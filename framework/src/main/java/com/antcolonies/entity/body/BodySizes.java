@@ -17,6 +17,8 @@ import net.minecraft.world.entity.EntityType;
  */
 public final class BodySizes {
     private static final Map<ResourceLocation, Float> FACTORS = new ConcurrentHashMap<>();
+    /** Each body's model length front to back at size factor 1 (blocks), for its length in play ({@link #modelLength}). */
+    private static final Map<ResourceLocation, Float> MODEL_LENGTHS = new ConcurrentHashMap<>();
 
     private BodySizes() {
     }
@@ -29,9 +31,27 @@ public final class BodySizes {
         FACTORS.put(body, factor);
     }
 
+    /**
+     * Signs up a body's size factor and its model's length front to back at factor 1 (blocks, jaws included): real
+     * sizes, step 2, reaches measured in body lengths ({@code AbstractAntEntity.bodyLength}).
+     */
+    public static void signUp(ResourceLocation body, float factor, float modelLength) {
+        if (!(modelLength > 0.0F)) {
+            throw new IllegalArgumentException("a body's model length must be above 0: " + body + " " + modelLength);
+        }
+        signUp(body, factor);
+        MODEL_LENGTHS.put(body, modelLength);
+    }
+
     /** The size factor of a body (1 if its mod signed none up). */
     public static float of(EntityType<?> type) {
         ResourceLocation id = BuiltInRegistries.ENTITY_TYPE.getKey(type);
         return id == null ? 1.0F : FACTORS.getOrDefault(id, 1.0F);
+    }
+
+    /** A body's model length at size factor 1 (blocks), or 0 if its mod signed none up (the red harvester ant). */
+    public static float modelLength(EntityType<?> type) {
+        ResourceLocation id = BuiltInRegistries.ENTITY_TYPE.getKey(type);
+        return id == null ? 0.0F : MODEL_LENGTHS.getOrDefault(id, 0.0F);
     }
 }

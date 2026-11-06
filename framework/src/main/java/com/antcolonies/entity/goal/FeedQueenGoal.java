@@ -166,10 +166,13 @@ public class FeedQueenGoal extends Goal {
             return;
         }
         if (ant.isFoodInCrop()) {
-            if (MouthToMouth.atMouth(ant, queen, REACH + Math.max(0.0, queen.getBbWidth() / 2.0 - 0.15))) {
+            Errand.At at = MouthToMouth.atMouth(ant, queen, REACH + Math.max(0.0, queen.getBbWidth() / 2.0 - 0.15));
+            if (at == Errand.At.THERE) {
                 errand.stop();
                 leg = Leg.PASS;
                 moment = 0;
+            } else if (at == Errand.At.STEPPING) {
+                // the last little step to her mouth
             } else if (!errand.walkOn(MouthToMouth.cellAtMouth(queen), 1.0) && !errand.walkOn(queen.blockPosition(), 1.0)) { // her mouth first
                 done = true;
             }

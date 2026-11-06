@@ -74,6 +74,8 @@ public class FightGoal extends Goal {
     private static final int SEARCH_EVERY = 60;
     /** Chasing one foe this long (ticks) without a blow at it, it leaves it a while ({@link #UNREACHABLE_TICKS}). */
     private static final int CHASE_TICKS = 200;
+    /** Real sizes, step 2: a foe this near sideways (blocks), its walk over, it steps straight at ({@link AbstractAntEntity#closeIn}). */
+    static final double CLOSE_IN_NEAR = 1.2;
     /** How fast (degrees a tick) it turns to face its foe. */
     private static final float TURN = 20.0F;
 
@@ -272,6 +274,13 @@ public class FightGoal extends Goal {
             unreachable.put(target.getUUID(), level.getGameTime() + UNREACHABLE_TICKS);
             foe = null;
             chasing = null;
+            return;
+        }
+        // Real sizes, step 2: beside it, its walk over, the last little bit straight at it (the jaws reach a third of its
+        // length, nearer than a walk to its cell brings it). Getting no nearer, it goes on as before (a new walk, or in
+        // the end it leaves the foe a while).
+        if (ant.closeIn(target.position(), CLOSE_IN_NEAR) == AbstractAntEntity.CloseIn.STEPPING) {
+            walkingTo = target.blockPosition();
             return;
         }
         BlockPos at = target.blockPosition();

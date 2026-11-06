@@ -112,6 +112,36 @@ public final class Errand<K> {
         return dx * dx + dz * dz <= reach * reach && dy > -below && dy < above;
     }
 
+    /** What {@link #at} found: at the thing, stepping the last little bit to it, or not there yet. */
+    public enum At {
+        THERE, STEPPING, NOT_YET
+    }
+
+    /**
+     * Real sizes, step 2 ({@code docs/plans/real-sizes.md}): whether it is at a thing to take it up (an egg, a body, a
+     * paralysed nestmate). There once its jaws touch it ({@link AbstractAntEntity#touches}); beside it (within
+     * {@code reach}, the reach every insect had before real sizes) with its walk over, it first steps the last little bit
+     * straight at it ({@link AbstractAntEntity#closeIn}); getting no nearer, or with the thing a level up or down it
+     * cannot step to, it takes it from where it stands, as before. While it steps, the goal starts no new walk. A body
+     * with no length signed up (the red harvester ant, until its rework) takes it within {@code reach} as before.
+     */
+    public At at(Entity thing, double reach) {
+        if (ant.bodyLength() <= 0.0) {
+            return within(thing, reach) ? At.THERE : At.NOT_YET; // (a body with no length signed up: as before, the harvester ant)
+        }
+        if (ant.touches(thing)) {
+            return At.THERE;
+        }
+        if (!within(thing, reach)) {
+            return At.NOT_YET;
+        }
+        return switch (ant.closeIn(thing.position(), reach)) {
+            case STEPPING -> At.STEPPING;
+            case NO_NEARER -> At.THERE;
+            case FAR -> ant.getNavigator().isDone() ? At.THERE : At.NOT_YET;
+        };
+    }
+
     /** Whether the body is in this very cell (packing a hole from under it, scraping soil in the shaft). */
     public boolean isIn(BlockPos cell) {
         return ant.blockPosition().equals(cell);

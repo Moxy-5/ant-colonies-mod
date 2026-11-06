@@ -152,8 +152,12 @@ public class MatabeleRaidGoal extends Goal {
             walkingTo = null;
             return;
         }
-        if (order.take() != null && column != null && level.getEntity(order.take()) instanceof net.minecraft.world.entity.Entity prey
-                && prey.distanceTo(ant) <= RaidColumn.PICK_REACH) {
+        net.minecraft.world.entity.Entity prey = order.take() != null && column != null ? level.getEntity(order.take()) : null;
+        int atPrey = prey instanceof net.minecraft.world.entity.LivingEntity stung ? atPrey(stung) : NOT_AT_PREY;
+        if (atPrey == STEPPING_TO_PREY) {
+            return; // (the last little bit straight at it)
+        }
+        if (atPrey == AT_PREY) {
             // Step 3c: at its stung termite: it stops, takes it up in its jaws, and stands a moment.
             ant.getNavigator().stop();
             ant.getLookControl().setLookAt(prey);
@@ -193,6 +197,31 @@ public class MatabeleRaidGoal extends Goal {
             }
         }
     }
+
+    /**
+     * Step 3c, at its stung termite to pick it up. Real sizes, step 2: its jaws on it (as in a fight, a little more
+     * downward into a broken tunnel; it used to take one up to 1.6 blocks off, three major lengths); beside it, its
+     * walk over, it steps the last little bit straight at it first; getting no nearer (a step of comb, a hole's edge), it
+     * takes it from where it stands, within {@link RaidColumn#PICK_REACH} as before real sizes.
+     */
+    private int atPrey(net.minecraft.world.entity.LivingEntity prey) {
+        if (ant.reachesInFight(prey)) {
+            return AT_PREY;
+        }
+        if (prey.distanceTo(ant) > RaidColumn.PICK_REACH) {
+            return NOT_AT_PREY;
+        }
+        AbstractAntEntity.CloseIn step = ant.closeIn(prey.position(), RaidColumn.PICK_REACH);
+        if (step == AbstractAntEntity.CloseIn.STEPPING) {
+            return STEPPING_TO_PREY;
+        }
+        return step == AbstractAntEntity.CloseIn.NO_NEARER ? AT_PREY : NOT_AT_PREY;
+    }
+
+    /** {@link #atPrey}: not there yet (it walks on), there (it picks it up), or stepping the last little bit. */
+    private static final int NOT_AT_PREY = 0;
+    private static final int AT_PREY = 1;
+    private static final int STEPPING_TO_PREY = 2;
 
     /**
      * Step 3Q, Q5: standing at its place, now and then it cleans an antenna (its species' {@code body_language.groom}

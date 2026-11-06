@@ -1273,9 +1273,100 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
                 && !isClimbing() && onGround() && !fightsNoMore();
     }
 
+    /**
+     * Real sizes, step 2 ({@code docs/plans/real-sizes.md}, audit 2): how far its jaws reach past its box, sideways: a
+     * third of its body's length (my pick, the jaws' reach; it keeps today's share, 0.35 blocks on the old 0.94-block
+     * major). A body with no length signed up (the red harvester ant, until its rework) keeps the old
+     * {@link #FIXED_JAW_REACH}.
+     */
+    public double jawReach() {
+        double length = bodyLength();
+        return length > 0.0 ? length / 3.0 : FIXED_JAW_REACH;
+    }
+
+    /** The jaws' reach of a body with no length signed up (blocks past its box): the reach every insect had before real sizes. */
+    public static final double FIXED_JAW_REACH = 0.35;
+
+    /**
+     * Real sizes, step 2: its body's length front to back in play (blocks, jaws included): its model's length times its
+     * game scale (a Matabele's own length in it); 0 if its mod signed no length up
+     * ({@link com.antcolonies.entity.body.BodySizes#signUp(net.minecraft.resources.ResourceLocation, float, float)}).
+     */
+    public double bodyLength() {
+        return com.antcolonies.entity.body.BodySizes.modelLength(getType()) * getScale();
+    }
+
     /** Whether its jaws and sting reach the foe (their boxes nearly touch; a little more downward, into a broken tunnel). */
     public boolean reachesInFight(LivingEntity target) {
-        return getBoundingBox().inflate(0.35, 0.2, 0.35).expandTowards(0.0, -0.6, 0.0).intersects(target.getBoundingBox());
+        double reach = jawReach();
+        return getBoundingBox().inflate(reach, 0.2, reach).expandTowards(0.0, -0.6, 0.0).intersects(target.getBoundingBox());
+    }
+
+    /**
+     * Real sizes, step 2: whether its jaws touch the thing, sideways within {@link #jawReach} of its box, and up or down
+     * within 0.2 (a soldier biting what touches it, a nurse at a body, picking a thing up).
+     */
+    public boolean touches(net.minecraft.world.entity.Entity thing) {
+        double reach = jawReach();
+        return getBoundingBox().inflate(reach, 0.2, reach).intersects(thing.getBoundingBox());
+    }
+
+    /** What {@link #closeIn} did this tick. */
+    public enum CloseIn {
+        /** It steps straight at the point. */
+        STEPPING,
+        /** Beside it, its walk over, but it can get no nearer (a step of comb, a wall's corner, a hole's edge, a second of trying). */
+        NO_NEARER,
+        /** Not beside it (farther than asked, a level up or down too far, or still walking a route): the mind walks it there. */
+        FAR
+    }
+
+    /** {@link #closeIn}: blocks up or down the point may be (lower: down in a broken tunnel, it leans over the edge). */
+    private static final double CLOSE_IN_UP = 0.5;
+    private static final double CLOSE_IN_DOWN = 1.5;
+    /** {@link #closeIn}: ticks without getting nearer before it counts as no nearer (as a walk's arriving gives up, a second). */
+    private static final int CLOSE_IN_TICKS = 20;
+    /** {@link #closeIn}: its pace for the last little bit (my pick: a careful step, slower than walking). */
+    private static final double CLOSE_IN_PACE = 0.8;
+    @Nullable
+    private Vec3 closingOn;
+    private double closingBest;
+    private int closingTicks;
+    private int closingAt = -2;
+
+    /**
+     * Real sizes, step 2: once its walk to a thing's cell is over, the last little bit straight at the point (within
+     * {@code near} blocks of it sideways; its legs step, {@link AntNavigator#stepToward}). A walk ends anywhere within
+     * 0.3 of a cell's middle, which reached a foe or a body when insects were big; at real sizes the jaws reach a third
+     * of a body length, so the mind asks for this step and acts once {@link #touches} (or {@link #reachesInFight}) says
+     * so. It tells how it went: {@link CloseIn#NO_NEARER} lets the mind fall back to the reach it had before real sizes,
+     * so nothing is ever stuck for want of a few hundredths of a block. Asked every tick while it is wanted (a gap of a
+     * tick starts it afresh).
+     */
+    public CloseIn closeIn(Vec3 point, double near) {
+        double dx = point.x - getX();
+        double dz = point.z - getZ();
+        double flat = Math.sqrt(dx * dx + dz * dz);
+        double dy = point.y - getY();
+        if (flat > near || dy > CLOSE_IN_UP || dy < -CLOSE_IN_DOWN || !navigator.isDone()) {
+            closingOn = null;
+            return CloseIn.FAR;
+        }
+        if (closingOn == null || closingAt < tickCount - 1 || closingOn.distanceToSqr(point) > 0.5 * 0.5) {
+            closingBest = flat;
+            closingTicks = 0;
+        } else if (flat < closingBest - 0.01) {
+            closingBest = flat;
+            closingTicks = 0;
+        } else {
+            closingTicks++;
+        }
+        closingOn = point;
+        closingAt = tickCount;
+        if (closingTicks > CLOSE_IN_TICKS || !navigator.stepToward(point, CLOSE_IN_PACE)) {
+            return CloseIn.NO_NEARER;
+        }
+        return CloseIn.STEPPING;
     }
 
     /**

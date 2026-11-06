@@ -141,10 +141,14 @@ public class GuardPostGoal extends Goal {
         }
     }
 
-    /** S1: a foe of the colony its jaws reach (their boxes nearly touch), which it may bite; null for none. */
+    /**
+     * S1: a foe of the colony its jaws reach (their boxes nearly touch), which it may bite; null for none. Real sizes,
+     * step 2: a third of its body's length past its box ({@link AbstractAntEntity#touches}; was a fixed 0.3 blocks).
+     */
     @Nullable
     private LivingEntity touchingFoe(ServerLevel level) {
-        for (LivingEntity foe : level.getEntitiesOfClass(LivingEntity.class, soldier.getBoundingBox().inflate(0.3, 0.2, 0.3), LivingEntity::isAlive)) {
+        double reach = soldier.jawReach();
+        for (LivingEntity foe : level.getEntitiesOfClass(LivingEntity.class, soldier.getBoundingBox().inflate(reach, 0.2, reach), LivingEntity::isAlive)) {
             if (foe != soldier && !(foe instanceof AbstractAntEntity insect && insect.isDowned())
                     && Fights.isFoe(colony.profile(), colony.getSpecies(), colony.getId(), foe) && Fights.mayAttack(soldier.profile(), foe)) {
                 return foe;

@@ -257,6 +257,47 @@ public class AntNavigator {
         return begin(shared.end().cell(), null, null, -1, null, shared, speed, AntPathFinder.StepCosts.NONE);
     }
 
+    /**
+     * Real sizes, step 2 ({@code docs/plans/real-sizes.md}): one tick of the last little bit straight at a point beside
+     * it on its own floor (a foe, a stung termite, a mouth), once a walk is over: a walk ends anywhere within
+     * {@link #ARRIVE_DISTANCE_SQR} of a cell's middle, while a small insect's jaws reach only a third of its length. The
+     * point may lie in its own cell, or in a neighbouring cell level with it that it fits into; one lower (down in a
+     * broken tunnel) or not to be stood in, it leans out as far as its own cell lets it, never stepping off its floor.
+     * False if it cannot step nearer now (walking a route, on a wall or a ceiling, in the air, or already as near as its
+     * cell lets it). Legs layer: the mind only says where; the steering is here, as {@link #arrive} walks to a middle.
+     */
+    public boolean stepToward(Vec3 point, double speed) {
+        if (route != null || at != null && !at.isFloor() || surface != Direction.DOWN || !ant.onGround() || ant.isClimbing()) {
+            return false;
+        }
+        BlockPos here = ant.blockPosition();
+        BlockPos there = BlockPos.containing(point.x, ant.getY() + 0.01, point.z);
+        if (Math.abs(there.getX() - here.getX()) > 1 || Math.abs(there.getZ() - here.getZ()) > 1) {
+            return false;
+        }
+        double x = point.x;
+        double z = point.z;
+        boolean fits = there.equals(here) || Foothold.isValid(new LevelCellMap(ant.level(), ant), there, Direction.DOWN)
+                && ant.level().noCollision(ant, ant.getBoundingBox().move(x - ant.getX(), 0.0, z - ant.getZ()));
+        if (!fits) {
+            // (leaning over a hole's edge or up to a wall: the middle of its body stays over its own cell, its box clear)
+            x = Mth.clamp(x, here.getX() + 0.01, here.getX() + 0.99);
+            z = Mth.clamp(z, here.getZ() + 0.01, here.getZ() + 0.99);
+            if (!ant.level().noCollision(ant, ant.getBoundingBox().move(x - ant.getX(), 0.0, z - ant.getZ()))) {
+                double half = ant.getBbWidth() / 2.0 + 0.01;
+                x = Mth.clamp(point.x, here.getX() + half, here.getX() + 1.0 - half);
+                z = Mth.clamp(point.z, here.getZ() + half, here.getZ() + 1.0 - half);
+            }
+        }
+        double dx = x - ant.getX();
+        double dz = z - ant.getZ();
+        if (dx * dx + dz * dz < 0.02 * 0.02) {
+            return false;
+        }
+        ant.getMoveControl().setWantedPosition(x, ant.getY(), z, speed);
+        return true;
+    }
+
     /** Stops walking. An insect on a wall keeps holding on where it is. */
     public void stop() {
         if (route != null) {

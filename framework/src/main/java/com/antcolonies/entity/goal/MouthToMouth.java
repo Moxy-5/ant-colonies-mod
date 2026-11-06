@@ -29,7 +29,11 @@ final class MouthToMouth {
     static final int SWALLOW_TICKS = 20;
     /** How long (ticks) the two stay head to head while the food is passed (my pick, to confirm). */
     static final int FEED_TICKS = 40;
-    /** How close (sideways, in blocks) the nurse's head must be to the other's mouth. */
+    /**
+     * How close (sideways, in blocks) the nurse's head must be to the other's mouth, for a body with no size in the size
+     * table (the harvester). A body with a size: its jaw reach plus a little ({@link #mouthReach}; real sizes, step 2, my
+     * pick).
+     */
     private static final double MOUTH_REACH = 0.45;
 
     private MouthToMouth() {
@@ -52,25 +56,42 @@ final class MouthToMouth {
 
     /**
      * Whether the nurse is head to head with the other: its head at the other's mouth; or, where it cannot get closer
-     * (its walk is over), within {@code reach} of the other's middle.
+     * (its walk is over), within {@code reach} of the other's middle. {@link Errand.At#STEPPING} while a sized nurse takes
+     * the last little step to the other's mouth (the goal then neither stops nor walks).
      */
-    static boolean atMouth(AbstractAntEntity nurse, Entity receiver, double reach) {
+    static Errand.At atMouth(AbstractAntEntity nurse, Entity receiver, double reach) {
         if (Math.abs(nurse.getY() - receiver.getY()) >= 1.5) {
-            return false;
+            return Errand.At.NOT_YET;
         }
         Vec3 head = nurse.headPoint();
         Vec3 mouth = mouthOf(receiver);
         double hx = head.x - mouth.x;
         double hz = head.z - mouth.z;
-        if (hx * hx + hz * hz <= MOUTH_REACH * MOUTH_REACH) {
-            return true;
+        double mouthReach = mouthReach(nurse);
+        if (hx * hx + hz * hz <= mouthReach * mouthReach) {
+            return Errand.At.THERE;
+        }
+        if (nurse.bodyLength() > 0.0) {
+            // The last little step a walk to a cell's middle cannot make: the nurse's middle to where its head meets the
+            // other's mouth (real sizes, step 2). Where it gets no nearer, the old reach of the middle below decides.
+            double headOut = Math.sqrt(Math.pow(head.x - nurse.getX(), 2) + Math.pow(head.z - nurse.getZ(), 2));
+            Vec3 away = new Vec3(nurse.getX() - mouth.x, 0.0, nurse.getZ() - mouth.z);
+            Vec3 stand = away.lengthSqr() < 1.0E-6 ? mouth : mouth.add(away.normalize().scale(headOut));
+            if (nurse.closeIn(new Vec3(stand.x, nurse.getY(), stand.z), 1.2) == AbstractAntEntity.CloseIn.STEPPING) {
+                return Errand.At.STEPPING;
+            }
         }
         double dx = nurse.getX() - receiver.getX();
         double dz = nurse.getZ() - receiver.getZ();
-        return nurse.getNavigator().isDone() && dx * dx + dz * dz <= reach * reach;
+        return nurse.getNavigator().isDone() && dx * dx + dz * dz <= reach * reach ? Errand.At.THERE : Errand.At.NOT_YET;
     }
 
-    /** The two turn to face each other (the queen too big to turn turns her head). */
+    /** How near the nurse's head must come to the other's mouth: a sized body its jaw reach plus a little. */
+    private static double mouthReach(AbstractAntEntity nurse) {
+        return nurse.bodyLength() > 0.0 ? nurse.jawReach() + 0.05 : MOUTH_REACH;
+    }
+
+        /** The two turn to face each other (the queen too big to turn turns her head). */
     static void faceEachOther(AbstractAntEntity nurse, Entity receiver) {
         Vec3 mouth = mouthOf(receiver);
         float yaw = (float) (Mth.atan2(mouth.z - nurse.getZ(), mouth.x - nurse.getX()) * Mth.RAD_TO_DEG) - 90.0F;

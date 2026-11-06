@@ -199,6 +199,11 @@ public class DefendGoal extends Goal {
             }
             return;
         }
+        // Real sizes, step 2: beside it, its walk over, the last little bit straight at it (see FightGoal).
+        if (soldier.closeIn(enemy.position(), CLOSE_IN_NEAR) == AbstractAntEntity.CloseIn.STEPPING) {
+            walkingTo = enemy.blockPosition();
+            return;
+        }
         BlockPos at = enemy.blockPosition();
         if (--replan <= 0 || soldier.getNavigator().isDone() || walkingTo == null || walkingTo.distSqr(at) > 2) {
             replan = CHASE_REPLAN;
@@ -216,10 +221,16 @@ public class DefendGoal extends Goal {
         }
     }
 
-    /** Whether the soldier's jaws reach the enemy (their boxes nearly touch). */
+    /**
+     * Whether the soldier's jaws reach the enemy (their boxes nearly touch). Real sizes, step 2: a third of its body's
+     * length past its box ({@link AbstractAntEntity#touches}; was a fixed 0.3 blocks).
+     */
     private boolean reaches(LivingEntity enemy) {
-        return soldier.getBoundingBox().inflate(0.3, 0.2, 0.3).intersects(enemy.getBoundingBox());
+        return soldier.touches(enemy);
     }
+
+    /** Real sizes, step 2: an enemy this near sideways (blocks), its walk over, it steps straight at. */
+    private static final double CLOSE_IN_NEAR = 1.2;
 
     /** Walks to the cell and stands in it facing the trouble (drumming once on arrival, if asked). */
     private void stand(BlockPos cell, BlockPos facing, boolean drumOnArrival) {

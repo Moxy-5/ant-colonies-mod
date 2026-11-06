@@ -27,7 +27,14 @@ public class StandByQueenGoal extends Goal {
     private static final double NEAR = 1.6;
     /** The court round the queen's head (mouth to mouth): how many places, and how far from her mouth. */
     private static final int COURT_PLACES = 5;
+    /**
+     * How far from her mouth a nurse's middle stands, for a body with no size in the size table (the harvester). A body
+     * with a size stands its own half length plus its jaw reach off, its head at her mouth ({@link #courtRadius}; real
+     * sizes, step 2, my pick).
+     */
     private static final double COURT_RADIUS = 0.45;
+    /** How near its court place a nurse with no size must stand; a sized one stands a third of its length off at most. */
+    private static final double COURT_THERE = 0.3;
 
     private final AbstractAntEntity ant;
     /** The walk to the queen (and to its place in her court). */
@@ -101,12 +108,21 @@ public class StandByQueenGoal extends Goal {
     private void standInTheCourt(AbstractAntEntity queen) {
         Vec3 mouth = queen.headPoint();
         int place = Math.floorMod(ant.getUUID().hashCode(), COURT_PLACES) - COURT_PLACES / 2;
-        Vec3 out = Vec3.directionFromRotation(0.0F, queen.yBodyRot + place * 40.0F).scale(COURT_RADIUS);
+        Vec3 out = Vec3.directionFromRotation(0.0F, queen.yBodyRot + place * 40.0F).scale(courtRadius());
         Vec3 spot = mouth.add(out);
         ant.getLookControl().setLookAt(mouth.x, mouth.y, mouth.z);
         double dx = ant.getX() - spot.x;
         double dz = ant.getZ() - spot.z;
-        boolean there = dx * dx + dz * dz <= 0.3 * 0.3 && Math.abs(ant.getY() - queen.getY()) < 1.5;
+        double thereReach = ant.bodyLength() > 0.0 ? ant.bodyLength() / 3.0 : COURT_THERE;
+        boolean there = dx * dx + dz * dz <= thereReach * thereReach && Math.abs(ant.getY() - queen.getY()) < 1.5;
+        if (!there && ant.bodyLength() > 0.0) {
+            // The last little step a walk to a cell's middle cannot make (real sizes, step 2).
+            AbstractAntEntity.CloseIn step = ant.closeIn(spot, 1.2);
+            if (step == AbstractAntEntity.CloseIn.STEPPING) {
+                return;
+            }
+            there = step == AbstractAntEntity.CloseIn.NO_NEARER;
+        }
         boolean nearEnough = !errand.isWalking() && errand.within(queen, NEAR);
         if (there || nearEnough && repath > 0) {
             errand.stop();
@@ -116,5 +132,11 @@ public class StandByQueenGoal extends Goal {
             }
             repath = 40; // not every tick if there is no way
         }
+    }
+
+    /** How far from the queen's mouth this nurse's middle stands: its head at her mouth. */
+    private double courtRadius() {
+        double length = ant.bodyLength();
+        return length > 0.0 ? length / 2.0 + ant.jawReach() : COURT_RADIUS;
     }
 }

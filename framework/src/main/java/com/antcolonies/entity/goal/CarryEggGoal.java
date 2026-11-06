@@ -133,13 +133,16 @@ public class CarryEggGoal extends Goal {
             return;
         }
         ant.getLookControl().setLookAt(egg);
-        if (errand.within(egg, REACH)) {
+        Errand.At at = errand.at(egg, REACH);
+        if (at == Errand.At.THERE) {
             colony.brood().releaseEgg(egg);
             egg.discard();
             egg = null;
             ant.setCarryingEgg(true);
             level.playSound(null, ant.blockPosition(), SoundEvents.ITEM_PICKUP, SoundSource.NEUTRAL, 0.15F, 1.6F);
             walkToSpot(); // (no room in the nursery after all: stop() puts the egg down)
+        } else if (at == Errand.At.STEPPING) {
+            // (real sizes, step 2: the last little bit straight at it)
         } else if (!errand.goTo(egg.getUUID(), egg.blockPosition(), 1.0)) {
             done = true; // no way to get there: let another ant have a go
         }

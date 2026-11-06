@@ -69,9 +69,9 @@ public final class InsectSizes {
     private InsectSizes() {
     }
 
-    /** Signs up every living savanna insect's size factor (once, while the mod loads). */
+    /** Signs up every living savanna insect's size factor and model length (once, while the mod loads). */
     public static void signUp() {
-        BY_MOB.forEach((mob, body) -> BodySizes.signUp(ResourceLocation.fromNamespaceAndPath(SavannaMod.MODID, mob), body.factor()));
+        BY_MOB.forEach((mob, body) -> BodySizes.signUp(ResourceLocation.fromNamespaceAndPath(SavannaMod.MODID, mob), body.factor(), body.drawnLength()));
     }
 
     /** Every body by its mob's name (for the checks). */

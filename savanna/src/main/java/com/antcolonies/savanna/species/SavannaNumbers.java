@@ -692,7 +692,7 @@ public final class SavannaNumbers {
                 Codec.INT.optionalFieldOf("most_real", 50).forGetter(ColumnNumbers::mostReal),
                 Codec.INT.optionalFieldOf("form_ticks", 600).forGetter(ColumnNumbers::formTicks),
                 Codec.INT.optionalFieldOf("least_form_ticks", 100).forGetter(ColumnNumbers::leastFormTicks),
-                Codec.DOUBLE.optionalFieldOf("spacing", 1.2).forGetter(ColumnNumbers::spacing),
+                Codec.DOUBLE.optionalFieldOf("spacing", 0.6).forGetter(ColumnNumbers::spacing),
                 Codec.INT.optionalFieldOf("single_file", 8).forGetter(ColumnNumbers::singleFile),
                 Codec.INT.optionalFieldOf("abreast", 3).forGetter(ColumnNumbers::abreast),
                 Codec.INT.optionalFieldOf("stretch", 8).forGetter(ColumnNumbers::stretch),

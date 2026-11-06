@@ -248,10 +248,13 @@ public class FeedLarvaGoal extends Goal {
             return;
         }
         if (ant.isFoodInCrop()) {
-            if (MouthToMouth.atMouth(ant, larva, reach())) {
+            Errand.At at = MouthToMouth.atMouth(ant, larva, reach());
+            if (at == Errand.At.THERE) {
                 errand.stop();
                 leg = Leg.PASS;
                 moment = 0;
+            } else if (at == Errand.At.STEPPING) {
+                // the last little step to its mouth
             } else if ((!errand.isWalking() || !larva.blockPosition().equals(larvaCell) && ticks % 20 == 0)
                     && !walkToLarva()) {
                 putBack(level);

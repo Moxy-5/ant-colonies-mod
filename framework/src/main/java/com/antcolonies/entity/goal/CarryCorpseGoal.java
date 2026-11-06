@@ -169,7 +169,8 @@ public class CarryCorpseGoal extends Goal {
             return;
         }
         ant.getLookControl().setLookAt(corpse);
-        boolean there = errand.within(corpse, REACH);
+        Errand.At at = errand.at(corpse, REACH);
+        boolean there = at == Errand.At.THERE;
         if (there && colony.refuse().mustCarryOut(corpse)) {
             // An old body or a stranger's: taken in the jaws and dragged out to a hole.
             dragging = corpse;
@@ -194,6 +195,8 @@ public class CarryCorpseGoal extends Goal {
             ant.setCarryingCorpse(true);
             level.playSound(null, ant.blockPosition(), SoundEvents.ITEM_PICKUP, SoundSource.NEUTRAL, 0.15F, 0.8F);
             walkToSpot(); // (no room after all: stop() puts the body down)
+        } else if (at == Errand.At.STEPPING) {
+            // (real sizes, step 2: the last little bit straight at it)
         } else if (!errand.goTo(corpse.getUUID(), corpse.blockPosition(), 1.0)) {
             done = true; // no way to get there: let another ant have a go
         }
@@ -210,13 +213,16 @@ public class CarryCorpseGoal extends Goal {
             return;
         }
         ant.getLookControl().setLookAt(paralysed);
-        if (errand.within(paralysed, REACH)) {
+        Errand.At at = errand.at(paralysed, REACH);
+        if (at == Errand.At.THERE) {
             colony.refuse().releaseBody(paralysed.getUUID());
             paralysed.discard();
             paralysed = null;
             ant.setCarryingCorpse(true);
             level.playSound(null, ant.blockPosition(), SoundEvents.ITEM_PICKUP, SoundSource.NEUTRAL, 0.15F, 0.8F);
             walkToSpot();
+        } else if (at == Errand.At.STEPPING) {
+            // (real sizes, step 2: the last little bit straight at it)
         } else if (!errand.goTo(paralysed.getUUID(), paralysed.blockPosition(), 1.0)) {
             done = true;
         }
