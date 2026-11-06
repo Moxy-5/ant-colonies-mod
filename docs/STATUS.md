@@ -38,3 +38,4 @@ Only rare test flakes (`docs/BUGS.md`); in play: the raid column freezing just o
 - **Overnight full run 2026-11-06:** 190 of 193; two test leaks fixed (BUGS 152, 154), one flake listed (153); termites stuck in a feeding spot's mud casts (BUGS 145) still open, for the follow-up session.
 - **Fix 2026-11-06 (BUGS 145):** termites no longer stand stuck at the mud casts of a feeding spot; one rarer case left (156, a nurse inside a cast).
 - **100-day soak done 2026-11-06:** 100 days with no hang, speed steady, saves not growing; finds mostly fixed in the night. Balance question for you: every Matabele colony starved in its first week.
+- **Overnight fixes merged into `master` 2026-11-06** (your OK, no new full run).
