@@ -271,9 +271,11 @@ public final class TreeLife {
             if (stages.get(i).stage() == stage) {
                 double start = stages.get(i).from();
                 double end = i + 1 < stages.size() ? stages.get(i + 1).from() : start + 1;
-                // Whole days only (the book counts days), every one of them inside the stage.
+                // Whole days only (the book counts days), every one of them inside the stage, with room for the part
+                // of today already gone (the stage is read from the days dead plus that part: BUGS 134, a roll on the
+                // stage's last day plus the afternoon moved a snag on into the next stage).
                 double done = fullStep(stage) > 0 ? start + (end - start) * slowPart(stage) : start;
-                long lo = (long) Math.ceil(done), hi = Math.max(lo, (long) Math.ceil(end) - 1);
+                long lo = (long) Math.ceil(done), hi = Math.max(lo, (long) Math.floor(end) - 1);
                 return lo + (long) Math.floor(roll * (hi - lo + 1));
             }
         }

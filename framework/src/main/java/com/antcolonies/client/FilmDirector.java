@@ -1,6 +1,7 @@
 package com.antcolonies.client;
 
 import java.io.IOException;
+import javax.annotation.Nullable;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -75,7 +76,8 @@ import net.neoforged.neoforge.event.tick.ServerTickEvent;
  * ant worker_ant walk             clear the floor, then one insect at the middle playing that clip, facing west
  * views walk 10 1.1               side (a burst of 10 frames), front, above and 3/4 shots of it, 1.1 blocks away
  *                                 (side and front level and from further off, like the lab's drawings)
- * walker worker_ant 0.5 -60 0.5 -90   clear the floor, then one insect that walks where it is sent (its goals taken
+ * walker worker_ant 0.5 -60 0.5 -90   (an optional sixth word adds saved data, e.g. BodyLength:15f)
+ *                                 clear the floor, then one insect that walks where it is sent (its goals taken
  *                                 away), standing at x y z facing that way; the game is left frozen
  * step 5                          the frozen game stepped 5 ticks, no picture
  * go 3 -58 0 1.0                  the walker walks its own route (the real legs: AntNavigator) to that cell
@@ -413,7 +415,7 @@ public final class FilmDirector {
             case "ant" -> putAnt(w[1], w[2]);
             case "views" -> views(w[1], w.length > 2 ? Integer.parseInt(w[2]) : 1,
                     w.length > 3 ? Double.parseDouble(w[3]) : 1.1);
-            case "walker" -> putWalker(w[1], w[2], w[3], w[4], w[5]);
+            case "walker" -> putWalker(w[1], w[2], w[3], w[4], w[5], w.length > 6 ? w[6] : null);
             case "freshclocks" -> freshClocks();
             case "forget" -> onWalker(mc, ant -> {
                 ant.forgetGoalsForFilm();
@@ -490,7 +492,7 @@ public final class FilmDirector {
      * place to the client every so many of its ticks, counted from when it came, so a walker that stood a few ticks
      * more or less in a running game (by timing luck) walked the same way but was drawn differently all scene.
      */
-    private static void putWalker(String type, String x, String y, String z, String yaw) {
+    private static void putWalker(String type, String x, String y, String z, String yaw, @Nullable String extra) {
         Deque<String> now = new ArrayDeque<>();
         now.add("cmd tick unfreeze");
         now.add("cmd kill @e[type=!player]");
@@ -501,8 +503,10 @@ public final class FilmDirector {
         // seen from its first tick, so its clips start then (filmed after another scene the camera may already be
         // looking there, filmed alone it is not)
         now.add(camera(Double.parseDouble(x) + 0.8, Double.parseDouble(y) + 0.55, Double.parseDouble(z) + 0.8, 135, 22));
-        now.add(String.format("cmd summon %s %s %s %s {PersistenceRequired:1b,Rotation:[%sf,0f],CustomName:'\"%s\"',UUID:%s}",
-                insect(type), x, y, z, yaw, WALKER, WALKER_ID));
+        // (an optional sixth word is more of the insect's saved data, e.g. BodyLength:15f for a Matabele, so an insect
+        // that rolls its own size gets the same one every launch: BUGS 137)
+        now.add(String.format("cmd summon %s %s %s %s {PersistenceRequired:1b,Rotation:[%sf,0f],CustomName:'\"%s\"',UUID:%s%s}",
+                insect(type), x, y, z, yaw, WALKER, WALKER_ID, extra == null ? "" : "," + extra));
         now.add("step 2");
         now.add("forget");
         now.add("step 40");

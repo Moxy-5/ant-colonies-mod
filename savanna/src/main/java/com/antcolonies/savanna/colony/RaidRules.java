@@ -165,6 +165,7 @@ public final class RaidRules {
             boolean away = !ant.blockPosition().closerThan(colony.getCenter(), HOME) && !colony.nest().isInside(level, ant.blockPosition());
             boolean excused = ant.getFightSpot() != null || ant.isParalysed()
                     || raid != null && raid.keepsNoHours() && raid.has(id)
+                    || raids.wasSentAnyHour(id) // (BUGS 123: a scout sent "anytime", by the command or the soak, keeps no hours)
                     || raids.isGoingHome(id) && look.stillFor(ant) < RAIDER_STILL;
             if (look.lasting(id.toString(), away && !excused) > OUT_AT_NIGHT) {
                 out.add(ant);

@@ -10,14 +10,14 @@ cmd kill @e[type=!player]
 cmd fill -3 -60 -3 3 -57 3 air
 cmd fill -2 -60 -2 1 -60 1 stone
 cmd fill -1 -60 -1 0 -60 0 air
-cmd summon antcolonies:matabele_major -0.02 -60 0.00 {Rotation:[0f,0f]}
-cmd summon antcolonies:matabele_major 0.01 -60 0.02 {Rotation:[45f,0f]}
-cmd summon antcolonies:matabele_major 0.00 -60 -0.02 {Rotation:[90f,0f]}
-cmd summon antcolonies:matabele_major 0.03 -60 0.01 {Rotation:[135f,0f]}
-cmd summon antcolonies:matabele_major -0.01 -60 0.03 {Rotation:[180f,0f]}
-cmd summon antcolonies:matabele_major 0.02 -60 -0.03 {Rotation:[225f,0f]}
-cmd summon antcolonies:matabele_major -0.03 -60 -0.01 {Rotation:[270f,0f]}
-cmd summon antcolonies:matabele_major 0.00 -60 0.04 {Rotation:[315f,0f]}
+cmd summon antcolonies:matabele_major -0.02 -60 0.00 {Rotation:[0f,0f],BodyLength:15f}
+cmd summon antcolonies:matabele_major 0.01 -60 0.02 {Rotation:[45f,0f],BodyLength:15f}
+cmd summon antcolonies:matabele_major 0.00 -60 -0.02 {Rotation:[90f,0f],BodyLength:15f}
+cmd summon antcolonies:matabele_major 0.03 -60 0.01 {Rotation:[135f,0f],BodyLength:15f}
+cmd summon antcolonies:matabele_major -0.01 -60 0.03 {Rotation:[180f,0f],BodyLength:15f}
+cmd summon antcolonies:matabele_major 0.02 -60 -0.03 {Rotation:[225f,0f],BodyLength:15f}
+cmd summon antcolonies:matabele_major -0.03 -60 -0.01 {Rotation:[270f,0f],BodyLength:15f}
+cmd summon antcolonies:matabele_major 0.00 -60 0.04 {Rotation:[315f,0f],BodyLength:15f}
 cmd tick freeze
 camera 0 -55.5 0.01 0 90
 fov 25

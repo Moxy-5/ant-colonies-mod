@@ -1408,6 +1408,11 @@ public class Raids {
         return sendNow(level, false);
     }
 
+    /** Whether this ant was sent by the command (or the soak) "anytime": it keeps no scouting hours on that trip (BUGS 123). */
+    public boolean wasSentAnyHour(UUID id) {
+        return sentAnyHour.contains(id);
+    }
+
     /**
      * The scout command: as {@link #sendNow(ServerLevel)}; R7: its find keeps the raid hours (after 19:00 it waits for
      * the morning) unless {@code anyHour} (its find raids at once, whatever the hour).

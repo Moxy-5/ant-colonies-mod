@@ -46,7 +46,9 @@ public final class RaidSoak implements Soak.Part {
     public List<Colony> subjects(ServerLevel level, BlockPos site, int radius) {
         List<Colony> ants = new ArrayList<>();
         for (Colony colony : ColonyManager.get(level).getColonies()) {
-            if (SavannaSpecies.MATABELE.equals(colony.getSpecies()) && sideways(colony.getCenter(), site) <= radius - 48
+            // (BUGS 139: was radius - 48, 80 blocks, and two seeds in four found no colony in 12 places with ones 83
+            // blocks off; once picked, the land round each watched colony is held by itself, so up to 16 short of the edge)
+            if (SavannaSpecies.MATABELE.equals(colony.getSpecies()) && sideways(colony.getCenter(), site) <= radius - 16
                     && !Raids.termiteColonies(level, colony.getCenter(), TERMITES_NEAR).isEmpty()) {
                 ants.add(colony);
             }
@@ -62,6 +64,11 @@ public final class RaidSoak implements Soak.Part {
             }
         }
         return picked;
+    }
+
+    @Override
+    public int stillSettling(ServerLevel level, BlockPos site, int radius) {
+        return NewLandMounds.stillWaiting(level, site, radius);
     }
 
     @Override

@@ -174,6 +174,29 @@ public class NewLandMounds extends SavedData {
         }
     }
 
+    /**
+     * The soak (BUGS 139): how many places within {@code radius} blocks of {@code site} wait to be put in though their
+     * land is loaded (their shapes still growing), counting places world generation queued and not looked at yet.
+     */
+    public static int stillWaiting(ServerLevel level, BlockPos site, int radius) {
+        int count = 0;
+        for (Queued q : QUEUE) {
+            if (q.dimension().equals(level.dimension()) && near(q.site().middle(), site, radius)) {
+                count++;
+            }
+        }
+        for (Site s : get(level).waiting) {
+            if (near(s.middle(), site, radius) && loadedRound(level, s.middle(), LOADED_ROUND)) {
+                count++;
+            }
+        }
+        return count;
+    }
+
+    private static boolean near(BlockPos a, BlockPos b, int radius) {
+        return Math.abs(a.getX() - b.getX()) <= radius && Math.abs(a.getZ() - b.getZ()) <= radius;
+    }
+
     private static boolean loadedRound(ServerLevel level, BlockPos middle, int round) {
         return level.hasChunksAt(middle.offset(-round, 0, -round), middle.offset(round, 0, round));
     }

@@ -30,8 +30,15 @@ for i in $(seq 1 "$shards"); do
     tasks="$tasks runGameTestShard$i"
 done
 echo "Game tests on $shards servers side by side${ANTCOLONIES_MODS:+ (mods: framework,$ANTCOLONIES_MODS)}${ANTCOLONIES_TESTS:+ (only: $ANTCOLONIES_TESTS)}; Gradle's output goes to run-test-shards/gradle.log"
+# The hang watchdog (tools/hang_watch.sh): a server silent for 12 minutes is thread-dumped and stopped, so a run can
+# never hang all night (it does not stop slow tests, only silent servers).
+rm -f run-test-shards/hangs.txt
+tools/hang_watch.sh run-test-shards gameTestShard "$shards" "${ANTCOLONIES_HANG_SECONDS:-720}" &
+watch_pid=$!
 ./gradlew $tasks -PtestShards="$shards" ${ANTCOLONIES_MODS:+-PspeciesMods="$ANTCOLONIES_MODS"} --continue > run-test-shards/gradle.log 2>&1
 gradle_exit=$?
+touch run-test-shards/.watch-stop
+wait $watch_pid 2>/dev/null
 
 echo
 failed=0
@@ -54,6 +61,12 @@ for i in $(seq 1 "$shards"); do
         failed=1
     fi
 done
+if [ -s run-test-shards/hangs.txt ]; then
+    echo
+    echo "The hang watchdog stopped these servers (look at their thread dumps; a new hang goes in docs/BUGS.md):"
+    sed 's/^/    /' run-test-shards/hangs.txt
+    failed=1
+fi
 minutes=$(( ($(date +%s) - start) / 60 ))
 seconds=$(( ($(date +%s) - start) % 60 ))
 echo

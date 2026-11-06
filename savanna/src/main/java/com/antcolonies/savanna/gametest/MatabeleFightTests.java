@@ -313,7 +313,10 @@ public class MatabeleFightTests {
             // Never camping (the user's bug of 2026-10-25): an ant sent to fight never stands in one block for half a
             // minute (it planned a way into the solid hay every tick and stood in a corner).
             for (MatabeleEntity ant : ants) {
-                if (!ant.isAlive() || ant.getFightSpot() == null) {
+                // (BUGS 106: one that fights no more, badly wounded with no nest to limp home to, rightly stands: a
+                // real hurt Megaponera waits to be rescued; this check is for ants that should fight)
+                if (!ant.isAlive() || ant.getFightSpot() == null || ant.fightsNoMore()) {
+                    standsAt.remove(ant.getUUID());
                     continue;
                 }
                 if (!ant.blockPosition().equals(standsAt.get(ant.getUUID()))) {

@@ -74,6 +74,15 @@ public final class Soak {
             return 1;
         }
 
+        /**
+         * How many places round {@code site} (within {@code radius} blocks) still wait for world generation's late work
+         * (new-land mounds and their colonies go in a little after their land loads, their shapes grown in the
+         * background); the soak waits for none before it looks for colonies (BUGS 139).
+         */
+        default int stillSettling(ServerLevel level, BlockPos site, int radius) {
+            return 0;
+        }
+
         /** Whether something worth a restart in the middle of is going on (a raid out). */
         boolean busy(ServerLevel level, List<Colony> subjects);
 
@@ -100,8 +109,11 @@ public final class Soak {
     static final int CHUNKS = 8;
     /** How long the land is given to be made and settle before the colonies are looked for (ticks; my pick). */
     static final int SETTLE = 2400;
+    /** And at most this long in real time for the late world generation round the site to finish (seconds; BUGS 139). */
+    static final int SETTLE_REAL_SECONDS = 180;
+    private static long settlingSince = -1;
     /** How many places are tried before the soak gives up finding colonies. */
-    static final int PLACES = 12;
+    static final int PLACES = 24;
     /** Pokes come every 1 to 5 game minutes (my pick). */
     static final int POKE_MIN = 1200;
     static final int POKE_MAX = 6000;
@@ -243,9 +255,20 @@ public final class Soak {
             return;
         }
         BlockPos site = site(level);
+        // (BUGS 139: the game runs flat out while finding, so SETTLE ticks are a few real seconds, too short for the
+        // mounds' shapes grown in the background: wait till none round the site is waiting, at most SETTLE_REAL.)
+        if (settlingSince < 0) {
+            settlingSince = System.nanoTime();
+        }
+        int settling = part.stillSettling(level, site, CHUNKS * 16);
+        if (settling > 0 && System.nanoTime() - settlingSince < SETTLE_REAL_SECONDS * 1_000_000_000L) {
+            return;
+        }
+        settlingSince = -1;
         List<Colony> picked = part.subjects(level, site, CHUNKS * 16);
         if (picked.isEmpty()) {
-            note(level.getServer(), "soak-pokes.txt", line(level, "no colonies to watch at " + site.toShortString() + ", trying further on"));
+            note(level.getServer(), "soak-pokes.txt", line(level, "no colonies to watch at " + site.toShortString() + " (" + settling
+                    + " places still waiting), trying further on"));
             holdLand(level, false);
             state.remove("siteX");
             state.remove("siteZ");

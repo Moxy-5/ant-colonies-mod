@@ -5,7 +5,7 @@
 cmd time set noon
 cmd weather clear
 lens 30
-walker matabele_major -2.5 -60 0.5 -90
+walker matabele_major -2.5 -60 0.5 -90 BodyLength:15f
 log clamped
 cmd antcolonies clamp dead 3
 step 60

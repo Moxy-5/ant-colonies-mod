@@ -297,8 +297,10 @@ public class MatabeleScoutGoal extends Goal {
 
     /** Out on its trip: smelling as it goes, walking out, then searching. */
     private void searchOn(ServerLevel level) {
-        boolean commanded = raids.wasSent(ant.getUUID());
-        if (ticks > numbers.tripTicks() + extraTicks || !commanded && !raids.isScoutingTime(level)) {
+        // (BUGS 123: only a scout sent "anytime" keeps no scouting hours; one the plain command sent keeps them, as
+        // its find's raid does, and goes home at 19:30 with the others)
+        boolean anyHour = raids.wasSentAnyHour(ant.getUUID());
+        if (ticks > numbers.tripTicks() + extraTicks || !anyHour && !raids.isScoutingTime(level)) {
             goHome(ticks > numbers.tripTicks() + extraTicks ? "its trip time is up" : "the scouting hours are over");
             return;
         }

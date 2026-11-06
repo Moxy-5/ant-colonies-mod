@@ -82,10 +82,18 @@ run_server() {
     fi
 }
 
+# The hang watchdog (tools/hang_watch.sh): a server silent for 10 minutes is thread-dumped and stopped; the loop
+# above then starts it again from its saved state, and the report lists every hang (run-soak/hangs.txt).
+tools/hang_watch.sh run-soak soakShard "$servers" "${ANTCOLONIES_HANG_SECONDS:-600}" &
+watch_pid=$!
+runners=""
 for i in $(seq 1 "$servers"); do
     run_server "$i" &
+    runners="$runners $!"
 done
-wait
+wait $runners
+touch run-soak/.watch-stop
+wait $watch_pid 2>/dev/null
 
 report="run-soak/soak-report.txt"
 {
@@ -100,6 +108,11 @@ report="run-soak/soak-report.txt"
         fi
         [ -f "run-soak/$i/soak-done" ] || echo "(not finished)"
     done
+    if [ -s run-soak/hangs.txt ]; then
+        echo
+        echo "=== hangs (the watchdog stopped these servers; each was started again) ==="
+        cat run-soak/hangs.txt
+    fi
 } > "$report"
 
 minutes=$(( ($(date +%s) - start) / 60 ))

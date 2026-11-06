@@ -2290,7 +2290,26 @@ public class AntNavigator {
         Direction.Axis along = sideAxis(wall);
         Vec3 here = pos();
         Vec3 point = with(new Vec3(here.x, y, here.z), wall.getAxis(), pinned(foothold.cell(), wall));
-        return with(point, along, clampIn(foothold.cell(), along, coord(here, along)));
+        return with(point, along, besideOpening(foothold.cell(), wall, along, clampIn(foothold.cell(), along, coord(here, along))));
+    }
+
+    /**
+     * docs/BUGS.md 135 (real sizes): a wall whose block has a channel opening facing the body (a tunnel mouth in the
+     * mound's shaft wall) is held on its solid rim beside the opening, the nearer side, never over the hole with
+     * nothing under the legs (a body wider than the opening covers it and stays where it is).
+     */
+    private double besideOpening(BlockPos cell, Direction wall, Direction.Axis along, double value) {
+        BlockPos held = cell.relative(wall);
+        BlockState state = ant.level().getBlockState(held);
+        if (!(state.getBlock() instanceof Channel channel) || !Channel.has(channel.openSides(ant.level(), held, state), wall.getOpposite())) {
+            return value;
+        }
+        double mid = held.get(along) + 0.5;
+        double band = Channel.HALF_WIDTH + half() + EPS;
+        if (band + half() > 0.5 || Math.abs(value - mid) >= band) {
+            return value; // too big to stand beside it (it covers it), or beside it already
+        }
+        return clampIn(cell, along, value < mid ? mid - band : mid + band);
     }
 
     /** The horizontal axis along a wall (sideways on it). */
