@@ -444,6 +444,16 @@ timings: all "my pick, to confirm" until then).
      as numbers take about 1.5 termites each from the termite colony there (at most 1,000 a raid) and bring them home onto
      the prey pile; the termites' count loses one in 1,000 of them, and they keep off the spot. Known change: a termite
      colony no longer dies from raids (it would take a million taken termites); the spot drying up is what limits them.
+     **Later: termites worn down until they die (the user, 2026-11-06; kept as built for testing for now).** The user:
+     "the whole point" is that the Matabele and the local wildlife slowly chip a termite colony down until it dries up,
+     and a player should be able to kill a mound set up near them; and the game's galleries are nowhere near a home for
+     a million termites. So 1,000 a counted termite is a testing number, not the end. To plan with the user then (my
+     ideas, nothing decided): the share a counted termite stands for shrinks with the colony (a young or dwindling colony
+     near 1 to 1, so raids really bite where the colony is weak); raids, aardvarks and pangolins (M9.5) and the player
+     wearing a colony down over days of play to a size where it starves or its queen goes unfed; and the player's ways
+     in (breaking into the royal chamber: the colony already dies when the queen dies). Check every number against the
+     others it meets (the balancer rule): how many raids, from how many Matabele nests, kill a mound in how many game
+     days, against how fast the termites grow back.
    - **3e The raid day.** 1 to 4 raids a day by hunger, mornings (6 to 11) and evenings (16 to 19:30), none at night or
      in heavy rain; a rare night raid in hot weather (the season asked of the shared source, fixed default for now).
      **Night scouting in the hot season** (the user, 2026-11-03): scouts search at night too, but only in the hot
