@@ -438,6 +438,12 @@ timings: all "my pick, to confirm" until then).
    - **3d The termites' losses.** Termites in the galleries round the spot are numbers until broken into
      (`HiddenTrips`), so a raid takes from the colony's real count; plugging, closing and danger memory (2f, 4g) dry
      the spot up, so later scouts hunt farther. Young termite colonies can die from repeated raids; big ones shrug it off.
+     **Built 2026-11-06** (branch `claude/m8-termite-losses`; the user's pick "count stands for many"; details in
+     `docs/DESIGN.md` "Step 3d, as built"): each counted termite stands for 1,000 real ones (`colony.stands_for`); the
+     raid is the colony's spare share (30 to 75 percent by hunger) for a rich find, at most 600 ants; the raiders going
+     as numbers take about 1.5 termites each from the termite colony there (at most 1,000 a raid) and bring them home onto
+     the prey pile; the termites' count loses one in 1,000 of them, and they keep off the spot. Known change: a termite
+     colony no longer dies from raids (it would take a million taken termites); the spot drying up is what limits them.
    - **3e The raid day.** 1 to 4 raids a day by hunger, mornings (6 to 11) and evenings (16 to 19:30), none at night or
      in heavy rain; a rare night raid in hot weather (the season asked of the shared source, fixed default for now).
      **Night scouting in the hot season** (the user, 2026-11-03): scouts search at night too, but only in the hot

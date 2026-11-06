@@ -277,7 +277,7 @@ public class MatabeleRaidTests {
                     RaidColumn raid = raids.raidForTests(level, at, 2, trail, scout.getUUID());
                     helper.assertTrue(raid != null, "no raid set out; " + raids.describe(level));
                     helper.assertTrue(raid.leader().equals(scout.getUUID()), "the raid is not led by the find's scout");
-                    helper.assertTrue(raid.members().size() == 10, "a raid of " + raid.members().size() + " real ants, not 10 (worth 2 at 4 an ant is 8, at least 10)");
+                    helper.assertTrue(raid.members().size() == 10, "a raid of " + raid.members().size() + " real ants, not 10 (worth 2 of a rich 6 is a third of the spare 15, at least 10)");
                     helper.assertTrue(flat(raid.gatheringPlace(), at) >= 4.0, "the gathering place is not short of the termites");
                     for (java.util.UUID id : raid.members()) {
                         if (level.getEntity(id) instanceof MatabeleEntity ant) {
@@ -504,7 +504,7 @@ public class MatabeleRaidTests {
      * Raid rework R2, the whole chain in one go, as in the user's world (BUGS 87): a big hungry colony in a dead
      * termite mound (120 workers, 50 of them real, every one starting inside down the chimney), the scout command's
      * scout finding termites feeding under three logs about 17 blocks out by itself, coming home with its own scent line
-     * (none put in by hand), and the raid it leads: at least the least raid of 10 real raiders (4 an ant for each termite smelt; raid rework R5: the scout counts the termites under all three logs, 5 or 6 of the
+     * (none put in by hand), and the raid it leads: at least the least raid of 10 real raiders (step 3d: the colony's spare share for a rich find; raid rework R5: the scout counts the termites under all three logs, 5 or 6 of the
      * 6, where it once scored them 3 to 6) come up out of the chimney, march, attack,
      * carry the stung termites home and go in. Every stage must end within its time (no stage may hang: the march of
      * about 17 blocks within 60 s), and at the end no raider stands about outside.

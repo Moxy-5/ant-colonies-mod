@@ -101,10 +101,17 @@ public class MatabeleAwayTests {
                     helper.assertTrue(colony.away().isAway(level), "the colony came back during the test");
                     helper.assertTrue(report.get(AwayReport.What.RAIDERS) >= 10, "a raid of only " + report.get(AwayReport.What.RAIDERS) + " set out");
                     helper.assertTrue(pile.broughtIn() > 0 && pile.edible() > 0, "the catch did not reach the prey pile" + pile.describe(level));
+                    // M8 step 3d: about per_raider termites a raider (real raids 200 to 1,000 with 150 to 550 ants), and
+                    // the termites' headcount losing only one in its stands_for of them (each counted termite stands for
+                    // many real ones; the remainder by dice, and a little slack for a natural death meanwhile).
+                    int brought = report.get(AwayReport.What.PREY_BROUGHT);
+                    int raiders = report.get(AwayReport.What.RAIDERS);
+                    helper.assertTrue(brought * 2 >= raiders, "a raid of " + raiders + " brought home only " + brought + " termites" + pile.describe(level));
                     int left = termites[0].population().inside(Caste.WORKER);
-                    helper.assertTrue(left < termitesBefore[0], "the termites lost no workers to the raid (" + left + " of " + termitesBefore[0] + ")");
-                    helper.assertTrue(termitesBefore[0] - left >= report.get(AwayReport.What.PREY_BROUGHT),
-                            "the raid brought home " + report.get(AwayReport.What.PREY_BROUGHT) + " termites, the termites lost only " + (termitesBefore[0] - left));
+                    int many = termites[0].population().standsFor();
+                    helper.assertTrue(many > 1, "a termite counted stands for only " + many);
+                    helper.assertTrue(termitesBefore[0] - left <= brought / many + 3, "the raid brought home " + brought
+                            + " termites, but the termites' count lost " + (termitesBefore[0] - left) + " (one counted stands for " + many + ")");
                     helper.assertTrue(termites[0].keepsOff(level, spot), "the termites do not keep off the spot they were raided at");
                     SavannaMod.LOGGER.info("[away raid test] home at {}: {}; {}", now, report.describe(), raids.describe(level));
                     helper.succeed();
@@ -113,5 +120,75 @@ public class MatabeleAwayTests {
                 }
             }
         });
+    }
+
+    /**
+     * M8 step 3d, the same scene near: a raid with more raiders than walk as real ants (the rest go along as numbers till
+     * step 4) takes about {@code per_raider} termites for each of those numbers from the termite colony feeding at the spot
+     * as the attack starts; the termites' count loses only one in its {@code stands_for} of them; the catch comes home onto
+     * the prey pile with the column, and the termites keep off the spot.
+     */
+    @GameTest(template = "arena", timeoutTicks = 12000, skyAccess = true, batch = "matabele_away")
+    public static void aNearRaidsNumbersTakeTermitesFromTheColonyAndBringThemHome(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        level.getServer().tickRateManager().setTickRate(2000.0F);
+        TestScenes.deepGround(helper);
+        TestClock.still(helper, 8.0); // (the morning raid hours)
+        Colony dead = NewLandMounds.get(level).put(level, helper.absolutePos(new BlockPos(MIDDLE, SURFACE, MIDDLE)), NewLandMounds.pickFor("dead", 30, 5L));
+        helper.assertTrue(dead != null, "no dead mound put in");
+        Colony colony = MatabeleCommands.makeColony(level, helper.absolutePos(new BlockPos(MIDDLE + 9, SURFACE, MIDDLE)), 200);
+        helper.assertTrue(colony != null, "no Matabele colony made");
+        Raids raids = colony.part(SavannaParts.RAIDS).orElseThrow();
+        PreyPile pile = colony.part(SavannaParts.PREY_PILE).orElseThrow();
+        BlockPos queenAt = helper.absolutePos(new BlockPos(54, SURFACE, 54));
+        helper.spawn(SavannaEntities.TERMITE_QUEEN.get(), 54, SURFACE, 54);
+        BlockPos spot = helper.absolutePos(new BlockPos(44, SURFACE, 44));
+        Colony[] termites = new Colony[1];
+        int[] termitesBefore = new int[1];
+        com.antcolonies.savanna.colony.RaidColumn[] column = new com.antcolonies.savanna.colony.RaidColumn[1];
+        helper.startSequence()
+                .thenIdle(10)
+                .thenExecute(() -> {
+                    termites[0] = ColonyManager.get(level).getColonies().stream()
+                            .filter(other -> SavannaSpecies.MACROTERMES.equals(other.getSpecies()) && other.getCenter().closerThan(queenAt, 6))
+                            .findFirst().orElse(null);
+                    helper.assertTrue(termites[0] != null, "no termite colony founded by the queen");
+                    termites[0].population().setOnForTests(true);
+                    termites[0].population().addNewMembers(Caste.WORKER, level.getGameTime(), 3000);
+                    termitesBefore[0] = termites[0].population().inside(Caste.WORKER);
+                    BlockPos entrance = colony.getCenter();
+                    java.util.List<BlockPos> trail = new java.util.ArrayList<>();
+                    int steps = (int) Math.ceil(Math.hypot(spot.getX() - entrance.getX(), spot.getZ() - entrance.getZ()) / 2.0);
+                    for (int i = 0; i <= steps; i++) {
+                        double t = i / (double) steps;
+                        int x = entrance.getX() + (int) Math.round((spot.getX() - entrance.getX()) * t);
+                        int z = entrance.getZ() + (int) Math.round((spot.getZ() - entrance.getZ()) * t);
+                        trail.add(level.getHeightmapPos(net.minecraft.world.level.levelgen.Heightmap.Types.MOTION_BLOCKING_NO_LEAVES,
+                                new BlockPos(x, entrance.getY(), z)));
+                    }
+                    helper.assertTrue(raids.isHungry(), "the Matabele colony is not hungry with an empty pile");
+                    column[0] = raids.raidForTests(level, spot, 12, trail, null);
+                    helper.assertTrue(column[0] != null, "no raid set out; " + raids.describe(level));
+                    SavannaMod.LOGGER.info("[near catch test] set out: {}", column[0].describe());
+                })
+                .thenWaitUntil(() -> helper.assertTrue(column[0].stage().ordinal() >= com.antcolonies.savanna.colony.RaidColumn.Stage.ATTACKING.ordinal(),
+                        "the column did not reach the spot; " + column[0].describe()))
+                .thenExecute(() -> {
+                    int hidden = column[0].hiddenCatch();
+                    helper.assertTrue(hidden >= 50, "the raiders going as numbers took only " + hidden + " termites; " + column[0].describe());
+                    int many = termites[0].population().standsFor();
+                    int lost = termitesBefore[0] - termites[0].population().inside(Caste.WORKER);
+                    helper.assertTrue(lost <= hidden / many + 1, hidden + " termites taken, but the termites' count lost " + lost
+                            + " (one counted stands for " + many + ")");
+                })
+                .thenWaitUntil(() -> helper.assertTrue(raids.column() != column[0], "the raid is not home yet; " + column[0].describe()))
+                .thenExecute(() -> {
+                    int hidden = column[0].hiddenCatch();
+                    helper.assertTrue(pile.broughtIn() >= hidden, hidden + " termites taken by the numbers, but " + pile.broughtIn()
+                            + " laid on the pile" + pile.describe(level));
+                    helper.assertTrue(termites[0].keepsOff(level, spot), "the termites do not keep off the spot they were raided at");
+                    SavannaMod.LOGGER.info("[near catch test] home: {}; {}", column[0].describe(), pile.describe(level));
+                })
+                .thenSucceed();
     }
 }

@@ -14,9 +14,11 @@ import org.jetbrains.annotations.Nullable;
 
 import com.antcolonies.colony.Caste;
 import com.antcolonies.colony.Colony;
+import com.antcolonies.colony.ColonyManager;
 import com.antcolonies.entity.AbstractAntEntity;
 import com.antcolonies.savanna.SavannaSpecies;
 import com.antcolonies.savanna.entity.MatabeleEntity;
+import com.antcolonies.savanna.registry.SavannaEntities;
 import com.antcolonies.savanna.species.SavannaNumbers;
 
 import net.minecraft.core.BlockPos;
@@ -534,10 +536,11 @@ public class Raids {
      */
     private void raidHome(ServerLevel level, RaidColumn raid) {
         Raids.Find find = raid.find();
+        bringHiddenHome(level, raid);
         if (!finds.contains(find)) {
             return;
         }
-        if (raid.carried() > 0) {
+        if (raid.carried() > 0 || raid.hiddenCatch() > 0) {
             find.checkedAt = level.getGameTime();
             find.misses = 0;
         } else if (raid.lostTrail() || raid.lostFromSight()) {
@@ -548,6 +551,27 @@ public class Raids {
         } else if (raid.foundNothing()) {
             foundEmpty(level, find); // (they were there and found nothing)
         }
+    }
+
+    /**
+     * M8 step 3d: what the raiders going as numbers took under the mud comes home with the column: onto the prey pile (out
+     * of sight: they are numbers), and the termite colony remembers the attack (its danger map: it keeps off the spot a
+     * few days and plugs the holes there, brain step 4g), as the real raiders' stings already tell it.
+     */
+    private void bringHiddenHome(ServerLevel level, RaidColumn raid) {
+        int hidden = raid.hiddenCatch();
+        if (hidden <= 0) {
+            return;
+        }
+        PreyPile pile = colony.part(SavannaParts.PREY_PILE).orElse(null);
+        if (pile != null) {
+            pile.bringIn(level, null, hidden);
+        }
+        Colony termites = raid.hiddenFrom() == null ? null : ColonyManager.get(level).getColony(raid.hiddenFrom());
+        if (termites != null) {
+            termites.danger().hurt(level, raid.find().at(), SavannaEntities.MATABELE_MAJOR.get().toShortString(), true);
+        }
+        say(level, "the raiders going as numbers bring " + hidden + " termite(s) home" + (pile == null ? "" : pile.describe(level)));
     }
 
     /** The last raid home, or null (tests and the colony list). */
@@ -1263,9 +1287,10 @@ public class Raids {
     }
 
     /**
-     * How many ants a raid to this find takes: {@code ants_per_worth} for each termite smelt there, at least
-     * {@code least_raid}, and never more than the colony can spare: a share of its workers from {@code least_share}
-     * (well fed) to {@code most_share} (starving), by its hunger (real raids take 30 to 75 percent of a colony, Yusuf 2026).
+     * How many ants a raid to this find takes (M8 step 3d): the share of its workers the colony can spare, from
+     * {@code least_share} (well fed) to {@code most_share} (starving), by its hunger (real raids take 30 to 75 percent of a
+     * colony, Yusuf 2026); all of it for a find worth {@code rich_worth} or more, less for a poorer one; at least
+     * {@code least_raid}, at most {@code raids.catch.most_raid} (real raids 150 to 550 ants).
      */
     public int raidSize(Find find) {
         SavannaNumbers.ColumnNumbers numbers = columnNumbers();
@@ -1276,7 +1301,9 @@ public class Raids {
         double fed = fedShare();
         double share = numbers.leastShare() + (numbers.mostShare() - numbers.leastShare()) * (1.0 - fed);
         int spare = Math.max(1, (int) Math.floor(workers * share));
-        return Math.min(spare, Math.max(numbers.leastRaid(), find.worth * numbers.antsPerWorth()));
+        double rich = Math.min(1.0, find.worth / Math.max(0.1, numbers.richWorth()));
+        int mostRaid = RaidCatch.numbers(colony).mostRaid();
+        return Math.min(Math.min(spare, mostRaid), Math.max(numbers.leastRaid(), (int) Math.round(spare * rich)));
     }
 
     /**

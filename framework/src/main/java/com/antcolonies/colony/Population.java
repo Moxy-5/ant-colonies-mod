@@ -297,6 +297,38 @@ public class Population {
     }
 
     /**
+     * How many real insects each counted member stands for (the profile's {@code colony.stands_for}, at least 1; M8 step
+     * 3d, the user's "count stands for many": termites 1,000).
+     */
+    public int standsFor() {
+        return Math.max(1, numbers().standsFor());
+    }
+
+    /**
+     * M8 step 3d: whether one real insect taken by hunters costs a counted member: always where each counted member is one
+     * insect, else one time in {@link #standsFor} (the rest came from the many it stands for). Dice from the colony's own.
+     */
+    public boolean takenCostsOne() {
+        int many = standsFor();
+        return many <= 1 || colony.random().nextInt(many) == 0;
+    }
+
+    /**
+     * M8 step 3d, the termites' losses: hunters took {@code real} real insects of this caste out of sight (a raid's catch
+     * from the termites feeding under the mud, who are numbers in their galleries). Each counted member stands for
+     * {@link #standsFor} real ones, so the headcount loses {@code real / standsFor}, the odd part by chance (fair on the
+     * whole: no remainder to save), never more than are inside. Returns the counted members lost.
+     */
+    public int loseToHunters(ServerLevel level, String caste, int real, AwayReport.What why) {
+        if (real <= 0) {
+            return 0;
+        }
+        int many = standsFor();
+        int counted = real / many + (colony.random().nextInt(many) < real % many ? 1 : 0);
+        return counted <= 0 ? 0 : loseInside(level, caste, counted, why);
+    }
+
+    /**
      * Up to {@code count} numbers of this caste die out of sight, any age (picked at random by how many of each age
      * there are), taken out of the headcount; the away report counts them under {@code why}. No body is owed (they fell
      * outside the nest). Returns how many died (never more than there are inside). Species-neutral: brain step 4g's

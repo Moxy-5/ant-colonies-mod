@@ -1228,13 +1228,19 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
 
     /**
      * A hunter carries it off where it lay paralysed (M8 step 3c: the Matabele take stung termites home to eat): it leaves
-     * its colony's headcount and the world.
+     * its colony's headcount and the world. M8 step 3d: where each counted member stands for many real insects (the
+     * profile's {@code colony.stands_for}), the one carried off was one of those many: only one time in so many does the
+     * headcount lose it; else it goes back into the numbers inside (counted already) as it leaves the world.
      */
     public void carriedOff(ServerLevel level) {
         Colony colony = getColonyId() == null ? null : ColonyManager.get(level).getColony(getColonyId());
         String caste = nestCaste();
         if (colony != null && caste != null) {
-            colony.setCount(caste, Math.max(0, colony.getCount(caste) - 1));
+            if (colony.population().takenCostsOne()) {
+                colony.setCount(caste, Math.max(0, colony.getCount(caste) - 1));
+            } else {
+                colony.away().foldInNow(level, this);
+            }
             ColonyManager.get(level).markChanged();
         }
         discard();

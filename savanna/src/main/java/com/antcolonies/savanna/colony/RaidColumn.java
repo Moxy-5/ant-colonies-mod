@@ -193,6 +193,13 @@ public final class RaidColumn {
     private int carriers;
     private boolean spread;
     /**
+     * M8 step 3d: the termites the raiders going as numbers took from under the mud at the attack (taken from the termite
+     * colony's numbers, {@link RaidCatch}), brought home with the column, and that termite colony.
+     */
+    private int hiddenCatch;
+    @Nullable
+    private UUID hiddenFrom;
+    /**
      * The raiders let go of the column out in the field since the colony last asked ({@link #takeLetGo}), and why: the
      * hurt, the stuck, the leftovers when the time at home ran out, a raid lost from sight. The colony's raids send each
      * one home along the trail ({@link WayHome}; the raid code review, finding 2, BUGS 88).
@@ -1044,6 +1051,7 @@ public final class RaidColumn {
 
     private void end(String why) {
         say("the raid is over: " + why + ", " + cameHome + " came home, " + carried + " termite(s) carried"
+                + (hiddenCatch > 0 ? " and " + hiddenCatch + " by the raiders going as numbers" : "")
                 + (lost.isEmpty() ? "" : ", lost on the way: " + lost));
         stage = Stage.DONE;
         ended = why;
@@ -1583,10 +1591,48 @@ public final class RaidColumn {
             next(Stage.ATTACKING, now);
             attackedAt = now;
             gatheredAtAttack = there;
+            takeHidden(level);
             for (MatabeleEntity ant : ants) {
                 sendIn(ant);
             }
         }
+    }
+
+    /**
+     * M8 step 3d: as the attack starts, the raiders going as numbers break into the galleries round the spot and take the
+     * termites feeding under the mud there ({@link RaidCatch}), if the termite colony still feeds there; brought home with
+     * the column ({@code Raids.raidHome}).
+     */
+    private void takeHidden(ServerLevel level) {
+        if (numbersAlong <= 0) {
+            return;
+        }
+        int reach = colony.profile().section(SavannaNumbers.AWAY_RAIDS).orElse(SavannaNumbers.AwayRaidNumbers.DEFAULT).termiteReach();
+        Colony termites = RaidCatch.termitesAt(level, find.at(), reach);
+        if (termites == null || termites.keepsOff(level, find.at())) {
+            say("the " + numbersAlong + " raiders going as numbers find no termites feeding under the mud here"
+                    + (termites == null ? " (no termite colony near)" : " (the termites keep off the spot)"));
+            return;
+        }
+        int wanted = RaidCatch.couldCarry(colony, numbersAlong, colony.random());
+        int most = RaidCatch.mostToTake(colony, termites);
+        hiddenCatch = Math.min(wanted, most);
+        hiddenFrom = termites.getId();
+        int countLost = RaidCatch.take(level, termites, hiddenCatch);
+        say("the " + numbersAlong + " raiders going as numbers take " + hiddenCatch + " termite(s) from under the mud (of " + wanted
+                + " they could carry, at most " + most + "); the termite colony's count lost " + countLost + ", each counted termite standing for "
+                + termites.population().standsFor());
+    }
+
+    /** M8 step 3d: the termites the raiders going as numbers took at the attack (brought home with the column). */
+    public int hiddenCatch() {
+        return hiddenCatch;
+    }
+
+    /** M8 step 3d: the termite colony the raiders going as numbers took termites from, or null. */
+    @Nullable
+    UUID hiddenFrom() {
+        return hiddenFrom;
     }
 
     /** Everyone to a place round the gathering place, a little back toward home; how many are there now. */
@@ -1968,6 +2014,9 @@ public final class RaidColumn {
         StringBuilder line = new StringBuilder("; a raid of ").append(size).append(" (").append(members.size()).append(" real out")
                 .append(numbersAlong > 0 ? ", " + numbersAlong + " as numbers" : "").append(") ").append(stage.name().toLowerCase())
                 .append(" to ").append(find.at().toShortString());
+        if (hiddenCatch > 0) {
+            line.append(", ").append(hiddenCatch).append(" termite(s) taken by the numbers");
+        }
         if (carried > 0 || spread) {
             line.append(", carrying ").append(carried).append(" termite(s)").append(spread ? ", spread out round the spot" : "");
         }

@@ -41,6 +41,7 @@ public final class SavannaNumbers {
     public static final SpeciesSection<SearchNumbers> SEARCH = SpeciesSection.signUp("raids.search", SearchNumbers.CODEC);
     public static final SpeciesSection<HoursSoundNumbers> HOURS_SOUND = SpeciesSection.signUp("raids.hours_and_sound", HoursSoundNumbers.CODEC);
     public static final SpeciesSection<AwayRaidNumbers> AWAY_RAIDS = SpeciesSection.signUp("raids.away", AwayRaidNumbers.CODEC);
+    public static final SpeciesSection<CatchNumbers> CATCH = SpeciesSection.signUp("raids.catch", CatchNumbers.CODEC);
 
     private SavannaNumbers() {
     }
@@ -636,9 +637,9 @@ public final class SavannaNumbers {
      * every player) raids as numbers by the same rules as the real column (the raid hours, hunger, the find's worth, the
      * raid's size), the time from the distance: the column walks out at {@code pace} blocks a second (the march in surges,
      * slower than one ant) after mustering at the entrance ({@code column.form_ticks}), attacks {@code fightTicks}, regroups
-     * and walks home laden ({@code carry.laden_pace}). It brings home {@code catchPerRaider} termites a raider (the loads:
-     * majors 4 to 10, minors 1 to 3, not every raider carrying), never more than {@code mostTakeShare} of the termite
-     * colony's workers inside its nest, taken from its numbers (the workers feeding under the mud at the spot). A share
+     * and walks home laden ({@code carry.laden_pace}). It brings home {@code raids.catch.per_raider} termites a raider
+     * ({@link CatchNumbers}), never more than {@code mostTakeShare} of the real termites the termite colony's workers
+     * inside stand for, taken from its numbers (the workers feeding under the mud at the spot; M8 step 3d). A share
      * {@code lostShare} of the raiders dies, {@code hurtShare} comes home hurt. At most {@code mostRaidsADay} raids a day
      * (1 to 4, Yusuf 2026). A raid leaves only if its attack starts before dusk. A spot is the termite colony's within
      * {@code termiteReach} blocks of its mound's middle. No raid out of sight to a spot a player is within
@@ -647,14 +648,13 @@ public final class SavannaNumbers {
      * not know yet within its reach (the termite colony's ways out to food), scored {@code scoutWorthLeast} to
      * {@code scoutWorthMost}. Every number my pick, to confirm.
      */
-    public record AwayRaidNumbers(double pace, int fightTicks, double catchPerRaider, double mostTakeShare, double lostShare,
+    public record AwayRaidNumbers(double pace, int fightTicks, double mostTakeShare, double lostShare,
                                   double hurtShare, int mostRaidsADay, int termiteReach, int playerNear, double scoutFindChance,
                                   int scoutWorthLeast, int scoutWorthMost) {
-        public static final AwayRaidNumbers DEFAULT = new AwayRaidNumbers(1.5, 1200, 1.5, 0.1, 0.01, 0.03, 4, 80, 64, 0.25, 6, 18);
+        public static final AwayRaidNumbers DEFAULT = new AwayRaidNumbers(1.5, 1200, 0.1, 0.01, 0.03, 4, 80, 64, 0.25, 6, 18);
         public static final Codec<AwayRaidNumbers> CODEC = RecordCodecBuilder.create(i -> i.group(
                 Codec.DOUBLE.optionalFieldOf("pace", DEFAULT.pace()).forGetter(AwayRaidNumbers::pace),
                 Codec.INT.optionalFieldOf("fight_ticks", DEFAULT.fightTicks()).forGetter(AwayRaidNumbers::fightTicks),
-                Codec.DOUBLE.optionalFieldOf("catch_per_raider", DEFAULT.catchPerRaider()).forGetter(AwayRaidNumbers::catchPerRaider),
                 Codec.DOUBLE.optionalFieldOf("most_take_share", DEFAULT.mostTakeShare()).forGetter(AwayRaidNumbers::mostTakeShare),
                 Codec.DOUBLE.optionalFieldOf("lost_share", DEFAULT.lostShare()).forGetter(AwayRaidNumbers::lostShare),
                 Codec.DOUBLE.optionalFieldOf("hurt_share", DEFAULT.hurtShare()).forGetter(AwayRaidNumbers::hurtShare),
@@ -668,11 +668,30 @@ public final class SavannaNumbers {
     }
 
     /**
+     * M8 step 3d, the termites' losses ({@code colony.RaidCatch}; the user's "count stands for many", 2026-11-06): real
+     * raids carry home about 200 to 1,000 termites with 150 to 550 ants, a few termites an ant (majors 1 to 12, minors 1 to
+     * 3; Yusuf 2026, Table 1). The raiders that go as numbers (and every raider of a raid out of sight) each bring home
+     * about {@code perRaider} termites (a quarter more or less, by chance) from the termites feeding under the mud there,
+     * who are numbers in the termite colony's galleries; a raid brings home at most {@code mostCatch} so; no raid is more
+     * than {@code mostRaid} ants (real raiding parties 20 to 500 or so). The termite colony's headcount loses one in
+     * {@code colony.stands_for} of them ({@code Population.loseToHunters}). Every number my pick, to confirm.
+     */
+    public record CatchNumbers(double perRaider, int mostCatch, int mostRaid) {
+        public static final CatchNumbers DEFAULT = new CatchNumbers(1.5, 1000, 600);
+        public static final Codec<CatchNumbers> CODEC = RecordCodecBuilder.create(i -> i.group(
+                Codec.DOUBLE.optionalFieldOf("per_raider", DEFAULT.perRaider()).forGetter(CatchNumbers::perRaider),
+                Codec.INT.optionalFieldOf("most_catch", DEFAULT.mostCatch()).forGetter(CatchNumbers::mostCatch),
+                Codec.INT.optionalFieldOf("most_raid", DEFAULT.mostRaid()).forGetter(CatchNumbers::mostRaid)
+        ).apply(i, CatchNumbers::new));
+    }
+
+    /**
      * M8 step 3b, the raid column ({@code colony.RaidColumn}; real Megaponera: the scout home from a find recruits a raid
-     * in proportion to the termites it found, Frank et al. 2018, and leads it out along its scent line). The raid's size:
-     * {@code antsPerWorth} ants for each point of the find's worth, at least {@code leastRaid}, and never more than a share
-     * of the colony's workers, from {@code leastShare} for a fed colony to {@code mostShare} for a starving one (30 to 75
-     * percent, Yusuf 2026); at most {@code mostReal} of them walk as real ants, the rest are numbers till step 4. The
+     * in proportion to the termites it found, Frank et al. 2018, and leads it out along its scent line). The raid's size
+     * (M8 step 3d): the share of the colony's workers it can spare, from {@code leastShare} for a fed colony to
+     * {@code mostShare} for a starving one (30 to 75 percent, Yusuf 2026), all of it for a find worth {@code richWorth} or
+     * more (a by-day feeding place, or two termites seen), a part for a poorer one, at least {@code leastRaid}, at most
+     * {@code raids.catch.most_raid}; at most {@code mostReal} of them walk as real ants, the rest are numbers till step 4. The
      * recruits gather at the entrance at least {@code leastFormTicks} and at most {@code formTicks}. On the march they
      * keep {@code spacing} blocks apart, single file for the first {@code singleFile} blocks of the trail, then up to
      * {@code abreast} side by side; the scout at the front waits when the ants keeping up are strung out more than
@@ -681,11 +700,11 @@ public final class SavannaNumbers {
      * regroups there (at most {@code regroupTicks}) and walks home, everyone home or let go after {@code homeTicks}.
      * Every number my pick, to confirm.
      */
-    public record ColumnNumbers(int antsPerWorth, int leastRaid, double leastShare, double mostShare, int mostReal, int formTicks,
+    public record ColumnNumbers(double richWorth, int leastRaid, double leastShare, double mostShare, int mostReal, int formTicks,
                                 int leastFormTicks, double spacing, int singleFile, int abreast, int stretch, int stopShort,
                                 int gatherTicks, int fightTicks, int regroupTicks, int homeTicks) {
         public static final Codec<ColumnNumbers> CODEC = RecordCodecBuilder.create(i -> i.group(
-                Codec.INT.optionalFieldOf("ants_per_worth", 4).forGetter(ColumnNumbers::antsPerWorth),
+                Codec.DOUBLE.optionalFieldOf("rich_worth", 6.0).forGetter(ColumnNumbers::richWorth),
                 Codec.INT.optionalFieldOf("least_raid", 10).forGetter(ColumnNumbers::leastRaid),
                 Codec.DOUBLE.optionalFieldOf("least_share", 0.3).forGetter(ColumnNumbers::leastShare),
                 Codec.DOUBLE.optionalFieldOf("most_share", 0.75).forGetter(ColumnNumbers::mostShare),

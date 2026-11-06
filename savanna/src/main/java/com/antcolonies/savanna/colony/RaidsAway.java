@@ -11,7 +11,6 @@ import com.antcolonies.colony.Caste;
 import com.antcolonies.colony.Colony;
 import com.antcolonies.colony.ColonyManager;
 import com.antcolonies.colony.FoodWays;
-import com.antcolonies.savanna.SavannaSpecies;
 import com.antcolonies.savanna.entity.TermiteSoldierEntity;
 import com.antcolonies.savanna.registry.SavannaEntities;
 import com.antcolonies.savanna.species.SavannaNumbers;
@@ -216,7 +215,8 @@ public final class RaidsAway {
         } else {
             out = new Out(find.at().immutable(), Math.max(1, column.size()), now, now + home, null);
             out.attacked = true;
-            out.caught = column.carried(); // (the termites it stung and picked up: taken from the termites as real ones)
+            // (the termites it stung and picked up, and what its raiders going as numbers took under the mud, M8 step 3d)
+            out.caught = column.carried() + column.hiddenCatch();
         }
         raids.diary(level, "the colony is out of sight with its raid to " + find.at().toShortString() + " out: it goes on as "
                 + out.raiders + " numbers, home in " + (out.backAt - now) + " ticks");
@@ -247,18 +247,24 @@ public final class RaidsAway {
                 raids.foundEmpty(level, find);
             }
         } else {
-            int wanted = (int) Math.round(out.raiders * numbers.catchPerRaider() * (0.75 + 0.5 * random.nextDouble()));
-            int most = (int) Math.floor(termites.population().inside(Caste.WORKER) * numbers.mostTakeShare());
-            int taken = termites.population().loseInside(level, Caste.WORKER, Math.min(wanted, most), AwayReport.What.TAKEN_BY_RAIDERS);
+            // M8 step 3d: the termites feeding under the mud there, each counted one standing for many real ones
+            int wanted = RaidCatch.couldCarry(colony, out.raiders, random);
+            int most = RaidCatch.mostToTake(colony, termites);
+            int taken = Math.min(wanted, most);
+            int countLost = RaidCatch.take(level, termites, taken);
             out.caught += taken;
             // M8 step 3S, as near: a tenth of the termite colony's soldiers (1 to 12) comes to the break; the majors sting
-            // about half of them and carry them home with the workers (my picks)
-            int soldiers = termites.getCount(TermiteSoldierEntity.Rank.MINOR.caste()) + termites.getCount(TermiteSoldierEntity.Rank.MAJOR.caste());
+            // about half of them and carry them home with the workers (my picks); the count loses them as the workers (3d)
+            String minor = TermiteSoldierEntity.Rank.MINOR.caste();
+            String major = TermiteSoldierEntity.Rank.MAJOR.caste();
+            int soldiers = termites.getCount(minor) + termites.getCount(major);
             answering = soldiers <= 0 ? 0 : Math.max(1, Math.min(Alarm.MOST_IN_WAVES, (int) Math.round(soldiers * 0.1)));
             int stung = count(random, answering, STUNG_SOLDIER_SHARE);
-            int stungMinors = termites.population().loseInside(level, TermiteSoldierEntity.Rank.MINOR.caste(), stung, AwayReport.What.TAKEN_BY_RAIDERS);
-            out.caught += stungMinors + termites.population().loseInside(level, TermiteSoldierEntity.Rank.MAJOR.caste(), stung - stungMinors,
-                    AwayReport.What.TAKEN_BY_RAIDERS);
+            if (stung > 0) {
+                termites.population().loseToHunters(level, termites.population().inside(minor) > 0 ? minor : major, stung,
+                        AwayReport.What.TAKEN_BY_RAIDERS);
+                out.caught += stung;
+            }
             // the termites remember the attack: they keep off the spot a few days and plug the holes there (brain step 4g)
             termites.danger().hurt(level, out.at, SavannaEntities.MATABELE_MAJOR.get().toShortString(), true);
             if (find != null) {
@@ -269,8 +275,9 @@ public final class RaidsAway {
                 }
             }
             raids.diary(level, "out of sight: the raid attacks at " + out.at.toShortString() + ": " + taken + " termite(s) stung and taken (of "
-                    + wanted + " the raiders could carry; the termite colony had " + (termites.population().inside(Caste.WORKER) + taken)
-                    + " workers inside, at most " + most + " to take; " + answering + " soldier(s) came to the break)");
+                    + wanted + " the raiders could carry, at most " + most + " to take; the termite colony's count lost " + countLost
+                    + ", each counted termite standing for " + termites.population().standsFor() + ", " + termites.population().inside(Caste.WORKER)
+                    + " workers inside now; " + answering + " soldier(s) came to the break)");
         }
         // M8 step 3S: each soldier that came may kill a raider or send one home hurt, on top of the raid's own losses
         out.lost = Math.min(out.raiders, count(random, out.raiders, numbers.lostShare()) + count(random, answering, SOLDIER_KILLS));
@@ -407,14 +414,7 @@ public final class RaidsAway {
     /** The living termite colony whose mound's middle is nearest this spot, within {@code termite_reach}; null if none. */
     @Nullable
     private Colony termitesAt(ServerLevel level, BlockPos at) {
-        Colony best = null;
-        for (Colony termites : Raids.termiteColonies(level, at, numbers().termiteReach())) {
-            if (SavannaSpecies.MACROTERMES.equals(termites.getSpecies()) && termites.getCount(Caste.WORKER) > 0
-                    && (best == null || termites.getCenter().distSqr(at) < best.getCenter().distSqr(at))) {
-                best = termites;
-            }
-        }
-        return best;
+        return RaidCatch.termitesAt(level, at, numbers().termiteReach());
     }
 
     /** Whether a player (alive) is within this many blocks of the spot, sideways. */

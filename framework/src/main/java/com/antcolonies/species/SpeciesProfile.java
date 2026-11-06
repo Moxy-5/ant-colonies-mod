@@ -123,7 +123,8 @@ public record SpeciesProfile(ColonyNumbers colony, WorkerNumbers worker, QueenNu
      * how many workers on there is one nurse, two nurses, and so on (one number per nurse, smallest first).
      */
     public record ColonyNumbers(int maxWorkers, List<Integer> nursesFrom, int realCap, int crew, int watchRadius, int swapsPerSecond,
-            Optional<DangerNumbers> danger, Optional<LostNumbers> lost, Optional<NeighbourNumbers> neighbours, boolean numbersWhenFar) {
+            Optional<DangerNumbers> danger, Optional<LostNumbers> lost, Optional<NeighbourNumbers> neighbours, boolean numbersWhenFar,
+            int standsFor) {
         public static final Codec<ColonyNumbers> CODEC = RecordCodecBuilder.create(i -> i.group(
                 Codec.INT.fieldOf("max_workers").forGetter(ColonyNumbers::maxWorkers),
                 Codec.INT.listOf().fieldOf("nurses_from_workers").forGetter(ColonyNumbers::nursesFrom),
@@ -136,16 +137,22 @@ public record SpeciesProfile(ColonyNumbers colony, WorkerNumbers worker, QueenNu
                 NeighbourNumbers.CODEC.optionalFieldOf("neighbours").forGetter(ColonyNumbers::neighbours),
                 // Far colonies (2026-11-04): whether a loaded colony with no player within 64 blocks lives as numbers
                 // (colony.AwayLife). Off for a species whose away life is not finished yet (the Matabele until step 3f).
-                Codec.BOOL.optionalFieldOf("numbers_when_far", true).forGetter(ColonyNumbers::numbersWhenFar)
+                Codec.BOOL.optionalFieldOf("numbers_when_far", true).forGetter(ColonyNumbers::numbersWhenFar),
+                // M8 step 3d (the user, 2026-11-06, "count stands for many"): how many real insects each one in the
+                // colony's headcount stands for, where the game's colonies are far smaller than real ones (Macrotermes:
+                // 50 to 700 counted against 1 to 2 million real). Hunters taking this colony's members take them from
+                // the many, so only one in standsFor of them costs a counted member (Population.loseToHunters,
+                // AbstractAntEntity.carriedOff). 1: each counted insect is one real one.
+                Codec.INT.optionalFieldOf("stands_for", 1).forGetter(ColonyNumbers::standsFor)
         ).apply(i, ColonyNumbers::new));
 
         public ColonyNumbers(int maxWorkers, List<Integer> nursesFrom, int realCap, int crew, int watchRadius, int swapsPerSecond,
                 Optional<DangerNumbers> danger) {
-            this(maxWorkers, nursesFrom, realCap, crew, watchRadius, swapsPerSecond, danger, Optional.empty(), Optional.empty(), true);
+            this(maxWorkers, nursesFrom, realCap, crew, watchRadius, swapsPerSecond, danger, Optional.empty(), Optional.empty(), true, 1);
         }
 
         public ColonyNumbers(int maxWorkers, List<Integer> nursesFrom, int realCap, int crew, int watchRadius, int swapsPerSecond) {
-            this(maxWorkers, nursesFrom, realCap, crew, watchRadius, swapsPerSecond, Optional.empty(), Optional.empty(), Optional.empty(), true);
+            this(maxWorkers, nursesFrom, realCap, crew, watchRadius, swapsPerSecond, Optional.empty(), Optional.empty(), Optional.empty(), true, 1);
         }
 
         /**
