@@ -282,6 +282,34 @@ public class FungusGarden implements NurseFood {
         return 20.0F / Math.max(20, numbers.noduleTicks());
     }
 
+    /**
+     * The comb counted as it lies, nothing changed (what {@link #grow} counts each second while here): as the colony goes
+     * away far before it was ever here, as a colony new land put in far from every player does (docs/BUGS.md 146).
+     */
+    boolean look(ServerLevel level) {
+        int combs = 0;
+        int fresh = 0;
+        int ripe = 0;
+        int old = 0;
+        int allNodules = 0;
+        for (BlockPos pos : getCombs(level)) {
+            BlockState state = level.getBlockState(pos);
+            if (state.is(SavannaBlocks.FUNGUS_COMB.get())) {
+                combs++;
+                fresh += FungusCombBlock.fresh(state);
+                ripe += FungusCombBlock.ripe(state);
+                old += FungusCombBlock.old(state);
+                allNodules += state.getValue(FungusCombBlock.NODULES);
+            }
+        }
+        seenCombs = combs;
+        seenFresh = fresh;
+        seenRipe = ripe;
+        seenOld = old;
+        seenNodules = allNodules;
+        return false;
+    }
+
     /** How many comb blocks the garden had the last second it was loaded. */
     int seenCombs() {
         return seenCombs;

@@ -662,9 +662,12 @@ public class TreeGrowthTests {
         // It comes down now, in sight (a test has no player: the fall is started as the testing command does).
         helper.assertTrue(forest.fellNow(level, t), "the shed tree would not fall");
         helper.assertTrue(!forest.fellNow(level, t), "a falling tree was made to fall again");
+        // (counted again here: the command first puts the tree into its finished shed shape, and a new-land shed tree may
+        // stand a little before that, its death day a whole day inside the stage, BUGS 134)
+        int creakHigh = countAround(level, foot, 9, 40, TreeGrowthTests::deadWood);
         helper.runAfterDelay(TreeFall.CREAK - 5, () -> {
             int high = countAround(level, foot, 9, 40, TreeGrowthTests::deadWood);
-            helper.assertTrue(high == standingHigh, "the tree went before its creak was over: " + high + " of " + standingHigh);
+            helper.assertTrue(high == creakHigh, "the tree went before its creak was over: " + high + " of " + creakHigh);
         });
         helper.runAfterDelay(TreeFall.CREAK + 10, () -> {
             int high = countAround(level, foot, 9, 40, TreeGrowthTests::deadWood);

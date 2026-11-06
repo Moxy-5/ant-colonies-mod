@@ -59,6 +59,8 @@ public class MatabeleScoutGoal extends Goal {
     private static final int HOME_GIVE_UP = 2400;
     /** It is home this near the entrance (blocks). */
     private static final double HOME = 2.5;
+    /** BUGS 143: where it walks to at the end: ground beside the entrance this far from it (blocks), within {@link #HOME}. */
+    private static final double[] NEAR_ENTRANCE = {1.5, 2.0, 1.0};
     /** Its pace home with a find (real scouts run home fast and straight, by path integration; my pick 1.3 times its walk). */
     private static final double FIND_PACE = 1.3;
     /** The turns (degrees) it tries, in order, when its own next step has no way: straight on first. */
@@ -918,6 +920,7 @@ public class MatabeleScoutGoal extends Goal {
             return;
         }
         double pace = find != null ? FIND_PACE : 1.0;
+        entrance = com.antcolonies.savanna.colony.WayHome.nearEntrance(level, ant, entrance, NEAR_ENTRANCE, 0.0); // (BUGS 143: not the chimney's open mouth)
         if (flat(at, entrance) <= HOP && ant.getNavigator().moveTo(entrance, pace) || hopToward(level, entrance, pace)
                 || tries >= TRIES_PER_POINT && ant.getNavigator().moveTo(entrance, pace)) { // (no hop: the whole way at once)
             tries = 0;

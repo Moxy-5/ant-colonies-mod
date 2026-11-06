@@ -298,4 +298,46 @@ public class TermiteClimbingTests {
                     reached[0], reached[1], reached[2], unreachable[0]);
         });
     }
+
+    /**
+     * BUGS 148 (the 100-day soak, 2026-11-06): a termite stood on a ramp high on its mound's face when a builder laid a
+     * thin layer of soil over the ramp. The ramp then no longer counted as a floor (no room over it), there was no
+     * floor within a drop beside it, and every walk it was given found no route, for minutes. It must find its way off
+     * by the mound's wall beside it and down to the ground.
+     */
+    @GameTest(template = "arena", timeoutTicks = 1600, skyAccess = true)
+    public static void aTermiteOnARampLaidOverFindsItsWayDown(GameTestHelper helper) {
+        floor(helper, 11, 9);
+        for (int x = 2; x <= 6; x++) {
+            for (int y = 1; y <= 15; y++) {
+                helper.setBlock(x, y, 2, soil()); // the mound's face, a wall to the north
+            }
+        }
+        for (int y = 1; y <= 13; y++) {
+            helper.setBlock(4, y, 3, soil()); // the ramp's footing
+        }
+        helper.setBlock(4, 14, 3, SavannaBlocks.TERMITE_RAMP.get().defaultBlockState()
+                .setValue(TermiteRampBlock.FACING, Direction.NORTH).setValue(MoundSoil.AGE, 2));
+        helper.setBlock(4, 15, 3, SavannaBlocks.TERMITE_MOUND.get().defaultBlockState()
+                .setValue(TermiteMoundBlock.LAYERS, 2).setValue(MoundSoil.AGE, 0)); // the builder's fresh layer
+        TermiteWorkerEntity termite = SavannaTests.loneTermite(helper, 4, 14, 3);
+        BlockPos on = helper.absolutePos(new BlockPos(4, 14, 3));
+        termite.moveTo(on.getX() + 0.5, on.getY() + 0.6, on.getZ() + 0.5);
+        TestWatch.watch(helper, termite, false);
+        BlockPos ground = new BlockPos(8, 1, 6);
+        boolean[] asked = {false};
+        helper.onEachTick(() -> {
+            if (!asked[0] && helper.getTick() >= 20) {
+                asked[0] = true;
+                helper.assertTrue(termite.getNavigator().moveTo(helper.absolutePos(ground), 1.0),
+                        "no route off the ramp laid over, from " + termite.blockPosition().toShortString());
+            }
+        });
+        helper.succeedWhen(() -> {
+            helper.assertTrue(asked[0], "not asked yet");
+            helper.assertTrue(termite.blockPosition().getY() <= helper.absolutePos(ground).getY() + 1
+                    && termite.blockPosition().distManhattan(helper.absolutePos(ground)) <= 3,
+                    "not down on the ground yet: at " + termite.blockPosition().toShortString());
+        });
+    }
 }

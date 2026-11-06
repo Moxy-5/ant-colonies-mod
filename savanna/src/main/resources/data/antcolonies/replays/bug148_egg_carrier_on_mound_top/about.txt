@@ -1,0 +1,70 @@
+Report 2026-11-06_05-26-08-not-stuck
+not-stuck broken: 1 insect(s) with a route but not moving for 30 s or more: termite_worker a2aa5a29 at 22244, 83, 2109
+Where: 22244, 83, 2109 in minecraft:overworld
+When: game tick 124612, day 6, 10:36
+Rules on: ON
+
+Colonies within 112 blocks (nearest first):
+- 3199b021 | antcolonies:macrotermes | center 22244, 69, 2108 | queen be78ee97 | members 196 | real 74 (wants 50), in the nest 121 (workers young 14, middle 49, old 58; soldiers 0 minor, 0 major) | while away (1.2 hours): nothing | foragers out as numbers 0 (remembers 899 plants) | ages 4 young, 20 middle, 14 old, jobs 4 nurses, 20 builders, 14 foragers | gardens 6 dug (planned 6), comb 216 layers on 54 blocks, nodules 1, mushrooms after rain: 8 | queen holds 0/6 nodules, not laying | queen unfed 0 of 100 min | eggs 1 | larvae 9 | soldiers 12 minor (wants 13), 5 major (wants 4), nymphs growing into soldiers 2, posts held 12, minors in | calm | knows 908 food plants | remembered trails: from 22252, 70, 2108 to 22231, 65, 2087 (strength 43) from 22226, 65, 2099 to 22231, 65, 2088 (strength 16) from 22229, 65, 2092 to 22231, 64, 2100 (strength 11) from 22250, 71, 2115 to 22231, 65, 2085 (strength 8) from 22247, 71, 2118 to 22232, 68, 2113 (strength 6) from 22234, 66, 2098 to 22230, 64, 2100 (strength 4) from 22253, 71, 2112 to 22250, 71, 2108 (strength 2) | danger: 4 places (strongest 3.1 at 22233, 64, 2099: matabele_minor) | 14 holes closed for danger | dead ants 0 (refuse chamber 0) | mound stage 18 (earned 18) of 32, 312/348 blocks finished, earned 365.3 blocks | staying in (out at: night, rain), holes open 0 of 15 | new holes 4 (0 spent, 0 being dug), reach 28 | runways 3 (1 finished) | galleries: 8 pieces (4 out to food), 6 tips, 96 of 62 blocks, reach 22, 15 holes, 0 in turn (last time) | hidden trips: 0 underway (0 made, 0 out at the far end, 0 broken into, 0 folded in), 0 eaten tufts growing back (0 on bare ground by the holes)
+- 2abc44a7 | antcolonies:megaponera_analis | center 22246, 78, 2163 | nest in a dead termite mound, rooms open 4 of 4 | queen 53be7c93 | members 253 | real 51 (wants 50), in the nest 202 (workers young 0, middle 74, old 128; hungry 202) | while away (1.2 hours): nothing | ages 0 young, 16 middle, 35 old, jobs 4 nurses, 16 builders, 31 foragers | food 0 pieces in the store | queen fed 0/6, rich 0/5 | queen unfed 38 of 100 min | eggs 0 | larvae 1, raids: 5 scout(s) out, its scouts reach out to 96 blocks, 1 good spot(s) (22234, 65, 2099, 65 out, worth 24, line of 35); 2 raider(s) going home by themselves; mound clue: 1 mound(s) ringed, 1 tunnel(s) followed, 1 find(s) | dead ants 9 (refuse chamber 9) | staying in (out at: )
+- 341dbb94 | antcolonies:macrotermes | center 22187, 64, 2085 | queen 34e3390a | members 20 | real 0 (wants 0), in the nest 19 (workers young 0, middle 0, old 0; soldiers 14 minor, 5 major; hungry 19) | away 97341 ticks | owed to the nest: 186 bodies, 10502.1 builder-hours of building | while away so far: 1 died of old age, 185 starved | ages 0 young, 0 middle, 0 old, jobs 0 nurses, 0 builders, 0 foragers | gardens 6 dug (planned 6), comb 141 layers on 54 blocks, nodules 0, mushrooms after rain: 8 | queen holds 0/6 nodules, not laying | queen unfed 80 of 100 min | eggs 0 | larvae 0 | soldiers 14 minor (wants 0), 5 major (wants 0), nymphs growing into soldiers 0, posts held 0, minors in | calm | knows 858 food plants | dead ants 0 (refuse chamber 0) | mound stage 14 (earned 17) of 32, 212/222 blocks finished, earned 334.3 blocks | staying in (out at: night, rain), holes open 0 of 2 | new holes 0 (0 spent, 0 being dug), reach 24 | runways 0 (0 finished) | galleries: 0 pieces (0 out to food), 0 tips, 0 of 0 blocks, reach 0, 2 holes, 0 in turn (last time) | hidden trips: 0 underway (0 made, 0 out at the far end, 0 broken into, 0 folded in), 0 eaten tufts growing back (0 on bare ground by the holes)
+
+Rules broken lately by these colonies:
+- none
+
+Insects within 24 blocks (nearest first):
+- termite_worker a2aa5a29 at 22244, 83, 2109 (22244.5, 83.3, 2109.8) hp 3.0/3 walking to 22245, 66, 2113, still 349 s, goals [CarryEggGoal] [colony 3199b021]
+- termite_worker 91a7b3b3 at 22244, 76, 2108 (22244.9, 77.0, 2108.9) hp 3.0/3 walking to 22244, 78, 2108, goals [DigGoal] [colony 3199b021]
+- termite_worker b15e7212 at 22244, 75, 2108 (22244.1, 75.1, 2108.9) hp 2.0/3 walking to 22244, 78, 2108, goals [DigGoal] [colony 3199b021]
+- termite_worker e3a493af at 22244, 75, 2108 (22244.9, 75.0, 2108.9) hp 2.0/3 walking to 22244, 78, 2108, goals [DigGoal] [colony 3199b021]
+- termite_worker 91f888a2 at 22244, 73, 2108 (22244.1, 74.0, 2108.9) hp 2.0/3 walking to 22243, 79, 2107, goals [ShapeMoundGoal] [colony 3199b021]
+- termite_worker 93dddb1a at 22244, 73, 2108 (22244.9, 73.6, 2108.9) hp 3.0/3 walking to 22244, 78, 2108, goals [DigGoal] [colony 3199b021]
+- termite_worker 979fa5ce at 22244, 73, 2108 (22244.1, 73.3, 2108.9) hp 3.0/3 walking to 22244, 78, 2108, goals [DigGoal] [colony 3199b021]
+- termite_worker 3c482ea4 at 22244, 73, 2108 (22244.9, 73.1, 2108.9) hp 2.0/3 walking to 22244, 78, 2108, goals [DigGoal] [colony 3199b021]
+- termite_worker 7202811a at 22244, 72, 2108 (22244.1, 72.3, 2108.9) hp 3.0/3 walking to 22245, 74, 2107, goals [ShapeMoundGoal] [colony 3199b021]
+- termite_worker d286af75 at 22244, 72, 2108 (22244.1, 72.2, 2108.9) hp 3.0/3 walking to 22244, 78, 2108, goals [DigGoal] [colony 3199b021]
+- termite_worker 42cce033 at 22244, 71, 2108 (22244.1, 71.2, 2108.9) hp 3.0/3 walking to 22244, 78, 2108, goals [DigGoal] [colony 3199b021]
+- termite_worker e779aacf at 22244, 71, 2108 (22244.1, 71.2, 2108.9) hp 3.0/3 walking to 22244, 78, 2108, goals [DigGoal] [colony 3199b021]
+- termite_worker 4b74855e at 22244, 71, 2108 (22244.9, 71.2, 2108.9) hp 3.0/3 walking to 22244, 78, 2108, goals [DigGoal] [colony 3199b021]
+- termite_worker 1b46edc3 at 22244, 70, 2108 (22244.9, 70.7, 2108.9) hp 3.0/3 walking to 22244, 78, 2108, goals [DigGoal] [colony 3199b021]
+- termite_worker a6392fc2 at 22244, 70, 2108 (22244.9, 70.7, 2108.9) hp 2.0/3 walking to 22244, 78, 2108, goals [DigGoal] [colony 3199b021]
+- termite_worker ced4a6fd at 22244, 70, 2108 (22244.1, 70.3, 2108.9) hp 2.0/3 walking to 22244, 78, 2108, goals [DigGoal] [colony 3199b021]
+- termite_worker d363db6d at 22244, 70, 2108 (22244.9, 70.3, 2108.9) hp 3.0/3 walking to 22244, 78, 2108, goals [DigGoal] [colony 3199b021]
+- termite_worker 3f3f308a at 22244, 69, 2108 (22244.1, 69.8, 2108.9) hp 3.0/3 walking to 22244, 78, 2108, goals [DigGoal] [colony 3199b021]
+- termite_worker 2f712bea at 22244, 68, 2108 (22244.9, 68.6, 2108.9) hp 2.0/3 walking to 22244, 78, 2108, goals [DigGoal] [colony 3199b021]
+- termite_worker 17d99a84 at 22240, 69, 2106 (22241.0, 69.3, 2106.5) hp 3.0/3 walking to 22239, 69, 2106, goals [ShapeMoundGoal] [colony 3199b021]
+- termite_worker 204c3f92 at 22244, 68, 2108 (22244.1, 68.4, 2108.9) hp 2.0/3 walking to 22244, 78, 2108, goals [DigGoal] [colony 3199b021]
+- matabele_major cbbb9945 at 22238, 68, 2108 (22238.5, 68.0, 2109.0) hp 10.0/10 walking to 22240, 70, 2112, goals [MatabeleRaidGoal] | going home: a scout that gave up on its way home [colony 2abc44a7]
+- termite_minor_soldier ea714a2f at 22251, 68, 2108 (22251.2, 68.0, 2108.4) hp 5.0/6 standing, still 432 s, goals [GuardPostGoal] [colony 3199b021]
+- termite_major_soldier 87daf0ce at 22244, 66, 2109 (22244.3, 66.0, 2109.9) hp 12.0/12 standing, still 453 s, goals [GuardPostGoal] [colony 3199b021]
+- termite_major_soldier b2e32958 at 22244, 66, 2111 (22244.8, 66.0, 2111.9) hp 12.0/12 standing, still 451 s, goals [GuardPostGoal] [colony 3199b021]
+- termite_worker 181f60af at 22244, 66, 2113 (22244.1, 66.0, 2113.2) hp 3.0/3 standing, still 47 s, goals [StandByQueenGoal] [colony 3199b021]
+- termite_queen be78ee97 at 22244, 66, 2113 (22244.5, 66.0, 2113.5) hp 20.0/20 standing, still 453 s, goals [] [colony 3199b021]
+- termite_king b8cdc9d0 at 22243, 66, 2113 (22243.5, 66.0, 2113.6) hp 10.0/10 standing, still 453 s, goals [] [colony 3199b021]
+- termite_worker f451a513 at 22247, 66, 2114 (22247.9, 66.5, 2114.4) hp 3.0/3 walking to 22247, 66, 2116, goals [FeedLarvaGoal] [colony 3199b021]
+- termite_major_soldier a5cb18a6 at 22246, 66, 2113 (22246.2, 66.0, 2113.4) hp 12.0/12 standing, still 449 s, goals [GuardPostGoal] [colony 3199b021]
+- termite_major_soldier 92eb1a42 at 22242, 66, 2113 (22242.9, 66.0, 2113.7) hp 12.0/12 standing, still 450 s, goals [GuardPostGoal] [colony 3199b021]
+- termite_major_soldier 202c3e96 at 22244, 66, 2115 (22244.4, 66.0, 2115.1) hp 12.0/12 standing, still 450 s, goals [GuardPostGoal] [colony 3199b021]
+- termite_worker 3c7c64af at 22248, 66, 2115 (22248.4, 66.4, 2115.3) hp 3.0/3 walking to 22247, 66, 2116, goals [FeedLarvaGoal] [colony 3199b021]
+- termite_worker 8206f3e5 at 22248, 66, 2115 (22248.5, 66.4, 2115.3) hp 3.0/3 walking to 22247, 66, 2116, goals [FeedLarvaGoal] [colony 3199b021]
+- termite_minor_soldier 927a107b at 22237, 66, 2108 (22237.2, 66.0, 2108.5) hp 6.0/6 standing, still 443 s, goals [GuardPostGoal] [colony 3199b021]
+- termite_worker 0bf8123b at 22241, 67, 2100 (22241.6, 67.0, 2100.3) hp 3.0/3 walking to 22244, 78, 2108, goals [DigGoal] [colony 3199b021]
+- termite_worker cd88c14b at 22241, 67, 2099 (22241.3, 67.0, 2099.8) hp 3.0/3 walking to 22244, 78, 2108, goals [DigGoal] [colony 3199b021]
+- termite_worker 77459bca at 22240, 67, 2099 (22240.9, 67.0, 2099.5) hp 3.0/3 walking to 22244, 78, 2108, goals [DigGoal] [colony 3199b021]
+- termite_worker 3db61f6c at 22241, 67, 2098 (22241.3, 67.0, 2098.5) hp 2.0/3 walking to 22244, 78, 2108, goals [DigGoal] [colony 3199b021]
+- termite_worker 84b878bf at 22239, 67, 2098 (22239.8, 67.0, 2098.5) hp 2.0/3 walking to 22244, 78, 2108, goals [DigGoal] [colony 3199b021]
+- termite_worker 6d35b6f4 at 22241, 67, 2097 (22241.3, 67.0, 2097.6) hp 3.0/3 walking to 22244, 78, 2108, goals [DigGoal] [colony 3199b021]
+- termite_worker 8783ae92 at 22236, 66, 2100 (22236.3, 66.6, 2100.9) hp 3.0/3 walking to 22244, 78, 2108, goals [DigGoal] [colony 3199b021]
+- termite_worker 65db429e at 22240, 66, 2096 (22240.3, 66.7, 2096.9) hp 3.0/3 walking to 22244, 78, 2108, goals [DigGoal] [colony 3199b021]
+- termite_minor_soldier 16260cb4 at 22231, 65, 2108 (22231.7, 65.0, 2108.3) hp 6.0/6 standing, still 391 s, goals [GuardPostGoal] [colony 3199b021]
+- termite_worker f6ac11c3 at 22240, 66, 2095 (22240.5, 66.0, 2095.8) hp 3.0/3 walking to 22244, 78, 2108, goals [DigGoal] [colony 3199b021]
+- termite_worker 558a8afc at 22240, 66, 2095 (22240.5, 66.0, 2095.1) hp 2.0/3 walking to 22244, 78, 2108, goals [DigGoal] [colony 3199b021]
+- termite_worker f5c9995c at 22237, 66, 2094 (22237.7, 66.0, 2095.0) hp 2.0/3 walking to 22244, 78, 2108, goals [DigGoal] [colony 3199b021]
+- termite_minor_soldier 260f7b0f at 22235, 64, 2098 (22235.8, 64.0, 2098.5) hp 5.0/6 standing, still 429 s, goals [GuardPostGoal] [colony 3199b021]
+- termite_worker af528e92 at 22229, 63, 2105 (22229.9, 63.5, 2105.1) hp 3.0/3 walking to 22247, 70, 2106, goals [ShapeMoundGoal] [colony 3199b021]
+- termite_minor_soldier 0045f6a7 at 22228, 64, 2105 (22228.3, 64.0, 2105.9) hp 6.0/6 standing, still 429 s, goals [GuardPostGoal] [colony 3199b021]
+- termite_worker 9371bed7 at 22233, 64, 2091 (22233.5, 64.2, 2091.9) hp 3.0/3 walking to 22244, 78, 2108, goals [DigGoal] [colony 3199b021]
+- termite_minor_soldier 1b54d37b at 22226, 63, 2100 (22226.8, 63.0, 2100.5) hp 6.0/6 standing, still 438 s, goals [GuardPostGoal] [colony 3199b021]
+- termite_minor_soldier 408b94a9 at 22228, 63, 2092 (22228.5, 63.0, 2092.7) hp 6.0/6 standing, still 450 s, goals [GuardPostGoal] [colony 3199b021]
+
+The place: 22197, 59, 2087 (corner), size 96 x 48 x 96, in place.nbt.

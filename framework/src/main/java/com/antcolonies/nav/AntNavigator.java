@@ -139,6 +139,16 @@ public class AntNavigator {
     private boolean failed;
     private int replans;
     private int stepTicks;
+    /**
+     * BUGS 122: on a slow step (a doorway's mouth, a fall: {@link #stepLimit} past {@link #STEP_TICKS}), where it stood
+     * when it last moved, and the ticks it has stood there since. Standing still {@link #STEP_TICKS} on such a step is
+     * stuck, as on any other step; the step's longer time is for a slow motion, not for standing.
+     */
+    @Nullable
+    private Vec3 stillAt;
+    private int stillTicks;
+    /** BUGS 122: moving less than this (blocks) from {@link #stillAt} counts as standing still. */
+    private static final double STILL_MOVE = 0.02;
     /** Ticks spent staying at a point of a doorway's motion (see {@link DoorwayMotion}). */
     private int legTicks;
     /** Whether it has reached the point of the doorway's motion it walks to ({@link #leg}) and stays there now. */
@@ -567,6 +577,7 @@ public class AntNavigator {
         CellMap map = new LevelCellMap(ant.level(), ant);
         Foothold start = currentFoothold(map);
         List<Foothold> starts = new ArrayList<>();
+        boolean fromBeside = false;
         if (start != null) {
             starts.add(start);
         } else {
@@ -574,15 +585,28 @@ public class AntNavigator {
             Foothold landing = AntPathFinder.landing(map, ant.blockPosition());
             if (landing != null) {
                 starts.add(landing);
-            } else if (!map.isOpen(ant.blockPosition())) {
+            } else {
                 // Inside a block that is not open (a thin plate of mud put down where it stood, the user's bug of
                 // 2026-10-14): from the open spots beside it, which it can step out to.
+                // Also a ramp it stands on with a block put on top of it (BUGS 148: a termite on a mound ramp, a
+                // builder's thin layer laid over it, no longer counts as a floor): the walls beside it as well as the
+                // floors, since on the face of a mound there is often no floor within a drop.
                 for (Direction side : Direction.values()) {
-                    Foothold beside = side == Direction.DOWN ? null : AntPathFinder.landing(map, ant.blockPosition().relative(side));
+                    if (side == Direction.DOWN) {
+                        continue;
+                    }
+                    BlockPos next = ant.blockPosition().relative(side);
+                    List<Foothold> holds = AntPathFinder.footholdsIn(map, next);
+                    if (!holds.isEmpty()) {
+                        starts.addAll(holds);
+                        continue;
+                    }
+                    Foothold beside = AntPathFinder.landing(map, next);
                     if (beside != null) {
                         starts.add(beside);
                     }
                 }
+                fromBeside = !starts.isEmpty();
             }
         }
         long now = ant.level().getGameTime();
@@ -623,7 +647,41 @@ public class AntNavigator {
         blockedFrom = ant.position();
         spot = null;
         at = start;
+        if (found != null && fromBeside) {
+            stepOutTo(found.start());
+        }
         return found != null;
+    }
+
+    /**
+     * Shut in where it stands (a block put on it, or over the ramp it stands on, BUGS 148), its route starts on a spot
+     * beside it: it steps straight out onto it (at most a block, a short hop), and the walk goes on from there. Without
+     * this it stood where it was, "landed somewhere else" every tick, and gave the walk up.
+     */
+    private void stepOutTo(Foothold start) {
+        BlockPos cell = start.cell();
+        if (start.isFloor() && cell.getY() < ant.blockPosition().getY()) {
+            // A floor further down beside it: out over the edge at its own height, and it drops onto it (the walk
+            // starts once it has landed there, as after any fall).
+            ant.moveTo(cell.getX() + 0.5, ant.getY(), cell.getZ() + 0.5, ant.getYRot(), ant.getXRot());
+            ant.setDeltaMovement(Vec3.ZERO);
+            at = null;
+            surface = Direction.DOWN;
+            return;
+        }
+        double y = start.isFloor() ? cell.getY() : Mth.clamp(ant.getY(), cell.getY(), cell.getY() + 1.0 - ant.getBbHeight());
+        double x = cell.getX() + 0.5;
+        double z = cell.getZ() + 0.5;
+        if (start.isWall()) {
+            // Right up against the wall it holds, not in the cell's middle.
+            double in = 0.5 - ant.getBbWidth() / 2.0 - 0.01;
+            x += start.surface().getStepX() * in;
+            z += start.surface().getStepZ() * in;
+        }
+        ant.moveTo(x, y, z, ant.getYRot(), ant.getXRot());
+        ant.setDeltaMovement(Vec3.ZERO);
+        at = start;
+        surface = start.inChannel() ? Direction.DOWN : start.surface();
     }
 
     /**
@@ -775,6 +833,9 @@ public class AntNavigator {
         } else if (++stepTicks > stepLimit(step)) {
             replan("stuck on " + describe(step) + ", motion " + motion);
             return;
+        } else if (standsTooLong(step)) {
+            replan("standing still on " + describe(step) + ", motion " + motion);
+            return;
         }
         faceTheWayItGoes();
     }
@@ -890,11 +951,31 @@ public class AntNavigator {
 
     /** A step starts from its first part (and a doorway's motion from its first point, not looking round). */
     private void startLeg() {
+        stillAt = null;
+        stillTicks = 0;
         leg = 0;
         legTicks = 0;
         holding = false;
         peeking = false;
         slowTurn = false;
+    }
+
+    /**
+     * BUGS 122: on a slow step, whether it has stood still for as long as any step may take ({@link #STEP_TICKS}); its
+     * doorway's own pauses (a peek, {@link DoorwayMotion#PEEK_TICKS}) are shorter, and waiting for the crowd never counts.
+     * Termite workers stood a minute at a mound's doorway: 20 s a try, three tries, never moving.
+     */
+    private boolean standsTooLong(Route.Step step) {
+        if (stepLimit(step) <= STEP_TICKS) {
+            return false;
+        }
+        Vec3 here = ant.position();
+        if (stillAt == null || here.distanceToSqr(stillAt) > STILL_MOVE * STILL_MOVE || heldForCrowd()) {
+            stillAt = here;
+            stillTicks = 0;
+            return false;
+        }
+        return ++stillTicks > STEP_TICKS;
     }
 
     /** How many ticks this step may take before the insect counts as stuck: a fall and a doorway's mouth take longer. */
@@ -2330,7 +2411,24 @@ public class AntNavigator {
     /** The point on a ceiling foothold: pressed against the ceiling, sideways where the body is (kept inside the cell). */
     private Vec3 ceilingPoint(Foothold foothold) {
         BlockPos cell = foothold.cell();
-        return new Vec3(clampIn(cell, Direction.Axis.X, ant.getX()), ceilingY(cell), clampIn(cell, Direction.Axis.Z, ant.getZ()));
+        double x = clampIn(cell, Direction.Axis.X, ant.getX());
+        double z = clampIn(cell, Direction.Axis.Z, ant.getZ());
+        BlockPos held = cell.above();
+        BlockState state = ant.level().getBlockState(held);
+        if (state.getBlock() instanceof Channel channel && Channel.has(channel.openSides(ant.level(), held, state), Direction.DOWN)) {
+            // (docs/BUGS.md 144, as 135 on a wall: a ceiling with a channel opening over the body is held on its solid
+            // rim beside the opening, the nearer way out of it, never under the hole with nothing over the legs)
+            double band = Channel.HALF_WIDTH + half() + EPS;
+            double dx = x - (held.getX() + 0.5), dz = z - (held.getZ() + 0.5);
+            if (band + half() <= 0.5 && Math.abs(dx) < band && Math.abs(dz) < band) {
+                if (Math.abs(dx) >= Math.abs(dz)) {
+                    x = clampIn(cell, Direction.Axis.X, held.getX() + 0.5 + (dx < 0 ? -band : band));
+                } else {
+                    z = clampIn(cell, Direction.Axis.Z, held.getZ() + 0.5 + (dz < 0 ? -band : band));
+                }
+            }
+        }
+        return new Vec3(x, ceilingY(cell), z);
     }
 
     private double clampY(BlockPos cell, double y) {

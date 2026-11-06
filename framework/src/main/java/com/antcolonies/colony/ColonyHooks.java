@@ -446,6 +446,13 @@ public final class ColonyHooks {
     public static final Kind<NumbersSearch> NUMBERS_SEARCH = Kind.of("numbers_search");
     /** Step 8c: while away, beside the queen's own life (the termite king's hunger clock). */
     public static final Kind<AwayWork> AWAY_BESIDE_QUEEN = Kind.of("away_beside_queen");
+    /**
+     * As the colony goes away while its land is still loaded (the far rule): what a part sees in the world written down
+     * for the time away, as it would have been while here (the fungus garden's comb and nodules). A colony new land put
+     * in far from every player goes away before its first second here, so without this the brain would know nothing of
+     * it (docs/BUGS.md 146).
+     */
+    public static final Kind<AwayWork> LOOK_ON_LEAVING = Kind.of("look_on_leaving");
     /** Step 8c: while away, after the nurses' work (the fungus garden growing nodules and ageing). */
     public static final Kind<AwayWork> AWAY_AFTER_NURSES = Kind.of("away_after_nurses");
     /** Step 8c: the nurses feeding another member while away, after the queen and before the young (the termite king). */

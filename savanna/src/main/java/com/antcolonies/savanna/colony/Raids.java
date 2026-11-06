@@ -595,6 +595,16 @@ public class Raids {
         return wayHome.orderFor(level, ant, colony, trails, trailNumbers());
     }
 
+    /** BUGS 140: this ant going home by itself found no way to the next place on its trail: straight home from now on. */
+    public boolean leaveTrailHome(ServerLevel level, AbstractAntEntity ant) {
+        if (!wayHome.onTrail(ant.getUUID())) {
+            return false;
+        }
+        wayHome.leaveTrail(ant.getUUID());
+        say(level, ant.getUUID().toString().substring(0, 8) + " leaves its trail home (no way along it) and makes straight for the entrance");
+        return true;
+    }
+
     /** Tests: this ant limps home along this column's trail. */
     public void limpForTests(MatabeleEntity ant, RaidColumn raid, long now) {
         wayHome.send(ant.getUUID(), raid.back(), now, "hurt (test)");

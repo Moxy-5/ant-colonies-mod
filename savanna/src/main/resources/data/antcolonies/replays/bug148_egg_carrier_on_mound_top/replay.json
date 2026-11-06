@@ -1,0 +1,9 @@
+{
+  "runs": 3,
+  "seconds": 300,
+  "from": "2026-11-06_05-26-08-not-stuck",
+  "required": true,
+  "species": [
+    "macrotermes"
+  ]
+}

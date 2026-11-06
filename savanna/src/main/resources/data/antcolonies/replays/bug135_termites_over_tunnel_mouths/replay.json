@@ -2,7 +2,7 @@
   "runs": 3,
   "seconds": 180,
   "from": "2026-11-06_04-13-44-holds-its-face",
-  "required": false,
+  "required": true,
   "species": [
     "macrotermes"
   ]

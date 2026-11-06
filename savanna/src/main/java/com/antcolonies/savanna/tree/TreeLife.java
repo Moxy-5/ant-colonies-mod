@@ -275,7 +275,11 @@ public final class TreeLife {
                 // of today already gone (the stage is read from the days dead plus that part: BUGS 134, a roll on the
                 // stage's last day plus the afternoon moved a snag on into the next stage).
                 double done = fullStep(stage) > 0 ? start + (end - start) * slowPart(stage) : start;
-                long lo = (long) Math.ceil(done), hi = Math.max(lo, (long) Math.floor(end) - 1);
+                // (BUGS 134 again, 2026-11-06: when the finished part of the stage is under a whole day, the first day
+                // past it ran over the stage's end; then the last whole day inside the stage, a little before the
+                // shape is quite finished, the stage kept)
+                long hi = Math.max((long) Math.floor(end) - 1, (long) Math.ceil(start));
+                long lo = Math.min((long) Math.ceil(done), hi);
                 return lo + (long) Math.floor(roll * (hi - lo + 1));
             }
         }

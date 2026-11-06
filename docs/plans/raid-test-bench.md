@@ -258,3 +258,11 @@ The user runs it overnight: they say when they go to bed, and Claude starts it t
 morning: read `run-soak/soak-report.txt` (its "Slow things" part first, every "LOOK:" line), `run-soak/<i>/soak-trend.txt`
 and `soak-breaches.txt`; every broken rule and every "LOOK:" goes on the bug list (`docs/BUGS.md`, numbers from
 `python tools/bug_number.py`), not fixed on the spot. Then on with B8 (BUGS 111, the flakes, 122, 123).
+
+### The 100-day soak, run 2026-11-06 (overnight)
+Started with `tools/soak.sh 4 100` in its own copy of the code (`.claude/worktrees/soak-100`, the code before the night's
+fixes), watched by the new hang watchdog (`tools/hang_watch.sh`, in place of the 31-minute limit). Server 3 stopped
+early: its seed (424242) had only one Matabele colony in 24 places, so the soak found nowhere worth watching (world
+luck, not a bug). The user asked for the finds to be fixed as they came (not only listed): fixed the same night in
+`C:\Ant Mod` on branch `claude/overnight-bugs`, BUGS 141, 143, 144, 146, 147 (and 123, 134 to 137 from the list),
+later 148, 122, 140 (again) and 135; open BUGS 145, 151. Its "Slow things" and trend lines are summed up in `docs/HISTORY.md` at its end.

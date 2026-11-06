@@ -90,6 +90,18 @@ public final class TestIsolation {
         FENCES.add(fence);
     }
 
+    /**
+     * Whether two spots lie in the arenas of two different running tests (always false outside the test server): a check
+     * that keeps things apart in the world, such as new land's mounds, never counts another test's colony (BUGS 152).
+     */
+    public static synchronized boolean inDifferentTests(BlockPos a, BlockPos b) {
+        if (running == null) {
+            return false;
+        }
+        GameTestInfo ta = testAt(a), tb = testAt(b);
+        return ta != null && tb != null && ta != tb;
+    }
+
     /** Called once when the test server starts. */
     @SuppressWarnings("unchecked")
     static void install() {

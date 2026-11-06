@@ -120,10 +120,14 @@ class TreeLifeTest {
             assertTrue(b.get(1).from() == 1 && slump >= 1 && slump <= 2 && heap >= 3 && heap <= 6 && dry >= 10 && dry <= 20 && b.get(4).stage() == null,
                     () -> "seed " + s + ": " + b);
             assertTrue(TreeLife.deadStage(baobab, seed, 60) == null, () -> "seed " + s + ": a baobab heap still there after 60 days");
-            for (TreeStage stage : new TreeStage[] {TreeStage.SNAG, TreeStage.MUD, TreeStage.SHED, TreeStage.FALLEN}) {
-                for (double roll : new double[] {0, 0.5, 0.999}) {
-                    long d = TreeLife.daysDeadIn(umbrella, seed, stage, roll);
-                    assertTrue(TreeLife.deadStage(umbrella, seed, d) == stage, () -> "seed " + s + " " + stage + " roll " + roll + ": " + d);
+            for (TreeKind kind : new TreeKind[] {umbrella, TreeKind.load("camel_thorn")}) {
+                for (TreeStage stage : new TreeStage[] {TreeStage.SNAG, TreeStage.MUD, TreeStage.SHED, TreeStage.FALLEN}) {
+                    for (double roll : new double[] {0, 0.5, 0.999}) {
+                        long d = TreeLife.daysDeadIn(kind, seed, stage, roll);
+                        // (BUGS 134: read on that day's last tick too, the part of today already gone added)
+                        assertTrue(TreeLife.deadStage(kind, seed, d) == stage && TreeLife.deadStage(kind, seed, d + 0.999) == stage,
+                                () -> "seed " + s + " " + stage + " roll " + roll + ": " + d + " in " + TreeLife.deadStages(kind, s));
+                    }
                 }
             }
             for (TreeStage stage : new TreeStage[] {TreeStage.SLUMP, TreeStage.HEAP, TreeStage.HEAP_DRY}) {

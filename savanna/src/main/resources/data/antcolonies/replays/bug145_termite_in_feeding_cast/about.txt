@@ -1,0 +1,53 @@
+Report 2026-11-06_06-48-36-not-stuck
+not-stuck broken: 1 insect(s) with a route but not moving for 30 s or more: termite_worker afb0e290 at 990, 68, -6
+Where: 990, 68, -6 in minecraft:overworld
+When: game tick 244336, day 11, 10:20
+Rules on: ON
+
+Colonies within 112 blocks (nearest first):
+- 5ccd9e33 | antcolonies:macrotermes | center 995, 70, 11 | queen 25b94601 | members 236 | real 50 (wants 50), in the nest 185 (workers young 18, middle 26, old 123; soldiers 10 minor, 8 major; hungry 3) | while away (0.9 hours): nothing | foragers out as numbers 0 (remembers 1339 plants) | ages 2 young, 13 middle, 18 old, jobs 4 nurses, 11 builders, 18 foragers | gardens 6 dug (planned 6), comb 214 layers on 54 blocks, nodules 0, mushrooms after rain: 8 | queen holds 0/6 nodules, not laying | queen unfed 0 of 100 min | eggs 0 | larvae 10 | soldiers 22 minor (wants 15), 8 major (wants 5), nymphs growing into soldiers 0, posts held 14, minors in | calm | knows 1364 food plants | remembered trails: from 1003, 70, 11 to 988, 70, -6 (strength 64) from 985, 70, 5 to 988, 71, -6 (strength 60) from 1005, 70, 9 to 996, 86, 0 (strength 60) from 1009, 70, 11 to 988, 70, -6 (strength 56) from 987, 70, 11 to 988, 71, -6 (strength 54) from 993, 71, -5 to 992, 84, -3 (strength 54) from 995, 71, 1 to 996, 86, 0 (strength 53) from 978, 70, 12 to 978, 90, 10 (strength 53) from 996, 71, 2 to 997, 87, 1 (strength 53) from 997, 70, 25 to 996, 86, 1 (strength 15) from 981, 70, 12 to 989, 71, -6 (strength 8) from 1003, 70, 20 to 988, 70, -6 (strength 7) from 1001, 71, -5 to 988, 70, -6 (strength 4) from 977, 70, 11 to 978, 90, 10 (strength 3) from 1006, 70, 7 to 1005, 91, 7 (strength 3) from 989, 70, 2 to 987, 84, 0 (strength 2) | dead ants 0 (refuse chamber 0) | mound stage 31 (earned 31) of 32, 922/1007 blocks finished, earned 1058.2 blocks | staying in (out at: night, rain), holes open 2 of 26 | new holes 9 (0 spent, 0 being dug), reach 27 | runways 3 (2 finished) | galleries: 13 pieces (9 out to food), 12 tips, 114 of 66 blocks, reach 21, 26 holes, 20 in turn (last time) | hidden trips: 5 underway (321 made, 304 out at the far end, 17 broken into, 0 folded in), 0 eaten tufts growing back (0 on bare ground by the holes)
+- fd714cc2 | antcolonies:megaponera_analis | center 933, 72, -13 | nest in a dead termite mound, rooms open 6 of 6 | queen d1ac7e95 | members 0 | real 0 (wants 50), in the nest 0 (workers young 0, middle 0, old 0) | while away (0.9 hours): nothing | ages 0 young, 0 middle, 0 old, jobs 0 nurses, 0 builders, 0 foragers | food 0 pieces in the store | queen fed 0/6, rich 0/5 | queen unfed 0 of 100 min | eggs 0 | larvae 0, raids: 0 scout(s) out, its scouts reach out to 96 blocks, 0 good spot(s) | dead ants 9 (refuse chamber 9) | staying in (out at: )
+
+Rules broken lately by these colonies:
+- none
+
+Insects within 24 blocks (nearest first):
+- termite_worker afb0e290 at 990, 68, -6 (990.3, 68.3, -5.6) hp 3.0/3 walking to 988, 71, -7, still 39 s, goals [ClipGrassGoal] [colony 5ccd9e33]
+- termite_worker 67295b92 at 990, 69, -6 (990.6, 69.0, -5.5) hp 3.0/3 walking to 990, 67, 15, goals [EatGoal] [colony 5ccd9e33]
+- termite_worker 50285b67 at 991, 69, -6 (991.7, 69.9, -5.9) hp 2.0/3 walking to 988, 72, -6, goals [ClipGrassGoal] [colony 5ccd9e33]
+- termite_worker 600706a8 at 991, 69, -6 (991.9, 69.9, -5.5) hp 3.0/3 walking to 999, 67, 20, goals [StoreSeedGoal] [colony 5ccd9e33]
+- termite_worker 3aebc040 at 989, 70, -6 (989.5, 70.3, -5.5) hp 3.0/3 standing, still 61 s, goals [RandomLookAroundGoal] [colony 5ccd9e33]
+- termite_worker bd0bb846 at 989, 70, -6 (989.5, 70.3, -5.5) hp 3.0/3 standing, still 5 s, goals [ClipGrassGoal] [colony 5ccd9e33]
+- termite_worker dc78ec1c at 988, 68, -7 (988.5, 68.3, -6.5) hp 3.0/3 walking to 986, 69, -7, goals [ClipGrassGoal] [colony 5ccd9e33]
+- termite_worker 4a722ab0 at 988, 69, -5 (988.5, 69.3, -4.5) hp 3.0/3 standing, still 3 s, goals [ClipGrassGoal] [colony 5ccd9e33]
+- termite_worker 378b3720 at 988, 70, -6 (988.5, 70.3, -5.5) hp 3.0/3 standing, still 9 s, goals [] [colony 5ccd9e33]
+- termite_worker ca28522d at 988, 70, -6 (988.5, 70.3, -5.5) hp 3.0/3 standing, goals [ClipGrassGoal] [colony 5ccd9e33]
+- termite_worker 38135108 at 992, 69, -6 (992.8, 69.9, -5.9) hp 2.0/3 walking to 988, 71, -7, goals [ClipGrassGoal] [colony 5ccd9e33]
+- termite_worker e0e2c4a4 at 988, 70, -5 (988.5, 70.3, -4.5) hp 2.0/3 standing, still 4 s, goals [ClipGrassGoal] [colony 5ccd9e33]
+- termite_worker 943db02a at 988, 70, -5 (988.5, 70.3, -4.5) hp 3.0/3 standing, still 3 s, goals [ClipGrassGoal] [colony 5ccd9e33]
+- termite_worker 856f39fd at 987, 68, -7 (987.5, 68.3, -6.5) hp 3.0/3 standing, still 2 s, goals [ClipGrassGoal] [colony 5ccd9e33]
+- termite_minor_soldier 707da73d at 993, 68, -8 (993.6, 68.0, -7.2) hp 6.0/6 standing, still 165 s, goals [GuardPostGoal] [colony 5ccd9e33]
+- termite_worker 20bcbf62 at 987, 67, -7 (987.1, 67.0, -6.1) hp 3.0/3 standing, still 8 s, goals [] [colony 5ccd9e33]
+- termite_worker b00233cd at 987, 67, -7 (987.1, 67.0, -6.1) hp 3.0/3 standing, still 5 s, goals [ClipGrassGoal] [colony 5ccd9e33]
+- termite_worker 1202a51b at 986, 68, -7 (986.5, 68.3, -6.5) hp 3.0/3 standing, goals [ClipGrassGoal] [colony 5ccd9e33]
+- termite_minor_soldier 8316bca9 at 995, 69, 2 (995.5, 69.0, 2.2) hp 6.0/6 standing, still 224 s, goals [GuardPostGoal] [colony 5ccd9e33]
+- termite_minor_soldier 7409a1f2 at 989, 68, 3 (989.1, 68.0, 3.9) hp 6.0/6 standing, still 144 s, goals [GuardPostGoal] [colony 5ccd9e33]
+- termite_minor_soldier 5221f22c at 986, 68, 5 (986.5, 68.0, 5.5) hp 6.0/6 standing, still 156 s, goals [GuardPostGoal] [colony 5ccd9e33]
+- termite_minor_soldier 093626fb at 988, 68, 11 (988.1, 68.0, 11.3) hp 5.0/6 standing, still 197 s, goals [GuardPostGoal] [colony 5ccd9e33]
+- termite_worker 2caee3ac at 995, 67, 12 (995.9, 67.0, 12.3) hp 3.0/3 walking to 988, 70, -4, goals [ClipGrassGoal] [colony 5ccd9e33]
+- termite_minor_soldier acff962a at 982, 68, 12 (982.5, 68.0, 12.6) hp 6.0/6 standing, still 129 s, goals [GuardPostGoal] [colony 5ccd9e33]
+- termite_minor_soldier 109da6e9 at 1005, 68, 8 (1005.2, 68.0, 8.4) hp 6.0/6 standing, still 224 s, goals [GuardPostGoal] [colony 5ccd9e33]
+- termite_minor_soldier 24fd2bdd at 978, 68, 11 (978.5, 68.0, 11.5) hp 6.0/6 standing, still 165 s, goals [GuardPostGoal] [colony 5ccd9e33]
+- termite_minor_soldier 0f84bec5 at 1002, 68, 11 (1002.4, 68.0, 11.7) hp 5.0/6 standing, still 159 s, goals [GuardPostGoal] [colony 5ccd9e33]
+- termite_minor_soldier bef1152f at 974, 68, 9 (974.6, 68.0, 9.5) hp 6.0/6 standing, still 204 s, goals [GuardPostGoal] [colony 5ccd9e33]
+- termite_worker a0392a8f at 995, 67, 16 (995.0, 67.0, 16.5) hp 3.0/3 standing, still 2 s, goals [StandByQueenGoal] [colony 5ccd9e33]
+- termite_king 287c2142 at 994, 67, 16 (994.5, 67.0, 16.7) hp 10.0/10 standing, still 224 s, goals [] [colony 5ccd9e33]
+- termite_queen 25b94601 at 995, 67, 16 (995.5, 67.0, 16.5) hp 20.0/20 standing, still 224 s, goals [] [colony 5ccd9e33]
+- termite_worker 487149bc at 995, 67, 16 (995.0, 67.0, 16.8) hp 3.0/3 standing, still 33 s, goals [StandByQueenGoal] [colony 5ccd9e33]
+- termite_worker ae3d7ebd at 995, 67, 16 (995.0, 67.0, 16.8) hp 3.0/3 standing, still 34 s, goals [StandByQueenGoal] [colony 5ccd9e33]
+- termite_worker deb7c321 at 994, 67, 16 (995.0, 67.0, 16.8) hp 3.0/3 standing, still 14 s, goals [] [colony 5ccd9e33]
+- termite_worker da1756a4 at 995, 67, 16 (995.1, 67.0, 16.8) hp 3.0/3 standing, still 37 s, goals [StandByQueenGoal] [colony 5ccd9e33]
+- termite_worker a1c6a5c0 at 996, 67, 16 (996.6, 67.0, 16.6) hp 3.0/3 standing, still 10 s, goals [] [colony 5ccd9e33]
+- termite_minor_soldier 1cc5634a at 1008, 68, 11 (1008.3, 68.0, 11.6) hp 6.0/6 standing, still 140 s, goals [GuardPostGoal] [colony 5ccd9e33]
+
+The place: 916, 44, -49 (corner), size 96 x 48 x 96, in place.nbt.

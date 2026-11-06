@@ -177,6 +177,11 @@ public class NestLife {
         return storeWorkLeft;
     }
 
+    /** For the tests: whether the brain counts the queen in her chamber for the time away (as last seen). */
+    public boolean queenHomeAsSeen() {
+        return queenHome;
+    }
+
     /** For the tests: what the founders still have to do (ticks of one founder's work). */
     public long foundingWorkLeft() {
         return foundingWorkLeft;

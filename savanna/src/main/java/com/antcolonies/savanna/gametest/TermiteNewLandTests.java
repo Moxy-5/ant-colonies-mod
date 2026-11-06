@@ -15,6 +15,7 @@ import com.antcolonies.savanna.block.FungusCombBlock;
 import com.antcolonies.savanna.colony.DeadMounds;
 import com.antcolonies.savanna.colony.MoundPlan;
 import com.antcolonies.savanna.colony.NewLandMounds;
+import com.antcolonies.savanna.colony.SavannaParts;
 import com.antcolonies.savanna.entity.TermiteKingEntity;
 import com.antcolonies.savanna.tree.Forest;
 import com.antcolonies.savanna.worldgen.TermiteMoundStructure;
@@ -183,6 +184,33 @@ public class TermiteNewLandTests {
             helper.assertTrue(helper.getTick() % 40 == 0, "(the feeding spots are counted every 2 seconds)");
             java.util.List<com.antcolonies.savanna.colony.FeedingSpots.Spot> spots = com.antcolonies.savanna.colony.FeedingSpots.of(level, colony);
             helper.assertTrue(com.antcolonies.savanna.colony.FeedingSpots.byDay(spots) >= 1, "no feeding spot fed at by day: " + spots);
+        });
+    }
+
+    /**
+     * docs/BUGS.md 146: a colony new land puts in far from every player goes away before its first second here. The brain
+     * must still know its queen is in her chamber and its garden holds comb (one last look as it goes away), or no nurse
+     * feeds the royal pair while away and they starve.
+     */
+    @GameTest(template = "arena", timeoutTicks = 600, skyAccess = true)
+    public static void aColonyOfNewLandBornFarFromPlayersKnowsItsQueenAndGarden(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        TestScenes.deepGround(helper);
+        flatArena(helper);
+        Colony colony = NewLandMounds.get(level).put(level, helper.absolutePos(new BlockPos(32, SURFACE, 32)), NewLandMounds.pickFor("half", 0, 4321L));
+        NewLandMounds.fenceForTests(null);
+        helper.assertTrue(colony != null, "no colony put in");
+        // Far at once, before the colony's first second (as in a world: nobody within 64 blocks when it goes in).
+        colony.away().setOnForTests(true);
+        colony.away().setFarForTests(true);
+        colony.away().setNearForTests(false);
+        colony.away().setGraceForTests(40L);
+        com.antcolonies.savanna.colony.FungusGarden garden = colony.part(SavannaParts.FUNGUS_GARDEN).orElseThrow();
+        helper.succeedWhen(() -> {
+            helper.assertTrue(colony.away().isAway(level), "not away yet");
+            helper.assertTrue(colony.life().queenHomeAsSeen(), "away, the brain thinks the queen is out of her chamber (no nurse would feed her)");
+            int layers = garden.freshKnown() + garden.ripeKnown() + garden.oldKnown();
+            helper.assertTrue(layers > 0, "away, the brain knows no comb in the garden (no nurse food, no nodules growing)");
         });
     }
 

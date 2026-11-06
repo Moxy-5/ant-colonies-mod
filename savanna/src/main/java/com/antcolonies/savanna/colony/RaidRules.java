@@ -92,7 +92,9 @@ public final class RaidRules {
         if (raid == null || raid.stage() == RaidColumn.Stage.DONE) {
             return;
         }
-        long since = look.now() - raid.updatedAt();
+        // (Counted only from the colony's coming back: while away the column is not worked out, and the rule may look
+        // before the raid's first second back; docs/BUGS.md 147.)
+        long since = look.now() - Math.max(raid.updatedAt(), look.colony().away().backAt());
         if (since > HEARTBEAT) {
             look.breach(raid.find().at(), raid.members(), "the raid (" + raid.stage().name().toLowerCase() + ") was last worked out "
                     + since / 20 + " s ago while its colony is here");
@@ -166,7 +168,10 @@ public final class RaidRules {
             boolean excused = ant.getFightSpot() != null || ant.isParalysed()
                     || raid != null && raid.keepsNoHours() && raid.has(id)
                     || raids.wasSentAnyHour(id) // (BUGS 123: a scout sent "anytime", by the command or the soak, keeps no hours)
-                    || raids.isGoingHome(id) && look.stillFor(ant) < RAIDER_STILL;
+                    || raids.isGoingHome(id) && look.stillFor(ant) < RAIDER_STILL
+                    // BUGS 142: a scout whose search ended at 19:30 runs home straight on its own goal, not along a trail;
+                    // still walking (not standing), it is on its way home like the others (one standing is raider-stuck's)
+                    || ant.runsGoal(com.antcolonies.savanna.entity.goal.MatabeleScoutGoal.class) && look.stillFor(ant) < RAIDER_STILL;
             if (look.lasting(id.toString(), away && !excused) > OUT_AT_NIGHT) {
                 out.add(ant);
             }

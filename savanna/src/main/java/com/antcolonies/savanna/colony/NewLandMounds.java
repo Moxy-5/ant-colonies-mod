@@ -11,6 +11,7 @@ import java.util.concurrent.ConcurrentLinkedQueue;
 
 import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
 
+import com.antcolonies.gametest.TestIsolation;
 import com.antcolonies.colony.Caste;
 import com.antcolonies.colony.Colony;
 import com.antcolonies.colony.ColonyHooks;
@@ -347,12 +348,12 @@ public class NewLandMounds extends SavedData {
     private static boolean crowded(ServerLevel level, BlockPos center) {
         double apart = (double) KEEP_APART * KEEP_APART;
         for (Colony other : ColonyManager.get(level).getColonies()) {
-            if (other.getCenter().distSqr(center) < apart) {
+            if (other.getCenter().distSqr(center) < apart && !TestIsolation.inDifferentTests(other.getCenter(), center)) {
                 return true;
             }
         }
         for (DeadMounds.DeadMound other : DeadMounds.get(level).all()) {
-            if (other.center.distSqr(center) < apart) {
+            if (other.center.distSqr(center) < apart && !TestIsolation.inDifferentTests(other.center, center)) {
                 return true;
             }
         }

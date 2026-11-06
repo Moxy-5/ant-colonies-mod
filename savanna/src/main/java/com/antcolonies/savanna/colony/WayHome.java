@@ -61,6 +61,25 @@ public final class WayHome {
                 before == null ? why : before.why));
     }
 
+    /**
+     * BUGS 140: the next place along its trail has no way to it (the trail ran where it cannot walk now: down a ravine's
+     * side, across a block put since): it leaves the trail and makes straight for the entrance, hop by hop, with the
+     * hops slanting round what is in the way.
+     */
+    public void leaveTrail(UUID ant) {
+        Going one = going.get(ant);
+        if (one != null) {
+            one.route = null;
+            one.looked = true;
+        }
+    }
+
+    /** Whether it still walks a trail home (not yet left for the straight way, {@link #leaveTrail}). */
+    public boolean onTrail(UUID ant) {
+        Going one = going.get(ant);
+        return one != null && one.route != null;
+    }
+
     public boolean isGoingHome(UUID ant) {
         return going.containsKey(ant);
     }
@@ -121,10 +140,47 @@ public final class WayHome {
             }
         }
         if (one.route == null) {
-            return entrance; // (no way known: straight for the entrance, hop by hop)
+            return nearEntrance(level, ant, entrance); // (no way known: straight for the entrance, hop by hop)
         }
         double along = one.route.along(ant.getX(), ant.getZ());
-        return along + STEP >= one.route.length() ? entrance : RaidColumn.place(level, one.route, along + STEP, 0.0);
+        return along + STEP >= one.route.length() ? nearEntrance(level, ant, entrance) : RaidColumn.place(level, one.route, along + STEP, 0.0);
+    }
+
+    /** BUGS 143: the distances (blocks) from the entrance a place to walk to is looked for at, nearest a good one first. */
+    private static final double[] NEAR_ENTRANCE = {HOME - 3, HOME - 5, HOME - 1.5};
+    /** BUGS 143: the turns (radians) off the line to the insect tried at each distance. */
+    private static final double[] NEAR_TURNS = {0.0, 0.6, -0.6, 1.2, -1.2, 2.0, -2.0};
+
+    /**
+     * BUGS 143: where to walk to make for the entrance: ground an insect can stand on a few blocks from it on its own side
+     * (within {@link #HOME}, so it is home there and goes in by itself), the entrance only if none is found. A dead
+     * mound's entrance is its chimney's open mouth, air over the shaft: no walk can end there, and an ant 11 blocks out
+     * on flat grass found "no route" every time and stood for minutes.
+     */
+    static BlockPos nearEntrance(ServerLevel level, AbstractAntEntity ant, BlockPos entrance) {
+        return nearEntrance(level, ant, entrance, NEAR_ENTRANCE, HOME);
+    }
+
+    /** The same, looking at these distances from the entrance, and giving the entrance itself when already within {@code within}. */
+    public static BlockPos nearEntrance(ServerLevel level, AbstractAntEntity ant, BlockPos entrance, double[] distances, double within) {
+        double dx = ant.getX() - (entrance.getX() + 0.5);
+        double dz = ant.getZ() - (entrance.getZ() + 0.5);
+        double d = Math.sqrt(dx * dx + dz * dz);
+        if (d <= within || d < 0.01) {
+            return entrance;
+        }
+        for (double r : distances) {
+            for (double turn : NEAR_TURNS) {
+                double c = Math.cos(turn), sn = Math.sin(turn);
+                double x = entrance.getX() + 0.5 + (dx * c - dz * sn) / d * r;
+                double z = entrance.getZ() + 0.5 + (dx * sn + dz * c) / d * r;
+                BlockPos at = RaidGround.standAt(level, x, z, entrance.getY());
+                if (at != null) {
+                    return at;
+                }
+            }
+        }
+        return entrance;
     }
 
     /** Whether this insect is home: within {@link #HOME} of the entrance (flat and up or down), or in the nest. */

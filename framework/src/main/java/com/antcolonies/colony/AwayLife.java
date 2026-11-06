@@ -75,6 +75,8 @@ public class AwayLife {
     private final AwayReport report = new AwayReport();
     /** How long the colony was away the last time (ticks; 0 while away or never). Saved. */
     private long lastAwayFor;
+    /** When the colony last came back (game time; not saved: a loaded game starts it over), for the watch rules. */
+    private long backAt = Colony.NOT_SET;
     /** The colony's insects frozen in unloaded land: id -> what it was. Saved. */
     private final Map<UUID, Frozen> frozen = new LinkedHashMap<>();
     /** Tests only: whether this runs at all (null: always, except on the game test server). Not saved. */
@@ -192,6 +194,14 @@ public class AwayLife {
             }
         }
         return false;
+    }
+
+    /**
+     * When the colony last came back from being away (game time, {@link Colony#NOT_SET} if not since the game loaded):
+     * a watch rule counting how long something was left alone counts only from here (docs/BUGS.md 147).
+     */
+    public long backAt() {
+        return backAt;
     }
 
     /** Whether the colony is away: its middle has been out of range for the grace minute (its frozen insects are numbers now). */
@@ -337,6 +347,15 @@ public class AwayLife {
             awaySince = now;
             report.clear();
             lastAwayFor = 0;
+            if (level.isLoaded(colony.getCenter())) {
+                // (Far, its land still loaded: one last look at the nest. A colony new land put in far from every player
+                // goes away before its first second here, and the brain would think its queen out of her chamber and its
+                // garden empty, and starve the royal pair; docs/BUGS.md 146.)
+                colony.life().watch(level);
+                for (ColonyHooks.AwayWork look : colony.hooks().all(ColonyHooks.LOOK_ON_LEAVING)) {
+                    look.work(level);
+                }
+            }
             ColonyManager.get(level).markChanged();
         }
         if (isAway(level)) {
@@ -449,6 +468,7 @@ public class AwayLife {
             awaySince = Colony.NOT_SET;
             lastFarLook = Colony.NOT_SET;
             lastAwayFor = away;
+            backAt = level.getGameTime();
             ColonyHooks.Underground web = colony.underground();
             if (web != null) {
                 web.cameBack(level);

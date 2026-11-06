@@ -1,0 +1,19 @@
+Report 2026-11-06_05-02-16-raider-stuck
+raider-stuck broken: 1 raider(s) stuck: 0e17b9c3 going home (a scout that gave up on its way home), still 60 s
+Where: 2054, 73, 2026 in minecraft:overworld
+When: game tick 14708, day 1, 20:42
+Rules on: ON
+
+Colonies within 112 blocks (nearest first):
+- 58845cca | antcolonies:megaponera_analis | center 2044, 71, 1993 | nest in a dead termite mound, rooms open 6 of 6 | queen ca072bf1 | members 1078 | real 50 (wants 50), in the nest 1028 (workers young 213, middle 431, old 384) | while away (0.8 hours): nothing | ages 9 young, 18 middle, 21 old, jobs 9 nurses, 18 builders, 21 foragers | food 0 pieces in the store | queen fed 6/6, rich 0/5 (egg in 0:00) | queen unfed 0 of 100 min | eggs 0 | larvae 0, raids: 1 scout(s) out, its scouts reach out to 96 blocks, 0 good spot(s); 1 raider(s) going home by themselves | dead ants 0 (refuse chamber 0) | staying in (out at: )
+- c5f0408f | antcolonies:macrotermes | center 2040, 93, 2058 | queen 800d1e56 | members 260 | real 50 (wants 50), in the nest 209 (workers young 45, middle 81, old 72; soldiers 5 minor, 6 major) | while away (0.8 hours): nothing | foragers out as numbers 0 (remembers 1078 plants) | ages 12 young, 13 middle, 13 old, jobs 12 nurses, 13 builders, 13 foragers | gardens 6 dug (planned 6), comb 216 layers on 54 blocks, nodules 1, mushrooms after rain: 8 | queen holds 2/6 nodules, next egg in 0:00 | queen unfed 0 of 100 min | eggs 3 | larvae 5 | soldiers 17 minor (wants 18), 6 major (wants 6), nymphs growing into soldiers 1, posts held 12 (1 beside ways out, 5 on trails) | trails: from 2040, 94, 2050 to 2039, 93, 2075 (4 spots) | calm | knows 1080 food plants (108 found, not yet told) | dead ants 0 (refuse chamber 0) | mound stage 16 (earned 16) of 32, 294/294 blocks finished, earned 322.8 blocks | foraging now (out at: night, rain), holes open 2 of 17 | new holes 4 (0 spent, 0 being dug), reach 30 | runways 3 (0 finished) | galleries: 7 pieces (4 out to food), 6 tips, 91 of 59 blocks, reach 24, 17 holes, 14 in turn | hidden trips: 0 underway (103 made, 101 out at the far end, 2 broken into, 0 folded in), 1 eaten tufts growing back (0 on bare ground by the holes)
+
+Rules broken lately by these colonies:
+- tick 13723 (49 s ago) not-stuck at 2040, 92, 2066: 2 insect(s) with a route but not moving for 30 s or more: termite_worker 05ebf406 at 2040, 92, 2066, termite_worker e1160f77 at 2040, 92, 2066
+
+Insects within 24 blocks (nearest first):
+- matabele_major 0e17b9c3 at 2054, 73, 2026 (2054.1, 73.0, 2026.9) hp 10.0/10 standing, still 60 s, goals [MatabeleRaidGoal] | going home: a scout that gave up on its way home [colony 58845cca]
+- matabele_major 46be7303 at 2043, 63, 2004 (2043.0, 63.0, 2004.8) hp 10.0/10 walking to 2041, 65, 2003, goals [MatabeleScoutGoal] | scouting [colony 58845cca]
+- termite_minor_soldier d8cbc91b at 2040, 94, 2049 (2040.3, 94.0, 2049.6) hp 6.0/6 standing, still 71 s, goals [GuardPostGoal] [colony c5f0408f]
+
+The place: 1999, 49, 1977 (corner), size 96 x 48 x 96, in place.nbt.

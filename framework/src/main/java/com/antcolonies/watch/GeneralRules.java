@@ -142,7 +142,9 @@ public final class GeneralRules {
             case WEST -> new net.minecraft.world.phys.AABB(box.minX - FACE_GAP, box.minY, box.minZ, box.minX, box.maxY, box.maxZ);
             default -> new net.minecraft.world.phys.AABB(box.maxX, box.minY, box.minZ, box.maxX + FACE_GAP, box.maxY, box.maxZ);
         };
-        return insect.level().noCollision(insect, slab.inflate(0.01));
+        // (docs/BUGS.md 144: the face's own shape, not what this insect may walk through: a termite pressed against a
+        // chimney mouth's side holds it, though termites pass through the block)
+        return !insect.level().getBlockCollisions(null, slab.inflate(0.01)).iterator().hasNext();
     }
 
     static void notWalledIn(Watch.Look look) {

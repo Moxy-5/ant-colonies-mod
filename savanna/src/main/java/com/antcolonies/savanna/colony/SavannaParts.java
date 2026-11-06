@@ -152,6 +152,7 @@ public final class SavannaParts {
             .hears(ColonyNews.COLONY_ENDED, 20, (garden, level, news) -> // M8 1a: Xylaria takes the dead garden
                     DeadMounds.get(level).addCombs(level, news.colony(), news.center(), garden.getCombs(level)))
             .plugs(ColonyHooks.AWAY_AFTER_NURSES, 10, garden -> new GardenAway(garden)::grow) // nodules grow and the comb ages while away
+            .plugs(ColonyHooks.LOOK_ON_LEAVING, 10, garden -> garden::look) // the comb counted as the colony goes away far (BUGS 146)
             .answers(ColonyQuestions.NOTHING_TO_EAT_IN_STORE, 10, (garden, level, nothing) -> garden.oldKnown() <= 0) // no old layer as far as the brain knows
             .plugs(ColonyHooks.NURSE_FOOD, 10, garden -> garden) // fungus nodules
             .plugs(ColonyHooks.GARDEN, 10, garden -> new ColonyHooks.Garden() {

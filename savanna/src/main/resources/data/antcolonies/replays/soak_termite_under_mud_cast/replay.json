@@ -1,0 +1,9 @@
+{
+  "runs": 3,
+  "seconds": 300,
+  "from": "2026-11-06_07-06-14-holds-its-face",
+  "required": false,
+  "species": [
+    "macrotermes"
+  ]
+}

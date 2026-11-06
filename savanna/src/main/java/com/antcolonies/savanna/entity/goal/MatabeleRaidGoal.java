@@ -39,6 +39,8 @@ public class MatabeleRaidGoal extends Goal {
     private static final double UP_DOWN = 1.5;
     /** After no way to its place it tries again this many ticks later. */
     private static final int RETRY = 20;
+    /** BUGS 140: going home alone along a trail, after this many tries in a row with no way it leaves the trail (my pick: 3, 15 s). */
+    private static final int LEAVE_TRAIL_AFTER = 3;
 
     private final MatabeleEntity ant;
     @Nullable
@@ -49,6 +51,19 @@ public class MatabeleRaidGoal extends Goal {
     /** Step 3c: whether it limps home along a raid's trail (else it walks in its column), and whether it stands picking a termite up. */
     private boolean limping;
     private boolean picking;
+    /** BUGS 140: going home alone, the tries in a row that found no way (after {@link #LEAVE_TRAIL_AFTER}, it leaves the trail). */
+    private int limpFails;
+    /**
+     * BUGS 141: where it was when it last made headway on a walk, and the tick (none while not walking). Walking that long
+     * without getting anywhere (its place inside the refuse heap by the entrance, a step it cannot take), it stops and
+     * stands where it is a while: the column's own stuck check looks only at raiders sent far, so one sent a block or two
+     * kept planning the same walk for ever.
+     */
+    @Nullable
+    private net.minecraft.world.phys.Vec3 progressAt;
+    private int progressSince;
+    /** BUGS 141: ticks walking without headway before it stops (my pick: 8 s, past a doorway's peek and a crowd's shuffle). */
+    private static final int NO_PROGRESS = 160;
     /**
      * Step 3Q, Q5: cleaning an antenna while it waits at its place (real raiders standing at a halt clean themselves
      * between bouts of antenna-waving): the tick the clean ends, 0 for none.
@@ -106,6 +121,8 @@ public class MatabeleRaidGoal extends Goal {
     public void start() {
         walkingTo = null;
         waitUntil = 0;
+        limpFails = 0;
+        progressAt = null;
     }
 
     @Override
@@ -145,6 +162,15 @@ public class MatabeleRaidGoal extends Goal {
         }
         if (order.lookAt() != null && ant.getNavigator().isDone() && cleaningUntil == 0) {
             ant.getLookControl().setLookAt(order.lookAt().getX() + 0.5, order.lookAt().getY() + 0.3, order.lookAt().getZ() + 0.5);
+        }
+        if (gotNowhere()) {
+            ant.getNavigator().stop();
+            walkingTo = order.to();
+            waitUntil = ant.tickCount + RETRY * 5;
+            if (limping) {
+                limpFails++;
+            }
+            return;
         }
         BlockPos to = order.to();
         if (to == null) {
@@ -188,7 +214,18 @@ public class MatabeleRaidGoal extends Goal {
             walkingTo = to;
             return;
         }
-        if (!walkToward(level, to, order.pace())) {
+        boolean walked = walkToward(level, to, order.pace());
+        if (limping) {
+            limpFails = walked ? 0 : limpFails + 1;
+            if (limpFails >= LEAVE_TRAIL_AFTER) {
+                Raids raids = raids();
+                if (raids != null && raids.leaveTrailHome(level, ant)) {
+                    limpFails = 0;
+                    return; // (the entrance next tick, hop by hop)
+                }
+            }
+        }
+        if (!walked) {
             // no way now: a little later (BUGS 76: never searched every tick); going home alone it tried five ways, so it
             // waits longer (B7: a stuck one costs a few searches every 5 s, and is folded in out of sight after minutes)
             waitUntil = ant.tickCount + (limping ? RETRY * 5 : RETRY);
@@ -271,15 +308,20 @@ public class MatabeleRaidGoal extends Goal {
                 walkingTo = to;
                 return true;
             }
-            return false;
-        }
-        BlockPos along = column == null ? null : column.hopAlong(level, from, to, HOP);
-        if (along != null && ant.getNavigator().moveTo(along, pace)) {
-            walkingTo = to;
-            return true;
-        }
-        if (hopToward(level, from, to, HOP, 0.0, pace)) {
-            return true;
+            // BUGS 140: a near place with no way to it was given up at once, even going home alone; such an ant now
+            // tries the slanting hops below too (a scout stood 60 s and more by a ravine, its trail's next place below it).
+            if (!limping) {
+                return false;
+            }
+        } else {
+            BlockPos along = column == null ? null : column.hopAlong(level, from, to, HOP);
+            if (along != null && ant.getNavigator().moveTo(along, pace)) {
+                walkingTo = to;
+                return true;
+            }
+            if (hopToward(level, from, to, HOP, 0.0, pace)) {
+                return true;
+            }
         }
         // B7 (BUGS 121): the straight hop has no way (a cliff, a pond, a thorn tree's trunk in the way): it tries a shorter
         // hop, then hops slanting off to either side, before it waits and tries again. A scout far from home stood for
@@ -292,6 +334,14 @@ public class MatabeleRaidGoal extends Goal {
             if (hopToward(level, from, to, turn == 0.0 ? HOP / 2.0 : HOP * 0.7, turn, pace)) {
                 return true;
             }
+        }
+        // BUGS 140, again: on a ravine's lip by a lake every hop's landing lay in the water, over the drop or inside the
+        // hill, so no route was ever asked for and the scout stood all night. Last, the legs themselves look for any
+        // floor some blocks nearer home (searching toward it first): round the lake, over the hill, whatever way there is.
+        double nearer = Math.max(2.0, Math.min(HOP / 2.0, distance - AT));
+        if (ant.getNavigator().moveTo(hold -> hold.isFloor() && flat(hold.cell(), to) <= distance - nearer, to, pace)) {
+            walkingTo = to;
+            return true;
         }
         return false;
     }
@@ -332,6 +382,21 @@ public class MatabeleRaidGoal extends Goal {
             return true;
         }
         return false;
+    }
+
+    /** BUGS 141: whether it has walked {@link #NO_PROGRESS} ticks without moving half a block (waiting for the crowd aside). */
+    private boolean gotNowhere() {
+        net.minecraft.world.phys.Vec3 here = ant.position();
+        if (ant.getNavigator().isDone() || ant.getNavigator().heldForCrowd() || progressAt == null || here.distanceToSqr(progressAt) > 0.25) {
+            progressAt = ant.getNavigator().isDone() ? null : here;
+            progressSince = ant.tickCount;
+            return false;
+        }
+        if (ant.tickCount - progressSince < NO_PROGRESS) {
+            return false;
+        }
+        progressAt = null;
+        return true;
     }
 
     private static double flat(BlockPos a, BlockPos b) {
