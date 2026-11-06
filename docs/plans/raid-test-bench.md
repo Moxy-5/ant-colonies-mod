@@ -249,4 +249,5 @@ members doubled or halved; a watched colony gone; any stray). The 100-day run it
 - BUGS 111: the limits above cover every wait it could have been stuck in (the seal, the soldiers, the attack, the
   update itself); its cause is still to be caught in a black box.
 - Found: BUGS 122 (a termite worker standing with a route to a high mound job).
+- First short soak with round 3 (`tools/soak.sh 2 2`, 7 minutes): no strays, saves and colonies steady; found BUGS 123 (scouts out at night break home-by-night); fixed the same day: the trend's first line was taken at the soak's start (0 ms, insects not out yet), a false "LOOK"; now the first line comes after the first day.
 - Moved rules still open: books-add-up and speed (route searches and ms per raid), next round.

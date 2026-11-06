@@ -417,6 +417,9 @@ public final class Soak {
         double ms = samples == 0 ? 0 : state.getDouble("dayMsSum") / samples;
         state.putDouble("dayMsSum", 0);
         state.putInt("dayMsN", 0);
+        if (samples == 0) {
+            return; // the soak's start: no day run yet (a row here read 0 ms and the insects not yet out, a false "LOOK")
+        }
         Map<String, Integer> bySpecies = new java.util.TreeMap<>();
         long saves = 0;
         int strays = 0;
