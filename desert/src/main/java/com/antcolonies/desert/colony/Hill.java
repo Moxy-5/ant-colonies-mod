@@ -1,5 +1,6 @@
 package com.antcolonies.desert.colony;
 
+import com.antcolonies.colony.GroundTop;
 import com.antcolonies.colony.Claims;
 import com.antcolonies.colony.Colony;
 import java.util.ArrayList;
@@ -28,7 +29,6 @@ import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
-import net.minecraft.world.level.levelgen.Heightmap;
 import net.minecraft.world.phys.AABB;
 
 /**
@@ -220,7 +220,7 @@ public class Hill {
                 if (!level.hasChunk(x >> 4, z >> 4)) {
                     continue;
                 }
-                BlockPos pos = new BlockPos(x, level.getHeight(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, x, z), z);
+                BlockPos pos = GroundTop.cell(level, x, z);
                 if (isMoundSpot(level, pos)) {
                     spots.add(pos);
                 }

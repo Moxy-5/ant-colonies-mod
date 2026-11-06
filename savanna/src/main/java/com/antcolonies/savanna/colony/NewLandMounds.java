@@ -1,5 +1,6 @@
 package com.antcolonies.savanna.colony;
 
+import com.antcolonies.colony.GroundTop;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
@@ -47,7 +48,6 @@ import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.DoublePlantBlock;
 import net.minecraft.world.level.block.state.BlockState;
-import net.minecraft.world.level.levelgen.Heightmap;
 import net.minecraft.world.level.levelgen.structure.BoundingBox;
 import net.minecraft.world.level.saveddata.SavedData;
 import net.minecraft.world.phys.Vec3;
@@ -206,7 +206,7 @@ public class NewLandMounds extends SavedData {
      */
     private Colony put(ServerLevel level, BlockPos middle, Pick pick, UUID colonyId, boolean treeNow) {
         int x = middle.getX(), z = middle.getZ();
-        BlockPos center = new BlockPos(x, level.getHeight(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, x, z), z);
+        BlockPos center = GroundTop.cell(level, x, z);
         BlockState ground = level.getBlockState(center.below());
         String why = !level.getFluidState(center.below()).isEmpty() || !level.getFluidState(center).isEmpty() ? "water"
                 : !ground.is(ModTags.DIGGABLE) ? "no soil (" + ground.getBlock().getName().getString() + ")"
@@ -551,7 +551,7 @@ public class NewLandMounds extends SavedData {
 
     /** The top of the ground (or hump) at x, z: the first free cell over it. */
     private static BlockPos top(ServerLevel level, int x, int z) {
-        return new BlockPos(x, level.getHeight(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, x, z), z);
+        return GroundTop.cell(level, x, z);
     }
 
     /**

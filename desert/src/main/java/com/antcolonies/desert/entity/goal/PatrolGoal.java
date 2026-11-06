@@ -1,5 +1,6 @@
 package com.antcolonies.desert.entity.goal;
 
+import com.antcolonies.colony.GroundTop;
 import com.antcolonies.entity.goal.Errand;
 import java.util.ArrayList;
 import java.util.EnumSet;
@@ -20,7 +21,6 @@ import net.minecraft.util.Mth;
 import net.minecraft.world.entity.Mob;
 import net.minecraft.world.entity.ai.goal.Goal;
 import net.minecraft.world.entity.monster.Enemy;
-import net.minecraft.world.level.levelgen.Heightmap;
 
 /**
  * The mind of a patroller (brain step 4b, part 3; see {@code colony.Patrol}, which picks the patrollers and their ways).
@@ -229,7 +229,7 @@ public class PatrolGoal extends Goal {
         if (!level.hasChunkAt(new BlockPos(x, center.getY(), z))) {
             return center;
         }
-        return new BlockPos(x, level.getHeight(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, x, z), z);
+        return GroundTop.cell(level, x, z);
     }
 
     private static boolean near(BlockPos at, BlockPos target) {

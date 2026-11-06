@@ -1,5 +1,6 @@
 package com.antcolonies.savanna.colony;
 
+import com.antcolonies.colony.GroundTop;
 import java.util.Locale;
 
 import org.jetbrains.annotations.Nullable;
@@ -17,7 +18,6 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.util.Mth;
 import net.minecraft.util.RandomSource;
-import net.minecraft.world.level.levelgen.Heightmap;
 import net.minecraft.world.phys.Vec3;
 
 /**
@@ -129,7 +129,7 @@ public final class MatabeleColonies {
             double distance = 1.5 + colony.random().nextDouble() * 2.5;
             int x = Mth.floor(at.getX() + 0.5 + Math.cos(angle) * distance);
             int z = Mth.floor(at.getZ() + 0.5 + Math.sin(angle) * distance);
-            int y = level.getHeight(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, x, z);
+            int y = GroundTop.y(level, x, z);
             ant.moveTo(x + 0.5, y, z + 0.5, colony.random().nextFloat() * 360.0F, 0.0F);
             ant.joinColony(colony);
             ant.setGrownUpAt(grownUpAt);
