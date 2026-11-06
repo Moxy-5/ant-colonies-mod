@@ -288,6 +288,25 @@ public class AwayLife {
         foldIn(level, mob.getUUID(), new Frozen(Kind.ADULT, mob.nestCaste(), grownUpAt, loadOf(mob), 0, 0, null, now, false, mob.getLastMeal()));
     }
 
+    /**
+     * The raid test bench, B7 ({@link Strays}): a real insect stuck out of every player's sight is folded into the numbers
+     * now, with what it carries, and leaves the world (as if it had found its own way home). False if it is none the colony
+     * folds in (the queen, the king, a paralysed or downed one).
+     */
+    public boolean foldInStray(ServerLevel level, AbstractAntEntity mob) {
+        Frozen what = frozenOf(level, mob);
+        if (what == null) {
+            return false;
+        }
+        Frozen was = frozen.remove(mob.getUUID());
+        if (was == null || !was.folded()) {
+            foldIn(level, mob.getUUID(), what);
+        }
+        mob.discard();
+        ColonyManager.get(level).markChanged();
+        return true;
+    }
+
     private static Load loadOf(AbstractAntEntity mob) {
         if (mob.isCarryingEgg()) {
             return Load.EGG;

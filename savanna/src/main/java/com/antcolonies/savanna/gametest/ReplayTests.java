@@ -31,7 +31,8 @@ import net.neoforged.neoforge.gametest.GameTestHolder;
  * fixed it stays tested. The tests are named {@code replay_<name>}, each in a batch of its own; category {@code replays}.
  *
  * <p>{@code replay.json}: {@code runs} (how many times, each with fresh dice; 3 if not given), {@code seconds} (game
- * seconds a run; 300), {@code required} (false for a bug not fixed yet, so it is listed but does not fail the run).
+ * seconds a run; 300), {@code required} (false for a bug not fixed yet, so it is listed but does not fail the run), {@code species} (a list such as
+ * {@code ["megaponera_analis"]}: only rules those colonies break count; every colony if not given).
  */
 @GameTestHolder(SavannaMod.MODID)
 public class ReplayTests {
@@ -62,6 +63,7 @@ public class ReplayTests {
             int runs = 3;
             int seconds = 300;
             boolean required = true;
+            java.util.Set<String> species = new java.util.HashSet<>();
             Path json = folder.resolve("replay.json");
             if (Files.exists(json)) {
                 try {
@@ -69,6 +71,9 @@ public class ReplayTests {
                     runs = options.has("runs") ? Math.max(1, options.get("runs").getAsInt()) : runs;
                     seconds = options.has("seconds") ? Math.max(10, options.get("seconds").getAsInt()) : seconds;
                     required = !options.has("required") || options.get("required").getAsBoolean();
+                    if (options.has("species")) {
+                        options.getAsJsonArray("species").forEach(one -> species.add(one.getAsString()));
+                    }
                 } catch (IOException | RuntimeException e) {
                     SavannaMod.LOGGER.error("[replay] {}: replay.json could not be read, its defaults used", name, e);
                 }
@@ -76,9 +81,10 @@ public class ReplayTests {
             String testName = "replay_" + name.toLowerCase(Locale.ROOT).replaceAll("[^a-z0-9_]", "_");
             int ticks = seconds * 20;
             int runsFinal = runs;
+            java.util.Set<String> speciesFinal = java.util.Set.copyOf(species);
             tests.add(new TestFunction(testName, testName, SavannaMod.MODID + ":arena", Rotation.NONE,
                     ReplayRun.timeoutFor(runs, ticks), 0, required, false, 1, 1, true,
-                    helper -> ReplayRun.run(helper, () -> read(folder, name), runsFinal, ticks)));
+                    helper -> ReplayRun.run(helper, () -> read(folder, name), runsFinal, ticks, speciesFinal)));
         }
         return tests;
     }

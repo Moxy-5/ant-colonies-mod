@@ -42,6 +42,15 @@ public final class ReplayRun {
 
     /** Runs the replay as this test (see the class comment). */
     public static void run(GameTestHelper helper, Supplier<Replay> source, int runs, int ticksPerRun) {
+        run(helper, source, runs, ticksPerRun, java.util.Set.of());
+    }
+
+    /**
+     * Runs the replay as this test, counting only rules broken by colonies of {@code species} (their ids' paths, such as
+     * {@code megaponera_analis}; empty: every colony). A replay made for one bug names its species, so another colony's
+     * own bug in the same place (BUGS 122 in the bug 121 replay) is logged but does not fail it.
+     */
+    public static void run(GameTestHelper helper, Supplier<Replay> source, int runs, int ticksPerRun, java.util.Set<String> species) {
         ServerLevel level = helper.getLevel();
         Replay replay;
         try {
@@ -59,6 +68,7 @@ public final class ReplayRun {
         Replay.Put[] put = {null};
         boolean[] done = {false};
         int[] nearEdge = {0};
+        List<String> others = new ArrayList<>();
         ColonyFrameworkMod.LOGGER.info("[replay] {}: {} runs of {} s, the report: {}", replay.name(), runs, ticksPerRun / 20, replay.why());
         helper.onEachTick(() -> {
             if (done[0]) {
@@ -87,7 +97,12 @@ public final class ReplayRun {
                 if (colony == null) {
                     continue;
                 }
+                boolean counts = species.isEmpty() || species.contains(colony.getSpecies().getPath());
                 for (Watch.Breach breach : Watch.breaches(colony)) {
+                    if (!counts) {
+                        others.add(colony.getSpecies().getPath() + " " + breach.rule() + " at " + breach.where().toShortString());
+                        continue;
+                    }
                     if (!inside(replay, breach.where()) || (WALLED_IN.equals(breach.rule()) && pocketReachesEdge(level, replay, breach.where()))) {
                         nearEdge[0]++;
                         continue;
@@ -111,6 +126,10 @@ public final class ReplayRun {
             if (nearEdge[0] > 0) {
                 ColonyFrameworkMod.LOGGER.info("[replay] {}: {} rule(s) broken within {} blocks of the saved box's edge, not counted (the land past it is made up)",
                         replay.name(), nearEdge[0], EDGE);
+            }
+            if (!others.isEmpty()) {
+                ColonyFrameworkMod.LOGGER.warn("[replay] {}: {} rule(s) broken by other colonies, not this replay's bug, not counted: {}",
+                        replay.name(), others.size(), String.join("; ", others.subList(0, Math.min(6, others.size()))));
             }
             if (broken.isEmpty()) {
                 ColonyFrameworkMod.LOGGER.info("[replay] {}: {} runs, no rule broken", replay.name(), runs);

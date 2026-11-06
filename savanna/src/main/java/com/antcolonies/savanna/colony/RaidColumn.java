@@ -604,6 +604,11 @@ public final class RaidColumn {
         RaidCost.begin();
         try {
             update(level);
+        } catch (RuntimeException e) {
+            // B7: as in the colony's own call (Raids): the raid is given up rather than crash the game or hold its raiders
+            com.antcolonies.ColonyFrameworkMod.LOGGER.error("[raid] colony {}: the raid column's update failed; the raid is given up",
+                    colony.getId(), e);
+            abandon(level, e.toString());
         } finally {
             RaidCost.end();
         }
@@ -1027,6 +1032,21 @@ public final class RaidColumn {
                 + (lost.isEmpty() ? "" : ", lost on the way: " + lost));
         stage = Stage.DONE;
         ended = why;
+    }
+
+    /**
+     * The raid test bench, B7: the column could not be worked out (its update failed): the raid is given up where it is,
+     * every raider let go to walk home along the trail by itself and every fight for the column ended, so no raider is
+     * left holding an order nobody updates (one guess at BUGS 111, the attack that never ended).
+     */
+    void abandon(ServerLevel level, String why) {
+        for (UUID id : List.copyOf(members)) {
+            if (level.getEntity(id) instanceof MatabeleEntity ant && ant.fightOrderBy() == this) {
+                ant.endFightOrder(this);
+            }
+            letGo(id, "the raid was given up");
+        }
+        end("given up: " + why);
     }
 
     /** Why the column ended, and who left it on the way (tests and the log). */

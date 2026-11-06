@@ -362,7 +362,16 @@ public class Raids {
             if (column.stage() != RaidColumn.Stage.DONE && !column.keepsNoHours() && !column.turnedAtDusk() && isDusk(level)) {
                 column.callDusk(); // (R7: raids end by dusk: it stops where it is, picks up what it stung and walks home)
             }
-            column.update(level); // (the raiders ask it every few ticks; this keeps it going with none of them loaded)
+            try {
+                column.update(level); // (the raiders ask it every few ticks; this keeps it going with none of them loaded)
+            } catch (RuntimeException e) {
+                // B7 (nothing waits for ever): a column that cannot be worked out would hold its raiders for ever; it is
+                // given up and everyone walks home, and the error goes to the log for the bug list.
+                com.antcolonies.ColonyFrameworkMod.LOGGER.error("[raid] colony {}: the raid column's update failed; the raid is given up",
+                        colony.getId(), e);
+                say(level, "the raid's update failed (" + e + "): the raid is given up, everyone walks home");
+                column.abandon(level, e.toString());
+            }
             for (RaidColumn.LetGo one : column.takeLetGo()) {
                 wayHome.send(one.ant(), column.back(), level.getGameTime(), one.why());
                 say(level, one.ant().toString().substring(0, 8) + " goes home along the trail by itself (" + one.why() + ")");

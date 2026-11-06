@@ -203,4 +203,50 @@ What was built, and how it differs from the steps above (my picks):
 - B3: `tools/report_to_test.py`, `ReplayTests` (category `replays`), `/antcolonies replay`. My picks: replays at the report's own coordinates; rules near the box's edge (8 blocks) and walled-in pockets reaching it not counted; report boxes shifted to take in the nests; 3 runs of 180 s for the first two replays.
 - B4: `tools/soak.sh`, `watch/Soak`, `colony/RaidSoak`. My picks: an 8-chunk patch and 8 chunks round each watched colony kept loaded; at most 3 Matabele colonies; pokes every 1 to 5 game minutes, raids weight 3; a restart about once a game day while a raid is out; 12 places tried; fixed seed list; tick rate 1000; "stand in a column" skipped (needs a real player); any number of days.
 - First soak (2 servers, 2 days): BUGS 120 fixed, BUGS 121 open; one seed found no colonies (now 12 places tried).
-- Round 3 (B5 the 100-day check, B7) not started.
+- Round 3 (B5 the 100-day check, B7): built, see below.
+
+## Round 3, BUILT 2026-11-05 (B7, B5, B8 begun)
+
+### B7: every wait, its limit and its escape
+| Who waits | For what | Limit | Then |
+|---|---|---|---|
+| The column, each stage (forming to homing) | its stage to finish | the stage's own limit (`stageMostTicks`) | given up; every raider let go home along the trail (`WayHome`) |
+| Forming | recruits to come out | 15 s for the scout's recruiting, the stage's limit for the pour-out | leaves with those out; latecomers follow |
+| The march's front | the ants behind | 4 s | walks on |
+| A raider on the march | a way on | 15 s stuck (no way 10 s) | goes home alone |
+| A broken trail | the trail picked up past the gap | the casting limit (R4) | a former scout leads on, else home |
+| The attack | termites to fight | 30 s after the last one, 2 minutes at most | collecting, then home |
+| An empty raid, spreading | a termite found | 30 s | home |
+| The walk home | the line to move | 10 s stuck | the line breaks up, each ant home its own way |
+| A raider out of sight | the player to look away | a minute's grace | folded in or let go |
+| An ant let go (going home alone) | a hop toward home | 20 s between tries (100 s when limping); then hops turned 45 and 90 degrees to each side, at its own height too (**new**, BUGS 121) | after `limpTicks` the raid sweep sends it again |
+| A shut-in Matabele (bite-out) | something it may bite | 30 s with nothing to bite | lets go for 30 s, the walk home tries |
+| A scout | its trip | its trip time (`trip_ticks`, 4 minutes) | home straight |
+| The raid's update itself | (an error in its code) | at once (**new**) | the raid given up, everyone let go home, the error in the log and the diary |
+| A termite seal | the foe to leave, then foraging time | as before, and now **one game day at most** (`RaidDefence.SEAL_MOST`, **new**) | the seal opens |
+| Termite soldiers shut out by a seal | the seal to open | the seal's limit (a day at most, **new**) | back in through it |
+| Termite workers retreating | the danger to pass | 15 s (`RetreatGoal`) | back to work |
+| Termite plugging | a hole to plug | `plugGiveUpTicks` × 3 and the wave wait | gives up |
+| A paralysed termite | to be carried off | a day | dies |
+| **Any insect** out of its nest, walking a route or with its last search failed (**new**, `colony/Strays`) | to get anywhere | not 1.5 blocks moved in 3 minutes, out of every player's sight | folded into the colony's numbers, as a real ant comes home unseen; a `[stray]` line in the log and the black box, and counted in the soak's trend |
+
+My picks: the seal a day at most (real termites reopen sealed galleries the next night); the stray net 3 minutes and
+only out of sight (a player never sees an ant vanish), never the queen or king, a paralysed, downed or clamped insect,
+or one inside its nest (the nest has its own rules). The stray net is a safety net, not a fix: each fold-in is a bug
+to look at, so the soak's report flags any.
+
+### B5: the 100-day check
+The soak writes one line a game day to `soak-trend.txt` (the day's mean ms a tick, real insects, every colony's save
+together, strays folded in, colonies by species, each watched colony's members and save), and the soak report gets a
+"Slow things" part comparing the first days with the last, with "LOOK:" before anything past its limit (my picks: ticks
+1.5 times slower and 2 ms more; saves still growing over 5 percent a day in the last half; insects or a watched colony's
+members doubled or halved; a watched colony gone; any stray). The 100-day run itself is your PC's time overnight:
+`tools/soak.sh 4 100`.
+
+### B8 begun
+- BUGS 121 fixed (the scout home over a ravine's lip) and its replay required, counting only the Matabele's rules (a
+  replay may now name its species, `replay.json` `"species"`, `report_to_test.py --species`).
+- BUGS 111: the limits above cover every wait it could have been stuck in (the seal, the soldiers, the attack, the
+  update itself); its cause is still to be caught in a black box.
+- Found: BUGS 122 (a termite worker standing with a route to a high mound job).
+- Moved rules still open: books-add-up and speed (route searches and ms per raid), next round.

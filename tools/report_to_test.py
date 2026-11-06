@@ -1,6 +1,6 @@
 """The raid test bench, round 2, B3 (docs/plans/raid-test-bench.md): a saved report made into a game test.
 
-    python tools/report_to_test.py <report> [--name NAME] [--runs N] [--seconds S] [--known-bug]
+    python tools/report_to_test.py <report> [--name NAME] [--runs N] [--seconds S] [--known-bug] [--species ID ...]
 
 <report> is a report folder (run/reports/<name>, or just its name: it is looked for in run/reports). Its place.nbt,
 colonies.nbt and report.txt are copied into savanna/src/main/resources/data/antcolonies/replays/<name>/ (report.txt
@@ -11,6 +11,9 @@ time and every rule watching; it fails if any rule breaks.
 
 --known-bug: the bug is not fixed yet, so the test is listed but does not fail a run (replay.json "required": false);
 take it out of replay.json once fixed.
+
+--species megaponera_analis [...]: only rules those species' colonies break count (replay.json "species"), so another
+colony's own bug in the same place does not fail this replay (it is logged); every colony counts if not given.
 
 Only reports saved with their land (a place.nbt) can be replayed.
 """
@@ -40,6 +43,7 @@ def main() -> None:
     parser.add_argument("--runs", type=int, default=3)
     parser.add_argument("--seconds", type=int, default=300)
     parser.add_argument("--known-bug", action="store_true")
+    parser.add_argument("--species", nargs="+", help="only these species' colonies' rules count")
     args = parser.parse_args()
 
     report = find_report(args.report)
@@ -57,6 +61,8 @@ def main() -> None:
     options = {"runs": max(1, args.runs), "seconds": max(10, args.seconds), "from": report.name}
     if args.known_bug:
         options["required"] = False
+    if args.species:
+        options["species"] = args.species
     (target / "replay.json").write_text(json.dumps(options, indent=2) + "\n", encoding="utf-8")
 
     size = sum(f.stat().st_size for f in target.iterdir()) / 1_000_000

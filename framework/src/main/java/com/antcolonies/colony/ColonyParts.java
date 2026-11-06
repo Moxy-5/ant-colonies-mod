@@ -118,6 +118,10 @@ public final class ColonyParts {
     public static final Type<AwayLife> AWAY_LIFE = shared("away_life", AwayLife::new, part -> part
             .ticks(10, AwayLife::settle)
             .saves(AwayLife::save, AwayLife::load));
+    /** The raid test bench, B7: an insect stuck out of sight for minutes finds its own way home (folded into the numbers). */
+    public static final Type<Strays> STRAYS = shared("strays", Strays::new, part -> part
+            .ticks(215, Strays::tick)
+            .notSaved("after a load every insect's stuck time starts again"));
     public static final Type<NestLedger> NEST_LEDGER = shared("nest_ledger", NestLedger::new, part -> part
             .saves(NestLedger::save, NestLedger::load));
     public static final Type<NestLife> NEST_LIFE = shared("nest_life", NestLife::new, part -> part

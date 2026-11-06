@@ -185,7 +185,9 @@ public class MatabeleRaidGoal extends Goal {
             return;
         }
         if (!walkToward(level, to, order.pace())) {
-            waitUntil = ant.tickCount + RETRY; // no way now: a little later (BUGS 76: never searched every tick)
+            // no way now: a little later (BUGS 76: never searched every tick); going home alone it tried five ways, so it
+            // waits longer (B7: a stuck one costs a few searches every 5 s, and is folded in out of sight after minutes)
+            waitUntil = ant.tickCount + (limping ? RETRY * 5 : RETRY);
             if (order.take() != null && column != null) {
                 column.noWayTo(level, ant, order.take()); // (another may reach it, or this one later)
             }
@@ -242,11 +244,55 @@ public class MatabeleRaidGoal extends Goal {
             walkingTo = to;
             return true;
         }
-        double share = HOP / distance;
-        double x = from.getX() + 0.5 + (to.getX() - from.getX()) * share;
-        double z = from.getZ() + 0.5 + (to.getZ() - from.getZ()) * share;
+        if (hopToward(level, from, to, HOP, 0.0, pace)) {
+            return true;
+        }
+        // B7 (BUGS 121): the straight hop has no way (a cliff, a pond, a thorn tree's trunk in the way): it tries a shorter
+        // hop, then hops slanting off to either side, before it waits and tries again. A scout far from home stood for
+        // hours where every straight hop home failed. (Only after the straight hop failed: no cost on open ground; and only
+        // for an ant going home by itself, so a column's many raiders never run five searches each.)
+        if (!limping) {
+            return false;
+        }
+        for (double turn : SIDE_TURNS) {
+            if (hopToward(level, from, to, turn == 0.0 ? HOP / 2.0 : HOP * 0.7, turn, pace)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /** B7: the turns (radians) a blocked hop tries, after a half hop straight: 45 degrees, then 90, each side. */
+    private static final double[] SIDE_TURNS = {0.0, Math.PI / 4, -Math.PI / 4, Math.PI / 2, -Math.PI / 2};
+    /** BUGS 121: the heights round the ant's own a hop's landing is looked for at, after the guess (each ±3 more by standAt). */
+    private static final int[] OWN_HEIGHTS = {0, 6, -6};
+
+    /** A hop of {@code length} blocks from {@code from} toward {@code to}, turned by {@code turn} radians; false if no way. */
+    private boolean hopToward(ServerLevel level, BlockPos from, BlockPos to, double length, double turn, double pace) {
+        double dx = to.getX() - from.getX();
+        double dz = to.getZ() - from.getZ();
+        double distance = Math.sqrt(dx * dx + dz * dz);
+        if (distance < 1.0E-3) {
+            return false;
+        }
+        double share = Math.min(1.0, length / distance);
+        double cos = Math.cos(turn);
+        double sin = Math.sin(turn);
+        double x = from.getX() + 0.5 + (dx * cos - dz * sin) * share;
+        double z = from.getZ() + 0.5 + (dx * sin + dz * cos) * share;
         int y = Mth.floor(Mth.lerp(share, from.getY(), to.getY()));
         BlockPos hop = RaidGround.standAt(level, x, z, y);
+        // BUGS 121: the height guessed from the way's two ends missed the ground on a hillside (the scout on a ravine's
+        // lip 10 blocks above its nest: every hop's guess lay inside the hill beside it or in the air over the ravine);
+        // the ant's own height, and a little over and under it, are tried too.
+        for (int dy : OWN_HEIGHTS) {
+            if (hop != null) {
+                break;
+            }
+            if (from.getY() + dy != y) {
+                hop = RaidGround.standAt(level, x, z, from.getY() + dy);
+            }
+        }
         if (hop != null && ant.getNavigator().moveTo(hop, pace)) {
             walkingTo = to;
             return true;

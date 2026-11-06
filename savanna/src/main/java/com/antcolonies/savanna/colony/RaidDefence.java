@@ -58,6 +58,13 @@ public class RaidDefence {
      * (ticks, 30 s: 12 soldiers in waves of 2 or 3 every 5 s; my pick). Real: the workers seal behind the soldiers.
      */
     private static final int WAVE_WAIT = 600;
+    /**
+     * The raid test bench, B7 (nothing waits for ever): a seal opens at the first foraging time this long after it was due
+     * (ticks, a game day) even with a foe still near the break. A raider stuck in a pit by the gallery (BUGS 111) or a lone
+     * ant wandering by would otherwise keep it shut, and the soldiers outside waiting by it, for ever (my pick; real
+     * termites reopen sealed galleries once the attack is over, and a day of one stray ant nearby is no attack).
+     */
+    static final long SEAL_MOST = 24000;
     /** S3: how far (blocks) from a break with no tunnel of ours under it the soldiers come out of a gallery, least and most. */
     private static final int WAVE_NEAREST = 2;
     private static final int WAVE_FARTHEST = 8;
@@ -206,8 +213,8 @@ public class RaidDefence {
                 trySeal(level, breach, now, numbers);
             } else if (breach.ours && !level.getBlockState(breach.plug).is(plugState().getBlock())) {
                 breaches.remove(breach); // the seal is gone (a player broke it)
-            } else if (colony.isForagingTime(level) && now - breach.lastFoe >= numbers.overAfterTicks()) {
-                open(level, breach);
+            } else if (colony.isForagingTime(level) && (now - breach.lastFoe >= numbers.overAfterTicks() || now - breach.due >= SEAL_MOST)) {
+                open(level, breach); // (B7: a foe stuck by the break for ever no longer keeps it shut for ever)
             }
         }
     }

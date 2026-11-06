@@ -291,14 +291,18 @@ public final class Soak {
             long nanos = System.nanoTime();
             if (lastTickSample >= 0) {
                 double realSeconds = (nanos - lastTickSampleNanos) / 1e9;
+                double msNow = server.getAverageTickTimeNanos() / 1e6;
                 note(server, "soak-ticks.txt", String.format(java.util.Locale.ROOT, "%s %.2f ms a tick, %.0f ticks a second, %d insects",
-                        when(level), server.getAverageTickTimeNanos() / 1e6, (now - lastTickSample) / Math.max(0.001, realSeconds), insects(level, watched)));
+                        when(level), msNow, (now - lastTickSample) / Math.max(0.001, realSeconds), insects(level, watched)));
+                state.putDouble("dayMsSum", state.getDouble("dayMsSum") + msNow); // (B5: the day's mean for the trend)
+                state.putInt("dayMsN", state.getInt("dayMsN") + 1);
             }
             lastTickSample = now;
             lastTickSampleNanos = nanos;
         }
         if (now >= state.getLong("nextDay")) {
             sizes(level, watched);
+            trend(level, watched);
             state.putLong("nextDay", now + 24000);
             report(level, false);
             saveState(server);
@@ -402,6 +406,120 @@ public final class Soak {
         }
     }
 
+    /**
+     * The raid test bench, B5 (the 100-hour check): one line a game day in {@code soak-trend.txt} with the slow things a
+     * long game shows: the day's mean milliseconds a tick, the world's real insects, the colonies by species, every
+     * colony's save together, each watched colony's members and save, and the strays folded in so far (B7's safety net:
+     * each one is an insect that was stuck for minutes, a bug to look at). {@link #slowThings} reads it back for the report.
+     */
+    private static void trend(ServerLevel level, List<Colony> watched) {
+        int samples = state.getInt("dayMsN");
+        double ms = samples == 0 ? 0 : state.getDouble("dayMsSum") / samples;
+        state.putDouble("dayMsSum", 0);
+        state.putInt("dayMsN", 0);
+        Map<String, Integer> bySpecies = new java.util.TreeMap<>();
+        long saves = 0;
+        int strays = 0;
+        for (Colony colony : ColonyManager.get(level).getColonies()) {
+            bySpecies.merge(colony.getSpecies().getPath(), 1, Integer::sum);
+            saves += colony.save().sizeInBytes();
+            strays += colony.part(com.antcolonies.colony.ColonyParts.STRAYS).map(com.antcolonies.colony.Strays::folded).orElse(0);
+        }
+        int insects = 0;
+        for (net.minecraft.world.entity.Entity entity : level.getAllEntities()) {
+            if (entity instanceof com.antcolonies.entity.AbstractAntEntity) {
+                insects++;
+            }
+        }
+        StringBuilder row = new StringBuilder(String.format(java.util.Locale.ROOT, "day %d | ms %.2f | insects %d | saves %d kB | strays %d | colonies",
+                state.getInt("trendDay") + 1, ms, insects, saves / 1024, strays));
+        bySpecies.forEach((species, count) -> row.append(' ').append(species).append(' ').append(count));
+        for (Colony colony : watched) {
+            row.append(" | ").append(colony.getId().toString(), 0, 8).append(" members ").append(colony.getMemberCount())
+                    .append(" save ").append(colony.save().sizeInBytes() / 1024).append(" kB");
+        }
+        state.putInt("trendDay", state.getInt("trendDay") + 1);
+        note(level.getServer(), "soak-trend.txt", row.toString());
+    }
+
+    /**
+     * B5: the slow things read back from {@code soak-trend.txt}: the first days against the last (ticks slower, saves and
+     * insects growing, watched colonies dying out or blowing up, strays), each a plain line, "LOOK:" before one past its
+     * limit (my picks: ticks 1.5 times slower and 2 ms more; saves still growing over 5 percent a day in the last half;
+     * insects or a colony's members doubled or halved; any stray).
+     */
+    static List<String> slowThings(List<String> rows) {
+        List<String> out = new ArrayList<>();
+        if (rows.size() < 2) {
+            out.add("  (fewer than 2 game days: nothing to compare yet)");
+            return out;
+        }
+        int n = Math.min(3, rows.size() / 2);
+        double msFirst = mean(rows.subList(0, n), "ms ");
+        double msLast = mean(rows.subList(rows.size() - n, rows.size()), "ms ");
+        boolean slower = msLast > msFirst * 1.5 && msLast > msFirst + 2;
+        out.add(String.format(java.util.Locale.ROOT, "  %sms a tick: %.2f the first %d day(s), %.2f the last %d", slower ? "LOOK: " : "", msFirst, n, msLast, n));
+        double savesHalf = number(rows.get(rows.size() / 2), "saves ");
+        double savesLast = number(rows.get(rows.size() - 1), "saves ");
+        int days = rows.size() - 1 - rows.size() / 2;
+        double growth = days <= 0 || savesHalf <= 0 ? 0 : (Math.pow(savesLast / savesHalf, 1.0 / days) - 1) * 100;
+        out.add(String.format(java.util.Locale.ROOT, "  %ssaves: %.0f kB on day 1, %.0f kB halfway, %.0f kB on the last day (%.1f percent a day in the last half)",
+                growth > 5 ? "LOOK: " : "", number(rows.get(0), "saves "), savesHalf, savesLast, growth));
+        double insectsFirst = number(rows.get(0), "insects ");
+        double insectsLast = number(rows.get(rows.size() - 1), "insects ");
+        boolean insectsOff = insectsFirst > 0 && (insectsLast > insectsFirst * 2 || insectsLast < insectsFirst / 2);
+        out.add(String.format(java.util.Locale.ROOT, "  %sreal insects in the world: %.0f on day 1, %.0f on the last day", insectsOff ? "LOOK: " : "", insectsFirst, insectsLast));
+        double strays = number(rows.get(rows.size() - 1), "strays ");
+        out.add(String.format(java.util.Locale.ROOT, "  %sstrays folded in (stuck 3 minutes out of sight): %.0f", strays > 0 ? "LOOK: " : "", strays));
+        Map<String, Double> firstMembers = members(rows.get(0));
+        Map<String, Double> lastMembers = members(rows.get(rows.size() - 1));
+        for (Map.Entry<String, Double> first : firstMembers.entrySet()) {
+            Double last = lastMembers.get(first.getKey());
+            if (last == null) {
+                out.add("  LOOK: watched colony " + first.getKey() + " is gone (" + Math.round(first.getValue()) + " members on day 1)");
+            } else {
+                boolean off = last > first.getValue() * 2 || last < first.getValue() / 2;
+                out.add("  " + (off ? "LOOK: " : "") + "colony " + first.getKey() + ": " + Math.round(first.getValue()) + " members on day 1, "
+                        + Math.round(last) + " on the last day");
+            }
+        }
+        return out;
+    }
+
+    private static double mean(List<String> rows, String key) {
+        return rows.stream().mapToDouble(row -> number(row, key)).average().orElse(0);
+    }
+
+    /** The number after {@code key} in a trend line (0 if none). */
+    static double number(String row, String key) {
+        int at = row.indexOf(key);
+        if (at < 0) {
+            return 0;
+        }
+        int from = at + key.length();
+        int to = from;
+        while (to < row.length() && (Character.isDigit(row.charAt(to)) || row.charAt(to) == '.')) {
+            to++;
+        }
+        try {
+            return Double.parseDouble(row.substring(from, to));
+        } catch (NumberFormatException e) {
+            return 0;
+        }
+    }
+
+    /** Each watched colony's members in a trend line, by its short id. */
+    static Map<String, Double> members(String row) {
+        Map<String, Double> out = new LinkedHashMap<>();
+        for (String part : row.split(" \\| ")) {
+            int at = part.indexOf(" members ");
+            if (at == 8) {
+                out.put(part.substring(0, 8), number(part, " members "));
+            }
+        }
+        return out;
+    }
+
     // --- the end and the report ------------------------------------------------------------------------------------
 
     private static void finish(ServerLevel level, @Nullable String why) {
@@ -496,6 +614,10 @@ public final class Soak {
             } else {
                 out.append('\n');
             }
+        }
+        out.append("Slow things (B5; one line a game day in soak-trend.txt):\n");
+        for (String row : slowThings(read(server, "soak-trend.txt"))) {
+            out.append(row).append('\n');
         }
         out.append("Sizes by day (soak-sizes.txt):\n");
         for (String row : read(server, "soak-sizes.txt")) {
