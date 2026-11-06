@@ -1,0 +1,28 @@
+# Guard film (real sizes, step 3, personal space, 2026-11-05): eight Matabele majors (half a block long) put down on
+# top of one another in a pen 2 blocks across. They must spread apart within a second or two and then stand shoulder to
+# shoulder, a little touching at most, never one body inside another (AntNavigator.keepApart, the crowd grid in
+# nav/Crowd), and none climbing onto another. Seen from above and from the side. Their own minds run (no colony: they
+# stand and stroll), so a stroll can differ between launches: a few changed pictures here are expected; look at them.
+cmd time set noon
+cmd weather clear
+lens 30
+cmd kill @e[type=!player]
+cmd fill -3 -60 -3 3 -57 3 air
+cmd fill -2 -60 -2 1 -60 1 stone
+cmd fill -1 -60 -1 0 -60 0 air
+cmd summon antcolonies:matabele_major -0.02 -60 0.00 {Rotation:[0f,0f]}
+cmd summon antcolonies:matabele_major 0.01 -60 0.02 {Rotation:[45f,0f]}
+cmd summon antcolonies:matabele_major 0.00 -60 -0.02 {Rotation:[90f,0f]}
+cmd summon antcolonies:matabele_major 0.03 -60 0.01 {Rotation:[135f,0f]}
+cmd summon antcolonies:matabele_major -0.01 -60 0.03 {Rotation:[180f,0f]}
+cmd summon antcolonies:matabele_major 0.02 -60 -0.03 {Rotation:[225f,0f]}
+cmd summon antcolonies:matabele_major -0.03 -60 -0.01 {Rotation:[270f,0f]}
+cmd summon antcolonies:matabele_major 0.00 -60 0.04 {Rotation:[315f,0f]}
+cmd tick freeze
+camera 0 -55.5 0.01 0 90
+fov 25
+burst spread_above 30 2
+step 40
+camera 0 -59.2 -3.2 0 15
+burst standing_side 10 2
+quit

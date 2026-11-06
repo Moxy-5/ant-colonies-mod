@@ -493,13 +493,23 @@ public class MatabeleFightTests {
         long[] openedAt = {-1};
         long[] stungAt = {-1};
         int[] stops = {0};
+        int[] crowdStops = {0}; // (held for the crowd, not counted; the shuffles aside among them in shuffleStops)
+        int[] shuffleStops = {0};
         Map<UUID, Boolean> moving = new HashMap<>();
         helper.onEachTick(() -> {
             long tick = helper.getTick();
             for (MatabeleEntity ant : ants) {
                 boolean now = ant.getDeltaMovement().horizontalDistanceSqr() > 1.0E-4;
+                // (waiting one's turn in the crowd at the opening is not stopping dead: real sizes step 3's personal space)
                 if (Boolean.TRUE.equals(moving.get(ant.getUUID())) && !now) {
-                    stops[0]++;
+                    if (!ant.getNavigator().heldForCrowd()) {
+                        stops[0]++;
+                    } else {
+                        crowdStops[0]++;
+                        if (ant.getNavigator().shuffledLately()) {
+                            shuffleStops[0]++;
+                        }
+                    }
                 }
                 moving.put(ant.getUUID(), now);
             }
@@ -522,13 +532,13 @@ public class MatabeleFightTests {
         helper.runAtTickTime(2400, () -> {
             int notFound = ants.stream().mapToInt(MatabeleEntity::chasesNotFoundForTests).sum();
             long stung = termites.stream().filter(termite -> termite.isParalysed() || !termite.isAlive()).count();
-            SavannaMod.LOGGER.info("[break-in test] opened at {} ({} blocks), first stung at {}, {} of 5 stung, {} walks not found, {} stops",
-                    openedAt[0], opened(helper), stungAt[0], stung, notFound, stops[0]);
+            SavannaMod.LOGGER.info("[break-in test] opened at {} ({} blocks), first stung at {}, {} of 5 stung, {} walks not found, {} stops ({} more for the crowd, {} of them shuffles aside)",
+                    openedAt[0], opened(helper), stungAt[0], stung, notFound, stops[0], crowdStops[0], shuffleStops[0]);
             helper.assertTrue(notFound <= 10, notFound + " walks planned to termites that could not be reached (600 on the old code)");
             helper.assertTrue(opened(helper) <= 5 * 6, opened(helper) + " blocks opened: more than 6 a major");
             helper.assertTrue(stung >= 3, "only " + stung + " of the 5 termites in the gallery stung in 2 minutes");
             int allowed = ants.size() * 2400 / 20 / 5;
-            helper.assertTrue(stops[0] <= allowed, stops[0] + " stops in 2 minutes for 10 ants (at most " + allowed + ": once every 5 s each)");
+            helper.assertTrue(stops[0] <= allowed, stops[0] + " stops in 2 minutes for 10 ants (at most " + allowed + ": once every 5 s each; waits for the crowd not counted)");
             helper.succeed();
         });
     }

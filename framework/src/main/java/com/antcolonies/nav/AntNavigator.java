@@ -208,6 +208,13 @@ public class AntNavigator {
     private static final double SPOT_REACH = 0.28;
     /** Within this (blocks) of its free spot a walk is over. */
     private static final double AT_SPOT = 0.06;
+    /**
+     * Walking onto its free spot it keeps its pace until this close (blocks), then eases to at least
+     * {@link #ARRIVE_SLOWEST} of it: a real ant walks up and stops, it never creeps the last bit (the break-in test
+     * counted every creep as a stop, real sizes step 3).
+     */
+    private static final double ARRIVE_EASE = 0.15;
+    private static final double ARRIVE_SLOWEST = 0.6;
     /** A standing insect closer than this share of the personal distance to an older stander shuffles aside. */
     private static final double KEEP_APART = 0.85;
     /** How far (blocks) one standing squeezed in looks for a free spot round it (my pick: a major's body and a half). */
@@ -219,13 +226,19 @@ public class AntNavigator {
     /** At most this far (blocks) a shuffle aims in one go, and at this pace (my pick: a quick step aside, as a jostled ant does). */
     private static final double SHUFFLE_MOST = 0.2;
     private static final double SHUFFLE_PACE = 1.0;
+    /** Ticks after a shuffle aside its stopping still counts as the crowd's doing ({@link #heldForCrowd}; my pick: the step takes a few). */
+    private static final int SHUFFLE_GRACE = 10;
 
-    /** The game time it stopped walking (the newcomer to a crowd gives way to those who stood there first); none while walking. */
     /** {@link #keepApart}: packed in, it looks for a free spot again from this tick (its own tick count). */
     private int freeSearchAfter;
+    /** The game time it stopped walking (the newcomer to a crowd gives way to those who stood there first); none while walking. */
     private long standSince = Long.MAX_VALUE;
     /** Ticks it has waited behind the body in front of it (following or with no room to pass). */
     private int crowdWaitTicks;
+    /** The game time the legs last held it still for the crowd (behind a nestmate, no room to pass, met a stander on arriving). */
+    private long crowdHeldAt = Long.MIN_VALUE;
+    /** The game time it last shuffled aside for one standing too near ({@link #keepApart}). */
+    private long shuffledAt = Long.MIN_VALUE / 2;
     /** Game time until which it squeezes past bodies in its way. */
     private long squeezeUntil;
     /** The free spot in the goal cell this walk ends on (picked on its first tick of arriving; null before). */
@@ -389,6 +402,21 @@ public class AntNavigator {
     }
 
     // --- What the body, the mind and the tests can ask; holding on after a reload ---
+
+    /**
+     * Whether its legs held it still for the crowd this tick or the last (waiting behind a nestmate, for room to pass,
+     * or stopping on meeting one already standing on its spot), or it has just shuffled aside for one standing too
+     * near: real sizes step 3, so a test counting stops can tell giving way in a crowd from stopping dead.
+     */
+    public boolean heldForCrowd() {
+        long now = ant.level().getGameTime();
+        return now - crowdHeldAt <= 1 || now - shuffledAt <= SHUFFLE_GRACE;
+    }
+
+    /** Whether it has shuffled aside for one standing too near in the last {@link #SHUFFLE_GRACE} ticks (tests sort stops by it). */
+    public boolean shuffledLately() {
+        return ant.level().getGameTime() - shuffledAt <= SHUFFLE_GRACE;
+    }
 
     /** True when there is nothing left to walk: arrived, stopped, or no route. See {@link #hasFailed()}. */
     public boolean isDone() {
@@ -897,9 +925,13 @@ public class AntNavigator {
             double far = Math.sqrt(dx * dx + dz * dz);
             // Pressing into one already standing there, it stops at once and steps aside as the newcomer ({@link #keepApart}),
             // never walking on through it to its spot.
-            if (far > AT_SPOT && ++arriveTicks <= ARRIVE_TIMEOUT && !(arriveTicks > 2 && insideStander(now))) {
+            boolean met = far > AT_SPOT && arriveTicks >= 2 && insideStander(now);
+            if (met) {
+                crowdHeldAt = now;
+            }
+            if (far > AT_SPOT && ++arriveTicks <= ARRIVE_TIMEOUT && !met) {
                 // (slowing as it nears, so a small body stops on its spot instead of circling it)
-                Vec3 aim = steer(spot, Math.min(speed, speed * Math.max(0.3, far / 0.3)));
+                Vec3 aim = steer(spot, speed * Mth.clamp(far / ARRIVE_EASE, ARRIVE_SLOWEST, 1.0));
                 ant.getMoveControl().setWantedPosition(aim.x, spot.y, aim.z, aimSpeed);
                 return;
             }
@@ -1088,6 +1120,7 @@ public class AntNavigator {
             if (gap <= 0.0) {
                 crowdWaitTicks++;
                 aimSpeed = 0.0;
+                crowdHeldAt = now;
                 return ant.position();
             }
             aimSpeed = pace * Mth.clamp(gap / LOOK, 0.25, 1.0);
@@ -1119,6 +1152,7 @@ public class AntNavigator {
             return aim;
         }
         aimSpeed = 0.0;
+        crowdHeldAt = now;
         return ant.position();
     }
 
@@ -1236,6 +1270,7 @@ public class AntNavigator {
             return;
         }
         ant.getMoveControl().setWantedPosition(to.x, ant.getY(), to.z, SHUFFLE_PACE);
+        shuffledAt = ant.level().getGameTime();
     }
 
     /**
