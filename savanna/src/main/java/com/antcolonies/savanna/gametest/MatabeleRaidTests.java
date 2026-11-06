@@ -846,8 +846,8 @@ public class MatabeleRaidTests {
                     RaidColumn raid = column[0];
                     long took = formedAt[0] - startedAt[0];
                     int rewalked = rewalks.values().stream().mapToInt(Integer::intValue).sum();
-                    SavannaMod.LOGGER.info("[raid form test] formed in {} s ({} s milling after the scout recruited), {} of {} set out, {} walk(s) off a place reached, the scout went in: {}; {}",
-                            took / 20, milled[0] / 20, raid.members().size(), members[0], rewalked, scoutWentIn[0], raid.endedWhy());
+                    SavannaMod.LOGGER.info("[raid form test] formed in {} s ({} s milling after the scout recruited), {} of {} set out, {} walk(s) off a place reached, the scout went in: {}; {}; the column left at watched tick {}",
+                            took / 20, milled[0] / 20, raid.members().size(), members[0], rewalked, scoutWentIn[0], raid.endedWhy(), crowd.watchedTicks());
                     helper.assertTrue(scoutWentIn[0], "the scout never went into the nest to recruit");
                     helper.assertTrue(raid.formFaults() == 0, raid.formFaults() + " recruit(s) out of the nest left home: " + raid.describe());
                     helper.assertTrue(milled[0] >= 0 && milled[0] < raid.columnNumbers().formTicks(), "the column milled the forming's longest time, "

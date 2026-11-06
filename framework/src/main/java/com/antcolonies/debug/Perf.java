@@ -22,6 +22,8 @@ public final class Perf {
     public enum Part {
         INSECTS("insects (vanilla body, goals)"),
         WALKING("walking (navigator)"),
+        /** Real sizes step 3: the neighbour grid's lookups and writes ({@code nav/Crowd}), out of walking's time. */
+        CROWD("neighbour grid (personal space)"),
         ROUTES("route searches"),
         BRAIN("colony brain"),
         TREES("giant trees (growing, dying, falling, fire)");

@@ -403,6 +403,18 @@ public class AntNavigator {
 
     // --- What the body, the mind and the tests can ask; holding on after a reload ---
 
+    /** What the standing shuffle ({@link #keepApart}) did or why not, last tick it was asked (for the tests' messages). */
+    private String apartWhy = "not asked";
+    /** The last free-spot searches' rejected spots, by why (for the debug log). */
+    private int freeNotClear, freeNotStandable, freePastWall;
+
+    /** For the tests' messages: its personal-space state now (walking or standing, since when, the last shuffle's outcome). */
+    public String crowdState() {
+        long now = ant.level().getGameTime();
+        return (route == null ? "no route" : "route") + ", stood " + (standSince == Long.MAX_VALUE ? "-" : String.valueOf(now - standSince))
+                + " ticks, shuffle: " + apartWhy + ", last shuffle " + (now - shuffledAt) + " ago";
+    }
+
     /**
      * Whether its legs held it still for the crowd this tick or the last (waiting behind a nestmate, for room to pass,
      * or stopping on meeting one already standing on its spot), or it has just shuffled aside for one standing too
@@ -1211,6 +1223,8 @@ public class AntNavigator {
      */
     private void keepApart() {
         if (!Crowd.keepsSpace(ant) || closedIn || ant.holdsStill() || !ant.onGround() || ant.getMoveControl().hasWanted()) {
+            apartWhy = closedIn ? "closed in" : ant.holdsStill() ? "holds still" : !ant.onGround() ? "off the ground"
+                    : ant.getMoveControl().hasWanted() ? "a move wanted" : "no size";
             return;
         }
         double mine = Crowd.radius(ant);
@@ -1244,6 +1258,7 @@ public class AntNavigator {
             pushZ += dz / dist * (need - dist);
         }
         if (!pressed) {
+            apartWhy = "not pressed";
             return;
         }
         double push = Math.sqrt(pushX * pushX + pushZ * pushZ);
@@ -1256,6 +1271,7 @@ public class AntNavigator {
             }
         }
         if (to == null && ant.tickCount >= freeSearchAfter) {
+            freeNotClear = freeNotStandable = freePastWall = 0;
             // Pushed into a wall, off an edge, into others, or squeezed from all sides alike: the nearest free spot round
             // it, near first, then a little farther (a crowd overflowing a cell spills into the cells round it).
             to = freeNear(ant.position(), mine, FREE_REACH, 0.1);
@@ -1264,11 +1280,15 @@ public class AntNavigator {
             }
             if (to == null) {
                 freeSearchAfter = ant.tickCount + FREE_RETRY; // (packed in: it stands, and looks again a little later)
+                ColonyFrameworkMod.LOGGER.debug("[crowd] ant {} at {} found no free spot: {} spots taken, {} no ground or no room, {} past a wall",
+                        ant.getId(), ant.position(), freeNotClear, freeNotStandable, freePastWall);
             }
         }
         if (to == null || to.distanceToSqr(ant.position()) < 0.02 * 0.02) {
+            apartWhy = to == null ? "no free spot" : "free spot here";
             return;
         }
+        apartWhy = "shuffled";
         ant.getMoveControl().setWantedPosition(to.x, ant.getY(), to.z, SHUFFLE_PACE);
         shuffledAt = ant.level().getGameTime();
     }
@@ -1318,8 +1338,17 @@ public class AntNavigator {
                     continue;
                 }
                 Vec3 p = new Vec3(centre.x + i * grid, ant.getY(), centre.z + j * grid);
-                if (crowd.clearance(ant, p, spaceFor(mine), now) >= 0.0 && standable(p)
-                        && fits(new Vec3((centre.x + p.x) / 2.0, ant.getY(), (centre.z + p.z) / 2.0))) { // (no spot past a wall)
+                boolean clear = crowd.clearance(ant, p, spaceFor(mine), now) >= 0.0;
+                boolean stand = clear && standable(p);
+                boolean through = stand && fits(new Vec3((centre.x + p.x) / 2.0, ant.getY(), (centre.z + p.z) / 2.0)); // (no spot past a wall)
+                if (!clear) {
+                    freeNotClear++;
+                } else if (!stand) {
+                    freeNotStandable++;
+                } else if (!through) {
+                    freePastWall++;
+                }
+                if (through) {
                     best = p;
                     bestDistance = distance;
                 }

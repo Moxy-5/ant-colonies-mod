@@ -166,169 +166,161 @@
   136
  ],
  "findings": {
-  "jump leg_r2": [
+  "jump leg_r2_foot": [
    1,
-   0.083
-  ],
-  "jump at down_55": [
-   19,
-   0.142
-  ],
-  "jump leg_r2_lower": [
-   2,
-   0.085
+   0.05
   ],
   "jump at up_70": [
-   10,
+   9,
    0.073
   ],
   "jump leg_l2": [
-   3,
-   0.075
+   2,
+   0.053
   ],
   "jump at up_33": [
    22,
-   0.115
+   0.114
   ],
-  "jump at down_54": [
-   15,
-   0.129
+  "jump at down_13": [
+   10,
+   0.072
   ],
   "jump leg_l2_lower": [
-   1,
-   0.066
+   2,
+   0.072
+  ],
+  "jump at down_50": [
+   20,
+   0.096
+  ],
+  "jump leg_l2_foot": [
+   2,
+   0.082
   ],
   "jump thorax": [
-   4,
-   0.096
+   3,
+   0.075
   ],
   "jump at up_32": [
    11,
-   0.099
+   0.096
   ],
   "jump head": [
-   5,
-   0.103
+   3,
+   0.072
   ],
   "jump mandible_r": [
-   4,
-   0.129
+   6,
+   0.096
+  ],
+  "jump at down_15": [
+   5,
+   0.051
+  ],
+  "jump at down_49": [
+   6,
+   0.075
   ],
   "jump antenna_l_1": [
-   4,
-   0.106
+   5,
+   0.075
   ],
   "jump antenna_l_2": [
-   4,
-   0.122
+   6,
+   0.087
   ],
   "jump mandible_l": [
-   4,
-   0.129
+   6,
+   0.096
   ],
   "jump antenna_r_1": [
-   4,
-   0.103
+   5,
+   0.075
   ],
   "jump antenna_r_2": [
-   4,
-   0.11
+   6,
+   0.089
   ],
   "jump leg_r3": [
-   4,
-   0.094
-  ],
-  "jump at down_19": [
-   7,
-   0.076
-  ],
-  "jump at down_20": [
-   1,
-   0.046
-  ],
-  "jump leg_r3_lower": [
-   2,
-   0.097
-  ],
-  "jump leg_r3_foot": [
-   2,
-   0.104
-  ],
-  "jump leg_r1": [
-   5,
-   0.078
-  ],
-  "jump at up_65": [
-   1,
-   0.032
-  ],
-  "jump leg_r1_lower": [
-   2,
-   0.078
-  ],
-  "jump leg_r1_foot": [
-   2,
+   3,
    0.083
   ],
-  "jump leg_l1": [
-   1,
-   0.085
+  "jump leg_r3_lower": [
+   3,
+   0.089
+  ],
+  "jump leg_r3_foot": [
+   3,
+   0.096
+  ],
+  "jump leg_r1": [
+   2,
+   0.052
+  ],
+  "jump leg_r1_lower": [
+   3,
+   0.074
+  ],
+  "jump at up_69": [
+   2,
+   0.057
+  ],
+  "jump leg_r1_foot": [
+   3,
+   0.082
   ],
   "jump leg_l1_lower": [
-   3,
-   0.09
-  ],
-  "jump at down_18": [
    2,
-   0.064
-  ],
-  "jump leg_l1_foot": [
-   3,
-   0.094
+   0.058
   ],
   "jump leg_l3": [
-   2,
-   0.116
+   1,
+   0.086
   ],
   "jump leg_l3_lower": [
-   2,
-   0.116
+   1,
+   0.104
   ],
   "jump leg_l3_foot": [
-   2,
-   0.12
+   1,
+   0.111
   ],
   "jump abdomen": [
-   3,
-   0.106
+   4,
+   0.084
+  ],
+  "jump at down_51": [
+   6,
+   0.083
   ],
   "jump abdomen_2": [
-   3,
-   0.114
+   4,
+   0.093
   ],
   "jump abdomen_3": [
-   3,
-   0.126
+   4,
+   0.104
   ],
   "jump abdomen_4": [
-   3,
-   0.136
+   4,
+   0.113
   ],
   "jump abdomen_5": [
    4,
-   0.141
+   0.114
   ],
-  "jump at down_57": [
+  "jump at down_53": [
    2,
-   0.045
+   0.038
   ],
   "jump abdomen_6": [
    4,
-   0.142
+   0.113
   ]
  },
  "body_findings": {
-  "tipped": 4
+  "tipped": 3
  },
  "known_bugs": "its short body tips up to 30 degrees a tick round the foot of a wall (real for a body a quarter block long); since BUGS 53 it walks on at the foot at its climbing pace, so the head's antennae and jaws swing up to 0.14 blocks a tick there"
 }

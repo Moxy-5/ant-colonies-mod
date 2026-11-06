@@ -23,6 +23,6 @@ camera 0 -55.5 0.01 0 90
 fov 25
 burst spread_above 30 2
 step 40
-camera 0 -59.2 -3.2 0 15
+camera 0 -59.4 -1.8 0 45
 burst standing_side 10 2
 quit

@@ -274,9 +274,9 @@
    1,
    0.137
   ],
-  "jump at down_104": [
+  "jump at down_101": [
    1,
-   0.128
+   0.132
   ],
   "jump thorax": [
    1,
@@ -303,16 +303,20 @@
    0.053
   ],
   "inside antenna_l_2": [
-   2,
-   0.021
+   3,
+   0.037
   ],
-  "inside at down_102": [
+  "inside at down_97": [
    2,
-   0.033
+   0.037
   ],
-  "inside at down_103": [
+  "inside at down_98": [
    2,
-   0.025
+   0.034
+  ],
+  "inside at down_99": [
+   2,
+   0.023
   ],
   "jump mandible_l": [
    1,
@@ -324,15 +328,11 @@
   ],
   "inside antenna_r_2": [
    4,
-   0.035
+   0.029
   ],
   "inside at down_100": [
    1,
-   0.01
-  ],
-  "inside at down_101": [
-   1,
-   0.035
+   0.013
   ],
   "jump leg_l1_foot": [
    1,
@@ -348,14 +348,14 @@
   ],
   "jump abdomen_2": [
    2,
-   0.04
+   0.041
   ],
-  "jump at down_102": [
+  "jump at down_98": [
    3,
-   0.04
+   0.041
   ],
   "jump abdomen_3": [
-   2,
+   1,
    0.038
   ],
   "jump abdomen_4": [
@@ -363,7 +363,7 @@
    0.037
   ],
   "jump abdomen_5": [
-   1,
+   2,
    0.037
   ]
  },

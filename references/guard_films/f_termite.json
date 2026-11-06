@@ -356,216 +356,212 @@
   136
  ],
  "findings": {
-  "jump leg_r2": [
-   1,
-   0.05
-  ],
-  "jump at ramp_down_06": [
-   4,
-   0.071
-  ],
   "inside leg_r2_lower": [
    1,
    0.011
   ],
-  "inside at pillar_down_36": [
-   6,
+  "inside at pillar_down_39": [
+   7,
    0.015
   ],
   "jump leg_r2_lower": [
    1,
+   0.046
+  ],
+  "jump at pillar_97": [
+   10,
    0.06
   ],
   "inside leg_r2_foot": [
    1,
    0.015
   ],
-  "jump leg_r2_foot": [
-   2,
-   0.071
-  ],
-  "jump at ramp_down_05": [
-   1,
-   0.061
-  ],
-  "inside leg_l2_foot": [
-   1,
-   0.011
-  ],
-  "inside at ramp_up_65": [
-   2,
-   0.011
-  ],
-  "jump leg_l2_foot": [
-   1,
-   0.057
-  ],
   "jump thorax": [
    1,
    0.054
   ],
-  "jump at pillar_down_35": [
+  "jump at pillar_down_38": [
    15,
-   0.083
-  ],
-  "inside head": [
-   1,
-   0.016
-  ],
-  "inside at ramp_up_66": [
-   5,
-   0.024
+   0.084
   ],
   "jump head": [
-   1,
-   0.044
+   3,
+   0.058
   ],
-  "jump at pillar_down_33": [
+  "jump at pillar_98": [
+   9,
+   0.081
+  ],
+  "jump at pillar_down_36": [
    7,
-   0.067
+   0.074
   ],
   "inside mandible_r": [
    1,
-   0.015
+   0.011
+  ],
+  "inside at ramp_up_66": [
+   3,
+   0.016
   ],
   "jump mandible_r": [
-   2,
-   0.048
+   4,
+   0.062
   ],
   "jump antenna_l_1": [
-   1,
-   0.047
+   2,
+   0.064
   ],
   "inside antenna_l_2": [
-   4,
-   0.026
+   3,
+   0.027
   ],
   "inside at ramp_up_38": [
    2,
    0.026
   ],
-  "inside at ramp_up_39": [
+  "inside at pillar_30": [
    2,
-   0.022
+   0.015
   ],
-  "inside at pillar_28": [
+  "inside at pillar_34": [
    2,
-   0.029
-  ],
-  "inside at pillar_29": [
-   2,
-   0.014
+   0.027
   ],
   "jump antenna_l_2": [
-   2,
-   0.071
+   4,
+   0.081
   ],
   "inside mandible_l": [
    1,
-   0.015
+   0.011
   ],
   "jump mandible_l": [
-   2,
-   0.048
+   4,
+   0.062
   ],
   "jump antenna_r_1": [
-   1,
-   0.049
-  ],
-  "inside antenna_r_2": [
-   4,
-   0.029
-  ],
-  "jump antenna_r_2": [
-   2,
-   0.068
-  ],
-  "jump leg_r3": [
-   2,
-   0.06
-  ],
-  "jump at pillar_96": [
-   7,
-   0.056
-  ],
-  "jump leg_r3_lower": [
-   2,
+   3,
    0.063
   ],
-  "inside leg_r3_foot": [
-   4,
-   0.014
-  ],
-  "inside at ramp_up_67": [
-   7,
-   0.025
-  ],
-  "inside at ramp_up_69": [
-   1,
-   0.013
-  ],
-  "inside at pillar_58": [
-   2,
-   0.014
-  ],
-  "inside at pillar_59": [
-   1,
-   0.01
-  ],
-  "jump leg_r3_foot": [
-   1,
-   0.056
-  ],
-  "inside leg_l1_lower": [
-   2,
-   0.016
-  ],
-  "inside leg_l1_foot": [
-   3,
-   0.024
-  ],
-  "jump leg_l3": [
-   1,
-   0.065
-  ],
-  "inside leg_l3_lower": [
-   3,
-   0.019
-  ],
-  "inside at pillar_57": [
-   6,
-   0.028
-  ],
-  "jump leg_l3_lower": [
-   1,
-   0.083
-  ],
-  "inside leg_l3_foot": [
+  "inside antenna_r_2": [
    5,
-   0.028
+   0.026
   ],
-  "inside at ramp_up_68": [
+  "inside at ramp_up_39": [
+   1,
+   0.018
+  ],
+  "jump antenna_r_2": [
    4,
+   0.075
+  ],
+  "jump leg_r3": [
+   1,
+   0.062
+  ],
+  "inside leg_r3_lower": [
+   2,
    0.013
   ],
   "inside at pillar_47": [
-   1,
+   3,
    0.013
   ],
-  "jump leg_l3_foot": [
+  "inside at pillar_53": [
+   2,
+   0.02
+  ],
+  "jump leg_r3_lower": [
+   1,
+   0.064
+  ],
+  "inside leg_r3_foot": [
+   6,
+   0.02
+  ],
+  "inside at ramp_up_68": [
+   3,
+   0.015
+  ],
+  "inside at ramp_up_69": [
+   1,
+   0.011
+  ],
+  "inside at pillar_35": [
+   1,
+   0.011
+  ],
+  "inside at pillar_61": [
+   1,
+   0.012
+  ],
+  "inside leg_r1_lower": [
+   1,
+   0.011
+  ],
+  "inside at pillar_33": [
+   2,
+   0.011
+  ],
+  "inside leg_r1_foot": [
+   1,
+   0.011
+  ],
+  "jump leg_l1": [
+   2,
+   0.05
+  ],
+  "inside leg_l1_lower": [
+   1,
+   0.011
+  ],
+  "jump leg_l1_lower": [
+   2,
+   0.052
+  ],
+  "inside leg_l1_foot": [
+   2,
+   0.016
+  ],
+  "jump leg_l1_foot": [
    1,
    0.06
   ],
-  "jump at pillar_03": [
+  "jump leg_l3": [
    1,
-   0.06
+   0.064
+  ],
+  "inside leg_l3_lower": [
+   4,
+   0.018
+  ],
+  "inside at ramp_up_67": [
+   6,
+   0.028
+  ],
+  "inside at pillar_41": [
+   2,
+   0.019
+  ],
+  "inside at pillar_59": [
+   3,
+   0.014
+  ],
+  "jump leg_l3_lower": [
+   1,
+   0.084
+  ],
+  "inside leg_l3_foot": [
+   6,
+   0.028
   ],
   "jump abdomen": [
-   2,
+   1,
    0.061
   ],
   "jump abdomen_2": [
-   2,
+   1,
    0.071
   ],
   "inside abdomen_3": [
@@ -573,36 +569,44 @@
    0.013
   ],
   "jump abdomen_3": [
-   2,
+   1,
    0.078
   ],
   "inside abdomen_4": [
+   2,
+   0.02
+  ],
+  "inside at pillar_60": [
    3,
    0.02
   ],
   "jump abdomen_4": [
-   2,
+   1,
    0.077
   ],
   "inside abdomen_5": [
-   3,
-   0.025
+   2,
+   0.023
   ],
   "jump abdomen_5": [
    1,
    0.076
   ],
   "inside abdomen_6": [
-   4,
-   0.024
+   3,
+   0.02
   ],
   "jump abdomen_6": [
-   1,
+   2,
    0.078
+  ],
+  "jump at pillar_102": [
+   1,
+   0.033
   ]
  },
  "body_findings": {
-  "tipped": 2
+  "tipped": 3
  },
- "known_bugs": "at the top of the ramps the termite's legs and gaster are drawn up to 0.06 blocks inside the ramp and the soil (found 2026-10-18 by the first guard films); at the pillar's foot its short body tips 30 degrees a tick round the corner as it walks on (BUGS 53: no more stop, turn and dash), its abdomen unrolling up to 0.1 blocks a tick"
+ "known_bugs": "at the top of the ramps the termite's legs and gaster are drawn up to 0.06 blocks inside the ramp and the soil (found 2026-10-18 by the first guard films); its short body (0.15 blocks at real size) tips up to 30 degrees a tick over the pillar's top edge and up to 50 at its foot as it walks on (BUGS 53: no more stop, turn and dash), its abdomen unrolling up to 0.1 blocks a tick"
 }

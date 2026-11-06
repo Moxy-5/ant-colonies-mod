@@ -5,6 +5,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.WeakHashMap;
 
+import com.antcolonies.debug.Perf;
 import com.antcolonies.entity.AbstractAntEntity;
 
 import it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap;
@@ -86,8 +87,15 @@ public final class Crowd {
 
     /** Writes a body in for this tick (read by the others from the next tick on). */
     void note(Body body, long now) {
-        roll(now);
-        writing.computeIfAbsent(key(body.x(), body.y(), body.z()), k -> new ArrayList<>(2)).add(body);
+        boolean timed = Perf.begin(Perf.Part.CROWD);
+        try {
+            roll(now);
+            writing.computeIfAbsent(key(body.x(), body.y(), body.z()), k -> new ArrayList<>(2)).add(body);
+        } finally {
+            if (timed) {
+                Perf.end();
+            }
+        }
     }
 
     /**
@@ -95,6 +103,17 @@ public final class Crowd {
      * {@link #SAME_FLOOR} up or down, other than {@code self}. The list is reused by the next call: read it at once.
      */
     List<Body> near(AbstractAntEntity self, double x, double y, double z, double reach, long now) {
+        boolean timed = Perf.begin(Perf.Part.CROWD);
+        try {
+            return lookUp(self, x, y, z, reach, now);
+        } finally {
+            if (timed) {
+                Perf.end();
+            }
+        }
+    }
+
+    private List<Body> lookUp(AbstractAntEntity self, double x, double y, double z, double reach, long now) {
         roll(now);
         found.clear();
         if (reading.isEmpty()) {
@@ -130,8 +149,19 @@ public final class Crowd {
 
     /** The nearest gap (blocks) between this point and a standing body's personal circle, for a body of radius {@code radius}; negative inside one. */
     double clearance(AbstractAntEntity self, Vec3 point, double radius, long now) {
+        boolean timed = Perf.begin(Perf.Part.CROWD);
+        try {
+            return gapTo(self, point, radius, now);
+        } finally {
+            if (timed) {
+                Perf.end();
+            }
+        }
+    }
+
+    private double gapTo(AbstractAntEntity self, Vec3 point, double radius, long now) {
         double best = Double.MAX_VALUE;
-        for (Body body : near(self, point.x, point.y, point.z, radius + 0.6, now)) {
+        for (Body body : lookUp(self, point.x, point.y, point.z, radius + 0.6, now)) {
             if (!body.standing()) {
                 continue;
             }

@@ -111,6 +111,11 @@ public final class RaidColumn {
      */
     private static final long FRONT_PAUSE = 80;
     /**
+     * Real sizes, step 4: a raider standing on the march with less room than this (blocks along the trail) before the gap
+     * behind the ant ahead waits where it stands (my pick, half the column's spacing of 0.6).
+     */
+    private static final double WAIT_ROOM = 0.3;
+    /**
      * Raid rework R3: a raider whose place is more than {@link #HEADWAY_FAR} blocks off and that has not got
      * {@link #HEADWAY_MOVE} blocks anywhere for this long (ticks) leaves the column and goes home along the trail, never
      * holding the rest (BUGS 87; my pick, 15 s).
@@ -276,6 +281,16 @@ public final class RaidColumn {
      * ant's place: they walked off their places and back).
      */
     private final Map<UUID, Integer> formIndex = new HashMap<>();
+    /**
+     * Real sizes, step 4: each recruit's milling place, chosen once (so it never walks off and back), and the body
+     * lengths already given each cell. A tall dead mound's hump round its open chimney has few cells at the entrance's
+     * height, and the ring of places gave 4 or 5 majors the same cell beside the chimney mouth, where they stood inside
+     * one another; a cell now takes about {@link #FORM_CELL_LENGTHS} body lengths, the rest spread farther round.
+     */
+    private final Map<Integer, BlockPos> formSpots = new HashMap<>();
+    private final Map<BlockPos, Double> formTaken = new HashMap<>();
+    /** Body lengths a milling cell is given (my pick: a block holds two majors, half a block long, side by side). */
+    private static final double FORM_CELL_LENGTHS = 1.0;
     /**
      * BUGS 101, the scout recruits in the nest (real Megaponera: the scout home from a find runs into the nest, and the
      * raiders it stirs pour out after it): the room cell it runs to (null for none), whether that was looked for, and when
@@ -1117,7 +1132,7 @@ public final class RaidColumn {
             if (ant == scout) {
                 spot = place(level, this.out, Math.min(2.0, this.out.length()), 0.0);
             } else {
-                spot = formSpot(level, formIndex.getOrDefault(ant.getUUID(), 0));
+                spot = formSpot(level, formIndex.getOrDefault(ant.getUUID(), 0), ant.bodyLength());
                 if (colony.nest().isInside(level, spot)) {
                     formFaults++; // (a milling place in the nest: never, the tests check)
                 }
@@ -1207,11 +1222,35 @@ public final class RaidColumn {
      * entrance), where the ant stood exactly at its place but never counted as out, and was left home. A place a block
      * or more under the entrance or in the nest is no place: farther out is tried, then the start of the trail.
      */
-    private BlockPos formSpot(ServerLevel level, int i) {
+    private BlockPos formSpot(ServerLevel level, int i, double length) {
+        BlockPos kept = formSpots.get(i);
+        if (kept != null) {
+            return kept;
+        }
+        // Real sizes, step 4: first a cell with room left for its body (FORM_CELL_LENGTHS), then any (as before).
+        double size = length > 0.0 ? length : 0.0;
+        BlockPos spot = formSpot(level, i, size, true);
+        if (spot == null) {
+            spot = formSpot(level, i, size, false);
+        }
+        if (spot == null) {
+            // Nowhere round it: along the start of the trail (it lies beside the chimney, R3), a little apart.
+            spot = place(level, out, Math.min(out.length(), 2.0 + i % 6), i % 2 == 0 ? 1.0 : -1.0);
+        }
+        if (level.hasChunkAt(spot)) {
+            formSpots.put(i, spot);
+            formTaken.merge(spot, size, Double::sum);
+        }
+        return spot;
+    }
+
+    /** {@link #formSpot}: the first cell round the entrance for recruit {@code i}; with {@code roomy}, only one with room left for {@code size}. */
+    @Nullable
+    private BlockPos formSpot(ServerLevel level, int i, double size, boolean roomy) {
         BlockPos entrance = colony.getCenter();
         double angle = i * 2.39996; // (the golden angle: spread evenly round the entrance)
         double radius = 1.5 + 1.5 * ((i * 7) % 10) / 10.0;
-        for (double extra = 0.0; extra <= 4.5; extra += 1.5) {
+        for (double extra = 0.0; extra <= (roomy ? 6.0 : 4.5); extra += roomy ? 0.75 : 1.5) {
             double x = entrance.getX() + 0.5 + Math.cos(angle) * (radius + extra);
             double z = entrance.getZ() + 0.5 + Math.sin(angle) * (radius + extra);
             for (int dy : FORM_HEIGHTS) {
@@ -1220,12 +1259,14 @@ public final class RaidColumn {
                     break;
                 }
                 if (RaidGround.canStand(level, cell) && !colony.nest().isInside(level, cell)) {
+                    if (roomy && size > 0.0 && formTaken.getOrDefault(cell, 0.0) + size > FORM_CELL_LENGTHS + 1.0E-6) {
+                        continue; // (full: farther out, or another height)
+                    }
                     return cell;
                 }
             }
         }
-        // Nowhere round it: along the start of the trail (it lies beside the chimney, R3), a little apart.
-        return place(level, out, Math.min(out.length(), 2.0 + i % 6), i % 2 == 0 ? 1.0 : -1.0);
+        return null;
     }
 
     /**
@@ -1318,6 +1359,14 @@ public final class RaidColumn {
             if (casting) {
                 target = Math.min(target, castGap.near() - GAP_STOP); // (the rest wait behind the gap)
                 target = Math.max(0.0, target);
+            }
+            if (!casting && target < own + WAIT_ROOM && ant.getNavigator().isDone()) {
+                // Real sizes, step 4: standing, with no room ahead on the trail yet: it waits where it stands (one walking
+                // walks on, so a moving line never stops and starts), as real raiders wait their
+                // turn. (It used to walk onto the trail at its own place: at the march's start, beside the chimney, every
+                // late one's place was the trail's first cell, and 5 to 7 majors stood in it inside one another.)
+                orders.put(ant.getUUID(), new Order(null, 1.0, point(route, Math.min(route.length(), own + 3.0))));
+                continue;
             }
             // (a block apart side by side; each ant keeps its own lane: with the line sorted by place, a lane by its place
             // in the line swapped sides every time two ants passed, and they stepped sideways back and forth)
