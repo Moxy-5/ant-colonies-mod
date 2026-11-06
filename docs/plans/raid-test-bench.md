@@ -251,3 +251,10 @@ members doubled or halved; a watched colony gone; any stray). The 100-day run it
 - Found: BUGS 122 (a termite worker standing with a route to a high mound job).
 - First short soak with round 3 (`tools/soak.sh 2 2`, 7 minutes): no strays, saves and colonies steady; found BUGS 123 (scouts out at night break home-by-night); fixed the same day: the trend's first line was taken at the soak's start (0 ms, insects not out yet), a false "LOOK"; now the first line comes after the first day.
 - Moved rules still open: books-add-up and speed (route searches and ms per raid), next round.
+
+### Next: the 100-day soak, tonight (the user, 2026-11-05)
+The user runs it overnight: they say when they go to bed, and Claude starts it then, in the background:
+`tools/soak.sh 4 100` (4 servers, 100 game days each; about 4 minutes a game day, so most of the night). In the
+morning: read `run-soak/soak-report.txt` (its "Slow things" part first, every "LOOK:" line), `run-soak/<i>/soak-trend.txt`
+and `soak-breaches.txt`; every broken rule and every "LOOK:" goes on the bug list (`docs/BUGS.md`, numbers from
+`python tools/bug_number.py`), not fixed on the spot. Then on with B8 (BUGS 111, the flakes, 122, 123).
