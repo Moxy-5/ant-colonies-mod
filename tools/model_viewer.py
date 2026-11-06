@@ -259,6 +259,46 @@ def queen_page(out):
     print("wrote", out)
 
 
+SIZE_INSECTS = (
+    # model, label, today's drawing scale (the renderers), real length in mm (None: shrunk with the majors).
+    # Real lengths, my picks from the literature: Megaponera majors about 15 mm (the model's own mm), minors drawn at
+    # 7.5 mm (most real minors 9 to 11); the queen 1.2 times a major (the user's pick); Macrotermes workers about 6 mm,
+    # minor soldiers about 9, major soldiers about 13, the king about 14; the queen before she swells, shrunk like the rest.
+    ("matabele_major", "Matabele major", 0.633, 15.0),
+    ("matabele_minor", "Matabele minor", 0.455, 7.5),
+    ("matabele_queen", "Matabele queen", 0.76, 18.0),
+    ("termite_worker", "Termite worker", 0.75, 6.0),
+    ("termite_minor_soldier", "Termite minor soldier", 0.75, 9.0),
+    ("termite_major_soldier", "Termite major soldier", 0.75, 13.0),
+    ("termite_king", "Termite king", 0.75, 14.0),
+    ("termite_queen", "Termite queen", 0.75, None),
+)
+
+
+def sizes_page(out):
+    """Every savanna insect at today's drawn size (back row) and at the new sizes (front row): the slider sets how long a
+    Matabele major is, every other insect follows from its real length (2026-11-05, the user's size rethink: two majors
+    to a block). Also a raid column and two majors on one block, and cameras at a player's eye height."""
+    data = {"insects": [], "notes": [
+        "<b>Real lengths used:</b> Matabele major 15 mm, minor 7.5 mm (most minors are 9 to 11), queen 1.2 times a major; "
+        "Macrotermes worker 6 mm, minor soldier 9, major soldier 13, king 14. The termite queen is shrunk with the majors "
+        "(the game swells her over time).",
+        "<b>Game-like pixels</b> draws the page at half resolution, closer to how small things look on a normal screen.",
+        "Only the size changes here; the models, textures and detail are the game's own, unchanged."]}
+    assets = mod_paths.assets("savanna")
+    for model, label, today, real in SIZE_INSECTS:
+        geo = json.loads((assets / f"geo/entity/{model}.geo.json").read_text(encoding="utf-8"))
+        desc = geo["minecraft:geometry"][0]["description"]
+        texture = "data:image/png;base64," + base64.b64encode((assets / f"textures/entity/{model}.png").read_bytes()).decode()
+        data["insects"].append({"key": model, "label": label, "bones": geo["minecraft:geometry"][0]["bones"],
+                                "texture": texture, "w": desc.get("texture_width", 64), "h": desc.get("texture_height", 64),
+                                "today": today, "real_mm": real, "major_mm": 15.0})
+    template = (Path(__file__).resolve().parent / "sizes_viewer.template.html").read_text(encoding="utf-8")
+    out.parent.mkdir(parents=True, exist_ok=True)
+    out.write_text(template.replace("/*DATA*/null", json.dumps(data)), encoding="utf-8")
+    print("wrote", out)
+
+
 def xylaria_page(out):
     """The Xylaria looks: for each look and stage, top and side textures (a few variants) and the stalks on a comb's top."""
     import comb_age_art as comb
@@ -336,6 +376,9 @@ def mix_soil(x, y):
 
 
 def main():
+    if len(sys.argv) > 1 and sys.argv[1] == "sizes":
+        sizes_page(Path(sys.argv[2]) if len(sys.argv) > 2 else ROOT / "references/sizes_viewer.html")
+        return
     if len(sys.argv) > 1 and sys.argv[1] == "bracket":
         bracket_page(Path(sys.argv[2]) if len(sys.argv) > 2 else ROOT / "references/bracket_viewer.html")
         return

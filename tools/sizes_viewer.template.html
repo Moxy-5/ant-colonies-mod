@@ -1,0 +1,256 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Insect Size Viewer</title>
+<style>
+  :root { --bg: #f4efe6; --panel: #fffaf2; --ink: #2b211b; --muted: #75685d; --line: #dccfbe; --accent: #a8401f; }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) { --bg: #1d1915; --panel: #27211c; --ink: #efe6da; --muted: #a8998a; --line: #3d342c; --accent: #e07a52; }
+  }
+  :root[data-theme="dark"] { --bg: #1d1915; --panel: #27211c; --ink: #efe6da; --muted: #a8998a; --line: #3d342c; --accent: #e07a52; }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font: 15px/1.45 system-ui, sans-serif; }
+  header { padding: 14px 16px 6px; }
+  h1 { margin: 0 0 4px; font-size: 20px; }
+  header p { margin: 0; color: var(--muted); max-width: 80ch; }
+  #wrap { position: relative; height: 62vh; min-height: 340px; margin: 10px 16px; border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
+  canvas { display: block; width: 100%; height: 100%; }
+  #labels { position: absolute; inset: 0; pointer-events: none; overflow: hidden; }
+  .tag { position: absolute; transform: translate(-50%, -100%); background: var(--panel); border: 1px solid var(--line); border-radius: 6px;
+         padding: 1px 6px; font-size: 12px; font-weight: 600; white-space: nowrap; }
+  .controls { display: flex; flex-wrap: wrap; gap: 8px 14px; padding: 0 16px 8px; align-items: center; }
+  .controls label { display: flex; gap: 8px; align-items: center; font-size: 14px; }
+  .controls input[type=range] { width: 180px; max-width: 50vw; }
+  .readout { color: var(--muted); font-size: 13px; }
+  button { font: inherit; padding: 6px 12px; border-radius: 8px; border: 1px solid var(--line); background: var(--panel); color: var(--ink); cursor: pointer; }
+  button.on { border-color: var(--accent); color: var(--accent); font-weight: 600; }
+  ul { margin: 8px 16px 24px; padding-left: 22px; max-width: 80ch; }
+  li { margin: 4px 0; }
+  li b { color: var(--accent); }
+</style>
+</head>
+<body>
+<header>
+  <h1>Insect size viewer</h1>
+  <p>Back row: every savanna insect at the size the game draws it today. Front row: the new sizes, set by the slider
+     (how long a Matabele major is), with every other insect sized from its real length so they keep their real
+     proportions. On the right: a raid column at the new size, single file with a body length between ants, and two
+     majors sharing one block (the yellow square). Grid lines are one block apart. Drag to turn, scroll or pinch to zoom.
+     The "eye" cameras use Minecraft's own view (field of view 70, a standing or sneaking player's eye height).</p>
+</header>
+<div id="wrap"><canvas id="c"></canvas><div id="labels"></div></div>
+<div class="controls">
+  <label>Matabele major <input id="major" type="range" min="0.25" max="1.2" step="0.05"> <span id="majorOut" class="readout"></span></label>
+  <label><input id="pix" type="checkbox"> game-like pixels</label>
+  <label><input id="tagsOn" type="checkbox" checked> labels</label>
+</div>
+<div class="controls" id="cams"></div>
+<ul id="list"></ul>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+<script>
+const DATA = /*DATA*/null;
+const canvas = document.getElementById('c'), wrap = document.getElementById('wrap');
+const renderer = new THREE.WebGLRenderer({canvas, antialias: true, preserveDrawingBuffer: true});
+renderer.setPixelRatio(window.devicePixelRatio);
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+const scene = new THREE.Scene();
+scene.background = new THREE.Color('#cfe3ee');
+const camera = new THREE.PerspectiveCamera(35, 1, 0.01, 200);
+const controls = new THREE.OrbitControls(camera, canvas);
+scene.add(new THREE.HemisphereLight('#ffffff', '#8a7454', 0.75));
+const sun = new THREE.DirectionalLight('#ffffff', 0.55);
+sun.position.set(4, 12, 6); sun.castShadow = true; sun.shadow.mapSize.set(4096, 4096); sun.shadow.bias = -0.0004;
+Object.assign(sun.shadow.camera, {left: -16, right: 16, top: 16, bottom: -16, near: 0.5, far: 40});
+scene.add(sun);
+const floor = new THREE.Mesh(new THREE.PlaneGeometry(80, 80), new THREE.MeshLambertMaterial({color: '#c9a77a'}));
+floor.rotation.x = -Math.PI / 2; floor.receiveShadow = true; scene.add(floor);
+const grid = new THREE.GridHelper(80, 80, '#9c7d55', '#9c7d55'); grid.position.y = 0.002; scene.add(grid);
+
+function deg(v) { return v * Math.PI / 180; }
+function setRot(obj, r) { obj.rotation.set(deg(-r[0]), deg(r[1]), deg(-r[2]), 'ZYX'); }
+
+function loadTexture(uri) {
+  const t = new THREE.TextureLoader().load(uri);
+  t.magFilter = THREE.NearestFilter;
+  t.minFilter = THREE.NearestFilter;
+  return t;
+}
+
+// Each face shows its own patch of the model's texture (tw x th pixels), as in the game (BoxGeometry's faces: +x, -x, +y, -y, +z, -z).
+const FACES = ['east', 'west', 'up', 'down', 'south', 'north'];
+function boxGeometry(c, tw, th) {
+  const g = new THREE.BoxGeometry(Math.max(c.size[0], 0.02), Math.max(c.size[1], 0.02), Math.max(c.size[2], 0.02));
+  const uv = g.attributes.uv;
+  FACES.forEach((f, i) => {
+    const face = (c.uv && c.uv[f]) || (c.uv && c.uv.north);
+    if (!face) return;
+    const [u0, v0] = face.uv, [w, h] = face.uv_size;
+    for (let k = 0; k < 4; k++) {
+      const j = i * 4 + k;
+      uv.setXY(j, (u0 + uv.getX(j) * w) / tw, 1 - (v0 + (1 - uv.getY(j)) * h) / th);
+    }
+  });
+  uv.needsUpdate = true;
+  return g;
+}
+
+function buildModel(bones, texture, tw, th) {
+  const mat = new THREE.MeshLambertMaterial({map: texture, alphaTest: 0.5});
+  const root = new THREE.Group();
+  const groups = {}, byName = {};
+  bones.forEach(b => byName[b.name] = b);
+  bones.forEach(b => {
+    const g = new THREE.Group();
+    const p = b.parent ? byName[b.parent].pivot : [0, 0, 0];
+    g.position.set(b.pivot[0] - p[0], b.pivot[1] - p[1], b.pivot[2] - p[2]);
+    if (b.rotation) setRot(g, b.rotation);
+    g.name = b.name;
+    groups[b.name] = g;
+    (b.cubes || []).forEach(c => {
+      const mesh = new THREE.Mesh(boxGeometry(c, tw, th), mat);
+      mesh.castShadow = true;
+      const centre = [c.origin[0] + c.size[0] / 2, c.origin[1] + c.size[1] / 2, c.origin[2] + c.size[2] / 2];
+      if (c.rotation) {
+        const holder = new THREE.Group();
+        holder.position.set(c.pivot[0] - b.pivot[0], c.pivot[1] - b.pivot[1], c.pivot[2] - b.pivot[2]);
+        setRot(holder, c.rotation);
+        mesh.position.set(centre[0] - c.pivot[0], centre[1] - c.pivot[1], centre[2] - c.pivot[2]);
+        holder.add(mesh);
+        g.add(holder);
+      } else {
+        mesh.position.set(centre[0] - b.pivot[0], centre[1] - b.pivot[1], centre[2] - b.pivot[2]);
+        g.add(mesh);
+      }
+    });
+  });
+  bones.forEach(b => (b.parent ? groups[b.parent] : root).add(groups[b.name]));
+  // Model units to blocks (16 a block); the holder takes the size, the root sits on the floor and is centred lengthwise.
+  root.scale.setScalar(1 / 16);
+  const holder = new THREE.Group();
+  holder.add(root);
+  // Measured without the antennae, so a head with longer antennae does not make its ant drawn smaller.
+  const antennae = Object.keys(groups).filter(n => n.startsWith('antenna')).map(n => groups[n]);
+  const parents = antennae.map(g => g.parent);
+  antennae.forEach(g => g.parent.remove(g));
+  const bounds = new THREE.Box3().setFromObject(holder);
+  antennae.forEach((g, i) => parents[i].add(g));
+  root.position.z = -(bounds.min.z + bounds.max.z) / 2;
+  root.position.y = -bounds.min.y;
+  holder.userData.length = bounds.max.z - bounds.min.z;    // in blocks at scale 1
+  holder.userData.height = bounds.max.y - bounds.min.y;
+  return holder;
+}
+
+
+
+const tags = [];
+function tag(text, obj) {
+  const el = document.createElement('div'); el.className = 'tag'; el.textContent = text;
+  document.getElementById('labels').appendChild(el); tags.push({el, obj}); return el;
+}
+const settings = {major: 0.5, cam: 'overview'};
+location.hash.slice(1).split('&').filter(Boolean).forEach(kv => {
+  const [k, v] = kv.split('=').map(decodeURIComponent); settings[k] = isNaN(parseFloat(v)) ? v : parseFloat(v); });
+
+const build = i => { const m = buildModel(i.bones, loadTexture(i.texture), i.w, i.h); m.rotation.y = -0.6; scene.add(m); return m; };
+const insects = DATA.insects.map(i => {
+  const today = build(i), now = build(i);
+  today.scale.setScalar(i.today);
+  tag(i.label, today);
+  const tagN = tag(i.label, now);
+  return {i, today, now, tagN};
+});
+const major = insects.find(x => x.i.key === 'matabele_major');
+const minorDef = insects.find(x => x.i.key === 'matabele_minor');
+const todayMajorLen = major.today.userData.length * major.i.today;
+const column = [], pair = [];
+for (let k = 0; k < 12; k++) { const d = (k % 3 === 2) ? minorDef : major; const m = build(d.i); m.rotation.y = 0; column.push({m, d}); }
+for (let k = 0; k < 2; k++) { const m = build(major.i); m.rotation.y = k ? 0.15 : Math.PI - 0.15; pair.push(m); }
+tag('raid column', column[0].m);
+tag('two majors, one block', pair[0]);
+const blockMark = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), new THREE.MeshBasicMaterial({color: '#f2d24b', transparent: true, opacity: 0.55}));
+blockMark.rotation.x = -Math.PI / 2; scene.add(blockMark);
+
+const player = new THREE.Group();
+[[0.5, 0.75, 0.25, 0.375, '#3b4a8f'], [0.5, 0.75, 0.25, 1.125, '#2f9c9c'], [0.5, 0.5, 0.5, 1.55, '#b98a68']].forEach(([w, h, d, y, col]) => {
+  const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), new THREE.MeshLambertMaterial({color: col})); m.position.y = y; m.castShadow = true; player.add(m); });
+player.userData.height = 1.8; scene.add(player); tag('player', player);
+const cube = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), new THREE.MeshLambertMaterial({color: '#7da453'}));
+cube.castShadow = true; cube.userData.height = 1; scene.add(cube); tag('1 block', cube);
+const rowA = new THREE.Object3D(), rowB = new THREE.Object3D(); scene.add(rowA, rowB);
+tag('TODAY', rowA); tag('NEW', rowB);
+
+function newScale(x) {
+  const k = settings.major / x.i.major_mm;                   // blocks per real millimetre
+  if (x.i.real_mm) return x.i.real_mm * k / x.now.userData.length;
+  return x.i.today * settings.major / todayMajorLen;         // no real length given: shrunk with the majors
+}
+function lenOf(m) { return m.userData.length * m.scale.x; }
+function layout() {
+  let xs = -10;
+  insects.forEach(x => {
+    x.now.scale.setScalar(newScale(x));
+    const lt = lenOf(x.today), ln = lenOf(x.now);
+    x.today.position.set(xs + lt / 2, 0, -3);
+    x.now.position.set(xs + lt / 2, 0, 0.5);
+    xs += Math.max(lt, 0.6) + 0.9;
+    x.tagN.textContent = ln.toFixed(2) + ' blocks';
+  });
+  rowA.position.set(-11.3, 0.3, -3); rowB.position.set(-11.3, 0.3, 0.5);
+  cube.position.set(xs + 0.5, 0.5, -3); player.position.set(xs + 2.2, 0, -3);
+  const cx = xs + 5;
+  let z = -4;
+  column.forEach(({m, d}) => { m.scale.setScalar(newScale(d)); const l = lenOf(m); m.position.set(cx, 0, z + l / 2); z += l * 2; });
+  const bx = cx + 2.5, bz = 0.5;
+  blockMark.position.set(bx, 0.004, bz);
+  pair.forEach((m, k) => { m.scale.setScalar(newScale(major)); m.position.set(bx + (k ? 0.24 : -0.24), 0, bz); });
+  document.getElementById('majorOut').textContent = settings.major.toFixed(2) + ' blocks long (' +
+    (1 / settings.major).toFixed(1) + ' end to end in a block; today ' + todayMajorLen.toFixed(2) + ')';
+  layout.cx = cx; layout.bx = bx;
+}
+const majorIn = document.getElementById('major'); majorIn.value = settings.major;
+majorIn.addEventListener('input', () => { settings.major = parseFloat(majorIn.value); layout(); });
+document.getElementById('pix').addEventListener('change', e => { renderer.setPixelRatio(e.target.checked ? 0.5 : window.devicePixelRatio); resize(); });
+document.getElementById('tagsOn').addEventListener('change', e => document.getElementById('labels').style.display = e.target.checked ? '' : 'none');
+
+const CAMS = {
+  'overview': () => { const mid = (layout.cx - 10) / 2; return [[mid, 9, 14], [mid, 0, -1.5], 35]; },
+  'new row close': () => [[-6, 1.2, 3.2], [-6, 0.1, 0.5], 35],
+  'eye: standing, 3 blocks': () => [[layout.cx - 1, 1.62, 3.5], [layout.cx, 0, 0], 70],
+  'eye: sneaking, 2 blocks': () => [[layout.bx - 0.5, 1.27, 2.5], [layout.bx, 0, 0.5], 70],
+  'eye: 10 blocks': () => [[layout.cx - 2, 1.62, 10], [layout.cx, 0, -1], 70],
+  'eye: down at both rows': () => [[-6, 1.62, 3.5], [-6, 0, -1], 70],
+  'two in a block': () => [[layout.bx + 0.6, 0.5, 1.4], [layout.bx, 0.05, 0.5], 35],
+};
+const camBox = document.getElementById('cams');
+function setCam(name) {
+  settings.cam = name; const [pos, target, fov] = CAMS[name]();
+  camera.fov = fov; camera.updateProjectionMatrix();
+  camera.position.set(...pos); controls.target.set(...target); controls.update();
+  [...camBox.children].forEach(b => b.classList.toggle('on', b.textContent === name));
+}
+Object.keys(CAMS).forEach(name => { const b = document.createElement('button'); b.textContent = name; b.onclick = () => setCam(name); camBox.appendChild(b); });
+const list = document.getElementById('list');
+DATA.notes.forEach(n => { const li = document.createElement('li'); li.innerHTML = n; list.appendChild(li); });
+function resize() { const w = wrap.clientWidth, h = wrap.clientHeight; renderer.setSize(w, h, false); camera.aspect = w / h; camera.updateProjectionMatrix(); }
+window.addEventListener('resize', resize);
+const v = new THREE.Vector3();
+function frame() {
+  controls.update(); renderer.render(scene, camera);
+  const w = wrap.clientWidth, h = wrap.clientHeight;
+  tags.forEach(({el, obj}) => {
+    const height = (obj.userData.height || 0.2) * obj.scale.y;
+    v.set(obj.position.x, (obj === cube ? 0 : obj.position.y) + height + 0.08, obj.position.z).project(camera);
+    const show = v.z < 1 && Math.abs(v.x) < 1.1 && Math.abs(v.y) < 1.1;
+    el.style.display = show ? '' : 'none'; el.style.left = ((v.x + 1) / 2 * w) + 'px'; el.style.top = ((1 - v.y) / 2 * h) + 'px';
+  });
+  requestAnimationFrame(frame);
+}
+layout(); resize(); setCam(CAMS[settings.cam] ? settings.cam : 'overview'); frame();
+</script>
+</body>
+</html>
