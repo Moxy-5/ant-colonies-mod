@@ -49,6 +49,13 @@ public class ClipGrassGoal extends Goal {
     private BlockPos grass;
     private int ticks;
     private int clipping;
+    /**
+     * Ticks spent on the last little step to this plant, over every try (BUGS 145): a step that dropped the ant into the
+     * cell below sent it on a walk back, and a walk wipes the step's own "no nearer" clock, so it stepped and walked for
+     * ever. Past {@link #CLOSE_IN_LIMIT} it nibbles from any cell beside the plant.
+     */
+    private int closingTicks;
+    private static final int CLOSE_IN_LIMIT = 60;
     /** Eating from inside the nest (out of foraging time): from a foothold inside only. */
     private boolean fromInside;
     /**
@@ -128,6 +135,7 @@ public class ClipGrassGoal extends Goal {
     public void start() {
         ticks = 0;
         clipping = 0;
+        closingTicks = 0;
         errand.begin();
     }
 
@@ -161,7 +169,15 @@ public class ClipGrassGoal extends Goal {
             }
         }
         ant.getLookControl().setLookAt(grass.getX() + 0.5, grass.getY() + 0.3, grass.getZ() + 0.5);
-        if (!errand.isWalking() && isNear(ant.blockPosition(), grass)) {
+        // (BUGS 145: a small body a hair under the cell beside the plant, its feet at 64.9 down in an open mud cast's
+        // top, counted as a cell too low; its walk to the cell above, a tenth of a block up, slipped back and began again
+        // for ever. Within a quarter block of a cell beside the plant, it stops walking and nibbles.)
+        boolean justUnder = !isNear(ant.blockPosition(), grass)
+                && isNear(BlockPos.containing(ant.getX(), ant.getY() + 0.25, ant.getZ()), grass);
+        if (justUnder && errand.isWalking()) {
+            errand.stop();
+        }
+        if ((!errand.isWalking() || justUnder) && (justUnder || isNear(ant.blockPosition(), grass))) {
             if (atPlant(level)) {
                 clip(level);
             }
@@ -193,6 +209,9 @@ public class ClipGrassGoal extends Goal {
         Vec3 away = new Vec3(ant.getX() - nx, 0.0, ant.getZ() - nz);
         if (away.lengthSqr() < 1.0E-4) {
             return true; // (right under or over it: nothing to step)
+        }
+        if (++closingTicks > CLOSE_IN_LIMIT) {
+            return true; // (stepped long enough, over every try: from where it stands, BUGS 145)
         }
         Vec3 stand = new Vec3(nx, ant.getY(), nz).add(away.normalize().scale(ant.getBbWidth() / 2.0 + 0.01));
         return ant.closeIn(stand, 1.8) != AbstractAntEntity.CloseIn.STEPPING;

@@ -2,7 +2,7 @@
   "runs": 3,
   "seconds": 300,
   "from": "2026-11-06_06-48-36-not-stuck",
-  "required": false,
+  "required": true,
   "species": [
     "macrotermes"
   ]
