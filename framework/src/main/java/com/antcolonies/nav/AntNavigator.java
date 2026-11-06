@@ -87,6 +87,8 @@ public class AntNavigator {
     private static final double CHANNEL_GAP = 0.01;
     /** Out of a hole in a floor, the body steps this far (in blocks) off the hole's middle, so it stands on the floor round it. */
     private static final double OFF_THE_HOLE = 0.25;
+    /** BUGS 156: walking past a hole in the ground it fits through, the body keeps this far (in blocks) clear of its edge. */
+    private static final double HOLE_MARGIN = 0.03;
 
     private final AbstractAntEntity ant;
     @Nullable
@@ -1080,13 +1082,75 @@ public class AntNavigator {
         surface = Direction.DOWN;
         Vec3 aim = Vec3.atBottomCenterOf(to.cell());
         if (Crowd.keepsSpace(ant) && stepFrom != null) {
-            aim = lanePoint(map, stepFrom.cell(), to.cell(), aim);
+            aim = roundHoles(map, stepFrom.cell(), to.cell(), lanePoint(map, stepFrom.cell(), to.cell(), aim));
             Vec3 steered = steer(aim, speed);
             ant.getMoveControl().setWantedPosition(steered.x, aim.y, steered.z, aimSpeed);
             return inFloorCell(map, to.cell());
         }
+        if (stepFrom != null) {
+            aim = roundHoles(map, stepFrom.cell(), to.cell(), aim);
+        }
         ant.getMoveControl().setWantedPosition(aim.x, aim.y, aim.z, speed);
         return inFloorCell(map, to.cell());
+    }
+
+    /**
+     * BUGS 156: half the width of the hole in the ground of this floor cell for this insect (the open top of a channel it
+     * fits through, a mud cast or a tunnel block under it; not a chimney mouth's tube, which has its own way in), else 0.
+     */
+    private static double holeUnder(CellMap map, BlockPos floorCell) {
+        BlockPos below = floorCell.below();
+        return Channel.has(map.channelSides(below), Direction.UP) && !map.isMouth(below) ? Channel.HALF_WIDTH : 0.0;
+    }
+
+    /**
+     * BUGS 156: a floor step from or into a cell whose ground has a hole in its middle (the open top of a channel the
+     * insect fits through) keeps to the rim, as a real termite walks round a hole it is not going down: the aim moves
+     * sideways out of the hole's band ({@link #HOLE_MARGIN} past it), and an insect still in front of the hole in the
+     * cell it leaves first steps sideways out of its way. Without this a worker that came up out of a mud cast walked
+     * straight back across the hole, dropped into the channel again (its route still saying "on top"), climbed out, and
+     * did the same for minutes. A step that is not straight along an axis, or a rim point with no room, keeps the aim.
+     */
+    private Vec3 roundHoles(CellMap map, BlockPos from, BlockPos to, Vec3 aim) {
+        double holeFrom = holeUnder(map, from);
+        double holeTo = holeUnder(map, to);
+        if (holeFrom <= 0.0 && holeTo <= 0.0) {
+            return aim;
+        }
+        int dx = Integer.signum(to.getX() - from.getX());
+        int dz = Integer.signum(to.getZ() - from.getZ());
+        if (dx != 0 && dz != 0 || dx == 0 && dz == 0) {
+            return aim;
+        }
+        double clear = Math.max(holeFrom, holeTo) + half() + HOLE_MARGIN;
+        double fromX = from.getX() + 0.5;
+        double fromZ = from.getZ() + 0.5;
+        // Along the step (dx, dz) and across it (-dz, dx), measured from the middle of the cell it leaves.
+        double along = (ant.getX() - fromX) * dx + (ant.getZ() - fromZ) * dz;
+        double across = (ant.getX() - fromX) * -dz + (ant.getZ() - fromZ) * dx;
+        double aimAcross = (aim.x - (to.getX() + 0.5)) * -dz + (aim.z - (to.getZ() + 0.5)) * dx;
+        double side = Math.abs(across) > 1.0E-3 ? Math.signum(across)
+                : Math.abs(aimAcross) > 1.0E-3 ? Math.signum(aimAcross) : lane() >= 0.0 ? 1.0 : -1.0;
+        double keep = Math.signum(aimAcross) == side ? Math.max(clear, Math.abs(aimAcross)) : clear;
+        keep = Math.min(keep, 0.5 - half() - EPS);
+        if (holeFrom > 0.0 && along < holeFrom + half() && Math.abs(across) < clear - HOLE_MARGIN / 2.0) {
+            // Still in front of (or beside) the hole in the cell it leaves: sideways out of its way first.
+            Vec3 aside = new Vec3(fromX + dx * along - dz * side * keep, aim.y, fromZ + dz * along + dx * side * keep);
+            if (fits(aside)) {
+                return aside;
+            }
+        }
+        double before = 1.0 - holeTo - half() - HOLE_MARGIN;
+        if (holeTo > 0.0 && along < before && Math.abs(across - side * keep) > HOLE_MARGIN) {
+            // Not yet on the rim's line: out onto it before the hole's band, or the straight way to the rim point clips
+            // the hole's near corner (the replay of 2026-11-06: half the workers that still fell in did it this way).
+            Vec3 lead = new Vec3(fromX + dx * before - dz * side * keep, aim.y, fromZ + dz * before + dx * side * keep);
+            if (fits(lead)) {
+                return lead;
+            }
+        }
+        Vec3 rim = new Vec3(to.getX() + 0.5 - dz * side * keep, aim.y, to.getZ() + 0.5 + dx * side * keep);
+        return fits(rim) ? rim : aim;
     }
 
     // --- Personal space: lanes, stepping round, free spots, standing apart (real sizes, step 3) ---
@@ -2021,6 +2085,11 @@ public class AntNavigator {
             // outside the channel: at least the channel's half width plus its own half width from the middle line.)
             return Foothold.channel(feet);
         }
+        if (inSideArm(map, feet)) {
+            // BUGS 156: inside one of the channel's side arms (it fell in through an open top and walked on inside, its
+            // route still saying "on top"): it is in the channel, so the new route starts there and crawls out.
+            return Foothold.channel(feet);
+        }
         BlockPos cell = BlockPos.containing(pos());
         if (surface == Direction.UP && Foothold.isValid(map, cell, Direction.UP)
                 && cell.getY() + 1 - (ant.getY() + ant.getBbHeight()) < CLING_GAP) {
@@ -2055,6 +2124,35 @@ public class AntNavigator {
             return at;
         }
         return nearest;
+    }
+
+    /**
+     * BUGS 156: whether the middle of the body lies inside an open side arm of the channel in {@code feet} (the hollow
+     * reaching from the channel's middle out to an open side, its floor to its roof). The soil closes the hollow on every
+     * other side, so a body there is in the channel, never hugging the block's outside.
+     */
+    private boolean inSideArm(CellMap map, BlockPos feet) {
+        int sides = map.channelSides(feet);
+        if (sides == 0) {
+            return false;
+        }
+        double x = ant.getX() - (feet.getX() + 0.5);
+        double z = ant.getZ() - (feet.getZ() + 0.5);
+        double y = ant.getY() + ant.getBbHeight() / 2.0 - feet.getY();
+        if (y < Channel.FLOOR || y > Channel.FLOOR + 2 * Channel.HALF_WIDTH) {
+            return false;
+        }
+        for (Direction side : Direction.Plane.HORIZONTAL) {
+            if (!Channel.has(sides, side)) {
+                continue;
+            }
+            double along = side.getAxis() == Direction.Axis.X ? x * side.getStepX() : z * side.getStepZ();
+            double across = side.getAxis() == Direction.Axis.X ? z : x;
+            if (along >= 0.0 && along <= 0.5 && Math.abs(across) < Channel.HALF_WIDTH) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /** The floor of a cell beside {@code cell} that the body overlaps (standing at the edge of it), the nearest one; or null. */
