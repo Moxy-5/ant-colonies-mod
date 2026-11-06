@@ -280,6 +280,44 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
     protected AbstractAntEntity(EntityType<? extends AbstractAntEntity> type, Level level) {
         super(type, level);
         this.moveControl = new AntMoveControl(this);
+        applyBodySize();
+    }
+
+    /**
+     * Real sizes (2026-11-05, {@link com.antcolonies.entity.body.BodySizes}): its own size on top of its body's (1 for
+     * every insect but one with a size of its own, a Matabele drawn at its own length).
+     */
+    protected float ownSize() {
+        return 1.0F;
+    }
+
+    /**
+     * Sets its {@link Attributes#SCALE} to its body's size factor times its own size: the drawing, the box and the
+     * climbing body follow (the game sends it to the players). On being made, after loading (an old save's scale is not
+     * kept) and when its own size changes.
+     */
+    public final void applyBodySize() {
+        AttributeInstance scale = getAttribute(Attributes.SCALE);
+        if (scale != null) {
+            double size = com.antcolonies.entity.body.BodySizes.of(getType()) * ownSize();
+            if (Math.abs(scale.getBaseValue() - size) > 1.0E-6) {
+                scale.setBaseValue(size);
+            }
+        }
+    }
+
+    /** Real sizes: how far off insects are drawn (blocks, times the player's entity distance setting), whatever their size. */
+    public static final double DRAW_DISTANCE = 48.0;
+
+    /**
+     * Drawn out to {@link #DRAW_DISTANCE} (real sizes, 2026-11-05): the game's own rule draws a mob out to 64 times its
+     * box's size, so a termite worker at its real size would vanish 7 blocks off and a raid column blink out half way
+     * down.
+     */
+    @Override
+    public boolean shouldRenderAtSqrDistance(double distanceSqr) {
+        double reach = DRAW_DISTANCE * getViewScale();
+        return distanceSqr < reach * reach;
     }
 
     @Override
@@ -1865,9 +1903,12 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
      * or put there by older code) is lifted onto it, as it cannot walk out of it. Once a second (public for the tests).
      */
     public void liftIfSunk() {
-        if (isPassenger() || navigator.isAttached() || isDeadOrDying()) {
+        if (isPassenger() || isDeadOrDying()) {
             return;
         }
+        // (Even one its legs think is on a wall: its middle in the low block's own cell, below its top, is inside it; a
+        // real climber of the block's side has its middle out in the cell beside. Real sizes, 2026-11-05: a termite
+        // worker's small body put in the comb read as holding on to it, so it was never lifted.)
         BlockPos feet = blockPosition();
         double top = com.antcolonies.colony.NestWalls.lowFloorTop(level(), feet);
         if (Double.isNaN(top)) {
@@ -2463,6 +2504,7 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
     @Override
     public void readAdditionalSaveData(CompoundTag tag) {
         super.readAdditionalSaveData(tag);
+        applyBodySize();
         if (tag.hasUUID("ColonyId")) {
             colonyId = tag.getUUID("ColonyId");
         }

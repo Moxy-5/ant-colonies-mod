@@ -165,6 +165,63 @@
   240,
   136
  ],
- "findings": {},
+ "findings": {
+  "jump leg_r2_lower": [
+   1,
+   0.076
+  ],
+  "jump at down_51": [
+   2,
+   0.083
+  ],
+  "jump leg_r2_foot": [
+   3,
+   0.112
+  ],
+  "jump at up_51": [
+   3,
+   0.122
+  ],
+  "jump at down_21": [
+   2,
+   0.078
+  ],
+  "jump leg_l2_lower": [
+   1,
+   0.077
+  ],
+  "jump at down_52": [
+   3,
+   0.087
+  ],
+  "jump leg_l2_foot": [
+   1,
+   0.086
+  ],
+  "jump leg_r1_foot": [
+   1,
+   0.087
+  ],
+  "jump leg_l1_lower": [
+   1,
+   0.078
+  ],
+  "jump leg_l1_foot": [
+   1,
+   0.122
+  ],
+  "jump leg_l3_foot": [
+   1,
+   0.118
+  ],
+  "jump abdomen_6": [
+   1,
+   0.105
+  ],
+  "jump at down_04": [
+   1,
+   0.105
+  ]
+ },
  "body_findings": {}
 }

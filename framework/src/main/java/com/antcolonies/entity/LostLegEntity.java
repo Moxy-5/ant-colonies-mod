@@ -101,4 +101,11 @@ public class LostLegEntity extends Entity {
             discard();
         }
     }
+
+    /** Real sizes (2026-11-05): drawn out to a set distance, not the game's 64 times its small box ({@link AbstractAntEntity#DRAW_DISTANCE}). */
+    @Override
+    public boolean shouldRenderAtSqrDistance(double distanceSqr) {
+        double reach = 24.0 * getViewScale();
+        return distanceSqr < reach * reach;
+    }
 }

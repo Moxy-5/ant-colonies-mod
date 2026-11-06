@@ -207,128 +207,128 @@
  ],
  "findings": {
   "jump leg_r2": [
-   3,
-   0.08
-  ],
-  "jump at left_above_25": [
-   9,
-   0.197
-  ],
-  "jump at right_above_10": [
-   9,
-   0.121
-  ],
-  "jump at right_above_14": [
-   9,
-   0.162
-  ],
-  "jump leg_r2_lower": [
    4,
-   0.118
+   0.039
   ],
-  "jump at right_above_18": [
-   8,
-   0.139
-  ],
-  "jump leg_r2_foot": [
-   4,
-   0.138
-  ],
-  "jump leg_l2": [
+  "jump at fast_02": [
    3,
-   0.072
+   0.059
   ],
   "jump at right_above_12": [
-   9,
-   0.173
+   2,
+   0.042
   ],
   "jump at right_above_16": [
    9,
-   0.162
+   0.08
   ],
   "jump at right_above_20": [
+   9,
+   0.087
+  ],
+  "jump leg_r2_lower": [
+   3,
+   0.054
+  ],
+  "jump at right_above_11": [
+   8,
+   0.067
+  ],
+  "jump leg_r2_foot": [
+   6,
+   0.064
+  ],
+  "jump at left_above_16": [
    7,
-   0.143
+   0.056
+  ],
+  "jump leg_l2": [
+   3,
+   0.038
+  ],
+  "jump at normal_29": [
+   2,
+   0.061
+  ],
+  "jump at right_above_18": [
+   9,
+   0.078
+  ],
+  "jump at right_above_22": [
+   9,
+   0.089
   ],
   "jump leg_l2_lower": [
-   3,
-   0.1
+   5,
+   0.056
   ],
-  "jump at left_above_27": [
+  "jump at right_above_09": [
+   8,
+   0.072
+  ],
+  "jump at right_above_14": [
    7,
-   0.123
+   0.067
   ],
   "jump leg_l2_foot": [
-   3,
-   0.118
+   6,
+   0.065
   ],
   "jump leg_r3": [
    3,
-   0.108
+   0.055
   ],
   "jump leg_r3_lower": [
-   4,
-   0.144
+   7,
+   0.073
+  ],
+  "jump at left_above_28": [
+   5,
+   0.073
+  ],
+  "jump at right_above_13": [
+   2,
+   0.054
   ],
   "jump leg_r3_foot": [
-   4,
-   0.173
+   7,
+   0.089
   ],
   "jump leg_r1": [
-   4,
-   0.114
+   5,
+   0.06
   ],
   "jump leg_r1_lower": [
-   5,
-   0.133
-  ],
-  "jump at left_above_23": [
-   2,
-   0.127
+   6,
+   0.07
   ],
   "jump leg_r1_foot": [
-   5,
-   0.15
+   6,
+   0.079
   ],
   "jump leg_l1": [
-   7,
-   0.15
-  ],
-  "jump at right_above_09": [
-   1,
-   0.077
-  ],
-  "jump at right_above_22": [
-   1,
-   0.076
-  ],
-  "jump at right_above_23": [
-   4,
-   0.108
+   3,
+   0.06
   ],
   "jump leg_l1_lower": [
-   4,
-   0.169
+   3,
+   0.069
   ],
   "jump leg_l1_foot": [
-   5,
-   0.189
-  ],
-  "jump at left_above_29": [
-   3,
-   0.121
+   4,
+   0.077
   ],
   "jump leg_l3": [
-   5,
-   0.132
+   3,
+   0.056
   ],
   "jump leg_l3_lower": [
-   6,
-   0.166
+   3,
+   0.073
   ],
   "jump leg_l3_foot": [
-   6,
-   0.197
+   3,
+   0.087
   ]
  },
  "body_findings": {}

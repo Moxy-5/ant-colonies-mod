@@ -266,45 +266,105 @@
   136
  ],
  "findings": {
-  "jump leg_l2_lower": [
-   1,
-   0.098
-  ],
-  "jump at down_103": [
-   2,
-   0.113
-  ],
   "jump leg_l2_foot": [
+   2,
+   0.137
+  ],
+  "jump at up_31": [
    1,
-   0.113
+   0.137
+  ],
+  "jump at down_104": [
+   1,
+   0.128
+  ],
+  "jump thorax": [
+   1,
+   0.043
+  ],
+  "jump at up_26": [
+   12,
+   0.053
+  ],
+  "jump wing_stubs": [
+   1,
+   0.04
+  ],
+  "jump head": [
+   1,
+   0.05
+  ],
+  "jump mandible_r": [
+   1,
+   0.048
+  ],
+  "jump antenna_l_1": [
+   1,
+   0.053
   ],
   "inside antenna_l_2": [
    2,
-   0.013
+   0.021
   ],
   "inside at down_102": [
    2,
-   0.027
+   0.033
   ],
   "inside at down_103": [
    2,
-   0.013
+   0.025
+  ],
+  "jump mandible_l": [
+   1,
+   0.048
+  ],
+  "jump antenna_r_1": [
+   1,
+   0.05
   ],
   "inside antenna_r_2": [
-   3,
-   0.031
+   4,
+   0.035
+  ],
+  "inside at down_100": [
+   1,
+   0.01
   ],
   "inside at down_101": [
    1,
-   0.031
+   0.035
   ],
-  "jump leg_r1": [
+  "jump leg_l1_foot": [
    1,
-   0.066
+   0.144
   ],
-  "jump at down_33": [
+  "jump at up_29": [
    1,
-   0.066
+   0.144
+  ],
+  "jump abdomen": [
+   1,
+   0.038
+  ],
+  "jump abdomen_2": [
+   2,
+   0.04
+  ],
+  "jump at down_102": [
+   3,
+   0.04
+  ],
+  "jump abdomen_3": [
+   2,
+   0.038
+  ],
+  "jump abdomen_4": [
+   2,
+   0.037
+  ],
+  "jump abdomen_5": [
+   1,
+   0.037
   ]
  },
  "body_findings": {}

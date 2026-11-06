@@ -9,6 +9,7 @@ import com.antcolonies.savanna.entity.TermiteQueenEntity;
 import com.antcolonies.savanna.entity.TermiteSoldierEntity;
 import com.antcolonies.savanna.entity.TermiteWorkerEntity;
 import com.antcolonies.savanna.SavannaSpecies;
+import com.antcolonies.savanna.species.InsectSizes;
 import com.antcolonies.species.SpeciesBodies;
 
 import java.util.Map;
@@ -25,11 +26,18 @@ public class SavannaEntities {
     public static final DeferredRegister<EntityType<?>> ENTITY_TYPES =
             DeferredRegister.create(Registries.ENTITY_TYPE, SavannaMod.MODID);
 
+    /**
+     * Real sizes (2026-11-05, {@link InsectSizes}): the termites' young and dead shrink as the worker does (their boxes
+     * and drawing were made the worker's size), the Matabele's as the major does. The living insects' boxes below are
+     * their models' own; each insect's size factor scales them in the game ({@code BodySizes}).
+     */
+    public static final float TERMITE_SIZE = InsectSizes.TERMITE_WORKER.factor();
+
     // The body of a dead termite (the same kind of body as a dead ant, drawn pale).
     public static final DeferredHolder<EntityType<?>, EntityType<AntCorpseEntity>> TERMITE_CORPSE =
             ENTITY_TYPES.register("termite_corpse", () -> EntityType.Builder
                     .of(AntCorpseEntity::new, MobCategory.MISC)
-                    .sized(0.25F, 0.15F)
+                    .sized(0.25F * TERMITE_SIZE, 0.15F * TERMITE_SIZE)
                     .clientTrackingRange(6)
                     .updateInterval(20)
                     .build("termite_corpse"));
@@ -73,7 +81,7 @@ public class SavannaEntities {
     public static final DeferredHolder<EntityType<?>, EntityType<AntLarvaEntity>> TERMITE_NYMPH =
             ENTITY_TYPES.register("termite_nymph", () -> EntityType.Builder
                     .<AntLarvaEntity>of(AntLarvaEntity::new, MobCategory.MISC)
-                    .sized(0.2F, 0.12F)
+                    .sized(0.2F * TERMITE_SIZE, 0.12F * TERMITE_SIZE)
                     .clientTrackingRange(6)
                     .updateInterval(20)
                     .build("termite_nymph"));
@@ -101,12 +109,12 @@ public class SavannaEntities {
 
     // M8 step 1c: the Matabele young and dead, for the shared brood and refuse code (no nest to raise young in yet, step
     // 1d; the dead are carried home in step 5). Drawn MATABELE_DRAW_SIZE times a small ant's grub and body.
-    public static final float MATABELE_DRAW_SIZE = 2.0F;
+    public static final float MATABELE_DRAW_SIZE = 2.0F * InsectSizes.MATABELE_MAJOR.factor();
 
     public static final DeferredHolder<EntityType<?>, EntityType<AntLarvaEntity>> MATABELE_LARVA =
             ENTITY_TYPES.register("matabele_larva", () -> EntityType.Builder
                     .<AntLarvaEntity>of(AntLarvaEntity::new, MobCategory.MISC)
-                    .sized(0.4F, 0.24F)
+                    .sized(0.4F * InsectSizes.MATABELE_MAJOR.factor(), 0.24F * InsectSizes.MATABELE_MAJOR.factor())
                     .clientTrackingRange(6)
                     .updateInterval(20)
                     .build("matabele_larva"));
@@ -114,7 +122,7 @@ public class SavannaEntities {
     public static final DeferredHolder<EntityType<?>, EntityType<AntCorpseEntity>> MATABELE_CORPSE =
             ENTITY_TYPES.register("matabele_corpse", () -> EntityType.Builder
                     .of(AntCorpseEntity::new, MobCategory.MISC)
-                    .sized(0.5F, 0.3F)
+                    .sized(0.5F * InsectSizes.MATABELE_MAJOR.factor(), 0.3F * InsectSizes.MATABELE_MAJOR.factor())
                     .clientTrackingRange(6)
                     .updateInterval(20)
                     .build("matabele_corpse"));
@@ -127,7 +135,7 @@ public class SavannaEntities {
                 Map.of(TermiteWorkerEntity.CASTE, TERMITE_WORKER, TermiteSoldierEntity.Rank.MINOR.caste(), TERMITE_MINOR_SOLDIER,
                         TermiteSoldierEntity.Rank.MAJOR.caste(), TERMITE_MAJOR_SOLDIER),
                 ResourceLocation.fromNamespaceAndPath(SavannaMod.MODID, "textures/entity/termite_nymph.png"),
-                ResourceLocation.fromNamespaceAndPath(SavannaMod.MODID, "textures/entity/termite_corpse.png")));
+                ResourceLocation.fromNamespaceAndPath(SavannaMod.MODID, "textures/entity/termite_corpse.png"), Map.of(), TERMITE_SIZE));
         // M8 step 1c: the Matabele workers are one caste; each new one gets the major's or the minor's body as often as
         // the real size spread draws each (MatabeleEntity.pickBody).
         SpeciesBodies.register(SavannaSpecies.MATABELE, new SpeciesBodies(MATABELE_LARVA, MATABELE_CORPSE,

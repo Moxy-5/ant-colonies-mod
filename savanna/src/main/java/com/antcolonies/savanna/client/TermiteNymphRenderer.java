@@ -75,7 +75,8 @@ public class TermiteNymphRenderer extends EntityRenderer<AntLarvaEntity> {
         pose.mulPose(Axis.YP.rotationDegrees(180.0F - nymph.getYRot()));
         float grown = (float) Math.min(nymph.getFed(), nymph.getMeal()) / nymph.getMeal();
         TermiteSoldierEntity.Rank rank = TermiteSoldierEntity.Rank.byId(nymph.getGrowsIntoNumber()); // (the soldiers' caste numbers, 1 and 2)
-        float size = 0.55F + (rank == TermiteSoldierEntity.Rank.MAJOR ? 0.6F : 0.35F) * grown;
+        float size = (0.55F + (rank == TermiteSoldierEntity.Rank.MAJOR ? 0.6F : 0.35F) * grown)
+                * com.antcolonies.savanna.registry.SavannaEntities.TERMITE_SIZE; // real sizes, 2026-11-05
         pose.scale(size, size, size);
         VertexConsumer consumer = buffers.getBuffer(RenderType.entityCutoutNoCull(texture));
         model.getChild("nymph").render(pose, consumer, light, OverlayTexture.NO_OVERLAY);

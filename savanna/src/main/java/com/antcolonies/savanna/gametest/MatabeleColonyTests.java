@@ -86,8 +86,13 @@ public class MatabeleColonyTests {
                 float length = ant.getLengthMm();
                 helper.assertTrue(length >= sizes.shortest() && length <= sizes.longest(), "a worker " + length + " mm long, outside the real spread");
                 helper.assertTrue(ant.hasMajorBody() == sizes.majorModelFor(length), "a worker " + length + " mm long has the farther model");
-                helper.assertTrue(Math.abs(ant.getScale() - sizes.scaleFor(length)) < 1.0E-3, "a worker " + length + " mm long is drawn at " + ant.getScale());
-                float width = ant.getType().getWidth() * sizes.scaleFor(length);
+                // Real sizes (2026-11-05): its model's size factor times its own length over its model's.
+                float drawn = com.antcolonies.entity.body.BodySizes.of(ant.getType()) * sizes.scaleFor(length);
+                helper.assertTrue(Math.abs(ant.getScale() - drawn) < 1.0E-3, "a worker " + length + " mm long is drawn at " + ant.getScale() + ", not " + drawn);
+                float realLength = (ant.hasMajorBody() ? com.antcolonies.savanna.species.InsectSizes.MATABELE_MAJOR : com.antcolonies.savanna.species.InsectSizes.MATABELE_MINOR).drawnLength() * ant.getScale();
+                helper.assertTrue(Math.abs(realLength - length * com.antcolonies.savanna.species.InsectSizes.BLOCKS_PER_MM) < 1.0E-3,
+                        "a worker " + length + " mm long is drawn " + realLength + " blocks long, not its real length on the scale");
+                float width = ant.getType().getWidth() * drawn;
                 helper.assertTrue(Math.abs(ant.getBbWidth() - width) < 1.0E-3, "a worker " + length + " mm long has a box " + ant.getBbWidth() + " wide, not " + width);
                 // Through a save: the same length and size.
                 CompoundTag tag = new CompoundTag();

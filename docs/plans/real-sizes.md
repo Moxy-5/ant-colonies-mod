@@ -45,7 +45,9 @@ The user's ask: be sure we thought of everything this changes in raiding, gather
 
 ## Steps
 
-### 1. One size rule (the drawing, the box, the climbing)
+### 1. One size rule (the drawing, the box, the climbing): BUILT 2026-11-05
+**As built:** one table, `savanna/.../species/InsectSizes.java` (real mm and today's drawn length per body, 30 mm a block), not the species file (my pick: the young's and the dead's boxes are made at start and the drawing needs the sizes on the player's side, where species files are never read). Each living insect's size factor is signed up with the framework (`entity/body/BodySizes`) and set as its game scale (`AbstractAntEntity.applyBodySize`: on being made, after loading, when a Matabele's own length is set), so the drawing, the box, the climbing body and the stride follow one number; the renderers' scales, the body plans and the anim lab are untouched. The young, the dead and the carried termites shrink from the same table; lost legs and clamped heads already followed the box. Drawn out to 48 blocks (`DRAW_DISTANCE`). **Not done:** still legs past 24 blocks (GeckoLib shares one set of bones across every insect of a model, so skipping the animation would draw another insect's pose; moved to the speed check of step 4, only if needed). The termite queen's swelling is scaled with the rest (her starting size the king's, 14 mm).
+
 - Each species file gets a `body_scale` (blocks per mm, 1/30) and each caste its real length; the drawing scale, the collision box (`.sized(...)` today, made from the length) and the per-ant Matabele size (`worker_sizes`) all come from it, so they can never drift apart again.
 - Body plans re-measured (`python tools/body_plan.py measure`), so climbing, the waist bend and the edge tipping fit the new bodies.
 - Everything carried or left behind follows: carried termites and their stacks, corpses, lost legs, clamped soldier heads, eggs, larvae, nymphs, the prey pile's look stays a block.

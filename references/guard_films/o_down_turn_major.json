@@ -136,21 +136,21 @@
   136
  ],
  "findings": {
-  "jump abdomen_5": [
-   2,
-   0.171
+  "jump leg_r2_lower": [
+   1,
+   0.104
   ],
-  "jump at major_down_turn_15": [
-   2,
-   0.172
+  "jump at major_down_turn_59": [
+   3,
+   0.137
   ],
-  "jump at major_down_turn_16": [
-   2,
-   0.184
+  "jump leg_r2_foot": [
+   1,
+   0.112
   ],
-  "jump abdomen_6": [
-   2,
-   0.184
+  "jump leg_l3_foot": [
+   1,
+   0.137
   ]
  },
  "body_findings": {}

@@ -270,11 +270,17 @@ public class MatabeleEntity extends AbstractAntEntity implements ColonyBorn {
      */
     public void setLengthMm(float length) {
         lengthMm = length;
+        applyBodySize();
+    }
+
+    /**
+     * Its own size on top of its model's (real sizes, 2026-11-05: the model's size factor, {@code InsectSizes}, makes
+     * the model mm long on the scale; this makes it its own length): its length over its model's.
+     */
+    @Override
+    protected float ownSize() {
         SavannaNumbers.WorkerSizes sizes = sizes();
-        AttributeInstance scale = getAttribute(Attributes.SCALE);
-        if (sizes != null && scale != null && length > 0.0F) {
-            scale.setBaseValue(length / (hasMajorBody() ? sizes.majorModelMm() : sizes.minorModelMm()));
-        }
+        return sizes != null && lengthMm > 0.0F ? lengthMm / (hasMajorBody() ? sizes.majorModelMm() : sizes.minorModelMm()) : 1.0F;
     }
 
     @Override

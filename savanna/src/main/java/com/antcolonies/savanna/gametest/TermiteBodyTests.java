@@ -29,25 +29,34 @@ import net.neoforged.neoforge.gametest.PrefixGameTestTemplate;
 @PrefixGameTestTemplate(false)
 public class TermiteBodyTests {
     /**
-     * A termite worker with nothing to do never falls asleep (its species has no naps) and never stops to clean its
-     * antennae (its species has no cleaning), though it would take every chance to. Watched for 15 seconds (the length
-     * of the ant's nap and cleaning it shared a scene with before the split, my pick).
+     * A termite worker with nothing to do never falls asleep (its species has no naps: termites rest standing), though it
+     * would take every chance to, but it does clean its antennae now and then (M8 step 3Q gave termites cleaning; before
+     * it this test checked they never cleaned, box 2 of the 4-box rule, 2026-11-05). Watched for 15 seconds (the length of
+     * the ant's nap and cleaning it shared a scene with before the split, my pick).
      */
     @GameTest(template = "arena", timeoutTicks = 600)
-    public static void idleTermitesNeverNapNorCleanTheirAntennae(GameTestHelper helper) {
+    public static void idleTermitesNeverNapButCleanTheirAntennae(GameTestHelper helper) {
         TermiteWorkerEntity termite = helper.spawn(SavannaEntities.TERMITE_WORKER.get(), MIDDLE - 4, SURFACE, MIDDLE);
         termite.keepOutOfColonies();
         termite.setNapChanceForTests(1.0F);
         termite.setGroomChanceForTests(1.0F);
+        boolean[] cleaned = {false};
         helper.onEachTick(() -> {
-            if (termite.getActivity() != AbstractAntEntity.ACTIVITY_NONE) {
-                helper.fail("a termite started cleaning its antennae (its species has no cleaning)");
+            byte activity = termite.getActivity();
+            if (activity == AbstractAntEntity.ACTIVITY_GROOM_L || activity == AbstractAntEntity.ACTIVITY_GROOM_R
+                    || activity == AbstractAntEntity.ACTIVITY_GROOM_BOTH) {
+                cleaned[0] = true;
             }
             if (termite.isAsleep()) {
                 helper.fail("a termite fell asleep (termites have no naps)");
             }
         });
-        helper.runAfterDelay(300, helper::succeed);
+        helper.runAfterDelay(300, () -> {
+            if (!cleaned[0]) {
+                helper.fail("an idle termite taking every chance to clean its antennae never did in 15 seconds");
+            }
+            helper.succeed();
+        });
     }
 
     /**

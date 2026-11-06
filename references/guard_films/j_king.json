@@ -86,37 +86,61 @@
   136
  ],
  "findings": {
-  "jump leg_r1": [
-   2,
-   0.051
-  ],
-  "jump at normal_10": [
+  "jump leg_r2_foot": [
    1,
-   0.051
-  ],
-  "jump at normal_28": [
-   1,
-   0.047
-  ],
-  "jump leg_l1": [
-   1,
-   0.05
+   0.093
   ],
   "jump at normal_12": [
    1,
-   0.05
+   0.093
   ],
-  "jump leg_l3": [
-   2,
-   0.049
-  ],
-  "jump at normal_11": [
+  "jump leg_l2": [
    1,
-   0.049
+   0.059
+  ],
+  "jump at normal_10": [
+   6,
+   0.097
+  ],
+  "jump leg_l2_lower": [
+   2,
+   0.073
+  ],
+  "jump at normal_14": [
+   2,
+   0.093
+  ],
+  "jump leg_l2_foot": [
+   2,
+   0.093
+  ],
+  "jump antenna_l_2": [
+   1,
+   0.043
   ],
   "jump at normal_29": [
    1,
+   0.043
+  ],
+  "jump leg_r1": [
+   1,
    0.048
+  ],
+  "jump leg_r1_lower": [
+   1,
+   0.08
+  ],
+  "jump leg_r1_foot": [
+   1,
+   0.097
+  ],
+  "jump leg_l1": [
+   1,
+   0.046
+  ],
+  "jump at normal_08": [
+   1,
+   0.046
   ]
  },
  "body_findings": {}

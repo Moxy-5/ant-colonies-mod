@@ -35,6 +35,7 @@ public class SavannaMod {
     public SavannaMod(IEventBus modEventBus) {
         // The bodies' plans (bone names, spine, climbing numbers), read by the framework from this mod's files.
         BodyPlans.signUp(SavannaMod.class, "/assets/" + MODID + "/body_plans/");
+        com.antcolonies.savanna.species.InsectSizes.signUp(); // real sizes, 2026-11-05
         SavannaBlocks.BLOCKS.register(modEventBus);
         SavannaFeatures.FEATURES.register(modEventBus);
         SavannaFeatures.BIOME_MODIFIERS.register(modEventBus);

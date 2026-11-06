@@ -28,11 +28,10 @@ public class SavannaClientEvents {
     /** Carried termite leftovers are drawn this big (as a fraction of a full block). */
     private static final float REMAINS_SIZE = 0.3F;
     /**
-     * M8 step 3c: a carried termite is drawn 7 pixels long in the major's model (0.3 of a major's body, a real
-     * Macrotermes worker beside a Matabele major, as in the pose viewer's stack, tools/matabele_anims.py); its boxes are
-     * 8 long, so this.
+     * Real sizes (2026-11-05): a carried termite is drawn a real Macrotermes worker's length on the scale
+     * ({@code InsectSizes.TERMITE_WORKER}, 0.15 blocks; its model 8 pixels long), however big its carrier.
      */
-    private static final float CARRIED_TERMITE_SIZE = 7.0F / 8.0F;
+    private static final float CARRIED_TERMITE_LENGTH = com.antcolonies.savanna.species.InsectSizes.TERMITE_WORKER.length();
     private static final ResourceLocation CARRIED_TERMITE_TEXTURE =
             ResourceLocation.fromNamespaceAndPath(SavannaMod.MODID, "textures/entity/carried_termite.png");
 
@@ -64,10 +63,10 @@ public class SavannaClientEvents {
         com.antcolonies.client.LoadLooks.signUp(com.antcolonies.savanna.entity.MatabeleLoads.TERMITES, context -> {
             net.minecraft.client.model.geom.ModelPart termite = carriedTermite();
             return (pose, carrier, load, buffers, light, overlay) -> {
-                float k = CARRIED_TERMITE_SIZE / Math.max(0.1F, carrier.getScale());
-                if (carrier instanceof MatabeleEntity ant && !ant.hasMajorBody()) {
-                    k *= MATABELE_MAJOR_SCALE / MATABELE_MINOR_SCALE;
-                }
+                // (the pose is the carrier's drawn size: its renderer's scale times its own; the termite 8 pixels long)
+                float carrierScale = (carrier instanceof MatabeleEntity ant && !ant.hasMajorBody() ? MATABELE_MINOR_SCALE : MATABELE_MAJOR_SCALE)
+                        * Math.max(0.05F, carrier.getScale());
+                float k = CARRIED_TERMITE_LENGTH / (8.0F / 16.0F * carrierScale);
                 float thick = 2.0F / 16.0F * k;
                 int count = load.item().getCount();
                 com.mojang.blaze3d.vertex.VertexConsumer consumer = buffers.getBuffer(
