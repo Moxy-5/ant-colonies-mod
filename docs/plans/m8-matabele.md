@@ -444,7 +444,7 @@ timings: all "my pick, to confirm" until then).
      as numbers take about 1.5 termites each from the termite colony there (at most 1,000 a raid) and bring them home onto
      the prey pile; the termites' count loses one in 1,000 of them, and they keep off the spot. Known change: a termite
      colony no longer dies from raids (it would take a million taken termites); the spot drying up is what limits them.
-     **Later: termites worn down until they die (the user, 2026-11-06; kept as built for testing for now).** The user:
+     **Later, with the savanna wildlife update (M9.5): termites worn down until they die (the user, 2026-11-06; kept as built for testing for now).** The user:
      "the whole point" is that the Matabele and the local wildlife slowly chip a termite colony down until it dries up,
      and a player should be able to kill a mound set up near them; and the game's galleries are nowhere near a home for
      a million termites. So 1,000 a counted termite is a testing number, not the end. To plan with the user then (my
