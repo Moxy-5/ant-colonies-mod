@@ -116,6 +116,22 @@ neoForge {
             }
         }
 
+        // The raid test bench's soak runs (round 2, B4; tools/soak.sh): headless servers on real generated worlds, each
+        // in its own folder, running a savanna patch flat out for -PsoakDays game days while a pretend player pokes at
+        // the raids (watch/Soak). How many: -PsoakShards=n (4 if not given).
+        def soakShards = (project.findProperty('soakShards') ?: '4') as int
+        def soakDays = (project.findProperty('soakDays') ?: '1').toString()
+        (1..soakShards).each { shard ->
+            register("soakShard${shard}") {
+                server()
+                programArgument '--nogui'
+                gameDirectory = project.file("run-soak/${shard}")
+                systemProperty 'neoforge.enabledGameTestNamespaces', gameTestNamespaces
+                systemProperty 'antcolonies.soak', 'true'
+                systemProperty 'antcolonies.soakDays', soakDays
+            }
+        }
+
         // The in-game camera (client/FilmDirector, development only): a fresh flat creative world, a shot list played
         // and its screenshots saved to run-film/screenshots, then the game quits. Claude's eyes in the real game.
         // ./gradlew runFilm  (the poses scene)  or  ./gradlew runFilm -PfilmScene=tools/film/<scene>.film

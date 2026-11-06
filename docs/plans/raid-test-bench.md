@@ -198,3 +198,9 @@ What was built, and how it differs from the steps above (my picks):
 - It cannot see what only looks wrong (jerky animation, legs through blocks): the guard films do that.
 - The pretend player is not you: you will still find things, but far fewer, and each one comes with a black box.
 - A replay is the same place, not the same dice: a bug of pure chance may need several runs to show again.
+
+## Round 2, BUILT 2026-11-05 (B3 and B4)
+- B3: `tools/report_to_test.py`, `ReplayTests` (category `replays`), `/antcolonies replay`. My picks: replays at the report's own coordinates; rules near the box's edge (8 blocks) and walled-in pockets reaching it not counted; report boxes shifted to take in the nests; 3 runs of 180 s for the first two replays.
+- B4: `tools/soak.sh`, `watch/Soak`, `colony/RaidSoak`. My picks: an 8-chunk patch and 8 chunks round each watched colony kept loaded; at most 3 Matabele colonies; pokes every 1 to 5 game minutes, raids weight 3; a restart about once a game day while a raid is out; 12 places tried; fixed seed list; tick rate 1000; "stand in a column" skipped (needs a real player); any number of days.
+- First soak (2 servers, 2 days): BUGS 120 fixed, BUGS 121 open; one seed found no colonies (now 12 places tried).
+- Round 3 (B5 the 100-day check, B7) not started.

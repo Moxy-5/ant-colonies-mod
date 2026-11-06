@@ -117,6 +117,17 @@ public class AwayLife {
         }
     }
 
+    /**
+     * The soak runs (the raid test bench, round 2, B4): colonies the soak watches live as if a player stood by them,
+     * though none is on the server (their land is kept loaded by the soak; unloaded, they still go away).
+     */
+    private static volatile java.util.function.Predicate<Colony> keptHere = colony -> false;
+
+    /** The soak runs: these colonies are never away by the far rule ({@link #keptHere}). */
+    public static void setKeptHere(java.util.function.Predicate<Colony> which) {
+        keptHere = which == null ? colony -> false : which;
+    }
+
     AwayLife(Colony colony) {
         this.colony = colony;
     }
@@ -154,6 +165,9 @@ public class AwayLife {
     private boolean farCounts(Level level) {
         if (farForTests != null) {
             return farForTests;
+        }
+        if (keptHere.test(colony)) {
+            return false;
         }
         // (Never on the game test server by itself, even where a test turns the away system on: those tests mean the
         // colony's own land being unloaded, not the far rule.)

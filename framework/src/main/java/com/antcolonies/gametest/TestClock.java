@@ -69,13 +69,25 @@ public final class TestClock {
     private double pausedSpeed;
 
     private TestClock(GameTestHelper helper, double hour, double speed) {
+        this(helper, helper.getBounds(), dayTimeOf(hour), speed);
+    }
+
+    private TestClock(GameTestHelper helper, AABB area, long dayTime, double speed) {
         test = helper.testInfo;
-        arena = helper.getBounds();
+        arena = area;
         level = helper.getLevel();
         this.speed = speed;
-        setDayTime(dayTimeOf(hour));
+        setDayTime(dayTime);
         CLOCKS.removeIf(clock -> clock.test == test || clock.test.isDone());
         CLOCKS.add(this);
+    }
+
+    /**
+     * The raid test bench's replay (round 2, B3): a moving clock for this test over another area than its arena (a
+     * report put back at its own coordinates), starting at this day time (Minecraft's scale, the report's own).
+     */
+    public static TestClock movingOver(GameTestHelper helper, AABB area, long dayTime) {
+        return new TestClock(helper, area, dayTime, 1.0);
     }
 
     /** A clock for this test that starts at this hour and runs at real speed. */

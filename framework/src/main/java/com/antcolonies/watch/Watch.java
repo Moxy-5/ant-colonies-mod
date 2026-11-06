@@ -145,6 +145,14 @@ public final class Watch {
         return !(level.getServer() instanceof net.minecraft.gametest.framework.GameTestServer) || FOR_TESTS.contains(colony.getId());
     }
 
+    /**
+     * The replay (round 2, B3): everything the rules knew of this colony is forgotten (its black box, stillness, what
+     * was told and reported when), as a colony put back from a report starts its moment afresh, the clock set back.
+     */
+    public static synchronized void forget(UUID colony) {
+        WATCHED.remove(colony);
+    }
+
     /** Tests: the rules watch this colony (on the game test server, where they are off by themselves). */
     public static synchronized void watchForTests(Colony colony) {
         FOR_TESTS.add(colony.getId());
@@ -214,6 +222,9 @@ public final class Watch {
 
     // --- the check, once a second ---------------------------------------------------------------------------------
 
+    /** A colony not checked for longer than this (ticks) starts its stillness afresh ({@link #check}). */
+    static final long GAP = 100;
+
     /** Each tick: the colonies whose turn it is this tick of the second (the brain's own slots) are checked. */
     public static void tick(ServerLevel level) {
         if (mode == Mode.OFF || RULES.isEmpty()) {
@@ -232,12 +243,21 @@ public final class Watch {
     /** The colony's insects in the world near its middle (the real ones; the numbers have no place to check). */
     public static List<AbstractAntEntity> insectsOf(ServerLevel level, Colony colony) {
         AABB around = new AABB(colony.getCenter()).inflate(REACH, REACH_UP, REACH);
-        return level.getEntitiesOfClass(AbstractAntEntity.class, around, insect -> colony.getId().equals(insect.getColonyId()));
+        // (Only those whose land runs: one at the edge of the loaded land stands frozen and is not stuck; round 2, the soak.)
+        return level.getEntitiesOfClass(AbstractAntEntity.class, around,
+                insect -> colony.getId().equals(insect.getColonyId()) && level.isPositionEntityTicking(insect.blockPosition()));
     }
 
     static void check(ServerLevel level, Colony colony) {
         ColonyWatch watch = of(colony);
         long now = level.getGameTime();
+        // Not checked for a while (the colony was away, its land unloaded, or the rules off): what was still or lasting
+        // before is not known to have gone on, so it starts afresh (round 2, found by the soak: an ant put back where
+        // it stood when its land came back counted the whole time away as standing still).
+        if (watch.checkedAt >= 0 && now - watch.checkedAt > GAP) {
+            watch.still.clear();
+            watch.lasting.clear();
+        }
         List<AbstractAntEntity> insects = insectsOf(level, colony);
         Set<UUID> seen = new HashSet<>();
         for (AbstractAntEntity insect : insects) {

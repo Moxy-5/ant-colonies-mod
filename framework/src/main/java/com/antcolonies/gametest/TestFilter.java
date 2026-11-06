@@ -40,6 +40,17 @@ public final class TestFilter {
     }
 
     /**
+     * Categories whose tests are made by a generator, not methods (the raid test bench's replays, round 2): a test whose
+     * name starts with the prefix belongs to the category.
+     */
+    static final Map<String, List<String>> PREFIXES = new LinkedHashMap<>();
+
+    /** Tests whose names start with {@code prefix} belong to this category (generated tests, such as the replays). */
+    public static synchronized void addCategoryPrefix(String name, String prefix) {
+        PREFIXES.computeIfAbsent(name, key -> new java.util.ArrayList<>()).add(prefix);
+    }
+
+    /**
      * The stress tests (performance, such as {@code TermiteStressTests}) are long and only measure: they run only when named, never in
      * a full run.
      */
@@ -90,7 +101,11 @@ public final class TestFilter {
                         }
                     }
                 }
-                if (classes.isEmpty()) {
+                List<String> prefixes = PREFIXES.getOrDefault(word, List.of());
+                for (String prefix : prefixes) {
+                    tests.stream().map(TestFunction::testName).filter(name -> name.startsWith(prefix)).forEach(named::add);
+                }
+                if (classes.isEmpty() && prefixes.isEmpty()) {
                     plainWords.add(word); // part of a test's name
                 }
                 for (Class<?> testClass : classes) {

@@ -520,6 +520,14 @@ public class Colony {
         return random;
     }
 
+    /**
+     * The raid test bench's replay (round 2, B3): the colony rolls fresh dice from this seed, so a scene put back from a
+     * report can be run again with other luck.
+     */
+    public void reseedDice(long seed) {
+        random = net.minecraft.util.RandomSource.create(seed);
+    }
+
     /** Game test server only: where each colony's dice come from (see {@link #testSeeds}). */
     public static void setTestSeeds(@Nullable java.util.function.Function<BlockPos, Long> seeds) {
         testSeeds = seeds;

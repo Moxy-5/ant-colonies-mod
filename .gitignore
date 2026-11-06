@@ -42,6 +42,7 @@ repo/
 ### Automatic game tests ###
 run-test/
 run-test-shards/
+run-soak/
 __pycache__/
 references/anim_lab/
 run-film/

@@ -57,6 +57,9 @@ public final class SavannaTests {
         TestFilter.addCategory("body", TermiteBodyTests.class);
         // The giant savanna trees (M7.5): their blocks, shapes, growth and fall.
         TestFilter.addCategory("trees", TreeTests.class, TreeGrowthTests.class);
+        // The raid test bench's replays (round 2, B3): saved reports put back and run again (ReplayTests, one test each).
+        TestFilter.addCategory("replays", ReplayTests.class);
+        TestFilter.addCategoryPrefix("replays", "replay_");
         // Performance (only when named, never in a full run).
         TestFilter.addCategory("stress", TermiteStressTests.class);
 

@@ -57,7 +57,20 @@ public class ColonyCommands {
                         .then(Commands.literal("on").executes(context -> rulesMode(context.getSource(), Watch.Mode.ON)))
                         .then(Commands.literal("quiet").executes(context -> rulesMode(context.getSource(), Watch.Mode.QUIET)))
                         .then(Commands.literal("off").executes(context -> rulesMode(context.getSource(), Watch.Mode.OFF))))
-                .then(Commands.literal("labels").executes(context -> labels(context.getSource()))));
+                .then(Commands.literal("labels").executes(context -> labels(context.getSource())))
+                // Round 2 (B3): a saved report put back where it happened, to watch it again (creative only; it
+                // overwrites the land there and sets the clock to the report's moment).
+                .then(Commands.literal("replay").executes(context -> replayList(context.getSource()))
+                        .then(Commands.argument("report", StringArgumentType.greedyString())
+                                .suggests((context, builder) -> {
+                                    for (String name : replayable(context.getSource().getLevel())) {
+                                        if (name.startsWith(builder.getRemainingLowerCase())) {
+                                            builder.suggest(name);
+                                        }
+                                    }
+                                    return builder.buildFuture();
+                                })
+                                .executes(context -> replay(context.getSource(), StringArgumentType.getString(context, "report"))))));
         // (The termites' own commands, mound, mushrooms, drum, alarm, queensize and age: TermiteCommands; the trees: TreeCommands.)
     }
 
@@ -71,6 +84,59 @@ public class ColonyCommands {
             return 0;
         }
         source.sendSuccess(() -> Component.literal("Report saved: " + saved + " (in the game folder; say \"check the reports\")."), false);
+        return 1;
+    }
+
+    /** The reports in the game folder that can be replayed (those saved with their land), newest first. */
+    private static java.util.List<String> replayable(ServerLevel level) {
+        java.nio.file.Path folder = Reports.folder(level);
+        if (!java.nio.file.Files.isDirectory(folder)) {
+            return java.util.List.of();
+        }
+        try (java.util.stream.Stream<java.nio.file.Path> all = java.nio.file.Files.list(folder)) {
+            return all.filter(dir -> java.nio.file.Files.exists(dir.resolve("place.nbt")) && java.nio.file.Files.exists(dir.resolve("colonies.nbt")))
+                    .map(dir -> dir.getFileName().toString()).sorted(Comparator.reverseOrder()).toList();
+        } catch (java.io.IOException e) {
+            return java.util.List.of();
+        }
+    }
+
+    private static int replayList(CommandSourceStack source) {
+        java.util.List<String> names = replayable(source.getLevel());
+        StringBuilder out = new StringBuilder("Reports you can replay (/antcolonies replay <report>; creative only, it overwrites the land there): "
+                + names.size());
+        for (String name : names.subList(0, Math.min(12, names.size()))) {
+            out.append("\n- ").append(name);
+        }
+        source.sendSuccess(() -> Component.literal(out.toString()), false);
+        return names.size();
+    }
+
+    private static int replay(CommandSourceStack source, String name) throws com.mojang.brigadier.exceptions.CommandSyntaxException {
+        net.minecraft.server.level.ServerPlayer player = source.getPlayerOrException();
+        if (!player.isCreative()) {
+            source.sendFailure(Component.literal("Replays are for creative mode: a replay overwrites the land where the report was made."));
+            return 0;
+        }
+        ServerLevel level = source.getLevel();
+        com.antcolonies.watch.Replay replay;
+        try {
+            replay = com.antcolonies.watch.Replay.read(Reports.folder(level).resolve(name.trim()));
+        } catch (java.io.IOException | RuntimeException e) {
+            source.sendFailure(Component.literal("That report could not be replayed: " + e.getMessage()));
+            return 0;
+        }
+        com.antcolonies.watch.Replay.Put put = replay.put(level, level.getRandom().nextLong());
+        level.setDayTime(replay.dayTime());
+        BlockPos spot = replay.spot();
+        player.teleportTo(level, spot.getX() + 0.5, spot.getY() + 1, spot.getZ() + 0.5, player.getYRot(), player.getXRot());
+        // The player keeps the land loaded now; the replay's own hold on it is let go.
+        for (net.minecraft.world.level.ChunkPos chunk : put.forced()) {
+            level.setChunkForced(chunk.x, chunk.z, false);
+        }
+        source.sendSuccess(() -> Component.literal("Replaying " + replay.name() + ": " + put.colonies().size() + " colonies, " + put.insects()
+                + " creatures, the clock set to the report's moment. The report said: " + replay.why()
+                + " (/antcolonies labels shows what each insect does.)"), true);
         return 1;
     }
 

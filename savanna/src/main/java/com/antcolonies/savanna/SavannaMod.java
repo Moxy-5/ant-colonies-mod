@@ -43,6 +43,7 @@ public class SavannaMod {
         SavannaEntities.ENTITY_TYPES.register(modEventBus);
         SavannaItems.ITEMS.register(modEventBus);
         com.antcolonies.savanna.registry.SavannaSounds.SOUNDS.register(modEventBus); // M8 step 2e: the Matabele squeak
+        com.antcolonies.watch.Soak.signUp(new com.antcolonies.savanna.colony.RaidSoak()); // the raid test bench's soak runs (round 2, B4)
         SavannaNumbers.signUp(); // its own sections of the species files (Apex part 3, T1), before they load
         SavannaParts.signUp();
         com.antcolonies.savanna.colony.RaidRules.signUp(); // the raid test bench's raid rules (docs/plans/raid-test-bench.md)

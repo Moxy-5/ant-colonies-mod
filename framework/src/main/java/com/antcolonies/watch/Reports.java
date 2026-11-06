@@ -180,10 +180,17 @@ public final class Reports {
         }
 
         // place.nbt
-        CompoundTag place = place(level, where);
+        CompoundTag place = place(level, where, near);
         if (place == null) {
             text.append("\n(The place was not saved: the land round it is not loaded.)\n");
         } else {
+            // Round 2 (B3, the replay): what the replay needs to put the moment back (Replay).
+            place.putLong(Replay.GAME_TIME, now);
+            place.putLong(Replay.DAY_TIME, level.getDayTime());
+            place.putBoolean(Replay.RAINING, level.isRaining());
+            place.putIntArray(Replay.SPOT, new int[] {where.getX(), where.getY(), where.getZ()});
+            level.getBiome(where).unwrapKey().ifPresent(biome -> place.putString(Replay.BIOME, biome.location().toString()));
+            place.putString(Replay.DIMENSION, level.dimension().location().toString());
             text.append("\nThe place: ").append(place.getString("ReportCorner")).append(" (corner), size ")
                     .append(place.getString("ReportSize")).append(", in place.nbt.\n");
         }
@@ -214,14 +221,34 @@ public final class Reports {
 
     /** The blocks and insects round the spot as a structure, the biggest box whose land is all loaded (or null). */
     @Nullable
-    private static CompoundTag place(ServerLevel level, BlockPos where) {
+    private static CompoundTag place(ServerLevel level, BlockPos where, List<Colony> near) {
         int[][] sizes = {{96, 48}, {48, 32}};
         for (int[] size : sizes) {
             int wide = size[0];
             int high = size[1];
+            // Round 2 (B3, found by the first replay): the box takes in the nests of the nearest colonies too, as far as
+            // they fit with 12 blocks to spare, so a replay has the nests their insects live from (a box round the spot
+            // alone cut a termite colony's galleries off from its nest, and its workers came out walled in).
+            int minX = where.getX();
+            int maxX = minX;
+            int minZ = where.getZ();
+            int maxZ = minZ;
+            for (Colony colony : near) {
+                BlockPos c = colony.getCenter();
+                int nMinX = Math.min(minX, c.getX());
+                int nMaxX = Math.max(maxX, c.getX());
+                int nMinZ = Math.min(minZ, c.getZ());
+                int nMaxZ = Math.max(maxZ, c.getZ());
+                if (nMaxX - nMinX <= wide - 24 && nMaxZ - nMinZ <= wide - 24) {
+                    minX = nMinX;
+                    maxX = nMaxX;
+                    minZ = nMinZ;
+                    maxZ = nMaxZ;
+                }
+            }
             int bottom = Math.max(level.getMinBuildHeight(), where.getY() - high / 2);
             int top = Math.min(level.getMaxBuildHeight(), bottom + high);
-            BlockPos corner = new BlockPos(where.getX() - wide / 2, bottom, where.getZ() - wide / 2);
+            BlockPos corner = new BlockPos((minX + maxX) / 2 - wide / 2, bottom, (minZ + maxZ) / 2 - wide / 2);
             if (!loaded(level, corner, wide)) {
                 continue;
             }
