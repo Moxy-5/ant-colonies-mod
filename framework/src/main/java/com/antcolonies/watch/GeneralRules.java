@@ -41,6 +41,16 @@ public final class GeneralRules {
     /** save-size: a colony's save bigger than this (bytes) breaks the rule: 2 MB. */
     static final int SAVE_MOST = 2_000_000;
 
+    /**
+     * holds-its-face: an insect its legs say holds a wall or a ceiling has the face this near its box (blocks; loose: a
+     * body over an edge or round a chimney's rim is a little off for a moment), and one going up or down a channel is
+     * at least {@link #CHANNEL_OFF} from the channel's middle line (it holds a side wall, docs/BUGS.md 129).
+     */
+    static final double FACE_GAP = 0.15;
+    static final double CHANNEL_OFF = 0.08;
+    /** holds-its-face: off its face this long (ticks): 5 s (a look round from a chimney is 2.8 s). */
+    static final long FLOAT_TICKS = 100;
+
     private static final Map<UUID, Long> SAVE_CHECKED = new ConcurrentHashMap<>();
 
     private GeneralRules() {
@@ -49,6 +59,8 @@ public final class GeneralRules {
     public static void signUp() {
         Watch.signUp("not-stuck", "no insect stands still for 30 s while walking a route", GeneralRules::notStuck);
         Watch.signUp("not-in-a-block", "no insect sits inside a solid block for more than 3 s", GeneralRules::notInABlock);
+        Watch.signUp("holds-its-face", "no insect holding a wall, a ceiling or a channel's side floats off it for more than 5 s",
+                GeneralRules::holdsItsFace);
         Watch.signUp("not-walled-in", "no insect stays a minute in a pocket with no way to its nest or the open air", GeneralRules::notWalledIn);
         Watch.signUp("prey-ends", "a paralysed insect is carried, eaten or dies by its paralysis' end", GeneralRules::preyEnds);
         Watch.signUp("save-size", "a colony's save stays under 2 MB", GeneralRules::saveSize);
@@ -77,6 +89,60 @@ public final class GeneralRules {
                         + look.level().getBlockState(insect.blockPosition()).getBlock().getName().getString() + " for " + inside / 20 + " s");
             }
         }
+    }
+
+    static void holdsItsFace(Watch.Look look) {
+        List<AbstractAntEntity> floating = new ArrayList<>();
+        for (AbstractAntEntity insect : look.insects()) {
+            long off = look.lasting(insect.getUUID().toString() + "/face", floats(insect));
+            if (off > FLOAT_TICKS) {
+                floating.add(insect);
+            }
+        }
+        if (!floating.isEmpty()) {
+            look.breach(floating.subList(0, Math.min(10, floating.size())), floating.size() + " insect(s) floating off the face their legs hold for "
+                    + FLOAT_TICKS / 20 + " s or more: " + who(floating) + "; " + floatingDetail(floating.get(0)));
+        }
+    }
+
+    /** What the first floating insect's legs hold and what is there (so a report says why without the world). */
+    private static String floatingDetail(AbstractAntEntity insect) {
+        com.antcolonies.nav.AntNavigator legs = insect.getNavigator();
+        Direction face = legs.getSurface();
+        BlockPos held = insect.blockPosition().relative(face);
+        return String.format(java.util.Locale.ROOT, "%s at %.3f, %.3f, %.3f holds %s%s, there %s, its own cell %s",
+                insect.getUUID().toString().substring(0, 8), insect.getX(), insect.getY(), insect.getZ(), face.getSerializedName(),
+                legs.isInChannel() ? " in a channel" : "", insect.level().getBlockState(held),
+                insect.level().getBlockState(insect.blockPosition()));
+    }
+
+    /**
+     * Whether an insect's legs hold a wall, a ceiling or a channel's side wall that its body is not at (real sizes,
+     * 2026-11-06: small bodies placed where a big one filled the space float, docs/BUGS.md 129 and 131).
+     */
+    public static boolean floats(AbstractAntEntity insect) {
+        com.antcolonies.nav.AntNavigator legs = insect.getNavigator();
+        Direction face = legs.getSurface();
+        if (!legs.isAttached() || face == Direction.DOWN || insect.isPassenger() || insect.isDowned() || insect.isDeadOrDying()) {
+            return false;
+        }
+        if (legs.isInChannel()) {
+            if (!face.getAxis().isHorizontal()) {
+                return false;
+            }
+            BlockPos cell = insect.blockPosition();
+            double off = face.getAxis() == Direction.Axis.X ? insect.getX() - (cell.getX() + 0.5) : insect.getZ() - (cell.getZ() + 0.5);
+            return Math.abs(off) < CHANNEL_OFF;
+        }
+        net.minecraft.world.phys.AABB box = insect.getBoundingBox();
+        net.minecraft.world.phys.AABB slab = switch (face) {
+            case UP -> new net.minecraft.world.phys.AABB(box.minX, box.maxY, box.minZ, box.maxX, box.maxY + FACE_GAP, box.maxZ);
+            case NORTH -> new net.minecraft.world.phys.AABB(box.minX, box.minY, box.minZ - FACE_GAP, box.maxX, box.maxY, box.minZ);
+            case SOUTH -> new net.minecraft.world.phys.AABB(box.minX, box.minY, box.maxZ, box.maxX, box.maxY, box.maxZ + FACE_GAP);
+            case WEST -> new net.minecraft.world.phys.AABB(box.minX - FACE_GAP, box.minY, box.minZ, box.minX, box.maxY, box.maxZ);
+            default -> new net.minecraft.world.phys.AABB(box.maxX, box.minY, box.minZ, box.maxX + FACE_GAP, box.maxY, box.maxZ);
+        };
+        return insect.level().noCollision(insect, slab.inflate(0.01));
     }
 
     static void notWalledIn(Watch.Look look) {

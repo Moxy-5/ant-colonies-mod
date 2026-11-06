@@ -150,7 +150,11 @@ public class CarryEggGoal extends Goal {
 
     /** Second leg: to a free spot in the nursery, where the ant puts the egg down. */
     private void bringEgg(ServerLevel level) {
-        if (errand.within(spot, REACH)) {
+        Errand.At at = errand.atSpot(spot, REACH);
+        if (at == Errand.At.STEPPING) {
+            return; // (real sizes: the last little bit, its head over the spot)
+        }
+        if (at == Errand.At.THERE) {
             if (colony.brood().placeEgg(level, spot)) {
                 ant.setCarryingEgg(false);
                 done = true;

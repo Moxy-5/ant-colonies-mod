@@ -71,6 +71,33 @@ class DoorwayMotionTest {
         assertTrue(last.y() < 1.0, "it does not end inside the block");
     }
 
+    /**
+     * A real-size termite worker (its game scale 0.42, real sizes 2026-11-06, docs/BUGS.md 131): only its head out while
+     * it looks round, its belly on the inside wall, and its feet on the spire's face going down the outside.
+     */
+    @Test
+    void aSmallerBodyPeeksWithItsOwnHeadAndKeepsItsFeetOnTheFaces() {
+        double size = 0.42;
+        List<DoorwayMotion.Key> keys = DoorwayMotion.comeOut(RIM, MOUTH, HALF_WIDTH * size, OVER_THE_TOP, size);
+        DoorwayMotion.Key peek = keys.stream().filter(DoorwayMotion.Key::peek).findFirst().orElseThrow();
+        double neck = peek.y() + 0.28 * size;
+        assertTrue(neck > RIM && neck < RIM + 0.1 * size, "the neck is at " + (neck - RIM) + " above the rim");
+        List<DoorwayMotion.Key> in = DoorwayMotion.goIn(RIM, MOUTH, HALF_WIDTH * size, OVER_THE_TOP, size);
+        for (List<DoorwayMotion.Key> motion : List.of(keys, in)) {
+            for (DoorwayMotion.Key key : motion) {
+                double drawn = key.out() - DoorwayMotion.drawnIntoWall(size); // (on the outside the push is back toward the spire)
+                if (key.on() == DoorwayMotion.On.OUTSIDE) {
+                    assertTrue(drawn > MOUTH && drawn - MOUTH <= 0.03 * size + 1e-9, "the feet are " + (drawn - MOUTH) + " off the face");
+                } else if (key.on() == DoorwayMotion.On.INSIDE) {
+                    double belly = key.out() + DoorwayMotion.drawnIntoWall(size);
+                    assertTrue(Math.abs(belly) <= MOUTH, "the body is drawn " + belly + " from the middle, outside the mouth");
+                }
+            }
+        }
+        // At size 1 the motion is the one approved before real sizes.
+        assertEquals(DoorwayMotion.comeOut(RIM, MOUTH, HALF_WIDTH, OVER_THE_TOP), DoorwayMotion.comeOut(RIM, MOUTH, HALF_WIDTH, OVER_THE_TOP, 1.0));
+    }
+
     @Test
     void writeTheMotionForThePictureTool() throws IOException {
         Path dir = Path.of("..", "chimney"); // build/chimney (the tests run in a folder inside build)

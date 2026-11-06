@@ -19,6 +19,7 @@ import com.antcolonies.nav.Foothold;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.entity.Entity;
+import net.minecraft.world.phys.Vec3;
 
 /**
  * The walking part of a job, shared by every goal that walks to work: to a seed, a body, a block to dig, a spot in a
@@ -110,6 +111,31 @@ public final class Errand<K> {
         double dz = ant.getZ() - z;
         double dy = ant.getY() - y;
         return dx * dx + dz * dz <= reach * reach && dy > -below && dy < above;
+    }
+
+    /**
+     * Real sizes (2026-11-06, docs/BUGS.md 133): whether it is at a spot to put a thing down in the middle of its cell (an
+     * egg, a body). Within {@code reach} of the middle (the reach every insect had before real sizes) a big body's jaws
+     * were over it; a real-size termite worker stood half a block off and the egg appeared far ahead of it. A body with a
+     * size is there once its head is over the middle (its middle half its length plus its jaws' reach off); nearer than
+     * {@code reach}, its walk over, it first steps the last little bit; getting no nearer, it puts it down from there, as
+     * before. A body with no size (the red harvester ant, until its rework) puts it down within {@code reach}, as before.
+     */
+    public At atSpot(@Nullable BlockPos spot, double reach) {
+        if (!within(spot, reach)) {
+            return At.NOT_YET;
+        }
+        if (ant.bodyLength() <= 0.0 || within(spot, ant.bodyLength() / 2.0 + ant.jawReach())) {
+            return At.THERE;
+        }
+        Vec3 middle = Vec3.atBottomCenterOf(spot);
+        Vec3 away = new Vec3(ant.getX() - middle.x, 0.0, ant.getZ() - middle.z);
+        Vec3 stand = middle.add(away.normalize().scale(ant.bodyLength() / 2.0));
+        return switch (ant.closeIn(new Vec3(stand.x, ant.getY(), stand.z), reach)) {
+            case STEPPING -> At.STEPPING;
+            case NO_NEARER -> At.THERE;
+            case FAR -> ant.getNavigator().isDone() ? At.THERE : At.NOT_YET;
+        };
     }
 
     /** What {@link #at} found: at the thing, stepping the last little bit to it, or not there yet. */

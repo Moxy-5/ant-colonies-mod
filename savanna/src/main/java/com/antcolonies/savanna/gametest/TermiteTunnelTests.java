@@ -129,7 +129,7 @@ public class TermiteTunnelTests {
                 helper.assertTrue(phase[0] != 3, "the termite looked round on its way back in by the mouth");
             }
             if (termite.getNavigator().isPeeking() && phase[0] == 2) {
-                helper.assertTrue(Math.abs(termite.getY() - (rim - com.antcolonies.nav.DoorwayMotion.PEEK_DEPTH)) < 0.02,
+                helper.assertTrue(Math.abs(termite.getY() - (rim - com.antcolonies.nav.DoorwayMotion.peekDepth(termite.getScale()))) < 0.02,
                         "the termite looks round from " + (termite.getY() - rim) + " below the rim, not with its head just out of the mouth");
                 if (peekedAt[0] == null) {
                     peekedAt[0] = termite.position();

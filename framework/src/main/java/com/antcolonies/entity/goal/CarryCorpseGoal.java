@@ -257,7 +257,11 @@ public class CarryCorpseGoal extends Goal {
 
     /** Second leg: down to a free spot in the refuse chamber, where the ant puts the body down (termites: onto the comb, where it is eaten). */
     private void bringCorpse(ServerLevel level) {
-        if (errand.within(spot, REACH)) {
+        Errand.At at = errand.atSpot(spot, REACH);
+        if (at == Errand.At.STEPPING) {
+            return; // (real sizes: the last little bit, its head over the spot)
+        }
+        if (at == Errand.At.THERE) {
             if (colony.refuse().setDown(level, spot)) {
                 ant.setCarryingCorpse(false);
                 done = true;

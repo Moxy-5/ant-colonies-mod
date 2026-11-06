@@ -47,268 +47,380 @@
  ],
  "findings": {
   "jump leg_r2": [
-   9,
-   0.19
+   6,
+   0.211
   ],
-  "jump at spread_above_09": [
-   23,
-   0.593
-  ],
-  "jump leg_r2_lower": [
-   10,
-   0.281
-  ],
-  "jump at standing_side_09": [
-   7,
-   0.078
-  ],
-  "jump leg_r2_foot": [
-   11,
-   0.312
-  ],
-  "jump head": [
-   10,
-   0.387
-  ],
-  "jump mandible_r": [
-   10,
-   0.434
-  ],
-  "jump mandible_l": [
-   10,
-   0.437
-  ],
-  "jump antenna_r_1": [
-   10,
-   0.459
-  ],
-  "jump antenna_r_2": [
-   11,
-   0.618
-  ],
-  "jump leg_r1_foot": [
-   11,
-   0.455
-  ],
-  "jump at spread_above_01": [
-   2,
-   0.034
-  ],
-  "jump leg_l1": [
-   9,
-   0.28
-  ],
-  "jump leg_l1_lower": [
-   10,
-   0.392
-  ],
-  "jump leg_l1_foot": [
-   10,
-   0.46
-  ],
-  "jump leg_l3_lower": [
-   10,
-   0.304
-  ],
-  "jump leg_l3_foot": [
-   10,
-   0.38
-  ],
-  "jump gaster_back": [
-   13,
-   0.36
-  ],
-  "jump at spread_above_03": [
-   94,
-   0.402
+  "jump at spread_above_12": [
+   8,
+   0.137
   ],
   "jump at standing_side_00": [
-   113,
-   0.618
+   58,
+   0.686
+  ],
+  "jump leg_r2_lower": [
+   8,
+   0.296
+  ],
+  "jump leg_r2_foot": [
+   8,
+   0.329
   ],
   "jump leg_l2": [
-   7,
-   0.182
+   11,
+   0.212
+  ],
+  "jump at spread_above_13": [
+   8,
+   0.154
   ],
   "jump leg_l2_lower": [
-   9,
-   0.281
+   11,
+   0.291
   ],
   "jump leg_l2_foot": [
    10,
-   0.312
+   0.323
   ],
   "jump thorax": [
+   10,
+   0.23
+  ],
+  "jump head": [
    9,
-   0.211
+   0.429
+  ],
+  "jump mandible_r": [
+   9,
+   0.483
   ],
   "jump antenna_l_1": [
-   9,
-   0.454
+   8,
+   0.514
   ],
   "jump antenna_l_2": [
    9,
-   0.616
+   0.686
+  ],
+  "jump mandible_l": [
+   9,
+   0.485
+  ],
+  "jump antenna_r_1": [
+   8,
+   0.503
+  ],
+  "jump antenna_r_2": [
+   9,
+   0.684
   ],
   "jump leg_r3": [
-   6,
-   0.144
+   9,
+   0.157
   ],
   "jump leg_r3_lower": [
-   7,
-   0.298
+   12,
+   0.315
   ],
   "jump leg_r3_foot": [
-   10,
-   0.372
+   13,
+   0.394
   ],
   "jump leg_r1": [
-   8,
-   0.276
+   10,
+   0.293
   ],
   "jump leg_r1_lower": [
-   9,
-   0.386
+   11,
+   0.409
   ],
-  "jump at standing_side_02": [
-   1,
-   0.133
+  "jump leg_r1_foot": [
+   12,
+   0.48
+  ],
+  "jump leg_l1": [
+   5,
+   0.295
+  ],
+  "jump leg_l1_lower": [
+   10,
+   0.421
+  ],
+  "jump at spread_above_14": [
+   2,
+   0.127
+  ],
+  "jump leg_l1_foot": [
+   10,
+   0.495
   ],
   "jump leg_l3": [
    8,
-   0.21
+   0.16
+  ],
+  "jump leg_l3_lower": [
+   8,
+   0.32
+  ],
+  "jump leg_l3_foot": [
+   9,
+   0.401
   ],
   "jump petiole": [
    6,
-   0.139
+   0.088
   ],
   "jump gaster_front": [
-   11,
-   0.147
+   8,
+   0.161
   ],
-  "jump at spread_above_18": [
-   3,
-   0.14
+  "jump gaster_back": [
+   9,
+   0.397
   ],
-  "jump at spread_above_02": [
-   18,
-   0.225
+  "jump at spread_above_08": [
+   8,
+   0.128
   ],
-  "inside antenna_l_2": [
-   13,
-   0.023
+  "jump at standing_side_07": [
+   4,
+   0.119
   ],
-  "inside at spread_above_07": [
-   1,
-   0.014
-  ],
-  "inside at spread_above_08": [
-   3,
-   0.027
-  ],
-  "inside at spread_above_15": [
-   2,
-   0.033
-  ],
-  "inside antenna_r_2": [
-   24,
-   0.047
-  ],
-  "inside at spread_above_14": [
-   2,
-   0.029
-  ],
-  "jump at spread_above_17": [
-   2,
-   0.21
+  "jump at standing_side_08": [
+   6,
+   0.092
   ],
   "jump at spread_above_06": [
-   7,
-   0.118
+   33,
+   0.199
   ],
-  "jump at standing_side_05": [
-   1,
-   0.083
+  "jump at standing_side_09": [
+   2,
+   0.091
   ],
   "jump at spread_above_07": [
-   1,
-   0.052
+   3,
+   0.184
   ],
-  "inside at spread_above_19": [
-   2,
-   0.044
+  "jump at spread_above_03": [
+   120,
+   0.44
   ],
-  "inside at spread_above_21": [
-   2,
-   0.047
+  "jump at spread_above_09": [
+   11,
+   0.16
   ],
-  "inside at spread_above_22": [
-   2,
-   0.047
-  ],
-  "inside at spread_above_23": [
-   2,
-   0.047
-  ],
-  "inside at spread_above_24": [
-   2,
-   0.045
-  ],
-  "inside at spread_above_25": [
-   2,
-   0.043
-  ],
-  "inside at spread_above_26": [
-   2,
+  "inside leg_r2_lower": [
+   10,
    0.042
   ],
-  "inside at spread_above_27": [
-   2,
+  "inside at standing_side_00": [
+   15,
+   0.073
+  ],
+  "inside at standing_side_01": [
+   15,
+   0.071
+  ],
+  "inside at standing_side_02": [
+   16,
+   0.071
+  ],
+  "inside at standing_side_03": [
+   14,
+   0.076
+  ],
+  "inside at standing_side_04": [
+   14,
+   0.077
+  ],
+  "inside at standing_side_05": [
+   14,
+   0.074
+  ],
+  "inside at standing_side_06": [
+   13,
+   0.073
+  ],
+  "inside at standing_side_07": [
+   13,
+   0.07
+  ],
+  "inside at standing_side_08": [
+   15,
+   0.074
+  ],
+  "inside at standing_side_09": [
+   17,
+   0.081
+  ],
+  "inside leg_r2_foot": [
+   10,
    0.042
   ],
-  "inside at spread_above_28": [
-   2,
-   0.042
-  ],
-  "inside at spread_above_29": [
-   2,
+  "inside leg_l2_lower": [
+   21,
    0.041
   ],
   "inside at spread_above_09": [
-   1,
-   0.025
+   9,
+   0.043
   ],
   "inside at spread_above_10": [
-   1,
-   0.028
+   9,
+   0.036
   ],
   "inside at spread_above_11": [
-   1,
-   0.029
+   9,
+   0.04
   ],
   "inside at spread_above_12": [
-   1,
-   0.029
+   10,
+   0.033
   ],
   "inside at spread_above_13": [
-   1,
-   0.028
+   11,
+   0.03
+  ],
+  "inside at spread_above_14": [
+   12,
+   0.034
+  ],
+  "inside at spread_above_15": [
+   12,
+   0.038
   ],
   "inside at spread_above_16": [
-   1,
-   0.037
-  ],
-  "inside at spread_above_17": [
-   1,
-   0.039
-  ],
-  "inside at spread_above_18": [
-   1,
+   12,
    0.042
   ],
-  "inside at spread_above_20": [
-   1,
+  "inside at spread_above_17": [
+   11,
    0.046
+  ],
+  "inside at spread_above_18": [
+   11,
+   0.049
+  ],
+  "inside at spread_above_19": [
+   11,
+   0.05
+  ],
+  "inside at spread_above_20": [
+   11,
+   0.051
+  ],
+  "inside at spread_above_21": [
+   11,
+   0.051
+  ],
+  "inside at spread_above_22": [
+   11,
+   0.051
+  ],
+  "inside at spread_above_23": [
+   12,
+   0.052
+  ],
+  "inside at spread_above_24": [
+   12,
+   0.054
+  ],
+  "inside at spread_above_25": [
+   12,
+   0.052
+  ],
+  "inside at spread_above_26": [
+   12,
+   0.05
+  ],
+  "inside at spread_above_27": [
+   12,
+   0.047
+  ],
+  "inside at spread_above_28": [
+   12,
+   0.045
+  ],
+  "inside at spread_above_29": [
+   12,
+   0.044
+  ],
+  "inside leg_l2_foot": [
+   21,
+   0.043
+  ],
+  "inside head": [
+   10,
+   0.046
+  ],
+  "inside mandible_r": [
+   10,
+   0.051
+  ],
+  "inside antenna_l_1": [
+   2,
+   0.033
+  ],
+  "inside antenna_l_2": [
+   90,
+   0.054
+  ],
+  "inside at spread_above_08": [
+   4,
+   0.027
+  ],
+  "inside mandible_l": [
+   2,
+   0.036
+  ],
+  "inside antenna_r_1": [
+   10,
+   0.081
+  ],
+  "inside antenna_r_2": [
+   88,
+   0.078
+  ],
+  "inside leg_r3_foot": [
+   1,
+   0.011
+  ],
+  "inside leg_r1": [
+   10,
+   0.039
+  ],
+  "inside leg_r1_lower": [
+   10,
+   0.069
+  ],
+  "inside leg_r1_foot": [
+   10,
+   0.069
+  ],
+  "inside leg_l1_lower": [
+   17,
+   0.012
+  ],
+  "inside leg_l1_foot": [
+   21,
+   0.019
+  ],
+  "inside leg_l3_lower": [
+   21,
+   0.035
+  ],
+  "inside leg_l3_foot": [
+   21,
+   0.04
+  ],
+  "inside at spread_above_07": [
+   1,
+   0.032
+  ],
+  "jump at spread_above_02": [
+   2,
+   0.236
   ]
  },
  "body_findings": {},

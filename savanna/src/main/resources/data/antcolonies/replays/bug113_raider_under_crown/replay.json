@@ -1,5 +1,8 @@
 {
   "runs": 3,
   "seconds": 180,
-  "from": "2026-11-05_14-45-35-raider-stuck"
+  "from": "2026-11-05_14-45-35-raider-stuck",
+  "species": [
+    "megaponera_analis"
+  ]
 }

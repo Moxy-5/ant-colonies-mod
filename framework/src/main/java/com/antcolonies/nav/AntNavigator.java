@@ -1792,7 +1792,7 @@ public class AntNavigator {
         }
         BlockPos beside = to.isFloor() ? to.cell().below() : to.cell();
         Direction e = toward(mouth, beside);
-        List<DoorwayMotion.Key> keys = DoorwayMotion.comeOut(door.mouthHeight(), door.mouthRadius(), half(), OVER_THE_TOP);
+        List<DoorwayMotion.Key> keys = DoorwayMotion.comeOut(door.mouthHeight(), door.mouthRadius(), half(), OVER_THE_TOP, ant.getScale());
         if (to.isFloor()) {
             return walkDoorway(keys, mouth, e);
         }
@@ -1820,7 +1820,7 @@ public class AntNavigator {
         }
         BlockPos beside = from.isFloor() ? from.cell().below() : from.cell();
         Direction e = toward(mouth, beside);
-        List<DoorwayMotion.Key> keys = new ArrayList<>(DoorwayMotion.goIn(door.mouthHeight(), door.mouthRadius(), half(), OVER_THE_TOP));
+        List<DoorwayMotion.Key> keys = new ArrayList<>(DoorwayMotion.goIn(door.mouthHeight(), door.mouthRadius(), half(), OVER_THE_TOP, ant.getScale()));
         if (from.isWall()) {
             DoorwayMotion.Key first = keys.get(0);
             keys.set(0, new DoorwayMotion.Key(first.out(), first.y(), DoorwayMotion.On.OUTSIDE, first.speed(), first.hold(), first.peek(), first.slowTurn()));
@@ -1843,7 +1843,7 @@ public class AntNavigator {
      * it comes up the spire.
      */
     private boolean comeOutOf(Doorway door, Foothold from) {
-        return walkDoorway(DoorwayMotion.comeOut(door.mouthHeight(), door.mouthRadius(), half(), OVER_THE_TOP), from.cell(), from.surface());
+        return walkDoorway(DoorwayMotion.comeOut(door.mouthHeight(), door.mouthRadius(), half(), OVER_THE_TOP, ant.getScale()), from.cell(), from.surface());
     }
 
     /**
@@ -1855,7 +1855,7 @@ public class AntNavigator {
         Foothold to = step.to();
         BlockPos c = to.cell();
         Direction s = to.surface(); // toward the block the insect comes from: the side it goes in by
-        List<DoorwayMotion.Key> keys = DoorwayMotion.goIn(door.mouthHeight(), door.mouthRadius(), half(), OVER_THE_TOP);
+        List<DoorwayMotion.Key> keys = DoorwayMotion.goIn(door.mouthHeight(), door.mouthRadius(), half(), OVER_THE_TOP, ant.getScale());
         if (leg < keys.size()) {
             walkDoorway(keys, c, s);
             return false;

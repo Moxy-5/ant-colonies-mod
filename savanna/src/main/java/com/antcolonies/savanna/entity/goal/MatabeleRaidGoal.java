@@ -215,7 +215,12 @@ public class MatabeleRaidGoal extends Goal {
         if (step == AbstractAntEntity.CloseIn.STEPPING) {
             return STEPPING_TO_PREY;
         }
-        return step == AbstractAntEntity.CloseIn.NO_NEARER ? AT_PREY : NOT_AT_PREY;
+        if (step == AbstractAntEntity.CloseIn.NO_NEARER) {
+            return AT_PREY;
+        }
+        // FAR with its walk over: the prey a little up or down where no step reaches (up a step of comb, down a broken
+        // tunnel): taken from where it stands, as before real sizes (BUGS 130; it used to wait there for ever).
+        return ant.getNavigator().isDone() ? AT_PREY : NOT_AT_PREY;
     }
 
     /** {@link #atPrey}: not there yet (it walks on), there (it picks it up), or stepping the last little bit. */

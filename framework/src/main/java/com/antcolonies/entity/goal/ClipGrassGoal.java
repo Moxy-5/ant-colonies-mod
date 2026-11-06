@@ -21,6 +21,9 @@ import net.minecraft.sounds.SoundSource;
 import net.minecraft.world.entity.ai.goal.Goal;
 import net.minecraft.world.level.block.SoundType;
 import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.phys.AABB;
+import net.minecraft.world.phys.Vec3;
+import net.minecraft.world.phys.shapes.VoxelShape;
 
 /**
  * Walks to a food plant near the nest, nibbles at it for a couple of seconds and cuts one piece off it: a seed off a
@@ -159,11 +162,40 @@ public class ClipGrassGoal extends Goal {
         }
         ant.getLookControl().setLookAt(grass.getX() + 0.5, grass.getY() + 0.3, grass.getZ() + 0.5);
         if (!errand.isWalking() && isNear(ant.blockPosition(), grass)) {
-            clip(level);
+            if (atPlant(level)) {
+                clip(level);
+            }
         } else if (!errand.goTo(grass.immutable(), fromInside
                 ? nearPlant(grass).and(at -> colony.nest().isInside(level, at.cell())) : nearPlant(grass), grass, 1.0)) {
             ticks = GIVE_UP_TICKS; // no way to get there: let another ant have a go
         }
+    }
+
+    /**
+     * Real sizes (2026-11-06, docs/BUGS.md 132): whether its jaws are at the plant. A walk ends in a cell beside it (one
+     * of the 26 round it, or its own), which a big body filled; a real-size termite worker stood half a block off and
+     * nibbled the air. So a body with a size first steps the last little bit to the plant's nearest face
+     * ({@link AbstractAntEntity#closeIn}); getting no nearer, it nibbles from where it stands, as before. A body with
+     * no size (the red harvester ant, until its rework) nibbles at once, as before.
+     */
+    private boolean atPlant(ServerLevel level) {
+        if (ant.bodyLength() <= 0.0) {
+            return true;
+        }
+        VoxelShape shape = level.getBlockState(grass).getShape(level, grass);
+        AABB plant = shape.isEmpty() ? new AABB(grass) : shape.bounds().move(grass);
+        double reach = ant.jawReach();
+        if (ant.getBoundingBox().inflate(reach, 0.2, reach).intersects(plant)) {
+            return true;
+        }
+        double nx = Math.max(plant.minX, Math.min(plant.maxX, ant.getX()));
+        double nz = Math.max(plant.minZ, Math.min(plant.maxZ, ant.getZ()));
+        Vec3 away = new Vec3(ant.getX() - nx, 0.0, ant.getZ() - nz);
+        if (away.lengthSqr() < 1.0E-4) {
+            return true; // (right under or over it: nothing to step)
+        }
+        Vec3 stand = new Vec3(nx, ant.getY(), nz).add(away.normalize().scale(ant.getBbWidth() / 2.0 + 0.01));
+        return ant.closeIn(stand, 1.8) != AbstractAntEntity.CloseIn.STEPPING;
     }
 
     /** Nibbles at the plant; after a while one piece comes off and the ant takes it. */
