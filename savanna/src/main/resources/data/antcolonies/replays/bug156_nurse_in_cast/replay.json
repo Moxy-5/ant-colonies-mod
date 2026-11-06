@@ -1,0 +1,9 @@
+{
+  "runs": 3,
+  "seconds": 300,
+  "from": "r156",
+  "required": false,
+  "species": [
+    "macrotermes"
+  ]
+}

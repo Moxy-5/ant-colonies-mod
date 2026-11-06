@@ -1,0 +1,66 @@
+Report 2026-11-06_08-01-05-not-stuck
+not-stuck broken: 1 insect(s) with a route but not moving for 30 s or more: termite_worker 44cac6e7 at 22230, 64, 2102
+Where: 22230, 64, 2102 in minecraft:overworld
+When: game tick 1009352, day 2, 14:24
+Rules on: ON
+
+Colonies within 112 blocks (nearest first):
+- 3199b021 | antcolonies:macrotermes | center 22244, 69, 2108 | queen be78ee97 | members 127 | real 71, in the nest 55 (workers young 8, middle 11, old 31; soldiers 0 minor, 5 major; hungry 2) | while away (2.3 hours): 1 eggs hatched, 15 meals eaten, 6 pieces of food brought in, 2 nodules grown, 2 comb layers ripened | foragers out as numbers 0 (remembers 786 plants) | ages 9 young, 15 middle, 13 old, jobs 9 nurses, 15 builders, 13 foragers | gardens 6 dug (planned 6), comb 211 layers on 54 blocks, nodules 0, mushrooms after rain: 8 | queen holds 1/6 nodules, not laying | queen unfed 0 of 100 min | eggs 0 | larvae 10 | soldiers 14 minor (wants 8), 5 major (wants 3), nymphs growing into soldiers 0, posts held 9, minors in | calm | knows 785 food plants | remembered trails: from 22234, 66, 2098 to 22232, 67, 2100 (strength 64) from 22226, 65, 2099 to 22230, 67, 2101 (strength 64) from 22252, 70, 2108 to 22230, 65, 2100 (strength 18) from 22229, 65, 2092 to 22230, 65, 2085 (strength 11) from 22237, 67, 2101 to 22233, 67, 2108 (strength 11) from 22239, 67, 2097 to 22225, 65, 2101 (strength 3) | dead ants 0 (refuse chamber 0) | mound stage 32 (earned 32) of 32, 914/1051 blocks finished, earned 1051.0 blocks | staying in (out at: night, rain), holes open 13 of 15 | new holes 4 (0 spent, 0 being dug), reach 28 | runways 3 (2 finished) | galleries: 8 pieces (4 out to food), 6 tips, 96 of 62 blocks, reach 22, 15 holes, 7 in turn (last time) | hidden trips: 0 underway (1 made, 1 out at the far end, 0 broken into, 0 folded in), 0 eaten tufts growing back (0 on bare ground by the holes)
+- 341dbb94 | antcolonies:macrotermes | center 22187, 64, 2085 | QUEENLESS: no new eggs, dwindling | members 19 | real 0, in the nest 19 (workers young 0, middle 0, old 0; soldiers 14 minor, 5 major; hungry 2) | owed to the nest: -1 nurse food | while away (40.8 days): 164 blocks dug, 248 mound blocks built, 1 died of old age, 185 starved, 3 gallery pieces grown, 3 gallery pieces grown toward food, 19 blocks of gallery grown, the queen starved, the king starved | ages 0 young, 0 middle, 0 old, jobs 0 nurses, 0 builders, 0 foragers | gardens 6 dug (planned 6), comb 141 layers on 54 blocks, nodules 1, mushrooms after rain: 8 | queen holds 0/6 nodules, not laying | queen unfed 817 of 100 min | eggs 0 | larvae 0 | soldiers 14 minor (wants 0), 5 major (wants 0), nymphs growing into soldiers 0, posts held 0, minors in | calm | knows 302 food plants | dead ants 0 (refuse chamber 0) | mound stage 19 (earned 19) of 32, 393/393 blocks finished, earned 408.0 blocks | staying in (out at: night, rain), holes open 0 of 12 | new holes 4 (0 spent, 0 being dug), reach 29 | runways 3 (0 finished) | galleries: 5 pieces (4 out to food), 4 tips, 66 of 30 blocks, reach 23, 12 holes, 0 in turn (last time) | hidden trips: 0 underway (0 made, 0 out at the far end, 0 broken into, 0 folded in), 0 eaten tufts growing back (0 on bare ground by the holes)
+- 2abc44a7 | antcolonies:megaponera_analis | center 22246, 78, 2163 | nest in a dead termite mound, rooms open 4 of 4 | queen 53be7c93 | members 0 | real 0, in the nest 0 (workers young 0, middle 0, old 0) | while away (2.3 hours): the founders dug their chamber and closed themselves in | ages 0 young, 0 middle, 0 old, jobs 0 nurses, 0 builders, 0 foragers | food 0 pieces in the store | queen fed 0/6, rich 0/5 | queen unfed 1 of 100 min | eggs 0 | larvae 0, raids: 0 scout(s) out, its scouts reach out to 96 blocks, 0 good spot(s) | dead ants 0 (refuse chamber 0) | staying in (out at: )
+
+Rules broken lately by these colonies:
+- none
+
+Insects within 24 blocks (nearest first):
+- termite_worker d8b6aada at 22230, 64, 2102 (22230.5, 64.3, 2102.4) hp 3.0/3 no route (last search failed), still 15 s, goals [RandomLookAroundGoal] [colony 3199b021]
+- termite_worker a15a1f96 at 22230, 64, 2102 (22230.6, 64.3, 2102.6) hp 3.0/3 walking to 22240, 66, 2113, goals [StoreSeedGoal] [colony 3199b021]
+- termite_worker 44cac6e7 at 22230, 64, 2102 (22230.4, 64.3, 2102.6) hp 2.0/3 walking to 22245, 66, 2120, still 30 s, goals [FeedLarvaGoal] [colony 3199b021]
+- termite_worker d8b42b16 at 22230, 64, 2102 (22230.6, 64.3, 2102.6) hp 3.0/3 walking to 22247, 66, 2112, still 2 s, goals [StoreSeedGoal] [colony 3199b021]
+- termite_worker 51d93821 at 22230, 64, 2102 (22230.5, 64.8, 2102.4) hp 2.0/3 standing, still 8 s, goals [ClipGrassGoal] [colony 3199b021]
+- termite_worker c3eb35fd at 22230, 64, 2101 (22230.5, 64.7, 2101.4) hp 3.0/3 standing, still 5 s, goals [ClipGrassGoal] [colony 3199b021]
+- termite_worker ac7f5c42 at 22230, 65, 2101 (22230.1, 65.8, 2101.3) hp 3.0/3 standing, still 21 s, goals [] [colony 3199b021]
+- termite_worker 60973cce at 22230, 63, 2101 (22230.9, 63.0, 2101.4) hp 3.0/3 walking to 22232, 67, 2100, goals [ClipGrassGoal] [colony 3199b021]
+- termite_worker 7ba403a3 at 22230, 65, 2101 (22230.5, 65.8, 2101.1) hp 3.0/3 standing, still 14 s, goals [] [colony 3199b021]
+- termite_worker a4f64378 at 22230, 65, 2101 (22230.5, 65.8, 2101.1) hp 2.0/3 standing, still 2 s, goals [ClipGrassGoal] [colony 3199b021]
+- termite_worker 3c2ea7ed at 22230, 66, 2101 (22230.5, 66.3, 2101.5) hp 3.0/3 no route (last search failed), still 107 s, goals [] [colony 3199b021]
+- termite_worker 8ecf4e76 at 22230, 63, 2101 (22230.4, 63.0, 2101.1) hp 2.0/3 no route (last search failed), still 4 s, goals [ClipGrassGoal] [colony 3199b021]
+- termite_minor_soldier 72b51efb at 22228, 64, 2105 (22228.8, 64.0, 2105.2) hp 5.0/6 standing, still 96 s, goals [GuardPostGoal] [colony 3199b021]
+- termite_minor_soldier d8866843 at 22226, 63, 2100 (22226.8, 63.0, 2100.5) hp 5.0/6 standing, still 99 s, goals [GuardPostGoal] [colony 3199b021]
+- termite_worker 4d60277d at 22235, 64, 2101 (22235.3, 64.0, 2101.5) hp 2.0/3 walking to 22248, 66, 2116, goals [StoreSeedGoal] [colony 3199b021]
+- termite_worker 9001e4ab at 22231, 64, 2107 (22231.5, 64.0, 2107.5) hp 3.0/3 walking to 22248, 66, 2116, goals [StoreSeedGoal] [colony 3199b021]
+- termite_worker d7f4b999 at 22235, 64, 2102 (22235.6, 64.0, 2103.0) hp 2.0/3 walking to 22231, 67, 2100, goals [ClipGrassGoal] [colony 3199b021]
+- termite_worker 404f6459 at 22237, 66, 2108 (22237.6, 66.0, 2108.5) hp 3.0/3 standing, still 9 s, goals [] [colony 3199b021]
+- termite_worker a8f7f00f at 22239, 64, 2103 (22240.0, 64.0, 2103.5) hp 3.0/3 walking to 22240, 64, 2101, goals [AntWanderGoal] [colony 3199b021]
+- termite_minor_soldier 2fd3eeef at 22237, 66, 2108 (22237.8, 66.0, 2108.5) hp 5.0/6 standing, still 106 s, goals [GuardPostGoal] [colony 3199b021]
+- termite_minor_soldier 67f5e516 at 22228, 63, 2092 (22228.4, 63.0, 2092.6) hp 5.0/6 standing, still 97 s, goals [GuardPostGoal] [colony 3199b021]
+- termite_worker c277a614 at 22240, 64, 2108 (22240.0, 64.0, 2108.4) hp 3.0/3 walking to 22240, 66, 2113, goals [StoreSeedGoal] [colony 3199b021]
+- termite_worker f84beb02 at 22244, 66, 2109 (22244.1, 66.0, 2109.4) hp 3.0/3 walking to 22248, 66, 2116, goals [StoreSeedGoal] [colony 3199b021]
+- termite_worker 3094309c at 22244, 65, 2108 (22244.6, 65.5, 2108.9) hp 3.0/3 walking to 22242, 64, 2115, goals [AntWanderGoal] [colony 3199b021]
+- termite_worker 5827872f at 22244, 66, 2109 (22244.5, 66.0, 2109.6) hp 2.0/3 walking to 22227, 64, 2101, goals [ClipGrassGoal] [colony 3199b021]
+- termite_worker 6f7597b8 at 22240, 66, 2115 (22240.4, 66.0, 2115.5) hp 3.0/3 standing, still 18 s, goals [] [colony 3199b021]
+- termite_worker f29fa478 at 22240, 66, 2115 (22240.6, 66.0, 2115.7) hp 3.0/3 standing, still 14 s, goals [AllogroomGoal] [colony 3199b021]
+- termite_worker eb096179 at 22244, 66, 2111 (22244.5, 66.0, 2111.6) hp 2.0/3 walking to 22227, 64, 2101, goals [ClipGrassGoal] [colony 3199b021]
+- termite_king b8cdc9d0 at 22243, 66, 2113 (22243.5, 66.0, 2113.6) hp 10.0/10 standing, still 107 s, goals [] [colony 3199b021]
+- termite_worker 08b022d9 at 22240, 66, 2116 (22240.1, 66.5, 2116.6) hp 2.0/3 no route (last search failed), still 20 s, goals [] [colony 3199b021]
+- termite_worker 2746302d at 22244, 66, 2113 (22244.0, 66.0, 2113.2) hp 3.0/3 standing, still 105 s, goals [StandByQueenGoal] [colony 3199b021]
+- termite_worker 7ed5ea1c at 22243, 66, 2113 (22244.0, 66.0, 2113.3) hp 2.0/3 standing, still 97 s, goals [StandByQueenGoal] [colony 3199b021]
+- termite_worker 4538e2bc at 22244, 66, 2113 (22244.0, 66.0, 2113.3) hp 3.0/3 standing, still 15 s, goals [StandByQueenGoal] [colony 3199b021]
+- termite_worker a19199fd at 22243, 66, 2113 (22244.0, 66.0, 2113.4) hp 3.0/3 standing, still 105 s, goals [StandByQueenGoal] [colony 3199b021]
+- termite_worker 0d8508c0 at 22243, 66, 2113 (22244.0, 66.0, 2113.4) hp 3.0/3 standing, still 17 s, goals [StandByQueenGoal] [colony 3199b021]
+- termite_worker 4fd60e37 at 22244, 66, 2113 (22244.1, 66.0, 2113.2) hp 3.0/3 standing, still 107 s, goals [StandByQueenGoal] [colony 3199b021]
+- termite_worker 6cf66065 at 22244, 66, 2113 (22244.1, 66.0, 2113.2) hp 3.0/3 standing, still 16 s, goals [StandByQueenGoal] [colony 3199b021]
+- termite_worker 5ec3bdd6 at 22244, 66, 2113 (22244.2, 66.0, 2113.2) hp 3.0/3 standing, still 107 s, goals [StandByQueenGoal] [colony 3199b021]
+- termite_worker 669ccd3f at 22244, 66, 2113 (22244.1, 66.0, 2113.2) hp 3.0/3 standing, still 107 s, goals [StandByQueenGoal] [colony 3199b021]
+- termite_queen be78ee97 at 22244, 66, 2113 (22244.5, 66.0, 2113.5) hp 20.0/20 standing, still 107 s, goals [] [colony 3199b021]
+- termite_worker ac9a9718 at 22241, 66, 2116 (22241.4, 66.4, 2116.9) hp 3.0/3 no route (last search failed), still 12 s, goals [] [colony 3199b021]
+- termite_worker 944a88bf at 22247, 66, 2113 (22247.6, 66.5, 2113.5) hp 3.0/3 standing, still 23 s, goals [] [colony 3199b021]
+- termite_minor_soldier e3078cb2 at 22251, 68, 2108 (22251.7, 68.0, 2108.6) hp 5.0/6 standing, still 98 s, goals [GuardPostGoal] [colony 3199b021]
+- termite_worker bfbd60fa at 22248, 66, 2116 (22248.5, 66.5, 2116.1) hp 2.0/3 no route (last search failed), goals [] [colony 3199b021]
+- termite_worker 2099a3ab at 22244, 66, 2120 (22244.9, 66.4, 2120.3) hp 3.0/3 no route (last search failed), still 8 s, goals [] [colony 3199b021]
+- termite_minor_soldier 58c04cb6 at 22247, 69, 2118 (22247.1, 69.0, 2118.1) hp 5.0/6 standing, goals [RandomLookAroundGoal] [colony 3199b021]
+- termite_minor_soldier d678a28d at 22248, 69, 2118 (22248.4, 69.0, 2118.3) hp 6.0/6 standing, still 103 s, goals [GuardPostGoal] [colony 3199b021]
+- termite_minor_soldier 9e953fc1 at 22245, 69, 2121 (22245.4, 69.0, 2121.2) hp 6.0/6 standing, still 97 s, goals [GuardPostGoal] [colony 3199b021]
+- termite_minor_soldier aa9e710e at 22251, 69, 2115 (22251.4, 69.0, 2115.4) hp 5.0/6 standing, still 77 s, goals [GuardPostGoal] [colony 3199b021]
+
+The place: 22167, 40, 2048 (corner), size 96 x 48 x 96, in place.nbt.

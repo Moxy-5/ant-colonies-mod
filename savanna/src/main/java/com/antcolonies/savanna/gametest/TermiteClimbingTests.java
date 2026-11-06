@@ -340,4 +340,54 @@ public class TermiteClimbingTests {
                     "not down on the ground yet: at " + termite.blockPosition().toShortString());
         });
     }
+
+    /**
+     * BUGS 156: a termite in a feeding spot's mud cast sunk level with the ground (a ring of four casts, each open to
+     * the next and to the sky over it) walks out over the rim and away over the ground. The soak's nurse stood 30 s in
+     * such a cast, rising a little and falling back.
+     */
+    @GameTest(template = "arena", timeoutTicks = 1200)
+    public static void aTermiteInASunkMudCastClimbsOutAndAway(GameTestHelper helper) {
+        floor(helper, 11, 11);
+        for (int x = 0; x < 11; x++) {
+            for (int z = 0; z < 11; z++) {
+                helper.setBlock(x, 1, z, Blocks.DIRT); // the ground, its top at 2
+            }
+        }
+        java.util.function.BiFunction<Direction, Direction, BlockState> cast = (a, b) -> SavannaBlocks.MUD_CAST.get().defaultBlockState()
+                .setValue(com.antcolonies.savanna.block.TermiteTunnelBlock.OPEN.get(a), true)
+                .setValue(com.antcolonies.savanna.block.TermiteTunnelBlock.OPEN.get(b), true)
+                .setValue(com.antcolonies.savanna.block.TermiteTunnelBlock.OPEN.get(Direction.UP), true);
+        helper.setBlock(4, 1, 4, cast.apply(Direction.EAST, Direction.NORTH));
+        helper.setBlock(5, 1, 4, cast.apply(Direction.WEST, Direction.NORTH));
+        helper.setBlock(4, 1, 3, cast.apply(Direction.EAST, Direction.SOUTH));
+        helper.setBlock(5, 1, 3, cast.apply(Direction.WEST, Direction.SOUTH));
+        // Seven in the one cast, all going the same way (the replay of BUGS 156 had seven there).
+        List<TermiteWorkerEntity> termites = new ArrayList<>();
+        BlockPos in = helper.absolutePos(new BlockPos(4, 1, 4));
+        for (int i = 0; i < 7; i++) {
+            TermiteWorkerEntity termite = SavannaTests.loneTermite(helper, 4, 1, 4);
+            termite.moveTo(in.getX() + 0.4 + 0.03 * i, in.getY() + 0.3, in.getZ() + 0.6);
+            termites.add(termite);
+        }
+        TestWatch.watch(helper, termites.get(0), false);
+        BlockPos away = new BlockPos(9, 2, 9);
+        boolean[] asked = {false};
+        helper.onEachTick(() -> {
+            if (!asked[0] && helper.getTick() >= 20) {
+                asked[0] = true;
+                for (TermiteWorkerEntity termite : termites) {
+                    helper.assertTrue(termite.getNavigator().moveTo(helper.absolutePos(away), 1.0),
+                            "no route out of the cast, from " + termite.blockPosition().toShortString());
+                }
+            }
+        });
+        helper.succeedWhen(() -> {
+            helper.assertTrue(asked[0], "not asked yet");
+            for (TermiteWorkerEntity termite : termites) {
+                helper.assertTrue(termite.blockPosition().distManhattan(helper.absolutePos(away)) <= 3,
+                        "not all out and away yet: one at " + termite.position());
+            }
+        });
+    }
 }
