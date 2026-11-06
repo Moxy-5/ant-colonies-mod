@@ -262,14 +262,14 @@ def queen_page(out):
 SIZE_INSECTS = (
     # model, label, today's drawing scale (the renderers), real length in mm (None: shrunk with the majors).
     # Real lengths, my picks from the literature: Megaponera majors about 15 mm (the model's own mm), minors drawn at
-    # 7.5 mm (most real minors 9 to 11); the queen 1.2 times a major (the user's pick); Macrotermes workers about 6 mm,
-    # minor soldiers about 9, major soldiers about 13, the king about 14; the queen before she swells, shrunk like the rest.
+    # 7.5 mm (most real minors 9 to 11); the queen 1.2 times a major (the user's pick); Macrotermes workers about 4.5 mm (minor
+    # workers 3.5 to 4, major workers 5 to 6), minor soldiers about 7, major soldiers about 12, the king about 14; the queen before she swells, shrunk like the rest.
     ("matabele_major", "Matabele major", 0.633, 15.0),
     ("matabele_minor", "Matabele minor", 0.455, 7.5),
     ("matabele_queen", "Matabele queen", 0.76, 18.0),
-    ("termite_worker", "Termite worker", 0.75, 6.0),
-    ("termite_minor_soldier", "Termite minor soldier", 0.75, 9.0),
-    ("termite_major_soldier", "Termite major soldier", 0.75, 13.0),
+    ("termite_worker", "Termite worker", 0.75, 4.5),
+    ("termite_minor_soldier", "Termite minor soldier", 0.75, 7.0),
+    ("termite_major_soldier", "Termite major soldier", 0.75, 12.0),
     ("termite_king", "Termite king", 0.75, 14.0),
     ("termite_queen", "Termite queen", 0.75, None),
 )
@@ -281,7 +281,7 @@ def sizes_page(out):
     to a block). Also a raid column and two majors on one block, and cameras at a player's eye height."""
     data = {"insects": [], "notes": [
         "<b>Real lengths used:</b> Matabele major 15 mm, minor 7.5 mm (most minors are 9 to 11), queen 1.2 times a major; "
-        "Macrotermes worker 6 mm, minor soldier 9, major soldier 13, king 14. The termite queen is shrunk with the majors "
+        "Macrotermes worker 4.5 mm (real minor workers 3.5 to 4, major workers 5 to 6), minor soldier 7, major soldier 12, king 14. The termite queen is shrunk with the majors "
         "(the game swells her over time).",
         "<b>Game-like pixels</b> draws the page at half resolution, closer to how small things look on a normal screen.",
         "Only the size changes here; the models, textures and detail are the game's own, unchanged."]}
