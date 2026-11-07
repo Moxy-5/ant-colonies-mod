@@ -94,6 +94,8 @@ public final class RaidColumn {
             new SavannaNumbers.CarryNumbers(4, 10, 1, 3, 10.0, 1200, 10, 600, 8.0, 5.0, 0.85, 10, 2400, 6000);
     /** A raider picks up a termite this near it (blocks). */
     public static final double PICK_REACH = 1.6;
+    /** M8 step 5: a raider carries a hurt nestmate only if at least this share of its width (my pick: minors carry minors). */
+    private static final double RESCUER_SIZE = 0.8;
     /** A termite a raider found no way to is left to the others this long (ticks; BUGS 76: never searched every tick). */
     private static final int NO_WAY_TICKS = 200;
 
@@ -250,6 +252,16 @@ public final class RaidColumn {
     private final Map<String, Integer> lost = new java.util.TreeMap<>();
     /** Step 3c: each prey-taker's termite, the termites nobody found a way to (till when), and what was carried. */
     private final Map<UUID, UUID> taking = new HashMap<>();
+    /**
+     * M8 step 5, rescue: raiders hurt at the spot (a foe clamped on, or legs gone), out of the column, standing and
+     * calling for help; a raider with empty jaws is sent to each ({@link #collect}), pulls the foe off and carries it
+     * home ({@link #pickUp}). Those nobody took are let go when the raid leaves the spot, to limp home.
+     */
+    private final Set<UUID> hurtHere = new java.util.LinkedHashSet<>();
+    /** When a raider began pulling a clamped foe off a hurt nestmate (by the hurt one). */
+    private final Map<UUID, Long> pullingSince = new HashMap<>();
+    /** Hurt nestmates carried home by the column (the log and tests). */
+    private int rescued;
     private final Map<UUID, Long> noWay = new HashMap<>();
     private int carried;
     private int carriers;
@@ -782,6 +794,18 @@ public final class RaidColumn {
             if (unseenSince.remove(id) != null) {
                 say(shortId(id) + " is in sight again");
             }
+            if (entity instanceof MatabeleEntity hurt && atTheSpot() && hurt.needsRescue()) {
+                // M8 step 5: hurt at the spot: out of the column, it stands and calls; a nestmate is sent for it
+                if (hurt.fightOrderBy() == this) {
+                    hurt.endFightOrder(this);
+                }
+                drop(id);
+                anchor.remove(id);
+                anchorSince.remove(id);
+                hurtHere.add(id);
+                say(shortId(id) + " is hurt (" + (hurt.clamp().isOn() ? "a foe clamped on" : "legs gone") + "): it stops and calls for help");
+                continue;
+            }
             if (entity instanceof MatabeleEntity ant && ant.isAlive() && !ant.fightsNoMore() && !ant.isDowned()) {
                 ants.add(ant);
                 if (ant.getFightSpot() != null && ant.fightOrderBy() != this) {
@@ -813,6 +837,7 @@ public final class RaidColumn {
                 }
             }
         }
+        tendHurt(level, now);
         if (lostFromSight) {
             for (UUID id : List.copyOf(members)) {
                 letGo(id, "the raid was lost from sight");
@@ -1125,8 +1150,10 @@ public final class RaidColumn {
     }
 
     private void end(String why) {
+        releaseHurt("the raid ended");
         say("the raid is over: " + why + ", " + cameHome + " came home, " + carried + " termite(s) carried"
                 + (hiddenCatch > 0 ? " and " + hiddenCatch + " by the raiders going as numbers" : "")
+                + (rescued > 0 ? ", " + rescued + " hurt nestmate(s) carried home" : "")
                 + (lost.isEmpty() ? "" : ", lost on the way: " + lost));
         stage = Stage.DONE;
         ended = why;
@@ -1153,6 +1180,9 @@ public final class RaidColumn {
     }
 
     private void next(Stage to, long now) {
+        if (to == Stage.REGROUPING || to == Stage.HOMING) {
+            releaseHurt("the raid left the spot without it");
+        }
         say("on to " + to.name().toLowerCase() + " after " + (now - stageSince) / 20 + " s, " + members.size() + " real raider(s)"
                 + (carried > 0 ? ", " + carried + " termite(s) carried" : ""));
         rank.clear();
@@ -1928,12 +1958,28 @@ public final class RaidColumn {
         for (AbstractAntEntity insect : prey) {
             left.put(insect.getUUID(), insect);
         }
+        List<MatabeleEntity> hurt = hurtWaiting(level);
+        for (MatabeleEntity one : hurt) {
+            left.put(one.getUUID(), one);
+        }
         taking.entrySet().removeIf(entry -> !left.containsKey(entry.getValue())); // (taken, dead, or no way: free again)
         Set<UUID> taken = new HashSet<>(taking.values());
         bunch(level, ants); // (the places of those with no termite to fetch)
         boolean anyFetching = false;
         for (MatabeleEntity ant : ants) {
             UUID mine = taking.get(ant.getUUID());
+            if (mine == null && !ant.hasFullMandibles()) {
+                // M8 step 5: a hurt nestmate first (real: rescue before prey, Frank et al. 2017), by one big enough
+                MatabeleEntity nearest = hurt.stream().filter(one -> !taken.contains(one.getUUID())
+                                && ant.getBbWidth() >= one.getBbWidth() * RESCUER_SIZE)
+                        .min(java.util.Comparator.comparingDouble(one -> one.distanceToSqr(ant))).orElse(null);
+                if (nearest != null) {
+                    mine = nearest.getUUID();
+                    taking.put(ant.getUUID(), mine);
+                    taken.add(mine);
+                    say(shortId(ant.getUUID()) + " goes to fetch hurt " + shortId(mine));
+                }
+            }
             if (mine == null && hasRoom(ant)) {
                 AbstractAntEntity nearest = prey.stream().filter(insect -> !taken.contains(insect.getUUID()))
                         .min(java.util.Comparator.comparingDouble(insect -> insect.distanceToSqr(ant))).orElse(null);
@@ -1963,6 +2009,9 @@ public final class RaidColumn {
      * jaws. False if it is not there to take (gone, taken, too far, no room).
      */
     public boolean pickUp(ServerLevel level, MatabeleEntity ant, UUID prey) {
+        if (hurtHere.contains(prey)) {
+            return fetchHurt(level, ant, prey);
+        }
         if (!prey.equals(taking.get(ant.getUUID())) || !(level.getEntity(prey) instanceof AbstractAntEntity insect)
                 || !insect.isAlive() || !insect.isParalysed() || insect.distanceTo(ant) > PICK_REACH + 0.5 || !hasRoom(ant)) {
             return false;
@@ -1977,6 +2026,102 @@ public final class RaidColumn {
         }
         level.playSound(null, ant.blockPosition(), SoundEvents.ITEM_PICKUP, SoundSource.NEUTRAL, 0.15F, 1.6F);
         return true;
+    }
+
+    /**
+     * M8 step 5: a raider at the hurt nestmate it was sent for: it pulls a clamped foe off first (the hurt one held still,
+     * {@code field_pull_ticks}; a living foe killed first), then takes it up in its jaws if it has legs gone. Freed and
+     * whole, the hurt one walks home by itself. True once it is carried.
+     */
+    private boolean fetchHurt(ServerLevel level, MatabeleEntity ant, UUID id) {
+        if (!id.equals(taking.get(ant.getUUID())) || !(level.getEntity(id) instanceof MatabeleEntity hurt) || !hurt.isAlive()
+                || hurt.distanceTo(ant) > PICK_REACH + 0.5) {
+            return false;
+        }
+        long now = level.getGameTime();
+        if (hurt.clamp().isOn()) {
+            hurt.tendedBy(ant.getUUID(), now + 40);
+            com.antcolonies.fight.FightNumbers.Rescue n = com.antcolonies.entity.Wounds.numbers(hurt);
+            long since = pullingSince.computeIfAbsent(id, key -> now);
+            if (now - since < (n != null ? n.fieldPullTicks() : 200)) {
+                return false; // (pulling)
+            }
+            pullingSince.remove(id);
+            hurt.clamp().takeOff(level); // (a living one is killed first, its head then pulled off: next time)
+            if (hurt.clamp().isOn()) {
+                return false;
+            }
+            say(shortId(ant.getUUID()) + " pulled the foe off hurt " + shortId(id));
+        }
+        if (hurt.isCarriable() && ant.pickUpHurt(hurt)) {
+            hurtHere.remove(id);
+            taking.remove(ant.getUUID());
+            rescued++;
+            say(shortId(ant.getUUID()) + " takes hurt " + shortId(id) + " up to carry it home");
+            return true;
+        }
+        if (!hurt.isCarriable()) {
+            hurtHere.remove(id);
+            taking.remove(ant.getUUID());
+            hurt.callForHelp(0);
+            letGo(id, "freed of its foe, it walks home"); // (home along the trail by itself)
+        }
+        return false;
+    }
+
+    /** The hurt raiders still waiting at the spot (alive, still needing help, not carried yet). */
+    private List<MatabeleEntity> hurtWaiting(ServerLevel level) {
+        List<MatabeleEntity> waiting = new ArrayList<>();
+        for (UUID id : hurtHere) {
+            if (level.getEntity(id) instanceof MatabeleEntity hurt && hurt.isAlive() && hurt.needsRescue() && !hurt.isPassenger()) {
+                waiting.add(hurt);
+            }
+        }
+        return waiting;
+    }
+
+    /** Every update: the hurt at the spot keep calling (they stand still); those dead, carried or healed are dropped. */
+    private void tendHurt(ServerLevel level, long now) {
+        for (UUID id : List.copyOf(hurtHere)) {
+            if (!(level.getEntity(id) instanceof MatabeleEntity hurt) || !hurt.isAlive() || hurt.isPassenger()) {
+                hurtHere.remove(id);
+                pullingSince.remove(id);
+                continue;
+            }
+            if (!hurt.needsRescue()) {
+                hurtHere.remove(id);
+                pullingSince.remove(id);
+                letGo(id, "no longer needs help, it walks home");
+                continue;
+            }
+            hurt.callForHelp(now + EVERY * 3L);
+        }
+    }
+
+    /** The raid leaves the spot (or ends): the hurt nobody took are let go, to limp home along the trail by themselves. */
+    private void releaseHurt(String why) {
+        for (UUID id : List.copyOf(hurtHere)) {
+            say("hurt " + shortId(id) + " is left: " + why);
+            lost.merge("hurt, left at the spot", 1, Integer::sum);
+            letGo(id, "hurt, nobody carried it");
+        }
+        hurtHere.clear();
+        pullingSince.clear();
+    }
+
+    /** Whether the column is at the find (gathering, attacking, collecting or spreading out): where the hurt are fetched. */
+    private boolean atTheSpot() {
+        return stage == Stage.GATHERING || stage == Stage.ATTACKING || stage == Stage.COLLECTING || stage == Stage.SPREADING;
+    }
+
+    /** Hurt nestmates carried home so far (tests). */
+    public int rescued() {
+        return rescued;
+    }
+
+    /** The hurt raiders waiting at the spot for a nestmate (tests). */
+    public Set<UUID> hurtHere() {
+        return java.util.Collections.unmodifiableSet(hurtHere);
     }
 
     /** How long a raider stands after each pick-up (ticks). */
@@ -2029,7 +2174,7 @@ public final class RaidColumn {
             orders.put(ant.getUUID(), new Order(spot, 1.0, at));
         }
         boolean fighting = ants.stream().anyMatch(ant -> ant.getFightSpot() != null);
-        boolean stung = !preyRound(level).isEmpty();
+        boolean stung = !preyRound(level).isEmpty() || !hurtWaiting(level).isEmpty();
         if (!fighting && (stung || now - stageSince >= carry.spreadTicks()) || now - stageSince >= carry.spreadTicks() + 200) {
             foundNothing = !stung && carried == 0;
             next(stung ? Stage.COLLECTING : Stage.REGROUPING, now);

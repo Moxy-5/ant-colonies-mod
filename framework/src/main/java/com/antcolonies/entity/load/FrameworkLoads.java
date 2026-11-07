@@ -55,6 +55,13 @@ public final class FrameworkLoads {
     public static final LoadKind CORPSE = LoadKind.signUp(LoadKind.flag(name("corpse"), "CarryingCorpse",
             (level, colony, carrier, load) -> colony.refuse().spawnCorpse(level, carrier.getX(), carrier.getY(), carrier.getZ())));
 
+    /**
+     * A hurt nestmate carried home (M8 step 5): it rides its carrier ({@code AbstractAntEntity.pickUpHurt}); when the
+     * carrier dies it is let go where they are.
+     */
+    public static final LoadKind HURT = LoadKind.signUp(LoadKind.flag(name("hurt"), "CarryingHurt",
+            (level, colony, carrier, load) -> carrier.ejectPassengers()));
+
     private FrameworkLoads() {
     }
 

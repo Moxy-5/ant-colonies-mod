@@ -470,6 +470,127 @@ def rest_clips(name):
         clips['groom_nestmate'] = made
     return clips
 
+
+# --- rescue and wound care (M8 step 5, 2026-11-07) ----------------------------------------------------------------------
+# carried: a hurt Megaponera carried home by a nestmate folds itself into the "pupal pose" (Frank et al. 2017, "Saving the
+#   injured"): legs drawn in tight under the body, the antennae folded back along the head, the gaster tucked under, the
+#   jaws shut, so the carrier can lift it clear of the ground. Held still (a slow breath of the gaster).
+# gland_dab: treating an infected wound (Frank et al. 2023): the ant reaches back with a front leg to the opening of its
+#   metapleural gland at the back of its thorax (the leg goes as near as it can), draws the leg through its jaws, then
+#   bows over the nestmate and works the secretion onto the wound with its jaws, the antennae tapping; then again with the
+#   other front leg. Where each part goes and how long: my picks, to confirm in the pose viewer.
+CARRIED_SECONDS = 3.0
+DAB_SECONDS = 4.0
+CARRIED_FRONT = (0.8, 1.1)     # the feet tucked, front, middle, hind: share of the way out, of the way along (my picks)
+CARRIED_MIDDLE = (0.3, 0.4)
+CARRIED_HIND = (0.6, 0.8)
+GLAND_OUT = 3.2               # where the foot goes beside the gland's opening, out from the middle (body sizes)
+GLAND_LEG = '2'
+GLAND_CLEAR = 0.4             # the reaching thigh kept at least this share of its length out from the body
+GLAND_TURN = 6.0               # the forebody turned toward the reaching side (degrees)
+GLAND_UP = 1.0
+GLAND_SWING = 1.2             # how wide the reaching leg swings round the thorax (body sizes)
+
+
+def carried(name):
+    """The carried clip (pupal pose; no foot is planted, so no miss to check)."""
+    import groom_motion as gm
+    r = rig(name)
+    tr = mo.Track(r)
+    T = CARRIED_SECONDS
+    guess = None
+    n = max(2, round(T / FRAME))
+    for i in range(n + 1):
+        t = T * i / n
+        breath = 2.0 * math.sin(2 * math.pi * t / T)
+        body = dict(head=[-12, 0, 0], antenna_l_1=[40, -35, 0], antenna_r_1=[40, 35, 0], antenna_l_2=[45, 0, 0],
+                    antenna_r_2=[45, 0, 0], **jaws(-10), **gaster(35 + breath, name))
+        gm.settle(r, body)                          # held in the air: nothing but the legs below where the floor was
+        up = body.get('body_pos', [0, 0, 0])[1]
+        feet = {}
+        for k, leg in r.legs.items():
+            hx, hy, hz = leg.H
+            x, _, z = r.stance(k)
+            # tucked: in toward the body, up to just under the hip, a little toward the body's middle along it; the
+            # front pair folded forward and out under the head, clear of the thorax
+            front = k.endswith('1')
+            out, along = CARRIED_FRONT if front else CARRIED_MIDDLE if k.endswith('2') else CARRIED_HIND
+            feet[k] = (hx + (x - hx) * out, hy + up - 0.25 * (hy - r.ground), hz + (z - hz) * along)
+        turns, guess, _ = mo.stand(r, body, feet, guess)
+        tr.pose(t, dict(body, **turns))
+    return {'loop': True, 'animation_length': T, 'bones': tr.bones(tol=0.05)}
+
+
+def gland_dab(name):
+    """The gland_dab clip and the worst miss of a planted foot (the reaching leg is not counted: it goes as near its
+    target as it can)."""
+    import groom_motion as gm
+    r = rig(name)
+    model = r.model
+    tr = mo.Track(r)
+    T = DAB_SECONDS
+    half = T / 2
+    k = gm.size(r)
+    guess, worst = {}, 0.0
+    n = max(2, round(T / FRAME))
+    for i in range(n + 1):
+        t = T * i / n
+        side = 'l' if t < half else 'r'
+        s = 1 if side == 'l' else -1
+        u = (t % half) / half                       # each half: back to the gland, to the jaws, the dab
+        reach_leg = f'{side}1'
+        back = r.legs[f'{side}{GLAND_LEG}'].H       # toward the gland's opening behind the thorax: the leg goes as far back
+        gland = (math.copysign(GLAND_OUT * k, back[0]), back[1] + GLAND_UP * (back[1] - r.ground), back[2])  # as it can, out and up (my pick)
+        jaw = gm.jaw_point(model, s, k)(1.3)
+        stance = r.stance(reach_leg)
+        bow = gm.smooth(min(1.0, max(0.0, (u - 0.45) / 0.15))) * (1 - gm.smooth(max(0.0, (u - 0.92) / 0.08)))
+        nib = 0.5 - 0.5 * math.cos(2 * math.pi * 3 * max(0.0, u - 0.6) / 0.32) if 0.6 <= u <= 0.92 else 0.0
+        turn_to = gm.smooth(min(1.0, u / 0.15)) * (1 - gm.smooth(min(1.0, max(0.0, (u - 0.3) / 0.15))))
+        body = {'forebody': [8 * bow, s * GLAND_TURN * turn_to, 0], 'head': [(22 + 5 * nib) * bow - 6 * (1 - bow), s * 10 * turn_to, 0],
+                'mandible_l': [0, -14 * nib * bow, 0], 'mandible_r': [0, 14 * nib * bow, 0],
+                'antenna_l_1': [24 * bow + 8 * max(0.0, math.sin(2 * math.pi * 4 * u)) * bow, 8 * bow, 0], 'antenna_l_2': [10 * bow, 0, 0],
+                'antenna_r_1': [24 * bow + 8 * max(0.0, math.sin(2 * math.pi * 4 * u + math.pi)) * bow, -8 * bow, 0], 'antenna_r_2': [10 * bow, 0, 0]}
+        gm.settle(r, body)
+        # the reaching leg: to the gland (0 - 0.2), along to the jaws (0.2 - 0.4), held in them (0.4 - 0.5), then down
+        if u < 0.2:
+            f = gm.smooth(u / 0.2)
+            target = gm.lerp(stance, gland, f)
+            target = mo.add(target, (s * GLAND_SWING * k * math.sin(math.pi * f), 0.4 * k * math.sin(math.pi * f), 0))
+        elif u < 0.4:
+            f = gm.smooth((u - 0.2) / 0.2)
+            target = mo.add(gm.lerp(gland, jaw, f), (s * GLAND_SWING * k * math.sin(math.pi * f), 0.3 * k * math.sin(math.pi * f), 0))
+        elif u < 0.5:
+            target = mo.add(jaw, (0, 0, -0.1 * k * math.sin(2 * math.pi * (u - 0.4) / 0.1)))
+        elif u < 0.6:
+            target = gm.lerp(jaw, stance, gm.smooth((u - 0.5) / 0.1))
+        else:
+            target = stance
+        pose = mo.pose_of(body)
+        turns = {}
+        for key, leg in r.legs.items():
+            aim = target if key == reach_leg else r.stance(key)
+            # (the reaching leg solved from its standing turns each frame: from the last frame's it may flip its thigh
+            # up over the back and stay flipped)
+            if key == reach_leg:
+                q, err = leg.reach(aim, pose, guess.get(key, (0.0, 0.0, 0.0, 0.0)), out=GLAND_CLEAR)  # (thigh kept out)
+            else:
+                q, err = leg.reach(aim, pose, guess.get(key, (0.0, 0.0, 0.0, 0.0)))
+            guess[key] = q
+            if key != reach_leg or u >= 0.6:
+                worst = max(worst, err)
+            for bone, turn in zip((leg.hip, leg.knee, leg.foot), leg.file_turns(q)):
+                turns[bone] = turn
+        tr.pose(t, dict(body, **turns))
+    return {'loop': True, 'animation_length': T, 'bones': tr.bones(tol=0.05)}, worst
+
+
+def rescue_clips(name):
+    """M8 step 5: carried and gland_dab (workers only: the queen is tended, never tends), checked."""
+    made, miss = gland_dab(name)
+    if miss > 0.05:
+        raise ValueError(f'{name} gland_dab: a planted foot misses its place by {miss:.3f}')
+    return {'carried': carried(name), 'gland_dab': made}
+
 # --- the attack, by where the termite is ---------------------------------------------------------------------------
 # A Matabele grabs a termite in its jaws and stings it: the sting paralyses (real; Frank's raids bring the termites home
 # alive and paralysed). The sting itself slides out of the gaster's tip only about a millimetre; a ponerine reaches its
@@ -751,6 +872,8 @@ def animations(name):
         clips.update(clamp_clips(name))                     # M8 step 2c: a termite soldier clamped on a leg
     clips['climb_feel'] = climb_feel()
     clips.update(rest_clips(name))                         # M8 step 3Q: naps and cleaning
+    if name != mm.QUEEN:
+        clips.update(rescue_clips(name))                   # M8 step 5: carried home, and treating a wound
     return {'format_version': '1.8.0', 'animations': clips}
 
 

@@ -503,6 +503,9 @@ timings: all "my pick, to confirm" until then).
 5. **Rescue and wound care:** the help smell, pulling clamped soldiers off, carrying
    the hurt home (legs tucked), the badly hurt left; wounds and infection in the
    nest, care by any nestmate.
+   **BUILT 2026-11-07** (branch `claude/raid-queue-openings-307d34`; `entity/Wounds`, `RescueGoal`, `WoundCareGoal`,
+   `RaidColumn`'s hurt fetching, clips `carried` and `gland_dab`; as built in `docs/DESIGN.md`, "Step 5, as built").
+   Not yet: the infected stump's darker look, nestmates turning toward a call. In-game test 6 covers 3e and 5.
 6. **Moving house:** every 40 game days per colony, the first move day random from 1 to
    40 (R1, the user, 2026-10-24), and on top when prey runs out nearby, after repeated attacks, when the
    nest floods or is too small; scouts pick the site, the

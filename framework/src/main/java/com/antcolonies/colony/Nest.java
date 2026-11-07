@@ -497,6 +497,29 @@ public class Nest {
         return getRoomCells(level, NestPlan.Kind.QUEEN);
     }
 
+    /**
+     * M8 step 5: where the hurt rest and are tended, the dug-out floor of the room nearest the entrance (not the refuse
+     * chamber), or of the queen's room if no other is dug; empty with no room yet. My pick (the design notes' "one room
+     * near the entrance"; where real Megaponera tend their hurt in the nest is not recorded).
+     */
+    public List<BlockPos> getHurtRoomCells(Level level) {
+        NestLayout layout = getLayout(level);
+        if (layout == null) {
+            return List.of();
+        }
+        BlockPos entrance = getEntrance();
+        List<NestPlan.Chamber> rooms = new ArrayList<>(layout.chambers());
+        rooms.removeIf(c -> c.kind() == NestPlan.Kind.REFUSE || c.kind() == NestPlan.Kind.FOUNDING);
+        rooms.sort(java.util.Comparator.comparingDouble(c -> c.center().distSqr(entrance)));
+        for (NestPlan.Chamber room : rooms) {
+            List<BlockPos> cells = getRoomCells(level, layout, room);
+            if (!cells.isEmpty()) {
+                return cells;
+            }
+        }
+        return getHomeRoomCells(level);
+    }
+
     /** The floor cells of the refuse chamber that are dug out and can be walked to (the room does not have to be finished). */
     public List<BlockPos> getRefuseCells(Level level) {
         return getRoomCells(level, NestPlan.Kind.REFUSE);

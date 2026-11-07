@@ -45,6 +45,7 @@ public class MatabeleFoodTests {
         helper.assertTrue(pile != null, "a Matabele colony has no prey pile");
         long[] hungrySince = new long[1];
         MatabeleEntity[] clamped = new MatabeleEntity[1];
+        MatabeleEntity[] wounded = new MatabeleEntity[2];
         helper.startSequence()
                 .thenWaitUntil(() -> helper.assertTrue(colony.nest().getFinishedRoomCenter(level) != null, "the queen's room is not open yet"))
                 .thenExecute(() -> {
@@ -68,6 +69,21 @@ public class MatabeleFoodTests {
                     holder.kill();
                     hurt.clamp().becomeHead();
                     clamped[0] = hurt;
+                    // M8 step 5: two more come home with a leg gone, one wound fresh, one infected and smelling of it.
+                    List<MatabeleEntity> others = TestIsolation.insectsOf(level, colony, MatabeleEntity.class).stream()
+                            .filter(ant -> ant != hurt && ant.canLoseLegs()).limit(2).toList();
+                    helper.assertTrue(others.size() == 2, "no two Matabele workers to wound");
+                    for (int i = 0; i < 2; i++) {
+                        MatabeleEntity ant = others.get(i);
+                        ant.moveTo(room.getX() + 0.5, room.getY(), room.getZ() + 0.5, ant.getYRot(), 0.0F);
+                        ant.loseLeg(i == 0 ? 1 : 4);
+                        wounded[i] = ant;
+                    }
+                    com.antcolonies.fight.FightNumbers.Rescue n = com.antcolonies.entity.Wounds.numbers(wounded[1]);
+                    helper.assertTrue(n != null, "the Matabele has no rescue numbers");
+                    wounded[1].wounds().setForTests(n.smellTicks() + 20, true);
+                    helper.assertTrue(wounded[0].wounds().wantsLicking() && wounded[1].wounds().wantsDab(), "the wounds want no care: "
+                            + wounded[0].wounds().describe() + " / " + wounded[1].wounds().describe());
                     // Every worker a day and a quarter without a meal: hungry, not yet slow.
                     hungrySince[0] = level.getGameTime() - 30000;
                     for (MatabeleEntity ant : TestIsolation.insectsOf(level, colony, MatabeleEntity.class)) {
@@ -83,6 +99,11 @@ public class MatabeleFoodTests {
                 .thenWaitUntil(() -> helper.assertTrue(!clamped[0].isAlive() || !clamped[0].clamp().isOn(),
                         "nobody in the nest has bitten the termite head off the worker at " + helper.relativePos(clamped[0].blockPosition())
                                 + " (goals " + clamped[0].runningGoals() + ")"))
+                // M8 step 5: nestmates lick the fresh wound and dab gland secretion on the infected one (Frank et al. 2018, 2023).
+                .thenWaitUntil(() -> helper.assertTrue(!wounded[0].isAlive() || wounded[0].wounds().licks() >= 1,
+                        "nobody licked the fresh wound: " + wounded[0].wounds().describe() + " at " + helper.relativePos(wounded[0].blockPosition())))
+                .thenWaitUntil(() -> helper.assertTrue(!wounded[1].isAlive() || wounded[1].wounds().isDabbed(),
+                        "nobody treated the infected wound: " + wounded[1].wounds().describe() + " at " + helper.relativePos(wounded[1].blockPosition())))
                 .thenExecute(() -> {
                     pile.stock(level, 2); // (the queen may have been fed the rest meanwhile)
                     int good = pile.edible();

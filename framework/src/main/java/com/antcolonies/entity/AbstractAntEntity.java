@@ -122,6 +122,10 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
      * it. A loop, at the speed it was made.
      */
     private static final RawAnimation GROOM_NESTMATE = RawAnimation.begin().thenLoop("groom_nestmate");
+    // M8 step 5: dabbing the metapleural gland's secretion on a nestmate's infected wound; carried home by a nestmate,
+    // legs and antennae folded tight (the "pupal pose" real hurt Megaponera take, Frank et al. 2017).
+    private static final RawAnimation GLAND_DAB = RawAnimation.begin().thenLoop("gland_dab");
+    private static final RawAnimation CARRIED = RawAnimation.begin().thenLoop("carried");
     /**
      * Digging (see {@code DigGoal}): the forebody and head down, the jaws biting, the front legs raking the loose soil
      * back by turns, the antennae tapping the face it digs. Ants only.
@@ -190,6 +194,8 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
     public static final byte ACTIVITY_DIG = 4;
     /** Cleaning a nestmate (M8 step 3Q, {@code AllogroomGoal}). */
     public static final byte ACTIVITY_ALLOGROOM = 5;
+    /** Dabbing gland secretion on a nestmate's infected wound (M8 step 5, {@code WoundCareGoal}). */
+    public static final byte ACTIVITY_GLAND_DAB = 6;
     /** How pale a young worker is drawn, 0 (grown dark) to 100 (just grown up). Synced for the renderer. */
     private static final EntityDataAccessor<Byte> DATA_YOUTH =
             SynchedEntityData.defineId(AbstractAntEntity.class, EntityDataSerializers.BYTE);
@@ -896,6 +902,8 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
         if (level() instanceof ServerLevel level) {
             clamp.tick(level);
             tickClamping(level);
+            wounds.tick(level);
+            tickRescue(level);
         }
         if (venomAt != NO_VENOM && paralysedAt == NOT_PARALYSED
                 && level().getGameTime() - venomAt >= fightNumbers().map(FightNumbers.Body::venomTicks).orElse(0)) {
@@ -1087,6 +1095,183 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
         return false;
     }
 
+    // --- M8 step 5, rescue and wound care (Wounds, RescueGoal, WoundCareGoal) ---
+
+    /** Its open wound, if any (server). */
+    private final Wounds wounds = new Wounds(this);
+    /** Until when (game time) it stands calling for help, and until when a nestmate tends it (it holds still). */
+    private long callingUntil;
+    /** It calls for help by itself again no sooner than this (game time). */
+    private long callAgainAt;
+    private long tendedUntil;
+    @Nullable
+    private UUID tendedBy;
+
+    public Wounds wounds() {
+        return wounds;
+    }
+
+    /**
+     * Whether its animation file has the rescue clips ({@code carried}, {@code gland_dab}); without them it plays its
+     * standing clip while carried and cleans a nestmate's wound with the cleaning clip.
+     */
+    protected boolean hasRescueClips() {
+        return false;
+    }
+
+    /**
+     * Whether it is hurt in a way its nestmates help with (M8 step 5): a foe clamped on a leg, or legs gone (at most its
+     * species' {@code call_legs_max}) with the wound still open. With more legs gone it calls no more (it flails; real
+     * Megaponera with 5 legs gone do not call and are left, Frank et al. 2017). Never while felled or carried.
+     */
+    public boolean needsRescue() {
+        FightNumbers.Rescue n = Wounds.numbers(this);
+        if (n == null || !isAlive() || isDowned() || isPassenger()) {
+            return false;
+        }
+        int gone = LostLegs.count(lostLegs());
+        return clamp.isOn() || gone > 0 && gone <= n.callLegsMax() && wounds.isOpen();
+    }
+
+    /** Whether a nestmate may carry it home: legs gone, at most its species' {@code carry_legs_max} (and it needs rescue). */
+    public boolean isCarriable() {
+        FightNumbers.Rescue n = Wounds.numbers(this);
+        int gone = LostLegs.count(lostLegs());
+        return n != null && needsRescue() && gone > 0 && gone <= n.carryLegsMax();
+    }
+
+    /** It stands calling for help until this game time (0: stops now). */
+    public void callForHelp(long until) {
+        if (until > callingUntil && !isCallingForHelp()) {
+            squeak();
+        }
+        callingUntil = until;
+    }
+
+    /** Whether it stands calling for help now (its head's alarm smell; real hurt Megaponera release it, Frank et al. 2017). */
+    public boolean isCallingForHelp() {
+        return callingUntil > level().getGameTime() && needsRescue();
+    }
+
+    /** A nestmate tends it (pulls a clamp, licks or treats a wound) until this game time: it holds still. */
+    public void tendedBy(UUID nestmate, long until) {
+        tendedBy = nestmate;
+        tendedUntil = until;
+    }
+
+    /** The nestmate tending it now, or null. */
+    @Nullable
+    public UUID tender() {
+        return tendedBy != null && tendedUntil > level().getGameTime() ? tendedBy : null;
+    }
+
+    private boolean isTended() {
+        return tender() != null;
+    }
+
+    /** The hurt nestmate it carries home, or null. */
+    @Nullable
+    public AbstractAntEntity carriedNestmate() {
+        return getFirstPassenger() instanceof AbstractAntEntity hurt ? hurt : null;
+    }
+
+    /**
+     * Takes a hurt nestmate in its jaws to carry it home (M8 step 5): the nestmate rides it, its legs folded. False if
+     * it cannot (its jaws full, the nestmate not carriable, or already carried).
+     */
+    public boolean pickUpHurt(AbstractAntEntity hurt) {
+        if (hasFullMandibles() || isPassenger() || isVehicle() || hurt == this || !hurt.isCarriable()) {
+            return false;
+        }
+        hurt.getNavigator().stop();
+        hurt.callingUntil = 0;
+        if (!hurt.startRiding(this, true)) {
+            return false;
+        }
+        setLoad(CarriedLoad.of(FrameworkLoads.HURT));
+        return true;
+    }
+
+    /** Puts the hurt nestmate it carries down in front of it, on its floor. */
+    public void setDownHurt() {
+        AbstractAntEntity hurt = carriedNestmate();
+        letGoOf(FrameworkLoads.HURT);
+        if (hurt == null) {
+            return;
+        }
+        hurt.stopRiding();
+        float yaw = yBodyRot * Mth.DEG_TO_RAD;
+        double ahead = getBbWidth() * 0.5;
+        hurt.moveTo(getX() - Mth.sin(yaw) * ahead, getY(), getZ() + Mth.cos(yaw) * ahead, getYRot(), 0.0F);
+        if (!level().noCollision(hurt)) {
+            hurt.moveTo(getX(), getY(), getZ(), getYRot(), 0.0F); // no room ahead: under it
+        }
+        hurt.getNavigator().stop();
+    }
+
+    /** Ants never steer the ant they ride (a carried nestmate is a load). */
+    @Override
+    @Nullable
+    public LivingEntity getControllingPassenger() {
+        return null;
+    }
+
+    /**
+     * A carried nestmate hangs in its jaws, under its head and forebody, facing the way it goes (Frank et al. 2017's
+     * pictures: the hurt ant held beneath the rescuer; where exactly is my pick).
+     */
+    @Override
+    protected void positionRider(net.minecraft.world.entity.Entity passenger, net.minecraft.world.entity.Entity.MoveFunction move) {
+        if (!(passenger instanceof AbstractAntEntity hurt)) {
+            super.positionRider(passenger, move);
+            return;
+        }
+        float yaw = yBodyRot * Mth.DEG_TO_RAD;
+        double ahead = getBbWidth() * 0.4;
+        move.accept(passenger, getX() - Mth.sin(yaw) * ahead, getY() + getBbHeight() * 0.1, getZ() + Mth.cos(yaw) * ahead);
+        hurt.setYRot(getYRot());
+        hurt.setYBodyRot(yBodyRot);
+        hurt.setYHeadRot(yBodyRot);
+    }
+
+    /** Once a tick (server): the carried load and the rider kept in step, and the help call's squeak. */
+    private void tickRescue(ServerLevel level) {
+        if (isCarrying(FrameworkLoads.HURT) && carriedNestmate() == null) {
+            letGoOf(FrameworkLoads.HURT); // it fell off (a reload, a hurt that died): nothing to carry
+        }
+        if (getVehicle() instanceof AbstractAntEntity carrier && (!carrier.isCarrying(FrameworkLoads.HURT) || !isAlive())) {
+            stopRiding();
+        }
+        if (isCallingForHelp() && (tickCount + getId()) % 60 == 0) {
+            squeak(); // and squeaks now and then (real Megaponera stridulate when in trouble)
+        }
+        if ((tickCount + getId()) % 100 == 0 && level.getGameTime() >= callAgainAt && !isCallingForHelp() && needsRescue()
+                && answersHelpCalls() && helpWithin(level)) {
+            callForHelp(level.getGameTime() + 200); // out of the nest with a nestmate near: it stops and calls 10 s
+            callAgainAt = level.getGameTime() + 200 + 600; // (unanswered, it limps on 30 s before it calls again; my pick)
+        }
+    }
+
+    /** Whether, out of its nest, a nestmate free to help is within its species' help reach. */
+    private boolean helpWithin(ServerLevel level) {
+        Colony colony = getColony();
+        FightNumbers.Rescue n = Wounds.numbers(this);
+        if (colony == null || n == null || colony.nest().isInside(level, blockPosition())) {
+            return false;
+        }
+        return !level.getEntitiesOfClass(AbstractAntEntity.class, getBoundingBox().inflate(n.helpReach()),
+                other -> other != this && colony.getId().equals(other.getColonyId())
+                        && com.antcolonies.entity.goal.RescueGoal.mayHelp(other) && other.answersHelpCalls()).isEmpty();
+    }
+
+    /**
+     * Whether it answers a hurt nestmate's call now (M8 step 5): a species says no while another job holds it (a
+     * Matabele marching in a raid column; the column fetches its own hurt).
+     */
+    public boolean answersHelpCalls() {
+        return true;
+    }
+
     /** The leg a dead head is locked on to (synced, for drawing it), or -1 for none. */
     public int clampedHeadLeg() {
         int shown = entityData.get(DATA_CLAMP);
@@ -1136,6 +1321,7 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
         lostLegAt = level().getGameTime();
         updateLimp();
         clamp.legLost(leg); // a foe holding that leg comes off with it
+        wounds.open(); // M8 step 5: the stump is an open wound
         if (level() instanceof ServerLevel level) {
             LostLegEntity.drop(level, this, leg);
         }
@@ -1268,8 +1454,9 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
     // hunter's jaws.
     @Override
     protected boolean isImmobile() {
-        return super.isImmobile() || isParalysed()
-                || !level().isClientSide && (pinnedBy != null || clampingOn != null || clamp.isHeldStill());
+        return super.isImmobile() || isParalysed() || getVehicle() instanceof AbstractAntEntity
+                || !level().isClientSide && (pinnedBy != null || clampingOn != null || clamp.isHeldStill()
+                || isCallingForHelp() || isTended());
     }
 
     /** How it attacks this foe (its clip), or null if it has no attack clip of its own. */
@@ -2625,6 +2812,7 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
             tag.putLong("LostLegAt", lostLegAt);
         }
         clamp.save(tag);
+        wounds.save(tag);
         if (clampingOnId != null) {
             tag.putUUID("ClampingOn", clampingOnId);
         }
@@ -2659,6 +2847,7 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
         entityData.set(DATA_LOST_LEGS, (byte) (tag.getByte("LostLegs") & 0x3F));
         lostLegAt = tag.contains("LostLegAt") ? tag.getLong("LostLegAt") : Long.MIN_VALUE;
         clamp.load(tag);
+        wounds.load(tag);
         if (tag.hasUUID("ClampingOn")) {
             clampingOnId = tag.getUUID("ClampingOn");
             noPhysics = true;
@@ -2771,6 +2960,9 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
         }
         if (isClampingOn() && hasClampClips()) {
             return CLAMP_HOLD;
+        }
+        if (getVehicle() instanceof AbstractAntEntity && hasRescueClips()) {
+            return CARRIED; // M8 step 5: carried home by a nestmate
         }
         String strike = entityData.get(DATA_STRIKE);
         if (!strike.isEmpty()) {
@@ -2917,6 +3109,7 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
             case ACTIVITY_GROOM_R -> hasGroomClips() ? GROOM_R : null;
             case ACTIVITY_GROOM_BOTH -> hasGroomClips() ? GROOM_BOTH : null;
             case ACTIVITY_ALLOGROOM -> hasGroomClips() ? GROOM_NESTMATE : null;
+            case ACTIVITY_GLAND_DAB -> hasRescueClips() ? GLAND_DAB : hasGroomClips() ? GROOM_NESTMATE : null;
             case ACTIVITY_DIG -> hasWorkClips() ? DIG : null;
             default -> null;
         };

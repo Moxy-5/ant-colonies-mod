@@ -12,6 +12,8 @@ import com.antcolonies.entity.goal.GroomGoal;
 import com.antcolonies.entity.goal.AntWanderGoal;
 import com.antcolonies.entity.goal.CarryEggGoal;
 import com.antcolonies.entity.goal.ClampCareGoal;
+import com.antcolonies.entity.goal.RescueGoal;
+import com.antcolonies.entity.goal.WoundCareGoal;
 import com.antcolonies.entity.goal.DigGoal;
 import com.antcolonies.entity.goal.EatGoal;
 import com.antcolonies.entity.goal.FightGoal;
@@ -193,6 +195,8 @@ public class MatabeleEntity extends AbstractAntEntity implements ColonyBorn {
         this.goalSelector.addGoal(2, new CarryEggGoal(this));
         this.goalSelector.addGoal(2, new CarryRemainsGoal(this));
         this.goalSelector.addGoal(2, new ClampCareGoal(this)); // M8 2c: termites off nestmates' legs in the nest
+        this.goalSelector.addGoal(2, new RescueGoal(this)); // M8 5: the hurt carried home, clamps pulled off on the field
+        this.goalSelector.addGoal(2, new WoundCareGoal(this)); // M8 5: wounds licked, infected ones treated
         // (the raid code review, finding 3: priority 1, so a scout or raider is really taken off its nest chores; chores
         // that carry something are never called to a raid or a scout's trip, and eating stands aside while it is out)
         scoutGoal = new MatabeleScoutGoal(this);
@@ -895,7 +899,32 @@ public class MatabeleEntity extends AbstractAntEntity implements ColonyBorn {
     @Nullable
     public BlockPos idlePlace() {
         Colony colony = getColony();
-        return colony == null || !restsInRooms() ? null : colony.nest().getFinishedRoomCenter(level());
+        if (colony == null || !restsInRooms()) {
+            return null;
+        }
+        if (wounds().isOpen()) {
+            // M8 step 5: the hurt rest in the room nearest the entrance, where they are tended (my pick)
+            java.util.List<BlockPos> hurtRoom = colony.nest().getHurtRoomCells(level());
+            if (!hurtRoom.isEmpty()) {
+                return hurtRoom.get(Math.floorMod(getId(), hurtRoom.size()));
+            }
+        }
+        return colony.nest().getFinishedRoomCenter(level());
+    }
+
+    /** M8 step 5: not while it is in a raid column (the column fetches its own hurt, {@code RaidColumn}). */
+    @Override
+    public boolean answersHelpCalls() {
+        Colony colony = getColony();
+        com.antcolonies.savanna.colony.RaidColumn column = colony == null ? null
+                : colony.part(com.antcolonies.savanna.colony.SavannaParts.RAIDS).map(com.antcolonies.savanna.colony.Raids::column).orElse(null);
+        return column == null || !column.has(getUUID());
+    }
+
+    /** M8 step 5: its clip file has the rescue clips (carried, gland_dab; tools/matabele_anims.py). */
+    @Override
+    protected boolean hasRescueClips() {
+        return true;
     }
 
     /** M8 step 3Q: its clip file has the cleaning clips (tools/groom_motion.py), not the digging and carrying ones. */

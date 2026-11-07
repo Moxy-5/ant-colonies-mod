@@ -1422,7 +1422,8 @@ public class Raids {
     /** Whether this ant may go raiding: a worker, whole, not clamped, not downed or fighting, carrying nothing (finding 3). */
     private static boolean raiderFit(MatabeleEntity ant) {
         return ant.isAlive() && ant.isColonyWorker() && !ant.isCrippled() && !ant.clamp().isOn() && !ant.isDowned()
-                && !ant.fightsNoMore() && ant.getFightSpot() == null && !ant.hasFullMandibles();
+                && !ant.fightsNoMore() && ant.getFightSpot() == null && !ant.hasFullMandibles()
+                && !ant.wounds().isOpen() && !ant.needsRescue(); // (M8 step 5: the hurt rest until the wound closes)
     }
 
     /** The raid command: a raid sets out now to the best known find, whatever the hour or hunger; null if none could. */

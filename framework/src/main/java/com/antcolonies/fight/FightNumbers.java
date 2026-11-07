@@ -48,7 +48,7 @@ import net.minecraft.resources.ResourceLocation;
  */
 public record FightNumbers(Map<String, Body> bodies, List<String> foeTypes, List<ResourceLocation> foeSpecies,
         List<ResourceLocation> prey, int paralysedTicks, List<Integer> lookOverTicks, int giveUpTicks, Optional<Flee> flee,
-        Optional<Hold> clamp, Optional<Clamped> clamped) {
+        Optional<Hold> clamp, Optional<Clamped> clamped, Optional<Rescue> rescue) {
 
     /** How long a hunter searches round its spot with no foe before giving up, if its species file says nothing. */
     public static final int DEFAULT_GIVE_UP_TICKS = 600;
@@ -66,8 +66,47 @@ public record FightNumbers(Map<String, Body> bodies, List<String> foeTypes, List
             Codec.INT.optionalFieldOf("give_up_ticks", DEFAULT_GIVE_UP_TICKS).forGetter(FightNumbers::giveUpTicks),
             Flee.CODEC.optionalFieldOf("flee").forGetter(FightNumbers::flee),
             Hold.CODEC.optionalFieldOf("clamp").forGetter(FightNumbers::clamp),
-            Clamped.CODEC.optionalFieldOf("clamped").forGetter(FightNumbers::clamped)
+            Clamped.CODEC.optionalFieldOf("clamped").forGetter(FightNumbers::clamped),
+            Rescue.CODEC.optionalFieldOf("rescue").forGetter(FightNumbers::rescue)
     ).apply(i, FightNumbers::new));
+
+    /**
+     * M8 step 5, rescue and wound care ({@code docs/DESIGN.md}, "Step 5"): how a species saves its hurt. Real (Frank et
+     * al. 2017, "Saving the injured: rescue behavior in the termite-hunting ant Megaponera analis"; Frank et al. 2018,
+     * wound care; Frank et al. 2023, antimicrobial treatment of infected wounds):
+     * <ul>
+     * <li>a hurt insect with at most {@code call_legs_max} legs gone (or a foe clamped on) calls for help (a smell from
+     * its head, and it squeaks); a nestmate within {@code help_reach} blocks comes, pulls a clamp off on the field
+     * ({@code field_pull_ticks}) and carries one with legs gone home ({@code carry_legs_max}); more legs gone, it calls
+     * no more and is never carried (it flails; real "triage").</li>
+     * <li>a lost leg leaves an open wound; nestmates lick it ({@code lick_ticks} a time, up to {@code licks}); a wound
+     * becomes infected by {@code infect_ticks} with the chance {@code infect_untended}, or {@code infect_licked} once
+     * licked; an infected wound can be smelt from {@code smell_ticks} after the wound and is treated with a gland dab
+     * ({@code dab_ticks}); by {@code course_ticks} an infected insect dies with the chance {@code death_untreated}, or
+     * {@code death_treated} once dabbed, else it heals; a clean wound heals by {@code heal_ticks}.</li>
+     * </ul>
+     */
+    public record Rescue(double helpReach, int callLegsMax, int carryLegsMax, int fieldPullTicks, int lickTicks, int licks,
+            int dabTicks, int infectTicks, int smellTicks, int courseTicks, int healTicks, double infectUntended,
+            double infectLicked, double deathUntreated, double deathTreated) {
+        public static final Codec<Rescue> CODEC = RecordCodecBuilder.create(i -> i.group(
+                Codec.DOUBLE.optionalFieldOf("help_reach", 6.0).forGetter(Rescue::helpReach),
+                Codec.INT.optionalFieldOf("call_legs_max", 4).forGetter(Rescue::callLegsMax),
+                Codec.INT.optionalFieldOf("carry_legs_max", 4).forGetter(Rescue::carryLegsMax),
+                Codec.INT.optionalFieldOf("field_pull_ticks", 200).forGetter(Rescue::fieldPullTicks),
+                Codec.INT.optionalFieldOf("lick_ticks", 300).forGetter(Rescue::lickTicks),
+                Codec.INT.optionalFieldOf("licks", 3).forGetter(Rescue::licks),
+                Codec.INT.optionalFieldOf("dab_ticks", 200).forGetter(Rescue::dabTicks),
+                Codec.INT.optionalFieldOf("infect_ticks", 6000).forGetter(Rescue::infectTicks),
+                Codec.INT.optionalFieldOf("smell_ticks", 11000).forGetter(Rescue::smellTicks),
+                Codec.INT.optionalFieldOf("course_ticks", 36000).forGetter(Rescue::courseTicks),
+                Codec.INT.optionalFieldOf("heal_ticks", 24000).forGetter(Rescue::healTicks),
+                Codec.DOUBLE.optionalFieldOf("infect_untended", 0.8).forGetter(Rescue::infectUntended),
+                Codec.DOUBLE.optionalFieldOf("infect_licked", 0.2).forGetter(Rescue::infectLicked),
+                Codec.DOUBLE.optionalFieldOf("death_untreated", 0.9).forGetter(Rescue::deathUntreated),
+                Codec.DOUBLE.optionalFieldOf("death_treated", 0.2).forGetter(Rescue::deathTreated)
+        ).apply(i, Rescue::new));
+    }
 
     /**
      * How an insect of a species that clamps holds on (M8 step 2c): every {@code squeeze_ticks} it squeezes, for

@@ -153,7 +153,7 @@ public class MatabeleRaidTests {
      * findings 1 and 3: a hungry recruit stays in the column (it never leaves to eat), and a raider out of sight on the
      * march for 10 s, less than the grace (its land not ticking) is kept in the column, and walks on with it once back.
      */
-    @GameTest(template = "arena", timeoutTicks = 14000, skyAccess = true, batch = "matabele_raids")
+    @GameTest(template = "arena", timeoutTicks = 18000, skyAccess = true, batch = "matabele_raids")
     public static void aScoutLeadsARaidColumnAlongItsTrailThatStopsShortAttacksTheWorkersAndComesHome(GameTestHelper helper) {
         ServerLevel level = helper.getLevel();
         level.getServer().tickRateManager().setTickRate(2000.0F);
@@ -178,6 +178,9 @@ public class MatabeleRaidTests {
         MatabeleEntity[] hidden = {null};
         long[] hiddenAt = {-1};
         boolean[] hiddenKept = {false};
+        MatabeleEntity[] hurt = {null};
+        boolean[] hurtCalled = {false};
+        boolean[] hurtCarried = {false};
         // M8 step 3Q: how much the raiders walk while they wait at their places (milling, bunched, regrouping).
         // (an ant counts as waiting once it has been at its place 2 s: the last steps of getting there are arriving)
         IdleWatch waits = new IdleWatch("raid's waits");
@@ -188,6 +191,11 @@ public class MatabeleRaidTests {
                 return;
             }
             long tickNow = helper.getLevel().getGameTime();
+            // M8 step 5: the raider hurt at the spot stands calling, then rides home in a nestmate's jaws.
+            if (hurt[0] != null) {
+                hurtCalled[0] |= hurt[0].isCallingForHelp() && raid.hurtHere().contains(hurt[0].getUUID());
+                hurtCarried[0] |= hurt[0].getVehicle() instanceof MatabeleEntity;
+            }
             waits.tick(raiders, ant -> {
                 if (!raid.waitingForTests(ant)) {
                     atPlaceSince.remove(ant.getUUID());
@@ -311,6 +319,16 @@ public class MatabeleRaidTests {
                             "the hungry recruit left the column before the attack"
                                     + (raids.whyGoingHome(hungry[0].getUUID()) == null ? "" : " (" + raids.whyGoingHome(hungry[0].getUUID()) + ")"));
                     SavannaMod.LOGGER.info("[raid test] attack at {}: {}", helper.getTick(), raids.describe(level));
+                    // M8 step 5: a raider (a minor if there is one, never the scout) has two legs bitten off at the spot.
+                    hurt[0] = raiders.stream().filter(ant -> ant.isAlive() && raid.has(ant.getUUID()) && !ant.getUUID().equals(raid.leader())
+                                    && ant != hungry[0] && ant != hidden[0])
+                            .min(java.util.Comparator.comparingDouble(MatabeleEntity::getBbWidth)).orElse(null);
+                    helper.assertTrue(hurt[0] != null, "no raider to hurt at the spot");
+                    hurt[0].loseLeg(1);
+                    hurt[0].loseLeg(4);
+                    hurt[0].setHealth(hurt[0].getMaxHealth());
+                    helper.assertTrue(hurt[0].needsRescue() && hurt[0].isCarriable() && hurt[0].wounds().isOpen(),
+                            "a raider with two legs gone should need carrying home with an open wound");
                 })
                 .thenWaitUntil(() -> helper.assertTrue(termites.stream().anyMatch(termite -> !termite.isAlive() || termite.isParalysed()),
                         "no termite worker stung; " + raids.describe(level)))
@@ -335,6 +353,11 @@ public class MatabeleRaidTests {
                         }
                     }
                     SavannaMod.LOGGER.info("[raid test] home at {}, {} came home ({})", helper.getTick(), raid.cameHome(), raid.endedWhy());
+                    // M8 step 5: the hurt raider called at the spot and was carried home by a nestmate (the column's or any other).
+                    helper.assertTrue(hurtCalled[0], "the raider hurt at the spot never stood calling for help; " + raid.endedWhy());
+                    // (a raider of the column, or any nestmate near that heard the call, such as a scout coming home)
+                    helper.assertTrue(hurtCarried[0], "nobody carried the hurt raider home (the column rescued "
+                            + raid.rescued() + "); it is at " + hurt[0].blockPosition().toShortString() + ", " + raid.endedWhy());
                     // Step 3c: the stung termites came home in the raiders' jaws.
                     helper.assertTrue(raid.carried() >= 1, "the raid came home with no termites; " + raids.describe(level));
                     long taken = termites.stream().filter(termite -> !termite.isAlive()).count();
@@ -344,6 +367,11 @@ public class MatabeleRaidTests {
                                 "a raider holds " + MatabeleLoads.termitesHeldBy(ant) + " termites, more than its " + ant.termitesItCanCarry());
                     }
                 })
+                // M8 step 5: set down in the nest and its wound licked there.
+                .thenWaitUntil(() -> helper.assertTrue(!hurt[0].isAlive() || !hurt[0].isPassenger() && colony.nest().isInside(level, hurt[0].blockPosition())
+                                && hurt[0].wounds().licks() >= 1,
+                        "the hurt raider is not set down in the nest and licked: at " + hurt[0].blockPosition().toShortString() + " carried "
+                                + hurt[0].isPassenger() + ", " + hurt[0].wounds().describe() + ", goals " + hurt[0].runningGoals()))
                 .thenWaitUntil(() -> helper.assertTrue(raiders.stream().noneMatch(ant -> ant.isAlive() && ant.isCarrying(MatabeleLoads.TERMITES)),
                         "a raider still holds its termites; " + colony.part(SavannaParts.PREY_PILE).map(pile -> pile.describe(level)).orElse("no pile")))
                 .thenExecute(() -> {
