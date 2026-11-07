@@ -299,6 +299,24 @@ def sizes_page(out):
     print("wrote", out)
 
 
+def march_page(out):
+    """March formations (the user, 2026-11-07, "I just want it to look good and smooth"): a Matabele raid leaving a dead
+    mound and marching to a log, in several formations and ways out of the nest, to pick the look from; the game's own
+    Matabele models at their real sizes, animated in the page (tools/march_viewer.template.html)."""
+    assets = mod_paths.assets("savanna")
+    data = {"insects": []}
+    for model in ("matabele_major", "matabele_minor"):
+        geo = json.loads((assets / f"geo/entity/{model}.geo.json").read_text(encoding="utf-8"))
+        desc = geo["minecraft:geometry"][0]["description"]
+        texture = "data:image/png;base64," + base64.b64encode((assets / f"textures/entity/{model}.png").read_bytes()).decode()
+        data["insects"].append({"key": model, "bones": geo["minecraft:geometry"][0]["bones"], "texture": texture,
+                                "w": desc.get("texture_width", 64), "h": desc.get("texture_height", 64)})
+    template = (Path(__file__).resolve().parent / "march_viewer.template.html").read_text(encoding="utf-8")
+    out.parent.mkdir(parents=True, exist_ok=True)
+    out.write_text(template.replace("/*DATA*/null", json.dumps(data)), encoding="utf-8")
+    print("wrote", out)
+
+
 def xylaria_page(out):
     """The Xylaria looks: for each look and stage, top and side textures (a few variants) and the stalks on a comb's top."""
     import comb_age_art as comb
@@ -379,6 +397,9 @@ def main():
     if len(sys.argv) > 1 and sys.argv[1] == "nestsites":
         import nest_sites_viewer  # the Matabele home choices (docs/plans/matabele-homes.md)
         nest_sites_viewer.page(Path(sys.argv[2]) if len(sys.argv) > 2 else ROOT / "references/nest_sites_viewer.html")
+        return
+    if len(sys.argv) > 1 and sys.argv[1] == "march":
+        march_page(Path(sys.argv[2]) if len(sys.argv) > 2 else ROOT / "references/march_viewer.html")
         return
     if len(sys.argv) > 1 and sys.argv[1] == "sizes":
         sizes_page(Path(sys.argv[2]) if len(sys.argv) > 2 else ROOT / "references/sizes_viewer.html")

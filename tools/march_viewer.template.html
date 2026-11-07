@@ -1,0 +1,492 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>March Formations</title>
+<style>
+  :root { --bg: #f4efe6; --panel: #fffaf2; --ink: #2b211b; --muted: #75685d; --line: #dccfbe; --accent: #a8401f; }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) { --bg: #1d1915; --panel: #27211c; --ink: #efe6da; --muted: #a8998a; --line: #3d342c; --accent: #e07a52; }
+  }
+  :root[data-theme="dark"] { --bg: #1d1915; --panel: #27211c; --ink: #efe6da; --muted: #a8998a; --line: #3d342c; --accent: #e07a52; }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font: 15px/1.45 system-ui, sans-serif; }
+  header { padding: 14px 16px 6px; }
+  h1 { margin: 0 0 4px; font-size: 20px; }
+  header p { margin: 0; color: var(--muted); max-width: 90ch; }
+  #wrap { position: relative; height: 60vh; min-height: 340px; margin: 10px 16px; border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
+  canvas { display: block; width: 100%; height: 100%; }
+  #hud { position: absolute; left: 10px; top: 10px; background: var(--panel); border: 1px solid var(--line); border-radius: 8px;
+         padding: 4px 10px; font-size: 13px; font-variant-numeric: tabular-nums; }
+  #pick { position: absolute; right: 10px; top: 10px; background: var(--panel); border: 1px solid var(--accent); color: var(--accent);
+          border-radius: 8px; padding: 4px 12px; font-size: 18px; font-weight: 700; }
+  .row { display: flex; flex-wrap: wrap; gap: 6px 8px; padding: 2px 16px 6px; align-items: center; }
+  .row > span.lab { color: var(--muted); font-size: 13px; min-width: 92px; }
+  .row label { display: flex; gap: 6px; align-items: center; font-size: 14px; }
+  .row input[type=range] { width: 140px; max-width: 40vw; }
+  button { font: inherit; font-size: 14px; padding: 5px 11px; border-radius: 8px; border: 1px solid var(--line); background: var(--panel); color: var(--ink); cursor: pointer; }
+  button.on { border-color: var(--accent); color: var(--accent); font-weight: 600; }
+  .readout { color: var(--muted); font-size: 13px; min-width: 7ch; }
+  ul { margin: 8px 16px 24px; padding-left: 22px; max-width: 90ch; }
+  li { margin: 4px 0; }
+  li b { color: var(--accent); }
+</style>
+</head>
+<body>
+<header>
+  <h1>March formations</h1>
+  <p>A Matabele raid leaving a dead termite mound and marching about 45 blocks to a termite feeding spot under a fallen
+     log, drawn with the game's own models at their real sizes (a major half a block long). Pick a <b>formation</b>
+     (letter) and a <b>way out of the nest</b> (number), watch it, and tell me the pair you like, for example "C2".
+     Drag to turn, scroll or pinch to zoom.</p>
+</header>
+<div id="wrap"><canvas id="c"></canvas><div id="hud"></div><div id="pick"></div></div>
+<div class="row" id="forms"><span class="lab">Formation</span></div>
+<div class="row" id="exits"><span class="lab">Way out</span></div>
+<div class="row" id="cams"><span class="lab">Camera</span></div>
+<div class="row">
+  <span class="lab">Play</span>
+  <button id="restart">Restart</button>
+  <button id="pause">Pause</button>
+  <label>speed <input id="speed" type="range" min="0.25" max="3" step="0.25" value="1"> <span id="speedOut" class="readout"></span></label>
+  <label>ants <input id="count" type="range" min="10" max="60" step="1" value="47"> <span id="countOut" class="readout"></span></label>
+  <label>walk <input id="walk" type="range" min="0.6" max="2.4" step="0.1" value="1.2"> <span id="walkOut" class="readout"></span></label>
+  <label><input id="trailOn" type="checkbox" checked> show the trail</label>
+  <label><input id="gridOn" type="checkbox"> block grid</label>
+  <label><input id="loopOn" type="checkbox" checked> loop</label>
+</div>
+<ul id="notes"></ul>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+<script>
+const DATA = /*DATA*/null;
+
+// ---------------------------------------------------------------- the scene
+const canvas = document.getElementById('c'), wrap = document.getElementById('wrap');
+const renderer = new THREE.WebGLRenderer({canvas, antialias: true});
+renderer.setPixelRatio(window.devicePixelRatio);
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+const scene = new THREE.Scene();
+scene.background = new THREE.Color('#cfe3ee');
+const camera = new THREE.PerspectiveCamera(40, 1, 0.02, 300);
+const controls = new THREE.OrbitControls(camera, canvas);
+scene.add(new THREE.HemisphereLight('#ffffff', '#8a7454', 0.75));
+const sun = new THREE.DirectionalLight('#ffffff', 0.6);
+sun.position.set(14, 30, 18); sun.castShadow = true; sun.shadow.mapSize.set(4096, 4096); sun.shadow.bias = -0.0005;
+Object.assign(sun.shadow.camera, {left: -40, right: 40, top: 40, bottom: -40, near: 1, far: 90});
+sun.target.position.set(22, 0, 6); scene.add(sun, sun.target);
+const floor = new THREE.Mesh(new THREE.PlaneGeometry(160, 160), new THREE.MeshLambertMaterial({color: '#b3a45e'}));
+floor.rotation.x = -Math.PI / 2; floor.receiveShadow = true; scene.add(floor);
+const grid = new THREE.GridHelper(160, 160, '#8f8248', '#8f8248'); grid.position.y = 0.003; grid.visible = false; scene.add(grid);
+
+// The dead mound: a worn hump of blocks, its old chimney an open hole at the top (the ants' way out).
+const MOUND = {x: 0, z: 0, top: 5, radius: 6.2};
+const columns = new Map();   // "x,z" -> height of the block column's top (0: no column)
+for (let x = -7; x <= 7; x++) for (let z = -7; z <= 7; z++) {
+  const r = Math.hypot(x, z) / MOUND.radius;
+  const h = Math.round(MOUND.top * Math.max(0, 1 - Math.pow(r, 1.6)) + (((x * 7 + z * 13) & 3) === 0 ? 0.4 : 0));
+  if (h > 0) columns.set(x + ',' + z, Math.min(h, MOUND.top));
+}
+columns.set('0,0', MOUND.top);
+(function buildMound() {
+  let count = 0; columns.forEach(h => count += h);
+  const mesh = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), new THREE.MeshLambertMaterial({color: '#ffffff'}), count);
+  mesh.castShadow = mesh.receiveShadow = true;
+  const m = new THREE.Matrix4(), c = new THREE.Color(); let i = 0;
+  columns.forEach((h, key) => {
+    const [x, z] = key.split(',').map(Number);
+    for (let y = 0; y < h; y++) {
+      m.makeTranslation(x, y + 0.5, z); mesh.setMatrixAt(i, m);
+      const shade = 0.9 + (((x * 31 + y * 17 + z * 7) & 7) / 7) * 0.18;
+      c.set(y === h - 1 && h <= 2 ? '#8f8a4a' : '#9b7a57').multiplyScalar(shade); mesh.setColorAt(i, c); i++;
+    }
+  });
+  scene.add(mesh);
+  const hole = new THREE.Mesh(new THREE.PlaneGeometry(0.8, 0.8), new THREE.MeshBasicMaterial({color: '#140f0b'}));
+  hole.rotation.x = -Math.PI / 2; hole.position.set(0, MOUND.top + 0.003, 0); scene.add(hole);
+})();
+function columnTop(x, z) { return columns.get(Math.round(x) + ',' + Math.round(z)) || 0; }
+// The ground under an insect: the block tops blended between block middles, so a walk over the steps reads as a climb.
+function ground(x, z) {
+  const x0 = Math.floor(x), z0 = Math.floor(z), fx = x - x0, fz = z - z0;
+  const a = columnTop(x0, z0), b = columnTop(x0 + 1, z0), c = columnTop(x0, z0 + 1), d = columnTop(x0 + 1, z0 + 1);
+  const s = t => t * t * (3 - 2 * t);
+  const u = s(fx), v = s(fz);
+  return (a * (1 - u) + b * u) * (1 - v) + (c * (1 - u) + d * u) * v;
+}
+
+// The trail: from the chimney, down the hump's side, out over the grass to the log.
+const TRAIL_POINTS = [[0, 0], [2.5, 0.6], [5.5, 1.2], [8.5, 2.4], [12, 3.2], [16, 2.8], [20, 4.8], [24, 8.2], [28, 10.4], [32, 10.6], [36, 9.4], [40, 10.8], [44, 13.5]];
+const curve = new THREE.CatmullRomCurve3(TRAIL_POINTS.map(([x, z]) => new THREE.Vector3(x, 0, z)), false, 'centripetal');
+const TP = curve.getSpacedPoints(900);
+const TS = [0]; for (let i = 1; i < TP.length; i++) TS.push(TS[i - 1] + TP[i].distanceTo(TP[i - 1]));
+const TRAIL_LEN = TS[TS.length - 1];
+function trailAt(s) {   // {x, z, tx, tz} at distance s along the trail (clamped)
+  s = Math.max(0, Math.min(TRAIL_LEN, s));
+  let lo = 0, hi = TS.length - 1;
+  while (hi - lo > 1) { const mid = (lo + hi) >> 1; if (TS[mid] <= s) lo = mid; else hi = mid; }
+  const f = (s - TS[lo]) / Math.max(1e-6, TS[hi] - TS[lo]);
+  const x = TP[lo].x + (TP[hi].x - TP[lo].x) * f, z = TP[lo].z + (TP[hi].z - TP[lo].z) * f;
+  let tx = TP[hi].x - TP[lo].x, tz = TP[hi].z - TP[lo].z; const l = Math.hypot(tx, tz) || 1;
+  return {x, z, tx: tx / l, tz: tz / l};
+}
+let S_FOOT = 0; for (let s = 0; s < TRAIL_LEN; s += 0.1) { const p = trailAt(s); if (ground(p.x, p.z) < 0.05) { S_FOOT = s; break; } }
+const S_END = TRAIL_LEN - 1.6;
+const trailLine = (() => {
+  const pts = []; for (let s = 0; s <= TRAIL_LEN; s += 0.25) { const p = trailAt(s); pts.push(new THREE.Vector3(p.x, ground(p.x, p.z) + 0.02, p.z)); }
+  const g = new THREE.BufferGeometry().setFromPoints(pts);
+  const line = new THREE.Line(g, new THREE.LineBasicMaterial({color: '#e8d27a', transparent: true, opacity: 0.8})); scene.add(line); return line;
+})();
+
+// The feeding spot: a fallen log, cased in termite mud, across the trail's end.
+const END = trailAt(TRAIL_LEN);
+const LOG = {x: END.x + END.tx * 1.4, z: END.z + END.tz * 1.4};
+(function buildLog() {
+  const holder = new THREE.Group(); holder.position.set(LOG.x, 0, LOG.z); holder.rotation.y = Math.atan2(END.tx, END.tz) + Math.PI / 2; scene.add(holder);
+  const log = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.55, 6, 10), new THREE.MeshLambertMaterial({color: '#cfc7b8'}));
+  log.rotation.z = Math.PI / 2; log.position.y = 0.5; log.castShadow = log.receiveShadow = true; holder.add(log);
+  const mud = new THREE.MeshLambertMaterial({color: '#8a5a36'});
+  [[-2.2, 0.9], [-0.9, 1.3], [0.6, 1.0], [1.9, 1.4]].forEach(([x, w]) => {
+    const m = new THREE.Mesh(new THREE.BoxGeometry(w, 0.18, 1.15), mud); m.position.set(x, 0.09, 0); m.castShadow = true; holder.add(m);
+    const top = new THREE.Mesh(new THREE.BoxGeometry(w * 0.7, 0.14, 0.5), mud); top.position.set(x, 1.02, 0); holder.add(top);
+  });
+})();
+
+// ---------------------------------------------------------------- the models (the game's own, as in the size viewer)
+function deg(v) { return v * Math.PI / 180; }
+function setRot(obj, r) { obj.rotation.set(deg(-r[0]), deg(r[1]), deg(-r[2]), 'ZYX'); }
+function loadTexture(uri) { const t = new THREE.TextureLoader().load(uri); t.magFilter = THREE.NearestFilter; t.minFilter = THREE.NearestFilter; return t; }
+const FACES = ['east', 'west', 'up', 'down', 'south', 'north'];
+function boxGeometry(c, tw, th) {
+  const g = new THREE.BoxGeometry(Math.max(c.size[0], 0.02), Math.max(c.size[1], 0.02), Math.max(c.size[2], 0.02));
+  const uv = g.attributes.uv;
+  FACES.forEach((f, i) => {
+    const face = (c.uv && c.uv[f]) || (c.uv && c.uv.north); if (!face) return;
+    const [u0, v0] = face.uv, [w, h] = face.uv_size;
+    for (let k = 0; k < 4; k++) { const j = i * 4 + k; uv.setXY(j, (u0 + uv.getX(j) * w) / tw, 1 - (v0 + (1 - uv.getY(j)) * h) / th); }
+  });
+  uv.needsUpdate = true; return g;
+}
+const geoCache = new Map();
+function buildModel(def, mat) {
+  const root = new THREE.Group(), groups = {}, byName = {};
+  def.bones.forEach(b => byName[b.name] = b);
+  def.bones.forEach(b => {
+    const g = new THREE.Group(); const p = b.parent ? byName[b.parent].pivot : [0, 0, 0];
+    g.position.set(b.pivot[0] - p[0], b.pivot[1] - p[1], b.pivot[2] - p[2]);
+    if (b.rotation) setRot(g, b.rotation);
+    groups[b.name] = g;
+    (b.cubes || []).forEach((c, ci) => {
+      const key = def.key + '/' + b.name + '/' + ci;
+      if (!geoCache.has(key)) geoCache.set(key, boxGeometry(c, def.w, def.h));
+      const mesh = new THREE.Mesh(geoCache.get(key), mat); mesh.castShadow = true;
+      const centre = [c.origin[0] + c.size[0] / 2, c.origin[1] + c.size[1] / 2, c.origin[2] + c.size[2] / 2];
+      if (c.rotation) {
+        const h = new THREE.Group(); h.position.set(c.pivot[0] - b.pivot[0], c.pivot[1] - b.pivot[1], c.pivot[2] - b.pivot[2]); setRot(h, c.rotation);
+        mesh.position.set(centre[0] - c.pivot[0], centre[1] - c.pivot[1], centre[2] - c.pivot[2]); h.add(mesh); g.add(h);
+      } else { mesh.position.set(centre[0] - b.pivot[0], centre[1] - b.pivot[1], centre[2] - b.pivot[2]); g.add(mesh); }
+    });
+  });
+  def.bones.forEach(b => (b.parent ? groups[b.parent] : root).add(groups[b.name]));
+  root.scale.setScalar(1 / 16);
+  const holder = new THREE.Group(); holder.rotation.order = 'YXZ'; holder.add(root);
+  const antennae = Object.keys(groups).filter(n => n.startsWith('antenna')).map(n => groups[n]);
+  const parents = antennae.map(g => g.parent); antennae.forEach(g => g.parent.remove(g));
+  const bounds = new THREE.Box3().setFromObject(holder);
+  antennae.forEach((g, i) => parents[i].add(g));
+  root.position.z = -(bounds.min.z + bounds.max.z) / 2; root.position.y = -bounds.min.y;
+  holder.userData.length = bounds.max.z - bounds.min.z;
+  const head = new THREE.Vector3(); holder.updateMatrixWorld(true); groups.head.getWorldPosition(head);
+  holder.userData.headSign = head.z >= 0 ? 1 : -1;
+  const TRIPOD_A = ['leg_l1', 'leg_r2', 'leg_l3'];
+  holder.userData.legs = Object.keys(groups).filter(n => /^leg_[lr][123]$/.test(n))
+    .map(n => ({g: groups[n], base: groups[n].rotation.y, off: TRIPOD_A.includes(n) ? 0 : Math.PI, side: n[4] === 'l' ? 1 : -1}));
+  holder.userData.antennae = ['antenna_l_1', 'antenna_r_1'].filter(n => groups[n]).map(n => ({g: groups[n], base: groups[n].rotation.x}));
+  return holder;
+}
+const MODELS = {};
+DATA.insects.forEach(d => { MODELS[d.key] = {def: d, mat: new THREE.MeshLambertMaterial({map: loadTexture(d.texture), alphaTest: 0.5})}; });
+
+// ---------------------------------------------------------------- formations: each ant's place, {s: blocks behind the front, lat: blocks to the side}
+const GAP = 0.6;   // the game's column spacing
+function rand(seed) { let t = seed + 0x6D2B79F5; t = Math.imul(t ^ t >>> 15, t | 1); t ^= t + Math.imul(t ^ t >>> 7, t | 61); return ((t ^ t >>> 14) >>> 0) / 4294967296; }
+function rowsOf(widths, ants, rowGap, latGap, jitter) {
+  const places = []; let row = 0, s = 0;
+  while (places.length < ants.length) {
+    const w = widths(row);
+    for (let k = 0; k < w && places.length < ants.length; k++) {
+      const j = places.length;
+      places.push({s: s + (rand(j * 3 + 1) - 0.5) * jitter, lat: (k - (w - 1) / 2) * latGap + (rand(j * 3 + 2) - 0.5) * jitter});
+    }
+    row++; s += rowGap;
+  }
+  return places;
+}
+// Places are handed out in the order the ants come out (majors first where the formation asks for them).
+function byCaste(ants, majorsFirst) {
+  const order = ants.map((a, i) => i);
+  if (majorsFirst) order.sort((a, b) => (ants[b].major - ants[a].major) || a - b);
+  return order;
+}
+const FORMS = {
+  A: {name: 'Single file', text: 'one line, each ant a fixed gap behind the one ahead, exactly on the trail (the tidiest, the longest column)',
+      places: ants => ({order: byCaste(ants), places: ants.map((a, i) => ({s: i * GAP, lat: 0}))})},
+  B: {name: 'Ribbon', text: 'rows of 2 and 3 side by side, each ant keeping its own place in the ribbon (close to what the game does now)',
+      places: ants => ({order: byCaste(ants), places: rowsOf(r => r % 2 ? 2 : 3, ants, 0.5, 0.4, 0.08)})},
+  C: {name: 'Living stream', text: '2 to 4 wide, every ant drifting slowly side to side and a little forward and back, passing its neighbours now and then: no fixed places, it flows like a stream',
+      places: ants => ({order: byCaste(ants), places: rowsOf(r => 3, ants, 0.45, 0.42, 0.25)}), drift: true},
+  D: {name: 'Tight pack', text: 'a short, dense block 6 wide that moves as one body (short and punchy, very "army")',
+      places: ants => ({order: byCaste(ants), places: rowsOf(r => 6, ants, 0.48, 0.36, 0.05)})},
+  E: {name: 'Spearhead', text: 'the scout at the point, the big majors in a narrow head that widens to 4, then the column thins to a tail of minors (a teardrop)',
+      places: ants => ({order: byCaste(ants, true), places: rowsOf(r => [1, 2, 3, 4, 4, 4, 4, 3, 3, 3, 2, 2, 2, 2][r] || 1, ants, 0.5, 0.4, 0.06)})},
+  F: {name: 'Armoured lanes', text: 'two outer lanes of majors walking either side of a middle lane of minors (looks guarded; not real, the real ants walk mixed)',
+      places: ants => {
+        const order = byCaste(ants, true), places = []; let maj = 0, min = 0;
+        order.forEach(i => {
+          if (ants[i].major) { places.push({s: Math.floor(maj / 2) * GAP, lat: maj % 2 ? 0.45 : -0.45}); maj++; }
+          else { places.push({s: 0.3 + min * 0.42, lat: 0}); min++; }
+        });
+        return {order, places};
+      }},
+};
+const EXITS = {
+  1: {name: 'Gather at the foot', text: 'they climb out of the chimney and walk straight down the side to a crowd on flat ground at the mound\'s foot; once everyone is down, the column files out of the front of the crowd'},
+  2: {name: 'Unroll out of the nest', text: 'no waiting at all: the front walks off slowly at once and each ant, as it comes out of the chimney, runs down to its place at the back; the column unrolls out of the hole, then picks up speed when the last one is out'},
+  3: {name: 'Gather on the top', text: 'they crowd round the chimney on the hump\'s top, then file down the side one after another (the top of the mound, where the game\'s raids get stuck today)'},
+};
+
+// ---------------------------------------------------------------- the raid
+const settings = {form: 'C', exit: '2', cam: 'overview', speed: 1, count: 47, walk: 1.2};
+location.hash.slice(1).split('&').filter(Boolean).forEach(kv => { const [k, v] = kv.split('=').map(decodeURIComponent); settings[k] = isNaN(parseFloat(v)) ? v : parseFloat(v); });
+let ants = [], raid = null, paused = false;
+
+function makeAnts(n) {
+  ants.forEach(a => scene.remove(a.m));
+  ants = [];
+  for (let i = 0; i < n; i++) {
+    // the game's size spread: half majors, a quarter in between, a quarter minors
+    const r = rand(i * 11 + 5), len = i === 0 ? 0.5 : r < 0.5 ? 0.46 + rand(i * 11 + 6) * 0.04 : r < 0.75 ? 0.36 + rand(i * 11 + 7) * 0.08 : 0.27 + rand(i * 11 + 8) * 0.06;
+    const key = len >= 0.36 ? 'matabele_major' : 'matabele_minor';
+    const m = buildModel(MODELS[key].def, MODELS[key].mat);
+    m.scale.setScalar(len / m.userData.length);
+    m.visible = false; scene.add(m);
+    ants.push({m, len, major: len >= 0.36 ? 1 : 0, x: 0, z: 0, y: MOUND.top, vx: 0, vz: 0, yaw: 0, pitch: 0, phase: rand(i) * 6.28,
+               out: false, outAt: 0, place: null, locked: false, arrived: false, seed: i});
+  }
+}
+
+function restart() {
+  const form = FORMS[settings.form];
+  const {order, places} = form.places(ants);
+  const v = settings.walk;
+  order.forEach((antIndex, k) => { ants[antIndex].place = places[k]; ants[antIndex].rank = k; });
+  // come out of the chimney in the order of their places (the front first)
+  const sorted = [...ants].sort((a, b) => a.place.s - b.place.s || a.rank - b.rank);
+  const length = Math.max(...ants.map(a => a.place.s));
+  const exit = settings.exit;
+  let interval = 0.3;
+  if (exit === '2') interval = Math.max(0.12, length / Math.max(1, ants.length - 1) / (0.75 * v));   // the front's crawl keeps each new place at the foot
+  sorted.forEach((a, k) => {
+    a.outAt = k * interval; a.out = false; a.locked = false; a.arrived = false; a.m.visible = false;
+    a.x = MOUND.x + (rand(a.seed * 5) - 0.5) * 0.3; a.z = MOUND.z + (rand(a.seed * 5 + 1) - 0.5) * 0.3; a.y = MOUND.top; a.vx = a.vz = 0;
+    a.yaw = rand(a.seed * 5 + 2) * 6.28; a.order = k;
+  });
+  const lastOut = (ants.length - 1) * interval;
+  // where the crowd waits (ways 1 and 3) and the trail distance where the column starts
+  const crowd = exit === '1' ? (() => { const p = trailAt(S_FOOT + 1.2); return {x: p.x, z: p.z, start: S_FOOT + 2.6}; })()
+              : exit === '3' ? {x: MOUND.x, z: MOUND.z, start: 1.3} : null;
+  sorted.forEach((a, k) => {
+    if (!crowd) return;
+    const ang = k * 2.39996, rad = (exit === '3' ? 0.75 : 0.45) + 0.3 * Math.sqrt(k);
+    a.wait = {x: crowd.x + Math.cos(ang) * Math.min(rad, exit === '3' ? 2.2 : 3.2), z: crowd.z + Math.sin(ang) * Math.min(rad, exit === '3' ? 2.2 : 3.2)};
+  });
+  raid = {t: 0, v, interval, lastOut, length, crowd, exit, front: crowd ? crowd.start : S_FOOT + 1.0, frontSpeed: 0, going: !crowd, goAt: null,
+          arrivedAt: null, done: false, doneAt: null, drift: !!form.drift};
+  if (exit === '2') raid.front = S_FOOT + 1.0;
+  updatePick();
+}
+
+// Each ant's target: its waiting place, its place in the moving column, or its spot round the log at the end.
+function targetOf(a) {
+  const r = raid;
+  let s = r.front - a.place.s, lat = a.place.lat;
+  if (r.drift) {
+    const t = r.t, k = a.seed;
+    lat += 0.22 * Math.sin(t * (0.35 + rand(k * 7) * 0.3) + k) + 0.12 * Math.sin(t * 1.1 + k * 2.3);
+    s += 0.35 * Math.sin(t * (0.25 + rand(k * 7 + 1) * 0.25) + k * 1.7);
+  }
+  if (s >= S_END - 0.6 || a.arrived) {
+    a.arrived = true;
+    const k = a.order, base = Math.atan2(-END.tz, -END.tx);
+    const ang = base + ((k * 0.61803) % 1 - 0.5) * 3.0, rad = 1.25 + 0.42 * Math.floor(k / 9) + rand(k * 3) * 0.2;
+    return {x: LOG.x + Math.cos(ang) * rad, z: LOG.z + Math.sin(ang) * rad, face: {x: LOG.x, z: LOG.z}};
+  }
+  if (r.crowd && (!r.going || s < r.crowd.start)) return {x: a.wait.x, z: a.wait.z, wait: true};
+  if (s < 0.3) s = 0.3;
+  const p = trailAt(s);
+  return {x: p.x - p.tz * lat, z: p.z + p.tx * lat};
+}
+
+function step(dt) {
+  const r = raid; r.t += dt;
+  const v = r.v;
+  ants.forEach(a => { if (!a.out && r.t >= a.outAt) { a.out = true; a.m.visible = true; } });
+  const allOut = r.t >= r.lastOut;
+  // the front: waits, crawls or walks
+  if (r.crowd) {
+    const ready = ants.filter(a => a.out && Math.hypot(a.x - a.wait.x, a.z - a.wait.z) < 0.6).length;
+    if (!r.going && allOut && (ready >= ants.length * 0.9 || r.t > r.lastOut + 8)) { r.going = true; r.goAt = r.t; }
+    r.frontSpeed += ((r.going ? v : 0) - r.frontSpeed) * Math.min(1, dt * 1.5);
+  } else {
+    const crawl = r.length / Math.max(1, ants.length - 1) / r.interval;   // keeps each new place at the foot
+    r.frontSpeed += ((allOut && r.t > r.lastOut + 1.5 ? v : Math.min(v, crawl)) - r.frontSpeed) * Math.min(1, dt * 1.2);
+  }
+  r.front += r.frontSpeed * dt;
+  const maxRun = v * 1.8, accel = 4.0;
+  ants.forEach(a => {
+    if (!a.out) return;
+    const t = targetOf(a);
+    const dx = t.x - a.x, dz = t.z - a.z, d = Math.hypot(dx, dz);
+    // desired speed: catch up fast, settle softly into the place
+    let want = Math.min(maxRun, d * 2.2);
+    if (d < 0.04) want = 0;
+    const wx = d > 1e-6 ? dx / d * want : 0, wz = d > 1e-6 ? dz / d * want : 0;
+    const ax = wx - a.vx, az = wz - a.vz, al = Math.hypot(ax, az), lim = accel * dt;
+    if (al > lim) { a.vx += ax / al * lim; a.vz += az / al * lim; } else { a.vx = wx; a.vz = wz; }
+    a.target = t;
+  });
+  // keep a little space (no stacking), softly
+  for (let i = 0; i < ants.length; i++) {
+    const a = ants[i]; if (!a.out) continue;
+    for (let j = i + 1; j < ants.length; j++) {
+      const b = ants[j]; if (!b.out) continue;
+      const dx = b.x - a.x, dz = b.z - a.z, d = Math.hypot(dx, dz), want = (a.len + b.len) * 0.36;
+      if (d < want && d > 1e-5) { const push = (want - d) * 0.5 * Math.min(1, dt * 8); a.x -= dx / d * push; a.z -= dz / d * push; b.x += dx / d * push; b.z += dz / d * push; }
+    }
+  }
+  let arrived = 0;
+  ants.forEach(a => {
+    if (!a.out) return;
+    a.x += a.vx * dt; a.z += a.vz * dt;
+    const sp = Math.hypot(a.vx, a.vz);
+    a.y += (ground(a.x, a.z) - a.y) * Math.min(1, dt * 12);
+    // face where it walks; standing, face the log (at the end) or keep its heading
+    let wantYaw = a.yaw;
+    if (sp > 0.08) wantYaw = Math.atan2(a.vx, a.vz);
+    else if (a.target && a.target.face) wantYaw = Math.atan2(a.target.face.x - a.x, a.target.face.z - a.z);
+    let dy = wantYaw - a.yaw; dy = Math.atan2(Math.sin(dy), Math.cos(dy));
+    a.yaw += dy * Math.min(1, dt * (sp > 0.08 ? 8 : 3));
+    // lean with the slope under it
+    const fx = Math.sin(a.yaw), fz = Math.cos(a.yaw), h = a.len * 0.5;
+    const slope = (ground(a.x + fx * h, a.z + fz * h) - ground(a.x - fx * h, a.z - fz * h)) / (2 * h);
+    a.pitch += (Math.max(-1.1, Math.min(1.1, Math.atan(slope))) - a.pitch) * Math.min(1, dt * 10);
+    const sign = a.m.userData.headSign;
+    a.m.position.set(a.x, a.y, a.z);
+    a.m.rotation.y = a.yaw + (sign > 0 ? 0 : Math.PI);
+    a.m.rotation.x = -sign * a.pitch;
+    // legs: alternating tripods, stride by body length
+    a.phase += sp * dt / (a.len * 0.55) * Math.PI;
+    const amp = 0.42 * Math.min(1, sp / (v * 0.5));
+    a.m.userData.legs.forEach(l => { l.g.rotation.y = l.base + l.side * amp * Math.sin(a.phase + l.off); });
+    a.m.userData.antennae.forEach((n, k) => { n.g.rotation.x = n.base + 0.12 * Math.sin(r.t * 3 + a.seed + k * 1.3); });
+    if (a.arrived && sp < 0.1) arrived++;
+  });
+  if (arrived >= ants.length * 0.95 && !r.done) { r.done = true; r.doneAt = r.t; }
+  if (r.arrivedAt == null && ants.some(a => a.arrived)) r.arrivedAt = r.t;
+}
+
+// ---------------------------------------------------------------- page controls
+function buttons(rowId, table, key, prefix) {
+  const row = document.getElementById(rowId);
+  Object.keys(table).forEach(k => {
+    const b = document.createElement('button'); b.textContent = (prefix ? k + ' ' : '') + table[k].name; b.dataset.k = k;
+    b.onclick = () => { settings[key] = k; mark(); restart(); }; row.appendChild(b);
+  });
+}
+function mark() {
+  document.querySelectorAll('#forms button').forEach(b => b.classList.toggle('on', b.dataset.k === settings.form));
+  document.querySelectorAll('#exits button').forEach(b => b.classList.toggle('on', b.dataset.k === String(settings.exit)));
+  document.querySelectorAll('#cams button').forEach(b => b.classList.toggle('on', b.dataset.k === settings.cam));
+  try { history.replaceState(null, '', '#form=' + settings.form + '&exit=' + settings.exit + '&cam=' + encodeURIComponent(settings.cam)); } catch (e) { /* (a page opened as a snapshot) */ }
+}
+function updatePick() { document.getElementById('pick').textContent = settings.form + settings.exit; }
+settings.exit = String(settings.exit);
+buttons('forms', FORMS, 'form', true);
+buttons('exits', EXITS, 'exit', true);
+const CAMS = {
+  'overview': () => ({pos: [20, 30, 40], target: [22, 0, 6], fov: 40}),
+  'the mound': () => ({pos: [12, 9, 13], target: [3, 2, 1], fov: 40}),
+  'follow the front': () => ({follow: true, fov: 45}),
+  'eye: beside the trail': () => ({pos: [11, 1.62, 9], target: [6, 1.2, 1.5], fov: 70}),
+  'eye: halfway': () => ({pos: [24, 1.62, 2], target: [24, 0, 8], fov: 70}),
+  'the log': () => ({pos: [LOG.x - 6, 4, LOG.z + 5], target: [LOG.x - 1, 0, LOG.z - 1], fov: 45}),
+};
+const camRow = document.getElementById('cams');
+Object.keys(CAMS).forEach(k => {
+  const b = document.createElement('button'); b.textContent = k; b.dataset.k = k;
+  b.onclick = () => { settings.cam = k; setCam(); mark(); }; camRow.appendChild(b);
+});
+function setCam() {
+  const c = CAMS[settings.cam] ? CAMS[settings.cam]() : CAMS.overview();
+  camera.fov = c.fov; camera.updateProjectionMatrix();
+  if (!c.follow) { camera.position.set(...c.pos); controls.target.set(...c.target); controls.update(); }
+}
+function followCam() {
+  const p = trailAt(Math.max(S_FOOT, raid.front - 3));
+  const tx = p.x, tz = p.z;
+  const want = new THREE.Vector3(tx - p.tx * 7 + p.tz * 5, 5.5, tz - p.tz * 7 - p.tx * 5);
+  camera.position.lerp(want, 0.05); controls.target.lerp(new THREE.Vector3(tx, 0.3, tz), 0.08);
+}
+const speedIn = document.getElementById('speed'), countIn = document.getElementById('count'), walkIn = document.getElementById('walk');
+speedIn.value = settings.speed; countIn.value = settings.count; walkIn.value = settings.walk;
+function readouts() {
+  document.getElementById('speedOut').textContent = settings.speed + 'x';
+  document.getElementById('countOut').textContent = settings.count;
+  document.getElementById('walkOut').textContent = settings.walk.toFixed(1) + ' blocks/s';
+}
+speedIn.oninput = () => { settings.speed = parseFloat(speedIn.value); readouts(); };
+countIn.onchange = () => { settings.count = parseInt(countIn.value); readouts(); makeAnts(settings.count); restart(); };
+countIn.oninput = readouts;
+walkIn.onchange = () => { settings.walk = parseFloat(walkIn.value); readouts(); restart(); };
+walkIn.oninput = () => { settings.walk = parseFloat(walkIn.value); readouts(); };
+document.getElementById('restart').onclick = restart;
+document.getElementById('pause').onclick = e => { paused = !paused; e.target.textContent = paused ? 'Play' : 'Pause'; e.target.classList.toggle('on', paused); };
+document.getElementById('trailOn').onchange = e => trailLine.visible = e.target.checked;
+document.getElementById('gridOn').onchange = e => grid.visible = e.target.checked;
+
+const notes = document.getElementById('notes');
+const addNote = html => { const li = document.createElement('li'); li.innerHTML = html; notes.appendChild(li); };
+Object.keys(FORMS).forEach(k => addNote('<b>' + k + ' ' + FORMS[k].name + ':</b> ' + FORMS[k].text + '.'));
+Object.keys(EXITS).forEach(k => addNote('<b>' + k + ' ' + EXITS[k].name + ':</b> ' + EXITS[k].text + '.'));
+addNote('<b>Same in every version:</b> 47 raiders (the size of your last raid), the game\'s size spread (half majors, a quarter between, a quarter minors), walking 1.2 blocks a second, ' +
+        'no regular stops, and at the log they fan out round it on the near side. Only the formation and the way out change. The yellow line is the scent trail (invisible in the game).');
+addNote('<b>What the page leaves out:</b> the real game\'s legs (blocks to climb, ants stepping round each other), so a pick here is a look to aim for; I then make the game match it and check it in the game\'s own camera films.');
+
+function resize() { const w = wrap.clientWidth, h = wrap.clientHeight; renderer.setSize(w, h, false); camera.aspect = w / h; camera.updateProjectionMatrix(); }
+window.addEventListener('resize', resize);
+const hud = document.getElementById('hud');
+let last = performance.now();
+function frame(now) {
+  const real = Math.min(0.1, (now - last) / 1000); last = now;
+  if (!paused && raid) {
+    let left = real * settings.speed;
+    while (left > 1e-4) { const dt = Math.min(1 / 60, left); step(dt); left -= dt; }
+    if (raid.done && settings.loopOn !== false && document.getElementById('loopOn').checked && raid.t - raid.doneAt > 4) restart();
+  }
+  if (settings.cam === 'follow the front' && raid) followCam();
+  controls.update(); renderer.render(scene, camera);
+  if (raid) {
+    const out = ants.filter(a => a.out).length;
+    hud.textContent = 'time ' + raid.t.toFixed(1) + ' s  ·  out of the nest ' + out + '/' + ants.length +
+      '  ·  front ' + Math.max(0, raid.front - S_FOOT).toFixed(0) + ' blocks past the foot' +
+      (raid.arrivedAt != null ? '  ·  first at the log ' + raid.arrivedAt.toFixed(0) + ' s' : '') +
+      (raid.done ? '  ·  all there ' + raid.doneAt.toFixed(0) + ' s' : '');
+  }
+  requestAnimationFrame(frame);
+}
+readouts(); makeAnts(settings.count); restart(); mark(); resize(); setCam(); requestAnimationFrame(frame);
+</script>
+</body>
+</html>
