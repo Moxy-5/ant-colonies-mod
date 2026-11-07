@@ -1,5 +1,6 @@
 package com.antcolonies.savanna.colony;
 
+import com.antcolonies.colony.GroundTop;
 import com.antcolonies.colony.Colony;
 import org.jetbrains.annotations.Nullable;
 
@@ -17,7 +18,6 @@ import net.minecraft.util.Mth;
 import net.minecraft.util.RandomSource;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.state.BlockState;
-import net.minecraft.world.level.levelgen.Heightmap;
 
 /**
  * Termitomyces mushrooms (M7 step 5c): the termites' garden fungus fruiting above ground. When a rain ends, a colony
@@ -119,7 +119,7 @@ public class Mushrooms {
         if (!level.hasChunkAt(new BlockPos(x, entrance.getY(), z))) {
             return null;
         }
-        BlockPos cell = new BlockPos(x, level.getHeight(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, x, z), z);
+        BlockPos cell = GroundTop.cell(level, x, z);
         return isGoodSpot(level, cell) ? cell : null;
     }
 

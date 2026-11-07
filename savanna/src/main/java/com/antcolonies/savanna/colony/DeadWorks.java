@@ -1,5 +1,6 @@
 package com.antcolonies.savanna.colony;
 
+import com.antcolonies.colony.GroundTop;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -27,7 +28,6 @@ import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.LevelEvent;
 import net.minecraft.world.level.block.state.BlockState;
-import net.minecraft.world.level.levelgen.Heightmap;
 import net.minecraft.world.phys.AABB;
 
 /**
@@ -209,7 +209,7 @@ final class DeadWorks {
      * loads too, before its light is worked out).
      */
     private static boolean underTheSky(ServerLevel level, BlockPos wall) {
-        return level.getHeight(Heightmap.Types.MOTION_BLOCKING, wall.getX(), wall.getZ()) <= wall.getY() + 1;
+        return !GroundTop.isRoofed(level, wall);
     }
 
     /** At a feeding spot: the mud casts left of the eaten wood crumble away, and so does the mud plastered over the wood. */

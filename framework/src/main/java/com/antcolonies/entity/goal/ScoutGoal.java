@@ -21,7 +21,6 @@ import net.minecraft.server.level.ServerLevel;
 import net.minecraft.util.Mth;
 import net.minecraft.world.entity.ai.goal.Goal;
 import net.minecraft.world.entity.item.ItemEntity;
-import net.minecraft.world.level.levelgen.Heightmap;
 
 /**
  * Searching for food, for species that find their food by looking ({@code food.find_radius}, see {@code FoodMap}: a
@@ -222,7 +221,7 @@ public class ScoutGoal extends Goal {
         if (!level.hasChunkAt(new BlockPos(x, center.getY(), z))) {
             return null;
         }
-        BlockPos cell = new BlockPos(x, level.getHeight(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, x, z), z);
+        BlockPos cell = com.antcolonies.colony.GroundTop.cell(level, x, z);
         BlockPos below = cell.below();
         if (!colony.foodMap().mayScout(cell) || !colony.mayForageAt(level, cell)) {
             return null;

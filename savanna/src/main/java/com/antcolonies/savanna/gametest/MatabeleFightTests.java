@@ -637,6 +637,24 @@ public class MatabeleFightTests {
         }
         helper.assertTrue(!com.antcolonies.fight.Fights.isShutIn(level, helper.absolutePos(new BlockPos(19, 1, 5))),
                 "open ground under a tree's crown counts as shut in");
+        // docs/BUGS.md 116: the shared ground top under the same crown is the grass, not the crown's top 8 blocks up
+        // (scouts, raid columns, new-land mounds, mushrooms and the prey heap all aim at it); wood under it still counts.
+        for (int x = 16; x <= 22; x++) {
+            for (int z = 2; z <= 8; z++) {
+                helper.setBlock(x, 0, z, Blocks.DIRT);
+            }
+        }
+        helper.setBlock(20, 3, 6, com.antcolonies.savanna.registry.TreeBlocks.CAMEL_THORN.log().get());
+        BlockPos underCrown = helper.absolutePos(new BlockPos(18, 1, 4));
+        BlockPos underLimb = helper.absolutePos(new BlockPos(20, 1, 6));
+        helper.assertTrue(com.antcolonies.colony.GroundTop.y(level, underCrown.getX(), underCrown.getZ()) == underCrown.getY(),
+                "the ground top under a tree's crown is not the grass (got y "
+                        + com.antcolonies.colony.GroundTop.y(level, underCrown.getX(), underCrown.getZ()) + ", wanted " + underCrown.getY() + ")");
+        helper.assertTrue(com.antcolonies.colony.GroundReader.surface(level, underCrown.getX(), underCrown.getZ()).equals(underCrown.below()),
+                "the ground reader's surface under a tree's crown is not the grass");
+        helper.assertTrue(!com.antcolonies.colony.GroundTop.isRoofed(level, underCrown), "a tree's crown counts as a roof");
+        helper.assertTrue(com.antcolonies.colony.GroundTop.y(level, underLimb.getX(), underLimb.getZ()) == underLimb.getY() + 3,
+                "a limb of wood under a crown is not counted as the top");
         int[] moundLeft = {0};
         // When each got out (game ticks from the start; -1 still shut in): once out a lone ant wanders where it likes.
         long start = level.getGameTime();

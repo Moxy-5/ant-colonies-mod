@@ -1,5 +1,6 @@
 package com.antcolonies.savanna.command;
 
+import com.antcolonies.colony.GroundTop;
 import org.jetbrains.annotations.Nullable;
 
 import com.antcolonies.colony.Caste;
@@ -24,7 +25,6 @@ import net.minecraft.server.level.ServerLevel;
 import net.minecraft.util.RandomSource;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.phys.AABB;
-import net.minecraft.world.level.levelgen.Heightmap;
 import net.minecraft.world.phys.Vec3;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
@@ -178,7 +178,7 @@ public class MatabeleCommands {
         for (int tries = 0; tries < 12; tries++) {
             double angle = random.nextDouble() * Math.PI * 2.0;
             BlockPos column = spot.offset((int) Math.round(Math.cos(angle) * 4.0), 0, (int) Math.round(Math.sin(angle) * 4.0));
-            BlockPos top = level.getHeightmapPos(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, column);
+            BlockPos top = GroundTop.cell(level, column);
             if (Math.abs(top.getY() - spot.getY()) <= 3 && !level.getBlockState(top.below()).getFluidState().isSource()) {
                 drop = top;
                 break;
@@ -349,7 +349,7 @@ public class MatabeleCommands {
     public static Colony makeColony(ServerLevel level, BlockPos at, MatabeleNest.Site site, int workers) {
         // Never inside the ground (a dead mound's hump may rise round the spot asked for): up onto its top.
         if (!level.getBlockState(at).getCollisionShape(level, at).isEmpty()) {
-            at = level.getHeightmapPos(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, at);
+            at = GroundTop.cell(level, at);
         }
         return MatabeleColonies.make(level, Vec3.atBottomCenterOf(at), site, workers, true);
     }

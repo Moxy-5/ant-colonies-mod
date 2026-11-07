@@ -2191,7 +2191,7 @@ public final class RaidColumn {
         BlockPos on = standAt(level, p[0], p[1], (int) Math.round(p[2]));
         if (on == null) {
             // (nothing near the line's height: the ground's top there, if it is not far off, never a cell in the ground)
-            BlockPos top = level.getHeightmapPos(net.minecraft.world.level.levelgen.Heightmap.Types.MOTION_BLOCKING_NO_LEAVES,
+            BlockPos top = com.antcolonies.colony.GroundTop.cell(level,
                     BlockPos.containing(p[0], p[2], p[1]));
             on = Math.abs(top.getY() - p[2]) <= 6 ? standAt(level, p[0], p[1], top.getY()) : null;
         }

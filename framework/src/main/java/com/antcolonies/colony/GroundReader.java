@@ -12,7 +12,6 @@ import net.minecraft.core.Direction;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.FallingBlock;
 import net.minecraft.world.level.block.state.BlockState;
-import net.minecraft.world.level.levelgen.Heightmap;
 
 /**
  * The shared ground reader (the user's decision of 2026-10-14, after hill bugs in the savanna): tells the planners
@@ -63,7 +62,7 @@ public final class GroundReader implements TunnelRoute.Ground {
     }
 
     private static BlockPos surface(Level level, int x, int z, java.util.function.Predicate<BlockState> cover) {
-        BlockPos top = new BlockPos(x, level.getHeight(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, x, z) - 1, z);
+        BlockPos top = new BlockPos(x, GroundTop.y(level, x, z) - 1, z);
         for (int i = 0; i < MAX_COVER && cover.test(level.getBlockState(top)); i++) {
             top = top.below();
         }

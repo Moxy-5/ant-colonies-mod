@@ -1,5 +1,6 @@
 package com.antcolonies.fight;
 
+import com.antcolonies.colony.GroundTop;
 import java.util.UUID;
 
 import org.jetbrains.annotations.Nullable;
@@ -25,7 +26,6 @@ import net.minecraft.world.entity.ai.attributes.Attributes;
 import net.minecraft.tags.BlockTags;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.state.BlockState;
-import net.minecraft.world.level.levelgen.Heightmap;
 
 /**
  * The shared fight rules (M8 step 2a, {@code docs/plans/m8-matabele.md}): who is an enemy, who may be attacked, and what
@@ -189,22 +189,9 @@ public final class Fights {
      * is at or below it). A termite under a log, under its mud or in a gallery under the ground is not.
      */
     public static boolean isInTheOpen(Level level, BlockPos cell) {
-        int top = level.getHeight(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, cell.getX(), cell.getZ());
-        if (cell.getY() >= top) {
-            return true;
-        }
-        // BUGS 113: Minecraft's map leaves out only its own leaf blocks; leaves of other kinds (the giant savanna trees')
-        // count as a roof there, so under a crown 40 blocks wide every cell looked covered and a Matabele on open grass
-        // counted itself shut in. Anything in the leaves tag, or that nothing bumps into, is no roof.
-        BlockPos.MutableBlockPos at = new BlockPos.MutableBlockPos(cell.getX(), top - 1, cell.getZ());
-        for (int y = top - 1; y > cell.getY(); y--) {
-            at.setY(y);
-            BlockState state = level.getBlockState(at);
-            if ((state.blocksMotion() || !state.getFluidState().isEmpty()) && !state.is(BlockTags.LEAVES)) {
-                return false;
-            }
-        }
-        return true;
+        // BUGS 113, 116: the ground's top with every tree's leaves passed through (the giant savanna trees' crowns are
+        // no roof: under one 40 blocks wide every cell looked covered and a Matabele on open grass counted itself shut in).
+        return cell.getY() >= GroundTop.y(level, cell.getX(), cell.getZ());
     }
 
     /**

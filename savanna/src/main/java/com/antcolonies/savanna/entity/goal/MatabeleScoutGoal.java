@@ -1,5 +1,6 @@
 package com.antcolonies.savanna.entity.goal;
 
+import com.antcolonies.colony.GroundTop;
 import java.util.ArrayList;
 import java.util.EnumSet;
 import java.util.List;
@@ -20,7 +21,6 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.util.Mth;
 import net.minecraft.world.entity.ai.goal.Goal;
-import net.minecraft.world.level.levelgen.Heightmap;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
 
@@ -549,7 +549,7 @@ public class MatabeleScoutGoal extends Goal {
         if (!level.hasChunkAt(new BlockPos(x, center.getY(), z))) {
             return null;
         }
-        BlockPos cell = new BlockPos(x, level.getHeight(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, x, z), z);
+        BlockPos cell = GroundTop.cell(level, x, z);
         // (the raid code review, finding 11: the raiders' own ground rule, so a scout's line only goes where a column can stand)
         if (Math.abs(cell.getY() - center.getY()) > 12 || !RaidGround.canStand(level, cell)
                 || !Raids.outOfMound(cell, mounds) || !colony.mayForageAt(level, cell)) {

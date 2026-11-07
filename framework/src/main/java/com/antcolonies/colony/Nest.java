@@ -584,7 +584,7 @@ public class Nest {
      * to the sky. A plug in the entrance itself does not count.
      */
     public boolean isEntranceCovered(Level level) {
-        return level.getHeight(net.minecraft.world.level.levelgen.Heightmap.Types.MOTION_BLOCKING, center.getX(), center.getZ()) > center.getY() + 1;
+        return GroundTop.isRoofed(level, center);
     }
 
     /**

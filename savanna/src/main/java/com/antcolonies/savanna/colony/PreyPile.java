@@ -1,5 +1,6 @@
 package com.antcolonies.savanna.colony;
 
+import com.antcolonies.colony.GroundTop;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.List;
@@ -27,7 +28,6 @@ import net.minecraft.util.RandomSource;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.state.BlockState;
-import net.minecraft.world.level.levelgen.Heightmap;
 import net.minecraft.world.phys.Vec3;
 
 /**
@@ -329,7 +329,7 @@ public class PreyPile implements NurseFood {
                 }
                 int x = entrance.getX() + dx;
                 int z = entrance.getZ() + dz;
-                BlockPos ground = new BlockPos(x, level.getHeight(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, x, z), z);
+                BlockPos ground = GroundTop.cell(level, x, z);
                 if (Math.abs(ground.getY() - entrance.getY()) > 3 || !hasRoom(level, ground)) {
                     continue;
                 }

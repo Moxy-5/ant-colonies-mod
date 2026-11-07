@@ -1,5 +1,6 @@
 package com.antcolonies.savanna.colony;
 
+import com.antcolonies.colony.GroundTop;
 import com.antcolonies.colony.Colony;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
@@ -23,7 +24,6 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.block.state.BlockState;
-import net.minecraft.world.level.levelgen.Heightmap;
 
 /**
  * Big dead wood calls the galleries (the user's pick, 2026-10-19, after termites never found a standing dead giant 15 to
@@ -76,7 +76,7 @@ final class DeadWoodCall {
                     if (dx * dx + dz * dz > far * far || !columns.add(BlockPos.asLong(x, 0, z)) || !level.hasChunk(x >> 4, z >> 4)) {
                         continue;
                     }
-                    top.set(x, level.getHeight(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, x, z) - 1, z);
+                    top.set(x, GroundTop.y(level, x, z) - 1, z);
                     if (measured.contains(top) || !isDeadWood(level.getBlockState(top))) {
                         continue;
                     }

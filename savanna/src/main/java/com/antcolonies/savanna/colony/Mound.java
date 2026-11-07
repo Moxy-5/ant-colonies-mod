@@ -340,7 +340,7 @@ public class Mound {
             if (part == MoundPlan.Part.OPEN) {
                 // Only once roofed over: a young mound's shaft open to the sky is outside (termites coming home
                 // stopped in it, clinging to its walls above the plug, the user's bug of 2026-10-13).
-                if (level.getHeight(net.minecraft.world.level.levelgen.Heightmap.Types.MOTION_BLOCKING, pos.getX(), pos.getZ()) > pos.getY() + 1) {
+                if (com.antcolonies.colony.GroundTop.isRoofed(level, pos)) {
                     cells.add(pos);
                 }
             } else if (part == MoundPlan.Part.MOUTH || part == MoundPlan.Part.TUNNEL || part == MoundPlan.Part.SPIRE) {
