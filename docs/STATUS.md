@@ -52,3 +52,5 @@ Only rare test flakes (`docs/BUGS.md`); in play: the raid column freezing just o
 - **Everything in one branch, 2026-11-07:** the three side branches (fixes for bugs 156, 159, 160 and 116, and a notes rule) are folded into `claude/raid-queue-openings-307d34`, so it holds all work not in `master`; full run 203 of 204 (one termite gallery test flaked, bug 167, passed 3 of 3 alone); in-game test 5 next.
 
 - **March formations to pick, 2026-11-07:** `references/march_viewer.html` shows six formations and three ways out of the nest; you pick a pair (like C2) and I make the game's march match it. Your empty-spot raid looked into (bug 168): two other Matabele colonies out of your sight had just raided that termite mound, so the termites were hiding in the mound's core, and the raid then stood about for a minute before leaving; not fixed yet.
+
+- **The ribbon march, 2026-11-07:** the scout calls in the nest and walks off at once, a little faster than the rest; the raiders unroll out behind it in rows of 3 and 2, each in its own lane, and never stop while marching (only a broken scent trail halts them). Tests pass on both mound kinds; not tried in-game yet.

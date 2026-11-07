@@ -261,6 +261,14 @@ public class AntNavigator {
     /** The way it walked last (a unit step: its lane lies at right angles to it). */
     private int laneX;
     private int laneZ = 1;
+    /**
+     * A lane the mind gave it ({@link #setSideShift}): this flat offset (blocks) from each floor cell's middle in place of
+     * its own lane, null for its own. The mind says where to walk, side included; the legs still check the body fits.
+     */
+    @Nullable
+    private Vec3 sideShift;
+    /** A mind's lane keeps the aim inside the cell walked into (blocks off its middle at most, each way). */
+    private static final double SHIFT_MOST = 0.45;
     /** The mind stepped it up to something on purpose ({@link #stepToward}) since its last walk: never shuffled away from it. */
     private boolean closedIn;
 
@@ -1205,9 +1213,43 @@ public class AntNavigator {
     @Nullable
     private Vec3 laneAim;
 
+    /**
+     * The mind gives it a lane: walk {@code shift} (blocks, flat; up to {@link #SHIFT_MOST} each way) to the side of each
+     * floor cell's middle, whichever way the step goes (a raid column's ribbon: rows of 3 and 2 side by side, each ant in
+     * its own lane), or null for its own lane again. Legs layer: only where to put the feet, never why.
+     */
+    public void setSideShift(@Nullable Vec3 shift) {
+        Vec3 clamped = shift == null ? null
+                : new Vec3(Mth.clamp(shift.x, -SHIFT_MOST, SHIFT_MOST), 0.0, Mth.clamp(shift.z, -SHIFT_MOST, SHIFT_MOST));
+        if (clamped == null ? sideShift != null : sideShift == null || clamped.distanceToSqr(sideShift) > 0.03 * 0.03) {
+            sideShift = clamped;
+            laneAim = null; // (the next step's aim worked out again)
+        }
+    }
+
+    /** Changes how fast the walk under way goes ({@code speed} multiplies its normal speed) without planning its route again. */
+    public void setPace(double speed) {
+        this.speed = speed;
+    }
+
     private Vec3 laneFor(CellMap map, BlockPos from, BlockPos to, Vec3 middle) {
         int dx = Integer.signum(to.getX() - from.getX());
         int dz = Integer.signum(to.getZ() - from.getZ());
+        if (sideShift != null) {
+            if ((dx == 0) != (dz == 0)) {
+                laneX = dx;
+                laneZ = dz;
+            }
+            if (map.isSlope(to) || map.isSlope(from)) {
+                return middle;
+            }
+            Vec3 point = middle.add(sideShift);
+            if (fits(point)) {
+                return point;
+            }
+            Vec3 half = middle.add(sideShift.scale(0.5));
+            return fits(half) ? half : middle; // (a narrow place: as near its lane as the body fits)
+        }
         if (dx != 0 && dz != 0 || dx == 0 && dz == 0) {
             return middle;
         }
@@ -1331,7 +1373,7 @@ public class AntNavigator {
         Crowd crowd = Crowd.of(ant.level());
         List<Vec3> spots = new ArrayList<>(17);
         double off = lane() * laneRoom();
-        spots.add(middle.add(-laneZ * off, 0.0, laneX * off));
+        spots.add(sideShift != null ? middle.add(sideShift) : middle.add(-laneZ * off, 0.0, laneX * off));
         List<Vec3> ring = new ArrayList<>(16);
         ring.add(middle);
         for (int i = 0; i < 8; i++) {

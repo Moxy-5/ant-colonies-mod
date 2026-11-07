@@ -624,10 +624,6 @@ public class MatabeleRaidTests {
                             + " stung termite(s), but " + Math.max(0, dropped[0]) + " lie where it died at " + diedAt[0].toShortString());
                     helper.assertTrue(raid.cameHome() * 2 >= raid.members().size(),
                             "only " + raid.cameHome() + " of " + raid.members().size() + " came home with the column: " + raid.endedWhy());
-                    // The raid and fight review 2, finding 2 (the user's raid): every milling place out on the open ground,
-                    // and nobody left home while standing at the place it was given.
-                    helper.assertTrue(raid.formFaults() == 0, raid.formFaults() + " milling place(s) in the nest or under the entrance,"
-                            + " or ants left home standing at theirs: " + raid.endedWhy());
                     // Finding 3: the attack ends once no termite the raiders would go for is about, not at its longest time
                     // (the termites hidden in their galleries or shut in under the logs once no major still breaks in).
                     Long attackAt = stageAt.get(RaidColumn.Stage.ATTACKING);
@@ -730,104 +726,154 @@ public class MatabeleRaidTests {
     }
 
     /**
-     * BUGS 101 (the user's raid of 2026-11-05): from a tall dead mound (dead only a few days, the hump still high round
-     * its open chimney), a raid of about 24 forms. Real Megaponera: the scout goes in and recruits, the raiders pour out
-     * after it and the column leaves almost at once, the late ones following the trail. Here: the scout goes into the nest
-     * first; every recruit that came out of the nest counts as out, wherever round the hump it stands (none is left home
-     * standing at the place it was given, and none out of the nest is left home at all); the column sets out before the
-     * forming's longest time; and a recruit at its place stands there, never walking off and back again and again.
-     * Real sizes, step 3: about 20 raiders milling at the entrance and the first 10 s of the march, no two out of the
-     * nest standing inside one another for more than a second ({@link CrowdWatch}).
+     * The ribbon (the user's pick of 2026-11-07 from the march viewer: formation B, "unroll out of the nest"), from a tall
+     * dead mound (BUGS 101: the hump still high round its open chimney). The scout calls at the nest's mouth and walks
+     * straight off: the march begins at once (no milling on the mound); nobody out of the nest is ever told to stand
+     * while the column marches (the user: "remove any lingering code of having the ants stop while they're marching");
+     * the front keeps moving all the time it is out and stays ahead of the raiders (its 5 percent faster pace); past the
+     * first blocks the column is a ribbon, rows of 3 and 2 by turns (not single file, never more than 3 side by side, its
+     * lanes within a block and a half of the trail: whole blocks apart down the steep hump); the same checks as the low
+     * mound's ({@link #ribbonMarch}, the user: the formation adapts to every kind of dead mound, the test does not); the raiders come out and follow (at most 1 left behind stuck, BUGS 166), no two
+     * standing inside one another ({@link CrowdWatch}); and the raid gets to the end of its trail and attacks. The log draws
+     * the ribbon every 5 s ({@code [ribbon test]} lines: each raider's place along the trail and to its side).
      */
     @GameTest(template = "arena", timeoutTicks = 6000, skyAccess = true, batch = "matabele_raids")
-    public static void aRaidFromATallDeadMoundSetsOutPromptlyWithEveryRecruitThatCameOut(GameTestHelper helper) {
+    public static void aRaidFromATallDeadMoundUnrollsBehindItsScoutAndNeverStops(GameTestHelper helper) {
+        ribbonMarch(helper, 6);
+    }
+
+    /**
+     * The same from a dead mound worn down to a low hump (about a month dead, as most dead mounds in the world are): the
+     * user (2026-11-07), "there are different types of dead mounds in the game, adapt the formations to the different
+     * mounds as well": the same checks, none loosened for either mound.
+     */
+    @GameTest(template = "arena", timeoutTicks = 6000, skyAccess = true, batch = "matabele_raids")
+    public static void aRaidFromALowDeadMoundMarchesAsARibbonOfThreesAndTwos(GameTestHelper helper) {
+        ribbonMarch(helper, 30);
+    }
+
+    private static void ribbonMarch(GameTestHelper helper, int deadDays) {
         ServerLevel level = helper.getLevel();
         level.getServer().tickRateManager().setTickRate(2000.0F);
         TestClock.moving(helper, 7.0);
-        TestScenes.shapeGround(helper, 45, (x, z) -> 0);
-        Colony dead = NewLandMounds.get(level).put(level, helper.absolutePos(new BlockPos(NEST, SURFACE, NEST)), NewLandMounds.pickFor("dead", 6, 5L));
+        TestScenes.shapeGround(helper, 65, (x, z) -> 0); // (the whole arena: a 40-block trail, so the ribbon has room to form)
+        Colony dead = NewLandMounds.get(level).put(level, helper.absolutePos(new BlockPos(NEST, SURFACE, NEST)), NewLandMounds.pickFor("dead", deadDays, 5L));
         helper.assertTrue(dead != null, "no dead mound put in");
         Colony colony = MatabeleCommands.makeColony(level, helper.absolutePos(new BlockPos(NEST + 6, SURFACE, NEST)), 120);
         helper.assertTrue(colony != null, "no Matabele colony made");
         Raids raids = colony.part(SavannaParts.RAIDS).orElse(null);
         helper.assertTrue(raids != null, "a Matabele colony has no raids part");
         RaidColumn[] column = {null};
-        long[] formedAt = {-1};
         long[] startedAt = {-1};
+        long[] marchFrom = {-1};
         long[] milled = {-1};
         int[] members = {0};
-        boolean[] scoutWentIn = {false};
-        // Each recruit's walks after it first stood at its place (BUGS 101: back and forth at the top of the hump). (Raid
-        // flow 2026-11-06: a shuffle, a step beside a place that has not moved, is no walk off it: waiting raiders mill.)
-        java.util.Map<java.util.UUID, Integer> rewalks = new java.util.HashMap<>();
-        java.util.Map<java.util.UUID, BlockPos> settled = new java.util.HashMap<>();
-        java.util.Map<java.util.UUID, BlockPos> walkingTo = new java.util.HashMap<>();
         CrowdWatch crowd = new CrowdWatch(ant -> !colony.nest().isInside(level, ant.blockPosition()));
-        long[] watchUntil = {Long.MAX_VALUE};
-        // The raid queue fix (the user's raid of 2026-11-06: the crowd stood on the hump about 30 s while the scout and 3
-        // walked off, then about 50 left at once, and some were sent home "stuck: no headway"): from the column leaving,
-        // each raider out of the nest, its longest stand (told to stand, not walking) and when it first got 3 blocks along
-        // the trail, off the hump.
-        java.util.Map<java.util.UUID, Long> standingSince = new java.util.HashMap<>();
-        java.util.Map<java.util.UUID, Long> longestStand = new java.util.HashMap<>();
-        java.util.Map<java.util.UUID, Long> offTheHumpAt = new java.util.HashMap<>();
-        java.util.Set<java.util.UUID> setOut = new java.util.HashSet<>();
-        // (when each raider first got a block from where it stood as the column left: the user's raid had 3 go with the
-        // scout and the rest stand some 30 s, then all leave at once)
-        java.util.Map<java.util.UUID, net.minecraft.world.phys.Vec3> startAt = new java.util.HashMap<>();
-        java.util.Map<java.util.UUID, Long> movedAt = new java.util.HashMap<>();
-        long[] marchFrom = {-1};
+        long[] crowdUntil = {Long.MAX_VALUE};
+        // What the march is measured by (from the column leaving till the front reaches the end of its trail):
+        java.util.Set<java.util.UUID> setOut = new java.util.HashSet<>(); // every raider seen out of the nest
+        java.util.List<String> standFaults = new java.util.ArrayList<>(); // raiders out told to stand
+        int[] standCount = {0};
+        long[] frontMovedAt = {-1};
+        net.minecraft.world.phys.Vec3[] frontAnchor = {null};
+        long[] frontLongestStill = {0};
+        int[] aheadTicks = {0};
+        int[] watchedTicks = {0};
+        double[] worstAhead = {0.0};
+        // the ribbon, sampled every 10 ticks past the first blocks: raiders counted, those with a row-mate beside them,
+        // samples with more than 3 side by side, raiders more than a block off the trail
+        int[] ribbonAnts = {0};
+        int[] withMate = {0};
+        int[] tooWideRows = {0};
+        int[] ribbonSamples = {0};
+        int[] offLanes = {0};
         helper.onEachTick(() -> {
             RaidColumn raid = column[0];
-            if (raid == null || formedAt[0] < 0 || raid.stage() != RaidColumn.Stage.MARCHING || helper.getTick() > formedAt[0] + MARCH_WATCH) {
+            if (raid == null || raid.stage() != RaidColumn.Stage.MARCHING) {
                 return;
             }
             long now = helper.getTick();
             if (marchFrom[0] < 0) {
                 marchFrom[0] = now;
             }
-            if ((now - marchFrom[0]) % 100 == 0) {
-                // (what the march looks like every 5 s: the front, and each raider out of the nest that is not off the hump yet)
-                StringBuilder line = new StringBuilder();
-                if (level.getEntity(raid.leader()) instanceof MatabeleEntity lead) {
-                    line.append("front ").append(lead.blockPosition().toShortString()).append(" along ")
-                            .append(String.format("%.1f", raid.alongOut(lead.blockPosition())));
+            if (!(level.getEntity(raid.leader()) instanceof MatabeleEntity lead)) {
+                return;
+            }
+            boolean frontOut = raid.isOutForTests(level, lead);
+            // The front never stops: the longest it stood within a quarter block of one place since it came out.
+            if (frontOut) {
+                if (frontAnchor[0] == null || lead.position().distanceTo(frontAnchor[0]) >= 0.25) {
+                    frontAnchor[0] = lead.position();
+                    frontMovedAt[0] = now;
                 }
-                for (java.util.UUID id : raid.members()) {
-                    if (!id.equals(raid.leader()) && !offTheHumpAt.containsKey(id) && level.getEntity(id) instanceof MatabeleEntity ant) {
-                        RaidColumn.Order order = raid.orderFor(level, ant);
-                        line.append("; ").append(id.toString(), 0, 4).append(" at ").append(ant.blockPosition().toShortString())
-                                .append(String.format(" along %.1f off %.1f", raid.alongOut(ant.blockPosition()), raid.offTrail(ant.blockPosition())))
-                                .append(" to ").append(order == null ? "none" : order.to() == null ? "stand" : order.to().toShortString())
-                                .append(ant.getNavigator().isDone() ? "" : " walking");
+                frontLongestStill[0] = Math.max(frontLongestStill[0], now - frontMovedAt[0]);
+            }
+            double frontAlong = raid.alongOut(lead.position());
+            List<MatabeleEntity> out = new ArrayList<>();
+            for (java.util.UUID id : raid.members()) {
+                if (level.getEntity(id) instanceof MatabeleEntity ant && raid.isOutForTests(level, ant)) {
+                    if (!id.equals(raid.leader())) {
+                        out.add(ant);
+                        setOut.add(id);
+                    }
+                    // Nobody out is told to stand while the column marches (the trail is never broken here, so no casting).
+                    RaidColumn.Order order = raid.orderFor(level, ant);
+                    if (order != null && order.to() == null && !raid.isCasting(id)) {
+                        standCount[0]++;
+                        if (standFaults.size() < 8) {
+                            standFaults.add(id.toString().substring(0, 4) + " at " + ant.blockPosition().toShortString() + " ("
+                                    + (now - marchFrom[0]) / 20 + " s)");
+                        }
                     }
                 }
-                SavannaMod.LOGGER.info("[raid form test] march at {} s: {}", (now - marchFrom[0]) / 20, line);
             }
-            for (java.util.UUID id : raid.members()) {
-                if (id.equals(raid.leader()) || !(level.getEntity(id) instanceof MatabeleEntity ant) || colony.nest().isInside(level, ant.blockPosition())) {
-                    continue;
-                }
-                setOut.add(id);
-                net.minecraft.world.phys.Vec3 from = startAt.computeIfAbsent(id, k -> ant.position());
-                if (!movedAt.containsKey(id) && ant.position().distanceTo(from) >= 1.0) {
-                    movedAt.put(id, now - marchFrom[0]);
-                }
-                if (raid.alongOut(ant.blockPosition()) >= 3.0) {
-                    offTheHumpAt.putIfAbsent(id, now - marchFrom[0]);
-                }
-                RaidColumn.Order order = raid.orderFor(level, ant);
-                if (order != null && order.to() == null && ant.getNavigator().isDone()) {
-                    long since = standingSince.computeIfAbsent(id, k -> now);
-                    longestStand.merge(id, now - since, Math::max);
+            // The front ahead of every raider out (half a block's slack).
+            if (frontOut) {
+                watchedTicks[0]++;
+                double most = out.stream().mapToDouble(ant -> raid.alongOut(ant.position())).max().orElse(-1.0);
+                if (most <= frontAlong + 0.5) {
+                    aheadTicks[0]++;
                 } else {
-                    standingSince.remove(id);
+                    worstAhead[0] = Math.max(worstAhead[0], most - frontAlong);
                 }
+            }
+            if (frontAlong >= 8.0 && (now - marchFrom[0]) % 10 == 0) {
+                // The ribbon: the raiders out past the first 3 blocks and a little behind the front.
+                List<double[]> places = new ArrayList<>();
+                for (MatabeleEntity ant : out) {
+                    double along = raid.alongOut(ant.position());
+                    if (along >= 3.0 && along <= frontAlong - 0.4 && ant.onGround()) {
+                        places.add(new double[] {along, raid.sideOfTrail(ant.position()), ant.getY() - lead.getY()});
+                    }
+                }
+                if (places.size() >= 4) {
+                    ribbonSamples[0]++;
+                    boolean wide = false;
+                    for (double[] a : places) {
+                        int mates = 0;
+                        for (double[] b : places) {
+                            if (a != b && Math.abs(a[0] - b[0]) <= 0.25 && Math.abs(a[1] - b[1]) <= 1.0) {
+                                mates++;
+                            }
+                        }
+                        ribbonAnts[0]++;
+                        withMate[0] += mates > 0 ? 1 : 0;
+                        wide |= mates > 2;
+                        offLanes[0] += Math.abs(a[1]) > 1.5 ? 1 : 0; // (lanes a whole block apart down a steep hump)
+                    }
+                    tooWideRows[0] += wide ? 1 : 0;
+                }
+            }
+            if ((now - marchFrom[0]) % 100 == 0) {
+                StringBuilder line = new StringBuilder("front along " + String.format("%.1f", frontAlong) + (frontOut ? "" : " (in the nest)"));
+                out.stream().sorted(java.util.Comparator.comparingDouble(ant -> -raid.alongOut(ant.position()))).forEach(ant ->
+                        line.append(String.format("; %.1f %+.2f", raid.alongOut(ant.position()), raid.sideOfTrail(ant.position()))));
+                SavannaMod.LOGGER.info("[ribbon test] march at {} s: {}", (now - marchFrom[0]) / 20, line);
             }
         });
         helper.onEachTick(() -> {
             RaidColumn raid = column[0];
-            if (raid == null || helper.getTick() > watchUntil[0]) {
+            if (raid == null || helper.getTick() > crowdUntil[0]) {
                 return;
             }
             List<com.antcolonies.entity.AbstractAntEntity> raiders = new ArrayList<>();
@@ -840,34 +886,13 @@ public class MatabeleRaidTests {
         });
         helper.onEachTick(() -> {
             RaidColumn raid = column[0];
-            if (raid == null || formedAt[0] >= 0) {
+            if (raid == null || milled[0] >= 0) {
                 return;
             }
             if (raid.stage() != RaidColumn.Stage.FORMING) {
-                formedAt[0] = helper.getTick();
-                milled[0] = raid.recruitedAt() < 0 ? -1 : level.getGameTime() - raid.recruitedAt();
+                milled[0] = raid.recruitedAt() < 0 ? Long.MAX_VALUE : level.getGameTime() - raid.recruitedAt();
+                crowdUntil[0] = helper.getTick() + 200;
                 return;
-            }
-            for (java.util.UUID id : raid.members()) {
-                if (!(level.getEntity(id) instanceof MatabeleEntity ant)) {
-                    continue;
-                }
-                if (id.equals(raid.leader()) && colony.nest().isInside(level, ant.blockPosition())) {
-                    scoutWentIn[0] = true;
-                }
-                RaidColumn.Order order = raid.orderFor(level, ant);
-                if (order == null || order.to() == null || id.equals(raid.leader())) {
-                    continue;
-                }
-                boolean at = flat(ant.blockPosition(), order.to()) <= 1.5 && Math.abs(ant.getY() - order.to().getY()) <= 1.5;
-                boolean walking = !ant.getNavigator().isDone();
-                if (at && !walking) {
-                    settled.put(id, order.to());
-                    walkingTo.remove(id);
-                } else if (settled.containsKey(id) && walking && !order.to().equals(settled.get(id)) && !order.to().equals(walkingTo.get(id))) {
-                    walkingTo.put(id, order.to());
-                    rewalks.merge(id, 1, Integer::sum);
-                }
             }
         });
         helper.startSequence()
@@ -882,8 +907,34 @@ public class MatabeleRaidTests {
                     helper.assertTrue(scout != null, "no real major outside to be the scout");
                     BlockPos by = com.antcolonies.savanna.colony.RaidGround.standAt(level, entrance.getX() + 2.5, entrance.getZ() + 0.5, entrance.getY());
                     helper.assertTrue(by != null, "no ground to stand on by the entrance");
-                    scout.moveTo(by.getX() + 0.5, by.getY(), by.getZ() + 0.5); // (home from its find, by the entrance)
-                    BlockPos at = helper.absolutePos(new BlockPos(NEST + 24, SURFACE, NEST));
+                    scout.moveTo(by.getX() + 2.5, by.getY(), by.getZ() + 0.5); // (home from its find, a little way from the entrance)
+                    // The rest at home in the rooms down the chimney, where idle Matabele settle (M8 step 3Q), so they come out
+                    // through the hole one after another as in the user's game.
+                    List<BlockPos> rooms = colony.nest().getAllRoomCells(level).stream()
+                            .filter(cell -> com.antcolonies.savanna.colony.RaidGround.canStand(level, cell)).toList();
+                    helper.assertTrue(!rooms.isEmpty(), "the dead mound's nest has no rooms to stand in");
+                    int k = 0;
+                    for (var ant : colony.population().realMembers(level)) {
+                        if (ant != scout) {
+                            BlockPos cell = rooms.get(k++ % rooms.size());
+                            ant.moveTo(cell.getX() + 0.2 + 0.6 * ((k * 7) % 10) / 10.0, cell.getY(), cell.getZ() + 0.2 + 0.6 * ((k * 3) % 10) / 10.0);
+                        }
+                    }
+                    // (the trail out the way farthest from the dead mound's dead tree, so the ribbon is measured on open ground)
+                    BlockPos tree = NewLandMounds.get(level).lastDeadTreeForTests();
+                    BlockPos at = null;
+                    double clearest = -1.0;
+                    for (BlockPos to : List.of(new BlockPos(NEST + 40, SURFACE, NEST), new BlockPos(NEST, SURFACE, NEST + 40),
+                            new BlockPos(NEST + 28, SURFACE, NEST + 28))) {
+                        BlockPos end = helper.absolutePos(to);
+                        double clear = tree == null ? 99.0 : offSegment(tree, entrance, end);
+                        if (clear > clearest) {
+                            clearest = clear;
+                            at = end;
+                        }
+                    }
+                    SavannaMod.LOGGER.info("[ribbon test] the dead tree at {}, the trail to {}, {} blocks clear of the tree's foot",
+                            tree == null ? "-" : tree.toShortString(), at.toShortString(), Math.round(clearest));
                     List<BlockPos> trail = new ArrayList<>();
                     int steps = (int) Math.ceil(Math.hypot(at.getX() - entrance.getX(), at.getZ() - entrance.getZ()) / 2.0);
                     for (int i = 0; i <= steps; i++) {
@@ -898,71 +949,54 @@ public class MatabeleRaidTests {
                     column[0] = raid;
                     startedAt[0] = helper.getTick();
                     members[0] = raid.members().size();
-                    StringBuilder ground = new StringBuilder();
-                    for (int dx = -6; dx <= 6; dx++) {
-                        BlockPos top = level.getHeightmapPos(net.minecraft.world.level.levelgen.Heightmap.Types.MOTION_BLOCKING_NO_LEAVES,
-                                entrance.offset(dx, 0, 0));
-                        ground.append(top.getY() - entrance.getY()).append(' ');
-                    }
-                    SavannaMod.LOGGER.info("[raid form test] {} raiders, entrance {}, the ground west to east from it: {}", members[0],
-                            entrance.toShortString(), ground);
+                    SavannaMod.LOGGER.info("[ribbon test] {} raiders, entrance {}, {} rooms", members[0], entrance.toShortString(), rooms.size());
                 })
-                .thenWaitUntil(() -> helper.assertTrue(formedAt[0] >= 0, "still forming; " + column[0].describe()))
+                .thenWaitUntil(() -> helper.assertTrue(milled[0] >= 0, "still forming; " + column[0].describe()))
                 .thenExecute(() -> {
                     RaidColumn raid = column[0];
-                    long took = formedAt[0] - startedAt[0];
-                    int rewalked = rewalks.values().stream().mapToInt(Integer::intValue).sum();
-                    SavannaMod.LOGGER.info("[raid form test] formed in {} s ({} s milling after the scout recruited), {} of {} set out, {} walk(s) off a place reached, the scout went in: {}; {}; the column left at watched tick {}",
-                            took / 20, milled[0] / 20, raid.members().size(), members[0], rewalked, scoutWentIn[0], raid.endedWhy(), crowd.watchedTicks());
-                    helper.assertTrue(scoutWentIn[0], "the scout never went into the nest to recruit");
-                    helper.assertTrue(raid.formFaults() == 0, raid.formFaults() + " recruit(s) out of the nest left home: " + raid.describe());
-                    helper.assertTrue(milled[0] >= 0 && milled[0] < raid.columnNumbers().formTicks(), "the column milled the forming's longest time, "
-                            + milled[0] / 20 + " s after the scout recruited: " + raid.describe());
-                    helper.assertTrue(raid.members().size() * 10 >= members[0] * 9, "only " + raid.members().size() + " of " + members[0]
-                            + " recruits set out");
-                    helper.assertTrue(rewalked <= Math.max(2, members[0] / 6), rewalked + " walks off a place already reached while forming "
-                            + rewalks + " (back and forth)");
-                    watchUntil[0] = helper.getTick() + 200;
+                    long called = raid.recruitedAt() - (level.getGameTime() - (helper.getTick() - startedAt[0]));
+                    SavannaMod.LOGGER.info("[ribbon test] the scout called at the nest's mouth after {} ticks, the march began {} ticks after",
+                            called, milled[0]);
+                    helper.assertTrue(called <= 300, "the scout took " + called / 20 + " s to get to the nest's mouth (it starts a few blocks off)");
+                    // (the column is worked out every 5 ticks: the march begins in the same working out as the recruiting)
+                    helper.assertTrue(milled[0] <= 10, "the column waited " + milled[0] + " ticks after the scout recruited (no milling): " + raid.describe());
                 })
                 .thenIdle(200)
                 .thenExecute(() -> {
-                    SavannaMod.LOGGER.info("[raid form test] personal space: {}", crowd.describe());
+                    SavannaMod.LOGGER.info("[ribbon test] personal space: {}", crowd.describe());
                     helper.assertTrue(crowd.keptApart(), "raiders stood inside one another: " + crowd.describe());
                 })
-                .thenWaitUntil(() -> helper.assertTrue(helper.getTick() > formedAt[0] + MARCH_WATCH, "watching the march"))
+                .thenWaitUntil(() -> helper.assertTrue(column[0].stage().ordinal() > RaidColumn.Stage.MARCHING.ordinal(),
+                        "the front did not reach the end of its trail; " + column[0].describe()))
                 .thenExecute(() -> {
                     RaidColumn raid = column[0];
-                    long worstStand = longestStand.values().stream().mapToLong(Long::longValue).max().orElse(0);
-                    long lastOff = offTheHumpAt.values().stream().mapToLong(Long::longValue).max().orElse(-1);
-                    java.util.List<String> left = new java.util.ArrayList<>();
-                    for (java.util.UUID id : setOut) {
-                        if (!offTheHumpAt.containsKey(id) && raid.members().contains(id)) {
-                            left.add(id.toString().substring(0, 4));
-                        }
-                    }
-                    long movedSoon = setOut.stream().filter(id -> movedAt.getOrDefault(id, Long.MAX_VALUE) <= SET_OFF_SOON).count();
-                    java.util.List<Long> offTimes = offTheHumpAt.values().stream().sorted().toList();
-                    SavannaMod.LOGGER.info("[raid form test] the march: {} raiders out ({} left the column), {} on the move within {} s, the longest stand {} s, the last off the hump after {} s (in order, s: {}), {} never off it {}; {}",
-                            setOut.size(), setOut.stream().filter(id -> !raid.members().contains(id)).count(), movedSoon, SET_OFF_SOON / 20,
-                            worstStand / 20.0, lastOff / 20.0, offTimes.stream().map(t -> String.valueOf(t / 20)).toList(), left.size(), left, raid.describe());
                     long dropped = setOut.stream().filter(id -> !raid.members().contains(id)).count();
-                    // (one raider walking but getting nowhere on the hump's side for 15 s, sent home stuck, is BUGS 166, a
-                    // climbing matter, about 1 run in 6; more than one is the march)
-                    helper.assertTrue(dropped <= 1, dropped + " raider(s) out of the nest left the column with no fight (sent home stuck): " + raid.describe());
-                    // The crowd pours down the hump behind the front while it marches: by the time the front reaches the
-                    // termites, at most half the raiders out are still on the hump (the old march: 31 to 35 of 47 still
-                    // there, the crowd standing for its places; the new one 13 to 19; down this test mound's 10-block wall
-                    // every raider must climb, about one a second, so not all).
-                    helper.assertTrue(left.size() * 2 <= setOut.size(), left.size() + " of " + setOut.size()
-                            + " raiders out still on the hump when the front reached the termites (the crowd left standing): " + offTheHumpAt);
+                    double ahead = watchedTicks[0] == 0 ? 0.0 : aheadTicks[0] / (double) watchedTicks[0];
+                    double mateShare = ribbonAnts[0] == 0 ? 0.0 : withMate[0] / (double) ribbonAnts[0];
+                    double offShare = ribbonAnts[0] == 0 ? 0.0 : offLanes[0] / (double) ribbonAnts[0];
+                    SavannaMod.LOGGER.info("[ribbon test] the march took {} s: {} of {} raiders came out, {} left the column; told to stand {} time(s) {};"
+                                    + " the front stood still at most {} ticks, ahead {} of {} ticks (worst {} blocks behind someone);"
+                                    + " the ribbon: {} samples, {} raider places, {} with a row-mate, {} samples more than 3 abreast, {} more than a block off the trail; {}",
+                            (helper.getTick() - marchFrom[0]) / 20, setOut.size(), members[0], dropped, standCount[0], standFaults,
+                            frontLongestStill[0], aheadTicks[0], watchedTicks[0], String.format("%.1f", worstAhead[0]),
+                            ribbonSamples[0], ribbonAnts[0], String.format("%.2f", mateShare), tooWideRows[0], String.format("%.2f", offShare),
+                            raid.describe());
+                    helper.assertTrue(standCount[0] == 0, "raiders out were told to stand while the column marched: " + standFaults);
+                    helper.assertTrue(frontLongestStill[0] <= 30, "the front stood still " + frontLongestStill[0] + " ticks while marching");
+                    helper.assertTrue(ahead >= 0.9, "the front was ahead of every raider only " + Math.round(ahead * 100)
+                            + " percent of the march (worst " + String.format("%.1f", worstAhead[0]) + " blocks behind)");
+                    helper.assertTrue(ribbonSamples[0] >= 5, "too few looks at the ribbon (" + ribbonSamples[0] + "): the raiders did not follow the front out");
+                    helper.assertTrue(mateShare >= 0.4, "not a ribbon: only " + Math.round(mateShare * 100) + " percent of the raiders had a row-mate beside them (single file?)");
+                    helper.assertTrue(tooWideRows[0] * 10 <= ribbonSamples[0], tooWideRows[0] + " of " + ribbonSamples[0] + " looks had more than 3 side by side");
+                    helper.assertTrue(offShare <= 0.1, Math.round(offShare * 100) + " percent of the raiders were more than a block and a half off the trail");
+                    helper.assertTrue(setOut.size() * 10 >= members[0] * 8, "only " + setOut.size() + " of " + members[0] + " raiders came out of the nest");
+                    // (one raider walking but getting nowhere on the hump's side for 15 s, sent home stuck, is BUGS 166)
+                    helper.assertTrue(dropped <= 1, dropped + " raider(s) out of the nest left the column (sent home stuck): " + raid.describe());
                 })
+                .thenWaitUntil(() -> helper.assertTrue(column[0].stage().ordinal() >= RaidColumn.Stage.ATTACKING.ordinal(),
+                        "the raid did not attack; " + column[0].describe()))
                 .thenSucceed();
     }
-
-    /** The raid queue fix: how long the tall mound test watches the march (ticks). */
-    private static final long MARCH_WATCH = 1200;
-    /** The raid queue fix: the log counts the raiders on the move this soon after the column leaves (ticks). */
-    private static final long SET_OFF_SOON = 200;
 
     /**
      * The raid code review, finding 18: a trail over a hill and round a bend, all of it a real scout's own. Between the
@@ -1618,6 +1652,13 @@ public class MatabeleRaidTests {
                     SavannaMod.LOGGER.info("[mound clue test] found at {}: {}", helper.getTick(), raids.describe(level));
                 })
                 .thenSucceed();
+    }
+
+    /** The ribbon test: how far (flat) a place is from the segment from a to b. */
+    private static double offSegment(BlockPos p, BlockPos a, BlockPos b) {
+        double dx = b.getX() - a.getX(), dz = b.getZ() - a.getZ();
+        double t = net.minecraft.util.Mth.clamp(((p.getX() - a.getX()) * dx + (p.getZ() - a.getZ()) * dz) / Math.max(1.0E-6, dx * dx + dz * dz), 0.0, 1.0);
+        return Math.hypot(p.getX() - (a.getX() + t * dx), p.getZ() - (a.getZ() + t * dz));
     }
 
     private static double flat(BlockPos a, BlockPos b) {

@@ -139,6 +139,7 @@ public class MatabeleRaidGoal extends Goal {
     @Override
     public void stop() {
         ant.getNavigator().stop();
+        ant.getNavigator().setSideShift(null); // (its own lane again)
         endCleaning();
         column = null;
         limping = false;
@@ -186,9 +187,14 @@ public class MatabeleRaidGoal extends Goal {
             }
             return;
         }
+        ant.getNavigator().setSideShift(order.shift()); // (the ribbon: its lane in the column's row; null its own)
+        if (order.onTheMove() && order.to() != null) {
+            march(level, order);
+            return;
+        }
         BlockPos to = order.to();
         if (to == null) {
-            ant.getNavigator().stop(); // the front waits for the line to close up
+            ant.getNavigator().stop(); // (it stands: behind a broken trail, at the gathering place, ...)
             walkingTo = null;
             mill(level, null); // (turning and touching its neighbours as it waits)
             return;
@@ -252,6 +258,32 @@ public class MatabeleRaidGoal extends Goal {
             }
         }
     }
+
+    /**
+     * The ribbon (the user's pick of 2026-11-07): marching, its place moves on with the column every few ticks, a little
+     * ahead of the ant. It never settles or mills there: it walks on, its route planned again once the place has moved
+     * {@link #MARCH_MOVED} or its walk is over, and in between only its pace changes (hurrying to its place in the ribbon,
+     * or walking on slower to let the column come up to it).
+     */
+    private void march(ServerLevel level, RaidColumn.Order order) {
+        endCleaning();
+        millLook = null;
+        BlockPos to = order.to();
+        boolean moved = walkingTo == null || flat(walkingTo, to) >= MARCH_MOVED || Math.abs(walkingTo.getY() - to.getY()) > UP_DOWN;
+        if (!moved && !ant.getNavigator().isDone()) {
+            ant.getNavigator().setPace(order.pace());
+            return;
+        }
+        if (!moved && flat(ant.blockPosition(), to) < 1.0 && Math.abs(ant.getY() - to.getY()) <= UP_DOWN || ant.tickCount < waitUntil) {
+            return; // (at its place already: the column gives it the next one in a moment)
+        }
+        if (!walkToward(level, to, order.pace())) {
+            waitUntil = ant.tickCount + RETRY; // (no way now: a little later; the column's stuck check lets it go if it lasts)
+        }
+    }
+
+    /** The ribbon: a marching raider plans its route again once its place has moved this far (blocks, flat). */
+    private static final double MARCH_MOVED = 1.0;
 
     /**
      * Step 3c, at its stung termite to pick it up. Real sizes, step 2: its jaws on it (as in a fight, a little more
