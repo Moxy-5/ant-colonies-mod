@@ -42,12 +42,14 @@
   <p>Every home choice, cut open down the middle, with the ants at today's real sizes: a major is half a block long
      (1 block = 30 mm of ant), a minor a quarter, the queen 0.6, a termite worker 0.15. White grubs are larvae, brown
      ones cocoons, upside-down termites the prey. Drag to turn, scroll or pinch to zoom, right-drag to slide.
-     The buttons jump to each home. Planning only: none of this is in the game.</p>
+     The buttons jump to each home. Red boxes are the blocks the ants would have to dig or clear to move in.
+     Planning only: none of this is in the game.</p>
 </header>
 <div id="wrap"><canvas id="c"></canvas><div id="labels"></div></div>
 <div class="controls">
   <label><input id="cut" type="checkbox" checked> cut open</label>
   <label><input id="tagsOn" type="checkbox" checked> labels</label>
+  <label><input id="dugOn" type="checkbox" checked> red: what the ants must dig to move in</label>
   <label>Tenants' size <input id="squeeze" type="range" min="0.15" max="1" step="0.05"> <span id="squeezeOut" class="readout"></span></label>
 </div>
 <div class="controls" id="cams"></div>
@@ -137,6 +139,9 @@ function S(x, y, z, type) { const k = (cur.ox + x) + ',' + y + ',' + (cur.oz + z
 function get(x, y, z) { const c = cells.get((cur.ox + x) + ',' + y + ',' + (cur.oz + z)); return c ? c.type : 'air'; }
 function fill(x0, y0, z0, x1, y1, z1, type) { for (let x = x0; x <= x1; x++) for (let y = y0; y <= y1; y++) for (let z = z0; z <= z1; z++) S(x, y, z, type); }
 function ground(soil) { for (let x = -6; x <= 6; x++) for (let z = -5; z <= 5; z++) for (let y = -6; y <= -1; y++) S(x, y, z, y === -1 ? 'grass' : (soil || 'dirt')); }
+const dugCells = [];       // cells the ants must dig or clear to move in: {x, y, z (world), lz, cuts}
+function dug(x, y, z) { S(x, y, z, 'air'); dugCells.push({x: cur.ox + x, y, z: cur.oz + z, lz: z, cuts: cur.cuts}); }
+function carpet(x, y, z) { extra(x, y, z, x + 1, y + 0.125, z + 1, all('frass')); } // frass: a 2-pixel carpet (FrassBlock)
 function extra(x0, y0, z0, x1, y1, z1, keys) { extras.push({b: [cur.ox + x0, y0, cur.oz + z0, cur.ox + x1, y1, cur.oz + z1], keys, lz: (z0 + z1) / 2, cuts: cur.cuts}); }
 function site(def) {
   cur = {ox: def.ox, oz: def.oz, cuts: def.cuts !== false};
@@ -240,12 +245,10 @@ site({ox: 15, oz: 0, title: '2 Hollow fallen giant (in the game now)', camY: 1.2
   for (let x = -5; x <= 4; x++) for (let y = 0; y <= 3; y++) for (let z = -2; z <= 1; z++) {
     const dy = y + 0.5 - 2, dz = z + 0.5, d2 = dy * dy + dz * dz;
     if (d2 > 4.41) continue;
-    if (d2 <= 1.21) { S(x, y, z, y === 1 && hash(x, y, z, 51) < 0.6 ? 'frass' : 'air'); continue; }
+    if (d2 <= 1.21) { S(x, y, z, 'air'); if (y === 1 && hash(x, y, z, 51) < 0.85) carpet(x, y, z); continue; }
     S(x, y, z, hash(x, y, z, 7) < 0.18 ? 'rotten' : 'deadlog');
   }
   S(1, 3, -1, 'air'); S(1, 3, 0, 'air'); S(-2, 2, -2, 'air');  // beetle galleries through the bark: the side doors
-  for (let x = -5; x <= 4; x++) for (const z of [-1, 0]) if (get(x, 1, z) === 'air') S(x, 1, z, 'frass'); // frass along the middle
-  fill(-1, 1, -1, 2, 1, 0, 'air');                             // the ants clear the frass out of their room (my idea)
   colony(-1, 3, -1, 1, 1, {ants: 10});
   bug('major', -4.5, 2, -0.3, 1.6); bug('minor', -5.6, 0, 0.4, 2.4); bug('major', 1.4, 4, -0.2, 0.3);
   heap(-6, -3, 8, 'termite_remains');
@@ -254,8 +257,8 @@ site({ox: 15, oz: 0, title: '2 Hollow fallen giant (in the game now)', camY: 1.2
 site({ox: 30, oz: 0, title: '3 Room under a fallen log', build() {
   ground();
   for (let x = -5; x <= 4; x++) for (let y = 0; y <= 2; y++) for (let z = -1; z <= 1; z++) { if (y === 2 && z !== 0) continue; S(x, y, z, 'deadlog'); }
-  fill(-3, -1, -1, 2, -1, 0, 'air');                           // the room under the trunk, one block down
-  S(0, -1, -2, 'air'); S(3, -1, 0, 'air'); S(5, -1, 0, 'air'); S(4, -1, 0, 'air'); // two doors, beside and past the end
+  for (let x = -3; x <= 2; x++) for (const z of [-1, 0]) dug(x, -1, z); // the room under the trunk, one block down: all dug
+  dug(0, -1, -2); dug(3, -1, 0); dug(4, -1, 0); dug(5, -1, 0);  // two doors, beside and past the end: dug too
   colony(-3, 3, -1, 1, -1, {ants: 9});
   bug('major', 5.5, -1, 0.4, 0.8);
   heap(5, -3, 6, 'termite_remains');
@@ -269,6 +272,7 @@ site({ox: 45, oz: 0, title: '4 Old aardvark burrow', build() {
   for (const [x, y] of path) for (const z of [-1, 0]) { S(x, y, z, 'air'); S(x, y + 1 > -1 ? y : y + 1, z, 'air'); }
   for (const z of [-1, 0]) { S(-4, 0, z, 'air'); S(-5, -1, z, 'air'); }
   fill(0, -5, -1, 3, -4, 0, 'air');                            // the end chamber
+  dug(-3, -1, 0);                                              // soil slumped into the tunnel: the ants clear it
   for (let y = -4; y <= -1; y++) S(4, y, -1, 'air');           // a second door, a bolt hole
   colony(0, 4, -1, 1, -5);
   bug('major', -2.5, -3, -0.3, Math.PI / 2 + 0.3); bug('minor', -5.2, -1, 0.3, 1.6);
@@ -291,8 +295,8 @@ site({ox: 0, oz: -18, title: '6 Root hollow at a living tree', labelY: 10.5, bui
   for (const [x, y, z] of [[1, -1, 0], [2, -1, 0], [3, -2, 0], [-2, -1, -1], [-3, -2, -1], [-1, -1, -2], [-1, -2, -3], [0, -2, 1], [1, -1, -1], [-2, -1, 0]]) S(x, y, z, 'tree');
   for (let x = -5; x <= 4; x++) for (let z = -5; z <= 4; z++) { const d2 = (x + 0.5) ** 2 + (z + 0.5) ** 2; if (d2 < 22) S(x, 8, z, 'leaves'); if (d2 < 9 && d2 > 1) S(x, 7, z, 'leaves'); }
   fill(-1, -3, -1, 2, -2, 0, 'air');                           // the hollow among the roots, under the trunk
-  S(1, -2, -1, 'rooted'); S(2, -1, -1, 'air');                 // a door between the roots
-  S(-2, -2, 0, 'air'); S(-2, -1, 1, 'grass');
+  S(1, -2, -1, 'rooted'); dug(2, -1, -1);                      // a door between the roots, widened by the ants
+  dug(-2, -2, 0); S(-2, -1, 1, 'grass');                       // a second door, opened by the ants
   colony(-1, 3, -1, 1, -3, {ants: 8});
   bug('major', 2.4, 0, -1.4, 2.2);
 }});
@@ -304,14 +308,14 @@ site({ox: 15, oz: -18, title: '7 Under a boulder', build() {
     if (e <= 1) S(x, y, z, hash(x, y, z, 3) < 0.2 ? 'andesite' : 'granite');
   }
   fill(-2, -1, -1, 1, -1, 0, 'air');                           // the scrape under its flat underside: the stone is the roof
-  S(2, -1, 0, 'air'); S(3, -1, 0, 'air'); S(-3, -1, -1, 'air'); S(-4, -1, -1, 'air');
+  S(2, -1, 0, 'air'); dug(3, -1, 0); S(-3, -1, -1, 'air'); dug(-4, -1, -1); // the doors' outer ends, cleared by the ants
   colony(-2, 2, -1, 1, -1, {ants: 8});
   bug('major', 4.2, -1, 0.3, 0.4);
 }});
 // 8. Under a pile of fallen branches.
 site({ox: 30, oz: -18, title: '8 Under a pile of fallen branches', camY: -0.5, build() {
   ground();
-  fill(-2, -1, -1, 1, -1, 0, 'air');                           // a shallow scrape, roofed only by the branches
+  for (let x = -2; x <= 1; x++) for (const z of [-1, 0]) dug(x, -1, z); // a shallow scrape, roofed only by the branches: all dug
   const B = {px: 'fallen_branch_end', nx: 'fallen_branch_end', py: 'fallen_branch_bark_0', ny: 'fallen_branch_bark_0', pz: 'fallen_branch_bark_0', nz: 'fallen_branch_bark_0'};
   const Bz = {px: 'fallen_branch_bark_0', nx: 'fallen_branch_bark_0', py: 'fallen_branch_bark_0', ny: 'fallen_branch_bark_0', pz: 'fallen_branch_end', nz: 'fallen_branch_end'};
   for (let i = 0; i < 9; i++) {
@@ -324,7 +328,7 @@ site({ox: 30, oz: -18, title: '8 Under a pile of fallen branches', camY: -0.5, b
 // 9. An old Matabele nest left behind (an old burrow): empty, its refuse heap of termite remains still outside.
 site({ox: 45, oz: -18, title: '9 Old nest left behind', build() {
   ground();
-  for (const z of [-1, 0]) { S(-3, -1, z, 'air'); S(-2, -1, z, 'air'); S(-2, -2, z, 'air'); S(-1, -2, z, 'air'); S(-1, -3, z, 'air'); }
+  for (const z of [-1, 0]) { dug(-3, -1, z); S(-2, -1, z, 'air'); S(-2, -2, z, 'air'); S(-1, -2, z, 'air'); S(-1, -3, z, 'air'); }
   fill(0, -4, -1, 3, -3, 0, 'air');
   for (let y = -3; y <= -1; y++) S(4, y, -1, 'air');
   heap(-4, -2, 18, 'termite_remains'); heap(-5, -3, 10, 'termite_remains');
@@ -442,6 +446,9 @@ function layoutTenants() {
 // ---------- draw the blocks ----------
 let world = new THREE.Group(); scene.add(world);
 let cutOn = true;
+let dugOn = true;
+const DUG_FILL = new THREE.MeshBasicMaterial({color: '#e0302a', transparent: true, opacity: 0.28, depthWrite: false});
+const DUG_EDGE = new THREE.LineBasicMaterial({color: '#b0140e'});
 function rebuild() {
   scene.remove(world); world.traverse(o => { if (o.geometry) o.geometry.dispose(); });
   world = new THREE.Group(); scene.add(world); batches = {};
@@ -464,6 +471,14 @@ function rebuild() {
     world.add(new THREE.Mesh(g, material(key)));
   }
   pieces.forEach(p => p.obj.visible = !(cutOn && p.cuts && p.lz >= 1));
+  if (dugOn) {
+    const geo = new THREE.BoxGeometry(0.98, 0.98, 0.98), edges = new THREE.EdgesGeometry(geo);
+    for (const d of dugCells) {
+      if (cutOn && d.cuts && d.lz >= 1) continue;
+      const m = new THREE.Mesh(geo, DUG_FILL); m.position.set(d.x + 0.5, d.y + 0.5, d.z + 0.5); world.add(m);
+      const l = new THREE.LineSegments(edges, DUG_EDGE); l.position.copy(m.position); world.add(l);
+    }
+  }
 }
 
 // ---------- cameras ----------
@@ -488,40 +503,53 @@ Object.keys(CAMS).forEach(name => { const b = document.createElement('button'); 
 // ---------- the cards ----------
 const CARDS = [
   ['1 Dead termite mound (today)', 'In Nigeria about half of 73 nests were in deserted <i>Macrotermes</i> mounds. The best home: dry, roomy, old rooms ready.',
-   'Already built. Rare: about 1 mound in 4 is dead, so nearest free one can be very far.', 'Years (wears down slowly).', 'yes', 'Keep as it is: the first choice.'],
+   'Already built. Rare: about 1 mound in 4 is dead, so nearest free one can be very far.', 'Years (wears down slowly).', 'yes', 'Keep as it is: the first choice.',
+   'None: the old chimney and rooms are open (as in the game today).'],
   ['2 Hollow fallen giant', '"Partly rotten logs" are on the real list (Yusuf 2026). Dry inside, a long hollow, beetle galleries as side doors.',
    'Already in the game: every grown dead giant falls hollow, galleries and frass included. At real sizes the hollow (2 blocks wide, 1 to 2 high over the frass) is a hall for them.',
-   'For good (age, fire, lightning); a few days once down if the rot killed it (crumbles to pulp: a forced move).', 'yes', 'Add: second choice. No new blocks.'],
-  ['3 Room under a fallen log', 'Real: they use hollows under logs other animals or the rot made. Digging their own room is the known departure you liked.',
-   'Built once on 2026-10-24, switched off. The room stays in the soil when the log rots away, then counts as a burrow.', 'As long as the log, then a burrow.', 'maybe', 'Cheap: the code exists. Only for logs 3+ across.'],
+   'For good (age, fire, lightning); a few days once down if the rot killed it (crumbles to pulp: a forced move).', 'yes', 'Add: second choice. No new blocks.',
+   'None: the hollow runs out to the broken end of the trunk (checked in <code>TreeDraw.seg</code>), the beetle galleries through the bark are side doors 1 block wide, and the frass is a 2-pixel carpet, not a block.'],
+  ['3 Room under a fallen log', 'Real: they use hollows under logs other animals or the rot made, never dig their own. Here they would dig the whole room.',
+   'Built once on 2026-10-24, switched off. The room stays in the soil when the log rots away, then counts as a burrow.', 'As long as the log, then a burrow.', 'no', 'Leave out: the hollow giant gives the same home with no digging.',
+   '16 blocks of soil: the whole room and both doors. Far over the budget of 4.'],
   ['4 Old aardvark burrow', 'Aardvark burrows are the savanna\'s spare rooms: warthogs, hyenas, porcupines, birds, snakes and many insects move in. Real Matabele nest in the ground in borrowed holes.',
    'A sloping tunnel to a room, a fan of spoil at the mouth (a visible landmark). The sloped burrow and soil ramp are already built.',
-   'Slowly fills in once empty (my pick 60 to 120 days); floods in heavy rain if low (forces a move).', 'yes', 'Add: fixes the 300-block gap, as it does not need a mound or a tree.'],
+   'Slowly fills in once empty (my pick 60 to 120 days); floods in heavy rain if low (forces a move).', 'yes', 'Add: fixes the 300-block gap, as it does not need a mound or a tree.',
+   'None for the hole: the aardvark dug it. At most a block or two of soil slumped into an old one.'],
   ['5 Ground squirrel warren', 'Unstriped ground squirrels and springhares dig warrens with many holes; real ants use small side chambers.',
-   'Several small holes and tunnels close under the grass.', 'Like a burrow.', 'maybe', 'Later, with M9.5 animals. A variety of burrow.'],
+   'Several small holes and tunnels close under the grass.', 'Like a burrow.', 'maybe', 'Later, with M9.5 animals. A variety of burrow.',
+   'None: the squirrels dug it.'],
   ['6 Root hollow at a living tree', '"Under trees" is on the real list (Yusuf 2026). Roots hold the soil up, so a room there does not cave in.',
-   'A room among the roots under the trunk. Never decays while the tree lives, and after a fall the roots rot into channels.', 'As long as the tree (decades).', 'yes', 'Add: lasting and common near big trees.'],
+   'A room among the roots under the trunk. Never decays while the tree lives, and after a fall the roots rot into channels.', 'As long as the tree (decades).', 'yes', 'Add: lasting and common near big trees.',
+   'About 2 blocks: the room is made open with the tree (rotted roots, soil washed out under the root plate); the ants widen a door or open a second one.'],
   ['7 Under a boulder', '"Under rocks" is on the real list. Many ants nest under stones: the stone heats by day and warms the brood under it.',
-   'Our savannas have no boulders yet. New: a few granite boulders and kopje outcrops in new land.', 'For ever.', 'maybe', 'A new look for the savanna: your call.'],
+   'Our savannas have no boulders yet. New: a few granite boulders and kopje outcrops in new land.', 'For ever.', 'maybe', 'A new look for the savanna: your call.',
+   'About 2 blocks: the scrape under the stone is made with it (rain and animals wash it out); the ants clear the outer ends of the doors.'],
   ['8 Under fallen branches', 'Ants do shelter under litter, but a pile of sticks is a poor roof against rain and raiders.',
-   'Fallen branches already lie under trees. Gaps between branch models show the ants.', 'Branches are eaten by termites and decay.', 'no', 'Leave out: short-lived and not on the real list.'],
+   'Fallen branches already lie under trees. Gaps between branch models show the ants.', 'Branches are eaten by termites and decay.', 'no', 'Leave out: short-lived and not on the real list.',
+   '8 blocks: the whole scrape. Over the budget.'],
   ['9 Old nest left behind', 'Real: a colony may return to an old site months later. A Matabele nest is easy to spot by the heap of termite heads outside it.',
-   'Every move leaves its room in the home book as "empty, ours before". Over time the land fills with old nests.', 'Its room lasts; the heap fades.', 'yes', 'Add: free, every move makes one.'],
+   'Every move leaves its room in the home book as "empty, ours before". Over time the land fills with old nests.', 'Its room lasts; the heap fades.', 'yes', 'Add: free, every move makes one.',
+   'About 2 blocks: the doorway slumps a little while it stands empty; the colony coming back clears it.'],
   ['10 One block is 3 cm', 'At real sizes a block is a hall for a Matabele: 2 majors end to end.',
-   'Two looks for later dead-wood life: loose bark plates standing off a log (scorpions, centipedes, cockroaches really hide there) and gallery blocks with a tunnel through (block models, like the tapering branches).', '', 'maybe', 'For M9.5 tenants; not needed for Matabele homes.'],
+   'Two looks for later dead-wood life: loose bark plates standing off a log (scorpions, centipedes, cockroaches really hide there) and gallery blocks with a tunnel through (block models, like the tapering branches).', '', 'maybe', 'For M9.5 tenants; not needed for Matabele homes.',
+   ''],
   ['Dead-wood tenants', 'Real savanna logs hold longhorn and jewel beetle grubs (they made the galleries), Scolopendra centipedes, bark scorpions, darkling beetles, giant millipedes.',
-   'At the ants\' scale a 13 cm centipede is 4.3 blocks long, bigger than a player is tall. The slider shows how squeezed they would need to be.', '', 'maybe', 'Scale for bigger animals is a choice for M9.5.'],
+   'At the ants\' scale a 13 cm centipede is 4.3 blocks long, bigger than a player is tall. The slider shows how squeezed they would need to be.', '', 'maybe', 'Scale for bigger animals is a choice for M9.5.',
+   ''],
 ];
 const cardsEl = document.getElementById('cards');
-CARDS.forEach(([t, real, mc, lasts, v, verdict]) => {
+CARDS.forEach(([t, real, mc, lasts, v, verdict, dig]) => {
   const c = document.createElement('div'); c.className = 'card';
   c.innerHTML = '<h3>' + t + '</h3><p><span class="k">Real:</span> ' + real + '</p><p><span class="k">In blocks:</span> ' + mc + '</p>' +
-    (lasts ? '<p><span class="k">Lasts:</span> ' + lasts + '</p>' : '') + '<p class="verdict ' + v + '">' + verdict + '</p>';
+    (lasts ? '<p><span class="k">Lasts:</span> ' + lasts + '</p>' : '') +
+    (dig ? '<p><span class="k">Digging to move in:</span> ' + dig + '</p>' : '') + '<p class="verdict ' + v + '">' + verdict + '</p>';
   cardsEl.appendChild(c);
 });
 
 // ---------- run ----------
 document.getElementById('cut').addEventListener('change', e => { cutOn = e.target.checked; rebuild(); });
+document.getElementById('dugOn').addEventListener('change', e => { dugOn = e.target.checked; rebuild(); });
 document.getElementById('tagsOn').addEventListener('change', e => document.getElementById('labels').style.display = e.target.checked ? '' : 'none');
 const sq = document.getElementById('squeeze'); sq.value = squeeze;
 sq.addEventListener('input', () => { squeeze = parseFloat(sq.value); layoutTenants(); });
