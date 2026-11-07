@@ -77,7 +77,7 @@ public class TermiteMoundStructure extends Structure {
                 Codec.DOUBLE.optionalFieldOf("dead_share", 0.5).forGetter(Numbers::deadShare),
                 Band.CODEC.listOf().optionalFieldOf("living_stages", Band.LIVING).forGetter(Numbers::livingStages),
                 Band.CODEC.listOf().optionalFieldOf("dead_sizes", Band.DEAD).forGetter(Numbers::deadSizes),
-                Codec.INT.listOf().optionalFieldOf("dead_stages", List.of(10, 35, 35, 20)).forGetter(Numbers::deadStages),
+                Codec.INT.listOf().optionalFieldOf("dead_stages", List.of(25, 55, 12, 8)).forGetter(Numbers::deadStages),
                 Codec.DOUBLE.optionalFieldOf("hump_woods", 0.5).forGetter(Numbers::humpWoods),
                 Codec.DOUBLE.optionalFieldOf("aardvark_burrows", 0.4).forGetter(Numbers::burrows),
                 Codec.BOOL.optionalFieldOf("hump_grass", true).forGetter(Numbers::humpGrass),
@@ -85,7 +85,7 @@ public class TermiteMoundStructure extends Structure {
                 Matabele.CODEC.optionalFieldOf("matabele", Matabele.DEFAULT).forGetter(Numbers::matabele)
         ).apply(i, Numbers::new));
 
-        public static final Numbers DEFAULT = new Numbers(0.5, Band.LIVING, Band.DEAD, List.of(10, 35, 35, 20), 0.5, 0.4, true,
+        public static final Numbers DEFAULT = new Numbers(0.5, Band.LIVING, Band.DEAD, List.of(25, 55, 12, 8), 0.5, 0.4, true,
                 MoundPlaces.Numbers.DEFAULT, Matabele.DEFAULT);
     }
 

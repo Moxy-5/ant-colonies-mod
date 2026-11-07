@@ -5,7 +5,7 @@
   "step": "surface_structures",
   "terrain_adaptation": "none",
   "numbers": {
-    "_note": "M8 step 1b (docs/DESIGN.md, 'World generation, details'; the user's decisions 2026-10-24, the exact numbers my picks, to confirm): dead_share, the dice for a dead mound (real surveys: a third to a half of mounds dead; 0.5 since BUGS 104, as a Matabele dead mound with no living mound near lives, leaving about a quarter dead); living_stages, bands of mound stage (1 to 32) and their weights for living colonies (the user's table 2026-10-24: giant cathedrals rare, most mounds small; stages 1 to 3 never, a first-year colony has no mound to see; the colony's workers and age follow its stage); dead_sizes, the same for the size a dead mound had stood to (tilted bigger: big mounds stand for decades, small dead ones wash away fast); dead_stages, weights of freshly dead (0-3 days), wearing (3-12), slumping (12-30) and old grassy humps (35-200); hump_woods, of the old humps how many have trees or a thicket on them (real mound islands); aardvark_burrows, of the old humps how many an aardvark has dug a burrow into, down to the old nest (0 turns it off); hump_grass, greener grass on the old humps (false turns it off).",
+    "_note": "M8 step 1b (docs/DESIGN.md, 'World generation, details'; the user's decisions 2026-10-24, the exact numbers my picks, to confirm): dead_share, the dice for a dead mound (real surveys: a third to a half of mounds dead; 0.5 since BUGS 104, as a Matabele dead mound with no living mound near lives, leaving about a quarter dead); living_stages, bands of mound stage (1 to 32) and their weights for living colonies (the user's table 2026-10-24: giant cathedrals rare, most mounds small; stages 1 to 3 never, a first-year colony has no mound to see; the colony's workers and age follow its stage); dead_sizes, the same for the size a dead mound had stood to (tilted bigger: big mounds stand for decades, small dead ones wash away fast); dead_stages, weights of freshly dead (0-3 days), wearing (3-12), slumping (12-30) and old grassy humps (35-200) (25, 55, 12, 8 since 2026-11-07, the user: 'I want 1 in 4 to 1 in 5' dead mounds seen; with 10, 35, 35, 20 a quarter of the mounds were dead but most of them already slumped into grassy lumps read as hills, 1 mound in 11 still looking dead; now about 1 in 4.5 still bare soil, under 12 days worn, guarded by the survey game test); hump_woods, of the old humps how many have trees or a thicket on them (real mound islands); aardvark_burrows, of the old humps how many an aardvark has dug a burrow into, down to the old nest (0 turns it off); hump_grass, greener grass on the old humps (false turns it off).",
     "dead_share": 0.5,
     "living_stages": [
       {"from": 4, "to": 9, "weight": 40},
@@ -21,7 +21,7 @@
       {"from": 20, "to": 24, "weight": 18},
       {"from": 25, "to": 32, "weight": 12}
     ],
-    "dead_stages": [10, 35, 35, 20],
+    "dead_stages": [25, 55, 12, 8],
     "hump_woods": 0.5,
     "aardvark_burrows": 0.4,
     "hump_grass": true,
