@@ -55,6 +55,8 @@ public class SavannaMod {
         SavannaTests.signUp();
         // How the giant savanna trees' blocks burn (Minecraft's fire table is filled once, at start).
         modEventBus.addListener((FMLCommonSetupEvent event) -> event.enqueueWork(TreeBlocks::setFlammable));
+        // Big savannas (2026-11-06): our own TerraBlender region, beside vanilla's and other mods'.
+        modEventBus.addListener((FMLCommonSetupEvent event) -> event.enqueueWork(com.antcolonies.savanna.worldgen.SavannaRegion::signUp));
         // In-game tests: only loaded when the game is started in game-test mode.
         modEventBus.addListener((RegisterGameTestsEvent event) -> event.register(com.antcolonies.savanna.gametest.TermiteTests.class));
         LOGGER.info("Ant & Termite Colonies loaded");

@@ -39,6 +39,12 @@ repositories {
         name = "GeckoLib"
         url = "https://dl.cloudsmith.io/public/geckolib3/geckolib/maven/"
     }
+    maven {
+        // TerraBlender (big savannas, 2026-11-06): Glitchfiend's biome region library, shared with Biomes O' Plenty
+        name = "Glitchfiend"
+        url = "https://maven.minecraftforge.net/"
+        content { includeGroup "com.github.glitchfiend" }
+    }
 }
 
 java.toolchain.languageVersion = JavaLanguageVersion.of(21)

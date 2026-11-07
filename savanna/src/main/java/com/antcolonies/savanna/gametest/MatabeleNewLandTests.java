@@ -31,8 +31,6 @@ import net.minecraft.core.Holder;
 import net.minecraft.core.QuartPos;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.world.level.biome.BiomeSource;
-import net.minecraft.world.level.biome.MultiNoiseBiomeSource;
-import net.minecraft.world.level.biome.MultiNoiseBiomeSourceParameterLists;
 import net.minecraft.world.level.levelgen.NoiseBasedChunkGenerator;
 import net.minecraft.world.level.levelgen.NoiseGeneratorSettings;
 import net.minecraft.world.level.levelgen.RandomState;
@@ -226,12 +224,12 @@ public class MatabeleNewLandTests {
     /** The commonness band of Matabele dead mounds among all mounds of new land (the user, 2026-11-06: uncommon, not rare). */
     static final double FEWEST_MATABELE = 0.18, MOST_MATABELE = 0.30;
 
-    /** Minecraft's overworld for a seed, as the noise makes it (no chunks), with the mounds' biomes. */
+    /** Minecraft's overworld for a seed, as the noise makes it (no chunks, big savannas and all), with the mounds' biomes. */
     private static MoundPlaces.Land realLand(ServerLevel level, long seed, TermiteMoundStructure mounds) {
         var registries = level.registryAccess();
         Holder<NoiseGeneratorSettings> settings = registries.lookupOrThrow(Registries.NOISE_SETTINGS).getOrThrow(NoiseGeneratorSettings.OVERWORLD);
-        BiomeSource biomes = MultiNoiseBiomeSource.createFromPreset(registries.lookupOrThrow(Registries.MULTI_NOISE_BIOME_SOURCE_PARAMETER_LIST)
-                .getOrThrow(MultiNoiseBiomeSourceParameterLists.OVERWORLD));
+        // big savannas (2026-11-06): TerraBlender's zones with ours laid out for this seed, as a new normal world has them
+        BiomeSource biomes = BiomeMaps.bigSavannaSource(registries, seed);
         NoiseBasedChunkGenerator generator = new NoiseBasedChunkGenerator(biomes, settings);
         RandomState random = RandomState.create(settings.value(), registries.lookupOrThrow(Registries.NOISE), seed);
         return new MoundPlaces.Land(seed, generator, level, random, mounds.biomes());

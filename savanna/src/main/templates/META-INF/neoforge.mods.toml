@@ -95,6 +95,14 @@ Ants and termites that live as real colonies: they dig, build, gather food, grow
     side="BOTH"
 
 [[dependencies.${mod_id}]]
+    # Big savannas (2026-11-06): our own biome region, mixed with vanilla's and other mods' (Biomes O' Plenty).
+    modId="terrablender"
+    type="required"
+    versionRange="[${terrablender_version},)"
+    ordering="AFTER"
+    side="BOTH"
+
+[[dependencies.${mod_id}]]
     modId="geckolib"
     type="required"
     versionRange="[4.8,)"

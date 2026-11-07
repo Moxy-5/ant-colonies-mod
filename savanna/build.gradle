@@ -37,4 +37,7 @@ neoForge {
 
 dependencies {
     implementation project(':framework')
+    // Big savannas (the user, 2026-11-06): our own biome region with big savannas, beside vanilla's and other mods'
+    // (Biomes O' Plenty uses the same library), docs/DESIGN.md "Big savannas in normal worlds with TerraBlender".
+    implementation "com.github.glitchfiend:TerraBlender-neoforge:${minecraft_version}-${terrablender_version}"
 }

@@ -61,6 +61,8 @@ public final class SavannaTests {
         TestFilter.addCategory("replays", ReplayTests.class);
         TestFilter.addCategoryPrefix("replays", "replay_");
         // Performance (only when named, never in a full run).
+        // big savannas in normal worlds (2026-11-06): biome maps measured against the agreed size and rarity
+        TestFilter.addCategory("worldgen", SavannaWorldTests.class);
         TestFilter.addCategory("stress", TermiteStressTests.class);
 
         AwayKit.addPartsCheck(SavannaTests::partsAreTheSavannas);

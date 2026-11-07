@@ -11,6 +11,12 @@ repositories {
         name = "GeckoLib"
         url = "https://dl.cloudsmith.io/public/geckolib3/geckolib/maven/"
     }
+    maven {
+        // TerraBlender (big savannas, 2026-11-06): Glitchfiend's biome region library, shared with Biomes O' Plenty
+        name = "Glitchfiend"
+        url = "https://maven.minecraftforge.net/"
+        content { includeGroup "com.github.glitchfiend" }
+    }
 }
 
 // Mojang ships Java 21 to end users in 1.21.1, so mods should target Java 21.
@@ -51,6 +57,7 @@ var generateModMetadata = tasks.register("generateModMetadata", ProcessResources
             framework_mod_name     : framework_mod_name,
             desert_mod_id          : desert_mod_id,
             desert_mod_name        : desert_mod_name,
+            terrablender_version   : terrablender_version,
     ]
     inputs.properties replaceProperties
     expand replaceProperties

@@ -45,13 +45,13 @@ import net.neoforged.neoforge.event.level.LevelEvent;
 @EventBusSubscriber(modid = SavannaMod.MODID)
 public final class SavannaSpawn {
     /** How far in from the savanna's edge the spawn should be, in blocks (my pick: well inside, not on the edge). */
-    static final int WANT_INSIDE = 192;
+    public static final int WANT_INSIDE = 192;
     /** How far round the nearest savanna find to look for its deep inside, in blocks. */
     static final int LOOK_ROUND = 1024;
     /** The grid of that look, and the rings of the edge test, in blocks. */
     static final int STEP = 64, RING_STEP = 32;
     /** The height the biome noise is read at: just over sea level, the surface biome. */
-    static final int SAMPLE_Y = 80;
+    public static final int SAMPLE_Y = 80;
 
     /** What to tell the first player in this game (null: nothing). */
     private static Component pendingMessage;
@@ -123,7 +123,7 @@ public final class SavannaSpawn {
     }
 
     /** How far in from the savanna's edge a place is (in steps of {@link #RING_STEP}, up to {@link #WANT_INSIDE}); 0 outside. */
-    static int depth(BiomeSource biomes, Climate.Sampler sampler, BlockPos at) {
+    public static int depth(BiomeSource biomes, Climate.Sampler sampler, BlockPos at) {
         if (!savannaAt(biomes, sampler, at.getX(), at.getZ())) {
             return 0;
         }
@@ -139,7 +139,7 @@ public final class SavannaSpawn {
     }
 
     /** The place round the find farthest in from the savanna's edge (the nearest of the deepest). */
-    static BlockPos deepInside(BiomeSource biomes, Climate.Sampler sampler, BlockPos find) {
+    public static BlockPos deepInside(BiomeSource biomes, Climate.Sampler sampler, BlockPos find) {
         BlockPos best = find;
         int bestDepth = depth(biomes, sampler, find);
         double bestDist = 0;
