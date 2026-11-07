@@ -190,7 +190,37 @@ public class MatabeleNewLandTests {
                 100 * matabele, 100 * FEWEST_MATABELE, report));
         helper.assertTrue(matabele <= MOST_MATABELE, String.format("Matabele dead mounds too common (%.0f%% of mounds, want at most %.0f%%): %s",
                 100 * matabele, 100 * MOST_MATABELE, report));
+
+        // BUGS 162: the user plays single-biome savanna worlds, rugged land with mounds about 150 apart; the same band there
+        long[] singleSeeds = {-5841907898462156635L, 1L};
+        int[] u = new int[7];
+        for (long seed : singleSeeds) {
+            MoundPlaces.Land land = singleBiomeSavanna(level, seed, mounds);
+            int[] r = survey(land, mounds.numbers(), savannaPlaces(land, mounds.numbers().places()), helper);
+            for (int i = 0; i < u.length; i++) {
+                u[i] += r[i];
+            }
+        }
+        String single = String.format("single-biome savanna: %d places, %d hold a mound, %d dead, %d of them Matabele (1 mound in %.1f),"
+                + " %d turned away, %d mounds nearer than 40", u[0], u[1], u[2], u[3], u[1] / (double) Math.max(1, u[3]), u[4], u[5]);
+        SavannaMod.LOGGER.info("[new-land] the savanna survey (BUGS 162): {}", single);
+        helper.assertTrue(u[4] == 0, "Matabele dead mounds turned away at put time: " + single);
+        double singleShare = u[3] / (double) Math.max(1, u[1]);
+        helper.assertTrue(singleShare >= FEWEST_MATABELE && singleShare <= MOST_MATABELE, String.format("Matabele dead mounds of a"
+                + " single-biome savanna outside %.0f%% to %.0f%% of mounds (%.0f%%): %s", 100 * FEWEST_MATABELE, 100 * MOST_MATABELE,
+                100 * singleShare, single));
+        helper.assertTrue(u[3] >= 0.75 * u[2], "most dead mounds should hold Matabele (the dice share), not stand empty: " + single);
         helper.succeed();
+    }
+
+    /** A single-biome savanna world for a seed (the user's way to play, BUGS 162): the overworld's terrain, all of it savanna. */
+    private static MoundPlaces.Land singleBiomeSavanna(ServerLevel level, long seed, TermiteMoundStructure mounds) {
+        var registries = level.registryAccess();
+        Holder<NoiseGeneratorSettings> settings = registries.lookupOrThrow(Registries.NOISE_SETTINGS).getOrThrow(NoiseGeneratorSettings.OVERWORLD);
+        BiomeSource savanna = new net.minecraft.world.level.biome.FixedBiomeSource(
+                registries.lookupOrThrow(Registries.BIOME).getOrThrow(net.minecraft.world.level.biome.Biomes.SAVANNA));
+        RandomState random = RandomState.create(settings.value(), registries.lookupOrThrow(Registries.NOISE), seed);
+        return new MoundPlaces.Land(seed, new NoiseBasedChunkGenerator(savanna, settings), level, random, mounds.biomes());
     }
 
     /** The commonness band of Matabele dead mounds among all mounds of new land (the user, 2026-11-06: uncommon, not rare). */

@@ -110,6 +110,9 @@ public final class MoundPlaces {
     private static final ConcurrentHashMap<Long, Boolean> ACCEPTED = new ConcurrentHashMap<>();
     private static volatile long memorySeed;
     private static volatile Numbers memoryNumbers;
+    /** {@link #livesInstead}'s remembered answers, by chunk, for one seed, numbers, dead share and reach. */
+    private static final ConcurrentHashMap<Long, Boolean> LIVES_INSTEAD = new ConcurrentHashMap<>();
+    private static volatile String livesInsteadFor = "";
 
     private MoundPlaces() {
     }
@@ -264,6 +267,55 @@ public final class MoundPlaces {
     /** Whether the place's mound is a living colony by its own dice (a dead one may still live: {@link TermiteMoundStructure#pickAt}). */
     public static boolean living(long seed, Place place, double deadShare) {
         return unit(mix(seed, place.chunk().x, place.chunk().z, 6)) >= deadShare;
+    }
+
+    /**
+     * Whether the mound at {@code place} (its foot {@code foot}), dead by its dice, lives instead (BUGS 162): no mound
+     * living by its dice stands within {@code reach} of it, and no higher-ranked mound within reach lives instead. So in
+     * a stretch of dead mounds far from any living one the highest-ranked lives and the rest stay dead round it: every
+     * dead mound of new land has a living one within reach (the Matabele's termites), however far apart the land puts
+     * its mounds. Real: a dead Macrotermes mound stands in a mound field among living neighbours. Before, only the dice
+     * counted, and a would-be Matabele mound with no mound living by the dice near lived instead: on rugged land (a
+     * single-biome savanna, mounds about 150 apart) 2 in 3 of them, so most dead mounds seen were empty. The question
+     * goes down the ranks only, so it never goes round in a circle.
+     */
+    public static boolean livesInstead(Land land, Place place, BlockPos foot, Numbers numbers, double deadShare, int reach) {
+        String key = land.seed() + "/" + System.identityHashCode(numbers) + "/" + deadShare + "/" + reach;
+        if (!key.equals(livesInsteadFor)) {
+            LIVES_INSTEAD.clear();
+            livesInsteadFor = key;
+        }
+        if (LIVES_INSTEAD.size() > MEMORY_CAP) {
+            LIVES_INSTEAD.clear();
+        }
+        return livesInstead(land, place, foot, numbers, deadShare, reach, 0);
+    }
+
+    private static boolean livesInstead(Land land, Place place, BlockPos foot, Numbers numbers, double deadShare, int reach, int depth) {
+        long key = place.chunk().toLong();
+        Boolean known = LIVES_INSTEAD.get(key);
+        if (known != null) {
+            return known;
+        }
+        boolean lives = !living(land.seed(), place, deadShare) && !livingByDiceNear(land, place, foot, numbers, deadShare, reach);
+        if (lives && depth < DEEPEST) {
+            for (Place other : near(land.seed(), foot.getX(), foot.getZ(), reach, numbers)) {
+                if (other.chunk().equals(place.chunk()) || !above(other, place)) {
+                    continue;
+                }
+                BlockPos at = holds(land, other, numbers);
+                if (at == null) {
+                    continue;
+                }
+                double dx = at.getX() - foot.getX(), dz = at.getZ() - foot.getZ();
+                if (dx * dx + dz * dz <= (double) reach * reach && livesInstead(land, other, at, numbers, deadShare, reach, depth + 1)) {
+                    lives = false;
+                    break;
+                }
+            }
+        }
+        LIVES_INSTEAD.put(key, lives);
+        return lives;
     }
 
     /**

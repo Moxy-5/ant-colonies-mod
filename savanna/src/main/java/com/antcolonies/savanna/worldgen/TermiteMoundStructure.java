@@ -231,21 +231,22 @@ public class TermiteMoundStructure extends Structure {
      * out again for a place not made yet (F4): living or dead by the place's dice, the stage at its size quantile
      * ({@code quantile}: its territory, leaning bigger next to empty places), the rest by its own dice as {@link #pick}.
      *
-     * <p><b>Dead among the living (BUGS 104).</b> A dead mound whose dice give it a Matabele colony lives instead when no
-     * mound living by the dice stands within {@link Matabele#livingNear} of it: the Matabele settle a dead mound only
-     * with termites to raid in reach (the server's check measures the same number to the living mound's edge, so every
-     * such dead mound passes it). Real: Matabele nests sit in mound fields among the termites they raid, and a
-     * dead Macrotermes mound stands among living neighbours. Minecraft's rolling savanna holds a mound at only about 1
-     * place in 3, so by the dice alone 15 of 24 such dead mounds stood alone and were left empty. The dead mounds the dice
-     * leave without ants stay dead wherever they are (an empty dead mound far from termites is real too).
+     * <p><b>Dead among the living (BUGS 104, 159).</b> Every dead mound has a living one within {@link Matabele#livingNear}
+     * ({@link MoundPlaces#livesInstead}: of a stretch of dead mounds with no living one in reach, the highest-ranked lives
+     * instead), so a dead mound's Matabele dice alone say whether it holds a colony, on any land: the Matabele settle a
+     * dead mound only with termites to raid in reach (the server's check measures the same number to the living mound's
+     * edge, so every such dead mound passes it). Real: Matabele nests sit in mound fields among the termites they raid,
+     * and a dead Macrotermes mound stands among living neighbours. Before BUGS 162 only the Matabele dead mounds lived
+     * instead, and only a mound living by the dice counted as a neighbour: on rugged land most of them lived, and most
+     * dead mounds seen were the empty ones.
      */
     public static Pick pickAt(Numbers numbers, MoundPlaces.Land land, MoundPlaces.Place place, double quantile) {
         RandomSource random = RandomSource.create(place.seed(land.seed()));
         long seed = random.nextLong() & 0xFFFFFFFFL;
         boolean living = MoundPlaces.living(land.seed(), place, numbers.deadShare());
-        if (!living && MatabeleColonies.wouldSettle(seed, numbers.matabele().share())) {
+        if (!living) {
             BlockPos foot = MoundPlaces.holds(land, place, numbers.places());
-            living = foot != null && !MoundPlaces.livingByDiceNear(land, place, foot, numbers.places(), numbers.deadShare(),
+            living = foot != null && MoundPlaces.livesInstead(land, place, foot, numbers.places(), numbers.deadShare(),
                     numbers.matabele().livingNear());
         }
         int stage = stageAt(living ? numbers.livingStages() : numbers.deadSizes(), quantile);
