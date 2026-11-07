@@ -30,8 +30,8 @@ import net.minecraft.world.phys.Vec3;
  * <p>New land, the real ants (Yusuf 2026, Annual Review of Entomology 71): colonies of 100 to 300, up to 2,300 workers;
  * in a Nigerian survey almost half the nests lay in deserted Macrotermes mounds; real nests sit among the termite
  * colonies they raid (nests 2 to 30 m apart, 4 to 22 a hectare, far more than the dead mounds). So most dead mounds of
- * new land with termites in reach hold a colony (the mound numbers' {@code matabele.share}, 0.85 since the commonness
- * plan, 2026-11-06; {@link TermiteMoundStructure.Matabele}), and the sizes lean small ({@link #sizeFor}).
+ * new land with termites in reach hold a colony (the mound numbers' {@code matabele.share}, 3 in 4 since the user's
+ * pick, 2026-11-07; {@link TermiteMoundStructure.Matabele}); a dead mound with no living termite mound near never does; and the sizes lean small ({@link #sizeFor}).
  */
 public final class MatabeleColonies {
     /** A new-land colony's size, the real range (Yusuf 2026). */
