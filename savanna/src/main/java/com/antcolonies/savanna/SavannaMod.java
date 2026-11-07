@@ -32,7 +32,9 @@ public class SavannaMod {
     public static final String MODID = "antcolonies";
     public static final Logger LOGGER = LogUtils.getLogger();
 
-    public SavannaMod(IEventBus modEventBus) {
+    public SavannaMod(IEventBus modEventBus, net.neoforged.fml.ModContainer modContainer) {
+        // the settings file (big savannas, 2026-11-06: spawn in the savanna)
+        modContainer.registerConfig(net.neoforged.fml.config.ModConfig.Type.COMMON, SavannaConfig.SPEC);
         // The bodies' plans (bone names, spine, climbing numbers), read by the framework from this mod's files.
         BodyPlans.signUp(SavannaMod.class, "/assets/" + MODID + "/body_plans/");
         com.antcolonies.savanna.species.InsectSizes.signUp(); // real sizes, 2026-11-05
