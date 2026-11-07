@@ -164,7 +164,7 @@ public class MatabeleNewLandTests {
             throw new net.minecraft.gametest.framework.GameTestAssertException("no termite mound structure");
         }
         long[] seeds = {-3635740773639857461L, 1L, 20261105L, 424242L, 987654321L};
-        int[] t = new int[8];
+        int[] t = new int[10];
         long start = System.nanoTime();
         for (long seed : seeds) {
             MoundPlaces.Land land = realLand(level, seed, mounds);
@@ -173,20 +173,18 @@ public class MatabeleNewLandTests {
                 t[i] += r[i];
             }
         }
-        String report = String.format("%d savanna places, %d hold a mound, %d dead (%d still looking dead, 1 mound in %.1f), %d of them Matabele"
-                + " (1 mound in %.1f), %d turned away, %d Matabele dead mounds alone living instead, %d mounds nearer than 40, %d ms",
-                t[0], t[1], t[2], t[7], t[1] / (double) Math.max(1, t[7]), t[3], t[1] / (double) Math.max(1, t[3]), t[4], t[6], t[5],
-                (System.nanoTime() - start) / 1_000_000);
-        SavannaMod.LOGGER.info("[new-land] the savanna survey (BUGS 104): {}", report);
+        String report = report("real savanna", t) + String.format(", %d ms", (System.nanoTime() - start) / 1_000_000);
+        SavannaMod.LOGGER.info("[new-land] the savanna survey: {}", report);
         helper.assertTrue(t[0] >= 300, "too few savanna places in the survey: " + report);
         helper.assertTrue(t[1] >= 0.28 * t[0], "too few places hold a mound (slopes up to 6 take one): " + report);
         double dead = t[2] / (double) t[1];
         helper.assertTrue(dead >= 0.2 && dead <= 0.4, "dead mounds not about a quarter of them: " + report);
         double looksDead = t[7] / (double) t[1];
         helper.assertTrue(looksDead >= FEWEST_LOOKING_DEAD && looksDead <= MOST_LOOKING_DEAD, String.format("dead mounds still looking"
-                + " dead (bare soil, under %.0f days worn) outside %.0f%% to %.0f%% of mounds (%.0f%%; look at dead_stages and dead_share in"
-                + " termite_mound.json): %s", LOOKS_DEAD_DAYS, 100 * FEWEST_LOOKING_DEAD, 100 * MOST_LOOKING_DEAD, 100 * looksDead, report));
-        helper.assertTrue(t[4] == 0, "Matabele dead mounds turned away at put time (world making and the server's check disagree): " + report);
+                + " dead (bare soil, under %.0f days worn) outside %.0f%% to %.0f%% of mounds (%.0f%%; look at dead_stages, dead_share and"
+                + " dead_apart in termite_mound.json): %s", LOOKS_DEAD_DAYS, 100 * FEWEST_LOOKING_DEAD, 100 * MOST_LOOKING_DEAD, 100 * looksDead, report));
+        helper.assertTrue(t[4] == 0, "dead mounds of new land with no living termite mound in reach (they should live instead): " + report);
+        checkTheMatabeleShare(helper, mounds.numbers(), t, report);
         double matabele = t[3] / (double) t[1];
         helper.assertTrue(matabele >= FEWEST_MATABELE, String.format("Matabele dead mounds too rare (%.0f%% of mounds, want at least %.0f%%;"
                 + " look at the share and living_near in termite_mound.json's matabele block, or what changed where mounds stand): %s",
@@ -194,9 +192,11 @@ public class MatabeleNewLandTests {
         helper.assertTrue(matabele <= MOST_MATABELE, String.format("Matabele dead mounds too common (%.0f%% of mounds, want at most %.0f%%): %s",
                 100 * matabele, 100 * MOST_MATABELE, report));
 
-        // BUGS 162: the user plays single-biome savanna worlds, rugged land with mounds about 150 apart; the same band there
+        // BUGS 162: the user plays single-biome savanna worlds, rugged land with mounds farther apart; dead mounds still
+        // spread out and still looking dead about 1 in 4 to 5; lonely dead mounds there stand empty (the user, 2026-11-07),
+        // so the Matabele may be rarer than on mixed land, but never rare
         long[] singleSeeds = {-5841907898462156635L, 1L};
-        int[] u = new int[8];
+        int[] u = new int[10];
         for (long seed : singleSeeds) {
             MoundPlaces.Land land = singleBiomeSavanna(level, seed, mounds);
             int[] r = survey(land, mounds.numbers(), savannaPlaces(land, mounds.numbers().places()), helper);
@@ -204,21 +204,39 @@ public class MatabeleNewLandTests {
                 u[i] += r[i];
             }
         }
-        String single = String.format("single-biome savanna: %d places, %d hold a mound, %d dead (%d still looking dead, 1 mound in %.1f),"
-                + " %d of them Matabele (1 mound in %.1f), %d turned away, %d mounds nearer than 40", u[0], u[1], u[2], u[7],
-                u[1] / (double) Math.max(1, u[7]), u[3], u[1] / (double) Math.max(1, u[3]), u[4], u[5]);
-        SavannaMod.LOGGER.info("[new-land] the savanna survey (BUGS 162): {}", single);
-        helper.assertTrue(u[4] == 0, "Matabele dead mounds turned away at put time: " + single);
-        double singleShare = u[3] / (double) Math.max(1, u[1]);
-        helper.assertTrue(singleShare >= FEWEST_MATABELE && singleShare <= MOST_MATABELE, String.format("Matabele dead mounds of a"
-                + " single-biome savanna outside %.0f%% to %.0f%% of mounds (%.0f%%): %s", 100 * FEWEST_MATABELE, 100 * MOST_MATABELE,
-                100 * singleShare, single));
+        String single = report("single-biome savanna", u);
+        SavannaMod.LOGGER.info("[new-land] the savanna survey: {}", single);
         double singleLooks = u[7] / (double) Math.max(1, u[1]);
         helper.assertTrue(singleLooks >= FEWEST_LOOKING_DEAD && singleLooks <= MOST_LOOKING_DEAD, String.format("dead mounds still looking"
                 + " dead of a single-biome savanna outside %.0f%% to %.0f%% of mounds (%.0f%%): %s", 100 * FEWEST_LOOKING_DEAD,
                 100 * MOST_LOOKING_DEAD, 100 * singleLooks, single));
-        helper.assertTrue(u[3] >= 0.75 * u[2], "most dead mounds should hold Matabele (the dice share), not stand empty: " + single);
+        helper.assertTrue(u[4] == 0, "dead mounds with no living termite mound in reach: " + single);
+        checkTheMatabeleShare(helper, mounds.numbers(), u, single);
+        double singleShare = u[3] / (double) Math.max(1, u[1]);
+        helper.assertTrue(singleShare >= FEWEST_MATABELE_SINGLE && singleShare <= MOST_MATABELE, String.format("Matabele dead mounds of a"
+                + " single-biome savanna outside %.0f%% to %.0f%% of mounds (%.0f%%): %s", 100 * FEWEST_MATABELE_SINGLE, 100 * MOST_MATABELE,
+                100 * singleShare, single));
         helper.succeed();
+    }
+
+    /** One survey's line for the log and the failures. */
+    private static String report(String land, int[] t) {
+        return String.format("%s: %d places, %d hold a mound, %d dead (%d still looking dead, 1 mound in %.1f; %d with another dead"
+                + " within %.0f, %d too near), %d of them Matabele (1 mound in %.1f, %.0f%% of the dead near termites), %d lonely dead"
+                + " mounds (no living mound in reach, empty), %d dead by the dice living instead, %d mounds nearer than 40", land, t[0], t[1],
+                t[2], t[7], t[1] / (double) Math.max(1, t[7]), t[9], CLUMP, t[8], t[3], t[1] / (double) Math.max(1, t[3]),
+                100.0 * t[3] / Math.max(1, t[2] - t[4]), t[4], t[6], t[5]);
+    }
+
+    /** Of the dead mounds with living termites in reach, the share's worth hold Matabele (3 in 4, the user 2026-11-07). */
+    private static void checkTheMatabeleShare(GameTestHelper helper, TermiteMoundStructure.Numbers numbers, int[] t, String report) {
+        double near = t[2] - t[4];
+        if (near < 20) {
+            return;
+        }
+        double share = t[3] / near;
+        helper.assertTrue(Math.abs(share - numbers.matabele().share()) < 0.2, String.format("%.0f%% of the dead mounds near termites"
+                + " hold Matabele, not about %.0f%%: %s", 100 * share, 100 * numbers.matabele().share(), report));
     }
 
     /** A single-biome savanna world for a seed (the user's way to play, BUGS 162): the overworld's terrain, all of it savanna. */
@@ -232,7 +250,13 @@ public class MatabeleNewLandTests {
     }
 
     /** The commonness band of Matabele dead mounds among all mounds of new land (the user, 2026-11-06: uncommon, not rare). */
-    static final double FEWEST_MATABELE = 0.18, MOST_MATABELE = 0.30;
+    static final double FEWEST_MATABELE = 0.15, MOST_MATABELE = 0.30;
+
+    /**
+     * The lowest Matabele share on rugged single-biome savanna, where mounds stand farther apart and a lonely dead mound
+     * stands empty (the user, 2026-11-07: "dead mounds not by termite mounds never have Matabele").
+     */
+    static final double FEWEST_MATABELE_SINGLE = 0.10;
 
     /**
      * Dead mounds the eye reads as dead (the user, 2026-11-07: "still seeing dead mounds about 1 in 10 to 1 in 15, I want 1 in
@@ -282,12 +306,15 @@ public class MatabeleNewLandTests {
     }
 
     /**
-     * Places, held, dead held, of those with Matabele dice, those turned away by F4 (no living mound in reach), feet
-     * nearer than 40 to another (each fails the test), and dead mounds with Matabele dice living instead (BUGS 104).
+     * Places, held, dead held, Matabele dead mounds (dice and a living mound in reach), lonely dead mounds (no living
+     * mound in reach, never Matabele), feet nearer than 40 to another (each fails the test), dead mounds by the dice living
+     * instead, dead still looking dead, pairs of dead mounds nearer than the numbers' {@code dead_apart} (each fails the
+     * test, the user's 2026-11-07 spreading), and dead mounds with another dead within {@link #CLUMP} (the clumps the user
+     * saw, reported).
      */
     private static int[] survey(MoundPlaces.Land land, TermiteMoundStructure.Numbers numbers, List<MoundPlaces.Place> places, GameTestHelper helper) {
-        int[] out = new int[8];
-        List<BlockPos> feet = new ArrayList<>();
+        int[] out = new int[10];
+        List<BlockPos> feet = new ArrayList<>(), deadFeet = new ArrayList<>();
         for (MoundPlaces.Place place : places) {
             out[0]++;
             BlockPos foot = MoundPlaces.holds(land, place, numbers.places());
@@ -303,25 +330,49 @@ public class MatabeleNewLandTests {
                 continue;
             }
             out[2]++;
+            deadFeet.add(foot);
             out[7] += pick.days() < LOOKS_DEAD_DAYS ? 1 : 0;
-            if (MatabeleColonies.wouldSettle(pick.seed(), numbers.matabele().share())) {
+            if (!NewLandMounds.livingPlaceNear(land, numbers, foot)) {
+                out[4]++;
+            } else if (MatabeleColonies.wouldSettle(pick.seed(), numbers.matabele().share())) {
                 out[3]++;
-                if (!NewLandMounds.livingPlaceNear(land, numbers, foot)) {
-                    out[4]++;
-                }
             }
         }
         for (int i = 0; i < feet.size(); i++) {
             for (int j = i + 1; j < feet.size(); j++) {
-                double dx = feet.get(i).getX() - feet.get(j).getX(), dz = feet.get(i).getZ() - feet.get(j).getZ();
-                if (dx * dx + dz * dz < NewLandMounds.KEEP_APART * NewLandMounds.KEEP_APART) {
+                double d = sideways(feet.get(i), feet.get(j));
+                if (d < NewLandMounds.KEEP_APART) {
                     out[5]++;
-                    helper.assertTrue(false, "two mounds " + Math.round(Math.sqrt(dx * dx + dz * dz)) + " apart at "
+                    helper.assertTrue(false, "two mounds " + Math.round(d) + " apart at "
                             + feet.get(i).toShortString() + " and " + feet.get(j).toShortString());
                 }
             }
         }
+        for (int i = 0; i < deadFeet.size(); i++) {
+            boolean clumped = false;
+            for (int j = 0; j < deadFeet.size(); j++) {
+                if (i == j) {
+                    continue;
+                }
+                double d = sideways(deadFeet.get(i), deadFeet.get(j));
+                if (j > i && d <= numbers.deadApart()) {
+                    out[8]++;
+                    helper.assertTrue(false, "two dead mounds " + Math.round(d) + " apart (dead_apart " + numbers.deadApart() + ") at "
+                            + deadFeet.get(i).toShortString() + " and " + deadFeet.get(j).toShortString());
+                }
+                clumped |= d <= CLUMP;
+            }
+            out[9] += clumped ? 1 : 0;
+        }
         return out;
+    }
+
+    /** Dead mounds with another dead one this near count as a clump in the survey's report (about 1.5 mound spacings). */
+    static final double CLUMP = 100;
+
+    private static double sideways(BlockPos a, BlockPos b) {
+        double dx = a.getX() - b.getX(), dz = a.getZ() - b.getZ();
+        return Math.sqrt(dx * dx + dz * dz);
     }
 
     /** The dice give the data file's share of dead mounds a colony; the sizes run 100 to 2,300, half under about 480. */

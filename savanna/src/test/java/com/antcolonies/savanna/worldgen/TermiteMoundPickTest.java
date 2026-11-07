@@ -37,8 +37,8 @@ class TermiteMoundPickTest {
                 assertTrue(pick.woods() == TermiteMoundStructure.NO_WOODS && !pick.burrow(), "woods or a burrow on a mound not yet a hump");
             }
         }
-        // The dead dice (1 in 2 since BUGS 104: a dead mound with Matabele and no living mound near lives in new land, so
-        // about a quarter end dead there, the game test deadMoundsOfRealSavannaHaveLivingTermitesInReach).
+        // The dead dice (0.6 since 2026-11-07: in new land a dead mound too near another dead one, or with no living mound
+        // near, lives instead, so about a quarter end dead there, the game test deadMoundsOfRealSavannaHaveLivingTermitesInReach).
         assertTrue(Math.abs(dead / (double) n - TermiteMoundStructure.Numbers.DEFAULT.deadShare()) < 0.02, "dead share " + dead / (double) n);
         // The living by the user's stage table (2026-10-24): 4-9 40, 10-14 28, 15-19 17, 20-24 10, 25-32 5 in 100;
         // the dead tilted bigger: 20, 25, 25, 18, 12.

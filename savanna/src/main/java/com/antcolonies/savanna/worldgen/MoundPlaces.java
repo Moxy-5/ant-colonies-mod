@@ -42,7 +42,7 @@ import com.antcolonies.savanna.SavannaMod;
  * <p><b>The ground's chance.</b> A place holds a mound only by chance, by the ground ({@link #holds}): real mound numbers
  * follow the soil, likely on flat, open, well-drained ground, less likely on a slope or by water; never in water, on a
  * steep slope or outside a savanna. On Minecraft's rolling savanna about 1 place in 3 (the 2 in 3 first planned was a
- * flat-ground guess, BUGS 104; dead mounds are kept among living ones by {@link TermiteMoundStructure#pickAt}). The user's third ground, giant trees, is
+ * flat-ground guess, BUGS 104; dead mounds are spread out among living ones by {@link #staysDead}). The user's third ground, giant trees, is
  * left out: the trees keep off the mounds' places themselves ({@link TermiteMoundStructure#crowds}), so asking the trees
  * would go round in a circle. Next to an empty place a mound leans bigger (real: its colony takes over the free ground).
  */
@@ -110,9 +110,10 @@ public final class MoundPlaces {
     private static final ConcurrentHashMap<Long, Boolean> ACCEPTED = new ConcurrentHashMap<>();
     private static volatile long memorySeed;
     private static volatile Numbers memoryNumbers;
-    /** {@link #livesInstead}'s remembered answers, by chunk, for one seed, numbers, dead share and reach. */
-    private static final ConcurrentHashMap<Long, Boolean> LIVES_INSTEAD = new ConcurrentHashMap<>();
-    private static volatile String livesInsteadFor = "";
+    /** {@link #staysDead}'s and its first rule's remembered answers, by chunk, for one seed, numbers, dead share and distances. */
+    private static final ConcurrentHashMap<Long, Boolean> STAYS_DEAD = new ConcurrentHashMap<>();
+    private static final ConcurrentHashMap<Long, Boolean> SPREAD = new ConcurrentHashMap<>();
+    private static volatile String staysDeadFor = "";
 
     private MoundPlaces() {
     }
@@ -264,43 +265,73 @@ public final class MoundPlaces {
         return 1 - (1 - place.size()) * Math.pow(numbers.emptyLean(), empty);
     }
 
-    /** Whether the place's mound is a living colony by its own dice (a dead one may still live: {@link TermiteMoundStructure#pickAt}). */
+    /** Whether the place's mound is a living colony by its own dice (a dead one too near another dead one lives: {@link #staysDead}). */
     public static boolean living(long seed, Place place, double deadShare) {
         return unit(mix(seed, place.chunk().x, place.chunk().z, 6)) >= deadShare;
     }
 
     /**
-     * Whether the mound at {@code place} (its foot {@code foot}), dead by its dice, lives instead (BUGS 162): no mound
-     * living by its dice stands within {@code reach} of it, and no higher-ranked mound within reach lives instead. So in
-     * a stretch of dead mounds far from any living one the highest-ranked lives and the rest stay dead round it: every
-     * dead mound of new land has a living one within reach (the Matabele's termites), however far apart the land puts
-     * its mounds. Real: a dead Macrotermes mound stands in a mound field among living neighbours. Before, only the dice
-     * counted, and a would-be Matabele mound with no mound living by the dice near lived instead: on rugged land (a
-     * single-biome savanna, mounds about 150 apart) 2 in 3 of them, so most dead mounds seen were empty. The question
-     * goes down the ranks only, so it never goes round in a circle.
+     * Whether the mound at {@code place} (its foot {@code foot}), dead by its dice, stays dead in new land. Two rules, so
+     * every dead mound stands alone among living ones (real: Macrotermes mound fields are spread evenly by neighbours
+     * fighting over the ground, and a colony that dies leaves living neighbours round its mound):
+     * <ol>
+     * <li><b>Spread out</b> (the user, 2026-11-07, dead mounds came in clumps of 2 or 3): of two dead by their dice within
+     * {@code apart} blocks of each other (feet, sideways), only the one with the higher dead rank stays dead
+     * ({@link #spreadStays}). Each mound flipping its own coin clumps: with 1 mound in 4 dead, about 3 dead mounds in 4 had
+     * a dead neighbour.</li>
+     * <li><b>Among the living</b> (BUGS 104, 162): a dead mound left with no living mound within {@code reach} lives
+     * instead. On Minecraft's rolling savanna only about 1 place in 3 holds a mound, and without this nearly half the dead
+     * mounds stood alone, empty of Matabele (no termites to raid).</li>
+     * </ol>
+     * Worked out by the seed and the land alone (the same answer for world making and the server's check); the second rule
+     * only reads the first, so nothing goes round in a circle, and every mound it leaves dead has a living one in reach.
+     * {@code apart} 0: no spreading.
      */
-    public static boolean livesInstead(Land land, Place place, BlockPos foot, Numbers numbers, double deadShare, int reach) {
-        String key = land.seed() + "/" + System.identityHashCode(numbers) + "/" + deadShare + "/" + reach;
-        if (!key.equals(livesInsteadFor)) {
-            LIVES_INSTEAD.clear();
-            livesInsteadFor = key;
+    public static boolean staysDead(Land land, Place place, BlockPos foot, Numbers numbers, double deadShare, int apart, int reach) {
+        String key = land.seed() + "/" + System.identityHashCode(numbers) + "/" + deadShare + "/" + apart + "/" + reach;
+        if (!key.equals(staysDeadFor)) {
+            SPREAD.clear();
+            STAYS_DEAD.clear();
+            staysDeadFor = key;
         }
-        if (LIVES_INSTEAD.size() > MEMORY_CAP) {
-            LIVES_INSTEAD.clear();
+        if (SPREAD.size() > MEMORY_CAP || STAYS_DEAD.size() > MEMORY_CAP) {
+            SPREAD.clear();
+            STAYS_DEAD.clear();
         }
-        return livesInstead(land, place, foot, numbers, deadShare, reach, 0);
-    }
-
-    private static boolean livesInstead(Land land, Place place, BlockPos foot, Numbers numbers, double deadShare, int reach, int depth) {
-        long key = place.chunk().toLong();
-        Boolean known = LIVES_INSTEAD.get(key);
+        Boolean known = STAYS_DEAD.get(place.chunk().toLong());
         if (known != null) {
             return known;
         }
-        boolean lives = !living(land.seed(), place, deadShare) && !livingByDiceNear(land, place, foot, numbers, deadShare, reach);
-        if (lives && depth < DEEPEST) {
-            for (Place other : near(land.seed(), foot.getX(), foot.getZ(), reach, numbers)) {
-                if (other.chunk().equals(place.chunk()) || !above(other, place)) {
+        boolean stays = spreadStays(land, place, foot, numbers, deadShare, apart, 0)
+                && livingAfterSpreadingNear(land, place, foot, numbers, deadShare, apart, reach);
+        STAYS_DEAD.put(place.chunk().toLong(), stays);
+        return stays;
+    }
+
+    /**
+     * Rule 1 of {@link #staysDead}: no other mound dead by its dice and kept by this rule, with a higher dead rank, stands
+     * within {@code apart} of the foot. Down the ranks only, so it never goes round in a circle.
+     */
+    private static boolean spreadStays(Land land, Place place, BlockPos foot, Numbers numbers, double deadShare, int apart, int depth) {
+        if (apart <= 0) {
+            return true;
+        }
+        long key = place.chunk().toLong();
+        Boolean known = SPREAD.get(key);
+        if (known != null) {
+            return known;
+        }
+        boolean stays = true;
+        if (depth < DEEPEST) {
+            double rank = deadRank(land.seed(), place);
+            for (Place other : near(land.seed(), foot.getX(), foot.getZ(), apart, numbers)) {
+                if (other.chunk().equals(place.chunk()) || living(land.seed(), other, deadShare)) {
+                    continue;
+                }
+                double otherRank = deadRank(land.seed(), other);
+                boolean higher = otherRank != rank ? otherRank > rank
+                        : other.chunk().x != place.chunk().x ? other.chunk().x > place.chunk().x : other.chunk().z > place.chunk().z;
+                if (!higher) {
                     continue;
                 }
                 BlockPos at = holds(land, other, numbers);
@@ -308,35 +339,41 @@ public final class MoundPlaces {
                     continue;
                 }
                 double dx = at.getX() - foot.getX(), dz = at.getZ() - foot.getZ();
-                if (dx * dx + dz * dz <= (double) reach * reach && livesInstead(land, other, at, numbers, deadShare, reach, depth + 1)) {
-                    lives = false;
+                if (dx * dx + dz * dz <= (double) apart * apart && spreadStays(land, other, at, numbers, deadShare, apart, depth + 1)) {
+                    stays = false;
                     break;
                 }
             }
         }
-        LIVES_INSTEAD.put(key, lives);
-        return lives;
+        SPREAD.put(key, stays);
+        return stays;
     }
 
     /**
-     * Whether a mound living by its dice stands with its foot within {@code reach} of {@code foot} (the foot of the mound
-     * at {@code place}, left out; {@code reach}: the mound numbers' {@code matabele.living_near}). Only the dice count,
-     * never a dead mound turned living, so the question never goes round in a circle (BUGS 104).
+     * Rule 2 of {@link #staysDead}: a mound living after rule 1 (living by its dice, or dead by them and given up by the
+     * spreading) stands with its foot within {@code reach} of {@code foot}.
      */
-    public static boolean livingByDiceNear(Land land, Place place, BlockPos foot, Numbers numbers, double deadShare, int reach) {
+    private static boolean livingAfterSpreadingNear(Land land, Place place, BlockPos foot, Numbers numbers, double deadShare, int apart, int reach) {
         for (Place other : near(land.seed(), foot.getX(), foot.getZ(), reach, numbers)) {
-            if (other.chunk().equals(place.chunk()) || !living(land.seed(), other, deadShare)) {
+            if (other.chunk().equals(place.chunk())) {
                 continue;
             }
-            BlockPos living = holds(land, other, numbers);
-            if (living != null) {
-                double dx = living.getX() - foot.getX(), dz = living.getZ() - foot.getZ();
-                if (dx * dx + dz * dz <= (double) reach * reach) {
-                    return true;
-                }
+            BlockPos at = holds(land, other, numbers);
+            if (at == null) {
+                continue;
+            }
+            double dx = at.getX() - foot.getX(), dz = at.getZ() - foot.getZ();
+            if (dx * dx + dz * dz <= (double) reach * reach
+                    && (living(land.seed(), other, deadShare) || !spreadStays(land, other, at, numbers, deadShare, apart, 0))) {
+                return true;
             }
         }
         return false;
+    }
+
+    /** A place's own rank among dead mounds (its own dice, apart from the pattern's rank, so the two never line up). */
+    private static double deadRank(long seed, Place place) {
+        return unit(mix(seed, place.chunk().x, place.chunk().z, 8));
     }
 
     /** About how far a mound's foot reaches from its middle at a stage (a full one about 12, its washed soil 13). */

@@ -64,17 +64,20 @@ public class TermiteMoundStructure extends Structure {
     public static final int FULL_STAGE = 32;
 
     /**
-     * The real spreads, from the structure's file. {@code deadShare}: the dice for a dead mound (a Matabele one with no living mound near lives, so about a quarter end dead: {@link #pickAt}).
-     * {@code livingStages}, {@code deadSizes}: bands of mound stage with their weights, for living colonies and for the
+     * The real spreads, from the structure's file. {@code deadShare}: the dice for a dead mound (one too near another dead
+     * mound lives instead, so fewer end dead: {@link #pickAt}). {@code deadApart}: how near (blocks, middle to middle) two
+     * dead mounds of new land may stand; nearer, only the higher-ranked stays dead (the user, 2026-11-07: dead mounds came
+     * in clumps of 2 or 3). {@code livingStages}, {@code deadSizes}: bands of mound stage with their weights, for living colonies and for the
      * size dead mounds had stood to. {@code deadStages}: weights of freshly dead (days 0 to 3, the spires standing,
      * Xylaria on the comb), wearing (3 to 12), slumping (12 to 30) and old grassy humps (35 to 200). {@code humpWoods}:
      * of the old humps, how many have trees or a thicket on them. {@code burrows}: of the old humps, how many an aardvark
      * has dug into. {@code humpGrass}: whether old humps carry the greener grass of real mound islands.
      */
-    public record Numbers(double deadShare, List<Band> livingStages, List<Band> deadSizes, List<Integer> deadStages,
+    public record Numbers(double deadShare, int deadApart, List<Band> livingStages, List<Band> deadSizes, List<Integer> deadStages,
             double humpWoods, double burrows, boolean humpGrass, MoundPlaces.Numbers places, Matabele matabele) {
         public static final Codec<Numbers> CODEC = RecordCodecBuilder.create(i -> i.group(
-                Codec.DOUBLE.optionalFieldOf("dead_share", 0.5).forGetter(Numbers::deadShare),
+                Codec.DOUBLE.optionalFieldOf("dead_share", 0.6).forGetter(Numbers::deadShare),
+                Codec.intRange(0, 256).optionalFieldOf("dead_apart", 90).forGetter(Numbers::deadApart),
                 Band.CODEC.listOf().optionalFieldOf("living_stages", Band.LIVING).forGetter(Numbers::livingStages),
                 Band.CODEC.listOf().optionalFieldOf("dead_sizes", Band.DEAD).forGetter(Numbers::deadSizes),
                 Codec.INT.listOf().optionalFieldOf("dead_stages", List.of(25, 55, 12, 8)).forGetter(Numbers::deadStages),
@@ -85,7 +88,7 @@ public class TermiteMoundStructure extends Structure {
                 Matabele.CODEC.optionalFieldOf("matabele", Matabele.DEFAULT).forGetter(Numbers::matabele)
         ).apply(i, Numbers::new));
 
-        public static final Numbers DEFAULT = new Numbers(0.5, Band.LIVING, Band.DEAD, List.of(25, 55, 12, 8), 0.5, 0.4, true,
+        public static final Numbers DEFAULT = new Numbers(0.6, 90, Band.LIVING, Band.DEAD, List.of(25, 55, 12, 8), 0.5, 0.4, true,
                 MoundPlaces.Numbers.DEFAULT, Matabele.DEFAULT);
     }
 
@@ -93,17 +96,17 @@ public class TermiteMoundStructure extends Structure {
      * The Matabele colonies of new land's dead mounds, one place for both numbers (the commonness plan, 2026-11-06,
      * {@code docs/plans/matabele-commonness.md}; before, the reach lived twice in the code and could drift apart).
      * {@code share}: the dice for a dead mound with termites in reach holding a colony. {@code livingNear}: how far
-     * (blocks) a living termite mound may stand for a dead one to get Matabele. World making measures it middle to middle
-     * ({@link MoundPlaces#livingByDiceNear}); the server's check at put time measures to the living mound's edge
-     * ({@code NewLandMounds.livingMoundNear}), never stricter, so a mound world making gave Matabele is never turned away.
+     * (blocks) a living termite mound's foot may stand for a dead one to get Matabele; a dead mound with none that near
+     * never holds them (the user, 2026-11-07: "dead mounds not by termite mounds never have Matabele"), checked when the
+     * mound is put ({@code NewLandMounds.livingMoundNear}).
      */
     public record Matabele(double share, int livingNear) {
         public static final Codec<Matabele> CODEC = RecordCodecBuilder.create(i -> i.group(
-                Codec.doubleRange(0, 1).optionalFieldOf("share", 0.85).forGetter(Matabele::share),
+                Codec.doubleRange(0, 1).optionalFieldOf("share", 0.75).forGetter(Matabele::share),
                 Codec.intRange(1, 256).optionalFieldOf("living_near", 90).forGetter(Matabele::livingNear)
         ).apply(i, Matabele::new));
 
-        public static final Matabele DEFAULT = new Matabele(0.85, 90);
+        public static final Matabele DEFAULT = new Matabele(0.75, 90);
     }
 
     /** The mound numbers of this world's data (the defaults if the structure is missing). */
@@ -231,14 +234,16 @@ public class TermiteMoundStructure extends Structure {
      * out again for a place not made yet (F4): living or dead by the place's dice, the stage at its size quantile
      * ({@code quantile}: its territory, leaning bigger next to empty places), the rest by its own dice as {@link #pick}.
      *
-     * <p><b>Dead among the living (BUGS 104, 159).</b> Every dead mound has a living one within {@link Matabele#livingNear}
-     * ({@link MoundPlaces#livesInstead}: of a stretch of dead mounds with no living one in reach, the highest-ranked lives
-     * instead), so a dead mound's Matabele dice alone say whether it holds a colony, on any land: the Matabele settle a
-     * dead mound only with termites to raid in reach (the server's check measures the same number to the living mound's
-     * edge, so every such dead mound passes it). Real: Matabele nests sit in mound fields among the termites they raid,
-     * and a dead Macrotermes mound stands among living neighbours. Before BUGS 162 only the Matabele dead mounds lived
-     * instead, and only a mound living by the dice counted as a neighbour: on rugged land most of them lived, and most
-     * dead mounds seen were the empty ones.
+     * <p><b>Dead mounds spread out (the user, 2026-11-07).</b> A mound dead by its dice stays dead only if no other dead
+     * mound stands within {@link Numbers#deadApart} of it ({@link MoundPlaces#staysDead}: of two too near, the
+     * higher-ranked stays dead and the other lives). Each mound used to flip its own coin, and coins clump: with 1 mound in
+     * 4 dead, about 3 dead mounds in 4 had a dead neighbour, so the user saw 2 or 3 dead together after 10 living. Real:
+     * Macrotermes mound fields are spread evenly by neighbours fighting over the ground, and a colony that dies leaves
+     * living neighbours round its mound. A dead mound left with no living one within {@link Matabele#livingNear} lives
+     * instead (BUGS 104, 162: on Minecraft's rolling savanna nearly half the dead mounds would otherwise stand alone, empty),
+     * so every dead mound of new land has termites in reach and its Matabele dice alone say whether it holds a colony (3 in
+     * 4). Matabele never settle a dead mound with no living one near (the check when the mound is put,
+     * {@code NewLandMounds.livingMoundNear}, for mounds of the commands and old worlds).
      */
     public static Pick pickAt(Numbers numbers, MoundPlaces.Land land, MoundPlaces.Place place, double quantile) {
         RandomSource random = RandomSource.create(place.seed(land.seed()));
@@ -246,7 +251,7 @@ public class TermiteMoundStructure extends Structure {
         boolean living = MoundPlaces.living(land.seed(), place, numbers.deadShare());
         if (!living) {
             BlockPos foot = MoundPlaces.holds(land, place, numbers.places());
-            living = foot != null && MoundPlaces.livesInstead(land, place, foot, numbers.places(), numbers.deadShare(),
+            living = foot != null && !MoundPlaces.staysDead(land, place, foot, numbers.places(), numbers.deadShare(), numbers.deadApart(),
                     numbers.matabele().livingNear());
         }
         int stage = stageAt(living ? numbers.livingStages() : numbers.deadSizes(), quantile);
