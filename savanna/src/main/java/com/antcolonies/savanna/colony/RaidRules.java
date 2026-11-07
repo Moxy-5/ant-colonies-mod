@@ -2,6 +2,7 @@ package com.antcolonies.savanna.colony;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import java.util.Set;
 import java.util.UUID;
 
@@ -9,6 +10,9 @@ import com.antcolonies.colony.Colony;
 import com.antcolonies.entity.AbstractAntEntity;
 import com.antcolonies.savanna.entity.MatabeleEntity;
 import com.antcolonies.savanna.entity.TermiteSoldierEntity;
+import com.antcolonies.savanna.entity.goal.MatabeleScoutGoal;
+import com.antcolonies.species.SpeciesProfile;
+import com.antcolonies.watch.GeneralRules;
 import com.antcolonies.watch.InsectStories;
 import com.antcolonies.watch.Watch;
 
@@ -18,7 +22,7 @@ import net.minecraft.world.phys.AABB;
 
 /**
  * The raid test bench, B1 ({@code docs/plans/raid-test-bench.md}): the raid rules, checked once a second for every
- * colony that is here, beside the framework's general ones ({@code com.antcolonies.watch.GeneralRules}). Each would
+ * colony that is here, beside the framework's general ones ({@code GeneralRules}). Each would
  * have caught a raid bug we had: BUGS 111 (the attack never ending), the frozen column of in-game test 5, ants left out
  * at night, soldiers waiting for ever by a seal. The rules only watch; they never change what an insect does.
  *
@@ -95,7 +99,7 @@ public final class RaidRules {
         long age = look.now() - raid.stageSince();
         long most = raid.stageMostTicks();
         if (age > most + STAGE_GRACE) {
-            look.breach(raid.find().at(), raid.members(), "the raid has been " + raid.stage().name().toLowerCase() + " for " + age / 20
+            look.breach(raid.find().at(), raid.members(), "the raid has been " + raid.stage().name().toLowerCase(Locale.ROOT) + " for " + age / 20
                     + " s, its longest is " + most / 20 + " s; " + raid.members().size() + " real raider(s)");
         }
     }
@@ -111,7 +115,7 @@ public final class RaidRules {
         // starts below zero, BUGS 159.)
         long since = look.now() - Math.max(Math.max(raid.updatedAt(), raid.startedAt()), look.colony().away().backAt());
         if (since > HEARTBEAT) {
-            look.breach(raid.find().at(), raid.members(), "the raid (" + raid.stage().name().toLowerCase() + ") was last worked out "
+            look.breach(raid.find().at(), raid.members(), "the raid (" + raid.stage().name().toLowerCase(Locale.ROOT) + ") was last worked out "
                     + since / 20 + " s ago while its colony is here");
         }
     }
@@ -145,7 +149,7 @@ public final class RaidRules {
                 if (off > ORDER_OFF && still >= RAIDER_STILL) {
                     stuck.add(ant);
                     why.append(stuck.size() == 1 ? "" : "; ").append(InsectStories.shortId(ant)).append(" told to ")
-                            .append(order.to().toShortString()).append(String.format(" (%.0f off)", off)).append(", still ").append(still / 20)
+                            .append(order.to().toShortString()).append(String.format(Locale.ROOT, " (%.0f off)", off)).append(", still ").append(still / 20)
                             .append(" s");
                 }
             } else if (homing.contains(id) && still >= HOMER_STILL && !ant.blockPosition().closerThan(center, HOME)
@@ -186,13 +190,13 @@ public final class RaidRules {
                     || raids.isGoingHome(id) && look.stillFor(ant) < RAIDER_STILL
                     // BUGS 142: a scout whose search ended at 19:30 runs home straight on its own goal, not along a trail;
                     // still walking (not standing), it is on its way home like the others (one standing is raider-stuck's)
-                    || ant.runsGoal(com.antcolonies.savanna.entity.goal.MatabeleScoutGoal.class) && look.stillFor(ant) < RAIDER_STILL;
+                    || ant.runsGoal(MatabeleScoutGoal.class) && look.stillFor(ant) < RAIDER_STILL;
             if (look.lasting(id.toString(), away && !excused) > OUT_AT_NIGHT) {
                 out.add(ant);
             }
         }
         if (!out.isEmpty()) {
-            look.breach(out.subList(0, Math.min(10, out.size())), out.size() + " Matabele out at " + com.antcolonies.species.SpeciesProfile.DayClock.clock(time)
+            look.breach(out.subList(0, Math.min(10, out.size())), out.size() + " Matabele out at " + SpeciesProfile.DayClock.clock(time)
                     + ", not walking home: " + who(look, out));
         }
     }
@@ -276,7 +280,7 @@ public final class RaidRules {
             }
             RaidColumn raid = raids.column();
             if (raid != null && raid.stage() != RaidColumn.Stage.DONE && raid.has(id)) {
-                StringBuilder words = new StringBuilder(raid.stage().name().toLowerCase());
+                StringBuilder words = new StringBuilder(raid.stage().name().toLowerCase(Locale.ROOT));
                 if (id.equals(raid.leader())) {
                     words.append(" (leads)");
                 }
@@ -288,7 +292,7 @@ public final class RaidRules {
                 }
                 RaidColumn.Order order = raid.orderNow(id);
                 if (order != null && order.to() != null) {
-                    words.append(String.format(", place %.0f off", Math.sqrt(insect.blockPosition().distSqr(order.to()))));
+                    words.append(String.format(Locale.ROOT, ", place %.0f off", Math.sqrt(insect.blockPosition().distSqr(order.to()))));
                 } else if (order != null) {
                     words.append(", told to stand");
                 }

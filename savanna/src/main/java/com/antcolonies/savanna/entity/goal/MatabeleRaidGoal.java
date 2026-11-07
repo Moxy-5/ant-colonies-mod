@@ -1,6 +1,9 @@
 package com.antcolonies.savanna.entity.goal;
 
+import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.EnumSet;
+import java.util.List;
 
 import org.jetbrains.annotations.Nullable;
 
@@ -14,9 +17,13 @@ import com.antcolonies.savanna.entity.MatabeleEntity;
 import com.antcolonies.species.SpeciesProfile;
 
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.util.Mth;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.ai.goal.Goal;
+import net.minecraft.world.phys.Vec3;
 
 /**
  * M8 step 3b, a raider walking in its colony's raid column ({@link RaidColumn}). The column (the colony's brain) says
@@ -60,7 +67,7 @@ public class MatabeleRaidGoal extends Goal {
      * kept planning the same walk for ever.
      */
     @Nullable
-    private net.minecraft.world.phys.Vec3 progressAt;
+    private Vec3 progressAt;
     private int progressSince;
     /** BUGS 141: ticks walking without headway before it stops (my pick: 8 s, past a doorway's peek and a crowd's shuffle). */
     private static final int NO_PROGRESS = 160;
@@ -76,7 +83,7 @@ public class MatabeleRaidGoal extends Goal {
      * until when (tick, 0 for none); the next tick it may do something new.
      */
     @Nullable
-    private net.minecraft.world.phys.Vec3 millLook;
+    private Vec3 millLook;
     private int millLookUntil;
     private int nextMill;
 
@@ -199,8 +206,8 @@ public class MatabeleRaidGoal extends Goal {
             mill(level, null); // (turning and touching its neighbours as it waits)
             return;
         }
-        net.minecraft.world.entity.Entity prey = order.take() != null && column != null ? level.getEntity(order.take()) : null;
-        int atPrey = prey instanceof net.minecraft.world.entity.LivingEntity stung ? atPrey(stung) : NOT_AT_PREY;
+        Entity prey = order.take() != null && column != null ? level.getEntity(order.take()) : null;
+        int atPrey = prey instanceof LivingEntity stung ? atPrey(stung) : NOT_AT_PREY;
         if (atPrey == STEPPING_TO_PREY) {
             return; // (the last little bit straight at it)
         }
@@ -291,7 +298,7 @@ public class MatabeleRaidGoal extends Goal {
      * walk over, it steps the last little bit straight at it first; getting no nearer (a step of comb, a hole's edge), it
      * takes it from where it stands, within {@link RaidColumn#PICK_REACH} as before real sizes.
      */
-    private int atPrey(net.minecraft.world.entity.LivingEntity prey) {
+    private int atPrey(LivingEntity prey) {
         if (ant.reachesInFight(prey)) {
             return AT_PREY;
         }
@@ -349,7 +356,7 @@ public class MatabeleRaidGoal extends Goal {
         if (roll < 0.5F) {
             MatabeleEntity mate = level.getEntitiesOfClass(MatabeleEntity.class, ant.getBoundingBox().inflate(1.5),
                     other -> other != ant && other.isAlive()).stream()
-                    .min(java.util.Comparator.comparingDouble(ant::distanceToSqr)).orElse(null);
+                    .min(Comparator.comparingDouble(ant::distanceToSqr)).orElse(null);
             if (mate != null) {
                 millLook = mate.position().add(0.0, mate.getBbHeight() * 0.6, 0.0);
                 millLookUntil = ant.tickCount + 20 + ant.getRandom().nextInt(20);
@@ -364,8 +371,8 @@ public class MatabeleRaidGoal extends Goal {
             return;
         }
         // A shuffle: a step to a cell beside it, still at its place (so it does not walk back), at an easy pace.
-        java.util.List<BlockPos> steps = new java.util.ArrayList<>();
-        for (net.minecraft.core.Direction side : net.minecraft.core.Direction.Plane.HORIZONTAL) {
+        List<BlockPos> steps = new ArrayList<>();
+        for (Direction side : Direction.Plane.HORIZONTAL) {
             BlockPos cell = ant.blockPosition().relative(side);
             if (flat(cell, anchor) <= AT - 0.2 && RaidGround.canStand(level, cell)) {
                 steps.add(cell);
@@ -483,7 +490,7 @@ public class MatabeleRaidGoal extends Goal {
 
     /** BUGS 141: whether it has walked {@link #NO_PROGRESS} ticks without moving half a block (waiting for the crowd aside). */
     private boolean gotNowhere() {
-        net.minecraft.world.phys.Vec3 here = ant.position();
+        Vec3 here = ant.position();
         if (ant.getNavigator().isDone() || ant.getNavigator().heldForCrowd() || progressAt == null || here.distanceToSqr(progressAt) > 0.25) {
             progressAt = ant.getNavigator().isDone() ? null : here;
             progressSince = ant.tickCount;

@@ -1,6 +1,9 @@
 package com.antcolonies.savanna.colony;
 
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
@@ -39,13 +42,13 @@ public final class WayHome {
     /** One insect on its way home: the way it follows (null: none yet), since when, and why it was sent. */
     private static final class Going {
         @Nullable
-        RaidColumn.Route route;
+        Route route;
         final long since;
         final String why;
         /** Whether a trail near it was looked for already (once: a straight walk after that). */
         boolean looked;
 
-        Going(@Nullable RaidColumn.Route route, long since, String why) {
+        Going(@Nullable Route route, long since, String why) {
             this.route = route;
             this.since = since;
             this.why = why;
@@ -55,7 +58,7 @@ public final class WayHome {
     private final Map<UUID, Going> going = new HashMap<>();
 
     /** It goes home: along this route if given (one it walked out on, nest end last), else the nearest way home. */
-    public void send(UUID ant, @Nullable RaidColumn.Route route, long now, String why) {
+    public void send(UUID ant, @Nullable Route route, long now, String why) {
         Going before = going.get(ant);
         going.put(ant, new Going(route != null ? route : before == null ? null : before.route, before == null ? now : before.since,
                 before == null ? why : before.why));
@@ -134,16 +137,16 @@ public final class WayHome {
             one.looked = true;
             ScentTrails.Trail trail = trails.nearestLive(ant.blockPosition(), TRAIL_NEAR, numbers, level.getGameTime());
             if (trail != null && trail.points().size() >= 2) {
-                java.util.List<BlockPos> home = new java.util.ArrayList<>(trail.points());
-                java.util.Collections.reverse(home); // (the trail runs from the nest out: home is its start)
-                one.route = new RaidColumn.Route(home);
+                List<BlockPos> home = new ArrayList<>(trail.points());
+                Collections.reverse(home); // (the trail runs from the nest out: home is its start)
+                one.route = new Route(home);
             }
         }
         if (one.route == null) {
             return nearEntrance(level, ant, entrance); // (no way known: straight for the entrance, hop by hop)
         }
         double along = one.route.along(ant.getX(), ant.getZ());
-        return along + STEP >= one.route.length() ? nearEntrance(level, ant, entrance) : RaidColumn.place(level, one.route, along + STEP, 0.0);
+        return along + STEP >= one.route.length() ? nearEntrance(level, ant, entrance) : one.route.place(level, along + STEP, 0.0);
     }
 
     /** BUGS 143: the distances (blocks) from the entrance a place to walk to is looked for at, nearest a good one first. */

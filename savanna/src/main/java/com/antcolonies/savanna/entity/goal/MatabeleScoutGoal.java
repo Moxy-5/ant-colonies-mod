@@ -1,19 +1,21 @@
 package com.antcolonies.savanna.entity.goal;
 
-import com.antcolonies.colony.GroundTop;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.EnumSet;
 import java.util.List;
 
 import org.jetbrains.annotations.Nullable;
 
 import com.antcolonies.colony.Colony;
+import com.antcolonies.colony.GroundTop;
 import com.antcolonies.entity.AbstractAntEntity;
 import com.antcolonies.savanna.SavannaSpecies;
 import com.antcolonies.savanna.colony.FeedingSpots;
 import com.antcolonies.savanna.colony.RaidGround;
 import com.antcolonies.savanna.colony.Raids;
 import com.antcolonies.savanna.colony.SavannaParts;
+import com.antcolonies.savanna.colony.WayHome;
 import com.antcolonies.savanna.entity.MatabeleEntity;
 import com.antcolonies.savanna.species.SavannaNumbers;
 
@@ -239,7 +241,7 @@ public class MatabeleScoutGoal extends Goal {
         ways.clear();
         int far = trip.reach();
         double reach = far + numbers.smell() + 32.0;
-        java.util.List<Colony> near = Raids.termiteColonies(level, colony.getCenter(), reach); // (once: the review, finding 11)
+        List<Colony> near = Raids.termiteColonies(level, colony.getCenter(), reach); // (once: the review, finding 11)
         for (Colony termites : near) {
             mounds.add(new Raids.MoundAt(termites.getCenter(), FeedingSpots.moundReach(level, termites)));
         }
@@ -905,7 +907,7 @@ public class MatabeleScoutGoal extends Goal {
             if (find != null) {
                 line.add(entrance);
                 List<BlockPos> nestFirst = new ArrayList<>(line);
-                java.util.Collections.reverse(nestFirst);
+                Collections.reverse(nestFirst);
                 raids.found(level, find, worth, nestFirst, ant.getUUID());
                 told = true;
             }
@@ -920,7 +922,7 @@ public class MatabeleScoutGoal extends Goal {
             return;
         }
         double pace = find != null ? FIND_PACE : 1.0;
-        entrance = com.antcolonies.savanna.colony.WayHome.nearEntrance(level, ant, entrance, NEAR_ENTRANCE, 0.0); // (BUGS 143: not the chimney's open mouth)
+        entrance = WayHome.nearEntrance(level, ant, entrance, NEAR_ENTRANCE, 0.0); // (BUGS 143: not the chimney's open mouth)
         if (flat(at, entrance) <= HOP && ant.getNavigator().moveTo(entrance, pace) || hopToward(level, entrance, pace)
                 || tries >= TRIES_PER_POINT && ant.getNavigator().moveTo(entrance, pace)) { // (no hop: the whole way at once)
             tries = 0;

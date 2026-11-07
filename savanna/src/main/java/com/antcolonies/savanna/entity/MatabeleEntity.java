@@ -1,61 +1,67 @@
 package com.antcolonies.savanna.entity;
 
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+
+import org.jetbrains.annotations.Nullable;
+
 import com.antcolonies.colony.Caste;
 import com.antcolonies.colony.Colony;
 import com.antcolonies.colony.ColonyManager;
+import com.antcolonies.colony.ColonyNews;
 import com.antcolonies.entity.AbstractAntEntity;
 import com.antcolonies.entity.ColonyBorn;
 import com.antcolonies.entity.WorkerHunger;
-import com.antcolonies.entity.goal.NapGoal;
 import com.antcolonies.entity.goal.AllogroomGoal;
-import com.antcolonies.entity.goal.GroomGoal;
 import com.antcolonies.entity.goal.AntWanderGoal;
 import com.antcolonies.entity.goal.CarryEggGoal;
 import com.antcolonies.entity.goal.ClampCareGoal;
-import com.antcolonies.entity.goal.RescueGoal;
-import com.antcolonies.entity.goal.WoundCareGoal;
 import com.antcolonies.entity.goal.DigGoal;
 import com.antcolonies.entity.goal.EatGoal;
-import com.antcolonies.entity.goal.FightGoal;
 import com.antcolonies.entity.goal.FeedLarvaGoal;
 import com.antcolonies.entity.goal.FeedQueenGoal;
+import com.antcolonies.entity.goal.FightGoal;
 import com.antcolonies.entity.goal.GoInsideGoal;
+import com.antcolonies.entity.goal.GroomGoal;
+import com.antcolonies.entity.goal.NapGoal;
+import com.antcolonies.entity.goal.RescueGoal;
 import com.antcolonies.entity.goal.WaitAtNestGoal;
+import com.antcolonies.entity.goal.WoundCareGoal;
+import com.antcolonies.fight.Fights;
 import com.antcolonies.savanna.SavannaSpecies;
+import com.antcolonies.savanna.block.MoundSoil;
+import com.antcolonies.savanna.colony.RaidColumn;
+import com.antcolonies.savanna.colony.Raids;
+import com.antcolonies.savanna.colony.SavannaParts;
 import com.antcolonies.savanna.entity.goal.BringPreyGoal;
 import com.antcolonies.savanna.entity.goal.CarryRemainsGoal;
+import com.antcolonies.savanna.entity.goal.MatabeleBiteOutGoal;
 import com.antcolonies.savanna.entity.goal.MatabeleRaidGoal;
 import com.antcolonies.savanna.entity.goal.MatabeleScoutGoal;
 import com.antcolonies.savanna.registry.SavannaBlocks;
 import com.antcolonies.savanna.registry.SavannaEntities;
+import com.antcolonies.savanna.registry.SavannaSounds;
 import com.antcolonies.savanna.registry.SavannaTags;
 import com.antcolonies.savanna.species.SavannaNumbers;
 import com.antcolonies.species.SpeciesProfile;
 import com.antcolonies.species.SpeciesProfiles;
 
-import org.jetbrains.annotations.Nullable;
-
-import java.util.ArrayList;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Set;
-
-import com.antcolonies.fight.Fights;
-
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.nbt.CompoundTag;
-import net.minecraft.sounds.SoundEvents;
-import net.minecraft.world.entity.LivingEntity;
-import net.minecraft.world.level.block.state.BlockState;
-import com.antcolonies.savanna.block.MoundSoil;
-import net.minecraft.world.phys.AABB;
-import net.minecraft.world.phys.Vec3;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.sounds.SoundEvent;
+import net.minecraft.sounds.SoundEvents;
+import net.minecraft.tags.BlockTags;
 import net.minecraft.util.RandomSource;
 import net.minecraft.world.damagesource.DamageSource;
 import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.PathfinderMob;
 import net.minecraft.world.entity.ai.attributes.AttributeInstance;
 import net.minecraft.world.entity.ai.attributes.AttributeSupplier;
@@ -63,6 +69,9 @@ import net.minecraft.world.entity.ai.attributes.Attributes;
 import net.minecraft.world.entity.ai.goal.FloatGoal;
 import net.minecraft.world.entity.ai.goal.RandomLookAroundGoal;
 import net.minecraft.world.level.Level;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.phys.AABB;
+import net.minecraft.world.phys.Vec3;
 
 /**
  * A Matabele ant worker (Megaponera analis), a major or a minor: the model, clips and climbing made in M8 step 1, put
@@ -121,7 +130,7 @@ public class MatabeleEntity extends AbstractAntEntity implements ColonyBorn {
     private BlockPos breach;
     @Nullable
     private BlockPos walkingToBreach;
-    private final java.util.Map<BlockPos, Long> noWayTo = new java.util.HashMap<>();
+    private final Map<BlockPos, Long> noWayTo = new HashMap<>();
     /** Its length in mm (0 until rolled, on its first tick). */
     private float lengthMm;
     @Nullable
@@ -184,7 +193,7 @@ public class MatabeleEntity extends AbstractAntEntity implements ColonyBorn {
     protected void registerGoals() {
         this.goalSelector.addGoal(0, new FloatGoal(this));
         // BUGS 102: shut in by the termites' seals, it bites its way out (ahead of the fight, see the goal).
-        this.goalSelector.addGoal(-1, new com.antcolonies.savanna.entity.goal.MatabeleBiteOutGoal(this));
+        this.goalSelector.addGoal(-1, new MatabeleBiteOutGoal(this));
         // M8 step 2b: sent to fight (the skirmish command; the raids later), or hurt by a termite, it fights.
         this.goalSelector.addGoal(0, new FightGoal(this));
         // Step 1e: they eat from the prey pile, feed the queen and the larvae from it, carry eggs and carry the waste out
@@ -355,10 +364,10 @@ public class MatabeleEntity extends AbstractAntEntity implements ColonyBorn {
     /** What it remembers of its own scouting (its direction, its reach; saved). */
     private final ScoutMemory scoutMemory = new ScoutMemory();
     /** Its scouting goal (tests: the shape of its search walk). */
-    @org.jetbrains.annotations.Nullable
+    @Nullable
     private MatabeleScoutGoal scoutGoal;
 
-    @org.jetbrains.annotations.Nullable
+    @Nullable
     public MatabeleScoutGoal scoutGoalForTests() {
         return scoutGoal;
     }
@@ -517,7 +526,7 @@ public class MatabeleEntity extends AbstractAntEntity implements ColonyBorn {
         if (mayBite(level, pos, state)) {
             return true;
         }
-        if (state.is(net.minecraft.tags.BlockTags.DIRT)) {
+        if (state.is(BlockTags.DIRT)) {
             return true; // (raid flow: the ground is bitten only to get out of a trap, never to break in)
         }
         for (Colony colony : ColonyManager.get(level).getColonies()) {
@@ -525,10 +534,10 @@ public class MatabeleEntity extends AbstractAntEntity implements ColonyBorn {
                     || !colony.profile().nest().isPlug(state)) {
                 continue;
             }
-            if (colony.part(com.antcolonies.savanna.colony.SavannaParts.RAID_DEFENCE).map(part -> part.seals().contains(pos)).orElse(false)) {
+            if (colony.part(SavannaParts.RAID_DEFENCE).map(part -> part.seals().contains(pos)).orElse(false)) {
                 return true;
             }
-            if (colony.part(com.antcolonies.savanna.colony.SavannaParts.MOUND).map(part -> part.getParts(level).containsKey(pos)).orElse(false)) {
+            if (colony.part(SavannaParts.MOUND).map(part -> part.getParts(level).containsKey(pos)).orElse(false)) {
                 return false;
             }
             if (colony.nest().isInside(level, pos)) {
@@ -559,7 +568,7 @@ public class MatabeleEntity extends AbstractAntEntity implements ColonyBorn {
         playAttack(BITE_COVER);
         playSound(SoundEvents.ROOTED_DIRT_BREAK, 0.6F, 1.4F);
         if (++bites >= needed) {
-            if (tellTermites && level.getBlockState(cover).is(net.minecraft.tags.BlockTags.DIRT)) {
+            if (tellTermites && level.getBlockState(cover).is(BlockTags.DIRT)) {
                 groundBroken++; // (raid flow: never, the watch rule "no-ground-dug" looks)
             }
             level.destroyBlock(cover, false, this);
@@ -569,10 +578,10 @@ public class MatabeleEntity extends AbstractAntEntity implements ColonyBorn {
             }
             opened++;
             // M8 step 2f: the colonies whose ground it is hear of it (the termites drum and seal the gallery behind them).
-            for (Colony colony : com.antcolonies.colony.ColonyManager.get(level).getColonies()) {
+            for (Colony colony : ColonyManager.get(level).getColonies()) {
                 double reach = colony.foragingRadius() + 8.0;
                 if (colony.getCenter().distSqr(cover) <= reach * reach) {
-                    colony.news().tell(level, com.antcolonies.colony.ColonyNews.BROKEN_OPEN, new com.antcolonies.colony.ColonyNews.BrokenOpen(cover.immutable(), this));
+                    colony.news().tell(level, ColonyNews.BROKEN_OPEN, new ColonyNews.BrokenOpen(cover.immutable(), this));
                 }
             }
         }
@@ -731,7 +740,7 @@ public class MatabeleEntity extends AbstractAntEntity implements ColonyBorn {
     private static boolean isMoundPiece(ServerLevel level, BlockPos pos) {
         for (Colony colony : ColonyManager.get(level).getColonies()) {
             if (SavannaSpecies.MACROTERMES.equals(colony.getSpecies()) && colony.getCenter().distSqr(pos) <= 48 * 48
-                    && colony.part(com.antcolonies.savanna.colony.SavannaParts.MOUND).map(part -> part.getParts(level).containsKey(pos)).orElse(false)) {
+                    && colony.part(SavannaParts.MOUND).map(part -> part.getParts(level).containsKey(pos)).orElse(false)) {
                 return true;
             }
         }
@@ -828,30 +837,33 @@ public class MatabeleEntity extends AbstractAntEntity implements ColonyBorn {
         if (super.mayGoOut()) {
             return true;
         }
-        Colony colony = getColony();
-        return colony != null && colony.part(com.antcolonies.savanna.colony.SavannaParts.RAIDS)
-                .map(raids -> raids.isScouting(getUUID()) || raids.isRaider(getUUID()) || raids.isGoingHome(getUUID())).orElse(false);
+        return onRaidErrand();
     }
 
     /** The raid code review, finding 3: scouting, in a raid column or going home from one, it does not leave to eat. */
     @Override
     public boolean isOnColonyErrand() {
+        return onRaidErrand();
+    }
+
+    /** Whether its colony has it out scouting, in a raid column or walking home from a raid (the raid tidy-up: was written twice). */
+    private boolean onRaidErrand() {
         Colony colony = getColony();
-        return colony != null && colony.part(com.antcolonies.savanna.colony.SavannaParts.RAIDS)
+        return colony != null && colony.part(SavannaParts.RAIDS)
                 .map(raids -> raids.isScouting(getUUID()) || raids.isRaider(getUUID()) || raids.isGoingHome(getUUID())).orElse(false);
     }
 
     /** Whether it is busy with a nest chore now (feeding the queen or the young, carrying eggs, waste or prey, care). */
     public boolean isBusyWithChore() {
         return runsGoal(FeedQueenGoal.class) || runsGoal(FeedLarvaGoal.class) || runsGoal(CarryEggGoal.class)
-                || runsGoal(CarryRemainsGoal.class) || runsGoal(ClampCareGoal.class) || runsGoal(com.antcolonies.savanna.entity.goal.BringPreyGoal.class);
+                || runsGoal(CarryRemainsGoal.class) || runsGoal(ClampCareGoal.class) || runsGoal(BringPreyGoal.class);
     }
 
     /** M8 step 3b: whether it walks in its colony's raid column now. */
     @Override
     public boolean isInAColumn() {
         Colony colony = getColony();
-        return colony != null && colony.part(com.antcolonies.savanna.colony.SavannaParts.RAIDS)
+        return colony != null && colony.part(SavannaParts.RAIDS)
                 .map(raids -> raids.isRaider(getUUID())).orElse(false);
     }
 
@@ -887,8 +899,8 @@ public class MatabeleEntity extends AbstractAntEntity implements ColonyBorn {
 
     /** Its squeak (M8 step 2e): real Megaponera stridulate when held or when the nest is broken into. */
     @Override
-    protected net.minecraft.sounds.SoundEvent squeakSound() {
-        return com.antcolonies.savanna.registry.SavannaSounds.MATABELE_SQUEAK.get();
+    protected SoundEvent squeakSound() {
+        return SavannaSounds.MATABELE_SQUEAK.get();
     }
 
     /**
@@ -904,7 +916,7 @@ public class MatabeleEntity extends AbstractAntEntity implements ColonyBorn {
         }
         if (wounds().isOpen()) {
             // M8 step 5: the hurt rest in the room nearest the entrance, where they are tended (my pick)
-            java.util.List<BlockPos> hurtRoom = colony.nest().getHurtRoomCells(level());
+            List<BlockPos> hurtRoom = colony.nest().getHurtRoomCells(level());
             if (!hurtRoom.isEmpty()) {
                 return hurtRoom.get(Math.floorMod(getId(), hurtRoom.size()));
             }
@@ -916,8 +928,8 @@ public class MatabeleEntity extends AbstractAntEntity implements ColonyBorn {
     @Override
     public boolean answersHelpCalls() {
         Colony colony = getColony();
-        com.antcolonies.savanna.colony.RaidColumn column = colony == null ? null
-                : colony.part(com.antcolonies.savanna.colony.SavannaParts.RAIDS).map(com.antcolonies.savanna.colony.Raids::column).orElse(null);
+        RaidColumn column = colony == null ? null
+                : colony.part(SavannaParts.RAIDS).map(Raids::column).orElse(null);
         return column == null || !column.has(getUUID());
     }
 

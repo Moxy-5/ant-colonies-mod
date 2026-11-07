@@ -290,6 +290,9 @@ timings: all "my pick, to confirm" until then).
        (forming, march, attack, collect, home), each with its own timers, sharing the members, routes, numbers and the
        diary; `Route` in its own file; every numbers record with a default so the fallbacks go; the timings the user may
        want to tune moved into `megaponera_analis.json`.
+       **Partly done 2026-11-07 (the raid tidy-up, `docs/reviews/raids-tidy-review-3.md`):** `Route` in its own file
+       (`colony/Route.java`) and the carry numbers' default (`CarryNumbers.DEFAULT`); the stage split and the timings
+       still to do.
      - **R10 Trails into the framework** (finding 13, after R9; code only, nothing changes in-game): the scent trail
        store, the route line, the stand-here rule (`RaidGround`) and the walk home along a trail (`WayHome`) moved into
        the framework under neutral names, so army ants, leafcutters and harvester neighbour fights reuse them; the

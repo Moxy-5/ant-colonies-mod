@@ -8,7 +8,7 @@ import com.antcolonies.colony.Colony;
 import com.antcolonies.entity.goal.Errand;
 import com.antcolonies.entity.load.CarriedLoad;
 import com.antcolonies.savanna.colony.PreyPile;
-import com.antcolonies.savanna.colony.RaidColumn;
+import com.antcolonies.savanna.colony.RaidGround;
 import com.antcolonies.savanna.colony.SavannaParts;
 import com.antcolonies.savanna.entity.MatabeleEntity;
 import com.antcolonies.savanna.entity.MatabeleLoads;
@@ -120,7 +120,7 @@ public class BringPreyGoal extends Goal {
     private void noWay(ServerLevel level) {
         nextTry = level.getGameTime() + RETRY_TICKS;
         Colony colony = ant.getColony();
-        if (colony != null && com.antcolonies.savanna.colony.RaidGround.flat(ant.blockPosition(), colony.getCenter()) > FAR_OUT) {
+        if (colony != null && RaidGround.flat(ant.blockPosition(), colony.getCenter()) > FAR_OUT) {
             // (the raid code review, finding 2: far out with no way to the pile, it goes home along a trail with its
             // termites first, and tries again from the entrance)
             colony.part(SavannaParts.RAIDS).ifPresent(raids -> raids.sendHome(level, ant, "a carrier with no way to the prey pile"));
@@ -144,6 +144,6 @@ public class BringPreyGoal extends Goal {
 
     private int bringTicks() {
         return ant.profile().section(SavannaNumbers.CARRY).map(SavannaNumbers.CarryNumbers::bringTicks)
-                .orElse(RaidColumn.DEFAULT_CARRY.bringTicks());
+                .orElse(SavannaNumbers.CarryNumbers.DEFAULT.bringTicks());
     }
 }

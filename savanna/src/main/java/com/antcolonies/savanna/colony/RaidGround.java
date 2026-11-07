@@ -1,5 +1,8 @@
 package com.antcolonies.savanna.colony;
 
+import java.util.Locale;
+import java.util.UUID;
+
 import org.jetbrains.annotations.Nullable;
 
 import com.antcolonies.colony.Colony;
@@ -18,6 +21,11 @@ public final class RaidGround {
     private static final int[] NEAR_HEIGHTS = {0, 1, -1, 2, -2, 3, -3};
 
     private RaidGround() {
+    }
+
+    /** An ant's short name in the raid diary: the first 8 letters of its id (the raid tidy-up: it was written out by hand 50 times). */
+    public static String shortId(UUID id) {
+        return id.toString().substring(0, 8);
     }
 
     /** The distance between two places on the ground's plan (x and z only, blocks). */
@@ -59,6 +67,6 @@ public final class RaidGround {
             return "?";
         }
         long dayTime = colony.timeOfDay(level) % 24000;
-        return String.format(java.util.Locale.ROOT, "%02d:%02d", (dayTime / 1000 + 6) % 24, (dayTime % 1000) * 60 / 1000);
+        return String.format(Locale.ROOT, "%02d:%02d", (dayTime / 1000 + 6) % 24, (dayTime % 1000) * 60 / 1000);
     }
 }
