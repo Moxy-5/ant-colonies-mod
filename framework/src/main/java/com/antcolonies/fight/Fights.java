@@ -8,6 +8,8 @@ import com.antcolonies.entity.AbstractAntEntity;
 import com.antcolonies.species.SpeciesProfile;
 
 import java.util.ArrayDeque;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.HashSet;
 import java.util.Set;
 
@@ -212,6 +214,48 @@ public final class Fights {
      * cannot find (the user's report of 2026-10-25: 600 failed route searches in 2 minutes): the way in must be opened
      * first. A cheap check only; the route search still has the last word.
      */
+    /**
+     * How many steps this cell lies from a cell in the open ({@link #isInTheOpen}), through cells that are not solid and
+     * past no plate of termite mud ({@link FacedWall}), as {@link #isShutIn} walks; 0 in the open itself, -1 if more than
+     * {@code most}. Cells {@code skip} says yes to are never walked through (a colony's own built home: its mound). The
+     * raid queue and openings fix (2026-11-06): a member that close to an opening is at it, reachable.
+     */
+    public static int stepsToTheOpen(Level level, BlockPos cell, int most, java.util.function.Predicate<BlockPos> skip) {
+        List<BlockPos> ring = new ArrayList<>();
+        Set<BlockPos> seen = new HashSet<>();
+        ring.add(cell.immutable());
+        seen.add(cell.immutable());
+        for (int steps = 0; steps <= most && !ring.isEmpty(); steps++) {
+            List<BlockPos> next = new ArrayList<>();
+            for (BlockPos at : ring) {
+                if (!level.isLoaded(at)) {
+                    continue;
+                }
+                if (isInTheOpen(level, at)) {
+                    return steps;
+                }
+                if (steps == most) {
+                    continue;
+                }
+                BlockState here = level.getBlockState(at);
+                for (Direction side : Direction.values()) {
+                    BlockPos to = at.relative(side);
+                    if (seen.contains(to) || FacedWall.hasFace(here, side) || skip.test(to)) {
+                        continue;
+                    }
+                    BlockState there = level.getBlockState(to);
+                    if (there.isCollisionShapeFullBlock(level, to) || FacedWall.hasFace(there, side.getOpposite())) {
+                        continue;
+                    }
+                    seen.add(to);
+                    next.add(to);
+                }
+            }
+            ring = next;
+        }
+        return -1;
+    }
+
     public static boolean isShutIn(Level level, BlockPos cell) {
         ArrayDeque<BlockPos> queue = new ArrayDeque<>();
         Set<BlockPos> seen = new HashSet<>();

@@ -342,18 +342,27 @@ public class FightGoal extends Goal {
 
     /**
      * Whether it goes after this foe (step 2g): one it can strike now, anything not an insect, or an insect in the open;
-     * an insect under cover only if it is not shut in, and never by a breaker, who opens the way in instead.
+     * an insect under cover only if it is not shut in, and never by a breaker, who opens the way in instead, unless it
+     * stands right at an opening (the raid queue and openings fix, 2026-11-06: a breaker grabs what is at the mouth of a
+     * broken gallery, {@link #MOUTH_STEPS}; the small ones go in after the rest).
      */
     private boolean worthChasing(ServerLevel level, LivingEntity candidate) {
-        if (!(candidate instanceof AbstractAntEntity) || ant.reachesInFight(candidate)) {
+        if (!(candidate instanceof AbstractAntEntity insect) || ant.reachesInFight(candidate)) {
             return true;
         }
         BlockPos at = candidate.blockPosition();
         if (Fights.isInTheOpen(level, at)) {
             return true;
         }
-        return !ant.breaksIn() && !Fights.isShutIn(level, at);
+        if (ant.breaksIn()) {
+            int steps = insect.stepsToAnOpening();
+            return steps >= 0 && steps <= MOUTH_STEPS;
+        }
+        return !Fights.isShutIn(level, at);
     }
+
+    /** How many steps in from an opening a breaker still goes for a member at it (my pick, 1: the mouth itself and the cell under it). */
+    private static final int MOUTH_STEPS = 1;
 
     /** How far this place lies ahead of it: 1 straight ahead, 0 to the side, -1 behind. */
     private double ahead(BlockPos place) {

@@ -83,6 +83,8 @@ public class Nest {
     private Set<BlockPos> insideChannels = Set.of();
     /** The mud casts joined to a feeding gallery (see {@link #isInside}), each with the gallery cell it is joined to. */
     private Map<BlockPos, BlockPos> castGalleries = Map.of();
+    /** The cells the colony's built home ({@link ColonyHooks.Structure}, the termites' mound) adds to the inside (see {@link #isStructureCell}). */
+    private Set<BlockPos> structureCells = Set.of();
     private long insideTick = Long.MIN_VALUE;
 
     Nest(Colony colony) {
@@ -1023,9 +1025,11 @@ public class Nest {
             channels.addAll(casts.keySet());
             castGalleries = casts;
             ColonyHooks.Structure structure = colony.hooks().first(ColonyHooks.STRUCTURE); // (the mound's hollow shaft and channels)
+            Set<BlockPos> fromStructure = new HashSet<>();
             if (structure != null) {
-                structure.addInside(level, cells, channels);
+                structure.addInside(level, recording(cells, fromStructure), recording(channels, fromStructure));
             }
+            structureCells = fromStructure;
             inside = cells;
             insideChannels = channels;
             insideTick = now;
@@ -1035,6 +1039,38 @@ public class Nest {
         }
         ColonyHooks.Structure structure = insideChannels.contains(cell) ? colony.hooks().first(ColonyHooks.STRUCTURE) : null;
         return structure != null && structure.isChannel(level.getBlockState(cell));
+    }
+
+    /**
+     * The raid queue and openings fix (2026-11-06): whether this cell is part of the colony's built home, a cell its
+     * structure ({@link ColonyHooks.Structure}, the termites' mound) counts as inside: its hollows and channels. A
+     * member at an opening there is not reachable by hunters (raids hit feeding sites, never the mound).
+     */
+    public boolean isStructureCell(Level level, BlockPos cell) {
+        isInside(level, cell); // brings the cells up to date
+        return structureCells.contains(cell);
+    }
+
+    /** A set that also notes in {@code added} every cell added to it (what the structure added to the inside). */
+    private static Set<BlockPos> recording(Set<BlockPos> into, Set<BlockPos> added) {
+        return new com.google.common.collect.ForwardingSet<>() {
+            @Override
+            protected Set<BlockPos> delegate() {
+                return into;
+            }
+
+            @Override
+            public boolean add(BlockPos cell) {
+                added.add(cell);
+                return into.add(cell);
+            }
+
+            @Override
+            public boolean addAll(java.util.Collection<? extends BlockPos> cells) {
+                added.addAll(cells);
+                return into.addAll(cells);
+            }
+        };
     }
 
     /**

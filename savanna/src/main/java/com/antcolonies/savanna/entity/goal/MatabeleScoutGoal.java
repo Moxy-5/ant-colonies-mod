@@ -609,7 +609,7 @@ public class MatabeleScoutGoal extends Goal {
         }
         return level.getEntitiesOfClass(AbstractAntEntity.class, box,
                 insect -> SavannaSpecies.MACROTERMES.equals(insect.species()) && insect.isAlive() && !insect.isDowned()
-                        && !insect.isSheltered() && Raids.awayFromMoundDoor(insect.blockPosition(), mounds));
+                        && !insect.isIndoors() && Raids.awayFromMoundDoor(insect.blockPosition(), mounds));
     }
 
     /** A by-day feeding place's dug cell (or its food) within {@code smell} of here, the nearest; null if none. */

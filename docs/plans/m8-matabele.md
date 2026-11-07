@@ -454,6 +454,14 @@ timings: all "my pick, to confirm" until then).
      looks about or shuffles a step every 1 to 3 s, besides cleaning); M3 grass and dirt off the bite list (only Mud
      Crust, mud casts and soft termite plugs; dirt only to bite out of a trap), a new watch rule `no-ground-dug`. Every
      number my pick, to confirm. Not tried in-game yet.
+     **Then the raid queue and the openings (the user's raid of 2026-11-06, "fix both"; branch
+     `claude/raid-queue-openings-307d34`):** the crowd on a tall dead mound queued one by one (all of it inside the
+     single-file start, one lane) and stood about 30 s, some sent home stuck; now places by rows, a queue only on the
+     trail itself, walks at most 4 blocks at a time, funnel cells at the ant's own height, distances walked with climbs
+     counted, never a place behind the ant on a wall, "down the chimney" only in the shaft, the front waiting only for
+     real stragglers (tall-mound test: 13 to 19 of 47 left on the hump when the front arrives, was 31 to 35). Termite workers packing soil
+     just inside a broken hole were never attacked (every gallery counted as cover); now a termite 0 to 2 cells from an
+     opening is fair game (majors only at the mouth), deeper in and the mound stay safe. Not tried in-game yet.
    - **Order (my pick):** S1 to S6, in-game test 5b, then Q1 to Q6, in-game test 5c (or the two tests as one if the
      user prefers), then 3d.
    - **3d The termites' losses.** Termites in the galleries round the spot are numbers until broken into

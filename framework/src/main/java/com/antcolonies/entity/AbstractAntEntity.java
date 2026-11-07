@@ -16,6 +16,7 @@ import com.antcolonies.registry.ModTags;
 import com.antcolonies.colony.ColonyManager;
 import com.antcolonies.colony.ColonyNews;
 import com.antcolonies.colony.ColonyRole;
+import com.antcolonies.colony.Nest;
 import com.antcolonies.debug.Perf;
 import com.antcolonies.entity.body.AntAnimationController;
 import com.antcolonies.entity.body.BodyPlans;
@@ -1600,8 +1601,44 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
      * the termites' side, step 2f.
      */
     public boolean isSheltered() {
+        // The raid queue and openings fix (the user's raid of 2026-11-06: termite workers packing soil into a broken
+        // gallery stood untouched beside the raiders): one at an opening, a step or two in from the open, is not sheltered
+        // (real Macrotermes workers rush to mend a breach, and that is where Megaponera seize them; the deep nest is safe).
+        return isIndoors() && stepsToAnOpening() < 0;
+    }
+
+    /**
+     * Server: whether it is inside its own nest and not in a feeding way, wherever in it (an opening or not): the rule
+     * {@link #isSheltered} had before the openings fix, kept for a scout looking for termites feeding (one mending a hole
+     * is not feeding).
+     */
+    public boolean isIndoors() {
         Colony colony = getColony();
         return colony != null && colony.nest().isInside(level(), blockPosition()) && !colony.nest().isFeedingWay(blockPosition());
+    }
+
+    /**
+     * How many members of a nest lie this many steps or fewer from the open count as at an opening, reachable (the raid
+     * queue and openings fix; my pick, 2: a broken gallery's mouth and a body length in).
+     */
+    public static final int OPENING_STEPS = 2;
+
+    /**
+     * Server: how many steps it stands in from an opening of its own nest, through open cells ({@link Fights#stepsToTheOpen},
+     * at most {@link #OPENING_STEPS}): 0 to {@link #OPENING_STEPS} at one (a broken gallery, a hole being sealed), -1 if
+     * deeper, with no colony, or in its colony's built home (the mound: raids keep off it).
+     */
+    public int stepsToAnOpening() {
+        Colony colony = getColony();
+        if (colony == null) {
+            return -1;
+        }
+        BlockPos at = blockPosition();
+        Nest nest = colony.nest();
+        if (nest.isStructureCell(level(), at)) {
+            return -1;
+        }
+        return Fights.stepsToTheOpen(level(), at, OPENING_STEPS, cell -> nest.isStructureCell(level(), cell));
     }
 
     /** Server: whether it fled from a hunter and is now hiding in its nest, out of reach ({@link #isSheltered}). */

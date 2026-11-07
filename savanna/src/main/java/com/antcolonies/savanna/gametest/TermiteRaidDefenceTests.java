@@ -297,6 +297,90 @@ public class TermiteRaidDefenceTests {
     }
 
     /**
+     * The raid queue fix, part 2 (the user's raid of 2026-11-06: the raiders stood by the broken mud while termite workers
+     * packed soil into the holes just inside, and nobody attacked them). A foraging tunnel is opened to the sky at one
+     * cell; a worker stands one cell in from the opening (as a worker packing the hole does) and another four cells in.
+     * The one at the mouth counts as at an opening, not sheltered; the one deeper in stays sheltered. A Matabele minor sent
+     * to fight there stings the worker at the mouth still and leaves the one deeper in alone (real Megaponera: the minors
+     * reach into the openings for the termites there; the nest itself they do not enter, Longhurst and Howse 1979).
+     */
+    @GameTest(template = "arena", timeoutTicks = 3000, skyAccess = true, batch = "termite_raid_mouth")
+    public static void aWorkerAtABreaksMouthIsStungAndOneDeeperInIsLeft(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        Scene scene = scene(helper, 12.0);
+        @SuppressWarnings("unchecked")
+        java.util.function.Supplier<String>[] failAt = new java.util.function.Supplier[1];
+        Runnable[] each = new Runnable[1];
+        helper.onEachTick(() -> {
+            if (each[0] != null) {
+                each[0].run();
+            }
+        });
+        helper.runAfterDelay(15, () -> {
+            Colony colony = scene.colony[0];
+            List<BlockPos> cells = scene.tunnel[0].tunnel();
+            int at = cells.size() - 2;
+            helper.assertTrue(at - 4 >= 1, "the foraging tunnel is too short for the test: " + cells.size() + " cells");
+            BlockPos breakAt = cells.get(at);
+            BlockPos mouthCell = cells.get(at - 1);
+            BlockPos deepCell = cells.get(at - 4);
+            // The break: the ground over the cell dug away to the sky.
+            int top = level.getHeight(net.minecraft.world.level.levelgen.Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, breakAt.getX(), breakAt.getZ());
+            for (int y = breakAt.getY() + 1; y < top; y++) {
+                level.setBlock(new BlockPos(breakAt.getX(), y, breakAt.getZ()), Blocks.AIR.defaultBlockState(), 3);
+            }
+            TermiteWorkerEntity mouth = put(level, SavannaEntities.TERMITE_WORKER.get(), mouthCell);
+            TermiteWorkerEntity deep = put(level, SavannaEntities.TERMITE_WORKER.get(), deepCell);
+            long readyAt = helper.getTick() + 10; // once they have joined the colony
+            boolean[] ready = {false};
+            MatabeleEntity[] minor = {null};
+            each[0] = () -> {
+                if (!ready[0]) {
+                    if (helper.getTick() < readyAt) {
+                        return;
+                    }
+                    ready[0] = true;
+                    for (TermiteWorkerEntity worker : new TermiteWorkerEntity[] {mouth, deep}) {
+                        helper.assertTrue(worker.getColony() == colony, "a worker put in the tunnel did not join the colony");
+                        worker.setNoAi(true); // (they stand there, packing soil)
+                        worker.moveTo(Vec3.atBottomCenterOf(worker == mouth ? mouthCell : deepCell));
+                        worker.setDodgeForTests(0.0, 0.0);
+                    }
+                    helper.assertTrue(mouth.isIndoors() && deep.isIndoors(), "the tunnel cells should be the nest's: mouth "
+                            + mouth.isIndoors() + ", deeper in " + deep.isIndoors());
+                    helper.assertTrue(mouth.stepsToAnOpening() == 1 && !mouth.isSheltered(), "the worker at the mouth should be 1 step from the opening and not sheltered, not "
+                            + mouth.stepsToAnOpening() + " steps, sheltered " + mouth.isSheltered());
+                    helper.assertTrue(deep.stepsToAnOpening() < 0 && deep.isSheltered(), "the worker deeper in should be sheltered, not "
+                            + deep.stepsToAnOpening() + " steps from an opening");
+                    BlockPos rel = helper.relativePos(breakAt);
+                    minor[0] = com.antcolonies.gametest.TestAnts.loneWithAMind(helper, SavannaEntities.MATABELE_MINOR.get(), rel.getX() + 3, TestScenes.SURFACE, rel.getZ());
+                    minor[0].orderToFight(breakAt.atY(top), level.getGameTime() + 2400);
+                    return;
+                }
+                // (the raiders keep the break open: the colony's builders mend it, as real termites do, and the plug is bitten away)
+                for (int y = breakAt.getY(); y < top; y++) {
+                    BlockPos open = new BlockPos(breakAt.getX(), y, breakAt.getZ());
+                    if (!level.getBlockState(open).isAir()) {
+                        level.setBlock(open, Blocks.AIR.defaultBlockState(), 3);
+                    }
+                }
+                helper.assertTrue(!deep.isParalysed(), "the worker deeper in (sheltered) was stung");
+                if (minor[0].isAlive()) {
+                    minor[0].setHealth(minor[0].getMaxHealth());
+                }
+                if (mouth.isParalysed()) {
+                    SavannaMod.LOGGER.info("[raid-mouth-test] the worker at the mouth stung at tick {}", helper.getTick());
+                    helper.succeed();
+                }
+            };
+            failAt[0] = () -> "the worker at the mouth was never stung: it is at " + (mouth.isAlive() ? mouth.blockPosition().toShortString() : "dead")
+                    + " (" + mouth.stepsToAnOpening() + " steps from an opening), the minor at "
+                    + (minor[0] == null ? "none" : minor[0].blockPosition().toShortString()) + ", break " + breakAt.toShortString();
+        });
+        helper.runAtTickTime(2990, () -> helper.fail(failAt[0] == null ? "the scene never got ready" : failAt[0].get()));
+    }
+
+    /**
      * A queen and six old workers (builders, who carry the dead); at tick 10 the clock is still at {@code hour}, the
      * nest is dug out at once and the entrance closed with stone (the scene of {@code MatabeleFightTests}).
      */

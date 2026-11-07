@@ -764,6 +764,67 @@ public class MatabeleRaidTests {
         java.util.Map<java.util.UUID, BlockPos> walkingTo = new java.util.HashMap<>();
         CrowdWatch crowd = new CrowdWatch(ant -> !colony.nest().isInside(level, ant.blockPosition()));
         long[] watchUntil = {Long.MAX_VALUE};
+        // The raid queue fix (the user's raid of 2026-11-06: the crowd stood on the hump about 30 s while the scout and 3
+        // walked off, then about 50 left at once, and some were sent home "stuck: no headway"): from the column leaving,
+        // each raider out of the nest, its longest stand (told to stand, not walking) and when it first got 3 blocks along
+        // the trail, off the hump.
+        java.util.Map<java.util.UUID, Long> standingSince = new java.util.HashMap<>();
+        java.util.Map<java.util.UUID, Long> longestStand = new java.util.HashMap<>();
+        java.util.Map<java.util.UUID, Long> offTheHumpAt = new java.util.HashMap<>();
+        java.util.Set<java.util.UUID> setOut = new java.util.HashSet<>();
+        // (when each raider first got a block from where it stood as the column left: the user's raid had 3 go with the
+        // scout and the rest stand some 30 s, then all leave at once)
+        java.util.Map<java.util.UUID, net.minecraft.world.phys.Vec3> startAt = new java.util.HashMap<>();
+        java.util.Map<java.util.UUID, Long> movedAt = new java.util.HashMap<>();
+        long[] marchFrom = {-1};
+        helper.onEachTick(() -> {
+            RaidColumn raid = column[0];
+            if (raid == null || formedAt[0] < 0 || raid.stage() != RaidColumn.Stage.MARCHING || helper.getTick() > formedAt[0] + MARCH_WATCH) {
+                return;
+            }
+            long now = helper.getTick();
+            if (marchFrom[0] < 0) {
+                marchFrom[0] = now;
+            }
+            if ((now - marchFrom[0]) % 100 == 0) {
+                // (what the march looks like every 5 s: the front, and each raider out of the nest that is not off the hump yet)
+                StringBuilder line = new StringBuilder();
+                if (level.getEntity(raid.leader()) instanceof MatabeleEntity lead) {
+                    line.append("front ").append(lead.blockPosition().toShortString()).append(" along ")
+                            .append(String.format("%.1f", raid.alongOut(lead.blockPosition())));
+                }
+                for (java.util.UUID id : raid.members()) {
+                    if (!id.equals(raid.leader()) && !offTheHumpAt.containsKey(id) && level.getEntity(id) instanceof MatabeleEntity ant) {
+                        RaidColumn.Order order = raid.orderFor(level, ant);
+                        line.append("; ").append(id.toString(), 0, 4).append(" at ").append(ant.blockPosition().toShortString())
+                                .append(String.format(" along %.1f off %.1f", raid.alongOut(ant.blockPosition()), raid.offTrail(ant.blockPosition())))
+                                .append(" to ").append(order == null ? "none" : order.to() == null ? "stand" : order.to().toShortString())
+                                .append(ant.getNavigator().isDone() ? "" : " walking");
+                    }
+                }
+                SavannaMod.LOGGER.info("[raid form test] march at {} s: {}", (now - marchFrom[0]) / 20, line);
+            }
+            for (java.util.UUID id : raid.members()) {
+                if (id.equals(raid.leader()) || !(level.getEntity(id) instanceof MatabeleEntity ant) || colony.nest().isInside(level, ant.blockPosition())) {
+                    continue;
+                }
+                setOut.add(id);
+                net.minecraft.world.phys.Vec3 from = startAt.computeIfAbsent(id, k -> ant.position());
+                if (!movedAt.containsKey(id) && ant.position().distanceTo(from) >= 1.0) {
+                    movedAt.put(id, now - marchFrom[0]);
+                }
+                if (raid.alongOut(ant.blockPosition()) >= 3.0) {
+                    offTheHumpAt.putIfAbsent(id, now - marchFrom[0]);
+                }
+                RaidColumn.Order order = raid.orderFor(level, ant);
+                if (order != null && order.to() == null && ant.getNavigator().isDone()) {
+                    long since = standingSince.computeIfAbsent(id, k -> now);
+                    longestStand.merge(id, now - since, Math::max);
+                } else {
+                    standingSince.remove(id);
+                }
+            }
+        });
         helper.onEachTick(() -> {
             RaidColumn raid = column[0];
             if (raid == null || helper.getTick() > watchUntil[0]) {
@@ -868,8 +929,40 @@ public class MatabeleRaidTests {
                     SavannaMod.LOGGER.info("[raid form test] personal space: {}", crowd.describe());
                     helper.assertTrue(crowd.keptApart(), "raiders stood inside one another: " + crowd.describe());
                 })
+                .thenWaitUntil(() -> helper.assertTrue(helper.getTick() > formedAt[0] + MARCH_WATCH, "watching the march"))
+                .thenExecute(() -> {
+                    RaidColumn raid = column[0];
+                    long worstStand = longestStand.values().stream().mapToLong(Long::longValue).max().orElse(0);
+                    long lastOff = offTheHumpAt.values().stream().mapToLong(Long::longValue).max().orElse(-1);
+                    java.util.List<String> left = new java.util.ArrayList<>();
+                    for (java.util.UUID id : setOut) {
+                        if (!offTheHumpAt.containsKey(id) && raid.members().contains(id)) {
+                            left.add(id.toString().substring(0, 4));
+                        }
+                    }
+                    long movedSoon = setOut.stream().filter(id -> movedAt.getOrDefault(id, Long.MAX_VALUE) <= SET_OFF_SOON).count();
+                    java.util.List<Long> offTimes = offTheHumpAt.values().stream().sorted().toList();
+                    SavannaMod.LOGGER.info("[raid form test] the march: {} raiders out ({} left the column), {} on the move within {} s, the longest stand {} s, the last off the hump after {} s (in order, s: {}), {} never off it {}; {}",
+                            setOut.size(), setOut.stream().filter(id -> !raid.members().contains(id)).count(), movedSoon, SET_OFF_SOON / 20,
+                            worstStand / 20.0, lastOff / 20.0, offTimes.stream().map(t -> String.valueOf(t / 20)).toList(), left.size(), left, raid.describe());
+                    long dropped = setOut.stream().filter(id -> !raid.members().contains(id)).count();
+                    // (one raider walking but getting nowhere on the hump's side for 15 s, sent home stuck, is BUGS 166, a
+                    // climbing matter, about 1 run in 6; more than one is the march)
+                    helper.assertTrue(dropped <= 1, dropped + " raider(s) out of the nest left the column with no fight (sent home stuck): " + raid.describe());
+                    // The crowd pours down the hump behind the front while it marches: by the time the front reaches the
+                    // termites, at most half the raiders out are still on the hump (the old march: 31 to 35 of 47 still
+                    // there, the crowd standing for its places; the new one 13 to 19; down this test mound's 10-block wall
+                    // every raider must climb, about one a second, so not all).
+                    helper.assertTrue(left.size() * 2 <= setOut.size(), left.size() + " of " + setOut.size()
+                            + " raiders out still on the hump when the front reached the termites (the crowd left standing): " + offTheHumpAt);
+                })
                 .thenSucceed();
     }
+
+    /** The raid queue fix: how long the tall mound test watches the march (ticks). */
+    private static final long MARCH_WATCH = 1200;
+    /** The raid queue fix: the log counts the raiders on the move this soon after the column leaves (ticks). */
+    private static final long SET_OFF_SOON = 200;
 
     /**
      * The raid code review, finding 18: a trail over a hill and round a bend, all of it a real scout's own. Between the

@@ -115,6 +115,26 @@ public final class RaidColumn {
     private static final double FALL_IN_PACE = 0.8;
     /** Raid flow: when the front waits (or casts about for the trail) the column closes up to this share of its spacing (nose to tail; my pick). */
     private static final double CLOSE_UP = 0.75;
+    /**
+     * The raid queue fix (2026-11-06): a marching raider walks to a place at most this far (blocks along the trail) ahead
+     * of itself at a time, then the next (a far place across a dead mound's hump found no way, and the ant was sent home
+     * after 15 s; my pick, about 8 major lengths).
+     */
+    private static final double WALK_AHEAD = 4.0;
+    /** The raid queue fix: an ant lower than the entrance this near it (flat blocks) is in the chimney's shaft. */
+    private static final double CHIMNEY_REACH = 1.5;
+    /**
+     * The raid queue fix: the crowd round the trail's start presses in to this near it (blocks), the cells nearest it
+     * filled first by room ({@link #FORM_CELL_LENGTHS} each), so it pours onto the trail as the ones ahead leave instead of
+     * standing where it milled (my pick).
+     */
+    private static final double CROWD_PRESS = 1.0;
+    /** The raid queue fix: how far on (blocks walked) a place that snapped back behind its ant looks for one ahead of it. */
+    private static final double AHEAD_LOOK = 6.0;
+    /** The raid queue fix: an ant in the crowd this near the trail's start or behind it (blocks along) funnels in toward the start. */
+    private static final double FUNNEL_FROM = 0.5;
+    /** The raid queue fix: an ant is on the trail this near its height there (blocks up or down). */
+    private static final double ON_TRAIL_HEIGHT = 1.5;
     /** How often (ticks) the column works out its places. */
     private static final int EVERY = 5;
     /**
@@ -1312,10 +1332,14 @@ public final class RaidColumn {
         if (turnBack) {
             return false;
         }
+        // (The raid queue fix: the column's places by the distance walked along the trail, climbs and drops counted, not
+        // the flat distance: down a steep hump the crowd waited for a front that had in truth walked far.)
+        double frontW = route.walkedOf(front.getX(), front.getY(), front.getZ());
         Map<UUID, Double> at = new HashMap<>();
         Map<UUID, Double> key = new HashMap<>();
         for (MatabeleEntity ant : line) {
-            double along = alongOf(route, ant);
+            double flatAlong = alongOf(route, ant);
+            double along = flatAlong <= 0.0 ? flatAlong : route.walkedOf(ant.getX(), ant.getY(), ant.getZ());
             at.put(ant.getUUID(), along);
             key.put(ant.getUUID(), along + rankLean(ant, route));
         }
@@ -1330,16 +1354,22 @@ public final class RaidColumn {
         line.sort(java.util.Comparator.comparingDouble(ant -> -key.get(ant.getUUID())));
         int rows = (int) Math.ceil(line.size() / (double) Math.max(1, numbers.abreast()));
         double length = rows * numbers.spacing();
-        double rear = frontAt;
+        // The front waits for an ant fallen far behind its own place in the column, not for the crowd still waiting its
+        // turn at the trail's start (the raid queue fix, 2026-11-06: the whole crowd round a tall dead mound's chimney
+        // counted as the line's rear, so the front stopped again and again on the hump's wall while the crowd's places
+        // had not even reached the trail; the column crept off the hump).
+        double[] places = rowsFrom(route, frontW, numbers.spacing(), line.size());
+        double lag = 0.0;
         MatabeleEntity hindmost = null;
-        for (MatabeleEntity ant : line) {
+        for (int k = 0; k < line.size(); k++) {
+            MatabeleEntity ant = line.get(k);
             double along = at.get(ant.getUUID());
-            if (along >= frontAt - length - numbers.stretch() * 2.0 && along < rear) {
-                rear = along; // (stragglers far behind are not waited for: they follow the scent on their own)
+            if (along >= frontW - length - numbers.stretch() * 2.0 && places[k] - along > lag) {
+                lag = places[k] - along; // (stragglers far behind are not waited for: they follow the scent on their own)
                 hindmost = ant;
             }
         }
-        boolean strung = frontAt - rear > length + numbers.stretch();
+        boolean strung = lag > numbers.stretch();
         // (Raid flow: no stops every 10 to 18 blocks any more, the user 2026-11-06, "just remove the stops": the column
         // walks on smoothly; the front still waits a moment when the line has strung out far behind it.)
         boolean waits = false;
@@ -1372,13 +1402,23 @@ public final class RaidColumn {
         // The others, each at its place in the moving column.
         double spacing = still ? numbers.spacing() * CLOSE_UP : numbers.spacing();
         BlockPos lineStart = place(level, route, 0.0, 0.0);
+        // Each place's row, filled from the front back, as many abreast as the trail is wide at the row (the raid queue fix,
+        // the user's raid of 2026-11-06: the rows went by how wide the trail is where each ant stood, so a crowd round the
+        // start, all of it in the single-file stretch, got places one behind another, far behind the start, and stood on the
+        // hump while the front walked off). Behind the trail's start the crowd is as wide as the column.
+        double[] slots = rowsFrom(route, frontW, spacing, line.size());
         // Each ant's lane (a block apart side by side; each keeps its own: with the line sorted by place, a lane by its
         // place in the line swapped sides every time two ants passed, and they stepped sideways back and forth).
         double[] sides = new double[line.size()];
+        // Which ants are really on the trail: past its narrow start, by it and at its height (the raid queue fix: the
+        // crowd on a dead mound's hump all lay about 1.6 blocks along it, two blocks under it, and queued one by one).
+        boolean[] onTrail = new boolean[line.size()];
         for (int k = 0; k < line.size(); k++) {
             MatabeleEntity ant = line.get(k);
-            int lanes = lanesAt(route, Math.max(0.0, at.get(ant.getUUID())));
+            double own = route.alongAtWalked(at.get(ant.getUUID()));
+            int lanes = lanesAt(route, Math.max(0.0, own));
             sides[k] = lanes == 1 ? 0.0 : Math.floorMod(ant.getUUID().hashCode(), lanes) - (lanes - 1) / 2.0;
+            onTrail[k] = onTrail(route, ant, own);
         }
         Map<BlockPos, Double> funnelTaken = new HashMap<>();
         for (int k = 0; k < line.size(); k++) {
@@ -1388,56 +1428,104 @@ public final class RaidColumn {
                 orders.put(ant.getUUID(), new Order(castSpot(level, route, 1 + k, now), 1.0, point(route, castGap.far())));
                 continue;
             }
-            int lanes = lanesAt(route, Math.max(0.0, own));
-            double slot = frontAt - (1 + k / Math.max(1, lanes)) * spacing;
+            double slot = slots[k];
             if (casting) {
-                slot = Math.min(slot, castGap.near() - GAP_STOP); // (the rest wait behind the gap)
+                slot = Math.min(slot, route.walked(castGap.near() - GAP_STOP)); // (the rest wait behind the gap)
             }
             double side = sides[k];
-            BlockPos look = point(route, Math.min(route.length(), Math.max(0.0, slot) + 3.0));
-            if (slot < 0.0) {
-                // Its place is not on the trail yet (the back of the crowd at the start): the crowd funnels in toward the
-                // trail's start, each ant from its own side to as far from the start as its place is behind it, so they
-                // all close up at once rather than standing till there is room (BUGS 127 again: all walking to the one
-                // cell at the start, they stood stacked on the hump top when the column halted).
-                BlockPos spot = still ? null : funnelSpot(level, lineStart, ant, -slot, funnelTaken);
-                orders.put(ant.getUUID(), new Order(spot, FALL_IN_PACE, look));
+            BlockPos look = point(route, Math.min(route.length(), Math.max(0.0, route.alongAtWalked(slot)) + 3.0));
+            double behind = slot - own;
+            double pace = still ? (behind > HURRY_BEHIND ? HURRY_PACE : 1.0) : Mth.clamp(LEAD_PACE + PACE_PER_BLOCK * behind, SLOWEST_PACE, HURRY_PACE);
+            if (!onTrail[k]) {
+                // In the crowd at the trail's start (on the hump, round the chimney): no queue here. One behind the start
+                // whose place is not on the trail yet funnels in toward the start from its own side, to as far from it as
+                // its place is behind (BUGS 127 again: all walking to the one cell at the start, they stood stacked); one
+                // already past the start whose place has not come back to it waits (milling) for it; the rest walk onto
+                // the trail toward their places, a few blocks at a time, the crowd pouring out behind the front as one
+                // band (real Megaponera: the recruits stream out right behind the scout, Longhurst and Howse 1979).
+                if (slot < 0.0 && own < FUNNEL_FROM) {
+                    BlockPos spot = still ? null : funnelSpot(level, lineStart, ant, Math.min(-slot, CROWD_PRESS), funnelTaken);
+                    orders.put(ant.getUUID(), new Order(spot, FALL_IN_PACE, look));
+                    continue;
+                }
+                if (slot < own + (still ? 0.3 : -0.3)) {
+                    orders.put(ant.getUUID(), new Order(null, 1.0, look));
+                    continue;
+                }
+                double target = still ? slot : Math.min(frontW - spacing * 0.5, Math.max(slot + CARROT, own + 1.0));
+                target = Math.min(target, own + WALK_AHEAD);
+                if (target < own + 0.3) {
+                    orders.put(ant.getUUID(), new Order(null, pace, look)); // (right behind the front: it waits a moment)
+                    continue;
+                }
+                orders.put(ant.getUUID(), new Order(placeAhead(level, route, target, side, own), pace, look));
                 continue;
             }
-            // Never into the ant ahead in its own lane (BUGS 127 again: near the front a dozen aimed at the one spot just
-            // behind the front and stood stacked at the first halt): no nearer than a spacing behind it.
-            double room = frontAt;
+            // On the trail: never into the ant ahead in its own lane (BUGS 127 again: near the front a dozen aimed at the
+            // one spot just behind the front and stood stacked at the first halt): no nearer than a spacing behind it.
+            // Only ants on the trail count (the raid queue fix: ants side by side in the crowd behind made a queue).
+            double room = frontW;
             for (int j = 0; j < line.size(); j++) {
                 double other = at.get(line.get(j).getUUID());
-                if (j != k && Math.abs(sides[j] - side) < 0.25 && other > own + 0.05 && other < room) {
+                if (j != k && onTrail[j] && Math.abs(sides[j] - side) < 0.25 && other > own + 0.05 && other < room) {
                     room = other;
                 }
             }
-            double cap = room - spacing;
+            double cap = Math.min(room - spacing, own + WALK_AHEAD); // (and a few blocks at a time: a far place across a hump found no way)
             if (still) {
                 // At a halt it closes up to its place; one already at or past it stands (it never walks back).
                 double target = Math.min(slot, cap);
                 orders.put(ant.getUUID(), target < own + 0.3 ? new Order(null, 1.0, look)
-                        : new Order(place(level, route, target, side), own < slot - HURRY_BEHIND ? HURRY_PACE : 1.0, look));
+                        : new Order(placeAhead(level, route, target, side, own), pace, look));
                 continue;
             }
             // Walking: it aims a little past its place, so it walks on without stopping as the place moves; its pace says
             // whether it closes up (behind its place) or lets the column come to it (ahead of its place).
-            double behind = slot - own;
-            double pace = Mth.clamp(LEAD_PACE + PACE_PER_BLOCK * behind, SLOWEST_PACE, HURRY_PACE);
-            double target = Math.min(frontAt - spacing * 0.5, slot + CARROT);
+            double target = Math.min(frontW - spacing * 0.5, slot + CARROT);
             target = Math.max(target, own + (behind < -CARROT ? 0.5 : 1.0));
             if (cap < own + 0.3) {
                 orders.put(ant.getUUID(), new Order(null, pace, look)); // (right behind the one ahead: it waits a moment)
                 continue;
             }
-            target = Math.max(0.0, Math.min(route.length(), Math.min(target, cap)));
-            orders.put(ant.getUUID(), new Order(place(level, route, target, side), pace, look));
+            target = Math.max(0.0, Math.min(route.walkedLength(), Math.min(target, cap)));
+            orders.put(ant.getUUID(), new Order(placeAhead(level, route, target, side, own), pace, look));
         }
         for (MatabeleEntity ant : notOut) {
             orders.put(ant.getUUID(), new Order(lineStart, HURRY_PACE, ahead)); // (up out of the nest to the line)
         }
         return false;
+    }
+
+    /**
+     * The raid queue fix: the places (blocks walked along the route) of {@code count} raiders in marching order behind a
+     * front at {@code frontW}, row by row from the front back, as many abreast as the trail is wide at each row; behind
+     * the trail's start the crowd is as wide as the column.
+     */
+    private double[] rowsFrom(Route route, double frontW, double spacing, int count) {
+        double[] slots = new double[count];
+        double row = frontW;
+        int left = 0;
+        for (int k = 0; k < count; k++) {
+            if (left == 0) {
+                row -= spacing;
+                left = row < 0.0 ? Math.max(1, numbers.abreast()) : lanesAt(route, route.alongAtWalked(row));
+            }
+            slots[k] = row;
+            left--;
+        }
+        return slots;
+    }
+
+    /**
+     * The raid queue fix: whether this raider is really on the trail, past its single-file start ({@code single_file}),
+     * within {@link #ON_ROUTE} of it and within {@link #ON_TRAIL_HEIGHT} of its height there; only such ants queue
+     * behind one another in their lanes. The crowd round the start (on a dead mound's hump, round its chimney) does not.
+     */
+    private boolean onTrail(Route route, MatabeleEntity ant, double own) {
+        if (route.walked(own) < numbers.singleFile() || route.offBy(ant.getX(), ant.getZ()) > ON_ROUTE) {
+            return false;
+        }
+        return route.awayFrom(ant.getX(), ant.getY(), ant.getZ()) <= ON_TRAIL_HEIGHT; // (straight to the line, height counted)
     }
 
     /**
@@ -1459,7 +1547,13 @@ public final class RaidColumn {
         double size = Math.max(0.0, ant.bodyLength());
         for (double extra = 0.0; extra <= 4.5; extra += 0.75) {
             double r = radius + extra;
-            BlockPos cell = standAt(level, start.getX() + 0.5 + dx / length * r, start.getZ() + 0.5 + dz / length * r, start.getY());
+            double x = start.getX() + 0.5 + dx / length * r, z = start.getZ() + 0.5 + dz / length * r;
+            // (the raid queue fix: at the ant's own height first, then the start's: a cell by a dead mound's chimney at
+            // the start's height was out of reach from the hump's side two blocks under it, and the ant stood stuck)
+            BlockPos cell = standAt(level, x, z, ant.getBlockY());
+            if (cell == null) {
+                cell = standAt(level, x, z, start.getY());
+            }
             if (cell == null || !level.hasChunkAt(cell) || colony.nest().isInside(level, cell)
                     || taken.getOrDefault(cell, 0.0) + size > FORM_CELL_LENGTHS + 1.0E-6) {
                 continue;
@@ -1642,7 +1736,20 @@ public final class RaidColumn {
         if (colony.nest().isInside(level, ant.blockPosition())) {
             return false;
         }
-        return !(flat(ant.blockPosition(), entrance) <= NEAR && ant.getY() < entrance.getY() - 1.5);
+        if (flat(ant.blockPosition(), entrance) <= NEAR && ant.getY() < entrance.getY() - 1.5
+                && (flat(ant.blockPosition(), entrance) <= CHIMNEY_REACH || !level.canSeeSky(ant.blockPosition().above()))) {
+            // (The raid queue fix: only in the shaft itself or under cover. An ant on the hump's open side, a block or two
+            // under its top and two off the trail, counted as down the chimney, was called back up to the line's start it
+            // could not climb to from there, and 14 of 47 were sent home "stuck" in one test run.)
+            // Lower than the entrance near it: down the chimney (BUGS 87), unless it is on the trail at the trail's own
+            // height (the raid queue fix, 2026-11-06: off a tall dead mound the trail drops steeply down the hump's side;
+            // an ant stepping down it counted as still in the nest, was called back up to the trail's start, then down
+            // again, and the whole crowd jammed at the hump's edge for 20 s and more).
+            // (Measured straight to the trail's line, height counted: halfway down a sheer wall the flat place along it
+            // cannot say how high the trail is there.)
+            return out.offBy(ant.getX(), ant.getZ()) <= ON_ROUTE && out.awayFrom(ant.getX(), ant.getY(), ant.getZ()) <= ON_TRAIL_HEIGHT;
+        }
+        return true;
     }
 
     /**
@@ -1673,7 +1780,9 @@ public final class RaidColumn {
 
     /** How many side by side at this place along a route: single file right at the entrance, then wider (raid flow: 2 then 3 within a few blocks). */
     private int lanesAt(Route route, double along) {
-        double fromNest = route == out ? along : route.length() - along;
+        // (The raid queue fix: measured as walked, climbs counted: down a tall hump's wall 2 flat blocks were 10 of
+        // climbing, all of it single file, and the whole crowd went down one block-wide lane.)
+        double fromNest = route == out ? route.walked(along) : route.walkedLength() - route.walked(along);
         if (fromNest < numbers.singleFile()) {
             return 1;
         }
@@ -2045,6 +2154,30 @@ public final class RaidColumn {
         }
     }
 
+    /**
+     * The raid queue fix (2026-11-06): the cell to stand in {@code walked} blocks walked along the route (climbs counted),
+     * but never one behind the ant it is for ({@code own}, walked). Partway down a sheer wall there is no floor, so a
+     * place there snaps to the nearest floor, and that was at times the wall's top behind the ant: raiders halfway down a
+     * tall dead mound's side were sent back up, got nowhere for 15 s and were sent home "stuck". A place that snaps back
+     * looks a little further on instead (at most {@link #AHEAD_LOOK} blocks), then the route's end side of it.
+     */
+    private static BlockPos placeAhead(ServerLevel level, Route route, double walked, double side, double own) {
+        double end = route.walkedLength();
+        BlockPos first = null;
+        for (double t = Math.min(walked, end); ; t = Math.min(end, t + 0.5)) {
+            BlockPos cell = place(level, route, route.alongAtWalked(t), side);
+            if (first == null) {
+                first = cell;
+            }
+            if (route.walkedOf(cell.getX() + 0.5, cell.getY(), cell.getZ() + 0.5) >= own - 0.25) {
+                return cell;
+            }
+            if (t >= end || t >= walked + AHEAD_LOOK) {
+                return first;
+            }
+        }
+    }
+
     /** The cell to stand in at this place along a route, {@code side} blocks to its right; the route's own point if none. */
     static BlockPos place(ServerLevel level, Route route, double along, double side) {
         double[] p = route.at(along);
@@ -2146,6 +2279,8 @@ public final class RaidColumn {
         private final double[] zs;
         private final double[] ys;
         private final double[] sums;
+        /** The distances walked to each point, climbs and drops counted (the raid queue fix). */
+        private final double[] walks;
 
         Route(List<BlockPos> points) {
             this.points = List.copyOf(points);
@@ -2154,12 +2289,98 @@ public final class RaidColumn {
             zs = new double[n];
             ys = new double[n];
             sums = new double[n];
+            walks = new double[n];
             for (int i = 0; i < n; i++) {
                 xs[i] = points.get(i).getX() + 0.5;
                 zs[i] = points.get(i).getZ() + 0.5;
                 ys[i] = points.get(i).getY();
                 sums[i] = i == 0 ? 0.0 : sums[i - 1] + Math.hypot(xs[i] - xs[i - 1], zs[i] - zs[i - 1]);
+                walks[i] = i == 0 ? 0.0 : walks[i - 1] + Math.hypot(sums[i] - sums[i - 1], ys[i] - ys[i - 1]);
             }
+        }
+
+        /**
+         * The raid queue fix (2026-11-06): how far an ant walks to this place {@code along} (flat) the line, the climbs
+         * and drops counted (down a tall dead mound's hump the trail drops 10 blocks in 3 flat ones: by the flat
+         * distance the front, after 14 blocks of climbing down, seemed barely ahead, and the crowd waited behind it).
+         * Behind the start and past the end, flat.
+         */
+        double walked(double along) {
+            int n = xs.length;
+            if (n == 1 || along <= 0.0) {
+                return along;
+            }
+            if (along >= length()) {
+                return walks[n - 1] + along - length();
+            }
+            int i = pieceAt(along);
+            double piece = sums[i] - sums[i - 1];
+            double t = piece <= 1.0E-6 ? 1.0 : Mth.clamp((along - sums[i - 1]) / piece, 0.0, 1.0);
+            return walks[i - 1] + t * (walks[i] - walks[i - 1]);
+        }
+
+        /** The other way round: the flat distance along the line of the place an ant reaches after walking this far. */
+        double alongAtWalked(double walked) {
+            int n = xs.length;
+            if (n == 1 || walked <= 0.0) {
+                return walked;
+            }
+            if (walked >= walks[n - 1]) {
+                return length() + walked - walks[n - 1];
+            }
+            int lo = 1, hi = n - 1;
+            while (lo < hi) {
+                int mid = (lo + hi) >>> 1;
+                if (walked <= walks[mid]) {
+                    hi = mid;
+                } else {
+                    lo = mid + 1;
+                }
+            }
+            double piece = walks[lo] - walks[lo - 1];
+            double t = piece <= 1.0E-6 ? 1.0 : Mth.clamp((walked - walks[lo - 1]) / piece, 0.0, 1.0);
+            return sums[lo - 1] + t * (sums[lo] - sums[lo - 1]);
+        }
+
+        /** The whole line's length walked, climbs and drops counted. */
+        double walkedLength() {
+            return walks[walks.length - 1];
+        }
+
+        /**
+         * How far an ant at (x, y, z) has walked along the line, its height counted (halfway down a wall it is halfway
+         * along the drop, which its flat place cannot tell).
+         */
+        double walkedOf(double x, double y, double z) {
+            return nearest3(x, y, z)[0];
+        }
+
+        /** How far (blocks, straight, height counted) the point (x, y, z) lies from the line. */
+        double awayFrom(double x, double y, double z) {
+            return Math.sqrt(nearest3(x, y, z)[1]);
+        }
+
+        /** The nearest place on the line in 3D: {walked to it, distance squared}. */
+        private double[] nearest3(double x, double y, double z) {
+            int n = xs.length;
+            if (n == 1) {
+                return new double[] {0.0, (x - xs[0]) * (x - xs[0]) + (z - zs[0]) * (z - zs[0]) + (y - ys[0]) * (y - ys[0])};
+            }
+            double best = Double.MAX_VALUE;
+            double bestWalked = 0.0;
+            for (int i = 1; i < n; i++) {
+                double dx = xs[i] - xs[i - 1], dz = zs[i] - zs[i - 1], dy = ys[i] - ys[i - 1];
+                double piece = dx * dx + dz * dz + dy * dy;
+                double t = piece <= 1.0E-9 ? 0.0
+                        : Mth.clamp(((x - xs[i - 1]) * dx + (z - zs[i - 1]) * dz + (y - ys[i - 1]) * dy) / piece, 0.0, 1.0);
+                double px = xs[i - 1] + dx * t, pz = zs[i - 1] + dz * t, py = ys[i - 1] + dy * t;
+                double distance = (x - px) * (x - px) + (z - pz) * (z - pz) + (y - py) * (y - py);
+                if (distance < best) {
+                    best = distance;
+                    bestWalked = walks[i - 1] + (walks[i] - walks[i - 1]) * t;
+                }
+            }
+            return new double[] {bestWalked, best};
         }
 
         double length() {
