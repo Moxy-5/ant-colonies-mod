@@ -475,6 +475,8 @@ timings: all "my pick, to confirm" until then).
    40 (R1, the user, 2026-10-24), and on top when prey runs out nearby, after repeated attacks, when the
    nest floods or is too small; scouts pick the site, the
    colony walks there in a column with brood and prey.
+   Only between dead mounds for now: other homes (hollow giants, burrows, root hollows, old nests) wait for M9.5
+   (the user, 2026-11-06; `docs/plans/matabele-homes.md`).
 
 **Order to playable (the user, 2026-10-24, "I just wanna get it playable before I go off to california"):**
 finish 1e (prey pile) and 1f (new-land colonies), then 2 (fights), then 4 (scouts and raids), at first with real

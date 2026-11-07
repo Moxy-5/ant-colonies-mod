@@ -1,6 +1,13 @@
 # Matabele homes beyond dead mounds (planning, 2026-11-06)
 
-**Status: planning only, nothing built.** Look at every choice at real sizes in the home viewer:
+**Status: moved to M9.5, savanna life (the user, 2026-11-06), to be planned again then with the wildlife (the
+aardvark that digs the burrows, the dead-wood tenants). Nothing built.** Until then M8 step 6 (moving house) moves only
+between dead mounds, as colonies live today. The viewer and its models are kept for that plan: `tools/nest_sites_viewer.py`
+and `tools/nest_sites_viewer.template.html` (the homes, the ants at real size, the tenants: centipede, scorpion,
+millipede, beetle grub), and the built page `references/nest_sites_viewer.html`, which holds its own textures and
+models and opens in a browser as it is, even if the game's files change later.
+
+Look at every choice at real sizes in the home viewer:
 `python tools/model_viewer.py nestsites` (writes `references/nest_sites_viewer.html`; each home cut open, the ants inside
 at real size, an ant's-eye view, the dead-wood tenants against a player).
 
