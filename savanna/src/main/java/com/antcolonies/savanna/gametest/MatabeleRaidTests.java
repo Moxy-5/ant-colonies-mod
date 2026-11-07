@@ -1302,11 +1302,55 @@ public class MatabeleRaidTests {
                     Raids.Find find = raid.find();
                     helper.assertTrue(raids.finds().contains(find) && find.misses() == 0,
                             "a raid turned home at dusk counted as an empty check of the spot; " + raids.describe(level));
+                    helper.assertTrue("dusk".equals(raid.turnedBy()), "the dusk raid says it turned for " + raid.turnedBy());
                     // R7, unloaded land: no raid sets out to a spot in land not loaded (the find is only remembered).
                     BlockPos far = colony.getCenter().offset(600, 0, 0);
                     RaidColumn none = raids.raidForTests(level, far, 2, List.of(colony.getCenter(), far), null);
                     helper.assertTrue(none == null && raids.whyNoRaid() != null && raids.whyNoRaid().contains("not loaded"),
                             "a raid set out to land not loaded, or not for that: " + raids.whyNoRaid());
+                })
+                // M8 step 3e, rain: the next morning a raid sets out dry in the raid hours (one more of the day's raids);
+                // rain begins while it marches: it turns home where it is, like dusk, attacks nothing, and the spot is no
+                // empty check. No raid may set out in the rain (the raid hours stop).
+                .thenExecute(() -> {
+                    clock.skipTo(7.0);
+                    helper.assertTrue(raids.isRaidTime(level) && !raids.isDusk(level), "7:00 is not in the raid hours");
+                    int before = raids.raidsToday(level);
+                    BlockPos entrance = colony.getCenter();
+                    BlockPos there = helper.absolutePos(new BlockPos(52, SURFACE, 52));
+                    List<BlockPos> trail = new ArrayList<>();
+                    int steps = (int) Math.ceil(Math.hypot(there.getX() - entrance.getX(), there.getZ() - entrance.getZ()) / 2.0);
+                    for (int i = 0; i <= steps; i++) {
+                        double t = i / (double) steps;
+                        int x = entrance.getX() + (int) Math.round((there.getX() - entrance.getX()) * t);
+                        int z = entrance.getZ() + (int) Math.round((there.getZ() - entrance.getZ()) * t);
+                        trail.add(level.getHeightmapPos(net.minecraft.world.level.levelgen.Heightmap.Types.MOTION_BLOCKING_NO_LEAVES,
+                                new BlockPos(x, entrance.getY(), z)));
+                    }
+                    RaidColumn raid = raids.raidForTests(level, there, 2, trail, null);
+                    helper.assertTrue(raid != null, "no morning raid set out; " + raids.describe(level));
+                    helper.assertTrue(!raid.keepsNoHours(), "a raid set out in the morning raid hours keeps no hours");
+                    helper.assertTrue(raids.raidsToday(level) == before + 1, "the morning raid was not counted as one of the day's raids ("
+                            + before + " before, " + raids.raidsToday(level) + " after)");
+                    column[0] = raid;
+                })
+                .thenWaitUntil(() -> helper.assertTrue(column[0].stage() == RaidColumn.Stage.MARCHING
+                        && level.getEntity(column[0].leader()) instanceof MatabeleEntity leader && column[0].alongOut(leader.blockPosition()) > 4.0,
+                        "the morning raid is not out on the march yet; " + raids.describe(level)))
+                .thenExecute(() -> {
+                    colony.setRainForTests(true);
+                    helper.assertTrue(!raids.isRaidTime(level), "the raid hours go on in the rain");
+                })
+                .thenWaitUntil(() -> helper.assertTrue(column[0].turnedAtDusk() && "rain".equals(column[0].turnedBy()),
+                        "the raid out in the rain did not turn home for it (" + column[0].turnedBy() + "); " + raids.describe(level)))
+                .thenWaitUntil(() -> helper.assertTrue(raids.column() == null, "the raid turned home by rain is not home yet; " + raids.describe(level)))
+                .thenExecute(() -> {
+                    RaidColumn raid = column[0];
+                    colony.setRainForTests(null);
+                    helper.assertTrue(raid.attackedAt() < 0, "the raid turned home by rain on the march attacked");
+                    helper.assertTrue(raid.cameHome() >= 1, "nobody came home with the rain raid: " + raid.endedWhy());
+                    helper.assertTrue(raids.finds().contains(raid.find()) && raid.find().misses() == 0,
+                            "a raid turned home by rain counted as an empty check of the spot; " + raids.describe(level));
                 })
                 .thenSucceed();
     }

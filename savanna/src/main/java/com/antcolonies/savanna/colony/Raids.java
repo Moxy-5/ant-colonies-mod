@@ -361,8 +361,14 @@ public class Raids {
     private void tickTimed(ServerLevel level) {
         trails.tick(level, level.getGameTime(), trailNumbers(), column == null ? null : column.trail(), what -> say(level, what));
         if (column != null) {
-            if (column.stage() != RaidColumn.Stage.DONE && !column.keepsNoHours() && !column.turnedAtDusk() && isDusk(level)) {
-                column.callDusk(); // (R7: raids end by dusk: it stops where it is, picks up what it stung and walks home)
+            if (column.stage() != RaidColumn.Stage.DONE && !column.keepsNoHours() && !column.turnedAtDusk()) {
+                if (isDusk(level)) {
+                    column.callDusk(); // (R7: raids end by dusk: it stops where it is, picks up what it stung and walks home)
+                } else if (colony.rainsNow(level)) {
+                    // M8 step 3e: rain turns a raid home the same way (it washes the scent trail out; real raids are not
+                    // seen in rain, Yusuf 2026; turning home mid-raid my pick)
+                    column.callRain();
+                }
             }
             try {
                 column.update(level); // (the raiders ask it every few ticks; this keeps it going with none of them loaded)
@@ -410,6 +416,8 @@ public class Raids {
         if (waiting != null && column == null && isRaidTime(level)) {
             if (!isHungry() && !waitingCommanded) {
                 waiting = null; // (fed by now: the spot stays remembered for the next hungry spell)
+            } else if (!waitingCommanded && !dayHasRoom(level)) {
+                // (M8 step 3e: the day's raids are made; the find waits for tomorrow's raid hours)
             } else if (startRaid(level, waiting) != null) {
                 say(level, "the raid hours: the waiting find at " + column.find().at().toShortString() + " gets its raid"
                         + (waitingCommanded ? " (brought home by the scout command's scout)" : ""));
@@ -713,6 +721,33 @@ public class Raids {
     public double fedShare() {
         PreyPile pile = colony.part(SavannaParts.PREY_PILE).orElse(null);
         return pile == null ? 0.0 : Math.min(1.0, pile.edibleTermites() / (double) Math.max(1, colony.getCount(Caste.WORKER)));
+    }
+
+    /**
+     * M8 step 3e, the raid day: how many raids the colony wants today, by its hunger: 1 when nearly fed up to
+     * {@code raids.away.most_raids_a_day} (4) when the pile is empty (real Megaponera raid 1 to 4 times a day, more when
+     * hungry; Yusuf 2026, Frank and Linsenmair 2017; the scale between my pick).
+     */
+    public int raidsWanted() {
+        int most = away.mostRaidsADay();
+        return Math.max(1, Math.min(most, (int) Math.ceil(most * (1.0 - fedShare()))));
+    }
+
+    /** M8 step 3e: whether the colony may still send a raid today (near or away; commands do not ask). */
+    public boolean dayHasRoom(ServerLevel level) {
+        return away.raidsToday(level) < raidsWanted();
+    }
+
+    /** M8 step 3e, tests: today's raids all made (the count raised to what the colony wants). */
+    public void fillDayForTests(ServerLevel level) {
+        while (away.raidsToday(level) < raidsWanted()) {
+            away.countRaid(level);
+        }
+    }
+
+    /** M8 step 3e: raids set out today, near or away. */
+    public int raidsToday(ServerLevel level) {
+        return away.raidsToday(level);
     }
 
     /** Whether it is the scouting hours at the nest (all day, the user's pick 2026-11-03) and dry. */
@@ -1225,7 +1260,8 @@ public class Raids {
         // not) unless sent with "anytime" (its find raids at once, whatever the hour)
         boolean anyHour = scout != null && sentAnyHour.contains(scout);
         Find made = known != null ? known : finds.get(finds.size() - 1);
-        if (column == null && !colony.rainsNow(level) && (anyHour || isRaidTime(level) && (commanded || isHungry()))) {
+        boolean dayFull = !commanded && !anyHour && !dayHasRoom(level); // (M8 step 3e: commands do not count the day)
+        if (column == null && !colony.rainsNow(level) && (anyHour || isRaidTime(level) && (commanded || isHungry() && !dayFull))) {
             say(level, "a scout (" + (scout == null ? "?" : scout.toString().substring(0, 8)) + ") is home from " + at.toShortString()
                     + ", worth " + worth + (anyHour ? ", sent by the command at any hour" : commanded ? ", sent by the command" : "") + ": a raid sets out");
             RaidColumn started = startRaid(level, made);
@@ -1251,6 +1287,11 @@ public class Raids {
                     + RaidGround.clock(colony, level) + "): it waits for them" + (commanded ? " (sent by the command, which keeps the hours)" : ""));
             waiting = made;
             waitingCommanded = commanded;
+        } else if (column == null && isHungry() && dayFull && !colony.rainsNow(level)) {
+            say(level, "a scout is home from " + at.toShortString() + ", worth " + worth + ": the colony has made its "
+                    + raidsToday(level) + " raid(s) today (it wants " + raidsWanted() + " this hungry); the find waits for tomorrow");
+            waiting = made;
+            waitingCommanded = false;
         } else {
             say(level, "a scout is home from " + at.toShortString() + ", worth " + worth + ", no raid: " + (column != null ? "one is out already"
                     : colony.rainsNow(level) ? "it rains" : "the colony is not hungry"));
@@ -1369,7 +1410,9 @@ public class Raids {
         List<MatabeleEntity> going = new ArrayList<>(fit.subList(0, real));
         going.sort(Comparator.comparingInt(ant -> ant == leader ? 0 : veterans.contains(ant.getUUID()) ? 1 : ant.hasMajorBody() ? 3 : 2));
         column = new RaidColumn(level, colony, numbers, carryNumbers(), trailNumbers(), find, trail, going, along, now);
+        away.countRaid(level); // (M8 step 3e: one of the day's raids)
         column.sayStart(level);
+        say(level, "raid " + away.raidsToday(level) + " today (the colony wants " + raidsWanted() + " this hungry)");
         raidCheckAt = now + 20; // (BUGS 89: a second later, every raider should be walking with it)
         whyNoRaid = null;
         find.scout = leader.getUUID(); // (it leads: the one to lead the next raid there too)

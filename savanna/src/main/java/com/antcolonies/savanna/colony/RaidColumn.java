@@ -286,6 +286,8 @@ public final class RaidColumn {
     private boolean duskCalled;
     /** R7: dusk has been dealt with (the column turned for home). */
     private boolean duskDone;
+    /** M8 step 3e: what turned the raid home, for the diary ("dusk", or "rain"). */
+    private String turnedBy = "dusk";
     /** R7: sent outside the raid hours by a command: it keeps no hours (no dusk turn). */
     private boolean keepsNoHours;
     /** R7: when a termite was last about the spot in the attack (game time), or -1. */
@@ -923,7 +925,24 @@ public final class RaidColumn {
     public void callDusk() {
         if (!keepsNoHours) {
             duskCalled = true;
+            turnedBy = "dusk";
         }
+    }
+
+    /**
+     * M8 step 3e: rain began while the raid is out: it turns home the way dusk turns it (stops where it is, picks up what
+     * it stung and walks home), and the find is not counted as checked empty.
+     */
+    public void callRain() {
+        if (!keepsNoHours && !duskCalled) {
+            duskCalled = true;
+            turnedBy = "rain";
+        }
+    }
+
+    /** M8 step 3e: what turned the raid home early ("dusk" or "rain"), if anything did. */
+    public String turnedBy() {
+        return turnedBy;
     }
 
     /** R7: whether dusk turned this raid home. */
@@ -955,10 +974,10 @@ public final class RaidColumn {
      */
     private void dusk(List<MatabeleEntity> ants, long now) {
         duskDone = true;
-        say("dusk (" + RaidGround.clock(colony, lastLevel) + "): the raid stops where it is at " + stage.name().toLowerCase()
+        say(turnedBy + " (" + RaidGround.clock(colony, lastLevel) + "): the raid stops where it is at " + stage.name().toLowerCase()
                 + ", picks up what it stung and walks home");
         switch (stage) {
-            case FORMING -> end("called off at dusk before it set out");
+            case FORMING -> end("called off at " + turnedBy + " before it set out");
             case MARCHING -> {
                 homeOrder(ants);
                 next(Stage.HOMING, now);

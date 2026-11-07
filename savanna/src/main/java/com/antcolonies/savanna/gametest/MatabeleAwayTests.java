@@ -89,7 +89,23 @@ public class MatabeleAwayTests {
                     helper.assertFalse(raids.away().isOut(), "a raid left out of sight at 13:00, between the raid hours");
                     helper.assertTrue(colony.away().report().get(AwayReport.What.RAIDS) == 0,
                             "the away report counts a raid at 13:00: " + colony.away().report().describe());
+                    // M8 step 3e, the raid day: a starving colony wants the most raids a day (4); with them all made today
+                    // (near or away) no raid leaves in the evening raid hours, and the next morning's do.
+                    helper.assertTrue(raids.raidsWanted() == 4, "a colony with an empty pile wants " + raids.raidsWanted() + " raids a day, not 4");
+                    raids.fillDayForTests(level);
+                    helper.assertFalse(raids.dayHasRoom(level), "the day has room for a raid after all its raids");
                     clock.skipTo(16.5); // (the evening raid hours)
+                    stage[0] = 10;
+                    stageAt[0] = now;
+                }
+                case 10 -> {
+                    if (now - stageAt[0] < 600) {
+                        helper.assertFalse(raids.away().isOut(), "a raid left out of sight with the day's raids all made");
+                        return;
+                    }
+                    helper.assertTrue(colony.away().report().get(AwayReport.What.RAIDS) == 0,
+                            "the away report counts a raid with the day's raids all made: " + colony.away().report().describe());
+                    clock.skipTo(7.0); // (the next morning's raid hours: a new day)
                     stage[0] = 2;
                     stageAt[0] = now;
                 }

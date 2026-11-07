@@ -488,6 +488,9 @@ timings: all "my pick, to confirm" until then).
      **Night scouting in the hot season** (the user, 2026-11-03): scouts search at night too, but only in the hot
      season, so it waits until Serene Seasons is added (the last steps of M9) and asks the shared season source; until
      then scouts search by day only (6:00 to 19:30, built 2026-11-03).
+     **Built 2026-11-07** (the hours and dusk were R7's; new: one raid count for the colony's day, near or away; 1 raid a
+     day when nearly fed up to 4 with an empty pile; rain turns a raid out home like dusk; details in `docs/HISTORY.md`).
+     Night raids in the hot season still wait for the shared season source.
    - **3f Out of sight.** Raids happen while the player is away too, as numbers by the same rates (termites taken,
      ants hurt or lost, heads left clamped, holes plugged); the away report lists them.
      **Built 2026-11-05** (`colony/RaidsAway`, `raids.away`; details and picks in `docs/DESIGN.md` "Step 3f, out of

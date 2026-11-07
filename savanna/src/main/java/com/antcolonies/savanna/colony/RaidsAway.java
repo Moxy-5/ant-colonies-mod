@@ -58,9 +58,14 @@ public final class RaidsAway {
     /** The raid out of sight now, or null. Saved. */
     @Nullable
     private Out out;
-    /** The day the raids are counted for ({@code timeOfDay / 24000}) and how many left on it. Saved. */
+    /**
+     * The day the raids are counted for ({@code timeOfDay / 24000}) and how many left on it, near or away (M8 step 3e: one
+     * count for the colony's whole day, so a colony raiding near the player and out of sight on the same day still makes
+     * at most {@code most_raids_a_day}), and how many of them left out of sight (the away report). Saved.
+     */
     private long day = Long.MIN_VALUE;
     private int raidsToday;
+    private int awayToday;
     /** When the number scouts next search (game time). Not saved. */
     private long nextScoutAt;
 
@@ -95,14 +100,31 @@ public final class RaidsAway {
         return colony.profile().section(SavannaNumbers.AWAY_RAIDS).orElse(SavannaNumbers.AwayRaidNumbers.DEFAULT);
     }
 
+    /** M8 step 3e: the most raids a starving colony sends in a day ({@code raids.away.most_raids_a_day}; near or away). */
+    int mostRaidsADay() {
+        return Math.max(1, numbers().mostRaidsADay());
+    }
+
     /** Whether a raid is out of sight now. */
     public boolean isOut() {
         return out != null;
     }
 
-    /** Raids set out out of sight today (tests). */
+    /** Raids set out today, near or away (tests; as last counted). */
     public int raidsToday() {
         return raidsToday;
+    }
+
+    /** M8 step 3e: raids set out today, near or away (the day turned over first). */
+    int raidsToday(ServerLevel level) {
+        newDay(level);
+        return raidsToday;
+    }
+
+    /** M8 step 3e: a raid with real ants set out near the player: one more of the day's raids. */
+    void countRaid(ServerLevel level) {
+        newDay(level);
+        raidsToday++;
     }
 
     /** Once a second while the colony is away: the raid out goes on; else one may set out; the number scouts search. */
@@ -132,6 +154,7 @@ public final class RaidsAway {
         if (today != day) {
             day = today;
             raidsToday = 0;
+            awayToday = 0;
         }
     }
 
@@ -142,7 +165,7 @@ public final class RaidsAway {
         SavannaNumbers.ScoutNumbers scouting = raids.numbers();
         SavannaNumbers.ColumnNumbers column = raids.columnNumbers();
         if (scouting == null || column == null || raids.column() != null || !raids.isRaidTime(level) || !raids.isHungry()
-                || raidsToday >= numbers.mostRaidsADay() || colony.population().inside(Caste.WORKER) <= 0) {
+                || !raids.dayHasRoom(level) || colony.population().inside(Caste.WORKER) <= 0) {
             return;
         }
         for (Raids.Find find : raids.finds()) {
@@ -180,12 +203,13 @@ public final class RaidsAway {
         out = new Out(find.at().immutable(), size, attackAt, attackAt + numbers.fightTicks() + homeTicks(distance, column, carry),
                 termites.getId());
         raidsToday++;
+        awayToday++;
         raids.forgetWaiting(find);
         raids.walkTrail(find.at(), now);
         colony.away().note(level, AwayReport.What.RAIDS, 1);
         colony.away().note(level, AwayReport.What.RAIDERS, size);
         raids.diary(level, "out of sight: a raid of " + size + " sets out to " + find.at().toShortString() + " (worth " + find.worth()
-                + ", " + Math.round(distance) + " blocks), raid " + raidsToday + " today; the attack in " + outTicks
+                + ", " + Math.round(distance) + " blocks), raid " + raidsToday + " today (near or away); the attack in " + outTicks
                 + " ticks, home in " + (out.backAt - now));
         ColonyManager.get(level).markChanged();
     }
@@ -439,8 +463,8 @@ public final class RaidsAway {
                     .append(out.attacked ? ", home in " + Math.max(0, out.backAt - level.getGameTime()) + " ticks with " + out.caught + " termite(s)"
                             : ", attacking in " + Math.max(0, out.attackAt - level.getGameTime()) + " ticks");
         }
-        if (raidsToday > 0) {
-            line.append("; ").append(raidsToday).append(" raid(s) out of sight today");
+        if (awayToday > 0) {
+            line.append("; ").append(awayToday).append(" raid(s) out of sight today");
         }
         return line.toString();
     }
@@ -451,6 +475,7 @@ public final class RaidsAway {
         CompoundTag away = new CompoundTag();
         away.putLong("day", day);
         away.putInt("today", raidsToday);
+        away.putInt("awayToday", awayToday);
         if (out != null) {
             CompoundTag raid = new CompoundTag();
             raid.putLong("at", out.at.asLong());
@@ -473,12 +498,14 @@ public final class RaidsAway {
         out = null;
         day = Long.MIN_VALUE;
         raidsToday = 0;
+        awayToday = 0;
         if (!tag.contains("raidsAway")) {
             return;
         }
         CompoundTag away = tag.getCompound("raidsAway");
         day = away.getLong("day");
         raidsToday = away.getInt("today");
+        awayToday = away.contains("awayToday") ? away.getInt("awayToday") : raidsToday; // (older saves counted only these)
         if (away.contains("out")) {
             CompoundTag raid = away.getCompound("out");
             out = new Out(BlockPos.of(raid.getLong("at")), raid.getInt("raiders"), raid.getLong("attackAt"), raid.getLong("backAt"),
@@ -492,7 +519,8 @@ public final class RaidsAway {
 
     void fillForTests(ServerLevel level) {
         day = 3;
-        raidsToday = 2;
+        raidsToday = 3;
+        awayToday = 2;
         out = new Out(colony.getCenter().offset(30, 0, -12), 140, 5000, 9000, new UUID(5, 9));
         out.attacked = true;
         out.caught = 180;
