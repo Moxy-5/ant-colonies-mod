@@ -376,6 +376,10 @@ def mix_soil(x, y):
 
 
 def main():
+    if len(sys.argv) > 1 and sys.argv[1] == "nestsites":
+        import nest_sites_viewer  # the Matabele home choices (docs/plans/matabele-homes.md)
+        nest_sites_viewer.page(Path(sys.argv[2]) if len(sys.argv) > 2 else ROOT / "references/nest_sites_viewer.html")
+        return
     if len(sys.argv) > 1 and sys.argv[1] == "sizes":
         sizes_page(Path(sys.argv[2]) if len(sys.argv) > 2 else ROOT / "references/sizes_viewer.html")
         return

@@ -1,0 +1,552 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Matabele Home Viewer</title>
+<style>
+  :root { --bg: #f4efe6; --panel: #fffaf2; --ink: #2b211b; --muted: #75685d; --line: #dccfbe; --accent: #a8401f; --ok: #3d7a3a; --no: #9b2f2f; }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) { --bg: #1d1915; --panel: #27211c; --ink: #efe6da; --muted: #a8998a; --line: #3d342c; --accent: #e07a52; --ok: #8fc98a; --no: #e08a8a; }
+  }
+  :root[data-theme="dark"] { --bg: #1d1915; --panel: #27211c; --ink: #efe6da; --muted: #a8998a; --line: #3d342c; --accent: #e07a52; --ok: #8fc98a; --no: #e08a8a; }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font: 15px/1.45 system-ui, sans-serif; }
+  header { padding: 14px 16px 6px; }
+  h1 { margin: 0 0 4px; font-size: 20px; }
+  header p { margin: 0; color: var(--muted); max-width: 90ch; }
+  #wrap { position: relative; height: 64vh; min-height: 340px; margin: 10px 16px; border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
+  canvas { display: block; width: 100%; height: 100%; }
+  #labels { position: absolute; inset: 0; pointer-events: none; overflow: hidden; }
+  .tag { position: absolute; transform: translate(-50%, -100%); background: var(--panel); border: 1px solid var(--line); border-radius: 6px;
+         padding: 1px 6px; font-size: 12px; font-weight: 600; white-space: nowrap; }
+  .tag.small { font-weight: 500; font-size: 11px; color: var(--muted); }
+  .controls { display: flex; flex-wrap: wrap; gap: 8px 10px; padding: 0 16px 8px; align-items: center; }
+  .controls label { display: flex; gap: 8px; align-items: center; font-size: 14px; }
+  .controls input[type=range] { width: 180px; max-width: 50vw; }
+  .readout { color: var(--muted); font-size: 13px; }
+  button { font: inherit; font-size: 13px; padding: 5px 10px; border-radius: 8px; border: 1px solid var(--line); background: var(--panel); color: var(--ink); cursor: pointer; }
+  button.on { border-color: var(--accent); color: var(--accent); font-weight: 600; }
+  #cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 10px; margin: 6px 16px 28px; }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; }
+  .card h3 { margin: 0 0 6px; font-size: 15px; }
+  .card p { margin: 4px 0; font-size: 13.5px; }
+  .card .k { color: var(--muted); font-weight: 600; }
+  .verdict { font-weight: 700; }
+  .verdict.yes { color: var(--ok); } .verdict.no { color: var(--no); } .verdict.maybe { color: var(--accent); }
+</style>
+</head>
+<body>
+<header>
+  <h1>Where could a Matabele colony live?</h1>
+  <p>Every home choice, cut open down the middle, with the ants at today's real sizes: a major is half a block long
+     (1 block = 30 mm of ant), a minor a quarter, the queen 0.6, a termite worker 0.15. White grubs are larvae, brown
+     ones cocoons, upside-down termites the prey. Drag to turn, scroll or pinch to zoom, right-drag to slide.
+     The buttons jump to each home. Planning only: none of this is in the game.</p>
+</header>
+<div id="wrap"><canvas id="c"></canvas><div id="labels"></div></div>
+<div class="controls">
+  <label><input id="cut" type="checkbox" checked> cut open</label>
+  <label><input id="tagsOn" type="checkbox" checked> labels</label>
+  <label>Tenants' size <input id="squeeze" type="range" min="0.15" max="1" step="0.05"> <span id="squeezeOut" class="readout"></span></label>
+</div>
+<div class="controls" id="cams"></div>
+<div id="cards"></div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+<script>
+const DATA = /*DATA*/null;
+const BLOCKS_PER_MM = 1 / 30;
+const SAVANNA_GRASS = [191, 183, 85];
+
+const canvas = document.getElementById('c'), wrap = document.getElementById('wrap');
+const renderer = new THREE.WebGLRenderer({canvas, antialias: true});
+renderer.outputEncoding = THREE.sRGBEncoding;
+renderer.setPixelRatio(Math.min(2, window.devicePixelRatio || 1));
+const scene = new THREE.Scene();
+scene.background = new THREE.Color('#cfe3ee');
+const camera = new THREE.PerspectiveCamera(40, 1, 0.01, 400);
+const controls = new THREE.OrbitControls(camera, canvas);
+controls.enableDamping = false;
+scene.add(new THREE.HemisphereLight('#ffffff', '#8a7454', 0.9));
+const sun = new THREE.DirectionalLight('#ffffff', 0.5); sun.position.set(4, 12, 6); scene.add(sun);
+const under = new THREE.Mesh(new THREE.PlaneGeometry(600, 600), new THREE.MeshBasicMaterial({color: '#8a6d4c'}));
+under.rotation.x = -Math.PI / 2; under.position.y = -6.02; scene.add(under);
+
+// ---------- textures ----------
+const images = {}, textures = {}, materials = {};
+function loadImage(name) { return new Promise(r => { const i = new Image(); i.onload = () => r(i); i.src = DATA.textures[name]; }); }
+function canvasTexture(draw) {
+  const c = document.createElement('canvas'); c.width = c.height = 16;
+  const g = c.getContext('2d'); g.imageSmoothingEnabled = false; draw(g);
+  const t = new THREE.CanvasTexture(c);
+  t.magFilter = t.minFilter = THREE.NearestFilter; t.encoding = THREE.sRGBEncoding; t.wrapS = t.wrapT = THREE.RepeatWrapping;
+  return t;
+}
+function tinted(g, img) {
+  const c = document.createElement('canvas'); c.width = c.height = 16;
+  const h = c.getContext('2d'); h.drawImage(img, 0, 0);
+  const px = h.getImageData(0, 0, 16, 16);
+  for (let i = 0; i < px.data.length; i += 4) for (let k = 0; k < 3; k++) px.data[i + k] = px.data[i + k] * SAVANNA_GRASS[k] / 255;
+  h.putImageData(px, 0, 0); g.drawImage(c, 0, 0);
+}
+function material(key) {
+  if (!materials[key]) materials[key] = new THREE.MeshBasicMaterial({map: textures[key], vertexColors: true, side: THREE.DoubleSide, alphaTest: 0.4});
+  return materials[key];
+}
+
+// ---------- blocks ----------
+const all = k => ({px: k, nx: k, py: k, ny: k, pz: k, nz: k});
+const sides = (side, top, bottom) => ({px: side, nx: side, pz: side, nz: side, py: top, ny: bottom || top});
+const TYPES = {
+  grass: sides('grass_side', 'grass_top', 'dirt'), dirt: all('dirt'), coarse: all('coarse_dirt'), rooted: all('rooted_dirt'),
+  granite: all('granite'), stone: all('stone'), andesite: all('andesite'),
+  mound: sides('termite_mound_old_side', 'termite_mound_old_top'),
+  deadlog: {px: 'dead_wood_top_0', nx: 'dead_wood_top_0', py: 'bleached_bark', ny: 'bleached_bark', pz: 'bleached_bark', nz: 'bleached_bark'},
+  frass: all('frass'), rotten: all('rotten_wood'),
+  tree: sides('umbrella_thorn_bark', 'umbrella_thorn_log_top'), leaves: all('umbrella_thorn_leaves'),
+};
+const SEE_THROUGH = new Set(['leaves']);
+const SHADE = {px: 0.6, nx: 0.6, py: 1.0, ny: 0.5, pz: 0.8, nz: 0.8};
+const DIRS = {px: [1, 0, 0], nx: [-1, 0, 0], py: [0, 1, 0], ny: [0, -1, 0], pz: [0, 0, 1], nz: [0, 0, -1]};
+let batches = {};
+function quad(key, corners, uvs, shade) {
+  const b = batches[key] || (batches[key] = {pos: [], uv: [], col: []});
+  for (const i of [0, 1, 2, 0, 2, 3]) { b.pos.push(...corners[i]); b.uv.push(...uvs[i]); b.col.push(shade, shade, shade); }
+}
+function box(x0, y0, z0, x1, y1, z1, keys, skip, dim) {
+  const f = (n, c, u) => { if (!skip || !skip(n)) quad(keys[n], c, u, SHADE[n] * (dim ? dim(n) : 1)); };
+  f('px', [[x1, y0, z0], [x1, y0, z1], [x1, y1, z1], [x1, y1, z0]], [[-z0, y0], [-z1, y0], [-z1, y1], [-z0, y1]]);
+  f('nx', [[x0, y0, z1], [x0, y0, z0], [x0, y1, z0], [x0, y1, z1]], [[z1, y0], [z0, y0], [z0, y1], [z1, y1]]);
+  f('py', [[x0, y1, z0], [x1, y1, z0], [x1, y1, z1], [x0, y1, z1]], [[x0, -z0], [x1, -z0], [x1, -z1], [x0, -z1]]);
+  f('ny', [[x0, y0, z1], [x1, y0, z1], [x1, y0, z0], [x0, y0, z0]], [[x0, z1], [x1, z1], [x1, z0], [x0, z0]]);
+  f('pz', [[x1, y0, z1], [x0, y0, z1], [x0, y1, z1], [x1, y1, z1]], [[-x1, y0], [-x0, y0], [-x0, y1], [-x1, y1]]);
+  f('nz', [[x0, y0, z0], [x1, y0, z0], [x1, y1, z0], [x0, y1, z0]], [[x0, y0], [x1, y0], [x1, y1], [x0, y1]]);
+}
+function hash(x, y, z, s) { let h = (x * 374761393 + y * 668265263 + z * 2147483647 + s * 1274126177) | 0; h = (h ^ (h >>> 13)) * 1274126177; return ((h ^ (h >>> 16)) >>> 0) / 4294967296; }
+
+// ---------- the homes ----------
+// Each home is built in its own patch of ground (x -6..6, z -5..5, soil y -6..-1, grass on top), cut open at z = 1:
+// everything at z >= 1 (local) is taken away when "cut open" is on, so the middle of each home shows from the front.
+const cells = new Map();   // "x,y,z" (world) -> {type, cut: true if cuttable}
+const extras = [];         // partial boxes: {b: [x0,y0,z0,x1,y1,z1], keys, lz: local z of the centre, cuts}
+const pieces = [];         // insects, brood, creatures: {obj, lz, cuts}
+const sites = [];
+let cur = null;
+function S(x, y, z, type) { const k = (cur.ox + x) + ',' + y + ',' + (cur.oz + z); if (type === 'air') cells.delete(k); else cells.set(k, {type, lz: z, cuts: cur.cuts}); }
+function get(x, y, z) { const c = cells.get((cur.ox + x) + ',' + y + ',' + (cur.oz + z)); return c ? c.type : 'air'; }
+function fill(x0, y0, z0, x1, y1, z1, type) { for (let x = x0; x <= x1; x++) for (let y = y0; y <= y1; y++) for (let z = z0; z <= z1; z++) S(x, y, z, type); }
+function ground(soil) { for (let x = -6; x <= 6; x++) for (let z = -5; z <= 5; z++) for (let y = -6; y <= -1; y++) S(x, y, z, y === -1 ? 'grass' : (soil || 'dirt')); }
+function extra(x0, y0, z0, x1, y1, z1, keys) { extras.push({b: [cur.ox + x0, y0, cur.oz + z0, cur.ox + x1, y1, cur.oz + z1], keys, lz: (z0 + z1) / 2, cuts: cur.cuts}); }
+function site(def) {
+  cur = {ox: def.ox, oz: def.oz, cuts: def.cuts !== false};
+  sites.push(def); def.build();
+  def.labelAt = new THREE.Vector3(def.ox, def.labelY || 4.5, def.oz);
+}
+
+// Insects at their real length (blocks = mm / 30), built from the game's own models (code from the size viewer).
+const FACES = ['east', 'west', 'up', 'down', 'south', 'north'];
+function deg(v) { return v * Math.PI / 180; }
+function setRot(o, r) { o.rotation.set(deg(-r[0]), deg(r[1]), deg(-r[2]), 'ZYX'); }
+function boxGeometry(c, tw, th) {
+  const g = new THREE.BoxGeometry(Math.max(c.size[0], 0.02), Math.max(c.size[1], 0.02), Math.max(c.size[2], 0.02));
+  const uv = g.attributes.uv;
+  FACES.forEach((f, i) => {
+    const face = (c.uv && c.uv[f]) || (c.uv && c.uv.north); if (!face) return;
+    const [u0, v0] = face.uv, [w, h] = face.uv_size;
+    for (let k = 0; k < 4; k++) { const j = i * 4 + k; uv.setXY(j, (u0 + uv.getX(j) * w) / tw, 1 - (v0 + (1 - uv.getY(j)) * h) / th); }
+  });
+  uv.needsUpdate = true; return g;
+}
+const insectMats = {};
+function buildInsect(kind) {
+  const d = DATA.insects[kind];
+  if (!insectMats[kind]) {
+    const t = new THREE.TextureLoader().load(d.texture); t.magFilter = t.minFilter = THREE.NearestFilter; t.encoding = THREE.sRGBEncoding;
+    insectMats[kind] = new THREE.MeshLambertMaterial({map: t, alphaTest: 0.5});
+  }
+  const mat = insectMats[kind], root = new THREE.Group(), groups = {}, byName = {};
+  d.bones.forEach(b => byName[b.name] = b);
+  d.bones.forEach(b => {
+    const g = new THREE.Group(), p = b.parent ? byName[b.parent].pivot : [0, 0, 0];
+    g.position.set(b.pivot[0] - p[0], b.pivot[1] - p[1], b.pivot[2] - p[2]); if (b.rotation) setRot(g, b.rotation);
+    groups[b.name] = g;
+    (b.cubes || []).forEach(c => {
+      const mesh = new THREE.Mesh(boxGeometry(c, d.w, d.h), mat);
+      const ctr = [c.origin[0] + c.size[0] / 2, c.origin[1] + c.size[1] / 2, c.origin[2] + c.size[2] / 2];
+      if (c.rotation) {
+        const hold = new THREE.Group(); hold.position.set(c.pivot[0] - b.pivot[0], c.pivot[1] - b.pivot[1], c.pivot[2] - b.pivot[2]);
+        setRot(hold, c.rotation); mesh.position.set(ctr[0] - c.pivot[0], ctr[1] - c.pivot[1], ctr[2] - c.pivot[2]); hold.add(mesh); g.add(hold);
+      } else { mesh.position.set(ctr[0] - b.pivot[0], ctr[1] - b.pivot[1], ctr[2] - b.pivot[2]); g.add(mesh); }
+    });
+  });
+  d.bones.forEach(b => (b.parent ? groups[b.parent] : root).add(groups[b.name]));
+  root.scale.setScalar(1 / 16);
+  const holder = new THREE.Group(); holder.add(root);
+  const ant = Object.keys(groups).filter(n => n.startsWith('antenna')).map(n => groups[n]), par = ant.map(g => g.parent);
+  ant.forEach(g => g.parent.remove(g));
+  const bb = new THREE.Box3().setFromObject(holder);
+  ant.forEach((g, i) => par[i].add(g));
+  root.position.z = -(bb.min.z + bb.max.z) / 2; root.position.y = -bb.min.y;
+  const len = bb.max.z - bb.min.z;
+  const outer = new THREE.Group(); outer.add(holder);
+  holder.scale.setScalar(d.mm * BLOCKS_PER_MM / len);
+  return outer;
+}
+// An insect in a home: x, y (the floor it stands on), z local; yaw in radians; opts.wall: on a wall facing +z, opts.back: on its back (prey).
+function bug(kind, x, y, z, yaw, opts) {
+  const o = buildInsect(kind); opts = opts || {};
+  if (kind === 'major' && opts.size) o.scale.setScalar(opts.size);
+  o.rotation.y = yaw || 0;
+  if (opts.back) { o.rotation.z = Math.PI; y += 0.06; }
+  if (opts.wall) { o.rotation.set(-Math.PI / 2, 0, yaw || 0, 'XZY'); }
+  o.position.set(cur.ox + x, y, cur.oz + z); scene.add(o); pieces.push({obj: o, lz: z, cuts: cur.cuts});
+  return o;
+}
+const broodMats = {larva: new THREE.MeshLambertMaterial({color: '#f1ead9'}), cocoon: new THREE.MeshLambertMaterial({color: '#9c7547'})};
+function brood(kind, x, y, z, yaw) {
+  const [w, h, l] = kind === 'larva' ? [0.07, 0.06, 0.16] : [0.1, 0.1, 0.27];
+  const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, l), broodMats[kind]);
+  m.position.set(cur.ox + x, y + h / 2, cur.oz + z); m.rotation.y = yaw || 0; scene.add(m); pieces.push({obj: m, lz: z, cuts: cur.cuts});
+}
+// A little colony in a room: queen, brood pile, prey, majors and minors round it (floor y, room from x0..x1, z0..z1).
+function colony(x0, x1, z0, z1, y, opts) {
+  opts = opts || {}; const r = (i, s) => hash(i, Math.round(y * 7), Math.round(x0 * 3), s);
+  const w = x1 - x0, d = z1 - z0, at = (u, v) => [x0 + w * u, z0 + d * v];
+  let [qx, qz] = at(0.35, 0.5); bug('queen', qx, y, qz, 1.3);
+  for (let i = 0; i < 10; i++) { const [bx, bz] = at(0.55 + r(i, 1) * 0.25, 0.25 + r(i, 2) * 0.5); brood(i % 3 ? 'larva' : 'cocoon', bx, y, bz, r(i, 3) * 6); }
+  if (!opts.noPrey) for (let i = 0; i < 4; i++) { const [px, pz] = at(0.15 + r(i, 4) * 0.15, 0.2 + r(i, 5) * 0.6); bug('termite', px, y, pz, r(i, 6) * 6, {back: true}); }
+  const n = opts.ants || 9;
+  for (let i = 0; i < n; i++) {
+    const [ax, az] = at(0.08 + r(i, 7) * 0.84, 0.12 + r(i, 8) * 0.76);
+    if (i % 3 === 2) bug('minor', ax, y, az, r(i, 9) * 6); else bug('major', ax, y, az, r(i, 9) * 6, {size: 0.85 + r(i, 10) * 0.3});
+  }
+}
+function heap(x, z, n, keyName) { for (let i = 0; i < n; i++) extra(x - 0.6 + hash(i, 1, x, 3) * 1.0, 0, z - 0.5 + hash(i, 2, z, 4) * 0.8, x - 0.3 + hash(i, 1, x, 3) * 1.0, 0.05 + 0.08 * hash(i, 5, 1, 1), z - 0.2 + hash(i, 2, z, 4) * 0.8, all(keyName)); }
+
+// 1. Today: the dead termite mound.
+site({ox: 0, oz: 0, title: '1 Dead termite mound (today)', build() {
+  ground();
+  for (let x = -4; x <= 4; x++) for (let z = -4; z <= 4; z++) { const d2 = x * x + z * z, h = Math.round(3.4 * (1 - d2 / 17)); for (let y = 0; y < h; y++) S(x, y, z, 'mound'); }
+  for (let y = -2; y <= 4; y++) S(0, y, 0, 'air');            // the old chimney, open from the hump's top
+  fill(-3, -3, -1, 1, -2, 0, 'air');                           // the old rooms
+  colony(-3, 2, -1, 1, -3);
+  bug('major', 0.3, 3.4, 0.4, 2);
+  heap(3, -4, 10, 'termite_remains');
+}});
+// 2. The hollow fallen giant (already in the game: DeadWood.fallen carves its hollow, galleries and frass).
+site({ox: 15, oz: 0, title: '2 Hollow fallen giant (in the game now)', camY: 1.2, build() {
+  ground();
+  for (let x = -5; x <= 4; x++) for (let y = 0; y <= 3; y++) for (let z = -2; z <= 1; z++) {
+    const dy = y + 0.5 - 2, dz = z + 0.5, d2 = dy * dy + dz * dz;
+    if (d2 > 4.41) continue;
+    if (d2 <= 1.21) { S(x, y, z, y === 1 && hash(x, y, z, 51) < 0.6 ? 'frass' : 'air'); continue; }
+    S(x, y, z, hash(x, y, z, 7) < 0.18 ? 'rotten' : 'deadlog');
+  }
+  S(1, 3, -1, 'air'); S(1, 3, 0, 'air'); S(-2, 2, -2, 'air');  // beetle galleries through the bark: the side doors
+  for (let x = -5; x <= 4; x++) for (const z of [-1, 0]) if (get(x, 1, z) === 'air') S(x, 1, z, 'frass'); // frass along the middle
+  fill(-1, 1, -1, 2, 1, 0, 'air');                             // the ants clear the frass out of their room (my idea)
+  colony(-1, 3, -1, 1, 1, {ants: 10});
+  bug('major', -4.5, 2, -0.3, 1.6); bug('minor', -5.6, 0, 0.4, 2.4); bug('major', 1.4, 4, -0.2, 0.3);
+  heap(-6, -3, 8, 'termite_remains');
+}});
+// 3. A room under a fallen log (the log is the roof; the ants dig one block down, a known departure).
+site({ox: 30, oz: 0, title: '3 Room under a fallen log', build() {
+  ground();
+  for (let x = -5; x <= 4; x++) for (let y = 0; y <= 2; y++) for (let z = -1; z <= 1; z++) { if (y === 2 && z !== 0) continue; S(x, y, z, 'deadlog'); }
+  fill(-3, -1, -1, 2, -1, 0, 'air');                           // the room under the trunk, one block down
+  S(0, -1, -2, 'air'); S(3, -1, 0, 'air'); S(5, -1, 0, 'air'); S(4, -1, 0, 'air'); // two doors, beside and past the end
+  colony(-3, 3, -1, 1, -1, {ants: 9});
+  bug('major', 5.5, -1, 0.4, 0.8);
+  heap(5, -3, 6, 'termite_remains');
+}});
+// 4. An old aardvark burrow.
+site({ox: 45, oz: 0, title: '4 Old aardvark burrow', build() {
+  ground();
+  for (let x = -6; x <= -3; x++) for (let z = -3; z <= 0; z++) if (hash(x, 0, z, 9) < 0.8) S(x, 0, z, 'coarse'); // the spoil fan
+  S(-5, 1, -1, 'coarse'); S(-4, 1, -2, 'coarse');
+  const path = [[-4, -1], [-3, -1], [-3, -2], [-2, -2], [-2, -3], [-1, -3], [-1, -4], [0, -4]];
+  for (const [x, y] of path) for (const z of [-1, 0]) { S(x, y, z, 'air'); S(x, y + 1 > -1 ? y : y + 1, z, 'air'); }
+  for (const z of [-1, 0]) { S(-4, 0, z, 'air'); S(-5, -1, z, 'air'); }
+  fill(0, -5, -1, 3, -4, 0, 'air');                            // the end chamber
+  for (let y = -4; y <= -1; y++) S(4, y, -1, 'air');           // a second door, a bolt hole
+  colony(0, 4, -1, 1, -5);
+  bug('major', -2.5, -3, -0.3, Math.PI / 2 + 0.3); bug('minor', -5.2, -1, 0.3, 1.6);
+}});
+// 5. A ground squirrel (or springhare) warren: many small holes.
+site({ox: 60, oz: 0, title: '5 Ground squirrel warren', build() {
+  ground();
+  for (const hx of [-4, 0, 4]) { for (let y = -3; y <= -1; y++) S(hx, y, 0, 'air'); S(hx + 1, 0, -1, 'coarse'); S(hx, 0, -1, 'coarse'); }
+  fill(-4, -3, 0, 4, -3, 0, 'air');
+  fill(-2, -4, -1, 0, -3, 0, 'air');                           // a side chamber
+  S(2, -1, -3, 'air'); S(2, -2, -3, 'air'); S(2, -2, -2, 'air'); S(2, -3, -2, 'air'); S(2, -3, -1, 'air');
+  colony(-2, 1, -1, 1, -4, {ants: 7});
+  bug('major', 3.2, -3, 0.3, 1.5);
+}});
+// 6. A root hollow at the foot of a living tree.
+site({ox: 0, oz: -18, title: '6 Root hollow at a living tree', labelY: 10.5, build() {
+  ground();
+  for (let x = -4; x <= 4; x++) for (let z = -4; z <= 4; z++) for (let y = -4; y <= -2; y++) if (x * x + z * z < 12) S(x, y, z, 'rooted');
+  fill(-1, 0, -1, 0, 7, 0, 'tree');
+  for (const [x, y, z] of [[1, -1, 0], [2, -1, 0], [3, -2, 0], [-2, -1, -1], [-3, -2, -1], [-1, -1, -2], [-1, -2, -3], [0, -2, 1], [1, -1, -1], [-2, -1, 0]]) S(x, y, z, 'tree');
+  for (let x = -5; x <= 4; x++) for (let z = -5; z <= 4; z++) { const d2 = (x + 0.5) ** 2 + (z + 0.5) ** 2; if (d2 < 22) S(x, 8, z, 'leaves'); if (d2 < 9 && d2 > 1) S(x, 7, z, 'leaves'); }
+  fill(-1, -3, -1, 2, -2, 0, 'air');                           // the hollow among the roots, under the trunk
+  S(1, -2, -1, 'rooted'); S(2, -1, -1, 'air');                 // a door between the roots
+  S(-2, -2, 0, 'air'); S(-2, -1, 1, 'grass');
+  colony(-1, 3, -1, 1, -3, {ants: 8});
+  bug('major', 2.4, 0, -1.4, 2.2);
+}});
+// 7. Under a boulder.
+site({ox: 15, oz: -18, title: '7 Under a boulder', build() {
+  ground();
+  for (let x = -4; x <= 3; x++) for (let y = 0; y <= 2; y++) for (let z = -3; z <= 2; z++) {
+    const e = ((x + 0.5) / 3.6) ** 2 + ((y + 0.2) / 2.6) ** 2 + ((z + 0.5) / 2.6) ** 2;
+    if (e <= 1) S(x, y, z, hash(x, y, z, 3) < 0.2 ? 'andesite' : 'granite');
+  }
+  fill(-2, -1, -1, 1, -1, 0, 'air');                           // the scrape under its flat underside: the stone is the roof
+  S(2, -1, 0, 'air'); S(3, -1, 0, 'air'); S(-3, -1, -1, 'air'); S(-4, -1, -1, 'air');
+  colony(-2, 2, -1, 1, -1, {ants: 8});
+  bug('major', 4.2, -1, 0.3, 0.4);
+}});
+// 8. Under a pile of fallen branches.
+site({ox: 30, oz: -18, title: '8 Under a pile of fallen branches', camY: -0.5, build() {
+  ground();
+  fill(-2, -1, -1, 1, -1, 0, 'air');                           // a shallow scrape, roofed only by the branches
+  const B = {px: 'fallen_branch_end', nx: 'fallen_branch_end', py: 'fallen_branch_bark_0', ny: 'fallen_branch_bark_0', pz: 'fallen_branch_bark_0', nz: 'fallen_branch_bark_0'};
+  const Bz = {px: 'fallen_branch_bark_0', nx: 'fallen_branch_bark_0', py: 'fallen_branch_bark_0', ny: 'fallen_branch_bark_0', pz: 'fallen_branch_end', nz: 'fallen_branch_end'};
+  for (let i = 0; i < 9; i++) {
+    const y = (i % 3) * 0.4, z = -3 + i * 0.55, t = 0.3 + 0.15 * hash(i, 1, 1, 1), x0 = -4 + hash(i, 2, 2, 2) * 1.5;
+    extra(x0, y, z, x0 + 5 + hash(i, 3, 3, 3) * 2, y + t, z + t, B);
+  }
+  for (let i = 0; i < 6; i++) { const x = -3 + i * 1.1, y = 0.25 + (i % 2) * 0.45, t = 0.3; extra(x, y, -3.5, x + t, y + t, 1.8, Bz); }
+  colony(-2, 2, -1, 1, -1, {ants: 8});
+}});
+// 9. An old Matabele nest left behind (an old burrow): empty, its refuse heap of termite remains still outside.
+site({ox: 45, oz: -18, title: '9 Old nest left behind', build() {
+  ground();
+  for (const z of [-1, 0]) { S(-3, -1, z, 'air'); S(-2, -1, z, 'air'); S(-2, -2, z, 'air'); S(-1, -2, z, 'air'); S(-1, -3, z, 'air'); }
+  fill(0, -4, -1, 3, -3, 0, 'air');
+  for (let y = -3; y <= -1; y++) S(4, y, -1, 'air');
+  heap(-4, -2, 18, 'termite_remains'); heap(-5, -3, 10, 'termite_remains');
+}});
+// 10. One block is 3 cm of ant: loose bark, a gallery block.
+site({ox: 60, oz: -18, title: '10 One block is 3 cm of ant', cuts: false, cam: () => [[60 + 7.5, 1.0, -18 + 2.6], [60 + 1.5, 0.6, -18 + 0.2], 40], build() {
+  ground();
+  S(-4, 0, -1, 'deadlog'); bug('major', -4.3, 1, -0.5, 0.4); bug('minor', -3.7, 1, -0.6, 2.2); bug('termite', -4.0, 1, -0.2, 1);
+  // Loose bark: a wall of dead log, a bark plate 2 pixels thick standing 4 pixels off it, two majors in the gap.
+  fill(-1, 0, -2, 1, 2, -2, 'deadlog');
+  const P = all('peeling_bleached_bark');
+  extra(-1, 0.2, -0.75, 1.9, 2.6, -0.625, P);
+  const w1 = bug('major', -0.2, 0, -0.9, 0, {wall: true}); w1.position.set(cur.ox - 0.2, 1.1, cur.oz - 0.98);
+  const w2 = bug('major', 0.9, 0, -0.9, 0, {wall: true}); w2.position.set(cur.ox + 0.9, 1.7, cur.oz - 0.98); w2.rotation.z = 2.6;
+  // A gallery block: a log block drawn with a 10-pixel tunnel through it (a block model, like the tapering branches).
+  const W = {px: 'dead_wood_top_0', nx: 'dead_wood_top_0', py: 'bleached_bark', ny: 'bleached_bark', pz: 'bleached_bark', nz: 'bleached_bark'};
+  for (const bx of [2, 3, 4]) {
+    const t = 3 / 16, x0 = bx, z0 = 1;
+    extra(x0, 0, z0, x0 + 1, t, z0 + 1, W); extra(x0, 1 - t, z0, x0 + 1, 1, z0 + 1, W);
+    extra(x0, t, z0, x0 + 1, 1 - t, z0 + t, W); extra(x0, t, z0 + 1 - t, x0 + 1, 1 - t, z0 + 1, W);
+  }
+  bug('major', 3.0, 3 / 16, 1.5, Math.PI / 2); bug('minor', 4.2, 3 / 16, 1.5, Math.PI / 2);
+}});
+
+// ---------- the dead-wood tenants (real size against squeezed) ----------
+const tenants = new THREE.Group(); scene.add(tenants);
+const TENANT_DEFS = [
+  {name: 'Scolopendra centipede', mm: 130, make: centipede},
+  {name: 'Bark scorpion (Uroplectes)', mm: 70, make: scorpion},
+  {name: 'Giant millipede', mm: 200, make: millipede},
+  {name: 'Longhorn beetle grub', mm: 60, make: grub},
+];
+function lam(c) { return new THREE.MeshLambertMaterial({color: c}); }
+function seg(g, w, h, l, x, y, z, m) { const b = new THREE.Mesh(new THREE.BoxGeometry(l, h, w), m); b.position.set(x, y, z); g.add(b); return b; }
+// Each made 1 unit long along +x, standing on y = 0.
+function centipede() {
+  const g = new THREE.Group(), n = 21, L = 1 / (n + 1), body = lam('#4f5a2a'), band = lam('#c06a1f'), leg = lam('#d9a33a'), head = lam('#a3361c');
+  seg(g, 0.07, 0.03, L * 1.2, 0.5 - L * 0.6, 0.035, 0, head);
+  for (let i = 0; i < n; i++) {
+    const x = 0.5 - L * 1.4 - i * L; seg(g, 0.075, 0.032, L * 0.92, x, 0.035, 0, i % 2 ? body : band);
+    for (const s of [-1, 1]) { const l = seg(g, 0.006, 0.006, 0.07, x, 0.02, s * 0.06, leg); l.rotation.y = s * 1.2; l.rotation.x = s * -0.4; }
+  }
+  return g;
+}
+function millipede() {
+  const g = new THREE.Group(), n = 48, L = 1 / n, body = lam('#2a1d16'), ring = lam('#6b2a1a'), leg = lam('#b0603a');
+  for (let i = 0; i < n; i++) {
+    const x = 0.5 - L / 2 - i * L, t = i < 2 || i > n - 3 ? 0.75 : 1;
+    seg(g, 0.055 * t, 0.055 * t, L * 0.95, x, 0.03 + 0.028 * t, 0, i % 2 ? body : ring);
+    for (const s of [-1, 1]) seg(g, 0.004, 0.025, 0.004, x, 0.014, s * 0.024, leg);
+  }
+  return g;
+}
+function grub() {
+  const g = new THREE.Group(), n = 12, L = 1 / n, body = lam('#efe2c4'), fold = lam('#d9c69c'), head = lam('#6b3d1e');
+  seg(g, 0.12, 0.08, L * 0.7, 0.5 - L * 0.35, 0.05, 0, head);
+  for (let i = 0; i < n; i++) { const t = i < 3 ? 1.35 - i * 0.12 : 1 - (i - 3) * 0.03; seg(g, 0.16 * t, 0.11 * t, L * 0.9, 0.5 - L * 1.2 - i * L, 0.06 * t, 0, i % 2 ? body : fold); }
+  return g;
+}
+function scorpion() {
+  const g = new THREE.Group(), body = lam('#9a7a3c'), dark = lam('#4d3a1c'), claw = lam('#b8893d');
+  for (let i = 0; i < 8; i++) seg(g, 0.2 - i * 0.008, 0.05, 0.065, 0.2 - i * 0.068, 0.045, 0, i % 2 ? body : dark);
+  // The tail: five segments going back and curling up over the body, then the sting.
+  let x = -0.3, y = 0.06, a = 0;
+  for (let i = 0; i < 5; i++) {
+    a += 0.45; const dx = -Math.cos(a), dy = Math.sin(a);
+    const s = seg(g, 0.05, 0.045, 0.075, x + dx * 0.035, y + dy * 0.035, 0, i % 2 ? dark : body); s.rotation.z = -a;
+    x += dx * 0.07; y += dy * 0.07;
+  }
+  seg(g, 0.03, 0.04, 0.06, x + 0.02, y + 0.02, 0, lam('#7a2a1a')).rotation.z = -2.6;
+  for (const s of [-1, 1]) {
+    const arm = seg(g, 0.025, 0.03, 0.16, 0.33, 0.05, s * 0.1, claw); arm.rotation.y = s * -0.5;
+    seg(g, 0.06, 0.04, 0.12, 0.45, 0.05, s * 0.15, claw);
+    for (let k = 0; k < 4; k++) { const l = seg(g, 0.012, 0.012, 0.14, 0.15 - k * 0.07, 0.03, s * 0.13, body); l.rotation.y = s * (0.9 - k * 0.15); l.rotation.x = s * -0.5; }
+  }
+  return g;
+}
+const TOX = 0, TOZ = -40;
+const tenantObjs = TENANT_DEFS.map(d => { const o = d.make(); tenants.add(o); return {d, o}; });
+const refMajor = buildInsect('major'); scene.add(refMajor);
+const refCube = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), new THREE.MeshLambertMaterial({color: '#7da453'})); scene.add(refCube);
+const player = new THREE.Group();
+[[0.5, 0.75, 0.25, 0.375, '#3b4a8f'], [0.5, 0.75, 0.25, 1.125, '#2f9c9c'], [0.5, 0.5, 0.5, 1.55, '#b98a68']].forEach(([w, h, d, y, c]) => {
+  const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), lam(c)); m.position.y = y; player.add(m); });
+scene.add(player);
+const tenantPad = new THREE.Mesh(new THREE.BoxGeometry(30, 0.2, 8), new THREE.MeshLambertMaterial({color: '#b49a6a'}));
+tenantPad.position.set(TOX + 10, -0.1, TOZ); scene.add(tenantPad);
+
+// ---------- labels ----------
+const tags = [];
+function tag(text, getPos, small, far) {
+  const el = document.createElement('div'); el.className = 'tag' + (small ? ' small' : ''); el.textContent = text;
+  document.getElementById('labels').appendChild(el); tags.push({el, getPos, far: far || 24}); return el;
+}
+sites.forEach(s => tag(s.title, () => s.labelAt, false, 90));
+const tenantTags = tenantObjs.map(t => tag('', () => new THREE.Vector3(t.o.position.x, 0.6, t.o.position.z)));
+tag('1 block', () => new THREE.Vector3(refCube.position.x, 1.2, refCube.position.z), true);
+tag('player', () => new THREE.Vector3(player.position.x, 2.0, player.position.z), true);
+tag('Matabele major', () => new THREE.Vector3(refMajor.position.x, 0.4, refMajor.position.z), true);
+tag('Dead-wood tenants (M9.5 ideas)', () => new THREE.Vector3(TOX + 10, 3.2, TOZ), false, 90);
+
+let squeeze = 1;
+function layoutTenants() {
+  let x = TOX - 2;
+  tenantObjs.forEach((t, i) => {
+    const len = t.d.mm * BLOCKS_PER_MM * squeeze;
+    t.o.scale.setScalar(len); t.o.position.set(x + len / 2, 0, TOZ + (i % 2 ? 1.5 : -1.5)); x += len + 1.2;
+    tenantTags[i].textContent = t.d.name + ': ' + len.toFixed(1) + ' blocks' + (squeeze < 1 ? ' (real ' + (t.d.mm * BLOCKS_PER_MM).toFixed(1) + ')' : '');
+  });
+  refMajor.position.set(x + 0.5, 0, TOZ); refCube.position.set(x + 2, 0.5, TOZ); player.position.set(x + 3.6, 0, TOZ);
+  layoutTenants.end = x + 4;
+  document.getElementById('squeezeOut').textContent = Math.round(squeeze * 100) + '% of real (ants stay real)';
+}
+
+// ---------- draw the blocks ----------
+let world = new THREE.Group(); scene.add(world);
+let cutOn = true;
+function rebuild() {
+  scene.remove(world); world.traverse(o => { if (o.geometry) o.geometry.dispose(); });
+  world = new THREE.Group(); scene.add(world); batches = {};
+  const hidden = c => cutOn && c.cuts && c.lz >= 1;
+  const solidAt = (x, y, z) => { const c = cells.get(x + ',' + y + ',' + z); return c && !hidden(c) && !SEE_THROUGH.has(c.type); };
+  const airUnder = (x, y, z) => y <= -1 && !cells.get(x + ',' + y + ',' + z);
+  for (const [k, c] of cells) {
+    if (hidden(c)) continue;
+    const [x, y, z] = k.split(',').map(Number);
+    box(x, y, z, x + 1, y + 1, z + 1, TYPES[c.type],
+        n => { const d = DIRS[n]; return !SEE_THROUGH.has(c.type) && solidAt(x + d[0], y + d[1], z + d[2]); },
+        n => { const d = DIRS[n]; return airUnder(x + d[0], y + d[1], z + d[2]) ? (n === 'py' ? 0.75 : 0.55) : 1; });
+  }
+  for (const e of extras) { if (cutOn && e.cuts && e.lz >= 1) continue; box(...e.b, e.keys); }
+  for (const [key, b] of Object.entries(batches)) {
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.Float32BufferAttribute(b.pos, 3));
+    g.setAttribute('uv', new THREE.Float32BufferAttribute(b.uv, 2));
+    g.setAttribute('color', new THREE.Float32BufferAttribute(b.col, 3));
+    world.add(new THREE.Mesh(g, material(key)));
+  }
+  pieces.forEach(p => p.obj.visible = !(cutOn && p.cuts && p.lz >= 1));
+}
+
+// ---------- cameras ----------
+const CAMS = {'overview': () => [[30, 42, 46], [30, -2, -16], 40]};
+sites.forEach(s => {
+  const n = s.title.split(' ')[0];
+  CAMS[s.title] = () => s.cam ? s.cam() : [[s.ox + 2, 2.2, s.oz + 9.5], [s.ox, (s.camY !== undefined ? s.camY : -1.5), s.oz], 40];
+});
+CAMS['ant\'s eye: in the hollow giant'] = () => [[15 - 3.3, 2.16, -0.55], [15 + 1.5, 1.7, -0.3], 70];
+CAMS['ant\'s eye: under the log'] = () => [[30 + 5.3, -0.85, 0.2], [30 - 1, -1.0, -0.2], 70];
+CAMS['eye: player standing by the giant'] = () => [[15 - 3, 1.62, 5], [15, 1.5, 0], 70];
+CAMS['tenants'] = () => [[TOX + 10, 3, TOZ + 12], [TOX + 10, 0.4, TOZ], 50];
+const camBox = document.getElementById('cams');
+function setCam(name) {
+  const [p, t, fov] = CAMS[name](); camera.fov = fov; camera.near = fov > 60 ? 0.005 : 0.05; camera.updateProjectionMatrix();
+  camera.position.set(...p); controls.target.set(...t); controls.update();
+  [...camBox.children].forEach(b => b.classList.toggle('on', b.dataset.cam === name));
+  try { localStorage.setItem('nest-sites-cam', name); } catch (e) {}
+}
+Object.keys(CAMS).forEach(name => { const b = document.createElement('button'); b.textContent = name; b.dataset.cam = name; b.onclick = () => setCam(name); camBox.appendChild(b); });
+
+// ---------- the cards ----------
+const CARDS = [
+  ['1 Dead termite mound (today)', 'In Nigeria about half of 73 nests were in deserted <i>Macrotermes</i> mounds. The best home: dry, roomy, old rooms ready.',
+   'Already built. Rare: about 1 mound in 4 is dead, so nearest free one can be very far.', 'Years (wears down slowly).', 'yes', 'Keep as it is: the first choice.'],
+  ['2 Hollow fallen giant', '"Partly rotten logs" are on the real list (Yusuf 2026). Dry inside, a long hollow, beetle galleries as side doors.',
+   'Already in the game: every grown dead giant falls hollow, galleries and frass included. At real sizes the hollow (2 blocks wide, 1 to 2 high over the frass) is a hall for them.',
+   'For good (age, fire, lightning); a few days once down if the rot killed it (crumbles to pulp: a forced move).', 'yes', 'Add: second choice. No new blocks.'],
+  ['3 Room under a fallen log', 'Real: they use hollows under logs other animals or the rot made. Digging their own room is the known departure you liked.',
+   'Built once on 2026-10-24, switched off. The room stays in the soil when the log rots away, then counts as a burrow.', 'As long as the log, then a burrow.', 'maybe', 'Cheap: the code exists. Only for logs 3+ across.'],
+  ['4 Old aardvark burrow', 'Aardvark burrows are the savanna\'s spare rooms: warthogs, hyenas, porcupines, birds, snakes and many insects move in. Real Matabele nest in the ground in borrowed holes.',
+   'A sloping tunnel to a room, a fan of spoil at the mouth (a visible landmark). The sloped burrow and soil ramp are already built.',
+   'Slowly fills in once empty (my pick 60 to 120 days); floods in heavy rain if low (forces a move).', 'yes', 'Add: fixes the 300-block gap, as it does not need a mound or a tree.'],
+  ['5 Ground squirrel warren', 'Unstriped ground squirrels and springhares dig warrens with many holes; real ants use small side chambers.',
+   'Several small holes and tunnels close under the grass.', 'Like a burrow.', 'maybe', 'Later, with M9.5 animals. A variety of burrow.'],
+  ['6 Root hollow at a living tree', '"Under trees" is on the real list (Yusuf 2026). Roots hold the soil up, so a room there does not cave in.',
+   'A room among the roots under the trunk. Never decays while the tree lives, and after a fall the roots rot into channels.', 'As long as the tree (decades).', 'yes', 'Add: lasting and common near big trees.'],
+  ['7 Under a boulder', '"Under rocks" is on the real list. Many ants nest under stones: the stone heats by day and warms the brood under it.',
+   'Our savannas have no boulders yet. New: a few granite boulders and kopje outcrops in new land.', 'For ever.', 'maybe', 'A new look for the savanna: your call.'],
+  ['8 Under fallen branches', 'Ants do shelter under litter, but a pile of sticks is a poor roof against rain and raiders.',
+   'Fallen branches already lie under trees. Gaps between branch models show the ants.', 'Branches are eaten by termites and decay.', 'no', 'Leave out: short-lived and not on the real list.'],
+  ['9 Old nest left behind', 'Real: a colony may return to an old site months later. A Matabele nest is easy to spot by the heap of termite heads outside it.',
+   'Every move leaves its room in the home book as "empty, ours before". Over time the land fills with old nests.', 'Its room lasts; the heap fades.', 'yes', 'Add: free, every move makes one.'],
+  ['10 One block is 3 cm', 'At real sizes a block is a hall for a Matabele: 2 majors end to end.',
+   'Two looks for later dead-wood life: loose bark plates standing off a log (scorpions, centipedes, cockroaches really hide there) and gallery blocks with a tunnel through (block models, like the tapering branches).', '', 'maybe', 'For M9.5 tenants; not needed for Matabele homes.'],
+  ['Dead-wood tenants', 'Real savanna logs hold longhorn and jewel beetle grubs (they made the galleries), Scolopendra centipedes, bark scorpions, darkling beetles, giant millipedes.',
+   'At the ants\' scale a 13 cm centipede is 4.3 blocks long, bigger than a player is tall. The slider shows how squeezed they would need to be.', '', 'maybe', 'Scale for bigger animals is a choice for M9.5.'],
+];
+const cardsEl = document.getElementById('cards');
+CARDS.forEach(([t, real, mc, lasts, v, verdict]) => {
+  const c = document.createElement('div'); c.className = 'card';
+  c.innerHTML = '<h3>' + t + '</h3><p><span class="k">Real:</span> ' + real + '</p><p><span class="k">In blocks:</span> ' + mc + '</p>' +
+    (lasts ? '<p><span class="k">Lasts:</span> ' + lasts + '</p>' : '') + '<p class="verdict ' + v + '">' + verdict + '</p>';
+  cardsEl.appendChild(c);
+});
+
+// ---------- run ----------
+document.getElementById('cut').addEventListener('change', e => { cutOn = e.target.checked; rebuild(); });
+document.getElementById('tagsOn').addEventListener('change', e => document.getElementById('labels').style.display = e.target.checked ? '' : 'none');
+const sq = document.getElementById('squeeze'); sq.value = squeeze;
+sq.addEventListener('input', () => { squeeze = parseFloat(sq.value); layoutTenants(); });
+function resize() { const w = wrap.clientWidth, h = wrap.clientHeight; renderer.setSize(w, h, false); camera.aspect = w / h; camera.updateProjectionMatrix(); }
+window.addEventListener('resize', resize);
+const v = new THREE.Vector3();
+function frame() {
+  controls.update(); renderer.render(scene, camera);
+  const w = wrap.clientWidth, h = wrap.clientHeight;
+  tags.forEach(({el, getPos, far}) => {
+    const p = getPos(), near = camera.position.distanceTo(p) < far;
+    v.copy(p).project(camera);
+    const show = near && v.z < 1 && Math.abs(v.x) < 1.05 && Math.abs(v.y) < 1.05;
+    el.style.display = show ? '' : 'none'; el.style.left = ((v.x + 1) / 2 * w) + 'px'; el.style.top = ((1 - v.y) / 2 * h) + 'px';
+  });
+  requestAnimationFrame(frame);
+}
+Promise.all(Object.keys(DATA.textures).map(n => loadImage(n).then(i => images[n] = i))).then(() => {
+  for (const n of Object.keys(DATA.textures)) textures[n] = canvasTexture(g => g.drawImage(images[n], 0, 0));
+  textures.grass_top = canvasTexture(g => tinted(g, images.grass_block_top));
+  textures.grass_side = canvasTexture(g => { g.drawImage(images.grass_block_side, 0, 0); tinted(g, images.grass_block_side_overlay); });
+  layoutTenants(); rebuild(); resize();
+  let start = 'overview'; try { const s = localStorage.getItem('nest-sites-cam'); if (s && CAMS[s]) start = s; } catch (e) {}
+  setCam(start); frame();
+});
+</script>
+</body>
+</html>
