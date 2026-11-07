@@ -155,7 +155,28 @@ public class MatabeleBiteOutGoal extends Goal {
         if (colony != null && colony.nest().isInside(level, at)) {
             return false; // its own rooms: home, not a trap
         }
+        if (!roofed(level, at)) {
+            return false; // BUGS 160: a roof far over it (a dead tree's bare limbs) is no trap
+        }
         return Fights.isShutIn(level, at);
+    }
+
+    /** How near over it (blocks) a roof must be for the ant to be shut in (BUGS 160; my pick). */
+    private static final int ROOF_NEAR = 3;
+
+    /**
+     * BUGS 160: whether something solid lies just over it. A seal of soil or mud is always right on top of a shut-in ant;
+     * under a dead tree's bare crown 15 blocks up (no leaves, so BUGS 113's leaf rule did not help) the shut-in walk of
+     * 40 cells never reached the open sky round the crown, and the ant bit at the grass every second.
+     */
+    private static boolean roofed(ServerLevel level, BlockPos at) {
+        for (int up = 1; up <= ROOF_NEAR; up++) {
+            BlockPos above = at.above(up);
+            if (!level.getBlockState(above).getCollisionShape(level, above).isEmpty()) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private boolean foeNear() {

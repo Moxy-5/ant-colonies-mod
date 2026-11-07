@@ -107,8 +107,9 @@ public final class RaidRules {
             return;
         }
         // (Counted only from the colony's coming back: while away the column is not worked out, and the rule may look
-        // before the raid's first second back; docs/BUGS.md 147.)
-        long since = look.now() - Math.max(raid.updatedAt(), look.colony().away().backAt());
+        // before the raid's first second back; docs/BUGS.md 147. Nor before a new raid's first working out: its clock
+        // starts below zero, BUGS 159.)
+        long since = look.now() - Math.max(Math.max(raid.updatedAt(), raid.startedAt()), look.colony().away().backAt());
         if (since > HEARTBEAT) {
             look.breach(raid.find().at(), raid.members(), "the raid (" + raid.stage().name().toLowerCase() + ") was last worked out "
                     + since / 20 + " s ago while its colony is here");
