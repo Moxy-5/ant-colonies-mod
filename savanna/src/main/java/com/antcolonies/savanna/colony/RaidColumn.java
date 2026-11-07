@@ -29,9 +29,10 @@ import net.minecraft.world.phys.Vec3;
 /**
  * M8 step 3b, one raid column ({@link Raids}; {@code docs/DESIGN.md}, "Step 3b, the column"). Real Megaponera
  * (Longhurst and Howse 1979, Hoelldobler et al. 1994, Frank et al. 2017-2018, Yusuf 2026): a scout home from a find
- * recruits nestmates at the entrance; they pour out and mill round it, then follow the scout out along its scent line,
- * single file near the nest and wider in the open, the column moving in surges as the front waits for the ants behind;
- * a little short of the termites it halts and bunches up, then they rush in all at once (the majors bite the
+ * recruits nestmates at the nest and they follow it out along its scent line as a column (here the ribbon, the user's
+ * pick of 2026-11-07: the scout leads off at once and the raiders unroll out of the nest behind it in rows of 3 and 2,
+ * never stopping on the march, {@link #march}); a little short of the termites it halts and bunches up, then they rush
+ * in all at once (the majors bite the
  * galleries open, the minors go in and sting); after the fight they gather again and walk home as a column.
  *
  * <p>Here the colony's brain keeps the column: who is in it (the scout leads), what stage it is at, and where along the
@@ -629,8 +630,8 @@ public final class RaidColumn {
     }
 
     /**
-     * Tests (M8 step 3Q): whether this raider is waiting now, at its place in one of the column's waits (milling at the
-     * entrance, bunched short of the termites, waiting out the attack, regrouping), not fighting and not sent anywhere far.
+     * Tests (M8 step 3Q): whether this raider is waiting now, at its place in one of the column's waits (standing while
+     * the scout calls at the nest's mouth, bunched short of the termites, waiting out the attack, regrouping), not fighting and not sent anywhere far.
      */
     public boolean waitingForTests(AbstractAntEntity ant) {
         if (stage != Stage.FORMING && stage != Stage.GATHERING && stage != Stage.ATTACKING && stage != Stage.REGROUPING) {
@@ -1200,6 +1201,10 @@ public final class RaidColumn {
      * slower: nobody is ever told to stand while the column marches. The one halt kept: a gap in the scent trail (a player
      * broke it), where the front casts about and the rest close up behind it. A raider still in the nest comes up to the
      * trail's start. At the route's end true (the next stage).
+     *
+     * <p>In five pieces: who is out and how far each has walked ({@link #walkedAlong}), the order of the line
+     * ({@link #rankLine}), the rows and their places ({@link #ribbon}), each raider's order ({@link #raiderOrder}, its lane
+     * by {@link #laneOrder}), and the ones still coming out of the nest ({@link #comeOut}).
      */
     private boolean march(ServerLevel level, List<MatabeleEntity> ants, Route route, long now) {
         MatabeleEntity front = ants.stream().filter(ant -> ant.getUUID().equals(leader)).findFirst().orElse(ants.get(0));
@@ -1220,22 +1225,70 @@ public final class RaidColumn {
         if (turnBack) {
             return false;
         }
-        // (The places by the distance walked along the trail, climbs and drops counted, not the flat distance: down a
-        // steep hump the flat distance says the front has hardly moved.)
         double frontW = route.walkedOf(front.getX(), front.getY(), front.getZ());
+        Map<UUID, Double> at = walkedAlong(route, line);
+        // (off the hump, and a block past its foot, on the way out; the way home has no hump to come down)
+        double settle = route == out ? hillEnd(level, route) + 1.0 : 0.0;
+        rankLine(route, line, at, settle);
+        double spacing = casting ? numbers.spacing() * CLOSE_UP : numbers.spacing();
+        double frontPlace = casting ? Math.min(frontW, route.walked(castGap.near() - GAP_STOP)) : frontW;
+        MarchStep step = new MarchStep(route, frontW, spacing, casting, settle, now);
+        Ribbon ribbon = ribbon(step, line, at, frontPlace);
+        BlockPos ahead = point(route, Math.min(route.length(), frontAt + 4.0));
+        if (casting) {
+            orders.put(front.getUUID(), new Order(castSpot(level, route, 0, now), 1.0, point(route, castGap.far())));
+        } else {
+            if (frontAt >= head - LEAD_STEP / 2) {
+                head = Math.min(route.length(), frontAt + LEAD_STEP);
+            }
+            orders.put(front.getUUID(), Order.marching(place(level, route, head, 0.0), ribbon.frontPace(), ahead, Vec3.ZERO));
+        }
+        for (int k = 0; k < line.size(); k++) {
+            MatabeleEntity ant = line.get(k);
+            orders.put(ant.getUUID(), raiderOrder(level, step, ribbon, ant, k, at.get(ant.getUUID())));
+        }
+        comeOut(level, route, front, notOut, ahead, now);
+        sayMarch(route, front, line, notOut, now);
+        return false;
+    }
+
+    /** One update of the march: the route, how far the front has walked along it, the gap between rows, whether it is held up at a broken trail, where the hump ends (along; 0 for none), the time. */
+    private record MarchStep(Route route, double frontW, double spacing, boolean casting, double settle, long now) {
+    }
+
+    /**
+     * The ribbon worked out for one update: each raider's row and its side in the row (blocks right of the trail), each
+     * row's lead (the one of it farthest along), whether each is off the hump and with its row, where each row really
+     * stands and its place, and the front's pace.
+     */
+    private record Ribbon(int[] rowOf, double[] sideOf, UUID[] leadOf, boolean[] settled, double[] rowAt, double[] rowPlace,
+                          double frontPace) {
+    }
+
+    /**
+     * How far each raider out has walked along the trail, climbs and drops counted, not the flat distance (down a steep
+     * hump the flat distance says the front has hardly moved); one not yet on the trail, its flat distance (0 or less).
+     */
+    private Map<UUID, Double> walkedAlong(Route route, List<MatabeleEntity> line) {
         Map<UUID, Double> at = new HashMap<>();
         for (MatabeleEntity ant : line) {
             double flatAlong = alongOf(route, ant);
             at.put(ant.getUUID(), flatAlong <= 0.0 ? flatAlong : route.walkedOf(ant.getX(), ant.getY(), ant.getZ()));
         }
-        // Each ant out gets the next place at the back as it comes out (several at once: the one farthest along first).
+        return at;
+    }
+
+    /**
+     * The order of the line (sorted in place): each ant out gets the next place at the back as it comes out (several at
+     * once: the one farthest along first). Down the hump the ants pass one another (three lanes, some quicker down a step
+     * than others), so until each is off it (and a block past its foot) the places among those still on it follow where
+     * they really are: in the order they came out, an ant down first had to slow at the foot for the ones it passed, and
+     * the foot jammed.
+     */
+    private void rankLine(Route route, List<MatabeleEntity> line, Map<UUID, Double> at, double settle) {
         line.stream().filter(ant -> !rank.containsKey(ant.getUUID()))
                 .sorted(java.util.Comparator.comparingDouble(ant -> -at.get(ant.getUUID())))
                 .forEach(ant -> rank.put(ant.getUUID(), nextRank++));
-        // Down the hump the ants pass one another (three lanes, some quicker down a step than others), so until each is
-        // off it (and a block past its foot) the places among those still on it follow where they really are: in the
-        // order they came out, an ant down first had to slow at the foot for the ones it passed, and the foot jammed.
-        double settle = route == out ? hillEnd(level, route) + 1.0 : 0.0;
         List<MatabeleEntity> unsettled = line.stream().filter(ant -> alongOf(route, ant) < settle).toList();
         if (unsettled.size() > 1) {
             List<Integer> ranks = unsettled.stream().map(ant -> rank.get(ant.getUUID())).sorted().toList();
@@ -1246,17 +1299,22 @@ public final class RaidColumn {
             }
         }
         line.sort(java.util.Comparator.comparingInt(ant -> rank.get(ant.getUUID())));
-        double spacing = casting ? numbers.spacing() * CLOSE_UP : numbers.spacing();
-        double frontPlace = casting ? Math.min(frontW, route.walked(castGap.near() - GAP_STOP)) : frontW;
-        BlockPos ahead = point(route, Math.min(route.length(), frontAt + 4.0));
-        if (casting) {
-            orders.put(front.getUUID(), new Order(castSpot(level, route, 0, now), 1.0, point(route, castGap.far())));
-        } else {
-            if (frontAt >= head - LEAD_STEP / 2) {
-                head = Math.min(route.length(), frontAt + LEAD_STEP);
-            }
-        }
-        // The rows (by the order the ants came out), and each row's lead: the one of it farthest along.
+    }
+
+    /**
+     * The rows and their places. Rows of {@code abreast} and one fewer by turns, in the line's order, the last row centred.
+     * Each row's place: its own share of the column behind the front, but never more than a row's gap ahead of the row
+     * before it as that row really stands (adapting the ribbon to the ground: down a tall dead mound's chimney and wall
+     * the raiders come out a second or more apart, and with places counted from the front alone each ran for its own far
+     * place and they came strung out one by one; so each row forms round its lead, and the rows close up behind one
+     * another, wherever the column's head has got to). The front keeps its little lead over the ribbon, not over the
+     * ground: while the ribbon behind it is strung out (the raiders come down a tall dead mound's wall, or a low hump's
+     * steps, slower than they walk, a row at a time) it walks on slower, never stopping, so the rows close up behind it
+     * into the ribbon instead of each trailing the one before by a block or more (the user, 2026-11-07: "adapt the
+     * formations to the different mounds"; on flat ground the ribbon keeps up and it walks at its full pace).
+     */
+    private Ribbon ribbon(MarchStep step, List<MatabeleEntity> line, Map<UUID, Double> at, double frontPlace) {
+        Route route = step.route();
         int wide = Math.max(1, numbers.abreast());
         int[] rowOf = new int[line.size()];
         double[] sideOf = new double[line.size()];
@@ -1282,145 +1340,152 @@ public final class RaidColumn {
                 leadOf.set(row, id);
             }
         }
-        // Each row's place: its own share of the column behind the front, but never more than a row's spacing ahead of
-        // the row before it as that row really stands (adapting the ribbon to the ground: down a tall dead mound's
-        // chimney and wall the raiders come out a second or more apart, and with places counted from the front alone each
-        // ran for its own far place and they came strung out one by one; so each row forms round its lead, and the rows
-        // close up behind one another, wherever the column's head has got to).
-        // Down the hump's steps the rows keep twice their gap (a raider climbs down a step face no faster than it walks
-        // a block, three lanes at a time; at the normal gap they reached each step faster than they got down it and
-        // bunched on the tread above it), closing up to the ribbon at its foot.
-        double hillW = settle > 0.0 ? route.walked(settle) : 0.0;
+        int rows = row + 1;
         // Each row as it really stands: the middle of its ants off the hump within a few blocks of its lead (one farther
-        // back is a straggler, not the row). The row walks to its place as one, and the front eases for it (below).
-        double[] rowSum = new double[row + 1];
-        int[] rowCount = new int[row + 1];
+        // back is a straggler, not the row). The row walks to its place as one, and the front eases for it.
+        double[] rowSum = new double[rows];
+        int[] rowCount = new int[rows];
         boolean[] settled = new boolean[line.size()];
         for (int k = 0; k < line.size(); k++) {
             int r = rowOf[k];
             double own = at.get(line.get(k).getUUID());
-            settled[k] = alongOf(route, line.get(k)) >= settle && own >= leadAt.get(r) - ROW_REACH;
+            settled[k] = alongOf(route, line.get(k)) >= step.settle() && own >= leadAt.get(r) - ROW_REACH;
             if (settled[k]) {
                 rowSum[r] += own;
                 rowCount[r]++;
             }
         }
-        double[] rowAt = new double[row + 1]; // (the row's middle, or its lead while none of it is off the hump)
-        for (int r = 0; r <= row; r++) {
+        double[] rowAt = new double[rows]; // (the row's middle, or its lead while none of it is off the hump)
+        for (int r = 0; r < rows; r++) {
             rowAt[r] = rowCount[r] > 0 ? rowSum[r] / rowCount[r] : leadAt.get(r);
         }
+        double hillW = step.settle() > 0.0 ? route.walked(step.settle()) : 0.0;
         // How far the ribbon off the hump trails its places closed up behind the front.
         double stretch = 0.0;
         double whole = frontPlace;
-        for (int r = 0; r <= row; r++) {
-            whole -= !casting && whole - spacing < hillW ? spacing * HILL_SPACING : spacing;
+        for (int r = 0; r < rows; r++) {
+            whole -= rowGap(step, whole, hillW);
             if (rowCount[r] > 0) {
                 stretch = Math.max(stretch, whole - rowAt[r]);
             }
         }
-        // The front keeps its little lead over the ribbon, not over the ground: while the ribbon behind it is strung out
-        // (the raiders come down a tall dead mound's wall, or a low hump's steps, slower than they walk, a row at a time)
-        // it walks on slower, never stopping, so the rows close up behind it into the ribbon instead of each trailing the
-        // one before by a block or more (the user, 2026-11-07: "adapt the formations to the different mounds"; on flat
-        // ground the ribbon keeps up and it walks at its full pace).
         double nearest = line.stream().mapToDouble(ant -> at.get(ant.getUUID())).max().orElse(0.0);
-        double frontPace = Mth.clamp(FRONT_PACE - PACE_PER_BLOCK * (Math.max(frontW - nearest - spacing, stretch) - FRONT_KEEP),
-                SLOWEST_PACE, FRONT_PACE);
-        double[] rowPlace = new double[row + 1];
+        double frontPace = Mth.clamp(FRONT_PACE - PACE_PER_BLOCK
+                * (Math.max(step.frontW() - nearest - step.spacing(), stretch) - FRONT_KEEP), SLOWEST_PACE, FRONT_PACE);
+        double[] rowPlace = new double[rows];
         double before = frontPlace;
-        for (int r = 0; r <= row; r++) {
-            double gap = !casting && before - spacing < hillW ? spacing * HILL_SPACING : spacing;
+        for (int r = 0; r < rows; r++) {
+            double gap = rowGap(step, before, hillW);
             rowPlace[r] = before - gap;
-            if (r > 0 && !casting) {
+            if (r > 0 && !step.casting()) {
                 rowPlace[r] = Math.min(rowPlace[r], rowAt[r - 1] - gap); // (a gap behind the row ahead as it really is)
             }
             before = rowPlace[r];
         }
-        if (!casting) {
-            orders.put(front.getUUID(), Order.marching(place(level, route, head, 0.0), frontPace, ahead, Vec3.ZERO));
+        return new Ribbon(rowOf, sideOf, leadOf.toArray(new UUID[0]), settled, rowAt, rowPlace, frontPace);
+    }
+
+    /**
+     * The gap behind a row whose place is {@code before} (walked along): the column's spacing, and twice it down the
+     * hump's steps (a raider climbs down a step face no faster than it walks a block, three lanes at a time; at the normal
+     * gap they reached each step faster than they got down it and bunched on the tread above it), closing up to the
+     * ribbon at its foot.
+     */
+    private static double rowGap(MarchStep step, double before, double hillW) {
+        return !step.casting() && before - step.spacing() < hillW ? step.spacing() * HILL_SPACING : step.spacing();
+    }
+
+    /**
+     * One raider's order on the march. Off the hump every raider walks at the front's pace, faster while its row is
+     * behind its place and slower while ahead (so at whatever pace the front walks the rows end up on their places, a gap
+     * apart), and more again by how far it is behind or ahead of its row's middle (so the row comes side by side). Still
+     * on the hump, at a walk, a little faster or slower by its row's place: the front's easing is for the ribbon, not for
+     * the hump (eased there too, they came down it slower and the front eased more). It aims a little past its place, so
+     * it walks on as the place moves (never past the front, a few blocks at a time); its pace says whether it closes up
+     * or lets the column come up to it. Behind a broken trail it closes up to its place and stands there (never walking
+     * back); one of the casters casts about.
+     */
+    private Order raiderOrder(ServerLevel level, MarchStep step, Ribbon ribbon, MatabeleEntity ant, int k, double own) {
+        Route route = step.route();
+        UUID id = ant.getUUID();
+        if (step.casting() && casters.contains(id)) {
+            return new Order(castSpot(level, route, 1 + k, step.now()), 1.0, point(route, castGap.far()));
         }
-        for (int k = 0; k < line.size(); k++) {
-            MatabeleEntity ant = line.get(k);
-            UUID id = ant.getUUID();
-            row = rowOf[k];
-            double sideways = sideOf[k];
-            if (casting && casters.contains(id)) {
-                orders.put(id, new Order(castSpot(level, route, 1 + k, now), 1.0, point(route, castGap.far())));
-                continue;
-            }
-            double own = at.get(id);
-            boolean lead = id.equals(leadOf.get(row));
-            // Off the hump every raider walks at the front's pace, faster while its row is behind its place and slower while
-            // ahead (so at whatever pace the front walks the rows end up on their places, a gap apart), and more again by
-            // how far it is behind or ahead of its row's middle (so the row comes side by side). Still on the hump, at a
-            // walk, a little faster or slower by its row's place: the front's easing is for the ribbon, not for the hump
-            // (eased there too, they came down it slower and the front eased more).
-            double base = casting ? 1.0 : settled[k] ? frontPace : 1.0;
-            double place = casting || !settled[k] ? rowPlace[row]
-                    : own + (rowPlace[row] - rowAt[row]) + ROW_PULL * (rowAt[row] - own);
-            double behind = place - own;
-            double placeAlong = Math.max(0.0, route.alongAtWalked(Math.max(0.0, place)));
-            Vec3 shift = sideOf(route, placeAlong, sideways);
-            BlockPos look = point(route, Math.min(route.length(), placeAlong + 3.0));
-            double pace = Mth.clamp(base + PACE_PER_BLOCK * behind, PASSED_PACE, lead && row == 0 ? HURRY_PACE : CATCH_UP_PACE);
-            if (!casting && own > frontW - spacing * 0.5) {
-                pace = PASSED_PACE; // (level with the front or past it: it drops back behind it, still walking)
-            }
-            if (casting) {
-                // The trail broken ahead: it closes up to its place behind the gap and stands there (it never walks back).
-                double target = Math.min(place, own + WALK_AHEAD);
-                orders.put(id, target < own + 0.3 ? new Order(null, 1.0, look)
-                        : new Order(placeAhead(level, route, target, 0.0, own), pace, look, null, shift, false));
-                continue;
-            }
-            // Walking: it aims a little past its place, so it walks on as the place moves (never past the front, a few
-            // blocks at a time); its pace says whether it closes up (behind its place) or lets the column come up to it.
-            double target = Math.min(frontW - spacing * 0.5, Math.max(place + CARROT, own + 1.0));
-            target = Math.max(own + 0.5, Math.min(target, own + WALK_AHEAD));
-            target = Mth.clamp(target, 0.0, route.walkedLength());
-            // (on the hump the lanes are whole blocks all the way down, flat treads too: in lanes inside one block the
-            // ants on a low hump's tread all came to the same block's edge and queued to step down it one at a time)
-            boolean steepHere = steep(route, alongOf(route, ant)) || steep(route, route.alongAtWalked(target))
-                    || route == out && alongOf(route, ant) < settle;
-            if (!steepHere) {
-                // Its lane is worked out from the middle of each cell its route runs through, so the route must run in the
-                // row of blocks the ant is in: a route from the block beside its lane's block (come down a hump by a lane
-                // of its own, or a hair over a block's edge stepping round a nestmate) to a place in the trail's row ran on
-                // in the ant's row, its lane half a block farther out still, and stepped over only at its end, which it
-                // never reached as the place moved on (the outer ant of a row of 3 walked a block out of its lane the whole
-                // march).
-                BlockPos abreast = place(level, route, alongOf(route, ant), 0.0);
-                BlockPos laneCell = BlockPos.containing(abreast.getX() + 0.5 + shift.x, abreast.getY(), abreast.getZ() + 0.5 + shift.z);
-                BlockPos mine = ant.blockPosition();
-                double off = Math.abs(sideOfTrail(ant.position()) - sideways);
-                if (off > 1.05) {
-                    // More than a block out of its lane: it steps straight back over, its place the trail's cell abreast
-                    // of it.
-                    orders.put(id, Order.marching(abreast, pace, look, shift));
-                    continue;
-                }
-                if (mine.getX() != laneCell.getX() || mine.getZ() != laneCell.getZ()) {
-                    // In the block beside its lane's: it walks on in its own row of blocks, at the edge nearest its lane
-                    // (the outer ant of a row of 3 a tenth of a block out of it, the right ant of a row of 2, come off the
-                    // hump a block over, a third), never stopping to step over: ants stepping sideways stopped the ribbon
-                    // and those behind came up 4 abreast.
-                    double myRow = sideOfTrail(new Vec3(mine.getX() + 0.5, ant.getY(), mine.getZ() + 0.5));
-                    double alongTo = Math.max(0.0, route.alongAtWalked(target));
-                    orders.put(id, Order.marching(placeAhead(level, route, target, Math.round(myRow), own), pace, look,
-                            sideOf(route, alongTo, sideways - myRow)));
-                    continue;
-                }
-            }
-            if (steepHere) {
-                // Down (or up) a steep hump the lanes are whole blocks, each its own way down, so 3 climb side by side
-                // (in lanes inside one block they climbed one after another and the rest queued at the lip); a row of 2
-                // takes the middle block and the one beside it (on blocks either side of the middle they were 2 apart).
-                double lane = Math.round(sideways / LANE_GAP);
-                orders.put(id, Order.marching(placeAhead(level, route, target, lane, own), pace, look, Vec3.ZERO));
-                continue;
-            }
-            orders.put(id, Order.marching(placeAhead(level, route, target, 0.0, own), pace, look, shift));
+        int row = ribbon.rowOf()[k];
+        double rowAt = ribbon.rowAt()[row];
+        double rowPlace = ribbon.rowPlace()[row];
+        boolean settled = ribbon.settled()[k];
+        double base = !step.casting() && settled ? ribbon.frontPace() : 1.0;
+        double place = step.casting() || !settled ? rowPlace : own + (rowPlace - rowAt) + ROW_PULL * (rowAt - own);
+        double placeAlong = Math.max(0.0, route.alongAtWalked(Math.max(0.0, place)));
+        double sideways = ribbon.sideOf()[k];
+        Vec3 shift = sideOf(route, placeAlong, sideways);
+        BlockPos look = point(route, Math.min(route.length(), placeAlong + 3.0));
+        boolean lead = id.equals(ribbon.leadOf()[row]);
+        double pace = Mth.clamp(base + PACE_PER_BLOCK * (place - own), PASSED_PACE, lead && row == 0 ? HURRY_PACE : CATCH_UP_PACE);
+        if (step.casting()) {
+            double target = Math.min(place, own + WALK_AHEAD);
+            return target < own + 0.3 ? new Order(null, 1.0, look)
+                    : new Order(placeAhead(level, route, target, 0.0, own), pace, look, null, shift, false);
         }
+        if (own > step.frontW() - step.spacing() * 0.5) {
+            pace = PASSED_PACE; // (level with the front or past it: it drops back behind it, still walking)
+        }
+        double target = Math.min(step.frontW() - step.spacing() * 0.5, Math.max(place + CARROT, own + 1.0));
+        target = Math.max(own + 0.5, Math.min(target, own + WALK_AHEAD));
+        target = Mth.clamp(target, 0.0, route.walkedLength());
+        return laneOrder(level, step, ant, own, target, sideways, shift, pace, look);
+    }
+
+    /**
+     * A marching raider's walk to {@code target} (walked along) in its lane ({@code sideways} blocks right of the trail,
+     * {@code shift} the flat offset for its legs). Three cases:
+     * <ul>
+     * <li>On (or by) a steep hump the lanes are whole blocks, flat treads too, each its own way down, so 3 climb side by
+     * side (in lanes inside one block they climbed one after another and the rest queued at the lip, and on a low hump's
+     * tread they all came to the same block's edge and stepped down it one at a time); a row of 2 takes the middle block
+     * and the one beside it (on blocks either side of the middle they were 2 apart).</li>
+     * <li>Its lane is worked out from the middle of each cell its route runs through, so the route must run in the row of
+     * blocks the ant is in: a route from the block beside its lane's block to a place in the trail's row ran on in the
+     * ant's row, its lane half a block farther out still, and stepped over only at its end, which it never reached as the
+     * place moved on (the outer ant of a row of 3 walked a block out of its lane the whole march). So more than a block
+     * out of its lane ({@link #OUT_OF_LANE}) it steps straight back over, its place the trail's cell abreast of it; in the
+     * block beside its lane's it walks on in its own row of blocks, at the edge nearest its lane, never stopping to step
+     * over (ants stepping sideways stopped the ribbon and those behind came up 4 abreast).</li>
+     * <li>Otherwise it walks on in its lane.</li>
+     * </ul>
+     */
+    private Order laneOrder(ServerLevel level, MarchStep step, MatabeleEntity ant, double own, double target, double sideways,
+                            Vec3 shift, double pace, BlockPos look) {
+        Route route = step.route();
+        double along = alongOf(route, ant);
+        if (steep(route, along) || steep(route, route.alongAtWalked(target)) || route == out && along < step.settle()) {
+            double lane = Math.round(sideways / LANE_GAP);
+            return Order.marching(placeAhead(level, route, target, lane, own), pace, look, Vec3.ZERO);
+        }
+        BlockPos abreast = place(level, route, along, 0.0);
+        if (Math.abs(sideOfTrail(ant.position()) - sideways) > OUT_OF_LANE) {
+            return Order.marching(abreast, pace, look, shift);
+        }
+        BlockPos laneCell = BlockPos.containing(abreast.getX() + 0.5 + shift.x, abreast.getY(), abreast.getZ() + 0.5 + shift.z);
+        BlockPos mine = ant.blockPosition();
+        if (mine.getX() != laneCell.getX() || mine.getZ() != laneCell.getZ()) {
+            double myRow = sideOfTrail(new Vec3(mine.getX() + 0.5, ant.getY(), mine.getZ() + 0.5));
+            double alongTo = Math.max(0.0, route.alongAtWalked(target));
+            return Order.marching(placeAhead(level, route, target, Math.round(myRow), own), pace, look,
+                    sideOf(route, alongTo, sideways - myRow));
+        }
+        return Order.marching(placeAhead(level, route, target, 0.0, own), pace, look, shift);
+    }
+
+    /** The ribbon: a marching raider more than this far (blocks) from its lane steps straight back over to it. */
+    private static final double OUT_OF_LANE = 1.05;
+
+    /**
+     * The raiders not yet out of the nest come up to the trail's start: behind the scout while it is still coming out,
+     * then hurrying. One still in the nest {@code formTicks} after the column left stays home.
+     */
+    private void comeOut(ServerLevel level, Route route, MatabeleEntity front, List<MatabeleEntity> notOut, BlockPos ahead, long now) {
         BlockPos lineStart = place(level, route, 0.0, 0.0);
         boolean frontOut = isOut(level, front);
         for (MatabeleEntity ant : notOut) {
@@ -1429,11 +1494,8 @@ public final class RaidColumn {
                 drop(ant.getUUID());
                 continue;
             }
-            // (up out of the nest to the trail's start: behind the scout while it is still coming out, then hurrying)
             orders.put(ant.getUUID(), new Order(lineStart, frontOut ? CATCH_UP_PACE : 1.0, ahead));
         }
-        sayMarch(route, front, line, notOut, now);
-        return false;
     }
 
     /**
