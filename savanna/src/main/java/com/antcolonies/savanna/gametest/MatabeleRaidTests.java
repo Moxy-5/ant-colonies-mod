@@ -25,6 +25,7 @@ import com.antcolonies.savanna.entity.MatabeleLoads;
 import com.antcolonies.savanna.entity.TermiteSoldierEntity;
 import com.antcolonies.savanna.entity.TermiteWorkerEntity;
 import com.antcolonies.savanna.species.SavannaNumbers;
+import com.antcolonies.savanna.registry.SavannaBlocks;
 import com.antcolonies.savanna.registry.SavannaEntities;
 
 import net.minecraft.core.BlockPos;
@@ -355,10 +356,13 @@ public class MatabeleRaidTests {
                     SavannaMod.LOGGER.info("[raid test] on the pile: {}", pile.describe(level));
                     waits.log();
                     // Q5: at their places in the raid's waits they stand (each keeps its own place, walking only when
-                    // it moves more than 1.5 blocks): a kind counted long enough still at least 3 quarters of the time.
+                    // it moves more than 1.5 blocks): a kind counted long enough still most of the time. (Raid flow,
+                    // 2026-11-06, the user: "it just looks wrong for ants to be standing still": a waiting raider now
+                    // shuffles a step beside its place now and then, so the raid's waits ask for RAID_WAIT_STILL, not
+                    // the calm nest's 3 quarters; still catches raiders walking back and forth between places.)
                     for (String kind : waits.kinds()) {
                         if (waits.waitingTicks(kind) >= 600) {
-                            helper.assertTrue(waits.stillShare(kind) >= IdleTests.STILL, "raiders walk about in the raid's waits: " + waits.report());
+                            helper.assertTrue(waits.stillShare(kind) >= RAID_WAIT_STILL, "raiders walk about in the raid's waits: " + waits.report());
                         }
                     }
                 })
@@ -753,9 +757,10 @@ public class MatabeleRaidTests {
         long[] milled = {-1};
         int[] members = {0};
         boolean[] scoutWentIn = {false};
-        // Each recruit's walks after it first stood at its place (BUGS 101: back and forth at the top of the hump).
+        // Each recruit's walks after it first stood at its place (BUGS 101: back and forth at the top of the hump). (Raid
+        // flow 2026-11-06: a shuffle, a step beside a place that has not moved, is no walk off it: waiting raiders mill.)
         java.util.Map<java.util.UUID, Integer> rewalks = new java.util.HashMap<>();
-        java.util.Set<java.util.UUID> settled = new java.util.HashSet<>();
+        java.util.Map<java.util.UUID, BlockPos> settled = new java.util.HashMap<>();
         java.util.Map<java.util.UUID, BlockPos> walkingTo = new java.util.HashMap<>();
         CrowdWatch crowd = new CrowdWatch(ant -> !colony.nest().isInside(level, ant.blockPosition()));
         long[] watchUntil = {Long.MAX_VALUE};
@@ -796,9 +801,9 @@ public class MatabeleRaidTests {
                 boolean at = flat(ant.blockPosition(), order.to()) <= 1.5 && Math.abs(ant.getY() - order.to().getY()) <= 1.5;
                 boolean walking = !ant.getNavigator().isDone();
                 if (at && !walking) {
-                    settled.add(id);
+                    settled.put(id, order.to());
                     walkingTo.remove(id);
-                } else if (settled.contains(id) && walking && !order.to().equals(walkingTo.get(id))) {
+                } else if (settled.containsKey(id) && walking && !order.to().equals(settled.get(id)) && !order.to().equals(walkingTo.get(id))) {
                     walkingTo.put(id, order.to());
                     rewalks.merge(id, 1, Integer::sum);
                 }
@@ -1557,15 +1562,23 @@ public class MatabeleRaidTests {
     private static final long SLACK = 300;
 
     /** Two termite workers feeding in a gallery under a 4-block log (along x from {@code x}) at row {@code z}. */
+    /** Raid flow: raiders in a raid's waits still at least this share of the time (they shuffle a step now and then). */
+    private static final double RAID_WAIT_STILL = 0.6;
+
     private static List<TermiteWorkerEntity> feedingUnderALog(GameTestHelper helper, int x, int z) {
         return feedingUnderALog(helper, x, z, 2);
     }
 
-    /** One or two termite workers feeding in a gallery under a 4-block log (along x from {@code x}) at row {@code z}. */
+    /**
+     * One or two termite workers feeding in a gallery under a 4-block log (along x from {@code x}) at row {@code z}. The
+     * two blocks over them are mud casts, as the termites leave a log they have been eating from below (raid flow,
+     * 2026-11-06: majors break only the termites' mud, never the ground; a gallery under bare wood and dirt has no way in).
+     */
     private static List<TermiteWorkerEntity> feedingUnderALog(GameTestHelper helper, int x, int z, int count) {
         List<TermiteWorkerEntity> termites = new ArrayList<>();
         for (int i = 0; i < 4; i++) {
-            helper.setBlock(new BlockPos(x + i, SURFACE, z), Blocks.OAK_LOG.defaultBlockState().setValue(RotatedPillarBlock.AXIS, Direction.Axis.X));
+            helper.setBlock(new BlockPos(x + i, SURFACE, z), i == 1 || i == 2 ? SavannaBlocks.MUD_CAST.get().defaultBlockState()
+                    : Blocks.OAK_LOG.defaultBlockState().setValue(RotatedPillarBlock.AXIS, Direction.Axis.X));
             helper.setBlock(x + i, SURFACE - 1, z, Blocks.AIR);
         }
         termites.add(TestAnts.lone(helper, SavannaEntities.TERMITE_WORKER.get(), x + 1, SURFACE - 1, z));

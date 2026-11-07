@@ -462,9 +462,11 @@ public class MatabeleFightTests {
      * need to be smarter"): ten Matabele sent at a real feeding spot, five termites eating a fallen log from the gallery
      * under it (soil all round, the log for a roof, mud on its top, the tunnel on to the nest under the ground). On the old
      * code nothing was opened and no termite stung in 2 minutes, and the ants planned 600 walks to termites they could
-     * not reach. Now the majors bite the soil beside the gallery open within 30 s, never the log, a few blocks each; the
+     * not reach. Now the majors bite the termites' mud open within 30 s, never the log, a few blocks each; the
      * minors go in and a termite is stung within a minute; hardly a walk is planned that cannot be found; and the ants,
-     * searching on, stop dead at most about once every 5 s each.
+     * searching on, stop dead at most about once every 5 s each. Raid flow (the user's raid of 2026-11-06: they dug
+     * trenches in the grass): the log is part eaten, two of its blocks mud casts joined to the gallery (as the termites
+     * leave it), and the majors open the casts, never a block of the ground.
      */
     @GameTest(template = "arena", timeoutTicks = 2600, skyAccess = true)
     public static void matabeleMajorsBreakIntoAFeedingGalleryUnderALog(GameTestHelper helper) {
@@ -477,7 +479,8 @@ public class MatabeleFightTests {
         }
         List<TermiteWorkerEntity> termites = new ArrayList<>();
         for (int x = 6; x <= 10; x++) {
-            helper.setBlock(new BlockPos(x, 3, 10), Blocks.OAK_LOG.defaultBlockState().setValue(RotatedPillarBlock.AXIS, Direction.Axis.X));
+            helper.setBlock(new BlockPos(x, 3, 10), x == 7 || x == 9 ? SavannaBlocks.MUD_CAST.get().defaultBlockState()
+                    : Blocks.OAK_LOG.defaultBlockState().setValue(RotatedPillarBlock.AXIS, Direction.Axis.X)); // (two blocks eaten: casts)
             helper.setBlock(x, 2, 10, Blocks.AIR); // the feeding gallery: the ground under the log
             termites.add(TestAnts.lone(helper, SavannaEntities.TERMITE_WORKER.get(), x, 2, 10));
         }
@@ -516,13 +519,14 @@ public class MatabeleFightTests {
                 }
                 moving.put(ant.getUUID(), now);
             }
-            if (openedAt[0] < 0 && opened(helper) > 0) {
+            if (openedAt[0] < 0 && castsOpened(helper) > 0) {
                 openedAt[0] = tick;
             }
+            helper.assertTrue(opened(helper) == 0, "a block of the ground was bitten open (" + opened(helper) + "): they break only the termites' mud");
             if (stungAt[0] < 0 && termites.stream().anyMatch(termite -> termite.isParalysed() || !termite.isAlive())) {
                 stungAt[0] = tick;
             }
-            for (int x = 6; x <= 10; x++) {
+            for (int x = 6; x <= 10; x += 2) {
                 helper.assertBlockPresent(Blocks.OAK_LOG, x, 3, 10); // never the wood
             }
             if (tick == 600) {
@@ -538,12 +542,17 @@ public class MatabeleFightTests {
             SavannaMod.LOGGER.info("[break-in test] opened at {} ({} blocks), first stung at {}, {} of 5 stung, {} walks not found, {} stops ({} more for the crowd, {} of them shuffles aside)",
                     openedAt[0], opened(helper), stungAt[0], stung, notFound, stops[0], crowdStops[0], shuffleStops[0]);
             helper.assertTrue(notFound <= 10, notFound + " walks planned to termites that could not be reached (600 on the old code)");
-            helper.assertTrue(opened(helper) <= 5 * 6, opened(helper) + " blocks opened: more than 6 a major");
+            helper.assertTrue(opened(helper) == 0, opened(helper) + " blocks of the ground opened: they break only the termites' mud");
             helper.assertTrue(stung >= 3, "only " + stung + " of the 5 termites in the gallery stung in 2 minutes");
             int allowed = ants.size() * 2400 / 20 / 5;
             helper.assertTrue(stops[0] <= allowed, stops[0] + " stops in 2 minutes for 10 ants (at most " + allowed + ": once every 5 s each; waits for the crowd not counted)");
             helper.succeed();
         });
+    }
+
+    /** Raid flow: how many of the break-in test's two mud casts have been bitten open. */
+    private static int castsOpened(GameTestHelper helper) {
+        return (helper.getBlockState(new BlockPos(7, 3, 10)).isAir() ? 1 : 0) + (helper.getBlockState(new BlockPos(9, 3, 10)).isAir() ? 1 : 0);
     }
 
     /** How many blocks of the break-in test's ground have been opened (the gallery and tunnel dug by the test aside). */

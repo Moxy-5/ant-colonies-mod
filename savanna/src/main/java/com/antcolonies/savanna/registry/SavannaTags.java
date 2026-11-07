@@ -30,7 +30,9 @@ public class SavannaTags {
 
     /**
      * What a Matabele major bites open to reach termites (M8 step 2b; data/antcolonies/tags/block/matabele_breaks_open.json):
-     * the termites' mud (sheeting, casts) and thin soil over a gallery, never the mound.
+     * the termites' mud (sheeting, casts), never the ground itself and never the mound (raid flow, 2026-11-06: real majors
+     * break open the termites' soil sheeting over a feeding site; they do not dig down through the ground, so grass and
+     * dirt left this tag; a Matabele shut in may still bite dirt to get out, {@code MatabeleEntity.mayBiteOut}).
      */
     public static final TagKey<Block> MATABELE_BREAKS_OPEN = TagKey.create(Registries.BLOCK,
             ResourceLocation.fromNamespaceAndPath(SavannaMod.MODID, "matabele_breaks_open"));

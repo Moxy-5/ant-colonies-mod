@@ -103,6 +103,24 @@ public final class RaidColumn {
      * mound's hump, unable to reach its place on the slope, held the whole line still in the R7 chain test).
      */
     private static final long HOME_STALL = 200;
+    /** Raid flow: a raider leans this far (blocks along the trail) toward its rank in the column's order (my pick). */
+    private static final double RANK_LEAN = 2.0;
+    /** Raid flow: a walking raider aims this far (blocks along the trail) past its place, so it walks on, never stopping. */
+    private static final double CARROT = 2.5;
+    /** Raid flow: its pace goes up (or down) this much for each block it is behind (or ahead of) its place. */
+    private static final double PACE_PER_BLOCK = 0.12;
+    /** Raid flow: the slowest pace of a raider ahead of its place (it lets the column come up to it, still walking). */
+    private static final double SLOWEST_PACE = 0.55;
+    /** Raid flow: the pace of an ant at the back of the crowd walking toward the trail's start to fall in. */
+    private static final double FALL_IN_PACE = 0.8;
+    /** Raid flow: at a halt the column closes up to this share of its spacing (nose to tail; my pick). */
+    private static final double CLOSE_UP = 0.75;
+    /** Raid flow: the front halts every 10 to 18 blocks on the way out (my pick; real columns move in surges). */
+    private static final double HALT_EVERY_LEAST = 10.0;
+    private static final double HALT_EVERY_MORE = 8.0;
+    /** Raid flow: each halt lasts 2 to 4 s (my pick). */
+    private static final int HALT_TICKS_LEAST = 40;
+    private static final int HALT_TICKS_MORE = 40;
     /** How often (ticks) the column works out its places. */
     private static final int EVERY = 5;
     /**
@@ -110,11 +128,6 @@ public final class RaidColumn {
      * {@link #LEAD_STEP} before it may wait again: real columns halt in surges and move on (my pick, a few seconds).
      */
     private static final long FRONT_PAUSE = 80;
-    /**
-     * Real sizes, step 4: a raider standing on the march with less room than this (blocks along the trail) before the gap
-     * behind the ant ahead waits where it stands (my pick, half the column's spacing of 0.6).
-     */
-    private static final double WAIT_ROOM = 0.3;
     /**
      * Raid rework R3: a raider whose place is more than {@link #HEADWAY_FAR} blocks off and that has not got
      * {@link #HEADWAY_MOVE} blocks anywhere for this long (ticks) leaves the column and goes home along the trail, never
@@ -252,6 +265,9 @@ public final class RaidColumn {
     private long waitSaidAt = -1;
     /** R3: since when the front has paused for the line now (-1 not), and how far along it must walk before it may again. */
     private long pausedSince = -1;
+    /** Raid flow: until when the front halts in a surge (-1 not), and where along the trail the next halt comes. */
+    private long haltUntil = -1;
+    private double nextHaltAt = -1.0;
     private double noPauseUntil = -1.0;
     /** R3: where each raider last got somewhere, and since when (for its headway). */
     private final Map<UUID, BlockPos> anchor = new HashMap<>();
@@ -678,6 +694,9 @@ public final class RaidColumn {
         if (pausedSince >= 0) {
             pausedSince += by;
         }
+        if (haltUntil >= 0) {
+            haltUntil += by;
+        }
         if (waitingSince >= 0) {
             waitingSince += by;
         }
@@ -1083,6 +1102,8 @@ public final class RaidColumn {
         waitingSince = -1;
         pausedSince = -1;
         noPauseUntil = -1.0;
+        haltUntil = -1;
+        nextHaltAt = -1.0;
         anchor.clear();
         anchorSince.clear();
         castingSince = -1;
@@ -1306,14 +1327,21 @@ public final class RaidColumn {
             return false;
         }
         Map<UUID, Double> at = new HashMap<>();
+        Map<UUID, Double> key = new HashMap<>();
         for (MatabeleEntity ant : line) {
-            at.put(ant.getUUID(), alongOf(route, ant));
+            double along = alongOf(route, ant);
+            at.put(ant.getUUID(), along);
+            key.put(ant.getUUID(), along + rankLean(ant, route));
         }
-        // The raid and fight review 2, finding 1 ("column stuck or messy"): each follows the ant really ahead of it on
-        // the trail, as on the way home (R7). Kept in the order they were called, an ant that came out of the nest first
-        // but stood "behind" a later one in that order waited, standing, until that one walked past it: the line moved
-        // in jerks, ants overtaking ants and stopping dead. (The scout still leads; the rest fall in as they come out.)
-        line.sort(java.util.Comparator.comparingDouble(ant -> -at.get(ant.getUUID())));
+        // Raid flow (the user's raid of 2026-11-06: "they stand in a group and go 1 by 1"): the column moves as one body.
+        // Each raider has a place in the column (its row behind the front, its own lane), and every place slides along the
+        // trail with the front at once: an ant far back walks to a place far back, so the whole crowd starts walking when
+        // the front does, as real raiders pour out behind the scout, a band 1 to 3 wide (Longhurst and Howse 1979). It
+        // used to walk only once there was room behind the ant ahead, so the line peeled off one ant at a time. The order
+        // is by place on the trail, leaning a little toward the raid's own order (former scouts ahead, majors behind as the
+        // rear guard; home, the carriers in the middle and the empty majors behind, Frank et al.): an ant behind its place
+        // hurries, one ahead of it slows, so the column sorts itself as it walks, no one stopping to let another by.
+        line.sort(java.util.Comparator.comparingDouble(ant -> -key.get(ant.getUUID())));
         int rows = (int) Math.ceil(line.size() / (double) Math.max(1, numbers.abreast()));
         double length = rows * numbers.spacing();
         double rear = frontAt;
@@ -1326,6 +1354,20 @@ public final class RaidColumn {
             }
         }
         boolean strung = frontAt - rear > length + numbers.stretch();
+        // Real columns move in surges: now and then the front stops a few seconds, the ants behind close up nose to tail,
+        // then it goes on and the column stretches out again (my picks, HALT_EVERY and HALT_TICKS).
+        if (nextHaltAt < 0) {
+            nextHaltAt = frontAt + HALT_EVERY_LEAST + colony.random().nextDouble() * HALT_EVERY_MORE;
+        }
+        boolean halted = !casting && haltUntil >= 0 && now < haltUntil;
+        if (!casting && haltUntil < 0 && frontAt >= nextHaltAt && route == out) {
+            haltUntil = now + HALT_TICKS_LEAST + colony.random().nextInt(HALT_TICKS_MORE + 1);
+            halted = true;
+        }
+        if (haltUntil >= 0 && now >= haltUntil) {
+            haltUntil = -1;
+            nextHaltAt = frontAt + HALT_EVERY_LEAST + colony.random().nextDouble() * HALT_EVERY_MORE;
+        }
         boolean waits = false;
         if (casting) {
             pausedSince = -1; // (stopped at the gap: no surge counted)
@@ -1343,50 +1385,130 @@ public final class RaidColumn {
             pausedSince = -1;
         }
         sayWait(route, front, waits, hindmost);
-        if (!waits && !casting && frontAt >= head - LEAD_STEP / 2) {
+        boolean still = waits || halted || casting;
+        if (!still && frontAt >= head - LEAD_STEP / 2) {
             head = Math.min(route.length(), frontAt + LEAD_STEP);
         }
         BlockPos ahead = point(route, Math.min(route.length(), frontAt + 4.0));
         if (casting) {
             orders.put(front.getUUID(), new Order(castSpot(level, route, 0, now), 1.0, point(route, castGap.far())));
         } else {
-            orders.put(front.getUUID(), waits ? new Order(null, LEAD_PACE, ahead) : new Order(place(level, route, head, 0.0), LEAD_PACE, ahead));
+            orders.put(front.getUUID(), still ? new Order(null, LEAD_PACE, ahead) : new Order(place(level, route, head, 0.0), LEAD_PACE, ahead));
         }
-        // The others, each behind the one ahead of it in the marching order.
+        // The others, each at its place in the moving column.
+        double spacing = still ? numbers.spacing() * CLOSE_UP : numbers.spacing();
+        BlockPos lineStart = place(level, route, 0.0, 0.0);
+        // Each ant's lane (a block apart side by side; each keeps its own: with the line sorted by place, a lane by its
+        // place in the line swapped sides every time two ants passed, and they stepped sideways back and forth).
+        double[] sides = new double[line.size()];
+        for (int k = 0; k < line.size(); k++) {
+            MatabeleEntity ant = line.get(k);
+            int lanes = lanesAt(route, Math.max(0.0, at.get(ant.getUUID())));
+            sides[k] = lanes == 1 ? 0.0 : Math.floorMod(ant.getUUID().hashCode(), lanes) - (lanes - 1) / 2.0;
+        }
+        Map<BlockPos, Double> funnelTaken = new HashMap<>();
         for (int k = 0; k < line.size(); k++) {
             MatabeleEntity ant = line.get(k);
             double own = at.get(ant.getUUID());
-            int lanes = lanesAt(route, own);
-            double aheadAt = k - lanes < 0 ? frontAt : at.get(line.get(k - lanes).getUUID());
-            double target = Math.max(own, Math.min(aheadAt - numbers.spacing(), own + LEAD_STEP));
-            target = Math.max(0.0, Math.min(route.length(), target));
             if (casting && casters.contains(ant.getUUID())) {
                 orders.put(ant.getUUID(), new Order(castSpot(level, route, 1 + k, now), 1.0, point(route, castGap.far())));
                 continue;
             }
+            int lanes = lanesAt(route, Math.max(0.0, own));
+            double slot = frontAt - (1 + k / Math.max(1, lanes)) * spacing;
             if (casting) {
-                target = Math.min(target, castGap.near() - GAP_STOP); // (the rest wait behind the gap)
-                target = Math.max(0.0, target);
+                slot = Math.min(slot, castGap.near() - GAP_STOP); // (the rest wait behind the gap)
             }
-            if (!casting && target < own + WAIT_ROOM && ant.getNavigator().isDone()) {
-                // Real sizes, step 4: standing, with no room ahead on the trail yet: it waits where it stands (one walking
-                // walks on, so a moving line never stops and starts), as real raiders wait their
-                // turn. (It used to walk onto the trail at its own place: at the march's start, beside the chimney, every
-                // late one's place was the trail's first cell, and 5 to 7 majors stood in it inside one another.)
-                orders.put(ant.getUUID(), new Order(null, 1.0, point(route, Math.min(route.length(), own + 3.0))));
+            double side = sides[k];
+            BlockPos look = point(route, Math.min(route.length(), Math.max(0.0, slot) + 3.0));
+            if (slot < 0.0) {
+                // Its place is not on the trail yet (the back of the crowd at the start): the crowd funnels in toward the
+                // trail's start, each ant from its own side to as far from the start as its place is behind it, so they
+                // all close up at once rather than standing till there is room (BUGS 127 again: all walking to the one
+                // cell at the start, they stood stacked on the hump top when the column halted).
+                BlockPos spot = still ? null : funnelSpot(level, lineStart, ant, -slot, funnelTaken);
+                orders.put(ant.getUUID(), new Order(spot, FALL_IN_PACE, look));
                 continue;
             }
-            // (a block apart side by side; each ant keeps its own lane: with the line sorted by place, a lane by its place
-            // in the line swapped sides every time two ants passed, and they stepped sideways back and forth)
-            double side = lanes == 1 ? 0.0 : Math.floorMod(ant.getUUID().hashCode(), lanes) - (lanes - 1) / 2.0;
-            double pace = own < target - HURRY_BEHIND ? HURRY_PACE : 1.0;
-            orders.put(ant.getUUID(), new Order(place(level, route, target, side), pace, point(route, Math.min(route.length(), target + 3.0))));
+            // Never into the ant ahead in its own lane (BUGS 127 again: near the front a dozen aimed at the one spot just
+            // behind the front and stood stacked at the first halt): no nearer than a spacing behind it.
+            double room = frontAt;
+            for (int j = 0; j < line.size(); j++) {
+                double other = at.get(line.get(j).getUUID());
+                if (j != k && Math.abs(sides[j] - side) < 0.25 && other > own + 0.05 && other < room) {
+                    room = other;
+                }
+            }
+            double cap = room - spacing;
+            if (still) {
+                // At a halt it closes up to its place; one already at or past it stands (it never walks back).
+                double target = Math.min(slot, cap);
+                orders.put(ant.getUUID(), target < own + 0.3 ? new Order(null, 1.0, look)
+                        : new Order(place(level, route, target, side), own < slot - HURRY_BEHIND ? HURRY_PACE : 1.0, look));
+                continue;
+            }
+            // Walking: it aims a little past its place, so it walks on without stopping as the place moves; its pace says
+            // whether it closes up (behind its place) or lets the column come to it (ahead of its place).
+            double behind = slot - own;
+            double pace = Mth.clamp(LEAD_PACE + PACE_PER_BLOCK * behind, SLOWEST_PACE, HURRY_PACE);
+            double target = Math.min(frontAt - spacing * 0.5, slot + CARROT);
+            target = Math.max(target, own + (behind < -CARROT ? 0.5 : 1.0));
+            if (cap < own + 0.3) {
+                orders.put(ant.getUUID(), new Order(null, pace, look)); // (right behind the one ahead: it waits a moment)
+                continue;
+            }
+            target = Math.max(0.0, Math.min(route.length(), Math.min(target, cap)));
+            orders.put(ant.getUUID(), new Order(place(level, route, target, side), pace, look));
         }
-        BlockPos lineStart = place(level, route, 0.0, 0.0);
         for (MatabeleEntity ant : notOut) {
             orders.put(ant.getUUID(), new Order(lineStart, HURRY_PACE, ahead)); // (up out of the nest to the line)
         }
         return false;
+    }
+
+    /**
+     * Raid flow: where a raider whose place is not on the trail yet walks: toward the trail's start from its own side, to
+     * {@code behind} blocks from it (at least a block), a cell that has room left for its body ({@link #FORM_CELL_LENGTHS},
+     * counted in {@code taken} this update), never in the nest; else farther out; null if nowhere (it stands).
+     */
+    @Nullable
+    private BlockPos funnelSpot(ServerLevel level, BlockPos start, MatabeleEntity ant, double behind, Map<BlockPos, Double> taken) {
+        double dx = ant.getX() - (start.getX() + 0.5), dz = ant.getZ() - (start.getZ() + 0.5);
+        double length = Math.hypot(dx, dz);
+        if (length < 0.3) {
+            double angle = formIndex.getOrDefault(ant.getUUID(), 0) * 2.39996;
+            dx = Math.cos(angle);
+            dz = Math.sin(angle);
+            length = 1.0;
+        }
+        double radius = Math.max(1.0, Math.min(behind, length));
+        double size = Math.max(0.0, ant.bodyLength());
+        for (double extra = 0.0; extra <= 4.5; extra += 0.75) {
+            double r = radius + extra;
+            BlockPos cell = standAt(level, start.getX() + 0.5 + dx / length * r, start.getZ() + 0.5 + dz / length * r, start.getY());
+            if (cell == null || !level.hasChunkAt(cell) || colony.nest().isInside(level, cell)
+                    || taken.getOrDefault(cell, 0.0) + size > FORM_CELL_LENGTHS + 1.0E-6) {
+                continue;
+            }
+            taken.merge(cell, size, Double::sum);
+            return cell;
+        }
+        return null;
+    }
+
+    /**
+     * Raid flow: how far (blocks along the trail) a raider leans forward or back in the column's order: on the way out the
+     * raid's own order (the scout, former scouts, the rest, majors at the back as the rear guard; it is given in that
+     * order, {@code Raids}), up to {@link #RANK_LEAN} blocks; on the way home the empty majors lean back (the rear guard)
+     * and the carriers keep the middle (Frank et al. 2018: carriers in the column's centre, fighters at its rear).
+     */
+    private double rankLean(MatabeleEntity ant, Route route) {
+        if (route == out) {
+            int index = members.indexOf(ant.getUUID());
+            return index < 0 || members.size() < 2 ? 0.0 : RANK_LEAN * (0.5 - index / (double) (members.size() - 1));
+        }
+        boolean carrying = MatabeleLoads.termitesHeldBy(ant) > 0;
+        return !carrying && ant.hasMajorBody() ? -RANK_LEAN : 0.0;
     }
 
     /**
@@ -1575,7 +1697,7 @@ public final class RaidColumn {
                 + (hindmost == null ? "?" : who(hindmost, route)));
     }
 
-    /** How many side by side at this place along a route: single file near the entrance, wider further out. */
+    /** How many side by side at this place along a route: single file right at the entrance, then wider (raid flow: 2 then 3 within a few blocks). */
     private int lanesAt(Route route, double along) {
         double fromNest = route == out ? along : route.length() - along;
         if (fromNest < numbers.singleFile()) {

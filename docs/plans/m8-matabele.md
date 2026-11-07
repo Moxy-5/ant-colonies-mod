@@ -433,6 +433,26 @@ timings: all "my pick, to confirm" until then).
        Matabele nest 89 to 99-100 percent, termite workers 79 to 87, the termite king 100; a raid's waits (majors
        counted once 2 s at their place) 81 to 86. Termite soldiers got no cleaning clips (see DESIGN). Next: in-game
        test 5c.
+   - **3M Raid flow (the user's raid of 2026-11-06, "it worked", "I just want things to feel realistic and seamless
+     smooth"; the user's OK to all three fixes the same day).** Three things looked wrong. (1) Before a raid the ants stood
+     still on the mound top, then left one at a time; about 10 trickled out after the scout, then the other 40 all at
+     once. (2) Home from the termites the same: bunched, standing still, then one by one. (3) Majors dug trenches in the
+     grass along the termites' tunnels instead of breaking the mud crust. **Causes:** the march was a queue (an ant
+     walked only once there was 0.6 blocks free behind the ant ahead, single file for the first 8 blocks), so the line
+     peeled off one ant at a time, the scout waited for it, and the rest poured out once the line widened; waiting ants
+     had nothing to do but stand; step 2g let majors bite grass and dirt over a smelt gallery (the bite list held
+     `#minecraft:dirt`). **What is real** (Longhurst and Howse 1979; Frank's thesis and papers): the recruits follow the
+     scout straight out as a dense band 1 to 3 wide, moving together, stretching and bunching; short of the termites it
+     stops and bunches round the scout; afterwards they gather where they waited and go home as a column, carriers in
+     the middle, fighters at the rear; majors break open the termites' soil sheeting, minors go into the galleries.
+     **Built 2026-11-06** (branch `claude/raid-flow`): M1 the column moves as one body (each raider a place in the
+     column, every place sliding with the front, so all walk at once; behind its place an ant hurries, ahead of it it
+     slows, still walking; the order leans to the raid's own, majors behind; home, empty majors behind the carriers;
+     single file only the first 2 blocks, then 2, then 3 abreast; the front halts every 10 to 18 blocks for 2 to 4 s and
+     the column closes up to three quarters of its spacing); M2 no statues (a waiting raider turns to a nestmate,
+     looks about or shuffles a step every 1 to 3 s, besides cleaning); M3 grass and dirt off the bite list (only Mud
+     Crust, mud casts and soft termite plugs; dirt only to bite out of a trap), a new watch rule `no-ground-dug`. Every
+     number my pick, to confirm. Not tried in-game yet.
    - **Order (my pick):** S1 to S6, in-game test 5b, then Q1 to Q6, in-game test 5c (or the two tests as one if the
      user prefers), then 3d.
    - **3d The termites' losses.** Termites in the galleries round the spot are numbers until broken into

@@ -69,6 +69,16 @@ public class MatabeleRaidGoal extends Goal {
      * between bouts of antenna-waving): the tick the clean ends, 0 for none.
      */
     private int cleaningUntil;
+    /**
+     * Raid flow (the user's raid of 2026-11-06: "it just looks wrong for ants to be standing still while they wait"): a
+     * raider waiting at its place is never a statue. Real raiders bunched at the entrance, at a halt or short of the
+     * termites keep moving: they turn, touch a neighbour with the antennae, shuffle a step. The point it looks at now and
+     * until when (tick, 0 for none); the next tick it may do something new.
+     */
+    @Nullable
+    private net.minecraft.world.phys.Vec3 millLook;
+    private int millLookUntil;
+    private int nextMill;
 
     public MatabeleRaidGoal(MatabeleEntity ant) {
         this.ant = ant;
@@ -119,6 +129,7 @@ public class MatabeleRaidGoal extends Goal {
 
     @Override
     public void start() {
+        millLook = null;
         walkingTo = null;
         waitUntil = 0;
         limpFails = 0;
@@ -160,7 +171,10 @@ public class MatabeleRaidGoal extends Goal {
         if (cleaningUntil != 0 && ant.tickCount >= cleaningUntil) {
             endCleaning();
         }
-        if (order.lookAt() != null && ant.getNavigator().isDone() && cleaningUntil == 0) {
+        boolean millLooking = millLook != null && ant.tickCount < millLookUntil;
+        if (millLooking && ant.getNavigator().isDone() && cleaningUntil == 0) {
+            ant.getLookControl().setLookAt(millLook.x, millLook.y, millLook.z);
+        } else if (order.lookAt() != null && ant.getNavigator().isDone() && cleaningUntil == 0) {
             ant.getLookControl().setLookAt(order.lookAt().getX() + 0.5, order.lookAt().getY() + 0.3, order.lookAt().getZ() + 0.5);
         }
         if (gotNowhere()) {
@@ -176,6 +190,7 @@ public class MatabeleRaidGoal extends Goal {
         if (to == null) {
             ant.getNavigator().stop(); // the front waits for the line to close up
             walkingTo = null;
+            mill(level, null); // (turning and touching its neighbours as it waits)
             return;
         }
         net.minecraft.world.entity.Entity prey = order.take() != null && column != null ? level.getEntity(order.take()) : null;
@@ -206,6 +221,9 @@ public class MatabeleRaidGoal extends Goal {
         if (!moved && !idleAndOff || ant.tickCount < waitUntil) {
             if (!moved && ant.getNavigator().isDone() && order.take() == null && (atPlace || settled)) {
                 maybeClean();
+                if (cleaningUntil == 0) {
+                    mill(level, walkingTo != null ? walkingTo : to);
+                }
             }
             return;
         }
@@ -284,6 +302,53 @@ public class MatabeleRaidGoal extends Goal {
         cleaningUntil = ant.tickCount + (both ? AbstractAntEntity.GROOM_BOTH_TICKS : AbstractAntEntity.GROOM_ONE_TICKS)
                 + AbstractAntEntity.GROOM_SETTLE_TICKS + 2;
     }
+
+    /**
+     * Raid flow: standing at its place, every 1 to 3 s it does something small (my picks): turns its head to a nestmate
+     * beside it (antennating, half the time when one is near), looks about, or shuffles a step to a cell beside it still
+     * at its place (never from a wall, with jaws full, or for the front, {@code anchor} null).
+     */
+    private void mill(ServerLevel level, @Nullable BlockPos anchor) {
+        if (ant.tickCount < nextMill || !ant.onGround() || ant.isInWater()) {
+            return;
+        }
+        nextMill = ant.tickCount + MILL_LEAST + ant.getRandom().nextInt(MILL_MORE);
+        float roll = ant.getRandom().nextFloat();
+        if (roll < 0.5F) {
+            MatabeleEntity mate = level.getEntitiesOfClass(MatabeleEntity.class, ant.getBoundingBox().inflate(1.5),
+                    other -> other != ant && other.isAlive()).stream()
+                    .min(java.util.Comparator.comparingDouble(ant::distanceToSqr)).orElse(null);
+            if (mate != null) {
+                millLook = mate.position().add(0.0, mate.getBbHeight() * 0.6, 0.0);
+                millLookUntil = ant.tickCount + 20 + ant.getRandom().nextInt(20);
+                return;
+            }
+        }
+        if (roll < 0.8F || anchor == null || ant.hasFullMandibles()) {
+            double turn = (ant.getRandom().nextDouble() - 0.5) * Math.PI * 1.2;
+            double yaw = Math.toRadians(ant.getYRot() + 90.0) + turn;
+            millLook = ant.position().add(Math.cos(yaw) * 2.0, ant.getBbHeight() * 0.5, Math.sin(yaw) * 2.0);
+            millLookUntil = ant.tickCount + 15 + ant.getRandom().nextInt(25);
+            return;
+        }
+        // A shuffle: a step to a cell beside it, still at its place (so it does not walk back), at an easy pace.
+        java.util.List<BlockPos> steps = new java.util.ArrayList<>();
+        for (net.minecraft.core.Direction side : net.minecraft.core.Direction.Plane.HORIZONTAL) {
+            BlockPos cell = ant.blockPosition().relative(side);
+            if (flat(cell, anchor) <= AT - 0.2 && RaidGround.canStand(level, cell)) {
+                steps.add(cell);
+            }
+        }
+        if (!steps.isEmpty()) {
+            millLook = null;
+            ant.getNavigator().moveTo(steps.get(ant.getRandom().nextInt(steps.size())), MILL_PACE);
+        }
+    }
+
+    /** Raid flow: a waiting raider does something small every {@link #MILL_LEAST} to that plus {@link #MILL_MORE} ticks, a shuffle at this pace (my picks). */
+    private static final int MILL_LEAST = 20;
+    private static final int MILL_MORE = 40;
+    private static final double MILL_PACE = 0.5;
 
     private void endCleaning() {
         if (cleaningUntil != 0) {

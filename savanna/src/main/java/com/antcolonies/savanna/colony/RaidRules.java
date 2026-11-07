@@ -65,11 +65,25 @@ public final class RaidRules {
         Watch.signUp("soldiers-go-back", "no termite soldier waits 3 minutes out in the open by day with nothing about", RaidRules::soldiersGoBack);
         Watch.signUp("seals-open", "a raid seal opens by the next night once the raiders are gone", RaidRules::sealsOpen);
         Watch.signUp("raid-lists", "a colony's trails, finds and ants going home stay few", RaidRules::raidLists);
+        Watch.signUp("no-ground-dug", "a Matabele never bites grass or dirt open to get at termites, only the termites' mud", RaidRules::noGroundDug);
         InsectStories.signUp(RaidRules::story);
     }
 
     private static Raids raidsOf(Colony colony) {
         return colony.part(SavannaParts.RAIDS).orElse(null);
+    }
+
+    /**
+     * Raid flow (the user's raid of 2026-11-06, trenches dug in the grass): real majors break the termites' sheeting open,
+     * never the ground. Biting out of a trap does not count (it is not a break-in).
+     */
+    static void noGroundDug(Watch.Look look) {
+        for (AbstractAntEntity insect : look.insects()) {
+            if (insect instanceof MatabeleEntity ant && ant.groundBroken() > 0) { // (told again only now and then: the watch's own repeat gap)
+                look.breach(ant.blockPosition(), List.of(ant.getUUID()), "a Matabele bit " + ant.groundBroken()
+                        + " block(s) of grass or dirt open to get at termites");
+            }
+        }
     }
 
     static void stageLimit(Watch.Look look) {

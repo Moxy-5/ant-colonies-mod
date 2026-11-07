@@ -448,7 +448,7 @@ public class MatabeleEntity extends AbstractAntEntity implements ColonyBorn {
     /**
      * A termite it cannot reach, under mud or in a gallery just under the ground (M8 step 2b): a major bites the cover
      * open (real Megaponera: the big workers break the termites' mud open, the small ones go in and sting). The cover is
-     * the termites' mud over or beside the termite (sheeting, a cast), or the one block of soil over its gallery when
+     * the termites' mud over or beside the termite (sheeting, a cast), or a soft plug of termite soil over its gallery when
      * the sky is right above that; never the mound. It walks up to the cover, bites at it {@link #BITES_TO_OPEN} times
      * and the block falls away. A minor leaves it.
      */
@@ -513,6 +513,9 @@ public class MatabeleEntity extends AbstractAntEntity implements ColonyBorn {
         if (mayBite(level, pos, state)) {
             return true;
         }
+        if (state.is(net.minecraft.tags.BlockTags.DIRT)) {
+            return true; // (raid flow: the ground is bitten only to get out of a trap, never to break in)
+        }
         for (Colony colony : ColonyManager.get(level).getColonies()) {
             if (!SavannaSpecies.MACROTERMES.equals(colony.getSpecies()) || colony.getCenter().distSqr(pos) > 96 * 96
                     || !colony.profile().nest().isPlug(state)) {
@@ -552,6 +555,9 @@ public class MatabeleEntity extends AbstractAntEntity implements ColonyBorn {
         playAttack(BITE_COVER);
         playSound(SoundEvents.ROOTED_DIRT_BREAK, 0.6F, 1.4F);
         if (++bites >= needed) {
+            if (tellTermites && level.getBlockState(cover).is(net.minecraft.tags.BlockTags.DIRT)) {
+                groundBroken++; // (raid flow: never, the watch rule "no-ground-dug" looks)
+            }
             level.destroyBlock(cover, false, this);
             breaking = null;
             if (!tellTermites) {
@@ -569,6 +575,13 @@ public class MatabeleEntity extends AbstractAntEntity implements ColonyBorn {
         return true;
     }
 
+    /** Raid flow: how many blocks of the ground (grass, dirt) it bit open to get at termites; 0 (watch rule "no-ground-dug"). */
+    private int groundBroken;
+
+    public int groundBroken() {
+        return groundBroken;
+    }
+
     /** Step 2g: the majors break in; the minors go in after the termites. */
     @Override
     public boolean breaksIn() {
@@ -578,7 +591,7 @@ public class MatabeleEntity extends AbstractAntEntity implements ColonyBorn {
     /**
      * Step 2g, the majors break in (real Megaponera: on arrival the big workers bite the termites' galleries and sheeting
      * open at once, the small ones go in): with no termite to go at, a major picks its own breach where it smells
-     * termites round the spot ({@link #scentCells}): a block of soil or termite mud over or beside a closed gallery cell
+     * termites round the spot ({@link #scentCells}): a block of termite mud or a soft plug over or beside a closed gallery cell
      * (or a mud cast itself), with open air over it to stand in; never wood, never the mound, never one another major
      * is at. It walks there and bites it open, then the next, up to {@link #OPENS_PER_SPOT} at the spot.
      */
@@ -669,7 +682,7 @@ public class MatabeleEntity extends AbstractAntEntity implements ColonyBorn {
 
     /**
      * The covers a major may bite open into this closed cell: the cell itself if it is termite mud (a cast, a crust),
-     * the block over it, or one beside it, each soil or termite mud with open air over it to stand in.
+     * the block over it, or one beside it, each termite mud or a soft plug with open air over it to stand in.
      */
     private static List<BlockPos> coversOf(ServerLevel level, BlockPos cell) {
         List<BlockPos> covers = new ArrayList<>();
@@ -691,8 +704,9 @@ public class MatabeleEntity extends AbstractAntEntity implements ColonyBorn {
     }
 
     /**
-     * Whether a Matabele may bite this block open (the user's rule, 2026-11-05): soil and the termites' thin mud (crust and
-     * casts) always, and the termites' building soil while it is still soft: fresh or setting ({@link MoundSoil#AGE} 0 or
+     * Whether a Matabele may bite this block open (the user's rule, 2026-11-05; raid flow 2026-11-06: no longer grass or
+     * dirt, real majors break the termites' sheeting open and never dig down through the ground): the termites' thin mud
+     * (crust and casts) always, and the termites' building soil while it is still soft: fresh or setting ({@link MoundSoil#AGE} 0 or
      * 1, what a player digs with a shovel), as a plug packed into a hole or a gallery during the raid is. Real
      * Macrotermes build with soil mixed with saliva that sets hard as it dries; dry and old soil (a pickaxe for a player)
      * is too hard for the jaws. Never the mound's own standing pieces, however fresh (raiders do not attack the mound).
