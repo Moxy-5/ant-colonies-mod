@@ -262,6 +262,11 @@ public final class RaidColumn {
     private final Map<UUID, Long> pullingSince = new HashMap<>();
     /** Hurt nestmates carried home by the column (the log and tests). */
     private int rescued;
+    /**
+     * Raiders hurt at the spot (BUGS 174): the termites were there and fought back, so the spot is no empty check and
+     * the column does not spread out round it with its rescuers carrying the hurt.
+     */
+    private int hurtAtSpot;
     private final Map<UUID, Long> noWay = new HashMap<>();
     private int carried;
     private int carriers;
@@ -802,8 +807,10 @@ public final class RaidColumn {
                 drop(id);
                 anchor.remove(id);
                 anchorSince.remove(id);
-                hurtHere.add(id);
-                say(shortId(id) + " is hurt (" + (hurt.clamp().isOn() ? "a foe clamped on" : "legs gone") + "): it stops and calls for help");
+                if (hurtHere.add(id)) {
+                    hurtAtSpot++;
+                }
+                say(shortId(id) + " is hurt (" + (hurt.clamp().isLiving() ? "a foe clamped on" : "legs gone") + "): it stops and calls for help");
                 continue;
             }
             if (entity instanceof MatabeleEntity ant && ant.isAlive() && !ant.fightsNoMore() && !ant.isDowned()) {
@@ -1997,8 +2004,9 @@ public final class RaidColumn {
         }
         if (!anyFetching || now - stageSince >= carry.collectTicks()) {
             taking.clear();
-            boolean spreadNow = carried == 0 && !spread && !duskDone && now - stageSince < carry.collectTicks();
-            foundNothing = carried == 0 && !spreadNow && !duskDone; // (at the spot and nothing to bring: an empty check of it; R7, never at dusk)
+            boolean spreadNow = carried == 0 && hurtAtSpot == 0 && !spread && !duskDone && now - stageSince < carry.collectTicks();
+            // (at the spot and nothing to bring: an empty check of it; R7, never at dusk; BUGS 174, never when the termites hurt a raider)
+            foundNothing = carried == 0 && hurtAtSpot == 0 && !spreadNow && !duskDone;
             next(spreadNow ? Stage.SPREADING : Stage.REGROUPING, now);
             spread |= spreadNow;
         }
@@ -2176,7 +2184,7 @@ public final class RaidColumn {
         boolean fighting = ants.stream().anyMatch(ant -> ant.getFightSpot() != null);
         boolean stung = !preyRound(level).isEmpty() || !hurtWaiting(level).isEmpty();
         if (!fighting && (stung || now - stageSince >= carry.spreadTicks()) || now - stageSince >= carry.spreadTicks() + 200) {
-            foundNothing = !stung && carried == 0;
+            foundNothing = !stung && carried == 0 && hurtAtSpot == 0; // (BUGS 174: hurt raiders mean termites were there)
             next(stung ? Stage.COLLECTING : Stage.REGROUPING, now);
         }
     }

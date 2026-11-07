@@ -105,8 +105,8 @@ public class RescueGoal extends Goal {
     @Override
     public void stop() {
         ant.getNavigator().stop();
-        if (ant.isCarrying(FrameworkLoads.HURT) && walking >= CARRY_TICKS) {
-            ant.setDownHurt(); // it could not get it to the room: it sets it down where it is
+        if (ant.isCarrying(FrameworkLoads.HURT) && walking >= CARRY_TICKS && ant.level() instanceof ServerLevel level) {
+            setDown(level); // it could not get it to the room: it sets it down where it is
         }
         patient = null;
     }
@@ -160,7 +160,7 @@ public class RescueGoal extends Goal {
         walking++;
         Colony colony = ant.getColony();
         if (colony == null) {
-            ant.setDownHurt();
+            setDown(level);
             return;
         }
         if (room == null) {
@@ -171,12 +171,27 @@ public class RescueGoal extends Goal {
                 || colony.nest().isInside(level, ant.blockPosition()) && ant.getNavigator().isDone() && ant.blockPosition().distManhattan(room) <= 3;
         if (inRoom) {
             ant.getNavigator().stop();
-            ant.setDownHurt();
+            setDown(level);
             return;
         }
         if (--replan <= 0 || ant.getNavigator().isDone()) {
             replan = 40;
             ant.getNavigator().moveTo(room, 1.0);
+        }
+    }
+
+    /**
+     * Sets the nestmate it carries down. Set down outside the nest (the room out of reach, or no room), it calls for help
+     * no more for this wound (BUGS 175: else the next nestmate picked it up and the carry failed again, for ever): it
+     * limps in by itself, or stays.
+     */
+    private void setDown(ServerLevel level) {
+        AbstractAntEntity hurt = ant.carriedNestmate();
+        ant.setDownHurt();
+        Colony colony = ant.getColony();
+        FightNumbers.Rescue n = hurt == null ? null : Wounds.numbers(hurt);
+        if (hurt != null && n != null && (colony == null || !colony.nest().isInside(level, hurt.blockPosition()))) {
+            hurt.holdHelpCalls(level.getGameTime() + n.healTicks());
         }
     }
 

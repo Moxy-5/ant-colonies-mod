@@ -1120,9 +1120,11 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
     }
 
     /**
-     * Whether it is hurt in a way its nestmates help with (M8 step 5): a foe clamped on a leg, or legs gone (at most its
-     * species' {@code call_legs_max}) with the wound still open. With more legs gone it calls no more (it flails; real
-     * Megaponera with 5 legs gone do not call and are left, Frank et al. 2017). Never while felled or carried.
+     * Whether it is hurt in a way its nestmates help with (M8 step 5): a living foe clamped on a leg, or legs gone (at
+     * most its species' {@code call_legs_max}) with the wound still open. With more legs gone it calls no more (it flails;
+     * real Megaponera with 5 legs gone do not call and are left, Frank et al. 2017). Never while felled or carried. A dead
+     * head left locked on does not count (BUGS 173: step 2c's rule, confirmed in-game: it slows the ant a little and it
+     * may fight on; nestmates bite it off in the nest, {@code ClampCareGoal}).
      */
     public boolean needsRescue() {
         FightNumbers.Rescue n = Wounds.numbers(this);
@@ -1130,7 +1132,7 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
             return false;
         }
         int gone = LostLegs.count(lostLegs());
-        return clamp.isOn() || gone > 0 && gone <= n.callLegsMax() && wounds.isOpen();
+        return clamp.isLiving() || gone > 0 && gone <= n.callLegsMax() && wounds.isOpen();
     }
 
     /** Whether a nestmate may carry it home: legs gone, at most its species' {@code carry_legs_max} (and it needs rescue). */
@@ -1146,6 +1148,14 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
             squeak();
         }
         callingUntil = until;
+    }
+
+    /**
+     * It calls for help by itself no sooner than this game time (BUGS 175: set down outside the nest after a carry that
+     * failed, it is not picked up again and again). A new wound lifts it.
+     */
+    public void holdHelpCalls(long until) {
+        callAgainAt = Math.max(callAgainAt, until);
     }
 
     /** Whether it stands calling for help now (its head's alarm smell; real hurt Megaponera release it, Frank et al. 2017). */
@@ -1322,6 +1332,7 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
         updateLimp();
         clamp.legLost(leg); // a foe holding that leg comes off with it
         wounds.open(); // M8 step 5: the stump is an open wound
+        callAgainAt = 0; // (BUGS 175: a new wound, a new call for help)
         if (level() instanceof ServerLevel level) {
             LostLegEntity.drop(level, this, leg);
         }

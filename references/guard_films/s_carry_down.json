@@ -1,0 +1,260 @@
+{
+ "pictures": [
+  "carry_down_00.png",
+  "carry_down_01.png",
+  "carry_down_02.png",
+  "carry_down_03.png",
+  "carry_down_04.png",
+  "carry_down_05.png",
+  "carry_down_06.png",
+  "carry_down_07.png",
+  "carry_down_08.png",
+  "carry_down_09.png",
+  "carry_down_10.png",
+  "carry_down_11.png",
+  "carry_down_12.png",
+  "carry_down_13.png",
+  "carry_down_14.png",
+  "carry_down_15.png",
+  "carry_down_16.png",
+  "carry_down_17.png",
+  "carry_down_18.png",
+  "carry_down_19.png",
+  "carry_down_20.png",
+  "carry_down_21.png",
+  "carry_down_22.png",
+  "carry_down_23.png",
+  "carry_down_24.png",
+  "carry_down_25.png",
+  "carry_down_26.png",
+  "carry_down_27.png",
+  "carry_down_28.png",
+  "carry_down_29.png",
+  "carry_down_30.png",
+  "carry_down_31.png",
+  "carry_down_32.png",
+  "carry_down_33.png",
+  "carry_down_34.png",
+  "carry_down_35.png",
+  "carry_down_36.png",
+  "carry_down_37.png",
+  "carry_down_38.png",
+  "carry_down_39.png",
+  "carry_down_40.png",
+  "carry_down_41.png",
+  "carry_down_42.png",
+  "carry_down_43.png",
+  "carry_down_44.png",
+  "carry_down_45.png",
+  "carry_down_46.png",
+  "carry_down_47.png",
+  "carry_down_48.png",
+  "carry_down_49.png",
+  "carry_down_50.png",
+  "carry_down_51.png",
+  "carry_down_52.png",
+  "carry_down_53.png",
+  "carry_down_54.png",
+  "carry_down_55.png",
+  "carry_down_56.png",
+  "carry_down_57.png",
+  "carry_down_58.png",
+  "carry_down_59.png",
+  "carry_down_60.png",
+  "carry_down_61.png",
+  "carry_down_62.png",
+  "carry_down_63.png",
+  "carry_down_64.png",
+  "carry_down_65.png",
+  "carry_down_66.png",
+  "carry_down_67.png",
+  "carry_down_68.png",
+  "carry_down_69.png",
+  "carry_down_70.png",
+  "carry_down_71.png",
+  "carry_down_72.png",
+  "carry_down_73.png",
+  "carry_down_74.png",
+  "carry_down_75.png",
+  "carry_down_76.png",
+  "carry_down_77.png",
+  "carry_down_78.png",
+  "carry_down_79.png",
+  "carry_down_80.png",
+  "carry_down_81.png",
+  "carry_down_82.png",
+  "carry_down_83.png",
+  "carry_down_84.png",
+  "carry_down_85.png",
+  "carry_down_86.png",
+  "carry_down_87.png",
+  "carry_down_88.png",
+  "carry_down_89.png",
+  "carry_down_90.png",
+  "carry_down_91.png",
+  "carry_down_92.png",
+  "carry_down_93.png",
+  "carry_down_94.png",
+  "carry_down_95.png",
+  "carry_down_96.png",
+  "carry_down_97.png",
+  "carry_down_98.png",
+  "carry_down_99.png",
+  "carry_down_100.png",
+  "carry_down_101.png",
+  "carry_down_102.png",
+  "carry_down_103.png",
+  "carry_down_104.png",
+  "carry_down_105.png",
+  "carry_down_106.png",
+  "carry_down_107.png",
+  "carry_down_108.png",
+  "carry_down_109.png",
+  "carry_down_110.png",
+  "carry_down_111.png",
+  "carry_down_112.png",
+  "carry_down_113.png",
+  "carry_down_114.png",
+  "carry_down_115.png",
+  "carry_down_116.png",
+  "carry_down_117.png",
+  "carry_down_118.png",
+  "carry_down_119.png",
+  "carry_down_120.png",
+  "carry_down_121.png",
+  "carry_down_122.png",
+  "carry_down_123.png",
+  "carry_down_124.png",
+  "carry_down_125.png",
+  "carry_down_126.png",
+  "carry_down_127.png",
+  "carry_down_128.png",
+  "carry_down_129.png",
+  "carry_down_130.png",
+  "carry_down_131.png",
+  "carry_down_132.png",
+  "carry_down_133.png",
+  "carry_down_134.png",
+  "carry_down_135.png",
+  "carry_down_136.png",
+  "carry_down_137.png",
+  "carry_down_138.png",
+  "carry_down_139.png"
+ ],
+ "size": [
+  240,
+  136
+ ],
+ "findings": {
+  "jump head": [
+   2,
+   0.174
+  ],
+  "jump at carry_down_117": [
+   5,
+   0.077
+  ],
+  "jump mandible_r": [
+   2,
+   0.193
+  ],
+  "jump antenna_l_1": [
+   2,
+   0.177
+  ],
+  "jump mandible_l": [
+   2,
+   0.193
+  ],
+  "jump antenna_r_1": [
+   2,
+   0.177
+  ],
+  "jump gaster_front": [
+   2,
+   0.061
+  ],
+  "jump at carry_down_110": [
+   2,
+   0.061
+  ],
+  "jump at carry_down_119": [
+   2,
+   0.082
+  ],
+  "jump gaster_back": [
+   3,
+   0.082
+  ],
+  "jump at carry_down_46": [
+   1,
+   0.075
+  ],
+  "jump leg_r2_lower": [
+   1,
+   0.053
+  ],
+  "jump at carry_down_03": [
+   7,
+   0.057
+  ],
+  "jump leg_r2_foot": [
+   1,
+   0.057
+  ],
+  "jump leg_l2": [
+   1,
+   0.031
+  ],
+  "jump leg_l2_lower": [
+   1,
+   0.052
+  ],
+  "jump leg_l2_foot": [
+   1,
+   0.056
+  ],
+  "jump thorax": [
+   1,
+   0.124
+  ],
+  "jump at carry_down_42": [
+   12,
+   0.193
+  ],
+  "jump antenna_l_2": [
+   2,
+   0.175
+  ],
+  "jump antenna_r_2": [
+   2,
+   0.175
+  ],
+  "jump leg_r1": [
+   1,
+   0.133
+  ],
+  "jump leg_l1": [
+   1,
+   0.133
+  ],
+  "jump leg_l1_lower": [
+   1,
+   0.167
+  ],
+  "jump leg_l1_foot": [
+   1,
+   0.187
+  ],
+  "inside gaster_back": [
+   1,
+   0.032
+  ],
+  "inside at carry_down_41": [
+   1,
+   0.032
+  ]
+ },
+ "body_findings": {},
+ "known_bugs": "a carried nestmate is drawn level on a wall, sticking out from its carrier's head into the shaft (BUGS 176); not inside the wall"
+}

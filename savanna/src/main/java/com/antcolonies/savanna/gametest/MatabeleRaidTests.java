@@ -1379,6 +1379,13 @@ public class MatabeleRaidTests {
                     helper.assertTrue(raid.cameHome() >= 1, "nobody came home with the rain raid: " + raid.endedWhy());
                     helper.assertTrue(raids.finds().contains(raid.find()) && raid.find().misses() == 0,
                             "a raid turned home by rain counted as an empty check of the spot; " + raids.describe(level));
+                    // BUGS 172: a raid the raid command sets out is not one of the colony's own raids of the day (to the
+                    // rain raid's spot: the first spot's trail was faded on purpose above, so nobody knows the way there).
+                    int before = raids.raidsToday(level);
+                    RaidColumn commanded = raids.raidByCommandForTests(level, raid.find());
+                    helper.assertTrue(commanded != null, "the raid command set out no raid: " + raids.whyNoRaid());
+                    helper.assertTrue(raids.raidsToday(level) == before, "the raid command's raid was counted among the day's raids ("
+                            + before + " before, " + raids.raidsToday(level) + " after)");
                 })
                 .thenSucceed();
     }

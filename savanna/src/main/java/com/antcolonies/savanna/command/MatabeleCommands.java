@@ -84,6 +84,8 @@ public class MatabeleCommands {
                         .executes(context -> loseLeg(context.getSource(), 1))
                         .then(Commands.argument("legs", IntegerArgumentType.integer(1, 6))
                                 .executes(context -> loseLeg(context.getSource(), IntegerArgumentType.getInteger(context, "legs")))))
+                .then(Commands.literal("carryhurt")
+                        .executes(context -> carryHurt(context.getSource())))
                 .then(Commands.literal("clamp")
                         .executes(context -> clamp(context.getSource(), false, -1))
                         .then(Commands.literal("dead")
@@ -129,6 +131,36 @@ public class MatabeleCommands {
         source.sendSuccess(() -> Component.literal((dead ? "A dead termite soldier's head is locked on the " : "A termite major soldier clamped on to the ")
                 + leg + " leg of the Matabele at " + ant.blockPosition().toShortString()
                 + (dead ? " (a little slower; a nestmate in the nest bites it off)" : " (it crawls home and fights no more; a nestmate's sting leaves the head)")), true);
+        return 1;
+    }
+
+    /**
+     * M8 step 5, for testing and the guard films (BUGS 176): of the Matabele within {@value #LOSE_LEG_LOOK} blocks, the
+     * smallest loses two legs (if it has none gone) and the biggest takes it up in its jaws to carry home, as a nestmate
+     * does after a fight.
+     */
+    private static int carryHurt(CommandSourceStack source) {
+        ServerLevel level = source.getLevel();
+        Vec3 at = source.getPosition();
+        java.util.List<MatabeleEntity> near = level.getEntitiesOfClass(MatabeleEntity.class, new AABB(at, at).inflate(LOSE_LEG_LOOK),
+                a -> a.isAlive() && !a.isPassenger() && !a.isVehicle());
+        if (near.size() < 2) {
+            source.sendFailure(Component.literal("Two Matabele are needed within " + (int) LOSE_LEG_LOOK + " blocks."));
+            return 0;
+        }
+        MatabeleEntity hurt = near.stream().min(java.util.Comparator.comparingDouble(MatabeleEntity::getBbWidth)).orElseThrow();
+        MatabeleEntity carrier = near.stream().filter(a -> a != hurt).max(java.util.Comparator.comparingDouble(MatabeleEntity::getBbWidth)).orElseThrow();
+        if (com.antcolonies.entity.body.LostLegs.count(hurt.lostLegs()) == 0) {
+            hurt.loseLeg(1);
+            hurt.loseLeg(4);
+        }
+        if (!carrier.pickUpHurt(hurt)) {
+            source.sendFailure(Component.literal("The Matabele at " + carrier.blockPosition().toShortString() + " could not take up the one at "
+                    + hurt.blockPosition().toShortString() + " (jaws full, or it is not hurt so as to be carried)."));
+            return 0;
+        }
+        source.sendSuccess(() -> Component.literal("The Matabele at " + carrier.blockPosition().toShortString()
+                + " carries a hurt nestmate in its jaws."), true);
         return 1;
     }
 

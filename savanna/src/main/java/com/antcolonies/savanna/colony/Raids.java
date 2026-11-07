@@ -418,7 +418,7 @@ public class Raids {
                 waiting = null; // (fed by now: the spot stays remembered for the next hungry spell)
             } else if (!waitingCommanded && !dayHasRoom(level)) {
                 // (M8 step 3e: the day's raids are made; the find waits for tomorrow's raid hours)
-            } else if (startRaid(level, waiting) != null) {
+            } else if (startRaid(level, waiting, !waitingCommanded) != null) {
                 say(level, "the raid hours: the waiting find at " + column.find().at().toShortString() + " gets its raid"
                         + (waitingCommanded ? " (brought home by the scout command's scout)" : ""));
                 waiting = null;
@@ -1264,7 +1264,7 @@ public class Raids {
         if (column == null && !colony.rainsNow(level) && (anyHour || isRaidTime(level) && (commanded || isHungry() && !dayFull))) {
             say(level, "a scout (" + (scout == null ? "?" : scout.toString().substring(0, 8)) + ") is home from " + at.toShortString()
                     + ", worth " + worth + (anyHour ? ", sent by the command at any hour" : commanded ? ", sent by the command" : "") + ": a raid sets out");
-            RaidColumn started = startRaid(level, made);
+            RaidColumn started = startRaid(level, made, !commanded && !anyHour);
             if (started == null) {
                 if (unloadedFind) {
                     say(level, "no raid: " + whyNoRaid + "; the find waits");
@@ -1351,9 +1351,11 @@ public class Raids {
      * A raid sets out to this find: the scout leads if it is fit (else the major nearest the entrance), then the real
      * workers nearest the entrance, up to {@code most_real} (majors and minors as they come), and the rest of the raid's
      * size from the numbers inside (they go along as numbers: drawn-only ants, step 4). Null if nobody is fit.
+     * {@code ownRaid}: the colony set it out by itself, so it is one of the day's raids (M8 step 3e); a command's raid
+     * (the raid command, the scout command's scout) is not counted (BUGS 172).
      */
     @Nullable
-    private RaidColumn startRaid(ServerLevel level, Find find) {
+    private RaidColumn startRaid(ServerLevel level, Find find, boolean ownRaid) {
         SavannaNumbers.ColumnNumbers numbers = columnNumbers();
         unloadedFind = false;
         if (numbers == null) {
@@ -1410,9 +1412,12 @@ public class Raids {
         List<MatabeleEntity> going = new ArrayList<>(fit.subList(0, real));
         going.sort(Comparator.comparingInt(ant -> ant == leader ? 0 : veterans.contains(ant.getUUID()) ? 1 : ant.hasMajorBody() ? 3 : 2));
         column = new RaidColumn(level, colony, numbers, carryNumbers(), trailNumbers(), find, trail, going, along, now);
-        away.countRaid(level); // (M8 step 3e: one of the day's raids)
+        if (ownRaid) {
+            away.countRaid(level); // (M8 step 3e: one of the day's raids; BUGS 172: commands do not count)
+        }
         column.sayStart(level);
-        say(level, "raid " + away.raidsToday(level) + " today (the colony wants " + raidsWanted() + " this hungry)");
+        say(level, ownRaid ? "raid " + away.raidsToday(level) + " today (the colony wants " + raidsWanted() + " this hungry)"
+                : "set out by a command: not counted among the day's raids (" + away.raidsToday(level) + " today)");
         raidCheckAt = now + 20; // (BUGS 89: a second later, every raider should be walking with it)
         whyNoRaid = null;
         find.scout = leader.getUUID(); // (it leads: the one to lead the next raid there too)
@@ -1432,7 +1437,7 @@ public class Raids {
         if (column != null || finds.isEmpty()) {
             return null;
         }
-        return keepNoHoursOutsideThem(level, startRaid(level, finds().get(0)));
+        return keepNoHoursOutsideThem(level, startRaid(level, finds().get(0), false));
     }
 
     /** R7: a raid a command (or a test) sets out outside the raid hours keeps no hours: dusk does not turn it home. */
@@ -1457,13 +1462,22 @@ public class Raids {
         return waiting != null;
     }
 
-    /** A raid to this find sets out now (tests: a find put in by hand, with its scent line and scout). */
+    /**
+     * A raid to this find sets out now (tests: a find put in by hand, with its scent line and scout). It stands for the
+     * colony's own raid, so it counts among the day's raids (M8 step 3e).
+     */
     @Nullable
     public RaidColumn raidForTests(ServerLevel level, BlockPos at, int worth, List<BlockPos> trail, @Nullable UUID scout) {
         Find find = new Find(at.immutable(), worth, level.getGameTime(), level.getGameTime(), 0, List.copyOf(trail), scout);
         finds.add(find);
         trails.lay(level, colony.getCenter(), at, trail, level.getGameTime(), false); // (R4: the scout's line, laid as it ran home)
-        return keepNoHoursOutsideThem(level, startRaid(level, find));
+        return keepNoHoursOutsideThem(level, startRaid(level, find, true));
+    }
+
+    /** Tests (BUGS 172): a raid to this remembered find set out as the raid command sets one out, not counted. */
+    @Nullable
+    public RaidColumn raidByCommandForTests(ServerLevel level, Find find) {
+        return column != null ? null : keepNoHoursOutsideThem(level, startRaid(level, find, false));
     }
 
     /** A remembered spot was checked and nothing smelt there: forgotten after {@code spot_misses} such checks. */

@@ -1,0 +1,24 @@
+# Guard film (docs/BUGS.md 176, the step 5 code review 2026-11-07): a Matabele major carrying a hurt minor (two legs
+# gone) in its jaws, head first down a dead mound's chimney: a hump of stone 4 high with a shaft one block wide through
+# it, its near wall glass so the camera sees in. The carried ant must hang under the carrier's head on the wall as on
+# the floor, never inside the shaft's walls (it was placed by the carrier's facing only, as if on flat ground).
+cmd time set noon
+cmd weather clear
+cmd fill -4 -60 -2 2 -57 2 stone
+cmd fill 0 -60 0 0 -57 0 air
+cmd fill 0 -60 -2 0 -57 -1 glass
+lens 30
+walker matabele_major -2.5 -56 0.5 -90 BodyLength:15f
+cmd summon antcolonies:matabele_minor -1.5 -56 0.5
+step 10
+log carry_down
+cmd antcolonies carryhurt
+step 10
+cmd tick freeze
+fov 14
+follow 0 1.0 -3.5 0 15
+go 0 -60 0 1.0
+burst carry_down 140 1
+log off
+follow off
+quit
