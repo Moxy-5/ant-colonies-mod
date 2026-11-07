@@ -449,7 +449,8 @@ timings: all "my pick, to confirm" until then).
      column, every place sliding with the front, so all walk at once; behind its place an ant hurries, ahead of it it
      slows, still walking; the order leans to the raid's own, majors behind; home, empty majors behind the carriers;
      single file only the first 2 blocks, then 2, then 3 abreast; the front halts every 10 to 18 blocks for 2 to 4 s and
-     the column closes up to three quarters of its spacing); M2 no statues (a waiting raider turns to a nestmate,
+     the column closes up to three quarters of its spacing; **the stops removed the same day, the user: "just remove the
+     stops", smoother**); M2 no statues (a waiting raider turns to a nestmate,
      looks about or shuffles a step every 1 to 3 s, besides cleaning); M3 grass and dirt off the bite list (only Mud
      Crust, mud casts and soft termite plugs; dirt only to bite out of a trap), a new watch rule `no-ground-dug`. Every
      number my pick, to confirm. Not tried in-game yet.

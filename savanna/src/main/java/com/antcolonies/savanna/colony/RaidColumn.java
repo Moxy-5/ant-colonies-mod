@@ -113,14 +113,8 @@ public final class RaidColumn {
     private static final double SLOWEST_PACE = 0.55;
     /** Raid flow: the pace of an ant at the back of the crowd walking toward the trail's start to fall in. */
     private static final double FALL_IN_PACE = 0.8;
-    /** Raid flow: at a halt the column closes up to this share of its spacing (nose to tail; my pick). */
+    /** Raid flow: when the front waits (or casts about for the trail) the column closes up to this share of its spacing (nose to tail; my pick). */
     private static final double CLOSE_UP = 0.75;
-    /** Raid flow: the front halts every 10 to 18 blocks on the way out (my pick; real columns move in surges). */
-    private static final double HALT_EVERY_LEAST = 10.0;
-    private static final double HALT_EVERY_MORE = 8.0;
-    /** Raid flow: each halt lasts 2 to 4 s (my pick). */
-    private static final int HALT_TICKS_LEAST = 40;
-    private static final int HALT_TICKS_MORE = 40;
     /** How often (ticks) the column works out its places. */
     private static final int EVERY = 5;
     /**
@@ -265,9 +259,6 @@ public final class RaidColumn {
     private long waitSaidAt = -1;
     /** R3: since when the front has paused for the line now (-1 not), and how far along it must walk before it may again. */
     private long pausedSince = -1;
-    /** Raid flow: until when the front halts in a surge (-1 not), and where along the trail the next halt comes. */
-    private long haltUntil = -1;
-    private double nextHaltAt = -1.0;
     private double noPauseUntil = -1.0;
     /** R3: where each raider last got somewhere, and since when (for its headway). */
     private final Map<UUID, BlockPos> anchor = new HashMap<>();
@@ -694,9 +685,6 @@ public final class RaidColumn {
         if (pausedSince >= 0) {
             pausedSince += by;
         }
-        if (haltUntil >= 0) {
-            haltUntil += by;
-        }
         if (waitingSince >= 0) {
             waitingSince += by;
         }
@@ -1102,8 +1090,6 @@ public final class RaidColumn {
         waitingSince = -1;
         pausedSince = -1;
         noPauseUntil = -1.0;
-        haltUntil = -1;
-        nextHaltAt = -1.0;
         anchor.clear();
         anchorSince.clear();
         castingSince = -1;
@@ -1354,20 +1340,8 @@ public final class RaidColumn {
             }
         }
         boolean strung = frontAt - rear > length + numbers.stretch();
-        // Real columns move in surges: now and then the front stops a few seconds, the ants behind close up nose to tail,
-        // then it goes on and the column stretches out again (my picks, HALT_EVERY and HALT_TICKS).
-        if (nextHaltAt < 0) {
-            nextHaltAt = frontAt + HALT_EVERY_LEAST + colony.random().nextDouble() * HALT_EVERY_MORE;
-        }
-        boolean halted = !casting && haltUntil >= 0 && now < haltUntil;
-        if (!casting && haltUntil < 0 && frontAt >= nextHaltAt && route == out) {
-            haltUntil = now + HALT_TICKS_LEAST + colony.random().nextInt(HALT_TICKS_MORE + 1);
-            halted = true;
-        }
-        if (haltUntil >= 0 && now >= haltUntil) {
-            haltUntil = -1;
-            nextHaltAt = frontAt + HALT_EVERY_LEAST + colony.random().nextDouble() * HALT_EVERY_MORE;
-        }
+        // (Raid flow: no stops every 10 to 18 blocks any more, the user 2026-11-06, "just remove the stops": the column
+        // walks on smoothly; the front still waits a moment when the line has strung out far behind it.)
         boolean waits = false;
         if (casting) {
             pausedSince = -1; // (stopped at the gap: no surge counted)
@@ -1385,7 +1359,7 @@ public final class RaidColumn {
             pausedSince = -1;
         }
         sayWait(route, front, waits, hindmost);
-        boolean still = waits || halted || casting;
+        boolean still = waits || casting;
         if (!still && frontAt >= head - LEAD_STEP / 2) {
             head = Math.min(route.length(), frontAt + LEAD_STEP);
         }
