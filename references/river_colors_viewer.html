@@ -39,12 +39,14 @@ const OPTIONS = {
   grass: { label: "Floodplain grass", pick: 2, picked: 2, list: [
     ["Savanna today", "savanna"], ["A fresh green (plains)", "plains"], ["B deep green", 0x6F9B45],
     ["C olive green", 0x7E9A4A], ["D darker still", 0x5A7F38]] },
-  bank: { label: "Bank step", pick: 1, list: [
-    ["Step 1 block back from the water", 1], ["Step 2 blocks back (my pick)", 2], ["Step 3 blocks back", 3],
-    ["Step 4 blocks back", 4], ["Step 5 blocks back", 5]] },
-  sand: { label: "River edges", pick: 0, list: [["1 Silt bars on the inside of bends (my pick)", "siltbars"],
+  bank: { label: "Bank step", pick: 3, list: [
+    ["Step 1 block back from the water", 1], ["Step 2 blocks back", 2], ["Step 3 blocks back", 3],
+    ["Step 4 blocks back (your pick)", 4], ["Step 5 blocks back", 5]] },
+  sand: { label: "River edges", pick: 5, list: [["1 Silt bars on the inside of bends", "siltbars"],
     ["2 Sand bars on the inside of bends", "sandbars"], ["3 Silt and mud, ragged, all along", "mix"],
-    ["4 Sand stripe (before)", "stripe"], ["5 Grass to the water", "none"]] },
+    ["4 Sand stripe (before)", "stripe"], ["5 Grass to the water", "none"],
+    ["6 Silt bars, trampled mud at the water and in the hollows (my pick)", "siltmud"],
+    ["7 Bars sand at the head, silt at the tail, mud at the water", "graded"]] },
   view: { label: "View", pick: 0, list: [["From above"], ["Under the river"]] },
 };
 const state = {};
@@ -92,7 +94,7 @@ function siltOf(wet) {
 function build() {
   while (scene.children.length) scene.remove(scene.children[0]);
   const bank = OPTIONS.bank.list[state.bank][1], edge = OPTIONS.sand.list[state.sand][1];
-  const bedKind = edge === "siltbars" || edge === "mix" ? "silt" : edge === "none" ? "dirt" : "sand";
+  const bedKind = edge === "siltbars" || edge === "mix" || edge === "siltmud" || edge === "graded" ? "silt" : edge === "none" ? "dirt" : "sand";
   const flood = colourOf("grass"), plain = SAVANNA;
   const river = OPTIONS.river.list[state.river], poolOpt = OPTIONS.pool.list[state.pool];
   const pool = poolOpt[1] === null ? river : poolOpt;
@@ -115,6 +117,17 @@ function build() {
         const inner = side * bend > 0, width = inner ? Math.min(bank, 0.6 + 3.6 * Math.pow(Math.abs(bend), 0.8)) : 0.15;
         if (out < width + 0.5 * wobble(x, z)) {
           kind = edge === "sandbars" ? "sand" : out < 1.1 ? "wetsilt" : "silt";
+          if (edge === "siltmud") {
+            // animals trample the waterline to mud; the low hollows between the bar's ridges hold mud too
+            if (out < 1.1 && hash(x, z) < 0.45) kind = "mud";
+            else if (width > 2.4 && out > 1.6 && out < 2.4 + 0.4 * wobble(z, x) && hash(x + 3, z) < 0.75) kind = "mud";
+          } else if (edge === "graded") {
+            // the current drops sand first, at the bar's upstream head, and the fine silt and mud at its tail
+            const head = bend * -Math.cos(nr.xx / 10) > 0;
+            if (head) kind = out < 1.1 ? "wetsilt" : hash(x, z) < 0.8 ? "sand" : "silt";
+            else kind = out < 1.1 ? (hash(x, z) < 0.6 ? "mud" : "wetsilt") : "silt";
+            if (head && out < 1.1 && hash(x + 7, z) < 0.5) kind = "sand";
+          }
           if (top > 0) top = 0; // a bar never stands on the plain: it lies on the low strip
           if (inner && Math.abs(bend) > 0.55 && out < 0.9) { top = -1; water = 0; wkind = "river"; } // shallows over the bar's foot
         }
