@@ -245,19 +245,31 @@ public final class Fights {
     }
 
     public static boolean isShutIn(Level level, BlockPos cell) {
+        return isShutIn(level, cell, SHUT_IN_SEARCH);
+    }
+
+    /**
+     * {@link #isShutIn(Level, BlockPos)} walking up to {@code most} cells. BUGS 185: on a giant baobab's trunk under its
+     * bulge, 40 cells never reached the open a few steps away and a Matabele scout took itself for sealed in, so the
+     * bite-out reflex asks with a wider look. Each column's ground top is read once; unloaded land is never walked into.
+     */
+    public static boolean isShutIn(Level level, BlockPos cell, int most) {
+        java.util.Map<Long, Integer> tops = new java.util.HashMap<>();
         ArrayDeque<BlockPos> queue = new ArrayDeque<>();
         Set<BlockPos> seen = new HashSet<>();
         queue.add(cell.immutable());
         seen.add(cell.immutable());
-        while (!queue.isEmpty() && seen.size() <= SHUT_IN_SEARCH) {
+        while (!queue.isEmpty() && seen.size() <= most) {
             BlockPos at = queue.poll();
-            if (isInTheOpen(level, at)) {
-                return false;
+            int top = tops.computeIfAbsent(net.minecraft.world.level.ChunkPos.asLong(at.getX(), at.getZ()),
+                    column -> GroundTop.y(level, at.getX(), at.getZ()));
+            if (at.getY() >= top) {
+                return false; // in the open, as isInTheOpen
             }
             BlockState here = level.getBlockState(at);
             for (Direction side : Direction.values()) {
                 BlockPos next = at.relative(side);
-                if (seen.contains(next) || FacedWall.hasFace(here, side)) {
+                if (seen.contains(next) || FacedWall.hasFace(here, side) || !LandReady.at(level, next)) {
                     continue;
                 }
                 BlockState there = level.getBlockState(next);

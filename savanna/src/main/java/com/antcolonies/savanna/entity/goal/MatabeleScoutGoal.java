@@ -161,6 +161,14 @@ public class MatabeleScoutGoal extends Goal {
     private long nextLookAt;
     /** How often it asks (ticks). */
     private static final long LOOK_EVERY = 20;
+    /**
+     * BUGS 185: when a more urgent goal pushed its trip aside (game time; -1 none). The trip is kept and picked up where
+     * it was once that goal is done, within {@link #PAUSE_MOST} ticks (my pick, 30 s), else it ends as a trip given up.
+     */
+    private long pausedAt = -1;
+    private static final long PAUSE_MOST = 600;
+    /** Whether the next start picks a pushed-aside trip up again (nothing reset). */
+    private boolean resuming;
 
     public MatabeleScoutGoal(MatabeleEntity ant) {
         this.ant = ant;
@@ -173,6 +181,13 @@ public class MatabeleScoutGoal extends Goal {
             return false;
         }
         nextLookAt = level.getGameTime() + LOOK_EVERY; // (the raid code review, finding 8: a clock of its own, no tick count)
+        if (pausedAt >= 0) {
+            if (mayResume(level)) {
+                resuming = true;
+                return true;
+            }
+            endPaused(level);
+        }
         Colony mine = ant.getColony();
         Raids part = mine == null ? null : mine.part(SavannaParts.RAIDS).orElse(null);
         if (part == null || part.numbers() == null || !part.mayScout(level, ant)) {
@@ -190,10 +205,43 @@ public class MatabeleScoutGoal extends Goal {
         return true;
     }
 
+    /**
+     * BUGS 185: whether its pushed-aside trip may go on: not too long ago, still one of its colony's scouts out (none
+     * once the colony went out of sight: its scouts are numbers then), and fit to walk on.
+     */
+    private boolean mayResume(ServerLevel level) {
+        return level.getGameTime() - pausedAt <= PAUSE_MOST && stage != Stage.DONE && colony != null && raids != null && trip != null
+                && ant.getColony() == colony && raids.isScouting(ant.getUUID()) && fitToGoOn();
+    }
+
+    /** BUGS 185: a pushed-aside trip not picked up again ends as any trip given up does. */
+    private void endPaused(ServerLevel level) {
+        boolean tooLong = level.getGameTime() - pausedAt > PAUSE_MOST;
+        pausedAt = -1;
+        resuming = false;
+        if (raids != null) {
+            raids.scoutSays(level, ant.getUUID(), "does not take its trip up again (" + (tooLong ? "pushed aside too long"
+                    : "no longer fit to, or no longer out scouting") + ")");
+        }
+        finish();
+    }
+
     @Override
     public void start() {
         if (!(ant.level() instanceof ServerLevel level) || raids == null || trip == null || numbers == null) {
             stage = Stage.DONE;
+            return;
+        }
+        if (resuming) {
+            // BUGS 185: back to its trip where it left it (its points, its find, its line home); its legs start afresh
+            resuming = false;
+            raids.scoutSays(level, ant.getUUID(), "takes its trip up again after " + (level.getGameTime() - pausedAt)
+                    + " ticks pushed aside, at " + ant.blockPosition().toShortString());
+            pausedAt = -1;
+            ant.getNavigator().stop();
+            if (stage == Stage.OUT) {
+                walkOn(level);
+            }
             return;
         }
         raids.setOut(ant, trip);
@@ -265,13 +313,29 @@ public class MatabeleScoutGoal extends Goal {
 
     @Override
     public boolean canContinueToUse() {
-        return stage != Stage.DONE && colony != null && ant.isAlive() && !ant.isCrippled() && !ant.clamp().isOn()
-                && ant.getFightSpot() == null && !ant.isDowned();
+        return stage != Stage.DONE && colony != null && fitToGoOn();
+    }
+
+    /** Alive and fit to walk on with its trip (not crippled, clamped, fighting or downed). */
+    private boolean fitToGoOn() {
+        return ant.isAlive() && !ant.isCrippled() && !ant.clamp().isOn() && ant.getFightSpot() == null && !ant.isDowned();
     }
 
     @Override
     public void stop() {
         ant.getNavigator().stop();
+        if (stage != Stage.DONE && colony != null && raids != null && fitToGoOn() && ant.level() instanceof ServerLevel level) {
+            // BUGS 185: stopped while it could go on: a more urgent goal pushed it aside (the bite-out reflex, a fight
+            // without a fight spot). Its trip is kept, to be picked up again ({@link #canUse}), not given up at once.
+            pausedAt = level.getGameTime();
+            raids.scoutSays(level, ant.getUUID(), "is pushed aside from its trip for a moment at " + ant.blockPosition().toShortString());
+            return;
+        }
+        finish();
+    }
+
+    /** The trip is over: told to the colony (back, or given up), and forgotten. */
+    private void finish() {
         if (raids != null) {
             raids.back(ant, told ? null : find); // (far out, it goes home along a trail; an untold find is lost: the diary says so)
         }
@@ -553,7 +617,10 @@ public class MatabeleScoutGoal extends Goal {
         if (!LandReady.at(level, new BlockPos(x, center.getY(), z))) {
             return null;
         }
-        BlockPos cell = GroundTop.cell(level, x, z);
+        BlockPos cell = RaidGround.groundCell(level, x, z); // (BUGS 185: the ground under a tree's limbs, never their top)
+        if (cell == null) {
+            return null;
+        }
         // (the raid code review, finding 11: the raiders' own ground rule, so a scout's line only goes where a column can stand)
         if (Math.abs(cell.getY() - center.getY()) > 12 || !RaidGround.canStand(level, cell)
                 || !Raids.outOfMound(cell, mounds) || !colony.mayForageAt(level, cell)) {

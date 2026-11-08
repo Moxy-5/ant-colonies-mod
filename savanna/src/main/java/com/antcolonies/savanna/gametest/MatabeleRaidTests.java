@@ -27,6 +27,7 @@ import com.antcolonies.savanna.entity.TermiteWorkerEntity;
 import com.antcolonies.savanna.species.SavannaNumbers;
 import com.antcolonies.savanna.registry.SavannaBlocks;
 import com.antcolonies.savanna.registry.SavannaEntities;
+import com.antcolonies.savanna.registry.TreeBlocks;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
@@ -74,8 +75,21 @@ public class MatabeleRaidTests {
         Raids raids = colony.part(SavannaParts.RAIDS).orElse(null);
         helper.assertTrue(raids != null, "a Matabele colony has no raids part");
         scoutsHeadToward(helper, colony, 37, NEST + 4);
+        // BUGS 185: a scout stands on the ground under a tree's limb, never on the limb; a tall trunk is no place for it
+        BlockPos limb = helper.absolutePos(new BlockPos(43, SURFACE + 3, 2));
+        level.setBlockAndUpdate(limb, TreeBlocks.BLEACHED_LOG.get().defaultBlockState());
+        BlockPos underLimb = com.antcolonies.savanna.colony.RaidGround.groundCell(level, limb.getX(), limb.getZ());
+        helper.assertTrue(underLimb != null && underLimb.getY() == helper.absolutePos(new BlockPos(0, SURFACE, 0)).getY(),
+                "a scout would stand at " + (underLimb == null ? "nowhere" : underLimb.toShortString()) + " under a limb, not on the ground");
+        BlockPos trunk = helper.absolutePos(new BlockPos(43, SURFACE, 6));
+        for (int up = 0; up < 6; up++) {
+            level.setBlockAndUpdate(trunk.above(up), TreeBlocks.BLEACHED_LOG.get().defaultBlockState());
+        }
+        helper.assertTrue(com.antcolonies.savanna.colony.RaidGround.groundCell(level, trunk.getX(), trunk.getZ()) == null,
+                "a scout would be sent up onto a 6-block trunk");
         long[] outAt = {-1};
         long[] foundAt = {-1};
+        boolean[] pushed = {false};
         java.util.Set<java.util.UUID> scouted = new java.util.HashSet<>();
         helper.onEachTick(() -> {
             colony.population().realMembers(level).stream().filter(ant -> raids.isScouting(ant.getUUID()))
@@ -91,6 +105,19 @@ public class MatabeleRaidTests {
         });
         helper.startSequence()
                 .thenWaitUntil(() -> helper.assertTrue(outAt[0] >= 0, "no scout out yet (hungry, 13:00: scouts search all day)"))
+                .thenWaitUntil(() -> {
+                    // BUGS 185: a scout pushed aside for a moment (the bite-out reflex, a fight) keeps its trip
+                    if (!pushed[0]) {
+                        MatabeleEntity scout = scoutNamed(level, colony, scouted.iterator().next());
+                        helper.assertTrue(scout != null && scout.scoutRunningForTests(), "the scout's goal is not running yet");
+                        helper.assertTrue(scout.pushScoutAsideForTests(), "the scout's goal could not be pushed aside");
+                        pushed[0] = true;
+                        helper.assertTrue(raids.isScouting(scout.getUUID()), "a scout pushed aside for a moment gave its trip up");
+                    }
+                    MatabeleEntity scout = scoutNamed(level, colony, scouted.iterator().next());
+                    helper.assertTrue(scout != null && raids.isScouting(scout.getUUID()), "a scout pushed aside gave its trip up");
+                    helper.assertTrue(scout.scoutRunningForTests(), "the pushed-aside scout has not taken its trip up again yet");
+                })
                 .thenWaitUntil(() -> helper.assertTrue(!raids.finds().isEmpty(), "no find yet; " + raids.describe(level)))
                 .thenExecute(() -> {
                     foundAt[0] = level.getGameTime();

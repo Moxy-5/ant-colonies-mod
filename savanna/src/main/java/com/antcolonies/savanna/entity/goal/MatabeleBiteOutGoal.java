@@ -15,6 +15,7 @@ import com.antcolonies.fight.Fights;
 import com.antcolonies.savanna.SavannaMod;
 import com.antcolonies.savanna.colony.RaidGround;
 import com.antcolonies.savanna.entity.MatabeleEntity;
+import com.antcolonies.savanna.registry.TreeBlocks;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
@@ -161,8 +162,26 @@ public class MatabeleBiteOutGoal extends Goal {
         if (!roofed(level, at)) {
             return false; // BUGS 160: a roof far over it (a dead tree's bare limbs) is no trap
         }
-        return Fights.isShutIn(level, at);
+        if (!Fights.isShutIn(level, at)) {
+            return false;
+        }
+        // BUGS 185: under tree wood (a giant baobab's bulge, a limb) the open may lie past the quick 40-cell look, so
+        // the ant looks wider before it believes it; a seal of soil or mud is judged as before
+        return !woodOver(level, at) || Fights.isShutIn(level, at, SURE_SHUT_IN);
     }
+
+    /** BUGS 185: whether the roof just over it is a tree's wood. */
+    private static boolean woodOver(ServerLevel level, BlockPos at) {
+        for (int up = 1; up <= ROOF_NEAR; up++) {
+            if (level.getBlockState(at.above(up)).is(TreeBlocks.TREE_WOOD)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /** How many cells the wide look walks before an ant is sure it is shut in (BUGS 185; my pick). */
+    private static final int SURE_SHUT_IN = 400;
 
     /** How near over it (blocks) a roof must be for the ant to be shut in (BUGS 160; my pick). */
     private static final int ROOF_NEAR = 3;

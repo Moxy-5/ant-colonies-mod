@@ -372,6 +372,30 @@ public class MatabeleEntity extends AbstractAntEntity implements ColonyBorn {
         return scoutGoal;
     }
 
+    /**
+     * Tests (BUGS 185): push its running scouting goal aside, as a higher goal (the bite-out reflex, a fight) does when
+     * it takes the legs for a moment. Whether a scouting goal was running.
+     */
+    public boolean pushScoutAsideForTests() {
+        for (net.minecraft.world.entity.ai.goal.WrappedGoal goal : goalSelector.getAvailableGoals()) {
+            if (goal.getGoal() == scoutGoal && goal.isRunning()) {
+                goal.stop();
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /** Tests (BUGS 185): whether its scouting goal is running right now. */
+    public boolean scoutRunningForTests() {
+        for (net.minecraft.world.entity.ai.goal.WrappedGoal goal : goalSelector.getAvailableGoals()) {
+            if (goal.getGoal() == scoutGoal && goal.isRunning()) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     /** What it remembers of its own scouting: its favourite direction, how far out it searches (saved). */
     public ScoutMemory scoutMemory() {
         return scoutMemory;

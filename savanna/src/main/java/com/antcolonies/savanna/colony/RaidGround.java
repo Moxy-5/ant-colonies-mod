@@ -7,8 +7,11 @@ import com.antcolonies.colony.LandReady;
 import org.jetbrains.annotations.Nullable;
 
 import com.antcolonies.colony.Colony;
+import com.antcolonies.colony.GroundTop;
+import com.antcolonies.savanna.registry.TreeBlocks;
 
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.util.Mth;
 
@@ -33,6 +36,42 @@ public final class RaidGround {
     public static double flat(BlockPos a, BlockPos b) {
         double dx = a.getX() - b.getX(), dz = a.getZ() - b.getZ();
         return Math.sqrt(dx * dx + dz * dz);
+    }
+
+    /** BUGS 185: the most wood (blocks) a ground cell may lie on top of where the wood rests on the ground (a fallen log; my pick). */
+    private static final int MOST_WOOD_UNDERFOOT = 3;
+
+    /**
+     * BUGS 185: the ground a walking ant stands on at x, z: {@link GroundTop}'s cell, but under a tree's limbs and crown
+     * the ground below them, not their top (the user's raid test, 2026-11-07: a scout told to stand over a termite
+     * tunnel climbed a giant baobab toward a dead limb 22 blocks up, thought itself shut in under the trunk's bulge and
+     * gave its trip up). Real Megaponera scouts search the ground. Wood with open air (or leaves) under it is passed;
+     * wood resting on the ground counts if at most {@value #MOST_WOOD_UNDERFOOT} blocks thick (a fallen log), a taller
+     * stack (a standing trunk) is no place to stand: null. Reads the one column only; the caller checks it is loaded.
+     */
+    @Nullable
+    public static BlockPos groundCell(ServerLevel level, int x, int z) {
+        BlockPos cell = GroundTop.cell(level, x, z);
+        int floor = level.getMinBuildHeight();
+        for (int pass = 0; pass < 8; pass++) { // (a few layers of limbs one over another at most)
+            BlockPos.MutableBlockPos at = cell.below().mutable();
+            int wood = 0;
+            while (at.getY() > floor && level.getBlockState(at).is(TreeBlocks.TREE_WOOD)) {
+                at.move(Direction.DOWN);
+                wood++;
+            }
+            if (wood == 0) {
+                return cell;
+            }
+            if (GroundTop.isGround(level.getBlockState(at))) {
+                return wood <= MOST_WOOD_UNDERFOOT ? cell : null;
+            }
+            while (at.getY() > floor && !GroundTop.isGround(level.getBlockState(at))) {
+                at.move(Direction.DOWN); // (open air under hanging wood: down to what is under it)
+            }
+            cell = at.above().immutable();
+        }
+        return cell;
     }
 
     /**
