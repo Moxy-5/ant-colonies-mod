@@ -30,17 +30,19 @@ const D = {"grass_block_top": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABA
 const X = 72, Z = 68;
 const zc = x => 30 + 6 * Math.sin(x / 10);
 const OPTIONS = {
-  river: { label: "River water", pick: 2, list: [
+  river: { label: "River water", pick: 2, picked: 2, list: [
     ["Minecraft today", 0x3F76E4, 0x050533], ["Swamp (for scale)", 0x617B64, 0x232317],
     ["A olive silt", 0x5C6E45, 0x1E2414], ["B brown-green", 0x6E6A44, 0x24210F], ["C dark tea", 0x4B5534, 0x171A0E]] },
-  pool: { label: "Pool water", pick: 2, list: [
+  pool: { label: "Pool water", pick: 3, picked: 3, list: [
     ["Same as the river", null, null], ["Minecraft today", 0x3F76E4, 0x050533],
     ["A algae green", 0x4F7B3A, 0x172612], ["B deep green", 0x3E5F33, 0x111C0D], ["C green-brown", 0x5E7040, 0x1D2312]] },
-  grass: { label: "Floodplain grass", pick: 0, list: [
+  grass: { label: "Floodplain grass", pick: 2, picked: 2, list: [
     ["Savanna today", "savanna"], ["A fresh green (plains)", "plains"], ["B deep green", 0x6F9B45],
     ["C olive green", 0x7E9A4A], ["D darker still", 0x5A7F38]] },
   bank: { label: "Bank height", pick: 0, list: [["1 block above the water (my pick)", 1], ["Flush with the water", 0]] },
-  sand: { label: "River edges", pick: 0, list: [["Sand bed and edges (my pick)", 1], ["Grass to the water", 0]] },
+  sand: { label: "River edges", pick: 0, list: [["1 Silt bars on the inside of bends (my pick)", "siltbars"],
+    ["2 Sand bars on the inside of bends", "sandbars"], ["3 Silt and mud, ragged, all along", "mix"],
+    ["4 Sand stripe (before)", "stripe"], ["5 Grass to the water", "none"]] },
   view: { label: "View", pick: 0, list: [["From above"], ["Under the river"]] },
 };
 const state = {};
@@ -66,25 +68,50 @@ camera.position.set(78, 30, -8); controls.target.set(38, 0, 30);
 
 function colourOf(key) { const v = OPTIONS[key].list[state[key]][1]; return v === "savanna" ? SAVANNA : v === "plains" ? PLAINS : v; }
 
-function dist(x, z) {
-  let best = 99;
-  for (let s = -14; s <= 14; s += 0.25) { const xx = x + s, dz = z - zc(xx); best = Math.min(best, Math.hypot(s, dz)); }
-  return best;
+function nearest(x, z) {
+  let best = 99, at = x;
+  for (let s = -14; s <= 14; s += 0.25) { const xx = x + s, h = Math.hypot(s, z - zc(xx)); if (h < best) { best = h; at = xx; } }
+  return { d: best, xx: at };
+}
+function dist(x, z) { return nearest(x, z).d; }
+function hash(x, z) { const s = Math.sin(x * 127.1 + z * 311.7) * 43758.5453; return s - Math.floor(s); }
+function wobble(x, z) { return 0.45 * Math.sin(x * 1.7 + z * 0.9) + 0.4 * Math.sin(x * 0.6 - z * 1.3); }
+function siltOf(wet) {
+  const s = canvasOf(IMG.sand), dd = canvasOf(IMG.dirt).getContext("2d").getImageData(0, 0, 16, 16).data;
+  const g = s.getContext("2d"), p = g.getImageData(0, 0, 16, 16);
+  const k = wet ? 0.68 : 0.86;
+  for (let i = 0; i < p.data.length; i += 4) {
+    const m = [0.45, 0.42, 0.4];
+    for (let c = 0; c < 3; c++) p.data[i + c] = (p.data[i + c] * m[c] + dd[i + c] * (1 - m[c])) * k * [1, 0.97, 0.9][c];
+  }
+  g.putImageData(p, 0, 0); return s;
 }
 
 function build() {
   while (scene.children.length) scene.remove(scene.children[0]);
-  const bank = OPTIONS.bank.list[state.bank][1], sandy = OPTIONS.sand.list[state.sand][1] === 1;
+  const bank = OPTIONS.bank.list[state.bank][1], edge = OPTIONS.sand.list[state.sand][1];
+  const bedKind = edge === "siltbars" || edge === "mix" ? "silt" : edge === "none" ? "dirt" : "sand";
   const flood = colourOf("grass"), plain = SAVANNA;
   const river = OPTIONS.river.list[state.river], poolOpt = OPTIONS.pool.list[state.pool];
   const pool = poolOpt[1] === null ? river : poolOpt;
   // columns: top solid cell, surface kind, water top cell and kind, grass colour
   const col = [];
   for (let x = 0; x < X; x++) for (let z = 0; z < Z; z++) {
-    const d = dist(x + 0.5, z + 0.5);
+    const nr = nearest(x + 0.5, z + 0.5), d = nr.d;
     let top = bank + Math.max(0, Math.min(3, Math.floor((d - 13) / 6))), kind = "grass", water = null, wkind = null;
-    if (d < 3.6) { top = d < 2.2 ? -3 : -2; kind = sandy ? "sand" : "dirt"; water = 0; wkind = "river"; }
-    else if (sandy && d < 4.9 && top === bank) kind = "sand";
+    if (d < 3.6) { top = d < 2.2 ? -3 : -2; kind = bedKind; water = 0; wkind = "river"; }
+    else if (top === bank && edge !== "none") {
+      const bend = -Math.sin(nr.xx / 10), side = Math.sign(z + 0.5 - zc(nr.xx)), out = d - 3.6;
+      if (edge === "stripe") { if (d < 4.9) kind = "sand"; }
+      else if (edge === "mix") { if (out < 1.1 + 0.8 * wobble(x, z)) kind = hash(x, z) < 0.35 ? "mud" : out < 0.9 ? "wetsilt" : "silt"; }
+      else {
+        const inner = side * bend > 0, width = inner ? 0.6 + 3.6 * Math.pow(Math.abs(bend), 0.8) : 0.15;
+        if (out < width + 0.7 * wobble(x, z)) {
+          kind = edge === "sandbars" ? "sand" : out < 1.1 ? "wetsilt" : "silt";
+          if (inner && width > 1.6 && out < 1.1 && bank >= 1) top = bank - 1; // the bar slopes into the water
+        }
+      }
+    }
     const oc = Math.hypot(x + 0.5 - 20, z + 0.5 - 53);
     if (z + 0.5 <= 53.5 && oc >= 6 && oc <= 8.6) {
       water = bank; wkind = "pool"; top = (oc > 6.9 && oc < 7.7 && z < 50) ? bank - 2 : bank - 1; kind = "mud";
@@ -101,19 +128,21 @@ function build() {
   const shade = [0.6, 0.6, 1, 0.5, 0.8, 0.8];
   const boxMats = map => shade.map((s, i) => new THREE.MeshBasicMaterial({ map: map[i] || map[0], color: new THREE.Color(s, s, s) }));
   const dirt = tex(canvasOf(IMG.dirt)), sand = tex(canvasOf(IMG.sand)), mud = tex(canvasOf(IMG.mud));
+  const silt = tex(siltOf(false)), wetsilt = tex(siltOf(true));
   const sideOf = h => { const c = canvasOf(IMG.dirt); c.getContext("2d").drawImage(tinted(IMG.grass_block_side_overlay, h), 0, 0); return tex(c); };
   const sideF = sideOf(flood), sideP = sideOf(plain);
   const mats = {
     grassF: boxMats([sideF, sideF, dirt, dirt, sideF, sideF]), grassP: boxMats([sideP, sideP, dirt, dirt, sideP, sideP]),
-    dirt: boxMats([dirt]), sand: boxMats([sand]), mud: boxMats([mud]),
+    dirt: boxMats([dirt]), sand: boxMats([sand]), mud: boxMats([mud]), silt: boxMats([silt]), wetsilt: boxMats([wetsilt]),
   };
-  const cells = { grassF: [], grassP: [], dirt: [], sand: [], mud: [] };
-  const tops = { grass: [], sand: [], dirt: [], mud: [] };
+  const cells = { grassF: [], grassP: [], dirt: [], sand: [], mud: [], silt: [], wetsilt: [] };
+  const tops = { grass: [], sand: [], dirt: [], mud: [], silt: [], wetsilt: [] };
   for (const c of col) {
     let low = c.top;
     for (const [dx, dz] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) { const n = at(c.x + dx, c.z + dz); low = Math.min(low, n ? n.top + 1 : -4); }
     for (let y = Math.max(low, -4); y <= c.top; y++) {
-      let k = y < c.top ? (c.kind === "sand" && y === c.top - 1 ? "sand" : "dirt") : c.kind === "grass" ? "grass" + c.side : c.kind;
+      let k = y < c.top ? ((c.kind === "sand" || c.kind === "silt") && y === c.top - 1 ? c.kind : c.kind === "wetsilt" && y === c.top - 1 ? "silt" : "dirt")
+        : c.kind === "grass" ? "grass" + c.side : c.kind;
       cells[k].push([c.x, y, c.z]);
     }
     tops[c.kind].push(c);
@@ -126,7 +155,7 @@ function build() {
     scene.add(mesh);
   }
   const plane = new THREE.PlaneGeometry(1, 1); plane.rotateX(-Math.PI / 2);
-  const topTex = { grass: tex(canvasOf(IMG.grass_block_top)), sand, dirt, mud };
+  const topTex = { grass: tex(canvasOf(IMG.grass_block_top)), sand, dirt, mud, silt, wetsilt };
   for (const k in tops) {
     if (!tops[k].length) continue;
     const mesh = new THREE.InstancedMesh(plane, new THREE.MeshBasicMaterial({ map: topTex[k] }), tops[k].length);
@@ -166,7 +195,7 @@ function buttons() {
     OPTIONS[key].list.forEach((o, i) => {
       const b = document.createElement("button");
       const c = typeof o[1] === "number" && key !== "bank" && key !== "sand" ? o[1] : o[1] === "savanna" ? SAVANNA : o[1] === "plains" ? PLAINS : null;
-      b.innerHTML = (c !== null && c !== undefined ? `<span class="sw" style="background:${hexCss(c)}"></span>` : "") + o[0];
+      b.innerHTML = (c !== null && c !== undefined && key !== "sand" ? `<span class="sw" style="background:${hexCss(c)}"></span>` : "") + o[0];
       b.className = state[key] === i ? "on" : "";
       b.onclick = () => {
         state[key] = i; [...row.querySelectorAll("button")].forEach((x, j) => x.className = j === i ? "on" : "");
