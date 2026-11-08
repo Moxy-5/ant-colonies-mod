@@ -137,25 +137,28 @@ public class SavannaWorldTests {
         List<Integer> climbs = new ArrayList<>();
         List<Integer> reliefs = new ArrayList<>();
         StringBuilder report = new StringBuilder();
-        int hollow = 0;
+        int hollow = 0, deep = 0;
         for (long seed : GROUND_SEEDS) {
             Climate.Sampler sampler = BiomeMaps.sampler(registries, seed);
             MultiNoiseBiomeSource source = BiomeMaps.bigSavannaSource(registries, seed);
             BiomeMaps.Ground ground = BiomeMaps.ground(registries, source, seed, helper.getLevel());
             byte[] map = BiomeMaps.map(source, sampler);
+            // the spots in one fixed order for the seed, whatever the map (BUGS 181: shuffling only the savanna cells let a
+            // change of the biome map swing which spots were read, 5 or 16 caves out of the same land)
             List<Integer> cells = new ArrayList<>();
             for (int c = 0; c < map.length; c++) {
-                if (map[c] == BiomeMaps.SAVANNA) {
-                    cells.add(c);
-                }
+                cells.add(c);
             }
             java.util.Collections.shuffle(cells, new java.util.Random(seed));
             List<Integer> seedClimbs = new ArrayList<>();
             List<Integer> seedReliefs = new ArrayList<>();
-            int[] seedHollow = {0};
+            int[] seedHollow = {0, 0};
             for (int c : cells) {
                 if (seedClimbs.size() >= GROUND_SPOTS) {
                     break;
+                }
+                if (map[c] != BiomeMaps.SAVANNA) {
+                    continue;
                 }
                 int x = -BiomeMaps.HALF + (c / BiomeMaps.SIDE) * BiomeMaps.STEP;
                 int z = -BiomeMaps.HALF + (c % BiomeMaps.SIDE) * BiomeMaps.STEP;
@@ -173,13 +176,17 @@ public class SavannaWorldTests {
                     }
                 }
                 seedReliefs.add(high - low);
-                if (ground.hollowUnder(x, z, HOLLOW_DEPTH)) {
+                int air = ground.airUnder(x, z, DEEP_CAVE_LOOK);
+                if (air > 0 && air <= HOLLOW_DEPTH) {
                     seedHollow[0]++;
+                } else if (air > 0) {
+                    seedHollow[1]++;
                 }
             }
-            report.append(String.format("%n  seed %d: %s, %d with a cave or pit within %d blocks under the ground", seed,
-                    groundLine(seedClimbs, seedReliefs), seedHollow[0], HOLLOW_DEPTH));
+            report.append(String.format("%n  seed %d: %s, %d with a cave or pit within %d blocks under the ground, %d with a closed cave's roof %d to %d under",
+                    seed, groundLine(seedClimbs, seedReliefs), seedHollow[0], HOLLOW_DEPTH, seedHollow[1], HOLLOW_DEPTH + 1, DEEP_CAVE_LOOK));
             hollow += seedHollow[0];
+            deep += seedHollow[1];
             climbs.addAll(seedClimbs);
             reliefs.addAll(seedReliefs);
             var found = seed != GROUND_SEEDS[0] ? null : source.findBiomeHorizontal(0, SavannaSpawn.SAMPLE_Y, 0, 6400, 32,
@@ -205,7 +212,8 @@ public class SavannaWorldTests {
         } finally {
             com.antcolonies.savanna.worldgen.FlatSavanna.setWholeWorld(false);
         }
-        String all = groundLine(climbs, reliefs) + String.format(", %d with a cave or pit within %d blocks under", hollow, HOLLOW_DEPTH) + report;
+        String all = groundLine(climbs, reliefs) + String.format(", %d with a cave or pit within %d blocks under, %d with a closed cave's roof %d to %d under",
+                hollow, HOLLOW_DEPTH, deep, HOLLOW_DEPTH + 1, DEEP_CAVE_LOOK) + report;
         SavannaMod.LOGGER.info("[biome maps] savanna ground: {}", all);
         double steep = share(climbs, STEEP_CLIMB);
         double rugged = share(reliefs, RUGGED_RELIEF);
@@ -443,10 +451,16 @@ public class SavannaWorldTests {
     static final double STEEP_MOST = 0.30, RUGGED_MOST = 0.30;
     /**
      * Caves and pits: how deep under the ground is looked at, and the most spots allowed one (the user, 2026-11-07: no
-     * dips, ravines or caves in the savanna). The edges of the climate mask may keep a few.
+     * dips, ravines or caves in the savanna). The edges of the climate mask may keep a few. 8 blocks, not 16 (BUGS 181):
+     * what is left under the plain is Minecraft's deep cheese caves (big round caverns), whose roofs lie 14 to 16 blocks
+     * under the grass, below the sea, closed over by solid ground; they only begin where the ground's noise is deep enough
+     * (about 13 blocks down on the flat plain), so they cannot come up to the grass. A dip, pit or cave a player would see
+     * from the savanna, or meet in a shallow dig, starts within 8. The deeper roofs are counted in the report, not limited.
      */
-    static final int HOLLOW_DEPTH = 16;
+    static final int HOLLOW_DEPTH = 8;
     static final double HOLLOW_MOST = 0.01;
+    /** How far down the report looks for a closed cave's roof (counted only). */
+    static final int DEEP_CAVE_LOOK = 16;
 
     private static double share(List<Integer> values, int atLeast) {
         return values.isEmpty() ? 0 : values.stream().filter(v -> v >= atLeast).count() / (double) values.size();

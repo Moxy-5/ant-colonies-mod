@@ -68,18 +68,18 @@ public final class BiomeMaps {
         }
 
         /**
-         * Is there air (a noise cave, a pit) within {@code depth} blocks under the ground at this spot? Only the noise's
-         * caves: carvers (ravines, carved caves) come later, in real chunks.
+         * How many blocks under the ground the first air (a noise cave, a pit) lies at this spot, looking down at most
+         * {@code depth} blocks; -1 if none. Only the noise's caves: carvers (ravines, carved caves) come later, in real chunks.
          */
-        public boolean hollowUnder(int x, int z, int depth) {
+        public int airUnder(int x, int z, int depth) {
             int top = height(x, z);
             var column = generator.getBaseColumn(x, z, level, random);
-            for (int y = top - 1; y >= top - depth; y--) {
-                if (column.getBlock(y).isAir()) {
-                    return true;
+            for (int d = 1; d <= depth; d++) {
+                if (column.getBlock(top - d).isAir()) {
+                    return d;
                 }
             }
-            return false;
+            return -1;
         }
     }
 
