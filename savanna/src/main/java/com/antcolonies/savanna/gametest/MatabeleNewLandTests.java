@@ -178,7 +178,7 @@ public class MatabeleNewLandTests {
         helper.assertTrue(t[0] >= 300, "too few savanna places in the survey: " + report);
         helper.assertTrue(t[1] >= 0.28 * t[0], "too few places hold a mound (slopes up to 6 take one): " + report);
         double dead = t[2] / (double) t[1];
-        helper.assertTrue(dead >= 0.2 && dead <= 0.4, "dead mounds not about a quarter of them: " + report);
+        helper.assertTrue(dead >= 0.25 && dead <= 0.45, "dead mounds not about a third of them: " + report);
         double looksDead = t[7] / (double) t[1];
         helper.assertTrue(looksDead >= FEWEST_LOOKING_DEAD && looksDead <= MOST_LOOKING_DEAD, String.format("dead mounds still looking"
                 + " dead (bare soil, under %.0f days worn) outside %.0f%% to %.0f%% of mounds (%.0f%%; look at dead_stages, dead_share and"
@@ -249,23 +249,26 @@ public class MatabeleNewLandTests {
         return new MoundPlaces.Land(seed, new NoiseBasedChunkGenerator(savanna, settings), level, random, mounds.biomes());
     }
 
-    /** The commonness band of Matabele dead mounds among all mounds of new land (the user, 2026-11-06: uncommon, not rare). */
-    static final double FEWEST_MATABELE = 0.15, MOST_MATABELE = 0.30;
+    /**
+     * The commonness band of Matabele dead mounds among all mounds of new land (the user, 2026-11-06: uncommon, not rare;
+     * 2026-11-07: dead mounds 1 in 3, 3 in 4 of them Matabele, so about 1 mound in 4).
+     */
+    static final double FEWEST_MATABELE = 0.18, MOST_MATABELE = 0.35;
 
     /**
      * The lowest Matabele share on rugged single-biome savanna, where mounds stand farther apart and a lonely dead mound
      * stands empty (the user, 2026-11-07: "dead mounds not by termite mounds never have Matabele").
      */
-    static final double FEWEST_MATABELE_SINGLE = 0.10;
+    static final double FEWEST_MATABELE_SINGLE = 0.12;
 
     /**
      * Dead mounds the eye reads as dead (the user, 2026-11-07: "still seeing dead mounds about 1 in 10 to 1 in 15, I want 1 in
-     * 4 to 1 in 5"): under {@link #LOOKS_DEAD_DAYS} days worn a dead mound still stands as bare soil (spires to day 5, the
+     * 4 to 1 in 5"; then 2026-11-07: 1 in 3): under {@link #LOOKS_DEAD_DAYS} days worn a dead mound still stands as bare soil (spires to day 5, the
      * body slumping fast to day 12, {@code MoundWear}); after that it is a low lump, then a grassy hump, read as a hill. The
      * user's game logs had a quarter of the mounds dead but only about 4 in 10 of those this young; this guard counts what is
      * seen, not the dice.
      */
-    static final double LOOKS_DEAD_DAYS = 12, FEWEST_LOOKING_DEAD = 0.18, MOST_LOOKING_DEAD = 0.30;
+    static final double LOOKS_DEAD_DAYS = 12, FEWEST_LOOKING_DEAD = 0.26, MOST_LOOKING_DEAD = 0.40;
 
     /** Minecraft's overworld for a seed, as the noise makes it (no chunks, big savannas and all), with the mounds' biomes. */
     private static MoundPlaces.Land realLand(ServerLevel level, long seed, TermiteMoundStructure mounds) {

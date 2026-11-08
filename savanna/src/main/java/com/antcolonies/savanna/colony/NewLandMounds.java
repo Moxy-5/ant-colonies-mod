@@ -292,7 +292,7 @@ public class NewLandMounds extends SavedData {
 
     /**
      * M8 step 3F, F4: a dead mound of new land holds a Matabele colony only with a living termite mound's foot within this
-     * many blocks (the mound numbers' {@code matabele.living_near}, 90 since the commonness plan, 2026-11-06, was 70; real
+     * many blocks (the mound numbers' {@code matabele.living_near}, 100 since 2026-11-07, 90 since the commonness plan, 2026-11-06, was 70; real
      * Matabele nests lie among the termite mounds they raid and forage out to about 95 m, Yusuf 2026; a colony with no
      * termites in reach would starve). One number for world making and this check ({@link TermiteMoundStructure.Matabele}).
      */
