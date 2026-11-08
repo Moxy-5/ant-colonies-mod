@@ -1,0 +1,198 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Savanna river colours</title>
+<style>
+  :root { --bg: #f4f1ea; --fg: #2c2c2a; --muted: #6b6a64; --line: #d3d1c7; --pick: #2f6b3a; }
+  @media (prefers-color-scheme: dark) { :root { --bg: #1f1f1d; --fg: #ecebe4; --muted: #a9a79e; --line: #44443f; --pick: #8fd19e; } }
+  body { margin: 0; background: var(--bg); color: var(--fg); font: 14px/1.5 system-ui, sans-serif; }
+  #panel { padding: 10px 16px; display: grid; gap: 6px; }
+  .row { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+  .row b { width: 130px; font-weight: 500; }
+  button { background: transparent; color: var(--fg); border: 1px solid var(--line); border-radius: 6px; padding: 3px 9px; cursor: pointer; font: inherit; }
+  button.on { border-color: var(--pick); color: var(--pick); font-weight: 500; }
+  .sw { display: inline-block; width: 11px; height: 11px; border-radius: 2px; margin-right: 5px; vertical-align: -1px; border: 1px solid #0003; }
+  #note { color: var(--muted); font-size: 13px; }
+  canvas { display: block; width: 100%; height: calc(100vh - 230px); min-height: 380px; }
+</style>
+</head>
+<body>
+<div id="panel">
+  <div id="note">A piece of floodplain: the river in front, an oxbow (cut-off bend) on the far side, a pan near the right, the plain rising at the back edges. Minecraft's own textures, tinted as the game tints them. Drag to turn, scroll to zoom.</div>
+</div>
+<canvas id="c"></canvas>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+<script>
+const D = {"grass_block_top": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAAAAAA6mKC9AAAA8UlEQVR42gUAWW+CMPj7yXuZ0ylHOWwpR6EFC0ERh8gh+ELGEl9mwh8zEC9iv2eaVxwodpoPHxKvlJmeGVp3E4uHXah8xXJIGMbndsRf+gwrm8ooU7hm+pK5jQI/5mgODzI8P/XmrhIfsnR9Q4ckxwkx1ySIQT3WITepZuHfIWokA4ZPbri7WnLEiJVaB00+9wMaj1NvcFsUKkjjz/fSXscR74KJIcgLWRtzIF6bxmREMrDGfSUt7kjubSdNofCUiGaR/U0jqpzrjQTUrriSoeUi2rwk7QOqy2s73WOhJgnuTu4G7ANxrmksgv9dZ4WkeAPz+JNw8txdwAAAAABJRU5ErkJggg==", "grass_block_side_overlay": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAAeElEQVQ4T+2NsQrAIAxE/WtHUdxUUARXZwcXfzDtXRFa6Cd4IPHlLokaY0jOWVprEmOUzajo4fXeyahrLbHW8g9PwXgPIqBugZ1zZATBtVbWnQ8hiOKWWwh672mAsWwv2tfmnOxprZ/rfyqlfAxjDDml9D9wdHREXc8PflIHcVV8AAAAAElFTkSuQmCC", "dirt": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQBAMAAADt3eJSAAAAFVBMVEW5hVyHh4eWbEpsbGx0WER5VTpZPSnqDkA3AAAAbklEQVR42hXLwQnDQAwEwOVA7uDyNgq6AtJD/mLD6m0Muv5LCJ7/YES6OhNsvjLGhpXJtA1vW+nMQJy31o+Ncu4uJUwzDSQE13I5giyGGuxqCQTTxnX4RPDkJ+5ChZskgPp6HemIqwp8+ojp8voDZ2EdYwBe7AYAAAAASUVORK5CYII=", "sand": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQBAMAAADt3eJSAAAAElBMVEXt68vn5Lvj27Daz6PVxJbRuopf1Q47AAAAZklEQVR42gVAwQ3CMBCzQPyRukEcBqjP/dNzWAC6/ywIm0y2GrH72h47eJ1VdqDpOdqF3FuqCK7BzApOv7N+Nlyx126E+nQYbKl1uCYOWcVLWMWMlSDdfnIJ5EtSBdKN5LdADrnIP0wTGY7btIheAAAAAElFTkSuQmCC", "mud": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQBAMAAADt3eJSAAAAFVBMVEVJSkxDREVGQD4+ODY6OD0zMjoyLTbNmEVsAAAAfklEQVR42g3JwRXCIBAFwB+fBQSDBYDbQMLiWSAUIOymgpD+S9C5DjZbWkl3hauNIqvCaNFzqR7bxx5f2ycEU8XtbsFGmilzx67icxkZwbeiPBEapdhne/zLvMjrgEs3nmoPsMLOnrziCJkuTYQrrs/2kAqVObr3qBDPymrkB/APHIll0hxTAAAAAElFTkSuQmCC", "water_still": "data:image/png;base64,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", "grass_colormap": "data:image/png;base64,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"};
+const X = 72, Z = 68;
+const zc = x => 30 + 6 * Math.sin(x / 10);
+const OPTIONS = {
+  river: { label: "River water", pick: 2, list: [
+    ["Minecraft today", 0x3F76E4, 0x050533], ["Swamp (for scale)", 0x617B64, 0x232317],
+    ["A olive silt", 0x5C6E45, 0x1E2414], ["B brown-green", 0x6E6A44, 0x24210F], ["C dark tea", 0x4B5534, 0x171A0E]] },
+  pool: { label: "Pool water", pick: 2, list: [
+    ["Same as the river", null, null], ["Minecraft today", 0x3F76E4, 0x050533],
+    ["A algae green", 0x4F7B3A, 0x172612], ["B deep green", 0x3E5F33, 0x111C0D], ["C green-brown", 0x5E7040, 0x1D2312]] },
+  grass: { label: "Floodplain grass", pick: 0, list: [
+    ["Savanna today", "savanna"], ["A fresh green (plains)", "plains"], ["B deep green", 0x6F9B45],
+    ["C olive green", 0x7E9A4A], ["D darker still", 0x5A7F38]] },
+  bank: { label: "Bank height", pick: 0, list: [["1 block above the water (my pick)", 1], ["Flush with the water", 0]] },
+  sand: { label: "River edges", pick: 0, list: [["Sand bed and edges (my pick)", 1], ["Grass to the water", 0]] },
+  view: { label: "View", pick: 0, list: [["From above"], ["Under the river"]] },
+};
+const state = {};
+for (const k in OPTIONS) state[k] = OPTIONS[k].pick;
+
+function load(src) { return new Promise(r => { const i = new Image(); i.onload = () => r(i); i.src = src; }); }
+function canvasOf(img, w, h) { const c = document.createElement("canvas"); c.width = w || img.width; c.height = h || img.height; c.getContext("2d").drawImage(img, 0, 0); return c; }
+function tinted(img, hex, w, h) {
+  const c = canvasOf(img, w, h), g = c.getContext("2d"), d = g.getImageData(0, 0, c.width, c.height);
+  const r = (hex >> 16 & 255) / 255, gg = (hex >> 8 & 255) / 255, b = (hex & 255) / 255;
+  for (let i = 0; i < d.data.length; i += 4) { d.data[i] *= r; d.data[i + 1] *= gg; d.data[i + 2] *= b; }
+  g.putImageData(d, 0, 0); return c;
+}
+function tex(c) { const t = new THREE.CanvasTexture(c); t.magFilter = THREE.NearestFilter; t.minFilter = THREE.NearestFilter; return t; }
+function hexCss(h) { return "#" + h.toString(16).padStart(6, "0"); }
+
+let IMG = {}, SAVANNA = 0, PLAINS = 0;
+const renderer = new THREE.WebGLRenderer({ canvas: document.getElementById("c"), antialias: true });
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(55, 1, 0.05, 500);
+const controls = new THREE.OrbitControls(camera, renderer.domElement);
+camera.position.set(78, 30, -8); controls.target.set(38, 0, 30);
+
+function colourOf(key) { const v = OPTIONS[key].list[state[key]][1]; return v === "savanna" ? SAVANNA : v === "plains" ? PLAINS : v; }
+
+function dist(x, z) {
+  let best = 99;
+  for (let s = -14; s <= 14; s += 0.25) { const xx = x + s, dz = z - zc(xx); best = Math.min(best, Math.hypot(s, dz)); }
+  return best;
+}
+
+function build() {
+  while (scene.children.length) scene.remove(scene.children[0]);
+  const bank = OPTIONS.bank.list[state.bank][1], sandy = OPTIONS.sand.list[state.sand][1] === 1;
+  const flood = colourOf("grass"), plain = SAVANNA;
+  const river = OPTIONS.river.list[state.river], poolOpt = OPTIONS.pool.list[state.pool];
+  const pool = poolOpt[1] === null ? river : poolOpt;
+  // columns: top solid cell, surface kind, water top cell and kind, grass colour
+  const col = [];
+  for (let x = 0; x < X; x++) for (let z = 0; z < Z; z++) {
+    const d = dist(x + 0.5, z + 0.5);
+    let top = bank + Math.max(0, Math.min(3, Math.floor((d - 13) / 6))), kind = "grass", water = null, wkind = null;
+    if (d < 3.6) { top = d < 2.2 ? -3 : -2; kind = sandy ? "sand" : "dirt"; water = 0; wkind = "river"; }
+    else if (sandy && d < 4.9 && top === bank) kind = "sand";
+    const oc = Math.hypot(x + 0.5 - 20, z + 0.5 - 53);
+    if (z + 0.5 <= 53.5 && oc >= 6 && oc <= 8.6) {
+      water = bank; wkind = "pool"; top = (oc > 6.9 && oc < 7.7 && z < 50) ? bank - 2 : bank - 1; kind = "mud";
+    } else if (z + 0.5 <= 54 && z + 0.5 > 51 && oc >= 5 && oc <= 9.6 && water === null) kind = "mud";
+    const pe = Math.hypot((x + 0.5 - 54) / 5.5, (z + 0.5 - 13.3) / 3.8);
+    if (pe < 1) { water = bank; wkind = "pool"; top = bank - 1; kind = "mud"; }
+    else if (pe < 1.45 && water === null) kind = "mud";
+    const t = Math.max(0, Math.min(1, (d - 19) / 6));
+    const g = new THREE.Color(flood).lerp(new THREE.Color(plain), t);
+    col.push({ x, z, top, kind, water, wkind, g, side: t < 0.5 ? "F" : "P" });
+  }
+  const at = (x, z) => (x < 0 || z < 0 || x >= X || z >= Z) ? null : col[x * Z + z];
+  // materials
+  const shade = [0.6, 0.6, 1, 0.5, 0.8, 0.8];
+  const boxMats = map => shade.map((s, i) => new THREE.MeshBasicMaterial({ map: map[i] || map[0], color: new THREE.Color(s, s, s) }));
+  const dirt = tex(canvasOf(IMG.dirt)), sand = tex(canvasOf(IMG.sand)), mud = tex(canvasOf(IMG.mud));
+  const sideOf = h => { const c = canvasOf(IMG.dirt); c.getContext("2d").drawImage(tinted(IMG.grass_block_side_overlay, h), 0, 0); return tex(c); };
+  const sideF = sideOf(flood), sideP = sideOf(plain);
+  const mats = {
+    grassF: boxMats([sideF, sideF, dirt, dirt, sideF, sideF]), grassP: boxMats([sideP, sideP, dirt, dirt, sideP, sideP]),
+    dirt: boxMats([dirt]), sand: boxMats([sand]), mud: boxMats([mud]),
+  };
+  const cells = { grassF: [], grassP: [], dirt: [], sand: [], mud: [] };
+  const tops = { grass: [], sand: [], dirt: [], mud: [] };
+  for (const c of col) {
+    let low = c.top;
+    for (const [dx, dz] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) { const n = at(c.x + dx, c.z + dz); low = Math.min(low, n ? n.top + 1 : -4); }
+    for (let y = Math.max(low, -4); y <= c.top; y++) {
+      let k = y < c.top ? (c.kind === "sand" && y === c.top - 1 ? "sand" : "dirt") : c.kind === "grass" ? "grass" + c.side : c.kind;
+      cells[k].push([c.x, y, c.z]);
+    }
+    tops[c.kind].push(c);
+  }
+  const box = new THREE.BoxGeometry(1, 1, 1), m4 = new THREE.Matrix4();
+  for (const k in cells) {
+    if (!cells[k].length) continue;
+    const mesh = new THREE.InstancedMesh(box, mats[k], cells[k].length);
+    cells[k].forEach(([x, y, z], i) => mesh.setMatrixAt(i, m4.makeTranslation(x + 0.5, y + 0.5, z + 0.5)));
+    scene.add(mesh);
+  }
+  const plane = new THREE.PlaneGeometry(1, 1); plane.rotateX(-Math.PI / 2);
+  const topTex = { grass: tex(canvasOf(IMG.grass_block_top)), sand, dirt, mud };
+  for (const k in tops) {
+    if (!tops[k].length) continue;
+    const mesh = new THREE.InstancedMesh(plane, new THREE.MeshBasicMaterial({ map: topTex[k] }), tops[k].length);
+    tops[k].forEach((c, i) => {
+      mesh.setMatrixAt(i, m4.makeTranslation(c.x + 0.5, c.top + 1.002, c.z + 0.5));
+      mesh.setColorAt(i, k === "grass" ? c.g : new THREE.Color(1, 1, 1));
+    });
+    scene.add(mesh);
+  }
+  for (const [wk, opt] of [["river", river], ["pool", pool]]) {
+    const ws = col.filter(c => c.wkind === wk);
+    if (!ws.length) continue;
+    const wt = tex(tinted(IMG.water_still, opt[1], 16, 16));
+    const mat = new THREE.MeshBasicMaterial({ map: wt, transparent: true, depthWrite: false, side: THREE.DoubleSide });
+    const mesh = new THREE.InstancedMesh(box, mat, ws.length);
+    ws.forEach((c, i) => {
+      const bottom = c.top + 1, h = c.water + 0.875 - bottom;
+      m4.makeScale(1, h, 1).setPosition(c.x + 0.5, bottom + h / 2, c.z + 0.5);
+      mesh.setMatrixAt(i, m4);
+    });
+    scene.add(mesh);
+  }
+  if (state.view === 1) {
+    scene.fog = new THREE.Fog(river[2], 0.3, 14); scene.background = new THREE.Color(river[2]);
+    camera.position.set(6, -1.2, zc(6)); controls.target.set(30, -1.6, zc(30));
+  } else {
+    scene.fog = null; scene.background = new THREE.Color(0x78A7FF);
+  }
+  controls.update();
+}
+
+function buttons() {
+  const panel = document.getElementById("panel");
+  for (const key in OPTIONS) {
+    const row = document.createElement("div"); row.className = "row";
+    row.innerHTML = `<b>${OPTIONS[key].label}</b>`;
+    OPTIONS[key].list.forEach((o, i) => {
+      const b = document.createElement("button");
+      const c = typeof o[1] === "number" && key !== "bank" && key !== "sand" ? o[1] : o[1] === "savanna" ? SAVANNA : o[1] === "plains" ? PLAINS : null;
+      b.innerHTML = (c !== null && c !== undefined ? `<span class="sw" style="background:${hexCss(c)}"></span>` : "") + o[0];
+      b.className = state[key] === i ? "on" : "";
+      b.onclick = () => {
+        state[key] = i; [...row.querySelectorAll("button")].forEach((x, j) => x.className = j === i ? "on" : "");
+        if (key === "view" && i === 0) { camera.position.set(78, 30, -8); controls.target.set(38, 0, 30); }
+        build();
+      };
+      row.appendChild(b);
+    });
+    panel.appendChild(row);
+  }
+}
+
+function resize() {
+  const c = renderer.domElement, w = c.clientWidth, h = c.clientHeight;
+  renderer.setSize(w, h, false); camera.aspect = w / h; camera.updateProjectionMatrix();
+}
+window.addEventListener("resize", resize);
+
+(async () => {
+  for (const k of ["grass_block_top", "grass_block_side_overlay", "dirt", "sand", "mud", "water_still", "grass_colormap"]) IMG[k] = await load(D[k]);
+  const cm = canvasOf(IMG.grass_colormap).getContext("2d");
+  const px = (i, j) => { const p = cm.getImageData(i, j, 1, 1).data; return p[0] << 16 | p[1] << 8 | p[2]; };
+  SAVANNA = px(0, 255); PLAINS = px(51, 173);
+  buttons(); build(); resize();
+  (function loop() { requestAnimationFrame(loop); controls.update(); renderer.render(scene, camera); })();
+})();
+</script>
+</body>
+</html>

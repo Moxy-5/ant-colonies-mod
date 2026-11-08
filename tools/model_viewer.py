@@ -38,6 +38,10 @@ bracket model on each kind of trunk, at the bracket stage and hollow (cut open);
 rot looks to pick from (rot_looks_art.py): bracket growth stages, stacked tiers, spore-dusted and wound bark, a trunk
 telling the whole story:
 python tools/model_viewer.py bracket [out.html]   (default references/bracket_viewer.html)
+Savanna river colours (docs/plans/savanna-rivers.md step 0, 2026-11-07; river_colors_viewer.template.html): a floodplain
+piece with a river, an oxbow and a pan in Minecraft's own textures, buttons for the river water, pool water, floodplain
+grass, bank height and sand edges, and a look under water:
+python tools/model_viewer.py rivers [out.html]   (default references/river_colors_viewer.html)
 """
 import base64
 import json
@@ -386,6 +390,22 @@ def bracket_page(out):
     print("wrote", out)
 
 
+def river_colors_page(out):
+    """Savanna river colours (step 0 of docs/plans/savanna-rivers.md, 2026-11-07): a piece of floodplain with a river,
+    an oxbow and a pan, drawn with Minecraft's own textures (read from the client jar, tinted in the page as the game
+    tints them by biome), to pick the river water, the pool water and the floodplain grass from."""
+    import zipfile
+    jar = Path.home() / ".gradle/caches/neoformruntime/artifacts/minecraft_1.21.1_client.jar"
+    z = zipfile.ZipFile(jar)
+    data = {name: uri(z.read(f"assets/minecraft/textures/block/{name}.png"))
+            for name in ("grass_block_top", "grass_block_side_overlay", "dirt", "sand", "mud", "water_still")}
+    data["grass_colormap"] = uri(z.read("assets/minecraft/textures/colormap/grass.png"))
+    template = (Path(__file__).resolve().parent / "river_colors_viewer.template.html").read_text(encoding="utf-8")
+    out.parent.mkdir(parents=True, exist_ok=True)
+    out.write_text(template.replace("/*DATA*/null", json.dumps(data)), encoding="utf-8")
+    print("wrote", out)
+
+
 def mix_soil(x, y):
     """Plain mound soil for the viewer's floor and walls."""
     rng = random.Random(x * 31 + y * 7)
@@ -397,6 +417,9 @@ def main():
     if len(sys.argv) > 1 and sys.argv[1] == "nestsites":
         import nest_sites_viewer  # the Matabele home choices (docs/plans/matabele-homes.md)
         nest_sites_viewer.page(Path(sys.argv[2]) if len(sys.argv) > 2 else ROOT / "references/nest_sites_viewer.html")
+        return
+    if len(sys.argv) > 1 and sys.argv[1] == "rivers":
+        river_colors_page(Path(sys.argv[2]) if len(sys.argv) > 2 else ROOT / "references/river_colors_viewer.html")
         return
     if len(sys.argv) > 1 and sys.argv[1] == "march":
         march_page(Path(sys.argv[2]) if len(sys.argv) > 2 else ROOT / "references/march_viewer.html")
