@@ -851,6 +851,11 @@ public class MatabeleRaidTests {
         double[] lastLength = {0.0};
         double[] groundY = {Double.NaN}; // (the ground's height at the hump's foot: the front's, 3 blocks past it)
         long[] lastHigh = {-1}; // (the last tick a raider out stood more than a block over that ground: still coming down)
+        // The way out, raider by raider (the user, 2026-11-08: count the crowding on the hump): the tick each came out of the
+        // nest, its height every tick after, and the ticks it stood held for the crowd high on the hump.
+        java.util.Map<java.util.UUID, Long> outAt = new java.util.HashMap<>();
+        java.util.Map<java.util.UUID, List<double[]>> heights = new java.util.HashMap<>();
+        java.util.Map<java.util.UUID, Integer> heldHigh = new java.util.HashMap<>();
         helper.onEachTick(() -> {
             RaidColumn raid = column[0];
             if (raid == null || raid.stage() != RaidColumn.Stage.MARCHING) {
@@ -973,6 +978,23 @@ public class MatabeleRaidTests {
         });
         helper.onEachTick(() -> {
             RaidColumn raid = column[0];
+            if (raid == null || marchFrom[0] < 0 || lastHigh[0] >= 0 && helper.getTick() - lastHigh[0] > 40) {
+                return;
+            }
+            long now = helper.getTick();
+            for (java.util.UUID id : raid.members()) {
+                if (id.equals(raid.leader()) || !(level.getEntity(id) instanceof MatabeleEntity ant) || !raid.isOutForTests(level, ant)) {
+                    continue;
+                }
+                outAt.putIfAbsent(id, now);
+                heights.computeIfAbsent(id, k -> new ArrayList<>()).add(new double[] {now, ant.getY()});
+                if (ant.getNavigator().heldForCrowd() && (Double.isNaN(groundY[0]) || ant.getY() > groundY[0] + 1.0)) {
+                    heldHigh.merge(id, 1, Integer::sum);
+                }
+            }
+        });
+        helper.onEachTick(() -> {
+            RaidColumn raid = column[0];
             if (raid == null || helper.getTick() > crowdUntil[0]) {
                 return;
             }
@@ -1090,6 +1112,28 @@ public class MatabeleRaidTests {
                             String.format("%.2f", frontSpeed), String.format("%.1f", lastFrontAlong[0] - speedFromAlong[0]),
                             String.format("%.1f", lastLength[0]), setOut.size(), String.format("%.1f", raid.humpEndForTests(level)),
                             String.format("%.1f", (lastHigh[0] - marchFrom[0]) / 20.0));
+                    // The way out, timed raider by raider: out of the nest, then down the hump to the ground.
+                    List<double[]> ways = new ArrayList<>(); // out (s into the march), down (s), held high (s)
+                    for (var e : outAt.entrySet()) {
+                        double down = Double.NaN;
+                        for (double[] h : heights.get(e.getKey())) {
+                            if (h[1] <= groundY[0] + 1.0) {
+                                down = h[0];
+                                break;
+                            }
+                        }
+                        if (!Double.isNaN(down)) {
+                            ways.add(new double[] {(e.getValue() - marchFrom[0]) / 20.0, (down - marchFrom[0]) / 20.0,
+                                    heldHigh.getOrDefault(e.getKey(), 0) / 20.0});
+                        }
+                    }
+                    ways.sort(java.util.Comparator.comparingDouble(w -> w[0]));
+                    StringBuilder each = new StringBuilder();
+                    for (double[] w : ways) {
+                        each.append(String.format(" %.1f>%.1f(%.1f)", w[0], w[1], w[2]));
+                    }
+                    SavannaMod.LOGGER.info("[ribbon test] the way out, raider by raider (out of the nest > down on the ground (held for the crowd up on the hump), s into the march), ground y {}, entrance y {}:{}",
+                            String.format("%.1f", groundY[0]), colony.getCenter().getY(), each);
                     helper.assertTrue(standCount[0] == 0, "raiders out were told to stand while the column marched: " + standFaults);
                     helper.assertTrue(frontLongestStill[0] <= 30, "the front stood still " + frontLongestStill[0] + " ticks while marching");
                     helper.assertTrue(ahead >= 0.9, "the front was ahead of every raider only " + Math.round(ahead * 100)
