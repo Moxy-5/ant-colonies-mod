@@ -89,5 +89,8 @@
   "death.attack.antcolonies.thorns.player": "%1$s was pricked to death by acacia thorns while fleeing %2$s",
   "entity.antcolonies.matabele_larva": "Matabele Ant Larva",
   "entity.antcolonies.matabele_corpse": "Dead Matabele Ant",
-  "subtitles.antcolonies.matabele_squeak": "Matabele ant squeaks"
+  "subtitles.antcolonies.matabele_squeak": "Matabele ant squeaks",
+  "block.antcolonies.silt": "Silt",
+  "block.antcolonies.wet_silt": "Wet Silt",
+  "block.antcolonies.river_mud": "River Mud"
 }

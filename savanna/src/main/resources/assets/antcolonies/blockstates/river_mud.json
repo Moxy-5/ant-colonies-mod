@@ -1,0 +1,21 @@
+{
+  "variants": {
+    "": [
+      {
+        "model": "antcolonies:block/river_mud"
+      },
+      {
+        "model": "antcolonies:block/river_mud",
+        "y": 90
+      },
+      {
+        "model": "antcolonies:block/river_mud",
+        "y": 180
+      },
+      {
+        "model": "antcolonies:block/river_mud",
+        "y": 270
+      }
+    ]
+  }
+}

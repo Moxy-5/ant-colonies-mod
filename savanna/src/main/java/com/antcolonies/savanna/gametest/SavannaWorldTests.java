@@ -4,11 +4,15 @@ import java.util.ArrayList;
 import java.util.List;
 
 import com.antcolonies.savanna.SavannaMod;
+import com.antcolonies.savanna.registry.SavannaBlocks;
+import com.antcolonies.savanna.worldgen.FloodplainPoolFeature;
+import com.antcolonies.savanna.worldgen.RiverBankFeature;
 import com.antcolonies.savanna.worldgen.SavannaRegion;
 import com.antcolonies.savanna.worldgen.SavannaSpawn;
 import com.mojang.datafixers.util.Pair;
 
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.QuartPos;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.gametest.framework.GameTest;
 import net.minecraft.gametest.framework.GameTestAssertException;
@@ -18,6 +22,9 @@ import net.minecraft.util.RandomSource;
 import net.minecraft.world.level.biome.Climate;
 import net.minecraft.world.level.biome.MultiNoiseBiomeSource;
 import net.minecraft.world.level.biome.MultiNoiseBiomeSourceParameterLists;
+import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.level.block.state.BlockState;
 import net.neoforged.fml.loading.FMLPaths;
 import net.neoforged.neoforge.gametest.GameTestHolder;
 import net.neoforged.neoforge.gametest.PrefixGameTestTemplate;
@@ -207,6 +214,217 @@ public class SavannaWorldTests {
         // the user, 2026-11-07: "random dips in the ground and ravines and caves, I want to get rid of all of that"
         helper.assertTrue(hollow <= HOLLOW_MOST * climbs.size(), "caves or pits under the savanna's ground: " + all);
         helper.succeed();
+    }
+
+    /**
+     * Savanna rivers (the user, 2026-11-07, {@code docs/plans/savanna-rivers.md}: "a river right up to the savannah ... like
+     * the nile river ... no drop off at all"): read from the noise on {@link #GROUND_SEEDS}, river spots with savanna round
+     * them, and from each the ground walked out from the water's edge in the four directions that end in savanna: the
+     * height above the water at each distance, how many banks drop more than {@link #BANK_DROP} blocks within 4 of the
+     * water, ponds met on the floodplain, and the river's depth. The real thing: big savanna rivers run through a wide flat
+     * floodplain a block or two above the dry-season water (the Nile, the Okavango, the Luangwa). The step down to the
+     * low strip by the water ({@code docs/plans/savanna-rivers.md}, 4 blocks back) is cut later in real chunks
+     * ({@code worldgen/RiverBankFeature}), not in the noise, so here the floodplain should lie 1 block above the water.
+     */
+    @GameTest(template = "arena", timeoutTicks = 400, batch = "savanna_maps")
+    public static void savannaRiversRunThroughFlatLand(GameTestHelper helper) {
+        var registries = helper.getLevel().registryAccess();
+        int[] offsets = RIVER_OFFSETS;
+        List<List<Integer>> above = new ArrayList<>();
+        for (int o : offsets) {
+            above.add(new ArrayList<>());
+        }
+        List<Integer> depths = new ArrayList<>();
+        int banks = 0, drops = 0, ponds = 0;
+        StringBuilder report = new StringBuilder();
+        for (long seed : GROUND_SEEDS) {
+            Climate.Sampler sampler = BiomeMaps.sampler(registries, seed);
+            MultiNoiseBiomeSource source = BiomeMaps.bigSavannaSource(registries, seed);
+            BiomeMaps.Ground ground = BiomeMaps.ground(registries, source, seed, helper.getLevel());
+            byte[] map = BiomeMaps.map(source, sampler);
+            List<Integer> cells = new ArrayList<>();
+            for (int c = 0; c < map.length; c++) {
+                int i = c / BiomeMaps.SIDE, j = c % BiomeMaps.SIDE;
+                if (map[c] == BiomeMaps.RIVER && i > 0 && j > 0 && i < BiomeMaps.SIDE - 1 && j < BiomeMaps.SIDE - 1
+                        && (map[c - 1] == BiomeMaps.SAVANNA || map[c + 1] == BiomeMaps.SAVANNA
+                        || map[c - BiomeMaps.SIDE] == BiomeMaps.SAVANNA || map[c + BiomeMaps.SIDE] == BiomeMaps.SAVANNA)) {
+                    cells.add(c);
+                }
+            }
+            java.util.Collections.shuffle(cells, new java.util.Random(seed));
+            int seedBanks = 0;
+            for (int c : cells) {
+                if (seedBanks >= RIVER_BANKS) {
+                    break;
+                }
+                int x = -BiomeMaps.HALF + (c / BiomeMaps.SIDE) * BiomeMaps.STEP;
+                int z = -BiomeMaps.HALF + (c % BiomeMaps.SIDE) * BiomeMaps.STEP;
+                if (ground.height(x, z) > SEA_TOP) {
+                    continue; // the river's own biome is a little wider than its water
+                }
+                for (int[] d : new int[][] {{1, 0}, {-1, 0}, {0, 1}, {0, -1}}) {
+                    int edge = -1, deepest = SEA_TOP;
+                    for (int k = 0; k <= 48; k++) {
+                        int h = ground.height(x + d[0] * k, z + d[1] * k);
+                        if (h > SEA_TOP) {
+                            edge = k;
+                            break;
+                        }
+                        deepest = Math.min(deepest, h);
+                    }
+                    int far = edge + offsets[offsets.length - 1];
+                    if (edge < 0 || !source.getNoiseBiome(QuartPos.fromBlock(x + d[0] * far), QuartPos.fromBlock(SavannaSpawn.SAMPLE_Y),
+                            QuartPos.fromBlock(z + d[1] * far), sampler).is(BiomeTags.IS_SAVANNA)) {
+                        continue;
+                    }
+                    seedBanks++;
+                    depths.add(SEA_TOP + 1 - deepest);
+                    boolean drop = false, pond = false;
+                    for (int n = 0; n < offsets.length; n++) {
+                        int k = edge + offsets[n];
+                        int a = ground.height(x + d[0] * k, z + d[1] * k) - (SEA_TOP + 1);
+                        above.get(n).add(a);
+                        drop |= offsets[n] <= 4 && a > BANK_DROP;
+                        pond |= offsets[n] >= 2 && a < 0;
+                    }
+                    drops += drop ? 1 : 0;
+                    ponds += pond ? 1 : 0;
+                }
+            }
+            banks += seedBanks;
+            report.append(String.format("%n  seed %d: %d banks", seed, seedBanks));
+        }
+        StringBuilder profile = new StringBuilder();
+        for (int n = 0; n < offsets.length; n++) {
+            profile.append(String.format(" %d:%d(%d)", offsets[n], middle(above.get(n), 0.5), middle(above.get(n), 0.9)));
+        }
+        String all = String.format("%d banks; height above the water by distance from its edge, median (90%% at most):%s; "
+                + "%.0f%% drop more than %d within 4 of the water; %.0f%% meet a pond on the floodplain; river depth median %d, 10%% at most %d%s",
+                banks, profile, banks == 0 ? 0 : 100.0 * drops / banks, BANK_DROP, banks == 0 ? 0 : 100.0 * ponds / banks,
+                middle(depths, 0.5), middle(depths, 0.1), report);
+        SavannaMod.LOGGER.info("[biome maps] savanna rivers: {}", all);
+        helper.assertTrue(banks >= 30, "too few savanna river banks found to measure: " + all);
+        helper.assertTrue(drops <= RIVER_DROPS_MOST * banks, "savanna rivers still sit in sloped valleys: " + all);
+        helper.assertTrue(ponds <= RIVER_PONDS_MOST * banks, "ponds on the savanna's floodplain: " + all);
+        helper.assertTrue(middle(depths, 0.5) >= RIVER_DEPTH_LEAST, "savanna rivers too shallow: " + all);
+        for (int n = 0; n < offsets.length; n++) {
+            if (offsets[n] >= 2 && offsets[n] <= FLOODPLAIN_OUT) {
+                helper.assertTrue(middle(above.get(n), 0.5) <= 1 && middle(above.get(n), 0.9) <= 2,
+                        "the floodplain is not a block above the water " + offsets[n] + " blocks out: " + all);
+            }
+        }
+        helper.succeed();
+    }
+
+    /** Distances out from the water's edge the ground is measured at, banks measured a seed, and the limits. */
+    static final int[] RIVER_OFFSETS = {0, 1, 2, 3, 4, 6, 8, 12, 16, 24, 32};
+    /** How far out the floodplain must lie a block above the water (median 1, nine in ten at most 2). */
+    static final int RIVER_BANKS = 80, BANK_DROP = 2, RIVER_DEPTH_LEAST = 3, FLOODPLAIN_OUT = 12;
+    /**
+     * Before the floodplain (2026-11-07) the land rose 3 to 7 blocks within 16 of the water and banks dropped; after it
+     * none dropped and 4 to 6 percent met a pond (a low dip of the lumps), so the limits leave room for chance.
+     */
+    static final double RIVER_DROPS_MOST = 0.03, RIVER_PONDS_MOST = 0.12;
+
+    /**
+     * The banks and pools as the game's own decoration makes them ({@code worldgen/RiverBankFeature},
+     * {@code worldgen/FloodplainPoolFeature}), on a river built in the arena: a plain a block over the water, the river
+     * winding through it. The land test above reads only the noise; this checks the user's picks: the low strip flush with
+     * the water 4 blocks back, the plain behind it untouched, silt and mud far more on the inside of the bends than the
+     * outside, the bed silt, a pan and an oxbow up on the plain holding their water, and no pool beside the river.
+     */
+    @GameTest(template = "arena", timeoutTicks = 100, batch = "savanna_rivers")
+    public static void riverBanksGetTheirStripSiltAndMud(GameTestHelper helper) {
+        var level = helper.getLevel();
+        int plain = 6, water = plain - 1;
+        java.util.function.IntUnaryOperator mid = x -> (int) Math.round(50 + 5 * Math.sin(x / 7.0));
+        for (int x = 1; x < 64; x++) {
+            for (int z = 1; z < 64; z++) {
+                boolean river = Math.abs(z - mid.applyAsInt(x)) <= 3; // 7 wide, 3 deep
+                for (int y = 1; y <= plain; y++) {
+                    Block b = river && y >= water - 2 ? (y <= water ? Blocks.WATER : Blocks.AIR) : y == plain ? Blocks.GRASS_BLOCK : Blocks.DIRT;
+                    helper.setBlock(x, y, z, b);
+                }
+            }
+        }
+        BlockPos a = helper.absolutePos(new BlockPos(1, water, 1));
+        int changed = RiverBankFeature.shape(level, a.getX(), a.getZ(), 63, 63, a.getY(), p -> true);
+        int flush = 0, near = 0, farTouched = 0, inner = 0, outer = 0, mud = 0, bedSilt = 0, bed = 0;
+        for (int x = 14; x < 50; x++) { // away from the arena's ends, where the river stops
+            int m = mid.applyAsInt(x);
+            // the inside of the bend is the side the river curves round (z'' = -5/49 sin(x/7))
+            double curve = -Math.sin(x / 7.0);
+            for (int z = 30; z < 64; z++) {
+                int out = Math.abs(z - m) - 3;
+                if (out <= 0) {
+                    bed++;
+                    bedSilt += helper.getBlockState(new BlockPos(x, water - 3, z)).is(SavannaBlocks.SILT.get()) ? 1 : 0;
+                    continue;
+                }
+                boolean open = helper.getBlockState(new BlockPos(x, plain, z)).isAir();
+                BlockState top = helper.getBlockState(new BlockPos(x, water, z));
+                if (out <= 3) {
+                    near++;
+                    flush += open ? 1 : 0;
+                    if (!top.is(Blocks.GRASS_BLOCK) && top.getFluidState().isEmpty() && Math.abs(curve) > 0.5) {
+                        if (Math.signum(z - m) == Math.signum(curve)) {
+                            inner++;
+                        } else {
+                            outer++;
+                        }
+                    }
+                    mud += top.is(SavannaBlocks.RIVER_MUD.get()) ? 1 : 0;
+                } else if (out >= 7 && (open || !helper.getBlockState(new BlockPos(x, plain, z)).is(Blocks.GRASS_BLOCK))) {
+                    farTouched++;
+                }
+            }
+        }
+        String report = String.format("%d columns changed; %d of %d within 3 of the water flush, %d far columns changed, silt or mud"
+                + " on %d inside bends and %d outside, %d mud, %d of %d bed columns silt", changed, flush, near, farTouched, inner, outer,
+                mud, bedSilt, bed);
+        SavannaMod.LOGGER.info("[river banks] {}", report);
+        helper.assertTrue(flush >= near * 0.95, "the low strip is not flush with the water: " + report);
+        helper.assertTrue(farTouched == 0, "the plain behind the strip was changed: " + report);
+        helper.assertTrue(inner >= 2 * outer + 10, "the silt bars are not on the inside of the bends: " + report);
+        helper.assertTrue(mud >= 5, "no trampled mud by the water: " + report);
+        helper.assertTrue(bedSilt >= bed * 0.9, "the river bed is not silt: " + report);
+        // the pools: a pan and an oxbow up on the plain, well away from the river; none within 8 blocks of it
+        RandomSource random = RandomSource.create(7);
+        boolean pan = false, oxbow = false;
+        for (int t = 0; t < 8 && !pan; t++) {
+            pan = FloodplainPoolFeature.place(level, helper.absolutePos(new BlockPos(14, plain, 14)), random, false, a.getY());
+        }
+        for (int t = 0; t < 8 && !oxbow; t++) {
+            oxbow = FloodplainPoolFeature.place(level, helper.absolutePos(new BlockPos(46, plain, 16)), random, true, a.getY());
+        }
+        boolean beside = FloodplainPoolFeature.place(level, helper.absolutePos(new BlockPos(30, plain, 34)), random, false, a.getY());
+        helper.assertTrue(pan && oxbow, "a pan (" + pan + ") or an oxbow (" + oxbow + ") did not fit on the open plain");
+        helper.assertFalse(beside, "a pool was put beside the river");
+        int poolWater = poolWater(helper, plain);
+        helper.assertTrue(poolWater >= 15, "the pools hold only " + poolWater + " blocks of water");
+        helper.runAfterDelay(60, () -> {
+            int spilled = 0;
+            for (int x = 1; x < 64; x++) {
+                for (int z = 1; z < 36; z++) {
+                    var f = helper.getBlockState(new BlockPos(x, plain, z)).getFluidState();
+                    spilled += (!f.isEmpty() && !f.isSource()) || !helper.getBlockState(new BlockPos(x, plain + 1, z)).getFluidState().isEmpty() ? 1 : 0;
+                }
+            }
+            int still = poolWater(helper, plain);
+            helper.assertTrue(spilled == 0 && still == poolWater, "the pools spilled: " + spilled + " flowing, " + still + " of " + poolWater + " still");
+            helper.succeed();
+        });
+    }
+
+    /** Still water blocks at the plain's top in the arena's northern part, where the test puts its pools. */
+    private static int poolWater(GameTestHelper helper, int plain) {
+        int n = 0;
+        for (int x = 1; x < 64; x++) {
+            for (int z = 1; z < 36; z++) {
+                n += helper.getBlockState(new BlockPos(x, plain, z)).getFluidState().isSource() ? 1 : 0;
+            }
+        }
+        return n;
     }
 
     static final long[] GROUND_SEEDS = {SEEDS[0], SEEDS[1], SEEDS[2]};

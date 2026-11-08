@@ -1,0 +1,20 @@
+{
+  "_note": "Savanna rivers (2026-11-07, my pick): an oxbow tried in about 1 floodplain chunk in 20; most tries fail (not level, too near the river), so they are rare.",
+  "feature": "antcolonies:oxbow",
+  "placement": [
+    {
+      "type": "minecraft:rarity_filter",
+      "chance": 20
+    },
+    {
+      "type": "minecraft:in_square"
+    },
+    {
+      "type": "minecraft:heightmap",
+      "heightmap": "OCEAN_FLOOR_WG"
+    },
+    {
+      "type": "minecraft:biome"
+    }
+  ]
+}

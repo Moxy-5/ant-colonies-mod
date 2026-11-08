@@ -57,10 +57,12 @@ public final class MoundPlaces {
      * apart. {@code groundChance}: a place's chance of a mound on flat, dry ground. {@code slopeCut}: the chance lost on
      * the steepest ground a mound takes ({@code maxUneven}, the most the ground may rise and fall 8 blocks round the middle). {@code waterCut}: the chance lost
      * with water within {@code waterLook} blocks. {@code emptyLean}: next to each empty place within {@code leanReach},
-     * a mound's size quantile's rest is times this (leaning bigger).
+     * a mound's size quantile's rest is times this (leaning bigger). {@code lowGround}: no mound where the ground stands
+     * this many blocks or less over the water (savanna rivers, 2026-11-07, my pick from the real termites: Macrotermes
+     * need ground that drains, and the floodplain's lowest ground floods; those near rivers stand on raised ground).
      */
     public record Numbers(double territoryMin, double territoryMax, double groundChance, double slopeCut, double waterCut,
-            int waterLook, double emptyLean, int leanReach, int maxUneven) {
+            int waterLook, double emptyLean, int leanReach, int maxUneven, int lowGround) {
         public static final Codec<Numbers> CODEC = RecordCodecBuilder.create(i -> i.group(
                 Codec.DOUBLE.optionalFieldOf("territory_min", 21.0).forGetter(Numbers::territoryMin),
                 Codec.DOUBLE.optionalFieldOf("territory_max", 41.0).forGetter(Numbers::territoryMax),
@@ -70,14 +72,15 @@ public final class MoundPlaces {
                 Codec.INT.optionalFieldOf("water_look", 14).forGetter(Numbers::waterLook),
                 Codec.DOUBLE.optionalFieldOf("empty_lean", 0.75).forGetter(Numbers::emptyLean),
                 Codec.INT.optionalFieldOf("lean_reach", 90).forGetter(Numbers::leanReach),
-                Codec.INT.optionalFieldOf("max_uneven", 6).forGetter(Numbers::maxUneven)
+                Codec.INT.optionalFieldOf("max_uneven", 6).forGetter(Numbers::maxUneven),
+                Codec.INT.optionalFieldOf("low_ground", 2).forGetter(Numbers::lowGround)
         ).apply(i, Numbers::new));
 
-        public static final Numbers DEFAULT = new Numbers(21, 41, 0.8, 0.5, 0.6, 14, 0.75, 90, 6);
+        public static final Numbers DEFAULT = new Numbers(21, 41, 0.8, 0.5, 0.6, 14, 0.75, 90, 6, 2);
 
         /** These numbers with another {@link #maxUneven} (the survey game test's before and after, BUGS 104). */
         public Numbers withUneven(int uneven) {
-            return new Numbers(territoryMin, territoryMax, groundChance, slopeCut, waterCut, waterLook, emptyLean, leanReach, uneven);
+            return new Numbers(territoryMin, territoryMax, groundChance, slopeCut, waterCut, waterLook, emptyLean, leanReach, uneven, lowGround);
         }
     }
 
@@ -212,7 +215,7 @@ public final class MoundPlaces {
     }
 
     /**
-     * The foot of the mound at {@code place}, or null if it holds none: never in water, on a steep slope or outside the
+     * The foot of the mound at {@code place}, or null if it holds none: never in water, on the floodplain's low ground, on a steep slope or outside the
      * land's biomes; otherwise by the ground's chance (flat, dry ground likely; a slope or water near less so).
      */
     public static BlockPos holds(Land land, Place place, Numbers numbers) {
@@ -232,6 +235,10 @@ public final class MoundPlaces {
         }
         int uneven = highest - lowest;
         BlockPos foot = new BlockPos(x, land.height(x, z, Heightmap.Types.WORLD_SURFACE_WG), z);
+        // the floodplain's lowest ground (the foot is the first air, so foot - sea level is the ground over the water)
+        if (foot.getY() - land.generator().getSeaLevel() <= numbers.lowGround()) {
+            return null;
+        }
         if (land.biomes() != null) {
             Holder<Biome> biome = land.generator().getBiomeSource().getNoiseBiome(QuartPos.fromBlock(x), QuartPos.fromBlock(foot.getY()),
                     QuartPos.fromBlock(z), land.random().sampler());

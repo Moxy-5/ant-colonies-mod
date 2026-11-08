@@ -27,7 +27,7 @@
     "aardvark_burrows": 0.4,
     "hump_grass": true,
     "places": {
-      "_note": "M8 step 3F, F1 (worldgen/MoundPlaces; the user's decisions 2026-11-04, the numbers my picks, to confirm): every chunk offers a candidate place with its own territory, territory_min to territory_max blocks (its size: big territories hold big mounds); two places stand at least their two territories apart, so mounds land about 42 to 82 blocks apart, mostly round 60. A place holds a mound by the ground's chance: ground_chance on flat dry ground, slope_cut of it lost on the steepest ground a mound takes (max_uneven blocks up and down 8 blocks round the middle; 6 since BUGS 104, was 4), water_cut lost with water within water_look blocks; never in water, on a steep slope or outside a savanna. In Minecraft's rolling savanna that is about 1 place in 3 (BUGS 104; the 2 in 3 first planned was a flat-ground guess), so mounds stand about 60 to 100 apart. Next to each empty place within lean_reach a mound leans bigger (its size quantile's rest times empty_lean). A dead mound lives instead when another dead mound stands within dead_apart (the higher-ranked stays dead) or no living mound stands within matabele.living_near (BUGS 104, 162; the user 2026-11-07), so dead_share is the dice (0.75), about a third of the mounds ending dead, spread out.",
+      "_note": "M8 step 3F, F1 (worldgen/MoundPlaces; the user's decisions 2026-11-04, the numbers my picks, to confirm): every chunk offers a candidate place with its own territory, territory_min to territory_max blocks (its size: big territories hold big mounds); two places stand at least their two territories apart, so mounds land about 42 to 82 blocks apart, mostly round 60. A place holds a mound by the ground's chance: ground_chance on flat dry ground, slope_cut of it lost on the steepest ground a mound takes (max_uneven blocks up and down 8 blocks round the middle; 6 since BUGS 104, was 4), water_cut lost with water within water_look blocks; never in water, on a steep slope or outside a savanna. In Minecraft's rolling savanna that is about 1 place in 3 (BUGS 104; the 2 in 3 first planned was a flat-ground guess), so mounds stand about 60 to 100 apart. Next to each empty place within lean_reach a mound leans bigger (its size quantile's rest times empty_lean). A dead mound lives instead when another dead mound stands within dead_apart (the higher-ranked stays dead) or no living mound stands within matabele.living_near (BUGS 104, 162; the user 2026-11-07), so dead_share is the dice (0.75), about a third of the mounds ending dead, spread out. low_ground (savanna rivers, 2026-11-07, my pick): no mound where the ground stands that many blocks or less over the water, the floodplain's lowest ground (real: Macrotermes need ground that drains; floodplain mounds stand on raised ground).",
       "max_uneven": 6,
       "territory_min": 21,
       "territory_max": 41,
@@ -35,6 +35,7 @@
       "slope_cut": 0.5,
       "water_cut": 0.6,
       "water_look": 14,
+      "low_ground": 2,
       "empty_lean": 0.75,
       "lean_reach": 90
     },

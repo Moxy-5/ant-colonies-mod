@@ -8,9 +8,11 @@ import com.antcolonies.savanna.SavannaMod;
 import com.mojang.datafixers.util.Pair;
 
 import net.minecraft.core.Registry;
+import net.minecraft.core.registries.Registries;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.level.biome.Biome;
+import net.minecraft.world.level.biome.Biomes;
 import net.minecraft.world.level.biome.Climate;
 import net.minecraft.world.level.biome.OverworldBiomeBuilder;
 
@@ -63,6 +65,19 @@ public final class SavannaRegion extends Region {
      */
     public static final Shape SHAPE = new Shape(0.05F, 0.6F, 0.3F);
 
+    /**
+     * The savanna rivers (2026-11-07, {@code docs/plans/savanna-rivers.md}): in the savanna's climate Minecraft's river
+     * becomes our murky {@code antcolonies:savanna_river}, and the savanna's band along it our green
+     * {@code antcolonies:savanna_floodplain}. The floodplain follows the same "peaks and valleys" band the land is
+     * flattened by ({@code tools/flat_savannas/flat_offset.py}, flat from -0.80 to -0.55): weirdness within 0.15 of 0
+     * (the river biome itself is within 0.05).
+     */
+    public static final ResourceKey<Biome> SAVANNA_RIVER = ResourceKey.create(Registries.BIOME,
+            ResourceLocation.fromNamespaceAndPath(SavannaMod.MODID, "savanna_river"));
+    public static final ResourceKey<Biome> SAVANNA_FLOODPLAIN = ResourceKey.create(Registries.BIOME,
+            ResourceLocation.fromNamespaceAndPath(SavannaMod.MODID, "savanna_floodplain"));
+    public static final float FLOODPLAIN_WEIRDNESS = 0.15F;
+
     /** Minecraft's own band edges (OverworldBiomeBuilder's temperatures and humidities). */
     private static final float[] TEMPERATURE_EDGES = {-1F, -0.45F, -0.15F, 0.2F, 0.55F, 1F};
     private static final float[] HUMIDITY_EDGES = {-1F, -0.35F, -0.1F, 0.1F, 0.3F, 1F};
@@ -114,11 +129,48 @@ public final class SavannaRegion extends Region {
                 Climate.Parameter humidity = piece == 1
                         ? new Climate.Parameter(stretch(p.humidity().min(), HUMIDITY_EDGES, newHumidity), stretch(p.humidity().max(), HUMIDITY_EDGES, newHumidity))
                         : p.humidity();
-                out.add(Pair.of(new Climate.ParameterPoint(temperature, humidity, p.continentalness(), p.erosion(), p.depth(), p.weirdness(),
-                        p.offset()), pair.getSecond()));
+                if (piece == 1) {
+                    addRiversAndFloodplains(out, temperature, humidity, p, pair.getSecond(), shape.dryTo());
+                } else {
+                    out.add(Pair.of(new Climate.ParameterPoint(temperature, humidity, p.continentalness(), p.erosion(), p.depth(), p.weirdness(),
+                            p.offset()), pair.getSecond()));
+                }
             }
         }
         return out;
+    }
+
+    /**
+     * One point of the warm band: a river in the savanna's dry part becomes the savanna river, and a savanna's slice within
+     * {@link #FLOODPLAIN_WEIRDNESS} of the valley the floodplain; everything else as it was.
+     */
+    private static void addRiversAndFloodplains(List<Pair<Climate.ParameterPoint, ResourceKey<Biome>>> out, Climate.Parameter temperature,
+            Climate.Parameter humidity, Climate.ParameterPoint p, ResourceKey<Biome> biome, float dryTo) {
+        long dry = Climate.quantizeCoord(dryTo);
+        if (biome == Biomes.RIVER && humidity.min() < dry) {
+            out.add(point(temperature, new Climate.Parameter(humidity.min(), Math.min(dry, humidity.max())), p, p.weirdness(), SAVANNA_RIVER));
+            if (humidity.max() > dry) {
+                out.add(point(temperature, new Climate.Parameter(dry, humidity.max()), p, p.weirdness(), Biomes.RIVER));
+            }
+            return;
+        }
+        if (biome == Biomes.SAVANNA) {
+            long edge = Climate.quantizeCoord(FLOODPLAIN_WEIRDNESS);
+            long a = p.weirdness().min(), b = p.weirdness().max();
+            long[] cuts = {a, Math.max(a, Math.min(b, -edge)), Math.max(a, Math.min(b, edge)), b};
+            for (int k = 0; k < 3; k++) {
+                if (cuts[k + 1] > cuts[k] || (a == b && k == (a < -edge ? 0 : a < edge ? 1 : 2))) {
+                    out.add(point(temperature, humidity, p, new Climate.Parameter(cuts[k], cuts[k + 1]), k == 1 ? SAVANNA_FLOODPLAIN : Biomes.SAVANNA));
+                }
+            }
+            return;
+        }
+        out.add(point(temperature, humidity, p, p.weirdness(), biome));
+    }
+
+    private static Pair<Climate.ParameterPoint, ResourceKey<Biome>> point(Climate.Parameter temperature, Climate.Parameter humidity,
+            Climate.ParameterPoint p, Climate.Parameter weirdness, ResourceKey<Biome> biome) {
+        return Pair.of(new Climate.ParameterPoint(temperature, humidity, p.continentalness(), p.erosion(), p.depth(), weirdness, p.offset()), biome);
     }
 
     private static int pieceOf(long value, long warmLow, long warmHigh) {

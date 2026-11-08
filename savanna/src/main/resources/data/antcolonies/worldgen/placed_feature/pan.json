@@ -1,0 +1,20 @@
+{
+  "_note": "Savanna rivers (2026-11-07, my pick): a pan tried in about 1 floodplain chunk in 6.",
+  "feature": "antcolonies:pan",
+  "placement": [
+    {
+      "type": "minecraft:rarity_filter",
+      "chance": 6
+    },
+    {
+      "type": "minecraft:in_square"
+    },
+    {
+      "type": "minecraft:heightmap",
+      "heightmap": "OCEAN_FLOOR_WG"
+    },
+    {
+      "type": "minecraft:biome"
+    }
+  ]
+}

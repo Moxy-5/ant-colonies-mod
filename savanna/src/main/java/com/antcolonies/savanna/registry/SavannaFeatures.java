@@ -10,7 +10,7 @@ import net.minecraft.world.level.levelgen.feature.configurations.NoneFeatureConf
 import net.neoforged.neoforge.registries.DeferredHolder;
 import net.neoforged.neoforge.registries.DeferredRegister;
 
-/** The savanna's land: fallen branches and trees, and rain (the split, step S4). */
+/** The savanna's land: fallen branches and trees, rain, and the rivers' banks and pools (the split, step S4; rivers 2026-11-07). */
 public class SavannaFeatures {
     public static final DeferredRegister<Feature<?>> FEATURES = DeferredRegister.create(Registries.FEATURE, SavannaMod.MODID);
 
@@ -22,6 +22,16 @@ public class SavannaFeatures {
     public static final DeferredHolder<Feature<?>, FallenTreeFeature> FALLEN_TREE =
             FEATURES.register("fallen_tree", () -> new FallenTreeFeature(NoneFeatureConfiguration.CODEC));
 
+    /** The savanna rivers' low strip, silt bars and mud (data/antcolonies/neoforge/biome_modifier/river_banks.json). */
+    public static final DeferredHolder<Feature<?>, com.antcolonies.savanna.worldgen.RiverBankFeature> RIVER_BANK =
+            FEATURES.register("river_bank", () -> new com.antcolonies.savanna.worldgen.RiverBankFeature(NoneFeatureConfiguration.CODEC));
+
+    /** Oxbow lakes and pans on the floodplain (data/antcolonies/neoforge/biome_modifier/floodplain_pools.json). */
+    public static final DeferredHolder<Feature<?>, com.antcolonies.savanna.worldgen.FloodplainPoolFeature> OXBOW =
+            FEATURES.register("oxbow", () -> new com.antcolonies.savanna.worldgen.FloodplainPoolFeature(NoneFeatureConfiguration.CODEC, true));
+    public static final DeferredHolder<Feature<?>, com.antcolonies.savanna.worldgen.FloodplainPoolFeature> PAN =
+            FEATURES.register("pan", () -> new com.antcolonies.savanna.worldgen.FloodplainPoolFeature(NoneFeatureConfiguration.CODEC, false));
+
     /** Our own kinds of biome modifier. */
     public static final DeferredRegister<com.mojang.serialization.MapCodec<? extends net.neoforged.neoforge.common.world.BiomeModifier>> BIOME_MODIFIERS =
             DeferredRegister.create(net.neoforged.neoforge.registries.NeoForgeRegistries.Keys.BIOME_MODIFIER_SERIALIZERS, SavannaMod.MODID);
@@ -30,4 +40,9 @@ public class SavannaFeatures {
     public static final DeferredHolder<com.mojang.serialization.MapCodec<? extends net.neoforged.neoforge.common.world.BiomeModifier>,
             com.mojang.serialization.MapCodec<com.antcolonies.savanna.worldgen.RainModifier>> RAIN =
             BIOME_MODIFIERS.register("rain", () -> com.antcolonies.savanna.worldgen.RainModifier.CODEC);
+
+    /** The savannas' murky green pool water (data/antcolonies/neoforge/biome_modifier/savanna_pool_water.json). */
+    public static final DeferredHolder<com.mojang.serialization.MapCodec<? extends net.neoforged.neoforge.common.world.BiomeModifier>,
+            com.mojang.serialization.MapCodec<com.antcolonies.savanna.worldgen.WaterColourModifier>> WATER_COLOUR =
+            BIOME_MODIFIERS.register("water_colour", () -> com.antcolonies.savanna.worldgen.WaterColourModifier.CODEC);
 }

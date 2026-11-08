@@ -157,6 +157,9 @@ public class SavannaEvents {
             event.accept(SavannaItems.FALLEN_BRANCH);
             event.accept(SavannaItems.DEAD_WOOD);
             event.accept(SavannaItems.MUD_CRUST);
+            event.accept(SavannaItems.SILT);
+            event.accept(SavannaItems.WET_SILT);
+            event.accept(SavannaItems.RIVER_MUD);
             // The giant savanna trees' blocks (M7.5).
             SavannaItems.TREE_ITEMS.forEach(event::accept);
         });

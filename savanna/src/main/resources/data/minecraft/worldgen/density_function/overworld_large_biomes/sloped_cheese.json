@@ -35,9 +35,21 @@
       "type": "minecraft:add",
       "argument1": 1.0,
       "argument2": {
-        "type": "minecraft:mul",
-        "argument1": -0.6,
-        "argument2": "antcolonies:overworld_large_biomes/savanna_flatness"
+        "type": "minecraft:add",
+        "argument1": {
+          "type": "minecraft:mul",
+          "argument1": -0.6,
+          "argument2": "antcolonies:overworld_large_biomes/savanna_flatness"
+        },
+        "argument2": {
+          "type": "minecraft:mul",
+          "argument1": -0.30000000000000004,
+          "argument2": {
+            "type": "minecraft:mul",
+            "argument1": "antcolonies:overworld_large_biomes/savanna_flatness",
+            "argument2": "antcolonies:overworld_large_biomes/floodplain"
+          }
+        }
       }
     }
   }

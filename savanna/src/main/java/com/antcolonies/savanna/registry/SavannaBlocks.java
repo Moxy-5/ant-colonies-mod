@@ -140,6 +140,18 @@ public class SavannaBlocks {
                     .isSuffocating((state, level, pos) -> false).isViewBlocking((state, level, pos) -> false)
                     .pushReaction(PushReaction.DESTROY).randomTicks());
 
+    /**
+     * The savanna rivers' edges (2026-11-07, docs/plans/savanna-rivers.md): silt, the river's own fine soil left as bars on
+     * the inside of bends where the current slows; wet silt by the water; river mud, the trampled wet silt at the waterline
+     * and in the bars' hollows, where animals come down to drink. Firm blocks, not falling like sand (real silt holds together).
+     */
+    public static final DeferredBlock<Block> SILT = BLOCKS.registerSimpleBlock("silt",
+            BlockBehaviour.Properties.of().mapColor(MapColor.TERRACOTTA_LIGHT_GRAY).strength(0.5F).sound(SoundType.SAND));
+    public static final DeferredBlock<Block> WET_SILT = BLOCKS.registerSimpleBlock("wet_silt",
+            BlockBehaviour.Properties.of().mapColor(MapColor.TERRACOTTA_GRAY).strength(0.5F).sound(SoundType.MUD));
+    public static final DeferredBlock<Block> RIVER_MUD = BLOCKS.registerSimpleBlock("river_mud",
+            BlockBehaviour.Properties.of().mapColor(MapColor.TERRACOTTA_BROWN).strength(0.5F).sound(SoundType.MUD));
+
     static {
         TreeBlocks.init(); // the giant savanna trees' blocks (M7.5), registered with the rest
     }

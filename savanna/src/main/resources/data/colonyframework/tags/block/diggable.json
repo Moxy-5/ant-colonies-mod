@@ -4,6 +4,9 @@
     "antcolonies:rotten_wood",
     "antcolonies:pulp_heap",
     "antcolonies:frass",
-    "antcolonies:baobab_fibre"
+    "antcolonies:baobab_fibre",
+    "antcolonies:silt",
+    "antcolonies:wet_silt",
+    "antcolonies:river_mud"
   ]
 }
