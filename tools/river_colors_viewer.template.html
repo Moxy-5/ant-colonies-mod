@@ -47,9 +47,9 @@ const OPTIONS = {
     ["4 Sand stripe (before)", "stripe"], ["5 Grass to the water", "none"],
     ["6 Silt bars, trampled mud at the water and in the hollows (my pick)", "siltmud"],
     ["7 Bars sand at the head, silt at the tail, mud at the water", "graded"]] },
-  mud: { label: "Mud block", pick: 4, list: [["Minecraft mud", "vanilla"], ["A Wet river mud (olive-brown)", "wet"],
+  mud: { label: "Mud block", pick: 1, list: [["Minecraft mud", "vanilla"], ["A Wet river mud (olive-brown, your pick)", "wet"],
     ["B Wet mud with hoof prints", "prints"], ["C Dried, cracked mud", "cracked"],
-    ["D Wet at the water, cracked further up (my pick)", "mixed"]] },
+    ["D Wet at the water, cracked further up", "mixed"]] },
   view: { label: "View", pick: 0, list: [["From above"], ["Under the river"]] },
 };
 const state = {};
@@ -108,7 +108,6 @@ function mudOf(style) {
     const t = (D[i] + D[i + 1] + D[i + 2] - mn) / Math.max(1, mx - mn);
     for (let k = 0; k < 3; k++) D[i + k] = lo[k] + (hi[k] - lo[k]) * t;
   }
-  if (!dry) for (const [x, y] of [[3, 2], [11, 5], [6, 12], [13, 13], [1, 9]]) set(x, y, [0x7C, 0x6E, 0x57]); // wet shine
   if (style === "prints") {
     // two cloven hoof prints: dark wet hollows with a pushed-up rim
     for (const [px, py] of [[3, 4], [10, 10]]) {
