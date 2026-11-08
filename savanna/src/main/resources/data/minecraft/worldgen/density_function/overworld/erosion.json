@@ -1,18 +1,21 @@
 {
-  "type": "minecraft:flat_cache",
+  "type": "antcolonies:shared",
   "argument": {
-    "type": "minecraft:add",
-    "argument1": "antcolonies:overworld/raw_erosion",
-    "argument2": {
-      "type": "minecraft:mul",
-      "argument1": "antcolonies:overworld/savanna_flatness",
+    "type": "minecraft:flat_cache",
+    "argument": {
+      "type": "minecraft:add",
+      "argument1": "antcolonies:overworld/raw_erosion",
       "argument2": {
-        "type": "minecraft:add",
-        "argument1": 0.28,
+        "type": "minecraft:mul",
+        "argument1": "antcolonies:overworld/savanna_flatness",
         "argument2": {
-          "type": "minecraft:mul",
-          "argument1": -0.92,
-          "argument2": "antcolonies:overworld/raw_erosion"
+          "type": "minecraft:add",
+          "argument1": 0.28,
+          "argument2": {
+            "type": "minecraft:mul",
+            "argument1": -0.92,
+            "argument2": "antcolonies:overworld/raw_erosion"
+          }
         }
       }
     }

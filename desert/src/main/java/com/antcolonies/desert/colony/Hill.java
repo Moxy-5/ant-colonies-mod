@@ -1,5 +1,6 @@
 package com.antcolonies.desert.colony;
 
+import com.antcolonies.colony.LandReady;
 import com.antcolonies.colony.GroundTop;
 import com.antcolonies.colony.Claims;
 import com.antcolonies.colony.Colony;
@@ -217,7 +218,7 @@ public class Hill {
                 }
                 int x = center.getX() + dx;
                 int z = center.getZ() + dz;
-                if (!level.hasChunk(x >> 4, z >> 4)) {
+                if (!LandReady.chunk(level, x >> 4, z >> 4)) {
                     continue;
                 }
                 BlockPos pos = GroundTop.cell(level, x, z);

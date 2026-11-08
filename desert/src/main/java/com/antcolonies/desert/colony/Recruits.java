@@ -1,5 +1,6 @@
 package com.antcolonies.desert.colony;
 
+import com.antcolonies.colony.LandReady;
 import com.antcolonies.colony.Colony;
 import com.antcolonies.colony.ColonyRole;
 import com.antcolonies.colony.FoodStore;
@@ -183,7 +184,7 @@ public class Recruits {
             for (int dz = -reach; dz <= reach; dz++) {
                 for (int dy = -2; dy <= 2; dy++) {
                     pos.set(where.getX() + dx, where.getY() + dy, where.getZ() + dz);
-                    if (!level.hasChunkAt(pos)) {
+                    if (!LandReady.at(level, pos)) {
                         continue;
                     }
                     SpeciesProfile.PlantFood plant = colony.profile().food().plantFor(level.getBlockState(pos));

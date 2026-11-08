@@ -2,6 +2,9 @@ import json, os, sys, zipfile
 root, jar, K = sys.argv[1], sys.argv[2], float(sys.argv[3])
 z = zipfile.ZipFile(jar)
 def w(path, obj):
+    # every land part wrapped in antcolonies:shared (savanna loading round 2): the same part, wired once per wiring
+    if '/density_function/' in path and obj.get("type") != "antcolonies:shared":
+        obj = {"type": "antcolonies:shared", "argument": obj}
     p = os.path.join(root, path); os.makedirs(os.path.dirname(p), exist_ok=True)
     with open(p, 'w', newline='\n') as f: json.dump(obj, f, indent=2); f.write('\n')
 # the cave entrances (sinkholes, pits, cave mouths) and the noodle caves (thin tunnels poking through the ground) are

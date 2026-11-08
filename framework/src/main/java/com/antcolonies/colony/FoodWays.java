@@ -83,7 +83,7 @@ public class FoodWays {
             gallery = runway.cells();
         }
         for (BlockPos part : gallery) {
-            if (!level.isLoaded(part)) {
+            if (!LandReady.at(level, part)) {
                 return false;
             }
             if (runway != null && !Nest.isDugOut(level, part)) {
@@ -221,7 +221,7 @@ public class FoodWays {
      * pieces are left lying for the foragers ({@code FoodStore.cutAwayForTheForagers}), so no food is thrown away.
      */
     public boolean isRunwayPlant(Level level, BlockPos cell) {
-        if (!level.isLoaded(cell)) {
+        if (!LandReady.at(level, cell)) {
             return false;
         }
         BlockState state = level.getBlockState(cell);

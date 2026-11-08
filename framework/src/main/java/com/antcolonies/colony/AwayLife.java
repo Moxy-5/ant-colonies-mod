@@ -151,7 +151,7 @@ public class AwayLife {
         if (awayForTests != null) {
             return !awayForTests;
         }
-        if (!level.isLoaded(colony.getCenter())) {
+        if (!LandReady.at(level, colony.getCenter())) {
             return false;
         }
         // Far colonies (the user, 2026-11-04): loaded but with no player near, a colony lives as numbers like one in
@@ -258,7 +258,7 @@ public class AwayLife {
      */
     private void foldLoaded(ServerLevel level) {
         long now = level.getGameTime();
-        if (lastFarLook != Colony.NOT_SET && now - lastFarLook < FAR_LOOK_TICKS || !level.isLoaded(colony.getCenter())) {
+        if (lastFarLook != Colony.NOT_SET && now - lastFarLook < FAR_LOOK_TICKS || !LandReady.at(level, colony.getCenter())) {
             return;
         }
         lastFarLook = now;
@@ -347,7 +347,7 @@ public class AwayLife {
             awaySince = now;
             report.clear();
             lastAwayFor = 0;
-            if (level.isLoaded(colony.getCenter())) {
+            if (LandReady.at(level, colony.getCenter())) {
                 // (Far, its land still loaded: one last look at the nest. A colony new land put in far from every player
                 // goes away before its first second here, and the brain would think its queen out of her chamber and its
                 // garden empty, and starve the royal pair; docs/BUGS.md 146.)
@@ -497,7 +497,7 @@ public class AwayLife {
             return !awayForTests;
         }
         AABB area = colony.nestArea();
-        return level.hasChunksAt(BlockPos.containing(area.minX, 0, area.minZ), BlockPos.containing(area.maxX, 0, area.maxZ));
+        return LandReady.box(level, (int) Math.floor(area.minX), (int) Math.floor(area.minZ), (int) Math.floor(area.maxX), (int) Math.floor(area.maxZ));
     }
 
     // --- the colony list ------------------------------------------------------------------------------------------

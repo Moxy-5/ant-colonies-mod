@@ -1,5 +1,6 @@
 package com.antcolonies.savanna.colony;
 
+import com.antcolonies.colony.LandReady;
 import org.jetbrains.annotations.Nullable;
 
 import com.antcolonies.colony.Colony;
@@ -43,7 +44,7 @@ public final class RaidGround {
         int bz = Mth.floor(z);
         for (int dy : NEAR_HEIGHTS) {
             BlockPos cell = new BlockPos(bx, y + dy, bz);
-            if (!level.hasChunkAt(cell)) {
+            if (!LandReady.at(level, cell)) {
                 return null;
             }
             if (canStand(level, cell)) {

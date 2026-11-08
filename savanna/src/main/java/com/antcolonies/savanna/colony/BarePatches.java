@@ -1,5 +1,6 @@
 package com.antcolonies.savanna.colony;
 
+import com.antcolonies.colony.LandReady;
 import com.antcolonies.colony.Colony;
 import com.antcolonies.colony.FoodWays;
 import com.antcolonies.colony.NestPlan;
@@ -116,7 +117,7 @@ public class BarePatches {
         List<Tuft> later = new ArrayList<>();
         for (Iterator<Tuft> it = tufts.iterator(); it.hasNext(); ) {
             Tuft tuft = it.next();
-            if (tuft.growsAt() > now || !level.isLoaded(tuft.spot()) || !level.isLoaded(tuft.spot().below())) {
+            if (tuft.growsAt() > now || !LandReady.at(level, tuft.spot()) || !LandReady.at(level, tuft.spot().below())) {
                 continue;
             }
             it.remove();

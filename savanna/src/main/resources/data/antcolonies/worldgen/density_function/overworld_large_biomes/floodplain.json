@@ -1,31 +1,34 @@
 {
-  "type": "minecraft:flat_cache",
+  "type": "antcolonies:shared",
   "argument": {
-    "type": "minecraft:spline",
-    "spline": {
-      "coordinate": "antcolonies:overworld_large_biomes/ridges_folded",
-      "points": [
-        {
-          "location": -0.86,
-          "value": 0.0,
-          "derivative": 0.0
-        },
-        {
-          "location": -0.8,
-          "value": 1.0,
-          "derivative": 0.0
-        },
-        {
-          "location": -0.55,
-          "value": 1.0,
-          "derivative": 0.0
-        },
-        {
-          "location": 0.0,
-          "value": 0.0,
-          "derivative": 0.0
-        }
-      ]
+    "type": "minecraft:flat_cache",
+    "argument": {
+      "type": "minecraft:spline",
+      "spline": {
+        "coordinate": "antcolonies:overworld_large_biomes/ridges_folded",
+        "points": [
+          {
+            "location": -0.86,
+            "value": 0.0,
+            "derivative": 0.0
+          },
+          {
+            "location": -0.8,
+            "value": 1.0,
+            "derivative": 0.0
+          },
+          {
+            "location": -0.55,
+            "value": 1.0,
+            "derivative": 0.0
+          },
+          {
+            "location": 0.0,
+            "value": 0.0,
+            "derivative": 0.0
+          }
+        ]
+      }
     }
   }
 }

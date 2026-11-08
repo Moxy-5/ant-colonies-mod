@@ -1,5 +1,6 @@
 package com.antcolonies.savanna.colony;
 
+import com.antcolonies.colony.LandReady;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -151,7 +152,7 @@ public final class FeedingSpots {
         round.add(food);
         for (BlockPos at : round) {
             for (BlockPos pos : BlockPos.betweenClosed(at.offset(-MUD_ROUND, -MUD_ROUND, -MUD_ROUND), at.offset(MUD_ROUND, MUD_ROUND, MUD_ROUND))) {
-                if (!level.isLoaded(pos) || !looked.add(pos.immutable())) {
+                if (!LandReady.at(level, pos) || !looked.add(pos.immutable())) {
                     continue;
                 }
                 BlockState state = level.getBlockState(pos);
@@ -166,7 +167,7 @@ public final class FeedingSpots {
     }
 
     private static String woodName(ServerLevel level, BlockPos food) {
-        if (!level.isLoaded(food)) {
+        if (!LandReady.at(level, food)) {
             return "not loaded";
         }
         BlockState state = level.getBlockState(food);

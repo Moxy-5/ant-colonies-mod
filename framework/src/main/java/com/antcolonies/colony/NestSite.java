@@ -31,7 +31,7 @@ public final class NestSite {
             for (int dz = -AREA; dz <= AREA; dz++) {
                 int x = ground.getX() + dx;
                 int z = ground.getZ() + dz;
-                if (!level.hasChunkAt(new BlockPos(x, ground.getY(), z))
+                if (!LandReady.at(level, new BlockPos(x, ground.getY(), z))
                         || Math.abs(GroundReader.surface(level, x, z).getY() - ground.getY()) > maxUnevenness) {
                     off++;
                 }
@@ -64,7 +64,7 @@ public final class NestSite {
         for (int dx = -radius; dx <= radius; dx++) {
             for (int dz = -radius; dz <= radius; dz++) {
                 int distance = dx * dx + dz * dz;
-                if (distance > radius * radius || !level.hasChunkAt(feet.offset(dx, 0, dz))) {
+                if (distance > radius * radius || !LandReady.at(level, feet.offset(dx, 0, dz))) {
                     continue;
                 }
                 BlockPos ground = GroundReader.surface(level, feet.getX() + dx, feet.getZ() + dz);

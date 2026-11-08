@@ -1,5 +1,6 @@
 package com.antcolonies.savanna.colony;
 
+import com.antcolonies.colony.LandReady;
 import com.antcolonies.colony.GroundTop;
 import com.antcolonies.colony.Colony;
 import org.jetbrains.annotations.Nullable;
@@ -116,7 +117,7 @@ public class Mushrooms {
         double distance = 2.0 + random.nextDouble() * Math.max(0, radius - 2);
         int x = entrance.getX() + Mth.floor(Math.cos(angle) * distance + 0.5);
         int z = entrance.getZ() + Mth.floor(Math.sin(angle) * distance + 0.5);
-        if (!level.hasChunkAt(new BlockPos(x, entrance.getY(), z))) {
+        if (!LandReady.at(level, new BlockPos(x, entrance.getY(), z))) {
             return null;
         }
         BlockPos cell = GroundTop.cell(level, x, z);

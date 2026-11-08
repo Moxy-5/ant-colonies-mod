@@ -1,5 +1,6 @@
 package com.antcolonies.nav;
 
+import com.antcolonies.colony.LandReady;
 import org.jetbrains.annotations.Nullable;
 
 import net.minecraft.core.BlockPos;
@@ -36,7 +37,7 @@ public final class LevelCellMap implements CellMap {
 
     @Override
     public boolean isOpen(BlockPos pos) {
-        if (!level.isLoaded(pos)) {
+        if (!LandReady.at(level, pos)) {
             return false;
         }
         BlockState state = level.getBlockState(pos);
@@ -54,7 +55,7 @@ public final class LevelCellMap implements CellMap {
     /** A full face, or a side of a column that can be climbed ({@link ClimbShape}, even one the insect may pass through). */
     @Override
     public boolean isSolidFace(BlockPos pos, Direction face) {
-        if (!level.isLoaded(pos)) {
+        if (!LandReady.at(level, pos)) {
             return false;
         }
         BlockState state = level.getBlockState(pos);
@@ -66,7 +67,7 @@ public final class LevelCellMap implements CellMap {
 
     @Override
     public int channelSides(BlockPos cell) {
-        if (!level.isLoaded(cell)) {
+        if (!LandReady.at(level, cell)) {
             return 0;
         }
         BlockState state = level.getBlockState(cell);
@@ -75,12 +76,12 @@ public final class LevelCellMap implements CellMap {
 
     @Override
     public boolean isMouth(BlockPos cell) {
-        return level.isLoaded(cell) && level.getBlockState(cell).getBlock() instanceof Doorway && channelSides(cell) != 0;
+        return LandReady.at(level, cell) && level.getBlockState(cell).getBlock() instanceof Doorway && channelSides(cell) != 0;
     }
 
     @Override
     public int slopeHeight(BlockPos cell, int u, int w) {
-        if (!level.isLoaded(cell)) {
+        if (!LandReady.at(level, cell)) {
             return -1;
         }
         BlockState state = level.getBlockState(cell);

@@ -66,6 +66,7 @@ public final class GroundHeights {
                 page = new int[256];
                 java.util.Arrays.fill(page, UNKNOWN);
                 pages.putAndMoveToLast(key, page);
+                Perf.newLand(Perf.NewLand.GROUND_CHUNKS, 0);
                 if (pages.size() > PAGES) {
                     pages.removeFirst();
                 }

@@ -240,7 +240,8 @@ public final class Perf {
         PLANNING("planned"),
         PLACING("put down, chunk by chunk"),
         GROUND("ground heights worked out from the world's shape"),
-        GROUND_KEPT("ground heights remembered");
+        GROUND_KEPT("ground heights remembered"),
+        GROUND_CHUNKS("chunks whose ground heights were asked about (new pages; savanna loading round 2, L1)");
 
         final String label;
         final java.util.concurrent.atomic.LongAdder count = new java.util.concurrent.atomic.LongAdder();

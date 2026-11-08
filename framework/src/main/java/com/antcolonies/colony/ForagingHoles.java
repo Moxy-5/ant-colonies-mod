@@ -133,7 +133,7 @@ public class ForagingHoles {
     @Nullable
     NestPlan.ForagingTunnel middleHole(Level level) {
         BlockPos entrance = colony.nest().getEntrance();
-        if (!colony.keepsASchedule() || !colony.buildsOverNestNow() || !level.isLoaded(entrance)
+        if (!colony.keepsASchedule() || !colony.buildsOverNestNow() || !LandReady.at(level, entrance)
                 || !Nest.isDugOut(level, entrance.below()) || colony.nest().isEntranceCovered(level)) {
             return null;
         }
@@ -177,7 +177,7 @@ public class ForagingHoles {
     /** Whether the hole is open: nothing solid in it, no water. */
     public static boolean isOpen(Level level, BlockPos hole) {
         BlockState state = level.getBlockState(hole);
-        return level.isLoaded(hole) && state.canBeReplaced() && state.getFluidState().isEmpty();
+        return LandReady.at(level, hole) && state.canBeReplaced() && state.getFluidState().isEmpty();
     }
 
     /** Whether the hole holds the plug of soil the workers packed into it. */
@@ -196,7 +196,7 @@ public class ForagingHoles {
         }
         boolean runway = hasFinishedRunway(level, hole);
         ColonyHooks.Underground web = colony.underground();
-        if (!(colony.isForagingTime(level) && (web == null || web.isInTurn(hole)) || runway) || !level.isLoaded(hole)) {
+        if (!(colony.isForagingTime(level) && (web == null || web.isInTurn(hole)) || runway) || !LandReady.at(level, hole)) {
             return false;
         }
         BlockState state = level.getBlockState(hole);
@@ -363,7 +363,7 @@ public class ForagingHoles {
             BlockPos hole = tunnel.tunnel().hole();
             if (colony.nest().foodWays().isSpent(hole)) {
                 // Spent by mistake (the bug below) while the food is still there: back in use.
-                if (level.isLoaded(tunnel.food()) && richBlockNear(level, tunnel.food(), FOOD_STILL_THERE) != null) {
+                if (LandReady.at(level, tunnel.food()) && richBlockNear(level, tunnel.food(), FOOD_STILL_THERE) != null) {
                     colony.nest().foodWays().unmarkSpent(hole);
                     ColonyManager.get(level).markChanged();
                 } else {
@@ -372,7 +372,7 @@ public class ForagingHoles {
             }
             // The real blocks round the food, not the food list: the list only holds plants near the nest's height, so a
             // fallen tree up a slope with one block eaten away counted as gone (the user's bug, 2026-10-14).
-            if (level.isLoaded(tunnel.food()) && richBlockNear(level, tunnel.food(), FOOD_STILL_THERE) == null) {
+            if (LandReady.at(level, tunnel.food()) && richBlockNear(level, tunnel.food(), FOOD_STILL_THERE) == null) {
                 colony.nest().foodWays().markSpent(hole);
                 ColonyManager.get(level).markChanged();
                 ColonyFrameworkMod.LOGGER.debug("[new-hole] the food at {} is gone: the hole at {} is plugged for good",
@@ -386,7 +386,7 @@ public class ForagingHoles {
             }
             boolean dug = isDug(level, tunnel.tunnel());
             digging |= !dug;
-            if (dug && tunnel.gallery() == null && level.isLoaded(tunnel.food())) {
+            if (dug && tunnel.gallery() == null && LandReady.at(level, tunnel.food())) {
                 // A tunnel of an older save, planned without its gallery: the gallery up under the food now.
                 List<BlockPos> gallery = planGallery(level, tunnel.tunnel(), tunnel.food());
                 colony.nest().foodWays().setGallery(tunnel.food(), gallery);
@@ -474,7 +474,7 @@ public class ForagingHoles {
         noRunwayUntil.values().removeIf(until -> until <= checked || until > checked + NO_ROUTE_TICKS);
         for (FoodWays.Runway runway : colony.nest().foodWays().getRunways()) {
             boolean spent = colony.nest().foodWays().isSpent(runway.hole());
-            if (spent || level.isLoaded(runway.food()) && richBlockNear(level, runway.food(), FOOD_STILL_THERE) == null) {
+            if (spent || LandReady.at(level, runway.food()) && richBlockNear(level, runway.food(), FOOD_STILL_THERE) == null) {
                 colony.nest().foodWays().dropRunway(runway);
                 ColonyManager.get(level).markChanged();
                 ColonyFrameworkMod.LOGGER.debug("[runway] {}: the runway from {} to the food at {} crumbles",
@@ -568,7 +568,7 @@ public class ForagingHoles {
 
             @Override
             public boolean isFree(BlockPos cell) {
-                if (!level.isLoaded(cell) || nest.contains(cell) || mound.containsKey(cell) || used.contains(cell)
+                if (!LandReady.at(level, cell) || nest.contains(cell) || mound.containsKey(cell) || used.contains(cell)
                         || isHole(level, cell) || isHole(level, cell.below())) {
                     return false;
                 }
@@ -605,7 +605,7 @@ public class ForagingHoles {
                     if (cells.contains(wall)) {
                         continue;
                     }
-                    if (!level.isLoaded(wall)) {
+                    if (!LandReady.at(level, wall)) {
                         loaded = false;
                         continue;
                     }
@@ -765,7 +765,7 @@ public class ForagingHoles {
         List<BlockPos> free = new java.util.ArrayList<>();
         for (NestPlan.ForagingTunnel tunnel : tunnels(level)) {
             if (isDug(level, tunnel) && !colony.nest().foodWays().isSpent(tunnel.hole()) && colony.nest().foodWays().runwayAt(tunnel.hole()) == null
-                    && level.isLoaded(tunnel.hole().above())) {
+                    && LandReady.at(level, tunnel.hole().above())) {
                 free.add(tunnel.hole());
             }
         }
@@ -804,7 +804,7 @@ public class ForagingHoles {
      */
     private boolean isSmall(Level level, BlockPos pos, SpeciesProfile.NewHoles numbers) {
         int pieces = pieces(level, pos);
-        if (pieces == 0 && level.isLoaded(pos)) {
+        if (pieces == 0 && LandReady.at(level, pos)) {
             BlockPos near = richBlockNear(level, pos, FOOD_STILL_THERE);
             pieces = near == null ? 0 : pieces(level, near);
         }
@@ -829,7 +829,7 @@ public class ForagingHoles {
             return spot;
         }
         for (BlockPos pos : BlockPos.betweenClosed(spot.offset(-within, -within, -within), spot.offset(within, within, within))) {
-            if (level.isLoaded(pos) && isRich(level, pos)) {
+            if (LandReady.at(level, pos) && isRich(level, pos)) {
                 return pos.immutable();
             }
         }

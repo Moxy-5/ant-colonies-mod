@@ -1,5 +1,6 @@
 package com.antcolonies.watch;
 
+import com.antcolonies.colony.LandReady;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -184,7 +185,7 @@ public final class GeneralRules {
         open.add(from);
         while (!open.isEmpty()) {
             BlockPos cell = open.poll();
-            if (!level.isLoaded(cell) || level.canSeeSky(cell) || colony.nest().isInside(level, cell)) {
+            if (!LandReady.at(level, cell) || level.canSeeSky(cell) || colony.nest().isInside(level, cell)) {
                 return 0;
             }
             if (seen.size() > POCKET_CELLS) {
@@ -199,7 +200,7 @@ public final class GeneralRules {
                     }
                     continue;
                 }
-                if (!level.isLoaded(next)) {
+                if (!LandReady.at(level, next)) {
                     return 0;
                 }
                 if (level.getBlockState(next).isCollisionShapeFullBlock(level, next)) {

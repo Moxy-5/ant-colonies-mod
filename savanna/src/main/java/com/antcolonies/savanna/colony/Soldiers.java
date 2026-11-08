@@ -1,5 +1,6 @@
 package com.antcolonies.savanna.colony;
 
+import com.antcolonies.colony.LandReady;
 import com.antcolonies.colony.Caste;
 import com.antcolonies.colony.Colony;
 import com.antcolonies.colony.ColonyHooks;
@@ -343,7 +344,7 @@ public class Soldiers {
      * the nest and the mound, not a foraging hole, and not where the mound is to grow.
      */
     private boolean isGuardSpotOutside(Level level, BlockPos cell) {
-        if (!level.isLoaded(cell)) {
+        if (!LandReady.at(level, cell)) {
             return false;
         }
         BlockState state = level.getBlockState(cell);

@@ -43,6 +43,7 @@ repo/
 run-test/
 run-test-shards/
 run-soak/
+run-flight/
 __pycache__/
 references/anim_lab/
 run-film/

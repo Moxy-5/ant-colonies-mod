@@ -1,5 +1,6 @@
 package com.antcolonies.savanna.colony;
 
+import com.antcolonies.colony.LandReady;
 import com.antcolonies.colony.Caste;
 import com.antcolonies.colony.Colony;
 import com.antcolonies.colony.ColonyManager;
@@ -258,7 +259,7 @@ public class HiddenTrips implements HiddenWays {
     @Nullable
     private String brokenInto(ServerLevel level, Trip trip) {
         for (BlockPos cell : trip.cells) {
-            if (!level.isLoaded(cell)) {
+            if (!LandReady.at(level, cell)) {
                 continue;
             }
             if (!isOpen(level, cell)) {
@@ -297,7 +298,7 @@ public class HiddenTrips implements HiddenWays {
     private BlockPos openingBeside(ServerLevel level, BlockPos cell) {
         for (Direction side : Direction.values()) {
             BlockPos next = cell.relative(side);
-            if (!cells.contains(next) && level.isLoaded(next) && isOpen(level, next)) {
+            if (!cells.contains(next) && LandReady.at(level, next) && isOpen(level, next)) {
                 return next;
             }
         }

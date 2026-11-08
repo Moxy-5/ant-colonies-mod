@@ -1,5 +1,6 @@
 package com.antcolonies.savanna.entity.goal;
 
+import com.antcolonies.colony.LandReady;
 import com.antcolonies.colony.GroundTop;
 import java.util.ArrayList;
 import java.util.EnumSet;
@@ -546,7 +547,7 @@ public class MatabeleScoutGoal extends Goal {
     @Nullable
     private BlockPos openGround(ServerLevel level, int x, int z) {
         BlockPos center = colony.getCenter();
-        if (!level.hasChunkAt(new BlockPos(x, center.getY(), z))) {
+        if (!LandReady.at(level, new BlockPos(x, center.getY(), z))) {
             return null;
         }
         BlockPos cell = GroundTop.cell(level, x, z);
@@ -618,7 +619,7 @@ public class MatabeleScoutGoal extends Goal {
         BlockPos best = null;
         double bestDistance = Double.MAX_VALUE;
         for (BlockPos cell : place.cells()) {
-            if (cell.closerThan(at, smell) && cell.distSqr(at) < bestDistance && level.isLoaded(cell)
+            if (cell.closerThan(at, smell) && cell.distSqr(at) < bestDistance && LandReady.at(level, cell)
                     && level.getBlockState(cell).getCollisionShape(level, cell).isEmpty()) {
                 best = cell;
                 bestDistance = cell.distSqr(at);
@@ -787,7 +788,7 @@ public class MatabeleScoutGoal extends Goal {
             for (int i = 0; i < cells.size(); i++) {
                 BlockPos cell = cells.get(i);
                 double distance = cell.distSqr(at);
-                if (distance <= bestDistance && level.isLoaded(cell) && level.getBlockState(cell).getCollisionShape(level, cell).isEmpty()) {
+                if (distance <= bestDistance && LandReady.at(level, cell) && level.getBlockState(cell).getCollisionShape(level, cell).isEmpty()) {
                     best = i;
                     bestDistance = distance;
                 }

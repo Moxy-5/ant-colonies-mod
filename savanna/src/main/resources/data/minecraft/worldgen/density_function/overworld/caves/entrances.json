@@ -1,9 +1,12 @@
 {
-  "type": "minecraft:add",
-  "argument1": "antcolonies:overworld/caves/raw_entrances",
-  "argument2": {
-    "type": "minecraft:mul",
-    "argument1": 3.0,
-    "argument2": "antcolonies:overworld/savanna_flatness"
+  "type": "antcolonies:shared",
+  "argument": {
+    "type": "minecraft:add",
+    "argument1": "antcolonies:overworld/caves/raw_entrances",
+    "argument2": {
+      "type": "minecraft:mul",
+      "argument1": 3.0,
+      "argument2": "antcolonies:overworld/savanna_flatness"
+    }
   }
 }

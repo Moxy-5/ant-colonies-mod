@@ -1,5 +1,6 @@
 package com.antcolonies.savanna.worldgen;
 
+import com.antcolonies.colony.LandReady;
 import java.util.EnumSet;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -216,7 +217,7 @@ public final class TreePlacer {
     public static Ground ground(net.minecraft.world.level.Level level, BlockPos foot) {
         return (x, z) -> {
             BlockPos.MutableBlockPos pos = new BlockPos.MutableBlockPos(x, foot.getY(), z);
-            if (!level.hasChunkAt(pos)) {
+            if (!LandReady.at(level, pos)) {
                 return foot.getY();
             }
             if (isGround(level.getBlockState(pos))) {

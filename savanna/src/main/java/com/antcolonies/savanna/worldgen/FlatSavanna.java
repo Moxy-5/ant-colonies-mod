@@ -33,6 +33,7 @@ public final class FlatSavanna {
 
     static {
         DENSITY_FUNCTION_TYPES.register("whole_savanna", () -> WholeSavanna.CODEC.codec());
+        DENSITY_FUNCTION_TYPES.register("shared", () -> Shared.CODEC.codec());
     }
 
     /** True while the running world is one biome, a savanna: the mask is 1 everywhere. */
@@ -70,6 +71,105 @@ public final class FlatSavanna {
                 .map(stem -> stem.generator().getBiomeSource() instanceof FixedBiomeSource fixed
                         && fixed.possibleBiomes().stream().allMatch(b -> b.is(BiomeTags.IS_SAVANNA)))
                 .orElse(false);
+    }
+
+    /**
+     * {@code antcolonies:shared} (savanna loading, round 2, {@code docs/plans/savanna-loading-2.md}): its argument,
+     * unchanged, worked out exactly as before. Only the wiring is quicker.
+     *
+     * <p>Why: before Minecraft works out a ground height for land not made yet (or a whole chunk), it wires up its land
+     * recipe afresh ({@code NoiseChunk}'s {@code mapAll}). That walks the recipe as a tree: a part used in ten places is
+     * rebuilt ten times, and every rebuilt part is looked up in a table (hashed) to find it was already there. The flat
+     * savanna's parts (the savanna mask, its erosion, peaks and floodplain) sit inside Minecraft's land-height curves at
+     * dozens of places, so since the flat savannas a ground height took about 7.5 ms (was 2.5), 4 parts in 5 of it wiring.
+     * Wrapped in this, a part is wired once per wiring and the same wired part handed to every place that uses it: the
+     * very object Minecraft's own table would have handed back, so the wired recipe, and the land, are the same.
+     *
+     * <p>Remembered per thread (land is made on several at once): the last wiring ({@code Visitor}) seen and its answer.
+     */
+    public static final class Shared implements DensityFunction {
+        static final KeyDispatchDataCodec<Shared> CODEC = KeyDispatchDataCodec.of(
+                DensityFunction.HOLDER_HELPER_CODEC.fieldOf("argument").xmap(Shared::new, Shared::argument));
+        /**
+         * For the speed tests only: true wires every use afresh, as Minecraft does (the same land, only slower); the flight
+         * run's "before" ({@code tools/flight.sh ... old}, system property {@code antcolonies.landWiringOld}).
+         */
+        public static volatile boolean off = Boolean.getBoolean("antcolonies.landWiringOld");
+
+        private record Wired(Visitor visitor, DensityFunction result) {
+        }
+
+        private final DensityFunction argument;
+        private final int hash;
+        private volatile ThreadLocal<Wired> last;
+
+        public Shared(DensityFunction argument) {
+            this.argument = argument;
+            this.hash = argument.hashCode() * 31 + 11;
+        }
+
+        public DensityFunction argument() {
+            return argument;
+        }
+
+        @Override
+        public double compute(FunctionContext context) {
+            return argument.compute(context);
+        }
+
+        @Override
+        public void fillArray(double[] array, ContextProvider provider) {
+            argument.fillArray(array, provider);
+        }
+
+        @Override
+        public DensityFunction mapAll(Visitor visitor) {
+            if (off) {
+                return visitor.apply(new Shared(argument.mapAll(visitor)));
+            }
+            ThreadLocal<Wired> memory = last;
+            if (memory == null) {
+                synchronized (this) {
+                    memory = last;
+                    if (memory == null) {
+                        memory = last = new ThreadLocal<>();
+                    }
+                }
+            }
+            Wired wired = memory.get();
+            if (wired != null && wired.visitor == visitor) {
+                return wired.result;
+            }
+            DensityFunction result = visitor.apply(new Shared(argument.mapAll(visitor)));
+            memory.set(new Wired(visitor, result));
+            return result;
+        }
+
+        @Override
+        public double minValue() {
+            return argument.minValue();
+        }
+
+        @Override
+        public double maxValue() {
+            return argument.maxValue();
+        }
+
+        @Override
+        public KeyDispatchDataCodec<? extends DensityFunction> codec() {
+            return CODEC;
+        }
+
+        /** Equal when they wrap equal parts, as Minecraft's own parts are (its wiring shares equal parts). */
+        @Override
+        public boolean equals(Object other) {
+            return other == this || other instanceof Shared s && s.hash == hash && s.argument.equals(argument);
+        }
+
+        @Override
+        public int hashCode() {
+            return hash;
+        }
     }
 
     /** {@code antcolonies:whole_savanna}: its argument (the climate mask), or 1 in a single-biome savanna world. */

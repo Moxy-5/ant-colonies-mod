@@ -1,0 +1,171 @@
+package com.antcolonies.debug;
+
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.concurrent.atomic.AtomicLong;
+
+import com.antcolonies.ColonyFrameworkMod;
+
+import net.neoforged.bus.api.SubscribeEvent;
+import net.neoforged.fml.common.EventBusSubscriber;
+import net.neoforged.neoforge.event.server.ServerStoppedEvent;
+import net.neoforged.neoforge.event.tick.ServerTickEvent;
+
+/**
+ * The stall watch (savanna loading, round 2, step L1, {@code docs/plans/savanna-loading-2.md}): when one server tick runs
+ * longer than {@link #STALL_MS} (the game freezes: "Can't keep up!"), a helper thread looks at what the server thread is
+ * doing every {@link #LOOK_MS} ms until the tick ends, then the log says how long it took and where the time went
+ * ({@code [stall]} lines: the calls seen in most looks, deepest first). It names the code that froze the game, ours or
+ * Minecraft's (for example a tree update reaching into land not made yet, which makes the server build it on the spot).
+ *
+ * <p>Always on, in the game and the test servers; it costs nothing until a tick is already slow.
+ */
+@EventBusSubscriber(modid = ColonyFrameworkMod.MODID)
+public final class StallWatch {
+    /** A tick this long is a stall (my pick: a tick should take 50 ms; 300 is a freeze anyone sees). */
+    public static final long STALL_MS = 300;
+    /** How often the helper looks during a stall. */
+    static final long LOOK_MS = 20;
+    /** At most this many lines of calls in a stall's report. */
+    static final int LINES = 40;
+
+    private static volatile Thread serverThread;
+    private static volatile long tickStart;
+    private static final Object LOCK = new Object();
+    private static final List<StackTraceElement[]> looks = new ArrayList<>();
+    private static Thread helper;
+
+    /** Counts for a summary (the flight run): stalls, their total and longest time (ms). */
+    public static final AtomicLong STALLS = new AtomicLong();
+    public static final AtomicLong STALL_TOTAL_MS = new AtomicLong();
+    public static final AtomicLong STALL_LONGEST_MS = new AtomicLong();
+    /** The stalls of this run, one line each: how long and the first of our calls seen (or Minecraft's top). */
+    public static final List<String> SEEN = java.util.Collections.synchronizedList(new ArrayList<>());
+
+    private StallWatch() {
+    }
+
+    @SubscribeEvent
+    public static void onTickStart(ServerTickEvent.Pre event) {
+        if (serverThread == null) {
+            serverThread = Thread.currentThread();
+            startHelper();
+        }
+        tickStart = System.nanoTime();
+    }
+
+    @SubscribeEvent
+    public static void onTickEnd(ServerTickEvent.Post event) {
+        long start = tickStart;
+        tickStart = 0;
+        List<StackTraceElement[]> taken;
+        synchronized (LOCK) {
+            if (looks.isEmpty()) {
+                return;
+            }
+            taken = new ArrayList<>(looks);
+            looks.clear();
+        }
+        long ms = (System.nanoTime() - start) / 1_000_000;
+        report(ms, taken);
+    }
+
+    @SubscribeEvent
+    public static void onServerStopped(ServerStoppedEvent event) {
+        serverThread = null;
+        tickStart = 0;
+        Thread h = helper;
+        helper = null;
+        if (h != null) {
+            h.interrupt();
+        }
+        synchronized (LOCK) {
+            looks.clear();
+        }
+    }
+
+    private static synchronized void startHelper() {
+        if (helper != null) {
+            return;
+        }
+        Thread h = new Thread(StallWatch::watch, "Ant colonies stall watch");
+        h.setDaemon(true);
+        helper = h;
+        h.start();
+    }
+
+    private static void watch() {
+        while (helper == Thread.currentThread()) {
+            try {
+                Thread.sleep(LOOK_MS);
+            } catch (InterruptedException e) {
+                return;
+            }
+            long start = tickStart;
+            Thread server = serverThread;
+            if (start == 0 || server == null || System.nanoTime() - start < STALL_MS * 1_000_000) {
+                continue;
+            }
+            StackTraceElement[] stack = server.getStackTrace();
+            synchronized (LOCK) {
+                if (tickStart == start) {
+                    looks.add(stack);
+                }
+            }
+        }
+    }
+
+    private static void report(long ms, List<StackTraceElement[]> taken) {
+        STALLS.incrementAndGet();
+        STALL_TOTAL_MS.addAndGet(ms);
+        STALL_LONGEST_MS.accumulateAndGet(ms, Math::max);
+        Map<String, Integer> counts = new HashMap<>();
+        for (StackTraceElement[] stack : taken) {
+            Set<String> once = new LinkedHashSet<>();
+            for (StackTraceElement frame : stack) {
+                once.add(name(frame));
+            }
+            for (String name : once) {
+                counts.merge(name, 1, Integer::sum);
+            }
+        }
+        // The calls of the look most like the others, deepest first, those seen in at least half the looks.
+        StackTraceElement[] typical = taken.get(taken.size() / 2);
+        StringBuilder out = new StringBuilder();
+        String ours = null;
+        int lines = 0;
+        Set<String> shown = new LinkedHashSet<>();
+        for (StackTraceElement frame : typical) {
+            String name = name(frame);
+            int n = counts.getOrDefault(name, 0);
+            if (n * 2 < taken.size() || !shown.add(name) || boilerplate(name)) {
+                continue;
+            }
+            if (ours == null && frame.getClassName().startsWith("com.antcolonies") && !frame.getClassName().contains(".debug.")) {
+                ours = name + ":" + frame.getLineNumber();
+            }
+            if (lines++ < LINES) {
+                out.append(String.format("%n    %3d%% %s:%d", n * 100 / taken.size(), name, frame.getLineNumber()));
+            }
+        }
+        String top = typical.length > 0 ? name(typical[0]) : "?";
+        SEEN.add(ms + " ms, " + (ours != null ? ours : "Minecraft: " + top));
+        ColonyFrameworkMod.LOGGER.warn("[stall] a server tick took {} ms; where the time went ({} looks, deepest first):{}",
+                ms, taken.size(), out);
+    }
+
+    private static String name(StackTraceElement frame) {
+        String cls = frame.getClassName();
+        return cls.substring(cls.lastIndexOf('.') + 1) + "." + frame.getMethodName();
+    }
+
+    /** The calls every tick passes through, left out of the report. */
+    private static boolean boilerplate(String name) {
+        return name.startsWith("MinecraftServer.") || name.startsWith("Thread.") || name.startsWith("DedicatedServer.")
+                || name.startsWith("IntegratedServer.") || name.startsWith("GameTestServer.");
+    }
+}

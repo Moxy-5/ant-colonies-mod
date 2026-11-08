@@ -1,5 +1,6 @@
 package com.antcolonies.savanna.colony;
 
+import com.antcolonies.colony.LandReady;
 import com.antcolonies.colony.NestWalls;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -54,7 +55,7 @@ public class MoundShaping {
         BlockPos best = null;
         for (Map.Entry<BlockPos, MoundPlan.Part> entry : mound.getParts(level).entrySet()) {
             BlockPos pos = entry.getKey();
-            if ((best != null && pos.getY() >= best.getY()) || !level.isLoaded(pos) || Mound.isClaimedByOther(carveClaims, pos, ant.getUUID())) {
+            if ((best != null && pos.getY() >= best.getY()) || !LandReady.at(level, pos) || Mound.isClaimedByOther(carveClaims, pos, ant.getUUID())) {
                 continue;
             }
             MoundGrowth.Job job = shapeJobAt(level, pos);
@@ -85,7 +86,7 @@ public class MoundShaping {
 
     /** Whether there is a tunnel to carve here now (or a tunnel's door into the shaft to open). */
     public boolean isCarveJob(Level level, BlockPos pos) {
-        if (mound.getParts(level).get(pos) != MoundPlan.Part.TUNNEL || !level.isLoaded(pos)) {
+        if (mound.getParts(level).get(pos) != MoundPlan.Part.TUNNEL || !LandReady.at(level, pos)) {
             return false;
         }
         BlockState state = level.getBlockState(pos);

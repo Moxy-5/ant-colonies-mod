@@ -1,5 +1,6 @@
 package com.antcolonies.watch;
 
+import com.antcolonies.colony.LandReady;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -267,7 +268,7 @@ public final class Reports {
     private static boolean loaded(ServerLevel level, BlockPos corner, int wide) {
         for (int cx = corner.getX() >> 4; cx <= (corner.getX() + wide - 1) >> 4; cx++) {
             for (int cz = corner.getZ() >> 4; cz <= (corner.getZ() + wide - 1) >> 4; cz++) {
-                if (!level.hasChunk(cx, cz)) {
+                if (!LandReady.chunk(level, cx, cz)) {
                     return false;
                 }
             }

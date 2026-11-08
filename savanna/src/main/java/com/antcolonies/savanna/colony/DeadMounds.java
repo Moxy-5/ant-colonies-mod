@@ -1,5 +1,6 @@
 package com.antcolonies.savanna.colony;
 
+import com.antcolonies.colony.LandReady;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashSet;
@@ -199,7 +200,7 @@ public class DeadMounds extends SavedData {
         List<BlockPos> built = new ArrayList<>();
         for (Map.Entry<BlockPos, MoundPlan.Part> entry : parts.entrySet()) {
             BlockPos pos = entry.getKey();
-            boolean loaded = level.isLoaded(pos);
+            boolean loaded = LandReady.at(level, pos);
             BlockState state = loaded ? level.getBlockState(pos) : null;
             if (entry.getValue() == MoundPlan.Part.OPEN) {
                 wear.shaft.add(pos.immutable());
@@ -248,7 +249,7 @@ public class DeadMounds extends SavedData {
         DeadMounds book = get(level);
         int budget = BLOCKS_PER_LOOK;
         for (DeadMound mound : book.mounds.values()) {
-            if (mound.isChanging() && level.isLoaded(mound.center)) {
+            if (mound.isChanging() && LandReady.at(level, mound.center)) {
                 budget -= book.update(level, mound, mound.days(level), budget);
                 if (budget <= 0) {
                     break; // the rest next look
@@ -360,7 +361,7 @@ public class DeadMounds extends SavedData {
     private void updateCombs(ServerLevel level, DeadMound mound, double days) {
         for (Iterator<Comb> it = mound.combs.iterator(); it.hasNext(); ) {
             Comb comb = it.next();
-            if (!level.isLoaded(comb.pos())) {
+            if (!LandReady.at(level, comb.pos())) {
                 continue;
             }
             BlockState now = level.getBlockState(comb.pos());
@@ -397,7 +398,7 @@ public class DeadMounds extends SavedData {
         // The pieces on top crumble, the highest first (a piece already gone or replaced is forgotten).
         for (Iterator<BlockPos> it = wear.pieces.iterator(); it.hasNext() && used < budget; ) {
             BlockPos pos = it.next();
-            if (!level.isLoaded(pos) || days < MoundWear.pieceDay(pos.getY() - mound.center.getY(), wear.highest, MoundWear.jitter(pos.asLong()))) {
+            if (!LandReady.at(level, pos) || days < MoundWear.pieceDay(pos.getY() - mound.center.getY(), wear.highest, MoundWear.jitter(pos.asLong()))) {
                 continue;
             }
             if (Mound.isPieceBlock(level.getBlockState(pos)) && !underPlayersBlock(level, pos)) {
@@ -410,7 +411,7 @@ public class DeadMounds extends SavedData {
         // The columns come down to their day's height, the highest block of the whole mound first.
         PriorityQueue<WearColumn> due = new PriorityQueue<>(Comparator.comparingInt((WearColumn column) -> column.now).reversed());
         for (WearColumn column : wear.columns) {
-            if (!column.kept && !column.plan.isApron() && column.now > height(mound, column, days) && level.isLoaded(base(mound, column))) {
+            if (!column.kept && !column.plan.isApron() && column.now > height(mound, column, days) && LandReady.at(level, base(mound, column))) {
                 due.add(column);
             }
         }
@@ -441,7 +442,7 @@ public class DeadMounds extends SavedData {
                 break;
             }
             BlockPos pos = base(mound, column);
-            if (!column.plan.isApron() || column.kept || column.now > 0 || !level.isLoaded(pos)
+            if (!column.plan.isApron() || column.kept || column.now > 0 || !LandReady.at(level, pos)
                     || days < MoundWear.apronDay(MoundWear.jitter(pos.asLong()))) {
                 continue;
             }
@@ -462,7 +463,7 @@ public class DeadMounds extends SavedData {
                 if (used >= budget) {
                     break;
                 }
-                if (column.kept || column.grassed || column.now != column.end() || !level.isLoaded(base(mound, column))) {
+                if (column.kept || column.grassed || column.now != column.end() || !LandReady.at(level, base(mound, column))) {
                     continue;
                 }
                 used += grass(level, mound, column);
@@ -483,7 +484,7 @@ public class DeadMounds extends SavedData {
      * column under a player's block does.
      */
     private static boolean underPlayersBlock(ServerLevel level, BlockPos pos) {
-        for (BlockPos up = pos.above(); level.isLoaded(up) && up.getY() < level.getMaxBuildHeight(); up = up.above()) {
+        for (BlockPos up = pos.above(); LandReady.at(level, up) && up.getY() < level.getMaxBuildHeight(); up = up.above()) {
             BlockState state = level.getBlockState(up);
             if (state.canBeReplaced()) {
                 return false;
@@ -543,7 +544,7 @@ public class DeadMounds extends SavedData {
         int changed = 0;
         for (Direction side : BARED) {
             BlockPos beside = gone.relative(side);
-            if (!level.isLoaded(beside)) {
+            if (!LandReady.at(level, beside)) {
                 continue;
             }
             BlockState state = level.getBlockState(beside);

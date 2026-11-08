@@ -1,19 +1,22 @@
 {
-  "type": "minecraft:flat_cache",
+  "type": "antcolonies:shared",
   "argument": {
-    "type": "minecraft:add",
-    "argument1": "antcolonies:overworld/raw_ridges_folded",
-    "argument2": {
-      "type": "minecraft:mul",
-      "argument1": {
-        "type": "minecraft:mul",
-        "argument1": -0.6,
-        "argument2": "antcolonies:overworld/savanna_flatness"
-      },
+    "type": "minecraft:flat_cache",
+    "argument": {
+      "type": "minecraft:add",
+      "argument1": "antcolonies:overworld/raw_ridges_folded",
       "argument2": {
-        "type": "minecraft:max",
-        "argument1": "antcolonies:overworld/raw_ridges_folded",
-        "argument2": 0.0
+        "type": "minecraft:mul",
+        "argument1": {
+          "type": "minecraft:mul",
+          "argument1": -0.6,
+          "argument2": "antcolonies:overworld/savanna_flatness"
+        },
+        "argument2": {
+          "type": "minecraft:max",
+          "argument1": "antcolonies:overworld/raw_ridges_folded",
+          "argument2": 0.0
+        }
       }
     }
   }

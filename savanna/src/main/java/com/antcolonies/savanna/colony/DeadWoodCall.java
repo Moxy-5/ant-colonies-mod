@@ -1,5 +1,6 @@
 package com.antcolonies.savanna.colony;
 
+import com.antcolonies.colony.LandReady;
 import com.antcolonies.colony.GroundTop;
 import com.antcolonies.colony.Colony;
 import java.util.ArrayDeque;
@@ -73,7 +74,7 @@ final class DeadWoodCall {
             for (int x = x0; x <= source.getX() + far; x += STEP) {
                 for (int z = z0; z <= source.getZ() + far; z += STEP) {
                     int dx = x - source.getX(), dz = z - source.getZ();
-                    if (dx * dx + dz * dz > far * far || !columns.add(BlockPos.asLong(x, 0, z)) || !level.hasChunk(x >> 4, z >> 4)) {
+                    if (dx * dx + dz * dz > far * far || !columns.add(BlockPos.asLong(x, 0, z)) || !LandReady.chunk(level, x >> 4, z >> 4)) {
                         continue;
                     }
                     top.set(x, GroundTop.y(level, x, z) - 1, z);
@@ -102,7 +103,7 @@ final class DeadWoodCall {
      * together): the way to it may go past the length the workers allow (a big find gets the diggers).
      */
     boolean isBig(ServerLevel level, BlockPos food, SavannaNumbers.WoodCall call) {
-        if (!level.isLoaded(food) || !isDeadWood(level.getBlockState(food))) {
+        if (!LandReady.at(level, food) || !isDeadWood(level.getBlockState(food))) {
             return false;
         }
         Wood wood = measure(level, food, new HashSet<>());
@@ -156,7 +157,7 @@ final class DeadWoodCall {
             for (Direction side : Direction.values()) {
                 BlockPos next = pos.relative(side);
                 if (Math.abs(next.getX() - start.getX()) <= SPREAD && Math.abs(next.getZ() - start.getZ()) <= SPREAD
-                        && Math.abs(next.getY() - start.getY()) <= 2 * SPREAD && level.isLoaded(next) && !measured.contains(next)
+                        && Math.abs(next.getY() - start.getY()) <= 2 * SPREAD && LandReady.at(level, next) && !measured.contains(next)
                         && isDeadWood(level.getBlockState(next))) {
                     measured.add(next);
                     open.add(next);

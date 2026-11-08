@@ -1,5 +1,6 @@
 package com.antcolonies.savanna.block;
 
+import com.antcolonies.colony.LandReady;
 import com.antcolonies.block.EatenInStages;
 import com.antcolonies.block.FoodCast;
 import java.util.ArrayDeque;
@@ -67,7 +68,7 @@ public class MudCastBlock extends TermiteTunnelBlock implements FoodCast {
             BlockPos cast = queue.poll();
             for (Direction side : Direction.values()) {
                 BlockPos next = cast.relative(side);
-                if (!level.hasChunkAt(next)) {
+                if (!LandReady.at(level, next)) {
                     return true;
                 }
                 BlockState state = level.getBlockState(next);

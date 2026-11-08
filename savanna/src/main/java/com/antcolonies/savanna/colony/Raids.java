@@ -1,5 +1,6 @@
 package com.antcolonies.savanna.colony;
 
+import com.antcolonies.colony.LandReady;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -289,7 +290,7 @@ public class Raids {
     void remember(ServerLevel level, BlockPos at, int worth, List<BlockPos> line) {
         long now = level.getGameTime();
         finds.add(new Find(at.immutable(), worth, now, now, 0, List.copyOf(line), null));
-        if (level.hasChunkAt(colony.getCenter()) && level.hasChunkAt(at) && trails.liveTo(at, trailReach(), trailNumbers(), now) == null) {
+        if (LandReady.at(level, colony.getCenter()) && LandReady.at(level, at) && trails.liveTo(at, trailReach(), trailNumbers(), now) == null) {
             trails.lay(level, colony.getCenter(), at, line, now, false);
         }
     }

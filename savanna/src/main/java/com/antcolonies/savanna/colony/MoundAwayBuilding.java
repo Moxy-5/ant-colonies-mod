@@ -1,5 +1,6 @@
 package com.antcolonies.savanna.colony;
 
+import com.antcolonies.colony.LandReady;
 import com.antcolonies.colony.AwayReport;
 import com.antcolonies.colony.BuildLife;
 import com.antcolonies.colony.Colony;
@@ -69,7 +70,7 @@ final class MoundAwayBuilding implements ColonyHooks.AwayBuilder {
                 }
                 BlockPos pos = entry.getKey();
                 MoundPlan.Part part = entry.getValue();
-                if (!level.isLoaded(pos)) {
+                if (!LandReady.at(level, pos)) {
                     continue;
                 }
                 MoundGrowth.Job job = mound.jobAt(level, pos, part);

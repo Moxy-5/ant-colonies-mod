@@ -138,6 +138,21 @@ neoForge {
             }
         }
 
+        // The flight run (savanna loading round 2, L1; tools/flight.sh): a headless server makes a new normal world in
+        // run-flight and a pretend player flies east from the spawn for -PflightSeconds (120) at view distance 12, then
+        // it writes run-flight/flight-report.txt (stalls, land in view made, tick time) and stops (watch/Flight).
+        // -PflightOld wires the land the old way (FlatSavanna.Shared off), for a before-and-after on the same land.
+        flight {
+            server()
+            programArgument '--nogui'
+            gameDirectory = project.file('run-flight')
+            systemProperty 'neoforge.enabledGameTestNamespaces', gameTestNamespaces
+            systemProperty 'antcolonies.flight', (project.findProperty('flightSeconds') ?: '120').toString()
+            if (project.hasProperty('flightOld')) {
+                systemProperty 'antcolonies.landWiringOld', 'true'
+            }
+        }
+
         // The in-game camera (client/FilmDirector, development only): a fresh flat creative world, a shot list played
         // and its screenshots saved to run-film/screenshots, then the game quits. Claude's eyes in the real game.
         // ./gradlew runFilm  (the poses scene)  or  ./gradlew runFilm -PfilmScene=tools/film/<scene>.film

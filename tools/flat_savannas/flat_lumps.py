@@ -4,6 +4,9 @@ root, jar, KEEP = sys.argv[1], sys.argv[2], float(sys.argv[3])
 FLOOD_KEEP = float(sys.argv[4]) if len(sys.argv) > 4 else None
 z = zipfile.ZipFile(jar)
 def w(path, obj):
+    # every land part wrapped in antcolonies:shared (savanna loading round 2): the same part, wired once per wiring
+    if '/density_function/' in path and obj.get("type") != "antcolonies:shared":
+        obj = {"type": "antcolonies:shared", "argument": obj}
     p = os.path.join(root, path); os.makedirs(os.path.dirname(p), exist_ok=True)
     with open(p, 'w', newline='\n') as f: json.dump(obj, f, indent=2); f.write('\n')
 # the 3D noise's lumps kept at KEEP of their size in the savanna's climate (sloped_cheese = the land's height part + the

@@ -1,5 +1,6 @@
 package com.antcolonies.savanna.colony;
 
+import com.antcolonies.colony.LandReady;
 import java.util.ArrayList;
 import java.util.BitSet;
 import java.util.List;
@@ -256,7 +257,7 @@ public final class ScentTrails {
         boolean moved = false;
         for (int i = trail.unsure.nextSetBit(0); i >= 0; i = trail.unsure.nextSetBit(i + 1)) {
             BlockPos p = trail.points.get(i);
-            if (!level.hasChunkAt(p)) {
+            if (!LandReady.at(level, p)) {
                 continue;
             }
             trail.unsure.clear(i);
@@ -290,7 +291,7 @@ public final class ScentTrails {
         BitSet unsure = new BitSet();
         for (BlockPos p : line) {
             boolean byEntrance = RaidGround.flat(p, entrance) <= ENTRANCE_FREE;
-            if (!byEntrance && !level.hasChunkAt(p)) {
+            if (!byEntrance && !LandReady.at(level, p)) {
                 unsure.set(points.size()); // (its land not loaded: put on its ground once it is; finding 15)
                 points.add(p.immutable());
                 continue;
@@ -371,7 +372,7 @@ public final class ScentTrails {
                     continue;
                 }
                 BlockPos p = trail.points.get(i);
-                if (!level.hasChunkAt(p) || p.closerThan(trail.to, SPOT_FREE)) {
+                if (!LandReady.at(level, p) || p.closerThan(trail.to, SPOT_FREE)) {
                     continue;
                 }
                 if (!RaidGround.canStand(level, p)) { // (the scent holds where an ant can stand)

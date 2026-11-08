@@ -1,5 +1,6 @@
 package com.antcolonies.savanna.colony;
 
+import com.antcolonies.colony.LandReady;
 import com.antcolonies.colony.GroundTop;
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -161,7 +162,7 @@ final class DeadWorks {
         int used = 0;
         for (Iterator<BlockPos> it = places.iterator(); it.hasNext() && used < budget; ) {
             BlockPos pos = it.next();
-            if (!level.isLoaded(pos) || days < dayOf.applyAsDouble(pos)) {
+            if (!LandReady.at(level, pos) || days < dayOf.applyAsDouble(pos)) {
                 continue;
             }
             int changed = step.at(level, pos);
@@ -184,7 +185,7 @@ final class DeadWorks {
         int changed = 0;
         for (Direction side : Direction.values()) {
             BlockPos wall = cell.relative(side);
-            if (!level.isLoaded(wall)) {
+            if (!LandReady.at(level, wall)) {
                 continue;
             }
             BlockState state = level.getBlockState(wall);

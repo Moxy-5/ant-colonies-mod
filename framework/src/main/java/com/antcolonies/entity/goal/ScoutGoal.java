@@ -1,5 +1,6 @@
 package com.antcolonies.entity.goal;
 
+import com.antcolonies.colony.LandReady;
 import java.util.EnumSet;
 import java.util.List;
 import java.util.Set;
@@ -218,7 +219,7 @@ public class ScoutGoal extends Goal {
     @Nullable
     private static BlockPos openGround(ServerLevel level, Colony colony, int x, int z) {
         BlockPos center = colony.getCenter();
-        if (!level.hasChunkAt(new BlockPos(x, center.getY(), z))) {
+        if (!LandReady.at(level, new BlockPos(x, center.getY(), z))) {
             return null;
         }
         BlockPos cell = com.antcolonies.colony.GroundTop.cell(level, x, z);

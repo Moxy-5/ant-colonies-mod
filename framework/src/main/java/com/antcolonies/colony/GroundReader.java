@@ -46,7 +46,7 @@ public final class GroundReader implements TunnelRoute.Ground {
     @Override
     @Nullable
     public Integer groundTop(int x, int z) {
-        if (!level.hasChunkAt(new BlockPos(x, colony.getCenter().getY(), z))) {
+        if (!LandReady.at(level, new BlockPos(x, colony.getCenter().getY(), z))) {
             return null;
         }
         BlockPos top = surface(level, x, z, this::isCover);
@@ -76,7 +76,7 @@ public final class GroundReader implements TunnelRoute.Ground {
 
     @Override
     public boolean mayDig(BlockPos cell) {
-        return level.isLoaded(cell) && level.getBlockState(cell).is(ModTags.DIGGABLE) && !touchesFluid(cell)
+        return LandReady.at(level, cell) && level.getBlockState(cell).is(ModTags.DIGGABLE) && !touchesFluid(cell)
                 && !(level.getBlockState(cell.above()).getBlock() instanceof FallingBlock)
                 && !mound.containsKey(cell) && !keepOut.contains(cell);
     }
@@ -90,7 +90,7 @@ public final class GroundReader implements TunnelRoute.Ground {
     /** Dug out already under a roof of solid ground (an older tunnel): a tunnel may run on through it. */
     @Override
     public boolean isDug(BlockPos cell) {
-        return level.isLoaded(cell) && Nest.isDugOut(level, cell) && !keepOut.contains(cell) && !touchesFluid(cell)
+        return LandReady.at(level, cell) && Nest.isDugOut(level, cell) && !keepOut.contains(cell) && !touchesFluid(cell)
                 && !level.getBlockState(cell.above()).getCollisionShape(level, cell.above()).isEmpty();
     }
 

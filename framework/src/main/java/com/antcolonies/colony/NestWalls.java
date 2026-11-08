@@ -111,7 +111,7 @@ public class NestWalls {
                 if (direction == Direction.UP && colony.foragingHoles().isHole(level, next) && ForagingHoles.isOpen(level, next)) {
                     next = next.above();
                 }
-                if (nest.contains(next) && !joined.contains(next) && level.isLoaded(next) && Nest.isDugOut(level, next)) {
+                if (nest.contains(next) && !joined.contains(next) && LandReady.at(level, next) && Nest.isDugOut(level, next)) {
                     joined.add(next);
                     queue.add(next);
                 }
@@ -170,7 +170,7 @@ public class NestWalls {
      * of the dug-out nest cells beside it.
      */
     public boolean isLeakOpen(Level level, BlockPos hole) {
-        if (!level.isLoaded(hole) || !FacedWall.isWall(level.getBlockState(hole))) {
+        if (!LandReady.at(level, hole) || !FacedWall.isWall(level.getBlockState(hole))) {
             return isOpen(level, hole);
         }
         Set<BlockPos> nest = colony.nest().nestCells(level);
@@ -188,7 +188,7 @@ public class NestWalls {
      * colony eats in stages. Over a feeding gallery it is cased in mud ({@link #wallFirst}), so the gallery has a roof.
      */
     public static boolean isWalkThroughFood(Level level, BlockPos pos) {
-        if (!level.isLoaded(pos)) {
+        if (!LandReady.at(level, pos)) {
             return false;
         }
         BlockState state = level.getBlockState(pos);
@@ -209,7 +209,7 @@ public class NestWalls {
         List<BlockPos> gaps = new ArrayList<>();
         for (Direction side : Direction.values()) {
             BlockPos next = food.relative(side);
-            if (side == gallery || nest.contains(next) || next.equals(center) || !level.isLoaded(next) || isWalkThroughFood(level, next)
+            if (side == gallery || nest.contains(next) || next.equals(center) || !LandReady.at(level, next) || isWalkThroughFood(level, next)
                     || isColonyOpening(level, next) || !level.getFluidState(next).isEmpty() || !isOpenToward(level, next, side.getOpposite())) {
                 continue;
             }
@@ -223,7 +223,7 @@ public class NestWalls {
      * of mud with no plate on that side.
      */
     public static boolean isOpenToward(Level level, BlockPos hole, Direction toward) {
-        if (!level.isLoaded(hole)) {
+        if (!LandReady.at(level, hole)) {
             return false;
         }
         BlockState state = level.getBlockState(hole);
@@ -272,7 +272,7 @@ public class NestWalls {
         boolean allIn = true;
         for (Direction side : Direction.values()) {
             BlockPos next = target.relative(side);
-            if (nest.contains(next) || next.equals(center) || mound.containsKey(next) || !level.isLoaded(next)
+            if (nest.contains(next) || next.equals(center) || mound.containsKey(next) || !LandReady.at(level, next)
                     || colony.foragingHoles().isHole(level, next) || !level.getFluidState(next).isEmpty()
                     || !isOpenToward(level, next, side.getOpposite())) {
                 continue;
@@ -336,7 +336,7 @@ public class NestWalls {
         for (boolean needFloor : new boolean[] {true, false}) {
             for (Direction side : Direction.values()) {
                 BlockPos next = cell.relative(side);
-                if (out != null || side == Direction.DOWN || FacedWall.hasFace(wall, side) || !level.isLoaded(next)) {
+                if (out != null || side == Direction.DOWN || FacedWall.hasFace(wall, side) || !LandReady.at(level, next)) {
                     continue;
                 }
                 BlockState state = level.getBlockState(next);
@@ -493,7 +493,7 @@ public class NestWalls {
 
     /** A cell an insect can be in (loaded, not a full block, no fluid) that is not part of the nest. */
     private boolean isOutsideOpen(Level level, Set<BlockPos> nest, BlockPos cell) {
-        if (nest.contains(cell) || !level.isLoaded(cell) || colony.nest().isInside(level, cell)) {
+        if (nest.contains(cell) || !LandReady.at(level, cell) || colony.nest().isInside(level, cell)) {
             return false;
         }
         BlockState state = level.getBlockState(cell);
@@ -514,7 +514,7 @@ public class NestWalls {
             BlockPos cell = hole.relative(side);
             BlockPos floor = cell.below();
             // First straight through the hole: the nest on one side, out on the other.
-            if (nest.contains(hole.relative(side.getOpposite())) && !nest.contains(cell) && level.isLoaded(cell) && level.getBlockState(cell).getCollisionShape(level, cell).isEmpty()
+            if (nest.contains(hole.relative(side.getOpposite())) && !nest.contains(cell) && LandReady.at(level, cell) && level.getBlockState(cell).getCollisionShape(level, cell).isEmpty()
                     && level.getBlockState(cell).getFluidState().isEmpty() && level.getBlockState(floor).isFaceSturdy(level, floor, Direction.UP)) {
                 return cell;
             }
@@ -523,7 +523,7 @@ public class NestWalls {
         for (boolean intoTheNest : new boolean[] {false, true}) {
             for (Direction side : Direction.values()) {
                 BlockPos cell = hole.relative(side);
-                if (nest.contains(cell) == intoTheNest && level.isLoaded(cell) && level.getBlockState(cell).getCollisionShape(level, cell).isEmpty()
+                if (nest.contains(cell) == intoTheNest && LandReady.at(level, cell) && level.getBlockState(cell).getCollisionShape(level, cell).isEmpty()
                         && level.getBlockState(cell).getFluidState().isEmpty()) {
                     return cell;
                 }
@@ -537,7 +537,7 @@ public class NestWalls {
      * chest, a flower someone planted) is left alone. A chunk that is not loaded counts as closed.
      */
     private static boolean isOpen(Level level, BlockPos pos) {
-        if (!level.isLoaded(pos)) {
+        if (!LandReady.at(level, pos)) {
             return false;
         }
         BlockState state = level.getBlockState(pos);
@@ -564,7 +564,7 @@ public class NestWalls {
                 for (int dy = -1; dy <= 1; dy++) {
                     for (int dz = -1; dz <= 1; dz++) {
                         BlockPos spot = hole.offset(dx, dy, dz);
-                        if (nest.contains(spot) && !spots.contains(spot) && level.isLoaded(spot) && hasRoomToStand(level, spot)
+                        if (nest.contains(spot) && !spots.contains(spot) && LandReady.at(level, spot) && hasRoomToStand(level, spot)
                                 && (needFloor ? hasFloor(level, spot) : hasWallToClingTo(level, spot))) {
                             found.add(spot);
                         }
@@ -590,7 +590,7 @@ public class NestWalls {
             for (int dy = -1; dy <= 1; dy++) {
                 for (int dz = -1; dz <= 1; dz++) {
                     BlockPos spot = hole.offset(dx, dy, dz);
-                    if (!nest.contains(spot) || !level.isLoaded(spot) || !hasRoomToStand(level, spot)
+                    if (!nest.contains(spot) || !LandReady.at(level, spot) || !hasRoomToStand(level, spot)
                             || !(needFloor ? hasFloor(level, spot) : hasWallToClingTo(level, spot))) {
                         continue;
                     }

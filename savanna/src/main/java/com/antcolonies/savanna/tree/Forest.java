@@ -1,5 +1,6 @@
 package com.antcolonies.savanna.tree;
 
+import com.antcolonies.colony.LandReady;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
@@ -521,7 +522,7 @@ public class Forest extends SavedData {
         if (falls.containsKey(t.foot.asLong())) {
             return true; // being drawn falling: it lands by itself
         }
-        if (!level.hasChunkAt(t.foot)) {
+        if (!LandReady.at(level, t.foot)) {
             return false;
         }
         TreePlacer.Placed now = t.placedAge >= 0 ? soon(t, t.placedAge, t.placedStage, t.placedStep, t.placedTermites, t.placedRot) : null;
@@ -658,7 +659,7 @@ public class Forest extends SavedData {
      */
     public boolean fellNow(ServerLevel level, Tree t) {
         TreeKind kind = t.treeKind();
-        if (kind.isBaobab() || t.fell || t.toppling || falling(t) || t.placedAge < 0 || !level.hasChunkAt(t.foot)) {
+        if (kind.isBaobab() || t.fell || t.toppling || falling(t) || t.placedAge < 0 || !LandReady.at(level, t.foot)) {
             return false;
         }
         boolean rot = HeartRot.hollow(t);
@@ -931,7 +932,7 @@ public class Forest extends SavedData {
         double time = time(level);
         smoulders.values().removeIf(s -> s.until() < time);
         for (Smoulder s : smoulders.values()) {
-            if (!level.hasChunkAt(s.top())) {
+            if (!LandReady.at(level, s.top())) {
                 continue;
             }
             level.sendParticles(ParticleTypes.CAMPFIRE_COSY_SMOKE, s.top().getX() + 0.5, s.top().getY(), s.top().getZ() + 0.5, 2, 0.3, 0.1, 0.3, 0.005);
@@ -1100,7 +1101,7 @@ public class Forest extends SavedData {
     }
 
     private static boolean loaded(ServerLevel level, BoundingBox box) {
-        return level.hasChunksAt(box.minX(), box.minZ(), box.maxX(), box.maxZ());
+        return LandReady.box(level, box.minX() - 1, box.minZ() - 1, box.maxX() + 1, box.maxZ() + 1); // (one more: a block set at the edge tells its neighbours)
     }
 
     /** Whether no player can see the tree's foot, middle or top (a catch-up of many days waits until then). */
@@ -1177,7 +1178,7 @@ public class Forest extends SavedData {
                     continue;
                 }
                 int x0 = rx * REGION, z0 = rz * REGION;
-                if (!level.hasChunksAt(x0, z0, x0 + REGION - 1, z0 + REGION - 1)) {
+                if (!LandReady.box(level, x0, z0, x0 + REGION - 1, z0 + REGION - 1)) {
                     continue;
                 }
                 regionDays.put(key, today);

@@ -1,4 +1,4 @@
-# Savanna loading, round 2 (planned 2026-11-07, nothing built)
+# Savanna loading, round 2 (planned 2026-11-07, L1, L2 and L4 BUILT 2026-11-08, L3 not needed)
 
 The user's in-game test of the savanna rivers (2026-11-07, "I am in love it looks amazing"): making the world is slow at
 first, then the game runs at normal speed, but **chunks load quite slowly**. Round 1 (`docs/plans/savanna-loading.md`,
@@ -39,6 +39,30 @@ same terrain files).
    for the slow world builder.
 4. The 18:52 run had view distance 20 (2.7 times the chunks of 12); tonight's was 12, so that is not tonight's cause.
    Worth knowing: 20 makes any slowness far worse.
+
+## Built (2026-11-08)
+
+| flight run, seed 8675309, 120 s east at 10.9 blocks a second, view 12 | before | after |
+|---|---|---|
+| one ground height (the land speed test, 3 seeds) | 7.2 to 7.9 ms | 1.8 to 1.9 ms |
+| finding the savanna spawn | 26.1 s | 11.0 s |
+| server start (`Done`) | 41.5 s | 18.1 s |
+| server tick, average | 33.8 ms | 9.9 ms |
+| our stalls (ticks over 300 ms) | 6, 55 s in all, longest 26 s | none |
+
+- **L1:** the land speed test (`SavannaLoadingTests`, `worldgen`), the stall watch (`debug/StallWatch`, `[stall]` lines in
+  every log), the flight run (`tools/flight.sh [seed] [seconds] [old]`, report in `run-flight/flight-report.txt`; `old`
+  runs the land wired the old way, for a "before").
+- **L2:** `antcolonies:shared` round every land part (`FlatSavanna.Shared`; added by the scripts in
+  `tools/flat_savannas/`). Why it was slow: Minecraft rewires its land recipe before each single height, rebuilding a part
+  at every place it is used; the flat savanna's parts sit at dozens of places in its curves. Now each part is wired once.
+  The land matches the saved fingerprint exactly (2,000 columns, 3 seeds).
+- **L3: not built** (my pick): a height costs less than vanilla's 2.5 ms now.
+- **L4:** every stall was our code reading a chunk Minecraft calls "loaded" (wanted) while it is still being made, which
+  freezes the server until it is done. `colony/LandReady` (the chunk really in memory) replaces Minecraft's check in all
+  game code. The one stall left in the flight is Minecraft's own (a trial chamber vault, `docs/BUGS.md` 183).
+- **L5:** build passes; full run stopped by the user with 5 of 6 servers done and the 6th 30 of 35 in: 3 known flakes
+  (BUGS 22, 167, 161) and 1 new failure (BUGS 184, the harvester larvae test, to rerun alone). In-game test owed.
 
 ## The steps
 

@@ -1,5 +1,6 @@
 package com.antcolonies.savanna.colony;
 
+import com.antcolonies.colony.LandReady;
 import com.antcolonies.colony.Claims;
 import com.antcolonies.colony.Colony;
 import com.antcolonies.colony.NestWalls;
@@ -319,7 +320,7 @@ public class Mound {
     /** Whether every cell of the stage being built is as the plan has it (nothing left to build, carve, reshape or clear). */
     private boolean isStageDone(Level level) {
         for (Map.Entry<BlockPos, MoundPlan.Part> entry : getParts(level).entrySet()) {
-            if (level.isLoaded(entry.getKey()) && jobAt(level, entry.getKey(), entry.getValue()) != null) {
+            if (LandReady.at(level, entry.getKey()) && jobAt(level, entry.getKey(), entry.getValue()) != null) {
                 return false;
             }
         }
@@ -396,7 +397,7 @@ public class Mound {
         }
         for (BlockPos offset : earlier) {
             BlockPos pos = center.offset(offset);
-            if (MoundGrowth.crumblesAway(cachedParts.get(pos)) && level.isLoaded(pos) && isPieceBlock(level.getBlockState(pos))) {
+            if (MoundGrowth.crumblesAway(cachedParts.get(pos)) && LandReady.at(level, pos) && isPieceBlock(level.getBlockState(pos))) {
                 level.destroyBlock(pos, false);
             }
         }
@@ -447,7 +448,7 @@ public class Mound {
     public int countFinished(Level level) {
         int finished = 0;
         for (Map.Entry<BlockPos, MoundPlan.Part> entry : getParts(level).entrySet()) {
-            if (isSoil(entry.getValue()) && level.isLoaded(entry.getKey()) && isWallDone(level, entry.getKey())) {
+            if (isSoil(entry.getValue()) && LandReady.at(level, entry.getKey()) && isWallDone(level, entry.getKey())) {
                 finished++;
             }
         }
@@ -492,7 +493,7 @@ public class Mound {
         Set<BlockPos> nestCells = colony.nest().nestCells(level);
         List<BlockPos> found = new ArrayList<>();
         for (Map.Entry<BlockPos, MoundPlan.Part> entry : getParts(level).entrySet()) {
-            if (!level.isLoaded(entry.getKey())) {
+            if (!LandReady.at(level, entry.getKey())) {
                 continue;
             }
             BlockPos spot = isSoil(entry.getValue()) ? spotIn(level, entry.getKey(), nestCells)
@@ -527,7 +528,7 @@ public class Mound {
         // The foot of the mound over a dip: fill it from the ground up.
         for (int i = 1; i <= MAX_FOOTING; i++) {
             BlockPos below = wall.below(i);
-            if (nestCells.contains(below) || !level.isLoaded(below)) {
+            if (nestCells.contains(below) || !LandReady.at(level, below)) {
                 return null;
             }
             BlockState under = level.getBlockState(below);
@@ -760,7 +761,7 @@ public class Mound {
 
     /** Whether a block is the mound's own soil (or a bump of earth) in a cell that must now be hollow. */
     public boolean isClearJob(Level level, BlockPos pos) {
-        if (!isActive() || getParts(level).get(pos) != MoundPlan.Part.OPEN || !level.isLoaded(pos)) {
+        if (!isActive() || getParts(level).get(pos) != MoundPlan.Part.OPEN || !LandReady.at(level, pos)) {
             return false;
         }
         BlockState state = level.getBlockState(pos);

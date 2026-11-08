@@ -1,5 +1,6 @@
 package com.antcolonies.savanna.colony;
 
+import com.antcolonies.colony.LandReady;
 import com.antcolonies.colony.GroundTop;
 import java.util.ArrayList;
 import java.util.List;
@@ -199,7 +200,7 @@ public class NewLandMounds extends SavedData {
     }
 
     private static boolean loadedRound(ServerLevel level, BlockPos middle, int round) {
-        return level.hasChunksAt(middle.offset(-round, 0, -round), middle.offset(round, 0, round));
+        return LandReady.round(level, middle, round);
     }
 
     /** How many places' mound shapes are grown in the background at once (each about a second of one thread's work). */
@@ -755,7 +756,7 @@ public class NewLandMounds extends SavedData {
                 tree = TreePlacer.rest(tree, foot, (gx, gz) -> top(level, gx, gz).getY());
             }
             BoundingBox box = tree.box(foot);
-            if (!level.hasChunksAt(box.minX(), box.minZ(), box.maxX(), box.maxZ())) {
+            if (!LandReady.box(level, box.minX() - 1, box.minZ() - 1, box.maxX() + 1, box.maxZ() + 1)) {
                 unloaded++;
                 continue;
             }
@@ -833,7 +834,7 @@ public class NewLandMounds extends SavedData {
         int lowest = Integer.MAX_VALUE, highest = Integer.MIN_VALUE;
         int[][] around = {{0, 0}, {reach, 0}, {-reach, 0}, {0, reach}, {0, -reach}};
         for (int[] o : around) {
-            if (!level.hasChunk((x + o[0]) >> 4, (z + o[1]) >> 4)) {
+            if (!LandReady.at(level, x + o[0], z + o[1])) {
                 why[5]++;
                 return null;
             }

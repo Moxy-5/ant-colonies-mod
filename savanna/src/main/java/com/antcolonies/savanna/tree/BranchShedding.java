@@ -1,5 +1,6 @@
 package com.antcolonies.savanna.tree;
 
+import com.antcolonies.colony.LandReady;
 import java.util.Random;
 
 import com.antcolonies.savanna.block.FallenBranchBlock;
@@ -69,7 +70,7 @@ public final class BranchShedding {
             }
             BlockPos from = foot.offset(now.xs()[i], now.ys()[i], now.zs()[i]);
             // Start just under the crown block: the branch falls through the air to the ground below.
-            if (!level.isLoaded(from) || !TreePlacer.isOpen(level.getBlockState(from.below()))) {
+            if (!LandReady.at(level, from) || !TreePlacer.isOpen(level.getBlockState(from.below()))) {
                 continue;
             }
             if (Forest.dropBranch(level, from.below(), dice)) {
@@ -87,7 +88,7 @@ public final class BranchShedding {
         int count = 0;
         BlockPos lo = foot.offset(now.minX(), -COUNT_DEPTH, now.minZ()), hi = foot.offset(now.maxX(), COUNT_DEPTH, now.maxZ());
         for (BlockPos pos : BlockPos.betweenClosed(lo, hi)) {
-            if (!level.isLoaded(pos)) {
+            if (!LandReady.at(level, pos)) {
                 continue;
             }
             BlockState state = level.getBlockState(pos);

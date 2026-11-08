@@ -1,5 +1,6 @@
 package com.antcolonies.savanna.colony;
 
+import com.antcolonies.colony.LandReady;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -92,13 +93,13 @@ public final class MatabeleNest {
     private static boolean isLoadedRound(ServerLevel level, BlockPos pos, int reach) {
         for (int dx = -reach; dx <= reach; dx += 16) {
             for (int dz = -reach; dz <= reach; dz += 16) {
-                if (!level.isLoaded(pos.offset(dx, 0, dz))) {
+                if (!LandReady.at(level, pos.offset(dx, 0, dz))) {
                     return false;
                 }
             }
         }
-        return level.isLoaded(pos.offset(reach, 0, reach)) && level.isLoaded(pos.offset(-reach, 0, -reach))
-                && level.isLoaded(pos.offset(reach, 0, -reach)) && level.isLoaded(pos.offset(-reach, 0, reach));
+        return LandReady.at(level, pos.offset(reach, 0, reach)) && LandReady.at(level, pos.offset(-reach, 0, -reach))
+                && LandReady.at(level, pos.offset(reach, 0, -reach)) && LandReady.at(level, pos.offset(-reach, 0, reach));
     }
 
     // ----- A dead termite mound -----

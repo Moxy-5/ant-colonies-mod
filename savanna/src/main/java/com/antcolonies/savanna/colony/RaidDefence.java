@@ -1,5 +1,6 @@
 package com.antcolonies.savanna.colony;
 
+import com.antcolonies.colony.LandReady;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.LinkedHashSet;
@@ -203,7 +204,7 @@ public class RaidDefence {
         tickedAt = now;
         SavannaNumbers.RaidNumbers numbers = numbers();
         for (Breach breach : new ArrayList<>(breaches)) {
-            if (!level.isLoaded(breach.plug)) {
+            if (!LandReady.at(level, breach.plug)) {
                 continue;
             }
             if (foeWithin(level, Vec3.atCenterOf(breach.at), numbers.drumReach())) {
@@ -375,7 +376,7 @@ public class RaidDefence {
                 int last = Math.min(cells.size() - 1, plug + numbers().plugBack()); // (the break's own cell)
                 for (int i = plug + 1; i <= last; i++) {
                     BlockPos cell = cells.get(i);
-                    if (level.isLoaded(cell) && Alarm.standable(level, cell)) {
+                    if (LandReady.at(level, cell) && Alarm.standable(level, cell)) {
                         out.add(cell);
                     }
                 }
@@ -386,7 +387,7 @@ public class RaidDefence {
             }
             for (BlockPos cell : cells) {
                 double distance = cell.distSqr(spot);
-                if (distance >= WAVE_NEAREST * WAVE_NEAREST && distance <= WAVE_FARTHEST * WAVE_FARTHEST && level.isLoaded(cell)
+                if (distance >= WAVE_NEAREST * WAVE_NEAREST && distance <= WAVE_FARTHEST * WAVE_FARTHEST && LandReady.at(level, cell)
                         && Alarm.standable(level, cell)) {
                     out.add(cell);
                 }

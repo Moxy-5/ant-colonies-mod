@@ -1,5 +1,6 @@
 package com.antcolonies.desert.entity.goal;
 
+import com.antcolonies.colony.LandReady;
 import com.antcolonies.colony.GroundTop;
 import com.antcolonies.entity.goal.Errand;
 import java.util.ArrayList;
@@ -226,7 +227,7 @@ public class PatrolGoal extends Goal {
     private static BlockPos surface(ServerLevel level, BlockPos center, double angle, int distance) {
         int x = center.getX() + Mth.floor(Math.cos(angle) * distance + 0.5);
         int z = center.getZ() + Mth.floor(Math.sin(angle) * distance + 0.5);
-        if (!level.hasChunkAt(new BlockPos(x, center.getY(), z))) {
+        if (!LandReady.at(level, new BlockPos(x, center.getY(), z))) {
             return center;
         }
         return GroundTop.cell(level, x, z);

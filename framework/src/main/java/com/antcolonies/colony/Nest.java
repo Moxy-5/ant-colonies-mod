@@ -226,7 +226,7 @@ public class Nest {
                 return next;
             }
             BlockPos shaftCell = center.below(NestPlan.FOUNDING_DEPTH);
-            if (!level.isLoaded(shaftCell) || !level.getBlockState(shaftCell).isAir()) {
+            if (!LandReady.at(level, shaftCell) || !level.getBlockState(shaftCell).isAir()) {
                 return null;
             }
             next = firstDiggable(level, planned.founding().cells());
@@ -245,7 +245,7 @@ public class Nest {
         }
         // Only start the tunnels once the shaft is completely open down to its bottom.
         BlockPos bottom = center.below(depth);
-        if (!level.isLoaded(bottom) || !level.getBlockState(bottom).isAir()) {
+        if (!LandReady.at(level, bottom) || !level.getBlockState(bottom).isAir()) {
             return null;
         }
         NestLayout layout = getLayout(level);
@@ -419,7 +419,7 @@ public class Nest {
     /** True when the entrance shaft is dug out down to {@code depth} blocks. */
     private boolean isShaftOpen(Level level, int depth) {
         for (int i = 1; i <= depth; i++) {
-            if (!level.isLoaded(center.below(i)) || !level.getBlockState(center.below(i)).isAir()) {
+            if (!LandReady.at(level, center.below(i)) || !level.getBlockState(center.below(i)).isAir()) {
                 return false;
             }
         }
@@ -554,7 +554,7 @@ public class Nest {
         Set<BlockPos> brood = colony.brood().getBroodCells(level);
         Set<BlockPos> planned = nestCells(level);
         cells.removeIf(pos -> {
-            if (!level.isLoaded(pos)) {
+            if (!LandReady.at(level, pos)) {
                 return true;
             }
             BlockState state = level.getBlockState(pos);
@@ -589,7 +589,7 @@ public class Nest {
      * it again (species with {@code seal_while_founding}).
      */
     public boolean isEntrancePlugged(Level level) {
-        return colony.profile().nest().sealWhileFounding() && !colony.isFounding() && level.isLoaded(center)
+        return colony.profile().nest().sealWhileFounding() && !colony.isFounding() && LandReady.at(level, center)
                 && colony.profile().nest().isPlug(level.getBlockState(center));
     }
 
@@ -615,7 +615,7 @@ public class Nest {
      * nothing to stand on, no water). Real founding queens and kings clear their spot before they dig in.
      */
     public boolean isPlantInEntrance(Level level) {
-        if (!level.isLoaded(center)) {
+        if (!LandReady.at(level, center)) {
             return false;
         }
         BlockState state = level.getBlockState(center);
@@ -666,7 +666,7 @@ public class Nest {
             left.add(center);
         }
         for (BlockPos pos : cells) {
-            if (!level.isLoaded(pos)) {
+            if (!LandReady.at(level, pos)) {
                 return null;
             }
             if (isSoil(level.getBlockState(pos))) {
@@ -702,7 +702,7 @@ public class Nest {
             }
             List<BlockPos> left = new ArrayList<>();
             for (BlockPos pos : cells) {
-                if (!level.isLoaded(pos)) {
+                if (!LandReady.at(level, pos)) {
                     return null;
                 }
                 if (isSoil(level.getBlockState(pos))) {
@@ -780,7 +780,7 @@ public class Nest {
     /** Whether the entrance hole is open: nothing solid in it (grass or snow do not close it). */
     public boolean isEntranceOpen(Level level) {
         BlockState state = level.getBlockState(center);
-        return level.isLoaded(center) && state.canBeReplaced() && state.getFluidState().isEmpty();
+        return LandReady.at(level, center) && state.canBeReplaced() && state.getFluidState().isEmpty();
     }
 
     /**
@@ -793,7 +793,7 @@ public class Nest {
 
     /** Open, or only a heap of seeds, bread or forage on the floor, or carved into a soil ramp: the block is dug out. A chunk that is not loaded counts as not dug. */
     public static boolean isDugOut(Level level, BlockPos pos) {
-        if (!level.isLoaded(pos)) {
+        if (!LandReady.at(level, pos)) {
             return false;
         }
         BlockState state = level.getBlockState(pos);
@@ -869,13 +869,13 @@ public class Nest {
         }
         NestPlan.Chamber founding = getFoundingChamber(level);
         BlockPos foundingShaft = center.below(NestPlan.FOUNDING_DEPTH);
-        if (founding != null && level.isLoaded(foundingShaft) && level.getBlockState(foundingShaft).isAir()) {
+        if (founding != null && LandReady.at(level, foundingShaft) && level.getBlockState(foundingShaft).isAir()) {
             cells.addAll(founding.cells());
         }
         BlockPos bottom = center.below(depth);
         if (site != null && layout != null) {
             cells.addAll(layout.cells()); // a nest of ready spaces: its ways and rooms (no shaft of its own, see settle)
-        } else if (level.isLoaded(bottom) && level.getBlockState(bottom).isAir()) {
+        } else if (LandReady.at(level, bottom) && level.getBlockState(bottom).isAir()) {
             NestLayout layout = getLayout(level);
             if (layout != null) {
                 cells.addAll(layout.cells());
@@ -955,7 +955,7 @@ public class Nest {
         boolean allLoaded = true;
         for (NestPlan.ForagingTunnel tunnel : flat) {
             BlockPos hole = tunnel.hole();
-            if (!level.isLoaded(hole) || !level.isLoaded(hole.relative(tunnel.side(), 2))) {
+            if (!LandReady.at(level, hole) || !LandReady.at(level, hole.relative(tunnel.side(), 2))) {
                 allLoaded = false;
                 fitted.add(tunnel);
                 continue;
@@ -1026,7 +1026,7 @@ public class Nest {
             List<BlockPos> topDown = new ArrayList<>(galleries);
             topDown.sort((a, b) -> Integer.compare(b.getY(), a.getY()));
             for (BlockPos gallery : topDown) {
-                if (level.isLoaded(gallery) && level.getBlockState(gallery.above()).getCollisionShape(level, gallery.above()).isEmpty()
+                if (LandReady.at(level, gallery) && level.getBlockState(gallery.above()).getCollisionShape(level, gallery.above()).isEmpty()
                         && !NestWalls.isWalkThroughFood(level, gallery.above()) && !cells.contains(gallery.above())) {
                     cells.remove(gallery);
                 }
@@ -1110,7 +1110,7 @@ public class Nest {
     public BlockPos firstDiggable(Level level, List<BlockPos> cells) {
         Set<BlockPos> nestCells = null;
         for (BlockPos pos : cells) {
-            if (!level.isLoaded(pos)) {
+            if (!LandReady.at(level, pos)) {
                 return null;
             }
             if (!isSoil(level.getBlockState(pos))) {
@@ -1171,7 +1171,7 @@ public class Nest {
         for (Direction side : Direction.Plane.HORIZONTAL) {
             BlockPos pos = target.relative(side);
             // Beside it on a heap of food or a fungus comb is fine too (a room partly dug and already in use).
-            if (level.isLoaded(pos) && isDugOut(level, pos)) {
+            if (LandReady.at(level, pos) && isDugOut(level, pos)) {
                 spots.add(pos);
             }
         }

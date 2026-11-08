@@ -1,5 +1,6 @@
 package com.antcolonies.fight;
 
+import com.antcolonies.colony.LandReady;
 import com.antcolonies.colony.GroundTop;
 import java.util.UUID;
 
@@ -215,7 +216,7 @@ public final class Fights {
         for (int steps = 0; steps <= most && !ring.isEmpty(); steps++) {
             List<BlockPos> next = new ArrayList<>();
             for (BlockPos at : ring) {
-                if (!level.isLoaded(at)) {
+                if (!LandReady.at(level, at)) {
                     continue;
                 }
                 if (isInTheOpen(level, at)) {

@@ -1,5 +1,6 @@
 package com.antcolonies.savanna.colony;
 
+import com.antcolonies.colony.LandReady;
 import com.antcolonies.colony.Caste;
 import com.antcolonies.colony.Colony;
 import com.antcolonies.colony.ColonyHooks;
@@ -158,7 +159,7 @@ final class GalleryWeb {
         ways.add(front);
         ways.add(front.getOpposite());
         for (Direction way : ways) {
-            if (!level.isLoaded(center.relative(way, numbers.armLength() + 2))) {
+            if (!LandReady.at(level, center.relative(way, numbers.armLength() + 2))) {
                 return; // (later, once the ground out there is loaded)
             }
         }
@@ -407,7 +408,7 @@ final class GalleryWeb {
         }
         for (NestPlan.ForagingTunnel arm : arms) {
             for (BlockPos cell : ownCells(arm)) {
-                if (!level.isLoaded(cell) || !Nest.isDugOut(level, cell)) {
+                if (!LandReady.at(level, cell) || !Nest.isDugOut(level, cell)) {
                     return; // one piece at a time: the last ones are dug first
                 }
             }
@@ -608,8 +609,8 @@ final class GalleryWeb {
     /** Whether the ground round a tip's end is loaded as far as its next piece may go. */
     private static boolean loadedAround(Level level, BlockPos end, SavannaNumbers.GalleryNumbers numbers) {
         int around = numbers.pieceLength() + TunnelRoute.HOLE_REACH + 2;
-        return level.isLoaded(end.offset(around, 0, around)) && level.isLoaded(end.offset(-around, 0, -around))
-                && level.isLoaded(end.offset(around, 0, -around)) && level.isLoaded(end.offset(-around, 0, around));
+        return LandReady.at(level, end.offset(around, 0, around)) && LandReady.at(level, end.offset(-around, 0, -around))
+                && LandReady.at(level, end.offset(around, 0, -around)) && LandReady.at(level, end.offset(-around, 0, around));
     }
 
     /**

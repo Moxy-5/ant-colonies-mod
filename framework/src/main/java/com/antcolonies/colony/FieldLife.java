@@ -154,9 +154,9 @@ public class FieldLife {
             boolean fromInside = schedule && plant.rich() && food.isFeedableFromInside(level, at);
             known.put(at, new Plant(numbers.plants().indexOf(plant), (float) walk(at, exits), fromInside));
         }
-        known.keySet().removeIf(pos -> !seen.contains(pos) && level.isLoaded(pos) && numbers.plantFor(level.getBlockState(pos)) == null);
+        known.keySet().removeIf(pos -> !seen.contains(pos) && LandReady.at(level, pos) && numbers.plantFor(level.getBlockState(pos)) == null);
         unknown.keySet().removeIf(pos -> known.containsKey(pos) || !picture
-                || !seen.contains(pos) && level.isLoaded(pos) && numbers.plantFor(level.getBlockState(pos)) == null);
+                || !seen.contains(pos) && LandReady.at(level, pos) && numbers.plantFor(level.getBlockState(pos)) == null);
         progress.keySet().retainAll(known.keySet());
     }
 
@@ -408,10 +408,10 @@ public class FieldLife {
         if (places <= 0) {
             return 0;
         }
-        if (level.isLoaded(pos) && colony.profile().food().plantFor(level.getBlockState(pos)) == null) {
+        if (LandReady.at(level, pos) && colony.profile().food().plantFor(level.getBlockState(pos)) == null) {
             return 0; // no plant there any more (the next look forgets it): nothing to cut
         }
-        if (level.isLoaded(pos) && !Population.outOfSight(level, pos, eyes)) {
+        if (LandReady.at(level, pos) && !Population.outOfSight(level, pos, eyes)) {
             progress.remove(pos); // a player sees it: left to the real foragers
             return 0;
         }
@@ -478,7 +478,7 @@ public class FieldLife {
         for (Iterator<Map.Entry<BlockPos, Long>> it = owed.entrySet().iterator(); it.hasNext() && done < PLANTS_PER_SECOND; ) {
             Map.Entry<BlockPos, Long> entry = it.next();
             BlockPos pos = entry.getKey();
-            if (!level.isLoaded(pos)) {
+            if (!LandReady.at(level, pos)) {
                 continue;
             }
             if (eyes == null) {

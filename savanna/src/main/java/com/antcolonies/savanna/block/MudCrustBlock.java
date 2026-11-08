@@ -1,5 +1,6 @@
 package com.antcolonies.savanna.block;
 
+import com.antcolonies.colony.LandReady;
 import com.antcolonies.block.FacedWall;
 import java.util.HashMap;
 import java.util.Map;
@@ -167,7 +168,7 @@ public class MudCrustBlock extends Block implements FacedWall {
      * insects' food (wood they are eating under it, a dead tree's wood too). A cell filled again with soil or stone needs no wall.
      */
     private static boolean isNeeded(LevelReader level, BlockPos cell) {
-        if (!level.hasChunkAt(cell)) {
+        if (!LandReady.at(level, cell)) {
             return true;
         }
         BlockState state = level.getBlockState(cell);

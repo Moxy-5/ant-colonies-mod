@@ -1,5 +1,6 @@
 package com.antcolonies.savanna.colony;
 
+import com.antcolonies.colony.LandReady;
 import com.antcolonies.colony.AwayReport;
 import com.antcolonies.colony.Colony;
 import com.antcolonies.colony.ColonyManager;
@@ -277,11 +278,11 @@ final class HoleTurns {
 
     static boolean allLoaded(Level level, NestPlan.ForagingTunnel tunnel) {
         for (BlockPos cell : tunnel.tunnel()) {
-            if (!level.isLoaded(cell)) {
+            if (!LandReady.at(level, cell)) {
                 return false;
             }
         }
-        return level.isLoaded(tunnel.hole());
+        return LandReady.at(level, tunnel.hole());
     }
 
     // --- turns -----------------------------------------------------------------------------------------------------
@@ -306,7 +307,7 @@ final class HoleTurns {
         } else {
             for (NestPlan.ForagingTunnel tunnel : colony.foragingHoles().tunnels(level)) {
                 BlockPos hole = tunnel.hole();
-                if (level.isLoaded(hole) && ForagingHoles.isDug(level, tunnel) && !ways.isSpent(hole) && ways.runwayAt(hole) == null
+                if (LandReady.at(level, hole) && ForagingHoles.isDug(level, tunnel) && !ways.isSpent(hole) && ways.runwayAt(hole) == null
                         && !candidates.contains(hole)) {
                     g.upkeep.dugHoles.add(hole.immutable());
                     if (!colony.isHoleKeptShut(level, hole)) { // (brain step 4g: an attacked hole has no turn)

@@ -127,7 +127,7 @@ public class FoodMap {
         lookedAt = now;
         List<BlockPos> plants = colony.food().plants(level);
         Set<BlockPos> stillPlants = new HashSet<>(plants);
-        known.removeIf(plant -> level.isLoaded(plant) && !stillPlants.contains(plant) && !colony.food().isFoodPlant(level.getBlockState(plant)));
+        known.removeIf(plant -> LandReady.at(level, plant) && !stillPlants.contains(plant) && !colony.food().isFoodPlant(level.getBlockState(plant)));
         double see = food().findRadius();
         double reach = colony.searchReach() + 8.0;
 

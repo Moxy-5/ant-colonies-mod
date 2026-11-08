@@ -1,5 +1,6 @@
 package com.antcolonies.desert.colony;
 
+import com.antcolonies.colony.LandReady;
 import com.antcolonies.colony.Colony;
 import com.antcolonies.colony.ColonyHooks;
 import java.util.UUID;
@@ -62,7 +63,7 @@ final class ForagerSearch implements ColonyHooks.LoneSearch {
         }
         BlockPos middle = colony.getCenter();
         BlockPos own = spots.spotOf(ant.getUUID());
-        if (own != null && level.hasChunkAt(own) && colony.mayForageAt(level, own) && colony.foodMap().mayScout(own)) {
+        if (own != null && LandReady.at(level, own) && colony.mayForageAt(level, own) && colony.foodMap().mayScout(own)) {
             double angle = Math.atan2(own.getZ() - middle.getZ(), own.getX() - middle.getX());
             double from = Math.max(LEAST_OUT, flat(own));
             return new ColonyHooks.SearchPlan(own, angle, from, Math.max(colony.foragingRadius(), (int) Math.ceil(from)), true);

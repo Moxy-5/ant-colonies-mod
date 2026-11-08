@@ -400,7 +400,7 @@ public class FoodStore {
             }
             // Forget the cuts of plants that are gone (eaten by something else, broken by a player), so a new tuft
             // growing in the same spot starts whole.
-            grassClips.keySet().removeIf(pos -> level.hasChunkAt(pos) && food().plantFor(level.getBlockState(pos)) == null);
+            grassClips.keySet().removeIf(pos -> LandReady.at(level, pos) && food().plantFor(level.getBlockState(pos)) == null);
         }
         return grassTufts;
     }
@@ -450,7 +450,7 @@ public class FoodStore {
      * below the nest (long trails run over hills): any plant counts up to the rich food's height difference.
      */
     private void scanColumn(Level level, int x, int z, boolean far) {
-        if (!level.hasChunkAt(new BlockPos(x, center.getY(), z))) {
+        if (!LandReady.at(level, new BlockPos(x, center.getY(), z))) {
             return;
         }
         BlockPos top = new BlockPos(x, level.getHeight(Heightmap.Types.WORLD_SURFACE, x, z), z);
@@ -658,7 +658,7 @@ public class FoodStore {
             // into it, block after block up a dead trunk (the user's ask, 2026-10-19).
             for (net.minecraft.core.Direction side : net.minecraft.core.Direction.values()) {
                 BlockPos beyond = pos.relative(side);
-                if (level.isLoaded(beyond) && isFoodPlant(level.getBlockState(beyond))) {
+                if (LandReady.at(level, beyond) && isFoodPlant(level.getBlockState(beyond))) {
                     colony.foodMap().learn(beyond);
                 }
             }
@@ -673,7 +673,7 @@ public class FoodStore {
      */
     int cutByNumbers(Level level, BlockPos plant, SpeciesProfile.PlantFood food) {
         BlockPos pos = plant.immutable();
-        if (!grassClips.containsKey(pos) && level.isLoaded(pos) && level.getBlockState(pos).getBlock() instanceof EatenInStages eaten) {
+        if (!grassClips.containsKey(pos) && LandReady.at(level, pos) && level.getBlockState(pos).getBlock() instanceof EatenInStages eaten) {
             grassClips.put(pos, eaten.eatenAlready(level.getBlockState(pos), food.pieces())); // already gnawed by someone else
         }
         return grassClips.merge(pos, 1, Integer::sum);
@@ -719,7 +719,7 @@ public class FoodStore {
         Set<BlockPos> young = colony.brood().getBroodCells(level);
         int room = 0;
         for (BlockPos pos : cells) {
-            if (!level.isLoaded(pos)) {
+            if (!LandReady.at(level, pos)) {
                 return; // (keep what was seen last)
             }
             BlockState state = level.getBlockState(pos);
@@ -797,7 +797,7 @@ public class FoodStore {
         Set<BlockPos> nest = colony.nest().nestCells(level);
         for (net.minecraft.core.Direction side : net.minecraft.core.Direction.Plane.HORIZONTAL) {
             BlockPos next = pos.relative(side);
-            if (!level.isLoaded(next) || nest.contains(next) || colony.nest().foodWays().getRunways().stream().anyMatch(r -> r.cells().contains(next))) {
+            if (!LandReady.at(level, next) || nest.contains(next) || colony.nest().foodWays().getRunways().stream().anyMatch(r -> r.cells().contains(next))) {
                 continue;
             }
             BlockState state = level.getBlockState(next);
@@ -841,7 +841,7 @@ public class FoodStore {
      */
     private void plaster(Level level, BlockPos wood, BlockState state) {
         BlockPos top = wood.above();
-        if (!colony.profile().nest().crustWalls() || !state.isCollisionShapeFullBlock(level, wood) || !level.isLoaded(top)) {
+        if (!colony.profile().nest().crustWalls() || !state.isCollisionShapeFullBlock(level, wood) || !LandReady.at(level, top)) {
             return;
         }
         BlockState above = level.getBlockState(top);

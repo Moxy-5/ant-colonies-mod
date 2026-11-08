@@ -1,5 +1,6 @@
 package com.antcolonies.savanna.colony;
 
+import com.antcolonies.colony.LandReady;
 import com.antcolonies.colony.AwayReport;
 import com.antcolonies.colony.Colony;
 import com.antcolonies.colony.ColonyHooks;
@@ -326,12 +327,12 @@ final class GalleryUpkeep {
             return false;
         }
         for (BlockPos cell : cells) {
-            if (!level.isLoaded(cell)) {
+            if (!LandReady.at(level, cell)) {
                 return false;
             }
         }
         for (BlockPos hole : holesOfPiece) {
-            if (!level.isLoaded(hole) || ForagingHoles.isOpen(level, hole)) {
+            if (!LandReady.at(level, hole) || ForagingHoles.isOpen(level, hole)) {
                 return false; // (shut tonight, or once the foragers are in)
             }
         }

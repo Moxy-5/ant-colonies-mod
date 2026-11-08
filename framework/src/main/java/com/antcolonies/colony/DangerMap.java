@@ -331,7 +331,7 @@ public class DangerMap {
             if (flat(place.pos, pos) > numbers.reach() || atHome(place.pos)) {
                 continue;
             }
-            if (level.isLoaded(place.pos) && !hostileAt(level, place)) {
+            if (LandReady.at(level, place.pos) && !hostileAt(level, place)) {
                 continue;
             }
             double strength = strength(place, now);

@@ -1,5 +1,6 @@
 package com.antcolonies.savanna.colony;
 
+import com.antcolonies.colony.LandReady;
 import com.antcolonies.colony.ColonyHooks;
 import com.antcolonies.colony.NestPlan;
 import com.antcolonies.colony.TunnelRoute;
@@ -94,7 +95,7 @@ final class FeedingGallery {
         boolean fromCast = com.antcolonies.savanna.block.MudCastBlock.isCast(fromState);
         for (Direction side : Direction.values()) {
             BlockPos next = from.relative(side);
-            if (casts.containsKey(next) || !level.isLoaded(next)) {
+            if (casts.containsKey(next) || !LandReady.at(level, next)) {
                 continue;
             }
             BlockState state = level.getBlockState(next);
@@ -158,7 +159,7 @@ final class FeedingGallery {
     /** The food blocks joined to {@code food} (face to face), near it. */
     static Set<BlockPos> foodBlocks(Level level, BlockPos food, java.util.function.Predicate<BlockPos> isFood) {
         Set<BlockPos> pieces = new LinkedHashSet<>();
-        if (!level.isLoaded(food) || !isFood.test(food)) {
+        if (!LandReady.at(level, food) || !isFood.test(food)) {
             return pieces;
         }
         ArrayDeque<BlockPos> queue = new ArrayDeque<>();
@@ -168,7 +169,7 @@ final class FeedingGallery {
             BlockPos at = queue.poll();
             for (Direction direction : Direction.values()) {
                 BlockPos next = at.relative(direction);
-                if (next.distManhattan(food) <= FOOD_SPREAD && !pieces.contains(next) && level.isLoaded(next) && isFood.test(next)) {
+                if (next.distManhattan(food) <= FOOD_SPREAD && !pieces.contains(next) && LandReady.at(level, next) && isFood.test(next)) {
                     pieces.add(next);
                     queue.add(next);
                 }

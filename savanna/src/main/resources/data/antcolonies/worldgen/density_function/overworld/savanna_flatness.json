@@ -1,69 +1,72 @@
 {
-  "type": "minecraft:flat_cache",
+  "type": "antcolonies:shared",
   "argument": {
-    "type": "antcolonies:whole_savanna",
+    "type": "minecraft:flat_cache",
     "argument": {
-      "type": "minecraft:mul",
-      "argument1": {
-        "type": "minecraft:spline",
-        "spline": {
-          "coordinate": {
-            "type": "minecraft:shifted_noise",
-            "noise": "minecraft:temperature",
-            "shift_x": "minecraft:shift_x",
-            "shift_y": 0.0,
-            "shift_z": "minecraft:shift_z",
-            "xz_scale": 0.25,
-            "y_scale": 0.0
-          },
-          "points": [
-            {
-              "location": -0.06,
-              "value": 0.0,
-              "derivative": 0.0
+      "type": "antcolonies:whole_savanna",
+      "argument": {
+        "type": "minecraft:mul",
+        "argument1": {
+          "type": "minecraft:spline",
+          "spline": {
+            "coordinate": {
+              "type": "minecraft:shifted_noise",
+              "noise": "minecraft:temperature",
+              "shift_x": "minecraft:shift_x",
+              "shift_y": 0.0,
+              "shift_z": "minecraft:shift_z",
+              "xz_scale": 0.25,
+              "y_scale": 0.0
             },
-            {
-              "location": 0.05,
-              "value": 1.0,
-              "derivative": 0.0
+            "points": [
+              {
+                "location": -0.06,
+                "value": 0.0,
+                "derivative": 0.0
+              },
+              {
+                "location": 0.05,
+                "value": 1.0,
+                "derivative": 0.0
+              },
+              {
+                "location": 0.6,
+                "value": 1.0,
+                "derivative": 0.0
+              },
+              {
+                "location": 0.7,
+                "value": 0.0,
+                "derivative": 0.0
+              }
+            ]
+          }
+        },
+        "argument2": {
+          "type": "minecraft:spline",
+          "spline": {
+            "coordinate": {
+              "type": "minecraft:shifted_noise",
+              "noise": "minecraft:vegetation",
+              "shift_x": "minecraft:shift_x",
+              "shift_y": 0.0,
+              "shift_z": "minecraft:shift_z",
+              "xz_scale": 0.25,
+              "y_scale": 0.0
             },
-            {
-              "location": 0.6,
-              "value": 1.0,
-              "derivative": 0.0
-            },
-            {
-              "location": 0.7,
-              "value": 0.0,
-              "derivative": 0.0
-            }
-          ]
-        }
-      },
-      "argument2": {
-        "type": "minecraft:spline",
-        "spline": {
-          "coordinate": {
-            "type": "minecraft:shifted_noise",
-            "noise": "minecraft:vegetation",
-            "shift_x": "minecraft:shift_x",
-            "shift_y": 0.0,
-            "shift_z": "minecraft:shift_z",
-            "xz_scale": 0.25,
-            "y_scale": 0.0
-          },
-          "points": [
-            {
-              "location": 0.3,
-              "value": 1.0,
-              "derivative": 0.0
-            },
-            {
-              "location": 0.42,
-              "value": 0.0,
-              "derivative": 0.0
-            }
-          ]
+            "points": [
+              {
+                "location": 0.3,
+                "value": 1.0,
+                "derivative": 0.0
+              },
+              {
+                "location": 0.42,
+                "value": 0.0,
+                "derivative": 0.0
+              }
+            ]
+          }
         }
       }
     }

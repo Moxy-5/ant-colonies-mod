@@ -1,5 +1,6 @@
 package com.antcolonies.desert.colony;
 
+import com.antcolonies.colony.LandReady;
 import com.antcolonies.colony.GroundTop;
 import com.antcolonies.colony.Caste;
 import com.antcolonies.colony.Colony;
@@ -524,7 +525,7 @@ public class TrunkTrails {
 
     @Nullable
     private static BlockPos ground(Level level, int x, int z) {
-        if (!level.hasChunkAt(new BlockPos(x, 0, z))) {
+        if (!LandReady.at(level, new BlockPos(x, 0, z))) {
             return null;
         }
         return new BlockPos(x, GroundTop.y(level, x, z) - 1, z);
@@ -641,7 +642,7 @@ public class TrunkTrails {
                     continue;
                 }
                 BlockPos ground = groundAt(level, trail, i);
-                if (ground == null || !level.isLoaded(ground.above())) {
+                if (ground == null || !LandReady.at(level, ground.above())) {
                     continue;
                 }
                 if (!workers.contains(key(new int[] {ground.getX(), ground.getZ()})) && !Population.outOfSight(level, ground.above(), eyes)) {
@@ -689,7 +690,7 @@ public class TrunkTrails {
                 continue;
             }
             BlockPos ground = ground(level, spot.x(), spot.z());
-            if (ground == null || !level.isLoaded(ground.above())) {
+            if (ground == null || !LandReady.at(level, ground.above())) {
                 continue;
             }
             if (!Population.outOfSight(level, ground.above(), eyes)) {

@@ -1,5 +1,6 @@
 package com.antcolonies.savanna.tree;
 
+import com.antcolonies.colony.LandReady;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -174,7 +175,7 @@ public final class TreeFall {
 
     /** One tick of the fall. Returns true when it is done (landed, or its land went away). */
     boolean tick() {
-        if (!level.hasChunkAt(foot) || !level.hasChunkAt(BlockPos.containing(pivot))) {
+        if (!LandReady.at(level, foot) || !LandReady.at(level, BlockPos.containing(pivot))) {
             // Its land went away in the middle: the displays went with it (thrown away when it loads), and the tree,
             // still marked toppling, is placed fallen when the land is back.
             displays.clear();

@@ -1,53 +1,56 @@
 {
-  "type": "minecraft:add",
-  "argument1": {
-    "type": "minecraft:mul",
-    "argument1": 4.0,
-    "argument2": {
-      "type": "minecraft:quarter_negative",
-      "argument": {
-        "type": "minecraft:mul",
-        "argument1": {
-          "type": "minecraft:add",
-          "argument1": "minecraft:overworld/depth",
-          "argument2": {
-            "type": "minecraft:mul",
-            "argument1": "minecraft:overworld/jaggedness",
+  "type": "antcolonies:shared",
+  "argument": {
+    "type": "minecraft:add",
+    "argument1": {
+      "type": "minecraft:mul",
+      "argument1": 4.0,
+      "argument2": {
+        "type": "minecraft:quarter_negative",
+        "argument": {
+          "type": "minecraft:mul",
+          "argument1": {
+            "type": "minecraft:add",
+            "argument1": "minecraft:overworld/depth",
             "argument2": {
-              "type": "minecraft:half_negative",
-              "argument": {
-                "type": "minecraft:noise",
-                "noise": "minecraft:jagged",
-                "xz_scale": 1500.0,
-                "y_scale": 0.0
+              "type": "minecraft:mul",
+              "argument1": "minecraft:overworld/jaggedness",
+              "argument2": {
+                "type": "minecraft:half_negative",
+                "argument": {
+                  "type": "minecraft:noise",
+                  "noise": "minecraft:jagged",
+                  "xz_scale": 1500.0,
+                  "y_scale": 0.0
+                }
               }
             }
-          }
-        },
-        "argument2": "minecraft:overworld/factor"
+          },
+          "argument2": "minecraft:overworld/factor"
+        }
       }
-    }
-  },
-  "argument2": {
-    "type": "minecraft:mul",
-    "argument1": "minecraft:overworld/base_3d_noise",
+    },
     "argument2": {
-      "type": "minecraft:add",
-      "argument1": 1.0,
+      "type": "minecraft:mul",
+      "argument1": "minecraft:overworld/base_3d_noise",
       "argument2": {
         "type": "minecraft:add",
-        "argument1": {
-          "type": "minecraft:mul",
-          "argument1": -0.6,
-          "argument2": "antcolonies:overworld/savanna_flatness"
-        },
+        "argument1": 1.0,
         "argument2": {
-          "type": "minecraft:mul",
-          "argument1": -0.30000000000000004,
+          "type": "minecraft:add",
+          "argument1": {
+            "type": "minecraft:mul",
+            "argument1": -0.6,
+            "argument2": "antcolonies:overworld/savanna_flatness"
+          },
           "argument2": {
             "type": "minecraft:mul",
-            "argument1": "antcolonies:overworld/savanna_flatness",
-            "argument2": "antcolonies:overworld/floodplain"
+            "argument1": -0.30000000000000004,
+            "argument2": {
+              "type": "minecraft:mul",
+              "argument1": "antcolonies:overworld/savanna_flatness",
+              "argument2": "antcolonies:overworld/floodplain"
+            }
           }
         }
       }

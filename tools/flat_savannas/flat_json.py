@@ -5,6 +5,9 @@ S = 0.4            # peaks squeezed to 0.4 of their height (factor's rough drop 
 E_LO, E_HI = 0.2, 0.36   # erosion target, inside band 4, clear of the 0.4+ rough splines
 A = (E_LO + E_HI) / 2; B = (E_HI - E_LO) / 2   # target = A + B*R
 def w(path, obj):
+    # every land part wrapped in antcolonies:shared (savanna loading round 2): the same part, wired once per wiring
+    if '/density_function/' in path and obj.get("type") != "antcolonies:shared":
+        obj = {"type": "antcolonies:shared", "argument": obj}
     p = os.path.join(root, path); os.makedirs(os.path.dirname(p), exist_ok=True)
     with open(p, 'w', newline='\n') as f: json.dump(obj, f, indent=2); f.write('\n')
 def noise(n):

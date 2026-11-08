@@ -12,6 +12,9 @@ FLOOD = float(sys.argv[4]) if len(sys.argv) > 4 else None
 CHANNEL, FLOOD_FROM, FLOOD_TO, PLAIN_AT = -0.86, -0.80, -0.55, 0.0
 z = zipfile.ZipFile(jar)
 def w(path, obj):
+    # every land part wrapped in antcolonies:shared (savanna loading round 2): the same part, wired once per wiring
+    if '/density_function/' in path and obj.get("type") != "antcolonies:shared":
+        obj = {"type": "antcolonies:shared", "argument": obj}
     p = os.path.join(root, path); os.makedirs(os.path.dirname(p), exist_ok=True)
     with open(p, 'w', newline='\n') as f: json.dump(obj, f, indent=2); f.write('\n')
 def spline(coord, pts):

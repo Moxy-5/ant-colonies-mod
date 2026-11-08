@@ -136,7 +136,7 @@ record NestLayout(List<NestPlan.Chamber> chambers, List<NestPlan.Chamber> sideRo
                     all.addAll(sideRooms(center.below(depth), direction));
                     for (NestPlan.Chamber chamber : all) {
                         for (BlockPos pos : chamber.cells()) {
-                            if (!level.isLoaded(pos)) {
+                            if (!LandReady.at(level, pos)) {
                                 return null;
                             }
                         }
