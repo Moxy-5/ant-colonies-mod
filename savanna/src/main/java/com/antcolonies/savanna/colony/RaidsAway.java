@@ -19,6 +19,7 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.util.RandomSource;
+import net.minecraft.world.entity.player.Player;
 
 /**
  * M8 step 3f, out of sight ({@code docs/plans/m8-matabele.md}): the Matabele raid while their colony is away (its land
@@ -216,7 +217,7 @@ public final class RaidsAway {
 
     /** Regrouping at the spot and the walk home laden, in ticks. */
     private long homeTicks(double distance, @Nullable SavannaNumbers.ColumnNumbers column, @Nullable SavannaNumbers.CarryNumbers carry) {
-        double laden = carry == null ? RaidColumn.DEFAULT_CARRY.ladenPace() : carry.ladenPace();
+        double laden = carry == null ? SavannaNumbers.CarryNumbers.DEFAULT.ladenPace() : carry.ladenPace();
         return (column == null ? 400 : column.regroupTicks())
                 + Math.round(distance / Math.max(0.1, numbers().pace() * laden) * 20.0);
     }
@@ -324,7 +325,6 @@ public final class RaidsAway {
         ColonyManager.get(level).markChanged();
     }
 
-    /** How many of {@code of} by a chance {@code share} each (a coin per ant, at most 2,500 ants). */
     /**
      * M8 step 3S out of sight (my picks, to the balance targets of {@code docs/DESIGN.md}, "Step 3S": of a raid, 0 to 2
      * dead and 1 to 5 hurt, 2 to 8 soldiers stung): the share of the soldiers at the break that each kill a raider, send
@@ -334,6 +334,7 @@ public final class RaidsAway {
     private static final double SOLDIER_HURTS = 0.3;
     private static final double STUNG_SOLDIER_SHARE = 0.5;
 
+    /** How many of {@code of} by a chance {@code share} each (a coin per ant, at most 2,500 ants). */
     private static int count(RandomSource random, int of, double share) {
         int hit = 0;
         for (int i = 0; i < of; i++) {
@@ -443,7 +444,7 @@ public final class RaidsAway {
 
     /** Whether a player (alive) is within this many blocks of the spot, sideways. */
     private static boolean playerNear(ServerLevel level, BlockPos at, int radius) {
-        for (net.minecraft.world.entity.player.Player player : level.players()) {
+        for (Player player : level.players()) {
             if (player.isAlive() && !player.isSpectator()) {
                 double dx = player.getX() - (at.getX() + 0.5);
                 double dz = player.getZ() - (at.getZ() + 0.5);

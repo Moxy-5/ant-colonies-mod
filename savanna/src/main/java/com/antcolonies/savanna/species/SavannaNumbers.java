@@ -735,6 +735,8 @@ public final class SavannaNumbers {
     public record CarryNumbers(int leastMajor, int mostMajor, int leastMinor, int mostMinor, double collectReach, int collectTicks,
                                int pickTicks, int spreadTicks, double spreadReach, double spreadSee, double ladenPace,
                                int termitesPerLayer, int bringTicks, int limpTicks) {
+        /** The carry numbers when a species file has none (the same as Megaponera's; were {@code RaidColumn.DEFAULT_CARRY}). */
+        public static final CarryNumbers DEFAULT = new CarryNumbers(4, 10, 1, 3, 10.0, 1200, 10, 600, 8.0, 5.0, 0.85, 10, 2400, 6000);
         public static final Codec<CarryNumbers> CODEC = RecordCodecBuilder.create(i -> i.group(
                 Codec.INT.optionalFieldOf("least_major", 4).forGetter(CarryNumbers::leastMajor),
                 Codec.INT.optionalFieldOf("most_major", 10).forGetter(CarryNumbers::mostMajor),

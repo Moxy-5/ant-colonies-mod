@@ -7,20 +7,25 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 
 import org.jetbrains.annotations.Nullable;
 
+import com.antcolonies.colony.AwayLife;
 import com.antcolonies.colony.Caste;
 import com.antcolonies.colony.Colony;
 import com.antcolonies.colony.ColonyManager;
 import com.antcolonies.entity.AbstractAntEntity;
+import com.antcolonies.savanna.SavannaMod;
 import com.antcolonies.savanna.SavannaSpecies;
 import com.antcolonies.savanna.entity.MatabeleEntity;
+import com.antcolonies.savanna.entity.goal.MatabeleRaidGoal;
 import com.antcolonies.savanna.registry.SavannaEntities;
 import com.antcolonies.savanna.species.SavannaNumbers;
+import com.antcolonies.watch.Watch;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.nbt.CompoundTag;
@@ -29,6 +34,8 @@ import net.minecraft.nbt.LongArrayTag;
 import net.minecraft.nbt.NbtUtils;
 import net.minecraft.nbt.Tag;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.level.Level;
 
 /**
  * M8 step 3, the Matabele raids ({@code docs/plans/m8-matabele.md}). Step 3a, the scouts: real Megaponera send lone
@@ -376,14 +383,14 @@ public class Raids {
             } catch (RuntimeException e) {
                 // B7 (nothing waits for ever): a column that cannot be worked out would hold its raiders for ever; it is
                 // given up and everyone walks home, and the error goes to the log for the bug list.
-                com.antcolonies.ColonyFrameworkMod.LOGGER.error("[raid] colony {}: the raid column's update failed; the raid is given up",
+                SavannaMod.LOGGER.error("[raid] colony {}: the raid column's update failed; the raid is given up",
                         colony.getId(), e);
                 say(level, "the raid's update failed (" + e + "): the raid is given up, everyone walks home");
                 column.abandon(level, e.toString());
             }
             for (RaidColumn.LetGo one : column.takeLetGo()) {
                 wayHome.send(one.ant(), column.back(), level.getGameTime(), one.why());
-                say(level, one.ant().toString().substring(0, 8) + " goes home along the trail by itself (" + one.why() + ")");
+                say(level, RaidGround.shortId(one.ant()) + " goes home along the trail by itself (" + one.why() + ")");
             }
             if (raidCheckAt >= 0 && level.getGameTime() >= raidCheckAt) {
                 raidCheckAt = -1;
@@ -427,7 +434,7 @@ public class Raids {
             }
         }
         SavannaNumbers.CarryNumbers carry = carryNumbers();
-        int limpTicks = carry == null ? RaidColumn.DEFAULT_CARRY.limpTicks() : carry.limpTicks();
+        int limpTicks = carry == null ? SavannaNumbers.CarryNumbers.DEFAULT.limpTicks() : carry.limpTicks();
         wayHome.forgetIf(id -> now - wayHome.since(id) > limpTicks || goneFor(level, id, now));
         if (now >= nextSweepAt) {
             nextSweepAt = now + SWEEP_EVERY; // (a clock of its own, no game-time remainder: the raid code review, finding 8)
@@ -443,7 +450,7 @@ public class Raids {
      * at once.
      */
     private boolean goneFor(ServerLevel level, UUID id, long now) {
-        net.minecraft.world.entity.Entity entity = level.getEntity(id);
+        Entity entity = level.getEntity(id);
         if (entity != null && !entity.isAlive()) {
             unseenSince.remove(id);
             return true;
@@ -453,7 +460,7 @@ public class Raids {
             return false;
         }
         long since = unseenSince.computeIfAbsent(id, key -> now);
-        return now - since > com.antcolonies.colony.AwayLife.GRACE_TICKS;
+        return now - since > AwayLife.GRACE_TICKS;
     }
 
     /**
@@ -461,7 +468,7 @@ public class Raids {
      * or folded into the numbers out of sight) for {@link #VETERAN_GRACE}. Seen alive, its count starts again.
      */
     private boolean veteranGone(ServerLevel level, UUID id, long now) {
-        net.minecraft.world.entity.Entity entity = level.getEntity(id);
+        Entity entity = level.getEntity(id);
         if (entity != null) {
             veteranMissingSince.remove(id);
             return !entity.isAlive();
@@ -471,7 +478,7 @@ public class Raids {
             return false;
         }
         veteranMissingSince.remove(id);
-        say(level, id.toString().substring(0, 8) + ", a former scout, has been missing " + VETERAN_GRACE / 1200
+        say(level, RaidGround.shortId(id) + ", a former scout, has been missing " + VETERAN_GRACE / 1200
                 + " minutes: it no longer counts as one that knows the way");
         return true;
     }
@@ -498,7 +505,7 @@ public class Raids {
                 continue;
             }
             wayHome.send(id, null, now, "left outside with nothing to do there");
-            say(level, id.toString().substring(0, 8) + " is outside at " + ant.blockPosition().toShortString()
+            say(level, RaidGround.shortId(id) + " is outside at " + ant.blockPosition().toShortString()
                     + " with nothing to do there: it goes home along a trail");
         }
     }
@@ -507,8 +514,8 @@ public class Raids {
     private void checkRaiders(ServerLevel level, RaidColumn raid) {
         for (UUID id : raid.members()) {
             if (level.getEntity(id) instanceof MatabeleEntity ant && ant.getFightSpot() == null
-                    && !ant.runsGoal(com.antcolonies.savanna.entity.goal.MatabeleRaidGoal.class)) {
-                say(level, id.toString().substring(0, 8) + " was called to the raid but is not walking with it a second later: it runs "
+                    && !ant.runsGoal(MatabeleRaidGoal.class)) {
+                say(level, RaidGround.shortId(id) + " was called to the raid but is not walking with it a second later: it runs "
                         + ant.runningGoals());
             }
         }
@@ -524,7 +531,7 @@ public class Raids {
             UUID id = entry.getKey();
             if (!scouts.contains(id)) {
                 String runs = level.getEntity(id) instanceof AbstractAntEntity ant ? ant.runningGoals() : "(not in the world)";
-                say(level, "scout command: " + id.toString().substring(0, 8) + " has not set out 2 s later: it runs " + runs
+                say(level, "scout command: " + RaidGround.shortId(id) + " has not set out 2 s later: it runs " + runs
                         + (mayScoutWhy(level, id)));
             }
             return true;
@@ -589,7 +596,6 @@ public class Raids {
         return last;
     }
 
-    /** Whether this ant goes home along a trail by itself (step 3c's limpers and every ant let go out in the field). */
     /** The raid test bench (the raid-lists rule): how many finds are remembered, and how many ants go home by themselves. */
     public int findsCount() {
         return finds.size();
@@ -604,6 +610,7 @@ public class Raids {
         return Set.copyOf(wayHome.ids());
     }
 
+    /** Whether this ant goes home along a trail by itself (step 3c's limpers and every ant let go out in the field). */
     public boolean isGoingHome(UUID ant) {
         return wayHome.isGoingHome(ant);
     }
@@ -634,7 +641,7 @@ public class Raids {
             return false;
         }
         wayHome.leaveTrail(ant.getUUID());
-        say(level, ant.getUUID().toString().substring(0, 8) + " leaves its trail home (no way along it) and makes straight for the entrance");
+        say(level, RaidGround.shortId(ant.getUUID()) + " leaves its trail home (no way along it) and makes straight for the entrance");
         return true;
     }
 
@@ -647,7 +654,7 @@ public class Raids {
     public void sendHome(ServerLevel level, AbstractAntEntity ant, String why) {
         if (!wayHome.isGoingHome(ant.getUUID()) && !WayHome.isHome(level, ant, colony)) {
             wayHome.send(ant.getUUID(), null, level.getGameTime(), why);
-            say(level, ant.getUUID().toString().substring(0, 8) + " goes home along a trail by itself (" + why + ")");
+            say(level, RaidGround.shortId(ant.getUUID()) + " goes home along a trail by itself (" + why + ")");
         }
     }
 
@@ -656,7 +663,7 @@ public class Raids {
      * called to defend the nest, nor a raider on the column's own fight; raiders milling at the entrance may be (they
      * rejoin the column, or catch it up along the trail).
      */
-    static boolean keptFromDefence(Raids raids, net.minecraft.world.level.Level level, AbstractAntEntity ant) {
+    static boolean keptFromDefence(Raids raids, Level level, AbstractAntEntity ant) {
         UUID id = ant.getUUID();
         return raids.scouts.contains(id) && !raids.isRaider(id) || raids.column != null && raids.column.fightsForTheColumn(ant);
     }
@@ -769,15 +776,15 @@ public class Raids {
         return waiting;
     }
 
-    /** Raid rework R1, the raid diary: one {@code [raid]} line in the log for the colony as a whole (the column says its own). */
     /** The diary: a line about this scout (its walk: the search starting, cut short, ...). */
     public void scoutSays(ServerLevel level, UUID scout, String what) {
-        say(level, "scout " + scout.toString().substring(0, 8) + " " + what);
+        say(level, "scout " + RaidGround.shortId(scout) + " " + what);
     }
 
+    /** Raid rework R1, the raid diary: one {@code [raid]} line in the log for the colony as a whole (the column says its own). */
     private void say(ServerLevel level, String what) {
-        com.antcolonies.watch.Watch.note(level, colony, "[raid] " + what);
-        com.antcolonies.savanna.SavannaMod.LOGGER.info("[raid] nest {} at {} (tick {}): {}", colony.getCenter().toShortString(),
+        Watch.note(level, colony, "[raid] " + what);
+        SavannaMod.LOGGER.info("[raid] nest {} at {} (tick {}): {}", colony.getCenter().toShortString(),
                 RaidGround.clock(colony, level), level.getGameTime(), what);
     }
 
@@ -872,7 +879,7 @@ public class Raids {
             reaches.put(ant.getUUID(), trip.reach());
         }
         if (ant.level() instanceof ServerLevel level) {
-            say(level, "scout " + ant.getUUID().toString().substring(0, 8) + " sets out" + (sent.contains(ant.getUUID()) ? " (sent by the command)" : "")
+            say(level, "scout " + RaidGround.shortId(ant.getUUID()) + " sets out" + (sent.contains(ant.getUUID()) ? " (sent by the command)" : "")
                     + (veterans.contains(ant.getUUID()) ? ", an old scout" : ", a new scout")
                     + (trip == null ? "" : trip.find() != null ? ", to recheck the spot at " + trip.find().at().toShortString()
                     + ", " + Math.round(RaidGround.flat(trip.find().at(), colony.getCenter())) + " blocks out"
@@ -908,9 +915,9 @@ public class Raids {
         }
         moundsTaken.values().removeIf(id::equals);
         if (scouts.contains(id) && ant.level() instanceof ServerLevel level) {
-            say(level, "scout " + id.toString().substring(0, 8) + " is back or gave up, at " + ant.blockPosition().toShortString());
+            say(level, "scout " + RaidGround.shortId(id) + " is back or gave up, at " + ant.blockPosition().toShortString());
             if (untold != null) {
-                say(level, "scout " + id.toString().substring(0, 8) + " never got home to tell of its find at " + untold.toShortString()
+                say(level, "scout " + RaidGround.shortId(id) + " never got home to tell of its find at " + untold.toShortString()
                         + ": the find is lost");
             }
             if (ant.isAlive() && !isRaider(id) && !WayHome.isHome(level, ant, colony)) {
@@ -958,7 +965,7 @@ public class Raids {
         if (!ant.scoutMemory().hasHeading()) {
             double heading = newHeading(ant.getUUID());
             ant.scoutMemory().setHeading(heading);
-            say(level, "scout " + ant.getUUID().toString().substring(0, 8) + " takes its own way out: toward the " + compass(heading)
+            say(level, "scout " + RaidGround.shortId(ant.getUUID()) + " takes its own way out: toward the " + compass(heading)
                     + " (" + Math.round(Math.toDegrees(heading)) + " degrees; the colony's other scouts' ways " + otherWays(ant.getUUID()) + ")");
         }
         int reach = memory.reach();
@@ -1050,7 +1057,7 @@ public class Raids {
             return false;
         }
         SavannaNumbers.SearchNumbers search = search();
-        String name = "scout " + ant.getUUID().toString().substring(0, 8);
+        String name = "scout " + RaidGround.shortId(ant.getUUID());
         int least = (int) Math.ceil(numbers.tripTicks() * search.searchedShare());
         if (searchTicks < least) {
             say(level, name + " comes home with nothing (" + why + ") after searching only " + searchTicks / 20 + " s of the "
@@ -1102,14 +1109,14 @@ public class Raids {
         ant.scoutMemory().setLastFind(away);
         headings.put(ant.getUUID(), ant.scoutMemory().heading());
         reaches.put(ant.getUUID(), to);
-        say(level, "scout " + ant.getUUID().toString().substring(0, 8) + " found termites " + away + " blocks out toward the " + compass(angleOf(at))
+        say(level, "scout " + RaidGround.shortId(ant.getUUID()) + " found termites " + away + " blocks out toward the " + compass(angleOf(at))
                 + ": it keeps to that way (" + Math.round(Math.toDegrees(fromHeading)) + " to " + Math.round(Math.toDegrees(angleOf(at)))
                 + " degrees) and its reach " + (to < from ? "shrinks" : to > from ? "grows" : "stays") + " from " + from + " to " + to + " blocks");
     }
 
     /** The diary: a scout noticed a faint smell of termites and slows to search the place closely (area-restricted search). */
     public void scentNoticed(ServerLevel level, BlockPos at, String what, UUID scout) {
-        say(level, "scout " + scout.toString().substring(0, 8) + " smells " + what + " near " + at.toShortString() + ", "
+        say(level, "scout " + RaidGround.shortId(scout) + " smells " + what + " near " + at.toShortString() + ", "
                 + Math.round(RaidGround.flat(at, colony.getCenter())) + " blocks out: it slows down and turns more, searching there closely");
     }
 
@@ -1119,8 +1126,8 @@ public class Raids {
      */
     public void passedOver(ServerLevel level, BlockPos at, int worth, @Nullable Find rechecking, UUID scout) {
         int away = (int) Math.round(RaidGround.flat(at, colony.getCenter()));
-        say(level, "scout " + scout.toString().substring(0, 8) + " passes over termites at " + at.toShortString() + ", " + away
-                + " blocks out: worth " + worth + ", a raid that far needs " + String.format(java.util.Locale.ROOT, "%.1f", need(at))
+        say(level, "scout " + RaidGround.shortId(scout) + " passes over termites at " + at.toShortString() + ", " + away
+                + " blocks out: worth " + worth + ", a raid that far needs " + String.format(Locale.ROOT, "%.1f", need(at))
                 + " with the colony " + Math.round(fedShare() * 100) + " percent fed");
         passedOverCount++;
         if (rechecking != null && finds.contains(rechecking)) {
@@ -1131,8 +1138,8 @@ public class Raids {
     /** R5, the diary: a scout found termites worth a raid this far out with the colony this hungry, and runs home. */
     public void takes(ServerLevel level, BlockPos at, int worth, UUID scout) {
         int away = (int) Math.round(RaidGround.flat(at, colony.getCenter()));
-        say(level, "scout " + scout.toString().substring(0, 8) + " takes the termites at " + at.toShortString() + ", " + away
-                + " blocks out: worth " + worth + ", a raid that far needs " + String.format(java.util.Locale.ROOT, "%.1f", need(at))
+        say(level, "scout " + RaidGround.shortId(scout) + " takes the termites at " + at.toShortString() + ", " + away
+                + " blocks out: worth " + worth + ", a raid that far needs " + String.format(Locale.ROOT, "%.1f", need(at))
                 + " with the colony " + Math.round(fedShare() * 100) + " percent fed");
     }
 
@@ -1159,14 +1166,14 @@ public class Raids {
         moundsTaken.put(mound.immutable(), scout);
         moundsNoticed++;
         int away = (int) Math.round(RaidGround.flat(mound, colony.getCenter()));
-        say(level, "scout " + scout.toString().substring(0, 8) + " notices a living termite mound at " + mound.toShortString() + ", "
+        say(level, "scout " + RaidGround.shortId(scout) + " notices a living termite mound at " + mound.toShortString() + ", "
                 + away + " blocks from the nest (its foot " + reach + " blocks from its middle), and searches round it in " + rings
                 + " ring(s) out to " + moundClue().pastFoot() + " blocks past its foot (" + points + " points)");
     }
 
     /** R6, the diary: a scout starts the next ring round a mound. */
     public void ringOn(ServerLevel level, BlockPos mound, int ring, int pastFoot, UUID scout) {
-        say(level, "scout " + scout.toString().substring(0, 8) + " rings the termite mound at " + mound.toShortString() + ": ring " + (ring + 1)
+        say(level, "scout " + RaidGround.shortId(scout) + " rings the termite mound at " + mound.toShortString() + ": ring " + (ring + 1)
                 + ", " + pastFoot + " blocks past its foot");
     }
 
@@ -1178,7 +1185,7 @@ public class Raids {
         moundsTaken.remove(mound);
         if (!found) {
             moundsRinged.put(mound.immutable(), level.getGameTime());
-            say(level, "scout " + scout.toString().substring(0, 8) + " ringed the termite mound at " + mound.toShortString()
+            say(level, "scout " + RaidGround.shortId(scout) + " ringed the termite mound at " + mound.toShortString()
                     + " and found nothing worth a raid round it");
         }
     }
@@ -1186,20 +1193,20 @@ public class Raids {
     /** R6, the diary: a scout smelt termites going along a tunnel to food and follows it outward. */
     public void followsTunnel(ServerLevel level, BlockPos smelt, BlockPos food, int points, UUID scout) {
         tunnelsFollowed++;
-        say(level, "scout " + scout.toString().substring(0, 8) + " smells termites going along a tunnel under " + smelt.toShortString()
+        say(level, "scout " + RaidGround.shortId(scout) + " smells termites going along a tunnel under " + smelt.toShortString()
                 + " and follows it out, away from their mound, toward its end by " + food.toShortString() + " (" + points + " points)");
     }
 
     /** R6, the diary: a scout followed a tunnel to its end and found nothing worth a raid there. */
     public void tunnelEnd(ServerLevel level, BlockPos food, UUID scout) {
-        say(level, "scout " + scout.toString().substring(0, 8) + " followed the tunnel to its end by " + food.toShortString()
+        say(level, "scout " + RaidGround.shortId(scout) + " followed the tunnel to its end by " + food.toShortString()
                 + ": nothing worth a raid there");
     }
 
     /** R6, the diary: the find a scout takes came from the mound clue ({@code how}: ringing a mound, following a tunnel). */
     public void clueFind(ServerLevel level, BlockPos at, String how, UUID scout) {
         clueFinds++;
-        say(level, "scout " + scout.toString().substring(0, 8) + "'s find at " + at.toShortString() + " came from " + how);
+        say(level, "scout " + RaidGround.shortId(scout) + "'s find at " + at.toShortString() + " came from " + how);
     }
 
     /** R6, tests: mounds noticed, tunnels followed and finds made by the mound clue since the colony was loaded. */
@@ -1263,7 +1270,7 @@ public class Raids {
         Find made = known != null ? known : finds.get(finds.size() - 1);
         boolean dayFull = !commanded && !anyHour && !dayHasRoom(level); // (M8 step 3e: commands do not count the day)
         if (column == null && !colony.rainsNow(level) && (anyHour || isRaidTime(level) && (commanded || isHungry() && !dayFull))) {
-            say(level, "a scout (" + (scout == null ? "?" : scout.toString().substring(0, 8)) + ") is home from " + at.toShortString()
+            say(level, "a scout (" + (scout == null ? "?" : RaidGround.shortId(scout)) + ") is home from " + at.toShortString()
                     + ", worth " + worth + (anyHour ? ", sent by the command at any hour" : commanded ? ", sent by the command" : "") + ": a raid sets out");
             RaidColumn started = startRaid(level, made, !commanded && !anyHour);
             if (started == null) {
@@ -1528,7 +1535,7 @@ public class Raids {
                 sentAnyHour.add(ant.getUUID());
             }
             sentCheckAt.put(ant.getUUID(), level.getGameTime() + 40); // (BUGS 89: two seconds later it should be out)
-            say(level, "the scout command sends " + ant.getUUID().toString().substring(0, 8) + " (it runs " + ant.runningGoals() + ")");
+            say(level, "the scout command sends " + RaidGround.shortId(ant.getUUID()) + " (it runs " + ant.runningGoals() + ")");
         }
         return ant;
     }
@@ -1668,7 +1675,7 @@ public class Raids {
 
     /** R4: a block dug or put here: every Matabele colony within 128 blocks hears of it (its scent trails may break). */
     public static void blockChangedNear(ServerLevel level, BlockPos pos) {
-        for (Colony other : com.antcolonies.colony.ColonyManager.get(level).getColonies()) {
+        for (Colony other : ColonyManager.get(level).getColonies()) {
             if (MatabeleEntity.SPECIES.equals(other.getSpecies()) && other.getCenter().closerThan(pos, 128)) {
                 other.part(SavannaParts.RAIDS).ifPresent(raids -> raids.blockChanged(level, pos));
             }
@@ -1682,7 +1689,7 @@ public class Raids {
     /** The living termite colonies within {@code within} blocks of {@code at}, with their mounds. */
     public static List<Colony> termiteColonies(ServerLevel level, BlockPos at, double within) {
         List<Colony> near = new ArrayList<>();
-        for (Colony other : com.antcolonies.colony.ColonyManager.get(level).getColonies()) {
+        for (Colony other : ColonyManager.get(level).getColonies()) {
             if (SavannaSpecies.MACROTERMES.equals(other.getSpecies()) && other.getCenter().closerThan(at, within)) {
                 near.add(other);
             }

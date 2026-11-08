@@ -251,7 +251,7 @@ public final class RaidSoak implements Soak.Part {
     }
 
     private static String name(Colony colony) {
-        return "the colony " + colony.getId().toString().substring(0, 8);
+        return "the colony " + RaidGround.shortId(colony.getId());
     }
 
     private static double sideways(BlockPos a, BlockPos b) {

@@ -4,6 +4,7 @@ import java.util.ArrayDeque;
 import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 
@@ -11,6 +12,8 @@ import org.jetbrains.annotations.Nullable;
 
 import com.antcolonies.colony.Colony;
 import com.antcolonies.fight.Fights;
+import com.antcolonies.savanna.SavannaMod;
+import com.antcolonies.savanna.colony.RaidGround;
 import com.antcolonies.savanna.entity.MatabeleEntity;
 
 import net.minecraft.core.BlockPos;
@@ -97,8 +100,8 @@ public class MatabeleBiteOutGoal extends Goal {
     public void start() {
         block = null;
         standAt = null;
-        com.antcolonies.savanna.SavannaMod.LOGGER.info("[raid] Matabele {} is shut in at {}: it bites its way out",
-                ant.getUUID().toString().substring(0, 8), ant.blockPosition().toShortString());
+        SavannaMod.LOGGER.info("[raid] Matabele {} is shut in at {}: it bites its way out",
+                RaidGround.shortId(ant.getUUID()), ant.blockPosition().toShortString());
     }
 
     @Override
@@ -122,8 +125,8 @@ public class MatabeleBiteOutGoal extends Goal {
         }
         if (block == null && !pick(level)) {
             letGoUntil = now + NOTHING_TO_BITE_WAIT; // (BUGS 113: no wait without a limit)
-            com.antcolonies.savanna.SavannaMod.LOGGER.debug("[raid] Matabele {} at {} finds nothing it may bite: it lets go for {} s",
-                    ant.getUUID().toString().substring(0, 8), ant.blockPosition().toShortString(), NOTHING_TO_BITE_WAIT / 20);
+            SavannaMod.LOGGER.debug("[raid] Matabele {} at {} finds nothing it may bite: it lets go for {} s",
+                    RaidGround.shortId(ant.getUUID()), ant.blockPosition().toShortString(), NOTHING_TO_BITE_WAIT / 20);
             return;
         }
         if (ant.inBiteReach(block) && ant.standsToFight()) {
@@ -133,8 +136,8 @@ public class MatabeleBiteOutGoal extends Goal {
         }
         if (ant.getNavigator().isDone()) {
             if (ant.blockPosition().equals(standAt) || !ant.getNavigator().moveTo(standAt, 1.0)) {
-                com.antcolonies.savanna.SavannaMod.LOGGER.debug("[raid] Matabele {} finds no stand to bite {} from (at {}, stand {}, floor {})",
-                        ant.getUUID().toString().substring(0, 8), block.toShortString(), ant.blockPosition().toShortString(), standAt.toShortString(), ant.standsToFight());
+                SavannaMod.LOGGER.debug("[raid] Matabele {} finds no stand to bite {} from (at {}, stand {}, floor {})",
+                        RaidGround.shortId(ant.getUUID()), block.toShortString(), ant.blockPosition().toShortString(), standAt.toShortString(), ant.standsToFight());
                 noWay.put(block, now + NO_WAY_TICKS); // there and still not in reach on a floor, or no way: another block
                 block = null;
                 standAt = null;
@@ -230,8 +233,8 @@ public class MatabeleBiteOutGoal extends Goal {
         }
         block = best.immutable();
         standAt = bestStand.immutable();
-        com.antcolonies.savanna.SavannaMod.LOGGER.debug("[raid] Matabele {} at {} picks {} to bite out through, standing at {} (score {})",
-                ant.getUUID().toString().substring(0, 8), ant.blockPosition().toShortString(), block.toShortString(), standAt.toShortString(), String.format("%.1f", bestScore));
+        SavannaMod.LOGGER.debug("[raid] Matabele {} at {} picks {} to bite out through, standing at {} (score {})",
+                RaidGround.shortId(ant.getUUID()), ant.blockPosition().toShortString(), block.toShortString(), standAt.toShortString(), String.format(Locale.ROOT, "%.1f", bestScore));
         return true;
     }
 

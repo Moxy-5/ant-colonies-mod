@@ -3,8 +3,10 @@ package com.antcolonies.savanna.colony;
 import com.antcolonies.colony.LandReady;
 import java.util.ArrayList;
 import java.util.BitSet;
+import java.util.Collections;
 import java.util.List;
 import java.util.function.Consumer;
+import java.util.function.Predicate;
 
 import org.jetbrains.annotations.Nullable;
 
@@ -94,7 +96,7 @@ public final class ScentTrails {
          * view drew every trail four times a second); it changes as the trail is mended.
          */
         public List<BlockPos> points() {
-            return java.util.Collections.unmodifiableList(points);
+            return Collections.unmodifiableList(points);
         }
 
         /** Counts the changes to the points' places (the column's gap look-up is kept till it changes). */
@@ -164,7 +166,7 @@ public final class ScentTrails {
          * place) moves to the ground to stand on next to it and is whole again, or, with no ground there (water, say),
          * is dropped (the trail runs straight across). How many points were mended or dropped.
          */
-        public int mend(ServerLevel level, java.util.function.Predicate<BlockPos> inGap) {
+        public int mend(ServerLevel level, Predicate<BlockPos> inGap) {
             int count = 0;
             for (int i = points.size() - 1; i >= 0; i--) {
                 if (!broken.get(i) || !inGap.test(points.get(i))) {
