@@ -1,0 +1,20 @@
+{
+  "type": "minecraft:flat_cache",
+  "argument": {
+    "type": "minecraft:add",
+    "argument1": "antcolonies:overworld_large_biomes/raw_erosion",
+    "argument2": {
+      "type": "minecraft:mul",
+      "argument1": "antcolonies:overworld_large_biomes/savanna_flatness",
+      "argument2": {
+        "type": "minecraft:add",
+        "argument1": 0.28,
+        "argument2": {
+          "type": "minecraft:mul",
+          "argument1": -0.92,
+          "argument2": "antcolonies:overworld_large_biomes/raw_erosion"
+        }
+      }
+    }
+  }
+}

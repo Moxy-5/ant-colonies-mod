@@ -1,0 +1,9 @@
+{
+  "type": "minecraft:add",
+  "argument1": "antcolonies:overworld_large_biomes/raw_offset",
+  "argument2": {
+    "type": "minecraft:mul",
+    "argument1": 0.03,
+    "argument2": "antcolonies:overworld_large_biomes/savanna_flatness"
+  }
+}

@@ -43,6 +43,7 @@ public class SavannaMod {
         SavannaFeatures.BIOME_MODIFIERS.register(modEventBus);
         SavannaStructures.STRUCTURE_TYPES.register(modEventBus);
         SavannaStructures.STRUCTURE_PIECES.register(modEventBus);
+        com.antcolonies.savanna.worldgen.FlatSavanna.DENSITY_FUNCTION_TYPES.register(modEventBus); // flat savannas, 2026-11-07
         SavannaEntities.ENTITY_TYPES.register(modEventBus);
         SavannaItems.ITEMS.register(modEventBus);
         com.antcolonies.savanna.registry.SavannaSounds.SOUNDS.register(modEventBus); // M8 step 2e: the Matabele squeak

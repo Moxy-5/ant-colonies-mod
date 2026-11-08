@@ -24,6 +24,9 @@ import net.minecraft.world.level.biome.Biomes;
 import net.minecraft.world.level.biome.Climate;
 import net.minecraft.world.level.biome.MultiNoiseBiomeSource;
 import net.minecraft.world.level.biome.MultiNoiseBiomeSourceParameterLists;
+import net.minecraft.world.level.LevelHeightAccessor;
+import net.minecraft.world.level.levelgen.Heightmap;
+import net.minecraft.world.level.levelgen.NoiseBasedChunkGenerator;
 import net.minecraft.world.level.levelgen.NoiseGeneratorSettings;
 import net.minecraft.world.level.levelgen.RandomState;
 
@@ -56,6 +59,19 @@ public final class BiomeMaps {
         IExtendedParameterList<Holder<Biome>> extended = (IExtendedParameterList<Holder<Biome>>) copy;
         extended.initializeForTerraBlender(registries, RegionType.OVERWORLD, seed);
         return MultiNoiseBiomeSource.createFromList(copy);
+    }
+
+    /** The ground of a seed read straight from the noise (no chunks): the height of the solid ground, water ignored. */
+    public record Ground(NoiseBasedChunkGenerator generator, RandomState random, LevelHeightAccessor level) {
+        public int height(int x, int z) {
+            return generator.getBaseHeight(x, z, Heightmap.Types.OCEAN_FLOOR_WG, level, random);
+        }
+    }
+
+    public static Ground ground(RegistryAccess registries, net.minecraft.world.level.biome.BiomeSource source, long seed, LevelHeightAccessor level) {
+        Holder<NoiseGeneratorSettings> settings = registries.lookupOrThrow(Registries.NOISE_SETTINGS).getOrThrow(NoiseGeneratorSettings.OVERWORLD);
+        RandomState random = RandomState.create(settings.value(), registries.lookupOrThrow(Registries.NOISE), seed);
+        return new Ground(new NoiseBasedChunkGenerator(source, settings), random, level);
     }
 
     public static Climate.Sampler sampler(RegistryAccess registries, long seed) {

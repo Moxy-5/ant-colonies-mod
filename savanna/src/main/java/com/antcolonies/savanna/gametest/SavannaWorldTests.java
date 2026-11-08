@@ -115,6 +115,159 @@ public class SavannaWorldTests {
     }
 
     /**
+     * How steep savanna ground is (the user, 2026-11-07: "the savanna has so many hills and climbs"), read straight from
+     * the noise on {@link #GROUND_SEEDS}: at {@link #GROUND_SPOTS} random dry savanna spots of each seed, the climb over 8
+     * blocks (the steeper of east and south) and the relief over 64 blocks (highest minus lowest of 9 spots 32 apart).
+     * Real savanna rises about 1 block in 20 to 50 (a catena from crest to drainage line; kopjes and river banks the
+     * exceptions), so over 8 blocks mostly 0 or 1. A picture of the ground round the spawn search's savanna spot goes to
+     * {@code biome-maps/ground_seed_<seed>.png} (1,024 blocks square, hill-shaded, a darker line every 5 blocks of height),
+     * the first seed's only, and one of a single-biome savanna world ({@code ground_single_biome_seed_1.png}); before and
+     * after pictures in {@code references/flat_savannas/}. The flattening itself: {@code worldgen/FlatSavanna}.
+     */
+    @GameTest(template = "arena", timeoutTicks = 400, batch = "savanna_maps")
+    public static void savannaGroundIsGentle(GameTestHelper helper) {
+        var registries = helper.getLevel().registryAccess();
+        List<Integer> climbs = new ArrayList<>();
+        List<Integer> reliefs = new ArrayList<>();
+        StringBuilder report = new StringBuilder();
+        for (long seed : GROUND_SEEDS) {
+            Climate.Sampler sampler = BiomeMaps.sampler(registries, seed);
+            MultiNoiseBiomeSource source = BiomeMaps.bigSavannaSource(registries, seed);
+            BiomeMaps.Ground ground = BiomeMaps.ground(registries, source, seed, helper.getLevel());
+            byte[] map = BiomeMaps.map(source, sampler);
+            List<Integer> cells = new ArrayList<>();
+            for (int c = 0; c < map.length; c++) {
+                if (map[c] == BiomeMaps.SAVANNA) {
+                    cells.add(c);
+                }
+            }
+            java.util.Collections.shuffle(cells, new java.util.Random(seed));
+            List<Integer> seedClimbs = new ArrayList<>();
+            List<Integer> seedReliefs = new ArrayList<>();
+            for (int c : cells) {
+                if (seedClimbs.size() >= GROUND_SPOTS) {
+                    break;
+                }
+                int x = -BiomeMaps.HALF + (c / BiomeMaps.SIDE) * BiomeMaps.STEP;
+                int z = -BiomeMaps.HALF + (c % BiomeMaps.SIDE) * BiomeMaps.STEP;
+                int h = ground.height(x, z);
+                if (h <= SEA_TOP) {
+                    continue; // a pond or river in the savanna
+                }
+                seedClimbs.add(Math.max(Math.abs(ground.height(x + 8, z) - h), Math.abs(ground.height(x, z + 8) - h)));
+                int low = h, high = h;
+                for (int dx = -32; dx <= 32; dx += 32) {
+                    for (int dz = -32; dz <= 32; dz += 32) {
+                        int k = ground.height(x + dx, z + dz);
+                        low = Math.min(low, k);
+                        high = Math.max(high, k);
+                    }
+                }
+                seedReliefs.add(high - low);
+            }
+            report.append(String.format("%n  seed %d: %s", seed, groundLine(seedClimbs, seedReliefs)));
+            climbs.addAll(seedClimbs);
+            reliefs.addAll(seedReliefs);
+            var found = seed != GROUND_SEEDS[0] ? null : source.findBiomeHorizontal(0, SavannaSpawn.SAMPLE_Y, 0, 6400, 32,
+                    b -> b.is(BiomeTags.IS_SAVANNA), RandomSource.create(seed), true, sampler);
+            if (found != null) { // one picture, the first seed's (each takes about two minutes)
+                try {
+                    drawGround(FMLPaths.GAMEDIR.get().resolve("biome-maps").resolve("ground_seed_" + seed + ".png"), ground,
+                            SavannaSpawn.deepInside(source, sampler, found.getFirst()));
+                } catch (java.io.IOException e) {
+                    SavannaMod.LOGGER.warn("[biome maps] could not draw the ground of seed {}: {}", seed, e.toString());
+                }
+            }
+        }
+        // a single-biome savanna world (the user's test worlds) is flattened everywhere: its picture round the middle
+        com.antcolonies.savanna.worldgen.FlatSavanna.setWholeWorld(true);
+        try {
+            net.minecraft.world.level.biome.BiomeSource single = new net.minecraft.world.level.biome.FixedBiomeSource(
+                    registries.lookupOrThrow(Registries.BIOME).getOrThrow(net.minecraft.world.level.biome.Biomes.SAVANNA));
+            drawGround(FMLPaths.GAMEDIR.get().resolve("biome-maps").resolve("ground_single_biome_seed_1.png"),
+                    BiomeMaps.ground(registries, single, 1L, helper.getLevel()), BlockPos.ZERO);
+        } catch (java.io.IOException e) {
+            SavannaMod.LOGGER.warn("[biome maps] could not draw the single-biome ground: {}", e.toString());
+        } finally {
+            com.antcolonies.savanna.worldgen.FlatSavanna.setWholeWorld(false);
+        }
+        String all = groundLine(climbs, reliefs) + report;
+        SavannaMod.LOGGER.info("[biome maps] savanna ground: {}", all);
+        double steep = share(climbs, STEEP_CLIMB);
+        double rugged = share(reliefs, RUGGED_RELIEF);
+        helper.assertTrue(steep <= STEEP_MOST, "too much steep savanna ground: " + all);
+        helper.assertTrue(rugged <= RUGGED_MOST, "too much rugged savanna ground: " + all);
+        helper.succeed();
+    }
+
+    static final long[] GROUND_SEEDS = {SEEDS[0], SEEDS[1], SEEDS[2]};
+    static final int GROUND_SPOTS = 200;
+    /** The top of the sea: ground at or below it is under water. */
+    static final int SEA_TOP = 62;
+    /** A hillside: a climb of 3 or more over 8 blocks (about 1 in 2.7, 20 degrees). */
+    static final int STEEP_CLIMB = 3;
+    /** Rugged: 16 or more blocks between the highest and lowest of 64 blocks of ground. */
+    static final int RUGGED_RELIEF = 16;
+    /**
+     * The most savanna allowed on a hillside or rugged (flat savannas, 2026-11-07; measured on 3 seeds, 600 spots): Minecraft's
+     * own savanna land was 40 percent hillside and 61 percent rugged, the flat savannas 21 and 20 (what is left is mostly
+     * river banks and coasts). The limits fail the old land by far and leave the new room for chance.
+     */
+    static final double STEEP_MOST = 0.30, RUGGED_MOST = 0.30;
+
+    private static double share(List<Integer> values, int atLeast) {
+        return values.isEmpty() ? 0 : values.stream().filter(v -> v >= atLeast).count() / (double) values.size();
+    }
+
+    private static int middle(List<Integer> values, double at) {
+        if (values.isEmpty()) {
+            return -1;
+        }
+        List<Integer> sorted = new ArrayList<>(values);
+        sorted.sort(Integer::compare);
+        return sorted.get(Math.min(sorted.size() - 1, (int) (at * sorted.size())));
+    }
+
+    private static String groundLine(List<Integer> climbs, List<Integer> reliefs) {
+        return String.format("%d spots; climb over 8 blocks: median %d, 90%% at most %d, %.0f%% hillside (%d+); relief over 64 blocks: median %d, 90%% at most %d, %.0f%% rugged (%d+)",
+                climbs.size(), middle(climbs, 0.5), middle(climbs, 0.9), 100 * share(climbs, STEEP_CLIMB), STEEP_CLIMB,
+                middle(reliefs, 0.5), middle(reliefs, 0.9), 100 * share(reliefs, RUGGED_RELIEF), RUGGED_RELIEF);
+    }
+
+    /** A hill-shaded picture of the ground, 1,024 blocks square round a spot, a pixel every 4 blocks. */
+    private static void drawGround(java.nio.file.Path file, BiomeMaps.Ground ground, BlockPos middle) throws java.io.IOException {
+        int side = 256, step = 4;
+        int[][] h = new int[side][side];
+        for (int i = 0; i < side; i++) {
+            for (int j = 0; j < side; j++) {
+                h[i][j] = ground.height(middle.getX() + (i - side / 2) * step, middle.getZ() + (j - side / 2) * step);
+            }
+        }
+        java.awt.image.BufferedImage image = new java.awt.image.BufferedImage(side, side, java.awt.image.BufferedImage.TYPE_INT_RGB);
+        for (int i = 0; i < side; i++) {
+            for (int j = 0; j < side; j++) {
+                int here = h[i][j];
+                if (here <= SEA_TOP) {
+                    image.setRGB(i, j, 0x2f5fa8);
+                    continue;
+                }
+                int west = h[Math.max(0, i - 1)][j], north = h[i][Math.max(0, j - 1)];
+                double light = Math.max(0.35, Math.min(1.25, 0.85 + 0.09 * (west - here) + 0.09 * (north - here)));
+                boolean contour = (here / 5) != (west / 5) || (here / 5) != (north / 5);
+                double l = contour ? light * 0.8 : light;
+                int r = (int) Math.min(255, 0xc8 * l), g = (int) Math.min(255, 0xae * l), b = (int) Math.min(255, 0x5a * l);
+                image.setRGB(i, j, (r << 16) | (g << 8) | b);
+            }
+        }
+        for (int x = 8; x < 8 + 100 / step; x++) { // a 100-block scale bar
+            image.setRGB(x, side - 8, 0);
+            image.setRGB(x, side - 9, 0);
+        }
+        java.nio.file.Files.createDirectories(file.getParent());
+        javax.imageio.ImageIO.write(image, "png", file.toFile());
+    }
+
+    /**
      * Tuning (only when named: {@code ANTCOLONIES_TESTS=stresssavannashapes}): pretend layouts for several region shares and
      * table shapes, measured on the same seeds, to pick {@link SavannaRegion#WEIGHT} and {@link SavannaRegion#SHAPE}.
      * The share is ours of all zones: vanilla's weight is 10, so weight 30 alone is 0.75; Biomes O' Plenty's regions

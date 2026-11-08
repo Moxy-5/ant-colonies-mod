@@ -197,12 +197,18 @@ public class MatabeleNewLandTests {
         // so the Matabele may be rarer than on mixed land, but never rare
         long[] singleSeeds = {-5841907898462156635L, 1L};
         int[] u = new int[10];
-        for (long seed : singleSeeds) {
-            MoundPlaces.Land land = singleBiomeSavanna(level, seed, mounds);
-            int[] r = survey(land, mounds.numbers(), savannaPlaces(land, mounds.numbers().places()), helper);
-            for (int i = 0; i < u.length; i++) {
-                u[i] += r[i];
+        // flat savannas (2026-11-07): a single-biome savanna world is flattened everywhere, as the game does for one
+        com.antcolonies.savanna.worldgen.FlatSavanna.setWholeWorld(true);
+        try {
+            for (long seed : singleSeeds) {
+                MoundPlaces.Land land = singleBiomeSavanna(level, seed, mounds);
+                int[] r = survey(land, mounds.numbers(), savannaPlaces(land, mounds.numbers().places()), helper);
+                for (int i = 0; i < u.length; i++) {
+                    u[i] += r[i];
+                }
             }
+        } finally {
+            com.antcolonies.savanna.worldgen.FlatSavanna.setWholeWorld(false);
         }
         String single = report("single-biome savanna", u);
         SavannaMod.LOGGER.info("[new-land] the savanna survey: {}", single);
