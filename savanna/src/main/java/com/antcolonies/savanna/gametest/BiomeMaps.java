@@ -66,6 +66,21 @@ public final class BiomeMaps {
         public int height(int x, int z) {
             return generator.getBaseHeight(x, z, Heightmap.Types.OCEAN_FLOOR_WG, level, random);
         }
+
+        /**
+         * Is there air (a noise cave, a pit) within {@code depth} blocks under the ground at this spot? Only the noise's
+         * caves: carvers (ravines, carved caves) come later, in real chunks.
+         */
+        public boolean hollowUnder(int x, int z, int depth) {
+            int top = height(x, z);
+            var column = generator.getBaseColumn(x, z, level, random);
+            for (int y = top - 1; y >= top - depth; y--) {
+                if (column.getBlock(y).isAir()) {
+                    return true;
+                }
+            }
+            return false;
+        }
     }
 
     public static Ground ground(RegistryAccess registries, net.minecraft.world.level.biome.BiomeSource source, long seed, LevelHeightAccessor level) {

@@ -130,6 +130,7 @@ public class SavannaWorldTests {
         List<Integer> climbs = new ArrayList<>();
         List<Integer> reliefs = new ArrayList<>();
         StringBuilder report = new StringBuilder();
+        int hollow = 0;
         for (long seed : GROUND_SEEDS) {
             Climate.Sampler sampler = BiomeMaps.sampler(registries, seed);
             MultiNoiseBiomeSource source = BiomeMaps.bigSavannaSource(registries, seed);
@@ -144,6 +145,7 @@ public class SavannaWorldTests {
             java.util.Collections.shuffle(cells, new java.util.Random(seed));
             List<Integer> seedClimbs = new ArrayList<>();
             List<Integer> seedReliefs = new ArrayList<>();
+            int[] seedHollow = {0};
             for (int c : cells) {
                 if (seedClimbs.size() >= GROUND_SPOTS) {
                     break;
@@ -164,8 +166,13 @@ public class SavannaWorldTests {
                     }
                 }
                 seedReliefs.add(high - low);
+                if (ground.hollowUnder(x, z, HOLLOW_DEPTH)) {
+                    seedHollow[0]++;
+                }
             }
-            report.append(String.format("%n  seed %d: %s", seed, groundLine(seedClimbs, seedReliefs)));
+            report.append(String.format("%n  seed %d: %s, %d with a cave or pit within %d blocks under the ground", seed,
+                    groundLine(seedClimbs, seedReliefs), seedHollow[0], HOLLOW_DEPTH));
+            hollow += seedHollow[0];
             climbs.addAll(seedClimbs);
             reliefs.addAll(seedReliefs);
             var found = seed != GROUND_SEEDS[0] ? null : source.findBiomeHorizontal(0, SavannaSpawn.SAMPLE_Y, 0, 6400, 32,
@@ -191,12 +198,14 @@ public class SavannaWorldTests {
         } finally {
             com.antcolonies.savanna.worldgen.FlatSavanna.setWholeWorld(false);
         }
-        String all = groundLine(climbs, reliefs) + report;
+        String all = groundLine(climbs, reliefs) + String.format(", %d with a cave or pit within %d blocks under", hollow, HOLLOW_DEPTH) + report;
         SavannaMod.LOGGER.info("[biome maps] savanna ground: {}", all);
         double steep = share(climbs, STEEP_CLIMB);
         double rugged = share(reliefs, RUGGED_RELIEF);
         helper.assertTrue(steep <= STEEP_MOST, "too much steep savanna ground: " + all);
         helper.assertTrue(rugged <= RUGGED_MOST, "too much rugged savanna ground: " + all);
+        // the user, 2026-11-07: "random dips in the ground and ravines and caves, I want to get rid of all of that"
+        helper.assertTrue(hollow <= HOLLOW_MOST * climbs.size(), "caves or pits under the savanna's ground: " + all);
         helper.succeed();
     }
 
@@ -214,6 +223,12 @@ public class SavannaWorldTests {
      * river banks and coasts). The limits fail the old land by far and leave the new room for chance.
      */
     static final double STEEP_MOST = 0.30, RUGGED_MOST = 0.30;
+    /**
+     * Caves and pits: how deep under the ground is looked at, and the most spots allowed one (the user, 2026-11-07: no
+     * dips, ravines or caves in the savanna). The edges of the climate mask may keep a few.
+     */
+    static final int HOLLOW_DEPTH = 16;
+    static final double HOLLOW_MOST = 0.01;
 
     private static double share(List<Integer> values, int atLeast) {
         return values.isEmpty() ? 0 : values.stream().filter(v -> v >= atLeast).count() / (double) values.size();

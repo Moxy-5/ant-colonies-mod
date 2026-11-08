@@ -1,0 +1,10 @@
+{
+  "type": "neoforge:remove_carvers",
+  "biomes": "#minecraft:is_savanna",
+  "carvers": [
+    "minecraft:canyon",
+    "minecraft:cave",
+    "minecraft:cave_extra_underground"
+  ],
+  "steps": "air"
+}

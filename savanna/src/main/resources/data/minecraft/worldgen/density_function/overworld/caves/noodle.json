@@ -1,0 +1,9 @@
+{
+  "type": "minecraft:add",
+  "argument1": "antcolonies:overworld/caves/raw_noodle",
+  "argument2": {
+    "type": "minecraft:mul",
+    "argument1": 3.0,
+    "argument2": "antcolonies:overworld/savanna_flatness"
+  }
+}

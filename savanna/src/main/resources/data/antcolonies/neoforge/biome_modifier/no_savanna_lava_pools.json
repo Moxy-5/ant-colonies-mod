@@ -1,0 +1,6 @@
+{
+  "type": "neoforge:remove_features",
+  "biomes": "#minecraft:is_savanna",
+  "features": "minecraft:lake_lava_surface",
+  "steps": "lakes"
+}
