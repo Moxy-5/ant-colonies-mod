@@ -47,6 +47,9 @@ const OPTIONS = {
     ["4 Sand stripe (before)", "stripe"], ["5 Grass to the water", "none"],
     ["6 Silt bars, trampled mud at the water and in the hollows (my pick)", "siltmud"],
     ["7 Bars sand at the head, silt at the tail, mud at the water", "graded"]] },
+  mud: { label: "Mud block", pick: 4, list: [["Minecraft mud", "vanilla"], ["A Wet river mud (olive-brown)", "wet"],
+    ["B Wet mud with hoof prints", "prints"], ["C Dried, cracked mud", "cracked"],
+    ["D Wet at the water, cracked further up (my pick)", "mixed"]] },
   view: { label: "View", pick: 0, list: [["From above"], ["Under the river"]] },
 };
 const state = {};
@@ -91,6 +94,51 @@ function siltOf(wet) {
   g.putImageData(p, 0, 0); return s;
 }
 
+// a new river mud: Minecraft's mud pattern recoloured to the silt's olive-brown, wet or dried and cracked
+function mudOf(style) {
+  if (style === "vanilla") return canvasOf(IMG.mud);
+  const c = canvasOf(IMG.mud, 16, 16), g = c.getContext("2d"), p = g.getImageData(0, 0, 16, 16), D = p.data;
+  const dry = style === "cracked";
+  const lo = dry ? [0x6A, 0x5D, 0x48] : [0x2F, 0x29, 0x1E], hi = dry ? [0x8E, 0x80, 0x66] : [0x5A, 0x4E, 0x3B];
+  let mn = 255, mx = 0;
+  for (let i = 0; i < D.length; i += 4) { const L = D[i] + D[i + 1] + D[i + 2]; mn = Math.min(mn, L); mx = Math.max(mx, L); }
+  const at = (x, y) => (((y + 16) % 16) * 16 + ((x + 16) % 16)) * 4;
+  const set = (x, y, rgb) => { const i = at(x, y); D[i] = rgb[0]; D[i + 1] = rgb[1]; D[i + 2] = rgb[2]; };
+  for (let i = 0; i < D.length; i += 4) {
+    const t = (D[i] + D[i + 1] + D[i + 2] - mn) / Math.max(1, mx - mn);
+    for (let k = 0; k < 3; k++) D[i + k] = lo[k] + (hi[k] - lo[k]) * t;
+  }
+  if (!dry) for (const [x, y] of [[3, 2], [11, 5], [6, 12], [13, 13], [1, 9]]) set(x, y, [0x7C, 0x6E, 0x57]); // wet shine
+  if (style === "prints") {
+    // two cloven hoof prints: dark wet hollows with a pushed-up rim
+    for (const [px, py] of [[3, 4], [10, 10]]) {
+      for (const [dx, dy] of [[0, 0], [0, 1], [0, 2], [2, 0], [2, 1], [2, 2]]) set(px + dx, py + dy, [0x1C, 0x18, 0x11]);
+      for (const [dx, dy] of [[-1, 0], [-1, 1], [-1, 2], [3, 0], [3, 1], [3, 2], [0, 3], [2, 3]]) set(px + dx, py + dy, [0x66, 0x59, 0x45]);
+      set(px + 1, py + 1, [0x3A, 0x32, 0x25]);
+    }
+  }
+  if (dry) {
+    // cracks between irregular plates (the edges of a Voronoi pattern on a wrapped 16 x 16), tiling seamlessly
+    const seeds = [[2.5, 3], [9, 1.5], [13.5, 7], [6.5, 8.5], [1.5, 12.5], [10.5, 13]];
+    const near = (x, y) => {
+      let a = 99, b = 99;
+      for (const [sx, sy] of seeds) for (const ox of [-16, 0, 16]) for (const oy of [-16, 0, 16]) {
+        const d = Math.hypot(x + 0.5 - sx - ox, y + 0.5 - sy - oy);
+        if (d < a) { b = a; a = d; } else if (d < b) b = d;
+      }
+      return b - a;
+    };
+    const edge = [];
+    for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) edge.push(near(x, y));
+    for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) {
+      const e = edge[y * 16 + x], i = at(x, y);
+      if (e < 0.9) { D[i] = 0x3E; D[i + 1] = 0x35; D[i + 2] = 0x28; }                  // the crack
+      else if (e < 1.9) for (let k = 0; k < 3; k++) D[i + k] = Math.min(255, D[i + k] * 1.07); // the plate's curled lip
+    }
+  }
+  g.putImageData(p, 0, 0); return c;
+}
+
 function build() {
   while (scene.children.length) scene.remove(scene.children[0]);
   const bank = OPTIONS.bank.list[state.bank][1], edge = OPTIONS.sand.list[state.sand][1];
@@ -111,7 +159,7 @@ function build() {
     else if (edge !== "none" && top <= PLAIN) {
       const bend = -Math.sin(nr.xx / 10), side = Math.sign(z + 0.5 - zc(nr.xx));
       if (edge === "stripe") { if (out < 1.3) kind = "sand"; }
-      else if (edge === "mix") { if (out < Math.min(bank, 1.1 + 0.8 * wobble(x, z))) kind = hash(x, z) < 0.35 ? "mud" : out < 0.9 ? "wetsilt" : "silt"; }
+      else if (edge === "mix") { if (out < Math.min(bank, 1.1 + 0.8 * wobble(x, z))) kind = hash(x, z) < 0.35 ? (out < 1.1 ? "mud" : "drymud") : out < 0.9 ? "wetsilt" : "silt"; }
       else {
         // bars on the inside of bends fill the low strip, wider where the bend is sharp; on the outside a thin wet line
         const inner = side * bend > 0, width = inner ? Math.min(bank, 0.6 + 3.6 * Math.pow(Math.abs(bend), 0.8)) : 0.15;
@@ -120,7 +168,7 @@ function build() {
           if (edge === "siltmud") {
             // animals trample the waterline to mud; the low hollows between the bar's ridges hold mud too
             if (out < 1.1 && hash(x, z) < 0.45) kind = "mud";
-            else if (width > 2.4 && out > 1.6 && out < 2.4 + 0.4 * wobble(z, x) && hash(x + 3, z) < 0.75) kind = "mud";
+            else if (width > 2.4 && out > 1.6 && out < 2.4 + 0.4 * wobble(z, x) && hash(x + 3, z) < 0.75) kind = "drymud";
           } else if (edge === "graded") {
             // the current drops sand first, at the bar's upstream head, and the fine silt and mud at its tail
             const head = bend * -Math.cos(nr.xx / 10) > 0;
@@ -136,10 +184,10 @@ function build() {
     const oc = Math.hypot(x + 0.5 - 20, z + 0.5 - 53);
     if (z + 0.5 <= 53.5 && oc >= 6 && oc <= 8.6) {
       water = PLAIN; wkind = "pool"; top = (oc > 6.9 && oc < 7.7 && z < 50) ? PLAIN - 2 : PLAIN - 1; kind = "mud";
-    } else if (z + 0.5 <= 54 && z + 0.5 > 51 && oc >= 5 && oc <= 9.6 && water === null) kind = "mud";
+    } else if (z + 0.5 <= 54 && z + 0.5 > 51 && oc >= 5 && oc <= 9.6 && water === null) kind = oc < 5.6 || oc > 9 ? "drymud" : "mud";
     const pe = Math.hypot((x + 0.5 - 54) / 5.5, (z + 0.5 - 13.3) / 3.8);
     if (pe < 1) { water = PLAIN; wkind = "pool"; top = PLAIN - 1; kind = "mud"; }
-    else if (pe < 1.45 && water === null) kind = "mud";
+    else if (pe < 1.45 && water === null) kind = pe > 1.22 ? "drymud" : "mud";
     const t = Math.max(0, Math.min(1, (d - 19) / 6));
     const g = new THREE.Color(flood).lerp(new THREE.Color(plain), t);
     col.push({ x, z, top, kind, water, wkind, g, side: t < 0.5 ? "F" : "P" });
@@ -148,16 +196,17 @@ function build() {
   // materials
   const shade = [0.6, 0.6, 1, 0.5, 0.8, 0.8];
   const boxMats = map => shade.map((s, i) => new THREE.MeshBasicMaterial({ map: map[i] || map[0], color: new THREE.Color(s, s, s) }));
-  const dirt = tex(canvasOf(IMG.dirt)), sand = tex(canvasOf(IMG.sand)), mud = tex(canvasOf(IMG.mud));
+  const dirt = tex(canvasOf(IMG.dirt)), sand = tex(canvasOf(IMG.sand)), mudStyle = OPTIONS.mud.list[state.mud][1];
+  const mud = tex(mudOf(mudStyle === "mixed" ? "wet" : mudStyle)), drymud = tex(mudOf(mudStyle === "mixed" ? "cracked" : mudStyle));
   const silt = tex(siltOf(false)), wetsilt = tex(siltOf(true));
   const sideOf = h => { const c = canvasOf(IMG.dirt); c.getContext("2d").drawImage(tinted(IMG.grass_block_side_overlay, h), 0, 0); return tex(c); };
   const sideF = sideOf(flood), sideP = sideOf(plain);
   const mats = {
     grassF: boxMats([sideF, sideF, dirt, dirt, sideF, sideF]), grassP: boxMats([sideP, sideP, dirt, dirt, sideP, sideP]),
-    dirt: boxMats([dirt]), sand: boxMats([sand]), mud: boxMats([mud]), silt: boxMats([silt]), wetsilt: boxMats([wetsilt]),
+    dirt: boxMats([dirt]), sand: boxMats([sand]), mud: boxMats([mud]), drymud: boxMats([drymud]), silt: boxMats([silt]), wetsilt: boxMats([wetsilt]),
   };
-  const cells = { grassF: [], grassP: [], dirt: [], sand: [], mud: [], silt: [], wetsilt: [] };
-  const tops = { grass: [], sand: [], dirt: [], mud: [], silt: [], wetsilt: [] };
+  const cells = { grassF: [], grassP: [], dirt: [], sand: [], mud: [], drymud: [], silt: [], wetsilt: [] };
+  const tops = { grass: [], sand: [], dirt: [], mud: [], drymud: [], silt: [], wetsilt: [] };
   for (const c of col) {
     let low = c.top;
     for (const [dx, dz] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) { const n = at(c.x + dx, c.z + dz); low = Math.min(low, n ? n.top + 1 : -4); }
@@ -176,7 +225,7 @@ function build() {
     scene.add(mesh);
   }
   const plane = new THREE.PlaneGeometry(1, 1); plane.rotateX(-Math.PI / 2);
-  const topTex = { grass: tex(canvasOf(IMG.grass_block_top)), sand, dirt, mud, silt, wetsilt };
+  const topTex = { grass: tex(canvasOf(IMG.grass_block_top)), sand, dirt, mud, drymud, silt, wetsilt };
   for (const k in tops) {
     if (!tops[k].length) continue;
     const mesh = new THREE.InstancedMesh(plane, new THREE.MeshBasicMaterial({ map: topTex[k] }), tops[k].length);
@@ -215,7 +264,7 @@ function buttons() {
     row.innerHTML = `<b>${OPTIONS[key].label}</b>`;
     OPTIONS[key].list.forEach((o, i) => {
       const b = document.createElement("button");
-      const c = typeof o[1] === "number" && key !== "bank" && key !== "sand" ? o[1] : o[1] === "savanna" ? SAVANNA : o[1] === "plains" ? PLAINS : null;
+      const c = typeof o[1] === "number" && key !== "bank" && key !== "sand" && key !== "mud" ? o[1] : o[1] === "savanna" ? SAVANNA : o[1] === "plains" ? PLAINS : null;
       b.innerHTML = (c !== null && c !== undefined && key !== "sand" ? `<span class="sw" style="background:${hexCss(c)}"></span>` : "") + o[0];
       b.className = state[key] === i ? "on" : "";
       b.onclick = () => {
