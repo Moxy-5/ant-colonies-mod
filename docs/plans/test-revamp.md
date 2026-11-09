@@ -160,6 +160,10 @@ plain method a quick test can call (test-only seams, no behaviour change).
 things the user's worlds showed: dead mounds holding Matabele, the dead tree by each mound, feeding spots in a raid's
 reach, no colony in water.
 
+### Part 2 as built (2026-11-09, branch `claude/test-revamp-2-092b4d`)
+
+**R4 done.** The exact checks of the survey gone through: nearly all are fair (scenes the test controls, counts that must come out even). Three lucky numbers became their rules: the job share (`Colony.shareOut` over the workers' real ages), the young (at least 3 grown, none lost, BUGS 184), the body (counted by owner wherever it lies, BUGS 179). The neighbours flake (BUGS 68) and the seed route flake (BUGS 49) are timing failures, not exact numbers, left for their own fixes. `antnest` 24 of 24.
+
 ## Later (not in this revamp)
 
 - **Handing the clock and weather in instead of the "ForTests" switches** (about 99 in the game code). It touches game

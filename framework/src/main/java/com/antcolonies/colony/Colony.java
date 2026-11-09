@@ -876,9 +876,10 @@ public class Colony {
     /**
      * How many workers do each job: as many as their ages say ({@code natural}), but at least {@code nursesWanted}
      * nurses and a third of the rest builders and a third foragers (rounded up; with too few workers for all of that,
-     * builders come first, then foragers). A short job takes workers from the job with the most to spare.
+     * builders come first, then foragers). A short job takes workers from the job with the most to spare. Public for
+     * the tests (test revamp R4: the jobs test checks this rule over the workers' real ages).
      */
-    static int[] shareOut(int total, int nursesWanted, int[] natural) {
+    public static int[] shareOut(int total, int nursesWanted, int[] natural) {
         int nurse = ColonyRole.NURSE.ordinal(), builder = ColonyRole.BUILDER.ordinal(), forager = ColonyRole.FORAGER.ordinal();
         int minNurses = Math.min(total, nursesWanted);
         int rest = total - minNurses;

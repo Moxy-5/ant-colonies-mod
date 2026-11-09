@@ -1031,6 +1031,7 @@ public class NestTests {
         boolean[] placed = {false};
         int[] workersBefore = {0};
         int[] antsBefore = {0};
+        int[] laidBefore = {0};
         helper.onEachTick(() -> {
             Colony colony = colony(helper);
             if (placed[0] || colony == null || airBelowSurface(helper) != NEST_CELLS || colony.nest().findDigTarget(level) != null
@@ -1040,6 +1041,7 @@ public class NestTests {
             placed[0] = true;
             workersBefore[0] = colony.getCount(Caste.WORKER);
             antsBefore[0] = colonyWorkers(helper, colony).size();
+            laidBefore[0] = colony.queenCare().getEggsLaid();
             var cells = colony.nest().getNurseryCells(level);
             for (int i = 0; i < 3; i++) {
                 colony.brood().placeEgg(level, cells.get(i * 7));
@@ -1062,11 +1064,18 @@ public class NestTests {
         helper.succeedWhen(() -> {
             Colony colony = colony(helper);
             helper.assertTrue(placed[0] && colony != null, "no eggs have been put in the nursery yet");
-            helper.assertTrue(colony.brood().countLarvae(level) == 0, colony.brood().countLarvae(level) + " larvae are still there");
-            helper.assertTrue(colony.getCount(Caste.WORKER) == workersBefore[0] + 3,
-                    "the colony counts " + colony.getCount(Caste.WORKER) + " workers, expected " + (workersBefore[0] + 3));
+            // Test revamp R4 (BUGS 184): the queen is fed from the same store and may lay eggs of her own meanwhile, so
+            // "no larva left" and "exactly 3 more workers" were numbers the colony only happened to hit. The rules: at
+            // least 3 young grew into workers, and every young is still there (grown up, a larva or an egg): none lost.
+            int grewUp = colony.getCount(Caste.WORKER) - workersBefore[0];
+            int laid = colony.queenCare().getEggsLaid() - laidBefore[0];
+            int young = colony.brood().countLarvae(level) + colony.brood().countEggs(level);
+            helper.assertTrue(grewUp >= 3, "only " + grewUp + " young grew into workers so far (" + colony.brood().countLarvae(level)
+                    + " larvae, hunger " + colony.brood().larvaHunger(level) + ", the queen laid " + laid + " eggs of her own)");
+            helper.assertTrue(grewUp + young == 3 + laid, "young were lost: " + grewUp + " grew up and " + young
+                    + " are eggs or larvae, of the 3 put in and the " + laid + " the queen laid");
             var workers = colonyWorkers(helper, colony);
-            helper.assertTrue(workers.size() == antsBefore[0] + 3, "there are " + workers.size() + " worker ants, expected " + (antsBefore[0] + 3));
+            helper.assertTrue(workers.size() == antsBefore[0] + grewUp, "there are " + workers.size() + " worker ants, expected " + (antsBefore[0] + grewUp));
             for (var worker : workers) {
                 helper.assertTrue(colony.getId().equals(worker.getColonyId()), "a worker belongs to no colony or the wrong one");
             }
@@ -1235,8 +1244,12 @@ public class NestTests {
             // chamber (in full runs it sometimes got there first, and a carried body is not one lying about).
             int carried = TestIsolation.insectsOf(helper, WorkerAntEntity.class,
                     worker -> colony.getId().equals(worker.getColonyId()) && worker.isCarryingCorpse()).size();
-            int bodies = colony.refuse().getCorpses(level).size() + carried;
-            helper.assertTrue(bodies == 1, bodies + " bodies (" + carried + " carried), expected 1");
+            // Test revamp R4 (BUGS 179): the colony's bodies wherever they lie (by owner, not only in the nest area).
+            int lying = TestIsolation.insectsOf(helper, com.antcolonies.entity.AntCorpseEntity.class,
+                    corpse -> corpse.isAlive() && colony.getId().equals(corpse.getColonyId())).size();
+            int bodies = lying + carried;
+            helper.assertTrue(bodies == 1, bodies + " bodies (" + carried + " carried, " + colony.refuse().getCorpses(level).size()
+                    + " in the nest area, " + colony.away().getBodiesOwed() + " owed by the numbers), expected 1");
         });
     }
 
@@ -1763,10 +1776,21 @@ public class NestTests {
                     nursesNearQueen++;
                 }
             }
-            helper.assertTrue(roles[com.antcolonies.colony.ColonyRole.NURSE.ordinal()] == 1
-                    && roles[com.antcolonies.colony.ColonyRole.BUILDER.ordinal()] == 3
-                    && roles[com.antcolonies.colony.ColonyRole.FORAGER.ordinal()] == 2,
-                    "roles (builder, forager, nurse): " + java.util.Arrays.toString(roles) + ", expected [3, 2, 1]");
+            // Test revamp R4: the jobs the share-out rule gives for these workers' real ages now (six spawned workers
+            // start as 1 nurse, 3 builders, 2 foragers, but over the minutes the nest takes to dig a builder may age into
+            // a forager: the rule, not the first day's numbers).
+            List<WorkerAntEntity> mine = TestIsolation.insectsOf(level, colony, WorkerAntEntity.class);
+            int[] natural = new int[com.antcolonies.colony.ColonyRole.values().length];
+            for (WorkerAntEntity worker : mine) {
+                natural[colony.profile().worker().roleForAge(level.getGameTime() - worker.getGrownUpAt()).ordinal()]++;
+            }
+            int[] expected = Colony.shareOut(mine.size(), colony.profile().colony().nurses(mine.size()), natural);
+            helper.assertTrue(mine.size() == 6, "the colony has " + mine.size() + " workers, not the 6 it started with");
+            helper.assertTrue(java.util.Arrays.equals(roles, expected),
+                    "roles (nurse, builder, forager): " + java.util.Arrays.toString(roles) + ", expected " + java.util.Arrays.toString(expected)
+                    + " by the share-out of their ages " + java.util.Arrays.toString(natural));
+            helper.assertTrue(roles[com.antcolonies.colony.ColonyRole.NURSE.ordinal()] >= 1 && roles[com.antcolonies.colony.ColonyRole.BUILDER.ordinal()] >= 1
+                    && roles[com.antcolonies.colony.ColonyRole.FORAGER.ordinal()] >= 1, "a job has nobody: " + java.util.Arrays.toString(roles));
             helper.assertTrue(nursesNearQueen == 1, "the nurse is not next to the queen");
         });
     }
