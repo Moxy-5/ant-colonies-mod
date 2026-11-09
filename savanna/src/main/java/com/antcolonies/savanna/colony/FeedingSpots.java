@@ -73,13 +73,16 @@ public final class FeedingSpots {
 
     /**
      * Raid rework R5: the colony's feeding places fed at by day (the {@link Spot#byDay} ones), with their cells, for the
-     * Matabele scouts to smell; no mud count (cheap enough for every scout's trip).
+     * Matabele scouts to smell; no mud count (cheap enough for every scout's trip). A place the colony keeps off
+     * ({@link Colony#keepsOff}: it was attacked there, brain step 4g) is left out: the termites have sealed it off and
+     * feed elsewhere, so there is nobody there to smell (BUGS 168: scouts scored abandoned spots worth a raid and sent
+     * columns to pace about an empty spot). The same question the number raiders ask ({@link RaidColumn}, {@link RaidsAway}).
      */
     public static List<ByDay> byDayPlaces(ServerLevel level, Colony colony) {
         List<ByDay> places = new ArrayList<>();
         FoodWays ways = colony.nest().foodWays();
         for (FoodWays.NewTunnel tunnel : ways.getNewTunnels()) {
-            if (ways.isSpent(tunnel.tunnel().hole())) {
+            if (ways.isSpent(tunnel.tunnel().hole()) || colony.keepsOff(level, tunnel.food())) {
                 continue;
             }
             List<BlockPos> gallery = tunnel.gallery() == null ? List.of() : tunnel.gallery();
@@ -88,7 +91,7 @@ public final class FeedingSpots {
             }
         }
         for (FoodWays.Runway runway : ways.getRunways()) {
-            if (ways.isRunwayClosed(level, runway)) {
+            if (ways.isRunwayClosed(level, runway) && !colony.keepsOff(level, runway.food())) {
                 places.add(new ByDay(runway.food(), List.copyOf(runway.cells())));
             }
         }
@@ -105,13 +108,14 @@ public final class FeedingSpots {
     /**
      * Raid rework R6: the colony's ways out to food in use (its tunnels to feeding places not spent, and its runways
      * with the tunnel to their hole), for the Matabele scouts to smell and follow outward. From the colony's own records
-     * ({@link FoodWays}, the foraging tunnels), no block scan.
+     * ({@link FoodWays}, the foraging tunnels), no block scan. Ways to food the colony keeps off are left out, as in
+     * {@link #byDayPlaces} (BUGS 168: the gallery is sealed there, no traffic to smell).
      */
     public static List<WayOut> waysOut(ServerLevel level, Colony colony) {
         List<WayOut> ways = new ArrayList<>();
         FoodWays foodWays = colony.nest().foodWays();
         for (FoodWays.NewTunnel tunnel : foodWays.getNewTunnels()) {
-            if (foodWays.isSpent(tunnel.tunnel().hole())) {
+            if (foodWays.isSpent(tunnel.tunnel().hole()) || colony.keepsOff(level, tunnel.food())) {
                 continue;
             }
             List<BlockPos> cells = new ArrayList<>(tunnel.tunnel().tunnel());
@@ -124,6 +128,9 @@ public final class FeedingSpots {
         if (!runways.isEmpty()) {
             List<com.antcolonies.colony.NestPlan.ForagingTunnel> tunnels = colony.foragingHoles().tunnels(level);
             for (FoodWays.Runway runway : runways) {
+                if (colony.keepsOff(level, runway.food())) {
+                    continue;
+                }
                 List<BlockPos> cells = new ArrayList<>();
                 for (com.antcolonies.colony.NestPlan.ForagingTunnel tunnel : tunnels) {
                     if (tunnel.hole().equals(runway.hole())) {

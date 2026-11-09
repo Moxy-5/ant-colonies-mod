@@ -2043,6 +2043,34 @@ public class MatabeleRaidTests {
                             && line.get(line.size() - 1).closerThan(find.at(), 8), "no scent line from the nest to the find");
                     SavannaMod.LOGGER.info("[mound clue test] found at {}: {}", helper.getTick(), raids.describe(level));
                 })
+                .thenExecute(() -> {
+                    // (BUGS 168, the user's report of 2026-11-09: a scout scored a spot the termites had given up after
+                    // earlier raids as worth a raid, and the column paced about an empty spot) once the termites are
+                    // attacked at the east feeding place they keep off it, and the scouts no longer smell it or the
+                    // tunnel out to it; the west way, never attacked, is still there
+                    BlockPos eastFood = helper.absolutePos(new BlockPos(59, SURFACE, 20));
+                    List<BlockPos> before = com.antcolonies.savanna.colony.FeedingSpots.waysOut(level, termites).stream()
+                            .map(com.antcolonies.savanna.colony.FeedingSpots.WayOut::food).toList();
+                    helper.assertTrue(before.contains(eastFood), "before any attack the east tunnel is not among the termites' ways out: " + before);
+                    termites.danger().hurt(level, eastFood, "matabele", true);
+                    termites.danger().hurt(level, eastFood, "matabele", true);
+                    helper.assertTrue(termites.keepsOff(level, eastFood), "the termites do not keep off the feeding place they were attacked at");
+                    helper.assertTrue(com.antcolonies.savanna.colony.FeedingSpots.byDayPlaces(level, termites).stream().noneMatch(place -> place.food().equals(eastFood)),
+                            "a scout still smells termites feeding at the place they keep off (it would score an empty spot worth a raid)");
+                    List<BlockPos> after = com.antcolonies.savanna.colony.FeedingSpots.waysOut(level, termites).stream()
+                            .map(com.antcolonies.savanna.colony.FeedingSpots.WayOut::food).toList();
+                    helper.assertTrue(!after.contains(eastFood), "a scout still follows the sealed tunnel out to the place the termites keep off");
+                    // (ways to food within the danger's reach of the attack go too, as the termites keep off all of it; the
+                    // colony's own tunnels dug next to the scene's lie there; ways farther off must stay)
+                    double reach = termites.danger().numbers().reach();
+                    helper.assertTrue(before.stream().anyMatch(food -> flat(food, eastFood) > reach + 1),
+                            "no way out past the attack's reach to check stays: " + before);
+                    for (BlockPos food : before) {
+                        helper.assertTrue(flat(food, eastFood) <= reach + 1 || after.contains(food), "the way out to " + food.toShortString()
+                                + ", " + Math.round(flat(food, eastFood)) + " blocks from the attack, was dropped too (kept off by "
+                                + termites.whoKeepsOff(level, food) + "); before " + before + ", after " + after);
+                    }
+                })
                 .thenSucceed();
     }
 
