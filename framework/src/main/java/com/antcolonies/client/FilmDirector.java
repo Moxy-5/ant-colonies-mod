@@ -85,6 +85,7 @@ import net.neoforged.neoforge.event.tick.ServerTickEvent;
  * follow 0 0.1 -7 0 0             the camera rides along with the walker, this far off it, with this turn and tilt,
  *                                 for every shot from now ("follow off" stops it)
  * log climb                       one line a tick about the walker's drawn body into climb.txt ("log off" ends it)
+ * repeat 100 ... end              the lines between written out 100 times, {i} in them 000, 001, ... (shot side_{i})
  * quit
  * </pre>
  * An insect named {@code film:<clip>} plays that clip and nothing else ({@code AbstractAntEntity.filmClip}); name tags
@@ -158,17 +159,49 @@ public final class FilmDirector {
             try {
                 java.util.List<String> lines = Files.readAllLines(scene, StandardCharsets.UTF_8);
                 steps.add("scene " + scene.getFileName().toString().replace(".film", ""));
+                java.util.List<String> own = new java.util.ArrayList<>();
                 for (String line : lines) {
                     String step = line.contains("#") && !line.trim().startsWith("cmd") ? line.substring(0, line.indexOf('#')) : line;
                     if (!step.isBlank()) {
-                        steps.add(step.trim());
+                        own.add(step.trim());
                     }
                 }
+                steps.addAll(repeats(own));
             } catch (IOException e) {
                 LOG.error("Film: cannot read the shot list {}", scene, e);
             }
         }
         LOG.info("Film: {} steps from {} scene(s): {}", steps.size(), scenes.size(), scenes);
+    }
+
+    /**
+     * A shot list with its {@code repeat n} ... {@code end} blocks written out n times over, {@code {i}} in their lines
+     * the time's number from 000 (2026-11-08, the raid march film: three cameras every other tick, round and round,
+     * without a shot list thousands of lines long). Blocks do not nest.
+     */
+    static java.util.List<String> repeats(java.util.List<String> lines) {
+        java.util.List<String> out = new java.util.ArrayList<>();
+        for (int at = 0; at < lines.size(); at++) {
+            String line = lines.get(at);
+            if (!line.startsWith("repeat ")) {
+                out.add(line);
+                continue;
+            }
+            int times = Integer.parseInt(line.substring(7).trim());
+            int end = at + 1;
+            while (end < lines.size() && !lines.get(end).equals("end")) {
+                end++;
+            }
+            java.util.List<String> body = lines.subList(at + 1, end);
+            for (int i = 0; i < times; i++) {
+                String number = String.format(java.util.Locale.ROOT, "%03d", i);
+                for (String step : body) {
+                    out.add(step.replace("{i}", number));
+                }
+            }
+            at = end;
+        }
+        return out;
     }
 
     /** The scene being filmed (its pictures and logs go into a folder of that name), and its checks. */

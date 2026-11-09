@@ -1,0 +1,37 @@
+# The raid march (2026-11-08, the user's ask: "an actual film test in game of them coming out and marching"): a dead
+# termite mound with a Matabele colony of 120 in it, a demo raid along a 40-block trail east (/antcolonies raid demo,
+# set out the way the ribbon test does: the scout by the entrance, the rest in the rooms). Three cameras every other
+# tick, so the three films line up: wide (the hump and the trail's first 20 blocks, fixed), side (riding along south
+# of the column, a little behind the scout) and top (straight down over the column, east to the right). The trail's
+# corridor is cleared of the mound's dead tree first, so nothing but the march is in the way.
+#   ./gradlew runFilm -PfilmScene=tools/film/raid_march.film
+#   python tools/raid_film.py     (the three films side by side: run-film/raid_march.mp4)
+cmd time set 1000
+cmd weather clear
+lens 45
+camera 0.5 -60 0.5 0 0
+cmd antcolonies newmound dead 6
+wait 200
+cmd fill 14 -60 -6 54 -30 6 air
+camera 6.5 -60 0.5 0 0
+cmd antcolonies matabele 120
+wait 100
+camera 16 -46 22 155 16
+wait 20
+cmd antcolonies raid demo 40 east
+cmd data merge entity @e[tag=raid_scout,limit=1] {CustomName:'"film-walker"'}
+cmd tick freeze
+repeat 450
+follow off
+fov 45
+camera 16 -46 22 155 16
+shot wide_{i}
+follow -4 2.5 9 180 15
+fov 50
+shot side_{i}
+follow -6 13 0 180 90
+fov 60
+shot top_{i}
+step 2
+end
+quit

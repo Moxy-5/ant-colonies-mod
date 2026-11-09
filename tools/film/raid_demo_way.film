@@ -1,0 +1,18 @@
+# A quick check of /antcolonies raid demo with no way given (2026-11-08): it should lay its trail the way of eight with the
+# plainest ground, away from the dead mound's own dead tree. Read the "[raid] demo" line in the log; one picture from above.
+#   ./gradlew runFilm -PfilmScene=tools/film/raid_demo_way.film
+cmd time set 1000
+lens 45
+camera 0.5 -60 0.5 0 0
+cmd antcolonies newmound dead 6
+wait 200
+camera 6.5 -60 0.5 0 0
+cmd antcolonies matabele 120
+wait 100
+cmd antcolonies raid demo
+wait 20
+camera 0.5 -10 0.5 0 90
+fov 70
+wait 10
+shot above
+quit

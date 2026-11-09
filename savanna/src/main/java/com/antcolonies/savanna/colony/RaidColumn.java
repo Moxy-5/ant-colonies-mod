@@ -19,6 +19,7 @@ import org.jetbrains.annotations.Nullable;
 
 import com.antcolonies.colony.AwayLife;
 import com.antcolonies.colony.Colony;
+import com.antcolonies.colony.LandReady;
 import com.antcolonies.entity.AbstractAntEntity;
 import com.antcolonies.entity.Wounds;
 import com.antcolonies.entity.goal.EatGoal;
@@ -114,9 +115,22 @@ public final class RaidColumn {
 
     /**
      * The ribbon (the user, 2026-11-07: "give him like a 5% speed boost, its subtle but it will keep him infront"): the
-     * front walks this much faster than the column's own pace, and never stops.
+     * front walks this much faster than the column's own pace, and never stops. (A slower front till the column had
+     * closed up behind it, 0.9, was tried on 2026-11-08 and taken out the same day: the crowd always leaves a few raiders
+     * two to four rows back, so "closed up" never came off a low mound and came on the top of a tall one, before anyone
+     * had climbed down; what had stretched the column was the slow climb, {@link #MARCH_CLIMB}.)
      */
     private static final double FRONT_PACE = 1.05;
+    /**
+     * On the way out (forming and marching) a raider climbs this many times faster than an insect's normal climb, up the
+     * nest's shaft and down the hump (the user's offer of 2026-11-08, "we can speed up the climbing down for the raid"): about its walking pace.
+     * Measured in the ribbon test: a major climbs 1.1 blocks a second at the column's pace and walks 2.0 to 2.3. Down a
+     * 13-block dead mound the scout took 19 s while all 47 raiders crowded on its top, then walked off on the flat while
+     * they trickled down the wall behind it, the column 20 blocks long 20 blocks past the hump's foot (a perfect one is
+     * 11.4); and the one-block shaft lets them out single file at the climb's speed, about 3.5 raiders a second. Real ants
+     * slow down on steep walls too; how much for Megaponera I do not know, so this is for the look.
+     */
+    public static final double MARCH_CLIMB = 2.0;
     /**
      * A raider level with the front or past it walks this slow, so it drops back behind it without stopping (a raider
      * that got past the front at the front's own pace stayed in front of it all the march). My pick.
@@ -124,8 +138,12 @@ public final class RaidColumn {
     private static final double PASSED_PACE = 0.4;
     /** A straggler, or the scout running in to recruit, hurries at this pace. */
     private static final double HURRY_PACE = 1.15;
-    /** The ribbon: a raider far behind its place (one just out of the nest) catches up at up to this pace (my pick). */
-    private static final double CATCH_UP_PACE = 1.35;
+    /**
+     * The ribbon: a raider far behind its place (one just out of the nest) catches up at up to this pace (a run; was 1.35,
+     * the user's plan of 2026-11-08: at 1.35 a raider gained only 0.7 blocks a second on the front, so the tail of 47
+     * raiders took some 50 blocks to close up; my pick).
+     */
+    private static final double CATCH_UP_PACE = 1.6;
     /**
      * The ribbon: the lanes in a row lie this far apart (blocks; my pick: a little over a major's personal distance, 0.4,
      * so ants side by side never count as in each other's way): 3 abreast at -0.44, 0, 0.44, 2 at -0.22, 0.22.
@@ -133,25 +151,6 @@ public final class RaidColumn {
     private static final double LANE_GAP = 0.44;
     /** How far ahead (blocks along the trail) of itself the front walks to at a time. */
     private static final double LEAD_STEP = 6.0;
-    /**
-     * The scout waits for its raiders at the foot of the nest's hump (the user, 2026-11-08, from the way out timed raider
-     * by raider: the raiders come out of the nest together, but need 13 s from a low dead mound's rooms to the ground and 23
-     * s from a tall one's, and a scout walking off at once was 25 to 45 blocks ahead of them, a tail the ribbon never closed
-     * up). Real Matabele recruit for 1 to 5 minutes before the column sets off behind its scout, and stop to let the column
-     * gather before the termites (Frank and Linsenmair 2017). It waits this far past the hump's last climb or drop (blocks
-     * along; my pick), until the nearest raider is within {@link #FOOT_CLOSE} of it, or {@link #FOOT_WAIT_MOST} has passed;
-     * the stream behind keeps walking to its places. On the way out only, once a raid.
-     */
-    private static final double FOOT_PAST = 1.0;
-    /** The scout leads off once the nearest raider is this near behind it (blocks walked along the trail; about 2 rows, my pick). */
-    private static final double FOOT_CLOSE = 1.5;
-    /**
-     * A scout this far past its waiting place leads on without going back (a raid loaded mid-march; blocks along: one
-     * coming off a wall may land a step or so past it).
-     */
-    private static final double FOOT_PASSED = 2.5;
-    /** The scout's wait at the foot lasts at most this long (ticks, 40 s; a tall dead mound's raiders take about 23, my pick). */
-    private static final long FOOT_WAIT_MOST = 800;
     /** A raider counts as at the gathering place, or out at the entrance, this near it (blocks, flat). */
     private static final double NEAR = 4.0;
     /** The share of the raiders that must be at the gathering place before the attack or the walk home (my pick). */
@@ -172,8 +171,11 @@ public final class RaidColumn {
     private static final long HOME_STALL = 200;
     /** Raid flow: a walking raider aims this far (blocks along the trail) past its place, so it walks on, never stopping. */
     private static final double CARROT = 2.5;
-    /** Raid flow: its pace goes up (or down) this much for each block it is behind (or ahead of) its place. */
-    private static final double PACE_PER_BLOCK = 0.12;
+    /**
+     * Raid flow: its pace goes up (or down) this much for each block it is behind (or ahead of) its place (was 0.12, the
+     * user's plan of 2026-11-08: at 0.12 the last two blocks closed slowly, a few seconds each; my pick).
+     */
+    private static final double PACE_PER_BLOCK = 0.3;
     /** The simple march: a raider ahead of its place slows to no less than this (it lets the row come up; nobody crawls). */
     private static final double LEAST_MARCH_PACE = 0.85;
     /** R4: while the front casts about for a broken trail the column closes up to this share of its spacing (nose to tail; my pick). */
@@ -253,8 +255,8 @@ public final class RaidColumn {
     /** Where the front walks to now, and where it is (blocks along the route). */
     private double head;
     private double frontAt;
-    /** When the scout led off from the hump's foot on the way out (game time; -1 while it waits or before the march). */
-    private long leftFootAt = -1;
+    /** Each marching raider's distance behind its place at the last update (blocks walked; tests measure the march by it). */
+    private final Map<UUID, Double> behindPlace = new HashMap<>();
     /** Each raider's place now, and the raiders sent in to fight. */
     private final Map<UUID, Order> orders = new HashMap<>();
     private final Set<UUID> sentIn = new HashSet<>();
@@ -388,15 +390,30 @@ public final class RaidColumn {
     private final Map<UUID, Integer> formIndex = new HashMap<>();
     /**
      * BUGS 101, the scout recruits in the nest (real Megaponera: the scout home from a find runs into the nest, and the
-     * raiders it stirs pour out after it): the room cell it runs to (null for none), whether that was looked for, and when
-     * it got there (or gave up), -1 till then. The march starts from then.
+     * raiders it stirs pour out after it): the cell it runs to (null for none), whether that was looked for, and when
+     * it got there (or gave up), -1 till then. The march starts from then. It is the foot of the nest's shaft
+     * ({@link #shaftFoot}), where every raider must pass behind it to get out: it called from the room cell nearest the
+     * nest's mouth at first (2026-11-08), 3 blocks from a tall dead mound's chimney with raiders as near, and 6 of them
+     * got into the one-block chimney before it (traced in the ribbon test: insects do not block one another, so ants as
+     * near the shaft as the scout climb it with or before it).
      */
     @Nullable
     private BlockPos recruitAt;
+    /**
+     * Where the raiders in the nest gather while the scout runs down to call (null: they stand where they are): the room
+     * cell nearest the shaft's foot at least {@link #GATHER_OFF} blocks from it, so the scout, at the foot, climbs first.
+     */
+    @Nullable
+    private BlockPos gatherAt;
+    /** How far from the shaft's foot the raiders gather at the least (blocks). */
+    private static final double GATHER_OFF = 2.0;
     private boolean recruitLooked;
     private long recruitedAt = -1;
-    /** The scout's longest run in to recruit (ticks; my pick, 15 s): then the column leaves all the same. */
-    private static final long RECRUIT_MOST = 300;
+    /**
+     * The scout's longest run in to recruit (ticks; my pick, 30 s, was 15 when it called at the mouth: down a tall dead
+     * mound's chimney takes it 10 s and more): then the column leaves all the same.
+     */
+    private static final long RECRUIT_MOST = 600;
 
     RaidColumn(ServerLevel level, Colony colony, SavannaNumbers.ColumnNumbers numbers, @Nullable SavannaNumbers.CarryNumbers carry,
                SavannaNumbers.TrailNumbers trailNumbers, Raids.Find find, ScentTrails.Trail scent, List<MatabeleEntity> raiders,
@@ -1215,17 +1232,22 @@ public final class RaidColumn {
         stageSince = now;
         head = 0.0;
         frontAt = 0.0;
-        leftFootAt = -1;
+        behindPlace.clear();
     }
 
     /**
-     * The raid forms: the scout home from its find runs to the nest's mouth (the trail's start, beside the entrance) and
-     * calls the raiders out there (real Megaponera recruit with a pheromone at and in the nest: Longhurst and Howse 1979,
-     * Hoelldobler et al. 1994; it called deep in the nest until 2026-11-07, and a tall dead mound's chimney left it climbing
-     * back out some 20 s while the raiders already out got ahead of it). Once it has called (or could not get there) the
-     * march begins at once (the user's pick of 2026-11-07, "unroll out of the nest": "have the scout immediately start
-     * walking after he calls for them"): no milling on the mound, no waiting for anyone. The scout walks straight off along
-     * its trail and each raider, as it comes out of the nest, takes the next place at the back of the ribbon ({@link #march}).
+     * The raid forms: the scout home from its find runs down into the nest, to the room nearest the way out (the foot of
+     * a dead mound's chimney), and calls the raiders there (real Megaponera recruit with a pheromone in the nest, and the
+     * raiders follow the scout out: Longhurst and Howse 1979, Hoelldobler et al. 1994). While it runs down, the raiders in
+     * the nest gather just off the foot of the shaft ({@link #gatherAt}; spread over a big nest's rooms they came out over
+     * 16 s, a trickle behind a scout long gone, 2026-11-08); the ones outside come to the trail's start beside the
+     * entrance and wait there (standing where they were, some stood out along the trail ahead of the scout, which then
+     * had to walk past them, 2026-11-08, the whole-chain raid test). (2026-11-07 to 2026-11-08 it called
+     * at the nest's mouth; before that it called deep in the nest while the raiders already set off, and climbed out
+     * behind them.) Once it has called (or could not get there) the march begins
+     * at once (the user's plan of 2026-11-08: "the scout goes down first all the way into the hole, then everyone starts
+     * following the scout out"): the scout, nearest the way out, climbs out first and walks straight off along its trail,
+     * and each raider, as it comes out of the nest, takes the next place at the back of the ribbon ({@link #march}).
      */
     private void form(ServerLevel level, List<MatabeleEntity> ants, long now) {
         MatabeleEntity scout = null;
@@ -1236,33 +1258,72 @@ public final class RaidColumn {
         }
         if (!recruitLooked) {
             recruitLooked = true;
-            recruitAt = out.place(level, 0.0, 0.0);
+            BlockPos mouth = out.place(level, 0.0, 0.0);
+            recruitAt = shaftFoot(level);
+            if (recruitAt == null && mouth != null) { // (no shaft under the entrance: the room cell nearest the mouth)
+                recruitAt = colony.nest().getAllRoomCells(level).stream()
+                        .filter(cell -> RaidGround.canStand(level, cell))
+                        .min(Comparator.comparingDouble(cell -> cell.distSqr(mouth)))
+                        .orElse(mouth); // (a nest with no room to stand in: at its mouth)
+            } else if (recruitAt != null) {
+                BlockPos foot = recruitAt;
+                gatherAt = colony.nest().getAllRoomCells(level).stream()
+                        .filter(cell -> cell.distSqr(foot) >= GATHER_OFF * GATHER_OFF && RaidGround.canStand(level, cell))
+                        .min(Comparator.comparingDouble(cell -> cell.distSqr(foot)))
+                        .orElse(null);
+            }
         }
         boolean there = scout == null || recruitAt == null || now - stageSince >= RECRUIT_MOST
                 || flat(scout.blockPosition(), recruitAt) <= 1.5 && Math.abs(scout.getY() - recruitAt.getY()) <= 1.5;
         if (!there) {
+            BlockPos lineStart = out.place(level, 0.0, 0.0);
             for (MatabeleEntity ant : ants) {
-                orders.put(ant.getUUID(), ant == scout ? new Order(recruitAt, HURRY_PACE, null) : new Order(null, 1.0, null));
+                orders.put(ant.getUUID(), ant == scout ? new Order(recruitAt, HURRY_PACE, null)
+                        : isOut(level, ant) ? new Order(lineStart, 1.0, null) : new Order(gatherAt, 1.0, null));
             }
             return;
         }
         recruitedAt = now;
         say(scout != null && recruitAt != null && now - stageSince < RECRUIT_MOST
-                ? "the scout calls at the nest's mouth after " + (now - stageSince) / 20 + " s and leads off at once: the column unrolls out of the nest behind it"
-                : "the scout did not get to the nest's mouth in " + (now - stageSince) / 20 + " s: it leads off all the same, the raiders following it out");
+                ? "the scout calls in the nest after " + (now - stageSince) / 20 + " s and leads off at once: it climbs out first, the column unrolling out of the nest behind it"
+                : "the scout did not get down into the nest in " + (now - stageSince) / 20 + " s: it leads off all the same, the raiders following it out");
         next(Stage.MARCHING, now);
     }
 
-    /** Tests: when the scout called at the nest's mouth (or gave up getting there), game time; -1 not yet. */
+    /**
+     * The foot of the nest's shaft: straight down from the entrance through open cells (a dead mound's chimney), the lowest
+     * one, if an ant can stand in it and it is at least 2 blocks under the entrance; null if there is no such shaft.
+     */
+    @Nullable
+    private BlockPos shaftFoot(ServerLevel level) {
+        BlockPos entrance = colony.getCenter();
+        BlockPos foot = null;
+        for (int down = 1; down <= SHAFT_MOST; down++) {
+            BlockPos cell = entrance.below(down);
+            if (!LandReady.at(level, cell) || !level.getBlockState(cell).getCollisionShape(level, cell).isEmpty()) {
+                break;
+            }
+            foot = cell;
+        }
+        return foot != null && entrance.getY() - foot.getY() >= 2 && RaidGround.canStand(level, foot) ? foot : null;
+    }
+
+    /** The deepest a nest's shaft is looked for under its entrance (blocks). */
+    private static final int SHAFT_MOST = 32;
+
+    /** Tests: when the scout called in the nest (or gave up getting there), game time; -1 not yet. */
     public long recruitedAt() {
         return recruitedAt;
     }
 
     /**
      * On the march, out or home: the ribbon (the user's pick of 2026-11-07 from the march viewer, formation B with exit 2,
-     * "unroll out of the nest"). The front waits at the foot of the nest's hump for the first raiders ({@link #waitsAtFoot}),
-     * then walks the trail ahead of itself and never stops, a little faster than the column ({@link #FRONT_PACE}), so it
-     * stays in front. Every other raider has a place in the ribbon: rows behind the
+     * "unroll out of the nest"). The front walks the trail ahead of itself and never stops, a little faster than the
+     * column ({@link #FRONT_PACE}), so it stays in front. On the way out the scout comes out of the nest first (the user's
+     * plan of 2026-11-08; it waited at the foot of the nest's hump for the first raiders before): it calls at the foot of
+     * the nest's shaft, and till it is out the raiders already outside wait for it by the entrance and the ones in the nest
+     * climb up behind it ({@link #comeOut}); the march proper starts as it comes out, and down a hump every marcher climbs
+     * at about its walking pace ({@link #MARCH_CLIMB}). Every other raider has a place in the ribbon: rows behind the
      * front, {@code spacing} apart, of {@code abreast} side by side and one fewer by turns (3, 2, 3, 2, ...), each ant in
      * its own lane in its row. The places are given in the order the ants come out of the nest (the first out nearest the
      * front), so the column unrolls out of the hole behind its scout; on the way home, in the order they stand along the
@@ -1299,55 +1360,45 @@ public final class RaidColumn {
         rankLine(line, at);
         double spacing = casting ? numbers.spacing() * CLOSE_UP : numbers.spacing();
         double frontPlace = casting ? Math.min(frontW, route.walked(castGap.near() - GAP_STOP)) : frontW;
+        boolean frontOut = route != out || isOut(level, front);
         MarchStep step = new MarchStep(route, frontW, spacing, casting, now);
         Ribbon ribbon = ribbon(step, line, frontPlace);
         BlockPos ahead = route.point(Math.min(route.length(), frontAt + 4.0));
         if (casting) {
             orders.put(front.getUUID(), new Order(castSpot(level, route, 0, now), 1.0, route.point(castGap.far())));
-        } else if (waitsAtFoot(level, route, frontW, line, at, now)) {
-            // (a plain order: it walks to the foot and waits there, looking along the trail; a marching order moves on)
-            orders.put(front.getUUID(), new Order(route.place(level, hillEnd(level, route) + FOOT_PAST, 0.0), FRONT_PACE, ahead));
         } else {
             if (frontAt >= head - LEAD_STEP / 2) {
                 head = Math.min(route.length(), frontAt + LEAD_STEP);
             }
             orders.put(front.getUUID(), Order.marching(route.place(level, head, 0.0), FRONT_PACE, ahead, Vec3.ZERO));
         }
+        BlockPos lineStart = frontOut ? null : route.place(level, 0.0, 0.0);
         for (int k = 0; k < line.size(); k++) {
             MatabeleEntity ant = line.get(k);
-            orders.put(ant.getUUID(), raiderOrder(level, step, ribbon, ant, k, at.get(ant.getUUID())));
+            // (the scout still in the nest: a raider already outside waits for it at the trail's start by the entrance,
+            // facing the trail; it walked on ahead of it before, at the passed pace, some 19 blocks while the scout climbed
+            // out of a tall mound, and standing where it was it could stand out along the trail ahead of the scout)
+            orders.put(ant.getUUID(), frontOut ? raiderOrder(level, step, ribbon, ant, k, at.get(ant.getUUID()))
+                    : new Order(lineStart, 1.0, ahead));
         }
         comeOut(level, route, front, notOut, ahead, now);
         sayMarch(route, front, line, notOut, now);
         return false;
     }
 
-    /**
-     * Whether the scout waits at the hump's foot for its raiders ({@link #FOOT_PAST}): on the way out, until the nearest
-     * raider out is {@link #FOOT_CLOSE} behind it or the wait's limit is up. A scout already past the foot (a raid loaded
-     * mid-march) never goes back to wait.
-     */
-    private boolean waitsAtFoot(ServerLevel level, Route route, double frontW, List<MatabeleEntity> line, Map<UUID, Double> at, long now) {
-        if (route != out || leftFootAt >= 0) {
-            return false;
+    /** Tests: a perfect ribbon's length for this many raiders behind the front (blocks, the front to its last row). */
+    public double perfectLengthForTests(int raiders) {
+        int wide = Math.max(1, numbers.abreast());
+        int rows = 0;
+        for (int k = 0; k < raiders; rows++) {
+            k += rows % 2 == 0 ? wide : Math.max(1, wide - 1);
         }
-        double foot = hillEnd(level, route) + FOOT_PAST;
-        double nearest = line.stream().mapToDouble(ant -> at.get(ant.getUUID())).max().orElse(Double.NEGATIVE_INFINITY);
-        boolean close = nearest >= frontW - FOOT_CLOSE;
-        if (frontAt > foot + FOOT_PASSED || close || now - stageSince >= FOOT_WAIT_MOST) {
-            leftFootAt = now;
-            say("the scout leads off from the hump's foot " + (now - stageSince) / 20 + " s into the march"
-                    + (close ? ", the nearest raider " + String.format(Locale.ROOT, "%.1f", Math.max(0.0, frontW - nearest)) + " blocks behind it"
-                    : frontAt > foot + FOOT_PASSED ? " (already well past it)" : ", waited its longest; the nearest raider "
-                    + (line.isEmpty() ? "not out yet" : String.format(Locale.ROOT, "%.1f", frontW - nearest) + " blocks behind")));
-            return false;
-        }
-        return true;
+        return rows * numbers.spacing();
     }
 
-    /** Tests: when the scout led off from the hump's foot on the way out (game time; -1 while it waits or before the march). */
-    public long leftFootAtForTests() {
-        return leftFootAt;
+    /** Tests: how far (blocks walked) this marching raider was behind its place at the last update (NaN if it has none). */
+    public double behindPlaceForTests(UUID id) {
+        return behindPlace.getOrDefault(id, Double.NaN);
     }
 
     /** One update of the march: the route, how far the front has walked along it, the gap between rows, whether it is held up at a broken trail, the time. */
@@ -1418,7 +1469,7 @@ public final class RaidColumn {
 
     /**
      * One raider's order on the march (the simple march): it walks toward a point a little past its row's place, in its
-     * lane, at the front's pace {@link #FRONT_PACE} (so a row at its place keeps with the row ahead), a little faster for each
+     * lane, at the front's pace now (so a row at its place keeps with the row ahead), a little faster for each
      * block it is behind its place (up to {@link #CATCH_UP_PACE}), a little slower when ahead of it (never under
      * {@link #LEAST_MARCH_PACE}: nobody crawls). One level with the front or past it drops back behind it at
      * {@link #PASSED_PACE}. Behind a broken trail it closes up to its place and stands there (never walking back); one of
@@ -1435,6 +1486,7 @@ public final class RaidColumn {
         double sideways = ribbon.sideOf()[k];
         Vec3 shift = sideOf(route, placeAlong, sideways);
         BlockPos look = route.point(Math.min(route.length(), placeAlong + 3.0));
+        behindPlace.put(id, place - own);
         double pace = Mth.clamp(FRONT_PACE + PACE_PER_BLOCK * (place - own), LEAST_MARCH_PACE, CATCH_UP_PACE);
         if (step.casting()) {
             double target = Math.min(place, own + WALK_AHEAD);
@@ -1494,8 +1546,11 @@ public final class RaidColumn {
     private static final double OUT_OF_LANE = 1.05;
 
     /**
-     * The raiders not yet out of the nest come up to the trail's start: behind the scout while it is still coming out,
-     * then hurrying. One still in the nest {@code formTicks} after the column left stays home.
+     * The raiders not yet out of the nest come up to the trail's start: behind the scout while it is still in, at a walk,
+     * a hair under its {@link #FRONT_PACE}, then hurrying. It called at the foot of the nest's shaft, so they climb it
+     * behind it; insects do not block one another, so it is their pace that keeps them there (hurrying, 1.6, they climbed
+     * straight through it, 2026-11-08; 0.85 only spread them out). One still in the nest {@code formTicks} after the
+     * column left stays home.
      */
     private void comeOut(ServerLevel level, Route route, MatabeleEntity front, List<MatabeleEntity> notOut, BlockPos ahead, long now) {
         BlockPos lineStart = route.place(level, 0.0, 0.0);

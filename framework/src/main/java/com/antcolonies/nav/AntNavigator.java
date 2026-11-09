@@ -1232,6 +1232,17 @@ public class AntNavigator {
         this.speed = speed;
     }
 
+    /**
+     * How many times its normal climbing speed it climbs (1 normally, never less). The mind may raise it: a raid column
+     * comes up out of its nest and down a tall dead mound at about its walking pace. Legs layer: only how fast, never why.
+     */
+    public void setClimbPace(double times) {
+        climbPace = Math.max(1.0, times);
+    }
+
+    /** {@link #setClimbPace}. */
+    private double climbPace = 1.0;
+
     private Vec3 laneFor(CellMap map, BlockPos from, BlockPos to, Vec3 middle) {
         int dx = Integer.signum(to.getX() - from.getX());
         int dz = Integer.signum(to.getZ() - from.getZ());
@@ -2299,7 +2310,7 @@ public class AntNavigator {
     }
 
     private double climbSpeed() {
-        return Math.max(MIN_CLIMB_SPEED, ant.getAttributeValue(Attributes.MOVEMENT_SPEED) * CLIMB_FACTOR * speed);
+        return Math.max(MIN_CLIMB_SPEED, ant.getAttributeValue(Attributes.MOVEMENT_SPEED) * CLIMB_FACTOR * speed * climbPace);
     }
 
     /**

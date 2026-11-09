@@ -20,6 +20,7 @@ import com.mojang.brigadier.arguments.IntegerArgumentType;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.util.RandomSource;
@@ -55,7 +56,8 @@ import net.neoforged.neoforge.event.RegisterCommandsEvent;
  *
  * <p>Step 3b: {@code /antcolonies raid} sends a raid column out now from the nearest Matabele colony within 64 blocks to
  * the best spot its scouts know, led by the spot's scout (whatever the hour, the hunger or the rain; R7: one set out
- * outside the raid hours keeps no hours, so dusk does not turn it home).
+ * outside the raid hours keeps no hours, so dusk does not turn it home). {@code /antcolonies raid demo [blocks] [east|south|west|north]}
+ * sets one out to watch, the way the ribbon test does ({@link #demo}).
  */
 @EventBusSubscriber(modid = SavannaMod.MODID)
 public class MatabeleCommands {
@@ -76,7 +78,19 @@ public class MatabeleCommands {
                 .then(Commands.literal("raid")
                         .executes(context -> raid(context.getSource()))
                         .then(Commands.literal("show")
-                                .executes(context -> show(context.getSource()))))
+                                .executes(context -> show(context.getSource())))
+                        .then(Commands.literal("demo")
+                                .executes(context -> demo(context.getSource(), DEMO_TRAIL, null))
+                                .then(Commands.argument("blocks", IntegerArgumentType.integer(16, 96))
+                                        .executes(context -> demo(context.getSource(), IntegerArgumentType.getInteger(context, "blocks"), null))
+                                        .then(Commands.literal("east").executes(context -> demo(context.getSource(),
+                                                IntegerArgumentType.getInteger(context, "blocks"), Direction.EAST)))
+                                        .then(Commands.literal("south").executes(context -> demo(context.getSource(),
+                                                IntegerArgumentType.getInteger(context, "blocks"), Direction.SOUTH)))
+                                        .then(Commands.literal("west").executes(context -> demo(context.getSource(),
+                                                IntegerArgumentType.getInteger(context, "blocks"), Direction.WEST)))
+                                        .then(Commands.literal("north").executes(context -> demo(context.getSource(),
+                                                IntegerArgumentType.getInteger(context, "blocks"), Direction.NORTH))))))
                 .then(Commands.literal("prey")
                         .then(Commands.argument("layers", IntegerArgumentType.integer(1, 64))
                                 .executes(context -> prey(context.getSource(), IntegerArgumentType.getInteger(context, "layers")))))
@@ -312,6 +326,111 @@ public class MatabeleCommands {
                 + " real) forms at the Matabele nest at " + colony.getCenter().toShortString() + " for the termites at "
                 + column.find().at().toShortString() + "; /antcolonies list follows it."), false);
         return 1;
+    }
+
+    /** The demo raid's trail when no length is given: the nearest termite mound is 40 or more blocks off (the user, 2026-11-08). */
+    private static final int DEMO_TRAIL = 40;
+
+    /**
+     * A raid march to watch (2026-11-08, for the in-game film, {@code tools/film/raid_march.film}, and the user's own
+     * look), set out from the nearest Matabele colony within 64 blocks the way the ribbon test sets one out: a real
+     * major is the scout, home from a find and standing two blocks from the entrance (tagged {@code raid_scout}, so the
+     * film's camera can ride along with it); every other real ant is put in the nest's rooms, so they come out of the
+     * hole behind it; a straight trail of {@code blocks} is laid the way given, else the way of eight with the plainest
+     * ground ({@link #climbing}); and the raid sets out at once, whatever the hour. No termites wait at the trail's
+     * end: it is for watching the way out and the march.
+     */
+    private static int demo(CommandSourceStack source, int blocks, @Nullable Direction way) {
+        ServerLevel level = source.getLevel();
+        Colony colony = ColonyManager.get(level).findNearest(BlockPos.containing(source.getPosition()), 64, MatabeleEntity.SPECIES);
+        com.antcolonies.savanna.colony.Raids raids = colony == null ? null : colony.part(SavannaParts.RAIDS).orElse(null);
+        if (raids == null) {
+            source.sendFailure(Component.literal("No Matabele colony within 64 blocks (/antcolonies newmound dead 6 matabele makes one)."));
+            return 0;
+        }
+        if (raids.column() != null) {
+            source.sendFailure(Component.literal("A raid is out already:" + raids.column().describe().substring(1) + "."));
+            return 0;
+        }
+        BlockPos entrance = colony.getCenter();
+        java.util.List<BlockPos> rooms = colony.nest().getAllRoomCells(level).stream()
+                .filter(cell -> com.antcolonies.savanna.colony.RaidGround.canStand(level, cell)).toList();
+        java.util.List<MatabeleEntity> real = colony.population().realMembers(level).stream()
+                .filter(ant -> ant instanceof MatabeleEntity matabele && matabele.isAlive()).map(ant -> (MatabeleEntity) ant).toList();
+        MatabeleEntity scout = real.stream().filter(MatabeleEntity::hasMajorBody)
+                .min(java.util.Comparator.comparingDouble(ant -> ant.distanceToSqr(Vec3.atBottomCenterOf(entrance)))).orElse(null);
+        if (rooms.isEmpty() || scout == null) {
+            source.sendFailure(Component.literal(rooms.isEmpty() ? "The nest has no rooms yet (is it settled?)." : "No real major in the colony to be the scout."));
+            return 0;
+        }
+        // The way: the one given, else of eight the one with the plainest ground (the least climbing up and down along it:
+        // a dead tree, a log or a rise in the way counts, so the march is watched on open ground; the last dead tree put
+        // in, which the ribbon test steers by, is often another mound's in a real world, BUGS 188).
+        double bestAngle = 0.0;
+        int plainest = Integer.MAX_VALUE;
+        for (int i = 0; i < 8; i++) {
+            double angle = way != null ? Math.atan2(way.getStepZ(), way.getStepX()) : i * Math.PI / 4;
+            int climbing = way != null ? 0 : climbing(level, entrance, angle, blocks);
+            if (climbing < plainest) {
+                plainest = climbing;
+                bestAngle = angle;
+            }
+            if (way != null) {
+                break;
+            }
+        }
+        double cos = Math.cos(bestAngle), sin = Math.sin(bestAngle);
+        BlockPos by = com.antcolonies.savanna.colony.RaidGround.standAt(level, entrance.getX() + 0.5 + cos * 2.0, entrance.getZ() + 0.5 + sin * 2.0, entrance.getY());
+        if (by == null) {
+            source.sendFailure(Component.literal("No ground to stand on by the entrance."));
+            return 0;
+        }
+        scout.moveTo(by.getX() + 0.5, by.getY(), by.getZ() + 0.5);
+        scout.getNavigator().stop();
+        scout.addTag("raid_scout");
+        int k = 0;
+        for (MatabeleEntity ant : real) {
+            if (ant != scout) {
+                BlockPos cell = rooms.get(k++ % rooms.size());
+                ant.moveTo(cell.getX() + 0.2 + 0.6 * ((k * 7) % 10) / 10.0, cell.getY(), cell.getZ() + 0.2 + 0.6 * ((k * 3) % 10) / 10.0);
+                ant.getNavigator().stop();
+            }
+        }
+        java.util.List<BlockPos> trail = new java.util.ArrayList<>();
+        int steps = (int) Math.ceil(blocks / 2.0);
+        for (int i = 0; i <= steps; i++) {
+            double t = i * (double) blocks / steps;
+            trail.add(level.getHeightmapPos(net.minecraft.world.level.levelgen.Heightmap.Types.MOTION_BLOCKING_NO_LEAVES,
+                    BlockPos.containing(entrance.getX() + 0.5 + cos * t, entrance.getY(), entrance.getZ() + 0.5 + sin * t)));
+        }
+        BlockPos at = trail.get(trail.size() - 1);
+        com.antcolonies.savanna.colony.RaidColumn column = raids.raidForTests(level, at, 6, trail, scout.getUUID());
+        if (column == null) {
+            String why = raids.whyNoRaid();
+            source.sendFailure(Component.literal("No raid: " + (why != null ? why : "nobody there fit to raid") + "."));
+            return 0;
+        }
+        SavannaMod.LOGGER.info("[raid] demo: {} raiders from the nest at {}, the scout at {}, the trail {} blocks to {}",
+                column.members().size(), entrance.toShortString(), by.toShortString(), blocks, at.toShortString());
+        source.sendSuccess(() -> Component.literal("A demo raid of " + column.members().size() + " real ants sets out from the nest at "
+                + entrance.toShortString() + " along a " + blocks + "-block trail to " + at.toShortString()
+                + " (no termites there); the scout is tagged raid_scout."), false);
+        return 1;
+    }
+
+    /** How much the ground climbs up and down (blocks, summed) along a straight way out of the nest, from 4 blocks out. */
+    private static int climbing(ServerLevel level, BlockPos entrance, double angle, int blocks) {
+        int sum = 0;
+        Integer before = null;
+        for (int t = 4; t <= blocks; t++) {
+            BlockPos at = BlockPos.containing(entrance.getX() + 0.5 + Math.cos(angle) * t, entrance.getY(), entrance.getZ() + 0.5 + Math.sin(angle) * t);
+            int y = level.getHeightmapPos(net.minecraft.world.level.levelgen.Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, at).getY();
+            if (before != null) {
+                sum += Math.abs(y - before);
+            }
+            before = y;
+        }
+        return sum;
     }
 
     /** R4: the raid view on or off for the player running the command ({@link RaidView}). */

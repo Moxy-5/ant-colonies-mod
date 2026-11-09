@@ -256,7 +256,8 @@ public class MatabeleRaidTests {
                 }
             }
             if (raid.stage() == RaidColumn.Stage.MARCHING && level.getEntity(raid.leader()) instanceof MatabeleEntity leader
-                    && !raid.isCasting(raid.leader())) { // (R4: casting about at the gap, the front's helpers range ahead of it)
+                    && !raid.isCasting(raid.leader()) // (R4: casting about at the gap, the front's helpers range ahead of it)
+                    && raid.isOutForTests(level, leader)) { // (the scout calls down in the nest, then comes out first: from then on)
                 marchTicks[0]++;
                 double front = raid.alongOut(leader.blockPosition());
                 boolean behind = false;
@@ -782,8 +783,11 @@ public class MatabeleRaidTests {
 
     /**
      * The ribbon (the user's pick of 2026-11-07 from the march viewer: formation B, "unroll out of the nest"), from a tall
-     * dead mound (BUGS 101: the hump still high round its open chimney). The scout calls at the nest's mouth and walks
-     * straight off: the march begins at once (no milling on the mound); nobody out of the nest is ever told to stand
+     * dead mound (BUGS 101: the hump still high round its open chimney). The scout runs down into the nest, calls, and
+     * comes out first (the user's plan of 2026-11-08; no raider out before it), the march beginning at once (no milling on
+     * the mound), and the column closes up behind it on the way (the front walks a little slower till then); the test
+     * logs how far out that was, the column's length 10, 20 and 30 blocks past the hump's foot and the crowding on the
+     * flat, for {@code tools/march_model.py} to set beside its model. Nobody out of the nest is ever told to stand
      * while the column marches (the user: "remove any lingering code of having the ants stop while they're marching");
      * the front keeps moving all the time it is out and stays ahead of the raiders (its 5 percent faster pace); past the
      * first blocks the column is a ribbon, rows of 3 and 2 by turns (not single file, never more than 3 side by side, its
@@ -856,6 +860,26 @@ public class MatabeleRaidTests {
         java.util.Map<java.util.UUID, Long> outAt = new java.util.HashMap<>();
         java.util.Map<java.util.UUID, List<double[]>> heights = new java.util.HashMap<>();
         java.util.Map<java.util.UUID, Integer> heldHigh = new java.util.HashMap<>();
+        // The scout first out (the user's plan of 2026-11-08): when the front first came out, and raiders out before it.
+        long[] frontOutAt = {-1};
+        java.util.Set<java.util.UUID> outBeforeFront = new java.util.HashSet<>();
+        // Crowding on the flat (the user, 2026-11-08: "add a way to check crowding in the test", so the march's model can
+        // count it): every tick, for each raider on the ground past the hump's foot, how far along the trail it got against
+        // the pace it was told (its speed asked: the front's own free speed per pace times its pace), split into raiders
+        // catching up (more than a row behind their place) and those keeping their place; the ticks it stood held for the
+        // crowd; and every 10 ticks each one's nearest raider (flat distance).
+        double[] frontFree = {0.0, 0.0}; // the front on the flat: blocks along, pace summed over its ticks
+        double[] catchUp = {0.0, 0.0, 0.0}; // raiders catching up: blocks along, pace summed, ticks
+        double[] keeping = {0.0, 0.0, 0.0}; // raiders at their place
+        int[] flatTicks = {0};
+        int[] flatHeld = {0};
+        List<Double> nearest = new ArrayList<>();
+        java.util.Map<java.util.UUID, Double> lastAlong = new java.util.HashMap<>();
+        double[] lastFront = {Double.NaN};
+        long[] frontFootAt = {-1}; // (when the front first stood on the ground past the hump's foot)
+        // The column's length (the front to the hindmost raider out, along the trail) as the front passes 10, 20 and 30
+        // blocks past the hump's foot: the march model's numbers, to compare.
+        double[] lengthAt = {Double.NaN, Double.NaN, Double.NaN};
         helper.onEachTick(() -> {
             RaidColumn raid = column[0];
             if (raid == null || raid.stage() != RaidColumn.Stage.MARCHING) {
@@ -869,8 +893,41 @@ public class MatabeleRaidTests {
                 return;
             }
             boolean frontOut = raid.isOutForTests(level, lead);
-            // (the scout waits at the hump's foot for its raiders, then leads off: the march is judged from then on)
-            boolean ledOff = raid.leftFootAtForTests() >= 0;
+            // (the scout comes out of the nest first: the march is judged from then on)
+            if (frontOut && frontOutAt[0] < 0) {
+                frontOutAt[0] = now;
+            }
+            // The climb out, traced (2026-11-08, the user: "they keep beating the scout, check if the test is accurate"):
+            // every second while the scout is still in, where it is (height, flat blocks from the entrance's column),
+            // whether the crowd holds it, and every raider still in that is higher than it or nearer the entrance's column.
+            if (frontOutAt[0] < 0 && (now - marchFrom[0]) % 20 == 0) {
+                BlockPos mouth = colony.getCenter();
+                double scoutFlat = Math.hypot(lead.getX() - (mouth.getX() + 0.5), lead.getZ() - (mouth.getZ() + 0.5));
+                StringBuilder ahead = new StringBuilder();
+                int inside = 0;
+                for (java.util.UUID id : raid.members()) {
+                    if (id.equals(raid.leader()) || !(level.getEntity(id) instanceof MatabeleEntity ant)) {
+                        continue;
+                    }
+                    if (raid.isOutForTests(level, ant)) {
+                        ahead.append(String.format(java.util.Locale.ROOT, " OUT %s y%.1f", id.toString().substring(0, 4), ant.getY()));
+                        continue;
+                    }
+                    inside++;
+                    double flat = Math.hypot(ant.getX() - (mouth.getX() + 0.5), ant.getZ() - (mouth.getZ() + 0.5));
+                    if (ant.getY() > lead.getY() + 0.5 || flat < scoutFlat - 0.5 && ant.getY() > lead.getY() - 0.5) {
+                        ahead.append(String.format(java.util.Locale.ROOT, " %s y%.1f f%.1f%s", id.toString().substring(0, 4), ant.getY(), flat,
+                                ant.getNavigator().heldForCrowd() ? " held" : ""));
+                    }
+                }
+                RaidColumn.Order fo = raid.orderNow(lead.getUUID());
+                SavannaMod.LOGGER.info("[ribbon test] climb at {} s: scout y{} f{} pace {} {} going to {}; {} in the nest; higher or nearer the shaft:{}",
+                        (now - marchFrom[0]) / 20, String.format(java.util.Locale.ROOT, "%.1f", lead.getY()),
+                        String.format(java.util.Locale.ROOT, "%.1f", scoutFlat), fo == null ? "-" : String.format(java.util.Locale.ROOT, "%.2f", fo.pace()),
+                        lead.getNavigator().heldForCrowd() ? "HELD" : "free",
+                        fo == null || fo.to() == null ? "-" : fo.to().toShortString(), inside, ahead);
+            }
+            boolean ledOff = frontOut;
             if (!ledOff) {
                 frontAnchor[0] = null;
             }
@@ -889,6 +946,9 @@ public class MatabeleRaidTests {
                     if (!id.equals(raid.leader())) {
                         out.add(ant);
                         setOut.add(id);
+                        if (frontOutAt[0] < 0) {
+                            outBeforeFront.add(id);
+                        }
                     }
                     // Nobody out is told to stand while the column marches (the trail is never broken here, so no casting;
                     // the first ones down may stand behind the scout while it waits at the hump's foot).
@@ -925,6 +985,60 @@ public class MatabeleRaidTests {
             if (Double.isNaN(groundY[0]) && frontAlong >= hump + 3.0 && lead.onGround()) {
                 groundY[0] = lead.getY();
             }
+            // Crowding on the flat (past the hump's foot, on the ground), and the column's length 10, 20, 30 blocks out.
+            if (frontOut && lead.onGround() && frontAlong >= hump + 1.0) {
+                if (!Double.isNaN(lastFront[0])) {
+                    RaidColumn.Order fo = raid.orderNow(lead.getUUID());
+                    frontFree[0] += frontAlong - lastFront[0];
+                    frontFree[1] += fo == null ? 1.0 : fo.pace();
+                }
+                lastFront[0] = frontAlong;
+                if (frontFootAt[0] < 0) {
+                    frontFootAt[0] = now;
+                }
+                for (int m = 0; m < 3; m++) {
+                    if (Double.isNaN(lengthAt[m]) && frontAlong >= hump + 10.0 * (m + 1)) {
+                        lengthAt[m] = frontAlong - out.stream().mapToDouble(ant -> raid.alongOut(ant.position())).min().orElse(frontAlong);
+                    }
+                }
+            } else {
+                lastFront[0] = Double.NaN;
+            }
+            List<MatabeleEntity> onFlat = new ArrayList<>();
+            for (MatabeleEntity ant : out) {
+                double along = raid.alongOut(ant.position());
+                java.util.UUID id = ant.getUUID();
+                Double before = lastAlong.put(id, along);
+                if (along < hump + 1.0 || !ant.onGround()) {
+                    lastAlong.remove(id);
+                    continue;
+                }
+                onFlat.add(ant);
+                RaidColumn.Order order = raid.orderNow(id);
+                double behind = raid.behindPlaceForTests(id);
+                if (before == null || order == null || order.to() == null || Double.isNaN(behind)) {
+                    continue;
+                }
+                double[] sum = behind > 0.6 ? catchUp : keeping; // (a row's spacing, as the column judges "closed up")
+                sum[0] += along - before;
+                sum[1] += order.pace();
+                sum[2]++;
+                flatTicks[0]++;
+                flatHeld[0] += ant.getNavigator().heldForCrowd() ? 1 : 0;
+            }
+            if ((now - marchFrom[0]) % 10 == 0) {
+                for (MatabeleEntity a : onFlat) {
+                    double best = Double.MAX_VALUE;
+                    for (MatabeleEntity b : onFlat) {
+                        if (a != b) {
+                            best = Math.min(best, Math.hypot(a.getX() - b.getX(), a.getZ() - b.getZ()));
+                        }
+                    }
+                    if (best < Double.MAX_VALUE) {
+                        nearest.add(best);
+                    }
+                }
+            }
             if (frontAlong >= hump + 8.0 && (now - marchFrom[0]) % 10 == 0) {
                 // The ribbon: the raiders 3 blocks past the hump's foot and a little behind the front.
                 List<double[]> places = new ArrayList<>();
@@ -951,6 +1065,28 @@ public class MatabeleRaidTests {
                     }
                     tooWideRows[0] += wide ? 1 : 0;
                 }
+            }
+            // Closing up, every second from when the front is out (2026-11-08: how far behind its place each raider out is,
+            // the column's judge of "closed up", against the column's length; the crowd never lets every one within a row):
+            if (frontOut && (now - marchFrom[0]) % 20 == 0 && !out.isEmpty()) {
+                List<Double> behinds = new ArrayList<>();
+                for (MatabeleEntity ant : out) {
+                    double b = raid.behindPlaceForTests(ant.getUUID());
+                    if (!Double.isNaN(b)) {
+                        behinds.add(b);
+                    }
+                }
+                behinds.sort(java.util.Comparator.reverseOrder());
+                double row = 0.6;
+                SavannaMod.LOGGER.info("[ribbon test] behind at {} s: front {} past the hump's foot, column {} long, {} out of {}; worst behind its place {}, 2nd {}, 5th {}; more than 1 row behind {}, 2 rows {}, 4 rows {}",
+                        (now - marchFrom[0]) / 20, String.format(java.util.Locale.ROOT, "%.1f", frontAlong - raid.humpEndForTests(level)),
+                        String.format(java.util.Locale.ROOT, "%.1f", frontAlong - out.stream().mapToDouble(ant -> raid.alongOut(ant.position())).min().orElse(frontAlong)),
+                        out.size(), raid.members().size() - 1,
+                        behinds.isEmpty() ? "-" : String.format(java.util.Locale.ROOT, "%.1f", behinds.get(0)),
+                        behinds.size() < 2 ? "-" : String.format(java.util.Locale.ROOT, "%.1f", behinds.get(1)),
+                        behinds.size() < 5 ? "-" : String.format(java.util.Locale.ROOT, "%.1f", behinds.get(4)),
+                        behinds.stream().filter(b -> b > row).count(), behinds.stream().filter(b -> b > 2 * row).count(),
+                        behinds.stream().filter(b -> b > 4 * row).count());
             }
             if ((now - marchFrom[0]) % 100 == 0) {
                 StringBuilder line = new StringBuilder("front along " + String.format("%.1f", frontAlong) + (frontOut ? "" : " (in the nest)"));
@@ -1083,9 +1219,9 @@ public class MatabeleRaidTests {
                 .thenExecute(() -> {
                     RaidColumn raid = column[0];
                     long called = raid.recruitedAt() - (level.getGameTime() - (helper.getTick() - startedAt[0]));
-                    SavannaMod.LOGGER.info("[ribbon test] the scout called at the nest's mouth after {} ticks, the march began {} ticks after",
+                    SavannaMod.LOGGER.info("[ribbon test] the scout called down in the nest after {} ticks, the march began {} ticks after",
                             called, milled[0]);
-                    helper.assertTrue(called <= 300, "the scout took " + called / 20 + " s to get to the nest's mouth (it starts a few blocks off)");
+                    helper.assertTrue(called <= 600, "the scout took " + called / 20 + " s to get down into the nest (it starts a few blocks off)");
                     // (the column is worked out every 5 ticks: the march begins in the same working out as the recruiting)
                     helper.assertTrue(milled[0] <= 10, "the column waited " + milled[0] + " ticks after the scout recruited (no milling): " + raid.describe());
                 })
@@ -1114,11 +1250,34 @@ public class MatabeleRaidTests {
                     double seconds = (lastFrontAt[0] - speedFrom[0]) / 20.0;
                     double frontSpeed = seconds <= 0.0 ? 0.0 : (lastFrontAlong[0] - speedFromAlong[0]) / seconds;
                     SavannaMod.LOGGER.info("[ribbon test] march speed: the front {} blocks a second over {} blocks; the column {} blocks long behind it at the end, {} raiders;"
-                                    + " the hump ends {} along, the scout led off from its foot {} s into the march, the last raider out down on the ground {} s into the march",
+                                    + " the hump ends {} along, the scout out of the nest {} s into the march, the last raider out down on the ground {} s into the march",
                             String.format("%.2f", frontSpeed), String.format("%.1f", lastFrontAlong[0] - speedFromAlong[0]),
                             String.format("%.1f", lastLength[0]), setOut.size(), String.format("%.1f", raid.humpEndForTests(level)),
-                            String.format("%.1f", (raid.leftFootAtForTests() - level.getGameTime() + helper.getTick() - marchFrom[0]) / 20.0),
+                            String.format("%.1f", (frontOutAt[0] - marchFrom[0]) / 20.0),
                             String.format("%.1f", (lastHigh[0] - marchFrom[0]) / 20.0));
+                    // Closing up and crowding, in two lines the march model reads (tools/march_model.py).
+                    java.util.Locale root = java.util.Locale.ROOT;
+                    double hump = raid.humpEndForTests(level);
+                    double perfect = raid.perfectLengthForTests(setOut.size()); // (the front to its last row, rows a spacing apart)
+                    double free = frontFree[1] <= 0.0 ? Double.NaN : frontFree[0] / frontFree[1]; // (blocks a tick at pace 1)
+                    double catchEff = catchUp[1] <= 0.0 ? Double.NaN : catchUp[0] / (free * catchUp[1]);
+                    double keepEff = keeping[1] <= 0.0 ? Double.NaN : keeping[0] / (free * keeping[1]);
+                    List<Double> near = new ArrayList<>(nearest);
+                    java.util.Collections.sort(near);
+                    double nearMin = near.isEmpty() ? Double.NaN : near.get(0);
+                    double nearLow = near.isEmpty() ? Double.NaN : near.get(near.size() / 10);
+                    double nearMid = near.isEmpty() ? Double.NaN : near.get(near.size() / 2);
+                    long inside = near.stream().filter(d -> d < 0.4).count();
+                    SavannaMod.LOGGER.info("[ribbon test] closing up: front_foot_s {} perfect {} length_at_10 {} length_at_20 {} length_at_30 {} length_end {} raiders {}",
+                            String.format(root, "%.1f", (frontFootAt[0] - marchFrom[0]) / 20.0), String.format(root, "%.1f", perfect),
+                            String.format(root, "%.1f", lengthAt[0]), String.format(root, "%.1f", lengthAt[1]),
+                            String.format(root, "%.1f", lengthAt[2]), String.format(root, "%.1f", lastLength[0]), setOut.size());
+                    SavannaMod.LOGGER.info("[ribbon test] crowding: free_speed {} catch_up_got {} catch_up_ticks {} keeping_got {} keeping_ticks {} held_share {} nearest_min {} nearest_p10 {} nearest_median {} nearest_under_0.4 {} of {}",
+                            String.format(root, "%.3f", free * 20.0), String.format(root, "%.2f", catchEff), (int) catchUp[2],
+                            String.format(root, "%.2f", keepEff), (int) keeping[2],
+                            String.format(root, "%.3f", flatTicks[0] == 0 ? 0.0 : flatHeld[0] / (double) flatTicks[0]),
+                            String.format(root, "%.2f", nearMin), String.format(root, "%.2f", nearLow),
+                            String.format(root, "%.2f", nearMid), inside, near.size());
                     // The way out, timed raider by raider: out of the nest, then down the hump to the ground.
                     List<double[]> ways = new ArrayList<>(); // out (s into the march), down (s), held high (s)
                     for (var e : outAt.entrySet()) {
@@ -1142,6 +1301,13 @@ public class MatabeleRaidTests {
                     SavannaMod.LOGGER.info("[ribbon test] the way out, raider by raider (out of the nest > down on the ground (held for the crowd up on the hump), s into the march), ground y {}, entrance y {}:{}",
                             String.format("%.1f", groundY[0]), colony.getCenter().getY(), each);
                     helper.assertTrue(standCount[0] == 0, "raiders out were told to stand while the column marched: " + standFaults);
+                    // The user's plan of 2026-11-08: the scout comes out of the nest first and the rows coming out close up
+                    // behind it on the way (the march model: within a block of a perfect ribbon 10 to 20 blocks past the hump's
+                    // foot; the game, the first runs: 12 to 14.6 blocks long 10 past it, 12.7 to 13 at 20, a perfect one 11.4).
+                    helper.assertTrue(outBeforeFront.isEmpty(), outBeforeFront.size() + " raider(s) came out of the nest before the scout");
+                    helper.assertTrue(!Double.isNaN(lengthAt[1]) && lengthAt[1] <= perfect * 1.4, "the column was "
+                            + String.format("%.1f", lengthAt[1]) + " blocks long 20 blocks past the hump's foot (a perfect ribbon of "
+                            + setOut.size() + " is " + String.format("%.1f", perfect) + "): the rows coming out did not close up behind the scout");
                     helper.assertTrue(frontLongestStill[0] <= 30, "the front stood still " + frontLongestStill[0] + " ticks while marching");
                     helper.assertTrue(ahead >= 0.9, "the front was ahead of every raider only " + Math.round(ahead * 100)
                             + " percent of the march (worst " + String.format("%.1f", worstAhead[0]) + " blocks behind)");

@@ -147,6 +147,7 @@ public class MatabeleRaidGoal extends Goal {
     public void stop() {
         ant.getNavigator().stop();
         ant.getNavigator().setSideShift(null); // (its own lane again)
+        ant.getNavigator().setClimbPace(1.0);
         endCleaning();
         column = null;
         limping = false;
@@ -195,6 +196,9 @@ public class MatabeleRaidGoal extends Goal {
             return;
         }
         ant.getNavigator().setSideShift(order.shift()); // (the ribbon: its lane in the column's row; null its own)
+        ant.getNavigator().setClimbPace(column != null && !limping
+                && (column.stage() == RaidColumn.Stage.FORMING || column.stage() == RaidColumn.Stage.MARCHING)
+                ? RaidColumn.MARCH_CLIMB : 1.0); // (the way out: up the nest's shaft and down the hump at about a walk)
         if (order.onTheMove() && order.to() != null) {
             march(level, order);
             return;
