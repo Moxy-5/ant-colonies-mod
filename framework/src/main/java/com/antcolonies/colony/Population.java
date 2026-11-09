@@ -417,7 +417,7 @@ public class Population {
         BlockPos center = colony.getCenter();
         List<Vec3> eyes = new ArrayList<>();
         for (Player player : level.players()) {
-            if (player.isSpectator() || !player.isAlive()) {
+            if (!Watchers.watches(player)) { // (spectators watch too, 2026-11-08)
                 continue;
             }
             double dx = player.getX() - (center.getX() + 0.5);

@@ -1108,7 +1108,7 @@ public class Forest extends SavedData {
     private static boolean outOfSight(ServerLevel level, Tree t, TreePlacer.Placed next) {
         List<Vec3> eyes = new ArrayList<>();
         for (ServerPlayer player : level.players()) {
-            if (!player.isSpectator() && player.blockPosition().closerThan(t.foot, Population.SIGHT + 48)) {
+            if (com.antcolonies.colony.Watchers.watches(player) && player.blockPosition().closerThan(t.foot, Population.SIGHT + 48)) {
                 eyes.add(player.getEyePosition());
             }
         }

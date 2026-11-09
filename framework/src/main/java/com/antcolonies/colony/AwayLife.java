@@ -177,23 +177,12 @@ public class AwayLife {
                 && colony.profile().colony().numbersWhenFar();
     }
 
-    /** Whether a player (alive, any game mode) is within this many blocks of the nest's middle, sideways. */
+    /** Whether a watcher ({@link Watchers}: any game mode) is within this many blocks of the nest's middle, sideways. */
     private boolean playerNear(ServerLevel level, int radius) {
         if (nearForTests != null) {
             return nearForTests;
         }
-        BlockPos center = colony.getCenter();
-        for (net.minecraft.world.entity.player.Player player : level.players()) {
-            if (!player.isAlive()) {
-                continue;
-            }
-            double dx = player.getX() - (center.getX() + 0.5);
-            double dz = player.getZ() - (center.getZ() + 0.5);
-            if (dx * dx + dz * dz <= (double) radius * radius) {
-                return true;
-            }
-        }
-        return false;
+        return Watchers.near(level, colony.getCenter(), radius);
     }
 
     /**

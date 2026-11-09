@@ -19,7 +19,6 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.util.RandomSource;
-import net.minecraft.world.entity.player.Player;
 
 /**
  * M8 step 3f, out of sight ({@code docs/plans/m8-matabele.md}): the Matabele raid while their colony is away (its land
@@ -442,18 +441,9 @@ public final class RaidsAway {
         return RaidCatch.termitesAt(level, at, numbers().termiteReach());
     }
 
-    /** Whether a player (alive) is within this many blocks of the spot, sideways. */
+    /** Whether a watcher (any game mode, spectators too: {@code Watchers}, 2026-11-08) is within this many blocks of the spot, sideways. */
     private static boolean playerNear(ServerLevel level, BlockPos at, int radius) {
-        for (Player player : level.players()) {
-            if (player.isAlive() && !player.isSpectator()) {
-                double dx = player.getX() - (at.getX() + 0.5);
-                double dz = player.getZ() - (at.getZ() + 0.5);
-                if (dx * dx + dz * dz <= (double) radius * radius) {
-                    return true;
-                }
-            }
-        }
-        return false;
+        return com.antcolonies.colony.Watchers.near(level, at, radius);
     }
 
     /** For the colony list: "; a raid of 120 out of sight to (x, y, z), home in 1200 ticks; 2 raid(s) today out of sight". */
