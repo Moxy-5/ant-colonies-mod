@@ -11,6 +11,7 @@ import java.util.UUID;
 import org.jetbrains.annotations.Nullable;
 
 import com.antcolonies.entity.AbstractAntEntity;
+import com.antcolonies.fight.FightDiary;
 import com.antcolonies.fight.FightNumbers;
 import com.antcolonies.fight.Fights;
 
@@ -181,6 +182,10 @@ public class FightGoal extends Goal {
                     && worthChasing(level, was) && next.distanceToSqr(ant) > MUCH_NEARER * was.distanceToSqr(ant)
                     && ant.foeRank(next) >= ant.foeRank(was); // (one it would rather fight first is taken at once: step 3b, prey first)
             foe = keep ? was : next;
+            if (foe != null && foe != was) {
+                FightDiary.note(ant, "goes for " + AbstractAntEntity.foeName(foe) + String.format(java.util.Locale.ROOT, " (%.1f blocks off%s)",
+                        Math.sqrt(foe.distanceToSqr(ant)), Fights.isInTheOpen(level, foe.blockPosition()) ? ", in the open" : ", under cover"));
+            }
         }
         if (foe != null) {
             idleTicks = 0;
@@ -203,6 +208,7 @@ public class FightGoal extends Goal {
             return;
         }
         if (!searching) {
+            FightDiary.note(ant, "no foe it may go for in reach: it searches round the spot");
             searching = true; // (no stop: it walks on from where it was going)
             nextStep = idleTicks;
         }
@@ -249,6 +255,7 @@ public class FightGoal extends Goal {
         }
         int giveUp = FightNumbers.of(ant.profile()).map(FightNumbers::giveUpTicks).orElse(FightNumbers.DEFAULT_GIVE_UP_TICKS);
         if (++idleTicks >= giveUp) {
+            FightDiary.note(ant, "searched " + idleTicks / 20 + " s with no foe: its fight is over");
             ant.endFightOrder();
         }
     }
@@ -271,6 +278,7 @@ public class FightGoal extends Goal {
         }
         // A chase that gets nowhere (it keeps out of reach, in a hole too tight): left a while, the next foe instead.
         if (++chaseTicks > CHASE_TICKS) {
+            FightDiary.note(ant, "chased " + AbstractAntEntity.foeName(target) + " " + CHASE_TICKS / 20 + " s without a blow: leaves it a while");
             unreachable.put(target.getUUID(), level.getGameTime() + UNREACHABLE_TICKS);
             foe = null;
             chasing = null;
@@ -288,6 +296,7 @@ public class FightGoal extends Goal {
             walkingTo = at;
             if (!ant.getNavigator().moveTo(at, 1.2) && !ant.openWayTo(level, target)) {
                 ant.countChaseNotFound();
+                FightDiary.note(ant, "no way to " + AbstractAntEntity.foeName(target) + ": leaves it a while");
                 unreachable.put(target.getUUID(), level.getGameTime() + UNREACHABLE_TICKS);
                 foe = null;
             }

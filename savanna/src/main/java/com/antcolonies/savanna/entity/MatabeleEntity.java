@@ -597,6 +597,9 @@ public class MatabeleEntity extends AbstractAntEntity implements ColonyBorn {
             }
             level.destroyBlock(cover, false, this);
             breaking = null;
+            if (tellTermites) {
+                com.antcolonies.fight.FightDiary.note(this, "bites " + cover.toShortString() + " open");
+            }
             if (!tellTermites) {
                 return true;
             }
@@ -656,6 +659,7 @@ public class MatabeleEntity extends AbstractAntEntity implements ColonyBorn {
             if (breach == null) {
                 return false;
             }
+            com.antcolonies.fight.FightDiary.note(this, "picks a breach at " + breach.toShortString() + " (" + opened + " opened so far)");
         }
         if (distanceToSqr(Vec3.atCenterOf(breach)) <= BITE_REACH * BITE_REACH && standsToFight()) {
             walkingToBreach = null;
@@ -680,6 +684,7 @@ public class MatabeleEntity extends AbstractAntEntity implements ColonyBorn {
                 && at.cell().distToCenterSqr(Vec3.atCenterOf(target)) <= (BITE_REACH - 0.3) * (BITE_REACH - 0.3)
                 && !at.cell().equals(target), target, 2, 1.2)) {
             noWayTo.put(target, now + NO_WAY_TICKS);
+            com.antcolonies.fight.FightDiary.note(this, "no way to the breach at " + target.toShortString());
             breach = null;
             walkingToBreach = null;
             return false;
@@ -687,12 +692,23 @@ public class MatabeleEntity extends AbstractAntEntity implements ColonyBorn {
         return true;
     }
 
+    /**
+     * The breach it is working at, or null: one it still can work at (BUGS 189). A major bitten while breaking in (legs
+     * gone, a soldier clamped on, badly wounded) leaves the fight and its breach with it: its claim kept every other major
+     * off that cover and the one beside it for as long as it lived, carried home and all, so a feeding spot with one
+     * gallery was never opened again and the raid stung nothing.
+     */
+    @Nullable
+    public BlockPos holdsBreach() {
+        return breach != null && getFightSpot() != null && !fightsNoMore() && !needsRescue() ? breach : null;
+    }
+
     /** The breach to work at: the nearest cover over a cell it smells termites in, cells with a termite first. */
     @Nullable
     private BlockPos pickBreach(ServerLevel level, BlockPos spot, double reach) {
         Set<BlockPos> taken = new HashSet<>();
         for (MatabeleEntity other : level.getEntitiesOfClass(MatabeleEntity.class, getBoundingBox().inflate(reach * 2),
-                other -> other != this && other.breach != null)) {
+                other -> other != this && other.holdsBreach() != null)) {
             taken.add(other.breach);
         }
         Set<BlockPos> termites = termiteCells(level, spot, reach);

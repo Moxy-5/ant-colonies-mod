@@ -347,10 +347,16 @@ public class MatabeleRaidTests {
                             "the hungry recruit left the column before the attack"
                                     + (raids.whyGoingHome(hungry[0].getUUID()) == null ? "" : " (" + raids.whyGoingHome(hungry[0].getUUID()) + ")"));
                     SavannaMod.LOGGER.info("[raid test] attack at {}: {}", helper.getTick(), raids.describe(level));
-                    // M8 step 5: a raider (a minor if there is one, never the scout) has two legs bitten off at the spot.
-                    hurt[0] = raiders.stream().filter(ant -> ant.isAlive() && raid.has(ant.getUUID()) && !ant.getUUID().equals(raid.leader())
-                                    && ant != hungry[0] && ant != hidden[0])
-                            .min(java.util.Comparator.comparingDouble(MatabeleEntity::getBbWidth)).orElse(null);
+                })
+                // M8 step 5 and BUGS 189: the major breaking the termites' mud open has two legs bitten off at the spot (what
+                // the termite soldiers do to the breakers); its breach must go to another major, and the raid still sting.
+                .thenWaitUntil(() -> helper.assertTrue(raiders.stream().anyMatch(ant -> ant.isAlive() && column[0].has(ant.getUUID())
+                                && ant.holdsBreach() != null && !(ant == hidden[0] && hiddenAt[0] >= 0)),
+                        "no major began to break the termites' mud open; " + raids.describe(level)))
+                .thenExecute(() -> {
+                    RaidColumn raid = column[0];
+                    hurt[0] = raiders.stream().filter(ant -> ant.isAlive() && raid.has(ant.getUUID()) && ant.holdsBreach() != null
+                                    && !(ant == hidden[0] && hiddenAt[0] >= 0)).findFirst().orElse(null);
                     helper.assertTrue(hurt[0] != null, "no raider to hurt at the spot");
                     hurt[0].loseLeg(1);
                     hurt[0].loseLeg(4);

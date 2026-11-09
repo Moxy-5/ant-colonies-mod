@@ -75,7 +75,7 @@ import net.minecraft.world.phys.Vec3;
  * home ({@link #lostTrail}). On the way home a gap is only a pause: the way home is always found. Numbers:
  * {@code raids.trails} ({@link SavannaNumbers.TrailNumbers}).
  */
-public final class RaidColumn {
+public final class RaidColumn implements com.antcolonies.fight.FightDiary {
     public enum Stage { FORMING, MARCHING, GATHERING, ATTACKING, COLLECTING, SPREADING, REGROUPING, HOMING, DONE }
 
     /**
@@ -476,6 +476,12 @@ public final class RaidColumn {
      * Raid rework R1, the raid diary: one line in the log, {@code [raid]} first, with the nest, the game time and the
      * time of day, and the stage now ({@code docs/plans/m8-matabele.md}, 3R).
      */
+    /** BUGS 189: the fight diary: a raider fighting for this column tells what it does (each grab, sting, break-in). */
+    @Override
+    public void fightNote(com.antcolonies.entity.AbstractAntEntity ant, String what) {
+        say(RaidGround.shortId(ant.getUUID()) + (ant instanceof MatabeleEntity m && m.hasMajorBody() ? " (major)" : " (minor)") + " " + what);
+    }
+
     void say(String what) {
         Watch.note(lastLevel, colony, "[raid] " + stage.name().toLowerCase(Locale.ROOT) + ": " + what);
         SavannaMod.LOGGER.info("[raid] nest {} at {} (tick {}), {}: {}", colony.getCenter().toShortString(),

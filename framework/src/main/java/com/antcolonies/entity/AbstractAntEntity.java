@@ -1623,15 +1623,22 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
         attackTick++;
         boolean holds = target != null && target.isAlive() && isAlive() && reachesInFight(target)
                 && navigator.getSurface() == Direction.DOWN && !isClimbing() && pinnedBy == null;
+        if (attackTick == how.gripAt() && !holds && target != null) {
+            com.antcolonies.fight.FightDiary.note(this, "its jaws close on nothing: " + foeName(target) + " out of reach or it is off its feet");
+        }
         if (attackTick == how.gripAt() && holds) {
             if (target instanceof AbstractAntEntity prey) {
                 if (prey.pinnedBy == null && !prey.isParalysed() && prey.dodges(this)) {
                     grabsMissed++;
+                    com.antcolonies.fight.FightDiary.note(this, "grabs at " + foeName(target) + ": it twists away");
                 } else if (prey.pinnedBy == null && !prey.isParalysed()) {
                     gripping = true;
                     prey.pinnedBy = this;
                     prey.navigator.stop();
                     prey.setDeltaMovement(Vec3.ZERO);
+                    com.antcolonies.fight.FightDiary.note(this, "grips " + foeName(target));
+                } else {
+                    com.antcolonies.fight.FightDiary.note(this, "grabs at " + foeName(target) + ": already " + (prey.isParalysed() ? "stung" : "held by another"));
                 }
             } else {
                 gripping = true;
@@ -1639,9 +1646,11 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
         }
         if (gripping && !holds) {
             gripping = false; // pulled away, or the striker knocked off its feet: a miss
+            com.antcolonies.fight.FightDiary.note(this, "loses its grip on " + foeName(target));
         }
         if (attackTick == how.hitAt() && gripping) {
-            Fights.strike(this, target);
+            boolean hit = Fights.strike(this, target);
+            com.antcolonies.fight.FightDiary.note(this, (hit ? "stings " : "strikes and misses ") + foeName(target));
         }
         if (attackTick >= how.letGoAt() && attackTick >= how.hitAt()) {
             gripping = false;
@@ -1651,6 +1660,11 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
             attackTarget = null;
             gripping = false;
         }
+    }
+
+    /** A foe's short name for the fight diary (BUGS 189): its kind and the start of its id. */
+    public static String foeName(@Nullable LivingEntity foe) {
+        return foe == null ? "nothing" : foe.getType().toShortString() + " " + foe.getUUID().toString().substring(0, 4);
     }
 
     /** Grabs of its that the foe twisted out of (server, not saved; for the game tests). */
