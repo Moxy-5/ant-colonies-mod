@@ -101,7 +101,8 @@ public final class MoundPlaces {
             return new Land(level.getSeed(), level.getChunkSource().getGenerator(), level, level.getChunkSource().randomState(), biomes);
         }
 
-        int height(int x, int z, Heightmap.Types type) {
+        /** The ground's height map at (x, z) (public for the new-land survey test, test revamp R6). */
+        public int height(int x, int z, Heightmap.Types type) {
             return GroundHeights.at(generator, x, z, type, heights, random);
         }
     }

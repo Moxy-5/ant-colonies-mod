@@ -31,6 +31,7 @@ import net.minecraft.core.Holder;
 import net.minecraft.core.QuartPos;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.world.level.biome.BiomeSource;
+import net.minecraft.world.level.levelgen.Heightmap;
 import net.minecraft.world.level.levelgen.NoiseBasedChunkGenerator;
 import net.minecraft.world.level.levelgen.NoiseGeneratorSettings;
 import net.minecraft.world.level.levelgen.RandomState;
@@ -164,13 +165,13 @@ public class MatabeleNewLandTests {
             throw new net.minecraft.gametest.framework.GameTestAssertException("no termite mound structure");
         }
         long[] seeds = {-3635740773639857461L, 1L, 20261105L, 424242L, 987654321L};
-        int[] t = new int[10];
+        int[] t = new int[16];
         long start = System.nanoTime();
         for (long seed : seeds) {
             MoundPlaces.Land land = realLand(level, seed, mounds);
             int[] r = survey(land, mounds.numbers(), savannaPlaces(land, mounds.numbers().places()), helper);
             for (int i = 0; i < t.length; i++) {
-                t[i] += r[i];
+                t[i] = i == 14 ? Math.max(t[i], r[i]) : t[i] + r[i]; // (14: the farthest, not a sum)
             }
         }
         String report = report("real savanna", t) + String.format(", %d ms", (System.nanoTime() - start) / 1_000_000);
@@ -185,6 +186,7 @@ public class MatabeleNewLandTests {
                 + " dead_apart in termite_mound.json): %s", LOOKS_DEAD_DAYS, 100 * FEWEST_LOOKING_DEAD, 100 * MOST_LOOKING_DEAD, 100 * looksDead, report));
         helper.assertTrue(t[4] == 0, "dead mounds of new land with no living termite mound in reach (they should live instead): " + report);
         checkTheMatabeleShare(helper, mounds.numbers(), t, report);
+        checkWaterTreesAndReach(helper, t, report);
         double matabele = t[3] / (double) t[1];
         helper.assertTrue(matabele >= FEWEST_MATABELE, String.format("Matabele dead mounds too rare (%.0f%% of mounds, want at least %.0f%%;"
                 + " look at the share and living_near in termite_mound.json's matabele block, or what changed where mounds stand): %s",
@@ -196,7 +198,7 @@ public class MatabeleNewLandTests {
         // spread out and still looking dead about 1 in 4 to 5; lonely dead mounds there stand empty (the user, 2026-11-07),
         // so the Matabele may be rarer than on mixed land, but never rare
         long[] singleSeeds = {-5841907898462156635L, 1L};
-        int[] u = new int[10];
+        int[] u = new int[16];
         // flat savannas (2026-11-07): a single-biome savanna world is flattened everywhere, as the game does for one
         com.antcolonies.savanna.worldgen.FlatSavanna.setWholeWorld(true);
         try {
@@ -204,7 +206,7 @@ public class MatabeleNewLandTests {
                 MoundPlaces.Land land = singleBiomeSavanna(level, seed, mounds);
                 int[] r = survey(land, mounds.numbers(), savannaPlaces(land, mounds.numbers().places()), helper);
                 for (int i = 0; i < u.length; i++) {
-                    u[i] += r[i];
+                    u[i] = i == 14 ? Math.max(u[i], r[i]) : u[i] + r[i];
                 }
             }
         } finally {
@@ -218,6 +220,7 @@ public class MatabeleNewLandTests {
                 100 * MOST_LOOKING_DEAD, 100 * singleLooks, single));
         helper.assertTrue(u[4] == 0, "dead mounds with no living termite mound in reach: " + single);
         checkTheMatabeleShare(helper, mounds.numbers(), u, single);
+        checkWaterTreesAndReach(helper, u, single);
         double singleShare = u[3] / (double) Math.max(1, u[1]);
         helper.assertTrue(singleShare >= FEWEST_MATABELE_SINGLE && singleShare <= MOST_MATABELE, String.format("Matabele dead mounds of a"
                 + " single-biome savanna outside %.0f%% to %.0f%% of mounds (%.0f%%): %s", 100 * FEWEST_MATABELE_SINGLE, 100 * MOST_MATABELE,
@@ -229,9 +232,11 @@ public class MatabeleNewLandTests {
     private static String report(String land, int[] t) {
         return String.format("%s: %d places, %d hold a mound, %d dead (%d still looking dead, 1 mound in %.1f; %d with another dead"
                 + " within %.0f, %d too near), %d of them Matabele (1 mound in %.1f, %.0f%% of the dead near termites), %d lonely dead"
-                + " mounds (no living mound in reach, empty), %d dead by the dice living instead, %d mounds nearer than 40", land, t[0], t[1],
+                + " mounds (no living mound in reach, empty), %d dead by the dice living instead, %d mounds nearer than 40; %d mounds"
+                + " in water or on the lowest floodplain, %d with little room for a dead tree; of the Matabele, %d with a living mound's"
+                + " edge within the scouts' reach less 10, its edge %.0f blocks off on average, %d at most", land, t[0], t[1],
                 t[2], t[7], t[1] / (double) Math.max(1, t[7]), t[9], CLUMP, t[8], t[3], t[1] / (double) Math.max(1, t[3]),
-                100.0 * t[3] / Math.max(1, t[2] - t[4]), t[4], t[6], t[5]);
+                100.0 * t[3] / Math.max(1, t[2] - t[4]), t[4], t[6], t[5], t[10], t[11], t[12], t[13] / (double) Math.max(1, t[3]), t[14]);
     }
 
     /** Of the dead mounds with living termites in reach, the share's worth hold Matabele (3 in 4, the user 2026-11-07). */
@@ -322,7 +327,7 @@ public class MatabeleNewLandTests {
      * saw, reported).
      */
     private static int[] survey(MoundPlaces.Land land, TermiteMoundStructure.Numbers numbers, List<MoundPlaces.Place> places, GameTestHelper helper) {
-        int[] out = new int[10];
+        int[] out = new int[16];
         List<BlockPos> feet = new ArrayList<>(), deadFeet = new ArrayList<>();
         for (MoundPlaces.Place place : places) {
             out[0]++;
@@ -334,6 +339,14 @@ public class MatabeleNewLandTests {
             feet.add(foot);
             TermiteMoundStructure.Pick pick = TermiteMoundStructure.pickAt(numbers, land, place,
                     MoundPlaces.sizeQuantile(land, place, numbers.places()));
+            // test revamp R6: no mound in water or on the floodplain's lowest ground, read again from the land itself
+            String wet = wetFoot(land, numbers.places(), foot);
+            if (wet != null) {
+                out[10]++;
+                helper.assertTrue(false, "a mound at " + foot.toShortString() + " " + wet);
+            }
+            // test revamp R6: room for its dead tree, dry fairly flat ground 10 to 30 blocks past its foot
+            out[11] += deadTreeGround(land, foot, MoundPlaces.footReach(pick.stage())) < DEAD_TREE_SPOTS_WANTED ? 1 : 0;
             if (pick.living()) {
                 out[6] += MoundPlaces.living(land.seed(), place, numbers.deadShare()) ? 0 : 1;
                 continue;
@@ -345,6 +358,11 @@ public class MatabeleNewLandTests {
                 out[4]++;
             } else if (MatabeleColonies.wouldSettle(pick.seed(), numbers.matabele().share())) {
                 out[3]++;
+                // test revamp R6: the living mound the raids feed on, its foot's edge from the Matabele nest
+                double edge = nearestLivingEdge(land, numbers, foot);
+                out[12] += edge <= SCOUT_REACH - NewLandMounds.DEAD_TREE_NEAREST ? 1 : 0;
+                out[13] += (int) Math.round(edge);
+                out[14] = Math.max(out[14], (int) Math.round(edge));
             }
         }
         for (int i = 0; i < feet.size(); i++) {
@@ -378,6 +396,97 @@ public class MatabeleNewLandTests {
 
     /** Dead mounds with another dead one this near count as a clump in the survey's report (about 1.5 mound spacings). */
     static final double CLUMP = 100;
+
+    /**
+     * Test revamp R6, what new land promises the raids and the termites, measured over the survey's real land: no mound
+     * in water or on the floodplain's lowest ground (asserted per mound in {@link #survey}); nearly every mound with room
+     * for its dead tree (the termites' by-day feeding, where the scouts look; {@code docs/BUGS.md} 81 once left 16 of 21
+     * without one); and nearly every Matabele nest with a living mound's foot within the scouts' reach, its dead tree
+     * 10 to 30 past that foot, so a raid has a feeding spot to find.
+     */
+    private static void checkWaterTreesAndReach(GameTestHelper helper, int[] t, String report) {
+        helper.assertTrue(t[10] == 0, "mounds in water or on the floodplain's lowest ground: " + report);
+        helper.assertTrue(t[11] <= MOST_WITHOUT_TREE_ROOM * t[1], String.format("%d of %d mounds have little room for their dead"
+                + " tree (fewer than %d dry, fairly flat spots 10 to 30 past the foot): %s", t[11], t[1], DEAD_TREE_SPOTS_WANTED, report));
+        if (t[3] >= 10) {
+            helper.assertTrue(t[12] >= LEAST_IN_SCOUT_REACH * t[3], String.format("only %d of %d Matabele nests have a living mound's"
+                    + " foot within %d blocks: %s", t[12], t[3], SCOUT_REACH - NewLandMounds.DEAD_TREE_NEAREST, report));
+            helper.assertTrue(t[13] / (double) t[3] <= MOST_AVERAGE_EDGE, String.format("the living mounds stand %.0f blocks from the"
+                    + " Matabele nests on average, over %.0f: %s", t[13] / (double) t[3], MOST_AVERAGE_EDGE, report));
+            helper.assertTrue(t[14] <= LIVING_NEAR_MOST, "a Matabele nest's nearest living mound's edge is " + t[14]
+                    + " blocks off, past matabele.living_near: " + report);
+        }
+    }
+
+    /** {@code matabele.living_near} in {@code termite_mound.json} (100), rounded up: no Matabele nest farther from termites. */
+    static final int LIVING_NEAR_MOST = 101;
+    /** The Matabele scouts' whole reach on new land ({@code raids.scouting.settled_range}). */
+    static final int SCOUT_REACH = 96;
+    /** Dead tree spots a mound should have (of the 24 looked at round it), and the share of mounds allowed fewer. */
+    static final int DEAD_TREE_SPOTS_WANTED = 3;
+    static final double MOST_WITHOUT_TREE_ROOM = 0.05;
+    /** The share of Matabele nests that must have a living mound's foot within the scouts' reach less 10, and the average edge. */
+    static final double LEAST_IN_SCOUT_REACH = 0.9, MOST_AVERAGE_EDGE = 70;
+
+    /** Why a mound's foot is wet (water at or round it, or ground at most {@code low_ground} over the sea), or null. */
+    private static String wetFoot(MoundPlaces.Land land, MoundPlaces.Numbers numbers, BlockPos foot) {
+        int[][] around = {{0, 0}, {8, 0}, {-8, 0}, {0, 8}, {0, -8}};
+        for (int[] o : around) {
+            int x = foot.getX() + o[0], z = foot.getZ() + o[1];
+            if (land.height(x, z, Heightmap.Types.WORLD_SURFACE_WG) != land.height(x, z, Heightmap.Types.OCEAN_FLOOR_WG)) {
+                return "has water " + o[0] + ", " + o[1] + " from its middle";
+            }
+        }
+        int over = foot.getY() - land.generator().getSeaLevel();
+        return over <= numbers.lowGround() ? "stands only " + over + " over the water (low_ground " + numbers.lowGround() + ")" : null;
+    }
+
+    /**
+     * How many (up to {@link #DEAD_TREE_SPOTS_WANTED}) of 24 spots round a mound (8 bearings, 3 distances 10 to 30 past its foot) have dry ground, flat within
+     * the dead tree's {@code DEAD_TREE_UNEVEN} over 3 blocks round, and near the mound's height (the dead tree's ground
+     * rule in {@code NewLandMounds}, read on land no world holds).
+     */
+    private static int deadTreeGround(MoundPlaces.Land land, BlockPos foot, double footReach) {
+        int found = 0;
+        int uneven = NewLandMounds.DEAD_TREE_UNEVEN;
+        for (int b = 0; b < 8; b++) {
+            double bearing = b * Math.PI / 4;
+            for (int d = 0; d < 3; d++) {
+                double r = footReach + NewLandMounds.DEAD_TREE_NEAREST + d * (NewLandMounds.DEAD_TREE_FARTHEST - NewLandMounds.DEAD_TREE_NEAREST) / 2.0;
+                int x = (int) Math.floor(foot.getX() + 0.5 + Math.cos(bearing) * r), z = (int) Math.floor(foot.getZ() + 0.5 + Math.sin(bearing) * r);
+                int lowest = Integer.MAX_VALUE, highest = Integer.MIN_VALUE;
+                boolean dry = true;
+                for (int[] o : new int[][] {{0, 0}, {3, 0}, {-3, 0}, {0, 3}, {0, -3}}) {
+                    int surface = land.height(x + o[0], z + o[1], Heightmap.Types.WORLD_SURFACE_WG);
+                    dry &= surface == land.height(x + o[0], z + o[1], Heightmap.Types.OCEAN_FLOOR_WG);
+                    lowest = Math.min(lowest, surface);
+                    highest = Math.max(highest, surface);
+                }
+                if (dry && highest - lowest <= uneven && Math.abs(lowest - foot.getY()) <= 2 * uneven && ++found >= DEAD_TREE_SPOTS_WANTED) {
+                    return found; // (enough: each ground height costs about 2 ms on this land)
+                }
+            }
+        }
+        return found;
+    }
+
+    /** How far (blocks, sideways) the foot's edge of the nearest living mound of new land lies from {@code center}. */
+    private static double nearestLivingEdge(MoundPlaces.Land land, TermiteMoundStructure.Numbers numbers, BlockPos center) {
+        MoundPlaces.Numbers places = numbers.places();
+        int look = numbers.matabele().livingNear() + (int) Math.ceil(MoundPlaces.footReach(TermiteMoundStructure.FULL_STAGE));
+        double nearest = Double.MAX_VALUE;
+        for (MoundPlaces.Place place : MoundPlaces.near(land.seed(), center.getX(), center.getZ(), look, places)) {
+            BlockPos foot = MoundPlaces.holds(land, place, places);
+            if (foot == null) {
+                continue;
+            }
+            TermiteMoundStructure.Pick pick = TermiteMoundStructure.pickAt(numbers, land, place, MoundPlaces.sizeQuantile(land, place, places));
+            if (pick.living()) {
+                nearest = Math.min(nearest, Math.max(0, sideways(foot, center) - MoundPlaces.footReach(pick.stage())));
+            }
+        }
+        return nearest;
+    }
 
     private static double sideways(BlockPos a, BlockPos b) {
         double dx = a.getX() - b.getX(), dz = a.getZ() - b.getZ();

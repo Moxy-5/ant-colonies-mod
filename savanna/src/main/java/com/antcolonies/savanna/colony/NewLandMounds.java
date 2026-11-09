@@ -694,7 +694,7 @@ public class NewLandMounds extends SavedData {
      * standing into the higher side as new land's giant trees do; was 2, and with the trunk's base counted as in the way it
      * was in truth 0: {@code docs/BUGS.md} 81; 4 my pick, the giants take 6); under a fallen log, this much from its foot.
      */
-    static final int DEAD_TREE_UNEVEN = 4;
+    public static final int DEAD_TREE_UNEVEN = 4;
     static final int DEAD_LOG_UNEVEN = 3;
 
     /**

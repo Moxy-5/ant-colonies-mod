@@ -166,6 +166,8 @@ reach, no colony in water.
 
 **R5 done (smaller than planned).** 18 quick tests: the queen's meals, hunger, the job share-out, the wound odds (framework), the raid day, raid size, catch and scouts' choosiness on the Matabele file (savanna), jobs, hunger and meals on the harvester file (desert); seams in `WorkerNumbers`, `QueenCare`, `Wounds`, `Raids`, `RaidCatch`, each used by the game code. **Not done, for later:** the seed count and the prey pile (the rules sit in the world's blocks; a quick test needs them pulled out of `FoodStore` and `PreyPile` into plain counts first, a bigger change), the numbers foraging (`FieldLife` reads the world's plants).
 
+**R6 done.** The savanna survey (real land, 7 seeds) checks no mound wet or on the lowest floodplain, dead tree room by every mound, and living termites within the scouts' reach of nearly every Matabele nest; measured 0 wet, 0 short of room, 72 of 74 (single-biome 27 of 28) within 86 blocks, 59 blocks on average.
+
 ## Later (not in this revamp)
 
 - **Handing the clock and weather in instead of the "ForTests" switches** (about 99 in the game code). It touches game
@@ -197,6 +199,9 @@ reach, no colony in water.
 - R5: a rule pulled out as a static method next to its game method, the game method calling it (one rule, one place), never a copy in the test.
 - R5: each species' quick tests read its own species file (`SpeciesProfile.read`), so a number changed in the file is checked against the rule at once; the framework's tests use made-up numbers (it never names a species).
 - R5: the seed count, prey pile and numbers foraging left out rather than pulling world code apart overnight.
+- R6: the new checks inside the existing survey (one land made, more checks), not a new test.
+- R6: the dead tree's ground rule read on land no world holds (dry, flat within 4 over 3 blocks, near the mound's height), 3 spots of 24 needed, since placing the real tree needs loaded chunks (that is checked on built arenas in `TermiteNewLandTests`).
+- R6: the reach band (90 percent within 86 blocks, 70 on average) set from the measured 97 percent and 59 blocks with room for chance.
 
 ## Your calls
 
