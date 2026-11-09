@@ -1,0 +1,58 @@
+# Drawing-cost scene (made by tools/perf_scenes.py, do not edit by hand): a termite colony's real mobs: 35 workers, 10 minor and 5 major soldiers.
+cmd time set noon
+cmd weather clear
+lens 30
+cmd summon antcolonies:termite_worker -5.10 -60 -5.00 {NoAI:1b,Rotation:[90f,0f],CustomName:'"film:walk"'}
+cmd summon antcolonies:termite_worker -4.30 -60 -5.00 {NoAI:1b,Rotation:[90f,0f],CustomName:'"film:walk"'}
+cmd summon antcolonies:termite_worker -3.50 -60 -5.00 {NoAI:1b,Rotation:[90f,0f],CustomName:'"film:walk"'}
+cmd summon antcolonies:termite_worker -2.70 -60 -5.00 {NoAI:1b,Rotation:[90f,0f],CustomName:'"film:walk"'}
+cmd summon antcolonies:termite_worker -1.90 -60 -5.00 {NoAI:1b,Rotation:[90f,0f],CustomName:'"film:walk"'}
+cmd summon antcolonies:termite_worker -1.10 -60 -5.00 {NoAI:1b,Rotation:[90f,0f],CustomName:'"film:walk"'}
+cmd summon antcolonies:termite_worker -0.30 -60 -5.00 {NoAI:1b,Rotation:[90f,0f],CustomName:'"film:walk"'}
+cmd summon antcolonies:termite_worker 0.50 -60 -5.00 {NoAI:1b,Rotation:[90f,0f],CustomName:'"film:walk"'}
+cmd summon antcolonies:termite_worker 1.30 -60 -5.00 {NoAI:1b,Rotation:[90f,0f],CustomName:'"film:walk"'}
+cmd summon antcolonies:termite_worker 2.10 -60 -5.00 {NoAI:1b,Rotation:[90f,0f],CustomName:'"film:walk"'}
+cmd summon antcolonies:termite_worker 2.90 -60 -5.00 {NoAI:1b,Rotation:[90f,0f],CustomName:'"film:walk"'}
+cmd summon antcolonies:termite_worker 3.70 -60 -5.00 {NoAI:1b,Rotation:[90f,0f],CustomName:'"film:walk"'}
+cmd summon antcolonies:termite_worker 4.50 -60 -5.00 {NoAI:1b,Rotation:[90f,0f],CustomName:'"film:walk"'}
+cmd summon antcolonies:termite_worker 5.30 -60 -5.00 {NoAI:1b,Rotation:[90f,0f],CustomName:'"film:walk"'}
+cmd summon antcolonies:termite_worker 6.10 -60 -5.00 {NoAI:1b,Rotation:[90f,0f],CustomName:'"film:walk"'}
+cmd summon antcolonies:termite_worker -5.10 -60 -4.20 {NoAI:1b,Rotation:[90f,0f],CustomName:'"film:walk"'}
+cmd summon antcolonies:termite_worker -4.30 -60 -4.20 {NoAI:1b,Rotation:[90f,0f],CustomName:'"film:walk"'}
+cmd summon antcolonies:termite_worker -3.50 -60 -4.20 {NoAI:1b,Rotation:[90f,0f],CustomName:'"film:walk"'}
+cmd summon antcolonies:termite_worker -2.70 -60 -4.20 {NoAI:1b,Rotation:[90f,0f],CustomName:'"film:walk"'}
+cmd summon antcolonies:termite_worker -1.90 -60 -4.20 {NoAI:1b,Rotation:[90f,0f],CustomName:'"film:walk"'}
+cmd summon antcolonies:termite_worker -1.10 -60 -4.20 {NoAI:1b,Rotation:[90f,0f],CustomName:'"film:walk"'}
+cmd summon antcolonies:termite_worker -0.30 -60 -4.20 {NoAI:1b,Rotation:[90f,0f],CustomName:'"film:walk"'}
+cmd summon antcolonies:termite_worker 0.50 -60 -4.20 {NoAI:1b,Rotation:[90f,0f],CustomName:'"film:walk"'}
+cmd summon antcolonies:termite_worker 1.30 -60 -4.20 {NoAI:1b,Rotation:[90f,0f],CustomName:'"film:walk"'}
+cmd summon antcolonies:termite_worker 2.10 -60 -4.20 {NoAI:1b,Rotation:[90f,0f],CustomName:'"film:walk"'}
+cmd summon antcolonies:termite_worker 2.90 -60 -4.20 {NoAI:1b,Rotation:[90f,0f],CustomName:'"film:walk"'}
+cmd summon antcolonies:termite_worker 3.70 -60 -4.20 {NoAI:1b,Rotation:[90f,0f],CustomName:'"film:walk"'}
+cmd summon antcolonies:termite_worker 4.50 -60 -4.20 {NoAI:1b,Rotation:[90f,0f],CustomName:'"film:walk"'}
+cmd summon antcolonies:termite_worker 5.30 -60 -4.20 {NoAI:1b,Rotation:[90f,0f],CustomName:'"film:walk"'}
+cmd summon antcolonies:termite_worker 6.10 -60 -4.20 {NoAI:1b,Rotation:[90f,0f],CustomName:'"film:walk"'}
+cmd summon antcolonies:termite_worker -5.10 -60 -3.40 {NoAI:1b,Rotation:[90f,0f],CustomName:'"film:walk"'}
+cmd summon antcolonies:termite_worker -4.30 -60 -3.40 {NoAI:1b,Rotation:[90f,0f],CustomName:'"film:walk"'}
+cmd summon antcolonies:termite_worker -3.50 -60 -3.40 {NoAI:1b,Rotation:[90f,0f],CustomName:'"film:walk"'}
+cmd summon antcolonies:termite_worker -2.70 -60 -3.40 {NoAI:1b,Rotation:[90f,0f],CustomName:'"film:walk"'}
+cmd summon antcolonies:termite_worker -1.90 -60 -3.40 {NoAI:1b,Rotation:[90f,0f],CustomName:'"film:walk"'}
+cmd summon antcolonies:termite_minor_soldier -1.10 -60 -3.40 {NoAI:1b,Rotation:[90f,0f],CustomName:'"film:walk"'}
+cmd summon antcolonies:termite_minor_soldier -0.30 -60 -3.40 {NoAI:1b,Rotation:[90f,0f],CustomName:'"film:walk"'}
+cmd summon antcolonies:termite_minor_soldier 0.50 -60 -3.40 {NoAI:1b,Rotation:[90f,0f],CustomName:'"film:walk"'}
+cmd summon antcolonies:termite_minor_soldier 1.30 -60 -3.40 {NoAI:1b,Rotation:[90f,0f],CustomName:'"film:walk"'}
+cmd summon antcolonies:termite_minor_soldier 2.10 -60 -3.40 {NoAI:1b,Rotation:[90f,0f],CustomName:'"film:walk"'}
+cmd summon antcolonies:termite_minor_soldier 2.90 -60 -3.40 {NoAI:1b,Rotation:[90f,0f],CustomName:'"film:walk"'}
+cmd summon antcolonies:termite_minor_soldier 3.70 -60 -3.40 {NoAI:1b,Rotation:[90f,0f],CustomName:'"film:walk"'}
+cmd summon antcolonies:termite_minor_soldier 4.50 -60 -3.40 {NoAI:1b,Rotation:[90f,0f],CustomName:'"film:walk"'}
+cmd summon antcolonies:termite_minor_soldier 5.30 -60 -3.40 {NoAI:1b,Rotation:[90f,0f],CustomName:'"film:walk"'}
+cmd summon antcolonies:termite_minor_soldier 6.10 -60 -3.40 {NoAI:1b,Rotation:[90f,0f],CustomName:'"film:walk"'}
+cmd summon antcolonies:termite_major_soldier -5.10 -60 -2.60 {NoAI:1b,Rotation:[90f,0f],CustomName:'"film:walk"'}
+cmd summon antcolonies:termite_major_soldier -4.30 -60 -2.60 {NoAI:1b,Rotation:[90f,0f],CustomName:'"film:walk"'}
+cmd summon antcolonies:termite_major_soldier -3.50 -60 -2.60 {NoAI:1b,Rotation:[90f,0f],CustomName:'"film:walk"'}
+cmd summon antcolonies:termite_major_soldier -2.70 -60 -2.60 {NoAI:1b,Rotation:[90f,0f],CustomName:'"film:walk"'}
+cmd summon antcolonies:termite_major_soldier -1.90 -60 -2.60 {NoAI:1b,Rotation:[90f,0f],CustomName:'"film:walk"'}
+camera 0.5 -58.4 -9 0 25
+wait 300
+shot c_termites50
+quit

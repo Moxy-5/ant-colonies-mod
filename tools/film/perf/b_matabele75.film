@@ -1,0 +1,83 @@
+# Drawing-cost scene (made by tools/perf_scenes.py, do not edit by hand): a whole raid of real Matabele: 38 majors, 37 minors.
+cmd time set noon
+cmd weather clear
+lens 30
+cmd summon antcolonies:matabele_major -5.10 -60 -5.00 {NoAI:1b,Rotation:[90f,0f],BodyLength:15f,CustomName:'"film:walk"'}
+cmd summon antcolonies:matabele_major -4.30 -60 -5.00 {NoAI:1b,Rotation:[90f,0f],BodyLength:15f,CustomName:'"film:walk"'}
+cmd summon antcolonies:matabele_major -3.50 -60 -5.00 {NoAI:1b,Rotation:[90f,0f],BodyLength:15f,CustomName:'"film:walk"'}
+cmd summon antcolonies:matabele_major -2.70 -60 -5.00 {NoAI:1b,Rotation:[90f,0f],BodyLength:15f,CustomName:'"film:walk"'}
+cmd summon antcolonies:matabele_major -1.90 -60 -5.00 {NoAI:1b,Rotation:[90f,0f],BodyLength:15f,CustomName:'"film:walk"'}
+cmd summon antcolonies:matabele_major -1.10 -60 -5.00 {NoAI:1b,Rotation:[90f,0f],BodyLength:15f,CustomName:'"film:walk"'}
+cmd summon antcolonies:matabele_major -0.30 -60 -5.00 {NoAI:1b,Rotation:[90f,0f],BodyLength:15f,CustomName:'"film:walk"'}
+cmd summon antcolonies:matabele_major 0.50 -60 -5.00 {NoAI:1b,Rotation:[90f,0f],BodyLength:15f,CustomName:'"film:walk"'}
+cmd summon antcolonies:matabele_major 1.30 -60 -5.00 {NoAI:1b,Rotation:[90f,0f],BodyLength:15f,CustomName:'"film:walk"'}
+cmd summon antcolonies:matabele_major 2.10 -60 -5.00 {NoAI:1b,Rotation:[90f,0f],BodyLength:15f,CustomName:'"film:walk"'}
+cmd summon antcolonies:matabele_major 2.90 -60 -5.00 {NoAI:1b,Rotation:[90f,0f],BodyLength:15f,CustomName:'"film:walk"'}
+cmd summon antcolonies:matabele_major 3.70 -60 -5.00 {NoAI:1b,Rotation:[90f,0f],BodyLength:15f,CustomName:'"film:walk"'}
+cmd summon antcolonies:matabele_major 4.50 -60 -5.00 {NoAI:1b,Rotation:[90f,0f],BodyLength:15f,CustomName:'"film:walk"'}
+cmd summon antcolonies:matabele_major 5.30 -60 -5.00 {NoAI:1b,Rotation:[90f,0f],BodyLength:15f,CustomName:'"film:walk"'}
+cmd summon antcolonies:matabele_major 6.10 -60 -5.00 {NoAI:1b,Rotation:[90f,0f],BodyLength:15f,CustomName:'"film:walk"'}
+cmd summon antcolonies:matabele_major -5.10 -60 -4.20 {NoAI:1b,Rotation:[90f,0f],BodyLength:15f,CustomName:'"film:walk"'}
+cmd summon antcolonies:matabele_major -4.30 -60 -4.20 {NoAI:1b,Rotation:[90f,0f],BodyLength:15f,CustomName:'"film:walk"'}
+cmd summon antcolonies:matabele_major -3.50 -60 -4.20 {NoAI:1b,Rotation:[90f,0f],BodyLength:15f,CustomName:'"film:walk"'}
+cmd summon antcolonies:matabele_major -2.70 -60 -4.20 {NoAI:1b,Rotation:[90f,0f],BodyLength:15f,CustomName:'"film:walk"'}
+cmd summon antcolonies:matabele_major -1.90 -60 -4.20 {NoAI:1b,Rotation:[90f,0f],BodyLength:15f,CustomName:'"film:walk"'}
+cmd summon antcolonies:matabele_major -1.10 -60 -4.20 {NoAI:1b,Rotation:[90f,0f],BodyLength:15f,CustomName:'"film:walk"'}
+cmd summon antcolonies:matabele_major -0.30 -60 -4.20 {NoAI:1b,Rotation:[90f,0f],BodyLength:15f,CustomName:'"film:walk"'}
+cmd summon antcolonies:matabele_major 0.50 -60 -4.20 {NoAI:1b,Rotation:[90f,0f],BodyLength:15f,CustomName:'"film:walk"'}
+cmd summon antcolonies:matabele_major 1.30 -60 -4.20 {NoAI:1b,Rotation:[90f,0f],BodyLength:15f,CustomName:'"film:walk"'}
+cmd summon antcolonies:matabele_major 2.10 -60 -4.20 {NoAI:1b,Rotation:[90f,0f],BodyLength:15f,CustomName:'"film:walk"'}
+cmd summon antcolonies:matabele_major 2.90 -60 -4.20 {NoAI:1b,Rotation:[90f,0f],BodyLength:15f,CustomName:'"film:walk"'}
+cmd summon antcolonies:matabele_major 3.70 -60 -4.20 {NoAI:1b,Rotation:[90f,0f],BodyLength:15f,CustomName:'"film:walk"'}
+cmd summon antcolonies:matabele_major 4.50 -60 -4.20 {NoAI:1b,Rotation:[90f,0f],BodyLength:15f,CustomName:'"film:walk"'}
+cmd summon antcolonies:matabele_major 5.30 -60 -4.20 {NoAI:1b,Rotation:[90f,0f],BodyLength:15f,CustomName:'"film:walk"'}
+cmd summon antcolonies:matabele_major 6.10 -60 -4.20 {NoAI:1b,Rotation:[90f,0f],BodyLength:15f,CustomName:'"film:walk"'}
+cmd summon antcolonies:matabele_major -5.10 -60 -3.40 {NoAI:1b,Rotation:[90f,0f],BodyLength:15f,CustomName:'"film:walk"'}
+cmd summon antcolonies:matabele_major -4.30 -60 -3.40 {NoAI:1b,Rotation:[90f,0f],BodyLength:15f,CustomName:'"film:walk"'}
+cmd summon antcolonies:matabele_major -3.50 -60 -3.40 {NoAI:1b,Rotation:[90f,0f],BodyLength:15f,CustomName:'"film:walk"'}
+cmd summon antcolonies:matabele_major -2.70 -60 -3.40 {NoAI:1b,Rotation:[90f,0f],BodyLength:15f,CustomName:'"film:walk"'}
+cmd summon antcolonies:matabele_major -1.90 -60 -3.40 {NoAI:1b,Rotation:[90f,0f],BodyLength:15f,CustomName:'"film:walk"'}
+cmd summon antcolonies:matabele_major -1.10 -60 -3.40 {NoAI:1b,Rotation:[90f,0f],BodyLength:15f,CustomName:'"film:walk"'}
+cmd summon antcolonies:matabele_major -0.30 -60 -3.40 {NoAI:1b,Rotation:[90f,0f],BodyLength:15f,CustomName:'"film:walk"'}
+cmd summon antcolonies:matabele_major 0.50 -60 -3.40 {NoAI:1b,Rotation:[90f,0f],BodyLength:15f,CustomName:'"film:walk"'}
+cmd summon antcolonies:matabele_minor 1.30 -60 -3.40 {NoAI:1b,Rotation:[90f,0f],BodyLength:7.5f,CustomName:'"film:walk"'}
+cmd summon antcolonies:matabele_minor 2.10 -60 -3.40 {NoAI:1b,Rotation:[90f,0f],BodyLength:7.5f,CustomName:'"film:walk"'}
+cmd summon antcolonies:matabele_minor 2.90 -60 -3.40 {NoAI:1b,Rotation:[90f,0f],BodyLength:7.5f,CustomName:'"film:walk"'}
+cmd summon antcolonies:matabele_minor 3.70 -60 -3.40 {NoAI:1b,Rotation:[90f,0f],BodyLength:7.5f,CustomName:'"film:walk"'}
+cmd summon antcolonies:matabele_minor 4.50 -60 -3.40 {NoAI:1b,Rotation:[90f,0f],BodyLength:7.5f,CustomName:'"film:walk"'}
+cmd summon antcolonies:matabele_minor 5.30 -60 -3.40 {NoAI:1b,Rotation:[90f,0f],BodyLength:7.5f,CustomName:'"film:walk"'}
+cmd summon antcolonies:matabele_minor 6.10 -60 -3.40 {NoAI:1b,Rotation:[90f,0f],BodyLength:7.5f,CustomName:'"film:walk"'}
+cmd summon antcolonies:matabele_minor -5.10 -60 -2.60 {NoAI:1b,Rotation:[90f,0f],BodyLength:7.5f,CustomName:'"film:walk"'}
+cmd summon antcolonies:matabele_minor -4.30 -60 -2.60 {NoAI:1b,Rotation:[90f,0f],BodyLength:7.5f,CustomName:'"film:walk"'}
+cmd summon antcolonies:matabele_minor -3.50 -60 -2.60 {NoAI:1b,Rotation:[90f,0f],BodyLength:7.5f,CustomName:'"film:walk"'}
+cmd summon antcolonies:matabele_minor -2.70 -60 -2.60 {NoAI:1b,Rotation:[90f,0f],BodyLength:7.5f,CustomName:'"film:walk"'}
+cmd summon antcolonies:matabele_minor -1.90 -60 -2.60 {NoAI:1b,Rotation:[90f,0f],BodyLength:7.5f,CustomName:'"film:walk"'}
+cmd summon antcolonies:matabele_minor -1.10 -60 -2.60 {NoAI:1b,Rotation:[90f,0f],BodyLength:7.5f,CustomName:'"film:walk"'}
+cmd summon antcolonies:matabele_minor -0.30 -60 -2.60 {NoAI:1b,Rotation:[90f,0f],BodyLength:7.5f,CustomName:'"film:walk"'}
+cmd summon antcolonies:matabele_minor 0.50 -60 -2.60 {NoAI:1b,Rotation:[90f,0f],BodyLength:7.5f,CustomName:'"film:walk"'}
+cmd summon antcolonies:matabele_minor 1.30 -60 -2.60 {NoAI:1b,Rotation:[90f,0f],BodyLength:7.5f,CustomName:'"film:walk"'}
+cmd summon antcolonies:matabele_minor 2.10 -60 -2.60 {NoAI:1b,Rotation:[90f,0f],BodyLength:7.5f,CustomName:'"film:walk"'}
+cmd summon antcolonies:matabele_minor 2.90 -60 -2.60 {NoAI:1b,Rotation:[90f,0f],BodyLength:7.5f,CustomName:'"film:walk"'}
+cmd summon antcolonies:matabele_minor 3.70 -60 -2.60 {NoAI:1b,Rotation:[90f,0f],BodyLength:7.5f,CustomName:'"film:walk"'}
+cmd summon antcolonies:matabele_minor 4.50 -60 -2.60 {NoAI:1b,Rotation:[90f,0f],BodyLength:7.5f,CustomName:'"film:walk"'}
+cmd summon antcolonies:matabele_minor 5.30 -60 -2.60 {NoAI:1b,Rotation:[90f,0f],BodyLength:7.5f,CustomName:'"film:walk"'}
+cmd summon antcolonies:matabele_minor 6.10 -60 -2.60 {NoAI:1b,Rotation:[90f,0f],BodyLength:7.5f,CustomName:'"film:walk"'}
+cmd summon antcolonies:matabele_minor -5.10 -60 -1.80 {NoAI:1b,Rotation:[90f,0f],BodyLength:7.5f,CustomName:'"film:walk"'}
+cmd summon antcolonies:matabele_minor -4.30 -60 -1.80 {NoAI:1b,Rotation:[90f,0f],BodyLength:7.5f,CustomName:'"film:walk"'}
+cmd summon antcolonies:matabele_minor -3.50 -60 -1.80 {NoAI:1b,Rotation:[90f,0f],BodyLength:7.5f,CustomName:'"film:walk"'}
+cmd summon antcolonies:matabele_minor -2.70 -60 -1.80 {NoAI:1b,Rotation:[90f,0f],BodyLength:7.5f,CustomName:'"film:walk"'}
+cmd summon antcolonies:matabele_minor -1.90 -60 -1.80 {NoAI:1b,Rotation:[90f,0f],BodyLength:7.5f,CustomName:'"film:walk"'}
+cmd summon antcolonies:matabele_minor -1.10 -60 -1.80 {NoAI:1b,Rotation:[90f,0f],BodyLength:7.5f,CustomName:'"film:walk"'}
+cmd summon antcolonies:matabele_minor -0.30 -60 -1.80 {NoAI:1b,Rotation:[90f,0f],BodyLength:7.5f,CustomName:'"film:walk"'}
+cmd summon antcolonies:matabele_minor 0.50 -60 -1.80 {NoAI:1b,Rotation:[90f,0f],BodyLength:7.5f,CustomName:'"film:walk"'}
+cmd summon antcolonies:matabele_minor 1.30 -60 -1.80 {NoAI:1b,Rotation:[90f,0f],BodyLength:7.5f,CustomName:'"film:walk"'}
+cmd summon antcolonies:matabele_minor 2.10 -60 -1.80 {NoAI:1b,Rotation:[90f,0f],BodyLength:7.5f,CustomName:'"film:walk"'}
+cmd summon antcolonies:matabele_minor 2.90 -60 -1.80 {NoAI:1b,Rotation:[90f,0f],BodyLength:7.5f,CustomName:'"film:walk"'}
+cmd summon antcolonies:matabele_minor 3.70 -60 -1.80 {NoAI:1b,Rotation:[90f,0f],BodyLength:7.5f,CustomName:'"film:walk"'}
+cmd summon antcolonies:matabele_minor 4.50 -60 -1.80 {NoAI:1b,Rotation:[90f,0f],BodyLength:7.5f,CustomName:'"film:walk"'}
+cmd summon antcolonies:matabele_minor 5.30 -60 -1.80 {NoAI:1b,Rotation:[90f,0f],BodyLength:7.5f,CustomName:'"film:walk"'}
+cmd summon antcolonies:matabele_minor 6.10 -60 -1.80 {NoAI:1b,Rotation:[90f,0f],BodyLength:7.5f,CustomName:'"film:walk"'}
+camera 0.5 -58.4 -9 0 25
+wait 300
+shot b_matabele75
+quit

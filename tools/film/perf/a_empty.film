@@ -1,0 +1,8 @@
+# Drawing-cost scene (made by tools/perf_scenes.py, do not edit by hand): no insects, the baseline.
+cmd time set noon
+cmd weather clear
+lens 30
+camera 0.5 -58.4 -9 0 25
+wait 300
+shot a_empty
+quit

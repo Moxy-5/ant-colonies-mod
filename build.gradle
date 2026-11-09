@@ -182,6 +182,10 @@ neoForge {
             }
             // -PfilmDebug: the game listens for the debugger on port 5005, so tools/film.sh swap can swap changed Java
             // method bodies into it (tools/film_swap.py) without a relaunch
+            // -PfilmRawFrames: every frame's drawing time in order, run-film/screenshots/frames_<scene>.txt (FilmFrameMeter)
+            if (project.hasProperty('filmRawFrames')) {
+                systemProperty 'antcolonies.film.rawFrames', 'true'
+            }
             if (project.hasProperty('filmDebug')) {
                 jvmArguments.add '-agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=127.0.0.1:5005'
             }
