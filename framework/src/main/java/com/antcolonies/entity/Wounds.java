@@ -130,10 +130,10 @@ public final class Wounds {
         RandomSource random = insect.getRandom();
         if (!decided && age >= n.infectTicks()) {
             decided = true;
-            infected = random.nextDouble() < (licks > 0 ? n.infectLicked() : n.infectUntended());
+            infected = random.nextDouble() < infectChance(licks, n);
         }
         if (decided && infected && age >= n.courseTicks()) {
-            boolean dies = random.nextDouble() < (dabbed ? n.deathTreated() : n.deathUntreated());
+            boolean dies = random.nextDouble() < deathChance(dabbed, n);
             openedAt = NONE;
             if (dies) {
                 insect.kill(); // the infection killed it (its nestmates carry it to the refuse like any dead)
@@ -141,6 +141,16 @@ public final class Wounds {
         } else if (decided && !infected && age >= n.healTicks()) {
             openedAt = NONE; // healed
         }
+    }
+
+    /** The odds a wound turns infected (test revamp R5): lower once a nestmate licked it at least once. */
+    public static double infectChance(int licks, FightNumbers.Rescue n) {
+        return licks > 0 ? n.infectLicked() : n.infectUntended();
+    }
+
+    /** The odds an infected wound kills (test revamp R5): lower once a nestmate dabbed its gland's secretion on it. */
+    public static double deathChance(boolean dabbed, FightNumbers.Rescue n) {
+        return dabbed ? n.deathTreated() : n.deathUntreated();
     }
 
     /** A line for the report and the labels. */

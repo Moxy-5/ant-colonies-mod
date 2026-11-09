@@ -728,7 +728,12 @@ public class Raids {
      */
     public double fedShare() {
         PreyPile pile = colony.part(SavannaParts.PREY_PILE).orElse(null);
-        return pile == null ? 0.0 : Math.min(1.0, pile.edibleTermites() / (double) Math.max(1, colony.getCount(Caste.WORKER)));
+        return pile == null ? 0.0 : fedShare(pile.edibleTermites(), colony.getCount(Caste.WORKER));
+    }
+
+    /** How well fed (0 to 1) a colony of this many workers is with this many good termites on its pile (test revamp R5). */
+    public static double fedShare(int edibleTermites, int workers) {
+        return Math.min(1.0, edibleTermites / (double) Math.max(1, workers));
     }
 
     /**
@@ -737,8 +742,12 @@ public class Raids {
      * hungry; Yusuf 2026, Frank and Linsenmair 2017; the scale between my pick).
      */
     public int raidsWanted() {
-        int most = away.mostRaidsADay();
-        return Math.max(1, Math.min(most, (int) Math.ceil(most * (1.0 - fedShare()))));
+        return raidsWanted(away.mostRaidsADay(), fedShare());
+    }
+
+    /** How many raids a day a colony this well fed (0 to 1) wants, at most {@code most} (test revamp R5: the rule as a plain method). */
+    public static int raidsWanted(int most, double fed) {
+        return Math.max(1, Math.min(most, (int) Math.ceil(most * (1.0 - fed))));
     }
 
     /** M8 step 3e: whether the colony may still send a raid today (near or away; commands do not ask). */
@@ -1346,12 +1355,18 @@ public class Raids {
         if (numbers == null) {
             return 0;
         }
-        int workers = Math.max(1, colony.getCount(Caste.WORKER));
-        double fed = fedShare();
+        return raidSize(colony.getCount(Caste.WORKER), fedShare(), find.worth, numbers, RaidCatch.numbers(colony).mostRaid());
+    }
+
+    /**
+     * {@link #raidSize(Find)}'s rule as a plain method (test revamp R5): the ants a colony of this many workers, this well
+     * fed (0 to 1), sends to a find of this worth.
+     */
+    public static int raidSize(int colonyWorkers, double fed, double worth, SavannaNumbers.ColumnNumbers numbers, int mostRaid) {
+        int workers = Math.max(1, colonyWorkers);
         double share = numbers.leastShare() + (numbers.mostShare() - numbers.leastShare()) * (1.0 - fed);
         int spare = Math.max(1, (int) Math.floor(workers * share));
-        double rich = Math.min(1.0, find.worth / Math.max(0.1, numbers.richWorth()));
-        int mostRaid = RaidCatch.numbers(colony).mostRaid();
+        double rich = Math.min(1.0, worth / Math.max(0.1, numbers.richWorth()));
         return Math.min(Math.min(spare, mostRaid), Math.max(numbers.leastRaid(), (int) Math.round(spare * rich)));
     }
 

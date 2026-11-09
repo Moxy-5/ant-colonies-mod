@@ -55,8 +55,15 @@ public final class RaidCatch {
         if (raiders <= 0) {
             return 0;
         }
-        SavannaNumbers.CatchNumbers numbers = numbers(matabele);
-        int wanted = (int) Math.round(raiders * numbers.perRaider() * (0.75 + 0.5 * random.nextDouble()));
+        return couldCarry(raiders, numbers(matabele), random.nextDouble());
+    }
+
+    /** {@link #couldCarry(Colony, int, RandomSource)} with its dice roll (0 to 1) handed in (test revamp R5). */
+    static int couldCarry(int raiders, SavannaNumbers.CatchNumbers numbers, double roll) {
+        if (raiders <= 0) {
+            return 0;
+        }
+        int wanted = (int) Math.round(raiders * numbers.perRaider() * (0.75 + 0.5 * roll));
         return Math.max(0, Math.min(numbers.mostCatch(), wanted));
     }
 

@@ -328,6 +328,21 @@ public record SpeciesProfile(ColonyNumbers colony, WorkerNumbers worker, QueenNu
             return age < nurseUntilTicks ? com.antcolonies.colony.ColonyRole.NURSE
                     : age < builderUntilTicks ? com.antcolonies.colony.ColonyRole.BUILDER : com.antcolonies.colony.ColonyRole.FORAGER;
         }
+
+        /** Whether a worker this long (ticks) since its last meal is hungry (test revamp R5: the rule in one place). */
+        public boolean hungryAfter(long sinceMeal) {
+            return sinceMeal >= mealIntervalTicks;
+        }
+
+        /** Whether a worker this long (ticks) since its last meal has slowed down to half speed. */
+        public boolean slowedAfter(long sinceMeal) {
+            return sinceMeal >= slowAfterTicks;
+        }
+
+        /** Whether a worker this long (ticks) since its last meal has starved. */
+        public boolean starvedAfter(long sinceMeal) {
+            return sinceMeal >= starveAfterTicks;
+        }
     }
 
     /** Where a worker's meal comes from: a piece of the food store (a seed, a layer of comb) or of the nurses' food (bread, a nodule). */

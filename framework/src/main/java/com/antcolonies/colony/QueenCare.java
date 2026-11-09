@@ -139,7 +139,7 @@ public class QueenCare {
      */
     public boolean feedQueen(ServerLevel level, boolean rich) {
         SpeciesProfile.QueenNumbers numbers = colony.profile().queen();
-        if (eggDue >= 0 || queenBread >= numbers.meal()) {
+        if (!takesPiece(eggDue >= 0, queenBread, numbers)) {
             return false;
         }
         queenLastFed = level.getGameTime();
@@ -147,21 +147,37 @@ public class QueenCare {
             queenBread++; // a queen who lays a steady stream just holds the food (see layInStream)
             return true;
         }
-        if (rich) {
-            // Rich bread: with a rich meal a burst of eggs starts, one every burst interval, and she needs no more food for it.
-            if (++queenRich >= numbers.richMeal()) {
-                queenRich = 0;
-                queenBread = 0;
-                burstLeft = numbers.burstEggs();
-                eggDue = level.getGameTime() + numbers.burstIntervalTicks();
-            }
-            return true;
-        }
-        queenBread++;
-        if (queenBread >= numbers.meal()) {
+        Meal meal = afterPiece(queenBread, queenRich, rich, numbers);
+        queenBread = meal.bread();
+        queenRich = meal.rich();
+        if (meal.burstStarts()) {
+            burstLeft = numbers.burstEggs();
+            eggDue = level.getGameTime() + numbers.burstIntervalTicks();
+        } else if (meal.eggStarts()) {
             eggDue = level.getGameTime() + numbers.incubationTicks();
         }
         return true;
+    }
+
+    /** Whether the queen takes another piece of bread: not while she carries an egg, nor once her meal is full. */
+    public static boolean takesPiece(boolean carryingEgg, int bread, SpeciesProfile.QueenNumbers numbers) {
+        return !carryingEgg && bread < numbers.meal();
+    }
+
+    /**
+     * What a queen's meal counts are after one more piece (test revamp R5: {@link #feedQueen}'s rule as a plain method):
+     * a plain piece adds to her meal, and a full meal starts an egg; a rich piece adds to her rich meal, and a full rich
+     * meal starts a burst of eggs (one every burst interval, needing no more food), both meals starting over.
+     */
+    public static Meal afterPiece(int bread, int rich, boolean richPiece, SpeciesProfile.QueenNumbers numbers) {
+        if (richPiece) {
+            return rich + 1 >= numbers.richMeal() ? new Meal(0, 0, false, true) : new Meal(bread, rich + 1, false, false);
+        }
+        return new Meal(bread + 1, rich, bread + 1 >= numbers.meal(), false);
+    }
+
+    /** The queen's meal counts after a piece, and whether an egg or a burst of eggs starts with it. */
+    public record Meal(int bread, int rich, boolean eggStarts, boolean burstStarts) {
     }
 
     /** Whether the egg the queen carries is ready to come out. */

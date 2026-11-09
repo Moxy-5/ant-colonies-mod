@@ -40,7 +40,7 @@ public class WorkerHunger {
     public boolean isHungry() {
         Colony colony = colony();
         return colony != null && lastAte != Colony.NOT_SET
-                && worker.level().getGameTime() - lastAte >= colony.profile().worker().mealIntervalTicks();
+                && colony.profile().worker().hungryAfter(worker.level().getGameTime() - lastAte);
     }
 
     /** It has eaten: full for another meal interval. */
@@ -70,8 +70,8 @@ public class WorkerHunger {
         }
         long hungry = now - lastAte;
         SpeciesProfile.WorkerNumbers numbers = colony.profile().worker();
-        updateStarving(hungry >= numbers.slowAfterTicks());
-        if (hungry >= numbers.starveAfterTicks()) {
+        updateStarving(numbers.slowedAfter(hungry));
+        if (numbers.starvedAfter(hungry)) {
             worker.hurt(worker.damageSources().starve(), 1000.0F);
         }
     }
