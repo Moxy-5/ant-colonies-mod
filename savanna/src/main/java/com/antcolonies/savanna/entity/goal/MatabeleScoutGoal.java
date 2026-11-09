@@ -748,8 +748,12 @@ public class MatabeleScoutGoal extends Goal {
                     .filter(termite -> termite.blockPosition().closerThan(here, smell + 0.5)).count();
             termitesSeen = Math.max(termitesSeen, counted);
             int hidden = 0;
+            // (the user's report, 2026-11-08: a scout locked onto a termite by a mud-covered branch or tree, found the
+            // feeding place's cells just past its smell from that termite, scored it worth 3 and passed the whole patch
+            // over, never to smell it again this trip; so the look counts every feeding place in the patch it would skip,
+            // the same twice-smell reach as wasPassed)
             for (FeedingSpots.ByDay place : byDay) {
-                if (nearestSmelt(level, place, here, smell) != null) {
+                if (nearestSmelt(level, place, here, smell * 2) != null) {
                     hidden += choose.byDayTermites();
                 }
             }

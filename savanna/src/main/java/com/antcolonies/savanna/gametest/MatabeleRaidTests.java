@@ -1784,6 +1784,12 @@ public class MatabeleRaidTests {
                     helper.assertTrue(pile.stock(level, 2) == 2, "the pile did not take 2 layers");
                     double fedFar = raids.need(center.offset(60, 0, 0));
                     helper.assertTrue(fedFar > farNeed, "fed, a find 60 out needs " + fedFar + ", hungry " + farNeed + ": not less the hungrier");
+                    // (the user's report, 2026-11-08: scouts passed over mud-covered branches and trees) a feeding place fed
+                    // at by day is a rich site, worth a raid at the scouts' whole reach even for a fed colony
+                    double placeWorth = 3.0 * raids.choosing().byDayTermites();
+                    double fedEdge = raids.need(center.offset(most, 0, 0));
+                    helper.assertTrue(placeWorth >= fedEdge, "a feeding place is worth " + placeWorth + " but a fed colony needs "
+                            + fedEdge + " at its whole reach, " + most + " blocks: scouts would pass feeding places over");
 
                     // a find 20 blocks out to the east: its way turns to the find, its reach shrinks back
                     raids.foundBy(level, a, center.offset(20, 0, 0));

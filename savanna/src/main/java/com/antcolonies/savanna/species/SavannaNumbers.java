@@ -800,7 +800,7 @@ public final class SavannaNumbers {
      */
     public record ChooseNumbers(double leastWorth, double worthPerBlock, double hungryEase, int byDayTermites, double inspectFrom,
                                 double fedScouts) {
-        public static final ChooseNumbers DEFAULT = new ChooseNumbers(3.0, 0.1, 0.5, 2, 3.5, 0.5);
+        public static final ChooseNumbers DEFAULT = new ChooseNumbers(3.0, 0.1, 0.5, 5, 3.5, 0.5);
         public static final Codec<ChooseNumbers> CODEC = RecordCodecBuilder.create(i -> i.group(
                 Codec.DOUBLE.optionalFieldOf("least_worth", DEFAULT.leastWorth()).forGetter(ChooseNumbers::leastWorth),
                 Codec.DOUBLE.optionalFieldOf("worth_per_block", DEFAULT.worthPerBlock()).forGetter(ChooseNumbers::worthPerBlock),
