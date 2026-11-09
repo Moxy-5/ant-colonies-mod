@@ -3309,6 +3309,18 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
                 && Math.abs(turnSpeed) > (turning ? STOP_TURNING : START_TURNING);
     }
 
+    /** Client: whether it is drawn with its model's far look just now ({@code InsectModel.pickLook}). */
+    private boolean farLook;
+
+    /** Client: whether it is drawn with the far model (fewer boxes, the same bones), set by the renderer each frame. */
+    public boolean isFarLook() {
+        return farLook;
+    }
+
+    public void setFarLook(boolean far) {
+        farLook = far;
+    }
+
     /** Client: how big the renderer draws it (1 = the model's own size). */
     public float getDrawScale() {
         return drawScale;

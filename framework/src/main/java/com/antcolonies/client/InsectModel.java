@@ -17,8 +17,30 @@ public class InsectModel<T extends AbstractAntEntity> extends DefaultedEntityGeo
     private ResourceLocation planModel;
     private BodyPlans.Plan plan;
 
+    /** The model its body plan is kept under, when that is not the model drawn (a far look: the full model's). */
+    private ResourceLocation planFrom;
+
     public InsectModel(ResourceLocation assetSubpath) {
         super(assetSubpath);
+    }
+
+    /**
+     * The far look of the model at {@code assetSubpath} (2026-11-09, the drawn-only insects' step 2): the same clips and
+     * body plan, the model and texture of {@code farSubpath}, which has the same bones and far fewer boxes. Drawing an
+     * insect costs about a millionth of a second a box (measured: {@code tools/perf_scenes.py}), and the Matabele's
+     * full model has 227. A model of its own, drawn by a renderer of its own ({@code AntRenderer}'s far renderer):
+     * GeckoLib restarts an insect's clips whenever one model object is switched from one model file to another.
+     */
+    public static <T extends AbstractAntEntity> InsectModel<T> farLook(ResourceLocation assetSubpath, ResourceLocation farSubpath) {
+        InsectModel<T> far = new InsectModel<>(assetSubpath);
+        far.planFrom = far.buildFormattedModelPath(assetSubpath);
+        far.withAltModel(farSubpath).withAltTexture(farSubpath);
+        return far;
+    }
+
+    /** The model its body plan is kept under: the full one, whichever look is drawn (the bones are the same). */
+    public ResourceLocation planResource(T insect) {
+        return planFrom != null ? planFrom : getModelResource(insect);
     }
 
     @Override
@@ -28,7 +50,7 @@ public class InsectModel<T extends AbstractAntEntity> extends DefaultedEntityGeo
     }
 
     private BodyPlans.Plan planOf(T insect) {
-        ResourceLocation model = getModelResource(insect);
+        ResourceLocation model = planResource(insect);
         if (!model.equals(planModel)) {
             plan = BodyPlans.ofGeo(model);
             planModel = model;

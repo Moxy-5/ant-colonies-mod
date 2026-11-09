@@ -24,6 +24,13 @@ public class SavannaClientEvents {
     /** The Matabele models' drawing scales, as the animation lab's (tools/anim_lab.py RENDER_SCALE). */
     static final float MATABELE_MAJOR_SCALE = 0.633F;
     static final float MATABELE_MINOR_SCALE = 0.455F;
+    /**
+     * How far from the camera (blocks) a Matabele is drawn with its far model, 54 boxes for 227 (tools/matabele_models.py,
+     * model(far=True); AntRenderer.withFarLook): where the full model's teeth, rounded edges and plate rims are under a
+     * pixel on a 1080-line screen. My picks, 2026-11-09, from side-by-side pictures (tools/film/far_look.film).
+     */
+    static final float MATABELE_MAJOR_FAR = 7.0F;
+    static final float MATABELE_MINOR_FAR = 4.5F;
     static final float MATABELE_QUEEN_SCALE = 0.76F;
     /** Carried termite leftovers are drawn this big (as a fraction of a full block). */
     private static final float REMAINS_SIZE = 0.3F;
@@ -115,10 +122,16 @@ public class SavannaClientEvents {
         event.registerEntityRenderer(SavannaEntities.MATABELE_MAJOR.get(), context -> new AntRenderer<>(
                 context, new InsectModel<MatabeleEntity>(
                         ResourceLocation.fromNamespaceAndPath(SavannaMod.MODID, "matabele_major")))
+                .withFarLook(context, InsectModel.farLook(
+                        ResourceLocation.fromNamespaceAndPath(SavannaMod.MODID, "matabele_major"),
+                        ResourceLocation.fromNamespaceAndPath(SavannaMod.MODID, "matabele_major_far")), MATABELE_MAJOR_FAR)
                 .withScale(MATABELE_MAJOR_SCALE));
         event.registerEntityRenderer(SavannaEntities.MATABELE_MINOR.get(), context -> new AntRenderer<>(
                 context, new InsectModel<MatabeleEntity>(
                         ResourceLocation.fromNamespaceAndPath(SavannaMod.MODID, "matabele_minor")))
+                .withFarLook(context, InsectModel.farLook(
+                        ResourceLocation.fromNamespaceAndPath(SavannaMod.MODID, "matabele_minor"),
+                        ResourceLocation.fromNamespaceAndPath(SavannaMod.MODID, "matabele_minor_far")), MATABELE_MINOR_FAR)
                 .withScale(MATABELE_MINOR_SCALE));
         event.registerEntityRenderer(SavannaEntities.MATABELE_QUEEN.get(), context -> new AntRenderer<>(
                 context, new InsectModel<com.antcolonies.savanna.entity.MatabeleQueenEntity>(

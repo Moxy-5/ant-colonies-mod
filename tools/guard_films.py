@@ -378,7 +378,9 @@ def frame_times(notes):
         w = line.split()
         if line.startswith("#") or len(w) < 5:
             continue
-        rows[w[0]] = (int(w[1]), float(w[2]), float(w[3]), float(w[4]))
+        # the middle by time (the 6th number, FilmFrameMeter since 2026-11-09) where the file has it: a scene's empty
+        # first moments make thousands of quick frames, which win the plain middle
+        rows[w[0]] = (int(w[1]), float(w[5]) if len(w) > 5 else float(w[2]), float(w[3]), float(w[4]))
     if "g_empty" in rows and "h_crowd" in rows:
         empty, crowd = rows["g_empty"][1], rows["h_crowd"][1]
         notes.append(f"drawing time: {empty:.2f} ms a frame with no insects, {crowd:.2f} ms with 400 ants "

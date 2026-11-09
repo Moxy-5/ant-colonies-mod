@@ -427,6 +427,20 @@ def carve(lo, hi, cut_lo, cut_hi):
     return [(a, b) for a, b in out if all(q - p > 0.04 for p, q in zip(a, b))]
 
 
+def far_head_boxes(spec):
+    """The far model's head (model(far=True)): the slices joined two by two into plain boxes, an eye a side in one
+    piece, the neck."""
+    boxes, slices = [], spec['slices']
+    for (z0, _, hw_a, lo_a, hi_a), (_, z1, hw_b, lo_b, hi_b) in zip(slices[::2], slices[1::2]):
+        hw = max(hw_a, hw_b)
+        boxes.append(([-hw, min(lo_a, lo_b), z1], [hw, max(hi_a, hi_b), z0], 'head'))
+    zc, yc, lz, hy, out = spec['eyes']
+    hw = max(s[2] for s in slices if s[1] < zc < s[0])
+    for sx in (1, -1):
+        boxes.append((*sym_points([hw - 0.12, yc - hy / 2, zc - lz / 2], [hw + out, yc + hy / 2, zc + lz / 2], sx), 'eye'))
+    return boxes + [NECK_BOX]
+
+
 def head_boxes(spec):
     """The head's boxes in its own frame, (lo, hi, swatch): the rounded slices, carved, then the extra boxes and the
     eyes (each eye in pieces following the steps of the head's side)."""
@@ -463,11 +477,13 @@ def jaw_line(m):
     return pts
 
 
-def jaw_cubes(f, spec, sx, size):
+def jaw_cubes(f, spec, sx, size, far=False):
     """The jaw (the left one for sx = 1) in the head's own frame: rows across it from the hinge to the point (see
     MANDIBLE), each a box round its piece of the middle line, the inner edge's strip and the teeth in the toothed
     edge's colour."""
     m = spec['mandible']
+    if far:                                     # the far model: a few plain rows, no edge strip, no teeth
+        m = {**m, 'rows': FAR_JAW_ROWS}
     basal_x, basal_t = m['basal']
     rows, line, cubes = m['rows'], jaw_line(m), []
     for r in range(rows):
@@ -493,7 +509,7 @@ def jaw_cubes(f, spec, sx, size):
                 return [min(za, zb) - pz, min(ya, yb) - py], [max(za, zb) + pz, max(ya, yb) + py]
             zm, ym = z_mid
             return [zm - z_half * along - pz, ym - z_half * down - py], [zm + z_half * along + pz, ym + z_half * down + py]
-        toothed = t >= basal_t
+        toothed = t >= basal_t and not far
         strip = min(0.2, (x_out - x_in) / 2) if toothed else 0
         (z_lo, y_lo), (z_hi, y_hi) = piece(0)
         if x_out - x_in - strip > 0.05:
@@ -507,15 +523,15 @@ def jaw_cubes(f, spec, sx, size):
     return cubes
 
 
-def head_bones(spec, size=1.0, antenna=1.0, tilt=0.0):
+def head_bones(spec, size=1.0, antenna=1.0, tilt=0.0, far=False):
     f = HeadFrame(size, tilt)
-    head = bone('head', 'forebody', NECK, [f.box(lo, hi, s) for lo, hi, s in head_boxes(spec)])
+    head = bone('head', 'forebody', NECK, [f.box(lo, hi, s) for lo, hi, s in (far_head_boxes if far else head_boxes)(spec)])
     if tilt:
         head['rotation'] = [tilt, 0, 0]
     bones = [head]
     for side, sx in (('l', 1), ('r', -1)):
         hinge = spec['mandible']['hinge']
-        jaw = bone(f'mandible_{side}', 'head', f.pt((hinge[0] * sx, hinge[1], hinge[2])), jaw_cubes(f, spec, sx, size))
+        jaw = bone(f'mandible_{side}', 'head', f.pt((hinge[0] * sx, hinge[1], hinge[2])), jaw_cubes(f, spec, sx, size, far))
         if spec['mandible']['open']:
             jaw['rotation'] = [0, -spec['mandible']['open'] * sx, 0]          # swung out at its hinge
         bones.append(jaw)
@@ -528,6 +544,12 @@ def head_bones(spec, size=1.0, antenna=1.0, tilt=0.0):
             return f.written(tuple(s + o * k for s, o in zip(socket_at, (off[0] * sx, off[1], off[2]))))
         socket, elbow = f.written(socket_at), a(spec['elbow'])
         end = 0.48 * size                                                     # the scape thickens toward the elbow
+        if far:                                 # the far model: the scape one rod, the whip three pieces
+            bones.append(bone(f'antenna_{side}_1', 'head', socket, [rod(socket, elbow, 0.45 * size, 'antenna')]))
+            rings = along([elbow] + [a(p) for p in spec['whip']], 3)
+            bones.append(bone(f'antenna_{side}_2', f'antenna_{side}_1', elbow, [
+                rod(p, q, 0.37 * size, f'whip{i * 5}') for i, (p, q) in enumerate(zip(rings, rings[1:]))]))
+            continue
         bones.append(bone(f'antenna_{side}_1', 'head', socket, [
             centered(*socket, 0.55 * size, 0.55 * size, 0.55 * size, 'joint'),
             rod(socket, lerp(socket, elbow, 0.55), 0.4 * size, 'antenna'),
@@ -550,7 +572,13 @@ def sym_points(lo, hi, sx):
     return [xs[0], lo[1], lo[2]], [xs[1], hi[1], hi[2]]
 
 
-def thorax_bone(queen=False):
+def thorax_bone(queen=False, far=False):
+    if far:                                     # the far model: the three humps as plain boxes
+        return bone('thorax', 'forebody', (0, 4.5, -3.4), [
+            box([-1.5, 3.2, -7.2], [1.5, 6.2, -4.4], 'thorax'),
+            box([-1.15, 3.2, -4.5], [1.15, 5.7, -2.0], 'thorax'),
+            box([-1.1, 3.2, -2.0], [1.1, 5.4, 0.4], 'thorax'),
+        ])
     groove_top = 4.4 if queen else 4.9                             # the queen's metanotal groove is deeper (Arnold 1915)
     return bone('thorax', 'forebody', (0, 4.5, -3.4), [
         box([-1.5, 3.6, -7.2], [1.5, 6.0, -4.4], 'thorax'),       # the pronotum, round and high
@@ -564,7 +592,7 @@ def thorax_bone(queen=False):
     ])
 
 
-def leg_bones(taper=0.0):
+def leg_bones(taper=0.0, far=False):
     """The legs. taper: 0 is today's even thin femur; above 0 the femur is thick at the hip and thins in two steps to
     the knee (the real ant's upper leg), the lower leg and feet unchanged (the user, 2026-10-23: less spidery)."""
     bones = []
@@ -573,6 +601,12 @@ def leg_bones(taper=0.0):
             def m(p):
                 return p if sx > 0 else mirror(p)
             h, k, a, t = m(hip), m(knee), m(ankle), m(toe)
+            if far:                             # the far model: a rod each for the femur, the tibia and the foot
+                thick = 0.62 * (1 + taper * 0.7) if taper > 0 and n != 1 else 0.62
+                bones.append(bone(f'leg_{side}{n}', 'forebody', h, [rod(h, k, thick, 'leg')]))
+                bones.append(bone(f'leg_{side}{n}_lower', f'leg_{side}{n}', k, [rod(k, a, 0.48, 'leg')]))
+                bones.append(bone(f'leg_{side}{n}_foot', f'leg_{side}{n}_lower', a, [rod(a, t, 0.34, 'tarsus')]))
+                continue
             if taper > 0 and n != 1:                                   # the front legs pass the head: left as they were
                 mid = lerp(h, k, 0.5)
                 femur = [rod(h, mid, 0.62 * (1 + taper), 'leg'),      # the femur, thick at the hip
@@ -595,17 +629,28 @@ SLIM = 0.72
 SLIM_BONES = ('thorax', 'petiole', 'gaster_front', 'gaster_back', 'gaster_mid', 'gaster_end', 'gaster_tip')
 
 
-def model(minor=False, head='A', taper=0.0, queen=None):
+FAR_JAW_ROWS = 5
+
+
+def model(minor=False, head='A', taper=0.0, queen=None, far=False):
     """The ant's bones (the game's model file format, each box naming its swatch until paint() gives it its place on
     the texture). minor: the small ant's proportions; head: which of the HEADS. queen: (width, height, length) times
     the worker's gaster, for the ergatoid queen (QUEEN_LOOKS): her gaster swollen, her waist node a thin scale leaning
-    forward, her groove deeper; the rest is a major."""
+    forward, her groove deeper; the rest is a major.
+    far: the far model (2026-11-09, the drawn-only insects' step 2): the same ant, bones and sizes from about a quarter
+    of the boxes, drawn in place of the full one past a few blocks, where its teeth, rounded edges and plate rims are
+    smaller than a pixel. Drawing an ant costs about a millionth of a second a box."""
     bones = [bone('body', None, (0, 4.5, 0)), bone('forebody', 'body', WAIST)]
     bones += head_bones(HEADS[head], MINOR_HEAD if minor else MAJOR_HEAD, MINOR_ANTENNA if minor else 1.0,
-                        MINOR_TILT if minor else MAJOR_TILT)
-    bones.append(thorax_bone(queen is not None))
-    bones += leg_bones(taper)
-    if queen is None:
+                        MINOR_TILT if minor else MAJOR_TILT, far)
+    bones.append(thorax_bone(queen is not None, far))
+    bones += leg_bones(taper, far)
+    if far:
+        node = [
+            box([-0.5, 3.8, 0.3], [0.5, 4.5, 0.8], 'waist'),
+            box([-1.1, 3.5, 0.7], [1.1, 6.2, 1.9], 'waist'),
+        ]
+    elif queen is None:
         node = [
             box([-0.5, 3.8, 0.3], [0.5, 4.5, 0.8], 'waist'),          # the short stalk
             box([-1.1, 3.5, 0.7], [1.1, 6.0, 1.9], 'waist'),          # the thick, tall node
@@ -628,14 +673,17 @@ def model(minor=False, head='A', taper=0.0, queen=None):
     def front(lo, hi):                                                 # a box of the first segment, swollen about its middle line
         return box([lo[0] * sw[0], GIRDLE[1] + (lo[1] - GIRDLE[1]) * sw[1], GASTER_START + (lo[2] - GASTER_START) * sw[2]],
                    [hi[0] * sw[0], GIRDLE[1] + (hi[1] - GIRDLE[1]) * sw[1], GASTER_START + (hi[2] - GASTER_START) * sw[2]], 'gaster')
-    bones.append(bone('gaster_front', 'petiole', GIRDLE_FRONT, [      # the gaster's first segment
+    bones.append(bone('gaster_front', 'petiole', GIRDLE_FRONT, [
+        front([-1.6, 3.1, 1.9], [1.6, 5.95, 4.6]),
+        front([-1.5, 3.4, 4.55], [1.5, 5.6, 5.0]),
+    ] if far else [                                                   # the gaster's first segment
         front([-1.3, 3.4, 1.9], [1.3, 5.6, 2.2]),
         front([-1.75, 3.15, 2.1], [1.75, 5.85, 4.6]),
         front([-1.45, 2.95, 2.4], [1.45, 6.05, 4.3]),
         front([-1.5, 3.4, 4.55], [1.5, 5.6, 5.0]),                    # the girdle, the pinch
     ]))
     if queen is None:
-        bones.append(bone('gaster_back', 'gaster_front', girdle, gaster_cubes(girdle, sw, bend)))
+        bones.append(bone('gaster_back', 'gaster_front', girdle, gaster_cubes(girdle, sw, bend, far)))
     else:                                                              # her gaster a chain, one bone a plate, to curve as she climbs
         parent = 'gaster_front'
         for name, (pivot, cubes) in zip(QUEEN_GASTER, gaster_chain(girdle, sw, bend)):
@@ -664,10 +712,10 @@ def tilted(centre, size, down, swatch):
                [-down, 0, 0])
 
 
-def gaster_cubes(girdle=GIRDLE, swell=(1.0, 1.0, 1.0), bend=1.0):
+def gaster_cubes(girdle=GIRDLE, swell=(1.0, 1.0, 1.0), bend=1.0, far=False):
     """The gaster from the pinch at girdle to the sting; swell: width, height and length times the worker's (the queen's);
     bend: the plates' downward angles times this (the sting keeps its turn beyond the last plate)."""
-    return [c for _, cubes in gaster_chain(girdle, swell, bend) for c in cubes]
+    return [c for _, cubes in gaster_chain(girdle, swell, bend, far) for c in cubes]
 
 
 # The queen's gaster as a chain (2026-10-24, the user's ask: "her larger abdomen so it properly curves while climbing"): a
@@ -677,8 +725,12 @@ def gaster_cubes(girdle=GIRDLE, swell=(1.0, 1.0, 1.0), bend=1.0):
 QUEEN_GASTER = ('gaster_back', 'gaster_mid', 'gaster_end', 'gaster_tip')
 
 
-def gaster_chain(girdle=GIRDLE, swell=(1.0, 1.0, 1.0), bend=1.0):
-    """The gaster plate by plate: [(where the plate is hinged, its boxes)], the sting with the last plate."""
+FAR_STING = [(2.1, 0.42, 80.0)]                   # the far model's sting in one piece
+
+
+def gaster_chain(girdle=GIRDLE, swell=(1.0, 1.0, 1.0), bend=1.0, far=False):
+    """The gaster plate by plate: [(where the plate is hinged, its boxes)], the sting with the last plate. far: the
+    far model's, a plain box a plate, no rounding and no rims."""
     out, p = [], [girdle[0], girdle[1], girdle[2] + 0.1]
     for i, (length, w, h, down) in enumerate(GASTER_PLATES):
         cubes, hinge = [], tuple(round(v, 3) for v in (p if i else girdle))
@@ -687,14 +739,14 @@ def gaster_chain(girdle=GIRDLE, swell=(1.0, 1.0, 1.0), bend=1.0):
         c = [q + v * length / 2 for q, v in zip(p, d)]
         out.append((hinge, cubes))
         cubes.append(tilted(c, (w, h, length), down, 'gaster'))
-        if i == 0:                                                   # the big segment rounded
+        if i == 0 and not far:                                       # the big segment rounded
             cubes.append(tilted(c, (w + 0.3, h - 0.8, length - 0.8), down, 'gaster'))
             cubes.append(tilted(c, (w - 1.2, h + 0.5, length - 0.8), down, 'gaster'))
-        if i < len(GASTER_PLATES) - 1:
+        if i < len(GASTER_PLATES) - 1 and not far:
             rim = [q + v * (length / 2 - 0.15) for q, v in zip(c, d)]
             cubes.append(tilted(rim, (w + 0.2, h + 0.2, 0.3), down, 'rim'))
         p = [q + v * (length - 0.1) for q, v in zip(p, d)]
-    for length, thick, down in STING:
+    for length, thick, down in (FAR_STING if far else STING):
         down = GASTER_PLATES[-1][3] * bend + (down - GASTER_PLATES[-1][3])
         d = (0, -math.sin(math.radians(down)), math.cos(math.radians(down)))
         c = [q + v * length / 2 for q, v in zip(p, d)]
@@ -762,13 +814,17 @@ def lowest_point(bones):
 
 
 QUEEN = 'matabele_queen'                                        # her game model (M8 step 1c, look B, the user's pick)
-GAME_MODELS = (*MODELS, QUEEN)
+YOUNG_COLOUR, YOUNG_AMOUNT = (140, 88, 58), 0.45                # the young Matabele's reddish brown (tools/young_textures.py)
+FAR = '_far'                                                    # a worker's far model: <name>_far (model(far=True))
+GAME_MODELS = (*MODELS, QUEEN, *(name + FAR for name in MODELS))
 
 
 def game_bones(name):
     """The model's bones with every face's place on its texture, and the texture: (bones, rows, width, height)."""
     if name == QUEEN:
         return paint(queen_bones(QUEEN_LOOK), LOOK)
+    if name.endswith(FAR):
+        return paint(model(minor=MODELS[name[:-len(FAR)]], head=JAW, taper=LEG_TAPER, far=True), LOOK)
     return paint(model(minor=MODELS[name], head=JAW, taper=LEG_TAPER), LOOK)
 
 
@@ -787,6 +843,10 @@ def write_drafts():
                     json.dump(geo, f, indent=1)
             else:
                 path.write_bytes(data)
+        if name.endswith(FAR):          # its young look, blended as tools/young_textures.py blends the full model's
+            pale = [[px if px[3] == 0 else tuple(round(v + (c - v) * YOUNG_AMOUNT) for v, c in zip(px, YOUNG_COLOUR)) + (px[3],)
+                     for px in row] for row in rows]
+            (DRAFTS / f'textures/entity/{name}_young.png').write_bytes(png(pale))
         print('wrote', (DRAFTS / f'geo/entity/{name}.geo.json').relative_to(mod_paths.PROJECT))
 
 

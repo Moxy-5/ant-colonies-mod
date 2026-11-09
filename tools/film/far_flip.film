@@ -1,0 +1,15 @@
+# The far look's swap must not disturb the animation (2026-11-09): a Matabele major walking, filmed every tick.
+#   ./gradlew runFilm -PfilmScene=far_flip -PfarLook=never    the full model all the way
+#   ./gradlew runFilm -PfilmScene=far_flip -PfarLook=flip     swapping to the far model and back every 10 ticks
+# The pictures taken while the flip run shows the full model must be the same as the first run's, to the pixel.
+cmd time set noon
+cmd weather clear
+lens 30
+walker matabele_major -9.5 -60 0.5 -90
+cmd tick freeze
+fov 10
+follow 0 0.15 -5 0 0
+go 10 -60 0 1.0
+burst walk 60 1
+follow off
+quit

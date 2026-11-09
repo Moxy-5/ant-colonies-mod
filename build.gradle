@@ -186,6 +186,11 @@ neoForge {
             if (project.hasProperty('filmRawFrames')) {
                 systemProperty 'antcolonies.film.rawFrames', 'true'
             }
+            // -PfarLook=always (or never): every insect with a far model drawn with it (or never), for measuring and
+            // for comparing the two looks (client/InsectModel.pickLook; films keep the full model otherwise)
+            if (project.hasProperty('farLook')) {
+                systemProperty 'antcolonies.farLook', project.property('farLook').toString()
+            }
             if (project.hasProperty('filmDebug')) {
                 jvmArguments.add '-agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=127.0.0.1:5005'
             }

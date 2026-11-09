@@ -1,0 +1,38 @@
+# The Matabele's two looks side by side (2026-11-09, the drawn-only insects' step 2): a major and a minor
+# walking on the spot, seen from 3 to 14 blocks as a player on a 1080-line screen sees them (the lens narrowed
+# to make up for the film's 540 lines). Film it twice and compare:
+#   ./gradlew runFilm -PfilmScene=far_look -PfarLook=never     the full models
+#   ./gradlew runFilm -PfilmScene=far_look -PfarLook=always    the far models
+#   ./gradlew runFilm -PfilmScene=far_look -PfarLook=distance  each by its distance, as in play (the far left
+#       major has lost two legs: its stumps must show in both looks, and its neighbours keep all six)
+cmd time set noon
+cmd weather clear
+lens 39
+cmd summon antcolonies:matabele_major 0.00 -60 0.00 {NoAI:1b,Rotation:[60f,0f],BodyLength:15f,CustomName:'"film:walk"'}
+cmd summon antcolonies:matabele_minor 1.00 -60 0.00 {NoAI:1b,Rotation:[60f,0f],BodyLength:7.5f,CustomName:'"film:walk"'}
+cmd summon antcolonies:matabele_major -1.20 -60 0.00 {NoAI:1b,Rotation:[180f,0f],BodyLength:15f,CustomName:'"film:walk"'}
+cmd summon antcolonies:matabele_major -2.40 -60 0.00 {NoAI:1b,Rotation:[60f,0f],BodyLength:15f,LostLegs:5b,CustomName:'"film:walk"'}
+cmd summon antcolonies:matabele_major 2.20 -60 0.60 {NoAI:1b,Rotation:[60f,0f],BodyLength:15f,CustomName:'"film:walk"'}
+wait 40
+camera 0.0 -58.38 -3.0 0 26.6
+wait 7
+shot d03
+camera 0.0 -58.38 -4.0 0 20.6
+wait 7
+shot d04
+camera 0.0 -58.38 -5.0 0 16.7
+wait 7
+shot d05
+camera 0.0 -58.38 -6.0 0 14.0
+wait 7
+shot d06
+camera 0.0 -58.38 -8.0 0 10.6
+wait 7
+shot d08
+camera 0.0 -58.38 -10.0 0 8.5
+wait 7
+shot d10
+camera 0.0 -58.38 -14.0 0 6.1
+wait 7
+shot d14
+quit

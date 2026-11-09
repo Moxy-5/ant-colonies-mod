@@ -5,6 +5,7 @@ import com.antcolonies.entity.body.BodyPlans;
 import com.antcolonies.entity.body.LostLegs;
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.math.Axis;
+import net.minecraft.client.Minecraft;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.phys.Vec3;
 
@@ -19,6 +20,11 @@ import net.minecraft.client.renderer.entity.EntityRendererProvider;
  * head first, or sideways). On a ceiling it is tipped on over, upside down with its feet on the ceiling, and turned
  * the way it goes. On a slope (a ramp) it tilts with the slope. The angles come from the insect and turn smoothly (see
  * {@code AbstractAntEntity.turnBody} and {@code tiltOnSlope}).
+ *
+ * <p><b>The far look</b> (2026-11-09, the drawn-only insects' step 2): a renderer may hold a second renderer with a
+ * simpler model of the same bones ({@link InsectModel#farLook}), which draws the insect past a distance where the
+ * difference is smaller than a pixel ({@link #withFarLook}). Everything else (clips, live layer, lost legs, loads) is
+ * the same, as the bones are.
  */
 public class AntRenderer<T extends AbstractAntEntity> extends GeoEntityRenderer<T> {
 
@@ -35,6 +41,61 @@ public class AntRenderer<T extends AbstractAntEntity> extends GeoEntityRenderer<
     /** Whether the last insect drawn had a leg hidden (so the next one shows all its legs again). */
     private boolean anyLegHidden;
 
+    /** The renderer of the far look (null: none) and the distance it takes over at (blocks). */
+    private AntRenderer<T> far;
+    private float farBlocks;
+    /** The switch back happens this much nearer than the switch out, so an insect at the edge never flickers. */
+    private static final float FAR_GAP = 1.0F;
+    /**
+     * For measuring and films: {@code -Dantcolonies.farLook=always} or {@code never}; {@code distance}: by distance in
+     * films too; {@code flip}: swapping every 10 ticks (tools/film/far_flip.film); anything else, by distance in play
+     * and the full model in films (so the guard films' pictures never depend on it).
+     */
+    private static final String FORCED = System.getProperty("antcolonies.farLook", "");
+
+    /**
+     * Gives the renderer a far look: {@code farModel} ({@link InsectModel#farLook}) drawn past {@code blocks} from the
+     * camera (at the usual field of view of 70; a narrower one, a zoom, pushes the distance out by as much as it
+     * magnifies). Call it before {@link #withScale}.
+     */
+    public AntRenderer<T> withFarLook(EntityRendererProvider.Context context, GeoModel<T> farModel, float blocks) {
+        far = new AntRenderer<>(context, farModel);
+        farBlocks = blocks;
+        return this;
+    }
+
+    @Override
+    public AntRenderer<T> withScale(float scaleWidth, float scaleHeight) {
+        super.withScale(scaleWidth, scaleHeight);
+        if (far != null) {
+            far.withScale(scaleWidth, scaleHeight);
+        }
+        return this;
+    }
+
+    /** Whether this insect is drawn with the far look this frame, from how far the camera is. */
+    private boolean drawnFar(T ant) {
+        boolean farNow;
+        if (FORCED.equals("flip")) {
+            farNow = ant.tickCount / 10 % 2 == 1;   // swapping every half second: the swap must not disturb the clips
+        } else if (FORCED.equals("always") || FORCED.equals("never")) {
+            farNow = FORCED.equals("always");
+        } else if (FilmDirector.active() && !FORCED.equals("distance")) {
+            farNow = false;
+        } else {
+            Minecraft mc = Minecraft.getInstance();
+            if (mc.player != null && mc.player.isScoping()) {
+                farNow = false;                 // through a spyglass everything is close
+            } else {
+                double zoom = Math.tan(Math.toRadians(35.0)) / Math.tan(Math.toRadians(mc.options.fov().get() / 2.0));
+                double edge = (ant.isFarLook() ? farBlocks - FAR_GAP : farBlocks) * zoom;
+                farNow = entityRenderDispatcher.distanceToSqr(ant) > edge * edge;
+            }
+        }
+        ant.setFarLook(farNow);
+        return farNow;
+    }
+
     public AntRenderer(EntityRendererProvider.Context context, GeoModel<T> model) {
         super(context, model);
         addRenderLayer(new YoungPaleLayer<>(this));
@@ -45,6 +106,10 @@ public class AntRenderer<T extends AbstractAntEntity> extends GeoEntityRenderer<
     @Override
     public void render(T ant, float entityYaw, float partialTick, PoseStack poseStack, MultiBufferSource buffers,
             int packedLight) {
+        if (far != null && drawnFar(ant)) {
+            far.render(ant, entityYaw, partialTick, poseStack, buffers, packedLight);
+            return;
+        }
         float drawWidth = drawWidth(ant);
         float drawHeight = drawHeight(ant);
         ant.setDrawScale(drawWidth); // for the stride: the legs keep pace with the ground at the size it is drawn
@@ -100,7 +165,8 @@ public class AntRenderer<T extends AbstractAntEntity> extends GeoEntityRenderer<
     }
 
     private BodyPlans.Plan planOf(T ant) {
-        ResourceLocation model = getGeoModel().getModelResource(ant);
+        ResourceLocation model = getGeoModel() instanceof InsectModel<T> insectModel ? insectModel.planResource(ant)
+                : getGeoModel().getModelResource(ant);
         if (!model.equals(planModel)) {
             plan = BodyPlans.ofGeo(model);
             planModel = model;
