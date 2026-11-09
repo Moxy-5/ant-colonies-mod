@@ -133,6 +133,25 @@ public final class RaidColumn {
     private static final double LANE_GAP = 0.44;
     /** How far ahead (blocks along the trail) of itself the front walks to at a time. */
     private static final double LEAD_STEP = 6.0;
+    /**
+     * The scout waits for its raiders at the foot of the nest's hump (the user, 2026-11-08, from the way out timed raider
+     * by raider: the raiders come out of the nest together, but need 13 s from a low dead mound's rooms to the ground and 23
+     * s from a tall one's, and a scout walking off at once was 25 to 45 blocks ahead of them, a tail the ribbon never closed
+     * up). Real Matabele recruit for 1 to 5 minutes before the column sets off behind its scout, and stop to let the column
+     * gather before the termites (Frank and Linsenmair 2017). It waits this far past the hump's last climb or drop (blocks
+     * along; my pick), until the nearest raider is within {@link #FOOT_CLOSE} of it, or {@link #FOOT_WAIT_MOST} has passed;
+     * the stream behind keeps walking to its places. On the way out only, once a raid.
+     */
+    private static final double FOOT_PAST = 1.0;
+    /** The scout leads off once the nearest raider is this near behind it (blocks walked along the trail; about 2 rows, my pick). */
+    private static final double FOOT_CLOSE = 1.5;
+    /**
+     * A scout this far past its waiting place leads on without going back (a raid loaded mid-march; blocks along: one
+     * coming off a wall may land a step or so past it).
+     */
+    private static final double FOOT_PASSED = 2.5;
+    /** The scout's wait at the foot lasts at most this long (ticks, 40 s; a tall dead mound's raiders take about 23, my pick). */
+    private static final long FOOT_WAIT_MOST = 800;
     /** A raider counts as at the gathering place, or out at the entrance, this near it (blocks, flat). */
     private static final double NEAR = 4.0;
     /** The share of the raiders that must be at the gathering place before the attack or the walk home (my pick). */
@@ -234,6 +253,8 @@ public final class RaidColumn {
     /** Where the front walks to now, and where it is (blocks along the route). */
     private double head;
     private double frontAt;
+    /** When the scout led off from the hump's foot on the way out (game time; -1 while it waits or before the march). */
+    private long leftFootAt = -1;
     /** Each raider's place now, and the raiders sent in to fight. */
     private final Map<UUID, Order> orders = new HashMap<>();
     private final Set<UUID> sentIn = new HashSet<>();
@@ -1194,6 +1215,7 @@ public final class RaidColumn {
         stageSince = now;
         head = 0.0;
         frontAt = 0.0;
+        leftFootAt = -1;
     }
 
     /**
@@ -1238,8 +1260,9 @@ public final class RaidColumn {
 
     /**
      * On the march, out or home: the ribbon (the user's pick of 2026-11-07 from the march viewer, formation B with exit 2,
-     * "unroll out of the nest"). The front walks the trail ahead of itself and never stops, a little faster than the
-     * column ({@link #FRONT_PACE}), so it stays in front. Every other raider has a place in the ribbon: rows behind the
+     * "unroll out of the nest"). The front waits at the foot of the nest's hump for the first raiders ({@link #waitsAtFoot}),
+     * then walks the trail ahead of itself and never stops, a little faster than the column ({@link #FRONT_PACE}), so it
+     * stays in front. Every other raider has a place in the ribbon: rows behind the
      * front, {@code spacing} apart, of {@code abreast} side by side and one fewer by turns (3, 2, 3, 2, ...), each ant in
      * its own lane in its row. The places are given in the order the ants come out of the nest (the first out nearest the
      * front), so the column unrolls out of the hole behind its scout; on the way home, in the order they stand along the
@@ -1281,6 +1304,9 @@ public final class RaidColumn {
         BlockPos ahead = route.point(Math.min(route.length(), frontAt + 4.0));
         if (casting) {
             orders.put(front.getUUID(), new Order(castSpot(level, route, 0, now), 1.0, route.point(castGap.far())));
+        } else if (waitsAtFoot(level, route, frontW, line, at, now)) {
+            // (a plain order: it walks to the foot and waits there, looking along the trail; a marching order moves on)
+            orders.put(front.getUUID(), new Order(route.place(level, hillEnd(level, route) + FOOT_PAST, 0.0), FRONT_PACE, ahead));
         } else {
             if (frontAt >= head - LEAD_STEP / 2) {
                 head = Math.min(route.length(), frontAt + LEAD_STEP);
@@ -1294,6 +1320,34 @@ public final class RaidColumn {
         comeOut(level, route, front, notOut, ahead, now);
         sayMarch(route, front, line, notOut, now);
         return false;
+    }
+
+    /**
+     * Whether the scout waits at the hump's foot for its raiders ({@link #FOOT_PAST}): on the way out, until the nearest
+     * raider out is {@link #FOOT_CLOSE} behind it or the wait's limit is up. A scout already past the foot (a raid loaded
+     * mid-march) never goes back to wait.
+     */
+    private boolean waitsAtFoot(ServerLevel level, Route route, double frontW, List<MatabeleEntity> line, Map<UUID, Double> at, long now) {
+        if (route != out || leftFootAt >= 0) {
+            return false;
+        }
+        double foot = hillEnd(level, route) + FOOT_PAST;
+        double nearest = line.stream().mapToDouble(ant -> at.get(ant.getUUID())).max().orElse(Double.NEGATIVE_INFINITY);
+        boolean close = nearest >= frontW - FOOT_CLOSE;
+        if (frontAt > foot + FOOT_PASSED || close || now - stageSince >= FOOT_WAIT_MOST) {
+            leftFootAt = now;
+            say("the scout leads off from the hump's foot " + (now - stageSince) / 20 + " s into the march"
+                    + (close ? ", the nearest raider " + String.format(Locale.ROOT, "%.1f", Math.max(0.0, frontW - nearest)) + " blocks behind it"
+                    : frontAt > foot + FOOT_PASSED ? " (already well past it)" : ", waited its longest; the nearest raider "
+                    + (line.isEmpty() ? "not out yet" : String.format(Locale.ROOT, "%.1f", frontW - nearest) + " blocks behind")));
+            return false;
+        }
+        return true;
+    }
+
+    /** Tests: when the scout led off from the hump's foot on the way out (game time; -1 while it waits or before the march). */
+    public long leftFootAtForTests() {
+        return leftFootAt;
     }
 
     /** One update of the march: the route, how far the front has walked along it, the gap between rows, whether it is held up at a broken trail, the time. */

@@ -213,6 +213,7 @@ What was built, and how it differs from the steps above (my picks):
 | The column, each stage (forming to homing) | its stage to finish | the stage's own limit (`stageMostTicks`) | given up; every raider let go home along the trail (`WayHome`) |
 | Forming | recruits to come out | 15 s for the scout's recruiting, the stage's limit for the pour-out | leaves with those out; latecomers follow |
 | The march's front | the ants behind | 4 s | walks on |
+| The scout at the hump's foot (on the way out, **new** 2026-11-08) | the nearest raider 1.5 blocks behind it | 40 s (`FOOT_WAIT_MOST`) | leads off |
 | A raider on the march | a way on | 15 s stuck (no way 10 s) | goes home alone |
 | A broken trail | the trail picked up past the gap | the casting limit (R4) | a former scout leads on, else home |
 | The attack | termites to fight | 30 s after the last one, 2 minutes at most | collecting, then home |

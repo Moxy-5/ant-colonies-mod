@@ -869,8 +869,13 @@ public class MatabeleRaidTests {
                 return;
             }
             boolean frontOut = raid.isOutForTests(level, lead);
-            // The front never stops: the longest it stood within a quarter block of one place since it came out.
-            if (frontOut) {
+            // (the scout waits at the hump's foot for its raiders, then leads off: the march is judged from then on)
+            boolean ledOff = raid.leftFootAtForTests() >= 0;
+            if (!ledOff) {
+                frontAnchor[0] = null;
+            }
+            // The front never stops: the longest it stood within a quarter block of one place since it led off.
+            if (frontOut && ledOff) {
                 if (frontAnchor[0] == null || lead.position().distanceTo(frontAnchor[0]) >= 0.25) {
                     frontAnchor[0] = lead.position();
                     frontMovedAt[0] = now;
@@ -885,9 +890,10 @@ public class MatabeleRaidTests {
                         out.add(ant);
                         setOut.add(id);
                     }
-                    // Nobody out is told to stand while the column marches (the trail is never broken here, so no casting).
+                    // Nobody out is told to stand while the column marches (the trail is never broken here, so no casting;
+                    // the first ones down may stand behind the scout while it waits at the hump's foot).
                     RaidColumn.Order order = raid.orderFor(level, ant);
-                    if (order != null && order.to() == null && !raid.isCasting(id)) {
+                    if (ledOff && order != null && order.to() == null && !raid.isCasting(id)) {
                         standCount[0]++;
                         if (standFaults.size() < 8) {
                             standFaults.add(id.toString().substring(0, 4) + " at " + ant.blockPosition().toShortString() + " ("
@@ -896,7 +902,7 @@ public class MatabeleRaidTests {
                     }
                 }
             }
-            if (frontAlong >= 3.0) {
+            if (frontAlong >= 3.0 && ledOff) {
                 if (speedFrom[0] < 0) {
                     speedFrom[0] = now;
                     speedFromAlong[0] = frontAlong;
@@ -1108,9 +1114,10 @@ public class MatabeleRaidTests {
                     double seconds = (lastFrontAt[0] - speedFrom[0]) / 20.0;
                     double frontSpeed = seconds <= 0.0 ? 0.0 : (lastFrontAlong[0] - speedFromAlong[0]) / seconds;
                     SavannaMod.LOGGER.info("[ribbon test] march speed: the front {} blocks a second over {} blocks; the column {} blocks long behind it at the end, {} raiders;"
-                                    + " the hump ends {} along, the last raider out down on the ground {} s into the march",
+                                    + " the hump ends {} along, the scout led off from its foot {} s into the march, the last raider out down on the ground {} s into the march",
                             String.format("%.2f", frontSpeed), String.format("%.1f", lastFrontAlong[0] - speedFromAlong[0]),
                             String.format("%.1f", lastLength[0]), setOut.size(), String.format("%.1f", raid.humpEndForTests(level)),
+                            String.format("%.1f", (raid.leftFootAtForTests() - level.getGameTime() + helper.getTick() - marchFrom[0]) / 20.0),
                             String.format("%.1f", (lastHigh[0] - marchFrom[0]) / 20.0));
                     // The way out, timed raider by raider: out of the nest, then down the hump to the ground.
                     List<double[]> ways = new ArrayList<>(); // out (s into the march), down (s), held high (s)
