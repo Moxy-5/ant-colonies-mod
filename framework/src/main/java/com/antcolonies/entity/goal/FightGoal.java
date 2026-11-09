@@ -1,5 +1,7 @@
 package com.antcolonies.entity.goal;
 
+import java.util.ArrayDeque;
+import java.util.Collection;
 import java.util.Comparator;
 import java.util.EnumSet;
 import java.util.ArrayList;
@@ -51,6 +53,13 @@ import net.minecraft.world.phys.AABB;
  * foe it opens the way in ({@link AbstractAntEntity#breakIn}); the others search where they smell prey
  * ({@link AbstractAntEntity#scentNear}) first. A foe is kept until it is caught, lost or a much nearer one turns up,
  * and the search walks on from place to place without stopping dead.
+ *
+ * <p>The tidy search (the user's raid of 2026-11-09: raiders paced back and forth across the spot until another found a
+ * termite): it walked to a random smell anywhere within 12 blocks, then another, crisscrossing the spot, and was pulled
+ * back to the spot whenever a smell took it more than {@link #SEARCH_REACH} + 2 out. Now it goes to the nearest smell it
+ * has not sniffed yet, remembering its last {@link #SNIFFED_KEPT} search places (each sniffed {@link #SNIFF_REACH}
+ * blocks round), so it works outward along the galleries the way real Megaponera spread through the opened galleries
+ * round a feeding site; with every smell sniffed it goes back to the spot and searches round it.
  */
 public class FightGoal extends Goal {
     /** How far (blocks) round the spot it looks for foes, unless its order says (a defender's, M8 step 2e). */
@@ -71,6 +80,10 @@ public class FightGoal extends Goal {
     private static final int UNREACHABLE_TICKS = 200;
     /** How far (blocks) from the spot it searches when no foe is in reach. */
     private static final int SEARCH_REACH = 4;
+    /** How many of its last search places it remembers as sniffed (my pick: about 50 blocks of gallery). */
+    static final int SNIFFED_KEPT = 12;
+    /** A smell this near (blocks, along the grid) where it stands or a place it sniffed counts as sniffed (my pick). */
+    static final int SNIFF_REACH = 3;
     /** How often (ticks) it picks a new place to search. */
     private static final int SEARCH_EVERY = 60;
     /** Chasing one foe this long (ticks) without a blow at it, it leaves it a while ({@link #UNREACHABLE_TICKS}). */
@@ -101,6 +114,10 @@ public class FightGoal extends Goal {
     @Nullable
     private LivingEntity chasing;
     private int chaseTicks;
+    /** The search places it sniffed lately, newest last, and the fight spot they belong to. */
+    private final ArrayDeque<BlockPos> sniffed = new ArrayDeque<>();
+    @Nullable
+    private BlockPos sniffedFor;
     /** Foes it found no way to, and until when it leaves each alone. */
     private final Map<UUID, Long> unreachable = new HashMap<>();
 
@@ -143,6 +160,10 @@ public class FightGoal extends Goal {
         struck = null;
         lookingOver = 0;
         walkingTo = null;
+        if (ant.getFightSpot() == null) {
+            sniffed.clear(); // its order is over: a later fight here starts fresh
+            sniffedFor = null;
+        }
     }
 
     @Override
@@ -215,10 +236,14 @@ public class FightGoal extends Goal {
         boolean walkOn = !pauseNext && walkingTo != null && stepsLeft() <= 1;
         if ((ant.getNavigator().isDone() || walkOn) && idleTicks >= nextStep) {
             boolean far = ant.blockPosition().distSqr(spot) > (SEARCH_REACH + 2) * (SEARCH_REACH + 2);
-            if (far && ant.getNavigator().moveTo(at -> at.cell().closerThan(spot, SEARCH_REACH), spot, SEARCH_REACH, 1.2)) {
-                walkingTo = spot;
-            } else if (!far && searchScent(level, spot)) {
+            // Smells first, anywhere in the area they come from (the tidy search: the old "far, back to the spot" came
+            // first and pulled it back from every smell more than 6 blocks out); with none left, back to the spot.
+            double smellReach = ant.getFightReach() + 2;
+            boolean inSmellArea = ant.blockPosition().distSqr(spot) <= smellReach * smellReach;
+            if (inSmellArea && searchScent(level, spot)) {
                 nextStep = idleTicks; // walking to where it smells prey
+            } else if (far && ant.getNavigator().moveTo(at -> at.cell().closerThan(spot, SEARCH_REACH), spot, SEARCH_REACH, 1.2)) {
+                walkingTo = spot;
             } else {
                 // Each search step goes somewhere new (never a place it already stands at: it kept "searching" on the
                 // spot, the same bug report).
@@ -335,18 +360,48 @@ public class FightGoal extends Goal {
      * stands; true if it is walking there.
      */
     private boolean searchScent(ServerLevel level, BlockPos spot) {
-        List<BlockPos> scent = new ArrayList<>(ant.scentNear(level, spot, ant.getFightReach()));
+        if (!spot.equals(sniffedFor)) {
+            sniffed.clear();
+            sniffedFor = spot;
+        }
         BlockPos here = ant.blockPosition();
-        scent.removeIf(cell -> cell.distManhattan(here) <= 1);
+        if (sniffed.isEmpty() || sniffed.peekLast().distManhattan(here) > SNIFF_REACH) {
+            remember(sniffed, here); // where it stands it sniffs too (where it began, or came to after a chase)
+        }
+        List<BlockPos> scent = nextSmells(ant.scentNear(level, spot, ant.getFightReach()), here, sniffed);
         for (int tries = 0; tries < 3 && !scent.isEmpty(); tries++) {
-            BlockPos smell = scent.remove(ant.getRandom().nextInt(scent.size()));
+            BlockPos smell = scent.remove(0);
+            remember(sniffed, smell); // (one with no way there too: not tried again soon, nor its neighbours)
             if (ant.getNavigator().moveTo(at -> at.cell().distManhattan(smell) <= 1, smell, 1, 0.9)) {
                 walkingTo = smell;
                 return true;
             }
-            scent.removeIf(cell -> cell.distManhattan(smell) <= 2); // (no way there: not its neighbours either)
+            scent.removeIf(cell -> cell.distManhattan(smell) <= SNIFF_REACH);
         }
         return false;
+    }
+
+    /** Adds a place to the search places sniffed lately, forgetting the oldest past {@link #SNIFFED_KEPT}. */
+    static void remember(ArrayDeque<BlockPos> sniffed, BlockPos place) {
+        sniffed.addLast(place);
+        while (sniffed.size() > SNIFFED_KEPT) {
+            sniffed.removeFirst();
+        }
+    }
+
+    /**
+     * The smells it has not sniffed yet, nearest to it first (the tidy search): none within {@link #SNIFF_REACH} of where
+     * it stands or of a place it sniffed lately.
+     */
+    static List<BlockPos> nextSmells(Collection<BlockPos> scent, BlockPos here, Collection<BlockPos> sniffed) {
+        List<BlockPos> left = new ArrayList<>();
+        for (BlockPos cell : scent) {
+            if (cell.distManhattan(here) > SNIFF_REACH && sniffed.stream().noneMatch(place -> place.distManhattan(cell) <= SNIFF_REACH)) {
+                left.add(cell);
+            }
+        }
+        left.sort(Comparator.comparingDouble(cell -> cell.distSqr(here)));
+        return left;
     }
 
     /**
