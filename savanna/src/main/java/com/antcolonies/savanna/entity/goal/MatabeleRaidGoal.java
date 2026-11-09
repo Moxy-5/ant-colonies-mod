@@ -146,7 +146,6 @@ public class MatabeleRaidGoal extends Goal {
     @Override
     public void stop() {
         ant.getNavigator().stop();
-        ant.getNavigator().setSideShift(null); // (its own lane again)
         ant.getNavigator().setClimbPace(1.0);
         endCleaning();
         column = null;
@@ -195,7 +194,6 @@ public class MatabeleRaidGoal extends Goal {
             }
             return;
         }
-        ant.getNavigator().setSideShift(order.shift()); // (the ribbon: its lane in the column's row; null its own)
         ant.getNavigator().setClimbPace(column != null && !limping
                 && (column.stage() == RaidColumn.Stage.FORMING || column.stage() == RaidColumn.Stage.MARCHING)
                 ? RaidColumn.MARCH_CLIMB : 1.0); // (the way out: up the nest's shaft and down the hump at about a walk)
@@ -271,9 +269,8 @@ public class MatabeleRaidGoal extends Goal {
     }
 
     /**
-     * The ribbon (the user's pick of 2026-11-07): marching, its place moves on with the column every few ticks, a little
-     * ahead of the ant. It never settles or mills there: it walks on, its route planned again once the place has moved
-     * {@link #MARCH_MOVED} or its walk is over, and in between only its pace changes (hurrying to its place in the ribbon,
+     * The stream: marching, its place on the trail moves on with the column every few ticks, a little ahead of the ant. It never settles or mills there: it walks on, its route planned again once the place has moved
+     * {@link #MARCH_MOVED} or its walk is over, and in between only its pace changes (hurrying to its place in the stream,
      * or walking on slower to let the column come up to it).
      */
     private void march(ServerLevel level, RaidColumn.Order order) {
@@ -293,7 +290,7 @@ public class MatabeleRaidGoal extends Goal {
         }
     }
 
-    /** The ribbon: a marching raider plans its route again once its place has moved this far (blocks, flat). */
+    /** The stream: a marching raider plans its route again once its place has moved this far (blocks, flat). */
     private static final double MARCH_MOVED = 1.0;
 
     /**

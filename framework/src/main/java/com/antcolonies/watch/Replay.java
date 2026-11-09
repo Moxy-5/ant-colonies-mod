@@ -230,13 +230,11 @@ public final class Replay {
         level.setWeatherParameters(raining ? 0 : 24000, raining ? 24000 : 0, raining, false);
         AABB area = area();
         List<ChunkPos> forced = new ArrayList<>();
-        for (int x = (int) Math.floor(area.minX) >> 4; x <= ((int) Math.ceil(area.maxX) - 1) >> 4; x++) {
-            for (int z = (int) Math.floor(area.minZ) >> 4; z <= ((int) Math.ceil(area.maxZ) - 1) >> 4; z++) {
-                if (level.setChunkForced(x, z, true)) {
-                    forced.add(new ChunkPos(x, z));
-                }
-                level.getChunk(x, z); // (loaded now, made if new)
+        for (ChunkPos chunk : chunks()) {
+            if (level.setChunkForced(chunk.x, chunk.z, true)) {
+                forced.add(chunk);
             }
+            level.getChunk(chunk.x, chunk.z); // (loaded now, made if new)
         }
         removeLeftovers(level, area);
 
@@ -295,6 +293,34 @@ public final class Replay {
         LOG.info("[replay] {} put back: {} colonies, {} of {} creatures, clock at game tick {} (day time {}){}", name, put.size(), insects,
                 entities.size(), gameTime, dayTime, raining ? ", raining" : "");
         return new Put(put, insects, forced);
+    }
+
+    /**
+     * Whether the put-back place is running: every chunk of its box has its creatures loaded and moving. {@link #put}
+     * holds and loads the chunks at once, but the game hands a chunk to its creature store a little later, as part of its
+     * own chunk work, and a test server at a high tick rate gets only a sliver of each tick for that work: after earlier
+     * tests left some behind, the place's creatures may stand hidden for many ticks, and a creature moved meanwhile into a
+     * chunk not running yet drops out of sight (BUGS 195). A test waits for this before it handles the replay's creatures.
+     */
+    public boolean running(ServerLevel level) {
+        for (ChunkPos chunk : chunks()) {
+            if (!level.areEntitiesLoaded(chunk.toLong()) || !level.isPositionEntityTicking(chunk.getWorldPosition())) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /** The chunks the saved box covers. */
+    private List<ChunkPos> chunks() {
+        AABB area = area();
+        List<ChunkPos> chunks = new ArrayList<>();
+        for (int x = (int) Math.floor(area.minX) >> 4; x <= ((int) Math.ceil(area.maxX) - 1) >> 4; x++) {
+            for (int z = (int) Math.floor(area.minZ) >> 4; z <= ((int) Math.ceil(area.maxZ) - 1) >> 4; z++) {
+                chunks.add(new ChunkPos(x, z));
+            }
+        }
+        return chunks;
     }
 
     /** Takes the replay away: its colonies with every insect of theirs, every creature in the area, the chunks let go. */

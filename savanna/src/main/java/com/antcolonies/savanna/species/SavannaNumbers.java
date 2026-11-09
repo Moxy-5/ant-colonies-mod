@@ -692,14 +692,14 @@ public final class SavannaNumbers {
      * {@code mostShare} for a starving one (30 to 75 percent, Yusuf 2026), all of it for a find worth {@code richWorth} or
      * more (a by-day feeding place, or two termites seen), a part for a poorer one, at least {@code leastRaid}, at most
      * {@code raids.catch.most_raid}; at most {@code mostReal} of them walk as real ants, the rest are numbers till step 4. A raider
-     * still in the nest {@code formTicks} after the column left stays home. On the march (the ribbon, the user's pick of
-     * 2026-11-07) the rows keep {@code spacing} blocks apart, {@code abreast} side by side and one fewer by turns. The column stops {@code stopShort} blocks short of the find and bunches up (at
+     * still in the nest {@code formTicks} after the column left stays home. On the march (the stream, 2026-11-08) each raider
+     * keeps {@code spacing} blocks of trail behind the one ahead of it, side by side left to the legs. The column stops {@code stopShort} blocks short of the find and bunches up (at
      * most {@code gatherTicks}), then attacks all at once, fighting at most {@code fightTicks}; after the fight it
      * regroups there (at most {@code regroupTicks}) and walks home, everyone home or let go after {@code homeTicks}.
      * Every number my pick, to confirm.
      */
     public record ColumnNumbers(double richWorth, int leastRaid, double leastShare, double mostShare, int mostReal, int formTicks,
-                                double spacing, int abreast, int stopShort,
+                                double spacing, int stopShort,
                                 int gatherTicks, int fightTicks, int regroupTicks, int homeTicks) {
         public static final Codec<ColumnNumbers> CODEC = RecordCodecBuilder.create(i -> i.group(
                 Codec.DOUBLE.optionalFieldOf("rich_worth", 6.0).forGetter(ColumnNumbers::richWorth),
@@ -708,8 +708,7 @@ public final class SavannaNumbers {
                 Codec.DOUBLE.optionalFieldOf("most_share", 0.75).forGetter(ColumnNumbers::mostShare),
                 Codec.INT.optionalFieldOf("most_real", 50).forGetter(ColumnNumbers::mostReal),
                 Codec.INT.optionalFieldOf("form_ticks", 600).forGetter(ColumnNumbers::formTicks),
-                Codec.DOUBLE.optionalFieldOf("spacing", 0.6).forGetter(ColumnNumbers::spacing),
-                Codec.INT.optionalFieldOf("abreast", 3).forGetter(ColumnNumbers::abreast),
+                Codec.DOUBLE.optionalFieldOf("spacing", 0.3).forGetter(ColumnNumbers::spacing),
                 Codec.INT.optionalFieldOf("stop_short", 4).forGetter(ColumnNumbers::stopShort),
                 Codec.INT.optionalFieldOf("gather_ticks", 300).forGetter(ColumnNumbers::gatherTicks),
                 Codec.INT.optionalFieldOf("fight_ticks", 2400).forGetter(ColumnNumbers::fightTicks),

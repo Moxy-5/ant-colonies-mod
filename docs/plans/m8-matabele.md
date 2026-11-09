@@ -465,6 +465,11 @@ timings: all "my pick, to confirm" until then).
      real stragglers (tall-mound test: 13 to 19 of 47 left on the hump when the front arrives, was 31 to 35). Termite workers packing soil
      just inside a broken hole were never attacked (every gallery counted as cover); now a termite 0 to 2 cells from an
      opening is fair game (majors only at the mouth), deeper in and the mound stay safe. Not tried in-game yet.
+     **Then the stream (2026-11-08, the user's OK; branch `claude/scout-command-raid`):** the ribbon formation (rows of
+     3 and 2 in lanes, the user's pick of 2026-11-07) fell apart on real savanna: its fixed places landed on one-block
+     steps and holes and the raiders piled up there (BUGS 194). Back to the real band above: every raider walks the
+     scout's own trail, a spacing behind the ant really ahead of it, side by side left to the legs; the scout first out
+     and nobody told to stand kept. Checked on the user's own lumpy ground made into a test place. Not tried in-game yet.
    - **Order (my pick):** S1 to S6, in-game test 5b, then Q1 to Q6, in-game test 5c (or the two tests as one if the
      user prefers), then 3d.
    - **3d The termites' losses.** Termites in the galleries round the spot are numbers until broken into

@@ -1,29 +1,31 @@
 """
 The march model (the user's plan of 2026-11-08 for the raid's way out: the scout goes down into the nest, comes out
-first, and the rows coming out meet up behind it, the nearest first).
+first, and the raiders coming out meet up behind it, the nearest first).
 
 The way out is all movement, so it can be worked out on paper: when each raider reaches the ground at the foot of the
-nest's hump, how fast the front walks, how fast a raider behind its place catches up, how far apart the rows are. This
-tool reruns that sum with the game's own numbers and sets it beside what the game really did in the ribbon tests:
+nest's hump, how fast the front walks, how fast a raider behind its place catches up, how far apart the raiders are. This
+tool reruns that sum with the game's own numbers and sets it beside what the game really did in the march tests (the
+two dead-mound tests, the stream since 2026-11-08; older logs of the ribbon tests read too):
 
   - the paces are read from RaidColumn.java (FRONT_PACE, FILLING_PACE, CATCH_UP_PACE, PACE_PER_BLOCK,
-    LEAST_MARCH_PACE, PASSED_PACE) and the rows from the Matabele species file (column.spacing, column.abreast), so they never drift;
-  - from the test log it reads, for each ribbon test: when the front stood on the ground past the hump's foot, when each
+    LEAST_MARCH_PACE, PASSED_PACE) and the spacing from the Matabele species file (column.spacing), so they never drift;
+    the stream has one place per raider, each a spacing behind the one ahead (side by side is left to the legs);
+  - from the test log it reads, for each march test: when the front stood on the ground past the hump's foot, when each
     raider came down on the ground (the way out, raider by raider), the front's free walking speed, and the crowding the
     test measured on the flat (how much of its asked speed a raider really got, catching up and keeping its place, the
     share of the time it stood held for the crowd, and how near its nearest nestmate was);
   - it runs the model twice, without crowding (every ant walks exactly its pace) and with the crowding the game measured,
     and prints both beside the game: how far past the hump's foot the front was when every raider was within a row of
     its place (closed up), and the column's length as the front passed 10, 20 and 30 blocks past the foot (a perfect
-    column is the rows times the spacing; the game counts every raider out of the nest, the model only the ones down on
+    column is the raiders times the spacing; the game counts every raider out of the nest, the model only the ones down on
     the ground, so the game's lengths run longer while raiders are still coming down the hump);
   - with --draw it draws the column from above every 5 s of the march, from the test's "march at" lines: one strip per
     look, the trail running left to right (a character a half block), three lanes (left of the trail, on it, right of it),
     S the front, 1 to 9 the raiders in a half block of a lane.
 
-Run (after `ANTCOLONIES_TESTS=ribbon tools/run_game_tests.sh` or any run that held the two ribbon tests):
+Run (after `ANTCOLONIES_TESTS=deadmoundstreams tools/run_game_tests.sh` or any run that held the two march tests):
 
-    python tools/march_model.py                 (every ribbon test found in run-test-shards/*/logs and run-test/logs)
+    python tools/march_model.py                 (every march test found in run-test-shards/*/logs and run-test/logs)
     python tools/march_model.py --draw          (and draw each march)
     python tools/march_model.py some/latest.log (a log of your own)
     python tools/march_model.py --try FRONT_PACE=1.0 CATCH_UP_PACE=1.35   (try other paces on the same way out)
@@ -49,7 +51,7 @@ PACES = ('FRONT_PACE', 'FILLING_PACE', 'CATCH_UP_PACE', 'PACE_PER_BLOCK', 'LEAST
 
 
 def game_numbers():
-    """The march's paces from RaidColumn.java and the rows from the species file."""
+    """The march's paces from RaidColumn.java and the spacing from the species file."""
     src = open(COLUMN_JAVA, encoding='utf-8').read()
     nums = {}
     for name in PACES:
@@ -60,7 +62,6 @@ def game_numbers():
     species = json.load(open(SPECIES, encoding='utf-8'))
     column = find_key(species, 'column')
     nums['spacing'] = float(column['spacing'])
-    nums['abreast'] = int(column['abreast'])
     return nums
 
 
@@ -93,14 +94,15 @@ def fields(line):
 
 
 def read_runs(paths):
-    """Each ribbon test in the logs: its way out, closing up, crowding and march drawings."""
+    """Each march test in the logs: its way out, closing up, crowding and march drawings."""
     runs = []
     for path in paths:
         run = None
         for raw in open(path, encoding='utf-8', errors='replace'):
-            if '[ribbon test]' not in raw:
+            tag = '[march test]' if '[march test]' in raw else ('[ribbon test]' if '[ribbon test]' in raw else None)
+            if tag is None:
                 continue
-            line = raw.split('[ribbon test]', 1)[1].strip()
+            line = raw.split(tag, 1)[1].strip()
             if re.match(r'\d+ raiders, entrance', line):
                 run = {'log': path, 'marches': [], 'title': line}
                 runs.append(run)
@@ -120,22 +122,11 @@ def read_runs(paths):
     return [r for r in runs if 'ways' in r and 'closing' in r and 'crowding' in r]
 
 
-def rows_of(n, abreast):
-    rows, row, k = [], 0, 0
-    while k < n:
-        width = abreast if row % 2 == 0 else max(1, abreast - 1)
-        for _ in range(min(width, n - k)):
-            rows.append(row)
-            k += 1
-        row += 1
-    return rows
-
-
 def model(nums, v, front_foot, ground, catch_eff=1.0, keep_eff=1.0, dt=0.05):
     """The way out from the hump's foot: closed up where (front past the foot), and the length at 10, 20, 30."""
     ground = sorted(ground)
     n = len(ground)
-    rows = rows_of(n, nums['abreast'])
+    rows = list(range(n))  # (the stream: one place per raider, a spacing apart)
     sp = nums['spacing']
     pos = [None] * n
     s = 0.0
@@ -213,13 +204,12 @@ def main():
         nums[k] = float(v)
     slow = '' if nums['FILLING_PACE'] == nums['FRONT_PACE'] else ' (%.2f till the column closes up)' % nums['FILLING_PACE']
     print('Paces: front %.2f%s, catch-up up to %.2f, %.2f more per block behind, no slower than %.2f;'
-          ' rows %.2f apart, %d and %d abreast' % (nums['FRONT_PACE'], slow, nums['CATCH_UP_PACE'],
-                                                  nums['PACE_PER_BLOCK'], nums['LEAST_MARCH_PACE'], nums['spacing'],
-                                                  nums['abreast'], max(1, nums['abreast'] - 1)))
+          ' raiders %.2f apart in the stream' % (nums['FRONT_PACE'], slow, nums['CATCH_UP_PACE'],
+                                               nums['PACE_PER_BLOCK'], nums['LEAST_MARCH_PACE'], nums['spacing']))
     runs = read_runs(paths)
     if not runs:
-        print('No ribbon test with the closing-up and crowding lines in: ' + ', '.join(paths or ['(no logs)']))
-        print('Run the ribbon tests first: ANTCOLONIES_TESTS=ribbon tools/run_game_tests.sh')
+        print('No march test with the closing-up and crowding lines in: ' + ', '.join(paths or ['(no logs)']))
+        print('Run the march tests first: ANTCOLONIES_TESTS=deadmoundstreams tools/run_game_tests.sh')
         return 1
     for run in runs:
         c, w = run['closing'], run['crowding']

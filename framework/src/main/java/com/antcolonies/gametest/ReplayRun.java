@@ -187,7 +187,7 @@ public final class ReplayRun {
      * The game's clock jumped by {@code delta} ticks: the test's start moves with it, so its own count of ticks (and its
      * timeout, and its waits) runs on unbroken ({@code GameTestInfo} counts its ticks from the game's clock).
      */
-    static void shiftTestClock(GameTestInfo test, long delta) {
+    public static void shiftTestClock(GameTestInfo test, long delta) {
         if (delta == 0) {
             return;
         }

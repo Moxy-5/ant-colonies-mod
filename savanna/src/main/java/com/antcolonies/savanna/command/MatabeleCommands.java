@@ -57,7 +57,7 @@ import net.neoforged.neoforge.event.RegisterCommandsEvent;
  * <p>Step 3b: {@code /antcolonies raid} sends a raid column out now from the nearest Matabele colony within 64 blocks to
  * the best spot its scouts know, led by the spot's scout (whatever the hour, the hunger or the rain; R7: one set out
  * outside the raid hours keeps no hours, so dusk does not turn it home). {@code /antcolonies raid demo [blocks] [east|south|west|north]}
- * sets one out to watch, the way the ribbon test does ({@link #demo}).
+ * sets one out to watch, the way the march test does ({@link #demo}).
  */
 @EventBusSubscriber(modid = SavannaMod.MODID)
 public class MatabeleCommands {
@@ -333,7 +333,7 @@ public class MatabeleCommands {
 
     /**
      * A raid march to watch (2026-11-08, for the in-game film, {@code tools/film/raid_march.film}, and the user's own
-     * look), set out from the nearest Matabele colony within 64 blocks the way the ribbon test sets one out: a real
+     * look), set out from the nearest Matabele colony within 64 blocks the way the march test sets one out: a real
      * major is the scout, home from a find and standing two blocks from the entrance (tagged {@code raid_scout}, so the
      * film's camera can ride along with it); every other real ant is put in the nest's rooms, so they come out of the
      * hole behind it; a straight trail of {@code blocks} is laid the way given, else the way of eight with the plainest
@@ -365,7 +365,7 @@ public class MatabeleCommands {
         }
         // The way: the one given, else of eight the one with the plainest ground (the least climbing up and down along it:
         // a dead tree, a log or a rise in the way counts, so the march is watched on open ground; the last dead tree put
-        // in, which the ribbon test steers by, is often another mound's in a real world, BUGS 188).
+        // in, which the march test steers by, is often another mound's in a real world, BUGS 188).
         double bestAngle = 0.0;
         int plainest = Integer.MAX_VALUE;
         for (int i = 0; i < 8; i++) {
