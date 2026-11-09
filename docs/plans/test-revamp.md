@@ -168,6 +168,8 @@ reach, no colony in water.
 
 **R6 done.** The savanna survey (real land, 7 seeds) checks no mound wet or on the lowest floodplain, dead tree room by every mound, and living termites within the scouts' reach of nearly every Matabele nest; measured 0 wet, 0 short of room, 72 of 74 (single-biome 27 of 28) within 86 blocks, 59 blocks on average.
 
+**Full run (R4 to R6): 211 of 211 on 6 servers, 31 minutes**; the optional BUGS 161 replay still fails (known). The R3 leftovers stay for whenever those tests are next touched. **The test revamp is finished.**
+
 ## Later (not in this revamp)
 
 - **Handing the clock and weather in instead of the "ForTests" switches** (about 99 in the game code). It touches game
