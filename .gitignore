@@ -42,6 +42,7 @@ repo/
 ### Automatic game tests ###
 run-test/
 run-test-shards/
+run-test-reruns/
 run-soak/
 run-flight/
 __pycache__/

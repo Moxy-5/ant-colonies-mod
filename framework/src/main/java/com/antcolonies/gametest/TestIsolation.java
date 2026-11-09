@@ -81,6 +81,8 @@ public final class TestIsolation {
     private static final Map<GameTestInfo, List<ChunkPos>> GROUND_HELD = new HashMap<>();
     /** How many running tests hold each ground chunk (its ticket is taken by the first and given back by the last). */
     private static final Map<ChunkPos, Integer> GROUND_HOLDERS = new HashMap<>();
+    /** The tests whose time is already written in the log (test revamp R1, {@link #logTimes}). */
+    private static final java.util.Set<GameTestInfo> TIMED = new java.util.HashSet<>();
 
     private TestIsolation() {
     }
@@ -251,7 +253,23 @@ public final class TestIsolation {
             }
         }
         GROUND_HELD.keySet().stream().filter(GameTestInfo::isDone).toList().forEach(test -> letGroundGo(level, test));
+        logTimes();
         ARENAS.keySet().removeIf(test -> test.isDone() && !OWNERS.containsValue(test));
+        TIMED.retainAll(ARENAS.keySet());
+    }
+
+    /**
+     * Each test's own time, once, when it is done (test revamp R1): a line {@code [test-time] <name> passed|failed <ms> ms}
+     * that {@code tools/run_game_tests.sh} reads to list the slowest tests (the game's own log only says when each batch
+     * starts). Only tests whose arena was seen running are timed (every test with a structure, so all of ours).
+     */
+    private static void logTimes() {
+        for (GameTestInfo test : ARENAS.keySet()) {
+            if (test.isDone() && TIMED.add(test)) {
+                ColonyFrameworkMod.LOGGER.info("[test-time] {} {} {} ms", test.getTestName(), test.hasSucceeded() ? "passed" : "failed",
+                        test.getRunTime());
+            }
+        }
     }
 
     /** The colony an insect, egg, larva or body belongs to, or null. */

@@ -19,7 +19,9 @@ import net.minecraft.server.MinecraftServer;
  * variable {@code ANTCOLONIES_TESTS} set to a comma-separated list of words. A word can be a category (see
  * {@link #CATEGORIES}, such as {@code termitefood}): every test of it runs. Otherwise the tests whose name (the method's
  * name in lower case, such as {@code termitesroamalloveracathedralmound}) contains the word, or whose class is named by
- * it (such as {@code termiteclimbingtests}), are run. Without it every test runs, as always.
+ * it (such as {@code termiteclimbingtests}), are run. A word starting with {@code =} picks only the test of exactly
+ * that name (test revamp R1: the run script reruns a failed test alone, and a plain word would also pick every test
+ * whose name holds it). Without it every test runs, as always.
  */
 public final class TestFilter {
     /**
@@ -93,6 +95,10 @@ public final class TestFilter {
             java.util.Set<String> named = new java.util.HashSet<>();
             List<String> plainWords = new java.util.ArrayList<>();
             for (String word : words) {
+                if (word.startsWith("=")) {
+                    named.add(word.substring(1)); // (an exact test name; names are compared in lower case below)
+                    continue;
+                }
                 List<Class<?>> classes = new java.util.ArrayList<>(CATEGORIES.getOrDefault(word, List.of()));
                 for (List<Class<?>> category : CATEGORIES.values()) {
                     for (Class<?> testClass : category) {
@@ -114,7 +120,7 @@ public final class TestFilter {
                     }
                 }
             }
-            tests.removeIf(test -> !named.contains(test.testName()) && plainWords.stream().noneMatch(test.testName().toLowerCase(Locale.ROOT)::contains));
+            tests.removeIf(test -> !named.contains(test.testName().toLowerCase(Locale.ROOT)) && !named.contains(test.testName()) && plainWords.stream().noneMatch(test.testName().toLowerCase(Locale.ROOT)::contains));
             ColonyFrameworkMod.LOGGER.warn("[test-filter] ONLY running {} of {} game tests (ANTCOLONIES_TESTS={})", tests.size(), before, only);
         } catch (ReflectiveOperationException e) {
             ColonyFrameworkMod.LOGGER.error("[test-filter] could not filter the game tests, running them all", e);

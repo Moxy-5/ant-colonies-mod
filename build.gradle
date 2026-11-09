@@ -112,11 +112,14 @@ neoForge {
 
         // Tests side by side (tools/run_game_tests.sh): one more game test server per share of the tests, each in its
         // own folder and world. How many: -PtestShards=n (5 if not given; the PC has 20 threads and 64 GB).
+        // -PtestShardsFolder=<folder> puts the servers' folders somewhere else (test revamp R1: the reruns of failed tests
+        // go to run-test-reruns/<n>, so the run's own logs stay where they were).
         def testShards = (project.findProperty('testShards') ?: '5') as int
+        def testShardsFolder = (project.findProperty('testShardsFolder') ?: 'run-test-shards').toString()
         (1..testShards).each { shard ->
             register("gameTestShard${shard}") {
                 type = "gameTestServer"
-                gameDirectory = project.file("run-test-shards/${shard}")
+                gameDirectory = project.file("${testShardsFolder}/${shard}")
                 systemProperty 'neoforge.enabledGameTestNamespaces', gameTestNamespaces
                 systemProperty 'antcolonies.shard', "${shard}/${testShards}"
             }

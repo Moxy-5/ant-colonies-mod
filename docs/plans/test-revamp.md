@@ -1,7 +1,7 @@
 # The test revamp (plan, 2026-11-09; `docs/plans/test-health.md` step 4)
 
 The user's ask (2026-11-09): run the test revamp overnight in linked sessions, fully automated. Part 1 (this branch,
-`claude/test-revamp-1ae0a8`, from `claude/empty-raid-189-001096`) builds R0 to R3; part 2 builds R4 to R6 on top of it.
+`claude/test-revamp`, from `claude/empty-raid-189-001096`) builds R0 to R3; part 2 builds R4 to R6 on top of it.
 **Test work only: nothing changes in-game.** Game code may only get test-only seams that change no behaviour.
 
 ## Why (from `test-health.md`)
