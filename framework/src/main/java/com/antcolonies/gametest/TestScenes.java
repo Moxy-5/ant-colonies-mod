@@ -3,7 +3,10 @@ package com.antcolonies.gametest;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
+import java.util.function.Consumer;
+import java.util.function.Function;
 import java.util.function.IntBinaryOperator;
+import java.util.function.IntFunction;
 
 import org.jetbrains.annotations.Nullable;
 
@@ -15,6 +18,7 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.gametest.framework.GameTestHelper;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.phys.Vec3;
@@ -126,5 +130,44 @@ public final class TestScenes {
 
     public static double horizontal(Vec3 a, Vec3 b) {
         return Math.sqrt((a.x - b.x) * (a.x - b.x) + (a.z - b.z) * (a.z - b.z));
+    }
+
+    /**
+     * The scene kit's start (test revamp R3), species-neutral (the species' scenes hand their types in): deep ground, a
+     * queen of this type at the arena's middle, after 5 ticks a worker of that type at each spot (the arena's own
+     * numbers; none, no workers), and after {@code lookAfter} ticks {@code then} gets the colony {@code find} finds (the
+     * test's own colony, maybe null: the scene or the test checks it).
+     */
+    public static void queenAndWorkers(GameTestHelper helper, EntityType<?> queen, EntityType<?> worker, List<BlockPos> spots, int lookAfter,
+            Function<GameTestHelper, Colony> find, Consumer<Colony> then) {
+        queenAndWorkers(helper, queen, null, null, worker, spots);
+        helper.runAfterDelay(lookAfter, () -> then.accept(find.apply(helper)));
+    }
+
+    /**
+     * The scene kit's start without the look-up: deep ground, a queen of this type at the middle, and after 5 ticks the
+     * partner (a termite king, say; none if null) at its spot, then a worker at each spot.
+     */
+    public static void queenAndWorkers(GameTestHelper helper, EntityType<?> queen, @Nullable EntityType<?> partner, @Nullable BlockPos partnerSpot,
+            EntityType<?> worker, List<BlockPos> spots) {
+        deepGround(helper);
+        helper.spawn(queen, MIDDLE, SURFACE, MIDDLE);
+        if (partner != null || !spots.isEmpty()) {
+            helper.runAfterDelay(5, () -> {
+                if (partner != null) {
+                    helper.spawn(partner, partnerSpot);
+                }
+                spots.forEach(spot -> helper.spawn(worker, spot));
+            });
+        }
+    }
+
+    /** {@code n} spots, the i-th where {@code spot} puts it (the workers of {@link #queenAndWorkers}). */
+    public static List<BlockPos> spots(int n, IntFunction<BlockPos> spot) {
+        List<BlockPos> spots = new ArrayList<>();
+        for (int i = 0; i < n; i++) {
+            spots.add(spot.apply(i));
+        }
+        return spots;
     }
 }

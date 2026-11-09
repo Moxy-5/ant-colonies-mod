@@ -399,7 +399,7 @@ public class TermiteRaidDefenceTests {
             Colony colony = TermiteMoundTests.colony(helper);
             helper.assertTrue(colony != null && !colony.isFounding(), "no termite colony with workers");
             TestClock.still(helper, hour);
-            TermiteSoldierTests.digNestAtOnce(level, colony);
+            TermiteScenes.digNestAtOnce(level, colony);
             level.setBlock(colony.nest().getEntrance(), Blocks.STONE.defaultBlockState(), 3);
             for (TermiteWorkerEntity worker : TestIsolation.insectsOf(helper, TermiteWorkerEntity.class)) {
                 worker.setGrownUpAt(builderAge(level, colony));

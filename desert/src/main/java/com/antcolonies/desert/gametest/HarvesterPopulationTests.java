@@ -43,20 +43,6 @@ public class HarvesterPopulationTests {
         return colony(helper, DesertSpecies.RED_HARVESTER_ANT);
     }
 
-    /** An ant queen on deep earth; after 10 ticks her colony has its nest dug, no hunger and the brain on, with nobody watching. */
-    static void startAntColony(GameTestHelper helper) {
-        TestScenes.deepGround(helper);
-        helper.spawn(DesertEntities.QUEEN_ANT.get(), MIDDLE, SURFACE, MIDDLE);
-        helper.runAfterDelay(10, () -> {
-            Colony colony = antColony(helper);
-            helper.assertTrue(colony != null, "no ant colony");
-            colony.setHungerOn(false);
-            digNestAtOnce(helper.getLevel(), colony);
-            colony.population().setOnForTests(true);
-            colony.population().setViewersForTests(List.of());
-        });
-    }
-
     /**
      * With a small crew (10, set for the test) and nobody near, 10 real workers come out of the 40 in the numbers, two a
      * second, and the headcount stays 40. A player near (eyes 20 blocks off, above ground): all 40 come out (fewer than
@@ -66,7 +52,7 @@ public class HarvesterPopulationTests {
     @GameTest(template = "arena", timeoutTicks = 2900)
     public static void aCrewWorksWhileNobodyIsNearAndMoreComeOutWhenAPlayerIs(GameTestHelper helper) {
         ServerLevel level = helper.getLevel();
-        startAntColony(helper);
+        HarvesterScenes.dugNest(helper);
         helper.runAfterDelay(15, () -> {
             antColony(helper).population().setCrewForTests(10);
             antColony(helper).population().addNewMembers(Caste.WORKER, level.getGameTime(), 40);
@@ -117,7 +103,7 @@ public class HarvesterPopulationTests {
     @GameTest(template = "arena", timeoutTicks = 800)
     public static void insectsComeOutOnlyWhereNoPlayerCanSee(GameTestHelper helper) {
         ServerLevel level = helper.getLevel();
-        startAntColony(helper);
+        HarvesterScenes.dugNest(helper);
         Set<UUID> seen = new HashSet<>();
         List<Vec3> eyes = new ArrayList<>();
         int[] cameOut = {0};
@@ -157,7 +143,7 @@ public class HarvesterPopulationTests {
     @GameTest(template = "arena", timeoutTicks = 400)
     public static void workersInTheNumbersDieOfOldAgeAndAreSaved(GameTestHelper helper) {
         ServerLevel level = helper.getLevel();
-        startAntColony(helper);
+        HarvesterScenes.dugNest(helper);
         helper.runAfterDelay(15, () -> {
             Colony colony = antColony(helper);
             colony.population().setOnForTests(false); // only the numbers, no swapping
@@ -185,7 +171,7 @@ public class HarvesterPopulationTests {
     @GameTest(template = "arena", timeoutTicks = 600)
     public static void aYoungOneGrowsUpIntoTheNumbersWhenNoMoreRealOnesAreWanted(GameTestHelper helper) {
         ServerLevel level = helper.getLevel();
-        startAntColony(helper);
+        HarvesterScenes.dugNest(helper);
         helper.runAfterDelay(15, () -> {
             antColony(helper).population().setCrewForTests(10);
             antColony(helper).population().addNewMembers(Caste.WORKER, level.getGameTime(), 12);

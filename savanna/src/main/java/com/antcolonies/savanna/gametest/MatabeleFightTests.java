@@ -252,7 +252,7 @@ public class MatabeleFightTests {
             for (TermiteWorkerEntity worker : TestIsolation.insectsOf(helper, TermiteWorkerEntity.class)) {
                 worker.setGrownUpAt(old);
             }
-            TermiteSoldierTests.digNestAtOnce(level, colony);
+            TermiteScenes.digNestAtOnce(level, colony);
             level.setBlock(colony.nest().getEntrance(), Blocks.STONE.defaultBlockState(), 3);
             List<NestPlan.ForagingTunnel> tunnels = colony.nest().getForagingTunnels(level);
             for (NestPlan.ForagingTunnel tunnel : tunnels) {

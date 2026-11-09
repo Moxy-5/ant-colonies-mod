@@ -130,13 +130,7 @@ public class TermitomycesTests {
     @GameTest(template = "arena", timeoutTicks = 600, skyAccess = true)
     public static void aHealthyGardenSendsUpMushroomsWhenTheRainEnds(GameTestHelper helper) {
         ServerLevel level = helper.getLevel();
-        TestScenes.deepGround(helper);
-        helper.spawn(SavannaEntities.TERMITE_QUEEN.get(), MIDDLE, SURFACE, MIDDLE);
-        helper.runAfterDelay(5, () -> {
-            for (int i = 0; i < 4; i++) {
-                helper.spawn(SavannaEntities.TERMITE_WORKER.get(), MIDDLE - 2 + i % 2, SURFACE, MIDDLE - 2 + i / 2);
-            }
-        });
+        TermiteScenes.start(helper, TermiteScenes.spots(4, i -> new BlockPos(MIDDLE - 2 + i % 2, SURFACE, MIDDLE - 2 + i / 2)), false);
         Colony[] colony = {null};
         helper.runAfterDelay(30, () -> {
             Colony c = TermiteMoundTests.colony(helper);

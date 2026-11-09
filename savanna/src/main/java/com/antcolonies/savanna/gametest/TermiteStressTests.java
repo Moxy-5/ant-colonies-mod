@@ -42,10 +42,7 @@ public class TermiteStressTests {
     @GameTest(template = "arena", timeoutTicks = 4 * STAGE + 200, skyAccess = true)
     public static void stressTermiteColony(GameTestHelper helper) {
         ServerLevel level = helper.getLevel();
-        TestScenes.deepGround(helper);
-        helper.spawn(SavannaEntities.TERMITE_QUEEN.get(), MIDDLE, SURFACE, MIDDLE);
-        helper.runAfterDelay(10, () -> {
-            Colony colony = TermiteMoundTests.colony(helper);
+        TermiteScenes.colony(helper, List.of(), colony -> {
             helper.assertTrue(colony != null, "no termite colony");
             digNestAtOnce(level, colony);
             TestClock.still(helper, 12.0); // midday: building, no foraging

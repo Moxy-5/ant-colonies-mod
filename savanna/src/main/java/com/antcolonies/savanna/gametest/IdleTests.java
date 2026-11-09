@@ -51,10 +51,8 @@ public class IdleTests {
         ServerLevel level = helper.getLevel();
         TestClock.still(helper, 22);
         TestScenes.deepGround(helper);
-        Colony termites = NewLandMounds.get(level).put(level, helper.absolutePos(new BlockPos(MIDDLE, SURFACE, MIDDLE)), NewLandMounds.pickFor("dead", 30, 5L));
-        helper.assertTrue(termites != null, "no dead mound put in");
-        Colony colony = MatabeleCommands.makeColony(level, helper.absolutePos(new BlockPos(MIDDLE + 9, SURFACE, MIDDLE)), 20);
-        helper.assertTrue(colony != null, "no Matabele colony made");
+        Colony termites = MatabeleScenes.deadMound(helper, MIDDLE, MIDDLE);
+        Colony colony = MatabeleScenes.colony(helper, MIDDLE + 9, MIDDLE, 20);
         PreyPile pile = colony.part(SavannaParts.PREY_PILE).orElse(null);
         helper.assertTrue(pile != null, "a Matabele colony has no prey pile");
         IdleWatch watch = new IdleWatch("calm Matabele nest");

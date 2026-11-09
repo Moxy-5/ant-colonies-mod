@@ -97,7 +97,7 @@ public class HarvesterAwayTests {
     @GameTest(template = "arena", timeoutTicks = 900)
     public static void aColonyAwayFoldsItsFrozenInsectsIntoTheNumbersAndPutsThingsBackOnReturn(GameTestHelper helper) {
         ServerLevel level = helper.getLevel();
-        startAntColony(helper);
+        HarvesterScenes.dugNest(helper);
         List<UUID> workers = new ArrayList<>();
         List<UUID> stragglers = new ArrayList<>();
         Map<UUID, CompoundTag> unloaded = new HashMap<>();
@@ -223,7 +223,7 @@ public class HarvesterAwayTests {
     @GameTest(template = "arena", timeoutTicks = 1200)
     public static void aColonyAwayEatsMillsBreadAndRaisesItsYoungAsNumbers(GameTestHelper helper) {
         ServerLevel level = helper.getLevel();
-        startAntColony(helper);
+        HarvesterScenes.dugNest(helper);
         UUID[] queen = new UUID[1];
         CompoundTag[] queenOnDisk = new CompoundTag[1];
         int[] eggsLaid = new int[1];
@@ -322,7 +322,7 @@ public class HarvesterAwayTests {
     @GameTest(template = "arena", timeoutTicks = 900, skyAccess = true)
     public static void anAntColonyAwayDigsItsRoomsAndHeapsItsHillOutOfSightOnReturn(GameTestHelper helper) {
         ServerLevel level = helper.getLevel();
-        startAntColony(helper);
+        HarvesterScenes.dugNest(helper);
         List<BlockPos> undug = new ArrayList<>();
         UUID[] queen = new UUID[1];
         CompoundTag[] queenOnDisk = new CompoundTag[1];
@@ -407,7 +407,7 @@ public class HarvesterAwayTests {
     @GameTest(template = "arena", timeoutTicks = 5000, skyAccess = true)
     public static void antNumbersForageOnlyOutOfSightAndFromWhatTheyRemember(GameTestHelper helper) {
         ServerLevel level = helper.getLevel();
-        startAntColony(helper);
+        HarvesterScenes.dugNest(helper);
         List<BlockPos> hidden = new ArrayList<>();
         List<BlockPos> seen = new ArrayList<>();
         BlockPos late = helper.absolutePos(new BlockPos(7, SURFACE, 1));
@@ -544,7 +544,7 @@ public class HarvesterAwayTests {
     @GameTest(template = "arena", timeoutTicks = 3600, skyAccess = true)
     public static void antPatrolNumbersAreLostOutOfSightOnWaysThroughDanger(GameTestHelper helper) {
         ServerLevel level = helper.getLevel();
-        startAntColony(helper);
+        HarvesterScenes.dugNest(helper);
         UUID[] queen = new UUID[1];
         CompoundTag[] queenOnDisk = new CompoundTag[1];
         List<net.minecraft.world.entity.Mob> husks = new ArrayList<>();
@@ -628,7 +628,7 @@ public class HarvesterAwayTests {
     @GameTest(template = "arena", timeoutTicks = 2200, skyAccess = true)
     public static void anAntColonyAwayLivesOnThroughASaveAndLoadAndCatchesUpOnReturn(GameTestHelper helper) {
         ServerLevel level = helper.getLevel();
-        startAntColony(helper);
+        HarvesterScenes.dugNest(helper);
         List<BlockPos> undug = new ArrayList<>();
         List<BlockPos> tufts = new ArrayList<>();
         UUID[] id = new UUID[1];
@@ -773,7 +773,7 @@ public class HarvesterAwayTests {
     @GameTest(template = "arena", timeoutTicks = 900)
     public static void aStarvingAntColonyAwayLosesItsYoungAndItsQueen(GameTestHelper helper) {
         ServerLevel level = helper.getLevel();
-        startAntColony(helper);
+        HarvesterScenes.dugNest(helper);
         UUID[] id = new UUID[1];
         UUID[] queen = new UUID[1];
         CompoundTag[] queenOnDisk = new CompoundTag[1];

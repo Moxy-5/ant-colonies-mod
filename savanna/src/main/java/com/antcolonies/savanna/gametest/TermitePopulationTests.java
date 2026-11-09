@@ -42,11 +42,8 @@ public class TermitePopulationTests {
     @GameTest(template = "arena", timeoutTicks = 1600, skyAccess = true)
     public static void aBigTermiteColonyShowsNoMoreThanTheCap(GameTestHelper helper) {
         ServerLevel level = helper.getLevel();
-        TestScenes.deepGround(helper);
-        helper.spawn(SavannaEntities.TERMITE_QUEEN.get(), MIDDLE, SURFACE, MIDDLE);
         int[] counted = {0};
-        helper.runAfterDelay(10, () -> {
-            Colony colony = TermiteMoundTests.colony(helper);
+        TermiteScenes.colony(helper, List.of(), colony -> {
             helper.assertTrue(colony != null, "no termite colony");
             digNestAtOnce(level, colony);
             TestClock.still(helper, 12.0); // midday: the foragers stay in
@@ -99,8 +96,6 @@ public class TermitePopulationTests {
     @GameTest(template = "arena", timeoutTicks = 4800)
     public static void termiteWorkersEatNodulesWhenYoungAndOldCombWhenOlder(GameTestHelper helper) {
         ServerLevel level = helper.getLevel();
-        TestScenes.deepGround(helper);
-        helper.spawn(SavannaEntities.TERMITE_QUEEN.get(), MIDDLE, SURFACE, MIDDLE);
         TermiteWorkerEntity[] workers = new TermiteWorkerEntity[2]; // young, old
         int[] phase = {0};
         long[] phaseAt = {0};
@@ -111,12 +106,11 @@ public class TermitePopulationTests {
         BlockPos[] ageing = new BlockPos[1];
         boolean[] sawRipe = {false};
         boolean[] sawOld = {false};
-        helper.runAfterDelay(10, () -> {
-            Colony colony = TermiteMoundTests.colony(helper);
+        TermiteScenes.colony(helper, List.of(), colony -> {
             helper.assertTrue(colony != null, "no termite colony");
             TestClock.still(helper, 12.0); // midday: the foragers stay in
             colony.setHungerOn(true);
-            TermiteSoldierTests.digNestAtOnce(level, colony);
+            TermiteScenes.digNestAtOnce(level, colony);
             List<BlockPos> room = colony.nest().getHomeChamber(level).room();
             for (int i = 0; i < 2; i++) {
                 TermiteWorkerEntity worker = SavannaEntities.TERMITE_WORKER.get().create(level);

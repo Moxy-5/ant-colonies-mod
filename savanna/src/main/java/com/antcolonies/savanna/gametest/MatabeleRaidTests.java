@@ -65,13 +65,11 @@ public class MatabeleRaidTests {
         level.getServer().tickRateManager().setTickRate(2000.0F); // (step 3b: a raid goes out between the find and the recheck)
         TestClock clock = TestClock.still(helper, 13.0); // (between the raid hours: the scouts search, no raid leaves)
         TestScenes.shapeGround(helper, 45, (x, z) -> 0);
-        Colony dead = NewLandMounds.get(level).put(level, helper.absolutePos(new BlockPos(NEST, SURFACE, NEST)), NewLandMounds.pickFor("dead", 30, 5L));
-        helper.assertTrue(dead != null, "no dead mound put in");
+        Colony dead = MatabeleScenes.deadMound(helper, NEST, NEST);
         List<TermiteWorkerEntity> termites = new ArrayList<>();
-        termites.addAll(feedingUnderALog(helper, 36, NEST + 4));
-        termites.addAll(feedingUnderALog(helper, 2, NEST - 4));
-        Colony colony = MatabeleCommands.makeColony(level, helper.absolutePos(new BlockPos(NEST + 6, SURFACE, NEST)), 10);
-        helper.assertTrue(colony != null, "no Matabele colony made");
+        termites.addAll(MatabeleScenes.feedingUnderALog(helper, 36, NEST + 4));
+        termites.addAll(MatabeleScenes.feedingUnderALog(helper, 2, NEST - 4));
+        Colony colony = MatabeleScenes.colony(helper, NEST + 6, NEST, 10);
         Raids raids = colony.part(SavannaParts.RAIDS).orElse(null);
         helper.assertTrue(raids != null, "a Matabele colony has no raids part");
         scoutsHeadToward(helper, colony, 37, NEST + 4);
@@ -185,13 +183,11 @@ public class MatabeleRaidTests {
         ServerLevel level = helper.getLevel();
         level.getServer().tickRateManager().setTickRate(2000.0F);
         TestScenes.shapeGround(helper, 45, (x, z) -> 0);
-        Colony dead = NewLandMounds.get(level).put(level, helper.absolutePos(new BlockPos(NEST, SURFACE, NEST)), NewLandMounds.pickFor("dead", 30, 5L));
-        helper.assertTrue(dead != null, "no dead mound put in");
-        List<TermiteWorkerEntity> termites = feedingUnderALog(helper, 36, NEST + 4);
+        Colony dead = MatabeleScenes.deadMound(helper, NEST, NEST);
+        List<TermiteWorkerEntity> termites = MatabeleScenes.feedingUnderALog(helper, 36, NEST + 4);
         // A termite soldier far from everything, to ask the raiders how they rank it (food first).
         TermiteSoldierEntity soldier = TestAnts.lone(helper, SavannaEntities.TERMITE_MINOR_SOLDIER.get(), 60, SURFACE, 60);
-        Colony colony = MatabeleCommands.makeColony(level, helper.absolutePos(new BlockPos(NEST + 6, SURFACE, NEST)), 20);
-        helper.assertTrue(colony != null, "no Matabele colony made");
+        Colony colony = MatabeleScenes.colony(helper, NEST + 6, NEST, 20);
         Raids raids = colony.part(SavannaParts.RAIDS).orElse(null);
         helper.assertTrue(raids != null, "a Matabele colony has no raids part");
         RaidColumn[] column = {null};
@@ -445,13 +441,11 @@ public class MatabeleRaidTests {
         ServerLevel level = helper.getLevel();
         level.getServer().tickRateManager().setTickRate(2000.0F);
         TestScenes.shapeGround(helper, 45, (x, z) -> 0);
-        Colony dead = NewLandMounds.get(level).put(level, helper.absolutePos(new BlockPos(NEST, SURFACE, NEST)), NewLandMounds.pickFor("dead", 30, 5L));
-        helper.assertTrue(dead != null, "no dead mound put in");
-        List<TermiteWorkerEntity> gone = feedingUnderALog(helper, 36, NEST + 4);
+        Colony dead = MatabeleScenes.deadMound(helper, NEST, NEST);
+        List<TermiteWorkerEntity> gone = MatabeleScenes.feedingUnderALog(helper, 36, NEST + 4);
         BlockPos at = gone.get(0).blockPosition();
         gone.forEach(termite -> termite.discard()); // (the termites have left the log)
-        Colony colony = MatabeleCommands.makeColony(level, helper.absolutePos(new BlockPos(NEST + 6, SURFACE, NEST)), 20);
-        helper.assertTrue(colony != null, "no Matabele colony made");
+        Colony colony = MatabeleScenes.colony(helper, NEST + 6, NEST, 20);
         Raids raids = colony.part(SavannaParts.RAIDS).orElse(null);
         helper.assertTrue(raids != null, "a Matabele colony has no raids part");
         RaidColumn[] column = {null};
@@ -581,14 +575,12 @@ public class MatabeleRaidTests {
         level.getServer().tickRateManager().setTickRate(2000.0F);
         TestClock.moving(helper, 7.0); // (the morning raid hours, a real moving clock)
         TestScenes.shapeGround(helper, 45, (x, z) -> 0);
-        Colony dead = NewLandMounds.get(level).put(level, helper.absolutePos(new BlockPos(NEST, SURFACE, NEST)), NewLandMounds.pickFor("dead", 30, 5L));
-        helper.assertTrue(dead != null, "no dead mound put in");
+        Colony dead = MatabeleScenes.deadMound(helper, NEST, NEST);
         List<TermiteWorkerEntity> termites = new ArrayList<>();
-        termites.addAll(feedingUnderALog(helper, 36, NEST + 3));
-        termites.addAll(feedingUnderALog(helper, 36, NEST + 5));
-        termites.addAll(feedingUnderALog(helper, 36, NEST + 7));
-        Colony colony = MatabeleCommands.makeColony(level, helper.absolutePos(new BlockPos(NEST + 6, SURFACE, NEST)), 120);
-        helper.assertTrue(colony != null, "no Matabele colony made");
+        termites.addAll(MatabeleScenes.feedingUnderALog(helper, 36, NEST + 3));
+        termites.addAll(MatabeleScenes.feedingUnderALog(helper, 36, NEST + 5));
+        termites.addAll(MatabeleScenes.feedingUnderALog(helper, 36, NEST + 7));
+        Colony colony = MatabeleScenes.colony(helper, NEST + 6, NEST, 120);
         Raids raids = colony.part(SavannaParts.RAIDS).orElse(null);
         helper.assertTrue(raids != null, "a Matabele colony has no raids part");
         // The raid test bench, B1: the whole chain runs with every rule watching (none may break).
@@ -722,11 +714,9 @@ public class MatabeleRaidTests {
         level.getServer().tickRateManager().setTickRate(2000.0F);
         TestClock.moving(helper, 7.0);
         TestScenes.shapeGround(helper, 45, (x, z) -> 0);
-        Colony dead = NewLandMounds.get(level).put(level, helper.absolutePos(new BlockPos(NEST, SURFACE, NEST)), NewLandMounds.pickFor("dead", 30, 5L));
-        helper.assertTrue(dead != null, "no dead mound put in");
-        feedingUnderALog(helper, 36, NEST + 5);
-        Colony colony = MatabeleCommands.makeColony(level, helper.absolutePos(new BlockPos(NEST + 6, SURFACE, NEST)), 60);
-        helper.assertTrue(colony != null, "no Matabele colony made");
+        Colony dead = MatabeleScenes.deadMound(helper, NEST, NEST);
+        MatabeleScenes.feedingUnderALog(helper, 36, NEST + 5);
+        Colony colony = MatabeleScenes.colony(helper, NEST + 6, NEST, 60);
         Raids raids = colony.part(SavannaParts.RAIDS).orElse(null);
         helper.assertTrue(raids != null, "a Matabele colony has no raids part");
         Watch.watchForTests(colony);
@@ -822,10 +812,8 @@ public class MatabeleRaidTests {
         level.getServer().tickRateManager().setTickRate(2000.0F);
         TestClock.moving(helper, 7.0);
         TestScenes.shapeGround(helper, 65, (x, z) -> 0); // (the whole arena: a 40-block trail, so the stream has room to form)
-        Colony dead = NewLandMounds.get(level).put(level, helper.absolutePos(new BlockPos(NEST, SURFACE, NEST)), NewLandMounds.pickFor("dead", deadDays, 5L));
-        helper.assertTrue(dead != null, "no dead mound put in");
-        Colony colony = MatabeleCommands.makeColony(level, helper.absolutePos(new BlockPos(NEST + 6, SURFACE, NEST)), 120);
-        helper.assertTrue(colony != null, "no Matabele colony made");
+        Colony dead = MatabeleScenes.deadMound(helper, NEST, NEST, deadDays);
+        Colony colony = MatabeleScenes.colony(helper, NEST + 6, NEST, 120);
         Raids raids = colony.part(SavannaParts.RAIDS).orElse(null);
         helper.assertTrue(raids != null, "a Matabele colony has no raids part");
         RaidColumn[] column = {null};
@@ -1354,8 +1342,7 @@ public class MatabeleRaidTests {
                 helper.setBlock(x, SURFACE - 2, z, Blocks.WATER);
             }
         }
-        Colony dead = NewLandMounds.get(level).put(level, helper.absolutePos(new BlockPos(NEST, SURFACE, NEST)), NewLandMounds.pickFor("dead", 30, 5L));
-        helper.assertTrue(dead != null, "no dead mound put in");
+        Colony dead = MatabeleScenes.deadMound(helper, NEST, NEST);
         // (the mound's own dead tree off the plain past the hump: it may lie across the logs or the ridge, and a log
         // with a trunk lying over it is no feeding spot a major can break into from the open)
         for (int x = 27; x < 45; x++) {
@@ -1369,11 +1356,10 @@ public class MatabeleRaidTests {
             }
         }
         List<TermiteWorkerEntity> termites = new ArrayList<>();
-        termites.addAll(feedingUnderALog(helper, 36, NEST + 3));
-        termites.addAll(feedingUnderALog(helper, 36, NEST + 5));
-        termites.addAll(feedingUnderALog(helper, 36, NEST + 7));
-        Colony colony = MatabeleCommands.makeColony(level, helper.absolutePos(new BlockPos(NEST + 6, SURFACE, NEST)), 60);
-        helper.assertTrue(colony != null, "no Matabele colony made");
+        termites.addAll(MatabeleScenes.feedingUnderALog(helper, 36, NEST + 3));
+        termites.addAll(MatabeleScenes.feedingUnderALog(helper, 36, NEST + 5));
+        termites.addAll(MatabeleScenes.feedingUnderALog(helper, 36, NEST + 7));
+        Colony colony = MatabeleScenes.colony(helper, NEST + 6, NEST, 60);
         Raids raids = colony.part(SavannaParts.RAIDS).orElse(null);
         helper.assertTrue(raids != null, "a Matabele colony has no raids part");
         scoutsHeadToward(helper, colony, 37, NEST + 5);
@@ -1454,10 +1440,8 @@ public class MatabeleRaidTests {
         level.getServer().tickRateManager().setTickRate(2000.0F);
         TestClock clock = TestClock.still(helper, 21.0); // (night: no scout sets out by itself, so the colony has no former scouts)
         TestScenes.shapeGround(helper, 45, (x, z) -> 0);
-        Colony dead = NewLandMounds.get(level).put(level, helper.absolutePos(new BlockPos(NEST, SURFACE, NEST)), NewLandMounds.pickFor("dead", 30, 5L));
-        helper.assertTrue(dead != null, "no dead mound put in");
-        Colony colony = MatabeleCommands.makeColony(level, helper.absolutePos(new BlockPos(NEST + 6, SURFACE, NEST)), 20);
-        helper.assertTrue(colony != null, "no Matabele colony made");
+        Colony dead = MatabeleScenes.deadMound(helper, NEST, NEST);
+        Colony colony = MatabeleScenes.colony(helper, NEST + 6, NEST, 20);
         Raids raids = colony.part(SavannaParts.RAIDS).orElse(null);
         helper.assertTrue(raids != null, "a Matabele colony has no raids part");
         BlockPos at = helper.absolutePos(new BlockPos(52, SURFACE, NEST + 4));
@@ -1713,10 +1697,8 @@ public class MatabeleRaidTests {
         ServerLevel level = helper.getLevel();
         TestClock.still(helper, 3.0); // (night: no scout sets out by itself; the scouts' trips are the test's own)
         TestScenes.shapeGround(helper, 45, (x, z) -> 0);
-        Colony dead = NewLandMounds.get(level).put(level, helper.absolutePos(new BlockPos(NEST, SURFACE, NEST)), NewLandMounds.pickFor("dead", 30, 5L));
-        helper.assertTrue(dead != null, "no dead mound put in");
-        Colony colony = MatabeleCommands.makeColony(level, helper.absolutePos(new BlockPos(NEST + 6, SURFACE, NEST)), 20);
-        helper.assertTrue(colony != null, "no Matabele colony made");
+        Colony dead = MatabeleScenes.deadMound(helper, NEST, NEST);
+        Colony colony = MatabeleScenes.colony(helper, NEST + 6, NEST, 20);
         Raids raids = colony.part(SavannaParts.RAIDS).orElse(null);
         PreyPile pile = colony.part(SavannaParts.PREY_PILE).orElse(null);
         helper.assertTrue(raids != null && pile != null, "a Matabele colony has no raids part or prey pile");
@@ -1826,10 +1808,8 @@ public class MatabeleRaidTests {
         level.getServer().tickRateManager().setTickRate(2000.0F);
         TestClock.still(helper, 13.0); // (scouts search all day)
         TestScenes.shapeGround(helper, 65, (x, z) -> 0);
-        Colony dead = NewLandMounds.get(level).put(level, helper.absolutePos(new BlockPos(30, SURFACE, 32)), NewLandMounds.pickFor("dead", 30, 5L));
-        helper.assertTrue(dead != null, "no dead mound put in");
-        Colony colony = MatabeleCommands.makeColony(level, helper.absolutePos(new BlockPos(34, SURFACE, 32)), 150);
-        helper.assertTrue(colony != null, "no Matabele colony made");
+        Colony dead = MatabeleScenes.deadMound(helper, 30, 32);
+        Colony colony = MatabeleScenes.colony(helper, 34, 32, 150);
         Raids raids = colony.part(SavannaParts.RAIDS).orElse(null);
         helper.assertTrue(raids != null, "a Matabele colony has no raids part");
         int first = raids.numbers().firstRange();
@@ -1897,18 +1877,16 @@ public class MatabeleRaidTests {
         level.getServer().tickRateManager().setTickRate(2000.0F);
         TestClock.still(helper, 13.0); // (between the raid hours: the find waits, no raid)
         TestScenes.shapeGround(helper, 45, (x, z) -> 0);
-        Colony dead = NewLandMounds.get(level).put(level, helper.absolutePos(new BlockPos(NEST, SURFACE, NEST)), NewLandMounds.pickFor("dead", 30, 5L));
-        helper.assertTrue(dead != null, "no dead mound put in");
+        Colony dead = MatabeleScenes.deadMound(helper, NEST, NEST);
         List<TermiteWorkerEntity> lone = new ArrayList<>();
-        lone.addAll(feedingUnderALog(helper, NEST + 11, NEST + 12, 1));
-        lone.addAll(feedingUnderALog(helper, NEST - 13, NEST + 12, 1));
-        lone.addAll(feedingUnderALog(helper, NEST - 13, NEST - 12, 1));
-        lone.addAll(feedingUnderALog(helper, NEST + 11, NEST - 12, 1));
+        lone.addAll(MatabeleScenes.feedingUnderALog(helper, NEST + 11, NEST + 12, 1));
+        lone.addAll(MatabeleScenes.feedingUnderALog(helper, NEST - 13, NEST + 12, 1));
+        lone.addAll(MatabeleScenes.feedingUnderALog(helper, NEST - 13, NEST - 12, 1));
+        lone.addAll(MatabeleScenes.feedingUnderALog(helper, NEST + 11, NEST - 12, 1));
         List<TermiteWorkerEntity> group = new ArrayList<>();
-        group.addAll(feedingUnderALog(helper, NEST + 19, NEST + 19));
-        group.addAll(feedingUnderALog(helper, NEST + 19, NEST + 21));
-        Colony colony = MatabeleCommands.makeColony(level, helper.absolutePos(new BlockPos(NEST + 6, SURFACE, NEST)), 40);
-        helper.assertTrue(colony != null, "no Matabele colony made");
+        group.addAll(MatabeleScenes.feedingUnderALog(helper, NEST + 19, NEST + 19));
+        group.addAll(MatabeleScenes.feedingUnderALog(helper, NEST + 19, NEST + 21));
+        Colony colony = MatabeleScenes.colony(helper, NEST + 6, NEST, 40);
         Raids raids = colony.part(SavannaParts.RAIDS).orElse(null);
         PreyPile pile = colony.part(SavannaParts.PREY_PILE).orElse(null);
         helper.assertTrue(raids != null && pile != null, "a Matabele colony has no raids part or prey pile");
@@ -1963,8 +1941,7 @@ public class MatabeleRaidTests {
         level.getServer().tickRateManager().setTickRate(2000.0F);
         TestClock.still(helper, 13.0); // (between the raid hours: the find waits, no raid)
         TestScenes.shapeGround(helper, 65, (x, z) -> 0);
-        Colony dead = NewLandMounds.get(level).put(level, helper.absolutePos(new BlockPos(24, SURFACE, 38)), NewLandMounds.pickFor("dead", 30, 5L));
-        helper.assertTrue(dead != null, "no dead mound put in");
+        Colony dead = MatabeleScenes.deadMound(helper, 24, 38);
         Colony termites = NewLandMounds.get(level).put(level, helper.absolutePos(new BlockPos(52, SURFACE, 8)), NewLandMounds.pickFor("young", 0, 11L));
         helper.assertTrue(termites != null, "no living termite mound put in");
         termites.foodMap().setTestArea(helper.getBounds().expandTowards(0, 16, 0));
@@ -1975,8 +1952,8 @@ public class MatabeleRaidTests {
             east.add(new BlockPos(52 + Math.min(7, z - 8), SURFACE - 2, z));
         }
         List<TermiteWorkerEntity> group = new ArrayList<>();
-        group.addAll(feedingUnderALog(helper, 58, 20));
-        group.addAll(feedingUnderALog(helper, 58, 22));
+        group.addAll(MatabeleScenes.feedingUnderALog(helper, 58, 20));
+        group.addAll(MatabeleScenes.feedingUnderALog(helper, 58, 22));
         List<BlockPos> eastGallery = List.of(new BlockPos(58, SURFACE - 1, 20), new BlockPos(59, SURFACE - 1, 20),
                 new BlockPos(60, SURFACE - 1, 20), new BlockPos(61, SURFACE - 1, 20));
         // the west tunnel out to one termite under a log
@@ -1984,7 +1961,7 @@ public class MatabeleRaidTests {
         for (int x = 52; x >= 37; x--) {
             west.add(new BlockPos(x, SURFACE - 2, Math.max(1, 8 - (52 - x) / 2)));
         }
-        List<TermiteWorkerEntity> lone = feedingUnderALog(helper, 34, 0, 1);
+        List<TermiteWorkerEntity> lone = MatabeleScenes.feedingUnderALog(helper, 34, 0, 1);
         List<BlockPos> westGallery = List.of(new BlockPos(35, SURFACE - 1, 0), new BlockPos(36, SURFACE - 1, 0));
         com.antcolonies.colony.FoodWays ways = termites.nest().foodWays();
         for (List<BlockPos> tunnel : List.of(east, west)) {
@@ -2000,8 +1977,7 @@ public class MatabeleRaidTests {
                     helper.absolutePos(isEast ? new BlockPos(59, SURFACE, 20) : new BlockPos(35, SURFACE, 0)),
                     (isEast ? eastGallery : westGallery).stream().map(helper::absolutePos).toList()));
         }
-        Colony colony = MatabeleCommands.makeColony(level, helper.absolutePos(new BlockPos(28, SURFACE, 38)), 10);
-        helper.assertTrue(colony != null, "no Matabele colony made");
+        Colony colony = MatabeleScenes.colony(helper, 28, 38, 10);
         Raids raids = colony.part(SavannaParts.RAIDS).orElse(null);
         helper.assertTrue(raids != null, "a Matabele colony has no raids part");
         scoutsHeadToward(helper, colony, 52, 8); // (its own way toward the living mound: it comes near it)
@@ -2115,32 +2091,8 @@ public class MatabeleRaidTests {
     /** A stage may last this much past its own longest time (ticks): the column works itself out every few ticks. */
     private static final long SLACK = 300;
 
-    /** Two termite workers feeding in a gallery under a 4-block log (along x from {@code x}) at row {@code z}. */
     /** Raid flow: raiders in a raid's waits still at least this share of the time (they shuffle a step now and then). */
     private static final double RAID_WAIT_STILL = 0.6;
-
-    private static List<TermiteWorkerEntity> feedingUnderALog(GameTestHelper helper, int x, int z) {
-        return feedingUnderALog(helper, x, z, 2);
-    }
-
-    /**
-     * One or two termite workers feeding in a gallery under a 4-block log (along x from {@code x}) at row {@code z}. The
-     * two blocks over them are mud casts, as the termites leave a log they have been eating from below (raid flow,
-     * 2026-11-06: majors break only the termites' mud, never the ground; a gallery under bare wood and dirt has no way in).
-     */
-    private static List<TermiteWorkerEntity> feedingUnderALog(GameTestHelper helper, int x, int z, int count) {
-        List<TermiteWorkerEntity> termites = new ArrayList<>();
-        for (int i = 0; i < 4; i++) {
-            helper.setBlock(new BlockPos(x + i, SURFACE, z), i == 1 || i == 2 ? SavannaBlocks.MUD_CAST.get().defaultBlockState()
-                    : Blocks.OAK_LOG.defaultBlockState().setValue(RotatedPillarBlock.AXIS, Direction.Axis.X));
-            helper.setBlock(x + i, SURFACE - 1, z, Blocks.AIR);
-        }
-        termites.add(TestAnts.lone(helper, SavannaEntities.TERMITE_WORKER.get(), x + 1, SURFACE - 1, z));
-        if (count > 1) {
-            termites.add(TestAnts.lone(helper, SavannaEntities.TERMITE_WORKER.get(), x + 2, SURFACE - 1, z));
-        }
-        return termites;
-    }
 
     /** How the game holds the chunk at {@code pos} (for a failure message): forced, its status, entities running. */
     private static String chunkState(ServerLevel level, BlockPos pos) {

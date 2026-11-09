@@ -45,10 +45,8 @@ public class MatabeleDefenceTests {
     public static void matabeleDefendTheirNestAgainstAPlayer(GameTestHelper helper) {
         ServerLevel level = helper.getLevel();
         TestScenes.deepGround(helper);
-        Colony termites = NewLandMounds.get(level).put(level, helper.absolutePos(new BlockPos(MIDDLE, SURFACE, MIDDLE)), NewLandMounds.pickFor("dead", 30, 5L));
-        helper.assertTrue(termites != null, "no dead mound put in");
-        Colony colony = MatabeleCommands.makeColony(level, helper.absolutePos(new BlockPos(MIDDLE + 9, SURFACE, MIDDLE)), 10);
-        helper.assertTrue(colony != null, "no Matabele colony made");
+        Colony termites = MatabeleScenes.deadMound(helper, MIDDLE, MIDDLE);
+        Colony colony = MatabeleScenes.colony(helper, MIDDLE + 9, MIDDLE, 10);
         NestDefence defence = colony.part(ColonyParts.NEST_DEFENCE).orElse(null);
         helper.assertTrue(defence != null, "a Matabele colony has no nest defence");
         DefenceNumbers numbers = DefenceNumbers.of(colony.profile()).orElseThrow();

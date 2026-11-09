@@ -91,7 +91,7 @@ public class TermiteNewHoleTests {
             for (TermiteWorkerEntity worker : TestIsolation.insectsOf(helper, TermiteWorkerEntity.class)) {
                 worker.setGrownUpAt(middleAged);
             }
-            TermiteSoldierTests.digNestAtOnce(level, colony);
+            TermiteScenes.digNestAtOnce(level, colony);
             colony.population().addNewMembers(Caste.WORKER, level.getGameTime() - 1000, 500);
             level.setBlock(hay, Blocks.HAY_BLOCK.defaultBlockState(), 3);
             colony.food().rescanPlantsSoon();
@@ -537,7 +537,7 @@ public class TermiteNewHoleTests {
                     // 3 builders (they dig the feeding gallery), the rest old foragers.
                     worker.setGrownUpAt(now - (i++ < 3 ? colony.profile().worker().nurseUntilTicks() : colony.profile().worker().builderUntilTicks()) - 1000);
                 }
-                TermiteSoldierTests.digNestAtOnce(level, colony);
+                TermiteScenes.digNestAtOnce(level, colony);
                 colony.population().addNewMembers(Caste.WORKER, now - 1000, 500);
                 colony.part(SavannaParts.HIDDEN_TRIPS).orElseThrow().setOnForTests(hiddenTrips);
             });
@@ -637,7 +637,7 @@ public class TermiteNewHoleTests {
             for (TermiteWorkerEntity worker : TestIsolation.insectsOf(helper, TermiteWorkerEntity.class)) {
                 worker.setGrownUpAt(middleAged);
             }
-            TermiteSoldierTests.digNestAtOnce(level, colony);
+            TermiteScenes.digNestAtOnce(level, colony);
             colony.population().addNewMembers(Caste.WORKER, level.getGameTime() - 1000, 500);
             TestClock.still(helper, 0.0); // midnight: foraging time
             for (BlockPos wood : tree) {
@@ -805,7 +805,7 @@ public class TermiteNewHoleTests {
             for (TermiteWorkerEntity worker : TestIsolation.insectsOf(helper, TermiteWorkerEntity.class)) {
                 worker.setGrownUpAt(middleAged);
             }
-            TermiteSoldierTests.digNestAtOnce(level, colony);
+            TermiteScenes.digNestAtOnce(level, colony);
             colony.population().addNewMembers(Caste.WORKER, level.getGameTime() - 1000, 500);
             if (kind == Food.GIANT) {
                 // The rest of the giant's log round the bottom row: 3 wide, 3 high, bark outside, the core inside.

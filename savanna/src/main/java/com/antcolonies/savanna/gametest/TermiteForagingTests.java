@@ -43,14 +43,7 @@ public class TermiteForagingTests {
     public static void termitesOpenTheirForagingHolesAtNightAndPlugThemByDay(GameTestHelper helper) {
         ServerLevel level = helper.getLevel();
         level.getServer().tickRateManager().setTickRate(2000.0F);
-        TestScenes.deepGround(helper);
-        helper.spawn(SavannaEntities.TERMITE_QUEEN.get(), MIDDLE, SURFACE, MIDDLE);
-        helper.runAfterDelay(5, () -> {
-            helper.spawn(SavannaEntities.TERMITE_KING.get(), MIDDLE + 2, SURFACE, MIDDLE + 1);
-            for (int i = 0; i < 6; i++) {
-                helper.spawn(SavannaEntities.TERMITE_WORKER.get(), MIDDLE - 2 + i % 3, SURFACE, MIDDLE - 2 + i / 3);
-            }
-        });
+        TermiteScenes.start(helper, TermiteScenes.spots(6, i -> new BlockPos(MIDDLE - 2 + i % 3, SURFACE, MIDDLE - 2 + i / 3)), true);
         BlockPos bush = new BlockPos(MIDDLE + 5, SURFACE, MIDDLE + 5);
         TestClock clock = TestClock.moving(helper, 18.5);
         int[] phase = {0}; // 0 the nights until both holes are open, 1 the day after, 2 waiting for the next night, 3 done
@@ -189,7 +182,7 @@ public class TermiteForagingTests {
             for (com.antcolonies.savanna.entity.TermiteWorkerEntity worker : TestIsolation.insectsOf(level, colony, com.antcolonies.savanna.entity.TermiteWorkerEntity.class)) {
                 worker.setGrownUpAt(now - (i++ < 2 ? colony.profile().worker().nurseUntilTicks() : colony.profile().worker().builderUntilTicks()) - 1000);
             }
-            TermiteSoldierTests.digNestAtOnce(level, colony);
+            TermiteScenes.digNestAtOnce(level, colony);
             colony.population().addNewMembers(Caste.WORKER, now - colony.profile().worker().builderUntilTicks() - 1000, 30);
             com.antcolonies.savanna.colony.Galleries.of(colony).setSwitchForTests(true);
             stage[0] = 1;
@@ -537,7 +530,7 @@ public class TermiteForagingTests {
             for (com.antcolonies.savanna.entity.TermiteWorkerEntity worker : TestIsolation.insectsOf(level, colony, com.antcolonies.savanna.entity.TermiteWorkerEntity.class)) {
                 worker.setGrownUpAt(now - colony.profile().worker().nurseUntilTicks() - 1000);
             }
-            TermiteSoldierTests.digNestAtOnce(level, colony);
+            TermiteScenes.digNestAtOnce(level, colony);
             colony.population().addNewMembers(Caste.WORKER, now - colony.profile().worker().builderUntilTicks() - 1000, 30);
             com.antcolonies.savanna.colony.Galleries.of(colony).setSwitchForTests(true);
             com.antcolonies.savanna.colony.Galleries.of(colony).setReachForTests(reach);

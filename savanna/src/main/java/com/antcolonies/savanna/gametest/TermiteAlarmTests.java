@@ -56,27 +56,19 @@ public class TermiteAlarmTests {
     public static void minorsBiteAChickenThatHuntsTheForagersWhoHurryHome(GameTestHelper helper) {
         ServerLevel level = helper.getLevel();
         level.getServer().tickRateManager().setTickRate(2000.0F);
-        TestScenes.deepGround(helper);
-        helper.spawn(SavannaEntities.TERMITE_QUEEN.get(), MIDDLE, SURFACE, MIDDLE);
-        helper.runAfterDelay(5, () -> {
-            for (int i = 0; i < 5; i++) {
-                helper.spawn(SavannaEntities.TERMITE_WORKER.get(), MIDDLE - 2 + i, SURFACE, MIDDLE - 2);
-            }
-        });
         List<TermiteSoldierEntity> minors = new ArrayList<>();
         BlockPos[] hay = new BlockPos[1];
         Chicken[] chicken = new Chicken[1];
         long[] at = {-1, -1}; // when the chicken came, when the alarm went up
         Set<UUID> biters = new HashSet<>();
-        helper.runAfterDelay(10, () -> {
-            Colony colony = TermiteMoundTests.colony(helper);
+        TermiteScenes.colony(helper, TermiteScenes.spots(5, i -> new BlockPos(MIDDLE - 2 + i, SURFACE, MIDDLE - 2)), colony -> {
             helper.assertTrue(colony != null && !colony.isFounding(), "no termite colony with workers");
             TestClock.still(helper, 12.0); // midday: everybody stays in
             long old = level.getGameTime() - colony.profile().worker().builderUntilTicks() - 1000;
             for (TermiteWorkerEntity worker : TestIsolation.insectsOf(helper, TermiteWorkerEntity.class)) {
                 worker.setGrownUpAt(old);
             }
-            TermiteSoldierTests.digNestAtOnce(level, colony);
+            TermiteScenes.digNestAtOnce(level, colony);
             level.setBlock(colony.nest().getEntrance(), Blocks.STONE.defaultBlockState(), 3);
             List<NestPlan.ForagingTunnel> tunnels = colony.nest().getForagingTunnels(level);
             for (NestPlan.ForagingTunnel tunnel : tunnels) {
@@ -162,26 +154,18 @@ public class TermiteAlarmTests {
     public static void theMiddleHoleIsPluggedSoonAfterAChickenAlarm(GameTestHelper helper) {
         ServerLevel level = helper.getLevel();
         level.getServer().tickRateManager().setTickRate(2000.0F);
-        TestScenes.deepGround(helper);
-        helper.spawn(SavannaEntities.TERMITE_QUEEN.get(), MIDDLE, SURFACE, MIDDLE);
-        helper.runAfterDelay(5, () -> {
-            for (int i = 0; i < 10; i++) {
-                helper.spawn(SavannaEntities.TERMITE_WORKER.get(), MIDDLE - 2 + i % 4, SURFACE, MIDDLE - 2 + i / 4);
-            }
-        });
         List<TermiteSoldierEntity> minors = new ArrayList<>();
         BlockPos[] bush = new BlockPos[1];
         Chicken[] chicken = new Chicken[1];
         long[] at = {-1, -1, -1}; // the chicken came, the fight was over (chicken dead or the minors back in), everybody was in
-        helper.runAfterDelay(10, () -> {
-            Colony colony = TermiteMoundTests.colony(helper);
+        TermiteScenes.colony(helper, TermiteScenes.spots(10, i -> new BlockPos(MIDDLE - 2 + i % 4, SURFACE, MIDDLE - 2 + i / 4)), colony -> {
             helper.assertTrue(colony != null && !colony.isFounding(), "no termite colony with workers");
             long old = level.getGameTime() - colony.profile().worker().builderUntilTicks() - 1000;
             List<TermiteWorkerEntity> workers = TestIsolation.insectsOf(helper, TermiteWorkerEntity.class);
             for (int i = 0; i < workers.size(); i++) {
                 workers.get(i).setGrownUpAt(i < 8 ? old : level.getGameTime()); // 8 foragers (a crowd at the hole), 2 young ones inside
             }
-            TermiteSoldierTests.digNestAtOnce(level, colony);
+            TermiteScenes.digNestAtOnce(level, colony);
             for (NestPlan.ForagingTunnel tunnel : colony.nest().getForagingTunnels(level)) {
                 level.setBlock(tunnel.hole(), Blocks.STONE.defaultBlockState(), 3); // no foraging holes yet: only the middle one
             }
@@ -282,16 +266,13 @@ public class TermiteAlarmTests {
     public static void aBreakInSpreadsTheDrummingAndSendsTheSoldiersToTheBreach(GameTestHelper helper) {
         ServerLevel level = helper.getLevel();
         level.getServer().tickRateManager().setTickRate(2000.0F);
-        TestScenes.deepGround(helper);
-        helper.spawn(SavannaEntities.TERMITE_QUEEN.get(), MIDDLE, SURFACE, MIDDLE);
         List<TermiteSoldierEntity> soldiers = new ArrayList<>();
         BlockPos[] breach = new BlockPos[1];
         boolean[] minorInTheBreach = {false};
-        helper.runAfterDelay(10, () -> {
-            Colony colony = TermiteMoundTests.colony(helper);
+        TermiteScenes.colony(helper, List.of(), colony -> {
             helper.assertTrue(colony != null, "no termite colony");
             TestClock.still(helper, 12.0); // midday: everybody stays in
-            TermiteSoldierTests.digNestAtOnce(level, colony);
+            TermiteScenes.digNestAtOnce(level, colony);
             List<BlockPos> room = colony.nest().getHomeChamber(level).room();
             for (int i = 0; i < 3; i++) {
                 TermiteWorkerEntity worker = SavannaEntities.TERMITE_WORKER.get().create(level);
@@ -380,16 +361,13 @@ public class TermiteAlarmTests {
     @GameTest(template = "arena", timeoutTicks = 200)
     public static void repeatedBreakInsMakeItLevelFourAndTheColonyWantsMoreSoldiers(GameTestHelper helper) {
         ServerLevel level = helper.getLevel();
-        TestScenes.deepGround(helper);
-        helper.spawn(SavannaEntities.TERMITE_QUEEN.get(), MIDDLE, SURFACE, MIDDLE);
-        helper.runAfterDelay(10, () -> {
-            Colony colony = TermiteMoundTests.colony(helper);
+        TermiteScenes.colony(helper, List.of(), colony -> {
             helper.assertTrue(colony != null, "no termite colony");
             TestClock.still(helper, 0.0); // midnight: foraging time
             colony.setCount(Caste.WORKER, 20);
             helper.assertTrue(colony.part(SavannaParts.SOLDIERS).orElseThrow().wanted(level, Rank.MINOR) == 2 && colony.part(SavannaParts.SOLDIERS).orElseThrow().wanted(level, Rank.MAJOR) == 1,
                     "20 workers should want 2 minors and 1 major");
-            TermiteSoldierTests.digNestAtOnce(level, colony);
+            TermiteScenes.digNestAtOnce(level, colony);
             BlockPos chamber = colony.nest().getHomeChamber(level).center();
             // Three blocks of the royal chamber's walls: under it, over it, and a side wall.
             BlockPos side = Direction.Plane.HORIZONTAL.stream().map(direction -> chamber.relative(direction, 2))
@@ -443,16 +421,13 @@ public class TermiteAlarmTests {
     public static void footstepsBringTwoMinorsToLookAndDrum(GameTestHelper helper) {
         ServerLevel level = helper.getLevel();
         level.getServer().tickRateManager().setTickRate(2000.0F);
-        TestScenes.deepGround(helper);
-        helper.spawn(SavannaEntities.TERMITE_QUEEN.get(), MIDDLE, SURFACE, MIDDLE);
         List<TermiteSoldierEntity> minors = new ArrayList<>();
         Set<UUID> drummedAtTheSpot = new HashSet<>();
         long[] raised = {-1};
-        helper.runAfterDelay(10, () -> {
-            Colony colony = TermiteMoundTests.colony(helper);
+        TermiteScenes.colony(helper, List.of(), colony -> {
             helper.assertTrue(colony != null, "no termite colony");
             TestClock.still(helper, 12.0); // midday: everybody stays in
-            TermiteSoldierTests.digNestAtOnce(level, colony);
+            TermiteScenes.digNestAtOnce(level, colony);
             List<BlockPos> room = colony.nest().getHomeChamber(level).room();
             for (int i = 0; i < 3; i++) {
                 minors.add(TermiteSoldierTests.put(level, SavannaEntities.TERMITE_MINOR_SOLDIER.get(), room.get(i)));

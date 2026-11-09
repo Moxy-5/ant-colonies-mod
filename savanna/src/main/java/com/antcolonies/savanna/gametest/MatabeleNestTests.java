@@ -61,8 +61,7 @@ public class MatabeleNestTests {
         MatabeleQueenEntity queen = helper.spawn(SavannaEntities.MATABELE_QUEEN.get(), MIDDLE + 9, SURFACE, MIDDLE);
         helper.runAfterDelay(40, () -> {
             helper.assertTrue(queen.getColonyId() == null, "the queen started a colony with no dead mound near");
-            Colony termites = NewLandMounds.get(level).put(level, helper.absolutePos(new BlockPos(MIDDLE, SURFACE, MIDDLE)), NewLandMounds.pickFor("dead", 30, 5L));
-            helper.assertTrue(termites != null, "no dead mound put in");
+            Colony termites = MatabeleScenes.deadMound(helper, MIDDLE, MIDDLE);
             // The hump may rise round her (a mound never appears under an ant in play): up onto its top.
             queen.teleportTo(queen.getX(), level.getHeight(net.minecraft.world.level.levelgen.Heightmap.Types.MOTION_BLOCKING_NO_LEAVES,
                     queen.getBlockX(), queen.getBlockZ()), queen.getZ());

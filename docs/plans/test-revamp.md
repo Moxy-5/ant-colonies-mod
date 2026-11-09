@@ -121,6 +121,31 @@ move to `insectsOf`.
 - desert (`HarvesterScenes`): a harvester nest already dug with N workers.
 Tests that build these scenes by hand move onto the kit, every check kept. Then a full run.
 
+### Part 1 as built (2026-11-09)
+
+- **R1** as planned.
+- **R2** as planned: `TestIsolation.coloniesOf`, `colonyOf`, `colonyOfQueen`, `insectsOf`; 14 away look-ups and 64 box
+  counts moved. Left on purpose: counts of dropped items and blocks (by box is right for them), and finds by a spot
+  ("the Matabele colony nearest this mound", `MatabeleNewLandTests.matabeleNear`, `MatabeleAwayTests`' queen within 6,
+  `TermiteNewLandTests`), which already pick their own colony.
+- **R3, a smaller version** (the overnight rule "if a step balloons, do a smaller version"): the kit is built
+  (`TestScenes.queenAndWorkers`/`spots`, `TermiteScenes.colony`/`start`/`digNestAtOnce`/`livingMound`,
+  `MatabeleScenes.deadMound`/`colony`/`feedingUnderALog`, `HarvesterScenes.dugNest`) and the tests that build these
+  scenes **exactly** the hand-built way moved onto it: 15 termite colony starts (11 with their look-up after 10 ticks,
+  4 start only), every caller of the termite nest dug at once (27, it lived in `TermiteSoldierTests`), 18 dead mounds
+  and 17 Matabele colonies (the colony now also checks it has its prey pile), 20 feeding spots under a log, and the 14
+  callers of the harvester nest already dug (`HarvesterPopulationTests.startAntColony`, gone). Moved by script
+  (only exact matches), every check kept, timings kept. **Left for part 2 (or whenever they are next touched):**
+  - termite starts with something in between (the away tests' `onEachTick` worker watch and the king at tick 2, 4 tests;
+    a colony looked up after 5 ticks, 2; a look-up on each tick, 1) and the tests that shape their own ground first
+    (`TermiteTests.ground`, the hill and new-hole tests);
+  - Matabele scenes with their own seeds or two mounds (`MatabeleColonyTests`, `MatabeleNewLandTests`, the nest tests'
+    queen walking in), and the fight tests' own feeding spots;
+  - `TermiteStressTests`' own nest digger (it digs side rooms and the founding chamber too, a different scene) and the
+    harvester `NestTests.digNestAtOnce` (also different);
+  - a living mound at stage N: `TermiteScenes.livingMound` is there, but the four tests that make one use new land's
+    `pickFor("full"|"half"|"young")` in one line already, so they were left.
+
 ### Part 2 (the next session, on top of this branch)
 
 **R4. Exact numbers into the rules they mean** (the 4-box rule's box 3): start with the known breakers (jobs, seeds,
@@ -160,6 +185,9 @@ reach, no colony in water.
   folder; shared bits in the framework's `TestScenes`.
 - R3: a living mound at any stage from a `TermiteMoundStructure.Pick` built in the test (the record is public), no
   game code touched.
+- R3: the moves made by script on exact matches only, so a test with anything different in its start keeps its own
+  start (no guessing whether a difference matters to the colony).
+- R3: `MatabeleScenes.colony` checks the prey pile as well as the raids part (one more check, never fewer).
 
 ## Your calls
 

@@ -43,14 +43,7 @@ public class TermiteRepairTests {
     public static void termitesSealOpeningsInTheirNestWithMoundSoil(GameTestHelper helper) {
         ServerLevel level = helper.getLevel();
         level.getServer().tickRateManager().setTickRate(2000.0F);
-        TestScenes.deepGround(helper);
-        helper.spawn(SavannaEntities.TERMITE_QUEEN.get(), MIDDLE, SURFACE, MIDDLE);
-        helper.runAfterDelay(5, () -> {
-            helper.spawn(SavannaEntities.TERMITE_KING.get(), MIDDLE + 2, SURFACE, MIDDLE + 1);
-            for (int i = 0; i < 6; i++) {
-                helper.spawn(SavannaEntities.TERMITE_WORKER.get(), MIDDLE - 2 + i % 3, SURFACE, MIDDLE - 2 + i / 3);
-            }
-        });
+        TermiteScenes.start(helper, TermiteScenes.spots(6, i -> new BlockPos(MIDDLE - 2 + i % 3, SURFACE, MIDDLE - 2 + i / 3)), true);
         List<BlockPos> holes = new ArrayList<>(); // the cut blocks that touch the nest: these must be plugged
         int groundTop = helper.absolutePos(new BlockPos(0, SURFACE - 1, 0)).getY();
         helper.onEachTick(() -> {

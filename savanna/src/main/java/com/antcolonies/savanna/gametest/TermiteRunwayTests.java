@@ -89,7 +89,7 @@ public class TermiteRunwayTests {
                 long old = now - colony.profile().worker().builderUntilTicks() - 1000;
                 workers.get(i).setGrownUpAt(i % 2 == 0 ? builder : old);
             }
-            TermiteSoldierTests.digNestAtOnce(level, colony);
+            TermiteScenes.digNestAtOnce(level, colony);
             colony.population().addNewMembers(Caste.WORKER, now - 1000, 500);
             // The hole whose way out leads into the arena: the nest is in the arena's middle and its holes face a side
             // picked by the colony, so the hay past a hole facing north or west lay outside the arena, under its barrier

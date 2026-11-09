@@ -62,7 +62,7 @@ public class HarvesterTrailTests {
     @GameTest(template = "arena", timeoutTicks = 600, skyAccess = true)
     public static void foragersWearLastingTrunkTrailsThatFadeAndGrowBack(GameTestHelper helper) {
         ServerLevel level = helper.getLevel();
-        HarvesterPopulationTests.startAntColony(helper);
+        HarvesterScenes.dugNest(helper);
         helper.onEachTick(() -> AwayKit.noRealWorkers(helper));
         BlockPos[] center = new BlockPos[1];
         int[] bare = new int[1];
@@ -295,7 +295,7 @@ public class HarvesterTrailTests {
     @GameTest(template = "arena", timeoutTicks = 72000, skyAccess = true, batch = "far_meadow")
     public static void aFarMeadowPastTheTrailsTipIsFoundRecruitedToAndPullsTheTrailOut(GameTestHelper helper) {
         ServerLevel level = helper.getLevel();
-        HarvesterPopulationTests.startAntColony(helper);
+        HarvesterScenes.dugNest(helper);
         // Ground east of the nest out past the meadow (the arena's own ground is only 25 blocks across).
         for (int x = 25; x <= MIDDLE + MEADOW_TO + 6; x++) {
             for (int z = 0; z < 25; z++) {

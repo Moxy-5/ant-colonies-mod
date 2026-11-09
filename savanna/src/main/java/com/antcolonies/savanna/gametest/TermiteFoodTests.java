@@ -254,25 +254,17 @@ public class TermiteFoodTests {
     public static void aWorkerFindsAHayBaleAndTheForagersGoForItRatherThanTheGrass(GameTestHelper helper) {
         ServerLevel level = helper.getLevel();
         level.getServer().tickRateManager().setTickRate(2000.0F);
-        TestScenes.deepGround(helper);
-        helper.spawn(SavannaEntities.TERMITE_QUEEN.get(), MIDDLE, SURFACE, MIDDLE);
-        helper.runAfterDelay(5, () -> {
-            for (int i = 0; i < 5; i++) {
-                helper.spawn(SavannaEntities.TERMITE_WORKER.get(), MIDDLE - 2 + i, SURFACE, MIDDLE - 2);
-            }
-        });
         BlockPos[] spots = new BlockPos[3]; // the hay, the grass by the first hole, the grass by the second
         int[] phase = {0}; // 0 setting up, 1 day: the finder, 2 night
         com.antcolonies.savanna.entity.TermiteWorkerEntity[] finder = {null};
-        helper.runAfterDelay(10, () -> {
-            Colony colony = TermiteMoundTests.colony(helper);
+        TermiteScenes.colony(helper, TermiteScenes.spots(5, i -> new BlockPos(MIDDLE - 2 + i, SURFACE, MIDDLE - 2)), colony -> {
             helper.assertTrue(colony != null && !colony.isFounding(), "no termite colony with workers");
             TestClock.still(helper, 12.0); // midday: nobody goes out
             long old = level.getGameTime() - colony.profile().worker().builderUntilTicks() - 1000;
             for (com.antcolonies.savanna.entity.TermiteWorkerEntity worker : TestIsolation.insectsOf(helper, com.antcolonies.savanna.entity.TermiteWorkerEntity.class)) {
                 worker.setGrownUpAt(old); // old workers: foragers first
             }
-            TermiteSoldierTests.digNestAtOnce(level, colony);
+            TermiteScenes.digNestAtOnce(level, colony);
             level.setBlock(colony.nest().getEntrance(), Blocks.STONE.defaultBlockState(), 3);
             List<NestPlan.ForagingTunnel> tunnels = colony.nest().getForagingTunnels(level);
             helper.assertTrue(tunnels.size() == 2, "the nest has " + tunnels.size() + " foraging tunnels");
@@ -751,7 +743,7 @@ public class TermiteFoodTests {
             Colony colony = TermiteMoundTests.colony(helper);
             helper.assertTrue(colony != null && !colony.isFounding(), "no termite colony with workers");
             long now = level.getGameTime();
-            TermiteSoldierTests.digNestAtOnce(level, colony);
+            TermiteScenes.digNestAtOnce(level, colony);
             colony.population().addNewMembers(Caste.WORKER, now - colony.profile().worker().builderUntilTicks() - 1000, 500);
             com.antcolonies.savanna.colony.Galleries.of(colony).setSwitchForTests(true);
             stage[0] = 1;

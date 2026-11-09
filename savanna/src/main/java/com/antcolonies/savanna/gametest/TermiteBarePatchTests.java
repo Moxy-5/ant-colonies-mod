@@ -52,7 +52,7 @@ public class TermiteBarePatchTests {
         helper.runAfterDelay(10, () -> {
             Colony colony = TermiteMoundTests.colony(helper);
             helper.assertTrue(colony != null && !colony.isFounding(), "no termite colony with workers");
-            TermiteSoldierTests.digNestAtOnce(level, colony);
+            TermiteScenes.digNestAtOnce(level, colony);
             NestPlan.ForagingTunnel first = colony.nest().getForagingTunnels(level).get(0);
             Direction out = first.side();
             tufts[0] = first.hole().above().relative(out, 2);

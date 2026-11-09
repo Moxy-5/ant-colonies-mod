@@ -184,7 +184,7 @@ public class TermiteAwayTests {
             helper.assertTrue(colony != null, "no termite colony");
             colony.population().setOnForTests(false); // no swapping: the numbers stay numbers
             colony.population().setViewersForTests(List.of());
-            TermiteSoldierTests.digNestAtOnce(level, colony);
+            TermiteScenes.digNestAtOnce(level, colony);
             colony.population().addNewMembers(Caste.WORKER, level.getGameTime() - 250000, 60);
             // Step 2c's rule with the 2 holes of before (the galleries' night holes have their own scene, step 4 below).
             com.antcolonies.savanna.colony.Galleries.of(colony).setSwitchForTests(false);
@@ -352,7 +352,7 @@ public class TermiteAwayTests {
             long now = level.getGameTime();
             colony.population().addNewMembers(Caste.WORKER, now - colony.profile().worker().builderUntilTicks() - 1000, 30);
             colony.population().addNewMembers(Caste.WORKER, now - colony.profile().worker().nurseUntilTicks() - 1000, 8);
-            TermiteSoldierTests.digNestAtOnce(level, colony); // (the nest of a colony with workers, not the founders' chamber)
+            TermiteScenes.digNestAtOnce(level, colony); // (the nest of a colony with workers, not the founders' chamber)
             com.antcolonies.savanna.colony.Galleries.of(colony).setSwitchForTests(true);
             com.antcolonies.savanna.colony.Galleries.of(colony).setReachForTests(reach);
             colony.field().setOnForTests(true);
@@ -630,7 +630,7 @@ public class TermiteAwayTests {
             helper.assertTrue(colony != null, "no termite colony");
             colony.population().setOnForTests(false); // no swapping: the numbers stay numbers
             colony.population().setViewersForTests(List.of());
-            TermiteSoldierTests.digNestAtOnce(level, colony);
+            TermiteScenes.digNestAtOnce(level, colony);
             colony.population().addNewMembers(Caste.WORKER, level.getGameTime() - 250000, 60);
             com.antcolonies.savanna.colony.Galleries.of(colony).setSwitchForTests(false);
             for (int i = 0; i < 6; i++) {
@@ -722,7 +722,7 @@ public class TermiteAwayTests {
             colony.setHungerOn(true);
             colony.population().setOnForTests(false); // no swapping: the numbers stay numbers
             colony.population().setViewersForTests(List.of());
-            TermiteSoldierTests.digNestAtOnce(level, colony);
+            TermiteScenes.digNestAtOnce(level, colony);
             BlockPos room = colony.nest().getFinishedRoomCenter(level);
             helper.assertTrue(room != null, "the royal chamber should be dug");
             AbstractAntEntity theQueen = colony.getQueen(level);
@@ -927,7 +927,7 @@ public class TermiteAwayTests {
             colony.setHungerOn(true);
             colony.population().setOnForTests(false);
             colony.population().setViewersForTests(List.of());
-            TermiteSoldierTests.digNestAtOnce(level, colony);
+            TermiteScenes.digNestAtOnce(level, colony);
             BlockPos room = colony.nest().getFinishedRoomCenter(level);
             helper.assertTrue(room != null, "the royal chamber should be dug");
             colony.getQueen(level).teleportTo(room.getX() + 0.5, room.getY(), room.getZ() + 0.5);
@@ -1001,14 +1001,11 @@ public class TermiteAwayTests {
     @GameTest(template = "arena", timeoutTicks = 3000, skyAccess = true)
     public static void aFarTermiteColonyLivesAsNumbersAndComesOutWhenAPlayerIsNear(GameTestHelper helper) {
         ServerLevel level = helper.getLevel();
-        TestScenes.deepGround(helper);
-        helper.spawn(SavannaEntities.TERMITE_QUEEN.get(), MIDDLE, SURFACE, MIDDLE);
         int[] stage = {0};
         int[] headcount = new int[1];
-        helper.runAfterDelay(10, () -> {
-            Colony colony = TermiteMoundTests.colony(helper);
+        TermiteScenes.colony(helper, List.of(), colony -> {
             helper.assertTrue(colony != null, "no termite colony");
-            TermiteSoldierTests.digNestAtOnce(level, colony);
+            TermiteScenes.digNestAtOnce(level, colony);
             colony.population().setOnForTests(true);
             colony.population().setViewersForTests(List.of()); // nobody watching: workers come out anywhere unseen
             colony.population().addNewMembers(Caste.WORKER, level.getGameTime(), 120);

@@ -156,13 +156,7 @@ public class TermiteSoldierTests {
     public static void soldiersStandGuardAndANurseFeedsAHungrySoldier(GameTestHelper helper) {
         ServerLevel level = helper.getLevel();
         level.getServer().tickRateManager().setTickRate(2000.0F);
-        TestScenes.deepGround(helper);
-        helper.spawn(SavannaEntities.TERMITE_QUEEN.get(), MIDDLE, SURFACE, MIDDLE);
-        helper.runAfterDelay(5, () -> {
-            for (int i = 0; i < 3; i++) {
-                helper.spawn(SavannaEntities.TERMITE_WORKER.get(), MIDDLE - 2 + i, SURFACE, MIDDLE - 2);
-            }
-        });
+        TermiteScenes.start(helper, TermiteScenes.spots(3, i -> new BlockPos(MIDDLE - 2 + i, SURFACE, MIDDLE - 2)), false);
         List<TermiteSoldierEntity> soldiers = new ArrayList<>();
         long[] hungrySince = {-1};
         int[] guarding = {0};
@@ -173,7 +167,7 @@ public class TermiteSoldierTests {
             for (TermiteWorkerEntity worker : TestIsolation.insectsOf(helper, TermiteWorkerEntity.class)) {
                 worker.setGrownUpAt(level.getGameTime()); // young: the colony's nurse is one of them
             }
-            digNestAtOnce(level, colony);
+            TermiteScenes.digNestAtOnce(level, colony);
             NestPlan.Chamber garden = colony.nest().getGardens(level).get(0);
             for (int i = 0; i < 3; i++) {
                 level.setBlock(garden.room().get(garden.room().size() - 1 - i), SavannaBlocks.FUNGUS_COMB.get().defaultBlockState()
@@ -270,24 +264,6 @@ public class TermiteSoldierTests {
         return way == net.minecraft.core.Direction.NORTH || way == net.minecraft.core.Direction.WEST ? way.getOpposite() : way;
     }
 
-    static void digNestAtOnce(ServerLevel level, Colony colony) {
-        BlockPos bottom = colony.nest().getShaftBottom(level);
-        for (BlockPos pos = colony.getCenter().below(); pos.getY() >= bottom.getY(); pos = pos.below()) {
-            level.setBlock(pos, Blocks.AIR.defaultBlockState(), 3);
-        }
-        List<BlockPos> cells = new ArrayList<>();
-        for (NestPlan.Chamber chamber : colony.nest().getPlannedChambers(level)) {
-            cells.addAll(chamber.cells());
-        }
-        cells.addAll(colony.nest().getGardens(level).get(0).cells());
-        for (NestPlan.ForagingTunnel tunnel : colony.nest().getForagingTunnels(level)) {
-            cells.addAll(tunnel.tunnel());
-        }
-        for (BlockPos pos : cells) {
-            level.setBlock(pos, Blocks.AIR.defaultBlockState(), 3);
-        }
-    }
-
     /**
      * The minors out at foraging time (step 6b). A colony with its royal chamber, a garden and both foraging tunnels dug
      * out, both holes open, and the entrance in the middle closed with stone (so the foragers go out by the holes). Five
@@ -305,13 +281,6 @@ public class TermiteSoldierTests {
     public static void minorsGuardTheHolesAndLineTheForagersTrailThenGoInLast(GameTestHelper helper) {
         ServerLevel level = helper.getLevel();
         level.getServer().tickRateManager().setTickRate(2000.0F);
-        TestScenes.deepGround(helper);
-        helper.spawn(SavannaEntities.TERMITE_QUEEN.get(), MIDDLE, SURFACE, MIDDLE);
-        helper.runAfterDelay(5, () -> {
-            for (int i = 0; i < 5; i++) {
-                helper.spawn(SavannaEntities.TERMITE_WORKER.get(), MIDDLE - 2 + i, SURFACE, MIDDLE - 2);
-            }
-        });
         List<TermiteSoldierEntity> minors = new ArrayList<>();
         BlockPos[] trail = new BlockPos[2]; // the first hole's mouth, the hay
         int[] phase = {0}; // 0 setting up, 1 night, 2 day, 3 everybody in
@@ -319,14 +288,13 @@ public class TermiteSoldierTests {
         boolean[] stoodGuard = {false};
         Set<Long> seenOut = new HashSet<>(); // (BUGS 75: logged once a second per worker)
         TestClock[] clock = {TestClock.still(helper, 12.0)}; // midday: setting up
-        helper.runAfterDelay(10, () -> {
-            Colony colony = TermiteMoundTests.colony(helper);
+        TermiteScenes.colony(helper, TermiteScenes.spots(5, i -> new BlockPos(MIDDLE - 2 + i, SURFACE, MIDDLE - 2)), colony -> {
             helper.assertTrue(colony != null && !colony.isFounding(), "no termite colony with workers");
             long old = level.getGameTime() - colony.profile().worker().builderUntilTicks() - 1000;
             for (TermiteWorkerEntity worker : TestIsolation.insectsOf(helper, TermiteWorkerEntity.class)) {
                 worker.setGrownUpAt(old); // old workers: foragers first
             }
-            digNestAtOnce(level, colony);
+            TermiteScenes.digNestAtOnce(level, colony);
             level.setBlock(colony.nest().getEntrance(), Blocks.STONE.defaultBlockState(), 3);
             List<NestPlan.ForagingTunnel> tunnels = colony.nest().getForagingTunnels(level);
             helper.assertTrue(tunnels.size() == 2, "the nest has " + tunnels.size() + " foraging tunnels");

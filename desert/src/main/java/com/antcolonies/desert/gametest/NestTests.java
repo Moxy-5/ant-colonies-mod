@@ -2017,7 +2017,7 @@ public class NestTests {
     @GameTest(template = "arena", timeoutTicks = 30000, skyAccess = true, batch = "full_store")
     public static void seedsLyingByAFullStoreAreLeftThereAndFetchedOnceThereIsRoom(GameTestHelper helper) {
         ServerLevel level = helper.getLevel();
-        HarvesterPopulationTests.startAntColony(helper);
+        HarvesterScenes.dugNest(helper);
         int[][] where = {{6, 0}, {-6, 1}, {1, 7}, {-2, -6}, {5, 5}, {-5, -5}, {7, -3}, {-4, 6}};
         int[] phase = {0};
         long[] roomAt = {-1};

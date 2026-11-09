@@ -40,10 +40,8 @@ public class MatabeleAwayTests {
         level.getServer().tickRateManager().setTickRate(2000.0F);
         TestScenes.deepGround(helper);
         TestClock clock = TestClock.still(helper, 13.0); // (between the raid hours: no raid may leave)
-        Colony dead = NewLandMounds.get(level).put(level, helper.absolutePos(new BlockPos(MIDDLE, SURFACE, MIDDLE)), NewLandMounds.pickFor("dead", 30, 5L));
-        helper.assertTrue(dead != null, "no dead mound put in");
-        Colony colony = MatabeleCommands.makeColony(level, helper.absolutePos(new BlockPos(MIDDLE + 9, SURFACE, MIDDLE)), 200);
-        helper.assertTrue(colony != null, "no Matabele colony made");
+        Colony dead = MatabeleScenes.deadMound(helper, MIDDLE, MIDDLE);
+        Colony colony = MatabeleScenes.colony(helper, MIDDLE + 9, MIDDLE, 200);
         Raids raids = colony.part(SavannaParts.RAIDS).orElseThrow();
         PreyPile pile = colony.part(SavannaParts.PREY_PILE).orElseThrow();
         // the termites: a royal pair founding in the far corner, with a big crowd of workers in its numbers
@@ -150,10 +148,8 @@ public class MatabeleAwayTests {
         level.getServer().tickRateManager().setTickRate(2000.0F);
         TestScenes.deepGround(helper);
         TestClock.still(helper, 8.0); // (the morning raid hours)
-        Colony dead = NewLandMounds.get(level).put(level, helper.absolutePos(new BlockPos(MIDDLE, SURFACE, MIDDLE)), NewLandMounds.pickFor("dead", 30, 5L));
-        helper.assertTrue(dead != null, "no dead mound put in");
-        Colony colony = MatabeleCommands.makeColony(level, helper.absolutePos(new BlockPos(MIDDLE + 9, SURFACE, MIDDLE)), 200);
-        helper.assertTrue(colony != null, "no Matabele colony made");
+        Colony dead = MatabeleScenes.deadMound(helper, MIDDLE, MIDDLE);
+        Colony colony = MatabeleScenes.colony(helper, MIDDLE + 9, MIDDLE, 200);
         Raids raids = colony.part(SavannaParts.RAIDS).orElseThrow();
         PreyPile pile = colony.part(SavannaParts.PREY_PILE).orElseThrow();
         BlockPos queenAt = helper.absolutePos(new BlockPos(54, SURFACE, 54));

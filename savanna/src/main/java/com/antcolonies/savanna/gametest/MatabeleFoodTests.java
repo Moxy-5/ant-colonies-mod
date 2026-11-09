@@ -160,10 +160,8 @@ public class MatabeleFoodTests {
     private static Colony settled(GameTestHelper helper) {
         ServerLevel level = helper.getLevel();
         TestScenes.deepGround(helper);
-        Colony termites = NewLandMounds.get(level).put(level, helper.absolutePos(new BlockPos(MIDDLE, SURFACE, MIDDLE)), NewLandMounds.pickFor("dead", 30, 5L));
-        helper.assertTrue(termites != null, "no dead mound put in");
-        Colony colony = MatabeleCommands.makeColony(level, helper.absolutePos(new BlockPos(MIDDLE + 9, SURFACE, MIDDLE)), 10);
-        helper.assertTrue(colony != null, "no Matabele colony made");
+        Colony termites = MatabeleScenes.deadMound(helper, MIDDLE, MIDDLE);
+        Colony colony = MatabeleScenes.colony(helper, MIDDLE + 9, MIDDLE, 10);
         return colony;
     }
 

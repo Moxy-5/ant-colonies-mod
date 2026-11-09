@@ -81,7 +81,7 @@ public class TermiteNeighbourTests {
                 for (com.antcolonies.savanna.entity.TermiteWorkerEntity worker : TestIsolation.insectsOf(level, colony, com.antcolonies.savanna.entity.TermiteWorkerEntity.class)) {
                     worker.setGrownUpAt(now - colony.profile().worker().nurseUntilTicks() - 1000);
                 }
-                TermiteSoldierTests.digNestAtOnce(level, colony);
+                TermiteScenes.digNestAtOnce(level, colony);
                 colony.population().addNewMembers(Caste.WORKER, now - colony.profile().worker().builderUntilTicks() - 1000, 900);
                 Galleries.of(colony).setSwitchForTests(true);
                 Galleries.of(colony).setReachForTests(30);
