@@ -1,5 +1,6 @@
 package com.antcolonies.savanna.gametest;
 
+import com.antcolonies.gametest.TestScenes;
 import com.antcolonies.gametest.TestAnts;
 import com.antcolonies.savanna.SavannaMod;
 import com.antcolonies.savanna.block.TermiteHoleBlock;
@@ -32,13 +33,10 @@ public class TermiteMoundTests {
     static final int SURFACE = 12;
     static final int MIDDLE = 12;
 
-    /** The termite colony in this test area (one with a living queen). */
+    /** This test's termite colony (one with a living queen; found by its owner, test revamp R2). */
     static Colony colony(GameTestHelper helper) {
         net.minecraft.world.phys.AABB area = helper.getBounds();
-        Colony found = ColonyManager.get(helper.getLevel()).getColonies().stream()
-                .filter(colony -> area.contains(net.minecraft.world.phys.Vec3.atCenterOf(colony.getCenter()))
-                        && colony.getQueen(helper.getLevel()) != null && colony.getSpecies().equals(SavannaSpecies.MACROTERMES))
-                .findFirst().orElse(null);
+        Colony found = TestScenes.colony(helper, SavannaSpecies.MACROTERMES);
         if (found != null) {
             // Both still needed on the 65 x 65 arenas (tried 2026-10-14: without either, the hay test failed in full runs
             // and passed alone): scouts and foragers stay in this test's arena, and only this test's enemies raise its alarm.

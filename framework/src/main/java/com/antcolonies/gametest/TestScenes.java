@@ -8,7 +8,6 @@ import java.util.function.IntBinaryOperator;
 import org.jetbrains.annotations.Nullable;
 
 import com.antcolonies.colony.Colony;
-import com.antcolonies.colony.ColonyManager;
 import com.antcolonies.colony.NestPlan;
 import com.antcolonies.entity.AbstractAntEntity;
 
@@ -18,7 +17,6 @@ import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.level.block.Blocks;
-import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
 
 /**
@@ -64,20 +62,17 @@ public final class TestScenes {
         }
     }
 
-    /** The colony of this species in this test area (one with a living queen), or null if there is none yet. */
+    /**
+     * This test's colony of this species (one with a living queen), or null if there is none yet: found by its owner,
+     * the test whose arena it was founded in (test revamp R2, {@link TestIsolation#colonyOf}), not by the arena's box.
+     */
     public static Colony colony(GameTestHelper helper, ResourceLocation species) {
-        AABB area = helper.getBounds();
-        return ColonyManager.get(helper.getLevel()).getColonies().stream()
-                .filter(c -> area.contains(Vec3.atCenterOf(c.getCenter())) && c.getQueen(helper.getLevel()) != null && c.getSpecies().equals(species))
-                .findFirst().orElse(null);
+        return TestIsolation.colonyOf(helper, species);
     }
 
-    /** The colonies of this species in the test's arena with a living queen, west first. */
+    /** This test's colonies of this species with a living queen, west first (found by owner, as {@link #colony}). */
     public static List<Colony> colonies(GameTestHelper helper, ResourceLocation species) {
-        AABB area = helper.getBounds();
-        List<Colony> found = new ArrayList<>(ColonyManager.get(helper.getLevel()).getColonies().stream()
-                .filter(c -> area.contains(Vec3.atCenterOf(c.getCenter())) && c.getQueen(helper.getLevel()) != null && c.getSpecies().equals(species))
-                .toList());
+        List<Colony> found = new ArrayList<>(TestIsolation.coloniesOf(helper, species));
         found.sort(Comparator.comparingInt(c -> c.getCenter().getX()));
         return found;
     }
@@ -102,10 +97,10 @@ public final class TestScenes {
         }
     }
 
-    /** This colony's real workers and soldiers that may go into the numbers, in the test area. */
+    /** This colony's real workers and soldiers that may go into the numbers, wherever they are (R2: not only near the arena). */
     public static List<AbstractAntEntity> real(GameTestHelper helper, Colony colony) {
-        return helper.getLevel().getEntitiesOfClass(AbstractAntEntity.class, helper.getBounds().inflate(16),
-                mob -> mob.isAlive() && colony.getId().equals(mob.getColonyId()) && mob.nestCaste() != null);
+        return TestIsolation.insectsOf(helper.getLevel(), colony, AbstractAntEntity.class).stream()
+                .filter(mob -> mob.isAlive() && mob.nestCaste() != null).toList();
     }
 
     /** Puts a mock player standing on the arena floor at this spot (the middle of the block at x, z, plus any part). */

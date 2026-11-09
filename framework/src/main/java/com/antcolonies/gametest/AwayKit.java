@@ -85,7 +85,7 @@ public final class AwayKit {
 
     /** Every real worker of the test's colonies leaves the world: only the numbers may forage in these tests. */
     public static void noRealWorkers(GameTestHelper helper) {
-        for (AbstractAntEntity worker : helper.getLevel().getEntitiesOfClass(AbstractAntEntity.class, helper.getBounds(),
+        for (AbstractAntEntity worker : TestIsolation.insectsOf(helper, AbstractAntEntity.class,
                 mob -> SpeciesBodies.all().stream().anyMatch(bodies -> mob.getType() == bodies.typeFor(Caste.WORKER)))) {
             worker.discard();
         }
@@ -398,7 +398,7 @@ public final class AwayKit {
                 List<Entity> all = new ArrayList<>();
                 all.add(colony.getQueen(level));
                 if (founders.partner() != null) {
-                    all.addAll(level.getEntitiesOfClass(founders.partner(), helper.getBounds(),
+                    all.addAll(TestIsolation.insectsOf(helper, founders.partner(),
                             king -> colony.getId().equals(king.getColonyId())));
                 }
                 for (Entity entity : all) {
@@ -429,7 +429,7 @@ public final class AwayKit {
                 List<Entity> all = new ArrayList<>();
                 all.add(colony.getQueen(level));
                 if (founders.partner() != null) {
-                    all.addAll(level.getEntitiesOfClass(founders.partner(), helper.getBounds(),
+                    all.addAll(TestIsolation.insectsOf(helper, founders.partner(),
                             king -> colony.getId().equals(king.getColonyId())));
                 }
                 all.addAll(colony.brood().getEggs(level));
@@ -501,7 +501,7 @@ public final class AwayKit {
                 return;
             }
             // Back: the first workers come out as real ones and open the entrance.
-            int real = level.getEntitiesOfClass(AbstractAntEntity.class, helper.getBounds(),
+            int real = TestIsolation.insectsOf(helper, AbstractAntEntity.class,
                     mob -> mob.isAlive() && colony.getId().equals(mob.getColonyId()) && Caste.WORKER.equals(mob.nestCaste())).size();
             if (colony.getQueen(level) != null && real == eggs && colony.nest().isEntranceOpen(level)) {
                 helper.assertTrue(colony.getCount(Caste.WORKER) == eggs, "still " + eggs + " workers: " + colony.getCount(Caste.WORKER));

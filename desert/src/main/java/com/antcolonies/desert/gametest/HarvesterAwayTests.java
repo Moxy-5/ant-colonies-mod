@@ -148,7 +148,7 @@ public class HarvesterAwayTests {
             colony.population().addNewMembers(Caste.WORKER, level.getGameTime() - lifespan * 12 / 10, 4);
         });
         helper.runAfterDelay(200, () -> {
-            Colony colony = ColonyManager.get(level).getColonies().stream().filter(c -> c.getQueenId().equals(queen[0])).findFirst().orElseThrow();
+            Colony colony = java.util.Objects.requireNonNull(com.antcolonies.gametest.TestIsolation.colonyOfQueen(level, queen[0]), "no colony of the queen");
             DesertMod.LOGGER.info("[away-test] away: {}{}", colony.population().describe(level), colony.away().describe(level));
             helper.assertTrue(colony.away().isAway(level), "the colony should be away");
             for (UUID id : unloaded.keySet()) {
@@ -257,7 +257,7 @@ public class HarvesterAwayTests {
             colony.brood().addInsideForTests(Brood.Young.larva(0, 0, null));
         });
         helper.runAfterDelay(500, () -> {
-            Colony colony = ColonyManager.get(level).getColonies().stream().filter(c -> c.getQueenId().equals(queen[0])).findFirst().orElseThrow();
+            Colony colony = java.util.Objects.requireNonNull(com.antcolonies.gametest.TestIsolation.colonyOfQueen(level, queen[0]), "no colony of the queen");
             DesertMod.LOGGER.info("[away-test] 2b away: {}{} | food {}, bread {}, queen bread {}", colony.population().describe(level),
                     colony.away().describe(level), colony.food().getFood(), colony.part(DesertParts.BAKERY).orElseThrow().getBread(), colony.queenCare().getQueenBread());
             helper.assertTrue(colony.away().isAway(level), "the colony should be away");
@@ -285,7 +285,7 @@ public class HarvesterAwayTests {
             colony.population().setLastAteForTests(level, Caste.WORKER, level.getGameTime() - worker.starveAfterTicks() + 60);
         });
         helper.runAfterDelay(600, () -> {
-            Colony colony = ColonyManager.get(level).getColonies().stream().filter(c -> c.getQueenId().equals(queen[0])).findFirst().orElseThrow();
+            Colony colony = java.util.Objects.requireNonNull(com.antcolonies.gametest.TestIsolation.colonyOfQueen(level, queen[0]), "no colony of the queen");
             int workers = colony.getCount(Caste.WORKER);
             DesertMod.LOGGER.info("[away-test] 2b starving: {}{}", colony.population().describe(level), colony.away().describe(level));
             helper.assertTrue(workers > 0 && workers <= foodLeft[0] && workers == colony.population().inside(Caste.WORKER),
@@ -350,7 +350,7 @@ public class HarvesterAwayTests {
             colony.away().setAwayForTests(true);
         });
         helper.runAfterDelay(400, () -> {
-            Colony colony = ColonyManager.get(level).getColonies().stream().filter(c -> c.getQueenId().equals(queen[0])).findFirst().orElseThrow();
+            Colony colony = java.util.Objects.requireNonNull(com.antcolonies.gametest.TestIsolation.colonyOfQueen(level, queen[0]), "no colony of the queen");
             DesertMod.LOGGER.info("[away-test] 2d ants away: {}{}", colony.population().describe(level), colony.away().describe(level));
             helper.assertTrue(colony.away().isAway(level), "the colony should be away");
             helper.assertTrue(undug.stream().allMatch(cell -> level.getBlockState(cell).is(Blocks.DIRT)) && hillBlocks(level, colony) == 0,
@@ -430,7 +430,7 @@ public class HarvesterAwayTests {
             if (!patrolOn[0]) {
                 return;
             }
-            Colony colony = ColonyManager.get(level).getColonies().stream().filter(c -> c.getQueenId().equals(queen[0])).findFirst().orElse(null);
+            Colony colony = com.antcolonies.gametest.TestIsolation.colonyOfQueen(level, queen[0]);
             if (colony != null && colony.part(DesertParts.PATROL).orElseThrow().backThisRound() == 0 && colony.away().report().get(AwayReport.What.FORAGED) > 0) {
                 foragedBeforePatrol[0] = true;
             }
@@ -484,13 +484,13 @@ public class HarvesterAwayTests {
             clock.skipTo(0.0); // midnight: the foragers stay in
         });
         helper.runAfterDelay(2300, () -> {
-            Colony colony = ColonyManager.get(level).getColonies().stream().filter(c -> c.getQueenId().equals(queen[0])).findFirst().orElseThrow();
+            Colony colony = java.util.Objects.requireNonNull(com.antcolonies.gametest.TestIsolation.colonyOfQueen(level, queen[0]), "no colony of the queen");
             checkNothingForaged(helper, colony, seen, "at midnight");
             clock.skipTo(7.0); // 7:00 the next morning, but raining on the nest
             colony.setRainForTests(true);
         });
         helper.runAfterDelay(2600, () -> {
-            Colony colony = ColonyManager.get(level).getColonies().stream().filter(c -> c.getQueenId().equals(queen[0])).findFirst().orElseThrow();
+            Colony colony = java.util.Objects.requireNonNull(com.antcolonies.gametest.TestIsolation.colonyOfQueen(level, queen[0]), "no colony of the queen");
             checkNothingForaged(helper, colony, seen, "in the rain");
             clock.skipTo(8.0); // 8:00 in a hot biome, dry: out (the midday rest is 11:00 to 15:00)
             colony.setHeatForTests(2.0F);
@@ -499,7 +499,7 @@ public class HarvesterAwayTests {
             patrolOn[0] = true;
         });
         helper.runAfterDelay(2660, () -> {
-            Colony colony = ColonyManager.get(level).getColonies().stream().filter(c -> c.getQueenId().equals(queen[0])).findFirst().orElseThrow();
+            Colony colony = java.util.Objects.requireNonNull(com.antcolonies.gametest.TestIsolation.colonyOfQueen(level, queen[0]), "no colony of the queen");
             DesertMod.LOGGER.info("[away-test] 4b: {}{}", colony.part(DesertParts.PATROL).orElseThrow().describe(level), colony.part(DesertParts.DOOR).orElseThrow().describe(level));
             helper.assertTrue(colony.part(DesertParts.PATROL).orElseThrow().isRoundOn() && colony.part(DesertParts.PATROL).orElseThrow().numbersOut() > 0 && colony.part(DesertParts.PATROL).orElseThrow().realOut().isEmpty(),
                     "the numbers should send a patrol of numbers first: " + colony.part(DesertParts.PATROL).orElseThrow().describe(level));
@@ -507,7 +507,7 @@ public class HarvesterAwayTests {
                     "the dawn patrol should be the share of the workers: " + colony.part(DesertParts.PATROL).orElseThrow().describe(level));
         });
         helper.runAfterDelay(4600, () -> {
-            Colony colony = ColonyManager.get(level).getColonies().stream().filter(c -> c.getQueenId().equals(queen[0])).findFirst().orElseThrow();
+            Colony colony = java.util.Objects.requireNonNull(com.antcolonies.gametest.TestIsolation.colonyOfQueen(level, queen[0]), "no colony of the queen");
             DesertMod.LOGGER.info("[away-test] 2c ants away: food {}{}{}", colony.food().getFood(), colony.away().describe(level),
                     colony.field().describe());
             helper.assertTrue(colony.away().isAway(level), "the colony should be away");
@@ -576,14 +576,14 @@ public class HarvesterAwayTests {
             before[0] = colony.getCount(Caste.WORKER);
         });
         helper.runAfterDelay(60, () -> {
-            Colony colony = ColonyManager.get(level).getColonies().stream().filter(c -> c.getQueenId().equals(queen[0])).findFirst().orElseThrow();
+            Colony colony = java.util.Objects.requireNonNull(com.antcolonies.gametest.TestIsolation.colonyOfQueen(level, queen[0]), "no colony of the queen");
             clock.skipTo(8.0); // a dry morning in a hot biome: the patrol goes out
             colony.setHeatForTests(2.0F);
             colony.setRainForTests(false);
             colony.part(DesertParts.PATROL).orElseThrow().setOnForTests(true);
         });
         helper.runAfterDelay(1500, () -> {
-            Colony colony = ColonyManager.get(level).getColonies().stream().filter(c -> c.getQueenId().equals(queen[0])).findFirst().orElseThrow();
+            Colony colony = java.util.Objects.requireNonNull(com.antcolonies.gametest.TestIsolation.colonyOfQueen(level, queen[0]), "no colony of the queen");
             int lost = colony.danger().lostOutOfSight();
             AwayReport report = colony.away().report();
             DesertMod.LOGGER.info("[away-test] 4g step 4 patrol: {} lost, {}{}{}", lost, colony.part(DesertParts.PATROL).orElseThrow().describe(level), report.describe(),
@@ -601,7 +601,7 @@ public class HarvesterAwayTests {
         });
         helper.runAfterDelay(1560, () -> clock.skipTo(8.0)); // the next morning: a new day, a new patrol
         helper.runAfterDelay(3000, () -> {
-            Colony colony = ColonyManager.get(level).getColonies().stream().filter(c -> c.getQueenId().equals(queen[0])).findFirst().orElseThrow();
+            Colony colony = java.util.Objects.requireNonNull(com.antcolonies.gametest.TestIsolation.colonyOfQueen(level, queen[0]), "no colony of the queen");
             DesertMod.LOGGER.info("[away-test] 4g step 4 patrol, the next morning: {}{}", colony.part(DesertParts.PATROL).orElseThrow().describe(level), colony.danger().describe(level));
             helper.assertTrue(colony.part(DesertParts.PATROL).orElseThrow().sentThisRound() > 0 && colony.part(DesertParts.PATROL).orElseThrow().backThisRound() > 0, "the next patrol should come back: "
                     + colony.part(DesertParts.PATROL).orElseThrow().describe(level));

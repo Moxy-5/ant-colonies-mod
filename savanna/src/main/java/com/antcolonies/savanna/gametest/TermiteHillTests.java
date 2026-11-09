@@ -1,5 +1,6 @@
 package com.antcolonies.savanna.gametest;
 
+import com.antcolonies.gametest.TestIsolation;
 import com.antcolonies.gametest.TestClock;
 import com.antcolonies.gametest.TestScenes;
 import static com.antcolonies.gametest.TestScenes.*;
@@ -177,7 +178,7 @@ public class TermiteHillTests {
             Colony colony = TermiteMoundTests.colony(helper);
             helper.assertTrue(colony != null && !colony.isFounding(), "no termite colony with workers");
             long middleAged = level.getGameTime() - colony.profile().worker().nurseUntilTicks() - 1000;
-            for (TermiteWorkerEntity worker : level.getEntitiesOfClass(TermiteWorkerEntity.class, helper.getBounds())) {
+            for (TermiteWorkerEntity worker : TestIsolation.insectsOf(helper, TermiteWorkerEntity.class)) {
                 worker.setGrownUpAt(middleAged);
             }
             List<NestPlan.ForagingTunnel> tunnels = colony.nest().getForagingTunnels(level);

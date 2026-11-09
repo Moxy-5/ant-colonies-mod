@@ -78,7 +78,7 @@ public class TermiteCathedralTests {
                         entry.getKey().subtract(origin).toShortString(), entry.getKey().subtract(colony.getCenter()).toShortString(), level.getBlockState(entry.getKey()));
             }
         }
-        for (com.antcolonies.savanna.entity.TermiteWorkerEntity worker : level.getEntitiesOfClass(com.antcolonies.savanna.entity.TermiteWorkerEntity.class, helper.getBounds().inflate(8))) {
+        for (com.antcolonies.savanna.entity.TermiteWorkerEntity worker : TestIsolation.insectsOf(helper, 8, com.antcolonies.savanna.entity.TermiteWorkerEntity.class)) {
             SavannaMod.LOGGER.info("[cathedral-test]   worker {} at {} on {}, carrying {}, goals {}, walking {}", worker.getId(),
                     worker.blockPosition().subtract(origin).toShortString(), worker.getNavigator().getFoothold(), worker.getCarriedBlock(),
                     worker.goalSelector.getAvailableGoals().stream().filter(g -> g.isRunning()).map(g -> g.getGoal().getClass().getSimpleName()).toList(),
@@ -226,7 +226,7 @@ public class TermiteCathedralTests {
                 }
             }
             if (helper.getTick() % 3000 == 0) {
-                long outside = level.getEntitiesOfClass(com.antcolonies.savanna.entity.TermiteWorkerEntity.class, helper.getBounds().inflate(8)).stream()
+                long outside = TestIsolation.insectsOf(helper, 8, com.antcolonies.savanna.entity.TermiteWorkerEntity.class).stream()
                         .filter(w -> !colony.nest().isInside(level, w.blockPosition())).count();
                 SavannaMod.LOGGER.info("[user-mound-test]   workers outside: {}", outside);
                 Map<String, Integer> left = jobsLeft(level, colony);

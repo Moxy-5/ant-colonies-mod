@@ -88,7 +88,7 @@ public class TermiteNewHoleTests {
             // tunnel. This scene is about the tunnel out to far food, so the arms are switched off here.
             com.antcolonies.savanna.colony.Galleries.of(colony).setSwitchForTests(false);
             long middleAged = level.getGameTime() - colony.profile().worker().nurseUntilTicks() - 1000;
-            for (TermiteWorkerEntity worker : level.getEntitiesOfClass(TermiteWorkerEntity.class, helper.getBounds())) {
+            for (TermiteWorkerEntity worker : TestIsolation.insectsOf(helper, TermiteWorkerEntity.class)) {
                 worker.setGrownUpAt(middleAged);
             }
             TermiteSoldierTests.digNestAtOnce(level, colony);
@@ -533,7 +533,7 @@ public class TermiteNewHoleTests {
                 helper.assertTrue(colony != null && !colony.isFounding(), "no termite colony with workers");
                 long now = level.getGameTime();
                 int i = 0;
-                for (TermiteWorkerEntity worker : level.getEntitiesOfClass(TermiteWorkerEntity.class, helper.getBounds())) {
+                for (TermiteWorkerEntity worker : TestIsolation.insectsOf(helper, TermiteWorkerEntity.class)) {
                     // 3 builders (they dig the feeding gallery), the rest old foragers.
                     worker.setGrownUpAt(now - (i++ < 3 ? colony.profile().worker().nurseUntilTicks() : colony.profile().worker().builderUntilTicks()) - 1000);
                 }
@@ -634,7 +634,7 @@ public class TermiteNewHoleTests {
             // tunnel. This scene is about the tunnel out to far food, so the arms are switched off here.
             com.antcolonies.savanna.colony.Galleries.of(colony).setSwitchForTests(false);
             long middleAged = level.getGameTime() - colony.profile().worker().nurseUntilTicks() - 1000;
-            for (TermiteWorkerEntity worker : level.getEntitiesOfClass(TermiteWorkerEntity.class, helper.getBounds())) {
+            for (TermiteWorkerEntity worker : TestIsolation.insectsOf(helper, TermiteWorkerEntity.class)) {
                 worker.setGrownUpAt(middleAged);
             }
             TermiteSoldierTests.digNestAtOnce(level, colony);
@@ -802,7 +802,7 @@ public class TermiteNewHoleTests {
             // tunnel. This scene is about the tunnel out to far food, so the arms are switched off here.
             com.antcolonies.savanna.colony.Galleries.of(colony).setSwitchForTests(false);
             long middleAged = level.getGameTime() - colony.profile().worker().nurseUntilTicks() - 1000;
-            for (TermiteWorkerEntity worker : level.getEntitiesOfClass(TermiteWorkerEntity.class, helper.getBounds())) {
+            for (TermiteWorkerEntity worker : TestIsolation.insectsOf(helper, TermiteWorkerEntity.class)) {
                 worker.setGrownUpAt(middleAged);
             }
             TermiteSoldierTests.digNestAtOnce(level, colony);

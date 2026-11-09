@@ -1,5 +1,6 @@
 package com.antcolonies.savanna.gametest;
 
+import com.antcolonies.gametest.TestIsolation;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -248,7 +249,7 @@ public class MatabeleFightTests {
             helper.assertTrue(colony != null && !colony.isFounding(), "no termite colony with workers");
             TestClock.still(helper, 12.0); // midday: everybody stays in while the nest is made ready
             long old = level.getGameTime() - colony.profile().worker().builderUntilTicks() - 1000;
-            for (TermiteWorkerEntity worker : level.getEntitiesOfClass(TermiteWorkerEntity.class, helper.getBounds())) {
+            for (TermiteWorkerEntity worker : TestIsolation.insectsOf(helper, TermiteWorkerEntity.class)) {
                 worker.setGrownUpAt(old);
             }
             TermiteSoldierTests.digNestAtOnce(level, colony);
@@ -273,7 +274,7 @@ public class MatabeleFightTests {
                 return;
             }
             long tick = helper.getTick();
-            List<TermiteWorkerEntity> workers = level.getEntitiesOfClass(TermiteWorkerEntity.class, helper.getBounds().inflate(8),
+            List<TermiteWorkerEntity> workers = TestIsolation.insectsOf(helper, 8, TermiteWorkerEntity.class,
                     worker -> colony.getId().equals(worker.getColonyId()));
             if (cameAt[0] < 0) {
                 List<TermiteWorkerEntity> atTheHay = workers.stream().filter(worker -> worker.blockPosition().closerThan(hay[0], 4.0)).toList();

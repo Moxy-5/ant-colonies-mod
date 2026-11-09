@@ -1,5 +1,6 @@
 package com.antcolonies.savanna.gametest;
 
+import com.antcolonies.gametest.TestIsolation;
 import com.antcolonies.gametest.AwayKit;
 import com.antcolonies.gametest.TestClock;
 import com.antcolonies.gametest.TestScenes;
@@ -758,7 +759,7 @@ public class TermiteAwayTests {
             AbstractAntEntity theQueen = colony.getQueen(level);
             queen[0] = theQueen.getUUID();
             // The king, a day and more since his last nodule: he wants one.
-            var theKing = level.getEntitiesOfClass(com.antcolonies.savanna.entity.TermiteKingEntity.class, helper.getBounds(),
+            var theKing = TestIsolation.insectsOf(helper, com.antcolonies.savanna.entity.TermiteKingEntity.class,
                     mob -> colony.getId().equals(mob.getColonyId())).stream().findFirst().orElse(null);
             helper.assertTrue(theKing != null && colony.getCount(com.antcolonies.savanna.entity.TermiteKingEntity.CASTE) == 1, "the king should have joined");
             theKing.teleportTo(theQueen.getX() + 1.0, theQueen.getY(), theQueen.getZ());
@@ -784,7 +785,7 @@ public class TermiteAwayTests {
             colony.away().setAwayForTests(true);
         });
         helper.runAfterDelay(420, () -> {
-            Colony colony = ColonyManager.get(level).getColonies().stream().filter(c -> c.getQueenId().equals(queen[0])).findFirst().orElseThrow();
+            Colony colony = java.util.Objects.requireNonNull(com.antcolonies.gametest.TestIsolation.colonyOfQueen(level, queen[0]), "no colony of the queen");
             SavannaMod.LOGGER.info("[away-test] termites away: {}{} | known comb {}/{}/{}, nodules {}, food {}, queen food {}",
                     colony.population().describe(level), colony.away().describe(level), colony.part(SavannaParts.FUNGUS_GARDEN).orElseThrow().freshKnown(), colony.part(SavannaParts.FUNGUS_GARDEN).orElseThrow().ripeKnown(),
                     colony.part(SavannaParts.FUNGUS_GARDEN).orElseThrow().oldKnown(), colony.life().nurseFoodLeft(level), colony.food().getFood(), colony.queenCare().getQueenBread());
@@ -814,7 +815,7 @@ public class TermiteAwayTests {
             eatenBefore[1] = colony.workerFood().getPiecesEaten(foods[1]);
         });
         helper.runAfterDelay(480, () -> {
-            Colony colony = ColonyManager.get(level).getColonies().stream().filter(c -> c.getQueenId().equals(queen[0])).findFirst().orElseThrow();
+            Colony colony = java.util.Objects.requireNonNull(com.antcolonies.gametest.TestIsolation.colonyOfQueen(level, queen[0]), "no colony of the queen");
             int comb = colony.workerFood().getPiecesEaten(com.antcolonies.species.SpeciesProfile.MealFood.STORE) - eatenBefore[0];
             int nodules = colony.workerFood().getPiecesEaten(com.antcolonies.species.SpeciesProfile.MealFood.NURSE_FOOD) - eatenBefore[1];
             SavannaMod.LOGGER.info("[away-test] termites away ate {} layers of comb and {} nodules: {}{}", comb, nodules,
@@ -940,7 +941,7 @@ public class TermiteAwayTests {
             helper.assertTrue(colony.queenCare().isQueenHome(level), "the queen should be in the royal chamber");
             helper.assertTrue(colony.life().nurseFoodLeft(level) == 0, "there should be no nodule: " + colony.life().nurseFoodLeft(level));
             AbstractAntEntity theQueen = colony.getQueen(level);
-            var theKing = level.getEntitiesOfClass(com.antcolonies.savanna.entity.TermiteKingEntity.class, helper.getBounds(),
+            var theKing = TestIsolation.insectsOf(helper, com.antcolonies.savanna.entity.TermiteKingEntity.class,
                     mob -> colony.getId().equals(mob.getColonyId())).stream().findFirst().orElse(null);
             helper.assertTrue(theKing != null, "the king should have joined");
             theKing.teleportTo(theQueen.getX() + 1.0, theQueen.getY(), theQueen.getZ());

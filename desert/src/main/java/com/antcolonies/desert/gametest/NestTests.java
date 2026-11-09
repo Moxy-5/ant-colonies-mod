@@ -122,7 +122,7 @@ public class NestTests {
                 TestClock.still(helper, 0.0); // midnight
                 DesertMod.LOGGER.info("[nest-test] tick {}: midnight", helper.getTick());
             } else if (nightFrom[0] >= 0 && helper.getTick() - nightFrom[0] >= 400 && outsideAtNight[0] == null) {
-                for (AbstractAntEntity ant : level.getEntitiesOfClass(WorkerAntEntity.class, helper.getBounds())) {
+                for (AbstractAntEntity ant : TestIsolation.insectsOf(helper, WorkerAntEntity.class)) {
                     if (!colony.nest().isInside(level, ant.blockPosition())) {
                         outsideAtNight[0] = ant.blockPosition().toShortString() + " at tick " + helper.getTick();
                     }
@@ -170,7 +170,7 @@ public class NestTests {
             helper.assertTrue(rooms.size() == 4, "expected 4 levels (food store, nursery, queen, refuse chamber) but the nest has " + rooms.size());
             BlockPos room = colony.nest().getFinishedRoomCenter(level);
             helper.assertTrue(room != null, "the room is not finished");
-            var queens = level.getEntitiesOfClass(com.antcolonies.desert.entity.QueenAntEntity.class, helper.getBounds());
+            var queens = TestIsolation.insectsOf(helper, com.antcolonies.desert.entity.QueenAntEntity.class);
             helper.assertTrue(!queens.isEmpty(), "the queen is gone");
             helper.assertTrue(queens.get(0).blockPosition().equals(room), "the queen is not in the middle of the room yet: " + queens.get(0).blockPosition().subtract(room));
             String hill = hillProblems(helper);
@@ -220,7 +220,7 @@ public class NestTests {
                 // entrance, as real harvester ants do; they do not stroll about outside. (Brain step 4c: with the store
                 // empty the foragers search for seeds, a job, not strolling; in game tests the door rule that holds them
                 // in is off, so the searchers are not counted.)
-                List<WorkerAntEntity> outside = level.getEntitiesOfClass(WorkerAntEntity.class, helper.getBounds(),
+                List<WorkerAntEntity> outside = TestIsolation.insectsOf(helper, WorkerAntEntity.class,
                         w -> w.isAlive() && !colony.nest().isInside(level, w.blockPosition()) && !colony.part(DesertParts.FORAGER_SPOTS).orElseThrow().isSearching(w.getUUID()));
                 if (!outside.isEmpty() || helper.getTick() < idleFrom[0] + 600) {
                     helper.assertTrue(helper.getTick() < idleFrom[0] + 8000, "with nothing to do every worker should be inside, but "
@@ -494,7 +494,7 @@ public class NestTests {
             helper.assertTrue(colony.nest().findDigTarget(level) == null, "something is still left to dig");
             BlockPos room = colony.nest().getFinishedRoomCenter(level);
             helper.assertTrue(room != null, "the room is not finished");
-            var queens = level.getEntitiesOfClass(com.antcolonies.desert.entity.QueenAntEntity.class, helper.getBounds());
+            var queens = TestIsolation.insectsOf(helper, com.antcolonies.desert.entity.QueenAntEntity.class);
             helper.assertTrue(!queens.isEmpty() && queens.get(0).blockPosition().equals(room), "the queen is not in the middle of the room yet");
             for (int x = 0; x < 25; x++) {
                 for (int z = 0; z < 25; z++) {
@@ -567,7 +567,7 @@ public class NestTests {
             helper.assertTrue(founding != null, "the nest has no founding chamber");
             helper.assertTrue(colony.queenCare().getEggsLaid() == 3, colony.queenCare().getEggsLaid() + " eggs laid, expected 3");
             helper.assertTrue(colony.brood().countBrood(level) == 0, "still " + colony.brood().countBrood(level) + " eggs and larvae");
-            var workers = level.getEntitiesOfClass(WorkerAntEntity.class, helper.getBounds(), w -> colony.getId().equals(w.getColonyId()));
+            var workers = TestIsolation.insectsOf(helper, WorkerAntEntity.class, w -> colony.getId().equals(w.getColonyId()));
             helper.assertTrue(workers.size() == 3 && colony.getCount(Caste.WORKER) == 3,
                     workers.size() + " workers, the colony counts " + colony.getCount(Caste.WORKER) + ", expected 3");
             helper.assertTrue(colony.nest().isEntranceOpen(level), "the entrance is still closed");
@@ -584,7 +584,7 @@ public class NestTests {
     /** {@link #aLoneQueenFoundsHerColonyAndRaisesHerFirstWorkers}, once her first workers have died. */
     private static void laterBatches(GameTestHelper helper, Colony colony, int[] phase, java.util.UUID[] queenId) {
         ServerLevel level = helper.getLevel();
-        var workers = level.getEntitiesOfClass(WorkerAntEntity.class, helper.getBounds(), w -> w.isAlive() && colony.getId().equals(w.getColonyId()));
+        var workers = TestIsolation.insectsOf(helper, WorkerAntEntity.class, w -> w.isAlive() && colony.getId().equals(w.getColonyId()));
         if (phase[0] == 1) {
             helper.assertTrue(colony.queenCare().isOnSecondBatch(), "her first workers are dead: she should start a second batch");
             helper.assertTrue(colony.queenCare().getEggsLaid() <= 5, "the second batch is 2 eggs: " + colony.queenCare().getEggsLaid() + " laid in all");
@@ -714,7 +714,7 @@ public class NestTests {
                 return;
             }
             linesSeen[0] = Math.max(linesSeen[0], colony.part(DesertParts.RECRUITS).orElseThrow().lines().size());
-            for (AbstractAntEntity ant : level.getEntitiesOfClass(AbstractAntEntity.class, helper.getBounds(), AbstractAntEntity::isColonyWorker)) {
+            for (AbstractAntEntity ant : TestIsolation.insectsOf(helper, AbstractAntEntity.class, AbstractAntEntity::isColonyWorker)) {
                 if (colony.part(DesertParts.RECRUITS).orElseThrow().isRecruited(ant.getUUID())) {
                     called.add(ant.getUUID());
                 }
@@ -749,7 +749,7 @@ public class NestTests {
                         helper.getTick() - dropTick[0], colony.part(DesertParts.PATROL).orElseThrow().describe(level));
             }
             if (firstOut[0] < 0) {
-                for (AbstractAntEntity ant : level.getEntitiesOfClass(AbstractAntEntity.class, helper.getBounds())) {
+                for (AbstractAntEntity ant : TestIsolation.insectsOf(helper, AbstractAntEntity.class)) {
                     if (colony.part(DesertParts.DOOR).orElseThrow().isOut(ant.getUUID()) || ant.isCarryingSeed()) {
                         firstOut[0] = helper.getTick();
                         DesertMod.LOGGER.info("[seed-test] tick {}: the first forager sets out", helper.getTick());
@@ -778,10 +778,10 @@ public class NestTests {
             if (!dropped[0] || colony == null) {
                 return;
             }
-            for (com.antcolonies.entity.AntLarvaEntity larva : level.getEntitiesOfClass(com.antcolonies.entity.AntLarvaEntity.class, helper.getBounds())) {
+            for (com.antcolonies.entity.AntLarvaEntity larva : TestIsolation.insectsOf(helper, com.antcolonies.entity.AntLarvaEntity.class)) {
                 larvaFed.merge(larva.getUUID(), larva.getFed(), Math::max);
             }
-            for (AbstractAntEntity ant : level.getEntitiesOfClass(AbstractAntEntity.class, helper.getBounds(), AbstractAntEntity::isColonyWorker)) {
+            for (AbstractAntEntity ant : TestIsolation.insectsOf(helper, AbstractAntEntity.class, AbstractAntEntity::isColonyWorker)) {
                 boolean now = ant.isCarryingSeed();
                 if (now && carrying.add(ant.getUUID())) {
                     BlockPos spot = colony.part(DesertParts.FORAGER_SPOTS).orElseThrow().spotOf(ant.getUUID());
@@ -826,7 +826,7 @@ public class NestTests {
                     + ", expected " + expected + " seeds in all; holding: " + carriers(helper));
             helper.assertTrue(seedsIn(level, storeBox(level, colony)) == colony.food().getFood(), "only " + seedsIn(level, storeBox(level, colony)) + " seeds are in the food store");
             helper.assertTrue(seedsIn(level, helper.getBounds()) == colony.food().getFood(), "some seeds are still lying around outside the store");
-            for (AbstractAntEntity ant : level.getEntitiesOfClass(AbstractAntEntity.class, helper.getBounds())) {
+            for (AbstractAntEntity ant : TestIsolation.insectsOf(helper, AbstractAntEntity.class)) {
                 helper.assertTrue(!ant.isCarryingSeed(), "an ant is still carrying a seed");
             }
             helper.assertTrue(backToItsSpot[0] > 0, "no ant went back to the tuft it last cut from (site fidelity)");
@@ -859,7 +859,7 @@ public class NestTests {
         // nurses feed the larva too (as real nurses feed the queen and the young from the same bread).
         java.util.Map<java.util.UUID, Integer> larvaFed = new java.util.HashMap<>();
         helper.onEachTick(() -> {
-            for (com.antcolonies.entity.AntLarvaEntity larva : level.getEntitiesOfClass(com.antcolonies.entity.AntLarvaEntity.class, helper.getBounds())) {
+            for (com.antcolonies.entity.AntLarvaEntity larva : TestIsolation.insectsOf(helper, com.antcolonies.entity.AntLarvaEntity.class)) {
                 larvaFed.merge(larva.getUUID(), larva.getFed(), Math::max);
             }
         });
@@ -905,7 +905,7 @@ public class NestTests {
             if (laidAt[0] < 0 && colony.queenCare().getEggsLaid() > 0) {
                 laidAt[0] = level.getGameTime();
                 // The egg must lie in her room, behind her (she looks the other way), and not in the nursery yet.
-                var queens = level.getEntitiesOfClass(com.antcolonies.desert.entity.QueenAntEntity.class, helper.getBounds());
+                var queens = TestIsolation.insectsOf(helper, com.antcolonies.desert.entity.QueenAntEntity.class);
                 var eggs = colony.brood().getLooseEggs(level);
                 if (queens.size() == 1 && eggs.size() == 1) {
                     var queen = queens.get(0);
@@ -915,7 +915,7 @@ public class NestTests {
                     cameOutBehindHer[0] = away.dot(facing) <= 0.001 && room != null
                             && Math.abs(eggs.get(0).getX() - (room.getX() + 0.5)) <= 2.5 && Math.abs(eggs.get(0).getZ() - (room.getZ() + 0.5)) <= 2.5;
                     DesertMod.LOGGER.info("[egg-test] tick {}: egg laid {} from the queen, facing {}", helper.getTick(), away, facing);
-                } else if (queens.size() == 1 && eggs.isEmpty() && level.getEntitiesOfClass(AbstractAntEntity.class, helper.getBounds())
+                } else if (queens.size() == 1 && eggs.isEmpty() && TestIsolation.insectsOf(helper, AbstractAntEntity.class)
                         .stream().anyMatch(AbstractAntEntity::isCarryingEgg)) {
                     // A nurse standing next to her picked the egg up in the very tick it came out.
                     cameOutBehindHer[0] = true;
@@ -944,8 +944,8 @@ public class NestTests {
             helper.assertTrue(eggInNursery[0], "the egg was never carried into the nursery");
             int young = colony.brood().getEggs(level).size() + colony.brood().countLarvae(level);
             helper.assertTrue(young == 1, "expected 1 egg or the larva it hatched into, but there are " + young);
-            helper.assertTrue(level.getEntitiesOfClass(com.antcolonies.entity.AntEggEntity.class, helper.getBounds()).size()
-                    + level.getEntitiesOfClass(com.antcolonies.entity.AntLarvaEntity.class, helper.getBounds()).size() == 1,
+            helper.assertTrue(TestIsolation.insectsOf(helper, com.antcolonies.entity.AntEggEntity.class).size()
+                    + TestIsolation.insectsOf(helper, com.antcolonies.entity.AntLarvaEntity.class).size() == 1,
                     "there is an egg or larva somewhere else");
             helper.assertTrue(breadInNursery[0], "no bread was ever seen on the nursery floor");
             int larvaeFed = larvaFed.values().stream().mapToInt(Integer::intValue).sum();
@@ -953,7 +953,7 @@ public class NestTests {
                     + " pieces of bread for the next egg and the larva " + larvaeFed + ", expected the 5 that were left between them");
             helper.assertTrue(colony.food().getFood() == 0 && seedsIn(level, storeBox(level, colony)) == 0, "seeds are left in the store");
             helper.assertTrue(colony.part(DesertParts.BAKERY).orElseThrow().getBread() == 0 && breadIn(level, helper.getBounds()) == 0, "bread is left in the nursery");
-            for (AbstractAntEntity ant : level.getEntitiesOfClass(AbstractAntEntity.class, helper.getBounds())) {
+            for (AbstractAntEntity ant : TestIsolation.insectsOf(helper, AbstractAntEntity.class)) {
                 helper.assertTrue(!ant.hasFullMandibles(), "an ant is still carrying something");
             }
         });
@@ -1233,7 +1233,7 @@ public class NestTests {
             helper.assertTrue(!larvae[2].isAlive() || larvae[2].isFull(), "the full larva is not full");
             // The body lies where the larva died, or the worker has already picked it up to take it to the refuse
             // chamber (in full runs it sometimes got there first, and a carried body is not one lying about).
-            int carried = level.getEntitiesOfClass(WorkerAntEntity.class, helper.getBounds(),
+            int carried = TestIsolation.insectsOf(helper, WorkerAntEntity.class,
                     worker -> colony.getId().equals(worker.getColonyId()) && worker.isCarryingCorpse()).size();
             int bodies = colony.refuse().getCorpses(level).size() + carried;
             helper.assertTrue(bodies == 1, bodies + " bodies (" + carried + " carried), expected 1");
@@ -1265,7 +1265,7 @@ public class NestTests {
                 ColonyManager manager = ColonyManager.get(level);
                 helper.assertTrue(manager.getColony(colony[0].getId()) == colony[0] && colony[0].isQueenless(),
                         "the colony should carry on without its queen");
-                List<WorkerAntEntity> workers = level.getEntitiesOfClass(WorkerAntEntity.class, helper.getBounds(),
+                List<WorkerAntEntity> workers = TestIsolation.insectsOf(helper, WorkerAntEntity.class,
                         worker -> colony[0].getId().equals(worker.getColonyId()));
                 helper.assertTrue(workers.size() == 1, "expected the one worker, found " + workers.size());
                 // No young left to grow up (this test is about the workers), and the worker is at the end of its life.
@@ -1528,7 +1528,7 @@ public class NestTests {
      */
     /** The real workers of this colony: also the ones that have wandered a little outside the test area. */
     private static List<WorkerAntEntity> colonyWorkers(GameTestHelper helper, Colony colony) {
-        return helper.getLevel().getEntitiesOfClass(WorkerAntEntity.class, helper.getBounds().inflate(20.0)).stream()
+        return TestIsolation.insectsOf(helper, 20.0, WorkerAntEntity.class).stream()
                 .filter(worker -> colony.getId().equals(worker.getColonyId())).toList();
     }
 
@@ -1541,7 +1541,7 @@ public class NestTests {
         java.util.Map<Integer, Integer> still = new java.util.HashMap<>();
         helper.onEachTick(() -> {
             BlockPos origin = helper.absolutePos(BlockPos.ZERO);
-            for (AbstractAntEntity ant : helper.getLevel().getEntitiesOfClass(AbstractAntEntity.class, helper.getBounds())) {
+            for (AbstractAntEntity ant : TestIsolation.insectsOf(helper, AbstractAntEntity.class)) {
                 var nav = ant.getNavigator();
                 Vec3 before = lastPos.put(ant.getId(), ant.position());
                 if (nav.isDone() || before == null) {
@@ -1571,7 +1571,7 @@ public class NestTests {
     /** Every ant in the test area that holds a seed or bread, with where it is: to find a seed that went missing. */
     private static String carriers(GameTestHelper helper) {
         List<String> out = new java.util.ArrayList<>();
-        for (AbstractAntEntity ant : helper.getLevel().getEntitiesOfClass(AbstractAntEntity.class, helper.getBounds().inflate(64))) {
+        for (AbstractAntEntity ant : TestIsolation.insectsOf(helper, 64, AbstractAntEntity.class)) {
             if (!ant.getCarriedSeed().isEmpty()) {
                 out.add("#" + ant.getId() + " " + ant.getCarriedSeed().getItem() + " at "
                         + ant.blockPosition().subtract(helper.absolutePos(BlockPos.ZERO)).toShortString()
@@ -1650,7 +1650,7 @@ public class NestTests {
                     DesertMod.LOGGER.info("[early-feed-test] tick {}: {}{} | {} | {} | {}", helper.getTick(), colony.describeJobs(level), colony.part(DesertParts.FORAGER_SPOTS).orElseThrow().describe(),
                             colony.part(DesertParts.DOOR).orElseThrow().describe(level), colony.part(DesertParts.PATROL).orElseThrow().describe(level), carriers(helper));
                     StringBuilder ants = new StringBuilder();
-                    for (WorkerAntEntity worker : level.getEntitiesOfClass(WorkerAntEntity.class, helper.getBounds().inflate(32))) {
+                    for (WorkerAntEntity worker : TestIsolation.insectsOf(helper, 32, WorkerAntEntity.class)) {
                         ants.append(" #").append(worker.getId()).append(" at ").append(worker.blockPosition().subtract(helper.absolutePos(BlockPos.ZERO)).toShortString())
                                 .append(colony.part(DesertParts.FORAGER_SPOTS).orElseThrow().isSearching(worker.getUUID()) ? " searching" : "")
                                 .append(colony.part(DesertParts.FORAGER_SPOTS).orElseThrow().spotOf(worker.getUUID()) != null ? " spot " + colony.part(DesertParts.FORAGER_SPOTS).orElseThrow().spotOf(worker.getUUID()).subtract(helper.absolutePos(BlockPos.ZERO)).toShortString() : "")
@@ -1670,7 +1670,7 @@ public class NestTests {
                     "the queen's home is not the founding chamber");
             helper.assertTrue(colony.getQueen(level).blockPosition().equals(colony.nest().getFoundingChamber(level).center()),
                     "the queen is not in her founding chamber");
-            for (AbstractAntEntity ant : level.getEntitiesOfClass(AbstractAntEntity.class, helper.getBounds())) {
+            for (AbstractAntEntity ant : TestIsolation.insectsOf(helper, AbstractAntEntity.class)) {
                 helper.assertTrue(!ant.isCarryingSeed(), "an ant is still carrying a seed");
             }
             helper.assertTrue(seedsIn(level, helper.getBounds()) == colony.food().getFood(), "some seeds are still lying around outside the store");
@@ -1697,8 +1697,8 @@ public class NestTests {
                 return;
             }
             ready[0] = true;
-            antsBefore[0] = level.getEntitiesOfClass(WorkerAntEntity.class, helper.getBounds()).size();
-            for (WorkerAntEntity w : level.getEntitiesOfClass(WorkerAntEntity.class, helper.getBounds().inflate(60))) {
+            antsBefore[0] = TestIsolation.insectsOf(helper, WorkerAntEntity.class).size();
+            for (WorkerAntEntity w : TestIsolation.insectsOf(helper, 60, WorkerAntEntity.class)) {
                 DesertMod.LOGGER.info("[room-egg-test] worker {} at {} colony {} (ours {}) alive {}", w.getId(), w.blockPosition(),
                         w.getColonyId(), colony.getId(), w.isAlive());
             }
@@ -1749,7 +1749,7 @@ public class NestTests {
             Colony colony = colony(helper);
             helper.assertTrue(colony != null && airBelowSurface(helper) == NEST_CELLS && colony.nest().findDigTarget(level) == null
                     && hillProblems(helper).isEmpty(), "the nest is not finished yet");
-            var queens = level.getEntitiesOfClass(com.antcolonies.desert.entity.QueenAntEntity.class, helper.getBounds());
+            var queens = TestIsolation.insectsOf(helper, com.antcolonies.desert.entity.QueenAntEntity.class);
             helper.assertTrue(queens.size() == 1, "no queen");
             int[] roles = new int[com.antcolonies.colony.ColonyRole.values().length];
             int nursesNearQueen = 0;
@@ -1916,13 +1916,9 @@ public class NestTests {
         return problems.toString();
     }
 
-    /** The colony inside this test's area (a test world can still hold colonies from earlier runs). */
+    /** This test's colony with a living queen (found by its owner, test revamp R2: never one of another test). */
     private static Colony colony(GameTestHelper helper) {
-        AABB area = helper.getBounds();
-        // A colony left over from an earlier test in this spot has no living queen (the test cleanup removed her): skip it.
-        return ColonyManager.get(helper.getLevel()).getColonies().stream()
-                .filter(colony -> area.contains(Vec3.atCenterOf(colony.getCenter())) && colony.getQueen(helper.getLevel()) != null)
-                .findFirst().orElse(null);
+        return TestIsolation.coloniesOf(helper).stream().filter(colony -> colony.getQueen(helper.getLevel()) != null).findFirst().orElse(null);
     }
 
     /** How many open (air) cells there are under the surface of the test area. */
@@ -2000,7 +1996,7 @@ public class NestTests {
                 .append(colony == null || colony.nest().findDigTarget(level) == null
                         ? "none" : colony.nest().findDigTarget(level).subtract(BlockPos.containing(origin)).toShortString())
                 .append(", mound blocks ").append(moundBlocks(helper)).append(". Ants:");
-        List<AbstractAntEntity> ants = level.getEntitiesOfClass(AbstractAntEntity.class, helper.getBounds().inflate(10));
+        List<AbstractAntEntity> ants = TestIsolation.insectsOf(helper, 10, AbstractAntEntity.class);
         for (AbstractAntEntity ant : ants) {
             Vec3 at = ant.position().subtract(origin);
             text.append(String.format(" [#%d %.1f,%.1f,%.1f%s%s%s]", ant.getId(), at.x, at.y, at.z,

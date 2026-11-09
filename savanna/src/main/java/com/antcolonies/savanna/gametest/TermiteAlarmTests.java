@@ -1,5 +1,6 @@
 package com.antcolonies.savanna.gametest;
 
+import com.antcolonies.gametest.TestIsolation;
 import com.antcolonies.gametest.TestClock;
 import com.antcolonies.gametest.TestScenes;
 import static com.antcolonies.savanna.gametest.TermiteMoundTests.MIDDLE;
@@ -72,7 +73,7 @@ public class TermiteAlarmTests {
             helper.assertTrue(colony != null && !colony.isFounding(), "no termite colony with workers");
             TestClock.still(helper, 12.0); // midday: everybody stays in
             long old = level.getGameTime() - colony.profile().worker().builderUntilTicks() - 1000;
-            for (TermiteWorkerEntity worker : level.getEntitiesOfClass(TermiteWorkerEntity.class, helper.getBounds())) {
+            for (TermiteWorkerEntity worker : TestIsolation.insectsOf(helper, TermiteWorkerEntity.class)) {
                 worker.setGrownUpAt(old);
             }
             TermiteSoldierTests.digNestAtOnce(level, colony);
@@ -141,7 +142,7 @@ public class TermiteAlarmTests {
             helper.assertTrue(minors.stream().anyMatch(minor -> colony.part(SavannaParts.ALARM).orElseThrow().hasHeard(minor.getUUID())), "no minor felt the alarm");
             helper.assertFalse(biters.isEmpty(), "no minor has bitten the chicken");
             helper.assertFalse(chicken[0].isAlive(), "the chicken is still alive (" + chicken[0].getHealth() + " health)");
-            boolean workerOut = !level.getEntitiesOfClass(TermiteWorkerEntity.class, helper.getBounds().inflate(8),
+            boolean workerOut = !TestIsolation.insectsOf(helper, 8, TermiteWorkerEntity.class,
                     worker -> colony.getId().equals(worker.getColonyId()) && !colony.nest().isInside(level, worker.blockPosition())).isEmpty();
             helper.assertFalse(workerOut, "a worker is still outside");
             SavannaMod.LOGGER.info("[alarm-test] tick {}: the chicken is dead, bitten by {} minors, the workers are in", helper.getTick(), biters.size());
@@ -176,7 +177,7 @@ public class TermiteAlarmTests {
             Colony colony = TermiteMoundTests.colony(helper);
             helper.assertTrue(colony != null && !colony.isFounding(), "no termite colony with workers");
             long old = level.getGameTime() - colony.profile().worker().builderUntilTicks() - 1000;
-            List<TermiteWorkerEntity> workers = level.getEntitiesOfClass(TermiteWorkerEntity.class, helper.getBounds());
+            List<TermiteWorkerEntity> workers = TestIsolation.insectsOf(helper, TermiteWorkerEntity.class);
             for (int i = 0; i < workers.size(); i++) {
                 workers.get(i).setGrownUpAt(i < 8 ? old : level.getGameTime()); // 8 foragers (a crowd at the hole), 2 young ones inside
             }
@@ -232,7 +233,7 @@ public class TermiteAlarmTests {
             }
             if (tick % 500 == 0) {
                 StringBuilder all = new StringBuilder();
-                for (TermiteWorkerEntity worker : level.getEntitiesOfClass(TermiteWorkerEntity.class, helper.getBounds())) {
+                for (TermiteWorkerEntity worker : TestIsolation.insectsOf(helper, TermiteWorkerEntity.class)) {
                     all.append("\n    worker ").append(worker.getId()).append(" at ").append(worker.blockPosition().toShortString())
                             .append(" ").append(colony.roleOf(level, worker)).append(worker.isIdle() ? " idle" : "")
                             .append(" ").append(worker.goalSelector.getAvailableGoals().stream().filter(g -> g.isRunning())

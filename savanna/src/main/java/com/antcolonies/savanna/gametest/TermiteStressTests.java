@@ -1,5 +1,6 @@
 package com.antcolonies.savanna.gametest;
 
+import com.antcolonies.gametest.TestIsolation;
 import com.antcolonies.gametest.TestClock;
 import com.antcolonies.gametest.TestScenes;
 import static com.antcolonies.gametest.TestScenes.MIDDLE;
@@ -78,7 +79,7 @@ public class TermiteStressTests {
 
     private static void log(GameTestHelper helper, String stage) {
         Colony colony = TermiteMoundTests.colony(helper);
-        long real = helper.getLevel().getEntitiesOfClass(AbstractAntEntity.class, helper.getBounds().inflate(48),
+        long real = TestIsolation.insectsOf(helper, 48, AbstractAntEntity.class,
                 mob -> mob.isAlive() && colony.getId().equals(mob.getColonyId())).size();
         SavannaMod.LOGGER.info("[stress] ===== {}: {} real mobs of the colony =====\n{}", stage, real, Perf.report());
     }

@@ -1,5 +1,6 @@
 package com.antcolonies.savanna.gametest;
 
+import com.antcolonies.gametest.TestIsolation;
 import com.antcolonies.gametest.TestClock;
 import com.antcolonies.gametest.TestScenes;
 import static com.antcolonies.savanna.gametest.TermiteMoundTests.MIDDLE;
@@ -169,7 +170,7 @@ public class TermiteSoldierTests {
             Colony colony = TermiteMoundTests.colony(helper);
             helper.assertTrue(colony != null && !colony.isFounding(), "no termite colony with workers");
             TestClock.still(helper, 12.0); // midday: everybody stays in
-            for (TermiteWorkerEntity worker : level.getEntitiesOfClass(TermiteWorkerEntity.class, helper.getBounds())) {
+            for (TermiteWorkerEntity worker : TestIsolation.insectsOf(helper, TermiteWorkerEntity.class)) {
                 worker.setGrownUpAt(level.getGameTime()); // young: the colony's nurse is one of them
             }
             digNestAtOnce(level, colony);
@@ -322,7 +323,7 @@ public class TermiteSoldierTests {
             Colony colony = TermiteMoundTests.colony(helper);
             helper.assertTrue(colony != null && !colony.isFounding(), "no termite colony with workers");
             long old = level.getGameTime() - colony.profile().worker().builderUntilTicks() - 1000;
-            for (TermiteWorkerEntity worker : level.getEntitiesOfClass(TermiteWorkerEntity.class, helper.getBounds())) {
+            for (TermiteWorkerEntity worker : TestIsolation.insectsOf(helper, TermiteWorkerEntity.class)) {
                 worker.setGrownUpAt(old); // old workers: foragers first
             }
             digNestAtOnce(level, colony);
@@ -376,11 +377,11 @@ public class TermiteSoldierTests {
                 }
                 return;
             }
-            boolean workerOut = !level.getEntitiesOfClass(TermiteWorkerEntity.class, helper.getBounds().inflate(8),
+            boolean workerOut = !TestIsolation.insectsOf(helper, 8, TermiteWorkerEntity.class,
                     worker -> colony.getId().equals(worker.getColonyId()) && !colony.nest().isInside(level, worker.blockPosition())).isEmpty();
             boolean minorIn = minors.stream().anyMatch(minor -> colony.nest().isInside(level, minor.blockPosition()));
             // (BUGS 75: every worker seen stepping out by day, with what it is doing, and the holes)
-            for (TermiteWorkerEntity worker : level.getEntitiesOfClass(TermiteWorkerEntity.class, helper.getBounds().inflate(8),
+            for (TermiteWorkerEntity worker : TestIsolation.insectsOf(helper, 8, TermiteWorkerEntity.class,
                     w -> colony.getId().equals(w.getColonyId()) && !colony.nest().isInside(level, w.blockPosition()))) {
                 if (seenOut.add(worker.getId() * 100000L + tick / 20)) {
                     SavannaMod.LOGGER.info("[sentry-test] tick {} ({} into the day): worker {} out at {} doing {}; holes open {}, minors in {}",
@@ -406,7 +407,7 @@ public class TermiteSoldierTests {
             if (phase[0] == 2 && tick - at[1] < colony.profile().section(SavannaNumbers.SOLDIERS).orElseThrow().escortHomeTicks() - 20) {
                 if (workerOut && minorIn) {
                     // (BUGS 75: name the worker outside, the minors in and what the colony counted outside)
-                    String out = level.getEntitiesOfClass(TermiteWorkerEntity.class, helper.getBounds().inflate(8),
+                    String out = TestIsolation.insectsOf(helper, 8, TermiteWorkerEntity.class,
                                     worker -> colony.getId().equals(worker.getColonyId()) && !colony.nest().isInside(level, worker.blockPosition()))
                             .stream().map(worker -> worker.blockPosition().toShortString() + " (" + level.getBlockState(worker.blockPosition()).getBlock()
                                     + ", on " + level.getBlockState(worker.blockPosition().below()).getBlock() + ", carrying " + worker.isCarrying()

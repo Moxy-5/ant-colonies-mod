@@ -21,6 +21,8 @@ import com.antcolonies.entity.AntEggEntity;
 import com.antcolonies.entity.AntLarvaEntity;
 
 import net.minecraft.core.BlockPos;
+import net.minecraft.resources.ResourceLocation;
+import net.minecraft.gametest.framework.GameTestHelper;
 import net.minecraft.gametest.framework.GameTestInfo;
 import net.minecraft.gametest.framework.GameTestTicker;
 import net.minecraft.server.level.ServerLevel;
@@ -82,6 +84,8 @@ public final class TestIsolation {
     /** How many running tests hold each ground chunk (its ticket is taken by the first and given back by the last). */
     private static final Map<ChunkPos, Integer> GROUND_HOLDERS = new HashMap<>();
     /** The tests whose time is already written in the log (test revamp R1, {@link #logTimes}). */
+    /** GameTestHelper's private field holding its test, found once. */
+    private static Field helperTest;
     private static final java.util.Set<GameTestInfo> TIMED = new java.util.HashSet<>();
 
     private TestIsolation() {
@@ -220,17 +224,7 @@ public final class TestIsolation {
         }
         readArenas(); // (each new test's ground starts running at once)
         ColonyManager manager = ColonyManager.get(level);
-        // Which test each colony belongs to (a colony can be founded at any moment of its test).
-        for (Colony colony : manager.getColonies()) {
-            if (!OWNERS.containsKey(colony.getId())) {
-                GameTestInfo test = testAt(colony.getCenter());
-                if (test != null) {
-                    OWNERS.put(colony.getId(), test);
-                    FENCES.forEach(fence -> fence.accept(colony, ARENAS.get(test))); // (e.g. its trails stop at its own arena's edge)
-                    colony.neighbours().setTestFence(ARENAS.get(test)); // (another test's colonies are not neighbours)
-                }
-            }
-        }
+        claimColonies(manager);
         // The colonies of tests that are done go, with all of their insects.
         List<UUID> gone = new ArrayList<>();
         OWNERS.forEach((id, test) -> {
@@ -258,6 +252,76 @@ public final class TestIsolation {
         TIMED.retainAll(ARENAS.keySet());
     }
 
+    /** Which test each colony belongs to (a colony can be founded at any moment of its test): the test whose arena held its middle then. */
+    private static void claimColonies(ColonyManager manager) {
+        for (Colony colony : manager.getColonies()) {
+            if (!OWNERS.containsKey(colony.getId())) {
+                GameTestInfo test = testAt(colony.getCenter());
+                if (test != null) {
+                    OWNERS.put(colony.getId(), test);
+                    FENCES.forEach(fence -> fence.accept(colony, ARENAS.get(test))); // (e.g. its trails stop at its own arena's edge)
+                    colony.neighbours().setTestFence(ARENAS.get(test)); // (another test's colonies are not neighbours)
+                }
+            }
+        }
+    }
+
+    /** The helper's own test (its private field, found by its type so a renamed field still works), or null. */
+    @Nullable
+    private static GameTestInfo testOf(GameTestHelper helper) {
+        if (helperTest == null) {
+            for (Field field : GameTestHelper.class.getDeclaredFields()) {
+                if (field.getType() == GameTestInfo.class) {
+                    field.setAccessible(true);
+                    helperTest = field;
+                }
+            }
+        }
+        try {
+            return helperTest == null ? null : (GameTestInfo) helperTest.get(helper);
+        } catch (IllegalAccessException e) {
+            return null;
+        }
+    }
+
+    /**
+     * Every colony this test made (test revamp R2): the colonies founded in its arena, wherever their middle is now
+     * (up a dead mound's chimney, above the arena's box) and wherever their insects are, never one of another test, in
+     * the colony list's order. A colony founded this very tick is given its owner on the spot. Outside the test server
+     * (no running tests known) it falls back to the colonies whose middle lies in the arena's box.
+     */
+    public static synchronized List<Colony> coloniesOf(GameTestHelper helper) {
+        ColonyManager manager = ColonyManager.get(helper.getLevel());
+        GameTestInfo test = running == null ? null : testOf(helper);
+        if (test == null) {
+            AABB area = helper.getBounds();
+            return manager.getColonies().stream().filter(c -> area.contains(net.minecraft.world.phys.Vec3.atCenterOf(c.getCenter()))).toList();
+        }
+        claimColonies(manager);
+        return manager.getColonies().stream().filter(c -> OWNERS.get(c.getId()) == test).toList();
+    }
+
+    /** This test's colonies of this species with a living queen (in the colony list's order). */
+    public static List<Colony> coloniesOf(GameTestHelper helper, ResourceLocation species) {
+        return coloniesOf(helper).stream().filter(c -> c.getSpecies().equals(species) && c.getQueen(helper.getLevel()) != null).toList();
+    }
+
+    /** This test's colony of this species with a living queen, or null if there is none yet. */
+    @Nullable
+    public static Colony colonyOf(GameTestHelper helper, ResourceLocation species) {
+        List<Colony> found = coloniesOf(helper, species);
+        return found.isEmpty() ? null : found.get(0);
+    }
+
+    /** The colony of the queen with this id (a queen the test spawned), or null if she founded none yet. */
+    @Nullable
+    public static Colony colonyOfQueen(ServerLevel level, @Nullable UUID queenId) {
+        if (queenId == null) {
+            return null;
+        }
+        return ColonyManager.get(level).getColonies().stream().filter(c -> queenId.equals(c.getQueenId())).findFirst().orElse(null);
+    }
+
     /**
      * Each test's own time, once, when it is done (test revamp R1): a line {@code [test-time] <name> passed|failed <ms> ms}
      * that {@code tools/run_game_tests.sh} reads to list the slowest tests (the game's own log only says when each batch
@@ -276,6 +340,50 @@ public final class TestIsolation {
     @Nullable
     private static UUID colonyOf(Entity entity) {
         return ColonyManager.colonyOf(entity);
+    }
+
+    /**
+     * This test's own insects of this kind (test revamp R2, in place of every insect in the arena's box): every insect,
+     * egg, larva or body of one of the test's colonies wherever it is (a forager out past the edge counts), plus those of
+     * no colony yet (or of a colony no test owns) inside the arena's box; never one of another test's colonies, even
+     * inside this box (the leak of BUGS 32).
+     */
+    public static <T extends Entity> List<T> insectsOf(GameTestHelper helper, Class<T> kind) {
+        return insectsOf(helper, 0, kind, entity -> true);
+    }
+
+    /** {@link #insectsOf(GameTestHelper, Class)}, only those that pass the check. */
+    public static <T extends Entity> List<T> insectsOf(GameTestHelper helper, Class<T> kind, java.util.function.Predicate<? super T> check) {
+        return insectsOf(helper, 0, kind, check);
+    }
+
+    /** {@link #insectsOf(GameTestHelper, Class)} with the box for insects of no colony widened by so many blocks. */
+    public static <T extends Entity> List<T> insectsOf(GameTestHelper helper, double widen, Class<T> kind) {
+        return insectsOf(helper, widen, kind, entity -> true);
+    }
+
+    /** {@link #insectsOf(GameTestHelper, Class)} with the box widened, only those that pass the check. */
+    public static synchronized <T extends Entity> List<T> insectsOf(GameTestHelper helper, double widen, Class<T> kind,
+            java.util.function.Predicate<? super T> check) {
+        AABB box = helper.getBounds().inflate(widen);
+        GameTestInfo test = running == null ? null : testOf(helper);
+        if (test != null) {
+            claimColonies(ColonyManager.get(helper.getLevel()));
+        }
+        List<T> found = new ArrayList<>();
+        for (Entity entity : helper.getLevel().getAllEntities()) {
+            if (!kind.isInstance(entity)) {
+                continue;
+            }
+            UUID colonyId = colonyOf(entity);
+            GameTestInfo owner = colonyId == null ? null : OWNERS.get(colonyId);
+            boolean ours = test != null && owner == test;
+            boolean inBoxAndFree = (owner == null || test == null) && box.intersects(entity.getBoundingBox());
+            if ((ours || inBoxAndFree) && check.test(kind.cast(entity))) {
+                found.add(kind.cast(entity));
+            }
+        }
+        return found;
     }
 
     /**

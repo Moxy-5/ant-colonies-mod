@@ -1,5 +1,7 @@
 package com.antcolonies.savanna.gametest;
 
+import com.antcolonies.gametest.TestIsolation;
+import com.antcolonies.gametest.TestScenes;
 import com.antcolonies.gametest.TestAnts;
 import com.antcolonies.gametest.TestClock;
 import com.antcolonies.savanna.SavannaMod;
@@ -58,7 +60,7 @@ public class TermiteTests {
             TermiteQueenEntity queen = (TermiteQueenEntity) colony.getQueen(level);
             BlockPos room = colony.nest().getFinishedRoomCenter(level);
             helper.assertTrue(queen.blockPosition().equals(room), "the queen is not in the middle of the chamber");
-            var kings = level.getEntitiesOfClass(TermiteKingEntity.class, helper.getBounds());
+            var kings = TestIsolation.insectsOf(helper, TermiteKingEntity.class);
             helper.assertTrue(kings.size() == 1 && colony.getId().equals(kings.get(0).getColonyId()), "the king is missing or not in her colony");
             BlockPos beside = StayWithQueenGoal.spotBesideQueen(level, colony);
             helper.assertTrue(kings.get(0).blockPosition().equals(beside), "the king is not beside the queen: " + kings.get(0).blockPosition().subtract(beside));
@@ -107,7 +109,7 @@ public class TermiteTests {
             helper.assertTrue(colony != null && sealed[0], "not sealed in yet");
             helper.assertTrue(colony.queenCare().getEggsLaid() == 5, colony.queenCare().getEggsLaid() + " eggs laid, expected 5");
             helper.assertTrue(colony.brood().countBrood(level) == 0, "still " + colony.brood().countBrood(level) + " eggs and nymphs");
-            var workers = level.getEntitiesOfClass(TermiteWorkerEntity.class, helper.getBounds());
+            var workers = TestIsolation.insectsOf(helper, TermiteWorkerEntity.class);
             helper.assertTrue(workers.size() == 5 && colony.getCount(TermiteWorkerEntity.CASTE) == 5,
                     workers.size() + " termite workers, the colony counts " + colony.getCount(TermiteWorkerEntity.CASTE) + ", expected 5");
             helper.assertTrue(workers.stream().allMatch(w -> colony.getId().equals(w.getColonyId())), "a worker is not in the colony");
@@ -165,13 +167,9 @@ public class TermiteTests {
         });
     }
 
-    /** The termite colony in this test area (one with a living queen). */
+    /** This test's termite colony (one with a living queen; found by its owner, test revamp R2). */
     private static Colony colony(GameTestHelper helper) {
-        AABB area = helper.getBounds();
-        return ColonyManager.get(helper.getLevel()).getColonies().stream()
-                .filter(colony -> area.contains(Vec3.atCenterOf(colony.getCenter())) && colony.getQueen(helper.getLevel()) != null
-                        && colony.getSpecies().equals(SavannaSpecies.MACROTERMES))
-                .findFirst().orElse(null);
+        return TestScenes.colony(helper, SavannaSpecies.MACROTERMES);
     }
 
     private static int airBelowSurface(GameTestHelper helper) {

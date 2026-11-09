@@ -1,5 +1,6 @@
 package com.antcolonies.savanna.gametest;
 
+import com.antcolonies.gametest.TestIsolation;
 import com.antcolonies.gametest.StuckWatcher;
 import com.antcolonies.gametest.TestClock;
 import com.antcolonies.gametest.TestScenes;
@@ -171,7 +172,7 @@ public class TermiteFoodTests {
                     : c.food().piecesOf(Blocks.HAY_BLOCK.defaultBlockState());
             // (Only this colony's termites and food items: the tests next door have ants and seeds of their own.)
             int carried = 0;
-            for (AbstractAntEntity ant : level.getEntitiesOfClass(AbstractAntEntity.class, helper.getBounds().inflate(16))) {
+            for (AbstractAntEntity ant : TestIsolation.insectsOf(helper, 16, AbstractAntEntity.class)) {
                 if (c.getId().equals(ant.getColonyId()) && !ant.isCarryingBread()) { // food pieces, not nodules
                     carried += ant.getCarriedSeed().getCount();
                 }
@@ -226,12 +227,12 @@ public class TermiteFoodTests {
     /** This colony's eggs and nymphs round the test area. */
     private static List<Entity> youngOf(ServerLevel level, GameTestHelper helper, Colony colony) {
         List<Entity> young = new ArrayList<>();
-        for (AntEggEntity egg : level.getEntitiesOfClass(AntEggEntity.class, helper.getBounds().inflate(4))) {
+        for (AntEggEntity egg : TestIsolation.insectsOf(helper, 4, AntEggEntity.class)) {
             if (colony.getId().equals(egg.getColonyId())) {
                 young.add(egg);
             }
         }
-        for (AntLarvaEntity nymph : level.getEntitiesOfClass(AntLarvaEntity.class, helper.getBounds().inflate(4))) {
+        for (AntLarvaEntity nymph : TestIsolation.insectsOf(helper, 4, AntLarvaEntity.class)) {
             if (colony.getId().equals(nymph.getColonyId())) {
                 young.add(nymph);
             }
@@ -268,7 +269,7 @@ public class TermiteFoodTests {
             helper.assertTrue(colony != null && !colony.isFounding(), "no termite colony with workers");
             TestClock.still(helper, 12.0); // midday: nobody goes out
             long old = level.getGameTime() - colony.profile().worker().builderUntilTicks() - 1000;
-            for (com.antcolonies.savanna.entity.TermiteWorkerEntity worker : level.getEntitiesOfClass(com.antcolonies.savanna.entity.TermiteWorkerEntity.class, helper.getBounds())) {
+            for (com.antcolonies.savanna.entity.TermiteWorkerEntity worker : TestIsolation.insectsOf(helper, com.antcolonies.savanna.entity.TermiteWorkerEntity.class)) {
                 worker.setGrownUpAt(old); // old workers: foragers first
             }
             TermiteSoldierTests.digNestAtOnce(level, colony);
@@ -540,8 +541,7 @@ public class TermiteFoodTests {
         helper.runAfterDelay(15, () -> {
             com.antcolonies.colony.Colony colony = TermiteMoundTests.colony(helper);
             helper.assertTrue(colony != null, "no termite colony");
-            List<com.antcolonies.savanna.entity.TermiteWorkerEntity> workers = level.getEntitiesOfClass(com.antcolonies.savanna.entity.TermiteWorkerEntity.class,
-                    helper.getBounds(), worker -> colony.getId().equals(worker.getColonyId()));
+            List<com.antcolonies.savanna.entity.TermiteWorkerEntity> workers = TestIsolation.insectsOf(helper, com.antcolonies.savanna.entity.TermiteWorkerEntity.class, worker -> colony.getId().equals(worker.getColonyId()));
             helper.assertTrue(workers.size() == 2, workers.size() + " workers joined the colony, not 2");
             com.antcolonies.savanna.entity.TermiteWorkerEntity first = workers.get(0);
             BlockPos cell = first.blockPosition();

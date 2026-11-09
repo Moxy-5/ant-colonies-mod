@@ -1,5 +1,6 @@
 package com.antcolonies.savanna.gametest;
 
+import com.antcolonies.gametest.TestIsolation;
 import java.util.List;
 
 import com.antcolonies.colony.Colony;
@@ -211,7 +212,7 @@ public class TermiteRaidDefenceTests {
             failAt[0] = () -> "old body out " + old.isOut() + " at " + old.blockPosition().toShortString()
                     + ", raider's body out " + stranger.isOut() + " at " + stranger.blockPosition().toShortString() + ", ways out "
                     + colony.refuse().wayOutMouths(level) + ", paralysed " + (lying[0] == null ? "not yet" : lying[0].isAlive() + " at "
-                    + lying[0].blockPosition().toShortString()) + "; workers " + level.getEntitiesOfClass(TermiteWorkerEntity.class, helper.getBounds()).stream()
+                    + lying[0].blockPosition().toShortString()) + "; workers " + TestIsolation.insectsOf(helper, TermiteWorkerEntity.class).stream()
                             .map(w -> w.blockPosition().toShortString() + " " + w.runningGoals()).toList();
         });
         helper.runAtTickTime(5990, () -> helper.fail(failAt[0] == null ? "the scene never got ready" : failAt[0].get()));
@@ -269,7 +270,7 @@ public class TermiteRaidDefenceTests {
                 int waves = alarm.cameInWaves(TermiteSoldierEntity.Rank.MINOR) + alarm.cameInWaves(TermiteSoldierEntity.Rank.MAJOR);
                 helper.assertTrue(waves <= 4, waves + " soldiers came in waves, more than the colony's tenth (4)");
                 int places = 0;
-                for (TermiteSoldierEntity soldier : level.getEntitiesOfClass(TermiteSoldierEntity.class, helper.getBounds())) {
+                for (TermiteSoldierEntity soldier : TestIsolation.insectsOf(helper, TermiteSoldierEntity.class)) {
                     if (alarm.holdsPlace(soldier.getUUID())) {
                         places++;
                     }
@@ -400,7 +401,7 @@ public class TermiteRaidDefenceTests {
             TestClock.still(helper, hour);
             TermiteSoldierTests.digNestAtOnce(level, colony);
             level.setBlock(colony.nest().getEntrance(), Blocks.STONE.defaultBlockState(), 3);
-            for (TermiteWorkerEntity worker : level.getEntitiesOfClass(TermiteWorkerEntity.class, helper.getBounds())) {
+            for (TermiteWorkerEntity worker : TestIsolation.insectsOf(helper, TermiteWorkerEntity.class)) {
                 worker.setGrownUpAt(builderAge(level, colony));
             }
             scene.colony()[0] = colony;

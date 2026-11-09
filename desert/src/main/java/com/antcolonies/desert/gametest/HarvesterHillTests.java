@@ -147,9 +147,8 @@ public class HarvesterHillTests {
     }
 
     private static Colony antColony(GameTestHelper helper) {
-        return com.antcolonies.colony.ColonyManager.get(helper.getLevel()).getColonies().stream()
-                .filter(c -> helper.getBounds().contains(net.minecraft.world.phys.Vec3.atCenterOf(c.getCenter()))
-                        && c.getQueen(helper.getLevel()) instanceof com.antcolonies.desert.entity.QueenAntEntity)
+        return com.antcolonies.gametest.TestIsolation.coloniesOf(helper).stream()
+                .filter(c -> c.getQueen(helper.getLevel()) instanceof com.antcolonies.desert.entity.QueenAntEntity)
                 .findFirst().orElse(null);
     }
 }
