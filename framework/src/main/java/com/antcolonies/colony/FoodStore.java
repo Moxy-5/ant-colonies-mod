@@ -317,6 +317,15 @@ public class FoodStore {
     }
 
     /**
+     * A forager found no way to this plant: every forager of the colony leaves it alone for {@code ticks} (tick spikes,
+     * 2026-11-10: each worker remembered only its own failed walks, so fifty workers each searched the whole land in
+     * reach for the same dead wood nobody can get to, about 4 failed searches a second at a big termite colony).
+     */
+    public void noWayTo(Level level, BlockPos plant, int ticks) {
+        busyGrass.put(plant.immutable(), level.getGameTime() + ticks);
+    }
+
+    /**
      * What a plant is worth going for: the food left on it (to the power 0.75: twice the food is worth a bit less than
      * twice the walk) against the walk from the way out, plus a few blocks every trip costs anyway. A full hay bale (48
      * pieces) is worth going about 28 blocks for rather than a tuft of grass (4 pieces) right by the hole, so within a

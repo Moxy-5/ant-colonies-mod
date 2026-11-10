@@ -190,6 +190,11 @@ public final class Errand<K> {
         return ant.getNavigator().moveTo(cell, speed, costs);
     }
 
+    /** Sets off now to the nearest of these cells there is a way to, one route search for them all, with the mind's own step costs. */
+    public boolean setOff(Collection<BlockPos> cells, double speed, AntPathFinder.StepCosts costs) {
+        return ant.getNavigator().moveTo(cells, speed, costs);
+    }
+
     /** Sets off now to any foothold {@code where} accepts (somewhere it can work on a thing from), searching towards {@code towards}. */
     public boolean setOff(Predicate<Foothold> where, BlockPos towards, double speed) {
         return ant.getNavigator().moveTo(where, towards, speed);

@@ -292,12 +292,17 @@ public class AntNavigator {
      * says which. False (and does nothing) if there is no route to any of them.
      */
     public boolean moveTo(Collection<BlockPos> goals, double speed) {
+        return moveTo(goals, speed, AntPathFinder.StepCosts.NONE);
+    }
+
+    /** Like {@link #moveTo(Collection, double)}, with the mind's own costs for this walk. */
+    public boolean moveTo(Collection<BlockPos> goals, double speed, AntPathFinder.StepCosts mindCosts) {
         if (goals.isEmpty()) {
             return false;
         }
         BlockPos here = ant.blockPosition();
         BlockPos nearest = goals.stream().min(Comparator.comparingInt(cell -> cell.distManhattan(here))).orElseThrow();
-        return begin(nearest, null, null, -1, goals, null, speed, AntPathFinder.StepCosts.NONE);
+        return begin(nearest, null, null, -1, goals, null, speed, mindCosts);
     }
 
     /**

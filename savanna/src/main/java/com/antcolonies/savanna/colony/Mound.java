@@ -260,9 +260,9 @@ public class Mound {
     }
 
     /**
-     * Once a second, near or away: while a watcher is within {@link #SHAPES_NEAR} blocks the mound holds on to its
-     * plan (asked for in the background on the way in, so it is there before anything needs it); farther off it lets
-     * go, and only the soil counts stay.
+     * Once a second while the colony is away (near, {@link #tick} holds the plan): while a watcher is within
+     * {@link #SHAPES_NEAR} blocks the mound holds on to its plan (asked for in the background on the way in, so it is
+     * there before anything needs it); farther off it lets go, and only the soil counts stay.
      */
     void keepShapes(net.minecraft.server.level.ServerLevel level) {
         MoundNumbers numbers = numbers();
@@ -438,8 +438,9 @@ public class Mound {
      * has nothing crumble away, once after the stage has changed (see {@link #crumbleLeftovers}).
      */
     public void tick(Level level) {
-        if (level instanceof net.minecraft.server.level.ServerLevel server) {
-            keepShapes(server);
+        MoundNumbers its = numbers();
+        if (held == null && its != null) {
+            held = MoundPlan.growthSoon(its, seed()); // (the colony is here, its insects real: it holds its plan)
         }
         Map<BlockPos, MoundPlan.Part> parts = getParts(level);
         MoundNumbers numbers = numbers();

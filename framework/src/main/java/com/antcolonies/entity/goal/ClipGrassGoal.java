@@ -183,6 +183,7 @@ public class ClipGrassGoal extends Goal {
             }
         } else if (!errand.goTo(grass.immutable(), fromInside
                 ? nearPlant(grass).and(at -> colony.nest().isInside(level, at.cell())) : nearPlant(grass), grass, 1.0)) {
+            colony.food().noWayTo(level, grass, Errand.LEAVE_ALONE_TICKS); // (the others skip it for as long as this ant does)
             ticks = GIVE_UP_TICKS; // no way to get there: let another ant have a go
         }
     }
