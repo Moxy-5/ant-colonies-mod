@@ -113,6 +113,7 @@ public final class MoundPlan {
     private static final Map<String, CompletableFuture<List<Shape>>> GROWING = new ConcurrentHashMap<>();
     /** The soil counts of every mound grown since the game started ({@link #wallsIfKnown}). */
     private static final Map<String, int[]> WALLS = new ConcurrentHashMap<>();
+    private static final Map<String, int[]> FOOT_REACH = new ConcurrentHashMap<>();
     /** A quarter of the computer's threads, 1 to 4: a world loaded with many mound colonies round the player grows them side by side. */
     private static final ExecutorService GROWER = Executors.newFixedThreadPool(Math.max(1, Math.min(4, Runtime.getRuntime().availableProcessors() / 4)), run -> {
         Thread thread = new Thread(run, "termite-mound-grower");
@@ -161,6 +162,13 @@ public final class MoundPlan {
         for (int h = 1; h < stages.size(); h++) {
             walls[h] = walls(stages.get(h));
         }
+        int[] reach = new int[stages.size()];
+        for (int h = 1; h < stages.size(); h++) {
+            for (BlockPos part : stages.get(h).parts().keySet()) {
+                reach[h] = Math.max(reach[h], (int) Math.ceil(Math.hypot(part.getX(), part.getZ())));
+            }
+        }
+        FOOT_REACH.put(key(numbers, seed), reach);
         WALLS.put(key(numbers, seed), walls);
         return stages;
     }
@@ -174,6 +182,12 @@ public final class MoundPlan {
     @org.jetbrains.annotations.Nullable
     public static int[] wallsIfKnown(MoundNumbers numbers, long seed) {
         return WALLS.get(key(numbers, seed));
+    }
+
+    /** Like {@link #wallsIfKnown}: how far (blocks, flat) each stage's foot reaches from the mound's middle. */
+    @org.jetbrains.annotations.Nullable
+    public static int[] reachIfKnown(MoundNumbers numbers, long seed) {
+        return FOOT_REACH.get(key(numbers, seed));
     }
 
     /**

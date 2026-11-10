@@ -190,12 +190,7 @@ public final class FeedingSpots {
         if (mound == null) {
             return 0;
         }
-        BlockPos center = colony.getCenter();
-        int reach = 0;
-        for (BlockPos part : mound.getParts(level).keySet()) {
-            reach = Math.max(reach, (int) Math.ceil(Math.hypot(part.getX() - center.getX(), part.getZ() - center.getZ())));
-        }
-        return reach;
+        return mound.footReach(level);
     }
 
     /** The direction the spot lies from the mound's middle, as a compass word (north, south-east, ...). */

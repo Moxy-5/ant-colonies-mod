@@ -119,6 +119,8 @@ public class Mound {
     private int[] wallsAt = new int[0];
     /** The soil counts read from the save (empty in an older one): the stage is known at once, with no mound grown. */
     private int[] savedWalls = new int[0];
+    /** How far each stage's foot reaches ({@link #footReach}); saved like the soil counts. */
+    private int[] reachAt = new int[0];
     /** Every stage of the plan, held while a watcher is near ({@link #keepShapes}); not saved. */
     @Nullable
     private List<MoundPlan.Shape> held;
@@ -198,6 +200,7 @@ public class Mound {
     public void setSeedForTests(long seed) {
         seedForTests = seed;
         savedWalls = new int[0];
+        reachAt = new int[0];
         held = null;
         shapesFor = null;
         cachedStage = 0;
@@ -229,6 +232,28 @@ public class Mound {
         wallsAt = walls;
         cachedStage = 0;
         return true;
+    }
+
+    /**
+     * How far (blocks, flat) the mound's foot reaches from its middle at its stage now. Known from the mound grown since
+     * the game started or from the save, with no shape needed (a scout looking round at a termite mound far from every
+     * player froze the game 1 to 3 s while its shape was grown, tick spikes 2026-11-10); until it is known, about that
+     * ({@link com.antcolonies.savanna.worldgen.MoundPlaces#footReach}).
+     */
+    public int footReach(Level level) {
+        MoundNumbers numbers = numbers();
+        if (numbers == null) {
+            return 0;
+        }
+        int h = getStage(level);
+        int[] known = MoundPlan.reachIfKnown(numbers, seed());
+        if (known != null) {
+            reachAt = known;
+        } else if (reachAt.length != numbers.maxHeight() + 1) {
+            MoundPlan.grownSoon(numbers, seed());
+            return (int) Math.ceil(com.antcolonies.savanna.worldgen.MoundPlaces.footReach(h));
+        }
+        return reachAt[Math.max(1, Math.min(h, numbers.maxHeight()))];
     }
 
     /** The game test server waits for a mound's shape: its ticks outrun the second of growing (docs/BUGS.md 73). */
@@ -1004,6 +1029,9 @@ public class Mound {
         } else if (savedWalls.length > 0) {
             tag.putIntArray("moundWalls", savedWalls);
         }
+        if (reachAt.length > 0) {
+            tag.putIntArray("moundReach", reachAt);
+        }
     }
 
     void load(CompoundTag tag) {
@@ -1011,5 +1039,6 @@ public class Mound {
         updatedAt = tag.contains("moundUpdated") ? tag.getLong("moundUpdated") : Colony.NOT_SET;
         workStage = tag.getInt("moundWorkStage"); // 0 in an old save: climbs up from the first stage
         savedWalls = tag.getIntArray("moundWalls"); // (none in an older save: worked out in the background)
+        reachAt = tag.getIntArray("moundReach");
     }
 }
