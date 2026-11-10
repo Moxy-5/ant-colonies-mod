@@ -77,6 +77,20 @@ public final class TunnelRoute {
         // made), and the planner's own lists are kept by column in maps that spread the columns well (as plain numbers
         // x and z fell into the same few slots).
         Ground ground = remembering(land);
+        // No column beside the food where a hole may open (food over the mound, in water, on stone): no tunnel can end
+        // there, so none is searched for (tick spikes, 2026-11-10; the same answer: the search below would look through
+        // all the ground in reach, thousands of columns, to find that out; dead wood in a crown over the mound asked
+        // every 10 seconds).
+        boolean anyHole = false;
+        for (int dx = -HOLE_REACH; dx <= HOLE_REACH && !anyHole; dx++) {
+            for (int dz = -HOLE_REACH; dz <= HOLE_REACH && !anyHole; dz++) {
+                Integer top = dx == 0 && dz == 0 ? null : ground.groundTop(food.getX() + dx, food.getZ() + dz);
+                anyHole = top != null && ground.mayOpenHole(new BlockPos(food.getX() + dx, top, food.getZ() + dz));
+            }
+        }
+        if (!anyHole) {
+            return null;
+        }
         Map<Long, Integer> best = new it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap<>();
         Map<Long, Long> cameFrom = new it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap<>();
         Map<Long, Integer> heightOf = new it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap<>();
@@ -119,13 +133,18 @@ public final class TunnelRoute {
                     continue;
                 }
                 List<BlockPos> step = step(new BlockPos(x, node.y, z), new BlockPos(nx, ny, nz));
-                boolean diggable = true;
-                for (BlockPos cell : step) {
-                    diggable &= ground.mayDig(cell) && isWalledIn(cell, ground);
-                }
                 int cost = node.cost + step.size();
                 long next = column(nx, nz);
-                if (!diggable || cost > maxLength || cost >= best.getOrDefault(next, Integer.MAX_VALUE) || firsts.contains(next)) {
+                // The quick questions first (tick spikes, 2026-11-10; the same answer): most neighbours are columns the
+                // search has already reached as cheaply, and need no look at the ground at all.
+                if (cost > maxLength || cost >= best.getOrDefault(next, Integer.MAX_VALUE) || firsts.contains(next)) {
+                    continue;
+                }
+                boolean diggable = true;
+                for (BlockPos cell : step) {
+                    diggable = diggable && ground.mayDig(cell) && isWalledIn(cell, ground);
+                }
+                if (!diggable) {
                     continue;
                 }
                 best.put(next, cost);
@@ -238,12 +257,13 @@ public final class TunnelRoute {
         return Math.max(0, Math.abs(x - food.getX()) + Math.abs(z - food.getZ()) - HOLE_REACH);
     }
 
-    /** {@code ground} with each column's top remembered once asked (for the length of one plan). */
+    /** {@code ground} with each column's top, and whether each block may be dug, remembered once asked (for the length of one plan). */
     private static Ground remembering(Ground ground) {
         it.unimi.dsi.fastutil.longs.Long2IntOpenHashMap tops = new it.unimi.dsi.fastutil.longs.Long2IntOpenHashMap();
         final int unknown = Integer.MIN_VALUE;
         final int none = Integer.MIN_VALUE + 1;
         tops.defaultReturnValue(unknown);
+        it.unimi.dsi.fastutil.longs.Long2ByteOpenHashMap digs = new it.unimi.dsi.fastutil.longs.Long2ByteOpenHashMap();
         return new Ground() {
             @Override
             public Integer groundTop(int x, int z) {
@@ -259,7 +279,13 @@ public final class TunnelRoute {
 
             @Override
             public boolean mayDig(BlockPos cell) {
-                return ground.mayDig(cell);
+                long key = cell.asLong();
+                byte known = digs.get(key);
+                if (known == 0) {
+                    known = ground.mayDig(cell) ? (byte) 1 : (byte) 2;
+                    digs.put(key, known);
+                }
+                return known == 1;
             }
 
             @Override

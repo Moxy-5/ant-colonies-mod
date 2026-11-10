@@ -50,6 +50,17 @@ public final class RunwayRoute {
         if (food.isEmpty()) {
             return null;
         }
+        // Each cell's kind is worked out once a plan (tick spikes, 2026-11-10; the same plan): it was asked again from
+        // every cell beside it, each time reading the column's ground and its neighbours' afresh.
+        Map<BlockPos, Integer> kinds = new HashMap<>();
+        java.util.function.Function<BlockPos, Integer> kindOf = cell -> {
+            Integer known = kinds.get(cell);
+            if (known == null) {
+                known = kind(cell, ground);
+                kinds.put(cell.immutable(), known);
+            }
+            return known;
+        };
         Map<BlockPos, Integer> cost = new HashMap<>();
         Map<BlockPos, Integer> length = new HashMap<>();
         Map<BlockPos, BlockPos> cameFrom = new HashMap<>();
@@ -72,14 +83,14 @@ public final class RunwayRoute {
             }
             for (Direction direction : Direction.values()) {
                 BlockPos next = at.relative(direction);
-                int kind = kind(next, ground);
+                int kind = kindOf.apply(next);
                 if (kind == 0 || food.contains(next)) {
                     continue;
                 }
                 // Up or down only between the two cells of a column (a climb over a step); never up into open air, and
                 // never along the side of a step (from one climb cell to another).
                 if (direction.getAxis().isVertical() ? !(kind == 2 && direction == Direction.UP || kind == 1 && direction == Direction.DOWN)
-                        : kind == 2 && kind(at, ground) == 2) {
+                        : kind == 2 && kindOf.apply(at) == 2) {
                     continue;
                 }
                 int newCost = cost.get(at) + (kind == 1 ? GROUND_COST : CLIMB_COST);
