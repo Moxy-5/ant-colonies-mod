@@ -1003,6 +1003,7 @@ public class TermiteAwayTests {
         ServerLevel level = helper.getLevel();
         int[] stage = {0};
         int[] headcount = new int[1];
+        long[] farAt = new long[1];
         TermiteScenes.colony(helper, List.of(), colony -> {
             helper.assertTrue(colony != null, "no termite colony");
             TermiteScenes.digNestAtOnce(level, colony);
@@ -1038,13 +1039,28 @@ public class TermiteAwayTests {
                         helper.assertTrue(now == headcount[0], "the headcount changed when the far colony's workers were folded in: "
                                 + headcount[0] + " before, " + now + " after");
                         helper.assertTrue(colony.getQueen(level) != null, "the queen of a far colony left the world");
-                        colony.away().setNearForTests(true); // a player comes near
+                        farAt[0] = level.getGameTime();
                         stage[0] = 3;
                     }
                 }
                 case 3 -> {
-                    if (!colony.away().isComingBack() && real.size() >= 3) {
-                        helper.succeed();
+                    // Far colonies' speed (2026-11-09): while her colony is far the queen rests as in unloaded land (she
+                    // and goals do not run), and lays no real eggs (the away brain lays them as numbers).
+                    if (level.getGameTime() - farAt[0] >= 60) {
+                        AbstractAntEntity queen = colony.getQueen(level);
+                        helper.assertTrue(queen != null, "the queen of a far colony left the world");
+                        helper.assertTrue(queen.isRestingFar(), "the queen of a far colony does not rest (on the ground " + queen.onGround()
+                                + ", hurt " + queen.hurtTime + ", in water " + queen.isInWater() + ")");
+                        int eggs = com.antcolonies.gametest.TestIsolation.insectsOf(helper, com.antcolonies.entity.AntEggEntity.class).size();
+                        helper.assertTrue(eggs == 0, "a far colony has " + eggs + " real eggs in the world");
+                        colony.away().setNearForTests(true); // a player comes near
+                        stage[0] = 4;
+                    }
+                }
+                case 4 -> {
+                    AbstractAntEntity queen = colony.getQueen(level);
+                    if (!colony.away().isComingBack() && real.size() >= 3 && queen != null && !queen.isRestingFar()) {
+                        helper.succeed(); // (back, real workers out again, and the queen carries on)
                     }
                 }
                 default -> {
