@@ -4,11 +4,13 @@ import com.antcolonies.entity.AbstractAntEntity;
 import com.antcolonies.entity.body.BodyPlans;
 import com.antcolonies.entity.body.LostLegs;
 import com.mojang.blaze3d.vertex.PoseStack;
+import com.mojang.blaze3d.vertex.VertexConsumer;
 import com.mojang.math.Axis;
 import net.minecraft.client.Minecraft;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.phys.Vec3;
 
+import software.bernie.geckolib.cache.object.GeoBone;
 import software.bernie.geckolib.model.GeoModel;
 import software.bernie.geckolib.renderer.GeoEntityRenderer;
 import net.minecraft.client.renderer.MultiBufferSource;
@@ -71,6 +73,17 @@ public class AntRenderer<T extends AbstractAntEntity> extends GeoEntityRenderer<
             far.withScale(scaleWidth, scaleHeight);
         }
         return this;
+    }
+
+    /** A bone's boxes from its ready-made faces ({@link BoneMesh}), the buried ones left out. */
+    @Override
+    public void renderCubesOfBone(PoseStack poseStack, GeoBone bone, VertexConsumer buffer, int packedLight,
+            int packedOverlay, int colour) {
+        if (BoneMesh.PLAIN) {
+            super.renderCubesOfBone(poseStack, bone, buffer, packedLight, packedOverlay, colour);
+        } else if (!bone.isHidden()) {
+            BoneMesh.draw(poseStack.last(), bone, buffer, packedLight, packedOverlay, colour);
+        }
     }
 
     /** Whether this insect is drawn with the far look this frame, from how far the camera is. */

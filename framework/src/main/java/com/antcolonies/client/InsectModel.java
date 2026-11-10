@@ -43,6 +43,20 @@ public class InsectModel<T extends AbstractAntEntity> extends DefaultedEntityGeo
         return planFrom != null ? planFrom : getModelResource(insect);
     }
 
+    /** A far insect is drawn with its last pose again while that is fresh ({@link PoseMemory}); else worked out. */
+    @Override
+    public void handleAnimations(T insect, long instanceId, AnimationState<T> state, float partialTick) {
+        if (!PoseMemory.far(insect)) {
+            super.handleAnimations(insect, instanceId, state, partialTick);
+            return;
+        }
+        var bones = getAnimationProcessor().getRegisteredBones();
+        if (!PoseMemory.reuse(insect, this, bones)) {
+            super.handleAnimations(insect, instanceId, state, partialTick);
+            PoseMemory.keep(insect, this, getAnimationProcessor().getRegisteredBones());
+        }
+    }
+
     @Override
     public void setCustomAnimations(T insect, long instanceId, AnimationState<T> state) {
         super.setCustomAnimations(insect, instanceId, state);

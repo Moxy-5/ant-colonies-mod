@@ -3321,6 +3321,17 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
         farLook = far;
     }
 
+    /** Client: what the drawing code keeps for it between frames (its last pose, {@code client/PoseMemory}). */
+    private Object drawMemory;
+
+    public Object getDrawMemory() {
+        return drawMemory;
+    }
+
+    public void setDrawMemory(Object memory) {
+        drawMemory = memory;
+    }
+
     /** Client: how big the renderer draws it (1 = the model's own size). */
     public float getDrawScale() {
         return drawScale;

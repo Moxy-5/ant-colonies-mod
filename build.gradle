@@ -186,6 +186,20 @@ neoForge {
             if (project.hasProperty('filmRawFrames')) {
                 systemProperty 'antcolonies.film.rawFrames', 'true'
             }
+            // -PplainBoxes: GeckoLib's own box drawing in place of the ready-made faces (client/BoneMesh), to compare
+            if (project.hasProperty('plainBoxes')) {
+                systemProperty 'antcolonies.plainBoxes', 'true'
+            }
+            // -PposeReuse=half (or never): far insects' kept poses (client/PoseMemory) every other frame at any distance,
+            // to measure them (films work every pose out otherwise)
+            if (project.hasProperty('poseReuse')) {
+                systemProperty 'antcolonies.poseReuse', project.property('poseReuse').toString()
+            }
+            // -PfilmProfile: Java's own flight recorder samples where the game's time goes while filming, written to
+            // run-film/film.jfr (read it with tools/film_profile.py)
+            if (project.hasProperty('filmProfile')) {
+                jvmArguments.add '-XX:StartFlightRecording=filename=film.jfr,settings=profile,dumponexit=true'
+            }
             // -PfarLook=always (or never): every insect with a far model drawn with it (or never), for measuring and
             // for comparing the two looks (client/InsectModel.pickLook; films keep the full model otherwise)
             if (project.hasProperty('farLook')) {
