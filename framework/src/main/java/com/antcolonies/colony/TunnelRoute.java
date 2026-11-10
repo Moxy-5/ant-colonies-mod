@@ -69,14 +69,19 @@ public final class TunnelRoute {
      * (beside the mound, which is not dug through).
      */
     @Nullable
-    public static Plan plan(List<BlockPos> starts, BlockPos food, Ground ground, int maxLength) {
+    public static Plan plan(List<BlockPos> starts, BlockPos food, Ground land, int maxLength) {
         record Node(long column, int y, int cost, int guess) {
         }
-        Map<Long, Integer> best = new HashMap<>();
-        Map<Long, Long> cameFrom = new HashMap<>();
-        Map<Long, Integer> heightOf = new HashMap<>();
+        // Far colonies' speed (2026-11-09), the same plan made quicker: each column's ground is read once a plan (it was
+        // read again for every neighbour and every "walled in?" question; the land does not change while one plan is
+        // made), and the planner's own lists are kept by column in maps that spread the columns well (as plain numbers
+        // x and z fell into the same few slots).
+        Ground ground = remembering(land);
+        Map<Long, Integer> best = new it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap<>();
+        Map<Long, Long> cameFrom = new it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap<>();
+        Map<Long, Integer> heightOf = new it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap<>();
         PriorityQueue<Node> open = new PriorityQueue<>((a, b) -> Integer.compare(a.cost + a.guess, b.cost + b.guess));
-        java.util.Set<Long> firsts = new java.util.HashSet<>();
+        java.util.Set<Long> firsts = new it.unimi.dsi.fastutil.longs.LongOpenHashSet();
         for (BlockPos start : starts) {
             long first = column(start.getX(), start.getZ());
             if (firsts.add(first)) {
@@ -231,6 +236,42 @@ public final class TunnelRoute {
 
     private static int guess(int x, int z, BlockPos food) {
         return Math.max(0, Math.abs(x - food.getX()) + Math.abs(z - food.getZ()) - HOLE_REACH);
+    }
+
+    /** {@code ground} with each column's top remembered once asked (for the length of one plan). */
+    private static Ground remembering(Ground ground) {
+        it.unimi.dsi.fastutil.longs.Long2IntOpenHashMap tops = new it.unimi.dsi.fastutil.longs.Long2IntOpenHashMap();
+        final int unknown = Integer.MIN_VALUE;
+        final int none = Integer.MIN_VALUE + 1;
+        tops.defaultReturnValue(unknown);
+        return new Ground() {
+            @Override
+            public Integer groundTop(int x, int z) {
+                long column = column(x, z);
+                int top = tops.get(column);
+                if (top == unknown) {
+                    Integer read = ground.groundTop(x, z);
+                    top = read == null ? none : read;
+                    tops.put(column, top);
+                }
+                return top == none ? null : Integer.valueOf(top);
+            }
+
+            @Override
+            public boolean mayDig(BlockPos cell) {
+                return ground.mayDig(cell);
+            }
+
+            @Override
+            public boolean mayOpenHole(BlockPos hole) {
+                return ground.mayOpenHole(hole);
+            }
+
+            @Override
+            public boolean isDug(BlockPos cell) {
+                return ground.isDug(cell);
+            }
+        };
     }
 
     private static long column(int x, int z) {

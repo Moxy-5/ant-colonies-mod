@@ -699,6 +699,12 @@ public record SpeciesProfile(ColonyNumbers colony, WorkerNumbers worker, QueenNu
                 Codec.BOOL.optionalFieldOf("rich", false).forGetter(PlantFood::rich)
         ).apply(i, PlantFood::new));
 
+        public PlantFood {
+            // (A plain copy: the map the file reader hands over built a new list of its entries on every question,
+            // 15 percent of the termites' ten-second check; far colonies' speed, 2026-11-09.)
+            state = Map.copyOf(state);
+        }
+
         public PlantFood(String block, int pieces, boolean onlyDecaying, int foragers) {
             this(block, pieces, onlyDecaying, foragers, Map.of(), false);
         }
@@ -712,12 +718,39 @@ public record SpeciesProfile(ColonyNumbers colony, WorkerNumbers worker, QueenNu
             if (!hasValues(state)) {
                 return false;
             }
-            if (block.startsWith("#")) {
-                ResourceLocation id = ResourceLocation.tryParse(block.substring(1));
-                return id != null && state.is(TagKey.create(Registries.BLOCK, id));
+            return blockTest(block).test(state);
+        }
+
+        /**
+         * A species file's block name ("minecraft:dead_bush", or a tag "#minecraft:leaves") as a test of a block, worked
+         * out once and remembered (far colonies' speed, 2026-11-09: reading the name out of its text on every question
+         * was 42 percent of the mod's server time, asked for every block a forager or the food map looks at). The same
+         * answers: a tag is asked of the block as before (its members may change with the data), a block is the same
+         * block for as long as the game runs. A name that is no block yet is not remembered.
+         */
+        private static final Map<String, java.util.function.Predicate<BlockState>> BLOCK_TESTS = new java.util.concurrent.ConcurrentHashMap<>();
+        private static final java.util.function.Predicate<BlockState> NO_BLOCK = state -> false;
+
+        private static java.util.function.Predicate<BlockState> blockTest(String name) {
+            java.util.function.Predicate<BlockState> test = BLOCK_TESTS.get(name);
+            if (test != null) {
+                return test;
             }
-            ResourceLocation id = ResourceLocation.tryParse(block);
-            return id != null && BuiltInRegistries.BLOCK.getOptional(id).map(state::is).orElse(false);
+            ResourceLocation id = ResourceLocation.tryParse(name.startsWith("#") ? name.substring(1) : name);
+            if (id == null) {
+                test = NO_BLOCK;
+            } else if (name.startsWith("#")) {
+                TagKey<Block> tag = TagKey.create(Registries.BLOCK, id);
+                test = state -> state.is(tag);
+            } else {
+                Block block = BuiltInRegistries.BLOCK.getOptional(id).orElse(null);
+                if (block == null) {
+                    return NO_BLOCK; // (not remembered: asked again next time)
+                }
+                test = state -> state.is(block);
+            }
+            BLOCK_TESTS.put(name, test);
+            return test;
         }
 
         /** Whether the block has every value named in {@code state} ("growth" = "dry"). */

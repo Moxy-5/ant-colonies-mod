@@ -70,8 +70,12 @@ public class ModEvents {
                 }
             }
             // The raid test bench (docs/plans/raid-test-bench.md): the rules checked after the brain, the labels.
+            long started = System.nanoTime();
             com.antcolonies.watch.Watch.tick(level);
+            long watched = System.nanoTime();
             com.antcolonies.watch.Labels.tick(level);
+            Perf.other("rule checks", watched - started);
+            Perf.other("labels", System.nanoTime() - watched);
         }
     }
 

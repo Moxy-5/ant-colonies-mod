@@ -35,6 +35,12 @@ motd=Ant colonies flight
 PROPS
 extra=""
 [ "$old" = "old" ] && extra="-PflightOld"
+# "stand" (far colonies' speed, docs/plans/far-colonies-speed.md): in place of flying, the pretend player stands at the
+# colony nearest the spawn for the seconds given once the land in view is made and the far colonies have gone over to
+# numbers; the report is the stopwatch (/antcolonies perf) averaged over that time, split by near and far colonies.
+[ "$old" = "stand" ] && extra="-PflightStand"
+# FLIGHT_PROFILE=1: Java's flight recorder on (run-flight/flight.jfr; python tools/film_profile.py server).
+[ -n "${FLIGHT_PROFILE:-}" ] && extra="$extra -PflightProfile"
 echo "Flight: seed $seed, $seconds s${old:+, the land wired the old way}; Gradle's output in run-flight/gradle.log"
 ./gradlew runFlight -PflightSeconds="$seconds" $extra > run-flight/gradle.log 2>&1
 grep -h "\[savanna spawn\]\|Preparing spawn area: 100\|Time elapsed\|Done (" run-flight/logs/latest.log | sed 's/^.*: \[/[/' | head -5

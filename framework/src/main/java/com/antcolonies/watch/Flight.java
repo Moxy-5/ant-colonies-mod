@@ -33,6 +33,21 @@ public final class Flight {
     static final double SPEED = Double.parseDouble(System.getProperty("antcolonies.flight.speed", "10.9"));
     static final int VIEW = Integer.getInteger("antcolonies.flight.view", 12);
     static final int SECONDS = Integer.getInteger("antcolonies.flight", 0);
+    /**
+     * The stand (far colonies' speed, 2026-11-09, {@code tools/flight.sh ... stand}): in place of flying, the pretend
+     * player waits at the spawn until the land in view is made, walks to the colony nearest the spawn and stands there
+     * (counting as a watcher, {@link com.antcolonies.colony.Watchers#setPretend}); once that land is made and the far
+     * colonies have had {@link #SETTLE} seconds to go over to numbers, the stopwatch's numbers are averaged for the
+     * run's seconds and written to the report ({@link com.antcolonies.debug.Perf#sessionReport}).
+     */
+    static final boolean STAND = Boolean.getBoolean("antcolonies.flight.stand");
+    /** The stand: seconds between the land round the colony being made and the measuring (the far rule's minute and a bit). */
+    static final int SETTLE = Integer.getInteger("antcolonies.flight.settle", 100);
+    /** The stand: at most this long (seconds) is waited for land to be made before going on anyway. */
+    static final int LAND_WAIT = 600;
+    private static int standStage;
+    private static double stageSince;
+    private static BlockPos standAt;
 
     private static MinecraftServer server;
     private static BlockPos start;
@@ -74,6 +89,10 @@ public final class Flight {
         worstTickNanos = Math.max(worstTickNanos, last);
         double t = (System.nanoTime() - startNanos) / 1e9;
         ServerLevel level = server.overworld();
+        if (STAND) {
+            stand(level, t);
+            return;
+        }
         int x = start.getX() + (int) Math.round(SPEED * t);
         ChunkPos at = new ChunkPos(x >> 4, start.getZ() >> 4);
         if (!at.equals(held)) {
@@ -95,6 +114,79 @@ public final class Flight {
         if (t >= SECONDS) {
             finish(level, x);
         }
+    }
+
+    private static void hold(ServerLevel level, ChunkPos at) {
+        if (!at.equals(held)) {
+            if (held != null) {
+                level.getChunkSource().removeRegionTicket(TicketType.PLAYER, held, VIEW, held);
+            }
+            level.getChunkSource().addRegionTicket(TicketType.PLAYER, at, VIEW, at);
+            held = at;
+        }
+    }
+
+    /** The stand's stages (see {@link #STAND}): 0 the spawn's land, 1 the colony's land, 2 settling, 3 measuring. */
+    private static void stand(ServerLevel level, double t) {
+        BlockPos at = standAt == null ? start : standAt;
+        hold(level, new ChunkPos(at));
+        level.resetEmptyTime(); // (a world with no real player stops ticking its mobs after 15 s: the insects must live here)
+        // (Only asked while waiting for land: asked every tick it would be part of what is measured.)
+        boolean made = standStage <= 1 && (shown(level, held) >= 1.0 || t - stageSince > LAND_WAIT);
+        if (standStage == 0 && made) {
+            com.antcolonies.colony.Colony nearest = null;
+            for (com.antcolonies.colony.Colony colony : com.antcolonies.colony.ColonyManager.get(level).getColonies()) {
+                if (nearest == null || colony.getCenter().distSqr(start) < nearest.getCenter().distSqr(start)) {
+                    nearest = colony;
+                }
+            }
+            if (nearest == null && t - stageSince < 60) {
+                return; // (the new land's colonies are put in a moment after their land)
+            }
+            standAt = nearest == null ? start : nearest.getCenter();
+            // Six blocks from the nest's middle, a little above the ground: a player standing by the mound.
+            int px = standAt.getX() + 6;
+            int pz = standAt.getZ();
+            int py = level.getHeight(net.minecraft.world.level.levelgen.Heightmap.Types.MOTION_BLOCKING, px, pz) + 2;
+            com.antcolonies.colony.Watchers.setPretend(List.of(new net.minecraft.world.phys.Vec3(px + 0.5, py, pz + 0.5)));
+            ColonyFrameworkMod.LOGGER.info("[flight] stand: at the {} colony at {} ({} colonies known), after {} s",
+                    nearest == null ? "no" : nearest.getSpecies(), standAt.toShortString(),
+                    com.antcolonies.colony.ColonyManager.get(level).getColonies().size(), (int) t);
+            standStage = 1;
+            stageSince = t;
+        } else if (standStage == 1 && made) {
+            ColonyFrameworkMod.LOGGER.info("[flight] stand: the land in view is made after {} s; settling {} s", (int) t, SETTLE);
+            standStage = 2;
+            stageSince = t;
+        } else if (standStage == 2 && t - stageSince >= SETTLE) {
+            ColonyFrameworkMod.LOGGER.info("[flight] stand: measuring for {} s", SECONDS);
+            com.antcolonies.debug.Perf.startSession();
+            tickNanosSum = 0;
+            ticks = 0;
+            worstTickNanos = 0;
+            standStage = 3;
+            stageSince = t;
+        } else if (standStage == 3 && t - stageSince >= SECONDS) {
+            done = true;
+            List<String> out = new ArrayList<>();
+            out.add(String.format("Stand: %d s at the colony at %s, view %d; %d colonies known in the world", SECONDS,
+                    standAt.toShortString(), VIEW, com.antcolonies.colony.ColonyManager.get(level).getColonies().size()));
+            out.add(String.format("Server tick: %.2f ms on average, worst %.0f ms (%d ticks)", tickNanosSum / 1e6 / Math.max(1, ticks),
+                    worstTickNanos / 1e6, ticks));
+            out.add(com.antcolonies.debug.Perf.sessionReport().replace("\n", System.lineSeparator()));
+            write(out);
+        }
+    }
+
+    private static void write(List<String> out) {
+        String text = String.join(System.lineSeparator(), out);
+        ColonyFrameworkMod.LOGGER.info("[flight] done{}{}", System.lineSeparator(), text);
+        try {
+            Files.writeString(server.getServerDirectory().resolve("flight-report.txt"), text + System.lineSeparator(), StandardCharsets.UTF_8);
+        } catch (IOException e) {
+            ColonyFrameworkMod.LOGGER.warn("[flight] could not write the report", e);
+        }
+        server.halt(false);
     }
 
     /** The share of the chunks in view (round the pretend player, as far as it sees) that are made and loaded. */

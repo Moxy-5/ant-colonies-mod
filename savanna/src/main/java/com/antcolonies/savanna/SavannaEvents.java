@@ -77,9 +77,15 @@ public class SavannaEvents {
     public static void onLevelTick(net.neoforged.neoforge.event.tick.LevelTickEvent.Post event) {
         if (event.getLevel() instanceof ServerLevel level) {
             com.antcolonies.savanna.tree.Forest.tick(level);
+            long started = System.nanoTime();
             com.antcolonies.savanna.colony.DeadMounds.tick(level);
+            long dead = System.nanoTime();
             com.antcolonies.savanna.colony.NewLandMounds.tick(level);
+            long newLand = System.nanoTime();
             com.antcolonies.savanna.command.RaidView.tick(level);
+            com.antcolonies.debug.Perf.other("dead mounds", dead - started);
+            com.antcolonies.debug.Perf.other("new-land mounds", newLand - dead);
+            com.antcolonies.debug.Perf.other("raid view", System.nanoTime() - newLand);
         }
     }
 

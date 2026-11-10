@@ -151,6 +151,15 @@ neoForge {
             gameDirectory = project.file('run-flight')
             systemProperty 'neoforge.enabledGameTestNamespaces', gameTestNamespaces
             systemProperty 'antcolonies.flight', (project.findProperty('flightSeconds') ?: '120').toString()
+            // -PflightProfile: Java's flight recorder samples the run, written to run-flight/flight.jfr (read it with
+            // python tools/film_profile.py server)
+            if (project.hasProperty('flightProfile')) {
+                jvmArguments.add '-XX:StartFlightRecording=filename=flight.jfr,settings=profile,dumponexit=true'
+            }
+            if (project.hasProperty('flightStand')) {
+                // (Far colonies' speed: the pretend player stands at one colony and the stopwatch is averaged.)
+                systemProperty 'antcolonies.flight.stand', 'true'
+            }
             if (project.hasProperty('flightOld')) {
                 systemProperty 'antcolonies.landWiringOld', 'true'
             }

@@ -2328,6 +2328,22 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
         wasAttached = navigator.isAttached();
     }
 
+    /**
+     * Far colonies' speed (2026-11-09): the queen and king of a colony that lives as numbers though its land is loaded
+     * (no player within 64 blocks, {@code colony.AwayLife}) stand as they are, exactly as they would frozen in unloaded
+     * land: the away brain feeds the queen, lays her eggs and counts her hunger meanwhile, and she carries on (and is
+     * checked for starving) the moment her colony is here again. Before, these were the only real mobs a far colony
+     * still ran, four fifths of its whole cost. Never one that is hurt, dying, in the air or in water, or in its first
+     * second (it still has to find its colony).
+     */
+    private boolean restsWhileColonyIsFar(ServerLevel level) {
+        if (nestCaste() != null || tickCount < 20 || !isAlive() || hurtTime > 0 || !onGround() || isInWater() || getColonyId() == null) {
+            return false;
+        }
+        com.antcolonies.colony.Colony colony = getColony();
+        return colony != null && colony.away().isAway(level);
+    }
+
     /** The game time of this insect's last server tick (not saved: after a load it has always just come back). */
     private long lastServerTick = Long.MIN_VALUE;
 
@@ -2336,6 +2352,9 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
         if (level() instanceof ServerLevel serverLevel && nestCaste() != null && backFromFrozen(serverLevel)) {
             return; // it was frozen in unloaded land and is one of its colony's numbers now: it has left the world
         }
+        if (level() instanceof ServerLevel serverLevel && restsWhileColonyIsFar(serverLevel)) {
+            return;
+        }
         boolean timed = !level().isClientSide && Perf.begin(Perf.Part.INSECTS);
         long started = timed ? System.nanoTime() : 0L;
         try {
@@ -2343,7 +2362,9 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
         } finally {
             if (timed) {
                 Perf.end();
-                Perf.insectKind(getType().builtInRegistryHolder().key().location().getPath(), System.nanoTime() - started);
+                com.antcolonies.colony.Colony mine = getColony();
+                Perf.insectKind(getType().builtInRegistryHolder().key().location().getPath()
+                        + (mine == null ? ", no colony" : mine.away().isComingBack() ? ", its colony far" : ""), System.nanoTime() - started);
             }
         }
     }

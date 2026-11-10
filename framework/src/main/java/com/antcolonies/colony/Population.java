@@ -416,6 +416,13 @@ public class Population {
         }
         BlockPos center = colony.getCenter();
         List<Vec3> eyes = new ArrayList<>();
+        for (Vec3 eye : Watchers.pretend()) { // (a measuring run's pretend player; none in a game)
+            double dx = eye.x - (center.getX() + 0.5);
+            double dz = eye.z - (center.getZ() + 0.5);
+            if (dx * dx + dz * dz <= (double) radius * radius && Math.abs(eye.y - center.getY()) <= 64) {
+                eyes.add(eye);
+            }
+        }
         for (Player player : level.players()) {
             if (!Watchers.watches(player)) { // (spectators watch too, 2026-11-08)
                 continue;

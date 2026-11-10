@@ -288,6 +288,12 @@ public class QueenCare {
         if (laying == null) {
             return false;
         }
+        if (colony.away().isAway(level)) {
+            // A far colony's queen is still a real mob in loaded land, but her colony lives as numbers: the away brain
+            // lays her eggs as numbers by this same clock ({@link #liveAway}). Before (far colonies' speed, 2026-11-09)
+            // she also laid real eggs here, each folded into the numbers within 20 s: the same egg by a longer way.
+            return false;
+        }
         boolean canLay = !colony.isFounding() && queenBread >= laying.foodPerEgg() && isQueenHome(level) && !colony.brood().isFull(level);
         long now = level.getGameTime();
         if (!canLay) {

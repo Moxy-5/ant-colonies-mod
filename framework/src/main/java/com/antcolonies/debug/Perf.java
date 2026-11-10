@@ -26,7 +26,9 @@ public final class Perf {
         CROWD("neighbour grid (personal space)"),
         ROUTES("route searches"),
         BRAIN("colony brain"),
-        TREES("giant trees (growing, dying, falling, fire)");
+        TREES("giant trees (growing, dying, falling, fire)"),
+        /** Far colonies' speed (2026-11-09): the rest of the mod's once-a-tick work, named one by one ({@link #other}). */
+        OTHER("other (rule checks, labels, dead mounds, new-land mounds)");
 
         final String label;
 
@@ -92,10 +94,51 @@ public final class Perf {
     /** Per colony part (brain): times ticked, nanoseconds, longest single tick (this window). */
     private static final Map<String, long[]> brainParts = new java.util.HashMap<>();
 
+    /**
+     * Far colonies' speed (2026-11-09): where the colony whose brain runs now is ("near", "far, land loaded", "land not
+     * loaded"), set by the colony manager round each colony's tick; its parts' times are filed under it.
+     */
+    private static String where;
+    /** Per where a colony is: brain ticks (one a colony a second), nanoseconds (this window). */
+    private static final Map<String, long[]> coloniesBy = new java.util.TreeMap<>();
+    /** The other once-a-tick work by name: times, nanoseconds, longest (this window). */
+    private static final Map<String, long[]> others = new java.util.HashMap<>();
+
+    /** The colony manager is about to run the brain of a colony that is here ({@code place}); null after. */
+    public static void colonyWhere(String place) {
+        where = place;
+    }
+
+    /** One colony's whole once-a-second brain tick took this long; {@code place} as in {@link #colonyWhere}. */
+    public static void colony(String place, long tookNanos) {
+        if (!onServerThread()) {
+            return;
+        }
+        long[] mine = coloniesBy.computeIfAbsent(place, k -> new long[2]);
+        mine[0]++;
+        mine[1] += tookNanos;
+    }
+
+    /** A piece of the mod's other once-a-tick work (not an insect, a colony's brain or the trees) took this long. */
+    public static void other(String name, long tookNanos) {
+        if (!onServerThread()) {
+            return;
+        }
+        long[] mine = others.computeIfAbsent(name, k -> new long[3]);
+        mine[0]++;
+        mine[1] += tookNanos;
+        mine[2] = Math.max(mine[2], tookNanos);
+        nanos.merge(Part.OTHER, tookNanos, Long::sum);
+        tickNanos += tookNanos;
+    }
+
     /** One colony part's once-a-second tick took this long (only counted on the server thread). */
     public static void brainPart(String name, long tookNanos) {
         if (!onServerThread()) {
             return;
+        }
+        if (where != null) {
+            name = name + " [" + where + "]";
         }
         long[] mine = brainParts.computeIfAbsent(name, k -> new long[3]);
         mine[0]++;
@@ -148,8 +191,15 @@ public final class Perf {
         if (++ticks < WINDOW) {
             return;
         }
+        figures.clear();
         last = buildReport();
+        if (session != null) {
+            figures.forEach((key, value) -> session.merge(key, value, Double::sum));
+            sessionWindows++;
+        }
         ColonyFrameworkMod.LOGGER.info("[perf]\n{}", last);
+        coloniesBy.clear();
+        others.clear();
         nanos.clear();
         worstTickNanos = 0;
         serverNanos = 0;
@@ -172,16 +222,24 @@ public final class Perf {
         out.append(String.format("Last 5 s: %.0f insects ticking (real mobs, all colonies)\n", insects));
         out.append(String.format("Whole server: %.2f ms a tick (worst %.1f), out of 50\n", ms(serverNanos) / ticks, ms(worstServerNanos)));
         out.append(String.format("Our mod: %.2f ms a tick (worst tick %.1f ms)\n", ms(ours) / ticks, ms(worstTickNanos)));
+        figures.put("Whole server, ms a tick", ms(serverNanos) / ticks);
+        figures.put("Our mod, ms a tick", ms(ours) / ticks);
+        figures.put("Insects ticking", insects);
         for (Part part : Part.values()) {
             out.append(String.format("  %s: %.2f ms\n", part.label, ms(nanos.getOrDefault(part, 0L)) / ticks));
+            figures.put("  " + part.label + ", ms", ms(nanos.getOrDefault(part, 0L)) / ticks);
         }
         if (insects > 0) {
             out.append(String.format("  per insect: %.3f ms\n", ms(ours - nanos.getOrDefault(Part.BRAIN, 0L) - nanos.getOrDefault(Part.TREES, 0L)) / ticks / insects));
         }
         out.append(String.format("Route searches: %.1f a second, %d failed, %.0f steps each, longest %.1f ms",
                 searches / (ticks / 20.0), failedSearches, searches == 0 ? 0.0 : (double) expansions / searches, ms(longestSearchNanos)));
+        figures.put("Route searches a second", searches / (ticks / 20.0));
+        figures.put("Route searches failed a second", failedSearches / (ticks / 20.0));
         reportKinds(out);
+        reportColonies(out);
         reportBrainParts(out);
+        reportOthers(out);
         reportAskers(out);
         reportNewLand(out);
         return out.toString();
@@ -196,7 +254,71 @@ public final class Perf {
         kinds.entrySet().stream().sorted((a, b) -> Long.compare(b.getValue()[1], a.getValue()[1])).forEach(e -> {
             long[] v = e.getValue();
             out.append(String.format("\n  %.0f  %.2f ms  %s", (double) v[0] / ticks, ms(v[1]) / ticks, e.getKey()));
+            figures.put("insects: " + e.getKey() + ", how many", (double) v[0] / ticks);
+            figures.put("insects: " + e.getKey() + ", ms", ms(v[1]) / ticks);
         });
+    }
+
+    /** The colonies by where they are: how many (each brain runs once a second) and their brains' time. */
+    private static void reportColonies(StringBuilder out) {
+        if (coloniesBy.isEmpty()) {
+            return;
+        }
+        out.append("\nColonies by where they are (how many, their brains' ms a tick):");
+        coloniesBy.forEach((place, v) -> {
+            out.append(String.format("\n  %.0f  %.3f ms  %s", v[0] / (ticks / 20.0), ms(v[1]) / ticks, place));
+            figures.put("colonies: " + place + ", how many", v[0] / (ticks / 20.0));
+            figures.put("colonies: " + place + ", ms", ms(v[1]) / ticks);
+        });
+    }
+
+    /** The other once-a-tick work by name, most time first. */
+    private static void reportOthers(StringBuilder out) {
+        if (others.isEmpty()) {
+            return;
+        }
+        out.append("\nOther work (ms a tick, longest single ms):");
+        others.entrySet().stream().sorted((a, b) -> Long.compare(b.getValue()[1], a.getValue()[1])).forEach(e -> {
+            long[] v = e.getValue();
+            out.append(String.format("\n  %.3f ms  longest %.1f  %s", ms(v[1]) / ticks, ms(v[2]), e.getKey()));
+            figures.put("other: " + e.getKey() + ", ms", ms(v[1]) / ticks);
+        });
+    }
+
+    /** The last report's numbers by name (for {@link #sessionReport}). */
+    private static final Map<String, Double> figures = new java.util.LinkedHashMap<>();
+    /** A measuring session ({@link #startSession}): every report's numbers added up; null while none runs. */
+    private static Map<String, Double> session;
+    private static int sessionWindows;
+
+    /** Starts a measuring session: from now every 5-second report's numbers are added up for {@link #sessionReport}. */
+    public static void startSession() {
+        session = new java.util.LinkedHashMap<>();
+        sessionWindows = 0;
+    }
+
+    /**
+     * The session's numbers averaged over its reports (a number missing from a report counts as 0 there), one a line,
+     * biggest first inside each group (far colonies' speed: the same run before and after a fix, compared line by line).
+     */
+    public static String sessionReport() {
+        if (session == null || sessionWindows == 0) {
+            return "No measuring session.";
+        }
+        StringBuilder out = new StringBuilder(String.format("Averages over %d s:", sessionWindows * WINDOW / 20));
+        java.util.List<String> prefixes = java.util.List.of("insects: ", "colonies: ", "brain: ", "other: ", "routes: ");
+        session.forEach((key, value) -> {
+            if (prefixes.stream().noneMatch(key::startsWith)) {
+                out.append(String.format("\n  %9.4f  %s", value / sessionWindows, key));
+            }
+        });
+        for (String prefix : prefixes) {
+            out.append("\n").append(prefix);
+            session.entrySet().stream().filter(e -> e.getKey().startsWith(prefix))
+                    .sorted((a, b) -> Double.compare(b.getValue(), a.getValue()))
+                    .forEach(e -> out.append(String.format("\n  %9.4f  %s", e.getValue() / sessionWindows, e.getKey())));
+        }
+        return out.toString();
     }
 
     /** The colony brain's costliest parts, most time first (with the longest single tick of one colony's part). */
@@ -209,6 +331,7 @@ public final class Perf {
             long[] v = e.getValue();
             out.append(String.format("\n  %.2f ms  longest %.1f  x%d  %s", ms(v[1]) / ticks, ms(v[2]), v[0], e.getKey()));
         });
+        brainParts.forEach((name, v) -> figures.put("brain: " + name + ", ms", ms(v[1]) / ticks));
     }
 
     /** The route searches' costliest askers (insect kind and running goals), most time first. */
@@ -222,6 +345,7 @@ public final class Perf {
             out.append(String.format("\n  %.2f ms  %.1f / %.1f  %.0f  %s", ms(v[3]) / ticks, v[0] / (ticks / 20.0),
                     v[1] / (ticks / 20.0), (double) v[2] / v[0], e.getKey()));
         });
+        askers.forEach((name, v) -> figures.put("routes: " + name + ", ms", ms(v[3]) / ticks));
     }
 
     private static double ms(long nanos) {

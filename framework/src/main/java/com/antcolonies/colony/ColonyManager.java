@@ -83,14 +83,32 @@ public class ColonyManager extends SavedData {
             if (tickSlot(colony) != slot) {
                 continue;
             }
+            // (The stopwatch files each colony's brain time under where the colony is: far colonies' speed, 2026-11-09.)
+            long started = System.nanoTime();
             if (!colony.away().isHere(level)) {
-                colony.away().tickAway(level);
+                String place = LandReady.at(level, colony.getCenter()) ? "far, land loaded" : "land not loaded";
+                com.antcolonies.debug.Perf.colonyWhere(place);
+                try {
+                    colony.away().tickAway(level);
+                } finally {
+                    com.antcolonies.debug.Perf.colonyWhere(null);
+                    com.antcolonies.debug.Perf.colony(place, System.nanoTime() - started);
+                }
                 continue;
             }
             if (!colony.isQueenless() && colony.getQueen(level) == null) {
+                com.antcolonies.debug.Perf.colony("near, queen not loaded", System.nanoTime() - started);
                 continue; // her part of the world is not loaded yet (or a game test has cleared her away)
             }
-            if (!colony.tick(level)) {
+            boolean lives;
+            com.antcolonies.debug.Perf.colonyWhere("near");
+            try {
+                lives = colony.tick(level);
+            } finally {
+                com.antcolonies.debug.Perf.colonyWhere(null);
+                com.antcolonies.debug.Perf.colony("near", System.nanoTime() - started);
+            }
+            if (!lives) {
                 com.antcolonies.ColonyFrameworkMod.LOGGER.info("[colony] queenless colony {} at {} has died out; its nest is abandoned",
                         colony.getId(), colony.getCenter().toShortString());
                 colonyEnded(level, colony);

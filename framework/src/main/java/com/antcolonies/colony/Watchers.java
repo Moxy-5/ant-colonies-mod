@@ -14,7 +14,23 @@ import net.minecraft.world.entity.player.Player;
  * with each of those, and there a spectator is not there at all.
  */
 public final class Watchers {
+    /**
+     * The measuring runs only ({@code watch/Flight}'s stand, far colonies' speed, 2026-11-09): the eyes of a pretend
+     * player on a headless server, who counts as watching like a real one. Empty in a game.
+     */
+    private static volatile java.util.List<net.minecraft.world.phys.Vec3> pretend = java.util.List.of();
+
     private Watchers() {
+    }
+
+    /** The measuring runs only: a pretend player's eyes are here (an empty list: nobody). */
+    public static void setPretend(java.util.List<net.minecraft.world.phys.Vec3> eyes) {
+        pretend = java.util.List.copyOf(eyes);
+    }
+
+    /** The pretend players' eyes (empty in a game). */
+    public static java.util.List<net.minecraft.world.phys.Vec3> pretend() {
+        return pretend;
     }
 
     /** Whether this player watches: alive and in the world, in any game mode. */
@@ -24,6 +40,13 @@ public final class Watchers {
 
     /** Whether a watcher is within {@code radius} blocks of this place, sideways. */
     public static boolean near(ServerLevel level, BlockPos at, int radius) {
+        for (net.minecraft.world.phys.Vec3 eye : pretend) {
+            double dx = eye.x - (at.getX() + 0.5);
+            double dz = eye.z - (at.getZ() + 0.5);
+            if (dx * dx + dz * dz <= (double) radius * radius) {
+                return true;
+            }
+        }
         for (Player player : level.players()) {
             if (watches(player)) {
                 double dx = player.getX() - (at.getX() + 0.5);
