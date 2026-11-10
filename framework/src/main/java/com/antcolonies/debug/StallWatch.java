@@ -28,8 +28,17 @@ import net.neoforged.neoforge.event.tick.ServerTickEvent;
 public final class StallWatch {
     /** A tick this long is a stall (my pick: a tick should take 50 ms; 300 is a freeze anyone sees). */
     public static final long STALL_MS = 300;
-    /** How often the helper looks during a stall. */
-    static final long LOOK_MS = 20;
+    /**
+     * A tick this long is a spike (tick spikes, 2026-11-10; the user feels them from about 70 ms): it gets a shorter
+     * {@code [spike]} record of the same kind.
+     */
+    public static final long SPIKE_MS = 70;
+    /** The helper starts looking once a tick has run this long (a tick should take 50 ms). */
+    static final long WATCH_FROM_MS = 50;
+    /** At most this many lines of calls in a spike's record. */
+    static final int SPIKE_LINES = 14;
+    /** How often the helper looks during a slow tick. */
+    static final long LOOK_MS = 10;
     /** At most this many lines of calls in a stall's report. */
     static final int LINES = 40;
 
@@ -71,7 +80,9 @@ public final class StallWatch {
             looks.clear();
         }
         long ms = (System.nanoTime() - start) / 1_000_000;
-        report(ms, taken);
+        if (ms >= SPIKE_MS) {
+            report(ms, taken);
+        }
     }
 
     @SubscribeEvent
@@ -107,7 +118,7 @@ public final class StallWatch {
             }
             long start = tickStart;
             Thread server = serverThread;
-            if (start == 0 || server == null || System.nanoTime() - start < STALL_MS * 1_000_000) {
+            if (start == 0 || server == null || System.nanoTime() - start < WATCH_FROM_MS * 1_000_000) {
                 continue;
             }
             StackTraceElement[] stack = server.getStackTrace();
@@ -120,9 +131,12 @@ public final class StallWatch {
     }
 
     private static void report(long ms, List<StackTraceElement[]> taken) {
-        STALLS.incrementAndGet();
-        STALL_TOTAL_MS.addAndGet(ms);
-        STALL_LONGEST_MS.accumulateAndGet(ms, Math::max);
+        boolean stall = ms >= STALL_MS;
+        if (stall) {
+            STALLS.incrementAndGet();
+            STALL_TOTAL_MS.addAndGet(ms);
+            STALL_LONGEST_MS.accumulateAndGet(ms, Math::max);
+        }
         Map<String, Integer> counts = new HashMap<>();
         for (StackTraceElement[] stack : taken) {
             Set<String> once = new LinkedHashSet<>();
@@ -148,14 +162,16 @@ public final class StallWatch {
             if (ours == null && frame.getClassName().startsWith("com.antcolonies") && !frame.getClassName().contains(".debug.")) {
                 ours = name + ":" + frame.getLineNumber();
             }
-            if (lines++ < LINES) {
+            if (lines++ < (stall ? LINES : SPIKE_LINES)) {
                 out.append(String.format("%n    %3d%% %s:%d", n * 100 / taken.size(), name, frame.getLineNumber()));
             }
         }
         String top = typical.length > 0 ? name(typical[0]) : "?";
-        SEEN.add(ms + " ms, " + (ours != null ? ours : "Minecraft: " + top));
-        ColonyFrameworkMod.LOGGER.warn("[stall] a server tick took {} ms; where the time went ({} looks, deepest first):{}",
-                ms, taken.size(), out);
+        if (stall) {
+            SEEN.add(ms + " ms, " + (ours != null ? ours : "Minecraft: " + top));
+        }
+        ColonyFrameworkMod.LOGGER.warn("[{}] a server tick took {} ms; where the time went ({} looks, deepest first):{}",
+                stall ? "stall" : "spike", ms, taken.size(), out);
     }
 
     private static String name(StackTraceElement frame) {

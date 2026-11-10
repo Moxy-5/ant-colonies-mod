@@ -111,6 +111,8 @@ public final class MoundPlan {
     };
     /** Mounds being grown in the background ({@link #grownSoon}), by key. */
     private static final Map<String, CompletableFuture<List<Shape>>> GROWING = new ConcurrentHashMap<>();
+    /** The soil counts of every mound grown since the game started ({@link #wallsIfKnown}). */
+    private static final Map<String, int[]> WALLS = new ConcurrentHashMap<>();
     /** A quarter of the computer's threads, 1 to 4: a world loaded with many mound colonies round the player grows them side by side. */
     private static final ExecutorService GROWER = Executors.newFixedThreadPool(Math.max(1, Math.min(4, Runtime.getRuntime().availableProcessors() / 4)), run -> {
         Thread thread = new Thread(run, "termite-mound-grower");
@@ -145,11 +147,49 @@ public final class MoundPlan {
                 return justGrown;
             }
         }
-        List<Shape> stages = MoundGrowth.grow(numbers.maxHeight(), h -> shapeOf(h, numbers, seed));
+        List<Shape> stages = grow(numbers, seed);
         synchronized (GROWN) {
             GROWN.put(key, stages);
         }
         return stages;
+    }
+
+    /** Grows the mound (about a second) and notes its soil counts ({@link #WALLS}). */
+    private static List<Shape> grow(MoundNumbers numbers, long seed) {
+        List<Shape> stages = MoundGrowth.grow(numbers.maxHeight(), h -> shapeOf(h, numbers, seed));
+        int[] walls = new int[stages.size()];
+        for (int h = 1; h < stages.size(); h++) {
+            walls[h] = walls(stages.get(h));
+        }
+        WALLS.put(key(numbers, seed), walls);
+        return stages;
+    }
+
+    /**
+     * How many blocks of soil each stage of a grown mound has (index {@code h} is stage {@code h}), kept for every
+     * mound grown since the game started (a few numbers each, unlike the shapes): a mound's stage is worked out from
+     * these alone, so asking a colony far away for its stage never grows its shape again (tick spikes, 2026-11-10).
+     * Null if this mound has not been grown since the game started.
+     */
+    @org.jetbrains.annotations.Nullable
+    public static int[] wallsIfKnown(MoundNumbers numbers, long seed) {
+        return WALLS.get(key(numbers, seed));
+    }
+
+    /**
+     * Every stage of the mound if it is grown and kept ({@link #growth} without the wait); if not, null, and it is
+     * grown on a background thread from now.
+     */
+    @org.jetbrains.annotations.Nullable
+    public static List<Shape> growthSoon(MoundNumbers numbers, long seed) {
+        synchronized (GROWN) {
+            List<Shape> stages = GROWN.get(key(numbers, seed));
+            if (stages != null) {
+                return stages;
+            }
+        }
+        grownSoon(numbers, seed);
+        return null;
     }
 
     /**
@@ -163,7 +203,7 @@ public final class MoundPlan {
                 return true;
             }
         }
-        GROWING.computeIfAbsent(key, k -> CompletableFuture.supplyAsync(() -> MoundGrowth.grow(numbers.maxHeight(), h -> shapeOf(h, numbers, seed)), GROWER)
+        GROWING.computeIfAbsent(key, k -> CompletableFuture.supplyAsync(() -> grow(numbers, seed), GROWER)
                 .whenComplete((stages, failed) -> {
                     if (stages != null) {
                         synchronized (GROWN) {

@@ -59,6 +59,7 @@ public final class SavannaParts {
             .saves(KingCare::save, KingCare::load));
     public static final Type<Mound> MOUND = listed("mound", Mound::new, part -> part
             .ticks(30, Mound::tick)
+            .ticksAway(5, Mound::keepShapes) // (its plan asked for before the player is there)
             .hears(ColonyNews.BLOCK_DUG, 10, (mound, level, news) -> mound.blockDug(level, news.where()))
             .hears(ColonyNews.COLONY_ENDED, 10, (mound, level, news) -> // M8 1a: it stays, dead, and wears down
                     DeadMounds.get(level).addMound(level, news.colony(), news.center(), mound.getParts(level)))

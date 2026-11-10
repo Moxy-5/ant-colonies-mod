@@ -78,6 +78,11 @@ public class Mound {
     private static final int FALLBACK_AFTER_TICKS = 1200;
     /** How long (in ticks) a spot nobody found a way to from inside is left alone. */
     private static final int UNREACHABLE_TICKS = 200;
+    /**
+     * A watcher this near (blocks, sideways), and the mound holds its plan ({@link #keepShapes}): twice the 64 at which a
+     * far colony comes back as real insects, so the second it takes to grow is over long before (my pick).
+     */
+    private static final int SHAPES_NEAR = 128;
 
     private final Colony colony;
     private final BlockPos center;
@@ -112,6 +117,11 @@ public class Mound {
     @Nullable
     private Long seedForTests;
     private int[] wallsAt = new int[0];
+    /** The soil counts read from the save (empty in an older one): the stage is known at once, with no mound grown. */
+    private int[] savedWalls = new int[0];
+    /** Every stage of the plan, held while a watcher is near ({@link #keepShapes}); not saved. */
+    @Nullable
+    private List<MoundPlan.Shape> held;
     private int cachedStage;
     private boolean crumbleDue; // the stage changed: leftovers of earlier stages still to crumble
     private Map<BlockPos, MoundPlan.Part> cachedParts = Map.of();
@@ -187,20 +197,43 @@ public class Mound {
     /** Tests only: gives this mound the shape of another colony's (from a save of the user's world). */
     public void setSeedForTests(long seed) {
         seedForTests = seed;
+        savedWalls = new int[0];
+        held = null;
         shapesFor = null;
         cachedStage = 0;
     }
 
-    private void prepareShapes(MoundNumbers numbers) {
+    /**
+     * Whether the soil counts of the mound's stages ({@link #wallsAt}) are known: from the mound grown since the game
+     * started, else from the save. If neither, the mound is grown now ({@code wait}, about a second: a command, a
+     * test, a mound set to a stage) or on a background thread, the answer false until it is done (the colony's own
+     * ticking never waits: tick spikes, 2026-11-10).
+     */
+    private boolean wallsKnown(MoundNumbers numbers, boolean wait) {
         if (numbers.equals(shapesFor)) {
-            return;
+            return true;
+        }
+        int[] walls = MoundPlan.wallsIfKnown(numbers, seed());
+        if (walls == null && savedWalls.length == numbers.maxHeight() + 1) {
+            walls = savedWalls;
+        }
+        if (walls == null) {
+            if (!wait) {
+                MoundPlan.grownSoon(numbers, seed());
+                return false;
+            }
+            MoundPlan.growth(numbers, seed());
+            walls = MoundPlan.wallsIfKnown(numbers, seed());
         }
         shapesFor = numbers;
-        wallsAt = new int[numbers.maxHeight() + 1];
-        for (int h = 1; h <= numbers.maxHeight(); h++) {
-            wallsAt[h] = MoundPlan.walls(MoundPlan.stage(h, numbers, seed()));
-        }
+        wallsAt = walls;
         cachedStage = 0;
+        return true;
+    }
+
+    /** The game test server waits for a mound's shape: its ticks outrun the second of growing (docs/BUGS.md 73). */
+    private static boolean waits(Level level) {
+        return level.getServer() instanceof net.minecraft.gametest.framework.GameTestServer;
     }
 
     /** How many blocks of soil the mound has at stage {@code h}. */
@@ -209,8 +242,35 @@ public class Mound {
         if (numbers == null) {
             return 0;
         }
-        prepareShapes(numbers);
+        wallsKnown(numbers, true);
         return wallsAt[Math.max(1, Math.min(h, numbers.maxHeight()))];
+    }
+
+    /**
+     * Every stage of the mound's plan: the one held while a watcher is near ({@link #keepShapes}), else the plan's own
+     * (kept for the last few mounds asked for; grown on the spot, about a second, if it is not).
+     */
+    private List<MoundPlan.Shape> stages(MoundNumbers numbers) {
+        return held != null ? held : MoundPlan.growth(numbers, seed());
+    }
+
+    private MoundPlan.Shape stage(int h, MoundNumbers numbers) {
+        List<MoundPlan.Shape> stages = stages(numbers);
+        return stages.get(Math.max(1, Math.min(h, stages.size() - 1)));
+    }
+
+    /**
+     * Once a second, near or away: while a watcher is within {@link #SHAPES_NEAR} blocks the mound holds on to its
+     * plan (asked for in the background on the way in, so it is there before anything needs it); farther off it lets
+     * go, and only the soil counts stay.
+     */
+    void keepShapes(net.minecraft.server.level.ServerLevel level) {
+        MoundNumbers numbers = numbers();
+        if (numbers == null || !com.antcolonies.colony.Watchers.near(level, center, SHAPES_NEAR)) {
+            held = null;
+        } else if (held == null) {
+            held = MoundPlan.growthSoon(numbers, seed());
+        }
     }
 
     /**
@@ -227,7 +287,8 @@ public class Mound {
         }
         int workers = colony.getCount(TermiteWorkerEntity.CASTE);
         double perTick = (numbers.blocksPerDay() + numbers.blocksPerDayPerWorker() * workers) / 24000.0;
-        allowance = Math.min(wallsAt(numbers.maxHeight()), allowance + Math.max(0, now - updatedAt) * perTick);
+        double most = wallsKnown(numbers, waits(level)) ? wallsAt[numbers.maxHeight()] : Double.MAX_VALUE; // (capped once known)
+        allowance = Math.min(most, allowance + Math.max(0, now - updatedAt) * perTick);
         updatedAt = now;
         return allowance;
     }
@@ -238,9 +299,12 @@ public class Mound {
         if (numbers == null) {
             return 0;
         }
+        if (!wallsKnown(numbers, waits(level))) {
+            return Math.max(1, workStage); // (its shape still being worked out: no further than it has got)
+        }
         double earned = getAllowance(level);
         int h = 1;
-        while (h < numbers.maxHeight() && wallsAt(h + 1) <= earned) {
+        while (h < numbers.maxHeight() && wallsAt[h + 1] <= earned) {
             h++;
         }
         return h;
@@ -358,7 +422,7 @@ public class Mound {
         }
         int h = getStage(level);
         if (h != cachedStage) {
-            MoundPlan.Shape shape = MoundPlan.stage(h, numbers, seed());
+            MoundPlan.Shape shape = stage(h, numbers);
             Map<BlockPos, MoundPlan.Part> parts = new LinkedHashMap<>();
             shape.parts().forEach((offset, part) -> parts.put(center.offset(offset), part));
             cachedParts = parts;
@@ -374,6 +438,9 @@ public class Mound {
      * has nothing crumble away, once after the stage has changed (see {@link #crumbleLeftovers}).
      */
     public void tick(Level level) {
+        if (level instanceof net.minecraft.server.level.ServerLevel server) {
+            keepShapes(server);
+        }
         Map<BlockPos, MoundPlan.Part> parts = getParts(level);
         MoundNumbers numbers = numbers();
         if (crumbleDue && numbers != null && !parts.isEmpty()) {
@@ -389,7 +456,7 @@ public class Mound {
     private void crumbleLeftovers(Level level, MoundNumbers numbers, int h) {
         java.util.Set<BlockPos> earlier = new java.util.HashSet<>();
         for (int stage = 1; stage < h; stage++) {
-            MoundPlan.stage(stage, numbers, seed()).parts().forEach((offset, part) -> {
+            stage(stage, numbers).parts().forEach((offset, part) -> {
                 if (isPiece(part)) {
                     earlier.add(offset);
                 }
@@ -931,15 +998,17 @@ public class Mound {
         tag.putDouble("moundAllowance", allowance);
         tag.putLong("moundUpdated", updatedAt);
         tag.putInt("moundWorkStage", workStage);
+        if (shapesFor != null) {
+            tag.putIntArray("moundWalls", wallsAt);
+        } else if (savedWalls.length > 0) {
+            tag.putIntArray("moundWalls", savedWalls);
+        }
     }
 
     void load(CompoundTag tag) {
         allowance = tag.getDouble("moundAllowance");
         updatedAt = tag.contains("moundUpdated") ? tag.getLong("moundUpdated") : Colony.NOT_SET;
         workStage = tag.getInt("moundWorkStage"); // 0 in an old save: climbs up from the first stage
-        MoundNumbers numbers = numbers();
-        if (numbers != null) {
-            MoundPlan.grownSoon(numbers, seed()); // its shape grown in the background while the world loads (M8 step 1b)
-        }
+        savedWalls = tag.getIntArray("moundWalls"); // (none in an older save: worked out in the background)
     }
 }

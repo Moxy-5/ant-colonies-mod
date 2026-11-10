@@ -71,6 +71,15 @@ public class ForagingHoles {
     private long newHolesCheckedAt = Long.MIN_VALUE;
     /** Plants the colony found no tunnel route to, and until when it leaves them. Not saved. */
     private final java.util.Map<BlockPos, Long> noRouteUntil = new java.util.HashMap<>();
+
+    /**
+     * A food's column: a tunnel's route depends only on where the food is sideways, so "no route" is remembered for the
+     * whole column (tick spikes, 2026-11-10: dead wood high in a crown was asked about again every check, a block up or
+     * down from the last one, each a search of all the ground in reach).
+     */
+    private static BlockPos column(BlockPos food) {
+        return new BlockPos(food.getX(), 0, food.getZ());
+    }
     /**
      * Plants the colony found no runway route to, and until when it leaves them; kept apart from {@link #noRouteUntil}
      * so food a runway cannot reach may still get a gallery piece (the user's bug, 2026-10-17). Not saved.
@@ -161,8 +170,21 @@ public class ForagingHoles {
     /** Whether a runway of sheeting leaves from this hole and is finished (closed all round). */
     public boolean hasFinishedRunway(Level level, BlockPos hole) {
         FoodWays.Runway runway = colony.nest().foodWays().runwayAt(hole);
-        return runway != null && colony.nest().foodWays().isRunwayClosed(level, runway);
+        if (runway == null) {
+            return false;
+        }
+        // Worked out once a tick for each hole (tick spikes, 2026-11-10): every worker looking for a hole to plug asked
+        // it of every hole on every tick, and each answer walks the whole nest plan.
+        long now = level.getGameTime();
+        if (now != finishedRunwaysTick) {
+            finishedRunwaysTick = now;
+            finishedRunways.clear();
+        }
+        return finishedRunways.computeIfAbsent(hole.immutable(), h -> colony.nest().foodWays().isRunwayClosed(level, runway));
     }
+
+    private long finishedRunwaysTick = Long.MIN_VALUE;
+    private final java.util.Map<BlockPos, Boolean> finishedRunways = new java.util.HashMap<>();
 
     /** Whether the whole tunnel is dug out, so its hole leads somewhere. */
     public static boolean isDug(Level level, NestPlan.ForagingTunnel tunnel) {
@@ -416,7 +438,7 @@ public class ForagingHoles {
                 BlockPos food = foods.get(tried);
                 ColonyHooks.GalleryPiece piece = galleries.pieceTo(level, food);
                 if (piece == null) {
-                    noRouteUntil.put(food.immutable(), now + NO_ROUTE_TICKS);
+                    noRouteUntil.put(column(food), now + NO_ROUTE_TICKS);
                     ColonyFrameworkMod.LOGGER.debug("[new-hole] no gallery piece to the food at {}", food.toShortString());
                     continue;
                 }
@@ -438,7 +460,7 @@ public class ForagingHoles {
         List<BlockPos> starts = startsFor(level);
         TunnelRoute.Plan plan = starts.isEmpty() ? null : TunnelRoute.plan(starts, food, ground(level), numbers.reachMax() + 16);
         if (plan == null) {
-            noRouteUntil.put(food.immutable(), now + NO_ROUTE_TICKS);
+            noRouteUntil.put(column(food), now + NO_ROUTE_TICKS);
             ColonyFrameworkMod.LOGGER.debug("[new-hole] no tunnel route to the food at {} from {} dug tunnel blocks", food.toShortString(), starts.size());
             return;
         }
@@ -724,7 +746,7 @@ public class ForagingHoles {
         }
         List<java.util.Map.Entry<Double, BlockPos>> found = new java.util.ArrayList<>();
         for (BlockPos plant : plants) {
-            if (!isRich(level, plant) || !colony.foodMap().knows(plant, null) || noRouteUntil.containsKey(plant)
+            if (!isRich(level, plant) || !colony.foodMap().knows(plant, null) || noRouteUntil.containsKey(column(plant))
                     || colony.keepsOff(level, plant)) { // (no gallery is dug toward where they were attacked: brain step 4g)
                 continue;
             }
