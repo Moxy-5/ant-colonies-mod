@@ -165,6 +165,35 @@ public class MatabeleRaidTests {
     }
 
     /**
+     * BUGS 200 (the user's report, 2026-11-10): from a tall dead mound on a low rise, its chimney top (the nest's middle)
+     * more than 12 blocks over the land round it, a hungry colony's scouts walked up and down the hump and turned back at
+     * the same height every time: a scout could only step onto ground within 12 blocks of the nest's middle, so all the
+     * land off the hump was out of bounds. With no termites anywhere, a scout gets well out on the flat land.
+     */
+    @GameTest(template = "arena", timeoutTicks = 6000, skyAccess = true, batch = "matabele_scouts")
+    public static void aScoutFromATallDeadMoundGetsOffTheHumpOntoTheLand(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        level.getServer().tickRateManager().setTickRate(2000.0F);
+        TestClock.still(helper, 9.0);
+        // (the land round the hump slopes gently down 4 blocks, a block every 2, from 8 blocks out: with the 6-day mound's
+        // 9 that is the report's 13, its chimney top 84 over land at 71)
+        TestScenes.shapeGround(helper, 65, (x, z) -> -Math.min(4, Math.max(0, ((int) Math.hypot(x - NEST, z - NEST) - 8) / 2)));
+        MatabeleScenes.deadMound(helper, NEST, NEST, 6);
+        Colony colony = MatabeleScenes.colony(helper, NEST + 6, NEST, 10);
+        Raids raids = colony.part(SavannaParts.RAIDS).orElse(null);
+        helper.assertTrue(raids != null, "a Matabele colony has no raids part");
+        int ground = helper.absolutePos(new BlockPos(0, SURFACE - 4, 0)).getY();
+        helper.assertTrue(colony.getCenter().getY() - ground > 12, "the dead mound is only " + (colony.getCenter().getY() - ground)
+                + " blocks over the land: not the tall mound of the report");
+        double[] farthest = {0.0};
+        helper.onEachTick(() -> colony.population().realMembers(level).stream().filter(ant -> raids.isScouting(ant.getUUID()))
+                .forEach(ant -> farthest[0] = Math.max(farthest[0], Math.hypot(ant.getX() - colony.getCenter().getX() - 0.5,
+                        ant.getZ() - colony.getCenter().getZ() - 0.5))));
+        helper.succeedWhen(() -> helper.assertTrue(farthest[0] >= 24, "the scouts got only " + Math.round(farthest[0])
+                + " blocks from the nest (the hump's foot is about 10 out); " + raids.describe(level)));
+    }
+
+    /**
      * Step 3b, the column: a hungry colony of 20 with a find (termites feeding under a log about 17 blocks out, the
      * scout's scent line to them put in by hand) sends a raid: 10 real ants (the least raid; 4 an ant for each of
      * the 2 termites smelt is 8; the hungry colony could spare 15), the find's scout in front. They mill round the entrance, then walk the scent line with the scout

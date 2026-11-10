@@ -608,7 +608,7 @@ public class MatabeleScoutGoal extends Goal {
     }
 
     /**
-     * The cell to stand in on the ground at this column, or null: loaded, near the nest's height, dry, free, with a
+     * The cell to stand in on the ground at this column, or null: loaded, dry, free, with a
      * floor, off the living termite mounds, and ground the colony may go to (no danger or neighbour there).
      */
     @Nullable
@@ -621,8 +621,10 @@ public class MatabeleScoutGoal extends Goal {
         if (cell == null) {
             return null;
         }
-        // (the raid code review, finding 11: the raiders' own ground rule, so a scout's line only goes where a column can stand)
-        if (Math.abs(cell.getY() - center.getY()) > 12 || !RaidGround.canStand(level, cell)
+        // (the raid code review, finding 11: the raiders' own ground rule, so a scout's line only goes where a column can stand;
+        // BUGS 200: no limit on the height against the nest's middle, which on a tall dead mound is its chimney top, 13 over
+        // the land round it, so every step off the hump was refused; cliffs are the route planner's to judge)
+        if (!RaidGround.canStand(level, cell)
                 || !Raids.outOfMound(cell, mounds) || !colony.mayForageAt(level, cell)) {
             return null;
         }
