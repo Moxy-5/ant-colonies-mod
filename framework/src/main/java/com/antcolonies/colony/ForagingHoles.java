@@ -544,8 +544,15 @@ public class ForagingHoles {
         java.util.Set<BlockPos> foodBlocks = feeding == null ? java.util.Set.of(food) : feeding.foodBlocks(level, food, pos -> isRich(level, pos));
         BlockPos target = food;
         free.sort(java.util.Comparator.comparingDouble(hole -> sideways(hole, target)));
+        // What the planner must know of the nest, the mound, the runways and the holes is gathered once a check, not once
+        // a hole, and a hole too far for any runway is not planned from (tick spikes, 2026-11-10; the same runways: the
+        // check cost about 20 ms every 10 s at a colony with dead wood up a tree, every hole searching all round itself).
+        RunwayLand land = new RunwayLand(level);
         for (BlockPos hole : free) {
-            List<BlockPos> cells = RunwayRoute.plan(hole.above(), foodBlocks, runwayGround(level, hole), sheeting.maxLength());
+            if (!withinRunway(hole.above(), foodBlocks, sheeting.maxLength())) {
+                continue;
+            }
+            List<BlockPos> cells = RunwayRoute.plan(hole.above(), foodBlocks, land.from(hole), sheeting.maxLength());
             if (cells != null) {
                 colony.nest().foodWays().addRunway(new FoodWays.Runway(hole.immutable(), food.immutable(), List.copyOf(cells)));
                 ColonyManager.get(level).markChanged();
@@ -559,58 +566,88 @@ public class ForagingHoles {
     }
 
     /**
-     * The ground as the runway planner sees it: the real ground of each column, and where a runway may run (open air or
-     * grass, no water beside it, not the colony's own space, its mound or another runway, and clear of its other holes,
-     * so no wall goes up over one: only the cell over its own {@code hole} may be beside it).
+     * Whether a runway of at most {@code maxLength} cells from {@code start} could end beside one of the food blocks at
+     * all: its cells touch face to face, so the last is at most {@code maxLength - 1} steps from the first and the food
+     * one step more. (A hole farther than that finds nothing however long it searches.)
      */
-    private RunwayRoute.Ground runwayGround(Level level, BlockPos hole) {
-        GroundReader reader = new GroundReader(level, colony, colony.nest().nestCells(level));
-        java.util.Set<BlockPos> nest = colony.nest().nestCells(level);
-        java.util.Map<BlockPos, ?> mound = colony.moundParts(level);
-        java.util.Set<BlockPos> used = new java.util.HashSet<>();
-        for (FoodWays.Runway runway : colony.nest().foodWays().getRunways()) {
-            for (BlockPos cell : runway.cells()) {
-                used.add(cell);
-                for (Direction side : Direction.values()) {
-                    used.add(cell.relative(side));
-                }
-            }
-        }
-        java.util.Set<BlockPos> mouths = new java.util.HashSet<>();
-        for (NestPlan.ForagingTunnel tunnel : tunnels(level)) {
-            mouths.add(tunnel.hole().above());
-        }
-        mouths.add(colony.nest().getEntrance());
-        mouths.add(colony.nest().getEntrance().above());
-        return new RunwayRoute.Ground() {
-            @Override
-            public Integer groundTop(int x, int z) {
-                return reader.groundTop(x, z);
-            }
-
-            @Override
-            public boolean isFree(BlockPos cell) {
-                if (!LandReady.at(level, cell) || nest.contains(cell) || mound.containsKey(cell) || used.contains(cell)
-                        || isHole(level, cell) || isHole(level, cell.below())) {
-                    return false;
-                }
-                BlockState state = level.getBlockState(cell);
-                if (!(state.isAir() || state.canBeReplaced()) || !state.getFluidState().isEmpty() || touchesFluid(level, cell)) {
-                    return false;
-                }
-                // No wall of it beside another hole's mouth (only its own, the cell right over its hole).
-                if (mouths.contains(cell)) {
-                    return false;
-                }
-                for (Direction side : Direction.values()) {
-                    BlockPos next = cell.relative(side);
-                    if (mouths.contains(next) && !next.equals(hole.above())) {
-                        return false;
-                    }
-                }
+    private static boolean withinRunway(BlockPos start, java.util.Set<BlockPos> food, int maxLength) {
+        for (BlockPos block : food) {
+            if (block.distManhattan(start) <= maxLength) {
                 return true;
             }
-        };
+        }
+        return false;
+    }
+
+    /**
+     * The ground as the runway planner sees it: the real ground of each column, and where a runway may run (open air or
+     * grass, no water beside it, not the colony's own space, its mound or another runway, and clear of its other holes,
+     * so no wall goes up over one: only the cell over its own hole may be beside it). Gathered once for a check's holes
+     * ({@link #from}).
+     */
+    private final class RunwayLand {
+        private final Level level;
+        private final GroundReader reader;
+        private final java.util.Set<BlockPos> nest;
+        private final java.util.Map<BlockPos, ?> mound;
+        private final java.util.Set<BlockPos> used = new java.util.HashSet<>();
+        private final java.util.Set<BlockPos> holes = new java.util.HashSet<>();
+        private final java.util.Set<BlockPos> mouths = new java.util.HashSet<>();
+
+        RunwayLand(Level level) {
+            this.level = level;
+            nest = colony.nest().nestCells(level);
+            reader = new GroundReader(level, colony, nest);
+            mound = colony.moundParts(level);
+            for (FoodWays.Runway runway : colony.nest().foodWays().getRunways()) {
+                for (BlockPos cell : runway.cells()) {
+                    used.add(cell);
+                    for (Direction side : Direction.values()) {
+                        used.add(cell.relative(side));
+                    }
+                }
+            }
+            for (NestPlan.ForagingTunnel tunnel : tunnels(level)) {
+                holes.add(tunnel.hole());
+                mouths.add(tunnel.hole().above());
+            }
+            mouths.add(colony.nest().getEntrance());
+            mouths.add(colony.nest().getEntrance().above());
+        }
+
+        /** The ground for a runway leaving from this hole. */
+        RunwayRoute.Ground from(BlockPos hole) {
+            BlockPos own = hole.above();
+            return new RunwayRoute.Ground() {
+                @Override
+                public Integer groundTop(int x, int z) {
+                    return reader.groundTop(x, z);
+                }
+
+                @Override
+                public boolean isFree(BlockPos cell) {
+                    if (!LandReady.at(level, cell) || nest.contains(cell) || mound.containsKey(cell) || used.contains(cell)
+                            || holes.contains(cell) || holes.contains(cell.below())) {
+                        return false;
+                    }
+                    BlockState state = level.getBlockState(cell);
+                    if (!(state.isAir() || state.canBeReplaced()) || !state.getFluidState().isEmpty() || touchesFluid(level, cell)) {
+                        return false;
+                    }
+                    // No wall of it beside another hole's mouth (only its own, the cell right over its hole).
+                    if (mouths.contains(cell)) {
+                        return false;
+                    }
+                    for (Direction side : Direction.values()) {
+                        BlockPos next = cell.relative(side);
+                        if (mouths.contains(next) && !next.equals(own)) {
+                            return false;
+                        }
+                    }
+                    return true;
+                }
+            };
+        }
     }
 
     /** The mud of the crumbling runways falls away, a plate at a time; a runway with no mud left is forgotten. */
