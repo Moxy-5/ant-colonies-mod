@@ -259,13 +259,35 @@ public class FieldLife {
     /** Whether the colony is away this second (set in {@link #tick}). Not saved. */
     private boolean awayNow;
 
+    /** Pieces the forager numbers are part-way to bringing in from land the brain has no picture of ({@link #forageByTheLand}). Not saved. */
+    private double landGot;
+
     /**
-     * Whether this colony has galleries but no hole laid out along them yet: a colony nobody has been near (the holes
-     * are laid out along dug tunnels, which real workers dig). Its forager numbers then go out by the nest's own ways.
+     * The brain while away (2026-11-11; brain step 4f's idea in its smallest form, my pick): a colony away whose forager
+     * numbers found no plant to work this second forages by the land. Far from every player the brain's picture is
+     * thin: the plants it remembers lie out of reach of any hole (holes are laid out along tunnels real workers dig, so
+     * a colony nobody has been near has none), are eaten up and never seen to grow back, or were never seen at all. So
+     * every far colony brought in nothing, ate its comb in three days and starved, queen and king too (the soaks of
+     * 2026-11-11; the 100-day soak of 2026-11-06 shows the same). Now each free forager brings a piece a trip of the
+     * graze's length, into the room the store has, with no block changed: the land out of sight is taken to feed the
+     * colony that lives on it. A known departure: this food is not cut from real plants.
      */
-    private boolean noHolesYet() {
+    private void forageByTheLand(ServerLevel level, double free) {
         ColonyHooks.Underground web = colony.underground();
-        return web != null && web.holesAlong().isEmpty();
+        int walk = web != null ? web.grazeRadius() : colony.profile().food().radius();
+        landGot += free * 20.0 / (TRIP_TICKS + 2.0 * walk * TICKS_PER_BLOCK);
+        placedNow += free;
+        out += (int) Math.round(free);
+        while (landGot >= 1 && roomNow > 0) {
+            landGot--;
+            roomNow--;
+            colony.food().countIn(false);
+            colony.ledger().addStore(1);
+            returnedNow++;
+            colony.away().note(level, AwayReport.What.FORAGED, 1);
+            changedNow = true;
+        }
+        landGot = Math.min(landGot, 1.0);
     }
 
     /** How often (ticks) an away colony looks for known plants it does not remember yet ({@link #lookAway}). */
@@ -285,20 +307,6 @@ public class FieldLife {
         lookedAt = now;
         SpeciesProfile.FoodNumbers numbers = colony.profile().food();
         List<BlockPos> exits = null;
-        if (colony.foodMap().knownCount() == 0 && noHolesYet()) {
-            // A colony nobody has been near that knows no plant at all (new land gave it no dead wood in reach): its
-            // foragers, out by the nest's own ways (see forageWith), come across the plants within their graze of them.
-            exits = exits(level);
-            int radius = colony.underground().grazeRadius();
-            for (BlockPos pos : colony.food().plants(level)) {
-                for (BlockPos exit : exits) {
-                    if (flat(pos, exit) <= radius) {
-                        colony.foodMap().learn(pos);
-                        break;
-                    }
-                }
-            }
-        }
         if (known.size() >= colony.foodMap().knownCount()) {
             return;
         }
@@ -361,7 +369,8 @@ public class FieldLife {
         if (alone) {
             colony.news().tell(level, ColonyNews.FORAGER_NUMBERS, new ColonyNews.ForagerNumbers(foragers)); // (fewer forager numbers than spots held: some died or came out as real ones)
         }
-        if (foragers <= 0 || known.isEmpty()) {
+        ColonyHooks.Underground web0 = colony.underground();
+        if (foragers <= 0 || known.isEmpty() && !(awayNow && web0 != null)) { // (away with nothing remembered: by the land, below)
             progress.clear();
             return false;
         }
@@ -391,11 +400,6 @@ public class FieldLife {
         // holes open tonight, near or away, and eat from inside under the feeding spots.
         ColonyHooks.Underground web = colony.underground();
         List<BlockPos> galleries = web != null ? web.holesInTurn(level) : null;
-        if (galleries != null && galleries.isEmpty() && awayNow && noHolesYet()) {
-            // (the brain while away, 2026-11-11: with no hole to graze round, every far colony of new land brought in
-            // nothing, ate its comb in three days and starved)
-            galleries = exits(level);
-        }
         for (Map.Entry<BlockPos, Plant> entry : known.entrySet()) {
             Plant plant = entry.getValue();
             if (plant.kind() < 0 || plant.kind() >= kinds.size() || !outside && !plant.fromInside()
@@ -431,6 +435,9 @@ public class FieldLife {
             }
         }
         forgetUsedUp(level, usedUp);
+        if (awayNow && web != null && outside && placedNow == 0 && free > 0) { // (a species with galleries: the termites)
+            forageByTheLand(level, free);
+        }
         return changedNow;
     }
 

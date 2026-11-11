@@ -168,8 +168,17 @@ public final class RaidsAway {
                 || !raids.dayHasRoom(level) || colony.population().inside(Caste.WORKER) <= 0) {
             return;
         }
+        boolean byTheLand = noTermitesOnRecord(level);
         for (Raids.Find find : raids.finds()) {
             Colony termites = termitesAt(level, find.at());
+            if (termites == null && byTheLand) { // (a termite colony that owns the spot is always raided by the real rules)
+                if (find.worth() < raids.need(find.at())) {
+                    continue;
+                }
+                double distance = RaidGround.flat(colony.getCenter(), find.at());
+                setOut(level, now, find, null, distance, column.formTicks() + Math.round(distance / Math.max(0.1, numbers.pace()) * 20.0));
+                return;
+            }
             if (termites == null || termites.keepsOff(level, find.at())) {
                 raids.diary(level, "out of sight: the scouts find the spot at " + find.at().toShortString() + " empty ("
                         + (termites == null ? "no termite colony there any more" : "the termites keep off it now") + ")");
@@ -194,14 +203,14 @@ public final class RaidsAway {
         }
     }
 
-    private void setOut(ServerLevel level, long now, Raids.Find find, Colony termites, double distance, long outTicks) {
+    private void setOut(ServerLevel level, long now, Raids.Find find, @Nullable Colony termites, double distance, long outTicks) {
         SavannaNumbers.AwayRaidNumbers numbers = numbers();
         SavannaNumbers.ColumnNumbers column = raids.columnNumbers();
         SavannaNumbers.CarryNumbers carry = raids.carryNumbers();
         int size = Math.max(1, Math.min(raids.raidSize(find), colony.population().inside(Caste.WORKER)));
         long attackAt = now + outTicks;
         out = new Out(find.at().immutable(), size, attackAt, attackAt + numbers.fightTicks() + homeTicks(distance, column, carry),
-                termites.getId());
+                termites == null ? null : termites.getId());
         raidsToday++;
         awayToday++;
         raids.forgetWaiting(find);
@@ -265,7 +274,16 @@ public final class RaidsAway {
         Colony termites = out.termites == null ? null : ColonyManager.get(level).getColony(out.termites);
         Raids.Find find = raids.findAt(out.at);
         int answering = 0; // (M8 step 3S: the termite soldiers that come to the break, as near)
-        if (termites == null || termites.keepsOff(level, out.at)) {
+        if (termites == null && noTermitesOnRecord(level)) {
+            // By the land (see noTermitesOnRecord): the catch a raid this size carries, no colony's count to take it from.
+            int taken = Math.min(RaidCatch.couldCarry(colony, out.raiders, random), Math.max(1, out.raiders / 10));
+            out.caught += taken;
+            if (find != null) {
+                raids.checked(find, now);
+            }
+            raids.diary(level, "out of sight: the raid attacks at " + out.at.toShortString() + " by the land (no termite colony on record in its reach yet): "
+                    + taken + " termite(s) stung and taken");
+        } else if (termites == null || termites.keepsOff(level, out.at)) {
             raids.diary(level, "out of sight: the raid reached " + out.at.toShortString() + " and found nothing to sting");
             if (find != null) {
                 raids.foundEmpty(level, find);
@@ -388,6 +406,15 @@ public final class RaidsAway {
                         foods.add(pos);
                     }
                 }
+                if (foods.isEmpty()) {
+                    // (its brain has no picture of its land either: it forages by the land round its mound,
+                    // FieldLife.forageByTheLand, so the scouts find it feeding a dozen blocks out on their side)
+                    BlockPos mound = termites.getCenter();
+                    double dx = colony.getCenter().getX() - mound.getX();
+                    double dz = colony.getCenter().getZ() - mound.getZ();
+                    double far = Math.max(1.0, Math.sqrt(dx * dx + dz * dz));
+                    foods.add(BlockPos.containing(mound.getX() + dx / far * 12 + 0.5, mound.getY(), mound.getZ() + dz / far * 12 + 0.5));
+                }
             }
             for (BlockPos food : foods) {
                 double distance = RaidGround.flat(colony.getCenter(), food);
@@ -399,10 +426,17 @@ public final class RaidsAway {
                 weights.add(1.0 / (distance + 8.0)); // (nearer places are found sooner)
             }
         }
+        RandomSource random = colony.random();
+        if (places.isEmpty() && noTermitesOnRecord(level)) {
+            // By the land: a place half the scouts' reach out, any way.
+            double way = random.nextDouble() * Math.PI * 2;
+            double far = Math.max(16, reach / 2.0);
+            places.add(BlockPos.containing(colony.getCenter().getX() + Math.cos(way) * far, colony.getCenter().getY(), colony.getCenter().getZ() + Math.sin(way) * far));
+            weights.add(1.0);
+        }
         if (places.isEmpty()) {
             return;
         }
-        RandomSource random = colony.random();
         for (int scout = 0; scout < raids.scoutsWanted() && !places.isEmpty(); scout++) {
             if (random.nextDouble() >= numbers.scoutFindChance()) {
                 continue;
@@ -421,6 +455,23 @@ public final class RaidsAway {
             raids.diary(level, "out of sight: a scout finds termites feeding at " + food.toShortString() + ", worth " + worth + ", "
                     + Math.round(RaidGround.flat(colony.getCenter(), food)) + " blocks out");
         }
+    }
+
+    /**
+     * The brain while away (2026-11-11, my pick): whether no living termite colony's mound is on record within the
+     * scouts' reach. Matabele only live where living termites are near (new land's rule), so this means the termites' land has
+     * not been made yet: their colony is put in when a player first comes near their mound. Until then the scouts and
+     * raids out of sight hunt by the land, as the far termites forage by it ({@code FieldLife.forageByTheLand}): a raid
+     * brings home its catch with no colony's count to take it from. Without this a Matabele colony at the rim of the
+     * land a player has seen found nothing and starved in four days (the soaks of 2026-11-11, 3 far colonies of 8).
+     */
+    private boolean noTermitesOnRecord(ServerLevel level) {
+        for (Colony termites : Raids.termiteColonies(level, colony.getCenter(), raids.range())) {
+            if (termites.getCount(Caste.WORKER) > 0) {
+                return false;
+            }
+        }
+        return true;
     }
 
     private static int pickWeighted(RandomSource random, List<Double> weights) {

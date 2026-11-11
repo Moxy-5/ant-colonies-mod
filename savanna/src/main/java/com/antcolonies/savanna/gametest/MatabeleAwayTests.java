@@ -186,7 +186,16 @@ public class MatabeleAwayTests {
                         "the column did not reach the spot; " + column[0].describe()))
                 .thenExecute(() -> {
                     int hidden = column[0].hiddenCatch();
-                    helper.assertTrue(hidden >= 1, "the raiders going as numbers took only " + hidden + " termites; " + column[0].describe());
+                    // Honest sizes (2026-11-11): a raid is all real up to 75, so few raiders go as numbers (5 here), each
+                    // taking raids.catch.per_raider (0.1) by the dice of RaidCatch (0.75 to 1.25 of that): the rule is the
+                    // range those raiders can take, no longer "at least one" (that was the old 1.5 a raider).
+                    int asNumbers = column[0].size() - column[0].members().size();
+                    double each = colony.profile().section(com.antcolonies.savanna.species.SavannaNumbers.CATCH)
+                            .orElse(com.antcolonies.savanna.species.SavannaNumbers.CatchNumbers.DEFAULT).perRaider();
+                    int least = (int) Math.floor(asNumbers * each * 0.75);
+                    int most = (int) Math.ceil(asNumbers * each * 1.25);
+                    helper.assertTrue(hidden >= least && hidden <= most, "the " + asNumbers + " raiders going as numbers took " + hidden
+                            + " termites, not " + least + " to " + most + "; " + column[0].describe());
                     int many = termites[0].population().standsFor();
                     int lost = termitesBefore[0] - termites[0].population().inside(Caste.WORKER);
                     helper.assertTrue(lost <= hidden / many + 1, hidden + " termites taken, but the termites' count lost " + lost
@@ -197,7 +206,9 @@ public class MatabeleAwayTests {
                     int hidden = column[0].hiddenCatch();
                     helper.assertTrue(pile.broughtIn() >= hidden, hidden + " termites taken by the numbers, but " + pile.broughtIn()
                             + " laid on the pile" + pile.describe(level));
-                    helper.assertTrue(termites[0].keepsOff(level, spot), "the termites do not keep off the spot they were raided at");
+                    // (a colony that lost nobody has nothing to remember: with 5 number raiders the dice may take none)
+                    helper.assertTrue(hidden == 0 || termites[0].keepsOff(level, spot), "the termites do not keep off the spot they lost "
+                            + hidden + " at");
                     SavannaMod.LOGGER.info("[near catch test] home: {}; {}", column[0].describe(), pile.describe(level));
                 })
                 .thenSucceed();

@@ -64,10 +64,14 @@ Found, with the new `soak-others.txt` (a line a day per far colony):
 
 - Far termite colonies never foraged: the brain remembered no plant (it looked only while "here") and had no hole to
   graze round (holes are laid out along tunnels real workers dig). Fixed (BUGS 203; `FieldLife.lookOnLeaving`,
-  `lookAway`, `noHolesYet`). The 100-day soak of 2026-11-06 shows the same on the old code.
+  `lookAway`, and where no plant can be worked the colony forages by the land,
+  `forageByTheLand`). The 100-day soak of 2026-11-06 shows the same on the old code.
 - Far Matabele found no termites (the number scouts read tunnels planned only near a player). Fixed (BUGS 204).
 - A scout home in a tall dead mound never told of its find. Fixed (BUGS 201).
 - Old age: 15-day lives cost a colony of 200 13 workers a day. Now 60 days.
 - The food: 1 to 3 termites made no pile layer; two far colonies took 116 termites from one mound in 5 days. Now a
   termite is a layer and feeds 20 ants; a numbers raid takes at most 10.
 - Open, BUGS 202: a shown raid to a feeding place with no termite at it comes home empty.
+- Far Matabele beside a termite mound whose colony is not made yet (it is put in when a player first comes near)
+  hunt by the land (`RaidsAway.noTermitesOnRecord`).
+- Measured after: far termite colonies 20 of 20 alive after 8 days (0 of 20 before), steady where not raided.
