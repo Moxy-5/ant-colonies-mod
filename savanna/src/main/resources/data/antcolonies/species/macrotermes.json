@@ -59,7 +59,8 @@
     "starve_after_ticks": 72000,
     "nurse_until_ticks": 72000,
     "builder_until_ticks": 192000,
-    "lifespan_ticks": 360000,
+    "_lifespan_note": "60 game days (2026-11-11, was 15; real Macrotermes workers live months): with 15 a colony of 200 lost 13 workers a day to old age and no colony held its size (the soak of 2026-11-11).",
+    "lifespan_ticks": 1440000,
     "eats": true,
     "diet": { "young": "nurse_food", "older": "store", "workers_per_piece": 4, "hungry_from_first_food": true, "mouth_to_mouth": true }
   },

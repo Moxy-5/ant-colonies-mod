@@ -356,6 +356,8 @@ it.** If a decision changes, ask the user first, then update it here. The short 
   workers still tunnel to the dead tree 40 blocks out as the old 700 did; small colonies keep their 4 first arms. All
   my picks, to confirm.
 
+**Retuned from the soak (2026-11-11, my picks).** One termite feeds 20 ants for a day (was 5), so a colony of 100 needs 5 termites a day, about one shown raid's catch and what a mound of 200 can spare; workers of both species live 60 game days (were 15), so a colony holds its size with the eggs its queen lays; a numbers raid takes a tenth of a termite a raider, at most 10. A colony far from every player lives on what its brain knows: it learns its plants in a look as it goes away and whenever their land is loaded, and with no foraging hole laid out yet its forager numbers go out by the nest's own ways.
+
 ### Colony brain
 - Each colony has a server-side brain storing: id, species, queen (and king) UUIDs, member count, stored food, growth stage, nest plan (chamber positions), territory center and radius.
 - Must survive save/reload (use SavedData). Queens and colony members never despawn.

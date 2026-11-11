@@ -120,7 +120,7 @@ public class MatabeleAwayTests {
                     // many real ones; the remainder by dice, and a little slack for a natural death meanwhile).
                     int brought = report.get(AwayReport.What.PREY_BROUGHT);
                     int raiders = report.get(AwayReport.What.RAIDERS);
-                    helper.assertTrue(brought * 5 >= raiders && brought <= raiders, "a raid of " + raiders + " brought home only " + brought + " termites" + pile.describe(level));
+                    helper.assertTrue(brought * 15 >= raiders && brought * 3 <= raiders, "a raid of " + raiders + " brought home only " + brought + " termites" + pile.describe(level));
                     int left = termites[0].population().inside(Caste.WORKER);
                     int many = termites[0].population().standsFor();
                     helper.assertTrue(termitesBefore[0] - left <= brought / many + 3, "the raid brought home " + brought

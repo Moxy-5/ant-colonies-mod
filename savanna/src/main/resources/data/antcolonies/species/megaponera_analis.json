@@ -29,9 +29,10 @@
     "starve_after_ticks": 96000,
     "nurse_until_ticks": 72000,
     "builder_until_ticks": 192000,
-    "lifespan_ticks": 360000,
+    "_lifespan_note": "60 game days (2026-11-11, was 15; real Megaponera workers live many months): with 15 a colony of 100 lost 7 workers a day to old age, more than its queen replaced (the soak of 2026-11-11).",
+    "lifespan_ticks": 1440000,
     "eats": true,
-    "diet": { "young": "nurse_food", "older": "nurse_food", "_food_note": "Honest sizes (2026-11-11): one termite feeds 5 ants for a day (a pile layer is raids.carry.termites_per_layer 4 termites and feeds workers_per_piece 20 workers), so a colony of 100 eats 20 termites a day. A known departure: real colonies of millions of termites feed a few termites an ant a raid; the mod's mound holds 200.",
+    "diet": { "young": "nurse_food", "older": "nurse_food", "_food_note": "Honest sizes (2026-11-11, retuned from the soak the same day): one termite feeds 20 ants for a day (a pile layer is raids.carry.termites_per_layer 1 termite and feeds workers_per_piece 20 workers), so a colony of 100 needs 5 termites a day, about what one shown raid brings home (1 to 20, mostly about 5) and what a termite colony of 200 can spare beside its old-age losses. A known departure from the real ants (docs/DESIGN.md, Honest sizes).",
       "workers_per_piece": 20, "mouth_to_mouth": false },
     "_rest_in_rooms_note": "With nothing to do the workers go down into the nest's rooms and stay there, never in the shaft (real Megaponera crowd into their chamber with the queen and the brood; the user's report 2026-10-24: they piled up at the top of the chimney).",
     "rest_in_rooms": true
@@ -168,8 +169,8 @@
     },
     "catch": {
       "_note": "M8 step 3d, the termites' losses (colony.RaidCatch; the user's pick 2026-11-06, 'count stands for many'). Real raids carry home about 200 to 1,000 termites with 150 to 550 ants, a few an ant (majors 1 to 12, minors 1 to 3; Yusuf 2026, Table 1). The raiders who go as numbers (and every raider of a raid out of sight) bring home per_raider termites each, give or take a quarter, from the termites feeding under the mud at the spot (numbers in the termite colony's galleries), only if the termite colony still feeds there; at most most_catch a raid; the termite colony's count loses one in its stands_for of them, and it keeps off the spot a few days. The real raiders carry the real termites they sting, as before. No raid is bigger than most_raid ants (real raiding parties up to about 500). Every number my pick, to confirm.",
-      "per_raider": 0.3,
-      "most_catch": 30,
+      "per_raider": 0.1,
+      "most_catch": 10,
       "most_raid": 75
     },
     "hours_and_sound": {
@@ -215,7 +216,7 @@
       "spread_reach": 8.0,
       "spread_see": 5.0,
       "laden_pace": 0.85,
-      "termites_per_layer": 4,
+      "termites_per_layer": 1,
       "bring_ticks": 2400,
       "limp_ticks": 6000
     },

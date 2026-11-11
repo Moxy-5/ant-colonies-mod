@@ -753,7 +753,7 @@ public class FoodStore {
     }
 
     /** How many more pieces the food store can take as far as the brain knows: the room it last saw, less what is owed to it. */
-    int roomKnown() {
+    public int roomKnown() {
         return (roomForTests != null ? roomForTests : seenRoom) - colony.ledger().store();
     }
 

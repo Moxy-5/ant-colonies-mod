@@ -110,7 +110,10 @@ public class FieldLife {
             if (colony.away().nestLoaded(level)) {
                 colony.food().watchRoom(level);
             }
+        } else {
+            lookAway(level);
         }
+        awayNow = away;
         boolean changed = showCuts(level);
         changed |= forage(level);
         if (changed) {
@@ -253,6 +256,67 @@ public class FieldLife {
         return Math.sqrt(dx * dx + dz * dz);
     }
 
+    /** Whether the colony is away this second (set in {@link #tick}). Not saved. */
+    private boolean awayNow;
+
+    /**
+     * Whether this colony has galleries but no hole laid out along them yet: a colony nobody has been near (the holes
+     * are laid out along dug tunnels, which real workers dig). Its forager numbers then go out by the nest's own ways.
+     */
+    private boolean noHolesYet() {
+        ColonyHooks.Underground web = colony.underground();
+        return web != null && web.holesAlong().isEmpty();
+    }
+
+    /** How often (ticks) an away colony looks for known plants it does not remember yet ({@link #lookAway}). */
+    private static final int LOOK_AWAY_TICKS = 600;
+
+    /**
+     * While away, now and then: the plants the colony knows that the brain does not remember yet (taught after its last
+     * look, or in land that was not loaded then) are remembered once their land is loaded, read where they stand. The
+     * last look on leaving alone missed them for most colonies of new land (their land comes in piece by piece), and
+     * forager numbers with nothing remembered never go out (the soak of 2026-11-11). Reads loaded land only.
+     */
+    private void lookAway(ServerLevel level) {
+        long now = level.getGameTime();
+        if (lookedAt != Long.MIN_VALUE && now - lookedAt < LOOK_AWAY_TICKS && now >= lookedAt) {
+            return;
+        }
+        lookedAt = now;
+        SpeciesProfile.FoodNumbers numbers = colony.profile().food();
+        List<BlockPos> exits = null;
+        if (colony.foodMap().knownCount() == 0 && noHolesYet()) {
+            // A colony nobody has been near that knows no plant at all (new land gave it no dead wood in reach): its
+            // foragers, out by the nest's own ways (see forageWith), come across the plants within their graze of them.
+            exits = exits(level);
+            int radius = colony.underground().grazeRadius();
+            for (BlockPos pos : colony.food().plants(level)) {
+                for (BlockPos exit : exits) {
+                    if (flat(pos, exit) <= radius) {
+                        colony.foodMap().learn(pos);
+                        break;
+                    }
+                }
+            }
+        }
+        if (known.size() >= colony.foodMap().knownCount()) {
+            return;
+        }
+        for (BlockPos pos : colony.foodMap().knownPlants()) {
+            if (known.containsKey(pos) || !LandReady.at(level, pos)) {
+                continue;
+            }
+            SpeciesProfile.PlantFood plant = numbers.plantFor(level.getBlockState(pos));
+            if (plant == null) {
+                continue;
+            }
+            if (exits == null) {
+                exits = exits(level);
+            }
+            known.put(pos.immutable(), new Plant(numbers.plants().indexOf(plant), (float) walk(pos, exits), false));
+        }
+    }
+
     // --- foraging -------------------------------------------------------------------------------------------------
 
     /**
@@ -327,6 +391,11 @@ public class FieldLife {
         // holes open tonight, near or away, and eat from inside under the feeding spots.
         ColonyHooks.Underground web = colony.underground();
         List<BlockPos> galleries = web != null ? web.holesInTurn(level) : null;
+        if (galleries != null && galleries.isEmpty() && awayNow && noHolesYet()) {
+            // (the brain while away, 2026-11-11: with no hole to graze round, every far colony of new land brought in
+            // nothing, ate its comb in three days and starved)
+            galleries = exits(level);
+        }
         for (Map.Entry<BlockPos, Plant> entry : known.entrySet()) {
             Plant plant = entry.getValue();
             if (plant.kind() < 0 || plant.kind() >= kinds.size() || !outside && !plant.fromInside()

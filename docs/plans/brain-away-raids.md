@@ -43,8 +43,9 @@ add, same day). Branch `claude/brain-away-raids`.
 | new-land termite colony | 20 to 700 by its mound | the same rule, at most 200 | stage 15 and up hold 200 |
 | termite galleries | 1 block per 4 workers | 1 block per worker | a full mound's 200 workers must still tunnel to its dead tree 40 blocks out (the old 700 had 175 blocks; with 1 per 4 the new-land test found the tree out of reach); colonies under about 60 keep their 4 first arms as before |
 | new holes' reach | full at 500 workers | unchanged | tried full at 200, taken back: it changed small colonies' tunnels |
-| one termite feeds | 1 ant a day | 5 ants a day | see below |
-| numbers raid's catch | 1.5 a raider, most 1,000 | 0.3 a raider, most 30 | what real ants bring home from a shown raid |
+| one termite feeds | 1 ant a day | 20 ants a day (5 at first) | see below, and the soak |
+| numbers raid's catch | 1.5 a raider, most 1,000 | 0.1 a raider, most 10 (0.3 and 30 at first) | what a mound of 200 can spare |
+| workers' lifespan, both species | 15 game days | 60 | at 15 a colony of 200 lost 13 a day to old age |
 
 **The food.** At one termite an ant a day, 100 ants eat a 200-termite mound in two days. Real Megaponera take a few
 termites an ant a raid from colonies of millions; the mod's mound has 200. So the food is the one place that cannot be
@@ -55,3 +56,18 @@ a few days, which is the brake. A known departure from the real ants, written in
 
 **To measure, not guess:** whether a 200-termite colony holds steady under one or two Matabele colonies (its queen's
 laying against old age and raids). A soak of 10 game days after the change, sizes by day (`tools/soak.sh`).
+
+## Step 1, what the soak found (2026-11-11)
+
+The first 10-day soak: every far colony died, Matabele near the player starved, full mounds slid from 220 to 145.
+Found, with the new `soak-others.txt` (a line a day per far colony):
+
+- Far termite colonies never foraged: the brain remembered no plant (it looked only while "here") and had no hole to
+  graze round (holes are laid out along tunnels real workers dig). Fixed (BUGS 203; `FieldLife.lookOnLeaving`,
+  `lookAway`, `noHolesYet`). The 100-day soak of 2026-11-06 shows the same on the old code.
+- Far Matabele found no termites (the number scouts read tunnels planned only near a player). Fixed (BUGS 204).
+- A scout home in a tall dead mound never told of its find. Fixed (BUGS 201).
+- Old age: 15-day lives cost a colony of 200 13 workers a day. Now 60 days.
+- The food: 1 to 3 termites made no pile layer; two far colonies took 116 termites from one mound in 5 days. Now a
+  termite is a layer and feeds 20 ants; a numbers raid takes at most 10.
+- Open, BUGS 202: a shown raid to a feeding place with no termite at it comes home empty.

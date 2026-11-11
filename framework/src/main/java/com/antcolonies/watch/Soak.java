@@ -441,7 +441,7 @@ public final class Soak {
                 continue;
             }
             note(level.getServer(), "soak-others.txt", when(level) + " " + describe(colony, level) + ", workers " + colony.getCount("worker")
-                    + ", food " + colony.food().getFood() + ", known plants " + colony.foodMap().knownCount() + colony.away().describe(level)
+                    + ", food " + colony.food().getFood() + ", known plants " + colony.foodMap().knownCount() + " (the brain remembers " + colony.field().known().size() + ", " + colony.field().foragersInside(level) + " forager numbers, room " + colony.food().roomKnown() + ")" + colony.away().describe(level)
                     + " | so far: " + colony.away().report().describe());
         }
     }
