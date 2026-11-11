@@ -145,7 +145,7 @@ public class GiantTreeStructure extends Structure {
                 continue;
             }
             // Step 6c: the dead wood lying round it (on the land as the world's shape makes it) widens the piece to take it in.
-            TreePlacer.Placed litter = GiantTreePiece.newLandLitter(chosen, foot, (lx, lz) -> height(context, lx, lz, Heightmap.Types.WORLD_SURFACE_WG));
+            TreePlacer.Placed litter = GiantTreePiece.newLandLitter(chosen, foot, GroundHeights.ground(context.chunkGenerator(), context.heightAccessor(), context.randomState()));
             net.minecraft.world.level.levelgen.structure.BoundingBox box = tree != null ? tree.box(foot) : litter.box(foot);
             boolean wider = tree == null;
             if (tree != null && litter.size() > 0) {
@@ -166,6 +166,10 @@ public class GiantTreeStructure extends Structure {
     private static BlockPos foot(GenerationContext context, int x, int z, int reach) {
         int lowest = Integer.MAX_VALUE, highest = Integer.MIN_VALUE;
         int[][] around = {{0, 0}, {reach, 0}, {-reach, 0}, {0, reach}, {0, -reach}};
+        if (reach > 0) { // the five columns worked out side by side first (the same answers, sooner)
+            GroundHeights.warm(context.chunkGenerator(), context.heightAccessor(), context.randomState(),
+                    new int[] {x, x + reach, x - reach, x, x}, new int[] {z, z, z, z + reach, z - reach});
+        }
         for (int[] o : around) {
             int surface = height(context, x + o[0], z + o[1], Heightmap.Types.WORLD_SURFACE_WG);
             int floor = height(context, x + o[0], z + o[1], Heightmap.Types.OCEAN_FLOOR_WG);
@@ -198,6 +202,20 @@ public class GiantTreeStructure extends Structure {
         if (tree.lying() == null) {
             return true;
         }
+        // the columns under the log, worked out side by side first (the same answers, sooner)
+        it.unimi.dsi.fastutil.longs.LongLinkedOpenHashSet under = new it.unimi.dsi.fastutil.longs.LongLinkedOpenHashSet();
+        for (int i = 0; i < tree.size(); i++) {
+            if (tree.lying().slice()[i] >= 0 && ((tree.xs()[i] + tree.zs()[i]) & 1) == 0) {
+                under.add(BlockPos.asLong(foot.getX() + tree.xs()[i], 0, foot.getZ() + tree.zs()[i]));
+            }
+        }
+        int[] xs = new int[under.size()], zs = new int[under.size()];
+        int n = 0;
+        for (long c : under) {
+            xs[n] = BlockPos.getX(c);
+            zs[n++] = BlockPos.getZ(c);
+        }
+        GroundHeights.warm(context.chunkGenerator(), context.heightAccessor(), context.randomState(), xs, zs);
         it.unimi.dsi.fastutil.longs.LongOpenHashSet seen = new it.unimi.dsi.fastutil.longs.LongOpenHashSet();
         for (int i = 0; i < tree.size(); i++) {
             int x = tree.xs()[i], z = tree.zs()[i];

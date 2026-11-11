@@ -126,6 +126,10 @@ public final class TreePlacer {
     /** Where the ground is: the first free block's height over the solid ground at a column (world coordinates). */
     public interface Ground {
         int freeY(int x, int z);
+
+        /** These columns are about to be asked for: a ground that is slow to read may work them out side by side first. */
+        default void warm(int[] xs, int[] zs) {
+        }
     }
 
     /**
@@ -150,6 +154,20 @@ public final class TreePlacer {
         it.unimi.dsi.fastutil.longs.Long2IntOpenHashMap heights = new it.unimi.dsi.fastutil.longs.Long2IntOpenHashMap();
         java.util.function.IntBinaryOperator at = (x, z) -> heights.computeIfAbsent(BlockPos.asLong(x, 0, z),
                 c -> ground.freeY(foot.getX() + x, foot.getZ() + z) - foot.getY());
+        // every column the lying wood covers, told to the ground first (new land works them out side by side)
+        it.unimi.dsi.fastutil.longs.LongLinkedOpenHashSet columns = new it.unimi.dsi.fastutil.longs.LongLinkedOpenHashSet();
+        for (int i = 0; i < tree.size(); i++) {
+            if (slice[i] >= 0) {
+                columns.add(BlockPos.asLong(foot.getX() + tree.xs()[i], 0, foot.getZ() + tree.zs()[i]));
+            }
+        }
+        int[] warmX = new int[columns.size()], warmZ = new int[columns.size()];
+        int w = 0;
+        for (long c : columns) {
+            warmX[w] = BlockPos.getX(c);
+            warmZ[w++] = BlockPos.getZ(c);
+        }
+        ground.warm(warmX, warmZ);
         // The underside of each slice's columns, then how far each must move to sit on the ground.
         it.unimi.dsi.fastutil.longs.Long2IntOpenHashMap bottom = new it.unimi.dsi.fastutil.longs.Long2IntOpenHashMap();
         bottom.defaultReturnValue(Integer.MAX_VALUE);

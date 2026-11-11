@@ -85,6 +85,17 @@ public class SavannaLoadingTests {
                 long t1 = System.nanoTime();
                 int height = ground.generator().getBaseHeight(x, z, Heightmap.Types.WORLD_SURFACE_WG, ground.level(), ground.random());
                 long t2 = System.nanoTime();
+                if (i % 4 == 0) {
+                    // Loading time, 2026-11-10: the remembered ground heights (both kinds from one look down the column)
+                    // must be exactly Minecraft's own answers.
+                    int keptTop = com.antcolonies.savanna.worldgen.GroundHeights.at(ground.generator(), x, z, Heightmap.Types.WORLD_SURFACE_WG, ground.level(), ground.random());
+                    int keptBed = com.antcolonies.savanna.worldgen.GroundHeights.at(ground.generator(), x, z, Heightmap.Types.OCEAN_FLOOR_WG, ground.level(), ground.random());
+                    int bed = ground.generator().getBaseHeight(x, z, Heightmap.Types.OCEAN_FLOOR_WG, ground.level(), ground.random());
+                    if ((keptTop != height || keptBed != bed) && mismatches.size() < 8) {
+                        mismatches.add("seed " + seed + " column " + x + ", " + z + ": the remembered heights " + keptTop + " and " + keptBed
+                                + " are not Minecraft's " + height + " and " + bed);
+                    }
+                }
                 int kind = biome.is(BiomeTags.IS_SAVANNA) ? 1 : 0;
                 biomeNanos += t1 - t0;
                 heightNanos[kind] += t2 - t1;

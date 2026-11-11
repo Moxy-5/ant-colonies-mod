@@ -223,6 +223,19 @@ public final class MoundPlaces {
         int x = place.middle().getX(), z = place.middle().getZ();
         int lowest = Integer.MAX_VALUE, highest = Integer.MIN_VALUE;
         int[][] around = {{0, 0}, {8, 0}, {-8, 0}, {0, 8}, {0, -8}, {6, 6}, {-6, 6}, {6, -6}, {-6, -6}};
+        int look = numbers.waterLook();
+        // every column this place reads, worked out side by side first (the same answers, sooner)
+        int[] xs = new int[around.length + 4], zs = new int[around.length + 4];
+        for (int i = 0; i < around.length; i++) {
+            xs[i] = x + around[i][0];
+            zs[i] = z + around[i][1];
+        }
+        int[][] shoreLook = {{look, 0}, {-look, 0}, {0, look}, {0, -look}};
+        for (int i = 0; i < 4; i++) {
+            xs[around.length + i] = x + shoreLook[i][0];
+            zs[around.length + i] = z + shoreLook[i][1];
+        }
+        GroundHeights.warm(land.generator(), land.heights(), land.random(), xs, zs);
         for (int[] o : around) {
             int surface = land.height(x + o[0], z + o[1], Heightmap.Types.WORLD_SURFACE_WG);
             if (surface != land.height(x + o[0], z + o[1], Heightmap.Types.OCEAN_FLOOR_WG)) {

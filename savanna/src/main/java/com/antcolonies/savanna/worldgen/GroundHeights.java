@@ -8,8 +8,10 @@ import com.antcolonies.debug.Perf;
 import it.unimi.dsi.fastutil.longs.Long2ObjectLinkedOpenHashMap;
 
 import net.minecraft.world.level.LevelHeightAccessor;
+import net.minecraft.world.level.NoiseColumn;
 import net.minecraft.world.level.chunk.ChunkGenerator;
 import net.minecraft.world.level.levelgen.Heightmap;
+import net.minecraft.world.level.levelgen.NoiseBasedChunkGenerator;
 import net.minecraft.world.level.levelgen.RandomState;
 
 /**
@@ -46,11 +48,66 @@ public final class GroundHeights {
             Perf.newLand(Perf.NewLand.GROUND_KEPT, 0);
             return h;
         }
+        return workOut(generator, x, z, type, heights, random);
+    }
+
+    /**
+     * Several columns worked out side by side on the world builder's spare threads before they are asked for one by one
+     * (loading time, 2026-11-10): a tree's foot or a mound's place asks for 5 to 13 columns in a row, each about 2 ms, on
+     * the one lane Minecraft makes structures on; the columns do not depend on each other, so together they take about
+     * as long as one. The same answers as asking one by one.
+     */
+    public static void warm(ChunkGenerator generator, LevelHeightAccessor heights, RandomState random, int[] xs, int[] zs) {
+        java.util.stream.IntStream.range(0, xs.length).parallel()
+                .forEach(i -> at(generator, xs[i], zs[i], Heightmap.Types.WORLD_SURFACE_WG, heights, random));
+    }
+
+    /** The land's surface as the world's shape makes it, for fitting trees and fallen wood (columns warmed side by side). */
+    public static TreePlacer.Ground ground(ChunkGenerator generator, LevelHeightAccessor heights, RandomState random) {
+        return new TreePlacer.Ground() {
+            @Override
+            public int freeY(int x, int z) {
+                return at(generator, x, z, Heightmap.Types.WORLD_SURFACE_WG, heights, random);
+            }
+
+            @Override
+            public void warm(int[] xs, int[] zs) {
+                GroundHeights.warm(generator, heights, random, xs, zs);
+            }
+        };
+    }
+
+    private static int workOut(ChunkGenerator generator, int x, int z, Heightmap.Types type, LevelHeightAccessor heights, RandomState random) {
         long start = System.nanoTime();
-        h = generator.getFirstFreeHeight(x, z, type, heights, random);
+        int i = (x & 15) << 4 | (z & 15);
+        int h;
+        boolean surface = type == Heightmap.Types.WORLD_SURFACE_WG, floor = type == Heightmap.Types.OCEAN_FLOOR_WG;
+        if ((surface || floor) && generator instanceof NoiseBasedChunkGenerator) {
+            // Both kinds of height from one look down the column: our trees and mounds always ask for the two together
+            // (dry ground is where they agree), and each asked alone works the whole column's shape out again. The same
+            // rule as Minecraft's own (the first block from the top that counts for this kind, plus one).
+            NoiseColumn column = generator.getBaseColumn(x, z, heights, random);
+            int top = first(column, heights, Heightmap.Types.WORLD_SURFACE_WG);
+            int bed = first(column, heights, Heightmap.Types.OCEAN_FLOOR_WG);
+            page(random, Heightmap.Types.WORLD_SURFACE_WG, x >> 4, z >> 4)[i] = top;
+            page(random, Heightmap.Types.OCEAN_FLOOR_WG, x >> 4, z >> 4)[i] = bed;
+            h = surface ? top : bed;
+        } else {
+            h = generator.getFirstFreeHeight(x, z, type, heights, random);
+            page(random, type, x >> 4, z >> 4)[i] = h; // (an int is written whole: another thread sees the height or UNKNOWN, never half of one)
+        }
         Perf.newLand(Perf.NewLand.GROUND, System.nanoTime() - start);
-        page[i] = h; // (an int is written whole: another thread sees the height or UNKNOWN, never half of one)
         return h;
+    }
+
+    private static int first(NoiseColumn column, LevelHeightAccessor heights, Heightmap.Types type) {
+        var counts = type.isOpaque();
+        for (int y = heights.getMaxBuildHeight() - 1; y >= heights.getMinBuildHeight(); y--) {
+            if (counts.test(column.getBlock(y))) {
+                return y + 1;
+            }
+        }
+        return heights.getMinBuildHeight();
     }
 
     private static int[] page(RandomState random, Heightmap.Types type, int cx, int cz) {

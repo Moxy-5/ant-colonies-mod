@@ -136,7 +136,7 @@ public class GiantTreePiece extends StructurePiece {
     /** The land's height as the world's shape makes it (the same answer for every chunk, made yet or not). */
     private static TreePlacer.Ground ground(WorldGenLevel level, ChunkGenerator generator) {
         net.minecraft.world.level.levelgen.RandomState random = level.getLevel().getChunkSource().randomState();
-        return (x, z) -> GroundHeights.at(generator, x, z, net.minecraft.world.level.levelgen.Heightmap.Types.WORLD_SURFACE_WG, level, random);
+        return GroundHeights.ground(generator, level, random);
     }
 
     @Override
