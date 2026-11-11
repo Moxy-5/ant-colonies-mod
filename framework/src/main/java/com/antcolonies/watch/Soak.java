@@ -326,6 +326,7 @@ public final class Soak {
         if (now >= state.getLong("nextDay")) {
             sizes(level, watched);
             trend(level, watched);
+            others(level, watched);
             state.putLong("nextDay", now + 24000);
             report(level, false);
             saveState(server);
@@ -426,6 +427,22 @@ public final class Soak {
                 out.append(' ').append(entry.getKey()).append(' ').append(entry.getValue() / 1024).append(" kB,");
             }
             note(level.getServer(), "soak-sizes.txt", out.substring(0, out.length() - 1));
+        }
+    }
+
+    /**
+     * One line a game day in {@code soak-others.txt} for every colony the soak does not watch (the colonies living far
+     * from the pretend player, as numbers): its size, its food and what its away report has counted so far, so a far
+     * colony that dwindles shows where its food ran out (the brain while away, 2026-11-11).
+     */
+    private static void others(ServerLevel level, List<Colony> watched) {
+        for (Colony colony : ColonyManager.get(level).getColonies()) {
+            if (watched.contains(colony)) {
+                continue;
+            }
+            note(level.getServer(), "soak-others.txt", when(level) + " " + describe(colony, level) + ", workers " + colony.getCount("worker")
+                    + ", food " + colony.food().getFood() + ", known plants " + colony.foodMap().knownCount() + colony.away().describe(level)
+                    + " | so far: " + colony.away().report().describe());
         }
     }
 

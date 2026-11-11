@@ -978,7 +978,9 @@ public class MatabeleScoutGoal extends Goal {
         if (find != null && (line.isEmpty() || line.get(line.size() - 1).distSqr(at) >= LINE_EVERY * LINE_EVERY)) {
             line.add(at);
         }
-        if (flat(at, entrance) <= HOME && Math.abs(at.getY() - entrance.getY()) <= 3) {
+        // (or in the nest's rooms: a tall dead mound's entrance is its chimney top, 17 blocks over the rooms a scout
+        // may walk into another way; such a scout never told of its find, docs/BUGS.md 201)
+        if (flat(at, entrance) <= HOME && Math.abs(at.getY() - entrance.getY()) <= 3 || colony.nest().isInside(level, at)) {
             if (find != null) {
                 line.add(entrance);
                 List<BlockPos> nestFirst = new ArrayList<>(line);

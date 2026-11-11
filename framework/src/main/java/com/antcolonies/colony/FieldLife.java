@@ -121,6 +121,23 @@ public class FieldLife {
 
     // --- what the brain knows -------------------------------------------------------------------------------------
 
+    /**
+     * The colony goes away with its land still loaded ({@link AwayLife#tickAway}): one last look at the plants and the
+     * store's room. A colony new land put in far from every player is never "here", so without this look its brain
+     * remembered no plant at all and its forager numbers never went out: it ate its comb in three days and starved
+     * (found in the soak of 2026-11-11, every far termite colony).
+     */
+    void lookOnLeaving(ServerLevel level) {
+        if (!isOn(level)) {
+            return;
+        }
+        lookedAt = Long.MIN_VALUE;
+        look(level);
+        if (colony.away().nestLoaded(level)) {
+            colony.food().watchRoom(level);
+        }
+    }
+
     /** Every few seconds while here: the known plants in loaded land are remembered as they are; gone ones are forgotten. */
     private void look(ServerLevel level) {
         long now = level.getGameTime();

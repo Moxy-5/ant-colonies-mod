@@ -341,6 +341,7 @@ public class AwayLife {
                 // goes away before its first second here, and the brain would think its queen out of her chamber and its
                 // garden empty, and starve the royal pair; docs/BUGS.md 146.)
                 colony.life().watch(level);
+                colony.field().lookOnLeaving(level);
                 for (ColonyHooks.AwayWork look : colony.hooks().all(ColonyHooks.LOOK_ON_LEAVING)) {
                     look.work(level);
                 }

@@ -374,6 +374,21 @@ public final class RaidsAway {
             for (FoodWays.Runway runway : ways.getRunways()) {
                 foods.add(runway.food());
             }
+            if (foods.isEmpty()) {
+                // A termite colony nobody has been near has no tunnel or runway on record yet (they are planned near a
+                // player), but its numbers feed all the same, under the dead wood it knows: one place per 8-block
+                // square of that wood (the brain while away, 2026-11-11: far Matabele found nothing and starved).
+                List<com.antcolonies.species.SpeciesProfile.PlantFood> kinds = termites.profile().food().plants();
+                java.util.Set<Long> squares = new java.util.HashSet<>();
+                for (java.util.Map.Entry<BlockPos, com.antcolonies.colony.FieldLife.Plant> plant : termites.field().known().entrySet()) {
+                    int kind = plant.getValue().kind();
+                    BlockPos pos = plant.getKey();
+                    if (kind >= 0 && kind < kinds.size() && kinds.get(kind).rich()
+                            && squares.add(net.minecraft.world.level.ChunkPos.asLong(pos.getX() >> 3, pos.getZ() >> 3))) {
+                        foods.add(pos);
+                    }
+                }
+            }
             for (BlockPos food : foods) {
                 double distance = RaidGround.flat(colony.getCenter(), food);
                 if (distance > reach || raids.findAt(food) != null || termites.keepsOff(level, food)
