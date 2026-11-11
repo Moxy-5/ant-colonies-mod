@@ -699,6 +699,9 @@ public class Colony {
      * the food map, the grass growing back and the members that are numbers. A queenless colony with nobody left is abandoned: it ends, and its nest stays in the ground.
      * Returns false once the colony has ended.
      */
+    /** A brain tick this long names its parts in the log (50 ms; {@code -Dantcolonies.slowBrainMs=20} to see more while measuring). */
+    private static final long SLOW_BRAIN_NANOS = Integer.getInteger("antcolonies.slowBrainMs", 50) * 1_000_000L;
+
     public boolean tick(ServerLevel level) {
         if (isQueenless() && isEmpty(level)) {
             return false;
@@ -706,10 +709,21 @@ public class Colony {
         if (bornAt == NOT_SET || bornAt > level.getGameTime()) {
             bornAt = level.getGameTime(); // (founded now, or an older save: counted from its first load)
         }
+        long tickStarted = System.nanoTime();
+        StringBuilder slow = null;
         for (ColonyPart<?> part : ticking) {
             long started = System.nanoTime();
             part.tick(level);
-            com.antcolonies.debug.Perf.brainPart(part.name(), System.nanoTime() - started);
+            long took = System.nanoTime() - started;
+            com.antcolonies.debug.Perf.brainPart(part.name(), took);
+            if (took >= 1_000_000) {
+                slow = (slow == null ? new StringBuilder() : slow.append(", ")).append(part.name()).append(' ').append(took / 100_000 / 10.0);
+            }
+        }
+        // A slow brain tick names its parts in the log (tick spikes, the coming-back tick: which part, and how long, ms).
+        long all = System.nanoTime() - tickStarted;
+        if (all >= SLOW_BRAIN_NANOS) {
+            com.antcolonies.ColonyFrameworkMod.LOGGER.info("[spike] colony {}'s brain tick took {} ms: {}", getId(), all / 1_000_000, slow);
         }
         return true;
     }

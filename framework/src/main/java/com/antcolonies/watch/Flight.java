@@ -166,15 +166,64 @@ public final class Flight {
             worstTickNanos = 0;
             standStage = 3;
             stageSince = t;
-        } else if (standStage == 3 && t - stageSince >= SECONDS) {
+        } else if (standStage == 3 && t - stageSince < SECONDS) {
+            if (VISITS) {
+                visit(t - stageSince);
+            }
+        } else if (standStage == 3) {
             done = true;
             List<String> out = new ArrayList<>();
+            out.addAll(visits);
             out.add(String.format("Stand: %d s at the colony at %s, view %d; %d colonies known in the world", SECONDS,
                     standAt.toShortString(), VIEW, com.antcolonies.colony.ColonyManager.get(level).getColonies().size()));
             out.add(String.format("Server tick: %.2f ms on average, worst %.0f ms (%d ticks)", tickNanosSum / 1e6 / Math.max(1, ticks),
                     worstTickNanos / 1e6, ticks));
             out.add(com.antcolonies.debug.Perf.sessionReport().replace("\n", System.lineSeparator()));
             write(out);
+        }
+    }
+
+    /**
+     * The visits ({@code tools/flight.sh ... visits}; tick spikes, the coming-back tick): while measuring, the pretend
+     * player is gone for {@link #VISIT_AWAY} s (the colony goes over to numbers) and back for {@link #VISIT_HERE} s, over
+     * and over; each return's worst server tick in its first 5 s is noted, so the first return (code never run before)
+     * can be told from the ones after.
+     */
+    static final boolean VISITS = Boolean.getBoolean("antcolonies.flight.visits");
+    static final int VISIT_AWAY = 40;
+    static final int VISIT_HERE = 20;
+    private static final List<String> visits = new ArrayList<>();
+    private static List<net.minecraft.world.phys.Vec3> visitEyes;
+    private static boolean visitHere = true;
+    private static double visitBackAt = -1;
+    private static long visitWorst;
+    private static int visitTicks;
+
+    private static void visit(double since) {
+        if (visitEyes == null) {
+            visitEyes = com.antcolonies.colony.Watchers.pretend();
+        }
+        boolean here = since % (VISIT_AWAY + VISIT_HERE) >= VISIT_AWAY;
+        if (here != visitHere) {
+            visitHere = here;
+            com.antcolonies.colony.Watchers.setPretend(here ? visitEyes : List.of());
+            if (here) {
+                visitBackAt = since;
+                visitWorst = 0;
+                visitTicks = 0;
+            }
+        }
+        if (visitBackAt >= 0) {
+            long[] times = server.getTickTimesNanos();
+            visitWorst = Math.max(visitWorst, times[Math.floorMod(server.getTickCount() - 1, times.length)]);
+            visitTicks++;
+            if (since - visitBackAt >= 5) {
+                String line = String.format("[flight] visit %d: back at %.0f s, worst tick of the next 5 s %.1f ms (%d ticks)",
+                        visits.size() + 1, visitBackAt, visitWorst / 1e6, visitTicks);
+                visits.add(line);
+                ColonyFrameworkMod.LOGGER.info(line);
+                visitBackAt = -1;
+            }
         }
     }
 

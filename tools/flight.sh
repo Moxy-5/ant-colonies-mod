@@ -39,6 +39,9 @@ extra=""
 # colony nearest the spawn for the seconds given once the land in view is made and the far colonies have gone over to
 # numbers; the report is the stopwatch (/antcolonies perf) averaged over that time, split by near and far colonies.
 [ "$old" = "stand" ] && extra="-PflightStand"
+# "visits" (tick spikes, the coming-back tick): the stand, but while measuring the pretend player leaves the colony for
+# 40 s and comes back for 20 s, over and over; each return's worst tick is a "[flight] visit" line in the log and report.
+[ "$old" = "visits" ] && extra="-PflightVisits"
 # FLIGHT_PROFILE=1: Java's flight recorder on (run-flight/flight.jfr; python tools/film_profile.py server).
 [ -n "${FLIGHT_PROFILE:-}" ] && extra="$extra -PflightProfile"
 echo "Flight: seed $seed, $seconds s${old:+, the land wired the old way}; Gradle's output in run-flight/gradle.log"

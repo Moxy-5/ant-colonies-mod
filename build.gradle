@@ -160,6 +160,12 @@ neoForge {
                 // (Far colonies' speed: the pretend player stands at one colony and the stopwatch is averaged.)
                 systemProperty 'antcolonies.flight.stand', 'true'
             }
+            if (project.hasProperty('flightVisits')) {
+                // (The coming-back tick: while standing, the pretend player leaves the colony and comes back over and over.)
+                systemProperty 'antcolonies.flight.stand', 'true'
+                systemProperty 'antcolonies.flight.visits', 'true'
+                systemProperty 'antcolonies.slowBrainMs', '20'
+            }
             if (project.hasProperty('flightOld')) {
                 systemProperty 'antcolonies.landWiringOld', 'true'
             }
