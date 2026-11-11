@@ -26,9 +26,6 @@ import net.minecraft.world.level.block.state.BlockState;
  * time to dry: a mound block goes in finished and set.
  */
 final class MoundAwayBuilding implements ColonyHooks.AwayBuilder {
-    /** At most this many times a second the whole mound plan is looked over. */
-    private static final int MOUND_PASSES = 8;
-
     private final Mound mound;
     private final Colony colony;
 
@@ -57,7 +54,7 @@ final class MoundAwayBuilding implements ColonyHooks.AwayBuilder {
      * digging and then from the galleries under the mound. True if there is more to build (time ran out, or it waits).
      */
     private boolean buildMound(ServerLevel level, BuildLife build) {
-        for (int pass = 0; pass < MOUND_PASSES; pass++) {
+        while (build.takeMoundPass()) { // (at most 8 looks a second over the whole plan)
             int before = build.changesNow();
             boolean left = false;
             boolean noSoil = false;

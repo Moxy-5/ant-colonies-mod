@@ -42,6 +42,11 @@ public class BuildLife {
     public static final int SHAPE_TICKS = 30;
     /** At most this many blocks change a second (a long time away can owe a lot; the rest comes the next second). */
     private static final int PER_SECOND = 200;
+    /**
+     * At most this many blocks change in one tick: the second's catch-up is spread over its 20 ticks (tick spikes,
+     * 2026-11-10: done all at once, a colony coming back froze the game about 200 ms once).
+     */
+    private static final int PER_TICK = 20;
     /** At most this many times a second the whole mound plan is looked over. */
     private static final int MOUND_PASSES = 8;
 
@@ -55,6 +60,11 @@ public class BuildLife {
     /** This second's catch-up: the players' eyes and how many blocks changed so far. Not saved. */
     private List<Vec3> eyes = List.of();
     private int changes;
+    /** This second (game time / 20) and what its slices have used of its limits so far. Not saved. */
+    private long second = Long.MIN_VALUE;
+    private int secondChanges;
+    private int secondPieces;
+    private int secondPasses;
 
     BuildLife(Colony colony) {
         this.colony = colony;
@@ -98,19 +108,44 @@ public class BuildLife {
 
     // --- coming back ----------------------------------------------------------------------------------------------
 
+    /** Whether there is catching up to do on return: building time left, or founders to put in their chamber. */
+    boolean hasCatchUp() {
+        return work > 0 || colony.life().foundedAway();
+    }
+
     /**
-     * Once a second while the whole nest is loaded and there is building time left (from {@link AwayLife#settle}): the
-     * work is done, out of every player's sight ({@code eyes}). True if any block changed. Once nothing more may be
-     * built (or dug) the time left over is dropped.
+     * A slice of the catch-up, every tick of the second but the colony's own brain tick while the whole nest is loaded
+     * and there is building time left (from {@link AwayLife#catchUpSlice}): the work is done, out of every player's
+     * sight ({@code eyes}), a little each tick within the second's limits (as many blocks, gallery pieces and mound
+     * passes a second as when it was done all at once). True if any block changed. Once nothing more may be built (or
+     * dug) the time left over is dropped.
      */
     boolean catchUp(ServerLevel level, List<Vec3> eyes) {
         boolean founders = colony.life().foundedAway();
         if (work <= 0 && !founders) {
             return false;
         }
+        long now = level.getGameTime() / 20;
+        if (now != second) {
+            second = now;
+            secondChanges = 0;
+            secondPieces = 0;
+            secondPasses = 0;
+        }
+        if (secondChanges >= PER_SECOND) {
+            return false; // this second's share is done: the rest comes the next second
+        }
         waited = false;
         this.eyes = eyes;
         changes = 0;
+        try {
+            return slice(level, founders);
+        } finally {
+            secondChanges += changes;
+        }
+    }
+
+    private boolean slice(ServerLevel level, boolean founders) {
         List<ColonyHooks.AwayBuilder> builders = colony.hooks().all(ColonyHooks.AWAY_BUILDER);
         boolean nestLeft = work > 0 && (firstWork(level, builders) || digNest(level));
         boolean moundLeft = work > 0 && afterWork(level, builders); // (the termite mound built up)
@@ -158,7 +193,7 @@ public class BuildLife {
     private boolean digNest(ServerLevel level) {
         List<ColonyHooks.AwayBuilder> builders = colony.hooks().all(ColonyHooks.AWAY_BUILDER);
         while (work > 0) {
-            if (changes >= PER_SECOND) {
+            if (full()) {
                 return true;
             }
             BlockPos target = colony.nest().findPlannedDigTarget(level);
@@ -199,7 +234,7 @@ public class BuildLife {
         return true;
     }
 
-    /** At most this many gallery pieces are planned a second on return (each is dug before the next is planned). */
+    /** At most this many gallery pieces are planned a second on return (each is dug before the next is planned; one a tick). */
     private static final int PIECES_PER_SECOND = 4;
 
     /**
@@ -213,22 +248,19 @@ public class BuildLife {
         if (galleries == null) {
             return false;
         }
-        for (int i = 0; i < PIECES_PER_SECOND; i++) {
-            if (work <= 0 || changes >= PER_SECOND) {
-                return true;
-            }
-            int[] grown = galleries.growNow(level);
-            if (grown[0] == 0) {
-                return false;
-            }
-            AwayReport report = colony.away().report();
-            report.add(AwayReport.What.GALLERY_PIECES, grown[0]);
-            report.add(AwayReport.What.GALLERY_TO_FOOD, grown[1]);
-            report.add(AwayReport.What.GALLERY_BLOCKS, grown[2]);
-            if (digNest(level)) {
-                return true; // (time ran out, or a player can see where it goes)
-            }
+        if (work <= 0 || full() || secondPieces >= PIECES_PER_SECOND) {
+            return true; // (the rest in the next slice)
         }
+        secondPieces++;
+        int[] grown = galleries.growNow(level);
+        if (grown[0] == 0) {
+            return false;
+        }
+        AwayReport report = colony.away().report();
+        report.add(AwayReport.What.GALLERY_PIECES, grown[0]);
+        report.add(AwayReport.What.GALLERY_TO_FOOD, grown[1]);
+        report.add(AwayReport.What.GALLERY_BLOCKS, grown[2]);
+        digNest(level); // (dug in this slice and the next ones before the next piece is planned)
         return true;
     }
 
@@ -326,9 +358,22 @@ public class BuildLife {
         return work > 0;
     }
 
-    /** Whether as many blocks have changed this second as may (the rest comes the next second). */
+    /** Whether as many blocks have changed this slice (or this second) as may (the rest comes in the next slice). */
     public boolean secondFull() {
-        return changes >= PER_SECOND;
+        return full();
+    }
+
+    private boolean full() {
+        return changes >= PER_TICK || secondChanges + changes >= PER_SECOND;
+    }
+
+    /** One look over the whole mound plan, if this second has any left ({@link #MOUND_PASSES} a second). */
+    public boolean takeMoundPass() {
+        if (secondPasses >= MOUND_PASSES) {
+            return false;
+        }
+        secondPasses++;
+        return true;
     }
 
     /** How many blocks have changed this second. */

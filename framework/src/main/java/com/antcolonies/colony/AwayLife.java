@@ -466,16 +466,35 @@ public class AwayLife {
             ColonyManager.get(level).markChanged();
         }
         colony.life().watch(level);
-        if (colony.ledger().isEmpty() && colony.brood().insideCount() == 0 && !colony.building().hasWork() && !colony.life().foundedAway()
-                || !nestLoaded(level)) {
+        if (colony.ledger().isEmpty() && colony.brood().insideCount() == 0 || !nestLoaded(level)) {
             return;
         }
         List<Vec3> eyes = colony.population().viewersInSight(level);
-        // The rooms first (step 2d): the young, the seeds and the bodies owed then have the rooms dug while away to go to.
-        boolean changed = colony.building().catchUp(level, eyes);
-        changed |= colony.brood().comeOut(level, eyes);
+        // The rooms are dug in the slices between ({@link #catchUpSlice}, step 2d): the young, the seeds and the bodies
+        // owed then have the rooms dug while away to go to.
+        boolean changed = colony.brood().comeOut(level, eyes);
         changed |= colony.ledger().apply(level, eyes);
         if (changed) {
+            ColonyManager.get(level).markChanged();
+        }
+    }
+
+    /** Whether the colony is back (settled) and still owes building from while away: a quick look, every tick. */
+    boolean catchingUp() {
+        return awaySince == Colony.NOT_SET && colony.building().hasCatchUp();
+    }
+
+    /**
+     * Every tick of the second but the colony's own brain tick (from {@link ColonyManager#tickColonies}), once the colony
+     * is back and while the whole nest is loaded: a slice of the building owed from while away ({@link BuildLife#catchUp}),
+     * so the catching up is spread over the second, never piled onto the tick every other part runs in (tick spikes,
+     * 2026-11-10: about 200 ms in one tick each time a player walked up to a far colony).
+     */
+    void catchUpSlice(ServerLevel level) {
+        if (!catchingUp() || !nestLoaded(level)) {
+            return; // (still away, or settle has not marked it back yet: the slices start the tick after)
+        }
+        if (colony.building().catchUp(level, colony.population().viewersInSight(level))) {
             ColonyManager.get(level).markChanged();
         }
     }

@@ -505,10 +505,13 @@ public class TermiteAwayTests {
                     int pieces = report.get(AwayReport.What.GALLERY_PIECES);
                     helper.assertTrue(pieces >= 2 && report.get(AwayReport.What.GALLERY_BLOCKS) >= pieces,
                             "the builders' time should have grown the galleries on return: " + report.describe() + galleries.describe(level));
-                    helper.assertTrue(report.get(AwayReport.What.GALLERY_TO_FOOD) >= 1, "a piece should have grown out to the known hay first: "
-                            + report.describe());
+                    // (The piece to the known hay is planned on the tick the colony is back, by the catch-up or by the
+                    // colony's own food check, whichever runs first; since the catch-up runs in slices across the second
+                    // (tick spikes, 2026-11-10) it is the food check, so the away report need not count it.)
                     com.antcolonies.colony.FoodWays.NewTunnel toHay = colony.nest().foodWays().getNewTunnels().stream()
                             .filter(tunnel -> tunnel.food().equals(spot[3])).findFirst().orElse(null);
+                    helper.assertTrue(toHay != null || report.get(AwayReport.What.GALLERY_TO_FOOD) >= 1,
+                            "a piece should have grown out to the known hay first: " + report.describe());
                     helper.assertTrue(toHay != null && galleries.hasPiece(toHay.tunnel().hole()), "no gallery piece out to the hay:"
                             + galleries.describe(level));
                     helper.assertTrue(galleries.digCells(galleries.pieceAt(toHay.tunnel().hole())).stream()

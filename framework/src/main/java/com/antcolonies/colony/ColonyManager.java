@@ -81,6 +81,7 @@ public class ColonyManager extends SavedData {
     public void tickColonies(ServerLevel level, int slot) {
         for (Colony colony : java.util.List.copyOf(colonies.values())) {
             if (tickSlot(colony) != slot) {
+                catchUpSlice(level, colony); // (the building owed from while away, a little every other tick)
                 continue;
             }
             // (The stopwatch files each colony's brain time under where the colony is: far colonies' speed, 2026-11-09.)
@@ -113,6 +114,22 @@ public class ColonyManager extends SavedData {
                         colony.getId(), colony.getCenter().toShortString());
                 colonyEnded(level, colony);
             }
+        }
+    }
+
+    /** A slice of a colony's catch-up after coming back ({@link AwayLife#catchUpSlice}), filed under its brain's away part. */
+    private static void catchUpSlice(ServerLevel level, Colony colony) {
+        if (!colony.away().catchingUp() || !colony.away().isHere(level) || !colony.isQueenless() && colony.getQueen(level) == null) {
+            return;
+        }
+        long started = System.nanoTime();
+        com.antcolonies.debug.Perf.colonyWhere("near");
+        try {
+            colony.away().catchUpSlice(level);
+            com.antcolonies.debug.Perf.brainPart("away_life catch-up", System.nanoTime() - started);
+        } finally {
+            com.antcolonies.debug.Perf.colonyWhere(null);
+            com.antcolonies.debug.Perf.colony("near", System.nanoTime() - started);
         }
     }
 
