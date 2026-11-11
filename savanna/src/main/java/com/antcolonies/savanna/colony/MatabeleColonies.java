@@ -34,15 +34,18 @@ import net.minecraft.world.phys.Vec3;
  * pick, 2026-11-07; {@link TermiteMoundStructure.Matabele}); a dead mound with no living termite mound near never does; and the sizes lean small ({@link #sizeFor}).
  */
 public final class MatabeleColonies {
-    /** A new-land colony's size, the real range (Yusuf 2026). */
-    public static final int FEWEST = 100, MOST = 2300;
+    /**
+     * A new-land colony's size. Honest sizes (the user, 2026-11-11): the real range, 100 to 2,300 (Yusuf 2026), shrunk to
+     * the mod's limit of 100 workers, every one of them a real ant near a player.
+     */
+    public static final int FEWEST = 30, MOST = 100;
 
     private MatabeleColonies() {
     }
 
     /**
-     * How many workers a new-land colony has: 100 to 2,300, evenly on a log scale (my pick, to confirm), so small
-     * colonies are common and big ones rare, as in the real counts: half are under about 480, one in five over 1,200.
+     * How many workers a new-land colony has: 30 to 100, evenly on a log scale (my pick, to confirm), so small
+     * colonies are common and big ones rare, as in the real counts: half are under about 55, one in five over 80.
      */
     public static int sizeFor(RandomSource random) {
         return (int) Math.round(FEWEST * Math.pow((double) MOST / FEWEST, random.nextDouble()));

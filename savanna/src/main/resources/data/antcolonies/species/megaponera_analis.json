@@ -15,9 +15,10 @@
   "colony": {
     "_far_note": "numbers_when_far true (M8 step 3f, 2026-11-05): a loaded Matabele colony with no player within 64 blocks (kept to 80) lives as numbers like every far colony (colony.AwayLife); its raids go on out of sight (raids.away, colony.RaidsAway), so a far colony raids, eats and grows as one in sight.",
     "numbers_when_far": true,
-    "max_workers": 2500,
-    "real_cap": 50,
-    "crew": 50,
+    "_size_note": "Honest sizes (the user, 2026-11-11; docs/plans/brain-away-raids.md): a colony is at most 100 workers, and a raid, at most 75 ants, is all real near a player (real_cap and crew 75).",
+    "max_workers": 100,
+    "real_cap": 75,
+    "crew": 75,
     "watch_radius": 48,
     "swaps_per_second": 2,
     "nurses_from_workers": [3, 8, 12, 20]
@@ -30,7 +31,8 @@
     "builder_until_ticks": 192000,
     "lifespan_ticks": 360000,
     "eats": true,
-    "diet": { "young": "nurse_food", "older": "nurse_food", "workers_per_piece": 10, "mouth_to_mouth": false },
+    "diet": { "young": "nurse_food", "older": "nurse_food", "_food_note": "Honest sizes (2026-11-11): one termite feeds 5 ants for a day (a pile layer is raids.carry.termites_per_layer 4 termites and feeds workers_per_piece 20 workers), so a colony of 100 eats 20 termites a day. A known departure: real colonies of millions of termites feed a few termites an ant a raid; the mod's mound holds 200.",
+      "workers_per_piece": 20, "mouth_to_mouth": false },
     "_rest_in_rooms_note": "With nothing to do the workers go down into the nest's rooms and stay there, never in the shaft (real Megaponera crowd into their chamber with the queen and the brood; the user's report 2026-10-24: they piled up at the top of the chimney).",
     "rest_in_rooms": true
   },
@@ -101,7 +103,7 @@
       "scout_hours": [[6.0, 19.5]],
       "_hours_note": "Raid rework R7 (the user's answer, 2026-11-04): no raid leaves after 19:00, so the evening raid hours end there (the paper's 19:30 is now raids.hours_and_sound.dusk, when a raid still out turns home).",
       "hours": [[6.0, 11.0], [16.0, 19.0]],
-      "workers_per_scout": 50,
+      "workers_per_scout": 20,
       "most_scouts": 5,
       "first_range": 32,
       "range_step": 8,
@@ -166,9 +168,9 @@
     },
     "catch": {
       "_note": "M8 step 3d, the termites' losses (colony.RaidCatch; the user's pick 2026-11-06, 'count stands for many'). Real raids carry home about 200 to 1,000 termites with 150 to 550 ants, a few an ant (majors 1 to 12, minors 1 to 3; Yusuf 2026, Table 1). The raiders who go as numbers (and every raider of a raid out of sight) bring home per_raider termites each, give or take a quarter, from the termites feeding under the mud at the spot (numbers in the termite colony's galleries), only if the termite colony still feeds there; at most most_catch a raid; the termite colony's count loses one in its stands_for of them, and it keeps off the spot a few days. The real raiders carry the real termites they sting, as before. No raid is bigger than most_raid ants (real raiding parties up to about 500). Every number my pick, to confirm.",
-      "per_raider": 1.5,
-      "most_catch": 1000,
-      "most_raid": 600
+      "per_raider": 0.3,
+      "most_catch": 30,
+      "most_raid": 75
     },
     "hours_and_sound": {
       "_note": "Raid rework R7, hours and sound (colony.Raids, colony.RaidColumn). Raids end by dusk (the user's answer, 2026-11-04): no raid leaves after 19:00 (the evening raid hours in scouting.hours end there: time to reach a spot and come home), a raid still out at dusk (19:30) stops where it is, picks up what it stung and walks home, and until the morning's first raid hour (6:00) it stays dusk, so a find made after 19:00 waits for the morning. Rare night raids in the hot season (Yusuf 2026) wait for the shared season source (Serene Seasons, M9). A raid a command sends outside the raid hours (/antcolonies raid, /antcolonies scout anytime) keeps no hours. The attack: once no termite has been about the spot (within carry.collect_reach) for quiet_ticks, the attack is over (real raids: the attack at the feeding site lasts about 10 to 20 minutes, the termites stung, fled or sealed in; Yusuf 2026; column.fight_ticks is the most it may last). The squeak (Hoelldobler et al. 1994: the columns' stridulation is no message between the ants but a warning to big animals): the raider nearest a player within squeak_hear blocks squeaks, squeak_quiet loud every squeak_every_far ticks at that distance, up to squeak_loud every squeak_every_near ticks at squeak_loud_at blocks, before anyone stings. A column marching into land not ticking within edge_look blocks ahead of its front turns home at that edge (until drawn-only ants, M8 step 4). Every number my pick, to confirm.",
@@ -188,7 +190,7 @@
       "least_raid": 10,
       "least_share": 0.3,
       "most_share": 0.75,
-      "most_real": 50,
+      "most_real": 75,
       "form_ticks": 600,
       "_spacing_note": "The stream (2026-11-08, replacing the ribbon): each raider keeps 0.3 blocks of trail behind the one ahead of it in the line (the line sorted every update by how far each has walked), so 47 raiders make a column about 14 blocks long. Side by side is left to the legs: each insect walks in its own lane and keeps its personal space, so the stream is 1 to 3 wide where there is room and single file where there is not, as real Megaponera columns are (a band 1 to 3 ants wide, Longhurst and Howse 1979). On the old ribbon this was the gap between rows of 3 and 2 (0.6, about 0.24 a raider). My pick, to confirm.",
       "spacing": 0.3,
@@ -213,7 +215,7 @@
       "spread_reach": 8.0,
       "spread_see": 5.0,
       "laden_pace": 0.85,
-      "termites_per_layer": 10,
+      "termites_per_layer": 4,
       "bring_ticks": 2400,
       "limp_ticks": 6000
     },

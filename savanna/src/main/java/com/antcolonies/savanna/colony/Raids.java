@@ -728,12 +728,15 @@ public class Raids {
      */
     public double fedShare() {
         PreyPile pile = colony.part(SavannaParts.PREY_PILE).orElse(null);
-        return pile == null ? 0.0 : fedShare(pile.edibleTermites(), colony.getCount(Caste.WORKER));
+        return pile == null ? 0.0 : fedShare(pile.antsFed(), colony.getCount(Caste.WORKER));
     }
 
-    /** How well fed (0 to 1) a colony of this many workers is with this many good termites on its pile (test revamp R5). */
-    public static double fedShare(int edibleTermites, int workers) {
-        return Math.min(1.0, edibleTermites / (double) Math.max(1, workers));
+    /**
+     * How well fed (0 to 1) a colony of this many workers is with a pile whose good layers feed this many ants for a day
+     * ({@code PreyPile.antsFed}; test revamp R5).
+     */
+    public static double fedShare(int antsFed, int workers) {
+        return Math.min(1.0, antsFed / (double) Math.max(1, workers));
     }
 
     /**

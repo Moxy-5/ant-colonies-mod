@@ -551,7 +551,15 @@ public class PreyPile implements NurseFood {
                 .map(com.antcolonies.savanna.species.SavannaNumbers.CarryNumbers::termitesPerLayer).orElse(10));
     }
 
-    /** The termites in the layers good to eat (one termite feeds one ant a day). */
+    /**
+     * How many ants the layers good to eat feed for a day: a layer feeds the diet's {@code workers_per_piece} workers
+     * (honest sizes, 2026-11-11: a layer of 4 termites feeds 20, one termite 5 ants).
+     */
+    public int antsFed() {
+        return edible.size() * Math.max(1, colony.profile().worker().diet().workersPerPiece());
+    }
+
+    /** The termites in the layers good to eat. */
     public int edibleTermites() {
         return edible.size() * termitesPerLayer();
     }

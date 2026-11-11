@@ -744,7 +744,7 @@ public class TermiteFoodTests {
             helper.assertTrue(colony != null && !colony.isFounding(), "no termite colony with workers");
             long now = level.getGameTime();
             TermiteScenes.digNestAtOnce(level, colony);
-            colony.population().addNewMembers(Caste.WORKER, now - colony.profile().worker().builderUntilTicks() - 1000, 500);
+            colony.population().addNewMembers(Caste.WORKER, now - colony.profile().worker().builderUntilTicks() - 1000, 125); // (honest sizes: a block of gallery a worker, was 1 per 4)
             com.antcolonies.savanna.colony.Galleries.of(colony).setSwitchForTests(true);
             stage[0] = 1;
         });

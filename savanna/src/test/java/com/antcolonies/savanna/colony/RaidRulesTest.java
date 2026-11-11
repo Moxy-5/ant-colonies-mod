@@ -77,9 +77,9 @@ class RaidRulesTest {
         SavannaNumbers.ColumnNumbers numbers = column();
         int mostRaid = caught().mostRaid();
         double rich = numbers.richWorth();
-        // A starving colony of 500 sends 75 percent to a rich find, a fed one 30 percent (Yusuf 2026: 30 to 75).
-        assertEquals((int) Math.floor(500 * numbers.mostShare()), Raids.raidSize(500, 0.0, rich, numbers, mostRaid));
-        assertEquals((int) Math.floor(500 * numbers.leastShare()), Raids.raidSize(500, 1.0, rich, numbers, mostRaid));
+        // (Honest sizes, 2026-11-11: a colony is at most 100.) A starving colony of 80 sends 75 percent to a rich find, a fed one 30 percent (Yusuf 2026: 30 to 75).
+        assertEquals((int) Math.floor(80 * numbers.mostShare()), Raids.raidSize(80, 0.0, rich, numbers, mostRaid));
+        assertEquals((int) Math.floor(80 * numbers.leastShare()), Raids.raidSize(80, 1.0, rich, numbers, mostRaid));
         // Never more than the most a raid can be, never fewer than the least (if the colony can spare them).
         assertEquals(mostRaid, Raids.raidSize(2300, 0.0, rich, numbers, mostRaid));
         assertEquals(numbers.leastRaid(), Raids.raidSize(1000, 1.0, 0.0, numbers, mostRaid));
@@ -97,12 +97,12 @@ class RaidRulesTest {
     }
 
     @Test
-    void theNumbersBringHomeAboutOneAndAHalfTermitesEach() {
+    void theNumbersBringHomeTheirShareOfTermitesEach() {
         SavannaNumbers.CatchNumbers numbers = caught();
         assertEquals(0, RaidCatch.couldCarry(0, numbers, 0.5));
-        assertEquals((int) Math.round(100 * numbers.perRaider()), RaidCatch.couldCarry(100, numbers, 0.5), "on average");
-        assertEquals((int) Math.round(100 * numbers.perRaider() * 0.75), RaidCatch.couldCarry(100, numbers, 0.0), "a quarter less");
-        assertEquals((int) Math.round(100 * numbers.perRaider() * 1.25), RaidCatch.couldCarry(100, numbers, 1.0), "a quarter more");
+        assertEquals((int) Math.round(40 * numbers.perRaider()), RaidCatch.couldCarry(40, numbers, 0.5), "on average");
+        assertEquals((int) Math.round(40 * numbers.perRaider() * 0.75), RaidCatch.couldCarry(40, numbers, 0.0), "a quarter less");
+        assertEquals((int) Math.round(40 * numbers.perRaider() * 1.25), RaidCatch.couldCarry(40, numbers, 1.0), "a quarter more");
         assertEquals(numbers.mostCatch(), RaidCatch.couldCarry(100000, numbers, 1.0), "never more than the most a raid brings");
     }
 

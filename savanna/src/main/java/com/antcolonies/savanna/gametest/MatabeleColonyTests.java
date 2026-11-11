@@ -117,7 +117,7 @@ public class MatabeleColonyTests {
             Colony whole = made[0];
             helper.assertTrue(whole.getCount(Caste.WORKER) == 60, whole.getCount(Caste.WORKER) + " workers in the command's colony, not 60");
             List<MatabeleEntity> real = TestIsolation.insectsOf(level, whole, MatabeleEntity.class);
-            int cap = whole.profile().colony().realCap();
+            int cap = Math.min(60, whole.profile().colony().realCap()); // (honest sizes: the cap is 75, so all 60 are real)
             helper.assertTrue(real.size() == cap, real.size() + " real workers round the command's queen, not " + cap);
             helper.assertTrue(whole.population().inside(Caste.WORKER) == 60 - cap, whole.population().inside(Caste.WORKER) + " workers inside, not " + (60 - cap));
             helper.assertTrue(whole.getQueen(level) instanceof MatabeleQueenEntity, "the command's colony has no Matabele queen");

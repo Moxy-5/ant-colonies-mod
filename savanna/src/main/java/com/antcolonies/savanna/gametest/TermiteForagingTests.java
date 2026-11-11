@@ -531,7 +531,8 @@ public class TermiteForagingTests {
                 worker.setGrownUpAt(now - colony.profile().worker().nurseUntilTicks() - 1000);
             }
             TermiteScenes.digNestAtOnce(level, colony);
-            colony.population().addNewMembers(Caste.WORKER, now - colony.profile().worker().builderUntilTicks() - 1000, 30);
+            // (Honest sizes, 2026-11-11: a block of gallery a worker, was 1 per 4, so the crowds here are a quarter of what they were.)
+            colony.population().addNewMembers(Caste.WORKER, now - colony.profile().worker().builderUntilTicks() - 1000, 2);
             com.antcolonies.savanna.colony.Galleries.of(colony).setSwitchForTests(true);
             com.antcolonies.savanna.colony.Galleries.of(colony).setReachForTests(reach);
             level.setBlock(hay, Blocks.HAY_BLOCK.defaultBlockState(), 3);
@@ -569,14 +570,14 @@ public class TermiteForagingTests {
                                 "a colony of " + colony.getCount(Caste.WORKER) + " workers grew its galleries past the arms:"
                                         + galleries.describe(level));
                         helper.assertTrue(colony.nest().foodWays().getNewTunnels().isEmpty(),
-                                "a colony of 38 workers dug a piece out to the hay, more than its workers allow:" + galleries.describe(level));
+                                "a small colony dug a piece out to the hay, more than its workers allow:" + galleries.describe(level));
                         if (since[0] >= 300) {
                             helper.assertTrue(colony.foragingHoles().isFoodWaiting(), "the known hay is not waiting for its piece:"
                                     + galleries.describe(level) + colony.foragingHoles().describeNewHoles(level));
                             holesBefore[0] = tunnels.size();
                             lengthAtStart[0] = galleries.length();
-                            colony.population().addNewMembers(Caste.WORKER, level.getGameTime() - 1000, 600);
-                            SavannaMod.LOGGER.info("[web-test] tick {}: 600 workers join, {} blocks allowed", tick, galleries.lengthAllowed());
+                            colony.population().addNewMembers(Caste.WORKER, level.getGameTime() - 1000, 150);
+                            SavannaMod.LOGGER.info("[web-test] tick {}: 150 workers join, {} blocks allowed", tick, galleries.lengthAllowed());
                             since[0] = 0;
                             stage[0] = 2;
                         }

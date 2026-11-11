@@ -1921,7 +1921,7 @@ public class MatabeleRaidTests {
         helper.assertTrue(raids != null && pile != null, "a Matabele colony has no raids part or prey pile");
         scoutsHeadToward(helper, colony, NEST + 20, NEST + 20); // (its way past the south-east lone termite to the group)
         helper.onEachTick(() -> {
-            if (helper.getTick() > 20 && helper.getTick() % 5 == 0 && pile.edibleTermites() < 20) {
+            if (helper.getTick() > 20 && helper.getTick() % 5 == 0 && pile.antsFed() < 20) {
                 pile.stock(level, 1); // (about half fed: never a day's food, so still hungry, never starving; a new
                                       // colony's 40 hungry workers eat its first meals fast)
             }
@@ -1937,7 +1937,7 @@ public class MatabeleRaidTests {
         });
         helper.startSequence()
                 .thenIdle(20)
-                .thenExecute(() -> helper.assertTrue(pile.stock(level, 2) == 2, "the pile did not take 2 layers"))
+                .thenExecute(() -> helper.assertTrue(pile.stock(level, 1) == 1, "the pile did not take a layer")) // (a layer feeds 20 of the 40)
                 .thenExecute(() -> helper.assertTrue(raids.fedShare() >= 0.4 && raids.isHungry(),
                         "the colony is " + Math.round(raids.fedShare() * 100) + " percent fed, not about half"))
                 .thenWaitUntil(() -> helper.assertTrue(!raids.finds().isEmpty(), "no find yet (" + raids.passedOverCount() + " passed over); "

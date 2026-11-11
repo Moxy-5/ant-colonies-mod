@@ -129,7 +129,7 @@ public class MatabeleNewLandTests {
             for (int i = 0; i < 2; i++) {
                 Colony colony = made.get(i);
                 helper.assertTrue(colony != null, "the command made no colony of " + sizes[i]);
-                int cap = colony.profile().colony().realCap();
+                int cap = Math.min(sizes[i], colony.profile().colony().realCap()); // (honest sizes: a small colony is all real)
                 helper.assertTrue(colony.getCount(Caste.WORKER) == sizes[i], colony.getCount(Caste.WORKER) + " workers, not " + sizes[i]);
                 int real = TestIsolation.insectsOf(level, colony, MatabeleEntity.class).size();
                 helper.assertTrue(real == cap, real + " real workers round the queen, not " + cap);
@@ -493,7 +493,7 @@ public class MatabeleNewLandTests {
         return Math.sqrt(dx * dx + dz * dz);
     }
 
-    /** The dice give the data file's share of dead mounds a colony; the sizes run 100 to 2,300, half under about 480. */
+    /** The dice give the data file's share of dead mounds a colony; the sizes run 30 to 100, half under about 55. */
     private static void checkTheDice(GameTestHelper helper) {
         double share = MatabeleColonies.share(helper.getLevel());
         int rolls = 3000, yes = 0, small = 0;
@@ -502,10 +502,10 @@ public class MatabeleNewLandTests {
             yes += MatabeleColonies.wouldSettle(random.nextLong(), share) ? 1 : 0;
             int size = MatabeleColonies.sizeFor(random);
             helper.assertTrue(size >= MatabeleColonies.FEWEST && size <= MatabeleColonies.MOST, "a colony of " + size);
-            small += size < 480 ? 1 : 0;
+            small += size < 55 ? 1 : 0;
         }
         helper.assertTrue(Math.abs(yes / (double) rolls - share) < 0.04, yes + " colonies in " + rolls + " dead mounds");
-        helper.assertTrue(Math.abs(small / (double) rolls - 0.5) < 0.04, small + " of " + rolls + " colonies under 480");
+        helper.assertTrue(Math.abs(small / (double) rolls - 0.5) < 0.04, small + " of " + rolls + " colonies under 55");
     }
 
     /** Soil in the arena's far corner for the second dead mound (past the deep ground). */

@@ -131,7 +131,7 @@ public class TermiteNewLandTests {
         int kings = level.getEntitiesOfClass(TermiteKingEntity.class, new AABB(home.center()).inflate(4),
                 king -> colony.getId().equals(king.getColonyId())).size();
         helper.assertTrue(kings == 1, kings + " kings by the queen");
-        helper.assertTrue(colony.getMemberCount() >= 400, "only " + colony.getMemberCount() + " members");
+        helper.assertTrue(colony.getMemberCount() >= 200, "only " + colony.getMemberCount() + " members");
         long comb = colony.nest().getGardenCells(level).stream()
                 .filter(cell -> level.getBlockState(cell).getBlock() instanceof FungusCombBlock).count();
         helper.assertTrue(comb >= 4, "only " + comb + " garden cells hold comb");

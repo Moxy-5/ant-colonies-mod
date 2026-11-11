@@ -66,7 +66,7 @@ public class MatabeleCommands {
         event.getDispatcher().register(Commands.literal("antcolonies")
                 .requires(source -> source.hasPermission(2))
                 .then(Commands.literal("matabele")
-                        .then(Commands.argument("workers", IntegerArgumentType.integer(0, 2500))
+                        .then(Commands.argument("workers", IntegerArgumentType.integer(0, 100))
                                 .executes(context -> colony(context.getSource(), IntegerArgumentType.getInteger(context, "workers")))))
                 .then(Commands.literal("skirmish")
                         .then(Commands.argument("ants", IntegerArgumentType.integer(1, 60))

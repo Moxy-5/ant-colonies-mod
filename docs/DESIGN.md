@@ -340,6 +340,22 @@ it.** If a decision changes, ask the user first, then update it here. The short 
 - **How a species plugs in:** its colony parts (signed up into `ColonyParts`, picked by the species file's `"parts"` list), the parts' questions, news and hooks, its bodies' table (`SpeciesBodies`), its body plans (`BodyPlans.signUp`), its own sub-commands under the one `/antcolonies` command, its own game tests and categories (`TestFilter` sign-ups). The framework signs up only the shared egg (`colonyframework:ant_egg`) and the shared tags (`colonyframework:diggable`, `seeds`, ...), which each species mod fills with its own entries.
 - **Left for Apex part 3:** the species' number groups still sit in the framework's species-file reader (only numbers; the user's call 4, moved before M8), and the legs and body tests still ride on the harvester ant (`apex.md` step 13, before it leaves).
 
+### Honest sizes (the user, 2026-11-09 and 2026-11-11; plan `docs/plans/brain-away-raids.md`)
+- **A Matabele colony is at most 100 workers, a termite colony at most 200, and a counted insect is one insect** (the
+  termites' `stands_for` is 1, was 1,000). New-land Matabele colonies run 30 to 100 (small ones common); a termite
+  colony's workers follow its mound as before, never more than 200 (mounds of stage 15 and up hold 200).
+- **Near a player everything is real:** a Matabele colony shows up to 75 ants, a raid is at most 75 and all real;
+  termites up to 50 real. No drawn-only insects (dropped 2026-11-09).
+- **Known departure, the food:** real Megaponera take a few termites an ant a raid from colonies of millions. A mound
+  of 200 cannot feed that, so one termite feeds 5 ants for a day (a pile layer is 4 termites and feeds 20 workers): a
+  colony of 100 eats 20 termites a day, one or two raids. A raid of numbers brings 0.3 termites a raider, at most 30,
+  never more than a tenth of the termite colony; the termites keep off a raided spot a few days, which is the brake.
+- **Colonies hold steady:** raids dent a mound, they do not kill it, until M9.5's wildlife (measured in a soak, see the
+  change log).
+- Scouts 1 per 20 workers, at most 5. Termite galleries 1 block per worker (was 1 per 4), so a full mound's 200
+  workers still tunnel to the dead tree 40 blocks out as the old 700 did; small colonies keep their 4 first arms. All
+  my picks, to confirm.
+
 ### Colony brain
 - Each colony has a server-side brain storing: id, species, queen (and king) UUIDs, member count, stored food, growth stage, nest plan (chamber positions), territory center and radius.
 - Must survive save/reload (use SavedData). Queens and colony members never despawn.

@@ -421,7 +421,9 @@ public class NewLandMounds extends SavedData {
      */
     static int workersFor(Pick pick, RandomSource random) {
         double share = (double) pick.stage() / TermiteMoundStructure.FULL_STAGE;
-        return Math.max(20, (int) Math.round(700 * Math.pow(share, 1.6) * (0.85 + 0.3 * random.nextDouble())));
+        // Honest sizes (the user, 2026-11-11): never more than the species' limit (200), so mounds of stage 15 and up hold it.
+        return Math.min(SpeciesProfiles.get(SavannaSpecies.MACROTERMES).colony().maxWorkers(),
+                Math.max(20, (int) Math.round(700 * Math.pow(share, 1.6) * (0.85 + 0.3 * random.nextDouble()))));
     }
 
     /** The members a colony of that size has, the nest dug, the mound up, the gardens filled (living or about to die). */

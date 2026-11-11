@@ -154,7 +154,7 @@ class SpeciesProfileTest {
     void termitesDigTheirOneLevelAtOnce() throws Exception {
         assertEquals(1, read("macrotermes").nest().levelsFor(0, 0), "termites have no nest stages");
         // The brain, part 1 (user, 2026-10-14): scaled-down caps, most of them numbers inside the nest.
-        assertEquals(50000, read("macrotermes").colony().maxWorkers());
+        assertEquals(200, read("macrotermes").colony().maxWorkers());
         assertEquals(50, read("macrotermes").colony().realCap());
         SpeciesProfile.RefuseNumbers termiteDead = read("macrotermes").refuse();
         assertTrue(termiteDead.eatsOrBuries() && termiteDead.eatFreshTicks().get() < termiteDead.corpseDecayTicks(),
