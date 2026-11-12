@@ -168,6 +168,7 @@ public class SavannaEvents {
             event.accept(SavannaItems.RIVER_MUD);
             // The giant savanna trees' blocks (M7.5).
             SavannaItems.TREE_ITEMS.forEach(event::accept);
+            SavannaItems.WOOD_ITEMS.forEach(items -> items.all().forEach(event::accept));
         });
         ModEvents.addToCreativeTab(CreativeModeTabs.INGREDIENTS, 20, event -> {
             event.accept(SavannaItems.FORAGE);

@@ -30,7 +30,12 @@ import net.minecraft.world.level.block.PressurePlateBlock;
 import net.minecraft.world.level.block.SlabBlock;
 import net.minecraft.world.level.block.StairBlock;
 import net.minecraft.world.level.block.TrapDoorBlock;
+import net.minecraft.world.level.block.CeilingHangingSignBlock;
+import net.minecraft.world.level.block.StandingSignBlock;
+import net.minecraft.world.level.block.WallHangingSignBlock;
+import net.minecraft.world.level.block.WallSignBlock;
 import net.minecraft.world.level.block.state.properties.BlockSetType;
+import net.minecraft.world.level.block.state.properties.NoteBlockInstrument;
 import net.minecraft.world.level.block.state.properties.WoodType;
 import net.minecraft.world.level.block.FireBlock;
 import net.minecraft.world.level.block.RotatedPillarBlock;
@@ -85,11 +90,16 @@ public final class TreeBlocks {
     public static final WoodSet BAOBAB_SET = woodSet("baobab", BAOBAB_PLANKS, MapColor.SAND, 1.0F);
     public static final List<WoodSet> WOOD_SETS = List.of(CAMEL_THORN_SET, BAOBAB_SET);
 
-    /** The things a kind's planks are made into, each as Minecraft's own wooden one (signs and boats not yet). */
-    public record WoodSet(DeferredBlock<Block> planks, DeferredBlock<StairBlock> stairs, DeferredBlock<SlabBlock> slab,
+    /**
+     * The things a kind's planks are made into, each as Minecraft's own wooden one. The signs are not in {@link #ALL}:
+     * a sign item places a standing or a wall sign, so their items are made by hand in {@link SavannaItems}.
+     * The boats are in {@link SavannaBoats}.
+     */
+    public record WoodSet(String name, WoodType type, DeferredBlock<Block> planks, DeferredBlock<StairBlock> stairs, DeferredBlock<SlabBlock> slab,
                           DeferredBlock<FenceBlock> fence, DeferredBlock<FenceGateBlock> fenceGate, DeferredBlock<DoorBlock> door,
                           DeferredBlock<TrapDoorBlock> trapdoor, DeferredBlock<PressurePlateBlock> pressurePlate,
-                          DeferredBlock<ButtonBlock> button) {
+                          DeferredBlock<ButtonBlock> button, DeferredBlock<StandingSignBlock> sign, DeferredBlock<WallSignBlock> wallSign,
+                          DeferredBlock<CeilingHangingSignBlock> hangingSign, DeferredBlock<WallHangingSignBlock> wallHangingSign) {
         /** The blocks that burn like Minecraft's wooden ones (doors, trapdoors, plates and buttons do not burn there either). */
         public List<DeferredBlock<? extends Block>> burning() {
             return List.of(planks, stairs, slab, fence, fenceGate);
@@ -207,7 +217,16 @@ public final class TreeBlocks {
                         .pushReaction(PushReaction.DESTROY)));
         var button = add(SavannaBlocks.BLOCKS.registerBlock(name + "_button", p -> new ButtonBlock(set, 30, p),
                 BlockBehaviour.Properties.of().noCollission().strength(0.5F).sound(SoundType.WOOD).pushReaction(PushReaction.DESTROY)));
-        return new WoodSet(planks, stairs, slab, fence, gate, door, trapdoor, plate, button);
+        // Signs as Minecraft's: the wall ones drop the standing or hanging sign.
+        java.util.function.Supplier<BlockBehaviour.Properties> signs = () -> BlockBehaviour.Properties.of().mapColor(colour)
+                .forceSolidOn().instrument(NoteBlockInstrument.BASS).noCollission().strength(1.0F).ignitedByLava();
+        var sign = SavannaBlocks.BLOCKS.registerBlock(name + "_sign", p -> new StandingSignBlock(type, p), signs.get());
+        var wallSign = SavannaBlocks.BLOCKS.registerBlock(name + "_wall_sign",
+                p -> new WallSignBlock(type, p.dropsLike(sign.get())), signs.get());
+        var hanging = SavannaBlocks.BLOCKS.registerBlock(name + "_hanging_sign", p -> new CeilingHangingSignBlock(type, p), signs.get());
+        var wallHanging = SavannaBlocks.BLOCKS.registerBlock(name + "_wall_hanging_sign",
+                p -> new WallHangingSignBlock(type, p.dropsLike(hanging.get())), signs.get());
+        return new WoodSet(name, type, planks, stairs, slab, fence, gate, door, trapdoor, plate, button, sign, wallSign, hanging, wallHanging);
     }
 
     private static RotBark rotBark(DeferredBlock<? extends RotatedPillarBlock> base, String name,

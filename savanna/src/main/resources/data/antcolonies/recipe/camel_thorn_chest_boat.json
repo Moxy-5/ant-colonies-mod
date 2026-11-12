@@ -1,0 +1,17 @@
+{
+  "type": "minecraft:crafting_shapeless",
+  "category": "misc",
+  "group": "chest_boat",
+  "ingredients": [
+    {
+      "item": "minecraft:chest"
+    },
+    {
+      "item": "antcolonies:camel_thorn_boat"
+    }
+  ],
+  "result": {
+    "count": 1,
+    "id": "antcolonies:camel_thorn_chest_boat"
+  }
+}

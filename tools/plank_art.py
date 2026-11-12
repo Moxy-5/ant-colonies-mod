@@ -375,6 +375,188 @@ def wood_set_files(assets, data, mc, png, write, add_to_tag):
             add_to_tag(mc / "tags/block" / f"{block_tag}.json", [f"antcolonies:{ours}"])
             add_to_tag(mc / "tags/item" / f"{item_tag}.json", [f"antcolonies:{ours}"])
             add_to_tag(mc / "tags/block/mineable/axe.json", [f"antcolonies:{ours}"])
+    signs_and_boats(assets, data, mc, jar, write, add_to_tag)
+
+
+# Signs and boats (the user, 2026-11-11, "Yes, add them"): Minecraft's acacia ones copied, their pictures recoloured
+# into each wood's own boards. A pixel the same in Minecraft's oak and acacia picture (chains, the chest, iron) is kept;
+# every other is wood, and takes the colour at the same brightness rank in our planks as it has in acacia planks.
+SIGN_PARTS = {  # part: (block tags, item tags); the wall signs drop the standing or hanging sign, so have no loot
+    "sign": (["standing_signs"], ["signs"]), "wall_sign": (["wall_signs"], []),
+    "hanging_sign": (["ceiling_hanging_signs"], ["hanging_signs"]), "wall_hanging_sign": (["wall_hanging_signs"], []),
+}
+BOAT_PARTS = {"boat": ["boats"], "chest_boat": ["chest_boats"]}
+SIGN_NAMES = {"sign": "Sign", "wall_sign": "Wall Sign", "hanging_sign": "Hanging Sign", "wall_hanging_sign": "Wall Hanging Sign"}
+BOAT_NAMES = {"boat": "Boat", "chest_boat": "Boat with Chest"}
+RECOLOURED = [  # (picture in Minecraft's textures with {w} for the wood, ours under antcolonies' textures with {g})
+    ("entity/signs/{w}.png", "entity/signs/{g}.png"),
+    ("entity/signs/hanging/{w}.png", "entity/signs/hanging/{g}.png"),
+    ("gui/hanging_signs/{w}.png", "gui/hanging_signs/{g}.png"),
+    ("item/{w}_sign.png", "item/{g}_sign.png"),
+    ("item/{w}_hanging_sign.png", "item/{g}_hanging_sign.png"),
+    ("item/{w}_boat.png", "item/{g}_boat.png"),
+    ("item/{w}_chest_boat.png", "item/{g}_chest_boat.png"),
+    ("entity/boat/{w}.png", "entity/boat/{g}.png"),
+    ("entity/chest_boat/{w}.png", "entity/chest_boat/{g}.png"),
+]
+
+
+def read_png(raw):
+    """A small PNG reader for Minecraft's pictures (8-bit grey, RGB, palette, grey-alpha, RGBA): rows of (r, g, b, a)."""
+    import struct
+    import zlib
+    pos, idat, palette, alpha = 8, b"", None, None
+    while pos < len(raw):
+        length, kind = struct.unpack(">I4s", raw[pos:pos + 8])
+        body = raw[pos + 8:pos + 8 + length]
+        if kind == b"IHDR":
+            w, h, depth, colour = struct.unpack(">IIBB", body[:10])
+            assert depth == 8 or colour in (0, 3), "only 8-bit colour pictures"
+        elif kind == b"PLTE":
+            palette = [tuple(body[i:i + 3]) for i in range(0, len(body), 3)]
+        elif kind == b"tRNS":
+            alpha = body
+        elif kind == b"IDAT":
+            idat += body
+        pos += 12 + length
+    bpp = {0: 1, 2: 3, 3: 1, 4: 2, 6: 4}[colour]  # bytes a pixel for filtering (1 for packed pictures)
+    stride = w * bpp if depth == 8 else (w * depth + 7) // 8
+    data, rows, prev = zlib.decompress(idat), [], bytearray(stride)
+    for y in range(h):
+        f, line = data[y * (stride + 1)], bytearray(data[y * (stride + 1) + 1:(y + 1) * (stride + 1)])
+        for i in range(stride):
+            a = line[i - bpp] if i >= bpp else 0
+            b, c = prev[i], (prev[i - bpp] if i >= bpp else 0)
+            if f == 1:
+                line[i] = (line[i] + a) & 255
+            elif f == 2:
+                line[i] = (line[i] + b) & 255
+            elif f == 3:
+                line[i] = (line[i] + (a + b) // 2) & 255
+            elif f == 4:
+                pa, pb, pc = abs(b - c), abs(a - c), abs(a + b - 2 * c)
+                line[i] = (line[i] + (a if pa <= pb and pa <= pc else b if pb <= pc else c)) & 255
+        prev, row = line, []
+        for x in range(w):
+            if depth < 8:  # packed palette or grey pixels, high bits first
+                v = (line[x * depth // 8] >> (8 - depth - (x * depth) % 8)) & ((1 << depth) - 1)
+                px = bytes([v if colour == 3 else v * 255 // ((1 << depth) - 1)])
+            else:
+                px = line[x * bpp:(x + 1) * bpp]
+            if colour == 6:
+                row.append(tuple(px))
+            elif colour == 2:
+                row.append(tuple(px) + (255,))
+            elif colour == 0:
+                row.append((px[0],) * 3 + (255,))
+            elif colour == 4:
+                row.append((px[0],) * 3 + (px[1],))
+            else:
+                row.append(palette[px[0]] + ((alpha[px[0]] if alpha and px[0] < len(alpha) else 255),))
+        rows.append(row)
+    return rows
+
+
+def write_png(rows):
+    import struct
+    import zlib
+    raw = b"".join(b"\x00" + bytes(c for px in row for c in px) for row in rows)
+
+    def chunk(kind, body):
+        return struct.pack(">I", len(body)) + kind + body + struct.pack(">I", zlib.crc32(kind + body) & 0xFFFFFFFF)
+    header = struct.pack(">IIBBBBB", len(rows[0]), len(rows), 8, 6, 0, 0, 0)
+    return b"\x89PNG\r\n\x1a\n" + chunk(b"IHDR", header) + chunk(b"IDAT", zlib.compress(raw, 9)) + chunk(b"IEND", b"")
+
+
+def _light(px):
+    return 0.299 * px[0] + 0.587 * px[1] + 0.114 * px[2]
+
+
+def recolour(acacia, oak, ours, acacia_planks):
+    """Acacia's picture in our wood: kept where it matches oak's, else by brightness rank from acacia planks to ours."""
+    import bisect
+    src = sorted(_light(px) for row in acacia_planks for px in row)
+    dst = sorted((px for row in ours for px in row), key=_light)
+    lo, hi = src[0], src[-1]
+    out = []
+    for y, row in enumerate(acacia):
+        new = []
+        for x, px in enumerate(row):
+            same = oak is not None and y < len(oak) and x < len(oak[0]) and oak[y][x] == px
+            if px[3] == 0 or same:
+                new.append(px)
+                continue
+            light = _light(px)
+            rank = bisect.bisect_right(src, light) / len(src)
+            colour = dst[min(len(dst) - 1, int(rank * len(dst)))]
+            # darker or lighter than any acacia board (outlines, highlights): scale our end colour alike
+            f = light / max(1.0, lo) if light < lo else (light / hi if light > hi else 1.0)
+            new.append(tuple(max(0, min(255, round(c * f))) for c in colour[:3]) + (px[3],))
+        out.append(new)
+    return out
+
+
+def signs_and_boats(assets, data, mc, jar, write, add_to_tag):
+    import json
+    textures = "assets/minecraft/textures/"
+    acacia_planks = read_png(jar.read(textures + "block/acacia_planks.png"))
+    planks = all_planks()
+    lang_path = assets / "lang/en_us.json"
+    lang = json.loads(lang_path.read_text(encoding="utf-8"))
+    for kind, look in PICKED.items():
+        g = GAME_NAMES[kind]
+        ours = [[tuple(px[:3]) + (255,) for px in row] for row in planks[kind][look]]
+        for src, dst in RECOLOURED:
+            acacia = read_png(jar.read(textures + src.format(w="acacia")))
+            oak = read_png(jar.read(textures + src.format(w="oak")))
+            path = assets / "textures" / dst.format(g=g)
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_bytes(write_png(recolour(acacia, oak, ours, acacia_planks)))
+
+        def swap(text):
+            return (text.replace("minecraft:block/stripped_acacia_log", f"antcolonies:block/{g}_planks")
+                        .replace("minecraft:block/acacia_", f"antcolonies:block/{g}_")
+                        .replace("minecraft:item/acacia_", f"antcolonies:item/{g}_")
+                        .replace("minecraft:acacia_", f"antcolonies:{g}_"))
+
+        def copy(src, dst):
+            obj = json.loads(swap(jar.read(src).decode("utf-8")))
+            # Hanging signs are cut from stripped logs; our trees have none, so any of the wood's trunk blocks do.
+            for k, v in obj.get("key", {}).items():
+                if v == {"item": "minecraft:stripped_acacia_log"}:
+                    obj["key"][k] = {"tag": f"antcolonies:{g}_logs"}
+            for crit in obj.get("criteria", {}).values():
+                for item in crit.get("conditions", {}).get("items", []):
+                    if item.get("items") == "minecraft:stripped_acacia_log":
+                        item["items"] = f"#antcolonies:{g}_logs"
+            write(dst, obj)
+
+        for part, (block_tags, item_tags) in SIGN_PARTS.items():
+            src, mine = f"acacia_{part}", f"{g}_{part}"
+            copy(f"assets/minecraft/blockstates/{src}.json", assets / "blockstates" / f"{mine}.json")
+            for tag in block_tags:
+                add_to_tag(mc / "tags/block" / f"{tag}.json", [f"antcolonies:{mine}"])
+            for tag in item_tags:
+                add_to_tag(mc / "tags/item" / f"{tag}.json", [f"antcolonies:{mine}"])
+            lang[f"block.antcolonies.{mine}"] = LANG[kind].replace("Planks", SIGN_NAMES[part])
+            if part.startswith("wall_"):
+                continue  # the standing or hanging sign's model, no loot, no item, no recipe
+            copy(f"assets/minecraft/models/block/{src}.json", assets / "models/block" / f"{mine}.json")
+            copy(f"assets/minecraft/models/item/{src}.json", assets / "models/item" / f"{mine}.json")
+            copy(f"data/minecraft/loot_table/blocks/{src}.json", data / "loot_table/blocks" / f"{mine}.json")
+            copy(f"data/minecraft/recipe/{src}.json", data / "recipe" / f"{mine}.json")
+            copy(f"data/minecraft/advancement/recipes/decorations/{src}.json",
+                 data / "advancement/recipes/decorations" / f"{mine}.json")
+        for part, item_tags in BOAT_PARTS.items():
+            src, mine = f"acacia_{part}", f"{g}_{part}"
+            copy(f"assets/minecraft/models/item/{src}.json", assets / "models/item" / f"{mine}.json")
+            copy(f"data/minecraft/recipe/{src}.json", data / "recipe" / f"{mine}.json")
+            copy(f"data/minecraft/advancement/recipes/transportation/{src}.json",
+                 data / "advancement/recipes/transportation" / f"{mine}.json")
+            for tag in item_tags:
+                add_to_tag(mc / "tags/item" / f"{tag}.json", [f"antcolonies:{mine}"])
+            lang[f"item.antcolonies.{mine}"] = LANG[kind].replace("Planks", BOAT_NAMES[part])
+    lang_path.write_text(json.dumps(lang, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
 
 
 if __name__ == "__main__":

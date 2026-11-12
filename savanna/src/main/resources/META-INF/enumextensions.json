@@ -1,0 +1,16 @@
+{
+  "entries": [
+    {
+      "enum": "net/minecraft/world/entity/vehicle/Boat$Type",
+      "name": "ANTCOLONIES_CAMEL_THORN",
+      "constructor": "(Ljava/util/function/Supplier;Ljava/lang/String;Ljava/util/function/Supplier;Ljava/util/function/Supplier;Ljava/util/function/Supplier;Z)V",
+      "parameters": { "class": "com/antcolonies/savanna/registry/SavannaBoats", "field": "CAMEL_THORN" }
+    },
+    {
+      "enum": "net/minecraft/world/entity/vehicle/Boat$Type",
+      "name": "ANTCOLONIES_BAOBAB",
+      "constructor": "(Ljava/util/function/Supplier;Ljava/lang/String;Ljava/util/function/Supplier;Ljava/util/function/Supplier;Ljava/util/function/Supplier;Z)V",
+      "parameters": { "class": "com/antcolonies/savanna/registry/SavannaBoats", "field": "BAOBAB" }
+    }
+  ]
+}

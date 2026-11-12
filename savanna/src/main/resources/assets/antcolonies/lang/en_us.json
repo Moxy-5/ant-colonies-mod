@@ -110,5 +110,17 @@
   "block.antcolonies.baobab_door": "Baobab Door",
   "block.antcolonies.baobab_trapdoor": "Baobab Trapdoor",
   "block.antcolonies.baobab_pressure_plate": "Baobab Pressure Plate",
-  "block.antcolonies.baobab_button": "Baobab Button"
+  "block.antcolonies.baobab_button": "Baobab Button",
+  "block.antcolonies.camel_thorn_sign": "Camel Thorn Sign",
+  "block.antcolonies.camel_thorn_wall_sign": "Camel Thorn Wall Sign",
+  "block.antcolonies.camel_thorn_hanging_sign": "Camel Thorn Hanging Sign",
+  "block.antcolonies.camel_thorn_wall_hanging_sign": "Camel Thorn Wall Hanging Sign",
+  "item.antcolonies.camel_thorn_boat": "Camel Thorn Boat",
+  "item.antcolonies.camel_thorn_chest_boat": "Camel Thorn Boat with Chest",
+  "block.antcolonies.baobab_sign": "Baobab Sign",
+  "block.antcolonies.baobab_wall_sign": "Baobab Wall Sign",
+  "block.antcolonies.baobab_hanging_sign": "Baobab Hanging Sign",
+  "block.antcolonies.baobab_wall_hanging_sign": "Baobab Wall Hanging Sign",
+  "item.antcolonies.baobab_boat": "Baobab Boat",
+  "item.antcolonies.baobab_chest_boat": "Baobab Boat with Chest"
 }

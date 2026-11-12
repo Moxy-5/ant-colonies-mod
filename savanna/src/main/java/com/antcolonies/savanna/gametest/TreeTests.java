@@ -153,6 +153,44 @@ public class TreeTests {
                 helper.fail(set.planks().getId() + "'s fence, gate or door is not in Minecraft's wooden tags");
             }
         }
+        // Signs and boats (the user, 2026-11-11): recipes, hanging signs cut from the trunk wood, the signs hold their
+        // writing (Minecraft's sign block entity), and a boat breaks back into its own item.
+        int x = 40;
+        for (var items : com.antcolonies.savanna.registry.SavannaItems.WOOD_ITEMS) {
+            for (var made : items.all()) {
+                var recipe = level.getRecipeManager().byKey(made.getId()).orElse(null);
+                if (recipe == null || recipe.value().getResultItem(level.registryAccess()).getItem() != made.get()) {
+                    helper.fail("no recipe making " + made.getId());
+                }
+            }
+            var boatType = items.boat() == com.antcolonies.savanna.registry.SavannaItems.CAMEL_THORN_ITEMS.boat()
+                    ? com.antcolonies.savanna.registry.SavannaBoats.CAMEL_THORN.getValue() : com.antcolonies.savanna.registry.SavannaBoats.BAOBAB.getValue();
+            if (boatType.getPlanks() == net.minecraft.world.level.block.Blocks.OAK_PLANKS
+                    || !boatType.getName().startsWith(SavannaMod.MODID + ":")) {
+                helper.fail(items.boat().getId() + " is not a boat kind of its own: " + boatType.getName());
+            }
+            var boat = new net.minecraft.world.entity.vehicle.Boat(level, 0, 0, 0);
+            boat.setVariant(boatType);
+            if (boat.getDropItem() != items.boat().get()) {
+                helper.fail(items.boat().getId() + " breaks into " + boat.getDropItem());
+            }
+        }
+        for (TreeBlocks.WoodSet set : TreeBlocks.WOOD_SETS) {
+            var hanging = level.getRecipeManager().byKey(set.hangingSign().getId()).orElseThrow().value();
+            var log = net.minecraft.core.registries.BuiltInRegistries.ITEM.get(
+                    ResourceLocation.fromNamespaceAndPath(SavannaMod.MODID, set.name() + "_log"));
+            if (hanging.getIngredients().stream().noneMatch(i -> i.test(new net.minecraft.world.item.ItemStack(log)))) {
+                helper.fail(set.name() + " hanging signs are not cut from its logs");
+            }
+            for (var sign : List.<DeferredBlock<? extends Block>>of(set.sign(), set.hangingSign())) {
+                BlockPos pos = new BlockPos(x, SURFACE + 2, 40);
+                x += 2;
+                helper.setBlock(pos, sign.get());
+                if (!(helper.getBlockEntity(pos) instanceof net.minecraft.world.level.block.entity.SignBlockEntity)) {
+                    helper.fail(sign.getId() + " has no sign to write on");
+                }
+            }
+        }
     }
 
     private static BlockState joined(GameTestHelper helper, BlockPos relative) {
