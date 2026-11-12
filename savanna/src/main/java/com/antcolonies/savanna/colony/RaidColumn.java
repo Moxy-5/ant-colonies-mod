@@ -453,6 +453,72 @@ public final class RaidColumn implements com.antcolonies.fight.FightDiary {
     }
 
     /**
+     * The brain while away, step 3 ({@code docs/plans/brain-away-raids.md}): the column starts partway, a raid that set
+     * out as numbers shown where it is now ({@code RaidsAway}). The raiders, just out of the numbers, are put on the
+     * trail, the first one in front and each the column's spacing behind the one ahead. Not attacked yet: on the way
+     * out, the front {@code share} of the way from the nest to the gathering place, marching on. Attacked (the catch
+     * already made as numbers, in the raiders' jaws): at the gathering place regrouping ({@code share} 1), or on the
+     * way home with the front (the one nearest home) {@code share} of the way out still to walk.
+     */
+    void startPartway(ServerLevel level, List<MatabeleEntity> ants, boolean attacked, double share, long now) {
+        share = Math.max(0.0, Math.min(1.0, share));
+        boolean home = attacked && share < 1.0;
+        Route route = home ? back : out;
+        double front = home ? (1.0 - share) * back.length() : share * out.length();
+        for (int k = 0; k < ants.size(); k++) {
+            double along = Math.max(0.0, front - k * numbers.spacing());
+            BlockPos cell = route.place(level, along, 0.0);
+            double[] way = route.direction(along);
+            float yaw = (float) (Mth.atan2(way[1], way[0]) * Mth.RAD_TO_DEG) - 90.0F;
+            MatabeleEntity ant = ants.get(k);
+            ant.moveTo(cell.getX() + 0.5, cell.getY(), cell.getZ() + 0.5, yaw, 0.0F);
+            ant.setYHeadRot(yaw);
+            ant.setYBodyRot(yaw);
+        }
+        recruitLooked = true;
+        recruitedAt = now;
+        stage = !attacked ? Stage.MARCHING : home ? Stage.HOMING : Stage.REGROUPING;
+        stageSince = now;
+        frontAt = front;
+        head = front;
+        updatedAt = now - EVERY; // (its clocks start now: no "not worked out for a while")
+        if (attacked) {
+            attackedAt = now; // (the fight is over: gone away again, it walks home with what it carries, RaidsAway.fromColumn)
+        }
+        lastLevel = level;
+        say("the raid out as numbers is shown: " + ants.size() + " raider(s) put on the trail " + Math.round(front) + " of "
+                + Math.round(route.length()) + " blocks along the way " + (home ? "home" : "out") + ", "
+                + stage.name().toLowerCase(Locale.ROOT));
+    }
+
+    /**
+     * Step 3 of the brain while away: how much of the way out from the nest to its spot the column's front is now (0 at
+     * the nest, 1 at the spot), from its stage and the front's place at the last update. A column that goes on as
+     * numbers goes on from here ({@code RaidsAway.fromColumn}).
+     */
+    double shareOut() {
+        return switch (stage) {
+            case FORMING, DONE -> 0.0;
+            case MARCHING -> Math.max(0.0, Math.min(1.0, frontAt / Math.max(1.0, out.length())));
+            case HOMING -> Math.max(0.0, Math.min(1.0, 1.0 - frontAt / Math.max(1.0, back.length())));
+            default -> 1.0;
+        };
+    }
+
+    /** Step 3 of the brain while away: termites this raider already holds in its jaws (caught while the raid was numbers). */
+    void noteCarried(int termites) {
+        if (termites > 0) {
+            carried += termites;
+            carriers++;
+        }
+    }
+
+    /** Step 3 of the brain while away: termites caught as numbers that no real raider's jaws had room for come home with the column. */
+    void addHidden(int termites) {
+        hiddenCatch += Math.max(0, termites);
+    }
+
+    /**
      * Raid rework R3: where the line starts: a cell to stand in 1 to 4 blocks out from the entrance, toward the trail's
      * first point past the entrance (or the find), turning a little either way if that is no ground; the entrance
      * itself only if none is found.

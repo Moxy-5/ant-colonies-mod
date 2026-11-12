@@ -203,7 +203,11 @@ public class AwayLife {
         return false;
     }
 
-    private boolean watcherNear(ServerLevel level, BlockPos at, int radius) {
+    /**
+     * Whether a watcher is within {@code radius} blocks of this place, sideways (the same watchers the far rule asks
+     * about; a species' part showing something of the colony's out in the field asks with it, the brain while away, step 3).
+     */
+    public boolean watcherNear(ServerLevel level, BlockPos at, int radius) {
         if (watcherForTests != null) {
             double dx = watcherForTests.getX() - at.getX();
             double dz = watcherForTests.getZ() - at.getZ();

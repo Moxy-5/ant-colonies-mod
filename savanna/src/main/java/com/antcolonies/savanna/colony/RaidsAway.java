@@ -37,16 +37,18 @@ import net.minecraft.util.RandomSource;
  * attack (their danger map: they keep off the spot for a few days and plug the holes there, brain step 4g), so the
  * spot dries up and the scouts must find another. A few raiders die and a few come home hurt; the catch goes onto the
  * prey pile, counted (its layers laid out of sight later). A find whose termites have gone (the colony dead, or keeping
- * off the spot) counts an empty check; a spot a player is near is left for real ants. No raid leaves unless its attack
- * starts before dusk.
+ * off the spot) counts an empty check. No raid leaves unless its attack starts before dusk. (A spot a player stood at
+ * was left "for real ants" until the brain while away, step 3: now the raid goes there and is shown as the player
+ * comes near it, {@link #show}.)
  *
  * <p>Out of sight the scouts are numbers too: in the scouting hours a hungry colony that knows no find worth a raid has
  * its scouts (as many as it would send) each find, by chance, one of the termites' feeding places within its reach that
  * it does not know yet (the termite colonies' own record of their ways out to food), scored as a scout would, passed
  * over if too poor. Every raid and find writes a {@code [raid]} diary line and counts in the away report.
  *
- * <p>Never reads or changes a block of land not loaded. A raid out when the colony comes back finishes as numbers on
- * its own time (its raiders walk in out of sight); a real column out when the colony goes away goes on as numbers.
+ * <p>Never reads or changes a block of land not loaded. A raid out when a watcher comes near it is shown as real ants
+ * on its trail ({@link #show}; else it finishes as numbers on its own time, its raiders walking in out of sight); a real
+ * column out when the colony goes away goes on as numbers.
  * Numbers: {@code raids.away} ({@link SavannaNumbers.AwayRaidNumbers}). Every number my pick, to confirm.
  */
 public final class RaidsAway {
@@ -72,7 +74,7 @@ public final class RaidsAway {
     /** A raid out of sight: where to, how many, when it attacks and is home, the termite colony, and what it took. */
     static final class Out {
         final BlockPos at;
-        final int raiders;
+        int raiders;
         final long attackAt;
         long backAt;
         @Nullable
@@ -103,6 +105,11 @@ public final class RaidsAway {
     /** M8 step 3e: the most raids a starving colony sends in a day ({@code raids.away.most_raids_a_day}; near or away). */
     int mostRaidsADay() {
         return Math.max(1, numbers().mostRaidsADay());
+    }
+
+    /** Whether the raid out of sight has attacked (tests). */
+    public boolean hasAttacked() {
+        return out != null && out.attacked;
     }
 
     /** Whether a raid is out of sight now. */
@@ -142,11 +149,113 @@ public final class RaidsAway {
         }
     }
 
-    /** Once a second while the colony is here: a raid still out of sight finishes as numbers on its own time. */
+    /**
+     * Once a second while the colony is here: a raid out as numbers goes on by its own times, and (the brain while away,
+     * step 3) is shown as real ants once a watcher is near it ({@link #show}).
+     */
     void tickHere(ServerLevel level) {
         if (out != null) {
             step(level, level.getGameTime());
         }
+        if (out != null) {
+            show(level);
+        }
+    }
+
+    // --- step 3 of the brain while away: where the raid is, and showing it ---------------------------------------------------
+
+    /**
+     * Just past how far insects are drawn (48 blocks, real sizes step 1): the raiders are put on the trail only where
+     * no watcher is within this of them, so nobody sees them appear.
+     */
+    private static final int SHOW_PAST = 50;
+    /** A raid this near its nest (blocks along its way) is not put on the trail: not attacked yet, it forms in the nest; nearly home, it walks in unseen. */
+    private static final double BY_THE_NEST = 8.0;
+
+    /** Where a raid out as numbers is: still mustering in the nest, how much of the way out it is from the nest (0 to 1), and whether it walks home. */
+    private record Where(boolean mustering, double share, boolean homeward) {
+    }
+
+    /**
+     * Where the raid is now, from its own times (the march out ends at {@code attackAt}; the walk home ends at
+     * {@code backAt}; before the walk home it is at the spot, fighting and regrouping).
+     */
+    private Where where(long now) {
+        double distance = Math.max(1.0, RaidGround.flat(colony.getCenter(), out.at));
+        SavannaNumbers.AwayRaidNumbers numbers = numbers();
+        if (!out.attacked) {
+            double walk = distance / Math.max(0.1, numbers.pace()) * 20.0;
+            double left = out.attackAt - now;
+            return left > walk ? new Where(true, 0.0, false) : new Where(false, Math.max(0.0, 1.0 - left / walk), false);
+        }
+        SavannaNumbers.CarryNumbers carry = raids.carryNumbers();
+        double laden = carry == null ? SavannaNumbers.CarryNumbers.DEFAULT.ladenPace() : carry.ladenPace();
+        double walk = distance / Math.max(0.1, numbers.pace() * laden) * 20.0;
+        double left = out.backAt - now;
+        return left > walk ? new Where(false, 1.0, false) : new Where(false, Math.max(0.0, left / walk), true);
+    }
+
+    /** The place this share of the way out from the nest to the raid's spot, along the way the raid walks. */
+    private BlockPos placeAt(double share, long now) {
+        List<BlockPos> way = raids.wayTo(out.at, now);
+        return way.get((int) Math.round(Math.max(0.0, Math.min(1.0, share)) * (way.size() - 1)));
+    }
+
+    /** Where the raid out as numbers is on its trail now (a watcher near it watches the colony, {@code Raids.outThere}); null if none is out. */
+    @Nullable
+    BlockPos whereNow(ServerLevel level) {
+        long now = level.getGameTime();
+        return out == null ? null : placeAt(where(now).share(), now);
+    }
+
+    /**
+     * The raid out as numbers is shown as real ants once a watcher is within the far rule's reach of where it is now
+     * (the user, 2026-11-11: raids that are out when the player comes near should show): its raiders come out of the
+     * numbers onto the trail there, in the stage it is in (marching out; regrouping at the spot or walking home with the
+     * catch it already made as numbers in their jaws), and it goes on as a real column ({@code Raids.showRaid}). Only
+     * where no watcher could see them appear ({@link #SHOW_PAST}) and the land ticks; else it goes on as numbers and
+     * is tried again next second. One that has only just left forms in the nest as any raid does; one nearly home
+     * walks in unseen.
+     */
+    private void show(ServerLevel level) {
+        long now = level.getGameTime();
+        Where where = where(now);
+        BlockPos front = placeAt(where.share(), now);
+        com.antcolonies.colony.AwayLife watch = colony.away();
+        if (!watch.watcherNear(level, front, com.antcolonies.colony.AwayLife.NEAR)) {
+            return; // (the colony is watched somewhere else: this raid goes on as numbers)
+        }
+        double distance = Math.max(1.0, RaidGround.flat(colony.getCenter(), out.at));
+        boolean byTheNest = where.mustering() || where.share() * distance < BY_THE_NEST;
+        if (byTheNest && out.attacked) {
+            return; // (nearly home: they walk in out of sight)
+        }
+        SavannaNumbers.ColumnNumbers column = raids.columnNumbers();
+        double spacing = column == null ? 0.3 : column.spacing();
+        // (the column's other end: behind the front toward the nest on the way out, toward the spot on the way home)
+        double lengthShare = out.raiders * spacing / distance;
+        BlockPos back = placeAt(where.share() + (where.homeward() ? lengthShare : -lengthShare), now);
+        if (!byTheNest && (watch.watcherNear(level, front, SHOW_PAST) || watch.watcherNear(level, back, SHOW_PAST)
+                || !level.isPositionEntityTicking(front) || !level.isPositionEntityTicking(back))) {
+            return; // (they would be seen appearing, or the land there does not tick)
+        }
+        if (out.attacked && out.lost + out.hurt > 0) {
+            // (what the fight cost, counted now as it would be at home)
+            int lost = colony.population().loseInside(level, Caste.WORKER, out.lost, AwayReport.What.RAIDERS_LOST);
+            colony.away().note(level, AwayReport.What.RAIDERS_HURT, out.hurt);
+            out.raiders = Math.max(1, out.raiders - lost);
+            out.lost = 0;
+            out.hurt = 0;
+        }
+        if (raids.showRaid(level, out.at, front, out.raiders, byTheNest, out.attacked, where.share(), out.caught)) {
+            out = null;
+        }
+        ColonyManager.get(level).markChanged();
+    }
+
+    /** The raiders out as numbers now (they are not in the nest: the colony keeps so many fewer real ants at home). */
+    int outAsNumbers() {
+        return out == null ? 0 : out.raiders;
     }
 
     private void newDay(ServerLevel level) {
@@ -185,8 +294,8 @@ public final class RaidsAway {
                 raids.foundEmpty(level, find);
                 return; // (one check a second)
             }
-            if (playerNear(level, find.at(), numbers.playerNear()) || find.worth() < raids.need(find.at())) {
-                continue; // (a player there: real ants only; or too poor for the colony now)
+            if (find.worth() < raids.need(find.at())) {
+                continue; // (too poor for the colony now)
             }
             double distance = RaidGround.flat(colony.getCenter(), find.at());
             long outTicks = column.formTicks() + Math.round(distance / Math.max(0.1, numbers.pace()) * 20.0);
@@ -231,8 +340,10 @@ public final class RaidsAway {
     }
 
     /**
-     * A real raid column was out when the colony went away: it goes on as numbers. Not yet at its spot: it attacks
-     * after the rest of the march (about half of it, my pick); already attacked: it walks home with what it picked up.
+     * A real raid column was out when the colony went away: it goes on as numbers from where it is
+     * ({@link RaidColumn#shareOut}; step 3 of the brain while away, it was "about half the march" before, and a column
+     * on its way home started the whole walk home again). Not yet at its spot: it attacks after the rest of the march;
+     * already attacked: it walks the rest of the way home with what it picked up (from the spot, it regroups first).
      */
     void fromColumn(ServerLevel level, RaidColumn column) {
         long now = level.getGameTime();
@@ -240,13 +351,17 @@ public final class RaidsAway {
         double distance = RaidGround.flat(colony.getCenter(), find.at());
         Colony termites = termitesAt(level, find.at());
         SavannaNumbers.AwayRaidNumbers numbers = numbers();
-        long home = homeTicks(distance, raids.columnNumbers(), raids.carryNumbers());
+        SavannaNumbers.ColumnNumbers columnNumbers = raids.columnNumbers();
+        SavannaNumbers.CarryNumbers carry = raids.carryNumbers();
+        double share = column.shareOut();
         if (column.attackedAt() < 0) {
-            long attackAt = now + Math.round(distance / Math.max(0.1, numbers.pace()) * 10.0);
-            out = new Out(find.at().immutable(), Math.max(1, column.size()), attackAt, attackAt + numbers.fightTicks() + home,
-                    termites == null ? null : termites.getId());
+            long attackAt = now + Math.round(distance * (1.0 - share) / Math.max(0.1, numbers.pace()) * 20.0);
+            out = new Out(find.at().immutable(), Math.max(1, column.size()), attackAt,
+                    attackAt + numbers.fightTicks() + homeTicks(distance, columnNumbers, carry), termites == null ? null : termites.getId());
         } else {
-            out = new Out(find.at().immutable(), Math.max(1, column.size()), now, now + home, null);
+            long home = column.stage() == RaidColumn.Stage.HOMING ? homeTicks(distance * share, columnNumbers, carry) - (columnNumbers == null ? 400 : columnNumbers.regroupTicks())
+                    : homeTicks(distance, columnNumbers, carry);
+            out = new Out(find.at().immutable(), Math.max(1, column.size()), now, now + Math.max(0, home), null);
             out.attacked = true;
             // (the termites it stung and picked up, and what its raiders going as numbers took under the mud, M8 step 3d)
             out.caught = column.carried() + column.hiddenCatch();
@@ -371,7 +486,7 @@ public final class RaidsAway {
         }
         SavannaNumbers.AwayRaidNumbers numbers = numbers();
         for (Raids.Find find : raids.finds()) {
-            if (find.worth() >= raids.need(find.at()) && !playerNear(level, find.at(), numbers.playerNear())) {
+            if (find.worth() >= raids.need(find.at())) {
                 return; // (it knows a find worth a raid: the raid hours will take it)
             }
         }
@@ -418,8 +533,7 @@ public final class RaidsAway {
             }
             for (BlockPos food : foods) {
                 double distance = RaidGround.flat(colony.getCenter(), food);
-                if (distance > reach || raids.findAt(food) != null || termites.keepsOff(level, food)
-                        || playerNear(level, food, numbers.playerNear())) {
+                if (distance > reach || raids.findAt(food) != null || termites.keepsOff(level, food)) {
                     continue;
                 }
                 places.add(food);
@@ -505,11 +619,6 @@ public final class RaidsAway {
     @Nullable
     private Colony termitesAt(ServerLevel level, BlockPos at) {
         return RaidCatch.termitesAt(level, at, numbers().termiteReach());
-    }
-
-    /** Whether a watcher (any game mode, spectators too: {@code Watchers}, 2026-11-08) is within this many blocks of the spot, sideways. */
-    private static boolean playerNear(ServerLevel level, BlockPos at, int radius) {
-        return com.antcolonies.colony.Watchers.near(level, at, radius);
     }
 
     /** For the colony list: "; a raid of 120 out of sight to (x, y, z), home in 1200 ticks; 2 raid(s) today out of sight". */

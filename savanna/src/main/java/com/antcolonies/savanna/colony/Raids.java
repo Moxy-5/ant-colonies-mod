@@ -258,14 +258,19 @@ public class Raids {
 
     /**
      * The brain while away, step 2: where the colony's real ants are out on a raid's business now: the raiders of the
-     * column out, the scouts out, the ants walking home by themselves. A watcher near any of them watches the colony
-     * ({@code AwayLife.isHere}), so a raid a player follows away from the nest stays real. Only ants in the world.
+     * column out, the scouts out, the ants walking home by themselves, and (step 3) the place on its trail of a raid out
+     * as numbers. A watcher near any of them watches the colony ({@code AwayLife.isHere}), so a raid a player follows
+     * away from the nest stays real, and one out as numbers is shown as a player comes near ({@link RaidsAway#tickHere}).
      */
     List<BlockPos> outThere(ServerLevel level) {
+        BlockPos numbersRaid = away.whereNow(level); // (step 3: a raid out as numbers, where it is on its trail now)
         if ((column == null || column.stage() == RaidColumn.Stage.DONE) && scouts.isEmpty() && wayHome.size() == 0) {
-            return List.of();
+            return numbersRaid == null ? List.of() : List.of(numbersRaid);
         }
         List<BlockPos> places = new ArrayList<>();
+        if (numbersRaid != null) {
+            places.add(numbersRaid);
+        }
         if (column != null && column.stage() != RaidColumn.Stage.DONE) {
             addPlaces(level, column.members(), places);
         }
@@ -280,6 +285,75 @@ public class Raids {
                 places.add(ant.blockPosition());
             }
         }
+    }
+
+    /**
+     * The brain while away, step 3: a raid out as numbers is shown as real ants ({@link RaidsAway#tickHere}). So many
+     * workers come out of the numbers and make a column to the raid's spot: {@code inNest}, in the nest's rooms, the raid
+     * forming as any raid does (it had only just left); else on the trail where the raid is now
+     * ({@link RaidColumn#startPartway}), with {@code caught} termites in their jaws if it has attacked. False if it
+     * could not be (no room cell, nobody inside to come out): it goes on as numbers.
+     */
+    boolean showRaid(ServerLevel level, BlockPos at, BlockPos where, int raiders, boolean inNest, boolean attacked, double share, int caught) {
+        SavannaNumbers.ColumnNumbers numbers = columnNumbers();
+        if (numbers == null || column != null) {
+            return false;
+        }
+        long now = level.getGameTime();
+        int real = Math.min(Math.min(raiders, numbers.mostReal()), colony.population().inside(Caste.WORKER));
+        List<BlockPos> cells = !inNest ? List.of(where) : colony.nest().getAllRoomCells(level).stream()
+                .filter(cell -> RaidGround.canStand(level, cell)).toList();
+        if (real <= 0 || cells.isEmpty()) {
+            return false;
+        }
+        List<MatabeleEntity> ants = new ArrayList<>();
+        for (int i = 0; i < real; i++) {
+            if (colony.population().comeOutAt(level, Caste.WORKER, cells.get(colony.random().nextInt(cells.size()))) instanceof MatabeleEntity ant) {
+                ants.add(ant);
+            }
+        }
+        if (ants.isEmpty()) {
+            return false;
+        }
+        // (the marching order: a major leads as the scout would, the other majors at the back, the rear guard)
+        MatabeleEntity leader = ants.stream().filter(MatabeleEntity::hasMajorBody).findFirst().orElse(ants.get(0));
+        ants.sort(Comparator.comparingInt(ant -> ant == leader ? 0 : ant.hasMajorBody() ? 2 : 1));
+        Find known = findAt(at);
+        Find find = known != null ? known : new Find(at.immutable(), 0, now, now, 0, RaidsAway.line(colony.getCenter(), at), null);
+        ScentTrails.Trail trail = trails.liveTo(find.at, trailReach(), trailNumbers(), now);
+        if (trail == null) {
+            trail = trails.lay(level, colony.getCenter(), find.at, find.trail, now, false);
+        }
+        column = new RaidColumn(level, colony, numbers, carryNumbers(), trailNumbers(), find, trail, ants, 0, now);
+        if (!inNest) {
+            column.startPartway(level, ants, attacked, share, now);
+        }
+        int left = attacked ? caught : 0;
+        for (MatabeleEntity ant : ants) {
+            int takes = Math.min(left, ant.termitesItCanCarry());
+            if (takes > 0) {
+                ant.setLoad(com.antcolonies.savanna.entity.MatabeleLoads.termites(takes));
+                column.noteCarried(takes);
+                left -= takes;
+            }
+        }
+        column.addHidden(left);
+        whyNoRaid = null;
+        find.scout = leader.getUUID();
+        say(level, "a raid out of sight to " + at.toShortString() + " is watched now: " + ants.size() + " real raider(s) "
+                + (inNest ? "form in the nest" : "on the trail at " + where.toShortString()
+                        + (attacked ? ", on the way home with " + caught + " termite(s)" : ", on the way out")));
+        return true;
+    }
+
+    /** The brain while away, step 3: the points of the way to this spot, the nest end first (the scent trail if one is smelt, else the scout's line). */
+    List<BlockPos> wayTo(BlockPos at, long now) {
+        ScentTrails.Trail trail = trails.liveTo(at, trailReach(), trailNumbers(), now);
+        if (trail != null && trail.points().size() >= 2) {
+            return trail.points();
+        }
+        Find find = findAt(at);
+        return find != null && find.trail.size() >= 2 ? find.trail : RaidsAway.line(colony.getCenter(), at);
     }
 
     /** The diary for {@link RaidsAway}. */
@@ -385,7 +459,7 @@ public class Raids {
     void tick(ServerLevel level) {
         RaidCost.begin();
         try {
-            away.tickHere(level); // (M8 step 3f: a raid out of sight when the colony came back finishes as numbers)
+            away.tickHere(level); // (a raid out as numbers goes on, and is shown as real ants once a watcher is near it)
             tickTimed(level);
         } finally {
             RaidCost.end();

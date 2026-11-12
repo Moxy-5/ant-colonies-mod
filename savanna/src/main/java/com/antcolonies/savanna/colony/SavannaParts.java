@@ -298,6 +298,22 @@ public final class SavannaParts {
             .ticks(117, Raids::tick).ticksAway(87, Raids::tickAway) // (M8 step 3f: raids out of sight)
             .plugs(ColonyHooks.LIST_SEARCH, 40, raids -> raids::describe).plugs(ColonyHooks.REACH, 10, raids -> raids::reach)
             .plugs(ColonyHooks.OUT_THERE, 10, raids -> raids::outThere) // (a watcher near the raid or the scouts watches the colony)
+            .plugs(ColonyHooks.HIDDEN_AWAY, 20, raids -> new ColonyHooks.HiddenAway() { // (raiders out as numbers are not at home)
+                @Override
+                public int travelling(String caste) {
+                    return com.antcolonies.colony.Caste.WORKER.equals(caste) ? raids.away().outAsNumbers() : 0;
+                }
+
+                @Override
+                public boolean anyWalksThrough(Set<BlockPos> cells) {
+                    return false;
+                }
+
+                @Override
+                public com.antcolonies.nav.HiddenWays ways(ServerLevel level) {
+                    return null;
+                }
+            })
             .answers(ColonyQuestions.KEEP_FROM_DEFENCE, 10, Raids::keptFromDefence) // (scouts out, raiders on their own fight)
             .saves(Raids::save, Raids::load)
             .sample(Raids::fillForTests));
