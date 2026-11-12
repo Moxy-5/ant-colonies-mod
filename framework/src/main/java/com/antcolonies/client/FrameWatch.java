@@ -31,8 +31,8 @@ public final class FrameWatch {
     /** A frame this long is a freeze anyone sees. */
     public static final long FREEZE_MS = 300;
     /** The helper starts looking once a frame has run this long. */
-    static final long WATCH_FROM_MS = 40;
-    static final long LOOK_MS = 10;
+    static final long WATCH_FROM_MS = 20;
+    static final long LOOK_MS = 5;
     static final int LINES = 30;
 
     private static volatile Thread renderThread;
@@ -41,6 +41,23 @@ public final class FrameWatch {
     private static final List<StackTraceElement[]> looks = new ArrayList<>();
     private static Thread helper;
     private static long gcAtStart;
+
+    /**
+     * The stutter count (the user, 2026-11-12: "constant stuttering" while walking, with hardly a frame over 100 ms): a
+     * frame of {@link #ROUGH_MS} or more is rough (at 60 frames a second a frame is 17 ms, so one was missed). Every
+     * {@link #SUMMARY_MS} the log gets a {@code [frames]} line: how many frames, how many rough, the worst, the
+     * memory-clearing time, and what the drawing thread was doing in the rough ones (the deepest game call of each look).
+     */
+    static final long ROUGH_MS = 25;
+    static final long SUMMARY_MS = 10_000;
+    private static long summaryStart;
+    private static int frames;
+    private static int rough;
+    private static int veryRough;
+    private static long worst;
+    private static long gcSum;
+    private static int roughLooks;
+    private static final java.util.Map<String, Integer> roughWhere = new java.util.HashMap<>();
 
     private FrameWatch() {
     }
@@ -65,12 +82,63 @@ public final class FrameWatch {
         }
         Minecraft mc = Minecraft.getInstance();
         long ms = (now - start) / 1_000_000;
-        if (start == 0 || ms < SLOW_MS || mc.level == null || mc.isPaused()) {
+        if (start == 0 || mc.level == null || mc.isPaused()) {
+            summaryStart = 0;
+            return;
+        }
+        count(now, ms, gc, taken);
+        if (ms < SLOW_MS) {
             return;
         }
         ColonyFrameworkMod.LOGGER.warn("[{}] a frame took {} ms, {} ms of it Java clearing memory; where the drawing"
                 + " thread was ({} looks, deepest first):{}", ms >= FREEZE_MS ? "freeze" : "frame", ms, gc, taken.size(),
                 taken.isEmpty() ? "" : StallWatch.where(taken, LINES, null));
+    }
+
+    private static void count(long now, long ms, long gc, List<StackTraceElement[]> taken) {
+        if (summaryStart == 0) {
+            summaryStart = now;
+            frames = rough = veryRough = roughLooks = 0;
+            worst = gcSum = 0;
+            roughWhere.clear();
+        }
+        frames++;
+        gcSum += gc;
+        worst = Math.max(worst, ms);
+        if (ms >= ROUGH_MS) {
+            rough++;
+            if (ms >= 50) {
+                veryRough++;
+            }
+            for (StackTraceElement[] stack : taken) {
+                roughLooks++;
+                roughWhere.merge(gameCall(stack), 1, Integer::sum);
+            }
+        }
+        if (now - summaryStart < SUMMARY_MS * 1_000_000) {
+            return;
+        }
+        if (rough > 0) {
+            StringBuilder out = new StringBuilder();
+            roughWhere.entrySet().stream().sorted((a, b) -> b.getValue() - a.getValue()).limit(12).forEach(e ->
+                    out.append(String.format("%n    %3d%% %s", e.getValue() * 100 / Math.max(1, roughLooks), e.getKey())));
+            ColonyFrameworkMod.LOGGER.info("[frames] last 10 s: {} frames, {} of 25 ms or more, {} of 50 ms or more, the"
+                    + " worst {} ms, {} ms Java clearing memory; the drawing thread in the rough ones ({} looks):{}",
+                    frames, rough, veryRough, worst, gcSum, roughLooks, out);
+        }
+        summaryStart = 0;
+    }
+
+    /** The deepest call of a look that is the game's or a mod's (Java's own and the libraries' calls skipped). */
+    private static String gameCall(StackTraceElement[] stack) {
+        for (StackTraceElement frame : stack) {
+            String cls = frame.getClassName();
+            if (cls.startsWith("net.minecraft.") || cls.startsWith("com.antcolonies.") || cls.startsWith("com.mojang.")
+                    || cls.startsWith("software.bernie.") || cls.startsWith("net.neoforged.") || cls.startsWith("terrablender.")) {
+                return cls.substring(cls.lastIndexOf('.') + 1) + "." + frame.getMethodName() + ":" + frame.getLineNumber();
+            }
+        }
+        return stack.length > 0 ? stack[0].getClassName() + "." + stack[0].getMethodName() : "?";
     }
 
     private static synchronized void startHelper() {
