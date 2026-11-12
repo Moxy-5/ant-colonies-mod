@@ -19,6 +19,24 @@
     "antcolonies:charred_branch",
     "antcolonies:rotten_wood",
     "antcolonies:thorny_twig",
-    "antcolonies:camel_thorn_pods"
+    "antcolonies:camel_thorn_pods",
+    "antcolonies:camel_thorn_planks",
+    "antcolonies:baobab_planks",
+    "antcolonies:camel_thorn_stairs",
+    "antcolonies:camel_thorn_slab",
+    "antcolonies:camel_thorn_fence",
+    "antcolonies:camel_thorn_fence_gate",
+    "antcolonies:camel_thorn_door",
+    "antcolonies:camel_thorn_trapdoor",
+    "antcolonies:camel_thorn_pressure_plate",
+    "antcolonies:camel_thorn_button",
+    "antcolonies:baobab_stairs",
+    "antcolonies:baobab_slab",
+    "antcolonies:baobab_fence",
+    "antcolonies:baobab_fence_gate",
+    "antcolonies:baobab_door",
+    "antcolonies:baobab_trapdoor",
+    "antcolonies:baobab_pressure_plate",
+    "antcolonies:baobab_button"
   ]
 }

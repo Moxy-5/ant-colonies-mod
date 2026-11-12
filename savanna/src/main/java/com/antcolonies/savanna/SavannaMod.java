@@ -56,6 +56,13 @@ public class SavannaMod {
         SavannaTests.signUp();
         // How the giant savanna trees' blocks burn (Minecraft's fire table is filled once, at start).
         modEventBus.addListener((FMLCommonSetupEvent event) -> event.enqueueWork(TreeBlocks::setFlammable));
+        // Camel thorn and baobab signs use Minecraft's own sign block entities (and so its sign drawing and editing).
+        modEventBus.addListener((net.neoforged.neoforge.event.BlockEntityTypeAddBlocksEvent event) -> {
+            for (TreeBlocks.WoodSet set : TreeBlocks.WOOD_SETS) {
+                event.modify(net.minecraft.world.level.block.entity.BlockEntityType.SIGN, set.sign().get(), set.wallSign().get());
+                event.modify(net.minecraft.world.level.block.entity.BlockEntityType.HANGING_SIGN, set.hangingSign().get(), set.wallHangingSign().get());
+            }
+        });
         // Big savannas (2026-11-06): our own TerraBlender region, beside vanilla's and other mods'.
         modEventBus.addListener((FMLCommonSetupEvent event) -> event.enqueueWork(com.antcolonies.savanna.worldgen.SavannaRegion::signUp));
         // In-game tests: only loaded when the game is started in game-test mode.

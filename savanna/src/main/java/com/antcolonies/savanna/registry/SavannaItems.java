@@ -6,7 +6,11 @@ import java.util.List;
 import com.antcolonies.savanna.SavannaMod;
 
 import net.minecraft.world.food.FoodProperties;
+import net.minecraft.world.entity.vehicle.Boat;
 import net.minecraft.world.item.BlockItem;
+import net.minecraft.world.item.BoatItem;
+import net.minecraft.world.item.HangingSignItem;
+import net.minecraft.world.item.SignItem;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.level.block.Block;
 import net.neoforged.neoforge.common.DeferredSpawnEggItem;
@@ -118,5 +122,28 @@ public class SavannaItems {
         for (DeferredBlock<? extends Block> block : TreeBlocks.ALL) {
             TREE_ITEMS.add(ITEMS.registerSimpleBlockItem(block));
         }
+    }
+
+    /** A wood's signs and boats, the items that are not simply a block's (the user, 2026-11-11). */
+    public record WoodItems(DeferredItem<SignItem> sign, DeferredItem<HangingSignItem> hangingSign,
+                            DeferredItem<BoatItem> boat, DeferredItem<BoatItem> chestBoat) {
+        public List<DeferredItem<? extends Item>> all() {
+            return List.of(sign, hangingSign, boat, chestBoat);
+        }
+    }
+
+    public static final WoodItems CAMEL_THORN_ITEMS = woodItems(TreeBlocks.CAMEL_THORN_SET, () -> SavannaBoats.CAMEL_THORN.getValue());
+    public static final WoodItems BAOBAB_ITEMS = woodItems(TreeBlocks.BAOBAB_SET, () -> SavannaBoats.BAOBAB.getValue());
+    public static final List<WoodItems> WOOD_ITEMS = List.of(CAMEL_THORN_ITEMS, BAOBAB_ITEMS);
+
+    private static WoodItems woodItems(TreeBlocks.WoodSet set, java.util.function.Supplier<Boat.Type> boatType) {
+        String name = set.name();
+        var sign = ITEMS.registerItem(name + "_sign",
+                p -> new SignItem(p, set.sign().get(), set.wallSign().get()), new Item.Properties().stacksTo(16));
+        var hanging = ITEMS.registerItem(name + "_hanging_sign",
+                p -> new HangingSignItem(set.hangingSign().get(), set.wallHangingSign().get(), p), new Item.Properties().stacksTo(16));
+        var boat = ITEMS.registerItem(name + "_boat", p -> new BoatItem(false, boatType.get(), p), new Item.Properties().stacksTo(1));
+        var chestBoat = ITEMS.registerItem(name + "_chest_boat", p -> new BoatItem(true, boatType.get(), p), new Item.Properties().stacksTo(1));
+        return new WoodItems(sign, hanging, boat, chestBoat);
     }
 }

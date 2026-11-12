@@ -1,0 +1,13 @@
+{
+  "variants": {
+    "type=bottom": {
+      "model": "antcolonies:block/camel_thorn_slab"
+    },
+    "type=double": {
+      "model": "antcolonies:block/camel_thorn_planks"
+    },
+    "type=top": {
+      "model": "antcolonies:block/camel_thorn_slab_top"
+    }
+  }
+}

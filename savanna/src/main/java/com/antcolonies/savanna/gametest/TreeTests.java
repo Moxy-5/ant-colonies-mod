@@ -86,6 +86,7 @@ public class TreeTests {
         helper.setBlock(first, TreeBlocks.UMBRELLA_THORN.branch().get());
         helper.setBlock(second, TreeBlocks.UMBRELLA_THORN.branch().get());
         helper.setBlock(second.north(), TreeBlocks.UMBRELLA_THORN.leaves().get());
+        planksFromTheWood(helper);
         helper.succeedWhen(() -> {
             for (int i = 0; i < TreeBlocks.ALL.size(); i++) {
                 BlockPos pos = new BlockPos(2 + 2 * (i % 30), SURFACE, 2 + 3 * (i / 30)); // 30 to a row, as placed
@@ -102,6 +103,119 @@ public class TreeTests {
             check(helper, b, Direction.NORTH, true, "the second branch joins the leaves");
             check(helper, b, Direction.EAST, false, "a branch does not join the air");
         });
+    }
+
+    /**
+     * Planks (the user, 2026-11-11): every trunk block of a kind, the heart rot marks too, saws into 4 planks: the
+     * umbrella thorn into Minecraft's acacia planks, the camel thorn and baobab into their own, which count as planks.
+     */
+    private static void planksFromTheWood(GameTestHelper helper) {
+        var level = helper.getLevel();
+        Object[][] cases = {
+                {"acacia_planks_from_umbrella_thorn", "umbrella_thorn_wood_wound", net.minecraft.world.item.Items.ACACIA_PLANKS},
+                {"camel_thorn_planks", "camel_thorn_wood_spores", TreeBlocks.CAMEL_THORN_PLANKS.get().asItem()},
+                {"baobab_planks", "baobab_log", TreeBlocks.BAOBAB_PLANKS.get().asItem()}};
+        for (Object[] c : cases) {
+            var id = ResourceLocation.fromNamespaceAndPath(SavannaMod.MODID, (String) c[0]);
+            var recipe = level.getRecipeManager().byKey(id).orElse(null);
+            if (recipe == null) {
+                helper.fail("no recipe " + id);
+                return;
+            }
+            var out = recipe.value().getResultItem(level.registryAccess());
+            if (out.getItem() != c[2] || out.getCount() != 4) {
+                helper.fail(id + " makes " + out + ", not 4 " + c[2]);
+            }
+            var wood = net.minecraft.core.registries.BuiltInRegistries.ITEM.get(
+                    ResourceLocation.fromNamespaceAndPath(SavannaMod.MODID, (String) c[1]));
+            if (!recipe.value().getIngredients().get(0).test(new net.minecraft.world.item.ItemStack(wood))) {
+                helper.fail(c[1] + " does not saw into planks by " + id);
+            }
+        }
+        for (DeferredBlock<Block> planks : List.of(TreeBlocks.CAMEL_THORN_PLANKS, TreeBlocks.BAOBAB_PLANKS)) {
+            if (!planks.get().defaultBlockState().is(net.minecraft.tags.BlockTags.PLANKS)
+                    || !new net.minecraft.world.item.ItemStack(planks.get()).is(net.minecraft.tags.ItemTags.PLANKS)) {
+                helper.fail(planks.getId() + " does not count as planks");
+            }
+        }
+        // Everything planks make (the user, 2026-11-11): each has its recipe, and joins Minecraft's wooden ones.
+        for (TreeBlocks.WoodSet set : TreeBlocks.WOOD_SETS) {
+            for (DeferredBlock<? extends Block> made : List.of(set.stairs(), set.slab(), set.fence(), set.fenceGate(), set.door(),
+                    set.trapdoor(), set.pressurePlate(), set.button())) {
+                var recipe = level.getRecipeManager().byKey(made.getId()).orElse(null);
+                if (recipe == null || recipe.value().getResultItem(level.registryAccess()).getItem() != made.get().asItem()) {
+                    helper.fail("no recipe making " + made.getId());
+                }
+            }
+            if (!set.fence().get().defaultBlockState().is(net.minecraft.tags.BlockTags.WOODEN_FENCES)
+                    || !set.fenceGate().get().defaultBlockState().is(net.minecraft.tags.BlockTags.FENCE_GATES)
+                    || !set.door().get().defaultBlockState().is(net.minecraft.tags.BlockTags.WOODEN_DOORS)) {
+                helper.fail(set.planks().getId() + "'s fence, gate or door is not in Minecraft's wooden tags");
+            }
+        }
+        // Used as Minecraft's own (the user, 2026-11-11): planks make sticks and burn; the trunk wood burns, smelts into
+        // charcoal and makes a campfire (the item tags, not only the block ones).
+        for (String name : List.of("camel_thorn_planks", "baobab_planks", "umbrella_thorn_log", "camel_thorn_wood", "baobab_log")) {
+            var stack = new net.minecraft.world.item.ItemStack(net.minecraft.core.registries.BuiltInRegistries.ITEM.get(
+                    ResourceLocation.fromNamespaceAndPath(SavannaMod.MODID, name)));
+            if (stack.getBurnTime(net.minecraft.world.item.crafting.RecipeType.SMELTING) <= 0) {
+                helper.fail(name + " does not burn in a furnace");
+            }
+            boolean log = name.contains("log") || name.endsWith("_wood");
+            var input = new net.minecraft.world.item.crafting.SingleRecipeInput(stack);
+            if (log && level.getRecipeManager().getRecipeFor(net.minecraft.world.item.crafting.RecipeType.SMELTING, input, level)
+                    .map(r -> r.value().getResultItem(level.registryAccess()).getItem()).orElse(null) != net.minecraft.world.item.Items.CHARCOAL) {
+                helper.fail(name + " does not smelt into charcoal");
+            }
+            if (log && !stack.is(net.minecraft.tags.ItemTags.LOGS)) {
+                helper.fail(name + " is no log for campfires and smokers");
+            }
+            if (!log) {
+                var sticks = net.minecraft.world.item.crafting.CraftingInput.of(1, 2, List.of(stack, stack));
+                if (level.getRecipeManager().getRecipeFor(net.minecraft.world.item.crafting.RecipeType.CRAFTING, sticks, level)
+                        .map(r -> r.value().getResultItem(level.registryAccess()).getItem()).orElse(null) != net.minecraft.world.item.Items.STICK) {
+                    helper.fail(name + " does not make sticks");
+                }
+            }
+        }
+        // Signs and boats (the user, 2026-11-11): recipes, hanging signs cut from the trunk wood, the signs hold their
+        // writing (Minecraft's sign block entity), and a boat breaks back into its own item.
+        int x = 40;
+        for (var items : com.antcolonies.savanna.registry.SavannaItems.WOOD_ITEMS) {
+            for (var made : items.all()) {
+                var recipe = level.getRecipeManager().byKey(made.getId()).orElse(null);
+                if (recipe == null || recipe.value().getResultItem(level.registryAccess()).getItem() != made.get()) {
+                    helper.fail("no recipe making " + made.getId());
+                }
+            }
+            var boatType = items.boat() == com.antcolonies.savanna.registry.SavannaItems.CAMEL_THORN_ITEMS.boat()
+                    ? com.antcolonies.savanna.registry.SavannaBoats.CAMEL_THORN.getValue() : com.antcolonies.savanna.registry.SavannaBoats.BAOBAB.getValue();
+            if (boatType.getPlanks() == net.minecraft.world.level.block.Blocks.OAK_PLANKS
+                    || !boatType.getName().startsWith(SavannaMod.MODID + ":")) {
+                helper.fail(items.boat().getId() + " is not a boat kind of its own: " + boatType.getName());
+            }
+            var boat = new net.minecraft.world.entity.vehicle.Boat(level, 0, 0, 0);
+            boat.setVariant(boatType);
+            if (boat.getDropItem() != items.boat().get()) {
+                helper.fail(items.boat().getId() + " breaks into " + boat.getDropItem());
+            }
+        }
+        for (TreeBlocks.WoodSet set : TreeBlocks.WOOD_SETS) {
+            var hanging = level.getRecipeManager().byKey(set.hangingSign().getId()).orElseThrow().value();
+            var log = net.minecraft.core.registries.BuiltInRegistries.ITEM.get(
+                    ResourceLocation.fromNamespaceAndPath(SavannaMod.MODID, set.name() + "_log"));
+            if (hanging.getIngredients().stream().noneMatch(i -> i.test(new net.minecraft.world.item.ItemStack(log)))) {
+                helper.fail(set.name() + " hanging signs are not cut from its logs");
+            }
+            for (var sign : List.<DeferredBlock<? extends Block>>of(set.sign(), set.hangingSign())) {
+                BlockPos pos = new BlockPos(x, SURFACE + 2, 40);
+                x += 2;
+                helper.setBlock(pos, sign.get());
+                if (!(helper.getBlockEntity(pos) instanceof net.minecraft.world.level.block.entity.SignBlockEntity)) {
+                    helper.fail(sign.getId() + " has no sign to write on");
+                }
+            }
+        }
     }
 
     private static BlockState joined(GameTestHelper helper, BlockPos relative) {

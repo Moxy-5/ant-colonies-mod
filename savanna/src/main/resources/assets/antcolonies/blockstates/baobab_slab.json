@@ -1,0 +1,13 @@
+{
+  "variants": {
+    "type=bottom": {
+      "model": "antcolonies:block/baobab_slab"
+    },
+    "type=double": {
+      "model": "antcolonies:block/baobab_planks"
+    },
+    "type=top": {
+      "model": "antcolonies:block/baobab_slab_top"
+    }
+  }
+}

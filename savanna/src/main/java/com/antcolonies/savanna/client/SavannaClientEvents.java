@@ -55,6 +55,13 @@ public class SavannaClientEvents {
                 .texOffs(0, 4).addBox(-4.0F, -1.0F, -1.0F, 2.0F, 2.0F, 2.0F), net.minecraft.client.model.geom.PartPose.ZERO);
         return net.minecraft.client.model.geom.builders.LayerDefinition.create(mesh, 16, 16).bakeRoot();
     }
+    /** The camel thorn and baobab sign pictures (Minecraft makes the sign list once; this adds ours if it was early). */
+    @SubscribeEvent
+    public static void onClientSetup(net.neoforged.fml.event.lifecycle.FMLClientSetupEvent event) {
+        event.enqueueWork(() -> com.antcolonies.savanna.registry.TreeBlocks.WOOD_SETS
+                .forEach(set -> net.minecraft.client.renderer.Sheets.addWoodType(set.type())));
+    }
+
     @SubscribeEvent
     public static void onRegisterRenderers(EntityRenderersEvent.RegisterRenderers event) {
         // M8 step 1e: termite leftovers carried out to the heap: a small heap of them in the jaws.

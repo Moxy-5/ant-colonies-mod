@@ -22,6 +22,21 @@ import net.minecraft.resources.ResourceLocation;
 import net.minecraft.tags.TagKey;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.level.block.ButtonBlock;
+import net.minecraft.world.level.block.DoorBlock;
+import net.minecraft.world.level.block.FenceBlock;
+import net.minecraft.world.level.block.FenceGateBlock;
+import net.minecraft.world.level.block.PressurePlateBlock;
+import net.minecraft.world.level.block.SlabBlock;
+import net.minecraft.world.level.block.StairBlock;
+import net.minecraft.world.level.block.TrapDoorBlock;
+import net.minecraft.world.level.block.CeilingHangingSignBlock;
+import net.minecraft.world.level.block.StandingSignBlock;
+import net.minecraft.world.level.block.WallHangingSignBlock;
+import net.minecraft.world.level.block.WallSignBlock;
+import net.minecraft.world.level.block.state.properties.BlockSetType;
+import net.minecraft.world.level.block.state.properties.NoteBlockInstrument;
+import net.minecraft.world.level.block.state.properties.WoodType;
 import net.minecraft.world.level.block.FireBlock;
 import net.minecraft.world.level.block.RotatedPillarBlock;
 import net.minecraft.world.level.block.SoundType;
@@ -60,6 +75,36 @@ public final class TreeBlocks {
     public static final Kind CAMEL_THORN = kind("camel_thorn", MapColor.TERRACOTTA_GRAY, 2.5F, MapColor.TERRACOTTA_GREEN, true);
     public static final Kind BAOBAB = kind("baobab", MapColor.TERRACOTTA_LIGHT_GRAY, 1.0F, MapColor.COLOR_GREEN, false);
     public static final List<Kind> KINDS = List.of(UMBRELLA_THORN, CAMEL_THORN, BAOBAB);
+
+    /**
+     * Planks sawn from the trees' wood (the user, 2026-11-11, look A of tools/plank_art.py for both): the camel thorn's
+     * dark red-brown boards, hard like its wood, and the baobab's pale soft ones. The umbrella thorn's logs make
+     * Minecraft's own acacia planks (the user's pick: so acacia planks stay in the game), so it has no planks block here.
+     */
+    public static final DeferredBlock<Block> CAMEL_THORN_PLANKS = add(SavannaBlocks.BLOCKS.registerBlock("camel_thorn_planks", Block::new,
+            BlockBehaviour.Properties.of().mapColor(MapColor.TERRACOTTA_RED).strength(2.5F, 3.0F).sound(SoundType.WOOD).ignitedByLava()));
+    /** What camel thorn planks make (the user, 2026-11-11: "all the rest of things"), as Minecraft's woods. */
+    public static final WoodSet CAMEL_THORN_SET = woodSet("camel_thorn", CAMEL_THORN_PLANKS, MapColor.TERRACOTTA_RED, 2.5F);
+    public static final DeferredBlock<Block> BAOBAB_PLANKS = add(SavannaBlocks.BLOCKS.registerBlock("baobab_planks", Block::new,
+            BlockBehaviour.Properties.of().mapColor(MapColor.SAND).strength(1.0F, 2.0F).sound(SoundType.WOOD).ignitedByLava()));
+    public static final WoodSet BAOBAB_SET = woodSet("baobab", BAOBAB_PLANKS, MapColor.SAND, 1.0F);
+    public static final List<WoodSet> WOOD_SETS = List.of(CAMEL_THORN_SET, BAOBAB_SET);
+
+    /**
+     * The things a kind's planks are made into, each as Minecraft's own wooden one. The signs are not in {@link #ALL}:
+     * a sign item places a standing or a wall sign, so their items are made by hand in {@link SavannaItems}.
+     * The boats are in {@link SavannaBoats}.
+     */
+    public record WoodSet(String name, WoodType type, DeferredBlock<Block> planks, DeferredBlock<StairBlock> stairs, DeferredBlock<SlabBlock> slab,
+                          DeferredBlock<FenceBlock> fence, DeferredBlock<FenceGateBlock> fenceGate, DeferredBlock<DoorBlock> door,
+                          DeferredBlock<TrapDoorBlock> trapdoor, DeferredBlock<PressurePlateBlock> pressurePlate,
+                          DeferredBlock<ButtonBlock> button, DeferredBlock<StandingSignBlock> sign, DeferredBlock<WallSignBlock> wallSign,
+                          DeferredBlock<CeilingHangingSignBlock> hangingSign, DeferredBlock<WallHangingSignBlock> wallHangingSign) {
+        /** The blocks that burn like Minecraft's wooden ones (doors, trapdoors, plates and buttons do not burn there either). */
+        public List<DeferredBlock<? extends Block>> burning() {
+            return List.of(planks, stairs, slab, fence, fenceGate);
+        }
+    }
 
     /** Thorny acacia twigs at the crown's edge and on young trees: slow and prick anything big, never insects. */
     public static final DeferredBlock<ThornyTwigBlock> THORNY_TWIG = add(SavannaBlocks.BLOCKS.registerBlock("thorny_twig", ThornyTwigBlock::new,
@@ -151,6 +196,39 @@ public final class TreeBlocks {
         return new Kind(name, log, wood, branch, leaves, seedling, deadLeaves);
     }
 
+    private static WoodSet woodSet(String name, DeferredBlock<Block> planks, MapColor colour, float hardness) {
+        BlockSetType set = BlockSetType.register(new BlockSetType(SavannaMod.MODID + ":" + name));
+        WoodType type = WoodType.register(new WoodType(SavannaMod.MODID + ":" + name, set));
+        java.util.function.Supplier<BlockBehaviour.Properties> solid = () -> BlockBehaviour.Properties.of().mapColor(colour)
+                .strength(hardness, 3.0F).sound(SoundType.WOOD).ignitedByLava();
+        var stairs = add(SavannaBlocks.BLOCKS.registerBlock(name + "_stairs",
+                p -> new StairBlock(planks.get().defaultBlockState(), p), solid.get()));
+        var slab = add(SavannaBlocks.BLOCKS.registerBlock(name + "_slab", SlabBlock::new, solid.get()));
+        var fence = add(SavannaBlocks.BLOCKS.registerBlock(name + "_fence", FenceBlock::new, solid.get()));
+        var gate = add(SavannaBlocks.BLOCKS.registerBlock(name + "_fence_gate", p -> new FenceGateBlock(type, p), solid.get()));
+        var door = add(SavannaBlocks.BLOCKS.registerBlock(name + "_door", p -> new DoorBlock(set, p),
+                BlockBehaviour.Properties.of().mapColor(colour).strength(3.0F).sound(SoundType.WOOD).noOcclusion().ignitedByLava()
+                        .pushReaction(PushReaction.DESTROY)));
+        var trapdoor = add(SavannaBlocks.BLOCKS.registerBlock(name + "_trapdoor", p -> new TrapDoorBlock(set, p),
+                BlockBehaviour.Properties.of().mapColor(colour).strength(3.0F).sound(SoundType.WOOD).noOcclusion().ignitedByLava()
+                        .isValidSpawn((state, level, pos, entity) -> false)));
+        var plate = add(SavannaBlocks.BLOCKS.registerBlock(name + "_pressure_plate", p -> new PressurePlateBlock(set, p),
+                BlockBehaviour.Properties.of().mapColor(colour).noCollission().strength(0.5F).sound(SoundType.WOOD).ignitedByLava()
+                        .pushReaction(PushReaction.DESTROY)));
+        var button = add(SavannaBlocks.BLOCKS.registerBlock(name + "_button", p -> new ButtonBlock(set, 30, p),
+                BlockBehaviour.Properties.of().noCollission().strength(0.5F).sound(SoundType.WOOD).pushReaction(PushReaction.DESTROY)));
+        // Signs as Minecraft's: the wall ones drop the standing or hanging sign.
+        java.util.function.Supplier<BlockBehaviour.Properties> signs = () -> BlockBehaviour.Properties.of().mapColor(colour)
+                .forceSolidOn().instrument(NoteBlockInstrument.BASS).noCollission().strength(1.0F).ignitedByLava();
+        var sign = SavannaBlocks.BLOCKS.registerBlock(name + "_sign", p -> new StandingSignBlock(type, p), signs.get());
+        var wallSign = SavannaBlocks.BLOCKS.registerBlock(name + "_wall_sign",
+                p -> new WallSignBlock(type, p.dropsLike(sign.get())), signs.get());
+        var hanging = SavannaBlocks.BLOCKS.registerBlock(name + "_hanging_sign", p -> new CeilingHangingSignBlock(type, p), signs.get());
+        var wallHanging = SavannaBlocks.BLOCKS.registerBlock(name + "_wall_hanging_sign",
+                p -> new WallHangingSignBlock(type, p.dropsLike(hanging.get())), signs.get());
+        return new WoodSet(name, type, planks, stairs, slab, fence, gate, door, trapdoor, plate, button, sign, wallSign, hanging, wallHanging);
+    }
+
     private static RotBark rotBark(DeferredBlock<? extends RotatedPillarBlock> base, String name,
                                    java.util.function.Supplier<BlockBehaviour.Properties> properties,
                                    java.util.function.Function<BlockBehaviour.Properties, ? extends RotatedPillarBlock> make) {
@@ -204,6 +282,12 @@ public final class TreeBlocks {
             fire.setFlammable(kind.branch().get(), 5, 0);
             fire.setFlammable(kind.leaves().get(), 30, 0);
             fire.setFlammable(kind.deadLeaves().get(), 60, 100);
+        }
+        // Planks burn like Minecraft's own (sawn boards burn away; only a living tree chars instead).
+        for (WoodSet set : WOOD_SETS) {
+            for (DeferredBlock<? extends Block> block : set.burning()) {
+                fire.setFlammable(block.get(), 5, 20);
+            }
         }
         fire.setFlammable(THORNY_TWIG.get(), 60, 100);
         fire.setFlammable(CAMEL_THORN_PODS.get(), 30, 60);

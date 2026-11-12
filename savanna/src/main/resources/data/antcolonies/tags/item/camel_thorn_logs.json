@@ -1,0 +1,9 @@
+{
+  "replace": false,
+  "values": [
+    "antcolonies:camel_thorn_log",
+    "antcolonies:camel_thorn_wood",
+    "antcolonies:camel_thorn_wood_spores",
+    "antcolonies:camel_thorn_wood_wound"
+  ]
+}
