@@ -55,6 +55,19 @@ public final class StallWatch {
     /** The stalls of this run, one line each: how long and the first of our calls seen (or Minecraft's top). */
     public static final List<String> SEEN = java.util.Collections.synchronizedList(new ArrayList<>());
 
+    private static long gcAtStart;
+
+    /** The time Java has spent in memory-clearing pauses so far (ms); a pause stops every thread, the server's too. */
+    public static long gcMillis() {
+        long sum = 0;
+        for (java.lang.management.GarbageCollectorMXBean bean : java.lang.management.ManagementFactory.getGarbageCollectorMXBeans()) {
+            if (!bean.getName().contains("Concurrent")) {
+                sum += Math.max(0, bean.getCollectionTime());
+            }
+        }
+        return sum;
+    }
+
     private StallWatch() {
     }
 
@@ -64,6 +77,7 @@ public final class StallWatch {
             serverThread = Thread.currentThread();
             startHelper();
         }
+        gcAtStart = gcMillis();
         tickStart = System.nanoTime();
     }
 
@@ -81,7 +95,7 @@ public final class StallWatch {
         }
         long ms = (System.nanoTime() - start) / 1_000_000;
         if (ms >= SPIKE_MS) {
-            report(ms, taken);
+            report(ms, gcMillis() - gcAtStart, taken);
         }
     }
 
@@ -130,13 +144,31 @@ public final class StallWatch {
         }
     }
 
-    private static void report(long ms, List<StackTraceElement[]> taken) {
+    private static void report(long ms, long gc, List<StackTraceElement[]> taken) {
         boolean stall = ms >= STALL_MS;
         if (stall) {
             STALLS.incrementAndGet();
             STALL_TOTAL_MS.addAndGet(ms);
             STALL_LONGEST_MS.accumulateAndGet(ms, Math::max);
         }
+        String[] ours = new String[1];
+        String out = where(taken, stall ? LINES : SPIKE_LINES, ours);
+        StackTraceElement[] typical = taken.get(taken.size() / 2);
+        String top = typical.length > 0 ? name(typical[0]) : "?";
+        if (stall) {
+            SEEN.add(ms + " ms, " + (ours[0] != null ? ours[0] : "Minecraft: " + top));
+        }
+        ColonyFrameworkMod.LOGGER.warn("[{}] a server tick took {} ms, {} ms of it Java clearing memory; where the time went ({} looks,"
+                + " deepest first):{}",
+                stall ? "stall" : "spike", ms, gc, taken.size(), out);
+    }
+
+    /**
+     * Where a thread's time went, from looks at it: the calls of the middle look seen in at least half the looks, deepest
+     * first, at most {@code maxLines} lines (shared with the frame watch). {@code ours}, if given, gets the first of our
+     * own calls.
+     */
+    public static String where(List<StackTraceElement[]> taken, int maxLines, String[] ours) {
         Map<String, Integer> counts = new HashMap<>();
         for (StackTraceElement[] stack : taken) {
             Set<String> once = new LinkedHashSet<>();
@@ -147,10 +179,8 @@ public final class StallWatch {
                 counts.merge(name, 1, Integer::sum);
             }
         }
-        // The calls of the look most like the others, deepest first, those seen in at least half the looks.
         StackTraceElement[] typical = taken.get(taken.size() / 2);
         StringBuilder out = new StringBuilder();
-        String ours = null;
         int lines = 0;
         Set<String> shown = new LinkedHashSet<>();
         for (StackTraceElement frame : typical) {
@@ -159,19 +189,15 @@ public final class StallWatch {
             if (n * 2 < taken.size() || !shown.add(name) || boilerplate(name)) {
                 continue;
             }
-            if (ours == null && frame.getClassName().startsWith("com.antcolonies") && !frame.getClassName().contains(".debug.")) {
-                ours = name + ":" + frame.getLineNumber();
+            if (ours != null && ours[0] == null && frame.getClassName().startsWith("com.antcolonies")
+                    && !frame.getClassName().contains(".debug.")) {
+                ours[0] = name + ":" + frame.getLineNumber();
             }
-            if (lines++ < (stall ? LINES : SPIKE_LINES)) {
+            if (lines++ < maxLines) {
                 out.append(String.format("%n    %3d%% %s:%d", n * 100 / taken.size(), name, frame.getLineNumber()));
             }
         }
-        String top = typical.length > 0 ? name(typical[0]) : "?";
-        if (stall) {
-            SEEN.add(ms + " ms, " + (ours != null ? ours : "Minecraft: " + top));
-        }
-        ColonyFrameworkMod.LOGGER.warn("[{}] a server tick took {} ms; where the time went ({} looks, deepest first):{}",
-                stall ? "stall" : "spike", ms, taken.size(), out);
+        return out.toString();
     }
 
     private static String name(StackTraceElement frame) {
