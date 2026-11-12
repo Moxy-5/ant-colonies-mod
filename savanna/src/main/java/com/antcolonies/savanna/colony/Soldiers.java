@@ -37,22 +37,38 @@ import net.minecraft.world.phys.AABB;
 /**
  * The colony's soldiers (species with {@code soldiers} in their profile: termites). How many it wants (about 1 in 10
  * of its termites, 3 minors to a major), which nymphs grow into soldiers instead of workers ("on demand": when the
- * colony has fewer than it wants), and where they stand guard (see {@link #posts}): the majors inside the nest, the
+ * colony has fewer than it wants), and where they keep watch (see {@link #posts}): the majors inside the nest, the
  * minors outside at foraging time (beside the ways out and along the foragers' trails) and inside otherwise. When the
  * foraging is over the minors stay out until the workers are in, then go in last ({@link #minorsOut}).
+ * <p>
+ * The termite alarm rework, step 2 (2026-11-12): a post is the middle of a soldier's <b>beat</b>, a short stretch it
+ * walks up and down ({@code WalkBeatGoal}; no soldier stands still on guard), and the soldiers go where the workers
+ * are: by day the feeding places the workers eat at under cover ({@link FeedingSpots#byDayPlaces}) each get a minor
+ * first, a major once the heart of the nest is held, then a second minor ({@link Kind#FEEDING}).
  */
 public class Soldiers {
     /**
-     * A place a soldier guards: it stands in {@code cell} and faces {@code facing} (a block the way trouble would come
-     * from).
+     * A soldier's beat: {@code cell} is its middle (the soldier walks a few blocks round it, see {@link #beatReach}),
+     * {@code facing} a block the way trouble would come from (it mostly looks that way when it pauses).
      */
     public record Post(BlockPos cell, BlockPos facing, Kind kind) {
     }
 
-    /** Where a post is: inside the nest, outside beside a way out, or outside along a foragers' trail. */
+    /**
+     * Where a beat is: inside the nest, in a feeding place fed at by day under cover, outside beside a way out, or
+     * outside along a foragers' trail.
+     */
     public enum Kind {
-        INSIDE, WAY_OUT, TRAIL
+        INSIDE, FEEDING, WAY_OUT, TRAIL
     }
+
+    /** How far (blocks) from its beat's middle a soldier walks: a few steps under cover, a step or two in the open. */
+    public static int beatReach(Kind kind) {
+        return kind == Kind.INSIDE || kind == Kind.FEEDING ? 2 : 1;
+    }
+
+    /** How often (ticks) the beats at the feeding places are worked out again. */
+    private static final int FEEDING_TICKS = 100;
 
     /** How often (ticks) the posts outside are worked out again (the trails change as the foragers move on). */
     private static final int OUTSIDE_TICKS = 20;
@@ -63,6 +79,9 @@ public class Soldiers {
     /** The minors' posts outside, and when they were worked out. */
     private List<Post> outsidePosts = List.of();
     private long outsideAt = Long.MIN_VALUE;
+    /** The beats at the by-day feeding places: a first minor's, a major's and a second minor's per place; and when worked out. */
+    private List<List<Post>> feedingPosts = List.of(List.of(), List.of(), List.of());
+    private long feedingAt = Long.MIN_VALUE;
     /** Whether the minors went out this foraging time and have not been called in yet. Not saved. */
     private boolean escorting;
     /** When the foraging time was seen to be over (from then on the minors wait for the workers). */
@@ -191,16 +210,25 @@ public class Soldiers {
                     add(level, posts, wayIn.get(0), bottom);
                 }
             }
+            // The heart held, one major goes out to the first feeding place (the user's ask: majors where the workers
+            // are too); further feeding places only after the garden doorways.
+            List<Post> feeding = feedingPosts(level).get(1);
+            if (!feeding.isEmpty()) {
+                posts.add(feeding.get(0));
+            }
             for (NestPlan.Chamber garden : nest.getGardens(level)) {
                 BlockPos door = garden.cells().get(0);
                 BlockPos out = door.offset(Integer.signum(door.getX() - garden.center().getX()), 0,
                         Integer.signum(door.getZ() - garden.center().getZ()));
                 add(level, posts, door, out);
             }
+            posts.addAll(feeding.subList(Math.min(1, feeding.size()), feeding.size()));
         } else {
             if (minorsOut(level)) {
                 posts.addAll(outsidePosts(level));
             }
+            // Where the workers feed by day: a minor to each feeding place before the tunnel ends.
+            posts.addAll(feedingPosts(level).get(0));
             List<NestPlan.ForagingTunnel> own = nest.ownForagingTunnels(level);
             for (NestPlan.ForagingTunnel tunnel : nest.getForagingTunnels(level)) {
                 List<BlockPos> cells = tunnel.tunnel();
@@ -214,8 +242,76 @@ public class Soldiers {
                     add(level, posts, cells.get(cells.size() - 2), tunnel.end());
                 }
             }
+            posts.addAll(feedingPosts(level).get(2));
         }
+        // (a feeding gallery may share a cell with a tunnel's end or a doorway: one beat to a cell)
+        Set<BlockPos> seen = new HashSet<>();
+        posts.removeIf(post -> !seen.add(post.cell()));
         return posts;
+    }
+
+    /**
+     * The beats at the colony's by-day feeding places ({@link FeedingSpots#byDayPlaces}: galleries under dead wood and
+     * closed mud runways, where the workers eat by day and the raids come), worked out every {@link #FEEDING_TICKS}:
+     * three lists, a first minor's beat per place (the middle of its cells), a major's (the nest end) and a second
+     * minor's (the far end), each facing the food. Only cells under the colony's cover with a floor count; a place
+     * with fewer such cells has fewer beats (a cell is one soldier's).
+     */
+    private List<List<Post>> feedingPosts(Level level) {
+        long now = level.getGameTime();
+        if (feedingAt != Long.MIN_VALUE && now - feedingAt < FEEDING_TICKS && now >= feedingAt) {
+            return feedingPosts;
+        }
+        feedingAt = now;
+        List<Post> first = new ArrayList<>(), majors = new ArrayList<>(), second = new ArrayList<>();
+        if (numbers() != null && level instanceof ServerLevel server) {
+            for (FeedingSpots.ByDay place : FeedingSpots.byDayPlaces(server, colony)) {
+                List<BlockPos> cells = new ArrayList<>();
+                for (BlockPos cell : place.cells()) {
+                    if (isBeatCellInside(level, cell)) {
+                        cells.add(cell);
+                    }
+                }
+                if (cells.isEmpty()) {
+                    continue;
+                }
+                first.add(new Post(cells.get(cells.size() / 2), place.food(), Kind.FEEDING));
+                if (cells.size() >= 2) {
+                    majors.add(new Post(cells.get(0), place.food(), Kind.FEEDING));
+                }
+                if (cells.size() >= 3) {
+                    second.add(new Post(cells.get(cells.size() - 1), place.food(), Kind.FEEDING));
+                }
+            }
+        }
+        feedingPosts = List.of(List.copyOf(first), List.copyOf(majors), List.copyOf(second));
+        return feedingPosts;
+    }
+
+    /** Whether a soldier may walk its beat through this cell under cover: loaded, open, with a floor, inside the colony's nest or galleries. */
+    public boolean isBeatCellInside(Level level, BlockPos cell) {
+        if (!LandReady.at(level, cell)) {
+            return false;
+        }
+        BlockPos floor = cell.below();
+        return Nest.isDugOut(level, cell) && level.getBlockState(floor).isFaceSturdy(level, floor, Direction.UP)
+                && colony.nest().isInside(level, cell);
+    }
+
+    /** Whether a soldier on a beat of this kind may walk through this cell. */
+    public boolean isBeatCell(Level level, Kind kind, BlockPos cell) {
+        return kind == Kind.INSIDE || kind == Kind.FEEDING ? isBeatCellInside(level, cell) : isGuardSpotOutside(level, cell);
+    }
+
+    /** The beat this soldier holds now, or null (for tests and the colony list). */
+    @Nullable
+    public Post beatOf(Level level, TermiteSoldierEntity soldier) {
+        for (Post post : posts(level, soldier.getRank())) {
+            if (soldier.getUUID().equals(held.get(post.cell()))) {
+                return post;
+            }
+        }
+        return null;
     }
 
     private static void add(Level level, List<Post> posts, BlockPos cell, BlockPos facing) {
@@ -343,7 +439,7 @@ public class Soldiers {
      * Whether a minor can stand guard here outside: an open cell (no fluid) on solid ground that isn't leaves, outside
      * the nest and the mound, not a foraging hole, and not where the mound is to grow.
      */
-    private boolean isGuardSpotOutside(Level level, BlockPos cell) {
+    public boolean isGuardSpotOutside(Level level, BlockPos cell) {
         if (!LandReady.at(level, cell)) {
             return false;
         }

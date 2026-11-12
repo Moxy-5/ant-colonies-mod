@@ -108,3 +108,32 @@ Colony of 186 workers, 14 minor and 5 major soldiers; 20 raiders (10 majors, 10 
 Against the targets: the raid costs the ants next to nothing (target 1 to 5 hurt, 0 to 2 dead), and takes up to three
 times the 3 to 6 termites it should. A new ant's health settles in its first ticks, so the scene counts "hurt" as health
 lost after tick 20.
+
+## Step 2, built 2026-11-12: soldiers walk beats where the workers are
+
+- **A post is now a beat** (`Soldiers.Post`, `Soldiers.beatReach`): its middle cell and the way trouble comes from. On it
+  a soldier walks a few steps to another cell of the beat (2 blocks round the middle under cover, 1 in the open), pauses
+  2 to 6 s looking roughly outward (up to 60 degrees to either side, a new side each pause), and walks on, at 0.7 of its
+  walk (`WalkBeatGoal`, was `GuardPostGoal`; the next cell is found by stepping out from where it stands through cells
+  of the beat, so no route search that could fail). All my picks.
+- **Feeding places get soldiers by day** (`Soldiers.feedingPosts`, kind `FEEDING`, from `FeedingSpots.byDayPlaces`,
+  worked out every 5 s): each by-day feeding place a minor first (before any tunnel end), a major once the royal
+  doorway and the way in from the shaft are held (before the garden doorways; further feeding places after them), then
+  a second minor. Only cells under the colony's cover with a floor count.
+- **A soldier with no beat strolls now and then** like the workers (it stood still since 3Q).
+- **Not in this step** (honest): no new clips (antenna sweep, jaws, tapping workers); the ring at a break and the
+  soldiers shut out by a seal still stand still (step 3); a mud runway's cells get a beat only where the nest counts
+  them as inside (not checked in the game); a beat far out that cannot be reached costs a failed route search a minute
+  per soldier that tries it.
+- **Tests:** `soldiersWalkBeatsAtAFeedingPlaceByDay` (new: a minor and one of three majors on beats at a feeding
+  gallery by day, the other two majors at the heart); the two guard tests now check "on its own beat" and that every
+  soldier has stood in at least two cells (no statues), in place of the exact cell and facing; `soldiers,raids,away` 57
+  of 57 and `colony` 25 of 25 on 6 servers.
+- **The measuring scene again, 6 runs: no change, as expected** (it has no feeding place on the colony's record, so no
+  soldier has a beat there: 5 real soldiers, the nearest 5 to 7 blocks off, at most 1 or 2 at the break, raiders 0 or 1
+  dead, 1 to 3 hurt). Step 2 changes where soldiers are and how they look; the raid's outcome is steps 3 and 5.
+- **A warning for step 5, from a scene tried and dropped** (a feeding place on the record, raiders after 30 s; too
+  noisy to keep, 0 to 19 raiders dead between runs): when soldiers were at the feeding place in number the raid was
+  wiped out (11 soldiers within 4 blocks: 19 of 20 raiders dead), and with 3 or 4 near, 1 to 8 died. So once step 3
+  brings soldiers to a trouble quickly, the fight numbers (a soldier's bite against a Matabele's health) need the
+  balance pass before the user plays raids, or the termites will be far too strong.

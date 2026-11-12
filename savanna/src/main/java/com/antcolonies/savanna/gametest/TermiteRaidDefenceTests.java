@@ -13,6 +13,7 @@ import com.antcolonies.savanna.SavannaMod;
 import com.antcolonies.savanna.colony.Alarm;
 import com.antcolonies.savanna.colony.RaidDefence;
 import com.antcolonies.savanna.colony.SavannaParts;
+import com.antcolonies.savanna.colony.Soldiers;
 import com.antcolonies.savanna.entity.MatabeleEntity;
 import com.antcolonies.savanna.entity.TermiteSoldierEntity;
 import com.antcolonies.savanna.entity.TermiteWorkerEntity;
@@ -530,6 +531,65 @@ public class TermiteRaidDefenceTests {
                 helper.assertTrue(brokeAt[0] >= 0 || !stung.isEmpty(), "the raid never happened: the cover was not broken and no termite stung");
                 helper.succeed();
             };
+        });
+    }
+
+    /**
+     * The termite alarm rework, step 2: soldiers go where the workers are. The same colony by day, with a feeding place
+     * on its record: the last cells of its first foraging tunnel a gallery under dead wood, two blocks of it eaten
+     * through and plastered with mud (so the workers can eat there by day under cover, the place a raid comes to). A
+     * minor and three majors are put in the royal chamber. The minor takes the beat at the feeding place before any
+     * tunnel end; two majors hold the heart (the royal doorway, the way in from the shaft) and the third goes out to
+     * the feeding place too (the user's ask); both are there within the time, on their beats.
+     */
+    @GameTest(template = "arena", timeoutTicks = 4000, skyAccess = true, batch = "termite_feeding_beats")
+    public static void soldiersWalkBeatsAtAFeedingPlaceByDay(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        Scene scene = scene(helper, 9.0);
+        List<TermiteSoldierEntity> soldiers = new java.util.ArrayList<>();
+        helper.runAfterDelay(15, () -> {
+            Colony colony = scene.colony[0];
+            List<BlockPos> cells = scene.tunnel[0].tunnel();
+            int at = cells.size() - 2;
+            helper.assertTrue(at >= 4, "the foraging tunnel is too short for the test: " + cells.size() + " cells");
+            List<BlockPos> gallery = List.of(cells.get(at - 3), cells.get(at - 2), cells.get(at - 1), cells.get(at));
+            // (the mud: a crust with its plate toward the gallery, so the gallery is closed all round and fed in by day)
+            net.minecraft.world.level.block.state.BlockState mud = ((com.antcolonies.block.FacedWall) com.antcolonies.savanna.registry.SavannaBlocks.MUD_CRUST.get())
+                    .withFace(com.antcolonies.savanna.registry.SavannaBlocks.MUD_CRUST.get().defaultBlockState(), net.minecraft.core.Direction.DOWN);
+            for (int i = 0; i < 4; i++) {
+                level.setBlock(gallery.get(i).above(), i == 1 || i == 2 ? mud
+                        : com.antcolonies.savanna.registry.SavannaBlocks.DEAD_WOOD.get().defaultBlockState(), 3);
+            }
+            BlockPos food = gallery.get(3).above();
+            colony.foodMap().knowForTests(food);
+            colony.nest().foodWays().addNewTunnelForTests(new com.antcolonies.colony.FoodWays.NewTunnel(scene.tunnel[0], food, gallery));
+            helper.assertTrue(com.antcolonies.savanna.colony.FeedingSpots.byDayPlaces(level, colony).size() == 1,
+                    "the test's feeding gallery does not count as fed at by day");
+            List<BlockPos> room = colony.nest().getHomeChamber(level).room();
+            soldiers.add(TermiteSoldierTests.put(level, SavannaEntities.TERMITE_MINOR_SOLDIER.get(), room.get(0)));
+            for (int i = 1; i <= 3; i++) {
+                soldiers.add(TermiteSoldierTests.put(level, SavannaEntities.TERMITE_MAJOR_SOLDIER.get(), room.get(i % room.size())));
+            }
+        });
+        helper.succeedWhen(() -> {
+            Colony colony = scene.colony[0];
+            helper.assertTrue(colony != null && soldiers.size() == 4, "not started");
+            Soldiers part = colony.part(SavannaParts.SOLDIERS).orElseThrow();
+            int majorsThere = 0;
+            StringBuilder where = new StringBuilder();
+            for (TermiteSoldierEntity soldier : soldiers) {
+                Soldiers.Post post = part.beatOf(level, soldier);
+                String wrong = TermiteSoldierTests.offItsBeat(soldier, post);
+                where.append(soldier.getRank()).append(' ').append(post == null ? "no beat" : post.kind() + (wrong == null ? "" : " (not there yet)")).append("; ");
+                if (soldier.getRank() == TermiteSoldierEntity.Rank.MAJOR && post != null && post.kind() == Soldiers.Kind.FEEDING && wrong == null) {
+                    majorsThere++;
+                }
+            }
+            Soldiers.Post minors = part.beatOf(level, soldiers.get(0));
+            helper.assertTrue(minors != null && minors.kind() == Soldiers.Kind.FEEDING && TermiteSoldierTests.offItsBeat(soldiers.get(0), minors) == null,
+                    "the minor is not on a beat at the feeding place: " + where);
+            helper.assertTrue(majorsThere == 1, majorsThere + " majors on a beat at the feeding place, expected 1: " + where);
+            SavannaMod.LOGGER.info("[soldier-test] feeding beats at tick {}: {}", helper.getTick(), where);
         });
     }
 

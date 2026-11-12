@@ -16,7 +16,7 @@ import com.antcolonies.savanna.colony.SavannaParts;
 import com.antcolonies.entity.goal.AntWanderGoal;
 import com.antcolonies.savanna.entity.goal.DefendGoal;
 import com.antcolonies.entity.goal.GoInsideGoal;
-import com.antcolonies.savanna.entity.goal.GuardPostGoal;
+import com.antcolonies.savanna.entity.goal.WalkBeatGoal;
 import com.antcolonies.savanna.SavannaSpecies;
 import com.antcolonies.species.SpeciesProfile;
 
@@ -52,7 +52,7 @@ import software.bernie.geckolib.animation.RawAnimation;
  * brings it to them ({@code FeedLarvaGoal}); a soldier a nurse is on its way to holds still. One that has gone without
  * for long (the profile's {@code soldiers.slow_after_ticks}) moves at half speed (it does not starve to death).
  * <p>
- * They stand guard (see {@link GuardPostGoal}): the majors inside, at the royal chamber's doorway, the way into its
+ * They keep watch walking a short beat (see {@link WalkBeatGoal}; by day also at the feeding places): the majors inside, at the royal chamber's doorway, the way into its
  * tunnel from the shaft and the garden doorways. The minors go out at foraging time: one beside each open way out and
  * the others in a sentry line along the foragers' trail, facing out; when the foraging is over they wait at their posts
  * until the workers are in, then go in last, and by day they wait in the foraging tunnels just inside the holes (see
@@ -177,12 +177,12 @@ public class TermiteSoldierEntity extends AbstractAntEntity implements FedByNurs
         this.goalSelector.addGoal(3, new DefendGoal(this));
         // Outside when it should be in (a major put down with a spawn egg, the minors once the workers are in): back inside.
         this.goalSelector.addGoal(4, new GoInsideGoal(this));
-        this.goalSelector.addGoal(5, new GuardPostGoal(this));
-        // No post to guard (the nest is not dug that far yet, every post taken): it strolls about (inside unless it may be out).
-        // M8 step 3Q: a soldier with no post stands where it is (it only walks back to where it may be).
+        this.goalSelector.addGoal(5, new WalkBeatGoal(this));
+        // No beat to walk (the nest is not dug that far yet, every beat taken): it strolls about now and then like
+        // the workers (inside unless it may be out; the alarm rework, step 2: no soldier stands still all day).
         // No cleaning of its own (my pick): a soldier's great head hangs over its front legs, which cannot reach its
         // antennae past it; the workers clean it (AllogroomGoal), as real Macrotermes workers tend their soldiers.
-        this.goalSelector.addGoal(6, new AntWanderGoal(this, 0.8, 200, 4, () -> true).restsFirst(0.0F));
+        this.goalSelector.addGoal(6, new AntWanderGoal(this, 0.8, 200, 4, () -> true).restsFirst(1.0F));
         this.goalSelector.addGoal(7, new RandomLookAroundGoal(this));
     }
 

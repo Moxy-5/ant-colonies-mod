@@ -160,6 +160,8 @@ public class TermiteSoldierTests {
         List<TermiteSoldierEntity> soldiers = new ArrayList<>();
         long[] hungrySince = {-1};
         int[] guarding = {0};
+        // (the alarm rework, step 2: no statues; the cells each soldier was seen in while on its beat)
+        java.util.Map<java.util.UUID, Set<BlockPos>> walked = new java.util.HashMap<>();
         helper.runAfterDelay(10, () -> {
             Colony colony = TermiteMoundTests.colony(helper);
             helper.assertTrue(colony != null && !colony.isFounding(), "no termite colony with workers");
@@ -195,6 +197,9 @@ public class TermiteSoldierTests {
                 return;
             }
             guarding[0] = allAtTheirPosts(level, colony, soldiers) == null ? guarding[0] + 1 : 0;
+            if (guarding[0] > 0) {
+                soldiers.forEach(soldier -> walked.computeIfAbsent(soldier.getUUID(), id -> new HashSet<>()).add(soldier.blockPosition()));
+            }
             if (helper.getTick() % 500 == 0) {
                 SavannaMod.LOGGER.info("[soldier-test] tick {}: {}; {}; hungry major fed at {}", helper.getTick(),
                         allAtTheirPosts(level, colony, soldiers), colony.part(SavannaParts.SOLDIERS).orElseThrow().describe(level), soldiers.get(0).getLastFed());
@@ -207,7 +212,11 @@ public class TermiteSoldierTests {
                     "no nurse has fed the hungry major yet (nodules " + colony.part(SavannaParts.FUNGUS_GARDEN).orElseThrow().available(level) + ")");
             String wrong = allAtTheirPosts(level, colony, soldiers);
             helper.assertTrue(wrong == null, wrong);
-            helper.assertTrue(guarding[0] >= 60, "the soldiers have stood at their posts for only " + guarding[0] + " ticks");
+            helper.assertTrue(guarding[0] >= 60, "the soldiers have been on their beats for only " + guarding[0] + " ticks");
+            for (TermiteSoldierEntity soldier : soldiers) {
+                helper.assertTrue(walked.getOrDefault(soldier.getUUID(), Set.of()).size() >= 2, "the " + soldier.getRank() + " soldier at "
+                        + soldier.blockPosition().toShortString() + " has not walked its beat yet (it stands like a statue)");
+            }
             SavannaMod.LOGGER.info("[soldier-test] all at their posts at tick {}: {} (major posts {}, minor posts {}); hungry major fed at {}",
                     helper.getTick(), soldiers.stream().map(s -> s.getRank() + " " + s.blockPosition().toShortString()).toList(),
                     colony.part(SavannaParts.SOLDIERS).orElseThrow().posts(level, Rank.MAJOR), colony.part(SavannaParts.SOLDIERS).orElseThrow().posts(level, Rank.MINOR), soldiers.get(0).getLastFed());
@@ -223,35 +232,45 @@ public class TermiteSoldierTests {
     }
 
     /**
-     * Null if the two majors stand at the first two majors' posts and the minor at a minor's post, each on the floor
-     * facing out; otherwise what is wrong.
+     * Null if the two majors hold the first two majors' beats and the minor a minor's beat, each on the floor within
+     * its beat's reach of the beat's middle (the alarm rework, step 2: a soldier walks its beat, it no longer stands in
+     * one cell facing one way); otherwise what is wrong.
      */
     private static String allAtTheirPosts(ServerLevel level, Colony colony, List<TermiteSoldierEntity> soldiers) {
-        List<Soldiers.Post> majorPosts = colony.part(SavannaParts.SOLDIERS).orElseThrow().posts(level, Rank.MAJOR);
-        List<Soldiers.Post> minorPosts = colony.part(SavannaParts.SOLDIERS).orElseThrow().posts(level, Rank.MINOR);
+        Soldiers part = colony.part(SavannaParts.SOLDIERS).orElseThrow();
+        List<Soldiers.Post> majorPosts = part.posts(level, Rank.MAJOR);
+        List<Soldiers.Post> minorPosts = part.posts(level, Rank.MINOR);
         if (majorPosts.size() < 3 || minorPosts.size() < 2) {
             return "posts missing: majors " + majorPosts + ", minors " + minorPosts;
         }
         Set<BlockPos> wanted = new HashSet<>(List.of(majorPosts.get(0).cell(), majorPosts.get(1).cell()));
         Set<BlockPos> majorsAt = new HashSet<>();
         for (TermiteSoldierEntity soldier : soldiers) {
-            List<Soldiers.Post> posts = soldier.getRank() == Rank.MAJOR ? majorPosts.subList(0, 2) : minorPosts;
-            Soldiers.Post post = posts.stream().filter(p -> p.cell().equals(soldier.blockPosition())).findFirst().orElse(null);
-            if (post == null || soldier.isClimbing()) {
-                return soldier.getRank() + " soldier at " + soldier.blockPosition().toShortString() + (soldier.isClimbing() ? " (climbing)" : "")
-                        + " is not at a post of its kind " + posts.stream().map(p -> p.cell().toShortString()).toList();
-            }
-            float facing = (float) (Mth.atan2(post.facing().getZ() - post.cell().getZ(), post.facing().getX() - post.cell().getX())
-                    * Mth.RAD_TO_DEG) - 90.0F;
-            if (Math.abs(Mth.wrapDegrees(soldier.getYRot() - facing)) > 20.0F) {
-                return soldier.getRank() + " soldier at " + soldier.blockPosition().toShortString() + " faces " + soldier.getYRot() + ", not out ("
-                        + facing + ")";
+            Soldiers.Post post = part.beatOf(level, soldier);
+            String wrong = offItsBeat(soldier, post);
+            if (wrong != null) {
+                return wrong;
             }
             if (soldier.getRank() == Rank.MAJOR) {
-                majorsAt.add(soldier.blockPosition());
+                majorsAt.add(post.cell());
             }
         }
-        return majorsAt.equals(wanted) ? null : "the majors stand at " + majorsAt + ", expected " + wanted;
+        return majorsAt.equals(wanted) ? null : "the majors hold the beats at " + majorsAt + ", expected " + wanted;
+    }
+
+    /** Null if the soldier is on this beat (its own): on a floor within the beat's reach of its middle; otherwise what is wrong. */
+    static String offItsBeat(TermiteSoldierEntity soldier, Soldiers.Post post) {
+        if (post == null) {
+            return soldier.getRank() + " soldier at " + soldier.blockPosition().toShortString() + " holds no beat";
+        }
+        int reach = Soldiers.beatReach(post.kind());
+        BlockPos at = soldier.blockPosition();
+        if (soldier.isClimbing() || Math.abs(at.getX() - post.cell().getX()) > reach || Math.abs(at.getZ() - post.cell().getZ()) > reach
+                || Math.abs(at.getY() - post.cell().getY()) > 1) {
+            return soldier.getRank() + " soldier at " + at.toShortString() + (soldier.isClimbing() ? " (climbing)" : "") + " is not on its beat ("
+                    + post.kind() + " round " + post.cell().toShortString() + ")";
+        }
+        return null;
     }
 
     /** Digs the termite colony's shaft, royal chamber, first garden room and foraging tunnels out at once. */
@@ -409,8 +428,8 @@ public class TermiteSoldierTests {
     }
 
     /**
-     * Null if the five minors stand at posts outside, facing out: one beside each hole and three on the trail from the
-     * first hole to the hay, on both sides of it; otherwise what is wrong.
+     * Null if the five minors walk beats outside: one beside each hole and three on the trail from the first hole to
+     * the hay, on both sides of it; otherwise what is wrong.
      */
     private static String minorsOnTheirPostsOutside(ServerLevel level, Colony colony, List<TermiteSoldierEntity> minors, BlockPos[] trail) {
         List<Soldiers.Post> outside = colony.part(SavannaParts.SOLDIERS).orElseThrow().posts(level, Rank.MINOR).stream().filter(post -> post.kind() != Soldiers.Kind.INSIDE).toList();
@@ -418,27 +437,29 @@ public class TermiteSoldierTests {
                 || outside.stream().filter(post -> post.kind() == Soldiers.Kind.TRAIL).count() != 3) {
             return "the posts outside should be the first hole's, three on its trail and the second hole's: " + outside;
         }
+        Soldiers part = colony.part(SavannaParts.SOLDIERS).orElseThrow();
         Set<Integer> sides = new HashSet<>();
+        Set<BlockPos> beats = new HashSet<>();
         for (TermiteSoldierEntity minor : minors) {
-            Soldiers.Post post = outside.stream().filter(p -> p.cell().equals(minor.blockPosition())).findFirst().orElse(null);
-            if (post == null || minor.isClimbing()) {
-                return "minor at " + minor.blockPosition().toShortString() + " is not at a post outside " + outside.stream()
-                        .map(p -> p.kind() + " " + p.cell().toShortString()).toList();
+            Soldiers.Post post = part.beatOf(level, minor);
+            String wrong = post != null && post.kind() == Soldiers.Kind.INSIDE ? "minor at " + minor.blockPosition().toShortString()
+                    + " holds a beat inside, not one outside" : offItsBeat(minor, post);
+            if (wrong != null) {
+                return wrong;
             }
-            float facing = (float) (Mth.atan2(post.facing().getZ() - post.cell().getZ(), post.facing().getX() - post.cell().getX())
-                    * Mth.RAD_TO_DEG) - 90.0F;
-            if (Math.abs(Mth.wrapDegrees(minor.getYRot() - facing)) > 20.0F) {
-                return "minor at " + minor.blockPosition().toShortString() + " faces " + minor.getYRot() + ", not out (" + facing + ")";
-            }
+            beats.add(post.cell());
             if (post.kind() == Soldiers.Kind.TRAIL) {
-                // The trail runs straight from the first hole's mouth to the hay: which side of it is this sentry on?
-                int side = Integer.signum((minor.getBlockX() - trail[0].getX()) * (trail[1].getZ() - trail[0].getZ())
-                        - (minor.getBlockZ() - trail[0].getZ()) * (trail[1].getX() - trail[0].getX()));
+                // The trail runs straight from the first hole's mouth to the hay: which side of it is this sentry's beat on?
+                int side = Integer.signum((post.cell().getX() - trail[0].getX()) * (trail[1].getZ() - trail[0].getZ())
+                        - (post.cell().getZ() - trail[0].getZ()) * (trail[1].getX() - trail[0].getX()));
                 if (side == 0) {
-                    return "a sentry stands on the trail itself at " + minor.blockPosition().toShortString();
+                    return "a sentry's beat is on the trail itself at " + post.cell().toShortString();
                 }
                 sides.add(side);
             }
+        }
+        if (beats.size() != minors.size()) {
+            return "two minors hold one beat: " + beats;
         }
         return sides.size() == 2 ? null : "the sentries stand on one side of the trail only";
     }
