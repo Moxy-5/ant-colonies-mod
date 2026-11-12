@@ -138,6 +138,21 @@ public class TreeTests {
                 helper.fail(planks.getId() + " does not count as planks");
             }
         }
+        // Everything planks make (the user, 2026-11-11): each has its recipe, and joins Minecraft's wooden ones.
+        for (TreeBlocks.WoodSet set : TreeBlocks.WOOD_SETS) {
+            for (DeferredBlock<? extends Block> made : List.of(set.stairs(), set.slab(), set.fence(), set.fenceGate(), set.door(),
+                    set.trapdoor(), set.pressurePlate(), set.button())) {
+                var recipe = level.getRecipeManager().byKey(made.getId()).orElse(null);
+                if (recipe == null || recipe.value().getResultItem(level.registryAccess()).getItem() != made.get().asItem()) {
+                    helper.fail("no recipe making " + made.getId());
+                }
+            }
+            if (!set.fence().get().defaultBlockState().is(net.minecraft.tags.BlockTags.WOODEN_FENCES)
+                    || !set.fenceGate().get().defaultBlockState().is(net.minecraft.tags.BlockTags.FENCE_GATES)
+                    || !set.door().get().defaultBlockState().is(net.minecraft.tags.BlockTags.WOODEN_DOORS)) {
+                helper.fail(set.planks().getId() + "'s fence, gate or door is not in Minecraft's wooden tags");
+            }
+        }
     }
 
     private static BlockState joined(GameTestHelper helper, BlockPos relative) {

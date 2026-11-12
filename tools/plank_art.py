@@ -176,6 +176,70 @@ def all_planks():
     return {kind: {"A": look_a(kind), "B": look_b(kind), "C": look_c(kind)} for kind in KINDS}
 
 
+# ---- Doors and trapdoors (the user, 2026-11-11: everything planks are made into) ----
+# My picks: plain board doors, the boards upright inside a darker frame with a cross brace, a small dark iron latch;
+# the camel thorn door has two little windows high up (a hard wood worth fine joinery), the baobab's is solid;
+# trapdoors are boards across a frame with two slits to see through. None = see-through.
+
+def _door_colours(kind):
+    w = WOOD[kind]
+    board = mix(w["heart"], w["sap"], 0.25 if kind != "baobab" else 0.4)
+    return board, shade(w["seam"], 1.1), w["seam"]
+
+
+def door_half(kind, top):
+    rng = random.Random(f"door{kind}{top}")
+    board, frame, seam = _door_colours(kind)
+    img = [[board] * S for _ in range(S)]
+    for y in range(S):
+        for x in range(S):
+            c = shade(board, 1 + rng.uniform(-0.03, 0.03))
+            if x in (5, 10):
+                c = seam  # gaps between the upright boards
+            if x in (0, 1, 14, 15) or (top and y in (0, 1)) or (not top and y in (14, 15)):
+                c = frame
+            img[y][x] = c
+    brace = 8 if top else 7
+    for x in range(2, 14):
+        img[brace][x] = shade(frame, 1.08)
+    if top and kind == "camel":
+        for x0 in (3, 9):
+            for y in range(3, 6):
+                for x in range(x0, x0 + 4):
+                    img[y][x] = None
+    if not top:
+        img[1][12], img[2][12], img[1][11] = (40, 38, 36), (40, 38, 36), (70, 66, 60)
+    return img
+
+
+def door_item(kind):
+    top, bottom = door_half(kind, True), door_half(kind, False)
+    tall = top + bottom
+    img = [[None] * S for _ in range(S)]
+    for y in range(S):
+        for x in range(3, 13):
+            img[y][x] = tall[y * 2][round((x - 3) * 15 / 9)]
+    return img
+
+
+def trapdoor(kind):
+    rng = random.Random(f"trapdoor{kind}")
+    board, frame, seam = _door_colours(kind)
+    img = [[board] * S for _ in range(S)]
+    for y in range(S):
+        for x in range(S):
+            c = shade(board, 1 + rng.uniform(-0.03, 0.03))
+            if y in (5, 10):
+                c = seam
+            if x in (0, 1, 14, 15) or y in (0, 15):
+                c = frame
+            img[y][x] = c
+    for x in range(4, 12):
+        img[5][x] = None
+        img[10][x] = None
+    return img
+
+
 # ---- The game's files (the user's picks, 2026-11-11) ----
 # Camel thorn and baobab: look A. Umbrella thorn makes Minecraft's acacia planks (no texture of its own, so acacia
 # planks stay in the game).
@@ -198,7 +262,7 @@ def game_files():
     assets, data = mod_paths.assets("savanna"), mod_paths.data("savanna")
 
     def png(rows):
-        raw = b"".join(b"\x00" + bytes(c for px in row for c in px[:3] + (255,)) for row in rows)
+        raw = b"".join(b"\x00" + bytes(c for px in row for c in ((0, 0, 0, 0) if px is None else px[:3] + (255,))) for row in rows)
 
         def chunk(kind, body):
             return struct.pack(">I", len(body)) + kind + body + struct.pack(">I", zlib.crc32(kind + body) & 0xFFFFFFFF)
@@ -242,12 +306,75 @@ def game_files():
     add_to_tag(mc / "tags/block/planks.json", names)
     add_to_tag(mc / "tags/item/planks.json", names)
     add_to_tag(mc / "tags/block/mineable/axe.json", names)
+    wood_set_files(assets, data, mc, png, write, add_to_tag)
     lang_path = assets / "lang/en_us.json"
     lang = json.loads(lang_path.read_text(encoding="utf-8"))
     for kind, text in LANG.items():
         lang[f"block.antcolonies.{GAME_NAMES[kind]}_planks"] = text
+        for part, words in PART_NAMES.items():
+            lang[f"block.antcolonies.{GAME_NAMES[kind]}_{part}"] = text.replace("Planks", words)
     lang_path.write_text(json.dumps(lang, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
     print("wrote the plank files:", ", ".join(names))
+
+
+# What planks are made into (the user, 2026-11-11), each copied from Minecraft's acacia one (blockstates, models, loot,
+# recipes, recipe book unlocks) with the names and textures swapped; vanilla's tags so they join, burn and craft alike.
+PARTS = {  # part: (block tag, item tag)
+    "stairs": ("wooden_stairs", "wooden_stairs"), "slab": ("wooden_slabs", "wooden_slabs"),
+    "fence": ("wooden_fences", "wooden_fences"), "fence_gate": ("fence_gates", "fence_gates"),
+    "door": ("wooden_doors", "wooden_doors"), "trapdoor": ("wooden_trapdoors", "wooden_trapdoors"),
+    "pressure_plate": ("wooden_pressure_plates", "wooden_pressure_plates"), "button": ("wooden_buttons", "wooden_buttons"),
+}
+PART_NAMES = {"stairs": "Stairs", "slab": "Slab", "fence": "Fence", "fence_gate": "Fence Gate", "door": "Door",
+              "trapdoor": "Trapdoor", "pressure_plate": "Pressure Plate", "button": "Button"}
+
+
+def wood_set_files(assets, data, mc, png, write, add_to_tag):
+    import json
+    import re
+    import zipfile
+    from pathlib import Path
+    jar = zipfile.ZipFile(Path.home() / ".gradle/caches/neoformruntime/artifacts/minecraft_1.21.1_client.jar")
+    names = set(jar.namelist())
+    for kind in PICKED:
+        g = GAME_NAMES[kind]
+
+        def swap(text):
+            return (text.replace("minecraft:block/acacia_", f"antcolonies:block/{g}_")
+                        .replace("minecraft:item/acacia_", f"antcolonies:item/{g}_")
+                        .replace("minecraft:acacia_", f"antcolonies:{g}_"))
+
+        def copy(src, dst, cutout=False):
+            obj = json.loads(swap(jar.read(src).decode("utf-8")))
+            if cutout:
+                obj["render_type"] = "minecraft:cutout"
+            write(dst, obj)
+            return json.dumps(obj)
+
+        tex = assets / "textures"
+        (tex / "block" / f"{g}_door_top.png").write_bytes(png(door_half(kind, True)))
+        (tex / "block" / f"{g}_door_bottom.png").write_bytes(png(door_half(kind, False)))
+        (tex / "block" / f"{g}_trapdoor.png").write_bytes(png(trapdoor(kind)))
+        (tex / "item").mkdir(parents=True, exist_ok=True)
+        (tex / "item" / f"{g}_door.png").write_bytes(png(door_item(kind)))
+        for part, (block_tag, item_tag) in PARTS.items():
+            src, ours = f"acacia_{part}", f"{g}_{part}"
+            cut = part in ("door", "trapdoor")
+            refs = copy(f"assets/minecraft/blockstates/{src}.json", assets / "blockstates" / f"{ours}.json")
+            refs += copy(f"assets/minecraft/models/item/{src}.json", assets / "models/item" / f"{ours}.json")
+            for model in sorted(set(re.findall(rf"antcolonies:block/({g}_[a-z_]+)", refs))):
+                if model == f"{g}_planks":
+                    continue
+                copy(f"assets/minecraft/models/block/{model.replace(g, 'acacia', 1)}.json",
+                     assets / "models/block" / f"{model}.json", cutout=cut)
+            copy(f"data/minecraft/loot_table/blocks/{src}.json", data / "loot_table/blocks" / f"{ours}.json")
+            copy(f"data/minecraft/recipe/{src}.json", data / "recipe" / f"{ours}.json")
+            for adv in (n for n in names if n.startswith("data/minecraft/advancement/recipes/") and n.endswith(f"/{src}.json")):
+                category = adv.split("/")[-2]
+                copy(adv, data / "advancement/recipes" / category / f"{ours}.json")
+            add_to_tag(mc / "tags/block" / f"{block_tag}.json", [f"antcolonies:{ours}"])
+            add_to_tag(mc / "tags/item" / f"{item_tag}.json", [f"antcolonies:{ours}"])
+            add_to_tag(mc / "tags/block/mineable/axe.json", [f"antcolonies:{ours}"])
 
 
 if __name__ == "__main__":

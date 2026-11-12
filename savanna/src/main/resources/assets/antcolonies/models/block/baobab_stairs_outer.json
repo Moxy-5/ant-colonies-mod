@@ -1,0 +1,8 @@
+{
+  "parent": "minecraft:block/outer_stairs",
+  "textures": {
+    "bottom": "antcolonies:block/baobab_planks",
+    "side": "antcolonies:block/baobab_planks",
+    "top": "antcolonies:block/baobab_planks"
+  }
+}

@@ -94,5 +94,21 @@
   "block.antcolonies.wet_silt": "Wet Silt",
   "block.antcolonies.river_mud": "River Mud",
   "block.antcolonies.camel_thorn_planks": "Camel Thorn Planks",
-  "block.antcolonies.baobab_planks": "Baobab Planks"
+  "block.antcolonies.baobab_planks": "Baobab Planks",
+  "block.antcolonies.camel_thorn_stairs": "Camel Thorn Stairs",
+  "block.antcolonies.camel_thorn_slab": "Camel Thorn Slab",
+  "block.antcolonies.camel_thorn_fence": "Camel Thorn Fence",
+  "block.antcolonies.camel_thorn_fence_gate": "Camel Thorn Fence Gate",
+  "block.antcolonies.camel_thorn_door": "Camel Thorn Door",
+  "block.antcolonies.camel_thorn_trapdoor": "Camel Thorn Trapdoor",
+  "block.antcolonies.camel_thorn_pressure_plate": "Camel Thorn Pressure Plate",
+  "block.antcolonies.camel_thorn_button": "Camel Thorn Button",
+  "block.antcolonies.baobab_stairs": "Baobab Stairs",
+  "block.antcolonies.baobab_slab": "Baobab Slab",
+  "block.antcolonies.baobab_fence": "Baobab Fence",
+  "block.antcolonies.baobab_fence_gate": "Baobab Fence Gate",
+  "block.antcolonies.baobab_door": "Baobab Door",
+  "block.antcolonies.baobab_trapdoor": "Baobab Trapdoor",
+  "block.antcolonies.baobab_pressure_plate": "Baobab Pressure Plate",
+  "block.antcolonies.baobab_button": "Baobab Button"
 }
