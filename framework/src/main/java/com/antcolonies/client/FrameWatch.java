@@ -78,6 +78,8 @@ public final class FrameWatch {
         if (renderThread == null) {
             renderThread = Thread.currentThread();
             startHelper();
+            ColonyFrameworkMod.LOGGER.info("[frames] Java's memory cleaners: {}", java.lang.management.ManagementFactory
+                    .getGarbageCollectorMXBeans().stream().map(bean -> bean.getName()).toList());
             return;
         }
         Minecraft mc = Minecraft.getInstance();

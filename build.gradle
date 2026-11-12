@@ -90,6 +90,13 @@ neoForge {
     runs {
         client {
             client()
+            // Smooth frames (2026-11-12, the user's "constant stuttering"): Java's usual memory cleaner (G1) stops the
+            // whole game 20 to 50 ms about once a second while land loads; the Z cleaner works beside the game with
+            // stops under a millisecond. -PclientGc=g1 goes back to the old one to compare.
+            if ((project.findProperty('clientGc') ?: 'z').toString() != 'g1') {
+                jvmArguments.add '-XX:+UseZGC'
+                jvmArguments.add '-XX:+ZGenerational'
+            }
             // Comma-separated list of namespaces to load gametests from. Empty = all namespaces.
             systemProperty 'neoforge.enabledGameTestNamespaces', gameTestNamespaces
         }

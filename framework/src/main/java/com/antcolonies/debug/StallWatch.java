@@ -61,7 +61,8 @@ public final class StallWatch {
     public static long gcMillis() {
         long sum = 0;
         for (java.lang.management.GarbageCollectorMXBean bean : java.lang.management.ManagementFactory.getGarbageCollectorMXBeans()) {
-            if (!bean.getName().contains("Concurrent")) {
+            String name = bean.getName();   // the Z cleaner's "Cycles" run beside the game, only its "Pauses" stop it
+            if (!name.contains("Concurrent") && !name.contains("Cycles")) {
                 sum += Math.max(0, bean.getCollectionTime());
             }
         }
