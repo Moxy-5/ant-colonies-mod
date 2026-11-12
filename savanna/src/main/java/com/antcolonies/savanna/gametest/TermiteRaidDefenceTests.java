@@ -382,6 +382,158 @@ public class TermiteRaidDefenceTests {
     }
 
     /**
+     * The termite alarm rework, step 1 ({@code docs/plans/termite-alarm-rework.md}): a measuring scene, compared before
+     * and after every step of the rework. A full colony by day (9:00, a raid hour): 180 workers, 15 minor and 5 major
+     * soldiers, most of them numbers, shown as they are to a player standing at the nest (the real-mob swap on, a pretend
+     * watcher). Six workers stand in the last cells of a foraging tunnel, a pit over it covered with a plate of termite
+     * mud (a feeding gallery under its cover); twenty Matabele (ten majors, ten minors) come from 6 blocks off, sent to
+     * fight there. Three minutes on, one {@code [alarm-measure]} line: when the cover was broken, how many soldiers
+     * answered and how soon the first stood at the break, the first bite on a raider, when the gallery was sealed, the
+     * workers stung and escaped, the raiders hurt and dead, the soldiers lost. It only checks that the raid happened
+     * (the cover broken or a termite stung); the rework's later steps add its checks.
+     */
+    @GameTest(template = "arena", timeoutTicks = 4400, skyAccess = true, batch = "termite_alarm_measure")
+    public static void aDaytimeRaidOnAFullColonyIsMeasured(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        Scene scene = scene(helper, 9.0);
+        Runnable[] each = new Runnable[1];
+        helper.onEachTick(() -> {
+            if (each[0] != null) {
+                each[0].run();
+            }
+        });
+        helper.runAfterDelay(15, () -> {
+            Colony colony = scene.colony[0];
+            Alarm alarm = colony.part(SavannaParts.ALARM).orElseThrow();
+            RaidDefence raid = colony.part(SavannaParts.RAID_DEFENCE).orElseThrow();
+            List<BlockPos> cells = scene.tunnel[0].tunnel();
+            int at = cells.size() - 2;
+            helper.assertTrue(at - PLUG_BACK - 1 >= 1, "the foraging tunnel is too short for the test: " + cells.size() + " cells");
+            BlockPos breakAt = cells.get(at);
+            long now = level.getGameTime();
+            long old = now - colony.profile().worker().builderUntilTicks() - 1000;
+            colony.population().addNewMembers(com.antcolonies.colony.Caste.WORKER, old, 180 - colony.getCount(com.antcolonies.colony.Caste.WORKER));
+            String added = colony.part(SavannaParts.SOLDIERS).orElseThrow().addFor(180, now);
+            colony.population().setOnForTests(true);
+            colony.population().setViewersForTests(List.of(Vec3.atCenterOf(colony.getCenter().above(2))));
+            // The feeding gallery's cover: a pit over the cell down to a plate of termite mud.
+            int top = level.getHeight(net.minecraft.world.level.levelgen.Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, breakAt.getX(), breakAt.getZ());
+            BlockPos cover = breakAt.above();
+            for (int y = cover.getY() + 1; y < top; y++) {
+                level.setBlock(new BlockPos(breakAt.getX(), y, breakAt.getZ()), Blocks.AIR.defaultBlockState(), 3);
+            }
+            level.setBlock(cover, com.antcolonies.savanna.registry.SavannaBlocks.MUD_CRUST.get().defaultBlockState(), 3);
+            java.util.Set<java.util.UUID> feeding = new java.util.HashSet<>();
+            for (int i = 0; i < 6; i++) {
+                feeding.add(put(level, SavannaEntities.TERMITE_WORKER.get(), cells.get(at - i % 3)).getUUID());
+            }
+            int dx = Integer.signum(breakAt.getX() - cells.get(0).getX());
+            int dz = Integer.signum(breakAt.getZ() - cells.get(0).getZ());
+            if (Math.abs(breakAt.getX() - cells.get(0).getX()) >= Math.abs(breakAt.getZ() - cells.get(0).getZ())) {
+                dz = 0;
+            } else {
+                dx = 0;
+            }
+            BlockPos from = new BlockPos(breakAt.getX() + dx * 6, top, breakAt.getZ() + dz * 6);
+            net.minecraft.world.phys.AABB area = new net.minecraft.world.phys.AABB(colony.getCenter()).inflate(40.0);
+            List<MatabeleEntity> ants = new java.util.ArrayList<>();
+            java.util.Set<java.util.UUID> soldiersSeen = new java.util.HashSet<>();
+            java.util.Set<java.util.UUID> soldiersLost = new java.util.HashSet<>();
+            java.util.Set<java.util.UUID> stung = new java.util.HashSet<>();
+            long comeAt = helper.getTick() + 100; // (the real mobs have come out of the numbers by then)
+            java.util.Map<java.util.UUID, Float> whole = new java.util.HashMap<>();
+            long[] cameAt = {-1};
+            long[] brokeAt = {-1};
+            long[] soldierAt = {-1};
+            long[] biteAt = {-1};
+            long[] sealedAt = {-1};
+            int[] mostAtBreak = {0};
+            int[] mostAlarmed = {0};
+            int[] waveTarget = {-1};
+            String[] atStart = {""};
+            each[0] = () -> {
+                long tick = helper.getTick();
+                List<TermiteSoldierEntity> soldiers = level.getEntitiesOfClass(TermiteSoldierEntity.class, area,
+                        soldier -> colony.getId().equals(soldier.getColonyId()));
+                List<TermiteWorkerEntity> workers = level.getEntitiesOfClass(TermiteWorkerEntity.class, area,
+                        worker -> colony.getId().equals(worker.getColonyId()));
+                if (cameAt[0] < 0) {
+                    if (tick < comeAt) {
+                        return;
+                    }
+                    cameAt[0] = tick;
+                    double nearest = soldiers.stream().mapToDouble(soldier -> Math.sqrt(soldier.blockPosition().distSqr(breakAt))).min().orElse(-1);
+                    atStart[0] = soldiers.stream().filter(soldier -> soldier.getRank() == TermiteSoldierEntity.Rank.MINOR).count() + " minor and "
+                            + soldiers.stream().filter(soldier -> soldier.getRank() == TermiteSoldierEntity.Rank.MAJOR).count()
+                            + " major soldiers real, the nearest " + String.format(java.util.Locale.ROOT, "%.1f", nearest) + " blocks from the break; "
+                            + workers.size() + " workers real, " + workers.stream().filter(worker -> feeding.contains(worker.getUUID())
+                                    && worker.blockPosition().closerThan(breakAt, 4.0)).count() + " of the 6 feeding still by the break";
+                    for (int i = 0; i < 20; i++) {
+                        MatabeleEntity ant = (i % 2 == 0 ? SavannaEntities.MATABELE_MAJOR.get() : SavannaEntities.MATABELE_MINOR.get()).create(level);
+                        ant.moveTo(from.getX() + 0.2 + (i % 4) * 0.25, from.getY(), from.getZ() + 0.2 + (i / 4) * 0.2, 0.0F, 0.0F);
+                        ant.keepOutOfColonies();
+                        ant.orderToFight(breakAt.atY(top), level.getGameTime() + 6000);
+                        level.addFreshEntity(ant);
+                        ants.add(ant);
+                    }
+                    return;
+                }
+                long since = tick - cameAt[0];
+                if (since <= 20) {
+                    // (a new ant's health settles with its own size in its first ticks: "hurt" is health lost after that)
+                    ants.forEach(ant -> whole.put(ant.getUUID(), ant.getHealth()));
+                    return;
+                }
+                if (brokeAt[0] < 0 && !level.getBlockState(cover).is(com.antcolonies.savanna.registry.SavannaBlocks.MUD_CRUST.get())) {
+                    brokeAt[0] = since;
+                }
+                waveTarget[0] = Math.max(waveTarget[0], alarm.waveTarget());
+                mostAlarmed[0] = Math.max(mostAlarmed[0], alarm.alarmedSoldiers().size());
+                int atBreak = 0;
+                for (TermiteSoldierEntity soldier : soldiers) {
+                    soldiersSeen.add(soldier.getUUID());
+                    if (soldier.isDowned() || !soldier.isAlive()) {
+                        soldiersLost.add(soldier.getUUID());
+                    } else if (soldier.blockPosition().closerThan(breakAt, 4.0)) {
+                        atBreak++;
+                    }
+                }
+                mostAtBreak[0] = Math.max(mostAtBreak[0], atBreak);
+                if (soldierAt[0] < 0 && atBreak > 0 && brokeAt[0] >= 0) {
+                    soldierAt[0] = since;
+                }
+                if (biteAt[0] < 0 && ants.stream().anyMatch(ant -> !ant.isAlive() || ant.getHealth() < whole.get(ant.getUUID()) - 0.01F)) {
+                    biteAt[0] = since;
+                }
+                if (sealedAt[0] < 0 && !raid.seals().isEmpty()) {
+                    sealedAt[0] = since;
+                }
+                for (TermiteWorkerEntity worker : workers) {
+                    if (worker.isDowned()) {
+                        stung.add(worker.getUUID());
+                    }
+                }
+                if (since < 3600) {
+                    return;
+                }
+                long feedingStung = feeding.stream().filter(stung::contains).count();
+                long dead = ants.stream().filter(ant -> !ant.isAlive()).count();
+                long hurt = ants.stream().filter(ant -> ant.isAlive() && (ant.lostLegs() != 0 || ant.getHealth() < whole.get(ant.getUUID()) - 0.01F)).count();
+                long legs = ants.stream().filter(ant -> ant.isAlive() && ant.lostLegs() != 0).count();
+                SavannaMod.LOGGER.info("[alarm-measure] colony of {} (added{}); at the start: {}. Ticks after the raiders came: cover broken {}, "
+                        + "first soldier at the break {}, first bite on a raider {}, sealed {}. Soldiers: wave target {}, most alarmed {}, most within 4 "
+                        + "blocks of the break {}, seen {}, lost {}. Workers stung {} ({} of the 6 feeding). Raiders of 20: {} dead, {} hurt ({} "
+                        + "with a leg off).{}{}",
+                        colony.getCount(com.antcolonies.colony.Caste.WORKER), added, atStart[0], brokeAt[0], soldierAt[0], biteAt[0], sealedAt[0],
+                        waveTarget[0], mostAlarmed[0], mostAtBreak[0], soldiersSeen.size(), soldiersLost.size(), stung.size(), feedingStung, dead,
+                        hurt, legs, alarm.describe(level), raid.describe(level));
+                helper.assertTrue(brokeAt[0] >= 0 || !stung.isEmpty(), "the raid never happened: the cover was not broken and no termite stung");
+                helper.succeed();
+            };
+        });
+    }
+
+    /**
      * A queen and six old workers (builders, who carry the dead); at tick 10 the clock is still at {@code hour}, the
      * nest is dug out at once and the entrance closed with stone (the scene of {@code MatabeleFightTests}).
      */
