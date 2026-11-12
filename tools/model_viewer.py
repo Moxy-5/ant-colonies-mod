@@ -42,6 +42,9 @@ Savanna river colours (docs/plans/savanna-rivers.md step 0, 2026-11-07; river_co
 piece with a river, an oxbow and a pan in Minecraft's own textures, buttons for the river water, pool water, floodplain
 grass, bank height and sand edges, and a look under water:
 python tools/model_viewer.py rivers [out.html]   (default references/river_colors_viewer.html)
+Planks from the giant trees' wood (2026-11-11, plank_art.py; plank_viewer.template.html): three looks for each tree,
+a floor, a wall and the log beside, Minecraft's acacia and oak planks to compare:
+python tools/model_viewer.py planks [out.html]   (default references/plank_viewer.html)
 """
 import base64
 import json
@@ -406,6 +409,27 @@ def river_colors_page(out):
     print("wrote", out)
 
 
+def planks_page(out):
+    """Planks from the giant trees (2026-11-11): plank_art.py's three looks per kind, with each kind's game log."""
+    import zipfile
+    import plank_art
+    models = mod_paths.assets("savanna") / "models/block"
+    jar = Path.home() / ".gradle/caches/neoformruntime/artifacts/minecraft_1.21.1_client.jar"
+    z = zipfile.ZipFile(jar)
+    data = {"grass": uri(png(grass())), "kinds": {},
+            "vanilla": {n: uri(z.read(f"assets/minecraft/textures/block/{n}.png")) for n in ("acacia_planks", "oak_planks")}}
+    names = {"umbrella": "umbrella_thorn_log", "camel": "camel_thorn_log", "baobab": "baobab_log"}
+    for kind, looks in plank_art.all_planks().items():
+        t = json.loads((models / f"{names[kind]}.json").read_text(encoding="utf-8"))["textures"]
+        data["kinds"][kind] = {"bark": file_uri(t["side"].split("/")[-1] + ".png"),
+                               "end": file_uri(t["end"].split("/")[-1] + ".png"),
+                               "planks": {look: uri(png(rows)) for look, rows in looks.items()}}
+    template = (Path(__file__).resolve().parent / "plank_viewer.template.html").read_text(encoding="utf-8")
+    out.parent.mkdir(parents=True, exist_ok=True)
+    out.write_text(template.replace("/*DATA*/null", json.dumps(data)), encoding="utf-8")
+    print("wrote", out)
+
+
 def mix_soil(x, y):
     """Plain mound soil for the viewer's floor and walls."""
     rng = random.Random(x * 31 + y * 7)
@@ -417,6 +441,9 @@ def main():
     if len(sys.argv) > 1 and sys.argv[1] == "nestsites":
         import nest_sites_viewer  # the Matabele home choices (docs/plans/matabele-homes.md)
         nest_sites_viewer.page(Path(sys.argv[2]) if len(sys.argv) > 2 else ROOT / "references/nest_sites_viewer.html")
+        return
+    if len(sys.argv) > 1 and sys.argv[1] == "planks":
+        planks_page(Path(sys.argv[2]) if len(sys.argv) > 2 else ROOT / "references/plank_viewer.html")
         return
     if len(sys.argv) > 1 and sys.argv[1] == "rivers":
         river_colors_page(Path(sys.argv[2]) if len(sys.argv) > 2 else ROOT / "references/river_colors_viewer.html")

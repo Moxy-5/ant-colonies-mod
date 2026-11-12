@@ -1,0 +1,254 @@
+"""Planks from the giant savanna trees' wood (the user's ask, 2026-11-11): three looks for each tree kind, to pick in
+the model viewer (python tools/model_viewer.py planks). Once the user picks, this file also writes the game's textures.
+
+The real wood (what the looks follow):
+- Umbrella thorn (Vachellia tortilis): a hard, heavy wood; reddish-brown heartwood with a wide pale yellowish sapwood,
+  so sawn boards often show both, a red board with a cream edge; fine, fairly straight grain.
+- Camel thorn (Vachellia erioloba): one of the hardest woods in Africa; dark red-brown to purplish heartwood, narrow
+  pale sapwood; interlocked grain that ripples across the board; boards darken further with age.
+- Baobab (Adansonia digitata): light, spongy, watery wood, pale cream to pinkish; coarse and fibrous, barely any
+  difference between heart and sap; in real life too soft to be good timber (the bark fibre is what people use), so
+  its planks are pale, coarse and stringy.
+
+Looks (the same three ideas for every kind):
+  A "Minecraft boards": four even boards with dark seams and staggered joints, like vanilla planks, in the wood's colour.
+  B "Heart and sap": every board a different cut, some all heartwood, some with a pale sapwood edge, real sawn timber.
+  C "Wild grain": the wood's own grain drawn big (umbrella fine streaks and small knots, camel rippling interlocked
+    grain, baobab coarse fibres and pores), boards wider and less even.
+
+Needs no extra libraries.
+"""
+import math
+import random
+
+S = 16
+KINDS = ["umbrella", "camel", "baobab"]
+LOOKS = ["A", "B", "C"]
+LOOK_NAMES = {"A": "Minecraft boards", "B": "Heart and sap", "C": "Wild grain"}
+
+# Sawn wood colours: heartwood, sapwood, seam (the dark line between boards).
+WOOD = {
+    "umbrella": {"heart": (156, 88, 60), "sap": (200, 160, 112), "seam": (88, 48, 34)},
+    "camel": {"heart": (116, 54, 44), "sap": (178, 118, 86), "seam": (60, 26, 22)},
+    "baobab": {"heart": (206, 184, 152), "sap": (220, 204, 174), "seam": (150, 128, 104)},
+}
+
+
+def clamp(c):
+    return max(0, min(255, round(c)))
+
+
+def shade(color, f):
+    return tuple(clamp(c * f) for c in color[:3])
+
+
+def mix(a, b, t):
+    return tuple(clamp(a[i] + (b[i] - a[i]) * t) for i in range(3))
+
+
+def speckle(img, rng, amount):
+    return [[shade(px, 1 + rng.uniform(-amount, amount)) for px in row] for row in img]
+
+
+def boards(heights, rng):
+    """Splits the 16 rows into boards (heights must add to 16); returns (top row, height) per board."""
+    out, y = [], 0
+    for h in heights:
+        out.append((y, h))
+        y += h
+    return out
+
+
+def grain_line(img, y, colour, strength, rng, wave=0.0, phase=0.0):
+    """A grain streak along a row (boards run left to right), broken now and then."""
+    for x in range(S):
+        if rng.random() < 0.18:
+            continue
+        yy = y + (round(math.sin(x / S * math.pi * 2 + phase) * wave) if wave else 0)
+        if 0 <= yy < S:
+            img[yy][x] = mix(img[yy][x], colour, strength)
+
+
+def look_a(kind):
+    """Minecraft boards: four boards of 4 rows, the bottom row of each a dark seam, one joint per board, light grain."""
+    w = WOOD[kind]
+    rng = random.Random(f"plankA{kind}")
+    base = mix(w["heart"], w["sap"], 0.25 if kind != "baobab" else 0.4)
+    img = [[base] * S for _ in range(S)]
+    for top, h in boards([4, 4, 4, 4], rng):
+        tone = rng.uniform(0.93, 1.07)
+        joint = rng.randrange(2, 14)
+        for dy in range(h):
+            for x in range(S):
+                c = shade(base, tone)
+                if dy == h - 1:
+                    c = w["seam"]
+                elif dy == 0:
+                    c = shade(c, 1.06)
+                if x == joint and dy < h - 1:
+                    c = mix(c, w["seam"], 0.8)
+                img[top + dy][x] = c
+        for _ in range(2):
+            grain_line(img, top + rng.randrange(1, h - 1), shade(base, 0.8), 0.45, rng)
+    return speckle(img, rng, 0.025)
+
+
+def look_b(kind):
+    """Heart and sap: boards of 4, 3, 5 and 4 rows, each a cut of its own: all heart, a sap edge, or mostly sap."""
+    w = WOOD[kind]
+    rng = random.Random(f"plankB{kind}")
+    img = [[w["heart"]] * S for _ in range(S)]
+    cuts = ["heart", "edge", "heart", "sap"] if kind != "baobab" else ["edge", "heart", "sap", "edge"]
+    for (top, h), cut in zip(boards([4, 3, 5, 4], rng), cuts):
+        tone = rng.uniform(0.92, 1.06)
+        joint = rng.randrange(1, 15)
+        edge_rows = rng.randint(1, 2)
+        for dy in range(h):
+            for x in range(S):
+                if cut == "sap":
+                    c = mix(w["sap"], w["heart"], 0.2)
+                elif cut == "edge" and dy < edge_rows:
+                    c = w["sap"]
+                elif cut == "edge" and dy == edge_rows:
+                    c = mix(w["sap"], w["heart"], 0.5)
+                else:
+                    c = w["heart"]
+                c = shade(c, tone)
+                if dy == h - 1:
+                    c = mix(c, w["seam"], 0.85)
+                if x == joint and dy < h - 1:
+                    c = mix(c, w["seam"], 0.75)
+                img[top + dy][x] = c
+        grain_line(img, top + rng.randrange(0, h - 1), shade(w["heart"], 0.78), 0.4, rng)
+    return speckle(img, rng, 0.03)
+
+
+def look_c(kind):
+    """Wild grain: three wide boards (6, 5, 5 rows) with the wood's own grain drawn big."""
+    w = WOOD[kind]
+    rng = random.Random(f"plankC{kind}")
+    base = w["heart"] if kind != "baobab" else mix(w["heart"], w["sap"], 0.3)
+    img = [[base] * S for _ in range(S)]
+    for top, h in boards([6, 5, 5], rng):
+        tone = rng.uniform(0.9, 1.08)
+        phase = rng.uniform(0, math.pi * 2)
+        for dy in range(h):
+            for x in range(S):
+                c = shade(base, tone)
+                if kind == "camel":
+                    # interlocked grain: light and dark bands rippling across the board
+                    t = 0.5 + 0.5 * math.sin((dy + math.sin(x / S * math.pi * 4 + phase) * 1.3) * 1.6)
+                    c = mix(shade(c, 0.82), shade(c, 1.12), t)
+                elif kind == "umbrella":
+                    t = 0.5 + 0.5 * math.sin((dy * 2.1 + math.sin(x / S * math.pi * 2 + phase) * 0.8))
+                    c = mix(shade(c, 0.9), mix(c, w["sap"], 0.25), t * 0.7)
+                if dy == h - 1:
+                    c = mix(c, w["seam"], 0.8)
+                img[top + dy][x] = c
+        if kind == "umbrella":
+            for _ in range(3):
+                grain_line(img, top + rng.randrange(0, h - 1), shade(base, 0.72), 0.5, rng, wave=0.6, phase=phase)
+            if rng.random() < 0.7:  # a small dark knot with a ring round it
+                kx, ky = rng.randrange(2, 14), top + rng.randrange(1, h - 2)
+                for dx in (-1, 0, 1):
+                    for dyy in (-1, 0, 1):
+                        if 0 <= ky + dyy < top + h - 1:
+                            img[ky + dyy][(kx + dx) % S] = mix(img[ky + dyy][(kx + dx) % S], w["seam"], 0.35)
+                img[ky][kx] = shade(w["seam"], 0.9)
+        elif kind == "baobab":
+            for _ in range(5):  # coarse fibres: short pale and dark dashes along the board
+                y = top + rng.randrange(0, h - 1)
+                x0, n = rng.randrange(S), rng.randint(3, 8)
+                col = shade(base, 0.82) if rng.random() < 0.6 else shade(w["sap"], 1.05)
+                for x in range(x0, x0 + n):
+                    img[y][x % S] = mix(img[y][x % S], col, 0.7)
+            for _ in range(6):  # open pores of the spongy wood
+                y = top + rng.randrange(0, h - 1)
+                img[y][rng.randrange(S)] = shade(base, 0.74)
+        joint = rng.randrange(1, 15)
+        for dy in range(h - 1):
+            img[top + dy][joint] = mix(img[top + dy][joint], w["seam"], 0.7)
+    return speckle(img, rng, 0.035)
+
+
+def all_planks():
+    """{kind: {look: rows}}, rows of (r, g, b)."""
+    return {kind: {"A": look_a(kind), "B": look_b(kind), "C": look_c(kind)} for kind in KINDS}
+
+
+# ---- The game's files (the user's picks, 2026-11-11) ----
+# Camel thorn and baobab: look A. Umbrella thorn makes Minecraft's acacia planks (no texture of its own, so acacia
+# planks stay in the game).
+PICKED = {"camel": "A", "baobab": "A"}
+GAME_NAMES = {"umbrella": "umbrella_thorn", "camel": "camel_thorn", "baobab": "baobab"}
+LOG_BLOCKS = {  # every block of a kind's trunk wood that saws into planks
+    "umbrella": ["umbrella_thorn_log", "umbrella_thorn_wood", "umbrella_thorn_wood_spores", "umbrella_thorn_wood_wound"],
+    "camel": ["camel_thorn_log", "camel_thorn_wood", "camel_thorn_wood_spores", "camel_thorn_wood_wound"],
+    "baobab": ["baobab_log", "baobab_wood"],
+}
+LANG = {"camel": "Camel Thorn Planks", "baobab": "Baobab Planks"}
+
+
+def game_files():
+    """Writes the plank textures, models, loot, tags, recipes and names into the savanna mod."""
+    import json
+    import struct
+    import zlib
+    import mod_paths
+    assets, data = mod_paths.assets("savanna"), mod_paths.data("savanna")
+
+    def png(rows):
+        raw = b"".join(b"\x00" + bytes(c for px in row for c in px[:3] + (255,)) for row in rows)
+
+        def chunk(kind, body):
+            return struct.pack(">I", len(body)) + kind + body + struct.pack(">I", zlib.crc32(kind + body) & 0xFFFFFFFF)
+        header = struct.pack(">IIBBBBB", S, S, 8, 6, 0, 0, 0)
+        return b"\x89PNG\r\n\x1a\n" + chunk(b"IHDR", header) + chunk(b"IDAT", zlib.compress(raw, 9)) + chunk(b"IEND", b"")
+
+    def write(path, obj):
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps(obj, indent=2) + "\n", encoding="utf-8")
+
+    def add_to_tag(path, values):
+        tag = json.loads(path.read_text(encoding="utf-8")) if path.exists() else {"replace": False, "values": []}
+        for v in values:
+            if v not in tag["values"]:
+                tag["values"].append(v)
+        write(path, tag)
+
+    planks = all_planks()
+    names = []
+    for kind, look in PICKED.items():
+        name = GAME_NAMES[kind] + "_planks"
+        names.append("antcolonies:" + name)
+        tex = assets / "textures/block" / f"{name}.png"
+        tex.write_bytes(png(planks[kind][look]))
+        write(assets / "blockstates" / f"{name}.json", {"variants": {"": {"model": f"antcolonies:block/{name}"}}})
+        write(assets / "models/block" / f"{name}.json", {"parent": "minecraft:block/cube_all",
+                                                         "textures": {"all": f"antcolonies:block/{name}"}})
+        write(assets / "models/item" / f"{name}.json", {"parent": f"antcolonies:block/{name}"})
+        write(data / "loot_table/blocks" / f"{name}.json", {"type": "minecraft:block", "pools": [{
+            "rolls": 1.0, "bonus_rolls": 0.0, "entries": [{"type": "minecraft:item", "name": f"antcolonies:{name}"}],
+            "conditions": [{"condition": "minecraft:survives_explosion"}]}]})
+    for kind, blocks in LOG_BLOCKS.items():
+        tag = GAME_NAMES[kind] + "_logs"
+        write(data / "tags/item" / f"{tag}.json", {"replace": False, "values": [f"antcolonies:{b}" for b in blocks]})
+        result = "minecraft:acacia_planks" if kind == "umbrella" else f"antcolonies:{GAME_NAMES[kind]}_planks"
+        recipe = "acacia_planks_from_umbrella_thorn" if kind == "umbrella" else f"{GAME_NAMES[kind]}_planks"
+        write(data / "recipe" / f"{recipe}.json", {"type": "minecraft:crafting_shapeless", "category": "building",
+                                                   "group": "planks", "ingredients": [{"tag": f"antcolonies:{tag}"}],
+                                                   "result": {"count": 4, "id": result}})
+    mc = mod_paths.data("savanna").parent / "minecraft"
+    add_to_tag(mc / "tags/block/planks.json", names)
+    add_to_tag(mc / "tags/item/planks.json", names)
+    add_to_tag(mc / "tags/block/mineable/axe.json", names)
+    lang_path = assets / "lang/en_us.json"
+    lang = json.loads(lang_path.read_text(encoding="utf-8"))
+    for kind, text in LANG.items():
+        lang[f"block.antcolonies.{GAME_NAMES[kind]}_planks"] = text
+    lang_path.write_text(json.dumps(lang, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+    print("wrote the plank files:", ", ".join(names))
+
+
+if __name__ == "__main__":
+    game_files()

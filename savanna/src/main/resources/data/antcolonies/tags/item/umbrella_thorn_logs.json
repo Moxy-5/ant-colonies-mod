@@ -1,0 +1,9 @@
+{
+  "replace": false,
+  "values": [
+    "antcolonies:umbrella_thorn_log",
+    "antcolonies:umbrella_thorn_wood",
+    "antcolonies:umbrella_thorn_wood_spores",
+    "antcolonies:umbrella_thorn_wood_wound"
+  ]
+}

@@ -86,6 +86,7 @@ public class TreeTests {
         helper.setBlock(first, TreeBlocks.UMBRELLA_THORN.branch().get());
         helper.setBlock(second, TreeBlocks.UMBRELLA_THORN.branch().get());
         helper.setBlock(second.north(), TreeBlocks.UMBRELLA_THORN.leaves().get());
+        planksFromTheWood(helper);
         helper.succeedWhen(() -> {
             for (int i = 0; i < TreeBlocks.ALL.size(); i++) {
                 BlockPos pos = new BlockPos(2 + 2 * (i % 30), SURFACE, 2 + 3 * (i / 30)); // 30 to a row, as placed
@@ -102,6 +103,41 @@ public class TreeTests {
             check(helper, b, Direction.NORTH, true, "the second branch joins the leaves");
             check(helper, b, Direction.EAST, false, "a branch does not join the air");
         });
+    }
+
+    /**
+     * Planks (the user, 2026-11-11): every trunk block of a kind, the heart rot marks too, saws into 4 planks: the
+     * umbrella thorn into Minecraft's acacia planks, the camel thorn and baobab into their own, which count as planks.
+     */
+    private static void planksFromTheWood(GameTestHelper helper) {
+        var level = helper.getLevel();
+        Object[][] cases = {
+                {"acacia_planks_from_umbrella_thorn", "umbrella_thorn_wood_wound", net.minecraft.world.item.Items.ACACIA_PLANKS},
+                {"camel_thorn_planks", "camel_thorn_wood_spores", TreeBlocks.CAMEL_THORN_PLANKS.get().asItem()},
+                {"baobab_planks", "baobab_log", TreeBlocks.BAOBAB_PLANKS.get().asItem()}};
+        for (Object[] c : cases) {
+            var id = ResourceLocation.fromNamespaceAndPath(SavannaMod.MODID, (String) c[0]);
+            var recipe = level.getRecipeManager().byKey(id).orElse(null);
+            if (recipe == null) {
+                helper.fail("no recipe " + id);
+                return;
+            }
+            var out = recipe.value().getResultItem(level.registryAccess());
+            if (out.getItem() != c[2] || out.getCount() != 4) {
+                helper.fail(id + " makes " + out + ", not 4 " + c[2]);
+            }
+            var wood = net.minecraft.core.registries.BuiltInRegistries.ITEM.get(
+                    ResourceLocation.fromNamespaceAndPath(SavannaMod.MODID, (String) c[1]));
+            if (!recipe.value().getIngredients().get(0).test(new net.minecraft.world.item.ItemStack(wood))) {
+                helper.fail(c[1] + " does not saw into planks by " + id);
+            }
+        }
+        for (DeferredBlock<Block> planks : List.of(TreeBlocks.CAMEL_THORN_PLANKS, TreeBlocks.BAOBAB_PLANKS)) {
+            if (!planks.get().defaultBlockState().is(net.minecraft.tags.BlockTags.PLANKS)
+                    || !new net.minecraft.world.item.ItemStack(planks.get()).is(net.minecraft.tags.ItemTags.PLANKS)) {
+                helper.fail(planks.getId() + " does not count as planks");
+            }
+        }
     }
 
     private static BlockState joined(GameTestHelper helper, BlockPos relative) {

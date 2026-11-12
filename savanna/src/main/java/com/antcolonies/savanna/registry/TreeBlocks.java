@@ -61,6 +61,16 @@ public final class TreeBlocks {
     public static final Kind BAOBAB = kind("baobab", MapColor.TERRACOTTA_LIGHT_GRAY, 1.0F, MapColor.COLOR_GREEN, false);
     public static final List<Kind> KINDS = List.of(UMBRELLA_THORN, CAMEL_THORN, BAOBAB);
 
+    /**
+     * Planks sawn from the trees' wood (the user, 2026-11-11, look A of tools/plank_art.py for both): the camel thorn's
+     * dark red-brown boards, hard like its wood, and the baobab's pale soft ones. The umbrella thorn's logs make
+     * Minecraft's own acacia planks (the user's pick: so acacia planks stay in the game), so it has no planks block here.
+     */
+    public static final DeferredBlock<Block> CAMEL_THORN_PLANKS = add(SavannaBlocks.BLOCKS.registerBlock("camel_thorn_planks", Block::new,
+            BlockBehaviour.Properties.of().mapColor(MapColor.TERRACOTTA_RED).strength(2.5F, 3.0F).sound(SoundType.WOOD).ignitedByLava()));
+    public static final DeferredBlock<Block> BAOBAB_PLANKS = add(SavannaBlocks.BLOCKS.registerBlock("baobab_planks", Block::new,
+            BlockBehaviour.Properties.of().mapColor(MapColor.SAND).strength(1.0F, 2.0F).sound(SoundType.WOOD).ignitedByLava()));
+
     /** Thorny acacia twigs at the crown's edge and on young trees: slow and prick anything big, never insects. */
     public static final DeferredBlock<ThornyTwigBlock> THORNY_TWIG = add(SavannaBlocks.BLOCKS.registerBlock("thorny_twig", ThornyTwigBlock::new,
             BlockBehaviour.Properties.of().mapColor(MapColor.PLANT).strength(0.2F).sound(SoundType.AZALEA).noCollission().noOcclusion()
@@ -205,6 +215,9 @@ public final class TreeBlocks {
             fire.setFlammable(kind.leaves().get(), 30, 0);
             fire.setFlammable(kind.deadLeaves().get(), 60, 100);
         }
+        // Planks burn like Minecraft's own (sawn boards burn away; only a living tree chars instead).
+        fire.setFlammable(CAMEL_THORN_PLANKS.get(), 5, 20);
+        fire.setFlammable(BAOBAB_PLANKS.get(), 5, 20);
         fire.setFlammable(THORNY_TWIG.get(), 60, 100);
         fire.setFlammable(CAMEL_THORN_PODS.get(), 30, 60);
         for (DeferredBlock<? extends Block> dead : List.of(BLEACHED_LOG, BLEACHED_WOOD, PEELING_BLEACHED_LOG, BLEACHED_BRANCH, ROTTEN_WOOD)) {
