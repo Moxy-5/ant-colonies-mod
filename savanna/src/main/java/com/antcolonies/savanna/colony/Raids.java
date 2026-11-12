@@ -264,12 +264,12 @@ public class Raids {
      */
     List<BlockPos> outThere(ServerLevel level) {
         BlockPos numbersRaid = away.whereNow(level); // (step 3: a raid out as numbers, where it is on its trail now)
-        if ((column == null || column.stage() == RaidColumn.Stage.DONE) && scouts.isEmpty() && wayHome.size() == 0) {
-            return numbersRaid == null ? List.of() : List.of(numbersRaid);
-        }
-        List<BlockPos> places = new ArrayList<>();
+        List<BlockPos> places = new ArrayList<>(away.scoutPlaces(level)); // (step 4: the scouts out as numbers)
         if (numbersRaid != null) {
             places.add(numbersRaid);
+        }
+        if ((column == null || column.stage() == RaidColumn.Stage.DONE) && scouts.isEmpty() && wayHome.size() == 0) {
+            return places;
         }
         if (column != null && column.stage() != RaidColumn.Stage.DONE) {
             addPlaces(level, column.members(), places);
@@ -343,6 +343,45 @@ public class Raids {
         say(level, "a raid out of sight to " + at.toShortString() + " is watched now: " + ants.size() + " real raider(s) "
                 + (inNest ? "form in the nest" : "on the trail at " + where.toShortString()
                         + (attacked ? ", on the way home with " + caught + " termite(s)" : ", on the way out")));
+        return true;
+    }
+
+    /**
+     * The brain while away, step 4: a scout out as numbers is watched now: one major comes out of the numbers at the
+     * ground there, with the way out it had as a number, and is one of the colony's scouts out from this moment (so
+     * nothing sends it home before its search starts; {@code MatabeleScoutGoal} takes it within a second and searches
+     * on from where it stands). A minor that came out goes straight back into the numbers (scouts are majors). False
+     * if the colony wants no more scouts, the ground there is no place to stand, or no major is left inside.
+     */
+    boolean showScout(ServerLevel level, BlockPos where, double heading) {
+        if (numbers() == null || column != null || waiting != null || scouts.size() >= scoutsWanted()) {
+            return true; // (nothing to show: not a failure)
+        }
+        BlockPos cell = RaidGround.groundCell(level, where.getX(), where.getZ());
+        if (cell == null || !RaidGround.canStand(level, cell)) {
+            return true; // (water, a trunk: this scout stays a number; another moment, another place)
+        }
+        MatabeleEntity scout = null;
+        for (int tries = 0; tries < 8 && scout == null; tries++) {
+            AbstractAntEntity mob = colony.population().comeOutAt(level, Caste.WORKER, cell);
+            if (mob == null) {
+                break;
+            }
+            if (mob instanceof MatabeleEntity ant && ant.hasMajorBody()) {
+                scout = ant;
+            } else {
+                colony.away().foldInNow(level, mob);
+            }
+        }
+        if (scout == null) {
+            return false;
+        }
+        scout.scoutMemory().setHeading(heading);
+        headings.put(scout.getUUID(), heading);
+        scouts.add(scout.getUUID());
+        say(level, "a scout out of sight is watched now: scout " + RaidGround.shortId(scout.getUUID()) + " is a real ant at "
+                + cell.toShortString() + ", " + Math.round(RaidGround.flat(cell, colony.getCenter())) + " blocks out toward the "
+                + compass(heading) + ", and searches on from there");
         return true;
     }
 
@@ -863,6 +902,12 @@ public class Raids {
         while (away.raidsToday(level) < raidsWanted()) {
             away.countRaid(level);
         }
+    }
+
+    /** Tests: every remembered find forgotten (a scene that wants the colony's scouts out, not a raid). */
+    public void forgetFindsForTests() {
+        finds.clear();
+        waiting = null;
     }
 
     /** M8 step 3e: raids set out today, near or away. */

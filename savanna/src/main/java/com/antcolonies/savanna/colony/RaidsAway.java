@@ -147,6 +147,7 @@ public final class RaidsAway {
             nextScoutAt = now + SCOUT_EVERY;
             scout(level);
         }
+        scoutsAsNumbers = true;
     }
 
     /**
@@ -159,6 +160,10 @@ public final class RaidsAway {
         }
         if (out != null) {
             show(level);
+        }
+        if (scoutsAsNumbers) {
+            scoutsAsNumbers = false; // (the colony is here: from now on its scouts are real ants, from the nest or shown here)
+            showScouts(level);
         }
     }
 
@@ -475,6 +480,91 @@ public final class RaidsAway {
             }
         }
         return hit;
+    }
+
+    // --- step 4 of the brain while away: where the scouts out as numbers are, and showing them -----------------------------
+
+    /** Whether the colony's scouts are numbers now (it was away at its last tick): only then have they places of their own. */
+    private boolean scoutsAsNumbers;
+    /** Nearer the nest than this (blocks) a scout out as numbers has no place of its own: the nest's own rule covers it. */
+    private static final double SCOUT_FROM = 16.0;
+    /** After a scout could not be shown (no major left inside), none is tried again before this (game time). */
+    private long noScoutShownBefore;
+
+    /** A scout out as numbers: which of the colony's scouts, its own way out (radians), and where it is now. */
+    record ScoutAt(int index, double heading, BlockPos at) {
+    }
+
+    /**
+     * Where the colony's scouts out as numbers are now (the brain while away, step 4). The dice of {@link #scout} say
+     * what they find; this says where they are, so a watcher who comes near one sees a real scout there
+     * ({@link #showScouts}). Each scout keeps its own way out, as real scouts do (route fidelity, {@code ScoutMemory}),
+     * and walks out to the colony's reach and home again at the numbers' pace, one trip after another, each scout at
+     * its own point of its trip. Worked out from the game time alone: nothing is kept or saved. Only places where a
+     * real scout could be put unseen count: none nearer the nest than {@link #SCOUT_FROM}, none a watcher is within
+     * {@link #SHOW_PAST} of (it would be seen appearing; and the colony must not be held "watched" by a scout that can
+     * never be shown), none in land that does not tick. Empty when the colony would send no scouts
+     * (the same rules as {@link #scout}).
+     */
+    List<ScoutAt> scoutsNow(ServerLevel level) {
+        SavannaNumbers.ScoutNumbers scouting = raids.numbers();
+        long now = level.getGameTime();
+        if (!scoutsAsNumbers || out != null || scouting == null || now < noScoutShownBefore || !raids.isScoutingTime(level)
+                || !raids.isHungry() || colony.population().inside(Caste.WORKER) <= 0) {
+            return List.of();
+        }
+        for (Raids.Find find : raids.finds()) {
+            if (find.worth() >= raids.need(find.at())) {
+                return List.of(); // (it knows a find worth a raid: no scout is out)
+            }
+        }
+        int reach = raids.range();
+        long trip = Math.max(200L, Math.round(2.0 * reach / Math.max(0.1, numbers().pace()) * 20.0));
+        BlockPos nest = colony.getCenter();
+        List<ScoutAt> places = new ArrayList<>();
+        int wanted = raids.scoutsWanted();
+        for (int i = 0; i < wanted; i++) {
+            long seed = net.minecraft.util.Mth.murmurHash3Mixer((int) colony.getId().getLeastSignificantBits() + i * 0x9E3779B9);
+            double heading = (seed & 0xFFFF) / 65536.0 * Math.PI * 2;
+            double phase = Math.floorMod(now + Math.floorMod(seed >> 16, trip), trip) / (double) trip;
+            double far = reach * (phase < 0.5 ? phase * 2 : (1.0 - phase) * 2);
+            if (far < SCOUT_FROM) {
+                continue;
+            }
+            BlockPos at = BlockPos.containing(nest.getX() + 0.5 + Math.cos(heading) * far, nest.getY(), nest.getZ() + 0.5 + Math.sin(heading) * far);
+            if (!level.isPositionEntityTicking(at) || colony.away().watcherNear(level, at, SHOW_PAST)) {
+                continue;
+            }
+            places.add(new ScoutAt(i, heading, at));
+        }
+        return places;
+    }
+
+    /** The places of {@link #scoutsNow}: a watcher near one watches the colony ({@code Raids.outThere}). */
+    public List<BlockPos> scoutPlaces(ServerLevel level) {
+        return scoutsNow(level).stream().map(ScoutAt::at).toList();
+    }
+
+    /**
+     * The colony is here again: each scout out as numbers that a watcher is near (the far rule's reach, and out of
+     * sight, {@link #scoutsNow}) is a real scout from now on, standing where it was, its own way out kept; it goes on
+     * with the real search from there ({@code MatabeleScoutGoal}), so what it finds is what is really there, not the
+     * dice. The others stay in the nest's numbers; real scouts leave from the nest as always.
+     */
+    private void showScouts(ServerLevel level) {
+        scoutsAsNumbers = true; // (asked as it was a moment ago, while its scouts were numbers)
+        List<ScoutAt> places = scoutsNow(level);
+        scoutsAsNumbers = false;
+        for (ScoutAt one : places) {
+            if (!colony.away().watcherNear(level, one.at(), com.antcolonies.colony.AwayLife.NEAR)) {
+                continue;
+            }
+            if (!raids.showScout(level, one.at(), one.heading())) {
+                noScoutShownBefore = level.getGameTime() + 2400; // (no major to show: not asked again for two minutes)
+                return;
+            }
+            ColonyManager.get(level).markChanged();
+        }
     }
 
     // --- the scouts as numbers ---------------------------------------------------------------------------------------

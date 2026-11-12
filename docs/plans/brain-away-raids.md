@@ -92,3 +92,50 @@ Found, with the new `soak-others.txt` (a line a day per far colony):
   the same cost as standing by the nest).
 - **Test:** `aWatcherNearAnAntOutInTheFieldWatchesItsColony` (`away`): a watcher 84 blocks from the nest but near an ant
   walking home keeps the colony here past the grace; once the ant is home the colony goes over to numbers.
+
+## Step 3, built 2026-11-11
+
+- **A raid out as numbers has a place.** From its own times (`RaidsAway.where`): mustering in the nest, so far along
+  its way out, at the spot, or so far along its way home; the place is that point of its scent trail (or the scout's
+  line; `Raids.wayTo`). A watcher within 64 blocks of it watches the colony (`Raids.outThere`).
+- **Shown as real ants** (`RaidsAway.show`, `Raids.showRaid`, `RaidColumn.startPartway`), once a second while the
+  colony is here: when a watcher is within 64 blocks of the raid's place and none within 50 of either end of the column
+  (insects are drawn to 48 blocks, so nobody sees them appear; my pick), the raiders come out of the numbers on the
+  trail, up to 75, in marching order. Not attacked yet: marching on from there. Already attacked as numbers: regrouping
+  at the spot or walking home, the catch already in their jaws, the fight's losses counted; the fight is not played
+  again (my pick). Just set out (within 8 blocks of the nest): the column forms in the nest's rooms as a real raid
+  does. Nearly home after its attack: it walks in unseen, as numbers.
+- **Back to numbers from where it is** (`RaidsAway.fromColumn`, `RaidColumn.shareOut`): a real column whose colony
+  goes away goes on from its real place (it was "half the march" before, and a column on its way home began the whole
+  walk home again).
+- **The nest keeps that many fewer real ants while a numbers raid is out** (the raid's ants are out, not in the
+  rooms; `ColonyHooks.HIDDEN_AWAY`, answered by the raids part).
+- **No more skipping a feeding spot a watcher stands at** (`RaidsAway.playerNear` removed): the raid going there is
+  shown on its way instead. `raids.away.player_near` in the species file is no longer read.
+- **Known limits:** checked once a second, so flying fast through the band between 50 and 64 blocks can pass a raid
+  unseen; a watcher nearer than 50 to where the raid is when the colony becomes watched sees no ants (the raid goes on
+  as numbers; ants appearing in plain sight would be worse); BUGS 202 still open (a shown raid arriving where no real
+  termite stands comes home empty).
+- **Tests** (`away`): `aRaidOutAsNumbersIsShownOnItsWayOutWhenAWatcherComesNear` (a marching column of real raiders,
+  none within 50 of the watcher, counted once in the day), `aRaidOutAsNumbersIsShownWithItsCatchAfterItsAttack`
+  (regrouping with the catch in their jaws, home, numbers again, the catch on the pile). `away,raids` 35 of 35 on 6
+  servers; full run 213 of 215 on 6 servers (23 minutes), the two failures old flakes, both 3 of 3 alone (BUGS 22, 93).
+
+## Step 4, built 2026-11-11
+
+- **A scout out as numbers has a place** (`RaidsAway.scoutsNow`): each of the scouts the colony would send keeps its
+  own way out (route fidelity, as the real scouts' `ScoutMemory`) and walks out to the colony's reach and home again at
+  the numbers' pace, trip after trip, each scout at its own point of its trip. Worked out from the game time and the
+  colony's id alone: nothing kept, nothing saved (fewer rules). Only while the colony would send scouts (the scouting
+  hours, dry, hungry, no find worth a raid, no raid out) and only 16 or more blocks from the nest.
+- **Shown as a real scout** (`RaidsAway.showScouts`, `Raids.showScout`): a watcher within 64 blocks of that place and
+  none within 50 makes the colony watched; in the same second one major comes out of the numbers on the ground there,
+  with that way out as its own, already one of the colony's scouts out. The existing scout behaviour takes it within a
+  second and goes on with the **real search** from where it stands, so what it finds is what is really there; the dice
+  stop the moment the colony is watched (they only ever ran while it was away).
+- **Places that cannot be shown do not count** (a watcher within 50, land not ticking): otherwise a player standing
+  near one would hold the colony "watched" with nothing to see and its raids as numbers stopped (my pick).
+- **Known limits:** as step 3 (once a second; no ants appear within 50 blocks). The number scout's place is a straight
+  line out and back; the real scout then searches on its winding path.
+- **Test** (`away`): `aScoutOutAsNumbersIsShownWhenAWatcherComesNear`: a real major 1 to 2 blocks from the number
+  scout's place, 53 to 56 from the watcher, 20 to 31 from its nest, scouting, and it walks on (3 of 3).

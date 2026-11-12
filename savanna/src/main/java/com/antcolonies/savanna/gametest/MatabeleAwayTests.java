@@ -334,6 +334,112 @@ public class MatabeleAwayTests {
     }
 
     /**
+     * The brain while away, step 4: a scout out as numbers is shown as a real scout when a watcher comes near where it
+     * is. A hungry far colony with no find; once it is away its number scouts have places on their own ways out; a
+     * watcher stands 56 blocks past one (inside the far rule's 64, outside the 50 where it would be seen appearing):
+     * a real major stands there, one of the colony's scouts out, never nearer the watcher than 50 as it appears, and
+     * its real search goes on from there (it walks).
+     */
+    @GameTest(template = "arena", timeoutTicks = 12000, skyAccess = true, batch = "matabele_away_shown_scout")
+    public static void aScoutOutAsNumbersIsShownWhenAWatcherComesNear(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        TestScenes.deepGround(helper);
+        TestClock.still(helper, 8.0);
+        MatabeleScenes.deadMound(helper, MIDDLE, MIDDLE);
+        Colony colony = MatabeleScenes.colony(helper, MIDDLE + 9, MIDDLE, 100);
+        Raids raids = colony.part(SavannaParts.RAIDS).orElseThrow();
+        int[] stage = {0};
+        long[] stageAt = new long[1];
+        BlockPos[] placeAt = new BlockPos[1];
+        BlockPos[] watcherAt = new BlockPos[1];
+        java.util.UUID[] scout = new java.util.UUID[1];
+        BlockPos[] firstAt = new BlockPos[1];
+        helper.onEachTick(() -> {
+            long now = helper.getTick();
+            BlockPos nest = colony.getCenter();
+            switch (stage[0]) {
+                case 0 -> {
+                    if (now < 10) {
+                        return;
+                    }
+                    helper.assertTrue(raids.isHungry(), "the Matabele colony is not hungry with an empty pile");
+                    colony.population().setOnForTests(true);
+                    colony.away().setOnForTests(true);
+                    colony.away().setFarForTests(true);
+                    colony.away().setGraceForTests(40L);
+                    colony.away().setWatcherForTests(nest.offset(0, 0, -600)); // (nobody near)
+                    stage[0] = 1;
+                    stageAt[0] = now;
+                }
+                case 1 -> {
+                    if (!colony.away().isAway(level)) {
+                        helper.assertTrue(now - stageAt[0] < 400, "the far colony never went away");
+                        return;
+                    }
+                    // (no raid and no find in this scene: with no termites on record the far colony hunts by the land, and
+                    // a colony with a find worth a raid sends no scouts; the day's raids are made, the dice finds forgotten)
+                    raids.fillDayForTests(level);
+                    raids.forgetFindsForTests();
+                    java.util.List<BlockPos> places = raids.away().scoutPlaces(level);
+                    if (places.isEmpty()) {
+                        helper.assertTrue(now - stageAt[0] < 6000, "the far, hungry colony's scouts out as numbers never had a place (raid out as numbers "
+                                + raids.away().isOut() + ", finds " + raids.finds().size() + ", hungry " + raids.isHungry() + ", scouting time " + raids.isScoutingTime(level)
+                                + ", reach " + raids.range() + ")");
+                        return;
+                    }
+                    helper.assertTrue(raids.scoutsOut().isEmpty(), "a colony away has real scouts out");
+                    BlockPos place = places.get(0);
+                    double far = Math.sqrt((place.getX() - nest.getX()) * (double) (place.getX() - nest.getX())
+                            + (place.getZ() - nest.getZ()) * (double) (place.getZ() - nest.getZ()));
+                    helper.assertTrue(far >= 15 && far <= raids.range() + 1, "a scout out as numbers is " + Math.round(far) + " blocks from its nest");
+                    placeAt[0] = place;
+                    watcherAt[0] = BlockPos.containing(place.getX() + (place.getX() - nest.getX()) / far * 56, place.getY(),
+                            place.getZ() + (place.getZ() - nest.getZ()) / far * 56);
+                    colony.away().setWatcherForTests(watcherAt[0]);
+                    stage[0] = 2;
+                    stageAt[0] = now;
+                }
+                case 2 -> {
+                    if (raids.scoutsOut().isEmpty()) {
+                        helper.assertTrue(now - stageAt[0] < 200, "no real scout was shown to the watcher 56 blocks past the number scout's place");
+                        return;
+                    }
+                    scout[0] = raids.scoutsOut().iterator().next();
+                    helper.assertTrue(level.getEntity(scout[0]) instanceof com.antcolonies.savanna.entity.MatabeleEntity, "the shown scout is not in the world");
+                    com.antcolonies.savanna.entity.MatabeleEntity ant = (com.antcolonies.savanna.entity.MatabeleEntity) level.getEntity(scout[0]);
+                    helper.assertTrue(ant.hasMajorBody(), "the shown scout is a minor");
+                    double toPlace = Math.hypot(ant.getX() - placeAt[0].getX(), ant.getZ() - placeAt[0].getZ());
+                    double toWatcher = Math.hypot(ant.getX() - watcherAt[0].getX(), ant.getZ() - watcherAt[0].getZ());
+                    double toNest = Math.hypot(ant.getX() - nest.getX(), ant.getZ() - nest.getZ());
+                    SavannaMod.LOGGER.info("[shown scout test] shown at {}: {} from its place, {} from the watcher, {} from the nest",
+                            now, Math.round(toPlace), Math.round(toWatcher), Math.round(toNest));
+                    helper.assertTrue(toPlace <= 12 && toWatcher >= 50 && toNest >= 12, "the shown scout stands " + Math.round(toPlace) + " blocks from the number scout's place, "
+                            + Math.round(toWatcher) + " from the watcher, " + Math.round(toNest) + " from the nest");
+                    helper.assertFalse(colony.away().isAway(level), "the colony is away with a watcher near its scout");
+                    firstAt[0] = ant.blockPosition();
+                    stage[0] = 3;
+                    stageAt[0] = now;
+                }
+                case 3 -> {
+                    // its real search goes on from there: still a scout out, and it walks
+                    if (!(level.getEntity(scout[0]) instanceof com.antcolonies.savanna.entity.MatabeleEntity ant)) {
+                        helper.fail("the shown scout left the world while watched");
+                        return;
+                    }
+                    if (raids.isScouting(scout[0]) && !ant.blockPosition().closerThan(firstAt[0], 5)) {
+                        helper.succeed();
+                        return;
+                    }
+                    helper.assertTrue(now - stageAt[0] < 1200, "the shown scout never walked on searching (it stands at " + ant.blockPosition().toShortString()
+                            + ", scouting " + raids.isScouting(scout[0]) + ")");
+                }
+                default -> {
+                }
+            }
+        });
+    }
+
+    /**
      * M8 step 3d, the same scene near: a raid with more raiders than walk as real ants (the rest go along as numbers till
      * step 4) takes about {@code per_raider} termites for each of those numbers from the termite colony feeding at the spot
      * as the attack starts; the termites' count loses only one in its {@code stands_for} of them; the catch comes home onto
