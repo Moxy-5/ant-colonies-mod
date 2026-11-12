@@ -75,3 +75,20 @@ Found, with the new `soak-others.txt` (a line a day per far colony):
 - Far Matabele beside a termite mound whose colony is not made yet (it is put in when a player first comes near)
   hunt by the land (`RaidsAway.noTermitesOnRecord`).
 - Measured after: far termite colonies 20 of 20 alive after 8 days (0 of 20 before), steady where not raided.
+
+## Step 2, built 2026-11-11
+
+- **The rule:** a colony is watched when a watcher is within the far rule's reach (64 blocks, kept till 80) of its
+  nest's middle **or of any of its real ants out on a raid's business**: the raiders of the column out, the scouts out,
+  the ants walking home by themselves (`AwayLife.playerNear`, the new neutral socket `ColonyHooks.OUT_THERE`, answered
+  by `Raids.outThere`). Before, a player who followed a raid more than 80 blocks from its nest saw the column handed to
+  the numbers and its ants leave the world a minute later; a scout the same.
+- **Left for step 3 (my pick, it differs from the list above):** a raid of numbers does not count as "out there" yet,
+  and a numbers raid still skips a feeding spot a watcher stands at. Both only make sense once a numbers raid can turn
+  real (step 3): until then, counting its point would make the nest's ants real with nothing to see, and dropping the
+  skip would let a raid happen unseen in front of the player (the rule of 2026-11-08: no hidden raid where one watches).
+  Step 3 adds the numbers raid's point on its trail to `Raids.outThere` and drops `RaidsAway.playerNear`.
+- **Side effect:** while a player stands by a raid far from its nest, the nest's ants stay real too (up to 75, not seen;
+  the same cost as standing by the nest).
+- **Test:** `aWatcherNearAnAntOutInTheFieldWatchesItsColony` (`away`): a watcher 84 blocks from the nest but near an ant
+  walking home keeps the colony here past the grace; once the ant is home the colony goes over to numbers.

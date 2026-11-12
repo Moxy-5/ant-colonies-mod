@@ -94,6 +94,9 @@ public class AwayLife {
     /** Tests only: pretend a player is near (true) or not (false); null: the real players. Not saved. */
     @Nullable
     private Boolean nearForTests;
+    /** Tests only: this colony's one pretend watcher stands here (null: the real players). Not saved. */
+    @Nullable
+    private BlockPos watcherForTests;
     /** When the loaded land was last looked over for real members while far ({@link #foldLoaded}). Not saved. */
     private long lastFarLook = Colony.NOT_SET;
 
@@ -177,12 +180,36 @@ public class AwayLife {
                 && colony.profile().colony().numbersWhenFar();
     }
 
-    /** Whether a watcher ({@link Watchers}: any game mode) is within this many blocks of the nest's middle, sideways. */
+    /**
+     * Whether the colony is watched: a watcher ({@link Watchers}: any game mode) within this many blocks, sideways, of
+     * the nest's middle, or of any of its real insects out in the field on the colony's business
+     * ({@link ColonyHooks#OUT_THERE}: a raid column, scouts; the brain while away, step 2). One rule: before, only the
+     * nest counted, and a raid a player had followed 80 blocks out was folded into the numbers in front of them.
+     */
     private boolean playerNear(ServerLevel level, int radius) {
         if (nearForTests != null) {
             return nearForTests;
         }
-        return Watchers.near(level, colony.getCenter(), radius);
+        if (watcherNear(level, colony.getCenter(), radius)) {
+            return true;
+        }
+        for (ColonyHooks.OutThere out : colony.hooks().all(ColonyHooks.OUT_THERE)) {
+            for (BlockPos place : out.places(level)) {
+                if (watcherNear(level, place, radius)) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    private boolean watcherNear(ServerLevel level, BlockPos at, int radius) {
+        if (watcherForTests != null) {
+            double dx = watcherForTests.getX() - at.getX();
+            double dz = watcherForTests.getZ() - at.getZ();
+            return dx * dx + dz * dz <= (double) radius * radius;
+        }
+        return Watchers.near(level, at, radius);
     }
 
     /**
@@ -589,6 +616,11 @@ public class AwayLife {
     /** Tests only: pretend a player is within the far rule's reach (true) or not (false); null: the real players. */
     public void setNearForTests(@Nullable Boolean near) {
         this.nearForTests = near;
+    }
+
+    /** Tests only: a pretend watcher for this colony alone stands here (null: the real players). */
+    public void setWatcherForTests(@Nullable BlockPos watcher) {
+        this.watcherForTests = watcher;
     }
 
     public void setGraceForTests(@Nullable Long ticks) {

@@ -64,6 +64,17 @@ public final class ColonyHooks {
         int reach();
     }
 
+    /**
+     * The brain while away, step 2 ({@code docs/plans/brain-away-raids.md}): where the colony's real insects are out in
+     * the field on the colony's business, away from the nest (a raid column, scouts, ants walking home from a raid). A
+     * watcher near one of these places watches the colony as one near its nest does ({@link AwayLife#isHere}), so the
+     * insects in front of a player who followed them out are never folded into the numbers. Empty when nobody is out.
+     */
+    @FunctionalInterface
+    public interface OutThere {
+        List<BlockPos> places(ServerLevel level);
+    }
+
     /** Lasting trails the colony walks: how long the walk to a plant is by trail, and which columns along them to scan for plants. */
     public interface Trails {
         /** The walk (blocks) to {@code pos} along a trail, or a negative number if no trail leads near it. */
@@ -434,6 +445,8 @@ public final class ColonyHooks {
     public static final Kind<Castes> CASTES = Kind.of("castes");
     /** Step 8b: insects away on hidden trips (the termites' galleries). */
     public static final Kind<HiddenAway> HIDDEN_AWAY = Kind.of("hidden_away");
+    /** The brain while away, step 2: where the colony's real insects are out in the field on its business (a raid, scouts). */
+    public static final Kind<OutThere> OUT_THERE = Kind.of("out_there");
     /** Step 8b: the structure over the nest (the termite mound). */
     public static final Kind<Structure> STRUCTURE = Kind.of("structure");
     /** Step 8b: a food garden whose blocks age (the fungus comb). */

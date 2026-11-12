@@ -256,6 +256,32 @@ public class Raids {
         away.tick(level);
     }
 
+    /**
+     * The brain while away, step 2: where the colony's real ants are out on a raid's business now: the raiders of the
+     * column out, the scouts out, the ants walking home by themselves. A watcher near any of them watches the colony
+     * ({@code AwayLife.isHere}), so a raid a player follows away from the nest stays real. Only ants in the world.
+     */
+    List<BlockPos> outThere(ServerLevel level) {
+        if ((column == null || column.stage() == RaidColumn.Stage.DONE) && scouts.isEmpty() && wayHome.size() == 0) {
+            return List.of();
+        }
+        List<BlockPos> places = new ArrayList<>();
+        if (column != null && column.stage() != RaidColumn.Stage.DONE) {
+            addPlaces(level, column.members(), places);
+        }
+        addPlaces(level, scouts, places);
+        addPlaces(level, wayHome.ids(), places);
+        return places;
+    }
+
+    private static void addPlaces(ServerLevel level, java.util.Collection<UUID> ants, List<BlockPos> places) {
+        for (UUID id : ants) {
+            if (level.getEntity(id) instanceof MatabeleEntity ant && ant.isAlive()) {
+                places.add(ant.blockPosition());
+            }
+        }
+    }
+
     /** The diary for {@link RaidsAway}. */
     void diary(ServerLevel level, String what) {
         say(level, what);

@@ -136,6 +136,69 @@ public class MatabeleAwayTests {
     }
 
     /**
+     * The brain while away, step 2 ({@code docs/plans/brain-away-raids.md}): one rule for "is this colony watched". A
+     * watcher 84 blocks from the nest (past the far rule's 80) but near one of the colony's ants walking home from the
+     * field keeps the colony here and the ant real, past the grace; once the ant is home and nothing of the colony is
+     * out near the watcher, the colony goes over to numbers as any far colony does.
+     */
+    @GameTest(template = "arena", timeoutTicks = 6000, skyAccess = true, batch = "matabele_away_watched")
+    public static void aWatcherNearAnAntOutInTheFieldWatchesItsColony(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        TestScenes.deepGround(helper);
+        TestClock.still(helper, 13.0); // (between the raid hours: no scout's find starts a raid)
+        MatabeleScenes.deadMound(helper, MIDDLE, MIDDLE);
+        Colony colony = MatabeleScenes.colony(helper, MIDDLE + 9, MIDDLE, 30);
+        Raids raids = colony.part(SavannaParts.RAIDS).orElseThrow();
+        com.antcolonies.savanna.entity.MatabeleEntity[] out = new com.antcolonies.savanna.entity.MatabeleEntity[1];
+        int[] stage = {0};
+        long[] stageAt = new long[1];
+        helper.onEachTick(() -> {
+            long now = helper.getTick();
+            BlockPos nest = colony.getCenter();
+            switch (stage[0]) {
+                case 0 -> {
+                    if (now < 5) {
+                        return;
+                    }
+                    // one of the colony's real workers, put 27 blocks out in the field and sent home from there
+                    out[0] = com.antcolonies.gametest.TestIsolation.insectsOf(level, colony, com.antcolonies.savanna.entity.MatabeleEntity.class)
+                            .stream().filter(mob -> mob.nestCaste() != null && mob.isAlive()).findFirst().orElse(null);
+                    helper.assertTrue(out[0] != null, "the colony has no real worker");
+                    BlockPos field = helper.absolutePos(new BlockPos(MIDDLE + 36, SURFACE + 1, MIDDLE));
+                    out[0].teleportTo(field.getX() + 0.5, field.getY(), field.getZ() + 0.5);
+                    raids.sendHome(level, out[0], "test");
+                    helper.assertTrue(raids.isGoingHome(out[0].getUUID()), "the ant out in the field was not sent home");
+                    colony.away().setOnForTests(true);
+                    colony.away().setFarForTests(true);
+                    colony.away().setGraceForTests(40L);
+                    colony.away().setWatcherForTests(nest.offset(84, 0, 0)); // (the ant is between the watcher and the nest)
+                    stage[0] = 1;
+                    stageAt[0] = now;
+                }
+                case 1 -> {
+                    if (now - stageAt[0] < 100) { // (well past the grace)
+                        return;
+                    }
+                    double far = Math.sqrt(out[0].blockPosition().distSqr(nest));
+                    helper.assertTrue(out[0].isAlive() && !out[0].isRemoved() && raids.isGoingHome(out[0].getUUID()) && far > 8,
+                            "the ant was to be still walking home here: " + Math.round(far) + " blocks out, going home " + raids.isGoingHome(out[0].getUUID()));
+                    helper.assertTrue(colony.away().isHere(level) && !colony.away().isAway(level),
+                            "a watcher 84 blocks from the nest but near the colony's ant in the field does not watch the colony");
+                    stage[0] = 2;
+                    stageAt[0] = now;
+                }
+                case 2 -> {
+                    if (colony.away().isAway(level) && level.getEntity(out[0].getUUID()) == null) {
+                        helper.succeed(); // (home, nothing out near the watcher: far, its real ants folded into the numbers)
+                    }
+                }
+                default -> {
+                }
+            }
+        });
+    }
+
+    /**
      * M8 step 3d, the same scene near: a raid with more raiders than walk as real ants (the rest go along as numbers till
      * step 4) takes about {@code per_raider} termites for each of those numbers from the termite colony feeding at the spot
      * as the attack starts; the termites' count loses only one in its {@code stands_for} of them; the catch comes home onto
