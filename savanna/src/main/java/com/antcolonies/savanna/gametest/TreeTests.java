@@ -153,6 +153,31 @@ public class TreeTests {
                 helper.fail(set.planks().getId() + "'s fence, gate or door is not in Minecraft's wooden tags");
             }
         }
+        // Used as Minecraft's own (the user, 2026-11-11): planks make sticks and burn; the trunk wood burns, smelts into
+        // charcoal and makes a campfire (the item tags, not only the block ones).
+        for (String name : List.of("camel_thorn_planks", "baobab_planks", "umbrella_thorn_log", "camel_thorn_wood", "baobab_log")) {
+            var stack = new net.minecraft.world.item.ItemStack(net.minecraft.core.registries.BuiltInRegistries.ITEM.get(
+                    ResourceLocation.fromNamespaceAndPath(SavannaMod.MODID, name)));
+            if (stack.getBurnTime(net.minecraft.world.item.crafting.RecipeType.SMELTING) <= 0) {
+                helper.fail(name + " does not burn in a furnace");
+            }
+            boolean log = name.contains("log") || name.endsWith("_wood");
+            var input = new net.minecraft.world.item.crafting.SingleRecipeInput(stack);
+            if (log && level.getRecipeManager().getRecipeFor(net.minecraft.world.item.crafting.RecipeType.SMELTING, input, level)
+                    .map(r -> r.value().getResultItem(level.registryAccess()).getItem()).orElse(null) != net.minecraft.world.item.Items.CHARCOAL) {
+                helper.fail(name + " does not smelt into charcoal");
+            }
+            if (log && !stack.is(net.minecraft.tags.ItemTags.LOGS)) {
+                helper.fail(name + " is no log for campfires and smokers");
+            }
+            if (!log) {
+                var sticks = net.minecraft.world.item.crafting.CraftingInput.of(1, 2, List.of(stack, stack));
+                if (level.getRecipeManager().getRecipeFor(net.minecraft.world.item.crafting.RecipeType.CRAFTING, sticks, level)
+                        .map(r -> r.value().getResultItem(level.registryAccess()).getItem()).orElse(null) != net.minecraft.world.item.Items.STICK) {
+                    helper.fail(name + " does not make sticks");
+                }
+            }
+        }
         // Signs and boats (the user, 2026-11-11): recipes, hanging signs cut from the trunk wood, the signs hold their
         // writing (Minecraft's sign block entity), and a boat breaks back into its own item.
         int x = 40;

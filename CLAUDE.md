@@ -422,6 +422,7 @@ A Minecraft mod where ants and termites live as real colonies: they dig, build, 
 - **Planks from the giant trees, BUILT 2026-11-11** (branch `claude/tree-planks`): camel thorn and baobab planks (look A, the user's pick in `python tools/model_viewer.py planks`), the umbrella thorn makes acacia planks; any trunk block crafts into 4; `trees` 18 of 18; not tried in-game yet.
 - **Everything planks make, BUILT 2026-11-11** (branch `claude/tree-planks`): camel thorn and baobab stairs, slabs, fences, gates, doors, trapdoors, pressure plates, buttons; signs and boats not yet; `trees` pass; not tried in-game yet.
 - **Signs and boats from the giant trees, BUILT 2026-11-11** (branch `claude/tree-planks`): camel thorn and baobab signs, hanging signs (cut from the trunk wood, my pick), boats and chest boats, as Minecraft's own (boats through NeoForge's enum extension, `registry/SavannaBoats`); not tried in-game yet.
+- **Fix 2026-11-11: the giant trees' logs now burn, smelt into charcoal and make campfires** (item tag `logs_that_burn`; planks already made sticks and everything else); not tried in-game yet.
 
 ## Other notes files (read only when the task needs them)
 - `docs/DESIGN.md`: every design decision for the species and shared systems (read the section for a feature before working on it).
