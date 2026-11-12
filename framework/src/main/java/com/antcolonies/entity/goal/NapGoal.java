@@ -51,7 +51,7 @@ public class NapGoal extends Goal {
             return false; // (never with a fight order, between bouts of its fight: M8 step 3Q, BUGS 97's skirmish found it)
         }
         Colony colony = insect.getColony();
-        return colony == null || colony.nest().isInside(insect.level(), insect.blockPosition()) && !colony.isAlarmed(insect.level());
+        return colony == null || colony.nest().isInside(insect.level(), insect.blockPosition()) && !colony.isAlarmed(insect.level(), insect.blockPosition());
     }
 
     @Override

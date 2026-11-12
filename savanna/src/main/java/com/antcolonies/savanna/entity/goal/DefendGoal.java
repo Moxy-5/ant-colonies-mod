@@ -21,10 +21,10 @@ import net.minecraft.world.entity.ai.goal.Goal;
 import net.minecraft.world.phys.Vec3;
 
 /**
- * A soldier answers the alarm (see {@link Alarm#taskFor}): it goes at an enemy (and bites it, if it is one it may bite:
- * for now only chickens), or it walks to a spot near the trouble (the breach, the nest cell nearest the footsteps) and
- * stands there facing it, drumming once on arrival at footsteps. When the alarm has nothing more for it, it goes back to
- * its post.
+ * A soldier answers a trouble it has heard (see {@link Alarm#taskFor}): it walks to its own place by it (round the foe
+ * or the breach, the nest cell nearest the footsteps) and stands there facing it, drumming once on arrival at
+ * footsteps. When the trouble is over it goes back to its beat. (The alarm rework, step 3: there is no separate chase
+ * of one enemy any more; it lunges from its place, below.)
  *
  * <p>M8 step 3S, S1 (the user's raid test of 2026-11-05: "the majors ignore them back"): standing at its spot it is no
  * statue. Real Macrotermes soldiers are blind and bite whatever touches them: it snaps at a foe its jaws reach and lunges
@@ -120,39 +120,31 @@ public class DefendGoal extends Goal {
         if (biteCooldown > 0) {
             biteCooldown--;
         }
-        if (task.enemy() != null) {
-            chase(task.enemy(), true);
-        } else if (task.cell() != null) {
-            if (lungingAt == null || !lungingAt.isAlive() || (soldier.tickCount + soldier.getId()) % 4 == 0) {
-                lungingAt = foeNear(level, task);
-            }
-            if (lungingAt != null) {
-                chase(lungingAt, false);
-            } else {
-                stand(task.cell(), task.spot(), task.facing(), task.drumOnArrival());
-            }
+        if (lungingAt == null || !lungingAt.isAlive() || (soldier.tickCount + soldier.getId()) % 4 == 0) {
+            lungingAt = foeNear(level, task);
+        }
+        if (lungingAt != null) {
+            chase(lungingAt);
+        } else {
+            stand(task.cell(), task.spot(), task.facing(), task.drumOnArrival());
         }
     }
 
-    /** Whether the task's enemy or spot is one it found no way to a little while ago. */
+    /** Whether the task's place is one it found no way to a little while ago. */
     private boolean leftAlone(Alarm.Task task) {
-        return task.enemy() != null ? noWay.isLeftAlone(task.enemy().getUUID())
-                : task.cell() != null && noWay.isLeftAlone(task.cell());
+        return noWay.isLeftAlone(task.cell());
     }
 
     /**
-     * The alarm's task for it; with none, a soldier shut out by a seal (M8 step 2f, {@link RaidDefence}) waits by the
-     * seal. A soldier inside is not sent at a breach past a seal (it cannot get there).
+     * The alarm's task for it. A soldier inside is not sent to a place past a seal (M8 step 2f, {@link RaidDefence}: it
+     * cannot get there); one shut out with no trouble left walks its beat by the seal ({@code WalkBeatGoal}).
      */
     @Nullable
     private Alarm.Task taskNow(ServerLevel level) {
         RaidDefence raid = colony.part(SavannaParts.RAID_DEFENCE).orElse(null);
         Alarm.Task now = alarm.taskFor(level, soldier);
-        if (now != null && raid != null && now.enemy() == null && now.cell() != null && raid.cutOff(soldier, now.cell())) {
+        if (now != null && raid != null && raid.cutOff(soldier, now.cell())) {
             now = null;
-        }
-        if (now == null && raid != null) {
-            now = raid.waitTaskFor(level, soldier);
         }
         return now;
     }
@@ -185,10 +177,9 @@ public class DefendGoal extends Goal {
 
     /**
      * Goes at the enemy; once it touches it, it holds still facing it and bites it now and then (if it may). With no way
-     * to it, it leaves it alone a while; {@code dropTask}: and gives up its task (a chase), else it goes back to its spot
-     * (a lunge from its spot, S1).
+     * to it, it leaves it alone a while and goes back to its place (a lunge from its place, S1).
      */
-    private void chase(LivingEntity enemy, boolean dropTask) {
+    private void chase(LivingEntity enemy) {
         if (reaches(enemy)) {
             soldier.getNavigator().stop();
             walkingTo = null;
@@ -211,12 +202,8 @@ public class DefendGoal extends Goal {
             // No way there (behind a seal, up a wall, on a runway's top): the soldier lets it be for a while.
             if (!soldier.getNavigator().moveTo(at, 1.2)) {
                 noWay.leaveAlone(enemy.getUUID());
-                if (dropTask) {
-                    task = null;
-                } else {
-                    lungingAt = null;
-                    walkingTo = null;
-                }
+                lungingAt = null;
+                walkingTo = null;
             }
         }
     }

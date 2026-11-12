@@ -375,9 +375,9 @@ public class FieldLife {
             return false;
         }
         boolean outside = colony.isForagingTime(level);
-        if (!outside && (alone || !colony.keepsASchedule() || colony.keepsEveryoneIn(level))) {
+        if (!outside && (alone || !colony.keepsASchedule())) {
             progress.clear();
-            return false; // the alarm keeps everyone in (searching alone: nothing to eat from inside)
+            return false; // (searching alone: nothing to eat from inside)
         }
         roomNow = colony.food().roomKnown();
         if (roomNow <= 0) {

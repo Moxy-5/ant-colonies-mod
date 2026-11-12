@@ -329,7 +329,7 @@ public class TermiteForagingTests {
                                         + colony.danger().describe(level) + ", once as strong as " + colony.danger().places().get(0).peak());
                         helper.assertTrue(colony.danger().places().get(0).attacks() == 1, "one chicken's flurry of pecks counted as "
                                 + colony.danger().places().get(0).attacks() + " attacks (BUGS 65)");
-                        helper.assertTrue(colony.part(SavannaParts.ALARM).orElseThrow().level(level) >= 2, "the chicken's attack raised no alarm");
+                        helper.assertTrue(colony.part(SavannaParts.ALARM).orElseThrow().anyKeptIn(level), "the chicken's attack raised no alarm");
                         since[0] = tick;
                         stage[0] = 61;
                     }
@@ -343,7 +343,7 @@ public class TermiteForagingTests {
                             since[0] = tick;
                             SavannaMod.LOGGER.info("[turns-test] tick {}: the chicken in the hole killed; {}", tick, alarm.describe(level));
                         }
-                    } else if (alarm.level(level) == 0) {
+                    } else if (alarm.isCalm(level)) {
                         SavannaMod.LOGGER.info("[turns-test] tick {}: the alarm settled {} ticks after the chicken was killed", tick, tick - since[0]);
                         helper.assertTrue(colony.isForagingTime(level), "the alarm settled at night but the colony does not forage again");
                         helper.assertTrue(colony.part(SavannaParts.CLOSED_HOLES).orElseThrow().left().isEmpty(),
@@ -351,8 +351,8 @@ public class TermiteForagingTests {
                         stage[0] = 7;
                     } else {
                         com.antcolonies.savanna.species.SavannaNumbers.AlarmNumbers numbers = alarm.numbers();
-                        helper.assertTrue(tick - since[0] <= numbers.calmTicksFor(2) + numbers.calmTicksFor(1) + 100,
-                                "the alarm is still at " + alarm.level(level) + " " + (tick - since[0]) + " ticks after the chicken was killed (BUGS 65): " + alarm.describe(level));
+                        helper.assertTrue(tick - since[0] <= numbers.lastsTicks(com.antcolonies.savanna.colony.Alarm.Kind.FOE) + 100,
+                                "the alarm is still up " + (tick - since[0]) + " ticks after the chicken was killed (BUGS 65): " + alarm.describe(level));
                     }
                 }
                 case 7 -> { // at once: the hole and the holes whose gallery runs near the kill closed, the others not

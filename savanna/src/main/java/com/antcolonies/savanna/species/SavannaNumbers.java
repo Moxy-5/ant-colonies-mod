@@ -266,29 +266,35 @@ public final class SavannaNumbers {
     }
 
     /**
-     * The alarm (species that raise one; see {@code colony.Alarm}). {@code calmTicks}: how long each level (1 footsteps,
-     * 2 an enemy at the foragers, 3 a break-in, 4 repeated break-ins) lasts after the last thing that raised it before it
-     * drops a level. {@code breakInsForLevel4} break-ins within {@code breakInWindowTicks} make it level 4; after a
-     * level 4 the colony wants {@code soldierBoost} times as many soldiers for {@code boostTicks}. A soldier feels the
-     * drumming of another within {@code feelRadius} blocks (through the walls).
+     * The alarm (species that raise one; see {@code colony.Alarm}; the termite alarm rework, step 3): a trouble is felt
+     * {@code felt} blocks round at footsteps on the mound, {@code foe} round a member hurt or an enemy at the foragers,
+     * {@code breach} round a broken wall; that reach shrinks by {@code fadePerSecond} blocks a second from the last
+     * thing that fed the trouble (so footsteps are over in 30 s, a foe or a breach 80 s after the last of it); the
+     * drumming runs out from it at {@code drumSpeed} blocks a second (real: about 1.3 m a second, Hager and Kirchner
+     * 2013); something new within {@code mergeWithin} blocks of a trouble feeds that one. My picks but the speed.
      */
-    public record AlarmNumbers(List<Integer> calmTicks, int breakInsForLevel4, int breakInWindowTicks, float soldierBoost, int boostTicks,
-            int feelRadius) {
+    public record AlarmNumbers(double felt, double foe, double breach, double fadePerSecond, double drumSpeed, double mergeWithin) {
         public static final Codec<AlarmNumbers> CODEC = RecordCodecBuilder.create(i -> i.group(
-                Codec.INT.listOf().optionalFieldOf("calm_ticks", List.of(600, 2400, 3600, 24000)).forGetter(AlarmNumbers::calmTicks),
-                Codec.INT.optionalFieldOf("break_ins_for_level_4", 3).forGetter(AlarmNumbers::breakInsForLevel4),
-                Codec.INT.optionalFieldOf("break_in_window_ticks", 6000).forGetter(AlarmNumbers::breakInWindowTicks),
-                Codec.FLOAT.optionalFieldOf("soldier_boost", 2.0F).forGetter(AlarmNumbers::soldierBoost),
-                Codec.INT.optionalFieldOf("boost_ticks", 72000).forGetter(AlarmNumbers::boostTicks),
-                Codec.INT.optionalFieldOf("feel_radius", 6).forGetter(AlarmNumbers::feelRadius)
+                Codec.DOUBLE.optionalFieldOf("felt", 6.0).forGetter(AlarmNumbers::felt),
+                Codec.DOUBLE.optionalFieldOf("foe", 16.0).forGetter(AlarmNumbers::foe),
+                Codec.DOUBLE.optionalFieldOf("breach", 16.0).forGetter(AlarmNumbers::breach),
+                Codec.DOUBLE.optionalFieldOf("fade_per_second", 0.2).forGetter(AlarmNumbers::fadePerSecond),
+                Codec.DOUBLE.optionalFieldOf("drum_speed", 1.3).forGetter(AlarmNumbers::drumSpeed),
+                Codec.DOUBLE.optionalFieldOf("merge_within", 8.0).forGetter(AlarmNumbers::mergeWithin)
         ).apply(i, AlarmNumbers::new));
 
-        /** How long (ticks) this level (1 to 4) lasts after the last thing that raised it. */
-        public int calmTicksFor(int level) {
-            if (calmTicks.isEmpty()) {
-                return 600;
-            }
-            return calmTicks.get(Math.max(0, Math.min(calmTicks.size() - 1, level - 1)));
+        /** How far (blocks) a trouble of this kind is felt when it starts. */
+        public double strength(com.antcolonies.savanna.colony.Alarm.Kind kind) {
+            return switch (kind) {
+                case FELT -> felt;
+                case FOE -> foe;
+                case BREACH -> breach;
+            };
+        }
+
+        /** How long (ticks) a trouble of this kind lasts after the last thing that fed it. */
+        public int lastsTicks(com.antcolonies.savanna.colony.Alarm.Kind kind) {
+            return (int) Math.ceil(strength(kind) / fadePerSecond * 20.0);
         }
     }
 

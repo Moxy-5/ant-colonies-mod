@@ -236,10 +236,10 @@ public class TermiteSoldierEntity extends AbstractAntEntity implements FedByNurs
         return rank == Rank.MINOR && colony.part(SavannaParts.SOLDIERS).map(soldiers -> soldiers.minorsOut(level())).orElse(false);
     }
 
-    /** Whether its colony's alarm is up (it then has no time to wait for a nurse). */
+    /** Whether it has heard a trouble's drumming and is answering it (it then has no time to wait for a nurse). */
     private boolean isAlarmed() {
         Colony colony = getColony();
-        return colony != null && colony.part(SavannaParts.ALARM).map(alarm -> alarm.level(level())).orElse(0) >= 2;
+        return colony != null && colony.part(SavannaParts.ALARM).map(alarm -> alarm.hasHeard(getUUID())).orElse(false);
     }
 
     // Soldiers dig nothing and carry nothing.

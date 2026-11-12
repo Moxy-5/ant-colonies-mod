@@ -84,7 +84,8 @@ public class ClipGrassGoal extends Goal {
         }
         // Foragers only go out at foraging time (termites: at night and in the rain). Out of it a colony that keeps a
         // schedule still eats food it can reach from inside (a fallen log over a feeding gallery).
-        fromInside = !colony.isForagingTime(level);
+        // (nor where its colony's alarm is felt: the termite alarm rework, step 3)
+        fromInside = !colony.isForagingTime(level) || colony.isAlarmed(level, ant.blockPosition());
         if (fromInside && !colony.keepsASchedule()) {
             return false;
         }

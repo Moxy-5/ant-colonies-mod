@@ -2154,6 +2154,9 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
         if (isKeepingIn()) {
             return false; // it fled from a hunter: it stays in a while (M8 fight polish, round B)
         }
+        if (hasColonyRole() && colony.isAlarmed(level(), blockPosition())) {
+            return false; // its colony feels trouble here (a foe, a broken wall): it goes in and stays in
+        }
         if (colony.keepsASchedule()) {
             return colony.isForagingTime(level());
         }

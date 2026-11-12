@@ -61,13 +61,13 @@ public class GroomGoal extends Goal {
             return false;
         }
         Colony colony = insect.getColony();
-        return colony == null || !colony.isAlarmed(insect.level());
+        return colony == null || !colony.isAlarmed(insect.level(), insect.blockPosition());
     }
 
     @Override
     public boolean canContinueToUse() {
         return ticksLeft > 0 && insect.onGround() && insect.hurtTime == 0 && !insect.isInWater() && insect.getFightSpot() == null
-                && (insect.getColony() == null || !insect.getColony().isAlarmed(insect.level()));
+                && (insect.getColony() == null || !insect.getColony().isAlarmed(insect.level(), insect.blockPosition()));
     }
 
     @Override

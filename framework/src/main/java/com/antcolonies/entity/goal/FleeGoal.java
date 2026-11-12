@@ -107,8 +107,15 @@ public class FleeGoal extends Goal {
         colony = null;
     }
 
-    /** Whether it feels a hunter close, or a nestmate felled or held by one. */
+    /**
+     * Whether it feels a hunter close, or a nestmate felled or held by one, or its colony's alarm where it stands (the
+     * termite alarm rework, step 3: the drumming of a foe or a breach sends the workers within it in, whatever they
+     * were doing; {@link Colony#isAlarmed}).
+     */
     private boolean feelsDanger(ServerLevel level, FightNumbers.Flee flee) {
+        if (colony != null && colony.isAlarmed(level, ant.blockPosition())) {
+            return true;
+        }
         AABB near = ant.getBoundingBox().inflate(flee.feelRadius());
         return !level.getEntitiesOfClass(AbstractAntEntity.class, near, other -> other != ant && other.isAlive()
                 && (!other.isDowned() && Fights.hunts(other.profile(), ant)

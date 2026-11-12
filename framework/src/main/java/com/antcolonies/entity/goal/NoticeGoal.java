@@ -171,7 +171,7 @@ public class NoticeGoal extends Goal {
             return false;
         }
         Colony colony = insect.getColony();
-        return colony == null || !colony.isAlarmed(level);
+        return colony == null || !colony.isAlarmed(level, insect.blockPosition());
     }
 
     @Override

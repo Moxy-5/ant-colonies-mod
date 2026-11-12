@@ -191,13 +191,12 @@ public final class AwayKit {
         // Colony parts steps 6 and 7, the colony questions: each kind is answered by the parts the colony has that used
         // to be asked by name, in the order they were asked; a kind nobody answers is "no" at once.
         Map<com.antcolonies.colony.ColonyQuestions.Kind<?>, List<String>> asked = Map.ofEntries(
-                Map.entry(com.antcolonies.colony.ColonyQuestions.KEEP_OFF, List.of("neighbours", "closed_holes", "danger_map", "trunk_trails")),
+                Map.entry(com.antcolonies.colony.ColonyQuestions.KEEP_OFF, List.of("neighbours", "closed_holes", "danger_map", "trunk_trails", "alarm")),
                 Map.entry(com.antcolonies.colony.ColonyQuestions.NOT_CLEARED, List.of("patrol")),
                 Map.entry(com.antcolonies.colony.ColonyQuestions.HOLE_KEPT_SHUT, List.of("closed_holes")),
                 Map.entry(com.antcolonies.colony.ColonyQuestions.ANY_HOLE_KEPT_SHUT, List.of("closed_holes")),
                 Map.entry(com.antcolonies.colony.ColonyQuestions.NO_GALLERY_THROUGH, List.of("closed_holes")),
                 // Step 8a: the rest of the shared code's yes/no asks, each answered by the one part it used to name.
-                Map.entry(com.antcolonies.colony.ColonyQuestions.KEEPS_EVERYONE_IN, List.of("alarm")),
                 Map.entry(com.antcolonies.colony.ColonyQuestions.BUILDS_OVER_NEST, List.of("mound")),
                 Map.entry(com.antcolonies.colony.ColonyQuestions.BUILDING_OVER_NEST, List.of("mound")),
                 Map.entry(com.antcolonies.colony.ColonyQuestions.CLEAR_JOB, List.of("mound")),

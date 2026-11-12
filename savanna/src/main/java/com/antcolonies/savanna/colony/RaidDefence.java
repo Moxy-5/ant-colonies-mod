@@ -42,7 +42,7 @@ import net.minecraft.world.phys.Vec3;
  * break for a while, the seal is bitten open again.
  *
  * <p>Heard from the colony news ({@code BROKEN_OPEN}, told by a Matabele major biting the cover open); the drumming is the
- * alarm's ({@link Alarm#raidBreakIn}). The seals are saved (a seal left standing over a reload still opens at night); who
+ * alarm's (a breach, {@link Alarm#trouble}). The seals are saved (a seal left standing over a reload still opens at night); who
  * was shut out and who is retreating are not (after a reload the soldiers outside find their own way home once it opens).
  */
 public class RaidDefence {
@@ -55,20 +55,14 @@ public class RaidDefence {
 
     /** The numbers when the species file has none (a test giving this part to another species). */
     /**
-     * M8 step 3S: the longest the seal waits past its time for the soldiers still coming out of the galleries in waves
-     * (ticks, 30 s: 12 soldiers in waves of 2 or 3 every 5 s; my pick). Real: the workers seal behind the soldiers.
-     */
-    private static final int WAVE_WAIT = 600;
-    /**
      * The raid test bench, B7 (nothing waits for ever): a seal opens at the first foraging time this long after it was due
      * (ticks, a game day) even with a foe still near the break. A raider stuck in a pit by the gallery (BUGS 111) or a lone
      * ant wandering by would otherwise keep it shut, and the soldiers outside waiting by it, for ever (my pick; real
      * termites reopen sealed galleries once the attack is over, and a day of one stray ant nearby is no attack).
      */
     static final long SEAL_MOST = 24000;
-    /** S3: how far (blocks) from a break with no tunnel of ours under it the soldiers come out of a gallery, least and most. */
-    private static final int WAVE_NEAREST = 2;
-    private static final int WAVE_FARTHEST = 8;
+    /** How far (blocks) inside the seal's place a soldier counts as on its way out to the break (my pick). */
+    private static final double COMING = 8.0;
     private static final SavannaNumbers.RaidNumbers DEFAULT = new SavannaNumbers.RaidNumbers(16, 4, 40, 200, 8, 600);
 
     /** One break into a gallery, and its seal. */
@@ -132,7 +126,7 @@ public class RaidDefence {
             return;
         }
         SavannaNumbers.RaidNumbers numbers = numbers();
-        colony.part(SavannaParts.ALARM).ifPresent(alarm -> alarm.raidBreakIn(level, where, by, numbers.drumReach()));
+        colony.part(SavannaParts.ALARM).ifPresent(alarm -> alarm.trouble(level, Alarm.Kind.BREACH, where));
         long now = level.getGameTime();
         for (Breach breach : breaches) {
             if (breach.at.distSqr(where) <= INTO_TUNNEL * INTO_TUNNEL || breach.plug.distSqr(where) <= 4) {
@@ -225,10 +219,10 @@ public class RaidDefence {
         if (now < breach.due) {
             return;
         }
-        if (now - breach.due < WAVE_WAIT && colony.part(SavannaParts.ALARM).map(alarm -> alarm.wavesComing(level)).orElse(false)) {
-            return; // soldiers are still coming out to the break (3S): the workers seal behind them
+        if (now - breach.due < numbers.plugGiveUpTicks() && soldierComing(level, breach)) {
+            return; // a soldier just inside is on its way out to the break: the workers seal behind the soldiers
         }
-        if (now - breach.due > numbers.plugGiveUpTicks() * 3L + WAVE_WAIT) {
+        if (now - breach.due > numbers.plugGiveUpTicks() * 3L) {
             breaches.remove(breach); // never got shut (something sat in the way all along): forgotten
             return;
         }
@@ -257,6 +251,23 @@ public class RaidDefence {
         breach.ours = true;
         breach.retreating.clear();
         shutOut(level, breach);
+    }
+
+    /**
+     * The alarm rework, step 3 (in place of 3S's wait for the waves): whether a soldier stands on the nest side of the
+     * seal's place within {@link #COMING} blocks of it. The drumming reaches it within seconds and it runs out to the
+     * break, so the seal waits for it, at most the workers' give-up time.
+     */
+    private boolean soldierComing(ServerLevel level, Breach breach) {
+        double plugToBreak = Math.sqrt(breach.plug.distSqr(breach.at));
+        Vec3 at = Vec3.atCenterOf(breach.at);
+        for (TermiteSoldierEntity soldier : colony.part(SavannaParts.SOLDIERS).map(part -> part.getSoldiers(level)).orElse(List.of())) {
+            double distance = soldier.position().distanceTo(at);
+            if (soldier.isAlive() && !soldier.isDowned() && distance >= plugToBreak + 0.5 && distance <= plugToBreak + COMING) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /** The soldiers left outside the seal (nearer the break than the plug, within the drumming's reach). */
@@ -315,17 +326,15 @@ public class RaidDefence {
     }
 
     /**
-     * What a shut-out soldier does once the raiders have gone (no foe within {@code quiet_reach}): it waits by the seal
-     * facing it, till it opens at night; null for a soldier not shut out (or with a foe near: then it fights).
+     * The beat of a soldier shut out by a seal (the alarm rework, step 3: no statues): the cell just outside the seal,
+     * and the seal it looks toward, till it opens at night; null for a soldier not shut out. The alarm still calls it
+     * away while a trouble lasts.
      */
     @Nullable
-    public Alarm.Task waitTaskFor(ServerLevel level, TermiteSoldierEntity soldier) {
+    public BlockPos[] sealBeat(UUID soldier) {
         for (Breach breach : breaches) {
-            if (breach.sealed && breach.shutOut.contains(soldier.getUUID())) {
-                if (foeWithin(level, soldier.position(), numbers().quietReach())) {
-                    return null;
-                }
-                return new Alarm.Task(null, breach.waitAt, breach.plug, false);
+            if (breach.sealed && breach.shutOut.contains(soldier)) {
+                return new BlockPos[] {breach.waitAt, breach.plug};
             }
         }
         return null;
@@ -346,59 +355,6 @@ public class RaidDefence {
     }
 
     /** Whether this soldier is shut out by a seal now. */
-    /**
-     * M8 step 3S: the cells the colony's soldiers come out of the numbers at for a raid's break at {@code spot}, the
-     * deepest first: the gallery's open cells between its planned seal and the break (so they run out to it, and are
-     * shut out with the others when it is packed); for a break with no seal of ours (a runway, a cast), the colony's
-     * tunnel cells {@link #WAVE_NEAREST} to {@link #WAVE_FARTHEST} blocks from it. Empty once the seal is packed.
-     */
-    public List<BlockPos> waveCells(ServerLevel level, BlockPos spot) {
-        Breach breach = null;
-        for (Breach one : breaches) {
-            if (breach == null || one.at.distSqr(spot) < breach.at.distSqr(spot)) {
-                breach = one;
-            }
-        }
-        if (breach != null && breach.at.distSqr(spot) > WAVE_FARTHEST * WAVE_FARTHEST) {
-            breach = null;
-        }
-        if (breach != null && breach.sealed) {
-            return List.of();
-        }
-        List<BlockPos> out = new ArrayList<>();
-        for (NestPlan.ForagingTunnel tunnel : colony.foragingHoles().tunnels(level)) {
-            List<BlockPos> cells = tunnel.tunnel();
-            if (breach != null) {
-                int plug = cells.indexOf(breach.plug);
-                if (plug < 0) {
-                    continue;
-                }
-                int last = Math.min(cells.size() - 1, plug + numbers().plugBack()); // (the break's own cell)
-                for (int i = plug + 1; i <= last; i++) {
-                    BlockPos cell = cells.get(i);
-                    if (LandReady.at(level, cell) && Alarm.standable(level, cell)) {
-                        out.add(cell);
-                    }
-                }
-                if (!out.isEmpty()) {
-                    return out;
-                }
-                continue;
-            }
-            for (BlockPos cell : cells) {
-                double distance = cell.distSqr(spot);
-                if (distance >= WAVE_NEAREST * WAVE_NEAREST && distance <= WAVE_FARTHEST * WAVE_FARTHEST && LandReady.at(level, cell)
-                        && Alarm.standable(level, cell)) {
-                    out.add(cell);
-                }
-            }
-        }
-        if (breach == null) {
-            out.sort(Comparator.comparingDouble((BlockPos cell) -> -cell.distSqr(spot)));
-        }
-        return out;
-    }
-
     public boolean isShutOut(UUID soldier) {
         return breaches.stream().anyMatch(breach -> breach.sealed && breach.shutOut.contains(soldier));
     }

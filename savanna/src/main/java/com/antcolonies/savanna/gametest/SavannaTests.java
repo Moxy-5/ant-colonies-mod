@@ -81,10 +81,10 @@ public final class SavannaTests {
         helper.assertTrue(colony.buildsMound() == colony.part(SavannaParts.MOUND).map(mound -> mound.numbers() != null).orElse(false)
                 && colony.buildsOverNestNow() == colony.part(SavannaParts.MOUND).map(Mound::isActive).orElse(false),
                 "a " + colony.getSpecies() + " colony should build a mound exactly when its mound part says so");
-        // Step 9a: the answers and sockets are today's (the alarm's level, the king beside the queen, the soldiers fed by nurses).
-        helper.assertTrue(colony.isAlarmed(helper.getLevel())
-                == colony.part(SavannaParts.ALARM).map(alarm -> alarm.level(helper.getLevel()) != 0).orElse(false),
-                "a " + colony.getSpecies() + " colony should be alarmed exactly when its alarm's level is above 0");
+        // Step 9a: the answers and sockets are today's (the alarm's troubles, the king beside the queen, the soldiers fed by nurses).
+        helper.assertTrue(colony.isAlarmed(helper.getLevel(), colony.getCenter())
+                == colony.part(SavannaParts.ALARM).map(alarm -> alarm.keepsIn(helper.getLevel(), colony.getCenter())).orElse(false),
+                "a " + colony.getSpecies() + " colony should be alarmed at a place exactly when its alarm feels a foe or a breach there");
         ColonyHooks.CoFounders founder = colony.hooks().first(ColonyHooks.CO_FOUNDERS);
         helper.assertTrue(colony.has(SavannaParts.KING_CARE) == (founder != null)
                 && (founder == null || founder.caste().equals(TermiteKingEntity.CASTE)

@@ -87,9 +87,6 @@ public class Soldiers {
     /** When the foraging time was seen to be over (from then on the minors wait for the workers). */
     private long foragingEndedAt = Colony.NOT_SET;
 
-    /** How many more minors come out while the alarm is up at a break-in (level 3 or more), beyond the ones with posts. */
-    private static final int BREACH_MINORS = 6;
-
     Soldiers(Colony colony) {
         this.colony = colony;
     }
@@ -105,14 +102,13 @@ public class Soldiers {
         return colony.getCount(rank.caste());
     }
 
-    /** How many soldiers of this kind the colony wants now (from how many workers it has, more after a level 4 alarm; none for a species without soldiers). */
+    /** How many soldiers of this kind the colony wants now (from how many workers it has; none for a species without soldiers). */
     public int wanted(Level level, Rank rank) {
         SavannaNumbers.SoldierNumbers numbers = numbers();
         if (numbers == null) {
             return 0;
         }
-        // After repeated break-ins (alarm level 4) the colony raises more soldiers for a while.
-        int workers = Math.round(colony.getCount(Caste.WORKER) * colony.part(SavannaParts.ALARM).map(alarm -> alarm.soldierBoost(level)).orElse(1.0F));
+        int workers = colony.getCount(Caste.WORKER);
         return rank == Rank.MINOR ? numbers.wantedMinors(workers) : numbers.wantedMajors(workers);
     }
 
@@ -306,6 +302,10 @@ public class Soldiers {
     /** The beat this soldier holds now, or null (for tests and the colony list). */
     @Nullable
     public Post beatOf(Level level, TermiteSoldierEntity soldier) {
+        Post bySeal = sealBeat(soldier.getUUID());
+        if (bySeal != null) {
+            return bySeal;
+        }
         for (Post post : posts(level, soldier.getRank())) {
             if (soldier.getUUID().equals(held.get(post.cell()))) {
                 return post;
@@ -463,6 +463,11 @@ public class Soldiers {
      */
     @Nullable
     public Post claimPost(ServerLevel level, TermiteSoldierEntity soldier, Set<BlockPos> avoid) {
+        Post bySeal = sealBeat(soldier.getUUID());
+        if (bySeal != null) {
+            releasePost(soldier.getUUID()); // (it cannot get back to its old beat: another soldier takes that)
+            return bySeal;
+        }
         pruneHolders(level);
         for (Post post : posts(level, soldier.getRank())) {
             UUID holder = held.get(post.cell());
@@ -481,6 +486,10 @@ public class Soldiers {
      * {@code avoid}) is free.
      */
     public boolean holds(ServerLevel level, TermiteSoldierEntity soldier, Post post, Set<BlockPos> avoid) {
+        Post bySeal = sealBeat(soldier.getUUID());
+        if (bySeal != null) {
+            return post.equals(bySeal); // shut out: its beat is by the seal (let in again, it holds nothing: a new beat)
+        }
         if (!soldier.getUUID().equals(held.get(post.cell()))) {
             return false;
         }
@@ -494,6 +503,16 @@ public class Soldiers {
             }
         }
         return false;
+    }
+
+    /**
+     * The alarm rework, step 3 (no statues): a soldier shut out by a raid's seal walks a beat by the seal, looking
+     * toward it, till it opens at night ({@link RaidDefence#sealBeat}); null for a soldier not shut out.
+     */
+    @Nullable
+    private Post sealBeat(UUID soldier) {
+        BlockPos[] beat = colony.part(SavannaParts.RAID_DEFENCE).map(raid -> raid.sealBeat(soldier)).orElse(null);
+        return beat == null ? null : new Post(beat[0], beat[1], Kind.INSIDE);
     }
 
     /** Frees the posts of soldiers that are gone (dead, unloaded, in another colony). */
@@ -544,29 +563,25 @@ public class Soldiers {
 
     /**
      * How many real soldiers the colony wants now, by rank (see {@link Population#targets}): watched (a player near), as
-     * many as there are posts for them (a few more minors at a break-in), up to a quarter of the real cap; not watched,
-     * only while the alarm is up (2 or more: an enemy at the foragers). No more than the colony has, so the workers get
-     * the rest of the cap. Returns how many in all.
+     * many as there are beats for them, up to a quarter of the real cap; while a foe's or a breach's drumming reaches the
+     * nest ({@link Alarm#reachesNest}), every soldier the colony has within that quarter (the alarm rework, step 3: no
+     * "tenth" and no waves; the ones coming out hear the drumming like any other soldier and go to it). Not watched,
+     * only while a trouble keeps workers in. Returns how many in all.
      */
     int wantReal(ServerLevel level, boolean watched, int cap, Map<String, Integer> wanted) {
         if (numbers() == null) {
             return 0;
         }
         int soldiers = 0;
-        int alarm = colony.part(SavannaParts.ALARM).map(part -> part.level(level)).orElse(0);
-        Alarm alarmPart = colony.part(SavannaParts.ALARM).orElse(null);
-        int waves = alarmPart == null || alarm < 3 ? 0 : alarmPart.cameInWaves(Rank.MINOR) + alarmPart.cameInWaves(Rank.MAJOR);
-        int soldierCap = cap / 4 + waves; // (3S: the ones that came to a raid's break in waves stay real; the workers hide)
+        Alarm alarm = colony.part(SavannaParts.ALARM).orElse(null);
+        boolean trouble = alarm != null && alarm.anyKeptIn(level);
+        boolean called = alarm != null && alarm.reachesNest(level);
+        int soldierCap = cap / 4;
         for (Rank rank : Rank.values()) {
-            int posts = posts(level, rank).size();
-            if (rank == Rank.MINOR && alarm >= 3) {
-                posts += BREACH_MINORS;
-            }
-            if (alarmPart != null && alarm >= 3) {
-                posts += alarmPart.cameInWaves(rank);
-            }
+            int count = colony.getCount(rank.caste());
+            int posts = called ? count : posts(level, rank).size();
             // (no more than the colony has, so the workers get the rest of the cap)
-            int want = watched || alarm >= 2 ? Math.min(Math.min(posts, colony.getCount(rank.caste())), soldierCap - soldiers) : 0;
+            int want = watched || trouble ? Math.min(Math.min(posts, count), soldierCap - soldiers) : 0;
             wanted.put(rank.caste(), Math.max(0, want));
             soldiers += Math.max(0, want);
         }

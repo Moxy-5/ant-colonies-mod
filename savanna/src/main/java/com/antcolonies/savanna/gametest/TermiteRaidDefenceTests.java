@@ -111,7 +111,11 @@ public class TermiteRaidDefenceTests {
                         helper.assertTrue(drummed[0], "the soldiers by the break never drummed");
                         helper.assertTrue(raid.isShutOut(byTheBreak.getUUID()) && raid.isShutOut(beside.getUUID()),
                                 "the soldiers by the break should be shut out by the seal");
-                        helper.assertTrue(!raid.isShutOut(deepIn.getUUID()), "the soldier deep in the nest was shut out too");
+                        // (the rework, step 3: the seal waits for a soldier just inside, so the one from the nest may have
+                        // run out past it and be shut out with the others; never one still on the nest's side)
+                        helper.assertTrue(!raid.isShutOut(deepIn.getUUID())
+                                || deepIn.position().distanceTo(Vec3.atCenterOf(breakAt)) < Math.sqrt(plug.distSqr(breakAt)) + 0.5,
+                                "the soldier still on the nest's side of the seal counts as shut out");
                         helper.assertTrue(worker.position().distanceTo(Vec3.atCenterOf(breakAt)) > Math.sqrt(plug.distSqr(breakAt)),
                                 "the worker should have gone deeper than the seal, but is at " + worker.blockPosition().toShortString());
                         raider.discard(); // the raiders go
@@ -121,7 +125,7 @@ public class TermiteRaidDefenceTests {
                     if (calmedAt[0] >= 0 && waitedAt[0] < 0 && tick - calmedAt[0] > 20) {
                         BlockPos waitAt = cells.get(at - PLUG_BACK + 1);
                         for (TermiteSoldierEntity soldier : new TermiteSoldierEntity[] {byTheBreak, beside}) {
-                            if (soldier.isAlive() && soldier.position().distanceTo(Vec3.atBottomCenterOf(waitAt)) <= 1.5) {
+                            if (soldier.isAlive() && soldier.position().distanceTo(Vec3.atBottomCenterOf(waitAt)) <= 2.5) { // (its beat by the seal)
                                 waitedAt[0] = tick;
                                 TestClock.still(helper, 0.0); // the night: the seal is to be opened
                                 nightAt[0] = tick;
@@ -222,8 +226,15 @@ public class TermiteRaidDefenceTests {
     /** The colony and the tunnel the scene was made ready with (set 10 ticks in). */
     private record Scene(Colony[] colony, NestPlan.ForagingTunnel[] tunnel) {}
 
+    /**
+     * The termite alarm rework, step 3 (was 3S's waves): a raider breaks into a gallery by day. Four soldiers stand in
+     * the tunnel on the nest side of where the seal will be; forty more are numbers in the nest. The drumming runs out
+     * from the break: the four hear it one after another (not at once), run out past the seal's place before it is
+     * packed (the workers seal behind the soldiers), take their own places round the break and bite the raider; then
+     * the seal is packed. While the drumming reaches the nest, soldiers come out of the numbers.
+     */
     @GameTest(template = "arena", timeoutTicks = 3000, skyAccess = true, batch = "termite_raid_waves")
-    public static void soldiersPourOutToARaidsBreakInWavesTakeTheirOwnPlacesAndBite(GameTestHelper helper) {
+    public static void soldiersWithinEarshotComeToARaidsBreakTakeTheirOwnPlacesAndBite(GameTestHelper helper) {
         ServerLevel level = helper.getLevel();
         Scene scene = scene(helper, 12.0);
         @SuppressWarnings("unchecked")
@@ -241,8 +252,14 @@ public class TermiteRaidDefenceTests {
             helper.assertTrue(at - PLUG_BACK - 1 >= 1, "the foraging tunnel is too short for the test: " + cells.size() + " cells");
             BlockPos breakAt = cells.get(at);
             BlockPos plug = cells.get(at - PLUG_BACK);
+            List<TermiteSoldierEntity> four = new java.util.ArrayList<>();
+            for (int i = 0; i < 4; i++) {
+                four.add(TermiteSoldierTests.put(level, i == 3 ? SavannaEntities.TERMITE_MAJOR_SOLDIER.get() : SavannaEntities.TERMITE_MINOR_SOLDIER.get(),
+                        cells.get(Math.max(0, at - PLUG_BACK - 1 - i))));
+            }
             colony.population().addNewMembers(TermiteSoldierEntity.Rank.MINOR.caste(), level.getGameTime(), 30);
             colony.population().addNewMembers(TermiteSoldierEntity.Rank.MAJOR.caste(), level.getGameTime(), 10);
+            colony.population().setOnForTests(true); // (the real-mob swap on, nobody watching: only the trouble calls soldiers out)
             MatabeleEntity raider = raider(level, breakAt);
             Alarm alarm = colony.part(SavannaParts.ALARM).orElseThrow();
             RaidDefence raid = colony.part(SavannaParts.RAID_DEFENCE).orElseThrow();
@@ -250,8 +267,9 @@ public class TermiteRaidDefenceTests {
             boolean[] told = {false};
             boolean[] bitten = {false};
             int[] mostPlaces = {0};
-            int[] wavesAtSeal = {-1};
+            int[] mostReal = {0};
             long[] sealedAt = {-1};
+            java.util.Set<Long> heardAt = new java.util.HashSet<>();
             each[0] = () -> {
                 long tick = helper.getTick();
                 if (!told[0]) {
@@ -260,7 +278,9 @@ public class TermiteRaidDefenceTests {
                     }
                     told[0] = true;
                     colony.news().tell(level, ColonyNews.BROKEN_OPEN, new ColonyNews.BrokenOpen(breakAt, raider));
-                    helper.assertTrue(alarm.waveTarget() == 4, "a tenth of 40 soldiers (4) should come, not " + alarm.waveTarget());
+                    helper.assertTrue(alarm.worst(level) == Alarm.Kind.BREACH, "a raid's break should be felt as a breach:" + alarm.describe(level));
+                    helper.assertTrue(four.stream().noneMatch(soldier -> alarm.hasHeard(soldier.getUUID())),
+                            "a soldier 5 or more blocks off heard the drumming the moment it began");
                 }
                 if (raider.isAlive()) {
                     if (raider.getHealth() < raider.getMaxHealth()) {
@@ -268,32 +288,36 @@ public class TermiteRaidDefenceTests {
                     }
                     raider.setHealth(raider.getMaxHealth()); // (it stays at the break)
                 }
-                int waves = alarm.cameInWaves(TermiteSoldierEntity.Rank.MINOR) + alarm.cameInWaves(TermiteSoldierEntity.Rank.MAJOR);
-                helper.assertTrue(waves <= 4, waves + " soldiers came in waves, more than the colony's tenth (4)");
                 int places = 0;
-                for (TermiteSoldierEntity soldier : TestIsolation.insectsOf(helper, TermiteSoldierEntity.class)) {
+                List<TermiteSoldierEntity> real = TestIsolation.insectsOf(helper, TermiteSoldierEntity.class);
+                for (TermiteSoldierEntity soldier : real) {
                     if (alarm.holdsPlace(soldier.getUUID())) {
                         places++;
                     }
                 }
+                for (TermiteSoldierEntity soldier : four) {
+                    if (alarm.hasHeard(soldier.getUUID())) {
+                        heardAt.add(alarm.heardAt(soldier.getUUID()));
+                    }
+                }
                 mostPlaces[0] = Math.max(mostPlaces[0], places);
+                mostReal[0] = Math.max(mostReal[0], real.size());
                 if (sealedAt[0] < 0 && level.getBlockState(plug).is(colony.profile().nest().plugState().getBlock())) {
                     sealedAt[0] = tick;
-                    wavesAtSeal[0] = waves;
                 }
-                if (sealedAt[0] >= 0 && bitten[0] && waves >= 2 && mostPlaces[0] >= 2) {
-                    helper.assertTrue(wavesAtSeal[0] >= 2 || sealedAt[0] - tellAt >= 600,
-                            "the seal was packed at " + (sealedAt[0] - tellAt) + " ticks with only " + wavesAtSeal[0] + " soldiers come in waves");
-                    SavannaMod.LOGGER.info("[raid-waves-test] {} minor and {} major came in waves, {} held places, sealed after {} ticks with {} come",
-                            alarm.cameInWaves(TermiteSoldierEntity.Rank.MINOR), alarm.cameInWaves(TermiteSoldierEntity.Rank.MAJOR), mostPlaces[0],
-                            sealedAt[0] - tellAt, wavesAtSeal[0]);
+                if (sealedAt[0] >= 0 && bitten[0] && mostPlaces[0] >= 2 && mostReal[0] > 4) {
+                    helper.assertTrue(heardAt.size() >= 2, "the four soldiers heard the drumming at the same moment (it does not run out)");
+                    long out = four.stream().filter(soldier -> raid.isShutOut(soldier.getUUID()) || !soldier.isAlive()).count();
+                    helper.assertTrue(out >= 2, "the seal was packed at " + (sealedAt[0] - tellAt) + " ticks before the soldiers were out: only "
+                            + out + " of the four are outside it");
+                    SavannaMod.LOGGER.info("[raid-earshot-test] {} held places, {} of the four out before the seal, sealed after {} ticks, {} soldiers real",
+                            mostPlaces[0], out, sealedAt[0] - tellAt, mostReal[0]);
                     helper.succeed();
                 }
             };
-            failAt[0] = () -> "bitten " + bitten[0] + ", came in waves " + alarm.cameInWaves(TermiteSoldierEntity.Rank.MINOR) + " minor "
-                    + alarm.cameInWaves(TermiteSoldierEntity.Rank.MAJOR) + " major, most holding places " + mostPlaces[0] + ", sealed at "
-                    + sealedAt[0] + " with " + wavesAtSeal[0] + "; wave cells " + raid.waveCells(level, breakAt).size() + ", break "
-                    + breakAt.toShortString() + ", plug " + plug.toShortString() + alarm.describe(level) + raid.describe(level);
+            failAt[0] = () -> "bitten " + bitten[0] + ", most holding places " + mostPlaces[0] + ", most real soldiers " + mostReal[0] + ", heard at "
+                    + heardAt + ", sealed at " + sealedAt[0] + "; the four at " + four.stream().map(s -> s.blockPosition().toShortString()).toList()
+                    + ", break " + breakAt.toShortString() + ", plug " + plug.toShortString() + alarm.describe(level) + raid.describe(level);
         });
         helper.runAtTickTime(2990, () -> helper.fail(failAt[0] == null ? "the scene never got ready" : failAt[0].get()));
     }
@@ -450,7 +474,6 @@ public class TermiteRaidDefenceTests {
             long[] sealedAt = {-1};
             int[] mostAtBreak = {0};
             int[] mostAlarmed = {0};
-            int[] waveTarget = {-1};
             String[] atStart = {""};
             each[0] = () -> {
                 long tick = helper.getTick();
@@ -488,7 +511,6 @@ public class TermiteRaidDefenceTests {
                 if (brokeAt[0] < 0 && !level.getBlockState(cover).is(com.antcolonies.savanna.registry.SavannaBlocks.MUD_CRUST.get())) {
                     brokeAt[0] = since;
                 }
-                waveTarget[0] = Math.max(waveTarget[0], alarm.waveTarget());
                 mostAlarmed[0] = Math.max(mostAlarmed[0], alarm.alarmedSoldiers().size());
                 int atBreak = 0;
                 for (TermiteSoldierEntity soldier : soldiers) {
@@ -522,11 +544,11 @@ public class TermiteRaidDefenceTests {
                 long hurt = ants.stream().filter(ant -> ant.isAlive() && (ant.lostLegs() != 0 || ant.getHealth() < whole.get(ant.getUUID()) - 0.01F)).count();
                 long legs = ants.stream().filter(ant -> ant.isAlive() && ant.lostLegs() != 0).count();
                 SavannaMod.LOGGER.info("[alarm-measure] colony of {} (added{}); at the start: {}. Ticks after the raiders came: cover broken {}, "
-                        + "first soldier at the break {}, first bite on a raider {}, sealed {}. Soldiers: wave target {}, most alarmed {}, most within 4 "
+                        + "first soldier at the break {}, first bite on a raider {}, sealed {}. Soldiers: most answering {}, most within 4 "
                         + "blocks of the break {}, seen {}, lost {}. Workers stung {} ({} of the 6 feeding). Raiders of 20: {} dead, {} hurt ({} "
                         + "with a leg off).{}{}",
                         colony.getCount(com.antcolonies.colony.Caste.WORKER), added, atStart[0], brokeAt[0], soldierAt[0], biteAt[0], sealedAt[0],
-                        waveTarget[0], mostAlarmed[0], mostAtBreak[0], soldiersSeen.size(), soldiersLost.size(), stung.size(), feedingStung, dead,
+                        mostAlarmed[0], mostAtBreak[0], soldiersSeen.size(), soldiersLost.size(), stung.size(), feedingStung, dead,
                         hurt, legs, alarm.describe(level), raid.describe(level));
                 helper.assertTrue(brokeAt[0] >= 0 || !stung.isEmpty(), "the raid never happened: the cover was not broken and no termite stung");
                 helper.succeed();

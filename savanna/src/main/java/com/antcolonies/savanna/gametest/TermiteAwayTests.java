@@ -257,19 +257,20 @@ public class TermiteAwayTests {
             }
             helper.assertTrue(colony.food().getFood() == foodBefore[0] + 4, "4 pieces should have come in during the rain: "
                     + colony.food().getFood() + ", was " + foodBefore[0]);
-            // A dry night, but an enemy at the foragers: the alarm at 2 keeps everyone in.
+            // A dry night, but an enemy at the foragers there: the alarm keeps the ground round it unforaged (the rework,
+            // step 3: only where the trouble is felt, not the whole colony).
             more.clear();
             more.add(knownDryTuft(helper, colony, MIDDLE + 6, MIDDLE - 6));
             more.add(knownDryTuft(helper, colony, MIDDLE - 6, MIDDLE + 6));
             clock.skipTo(colony, TestClock.Phase.NIGHT); // a dry night
             colony.setRainForTests(false);
-            colony.part(SavannaParts.ALARM).orElseThrow().raise(level, 2, colony.getCenter(), null);
+            colony.part(SavannaParts.ALARM).orElseThrow().trouble(level, com.antcolonies.savanna.colony.Alarm.Kind.FOE, colony.getCenter());
             foodBefore[0] = colony.food().getFood();
         });
         helper.runAfterDelay(3200, () -> {
             Colony colony = TermiteMoundTests.colony(helper);
-            helper.assertTrue(colony.part(SavannaParts.ALARM).orElseThrow().keepsEveryoneIn(level), "the alarm should still keep everyone in");
             for (BlockPos tuft : more) {
+                helper.assertTrue(colony.part(SavannaParts.ALARM).orElseThrow().keepsIn(level, tuft), "the alarm should still be felt at " + tuft);
                 helper.assertTrue(colony.field().remembers(tuft) && colony.food().getPiecesCut(tuft) == 2,
                         "nothing should be foraged while the alarm keeps everyone in: " + tuft + " cut " + colony.food().getPiecesCut(tuft));
             }

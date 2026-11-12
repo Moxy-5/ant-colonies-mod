@@ -415,12 +415,13 @@ public final class RaidsAway {
             int taken = Math.min(wanted, most);
             int countLost = RaidCatch.take(level, termites, taken);
             out.caught += taken;
-            // M8 step 3S, as near: a tenth of the termite colony's soldiers (1 to 12) comes to the break; the majors sting
+            // M8 step 3S: a tenth of the termite colony's soldiers (1 to 12) comes to the break (the old rule near a
+            // player too; the alarm rework's step 5 makes this read the new local alarm's rule); the majors sting
             // about half of them and carry them home with the workers (my picks); the count loses them as the workers (3d)
             String minor = TermiteSoldierEntity.Rank.MINOR.caste();
             String major = TermiteSoldierEntity.Rank.MAJOR.caste();
             int soldiers = termites.getCount(minor) + termites.getCount(major);
-            answering = soldiers <= 0 ? 0 : Math.max(1, Math.min(Alarm.MOST_IN_WAVES, (int) Math.round(soldiers * 0.1)));
+            answering = soldiers <= 0 ? 0 : Math.max(1, Math.min(12, (int) Math.round(soldiers * 0.1)));
             int stung = count(random, answering, STUNG_SOLDIER_SHARE);
             if (stung > 0) {
                 termites.population().loseToHunters(level, termites.population().inside(minor) > 0 ? minor : major, stung,

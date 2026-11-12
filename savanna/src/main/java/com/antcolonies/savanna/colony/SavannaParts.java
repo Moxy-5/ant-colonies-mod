@@ -248,14 +248,16 @@ public final class SavannaParts {
             .notSaved("the soldiers simply take their posts again after a load"));
     public static final Type<Alarm> ALARM = listed("alarm", Alarm::new, part -> part
             .ticks(60, Alarm::tick)
-            .hears(ColonyNews.MEMBER_HURT, 10, (alarm, level, news) -> alarm.memberHurt(level, news.by())) // level 2 at the attacker
-            .answers(ColonyQuestions.KEEPS_EVERYONE_IN, 10, (alarm, level, nothing) -> alarm.keepsEveryoneIn(level)) // the foragers hurry home
+            .hears(ColonyNews.MEMBER_HURT, 10, (alarm, level, news) -> alarm.memberHurt(level, news.by())) // a foe where the attacker is
             .plugs(ColonyHooks.LIST_BROOD, 20, alarm -> alarm::describe)
-            .answers(ColonyQuestions.ALARMED, 10, (alarm, level, nothing) -> alarm.level(level) != 0) // no grooming, napping or idle looking round
-            .hears(ColonyNews.PLAYER_STAMPED, 10, (alarm, level, news) -> alarm.footsteps(level, news.player())) // footsteps, the first level
-            .hears(ColonyNews.BLOCK_BROKEN, 10, (alarm, level, news) -> alarm.blockBroken(level, news.where(), news.breaker())) // a break-in, the third level
-            .saves(Alarm::save, Alarm::load)
-            .sample(Alarm::fillForTests));
+            // The rework, step 3: the alarm is local. Where a foe or a breach is felt the members go in and do not groom
+            // or nap and no food is fetched; nowhere else. (It plugs no hole itself: an attacked hole is plugged by the
+            // danger memory, the closed holes, which hear the same news.)
+            .answers(ColonyQuestions.ALARMED, 10, Alarm::keepsIn)
+            .answers(ColonyQuestions.KEEP_OFF, 50, Alarm::keepsIn)
+            .hears(ColonyNews.PLAYER_STAMPED, 10, (alarm, level, news) -> alarm.footsteps(level, news.player())) // something felt
+            .hears(ColonyNews.BLOCK_BROKEN, 10, (alarm, level, news) -> alarm.blockBroken(level, news.where(), news.breaker())) // a breach
+            .notSaved("a trouble lasts a minute or two: after a load the colony is calm"));
     /**
      * M8 step 2f: a raid breaking into a gallery: the soldiers near drum, the workers go deeper and pack the gallery shut
      * behind the soldiers, who are let back in at night ({@link RaidDefence}).

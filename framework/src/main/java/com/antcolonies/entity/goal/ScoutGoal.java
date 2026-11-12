@@ -115,7 +115,8 @@ public class ScoutGoal extends Goal {
             return false;
         }
         colony = ColonyManager.get(level).getColony(ant.getColonyId());
-        if (colony == null || !colony.foodMap().findsByLooking() || !colony.isForagingTime(level) || !colony.food().wantsSeeds(level)
+        if (colony == null || !colony.foodMap().findsByLooking() || !colony.isForagingTime(level) || colony.isAlarmed(level, ant.blockPosition())
+                || !colony.food().wantsSeeds(level)
                 || colony.mustWait(level, ant)) {
             return false; // (a searcher waits for the homecomers' touches like any forager, see colony.Door)
         }

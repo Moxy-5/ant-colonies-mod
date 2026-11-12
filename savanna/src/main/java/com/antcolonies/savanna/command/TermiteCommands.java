@@ -72,14 +72,17 @@ public class TermiteCommands {
                                 .then(Commands.literal("giant")
                                         .executes(context -> mushrooms(context.getSource(), IntegerArgumentType.getInteger(context, "count"), true)))))
                 // Every termite soldier within 16 blocks drums (the head bang) for that many seconds (default 3).
-                // The nearest termite colony's alarm goes up to that level where the player stands (step 6c), or calms down (0).
+                // /antcolonies alarm calm|felt|foe|breach: a trouble of that kind where the player stands, for the nearest
+                // termite colony (the alarm rework, step 3), or every trouble over (calm).
                 .then(Commands.literal("drum")
                         .executes(context -> drum(context.getSource(), 3))
                         .then(Commands.argument("seconds", IntegerArgumentType.integer(1, 60))
                                 .executes(context -> drum(context.getSource(), IntegerArgumentType.getInteger(context, "seconds")))))
                 .then(Commands.literal("alarm")
-                        .then(Commands.argument("level", IntegerArgumentType.integer(0, 4))
-                                .executes(context -> alarm(context.getSource(), IntegerArgumentType.getInteger(context, "level")))))
+                        .then(Commands.literal("calm").executes(context -> alarm(context.getSource(), null)))
+                        .then(Commands.literal("felt").executes(context -> alarm(context.getSource(), Alarm.Kind.FELT)))
+                        .then(Commands.literal("foe").executes(context -> alarm(context.getSource(), Alarm.Kind.FOE)))
+                        .then(Commands.literal("breach").executes(context -> alarm(context.getSource(), Alarm.Kind.BREACH))))
                 // M8 step 1a: the dead termite mounds (a colony's end: /antcolonies kill), how long dead, comb left.
                 .then(Commands.literal("deadmounds").executes(context -> {
                     context.getSource().sendSuccess(() -> Component.literal(
@@ -191,7 +194,7 @@ public class TermiteCommands {
         return count;
     }
 
-    private static int alarm(CommandSourceStack source, int to) {
+    private static int alarm(CommandSourceStack source, @org.jetbrains.annotations.Nullable Alarm.Kind to) {
         ServerLevel level = source.getLevel();
         BlockPos at = BlockPos.containing(source.getPosition());
         Colony colony = nearestTermiteColony(level, at);
@@ -200,10 +203,10 @@ public class TermiteCommands {
             source.sendFailure(Component.literal("No termite colony within 64 blocks."));
             return 0;
         }
-        if (to == 0) {
+        if (to == null) {
             alarm.calmForTests();
         } else {
-            alarm.raise(level, to, at, source.getEntity());
+            alarm.trouble(level, to, at);
         }
         source.sendSuccess(() -> Component.literal("Alarm now" + alarm.describe(level).replace(" | ", " ")), false);
         return 1;

@@ -254,19 +254,17 @@ public class Colony {
         return questions.ask(null, ColonyQuestions.BUILDS_OVER_NEST, null);
     }
 
-    /** Whether everyone is kept in the nest now (the alarm at an attacker, {@link Alarm#keepsEveryoneIn}): asked of every part ({@link ColonyQuestions#KEEPS_EVERYONE_IN}). */
-    public boolean keepsEveryoneIn(Level level) {
-        return questions.ask(level, ColonyQuestions.KEEPS_EVERYONE_IN, null);
-    }
-
     /** Whether the structure over the nest is being built now (a mound, past founding; {@link Mound#isActive}): asked of every part ({@link ColonyQuestions#BUILDING_OVER_NEST}). */
     public boolean buildsOverNestNow() {
         return questions.ask(null, ColonyQuestions.BUILDING_OVER_NEST, null);
     }
 
-    /** Whether the colony is alarmed now ({@link Alarm#level} above 0): asked of every part ({@link ColonyQuestions#ALARMED}, Apex step 9a). */
-    public boolean isAlarmed(Level level) {
-        return questions.ask(level, ColonyQuestions.ALARMED, null);
+    /**
+     * Whether the colony feels trouble at this place now (a foe, a broken wall: the members there stay in and do not
+     * groom or nap): asked of every part ({@link ColonyQuestions#ALARMED}; local since the termite alarm rework, step 3).
+     */
+    public boolean isAlarmed(Level level, BlockPos pos) {
+        return questions.ask(level, ColonyQuestions.ALARMED, pos);
     }
 
     /** Whether this forager must wait in the nest before it sets out (the harvester's door, {@link ColonyQuestions#MUST_WAIT}). */
@@ -457,13 +455,11 @@ public class Colony {
      * Whether it is time to forage (the profile's {@code food.day_clock} if it has one: harvester ants by day with a
      * midday rest, never in the rain; otherwise its {@code food.forage_at}: termites at night and in the rain). Outside this time the foragers stay home, the foraging holes are plugged, and a species that
      * keeps to a schedule does no work outside the nest and the mound at all (it stays in, out of the sun). The end of the
-     * night already counts as day ({@link #isBeforeDawn}): they head in before the sun is up. Never while the alarm is at
-     * 2 or more ({@link Alarm#keepsEveryoneIn}): the foragers hurry home.
+     * night already counts as day ({@link #isBeforeDawn}): they head in before the sun is up. An alarm no longer
+     * ends it for the whole colony (the termite alarm rework, step 3): only the members where the trouble is felt go in
+     * ({@link #isAlarmed}).
      */
     public boolean isForagingTime(net.minecraft.world.level.Level level) {
-        if (keepsEveryoneIn(level)) {
-            return false;
-        }
         Optional<SpeciesProfile.DayClock> clock = profile().food().dayClock();
         if (clock.isPresent()) {
             return clock.get().outAt(timeOfDay(level), heat(level), rainForTests != null ? rainForTests : rainsOnNest(level));

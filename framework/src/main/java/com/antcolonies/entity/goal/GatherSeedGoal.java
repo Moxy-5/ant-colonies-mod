@@ -53,8 +53,8 @@ public class GatherSeedGoal extends Goal {
             return false;
         }
         colony = ColonyManager.get(level).getColony(ant.getColonyId());
-        if (colony == null || !colony.isForagingTime(level)) {
-            return false; // foragers only go out at foraging time (termites: at night and in the rain)
+        if (colony == null || !colony.isForagingTime(level) || colony.isAlarmed(level, ant.blockPosition())) {
+            return false; // foragers only go out at foraging time (termites: at night and in the rain), not where the alarm is felt
         }
         if (colony.mustWait(level, ant)) {
             return false; // waits by the entrance for the homecomers' touches (Gordon's rule, see colony.Door)

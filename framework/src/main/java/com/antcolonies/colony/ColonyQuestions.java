@@ -79,8 +79,6 @@ public final class ColonyQuestions {
 
     // Step 8a: the rest of the shared code's yes/no asks of a species part, each now asked of whoever answers it.
 
-    /** Step 8a: whether everyone is kept in the nest now (an alarm at an attacker: the foragers hurry home); asked about nothing (null). */
-    public static final Kind<Void> KEEPS_EVERYONE_IN = Kind.of("keeps_everyone_in");
     /** Step 8a: whether the colony builds a structure over its nest (a termite mound); asked about nothing (null). */
     public static final Kind<Void> BUILDS_OVER_NEST = Kind.of("builds_over_nest");
     /** Step 8a: whether that structure is being built now (the species builds one and the colony is past founding); asked about nothing (null). */
@@ -106,8 +104,13 @@ public final class ColonyQuestions {
     public static final Kind<AbstractAntEntity> MUST_WAIT = Kind.of("must_wait");
     /** Step 9a: whether this forager passes the food by (it was called out to a richer patch and is on its way there). */
     public static final Kind<FoodFor> PASSES_BY = Kind.of("passes_by");
-    /** Step 9a: whether the colony is alarmed now (no grooming, napping or stopping to look at a player); asked about nothing (null). */
-    public static final Kind<Void> ALARMED = Kind.of("alarmed");
+    /**
+     * Whether the colony feels trouble at this place now (a foe there, a wall broken): the members there do not groom,
+     * nap or stop to look at a player, and those outside go in and stay in ({@code AbstractAntEntity.mayGoOut}). Local
+     * since the termite alarm rework, step 3 (2026-11-12): it was asked about the whole colony, with a second question,
+     * "keeps everyone in", that stopped all foraging for one enemy at one hole.
+     */
+    public static final Kind<BlockPos> ALARMED = Kind.of("alarmed");
     /** Step 9a: whether this place is on one of the colony's lasting trails (a neighbour stepping onto it meets the colony). */
     public static final Kind<BlockPos> ON_TRAIL = Kind.of("on_trail");
 

@@ -208,7 +208,7 @@ public final class RaidRules {
         }
         ServerLevel level = look.level();
         boolean day = !colony.isForagingTime(level);
-        boolean calm = colony.part(SavannaParts.ALARM).map(alarm -> alarm.level(level) == 0).orElse(true);
+        boolean calm = colony.part(SavannaParts.ALARM).map(alarm -> alarm.isCalm(level)).orElse(true);
         RaidDefence defence = colony.part(SavannaParts.RAID_DEFENCE).orElse(null);
         List<AbstractAntEntity> out = new ArrayList<>();
         for (AbstractAntEntity insect : look.insects()) {

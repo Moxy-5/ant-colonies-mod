@@ -81,7 +81,7 @@ public class AllogroomGoal extends Goal {
             return false;
         }
         Colony colony = who.getColony();
-        return colony == null || !colony.isAlarmed(who.level());
+        return colony == null || !colony.isAlarmed(who.level(), who.blockPosition());
     }
 
     @Override

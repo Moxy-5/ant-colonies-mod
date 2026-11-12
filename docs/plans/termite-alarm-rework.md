@@ -137,3 +137,51 @@ lost after tick 20.
   wiped out (11 soldiers within 4 blocks: 19 of 20 raiders dead), and with 3 or 4 near, 1 to 8 died. So once step 3
   brings soldiers to a trouble quickly, the fight numbers (a soldier's bite against a Matabele's health) need the
   balance pass before the user plays raids, or the termites will be far too strong.
+
+## Step 3, built 2026-11-12: one local alarm replaces the ladder
+
+**What it is now.** The alarm is a short list of *troubles* (`colony/Alarm`). A trouble is a place with a strength, the
+distance in blocks it is felt; the strength shrinks from the last time something fed it, and the trouble is over when it
+reaches nothing. Three kinds: **felt** (footsteps, a sprint or jump on the nest), **foe** (a termite hurt or killed, an
+enemy seen at a hole) and **breach** (a raid breaking a gallery open, a player breaking into the mound: the same rule).
+Things happening within 8 blocks of a trouble feed it instead of making a new one; a colony holds at most 8.
+
+- **Soldiers.** The drumming runs outward from the trouble at 1.3 blocks a second. A soldier it reaches answers until
+  the trouble is over: for something felt it goes to the nest cell nearest it and drums there; for a foe or a breach it
+  takes its own place in a ring round it, facing out, minors first, the opening itself held by the nearest major (a
+  minor if none). It lunges at an enemy within 2 blocks and never leaves its place by more than 4.
+- **Soldier numbers.** When a foe's or a breach's drumming reaches the nest, every soldier the colony has as numbers
+  comes out as a real one (up to a quarter of the real-mob cap). No waves, no tenth.
+- **Workers.** A worker within a trouble's reach goes deeper into the nest and does not come out there; foraging stops
+  only there (the brain's numbers too). Everywhere else the colony carries on.
+- **The seal** (`RaidDefence`) is kept: the gallery is packed 4 blocks back behind the soldiers. It now waits a little
+  while a soldier on the nest's side is within 8 blocks of it (so the ones coming get out first); a soldier shut out
+  walks a beat by the seal until it opens at night.
+
+**Gone:** the levels 1 to 4, "everyone in" for the whole colony, the raid/player switch, the lookers, the waves' tenth,
+level 4 and its soldier boost, the alarm plugging holes.
+
+**My picks:** strengths felt 6, foe 16, breach 16 blocks; fading 0.2 blocks a second (felt over in 30 s, a foe or
+breach in 80 s after the last thing that fed it); drumming 1.3 blocks a second (real *Macrotermes* drumming is relayed
+at about 1.3 m a second, Hager and Kirchner 2013); merge within 8; at most 8 troubles; the seal waits for soldiers
+within 8 blocks. All in `macrotermes.json`, `alarm`. Command: `/antcolonies alarm calm|felt|foe|breach` (a trouble
+where you stand).
+
+**Fewer rules, decided while building:**
+- **The alarm plugs no hole itself.** The danger memory (`ClosedHoles`) already plugs a hole a termite was attacked
+  at; a second place doing the same shut soldiers out and judged the same thing twice.
+- **The danger memory was not folded into the troubles.** It is memory over days (where not to forage); a trouble
+  lasts a minute or two (who comes now). Two different questions, kept apart.
+
+**Not done, for later steps:** raids out of sight still use the old tenth (`RaidsAway`, step 5); soldiers stay at a
+dead foe's place until the trouble fades (about 80 s); number soldiers come out in the nest, not at the trouble; no new
+clips (the drumming is the old `head_bang`).
+
+**Measured (the step 1 scene, a daytime raid of 20 on a full colony, 3 runs):** most soldiers within 4 blocks of the
+break 8, 6, 7 (was at most 1); soldiers answering 17, 17, 15; raiders dead 1, 11, 3 and hurt 11, 5, 7 (were 0 dead, 0
+to 5 hurt); soldiers lost 12, 7, 8; workers stung 5, 7, 6 (were 1 to 18), none of the 6 feeding; sealed about 250 ticks
+after the cover broke. **Warning for step 5:** raids are now swingy and the termites can be too strong (11 of 20
+raiders dead in one run); the fight numbers have not been touched, that is step 5's balance pass.
+
+**Tests:** `soldiers,raids,away,termitefood,colony` on 6 servers: only two old flakes, both 3 of 3 alone (the neighbours test, BUGS 68, and the away tuft, BUGS 80); full run on 6 servers (38 minutes): every test passed but the old harvester larva flake (BUGS 179, 3 of 3 alone) and the optional raider-going-home replay (3 of 3 alone);
+
