@@ -74,7 +74,9 @@ public class MatabeleCommands {
                 .then(Commands.literal("scout")
                         .executes(context -> scout(context.getSource(), false))
                         .then(Commands.literal("anytime")
-                                .executes(context -> scout(context.getSource(), true))))
+                                .executes(context -> scout(context.getSource(), true)))
+                        .then(Commands.literal("raid")
+                                .executes(context -> scoutRaid(context.getSource()))))
                 .then(Commands.literal("raid")
                         .executes(context -> raid(context.getSource()))
                         .then(Commands.literal("show")
@@ -296,6 +298,64 @@ public class MatabeleCommands {
                 + ") sets out from the Matabele nest at " + colony.getCenter().toShortString() + ", searching up to "
                 + raids.range() + " blocks out; /antcolonies list shows what the scouts found"
                 + (anyHour ? ". Its find raids at once, whatever the hour." : ". Its find raids in the raid hours (6 to 11, 16 to 19), else waits for them.")), false);
+        return 1;
+    }
+
+    /**
+     * {@code /antcolonies scout raid} (the user, 2026-11-13, to speed up testing): a scout from the nearest Matabele
+     * colony goes straight to the nearest termite feeding place (mud-covered wood or a mud runway fed at by day) where
+     * real termites are right now, within the scouts' reach of the nest, looks it over and brings a raid, whatever the hour.
+     */
+    private static int scoutRaid(CommandSourceStack source) {
+        ServerLevel level = source.getLevel();
+        Colony colony = ColonyManager.get(level).findNearest(BlockPos.containing(source.getPosition()), 64, MatabeleEntity.SPECIES);
+        com.antcolonies.savanna.colony.Raids raids = colony == null ? null : colony.part(SavannaParts.RAIDS).orElse(null);
+        if (raids == null) {
+            source.sendFailure(Component.literal("No Matabele colony within 64 blocks (/antcolonies matabele <workers> makes one)."));
+            return 0;
+        }
+        BlockPos nest = colony.getCenter();
+        int reach = raids.numbers() == null ? 96 : raids.numbers().mostRange();
+        BlockPos best = null;
+        int termitesThere = 0;
+        int places = 0;
+        for (Colony other : ColonyManager.get(level).getColonies()) {
+            if (other == colony || other.getCenter().distSqr(nest) > (reach + 64.0) * (reach + 64.0)) {
+                continue;
+            }
+            for (com.antcolonies.savanna.colony.FeedingSpots.ByDay place : com.antcolonies.savanna.colony.FeedingSpots.byDayPlaces(level, other)) {
+                if (place.food().distSqr(nest) > (double) reach * reach) {
+                    continue;
+                }
+                places++;
+                int termites = level.getEntitiesOfClass(com.antcolonies.savanna.entity.TermiteWorkerEntity.class,
+                        new net.minecraft.world.phys.AABB(place.food()).inflate(5.0, 3.0, 5.0),
+                        termite -> termite.isAlive() && !termite.isDowned() && other.getId().equals(termite.getColonyId())).size();
+                if (termites > 0 && (best == null || place.food().distSqr(nest) < best.distSqr(nest))) {
+                    best = place.food();
+                    termitesThere = termites;
+                }
+            }
+        }
+        if (best == null) {
+            int found = places;
+            source.sendFailure(Component.literal(found == 0
+                    ? "No termite feeding place fed at by day within " + reach + " blocks of the Matabele nest (/antcolonies feedingspots at a termite mound lists them)."
+                    : "No real termites right now at any of the " + found + " feeding place(s) within " + reach
+                            + " blocks of the Matabele nest (termites far from every player are numbers; go nearer the termite mound, or wait for day)."));
+            return 0;
+        }
+        MatabeleEntity scout = raids.sendTo(level, best);
+        if (scout == null) {
+            source.sendFailure(Component.literal("No major there fit to scout (real ones only; not hurt, fighting or hungry)."));
+            return 0;
+        }
+        BlockPos at = best;
+        int count = termitesThere;
+        int away = (int) Math.round(Math.sqrt(at.distSqr(nest)));
+        source.sendSuccess(() -> Component.literal("A scout (a major at " + scout.blockPosition().toShortString() + ") goes straight to the termites at "
+                + at.toShortString() + " (" + away + " blocks from the nest, " + count + " termite(s) there now); once it has looked it comes home and"
+                + " brings a raid at once, whatever the hour. /antcolonies raid show draws its trail."), false);
         return 1;
     }
 

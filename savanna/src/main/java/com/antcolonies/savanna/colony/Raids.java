@@ -1676,6 +1676,27 @@ public class Raids {
         return sendNow(level, false);
     }
 
+    /**
+     * The scout raid command (the user, 2026-11-13, to speed up testing): the place is given to the colony as a spot to
+     * recheck on this trip (the other spots wait their turn; its worth is the scout's to judge), and a scout sets out to it now; its
+     * find raids at once, whatever the hour. The scout still looks the place over itself and leads the raid as always.
+     */
+    @Nullable
+    public MatabeleEntity sendTo(ServerLevel level, BlockPos at) {
+        long now = level.getGameTime();
+        finds.removeIf(find -> find.at.closerThan(at, 4.0));
+        finds.forEach(find -> find.pickedAt = now); // (the other spots wait their turn: this trip is the tip's)
+        Find tip = new Find(at.immutable(), 1, now, now - RECHECK_AFTER, 0, RaidsAway.line(colony.getCenter(), at), null);
+        finds.add(tip);
+        MatabeleEntity ant = sendNow(level, true);
+        if (ant == null) {
+            finds.remove(tip);
+        } else {
+            say(level, "the scout raid command points " + RaidGround.shortId(ant.getUUID()) + " to the termites at " + at.toShortString());
+        }
+        return ant;
+    }
+
     /** Whether this ant was sent by the command (or the soak) "anytime": it keeps no scouting hours on that trip (BUGS 123). */
     public boolean wasSentAnyHour(UUID id) {
         return sentAnyHour.contains(id);

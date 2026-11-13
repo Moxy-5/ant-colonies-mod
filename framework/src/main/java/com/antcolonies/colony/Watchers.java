@@ -38,8 +38,28 @@ public final class Watchers {
         return player.isAlive() && !player.isRemoved();
     }
 
+    /**
+     * Whether what appears or vanishes in front of this player must be hidden from it: every watcher but a spectator
+     * (the user, 2026-11-13: raids looked broken watched in spectator mode). A spectator sees through every block, so
+     * nothing is ever out of its sight and no insect could come out of the numbers near it; it is a camera for looking
+     * at the colonies, so insects and blocks may appear and vanish in front of it. It still watches ({@link #watches}):
+     * colonies near it stay real.
+     */
+    public static boolean hiddenFrom(Player player) {
+        return watches(player) && !player.isSpectator();
+    }
+
+    /** Whether a watcher things must be hidden from ({@link #hiddenFrom}) is within {@code radius} blocks of this place, sideways. */
+    public static boolean seerNear(ServerLevel level, BlockPos at, int radius) {
+        return near(level, at, radius, true);
+    }
+
     /** Whether a watcher is within {@code radius} blocks of this place, sideways. */
     public static boolean near(ServerLevel level, BlockPos at, int radius) {
+        return near(level, at, radius, false);
+    }
+
+    private static boolean near(ServerLevel level, BlockPos at, int radius, boolean seersOnly) {
         for (net.minecraft.world.phys.Vec3 eye : pretend) {
             double dx = eye.x - (at.getX() + 0.5);
             double dz = eye.z - (at.getZ() + 0.5);
@@ -48,7 +68,7 @@ public final class Watchers {
             }
         }
         for (Player player : level.players()) {
-            if (watches(player)) {
+            if (seersOnly ? hiddenFrom(player) : watches(player)) {
                 double dx = player.getX() - (at.getX() + 0.5);
                 double dz = player.getZ() - (at.getZ() + 0.5);
                 if (dx * dx + dz * dz <= (double) radius * radius) {

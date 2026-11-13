@@ -402,7 +402,7 @@ public class Population {
 
     /** Where the players near the nest (within the profile's {@code watch_radius}) have their eyes (none: nobody is watching). */
     List<Vec3> viewers(ServerLevel level) {
-        return viewers(level, numbers().watchRadius());
+        return viewers(level, numbers().watchRadius(), false);
     }
 
     /**
@@ -411,6 +411,14 @@ public class Population {
      * insect pop in or out either.
      */
     private List<Vec3> viewers(ServerLevel level, int radius) {
+        return viewers(level, radius, true);
+    }
+
+    /**
+     * {@code seersOnly}: only the eyes things must be hidden from ({@link Watchers#hiddenFrom}: not a spectator's, who
+     * sees through every block, so that nothing could ever appear near one). "Is anybody watching" counts spectators.
+     */
+    private List<Vec3> viewers(ServerLevel level, int radius, boolean seersOnly) {
         if (viewersForTests != null) {
             return viewersForTests;
         }
@@ -424,7 +432,7 @@ public class Population {
             }
         }
         for (Player player : level.players()) {
-            if (!Watchers.watches(player)) { // (spectators watch too, 2026-11-08)
+            if (seersOnly ? !Watchers.hiddenFrom(player) : !Watchers.watches(player)) { // (spectators watch too, 2026-11-08)
                 continue;
             }
             double dx = player.getX() - (center.getX() + 0.5);

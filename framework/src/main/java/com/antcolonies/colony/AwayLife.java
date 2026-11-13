@@ -217,6 +217,14 @@ public class AwayLife {
     }
 
     /**
+     * As {@link #watcherNear}, for "would it be seen appearing": a spectator does not count ({@link Watchers#hiddenFrom}),
+     * so a raid or scout out as numbers is shown right beside one.
+     */
+    public boolean seerNear(ServerLevel level, BlockPos at, int radius) {
+        return watcherForTests != null ? watcherNear(level, at, radius) : Watchers.seerNear(level, at, radius);
+    }
+
+    /**
      * When the colony last came back from being away (game time, {@link Colony#NOT_SET} if not since the game loaded):
      * a watch rule counting how long something was left alone counts only from here (docs/BUGS.md 147).
      */

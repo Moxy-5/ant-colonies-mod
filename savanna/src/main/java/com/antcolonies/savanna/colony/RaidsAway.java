@@ -240,7 +240,7 @@ public final class RaidsAway {
         // (the column's other end: behind the front toward the nest on the way out, toward the spot on the way home)
         double lengthShare = out.raiders * spacing / distance;
         BlockPos back = placeAt(where.share() + (where.homeward() ? lengthShare : -lengthShare), now);
-        if (!byTheNest && (watch.watcherNear(level, front, SHOW_PAST) || watch.watcherNear(level, back, SHOW_PAST)
+        if (!byTheNest && (watch.seerNear(level, front, SHOW_PAST) || watch.seerNear(level, back, SHOW_PAST)
                 || !level.isPositionEntityTicking(front) || !level.isPositionEntityTicking(back))) {
             return; // (they would be seen appearing, or the land there does not tick)
         }
@@ -536,7 +536,7 @@ public final class RaidsAway {
                 continue;
             }
             BlockPos at = BlockPos.containing(nest.getX() + 0.5 + Math.cos(heading) * far, nest.getY(), nest.getZ() + 0.5 + Math.sin(heading) * far);
-            if (!level.isPositionEntityTicking(at) || colony.away().watcherNear(level, at, SHOW_PAST)) {
+            if (!level.isPositionEntityTicking(at) || colony.away().seerNear(level, at, SHOW_PAST)) {
                 continue;
             }
             places.add(new ScoutAt(i, heading, at));
