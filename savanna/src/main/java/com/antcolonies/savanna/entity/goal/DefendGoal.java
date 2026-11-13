@@ -46,6 +46,8 @@ public class DefendGoal extends Goal {
     private static final int NO_WAY_TICKS = 200;
     /** S1: a standing soldier lunges at a foe it feels this near (blocks; my pick). */
     private static final double LUNGE = 2.0;
+    /** How far from its place under cover a soldier's jaws snap at an insect (blocks; my pick: the cell in front of it). */
+    private static final double SNAP = 1.0;
 
     private final TermiteSoldierEntity soldier;
     @Nullable
@@ -132,11 +134,24 @@ public class DefendGoal extends Goal {
             com.antcolonies.fight.HeldCells.hold(soldier, task.cell());
         }
         boolean staysIn = post && lungingAt instanceof AbstractAntEntity;
-        if (lungingAt != null && (!staysIn || reaches(lungingAt))) {
+        if (lungingAt != null && staysIn && !reaches(lungingAt) && snapsAt(lungingAt)) {
+            // BUGS 210 (the user's test: "the major soldiers weren't attacking"): from its place it snaps at a foe in
+            // front of its hole without leaving it; before, it bit only what touched its box, and the raiders keep clear
+            face(lungingAt.getX(), lungingAt.getZ());
+            if (biteCooldown <= 0 && Fights.mayAttack(soldier.profile(), lungingAt)) {
+                soldier.bite(lungingAt);
+                biteCooldown = BITE_INTERVAL;
+            }
+        } else if (lungingAt != null && (!staysIn || reaches(lungingAt))) {
             chase(lungingAt);
         } else {
             stand(task.cell(), task.spot(), task.facing(), task.drumOnArrival());
         }
+    }
+
+    /** Standing in its place, a foe within {@link #SNAP} blocks of it (the next cell: the opening in front of its head). */
+    private boolean snapsAt(LivingEntity foe) {
+        return task != null && soldier.blockPosition().equals(task.cell()) && !soldier.isClimbing() && soldier.distanceToSqr(foe) <= SNAP * SNAP;
     }
 
     /** Whether the task's place is one it found no way to a little while ago. */

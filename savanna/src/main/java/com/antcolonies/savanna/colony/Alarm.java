@@ -587,7 +587,10 @@ public class Alarm {
         places.keySet().retainAll(ids);
         places.values().removeIf(place -> !cellSet.contains(place.cell()) || badPlaces.containsKey(place.cell()));
         Set<Place> taken = new HashSet<>(places.values());
-        for (Rank rank : new Rank[] {Rank.MINOR, Rank.MAJOR}) {
+        // (BUGS 210: against insects the majors take the places nearest the opening, their big heads the plug, the minors
+        // behind and beside them; minors first left the majors at the back, where they never met a raider)
+        Rank[] order = trouble.insects ? new Rank[] {Rank.MAJOR, Rank.MINOR} : new Rank[] {Rank.MINOR, Rank.MAJOR};
+        for (Rank rank : order) {
             for (TermiteSoldierEntity soldier : answering) {
                 if (soldier.getRank() != rank) {
                     continue;
