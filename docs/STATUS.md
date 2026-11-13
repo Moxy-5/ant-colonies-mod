@@ -105,3 +105,4 @@ Only rare test flakes (`docs/BUGS.md`); in play: the raid column freezing just o
 - **More Matabele nests (2026-11-13):** about a third of dead mounds could not take a colony (chimney still capped on freshly dead ones); fixed for new worlds.
 - **Spawn in a big savanna (2026-11-13):** the start point now goes to the nearest big savanna, not the nearest of any size. Next plan: no small savannas at all (`docs/plans/no-small-savannas.md`).
 - **Major soldiers attack (2026-11-13):** the big soldiers now stand at the front of the hole and snap at any ant that comes within a block, without leaving cover. Raids cost the ants more (0 to 7 dead of 20 in my test raids). Waiting for your look, then the merge.
+- **Mud repaired after a raid (2026-11-13):** termites now re-plaster a branch the Matabele bit open, the top too (before, a hole bitten from above stayed open for good). Waiting for your look.

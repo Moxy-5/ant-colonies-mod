@@ -588,13 +588,15 @@ public class NestWalls {
         List<BlockPos> spots = new ArrayList<>();
         for (boolean needFloor : new boolean[] {true, false}) {
             List<BlockPos> found = new ArrayList<>();
-            for (int dx = -1; dx <= 1; dx++) {
-                for (int dy = -1; dy <= 1; dy++) {
-                    for (int dz = -1; dz <= 1; dz++) {
-                        BlockPos spot = hole.offset(dx, dy, dz);
-                        if (nest.contains(spot) && !spots.contains(spot) && LandReady.at(level, spot) && hasRoomToStand(level, spot)
-                                && (needFloor ? hasFloor(level, spot) : hasWallToClingTo(level, spot))) {
-                            found.add(spot);
+            for (BlockPos from : workedFrom(level, hole)) {
+                for (int dx = -1; dx <= 1; dx++) {
+                    for (int dy = -1; dy <= 1; dy++) {
+                        for (int dz = -1; dz <= 1; dz++) {
+                            BlockPos spot = from.offset(dx, dy, dz);
+                            if (nest.contains(spot) && !spots.contains(spot) && !found.contains(spot) && LandReady.at(level, spot)
+                                    && hasRoomToStand(level, spot) && (needFloor ? hasFloor(level, spot) : hasWallToClingTo(level, spot))) {
+                                found.add(spot);
+                            }
                         }
                     }
                 }
@@ -606,8 +608,32 @@ public class NestWalls {
     }
 
     private static BlockPos findPlugSpot(Level level, Set<BlockPos> nest, BlockPos hole) {
-        BlockPos onFloor = closestPlugSpot(level, nest, hole, true);
-        return onFloor != null ? onFloor : closestPlugSpot(level, nest, hole, false);
+        for (boolean needFloor : new boolean[] {true, false}) {
+            for (BlockPos from : workedFrom(level, hole)) {
+                BlockPos spot = closestPlugSpot(level, nest, from, needFloor);
+                if (spot != null) {
+                    return spot;
+                }
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Where a hole is worked on from: the hole itself, then every block of walk-through food beside it (a fallen
+     * branch). A gap in a branch's casing is closed from the gallery under the branch, through the branch the insects
+     * eat their way into: the plate over a branch lies two blocks over the gallery, so no nest cell is beside it, and a
+     * top plate bitten open by a raider was never put back (the user, 2026-11-13: "make sure they repair it after a raid").
+     */
+    private static List<BlockPos> workedFrom(Level level, BlockPos hole) {
+        List<BlockPos> from = new ArrayList<>();
+        from.add(hole);
+        for (Direction side : Direction.values()) {
+            if (isWalkThroughFood(level, hole.relative(side))) {
+                from.add(hole.relative(side));
+            }
+        }
+        return from;
     }
 
     @Nullable

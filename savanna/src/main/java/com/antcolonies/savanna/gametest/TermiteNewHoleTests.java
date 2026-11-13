@@ -727,7 +727,7 @@ public class TermiteNewHoleTests {
      * 2026-10-14 whose casing and gallery stayed open on that side, 2 blocks high): the gallery's open side is walled
      * and the branch is cased on that side too.
      */
-    @GameTest(template = "arena", timeoutTicks = 90000, skyAccess = true)
+    @GameTest(template = "arena", timeoutTicks = 150000, skyAccess = true)
     public static void aFallenBranchOnTheEdgeOfAStepIsCasedInMudAndEatenFromBelowByDay(GameTestHelper helper) {
         eatenFromBelow(helper, true, Food.BRANCH);
     }
@@ -745,6 +745,51 @@ public class TermiteNewHoleTests {
     private enum Food { LOG, STUMP, BRANCH, GIANT }
 
     /** The giant log's underside: its bottom row and the blocks either side of it, 3 across. */
+    /** How long after a raid the casing of the branch must be whole again (ticks: two game days; my pick). */
+    private static final int REPAIRED_WITHIN = 48000;
+
+    /**
+     * After the raid on the branch: the raider leaves after 10 seconds, the clock runs on (the seal behind the break is
+     * bitten open at night), and the termites plaster the broken plates again: every side of what is left of the branch
+     * closed, with the block under the broken top plate still there (not "repaired" by being eaten away).
+     */
+    private static void afterTheRaid(GameTestHelper helper, Colony colony, java.util.List<BlockPos> log, FoodWays.NewTunnel tunnel, long raidAt,
+            net.minecraft.world.entity.Entity raider, TestClock clock) {
+        ServerLevel level = helper.getLevel();
+        long since = helper.getTick() - raidAt;
+        if (since == 200) {
+            raider.discard();
+            clock.run();
+        }
+        java.util.Set<BlockPos> ours = colony.nest().nestCells(level);
+        java.util.List<String> open = new java.util.ArrayList<>();
+        for (BlockPos wood : log) {
+            if (!com.antcolonies.colony.NestWalls.isWalkThroughFood(level, wood)) {
+                continue;
+            }
+            for (net.minecraft.core.Direction round : net.minecraft.core.Direction.values()) {
+                BlockPos beside = wood.relative(round);
+                if (!ours.contains(beside) && !com.antcolonies.colony.NestWalls.isWalkThroughFood(level, beside)
+                        && com.antcolonies.colony.NestWalls.isOpenToward(level, beside, round.getOpposite())) {
+                    open.add(beside.toShortString());
+                }
+            }
+        }
+        if (since % 2000 == 0) {
+            SavannaMod.LOGGER.info("[new-hole-test] after the raid: {} ticks, {}, open {}, leaks {}, danger {}", since, clock.describe(), open,
+                    colony.walls().getLeaks(level).size(), colony.danger().describe(level));
+        }
+        if (since > 200 && open.isEmpty()) {
+            helper.assertTrue(com.antcolonies.colony.NestWalls.isWalkThroughFood(level, log.get(1)),
+                    "the branch was eaten away before its casing was repaired: " + level.getBlockState(log.get(1)));
+            SavannaMod.LOGGER.info("[new-hole-test] the casing is whole again {} ticks after the raid ({})", since, clock.describe());
+            helper.succeed();
+            return;
+        }
+        helper.assertTrue(since < REPAIRED_WITHIN, "the casing broken by the raid is still open after " + since + " ticks at " + open + "; leaks "
+                + colony.walls().getLeaks(level).size() + ", " + clock.describe() + ", danger " + colony.danger().describe(level));
+    }
+
     private static java.util.List<BlockPos> underside(java.util.List<BlockPos> log) {
         java.util.List<BlockPos> under = new java.util.ArrayList<>();
         for (BlockPos bottom : log) {
@@ -794,6 +839,9 @@ public class TermiteNewHoleTests {
         boolean[] night = {false}; // (phase 2: a night came between the days)
         int[] eatenAtDawn = {0};
         boolean[] numbersAte = {kind != Food.LOG}; // (brain part 3, the log test only)
+        // The branch test's last part: a raid bites two plates of the casing open, goes home, and the termites put them back.
+        long[] raidAt = {-1};
+        net.minecraft.world.entity.Entity[] raider = {null};
         helper.runAfterDelay(10, () -> {
             Colony colony = TermiteMoundTests.colony(helper);
             helper.assertTrue(colony != null && !colony.isFounding(), "no termite colony with workers");
@@ -866,6 +914,10 @@ public class TermiteNewHoleTests {
                         tunnel == null || tunnel.gallery() == null ? "none" : tunnel.gallery().stream().filter(c -> Nest.isDugOut(level, c)).count() + "/" + tunnel.gallery().size(),
                         eaten, kind == Food.STUMP && phase[0] == 2 ? ", under the stump " + level.getBlockState(log.get(0)) + " (cut " + colony.food().getPiecesCut(log.get(0))
                                 + "), stump " + level.getBlockState(stump) + " (cut " + colony.food().getPiecesCut(stump) + ")" : "");
+            }
+            if (raidAt[0] >= 0) {
+                afterTheRaid(helper, colony, log, tunnel, raidAt[0], raider[0], clock);
+                return;
             }
             if (tunnel != null) {
                 // Planned with the tunnel, as one job (the user's decision, 2026-10-14), not once the tunnel is dug.
@@ -1006,7 +1058,26 @@ public class TermiteNewHoleTests {
                     cased += com.antcolonies.savanna.block.MudCrustBlock.hasFace(level.getBlockState(wood.above()), net.minecraft.core.Direction.DOWN) ? 1 : 0;
                 }
                 if (eaten > eatenAtDawn[0] && cased > 0) {
-                    helper.succeed();
+                    // A raid (the user, 2026-11-13: "make sure they repair it after a raid"): a Matabele major bites the
+                    // plate over the middle of the branch and the one at its far end open, a worker is hurt, the raid leaves.
+                    com.antcolonies.savanna.entity.MatabeleEntity ant = SavannaEntities.MATABELE_MAJOR.get().create(level);
+                    ant.moveTo(log.get(1).getX() + 0.5, log.get(1).getY() + 2, log.get(1).getZ() + 0.5, 0.0F, 0.0F);
+                    ant.keepOutOfColonies();
+                    ant.setNoAi(true);
+                    level.addFreshEntity(ant);
+                    raider[0] = ant;
+                    BlockPos plateTop = log.get(1).above();
+                    BlockPos end = log.get(log.size() - 1).east();
+                    helper.assertTrue(com.antcolonies.block.FacedWall.isWall(level.getBlockState(plateTop))
+                            && com.antcolonies.block.FacedWall.isWall(level.getBlockState(end)),
+                            "no plate over the branch's middle (" + level.getBlockState(plateTop) + ") or at its end (" + level.getBlockState(end) + ")");
+                    level.destroyBlock(plateTop, false, ant);
+                    level.destroyBlock(end, false, ant);
+                    colony.news().tell(level, com.antcolonies.colony.ColonyNews.BROKEN_OPEN, new com.antcolonies.colony.ColonyNews.BrokenOpen(plateTop, ant));
+                    TestIsolation.insectsOf(helper, TermiteWorkerEntity.class).stream().findFirst().ifPresent(worker -> colony.news().tell(level,
+                            com.antcolonies.colony.ColonyNews.MEMBER_HURT, new com.antcolonies.colony.ColonyNews.MemberHurt(worker, log.get(1).below(), ant, false)));
+                    raidAt[0] = helper.getTick();
+                    SavannaMod.LOGGER.info("[new-hole-test] the raid broke the casing open at {} and {} at tick {}", plateTop.toShortString(), end.toShortString(), raidAt[0]);
                 }
             } else if (eaten > eatenAtDawn[0] && (!onAStep || crusts > 0) && numbersAte[0]) {
                 helper.succeed();
