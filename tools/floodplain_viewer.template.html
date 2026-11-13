@@ -1,0 +1,562 @@
+<title>Floodplain Trees</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,800&family=Atkinson+Hyperlegible:wght@400;700&display=swap">
+<style>
+  /* The same field-notebook bench as the tree viewer: the 3D tree on the main stage, the choices beside it. */
+  :root {
+    --bg: #eeece4; --panel: #f8f7f2; --fg: #1f1d19; --muted: #5d5850; --line: #cdc7b8; --accent: #8a5a2c; --sky: #c4d8e2;
+    --display: "Bricolage Grotesque", "Segoe UI", system-ui, sans-serif;
+    --body: "Atkinson Hyperlegible", "Segoe UI", system-ui, sans-serif;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #171512; --panel: #201d19; --fg: #e9e5dc; --muted: #aaa293; --line: #3a352e; --accent: #d9a560; --sky: #2c3c45;
+      color-scheme: dark;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #171512; --panel: #201d19; --fg: #e9e5dc; --muted: #aaa293; --line: #3a352e; --accent: #d9a560; --sky: #2c3c45;
+    color-scheme: dark;
+  }
+  html, body { height: 100%; }
+  body { margin: 0; background: var(--bg); color: var(--fg); font-family: var(--body); font-size: 15px; line-height: 1.5; }
+  .wrap { max-width: 1280px; margin: 0 auto; padding-inline: 16px; padding-block: 20px 28px; display: grid; gap: 16px; }
+  header h1 { font-family: var(--display); font-weight: 800; font-size: clamp(1.6rem, 3vw, 2.2rem); line-height: 1.1; margin: 0; text-wrap: balance; }
+  header p { margin: 6px 0 0; color: var(--muted); max-width: 75ch; }
+  .bench { display: grid; grid-template-columns: minmax(0, 1fr) 360px; gap: 16px; align-items: start; }
+  @media (max-width: 880px) { .bench { grid-template-columns: minmax(0, 1fr); } }
+  .left { display: grid; gap: 10px; min-width: 0; }
+  .stage { position: relative; background: var(--sky); border-radius: 10px; overflow: hidden; aspect-ratio: 4 / 3; max-width: 100%; }
+  .stage canvas { display: block; width: 100%; height: 100%; cursor: grab; touch-action: none; }
+  .stage canvas:active { cursor: grabbing; }
+  .hint { position: absolute; left: 12px; bottom: 10px; font-size: 12px; color: var(--fg); background: color-mix(in srgb, var(--panel) 80%, transparent); padding: 3px 8px; border-radius: 6px; }
+  .count { position: absolute; right: 12px; bottom: 10px; font-size: 12px; color: var(--fg); background: color-mix(in srgb, var(--panel) 80%, transparent); padding: 3px 8px; border-radius: 6px; font-variant-numeric: tabular-nums; }
+  .views { display: flex; gap: 6px; flex-wrap: wrap; }
+  .real { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 12px 16px; }
+  .real h2, .label h2 { font-family: var(--display); font-weight: 600; font-size: 0.78rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); margin: 0 0 6px; }
+  .real p { margin: 0; max-width: 80ch; }
+  .label { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 16px; display: grid; gap: 16px; min-width: 0; }
+  .choices { display: grid; gap: 6px; }
+  .choice { display: grid; grid-template-columns: 28px minmax(0, 1fr); gap: 10px; align-items: start; text-align: left; font: inherit; color: inherit;
+            background: transparent; border: 1px solid var(--line); border-radius: 8px; padding: 7px 10px; cursor: pointer; }
+  .choice b { font-family: var(--display); font-size: 1.05rem; line-height: 1.2; }
+  .choice small { color: var(--muted); font-size: 0.8rem; line-height: 1.35; display: block; }
+  .choice[aria-pressed="true"] { border-color: var(--fg); box-shadow: inset 0 0 0 1px var(--fg); }
+  .row { display: grid; grid-template-columns: repeat(auto-fit, minmax(0, 1fr)); gap: 4px; }
+  .row button, .views button { font: inherit; font-size: 0.8rem; color: inherit; background: transparent; border: 1px solid var(--line); border-radius: 6px; padding: 6px 4px; cursor: pointer; }
+  .row button[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: var(--panel); }
+  button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .pair { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+  .pick { display: grid; gap: 4px; }
+  .pick span { font-size: 0.82rem; color: var(--muted); }
+  input[type=range] { width: 100%; accent-color: var(--accent); }
+  .toggles { display: grid; gap: 4px; font-size: 0.88rem; }
+  .toggles label { display: flex; gap: 8px; align-items: center; cursor: pointer; }
+  .note { color: var(--muted); font-size: 0.85rem; margin: 0; }
+  .flat { display: grid; grid-template-columns: repeat(auto-fill, minmax(62px, 1fr)); gap: 8px; }
+  .flat figure { margin: 0; display: grid; gap: 2px; justify-items: center; }
+  .flat img { width: 48px; height: 48px; image-rendering: pixelated; background: color-mix(in srgb, var(--sky) 50%, var(--panel)); border-radius: 6px; }
+  .flat figcaption { font-size: 0.7rem; color: var(--muted); text-align: center; line-height: 1.2; }
+  .summary { font-family: ui-monospace, Consolas, monospace; font-size: 0.8rem; background: color-mix(in srgb, var(--sky) 25%, var(--panel)); border-radius: 6px; padding: 8px; white-space: pre-wrap; margin: 0; }
+</style>
+
+<div class="wrap">
+  <header>
+    <h1>Floodplain Trees</h1>
+    <p>Drafts of the three trees for the savanna floodplain: the fever tree, the sycamore fig and the doum palm. Nothing here is in the game yet. Every tree is made from one seed; "Another tree" shows how much they differ. The little figures at the foot are for size: a player and a Matabele major (half a block long). For scale, the umbrella thorn in the game is about 34 blocks tall and 44 wide.</p>
+  </header>
+  <div class="bench">
+    <div class="left">
+      <div class="stage">
+        <canvas id="view" aria-label="3D view of a floodplain tree"></canvas>
+        <div class="hint">Drag to turn, right-drag to move, scroll to zoom</div>
+        <div class="count" id="count"></div>
+      </div>
+      <div class="views">
+        <button type="button" id="v-over">Whole view</button>
+        <button type="button" id="v-player">Player at the foot</button>
+        <button type="button" id="v-seed">Another tree (new seed)</button>
+      </div>
+      <div class="real">
+        <h2>The real tree</h2>
+        <p id="real"></p>
+      </div>
+      <div class="real">
+        <h2>Blocks, flat as drawn</h2>
+        <div class="flat" id="flat"></div>
+      </div>
+    </div>
+    <aside class="label">
+      <div>
+        <h2>What to look at</h2>
+        <div class="choices" id="kinds"></div>
+      </div>
+      <div id="looks">
+        <h2>Looks to pick (for this tree)</h2>
+        <div class="pair">
+          <div class="pick"><span>Shape</span><div class="row" id="pick-shape"></div></div>
+          <div class="pick"><span>Bark</span><div class="row" id="pick-bark"></div></div>
+        </div>
+        <p class="note" id="shape-note"></p>
+      </div>
+      <div class="toggles">
+        <label><input type="checkbox" id="bare"> Leaves off (to see the wood)</label>
+      </div>
+      <div>
+        <h2>Your picks</h2>
+        <pre class="summary" id="summary"></pre>
+        <p class="note">Tell Claude these, or anything to change. Sizes and numbers are my picks too.</p>
+      </div>
+    </aside>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+<script>
+const DATA = /*DATA*/null;
+
+// ================= Choices =================
+const KINDS = [
+  { id: "fever", swatch: "#b9bc54", name: "Fever tree", text: "Tall and airy, lime yellow-green trunk and limbs, thin flat layers of leaves. In groves by the water." },
+  { id: "fig", swatch: "#3f6a34", name: "Sycamore fig", text: "A short, thick, buttressed trunk, a huge dark dense crown, figs straight out of the bark. Rare." },
+  { id: "doum", swatch: "#8a9a6a", name: "Doum palm", text: "A palm that forks into a Y again and again, a fan of stiff fronds on every tip. Here and there." },
+  { id: "bank", swatch: "#58684a", name: "Riverbank: all three, spaced", text: "A stretch of floodplain with a fever grove, palms and one fig, to judge the spacing (open grass for the wildlife)." },
+];
+const SHAPES = {
+  fever: { A: "Tall: a long clean trunk, the limbs leave high and rise steeply; a narrow, open crown.", B: "Spreading: the fork lower, the limbs reaching wider, a broader and flatter crown (old trees in the open)." },
+  fig: { A: "Wide: low and very broad, the limbs reaching far out sideways, the crown's edge hanging low.", B: "Tall: a higher, rounder dome on a longer trunk (figs crowded by other trees)." },
+  doum: { A: "Forked twice: four crowns.", B: "Old: forked three times, eight crowns, taller." },
+};
+const BARKS = {
+  fever: { A: "A powdery lime yellow-green.", B: "B yellower, with papery flakes." },
+  fig: { A: "A warm buff-orange, flaking.", B: "B paler and greyer (less like the fever tree's yellow)." },
+  doum: { A: "A the bare ringed trunk.", B: "B the old leaf bases still on, criss-crossed." },
+};
+const REAL = {
+  fever: "Vachellia xanthophloea. 15 to 25 m tall, on ground that is wet or flooded part of the year: floodplains, pan edges, river banks. The smooth bark is covered in a yellow powder and is green underneath: the tree makes food through its bark. The trunk is bare for a long way up, the limbs rise steeply, and the crown is thin and open, so the grass grows right under it. An acacia, with paired straight white spines. It grows in stands of one age, and a whole stand often dies off together. Early settlers blamed it for malaria (the mosquitoes of its swamps were the cause), hence the name.",
+  fig: "Ficus sycomorus. Up to 25 m tall and wider than tall, with a short, fluted, buttressed trunk that can be several metres through. The bark is pale buff to orange-yellow and flakes off in papery scales. The figs grow in thick clusters on leafless twigs straight out of the trunk and big limbs, several crops a year, each pollinated by its own tiny wasp; a fruiting tree draws monkeys, baboons, fruit bats, hornbills and green pigeons, and antelope and fish take what falls. It stands by rivers, and often on old termite mounds.",
+  doum: "Hyphaene thebaica. Up to about 15 m. One of the few palms whose trunk forks: it divides in two, and each arm in two again, up to four or five times in old trees. The trunk is ringed with old leaf scars; each tip carries a crown of 20 to 30 stiff grey-green fan fronds on thorny stalks, the dead ones hanging under it. The fruit, the size of an apple, glossy orange-brown and tasting of gingerbread, hangs in heavy bunches; elephants and baboons eat it and spread the seed. It grows where there is water in the ground: river banks and oases.",
+  bank: "How they could stand on the floodplain: fever trees in a loose grove near the water, the trees about 15 blocks apart; a few doum palms in a clump on slightly higher ground; one sycamore fig on its own, set back. Most of the plain stays open grass. All spacings are my picks.",
+};
+let kind = "fever", seed = 1, bare = false;
+let picks = { shape: { fever: "A", fig: "A", doum: "A" }, bark: { fever: "A", fig: "A", doum: "A" } };
+try { const s = JSON.parse(localStorage.getItem("floodplain-picks-1") || "null"); if (s && s.shape && s.bark) picks = s; } catch (e) {}
+
+// ================= The shape maker =================
+// A block is "shape|texture": cube (wood), thin (a branch half a block thick), leaf (see-through cube), cross (a plant).
+const PRIO = { cross: 1, leaf: 2, thin: 3, cube: 5 };
+const shapeOf = b => b.slice(0, b.indexOf("|"));
+
+class Vox {
+  constructor() { this.m = new Map(); this.ox = 0; this.oz = 0; }
+  key(x, y, z) { return ((x + 1024) * 256 + (y + 64)) * 2048 + (z + 1024); }
+  put(x, y, z, b) {
+    if (y < -1) return;
+    const k = this.key(x + this.ox, y, z + this.oz), old = this.m.get(k);
+    if (old === undefined || PRIO[shapeOf(b)] >= PRIO[shapeOf(old)]) this.m.set(k, b);
+  }
+  get(x, y, z) { return this.m.get(this.key(x + this.ox, y, z + this.oz)); }
+  raw(x, y, z) { return this.m.get(this.key(x, y, z)); }
+  each(f) { for (const [k, b] of this.m) { const z = k % 2048 - 1024, t = Math.floor(k / 2048); f(Math.floor(t / 256) - 1024, t % 256 - 64, z, b); } }
+}
+
+function rng(s) { return () => { s |= 0; s = s + 0x6D2B79F5 | 0; let t = Math.imul(s ^ s >>> 15, 1 | s); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+function hash(x, y, z, s) {
+  let h = (Math.imul(x, 374761393) + Math.imul(y, 668265263) + Math.imul(z, 1440670441) + Math.imul(s, 1103515245)) | 0;
+  h = Math.imul(h ^ (h >>> 13), 1274126177); h ^= h >>> 16; return (h >>> 0) / 4294967296;
+}
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+const lerp = (a, b, t) => a + (b - a) * t;
+const add = (a, b) => [a[0] + b[0], a[1] + b[1], a[2] + b[2]];
+const sub = (a, b) => [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
+const mul = (a, s) => [a[0] * s, a[1] * s, a[2] * s];
+const len = a => Math.hypot(a[0], a[1], a[2]);
+const dir = (az, el) => [Math.cos(az) * Math.cos(el), Math.sin(el), Math.sin(az) * Math.cos(el)];
+
+// One block wide, every step along one axis only, so the pieces always join face to face.
+function line(v, a, b, block) {
+  let p = a.map(Math.round);
+  v.put(p[0], p[1], p[2], block);
+  const n = Math.ceil(len(sub(b, a)) * 3) + 1;
+  for (let i = 1; i <= n; i++) {
+    const q = add(a, mul(sub(b, a), i / n)).map(Math.round);
+    while (p[0] !== q[0] || p[1] !== q[1] || p[2] !== q[2]) {
+      let ax = 0, best = -1;
+      for (let j = 0; j < 3; j++) { const d = Math.abs(q[j] - p[j]); if (d > best) { best = d; ax = j; } }
+      p[ax] += Math.sign(q[ax] - p[ax]);
+      v.put(p[0], p[1], p[2], block);
+    }
+  }
+}
+// A round piece of wood from a to b, radius ra to rb: bark outside, wood inside; a thin branch when narrow.
+function seg(v, a, b, ra, rb, k) {
+  if (Math.max(ra, rb) < 0.8) { line(v, a, b, "thin|bark_" + k); return; }
+  const ab = sub(b, a), l2 = Math.max(1e-6, ab[0] * ab[0] + ab[1] * ab[1] + ab[2] * ab[2]);
+  const R = Math.max(ra, rb) + 1;
+  const lo = [0, 1, 2].map(i => Math.floor(Math.min(a[i], b[i]) - R)), hi = [0, 1, 2].map(i => Math.ceil(Math.max(a[i], b[i]) + R));
+  for (let x = lo[0]; x <= hi[0]; x++) for (let y = Math.max(-1, lo[1]); y <= hi[1]; y++) for (let z = lo[2]; z <= hi[2]; z++) {
+    const t = clamp(((x - a[0]) * ab[0] + (y - a[1]) * ab[1] + (z - a[2]) * ab[2]) / l2, 0, 1);
+    const d = len(sub([x, y, z], add(a, mul(ab, t)))), r = lerp(ra, rb, t);
+    if (d > r) continue;
+    v.put(x, y, z, (d > r - 1.15 ? "cube|bark_" : "cube|inner_") + k);
+  }
+}
+function path(v, pts, radii, k) { for (let i = 0; i + 1 < pts.length; i++) seg(v, pts[i], pts[i + 1], radii[i], radii[i + 1], k); }
+// A cloud of leaves: an ellipsoid, thinner toward its edge; dens is the share of cells that hold leaves.
+function blob(v, c, rx, ry, rz, dens, block, s, minY = -99) {
+  for (let x = Math.floor(c[0] - rx); x <= Math.ceil(c[0] + rx); x++) for (let y = Math.max(minY, Math.floor(c[1] - ry)); y <= Math.ceil(c[1] + ry); y++)
+    for (let z = Math.floor(c[2] - rz); z <= Math.ceil(c[2] + rz); z++) {
+      const d = ((x - c[0]) / rx) ** 2 + ((y - c[1]) / ry) ** 2 + ((z - c[2]) / rz) ** 2;
+      if (d <= 1 && hash(x, y, z, s) < dens * (d > 0.6 ? 0.75 : 1)) v.put(x, y, z, block);
+    }
+}
+
+// ---- Fever tree: a long clean trunk, steep limbs, thin flat pads of leaves; bark-coloured to the last twig ----
+function fever(v, seed, shape) {
+  const r = rng(seed * 7919 + 11), wide = shape === "B";
+  const H = (wide ? 23 : 29) + Math.floor(r() * 4), R0 = 1.5, Rc = wide ? 16 : 11.5;
+  const fy = Math.round(H * (wide ? 0.36 : 0.5) + r() * 2), lean = [(r() - 0.5) * 2.4, 0, (r() - 0.5) * 2.4];
+  const fork = [lean[0], fy, lean[2]];
+  path(v, [[0, -1, 0], [lean[0] * 0.4, fy * 0.5, lean[2] * 0.4], fork], [R0 + 0.3, R0 * 0.85, R0 * 0.72], "fever");
+  const n = (wide ? 4 : 3) + (r() < 0.5 ? 1 : 0), az0 = r() * Math.PI * 2, pads = [];
+  const limb = (az, reach, top, thick) => {
+    const out = [Math.cos(az), 0, Math.sin(az)];
+    const mid = add(fork, add(mul(out, reach * 0.35), [0, (top - fy) * 0.55, 0]));
+    const end = add(fork, add(mul(out, reach * 0.75), [0, (top - fy) * 0.9, 0]));
+    path(v, [fork, mid, end], [thick, 0.82, 0.6], "fever");
+    const twigs = 2 + Math.floor(r() * 2);
+    for (let i = 0; i < twigs; i++) {
+      const a = az + (i - (twigs - 1) / 2) * 0.9 + (r() - 0.5) * 0.4, l = reach * (0.3 + r() * 0.2);
+      const tip = add(end, [Math.cos(a) * l, 1 + r() * 2, Math.sin(a) * l]);
+      line(v, end, tip, "thin|bark_fever");
+      pads.push([tip, 3.8 + r() * 1.8]);
+    }
+    // one lower side branch on some limbs: the crown in two or three thin layers
+    if (r() < 0.6) {
+      const a = az + (r() < 0.5 ? 1 : -1) * (0.7 + r() * 0.5), l = reach * 0.45;
+      const tip = add(mid, [Math.cos(a) * l, 1 + r() * 1.5, Math.sin(a) * l]);
+      line(v, mid, tip, "thin|bark_fever");
+      pads.push([tip, 3.2 + r() * 1.4]);
+    }
+  };
+  for (let i = 0; i < n; i++) limb(az0 + i / n * Math.PI * 2 + (r() - 0.5) * 0.5, Rc * (0.8 + r() * 0.35), H - 2 - Math.floor(r() * 3), 1.0);
+  limb(r() * 6.28, 2.5, H - 1, 0.95);  // the leader, nearly straight up
+  for (const [c, rad] of pads) {
+    blob(v, add(c, [0, 1, 0]), rad, 1.2, rad, 0.42, "leaf|leaves_fever", seed);
+    for (let i = 0; i < 3; i++) {  // spines under the pads
+      const x = Math.round(c[0] + (r() - 0.5) * rad), z = Math.round(c[2] + (r() - 0.5) * rad), y = Math.round(c[1]) - 1;
+      if (!v.get(x, y, z)) v.put(x, y, z, "cross|thorns");
+    }
+  }
+  return { R: R0 + 0.3 };
+}
+
+// ---- Sycamore fig: a short fluted trunk with buttresses, huge spreading limbs, a dense dark dome, figs on the bark ----
+function fig(v, seed, shape) {
+  const r = rng(seed * 104729 + 5), tall = shape === "B";
+  const H = (tall ? 30 : 24) + Math.floor(r() * 3), R0 = tall ? 3.1 : 3.5, Rc = (tall ? 15 : 20) + r() * 2, fy = tall ? 9 : 6;
+  seg(v, [0, -1, 0], [0, fy + 1, 0], R0 + 0.7, R0, "fig");
+  const nb = 5 + Math.floor(r() * 2), b0 = r() * 6.28;
+  for (let i = 0; i < nb; i++) {  // buttresses: ridges running down the trunk and out along the ground
+    const a = b0 + i / nb * 6.28 + (r() - 0.5) * 0.4, o = [Math.cos(a), 0, Math.sin(a)], reach = R0 + 2.5 + r() * 2.5;
+    path(v, [add(mul(o, R0 * 0.7), [0, fy * (0.6 + r() * 0.3), 0]), add(mul(o, R0 + 0.9), [0, 1, 0]), add(mul(o, reach), [0, -1, 0])], [0.9, 1.25, 1.0], "fig");
+  }
+  const fork = [0, fy, 0], n = 5 + Math.floor(r() * 3), az0 = r() * 6.28, base = fy + (H - fy) * 0.3;
+  const crown = (c, rx, ry) => blob(v, c, rx, ry, rx, 0.93, "leaf|leaves_fig", seed, Math.round(base - 1 - Math.max(0, Math.hypot(c[0], c[2]) - Rc * 0.55) * 0.35));
+  for (let i = 0; i < n; i++) {
+    const az = az0 + i / n * 6.28 + (r() - 0.5) * 0.5, o = [Math.cos(az), 0, Math.sin(az)], reach = Rc * (0.8 + r() * 0.3), up = H - fy;
+    const bend = az + (r() - 0.5) * 0.7, o2 = [Math.cos(bend), 0, Math.sin(bend)];
+    const p1 = add(fork, add(mul(o, reach * 0.3), [0, up * 0.3, 0]));
+    const p2 = add(p1, add(mul(o2, reach * 0.38), [0, up * 0.2, 0]));
+    const p3 = add(p2, add(mul(o, reach * 0.26), [0, up * 0.08, 0]));
+    path(v, [fork, p1, p2, p3], [R0 * 0.62, 1.6, 1.05, 0.7], "fig");
+    for (const [p, s] of [[p1, 0.75], [p2, 1], [p3, 0.85]]) {
+      const top = add(p, [(r() - 0.5) * 4, 3 + r() * 3, (r() - 0.5) * 4]);
+      line(v, p, top, "thin|bark_fig");
+      crown(add(top, [0, 1, 0]), (5.5 + r() * 2) * s, (3.6 + r()) * s);
+    }
+    crown(add(p3, mul(o, 2.5)), 5 + r() * 1.5, 3.2 + r());
+  }
+  path(v, [fork, [(r() - 0.5) * 3, fy + (H - fy) * 0.45, (r() - 0.5) * 3], [(r() - 0.5) * 4, H - 5, (r() - 0.5) * 4]], [R0 * 0.6, 1.3, 0.7], "fig");
+  crown([0, fy + (H - fy) * 0.68, 0], Rc * 0.62, (H - fy) * 0.34);
+  // figs: clusters on the trunk and the lower limbs, wherever bark faces open air
+  const spots = [];
+  v.each((X, y, Z, b) => {
+    if (b !== "cube|bark_fig" || y < 1 || y > fy + 7) return;
+    const x = X - v.ox, z = Z - v.oz;
+    if (Math.hypot(x, z) > R0 + 9) return;
+    for (const d of [[1, 0], [-1, 0], [0, 1], [0, -1]])
+      if (!v.get(x + d[0], y, z + d[1]) && hash(x >> 1, y >> 1, z >> 1, seed) < 0.42 && hash(x + d[0], y, z + d[1], seed + 3) < 0.55) spots.push([x + d[0], y, z + d[1]]);
+  });
+  for (const p of spots) v.put(p[0], p[1], p[2], "cross|figs");
+  return { R: R0 + 3 };
+}
+
+// ---- Doum palm: a ringed trunk forking in two again and again, a fan of fronds on every tip ----
+function doum(v, seed, shape) {
+  const r = rng(seed * 15485863 + 3), levels = shape === "B" ? 3 : 2;
+  const crownAt = p => {
+    const turn = r() * 6.28;
+    const ring = (count, el, reach, size, block) => {
+      for (let i = 0; i < count; i++) {
+        const d = dir(turn + i / count * 6.28 + (r() - 0.5) * 0.3, el + (r() - 0.5) * 0.2), tip = add(p, mul(d, reach));
+        line(v, add(p, mul(d, 1)), add(p, mul(d, reach * 0.55)), "thin|bark_doum_stalk");
+        blob(v, tip, size, size * 0.8, size, 0.8, block, seed + i);
+      }
+    };
+    ring(4, 1.05, 2.6, 1.3, "leaf|frond");
+    ring(6, 0.35, 3.3, 1.5, "leaf|frond");
+    ring(5, -0.35, 3.0, 1.3, r() < 0.5 ? "leaf|frond" : "leaf|frond_dead");
+    for (let i = 0; i < 6; i++) {  // the skirt of dead fronds, and fruit bunches under the crown
+      const x = Math.round(p[0] + (r() - 0.5) * 2.2), z = Math.round(p[2] + (r() - 0.5) * 2.2), y = Math.round(p[1]) - 1 - Math.floor(r() * 3);
+      if (!v.get(x, y, z)) v.put(x, y, z, i < 4 ? "leaf|frond_dead" : "cross|doum_fruit");
+    }
+  };
+  const grow = (p, az, level) => {
+    if (level === 0) { crownAt(p); return; }
+    for (const side of [1, -1]) {
+      const a = az + (side > 0 ? 0 : Math.PI) + (r() - 0.5) * 0.5, o = [Math.cos(a), 0, Math.sin(a)];
+      const out = 2.2 + level * 1.5 + r(), rise = 4 + r() * 2.5;
+      const q1 = add(p, add(mul(o, out), [0, 2 + r(), 0]));
+      const q2 = add(q1, add(mul(o, out * 0.35), [0, rise, 0]));
+      line(v, p, q1, "cube|bark_doum"); line(v, q1, q2, "cube|bark_doum");
+      grow(q2, az + Math.PI / 2 + (r() - 0.5) * 0.8, level - 1);
+    }
+  };
+  const top = [(r() - 0.5) * 3, (levels === 3 ? 9 : 8) + Math.floor(r() * 3), (r() - 0.5) * 3];
+  line(v, [0, -1, 0], [top[0] * 0.5, top[1] * 0.5, top[2] * 0.5], "cube|bark_doum");
+  line(v, [top[0] * 0.5, top[1] * 0.5, top[2] * 0.5], top, "cube|bark_doum");
+  for (const d of [[1, 0], [-1, 0], [0, 1], [0, -1]]) { v.put(d[0], -1, d[1], "cube|bark_doum"); if (r() < 0.6) v.put(d[0], 0, d[1], "cube|bark_doum"); }
+  grow(top, r() * 6.28, levels);
+  return { R: 1.5 };
+}
+
+const MAKERS = { fever, fig, doum };
+// The riverbank: the water lies along -z; x runs along the river. [kind, x, z, seed offset]
+const BANK = [["fever", -50, -7, 0], ["fever", -33, -2, 1], ["fever", -17, -8, 2], ["fever", -29, 13, 3], ["fever", 44, -5, 4],
+              ["fig", 14, 16, 0], ["doum", -52, 30, 0], ["doum", -43, 37, 1], ["doum", 52, 20, 2], ["doum", 60, 31, 3]];
+const WATER_Z = -15;
+function makeScene() {
+  const v = new Vox();
+  if (kind !== "bank") return { v, R: MAKERS[kind](v, seed, picks.shape[kind]).R };
+  for (const [k, x, z, s] of BANK) { v.ox = x; v.oz = z; MAKERS[k](v, seed * 31 + s, picks.shape[k]); }
+  v.ox = v.oz = 0;
+  return { v, R: 0 };
+}
+
+// ================= Drawing =================
+const canvas = document.getElementById("view");
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
+renderer.outputEncoding = THREE.sRGBEncoding;
+renderer.setPixelRatio(Math.min(2, window.devicePixelRatio || 1));
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(50, 4 / 3, 0.05, 900);
+const controls = new THREE.OrbitControls(camera, canvas);
+controls.enableDamping = true;
+controls.maxPolarAngle = Math.PI * 0.497;
+controls.minDistance = 0.5; controls.maxDistance = 320;
+
+const loader = new THREE.TextureLoader();
+const cache = {};
+function tex(name, rx, ry) {
+  const key = name + (rx ? `:${rx}:${ry}` : "");
+  if (!cache[key]) {
+    const t = loader.load(DATA[name], () => draw());
+    t.magFilter = THREE.NearestFilter; t.minFilter = THREE.NearestFilter; t.encoding = THREE.sRGBEncoding;
+    if (rx) { t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(rx, ry); }
+    cache[key] = t;
+  }
+  return cache[key];
+}
+const SHADE = [0.6, 0.6, 1.0, 0.5, 0.8, 0.8];
+const matCache = {};
+function mats(name, see) {
+  const key = name + (see ? "!" : "");
+  if (!matCache[key]) matCache[key] = SHADE.map(s => new THREE.MeshBasicMaterial({ map: tex(name), color: new THREE.Color(s, s, s),
+    alphaTest: see ? 0.5 : 0, side: see ? THREE.DoubleSide : THREE.FrontSide }));
+  return matCache[key];
+}
+function plantMat(name) {
+  const key = name + "~";
+  if (!matCache[key]) matCache[key] = new THREE.MeshBasicMaterial({ map: tex(name), alphaTest: 0.5, side: THREE.DoubleSide, color: new THREE.Color(0.9, 0.9, 0.9) });
+  return matCache[key];
+}
+// The texture of a block: the barks have looks to pick; a palm frond's stalk is drawn with the palm's bark.
+function texName(t) {
+  if (t === "bark_doum_stalk") return "bark_doum_" + picks.bark.doum;
+  if (t.startsWith("bark_")) return t + "_" + picks.bark[t.slice(5)];
+  if (t === "inner_doum") return "inner_fig";
+  return t;
+}
+
+function flatPlane(parent, w, d, name, y, x, z) {
+  const m = new THREE.Mesh(new THREE.PlaneGeometry(w, d), new THREE.MeshBasicMaterial({ map: tex(name, w, d), color: 0xeeeeee }));
+  m.rotation.x = -Math.PI / 2; m.position.set(x, y, z); parent.add(m);
+}
+const WATER_EDGE = -15;
+flatPlane(scene, 400, 400, "grass", -0.5, 0, 0);
+const bankGround = new THREE.Group(); scene.add(bankGround);
+flatPlane(bankGround, 400, 5, "silt", -0.49, 0, WATER_EDGE + 2.5);
+flatPlane(bankGround, 400, 200, "water", -0.48, 0, WATER_EDGE - 100);
+const treeGroup = new THREE.Group();
+scene.add(treeGroup);
+const figures = new THREE.Group();
+scene.add(figures);
+function box(w, h, d, color, x, y, z) {
+  const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), SHADE.map(s => new THREE.MeshBasicMaterial({ color: new THREE.Color(color).multiplyScalar(s) })));
+  m.position.set(x, y, z); figures.add(m); return m;
+}
+function placeFigures(x, z) {
+  figures.clear();
+  box(0.6, 0.75, 0.3, 0x3a4a9a, x, -0.5 + 0.375, z);
+  box(0.6, 0.75, 0.3, 0x2f9c9c, x, -0.5 + 1.125, z);
+  box(0.5, 0.5, 0.5, 0xc69c7a, x, -0.5 + 1.75, z);
+  const l = 0.5, h = l * 0.22, ax = x - 1.4, az = z + 0.8;  // a Matabele major, half a block long
+  box(l * 0.28, h, l * 0.22, 0x1c1a19, ax - l * 0.36, -0.5 + h * 0.75, az);
+  box(l * 0.3, h * 0.8, l * 0.14, 0x1c1a19, ax - l * 0.05, -0.5 + h * 0.75, az);
+  box(l * 0.38, h * 1.1, l * 0.26, 0x1c1a19, ax + l * 0.3, -0.5 + h * 0.8, az);
+}
+
+const geo = { cube: new THREE.BoxGeometry(1, 1, 1), half: new THREE.BoxGeometry(0.5, 0.5, 0.5) };
+const planeA = new THREE.PlaneGeometry(1, 1).rotateY(Math.PI / 4), planeB = new THREE.PlaneGeometry(1, 1).rotateY(-Math.PI / 4);
+const SIDES = [[1, 0, 0], [-1, 0, 0], [0, 1, 0], [0, -1, 0], [0, 0, 1], [0, 0, -1]];
+let bounds = null;
+
+function build(reframe) {
+  const made = makeScene(), v = made.v;
+  for (const c of treeGroup.children) c.dispose && c.dispose();
+  treeGroup.clear();
+  bankGround.visible = kind === "bank";
+  const lists = {};
+  const push = (key, p) => (lists[key] = lists[key] || []).push(p);
+  let count = 0, maxY = 0, maxR = 0;
+  v.each((x, y, z, b) => {
+    const s = shapeOf(b), name = texName(b.slice(s.length + 1));
+    if (y < 0 || (bare && s !== "cube" && s !== "thin")) return;
+    count++;
+    maxY = Math.max(maxY, y); maxR = Math.max(maxR, Math.hypot(x, z));
+    if (s === "cube" || s === "leaf") {
+      // hidden blocks are left out: wood behind wood, leaves with wood or leaves on every side
+      if (SIDES.every(d => { const n = v.raw(x + d[0], y + d[1], z + d[2]); return n && (shapeOf(n) === "cube" || (s === "leaf" && shapeOf(n) === "leaf")); })) return;
+      push(s + "|" + name, [x, y, z]);
+    } else if (s === "cross") push("cross|" + name, [x, y, z]);
+    else {
+      push("thin|" + name, [x, y, z]);
+      for (const d of SIDES) {
+        const n = v.raw(x + d[0], y + d[1], z + d[2]);
+        if (!n || shapeOf(n) === "leaf" || shapeOf(n) === "cross" || (shapeOf(n) === "thin" && d[0] + d[1] + d[2] < 0)) continue;
+        push("thin|" + name, [x + d[0] * 0.5, y + d[1] * 0.5, z + d[2] * 0.5]);
+      }
+    }
+  });
+  const m4 = new THREE.Matrix4();
+  for (const key in lists) {
+    const [s, name] = key.split("|"), ps = lists[key];
+    const meshes = s === "cross" ? [new THREE.InstancedMesh(planeA, plantMat(name), ps.length), new THREE.InstancedMesh(planeB, plantMat(name), ps.length)]
+      : [new THREE.InstancedMesh(s === "thin" ? geo.half : geo.cube, mats(name, s === "leaf"), ps.length)];
+    for (const mesh of meshes) {
+      ps.forEach((p, i) => { m4.makeTranslation(p[0], p[1], p[2]); mesh.setMatrixAt(i, m4); });
+      mesh.instanceMatrix.needsUpdate = true;
+      treeGroup.add(mesh);
+    }
+  }
+  document.getElementById("count").textContent = kind === "bank" ? `${BANK.length} trees on about 130 x 60 blocks`
+    : `${count.toLocaleString()} blocks · ${maxY + 1} tall · ${Math.round(maxR * 2)} wide`;
+  bounds = { h: maxY + 1, r: Math.max(2, maxR), R: made.R };
+  if (kind === "bank") placeFigures(-24, 4); else placeFigures(made.R + 3, 0);
+  if (reframe) view("over");
+  draw();
+}
+
+function view(which) {
+  const { h, r, R } = bounds;
+  if (kind === "bank") {
+    if (which === "over") { controls.target.set(4, 6, 6); camera.position.set(-40, 62, 138); }
+    else { controls.target.set(-33, 12, -2); camera.position.set(-22, 1.6, 9); }
+  } else if (which === "over") {
+    controls.target.set(0, h * 0.45, 0);
+    const d = Math.max(h, r * 2) * 1.15 + 4;
+    camera.position.set(d * 0.75, h * 0.4 + d * 0.2, d * 0.75);
+  } else {
+    controls.target.set(0, Math.min(h * 0.5, 12), 0);
+    camera.position.set(R + 9, 1.6, 5);
+  }
+  controls.update(); draw();
+}
+function resize() {
+  const w = canvas.clientWidth, h = canvas.clientHeight;
+  if (!w || !h) return;
+  renderer.setSize(w, h, false);
+  camera.aspect = w / h; camera.updateProjectionMatrix();
+  draw();
+}
+let pending = false;
+function draw() {
+  if (pending) return;
+  pending = true;
+  requestAnimationFrame(() => { pending = false; if (controls.update()) draw(); renderer.render(scene, camera); });
+}
+controls.addEventListener("change", draw);
+new ResizeObserver(resize).observe(canvas);
+
+// ================= The panel =================
+const FLAT = {
+  fever: [["bark_fever", "bark"], ["leaves_fever", "leaves"], ["thorns", "spines"], ["inner_fever", "inside wood"]],
+  fig: [["bark_fig", "bark"], ["leaves_fig", "leaves"], ["figs", "figs"], ["inner_fig", "inside wood"]],
+  doum: [["bark_doum", "trunk"], ["frond", "frond"], ["frond_dead", "dead frond"], ["doum_fruit", "fruit"]],
+};
+FLAT.bank = [].concat(FLAT.fever.slice(0, 2), FLAT.fig.slice(0, 3), FLAT.doum.slice(0, 2), [["grass", "floodplain grass"], ["silt", "silt"], ["water", "river water"]]);
+function flat() {
+  const el = document.getElementById("flat");
+  el.innerHTML = "";
+  for (const [t, label] of FLAT[kind]) {
+    const f = document.createElement("figure");
+    f.innerHTML = `<img alt="${label}" src="${DATA[texName(t)]}"><figcaption>${label}</figcaption>`;
+    el.appendChild(f);
+  }
+}
+function buttons(el, list, isOn, onPick) {
+  el.innerHTML = "";
+  for (const [id, label] of list) {
+    const b = document.createElement("button");
+    b.type = "button"; b.textContent = label;
+    b.setAttribute("aria-pressed", String(isOn(id)));
+    b.addEventListener("click", () => onPick(id));
+    el.appendChild(b);
+  }
+}
+function save() { try { localStorage.setItem("floodplain-picks-1", JSON.stringify(picks)); } catch (e) {} }
+function sync() {
+  document.querySelectorAll("#kinds .choice").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.id === kind)));
+  const one = kind !== "bank";
+  document.getElementById("looks").hidden = !one;
+  if (one) {
+    const ab = [["A", "A"], ["B", "B"]];
+    buttons(document.getElementById("pick-shape"), ab, x => picks.shape[kind] === x, x => { picks.shape[kind] = x; save(); refresh(true); });
+    buttons(document.getElementById("pick-bark"), ab, x => picks.bark[kind] === x, x => { picks.bark[kind] = x; save(); refresh(false); });
+    document.getElementById("shape-note").innerHTML = `Shape A: ${SHAPES[kind].A}<br>Shape B: ${SHAPES[kind].B}<br>Bark: ${BARKS[kind].A} ${BARKS[kind].B}<br>Both shapes could be in the game together, mixed by seed, as with the giant trees.`;
+  }
+  document.getElementById("real").textContent = REAL[kind];
+  document.getElementById("bare").checked = bare;
+  document.getElementById("summary").textContent = KINDS.slice(0, 3).map(k => `${k.name}: shape ${picks.shape[k.id]}, bark ${picks.bark[k.id]}`).join("\n");
+  flat();
+}
+function refresh(reframe) { sync(); build(reframe); }
+(function kinds() {
+  const el = document.getElementById("kinds");
+  for (const c of KINDS) {
+    const b = document.createElement("button");
+    b.type = "button"; b.className = "choice"; b.dataset.id = c.id;
+    b.innerHTML = `<b style="color:${c.swatch}">&#9679;</b><span>${c.name}<small>${c.text}</small></span>`;
+    b.addEventListener("click", () => { kind = c.id; refresh(true); });
+    el.appendChild(b);
+  }
+})();
+document.getElementById("bare").addEventListener("change", e => { bare = e.target.checked; build(false); });
+document.getElementById("v-over").addEventListener("click", () => view("over"));
+document.getElementById("v-player").addEventListener("click", () => view("player"));
+document.getElementById("v-seed").addEventListener("click", () => { seed++; refresh(true); });
+resize(); refresh(true);
+</script>

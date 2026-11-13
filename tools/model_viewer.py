@@ -42,6 +42,10 @@ Savanna river colours (docs/plans/savanna-rivers.md step 0, 2026-11-07; river_co
 piece with a river, an oxbow and a pan in Minecraft's own textures, buttons for the river water, pool water, floodplain
 grass, bank height and sand edges, and a look under water:
 python tools/model_viewer.py rivers [out.html]   (default references/river_colors_viewer.html)
+Floodplain trees (2026-11-13, floodplain_tree_art.py; floodplain_viewer.template.html): drafts of the fever tree, the
+sycamore fig and the doum palm, two shapes and two barks each, and a riverbank with all three to judge the spacing:
+python tools/model_viewer.py floodplain [out.html]   (default references/floodplain_viewer.html)
+
 Planks from the giant trees' wood (2026-11-11, plank_art.py; plank_viewer.template.html): three looks for each tree,
 a floor, a wall and the log beside, Minecraft's acacia and oak planks to compare:
 python tools/model_viewer.py planks [out.html]   (default references/plank_viewer.html)
@@ -202,6 +206,18 @@ def trees_page(out):
     else:
         print("no build/tree_shapes.json yet (run ./gradlew test): the page shows only the viewer's own shapes")
     template = (Path(__file__).resolve().parent / "tree_viewer.template.html").read_text(encoding="utf-8")
+    out.parent.mkdir(parents=True, exist_ok=True)
+    out.write_text(template.replace("/*DATA*/null", json.dumps(data)), encoding="utf-8")
+    print("wrote", out)
+
+
+def floodplain_page(out):
+    """Drafts of the floodplain trees (2026-11-13): the fever tree, the sycamore fig and the doum palm, their textures
+    from floodplain_tree_art.py, their shapes made in the page; a riverbank with all three to judge the spacing."""
+    import floodplain_tree_art
+    data = {name: uri(png([[px if px is not None else (0, 0, 0, 0) for px in row] for row in img]))
+            for name, img in floodplain_tree_art.all_textures().items()}
+    template = (Path(__file__).resolve().parent / "floodplain_viewer.template.html").read_text(encoding="utf-8")
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(template.replace("/*DATA*/null", json.dumps(data)), encoding="utf-8")
     print("wrote", out)
@@ -441,6 +457,9 @@ def main():
     if len(sys.argv) > 1 and sys.argv[1] == "nestsites":
         import nest_sites_viewer  # the Matabele home choices (docs/plans/matabele-homes.md)
         nest_sites_viewer.page(Path(sys.argv[2]) if len(sys.argv) > 2 else ROOT / "references/nest_sites_viewer.html")
+        return
+    if len(sys.argv) > 1 and sys.argv[1] == "floodplain":
+        floodplain_page(Path(sys.argv[2]) if len(sys.argv) > 2 else ROOT / "references/floodplain_viewer.html")
         return
     if len(sys.argv) > 1 and sys.argv[1] == "planks":
         planks_page(Path(sys.argv[2]) if len(sys.argv) > 2 else ROOT / "references/plank_viewer.html")
