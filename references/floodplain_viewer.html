@@ -64,7 +64,7 @@
 <div class="wrap">
   <header>
     <h1>Floodplain Trees</h1>
-    <p>Drafts of the three trees for the savanna floodplain: the fever tree, the sycamore fig and the doum palm. Nothing here is in the game yet. Every tree is made from one seed; "Another tree" shows how much they differ. The little figures at the foot are for size: a player and a Matabele major (half a block long). For scale, the umbrella thorn in the game is about 34 blocks tall and 44 wide.</p>
+    <p>The sycamore fig and the doum palm, rebuilt from your two pictures. Trunks, stems and thick limbs are full blocks; the thin limb ends, the roots at the foot, the fruit and every palm frond are sculpted pieces (small boxes, as a block model can hold). Nothing here is in the game yet. "Another tree" shows how much one kind differs from seed to seed. The little figures at the foot are for scale: a player, and a Matabele major ant beside them.</p>
   </header>
   <div class="bench">
     <div class="left">
@@ -76,7 +76,12 @@
       <div class="views">
         <button type="button" id="v-over">Whole view</button>
         <button type="button" id="v-player">Player at the foot</button>
+        <button type="button" id="v-fruit">Close on the fruit</button>
         <button type="button" id="v-seed">Another tree (new seed)</button>
+      </div>
+      <div class="real">
+        <h2>Blocks and sculpted pieces</h2>
+        <p id="sculpt"></p>
       </div>
       <div class="real">
         <h2>The real tree</h2>
@@ -101,7 +106,7 @@
         <p class="note" id="shape-note"></p>
       </div>
       <div class="toggles">
-        <label><input type="checkbox" id="bare"> Leaves off (to see the wood)</label>
+        <label><input type="checkbox" id="bare"> Leaves off (to see the wood and the fruit)</label>
       </div>
       <div>
         <h2>Your picks</h2>
@@ -115,51 +120,60 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
 <script>
-const DATA = {"bark_fever_A": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAACVUlEQVR42k1TWXITQQztc4GruAEee2xXOXESJ1CQ4hBUnDgLN8HY49m8zOJtnGBDLgGkQgKnEO+p2T5U0yM9PT2p1cZLKzKE+bBwVhUvceT9qKw+L7Gx/sSRXvxceuOyDKaOBHlVQpifVcT0APZSR0E/Hq6U4P7uXOgfwEcLsqo8fr+Uk7dPfmNIWpY+yAwPrEJWBfOLwAdUC+euKvMz+sqaFP5XPZi5YryprRBB/hDMEZII4DkAiKTE/PHzzBjPzDFhZp1hZlUo0bQiMdiHTOQ/SOgjdgAVVDVUIrQwWbgSwEGgB+AIlSaLmtBP0hh+H8CQQyYud2WA9mLExzCTLGt/g2FeUecUBNNVHYm2kpICN8E3hrE1ksZQbJJ5Q85PS9LtlOSs81TGBBMIuUykbBoLjdFWSFIqgi+GGrPe7Eu6aKKNqjJHUJICPOKkE9sa28iKumSrmsa5LySfrXfEFB/3JS92wVaTb1+6MkKVGCBVgXOUWwURCpCUiVRA8of7SyjYHoJpT8FUwIHqDKCCqjgDxhLMhNXH8zpIGpKj+mzVErO4bstyc4AhNXQwZOZwRnp9ZSXoYjYXZyW5OH0mxeYV7CWKtqXYHkHBpxforyV3X7t6PdHcSmZ1yued/3x8hwE2ZXN7jPOVbD6/kTWIZkVbTIrkbN1CgmsXKv+3lfzvYP9pvKXlzZFcb4/l5va1zNeHkq72sMpJFXvv6G4zye5+Rd8Dp81/rnMf6pKiid4PMKMdnHdRqGFfo5/bBPuEHTWShBgek/3UPnNiQ9xWkLmKZ2u/ABuowEzdCJ2pAAAAAElFTkSuQmCC", "bark_fig_A": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAC5klEQVR42iVT2VYaURCcn4wnJnF7UEABN4y7sgiCvuQcE7MYo8i+zaKo2RQXZphhYFB/qFL35qHPnTn3dldXdZfSrU6iWw/D1mLwLlPoN3fgGAn0eLrnCdi1IDoVRjWIdikAtx5CT51Fn9GrT0F5MQLy0lK30dGispAo0jXi8JoJWOUZPBtzLDKNJ2MWZjkAh0U9bQ6e6oPyrPvhNsLoXcThaNtw9CjMxias+hbatXUmTEtUs+gnYhBOdRoDfRaezgKig9PEEE6TI0zewmNlDVZtDe3KKqzqKjr1dZkoot+YQbswxSI8+e+pYZztDEG5/TGB+/Iq7orLTFrDfWGJEcHN2QI5LyG78xYniWEcR1+jmB5BNvEG+d0R/P0+jhZzla4Q5Zzc6xuwybNbDaBbCcAu+/FYjMAsRfBQWEDrbI7/i/yOwKqsYKCF0a2FoAiRzCpbJbqnCq4+dEo+2e5dbgG32XncZOdk3OXmZVcmKQ60WeoRhFJIj1KwdfJfkQU8crVKfl4GcJdfxECl4ow+wywJPQK4Ly3jaEto9w6KQHYaG6h/mMKTFkJHjIkUhGitfASXn8cgaIpR94kqkPukfP0tBJt5Siv/Hi0Kpx74kI2/wglDqFvJDMtxHUeHkUuPIZ8e5zmOsxQLGjFcfAnC1TZFgQhucxHoH/2SghDH4sY51RnYRHX0GHrc0Oc/+3AuUnj6lUGHu2IcTuOxvAKlI+ZdWyWFSTlvMWOXC/Okh7l9M3Kd3YskvOsMelcZeFdpuaXNr0FoB35OgRqIMD4F0GtwCkS3id4XnXALRbu9ZhIvv/cw+JmBrSfomSQeuHTFvTEobVGAOyC2sLA7ilJmDLnUKLnye3+CvkhIfzh6XJpMoHfUqCxQ5r1iq1twaKQ+vWDTC+55TBrLpBe8yx16hIbimwG/xRuzvonH6oY02vVRWGxiWDpLPBxcpSSSRcTBdUqi/U9Y5+hi0lwuBXSNKAtQh8Nx/AMPfdsi761ojAAAAABJRU5ErkJggg==", "bark_doum_A": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAACTUlEQVR42k1TaXPaQAzdH5eEJNNOKYGUgMHGDg6YwzYQznBfhgQajl6/VtWTnU4/aLSrXWn13tOq49Slt5cKnRc+nee+rPejKu2GFQp6Jdqz34lV/8XhD5x3mnmkOuUsrTs2rTpFWrWL9Novi+86GZo1TBq5Oi1aFk39At8rim26T3zflrXa8Cuouuk98esObfol6lc0uYCz5fOjFIBH4rxpir0NHLmvBtUcmfe3YvbDZyqmP/HrWfFm6pYKyWvS72LkmynKJa7IuLsmi+N5jg1qeVLnZYP+bNr0O2jTiTn4uWqytejXukUHxoj9kT34AW7gP85cif3gXIU2QByCp7lHIPUwrcv++7hGAbe94/NOKSNcLVohFEAKGLbaRqStOyEHSAZ2xOGDrs1r9pw8Y+yzRoF8KxkW4ELKYIwG4wE+WLv0QDp7cGKx5XntmUnhQotfhvblghrWvZyp3dChLTOK10IYvnTxP4zDxGV1yjIT274jqgn0QZmUayRo4um0btvSJuQE1iXDAt4PzPOmJe0P63mRETMCr0Z1ncZcAAFcBh89RxOME9+IEi3xSMBMhGuLxq7BHDB+YIHWwKVHuufiVxJHTItfiP5G8oa5uGGe0mSyz3JcAeOH7dmg9/ukLnq/MkZILJjZjjIHNZkH3H9n47+QkbYhEbAHkcbAi/mfeIa0jkkMoj8QnluSo6BzEH0MENcqpmUvRbnIS1UT3Z/tb5wYfjjk4DEQr6AvZgEXjGidT8RI+3pJdT1BRiIme/AC87iYmQq5KKRu6C8q4k6hwxO3qAAAAABJRU5ErkJggg==", "bark_fever_B": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAACvElEQVR42kVTSU9TURR+vw13gls70hZaplLLJBBMdOOw1xAVQSaHhBiXQts39o2doKLGP2BQEUUwGpef3z0NcXFy33DO+YZzrtZtL6IZTiHy8rBqSThWCm92Y9jbi8FzMgicHOpWGrqekO+mnsTvkw3JPT1ag9YMZ9BulBG6wzj/+lQSKtU4DCMBi89n/Pbr27rEzy9rAuDZaRjVhNRpzegaAncMvpOFzYI6f+4SqUIGrjOI7UdX8GL1Cp6t9GPrcb8AKPSGXyDDUWhevQCf6K6VxflxD+3H0apIMKpJ2MYgI4vAH0HgTeCgNcVQjMfh1UegOXaOVJlkprFNhM2Hl7FNNINIRjVF/RmE9KcVTaLTnMW7g0V0olm0whKZF6C5zjAsIvj1HIxaWiQYegqmQeOo02Fjk++uPUyzJxD5RbTZLPLHoGppIh/sETR4tqIJNhrlex62NYhqJY77t/uwfO+SnDWaa5lJNk8QTE1sCFpALWd0N/RKpDWNfdLs0F3LyJBJQuKiUK8l2Dgpz0qi7+ahKS2dZln0dVvzeNtZpEmzbJAj0v/kXoO4sFJN1T/HykGLPNVgmkVzRJ7jOU8WM3Q4L4nLd3v0H9zpk/eehKSwckx6cLi/gG5bFc3hz/dNkdDwS/h7usXkDCmnJC7kKAaqWElpNyahfejexMmnJ4wV2QHlxz5n3QyLCMTQAkxOp8aJqOUSScoLMyVStY+Ht/BqI4XXW0nsrMews3FVmLS5oY1gkoxKpDokxboex+nnVYnz43X6db3X4H33Btq8Ew2vKPONgnGE6vTH2YhMuEimyWnQxOcrA1ztAbxkKLnaQWuJHizwNhZR50LpXN+azDjL0XLfKcGRnYjJjbRoYJ30bSNFgLIycQnNYJoXg8vDjatVaBQ1qmR1bT0ui2Oqpvxm9EwMXZrLRq2ojH85TukSuEcfqwAAAABJRU5ErkJggg==", "bark_fig_B": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAACtklEQVR42jVTaU9aURR8/7RJk6ZaRNsaFVkEZRPZFwXUalNFBeQBb99YNfqzpnOv8cPhvJB75sydmauY/RysySGebn9h7qTw4l7gZZbFwj2GPY0hsJLwJyUE07Ls3rgIgzPBuASzn4eiPWbRKYVROf6G1mkIS6uF69pvNAtb6FZ+ol3ahq5GoI8iMCcR2M95TB/S8NQPIEX8uKMzOCxvUsbcaGBhniPQ6ljZLazMBjwjDnMcgaPFMO2lYQ9PoT1koHO5ElhxGKMD+GZCUn7zO3gLulja55jrdVYNrs4zKs8QyB7mMb47hjXMQXvMQHH1GOkdSB2W3olk8OK2WR140wpctYxGbpPX20SZ19SfMlDvklD/JakBAaaDPYnsaFFuSmCmN7j9Aq9ksrSaWOhVUs3Igcl9CtYgC+MpLWtMIMU3BYN9OnCEmZ3k/ZuSvrwC2QRkYfSzclDUtHfCwRRum7uyK7XMBpUOy6qT6prCCScWFG/JWhh10s5R/YIEctUCBS/gvhuBT0sV+/kMM60ifXZGRQ7VZQk2FkW1JlE4tMwkQP8mQXeqFLYqv0VXhOrCMn9SkX98hkUoL5zxzSOC8/9pDb2ruGQ349VE97UalLl7AsfYg2ftwzVZehQmg+ObcQQEmLspqctbcIVXr4u108b77BJzsyVLcY0kHv+G0bsJwdJ2mYUoPY/AY2hEgDwyEABrWrumta9+V35/duYgibs/ITzcbkkWMrLjQzTzwvsf6JZ3mMhzae+MQO/zK7rTIqNL2ZVmIYTr1nc08l8xuN+hcNGPzXwsUhPaaKsl9qp0Rrg0pzPiW0RdmVHVdjGMXOwLt23LjZ3qhoy1KNdI8DBd4TlhqzU8o6VFBqwuxeVjysuNYkg8Z3dcgcNEusYRVn4aK8bbJRvx2HQ+PHNwSpCCzIaY/Q907+U8I9nMtwAAAABJRU5ErkJggg==", "bark_doum_B": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAACNUlEQVR42jVTSVviQBDt/+XonHXG68hAVsKiJ0eQJITlc4OQjUT8wTXvVeMh0m2qXr2lYv7+upSPJ1feZ67sZ32pU0/yZ1+KZIjzSAa3P6XEuYhDqRJPmmUg+3mAmkBeHx0xu5knf64v5LDgC1+axJdy4eIeSu/mh1TLkXBIsxrruUl9ffj+Du8Np5XPjhblAKmzkYL0bi7lkIS4j+WIqQQjq3Y9QbOr93zhi6liV2qlNlaQ+vz7ub2X5txccyrOd9cASYc6eY/BB8gybC6TSDWyiHLa9RQAD9IuQzmmobQb3Df30uH/PYCXaSQ7AOTwzOSzAYp8RRzcXkkFCaTHJp5P60hBlIHKiMDkQutprnn750g+H0j/9xWQ6XYEkwILBtPKZQSJvqZBeU02UWaUuYPphn9YTIP4dNlQNR9XU5XTwYsBwI+riVKvYkiOGXWofUbpAKTiJDQWC08nF/FQE6BxjPD08iCnzUhrNE48H0+eGNWu9IHOmMCAIN12avfgvEw0ljVf27FdqMzuBwAC5OqouzVQ2VDyfs6d0z8BSo9opKaTfXsABtyqHIvEGEmXU/p4yYwJyIQY9SG2+XeI024oGKPWFNgqxsGN5OPo7oe66woMNjSabJgI39PYPA4V3DDCEttIQ0iLzfqLAlJU1zGEK6wy4IVd+xDmQ8I7vsTvb4EylM3ceqDbhsIOmtnMVOhDHVvj+UGZ10e7RNRMQwuwKUg9sZpJX5uZEiRQcrsKlSH35D8NdEVbhshupgAAAABJRU5ErkJggg==", "leaves_fever": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAABRklEQVR42mPoPBT8nwEP6Doc/L92g/d/jzRtMC6Y5/K/YpUnmA1WAGJkTLLHawgIgAzpPhLyv+tI8P/Mqfb/c2Y6QgyBmVS1xpOgITC1IBeULXf/D3Z9/hxnhHMIgLJl7nCvZEyx/9+6J+A/A6EwQAcgpxctdIUbxECs7eigYavv/9Q+2/84/Zo724ksgxnSJtqBnVYDDHV0uep1XsSFV8lSN7BCUHTBxPKQAhsUDnDFNeu9/4NiIn+u8/+2vYH/6zb5/E+bAHEFiJ8H9EomMMRhgZY11eE/hn+x4Y4DQRBXQDU3bff7X77C4z9O5+LCMOdmTXPA7feqtV7/G4E2NO3w+1+8yPV/+/6g/5WrIekdFOcM5ILSpZCUBwoXdDmQF0EWEzSkeZc/ONl2HARqAOaXdGA0w1wHjhVQSBPKQNgwKJuDDAIAvaf644MtI5QAAAAASUVORK5CYII=", "leaves_fig": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAABjElEQVR42mWTy0oDQRBF50PyMm9BQogxxMSJk8dIUBBFITsXii4EUXShGxF040IEceXXln1qrKYTB256ksm5dbu6Jorc1ZiVJLntSnNvTfheGeUlfeqremcbqtPvdEnz56GUhzmJ9l9jqU+LUhsXpJGW1IQVyEzMaPLQ8+qft2Rw2ZaID5SZFKUS5zVFdTfvq5sJIJWBEcW9gYGYEK26W5BaUvAmACEM4w2a6d/enQlwY1qSyk5Oyk70B6NV2BvMX4YKH31MZHSzKfF1R3X4nvit0BMUBdf2RUuQv8EghFFy19UEADSXRKRlezBa3AxC2O47i3UVMOJ4q0kGLxnwo1U1mOqhQVY9S/PPgJirlc0AuDbJjrjuVusBsPYAZ6vENIYwwrzqotc5Gbfyf2aGNJXYTWIIj++3VDYTOhdue6xAg6u2yp5hGBl88jXzBia6TQIDTQdvsW6JNBGwVcfEpAau+uyxr1r8zBVElkJfvuPPqaDV6piEMGuYwubDJwiToFUY8TKxb2CaSn9+AcyWoe0i8DkqAAAAAElFTkSuQmCC", "frond": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAABsElEQVR42pVTaU/CQBDl3/nJGM8gQTzDVc4iWJSCXAFBQU7RKAS8I94aNSZGE/1dz+6UFrBB4ybNTGd33r6dN6PTDVilOx90/12hnQU1aevCrfrRAzP5KwXT36BC51D6mEOyZSM/vLsIPmOAP2ccDND6Wlc3PWk9+fG6haxQNMGd0qv7jXcRrc+IFqz2LKBww8MRm6RNsSbfbBFHYY+OI3/pQeXRj9qL0E1W3qesXNuN1KGdkthzHPFJLKwMI9m0IXvuwsDisQLxWQOciSnEGxYYXEN9X6xuRrA4i8jeEtVmIBgXnYA1PKYBYOCB/AyBp0845NoelO+XZRAWFGsyC+/GNLjYhAbgT/n2XoNgzZM9d9LhnwAKffYUTXL9PdQXXC3PSXSNRHkpOEJ1STStdIYVMyepwdTSADF0dguBVOYQqs7DFhmnfyZn5syJrbbcoZUHfz9A5tSB1JGdgjFJWlFShllXckpu4+0ZsiWpcNWnQH9y8daH/JVXDbI+SB1xRNsnVV+Js5Zmdv9tDY0PsQtS7qGz2dFXGSbhxwAxxX5Vo3DNq1SVmNgzpWmJWW/CN7pNOqIPt6SDAAAAAElFTkSuQmCC", "frond_dead": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAByUlEQVR42oVT+TNCURR+/50fGuvYZUkkFTJhCNmTXUSRJZVC9i2UsS8zGD8ZDP6Wzz2X94ZecWbe3HvP/c453znffYKQwN4jLRD33j4l339EWiH8Za8HZjztNkqgl7AZM9250vnnXUK7XzNJoMeNeky2ZfHzw1qd5L9YrIYs6HalVnJeBr4A10EjRs3pOPbocRWs4b6wW4vIvE7O5NRnQJRd7Lo0HLDjLEfUo0N/fQoOZ7U8YHVMhc0J9e/g530z7lZNEGkRYGm4GBsONXZc5eg2KrA1WQb/QKEU+HbYLGdw4jUgMqfjQf4BJSz6pF9f2F2BM38VL/bvIINDRbIE284yzooSnSwYcLNkBA1ZIAfRXh4pga9fyWWbsGTKErg6suHuyk1cfW9Kg3VHKe+fzrEJetgs5qx5WBwsRMiu4ox44DkbXjRGlr66ZFhrFaBW5nvzMdacAZspGcONabCzvYg7mNHKGRFgsCGVX6yPlyLAKk535vDq5PtqJUceSCBnexYcrP+RpjTsT1dI2tMaYGxELCX7KavgZcPzMKo80Xd2en20kqy0huwlXIW4AxQH57EVSADx6ZIdzVb+rz0ZyRjvpzr1VSVM8Al/LlOLfK3OpAAAAABJRU5ErkJggg==", "figs": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAABMklEQVR42mNgGHSgdq7r//r5bv/J0lwz2+X/lF2B/+uAhoAwSKwuxQlMn1nt/f/W9gD8BjcudP/ftNgd7ILqWc5wA0Aav52L+n9nZ+D/C+t98RuS02b9v26e63+Qa2AGnFvr8//8Oh+wZsKuWOQO9gaIrp3j8h/mhU3TnP6DMF7NR3Ns/9cDbW9c6Pa/YYEbmA0zgCA4lG3z/0WDx/8TeXb/Qd4AYZgXNnmagzFeA44DNZ4vcvh/usD+/8EsG7jiDR5m/8+E2P/f5mXxf7WbCX5DVsSY/AdhZDGQxrXupnBMdJq4uS3g/+WNfuAwmGKjC8ZHgGF0AehKojSD4h0UZbB4P5lvBw6jc4UOYK/iNeDsGh9w3IMMAmGQGChszhba/z+Wa/v/DJBN0BXY4h1bGFEMAB7m2Fj2MPI7AAAAAElFTkSuQmCC", "doum_fruit": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAAX0lEQVR42mNgIAAKEmz+M1ACyDJgTZLOf7INeFBv+R9kAMwQZAOQDcZrOzYD0A3GC9p8lDC8gG4wUf5H9wKywcPV/+iuIcn/+MKCpHDA5WSSwgHmZPRYIDkc8AUw1QAAw8mDxYMVEDQAAAAASUVORK5CYII=", "thorns": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAASklEQVR42mNgwALevLj1H4QJiREEIA15Dnqka0QGIANIshGbATZ6Gv9xyRP0P8wLQ8D/2MIB2f/4wglnOCC7YDQdDKl0gMv/uAAAOXqQYFqtBdkAAAAASUVORK5CYII=", "inner_fever": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAABy0lEQVR42j2TaULCQAyF5+IClh1vhCACgihtQRDZF08S870y/ii0aeZtScMt69jX4NGuace4X/QrtnipWNYr3ettWw0Ty3tl2783bN59sPS5ZLtp3baTugUelt7I/89bTSDHWVP3q9fEr+Ld6bNleb8s0Mu8rZoAQFo6IyCnj5bYuc7edJg1BJg5+2ZcFSgH164IQNSGtFuyqzep6AA0nP1l5v8Xl39w2RAcXBXKUIUViAEM/CDrPG9JGmzkQfMCyW4BGxzYTxuqHz+aeoYsIBGpNAIQ/XHd8kIZALByjxUsAvQ9qlrAC2GgIqaPivUoUZ3gsAYJILCjejupSWHgkA77A82EGUdLE2MTa78IknGSB2BYDXF8BEdgBKqxOSv3yIwZxZEzIQCUAZJ3LpXDMETvheym7DAFsqFGHvgnRM5qD2jkJXnQiIW4QNF3oSbRParI53+ROLQcVHRgM67J0m/+JBbUxOnk94VivU8ORH5BaPcMAGBRWCACRRnNSwVazJ1+7EZlgdmSJs18NPgifexwEGWwsifZfQLajWGivoBXCowLVu5Bh6n4YGqqYyF+SACiSBZigWaWhbAIlFGRhWppR8rog5mpQQTwHweyHCf++Fi9AAAAAElFTkSuQmCC", "inner_fig": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAABx0lEQVR42jWTaV7CUAzE3/1PIKDsi+dQQQEBhbKLlB1PEfOf9n3oL319mcxkkoZ0XLeDP8dJw7b9sq0/nmz+VlS8Jm1LXgs6zz3OXh6Us/AzceM5gYT9qGY/g4odvxr2t3jWmQjo97OqIjcvRiHel92SpZ5z/m5a2A0rYifGjzDthlU7T5u2fn8UCJVEzpdpy+7zjqIKLLpFXQCOLCs/k3T2pE3/yZa9kq16GTN3YCAKyI5AFXEAzIdJXapoBcDJ806eh2fkACY/pOOa3ZyJ5zprCwTbZdYSGDUowRd8kCcO5p2CgQtMQR4FuCCijIgyXJcHDkQB8vdeSFOAhaoYgkzkoirJJ4DBtMM9xQEhPxqvMSIZmbekI2ZmDCCaiYo03xUZ6ooZOzHwkZdTvgMwwET1OBH84S4uFvmoIi9kzG1VRBp9Il29e6+YGVuiOBNDMQXwJWAQRWISF7Cp334GuOcTgjmuO1GbCBOMt3yzAAHQ+LxQ3MTtoJz/F4VsFxzM5DRG+t2Pqpqrkr16fIcARShDLW3SLiogDvTDCyYSNVLvGyCm0YpkuxLI8IGHIpAG1pIfB9mMMM6fBxBTgi3+oVcvLgPzVf8HZY1IScI026UAAAAASUVORK5CYII=", "grass": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAABxklEQVR42lWTyVYCQQxF69MYu5mOnwLI1MwCCzfiDCKioogLvzLWTXU4uqhT1VV5Ly/Ja3f5cyYXnxUZbGPprYvSfshL6y4nnceCnN/mpHGdleZNzq+stO/zuoYvsUzeyzL/qorjMH4rSf85kv42kt5TUcGQAYKEc3dV0GXkkMwOFXH9TaQBLB4JIoB94IPYh7vYK4z0HoXddUG/Seg6qyCVwMbSZ9QMeSVE2exQldGupMF8J5uiquUdEme1QUKt9WVG6wYEYPFdk/kxkIxewx0KUNL0cc5q1ab57BDxaBKnHxUtZex7RSn0KPFldz2u4+NcKwUl/gEC2OkLMiGhWQBJQGncUzaltLxyByOLrAQZmCwBVJBTjAckadMBc+eYPyDrtoEJrl9lAol6I68gG3EopRh6gHwbpXnCVFEe0tt/wABJoiXYCCGh5um+rAQY7OQHepF6AQIrDVJnzoKVji+ONQVzhojxmXUHqVPZk9SxStBVU8TqbeZuBJhIz14VY5zs/9ueEh0fyOQRAhaGAWwgFAzScaJU/411mI6zem0HbNK1B6nrbJxJaqTgk1gcGfmdyWIzNlUAsbX+4r5h3DFygPQB3C/tW1KIbIG39QAAAABJRU5ErkJggg==", "silt": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAABtElEQVR42k2T6VbCQAyF5305soMgPIEeBQVlLwVk33zDmC+dVH+kmU6Tm3uTNBxnLTlMH+Wkfj9uymnekt24Ied5W/aTpvlr8iSXxZNsPmtqdYs7ag4+bEcN+f6qi3su8ZdFW8EyEAtWT6HlR8XOO43DB5A5YOth1aqsBpkH9LbsyCXJYkjmPlW/0li+Bej9rLr5BwIBQJrLgA3JFEjey+YxGIV72pUrVZQJ1NG41CDOLsHABxVZ9EoyfinY2ftmEqCSa9RkqJ+1Kh6tMMkaWJP5W1EW/ZKx5D7woPM0DwCSAMNDHXmc+UbSf4Nl4EGXASGQntyipHvaESTyTgzVp68P1gfY2BSg7POmcTdNcgCM/ricmQKMngvmYUAvAhrXimZNm/1J4Z53wPDroervFdVKNhHMJCT9cr4HG+TMMikk5QAqzzVD3w0ZIY1IeBK3cZSwoIkmQ/tymGQTYpSAURgfQOESAGj76AxEkwDyheIf8R3BkBWyQzXvAXQPcSqn2NRTlEUMVX3M1gMuAPBFshVW6lQz6rYb9ZiU+VVcY5PgSRhJTg/66N/FX5d+UIgz4/P9+QUIRLHjEgyQ7gAAAABJRU5ErkJggg==", "water": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAABeUlEQVR42k2Ty3LCMAxF/WstNASWJTgk0M60lHcf/79yfa4lk4XGsixdyVdS6M8vafM1T91hljbHeYqnuU7u5W0mQY/ZPt4W0vWW74GAIRtxiqfHA87Y1p/Pku2lkezurfz77DtcFymMt1YP00CACKaK9aEEE8S5/1mm/ffSqmhS2J4NORtBRCizgmR52FtV8Pa7EhBxAQUjiCCjI9trUzkhmPf3v5UqAYCExAoA0VdyUHEuVfFPqnEAbNwRTxKcnPHeVpK8VA9yjgBCp6qd+Qc3II+sJRhQuOAcro10iEUcLERrB7KxPntWbKWihchUa7OQxH0rQG+sqwPHQhxV6RuZkzgdLtMBD6WnjQjxDD5cXoX3vLPB6m3g9AVNlmXDoLG1EqcAGncbri4P12DdCIO1aTQgD/SsItmnM58+2pVEXwwfnM6WJ5oO+zh6oO9FtET1C+5IVgBx5Fvsgu9EeWvqQA36gs2+MytnC6aS14+nuuLiaNJqtvEfOWADTZecep0AAAAASUVORK5CYII="};
+const DATA = {"bark_fig_A_0": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAChklEQVR42jVT6U4aURi9z96kSU1rTK2oICiICiguVK3VahGQbRiGnUERwa02bZOmT3B6zlV/3Ny52/edbUz9NIjK0TzK+x/hHs3B+x5C38ng0v0M7ywE52QB7rcgWudhXJZX8aOTxsRLYMDvBu+aytd5fixBsy528iv24bCyhsbZkl23sksYFGO4a6Tw0NpCl3v9iygK+7MwtZNFXgjDOw1hUk/gob3FQ14oRHFZitvi7fMIv1cxKMWIIo5OLsL9MMpEbrr5Zdu9W1i20IbVNTyyi+axu4FeYQVNNlCRBpGps5pqNInMCG6T1dT9vrmJcW0DN26CY4NF4qim3qGa5GCT4sEnW8zl405uGTVSNj3ycbghga4qcXLcxFNnGz45i4Jg63Kfa2lUPgzAOaawJ0EWXYApHs6hzgNBvudjzSOiUBHpMfGSFs1dI2lF1XmXtDy6V/4yRxeOArQoYruPCX1UW8c91X5spy0a0XqiddJjUk9aTaTHM6ooTCsXtps+F9esrvGsRwq//F38GWTsw1si+Ts8wG9/D9fOum0kA8xpaspy61/E7BASWfizt4MrWvbqxp2XQuVgFt1sCN5xAPndaZxvf4CRFbInF30DJzllQzJUEdrVt8hiloZCNGAWRuwuBLqnjBhF9Kq6itL6W7QZELnR5IGslQMq1M5G4HO+dtbsuSgrWBLX5HemLZxs+j1VDUCiyiYFRYmUJoryDTmrmIS+JR3RKvH/MYLSoRh61H2BrGgLrpQWGiHrvZypgIbe1Y4XYdpKFLuV2VmXXfr7apHNPL3vUVQFTkX/jQ6tO8qFT4omtzdjfwq/FLWPFFN1E9zeS2BUWJaJd50OCLpoFzMz+A+d1zVYLUfibwAAAABJRU5ErkJggg==", "bark_fig_A_1": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAACM0lEQVR42k2T6W4aQRCE993MbcCOItmAwYDByMoDJEqU4x2ihHAt97UOOLJlKY/Xqa93kfJjNDvb09VV1T3B413JVo2CRe2irW8LNq1lbXqTtU2zYI93RcXyttRa3cb7opGzRT1vG91d61+wa53bb4E89y4tahUdIKxmjP+AsgNGgu9N3e+ULBL48/2FBaP2uU31YyqQsJaxYSUdM7nJOQBJsAgFPKpkbFRN20TJm4c3Fr17a0EoutCCdvS+aU8f285iLDCnrUVsovNYySMV+F7PWp//Khygi4qARB+aupTxZM57ZKjaVrQH12n7cXVmv65SWmc2r+diD/iYqCLGwIB1/NS2v996iRRVFyjfgHAeVlIOgMxgIQYAIOXlc8cpLhQc19LOZpnEXZbOeALYqJrxFQyERsIkuRxLYs/5mgl4KykH6X3qlu1V5v25LzsTpAUYhcMroZKM87TV50LVoLvsXdhY3Zp1irZU62YCgwkgAZVhsGVwOnHisVNW5ZzrPLFD4kEM9oofFF97QXnwU44OrlPeIqjCCAbrJlOXd2ZUY6B2GjTip3szgQdDJfYFEiato+JcO5M3V9XYsLTHkArYUncYf+LOoK/e+oVkhHkf3qb/3gVniizds3hWAHQP0Ou9Th4Q571MQzddIHnbik17/dr1aT155I8JTSQfZRKaCdIikukMZ97DTga+fLlzv3wSaWPIk1Wbturv5uEyNqoRd2SmmYcJYBQiCfPYae20W7J/rv5J37YpAfcAAAAASUVORK5CYII=", "bark_fig_A_2": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAACV0lEQVR42j1Ta2+iUBTk//+bTZOm9pG0u1lt1SriExAQBBXFFz6rxtkzx7gfbrjcy8yZM2cwJmEd+bSH6z7CceUBpzHwk+CcD7Act7BOO/hZexj537KqCO1PzJOm3LWxGLVgrNMuDou+kuwXruxdnPIAOMTYzR3Mhg1595U8lWKJkBCTeBXdG6tJW9n5JOth6SGLGwqmgl3mAMcE+7mL47KvVdPQxFbO+Y2RxRZyYRwHNcT9CiKnrM982lX5bOe09rERhWyPCteTDvJZDxtZBqvGIifqlzF0y0gHNWwyWy5tbeW6i7QdnEbAfqhk580Al+1ASQ1uuEh03gSqZiIk3F93oUi1gbMYexhqCxcB5+M6Ur+oCg3z7y/Y1QLs7yd45itWcnjdRjKFABcBUcFBgKxGswmi4cdVH83SAwyOhT3TyKjzjvbXI/rmy//FyvSBY+aeJDSaGLf1Rwh6JTFQwM6XGjkbWupulljqOFuj7JUYd58MJzaXe+IMztO2PiQgJQ3INDL1yd4vm1D7pmxmhFngOUmYD79ThHFP11iMY2+pJvM2QhrKXhmk/cLRsZGEyUy86k3BZFDX8bnmM2yzoIdB76aGo2ROWPVOzLaoksV4Z1AKL4PWGzLZO/VnxPZvLISAdyMh5IccLf3Y0x9JKt+3meSArJRGk5jxsPuuwGnUUACnw3emjyGaSowJptn0xfCtV7Q+H+DUCvCtN7j1F3UZx1g86GnuVaVXFGUfUr2pxeaiqlt5vLVAiQzLVpRctqFW7lWfhOxZfxrOnlXpFf9A+sOfi9h/30OmgH5SAm8AAAAASUVORK5CYII=", "bark_fig_A_3": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAACaUlEQVR42jVT2VIaURS8H56XvCQPSapMpdwxAm4salLRqkhwA3EZGGYYGAQElcUlyU90ug/hYWqYc+k+3X3Odd3LFJrna7itJDEOs3xyeGrkEJ0l4B8vwyssoH2xjsbpKlrlr7j5uYD68Qo6/L++3biRwSTKoXeVwnOUN4JRkMGjv23A+9oWar+WUC0swi8u27tNcL+6hbhCgvPcexRW3qCUfgv/aB7R8RLa5XX0bzZx9WMOpb2PJE8bWXCyglaJKg4/o7z/CQHVuf7NBq6235mcqdQEHus76F2nEdGarKj+QEWqd6hUCruXabPtorOp/2ZpDR3mIXkNgqRA2cQkjtnVat4Gfsd7eG7mzZrUuIBBqYOeFkn63iYivkOFJlISSs2Anru08kKwVHdZkyUnSequD6Wut1QETLp3nTJLIho3shiQ/G/nmymYKXZ+cZqwgNWjRY5p3qQr8TvloAxIaBOhikd/B3/a+waOGbarFaYgSda4vKMFhpdAlb9Vk/zbSgoT7QfHPKxnjGAUZmw6rvk/aS2KALPuCqjj5dH1dnFHz2FxEdcHc3ht7ZqVgbdlwTqlLDkieahtUzYDYi4KTRIFViedqYHO7WF9SDtOYB2OgqyF89ras42UV40qPFk1ApFq3LIbM4+4nDScu69u2vq+cL7y9iKJrGlZ1Gm2C7oDUqCww9NpsHYXhoHuQta6aNOUtAgEnqUfEqSxVQ6/wGe498F3jJsH002UD/1pwhuoLdONVOLtiySzSUJjluTGmW7julnSiotIi+W0KOrW4aiemMEl74Wf/2A7L4Iez2ZTEmi22iFrGvs/Cjo4JDkg5zUAAAAASUVORK5CYII=", "bark_doum_A": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAACh0lEQVR42jVTaVMaQRTcPxO0VC5NSk65EcEIKiogIiywoJWqBFTwAAMemORPd7qH8tOwzLz3+npWLbmOwck22nkf3jtJ/Ch+Q+/7Jl7bCUwaUZRCLt4HYO96Ma6G0NnzYnIRxWXWg4daGNagvI2j8ApG1TCmlzvoH2yhzwbzVgxqPqqEcBh2YdFLYcrCzp6PZwR2zotaYh1Wa9djOpcjq/h3lcUbJ8/tGJpZNxbdJO7OgniqR0yTDyeFZw753YyhGPxiTksdBa+d8+Ei7caDHhO2KIwrQUJ1o8033YKf9xtEGsI5kd2ehUxjq0vuTt6Px/OI+aMcXTHF08YOHvk9JH/xdfb9hvsRkbxSK+n0xBqDQMLYRKBp9xRGmoiKfoui3rTIuZFx444IGhkPz7AZaqm7BGmkl5ydwiY6RCWYMwqpQoffavrRSxsqL3Ycx9Rs0U3B+kkXDijIL1opMW1OFC1ZVImvYXgaMM3e+XjWjOOFyGatOAf56cIarEN21iOhGFE0TWzteo19aiLhBuUA1Y/h1U7guvjV5EVW6711S5uk+g3PeyKYULg2m6i4Sp9vzgKopzbM/XJ6zNgsBPUUc6BwdClSJb6Ot07CKC3bqoT3won3Jn0+lIIu/LnKmMlySAmdUwvLKSw97uaXHYenQQpEwZwkHqiyRBatzxwsXaAbpPjEYZamS3VBmjFZKlZIREGiyuuOCZLPpFCJ/NtP45kohN5q5TzoMSRTLk6dVo5rIdNkTqUFX9OFQvfKyZiNz4X0RJpxmZomBx4mcBVvtEqJuy5uGToL0pCgn7sgK/v7m6QWxjHd07fZRi2GOEnlBRfmmhspBOKqiSUWi440kd0SWhS1jf8BWNryTR+3O44AAAAASUVORK5CYII=", "bark_fig_B_0": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAACbklEQVR42jVT2W7aUBC939uHVoWwmS0sTRtVqvLep1ZqIWSBAAlLDGY3AQIGEkhU5aU/Mj1nXB6ufG3PzFlmxixuE7JspGTXzQrvm/tjWTVT8tLL6f3P8ES/P94l9X1ai+v/+V1CHqpxMZObmHitFF4seahZSMzLpn2Me1zveycvj42k/lvpMy6zelyeOhmZ1xNinuyMPAN95+TkbfJZ3sYnikRGr4NPGrgCQ54FWJDJpBKVKYAXYGG2KGD/+iidAk4xIA6e/dKR9HCcYlAq399J+3dA3GpM3EpMWoid1RLKaudkxcyhbw/0505WkYlIZK+dVqrujSXd85AMr6PSRrKDwsPrCJgkfAnTqq/ba0F32xK3aUFSRshshEAa5cETGuki1gV1+jYuRxXQUNcI1VlojCcZrYE+KkdwotL48V6aPz+orNltXAaXYe0a2fVKYTF9fGDVDvR2CkGl1z0HzauISnvt5xVp2fDbuG6l1UgWsOGNYaJdCMjgKiz9yxDoWYpCfWRCoxadpHTLR4pMjxhLeeNyTAwdnje/yMb5pi7TMLvoM+HAUOILWKzhg9dMiz83vsT+BSQsm0kUOFUPehdIhgwyYI8P80DKNHGFRJrKIpSwuc+I2cBtTh6D2esBtKsvYMMWMljHHWwOXvBskfx3eirGxVTNkdgrBbU6zXPAxCmFlCa74v1H5rRygGjurpsT5poNjKJO9pXtdNABmqkzj7O1uVwYKl067AKoswBZcX4MK9Is6mTfyWAC+vxGZL9IBu5n1Uj6oNvIQthYwxlgb5f2V9mPzrR1h6WhbgIQbVb3Td0DddXyi3OZ/gGK/vqceLmtpAAAAABJRU5ErkJggg==", "bark_fig_B_1": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAACLUlEQVR42kWT/XLSUBDF85rO1BkavgIEqKhv4jhO/apAAgkJJIEm0FK1OuNrrfvb2+ofOzfJ3nP27NmNdziOZVsNhHOddSXd9mW3H8rxPJWqGcn3XzN5eHwt55+vpLmfyL4JpdFccz+VvByIt2/GUtah3J4cASfRnCfy4/cbOT1cGdC+300MVB1Dw1DIKw5DVTCUrOjLZteX8nakRD3J0p7ES1/mNy197soq7hgZJAAJsF6sySQHGJo82uHSqb6SuppqrieFXoac6ki39lTBYuWLt9p0ZR77yqjSlOCunkm1G5uKdOtiuW4rcaAqAytCbHaB4YwgTjuS5k4+ScDRumNAl+tZi6ijOvdowUxEUnEYWbJW6SQzTWRlIIu4LTfLyyeFQ/VgKvc6jcc/b3UyM+cB5qSJmhR11LS2yfwWXZqKL/OWErRkHvn/5Je7geRZIFWhRurpYVD5pAC5z7HaKLH2GWuLjNdNy6ksVGWto61VvYd85FEhStq2SJwfry/k+sOFvH/3Qj5/einRwrf2cH+7/0/m5QrEDMYJkJOg9zqfyj4JzQM3xsAW6nkSvHsYgzwq8wHnAX9dtKRch+YH84aAhYuSjinGIyNwi+NY2QWI5uo+BBBBuFAFBM/kWTrGD6mtMj8SHrAcBBXZTgCJEfoGoHquBWmZVowAIEuCJLfWPVOSFe4i02AKyMfAqh7ZOzm+eVvbqMB8gICWqOb23o2MZStrN2qecR8cq/8XL9vE0PXOqCQAAAAASUVORK5CYII=", "bark_fig_B_2": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAChElEQVR42j1TaVMaQRCd//8fjGWlTGHECoo3CCIiSkSEFeRYlmuXa7lFiMbUS7+2kg9Tuzvb/fodM6ZXO8OodYF8chOF5Baa+SAK11uo53b0+z6+gUH9HOPmBTrPxxjYEYylfu5eyn4EZtq5xGqYwmqQwqQVw7KfRM8+h9+IakOreAi3fCwAMfk+0qaRgM29BPpSZ4ZOFJN2TFBj/yet/RuMGhdwCvvoSHM9vy+gZ+hWT7WJdXxvl45gipldtOSF0ymHk8mIU4uZ77DudtCwDuBY+9o8bccxbcVlQBSln0GYh+Q2nu+DOm0mct7Ht/glDGyZWkgHUHnYQ51MhL7fiMCrnMjkQ2VWuAnAWLcB3aAEvxqC/fANa/GDU1ncFA/sfEgpE4Ts+ipH/llhmGYxrK6ywM5uY9lLKlWaRK0TocwGr3yii1IpY9SMgv4ZTl50r3SDBlJKQ5DnIod+8J8vhZRGY9fCgE8OnLsJSUFiWUoR4xrIZDrLmFaDawwF4FVixcu9Nvqy79dC6D3vYeBENC1DJBaRCZ11RDtB1n4Kb6M0sMwBv5+wEEmMks9V/1rZvcrTdMUoaiRN6nZFJ0Hfxmk4chq9khibDaDLEysyXTlczafwJ2PxyFAv82/LRp9Fos+Xwm4pCK8YVO0z99MPng2ncKCx1x5DqEk6hpSJxIjeRrd4l/UxvYP7tKsU/8wymopXOUUt90MBbGkm85bErx5w0bCFdwXejVknrneDC4ss8JpDWwZUBcBKbcC6+aL3hHINT1Sv+nmECfDvYk0FpHy3LcVf8Xi1qSwptZLdw1DemR4lmX79TKfS7Y9JRjVzvQjYRPYX3YR64JaPlDobCcakCPgXobd8rO6+UUwAAAAASUVORK5CYII=", "bark_fig_B_3": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAACaklEQVR42jVTWU/bYBD8/m3fqpADh8QOhKOVKrVvlXjuDeFOCQkmTpyL3CEB1ELFb5nOrNuHlT/7252dnR273kkezYMsJpdFPHQ+4GX0EWOe+6d5dI893mXQ4v3gbAN9xuzS5zOPUbWIHnPcgC/RYRYCeop38aezh0W9hM7xukW7kiPQOpM9dE88DFg0rfkGrjs3uihgVgswON/AE4vvb8r43d5hUmCF7cMcGl/XCOZh/NNnFA1AzyFrXfg9ze4epqT2wOKX/lsy2UsAyEosrj6n0DnKkX6AFXMWVyXEfJ8QxE1YKHpCFHWFGM1qvs0oFqLbIpNluGUMf7V28BjtmE6uS6Rb0n/uvsGKCU+dXTwzdDk8LyD8lrazRvnfYGDAWYRfUnDtwwxiiqgQzf4JBWPXRaOEiOqrMPqRwbjqo1XROY36p9e8S1uNm3OeYaOAm9OMrecx2uZsvlHVWOougfVNTOvsKmCJqtU6Kdk8y2B2FZgXRtWCJdpmCKh7adHkKEf7r8jSI8ia5czrAZzN1diExFTx8KJoyFJa3/QuZq2DHIY0T0RjNSprqFdStjl3Kx+E77BqvSfVxJW6ECONcU9h5zxrrWrQpk69mofbiw2yoA+W11tGd0z0uJKsLD5a5+yeuVPdjS5BtCWFDHVH1rKzS7qUbc+aWd7X6mRbrfH+ZgvL602s2EhNHptlLFm8DBn85mRLbUIAChUqlCyRRFv0pcVDc9u2JENN6UpzoiwppUVdlCVgAlBATD9M/nn+jmLPa4ExkuXn9URkp1mnXN/SZiqY07TzkSmetX9BP5MaSDjNrrGlm6z8F/8P89eLS67BAAAAAElFTkSuQmCC", "bark_doum_B": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAACVUlEQVR42kVTaVMaURB8/y1RRK3SgAJBbpZr5YblVBGQa5FDKVMxf3bSPYvJh6nZmTdvdrqnn3l9vJfdqCKHaV32z1VhTL8e2vqt/sFGriLbp3tZ9QviDkqyxx0XZ2bZK8h6UMRBUbrFqPqXdlZc+GkrI5NmRhbdAnKWjGoJmcE3MjfI5bXesFuvFNWEi0ZsyAazTk7msPWwpE1pjOlZy0kWvbyYQTkmqeCZZG7PJfHjVNI3Z9LOhyUFb4UuJBM6x5lfWrkIcn7Jhi8khZj5Ie6aw7Qhv+Ztxb19Ksv7pCZv46rGu1EV3zXZAf8b87DPlSO/F6hHnvfMGgRtQBbH8swbnRx0ij+VsBWgkTT+YAN7qCb+kWt4mQf/sRaUPHJAI4GvKOZ53455DfveFvaY0BCfFbkUK3ypuNu5sCSCPnDhByc+iYMXcsKY5/HAqWSBv2ffKSfmj9uVz6Wje/6YNeQwqXujHifbPJZ11M1RL+SINeSG2jFKGggjzhVW6BQiygX3rut0LI0ngDVtHWNCQ+07mhh24p96dlTGzbQWLY+ETppZ5WTesWSOi+SGNV3oRgUIXkwSuJLATA3U00GJXZ1AFz7JcOfQBtVGbSQDPrXY9YlUUgH9tqAJ8zFrYQJvRbuRtw3idQe2jrglbnjvfZRUraz7OjPDMvSNEYmNRsY56hT4qYN2PqKMUxujWlLGjZQ811PKl0Igli9tE7/3gNJolpNmLoSLebWX4yMiTKcQ1ho2NcRPHhz8SXeNd8HdM8+NxIE5AbzUwN3VN21CHmLX35W3v2eYTxtWPW0gAAAAAElFTkSuQmCC", "leaves_fig_0": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAACGUlEQVR42k2Ta0vUURDGz5dx7y+tXNPWyhSh9AOs173+99JFM98GhogKSsuq6yVW8VZ2IaILZUXQSxGCPtB4fsOO7MJw9nDmeWaeZ+bvJkthKTyJSW2vRxonKWl+uC3l2bg4/xsvhuX0x4CsH/bqnd9yIyn1g145/tqvpxvNh6T0NC4v1q5rlGcTMuFJg5m4gn//G9bzz/8RefdzUNLZDslWowpWgrFCSILpuNAJFQuPY1qN+1Q5omDi5Ns9mQjCkqlErrojHCz8IWFlKynF6ZhKMBmAeDu7eKAnndFx3hfSYmhpT8CD1d1ulQIBXZDMG/F8pVNyD6NaSCWYFksATGR90tbrlCxtdMnh57tqMuDlzaQS00m+JdcV/RTSuZBU5hIKwOn8o6j+JwBX/Ru+mCwIbDIOTZyVZwkFm1E5TxL4NwBIQfOUf+MdGZmqz2MH6ABG2uZEH2Tmgf23O6FTCMItCR7AOGGEIJ3rUKfH/I5Q9ehLv7z/NSjbb1Iqhc7oivDzjuhiaCd+H+jm098hNRLTAH8/v68nBAu1G1d3sK5xfEsW613Kij6MZJSAuUNIMgGYsPukl+IAE9nWbBmNOUxn7R0gDQPxxCbiSn7jMKV9Epx8I8iiM6tIkZfNHplfvab5dOjsa6QazqKLEWEQuwARhOTwDpgits46Fpvz27MBNRAPDMhk2FA+ach3Tvt0V/Y/3pG1VzflEtyL/kNcqNJ5AAAAAElFTkSuQmCC", "leaves_fig_1": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAACDElEQVR42k2TW09TQRRGz0+B3t6A0mJbwiVCW6AUX0BACpSCXALKJSBIuSiaCAoC0UQThYQHXv2P21nf6QAn2ZlzZmbty7f3CV5/aLfFjylb+pS2+cOkVd+3WWEiYvnxiPWNNtlILWFB4ym+itrQTEznw9W4wQbAW9c5OQEG9Je5ODAVtRcLiQdH5bmE7rAX+A1grOS8swfISrTiZMQGK1Gd9b9sVlY+AM71wsaAW7XpbLASs+O7Xtu6ylllp8WWTtJafSmcj8wnVEbgU+sfa7bSbBiFQ2AuYMDY0HTsITr35A0HpJcfDzfK7pv6SNUDy05g7PC21za+Z231S8ejuHu/u2zt9Jkd3PTY+nlGZWxe5pzCKfMB0CLvdPFw7SCpVSUAY8AYqQFj5bm4NOlz5Q3PxuUQ+OT+uW3/6Ayzxjsp7//plhUbIvpO4LDU6IbKdY6AcYRugdKgC/TbiQeAgLTVtxSHK5/TNvOuVU4Aab9aCujT5CIZnf0rWN1lQ2T2EBYYA1T/n8xLQGT1t6E6MBGr+2325mvGavWkhgmAUgqT4ShralEXsYDpP+/AOz87tQL78UYrWksH5IgMno4nD8ouHLULxup/u90kpqyyHU4i8O6vLjnRMFGPps/VSQbAGxdZrcAYMEZExhoYo6yAXzJPFk7Et98y+qWBMTKjVnVnLMyUkUZ0uM3LrP0HY6mv6yuGN9kAAAAASUVORK5CYII=", "leaves_fig_2": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAB2UlEQVR42k2TWU/DQAyE8z8obXmjTbtJKacQFEqPcAukIh64JMSNEKcEPAD/3Ow3zRYiWXvEY4/H3ijplWzlLJaxX79vWO86kSW9skX+k89pbNltqrWyNGYbDw1ZVG8XLemWrHvlbPmoYrXVcYtXxq176QTefJyyNCvrDBhz3j9uFcx1ivKJ6mtFgTHOOG+/NA3w4Gtea/8msd23Ga1pv2y1dg6uLheMANBcO6/Z4uGkDb4XbOupqayAMVgCxsAI61lE1BPl3977rGV3qcCYqPpyKIsk0sPfsVJW7O9HDDgAxmptD/AUyQBdAASq+5rxReCQVJFgQSDKAOhyR9cp6V8jm7Cd12kPdAIP98mfiHyVpYLaBgj6nYu6qAcGQ7ATaNRmyiErju1cQPaAYRI0CT4o38jKCqJOoAFRoAuYTPxEg+3n5j9NihKTPcICJqgTg6BqTpUP8MHPgoL0bxNrnVQFDozC7IhBOIR2MUyDryEYA0w2/AIjhEeD1nHVRplpI4qzhjmgMwRWWf5eXfLJGDDACqAfeRl7H7P+MaXqBPURQJbPQ9IfvgmYsWoIEYws0AIcqHHvcoHDIGGAAMv8A4x4xtTFSpb9z7nRkwYMgOAE4SWGcQbMc/4F7wSDnYfUotwAAAAASUVORK5CYII=", "sprig_fig": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAABCUlEQVR42s3RXUsCQRTG8f06lpYusqYQSPkafoNCNF8qXBcRvfJCL7rIiDD0+678j55xBizYuw4cmDkzz293Wc87VjPMxbWndFx/u451Vn25ktl0U5TZ9Kco+/7SN3dM2AZowjZA2AYchA1AZZBxgeEBmHzfSHi+K8m+McqeANU4AKDl9YcuQNgGaAfQw4fId4DoqyBzzlsT39wxAGXrHCpCWAHC9PgzkPPByneBcvtCLt49n95i9BEIUO5cmjDNPQCDEL7vZQxAE6aZAdAKkHEAwr8B+t3hOnD/vV0KsFaAtX63An8i54rw63tegO4imxy4fUwJMNuWBKAThWmeDqBIYoC1At6/rD0EbR2hpmDxegAAAABJRU5ErkJggg==", "grass": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAABxklEQVR42lWTyVYCQQxF69MYu5mOnwLI1MwCCzfiDCKioogLvzLWTXU4uqhT1VV5Ly/Ja3f5cyYXnxUZbGPprYvSfshL6y4nnceCnN/mpHGdleZNzq+stO/zuoYvsUzeyzL/qorjMH4rSf85kv42kt5TUcGQAYKEc3dV0GXkkMwOFXH9TaQBLB4JIoB94IPYh7vYK4z0HoXddUG/Seg6qyCVwMbSZ9QMeSVE2exQldGupMF8J5uiquUdEme1QUKt9WVG6wYEYPFdk/kxkIxewx0KUNL0cc5q1ab57BDxaBKnHxUtZex7RSn0KPFldz2u4+NcKwUl/gEC2OkLMiGhWQBJQGncUzaltLxyByOLrAQZmCwBVJBTjAckadMBc+eYPyDrtoEJrl9lAol6I68gG3EopRh6gHwbpXnCVFEe0tt/wABJoiXYCCGh5um+rAQY7OQHepF6AQIrDVJnzoKVji+ONQVzhojxmXUHqVPZk9SxStBVU8TqbeZuBJhIz14VY5zs/9ueEh0fyOQRAhaGAWwgFAzScaJU/411mI6zem0HbNK1B6nrbJxJaqTgk1gcGfmdyWIzNlUAsbX+4r5h3DFygPQB3C/tW1KIbIG39QAAAABJRU5ErkJggg==", "silt": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAABtElEQVR42k2T6VbCQAyF5305soMgPIEeBQVlLwVk33zDmC+dVH+kmU6Tm3uTNBxnLTlMH+Wkfj9uymnekt24Ied5W/aTpvlr8iSXxZNsPmtqdYs7ag4+bEcN+f6qi3su8ZdFW8EyEAtWT6HlR8XOO43DB5A5YOth1aqsBpkH9LbsyCXJYkjmPlW/0li+Bej9rLr5BwIBQJrLgA3JFEjey+YxGIV72pUrVZQJ1NG41CDOLsHABxVZ9EoyfinY2ftmEqCSa9RkqJ+1Kh6tMMkaWJP5W1EW/ZKx5D7woPM0DwCSAMNDHXmc+UbSf4Nl4EGXASGQntyipHvaESTyTgzVp68P1gfY2BSg7POmcTdNcgCM/ricmQKMngvmYUAvAhrXimZNm/1J4Z53wPDroervFdVKNhHMJCT9cr4HG+TMMikk5QAqzzVD3w0ZIY1IeBK3cZSwoIkmQ/tymGQTYpSAURgfQOESAGj76AxEkwDyheIf8R3BkBWyQzXvAXQPcSqn2NRTlEUMVX3M1gMuAPBFshVW6lQz6rYb9ZiU+VVcY5PgSRhJTg/66N/FX5d+UIgz4/P9+QUIRLHjEgyQ7gAAAABJRU5ErkJggg==", "water": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAABeUlEQVR42k2Ty3LCMAxF/WstNASWJTgk0M60lHcf/79yfa4lk4XGsixdyVdS6M8vafM1T91hljbHeYqnuU7u5W0mQY/ZPt4W0vWW74GAIRtxiqfHA87Y1p/Pku2lkezurfz77DtcFymMt1YP00CACKaK9aEEE8S5/1mm/ffSqmhS2J4NORtBRCizgmR52FtV8Pa7EhBxAQUjiCCjI9trUzkhmPf3v5UqAYCExAoA0VdyUHEuVfFPqnEAbNwRTxKcnPHeVpK8VA9yjgBCp6qd+Qc3II+sJRhQuOAcro10iEUcLERrB7KxPntWbKWihchUa7OQxH0rQG+sqwPHQhxV6RuZkzgdLtMBD6WnjQjxDD5cXoX3vLPB6m3g9AVNlmXDoLG1EqcAGncbri4P12DdCIO1aTQgD/SsItmnM58+2pVEXwwfnM6WJ5oO+zh6oO9FtET1C+5IVgBx5Fvsgu9EeWvqQA36gs2+MytnC6aS14+nuuLiaNJqtvEfOWADTZecep0AAAAASUVORK5CYII="};
 
 // ================= Choices =================
 const KINDS = [
-  { id: "fever", swatch: "#b9bc54", name: "Fever tree", text: "Tall and airy, lime yellow-green trunk and limbs, thin flat layers of leaves. In groves by the water." },
-  { id: "fig", swatch: "#3f6a34", name: "Sycamore fig", text: "A short, thick, buttressed trunk, a huge dark dense crown, figs straight out of the bark. Rare." },
-  { id: "doum", swatch: "#8a9a6a", name: "Doum palm", text: "A palm that forks into a Y again and again, a fan of stiff fronds on every tip. Here and there." },
-  { id: "bank", swatch: "#58684a", name: "Riverbank: all three, spaced", text: "A stretch of floodplain with a fever grove, palms and one fig, to judge the spacing (open grass for the wildlife)." },
+  { id: "fig", swatch: "#7f9a3c", name: "Sycamore fig", text: "A thick mottled trunk on flaring roots, bare limbs sweeping up like spokes, flat pads of leaves in layers, bunches of red figs hanging under the limbs." },
+  { id: "doum", swatch: "#9a7a4a", name: "Doum palm", text: "A fat rough clump with leaning stems, a crown of arching fan fronds on each, bunches of orange-brown fruit under the crowns." },
+  { id: "bank", swatch: "#58684a", name: "Riverbank: both, spaced", text: "A stretch of floodplain with two figs and two clumps of palms, to judge the spacing (open grass for the wildlife)." },
 ];
 const SHAPES = {
-  fever: { A: "Tall: a long clean trunk, the limbs leave high and rise steeply; a narrow, open crown.", B: "Spreading: the fork lower, the limbs reaching wider, a broader and flatter crown (old trees in the open)." },
-  fig: { A: "Wide: low and very broad, the limbs reaching far out sideways, the crown's edge hanging low.", B: "Tall: a higher, rounder dome on a longer trunk (figs crowded by other trees)." },
-  doum: { A: "Forked twice: four crowns.", B: "Old: forked three times, eight crowns, taller." },
+  fig: { A: "As your picture: about 20 tall and 34 wide.", B: "A giant: about 27 tall and 46 wide, a match for the umbrella thorn (old trees; nearer the real one's size)." },
+  doum: { A: "As your picture: a clump of three stems, about 13 tall.", B: "An old clump: four or five stems, taller, one of them forking in two near the top (the real palm's trick)." },
 };
 const BARKS = {
-  fever: { A: "A powdery lime yellow-green.", B: "B yellower, with papery flakes." },
-  fig: { A: "A warm buff-orange, flaking.", B: "B paler and greyer (less like the fever tree's yellow)." },
-  doum: { A: "A the bare ringed trunk.", B: "B the old leaf bases still on, criss-crossed." },
+  fig: { A: "A as your picture: cream, with red-brown and pale patches.", B: "B nearer the real tree: buff-yellow, the patches yellow-green and papery pale." },
+  doum: { A: "A as your picture: warm dark brown, fibrous.", B: "B the real palm's lower trunk: grey-brown, ringed." },
+};
+const SCULPT = {
+  fig: "Full blocks: the trunk, the thick limbs, the leaves (three tones: lit on top of a pad, dark underneath). Sculpted: the limbs thinning toward their tips (the tapering branch the acacias already have), the root steps at the foot, the bunches of figs hanging under the limbs and the figs sitting on the bark, and the sprays of leaves hanging under the pads. Figs really do grow straight out of the trunk and big limbs.",
+  doum: "Full blocks: the clump and the stems, so insects can walk them. Sculpted: the old leaf bases sticking out of the stems, every frond (a stalk, then a fan of five fingers in thin plates that arch over and hang), the spear of the newest leaf, the cap under the crown, and the fruit bunches. Every sculpted box lies flat and is only ever turned round the upright, which is what a Minecraft block model can do.",
+  bank: "The same trees as on their own pages; both shapes of each are mixed here.",
 };
 const REAL = {
-  fever: "Vachellia xanthophloea. 15 to 25 m tall, on ground that is wet or flooded part of the year: floodplains, pan edges, river banks. The smooth bark is covered in a yellow powder and is green underneath: the tree makes food through its bark. The trunk is bare for a long way up, the limbs rise steeply, and the crown is thin and open, so the grass grows right under it. An acacia, with paired straight white spines. It grows in stands of one age, and a whole stand often dies off together. Early settlers blamed it for malaria (the mosquitoes of its swamps were the cause), hence the name.",
-  fig: "Ficus sycomorus. Up to 25 m tall and wider than tall, with a short, fluted, buttressed trunk that can be several metres through. The bark is pale buff to orange-yellow and flakes off in papery scales. The figs grow in thick clusters on leafless twigs straight out of the trunk and big limbs, several crops a year, each pollinated by its own tiny wasp; a fruiting tree draws monkeys, baboons, fruit bats, hornbills and green pigeons, and antelope and fish take what falls. It stands by rivers, and often on old termite mounds.",
-  doum: "Hyphaene thebaica. Up to about 15 m. One of the few palms whose trunk forks: it divides in two, and each arm in two again, up to four or five times in old trees. The trunk is ringed with old leaf scars; each tip carries a crown of 20 to 30 stiff grey-green fan fronds on thorny stalks, the dead ones hanging under it. The fruit, the size of an apple, glossy orange-brown and tasting of gingerbread, hangs in heavy bunches; elephants and baboons eat it and spread the seed. It grows where there is water in the ground: river banks and oases.",
-  bank: "How they could stand on the floodplain: fever trees in a loose grove near the water, the trees about 15 blocks apart; a few doum palms in a clump on slightly higher ground; one sycamore fig on its own, set back. Most of the plain stays open grass. All spacings are my picks.",
+  fig: "Ficus sycomorus. Up to 25 m tall and wider than tall, with a short, fluted, buttressed trunk that can be several metres through. The bark is pale buff to yellowish and flakes off in papery scales. The figs grow in thick clusters on leafless twigs straight out of the trunk and the main limbs, several crops a year, so a fig tree in fruit feeds everything around it: monkeys, birds, bats, antelope under it. It keeps to river banks and floodplains because its roots need water all year.",
+  doum: "Hyphaene thebaica. Up to about 15 m. It grows in clumps, sprouting new stems from its foot, and is one of the few palms whose stem forks in two. The upper stem keeps the stubs of its old leaf stalks. The leaves are stiff fans on long stalks, folded along a curved rib so the whole fan arches over; the fruit is glossy orange-brown, the size of an apple, in hanging bunches (it tastes of gingerbread; elephants and baboons eat it and spread the seed). It marks ground water, so it stands on river banks and in oases.",
+  bank: "How they could stand on the floodplain: a few doum palms in loose clumps near the water, a sycamore fig on its own here and there, set back. Most of the plain stays open grass. All spacing is my pick, to judge here.",
 };
-let kind = "fever", seed = 1, bare = false;
-let picks = { shape: { fever: "A", fig: "A", doum: "A" }, bark: { fever: "A", fig: "A", doum: "A" } };
-try { const s = JSON.parse(localStorage.getItem("floodplain-picks-1") || "null"); if (s && s.shape && s.bark) picks = s; } catch (e) {}
+let kind = "fig", seed = 1, bare = false;
+let picks = { shape: { fig: "A", doum: "A" }, bark: { fig: "A", doum: "A" } };
+try { const s = JSON.parse(localStorage.getItem("floodplain-picks-2") || "null"); if (s && s.shape && s.bark) picks = s; } catch (e) {}
 
 // ================= The shape maker =================
-// A block is "shape|texture": cube (wood), thin (a branch half a block thick), leaf (see-through cube), cross (a plant).
-const PRIO = { cross: 1, leaf: 2, thin: 3, cube: 5 };
+// A block is "shape|texture". Shapes: cube (wood), leaf (see-through cube), b<px> (a tapering branch that many pixels
+// thick), slab<px> (a root step that many pixels high), cross (a hanging plant). Free sculpted boxes are "bits".
 const shapeOf = b => b.slice(0, b.indexOf("|"));
+const prio = b => { const s = shapeOf(b); return s === "cube" ? 5 : s[0] === "b" ? 4 : s[0] === "s" ? 3 : s === "leaf" ? 2 : 1; };
+const isWood = b => !!b && (shapeOf(b) === "cube" || shapeOf(b)[0] === "b");
 
 class Vox {
-  constructor() { this.m = new Map(); this.ox = 0; this.oz = 0; }
+  constructor() { this.m = new Map(); this.bits = []; this.ox = 0; this.oz = 0; }
   key(x, y, z) { return ((x + 1024) * 256 + (y + 64)) * 2048 + (z + 1024); }
   put(x, y, z, b) {
     if (y < -1) return;
     const k = this.key(x + this.ox, y, z + this.oz), old = this.m.get(k);
-    if (old === undefined || PRIO[shapeOf(b)] >= PRIO[shapeOf(old)]) this.m.set(k, b);
+    if (old === undefined || prio(b) >= prio(old)) this.m.set(k, b);
   }
   get(x, y, z) { return this.m.get(this.key(x + this.ox, y, z + this.oz)); }
   raw(x, y, z) { return this.m.get(this.key(x, y, z)); }
+  setRaw(x, y, z, b) { this.m.set(this.key(x, y, z), b); }
   each(f) { for (const [k, b] of this.m) { const z = k % 2048 - 1024, t = Math.floor(k / 2048); f(Math.floor(t / 256) - 1024, t % 256 - 64, z, b); } }
+  // A sculpted box, w x h x d pixels, its middle at (x, y, z) in blocks; turned round the upright by o.rot.
+  bit(x, y, z, w, h, d, o = {}) {
+    this.bits.push({ x: x + this.ox, y, z: z + this.oz, w: Math.max(1, Math.round(w)), h: Math.max(1, Math.round(h)), d: Math.max(1, Math.round(d)),
+      rot: o.rot || 0, tex: o.tex || "", tint: o.tint || [1, 1, 1], leafy: !!o.leafy });
+  }
 }
 
 function rng(s) { return () => { s |= 0; s = s + 0x6D2B79F5 | 0; let t = Math.imul(s ^ s >>> 15, 1 | s); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
@@ -167,18 +181,41 @@ function hash(x, y, z, s) {
   let h = (Math.imul(x, 374761393) + Math.imul(y, 668265263) + Math.imul(z, 1440670441) + Math.imul(s, 1103515245)) | 0;
   h = Math.imul(h ^ (h >>> 13), 1274126177); h ^= h >>> 16; return (h >>> 0) / 4294967296;
 }
+// Smooth noise in space, 0..1: for bark patches that run over several blocks and for lumpy outlines.
+function vnoise(x, y, z, s) {
+  const xi = Math.floor(x), yi = Math.floor(y), zi = Math.floor(z);
+  const sm = t => t * t * (3 - 2 * t), fx = sm(x - xi), fy = sm(y - yi), fz = sm(z - zi);
+  let v = 0;
+  for (let i = 0; i < 8; i++) {
+    const dx = i & 1, dy = (i >> 1) & 1, dz = (i >> 2) & 1;
+    v += hash(xi + dx, yi + dy, zi + dz, s) * (dx ? fx : 1 - fx) * (dy ? fy : 1 - fy) * (dz ? fz : 1 - fz);
+  }
+  return v;
+}
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 const lerp = (a, b, t) => a + (b - a) * t;
 const add = (a, b) => [a[0] + b[0], a[1] + b[1], a[2] + b[2]];
 const sub = (a, b) => [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
 const mul = (a, s) => [a[0] * s, a[1] * s, a[2] * s];
 const len = a => Math.hypot(a[0], a[1], a[2]);
-const dir = (az, el) => [Math.cos(az) * Math.cos(el), Math.sin(el), Math.sin(az) * Math.cos(el)];
+const C = hex => { const c = new THREE.Color(hex).convertSRGBToLinear(); return [c.r, c.g, c.b]; };
+const mixC = (a, b, t) => [lerp(a[0], b[0], t), lerp(a[1], b[1], t), lerp(a[2], b[2], t)];
 
-// One block wide, every step along one axis only, so the pieces always join face to face.
-function line(v, a, b, block) {
+let NS = 1, FIG_FY = 7;  // the tree being made: its noise seed, and where the fig's limbs leave the trunk
+// The fig's bark tile for a block: big patches low on the trunk, fewer up on the limbs.
+function figTile(x, y, z) {
+  const n = vnoise(x / 2.0 + 9.3, y / 2.5, z / 2.0 - 4.1, NS), m = vnoise(x / 1.8 - 31.7, y / 2.2 + 5.5, z / 1.8 + 12.9, NS + 7);
+  const calm = clamp((y - FIG_FY + 1) / 5, 0, 1) * 0.13;
+  if (n > 0.635 + calm) return 1;
+  if (m > 0.655 + calm * 0.6) return 2;
+  return hash(x, y, z, NS + 9) < 0.5 ? 0 : 3;
+}
+const bark = (k, c) => k === "fig" ? "bark_fig:" + figTile(c[0], c[1], c[2]) : "bark_doum";
+
+// The cells from a to b, every step along one axis only, so the pieces always join face to face.
+function cellsOf(a, b) {
   let p = a.map(Math.round);
-  v.put(p[0], p[1], p[2], block);
+  const out = [p.slice()];
   const n = Math.ceil(len(sub(b, a)) * 3) + 1;
   for (let i = 1; i <= n; i++) {
     const q = add(a, mul(sub(b, a), i / n)).map(Math.round);
@@ -186,176 +223,318 @@ function line(v, a, b, block) {
       let ax = 0, best = -1;
       for (let j = 0; j < 3; j++) { const d = Math.abs(q[j] - p[j]); if (d > best) { best = d; ax = j; } }
       p[ax] += Math.sign(q[ax] - p[ax]);
-      v.put(p[0], p[1], p[2], block);
+      out.push(p.slice());
     }
   }
+  return out;
 }
-// A round piece of wood from a to b, radius ra to rb: bark outside, wood inside; a thin branch when narrow.
+// A round piece of wood from a to b, radius ra to rb, in full blocks.
 function seg(v, a, b, ra, rb, k) {
-  if (Math.max(ra, rb) < 0.8) { line(v, a, b, "thin|bark_" + k); return; }
   const ab = sub(b, a), l2 = Math.max(1e-6, ab[0] * ab[0] + ab[1] * ab[1] + ab[2] * ab[2]);
   const R = Math.max(ra, rb) + 1;
   const lo = [0, 1, 2].map(i => Math.floor(Math.min(a[i], b[i]) - R)), hi = [0, 1, 2].map(i => Math.ceil(Math.max(a[i], b[i]) + R));
   for (let x = lo[0]; x <= hi[0]; x++) for (let y = Math.max(-1, lo[1]); y <= hi[1]; y++) for (let z = lo[2]; z <= hi[2]; z++) {
     const t = clamp(((x - a[0]) * ab[0] + (y - a[1]) * ab[1] + (z - a[2]) * ab[2]) / l2, 0, 1);
-    const d = len(sub([x, y, z], add(a, mul(ab, t)))), r = lerp(ra, rb, t);
-    if (d > r) continue;
-    v.put(x, y, z, (d > r - 1.15 ? "cube|bark_" : "cube|inner_") + k);
+    if (len(sub([x, y, z], add(a, mul(ab, t)))) <= lerp(ra, rb, t)) v.put(x, y, z, "cube|" + bark(k, [x, y, z]));
   }
 }
-function path(v, pts, radii, k) { for (let i = 0; i + 1 < pts.length; i++) seg(v, pts[i], pts[i + 1], radii[i], radii[i + 1], k); }
-// A cloud of leaves: an ellipsoid, thinner toward its edge; dens is the share of cells that hold leaves.
-function blob(v, c, rx, ry, rz, dens, block, s, minY = -99) {
-  for (let x = Math.floor(c[0] - rx); x <= Math.ceil(c[0] + rx); x++) for (let y = Math.max(minY, Math.floor(c[1] - ry)); y <= Math.ceil(c[1] + ry); y++)
-    for (let z = Math.floor(c[2] - rz); z <= Math.ceil(c[2] + rz); z++) {
-      const d = ((x - c[0]) / rx) ** 2 + ((y - c[1]) / ry) ** 2 + ((z - c[2]) / rz) ** 2;
-      if (d <= 1 && hash(x, y, z, s) < dens * (d > 0.6 ? 0.75 : 1)) v.put(x, y, z, block);
+// Wood along a bent line, its radius falling evenly from r0 to r1: round and several blocks thick while it is thick, then
+// one block, then the tapering branch, thinner and thinner to the tip.
+const TAPER = [14, 12, 10, 8, 6, 4];
+function woodPath(v, pts, r0, r1, k, e = 1) {
+  const ls = [];
+  let total = 0, s = 0;
+  for (let i = 0; i + 1 < pts.length; i++) { ls.push(len(sub(pts[i + 1], pts[i]))); total += ls[i]; }
+  for (let i = 0; i + 1 < pts.length; i++) {
+    const n = Math.max(1, Math.ceil(ls[i] / 1.1)), d = sub(pts[i + 1], pts[i]);
+    for (let j = 0; j < n; j++) {
+      const a = add(pts[i], mul(d, j / n)), b = add(pts[i], mul(d, (j + 1) / n));
+      const ra = lerp(r0, r1, (s / total) ** e), rb = lerp(r0, r1, ((s + ls[i] / n) / total) ** e), rm = (ra + rb) / 2;
+      s += ls[i] / n;
+      if (rm >= 0.85) { seg(v, a, b, ra, rb, k); continue; }
+      const px = rm * 32, t = TAPER.reduce((best, x) => Math.abs(x - px) < Math.abs(best - px) ? x : best, 14);
+      for (const c of cellsOf(a, b)) v.put(c[0], c[1], c[2], (rm >= 0.5 ? "cube|" : "b" + t + "|") + bark(k, c));
     }
+  }
 }
 
-// ---- Fever tree: a long clean trunk, steep limbs, thin flat pads of leaves; bark-coloured to the last twig ----
-function fever(v, seed, shape) {
-  const r = rng(seed * 7919 + 11), wide = shape === "B";
-  const H = (wide ? 23 : 29) + Math.floor(r() * 4), R0 = 1.5, Rc = wide ? 16 : 11.5;
-  const fy = Math.round(H * (wide ? 0.36 : 0.5) + r() * 2), lean = [(r() - 0.5) * 2.4, 0, (r() - 0.5) * 2.4];
-  const fork = [lean[0], fy, lean[2]];
-  path(v, [[0, -1, 0], [lean[0] * 0.4, fy * 0.5, lean[2] * 0.4], fork], [R0 + 0.3, R0 * 0.85, R0 * 0.72], "fever");
-  const n = (wide ? 4 : 3) + (r() < 0.5 ? 1 : 0), az0 = r() * Math.PI * 2, pads = [];
-  const limb = (az, reach, top, thick) => {
-    const out = [Math.cos(az), 0, Math.sin(az)];
-    const mid = add(fork, add(mul(out, reach * 0.35), [0, (top - fy) * 0.55, 0]));
-    const end = add(fork, add(mul(out, reach * 0.75), [0, (top - fy) * 0.9, 0]));
-    path(v, [fork, mid, end], [thick, 0.82, 0.6], "fever");
-    const twigs = 2 + Math.floor(r() * 2);
-    for (let i = 0; i < twigs; i++) {
-      const a = az + (i - (twigs - 1) / 2) * 0.9 + (r() - 0.5) * 0.4, l = reach * (0.3 + r() * 0.2);
-      const tip = add(end, [Math.cos(a) * l, 1 + r() * 2, Math.sin(a) * l]);
-      line(v, end, tip, "thin|bark_fever");
-      pads.push([tip, 3.8 + r() * 1.8]);
-    }
-    // one lower side branch on some limbs: the crown in two or three thin layers
-    if (r() < 0.6) {
-      const a = az + (r() < 0.5 ? 1 : -1) * (0.7 + r() * 0.5), l = reach * 0.45;
-      const tip = add(mid, [Math.cos(a) * l, 1 + r() * 1.5, Math.sin(a) * l]);
-      line(v, mid, tip, "thin|bark_fever");
-      pads.push([tip, 3.2 + r() * 1.4]);
-    }
-  };
-  for (let i = 0; i < n; i++) limb(az0 + i / n * Math.PI * 2 + (r() - 0.5) * 0.5, Rc * (0.8 + r() * 0.35), H - 2 - Math.floor(r() * 3), 1.0);
-  limb(r() * 6.28, 2.5, H - 1, 0.95);  // the leader, nearly straight up
-  for (const [c, rad] of pads) {
-    blob(v, add(c, [0, 1, 0]), rad, 1.2, rad, 0.42, "leaf|leaves_fever", seed);
-    for (let i = 0; i < 3; i++) {  // spines under the pads
-      const x = Math.round(c[0] + (r() - 0.5) * rad), z = Math.round(c[2] + (r() - 0.5) * rad), y = Math.round(c[1]) - 1;
-      if (!v.get(x, y, z)) v.put(x, y, z, "cross|thorns");
-    }
-  }
-  return { R: R0 + 0.3 };
+// ---- Sculpted pieces ----
+// A little rounded ball s pixels through: a cube with its edges trimmed, from three crossing boxes.
+function ball(v, x, y, z, s, tint) {
+  const q = a => Math.round(a * 16) / 16, t = s - 2;
+  x = q(x); y = q(y); z = q(z);
+  v.bit(x, y, z, s, t, t, { tint }); v.bit(x, y, z, t, s, t, { tint }); v.bit(x, y, z, t, t, s, { tint });
 }
-
-// ---- Sycamore fig: a short fluted trunk with buttresses, huge spreading limbs, a dense dark dome, figs on the bark ----
-function fig(v, seed, shape) {
-  const r = rng(seed * 104729 + 5), tall = shape === "B";
-  const H = (tall ? 30 : 24) + Math.floor(r() * 3), R0 = tall ? 3.1 : 3.5, Rc = (tall ? 15 : 20) + r() * 2, fy = tall ? 9 : 6;
-  seg(v, [0, -1, 0], [0, fy + 1, 0], R0 + 0.7, R0, "fig");
-  const nb = 5 + Math.floor(r() * 2), b0 = r() * 6.28;
-  for (let i = 0; i < nb; i++) {  // buttresses: ridges running down the trunk and out along the ground
-    const a = b0 + i / nb * 6.28 + (r() - 0.5) * 0.4, o = [Math.cos(a), 0, Math.sin(a)], reach = R0 + 2.5 + r() * 2.5;
-    path(v, [add(mul(o, R0 * 0.7), [0, fy * (0.6 + r() * 0.3), 0]), add(mul(o, R0 + 0.9), [0, 1, 0]), add(mul(o, reach), [0, -1, 0])], [0.9, 1.25, 1.0], "fig");
-  }
-  const fork = [0, fy, 0], n = 5 + Math.floor(r() * 3), az0 = r() * 6.28, base = fy + (H - fy) * 0.3;
-  const crown = (c, rx, ry) => blob(v, c, rx, ry, rx, 0.93, "leaf|leaves_fig", seed, Math.round(base - 1 - Math.max(0, Math.hypot(c[0], c[2]) - Rc * 0.55) * 0.35));
+// A strip of flat plates from p, heading az, climbing at phi and bending down by curv for every block of its length; its
+// width runs from w0 to w1 pixels and its colour from c0 to c1. Every plate lies flat: only the steps make the arch.
+function arcStrip(v, p, az, phi, length, curv, w0, w1, c0, c1, leafy) {
+  const n = Math.max(1, Math.round(length * 4)), ca = Math.cos(az), sa = Math.sin(az);
+  const jit = 0.92 + hash(Math.round(p[0] * 16), Math.round(az * 100), Math.round(p[2] * 16), n) * 0.16;
+  let h = 0, y = p[1], py = Math.round(p[1] * 16), a = phi;
   for (let i = 0; i < n; i++) {
-    const az = az0 + i / n * 6.28 + (r() - 0.5) * 0.5, o = [Math.cos(az), 0, Math.sin(az)], reach = Rc * (0.8 + r() * 0.3), up = H - fy;
-    const bend = az + (r() - 0.5) * 0.7, o2 = [Math.cos(bend), 0, Math.sin(bend)];
-    const p1 = add(fork, add(mul(o, reach * 0.3), [0, up * 0.3, 0]));
-    const p2 = add(p1, add(mul(o2, reach * 0.38), [0, up * 0.2, 0]));
-    const p3 = add(p2, add(mul(o, reach * 0.26), [0, up * 0.08, 0]));
-    path(v, [fork, p1, p2, p3], [R0 * 0.62, 1.6, 1.05, 0.7], "fig");
-    for (const [p, s] of [[p1, 0.75], [p2, 1], [p3, 0.85]]) {
-      const top = add(p, [(r() - 0.5) * 4, 3 + r() * 3, (r() - 0.5) * 4]);
-      line(v, p, top, "thin|bark_fig");
-      crown(add(top, [0, 1, 0]), (5.5 + r() * 2) * s, (3.6 + r()) * s);
-    }
-    crown(add(p3, mul(o, 2.5)), 5 + r() * 1.5, 3.2 + r());
+    a = Math.max(-1.45, phi - curv * (i + 0.5) * 0.25);
+    const h0 = h;
+    h += Math.cos(a) * 0.25; y += Math.sin(a) * 0.25;
+    const ny = Math.round(y * 16), t = n > 1 ? i / (n - 1) : 0;
+    const L = clamp(Math.round(Math.abs(h - h0) * 16) + 1, 2, 5), T = clamp(Math.abs(ny - py) + 2, 2, 6);
+    v.bit(p[0] + ca * (h0 + h) / 2, (ny + py) / 32, p[2] + sa * (h0 + h) / 2, L, T, Math.round(lerp(w0, w1, t)), { rot: -az, tint: mixC(c0, c1, t).map(x => x * jit), leafy });
+    py = ny;
   }
-  path(v, [fork, [(r() - 0.5) * 3, fy + (H - fy) * 0.45, (r() - 0.5) * 3], [(r() - 0.5) * 4, H - 5, (r() - 0.5) * 4]], [R0 * 0.6, 1.3, 0.7], "fig");
-  crown([0, fy + (H - fy) * 0.68, 0], Rc * 0.62, (H - fy) * 0.34);
-  // figs: clusters on the trunk and the lower limbs, wherever bark faces open air
-  const spots = [];
+  return { p: [p[0] + ca * h, y, p[2] + sa * h], phi: a };
+}
+
+// ================= Sycamore fig =================
+const FIG_TINTS = ["#74202a", "#74202a", "#7e2430", "#8a2630", "#8a2630", "#a02f38", "#a02f38", "#b2433c", "#c2903c", "#8f9c48"].map(C);
+const FIG_STALK = C("#6e5c36");
+// A bunch of figs hanging in the cell under a limb and on down below it.
+function figBunch(v, x, y, z, r) {
+  const top = y + 0.5, rot0 = r() * 6.28, levels = 3 + (r() < 0.65 ? 1 : 0);
+  v.bit(x, top - 3 / 16, z, 2, 6, 2, { tint: FIG_STALK });
+  v.bit(x, top - (6 + levels * 2.4) / 16, z, 1, levels * 5, 1, { tint: FIG_STALK });
+  for (let L = 0; L < levels; L++) {
+    const last = L === levels - 1, cnt = last ? 2 : L === 0 ? 3 : 4, rad = (last ? 2.2 : L === 0 ? 3.4 : 4.4) / 16;
+    for (let j = 0; j < cnt; j++) {
+      const a = rot0 + L * 1.1 + j / cnt * 6.28;
+      ball(v, x + Math.cos(a) * rad, top - (7.5 + L * 4.6 + r() * 1.5) / 16, z + Math.sin(a) * rad, r() < 0.45 ? 6 : 5, FIG_TINTS[Math.floor(r() * FIG_TINTS.length)]);
+    }
+  }
+}
+// Figs sitting straight on the bark: (x, y, z) is the air beside it, d the way to the bark.
+function figCluster(v, x, y, z, d, r) {
+  const fx = x + d[0] * 0.5, fz = z + d[1] * 0.5, n = 4 + Math.floor(r() * 3);
+  for (let i = 0; i < n; i++) {
+    const u = (r() - 0.5) * 11 / 16, w = (r() - 0.5) * 11 / 16, out = (2 + r() * 2.5) / 16;
+    ball(v, fx - d[0] * out - d[1] * u, y + w, fz - d[1] * out + d[0] * u, r() < 0.4 ? 6 : 5, FIG_TINTS[Math.floor(r() * FIG_TINTS.length)]);
+  }
+}
+// Root steps: half-height pieces in the corners of the steps at a tree's foot, so it runs down into the ground.
+function rootSteps(v, span, top, k) {
+  for (let y = 0; y <= top; y++) for (let x = -span; x <= span; x++) for (let z = -span; z <= span; z++) {
+    if (v.get(x, y, z) || (y > 0 && shapeOf(v.get(x, y - 1, z) || "|") !== "cube")) continue;
+    const near = [[1, 0], [-1, 0], [0, 1], [0, -1]].filter(d => shapeOf(v.get(x + d[0], y, z + d[1]) || "|") === "cube").length;
+    if (!near || hash(x, y, z, NS + 2) > (near > 1 ? 0.9 : 0.6)) continue;
+    v.put(x, y, z, (hash(x, y, z, NS + 4) < 0.6 ? "slab8|" : "slab5|") + bark(k, [x, y, z]));
+  }
+}
+// The trunk: fluted, the ridges running down into buttress roots that step out along the ground.
+function figTrunk(v, P) {
+  const span = Math.ceil(P.Rw * 3.2);
+  for (let y = -1; y <= P.fy + 1; y++) {
+    const yy = Math.max(0, y), flare = 1.25 * Math.exp(-yy / 1.5), neck = 0.55 * clamp((yy - (P.fy - 3)) / 3, 0, 1);
+    for (let x = -span; x <= span; x++) for (let z = -span; z <= span; z++) {
+      const lobe = Math.cos(P.nb * Math.atan2(z, x) + P.ph + yy * 0.12), butt = Math.max(0, lobe - 0.35) / 0.65;
+      const R = (P.Rw + flare + neck) * (1 + 0.07 * lobe) + butt * Math.max(0, 3.2 - yy) * 0.62 * P.Rw / 2.4;
+      if (Math.hypot(x, z) <= R) v.put(x, y, z, "cube|" + bark("fig", [x, y, z]));
+    }
+  }
+  rootSteps(v, span + 1, 3, "fig");
+}
+// A pad of leaves, its flat bottom at c: a lumpy dome, h layers at its thickest, its rim lobed, thin and ragged.
+function pad(v, c, R, h) {
+  const y0 = Math.round(c[1]), n = Math.ceil(R * 1.25);
+  for (let x = Math.floor(c[0] - n); x <= Math.ceil(c[0] + n); x++) for (let z = Math.floor(c[2] - n); z <= Math.ceil(c[2] + n); z++) {
+    const d = Math.hypot(x - c[0], z - c[2]), th = Math.atan2(z - c[2], x - c[0]);
+    const edge = R * (0.78 + 0.44 * vnoise(Math.cos(th) * 1.5 + c[0] * 0.37, 0.5, Math.sin(th) * 1.5 + c[2] * 0.37, NS + 3));
+    if (d > edge) continue;
+    const rim = d > edge - 1.5, lump = 0.5 + 1.0 * vnoise(x / 2.3 + 17.2, y0 * 0.31, z / 2.3 - 8.4, NS + 4);
+    if (rim && hash(x, y0, z, NS + 6) < 0.16) continue;
+    const top = Math.max(1, Math.round(h * Math.sqrt(1 - (d / edge) ** 2) * lump)), from = rim && hash(x, y0, z, NS + 5) < 0.45 ? 1 : 0;
+    for (let dy = from; dy <= top; dy++) v.put(x, y0 + dy, z, "leaf|leaves_fig_1");
+  }
+}
+function fig(v, seed, shape) {
+  const r = rng(seed * 104729 + 5), big = shape === "B", S = big ? 1.36 : 1;
+  NS = seed * 13 + 1;
+  const H = Math.round((20 + r() * 2) * S), fy = Math.round(7.6 * S), Rw = big ? 3.15 : 2.4;
+  FIG_FY = fy;
+  figTrunk(v, { Rw, fy, nb: (big ? 6 : 5) + (r() < 0.5 ? 1 : 0), ph: r() * 6.28 });
+  const pads = [], fork = [0, fy - 0.5, 0], thick = big ? 1.55 : 1.3;
+  // the outer limbs: spokes sweeping out and up, each with a higher side branch
+  const nOut = (big ? 8 : 7) + (r() < 0.4 ? 1 : 0), az0 = r() * 6.28, low = Math.floor(r() * nOut);
+  for (let i = 0; i < nOut; i++) {
+    const az = az0 + i / nOut * 6.28 + (r() - 0.5) * 0.4, o = [Math.cos(az), 0, Math.sin(az)], side = [-o[2], 0, o[0]];
+    const far = r(), reach = (9.5 + far * 3.5) * S, el = i === low ? 0.3 + r() * 0.08 : 0.66 - far * 0.2 + (i % 2 ? 0.13 : -0.05) + (r() - 0.5) * 0.08;
+    const start = add(fork, mul(o, Rw * 0.5)), end = [o[0] * reach, fy + (reach - Rw) * Math.tan(el), o[2] * reach];
+    const mid = add(add(mul(add(start, end), 0.5), [0, 0.9 + r() * 0.8, 0]), mul(side, (r() - 0.5) * 2.4));
+    woodPath(v, [start, mid, end], thick, 0.2, "fig", 1.7);
+    pads.push([end, (3.7 + r() * 1.1) * S, 3]);
+    if (big || r() < 0.85) {
+      const az2 = az + (r() < 0.5 ? 1 : -1) * (0.42 + r() * 0.2), d2 = reach * (0.52 + r() * 0.16);
+      const from = add(start, mul(sub(mid, start), 0.8)), e2 = [Math.cos(az2) * d2, end[1] + 2 + r() * 2.5, Math.sin(az2) * d2];
+      woodPath(v, [from, add(mul(add(from, e2), 0.5), [0, 0.8, 0]), e2], 0.84, 0.16, "fig", 1.5);
+      pads.push([e2, (3.3 + r() * 1.0) * S, 3]);
+    }
+  }
+  // the inner limbs: steep, carrying the top of the crown
+  const nIn = big ? 4 : 3;
+  for (let i = 0; i < nIn; i++) {
+    const az = az0 + 0.5 + i / nIn * 6.28 + (r() - 0.5) * 0.5, o = [Math.cos(az), 0, Math.sin(az)], d = (3.2 + r() * 2.6) * S;
+    const start = add(fork, mul(o, Rw * 0.3)), end = [o[0] * d, H - 4 - r() * 1.5, o[2] * d];
+    woodPath(v, [start, add(mul(add(start, end), 0.5), mul(o, 0.9)), end], thick * 0.9, 0.18, "fig", 1.6);
+    pads.push([end, (4.2 + r() * 1.2) * S, 4]);
+  }
+  for (const [c, R, h] of pads) {
+    for (let j = 0; j < 3; j++) {  // short twigs spreading under the pad, seen from below
+      const a = r() * 6.28, l = R * (0.4 + r() * 0.2), from = c.map(Math.round);
+      woodPath(v, [from, [from[0] + Math.cos(a) * l, from[1] + (r() < 0.5 ? 0 : 1), from[2] + Math.sin(a) * l]], 0.3, 0.17, "fig");
+    }
+    pad(v, c, R, h);
+  }
+  // figs: bunches hanging under the limbs, and clusters on the bark of the trunk
+  const under = [], onBark = [], ox = v.ox, oz = v.oz;
   v.each((X, y, Z, b) => {
-    if (b !== "cube|bark_fig" || y < 1 || y > fy + 7) return;
-    const x = X - v.ox, z = Z - v.oz;
-    if (Math.hypot(x, z) > R0 + 9) return;
-    for (const d of [[1, 0], [-1, 0], [0, 1], [0, -1]])
-      if (!v.get(x + d[0], y, z + d[1]) && hash(x >> 1, y >> 1, z >> 1, seed) < 0.42 && hash(x + d[0], y, z + d[1], seed + 3) < 0.55) spots.push([x + d[0], y, z + d[1]]);
+    const x = X - ox, z = Z - oz, dist = Math.hypot(x, z);
+    if (dist > 30 * S || !isWood(b)) return;
+    const s = shapeOf(b);
+    if (y >= fy - 1 && (s === "cube" || s === "b14" || s === "b12") && !v.get(x, y - 1, z) && !v.get(x, y - 2, z) && dist > Rw + 1.5) under.push([x, y - 1, z]);
+    if (s === "cube" && y >= 2 && y <= fy + 2 && dist < Rw + 2.2)
+      for (const d of [[1, 0], [-1, 0], [0, 1], [0, -1]]) if (!v.get(x + d[0], y, z + d[1])) onBark.push([x + d[0], y, z + d[1], [-d[0], -d[1]]]);
   });
-  for (const p of spots) v.put(p[0], p[1], p[2], "cross|figs");
-  return { R: R0 + 3 };
+  const order = a => a.map(p => [hash(p[0], p[1], p[2], NS + 11), p]).sort((p, q) => p[0] - q[0]).map(p => p[1]);
+  const taken = [], far = (p, gap) => taken.every(q => Math.hypot(p[0] - q[0], p[1] - q[1], p[2] - q[2]) >= gap);
+  let left = big ? 22 : 14;
+  for (const p of order(under)) if (left && far(p, 3.2)) { taken.push(p); left--; figBunch(v, p[0], p[1], p[2], r); }
+  left = big ? 8 : 5;
+  for (const p of order(onBark)) if (left && far(p, 3)) { taken.push(p); left--; figCluster(v, p[0], p[1], p[2], p[3], r); }
+  return { R: Rw + 3.5, fruit: taken[0] ? [taken[0][0], taken[0][1], taken[0][2]] : [0, fy, 0] };
+}
+// Once every tree stands: leaves lit where the sky is over them and dark where they are a pad's underside, and sprays
+// of leaves hanging under the rims.
+function finishLeaves(v) {
+  const edits = [];
+  v.each((x, y, z, b) => {
+    if (shapeOf(b) !== "leaf") return;
+    const over = v.raw(x, y + 1, z), below = v.raw(x, y - 1, z), u = hash(x, y, z, 77);
+    const open = !over || shapeOf(over) !== "leaf", bottom = !below || shapeOf(below) !== "leaf";
+    edits.push([x, y, z, "leaf|leaves_fig_" + (open ? (u < 0.68 ? 0 : 1) : bottom ? (u < 0.7 ? 2 : 1) : (u < 0.2 ? 0 : u < 0.72 ? 1 : 2))]);
+    if (!below && !v.raw(x, y - 2, z) && hash(x, y, z, 78) < 0.2) edits.push([x, y - 1, z, "cross|sprig_fig"]);
+  });
+  for (const e of edits) v.setRaw(e[0], e[1], e[2], e[3]);
 }
 
-// ---- Doum palm: a ringed trunk forking in two again and again, a fan of fronds on every tip ----
+// ================= Doum palm =================
+const FROND = { live: [C("#56702c"), C("#96a440")], old: [C("#7a7e38"), C("#b4a650")], dead: [C("#9c8650"), C("#c4ac70")] };
+const PALM_STALK = C("#9a9450"), SPEAR = [C("#a8ae58"), C("#c4c674")], BOOT = [[1.5, 1.42, 1.24], [1.3, 1.25, 1.12]];
+const DOUM_TINTS = ["#a8521d", "#a8521d", "#b55f22", "#8b3d17", "#8b3d17", "#96481a", "#c7893a", "#c7893a", "#6f2f13"].map(C);
+// One fan leaf: a stiff stalk, then five fingers spreading from its end, arching over and hanging at the tips.
+function frond(v, p, az, el, pet, blade, curv, r, look) {
+  const [c0, c1] = FROND[look];
+  const stalk = arcStrip(v, p, az, el, pet, 0.12, 3, 3, look === "dead" ? c0 : PALM_STALK, c0, true);
+  for (const [off, lf, drop] of [[0, 1, 0], [0.3927, 0.93, 0.12], [-0.3927, 0.93, 0.12], [0.7854, 0.76, 0.3], [-0.7854, 0.76, 0.3]])
+    arcStrip(v, stalk.p, az + off, stalk.phi - drop, blade * lf * (0.92 + r() * 0.16), curv * (1 + r() * 0.25), 6, 2, c0, c1, true);
+}
+// A bunch of fruit: a stalk arching out from under the crown, the fruit hanging from it like a teardrop.
+function doumBunch(v, top, az, r) {
+  const s = arcStrip(v, [top[0] + Math.cos(az) * 0.55, top[1] - 0.2, top[2] + Math.sin(az) * 0.55], az, 0.3, 0.85, 1.9, 2, 2, PALM_STALK, PALM_STALK, false);
+  const rad = [2.6, 4.6, 5.2, 4.2, 2.4], cnt = [3, 4, 5, 4, 2], rot0 = r() * 6.28;
+  for (let L = 0; L < 5; L++) for (let j = 0; j < cnt[L]; j++) {
+    const a = rot0 + L * 0.9 + j / cnt[L] * 6.28;
+    ball(v, s.p[0] + Math.cos(a) * rad[L] / 16, s.p[1] - (2 + L * 4.4 + r() * 1.4) / 16, s.p[2] + Math.sin(a) * rad[L] / 16, r() < 0.5 ? 6 : 5, DOUM_TINTS[Math.floor(r() * DOUM_TINTS.length)]);
+  }
+  v.bit(s.p[0], s.p[1] - 10 / 16, s.p[2], 2, 18, 2, { tint: PALM_STALK });
+  return s.p;
+}
+function palmCrown(v, T, r, size) {
+  const top = [T[0], T[1] + 0.5, T[2]], snap = a => Math.round(a / (Math.PI / 8)) * (Math.PI / 8);
+  v.bit(top[0], top[1] + 3 / 16, top[2], 14, 6, 14, { tex: "bark_doum", tint: [1.12, 1.08, 0.9] });  // the cap the leaves come out of
+  v.bit(top[0], top[1] + 8 / 16, top[2], 10, 4, 10, { tint: PALM_STALK });
+  let turn = r() * 6.28;
+  const tier = (n, el, pet, blade, curv, lift, look) => {
+    for (let i = 0; i < n; i++) {
+      const az = snap(turn + i / n * 6.28 + (r() - 0.5) * 0.3);
+      const how = look === "old" && r() < 0.3 ? "dead" : look;
+      frond(v, [top[0] + Math.cos(az) * 0.4, top[1] + lift, top[2] + Math.sin(az) * 0.4], az, el + (r() - 0.5) * 0.24, pet * size, blade * size * (0.9 + r() * 0.2), curv / size, r, how);
+    }
+    turn += 0.7;
+  };
+  tier(3, 1.35, 0.9, 2.3, 0.75, 0.5, "live");
+  tier(5, 0.85, 1.3, 3.0, 0.62, 0.35, "live");
+  tier(5, 0.3, 1.5, 3.1, 0.5, 0.2, "live");
+  tier(4, -0.35, 1.2, 2.6, 0.3, 0.05, "old");
+  arcStrip(v, [top[0], top[1] + 0.6, top[2]], r() * 6.28, 1.5, 1.7 * size, 0.06, 3, 2, SPEAR[0], SPEAR[1], true);  // the spear: the newest leaf, still shut
+  const n = 2 + (r() < 0.5 ? 1 : 0), a0 = r() * 6.28;
+  let fruit = null;  // the bunch hanging farthest out from the clump's middle, for the close view
+  for (let i = 0; i < n; i++) {
+    const p = doumBunch(v, top, a0 + i / n * 6.28 + (r() - 0.5) * 0.6, r);
+    if (!fruit || Math.hypot(p[0], p[2]) > Math.hypot(fruit[0], fruit[2])) fruit = p;
+  }
+  return fruit;
+}
 function doum(v, seed, shape) {
-  const r = rng(seed * 15485863 + 3), levels = shape === "B" ? 3 : 2;
-  const crownAt = p => {
-    const turn = r() * 6.28;
-    const ring = (count, el, reach, size, block) => {
-      for (let i = 0; i < count; i++) {
-        const d = dir(turn + i / count * 6.28 + (r() - 0.5) * 0.3, el + (r() - 0.5) * 0.2), tip = add(p, mul(d, reach));
-        line(v, add(p, mul(d, 1)), add(p, mul(d, reach * 0.55)), "thin|bark_doum_stalk");
-        blob(v, tip, size, size * 0.8, size, 0.8, block, seed + i);
-      }
-    };
-    ring(4, 1.05, 2.6, 1.3, "leaf|frond");
-    ring(6, 0.35, 3.3, 1.5, "leaf|frond");
-    ring(5, -0.35, 3.0, 1.3, r() < 0.5 ? "leaf|frond" : "leaf|frond_dead");
-    for (let i = 0; i < 6; i++) {  // the skirt of dead fronds, and fruit bunches under the crown
-      const x = Math.round(p[0] + (r() - 0.5) * 2.2), z = Math.round(p[2] + (r() - 0.5) * 2.2), y = Math.round(p[1]) - 1 - Math.floor(r() * 3);
-      if (!v.get(x, y, z)) v.put(x, y, z, i < 4 ? "leaf|frond_dead" : "cross|doum_fruit");
+  const r = rng(seed * 15485863 + 3), old = shape === "B";
+  NS = seed * 17 + 5;
+  const RB = old ? 2.7 : 2.3, HB = old ? 3.0 : 2.6;
+  for (let x = -5; x <= 5; x++) for (let z = -5; z <= 5; z++) for (let y = -1; y <= 4; y++) {  // the clump's middle: a low lumpy mound
+    const th = Math.atan2(z, x), wob = 0.8 + 0.4 * vnoise(Math.cos(th) * 1.5, y * 0.5, Math.sin(th) * 1.5, NS);
+    if ((Math.hypot(x, z) / (RB * wob)) ** 2 + (Math.max(0, y) / HB) ** 2 <= 1) v.put(x, y, z, "cube|bark_doum");
+  }
+  const n = old ? 4 + (r() < 0.5 ? 1 : 0) : 3, az0 = r() * 6.28, upright = Math.floor(r() * n), forks = old ? (upright + 1 + Math.floor(r() * (n - 1))) % n : -1;
+  const tips = [];
+  for (let i = 0; i < n; i++) {
+    const az = az0 + i / n * 6.28 + (r() - 0.5) * 0.5, o = [Math.cos(az), 0, Math.sin(az)];
+    const lean = i === upright ? 0.6 + r() : (old ? 3.4 : 2.8) + r() * 1.8, ht = i === upright ? (old ? 13 : 11) + r() : (old ? 9 : 7.4) + r() * 2;
+    const out = RB * 0.55, at = (f, y) => add(mul(o, out + lean * f), [0, y, 0]);
+    // each stem swells into the clump at its foot, leans out, then straightens toward its crown
+    const p0 = at(0, -1), pa = at(0.22, HB + 0.8), p1 = at(0.66, HB + (ht - HB) * 0.48), p2 = at(1, ht);
+    seg(v, p0, pa, old ? 1.75 : 1.6, 1.0, "doum");
+    woodPath(v, [pa, p1, p2], 1.0, 0.56, "doum", 0.55);
+    if (i !== forks) { tips.push(p2); continue; }
+    for (const sgn of [1, -1]) {  // the fork: two arms, each with its own crown
+      const a = az + sgn * (1.3 + r() * 0.4), q1 = add(p2, [Math.cos(a) * 1.7, 1.4, Math.sin(a) * 1.7]), q2 = add(q1, [Math.cos(a) * 0.9, 2.4 + r(), Math.sin(a) * 0.9]);
+      woodPath(v, [p2, q1, q2], 0.58, 0.52, "doum");
+      tips.push(q2);
     }
-  };
-  const grow = (p, az, level) => {
-    if (level === 0) { crownAt(p); return; }
-    for (const side of [1, -1]) {
-      const a = az + (side > 0 ? 0 : Math.PI) + (r() - 0.5) * 0.5, o = [Math.cos(a), 0, Math.sin(a)];
-      const out = 2.2 + level * 1.5 + r(), rise = 4 + r() * 2.5;
-      const q1 = add(p, add(mul(o, out), [0, 2 + r(), 0]));
-      const q2 = add(q1, add(mul(o, out * 0.35), [0, rise, 0]));
-      line(v, p, q1, "cube|bark_doum"); line(v, q1, q2, "cube|bark_doum");
-      grow(q2, az + Math.PI / 2 + (r() - 0.5) * 0.8, level - 1);
+  }
+  rootSteps(v, 7, 2, "doum");
+  // old leaf bases: stubs sticking out and up from the stems, more of them toward the crowns
+  const ox = v.ox, oz = v.oz, maxY = Math.max(...tips.map(t => t[1]));
+  v.each((X, y, Z, b) => {
+    const x = X - ox, z = Z - oz;
+    if (b !== "cube|bark_doum" || y < 0 || Math.hypot(x, z) > 14) return;
+    for (const d of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+      if (v.get(x + d[0], y, z + d[1])) continue;
+      const u = hash(x * 4 + d[0], y, z * 4 + d[1], NS + 1);
+      if (u > lerp(0.34, 0.8, clamp(y / maxY, 0, 1))) continue;
+      const rot = d[0] ? 0 : Math.PI / 2, oy = (hash(x, y, z, NS + 6) < 0.5 ? 3 : 9) / 16 - 0.5, sh = ((u * 97) % 1 - 0.5) * 4 / 16;
+      const at = (out, dy) => [x + d[0] * (0.5 + out / 16) - d[1] * sh, y + oy + dy / 16, z + d[1] * (0.5 + out / 16) + d[0] * sh];
+      const wide = u * 31 % 1 < 0.5 ? 14 : 10;
+      v.bit(...at(1.5, 0), 3, 6, wide, { rot, tex: "bark_doum", tint: [0.84, 0.84, 0.84] });
+      v.bit(...at(2.5, 4), 5, 5, wide - 4, { rot, tex: "bark_doum", tint: BOOT[u * 53 % 1 < 0.5 ? 0 : 1] });
     }
-  };
-  const top = [(r() - 0.5) * 3, (levels === 3 ? 9 : 8) + Math.floor(r() * 3), (r() - 0.5) * 3];
-  line(v, [0, -1, 0], [top[0] * 0.5, top[1] * 0.5, top[2] * 0.5], "cube|bark_doum");
-  line(v, [top[0] * 0.5, top[1] * 0.5, top[2] * 0.5], top, "cube|bark_doum");
-  for (const d of [[1, 0], [-1, 0], [0, 1], [0, -1]]) { v.put(d[0], -1, d[1], "cube|bark_doum"); if (r() < 0.6) v.put(d[0], 0, d[1], "cube|bark_doum"); }
-  grow(top, r() * 6.28, levels);
-  return { R: 1.5 };
+  });
+  let fruit = null, from = null;
+  for (const t of tips) {
+    const p = palmCrown(v, t.map(Math.round), r, old ? 1.06 : 1);
+    if (!fruit || Math.hypot(p[0], p[2]) > Math.hypot(fruit[0], fruit[2])) { fruit = p; from = t; }
+  }
+  return { R: RB + 2.5, fruit, from };  // from: the crown the fruit hangs under, so the close view looks in from outside it
 }
 
-const MAKERS = { fever, fig, doum };
-// The riverbank: the water lies along -z; x runs along the river. [kind, x, z, seed offset]
-const BANK = [["fever", -50, -7, 0], ["fever", -33, -2, 1], ["fever", -17, -8, 2], ["fever", -29, 13, 3], ["fever", 44, -5, 4],
-              ["fig", 14, 16, 0], ["doum", -52, 30, 0], ["doum", -43, 37, 1], ["doum", 52, 20, 2], ["doum", 60, 31, 3]];
+const MAKERS = { fig, doum };
+// The riverbank: the water lies along -z; x runs along the river. [kind, x, z, seed offset, shape]
+const BANK = [["fig", 18, 20, 0, "A"], ["fig", -50, 34, 1, "B"],
+              ["doum", -24, -3, 0, "A"], ["doum", -14, 5, 1, "B"], ["doum", -31, 9, 2, "A"], ["doum", 52, -4, 3, "B"], ["doum", 61, 6, 4, "A"]];
 const WATER_Z = -15;
 function makeScene() {
   const v = new Vox();
-  if (kind !== "bank") return { v, R: MAKERS[kind](v, seed, picks.shape[kind]).R };
-  for (const [k, x, z, s] of BANK) { v.ox = x; v.oz = z; MAKERS[k](v, seed * 31 + s, picks.shape[k]); }
+  let made = { R: 0, fruit: [0, 0, 0] };
+  if (kind !== "bank") made = MAKERS[kind](v, seed, picks.shape[kind]);
+  else for (const [k, x, z, s, shape] of BANK) { v.ox = x; v.oz = z; MAKERS[k](v, seed * 31 + s, shape); }
   v.ox = v.oz = 0;
-  return { v, R: 0 };
+  finishLeaves(v);
+  return { v, R: made.R, fruit: made.fruit, from: made.from };
 }
 
 // ================= Drawing =================
 const canvas = document.getElementById("view");
-const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true, preserveDrawingBuffer: true });
 renderer.outputEncoding = THREE.sRGBEncoding;
 renderer.setPixelRatio(Math.min(2, window.devicePixelRatio || 1));
 const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(50, 4 / 3, 0.05, 900);
 const controls = new THREE.OrbitControls(camera, canvas);
 controls.enableDamping = true;
-controls.maxPolarAngle = Math.PI * 0.497;
+controls.maxPolarAngle = Math.PI * 0.6;
 controls.minDistance = 0.5; controls.maxDistance = 320;
 
 const loader = new THREE.TextureLoader();
@@ -374,32 +553,40 @@ const SHADE = [0.6, 0.6, 1.0, 0.5, 0.8, 0.8];
 const matCache = {};
 function mats(name, see) {
   const key = name + (see ? "!" : "");
-  if (!matCache[key]) matCache[key] = SHADE.map(s => new THREE.MeshBasicMaterial({ map: tex(name), color: new THREE.Color(s, s, s),
+  if (!matCache[key]) matCache[key] = SHADE.map(s => new THREE.MeshBasicMaterial({ map: name ? tex(name) : null, color: new THREE.Color(s, s, s),
     alphaTest: see ? 0.5 : 0, side: see ? THREE.DoubleSide : THREE.FrontSide }));
   return matCache[key];
 }
 function plantMat(name) {
   const key = name + "~";
-  if (!matCache[key]) matCache[key] = new THREE.MeshBasicMaterial({ map: tex(name), alphaTest: 0.5, side: THREE.DoubleSide, color: new THREE.Color(0.9, 0.9, 0.9) });
+  if (!matCache[key]) matCache[key] = new THREE.MeshBasicMaterial({ map: tex(name), alphaTest: 0.5, side: THREE.DoubleSide, color: new THREE.Color(0.86, 0.86, 0.86) });
   return matCache[key];
 }
-// The texture of a block: the barks have looks to pick; a palm frond's stalk is drawn with the palm's bark.
+// The texture of a block: the barks have looks to pick, and the fig's bark comes in five tiles.
 function texName(t) {
-  if (t === "bark_doum_stalk") return "bark_doum_" + picks.bark.doum;
-  if (t.startsWith("bark_")) return t + "_" + picks.bark[t.slice(5)];
-  if (t === "inner_doum") return "inner_fig";
-  return t;
+  const [n, tile] = t.split(":");
+  if (n === "bark_fig") return `bark_fig_${picks.bark.fig}_${tile || 0}`;
+  if (n === "bark_doum") return "bark_doum_" + picks.bark.doum;
+  return n;
+}
+// A box of so many pixels whose faces show as many pixels of the texture, as a block model's would.
+const geoCache = {};
+function boxGeo(w, h, d) {
+  const key = w + "x" + h + "x" + d;
+  if (geoCache[key]) return geoCache[key];
+  const g = new THREE.BoxGeometry(w / 16, h / 16, d / 16), uv = g.attributes.uv, dims = [[d, h], [d, h], [w, d], [w, d], [w, h], [w, h]];
+  for (let f = 0; f < 6; f++) for (let i = 0; i < 4; i++) { const j = f * 4 + i; uv.setXY(j, uv.getX(j) * Math.min(1, dims[f][0] / 16), uv.getY(j) * Math.min(1, dims[f][1] / 16)); }
+  return geoCache[key] = g;
 }
 
 function flatPlane(parent, w, d, name, y, x, z) {
   const m = new THREE.Mesh(new THREE.PlaneGeometry(w, d), new THREE.MeshBasicMaterial({ map: tex(name, w, d), color: 0xeeeeee }));
   m.rotation.x = -Math.PI / 2; m.position.set(x, y, z); parent.add(m);
 }
-const WATER_EDGE = -15;
 flatPlane(scene, 400, 400, "grass", -0.5, 0, 0);
 const bankGround = new THREE.Group(); scene.add(bankGround);
-flatPlane(bankGround, 400, 5, "silt", -0.49, 0, WATER_EDGE + 2.5);
-flatPlane(bankGround, 400, 200, "water", -0.48, 0, WATER_EDGE - 100);
+flatPlane(bankGround, 400, 5, "silt", -0.49, 0, WATER_Z + 2.5);
+flatPlane(bankGround, 400, 200, "water", -0.48, 0, WATER_Z - 100);
 const treeGroup = new THREE.Group();
 scene.add(treeGroup);
 const figures = new THREE.Group();
@@ -419,7 +606,7 @@ function placeFigures(x, z) {
   box(l * 0.38, h * 1.1, l * 0.26, 0x1c1a19, ax + l * 0.3, -0.5 + h * 0.8, az);
 }
 
-const geo = { cube: new THREE.BoxGeometry(1, 1, 1), half: new THREE.BoxGeometry(0.5, 0.5, 0.5) };
+const cubeGeo = new THREE.BoxGeometry(1, 1, 1);
 const planeA = new THREE.PlaneGeometry(1, 1).rotateY(Math.PI / 4), planeB = new THREE.PlaneGeometry(1, 1).rotateY(-Math.PI / 4);
 const SIDES = [[1, 0, 0], [-1, 0, 0], [0, 1, 0], [0, -1, 0], [0, 0, 1], [0, 0, -1]];
 let bounds = null;
@@ -429,12 +616,14 @@ function build(reframe) {
   for (const c of treeGroup.children) c.dispose && c.dispose();
   treeGroup.clear();
   bankGround.visible = kind === "bank";
-  const lists = {};
+  const lists = {}, bitLists = {};
   const push = (key, p) => (lists[key] = lists[key] || []).push(p);
+  const pushBit = (t, x, y, z, w, h, d, rot, tint) => { const key = `${t}|${w}|${h}|${d}`; (bitLists[key] = bitLists[key] || []).push([x, y, z, rot, tint]); };
+  const WHITE = [1, 1, 1];
   let count = 0, maxY = 0, maxR = 0;
   v.each((x, y, z, b) => {
     const s = shapeOf(b), name = texName(b.slice(s.length + 1));
-    if (y < 0 || (bare && s !== "cube" && s !== "thin")) return;
+    if (y < 0 || (bare && (s === "leaf" || s === "cross"))) return;
     count++;
     maxY = Math.max(maxY, y); maxR = Math.max(maxR, Math.hypot(x, z));
     if (s === "cube" || s === "leaf") {
@@ -442,46 +631,76 @@ function build(reframe) {
       if (SIDES.every(d => { const n = v.raw(x + d[0], y + d[1], z + d[2]); return n && (shapeOf(n) === "cube" || (s === "leaf" && shapeOf(n) === "leaf")); })) return;
       push(s + "|" + name, [x, y, z]);
     } else if (s === "cross") push("cross|" + name, [x, y, z]);
-    else {
-      push("thin|" + name, [x, y, z]);
+    else if (s[0] === "s") { const h = +s.slice(4); pushBit(name, x, y - 0.5 + h / 32, z, 16, h, 16, 0, WHITE); }
+    else {  // a tapering branch: its own thickness, joined to the wood beside it
+      const t = +s.slice(1);
+      pushBit(name, x, y, z, t, t, t, 0, WHITE);
       for (const d of SIDES) {
         const n = v.raw(x + d[0], y + d[1], z + d[2]);
-        if (!n || shapeOf(n) === "leaf" || shapeOf(n) === "cross" || (shapeOf(n) === "thin" && d[0] + d[1] + d[2] < 0)) continue;
-        push("thin|" + name, [x + d[0] * 0.5, y + d[1] * 0.5, z + d[2] * 0.5]);
+        if (!isWood(n)) continue;
+        const c = Math.min(t, shapeOf(n) === "cube" ? 16 : +shapeOf(n).slice(1));
+        pushBit(name, x + d[0] * 0.25, y + d[1] * 0.25, z + d[2] * 0.25, d[0] ? 8 : c, d[1] ? 8 : c, d[2] ? 8 : c, 0, WHITE);
       }
     }
   });
-  const m4 = new THREE.Matrix4();
+  let sculpted = 0;
+  for (const b of v.bits) {
+    if (bare && b.leafy) continue;
+    sculpted++;
+    maxY = Math.max(maxY, Math.round(b.y)); maxR = Math.max(maxR, Math.hypot(b.x, b.z));
+    pushBit(b.tex ? texName(b.tex) : "", b.x, b.y, b.z, b.w, b.h, b.d, b.rot, b.tint);
+  }
+  const m4 = new THREE.Matrix4(), col = new THREE.Color();
   for (const key in lists) {
     const [s, name] = key.split("|"), ps = lists[key];
     const meshes = s === "cross" ? [new THREE.InstancedMesh(planeA, plantMat(name), ps.length), new THREE.InstancedMesh(planeB, plantMat(name), ps.length)]
-      : [new THREE.InstancedMesh(s === "thin" ? geo.half : geo.cube, mats(name, s === "leaf"), ps.length)];
+      : [new THREE.InstancedMesh(cubeGeo, mats(name, s === "leaf"), ps.length)];
     for (const mesh of meshes) {
       ps.forEach((p, i) => { m4.makeTranslation(p[0], p[1], p[2]); mesh.setMatrixAt(i, m4); });
       mesh.instanceMatrix.needsUpdate = true;
       treeGroup.add(mesh);
     }
   }
+  for (const key in bitLists) {
+    const [name, w, h, d] = key.split("|"), ps = bitLists[key];
+    const mesh = new THREE.InstancedMesh(boxGeo(+w, +h, +d), mats(name, false), ps.length);
+    ps.forEach((p, i) => {
+      m4.makeRotationY(p[3]); m4.setPosition(p[0], p[1], p[2]); mesh.setMatrixAt(i, m4);
+      mesh.setColorAt(i, col.setRGB(p[4][0], p[4][1], p[4][2]));
+    });
+    mesh.instanceMatrix.needsUpdate = true; mesh.instanceColor.needsUpdate = true;
+    mesh.frustumCulled = false;
+    treeGroup.add(mesh);
+  }
   document.getElementById("count").textContent = kind === "bank" ? `${BANK.length} trees on about 130 x 60 blocks`
-    : `${count.toLocaleString()} blocks · ${maxY + 1} tall · ${Math.round(maxR * 2)} wide`;
-  bounds = { h: maxY + 1, r: Math.max(2, maxR), R: made.R };
-  if (kind === "bank") placeFigures(-24, 4); else placeFigures(made.R + 3, 0);
+    : `${count.toLocaleString()} blocks · ${sculpted.toLocaleString()} sculpted boxes · ${maxY + 1} tall · ${Math.round(maxR * 2)} wide`;
+  bounds = { h: maxY + 1, r: Math.max(2, maxR), R: made.R, fruit: made.fruit, from: made.from };
+  if (kind === "bank") placeFigures(-4, 6); else placeFigures(made.R + 3, 0);
   if (reframe) view("over");
   draw();
 }
 
 function view(which) {
-  const { h, r, R } = bounds;
+  const { h, r, R, fruit, from } = bounds;
   if (kind === "bank") {
-    if (which === "over") { controls.target.set(4, 6, 6); camera.position.set(-40, 62, 138); }
-    else { controls.target.set(-33, 12, -2); camera.position.set(-22, 1.6, 9); }
+    if (which === "over") { controls.target.set(4, 5, 8); camera.position.set(-36, 52, 128); }
+    else if (which === "fruit") { controls.target.set(-24, 8, -3); camera.position.set(-15, 6, 9); }
+    else { controls.target.set(-24, 7, -3); camera.position.set(-4.5, 1.1, 8); }
   } else if (which === "over") {
     controls.target.set(0, h * 0.45, 0);
-    const d = Math.max(h, r * 2) * 1.15 + 4;
-    camera.position.set(d * 0.75, h * 0.4 + d * 0.2, d * 0.75);
+    const d = Math.max(h, r * 2) * 1.0 + 4;
+    controls.target.set(0, h * 0.5, 0);
+    camera.position.set(d * 0.74, 3, d * 0.74);
+  } else if (which === "fruit") {
+    // Look in from outside: away from the tree's middle for the fig, away from the crown the bunch hangs under for the
+    // palm (its dead fronds hang round the crown, so the palm's camera stands farther out and lower, under them).
+    const c = from || [0, 0, 0], dx = fruit[0] - c[0], dz = fruit[2] - c[2], o = Math.hypot(dx, dz) || 1;
+    const out = from ? 6 : 3.6, down = from ? 3.4 : 2.6;
+    controls.target.set(fruit[0], fruit[1] - 0.5, fruit[2]);
+    camera.position.set(fruit[0] + dx / o * out + (from ? 0 : 1), fruit[1] - down, fruit[2] + dz / o * out + (from ? 0 : 1));
   } else {
-    controls.target.set(0, Math.min(h * 0.5, 12), 0);
-    camera.position.set(R + 9, 1.6, 5);
+    controls.target.set(0, Math.min(h * 0.5, 11), 0);
+    camera.position.set(R + 9, 1.1, 5);
   }
   controls.update(); draw();
 }
@@ -503,11 +722,11 @@ new ResizeObserver(resize).observe(canvas);
 
 // ================= The panel =================
 const FLAT = {
-  fever: [["bark_fever", "bark"], ["leaves_fever", "leaves"], ["thorns", "spines"], ["inner_fever", "inside wood"]],
-  fig: [["bark_fig", "bark"], ["leaves_fig", "leaves"], ["figs", "figs"], ["inner_fig", "inside wood"]],
-  doum: [["bark_doum", "trunk"], ["frond", "frond"], ["frond_dead", "dead frond"], ["doum_fruit", "fruit"]],
+  fig: [["bark_fig:0", "bark"], ["bark_fig:3", "bark, again"], ["bark_fig:1", "patch"], ["bark_fig:2", "pale patch"],
+        ["leaves_fig_0", "leaves, lit"], ["leaves_fig_1", "leaves"], ["leaves_fig_2", "leaves, shaded"], ["sprig_fig", "hanging spray"]],
+  doum: [["bark_doum", "trunk"]],
 };
-FLAT.bank = [].concat(FLAT.fever.slice(0, 2), FLAT.fig.slice(0, 3), FLAT.doum.slice(0, 2), [["grass", "floodplain grass"], ["silt", "silt"], ["water", "river water"]]);
+FLAT.bank = [].concat(FLAT.fig.slice(0, 4), FLAT.fig.slice(4, 7), FLAT.doum, [["grass", "floodplain grass"], ["silt", "silt"], ["water", "river water"]]);
 function flat() {
   const el = document.getElementById("flat");
   el.innerHTML = "";
@@ -527,7 +746,7 @@ function buttons(el, list, isOn, onPick) {
     el.appendChild(b);
   }
 }
-function save() { try { localStorage.setItem("floodplain-picks-1", JSON.stringify(picks)); } catch (e) {} }
+function save() { try { localStorage.setItem("floodplain-picks-2", JSON.stringify(picks)); } catch (e) {} }
 function sync() {
   document.querySelectorAll("#kinds .choice").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.id === kind)));
   const one = kind !== "bank";
@@ -536,11 +755,12 @@ function sync() {
     const ab = [["A", "A"], ["B", "B"]];
     buttons(document.getElementById("pick-shape"), ab, x => picks.shape[kind] === x, x => { picks.shape[kind] = x; save(); refresh(true); });
     buttons(document.getElementById("pick-bark"), ab, x => picks.bark[kind] === x, x => { picks.bark[kind] = x; save(); refresh(false); });
-    document.getElementById("shape-note").innerHTML = `Shape A: ${SHAPES[kind].A}<br>Shape B: ${SHAPES[kind].B}<br>Bark: ${BARKS[kind].A} ${BARKS[kind].B}<br>Both shapes could be in the game together, mixed by seed, as with the giant trees.`;
+    document.getElementById("shape-note").innerHTML = `Shape A: ${SHAPES[kind].A}<br>Shape B: ${SHAPES[kind].B}<br>Bark: ${BARKS[kind].A} ${BARKS[kind].B}<br>Both shapes could be in the game together, as young and old trees.`;
   }
   document.getElementById("real").textContent = REAL[kind];
+  document.getElementById("sculpt").textContent = SCULPT[kind];
   document.getElementById("bare").checked = bare;
-  document.getElementById("summary").textContent = KINDS.slice(0, 3).map(k => `${k.name}: shape ${picks.shape[k.id]}, bark ${picks.bark[k.id]}`).join("\n");
+  document.getElementById("summary").textContent = KINDS.slice(0, 2).map(k => `${k.name}: shape ${picks.shape[k.id]}, bark ${picks.bark[k.id]}`).join("\n");
   flat();
 }
 function refresh(reframe) { sync(); build(reframe); }
@@ -557,6 +777,12 @@ function refresh(reframe) { sync(); build(reframe); }
 document.getElementById("bare").addEventListener("change", e => { bare = e.target.checked; build(false); });
 document.getElementById("v-over").addEventListener("click", () => view("over"));
 document.getElementById("v-player").addEventListener("click", () => view("player"));
+document.getElementById("v-fruit").addEventListener("click", () => view("fruit"));
 document.getElementById("v-seed").addEventListener("click", () => { seed++; refresh(true); });
-resize(); refresh(true);
+// For checking the page: show(kind, view, seed, shape) from the console, or #fig,player in the address.
+window.show = (k, which, s, shape) => { kind = k; if (s) seed = s; if (shape && k !== "bank") picks.shape[k] = shape; refresh(true); if (which) view(which); };
+const start = location.hash.slice(1).split(",");
+if (KINDS.some(k => k.id === start[0])) kind = start[0];
+refresh(true);
+if (start[1]) view(start[1]);
 </script>
