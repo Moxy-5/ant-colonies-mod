@@ -900,6 +900,27 @@ public class TermiteNewHoleTests {
                     }
                 }
             }
+            // The whole branch is cased (the user's report, 2026-11-12: Matabele walked into the galleries without breaking
+            // any mud): from the moment a gallery block under any part of it is dug, no block of the branch is open to the
+            // outside on any side, the blocks with no gallery dug under them yet included (they were a door into the rest).
+            if (kind == Food.BRANCH && tunnel != null && tunnel.gallery() != null
+                    && log.stream().anyMatch(wood -> com.antcolonies.colony.NestWalls.isWalkThroughFood(level, wood)
+                            && tunnel.gallery().contains(wood.below()) && Nest.isDugOut(level, wood.below()))) {
+                java.util.Set<BlockPos> ours = colony.nest().nestCells(level);
+                for (BlockPos wood : log) {
+                    if (!com.antcolonies.colony.NestWalls.isWalkThroughFood(level, wood)) {
+                        continue;
+                    }
+                    for (net.minecraft.core.Direction round : net.minecraft.core.Direction.values()) {
+                        BlockPos beside = wood.relative(round);
+                        helper.assertTrue(ours.contains(beside) || tunnel.gallery().contains(beside)
+                                || com.antcolonies.colony.NestWalls.isWalkThroughFood(level, beside)
+                                || !com.antcolonies.colony.NestWalls.isOpenToward(level, beside, round.getOpposite()),
+                                "the branch block " + wood.toShortString() + " is open to the outside at " + beside.toShortString() + " ("
+                                        + level.getBlockState(beside) + ") while a gallery under the branch is dug: a way in with no mud to break");
+                    }
+                }
+            }
             if (phase[0] == 1) {
                 if (tunnel != null) {
                     long under = log.stream().filter(wood -> tunnel.gallery().contains(wood.below())).count();

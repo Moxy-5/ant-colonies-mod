@@ -255,3 +255,15 @@ coming; the seal given up; `RaidsAway` on the same rule as near; the soak (`tool
 
 **Tests:** `soldiers,raids,away` on 6 servers: all passed but the old mound-ringing scout flake (BUGS 153, 3 of 3 alone) and the fight test's exact bite check, updated on purpose (a major soldier's bite takes 1.5, was 4; then 3 of 3).
 
+
+## The mud gaps, fixed 2026-11-12 (the user's report while planning step 5; `docs/BUGS.md` 205)
+
+The user: the Matabele mostly walk in without breaking any mud, as branches are not fully covered. Found in the code
+and proved with a test (fails 3 of 3 on the old code): only the branch block right over a dug gallery cell was cased,
+and the uncovered rest of the branch was a door into it. Now the whole branch is plastered as the first gallery block
+under it is dug (`NestWalls.casingGaps`). This comes before the next idea agreed in talk, not built: **soldiers fight
+from inside the hole** (they line up in the gallery behind the mouth's holder, and a soldier under cover facing its
+attacker cannot be stung, only bitten at by the Matabele majors), which only means something once there is mud to
+break. Not known: whether other feeding places (log tops, runways of sheeting) have gaps of their own; the user's
+next look in-game will tell.
+

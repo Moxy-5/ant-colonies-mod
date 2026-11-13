@@ -79,9 +79,9 @@ public class NestWalls {
                 if (nest.contains(food) || !isWalkThroughFood(level, food)) {
                     continue;
                 }
-                for (BlockPos gap : casingGaps(level, food, direction.getOpposite(), nest)) {
-                    if (seen.add(gap)) {
-                        leaks.add(new Leak(gap, findPlugSpot(level, nest, gap)));
+                for (Gap gap : casingGaps(level, food, direction.getOpposite(), nest)) {
+                    if (seen.add(gap.cell())) {
+                        leaks.add(new Leak(gap.cell(), findPlugSpot(level, nest, gap.cell())));
                     }
                 }
             }
@@ -200,20 +200,49 @@ public class NestWalls {
         return colony.foragingHoles().isHole(level, pos) || colony.foragingHoles().isHole(level, pos.below());
     }
 
+    /** A gap in a branch's casing: the open cell, and the side of it the food lies on (where its plate of mud goes). */
+    private record Gap(BlockPos cell, Direction toward) {
+    }
+
+    /** At most this many blocks of walk-through food joined to one over a gallery are cased with it (a branch is 2 or 3). */
+    private static final int CASED_TOGETHER = 12;
+
     /**
      * The gaps in the mud casing of this walk-through food over the gallery on side {@code gallery}: every block beside
-     * it (but the gallery) that leaves it open to the outside. Other food beside it, the nest and the colony's own holes
-     * are no gap.
+     * it (but the gallery) that leaves it open to the outside, and the same for every block of such food joined to it
+     * (the whole branch). The nest and the colony's own holes are no gap.
+     * <p>
+     * The whole branch (the user's report, 2026-11-12: Matabele walked into the feeding galleries without breaking any
+     * mud): only the block right over a dug gallery cell was cased, and the next block of the branch counted as closed
+     * though it stood open to the air, so the uncovered end of a branch was a door into the covered part. Real
+     * Macrotermes plaster the whole of a branch before they eat it from underneath.
      */
-    private List<BlockPos> casingGaps(Level level, BlockPos food, Direction gallery, Set<BlockPos> nest) {
-        List<BlockPos> gaps = new ArrayList<>();
-        for (Direction side : Direction.values()) {
-            BlockPos next = food.relative(side);
-            if (side == gallery || nest.contains(next) || next.equals(center) || !LandReady.at(level, next) || isWalkThroughFood(level, next)
-                    || isColonyOpening(level, next) || !level.getFluidState(next).isEmpty() || !isOpenToward(level, next, side.getOpposite())) {
-                continue;
+    private List<Gap> casingGaps(Level level, BlockPos food, Direction gallery, Set<BlockPos> nest) {
+        List<Gap> gaps = new ArrayList<>();
+        Set<BlockPos> branch = new HashSet<>();
+        java.util.ArrayDeque<BlockPos> queue = new java.util.ArrayDeque<>();
+        branch.add(food.immutable());
+        queue.add(food.immutable());
+        while (!queue.isEmpty()) {
+            BlockPos at = queue.poll();
+            for (Direction side : Direction.values()) {
+                BlockPos next = at.relative(side);
+                if (at.equals(food) && side == gallery || branch.contains(next) || nest.contains(next) || next.equals(center)
+                        || !LandReady.at(level, next)) {
+                    continue;
+                }
+                if (isWalkThroughFood(level, next)) {
+                    if (branch.size() < CASED_TOGETHER) {
+                        branch.add(next.immutable());
+                        queue.add(next.immutable());
+                    }
+                    continue;
+                }
+                if (isColonyOpening(level, next) || !level.getFluidState(next).isEmpty() || !isOpenToward(level, next, side.getOpposite())) {
+                    continue;
+                }
+                gaps.add(new Gap(next.immutable(), side.getOpposite()));
             }
-            gaps.add(next.immutable());
         }
         return gaps;
     }
@@ -287,10 +316,9 @@ public class NestWalls {
             if (nest.contains(food) || !isWalkThroughFood(level, food)) {
                 continue;
             }
-            for (BlockPos gap : casingGaps(level, food, side.getOpposite(), nest)) {
-                if (!mound.containsKey(gap)) {
-                    Direction toward = Direction.getNearest(food.getX() - gap.getX(), food.getY() - gap.getY(), food.getZ() - gap.getZ());
-                    allIn &= plate(level, gap, toward);
+            for (Gap gap : casingGaps(level, food, side.getOpposite(), nest)) {
+                if (!mound.containsKey(gap.cell())) {
+                    allIn &= plate(level, gap.cell(), gap.toward());
                 }
             }
         }
