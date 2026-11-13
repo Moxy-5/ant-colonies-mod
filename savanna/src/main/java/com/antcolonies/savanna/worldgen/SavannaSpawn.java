@@ -4,6 +4,8 @@ import com.antcolonies.savanna.SavannaConfig;
 import com.antcolonies.savanna.SavannaMod;
 import com.mojang.datafixers.util.Pair;
 
+import org.jetbrains.annotations.Nullable;
+
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Holder;
 import net.minecraft.core.QuartPos;
@@ -50,6 +52,9 @@ public final class SavannaSpawn {
     static final int LOOK_ROUND = 1024;
     /** The grid of that look, and the rings of the edge test, in blocks. */
     static final int STEP = 64, RING_STEP = 32;
+    /** A big savanna: savanna all round a place out to this many blocks (my pick: at least 1,000 across), looked for on this grid. */
+    public static final int BIG_ROUND = 500;
+    static final int BIG_STEP = 128;
     /** The height the biome noise is read at: just over sea level, the surface biome. */
     public static final int SAMPLE_Y = 80;
 
@@ -82,7 +87,7 @@ public final class SavannaSpawn {
             say("No savanna within " + radius + " blocks of the normal spawn: the normal spawn is kept.");
             return;
         }
-        BlockPos inside = deepInside(biomes, sampler, found.getFirst());
+        BlockPos inside = spawnPlace(biomes, sampler, vanilla, found.getFirst(), radius);
         BlockPos spot = groundNear(level, inside);
         if (spot == null) {
             say("A savanna was found at " + inside.getX() + ", " + inside.getZ() + " but no dry open ground in it: the normal spawn is kept.");
@@ -119,7 +124,9 @@ public final class SavannaSpawn {
     }
 
     static boolean savannaAt(BiomeSource biomes, Climate.Sampler sampler, int x, int z) {
-        return biomes.getNoiseBiome(QuartPos.fromBlock(x), QuartPos.fromBlock(SAMPLE_Y), QuartPos.fromBlock(z), sampler).is(BiomeTags.IS_SAVANNA);
+        // (a savanna's own river is inside it, not its edge: BUGS 209, rivers cut every big savanna into "small" ones)
+        Holder<Biome> biome = biomes.getNoiseBiome(QuartPos.fromBlock(x), QuartPos.fromBlock(SAMPLE_Y), QuartPos.fromBlock(z), sampler);
+        return biome.is(BiomeTags.IS_SAVANNA) || biome.is(SavannaRegion.SAVANNA_RIVER);
     }
 
     /** How far in from the savanna's edge a place is (in steps of {@link #RING_STEP}, up to {@link #WANT_INSIDE}); 0 outside. */
@@ -136,6 +143,57 @@ public final class SavannaSpawn {
             }
         }
         return WANT_INSIDE;
+    }
+
+    /**
+     * Where the spawn goes: the nearest place inside a big savanna ({@link #bigSavanna}); with none in reach, the deepest
+     * place of the nearest savanna, as before ({@link #deepInside}).
+     */
+    public static BlockPos spawnPlace(BiomeSource biomes, Climate.Sampler sampler, BlockPos from, BlockPos find, int radius) {
+        BlockPos big = bigSavanna(biomes, sampler, from, radius);
+        return big != null ? big : deepInside(biomes, sampler, find);
+    }
+
+    /**
+     * The nearest place to {@code from} within {@code radius} that lies well inside a big savanna: savanna all round it
+     * out to {@link #BIG_ROUND} blocks, so the savanna is at least twice that across (BUGS 209: the nearest savanna was
+     * often one of Minecraft's own small ones, a windswept patch 100 blocks across, with the big ones farther off).
+     * Null when there is none.
+     */
+    @Nullable
+    public static BlockPos bigSavanna(BiomeSource biomes, Climate.Sampler sampler, BlockPos from, int radius) {
+        for (int ring = 0; ring * BIG_STEP <= radius; ring++) {
+            BlockPos best = null;
+            double bestDist = Double.MAX_VALUE;
+            for (int i = -ring; i <= ring; i++) {
+                for (int j = -ring; j <= ring; j++) {
+                    if (Math.max(Math.abs(i), Math.abs(j)) != ring) {
+                        continue;
+                    }
+                    BlockPos p = from.offset(i * BIG_STEP, 0, j * BIG_STEP);
+                    double dist = (double) i * i + (double) j * j;
+                    if (dist < bestDist && savannaAt(biomes, sampler, p.getX(), p.getZ()) && savannaRound(biomes, sampler, p, BIG_ROUND)
+                            && savannaRound(biomes, sampler, p, BIG_ROUND / 2) && depth(biomes, sampler, p) >= WANT_INSIDE) {
+                        best = p;
+                        bestDist = dist;
+                    }
+                }
+            }
+            if (best != null) {
+                return best;
+            }
+        }
+        return null;
+    }
+
+    private static boolean savannaRound(BiomeSource biomes, Climate.Sampler sampler, BlockPos at, int r) {
+        for (int k = 0; k < 16; k++) {
+            double a = k * Math.PI / 8;
+            if (!savannaAt(biomes, sampler, at.getX() + (int) (r * Math.cos(a)), at.getZ() + (int) (r * Math.sin(a)))) {
+                return false;
+            }
+        }
+        return true;
     }
 
     /** The place round the find farthest in from the savanna's edge (the nearest of the deepest). */

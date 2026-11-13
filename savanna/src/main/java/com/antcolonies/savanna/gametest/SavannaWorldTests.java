@@ -61,7 +61,7 @@ public class SavannaWorldTests {
         MultiNoiseBiomeSource vanillaSource = MultiNoiseBiomeSource.createFromPreset(registries.lookupOrThrow(
                 Registries.MULTI_NOISE_BIOME_SOURCE_PARAMETER_LIST).getOrThrow(MultiNoiseBiomeSourceParameterLists.OVERWORLD));
         List<Integer> typical = new ArrayList<>();
-        int biggest = 0, big = 0, tooFar = 0;
+        int biggest = 0, big = 0, tooFar = 0, small = 0;
         double landShare = 0;
         int land = 0;
         StringBuilder report = new StringBuilder();
@@ -95,8 +95,12 @@ public class SavannaWorldTests {
                 tooFar++;
                 report.append("\n    spawn: no savanna within 6,400 blocks");
             } else {
-                BlockPos inside = SavannaSpawn.deepInside(source, sampler, found.getFirst());
+                BlockPos inside = SavannaSpawn.spawnPlace(source, sampler, BlockPos.ZERO, found.getFirst(), 6400);
                 int depth = SavannaSpawn.depth(source, sampler, inside);
+                // BUGS 209: the spawn's savanna must be a big one (the nearest was often one of Minecraft's small patches)
+                boolean isBig = SavannaSpawn.bigSavanna(source, sampler, BlockPos.ZERO, 6400) != null;
+                small += isBig ? 0 : 1;
+                report.append(isBig ? "" : "\n    spawn: NO big savanna within 6,400 blocks");
                 int dist = (int) Math.sqrt(inside.distSqr(BlockPos.ZERO.atY(inside.getY())));
                 report.append(String.format("%n    spawn: nearest savanna %d blocks out, the spawn %d blocks out, %d blocks in from the edge",
                         (int) Math.sqrt(found.getFirst().distSqr(BlockPos.ZERO.atY(found.getFirst().getY()))), dist, depth));
@@ -117,6 +121,7 @@ public class SavannaWorldTests {
         helper.assertTrue(biggest >= BIGGEST_LEAST, "no savanna big enough: " + all);
         helper.assertTrue(spacing <= SPACING_MOST, "big savannas too rare: " + all);
         helper.assertTrue(coverage <= COVERAGE_MOST, "too much savanna: " + all);
+        helper.assertTrue(small == 0, "the spawn is not in a big savanna for " + small + " seeds: " + all);
         helper.assertTrue(tooFar == 0, "the spawn search found no place well inside a savanna for every seed: " + all);
         helper.succeed();
     }

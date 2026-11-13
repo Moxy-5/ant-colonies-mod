@@ -671,6 +671,8 @@ Moved here from CLAUDE.md on 2026-10-13 (it was loaded into every chat and took 
 
 - **Fix (BUGS 208), 2026-11-13: freshly dead mounds with the Matabele dice are dead 3.1 to 4.9 days, so their chimney is open** (`TermiteMoundStructure.pick`; before, the 30 in 100 freshly dead mounds had a capped chimney and their colony was dropped, "no way in"); fewer dead mounds now look brand new (about 1 in 13, was 3 in 10; my pick); the survey test checks it. Not tried in-game yet (a new world).
 
+- **Fix (BUGS 209), 2026-11-13: the spawn goes to the nearest big savanna** (`SavannaSpawn.spawnPlace`, `bigSavanna`, `BIG_ROUND` 500, my pick: at least 1,000 across; before, the nearest savanna of any size, often a small one of Minecraft's own zones); `SavannaWorldTests` checks it on its seeds. Not tried in-game yet (a new world).
+
 ## Handover notes for a code reviewer (written at the end of a very long session)
 - State: branch `master`, all committed, `./gradlew build` passes, `./gradlew runGameTestServer` passes 47 tests (about 8 minutes, in one world, tests run in parallel arena grids). Some tests are timing-sensitive under load (`antsOnBumpyGroundReachTheFoodStore` and `aStarvingWorkerSlowsDownAndDies` have each failed once and passed on a re-run): re-run before blaming a change.
 - Confirmed in-game by the user so far: everything up to and including dead ants and the refuse chamber, rich bread, worker hunger, colony starvation, and the hill-jam fix. Older bullets in "Current status" that still say "waiting for the user to confirm" are probably stale (the user tested them and reported no problems), but this was never written down: do not rely on those flags.
