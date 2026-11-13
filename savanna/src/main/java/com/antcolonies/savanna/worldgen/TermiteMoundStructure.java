@@ -271,6 +271,13 @@ public class TermiteMoundStructure extends Structure {
             case 2 -> between(random, 12, 30);
             default -> between(random, 35, 200);
         };
+        // BUGS 208: a mound's chimney stays capped until its tips crumble (MoundWear.PIECES_TO), so a freshly dead mound has
+        // no way in and its Matabele colony was silently dropped (6 of 18 dead mounds in the user's world, the 30 in 100
+        // freshly dead). A mound the ants hold has been dead long enough for them to get in: just open, spires still up.
+        double open = com.antcolonies.savanna.colony.MoundWear.PIECES_TO;
+        if (days < open + 0.1 && com.antcolonies.savanna.colony.MatabeleColonies.wouldSettle(seed, numbers.matabele().share())) {
+            days = open + 0.1 + days * 0.6;
+        }
         int woods = NO_WOODS;
         if (days >= 35 && random.nextDouble() < numbers.humpWoods()) {
             double r = random.nextDouble();

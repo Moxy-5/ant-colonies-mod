@@ -358,6 +358,9 @@ public class MatabeleNewLandTests {
                 out[4]++;
             } else if (MatabeleColonies.wouldSettle(pick.seed(), numbers.matabele().share())) {
                 out[3]++;
+                // BUGS 208: the survey counted the dice only, while a freshly dead mound's capped chimney let no colony in
+                helper.assertTrue(pick.days() >= com.antcolonies.savanna.colony.MoundWear.PIECES_TO, "a Matabele mound at " + foot.toShortString()
+                        + " is dead only " + pick.days() + " days: its chimney is still capped, so no colony gets in");
                 // test revamp R6: the living mound the raids feed on, its foot's edge from the Matabele nest
                 double edge = nearestLivingEdge(land, numbers, foot);
                 out[12] += edge <= SCOUT_REACH - NewLandMounds.DEAD_TREE_NEAREST ? 1 : 0;
