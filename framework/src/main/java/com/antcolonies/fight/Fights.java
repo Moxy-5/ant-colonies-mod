@@ -248,12 +248,26 @@ public final class Fights {
         return isShutIn(level, cell, SHUT_IN_SEARCH);
     }
 
+    /** {@link #isShutIn(Level, BlockPos)} for one asker (cells its foes hold are walls to it). */
+    public static boolean isShutIn(Level level, BlockPos cell, net.minecraft.world.entity.Entity asker) {
+        return isShutIn(level, cell, SHUT_IN_SEARCH, asker);
+    }
+
     /**
      * {@link #isShutIn(Level, BlockPos)} walking up to {@code most} cells. BUGS 185: on a giant baobab's trunk under its
      * bulge, 40 cells never reached the open a few steps away and a Matabele scout took itself for sealed in, so the
      * bite-out reflex asks with a wider look. Each column's ground top is read once; unloaded land is never walked into.
      */
     public static boolean isShutIn(Level level, BlockPos cell, int most) {
+        return isShutIn(level, cell, most, null);
+    }
+
+    /**
+     * {@link #isShutIn(Level, BlockPos, int)} for one asker: a cell a foe of its holds ({@link HeldCells}) is a wall
+     * to it too, so a member behind a held mouth is shut in for it until the holder is felled.
+     */
+    public static boolean isShutIn(Level level, BlockPos cell, int most, @org.jetbrains.annotations.Nullable net.minecraft.world.entity.Entity asker) {
+        boolean held = asker != null && HeldCells.any(level);
         java.util.Map<Long, Integer> tops = new java.util.HashMap<>();
         ArrayDeque<BlockPos> queue = new ArrayDeque<>();
         Set<BlockPos> seen = new HashSet<>();
@@ -273,7 +287,8 @@ public final class Fights {
                     continue;
                 }
                 BlockState there = level.getBlockState(next);
-                if (there.isCollisionShapeFullBlock(level, next) || FacedWall.hasFace(there, side.getOpposite())) {
+                if (there.isCollisionShapeFullBlock(level, next) || FacedWall.hasFace(there, side.getOpposite())
+                        || held && HeldCells.barred(level, next, asker)) {
                     continue;
                 }
                 seen.add(next);

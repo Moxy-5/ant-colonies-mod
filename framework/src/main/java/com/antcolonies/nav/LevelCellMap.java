@@ -44,6 +44,9 @@ public final class LevelCellMap implements CellMap {
         if (state.getBlock() instanceof Channel) {
             return false; // only ever crawled through by its channel (see channelSides)
         }
+        if (com.antcolonies.fight.HeldCells.barred(level, pos, insect)) {
+            return false; // a foe holds it (the held mouth): a wall to this insect while the holder lives
+        }
         return state.getCollisionShape(level, pos, context).isEmpty()
                 && state.getFluidState().isEmpty()
                 && !state.is(BlockTags.FIRE)

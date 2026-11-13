@@ -185,3 +185,38 @@ raiders dead in one run); the fight numbers have not been touched, that is step 
 
 **Tests:** `soldiers,raids,away,termitefood,colony` on 6 servers: only two old flakes, both 3 of 3 alone (the neighbours test, BUGS 68, and the away tuft, BUGS 80); full run on 6 servers (38 minutes): every test passed but the old harvester larva flake (BUGS 179, 3 of 3 alone) and the optional raider-going-home replay (3 of 3 alone);
 
+
+## Step 4, built 2026-11-12: the held mouth
+
+**One rule:** a cell a living soldier holds is a wall to everything it would fight, for as long as it lives and stands
+in it (`fight/HeldCells`, in the framework, species-neutral). Two readers, no new judge:
+
+- **The legs** (`LevelCellMap.isOpen`): no enemy's route goes into or through the cell. Its own nestmates pass.
+- **The hunters' "is it shut in?"** (`Fights.isShutIn` for an asker, read by `FightGoal.worthChasing`): a termite
+  behind the held mouth counts as shut in for the raiders, so nobody plans a walk to it that must fail (a failed
+  route search is the dear one). The holder itself is fought from the cell beside it.
+
+**Who holds:** the soldier the alarm gave the opening itself to at a foe or a breach (the nearest major, a minor if
+none; step 3's rule, `Alarm.holdsMouth`). While it stands in the opening it never leaves it for a lunge: it bites what
+comes within reach of its jaws (`DefendGoal`). Dead, paralysed or out of the cell, and the wall is gone that tick or
+within half a second.
+
+**Real:** a *Macrotermes* major plugs a gallery with its head and jaws (phragmosis); *Megaponera* majors go for the
+soldiers first so the minors can get at the workers behind. In blocks one soldier stands for that plug: a gallery is
+one cell wide, so the opening's cell is the choke point.
+
+**My picks:** a hold lasts 10 ticks unless renewed; the holder is fought from any cell touching its own.
+
+**Not done / limits:** only the opening itself is held (the soldiers in the ring round it do not block); a break made
+through a gallery's roof where no soldier can stand in the broken cell has no holder; a second break beside the first
+is a second way in until its own trouble has a holder; no new clip (the holder stands with the others' stance).
+Guard films not run: the change is only read where a soldier holds a cell on alarm, which no guard scene has.
+
+**Measured (the daytime raid of 20, 4 runs, with the held mouth):** workers stung 3, 9, 5, 1 (step 3: 5, 7, 6, 4);
+raiders dead 2, 19, 5, 2; soldiers lost 12, 6, 11, 12; in the earshot scene the mouth was held 20 to 191 ticks.
+Still swingy and too hard on the raiders: step 5.
+
+**Tests:** new checks in `soldiersWithinEarshotComeToARaidsBreakTakeTheirOwnPlacesAndBite` (while a living soldier
+stands in the opening it is a wall to a raider's legs and its "shut in?", never to nestmates; with no soldier in it,
+to nobody; held at least a second); `soldiers,raids,away,legs` 82 of 82 on 6 servers (4 minutes).
+

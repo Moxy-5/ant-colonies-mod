@@ -261,6 +261,9 @@ public class TermiteRaidDefenceTests {
             colony.population().addNewMembers(TermiteSoldierEntity.Rank.MAJOR.caste(), level.getGameTime(), 10);
             colony.population().setOnForTests(true); // (the real-mob swap on, nobody watching: only the trouble calls soldiers out)
             MatabeleEntity raider = raider(level, breakAt);
+            // (the rework, step 4, the held mouth: a second raider out of everyone's reach, asked whether the break is a wall to it)
+            MatabeleEntity watcher = raider(level, breakAt.above(8));
+            int[] heldTicks = {0};
             Alarm alarm = colony.part(SavannaParts.ALARM).orElseThrow();
             RaidDefence raid = colony.part(SavannaParts.RAID_DEFENCE).orElseThrow();
             long tellAt = helper.getTick() + 10;
@@ -290,9 +293,33 @@ public class TermiteRaidDefenceTests {
                 }
                 int places = 0;
                 List<TermiteSoldierEntity> real = TestIsolation.insectsOf(helper, TermiteSoldierEntity.class);
+                TermiteSoldierEntity inMouth = null;
                 for (TermiteSoldierEntity soldier : real) {
                     if (alarm.holdsPlace(soldier.getUUID())) {
                         places++;
+                    }
+                    if (soldier.isAlive() && alarm.holdsMouth(soldier.getUUID()) && soldier.blockPosition().equals(breakAt)) {
+                        inMouth = soldier;
+                    }
+                }
+                // Step 4, the held mouth: while a living soldier stands in the opening it is a wall to the raiders (their
+                // legs and their "is it shut in?"), never to its own side; with no soldier in it, to nobody.
+                boolean barred = com.antcolonies.fight.HeldCells.barred(level, breakAt, watcher);
+                if (inMouth == null) {
+                    helper.assertTrue(!barred, "the break is a wall to a raider with no soldier standing in it");
+                } else if (barred) {
+                    heldTicks[0]++;
+                    helper.assertTrue(!new com.antcolonies.nav.LevelCellMap(level, watcher).isOpen(breakAt),
+                            "a raider's legs may still plan through the mouth a soldier holds");
+                    for (TermiteSoldierEntity soldier : real) {
+                        helper.assertTrue(!com.antcolonies.fight.HeldCells.barred(level, breakAt, soldier),
+                                "the mouth a soldier holds is a wall to its own nestmates");
+                    }
+                    if (sealedAt[0] < 0) {
+                        helper.assertTrue(com.antcolonies.fight.Fights.isShutIn(level, breakAt.relative(net.minecraft.core.Direction.DOWN, 0).offset(
+                                        cells.get(at - 1).getX() - breakAt.getX(), cells.get(at - 1).getY() - breakAt.getY(), cells.get(at - 1).getZ() - breakAt.getZ()), watcher)
+                                        || com.antcolonies.fight.Fights.isInTheOpen(level, cells.get(at - 1)),
+                                "a termite one cell behind the held mouth is not shut in for a raider");
                     }
                 }
                 for (TermiteSoldierEntity soldier : four) {
@@ -305,17 +332,17 @@ public class TermiteRaidDefenceTests {
                 if (sealedAt[0] < 0 && level.getBlockState(plug).is(colony.profile().nest().plugState().getBlock())) {
                     sealedAt[0] = tick;
                 }
-                if (sealedAt[0] >= 0 && bitten[0] && mostPlaces[0] >= 2 && mostReal[0] > 4) {
+                if (sealedAt[0] >= 0 && bitten[0] && mostPlaces[0] >= 2 && mostReal[0] > 4 && heldTicks[0] >= 20) {
                     helper.assertTrue(heardAt.size() >= 2, "the four soldiers heard the drumming at the same moment (it does not run out)");
                     long out = four.stream().filter(soldier -> raid.isShutOut(soldier.getUUID()) || !soldier.isAlive()).count();
                     helper.assertTrue(out >= 2, "the seal was packed at " + (sealedAt[0] - tellAt) + " ticks before the soldiers were out: only "
                             + out + " of the four are outside it");
-                    SavannaMod.LOGGER.info("[raid-earshot-test] {} held places, {} of the four out before the seal, sealed after {} ticks, {} soldiers real",
-                            mostPlaces[0], out, sealedAt[0] - tellAt, mostReal[0]);
+                    SavannaMod.LOGGER.info("[raid-earshot-test] {} held places, {} of the four out before the seal, sealed after {} ticks, {} soldiers real, the mouth held {} ticks",
+                            mostPlaces[0], out, sealedAt[0] - tellAt, mostReal[0], heldTicks[0]);
                     helper.succeed();
                 }
             };
-            failAt[0] = () -> "bitten " + bitten[0] + ", most holding places " + mostPlaces[0] + ", most real soldiers " + mostReal[0] + ", heard at "
+            failAt[0] = () -> "mouth held " + heldTicks[0] + " ticks, bitten " + bitten[0] + ", most holding places " + mostPlaces[0] + ", most real soldiers " + mostReal[0] + ", heard at "
                     + heardAt + ", sealed at " + sealedAt[0] + "; the four at " + four.stream().map(s -> s.blockPosition().toShortString()).toList()
                     + ", break " + breakAt.toShortString() + ", plug " + plug.toShortString() + alarm.describe(level) + raid.describe(level);
         });

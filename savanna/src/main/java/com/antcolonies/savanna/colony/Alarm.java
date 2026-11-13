@@ -688,6 +688,17 @@ public class Alarm {
         }
     }
 
+    /** Whether this soldier's place at a foe or a breach is the opening itself (a gallery's mouth: step 4, the held mouth). */
+    public boolean holdsMouth(UUID soldier) {
+        for (Trouble trouble : troubles) {
+            Place place = trouble.places.get(soldier);
+            if (place != null && place.cell().equals(trouble.at)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     /** Whether this soldier holds a place at a foe or a breach now (it stands out to fight there, not sheltered). */
     public boolean holdsPlace(UUID soldier) {
         for (Trouble trouble : troubles) {

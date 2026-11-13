@@ -123,7 +123,13 @@ public class DefendGoal extends Goal {
         if (lungingAt == null || !lungingAt.isAlive() || (soldier.tickCount + soldier.getId()) % 4 == 0) {
             lungingAt = foeNear(level, task);
         }
-        if (lungingAt != null) {
+        // The held mouth (the rework, step 4): the soldier standing in the opening itself is a wall to its foes while it
+        // lives (HeldCells), and never leaves it for a lunge: it bites what comes within reach of its jaws.
+        boolean inMouth = alarm.holdsMouth(soldier.getUUID()) && soldier.blockPosition().equals(task.cell()) && !soldier.isClimbing();
+        if (inMouth) {
+            com.antcolonies.fight.HeldCells.hold(soldier, task.cell());
+        }
+        if (lungingAt != null && (!inMouth || reaches(lungingAt))) {
             chase(lungingAt);
         } else {
             stand(task.cell(), task.spot(), task.facing(), task.drumOnArrival());

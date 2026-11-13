@@ -319,7 +319,11 @@ public class FightGoal extends Goal {
         BlockPos at = target.blockPosition();
         if (ant.getNavigator().isDone() || walkingTo == null || walkingTo.distSqr(at) > 2) {
             walkingTo = at;
-            if (!ant.getNavigator().moveTo(at, 1.2) && !ant.openWayTo(level, target)) {
+            // The held mouth: a foe holding its cell is fought from the cell beside it (no walk goes into a held cell).
+            boolean found = com.antcolonies.fight.HeldCells.barred(level, at, ant)
+                    ? ant.getNavigator().moveTo(hold -> hold.cell().distManhattan(at) == 1, at, 1, 1.2)
+                    : ant.getNavigator().moveTo(at, 1.2);
+            if (!found && !ant.openWayTo(level, target)) {
                 ant.countChaseNotFound();
                 FightDiary.note(ant, "no way to " + AbstractAntEntity.foeName(target) + ": leaves it a while");
                 unreachable.put(target.getUUID(), level.getGameTime() + UNREACHABLE_TICKS);
@@ -418,11 +422,13 @@ public class FightGoal extends Goal {
         if (Fights.isInTheOpen(level, at)) {
             return true;
         }
+        // The held mouth (the termite alarm rework, step 4): a member behind a cell one of its soldiers holds is shut in
+        // for this ant until the holder is felled (the holder itself, in its cell, is not).
         if (ant.breaksIn()) {
             int steps = insect.stepsToAnOpening();
-            return steps >= 0 && steps <= MOUTH_STEPS;
+            return steps >= 0 && steps <= MOUTH_STEPS && !(com.antcolonies.fight.HeldCells.any(level) && Fights.isShutIn(level, at, ant));
         }
-        return !Fights.isShutIn(level, at);
+        return !Fights.isShutIn(level, at, ant);
     }
 
     /** How many steps in from an opening a breaker still goes for a member at it (my pick, 1: the mouth itself and the cell under it). */
