@@ -123,6 +123,9 @@ public final class Fights {
             if (prey.isDowned()) {
                 return false;
             }
+            if (shielded(prey)) {
+                return false; // (only its armoured head is to be got at: no grip, no sting, no harm)
+            }
             float prick = Math.min(STING_PRICK, prey.getHealth() - STING_PRICK);
             if (prick > 0.0F) {
                 prey.hurt(striker.damageSources().mobAttack(striker), prick);
@@ -146,6 +149,20 @@ public final class Fights {
             cutLeg(striker, insect);
         }
         return hit;
+    }
+
+    /**
+     * Whether a hunter's sting cannot land on this prey (the termite alarm rework, step 5; the user, 2026-11-12: soldiers
+     * fight from inside the hole): a body with a {@code head_shield} (a termite soldier) that holds its cell
+     * ({@link HeldCells}: its place in a gallery, or a gallery's mouth) shows only its armoured head, and the sting has
+     * to reach the soft abdomen: its hunters can neither grip nor sting nor hurt it, and leave it alone (my pick, after
+     * measuring: bitten at for the hunter's damage instead, the line of soldiers fell in seconds, two bites each). They
+     * get at it where it does not hold a cell: out in the open, on its way to its place, or once the cover over it is
+     * broken; and one that clamps on to a leg is dragged out. Real: Megaponera sting termites in the abdomen;
+     * Macrotermes soldiers block galleries head out.
+     */
+    public static boolean shielded(AbstractAntEntity prey) {
+        return prey.headShield() && HeldCells.holds(prey);
     }
 
     /**

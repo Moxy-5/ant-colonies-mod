@@ -415,13 +415,14 @@ public final class RaidsAway {
             int taken = Math.min(wanted, most);
             int countLost = RaidCatch.take(level, termites, taken);
             out.caught += taken;
-            // M8 step 3S: a tenth of the termite colony's soldiers (1 to 12) comes to the break (the old rule near a
-            // player too; the alarm rework's step 5 makes this read the new local alarm's rule); the majors sting
-            // about half of them and carry them home with the workers (my picks); the count loses them as the workers (3d)
+            // The alarm rework, step 5: as near a player now, the soldiers within earshot come to the break (measured
+            // near: 12 to 17 of a full colony's 20 or so; here 6 in 10, at most 12) and hold the gallery from inside,
+            // so only about a quarter of them are lost (the ones that clamp on to a leg and are dragged out, or are
+            // caught on the way to their place) and carried home with the workers; the count loses them as the workers (3d)
             String minor = TermiteSoldierEntity.Rank.MINOR.caste();
             String major = TermiteSoldierEntity.Rank.MAJOR.caste();
             int soldiers = termites.getCount(minor) + termites.getCount(major);
-            answering = soldiers <= 0 ? 0 : Math.max(1, Math.min(12, (int) Math.round(soldiers * 0.1)));
+            answering = soldiers <= 0 ? 0 : Math.max(1, Math.min(12, (int) Math.round(soldiers * ANSWERING_SHARE)));
             int stung = count(random, answering, STUNG_SOLDIER_SHARE);
             if (stung > 0) {
                 termites.population().loseToHunters(level, termites.population().inside(minor) > 0 ? minor : major, stung,
@@ -464,13 +465,15 @@ public final class RaidsAway {
     }
 
     /**
-     * M8 step 3S out of sight (my picks, to the balance targets of {@code docs/DESIGN.md}, "Step 3S": of a raid, 0 to 2
-     * dead and 1 to 5 hurt, 2 to 8 soldiers stung): the share of the soldiers at the break that each kill a raider, send
-     * one home hurt, are stung and carried home.
+     * Soldiers at a raid out of sight (my picks, set to what the measuring scene of the alarm rework's step 5 gave near a
+     * player: of a raid of 20 that broke in, 0 to 6 raiders dead, 1 to 14 hurt, 1 to 6 soldiers lost): the share of the
+     * colony's soldiers that comes to the break, and of those the share that each kill a raider, send one home hurt,
+     * are stung and carried home.
      */
+    private static final double ANSWERING_SHARE = 0.6;
     private static final double SOLDIER_KILLS = 0.12;
     private static final double SOLDIER_HURTS = 0.3;
-    private static final double STUNG_SOLDIER_SHARE = 0.5;
+    private static final double STUNG_SOLDIER_SHARE = 0.25;
 
     /** How many of {@code of} by a chance {@code share} each (a coin per ant, at most 2,500 ants). */
     private static int count(RandomSource random, int of, double share) {

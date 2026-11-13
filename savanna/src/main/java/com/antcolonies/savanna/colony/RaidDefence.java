@@ -126,7 +126,7 @@ public class RaidDefence {
             return;
         }
         SavannaNumbers.RaidNumbers numbers = numbers();
-        colony.part(SavannaParts.ALARM).ifPresent(alarm -> alarm.trouble(level, Alarm.Kind.BREACH, where));
+        colony.part(SavannaParts.ALARM).ifPresent(alarm -> alarm.trouble(level, Alarm.Kind.BREACH, where, by));
         long now = level.getGameTime();
         for (Breach breach : breaches) {
             if (breach.at.distSqr(where) <= INTO_TUNNEL * INTO_TUNNEL || breach.plug.distSqr(where) <= 4) {

@@ -267,3 +267,41 @@ attacker cannot be stung, only bitten at by the Matabele majors), which only mea
 break. Not known: whether other feeding places (log tops, runways of sheeting) have gaps of their own; the user's
 next look in-game will tell.
 
+
+## Step 5, part 2, built 2026-11-12: soldiers fight from inside the hole (the user: "complete the last step first")
+
+**What it is now, in one rule:** against insects (a raid), soldiers take their places only under cover, in the gallery
+behind the opening or the galleries nearest the foe, and a soldier standing at its place is a wall to the raiders and
+cannot be gripped, stung or hurt by them: only its armoured head shows. The raiders leave such a soldier alone. They
+get at soldiers that do not hold a place: out in the open, on the way to a place, under cover that has just been
+broken, or one that clamps on to a leg and is dragged out (the real sacrifice, kept).
+
+**How it got there (measured each time with the measuring scene, 6 to 12 raids):**
+1. Places under cover and "no sting from the front": soldiers still all died in half the runs. Cause found with a line
+   per lost soldier: a gripped soldier is held still, so it stopped "holding" its cell after half a second and both
+   its wall and its shield lapsed. Now a soldier holding its place is never gripped.
+2. Bitten at for the hunter's damage instead of stung (what was agreed in talk): the line fell in seconds, two major
+   bites a soldier. **My pick, changed from what we said:** no harm at all from the front; the ants cannot crunch
+   through a head in a hole. The other way (majors may bite through) is one line to bring back if wanted.
+3. The special "holder in the opening itself" (step 4) removed: each soldier stepping up into the open cell was stung
+   in turn. Every soldier at a covered place is a wall now (`HeldCells` takes several holders a cell), so step 4's
+   rule became simpler, and the raiders' "fight the holder from beside" code went with it.
+4. A foe's trouble left beside a breach kept most soldiers, their places jumping with the foe: troubles within the
+   merge distance fold into the worst one (`Alarm.foldInto`).
+5. Spare places past the first ones were handed out afresh every half second and could be the open cell itself: they
+   are kept like any place now and are under cover.
+6. Against a chicken or a player nothing changes: the soldiers still stand out in the open round it and lunge
+   (`Trouble.insects`; found by the chicken tests).
+
+**Measured at the end:** measured over the last 24 raids of 20 on a full colony: the 10 that broke in cost the termites 1 to 6 soldiers (most 1 to 3; nearly all had clamped on to a leg and been dragged out, or were caught before reaching a place; before, up to 12 to 18), workers stung 5 to 6, raiders 0 to 6 dead and 1 to 14 hurt; in the other 14 the scene's raiders never found the cover. Targets were soldiers 0 to 2, workers 3 to 6, raiders 0 to 2 dead and 1
+to 5 hurt: soldiers and workers about there, raiders hurt above it (soldiers biting from cover cannot be answered).
+
+**Raids out of sight** follow it (`RaidsAway`): 6 in 10 of the soldiers come (at most 12, was a tenth), a quarter of
+those are lost (was half); the kills and hurts per soldier unchanged.
+
+**Limits and what is not known:** the measuring scene's raiders are no column, and in over half its runs they never
+find the cover, so the numbers come from few raids; no soak run was made. The raid stays its full 2 minutes while
+workers sit sealed within 10 blocks (older rule). A soldier holding a place cannot be hurt by ants even from behind
+after a second break, until the cover over it is gone. The seal given up 1 run in 12 (part 1) was not looked into.
+Tests: full run on 6 servers (44 minutes): every test passed but two, the harvester numbers test (BUGS 206, old) and the middle-hole chicken test (BUGS 207, with the minors-bite-a-chicken test, which fails about half its runs on the last commit too).
+

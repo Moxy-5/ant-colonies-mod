@@ -1372,6 +1372,11 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
         legCutForTests = chance;
     }
 
+    /** Whether its head is a shield (its body's {@code head_shield}; see {@link Fights#shielded}). */
+    public boolean headShield() {
+        return fightNumbers().map(FightNumbers.Body::headShield).orElse(false);
+    }
+
     /** The chance one of its landed blows bites a leg off a foe that can lose legs (its body's {@code leg_cut}). */
     public double legCut() {
         return legCutForTests >= 0.0 ? legCutForTests : fightNumbers().map(FightNumbers.Body::legCut).orElse(0.0);
@@ -1628,7 +1633,10 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
         }
         if (attackTick == how.gripAt() && holds) {
             if (target instanceof AbstractAntEntity prey) {
-                if (prey.pinnedBy == null && !prey.isParalysed() && prey.dodges(this)) {
+                if (Fights.hunts(profile(), prey) && Fights.shielded(prey)) {
+                    // (a prey holding its cell head out is never gripped: held still it would stop holding it)
+                    com.antcolonies.fight.FightDiary.note(this, "its jaws slide off the head of " + foeName(target));
+                } else if (prey.pinnedBy == null && !prey.isParalysed() && prey.dodges(this)) {
                     grabsMissed++;
                     com.antcolonies.fight.FightDiary.note(this, "grabs at " + foeName(target) + ": it twists away");
                 } else if (prey.pinnedBy == null && !prey.isParalysed()) {

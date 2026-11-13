@@ -20,16 +20,14 @@ import java.util.WeakHashMap;
  * (phragmosis), and Megaponera must kill it before they get at the workers behind.
  *
  * <p>Server thread only. The holder says so again every few ticks ({@link #hold}); a hold not renewed, or whose holder
- * is dead, down or out of its cell, is gone.
+ * is dead, down or out of its cell, is gone. Several insects may hold one cell (soldiers side by side in a gallery).
  */
 public final class HeldCells {
     /** How long one {@link #hold} lasts (ticks): the holder renews it while it stands there. */
     private static final int HOLD_TICKS = 10;
 
-    private record Hold(AbstractAntEntity holder, long until) {
-    }
-
-    private static final Map<Level, Map<BlockPos, Hold>> HELD = new WeakHashMap<>();
+    /** Per world, per cell: its holders, each with the game time its hold lasts to. */
+    private static final Map<Level, Map<BlockPos, Map<AbstractAntEntity, Long>>> HELD = new WeakHashMap<>();
 
     private HeldCells() {
     }
@@ -39,13 +37,28 @@ public final class HeldCells {
         if (holder.level().isClientSide) {
             return;
         }
-        HELD.computeIfAbsent(holder.level(), level -> new HashMap<>())
-                .put(cell.immutable(), new Hold(holder, holder.level().getGameTime() + HOLD_TICKS));
+        long now = holder.level().getGameTime();
+        Map<AbstractAntEntity, Long> holders = HELD.computeIfAbsent(holder.level(), level -> new HashMap<>())
+                .computeIfAbsent(cell.immutable(), at -> new HashMap<>(2));
+        holders.entrySet().removeIf(hold -> gone(hold.getKey(), hold.getValue(), cell, now));
+        holders.put(holder, now + HOLD_TICKS);
+    }
+
+    private static boolean gone(AbstractAntEntity holder, long until, BlockPos cell, long now) {
+        return until < now || !holder.isAlive() || holder.isDowned() || !holder.blockPosition().equals(cell);
+    }
+
+    /** Whether this insect holds the cell it stands in now. */
+    public static boolean holds(AbstractAntEntity insect) {
+        Map<BlockPos, Map<AbstractAntEntity, Long>> held = HELD.get(insect.level());
+        Map<AbstractAntEntity, Long> holders = held == null ? null : held.get(insect.blockPosition());
+        Long until = holders == null ? null : holders.get(insect);
+        return until != null && until >= insect.level().getGameTime() && insect.isAlive() && !insect.isDowned();
     }
 
     /** Whether any cell of this world may be held now (a cheap first question). */
     public static boolean any(Level level) {
-        Map<BlockPos, Hold> held = HELD.get(level);
+        Map<BlockPos, Map<AbstractAntEntity, Long>> held = HELD.get(level);
         return held != null && !held.isEmpty();
     }
 
@@ -54,19 +67,28 @@ public final class HeldCells {
      * Never to an asker with no body, to the holder's own side, or to one already inside the cell.
      */
     public static boolean barred(Level level, BlockPos cell, @Nullable Entity asker) {
-        Map<BlockPos, Hold> held = HELD.get(level);
+        Map<BlockPos, Map<AbstractAntEntity, Long>> held = HELD.get(level);
         if (held == null || held.isEmpty() || asker == null) {
             return false;
         }
-        Hold hold = held.get(cell);
-        if (hold == null) {
+        Map<AbstractAntEntity, Long> holders = held.get(cell);
+        if (holders == null) {
             return false;
         }
-        AbstractAntEntity holder = hold.holder();
-        if (hold.until() < level.getGameTime() || !holder.isAlive() || holder.isDowned() || !holder.blockPosition().equals(cell)) {
+        long now = level.getGameTime();
+        holders.entrySet().removeIf(hold -> gone(hold.getKey(), hold.getValue(), cell, now));
+        if (holders.isEmpty()) {
             held.remove(cell);
             return false;
         }
-        return asker != holder && !asker.blockPosition().equals(cell) && Fights.mayAttack(holder, asker);
+        if (asker.blockPosition().equals(cell)) {
+            return false;
+        }
+        for (AbstractAntEntity holder : holders.keySet()) {
+            if (asker != holder && Fights.mayAttack(holder, asker)) {
+                return true;
+            }
+        }
+        return false;
     }
 }

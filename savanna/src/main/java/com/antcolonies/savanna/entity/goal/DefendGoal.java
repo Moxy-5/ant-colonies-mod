@@ -123,13 +123,16 @@ public class DefendGoal extends Goal {
         if (lungingAt == null || !lungingAt.isAlive() || (soldier.tickCount + soldier.getId()) % 4 == 0) {
             lungingAt = foeNear(level, task);
         }
-        // The held mouth (the rework, step 4): the soldier standing in the opening itself is a wall to its foes while it
-        // lives (HeldCells), and never leaves it for a lunge: it bites what comes within reach of its jaws.
-        boolean inMouth = alarm.holdsMouth(soldier.getUUID()) && soldier.blockPosition().equals(task.cell()) && !soldier.isClimbing();
-        if (inMouth) {
+        // Held places (the rework, steps 4 and 5, soldiers fight from inside the hole): a soldier standing at its place
+        // under cover (the gallery behind an opening) is a wall to its foes while it lives (HeldCells): the line of them
+        // is wall after wall. None of them leaves its place for a lunge at an insect (out in the open it is got round
+        // and stung): it bites what comes within reach of its jaws. At a player or an animal it still lunges.
+        boolean post = !Fights.isInTheOpen(level, task.cell());
+        if (post && soldier.blockPosition().equals(task.cell()) && !soldier.isClimbing()) {
             com.antcolonies.fight.HeldCells.hold(soldier, task.cell());
         }
-        if (lungingAt != null && (!inMouth || reaches(lungingAt))) {
+        boolean staysIn = post && lungingAt instanceof AbstractAntEntity;
+        if (lungingAt != null && (!staysIn || reaches(lungingAt))) {
             chase(lungingAt);
         } else {
             stand(task.cell(), task.spot(), task.facing(), task.drumOnArrival());

@@ -151,7 +151,7 @@ public record FightNumbers(Map<String, Body> bodies, List<String> foeTypes, List
 
     /** One body's numbers. */
     public record Body(double health, double damage, int stingsToFall, int venomTicks, double dodge, double biteBack,
-            double legCut, boolean losesLegs, double clamp) {
+            double legCut, boolean losesLegs, double clamp, boolean headShield) {
         public static final Codec<Body> CODEC = RecordCodecBuilder.create(i -> i.group(
                 Codec.DOUBLE.fieldOf("health").forGetter(Body::health),
                 Codec.DOUBLE.fieldOf("damage").forGetter(Body::damage),
@@ -161,7 +161,8 @@ public record FightNumbers(Map<String, Body> bodies, List<String> foeTypes, List
                 Codec.DOUBLE.optionalFieldOf("bite_back", 0.0).forGetter(Body::biteBack),
                 Codec.DOUBLE.optionalFieldOf("leg_cut", 0.0).forGetter(Body::legCut),
                 Codec.BOOL.optionalFieldOf("loses_legs", false).forGetter(Body::losesLegs),
-                Codec.DOUBLE.optionalFieldOf("clamp", 0.0).forGetter(Body::clamp)
+                Codec.DOUBLE.optionalFieldOf("clamp", 0.0).forGetter(Body::clamp),
+                Codec.BOOL.optionalFieldOf("head_shield", false).forGetter(Body::headShield)
         ).apply(i, Body::new));
     }
 

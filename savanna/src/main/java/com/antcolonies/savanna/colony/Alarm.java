@@ -112,6 +112,11 @@ public class Alarm {
         @Nullable
         BlockPos cellsFor;
         long cellsAt = Long.MIN_VALUE;
+        /**
+         * Step 5: insects made it (a raid): the soldiers take places only under cover, where they hold the galleries
+         * from inside. Against anything else (a chicken, a player) they also stand out in the open round it, as before.
+         */
+        boolean insects;
 
         Trouble(Kind kind, BlockPos at, double base, long now) {
             this.kind = kind;
@@ -194,6 +199,12 @@ public class Alarm {
      * moves to the newest, but a breach stays where the wall was broken), or starts a new one.
      */
     public void trouble(ServerLevel world, Kind kind, BlockPos at) {
+        trouble(world, kind, at, null);
+    }
+
+    /** {@link #trouble(ServerLevel, Kind, BlockPos)} with what made it, if known (insects are met from under cover). */
+    public void trouble(ServerLevel world, Kind kind, BlockPos at, @Nullable Entity by) {
+        boolean insects = by instanceof AbstractAntEntity;
         SavannaNumbers.AlarmNumbers numbers = numbers();
         if (numbers == null) {
             return;
@@ -201,14 +212,18 @@ public class Alarm {
         long now = world.getGameTime();
         double strength = numbers.strength(kind);
         double merge = numbers.mergeWithin();
+        // (the worst trouble within the merge distance takes it, then the nearest: a foe seen by a breach is the breach's)
         Trouble near = null;
         for (Trouble trouble : live(world)) {
-            if (trouble.at.distSqr(at) <= merge * merge && (near == null || trouble.at.distSqr(at) < near.at.distSqr(at))) {
+            if (trouble.at.distSqr(at) <= merge * merge && (near == null || trouble.kind.ordinal() > near.kind.ordinal()
+                    || trouble.kind == near.kind && trouble.at.distSqr(at) < near.at.distSqr(at))) {
                 near = trouble;
             }
         }
         if (near == null) {
-            troubles.add(new Trouble(kind, at.immutable(), strength, now));
+            Trouble made = new Trouble(kind, at.immutable(), strength, now);
+            made.insects = insects;
+            troubles.add(made);
             while (troubles.size() > MOST) {
                 troubles.remove(troubles.stream().min(Comparator.comparingDouble(trouble -> strength(trouble, now))).orElseThrow());
             }
@@ -217,19 +232,47 @@ public class Alarm {
         }
         near.base = Math.max(strength(near, now), strength);
         near.fedAt = now;
+        if (insects && !near.insects) {
+            near.insects = true;
+            near.cellsAt = Long.MIN_VALUE;
+            tasksAt = Long.MIN_VALUE;
+        }
         if (kind.ordinal() > near.kind.ordinal()) {
             near.kind = kind;
             near.startedAt = now;
             near.at = at.immutable();
             tasksAt = Long.MIN_VALUE;
+            foldInto(near, merge, now);
         } else if (kind == near.kind && kind != Kind.BREACH && !near.at.equals(at)) {
             near.at = at.immutable();
+            foldInto(near, merge, now);
+        }
+    }
+
+    /**
+     * Troubles no worse than this one within the merge distance of it become part of it: their soldiers answer it (step
+     * 5: a foe's trouble left beside a breach kept most of the soldiers, their places moving with the foe).
+     */
+    private void foldInto(Trouble into, double merge, long now) {
+        for (java.util.Iterator<Trouble> others = troubles.iterator(); others.hasNext();) {
+            Trouble other = others.next();
+            if (other != into && other.kind.ordinal() <= into.kind.ordinal() && other.at.distSqr(into.at) <= merge * merge) {
+                into.base = Math.max(strength(into, now), strength(other, now));
+                into.fedAt = now;
+                other.heard.forEach(into.heard::putIfAbsent);
+                if (other.insects && !into.insects) {
+                    into.insects = true;
+                    into.cellsAt = Long.MIN_VALUE;
+                }
+                others.remove();
+                tasksAt = Long.MIN_VALUE;
+            }
         }
     }
 
     /** A member of the colony was hurt by {@code attacker}: a foe where the attacker is. */
     public void memberHurt(ServerLevel world, Entity attacker) {
-        trouble(world, Kind.FOE, attacker.blockPosition());
+        trouble(world, Kind.FOE, attacker.blockPosition(), attacker);
     }
 
     /** A player broke this block (before it is gone). A block of the mound, or one touching a dug-out nest cell, is a breach. */
@@ -320,7 +363,7 @@ public class Alarm {
                     }
                 }
                 if (near) {
-                    trouble(world, Kind.FOE, at);
+                    trouble(world, Kind.FOE, at, foe);
                 }
             }
         }
@@ -526,10 +569,10 @@ public class Alarm {
     }
 
     /**
-     * A foe or a breach: every soldier that heard comes, majors too: the nearest major (else the nearest minor) holds
-     * the place itself (a gallery's mouth), the others take the places round it (nearest first, minors before majors,
-     * the ones nearer coming first), facing out, each keeping its own place; any past the places stand at the nest cells
-     * nearest it. Every one guards the trouble's place (it bites foes within the leash of it).
+     * A foe or a breach: every soldier that heard comes, majors too, and takes a place under cover by it (nearest
+     * first, minors before majors, the ones nearer coming first), facing it, each keeping its own place; any past the
+     * places stand at the nest cells nearest it. Every one guards the trouble's place (it bites foes within the leash
+     * of it), and at its place is a wall to its foes ({@code HeldCells}, steps 4 and 5).
      */
     private void places(ServerLevel world, Trouble trouble, List<TermiteSoldierEntity> answering, Map<UUID, Task> out) {
         long time = world.getGameTime();
@@ -537,27 +580,13 @@ public class Alarm {
         Map<UUID, Place> places = trouble.places;
         Map<BlockPos, Long> badPlaces = trouble.badPlaces;
         badPlaces.values().removeIf(until -> until <= time || until > time + BAD_PLACE_TICKS);
-        List<BlockPos> cells = trouble.ring;
-        Set<BlockPos> cellSet = new HashSet<>(cells);
+        Set<BlockPos> cellSet = new HashSet<>();
+        trouble.slots.forEach(slot -> cellSet.add(slot.cell()));
         Set<UUID> ids = new HashSet<>();
         answering.forEach(soldier -> ids.add(soldier.getUUID()));
         places.keySet().retainAll(ids);
         places.values().removeIf(place -> !cellSet.contains(place.cell()) || badPlaces.containsKey(place.cell()));
         Set<Place> taken = new HashSet<>(places.values());
-        Place mouth = !cells.isEmpty() && cells.get(0).equals(spot) ? new Place(spot, 4) : null;
-        if (mouth != null && !taken.contains(mouth) && !badPlaces.containsKey(spot)) {
-            TermiteSoldierEntity holder = null;
-            for (TermiteSoldierEntity soldier : answering) {
-                if (!places.containsKey(soldier.getUUID()) && (holder == null || holder.getRank() != Rank.MAJOR && soldier.getRank() == Rank.MAJOR)) {
-                    holder = soldier; // (the nearest major; the nearest minor if no major is free)
-                }
-            }
-            if (holder != null) {
-                places.put(holder.getUUID(), mouth);
-                taken.add(mouth);
-            }
-        }
-        int next = 0;
         for (Rank rank : new Rank[] {Rank.MINOR, Rank.MAJOR}) {
             for (TermiteSoldierEntity soldier : answering) {
                 if (soldier.getRank() != rank) {
@@ -578,8 +607,6 @@ public class Alarm {
                     BlockPos cell = place.cell();
                     BlockPos facing = cell.equals(spot) ? spot : cell.offset(cell.getX() - spot.getX(), 0, cell.getZ() - spot.getZ());
                     out.put(soldier.getUUID(), new Task(cell, facing, false, spot, place.spot()));
-                } else if (next < trouble.spots.size()) {
-                    out.put(soldier.getUUID(), new Task(trouble.spots.get(next++), spot, false, spot, null));
                 }
             }
         }
@@ -589,10 +616,9 @@ public class Alarm {
      * The cells soldiers stand in at this trouble, kept for a second. The nest cells near it ({@code spots}, nearest
      * first): the place itself if it is open with a floor and opens into the nest (the hole a player made in a wall),
      * then the dug-out nest cells joined to the shaft that have a floor, within {@link #SPOTS_REACH} blocks. And for a
-     * foe or a breach the places round it ({@code ring}, nearest first): the place itself if one can stand in it (a
-     * gallery's mouth), then the open cells with a floor within {@link #RING} blocks sideways and {@link #RING_HEIGHT}
-     * up or down that open into it (outside through the broken cover, or along the gallery; never the ground over a
-     * gallery still roofed, which no soldier could reach), each with its spots ({@code slots}).
+     * foe or a breach the places by it ({@code ring}, nearest first): the cells under cover with a floor within
+     * {@link #RING} blocks sideways and {@link #RING_HEIGHT} up or down that open into it (the gallery behind a broken
+     * cover; never a cell out in the open, step 5), each with its spots ({@code slots}).
      */
     private void cellsNear(Level world, Trouble trouble) {
         long now = world.getGameTime();
@@ -636,7 +662,11 @@ public class Alarm {
         }
         while (!open.isEmpty()) {
             BlockPos cell = open.poll();
-            if (!cell.equals(at) && standable(world, cell)) {
+            // Step 5 (the user, 2026-11-12: soldiers fight from inside the hole): the places are under cover, along the
+            // gallery behind the opening or the galleries nearest the foe, never out in the open (there the Matabele
+            // got round the soldiers and stung them all, and each one stepping up into the opening itself was stung
+            // in turn). With no cover this near, they take the nest cells nearest it.
+            if (standable(world, cell) && (!trouble.insects || !com.antcolonies.fight.Fights.isInTheOpen(world, cell))) {
                 cells.add(cell);
             }
             for (Direction side : Direction.values()) {
@@ -647,19 +677,11 @@ public class Alarm {
             }
         }
         cells.sort(Comparator.comparingDouble((BlockPos cell) -> cell.distSqr(at)).thenComparingLong(BlockPos::asLong));
-        if (standable(world, at)) {
-            cells.add(0, at);
-        }
         trouble.ring = List.copyOf(cells);
-        // The spots: the place itself holds one (its middle), every other cell SLOT_GAP-apart spots, so the first dozen
-        // ring an opening shoulder to shoulder.
+        // The spots: every cell SLOT_GAP-apart spots, so the first dozen stand shoulder to shoulder.
         Vec3 middle = Vec3.atBottomCenterOf(at);
         List<Place> slots = new ArrayList<>();
         for (BlockPos cell : cells) {
-            if (cell.equals(at)) {
-                slots.add(new Place(cell, 4));
-                continue;
-            }
             for (int slot = 0; slot < 9; slot++) {
                 slots.add(new Place(cell, slot));
             }
@@ -667,6 +689,14 @@ public class Alarm {
         slots.sort(Comparator.comparingDouble((Place place) -> flatSqr(place.spot(), middle))
                 .thenComparingInt(place -> Math.abs(place.cell().getY() - at.getY()))
                 .thenComparingLong(place -> place.cell().asLong()).thenComparingInt(Place::slot));
+        // Past those, the nest cells nearest it that are under cover, one soldier each: kept like any place (step 5:
+        // handed out afresh each time, soldiers swapped sides through the opening, and one was the open cell itself).
+        Set<BlockPos> ringed = new HashSet<>(cells);
+        for (BlockPos cell : spots) {
+            if (!ringed.contains(cell) && (!trouble.insects || !com.antcolonies.fight.Fights.isInTheOpen(world, cell))) {
+                slots.add(new Place(cell, 4));
+            }
+        }
         trouble.slots = List.copyOf(slots);
     }
 
@@ -686,17 +716,6 @@ public class Alarm {
                 tasksAt = Long.MIN_VALUE;
             }
         }
-    }
-
-    /** Whether this soldier's place at a foe or a breach is the opening itself (a gallery's mouth: step 4, the held mouth). */
-    public boolean holdsMouth(UUID soldier) {
-        for (Trouble trouble : troubles) {
-            Place place = trouble.places.get(soldier);
-            if (place != null && place.cell().equals(trouble.at)) {
-                return true;
-            }
-        }
-        return false;
     }
 
     /** Whether this soldier holds a place at a foe or a breach now (it stands out to fight there, not sheltered). */
