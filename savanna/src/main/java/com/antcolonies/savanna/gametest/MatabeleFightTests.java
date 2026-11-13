@@ -122,9 +122,9 @@ public class MatabeleFightTests {
                 helper.assertTrue(minor.getMaxHealth() == 5.0F, "a Matabele minor should have 5 health, has " + minor.getMaxHealth());
                 helper.assertTrue(major.getMaxHealth() == 10.0F && major.getHealth() == 10.0F,
                         "a Matabele major should start with 10 of 10 health, has " + major.getHealth() + " of " + major.getMaxHealth());
-                // A soldier's bite is a wound by its damage (4), never the venom.
+                // A soldier's bite is a wound by its damage (1.5 since the alarm rework, step 5; was 4), never the venom.
                 soldier.bite(major);
-                helper.assertTrue(major.getHealth() == 6.0F, "the soldier's bite should take 4 health, the major has " + major.getHealth());
+                helper.assertTrue(major.getHealth() == 8.5F, "the soldier's bite should take 1.5 health, the major has " + major.getHealth());
                 helper.assertTrue(!major.isParalysed(), "a termite's bite should not paralyse a Matabele");
                 bitten[0] = true;
                 checkLostLegs(helper, soldier, major);

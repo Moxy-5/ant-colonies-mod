@@ -349,7 +349,7 @@ public class MatabeleEntity extends AbstractAntEntity implements ColonyBorn {
 
     /**
      * M8 step 3S: below this share of its health a raider is badly wounded, leaves the fight and walks home along the
-     * trail (my pick, 40 percent: two soldier bites send a major home, one a minor). Real: hurt Matabele call for help
+     * trail (my pick, 40 percent; since the alarm rework's step 5, soldier bites of 1 and 1.5: about six bites send a major home, three a minor). Real: hurt Matabele call for help
      * and are carried home or limp (Frank et al. 2017); the carrying is step 5.
      */
     private static final float BADLY_WOUNDED = 0.4F;

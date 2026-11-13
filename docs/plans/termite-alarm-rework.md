@@ -220,3 +220,38 @@ Still swingy and too hard on the raiders: step 5.
 stands in the opening it is a wall to a raider's legs and its "shut in?", never to nestmates; with no soldier in it,
 to nobody; held at least a second); `soldiers,raids,away,legs` 82 of 82 on 6 servers (4 minutes).
 
+
+## Step 5, part 1, built 2026-11-12: bites hurt, the raid leaves (the user's two picks)
+
+Proposed to the user and picked by them ("these 2 sound good", and "leave them outside till night"):
+
+1. **Soldier bites hurt, they rarely kill.** A minor soldier's bite 1 (was 3), a major's 1.5 (was 4)
+   (`macrotermes.json`, `fight.bodies`). A Matabele major (10 health) goes home badly wounded after about six minor
+   bites, a minor (5) after three; leg cuts and clamps unchanged. The numbers are my picks. Side effects, told to the
+   user: soldiers also hurt chickens and the player less.
+2. **The raid leaves once the workers are sealed away or gone.** Soldiers alone no longer keep an attack going
+   (`RaidColumn.preyAbout`): 30 s after the last worker in reach the raid picks up what it stung and goes; the soldiers
+   shut outside are left till night (the user's pick; real raiders also carry soldiers home, a known departure).
+
+**The measuring scene now ends as a column does** (it was a 5-minute skirmish, which overstated every loss): badly
+wounded raiders leave, the attack ends 30 s after the last prey or after 2 minutes, counted from the cover's break.
+
+**Measured (a daytime raid of 20 on a full colony, 11 runs that had a fight):** raiders dead 0 in 9 runs, 2 and 7 in
+the others (was 1 to 19); raiders hurt 2 to 11 (target 1 to 5); workers stung 1 to 11, once 33 (target 3 to 6);
+soldiers lost 1 to 14, once 19 (target 0 to 2).
+
+**Still off, and why (honest):**
+- **Soldiers lost is still high.** Minor soldiers fall to one sting and 6 to 10 of them stand in the raiders' reach.
+  Part of it is the scene: its raiders belong to no column, so every one fights every soldier alike, where a real
+  column's minors leave soldiers that are not right in their way. Not measured on a real column yet.
+- **Raiders hurt is above target** for the same reason (a melee of 15 to 20 soldiers against 20 raiders).
+- **One run in 12 never sealed** (the seal was given up after 30 s, `plug_give_up_ticks` times 3, and the raid ran
+  its whole 2 minutes: 33 workers stung, 19 soldiers, 7 raiders). Older than this step; to look into.
+- **The scene's majors take from 4 s to 3 minutes to find the cover**, so runs differ a lot before the fight starts.
+
+**Next in step 5 (not built):** measure on a real raid column (the whole-chain raid test with these counts); then, if
+soldiers still die in numbers, the user's call between tougher soldiers (two stings to fell a minor) and fewer soldiers
+coming; the seal given up; `RaidsAway` on the same rule as near; the soak (`tools/soak.sh 2 6`); full run; merge.
+
+**Tests:** `soldiers,raids,away` on 6 servers: all passed but the old mound-ringing scout flake (BUGS 153, 3 of 3 alone) and the fight test's exact bite check, updated on purpose (a major soldier's bite takes 1.5, was 4; then 3 of 3).
+

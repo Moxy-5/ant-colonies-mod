@@ -1194,10 +1194,22 @@ public final class RaidColumn implements com.antcolonies.fight.FightDiary {
         // with nobody fighting, the ants searching round on their own till the attack's longest time (the user's raid:
         // 70 game minutes, till dusk).
         boolean breaking = ants.stream().anyMatch(ant -> ant.breaksIn() && fightsForTheColumn(ant));
+        return preyAbout(level, colony.getId(), at, reach, breaking);
+    }
+
+    /**
+     * Whether prey a raid stays for is about this spot (see {@link #termitesAbout}; also asked by the measuring scene of
+     * the alarm rework, so it ends its raid as a column does). {@code breaking}: a major still breaks a way in.
+     */
+    public static boolean preyAbout(ServerLevel level, @Nullable UUID raiders, BlockPos at, double reach, boolean breaking) {
         return !level.getEntitiesOfClass(AbstractAntEntity.class, new AABB(at).inflate(reach, 6.0, reach),
                 insect -> insect.isAlive() && !insect.isParalysed() && !insect.isDowned() && !(insect instanceof MatabeleEntity)
-                        && !colony.getId().equals(insect.getColonyId()) && flat(insect.blockPosition(), at) <= reach
+                        && (raiders == null || !raiders.equals(insect.getColonyId())) && flat(insect.blockPosition(), at) <= reach
                         && !insect.isSheltered()
+                        // The alarm rework, step 5 (the user, 2026-11-12): soldiers are fought only when in the way, so they
+                        // alone never keep an attack going: once the workers are sealed away or gone the raid picks up and
+                        // leaves, and the soldiers shut outside are left till night.
+                        && !(insect instanceof com.antcolonies.savanna.entity.TermiteSoldierEntity)
                         && (breaking || Fights.isInTheOpen(level, insect.blockPosition())
                                 || !Fights.isShutIn(level, insect.blockPosition()))).isEmpty();
     }

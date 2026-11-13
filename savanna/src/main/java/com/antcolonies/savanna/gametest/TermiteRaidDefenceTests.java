@@ -496,6 +496,8 @@ public class TermiteRaidDefenceTests {
             java.util.Map<java.util.UUID, Float> whole = new java.util.HashMap<>();
             long[] cameAt = {-1};
             long[] brokeAt = {-1};
+            long[] leftAt = {-1};
+            long[] preyAt = {0};
             long[] soldierAt = {-1};
             long[] biteAt = {-1};
             long[] sealedAt = {-1};
@@ -531,6 +533,7 @@ public class TermiteRaidDefenceTests {
                 }
                 long since = tick - cameAt[0];
                 if (since <= 20) {
+                    preyAt[0] = since;
                     // (a new ant's health settles with its own size in its first ticks: "hurt" is health lost after that)
                     ants.forEach(ant -> whole.put(ant.getUUID(), ant.getHealth()));
                     return;
@@ -563,7 +566,34 @@ public class TermiteRaidDefenceTests {
                         stung.add(worker.getUUID());
                     }
                 }
-                if (since < 3600) {
+                // Step 5: the scene's raid ends as a column's does (it was a 5-minute skirmish): a badly wounded raider
+                // leaves the fight, and the attack is over 30 s after the last prey about the spot (soldiers alone do
+                // not keep it going), or after its longest time; what is counted is what had happened by then.
+                if (leftAt[0] < 0) {
+                    boolean breaking = ants.stream().anyMatch(ant -> ant.isAlive() && ant.breaksIn() && ant.getFightSpot() != null);
+                    if (com.antcolonies.savanna.colony.RaidColumn.preyAbout(level, null, breakAt, 10.0, breaking)) {
+                        preyAt[0] = since;
+                    }
+                    for (MatabeleEntity ant : ants) {
+                        if (ant.isAlive() && ant.badlyWounded() && ant.getFightSpot() != null) {
+                            ant.orderToFight(breakAt, 0L);
+                        }
+                    }
+                    // (the scene's majors take from 4 s to 3 minutes to find the cover: the attack's clock starts at its break)
+                    if (brokeAt[0] < 0 && stung.isEmpty()) {
+                        preyAt[0] = since;
+                        if (since < 3600) {
+                            return;
+                        }
+                    }
+                    long began = brokeAt[0] < 0 ? 0 : brokeAt[0];
+                    if (since - Math.max(preyAt[0], began) >= 600 || since - began >= 2400) {
+                        leftAt[0] = since;
+                        ants.forEach(ant -> ant.orderToFight(breakAt, 0L));
+                    }
+                    return;
+                }
+                if (since < leftAt[0] + 100) {
                     return;
                 }
                 long feedingStung = feeding.stream().filter(stung::contains).count();
@@ -573,10 +603,10 @@ public class TermiteRaidDefenceTests {
                 SavannaMod.LOGGER.info("[alarm-measure] colony of {} (added{}); at the start: {}. Ticks after the raiders came: cover broken {}, "
                         + "first soldier at the break {}, first bite on a raider {}, sealed {}. Soldiers: most answering {}, most within 4 "
                         + "blocks of the break {}, seen {}, lost {}. Workers stung {} ({} of the 6 feeding). Raiders of 20: {} dead, {} hurt ({} "
-                        + "with a leg off).{}{}",
+                        + "with a leg off). The raid left at {}.{}{}",
                         colony.getCount(com.antcolonies.colony.Caste.WORKER), added, atStart[0], brokeAt[0], soldierAt[0], biteAt[0], sealedAt[0],
                         mostAlarmed[0], mostAtBreak[0], soldiersSeen.size(), soldiersLost.size(), stung.size(), feedingStung, dead,
-                        hurt, legs, alarm.describe(level), raid.describe(level));
+                        hurt, legs, leftAt[0], alarm.describe(level), raid.describe(level));
                 helper.assertTrue(brokeAt[0] >= 0 || !stung.isEmpty(), "the raid never happened: the cover was not broken and no termite stung");
                 helper.succeed();
             };
