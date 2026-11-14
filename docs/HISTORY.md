@@ -716,6 +716,7 @@ Moved here from CLAUDE.md on 2026-10-13 (it was loaded into every chat and took 
 - **Floodplain fruit and the fallen fruit under new trees confirmed in-game by the user 2026-11-14** ("everything works"); `claude/termite-alarm-rework` merged into `master` with the user's OK, no full run (the user: "no test needed").
 
 - **M2 dropped (the user, 2026-11-14):** the user will not work in Blockbench, so M2 (waiting for their Blockbench worker model) is closed; Claude makes every model and clip with the tools, and "Blockbench both ways" (upgrade review M8, tools review V7) is shelved. Notes only.
+- **Milestones renumbered (the user, 2026-11-14, "I am jumping ahead"):** M9 is now the animals (the animal kit, was M9.4, then savanna life, was M9.5); the nuptial flights moved from M9 to M9.5. Notes only.
 
 ## Handover notes for a code reviewer (written at the end of a very long session)
 - State: branch `master`, all committed, `./gradlew build` passes, `./gradlew runGameTestServer` passes 47 tests (about 8 minutes, in one world, tests run in parallel arena grids). Some tests are timing-sensitive under load (`antsOnBumpyGroundReachTheFoodStore` and `aStarvingWorkerSlowsDownAndDies` have each failed once and passed on a re-run): re-run before blaming a change.

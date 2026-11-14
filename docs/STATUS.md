@@ -24,7 +24,7 @@ Keep this short. The full story is in `docs/HISTORY.md`; the long status is at t
 2. **Step 4, drawn-only ants:** big raid columns of 200 to 500 without lag.
 
 ## Optional, after the finish line
-Savanna loading step 4 (mounds made with the world itself), the test revamp, moving house, polish (M8.5), flying queens (M9), the savanna animals (M9.5), more species.
+Savanna loading step 4 (mounds made with the world itself), the test revamp, moving house, polish (M8.5), the animals (M9: the animal kit, then the savanna animals), flying queens (M9.5), more species.
 
 ## Open bugs
 **Savanna lag (2026-11-04):** about 50 ms a tick with 1-second spikes; fix built on `claude/perf-far-colonies` (colonies with no player within 64 blocks live as numbers, brains spread over the second), not tried in-game yet; the Matabele joined the far rule with away raids (3f, 2026-11-05).
@@ -107,3 +107,4 @@ Only rare test flakes (`docs/BUGS.md`); in play: the raid column freezing just o
 - **Major soldiers attack (2026-11-13):** the big soldiers now stand at the front of the hole and snap at any ant that comes within a block, without leaving cover. Raids cost the ants more (0 to 7 dead of 20 in my test raids). Waiting for your look, then the merge.
 - **Mud repaired after a raid (2026-11-13):** termites now re-plaster a branch the Matabele bit open, the top too (before, a hole bitten from above stayed open for good). Waiting for your look.
 - **Spectator mode and a quick raid command (2026-11-13):** watching in spectator no longer keeps ants from appearing; `/antcolonies scout raid` sends a scout straight to the nearest termites and brings a raid. Waiting for your look.
+- **Milestones renumbered (your call, 2026-11-14):** the animals are now M9 (the animal kit, then the savanna animals) and the flying queens M9.5; older notes use the old numbers. M2 (the Blockbench worker) dropped. Next: the first animal, my pick the aardvark.
