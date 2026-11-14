@@ -1,0 +1,6 @@
+{
+  "type": "neoforge:add_features",
+  "biomes": "#antcolonies:savanna_waters",
+  "features": "antcolonies:river_algae",
+  "step": "vegetal_decoration"
+}

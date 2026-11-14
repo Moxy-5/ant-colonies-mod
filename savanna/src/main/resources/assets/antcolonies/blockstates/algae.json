@@ -1,0 +1,72 @@
+{
+  "variants": {
+    "growth=0": [
+      {
+        "model": "antcolonies:block/algae_0"
+      },
+      {
+        "model": "antcolonies:block/algae_0",
+        "y": 90
+      },
+      {
+        "model": "antcolonies:block/algae_0",
+        "y": 180
+      },
+      {
+        "model": "antcolonies:block/algae_0",
+        "y": 270
+      }
+    ],
+    "growth=1": [
+      {
+        "model": "antcolonies:block/algae_1"
+      },
+      {
+        "model": "antcolonies:block/algae_1",
+        "y": 90
+      },
+      {
+        "model": "antcolonies:block/algae_1",
+        "y": 180
+      },
+      {
+        "model": "antcolonies:block/algae_1",
+        "y": 270
+      }
+    ],
+    "growth=2": [
+      {
+        "model": "antcolonies:block/algae_2"
+      },
+      {
+        "model": "antcolonies:block/algae_2",
+        "y": 90
+      },
+      {
+        "model": "antcolonies:block/algae_2",
+        "y": 180
+      },
+      {
+        "model": "antcolonies:block/algae_2",
+        "y": 270
+      }
+    ],
+    "growth=3": [
+      {
+        "model": "antcolonies:block/algae_3"
+      },
+      {
+        "model": "antcolonies:block/algae_3",
+        "y": 90
+      },
+      {
+        "model": "antcolonies:block/algae_3",
+        "y": 180
+      },
+      {
+        "model": "antcolonies:block/algae_3",
+        "y": 270
+      }
+    ]
+  }
+}

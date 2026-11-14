@@ -54,6 +54,7 @@ public class SavannaItems {
     public static final DeferredItem<BlockItem> SILT = ITEMS.registerSimpleBlockItem(SavannaBlocks.SILT);
     public static final DeferredItem<BlockItem> WET_SILT = ITEMS.registerSimpleBlockItem(SavannaBlocks.WET_SILT);
     public static final DeferredItem<BlockItem> RIVER_MUD = ITEMS.registerSimpleBlockItem(SavannaBlocks.RIVER_MUD);
+    public static final DeferredItem<BlockItem> ALGAE = ITEMS.registerSimpleBlockItem(SavannaBlocks.ALGAE);
 
     /**
      * A piece of forage: dead plant material a termite cut off a plant (dry grass, a dead bush, dying leaves, a hay

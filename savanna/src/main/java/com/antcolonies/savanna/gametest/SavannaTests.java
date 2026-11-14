@@ -62,6 +62,8 @@ public final class SavannaTests {
         TestFilter.addCategoryPrefix("replays", "replay_");
         // Performance (only when named, never in a full run).
         // big savannas in normal worlds (2026-11-06): biome maps measured against the agreed size and rarity
+        // River life (M9): the algae on the bed, later the fish.
+        TestFilter.addCategory("river", RiverLifeTests.class);
         TestFilter.addCategory("worldgen", SavannaWorldTests.class, SavannaLoadingTests.class);
         TestFilter.addCategory("stress", TermiteStressTests.class);
 

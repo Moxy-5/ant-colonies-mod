@@ -152,6 +152,15 @@ public class SavannaBlocks {
     public static final DeferredBlock<Block> RIVER_MUD = BLOCKS.registerSimpleBlock("river_mud",
             BlockBehaviour.Properties.of().mapColor(MapColor.TERRACOTTA_BROWN).strength(0.5F).sound(SoundType.MUD));
 
+    /**
+     * River algae (M9 river life, 2026-11-14): a thin green mat on river, pan and oxbow beds under water, food for the
+     * grazing fish (block/AlgaeBlock). Holds water like seagrass; no collision; broken by hand at once.
+     */
+    public static final DeferredBlock<com.antcolonies.savanna.block.AlgaeBlock> ALGAE = BLOCKS.registerBlock("algae",
+            com.antcolonies.savanna.block.AlgaeBlock::new,
+            BlockBehaviour.Properties.of().mapColor(MapColor.WATER).replaceable().noCollission().instabreak()
+                    .sound(SoundType.WET_GRASS).randomTicks().pushReaction(PushReaction.DESTROY));
+
     static {
         TreeBlocks.init(); // the giant savanna trees' blocks (M7.5), registered with the rest
     }

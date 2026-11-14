@@ -1,4 +1,5 @@
-"""Textures for the river algae (M9 river life, the first link of the food chain; 2026-11-14), three looks to pick from in
+"""Textures for the river algae (look C picked by the user 2026-11-14; `python tools/algae_art.py` writes the game's
+files: algae_mat_0..3.png, algae_strands_short.png and algae_strands_tall.png, 8 frames each, with their .mcmeta) (M9 river life, the first link of the food chain; 2026-11-14), three looks to pick from in
 the algae viewer (python tools/model_viewer.py algae, tools/algae_viewer.template.html):
   A  green felt      a soft, even green film, darker specks; thickens from scattered specks to a full carpet
   B  slime mat       olive brown-green blobs with pale gas bubbles caught in it when thick (the "pond scum" look)
@@ -76,9 +77,10 @@ def strands_film(stage):
     return felt(stage)
 
 
-def streamer(tall):
+def streamer(tall, frame=0, frames=1):
     """The upright tuft for look C (drawn on two crossed planes, as Minecraft draws grass): thin wavy strands rising
-    from the bottom edge, brighter at their tips; `tall` the stage (2 short, 3 long)."""
+    from the bottom edge, brighter at their tips; `tall` the stage (2 short, 3 long). `frame` of `frames`: the strands'
+    sway, a lean to and fro moving up them (the game plays the frames as an animated texture)."""
     rows = [[(0, 0, 0, 0)] * S for _ in range(S)]
     rng = random.Random(400 + tall)
     for i in range(7 if tall == 3 else 5):
@@ -87,7 +89,8 @@ def streamer(tall):
         phase = rng.uniform(0, 6.283)
         for y in range(S - 1, top - 1, -1):
             t = (S - 1 - y) / max(1, S - 1 - top)          # 0 at the foot, 1 at the tip
-            x = int(round(x0 + 1.4 * t * math.sin(phase + y * 0.7))) % S
+            lean = 1.2 * t * math.sin(6.283 * frame / frames + phase * 0.3) if frames > 1 else 0
+            x = int(round(x0 + 1.4 * t * math.sin(phase + y * 0.7) + lean)) % S
             g = (60 + 70 * t, 104 + 76 * t, 40 + 30 * t)
             rows[y][x] = tuple(clamp(v) for v in g) + (240,)
     return rows
@@ -103,3 +106,27 @@ def all_looks():
         out[look] = {"mat": [fn(s) for s in range(4)], "tuft": {}}
     out["C"]["tuft"] = {2: streamer(2), 3: streamer(3)}
     return out
+
+
+FRAMES = 8
+OUT = "savanna/src/main/resources/assets/antcolonies/textures/block"
+
+
+def main():
+    """Writes look C's textures into the savanna mod (the user's pick, 2026-11-14)."""
+    import os
+    import river_blocks_art
+    os.makedirs(OUT, exist_ok=True)
+    for stage in range(4):
+        rows = strands_film(stage)
+        river_blocks_art.write_png(os.path.join(OUT, f"algae_mat_{stage}.png"), S, S, [p for r in rows for p in r])
+    for name, tall in (("short", 2), ("tall", 3)):
+        px = [p for f in range(FRAMES) for r in streamer(tall, f, FRAMES) for p in r]
+        river_blocks_art.write_png(os.path.join(OUT, f"algae_strands_{name}.png"), S, S * FRAMES, px)
+        with open(os.path.join(OUT, f"algae_strands_{name}.png.mcmeta"), "w", encoding="utf-8") as f:
+            f.write('{"animation": {"frametime": 5, "interpolate": false}}\n')
+    print("wrote the algae textures into", OUT)
+
+
+if __name__ == "__main__":
+    main()
