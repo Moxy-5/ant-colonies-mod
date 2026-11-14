@@ -250,6 +250,17 @@ public class TilapiaEntity extends AbstractSchoolingFish implements GeoEntity {
         return new ItemStack(SavannaItems.TILAPIA_BUCKET.get());
     }
 
+    /**
+     * Tilapia live in their river like cows on their plain (2026-11-14, the user: "they barely spawn"): Minecraft removes
+     * its own fish once no player is within 64 blocks, and at random past 32, while new ones spawn 24 to 128 blocks out,
+     * so most were gone as soon as they came and a narrow river held only one or two. They still count toward the
+     * water mobs' cap near a player (20), so the river fills to that and no further.
+     */
+    @Override
+    public boolean removeWhenFarAway(double distanceToClosestPlayer) {
+        return false;
+    }
+
     /** How far off a fish is still drawn (blocks; Minecraft's own rule, by the box's size, gave about 25). */
     static final double DRAW_DISTANCE = 64.0;
 

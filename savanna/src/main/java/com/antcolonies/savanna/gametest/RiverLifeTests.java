@@ -222,6 +222,12 @@ public class RiverLifeTests {
                 helper.fail("no tilapia in the spawn list of " + key.location());
             }
         }
+        // a wild fish stays in its river (never removed far from players) but still counts toward the water mobs' cap
+        TilapiaEntity wild = new TilapiaEntity(SavannaEntities.TILAPIA.get(), level);
+        wild.setUp(false, level.random);
+        if (wild.removeWhenFarAway(200.0 * 200.0) || wild.isPersistenceRequired() || wild.requiresCustomPersistence()) {
+            helper.fail("a wild tilapia is removed far away, or no longer counts toward the cap");
+        }
         // hungry grown fish in the deep end; a young one about to grow up
         TilapiaEntity[] school = new TilapiaEntity[4];
         for (int i = 0; i < school.length; i++) {
