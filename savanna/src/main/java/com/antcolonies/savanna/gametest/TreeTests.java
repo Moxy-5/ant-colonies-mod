@@ -190,6 +190,96 @@ public class TreeTests {
     }
 
     /**
+     * The sycamore fig's shapes as the game's blocks (floodplain trees step 4, 2026-11-13; the shapes themselves are
+     * checked against the model viewer in {@code FigShapeTest}): a grown fig set down in the arena is every block of its
+     * shape, its branches join what they touch, and every fig bunch, leaf spray and bark fig can hang where it is; then
+     * the same seed breaking up (dead, hollow, limbs fallen) has its bracket fungi holding on to the dead wood. Every age
+     * and dead stage of a few seeds turns into blocks with every small block finding its cell.
+     */
+    @GameTest(template = "arena", timeoutTicks = 100)
+    public static void figTreesStandAsTheViewerDrewThem(GameTestHelper helper) {
+        var level = helper.getLevel();
+        for (int seed = 1; seed <= 3; seed++) {
+            for (com.antcolonies.savanna.tree.FigShape.Age age : com.antcolonies.savanna.tree.FigShape.Age.values()) {
+                var shape = com.antcolonies.savanna.tree.FigShape.make(seed, age);
+                var states = shape.states();
+                if (states.size() != shape.cells().size() + shape.marks().size()) {
+                    helper.fail("fig seed " + seed + " " + age + ": " + (shape.cells().size() + shape.marks().size() - states.size())
+                            + " small blocks land on a cell already taken");
+                }
+            }
+        }
+        BlockPos foot = helper.absolutePos(new BlockPos(TREE_MIDDLE, SURFACE + 1, TREE_MIDDLE));
+        var grown = com.antcolonies.savanna.tree.FigShape.make(1, com.antcolonies.savanna.tree.FigShape.Age.GROWN).states();
+        setFig(level, foot, grown);
+        int bunches = 0, barkFigs = 0, joined = 0, branches = 0;
+        for (var e : grown.long2ObjectEntrySet()) {
+            BlockPos pos = foot.offset(BlockPos.of(e.getLongKey()));
+            BlockState want = e.getValue(), there = level.getBlockState(pos);
+            if (there.is(Blocks.BARRIER)) {
+                continue; // the arena's ceiling, which the tree grows up through
+            }
+            if (!there.equals(want)) {
+                helper.fail("the grown fig's block at " + BlockPos.of(e.getLongKey()).toShortString() + " is " + there + ", not " + want);
+                return;
+            }
+            if (want.is(TreeBlocks.FIG_BUNCH.get()) || want.is(TreeBlocks.FIG_LEAF_SPRAY.get()) || want.is(TreeBlocks.TRUNK_FIGS.get())) {
+                if (!want.canSurvive(level, pos)) {
+                    helper.fail(want.getBlock() + " cannot hang at " + BlockPos.of(e.getLongKey()).toShortString());
+                }
+                bunches += want.is(TreeBlocks.FIG_BUNCH.get()) ? 1 : 0;
+                barkFigs += want.is(TreeBlocks.TRUNK_FIGS.get()) ? 1 : 0;
+            }
+            if (want.getBlock() instanceof com.antcolonies.savanna.block.FigBranchBlock) {
+                branches++;
+                for (Direction d : Direction.values()) {
+                    if (want.getValue(TreeBranchBlock.PROPERTY_BY_DIRECTION.get(d))) {
+                        joined++;
+                        break;
+                    }
+                }
+            }
+        }
+        if (bunches < 10 || barkFigs < 3) {
+            helper.fail("the grown fig has " + bunches + " fig bunches and " + barkFigs + " bark figs (the viewer draws 22 and 8 at most)");
+        }
+        if (branches == 0 || joined < branches) {
+            helper.fail((branches - joined) + " of " + branches + " fig branches join nothing");
+        }
+        for (long k : grown.keySet()) {
+            if (!level.getBlockState(foot.offset(BlockPos.of(k))).is(Blocks.BARRIER)) {
+                level.setBlock(foot.offset(BlockPos.of(k)), Blocks.AIR.defaultBlockState(), Block.UPDATE_CLIENTS);
+            }
+        }
+        var dead = com.antcolonies.savanna.tree.FigShape.make(1, com.antcolonies.savanna.tree.FigShape.Age.BREAKING_UP).states();
+        setFig(level, foot, dead);
+        int brackets = 0;
+        for (var e : dead.long2ObjectEntrySet()) {
+            if (e.getValue().is(TreeBlocks.BRACKET_FUNGUS.get())) {
+                brackets++;
+                if (!e.getValue().canSurvive(level, foot.offset(BlockPos.of(e.getLongKey())))) {
+                    helper.fail("a bracket fungus on the dead fig has no dead wood behind it at " + BlockPos.of(e.getLongKey()).toShortString());
+                }
+            }
+        }
+        if (brackets == 0) {
+            helper.fail("the fig breaking up has no bracket fungi");
+        }
+        helper.succeed();
+    }
+
+    /** A fig's blocks set down around its foot, in their order (wood before what hangs on it), never over the arena's ceiling. */
+    private static void setFig(net.minecraft.server.level.ServerLevel level, BlockPos foot,
+            it.unimi.dsi.fastutil.longs.Long2ObjectMap<BlockState> states) {
+        for (var e : states.long2ObjectEntrySet()) {
+            BlockPos pos = foot.offset(BlockPos.of(e.getLongKey()));
+            if (!level.getBlockState(pos).is(Blocks.BARRIER)) {
+                level.setBlock(pos, e.getValue(), Block.UPDATE_CLIENTS);
+            }
+        }
+    }
+
+    /**
      * Planks (the user, 2026-11-11): every trunk block of a kind, the heart rot marks too, saws into 4 planks: the
      * umbrella thorn into Minecraft's acacia planks, the camel thorn and baobab into their own, which count as planks.
      */

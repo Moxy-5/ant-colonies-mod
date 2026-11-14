@@ -1,6 +1,7 @@
 package com.antcolonies.savanna.command;
 
 import com.antcolonies.savanna.SavannaMod;
+import com.antcolonies.savanna.tree.FigShape;
 import com.antcolonies.savanna.tree.Forest;
 import com.antcolonies.savanna.tree.HeartRot;
 import com.antcolonies.savanna.tree.TreeLife;
@@ -12,6 +13,8 @@ import java.util.Comparator;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
 import com.mojang.brigadier.arguments.IntegerArgumentType;
+import com.mojang.brigadier.arguments.StringArgumentType;
+import net.minecraft.commands.SharedSuggestionProvider;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerLevel;
@@ -39,7 +42,35 @@ public class TreeCommands {
                         // days ago (0 hidden, 6 brackets, 16 hollow).
                         .then(Commands.literal("rot").executes(context -> rot(context.getSource(), (int) HeartRot.HOLLOW_FROM))
                                 .then(Commands.argument("days", IntegerArgumentType.integer(0, 1000))
-                                        .executes(context -> rot(context.getSource(), IntegerArgumentType.getInteger(context, "days")))))));
+                                        .executes(context -> rot(context.getSource(), IntegerArgumentType.getInteger(context, "days")))))
+                        // Floodplain trees step 4, for looking: a sycamore fig at an age or dead stage (seed, sapling,
+                        // young, mature, grown, dead1, dead2, dead3) where you stand, as the model viewer draws it; a seed
+                        // picks the tree (the viewer's seed), else one at random.
+                        .then(Commands.literal("fig").then(Commands.argument("age", StringArgumentType.word())
+                                .suggests((context, builder) -> SharedSuggestionProvider.suggest(
+                                        java.util.Arrays.stream(FigShape.Age.values()).map(a -> a.id), builder))
+                                .executes(context -> fig(context.getSource(), StringArgumentType.getString(context, "age"), -1))
+                                .then(Commands.argument("seed", IntegerArgumentType.integer(1, 1_000_000))
+                                        .executes(context -> fig(context.getSource(), StringArgumentType.getString(context, "age"),
+                                                IntegerArgumentType.getInteger(context, "seed"))))))));
+    }
+
+    /** Floodplain trees step 4: a fig of this age (the viewer's names) and seed (-1 at random) set down where the player stands. */
+    private static int fig(CommandSourceStack source, String ageId, int seed) {
+        FigShape.Age age = FigShape.Age.byId(ageId);
+        if (age == null) {
+            source.sendFailure(Component.literal("No fig age " + ageId + ": seed, sapling, young, mature, grown, dead1, dead2 or dead3."));
+            return 0;
+        }
+        int s = seed > 0 ? seed : 1 + source.getLevel().getRandom().nextInt(10_000);
+        BlockPos foot = BlockPos.containing(source.getPosition());
+        ServerLevel level = source.getLevel();
+        var states = FigShape.make(s, age).states();
+        for (var e : states.long2ObjectEntrySet()) {
+            level.setBlock(foot.offset(BlockPos.of(e.getLongKey())), e.getValue(), net.minecraft.world.level.block.Block.UPDATE_CLIENTS);
+        }
+        source.sendSuccess(() -> Component.literal("A sycamore fig, " + age.id + ", seed " + s + ": " + states.size() + " blocks."), false);
+        return 1;
     }
 
     /** Step 5, for testing: the nearest grown tree within 32 blocks dies now, or (fell) an acacia sheds and falls now. */

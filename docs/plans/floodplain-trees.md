@@ -117,7 +117,7 @@ is measured first. Either way the stems are full blocks you can climb.
 3. **DONE 2026-11-13 (details in `docs/HISTORY.md`). The fig's blocks:** fig log and wood (bark A in its tiles, young bark, dead bark, bare grey wood), fig branch
    (tapering, the same thicknesses), fig leaves, root slabs, fig bunch, figs on the bark, leaf spray, fig seedling;
    textures written by `tools/floodplain_tree_art.py` into the game's folders. Test category `trees`.
-4. **The fig's shapes in Java** (`tree/FigShape`, from `fig()`, `figSeedling`, `figSapling`, `deadFig`, `figFallen`;
+4. **DONE 2026-11-13 (details in `docs/HISTORY.md`; the viewer's 40 trees matched block for block on the first try). The fig's shapes in Java** (`tree/FigShape`, from `fig()`, `figSeedling`, `figSapling`, `deadFig`, `figFallen`;
    one seed one tree, as in the viewer), checked block for block against the viewer for a few seeds (a small export
    from the viewer, compared in `./gradlew test`).
 4b. **Fig fruit:** the bunch and bark-fig blocks ripening in stages, dropping to fallen figs that rot, the fig and green
