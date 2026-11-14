@@ -361,7 +361,7 @@ function pad(v, c, R, h) {
 // young: the young tree of the ages (about 15 tall, 21 wide, my pick): the same plan as the grown tree, smaller, with a
 // slimmer trunk barely flared, few root steps, thinner pads, smooth bark above the foot and only a first few figs.
 // dead: the dead stages, 1 just died (no leaves, no figs, the twigs bare), 2 breaking up (limbs broken off and lying
-// under the tree, the trunk hollow from the fork down, bracket fungi, termite mud at the foot). The fallen stage is
+// under the tree, the trunk hollow from the fork down, bracket fungi; no termite mud: only real termites put it on, the user 2026-11-13). The fallen stage is
 // made from stage 2 by figFallen. The dead stages keep the living tree's own limbs, so one seed is one tree.
 function fig(v, seed, shape, young, dead = 0) {
   const r = rng(seed * 104729 + 5), big = shape === "B" && !young, S = young ? 0.6 : big ? 1.36 : 1;
@@ -520,20 +520,10 @@ function barkSpots(v, lo, hi, n, gap, salt) {
     if (out.length < n && out.every(q => Math.hypot(p[0] - q[0], p[1] - q[1], p[2] - q[2]) >= gap)) out.push(p);
   return out;
 }
-// Termite mud over the dead wood near the ground: the cubes of fig bark up to about maxY (lumpy), in patches.
-function mudOver(v, maxY, share) {
-  const edits = [];
-  v.each((x, y, z, b) => {
-    if (y > maxY + (vnoise(x / 1.6 + 2.2, y / 1.4, z / 1.6 + 7.7, NS + 23) - 0.5) * 3 || !b.startsWith("cube|bark_fig")) return;
-    if (vnoise(x / 2.1 + 1.1, y / 2.6, z / 2.1 - 3.3, NS + 25) < 1 - share) return;
-    edits.push([x, y, z]);
-  });
-  for (const e of edits) v.setRaw(e[0], e[1], e[2], "cube|bark_fig:7");
-}
 // A dead fig. Stage 1, just died (weeks to a few months): every limb still there but bare, the leaves gone, the twigs
 // standing out like a broom, the bark dulled and starting to flake off. Stage 2, breaking up (a few years): the thin
 // limbs fallen and lying round it, the thick ones broken short, one gone to a stub, the trunk rotted hollow from the fork
-// down, bracket fungi on the bark, the termites' mud climbing the foot.
+// down, bracket fungi on the bark.
 function deadFig(v, o) {
   const { dead, pads, fallen, fy, Rw, r, rd } = o;
   if (dead === 1) {
@@ -553,14 +543,13 @@ function deadFig(v, o) {
   for (let y = dead === 3 ? 2 : fy - 3; y <= fy + 2; y++) for (let x = -4; x <= 4; x++) for (let z = -4; z <= 4; z++)  // hollow from the fork down
     if (Math.hypot(x, z) < Rw - 1.1) v.del(x, y, z);
   if (dead === 3) return {};  // the fallen tree: figFallen does the rest
-  mudOver(v, 2, 0.45);
   const spots = barkSpots(v, 2, fy, 6, 3.5, 31);
   spots.forEach((p, i) => bracket(v, p[0], p[1], p[2], p[3], i % 2 === 0));
   return { R: Rw + 3.5, fruit: spots[0] ? spots[0].slice(0, 3) : [0, fy, 0] };
 }
 // Stage 3, fallen (some years on): the hollow trunk snapped a few blocks up, leaving a jagged hollow stump on its
 // buttresses; the top lies beside it, hollow, its broken limbs sticking up and the ones it fell on snapped off; the
-// limbs that broke earlier have rotted into the ground; termite mud along the log and up the stump; bracket fungi.
+// limbs that broke earlier have rotted into the ground; bracket fungi.
 function figFallen(v, seed, shape) {
   const t = new Vox();
   fig(t, seed, shape, false, 3);
@@ -577,7 +566,6 @@ function figFallen(v, seed, shape) {
   });
   for (let y = 0; y <= snap + 3; y++) for (let x = -4; x <= 4; x++) for (let z = -4; z <= 4; z++)  // the stump, hollow
     if (Math.hypot(x, z) < Rw - 1.1) v.del(x, y, z);
-  mudOver(v, 2.5, 0.55);
   const spots = barkSpots(v, 1, snap + 2, 6, 3, 35);
   spots.forEach((q, i) => bracket(v, q[0], q[1], q[2], q[3], i % 2 === 0));
   return { R: Rw + 3.5, fruit: [0, snap + 1, 0] };
@@ -950,8 +938,8 @@ const AGES = {
 const DEAD = {
   fig: [
     ["dead1", "Just died", "Weeks to a few months dead: every limb still there but bare, the leaves dropped, the twigs standing out like a broom, no figs. The bark has dulled and started to flake, showing grey wood underneath."],
-    ["dead2", "Breaking up", "A few years dead: fig wood is soft and rots fast in the wet, so the thin limbs have fallen and lie round the tree, the thick ones are broken short (one to a stub), the trunk has rotted hollow from the fork down, bracket fungi grow on the bark, and termite mud climbs the foot. Mostly bare grey wood now."],
-    ["dead3", "Fallen", "Some years on: the hollow trunk snapped a few blocks up, leaving a jagged hollow stump on its buttresses. The top lies beside it, hollow, its broken limbs sticking up and the ones it fell on snapped off; the limbs that fell earlier have rotted into the ground. Termite mud and bracket fungi on the log."],
+    ["dead2", "Breaking up", "A few years dead: fig wood is soft and rots fast in the wet, so the thin limbs have fallen and lie round the tree, the thick ones are broken short (one to a stub), the trunk has rotted hollow from the fork down, and bracket fungi grow on the bark. Mostly bare grey wood now."],
+    ["dead3", "Fallen", "Some years on: the hollow trunk snapped a few blocks up, leaving a jagged hollow stump on its buttresses. The top lies beside it, hollow, its broken limbs sticking up and the ones it fell on snapped off; the limbs that fell earlier have rotted into the ground. Bracket fungi on the log."],
   ],
   doum: [
     ["dead1", "Just died", "A palm stem grows from one bud at its top and cannot heal: once the bud dies, the stem dies. Every crown has gone brown, the fronds hanging down round the stems; no spear leaf, no fruit. The stems are still whole."],
@@ -1245,7 +1233,7 @@ new ResizeObserver(resize).observe(canvas);
 const FLAT = {
   fig: [["bark_fig:4", "young bark"], ["bark_fig:0", "bark"], ["bark_fig:3", "bark, again"], ["bark_fig:1", "patch"], ["bark_fig:2", "pale patch"],
         ["leaves_fig_0", "leaves, lit"], ["leaves_fig_1", "leaves"], ["leaves_fig_2", "leaves, shaded"], ["sprig_fig", "hanging spray"],
-        ["bark_fig:5", "dead bark, flaking"], ["bark_fig:6", "bare dead wood"], ["bark_fig:7", "termite mud"]],
+        ["bark_fig:5", "dead bark, flaking"], ["bark_fig:6", "bare dead wood"]],
   doum: [["bark_doum", "trunk"], ["bark_doumdead", "dead trunk"]],
 };
 FLAT.bank = [].concat(FLAT.fig.slice(0, 5), FLAT.fig.slice(5, 8), FLAT.fig.slice(9), FLAT.doum, [["grass", "floodplain grass"], ["silt", "silt"], ["water", "river water"]]);

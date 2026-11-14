@@ -523,7 +523,7 @@ final class AcaciaShape {
         }
     }
 
-    /** Dead wood: bark peels in patches; termite mud climbs the trunk from the ground. */
+    /** Dead wood: bark peels in patches (no mud of its own, {@link DeadWood#weather}). */
     private void weather(TreeVoxels v, Grown gr, TreeStage stage) {
         DeadWood.weather(v, seed, gr.trunkTip()[1], gr.r0, stage);
     }

@@ -472,8 +472,9 @@ public class TreeTests {
     }
 
     /**
-     * A mud-climbed dead umbrella thorn: termite mud is plastered over the dead bark (Mud Crust plates on bleached wood)
-     * and it stays, however long it ticks: it is over wood the termites eat, so it is still needed.
+     * A weathered dead umbrella thorn (the "mud" stage) has no termite mud of its own (the user, 2026-11-13: mud is the
+     * sign termites were there); mud plastered over its dead bark, as termites put it there, stays however long it
+     * ticks: it is over wood the termites eat, so it is still needed.
      */
     @GameTest(template = "arena", timeoutTicks = 100)
     public static void termiteMudOnADeadTreeStays(GameTestHelper helper) {
@@ -481,15 +482,30 @@ public class TreeTests {
         BlockPos foot = helper.absolutePos(new BlockPos(TREE_MIDDLE, SURFACE, TREE_MIDDLE));
         TreePlacer.Placed tree = TreePlacer.placed("umbrella_thorn", 3, 1, TreeStage.MUD);
         TreePlacer.place(level, tree, foot, tree.box(foot), Block.UPDATE_CLIENTS);
+        int made = 0;
+        for (BlockPos pos : BlockPos.betweenClosed(foot.offset(-30, -2, -30), foot.offset(30, 40, 30))) {
+            made += MudCrustBlock.isCrust(level.getBlockState(pos)) ? 1 : 0;
+        }
+        if (made > 0) {
+            helper.fail(made + " mud plates on a dead tree no termite fed on");
+        }
+        // Termites plaster its trunk: a plate on every open side of the dead wood low down.
         List<BlockPos> crusts = new ArrayList<>();
         for (int i = 0; i < tree.size(); i++) {
             BlockPos pos = foot.offset(tree.xs()[i], tree.ys()[i], tree.zs()[i]);
-            if (MudCrustBlock.isCrust(level.getBlockState(pos))) {
-                crusts.add(pos);
+            if (tree.ys()[i] < 1 || tree.ys()[i] > 6 || !level.getBlockState(pos).is(TreeBlocks.TERMITE_WOOD)) {
+                continue;
+            }
+            for (Direction d : Direction.Plane.HORIZONTAL) {
+                BlockPos out = pos.relative(d);
+                if (level.getBlockState(out).isAir()) {
+                    level.setBlock(out, SavannaBlocks.MUD_CRUST.get().withFace(Blocks.AIR.defaultBlockState(), d.getOpposite()), Block.UPDATE_CLIENTS);
+                    crusts.add(out.immutable());
+                }
             }
         }
         if (crusts.size() < 20) {
-            helper.fail("only " + crusts.size() + " mud plates on a mud-climbed tree");
+            helper.fail("only " + crusts.size() + " mud plates put on the dead tree's trunk");
         }
         for (BlockPos pos : crusts) {
             boolean onWood = false;

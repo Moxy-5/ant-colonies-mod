@@ -703,8 +703,8 @@ public class TermiteFoodTests {
      * Big dead wood calls (the user's report, 2026-10-19: termites never found a standing dead giant 15 to 30 blocks out;
      * their pick: big dead wood is sensed from afar, as real termites smell and feel rotting wood through the soil): a
      * colony with its galleries grown as long as its workers allow, which has never seen it, senses a real dead giant
-     * (a mud-climbed umbrella thorn, standing in a dip a block deep, its roots running on under the grass round it) 10
-     * to 15 blocks from its nearest hole (at midday, nobody outside), and a gallery piece with its feeding gallery goes
+     * (a weathered dead umbrella thorn, standing in a dip a block deep, its roots running on under the grass round it), its
+     * nearest open wood 13 to 16 blocks from its nearest hole (at midday, nobody outside), and a gallery piece with its feeding gallery goes
      * out to its foot past the length allowed (the user's pick, 2026-10-19: a big find gets the diggers; before, the
      * colony sensed it and waited for ever), or from a hole near it a runway of mud. The foot is wood lying open, not a
      * buried root the colony never sees as food. Then by day the workers dig the feeding gallery down under it, every
@@ -764,8 +764,21 @@ public class TermiteFoodTests {
             long tick = helper.getTick();
             if (stage[0] == 1 && tick >= 1000 && tick % 100 == 0 && galleries.length() >= galleries.lengthAllowed()) {
                 // The galleries as long as the workers allow (the user's world: 500 workers, the tips all grown), then
-                // the dead giant: bleached log 3 thick and 10 tall, 10 to 15 blocks from the nearest hole (too far for a
-                // runway, so a gallery piece past the length allowed: a big find gets the diggers).
+                // the dead giant, its nearest open wood 13 to 16 blocks from the nearest hole: too far for a
+                // runway (at most 12; until 2026-11-13 a mud collar at its foot kept the runway off, and the foot was
+                // reckoned from the trunk), near enough to be sensed, so a gallery piece past the length allowed: a big
+                // find gets the diggers.
+                com.antcolonies.savanna.worldgen.TreePlacer.Placed tree = com.antcolonies.savanna.worldgen.TreePlacer.placed("umbrella_thorn", 3, 0.8,
+                        com.antcolonies.savanna.tree.TreeStage.MUD);
+                double spread = 0;
+                for (int i = 0; i < tree.size(); i++) {
+                    // Its open wood on the ground: in the dip (5 round); the roots running on under the grass round it are
+                    // neither sensed nor food.
+                    double out = Math.hypot(tree.xs()[i], tree.zs()[i]);
+                    if (tree.ys()[i] <= 1 && out <= 5.5) {
+                        spread = Math.max(spread, out);
+                    }
+                }
                 List<BlockPos> holes = colony.foragingHoles().tunnels(level).stream().map(NestPlan.ForagingTunnel::hole).toList();
                 List<BlockPos> dug = colony.foragingHoles().tunnels(level).stream().flatMap(t -> t.tunnel().stream()).toList();
                 BlockPos spot = null;
@@ -777,14 +790,15 @@ public class TermiteFoodTests {
                             near = Math.min(near, Math.sqrt(Math.pow(hole.getX() - at.getX(), 2) + Math.pow(hole.getZ() - at.getZ(), 2)));
                         }
                         boolean clear = dug.stream().noneMatch(cell -> Math.abs(cell.getX() - at.getX()) <= 7 && Math.abs(cell.getZ() - at.getZ()) <= 7);
-                        if (near >= 10 && near <= 15 && clear && Math.abs(x - (mid - 21)) + Math.abs(z - (mid - 10)) > 20) {
+                        if (near - spread >= 13 && near - spread <= 16 && clear && Math.abs(x - (mid - 21)) + Math.abs(z - (mid - 10)) > 20) {
                             spot = new BlockPos(x, SURFACE, z);
                         }
                     }
                 }
-                helper.assertTrue(spot != null, "no spot 10 to 15 blocks from the nearest hole:" + galleries.describe(level));
-                // A real dead giant as new land and the tree book make it: a mud-climbed umbrella thorn (its flared foot
-                // and roots in the soil, mud plates up its bark; the user's tree, 2026-10-19).
+                helper.assertTrue(spot != null, "no spot with the tree's nearest wood 13 to 16 blocks from the nearest hole (the tree spreads "
+                        + Math.round(spread) + "):" + galleries.describe(level));
+                // A real dead giant as new land and the tree book make it: a weathered dead umbrella thorn (its flared foot
+                // and roots in the soil; no mud of its own since 2026-11-13; the user's tree, 2026-10-19).
                 // It stands in a dip a block deep (as the user's did, 2026-10-19): the feeding gallery steps down from the
                 // tunnel to get under it.
                 for (int dx = -5; dx <= 5; dx++) {
@@ -797,8 +811,6 @@ public class TermiteFoodTests {
                 }
                 BlockPos treeFoot = helper.absolutePos(spot.below());
                 trunkFloor[0] = treeFoot.getY();
-                com.antcolonies.savanna.worldgen.TreePlacer.Placed tree = com.antcolonies.savanna.worldgen.TreePlacer.placed("umbrella_thorn", 3, 0.8,
-                        com.antcolonies.savanna.tree.TreeStage.MUD);
                 com.antcolonies.savanna.worldgen.TreePlacer.place(level, tree, treeFoot, tree.box(treeFoot), 3);
                 for (int i = 0; i < tree.size(); i++) {
                     BlockPos at = treeFoot.offset(tree.xs()[i], tree.ys()[i], tree.zs()[i]);

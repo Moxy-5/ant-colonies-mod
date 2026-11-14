@@ -115,7 +115,7 @@ public final class TreeLife {
     /**
      * The days after its death each dead stage starts, by the tree's own dice (the user's decisions, "real, squeezed";
      * my picks inside them, to confirm). The day it dies its leaves wither on the living shape (the first entry, LIVING).
-     * Acacias: the bare snag from the next day for 2 to 4 days, termite mud climbing 3 to 6 days, the limbs breaking off
+     * Acacias: the bare snag from the next day for 2 to 4 days, the weathered snag (the "mud" stage, with no mud since 2026-11-13: only real termites put mud on) 3 to 6 days, the limbs breaking off
      * 5 to 10 days, then the fall (11 to 21 days after death), the fallen log for good. Baobabs: standing dead under a day,
      * slumping 1 to 2 days, a wet fibre heap 3 to 6, a dried heap shrinking 10 to 20, then gone (the last entry, null).
      */

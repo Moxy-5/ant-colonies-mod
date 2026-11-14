@@ -542,7 +542,8 @@ public class TreeGrowthTests {
             helper.assertTrue(t.stage == want && t.placedStage == want && t.placedStep == step, at + " days after death: " + t.stage.id + " placed "
                     + t.placedStage.id + " step " + t.placedStep + ", not " + want.id + " step " + step);
             if (before == TreeStage.MUD && want != TreeStage.MUD) {
-                helper.assertTrue(lastMud > 20 && firstMud < lastMud, "the mud did not climb: " + firstMud + " plates at first, " + lastMud + " at the end");
+                // No mud on a dead tree no termite fed on (the user, 2026-11-13: mud is the sign termites were there).
+                helper.assertTrue(firstMud == 0 && lastMud == 0, "mud on a dead tree no termite fed on: " + firstMud + " plates at first, " + lastMud + " at the end");
             }
             if (before == TreeStage.SHED && want != TreeStage.SHED) {
                 helper.assertTrue(highChanges >= 3, "the limbs did not break off one by one: the wood up high changed " + highChanges + " times");

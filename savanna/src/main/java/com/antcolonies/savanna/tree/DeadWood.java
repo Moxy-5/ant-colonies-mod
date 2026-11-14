@@ -14,7 +14,7 @@ import java.util.List;
 
 /**
  * What every dead acacia shares, whatever its shape (M7.5; moved out of {@link AcaciaShape} unchanged so the new
- * umbrella thorn, {@link UmbrellaShape}, dies the same way): bark peeling, termite mud climbing from the ground, fallen
+ * umbrella thorn, {@link UmbrellaShape}, dies the same way): bark peeling (no mud: only real termites put mud on), fallen
  * pieces round it, and the fallen hollow giant.
  */
 final class DeadWood {
@@ -44,38 +44,17 @@ final class DeadWood {
         return cx * cx + cz * cz < 0.25 ? fallback : Math.atan2(cz, cx);
     }
 
-    /** Dead wood: bark peels in patches; termite mud climbs the trunk from the ground. trunkTop: the trunk's tip height. */
+    /**
+     * Dead wood: bark peels in patches. No termite mud of its own (the user, 2026-11-13: mud is the sign termites were
+     * there, so only real termites put it on, as they do over the wood they feed on). The stage still counts (old saves,
+     * timings); trunkTop, r0 and stage are kept for callers.
+     */
     static void weather(TreeVoxels v, long seed, double trunkTop, double r0, TreeStage stage) {
-        boolean muddy = stage != TreeStage.SNAG;
-        double mudTop = 4 + trunkTop * 0.9;
         v.forEach((x, y, z, b) -> {
-            if (b != TreePart.DEAD_BARK) {
-                return;
-            }
-            if (muddy) {
-                double a = Math.atan2(z, x);
-                double line = mudTop * (0.55 + 0.45 * (0.5 + 0.5 * Math.sin(a * 3 + seed))) + (stage == TreeStage.FALLEN ? -mudTop + 1.6 : 0);
-                if (y <= line && TreeRandom.hash(x, y, z, 31) < 0.85) {
-                    v.set(x, y, z, TreePart.MUD);
-                    v.markOverBark(x, y, z);
-                    return;
-                }
-            }
-            if (TreeRandom.hash(x, Math.floorDiv(y, 3), z, 33) < 0.22) {
+            if (b == TreePart.DEAD_BARK && TreeRandom.hash(x, Math.floorDiv(y, 3), z, 33) < 0.22) {
                 v.set(x, y, z, TreePart.PEELING);
             }
         });
-        if (muddy && stage != TreeStage.FALLEN) {
-            // A collar of mud round the foot, where the termites come up.
-            double r = r0 + 1.6;
-            for (int x = (int) Math.floor(-r - 1); x <= r + 1; x++) {
-                for (int z = (int) Math.floor(-r - 1); z <= r + 1; z++) {
-                    if (Math.hypot(x, z) <= r + 0.6 && v.get(x, 0, z) == null && TreeRandom.hash(x, 0, z, 35) < 0.7) {
-                        v.put(x, 0, z, TreePart.MUD);
-                    }
-                }
-            }
-        }
     }
 
     /** Fallen limbs round a dead tree: termite food (fallen branches and bigger pieces). k: how grown the tree is. */
