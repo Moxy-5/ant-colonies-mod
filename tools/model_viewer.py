@@ -466,6 +466,23 @@ def algae_page(out):
     print("wrote", out)
 
 
+def tilapia_page(out):
+    """The Nile tilapia (M9 river life, the grazing fish, tilapia_models.py): looks A to C swimming over a silt bed with
+    the game's algae, with a size slider, the swim wave on or off, a graze, and a school."""
+    import tilapia_models as tm
+    bones = tm.model()
+    looks = {}
+    for key, look in tm.LOOKS.items():
+        b, rows, w, h = tm.paint(bones, key)
+        looks[key] = {"name": look["name"], "note": look["note"], "bones": b, "texture": uri(tm.png(rows)), "w": w, "h": h}
+    blocks = {n: file_uri(n + ".png") for n in ("silt", "wet_silt", "algae_mat_3", "algae_mat_2", "algae_strands_tall")}
+    data = {"looks": looks, "blocks": blocks, "boxes": sum(len(b.get("cubes", [])) for b in bones)}
+    template = (Path(__file__).resolve().parent / "tilapia_viewer.template.html").read_text(encoding="utf-8")
+    out.parent.mkdir(parents=True, exist_ok=True)
+    out.write_text(template.replace("/*DATA*/null", json.dumps(data)), encoding="utf-8")
+    print("wrote", out)
+
+
 def mix_soil(x, y):
     """Plain mound soil for the viewer's floor and walls."""
     rng = random.Random(x * 31 + y * 7)
@@ -480,6 +497,9 @@ def main():
         return
     if len(sys.argv) > 1 and sys.argv[1] == "floodplain":
         floodplain_page(Path(sys.argv[2]) if len(sys.argv) > 2 else ROOT / "references/floodplain_viewer.html")
+        return
+    if len(sys.argv) > 1 and sys.argv[1] == "tilapia":
+        tilapia_page(Path(sys.argv[2]) if len(sys.argv) > 2 else ROOT / "references/tilapia_viewer.html")
         return
     if len(sys.argv) > 1 and sys.argv[1] == "algae":
         algae_page(Path(sys.argv[2]) if len(sys.argv) > 2 else ROOT / "references/algae_viewer.html")
