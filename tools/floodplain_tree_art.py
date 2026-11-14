@@ -143,6 +143,78 @@ def doum_bark(look):
     return speckle(img, rng, 0.03)
 
 
+# ---- Dead wood (2026-11-13, the dead stages; my picks) ----
+
+DEAD_GREY = (150, 146, 136)
+
+
+def fig_dead_bark(look):
+    """Tile 5, dead fig bark: the look's bark gone dull and grey once the tree dies, the papery flakes curling off
+    (a dark shadow under each lifted edge) and grey wood showing where one has fallen."""
+    rng = random.Random(f"figdead{look}")
+    base, _, pale, line = FIG_BARK[look]
+    ground = mix(base, DEAD_GREY, 0.5)
+    n = noise(f"figd{look}", 4)
+    img = [[shade(ground, 0.9 + 0.18 * n(x, y)) for x in range(S)] for y in range(S)]
+    for _ in range(7):  # curling flakes: a lit lifted edge, a dark gap under it, grey wood beside
+        x, y, w = rng.randrange(S), rng.randrange(S), rng.randint(3, 6)
+        for i in range(w):
+            xx = (x + i) % S
+            img[y][xx] = mix(img[y][xx], pale, 0.35)
+            img[(y + 1) % S][xx] = mix(img[(y + 1) % S][xx], line, 0.6)
+            if rng.random() < 0.5:
+                img[(y + 2) % S][xx] = mix(img[(y + 2) % S][xx], (176, 172, 162), 0.6)
+    return speckle(img, rng, 0.05)
+
+
+def bare_wood():
+    """Tile 6, the bare wood of a dead fig: weathered silver-grey, the grain running up in long darker lines, a few
+    deep cracks. Fig wood is soft, so it splits and checks as it dries."""
+    rng = random.Random("figbare")
+    base, grain, crack = (170, 166, 154), (128, 124, 114), (78, 74, 68)
+    n = noise("figbare", 4)
+    img = [[shade(base, 0.92 + 0.14 * n(x, y)) for x in range(S)] for y in range(S)]
+    for x in range(S):  # grain: broken lines running up
+        if rng.random() < 0.5:
+            for y in range(S):
+                if rng.random() < 0.75:
+                    img[y][x] = mix(img[y][x], grain, 0.35)
+    for _ in range(2):  # checks: deep cracks along the grain
+        x, y0, length = rng.randrange(S), rng.randrange(S), rng.randint(5, 10)
+        for i in range(length):
+            img[(y0 + i) % S][x] = crack
+            if rng.random() < 0.3:
+                x = (x + rng.choice((-1, 1))) % S
+    return speckle(img, rng, 0.04)
+
+
+def termite_mud():
+    """Tile 7, the termites' mud over dead wood, built from the floodplain's own grey-brown silt (Macrotermes build
+    with the soil under them, so here it is the silt's colour, not red savanna earth, darkened as the mud is kept damp):
+    little pellets, darker gaps."""
+    rng = random.Random("figmud")
+    base, dark, light = (110, 94, 72), (74, 62, 48), (140, 122, 94)
+    img = [[shade(base, rng.uniform(0.9, 1.05)) for _ in range(S)] for _ in range(S)]
+    for _ in range(26):  # pellets: a lit top, a dark rim below
+        x, y = rng.randrange(S), rng.randrange(S)
+        img[y][x] = light
+        img[y][(x + 1) % S] = mix(img[y][(x + 1) % S], light, 0.5)
+        img[(y + 1) % S][x] = dark
+    return img
+
+
+def doum_dead_bark(look):
+    """A dead doum stem: the look's trunk weathered grey, the fibres standing out, split by long cracks. Doum wood is
+    hard and fibrous, so a dead stem stands for years."""
+    rng = random.Random(f"doumdead{look}")
+    img = [[mix(px, DEAD_GREY, 0.7) for px in row] for row in doum_bark(look)]
+    for _ in range(2):
+        x, y0, length = rng.randrange(S), rng.randrange(S), rng.randint(6, 12)
+        for i in range(length):
+            img[(y0 + i) % S][x] = mix(img[(y0 + i) % S][x], (60, 56, 50), 0.7)
+    return speckle(img, rng, 0.04)
+
+
 # ---- The ground the trees stand on ----
 
 def flat_ground(name, base, lumps=0.2):
@@ -159,6 +231,10 @@ def all_textures():
             out[f"bark_fig_{look}_{tile}"] = fig_bark(look, tile)
         out[f"bark_fig_{look}_4"] = fig_young_bark(look)
         out[f"bark_doum_{look}"] = doum_bark(look)
+        out[f"bark_fig_{look}_5"] = fig_dead_bark(look)
+        out[f"bark_fig_{look}_6"] = bare_wood()
+        out[f"bark_fig_{look}_7"] = termite_mud()
+        out[f"bark_doumdead_{look}"] = doum_dead_bark(look)
     for tone in range(3):
         out[f"leaves_fig_{tone}"] = fig_leaves(tone)
     out["sprig_fig"] = sprig()
