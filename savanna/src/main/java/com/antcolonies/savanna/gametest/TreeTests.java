@@ -328,6 +328,81 @@ public class TreeTests {
         helper.succeed();
     }
 
+    /**
+     * The doum palm's shapes as the game's blocks (floodplain trees step 6, 2026-11-14; the shapes themselves are checked
+     * against the model viewer in {@code DoumShapeTest}): every age and dead stage of a few seeds finds a block for every
+     * sculpted piece; a grown palm set down in the arena is every block of its shape, every crown, bunch and frond heap
+     * keeps the recipe it was given, and every leaf-base stub leans on doum wood; the same seed dead has only dead wood.
+     */
+    @GameTest(template = "arena", timeoutTicks = 100)
+    public static void doumTreesStandAsTheViewerDrewThem(GameTestHelper helper) {
+        var level = helper.getLevel();
+        for (int seed = 1; seed <= 3; seed++) {
+            for (com.antcolonies.savanna.tree.DoumShape.Age age : com.antcolonies.savanna.tree.DoumShape.Age.values()) {
+                var shape = com.antcolonies.savanna.tree.DoumShape.make(seed, age);
+                var placed = shape.placed();
+                if (placed.looks().size() != shape.pieces()) {
+                    helper.fail("doum seed " + seed + " " + age + ": " + (shape.pieces() - placed.looks().size()) + " of "
+                            + shape.pieces() + " sculpted pieces find no free block");
+                }
+                if (shape.cells().size() + shape.stubs().size() + shape.pieces() - placed.blocks().size() > shape.stubs().size() / 4) {
+                    helper.fail("doum seed " + seed + " " + age + ": too many leaf-base stubs land on a taken block ("
+                            + placed.blocks().size() + " blocks for " + shape.cells().size() + " cells, " + shape.stubs().size()
+                            + " stubs and " + shape.pieces() + " pieces)");
+                }
+            }
+        }
+        BlockPos foot = helper.absolutePos(new BlockPos(TREE_MIDDLE, SURFACE + 1, TREE_MIDDLE));
+        var grown = com.antcolonies.savanna.tree.DoumShape.make(1, com.antcolonies.savanna.tree.DoumShape.Age.GROWN).placed();
+        grown.setDown(level, foot);
+        int crowns = 0, bunches = 0, stubs = 0;
+        for (var e : grown.blocks().long2ObjectEntrySet()) {
+            BlockPos pos = foot.offset(BlockPos.of(e.getLongKey()));
+            BlockState want = e.getValue(), there = level.getBlockState(pos);
+            if (there.is(Blocks.BARRIER)) {
+                continue; // the arena's ceiling
+            }
+            if (!there.equals(want)) {
+                helper.fail("the grown doum's block at " + BlockPos.of(e.getLongKey()).toShortString() + " is " + there + ", not " + want);
+                return;
+            }
+            var look = grown.looks().get(e.getLongKey());
+            if (look != null) {
+                if (!(level.getBlockEntity(pos) instanceof com.antcolonies.savanna.block.DoumBlockEntity piece) || !look.equals(piece.look())) {
+                    helper.fail("the grown doum's " + want.getBlock() + " at " + BlockPos.of(e.getLongKey()).toShortString()
+                            + " lost the recipe it was given");
+                    return;
+                }
+                crowns += want.is(TreeBlocks.DOUM_CROWN.get()) ? 1 : 0;
+                bunches += want.is(TreeBlocks.DOUM_NUT_BUNCH.get()) ? 1 : 0;
+            }
+            if (want.is(TreeBlocks.DOUM_LEAF_BASE.get())) {
+                stubs++;
+                Direction facing = want.getValue(net.minecraft.world.level.block.HorizontalDirectionalBlock.FACING);
+                BlockState behind = level.getBlockState(pos.relative(facing.getOpposite()));
+                if (!behind.is(TreeBlocks.DOUM_WOOD.get()) && !behind.is(TreeBlocks.DOUM_ROOT.get()) && !behind.is(Blocks.BARRIER)) {
+                    helper.fail("a leaf-base stub at " + BlockPos.of(e.getLongKey()).toShortString() + " leans on " + behind + ", not doum wood");
+                }
+            }
+        }
+        if (crowns < 3 || bunches == 0 || stubs == 0) {
+            helper.fail("the grown doum has " + crowns + " crowns, " + bunches + " nut bunches and " + stubs + " leaf-base stubs");
+        }
+        for (long k : grown.blocks().keySet()) {
+            if (!level.getBlockState(foot.offset(BlockPos.of(k))).is(Blocks.BARRIER)) {
+                level.setBlock(foot.offset(BlockPos.of(k)), Blocks.AIR.defaultBlockState(), Block.UPDATE_CLIENTS);
+            }
+        }
+        var dead = com.antcolonies.savanna.tree.DoumShape.make(1, com.antcolonies.savanna.tree.DoumShape.Age.SNAGS).placed();
+        for (var st : dead.blocks().values()) {
+            if (st.is(TreeBlocks.DOUM_WOOD.get()) && !st.getValue(com.antcolonies.savanna.block.DoumWoodBlock.DEAD)) {
+                helper.fail("the dead doum's snags have living wood");
+                return;
+            }
+        }
+        helper.succeed();
+    }
+
     /** A fig's blocks set down around its foot, in their order (wood before what hangs on it), never over the arena's ceiling. */
     private static void setFig(net.minecraft.server.level.ServerLevel level, BlockPos foot,
             it.unimi.dsi.fastutil.longs.Long2ObjectMap<BlockState> states) {

@@ -49,6 +49,8 @@ public final class PalmPieces {
     /** Every nut green (an unripe bunch): the same dice drawn, so the bunch keeps its shape. */
     private final boolean allGreen;
     private int bunch = -1;
+    /** The places a maker reports: each fruit bunch's (doumBunch's return), a lying frond's foot. */
+    private final List<double[]> at = new ArrayList<>();
 
     private PalmPieces(long seedOrState, boolean allGreen) {
         this.r = new TreeRandom(seedOrState);
@@ -66,6 +68,36 @@ public final class PalmPieces {
         PalmPieces p = new PalmPieces(state, allGreen);
         p.palmCrown(new double[] {tx, ty, tz}, size, old, dead, bunches);
         return p.bits;
+    }
+
+    /**
+     * What a crown or a lying frond made, for a growing palm ({@code DoumShape}): its boxes, where the dice stand after
+     * it (the tree's next number), and the places it reports: for a crown each fruit bunch's (the viewer's doumBunch
+     * returns, under where its stalk splits), for a frond its foot.
+     */
+    record Made(List<Bit> bits, int end, List<double[]> at) {
+    }
+
+    /** {@link #crown}, with where the dice end and where its bunches hang. */
+    static Made crownMade(int state, double tx, double ty, double tz, double size, boolean old, boolean dead, int bunches) {
+        PalmPieces p = new PalmPieces(state, false);
+        p.palmCrown(new double[] {tx, ty, tz}, size, old, dead, bunches);
+        return new Made(p.bits, p.r.state(), p.at);
+    }
+
+    /**
+     * One old frond lying on the ground round a dead palm (the viewer's groundFronds, one frond of it), its foot r to r + 2
+     * from the clump's middle, drawn with the dice at {@code state}; grey: bleached by years (else freshly dead brown).
+     */
+    public static List<Bit> groundFrond(int state, double r, boolean grey) {
+        return groundFrondMade(state, r, grey).bits();
+    }
+
+    /** {@link #groundFrond}, with where the dice end and the frond's foot. */
+    static Made groundFrondMade(int state, double r, boolean grey) {
+        PalmPieces p = new PalmPieces(state, false);
+        p.groundFrond(r, grey);
+        return new Made(p.bits, p.r.state(), p.at);
     }
 
     /** The seedling (a year or two, under a block), from its seed. */
@@ -230,7 +262,7 @@ public final class PalmPieces {
         for (int i = 0; i < n; i++) {
             double az = a0 + (double) i / n * 6.28 + (r.next() - 0.5) * 0.6;
             bunch = i;
-            doumBunch(top, az);
+            at.add(doumBunch(top, az));
             bunch = -1;
         }
     }
@@ -261,6 +293,14 @@ public final class PalmPieces {
             double blade = 3.2 * size * (0.85 + r.next() * 0.3);
             frond(new double[] {StrictMath.cos(az) * 0.6, -0.42, StrictMath.sin(az) * 0.6}, az, 0.08, 1.2 * size, blade, 0.05, Look.DEAD);
         }
+    }
+
+    /** groundFronds, one frond: lying flat, its foot r to r + 2 out. */
+    private void groundFrond(double rr, boolean grey) {
+        double az = r.next() * 6.28, d = rr + r.next() * 2;
+        double[] p = {StrictMath.cos(az) * d, -0.42, StrictMath.sin(az) * d};
+        at.add(p);
+        frond(p, az + (r.next() - 0.5) * 1.2, 0.06, 1.3, 3.2 * (0.85 + r.next() * 0.3), 0.04, grey ? Look.GREY : Look.DEAD);
     }
 
     private void doumSeedling() {

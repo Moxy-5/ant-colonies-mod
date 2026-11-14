@@ -133,7 +133,7 @@ is measured first. Either way the stems are full blocks you can climb.
    rosette and nut bunch are drawn the same way. To watch in step 7: a grown palm is about 66,000 faces (a grown fig
    about 29,000), the whole crown pops out when its block's chunk section is off screen at the screen's edge, and the
    crown has flat light (no soft shadows), as the viewer has.
-6. **The doum's shapes in Java** (`tree/DoumShape`, from `doum`, `doumSeedling` to `doumClump`, `deadDoum`), checked
+6. **DONE 2026-11-14 (details in `docs/HISTORY.md`; the viewer's 45 palms matched block for block). The doum's shapes in Java** (`tree/DoumShape`, from `doum`, `doumSeedling` to `doumClump`, `deadDoum`), checked
    against the viewer the same way.
 6b. **Doum fruit:** the nut bunch the same way (stages, dropping, fallen nuts lasting about 20 days, the items,
    eating slowly), with its test.

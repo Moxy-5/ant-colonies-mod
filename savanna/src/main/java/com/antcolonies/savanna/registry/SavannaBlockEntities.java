@@ -17,7 +17,7 @@ public final class SavannaBlockEntities {
     @SuppressWarnings("DataFlowIssue") // Minecraft's own blocks pass null for the data fixer type, as here
     public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<DoumBlockEntity>> DOUM_PIECE = BLOCK_ENTITIES.register("doum_piece",
             () -> BlockEntityType.Builder.of(DoumBlockEntity::new, TreeBlocks.DOUM_CROWN.get(), TreeBlocks.DOUM_NUT_BUNCH.get(),
-                    TreeBlocks.DOUM_SEEDLING.get(), TreeBlocks.DOUM_ROSETTE.get()).build(null));
+                    TreeBlocks.DOUM_SEEDLING.get(), TreeBlocks.DOUM_ROSETTE.get(), TreeBlocks.DOUM_FRONDS.get()).build(null));
 
     private SavannaBlockEntities() {
     }

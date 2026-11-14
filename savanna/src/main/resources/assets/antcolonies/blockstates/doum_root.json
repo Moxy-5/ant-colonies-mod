@@ -1,0 +1,16 @@
+{
+  "variants": {
+    "dead=false,low=false": {
+      "model": "antcolonies:block/doum_root_high"
+    },
+    "dead=false,low=true": {
+      "model": "antcolonies:block/doum_root_low"
+    },
+    "dead=true,low=false": {
+      "model": "antcolonies:block/doum_root_dead_high"
+    },
+    "dead=true,low=true": {
+      "model": "antcolonies:block/doum_root_dead_low"
+    }
+  }
+}

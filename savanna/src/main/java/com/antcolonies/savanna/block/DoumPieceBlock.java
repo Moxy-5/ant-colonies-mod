@@ -28,7 +28,7 @@ public class DoumPieceBlock extends Block implements EntityBlock, DoumPiece {
     /** A bunch's nuts ripe (chestnut to orange-brown) or still green. */
     public static final BooleanProperty RIPE = BooleanProperty.create("ripe");
     private static final VoxelShape CAP = box(0, 0, 0, 16, 6, 16), CROWN_OUTLINE = box(0, 0, 0, 16, 11, 16),
-            BUNCH = box(4, 0, 4, 12, 16, 12);
+            BUNCH = box(4, 0, 4, 12, 16, 12), FRONDS = box(0, 0, 0, 16, 2, 16);
 
     private final Piece piece;
 
@@ -59,7 +59,7 @@ public class DoumPieceBlock extends Block implements EntityBlock, DoumPiece {
 
     @Override
     protected VoxelShape getShape(BlockState state, BlockGetter level, BlockPos pos, CollisionContext context) {
-        return piece == Piece.CROWN ? CROWN_OUTLINE : BUNCH;
+        return piece == Piece.CROWN ? CROWN_OUTLINE : piece == Piece.FRONDS ? FRONDS : BUNCH;
     }
 
     @Override

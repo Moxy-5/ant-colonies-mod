@@ -3,7 +3,7 @@
   "textures": {
     "particle": "antcolonies:block/doum_leaf_base",
     "sheath": "antcolonies:block/doum_leaf_base",
-    "boot": "antcolonies:block/doum_leaf_boot_1"
+    "boot": "antcolonies:block/doum_leaf_boot_0"
   },
   "elements": [
     {

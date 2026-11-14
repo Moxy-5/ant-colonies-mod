@@ -30,6 +30,8 @@ public class DoumLeafBaseBlock extends HorizontalDirectionalBlock {
     public static final BooleanProperty PALE = BooleanProperty.create("pale");
     /** How far to one side: 0 to 4, 2 the middle, a pixel's step each. */
     public static final IntegerProperty SHIFT = IntegerProperty.create("shift", 0, 4);
+    /** A dead palm's grey (the sheath and boot bleached, floodplain trees step 6). */
+    public static final BooleanProperty DEAD = BooleanProperty.create("dead");
     private static final VoxelShape[] SHAPES = {
             box(4, 0, 0, 12, 16, 5),   // the stem to the north: stub against the block's north face (facing south)
             box(11, 0, 4, 16, 16, 12), // stem to the east
@@ -39,7 +41,7 @@ public class DoumLeafBaseBlock extends HorizontalDirectionalBlock {
     public DoumLeafBaseBlock(Properties properties) {
         super(properties);
         registerDefaultState(defaultBlockState().setValue(FACING, Direction.EAST).setValue(LOW, false).setValue(WIDE, true)
-                .setValue(PALE, false).setValue(SHIFT, 2));
+                .setValue(PALE, false).setValue(SHIFT, 2).setValue(DEAD, false));
     }
 
     @Override
@@ -49,7 +51,7 @@ public class DoumLeafBaseBlock extends HorizontalDirectionalBlock {
 
     @Override
     protected void createBlockStateDefinition(StateDefinition.Builder<Block, BlockState> builder) {
-        builder.add(FACING, LOW, WIDE, PALE, SHIFT);
+        builder.add(FACING, LOW, WIDE, PALE, SHIFT, DEAD);
     }
 
     @Override

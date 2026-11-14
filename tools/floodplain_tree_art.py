@@ -610,8 +610,10 @@ def doum_game_files():
     texture("doum_frond", doum_frond_texture())
     texture("doum_nut", doum_nut_texture())
     texture("doum_leaf_base", tinted(bark, (0.84, 0.84, 0.84)))
-    for i, t in enumerate(DOUM_BOOT):
+    texture("doum_leaf_base_dead", tinted(dead, (0.84, 0.84, 0.84)))
+    for i, t in enumerate(DOUM_BOOT):  # 0 the paler boot
         texture(f"doum_leaf_boot_{i}", tinted(bark, t))
+        texture(f"doum_leaf_boot_dead_{i}", tinted(dead, t))
     for name, rows in zip(("doum_crown_item", "doum_rosette_item", "doum_seedling_item", "doum_nut_bunch_item"), doum_icons()):
         texture(name, rows)
 
@@ -634,12 +636,12 @@ def doum_game_files():
 
     # The sculpted pieces: one model each, drawn by the doum_sculpted loader.
     for name, particle in (("doum_crown", "doum_frond"), ("doum_nut_bunch", "doum_nut"), ("doum_seedling", "doum_frond"),
-                           ("doum_rosette", "doum_frond")):
+                           ("doum_rosette", "doum_frond"), ("doum_fronds", "doum_frond")):
         model(name, {"loader": "antcolonies:doum_sculpted", "textures": {
             "plain": "antcolonies:block/doum_plain", "cap": "antcolonies:block/doum_cap", "cap_dead": "antcolonies:block/doum_cap_dead",
             "particle": f"antcolonies:block/{particle}"}})
         write_json(ASSETS / f"blockstates/{name}.json", {"variants": {"": {"model": f"antcolonies:block/{name}"}}})
-        flat_item(name, f"{name}_item")
+        flat_item(name, "doum_frond" if name == "doum_fronds" else f"{name}_item")
     # A crown gives itself to shears or silk touch, now and then a seedling (my pick, as a leaf block gives a sapling).
     loot("doum_crown", [{"rolls": 1.0, "bonus_rolls": 0.0, "entries": [{"type": "minecraft:alternatives", "children": [
         {"type": "minecraft:item", "name": "antcolonies:doum_crown", "conditions": [SHEARS_OR_SILK]},
@@ -648,6 +650,23 @@ def doum_game_files():
     drops_itself("doum_nut_bunch")  # until its nuts drop and ripen (step 6b)
     drops_itself("doum_seedling")
     drops_itself("doum_rosette")
+    loot("doum_fronds", [])  # old fronds crumble (my pick)
+
+    # Root steps at the clump's foot: 8 or 5 pixels high, bark on every face, living or dead grey (step 6).
+    variants = {}
+    for is_dead in (False, True):
+        tex = "antcolonies:block/" + ("doum_bark_dead" if is_dead else "doum_bark")
+        for low, h in ((False, 8), (True, 5)):
+            m = f"doum_root_{'dead_' if is_dead else ''}{'low' if low else 'high'}"
+            fc = {f: {"texture": "#bark", "uv": [0, 16 - h, 16, 16], "cullface": f} for f in ("north", "south", "east", "west")}
+            fc["up"] = {"texture": "#bark", "uv": [0, 0, 16, 16]}
+            fc["down"] = {"texture": "#bark", "uv": [0, 0, 16, 16], "cullface": "down"}
+            model(m, {"parent": "minecraft:block/block", "textures": {"particle": tex, "bark": tex},
+                      "elements": [{"from": [0, 0, 0], "to": [16, h, 16], "faces": fc}]})
+            variants[f"dead={'true' if is_dead else 'false'},low={'true' if low else 'false'}"] = {"model": f"antcolonies:block/{m}"}
+    write_json(ASSETS / "blockstates/doum_root.json", {"variants": variants})
+    item_from_block("doum_root", "doum_root_high")
+    drops_itself("doum_root")
 
     # Leaf-base stubs: the viewer's two boxes against the stem, facing out east, turned by the blockstate.
     def faces(tex, w, h, d):
@@ -658,25 +677,28 @@ def doum_game_files():
     for low in (False, True):
         for wide in (True, False):
             width = 14 if wide else 10
-            for pale in (0, 1):
+            for pale, is_dead in ((p, d) for d in (False, True) for p in (0, 1)):
                 for shift in range(5):
                     sh = shift - 2
-                    m = f"doum_leaf_base_{'low' if low else 'high'}_{width}_{pale}_{shift}"
+                    boot = 0 if pale else 1  # DOUM_BOOT[0] is the paler boot
+                    dd = "dead_" if is_dead else ""
+                    m = f"doum_leaf_base_{dd}{'low' if low else 'high'}_{width}_{pale}_{shift}"
                     y0 = 0 if low else 6
                     z0, z1 = 8 + sh - width / 2, 8 + sh + width / 2
                     b0, b1 = 8 + sh - (width - 4) / 2, 8 + sh + (width - 4) / 2
                     by = 4.5 if low else 10.5
                     model(m, {"parent": "minecraft:block/block", "textures": {
-                        "particle": "antcolonies:block/doum_leaf_base", "sheath": "antcolonies:block/doum_leaf_base",
-                        "boot": f"antcolonies:block/doum_leaf_boot_{pale}"}, "elements": [
+                        "particle": f"antcolonies:block/doum_leaf_base{'_dead' if is_dead else ''}",
+                        "sheath": f"antcolonies:block/doum_leaf_base{'_dead' if is_dead else ''}",
+                        "boot": f"antcolonies:block/doum_leaf_boot_{dd}{boot}"}, "elements": [
                         {"from": [0, y0, z0], "to": [3, y0 + 6, z1], "faces": faces("#sheath", 3, 6, width)},
                         {"from": [0, by, b0], "to": [5, by + 5, b1], "faces": faces("#boot", 5, 5, width - 4)}]})
                     for facing, turn in (("east", 0), ("south", 90), ("west", 180), ("north", 270)):
                         v = {"model": f"antcolonies:block/{m}"}
                         if turn:
                             v["y"] = turn
-                        variants[f"facing={facing},low={str(low).lower()},pale={'true' if pale else 'false'},"
-                                 f"shift={shift},wide={str(wide).lower()}"] = v
+                        variants[f"dead={str(is_dead).lower()},facing={facing},low={str(low).lower()},"
+                                 f"pale={'true' if pale else 'false'},shift={shift},wide={str(wide).lower()}"] = v
     write_json(ASSETS / "blockstates/doum_leaf_base.json", {"variants": variants})
     item_from_block("doum_leaf_base", "doum_leaf_base_high_14_0_2")
     loot("doum_leaf_base", [])

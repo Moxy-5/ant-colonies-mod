@@ -23,8 +23,13 @@ import net.minecraft.util.Mth;
  * @param dead    a dead crown: every frond brown and hanging, no spear, no fruit
  * @param bunches how many fruit bunches the crown has, -1 for the grown palm's 2 or 3
  * @param bunch   which of the crown's bunches a bunch block draws
+ *
+ * <p>Fronds lying on the ground ({@link DoumPiece.Piece#FRONDS}, step 6) use the same recipe: state the dice where the
+ * frond starts, tx how far out from the clump's middle it lies (the viewer's R), old a frond bleached grey by years (else
+ * brown), c the block's place in the tree's grid. The size is kept to the last digit (a double, not a float), so a
+ * grown palm's crown is drawn from exactly the numbers the tree's shape used.
  */
-public record DoumLook(boolean grown, int state, double tx, double ty, double tz, int cx, int cy, int cz, float size, boolean old,
+public record DoumLook(boolean grown, int state, double tx, double ty, double tz, int cx, int cy, int cz, double size, boolean old,
                        boolean dead, int bunches, int bunch) {
 
     /** A piece placed by hand: its dice from where it stands, its crown or bunch centred on its own block. */
@@ -56,6 +61,20 @@ public record DoumLook(boolean grown, int state, double tx, double ty, double tz
                     keep = 0;
                 }
             }
+            case FRONDS -> {
+                if (grown) {
+                    all = PalmPieces.groundFrond(state, tx, old);
+                    shift = true;
+                } else { // one laid by hand: its foot on its own block
+                    List<PalmPieces.Bit> f = PalmPieces.groundFrond(state, 0, false);
+                    all = new ArrayList<>(f.size());
+                    PalmPieces.Bit first = f.get(0);
+                    for (PalmPieces.Bit b : f) {
+                        all.add(new PalmPieces.Bit(b.x() - first.x(), b.y(), b.z() - first.z(), b.w(), b.h(), b.d(), b.rot(), b.skin(), b.r(),
+                                b.g(), b.b(), b.leafy(), b.bunch()));
+                    }
+                }
+            }
             case SEEDLING -> all = PalmPieces.seedling(state);
             case ROSETTE -> all = PalmPieces.rosette(state, grown ? size : 0.8);
             default -> throw new IllegalStateException(piece.name());
@@ -84,7 +103,7 @@ public record DoumLook(boolean grown, int state, double tx, double ty, double tz
         tag.putInt("cx", cx);
         tag.putInt("cy", cy);
         tag.putInt("cz", cz);
-        tag.putFloat("size", size);
+        tag.putDouble("size", size);
         tag.putBoolean("old", old);
         tag.putBoolean("dead", dead);
         tag.putInt("bunches", bunches);
@@ -94,7 +113,7 @@ public record DoumLook(boolean grown, int state, double tx, double ty, double tz
 
     static DoumLook load(CompoundTag tag) {
         return new DoumLook(true, tag.getInt("state"), tag.getDouble("tx"), tag.getDouble("ty"), tag.getDouble("tz"), tag.getInt("cx"),
-                tag.getInt("cy"), tag.getInt("cz"), tag.getFloat("size"), tag.getBoolean("old"), tag.getBoolean("dead"), tag.getInt("bunches"),
+                tag.getInt("cy"), tag.getInt("cz"), tag.getDouble("size"), tag.getBoolean("old"), tag.getBoolean("dead"), tag.getInt("bunches"),
                 tag.getInt("bunch"));
     }
 }

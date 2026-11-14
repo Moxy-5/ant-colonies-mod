@@ -8,9 +8,9 @@ import net.minecraft.util.StringRepresentable;
 public interface DoumPiece {
     Piece piece();
 
-    /** The kinds of piece: a crown of fronds, a bunch of nuts, the seedling, the stemless rosette. */
+    /** The kinds of piece: a crown of fronds, a bunch of nuts, the seedling, the stemless rosette, an old frond lying on the ground. */
     enum Piece implements StringRepresentable {
-        CROWN, BUNCH, SEEDLING, ROSETTE;
+        CROWN, BUNCH, SEEDLING, ROSETTE, FRONDS;
 
         public static final Codec<Piece> CODEC = StringRepresentable.fromEnum(Piece::values);
 

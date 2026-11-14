@@ -138,5 +138,7 @@
   "block.antcolonies.doum_nut_bunch": "Doum Nut Bunch",
   "block.antcolonies.doum_seedling": "Doum Palm Seedling",
   "block.antcolonies.doum_rosette": "Young Doum Palm",
-  "block.antcolonies.doum_leaf_base": "Doum Leaf Base"
+  "block.antcolonies.doum_leaf_base": "Doum Leaf Base",
+  "block.antcolonies.doum_root": "Doum Palm Root",
+  "block.antcolonies.doum_fronds": "Dead Doum Fronds"
 }

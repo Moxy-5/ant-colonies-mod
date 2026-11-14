@@ -1,6 +1,7 @@
 package com.antcolonies.savanna.command;
 
 import com.antcolonies.savanna.SavannaMod;
+import com.antcolonies.savanna.tree.DoumShape;
 import com.antcolonies.savanna.tree.FigShape;
 import com.antcolonies.savanna.tree.Forest;
 import com.antcolonies.savanna.tree.HeartRot;
@@ -52,6 +53,15 @@ public class TreeCommands {
                                 .executes(context -> fig(context.getSource(), StringArgumentType.getString(context, "age"), -1))
                                 .then(Commands.argument("seed", IntegerArgumentType.integer(1, 1_000_000))
                                         .executes(context -> fig(context.getSource(), StringArgumentType.getString(context, "age"),
+                                                IntegerArgumentType.getInteger(context, "seed"))))))
+                        // Floodplain trees step 6, for looking: a doum palm at an age or dead stage (seed, rosette, stem,
+                        // fork, clump, grown, dead1, dead2, dead3) where you stand, as the model viewer draws it.
+                        .then(Commands.literal("doum").then(Commands.argument("age", StringArgumentType.word())
+                                .suggests((context, builder) -> SharedSuggestionProvider.suggest(
+                                        java.util.Arrays.stream(DoumShape.Age.values()).map(a -> a.id), builder))
+                                .executes(context -> doum(context.getSource(), StringArgumentType.getString(context, "age"), -1))
+                                .then(Commands.argument("seed", IntegerArgumentType.integer(1, 1_000_000))
+                                        .executes(context -> doum(context.getSource(), StringArgumentType.getString(context, "age"),
                                                 IntegerArgumentType.getInteger(context, "seed"))))))));
     }
 
@@ -70,6 +80,20 @@ public class TreeCommands {
             level.setBlock(foot.offset(BlockPos.of(e.getLongKey())), e.getValue(), net.minecraft.world.level.block.Block.UPDATE_CLIENTS);
         }
         source.sendSuccess(() -> Component.literal("A sycamore fig, " + age.id + ", seed " + s + ": " + states.size() + " blocks."), false);
+        return 1;
+    }
+
+    /** Floodplain trees step 6: a doum palm of this age (the viewer's names) and seed (-1 at random) set down where the player stands. */
+    private static int doum(CommandSourceStack source, String ageId, int seed) {
+        DoumShape.Age age = DoumShape.Age.byId(ageId);
+        if (age == null) {
+            source.sendFailure(Component.literal("No doum age " + ageId + ": seed, rosette, stem, fork, clump, grown, dead1, dead2 or dead3."));
+            return 0;
+        }
+        int s = seed > 0 ? seed : 1 + source.getLevel().getRandom().nextInt(10_000);
+        var placed = DoumShape.make(s, age).placed();
+        int set = placed.setDown(source.getLevel(), BlockPos.containing(source.getPosition()));
+        source.sendSuccess(() -> Component.literal("A doum palm, " + age.id + ", seed " + s + ": " + set + " blocks."), false);
         return 1;
     }
 

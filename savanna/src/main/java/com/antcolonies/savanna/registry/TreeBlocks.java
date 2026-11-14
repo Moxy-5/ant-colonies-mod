@@ -11,6 +11,7 @@ import com.antcolonies.savanna.block.DoumLeafBaseBlock;
 import com.antcolonies.savanna.block.DoumPiece;
 import com.antcolonies.savanna.block.DoumPieceBlock;
 import com.antcolonies.savanna.block.DoumPlantBlock;
+import com.antcolonies.savanna.block.DoumRootBlock;
 import com.antcolonies.savanna.block.DoumWoodBlock;
 import com.antcolonies.savanna.block.FigBranchBlock;
 import com.antcolonies.savanna.block.FigLeavesBlock;
@@ -253,6 +254,15 @@ public final class TreeBlocks {
             DoumLeafBaseBlock::new, BlockBehaviour.Properties.of().mapColor(MapColor.TERRACOTTA_BROWN).strength(0.3F).sound(SoundType.WOOD)
                     .noCollission().noOcclusion().ignitedByLava().pushReaction(PushReaction.DESTROY)));
 
+    /** The root steps at the clump's swollen foot, living or dead grey (step 6). */
+    public static final DeferredBlock<DoumRootBlock> DOUM_ROOT = add(SavannaBlocks.BLOCKS.registerBlock("doum_root", DoumRootBlock::new,
+            wood(MapColor.TERRACOTTA_BROWN, 2.0F).noOcclusion()));
+    /** An old frond lying on the ground round a clump, brown or bleached grey (step 6). */
+    public static final DeferredBlock<DoumPieceBlock> DOUM_FRONDS = add(SavannaBlocks.BLOCKS.registerBlock("doum_fronds",
+            p -> new DoumPieceBlock(DoumPiece.Piece.FRONDS, p), BlockBehaviour.Properties.of().mapColor(MapColor.TERRACOTTA_BROWN)
+                    .strength(0.2F).sound(SoundType.AZALEA_LEAVES).noCollission().noOcclusion().ignitedByLava()
+                    .pushReaction(PushReaction.DESTROY)));
+
     private TreeBlocks() {
     }
 
@@ -402,5 +412,7 @@ public final class TreeBlocks {
         fire.setFlammable(DOUM_ROSETTE.get(), 30, 60);
         fire.setFlammable(DOUM_NUT_BUNCH.get(), 30, 60);
         fire.setFlammable(DOUM_LEAF_BASE.get(), 60, 100);
+        fire.setFlammable(DOUM_ROOT.get(), 5, 5);
+        fire.setFlammable(DOUM_FRONDS.get(), 60, 100);
     }
 }
