@@ -457,6 +457,75 @@ public class SavannaWorldTests {
         helper.succeed();
     }
 
+    /**
+     * How wide the savanna rivers' water is (the user, 2026-11-14: rivers to be made bigger before the river animals;
+     * measure first), read from the noise on {@link #GROUND_SEEDS}: at river spots with savanna beside them and water
+     * there, the run of water through the spot along four lines (east-west, north-south and the two diagonals, a
+     * diagonal step counted as 1.41 blocks); the shortest of the four is the river's width across. Only measures: no limit
+     * but enough spots found.
+     */
+    @GameTest(template = "arena", timeoutTicks = 400, batch = "savanna_maps")
+    public static void riverWidthIsMeasured(GameTestHelper helper) {
+        var registries = helper.getLevel().registryAccess();
+        List<Integer> widths = new ArrayList<>();
+        int spots = 0;
+        StringBuilder report = new StringBuilder();
+        int[][] lines = {{1, 0}, {0, 1}, {1, 1}, {1, -1}};
+        for (long seed : GROUND_SEEDS) {
+            Climate.Sampler sampler = BiomeMaps.sampler(registries, seed);
+            MultiNoiseBiomeSource source = BiomeMaps.bigSavannaSource(registries, seed);
+            BiomeMaps.Ground ground = BiomeMaps.ground(registries, source, seed, helper.getLevel());
+            byte[] map = BiomeMaps.map(source, sampler);
+            int side = BiomeMaps.SIDE;
+            List<Integer> cells = new ArrayList<>();
+            for (int c = 0; c < map.length; c++) {
+                int i = c / side, j = c % side;
+                if (map[c] != BiomeMaps.RIVER || i == 0 || j == 0 || i == side - 1 || j == side - 1) {
+                    continue;
+                }
+                if (map[c - 1] == BiomeMaps.SAVANNA || map[c + 1] == BiomeMaps.SAVANNA
+                        || map[c - side] == BiomeMaps.SAVANNA || map[c + side] == BiomeMaps.SAVANNA) {
+                    cells.add(c);
+                }
+            }
+            java.util.Collections.shuffle(cells, new java.util.Random(seed));
+            List<Integer> seedWidths = new ArrayList<>();
+            for (int c : cells) {
+                if (seedWidths.size() >= RIVER_BANKS) {
+                    break;
+                }
+                int x = -BiomeMaps.HALF + (c / side) * BiomeMaps.STEP, z = -BiomeMaps.HALF + (c % side) * BiomeMaps.STEP;
+                if (ground.height(x, z) > SEA_TOP) {
+                    continue; // the river's biome over dry ground
+                }
+                double across = Double.MAX_VALUE;
+                for (int[] d : lines) {
+                    int run = 1;
+                    for (int sign : new int[] {1, -1}) {
+                        for (int k = 1; k <= WIDTH_LOOK && ground.height(x + sign * d[0] * k, z + sign * d[1] * k) <= SEA_TOP; k++) {
+                            run++;
+                        }
+                    }
+                    across = Math.min(across, run * (d[0] != 0 && d[1] != 0 ? Math.sqrt(2) : 1));
+                }
+                seedWidths.add((int) Math.round(across));
+            }
+            spots += seedWidths.size();
+            widths.addAll(seedWidths);
+            report.append(String.format("%n  seed %d: %d spots, median %d, 10%% %d, 90%% %d, widest %d", seed, seedWidths.size(),
+                    middle(seedWidths, 0.5), middle(seedWidths, 0.1), middle(seedWidths, 0.9), middle(seedWidths, 1.0)));
+        }
+        String all = String.format("%d spots; river water width across median %d, 10%% at most %d, 25%% %d, 75%% %d, 90%% %d, widest %d%s",
+                spots, middle(widths, 0.5), middle(widths, 0.1), middle(widths, 0.25), middle(widths, 0.75), middle(widths, 0.9),
+                middle(widths, 1.0), report);
+        SavannaMod.LOGGER.info("[biome maps] river width: {}", all);
+        helper.assertTrue(spots >= 30, "too few savanna river spots found to measure: " + all);
+        helper.succeed();
+    }
+
+    /** How far each way along a line the river's water is followed, in blocks. */
+    static final int WIDTH_LOOK = 120;
+
     /** How far out from the water the floodplain is followed, in blocks. */
     static final int FLOOD_LOOK = 400;
     /**
