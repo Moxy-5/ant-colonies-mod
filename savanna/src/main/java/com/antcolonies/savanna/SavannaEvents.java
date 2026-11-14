@@ -49,6 +49,15 @@ public class SavannaEvents {
         event.put(SavannaEntities.MATABELE_MAJOR.get(), com.antcolonies.savanna.entity.MatabeleEntity.createMajorAttributes().build());
         event.put(SavannaEntities.MATABELE_MINOR.get(), com.antcolonies.savanna.entity.MatabeleEntity.createMinorAttributes().build());
         event.put(SavannaEntities.MATABELE_QUEEN.get(), com.antcolonies.savanna.entity.MatabeleQueenEntity.createAttributes().build());
+        event.put(SavannaEntities.TILAPIA.get(), com.antcolonies.savanna.animal.TilapiaEntity.createAttributes().build());
+    }
+
+    /** Where the river animals may spawn (M9): the tilapia in the savanna's rivers, pans and oxbows. */
+    @SubscribeEvent
+    public static void onSpawnPlacements(net.neoforged.neoforge.event.entity.RegisterSpawnPlacementsEvent event) {
+        event.register(SavannaEntities.TILAPIA.get(), net.minecraft.world.entity.SpawnPlacementTypes.IN_WATER,
+                net.minecraft.world.level.levelgen.Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, com.antcolonies.savanna.animal.TilapiaEntity::canSpawn,
+                net.neoforged.neoforge.event.entity.RegisterSpawnPlacementsEvent.Operation.REPLACE);
     }
 
     /** Chickens hunt termite workers out on the surface (step 6c; see {@link HuntTermitesGoal}). */
@@ -180,7 +189,10 @@ public class SavannaEvents {
             event.accept(SavannaItems.COOKED_TERMITOMYCES);
             event.accept(SavannaItems.FIG);
             event.accept(SavannaItems.DOUM_NUT);
+            event.accept(SavannaItems.TILAPIA);
+            event.accept(SavannaItems.COOKED_TILAPIA);
         });
+        ModEvents.addToCreativeTab(CreativeModeTabs.TOOLS_AND_UTILITIES, 20, event -> event.accept(SavannaItems.TILAPIA_BUCKET));
         ModEvents.addToCreativeTab(CreativeModeTabs.SPAWN_EGGS, 20, event -> {
             event.accept(SavannaItems.TERMITE_QUEEN_SPAWN_EGG);
             event.accept(SavannaItems.TERMITE_KING_SPAWN_EGG);
@@ -190,6 +202,7 @@ public class SavannaEvents {
             event.accept(SavannaItems.MATABELE_MAJOR_SPAWN_EGG);
             event.accept(SavannaItems.MATABELE_MINOR_SPAWN_EGG);
             event.accept(SavannaItems.MATABELE_QUEEN_SPAWN_EGG);
+            event.accept(SavannaItems.TILAPIA_SPAWN_EGG);
         });
     }
 }

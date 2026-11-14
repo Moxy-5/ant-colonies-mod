@@ -107,6 +107,16 @@ public class SavannaEntities {
                     .sized(0.48F, 0.36F)
                     .build("matabele_queen"));
 
+    // The Nile tilapia (M9 river life, 2026-11-14): a river fish about 0.35 blocks long grown (my pick), its box the
+    // grown fish's; young and big fish are scaled through their SCALE attribute.
+    public static final DeferredHolder<EntityType<?>, EntityType<com.antcolonies.savanna.animal.TilapiaEntity>> TILAPIA =
+            ENTITY_TYPES.register("tilapia", () -> EntityType.Builder
+                    .of(com.antcolonies.savanna.animal.TilapiaEntity::new, MobCategory.WATER_AMBIENT)
+                    .sized(0.35F, 0.25F)
+                    .eyeHeight(0.12F)
+                    .clientTrackingRange(4)
+                    .build("tilapia"));
+
     // M8 step 1c: the Matabele young and dead, for the shared brood and refuse code (no nest to raise young in yet, step
     // 1d; the dead are carried home in step 5). Drawn MATABELE_DRAW_SIZE times a small ant's grub and body.
     public static final float MATABELE_DRAW_SIZE = 2.0F * InsectSizes.MATABELE_MAJOR.factor();

@@ -93,6 +93,23 @@ public class SavannaItems {
             new Item.Properties().food(new FoodProperties(4, 2.4F, false, 2.4F, java.util.Optional.empty(), java.util.List.of())));
     public static final DeferredItem<Item> GREEN_DOUM_NUT = ITEMS.registerSimpleItem("green_doum_nut");
 
+    /*
+     * The Nile tilapia (M9 river life, 2026-11-14, my picks): raw a little food like a cod, cooked a good meal; a bucket
+     * carries a living fish (its age, sex, look and size kept).
+     */
+    public static final DeferredItem<Item> TILAPIA = ITEMS.registerSimpleItem("tilapia",
+            new Item.Properties().food(new FoodProperties.Builder().nutrition(2).saturationModifier(0.1F).build()));
+    public static final DeferredItem<Item> COOKED_TILAPIA = ITEMS.registerSimpleItem("cooked_tilapia",
+            new Item.Properties().food(new FoodProperties.Builder().nutrition(5).saturationModifier(0.6F).build()));
+    public static final DeferredItem<Item> TILAPIA_BUCKET = ITEMS.register("tilapia_bucket",
+            () -> new net.minecraft.world.item.MobBucketItem(SavannaEntities.TILAPIA.get(), net.minecraft.world.level.material.Fluids.WATER,
+                    net.minecraft.sounds.SoundEvents.BUCKET_EMPTY_FISH, new Item.Properties().stacksTo(1)
+                            .component(net.minecraft.core.component.DataComponents.BUCKET_ENTITY_DATA, net.minecraft.world.item.component.CustomData.EMPTY)));
+    // Olive grey with a red throat (the breeding male's), my pick.
+    public static final DeferredItem<DeferredSpawnEggItem> TILAPIA_SPAWN_EGG =
+            ITEMS.register("tilapia_spawn_egg",
+                    () -> new DeferredSpawnEggItem(SavannaEntities.TILAPIA, 0x5E6450, 0xB04A3A, new Item.Properties()));
+
     public static final DeferredItem<DeferredSpawnEggItem> TERMITE_KING_SPAWN_EGG =
             ITEMS.register("termite_king_spawn_egg",
                     () -> new DeferredSpawnEggItem(SavannaEntities.TERMITE_KING, 0x42210F, 0xC4923F, new Item.Properties()));

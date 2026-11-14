@@ -147,5 +147,10 @@
   "item.antcolonies.green_fig": "Green Fig",
   "item.antcolonies.doum_nut": "Doum Nut",
   "item.antcolonies.green_doum_nut": "Green Doum Nut",
-  "block.antcolonies.algae": "Algae"
+  "block.antcolonies.algae": "Algae",
+  "entity.antcolonies.tilapia": "Nile Tilapia",
+  "item.antcolonies.tilapia": "Raw Tilapia",
+  "item.antcolonies.cooked_tilapia": "Cooked Tilapia",
+  "item.antcolonies.tilapia_bucket": "Bucket of Tilapia",
+  "item.antcolonies.tilapia_spawn_egg": "Nile Tilapia Spawn Egg"
 }

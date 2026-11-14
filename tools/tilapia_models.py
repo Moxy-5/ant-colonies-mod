@@ -19,7 +19,8 @@ Looks (my picks): A everyday olive-silver with faint bars; B young fish, paler a
 
 Units are model pixels (16 a block), the head points to -Z, up is +Y, left is +X; the lateral line is at y = MID.
 Every face is painted pixel by pixel from where that pixel lies on the fish (paint()), so bars, countershading and the
-tail's stripes run across the boxes as they would on the real fish. Nothing goes into the game yet.
+tail's stripes run across the boxes as they would on the real fish.
+`python tools/tilapia_models.py game` writes the game's files (model, three textures, clips) into the savanna mod.
 """
 import copy
 import math
@@ -346,7 +347,124 @@ def png(rows):
     return b'\x89PNG\r\n\x1a\n' + chunk(b'IHDR', header) + chunk(b'IDAT', zlib.compress(raw, 9)) + chunk(b'IEND', b'')
 
 
+# --- the game's files (built in the game 2026-11-14, the user's "sounds good build it in game") -----------------------
+# One model, three textures: the young wear B, grown fish A, about 1 grown male in 3 the breeding colours C (my picks).
+GAME_TEXTURES = {'A': 'tilapia', 'B': 'tilapia_young', 'C': 'tilapia_breeding'}
+WAVE = [('head', 'body', -0.05, 0.0), ('front', 'body', 0.04, 0.6), ('mid', 'front', 0.1, 1.3),
+        ('rear', 'mid', 0.19, 2.0), ('peduncle', 'rear', 0.3, 2.6), ('tail', 'peduncle', 0.42, 3.1)]
+
+
+def wave_pose(t, amount, beat, curl=0):
+    """Each bone's turn (degrees, the model file's rules) in the viewer's swim wave at time t: the body bones' sideways
+    angles a sine, bigger and later toward the tail, each less its parent's (curl 1 or -1: one way only, a fish on its
+    side arching up off the ground); the side fins flutter at twice the beat."""
+    ab, out = {'body': 0.0}, {}
+    for name, parent, a, lag in WAVE:
+        wave = math.sin(beat * t - lag)
+        ab[name] = amount * a * (wave if not curl else curl * (0.5 + 0.5 * wave))   # curl: bends one way only
+        out[name] = [0.0, math.degrees(ab[name] - ab[parent]), 0.0]
+    for i, side in enumerate(('left', 'right')):
+        sign = -1 if i else 1
+        out[f'pectoral_{side}'] = [0.0, math.degrees(sign * (0.25 + 0.75 * amount) * 0.22 * math.sin(beat * 2 * t + i * 0.5)), 0.0]
+        out[f'pelvic_{side}'] = [-math.degrees(0.08 * math.sin(beat * t)), 0.0, 0.0]
+    return out
+
+
+def clip(length, pose_at, steps, loop=True):
+    """A clip from pose_at(t) -> {bone: {'rotation': [..], 'position': [..]}} sampled at steps + 1 times."""
+    bones = {}
+    for k in range(steps + 1):
+        t = length * k / steps
+        for bone, chans in pose_at(t).items():
+            for ch, v in chans.items():
+                bones.setdefault(bone, {}).setdefault(ch, {})[f'{t:.4f}'.rstrip('0').rstrip('.') or '0'] = [round(x, 3) for x in v]
+    out = {'animation_length': round(length, 4), 'bones': bones}
+    if loop is True:
+        out['loop'] = True
+    elif loop == 'hold':
+        out['loop'] = 'hold_on_last_frame'
+    return out
+
+
+def rot_only(pose):
+    return {b: {'rotation': r} for b, r in pose.items()}
+
+
+def clips():
+    """swim (a full beat, 0.9 s; the game plays it faster or slower by the swimming speed), idle (hanging in the water,
+    a slow gentle wave), graze (nose down to the bed, three pecks), flop (on land, on its side, curling), death (rolls
+    onto its side and goes still)."""
+    swim_len = 0.9
+    CURL = -1            # which way lying on its side is up
+    LIE = 4.0           # how far the body comes down lying on its side
+    beat = 2 * math.pi / swim_len
+
+    def idle(t):
+        p = rot_only(wave_pose(t, 0.22, math.pi))
+        p['body'] = {'rotation': [0, 0, 0], 'position': [0, 0.2 * math.sin(math.pi * t), 0]}
+        return p
+
+    def graze(t):
+        peck = max(0.0, math.sin(2 * math.pi * t / 0.6))
+        p = rot_only(wave_pose(t, 0.55 + 0.25 * peck, beat))
+        p['body'] = {'rotation': [38 + 6 * peck, 0, 0], 'position': [0, 1.3, -0.3 * peck]}
+        return p
+
+    def folded(p, f):
+        """The side fins pressed flat to the body (f 0 to 1), as a fish lying on its side holds them."""
+        for s, side in ((1, 'left'), (-1, 'right')):
+            p[f'pectoral_{side}'] = {'rotation': [15 * f, -s * 32 * f, s * 12 * f]}
+            p[f'pelvic_{side}'] = {'rotation': [38 * f, -s * 10 * f, 0]}
+        return p
+
+    def flop(t):
+        p = folded(rot_only(wave_pose(t, 1.5, 2 * math.pi / 0.6, CURL)), 1)
+        p['body'] = {'rotation': [0, 0, 90], 'position': [0, -LIE + 0.8 * abs(math.sin(2 * math.pi * t / 0.6)), 0]}
+        return p
+
+    def death(t):
+        f = min(1.0, t / 0.8)
+        f = f * f * (3 - 2 * f)
+        p = folded(rot_only(wave_pose(t, 0.9 * (1 - f), 2 * math.pi / 0.6, CURL)), min(1.0, t / 0.3))
+        p['body'] = {'rotation': [0, 0, 90 * f], 'position': [0, -LIE * f, 0]}
+        return p
+
+    return {'idle': clip(2.0, idle, 24), 'swim': clip(swim_len, lambda t: rot_only(wave_pose(t, 1.0, beat)), 18),
+            'graze': clip(1.8, graze, 36), 'flop': clip(0.6, flop, 12), 'death': clip(1.2, death, 12, 'hold')}
+
+
+def write_game():
+    """Writes the tilapia's model, its three textures and its clips into the savanna mod."""
+    import json
+    import mod_paths
+    root = mod_paths.assets('savanna')
+    bones = model()
+    files = {}
+    for look, name in GAME_TEXTURES.items():
+        game_bones, rows, w, h = paint(bones, look)
+        files[f'textures/entity/{name}.png'] = png(rows)
+    geo = {'format_version': '1.12.0', 'minecraft:geometry': [{
+        'description': {'identifier': 'geometry.tilapia', 'texture_width': w, 'texture_height': h,
+                        'visible_bounds_width': 2, 'visible_bounds_height': 1.5, 'visible_bounds_offset': [0, 0.5, 0]},
+        'bones': game_bones}]}
+    files['geo/entity/tilapia.geo.json'] = geo
+    files['animations/entity/tilapia.animation.json'] = {'format_version': '1.8.0', 'animations': clips()}
+    for rel, data in files.items():
+        path = root / rel
+        path.parent.mkdir(parents=True, exist_ok=True)
+        if isinstance(data, bytes):
+            path.write_bytes(data)
+        else:
+            with open(path, 'w', encoding='utf-8', newline='\n') as f:
+                json.dump(data, f, indent=1)
+        print('wrote', path.relative_to(mod_paths.PROJECT))
+
+
 if __name__ == '__main__':
+    import sys
+    if sys.argv[1:] == ['game']:
+        write_game()
+        sys.exit()
     bones = model()
     n = sum(len(b.get('cubes', [])) for b in bones)
     _, rows, w, h = paint(bones, 'A')
