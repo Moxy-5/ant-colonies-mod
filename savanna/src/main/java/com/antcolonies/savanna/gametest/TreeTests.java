@@ -9,6 +9,8 @@ import java.util.List;
 
 import com.antcolonies.savanna.SavannaMod;
 import com.antcolonies.savanna.block.FallenBranchBlock;
+import com.antcolonies.savanna.block.FallenFruitBlock;
+import com.antcolonies.savanna.block.HangingFruit;
 import com.antcolonies.savanna.block.MudCrustBlock;
 import com.antcolonies.savanna.block.TreeBranchBlock;
 import com.antcolonies.savanna.entity.TermiteWorkerEntity;
@@ -17,6 +19,7 @@ import com.antcolonies.savanna.tree.TreeStage;
 import com.antcolonies.savanna.worldgen.TreePlacer;
 import com.antcolonies.savanna.registry.SavannaBlocks;
 import com.antcolonies.savanna.registry.SavannaEntities;
+import com.antcolonies.savanna.registry.SavannaItems;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
@@ -24,6 +27,7 @@ import net.minecraft.core.registries.Registries;
 import net.minecraft.gametest.framework.GameTest;
 import net.minecraft.gametest.framework.GameTestHelper;
 import net.minecraft.resources.ResourceLocation;
+import net.minecraft.server.level.ServerLevel;
 import net.minecraft.util.RandomSource;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.animal.Pig;
@@ -31,6 +35,8 @@ import net.minecraft.world.level.biome.Biome;
 import net.minecraft.world.level.biome.Biomes;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.level.block.BonemealableBlock;
+import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.levelgen.structure.BoundingBox;
 import net.minecraft.world.phys.Vec3;
@@ -207,7 +213,7 @@ public class TreeTests {
             return;
         }
         var byHand = piece.look();
-        if (byHand.grown() || byHand.bits(com.antcolonies.savanna.block.DoumPiece.Piece.CROWN, false).size() < 300) {
+        if (byHand.grown() || byHand.bits(com.antcolonies.savanna.block.DoumPiece.Piece.CROWN, com.antcolonies.savanna.block.HangingFruit.RIPE).size() < 300) {
             helper.fail("a hand-placed doum crown draws no crown of its own: " + byHand);
         }
         var planned = new com.antcolonies.savanna.block.DoumLook(true, 12345, 0.5, 9.5, 0.5, 0, 10, 1, 1.06F, true, false, 3, 2);
@@ -228,7 +234,7 @@ public class TreeTests {
         BlockPos bunch = new BlockPos(14, y + 2, 10);
         helper.setBlock(bunch, TreeBlocks.DOUM_NUT_BUNCH.get());
         BlockState bunchState = helper.getBlockState(bunch);
-        if (!bunchState.getValue(com.antcolonies.savanna.block.DoumPieceBlock.RIPE)) {
+        if (bunchState.getValue(com.antcolonies.savanna.block.HangingFruit.STAGE) != com.antcolonies.savanna.block.HangingFruit.RIPE) {
             helper.fail("a doum nut bunch starts green");
         }
         if (!bunchState.getCollisionShape(level, helper.absolutePos(bunch)).isEmpty()) {
@@ -525,6 +531,151 @@ public class TreeTests {
                 }
             }
         }
+    }
+
+    /**
+     * The floodplain trees' fruit (steps 4b and 6b, 2026-11-14): a fig bunch, figs on the bark and a doum nut bunch each
+     * go through every stage (bone meal from a bare stalk to green, then the random ticks), the ripe fruit falls onto the
+     * ground below as fallen fruit and the bunch is bare again; fallen figs rot and are gone, rotten ones giving nothing,
+     * fallen nuts weather and still give nuts; broken bunches give fruit by their stage (none from a bare stalk); a ripe
+     * bunch is picked by hand; fruit falling into water or onto a termite mound is lost.
+     */
+    @GameTest(template = "arena", timeoutTicks = 100)
+    public static void floodplainFruitRipensFallsAndRots(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        int y = SURFACE + 6;
+        // A fig bunch under fig leaves, a bark cluster on a fig log, a nut bunch hanging free, each 5 over dirt.
+        BlockPos bunch = new BlockPos(20, y, 20), figs = new BlockPos(24, y, 20), nuts = new BlockPos(28, y, 20);
+        for (BlockPos top : List.of(bunch, figs, nuts)) {
+            for (int dy = -5; dy <= 0; dy++) {
+                helper.setBlock(top.above(dy), Blocks.AIR);
+            }
+            helper.setBlock(top.below(6), Blocks.DIRT);
+        }
+        helper.setBlock(bunch.above(), TreeBlocks.FIG_LEAVES.get());
+        helper.setBlock(figs.south(), TreeBlocks.FIG_LOG.get());
+        helper.setBlock(nuts.above(), TreeBlocks.DOUM_WOOD.get());
+        helper.setBlock(bunch, TreeBlocks.FIG_BUNCH.get().defaultBlockState().setValue(HangingFruit.STAGE, HangingFruit.BARE));
+        helper.setBlock(figs, TreeBlocks.TRUNK_FIGS.get().defaultBlockState().setValue(HangingFruit.STAGE, HangingFruit.BARE));
+        helper.setBlock(nuts, TreeBlocks.DOUM_NUT_BUNCH.get().defaultBlockState().setValue(HangingFruit.STAGE, HangingFruit.BARE));
+        for (BlockPos at : List.of(bunch, figs, nuts)) {
+            if (!dropsOf(helper, at).isEmpty()) {
+                helper.fail("a bare fruit stalk at " + at + " gives " + dropsOf(helper, at));
+                return;
+            }
+        }
+        ripenAndFall(helper, bunch, TreeBlocks.FIG_BUNCH.get(), SavannaItems.GREEN_FIG.get(), TreeBlocks.FALLEN_FIGS.get(), 2, 3);
+        ripenAndFall(helper, figs, TreeBlocks.TRUNK_FIGS.get(), SavannaItems.GREEN_FIG.get(), TreeBlocks.FALLEN_FIGS.get(), 1, 3);
+        ripenAndFall(helper, nuts, TreeBlocks.DOUM_NUT_BUNCH.get(), SavannaItems.GREEN_DOUM_NUT.get(), TreeBlocks.FALLEN_DOUM_NUTS.get(), 1, 3);
+
+        // Fallen figs rot (giving nothing), then are gone; fallen nuts weather and still give nuts.
+        lieAndGo(helper, bunch.below(5), TreeBlocks.FALLEN_FIGS.get(), SavannaItems.FIG.get(), false);
+        lieAndGo(helper, nuts.below(5), TreeBlocks.FALLEN_DOUM_NUTS.get(), SavannaItems.DOUM_NUT.get(), true);
+
+        // Ripe bunches broken give ripe fruit.
+        helper.setBlock(bunch, TreeBlocks.FIG_BUNCH.get().defaultBlockState());
+        List<ItemStack> ripe = dropsOf(helper, bunch);
+        if (ripe.size() != 1 || !ripe.get(0).is(SavannaItems.FIG.get()) || ripe.get(0).getCount() < 2 || ripe.get(0).getCount() > 4) {
+            helper.fail("a ripe fig bunch broken gives " + ripe + ", not 2 to 4 figs");
+            return;
+        }
+        // Picked by hand: figs pop out, the bunch is bare.
+        HangingFruit.pick(HangingFruit.Fruit.FIG, 2, 4, helper.getBlockState(bunch), level, helper.absolutePos(bunch), null);
+        if (helper.getBlockState(bunch).getValue(HangingFruit.STAGE) != HangingFruit.BARE) {
+            helper.fail("a picked fig bunch is not bare");
+            return;
+        }
+        helper.assertItemEntityPresent(SavannaItems.FIG.get(), bunch, 2);
+
+        // Into water or onto a termite mound the fruit is lost.
+        BlockPos pond = new BlockPos(32, SURFACE + 1, 20), mound = new BlockPos(34, SURFACE + 1, 20);
+        helper.setBlock(pond, Blocks.WATER);
+        helper.setBlock(mound, SavannaBlocks.TERMITE_MOUND.get());
+        for (BlockPos below : List.of(pond, mound)) {
+            for (int dy = 1; dy <= 6; dy++) {
+                helper.setBlock(below.above(dy), Blocks.AIR);
+            }
+            HangingFruit.fall(HangingFruit.Fruit.FIG, level, helper.absolutePos(below.above(6)), 3);
+            for (int dy = 0; dy <= 6; dy++) {
+                if (helper.getBlockState(below.above(dy)).is(TreeBlocks.FALLEN_FIGS.get())) {
+                    helper.fail("figs landed on " + helper.getBlockState(below));
+                    return;
+                }
+            }
+        }
+        if (!helper.getBlockState(pond).is(Blocks.WATER)) {
+            helper.fail("fruit fallen into water changed the water");
+            return;
+        }
+        helper.succeed();
+    }
+
+    /** A bare fruit block: bone meal to green, then random ticks through turning and ripe until it drops and is bare. */
+    private static void ripenAndFall(GameTestHelper helper, BlockPos at, Block block, net.minecraft.world.item.Item unripe, Block fallen,
+                                     int fewest, int most) {
+        ServerLevel level = helper.getLevel();
+        BlockPos abs = helper.absolutePos(at);
+        ((BonemealableBlock) block).performBonemeal(level, level.random, abs, helper.getBlockState(at));
+        List<Integer> seen = new ArrayList<>();
+        seen.add(helper.getBlockState(at).getValue(HangingFruit.STAGE));
+        List<ItemStack> green = dropsOf(helper, at);
+        if (green.isEmpty() || !green.stream().allMatch(s -> s.is(unripe))) {
+            helper.fail(block + " green gives " + green + ", not only unripe fruit");
+        }
+        for (int i = 0; i < 200_000 && !helper.getBlockState(at.below(5)).is(fallen); i++) {
+            BlockState s = helper.getBlockState(at);
+            s.randomTick(level, abs, level.random);
+            int stage = helper.getBlockState(at).getValue(HangingFruit.STAGE);
+            if (stage != seen.get(seen.size() - 1)) {
+                seen.add(stage);
+            }
+        }
+        if (!seen.equals(List.of(HangingFruit.GREEN, HangingFruit.TURNING, HangingFruit.RIPE, HangingFruit.BARE))) {
+            helper.fail(block + " went through the stages " + seen + ", not green, turning, ripe, bare");
+            return;
+        }
+        BlockState lying = helper.getBlockState(at.below(5));
+        if (!lying.is(fallen) || lying.getValue(FallenFruitBlock.FRUITS) < fewest || lying.getValue(FallenFruitBlock.FRUITS) > most) {
+            helper.fail(block + " dropped " + lying + " under it, not " + fewest + " to " + most + " fallen fruit");
+        }
+        for (int dy = 1; dy <= 4; dy++) {
+            if (!helper.getBlockState(at.below(dy)).isAir()) {
+                helper.fail(block + "'s fruit stopped in the air at " + at.below(dy));
+            }
+        }
+    }
+
+    /** Fallen fruit by random ticks: old (rotten figs give nothing, old nuts still give nuts), then gone. */
+    private static void lieAndGo(GameTestHelper helper, BlockPos at, Block fallen, net.minecraft.world.item.Item fruit, boolean oldGives) {
+        ServerLevel level = helper.getLevel();
+        BlockPos abs = helper.absolutePos(at);
+        int count = helper.getBlockState(at).getValue(FallenFruitBlock.FRUITS);
+        List<ItemStack> fresh = dropsOf(helper, at);
+        if (fresh.size() != 1 || !fresh.get(0).is(fruit) || fresh.get(0).getCount() != count) {
+            helper.fail(fallen + " fresh, " + count + " lying, gives " + fresh);
+            return;
+        }
+        boolean wentOld = false;
+        for (int i = 0; i < 200_000 && helper.getBlockState(at).is(fallen); i++) {
+            helper.getBlockState(at).randomTick(level, abs, level.random);
+            BlockState now = helper.getBlockState(at);
+            if (!wentOld && now.is(fallen) && now.getValue(FallenFruitBlock.OLD)) {
+                wentOld = true;
+                List<ItemStack> old = dropsOf(helper, at);
+                if (oldGives != (!old.isEmpty() && old.get(0).getCount() == count)) {
+                    helper.fail(fallen + " old gives " + old);
+                    return;
+                }
+            }
+        }
+        if (!wentOld || helper.getBlockState(at).is(fallen)) {
+            helper.fail(fallen + " never went old and away (old: " + wentOld + ")");
+        }
+    }
+
+    private static List<ItemStack> dropsOf(GameTestHelper helper, BlockPos at) {
+        BlockPos abs = helper.absolutePos(at);
+        return Block.getDrops(helper.getBlockState(at), helper.getLevel(), abs, helper.getLevel().getBlockEntity(abs));
     }
 
     private static BlockState joined(GameTestHelper helper, BlockPos relative) {

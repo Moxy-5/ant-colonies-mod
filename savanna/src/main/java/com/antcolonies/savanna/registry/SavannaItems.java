@@ -80,6 +80,17 @@ public class SavannaItems {
     /** A cooked Termitomyces (furnace, smoker or campfire): 3 drumsticks, about as good as cooked fish (my pick). */
     public static final DeferredItem<Item> COOKED_TERMITOMYCES = ITEMS.registerSimpleItem("cooked_termitomyces",
             new Item.Properties().food(new FoodProperties.Builder().nutrition(6).saturationModifier(0.6F).build()));
+    /*
+     * The floodplain trees' fruit (steps 4b and 6b, 2026-11-14, my picks). A ripe sycamore fig: small and soft, a little
+     * food eaten fast. A ripe doum nut: a hard fruit with a sweet gingerbread-tasting fibrous rind round a stone, more
+     * food, chewed slowly. The green ones fall from an unripe bunch broken off: not food.
+     */
+    public static final DeferredItem<Item> FIG = ITEMS.registerSimpleItem("fig",
+            new Item.Properties().food(new FoodProperties.Builder().nutrition(2).saturationModifier(0.3F).fast().build()));
+    public static final DeferredItem<Item> GREEN_FIG = ITEMS.registerSimpleItem("green_fig");
+    public static final DeferredItem<Item> DOUM_NUT = ITEMS.registerSimpleItem("doum_nut",
+            new Item.Properties().food(new FoodProperties(4, 2.4F, false, 2.4F, java.util.Optional.empty(), java.util.List.of())));
+    public static final DeferredItem<Item> GREEN_DOUM_NUT = ITEMS.registerSimpleItem("green_doum_nut");
 
     public static final DeferredItem<DeferredSpawnEggItem> TERMITE_KING_SPAWN_EGG =
             ITEMS.register("termite_king_spawn_egg",

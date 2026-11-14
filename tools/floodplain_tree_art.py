@@ -256,6 +256,12 @@ FIG_TINTS = ((0x74, 0x20, 0x2a), (0x7e, 0x24, 0x30), (0x8a, 0x26, 0x30), (0xa0, 
              (0xc2, 0x90, 0x3c), (0x8f, 0x9c, 0x48))  # ripe dark red to unripe yellow and green, as in the viewer
 FIG_TINT_ODDS = (2, 1, 2, 2, 1, 1, 1)  # the viewer's mix: mostly reds, a few still yellow or green
 FIG_STALK = (0x6e, 0x5c, 0x36)
+# Step 4b, the fig's stages (my picks): cell 8 light green, 9 deep green, 10 orange, then rotting fallen figs, 11 brown,
+# 12 dark brown, 13 grey mould.
+FIG_STAGE_TINTS = ((0xa6, 0xb4, 0x5c), (0x6f, 0x82, 0x38), (0xc8, 0x6e, 0x34), (0x5e, 0x40, 0x26), (0x3e, 0x2a, 0x1c),
+                   (0x8a, 0x80, 0x68))
+FIG_GREEN_CELLS, FIG_TURNING_CELLS, FIG_ROT_CELLS = (6, 8, 9), (5, 10, 8, 4), (11, 12, 13, 11)
+FIG_STAGES = ("bare", "green", "turning", "ripe")
 
 
 def fig_log_top(dead):
@@ -308,7 +314,7 @@ def fig_fruit_atlas():
     tints, then the stalk. The bunch models paint each little box from one cell."""
     rng = random.Random("figfruit")
     img = blank((0, 0, 0))
-    for i, c in enumerate(FIG_TINTS + (FIG_STALK,)):
+    for i, c in enumerate(FIG_TINTS + (FIG_STALK,) + FIG_STAGE_TINTS):
         cx, cy = (i % 4) * 4, (i // 4) * 4
         for y in range(4):
             for x in range(4):
@@ -327,18 +333,26 @@ def _box(lo, hi, cell):
             "faces": {f: {"texture": "#fruit", "uv": cell} for f in ("north", "south", "east", "west", "up", "down")}}
 
 
-def _fig(rng, cx, cy, cz, size):
-    """One fig: three crossing boxes, so it looks round from every side (the viewer's figs)."""
+def _fig(rng, cx, cy, cz, size, stage="ripe", tones=None):
+    """One fig: three crossing boxes, so it looks round from every side (the viewer's figs). Every stage of one bunch
+    draws the same dice from rng (the same figs in the same places); the stage's colour comes from tones, its own dice.
+    A bare spur is one small stub where the fig will grow; "rotten" is a fallen fig going brown."""
     tint = rng.choices(range(len(FIG_TINTS)), FIG_TINT_ODDS)[0]
+    if stage == "bare":
+        return [_box((cx - 0.75, cy - 0.75, cz - 0.75), (cx + 0.75, cy + 0.75, cz + 0.75), _cell(len(FIG_TINTS)))]
+    if stage != "ripe":
+        tint = tones.choice({"green": FIG_GREEN_CELLS, "turning": FIG_TURNING_CELLS, "rotten": FIG_ROT_CELLS}[stage])
+    if stage == "green":
+        size -= 1  # unripe figs are smaller
     h, t = size / 2, size / 2 - 1
     return [_box((cx - h, cy - t, cz - t), (cx + h, cy + t, cz + t), _cell(tint)),
             _box((cx - t, cy - h, cz - t), (cx + t, cy + h, cz + t), _cell(tint)),
             _box((cx - t, cy - t, cz - h), (cx + t, cy + t, cz + h), _cell(tint))]
 
 
-def fig_bunch_model(variant):
+def fig_bunch_model(variant, stage="ripe"):
     """A bunch of figs hanging from the block above: a short stalk, then 3 or 4 rings of figs, smaller to the bottom."""
-    rng = random.Random(f"figbunch{variant}")
+    rng, tones = random.Random(f"figbunch{variant}"), random.Random(f"figbunch{variant}{stage}")
     stalk = _cell(len(FIG_TINTS))
     els = [_box((7, 10, 7), (9, 16, 9), stalk), _box((7.5, 7, 7.5), (8.5, 10, 8.5), stalk)]
     rings = ((3, 3.4), (4, 4.4), (2, 2.2)) + (((1, 0.0),) if rng.random() < 0.5 else ())
@@ -348,19 +362,193 @@ def fig_bunch_model(variant):
         for k in range(count):
             a = turn + k * 6.283 / count
             size = rng.choice((5, 6)) if level < 2 else 5
-            els += _fig(rng, 8 + radius * math.cos(a), y - rng.uniform(0, 1.2), 8 + radius * math.sin(a), size)
+            els += _fig(rng, 8 + radius * math.cos(a), y - rng.uniform(0, 1.2), 8 + radius * math.sin(a), size, stage, tones)
     return {"textures": {"particle": "antcolonies:block/fig_fruit", "fruit": "antcolonies:block/fig_fruit"}, "elements": els}
 
 
-def trunk_figs_model(variant):
+def trunk_figs_model(variant, stage="ripe"):
     """Figs growing on the bark (built facing north: the bark behind them at the south face), 4 to 6 in a cluster."""
-    rng = random.Random(f"trunkfigs{variant}")
+    rng, tones = random.Random(f"trunkfigs{variant}"), random.Random(f"trunkfigs{variant}{stage}")
     els = []
     for _ in range(rng.randint(4, 6)):
         size = rng.choice((5, 6))
         out = rng.uniform(2, 4.5)
-        els += _fig(rng, 8 + rng.uniform(-5.5, 5.5) * 0.7, 8 + rng.uniform(-5.5, 5.5) * 0.7, 16 - out, size)
+        els += _fig(rng, 8 + rng.uniform(-5.5, 5.5) * 0.7, 8 + rng.uniform(-5.5, 5.5) * 0.7, 16 - out, size, stage, tones)
     return {"textures": {"particle": "antcolonies:block/fig_fruit", "fruit": "antcolonies:block/fig_fruit"}, "elements": els}
+
+
+def fallen_figs_model(fruits, old):
+    """Ripe figs lying under the tree, 2 a fruit (my pick), fresh red or rotting brown; each squashed a little flat."""
+    rng, tones = random.Random(f"fallenfigs{fruits}"), random.Random(f"fallenfigs{fruits}{old}")
+    els = []
+    spots = ((5, 6), (10, 9), (7, 11), (11, 4), (4, 11), (9, 6))
+    for x, z in spots[:fruits * 2]:
+        size = rng.choice((4, 5))
+        h = size / 2
+        for box in _fig(rng, x + rng.uniform(-0.8, 0.8), h - 0.6, z + rng.uniform(-0.8, 0.8), size, "rotten" if old else "ripe", tones):
+            box["from"][1] = max(0, box["from"][1])
+            els.append(box)
+    return {"textures": {"particle": "antcolonies:block/fig_fruit", "fruit": "antcolonies:block/fig_fruit"}, "elements": els}
+
+
+# The doum nuts on the ground (step 6b, my picks): a little atlas as the fig's, 4 ripe tones (cells 0 to 3), the glossy
+# top (4), the dark ends (5), and 4 dull grey-browns for nuts that have lain a while (6 to 9).
+DOUM_GROUND = ((0x7e, 0x38, 0x14), (0x8a, 0x40, 0x18), (0x96, 0x49, 0x1c), (0xa2, 0x53, 0x1f), (0xc0, 0x74, 0x3a),
+               (0x50, 0x24, 0x0e), (0x6a, 0x4c, 0x36), (0x74, 0x58, 0x40), (0x62, 0x48, 0x34), (0x7c, 0x62, 0x4a))
+
+
+def doum_nut_atlas():
+    rng = random.Random("doumnutfruit")
+    img = blank((0, 0, 0))
+    for i, c in enumerate(DOUM_GROUND):
+        cx, cy = (i % 4) * 4, (i // 4) * 4
+        for y in range(4):
+            for x in range(4):
+                f = 1.15 if (x, y) == (1, 1) else 0.92 if x == 3 or y == 3 else 1.0
+                img[cy + y][cx + x] = shade(c, f * rng.uniform(0.95, 1.05))
+    return img
+
+
+def _nut_box(lo, hi, cell, angle, cx, cz):
+    box = {"from": [round(v, 3) for v in lo], "to": [round(v, 3) for v in hi],
+           "faces": {f: {"texture": "#fruit", "uv": _cell(cell)} for f in ("north", "south", "east", "west", "up", "down")}}
+    if angle:
+        box["rotation"] = {"origin": [cx, 0, cz], "axis": "y", "angle": angle}
+    return box
+
+
+def fallen_doum_nuts_model(fruits, old):
+    """Doum nuts lying on their sides, 1 a fruit: egg-shaped, about 6 pixels across and 10 long, glossy on top."""
+    rng = random.Random(f"fallennuts{fruits}")
+    els = []
+    for x, z in ((8, 8), (4.5, 5), (11.5, 10.5))[:fruits]:
+        angle = rng.choice((-45, -22.5, 0, 22.5, 45))
+        tone = rng.randrange(6, 10) if old else rng.randrange(0, 4)
+        top = tone if old else 4
+        els += [_nut_box((x - 3, 0, z - 4), (x + 3, 4.5, z + 4), tone, angle, x, z),
+                _nut_box((x - 2, 0.5, z - 5), (x + 2, 4, z + 5), 5 if not old else tone, angle, x, z),
+                _nut_box((x - 2, 4.5, z - 3), (x + 2, 5.5, z + 3), top, angle, x, z)]
+    return {"textures": {"particle": "antcolonies:block/doum_nut_fruit", "fruit": "antcolonies:block/doum_nut_fruit"}, "elements": els}
+
+
+def _blob(img, cx, cy, rx, ry, tone, rng):
+    """A round fruit seen from the side, lit from the upper left."""
+    for y in range(S):
+        for x in range(S):
+            d = ((x + 0.5 - cx) / rx) ** 2 + ((y + 0.5 - cy) / ry) ** 2
+            if d <= 1:
+                light = 1.25 - 0.45 * ((x + 0.5 - cx + rx * 0.4) ** 2 + (y + 0.5 - cy + ry * 0.4) ** 2) ** 0.5 / max(rx, ry)
+                img[y][x] = shade(tone, max(0.6, light) * rng.uniform(0.95, 1.05))
+
+
+def fruit_icons():
+    """Item pictures: a ripe fig and a green one (a fat pear shape, the eye at the bottom, a stalk on top), a ripe doum
+    nut and a green one (a glossy egg)."""
+    rng = random.Random("fruiticons")
+    out = []
+    for body, eye in (((0x9a, 0x2c, 0x34), (0x52, 0x14, 0x1c)), ((0x8f, 0x9c, 0x48), (0x5e, 0x6a, 0x2a))):
+        img = blank(None)
+        _blob(img, 8, 10, 5.2, 4.8, body, rng)
+        _blob(img, 8, 6.2, 3.2, 3.0, body, rng)
+        for y in range(1, 4):
+            img[y][8] = FIG_STALK
+        img[14][8] = eye
+        img[3][7] = shade(body, 0.8)
+        out.append(img)
+    for body in ((0x96, 0x49, 0x1c), (0x76, 0x64, 0x2c)):
+        img = blank(None)
+        _blob(img, 8, 8.5, 5.0, 6.6, body, rng)
+        for y in range(1, 3):
+            img[y][8] = (0x6e, 0x5c, 0x36)
+        img[5][5], img[6][5], img[5][6] = (shade(body, 1.7),) * 3  # the gloss
+        out.append(img)
+    return out
+
+
+def fruit_loot(name, ripe, ripe_count, unripe_steps):
+    """A hanging fruit block's drops (step 4b and 6b, my picks): with shears or silk touch the block itself; else by its
+    stage, ripe fruit, or for green and turning ones what unripe_steps lists, nothing from a bare stalk."""
+    from tree_art import SHEARS_OR_SILK, loot
+
+    def at(stage):
+        return {"condition": "minecraft:block_state_property", "block": f"antcolonies:{name}", "properties": {"stage": str(stage)}}
+
+    def item(what, lo, hi):
+        e = {"type": "minecraft:item", "name": f"antcolonies:{what}"}
+        if hi > 1:
+            e["functions"] = [{"function": "minecraft:set_count", "count": {"type": "minecraft:uniform", "min": lo, "max": hi}}]
+        return e
+    children = [{"type": "minecraft:item", "name": f"antcolonies:{name}", "conditions": [SHEARS_OR_SILK]},
+                dict(item(ripe, *ripe_count), conditions=[at(3)])]
+    for stage, items in unripe_steps:
+        entry = item(*items[0]) if len(items) == 1 else {"type": "minecraft:group", "children": [item(*i) for i in items]}
+        children.append(dict(entry, conditions=[at(stage)]))
+    loot(name, [{"rolls": 1.0, "bonus_rolls": 0.0, "entries": [{"type": "minecraft:alternatives", "children": children}],
+                 "conditions": [{"condition": "minecraft:survives_explosion"}]}])
+
+
+def fallen_loot(name, fruit, rot_gives_nothing):
+    """Fallen fruit broken: one fruit a fruit lying there; rotten figs nothing (my pick)."""
+    from tree_art import loot
+    children = []
+    for n in (1, 2, 3):
+        props = {"fruits": str(n)}
+        if rot_gives_nothing:
+            props["old"] = "false"
+        e = {"type": "minecraft:item", "name": f"antcolonies:{fruit}",
+             "conditions": [{"condition": "minecraft:block_state_property", "block": f"antcolonies:{name}", "properties": props}]}
+        if n > 1:
+            e["functions"] = [{"function": "minecraft:set_count", "count": n}]
+        children.append(e)
+    loot(name, [{"rolls": 1.0, "bonus_rolls": 0.0, "entries": [{"type": "minecraft:alternatives", "children": children}],
+                 "conditions": [{"condition": "minecraft:survives_explosion"}]}])
+
+
+def fruit_files():
+    """The floodplain trees' fruit (steps 4b and 6b): stage models, fallen fruit, items, drops."""
+    from tree_art import ASSETS, flat_item, item_from_block, model, texture, write_json
+    stages = list(enumerate(FIG_STAGES))
+    for v in range(3):
+        for _, st in stages:
+            model(f"fig_bunch_{st}_{v}", fig_bunch_model(v, st))
+            model(f"trunk_figs_{st}_{v}", trunk_figs_model(v, st))
+    write_json(ASSETS / "blockstates/fig_bunch.json", {"variants": {
+        f"stage={i}": [{"model": f"antcolonies:block/fig_bunch_{st}_{v}"} for v in range(3)] for i, st in stages}})
+    variants = {}
+    for d, r in (("north", 0), ("east", 90), ("south", 180), ("west", 270)):
+        for i, st in stages:
+            variants[f"facing={d},stage={i}"] = [dict({"model": f"antcolonies:block/trunk_figs_{st}_{v}"}, **({"y": r} if r else {}))
+                                                for v in range(3)]
+    write_json(ASSETS / "blockstates/trunk_figs.json", {"variants": variants})
+    item_from_block("fig_bunch", "fig_bunch_ripe_0")
+    item_from_block("trunk_figs", "trunk_figs_ripe_0")
+    for v in range(3):  # the old one-stage models
+        for old in (f"fig_bunch_{v}", f"trunk_figs_{v}"):
+            f = ASSETS / f"models/block/{old}.json"
+            if f.exists():
+                f.unlink()
+    fruit_loot("fig_bunch", "fig", (2, 4), [(1, [("green_fig", 1, 2)]), (2, [("green_fig", 1, 2)])])
+    fruit_loot("trunk_figs", "fig", (1, 3), [(1, [("green_fig", 1, 1)]), (2, [("green_fig", 1, 1)])])
+    fruit_loot("doum_nut_bunch", "doum_nut", (1, 3), [(1, [("green_doum_nut", 1, 2)]),
+                                                      (2, [("doum_nut", 1, 1), ("green_doum_nut", 1, 1)])])
+
+    texture("doum_nut_fruit", doum_nut_atlas())
+    for name, maker in (("fallen_figs", fallen_figs_model), ("fallen_doum_nuts", fallen_doum_nuts_model)):
+        variants = {}
+        for n in (1, 2, 3):
+            for old in (False, True):
+                m = f"{name}_{n}{'_old' if old else ''}"
+                model(m, maker(n, old))
+                variants[f"fruits={n},old={'true' if old else 'false'}"] = {"model": f"antcolonies:block/{m}"}
+        write_json(ASSETS / f"blockstates/{name}.json", {"variants": variants})
+        item_from_block(name, f"{name}_3")
+    fallen_loot("fallen_figs", "fig", True)
+    fallen_loot("fallen_doum_nuts", "doum_nut", False)
+
+    for name, rows in zip(("fig", "green_fig", "doum_nut", "green_doum_nut"), fruit_icons()):
+        texture(f"{name}_item", rows)
+        flat_item(name, f"{name}_item")
+    print("wrote the floodplain fruit")
 
 
 def game_files():
@@ -474,19 +662,7 @@ def game_files():
     cross("fig_seedling", "fig_seedling")
     drops_itself("fig_seedling")
 
-    # Fig bunches (three looks, picked at random) and figs on the bark (three looks, turned to face out).
-    for v in range(3):
-        model(f"fig_bunch_{v}", fig_bunch_model(v))
-        model(f"trunk_figs_{v}", trunk_figs_model(v))
-    write_json(ASSETS / "blockstates/fig_bunch.json", {"variants": {"": [{"model": f"antcolonies:block/fig_bunch_{v}"} for v in range(3)]}})
-    write_json(ASSETS / "blockstates/trunk_figs.json", {"variants": {
-        f"facing={d}": [{"model": f"antcolonies:block/trunk_figs_{v}", "y": r} for v in range(3)] if r else
-        [{"model": f"antcolonies:block/trunk_figs_{v}"} for v in range(3)]
-        for d, r in (("north", 0), ("east", 90), ("south", 180), ("west", 270))}})
-    item_from_block("fig_bunch", "fig_bunch_0")
-    item_from_block("trunk_figs", "trunk_figs_0")
-    drops_itself("fig_bunch")
-    drops_itself("trunk_figs")
+    # Fig bunches and figs on the bark: three looks each at every stage, in fruit_files (step 4b).
     print("wrote the sycamore fig blocks")
 
 
@@ -647,7 +823,7 @@ def doum_game_files():
         {"type": "minecraft:item", "name": "antcolonies:doum_crown", "conditions": [SHEARS_OR_SILK]},
         {"type": "minecraft:item", "name": "antcolonies:doum_seedling", "conditions": [
             {"condition": "minecraft:survives_explosion"}, {"condition": "minecraft:random_chance", "chance": 0.05}]}]}]}])
-    drops_itself("doum_nut_bunch")  # until its nuts drop and ripen (step 6b)
+    # The nut bunch's drops by stage are in fruit_files (step 6b).
     drops_itself("doum_seedling")
     drops_itself("doum_rosette")
     loot("doum_fronds", [])  # old fronds crumble (my pick)
@@ -708,3 +884,4 @@ def doum_game_files():
 if __name__ == "__main__":
     game_files()
     doum_game_files()
+    fruit_files()

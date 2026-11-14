@@ -1,55 +1,214 @@
 {
   "variants": {
-    "facing=north": [
+    "facing=north,stage=0": [
       {
-        "model": "antcolonies:block/trunk_figs_0"
+        "model": "antcolonies:block/trunk_figs_bare_0"
       },
       {
-        "model": "antcolonies:block/trunk_figs_1"
+        "model": "antcolonies:block/trunk_figs_bare_1"
       },
       {
-        "model": "antcolonies:block/trunk_figs_2"
+        "model": "antcolonies:block/trunk_figs_bare_2"
       }
     ],
-    "facing=east": [
+    "facing=north,stage=1": [
       {
-        "model": "antcolonies:block/trunk_figs_0",
+        "model": "antcolonies:block/trunk_figs_green_0"
+      },
+      {
+        "model": "antcolonies:block/trunk_figs_green_1"
+      },
+      {
+        "model": "antcolonies:block/trunk_figs_green_2"
+      }
+    ],
+    "facing=north,stage=2": [
+      {
+        "model": "antcolonies:block/trunk_figs_turning_0"
+      },
+      {
+        "model": "antcolonies:block/trunk_figs_turning_1"
+      },
+      {
+        "model": "antcolonies:block/trunk_figs_turning_2"
+      }
+    ],
+    "facing=north,stage=3": [
+      {
+        "model": "antcolonies:block/trunk_figs_ripe_0"
+      },
+      {
+        "model": "antcolonies:block/trunk_figs_ripe_1"
+      },
+      {
+        "model": "antcolonies:block/trunk_figs_ripe_2"
+      }
+    ],
+    "facing=east,stage=0": [
+      {
+        "model": "antcolonies:block/trunk_figs_bare_0",
         "y": 90
       },
       {
-        "model": "antcolonies:block/trunk_figs_1",
+        "model": "antcolonies:block/trunk_figs_bare_1",
         "y": 90
       },
       {
-        "model": "antcolonies:block/trunk_figs_2",
+        "model": "antcolonies:block/trunk_figs_bare_2",
         "y": 90
       }
     ],
-    "facing=south": [
+    "facing=east,stage=1": [
       {
-        "model": "antcolonies:block/trunk_figs_0",
+        "model": "antcolonies:block/trunk_figs_green_0",
+        "y": 90
+      },
+      {
+        "model": "antcolonies:block/trunk_figs_green_1",
+        "y": 90
+      },
+      {
+        "model": "antcolonies:block/trunk_figs_green_2",
+        "y": 90
+      }
+    ],
+    "facing=east,stage=2": [
+      {
+        "model": "antcolonies:block/trunk_figs_turning_0",
+        "y": 90
+      },
+      {
+        "model": "antcolonies:block/trunk_figs_turning_1",
+        "y": 90
+      },
+      {
+        "model": "antcolonies:block/trunk_figs_turning_2",
+        "y": 90
+      }
+    ],
+    "facing=east,stage=3": [
+      {
+        "model": "antcolonies:block/trunk_figs_ripe_0",
+        "y": 90
+      },
+      {
+        "model": "antcolonies:block/trunk_figs_ripe_1",
+        "y": 90
+      },
+      {
+        "model": "antcolonies:block/trunk_figs_ripe_2",
+        "y": 90
+      }
+    ],
+    "facing=south,stage=0": [
+      {
+        "model": "antcolonies:block/trunk_figs_bare_0",
         "y": 180
       },
       {
-        "model": "antcolonies:block/trunk_figs_1",
+        "model": "antcolonies:block/trunk_figs_bare_1",
         "y": 180
       },
       {
-        "model": "antcolonies:block/trunk_figs_2",
+        "model": "antcolonies:block/trunk_figs_bare_2",
         "y": 180
       }
     ],
-    "facing=west": [
+    "facing=south,stage=1": [
       {
-        "model": "antcolonies:block/trunk_figs_0",
+        "model": "antcolonies:block/trunk_figs_green_0",
+        "y": 180
+      },
+      {
+        "model": "antcolonies:block/trunk_figs_green_1",
+        "y": 180
+      },
+      {
+        "model": "antcolonies:block/trunk_figs_green_2",
+        "y": 180
+      }
+    ],
+    "facing=south,stage=2": [
+      {
+        "model": "antcolonies:block/trunk_figs_turning_0",
+        "y": 180
+      },
+      {
+        "model": "antcolonies:block/trunk_figs_turning_1",
+        "y": 180
+      },
+      {
+        "model": "antcolonies:block/trunk_figs_turning_2",
+        "y": 180
+      }
+    ],
+    "facing=south,stage=3": [
+      {
+        "model": "antcolonies:block/trunk_figs_ripe_0",
+        "y": 180
+      },
+      {
+        "model": "antcolonies:block/trunk_figs_ripe_1",
+        "y": 180
+      },
+      {
+        "model": "antcolonies:block/trunk_figs_ripe_2",
+        "y": 180
+      }
+    ],
+    "facing=west,stage=0": [
+      {
+        "model": "antcolonies:block/trunk_figs_bare_0",
         "y": 270
       },
       {
-        "model": "antcolonies:block/trunk_figs_1",
+        "model": "antcolonies:block/trunk_figs_bare_1",
         "y": 270
       },
       {
-        "model": "antcolonies:block/trunk_figs_2",
+        "model": "antcolonies:block/trunk_figs_bare_2",
+        "y": 270
+      }
+    ],
+    "facing=west,stage=1": [
+      {
+        "model": "antcolonies:block/trunk_figs_green_0",
+        "y": 270
+      },
+      {
+        "model": "antcolonies:block/trunk_figs_green_1",
+        "y": 270
+      },
+      {
+        "model": "antcolonies:block/trunk_figs_green_2",
+        "y": 270
+      }
+    ],
+    "facing=west,stage=2": [
+      {
+        "model": "antcolonies:block/trunk_figs_turning_0",
+        "y": 270
+      },
+      {
+        "model": "antcolonies:block/trunk_figs_turning_1",
+        "y": 270
+      },
+      {
+        "model": "antcolonies:block/trunk_figs_turning_2",
+        "y": 270
+      }
+    ],
+    "facing=west,stage=3": [
+      {
+        "model": "antcolonies:block/trunk_figs_ripe_0",
+        "y": 270
+      },
+      {
+        "model": "antcolonies:block/trunk_figs_ripe_1",
+        "y": 270
+      },
+      {
+        "model": "antcolonies:block/trunk_figs_ripe_2",
         "y": 270
       }
     ]

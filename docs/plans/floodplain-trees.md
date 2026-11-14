@@ -120,7 +120,7 @@ is measured first. Either way the stems are full blocks you can climb.
 4. **DONE 2026-11-13 (details in `docs/HISTORY.md`; the viewer's 40 trees matched block for block on the first try). The fig's shapes in Java** (`tree/FigShape`, from `fig()`, `figSeedling`, `figSapling`, `deadFig`, `figFallen`;
    one seed one tree, as in the viewer), checked block for block against the viewer for a few seeds (a small export
    from the viewer, compared in `./gradlew test`).
-4b. **Fig fruit:** the bunch and bark-fig blocks ripening in stages, dropping to fallen figs that rot, the fig and green
+4b. **DONE 2026-11-14 (details in `docs/HISTORY.md`). Fig fruit:** the bunch and bark-fig blocks ripening in stages, dropping to fallen figs that rot, the fig and green
    fig items, eating, picking, bone meal (section above). Test: a bunch in an arena goes through every stage, drops,
    lands on the ground, the fallen figs rot; breaking gives the items.
 5. **DONE 2026-11-14 (details in `docs/HISTORY.md`). The doum's blocks:** stem bark A and the dead grey bark, the frond pieces, the spear, the crown cap, nut bunch
@@ -135,7 +135,7 @@ is measured first. Either way the stems are full blocks you can climb.
    crown has flat light (no soft shadows), as the viewer has.
 6. **DONE 2026-11-14 (details in `docs/HISTORY.md`; the viewer's 45 palms matched block for block). The doum's shapes in Java** (`tree/DoumShape`, from `doum`, `doumSeedling` to `doumClump`, `deadDoum`), checked
    against the viewer the same way.
-6b. **Doum fruit:** the nut bunch the same way (stages, dropping, fallen nuts lasting about 20 days, the items,
+6b. **DONE 2026-11-14 (details in `docs/HISTORY.md`). Doum fruit:** the nut bunch the same way (stages, dropping, fallen nuts lasting about 20 days, the items,
    eating slowly), with its test.
 7. **DONE 2026-11-14 (details in `docs/HISTORY.md`; figs alone, doum groves, dead 1 in 7.7 over 410 trees). New land:** a floodplain tree structure (its own set, so it never crowds the dry trees' spacing), figs alone and
    doum groves by the spacing above, every age, dead 1 in 8; new checks in `worldgen`: only on floodplain ground, the

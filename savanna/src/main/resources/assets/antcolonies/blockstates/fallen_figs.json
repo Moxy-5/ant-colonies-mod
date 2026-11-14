@@ -1,0 +1,22 @@
+{
+  "variants": {
+    "fruits=1,old=false": {
+      "model": "antcolonies:block/fallen_figs_1"
+    },
+    "fruits=1,old=true": {
+      "model": "antcolonies:block/fallen_figs_1_old"
+    },
+    "fruits=2,old=false": {
+      "model": "antcolonies:block/fallen_figs_2"
+    },
+    "fruits=2,old=true": {
+      "model": "antcolonies:block/fallen_figs_2_old"
+    },
+    "fruits=3,old=false": {
+      "model": "antcolonies:block/fallen_figs_3"
+    },
+    "fruits=3,old=true": {
+      "model": "antcolonies:block/fallen_figs_3_old"
+    }
+  }
+}

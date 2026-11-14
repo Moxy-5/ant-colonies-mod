@@ -3,6 +3,8 @@ package com.antcolonies.savanna.tree;
 import java.util.ArrayList;
 import java.util.List;
 
+import com.antcolonies.savanna.block.HangingFruit;
+
 /**
  * The doum palm's sculpted pieces (floodplain trees step 5, 2026-11-14): a crown of fan fronds with its cap, spear and
  * nut bunches, the seedling and the stemless rosette, made box for box as the model viewer makes them
@@ -46,26 +48,30 @@ public final class PalmPieces {
 
     private final TreeRandom r;
     private final List<Bit> bits = new ArrayList<>();
-    /** Every nut green (an unripe bunch): the same dice drawn, so the bunch keeps its shape. */
-    private final boolean allGreen;
+    /**
+     * Which crop the bunches show ({@link HangingFruit}'s stages, floodplain trees step 6b): bare stalks (the nuts
+     * fallen), every nut green, half of them still green, or ripe. The same dice are drawn every time, so a bunch keeps
+     * its shape as it ripens.
+     */
+    private final int nuts;
     private int bunch = -1;
     /** The places a maker reports: each fruit bunch's (doumBunch's return), a lying frond's foot. */
     private final List<double[]> at = new ArrayList<>();
 
-    private PalmPieces(long seedOrState, boolean allGreen) {
+    private PalmPieces(long seedOrState, int nuts) {
         this.r = new TreeRandom(seedOrState);
-        this.allGreen = allGreen;
+        this.nuts = nuts;
     }
 
     /**
      * A crown on a stem whose top's middle is (tx, ty, tz) (the viewer's T: on a block edge for a stem two blocks wide),
      * drawn with the dice standing at {@code state} as the crown starts. bunches: how many fruit bunches, -1 for the
      * grown palm's 2 or 3 (left to the dice). old false: no hanging old fronds. dead: every frond brown and hanging, no
-     * spear, no fruit. allGreen: every nut unripe.
+     * spear, no fruit. nuts: the bunches' stage ({@link HangingFruit#STAGE}).
      */
     public static List<Bit> crown(int state, double tx, double ty, double tz, double size, boolean old, boolean dead, int bunches,
-                                  boolean allGreen) {
-        PalmPieces p = new PalmPieces(state, allGreen);
+                                  int nuts) {
+        PalmPieces p = new PalmPieces(state, nuts);
         p.palmCrown(new double[] {tx, ty, tz}, size, old, dead, bunches);
         return p.bits;
     }
@@ -80,7 +86,7 @@ public final class PalmPieces {
 
     /** {@link #crown}, with where the dice end and where its bunches hang. */
     static Made crownMade(int state, double tx, double ty, double tz, double size, boolean old, boolean dead, int bunches) {
-        PalmPieces p = new PalmPieces(state, false);
+        PalmPieces p = new PalmPieces(state, HangingFruit.RIPE);
         p.palmCrown(new double[] {tx, ty, tz}, size, old, dead, bunches);
         return new Made(p.bits, p.r.state(), p.at);
     }
@@ -95,21 +101,21 @@ public final class PalmPieces {
 
     /** {@link #groundFrond}, with where the dice end and the frond's foot. */
     static Made groundFrondMade(int state, double r, boolean grey) {
-        PalmPieces p = new PalmPieces(state, false);
+        PalmPieces p = new PalmPieces(state, HangingFruit.RIPE);
         p.groundFrond(r, grey);
         return new Made(p.bits, p.r.state(), p.at);
     }
 
     /** The seedling (a year or two, under a block), from its seed. */
     public static List<Bit> seedling(int seed) {
-        PalmPieces p = new PalmPieces(seed * 2741L + 13, false);
+        PalmPieces p = new PalmPieces(seed * 2741L + 13, HangingFruit.RIPE);
         p.doumSeedling();
         return p.bits;
     }
 
     /** The rosette (a stemless young palm, about 4 tall at size 0.8; a sucker at 0.38 to 0.48), from its seed. */
     public static List<Bit> rosette(int seed, double size) {
-        PalmPieces p = new PalmPieces(seed * 4513L + 17, false);
+        PalmPieces p = new PalmPieces(seed * 4513L + 17, HangingFruit.RIPE);
         p.palmCrown(new double[] {0, -0.9, 0}, size, false, false, 0);
         p.deadSkirt(3, size);
         return p.bits;
@@ -119,8 +125,8 @@ public final class PalmPieces {
      * A bunch of nuts on its own (one placed by a player, with no crown above it): its stalk's split moved to the top of
      * the viewer's cell (0, 0, 0), heading az, from the seed.
      */
-    public static List<Bit> loneBunch(int seed, double az, boolean allGreen) {
-        PalmPieces p = new PalmPieces(seed * 6151L + 31, allGreen);
+    public static List<Bit> loneBunch(int seed, double az, int nuts) {
+        PalmPieces p = new PalmPieces(seed * 6151L + 31, nuts);
         p.bunch = 0;
         double[] at = p.doumBunch(new double[] {0, 0, 0}, az);
         double dx = -at[0], dy = 0.45 - (at[1] + 1), dz = -at[2];
@@ -218,22 +224,25 @@ public final class PalmPieces {
             double off = (k - half) * 4.5 / 16, back = (r.next() - 0.5) * 3 / 16;
             double sx = b0 + StrictMath.cos(spin) * off + StrictMath.cos(az) * back, sz = b2 + StrictMath.sin(spin) * off + StrictMath.sin(az) * back;
             double middle = 1 - Math.abs(k - half) / strands;
-            long nuts = 3 + Math.round(middle * 3 + r.next() * 1.5);
-            double length = 4 + nuts * 5.2;
+            long onStrand = 3 + Math.round(middle * 3 + r.next() * 1.5);
+            double length = 4 + onStrand * 5.2;
             if (off != 0) {
                 bit((b0 + sx) / 2, b1 - 3.0 / 16, (b2 + sz) / 2, Math.max(1, Math.abs(off) * 16), 1, 1, -spin, PALM_STALK);
             }
             bit(sx, b1 - (3 + length / 2) / 16, sz, 1, length, 1, rot, PALM_STALK);
-            for (int j = 0; j < nuts; j++) {
+            for (int j = 0; j < onStrand; j++) {
                 double a = spin + (j % 2 != 0 ? 0 : Math.PI) + k * 0.8 + (r.next() - 0.5) * 0.7, out = 3.4 / 16;
                 boolean green = r.next() < 0.08;
                 double[] tint = green ? DOUM_GREEN : mixC(ripe, DOUM_TINTS[(int) Math.floor(r.next() * DOUM_TINTS.length)], 0.5);
-                if (allGreen) {
-                    tint = DOUM_GREEN;
+                if (this.nuts == HangingFruit.GREEN || this.nuts == HangingFruit.TURNING && (k + j) % 2 == 0) {
+                    tint = DOUM_GREEN; // unripe, or every other nut of a ripening bunch
                 }
                 double ny = b1 - (4 + j * 5.2 + r.next()) / 16;
                 double nrot = rot + (r.next() - 0.5) * 0.5;
-                doumNut(sx + StrictMath.cos(a) * out, ny, sz + StrictMath.sin(a) * out, nrot, tint, r.next() < 0.35);
+                boolean big = r.next() < 0.35; // drawn even for a bare stalk, so the dice stay the viewer's
+                if (this.nuts != HangingFruit.BARE) {
+                    doumNut(sx + StrictMath.cos(a) * out, ny, sz + StrictMath.sin(a) * out, nrot, tint, big);
+                }
             }
         }
         return new double[] {b0, b1 - 1, b2};

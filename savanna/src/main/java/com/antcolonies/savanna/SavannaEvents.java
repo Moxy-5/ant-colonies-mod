@@ -177,6 +177,8 @@ public class SavannaEvents {
         ModEvents.addToCreativeTab(CreativeModeTabs.FOOD_AND_DRINKS, 20, event -> {
             event.accept(SavannaItems.TERMITOMYCES);
             event.accept(SavannaItems.COOKED_TERMITOMYCES);
+            event.accept(SavannaItems.FIG);
+            event.accept(SavannaItems.DOUM_NUT);
         });
         ModEvents.addToCreativeTab(CreativeModeTabs.SPAWN_EGGS, 20, event -> {
             event.accept(SavannaItems.TERMITE_QUEEN_SPAWN_EGG);

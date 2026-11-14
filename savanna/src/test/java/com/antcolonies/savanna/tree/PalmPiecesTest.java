@@ -1,5 +1,7 @@
 package com.antcolonies.savanna.tree;
 
+import com.antcolonies.savanna.block.HangingFruit;
+
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -52,13 +54,13 @@ class PalmPiecesTest {
     /** The crowns the export draws (tools/doum_pieces_export.js, CROWNS). */
     private static List<PalmPieces.Bit> crown(String name, int seed) {
         return switch (name) {
-            case "grown" -> PalmPieces.crown(seed, 3.5, 14, -2.5, 1, true, false, -1, false);
-            case "old" -> PalmPieces.crown(seed, -6.5, 17, 4.5, 1.06, true, false, -1, false);
-            case "stem" -> PalmPieces.crown(seed, 0.5, 9, 0.5, 0.88, true, false, 0, false);
-            case "fork1" -> PalmPieces.crown(seed, 5.5, 12, 7.5, 0.95, true, false, 1, false);
-            case "fork0" -> PalmPieces.crown(seed, -2.5, 13, -9.5, 0.95, true, false, 0, false);
-            case "dead" -> PalmPieces.crown(seed, 1.5, 15, 2.5, 1, true, true, -1, false);
-            case "young" -> PalmPieces.crown(seed, 0.5, 6, 0.5, 1, false, false, -1, false);
+            case "grown" -> PalmPieces.crown(seed, 3.5, 14, -2.5, 1, true, false, -1, HangingFruit.RIPE);
+            case "old" -> PalmPieces.crown(seed, -6.5, 17, 4.5, 1.06, true, false, -1, HangingFruit.RIPE);
+            case "stem" -> PalmPieces.crown(seed, 0.5, 9, 0.5, 0.88, true, false, 0, HangingFruit.RIPE);
+            case "fork1" -> PalmPieces.crown(seed, 5.5, 12, 7.5, 0.95, true, false, 1, HangingFruit.RIPE);
+            case "fork0" -> PalmPieces.crown(seed, -2.5, 13, -9.5, 0.95, true, false, 0, HangingFruit.RIPE);
+            case "dead" -> PalmPieces.crown(seed, 1.5, 15, 2.5, 1, true, true, -1, HangingFruit.RIPE);
+            case "young" -> PalmPieces.crown(seed, 0.5, 6, 0.5, 1, false, false, -1, HangingFruit.RIPE);
             default -> throw new IllegalStateException(name);
         };
     }

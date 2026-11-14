@@ -12,7 +12,7 @@ import com.antcolonies.savanna.SavannaMod;
 import com.antcolonies.savanna.block.DoumBlockEntity;
 import com.antcolonies.savanna.block.DoumLook;
 import com.antcolonies.savanna.block.DoumPiece;
-import com.antcolonies.savanna.block.DoumPieceBlock;
+import com.antcolonies.savanna.block.HangingFruit;
 import com.antcolonies.savanna.tree.PalmPieces;
 import com.google.gson.JsonDeserializationContext;
 import com.google.gson.JsonObject;
@@ -59,7 +59,7 @@ public final class DoumModel implements IDynamicBakedModel {
     private static final int[][] CORNER = {{-1, 1}, {-1, -1}, {1, -1}, {1, 1}};
     private static final int KEEP = 24;
 
-    private record Key(DoumLook look, DoumPiece.Piece piece, boolean green) {
+    private record Key(DoumLook look, DoumPiece.Piece piece, int nuts) {
     }
 
     private final TextureAtlasSprite plain, cap, capDead, particle;
@@ -87,15 +87,15 @@ public final class DoumModel implements IDynamicBakedModel {
         if (look == null) {
             look = DoumLook.byPlace(BlockPos.ZERO);
         }
-        boolean green = piece.piece() == DoumPiece.Piece.BUNCH && state.hasProperty(DoumPieceBlock.RIPE) && !state.getValue(DoumPieceBlock.RIPE);
-        Key key = new Key(look, piece.piece(), green);
+        int nuts = state.hasProperty(HangingFruit.STAGE) ? state.getValue(HangingFruit.STAGE) : HangingFruit.RIPE;
+        Key key = new Key(look, piece.piece(), piece.piece() == DoumPiece.Piece.BUNCH ? nuts : HangingFruit.RIPE);
         List<BakedQuad> quads;
         synchronized (made) {
             quads = made.get(key);
         }
         if (quads == null) {
             // Worked out outside the lock: the chunk builders draw on several threads at once.
-            quads = quads(look.bits(piece.piece(), green), look.dead());
+            quads = quads(look.bits(piece.piece(), key.nuts()), look.dead());
             synchronized (made) {
                 made.put(key, quads);
             }

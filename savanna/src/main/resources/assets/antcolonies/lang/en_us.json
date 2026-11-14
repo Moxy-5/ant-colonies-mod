@@ -140,5 +140,11 @@
   "block.antcolonies.doum_rosette": "Young Doum Palm",
   "block.antcolonies.doum_leaf_base": "Doum Leaf Base",
   "block.antcolonies.doum_root": "Doum Palm Root",
-  "block.antcolonies.doum_fronds": "Dead Doum Fronds"
+  "block.antcolonies.doum_fronds": "Dead Doum Fronds",
+  "block.antcolonies.fallen_figs": "Fallen Figs",
+  "block.antcolonies.fallen_doum_nuts": "Fallen Doum Nuts",
+  "item.antcolonies.fig": "Fig",
+  "item.antcolonies.green_fig": "Green Fig",
+  "item.antcolonies.doum_nut": "Doum Nut",
+  "item.antcolonies.green_doum_nut": "Green Doum Nut"
 }

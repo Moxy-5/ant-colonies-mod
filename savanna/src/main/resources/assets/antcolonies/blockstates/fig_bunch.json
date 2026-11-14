@@ -1,14 +1,47 @@
 {
   "variants": {
-    "": [
+    "stage=0": [
       {
-        "model": "antcolonies:block/fig_bunch_0"
+        "model": "antcolonies:block/fig_bunch_bare_0"
       },
       {
-        "model": "antcolonies:block/fig_bunch_1"
+        "model": "antcolonies:block/fig_bunch_bare_1"
       },
       {
-        "model": "antcolonies:block/fig_bunch_2"
+        "model": "antcolonies:block/fig_bunch_bare_2"
+      }
+    ],
+    "stage=1": [
+      {
+        "model": "antcolonies:block/fig_bunch_green_0"
+      },
+      {
+        "model": "antcolonies:block/fig_bunch_green_1"
+      },
+      {
+        "model": "antcolonies:block/fig_bunch_green_2"
+      }
+    ],
+    "stage=2": [
+      {
+        "model": "antcolonies:block/fig_bunch_turning_0"
+      },
+      {
+        "model": "antcolonies:block/fig_bunch_turning_1"
+      },
+      {
+        "model": "antcolonies:block/fig_bunch_turning_2"
+      }
+    ],
+    "stage=3": [
+      {
+        "model": "antcolonies:block/fig_bunch_ripe_0"
+      },
+      {
+        "model": "antcolonies:block/fig_bunch_ripe_1"
+      },
+      {
+        "model": "antcolonies:block/fig_bunch_ripe_2"
       }
     ]
   }

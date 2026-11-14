@@ -1,0 +1,22 @@
+{
+  "variants": {
+    "fruits=1,old=false": {
+      "model": "antcolonies:block/fallen_doum_nuts_1"
+    },
+    "fruits=1,old=true": {
+      "model": "antcolonies:block/fallen_doum_nuts_1_old"
+    },
+    "fruits=2,old=false": {
+      "model": "antcolonies:block/fallen_doum_nuts_2"
+    },
+    "fruits=2,old=true": {
+      "model": "antcolonies:block/fallen_doum_nuts_2_old"
+    },
+    "fruits=3,old=false": {
+      "model": "antcolonies:block/fallen_doum_nuts_3"
+    },
+    "fruits=3,old=true": {
+      "model": "antcolonies:block/fallen_doum_nuts_3_old"
+    }
+  }
+}

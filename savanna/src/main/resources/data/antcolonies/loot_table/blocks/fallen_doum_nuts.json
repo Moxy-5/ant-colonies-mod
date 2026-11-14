@@ -1,0 +1,72 @@
+{
+  "type": "minecraft:block",
+  "pools": [
+    {
+      "rolls": 1.0,
+      "bonus_rolls": 0.0,
+      "entries": [
+        {
+          "type": "minecraft:alternatives",
+          "children": [
+            {
+              "type": "minecraft:item",
+              "name": "antcolonies:doum_nut",
+              "conditions": [
+                {
+                  "condition": "minecraft:block_state_property",
+                  "block": "antcolonies:fallen_doum_nuts",
+                  "properties": {
+                    "fruits": "1"
+                  }
+                }
+              ]
+            },
+            {
+              "type": "minecraft:item",
+              "name": "antcolonies:doum_nut",
+              "conditions": [
+                {
+                  "condition": "minecraft:block_state_property",
+                  "block": "antcolonies:fallen_doum_nuts",
+                  "properties": {
+                    "fruits": "2"
+                  }
+                }
+              ],
+              "functions": [
+                {
+                  "function": "minecraft:set_count",
+                  "count": 2
+                }
+              ]
+            },
+            {
+              "type": "minecraft:item",
+              "name": "antcolonies:doum_nut",
+              "conditions": [
+                {
+                  "condition": "minecraft:block_state_property",
+                  "block": "antcolonies:fallen_doum_nuts",
+                  "properties": {
+                    "fruits": "3"
+                  }
+                }
+              ],
+              "functions": [
+                {
+                  "function": "minecraft:set_count",
+                  "count": 3
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "conditions": [
+        {
+          "condition": "minecraft:survives_explosion"
+        }
+      ]
+    }
+  ]
+}

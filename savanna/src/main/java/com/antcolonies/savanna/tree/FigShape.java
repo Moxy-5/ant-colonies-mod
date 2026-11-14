@@ -10,6 +10,7 @@ import com.antcolonies.savanna.block.FigBranchBlock;
 import com.antcolonies.savanna.block.FigLeavesBlock;
 import com.antcolonies.savanna.block.FigRootBlock;
 import com.antcolonies.savanna.block.TreeBranchBlock;
+import com.antcolonies.savanna.block.HangingFruit;
 import com.antcolonies.savanna.block.TrunkFigsBlock;
 import com.antcolonies.savanna.registry.TreeBlocks;
 
@@ -169,6 +170,8 @@ public final class FigShape {
     private final List<Mark> marks = new ArrayList<>();
     /** The tree being made: its noise seed, where its limbs leave the trunk, how far up the young bark starts, its dead stage. */
     private int ns = 1, figFy = 7, figDead;
+    /** The seed the tree was made from: its fruit's timetable (step 4b; no dice drawn from it). */
+    private int seed;
     private double figOldBelow = Double.POSITIVE_INFINITY;
 
     private FigShape() {
@@ -177,6 +180,7 @@ public final class FigShape {
     /** The fig of this seed at this age, every block worked out as in the viewer. */
     public static FigShape make(int seed, Age age) {
         FigShape f = new FigShape();
+        f.seed = seed;
         switch (age) {
             case SEEDLING -> f.marks.add(new Mark(MarkKind.SEEDLING, 0, 0, 0, 0, 0, false));
             case SAPLING -> f.sapling(seed);
@@ -230,9 +234,9 @@ public final class FigShape {
         for (Mark mk : marks) {
             long k = BlockPos.asLong(mk.x, mk.y, mk.z);
             BlockState s = switch (mk.kind) {
-                case BUNCH -> TreeBlocks.FIG_BUNCH.get().defaultBlockState();
+                case BUNCH -> HangingFruit.onTree(TreeBlocks.FIG_BUNCH.get().defaultBlockState(), seed);
                 case SEEDLING -> TreeBlocks.FIG_SEEDLING.get().defaultBlockState();
-                case BARK_FIGS -> TreeBlocks.TRUNK_FIGS.get().defaultBlockState()
+                case BARK_FIGS -> HangingFruit.onTree(TreeBlocks.TRUNK_FIGS.get().defaultBlockState(), seed)
                         .setValue(TrunkFigsBlock.FACING, Direction.fromDelta(-mk.dx, 0, -mk.dz));
                 // My pick: the viewer's two-tier brackets are grown ones, its three-tier ones tiered.
                 case BRACKET -> TreeBlocks.BRACKET_FUNGUS.get().defaultBlockState()

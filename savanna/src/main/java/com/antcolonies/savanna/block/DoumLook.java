@@ -39,25 +39,25 @@ public record DoumLook(boolean grown, int state, double tx, double ty, double tz
     }
 
     /**
-     * The boxes this piece draws, placed in its own block (0 to 1 across; parts reach far out of it). green: a bunch
-     * not yet ripe.
+     * The boxes this piece draws, placed in its own block (0 to 1 across; parts reach far out of it). nuts: a bunch's
+     * {@link com.antcolonies.savanna.block.HangingFruit} stage (a crown always draws ripe ones; it shows no bunch itself).
      */
-    public List<PalmPieces.Bit> bits(DoumPiece.Piece piece, boolean green) {
+    public List<PalmPieces.Bit> bits(DoumPiece.Piece piece, int nuts) {
         List<PalmPieces.Bit> all;
         int keep = -1;
         boolean shift = false;
         switch (piece) {
             case CROWN -> {
-                all = PalmPieces.crown(state, tx, ty, tz, size, old, dead, grown ? bunches : 0, false);
+                all = PalmPieces.crown(state, tx, ty, tz, size, old, dead, grown ? bunches : 0, HangingFruit.RIPE);
                 shift = grown;
             }
             case BUNCH -> {
                 if (grown) {
-                    all = PalmPieces.crown(state, tx, ty, tz, size, old, dead, bunches, green);
+                    all = PalmPieces.crown(state, tx, ty, tz, size, old, dead, bunches, nuts);
                     keep = bunch;
                     shift = true;
                 } else {
-                    all = PalmPieces.loneBunch(state, (state & 1023) / 1023.0 * Math.PI * 2, green);
+                    all = PalmPieces.loneBunch(state, (state & 1023) / 1023.0 * Math.PI * 2, nuts);
                     keep = 0;
                 }
             }

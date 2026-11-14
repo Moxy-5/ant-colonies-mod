@@ -18,6 +18,9 @@ import com.antcolonies.savanna.block.FigLeavesBlock;
 import com.antcolonies.savanna.block.FigRootBlock;
 import com.antcolonies.savanna.block.FigWoodBlock;
 import com.antcolonies.savanna.block.TrunkFigsBlock;
+import com.antcolonies.savanna.block.FallenFruitBlock;
+import com.antcolonies.savanna.block.FigBunchBlock;
+import com.antcolonies.savanna.block.HangingFruit;
 import com.antcolonies.savanna.block.FrassBlock;
 import com.antcolonies.savanna.block.PulpHeapBlock;
 import com.antcolonies.savanna.block.HangingPodsBlock;
@@ -208,14 +211,18 @@ public final class TreeBlocks {
     public static final DeferredBlock<HangingPodsBlock> FIG_LEAF_SPRAY = add(SavannaBlocks.BLOCKS.registerBlock("fig_leaf_spray", HangingPodsBlock::new,
             BlockBehaviour.Properties.of().mapColor(MapColor.PLANT).strength(0.1F).sound(SoundType.AZALEA_LEAVES).noCollission()
                     .noOcclusion().replaceable().ignitedByLava().pushReaction(PushReaction.DESTROY)));
-    /** A bunch of figs hanging under a limb (looks only until step 4b). */
-    public static final DeferredBlock<HangingPodsBlock> FIG_BUNCH = add(SavannaBlocks.BLOCKS.registerBlock("fig_bunch", HangingPodsBlock::new,
+    /** A bunch of figs hanging under a limb, ripening in stages and dropping its figs (step 4b). */
+    public static final DeferredBlock<FigBunchBlock> FIG_BUNCH = add(SavannaBlocks.BLOCKS.registerBlock("fig_bunch", FigBunchBlock::new,
             BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_RED).strength(0.2F).sound(SoundType.AZALEA_LEAVES)
                     .noCollission().noOcclusion().ignitedByLava().pushReaction(PushReaction.DESTROY)));
-    /** Figs growing straight on the trunk's bark (looks only until step 4b). */
+    /** Figs growing straight on the trunk's bark, ripening like a bunch (step 4b). */
     public static final DeferredBlock<TrunkFigsBlock> TRUNK_FIGS = add(SavannaBlocks.BLOCKS.registerBlock("trunk_figs", TrunkFigsBlock::new,
             BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_RED).strength(0.2F).sound(SoundType.AZALEA_LEAVES)
                     .noCollission().noOcclusion().ignitedByLava().pushReaction(PushReaction.DESTROY)));
+    /** Ripe figs fallen under a fig, rotting in about 2 days (step 4b). */
+    public static final DeferredBlock<FallenFruitBlock> FALLEN_FIGS = add(SavannaBlocks.BLOCKS.registerBlock("fallen_figs",
+            p -> new FallenFruitBlock(HangingFruit.Fruit.FIG, p), BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_RED).strength(0.1F)
+                    .sound(SoundType.AZALEA_LEAVES).noCollission().noOcclusion().pushReaction(PushReaction.DESTROY)));
     /** A fig seedling (a player's does not grow yet: growing in play is step 8). */
     public static final DeferredBlock<TreeSeedlingBlock> FIG_SEEDLING = add(SavannaBlocks.BLOCKS.registerBlock("fig_seedling", TreeSeedlingBlock::new,
             BlockBehaviour.Properties.of().mapColor(MapColor.PLANT).noCollission().instabreak().sound(SoundType.GRASS)
@@ -237,10 +244,14 @@ public final class TreeBlocks {
     public static final DeferredBlock<DoumPieceBlock> DOUM_CROWN = add(SavannaBlocks.BLOCKS.registerBlock("doum_crown",
             p -> new DoumPieceBlock(DoumPiece.Piece.CROWN, p), BlockBehaviour.Properties.of().mapColor(MapColor.PLANT).strength(0.6F)
                     .sound(SoundType.AZALEA_LEAVES).noOcclusion().ignitedByLava().pushReaction(PushReaction.DESTROY)));
-    /** A bunch of doum nuts hanging under a crown, ripe or green (looks only until step 6b). */
+    /** A bunch of doum nuts hanging under a crown, ripening in stages and dropping its nuts (step 6b). */
     public static final DeferredBlock<DoumPieceBlock> DOUM_NUT_BUNCH = add(SavannaBlocks.BLOCKS.registerBlock("doum_nut_bunch",
             p -> new DoumPieceBlock(DoumPiece.Piece.BUNCH, p), BlockBehaviour.Properties.of().mapColor(MapColor.TERRACOTTA_ORANGE)
                     .strength(0.3F).sound(SoundType.WOOD).noCollission().noOcclusion().ignitedByLava().pushReaction(PushReaction.DESTROY)));
+    /** Ripe doum nuts fallen under a palm, lasting about 20 days (step 6b). */
+    public static final DeferredBlock<FallenFruitBlock> FALLEN_DOUM_NUTS = add(SavannaBlocks.BLOCKS.registerBlock("fallen_doum_nuts",
+            p -> new FallenFruitBlock(HangingFruit.Fruit.DOUM, p), BlockBehaviour.Properties.of().mapColor(MapColor.TERRACOTTA_ORANGE)
+                    .strength(0.2F).sound(SoundType.WOOD).noCollission().noOcclusion().pushReaction(PushReaction.DESTROY)));
     /** A doum seedling (a player's does not grow yet: growing in play is step 8). */
     public static final DeferredBlock<DoumPlantBlock> DOUM_SEEDLING = add(SavannaBlocks.BLOCKS.registerBlock("doum_seedling",
             p -> new DoumPlantBlock(DoumPiece.Piece.SEEDLING, p), BlockBehaviour.Properties.of().mapColor(MapColor.PLANT).noCollission()
@@ -405,6 +416,8 @@ public final class TreeBlocks {
         fire.setFlammable(FIG_LEAF_SPRAY.get(), 60, 100);
         fire.setFlammable(FIG_BUNCH.get(), 30, 60);
         fire.setFlammable(TRUNK_FIGS.get(), 30, 60);
+        fire.setFlammable(FALLEN_FIGS.get(), 30, 60);
+        fire.setFlammable(FALLEN_DOUM_NUTS.get(), 30, 60);
         // The doum the same, its dry fronds and leaf bases quick to catch.
         fire.setFlammable(DOUM_LOG.get(), 5, 5);
         fire.setFlammable(DOUM_WOOD.get(), 5, 5);

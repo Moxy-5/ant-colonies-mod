@@ -7,6 +7,7 @@ import com.antcolonies.savanna.block.DoumLeafBaseBlock;
 import com.antcolonies.savanna.block.DoumLook;
 import com.antcolonies.savanna.block.DoumRootBlock;
 import com.antcolonies.savanna.block.DoumWoodBlock;
+import com.antcolonies.savanna.block.HangingFruit;
 import com.antcolonies.savanna.registry.TreeBlocks;
 
 import it.unimi.dsi.fastutil.longs.Long2IntLinkedOpenHashMap;
@@ -161,6 +162,8 @@ public final class DoumShape {
     private TreeRandom r;
     /** The palm's noise seed. */
     private int ns = 1;
+    /** The seed the palm was made from: its nuts' timetable (step 6b; no dice drawn from it). */
+    private int seed;
 
     private DoumShape() {
     }
@@ -168,6 +171,7 @@ public final class DoumShape {
     /** The doum of this seed at this age, every block worked out as in the viewer. */
     public static DoumShape make(int seed, Age age) {
         DoumShape d = new DoumShape();
+        d.seed = seed;
         switch (age) {
             case SEEDLING -> d.draws.add(new Draw(DrawKind.SEEDLING, seed, 0, 0, 0, 1, false, false, 0, PalmPieces.seedling(seed).size(),
                     List.of()));
@@ -263,7 +267,7 @@ public final class DoumShape {
                         int bx = (int) Math.round(p[0]), by = (int) Math.round(p[1]), bz = (int) Math.round(p[2]);
                         long bt = free(out, new int[][] {{bx, by, bz}, {bx, by - 1, bz}, {bx, by + 1, bz}});
                         if (bt != Long.MIN_VALUE) {
-                            out.put(bt, TreeBlocks.DOUM_NUT_BUNCH.get().defaultBlockState());
+                            out.put(bt, HangingFruit.onTree(TreeBlocks.DOUM_NUT_BUNCH.get().defaultBlockState(), seed));
                             looks.put(bt, look(d, bt, j));
                         }
                     }
