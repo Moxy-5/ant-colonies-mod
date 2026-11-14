@@ -458,7 +458,7 @@ A Minecraft mod where ants and termites live as real colonies: they dig, build, 
 
 - **River algae looks in the model viewer, 2026-11-14** (M9, the first animal step; `python tools/model_viewer.py algae`): A green felt, B slime mat with bubbles, C felt with waving strands, each at four stages (grazed bare, thin, thick, lush), on a piece of savanna river and side by side; waiting for the user's pick; nothing in-game yet.
 
-- **River algae BUILT 2026-11-14** (on `master`, look C picked by the user): `antcolonies:algae`, a waterlogged mat on savanna river, pan and oxbow beds in new land, growing a stage a game day up to what the depth allows (lush in shallows, thin in the channel), spreading, grazed a stage a bite by the fish to come (`AlgaeBlock.graze`), streamers swaying; creative Natural Blocks tab; test category `river`, `river,worldgen` 11 of 11 on 6 servers; not tried in-game yet (a new world). Next: the grazing fish.
+- **River algae BUILT 2026-11-14** (on `master`, look C picked by the user): `antcolonies:algae`, a waterlogged mat on savanna river, pan and oxbow beds in new land, growing a stage a game day up to what the depth allows (lush in shallows, thin in the channel), spreading, grazed a stage a bite by the fish to come (`AlgaeBlock.graze`), streamers swaying; creative Natural Blocks tab; test category `river`, `river,worldgen` 11 of 11 on 6 servers; **confirmed in-game by the user 2026-11-14 ("It looks amazing i love it")**. Next: the grazing fish.
 
 ## Other notes files (read only when the task needs them)
 - `docs/DESIGN.md`: every design decision for the species and shared systems (read the section for a feature before working on it).
