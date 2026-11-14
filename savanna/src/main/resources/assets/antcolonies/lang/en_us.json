@@ -131,5 +131,12 @@
   "block.antcolonies.fig_leaf_spray": "Sycamore Fig Leaf Spray",
   "block.antcolonies.fig_seedling": "Sycamore Fig Seedling",
   "block.antcolonies.fig_bunch": "Fig Bunch",
-  "block.antcolonies.trunk_figs": "Trunk Figs"
+  "block.antcolonies.trunk_figs": "Trunk Figs",
+  "block.antcolonies.doum_log": "Doum Palm Log",
+  "block.antcolonies.doum_wood": "Doum Palm Wood",
+  "block.antcolonies.doum_crown": "Doum Palm Crown",
+  "block.antcolonies.doum_nut_bunch": "Doum Nut Bunch",
+  "block.antcolonies.doum_seedling": "Doum Palm Seedling",
+  "block.antcolonies.doum_rosette": "Young Doum Palm",
+  "block.antcolonies.doum_leaf_base": "Doum Leaf Base"
 }

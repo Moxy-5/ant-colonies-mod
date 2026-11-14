@@ -28,6 +28,8 @@
     "antcolonies:fig_log",
     "antcolonies:fig_wood",
     "antcolonies:fig_branch",
-    "antcolonies:fig_root"
+    "antcolonies:fig_root",
+    "antcolonies:doum_log",
+    "antcolonies:doum_wood"
   ]
 }

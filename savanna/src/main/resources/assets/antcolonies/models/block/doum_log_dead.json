@@ -1,0 +1,7 @@
+{
+  "parent": "minecraft:block/cube_column",
+  "textures": {
+    "side": "antcolonies:block/doum_bark_dead",
+    "end": "antcolonies:block/doum_log_top_dead"
+  }
+}

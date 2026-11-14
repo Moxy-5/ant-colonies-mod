@@ -7,6 +7,11 @@ import com.antcolonies.savanna.SavannaMod;
 import com.antcolonies.savanna.block.BleachedBranchBlock;
 import com.antcolonies.savanna.block.BracketFungusBlock;
 import com.antcolonies.savanna.block.DeadTreeWoodBlock;
+import com.antcolonies.savanna.block.DoumLeafBaseBlock;
+import com.antcolonies.savanna.block.DoumPiece;
+import com.antcolonies.savanna.block.DoumPieceBlock;
+import com.antcolonies.savanna.block.DoumPlantBlock;
+import com.antcolonies.savanna.block.DoumWoodBlock;
 import com.antcolonies.savanna.block.FigBranchBlock;
 import com.antcolonies.savanna.block.FigLeavesBlock;
 import com.antcolonies.savanna.block.FigRootBlock;
@@ -215,6 +220,39 @@ public final class TreeBlocks {
             BlockBehaviour.Properties.of().mapColor(MapColor.PLANT).noCollission().instabreak().sound(SoundType.GRASS)
                     .pushReaction(PushReaction.DESTROY)));
 
+    /*
+     * The doum palm (floodplain trees step 5, 2026-11-14; shape B and bark A, the user's picks in the model viewer).
+     * Stems are plain blocks; a crown, a nut bunch, the seedling and the rosette are each one block drawing the viewer's
+     * whole sculpted piece from its recipe (block/DoumLook, the client's DoumModel), as fronds that overlap a dozen deep
+     * cannot be cut into blocks. Hard, fibrous stems (my pick: a little harder than the fig).
+     */
+    /** The doum's stem as a log, living or dead grey ({@link DoumWoodBlock#DEAD}). */
+    public static final DeferredBlock<DoumWoodBlock> DOUM_LOG = add(SavannaBlocks.BLOCKS.registerBlock("doum_log", DoumWoodBlock::new,
+            wood(MapColor.TERRACOTTA_BROWN, 2.0F)));
+    /** The doum's stem, bark all round: what a palm's two-block-wide stems are built of. */
+    public static final DeferredBlock<DoumWoodBlock> DOUM_WOOD = add(SavannaBlocks.BLOCKS.registerBlock("doum_wood", DoumWoodBlock::new,
+            wood(MapColor.TERRACOTTA_BROWN, 2.0F)));
+    /** A crown of fan fronds round its spear leaf, on top of a stem; only its cap is solid. */
+    public static final DeferredBlock<DoumPieceBlock> DOUM_CROWN = add(SavannaBlocks.BLOCKS.registerBlock("doum_crown",
+            p -> new DoumPieceBlock(DoumPiece.Piece.CROWN, p), BlockBehaviour.Properties.of().mapColor(MapColor.PLANT).strength(0.6F)
+                    .sound(SoundType.AZALEA_LEAVES).noOcclusion().ignitedByLava().pushReaction(PushReaction.DESTROY)));
+    /** A bunch of doum nuts hanging under a crown, ripe or green (looks only until step 6b). */
+    public static final DeferredBlock<DoumPieceBlock> DOUM_NUT_BUNCH = add(SavannaBlocks.BLOCKS.registerBlock("doum_nut_bunch",
+            p -> new DoumPieceBlock(DoumPiece.Piece.BUNCH, p), BlockBehaviour.Properties.of().mapColor(MapColor.TERRACOTTA_ORANGE)
+                    .strength(0.3F).sound(SoundType.WOOD).noCollission().noOcclusion().ignitedByLava().pushReaction(PushReaction.DESTROY)));
+    /** A doum seedling (a player's does not grow yet: growing in play is step 8). */
+    public static final DeferredBlock<DoumPlantBlock> DOUM_SEEDLING = add(SavannaBlocks.BLOCKS.registerBlock("doum_seedling",
+            p -> new DoumPlantBlock(DoumPiece.Piece.SEEDLING, p), BlockBehaviour.Properties.of().mapColor(MapColor.PLANT).noCollission()
+                    .instabreak().sound(SoundType.GRASS).noOcclusion().pushReaction(PushReaction.DESTROY)));
+    /** A young doum with no stem yet: fans straight out of the ground. */
+    public static final DeferredBlock<DoumPlantBlock> DOUM_ROSETTE = add(SavannaBlocks.BLOCKS.registerBlock("doum_rosette",
+            p -> new DoumPlantBlock(DoumPiece.Piece.ROSETTE, p), BlockBehaviour.Properties.of().mapColor(MapColor.PLANT).noCollission()
+                    .strength(0.2F).sound(SoundType.AZALEA_LEAVES).noOcclusion().ignitedByLava().pushReaction(PushReaction.DESTROY)));
+    /** An old leaf's base left on the stem's side. */
+    public static final DeferredBlock<DoumLeafBaseBlock> DOUM_LEAF_BASE = add(SavannaBlocks.BLOCKS.registerBlock("doum_leaf_base",
+            DoumLeafBaseBlock::new, BlockBehaviour.Properties.of().mapColor(MapColor.TERRACOTTA_BROWN).strength(0.3F).sound(SoundType.WOOD)
+                    .noCollission().noOcclusion().ignitedByLava().pushReaction(PushReaction.DESTROY)));
+
     private TreeBlocks() {
     }
 
@@ -357,5 +395,12 @@ public final class TreeBlocks {
         fire.setFlammable(FIG_LEAF_SPRAY.get(), 60, 100);
         fire.setFlammable(FIG_BUNCH.get(), 30, 60);
         fire.setFlammable(TRUNK_FIGS.get(), 30, 60);
+        // The doum the same, its dry fronds and leaf bases quick to catch.
+        fire.setFlammable(DOUM_LOG.get(), 5, 5);
+        fire.setFlammable(DOUM_WOOD.get(), 5, 5);
+        fire.setFlammable(DOUM_CROWN.get(), 30, 60);
+        fire.setFlammable(DOUM_ROSETTE.get(), 30, 60);
+        fire.setFlammable(DOUM_NUT_BUNCH.get(), 30, 60);
+        fire.setFlammable(DOUM_LEAF_BASE.get(), 60, 100);
     }
 }

@@ -490,5 +490,199 @@ def game_files():
     print("wrote the sycamore fig blocks")
 
 
+# ---- The doum palm's blocks (floodplain trees step 5, 2026-11-14; bark A and shape B, the user's picks) ----
+# Stems are plain blocks (doum_log, doum_wood, living or dead grey); a crown, a nut bunch, the seedling and the rosette
+# are each one block whose model replays the viewer's own sculpted piece (antcolonies:doum_sculpted, the client's
+# DoumModel): those boxes are drawn with a plain white picture coloured box by box, and the crown's cap with the bark
+# tinted as the viewer tints it (baked here). Leaf-base stubs are ordinary block models, the viewer's two boxes.
+
+DOUM_CAP_TINT = (1.12, 1.08, 0.9)
+DOUM_BOOT = ((1.5, 1.42, 1.24), (1.3, 1.25, 1.12))
+DOUM_FROND = ((0x56, 0x70, 0x2c), (0x96, 0xa4, 0x40))
+DOUM_NUT = ((0x7e, 0x38, 0x14), (0x96, 0x49, 0x1c), (0xb0, 0x62, 0x2a), (0x6c, 0x2e, 0x12))
+
+
+def _lin(v):
+    v /= 255
+    return v / 12.92 if v <= 0.04045 else ((v + 0.055) / 1.055) ** 2.4
+
+
+def _srgb(v):
+    v = max(0.0, min(1.0, v))
+    return round(255 * (v * 12.92 if v <= 0.0031308 else 1.055 * v ** (1 / 2.4) - 0.055))
+
+
+def tinted(rows, tint):
+    """A picture coloured as the viewer colours it: each pixel times the tint in linear light."""
+    return [[None if px is None else tuple(_srgb(_lin(c) * t) for c, t in zip(px, tint)) for px in row] for row in rows]
+
+
+def doum_log_top(dead):
+    """A doum stem's cut end: no rings (a palm has none), pale fibrous pith speckled with the cut dark strands, thickest
+    toward the rim, and the bark round it (grey once dead)."""
+    rng = random.Random(f"doumend{dead}")
+    pith, strand = ((196, 170, 120), (104, 72, 44)) if not dead else ((172, 166, 152), (96, 90, 80))
+    bark = doum_dead_bark(GAME_LOOK) if dead else doum_bark(GAME_LOOK)
+    img = []
+    for y in range(S):
+        row = []
+        for x in range(S):
+            edge = max(abs(x - 7.5), abs(y - 7.5))
+            if edge > 7:
+                row.append(bark[y][x])
+                continue
+            r = math.hypot(x - 7.5, y - 7.5) / 7.5
+            c = shade(pith, rng.uniform(0.94, 1.06))
+            if rng.random() < 0.12 + 0.28 * r:  # the strands lie thicker toward the outside, as in a real palm stem
+                c = mix(c, strand, rng.uniform(0.5, 0.85))
+            row.append(c)
+        img.append(row)
+    return img
+
+
+def doum_frond_texture():
+    """A solid frond green for the pieces' break specks: fan segments in light and dark."""
+    rng = random.Random("doumfrond")
+    return [[shade(mix(*DOUM_FROND, 0.5 + 0.5 * math.sin((x + y * 0.3) * 1.7)), rng.uniform(0.9, 1.08)) for x in range(S)] for y in range(S)]
+
+
+def doum_nut_texture():
+    rng = random.Random("doumnut")
+    return [[shade(DOUM_NUT[(x // 3 + y // 4) % 4], rng.uniform(0.85, 1.12)) for x in range(S)] for y in range(S)]
+
+
+def _icon_fan(img, cx, cy, radius, a0, a1, rays, rng):
+    """A fan leaf seen from the side: segments from (cx, cy) out to radius between angles a0 and a1 (degrees, 0 up)."""
+    for i in range(rays):
+        a = math.radians(a0 + (a1 - a0) * i / max(1, rays - 1))
+        tone = DOUM_FROND[i % 2]
+        for step in range(1, radius * 3):
+            t = step / 3
+            x, y = int(round(cx + math.sin(a) * t)), int(round(cy - math.cos(a) * t))
+            if 0 <= x < S and 0 <= y < S:
+                img[y][x] = shade(tone, rng.uniform(0.9, 1.1) * (1.05 - 0.2 * t / radius))
+
+
+def doum_icons():
+    """Item pictures: the crown (a fan of fronds on its cap), the rosette (fans from the ground), the seedling (one
+    folded leaf from the nut) and a bunch of nuts."""
+    rng = random.Random("doumicons")
+    crown = blank(None)
+    _icon_fan(crown, 7.5, 9, 7, -80, 80, 13, rng)
+    for x in range(5, 11):
+        for y in range(9, 12):
+            crown[y][x] = shade(doum_bark(GAME_LOOK)[y][x], 1.1)
+    for y in range(2, 9):  # the spear leaf
+        crown[y][7] = (0xc4, 0xc6, 0x74)
+    rosette = blank(None)
+    _icon_fan(rosette, 4, 14, 8, -40, 50, 7, rng)
+    _icon_fan(rosette, 11, 14, 8, -50, 40, 7, rng)
+    _icon_fan(rosette, 7.5, 14, 10, -25, 25, 5, rng)
+    seedling = blank(None)
+    for y in range(6, 15):
+        seedling[y][7] = (0x7a, 0x8a, 0x3a)
+    _icon_fan(seedling, 7.5, 7, 5, -35, 35, 5, rng)
+    for x in range(6, 10):
+        seedling[15][x] = DOUM_NUT[0]
+    bunch = blank(None)
+    for y in range(0, 6):
+        bunch[y][7] = (0x9a, 0x94, 0x50)
+    for i, (x, y) in enumerate(((5, 6), (9, 6), (7, 8), (4, 10), (10, 10), (7, 12), (6, 4), (8, 4), (5, 13), (9, 13))):
+        tone = DOUM_NUT[i % 4]
+        for dx in range(-1, 2):
+            for dy in range(-1, 3):
+                if abs(dx) + abs(dy - 0.5) < 2.4 and 0 <= x + dx < S and 0 <= y + dy < S:
+                    bunch[y + dy][x + dx] = shade(tone, 1.25 if dx < 0 and dy < 1 else 1.0)
+    return crown, rosette, seedling, bunch
+
+
+def doum_game_files():
+    """Every block of the doum palm (floodplain trees step 5)."""
+    from tree_art import ASSETS, SHEARS_OR_SILK, drops_itself, flat_item, item_from_block, loot, model, texture, write_json
+    bark, dead = doum_bark(GAME_LOOK), doum_dead_bark(GAME_LOOK)
+    texture("doum_bark", bark)
+    texture("doum_bark_dead", dead)
+    texture("doum_log_top", doum_log_top(False))
+    texture("doum_log_top_dead", doum_log_top(True))
+    texture("doum_plain", [[(255, 255, 255)] * S for _ in range(S)])
+    texture("doum_cap", tinted(bark, DOUM_CAP_TINT))
+    texture("doum_cap_dead", tinted(dead, DOUM_CAP_TINT))
+    texture("doum_frond", doum_frond_texture())
+    texture("doum_nut", doum_nut_texture())
+    texture("doum_leaf_base", tinted(bark, (0.84, 0.84, 0.84)))
+    for i, t in enumerate(DOUM_BOOT):
+        texture(f"doum_leaf_boot_{i}", tinted(bark, t))
+    for name, rows in zip(("doum_crown_item", "doum_rosette_item", "doum_seedling_item", "doum_nut_bunch_item"), doum_icons()):
+        texture(name, rows)
+
+    # Stems: log (cut ends top and bottom) and wood (bark all round), turned by placing, living or dead grey.
+    for name, all_round in (("doum_log", False), ("doum_wood", True)):
+        variants = {}
+        for is_dead in (False, True):
+            side = "antcolonies:block/" + ("doum_bark_dead" if is_dead else "doum_bark")
+            end = side if all_round else "antcolonies:block/" + ("doum_log_top_dead" if is_dead else "doum_log_top")
+            m = name + ("_dead" if is_dead else "")
+            model(m, {"parent": "minecraft:block/cube_column", "textures": {"side": side, "end": end}})
+            model(f"{m}_horizontal", {"parent": "minecraft:block/cube_column_horizontal", "textures": {"side": side, "end": end}})
+            flag = "true" if is_dead else "false"
+            variants[f"axis=y,dead={flag}"] = {"model": f"antcolonies:block/{m}"}
+            variants[f"axis=z,dead={flag}"] = {"model": f"antcolonies:block/{m}_horizontal", "x": 90}
+            variants[f"axis=x,dead={flag}"] = {"model": f"antcolonies:block/{m}_horizontal", "x": 90, "y": 90}
+        write_json(ASSETS / f"blockstates/{name}.json", {"variants": variants})
+        item_from_block(name)
+        drops_itself(name)
+
+    # The sculpted pieces: one model each, drawn by the doum_sculpted loader.
+    for name, particle in (("doum_crown", "doum_frond"), ("doum_nut_bunch", "doum_nut"), ("doum_seedling", "doum_frond"),
+                           ("doum_rosette", "doum_frond")):
+        model(name, {"loader": "antcolonies:doum_sculpted", "textures": {
+            "plain": "antcolonies:block/doum_plain", "cap": "antcolonies:block/doum_cap", "cap_dead": "antcolonies:block/doum_cap_dead",
+            "particle": f"antcolonies:block/{particle}"}})
+        write_json(ASSETS / f"blockstates/{name}.json", {"variants": {"": {"model": f"antcolonies:block/{name}"}}})
+        flat_item(name, f"{name}_item")
+    # A crown gives itself to shears or silk touch, now and then a seedling (my pick, as a leaf block gives a sapling).
+    loot("doum_crown", [{"rolls": 1.0, "bonus_rolls": 0.0, "entries": [{"type": "minecraft:alternatives", "children": [
+        {"type": "minecraft:item", "name": "antcolonies:doum_crown", "conditions": [SHEARS_OR_SILK]},
+        {"type": "minecraft:item", "name": "antcolonies:doum_seedling", "conditions": [
+            {"condition": "minecraft:survives_explosion"}, {"condition": "minecraft:random_chance", "chance": 0.05}]}]}]}])
+    drops_itself("doum_nut_bunch")  # until its nuts drop and ripen (step 6b)
+    drops_itself("doum_seedling")
+    drops_itself("doum_rosette")
+
+    # Leaf-base stubs: the viewer's two boxes against the stem, facing out east, turned by the blockstate.
+    def faces(tex, w, h, d):
+        dims = {"east": (d, h), "west": (d, h), "up": (w, d), "down": (w, d), "south": (w, h), "north": (w, h)}
+        return {f: {"texture": tex, "uv": [0, 16 - min(16, v), min(16, u), 16]} for f, (u, v) in dims.items()}
+
+    variants = {}
+    for low in (False, True):
+        for wide in (True, False):
+            width = 14 if wide else 10
+            for pale in (0, 1):
+                for shift in range(5):
+                    sh = shift - 2
+                    m = f"doum_leaf_base_{'low' if low else 'high'}_{width}_{pale}_{shift}"
+                    y0 = 0 if low else 6
+                    z0, z1 = 8 + sh - width / 2, 8 + sh + width / 2
+                    b0, b1 = 8 + sh - (width - 4) / 2, 8 + sh + (width - 4) / 2
+                    by = 4.5 if low else 10.5
+                    model(m, {"parent": "minecraft:block/block", "textures": {
+                        "particle": "antcolonies:block/doum_leaf_base", "sheath": "antcolonies:block/doum_leaf_base",
+                        "boot": f"antcolonies:block/doum_leaf_boot_{pale}"}, "elements": [
+                        {"from": [0, y0, z0], "to": [3, y0 + 6, z1], "faces": faces("#sheath", 3, 6, width)},
+                        {"from": [0, by, b0], "to": [5, by + 5, b1], "faces": faces("#boot", 5, 5, width - 4)}]})
+                    for facing, turn in (("east", 0), ("south", 90), ("west", 180), ("north", 270)):
+                        v = {"model": f"antcolonies:block/{m}"}
+                        if turn:
+                            v["y"] = turn
+                        variants[f"facing={facing},low={str(low).lower()},pale={'true' if pale else 'false'},"
+                                 f"shift={shift},wide={str(wide).lower()}"] = v
+    write_json(ASSETS / "blockstates/doum_leaf_base.json", {"variants": variants})
+    item_from_block("doum_leaf_base", "doum_leaf_base_high_14_0_2")
+    loot("doum_leaf_base", [])
+    print("wrote the doum palm blocks")
+
+
 if __name__ == "__main__":
     game_files()
+    doum_game_files()

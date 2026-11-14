@@ -1,0 +1,146 @@
+{
+  "parent": "minecraft:block/block",
+  "textures": {
+    "particle": "antcolonies:block/doum_leaf_base",
+    "sheath": "antcolonies:block/doum_leaf_base",
+    "boot": "antcolonies:block/doum_leaf_boot_0"
+  },
+  "elements": [
+    {
+      "from": [
+        0,
+        6,
+        4.0
+      ],
+      "to": [
+        3,
+        12,
+        14.0
+      ],
+      "faces": {
+        "east": {
+          "texture": "#sheath",
+          "uv": [
+            0,
+            10,
+            10,
+            16
+          ]
+        },
+        "west": {
+          "texture": "#sheath",
+          "uv": [
+            0,
+            10,
+            10,
+            16
+          ]
+        },
+        "up": {
+          "texture": "#sheath",
+          "uv": [
+            0,
+            6,
+            3,
+            16
+          ]
+        },
+        "down": {
+          "texture": "#sheath",
+          "uv": [
+            0,
+            6,
+            3,
+            16
+          ]
+        },
+        "south": {
+          "texture": "#sheath",
+          "uv": [
+            0,
+            10,
+            3,
+            16
+          ]
+        },
+        "north": {
+          "texture": "#sheath",
+          "uv": [
+            0,
+            10,
+            3,
+            16
+          ]
+        }
+      }
+    },
+    {
+      "from": [
+        0,
+        10.5,
+        6.0
+      ],
+      "to": [
+        5,
+        15.5,
+        12.0
+      ],
+      "faces": {
+        "east": {
+          "texture": "#boot",
+          "uv": [
+            0,
+            11,
+            6,
+            16
+          ]
+        },
+        "west": {
+          "texture": "#boot",
+          "uv": [
+            0,
+            11,
+            6,
+            16
+          ]
+        },
+        "up": {
+          "texture": "#boot",
+          "uv": [
+            0,
+            10,
+            5,
+            16
+          ]
+        },
+        "down": {
+          "texture": "#boot",
+          "uv": [
+            0,
+            10,
+            5,
+            16
+          ]
+        },
+        "south": {
+          "texture": "#boot",
+          "uv": [
+            0,
+            11,
+            5,
+            16
+          ]
+        },
+        "north": {
+          "texture": "#boot",
+          "uv": [
+            0,
+            11,
+            5,
+            16
+          ]
+        }
+      }
+    }
+  ]
+}

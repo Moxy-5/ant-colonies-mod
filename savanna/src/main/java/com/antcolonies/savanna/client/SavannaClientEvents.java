@@ -42,6 +42,12 @@ public class SavannaClientEvents {
     private static final ResourceLocation CARRIED_TERMITE_TEXTURE =
             ResourceLocation.fromNamespaceAndPath(SavannaMod.MODID, "textures/entity/carried_termite.png");
 
+    /** The doum palm's sculpted pieces (floodplain trees step 5): the model files' loader. */
+    @SubscribeEvent
+    public static void onRegisterGeometry(net.neoforged.neoforge.client.event.ModelEvent.RegisterGeometryLoaders event) {
+        event.register(DoumModel.LOADER, DoumModel.Loader.INSTANCE);
+    }
+
     @SubscribeEvent
     public static void onRegisterLayers(EntityRenderersEvent.RegisterLayerDefinitions event) {
         event.registerLayerDefinition(TermiteNymphRenderer.LAYER, TermiteNymphRenderer::createLayer);

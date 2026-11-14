@@ -123,9 +123,16 @@ is measured first. Either way the stems are full blocks you can climb.
 4b. **Fig fruit:** the bunch and bark-fig blocks ripening in stages, dropping to fallen figs that rot, the fig and green
    fig items, eating, picking, bone meal (section above). Test: a bunch in an arena goes through every stage, drops,
    lands on the ground, the fallen figs rot; breaking gives the items.
-5. **The doum's blocks:** stem bark A and the dead grey bark, the frond pieces, the spear, the crown cap, nut bunch
+5. **DONE 2026-11-14 (details in `docs/HISTORY.md`). The doum's blocks:** stem bark A and the dead grey bark, the frond pieces, the spear, the crown cap, nut bunch
    (ripe and green), leaf-base stub, seedling and rosette. Look checked in the viewer first: the frond pieces drawn the
    way the game will draw them (snapped to 16 directions) beside today's, for the user's OK.
+   **Changed in the build (my pick, the user may say no):** frond blocks turned to 16 directions could not work, as about
+   17 fronds overlap inside each crown and a block holds one thing. Instead one crown block per stem keeps its recipe
+   (`block/DoumLook`, in a block entity) and the client draws the viewer's own boxes from it into the chunk's picture
+   (`client/DoumModel`): the same look as the viewer, so the snapped look for the user's OK fell away. Seedling,
+   rosette and nut bunch are drawn the same way. To watch in step 7: a grown palm is about 66,000 faces (a grown fig
+   about 29,000), the whole crown pops out when its block's chunk section is off screen at the screen's edge, and the
+   crown has flat light (no soft shadows), as the viewer has.
 6. **The doum's shapes in Java** (`tree/DoumShape`, from `doum`, `doumSeedling` to `doumClump`, `deadDoum`), checked
    against the viewer the same way.
 6b. **Doum fruit:** the nut bunch the same way (stages, dropping, fallen nuts lasting about 20 days, the items,

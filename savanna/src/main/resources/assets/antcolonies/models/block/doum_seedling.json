@@ -1,0 +1,9 @@
+{
+  "loader": "antcolonies:doum_sculpted",
+  "textures": {
+    "plain": "antcolonies:block/doum_plain",
+    "cap": "antcolonies:block/doum_cap",
+    "cap_dead": "antcolonies:block/doum_cap_dead",
+    "particle": "antcolonies:block/doum_frond"
+  }
+}

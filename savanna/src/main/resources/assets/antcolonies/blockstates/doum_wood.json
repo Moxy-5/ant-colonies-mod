@@ -1,0 +1,28 @@
+{
+  "variants": {
+    "axis=y,dead=false": {
+      "model": "antcolonies:block/doum_wood"
+    },
+    "axis=z,dead=false": {
+      "model": "antcolonies:block/doum_wood_horizontal",
+      "x": 90
+    },
+    "axis=x,dead=false": {
+      "model": "antcolonies:block/doum_wood_horizontal",
+      "x": 90,
+      "y": 90
+    },
+    "axis=y,dead=true": {
+      "model": "antcolonies:block/doum_wood_dead"
+    },
+    "axis=z,dead=true": {
+      "model": "antcolonies:block/doum_wood_dead_horizontal",
+      "x": 90
+    },
+    "axis=x,dead=true": {
+      "model": "antcolonies:block/doum_wood_dead_horizontal",
+      "x": 90,
+      "y": 90
+    }
+  }
+}

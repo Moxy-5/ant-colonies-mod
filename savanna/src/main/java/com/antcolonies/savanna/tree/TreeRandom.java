@@ -12,6 +12,14 @@ final class TreeRandom {
         state = (int) seed;
     }
 
+    /**
+     * Where the dice stand now: a new {@code TreeRandom(state())} draws the same numbers from here on (a doum crown
+     * keeps it, so its block can draw the crown again, {@link PalmPieces}).
+     */
+    int state() {
+        return state;
+    }
+
     /** The next number from 0 (included) to 1 (not included). */
     double next() {
         state += 0x6D2B79F5;

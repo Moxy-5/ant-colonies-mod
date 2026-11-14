@@ -1,0 +1,604 @@
+{
+  "variants": {
+    "facing=east,low=false,pale=false,shift=0,wide=true": {
+      "model": "antcolonies:block/doum_leaf_base_high_14_0_0"
+    },
+    "facing=south,low=false,pale=false,shift=0,wide=true": {
+      "model": "antcolonies:block/doum_leaf_base_high_14_0_0",
+      "y": 90
+    },
+    "facing=west,low=false,pale=false,shift=0,wide=true": {
+      "model": "antcolonies:block/doum_leaf_base_high_14_0_0",
+      "y": 180
+    },
+    "facing=north,low=false,pale=false,shift=0,wide=true": {
+      "model": "antcolonies:block/doum_leaf_base_high_14_0_0",
+      "y": 270
+    },
+    "facing=east,low=false,pale=false,shift=1,wide=true": {
+      "model": "antcolonies:block/doum_leaf_base_high_14_0_1"
+    },
+    "facing=south,low=false,pale=false,shift=1,wide=true": {
+      "model": "antcolonies:block/doum_leaf_base_high_14_0_1",
+      "y": 90
+    },
+    "facing=west,low=false,pale=false,shift=1,wide=true": {
+      "model": "antcolonies:block/doum_leaf_base_high_14_0_1",
+      "y": 180
+    },
+    "facing=north,low=false,pale=false,shift=1,wide=true": {
+      "model": "antcolonies:block/doum_leaf_base_high_14_0_1",
+      "y": 270
+    },
+    "facing=east,low=false,pale=false,shift=2,wide=true": {
+      "model": "antcolonies:block/doum_leaf_base_high_14_0_2"
+    },
+    "facing=south,low=false,pale=false,shift=2,wide=true": {
+      "model": "antcolonies:block/doum_leaf_base_high_14_0_2",
+      "y": 90
+    },
+    "facing=west,low=false,pale=false,shift=2,wide=true": {
+      "model": "antcolonies:block/doum_leaf_base_high_14_0_2",
+      "y": 180
+    },
+    "facing=north,low=false,pale=false,shift=2,wide=true": {
+      "model": "antcolonies:block/doum_leaf_base_high_14_0_2",
+      "y": 270
+    },
+    "facing=east,low=false,pale=false,shift=3,wide=true": {
+      "model": "antcolonies:block/doum_leaf_base_high_14_0_3"
+    },
+    "facing=south,low=false,pale=false,shift=3,wide=true": {
+      "model": "antcolonies:block/doum_leaf_base_high_14_0_3",
+      "y": 90
+    },
+    "facing=west,low=false,pale=false,shift=3,wide=true": {
+      "model": "antcolonies:block/doum_leaf_base_high_14_0_3",
+      "y": 180
+    },
+    "facing=north,low=false,pale=false,shift=3,wide=true": {
+      "model": "antcolonies:block/doum_leaf_base_high_14_0_3",
+      "y": 270
+    },
+    "facing=east,low=false,pale=false,shift=4,wide=true": {
+      "model": "antcolonies:block/doum_leaf_base_high_14_0_4"
+    },
+    "facing=south,low=false,pale=false,shift=4,wide=true": {
+      "model": "antcolonies:block/doum_leaf_base_high_14_0_4",
+      "y": 90
+    },
+    "facing=west,low=false,pale=false,shift=4,wide=true": {
+      "model": "antcolonies:block/doum_leaf_base_high_14_0_4",
+      "y": 180
+    },
+    "facing=north,low=false,pale=false,shift=4,wide=true": {
+      "model": "antcolonies:block/doum_leaf_base_high_14_0_4",
+      "y": 270
+    },
+    "facing=east,low=false,pale=true,shift=0,wide=true": {
+      "model": "antcolonies:block/doum_leaf_base_high_14_1_0"
+    },
+    "facing=south,low=false,pale=true,shift=0,wide=true": {
+      "model": "antcolonies:block/doum_leaf_base_high_14_1_0",
+      "y": 90
+    },
+    "facing=west,low=false,pale=true,shift=0,wide=true": {
+      "model": "antcolonies:block/doum_leaf_base_high_14_1_0",
+      "y": 180
+    },
+    "facing=north,low=false,pale=true,shift=0,wide=true": {
+      "model": "antcolonies:block/doum_leaf_base_high_14_1_0",
+      "y": 270
+    },
+    "facing=east,low=false,pale=true,shift=1,wide=true": {
+      "model": "antcolonies:block/doum_leaf_base_high_14_1_1"
+    },
+    "facing=south,low=false,pale=true,shift=1,wide=true": {
+      "model": "antcolonies:block/doum_leaf_base_high_14_1_1",
+      "y": 90
+    },
+    "facing=west,low=false,pale=true,shift=1,wide=true": {
+      "model": "antcolonies:block/doum_leaf_base_high_14_1_1",
+      "y": 180
+    },
+    "facing=north,low=false,pale=true,shift=1,wide=true": {
+      "model": "antcolonies:block/doum_leaf_base_high_14_1_1",
+      "y": 270
+    },
+    "facing=east,low=false,pale=true,shift=2,wide=true": {
+      "model": "antcolonies:block/doum_leaf_base_high_14_1_2"
+    },
+    "facing=south,low=false,pale=true,shift=2,wide=true": {
+      "model": "antcolonies:block/doum_leaf_base_high_14_1_2",
+      "y": 90
+    },
+    "facing=west,low=false,pale=true,shift=2,wide=true": {
+      "model": "antcolonies:block/doum_leaf_base_high_14_1_2",
+      "y": 180
+    },
+    "facing=north,low=false,pale=true,shift=2,wide=true": {
+      "model": "antcolonies:block/doum_leaf_base_high_14_1_2",
+      "y": 270
+    },
+    "facing=east,low=false,pale=true,shift=3,wide=true": {
+      "model": "antcolonies:block/doum_leaf_base_high_14_1_3"
+    },
+    "facing=south,low=false,pale=true,shift=3,wide=true": {
+      "model": "antcolonies:block/doum_leaf_base_high_14_1_3",
+      "y": 90
+    },
+    "facing=west,low=false,pale=true,shift=3,wide=true": {
+      "model": "antcolonies:block/doum_leaf_base_high_14_1_3",
+      "y": 180
+    },
+    "facing=north,low=false,pale=true,shift=3,wide=true": {
+      "model": "antcolonies:block/doum_leaf_base_high_14_1_3",
+      "y": 270
+    },
+    "facing=east,low=false,pale=true,shift=4,wide=true": {
+      "model": "antcolonies:block/doum_leaf_base_high_14_1_4"
+    },
+    "facing=south,low=false,pale=true,shift=4,wide=true": {
+      "model": "antcolonies:block/doum_leaf_base_high_14_1_4",
+      "y": 90
+    },
+    "facing=west,low=false,pale=true,shift=4,wide=true": {
+      "model": "antcolonies:block/doum_leaf_base_high_14_1_4",
+      "y": 180
+    },
+    "facing=north,low=false,pale=true,shift=4,wide=true": {
+      "model": "antcolonies:block/doum_leaf_base_high_14_1_4",
+      "y": 270
+    },
+    "facing=east,low=false,pale=false,shift=0,wide=false": {
+      "model": "antcolonies:block/doum_leaf_base_high_10_0_0"
+    },
+    "facing=south,low=false,pale=false,shift=0,wide=false": {
+      "model": "antcolonies:block/doum_leaf_base_high_10_0_0",
+      "y": 90
+    },
+    "facing=west,low=false,pale=false,shift=0,wide=false": {
+      "model": "antcolonies:block/doum_leaf_base_high_10_0_0",
+      "y": 180
+    },
+    "facing=north,low=false,pale=false,shift=0,wide=false": {
+      "model": "antcolonies:block/doum_leaf_base_high_10_0_0",
+      "y": 270
+    },
+    "facing=east,low=false,pale=false,shift=1,wide=false": {
+      "model": "antcolonies:block/doum_leaf_base_high_10_0_1"
+    },
+    "facing=south,low=false,pale=false,shift=1,wide=false": {
+      "model": "antcolonies:block/doum_leaf_base_high_10_0_1",
+      "y": 90
+    },
+    "facing=west,low=false,pale=false,shift=1,wide=false": {
+      "model": "antcolonies:block/doum_leaf_base_high_10_0_1",
+      "y": 180
+    },
+    "facing=north,low=false,pale=false,shift=1,wide=false": {
+      "model": "antcolonies:block/doum_leaf_base_high_10_0_1",
+      "y": 270
+    },
+    "facing=east,low=false,pale=false,shift=2,wide=false": {
+      "model": "antcolonies:block/doum_leaf_base_high_10_0_2"
+    },
+    "facing=south,low=false,pale=false,shift=2,wide=false": {
+      "model": "antcolonies:block/doum_leaf_base_high_10_0_2",
+      "y": 90
+    },
+    "facing=west,low=false,pale=false,shift=2,wide=false": {
+      "model": "antcolonies:block/doum_leaf_base_high_10_0_2",
+      "y": 180
+    },
+    "facing=north,low=false,pale=false,shift=2,wide=false": {
+      "model": "antcolonies:block/doum_leaf_base_high_10_0_2",
+      "y": 270
+    },
+    "facing=east,low=false,pale=false,shift=3,wide=false": {
+      "model": "antcolonies:block/doum_leaf_base_high_10_0_3"
+    },
+    "facing=south,low=false,pale=false,shift=3,wide=false": {
+      "model": "antcolonies:block/doum_leaf_base_high_10_0_3",
+      "y": 90
+    },
+    "facing=west,low=false,pale=false,shift=3,wide=false": {
+      "model": "antcolonies:block/doum_leaf_base_high_10_0_3",
+      "y": 180
+    },
+    "facing=north,low=false,pale=false,shift=3,wide=false": {
+      "model": "antcolonies:block/doum_leaf_base_high_10_0_3",
+      "y": 270
+    },
+    "facing=east,low=false,pale=false,shift=4,wide=false": {
+      "model": "antcolonies:block/doum_leaf_base_high_10_0_4"
+    },
+    "facing=south,low=false,pale=false,shift=4,wide=false": {
+      "model": "antcolonies:block/doum_leaf_base_high_10_0_4",
+      "y": 90
+    },
+    "facing=west,low=false,pale=false,shift=4,wide=false": {
+      "model": "antcolonies:block/doum_leaf_base_high_10_0_4",
+      "y": 180
+    },
+    "facing=north,low=false,pale=false,shift=4,wide=false": {
+      "model": "antcolonies:block/doum_leaf_base_high_10_0_4",
+      "y": 270
+    },
+    "facing=east,low=false,pale=true,shift=0,wide=false": {
+      "model": "antcolonies:block/doum_leaf_base_high_10_1_0"
+    },
+    "facing=south,low=false,pale=true,shift=0,wide=false": {
+      "model": "antcolonies:block/doum_leaf_base_high_10_1_0",
+      "y": 90
+    },
+    "facing=west,low=false,pale=true,shift=0,wide=false": {
+      "model": "antcolonies:block/doum_leaf_base_high_10_1_0",
+      "y": 180
+    },
+    "facing=north,low=false,pale=true,shift=0,wide=false": {
+      "model": "antcolonies:block/doum_leaf_base_high_10_1_0",
+      "y": 270
+    },
+    "facing=east,low=false,pale=true,shift=1,wide=false": {
+      "model": "antcolonies:block/doum_leaf_base_high_10_1_1"
+    },
+    "facing=south,low=false,pale=true,shift=1,wide=false": {
+      "model": "antcolonies:block/doum_leaf_base_high_10_1_1",
+      "y": 90
+    },
+    "facing=west,low=false,pale=true,shift=1,wide=false": {
+      "model": "antcolonies:block/doum_leaf_base_high_10_1_1",
+      "y": 180
+    },
+    "facing=north,low=false,pale=true,shift=1,wide=false": {
+      "model": "antcolonies:block/doum_leaf_base_high_10_1_1",
+      "y": 270
+    },
+    "facing=east,low=false,pale=true,shift=2,wide=false": {
+      "model": "antcolonies:block/doum_leaf_base_high_10_1_2"
+    },
+    "facing=south,low=false,pale=true,shift=2,wide=false": {
+      "model": "antcolonies:block/doum_leaf_base_high_10_1_2",
+      "y": 90
+    },
+    "facing=west,low=false,pale=true,shift=2,wide=false": {
+      "model": "antcolonies:block/doum_leaf_base_high_10_1_2",
+      "y": 180
+    },
+    "facing=north,low=false,pale=true,shift=2,wide=false": {
+      "model": "antcolonies:block/doum_leaf_base_high_10_1_2",
+      "y": 270
+    },
+    "facing=east,low=false,pale=true,shift=3,wide=false": {
+      "model": "antcolonies:block/doum_leaf_base_high_10_1_3"
+    },
+    "facing=south,low=false,pale=true,shift=3,wide=false": {
+      "model": "antcolonies:block/doum_leaf_base_high_10_1_3",
+      "y": 90
+    },
+    "facing=west,low=false,pale=true,shift=3,wide=false": {
+      "model": "antcolonies:block/doum_leaf_base_high_10_1_3",
+      "y": 180
+    },
+    "facing=north,low=false,pale=true,shift=3,wide=false": {
+      "model": "antcolonies:block/doum_leaf_base_high_10_1_3",
+      "y": 270
+    },
+    "facing=east,low=false,pale=true,shift=4,wide=false": {
+      "model": "antcolonies:block/doum_leaf_base_high_10_1_4"
+    },
+    "facing=south,low=false,pale=true,shift=4,wide=false": {
+      "model": "antcolonies:block/doum_leaf_base_high_10_1_4",
+      "y": 90
+    },
+    "facing=west,low=false,pale=true,shift=4,wide=false": {
+      "model": "antcolonies:block/doum_leaf_base_high_10_1_4",
+      "y": 180
+    },
+    "facing=north,low=false,pale=true,shift=4,wide=false": {
+      "model": "antcolonies:block/doum_leaf_base_high_10_1_4",
+      "y": 270
+    },
+    "facing=east,low=true,pale=false,shift=0,wide=true": {
+      "model": "antcolonies:block/doum_leaf_base_low_14_0_0"
+    },
+    "facing=south,low=true,pale=false,shift=0,wide=true": {
+      "model": "antcolonies:block/doum_leaf_base_low_14_0_0",
+      "y": 90
+    },
+    "facing=west,low=true,pale=false,shift=0,wide=true": {
+      "model": "antcolonies:block/doum_leaf_base_low_14_0_0",
+      "y": 180
+    },
+    "facing=north,low=true,pale=false,shift=0,wide=true": {
+      "model": "antcolonies:block/doum_leaf_base_low_14_0_0",
+      "y": 270
+    },
+    "facing=east,low=true,pale=false,shift=1,wide=true": {
+      "model": "antcolonies:block/doum_leaf_base_low_14_0_1"
+    },
+    "facing=south,low=true,pale=false,shift=1,wide=true": {
+      "model": "antcolonies:block/doum_leaf_base_low_14_0_1",
+      "y": 90
+    },
+    "facing=west,low=true,pale=false,shift=1,wide=true": {
+      "model": "antcolonies:block/doum_leaf_base_low_14_0_1",
+      "y": 180
+    },
+    "facing=north,low=true,pale=false,shift=1,wide=true": {
+      "model": "antcolonies:block/doum_leaf_base_low_14_0_1",
+      "y": 270
+    },
+    "facing=east,low=true,pale=false,shift=2,wide=true": {
+      "model": "antcolonies:block/doum_leaf_base_low_14_0_2"
+    },
+    "facing=south,low=true,pale=false,shift=2,wide=true": {
+      "model": "antcolonies:block/doum_leaf_base_low_14_0_2",
+      "y": 90
+    },
+    "facing=west,low=true,pale=false,shift=2,wide=true": {
+      "model": "antcolonies:block/doum_leaf_base_low_14_0_2",
+      "y": 180
+    },
+    "facing=north,low=true,pale=false,shift=2,wide=true": {
+      "model": "antcolonies:block/doum_leaf_base_low_14_0_2",
+      "y": 270
+    },
+    "facing=east,low=true,pale=false,shift=3,wide=true": {
+      "model": "antcolonies:block/doum_leaf_base_low_14_0_3"
+    },
+    "facing=south,low=true,pale=false,shift=3,wide=true": {
+      "model": "antcolonies:block/doum_leaf_base_low_14_0_3",
+      "y": 90
+    },
+    "facing=west,low=true,pale=false,shift=3,wide=true": {
+      "model": "antcolonies:block/doum_leaf_base_low_14_0_3",
+      "y": 180
+    },
+    "facing=north,low=true,pale=false,shift=3,wide=true": {
+      "model": "antcolonies:block/doum_leaf_base_low_14_0_3",
+      "y": 270
+    },
+    "facing=east,low=true,pale=false,shift=4,wide=true": {
+      "model": "antcolonies:block/doum_leaf_base_low_14_0_4"
+    },
+    "facing=south,low=true,pale=false,shift=4,wide=true": {
+      "model": "antcolonies:block/doum_leaf_base_low_14_0_4",
+      "y": 90
+    },
+    "facing=west,low=true,pale=false,shift=4,wide=true": {
+      "model": "antcolonies:block/doum_leaf_base_low_14_0_4",
+      "y": 180
+    },
+    "facing=north,low=true,pale=false,shift=4,wide=true": {
+      "model": "antcolonies:block/doum_leaf_base_low_14_0_4",
+      "y": 270
+    },
+    "facing=east,low=true,pale=true,shift=0,wide=true": {
+      "model": "antcolonies:block/doum_leaf_base_low_14_1_0"
+    },
+    "facing=south,low=true,pale=true,shift=0,wide=true": {
+      "model": "antcolonies:block/doum_leaf_base_low_14_1_0",
+      "y": 90
+    },
+    "facing=west,low=true,pale=true,shift=0,wide=true": {
+      "model": "antcolonies:block/doum_leaf_base_low_14_1_0",
+      "y": 180
+    },
+    "facing=north,low=true,pale=true,shift=0,wide=true": {
+      "model": "antcolonies:block/doum_leaf_base_low_14_1_0",
+      "y": 270
+    },
+    "facing=east,low=true,pale=true,shift=1,wide=true": {
+      "model": "antcolonies:block/doum_leaf_base_low_14_1_1"
+    },
+    "facing=south,low=true,pale=true,shift=1,wide=true": {
+      "model": "antcolonies:block/doum_leaf_base_low_14_1_1",
+      "y": 90
+    },
+    "facing=west,low=true,pale=true,shift=1,wide=true": {
+      "model": "antcolonies:block/doum_leaf_base_low_14_1_1",
+      "y": 180
+    },
+    "facing=north,low=true,pale=true,shift=1,wide=true": {
+      "model": "antcolonies:block/doum_leaf_base_low_14_1_1",
+      "y": 270
+    },
+    "facing=east,low=true,pale=true,shift=2,wide=true": {
+      "model": "antcolonies:block/doum_leaf_base_low_14_1_2"
+    },
+    "facing=south,low=true,pale=true,shift=2,wide=true": {
+      "model": "antcolonies:block/doum_leaf_base_low_14_1_2",
+      "y": 90
+    },
+    "facing=west,low=true,pale=true,shift=2,wide=true": {
+      "model": "antcolonies:block/doum_leaf_base_low_14_1_2",
+      "y": 180
+    },
+    "facing=north,low=true,pale=true,shift=2,wide=true": {
+      "model": "antcolonies:block/doum_leaf_base_low_14_1_2",
+      "y": 270
+    },
+    "facing=east,low=true,pale=true,shift=3,wide=true": {
+      "model": "antcolonies:block/doum_leaf_base_low_14_1_3"
+    },
+    "facing=south,low=true,pale=true,shift=3,wide=true": {
+      "model": "antcolonies:block/doum_leaf_base_low_14_1_3",
+      "y": 90
+    },
+    "facing=west,low=true,pale=true,shift=3,wide=true": {
+      "model": "antcolonies:block/doum_leaf_base_low_14_1_3",
+      "y": 180
+    },
+    "facing=north,low=true,pale=true,shift=3,wide=true": {
+      "model": "antcolonies:block/doum_leaf_base_low_14_1_3",
+      "y": 270
+    },
+    "facing=east,low=true,pale=true,shift=4,wide=true": {
+      "model": "antcolonies:block/doum_leaf_base_low_14_1_4"
+    },
+    "facing=south,low=true,pale=true,shift=4,wide=true": {
+      "model": "antcolonies:block/doum_leaf_base_low_14_1_4",
+      "y": 90
+    },
+    "facing=west,low=true,pale=true,shift=4,wide=true": {
+      "model": "antcolonies:block/doum_leaf_base_low_14_1_4",
+      "y": 180
+    },
+    "facing=north,low=true,pale=true,shift=4,wide=true": {
+      "model": "antcolonies:block/doum_leaf_base_low_14_1_4",
+      "y": 270
+    },
+    "facing=east,low=true,pale=false,shift=0,wide=false": {
+      "model": "antcolonies:block/doum_leaf_base_low_10_0_0"
+    },
+    "facing=south,low=true,pale=false,shift=0,wide=false": {
+      "model": "antcolonies:block/doum_leaf_base_low_10_0_0",
+      "y": 90
+    },
+    "facing=west,low=true,pale=false,shift=0,wide=false": {
+      "model": "antcolonies:block/doum_leaf_base_low_10_0_0",
+      "y": 180
+    },
+    "facing=north,low=true,pale=false,shift=0,wide=false": {
+      "model": "antcolonies:block/doum_leaf_base_low_10_0_0",
+      "y": 270
+    },
+    "facing=east,low=true,pale=false,shift=1,wide=false": {
+      "model": "antcolonies:block/doum_leaf_base_low_10_0_1"
+    },
+    "facing=south,low=true,pale=false,shift=1,wide=false": {
+      "model": "antcolonies:block/doum_leaf_base_low_10_0_1",
+      "y": 90
+    },
+    "facing=west,low=true,pale=false,shift=1,wide=false": {
+      "model": "antcolonies:block/doum_leaf_base_low_10_0_1",
+      "y": 180
+    },
+    "facing=north,low=true,pale=false,shift=1,wide=false": {
+      "model": "antcolonies:block/doum_leaf_base_low_10_0_1",
+      "y": 270
+    },
+    "facing=east,low=true,pale=false,shift=2,wide=false": {
+      "model": "antcolonies:block/doum_leaf_base_low_10_0_2"
+    },
+    "facing=south,low=true,pale=false,shift=2,wide=false": {
+      "model": "antcolonies:block/doum_leaf_base_low_10_0_2",
+      "y": 90
+    },
+    "facing=west,low=true,pale=false,shift=2,wide=false": {
+      "model": "antcolonies:block/doum_leaf_base_low_10_0_2",
+      "y": 180
+    },
+    "facing=north,low=true,pale=false,shift=2,wide=false": {
+      "model": "antcolonies:block/doum_leaf_base_low_10_0_2",
+      "y": 270
+    },
+    "facing=east,low=true,pale=false,shift=3,wide=false": {
+      "model": "antcolonies:block/doum_leaf_base_low_10_0_3"
+    },
+    "facing=south,low=true,pale=false,shift=3,wide=false": {
+      "model": "antcolonies:block/doum_leaf_base_low_10_0_3",
+      "y": 90
+    },
+    "facing=west,low=true,pale=false,shift=3,wide=false": {
+      "model": "antcolonies:block/doum_leaf_base_low_10_0_3",
+      "y": 180
+    },
+    "facing=north,low=true,pale=false,shift=3,wide=false": {
+      "model": "antcolonies:block/doum_leaf_base_low_10_0_3",
+      "y": 270
+    },
+    "facing=east,low=true,pale=false,shift=4,wide=false": {
+      "model": "antcolonies:block/doum_leaf_base_low_10_0_4"
+    },
+    "facing=south,low=true,pale=false,shift=4,wide=false": {
+      "model": "antcolonies:block/doum_leaf_base_low_10_0_4",
+      "y": 90
+    },
+    "facing=west,low=true,pale=false,shift=4,wide=false": {
+      "model": "antcolonies:block/doum_leaf_base_low_10_0_4",
+      "y": 180
+    },
+    "facing=north,low=true,pale=false,shift=4,wide=false": {
+      "model": "antcolonies:block/doum_leaf_base_low_10_0_4",
+      "y": 270
+    },
+    "facing=east,low=true,pale=true,shift=0,wide=false": {
+      "model": "antcolonies:block/doum_leaf_base_low_10_1_0"
+    },
+    "facing=south,low=true,pale=true,shift=0,wide=false": {
+      "model": "antcolonies:block/doum_leaf_base_low_10_1_0",
+      "y": 90
+    },
+    "facing=west,low=true,pale=true,shift=0,wide=false": {
+      "model": "antcolonies:block/doum_leaf_base_low_10_1_0",
+      "y": 180
+    },
+    "facing=north,low=true,pale=true,shift=0,wide=false": {
+      "model": "antcolonies:block/doum_leaf_base_low_10_1_0",
+      "y": 270
+    },
+    "facing=east,low=true,pale=true,shift=1,wide=false": {
+      "model": "antcolonies:block/doum_leaf_base_low_10_1_1"
+    },
+    "facing=south,low=true,pale=true,shift=1,wide=false": {
+      "model": "antcolonies:block/doum_leaf_base_low_10_1_1",
+      "y": 90
+    },
+    "facing=west,low=true,pale=true,shift=1,wide=false": {
+      "model": "antcolonies:block/doum_leaf_base_low_10_1_1",
+      "y": 180
+    },
+    "facing=north,low=true,pale=true,shift=1,wide=false": {
+      "model": "antcolonies:block/doum_leaf_base_low_10_1_1",
+      "y": 270
+    },
+    "facing=east,low=true,pale=true,shift=2,wide=false": {
+      "model": "antcolonies:block/doum_leaf_base_low_10_1_2"
+    },
+    "facing=south,low=true,pale=true,shift=2,wide=false": {
+      "model": "antcolonies:block/doum_leaf_base_low_10_1_2",
+      "y": 90
+    },
+    "facing=west,low=true,pale=true,shift=2,wide=false": {
+      "model": "antcolonies:block/doum_leaf_base_low_10_1_2",
+      "y": 180
+    },
+    "facing=north,low=true,pale=true,shift=2,wide=false": {
+      "model": "antcolonies:block/doum_leaf_base_low_10_1_2",
+      "y": 270
+    },
+    "facing=east,low=true,pale=true,shift=3,wide=false": {
+      "model": "antcolonies:block/doum_leaf_base_low_10_1_3"
+    },
+    "facing=south,low=true,pale=true,shift=3,wide=false": {
+      "model": "antcolonies:block/doum_leaf_base_low_10_1_3",
+      "y": 90
+    },
+    "facing=west,low=true,pale=true,shift=3,wide=false": {
+      "model": "antcolonies:block/doum_leaf_base_low_10_1_3",
+      "y": 180
+    },
+    "facing=north,low=true,pale=true,shift=3,wide=false": {
+      "model": "antcolonies:block/doum_leaf_base_low_10_1_3",
+      "y": 270
+    },
+    "facing=east,low=true,pale=true,shift=4,wide=false": {
+      "model": "antcolonies:block/doum_leaf_base_low_10_1_4"
+    },
+    "facing=south,low=true,pale=true,shift=4,wide=false": {
+      "model": "antcolonies:block/doum_leaf_base_low_10_1_4",
+      "y": 90
+    },
+    "facing=west,low=true,pale=true,shift=4,wide=false": {
+      "model": "antcolonies:block/doum_leaf_base_low_10_1_4",
+      "y": 180
+    },
+    "facing=north,low=true,pale=true,shift=4,wide=false": {
+      "model": "antcolonies:block/doum_leaf_base_low_10_1_4",
+      "y": 270
+    }
+  }
+}

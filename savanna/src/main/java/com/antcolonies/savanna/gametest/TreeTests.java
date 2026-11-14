@@ -60,8 +60,8 @@ public class TreeTests {
                 x = 2; // the next row
                 z += 3;
             }
-            if (z > 8) {
-                helper.fail("too many tree blocks for three rows");
+            if (z > 11) {
+                helper.fail("too many tree blocks for four rows");
             }
             BlockPos pos = new BlockPos(x, SURFACE, z);
             BlockState state = block.get().defaultBlockState();
@@ -187,6 +187,66 @@ public class TreeTests {
             helper.assertBlockNotPresent(TreeBlocks.FIG_LEAF_SPRAY.get(), spray);
             helper.assertBlockNotPresent(TreeBlocks.TRUNK_FIGS.get(), figs);
         });
+    }
+
+    /**
+     * The doum palm's blocks (floodplain trees step 5, 2026-11-14): a crown keeps its recipe in its block entity, and a
+     * recipe set by a growing palm survives a save and load; the crown's cap is solid and 6 pixels high, its fronds and a
+     * nut bunch can be walked through; a bunch starts ripe; a placed leaf-base stub faces away from the stem it was put
+     * against; the stem wood has a dead grey look.
+     */
+    @GameTest(template = "arena", timeoutTicks = 100)
+    public static void doumBlocksPlaceAndKeepTheirLook(GameTestHelper helper) {
+        var level = helper.getLevel();
+        int y = SURFACE + 1;
+        BlockPos stem = new BlockPos(10, y, 10), crown = stem.above();
+        helper.setBlock(stem, TreeBlocks.DOUM_LOG.get());
+        helper.setBlock(crown, TreeBlocks.DOUM_CROWN.get());
+        if (!(level.getBlockEntity(helper.absolutePos(crown)) instanceof com.antcolonies.savanna.block.DoumBlockEntity piece)) {
+            helper.fail("a doum crown has no block entity to keep its look");
+            return;
+        }
+        var byHand = piece.look();
+        if (byHand.grown() || byHand.bits(com.antcolonies.savanna.block.DoumPiece.Piece.CROWN, false).size() < 300) {
+            helper.fail("a hand-placed doum crown draws no crown of its own: " + byHand);
+        }
+        var planned = new com.antcolonies.savanna.block.DoumLook(true, 12345, 0.5, 9.5, 0.5, 0, 10, 1, 1.06F, true, false, 3, 2);
+        piece.setLook(planned);
+        var saved = piece.saveWithFullMetadata(level.registryAccess()); // with its id and place, as a chunk saves it
+        var loaded = net.minecraft.world.level.block.entity.BlockEntity.loadStatic(helper.absolutePos(crown), helper.getBlockState(crown), saved,
+                level.registryAccess());
+        if (!(loaded instanceof com.antcolonies.savanna.block.DoumBlockEntity again) || !planned.equals(again.look())) {
+            helper.fail("a doum crown's planned look is lost in a save and load: " + planned + " became "
+                    + (loaded instanceof com.antcolonies.savanna.block.DoumBlockEntity d ? d.look() : loaded));
+            return;
+        }
+        BlockPos at = helper.absolutePos(crown);
+        double cap = helper.getBlockState(crown).getCollisionShape(level, at).max(Direction.Axis.Y);
+        if (Math.abs(cap - 6 / 16.0) > 1e-6) {
+            helper.fail("a doum crown's solid cap is " + cap * 16 + " pixels high, not 6");
+        }
+        BlockPos bunch = new BlockPos(14, y + 2, 10);
+        helper.setBlock(bunch, TreeBlocks.DOUM_NUT_BUNCH.get());
+        BlockState bunchState = helper.getBlockState(bunch);
+        if (!bunchState.getValue(com.antcolonies.savanna.block.DoumPieceBlock.RIPE)) {
+            helper.fail("a doum nut bunch starts green");
+        }
+        if (!bunchState.getCollisionShape(level, helper.absolutePos(bunch)).isEmpty()) {
+            helper.fail("a doum nut bunch can be stood on");
+        }
+        net.minecraft.world.entity.player.Player player = helper.makeMockPlayer(net.minecraft.world.level.GameType.CREATIVE);
+        net.minecraft.world.item.ItemStack stubs = new net.minecraft.world.item.ItemStack(TreeBlocks.DOUM_LEAF_BASE.get(), 4);
+        player.setItemInHand(net.minecraft.world.InteractionHand.MAIN_HAND, stubs);
+        helper.placeAt(player, stubs, stem, Direction.SOUTH);
+        BlockState stub = helper.getBlockState(stem.south());
+        if (!stub.is(TreeBlocks.DOUM_LEAF_BASE.get())
+                || stub.getValue(net.minecraft.world.level.block.HorizontalDirectionalBlock.FACING) != Direction.SOUTH) {
+            helper.fail("a leaf-base stub put on a stem's south side is " + stub + ", not facing south");
+        }
+        BlockState dead = TreeBlocks.DOUM_LOG.get().defaultBlockState().setValue(com.antcolonies.savanna.block.DoumWoodBlock.DEAD, true);
+        helper.setBlock(new BlockPos(16, y, 10), dead);
+        helper.assertBlockProperty(new BlockPos(16, y, 10), com.antcolonies.savanna.block.DoumWoodBlock.DEAD, true);
+        helper.succeed();
     }
 
     /**
