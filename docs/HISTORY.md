@@ -715,6 +715,8 @@ Moved here from CLAUDE.md on 2026-10-13 (it was loaded into every chat and took 
 
 - **Floodplain fruit and the fallen fruit under new trees confirmed in-game by the user 2026-11-14** ("everything works"); `claude/termite-alarm-rework` merged into `master` with the user's OK, no full run (the user: "no test needed").
 
+- **M2 dropped (the user, 2026-11-14):** the user will not work in Blockbench, so M2 (waiting for their Blockbench worker model) is closed; Claude makes every model and clip with the tools, and "Blockbench both ways" (upgrade review M8, tools review V7) is shelved. Notes only.
+
 ## Handover notes for a code reviewer (written at the end of a very long session)
 - State: branch `master`, all committed, `./gradlew build` passes, `./gradlew runGameTestServer` passes 47 tests (about 8 minutes, in one world, tests run in parallel arena grids). Some tests are timing-sensitive under load (`antsOnBumpyGroundReachTheFoodStore` and `aStarvingWorkerSlowsDownAndDies` have each failed once and passed on a re-run): re-run before blaming a change.
 - Confirmed in-game by the user so far: everything up to and including dead ants and the refuse chamber, rich bread, worker hunger, colony starvation, and the hill-jam fix. Older bullets in "Current status" that still say "waiting for the user to confirm" are probably stale (the user tested them and reported no problems), but this was never written down: do not rely on those flags.
