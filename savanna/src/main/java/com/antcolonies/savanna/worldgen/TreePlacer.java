@@ -1118,7 +1118,7 @@ public final class TreePlacer {
     }
 
     /** Soil a tree's roots may take at its foot. */
-    private static boolean isSoil(BlockState state) {
+    public static boolean isSoil(BlockState state) {
         return state.is(BlockTags.DIRT) || state.is(Blocks.SAND) || state.is(Blocks.RED_SAND);
     }
 }

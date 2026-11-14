@@ -137,7 +137,7 @@ is measured first. Either way the stems are full blocks you can climb.
    against the viewer the same way.
 6b. **Doum fruit:** the nut bunch the same way (stages, dropping, fallen nuts lasting about 20 days, the items,
    eating slowly), with its test.
-7. **New land:** a floodplain tree structure (its own set, so it never crowds the dry trees' spacing), figs alone and
+7. **DONE 2026-11-14 (details in `docs/HISTORY.md`; figs alone, doum groves, dead 1 in 7.7 over 410 trees). New land:** a floodplain tree structure (its own set, so it never crowds the dry trees' spacing), figs alone and
    doum groves by the spacing above, every age, dead 1 in 8; new checks in `worldgen`: only on floodplain ground, the
    spacing, the dead share, no tree in water. Then the user's look in a new world.
 8. **Life in play** (after the user's look; asked again first): growing through the ages, dying, the dead stages, the

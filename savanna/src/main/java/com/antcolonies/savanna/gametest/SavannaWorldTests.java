@@ -6,6 +6,8 @@ import java.util.List;
 import com.antcolonies.savanna.SavannaMod;
 import com.antcolonies.savanna.registry.SavannaBlocks;
 import com.antcolonies.savanna.worldgen.FloodplainPoolFeature;
+import com.antcolonies.savanna.worldgen.FloodplainTreePiece;
+import com.antcolonies.savanna.worldgen.FloodplainTreeStructure;
 import com.antcolonies.savanna.worldgen.RiverBankFeature;
 import com.antcolonies.savanna.worldgen.SavannaRegion;
 import com.antcolonies.savanna.worldgen.SavannaSpawn;
@@ -546,6 +548,161 @@ public class SavannaWorldTests {
         helper.assertTrue(onFlood == 0, "dry trees stand on the floodplain: " + report);
         helper.assertTrue(dryTrees >= dryChunks / 4, "too few trees in the dry savanna: " + report);
         helper.succeed();
+    }
+
+    /** Floodplain chunks per seed the floodplain trees test plans its trees round. */
+    static final int FLOODPLAIN_TREE_CHUNKS = 150;
+
+    /**
+     * Floodplain trees step 7 (the user, 2026-11-14: "put the trees into new land so they naturally spawn in"): the
+     * sycamore figs and doum groves, planned as world generation plans them (no chunks made) round floodplain chunks of
+     * the survey seeds, stand only on the floodplain, on dry ground a block or more over the water (never in it), a grove's
+     * palms 8 or more apart; about 1 in 8 dead; never two big figs (mature, grown or dead) within 40 (every fig place
+     * round each big one planned too); and figs and groves both turn up.
+     */
+    @GameTest(template = "arena", timeoutTicks = 400, batch = "savanna_maps")
+    public static void floodplainTreesStandOnTheFloodplainAndKeepApart(GameTestHelper helper) {
+        var level = helper.getLevel();
+        var registries = level.registryAccess();
+        var structures = registries.registryOrThrow(Registries.STRUCTURE);
+        var sets = registries.registryOrThrow(Registries.STRUCTURE_SET);
+        String[] kinds = {"fig", "doum"};
+        net.minecraft.world.level.levelgen.structure.Structure[] structure = new net.minecraft.world.level.levelgen.structure.Structure[2];
+        net.minecraft.world.level.levelgen.structure.placement.RandomSpreadStructurePlacement[] grid =
+                new net.minecraft.world.level.levelgen.structure.placement.RandomSpreadStructurePlacement[2];
+        for (int k = 0; k < 2; k++) {
+            structure[k] = structures.get(net.minecraft.resources.ResourceLocation.fromNamespaceAndPath(SavannaMod.MODID, "floodplain_" + kinds[k]));
+            var set = sets.get(net.minecraft.resources.ResourceLocation.fromNamespaceAndPath(SavannaMod.MODID, "floodplain_" + kinds[k] + "s"));
+            if (structure[k] == null || set == null) {
+                throw new GameTestAssertException("no structure or set for " + kinds[k]);
+            }
+            grid[k] = (net.minecraft.world.level.levelgen.structure.placement.RandomSpreadStructurePlacement) set.placement();
+        }
+        int figs = 0, bigFigs = 0, groves = 0, palms = 0, dead = 0, wrong = 0, closeFigs = 0, closePalms = 0;
+        String firstWrong = "", firstClose = "";
+        long start = System.nanoTime();
+        for (long seed : GROUND_SEEDS) {
+            Climate.Sampler sampler = BiomeMaps.sampler(registries, seed);
+            MultiNoiseBiomeSource source = BiomeMaps.bigSavannaSource(registries, seed);
+            BiomeMaps.Ground ground = BiomeMaps.ground(registries, source, seed, level);
+            byte[] map = BiomeMaps.map(source, sampler);
+            List<net.minecraft.world.level.ChunkPos> flood = new ArrayList<>();
+            for (int c = 0; c < map.length; c++) {
+                int x = -BiomeMaps.HALF + (c / BiomeMaps.SIDE) * BiomeMaps.STEP, z = -BiomeMaps.HALF + (c % BiomeMaps.SIDE) * BiomeMaps.STEP;
+                if (map[c] == BiomeMaps.SAVANNA && floodplain(source, sampler, x, z)) {
+                    flood.add(new net.minecraft.world.level.ChunkPos(x >> 4, z >> 4));
+                }
+            }
+            int every = Math.max(1, flood.size() / FLOODPLAIN_TREE_CHUNKS);
+            for (int k = 0; k < 2; k++) {
+                java.util.Set<Long> seen = new java.util.HashSet<>();
+                for (int i = 0; i < flood.size(); i += every) {
+                    int s = grid[k].spacing();
+                    var chunk = grid[k].getPotentialStructureChunk(seed, Math.floorDiv(flood.get(i).x, s) * s, Math.floorDiv(flood.get(i).z, s) * s);
+                    if (!seen.add(chunk.toLong())) {
+                        continue;
+                    }
+                    List<FloodplainTreeStructure.Tree> trees = planned(structure[k], registries, ground, source, level, seed, chunk);
+                    if (trees.isEmpty()) {
+                        continue;
+                    }
+                    if (k == 0) {
+                        figs++;
+                    } else {
+                        groves++;
+                        palms += trees.size();
+                    }
+                    for (int t = 0; t < trees.size(); t++) {
+                        var tree = trees.get(t);
+                        if (tree.age().startsWith("dead")) {
+                            dead++;
+                        }
+                        String why = badGround(tree.foot(), source, ground, level);
+                        if (why != null && wrong++ == 0) {
+                            firstWrong = kinds[k] + " seed " + seed + " at " + tree.foot().toShortString() + ": " + why;
+                        }
+                        for (int u = 0; u < t; u++) {
+                            if (flat(tree.foot(), trees.get(u).foot()) < FloodplainTreeStructure.PALM_APART && closePalms++ == 0 && firstClose.isEmpty()) {
+                                firstClose = "palms at " + tree.foot().toShortString() + " and " + trees.get(u).foot().toShortString();
+                            }
+                        }
+                    }
+                    if (k == 0 && bigFig(trees.get(0))) {
+                        bigFigs++;
+                        // every fig place round it, planned too: none may be another big fig within 40
+                        BlockPos foot = trees.get(0).foot();
+                        int fs = grid[0].spacing();
+                        int rx = Math.floorDiv(foot.getX() >> 4, fs), rz = Math.floorDiv(foot.getZ() >> 4, fs);
+                        for (int dx = -1; dx <= 1; dx++) {
+                            for (int dz = -1; dz <= 1; dz++) {
+                                var other = grid[0].getPotentialStructureChunk(seed, (rx + dx) * fs, (rz + dz) * fs);
+                                if (other.equals(chunk)) {
+                                    continue;
+                                }
+                                for (var near : planned(structure[0], registries, ground, source, level, seed, other)) {
+                                    if (bigFig(near) && flat(near.foot(), foot) < FloodplainTreeStructure.BIG_FIG_APART && closeFigs++ == 0) {
+                                        firstClose = "big figs at " + foot.toShortString() + " and " + near.foot().toShortString();
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        int trees = figs + palms;
+        String report = String.format("%d figs (%d big), %d groves of %d palms; %d dead (1 in %.1f); %d on wrong ground%s;"
+                + " %d big figs within %d, %d palms within %d%s; %d ms", figs, bigFigs, groves, palms, dead,
+                dead == 0 ? 0.0 : trees / (double) dead, wrong, firstWrong.isEmpty() ? "" : ", the first " + firstWrong,
+                closeFigs / 2, FloodplainTreeStructure.BIG_FIG_APART, closePalms, FloodplainTreeStructure.PALM_APART,
+                firstClose.isEmpty() ? "" : ", " + firstClose, (System.nanoTime() - start) / 1_000_000);
+        SavannaMod.LOGGER.info("[biome maps] floodplain trees: {}", report);
+        helper.assertTrue(wrong == 0, "floodplain trees off the floodplain or in water: " + report);
+        helper.assertTrue(closeFigs == 0 && closePalms == 0, "floodplain trees too close: " + report);
+        helper.assertTrue(figs >= 20 && groves >= 20, "too few floodplain trees: " + report);
+        // 1 in 8 by the dice; over 100+ trees 1 in 14 to 1 in 5 leaves room for chance
+        helper.assertTrue(dead * 14 >= trees && dead * 5 <= trees, "the dead share is off 1 in 8: " + report);
+        helper.succeed();
+    }
+
+    /** The trees a floodplain tree structure plans in a chunk (none if it plans nothing there). */
+    private static List<FloodplainTreeStructure.Tree> planned(net.minecraft.world.level.levelgen.structure.Structure structure,
+            net.minecraft.core.RegistryAccess registries, BiomeMaps.Ground ground, MultiNoiseBiomeSource source,
+            net.minecraft.server.level.ServerLevel level, long seed, net.minecraft.world.level.ChunkPos chunk) {
+        var context = new net.minecraft.world.level.levelgen.structure.Structure.GenerationContext(registries, ground.generator(),
+                source, ground.random(), level.getStructureManager(), seed, chunk, level, structure.biomes()::contains);
+        List<FloodplainTreeStructure.Tree> out = new ArrayList<>();
+        structure.findValidGenerationPoint(context).ifPresent(stub -> {
+            for (var piece : stub.getPiecesBuilder().build().pieces()) {
+                out.add(((FloodplainTreePiece) piece).tree());
+            }
+        });
+        return out;
+    }
+
+    private static boolean bigFig(FloodplainTreeStructure.Tree tree) {
+        return tree.kind().equals("fig") && com.antcolonies.savanna.tree.FigShape.Age.byId(tree.age()).ordinal()
+                >= com.antcolonies.savanna.tree.FigShape.Age.MATURE.ordinal();
+    }
+
+    /** Why a floodplain tree's foot is on the wrong ground (off the floodplain, in water, on the strip flush with it), or null. */
+    private static String badGround(BlockPos foot, MultiNoiseBiomeSource source, BiomeMaps.Ground ground, net.minecraft.server.level.ServerLevel level) {
+        if (!source.getNoiseBiome(QuartPos.fromBlock(foot.getX()), QuartPos.fromBlock(foot.getY()), QuartPos.fromBlock(foot.getZ()),
+                ground.random().sampler()).is(SavannaRegion.SAVANNA_FLOODPLAIN)) {
+            return "not floodplain";
+        }
+        int surface = com.antcolonies.savanna.worldgen.GroundHeights.at(ground.generator(), foot.getX(), foot.getZ(),
+                net.minecraft.world.level.levelgen.Heightmap.Types.WORLD_SURFACE_WG, level, ground.random());
+        int floor = com.antcolonies.savanna.worldgen.GroundHeights.at(ground.generator(), foot.getX(), foot.getZ(),
+                net.minecraft.world.level.levelgen.Heightmap.Types.OCEAN_FLOOR_WG, level, ground.random());
+        if (surface != floor) {
+            return "in water";
+        }
+        return surface <= ground.generator().getSeaLevel() ? "flush with the water" : null;
+    }
+
+    private static double flat(BlockPos a, BlockPos b) {
+        return Math.sqrt((double) (a.getX() - b.getX()) * (a.getX() - b.getX()) + (double) (a.getZ() - b.getZ()) * (a.getZ() - b.getZ()));
     }
 
     /**

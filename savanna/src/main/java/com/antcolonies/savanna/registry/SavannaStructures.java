@@ -1,6 +1,8 @@
 package com.antcolonies.savanna.registry;
 
 import com.antcolonies.savanna.SavannaMod;
+import com.antcolonies.savanna.worldgen.FloodplainTreePiece;
+import com.antcolonies.savanna.worldgen.FloodplainTreeStructure;
 import com.antcolonies.savanna.worldgen.GiantTreePiece;
 import com.antcolonies.savanna.worldgen.GiantTreeStructure;
 import com.antcolonies.savanna.worldgen.TermiteMoundPiece;
@@ -12,7 +14,7 @@ import net.minecraft.world.level.levelgen.structure.pieces.StructurePieceType;
 import net.neoforged.neoforge.registries.DeferredHolder;
 import net.neoforged.neoforge.registries.DeferredRegister;
 
-/** The savanna's structures: the giant savanna trees in new land (M7.5 step 3) and the termite mounds (M8 step 1b). */
+/** The savanna's structures: the giant savanna trees in new land (M7.5 step 3), the floodplain's figs and doum palms (floodplain trees step 7) and the termite mounds (M8 step 1b). */
 public final class SavannaStructures {
     public static final DeferredRegister<StructureType<?>> STRUCTURE_TYPES = DeferredRegister.create(Registries.STRUCTURE_TYPE, SavannaMod.MODID);
     public static final DeferredRegister<StructurePieceType> STRUCTURE_PIECES = DeferredRegister.create(Registries.STRUCTURE_PIECE, SavannaMod.MODID);
@@ -22,6 +24,12 @@ public final class SavannaStructures {
             STRUCTURE_TYPES.register("giant_tree", () -> () -> GiantTreeStructure.CODEC);
     public static final DeferredHolder<StructurePieceType, StructurePieceType> GIANT_TREE_PIECE =
             STRUCTURE_PIECES.register("giant_tree", () -> (StructurePieceType.ContextlessType) GiantTreePiece::new);
+
+    /** A sycamore fig or a doum palm grove of the floodplain; placed by data/antcolonies/worldgen/structure/floodplain_*.json. */
+    public static final DeferredHolder<StructureType<?>, StructureType<FloodplainTreeStructure>> FLOODPLAIN_TREE =
+            STRUCTURE_TYPES.register("floodplain_tree", () -> () -> FloodplainTreeStructure.CODEC);
+    public static final DeferredHolder<StructurePieceType, StructurePieceType> FLOODPLAIN_TREE_PIECE =
+            STRUCTURE_PIECES.register("floodplain_tree", () -> (StructurePieceType.ContextlessType) FloodplainTreePiece::new);
 
     /** A termite mound's place, living or dead; placed in savannas by data/antcolonies/worldgen/structure/termite_mound.json. */
     public static final DeferredHolder<StructureType<?>, StructureType<TermiteMoundStructure>> TERMITE_MOUND =

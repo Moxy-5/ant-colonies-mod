@@ -1,0 +1,8 @@
+{
+  "type": "antcolonies:floodplain_tree",
+  "kind": "doum",
+  "biomes": "antcolonies:savanna_floodplain",
+  "spawn_overrides": {},
+  "step": "surface_structures",
+  "terrain_adaptation": "none"
+}

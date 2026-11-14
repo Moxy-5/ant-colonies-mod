@@ -1,0 +1,9 @@
+{
+  "structures": [{"structure": "antcolonies:floodplain_fig", "weight": 1}],
+  "placement": {
+    "type": "minecraft:random_spread",
+    "spacing": 3,
+    "separation": 1,
+    "salt": 482911040
+  }
+}
