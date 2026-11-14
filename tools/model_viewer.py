@@ -446,6 +446,26 @@ def planks_page(out):
     print("wrote", out)
 
 
+def algae_page(out):
+    """River algae looks (M9 river life, 2026-11-14, algae_art.py): three looks at four growth stages on a piece of
+    savanna river (shallow edge, deep channel, a still pan, grazed patches) and side by side on silt, river mud and sand."""
+    import zipfile
+    import algae_art
+    jar = Path.home() / ".gradle/caches/neoformruntime/artifacts/minecraft_1.21.1_client.jar"
+    z = zipfile.ZipFile(jar)
+    blocks = {n: uri(z.read(f"assets/minecraft/textures/block/{n}.png"))
+              for n in ("grass_block_top", "grass_block_side_overlay", "dirt", "sand", "water_still")}
+    blocks["grass_colormap"] = uri(z.read("assets/minecraft/textures/colormap/grass.png"))
+    for n in ("silt", "wet_silt", "river_mud"):
+        blocks[n] = file_uri(n + ".png")
+    algae = {look: {"mat": [uri(png(r)) for r in v["mat"]], "tuft": {s: uri(png(r)) for s, r in v["tuft"].items()}}
+             for look, v in algae_art.all_looks().items()}
+    template = (Path(__file__).resolve().parent / "algae_viewer.template.html").read_text(encoding="utf-8")
+    out.parent.mkdir(parents=True, exist_ok=True)
+    out.write_text(template.replace("/*DATA*/null", json.dumps({"blocks": blocks, "algae": algae})), encoding="utf-8")
+    print("wrote", out)
+
+
 def mix_soil(x, y):
     """Plain mound soil for the viewer's floor and walls."""
     rng = random.Random(x * 31 + y * 7)
@@ -460,6 +480,9 @@ def main():
         return
     if len(sys.argv) > 1 and sys.argv[1] == "floodplain":
         floodplain_page(Path(sys.argv[2]) if len(sys.argv) > 2 else ROOT / "references/floodplain_viewer.html")
+        return
+    if len(sys.argv) > 1 and sys.argv[1] == "algae":
+        algae_page(Path(sys.argv[2]) if len(sys.argv) > 2 else ROOT / "references/algae_viewer.html")
         return
     if len(sys.argv) > 1 and sys.argv[1] == "planks":
         planks_page(Path(sys.argv[2]) if len(sys.argv) > 2 else ROOT / "references/plank_viewer.html")

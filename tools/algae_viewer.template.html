@@ -1,0 +1,212 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>River algae looks</title>
+<style>
+  :root { --bg: #f4f1ea; --fg: #2c2c2a; --muted: #6b6a64; --line: #d3d1c7; --pick: #2f6b3a; }
+  @media (prefers-color-scheme: dark) { :root { --bg: #1f1f1d; --fg: #ecebe4; --muted: #a9a79e; --line: #44443f; --pick: #8fd19e; } }
+  body { margin: 0; background: var(--bg); color: var(--fg); font: 14px/1.5 system-ui, sans-serif; }
+  #panel { padding: 10px 16px; display: grid; gap: 6px; }
+  .row { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+  .row b { width: 110px; font-weight: 500; }
+  button { background: transparent; color: var(--fg); border: 1px solid var(--line); border-radius: 6px; padding: 3px 9px; cursor: pointer; font: inherit; }
+  button.on { border-color: var(--pick); color: var(--pick); font-weight: 500; }
+  #note { color: var(--muted); font-size: 13px; }
+  canvas { display: block; width: 100%; height: calc(100vh - 170px); min-height: 380px; }
+</style>
+</head>
+<body>
+<div id="panel">
+  <div id="note">River algae on the bed. The river runs left to right: shallow edge at the front, deep channel at the back, a still pan on the bank at the front left. Algae is thickest in shallow still water and thin in the deep channel; the bare oval in the pan and the bare strip by the edge are where a school of fish has grazed (it grows back green over a few days). Drag to turn, scroll to zoom.</div>
+</div>
+<canvas id="c"></canvas>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+<script>
+const D = /*DATA*/null;
+const OPTIONS = {
+  look: { label: "Algae look", pick: 0, list: [["A Green felt"], ["B Slime mat with bubbles"], ["C Felt with waving strands"]] },
+  scene: { label: "Show", pick: 0, list: [["In the river"], ["Every stage side by side (bare, thin, thick, lush)"]] },
+  view: { label: "View", pick: 0, list: [["From above"], ["Under the water"]] },
+};
+const state = {}; for (const k in OPTIONS) state[k] = OPTIONS[k].pick;
+const LOOK = ["A", "B", "C"];
+const RIVER = 0x5C6E45, POOL = 0x3E5F33;
+
+function load(src) { return new Promise(r => { const i = new Image(); i.onload = () => r(i); i.src = src; }); }
+function canvasOf(img, w, h) { const c = document.createElement("canvas"); c.width = w || img.width; c.height = h || img.height; c.getContext("2d").drawImage(img, 0, 0); return c; }
+function tinted(img, hex, w, h) {
+  const c = canvasOf(img, w, h), g = c.getContext("2d"), d = g.getImageData(0, 0, c.width, c.height);
+  const r = (hex >> 16 & 255) / 255, gg = (hex >> 8 & 255) / 255, b = (hex & 255) / 255;
+  for (let i = 0; i < d.data.length; i += 4) { d.data[i] *= r; d.data[i + 1] *= gg; d.data[i + 2] *= b; }
+  g.putImageData(d, 0, 0); return c;
+}
+function tex(c) { const t = new THREE.CanvasTexture(c); t.magFilter = THREE.NearestFilter; t.minFilter = THREE.NearestFilter; return t; }
+function hash(x, z) { const s = Math.sin(x * 127.1 + z * 311.7) * 43758.5453; return s - Math.floor(s); }
+
+const IMG = {}, ALG = {};
+let SAVANNA = 0x9EA75A;
+const renderer = new THREE.WebGLRenderer({ canvas: document.getElementById("c"), antialias: true });
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(55, 1, 0.05, 300);
+const controls = new THREE.OrbitControls(camera, renderer.domElement);
+let tufts = [];
+
+// the river piece: 36 long (x), 22 across (z); each column a bed top, a bed block, water top, algae stage
+function riverColumns() {
+  const col = [];
+  for (let x = 0; x < 36; x++) for (let z = 0; z < 22; z++) {
+    const zc = 9 + 2 * Math.sin(x / 7);                  // the channel's middle line
+    const d = Math.abs(z + 0.5 - zc);
+    let top = 1, kind = "grass", water = null, wk = null, stage = null;
+    if (d < 7.5) {
+      water = 1; wk = "river";
+      if (d < 3) { top = -3; kind = "silt"; stage = 0; }                    // deep channel: hardly any light, bare
+      else if (d < 5) { top = -2; kind = "silt"; stage = 1; }              // the slope: thin
+      else { top = -1; kind = hash(x, z) < 0.4 ? "mud" : "wetsilt"; stage = hash(x + 1, z) < 0.3 ? 3 : 2; }  // shallow edge
+      // a bare strip along the near edge, grazed by a school
+      if (z > zc && d > 5 && d < 6.5 && x > 18 && x < 28) stage = 0;
+    } else if (z > zc && d < 8.5) { top = 0; kind = hash(x, z) < 0.5 ? "wetsilt" : "silt"; }
+    // the still pan on the bank (front left)
+    const pe = Math.hypot((x + 0.5 - 8) / 5, (z + 0.5 - 19) / 2.6);
+    if (pe < 1) { top = 0; kind = "mud"; water = 1; wk = "pool"; stage = 3; if (Math.hypot(x + 0.5 - 9.5, z + 0.5 - 19) < 1.8) stage = 0; }
+    else if (pe < 1.3 && water === null) kind = "mud";
+    col.push({ x, z, top, kind, water, wk, stage });
+  }
+  return col;
+}
+
+// every stage side by side: for each bed (silt, river mud, sand) a row of four 3x3 pads under still water
+function stageColumns() {
+  const col = [];
+  for (let x = 0; x < 19; x++) for (let z = 0; z < 15; z++) {
+    let top = 1, kind = "grass", water = null, wk = null, stage = null;
+    const gx = x - 1, gz = z - 1;
+    if (gx >= 0 && gx < 16 && gz >= 0 && gz < 12 && gx % 4 !== 3 && gz % 4 !== 3) {
+      top = 0; kind = ["silt", "mud", "sand"][Math.floor(gz / 4)]; water = 1; wk = "river"; stage = Math.floor(gx / 4);
+    } else if (gx >= -1 && gx <= 16 && gz >= -1 && gz <= 12) { top = 1; kind = "grass"; }
+    col.push({ x, z, top, kind, water, wk, stage });
+  }
+  return col;
+}
+
+function build() {
+  while (scene.children.length) scene.remove(scene.children[0]);
+  tufts = [];
+  const col = state.scene === 0 ? riverColumns() : stageColumns();
+  const W = state.scene === 0 ? 36 : 19, L = state.scene === 0 ? 22 : 15;
+  const at = (x, z) => (x < 0 || z < 0 || x >= W || z >= L) ? null : col[x * L + z];
+  const shade = [0.6, 0.6, 1, 0.5, 0.8, 0.8];
+  const boxMats = map => shade.map((s, i) => new THREE.MeshBasicMaterial({ map: map[i] || map[0], color: new THREE.Color(s, s, s) }));
+  const dirt = tex(canvasOf(IMG.dirt));
+  const side = (() => { const c = canvasOf(IMG.dirt); c.getContext("2d").drawImage(tinted(IMG.grass_block_side_overlay, SAVANNA), 0, 0); return tex(c); })();
+  const T = { dirt, sand: tex(canvasOf(IMG.sand)), silt: tex(canvasOf(IMG.silt)), wetsilt: tex(canvasOf(IMG.wet_silt)), mud: tex(canvasOf(IMG.river_mud)),
+              grass: tex(tinted(IMG.grass_block_top, SAVANNA)) };
+  const mats = { grass: boxMats([side, side, T.grass, dirt, side, side]), dirt: boxMats([dirt]), sand: boxMats([T.sand]),
+                 silt: boxMats([T.silt]), wetsilt: boxMats([T.wetsilt]), mud: boxMats([T.mud]) };
+  const cells = {}; for (const k in mats) cells[k] = [];
+  for (const c of col) {
+    let low = c.top;
+    for (const [dx, dz] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) { const n = at(c.x + dx, c.z + dz); low = Math.min(low, n ? n.top + 1 : -4); }
+    for (let y = Math.max(low, -4); y <= c.top; y++) cells[y < c.top ? "dirt" : c.kind].push([c.x, y, c.z]);
+  }
+  const box = new THREE.BoxGeometry(1, 1, 1), m4 = new THREE.Matrix4();
+  for (const k in cells) {
+    if (!cells[k].length) continue;
+    const mesh = new THREE.InstancedMesh(box, mats[k], cells[k].length);
+    cells[k].forEach(([x, y, z], i) => mesh.setMatrixAt(i, m4.makeTranslation(x + 0.5, y + 0.5, z + 0.5)));
+    scene.add(mesh);
+  }
+  // the algae mat: a thin layer just over the bed's top, one texture per stage of the picked look
+  const look = ALG[LOOK[state.look]];
+  const plane = new THREE.PlaneGeometry(1, 1); plane.rotateX(-Math.PI / 2);
+  for (let s = 0; s < 4; s++) {
+    const cs = col.filter(c => c.stage === s);
+    if (!cs.length) continue;
+    const mat = new THREE.MeshBasicMaterial({ map: look.mat[s], transparent: true, alphaTest: 0.05, depthWrite: false });
+    const mesh = new THREE.InstancedMesh(plane, mat, cs.length);
+    cs.forEach((c, i) => mesh.setMatrixAt(i, m4.makeRotationY(Math.floor(hash(c.x + 9, c.z + 4) * 4) * Math.PI / 2).setPosition(c.x + 0.5, c.top + 1.01, c.z + 0.5)));  // turned at random, as the game will
+    scene.add(mesh);
+  }
+  // look C: streamers on two crossed planes, short when thick, long when lush, swaying in the loop
+  if (look.tuft[2]) {
+    for (const s of [2, 3]) {
+      const cs = col.filter(c => c.stage === s && hash(c.x + 5, c.z) < (s === 3 ? 0.8 : 0.45));
+      if (!cs.length) continue;
+      const h = s === 3 ? 0.9 : 0.5;
+      const g = new THREE.PlaneGeometry(0.9, h); g.translate(0, h / 2, 0);
+      const g2 = g.clone(); g.rotateY(Math.PI / 4); g2.rotateY(-Math.PI / 4);
+      const mat = new THREE.MeshBasicMaterial({ map: look.tuft[s], transparent: true, alphaTest: 0.1, side: THREE.DoubleSide });
+      for (const geo of [g, g2]) {
+        const mesh = new THREE.InstancedMesh(geo, mat, cs.length);
+        scene.add(mesh);
+        tufts.push({ mesh, cs: cs.map(c => ({ x: c.x + 0.5 + (hash(c.x, c.z + 2) - 0.5) * 0.3, y: c.top + 1, z: c.z + 0.5 + (hash(c.x + 2, c.z) - 0.5) * 0.3, p: hash(c.x, c.z) * 6.28 })) });
+      }
+    }
+  }
+  for (const [wk, hex] of [["river", RIVER], ["pool", POOL]]) {
+    const ws = col.filter(c => c.wk === wk);
+    if (!ws.length) continue;
+    const mat = new THREE.MeshBasicMaterial({ map: tex(tinted(IMG.water_still, hex, 16, 16)), transparent: true, opacity: 0.45, depthWrite: false, side: THREE.DoubleSide });
+    const mesh = new THREE.InstancedMesh(plane, mat, ws.length);   // only the surface, so the bed stays clear to see
+    ws.forEach((c, i) => mesh.setMatrixAt(i, m4.makeTranslation(c.x + 0.5, c.water + 0.875, c.z + 0.5)));
+    scene.add(mesh);
+  }
+  if (state.view === 1) {
+    scene.fog = new THREE.Fog(0x1E2414, 0.3, 16); scene.background = new THREE.Color(0x1E2414);
+    if (state.scene === 0) { camera.position.set(4, 0.7, 13.6); controls.target.set(16, -1.2, 10); }
+    else { camera.position.set(9, 0.75, 16.5); controls.target.set(9, 0.2, 7); }
+  } else {
+    scene.fog = null; scene.background = new THREE.Color(0x78A7FF);
+    if (state.scene === 0) { camera.position.set(14, 9, 27); controls.target.set(15, -1.5, 14); }
+    else { camera.position.set(9.5, 11, 22); controls.target.set(9.5, 0, 7); }
+  }
+  controls.update();
+}
+
+function sway(t) {
+  const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), e = new THREE.Euler(), one = new THREE.Vector3(1, 1, 1), p = new THREE.Vector3();
+  for (const tf of tufts) {
+    tf.cs.forEach((c, i) => {
+      e.set(0.25 * Math.sin(t * 1.3 + c.p), 0, 0.12 * Math.sin(t * 0.9 + c.p * 1.7));   // leaning with the current, to and fro
+      q.setFromEuler(e); p.set(c.x, c.y, c.z);
+      tf.mesh.setMatrixAt(i, m4.compose(p, q, one));
+    });
+    tf.mesh.instanceMatrix.needsUpdate = true;
+  }
+}
+
+function buttons() {
+  const panel = document.getElementById("panel");
+  for (const key in OPTIONS) {
+    const row = document.createElement("div"); row.className = "row";
+    row.innerHTML = `<b>${OPTIONS[key].label}</b>`;
+    OPTIONS[key].list.forEach((o, i) => {
+      const b = document.createElement("button"); b.textContent = o[0]; b.className = state[key] === i ? "on" : "";
+      b.onclick = () => { state[key] = i; [...row.querySelectorAll("button")].forEach((x, j) => x.className = j === i ? "on" : ""); build(); };
+      row.appendChild(b);
+    });
+    panel.appendChild(row);
+  }
+}
+
+function resize() { const c = renderer.domElement; renderer.setSize(c.clientWidth, c.clientHeight, false); camera.aspect = c.clientWidth / c.clientHeight; camera.updateProjectionMatrix(); }
+window.addEventListener("resize", resize);
+
+(async () => {
+  for (const k of ["grass_block_top", "grass_block_side_overlay", "dirt", "sand", "water_still", "grass_colormap", "silt", "wet_silt", "river_mud"]) IMG[k] = await load(D.blocks[k]);
+  const cm = canvasOf(IMG.grass_colormap).getContext("2d"); const p = cm.getImageData(0, 255, 1, 1).data; SAVANNA = p[0] << 16 | p[1] << 8 | p[2];
+  for (const L of LOOK) {
+    ALG[L] = { mat: [], tuft: {} };
+    for (const src of D.algae[L].mat) ALG[L].mat.push(tex(canvasOf(await load(src))));
+    for (const s in D.algae[L].tuft) ALG[L].tuft[s] = tex(canvasOf(await load(D.algae[L].tuft[s])));
+  }
+  buttons(); build(); resize();
+  const t0 = performance.now();
+  (function loop() { requestAnimationFrame(loop); sway((performance.now() - t0) / 1000); controls.update(); renderer.render(scene, camera); })();
+})();
+</script>
+</body>
+</html>
