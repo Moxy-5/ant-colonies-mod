@@ -170,6 +170,13 @@ public class NewLandMounds extends SavedData {
             if (!loadedRound(level, site.middle(), TREE_ROUND) || !deadTreeShapesSoon(site.pick().seed())) {
                 continue;
             }
+            if (site.pick().living() && numbers != null && MoundPlan.growthSoon(numbers, moundSeed(site.colony())) == null) {
+                // The tree's place is measured from the living mound's own foot, which needs the mound's shape. It was
+                // grown when the mound went in, but only the last few shapes are kept: if this one has been dropped
+                // since, it is grown again in the background and the tree waits, in place of growing it here (a
+                // 1.3-second freeze, docs/BUGS.md 214).
+                continue;
+            }
             book.treesWaiting.remove(i);
             book.setDirty();
             book.treeBy(level, site.middle(), site.pick(), ColonyManager.get(level).getColony(site.colony()));
