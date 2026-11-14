@@ -1,3 +1,4 @@
+<meta charset="utf-8">
 <title>Floodplain Trees</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -44,8 +45,9 @@
   .choice small { color: var(--muted); font-size: 0.8rem; line-height: 1.35; display: block; }
   .choice[aria-pressed="true"] { border-color: var(--fg); box-shadow: inset 0 0 0 1px var(--fg); }
   .row { display: grid; grid-template-columns: repeat(auto-fit, minmax(0, 1fr)); gap: 4px; }
-  .row button, .views button { font: inherit; font-size: 0.8rem; color: inherit; background: transparent; border: 1px solid var(--line); border-radius: 6px; padding: 6px 4px; cursor: pointer; }
-  .row button[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: var(--panel); }
+  .ages { display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 4px; }
+  .row button, .views button, .ages button { font: inherit; font-size: 0.8rem; color: inherit; background: transparent; border: 1px solid var(--line); border-radius: 6px; padding: 6px 4px; cursor: pointer; }
+  .row button[aria-pressed="true"], .ages button[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: var(--panel); }
   button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
   .pair { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
   .pick { display: grid; gap: 4px; }
@@ -64,7 +66,7 @@
 <div class="wrap">
   <header>
     <h1>Floodplain Trees</h1>
-    <p>The sycamore fig and the doum palm, rebuilt from your two pictures. Trunks, stems and thick limbs are full blocks; the thin limb ends, the roots at the foot, the fruit and every palm frond are sculpted pieces (small boxes, as a block model can hold). Nothing here is in the game yet. "Another tree" shows how much one kind differs from seed to seed. The little figures at the foot are for scale: a player, and a Matabele major ant beside them.</p>
+    <p>The sycamore fig and the doum palm, rebuilt from your two pictures, now at every age from seedling to your grown tree ("Every age" stands them side by side, youngest on the left). Trunks, stems and thick limbs are full blocks; the thin limb ends, the roots at the foot, the fruit and every palm frond are sculpted pieces (small boxes, as a block model can hold). Nothing here is in the game yet. "Another tree" shows how much one kind differs from seed to seed. The little figures at the foot are for scale: a player, and a Matabele major ant beside them.</p>
   </header>
   <div class="bench">
     <div class="left">
@@ -98,11 +100,13 @@
         <div class="choices" id="kinds"></div>
       </div>
       <div id="looks">
-        <h2>Looks to pick (for this tree)</h2>
-        <div class="pair">
-          <div class="pick"><span>Shape</span><div class="row" id="pick-shape"></div></div>
-          <div class="pick"><span>Bark</span><div class="row" id="pick-bark"></div></div>
-        </div>
+        <h2>Age (for this tree)</h2>
+        <div class="ages" id="pick-age"></div>
+        <p class="note" id="age-note"></p>
+      </div>
+      <div id="barks">
+        <h2>Bark</h2>
+        <div class="row" id="pick-bark"></div>
         <p class="note" id="shape-note"></p>
       </div>
       <div class="toggles">
@@ -124,14 +128,10 @@ const DATA = /*DATA*/null;
 
 // ================= Choices =================
 const KINDS = [
-  { id: "fig", swatch: "#7f9a3c", name: "Sycamore fig", text: "A thick mottled trunk on flaring roots, bare limbs sweeping up like spokes, flat pads of leaves in layers, bunches of red figs hanging under the limbs." },
-  { id: "doum", swatch: "#9a7a4a", name: "Doum palm", text: "A fat rough clump with leaning stems, a crown of arching fan fronds on each, bunches of orange-brown fruit under the crowns." },
-  { id: "bank", swatch: "#58684a", name: "Riverbank: both, spaced", text: "A stretch of floodplain with two figs and two clumps of palms, to judge the spacing (open grass for the wildlife)." },
+  { id: "fig", swatch: "#7f9a3c", name: "Sycamore fig", text: "From a seedling on the mud to the giant: a thick mottled trunk on flaring roots, spoke limbs, flat pads of leaves, red figs under the limbs." },
+  { id: "doum", swatch: "#9a7a4a", name: "Doum palm", text: "From a stemless tuft of fans to the old clump: leaning stems forking in Y shapes, arching fan fronds, orange-brown fruit." },
+  { id: "bank", swatch: "#58684a", name: "Riverbank: every age, spaced", text: "A stretch of floodplain with figs and palms of mixed ages, to judge the spacing (open grass for the wildlife)." },
 ];
-const SHAPES = {
-  fig: { A: "As your picture: about 20 tall and 34 wide.", B: "A giant: about 27 tall and 46 wide, a match for the umbrella thorn (old trees; nearer the real one's size)." },
-  doum: { A: "As your picture: a clump of three stems, about 13 tall.", B: "An old clump: four or five stems, taller, one of them forking in two near the top (the real palm's trick)." },
-};
 const BARKS = {
   fig: { A: "A as your picture: cream, with red-brown and pale patches.", B: "B nearer the real tree: buff-yellow, the patches yellow-green and papery pale." },
   doum: { A: "A as your picture: warm dark brown, fibrous.", B: "B the real palm's lower trunk: grey-brown, ringed." },
@@ -147,6 +147,7 @@ const REAL = {
   bank: "How they could stand on the floodplain: a few doum palms in loose clumps near the water, a sycamore fig on its own here and there, set back. Most of the plain stays open grass. All spacing is my pick, to judge here.",
 };
 let kind = "fig", seed = 1, bare = false;
+let age = { fig: "all", doum: "all" };  // "all": every age side by side
 let picks = { shape: { fig: "B", doum: "B" }, bark: { fig: "A", doum: "A" } };  // the user's picks, 2026-11-13: shape B and bark A for both
 try { const s = JSON.parse(localStorage.getItem("floodplain-picks-2") || "null"); if (s && s.shape && s.bark) picks = s; } catch (e) {}
 
@@ -202,8 +203,12 @@ const C = hex => { const c = new THREE.Color(hex).convertSRGBToLinear(); return 
 const mixC = (a, b, t) => [lerp(a[0], b[0], t), lerp(a[1], b[1], t), lerp(a[2], b[2], t)];
 
 let NS = 1, FIG_FY = 7;  // the tree being made: its noise seed, and where the fig's limbs leave the trunk
+// How far up the old, mottled bark reaches (the ages): a young fig's bark is smooth and pale (tile 4); the flaking and
+// the patches start low on the trunk and climb as the tree ages. A grown tree is mottled all over.
+let FIG_OLD_BELOW = Infinity;
 // The fig's bark tile for a block: big patches low on the trunk, fewer up on the limbs.
 function figTile(x, y, z) {
+  if (y > FIG_OLD_BELOW + (vnoise(x / 1.7 + 3.1, y / 2, z / 1.7 - 6.2, NS + 13) - 0.5) * 3) return 4;
   const n = vnoise(x / 2.0 + 9.3, y / 2.5, z / 2.0 - 4.1, NS), m = vnoise(x / 1.8 - 31.7, y / 2.2 + 5.5, z / 1.8 + 12.9, NS + 7);
   const calm = clamp((y - FIG_FY + 1) / 5, 0, 1) * 0.13;
   if (n > 0.635 + calm) return 1;
@@ -320,14 +325,14 @@ function rootSteps(v, span, top, k) {
 function figTrunk(v, P) {
   const span = Math.ceil(P.Rw * 3.2);
   for (let y = -1; y <= P.fy + 1; y++) {
-    const yy = Math.max(0, y), flare = 1.25 * Math.exp(-yy / 1.5), neck = 0.55 * clamp((yy - (P.fy - 3)) / 3, 0, 1);
+    const yy = Math.max(0, y), flare = (P.flare ?? 1) * 1.25 * Math.exp(-yy / 1.5), neck = (P.flare ?? 1) * 0.55 * clamp((yy - (P.fy - 3)) / 3, 0, 1);
     for (let x = -span; x <= span; x++) for (let z = -span; z <= span; z++) {
       const lobe = Math.cos(P.nb * Math.atan2(z, x) + P.ph + yy * 0.12), butt = Math.max(0, lobe - 0.35) / 0.65;
-      const R = (P.Rw + flare + neck) * (1 + 0.07 * lobe) + butt * Math.max(0, 3.2 - yy) * 0.62 * P.Rw / 2.4;
+      const R = (P.Rw + flare + neck) * (1 + 0.07 * lobe) + (P.butt ?? 1) * butt * Math.max(0, 3.2 - yy) * 0.62 * P.Rw / 2.4;
       if (Math.hypot(x, z) <= R) v.put(x, y, z, "cube|" + bark("fig", [x, y, z]));
     }
   }
-  rootSteps(v, span + 1, 3, "fig");
+  rootSteps(v, span + 1, P.roots ?? 3, "fig");
 }
 // A pad of leaves, its flat bottom at c: a lumpy dome, h layers at its thickest, its rim lobed, thin and ragged.
 function pad(v, c, R, h) {
@@ -342,36 +347,39 @@ function pad(v, c, R, h) {
     for (let dy = from; dy <= top; dy++) v.put(x, y0 + dy, z, "leaf|leaves_fig_1");
   }
 }
-function fig(v, seed, shape) {
-  const r = rng(seed * 104729 + 5), big = shape === "B", S = big ? 1.36 : 1;
+// young: the young tree of the ages (about 15 tall, 21 wide, my pick): the same plan as the grown tree, smaller, with a
+// slimmer trunk barely flared, few root steps, thinner pads, smooth bark above the foot and only a first few figs.
+function fig(v, seed, shape, young) {
+  const r = rng(seed * 104729 + 5), big = shape === "B" && !young, S = young ? 0.6 : big ? 1.36 : 1;
   NS = seed * 13 + 1;
-  const H = Math.round((20 + r() * 2) * S), fy = Math.round(7.6 * S), Rw = big ? 3.15 : 2.4;
+  FIG_OLD_BELOW = young ? 2.5 : Infinity;
+  const H = Math.round((20 + r() * 2) * S), fy = Math.round(7.6 * S), Rw = young ? 1.25 : big ? 3.15 : 2.4;
   FIG_FY = fy;
-  figTrunk(v, { Rw, fy, nb: (big ? 6 : 5) + (r() < 0.5 ? 1 : 0), ph: r() * 6.28 });
-  const pads = [], fork = [0, fy - 0.5, 0], thick = big ? 1.55 : 1.3;
+  figTrunk(v, { Rw, fy, nb: (big ? 6 : 5) + (r() < 0.5 ? 1 : 0), ph: r() * 6.28, flare: young ? 0.4 : 1, butt: young ? 0.35 : 1, roots: young ? 1 : 3 });
+  const pads = [], fork = [0, fy - 0.5, 0], thick = young ? 0.98 : big ? 1.55 : 1.3, padH = young ? 1 : 0;
   // the outer limbs: spokes sweeping out and up, each with a higher side branch
-  const nOut = (big ? 8 : 7) + (r() < 0.4 ? 1 : 0), az0 = r() * 6.28, low = Math.floor(r() * nOut);
+  const nOut = (young ? 5 : big ? 8 : 7) + (r() < 0.4 ? 1 : 0), az0 = r() * 6.28, low = Math.floor(r() * nOut);
   for (let i = 0; i < nOut; i++) {
     const az = az0 + i / nOut * 6.28 + (r() - 0.5) * 0.4, o = [Math.cos(az), 0, Math.sin(az)], side = [-o[2], 0, o[0]];
     const far = r(), reach = (9.5 + far * 3.5) * S, el = i === low ? 0.3 + r() * 0.08 : 0.66 - far * 0.2 + (i % 2 ? 0.13 : -0.05) + (r() - 0.5) * 0.08;
     const start = add(fork, mul(o, Rw * 0.5)), end = [o[0] * reach, fy + (reach - Rw) * Math.tan(el), o[2] * reach];
     const mid = add(add(mul(add(start, end), 0.5), [0, 0.9 + r() * 0.8, 0]), mul(side, (r() - 0.5) * 2.4));
     woodPath(v, [start, mid, end], thick, 0.2, "fig", 1.7);
-    pads.push([end, (3.7 + r() * 1.1) * S, 3]);
+    pads.push([end, (3.7 + r() * 1.1) * S, 3 - padH]);
     if (big || r() < 0.85) {
       const az2 = az + (r() < 0.5 ? 1 : -1) * (0.42 + r() * 0.2), d2 = reach * (0.52 + r() * 0.16);
       const from = add(start, mul(sub(mid, start), 0.8)), e2 = [Math.cos(az2) * d2, end[1] + 2 + r() * 2.5, Math.sin(az2) * d2];
-      woodPath(v, [from, add(mul(add(from, e2), 0.5), [0, 0.8, 0]), e2], 0.84, 0.16, "fig", 1.5);
-      pads.push([e2, (3.3 + r() * 1.0) * S, 3]);
+      woodPath(v, [from, add(mul(add(from, e2), 0.5), [0, 0.8, 0]), e2], young ? 0.62 : 0.84, 0.16, "fig", 1.5);
+      pads.push([e2, (3.3 + r() * 1.0) * S, 3 - padH]);
     }
   }
   // the inner limbs: steep, carrying the top of the crown
-  const nIn = big ? 4 : 3;
+  const nIn = young ? 2 : big ? 4 : 3;
   for (let i = 0; i < nIn; i++) {
     const az = az0 + 0.5 + i / nIn * 6.28 + (r() - 0.5) * 0.5, o = [Math.cos(az), 0, Math.sin(az)], d = (3.2 + r() * 2.6) * S;
     const start = add(fork, mul(o, Rw * 0.3)), end = [o[0] * d, H - 4 - r() * 1.5, o[2] * d];
     woodPath(v, [start, add(mul(add(start, end), 0.5), mul(o, 0.9)), end], thick * 0.9, 0.18, "fig", 1.6);
-    pads.push([end, (4.2 + r() * 1.2) * S, 4]);
+    pads.push([end, (4.2 + r() * 1.2) * S, 4 - padH]);
   }
   for (const [c, R, h] of pads) {
     for (let j = 0; j < 3; j++) {  // short twigs spreading under the pad, seen from below
@@ -392,12 +400,58 @@ function fig(v, seed, shape) {
   });
   const order = a => a.map(p => [hash(p[0], p[1], p[2], NS + 11), p]).sort((p, q) => p[0] - q[0]).map(p => p[1]);
   const taken = [], far = (p, gap) => taken.every(q => Math.hypot(p[0] - q[0], p[1] - q[1], p[2] - q[2]) >= gap);
-  let left = big ? 22 : 14;
+  let left = young ? 3 : big ? 22 : 14;
   for (const p of order(under)) if (left && far(p, 3.2)) { taken.push(p); left--; figBunch(v, p[0], p[1], p[2], r); }
-  left = big ? 8 : 5;
+  left = young ? 2 : big ? 8 : 5;
   for (const p of order(onBark)) if (left && far(p, 3)) { taken.push(p); left--; figCluster(v, p[0], p[1], p[2], p[3], r); }
   return { R: Rw + 3.5, fruit: taken[0] ? [taken[0][0], taken[0][1], taken[0][2]] : [0, fy, 0] };
 }
+// ---- The fig's younger ages (2026-11-13; sizes and years my picks) ----
+const FIG_LEAF_TINTS = ["#92a03c", "#68843a", "#7c963e"].map(C), FIG_STEM = C("#8a8a56"), FIG_BUD = C("#b4b46a");
+// One broad fig leaf as a flat plate on a short stalk, from the stem at (x, y, z) out along az; s scales it.
+function figLeaf(v, x, y, z, az, s, tint) {
+  const ca = Math.cos(az), sa = Math.sin(az), stalk = 3 * s / 16, L = Math.round(8 * s), W = Math.round(7 * s);
+  v.bit(x + ca * stalk / 2, y, z + sa * stalk / 2, Math.max(2, Math.round(3 * s)), 1, 1, { rot: -az, tint: FIG_STEM, leafy: true });
+  v.bit(x + ca * (stalk + L / 32), y - 1 / 16, z + sa * (stalk + L / 32), L, 1, W, { rot: -az, tint, leafy: true });
+  v.bit(x + ca * (stalk + L / 16 + 1 / 16), y - 2 / 16, z + sa * (stalk + L / 16 + 1 / 16), 2, 1, Math.max(2, W - 4), { rot: -az, tint: tint.map(c => c * 0.85), leafy: true });
+}
+// Seedling, about a year (about a block tall): a soft, pale stem with a few broad leaves set round it in a spiral, and
+// the pointed bud at the tip wrapped in its stipule, as every fig shoot has.
+function figSeedling(v, seed) {
+  const r = rng(seed * 7919 + 11), hpx = 15 + Math.floor(r() * 4), lean = (r() - 0.5) * 2 / 16;
+  v.bit(0, -0.5 + hpx / 32, 0, 2, hpx, 2, { tint: FIG_STEM });
+  v.bit(lean, -0.5 + hpx / 16 + 2 / 16, 0, 1, 4, 1, { tint: FIG_BUD, leafy: true });  // the bud in its stipule
+  let az = r() * 6.28;
+  const n = 5 + Math.floor(r() * 2);
+  for (let i = 0; i < n; i++) {
+    const up = (3 + i * (hpx - 4) / n) / 16, size = 0.7 + 0.5 * (1 - Math.abs(i - n * 0.55) / n);
+    figLeaf(v, lean * i / n, -0.5 + up, 0, az, size, FIG_LEAF_TINTS[i % 3]);
+    az += 2.4;
+  }
+  return { R: 0.8, fruit: [0, 0, 0] };
+}
+// Sapling, a few years (about 9 tall with its leaves): one straight stem a block thick in smooth pale bark, branching low into a few
+// steep limbs with small pads of leaves. No figs yet, no root steps worth the name, no mottling.
+function figSapling(v, seed) {
+  const r = rng(seed * 6007 + 19);
+  NS = seed * 13 + 3; FIG_OLD_BELOW = -99; FIG_FY = 3;
+  const top = 3 + Math.floor(r() * 2);
+  for (let y = -1; y <= top; y++) v.put(0, y, 0, "cube|" + bark("fig", [0, y, 0]));
+  rootSteps(v, 1, 0, "fig");
+  const pads = [], n = 3 + (r() < 0.5 ? 1 : 0), az0 = r() * 6.28;
+  for (let i = 0; i < n; i++) {
+    const az = az0 + i / n * 6.28 + (r() - 0.5) * 0.5, o = [Math.cos(az), 0, Math.sin(az)], d = 2.2 + r() * 1.4;
+    const from = [0, top - 0.6 - (i % 2) * 0.8, 0], end = [o[0] * d, top + 1 + r() * 1.1, o[2] * d];
+    woodPath(v, [from, add(mul(add(from, end), 0.5), mul(o, 0.4)), end], 0.62, 0.2, "fig");
+    pads.push([end, 1.6 + r() * 0.6, 2]);
+  }
+  const lead = [0.3, top + 3 + r() * 0.6, -0.2];
+  woodPath(v, [[0, top, 0], lead], 0.55, 0.2, "fig");
+  pads.push([lead, 1.9, 2]);
+  for (const [c, R, h] of pads) pad(v, c, R, h);
+  return { R: 1.5, fruit: [0, top, 0] };
+}
+
 // Once every tree stands: leaves lit where the sky is over them and dark where they are a pad's underside, and sprays
 // of leaves hanging under the rims.
 function finishLeaves(v) {
@@ -461,10 +515,12 @@ function doumBunch(v, top, az, r) {
   }
   return [base[0], base[1] - 1, base[2]];
 }
-function palmCrown(v, T, r, size) {  // T: the middle of the stem's top, on a block edge for a stem two blocks wide
-  const top = [T[0], T[1] + 0.5, T[2]], snap = a => Math.round(a / (Math.PI / 8)) * (Math.PI / 8);
-  v.bit(top[0], top[1] + 3 / 16, top[2], 28, 6, 28, { tex: "bark_doum", tint: [1.12, 1.08, 0.9] });  // the cap the leaves come out of
-  v.bit(top[0], top[1] + 8 / 16, top[2], 18, 5, 18, { tint: PALM_STALK });
+// o.bunches: how many fruit bunches (left out: 2 or 3, the grown palm); o.old false: no hanging old fronds (a rosette's
+// lie on the ground). A crown smaller than 1 has a smaller cap too.
+function palmCrown(v, T, r, size, o = {}) {  // T: the middle of the stem's top, on a block edge for a stem two blocks wide
+  const top = [T[0], T[1] + 0.5, T[2]], snap = a => Math.round(a / (Math.PI / 8)) * (Math.PI / 8), cs = Math.min(1, size);
+  v.bit(top[0], top[1] + 3 / 16, top[2], Math.round(28 * cs), 6, Math.round(28 * cs), { tex: "bark_doum", tint: [1.12, 1.08, 0.9] });  // the cap the leaves come out of
+  v.bit(top[0], top[1] + 8 / 16, top[2], Math.round(18 * cs), 5, Math.round(18 * cs), { tint: PALM_STALK });
   let turn = r() * 6.28;
   const tier = (n, el, pet, blade, curv, lift, look) => {
     for (let i = 0; i < n; i++) {
@@ -477,9 +533,9 @@ function palmCrown(v, T, r, size) {  // T: the middle of the stem's top, on a bl
   tier(3, 1.35, 1.2, 3.1, 0.6, 0.5, "live");
   tier(5, 0.85, 1.75, 4.0, 0.5, 0.35, "live");
   tier(5, 0.3, 2.0, 4.2, 0.4, 0.2, "live");
-  tier(4, -0.35, 1.6, 3.5, 0.24, 0.05, "old");
+  if (o.old !== false) tier(4, -0.35, 1.6, 3.5, 0.24, 0.05, "old");
   arcStrip(v, [top[0], top[1] + 0.6, top[2]], r() * 6.28, 1.5, 2.2 * size, 0.06, 3, 2, SPEAR[0], SPEAR[1], true);  // the spear: the newest leaf, still shut
-  const n = 2 + (r() < 0.5 ? 1 : 0), a0 = r() * 6.28;
+  const n = o.bunches ?? 2 + (r() < 0.5 ? 1 : 0), a0 = r() * 6.28;
   let fruit = null;  // the bunch hanging farthest out from the clump's middle, for the close view
   for (let i = 0; i < n; i++) {
     const p = doumBunch(v, top, a0 + i / n * 6.28 + (r() - 0.5) * 0.6, r);
@@ -529,15 +585,30 @@ function doum(v, seed, shape) {
     for (const sgn of [1, -1]) arm(p2, az, sgn, 3.4 + r() * 0.8, 2.6 + r() * 0.6, sgn === again);
   }
   rootSteps(v, 7, 2, "doum");
-  // old leaf bases: stubs sticking out and up from the stems, more of them toward the crowns
-  const ox = v.ox, oz = v.oz, maxY = Math.max(...tips.map(t => t[1]));
+  leafBases(v, Math.max(...tips.map(t => t[1])));
+  return crowns(v, tips, r, old ? 1.06 : 1, RB + 2.5);
+}
+// A crown on every stem tip; the fruit bunch hanging farthest out is the close view's (from: the crown it hangs under,
+// so the view looks in from outside it). bunches(i): how many bunches the i-th crown carries (left out: the grown palm's).
+function crowns(v, tips, r, size, R, bunches) {
+  let fruit = null, from = null;
+  tips.forEach((t, i) => {
+    const p = palmCrown(v, [Math.round(t[0]) + 0.5, Math.round(t[1]), Math.round(t[2]) + 0.5], r, size, bunches ? { bunches: bunches(i) } : {});
+    if (p && (!fruit || Math.hypot(p[0], p[2]) > Math.hypot(fruit[0], fruit[2]))) { fruit = p; from = t; }
+  });
+  return { R, fruit: fruit || [0, Math.max(...tips.map(t => t[1])), 0], from };
+}
+// Old leaf bases: stubs sticking out and up from the stems, more of them toward the crowns (from lo at the foot to hi at
+// maxY). A young stem is clothed in them all the way down, so its lo is higher.
+function leafBases(v, maxY, lo = 0.18, hi = 0.7) {
+  const ox = v.ox, oz = v.oz;
   v.each((X, y, Z, b) => {
     const x = X - ox, z = Z - oz;
     if (b !== "cube|bark_doum" || y < 0 || Math.hypot(x, z) > 14) return;
     for (const d of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
       if (v.get(x + d[0], y, z + d[1])) continue;
       const u = hash(x * 4 + d[0], y, z * 4 + d[1], NS + 1);
-      if (u > lerp(0.18, 0.7, clamp(y / maxY, 0, 1))) continue;
+      if (u > lerp(lo, hi, clamp(y / maxY, 0, 1))) continue;
       const rot = d[0] ? 0 : Math.PI / 2, oy = (hash(x, y, z, NS + 6) < 0.5 ? 3 : 9) / 16 - 0.5, sh = ((u * 97) % 1 - 0.5) * 4 / 16;
       const at = (out, dy) => [x + d[0] * (0.5 + out / 16) - d[1] * sh, y + oy + dy / 16, z + d[1] * (0.5 + out / 16) + d[0] * sh];
       const wide = u * 31 % 1 < 0.5 ? 14 : 10;
@@ -545,27 +616,164 @@ function doum(v, seed, shape) {
       v.bit(...at(2.5, 4), 5, 5, wide - 4, { rot, tex: "bark_doum", tint: BOOT[u * 53 % 1 < 0.5 ? 0 : 1] });
     }
   });
-  let fruit = null, from = null;
-  for (const t of tips) {
-    const p = palmCrown(v, [Math.round(t[0]) + 0.5, Math.round(t[1]), Math.round(t[2]) + 0.5], r, old ? 1.06 : 1);
-    if (!fruit || Math.hypot(p[0], p[2]) > Math.hypot(fruit[0], fruit[2])) { fruit = p; from = t; }
-  }
-  return { R: RB + 2.5, fruit, from };  // from: the crown the fruit hangs under, so the close view looks in from outside it
 }
 
-const MAKERS = { fig, doum };
-// The riverbank: the water lies along -z; x runs along the river. [kind, x, z, seed offset, shape]
-const BANK = [["fig", 18, 20, 0, "A"], ["fig", -50, 34, 1, "B"],
-              ["doum", -24, -3, 0, "A"], ["doum", -14, 5, 1, "B"], ["doum", -31, 9, 2, "A"], ["doum", 52, -4, 3, "B"], ["doum", 61, 6, 4, "A"]];
+// ---- The doum palm's younger ages (2026-11-13; sizes and years my picks) ----
+// A palm stem: a column two blocks by two, its line running between blocks, as the grown clump's.
+function doumWood(v, pts, r0, r1) {
+  const H = [0.5, 0, 0.5];
+  for (let i = 0; i + 1 < pts.length; i++) seg(v, add(pts[i], H), add(pts[i + 1], H), lerp(r0, r1, i / (pts.length - 1)), lerp(r0, r1, (i + 1) / (pts.length - 1)), "doum");
+}
+// A young stem as a true column two blocks by two at every height, its middle following the line pts (going up): a
+// round piece along a leaning line covers only 2 or 3 blocks of a layer, which looked thin on a young stem.
+function column2(v, pts) {
+  for (let i = 0; i + 1 < pts.length; i++) {
+    const a = pts[i], b = pts[i + 1];
+    for (let y = Math.ceil(a[1]); y <= Math.floor(b[1]); y++) {
+      const t = (y - a[1]) / (b[1] - a[1]), cx = Math.round(lerp(a[0], b[0], t)), cz = Math.round(lerp(a[2], b[2], t));
+      for (const dx of [0, 1]) for (const dz of [0, 1]) v.put(cx + dx, y, cz + dz, "cube|bark_doum");
+    }
+  }
+}
+// Whatever f makes, made dx, dz blocks over.
+function shifted(v, dx, dz, f) { v.ox += dx; v.oz += dz; try { return f(); } finally { v.ox -= dx; v.oz -= dz; } }
+// Dead fronds lying round a stemless palm, browned and flat on the ground.
+function deadSkirt(v, r, n, size) {
+  for (let i = 0; i < n; i++) {
+    const az = r() * 6.28;
+    frond(v, [Math.cos(az) * 0.6, -0.42, Math.sin(az) * 0.6], az, 0.08, 1.2 * size, 3.2 * size * (0.85 + r() * 0.3), 0.05, r, "dead");
+  }
+}
+// Seedling, a year or two (under a block): the nut sends its shoot down into the ground first, so nothing stands up
+// but the first leaves, two narrow strap leaves and the first small fan, from a pale sheath at the soil.
+function doumSeedling(v, seed) {
+  const r = rng(seed * 2741 + 13);
+  v.bit(0, -0.5 + 1.5 / 16, 0, 3, 3, 3, { tint: PALM_STALK });
+  let az = r() * 6.28;
+  for (let i = 0; i < 2; i++, az += 2.6 + r() * 0.6)
+    arcStrip(v, [0, -0.35, 0], az, 1.25 + r() * 0.15, 0.9 + r() * 0.3, 0.45, 4, 2, FROND.live[0], FROND.live[1], true);
+  frond(v, [0, -0.3, 0], az, 1.15, 0.45, 0.75, 0.7, r, "live");
+  return { R: 0.6, fruit: [0, 0, 0] };
+}
+// Rosette, a stemless young palm (about 4 tall; my pick, some 5 to 10 years): for years a palm builds its base under
+// the ground and shows only a tuft of full fan leaves straight out of the soil, the dead ones lying round it.
+function doumRosette(v, seed, size = 0.8) {
+  const r = rng(seed * 4513 + 17);
+  palmCrown(v, [0, -0.9, 0], r, size, { bunches: 0, old: false });
+  deadSkirt(v, r, 3, size);
+  return { R: 1.2, fruit: [0, 1, 0] };
+}
+// Young stem (about 11 tall with its crown): the stem rises, one column, swollen at the foot and clothed in old leaf
+// bases all the way down. Not yet forked, no fruit yet.
+function doumStem(v, seed) {
+  const r = rng(seed * 3571 + 7);
+  NS = seed * 17 + 9;
+  const az = r() * 6.28, o = [Math.cos(az), 0, Math.sin(az)], ht = 7 + r() * 1.2, lean = 0.6 + r() * 0.7;
+  doumWood(v, [[0, -1, 0], [0, 1.1, 0]], 1.3, 0.82);
+  column2(v, [[0, 0, 0], add(mul(o, lean * 0.35), [0, ht * 0.5, 0]), add(mul(o, lean), [0, ht, 0])]);
+  rootSteps(v, 3, 1, "doum");
+  const tip = add(mul(o, lean), [0, ht, 0]);
+  leafBases(v, ht, 0.5, 0.78);
+  return crowns(v, [tip], r, 0.88, 2.5, () => 0);
+}
+// First fork (about 14 tall): the stem splits evenly in two, the doum's own trick, each arm with its own crown; the
+// first bunch of fruit on one crown (my pick), and the first sucker coming up at the foot.
+function doumFork(v, seed) {
+  const r = rng(seed * 8191 + 23);
+  NS = seed * 17 + 11;
+  const az = r() * 6.28, o = [Math.cos(az), 0, Math.sin(az)], ht = 6.4 + r() * 1.0, lean = 0.8 + r() * 0.8;
+  const p2 = add(mul(o, lean), [0, ht, 0]);
+  doumWood(v, [[0, -1, 0], [0, 1.2, 0]], 1.4, 0.84);
+  column2(v, [[0, 0, 0], add(mul(o, lean * 0.35), [0, ht * 0.5, 0]), p2]);
+  const tips = [];
+  for (const sgn of [1, -1]) {
+    const side = [Math.cos(az + sgn * Math.PI / 2), 0, Math.sin(az + sgn * Math.PI / 2)], rise = 3 + r() * 0.6, reach = 2.3 + r() * 0.4;
+    const q1 = add(p2, add(mul(side, reach * 0.7), add(mul(o, 0.3), [0, rise * 0.4, 0]))), q2 = add(q1, add(mul(side, reach * 0.3), [0, rise * 0.6, 0]));
+    doumWood(v, [p2, q1, q2], 0.92, 0.85);
+    tips.push(q2);
+  }
+  rootSteps(v, 4, 1, "doum");
+  leafBases(v, Math.max(...tips.map(t => t[1])), 0.4, 0.75);
+  const made = crowns(v, tips, r, 0.95, 3, i => i === 0 ? 1 : 0);
+  shifted(v, -Math.round(o[0] * 3), -Math.round(o[2] * 3), () => doumRosette(v, seed + 101, 0.42));  // the first sucker
+  return made;
+}
+// Clump (about 13 tall): three stems from the swollen clump, one of them forked, fruiting; new suckers keep coming up
+// round its edge, the way the clump spreads. The stems are the earlier shape A.
+function doumClump(v, seed) {
+  const made = doum(v, seed, "A"), r = rng(seed * 991 + 29), a0 = r() * 6.28;
+  let left = 2;
+  for (let i = 0; i < 12 && left; i++) {
+    const a = a0 + i * 0.52, x = Math.round(Math.cos(a) * 3.4), z = Math.round(Math.sin(a) * 3.4);
+    let free = true;
+    for (let dx = -1; dx <= 1; dx++) for (let dz = -1; dz <= 1; dz++) for (let y = 0; y <= 3; y++) if (v.get(x + dx, y, z + dz)) free = false;
+    if (!free) continue;
+    left--;
+    shifted(v, x, z, () => doumRosette(v, seed + 200 + i, 0.38 + r() * 0.1));
+  }
+  return made;
+}
+
+// ---- The ages ----
+const AGES = {
+  fig: [
+    ["seed", "Seedling", "About a year, a block tall: a soft pale stem, a few broad leaves set round it in a spiral, and the pointed bud at the tip wrapped in its stipule (every fig shoot has one). Fig seedlings come up on wet mud and silt left by a flood, or in a crack in another tree's bark."],
+    ["sapling", "Sapling", "A few years, about 8 tall: one stem a block thick, branching low into a few steep limbs, small pads of leaves. The bark is still smooth and pale, greener than the old bark, with small corky dashes (lenticels). No figs yet."],
+    ["young", "Young tree", "About 15 tall and 21 wide (a sycamore fig grows fast with water): the grown tree's plan of spoke limbs, smaller, the trunk three blocks thick and barely flared, few root steps, thinner pads. The bark is mottled only low on the trunk; above it is still smooth. The first few figs."],
+    ["mature", "Mature", "About 20 tall and 34 wide (the shape A from before): fluted trunk, the full spoke crown, mottled all over, figs in plenty on the limbs and the trunk."],
+    ["grown", "Grown giant", "About 27 tall and 46 wide (your pick, shape B): an old tree, the trunk buttressed and stepping out into roots, the widest crown."],
+  ],
+  doum: [
+    ["seed", "Seedling", "A year or two, under a block: the nut sends its shoot down into the ground first (a palm's way), so only the first leaves show, two narrow strap leaves and a first small fan, from a pale sheath at the soil."],
+    ["rosette", "Rosette", "Some 5 to 10 years, about 4 tall: a palm builds its base under the ground for years and shows no stem at all, only a tuft of full fan leaves straight out of the soil, the dead ones lying round it."],
+    ["stem", "Young stem", "About 11 tall with its crown: the stem rises at last, one column two blocks wide, swollen at the foot and clothed in old leaf bases all the way down. Not forked, no fruit."],
+    ["fork", "First fork", "About 14 tall: the stem splits evenly in two (the doum is one of the few palms that branch), a crown on each arm. The first bunch of fruit, and the first sucker coming up at the foot."],
+    ["clump", "Clump", "About 15 tall (the shape A from before): three stems from a swollen clump, one forked, fruiting, and new suckers coming up round the edge, the way the clump spreads."],
+    ["grown", "Grown clump", "About 17 tall (your pick, shape B): four stems, two forked, sometimes a fork's fork, crowns full of fruit."],
+  ],
+};
+// The line-up: how far each age spreads from its middle, and where its player stands (in front of the trunk).
+const LINE = { fig: { seed: [1.5, 0.8], sapling: [4, 1.5], young: [11, 3], mature: [18, 5], grown: [24, 6.5] },
+               doum: { seed: [1.5, 0.8], rosette: [3.5, 2.5], stem: [4, 2.5], fork: [5, 3], clump: [10, 4], grown: [12, 4.5] } };
+function makeTree(v, k, s, a) {
+  if (k === "fig") return a === "seed" ? figSeedling(v, s) : a === "sapling" ? figSapling(v, s) : a === "young" ? fig(v, s, "B", true)
+    : fig(v, s, a === "mature" ? "A" : picks.shape.fig);
+  return a === "seed" ? doumSeedling(v, s) : a === "rosette" ? doumRosette(v, s) : a === "stem" ? doumStem(v, s) : a === "fork" ? doumFork(v, s)
+    : a === "clump" ? doumClump(v, s) : doum(v, s, picks.shape.doum);
+}
+// One tree made on its own, then set down at x, z: so one tree's scans (leaf bases, fig spots) never see a neighbour.
+function plant(dst, k, s, a, x, z) {
+  const one = new Vox(), made = makeTree(one, k, s, a);
+  one.each((X, y, Z, b) => dst.put(X + x, y, Z + z, b));
+  for (const b of one.bits) dst.bits.push({ ...b, x: b.x + x, z: b.z + z });
+  return made;
+}
+// The riverbank: the water lies along -z; x runs along the river. [kind, x, z, seed offset, age]. Seedlings of both on
+// the wet silt near the water (where a flood leaves seed), young trees between the old ones (my picks).
+const BANK = [["fig", 18, 20, 0, "mature"], ["fig", -50, 34, 1, "grown"], ["fig", 36, -2, 5, "sapling"], ["fig", 27, -9, 6, "seed"], ["fig", -78, 14, 7, "young"],
+              ["doum", -24, -3, 0, "clump"], ["doum", -14, 5, 1, "grown"], ["doum", -31, 9, 2, "fork"], ["doum", 52, -4, 3, "grown"], ["doum", 61, 6, 4, "stem"],
+              ["doum", 44, 9, 8, "rosette"], ["doum", 69, -8, 9, "seed"], ["doum", -4, -9, 10, "seed"]];
 const WATER_Z = -15;
 function makeScene() {
-  const v = new Vox();
-  let made = { R: 0, fruit: [0, 0, 0] };
-  if (kind !== "bank") made = MAKERS[kind](v, seed, picks.shape[kind]);
-  else for (const [k, x, z, s, shape] of BANK) { v.ox = x; v.oz = z; MAKERS[k](v, seed * 31 + s, shape); }
-  v.ox = v.oz = 0;
+  const v = new Vox(), people = [];
+  let made = { R: 0, fruit: [0, 0, 0] }, line = null;
+  if (kind === "bank") { for (const [k, x, z, s, a] of BANK) plant(v, k, seed * 31 + s, a, x, z); people.push([-4, 6]); }
+  else if (age[kind] === "all") {
+    const L = LINE[kind], ages = AGES[kind].map(a => a[0]), gap = 3;
+    const W = ages.reduce((t, a) => t + 2 * L[a][0], 0) + gap * (ages.length - 1);
+    let x = -W / 2;
+    line = { W, at: [] };
+    for (const a of ages) {
+      x += L[a][0];
+      const cx = Math.round(x), m = plant(v, kind, seed, a, cx, 0);
+      line.at.push(cx);
+      people.push([cx + 1.4, L[a][1] + 1.2]);
+      if (a === "grown") made = { R: m.R, fruit: add(m.fruit, [cx, 0, 0]), from: m.from && add(m.from, [cx, 0, 0]) };
+      x += L[a][0] + gap;
+    }
+  } else { made = plant(v, kind, seed, age[kind], 0, 0); people.push([made.R + 3, 0]); }
   finishLeaves(v);
-  return { v, R: made.R, fruit: made.fruit, from: made.from };
+  return { v, R: made.R, fruit: made.fruit, from: made.from, line, people };
 }
 
 // ================= Drawing =================
@@ -638,8 +846,11 @@ function box(w, h, d, color, x, y, z) {
   const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), SHADE.map(s => new THREE.MeshBasicMaterial({ color: new THREE.Color(color).multiplyScalar(s) })));
   m.position.set(x, y, z); figures.add(m); return m;
 }
-function placeFigures(x, z) {
+function placeFigures(list) {
   figures.clear();
+  for (const [x, z] of list) figure(x, z);
+}
+function figure(x, z) {
   box(0.6, 0.75, 0.3, 0x3a4a9a, x, -0.5 + 0.375, z);
   box(0.6, 0.75, 0.3, 0x2f9c9c, x, -0.5 + 1.125, z);
   box(0.5, 0.5, 0.5, 0xc69c7a, x, -0.5 + 1.75, z);
@@ -701,6 +912,7 @@ function build(reframe) {
     for (const mesh of meshes) {
       ps.forEach((p, i) => { m4.makeTranslation(p[0], p[1], p[2]); mesh.setMatrixAt(i, m4); });
       mesh.instanceMatrix.needsUpdate = true;
+      mesh.frustumCulled = false;  // the instances lie all over; three.js would cull them all once the origin is off screen
       treeGroup.add(mesh);
     }
   }
@@ -715,17 +927,24 @@ function build(reframe) {
     mesh.frustumCulled = false;
     treeGroup.add(mesh);
   }
-  document.getElementById("count").textContent = kind === "bank" ? `${BANK.length} trees on about 130 x 60 blocks`
+  document.getElementById("count").textContent = kind === "bank" ? `${BANK.length} trees on about 160 x 60 blocks`
+    : made.line ? `${AGES[kind].length} ages, youngest on the left · tallest ${maxY + 1}`
     : `${count.toLocaleString()} blocks · ${sculpted.toLocaleString()} sculpted boxes · ${maxY + 1} tall · ${Math.round(maxR * 2)} wide`;
-  bounds = { h: maxY + 1, r: Math.max(2, maxR), R: made.R, fruit: made.fruit, from: made.from };
-  if (kind === "bank") placeFigures(-4, 6); else placeFigures(made.R + 3, 0);
+  bounds = { h: maxY + 1, r: Math.max(2, maxR), R: made.R, fruit: made.fruit, from: made.from, line: made.line };
+  placeFigures(made.people);
   if (reframe) view("over");
   draw();
 }
 
 function view(which) {
-  const { h, r, R, fruit, from } = bounds;
-  if (kind === "bank") {
+  const { h, r, R, fruit, from, line } = bounds;
+  if (line && which !== "fruit") {
+    if (which === "over") { controls.target.set(0, h * 0.4, 0); camera.position.set(-line.W * 0.08, h * 0.5 + 3, line.W * 0.72 + 8); }
+    else {  // the young ones up close, with their players
+      const x = (line.at[0] + line.at[2]) / 2;
+      controls.target.set(x, 2.2, 0); camera.position.set(x - 3, 3.5, 17);
+    }
+  } else if (kind === "bank") {
     if (which === "over") { controls.target.set(4, 5, 8); camera.position.set(-36, 52, 128); }
     else if (which === "fruit") { controls.target.set(-24, 8, -3); camera.position.set(-15, 6, 9); }
     else { controls.target.set(-24, 7, -3); camera.position.set(-4.5, 1.1, 8); }
@@ -765,11 +984,11 @@ new ResizeObserver(resize).observe(canvas);
 
 // ================= The panel =================
 const FLAT = {
-  fig: [["bark_fig:0", "bark"], ["bark_fig:3", "bark, again"], ["bark_fig:1", "patch"], ["bark_fig:2", "pale patch"],
+  fig: [["bark_fig:4", "young bark"], ["bark_fig:0", "bark"], ["bark_fig:3", "bark, again"], ["bark_fig:1", "patch"], ["bark_fig:2", "pale patch"],
         ["leaves_fig_0", "leaves, lit"], ["leaves_fig_1", "leaves"], ["leaves_fig_2", "leaves, shaded"], ["sprig_fig", "hanging spray"]],
   doum: [["bark_doum", "trunk"]],
 };
-FLAT.bank = [].concat(FLAT.fig.slice(0, 4), FLAT.fig.slice(4, 7), FLAT.doum, [["grass", "floodplain grass"], ["silt", "silt"], ["water", "river water"]]);
+FLAT.bank = [].concat(FLAT.fig.slice(0, 5), FLAT.fig.slice(5, 8), FLAT.doum, [["grass", "floodplain grass"], ["silt", "silt"], ["water", "river water"]]);
 function flat() {
   const el = document.getElementById("flat");
   el.innerHTML = "";
@@ -794,11 +1013,14 @@ function sync() {
   document.querySelectorAll("#kinds .choice").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.id === kind)));
   const one = kind !== "bank";
   document.getElementById("looks").hidden = !one;
+  document.getElementById("barks").hidden = !one;
   if (one) {
     const ab = [["A", "A"], ["B", "B"]];
-    buttons(document.getElementById("pick-shape"), ab, x => picks.shape[kind] === x, x => { picks.shape[kind] = x; save(); refresh(true); });
+    buttons(document.getElementById("pick-age"), [["all", "Every age"]].concat(AGES[kind].map(a => [a[0], a[1]])), x => age[kind] === x, x => { age[kind] = x; refresh(true); });
+    const a = AGES[kind].find(e => e[0] === age[kind]);
+    document.getElementById("age-note").textContent = a ? a[2] : "Every age side by side, youngest on the left, a player and a Matabele major in front of each. Years and sizes are my picks.";
     buttons(document.getElementById("pick-bark"), ab, x => picks.bark[kind] === x, x => { picks.bark[kind] = x; save(); refresh(false); });
-    document.getElementById("shape-note").innerHTML = `Shape A: ${SHAPES[kind].A}<br>Shape B: ${SHAPES[kind].B}<br>Bark: ${BARKS[kind].A} ${BARKS[kind].B}<br>Both shapes could be in the game together, as young and old trees.`;
+    document.getElementById("shape-note").innerHTML = `${BARKS[kind].A}<br>${BARKS[kind].B}` + (kind === "fig" ? "<br>The young bark (smooth, pale, small corky dashes) is the same in both." : "");
   }
   document.getElementById("real").textContent = REAL[kind];
   document.getElementById("sculpt").textContent = SCULPT[kind];
@@ -822,8 +1044,9 @@ document.getElementById("v-over").addEventListener("click", () => view("over"));
 document.getElementById("v-player").addEventListener("click", () => view("player"));
 document.getElementById("v-fruit").addEventListener("click", () => view("fruit"));
 document.getElementById("v-seed").addEventListener("click", () => { seed++; refresh(true); });
-// For checking the page: show(kind, view, seed, shape) from the console, or #fig,player in the address.
-window.show = (k, which, s, shape) => { kind = k; if (s) seed = s; if (shape && k !== "bank") picks.shape[k] = shape; refresh(true); if (which) view(which); };
+// For checking the page: show(kind, view, seed, age) from the console (age "all" or an id from AGES), or #fig,player in
+// the address.
+window.show = (k, which, s, a) => { kind = k; if (s) seed = s; if (a && k !== "bank") age[k] = a; refresh(true); if (which) view(which); };
 const start = location.hash.slice(1).split(",");
 if (KINDS.some(k => k.id === start[0])) kind = start[0];
 refresh(true);

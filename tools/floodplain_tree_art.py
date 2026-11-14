@@ -50,6 +50,28 @@ def fig_bark(look, tile):
     return speckle(img, rng, 0.04)
 
 
+FIG_YOUNG = {  # look -> the smooth young bark, its lenticels (the corky breathing pores), a faint light streak
+    "A": ((186, 180, 136), (124, 114, 84), (206, 200, 160)),
+    "B": ((176, 172, 112), (120, 114, 72), (198, 194, 140)),
+}
+
+
+def fig_young_bark(look):
+    """Tile 4, the young bark (2026-11-13, for the ages): a young sycamore fig's bark is smooth and pale, greener than
+    the old bark, with small corky lenticels in short level dashes; the papery flakes and the patches come only with
+    age, low on the trunk first. Same colour family as the look's base bark so the two meet without a seam."""
+    rng = random.Random(f"figyoung{look}")
+    base, pore, light = FIG_YOUNG[look]
+    n = noise(f"figy{look}", 4)
+    img = [[mix(base, light, n(x, y) * 0.35) for x in range(S)] for y in range(S)]
+    for _ in range(9):  # lenticels: a dash two or three pixels long, darker, a lit pixel above it
+        x, y, w = rng.randrange(S), rng.randrange(S), rng.randint(2, 3)
+        for i in range(w):
+            img[y][(x + i) % S] = mix(img[y][(x + i) % S], pore, 0.55)
+            img[(y - 1) % S][(x + i) % S] = mix(img[(y - 1) % S][(x + i) % S], light, 0.3)
+    return speckle(img, rng, 0.03)
+
+
 FIG_LEAF = [(146, 160, 60), (104, 132, 52), (66, 98, 44)]  # sunlit, plain, shaded
 
 
@@ -135,6 +157,7 @@ def all_textures():
     for look in ("A", "B"):
         for tile in range(4):
             out[f"bark_fig_{look}_{tile}"] = fig_bark(look, tile)
+        out[f"bark_fig_{look}_4"] = fig_young_bark(look)
         out[f"bark_doum_{look}"] = doum_bark(look)
     for tone in range(3):
         out[f"leaves_fig_{tone}"] = fig_leaves(tone)
