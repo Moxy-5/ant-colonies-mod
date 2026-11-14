@@ -216,17 +216,25 @@ public class RiverLifeTests {
         for (var key : java.util.List.of(net.minecraft.world.level.biome.Biomes.SAVANNA,
                 net.minecraft.resources.ResourceKey.create(net.minecraft.core.registries.Registries.BIOME,
                         net.minecraft.resources.ResourceLocation.fromNamespaceAndPath(SavannaMod.MODID, "savanna_river")))) {
-            boolean listed = biomes.getOrThrow(key).getMobSettings().getMobs(net.minecraft.world.entity.MobCategory.WATER_AMBIENT)
+            boolean listed = biomes.getOrThrow(key).getMobSettings().getMobs(com.antcolonies.savanna.registry.SavannaMobCategories.riverFish())
                     .unwrap().stream().anyMatch(d -> d.type == SavannaEntities.TILAPIA.get());
             if (!listed) {
                 helper.fail("no tilapia in the spawn list of " + key.location());
             }
         }
-        // a wild fish stays in its river (never removed far from players) but still counts toward the water mobs' cap
+        // river fish have their own spawning group and cap, apart from Minecraft's fish; a wild fish stays near a
+        // player, goes when left far behind, and counts toward its group's cap
+        var group = SavannaEntities.TILAPIA.get().getCategory();
+        if (group != com.antcolonies.savanna.registry.SavannaMobCategories.riverFish()
+                || group.getMaxInstancesPerChunk() <= net.minecraft.world.entity.MobCategory.WATER_AMBIENT.getMaxInstancesPerChunk()
+                || group.isPersistent()) {
+            helper.fail("tilapia are not in the river fish group with its own bigger cap: " + group.getName());
+        }
         TilapiaEntity wild = new TilapiaEntity(SavannaEntities.TILAPIA.get(), level);
         wild.setUp(false, level.random);
-        if (wild.removeWhenFarAway(200.0 * 200.0) || wild.isPersistenceRequired() || wild.requiresCustomPersistence()) {
-            helper.fail("a wild tilapia is removed far away, or no longer counts toward the cap");
+        if (wild.removeWhenFarAway(64.0 * 64.0) || !wild.removeWhenFarAway(200.0 * 200.0)
+                || wild.isPersistenceRequired() || wild.requiresCustomPersistence()) {
+            helper.fail("a wild tilapia is removed near a player, kept far away, or no longer counts toward the cap");
         }
         // hungry grown fish in the deep end; a young one about to grow up
         TilapiaEntity[] school = new TilapiaEntity[4];

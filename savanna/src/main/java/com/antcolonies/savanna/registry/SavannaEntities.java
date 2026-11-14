@@ -112,7 +112,7 @@ public class SavannaEntities {
     // grown fish's; young and big fish are scaled through their SCALE attribute.
     public static final DeferredHolder<EntityType<?>, EntityType<com.antcolonies.savanna.animal.TilapiaEntity>> TILAPIA =
             ENTITY_TYPES.register("tilapia", () -> EntityType.Builder
-                    .of(com.antcolonies.savanna.animal.TilapiaEntity::new, MobCategory.WATER_AMBIENT)
+                    .of(com.antcolonies.savanna.animal.TilapiaEntity::new, SavannaMobCategories.riverFish())
                     .sized(0.6F, 0.4F)
                     .eyeHeight(0.2F)
                     .clientTrackingRange(4)

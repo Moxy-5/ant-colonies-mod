@@ -466,6 +466,8 @@ A Minecraft mod where ants and termites live as real colonies: they dig, build, 
 - **The tilapia bigger and drawn farther, 2026-11-14** (on `master`, the user's report that none spawned): spawning was wired (now checked in the test); the 0.35-block fish were only drawn within about 20 blocks; now 0.6 blocks grown, drawn out to 64; `river` 2 of 2 on 6 servers; not tried in-game yet.
 - **The tilapia's size confirmed in-game by the user 2026-11-14 ("they look perfect at that size"); fix the same day: tilapia stay in their river** (they barely spawned: Minecraft removes fish past 32 to 64 blocks while spawning them 24 to 128 out; now they stay like cows, the cap of 20 near a player still holds); `river` 2 of 2 on 6 servers; not tried in-game yet.
 
+- **River fish get their own spawning group, BUILT 2026-11-14** (on `master`, the user's ask for a river "alive with fish"): tilapia were in Minecraft's water fish group, 20 round a player, kept for ever so the cap stayed full; now `antcolonies:river_fish` (`registry/SavannaMobCategories`, enum extension), cap 60 (my pick), fish kept within 96 blocks of a player and gone past 128 so the river ahead refills; Minecraft's fish unchanged; `river` 2 of 2 on 6 servers; not tried in-game yet.
+
 ## Other notes files (read only when the task needs them)
 - `docs/DESIGN.md`: every design decision for the species and shared systems (read the section for a feature before working on it).
 - `docs/HISTORY.md`: the full change log of every feature (class names, numbers, tests, the user's confirmations) and the old handover notes for a code reviewer. Older bullets name methods as `Colony.something`: since the code review split they live in the colony's parts (`Nest`, `FoodStore`, `Brood`, ...).
