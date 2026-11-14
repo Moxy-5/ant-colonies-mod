@@ -1,0 +1,77 @@
+{
+  "textures": {
+    "particle": "antcolonies:block/fig_wood_bare",
+    "side": "antcolonies:block/fig_wood_bare",
+    "end": "antcolonies:block/fig_log_top_dead"
+  },
+  "elements": [
+    {
+      "from": [
+        3.0,
+        3.0,
+        3.0
+      ],
+      "to": [
+        13.0,
+        13.0,
+        13.0
+      ],
+      "faces": {
+        "north": {
+          "texture": "#side",
+          "uv": [
+            3.0,
+            3.0,
+            13.0,
+            13.0
+          ]
+        },
+        "south": {
+          "texture": "#side",
+          "uv": [
+            3.0,
+            3.0,
+            13.0,
+            13.0
+          ]
+        },
+        "east": {
+          "texture": "#side",
+          "uv": [
+            3.0,
+            3.0,
+            13.0,
+            13.0
+          ]
+        },
+        "west": {
+          "texture": "#side",
+          "uv": [
+            3.0,
+            3.0,
+            13.0,
+            13.0
+          ]
+        },
+        "up": {
+          "texture": "#side",
+          "uv": [
+            3.0,
+            3.0,
+            13.0,
+            13.0
+          ]
+        },
+        "down": {
+          "texture": "#side",
+          "uv": [
+            3.0,
+            3.0,
+            13.0,
+            13.0
+          ]
+        }
+      }
+    }
+  ]
+}

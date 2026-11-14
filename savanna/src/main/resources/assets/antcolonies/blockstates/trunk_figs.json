@@ -1,0 +1,57 @@
+{
+  "variants": {
+    "facing=north": [
+      {
+        "model": "antcolonies:block/trunk_figs_0"
+      },
+      {
+        "model": "antcolonies:block/trunk_figs_1"
+      },
+      {
+        "model": "antcolonies:block/trunk_figs_2"
+      }
+    ],
+    "facing=east": [
+      {
+        "model": "antcolonies:block/trunk_figs_0",
+        "y": 90
+      },
+      {
+        "model": "antcolonies:block/trunk_figs_1",
+        "y": 90
+      },
+      {
+        "model": "antcolonies:block/trunk_figs_2",
+        "y": 90
+      }
+    ],
+    "facing=south": [
+      {
+        "model": "antcolonies:block/trunk_figs_0",
+        "y": 180
+      },
+      {
+        "model": "antcolonies:block/trunk_figs_1",
+        "y": 180
+      },
+      {
+        "model": "antcolonies:block/trunk_figs_2",
+        "y": 180
+      }
+    ],
+    "facing=west": [
+      {
+        "model": "antcolonies:block/trunk_figs_0",
+        "y": 270
+      },
+      {
+        "model": "antcolonies:block/trunk_figs_1",
+        "y": 270
+      },
+      {
+        "model": "antcolonies:block/trunk_figs_2",
+        "y": 270
+      }
+    ]
+  }
+}

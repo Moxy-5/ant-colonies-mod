@@ -122,5 +122,14 @@
   "block.antcolonies.baobab_hanging_sign": "Baobab Hanging Sign",
   "block.antcolonies.baobab_wall_hanging_sign": "Baobab Wall Hanging Sign",
   "item.antcolonies.baobab_boat": "Baobab Boat",
-  "item.antcolonies.baobab_chest_boat": "Baobab Boat with Chest"
+  "item.antcolonies.baobab_chest_boat": "Baobab Boat with Chest",
+  "block.antcolonies.fig_log": "Sycamore Fig Log",
+  "block.antcolonies.fig_wood": "Sycamore Fig Wood",
+  "block.antcolonies.fig_branch": "Sycamore Fig Branch",
+  "block.antcolonies.fig_root": "Sycamore Fig Root",
+  "block.antcolonies.fig_leaves": "Sycamore Fig Leaves",
+  "block.antcolonies.fig_leaf_spray": "Sycamore Fig Leaf Spray",
+  "block.antcolonies.fig_seedling": "Sycamore Fig Seedling",
+  "block.antcolonies.fig_bunch": "Fig Bunch",
+  "block.antcolonies.trunk_figs": "Trunk Figs"
 }

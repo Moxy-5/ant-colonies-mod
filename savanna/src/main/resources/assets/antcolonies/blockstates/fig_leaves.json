@@ -1,0 +1,13 @@
+{
+  "variants": {
+    "tone=0": {
+      "model": "antcolonies:block/fig_leaves_lit"
+    },
+    "tone=1": {
+      "model": "antcolonies:block/fig_leaves"
+    },
+    "tone=2": {
+      "model": "antcolonies:block/fig_leaves_shaded"
+    }
+  }
+}

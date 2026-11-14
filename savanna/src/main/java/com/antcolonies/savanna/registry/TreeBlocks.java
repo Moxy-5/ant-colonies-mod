@@ -7,6 +7,11 @@ import com.antcolonies.savanna.SavannaMod;
 import com.antcolonies.savanna.block.BleachedBranchBlock;
 import com.antcolonies.savanna.block.BracketFungusBlock;
 import com.antcolonies.savanna.block.DeadTreeWoodBlock;
+import com.antcolonies.savanna.block.FigBranchBlock;
+import com.antcolonies.savanna.block.FigLeavesBlock;
+import com.antcolonies.savanna.block.FigRootBlock;
+import com.antcolonies.savanna.block.FigWoodBlock;
+import com.antcolonies.savanna.block.TrunkFigsBlock;
 import com.antcolonies.savanna.block.FrassBlock;
 import com.antcolonies.savanna.block.PulpHeapBlock;
 import com.antcolonies.savanna.block.HangingPodsBlock;
@@ -172,6 +177,44 @@ public final class TreeBlocks {
     public static final DeferredBlock<SoftDeadWoodBlock> BAOBAB_FIBRE = add(SavannaBlocks.BLOCKS.registerBlock("baobab_fibre", SoftDeadWoodBlock::new,
             BlockBehaviour.Properties.of().mapColor(MapColor.TERRACOTTA_BROWN).strength(0.4F).sound(SoundType.WET_GRASS)));
 
+    /*
+     * The sycamore fig (floodplain trees step 3, 2026-11-13, docs/plans/floodplain-trees.md; shape B and bark A, the
+     * user's picks in the model viewer; textures from tools/floodplain_tree_art.py). Its own blocks, not a Kind: the
+     * dry trees' systems that walk KINDS (the tree book, fire, rot, new land) stay as they are until the fig's own steps.
+     * Soft, light wood (my pick: a little softer than the umbrella thorn's).
+     */
+    /** The fig's log, turned by how it was placed; its bark one of {@link com.antcolonies.savanna.block.FigBark}. */
+    public static final DeferredBlock<FigWoodBlock> FIG_LOG = add(SavannaBlocks.BLOCKS.registerBlock("fig_log", FigWoodBlock::new,
+            wood(MapColor.SAND, 1.5F)));
+    /** The fig's wood, bark all round: what a grown fig's fluted trunk and thick limbs are built of. */
+    public static final DeferredBlock<FigWoodBlock> FIG_WOOD = add(SavannaBlocks.BLOCKS.registerBlock("fig_wood", FigWoodBlock::new,
+            wood(MapColor.SAND, 1.5F)));
+    /** The fig's thinner limbs, tapering through six thicknesses. */
+    public static final DeferredBlock<FigBranchBlock> FIG_BRANCH = add(SavannaBlocks.BLOCKS.registerBlock("fig_branch", FigBranchBlock::new,
+            branchProperties(MapColor.SAND, 0.75F)));
+    /** The root steps at the foot of the buttresses. */
+    public static final DeferredBlock<FigRootBlock> FIG_ROOT = add(SavannaBlocks.BLOCKS.registerBlock("fig_root", FigRootBlock::new,
+            wood(MapColor.SAND, 1.5F)));
+    /** The fig's leaves, in three tones. */
+    public static final DeferredBlock<FigLeavesBlock> FIG_LEAVES = add(SavannaBlocks.BLOCKS.registerBlock("fig_leaves", FigLeavesBlock::new,
+            leaves(MapColor.PLANT)));
+    /** A spray of leaves hanging under a leaf pad. */
+    public static final DeferredBlock<HangingPodsBlock> FIG_LEAF_SPRAY = add(SavannaBlocks.BLOCKS.registerBlock("fig_leaf_spray", HangingPodsBlock::new,
+            BlockBehaviour.Properties.of().mapColor(MapColor.PLANT).strength(0.1F).sound(SoundType.AZALEA_LEAVES).noCollission()
+                    .noOcclusion().replaceable().ignitedByLava().pushReaction(PushReaction.DESTROY)));
+    /** A bunch of figs hanging under a limb (looks only until step 4b). */
+    public static final DeferredBlock<HangingPodsBlock> FIG_BUNCH = add(SavannaBlocks.BLOCKS.registerBlock("fig_bunch", HangingPodsBlock::new,
+            BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_RED).strength(0.2F).sound(SoundType.AZALEA_LEAVES)
+                    .noCollission().noOcclusion().ignitedByLava().pushReaction(PushReaction.DESTROY)));
+    /** Figs growing straight on the trunk's bark (looks only until step 4b). */
+    public static final DeferredBlock<TrunkFigsBlock> TRUNK_FIGS = add(SavannaBlocks.BLOCKS.registerBlock("trunk_figs", TrunkFigsBlock::new,
+            BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_RED).strength(0.2F).sound(SoundType.AZALEA_LEAVES)
+                    .noCollission().noOcclusion().ignitedByLava().pushReaction(PushReaction.DESTROY)));
+    /** A fig seedling (a player's does not grow yet: growing in play is step 8). */
+    public static final DeferredBlock<TreeSeedlingBlock> FIG_SEEDLING = add(SavannaBlocks.BLOCKS.registerBlock("fig_seedling", TreeSeedlingBlock::new,
+            BlockBehaviour.Properties.of().mapColor(MapColor.PLANT).noCollission().instabreak().sound(SoundType.GRASS)
+                    .pushReaction(PushReaction.DESTROY)));
+
     private TreeBlocks() {
     }
 
@@ -306,5 +349,13 @@ public final class TreeBlocks {
         fire.setFlammable(FRASS.get(), 60, 100);
         fire.setFlammable(PULP_HEAP.get(), 30, 60);
         fire.setFlammable(BAOBAB_FIBRE.get(), 5, 5);
+        // The fig burns like Minecraft's own trees until its life in play (step 8) gives it its own fire rules.
+        for (DeferredBlock<? extends Block> wood : List.of(FIG_LOG, FIG_WOOD, FIG_BRANCH, FIG_ROOT)) {
+            fire.setFlammable(wood.get(), 5, 5);
+        }
+        fire.setFlammable(FIG_LEAVES.get(), 30, 60);
+        fire.setFlammable(FIG_LEAF_SPRAY.get(), 60, 100);
+        fire.setFlammable(FIG_BUNCH.get(), 30, 60);
+        fire.setFlammable(TRUNK_FIGS.get(), 30, 60);
     }
 }

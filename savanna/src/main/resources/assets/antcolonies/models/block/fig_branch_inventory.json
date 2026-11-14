@@ -1,0 +1,78 @@
+{
+  "parent": "minecraft:block/block",
+  "textures": {
+    "particle": "antcolonies:block/fig_bark",
+    "side": "antcolonies:block/fig_bark",
+    "end": "antcolonies:block/fig_log_top"
+  },
+  "elements": [
+    {
+      "from": [
+        1,
+        1,
+        0
+      ],
+      "to": [
+        15,
+        15,
+        16
+      ],
+      "faces": {
+        "north": {
+          "texture": "#end",
+          "uv": [
+            1,
+            1,
+            15,
+            15
+          ]
+        },
+        "south": {
+          "texture": "#end",
+          "uv": [
+            1,
+            1,
+            15,
+            15
+          ]
+        },
+        "east": {
+          "texture": "#side",
+          "uv": [
+            0,
+            1,
+            16,
+            15
+          ]
+        },
+        "west": {
+          "texture": "#side",
+          "uv": [
+            0,
+            1,
+            16,
+            15
+          ]
+        },
+        "up": {
+          "texture": "#side",
+          "uv": [
+            1,
+            0,
+            15,
+            16
+          ]
+        },
+        "down": {
+          "texture": "#side",
+          "uv": [
+            1,
+            0,
+            15,
+            16
+          ]
+        }
+      }
+    }
+  ]
+}

@@ -37,6 +37,10 @@
     "antcolonies:baobab_door",
     "antcolonies:baobab_trapdoor",
     "antcolonies:baobab_pressure_plate",
-    "antcolonies:baobab_button"
+    "antcolonies:baobab_button",
+    "antcolonies:fig_log",
+    "antcolonies:fig_wood",
+    "antcolonies:fig_branch",
+    "antcolonies:fig_root"
   ]
 }

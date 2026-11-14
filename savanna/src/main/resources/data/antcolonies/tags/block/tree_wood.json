@@ -24,6 +24,10 @@
     "antcolonies:bleached_wood_spores",
     "antcolonies:bleached_wood_wound",
     "antcolonies:charred_wood_spores",
-    "antcolonies:charred_wood_wound"
+    "antcolonies:charred_wood_wound",
+    "antcolonies:fig_log",
+    "antcolonies:fig_wood",
+    "antcolonies:fig_branch",
+    "antcolonies:fig_root"
   ]
 }

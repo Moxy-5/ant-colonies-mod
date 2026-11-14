@@ -1,0 +1,15 @@
+{
+  "variants": {
+    "": [
+      {
+        "model": "antcolonies:block/fig_bunch_0"
+      },
+      {
+        "model": "antcolonies:block/fig_bunch_1"
+      },
+      {
+        "model": "antcolonies:block/fig_bunch_2"
+      }
+    ]
+  }
+}

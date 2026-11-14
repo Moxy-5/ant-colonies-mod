@@ -71,6 +71,12 @@ public class TreeTests {
             if (block == TreeBlocks.BRACKET_FUNGUS) {
                 helper.setBlock(pos.south(), TreeBlocks.UMBRELLA_THORN.log().get()); // a bracket grows out of the bark behind it
             }
+            if (block == TreeBlocks.FIG_BUNCH || block == TreeBlocks.FIG_LEAF_SPRAY) {
+                helper.setBlock(pos.above(), TreeBlocks.FIG_LEAVES.get()); // they hang under a leaf pad
+            }
+            if (block == TreeBlocks.TRUNK_FIGS) {
+                helper.setBlock(pos.south(), TreeBlocks.FIG_WOOD.get()); // figs grow on the bark behind them (facing north)
+            }
             helper.setBlock(pos, state);
             x += 2;
         }
@@ -102,6 +108,84 @@ public class TreeTests {
             check(helper, b, Direction.WEST, true, "the second branch joins the first");
             check(helper, b, Direction.NORTH, true, "the second branch joins the leaves");
             check(helper, b, Direction.EAST, false, "a branch does not join the air");
+        });
+    }
+
+    /**
+     * The sycamore fig's blocks (floodplain trees step 3, 2026-11-13): a fig branch joins fig wood, other branches and
+     * fig leaves; branches a player builds out from a trunk taper (the first the thickest, one thickness thinner every 2
+     * placed on); fig bunches and leaf sprays drop when the leaves above them go, trunk figs when the bark behind them goes
+     * and cannot be set where no fig wood is behind; the root steps are 8 and 5 pixels high; the leaves never decay.
+     */
+    @GameTest(template = "arena", timeoutTicks = 100)
+    public static void figBlocksPlaceJoinAndHang(GameTestHelper helper) {
+        int y = SURFACE + 1;
+        net.minecraft.world.entity.player.Player player = helper.makeMockPlayer(net.minecraft.world.level.GameType.CREATIVE);
+        net.minecraft.world.item.ItemStack branches = new net.minecraft.world.item.ItemStack(TreeBlocks.FIG_BRANCH.get(), 64); // a test player still uses up what it places
+        player.setItemInHand(net.minecraft.world.InteractionHand.MAIN_HAND, branches);
+        BlockPos trunk = new BlockPos(10, y, 10);
+        helper.setBlock(trunk, TreeBlocks.FIG_WOOD.get());
+        BlockPos[] limb = new BlockPos[5];
+        BlockPos against = trunk;
+        for (int i = 0; i < limb.length; i++) {
+            helper.placeAt(player, branches, against, Direction.EAST); // built out east, each against the last
+            limb[i] = against.east();
+            against = limb[i];
+        }
+        int[] wantedStep = {0, 1, 2, 3, 4};
+        int[] wantedWidth = {14, 14, 12, 12, 10};
+        for (int i = 0; i < limb.length; i++) {
+            BlockState state = helper.getBlockState(limb[i]);
+            if (!state.is(TreeBlocks.FIG_BRANCH.get())) {
+                helper.fail("no fig branch placed at " + limb[i]);
+                return;
+            }
+            int step = state.getValue(com.antcolonies.savanna.block.FigBranchBlock.STEP);
+            int width = com.antcolonies.savanna.block.FigBranchBlock.width(step / 2);
+            if (step != wantedStep[i] || width != wantedWidth[i]) {
+                helper.fail("placed fig branch " + (i + 1) + " is step " + step + " (" + width + " pixels), not step "
+                        + wantedStep[i] + " (" + wantedWidth[i] + ")");
+            }
+        }
+        helper.setBlock(limb[1].north(), TreeBlocks.FIG_LEAVES.get());
+        BlockState first = joined(helper, limb[0]);
+        BlockState second = joined(helper, limb[1]);
+        check(helper, first, Direction.WEST, true, "the first fig branch joins the fig wood");
+        check(helper, first, Direction.EAST, true, "the first fig branch joins the second");
+        check(helper, first, Direction.DOWN, false, "a fig branch does not join the air under it");
+        check(helper, second, Direction.NORTH, true, "a fig branch joins the fig leaves");
+        if (TreeBlocks.FIG_LEAVES.get().defaultBlockState().isRandomlyTicking()) {
+            helper.fail("fig leaves tick (they would decay)");
+        }
+        // Hanging things: under leaves, on the bark.
+        BlockPos bunch = new BlockPos(20, y, 10), spray = new BlockPos(22, y, 10), figs = new BlockPos(24, y, 10);
+        helper.setBlock(bunch.above(), TreeBlocks.FIG_LEAVES.get());
+        helper.setBlock(bunch, TreeBlocks.FIG_BUNCH.get());
+        helper.setBlock(spray.above(), TreeBlocks.FIG_LEAVES.get());
+        helper.setBlock(spray, TreeBlocks.FIG_LEAF_SPRAY.get());
+        helper.setBlock(figs.south(), TreeBlocks.FIG_LOG.get());
+        helper.setBlock(figs, TreeBlocks.TRUNK_FIGS.get());
+        BlockPos lonely = new BlockPos(26, y, 10);
+        if (TreeBlocks.TRUNK_FIGS.get().defaultBlockState().canSurvive(helper.getLevel(), helper.absolutePos(lonely))) {
+            helper.fail("trunk figs could stand with no fig wood behind them");
+        }
+        helper.assertBlockPresent(TreeBlocks.FIG_BUNCH.get(), bunch);
+        helper.assertBlockPresent(TreeBlocks.TRUNK_FIGS.get(), figs);
+        helper.setBlock(bunch.above(), Blocks.AIR);
+        helper.setBlock(spray.above(), Blocks.AIR);
+        helper.setBlock(figs.south(), Blocks.AIR);
+        // Root steps.
+        var root = TreeBlocks.FIG_ROOT.get().defaultBlockState();
+        var level = helper.getLevel();
+        double high = root.getShape(level, helper.absolutePos(trunk)).max(Direction.Axis.Y);
+        double low = root.setValue(com.antcolonies.savanna.block.FigRootBlock.LOW, true).getShape(level, helper.absolutePos(trunk)).max(Direction.Axis.Y);
+        if (Math.abs(high - 0.5) > 1e-6 || Math.abs(low - 5 / 16.0) > 1e-6) {
+            helper.fail("fig root steps are " + high + " and " + low + " high, not 8 and 5 pixels");
+        }
+        helper.succeedWhen(() -> {
+            helper.assertBlockNotPresent(TreeBlocks.FIG_BUNCH.get(), bunch);
+            helper.assertBlockNotPresent(TreeBlocks.FIG_LEAF_SPRAY.get(), spray);
+            helper.assertBlockNotPresent(TreeBlocks.TRUNK_FIGS.get(), figs);
         });
     }
 

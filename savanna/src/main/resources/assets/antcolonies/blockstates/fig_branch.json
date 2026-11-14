@@ -1,0 +1,2668 @@
+{
+  "multipart": [
+    {
+      "when": {
+        "step": "0|1",
+        "bark": "mottled"
+      },
+      "apply": {
+        "model": "antcolonies:block/fig_branch_mottled_core_0"
+      }
+    },
+    {
+      "when": {
+        "north": "true",
+        "step": "0|1",
+        "bark": "mottled"
+      },
+      "apply": {
+        "model": "antcolonies:block/fig_branch_mottled_arm_0"
+      }
+    },
+    {
+      "when": {
+        "east": "true",
+        "step": "0|1",
+        "bark": "mottled"
+      },
+      "apply": {
+        "model": "antcolonies:block/fig_branch_mottled_arm_0",
+        "y": 90
+      }
+    },
+    {
+      "when": {
+        "south": "true",
+        "step": "0|1",
+        "bark": "mottled"
+      },
+      "apply": {
+        "model": "antcolonies:block/fig_branch_mottled_arm_0",
+        "y": 180
+      }
+    },
+    {
+      "when": {
+        "west": "true",
+        "step": "0|1",
+        "bark": "mottled"
+      },
+      "apply": {
+        "model": "antcolonies:block/fig_branch_mottled_arm_0",
+        "y": 270
+      }
+    },
+    {
+      "when": {
+        "up": "true",
+        "step": "0|1",
+        "bark": "mottled"
+      },
+      "apply": {
+        "model": "antcolonies:block/fig_branch_mottled_arm_0",
+        "x": 270
+      }
+    },
+    {
+      "when": {
+        "down": "true",
+        "step": "0|1",
+        "bark": "mottled"
+      },
+      "apply": {
+        "model": "antcolonies:block/fig_branch_mottled_arm_0",
+        "x": 90
+      }
+    },
+    {
+      "when": {
+        "step": "2|3",
+        "bark": "mottled"
+      },
+      "apply": {
+        "model": "antcolonies:block/fig_branch_mottled_core_1"
+      }
+    },
+    {
+      "when": {
+        "north": "true",
+        "step": "2|3",
+        "bark": "mottled"
+      },
+      "apply": {
+        "model": "antcolonies:block/fig_branch_mottled_arm_1"
+      }
+    },
+    {
+      "when": {
+        "east": "true",
+        "step": "2|3",
+        "bark": "mottled"
+      },
+      "apply": {
+        "model": "antcolonies:block/fig_branch_mottled_arm_1",
+        "y": 90
+      }
+    },
+    {
+      "when": {
+        "south": "true",
+        "step": "2|3",
+        "bark": "mottled"
+      },
+      "apply": {
+        "model": "antcolonies:block/fig_branch_mottled_arm_1",
+        "y": 180
+      }
+    },
+    {
+      "when": {
+        "west": "true",
+        "step": "2|3",
+        "bark": "mottled"
+      },
+      "apply": {
+        "model": "antcolonies:block/fig_branch_mottled_arm_1",
+        "y": 270
+      }
+    },
+    {
+      "when": {
+        "up": "true",
+        "step": "2|3",
+        "bark": "mottled"
+      },
+      "apply": {
+        "model": "antcolonies:block/fig_branch_mottled_arm_1",
+        "x": 270
+      }
+    },
+    {
+      "when": {
+        "down": "true",
+        "step": "2|3",
+        "bark": "mottled"
+      },
+      "apply": {
+        "model": "antcolonies:block/fig_branch_mottled_arm_1",
+        "x": 90
+      }
+    },
+    {
+      "when": {
+        "step": "4|5",
+        "bark": "mottled"
+      },
+      "apply": {
+        "model": "antcolonies:block/fig_branch_mottled_core_2"
+      }
+    },
+    {
+      "when": {
+        "north": "true",
+        "step": "4|5",
+        "bark": "mottled"
+      },
+      "apply": {
+        "model": "antcolonies:block/fig_branch_mottled_arm_2"
+      }
+    },
+    {
+      "when": {
+        "east": "true",
+        "step": "4|5",
+        "bark": "mottled"
+      },
+      "apply": {
+        "model": "antcolonies:block/fig_branch_mottled_arm_2",
+        "y": 90
+      }
+    },
+    {
+      "when": {
+        "south": "true",
+        "step": "4|5",
+        "bark": "mottled"
+      },
+      "apply": {
+        "model": "antcolonies:block/fig_branch_mottled_arm_2",
+        "y": 180
+      }
+    },
+    {
+      "when": {
+        "west": "true",
+        "step": "4|5",
+        "bark": "mottled"
+      },
+      "apply": {
+        "model": "antcolonies:block/fig_branch_mottled_arm_2",
+        "y": 270
+      }
+    },
+    {
+      "when": {
+        "up": "true",
+        "step": "4|5",
+        "bark": "mottled"
+      },
+      "apply": {
+        "model": "antcolonies:block/fig_branch_mottled_arm_2",
+        "x": 270
+      }
+    },
+    {
+      "when": {
+        "down": "true",
+        "step": "4|5",
+        "bark": "mottled"
+      },
+      "apply": {
+        "model": "antcolonies:block/fig_branch_mottled_arm_2",
+        "x": 90
+      }
+    },
+    {
+      "when": {
+        "step": "6|7",
+        "bark": "mottled"
+      },
+      "apply": {
+        "model": "antcolonies:block/fig_branch_mottled_core_3"
+      }
+    },
+    {
+      "when": {
+        "north": "true",
+        "step": "6|7",
+        "bark": "mottled"
+      },
+      "apply": {
+        "model": "antcolonies:block/fig_branch_mottled_arm_3"
+      }
+    },
+    {
+      "when": {
+        "east": "true",
+        "step": "6|7",
+        "bark": "mottled"
+      },
+      "apply": {
+        "model": "antcolonies:block/fig_branch_mottled_arm_3",
+        "y": 90
+      }
+    },
+    {
+      "when": {
+        "south": "true",
+        "step": "6|7",
+        "bark": "mottled"
+      },
+      "apply": {
+        "model": "antcolonies:block/fig_branch_mottled_arm_3",
+        "y": 180
+      }
+    },
+    {
+      "when": {
+        "west": "true",
+        "step": "6|7",
+        "bark": "mottled"
+      },
+      "apply": {
+        "model": "antcolonies:block/fig_branch_mottled_arm_3",
+        "y": 270
+      }
+    },
+    {
+      "when": {
+        "up": "true",
+        "step": "6|7",
+        "bark": "mottled"
+      },
+      "apply": {
+        "model": "antcolonies:block/fig_branch_mottled_arm_3",
+        "x": 270
+      }
+    },
+    {
+      "when": {
+        "down": "true",
+        "step": "6|7",
+        "bark": "mottled"
+      },
+      "apply": {
+        "model": "antcolonies:block/fig_branch_mottled_arm_3",
+        "x": 90
+      }
+    },
+    {
+      "when": {
+        "step": "8|9",
+        "bark": "mottled"
+      },
+      "apply": {
+        "model": "antcolonies:block/fig_branch_mottled_core_4"
+      }
+    },
+    {
+      "when": {
+        "north": "true",
+        "step": "8|9",
+        "bark": "mottled"
+      },
+      "apply": {
+        "model": "antcolonies:block/fig_branch_mottled_arm_4"
+      }
+    },
+    {
+      "when": {
+        "east": "true",
+        "step": "8|9",
+        "bark": "mottled"
+      },
+      "apply": {
+        "model": "antcolonies:block/fig_branch_mottled_arm_4",
+        "y": 90
+      }
+    },
+    {
+      "when": {
+        "south": "true",
+        "step": "8|9",
+        "bark": "mottled"
+      },
+      "apply": {
+        "model": "antcolonies:block/fig_branch_mottled_arm_4",
+        "y": 180
+      }
+    },
+    {
+      "when": {
+        "west": "true",
+        "step": "8|9",
+        "bark": "mottled"
+      },
+      "apply": {
+        "model": "antcolonies:block/fig_branch_mottled_arm_4",
+        "y": 270
+      }
+    },
+    {
+      "when": {
+        "up": "true",
+        "step": "8|9",
+        "bark": "mottled"
+      },
+      "apply": {
+        "model": "antcolonies:block/fig_branch_mottled_arm_4",
+        "x": 270
+      }
+    },
+    {
+      "when": {
+        "down": "true",
+        "step": "8|9",
+        "bark": "mottled"
+      },
+      "apply": {
+        "model": "antcolonies:block/fig_branch_mottled_arm_4",
+        "x": 90
+      }
+    },
+    {
+      "when": {
+        "step": "10|11",
+        "bark": "mottled"
+      },
+      "apply": {
+        "model": "antcolonies:block/fig_branch_mottled_core_5"
+      }
+    },
+    {
+      "when": {
+        "north": "true",
+        "step": "10|11",
+        "bark": "mottled"
+      },
+      "apply": {
+        "model": "antcolonies:block/fig_branch_mottled_arm_5"
+      }
+    },
+    {
+      "when": {
+        "east": "true",
+        "step": "10|11",
+        "bark": "mottled"
+      },
+      "apply": {
+        "model": "antcolonies:block/fig_branch_mottled_arm_5",
+        "y": 90
+      }
+    },
+    {
+      "when": {
+        "south": "true",
+        "step": "10|11",
+        "bark": "mottled"
+      },
+      "apply": {
+        "model": "antcolonies:block/fig_branch_mottled_arm_5",
+        "y": 180
+      }
+    },
+    {
+      "when": {
+        "west": "true",
+        "step": "10|11",
+        "bark": "mottled"
+      },
+      "apply": {
+        "model": "antcolonies:block/fig_branch_mottled_arm_5",
+        "y": 270
+      }
+    },
+    {
+      "when": {
+        "up": "true",
+        "step": "10|11",
+        "bark": "mottled"
+      },
+      "apply": {
+        "model": "antcolonies:block/fig_branch_mottled_arm_5",
+        "x": 270
+      }
+    },
+    {
+      "when": {
+        "down": "true",
+        "step": "10|11",
+        "bark": "mottled"
+      },
+      "apply": {
+        "model": "antcolonies:block/fig_branch_mottled_arm_5",
+        "x": 90
+      }
+    },
+    {
+      "when": {
+        "step": "0|1",
+        "bark": "patch"
+      },
+      "apply": {
+        "model": "antcolonies:block/fig_branch_patch_core_0"
+      }
+    },
+    {
+      "when": {
+        "north": "true",
+        "step": "0|1",
+        "bark": "patch"
+      },
+      "apply": {
+        "model": "antcolonies:block/fig_branch_patch_arm_0"
+      }
+    },
+    {
+      "when": {
+        "east": "true",
+        "step": "0|1",
+        "bark": "patch"
+      },
+      "apply": {
+        "model": "antcolonies:block/fig_branch_patch_arm_0",
+        "y": 90
+      }
+    },
+    {
+      "when": {
+        "south": "true",
+        "step": "0|1",
+        "bark": "patch"
+      },
+      "apply": {
+        "model": "antcolonies:block/fig_branch_patch_arm_0",
+        "y": 180
+      }
+    },
+    {
+      "when": {
+        "west": "true",
+        "step": "0|1",
+        "bark": "patch"
+      },
+      "apply": {
+        "model": "antcolonies:block/fig_branch_patch_arm_0",
+        "y": 270
+      }
+    },
+    {
+      "when": {
+        "up": "true",
+        "step": "0|1",
+        "bark": "patch"
+      },
+      "apply": {
+        "model": "antcolonies:block/fig_branch_patch_arm_0",
+        "x": 270
+      }
+    },
+    {
+      "when": {
+        "down": "true",
+        "step": "0|1",
+        "bark": "patch"
+      },
+      "apply": {
+        "model": "antcolonies:block/fig_branch_patch_arm_0",
+        "x": 90
+      }
+    },
+    {
+      "when": {
+        "step": "2|3",
+        "bark": "patch"
+      },
+      "apply": {
+        "model": "antcolonies:block/fig_branch_patch_core_1"
+      }
+    },
+    {
+      "when": {
+        "north": "true",
+        "step": "2|3",
+        "bark": "patch"
+      },
+      "apply": {
+        "model": "antcolonies:block/fig_branch_patch_arm_1"
+      }
+    },
+    {
+      "when": {
+        "east": "true",
+        "step": "2|3",
+        "bark": "patch"
+      },
+      "apply": {
+        "model": "antcolonies:block/fig_branch_patch_arm_1",
+        "y": 90
+      }
+    },
+    {
+      "when": {
+        "south": "true",
+        "step": "2|3",
+        "bark": "patch"
+      },
+      "apply": {
+        "model": "antcolonies:block/fig_branch_patch_arm_1",
+        "y": 180
+      }
+    },
+    {
+      "when": {
+        "west": "true",
+        "step": "2|3",
+        "bark": "patch"
+      },
+      "apply": {
+        "model": "antcolonies:block/fig_branch_patch_arm_1",
+        "y": 270
+      }
+    },
+    {
+      "when": {
+        "up": "true",
+        "step": "2|3",
+        "bark": "patch"
+      },
+      "apply": {
+        "model": "antcolonies:block/fig_branch_patch_arm_1",
+        "x": 270
+      }
+    },
+    {
+      "when": {
+        "down": "true",
+        "step": "2|3",
+        "bark": "patch"
+      },
+      "apply": {
+        "model": "antcolonies:block/fig_branch_patch_arm_1",
+        "x": 90
+      }
+    },
+    {
+      "when": {
+        "step": "4|5",
+        "bark": "patch"
+      },
+      "apply": {
+        "model": "antcolonies:block/fig_branch_patch_core_2"
+      }
+    },
+    {
+      "when": {
+        "north": "true",
+        "step": "4|5",
+        "bark": "patch"
+      },
+      "apply": {
+        "model": "antcolonies:block/fig_branch_patch_arm_2"
+      }
+    },
+    {
+      "when": {
+        "east": "true",
+        "step": "4|5",
+        "bark": "patch"
+      },
+      "apply": {
+        "model": "antcolonies:block/fig_branch_patch_arm_2",
+        "y": 90
+      }
+    },
+    {
+      "when": {
+        "south": "true",
+        "step": "4|5",
+        "bark": "patch"
+      },
+      "apply": {
+        "model": "antcolonies:block/fig_branch_patch_arm_2",
+        "y": 180
+      }
+    },
+    {
+      "when": {
+        "west": "true",
+        "step": "4|5",
+        "bark": "patch"
+      },
+      "apply": {
+        "model": "antcolonies:block/fig_branch_patch_arm_2",
+        "y": 270
+      }
+    },
+    {
+      "when": {
+        "up": "true",
+        "step": "4|5",
+        "bark": "patch"
+      },
+      "apply": {
+        "model": "antcolonies:block/fig_branch_patch_arm_2",
+        "x": 270
+      }
+    },
+    {
+      "when": {
+        "down": "true",
+        "step": "4|5",
+        "bark": "patch"
+      },
+      "apply": {
+        "model": "antcolonies:block/fig_branch_patch_arm_2",
+        "x": 90
+      }
+    },
+    {
+      "when": {
+        "step": "6|7",
+        "bark": "patch"
+      },
+      "apply": {
+        "model": "antcolonies:block/fig_branch_patch_core_3"
+      }
+    },
+    {
+      "when": {
+        "north": "true",
+        "step": "6|7",
+        "bark": "patch"
+      },
+      "apply": {
+        "model": "antcolonies:block/fig_branch_patch_arm_3"
+      }
+    },
+    {
+      "when": {
+        "east": "true",
+        "step": "6|7",
+        "bark": "patch"
+      },
+      "apply": {
+        "model": "antcolonies:block/fig_branch_patch_arm_3",
+        "y": 90
+      }
+    },
+    {
+      "when": {
+        "south": "true",
+        "step": "6|7",
+        "bark": "patch"
+      },
+      "apply": {
+        "model": "antcolonies:block/fig_branch_patch_arm_3",
+        "y": 180
+      }
+    },
+    {
+      "when": {
+        "west": "true",
+        "step": "6|7",
+        "bark": "patch"
+      },
+      "apply": {
+        "model": "antcolonies:block/fig_branch_patch_arm_3",
+        "y": 270
+      }
+    },
+    {
+      "when": {
+        "up": "true",
+        "step": "6|7",
+        "bark": "patch"
+      },
+      "apply": {
+        "model": "antcolonies:block/fig_branch_patch_arm_3",
+        "x": 270
+      }
+    },
+    {
+      "when": {
+        "down": "true",
+        "step": "6|7",
+        "bark": "patch"
+      },
+      "apply": {
+        "model": "antcolonies:block/fig_branch_patch_arm_3",
+        "x": 90
+      }
+    },
+    {
+      "when": {
+        "step": "8|9",
+        "bark": "patch"
+      },
+      "apply": {
+        "model": "antcolonies:block/fig_branch_patch_core_4"
+      }
+    },
+    {
+      "when": {
+        "north": "true",
+        "step": "8|9",
+        "bark": "patch"
+      },
+      "apply": {
+        "model": "antcolonies:block/fig_branch_patch_arm_4"
+      }
+    },
+    {
+      "when": {
+        "east": "true",
+        "step": "8|9",
+        "bark": "patch"
+      },
+      "apply": {
+        "model": "antcolonies:block/fig_branch_patch_arm_4",
+        "y": 90
+      }
+    },
+    {
+      "when": {
+        "south": "true",
+        "step": "8|9",
+        "bark": "patch"
+      },
+      "apply": {
+        "model": "antcolonies:block/fig_branch_patch_arm_4",
+        "y": 180
+      }
+    },
+    {
+      "when": {
+        "west": "true",
+        "step": "8|9",
+        "bark": "patch"
+      },
+      "apply": {
+        "model": "antcolonies:block/fig_branch_patch_arm_4",
+        "y": 270
+      }
+    },
+    {
+      "when": {
+        "up": "true",
+        "step": "8|9",
+        "bark": "patch"
+      },
+      "apply": {
+        "model": "antcolonies:block/fig_branch_patch_arm_4",
+        "x": 270
+      }
+    },
+    {
+      "when": {
+        "down": "true",
+        "step": "8|9",
+        "bark": "patch"
+      },
+      "apply": {
+        "model": "antcolonies:block/fig_branch_patch_arm_4",
+        "x": 90
+      }
+    },
+    {
+      "when": {
+        "step": "10|11",
+        "bark": "patch"
+      },
+      "apply": {
+        "model": "antcolonies:block/fig_branch_patch_core_5"
+      }
+    },
+    {
+      "when": {
+        "north": "true",
+        "step": "10|11",
+        "bark": "patch"
+      },
+      "apply": {
+        "model": "antcolonies:block/fig_branch_patch_arm_5"
+      }
+    },
+    {
+      "when": {
+        "east": "true",
+        "step": "10|11",
+        "bark": "patch"
+      },
+      "apply": {
+        "model": "antcolonies:block/fig_branch_patch_arm_5",
+        "y": 90
+      }
+    },
+    {
+      "when": {
+        "south": "true",
+        "step": "10|11",
+        "bark": "patch"
+      },
+      "apply": {
+        "model": "antcolonies:block/fig_branch_patch_arm_5",
+        "y": 180
+      }
+    },
+    {
+      "when": {
+        "west": "true",
+        "step": "10|11",
+        "bark": "patch"
+      },
+      "apply": {
+        "model": "antcolonies:block/fig_branch_patch_arm_5",
+        "y": 270
+      }
+    },
+    {
+      "when": {
+        "up": "true",
+        "step": "10|11",
+        "bark": "patch"
+      },
+      "apply": {
+        "model": "antcolonies:block/fig_branch_patch_arm_5",
+        "x": 270
+      }
+    },
+    {
+      "when": {
+        "down": "true",
+        "step": "10|11",
+        "bark": "patch"
+      },
+      "apply": {
+        "model": "antcolonies:block/fig_branch_patch_arm_5",
+        "x": 90
+      }
+    },
+    {
+      "when": {
+        "step": "0|1",
+        "bark": "pale"
+      },
+      "apply": {
+        "model": "antcolonies:block/fig_branch_pale_core_0"
+      }
+    },
+    {
+      "when": {
+        "north": "true",
+        "step": "0|1",
+        "bark": "pale"
+      },
+      "apply": {
+        "model": "antcolonies:block/fig_branch_pale_arm_0"
+      }
+    },
+    {
+      "when": {
+        "east": "true",
+        "step": "0|1",
+        "bark": "pale"
+      },
+      "apply": {
+        "model": "antcolonies:block/fig_branch_pale_arm_0",
+        "y": 90
+      }
+    },
+    {
+      "when": {
+        "south": "true",
+        "step": "0|1",
+        "bark": "pale"
+      },
+      "apply": {
+        "model": "antcolonies:block/fig_branch_pale_arm_0",
+        "y": 180
+      }
+    },
+    {
+      "when": {
+        "west": "true",
+        "step": "0|1",
+        "bark": "pale"
+      },
+      "apply": {
+        "model": "antcolonies:block/fig_branch_pale_arm_0",
+        "y": 270
+      }
+    },
+    {
+      "when": {
+        "up": "true",
+        "step": "0|1",
+        "bark": "pale"
+      },
+      "apply": {
+        "model": "antcolonies:block/fig_branch_pale_arm_0",
+        "x": 270
+      }
+    },
+    {
+      "when": {
+        "down": "true",
+        "step": "0|1",
+        "bark": "pale"
+      },
+      "apply": {
+        "model": "antcolonies:block/fig_branch_pale_arm_0",
+        "x": 90
+      }
+    },
+    {
+      "when": {
+        "step": "2|3",
+        "bark": "pale"
+      },
+      "apply": {
+        "model": "antcolonies:block/fig_branch_pale_core_1"
+      }
+    },
+    {
+      "when": {
+        "north": "true",
+        "step": "2|3",
+        "bark": "pale"
+      },
+      "apply": {
+        "model": "antcolonies:block/fig_branch_pale_arm_1"
+      }
+    },
+    {
+      "when": {
+        "east": "true",
+        "step": "2|3",
+        "bark": "pale"
+      },
+      "apply": {
+        "model": "antcolonies:block/fig_branch_pale_arm_1",
+        "y": 90
+      }
+    },
+    {
+      "when": {
+        "south": "true",
+        "step": "2|3",
+        "bark": "pale"
+      },
+      "apply": {
+        "model": "antcolonies:block/fig_branch_pale_arm_1",
+        "y": 180
+      }
+    },
+    {
+      "when": {
+        "west": "true",
+        "step": "2|3",
+        "bark": "pale"
+      },
+      "apply": {
+        "model": "antcolonies:block/fig_branch_pale_arm_1",
+        "y": 270
+      }
+    },
+    {
+      "when": {
+        "up": "true",
+        "step": "2|3",
+        "bark": "pale"
+      },
+      "apply": {
+        "model": "antcolonies:block/fig_branch_pale_arm_1",
+        "x": 270
+      }
+    },
+    {
+      "when": {
+        "down": "true",
+        "step": "2|3",
+        "bark": "pale"
+      },
+      "apply": {
+        "model": "antcolonies:block/fig_branch_pale_arm_1",
+        "x": 90
+      }
+    },
+    {
+      "when": {
+        "step": "4|5",
+        "bark": "pale"
+      },
+      "apply": {
+        "model": "antcolonies:block/fig_branch_pale_core_2"
+      }
+    },
+    {
+      "when": {
+        "north": "true",
+        "step": "4|5",
+        "bark": "pale"
+      },
+      "apply": {
+        "model": "antcolonies:block/fig_branch_pale_arm_2"
+      }
+    },
+    {
+      "when": {
+        "east": "true",
+        "step": "4|5",
+        "bark": "pale"
+      },
+      "apply": {
+        "model": "antcolonies:block/fig_branch_pale_arm_2",
+        "y": 90
+      }
+    },
+    {
+      "when": {
+        "south": "true",
+        "step": "4|5",
+        "bark": "pale"
+      },
+      "apply": {
+        "model": "antcolonies:block/fig_branch_pale_arm_2",
+        "y": 180
+      }
+    },
+    {
+      "when": {
+        "west": "true",
+        "step": "4|5",
+        "bark": "pale"
+      },
+      "apply": {
+        "model": "antcolonies:block/fig_branch_pale_arm_2",
+        "y": 270
+      }
+    },
+    {
+      "when": {
+        "up": "true",
+        "step": "4|5",
+        "bark": "pale"
+      },
+      "apply": {
+        "model": "antcolonies:block/fig_branch_pale_arm_2",
+        "x": 270
+      }
+    },
+    {
+      "when": {
+        "down": "true",
+        "step": "4|5",
+        "bark": "pale"
+      },
+      "apply": {
+        "model": "antcolonies:block/fig_branch_pale_arm_2",
+        "x": 90
+      }
+    },
+    {
+      "when": {
+        "step": "6|7",
+        "bark": "pale"
+      },
+      "apply": {
+        "model": "antcolonies:block/fig_branch_pale_core_3"
+      }
+    },
+    {
+      "when": {
+        "north": "true",
+        "step": "6|7",
+        "bark": "pale"
+      },
+      "apply": {
+        "model": "antcolonies:block/fig_branch_pale_arm_3"
+      }
+    },
+    {
+      "when": {
+        "east": "true",
+        "step": "6|7",
+        "bark": "pale"
+      },
+      "apply": {
+        "model": "antcolonies:block/fig_branch_pale_arm_3",
+        "y": 90
+      }
+    },
+    {
+      "when": {
+        "south": "true",
+        "step": "6|7",
+        "bark": "pale"
+      },
+      "apply": {
+        "model": "antcolonies:block/fig_branch_pale_arm_3",
+        "y": 180
+      }
+    },
+    {
+      "when": {
+        "west": "true",
+        "step": "6|7",
+        "bark": "pale"
+      },
+      "apply": {
+        "model": "antcolonies:block/fig_branch_pale_arm_3",
+        "y": 270
+      }
+    },
+    {
+      "when": {
+        "up": "true",
+        "step": "6|7",
+        "bark": "pale"
+      },
+      "apply": {
+        "model": "antcolonies:block/fig_branch_pale_arm_3",
+        "x": 270
+      }
+    },
+    {
+      "when": {
+        "down": "true",
+        "step": "6|7",
+        "bark": "pale"
+      },
+      "apply": {
+        "model": "antcolonies:block/fig_branch_pale_arm_3",
+        "x": 90
+      }
+    },
+    {
+      "when": {
+        "step": "8|9",
+        "bark": "pale"
+      },
+      "apply": {
+        "model": "antcolonies:block/fig_branch_pale_core_4"
+      }
+    },
+    {
+      "when": {
+        "north": "true",
+        "step": "8|9",
+        "bark": "pale"
+      },
+      "apply": {
+        "model": "antcolonies:block/fig_branch_pale_arm_4"
+      }
+    },
+    {
+      "when": {
+        "east": "true",
+        "step": "8|9",
+        "bark": "pale"
+      },
+      "apply": {
+        "model": "antcolonies:block/fig_branch_pale_arm_4",
+        "y": 90
+      }
+    },
+    {
+      "when": {
+        "south": "true",
+        "step": "8|9",
+        "bark": "pale"
+      },
+      "apply": {
+        "model": "antcolonies:block/fig_branch_pale_arm_4",
+        "y": 180
+      }
+    },
+    {
+      "when": {
+        "west": "true",
+        "step": "8|9",
+        "bark": "pale"
+      },
+      "apply": {
+        "model": "antcolonies:block/fig_branch_pale_arm_4",
+        "y": 270
+      }
+    },
+    {
+      "when": {
+        "up": "true",
+        "step": "8|9",
+        "bark": "pale"
+      },
+      "apply": {
+        "model": "antcolonies:block/fig_branch_pale_arm_4",
+        "x": 270
+      }
+    },
+    {
+      "when": {
+        "down": "true",
+        "step": "8|9",
+        "bark": "pale"
+      },
+      "apply": {
+        "model": "antcolonies:block/fig_branch_pale_arm_4",
+        "x": 90
+      }
+    },
+    {
+      "when": {
+        "step": "10|11",
+        "bark": "pale"
+      },
+      "apply": {
+        "model": "antcolonies:block/fig_branch_pale_core_5"
+      }
+    },
+    {
+      "when": {
+        "north": "true",
+        "step": "10|11",
+        "bark": "pale"
+      },
+      "apply": {
+        "model": "antcolonies:block/fig_branch_pale_arm_5"
+      }
+    },
+    {
+      "when": {
+        "east": "true",
+        "step": "10|11",
+        "bark": "pale"
+      },
+      "apply": {
+        "model": "antcolonies:block/fig_branch_pale_arm_5",
+        "y": 90
+      }
+    },
+    {
+      "when": {
+        "south": "true",
+        "step": "10|11",
+        "bark": "pale"
+      },
+      "apply": {
+        "model": "antcolonies:block/fig_branch_pale_arm_5",
+        "y": 180
+      }
+    },
+    {
+      "when": {
+        "west": "true",
+        "step": "10|11",
+        "bark": "pale"
+      },
+      "apply": {
+        "model": "antcolonies:block/fig_branch_pale_arm_5",
+        "y": 270
+      }
+    },
+    {
+      "when": {
+        "up": "true",
+        "step": "10|11",
+        "bark": "pale"
+      },
+      "apply": {
+        "model": "antcolonies:block/fig_branch_pale_arm_5",
+        "x": 270
+      }
+    },
+    {
+      "when": {
+        "down": "true",
+        "step": "10|11",
+        "bark": "pale"
+      },
+      "apply": {
+        "model": "antcolonies:block/fig_branch_pale_arm_5",
+        "x": 90
+      }
+    },
+    {
+      "when": {
+        "step": "0|1",
+        "bark": "young"
+      },
+      "apply": {
+        "model": "antcolonies:block/fig_branch_young_core_0"
+      }
+    },
+    {
+      "when": {
+        "north": "true",
+        "step": "0|1",
+        "bark": "young"
+      },
+      "apply": {
+        "model": "antcolonies:block/fig_branch_young_arm_0"
+      }
+    },
+    {
+      "when": {
+        "east": "true",
+        "step": "0|1",
+        "bark": "young"
+      },
+      "apply": {
+        "model": "antcolonies:block/fig_branch_young_arm_0",
+        "y": 90
+      }
+    },
+    {
+      "when": {
+        "south": "true",
+        "step": "0|1",
+        "bark": "young"
+      },
+      "apply": {
+        "model": "antcolonies:block/fig_branch_young_arm_0",
+        "y": 180
+      }
+    },
+    {
+      "when": {
+        "west": "true",
+        "step": "0|1",
+        "bark": "young"
+      },
+      "apply": {
+        "model": "antcolonies:block/fig_branch_young_arm_0",
+        "y": 270
+      }
+    },
+    {
+      "when": {
+        "up": "true",
+        "step": "0|1",
+        "bark": "young"
+      },
+      "apply": {
+        "model": "antcolonies:block/fig_branch_young_arm_0",
+        "x": 270
+      }
+    },
+    {
+      "when": {
+        "down": "true",
+        "step": "0|1",
+        "bark": "young"
+      },
+      "apply": {
+        "model": "antcolonies:block/fig_branch_young_arm_0",
+        "x": 90
+      }
+    },
+    {
+      "when": {
+        "step": "2|3",
+        "bark": "young"
+      },
+      "apply": {
+        "model": "antcolonies:block/fig_branch_young_core_1"
+      }
+    },
+    {
+      "when": {
+        "north": "true",
+        "step": "2|3",
+        "bark": "young"
+      },
+      "apply": {
+        "model": "antcolonies:block/fig_branch_young_arm_1"
+      }
+    },
+    {
+      "when": {
+        "east": "true",
+        "step": "2|3",
+        "bark": "young"
+      },
+      "apply": {
+        "model": "antcolonies:block/fig_branch_young_arm_1",
+        "y": 90
+      }
+    },
+    {
+      "when": {
+        "south": "true",
+        "step": "2|3",
+        "bark": "young"
+      },
+      "apply": {
+        "model": "antcolonies:block/fig_branch_young_arm_1",
+        "y": 180
+      }
+    },
+    {
+      "when": {
+        "west": "true",
+        "step": "2|3",
+        "bark": "young"
+      },
+      "apply": {
+        "model": "antcolonies:block/fig_branch_young_arm_1",
+        "y": 270
+      }
+    },
+    {
+      "when": {
+        "up": "true",
+        "step": "2|3",
+        "bark": "young"
+      },
+      "apply": {
+        "model": "antcolonies:block/fig_branch_young_arm_1",
+        "x": 270
+      }
+    },
+    {
+      "when": {
+        "down": "true",
+        "step": "2|3",
+        "bark": "young"
+      },
+      "apply": {
+        "model": "antcolonies:block/fig_branch_young_arm_1",
+        "x": 90
+      }
+    },
+    {
+      "when": {
+        "step": "4|5",
+        "bark": "young"
+      },
+      "apply": {
+        "model": "antcolonies:block/fig_branch_young_core_2"
+      }
+    },
+    {
+      "when": {
+        "north": "true",
+        "step": "4|5",
+        "bark": "young"
+      },
+      "apply": {
+        "model": "antcolonies:block/fig_branch_young_arm_2"
+      }
+    },
+    {
+      "when": {
+        "east": "true",
+        "step": "4|5",
+        "bark": "young"
+      },
+      "apply": {
+        "model": "antcolonies:block/fig_branch_young_arm_2",
+        "y": 90
+      }
+    },
+    {
+      "when": {
+        "south": "true",
+        "step": "4|5",
+        "bark": "young"
+      },
+      "apply": {
+        "model": "antcolonies:block/fig_branch_young_arm_2",
+        "y": 180
+      }
+    },
+    {
+      "when": {
+        "west": "true",
+        "step": "4|5",
+        "bark": "young"
+      },
+      "apply": {
+        "model": "antcolonies:block/fig_branch_young_arm_2",
+        "y": 270
+      }
+    },
+    {
+      "when": {
+        "up": "true",
+        "step": "4|5",
+        "bark": "young"
+      },
+      "apply": {
+        "model": "antcolonies:block/fig_branch_young_arm_2",
+        "x": 270
+      }
+    },
+    {
+      "when": {
+        "down": "true",
+        "step": "4|5",
+        "bark": "young"
+      },
+      "apply": {
+        "model": "antcolonies:block/fig_branch_young_arm_2",
+        "x": 90
+      }
+    },
+    {
+      "when": {
+        "step": "6|7",
+        "bark": "young"
+      },
+      "apply": {
+        "model": "antcolonies:block/fig_branch_young_core_3"
+      }
+    },
+    {
+      "when": {
+        "north": "true",
+        "step": "6|7",
+        "bark": "young"
+      },
+      "apply": {
+        "model": "antcolonies:block/fig_branch_young_arm_3"
+      }
+    },
+    {
+      "when": {
+        "east": "true",
+        "step": "6|7",
+        "bark": "young"
+      },
+      "apply": {
+        "model": "antcolonies:block/fig_branch_young_arm_3",
+        "y": 90
+      }
+    },
+    {
+      "when": {
+        "south": "true",
+        "step": "6|7",
+        "bark": "young"
+      },
+      "apply": {
+        "model": "antcolonies:block/fig_branch_young_arm_3",
+        "y": 180
+      }
+    },
+    {
+      "when": {
+        "west": "true",
+        "step": "6|7",
+        "bark": "young"
+      },
+      "apply": {
+        "model": "antcolonies:block/fig_branch_young_arm_3",
+        "y": 270
+      }
+    },
+    {
+      "when": {
+        "up": "true",
+        "step": "6|7",
+        "bark": "young"
+      },
+      "apply": {
+        "model": "antcolonies:block/fig_branch_young_arm_3",
+        "x": 270
+      }
+    },
+    {
+      "when": {
+        "down": "true",
+        "step": "6|7",
+        "bark": "young"
+      },
+      "apply": {
+        "model": "antcolonies:block/fig_branch_young_arm_3",
+        "x": 90
+      }
+    },
+    {
+      "when": {
+        "step": "8|9",
+        "bark": "young"
+      },
+      "apply": {
+        "model": "antcolonies:block/fig_branch_young_core_4"
+      }
+    },
+    {
+      "when": {
+        "north": "true",
+        "step": "8|9",
+        "bark": "young"
+      },
+      "apply": {
+        "model": "antcolonies:block/fig_branch_young_arm_4"
+      }
+    },
+    {
+      "when": {
+        "east": "true",
+        "step": "8|9",
+        "bark": "young"
+      },
+      "apply": {
+        "model": "antcolonies:block/fig_branch_young_arm_4",
+        "y": 90
+      }
+    },
+    {
+      "when": {
+        "south": "true",
+        "step": "8|9",
+        "bark": "young"
+      },
+      "apply": {
+        "model": "antcolonies:block/fig_branch_young_arm_4",
+        "y": 180
+      }
+    },
+    {
+      "when": {
+        "west": "true",
+        "step": "8|9",
+        "bark": "young"
+      },
+      "apply": {
+        "model": "antcolonies:block/fig_branch_young_arm_4",
+        "y": 270
+      }
+    },
+    {
+      "when": {
+        "up": "true",
+        "step": "8|9",
+        "bark": "young"
+      },
+      "apply": {
+        "model": "antcolonies:block/fig_branch_young_arm_4",
+        "x": 270
+      }
+    },
+    {
+      "when": {
+        "down": "true",
+        "step": "8|9",
+        "bark": "young"
+      },
+      "apply": {
+        "model": "antcolonies:block/fig_branch_young_arm_4",
+        "x": 90
+      }
+    },
+    {
+      "when": {
+        "step": "10|11",
+        "bark": "young"
+      },
+      "apply": {
+        "model": "antcolonies:block/fig_branch_young_core_5"
+      }
+    },
+    {
+      "when": {
+        "north": "true",
+        "step": "10|11",
+        "bark": "young"
+      },
+      "apply": {
+        "model": "antcolonies:block/fig_branch_young_arm_5"
+      }
+    },
+    {
+      "when": {
+        "east": "true",
+        "step": "10|11",
+        "bark": "young"
+      },
+      "apply": {
+        "model": "antcolonies:block/fig_branch_young_arm_5",
+        "y": 90
+      }
+    },
+    {
+      "when": {
+        "south": "true",
+        "step": "10|11",
+        "bark": "young"
+      },
+      "apply": {
+        "model": "antcolonies:block/fig_branch_young_arm_5",
+        "y": 180
+      }
+    },
+    {
+      "when": {
+        "west": "true",
+        "step": "10|11",
+        "bark": "young"
+      },
+      "apply": {
+        "model": "antcolonies:block/fig_branch_young_arm_5",
+        "y": 270
+      }
+    },
+    {
+      "when": {
+        "up": "true",
+        "step": "10|11",
+        "bark": "young"
+      },
+      "apply": {
+        "model": "antcolonies:block/fig_branch_young_arm_5",
+        "x": 270
+      }
+    },
+    {
+      "when": {
+        "down": "true",
+        "step": "10|11",
+        "bark": "young"
+      },
+      "apply": {
+        "model": "antcolonies:block/fig_branch_young_arm_5",
+        "x": 90
+      }
+    },
+    {
+      "when": {
+        "step": "0|1",
+        "bark": "dead"
+      },
+      "apply": {
+        "model": "antcolonies:block/fig_branch_dead_core_0"
+      }
+    },
+    {
+      "when": {
+        "north": "true",
+        "step": "0|1",
+        "bark": "dead"
+      },
+      "apply": {
+        "model": "antcolonies:block/fig_branch_dead_arm_0"
+      }
+    },
+    {
+      "when": {
+        "east": "true",
+        "step": "0|1",
+        "bark": "dead"
+      },
+      "apply": {
+        "model": "antcolonies:block/fig_branch_dead_arm_0",
+        "y": 90
+      }
+    },
+    {
+      "when": {
+        "south": "true",
+        "step": "0|1",
+        "bark": "dead"
+      },
+      "apply": {
+        "model": "antcolonies:block/fig_branch_dead_arm_0",
+        "y": 180
+      }
+    },
+    {
+      "when": {
+        "west": "true",
+        "step": "0|1",
+        "bark": "dead"
+      },
+      "apply": {
+        "model": "antcolonies:block/fig_branch_dead_arm_0",
+        "y": 270
+      }
+    },
+    {
+      "when": {
+        "up": "true",
+        "step": "0|1",
+        "bark": "dead"
+      },
+      "apply": {
+        "model": "antcolonies:block/fig_branch_dead_arm_0",
+        "x": 270
+      }
+    },
+    {
+      "when": {
+        "down": "true",
+        "step": "0|1",
+        "bark": "dead"
+      },
+      "apply": {
+        "model": "antcolonies:block/fig_branch_dead_arm_0",
+        "x": 90
+      }
+    },
+    {
+      "when": {
+        "step": "2|3",
+        "bark": "dead"
+      },
+      "apply": {
+        "model": "antcolonies:block/fig_branch_dead_core_1"
+      }
+    },
+    {
+      "when": {
+        "north": "true",
+        "step": "2|3",
+        "bark": "dead"
+      },
+      "apply": {
+        "model": "antcolonies:block/fig_branch_dead_arm_1"
+      }
+    },
+    {
+      "when": {
+        "east": "true",
+        "step": "2|3",
+        "bark": "dead"
+      },
+      "apply": {
+        "model": "antcolonies:block/fig_branch_dead_arm_1",
+        "y": 90
+      }
+    },
+    {
+      "when": {
+        "south": "true",
+        "step": "2|3",
+        "bark": "dead"
+      },
+      "apply": {
+        "model": "antcolonies:block/fig_branch_dead_arm_1",
+        "y": 180
+      }
+    },
+    {
+      "when": {
+        "west": "true",
+        "step": "2|3",
+        "bark": "dead"
+      },
+      "apply": {
+        "model": "antcolonies:block/fig_branch_dead_arm_1",
+        "y": 270
+      }
+    },
+    {
+      "when": {
+        "up": "true",
+        "step": "2|3",
+        "bark": "dead"
+      },
+      "apply": {
+        "model": "antcolonies:block/fig_branch_dead_arm_1",
+        "x": 270
+      }
+    },
+    {
+      "when": {
+        "down": "true",
+        "step": "2|3",
+        "bark": "dead"
+      },
+      "apply": {
+        "model": "antcolonies:block/fig_branch_dead_arm_1",
+        "x": 90
+      }
+    },
+    {
+      "when": {
+        "step": "4|5",
+        "bark": "dead"
+      },
+      "apply": {
+        "model": "antcolonies:block/fig_branch_dead_core_2"
+      }
+    },
+    {
+      "when": {
+        "north": "true",
+        "step": "4|5",
+        "bark": "dead"
+      },
+      "apply": {
+        "model": "antcolonies:block/fig_branch_dead_arm_2"
+      }
+    },
+    {
+      "when": {
+        "east": "true",
+        "step": "4|5",
+        "bark": "dead"
+      },
+      "apply": {
+        "model": "antcolonies:block/fig_branch_dead_arm_2",
+        "y": 90
+      }
+    },
+    {
+      "when": {
+        "south": "true",
+        "step": "4|5",
+        "bark": "dead"
+      },
+      "apply": {
+        "model": "antcolonies:block/fig_branch_dead_arm_2",
+        "y": 180
+      }
+    },
+    {
+      "when": {
+        "west": "true",
+        "step": "4|5",
+        "bark": "dead"
+      },
+      "apply": {
+        "model": "antcolonies:block/fig_branch_dead_arm_2",
+        "y": 270
+      }
+    },
+    {
+      "when": {
+        "up": "true",
+        "step": "4|5",
+        "bark": "dead"
+      },
+      "apply": {
+        "model": "antcolonies:block/fig_branch_dead_arm_2",
+        "x": 270
+      }
+    },
+    {
+      "when": {
+        "down": "true",
+        "step": "4|5",
+        "bark": "dead"
+      },
+      "apply": {
+        "model": "antcolonies:block/fig_branch_dead_arm_2",
+        "x": 90
+      }
+    },
+    {
+      "when": {
+        "step": "6|7",
+        "bark": "dead"
+      },
+      "apply": {
+        "model": "antcolonies:block/fig_branch_dead_core_3"
+      }
+    },
+    {
+      "when": {
+        "north": "true",
+        "step": "6|7",
+        "bark": "dead"
+      },
+      "apply": {
+        "model": "antcolonies:block/fig_branch_dead_arm_3"
+      }
+    },
+    {
+      "when": {
+        "east": "true",
+        "step": "6|7",
+        "bark": "dead"
+      },
+      "apply": {
+        "model": "antcolonies:block/fig_branch_dead_arm_3",
+        "y": 90
+      }
+    },
+    {
+      "when": {
+        "south": "true",
+        "step": "6|7",
+        "bark": "dead"
+      },
+      "apply": {
+        "model": "antcolonies:block/fig_branch_dead_arm_3",
+        "y": 180
+      }
+    },
+    {
+      "when": {
+        "west": "true",
+        "step": "6|7",
+        "bark": "dead"
+      },
+      "apply": {
+        "model": "antcolonies:block/fig_branch_dead_arm_3",
+        "y": 270
+      }
+    },
+    {
+      "when": {
+        "up": "true",
+        "step": "6|7",
+        "bark": "dead"
+      },
+      "apply": {
+        "model": "antcolonies:block/fig_branch_dead_arm_3",
+        "x": 270
+      }
+    },
+    {
+      "when": {
+        "down": "true",
+        "step": "6|7",
+        "bark": "dead"
+      },
+      "apply": {
+        "model": "antcolonies:block/fig_branch_dead_arm_3",
+        "x": 90
+      }
+    },
+    {
+      "when": {
+        "step": "8|9",
+        "bark": "dead"
+      },
+      "apply": {
+        "model": "antcolonies:block/fig_branch_dead_core_4"
+      }
+    },
+    {
+      "when": {
+        "north": "true",
+        "step": "8|9",
+        "bark": "dead"
+      },
+      "apply": {
+        "model": "antcolonies:block/fig_branch_dead_arm_4"
+      }
+    },
+    {
+      "when": {
+        "east": "true",
+        "step": "8|9",
+        "bark": "dead"
+      },
+      "apply": {
+        "model": "antcolonies:block/fig_branch_dead_arm_4",
+        "y": 90
+      }
+    },
+    {
+      "when": {
+        "south": "true",
+        "step": "8|9",
+        "bark": "dead"
+      },
+      "apply": {
+        "model": "antcolonies:block/fig_branch_dead_arm_4",
+        "y": 180
+      }
+    },
+    {
+      "when": {
+        "west": "true",
+        "step": "8|9",
+        "bark": "dead"
+      },
+      "apply": {
+        "model": "antcolonies:block/fig_branch_dead_arm_4",
+        "y": 270
+      }
+    },
+    {
+      "when": {
+        "up": "true",
+        "step": "8|9",
+        "bark": "dead"
+      },
+      "apply": {
+        "model": "antcolonies:block/fig_branch_dead_arm_4",
+        "x": 270
+      }
+    },
+    {
+      "when": {
+        "down": "true",
+        "step": "8|9",
+        "bark": "dead"
+      },
+      "apply": {
+        "model": "antcolonies:block/fig_branch_dead_arm_4",
+        "x": 90
+      }
+    },
+    {
+      "when": {
+        "step": "10|11",
+        "bark": "dead"
+      },
+      "apply": {
+        "model": "antcolonies:block/fig_branch_dead_core_5"
+      }
+    },
+    {
+      "when": {
+        "north": "true",
+        "step": "10|11",
+        "bark": "dead"
+      },
+      "apply": {
+        "model": "antcolonies:block/fig_branch_dead_arm_5"
+      }
+    },
+    {
+      "when": {
+        "east": "true",
+        "step": "10|11",
+        "bark": "dead"
+      },
+      "apply": {
+        "model": "antcolonies:block/fig_branch_dead_arm_5",
+        "y": 90
+      }
+    },
+    {
+      "when": {
+        "south": "true",
+        "step": "10|11",
+        "bark": "dead"
+      },
+      "apply": {
+        "model": "antcolonies:block/fig_branch_dead_arm_5",
+        "y": 180
+      }
+    },
+    {
+      "when": {
+        "west": "true",
+        "step": "10|11",
+        "bark": "dead"
+      },
+      "apply": {
+        "model": "antcolonies:block/fig_branch_dead_arm_5",
+        "y": 270
+      }
+    },
+    {
+      "when": {
+        "up": "true",
+        "step": "10|11",
+        "bark": "dead"
+      },
+      "apply": {
+        "model": "antcolonies:block/fig_branch_dead_arm_5",
+        "x": 270
+      }
+    },
+    {
+      "when": {
+        "down": "true",
+        "step": "10|11",
+        "bark": "dead"
+      },
+      "apply": {
+        "model": "antcolonies:block/fig_branch_dead_arm_5",
+        "x": 90
+      }
+    },
+    {
+      "when": {
+        "step": "0|1",
+        "bark": "bare"
+      },
+      "apply": {
+        "model": "antcolonies:block/fig_branch_bare_core_0"
+      }
+    },
+    {
+      "when": {
+        "north": "true",
+        "step": "0|1",
+        "bark": "bare"
+      },
+      "apply": {
+        "model": "antcolonies:block/fig_branch_bare_arm_0"
+      }
+    },
+    {
+      "when": {
+        "east": "true",
+        "step": "0|1",
+        "bark": "bare"
+      },
+      "apply": {
+        "model": "antcolonies:block/fig_branch_bare_arm_0",
+        "y": 90
+      }
+    },
+    {
+      "when": {
+        "south": "true",
+        "step": "0|1",
+        "bark": "bare"
+      },
+      "apply": {
+        "model": "antcolonies:block/fig_branch_bare_arm_0",
+        "y": 180
+      }
+    },
+    {
+      "when": {
+        "west": "true",
+        "step": "0|1",
+        "bark": "bare"
+      },
+      "apply": {
+        "model": "antcolonies:block/fig_branch_bare_arm_0",
+        "y": 270
+      }
+    },
+    {
+      "when": {
+        "up": "true",
+        "step": "0|1",
+        "bark": "bare"
+      },
+      "apply": {
+        "model": "antcolonies:block/fig_branch_bare_arm_0",
+        "x": 270
+      }
+    },
+    {
+      "when": {
+        "down": "true",
+        "step": "0|1",
+        "bark": "bare"
+      },
+      "apply": {
+        "model": "antcolonies:block/fig_branch_bare_arm_0",
+        "x": 90
+      }
+    },
+    {
+      "when": {
+        "step": "2|3",
+        "bark": "bare"
+      },
+      "apply": {
+        "model": "antcolonies:block/fig_branch_bare_core_1"
+      }
+    },
+    {
+      "when": {
+        "north": "true",
+        "step": "2|3",
+        "bark": "bare"
+      },
+      "apply": {
+        "model": "antcolonies:block/fig_branch_bare_arm_1"
+      }
+    },
+    {
+      "when": {
+        "east": "true",
+        "step": "2|3",
+        "bark": "bare"
+      },
+      "apply": {
+        "model": "antcolonies:block/fig_branch_bare_arm_1",
+        "y": 90
+      }
+    },
+    {
+      "when": {
+        "south": "true",
+        "step": "2|3",
+        "bark": "bare"
+      },
+      "apply": {
+        "model": "antcolonies:block/fig_branch_bare_arm_1",
+        "y": 180
+      }
+    },
+    {
+      "when": {
+        "west": "true",
+        "step": "2|3",
+        "bark": "bare"
+      },
+      "apply": {
+        "model": "antcolonies:block/fig_branch_bare_arm_1",
+        "y": 270
+      }
+    },
+    {
+      "when": {
+        "up": "true",
+        "step": "2|3",
+        "bark": "bare"
+      },
+      "apply": {
+        "model": "antcolonies:block/fig_branch_bare_arm_1",
+        "x": 270
+      }
+    },
+    {
+      "when": {
+        "down": "true",
+        "step": "2|3",
+        "bark": "bare"
+      },
+      "apply": {
+        "model": "antcolonies:block/fig_branch_bare_arm_1",
+        "x": 90
+      }
+    },
+    {
+      "when": {
+        "step": "4|5",
+        "bark": "bare"
+      },
+      "apply": {
+        "model": "antcolonies:block/fig_branch_bare_core_2"
+      }
+    },
+    {
+      "when": {
+        "north": "true",
+        "step": "4|5",
+        "bark": "bare"
+      },
+      "apply": {
+        "model": "antcolonies:block/fig_branch_bare_arm_2"
+      }
+    },
+    {
+      "when": {
+        "east": "true",
+        "step": "4|5",
+        "bark": "bare"
+      },
+      "apply": {
+        "model": "antcolonies:block/fig_branch_bare_arm_2",
+        "y": 90
+      }
+    },
+    {
+      "when": {
+        "south": "true",
+        "step": "4|5",
+        "bark": "bare"
+      },
+      "apply": {
+        "model": "antcolonies:block/fig_branch_bare_arm_2",
+        "y": 180
+      }
+    },
+    {
+      "when": {
+        "west": "true",
+        "step": "4|5",
+        "bark": "bare"
+      },
+      "apply": {
+        "model": "antcolonies:block/fig_branch_bare_arm_2",
+        "y": 270
+      }
+    },
+    {
+      "when": {
+        "up": "true",
+        "step": "4|5",
+        "bark": "bare"
+      },
+      "apply": {
+        "model": "antcolonies:block/fig_branch_bare_arm_2",
+        "x": 270
+      }
+    },
+    {
+      "when": {
+        "down": "true",
+        "step": "4|5",
+        "bark": "bare"
+      },
+      "apply": {
+        "model": "antcolonies:block/fig_branch_bare_arm_2",
+        "x": 90
+      }
+    },
+    {
+      "when": {
+        "step": "6|7",
+        "bark": "bare"
+      },
+      "apply": {
+        "model": "antcolonies:block/fig_branch_bare_core_3"
+      }
+    },
+    {
+      "when": {
+        "north": "true",
+        "step": "6|7",
+        "bark": "bare"
+      },
+      "apply": {
+        "model": "antcolonies:block/fig_branch_bare_arm_3"
+      }
+    },
+    {
+      "when": {
+        "east": "true",
+        "step": "6|7",
+        "bark": "bare"
+      },
+      "apply": {
+        "model": "antcolonies:block/fig_branch_bare_arm_3",
+        "y": 90
+      }
+    },
+    {
+      "when": {
+        "south": "true",
+        "step": "6|7",
+        "bark": "bare"
+      },
+      "apply": {
+        "model": "antcolonies:block/fig_branch_bare_arm_3",
+        "y": 180
+      }
+    },
+    {
+      "when": {
+        "west": "true",
+        "step": "6|7",
+        "bark": "bare"
+      },
+      "apply": {
+        "model": "antcolonies:block/fig_branch_bare_arm_3",
+        "y": 270
+      }
+    },
+    {
+      "when": {
+        "up": "true",
+        "step": "6|7",
+        "bark": "bare"
+      },
+      "apply": {
+        "model": "antcolonies:block/fig_branch_bare_arm_3",
+        "x": 270
+      }
+    },
+    {
+      "when": {
+        "down": "true",
+        "step": "6|7",
+        "bark": "bare"
+      },
+      "apply": {
+        "model": "antcolonies:block/fig_branch_bare_arm_3",
+        "x": 90
+      }
+    },
+    {
+      "when": {
+        "step": "8|9",
+        "bark": "bare"
+      },
+      "apply": {
+        "model": "antcolonies:block/fig_branch_bare_core_4"
+      }
+    },
+    {
+      "when": {
+        "north": "true",
+        "step": "8|9",
+        "bark": "bare"
+      },
+      "apply": {
+        "model": "antcolonies:block/fig_branch_bare_arm_4"
+      }
+    },
+    {
+      "when": {
+        "east": "true",
+        "step": "8|9",
+        "bark": "bare"
+      },
+      "apply": {
+        "model": "antcolonies:block/fig_branch_bare_arm_4",
+        "y": 90
+      }
+    },
+    {
+      "when": {
+        "south": "true",
+        "step": "8|9",
+        "bark": "bare"
+      },
+      "apply": {
+        "model": "antcolonies:block/fig_branch_bare_arm_4",
+        "y": 180
+      }
+    },
+    {
+      "when": {
+        "west": "true",
+        "step": "8|9",
+        "bark": "bare"
+      },
+      "apply": {
+        "model": "antcolonies:block/fig_branch_bare_arm_4",
+        "y": 270
+      }
+    },
+    {
+      "when": {
+        "up": "true",
+        "step": "8|9",
+        "bark": "bare"
+      },
+      "apply": {
+        "model": "antcolonies:block/fig_branch_bare_arm_4",
+        "x": 270
+      }
+    },
+    {
+      "when": {
+        "down": "true",
+        "step": "8|9",
+        "bark": "bare"
+      },
+      "apply": {
+        "model": "antcolonies:block/fig_branch_bare_arm_4",
+        "x": 90
+      }
+    },
+    {
+      "when": {
+        "step": "10|11",
+        "bark": "bare"
+      },
+      "apply": {
+        "model": "antcolonies:block/fig_branch_bare_core_5"
+      }
+    },
+    {
+      "when": {
+        "north": "true",
+        "step": "10|11",
+        "bark": "bare"
+      },
+      "apply": {
+        "model": "antcolonies:block/fig_branch_bare_arm_5"
+      }
+    },
+    {
+      "when": {
+        "east": "true",
+        "step": "10|11",
+        "bark": "bare"
+      },
+      "apply": {
+        "model": "antcolonies:block/fig_branch_bare_arm_5",
+        "y": 90
+      }
+    },
+    {
+      "when": {
+        "south": "true",
+        "step": "10|11",
+        "bark": "bare"
+      },
+      "apply": {
+        "model": "antcolonies:block/fig_branch_bare_arm_5",
+        "y": 180
+      }
+    },
+    {
+      "when": {
+        "west": "true",
+        "step": "10|11",
+        "bark": "bare"
+      },
+      "apply": {
+        "model": "antcolonies:block/fig_branch_bare_arm_5",
+        "y": 270
+      }
+    },
+    {
+      "when": {
+        "up": "true",
+        "step": "10|11",
+        "bark": "bare"
+      },
+      "apply": {
+        "model": "antcolonies:block/fig_branch_bare_arm_5",
+        "x": 270
+      }
+    },
+    {
+      "when": {
+        "down": "true",
+        "step": "10|11",
+        "bark": "bare"
+      },
+      "apply": {
+        "model": "antcolonies:block/fig_branch_bare_arm_5",
+        "x": 90
+      }
+    }
+  ]
+}

@@ -242,3 +242,253 @@ def all_textures():
     out["silt"] = flat_ground("floodsilt", (164, 150, 116), 0.14)
     out["water"] = flat_ground("floodwater", (88, 104, 70), 0.1)
     return out
+
+
+# ---- The game's files (floodplain trees step 3, 2026-11-13: the sycamore fig's blocks, look A, shape B) ----
+# python tools/floodplain_tree_art.py writes the fig's textures, models, blockstates, item models and loot into the
+# savanna mod. The blocks are in registry/TreeBlocks.java (FIG_LOG ... FIG_SEEDLING); a fig block's bark is one of
+# block/FigBark (mottled, patch, pale, young, dead, bare).
+
+GAME_LOOK = "A"  # the user's pick, 2026-11-13
+BARKS = ("mottled", "patch", "pale", "young", "dead", "bare")
+FIG_TAPER = (14, 12, 10, 8, 6, 4)  # FigBranchBlock.width, the model viewer's TAPER
+FIG_TINTS = ((0x74, 0x20, 0x2a), (0x7e, 0x24, 0x30), (0x8a, 0x26, 0x30), (0xa0, 0x2f, 0x38), (0xb2, 0x43, 0x3c),
+             (0xc2, 0x90, 0x3c), (0x8f, 0x9c, 0x48))  # ripe dark red to unripe yellow and green, as in the viewer
+FIG_TINT_ODDS = (2, 1, 2, 2, 1, 1, 1)  # the viewer's mix: mostly reds, a few still yellow or green
+FIG_STALK = (0x6e, 0x5c, 0x36)
+
+
+def fig_log_top(dead):
+    """The cut end of a fig log: soft pale wood, faint rings, the bark rim (grey once the tree is dead)."""
+    heart, sap, rim = ((206, 186, 148), (224, 208, 172), (170, 136, 104)) if not dead else (
+        (164, 158, 144), (176, 170, 156), (124, 118, 108))
+    rng = random.Random(f"figend{dead}")
+    img = []
+    for y in range(S):
+        row = []
+        for x in range(S):
+            r = math.hypot(x - 7.5, y - 7.5)
+            if max(abs(x - 7.5), abs(y - 7.5)) > 7:
+                c = rim
+            elif r > 5.6:
+                c = sap
+            else:
+                c = shade(heart, 0.9 if int(r * 1.2) % 2 else 1.03)
+            row.append(c)
+        img.append(row)
+    if dead:
+        for _ in range(3):  # radial checks in dry dead wood
+            a = rng.uniform(0, 6.283)
+            for i in range(2, 7):
+                img[int(7.5 + i * math.sin(a))][int(7.5 + i * math.cos(a))] = (96, 90, 82)
+    return speckle(img, rng, 0.04)
+
+
+def fig_seedling():
+    """A fig seedling: a pale stem with a leaf bud at the top and broad rounded leaves turning up it, as in the viewer."""
+    rng = random.Random("figseedling")
+    img = blank(None)
+    stem = (172, 166, 120)
+    for y in range(3, S):
+        img[y][7] = stem
+        img[y][8] = shade(stem, 0.85) if y > 9 else None
+    img[2][7] = (130, 150, 60)
+    for y0, side in ((4, -1), (7, 1), (10, -1), (12, 1)):  # broad leaves, alternate sides
+        tone = FIG_LEAF[0 if y0 < 6 else 1]
+        for dy in range(-1, 3):
+            for dx in range(1, 6 - abs(dy - 1)):
+                x = 7 + side * dx if side < 0 else 8 + dx
+                if 0 <= x < S and 0 <= y0 + dy < S:
+                    img[y0 + dy][x] = shade(tone, rng.uniform(0.9, 1.1) * (1.08 if dy == 0 else 1))
+    return img
+
+
+def fig_fruit_atlas():
+    """One small picture holding every fig colour, 4 x 4 pixels each (cell i at column i % 4, row i // 4): the fig
+    tints, then the stalk. The bunch models paint each little box from one cell."""
+    rng = random.Random("figfruit")
+    img = blank((0, 0, 0))
+    for i, c in enumerate(FIG_TINTS + (FIG_STALK,)):
+        cx, cy = (i % 4) * 4, (i // 4) * 4
+        for y in range(4):
+            for x in range(4):
+                f = 1.12 if (x, y) == (1, 1) else 0.92 if x == 3 or y == 3 else 1.0
+                img[cy + y][cx + x] = shade(c, f * rng.uniform(0.96, 1.04))
+    return img
+
+
+def _cell(i):
+    cx, cy = (i % 4) * 4, (i // 4) * 4
+    return [cx, cy, cx + 4, cy + 4]
+
+
+def _box(lo, hi, cell):
+    return {"from": [round(v, 3) for v in lo], "to": [round(v, 3) for v in hi],
+            "faces": {f: {"texture": "#fruit", "uv": cell} for f in ("north", "south", "east", "west", "up", "down")}}
+
+
+def _fig(rng, cx, cy, cz, size):
+    """One fig: three crossing boxes, so it looks round from every side (the viewer's figs)."""
+    tint = rng.choices(range(len(FIG_TINTS)), FIG_TINT_ODDS)[0]
+    h, t = size / 2, size / 2 - 1
+    return [_box((cx - h, cy - t, cz - t), (cx + h, cy + t, cz + t), _cell(tint)),
+            _box((cx - t, cy - h, cz - t), (cx + t, cy + h, cz + t), _cell(tint)),
+            _box((cx - t, cy - t, cz - h), (cx + t, cy + t, cz + h), _cell(tint))]
+
+
+def fig_bunch_model(variant):
+    """A bunch of figs hanging from the block above: a short stalk, then 3 or 4 rings of figs, smaller to the bottom."""
+    rng = random.Random(f"figbunch{variant}")
+    stalk = _cell(len(FIG_TINTS))
+    els = [_box((7, 10, 7), (9, 16, 9), stalk), _box((7.5, 7, 7.5), (8.5, 10, 8.5), stalk)]
+    rings = ((3, 3.4), (4, 4.4), (2, 2.2)) + (((1, 0.0),) if rng.random() < 0.5 else ())
+    for level, (count, radius) in enumerate(rings):
+        y = 16 - (7.5 + level * 3.2)
+        turn = rng.uniform(0, 6.283)
+        for k in range(count):
+            a = turn + k * 6.283 / count
+            size = rng.choice((5, 6)) if level < 2 else 5
+            els += _fig(rng, 8 + radius * math.cos(a), y - rng.uniform(0, 1.2), 8 + radius * math.sin(a), size)
+    return {"textures": {"particle": "antcolonies:block/fig_fruit", "fruit": "antcolonies:block/fig_fruit"}, "elements": els}
+
+
+def trunk_figs_model(variant):
+    """Figs growing on the bark (built facing north: the bark behind them at the south face), 4 to 6 in a cluster."""
+    rng = random.Random(f"trunkfigs{variant}")
+    els = []
+    for _ in range(rng.randint(4, 6)):
+        size = rng.choice((5, 6))
+        out = rng.uniform(2, 4.5)
+        els += _fig(rng, 8 + rng.uniform(-5.5, 5.5) * 0.7, 8 + rng.uniform(-5.5, 5.5) * 0.7, 16 - out, size)
+    return {"textures": {"particle": "antcolonies:block/fig_fruit", "fruit": "antcolonies:block/fig_fruit"}, "elements": els}
+
+
+def game_files():
+    """Every block of the sycamore fig (floodplain trees step 3)."""
+    from tree_art import ASSETS, SHEARS_OR_SILK, drops_itself, item_from_block, loot, model, single, cross, texture, write_json
+    look = GAME_LOOK
+    texture("fig_bark", fig_bark(look, 0))
+    texture("fig_bark_2", fig_bark(look, 3))
+    texture("fig_bark_patch", fig_bark(look, 1))
+    texture("fig_bark_pale", fig_bark(look, 2))
+    texture("fig_bark_young", fig_young_bark(look))
+    texture("fig_bark_dead", fig_dead_bark(look))
+    texture("fig_wood_bare", bare_wood())
+    texture("fig_log_top", fig_log_top(False))
+    texture("fig_log_top_dead", fig_log_top(True))
+    for tone, name in enumerate(("fig_leaves_lit", "fig_leaves", "fig_leaves_shaded")):
+        texture(name, fig_leaves(tone))
+    texture("fig_leaf_spray", sprig())
+    texture("fig_seedling", fig_seedling())
+    texture("fig_fruit", fig_fruit_atlas())
+
+    def sides(bark):
+        """The bark picture(s) for a FigBark value: mottled has two, mixed at random so the trunk does not repeat."""
+        names = {"mottled": ["fig_bark", "fig_bark_2"], "patch": ["fig_bark_patch"], "pale": ["fig_bark_pale"],
+                 "young": ["fig_bark_young"], "dead": ["fig_bark_dead"], "bare": ["fig_wood_bare"]}[bark]
+        return [f"antcolonies:block/{n}" for n in names]
+
+    def end(bark):
+        return "antcolonies:block/" + ("fig_log_top_dead" if bark in ("dead", "bare") else "fig_log_top")
+
+    # Log and wood: turned by placing, one model per bark (two for mottled).
+    for name, all_round in (("fig_log", False), ("fig_wood", True)):
+        variants = {}
+        for bark in BARKS:
+            ups, sideways = [], []
+            for i, side in enumerate(sides(bark)):
+                top = side if all_round else end(bark)
+                m = f"{name}_{bark}" + (f"_{i}" if i else "")
+                model(m, {"parent": "minecraft:block/cube_column", "textures": {"side": side, "end": top}})
+                model(f"{m}_horizontal", {"parent": "minecraft:block/cube_column_horizontal", "textures": {"side": side, "end": top}})
+                ups.append(f"antcolonies:block/{m}")
+                sideways.append(f"antcolonies:block/{m}_horizontal")
+            variants[f"axis=y,bark={bark}"] = [{"model": m} for m in ups]
+            variants[f"axis=z,bark={bark}"] = [{"model": m, "x": 90} for m in sideways]
+            variants[f"axis=x,bark={bark}"] = [{"model": m, "x": 90, "y": 90} for m in sideways]
+        write_json(ASSETS / f"blockstates/{name}.json", {"variants": variants})
+        item_from_block(name, f"{name}_mottled")
+        drops_itself(name)
+
+    # Branch: six thicknesses (FigBranchBlock.width), 2 steps a thickness, each bark.
+    turn = {"north": {}, "east": {"y": 90}, "south": {"y": 180}, "west": {"y": 270}, "up": {"x": 270}, "down": {"x": 90}}
+    parts = []
+    for bark in BARKS:
+        tex = {"particle": sides(bark)[0], "side": sides(bark)[0], "end": end(bark)}
+        for level, w in enumerate(FIG_TAPER):
+            lo, hi = (16 - w) / 2, 16 - (16 - w) / 2
+            steps = f"{2 * level}|{2 * level + 1}"
+            core, arm = f"fig_branch_{bark}_core_{level}", f"fig_branch_{bark}_arm_{level}"
+            model(core, {"textures": tex, "elements": [{"from": [lo, lo, lo], "to": [hi, hi, hi], "faces": {
+                f: {"texture": "#side", "uv": [lo, lo, hi, hi]} for f in ("north", "south", "east", "west", "up", "down")}}]})
+            arm_faces = {f: {"texture": "#side", "uv": [lo, 0, hi, lo]} for f in ("east", "west", "up", "down")}
+            arm_faces["north"] = {"texture": "#end", "uv": [lo, lo, hi, hi], "cullface": "north"}
+            model(arm, {"textures": tex, "elements": [{"from": [lo, lo, 0], "to": [hi, hi, lo], "faces": arm_faces}]})
+            parts.append({"when": {"step": steps, "bark": bark}, "apply": {"model": f"antcolonies:block/{core}"}})
+            for d, r in turn.items():
+                parts.append({"when": {d: "true", "step": steps, "bark": bark}, "apply": dict({"model": f"antcolonies:block/{arm}"}, **r)})
+    lo, hi = 1, 15
+    tex = {"particle": sides("mottled")[0], "side": sides("mottled")[0], "end": end("mottled")}
+    model("fig_branch_inventory", {"parent": "minecraft:block/block", "textures": tex, "elements": [{"from": [lo, lo, 0], "to": [hi, hi, 16], "faces": {
+        "north": {"texture": "#end", "uv": [lo, lo, hi, hi]}, "south": {"texture": "#end", "uv": [lo, lo, hi, hi]},
+        "east": {"texture": "#side", "uv": [0, lo, 16, hi]}, "west": {"texture": "#side", "uv": [0, lo, 16, hi]},
+        "up": {"texture": "#side", "uv": [lo, 0, hi, 16]}, "down": {"texture": "#side", "uv": [lo, 0, hi, 16]}}}]})
+    write_json(ASSETS / "blockstates/fig_branch.json", {"multipart": parts})
+    item_from_block("fig_branch", "fig_branch_inventory")
+    drops_itself("fig_branch")
+
+    # Root steps: 8 or 5 pixels high, bark on every face (the viewer's slab8 and slab5).
+    variants = {}
+    for bark in BARKS:
+        for low, h in ((False, 8), (True, 5)):
+            m = f"fig_root_{bark}_{'low' if low else 'high'}"
+            faces = {f: {"texture": "#bark", "uv": [0, 16 - h, 16, 16], "cullface": f} for f in ("north", "south", "east", "west")}
+            faces["up"] = {"texture": "#bark", "uv": [0, 0, 16, 16]}
+            faces["down"] = {"texture": "#bark", "uv": [0, 0, 16, 16], "cullface": "down"}
+            model(m, {"parent": "minecraft:block/block", "textures": {"particle": sides(bark)[0], "bark": sides(bark)[0]},
+                      "elements": [{"from": [0, 0, 0], "to": [16, h, 16], "faces": faces}]})
+            variants[f"bark={bark},low={'true' if low else 'false'}"] = {"model": f"antcolonies:block/{m}"}
+    write_json(ASSETS / "blockstates/fig_root.json", {"variants": variants})
+    item_from_block("fig_root", "fig_root_mottled_high")
+    drops_itself("fig_root")
+
+    # Leaves: three tones (FigLeavesBlock.TONE).
+    for name in ("fig_leaves_lit", "fig_leaves", "fig_leaves_shaded"):
+        model(name, {"parent": "minecraft:block/cube_all", "render_type": "minecraft:cutout_mipped",
+                     "textures": {"all": f"antcolonies:block/{name}"}})
+    write_json(ASSETS / "blockstates/fig_leaves.json", {"variants": {
+        "tone=0": {"model": "antcolonies:block/fig_leaves_lit"}, "tone=1": {"model": "antcolonies:block/fig_leaves"},
+        "tone=2": {"model": "antcolonies:block/fig_leaves_shaded"}}})
+    item_from_block("fig_leaves")
+    loot("fig_leaves", [{"rolls": 1.0, "bonus_rolls": 0.0, "entries": [{"type": "minecraft:alternatives", "children": [
+        {"type": "minecraft:item", "name": "antcolonies:fig_leaves", "conditions": [SHEARS_OR_SILK]},
+        {"type": "minecraft:item", "name": "antcolonies:fig_seedling", "conditions": [
+            {"condition": "minecraft:survives_explosion"}, {"condition": "minecraft:random_chance", "chance": 0.05}]},
+        {"type": "minecraft:item", "name": "minecraft:stick", "conditions": [
+            {"condition": "minecraft:survives_explosion"}, {"condition": "minecraft:random_chance", "chance": 0.02}]}]}]}])
+
+    # The leaf spray under the pads: itself only to shears or silk touch, like the thorny twig.
+    cross("fig_leaf_spray", "fig_leaf_spray")
+    loot("fig_leaf_spray", [{"rolls": 1.0, "bonus_rolls": 0.0, "entries": [{"type": "minecraft:item", "name": "antcolonies:fig_leaf_spray"}],
+                             "conditions": [SHEARS_OR_SILK]}])
+    cross("fig_seedling", "fig_seedling")
+    drops_itself("fig_seedling")
+
+    # Fig bunches (three looks, picked at random) and figs on the bark (three looks, turned to face out).
+    for v in range(3):
+        model(f"fig_bunch_{v}", fig_bunch_model(v))
+        model(f"trunk_figs_{v}", trunk_figs_model(v))
+    write_json(ASSETS / "blockstates/fig_bunch.json", {"variants": {"": [{"model": f"antcolonies:block/fig_bunch_{v}"} for v in range(3)]}})
+    write_json(ASSETS / "blockstates/trunk_figs.json", {"variants": {
+        f"facing={d}": [{"model": f"antcolonies:block/trunk_figs_{v}", "y": r} for v in range(3)] if r else
+        [{"model": f"antcolonies:block/trunk_figs_{v}"} for v in range(3)]
+        for d, r in (("north", 0), ("east", 90), ("south", 180), ("west", 270))}})
+    item_from_block("fig_bunch", "fig_bunch_0")
+    item_from_block("trunk_figs", "trunk_figs_0")
+    drops_itself("fig_bunch")
+    drops_itself("trunk_figs")
+    print("wrote the sycamore fig blocks")
+
+
+if __name__ == "__main__":
+    game_files()

@@ -1,0 +1,124 @@
+{
+  "variants": {
+    "axis=y,bark=mottled": [
+      {
+        "model": "antcolonies:block/fig_log_mottled"
+      },
+      {
+        "model": "antcolonies:block/fig_log_mottled_1"
+      }
+    ],
+    "axis=z,bark=mottled": [
+      {
+        "model": "antcolonies:block/fig_log_mottled_horizontal",
+        "x": 90
+      },
+      {
+        "model": "antcolonies:block/fig_log_mottled_1_horizontal",
+        "x": 90
+      }
+    ],
+    "axis=x,bark=mottled": [
+      {
+        "model": "antcolonies:block/fig_log_mottled_horizontal",
+        "x": 90,
+        "y": 90
+      },
+      {
+        "model": "antcolonies:block/fig_log_mottled_1_horizontal",
+        "x": 90,
+        "y": 90
+      }
+    ],
+    "axis=y,bark=patch": [
+      {
+        "model": "antcolonies:block/fig_log_patch"
+      }
+    ],
+    "axis=z,bark=patch": [
+      {
+        "model": "antcolonies:block/fig_log_patch_horizontal",
+        "x": 90
+      }
+    ],
+    "axis=x,bark=patch": [
+      {
+        "model": "antcolonies:block/fig_log_patch_horizontal",
+        "x": 90,
+        "y": 90
+      }
+    ],
+    "axis=y,bark=pale": [
+      {
+        "model": "antcolonies:block/fig_log_pale"
+      }
+    ],
+    "axis=z,bark=pale": [
+      {
+        "model": "antcolonies:block/fig_log_pale_horizontal",
+        "x": 90
+      }
+    ],
+    "axis=x,bark=pale": [
+      {
+        "model": "antcolonies:block/fig_log_pale_horizontal",
+        "x": 90,
+        "y": 90
+      }
+    ],
+    "axis=y,bark=young": [
+      {
+        "model": "antcolonies:block/fig_log_young"
+      }
+    ],
+    "axis=z,bark=young": [
+      {
+        "model": "antcolonies:block/fig_log_young_horizontal",
+        "x": 90
+      }
+    ],
+    "axis=x,bark=young": [
+      {
+        "model": "antcolonies:block/fig_log_young_horizontal",
+        "x": 90,
+        "y": 90
+      }
+    ],
+    "axis=y,bark=dead": [
+      {
+        "model": "antcolonies:block/fig_log_dead"
+      }
+    ],
+    "axis=z,bark=dead": [
+      {
+        "model": "antcolonies:block/fig_log_dead_horizontal",
+        "x": 90
+      }
+    ],
+    "axis=x,bark=dead": [
+      {
+        "model": "antcolonies:block/fig_log_dead_horizontal",
+        "x": 90,
+        "y": 90
+      }
+    ],
+    "axis=y,bark=bare": [
+      {
+        "model": "antcolonies:block/fig_log_bare"
+      }
+    ],
+    "axis=z,bark=bare": [
+      {
+        "model": "antcolonies:block/fig_log_bare_horizontal",
+        "x": 90
+      }
+    ],
+    "axis=x,bark=bare": [
+      {
+        "model": "antcolonies:block/fig_log_bare_horizontal",
+        "x": 90,
+        "y": 90
+      }
+    ]
+  }
+}

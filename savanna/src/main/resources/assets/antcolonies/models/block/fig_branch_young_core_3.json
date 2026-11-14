@@ -1,0 +1,77 @@
+{
+  "textures": {
+    "particle": "antcolonies:block/fig_bark_young",
+    "side": "antcolonies:block/fig_bark_young",
+    "end": "antcolonies:block/fig_log_top"
+  },
+  "elements": [
+    {
+      "from": [
+        4.0,
+        4.0,
+        4.0
+      ],
+      "to": [
+        12.0,
+        12.0,
+        12.0
+      ],
+      "faces": {
+        "north": {
+          "texture": "#side",
+          "uv": [
+            4.0,
+            4.0,
+            12.0,
+            12.0
+          ]
+        },
+        "south": {
+          "texture": "#side",
+          "uv": [
+            4.0,
+            4.0,
+            12.0,
+            12.0
+          ]
+        },
+        "east": {
+          "texture": "#side",
+          "uv": [
+            4.0,
+            4.0,
+            12.0,
+            12.0
+          ]
+        },
+        "west": {
+          "texture": "#side",
+          "uv": [
+            4.0,
+            4.0,
+            12.0,
+            12.0
+          ]
+        },
+        "up": {
+          "texture": "#side",
+          "uv": [
+            4.0,
+            4.0,
+            12.0,
+            12.0
+          ]
+        },
+        "down": {
+          "texture": "#side",
+          "uv": [
+            4.0,
+            4.0,
+            12.0,
+            12.0
+          ]
+        }
+      }
+    }
+  ]
+}

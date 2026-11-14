@@ -114,7 +114,7 @@ is measured first. Either way the stems are full blocks you can climb.
    tree feet on the floodplain (`SavannaWorldTests.noDryTreeStandsOnTheFloodplain`); the mound survey: 0 of 357 mounds
    lost the room for their dead tree to the floodplain (a mound near a river finds its spot on the dry side), every band
    unchanged.
-3. **The fig's blocks:** fig log and wood (bark A in its tiles, young bark, dead bark, bare grey wood), fig branch
+3. **DONE 2026-11-13 (details in `docs/HISTORY.md`). The fig's blocks:** fig log and wood (bark A in its tiles, young bark, dead bark, bare grey wood), fig branch
    (tapering, the same thicknesses), fig leaves, root slabs, fig bunch, figs on the bark, leaf spray, fig seedling;
    textures written by `tools/floodplain_tree_art.py` into the game's folders. Test category `trees`.
 4. **The fig's shapes in Java** (`tree/FigShape`, from `fig()`, `figSeedling`, `figSapling`, `deadFig`, `figFallen`;

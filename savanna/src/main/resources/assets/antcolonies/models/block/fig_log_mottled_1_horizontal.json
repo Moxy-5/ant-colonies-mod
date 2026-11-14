@@ -1,0 +1,7 @@
+{
+  "parent": "minecraft:block/cube_column_horizontal",
+  "textures": {
+    "side": "antcolonies:block/fig_bark_2",
+    "end": "antcolonies:block/fig_log_top"
+  }
+}

@@ -1,0 +1,40 @@
+{
+  "variants": {
+    "bark=mottled,low=false": {
+      "model": "antcolonies:block/fig_root_mottled_high"
+    },
+    "bark=mottled,low=true": {
+      "model": "antcolonies:block/fig_root_mottled_low"
+    },
+    "bark=patch,low=false": {
+      "model": "antcolonies:block/fig_root_patch_high"
+    },
+    "bark=patch,low=true": {
+      "model": "antcolonies:block/fig_root_patch_low"
+    },
+    "bark=pale,low=false": {
+      "model": "antcolonies:block/fig_root_pale_high"
+    },
+    "bark=pale,low=true": {
+      "model": "antcolonies:block/fig_root_pale_low"
+    },
+    "bark=young,low=false": {
+      "model": "antcolonies:block/fig_root_young_high"
+    },
+    "bark=young,low=true": {
+      "model": "antcolonies:block/fig_root_young_low"
+    },
+    "bark=dead,low=false": {
+      "model": "antcolonies:block/fig_root_dead_high"
+    },
+    "bark=dead,low=true": {
+      "model": "antcolonies:block/fig_root_dead_low"
+    },
+    "bark=bare,low=false": {
+      "model": "antcolonies:block/fig_root_bare_high"
+    },
+    "bark=bare,low=true": {
+      "model": "antcolonies:block/fig_root_bare_low"
+    }
+  }
+}
