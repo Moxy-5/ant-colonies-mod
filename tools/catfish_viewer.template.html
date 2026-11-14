@@ -1,0 +1,331 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>River Catfish Viewer</title>
+<style>
+  :root { --bg: #eef3f2; --panel: #fbfdfc; --ink: #1d2a2c; --muted: #5d6f71; --line: #cfdcdb; --accent: #2f7d84; }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) { --bg: #141b1c; --panel: #1c2526; --ink: #e3eeee; --muted: #94a8a9; --line: #2f3b3c; --accent: #6cc3c9; }
+  }
+  :root[data-theme="dark"] { --bg: #141b1c; --panel: #1c2526; --ink: #e3eeee; --muted: #94a8a9; --line: #2f3b3c; --accent: #6cc3c9; }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font: 15px/1.45 system-ui, sans-serif; }
+  header { padding: 14px 16px 6px; }
+  h1 { margin: 0 0 4px; font-size: 20px; }
+  header p { margin: 0; color: var(--muted); max-width: 82ch; }
+  #wrap { position: relative; height: 62vh; min-height: 340px; margin: 10px 16px; border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
+  canvas { display: block; width: 100%; height: 100%; }
+  #labels { position: absolute; inset: 0; pointer-events: none; overflow: hidden; }
+  .tag { position: absolute; transform: translate(-50%, -100%); background: var(--panel); border: 1px solid var(--line); border-radius: 6px;
+         padding: 1px 6px; font-size: 12px; font-weight: 600; white-space: nowrap; }
+  .controls { display: flex; flex-wrap: wrap; gap: 8px 14px; padding: 0 16px 8px; align-items: center; }
+  .controls label { display: flex; gap: 8px; align-items: center; font-size: 14px; }
+  .controls input[type=range] { width: 180px; max-width: 50vw; }
+  .readout { color: var(--muted); font-size: 13px; }
+  button { font: inherit; padding: 6px 12px; border-radius: 8px; border: 1px solid var(--line); background: var(--panel); color: var(--ink); cursor: pointer; }
+  button.on { border-color: var(--accent); color: var(--accent); font-weight: 600; }
+  ul { margin: 8px 16px 24px; padding-left: 22px; max-width: 82ch; }
+  li { margin: 4px 0; }
+  li b { color: var(--accent); }
+</style>
+</head>
+<body>
+<header>
+  <h1>River catfish viewer</h1>
+  <p>The river's big hunter in three looks, A to C, over a silt bed with the game's algae and a school of the game's
+     tilapia (at their game size, 0.6 blocks) for scale. Its body is a chain of bones (head, front, middle, rear, hind,
+     tail fin), so it swims in a long wave; its four pairs of barbels and its lower jaw are their own bones, so the
+     whiskers sway and "Strike" makes it lunge with its mouth open. The size slider sets how long the catfish is. Drag
+     to turn, scroll or pinch to zoom, right-drag to slide.</p>
+</header>
+<div id="wrap"><canvas id="c"></canvas><div id="labels"></div></div>
+<div class="controls">
+  <label>Catfish length <input id="size" type="range" min="0.5" max="3" step="0.05"> <span id="sizeOut" class="readout"></span></label>
+  <label><input id="swim" type="checkbox" checked> Swim wave</label>
+  <button id="graze">Strike</button>
+  <span id="boxes" class="readout"></span>
+</div>
+<div class="controls" id="cams"></div>
+<ul id="list"></ul>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+<script>
+const DATA = /*DATA*/null;
+const canvas = document.getElementById('c');
+const wrap = document.getElementById('wrap');
+const renderer = new THREE.WebGLRenderer({canvas, antialias: true, preserveDrawingBuffer: true});
+renderer.setPixelRatio(window.devicePixelRatio);
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+const scene = new THREE.Scene();
+const WATER = new THREE.Color('#4f8f98');
+scene.background = WATER;
+scene.fog = new THREE.Fog(WATER, 5, 22);
+const camera = new THREE.PerspectiveCamera(35, 1, 0.01, 200);
+const controls = new THREE.OrbitControls(camera, canvas);
+scene.add(new THREE.HemisphereLight('#dff4f2', '#6b6248', 0.8));
+const sun = new THREE.DirectionalLight('#fffbe8', 0.6);
+sun.position.set(3, 12, 5);
+sun.castShadow = true;
+sun.shadow.mapSize.set(2048, 2048);
+sun.shadow.bias = -0.0004;
+Object.assign(sun.shadow.camera, {left: -8, right: 8, top: 8, bottom: -8, near: 0.5, far: 30});
+scene.add(sun);
+
+function deg(v) { return v * Math.PI / 180; }
+function setRot(obj, r) { obj.rotation.set(deg(-r[0]), deg(r[1]), deg(-r[2]), 'ZYX'); }
+function loadTexture(uri, repeat) {
+  const t = new THREE.TextureLoader().load(uri);
+  t.magFilter = THREE.NearestFilter;
+  t.minFilter = THREE.NearestFilter;
+  if (repeat) { t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(repeat, repeat); }
+  return t;
+}
+
+// The river bed: silt, patches of the game's lush and thick algae with their streamers, a water surface above.
+const bed = new THREE.Mesh(new THREE.PlaneGeometry(40, 40), new THREE.MeshLambertMaterial({map: loadTexture(DATA.blocks.silt, 40)}));
+bed.rotation.x = -Math.PI / 2;
+bed.receiveShadow = true;
+scene.add(bed);
+const matMats = ['algae_mat_3', 'algae_mat_2'].map(n => new THREE.MeshLambertMaterial({map: loadTexture(DATA.blocks[n]), transparent: true, alphaTest: 0.3}));
+const strandTex = loadTexture(DATA.blocks.algae_strands_tall);
+strandTex.repeat.set(1, 1 / 8);
+strandTex.offset.set(0, 7 / 8);
+const strandMat = new THREE.MeshLambertMaterial({map: strandTex, alphaTest: 0.3, side: THREE.DoubleSide});
+const rand = (() => { let s = 7; return () => (s = (s * 16807) % 2147483647) / 2147483647; })();
+for (let x = -6; x <= 6; x++) for (let z = -4; z <= 3; z++) {
+  if (rand() < 0.35) continue;
+  const lush = rand() < 0.6 && !(z >= -1 && Math.abs(x + 0.5) < 4.5);  // no streamers in front of the three fish
+  const m = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), matMats[lush ? 0 : 1]);
+  m.rotation.x = -Math.PI / 2; m.rotation.z = Math.floor(rand() * 4) * Math.PI / 2;
+  m.position.set(x + 0.5, 0.01, z + 0.5); m.receiveShadow = true;
+  scene.add(m);
+  if (lush) [Math.PI / 4, -Math.PI / 4].forEach(a => {
+    const s = new THREE.Mesh(new THREE.PlaneGeometry(0.9, 1), strandMat);
+    s.position.set(x + 0.5, 0.5, z + 0.5); s.rotation.y = a;
+    scene.add(s);
+  });
+}
+const surface = new THREE.Mesh(new THREE.PlaneGeometry(40, 40), new THREE.MeshLambertMaterial({color: '#9fd3d6', transparent: true, opacity: 0.35, side: THREE.DoubleSide}));
+surface.rotation.x = -Math.PI / 2; surface.position.y = 3.2;
+scene.add(surface);
+
+// --- the fish ---------------------------------------------------------------------------------------------------------
+const FACES = ['east', 'west', 'up', 'down', 'south', 'north'];
+function boxGeometry(c, tw, th) {
+  const g = new THREE.BoxGeometry(Math.max(c.size[0], 0.02), Math.max(c.size[1], 0.02), Math.max(c.size[2], 0.02));
+  const uv = g.attributes.uv;
+  FACES.forEach((f, i) => {
+    const face = c.uv && c.uv[f];
+    if (!face) return;
+    const [u0, v0] = face.uv, [w, h] = face.uv_size;
+    for (let k = 0; k < 4; k++) {
+      const j = i * 4 + k;
+      uv.setXY(j, (u0 + uv.getX(j) * w) / tw, 1 - (v0 + (1 - uv.getY(j)) * h) / th);
+    }
+  });
+  uv.needsUpdate = true;
+  return g;
+}
+
+function buildFish(look) {
+  const tex = loadTexture(look.texture);
+  const mat = new THREE.MeshLambertMaterial({map: tex, alphaTest: 0.5});
+  const root = new THREE.Group(), groups = {}, byName = {};
+  look.bones.forEach(b => byName[b.name] = b);
+  look.bones.forEach(b => {
+    const g = new THREE.Group();
+    const p = b.parent ? byName[b.parent].pivot : [0, 0, 0];
+    g.position.set(b.pivot[0] - p[0], b.pivot[1] - p[1], b.pivot[2] - p[2]);
+    if (b.rotation) setRot(g, b.rotation);
+    g.userData.base = g.rotation.clone();
+    groups[b.name] = g;
+    (b.cubes || []).forEach(c => {
+      const mesh = new THREE.Mesh(boxGeometry(c, look.w, look.h), mat);
+      mesh.castShadow = true;
+      mesh.position.set(c.origin[0] + c.size[0] / 2 - b.pivot[0], c.origin[1] + c.size[1] / 2 - b.pivot[1], c.origin[2] + c.size[2] / 2 - b.pivot[2]);
+      g.add(mesh);
+    });
+  });
+  look.bones.forEach(b => (b.parent ? groups[b.parent] : root).add(groups[b.name]));
+  root.scale.setScalar(1 / 16);
+  const pitch = new THREE.Group();      // nose up and down (grazing)
+  pitch.add(root);
+  const bounds = new THREE.Box3().setFromObject(pitch);
+  const c = bounds.getCenter(new THREE.Vector3());
+  root.position.set(-c.x, -c.y, -c.z);  // turns about its middle
+  const yaw = new THREE.Group();        // the heading
+  yaw.add(pitch);
+  yaw.userData = {groups, pitch, length: bounds.max.z - bounds.min.z, height: bounds.max.y - bounds.min.y, phase: rand() * 6.28};
+  scene.add(yaw);
+  return yaw;
+}
+
+// The swim wave: each body bone's sideways angle a sine, bigger and later toward the tail; a bone turns by its own angle
+// less its parent's. The side fins flutter, the barbels sway.
+function swim(fish, t, amount, beat, wave) {
+  const g = fish.userData.groups, abs = {body: 0}, ph = fish.userData.phase;
+  wave.forEach(([name, parent, a, lag]) => {
+    abs[name] = amount * a * Math.sin(beat * t - lag + ph);
+    g[name].rotation.y = abs[name] - abs[parent];
+  });
+  ['left', 'right'].forEach((s, i) => {
+    const sign = i ? -1 : 1;
+    const p = g['pectoral_' + s], v = g['pelvic_' + s];
+    p.rotation.y = p.userData.base.y + sign * (0.25 + 0.75 * amount) * 0.15 * Math.sin(beat * 2 * t + ph + i * 0.5);
+    v.rotation.x = v.userData.base.x + 0.08 * Math.sin(beat * t + ph);
+  });
+  Object.keys(g).filter(n => n.startsWith('barbel')).forEach((n, i) => {
+    const b = g[n], k = n.includes('tip') ? 0.22 : 0.12;
+    b.rotation.y = b.userData.base.y + k * Math.sin(t * 1.7 + i * 0.9 + ph);
+    b.rotation.x = b.userData.base.x + k * 0.6 * Math.sin(t * 1.3 + i * 1.7 + ph);
+  });
+}
+const TILAPIA_WAVE = [['head', 'body', -0.05, 0], ['front', 'body', 0.04, 0.6], ['mid', 'front', 0.1, 1.3],
+                      ['rear', 'mid', 0.19, 2.0], ['peduncle', 'rear', 0.3, 2.6], ['tail', 'peduncle', 0.42, 3.1]];
+
+const settings = {size: 1.5, cam: 'overview'};
+const TILAPIA = 0.6;
+location.hash.slice(1).split('&').filter(Boolean).forEach(kv => {
+  const [k, v] = kv.split('=').map(decodeURIComponent);
+  settings[k] = isNaN(parseFloat(v)) ? v : parseFloat(v);
+});
+
+const tags = [];
+function tag(text, obj, lift) {
+  const el = document.createElement('div');
+  el.className = 'tag'; el.textContent = text;
+  document.getElementById('labels').appendChild(el);
+  tags.push({el, obj, lift});
+}
+
+const looks = Object.entries(DATA.looks).map(([key, look]) => {
+  const fish = buildFish(look);
+  fish.rotation.y = Math.PI / 2;     // head to -x, the side to the camera
+  tag(key + '. ' + look.name, fish, 1);
+  return {key, look, fish};
+});
+const school = [];
+for (let i = 0; i < 7; i++) school.push(buildFish(DATA.tilapia));
+
+const block = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), new THREE.MeshLambertMaterial({map: loadTexture(DATA.blocks.wet_silt)}));
+block.castShadow = true; block.userData.height = 1;
+scene.add(block); tag('1 block', block, 0);
+const player = new THREE.Group();
+[[0.5, 0.75, 0.25, 0.375, '#3b4a8f'], [0.5, 0.75, 0.25, 1.125, '#2f9c9c'], [0.5, 0.5, 0.5, 1.55, '#b98a68']].forEach(([w, h, d, y, col]) => {
+  const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), new THREE.MeshLambertMaterial({color: col}));
+  m.position.y = y; m.castShadow = true; player.add(m);
+});
+player.userData.height = 1.8;
+scene.add(player); tag('Player, 1.8 blocks', player, 0);
+
+const sizeIn = document.getElementById('size');
+sizeIn.value = settings.size;
+function hoverY() { return 0.2 + settings.size * 0.12; }
+function layout() {
+  const s = settings.size, gap = Math.max(0.5, s * 0.25);
+  looks.forEach((l, i) => {
+    l.fish.scale.setScalar(s / l.fish.userData.length);
+    l.fish.userData.home = new THREE.Vector3((i - 1) * (s + gap), hoverY(), 0.6);
+    l.fish.position.copy(l.fish.userData.home);
+  });
+  school.forEach(f => f.scale.setScalar(TILAPIA / f.userData.length));
+  block.position.set(1.0 + s * 1.7, 0.5, -1.6);
+  player.position.set(2.6 + s * 1.7, 0, -1.6);
+  document.getElementById('sizeOut').textContent = s.toFixed(2) + ' blocks long, ' + (s / TILAPIA).toFixed(1) + ' times a tilapia (a real sharptooth catfish is often 0.5 to 1 m, the biggest about 1.7 m)';
+}
+sizeIn.addEventListener('input', () => { settings.size = parseFloat(sizeIn.value); layout(); });
+document.getElementById('boxes').textContent = DATA.boxes + ' boxes a fish';
+
+// Strike: a quick lunge forward with the jaw dropped open, then the mouth snaps shut and it glides back.
+let grazeStart = -1;
+document.getElementById('graze').onclick = () => { grazeStart = performance.now() / 1000; };
+function grazePose(t) {
+  if (grazeStart < 0) return {lunge: 0, gape: 0, beat: 0};
+  const k = t - grazeStart;
+  if (k > 2.2) { grazeStart = -1; return {lunge: 0, gape: 0, beat: 0}; }
+  const ease = x => x * x * (3 - 2 * x);
+  const lunge = k < 0.35 ? ease(k / 0.35) : k < 0.8 ? 1 : ease(Math.max(0, (2.2 - k) / 1.4));
+  const gape = k < 0.1 ? 0 : k < 0.3 ? ease((k - 0.1) / 0.2) : k < 0.5 ? ease((0.5 - k) / 0.2) : 0;
+  return {lunge, gape, beat: k < 0.45 ? 1 : 0};
+}
+
+// --- cameras -----------------------------------------------------------------------------------------------------------
+const CAMS = {
+  overview: () => [[0, hoverY() + 0.5 + settings.size * 0.6, 1.5 + settings.size * 2.4], [0, hoverY(), 0.4]],
+  'with tilapia': () => [[0, 2.2, 3.4 + settings.size * 2.2], [0, 0.5, -0.6]],
+};
+looks.forEach(l => {
+  CAMS['side ' + l.key] = () => { const p = l.fish.userData.home; return [[p.x, p.y + 0.04, p.z + settings.size * 0.9 + 0.08], [p.x, p.y, p.z]]; };
+});
+CAMS.front = () => { const p = looks[0].fish.userData.home; return [[p.x - settings.size * 0.9 - 0.15, p.y + settings.size * 0.1, p.z + 0.02], [p.x, p.y, p.z]]; };
+CAMS.top = () => { const p = looks[1].fish.userData.home; return [[p.x + 0.001, p.y + settings.size * 1.2 + 0.2, p.z + 0.001], [p.x, p.y, p.z]]; };
+CAMS.belly = () => { const p = looks[1].fish.userData.home; return [[p.x + 0.05, 0.03, p.z + settings.size * 0.5], [p.x, p.y, p.z]]; };
+const camBox = document.getElementById('cams');
+function setCam(name) {
+  settings.cam = name;
+  const [pos, target] = CAMS[name]();
+  camera.position.set(...pos); controls.target.set(...target); controls.update();
+  [...camBox.children].forEach(b => b.classList.toggle('on', b.textContent === name));
+}
+Object.keys(CAMS).forEach(name => {
+  const b = document.createElement('button');
+  b.textContent = name; b.onclick = () => setCam(name);
+  camBox.appendChild(b);
+});
+const list = document.getElementById('list');
+looks.forEach(l => {
+  const li = document.createElement('li');
+  li.innerHTML = '<b>' + l.key + '. ' + l.look.name + ':</b> ' + l.look.note;
+  list.appendChild(li);
+});
+
+function resize() {
+  const w = wrap.clientWidth, h = wrap.clientHeight;
+  renderer.setSize(w, h, false);
+  camera.aspect = w / h; camera.updateProjectionMatrix();
+}
+window.addEventListener('resize', resize);
+
+const v = new THREE.Vector3();
+const swimIn = document.getElementById('swim');
+function frame() {
+  const t = performance.now() / 1000;
+  const on = swimIn.checked ? 1 : 0;
+  const g = grazePose(t);
+  looks.forEach(l => {
+    const f = l.fish, s = settings.size;
+    swim(f, t, on * (0.45 + 1.1 * g.beat), 4.5 + 6 * g.beat, DATA.wave);
+    f.userData.groups.jaw.rotation.x = -g.gape * deg(32);
+    const bob = on * 0.015 * s * Math.sin(t * 1.1 + f.userData.phase);
+    f.position.y = f.userData.home.y + bob;
+    f.position.x = f.userData.home.x - g.lunge * s * 0.35;
+  });
+  school.forEach((f, i) => {
+    const r = 1.6 + (i % 3) * 0.35, a = t * 0.35 + i * 0.9, y = 0.9 + (i % 4) * 0.22 + 0.04 * Math.sin(t + i);
+    f.position.set(Math.cos(a) * r, y, -1.6 + Math.sin(a) * r * 0.7);
+    f.rotation.y = Math.PI - a;
+    swim(f, t, on, 9, TILAPIA_WAVE);
+  });
+  controls.update();
+  renderer.render(scene, camera);
+  const w = wrap.clientWidth, h = wrap.clientHeight;
+  tags.forEach(({el, obj, lift}) => {
+    const height = lift ? settings.size * 0.25 : (obj.userData.height || 0.2);
+    v.set(obj.position.x, (obj === block ? 0 : obj.position.y) + height + 0.06, obj.position.z).project(camera);
+    const show = v.z < 1 && Math.abs(v.x) < 1.1 && Math.abs(v.y) < 1.1;
+    el.style.display = show ? '' : 'none';
+    el.style.left = ((v.x + 1) / 2 * w) + 'px';
+    el.style.top = ((1 - v.y) / 2 * h) + 'px';
+  });
+  requestAnimationFrame(frame);
+}
+layout();
+resize();
+setCam(CAMS[settings.cam] ? settings.cam : 'overview');
+frame();
+</script>
+</body>
+</html>

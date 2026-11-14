@@ -483,6 +483,26 @@ def tilapia_page(out):
     print("wrote", out)
 
 
+def catfish_page(out):
+    """The river catfish (M9 river life, the hunter, catfish_models.py): looks A to C over a silt bed with the game's
+    algae and a school of the game's tilapia for scale, with a size slider, the swim wave, swaying barbels and a strike."""
+    import catfish_models as cm
+    import tilapia_models as tm
+    bones = cm.model()
+    looks = {}
+    for key, look in cm.LOOKS.items():
+        b, rows, w, h = cm.paint(bones, key)
+        looks[key] = {"name": look["name"], "note": look["note"], "bones": b, "texture": uri(tm.png(rows)), "w": w, "h": h}
+    tb, rows, w, h = tm.paint(tm.model(), "A")
+    blocks = {n: file_uri(n + ".png") for n in ("silt", "wet_silt", "algae_mat_3", "algae_mat_2", "algae_strands_tall")}
+    data = {"looks": looks, "tilapia": {"bones": tb, "texture": uri(tm.png(rows)), "w": w, "h": h}, "blocks": blocks,
+            "wave": cm.WAVE, "boxes": sum(len(b.get("cubes", [])) for b in bones)}
+    template = (Path(__file__).resolve().parent / "catfish_viewer.template.html").read_text(encoding="utf-8")
+    out.parent.mkdir(parents=True, exist_ok=True)
+    out.write_text(template.replace("/*DATA*/null", json.dumps(data)), encoding="utf-8")
+    print("wrote", out)
+
+
 def mix_soil(x, y):
     """Plain mound soil for the viewer's floor and walls."""
     rng = random.Random(x * 31 + y * 7)
@@ -497,6 +517,9 @@ def main():
         return
     if len(sys.argv) > 1 and sys.argv[1] == "floodplain":
         floodplain_page(Path(sys.argv[2]) if len(sys.argv) > 2 else ROOT / "references/floodplain_viewer.html")
+        return
+    if len(sys.argv) > 1 and sys.argv[1] == "catfish":
+        catfish_page(Path(sys.argv[2]) if len(sys.argv) > 2 else ROOT / "references/catfish_viewer.html")
         return
     if len(sys.argv) > 1 and sys.argv[1] == "tilapia":
         tilapia_page(Path(sys.argv[2]) if len(sys.argv) > 2 else ROOT / "references/tilapia_viewer.html")
