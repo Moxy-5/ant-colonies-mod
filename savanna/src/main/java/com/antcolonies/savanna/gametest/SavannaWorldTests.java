@@ -334,6 +334,144 @@ public class SavannaWorldTests {
     /** How far out the floodplain must lie a block above the water (median 1, nine in ten at most 2). */
     static final int RIVER_BANKS = 80, BANK_DROP = 2, RIVER_DEPTH_LEAST = 3, FLOODPLAIN_OUT = 12;
     /**
+     * How much floodplain the savanna rivers have (floodplain trees, step 1, 2026-11-13, {@code docs/plans/floodplain-trees.md}),
+     * read from the noise on {@link #GROUND_SEEDS}, so the trees' spacing fits the real land: from river banks with
+     * savanna behind them, how far the floodplain biome ({@link SavannaRegion#SAVANNA_FLOODPLAIN}) reaches out from the
+     * water's edge (read every 4 blocks, the biome's own grain), and how much of that is low ground (2 blocks or less over
+     * the water, where mounds keep off); on the map, the floodplain's share of the savanna, how many blocks of it a block
+     * of savanna river has, and how much lies far from any river (a dry valley).
+     */
+    @GameTest(template = "arena", timeoutTicks = 400, batch = "savanna_maps")
+    public static void floodplainWidthIsMeasured(GameTestHelper helper) {
+        var registries = helper.getLevel().registryAccess();
+        List<Integer> widths = new ArrayList<>(), lows = new ArrayList<>(), riverBiomeOver = new ArrayList<>();
+        int banks = 0, none = 0;
+        long floodCells = 0, savannaCells = 0, riverCells = 0, farCells = 0;
+        StringBuilder report = new StringBuilder();
+        for (long seed : GROUND_SEEDS) {
+            Climate.Sampler sampler = BiomeMaps.sampler(registries, seed);
+            MultiNoiseBiomeSource source = BiomeMaps.bigSavannaSource(registries, seed);
+            BiomeMaps.Ground ground = BiomeMaps.ground(registries, source, seed, helper.getLevel());
+            byte[] map = BiomeMaps.map(source, sampler);
+            int side = BiomeMaps.SIDE;
+            boolean[] flood = new boolean[map.length];
+            for (int c = 0; c < map.length; c++) {
+                if (map[c] != BiomeMaps.SAVANNA) {
+                    continue;
+                }
+                savannaCells++;
+                int x = -BiomeMaps.HALF + (c / side) * BiomeMaps.STEP, z = -BiomeMaps.HALF + (c % side) * BiomeMaps.STEP;
+                flood[c] = floodplain(source, sampler, x, z);
+                floodCells += flood[c] ? 1 : 0;
+            }
+            List<Integer> cells = new ArrayList<>();
+            for (int c = 0; c < map.length; c++) {
+                int i = c / side, j = c % side;
+                if (map[c] != BiomeMaps.RIVER || i == 0 || j == 0 || i == side - 1 || j == side - 1) {
+                    continue;
+                }
+                boolean bySavanna = map[c - 1] == BiomeMaps.SAVANNA || map[c + 1] == BiomeMaps.SAVANNA
+                        || map[c - side] == BiomeMaps.SAVANNA || map[c + side] == BiomeMaps.SAVANNA;
+                if (bySavanna) {
+                    riverCells++;
+                    cells.add(c);
+                }
+            }
+            for (int c = 0; c < map.length; c++) {
+                if (!flood[c]) {
+                    continue;
+                }
+                boolean near = false;
+                int i = c / side, j = c % side;
+                for (int di = -8; di <= 8 && !near; di++) {
+                    for (int dj = -8; dj <= 8 && !near; dj++) {
+                        int a = i + di, b = j + dj;
+                        near = a >= 0 && b >= 0 && a < side && b < side && map[a * side + b] == BiomeMaps.RIVER;
+                    }
+                }
+                farCells += near ? 0 : 1;
+            }
+            java.util.Collections.shuffle(cells, new java.util.Random(seed));
+            int seedBanks = 0;
+            for (int c : cells) {
+                if (seedBanks >= RIVER_BANKS) {
+                    break;
+                }
+                int x = -BiomeMaps.HALF + (c / side) * BiomeMaps.STEP, z = -BiomeMaps.HALF + (c % side) * BiomeMaps.STEP;
+                if (ground.height(x, z) > SEA_TOP) {
+                    continue;
+                }
+                for (int[] d : new int[][] {{1, 0}, {-1, 0}, {0, 1}, {0, -1}}) {
+                    int edge = -1;
+                    for (int k = 0; k <= 48; k++) {
+                        if (ground.height(x + d[0] * k, z + d[1] * k) > SEA_TOP) {
+                            edge = k;
+                            break;
+                        }
+                    }
+                    if (edge < 0 || !source.getNoiseBiome(QuartPos.fromBlock(x + d[0] * (edge + 300)), QuartPos.fromBlock(SavannaSpawn.SAMPLE_Y),
+                            QuartPos.fromBlock(z + d[1] * (edge + 300)), sampler).is(BiomeTags.IS_SAVANNA)) {
+                        continue; // only banks with savanna behind them
+                    }
+                    seedBanks++;
+                    int width = 0, low = 0, start = 0;
+                    while (start < 64 && source.getNoiseBiome(QuartPos.fromBlock(x + d[0] * (edge + start)), QuartPos.fromBlock(SavannaSpawn.SAMPLE_Y),
+                            QuartPos.fromBlock(z + d[1] * (edge + start)), sampler).is(BiomeTags.IS_RIVER)) {
+                        start += 4; // the river's biome reaches a little past its water
+                    }
+                    riverBiomeOver.add(start);
+                    for (int k = start; k <= FLOOD_LOOK; k += 4) {
+                        int bx = x + d[0] * (edge + k), bz = z + d[1] * (edge + k);
+                        if (!floodplain(source, sampler, bx, bz)) {
+                            break;
+                        }
+                        width = k + 4;
+                        if (ground.height(bx, bz) - (SEA_TOP + 1) <= 1) {
+                            low = k + 4; // the ground's top block 2 or less over the water's top
+                        }
+                    }
+                    widths.add(width);
+                    lows.add(low);
+                    none += width == 0 ? 1 : 0;
+                }
+            }
+            banks += seedBanks;
+            report.append(String.format("%n  seed %d: %d banks", seed, seedBanks));
+        }
+        String all = String.format("%d banks; floodplain width from the water's edge median %d, 10%% %d, 90%% %d (none on %.0f%%, %d or more on %.0f%%); "
+                + "low ground (2 or less over the water) median %d, 90%% %d; the floodplain %.1f%% of the savanna, %.0f blocks of it a block of "
+                + "savanna river, %.0f%% of it more than 256 blocks from a river; the river's biome reaches past its water median %d, 90%% %d%s",
+                banks, middle(widths, 0.5), middle(widths, 0.1), middle(widths, 0.9), banks == 0 ? 0 : 100.0 * none / banks,
+                FLOOD_LOOK, banks == 0 ? 0 : 100.0 * widths.stream().filter(w -> w > FLOOD_LOOK).count() / banks,
+                middle(lows, 0.5), middle(lows, 0.9), savannaCells == 0 ? 0 : 100.0 * floodCells / savannaCells,
+                riverCells == 0 ? 0 : (double) floodCells * BiomeMaps.STEP / riverCells, floodCells == 0 ? 0 : 100.0 * farCells / floodCells,
+                middle(riverBiomeOver, 0.5), middle(riverBiomeOver, 0.9), report);
+        SavannaMod.LOGGER.info("[biome maps] floodplain: {}", all);
+        helper.assertTrue(banks >= 30, "too few savanna river banks found to measure: " + all);
+        helper.assertTrue(middle(widths, 0.5) >= FLOOD_WIDTH_LEAST && none <= FLOOD_NONE_MOST * banks,
+                "the floodplain too narrow for its trees: " + all);
+        double share = savannaCells == 0 ? 0 : (double) floodCells / savannaCells;
+        helper.assertTrue(share >= FLOOD_SHARE[0] && share <= FLOOD_SHARE[1], "the floodplain's share of the savanna out of its band: " + all);
+        helper.succeed();
+    }
+
+    /** How far out from the water the floodplain is followed, in blocks. */
+    static final int FLOOD_LOOK = 400;
+    /**
+     * Measured 2026-11-13 on {@link #GROUND_SEEDS}: width median 20 (10 in 100 banks 0, 90 in 100 at most 76), none on
+     * 19 percent of banks, the floodplain 22.4 percent of the savanna; the floodplain trees' spacing was picked for it, so
+     * these limits flag a change in the land that would leave them no room (or the dry trees too little).
+     */
+    static final int FLOOD_WIDTH_LEAST = 12;
+    static final double FLOOD_NONE_MOST = 0.35;
+    static final double[] FLOOD_SHARE = {0.10, 0.35};
+
+    private static boolean floodplain(MultiNoiseBiomeSource source, Climate.Sampler sampler, int x, int z) {
+        return source.getNoiseBiome(QuartPos.fromBlock(x), QuartPos.fromBlock(SavannaSpawn.SAMPLE_Y), QuartPos.fromBlock(z), sampler)
+                .is(SavannaRegion.SAVANNA_FLOODPLAIN);
+    }
+
+    /**
      * Before the floodplain (2026-11-07) the land rose 3 to 7 blocks within 16 of the water and banks dropped; after it
      * none dropped and 4 to 6 percent met a pond (a low dip of the lumps), so the limits leave room for chance.
      */

@@ -18,10 +18,24 @@ dead stages each.
 ## The picks (my picks unless marked; the user may change any)
 - **Where:** only on the floodplain biome (`antcolonies:savanna_floodplain`, the greener grass), on dry ground (never
   in water, a pool or the 4-block strip by the river).
-- **Dry trees off the floodplain (the user):** no umbrella thorn, camel thorn or baobab stands or sprouts with its foot
+- **Dry trees off the floodplain (the user):** (measured: the floodplain is about a fifth of the savanna, so the dry
+  trees lose that share of their land; the open savanna keeps all of them) no umbrella thorn, camel thorn or baobab stands or sprouts with its foot
   on floodplain ground, in new land or in play. One check in one place (`TreeKinds`, "may this kind stand here?"),
   asked by both the new-land placer and the seedling chooser (`Forest.sproutSite`), so the rule is never written twice.
-- **Spacing (open grass for the wildlife, the user's wish):**
+- **The floodplain as measured (step 1, 2026-11-13, `SavannaWorldTests.floodplainWidthIsMeasured`, 240 river banks on 3
+  seeds):** from the water's edge the floodplain reaches a median **20 blocks** on each side (1 bank in 10 has none at
+  that spot, 1 in 10 has 76 or more; 19 in 100 banks have none, mostly where a river runs along the savanna's edge); the
+  lowest ground (2 blocks or less over the water, where mounds keep off) a median 12 of those 20. All of it lies within
+  256 blocks of a river. It is **22 percent of all savanna land**, about 54 blocks of floodplain for each block of river.
+  So: a typical floodplain is a strip about 20 blocks wide each side of the river, a line of trees, not a wood; here and
+  there it widens to 50 to 80 blocks, where groves fit. And the dry trees leave about a fifth of the savanna.
+- **Spacing (open grass for the wildlife, the user's wish), retuned for the strip:** set by area of floodplain, so a
+  narrow strip gets a line and a wide stretch gets more:
+  - Fig: about **one grown fig per 40 by 40 blocks of floodplain** (on a 20-block strip, one every 80 blocks of river on
+    each side; on a wide stretch closer); never two grown figs within 40 blocks; young figs as often again.
+  - Doum: about **one grove per 50 by 50 blocks of floodplain**; on a narrow strip the grove strings out along the river
+    (2 or 3 palms in a line), on a wide stretch a loose clump of up to 5; palms 8 to 15 apart.
+  - The first picks, kept as the feel:
   - Fig: grown figs **one about every 60 to 80 blocks along the floodplain**, within about 30 blocks of the water;
     young figs as often again, near the water. Never two grown figs within 40 blocks.
   - Doum: **groves of 2 to 5 palms**, a palm 8 to 15 blocks from the next in its grove, groves about **every 50 to 70
@@ -87,7 +101,7 @@ stand on them. A Minecraft model turns only in steps of 22.5 degrees, so a frond
 is measured first. Either way the stems are full blocks you can climb.
 
 ## Steps (each ends with `./gradlew build` and the `trees` and `worldgen` tests on 6 servers)
-1. **Measure the floodplain:** how wide it is in blocks and how many blocks of it a typical river has, on the survey
+1. **DONE 2026-11-13. Measure the floodplain:** how wide it is in blocks and how many blocks of it a typical river has, on the survey
    seeds (`SavannaWorldTests`), so the spacing above fits the real land (a floodplain 20 blocks wide holds a line of
    trees, not groves). Retune the spacing if needed, and say so.
 2. **Dry trees off the floodplain** (the one check, new land and seedlings). Test: new land on the survey seeds has no
