@@ -147,7 +147,7 @@ const REAL = {
   bank: "How they could stand on the floodplain: a few doum palms in loose clumps near the water, a sycamore fig on its own here and there, set back. Most of the plain stays open grass. All spacing is my pick, to judge here.",
 };
 let kind = "fig", seed = 1, bare = false;
-let picks = { shape: { fig: "A", doum: "A" }, bark: { fig: "A", doum: "A" } };
+let picks = { shape: { fig: "B", doum: "B" }, bark: { fig: "A", doum: "A" } };  // the user's picks, 2026-11-13: shape B and bark A for both
 try { const s = JSON.parse(localStorage.getItem("floodplain-picks-2") || "null"); if (s && s.shape && s.bark) picks = s; } catch (e) {}
 
 // ================= The shape maker =================
