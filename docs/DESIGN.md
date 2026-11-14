@@ -348,6 +348,7 @@ it.** If a decision changes, ask the user first, then update it here. The short 
 - Spacing (my picks, to confirm): figs alone, one about every 60 to 80 blocks along the floodplain near the water; doum palms in groves of 2 to 5, groves about every 50 to 70 blocks; open grass between for the wildlife (the user's wish).
 - **Fruit (the user): it ripens in stages on the tree, drops, and is an item the player can eat when broken.** Fig bunches go green, yellow, ripe red over about 6 game days, each tree on its own timetable, and drop onto the ground as fallen figs that rot in about 2 days; doum nuts go green to orange-brown over about 20 days and lie fallen about 20. Fig 2 hunger eaten fast, doum nut 4 eaten slowly; green fruit is an item but not food; right-click picks a ripe bunch (my picks, numbers to confirm).
 - The palm's fronds become a frond block family turned to 16 directions (my pick; a drawn whole crown is the fallback), as Minecraft cannot place the viewer's sculpted boxes one by one.
+- **Dry trees off the floodplain, how (step 2, 2026-11-13):** one rule, `tree/TreeLands.mayStand`, asked by every placer (new land's trees, seedlings after rain, trees on and by new land's mounds). On new land a tree whose spot falls on the floodplain is not moved to the floodplain's edge (no tree there; my pick, so no wall of thorns lines it). A seedling a player plants grows anywhere (my pick).
 
 ## Core systems
 

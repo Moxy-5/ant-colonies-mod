@@ -20,8 +20,11 @@ dead stages each.
   in water, a pool or the 4-block strip by the river).
 - **Dry trees off the floodplain (the user):** (measured: the floodplain is about a fifth of the savanna, so the dry
   trees lose that share of their land; the open savanna keeps all of them) no umbrella thorn, camel thorn or baobab stands or sprouts with its foot
-  on floodplain ground, in new land or in play. One check in one place (`TreeKinds`, "may this kind stand here?"),
-  asked by both the new-land placer and the seedling chooser (`Forest.sproutSite`), so the rule is never written twice.
+  on floodplain ground, in new land or in play. One check in one place (`tree/TreeLands.mayStand`, "may this kind stand here?"),
+  asked by new land's tree structures, the seedlings after rain (`Forest.sproutIn`) and the trees on and by new land's
+  termite mounds (`NewLandMounds`), so the rule is never written twice. A seedling a player plants grows anywhere (my pick).
+  On new land a tree meant for a floodplain spot is not moved to the floodplain's edge: there is just no tree there
+  (my pick, so no wall of thorn trees lines the floodplain).
 - **The floodplain as measured (step 1, 2026-11-13, `SavannaWorldTests.floodplainWidthIsMeasured`, 240 river banks on 3
   seeds):** from the water's edge the floodplain reaches a median **20 blocks** on each side (1 bank in 10 has none at
   that spot, 1 in 10 has 76 or more; 19 in 100 banks have none, mostly where a river runs along the savanna's edge); the
@@ -104,9 +107,13 @@ is measured first. Either way the stems are full blocks you can climb.
 1. **DONE 2026-11-13. Measure the floodplain:** how wide it is in blocks and how many blocks of it a typical river has, on the survey
    seeds (`SavannaWorldTests`), so the spacing above fits the real land (a floodplain 20 blocks wide holds a line of
    trees, not groves). Retune the spacing if needed, and say so.
-2. **Dry trees off the floodplain** (the one check, new land and seedlings). Test: new land on the survey seeds has no
+2. **DONE 2026-11-13 (the counts below). Dry trees off the floodplain** (the one check, new land and seedlings). Test: new land on the survey seeds has no
    dry tree foot on floodplain ground; the mound survey bands still hold (dry trees also give the termites their dead
    wood: count how many mounds near rivers lose their dead tree, and say so).
+   Measured: new land's tree structures planned in 364 floodplain chunks and 363 dry savanna chunks on 3 seeds put 0
+   tree feet on the floodplain (`SavannaWorldTests.noDryTreeStandsOnTheFloodplain`); the mound survey: 0 of 357 mounds
+   lost the room for their dead tree to the floodplain (a mound near a river finds its spot on the dry side), every band
+   unchanged.
 3. **The fig's blocks:** fig log and wood (bark A in its tiles, young bark, dead bark, bare grey wood), fig branch
    (tapering, the same thicknesses), fig leaves, root slabs, fig bunch, figs on the bark, leaf spray, fig seedling;
    textures written by `tools/floodplain_tree_art.py` into the game's folders. Test category `trees`.

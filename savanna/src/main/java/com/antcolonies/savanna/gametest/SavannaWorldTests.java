@@ -471,6 +471,83 @@ public class SavannaWorldTests {
                 .is(SavannaRegion.SAVANNA_FLOODPLAIN);
     }
 
+    /** Chunks of each kind (floodplain, dry savanna) the dry trees test plans its trees in, per seed. */
+    static final int DRY_TREE_CHUNKS = 120;
+
+    /**
+     * Floodplain trees step 2 (the user, 2026-11-13: "dry savanna trees no longer can grow on the greener dirt"): new land's
+     * two giant tree structures, planned as world generation plans them (no chunks made) in chunks on the floodplain and in
+     * chunks of dry savanna on the survey seeds, never put a dry tree's foot on floodplain ground, and still put trees in
+     * the dry savanna.
+     */
+    @GameTest(template = "arena", timeoutTicks = 400, batch = "savanna_maps")
+    public static void noDryTreeStandsOnTheFloodplain(GameTestHelper helper) {
+        var level = helper.getLevel();
+        var registries = level.registryAccess();
+        var structures = registries.registryOrThrow(Registries.STRUCTURE);
+        List<net.minecraft.world.level.levelgen.structure.Structure> trees = new ArrayList<>();
+        for (String name : new String[] {"big_savanna_tree", "young_savanna_tree"}) {
+            var structure = structures.get(net.minecraft.resources.ResourceLocation.fromNamespaceAndPath(SavannaMod.MODID, name));
+            if (structure == null) {
+                throw new GameTestAssertException("no structure " + name);
+            }
+            trees.add(structure);
+        }
+        int floodChunks = 0, dryChunks = 0, floodTrees = 0, dryTrees = 0, onFlood = 0;
+        String first = "";
+        long start = System.nanoTime();
+        for (long seed : GROUND_SEEDS) {
+            Climate.Sampler sampler = BiomeMaps.sampler(registries, seed);
+            MultiNoiseBiomeSource source = BiomeMaps.bigSavannaSource(registries, seed);
+            BiomeMaps.Ground ground = BiomeMaps.ground(registries, source, seed, level);
+            byte[] map = BiomeMaps.map(source, sampler);
+            List<net.minecraft.world.level.ChunkPos> flood = new ArrayList<>(), dry = new ArrayList<>();
+            for (int c = 0; c < map.length; c++) {
+                if (map[c] != BiomeMaps.SAVANNA) {
+                    continue;
+                }
+                int x = -BiomeMaps.HALF + (c / BiomeMaps.SIDE) * BiomeMaps.STEP, z = -BiomeMaps.HALF + (c % BiomeMaps.SIDE) * BiomeMaps.STEP;
+                (floodplain(source, sampler, x, z) ? flood : dry).add(new net.minecraft.world.level.ChunkPos(x >> 4, z >> 4));
+            }
+            for (int kind = 0; kind < 2; kind++) {
+                List<net.minecraft.world.level.ChunkPos> chunks = kind == 0 ? flood : dry;
+                int every = Math.max(1, chunks.size() / DRY_TREE_CHUNKS); // spread over the whole map
+                for (int i = 0; i < chunks.size(); i += every) {
+                    if (kind == 0) {
+                        floodChunks++;
+                    } else {
+                        dryChunks++;
+                    }
+                    for (var structure : trees) {
+                        var context = new net.minecraft.world.level.levelgen.structure.Structure.GenerationContext(registries, ground.generator(),
+                                source, ground.random(), level.getStructureManager(), seed, chunks.get(i), level, structure.biomes()::contains);
+                        var stub = structure.findValidGenerationPoint(context);
+                        if (stub.isEmpty()) {
+                            continue;
+                        }
+                        BlockPos foot = stub.get().position();
+                        if (kind == 0) {
+                            floodTrees++;
+                        } else {
+                            dryTrees++;
+                        }
+                        if (source.getNoiseBiome(QuartPos.fromBlock(foot.getX()), QuartPos.fromBlock(foot.getY()), QuartPos.fromBlock(foot.getZ()),
+                                ground.random().sampler()).is(SavannaRegion.SAVANNA_FLOODPLAIN) && onFlood++ == 0) {
+                            first = "seed " + seed + " at " + foot.toShortString();
+                        }
+                    }
+                }
+            }
+        }
+        String report = String.format("%d floodplain chunks planned %d dry trees (moved off it), %d dry savanna chunks %d trees; %d feet"
+                + " on the floodplain%s; %d ms", floodChunks, floodTrees, dryChunks, dryTrees, onFlood, first.isEmpty() ? "" : ", the first " + first,
+                (System.nanoTime() - start) / 1_000_000);
+        SavannaMod.LOGGER.info("[biome maps] dry trees and the floodplain: {}", report);
+        helper.assertTrue(onFlood == 0, "dry trees stand on the floodplain: " + report);
+        helper.assertTrue(dryTrees >= dryChunks / 4, "too few trees in the dry savanna: " + report);
+        helper.succeed();
+    }
+
     /**
      * Before the floodplain (2026-11-07) the land rose 3 to 7 blocks within 16 of the water and banks dropped; after it
      * none dropped and 4 to 6 percent met a pond (a low dip of the lumps), so the limits leave room for chance.

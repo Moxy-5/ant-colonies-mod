@@ -12,6 +12,7 @@ import com.mojang.serialization.MapCodec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
 
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.QuartPos;
 import net.minecraft.util.RandomSource;
 import net.minecraft.world.level.levelgen.Heightmap;
 import net.minecraft.world.level.levelgen.structure.Structure;
@@ -130,7 +131,10 @@ public class GiantTreeStructure extends Structure {
                 x = context.chunkPos().getMiddleBlockX() + random.nextInt(2 * MOVE + 1) - MOVE;
                 z = context.chunkPos().getMiddleBlockZ() + random.nextInt(2 * MOVE + 1) - MOVE;
             }
-            BlockPos foot = foot(context, x, z, reach);
+            BlockPos ground = foot(context, x, z, reach);
+            // the floodplain: no dry tree there (floodplain trees step 2), and none moved to its edge
+            BlockPos foot = ground != null && com.antcolonies.savanna.tree.TreeLands.mayStand(pick.kind(), context.biomeSource().getNoiseBiome(
+                    QuartPos.fromBlock(x), QuartPos.fromBlock(ground.getY()), QuartPos.fromBlock(z), context.randomState().sampler())) ? ground : null;
             if (foot == null) {
                 if (spot == 0) {
                     return Optional.empty(); // water or a steep slope where it was meant to be: no tree, as before the mounds

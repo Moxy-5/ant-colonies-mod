@@ -233,10 +233,10 @@ public class MatabeleNewLandTests {
         return String.format("%s: %d places, %d hold a mound, %d dead (%d still looking dead, 1 mound in %.1f; %d with another dead"
                 + " within %.0f, %d too near), %d of them Matabele (1 mound in %.1f, %.0f%% of the dead near termites), %d lonely dead"
                 + " mounds (no living mound in reach, empty), %d dead by the dice living instead, %d mounds nearer than 40; %d mounds"
-                + " in water or on the lowest floodplain, %d with little room for a dead tree; of the Matabele, %d with a living mound's"
+                + " in water or on the lowest floodplain, %d with little room for a dead tree (%d of them lost it to the floodplain); of the Matabele, %d with a living mound's"
                 + " edge within the scouts' reach less 10, its edge %.0f blocks off on average, %d at most", land, t[0], t[1],
                 t[2], t[7], t[1] / (double) Math.max(1, t[7]), t[9], CLUMP, t[8], t[3], t[1] / (double) Math.max(1, t[3]),
-                100.0 * t[3] / Math.max(1, t[2] - t[4]), t[4], t[6], t[5], t[10], t[11], t[12], t[13] / (double) Math.max(1, t[3]), t[14]);
+                100.0 * t[3] / Math.max(1, t[2] - t[4]), t[4], t[6], t[5], t[10], t[11], t[15], t[12], t[13] / (double) Math.max(1, t[3]), t[14]);
     }
 
     /** Of the dead mounds with living termites in reach, the share's worth hold Matabele (3 in 4, the user 2026-11-07). */
@@ -346,7 +346,10 @@ public class MatabeleNewLandTests {
                 helper.assertTrue(false, "a mound at " + foot.toShortString() + " " + wet);
             }
             // test revamp R6: room for its dead tree, dry fairly flat ground 10 to 30 blocks past its foot
-            out[11] += deadTreeGround(land, foot, MoundPlaces.footReach(pick.stage())) < DEAD_TREE_SPOTS_WANTED ? 1 : 0;
+            int[] room = deadTreeGround(land, foot, MoundPlaces.footReach(pick.stage()));
+            out[11] += room[0] < DEAD_TREE_SPOTS_WANTED ? 1 : 0;
+            // floodplain trees step 2: mounds whose dead tree had room only on the floodplain, where no dry tree stands now
+            out[15] += room[0] < DEAD_TREE_SPOTS_WANTED && room[1] >= DEAD_TREE_SPOTS_WANTED ? 1 : 0;
             if (pick.living()) {
                 out[6] += MoundPlaces.living(land.seed(), place, numbers.deadShare()) ? 0 : 1;
                 continue;
@@ -447,10 +450,11 @@ public class MatabeleNewLandTests {
     /**
      * How many (up to {@link #DEAD_TREE_SPOTS_WANTED}) of 24 spots round a mound (8 bearings, 3 distances 10 to 30 past its foot) have dry ground, flat within
      * the dead tree's {@code DEAD_TREE_UNEVEN} over 3 blocks round, and near the mound's height (the dead tree's ground
-     * rule in {@code NewLandMounds}, read on land no world holds).
+     * rule in {@code NewLandMounds}, read on land no world holds), as [off the floodplain (the game's rule since floodplain
+     * trees step 2), anywhere (the rule before it)].
      */
-    private static int deadTreeGround(MoundPlaces.Land land, BlockPos foot, double footReach) {
-        int found = 0;
+    private static int[] deadTreeGround(MoundPlaces.Land land, BlockPos foot, double footReach) {
+        int found = 0, anywhere = 0;
         int uneven = NewLandMounds.DEAD_TREE_UNEVEN;
         for (int b = 0; b < 8; b++) {
             double bearing = b * Math.PI / 4;
@@ -465,12 +469,17 @@ public class MatabeleNewLandTests {
                     lowest = Math.min(lowest, surface);
                     highest = Math.max(highest, surface);
                 }
-                if (dry && highest - lowest <= uneven && Math.abs(lowest - foot.getY()) <= 2 * uneven && ++found >= DEAD_TREE_SPOTS_WANTED) {
-                    return found; // (enough: each ground height costs about 2 ms on this land)
+                if (dry && highest - lowest <= uneven && Math.abs(lowest - foot.getY()) <= 2 * uneven) {
+                    anywhere++;
+                    Holder<net.minecraft.world.level.biome.Biome> biome = land.generator().getBiomeSource().getNoiseBiome(QuartPos.fromBlock(x),
+                            QuartPos.fromBlock(lowest), QuartPos.fromBlock(z), land.random().sampler());
+                    if (com.antcolonies.savanna.tree.TreeLands.mayStand("umbrella_thorn", biome) && ++found >= DEAD_TREE_SPOTS_WANTED) {
+                        return new int[] {found, anywhere}; // (enough: each ground height costs about 2 ms on this land)
+                    }
                 }
             }
         }
-        return found;
+        return new int[] {found, anywhere};
     }
 
     /** How far (blocks, sideways) the foot's edge of the nearest living mound of new land lies from {@code center}. */

@@ -1205,7 +1205,7 @@ public class Forest extends SavedData {
                 String kind = pickKind(dice);
                 long seed = dice.nextLong() & 0xFFFFFFFFL;
                 BlockPos foot = sproutSite(level, x, z);
-                if (takes && foot != null) {
+                if (takes && foot != null && TreeLands.mayStand(kind, level.getBiome(foot))) {
                     Tree t = addSeedling(kind, foot, seed, day + 1, false);
                     sprouted++;
                     count++;

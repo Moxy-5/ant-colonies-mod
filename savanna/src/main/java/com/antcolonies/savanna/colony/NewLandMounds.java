@@ -29,6 +29,7 @@ import com.antcolonies.savanna.species.SavannaNumbers;
 import com.antcolonies.savanna.species.SavannaNumbers.MoundNumbers;
 import com.antcolonies.species.SpeciesProfiles;
 import com.antcolonies.savanna.tree.Forest;
+import com.antcolonies.savanna.tree.TreeLands;
 import com.antcolonies.savanna.tree.TreeStage;
 import com.antcolonies.savanna.worldgen.MoundPlaces;
 import com.antcolonies.savanna.worldgen.TermiteMoundPiece;
@@ -667,8 +668,9 @@ public class NewLandMounds extends SavedData {
             double r = (count > 1 ? 3 : 2.5) + random.nextDouble() * 2.5;
             BlockPos foot = top(level, (int) Math.floor(center.getX() + 0.5 + Math.cos(b) * r), (int) Math.floor(center.getZ() + 0.5 + Math.sin(b) * r));
             BlockState under = level.getBlockState(foot.below());
-            if (!(under.is(BlockTags.DIRT) || Mound.isMoundBlock(under)) || Forest.get(level).at(foot) != null) {
-                continue;
+            if (!(under.is(BlockTags.DIRT) || Mound.isMoundBlock(under)) || Forest.get(level).at(foot) != null
+                    || !TreeLands.mayStand(kind, level.getBiome(foot))) {
+                continue; // (a hump on the floodplain keeps no dry tree: floodplain trees step 2)
             }
             long seed = random.nextLong() & 0xFFFFFFFFL;
             TreePlacer.Placed tree = TreePlacer.placed(kind, seed, age, TreeStage.LIVING);
@@ -753,6 +755,10 @@ public class NewLandMounds extends SavedData {
                 noGround[4]++;
                 continue;
             }
+            if (!TreeLands.mayStand(kind, level.getBiome(foot))) {
+                noGround[6]++;
+                continue;
+            }
             TreePlacer.Placed tree = shapes != null ? shapes.get(attempt) : TreePlacer.placed(kind, seed, age, stage);
             if (tree.lying() != null) {
                 tree = TreePlacer.rest(tree, foot, (gx, gz) -> top(level, gx, gz).getY());
@@ -825,7 +831,8 @@ public class NewLandMounds extends SavedData {
 
     /** Why a place had no ground for a dead tree, for the log (counted in {@link #deadTreeFoot}'s {@code why}). */
     private static final String[] NO_GROUND_WHY = {"past a test's fence", "not soil (water, sand, rock or something lying)", "too steep",
-            "too far above or below the mound", "another tree's place", "land round it not loaded"};
+            "too far above or below the mound", "another tree's place", "land round it not loaded",
+            "the floodplain (no dry tree there)"};
 
     /**
      * A dead tree's foot near (x, z): the lowest ground round its trunk, on soil near the mound's own ground (within twice
