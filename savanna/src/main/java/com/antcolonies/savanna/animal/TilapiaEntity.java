@@ -250,6 +250,15 @@ public class TilapiaEntity extends AbstractSchoolingFish implements GeoEntity {
         return new ItemStack(SavannaItems.TILAPIA_BUCKET.get());
     }
 
+    /** How far off a fish is still drawn (blocks; Minecraft's own rule, by the box's size, gave about 25). */
+    static final double DRAW_DISTANCE = 64.0;
+
+    @Override
+    public boolean shouldRenderAtSqrDistance(double distanceSqr) {
+        double reach = DRAW_DISTANCE * getViewScale();
+        return distanceSqr < reach * reach;
+    }
+
     @Override
     public int getMaxSchoolSize() {
         return 8;

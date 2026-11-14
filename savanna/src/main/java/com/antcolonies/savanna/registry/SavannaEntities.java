@@ -107,13 +107,14 @@ public class SavannaEntities {
                     .sized(0.48F, 0.36F)
                     .build("matabele_queen"));
 
-    // The Nile tilapia (M9 river life, 2026-11-14): a river fish about 0.35 blocks long grown (my pick), its box the
+    // The Nile tilapia (M9 river life, 2026-11-14): a river fish about 0.6 blocks long grown (my pick, made
+    // bigger than life so it is seen, the user's ask), its box the
     // grown fish's; young and big fish are scaled through their SCALE attribute.
     public static final DeferredHolder<EntityType<?>, EntityType<com.antcolonies.savanna.animal.TilapiaEntity>> TILAPIA =
             ENTITY_TYPES.register("tilapia", () -> EntityType.Builder
                     .of(com.antcolonies.savanna.animal.TilapiaEntity::new, MobCategory.WATER_AMBIENT)
-                    .sized(0.35F, 0.25F)
-                    .eyeHeight(0.12F)
+                    .sized(0.6F, 0.4F)
+                    .eyeHeight(0.2F)
                     .clientTrackingRange(4)
                     .build("tilapia"));
 

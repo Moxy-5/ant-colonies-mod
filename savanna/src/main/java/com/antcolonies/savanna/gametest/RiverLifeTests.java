@@ -207,6 +207,21 @@ public class RiverLifeTests {
         if (TilapiaEntity.canSpawn(SavannaEntities.TILAPIA.get(), level, MobSpawnType.NATURAL, air, level.random)) {
             helper.fail("may spawn in the air over the pond");
         }
+        // natural spawning is wired: the placement rule signed up and the savanna waters listing the fish
+        if (net.minecraft.world.entity.SpawnPlacements.getPlacementType(SavannaEntities.TILAPIA.get())
+                != net.minecraft.world.entity.SpawnPlacementTypes.IN_WATER) {
+            helper.fail("the tilapia's spawn placement is not signed up");
+        }
+        var biomes = level.registryAccess().registryOrThrow(net.minecraft.core.registries.Registries.BIOME);
+        for (var key : java.util.List.of(net.minecraft.world.level.biome.Biomes.SAVANNA,
+                net.minecraft.resources.ResourceKey.create(net.minecraft.core.registries.Registries.BIOME,
+                        net.minecraft.resources.ResourceLocation.fromNamespaceAndPath(SavannaMod.MODID, "savanna_river")))) {
+            boolean listed = biomes.getOrThrow(key).getMobSettings().getMobs(net.minecraft.world.entity.MobCategory.WATER_AMBIENT)
+                    .unwrap().stream().anyMatch(d -> d.type == SavannaEntities.TILAPIA.get());
+            if (!listed) {
+                helper.fail("no tilapia in the spawn list of " + key.location());
+            }
+        }
         // hungry grown fish in the deep end; a young one about to grow up
         TilapiaEntity[] school = new TilapiaEntity[4];
         for (int i = 0; i < school.length; i++) {

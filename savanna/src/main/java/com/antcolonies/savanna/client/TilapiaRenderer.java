@@ -17,10 +17,11 @@ import software.bernie.geckolib.renderer.GeoEntityRenderer;
  */
 public class TilapiaRenderer extends GeoEntityRenderer<TilapiaEntity> {
     /**
-     * The model is about 1.72 blocks long as made (its boxes in pixels); a grown fish is 0.35 blocks (my pick), its own
+     * The model is about 1.72 blocks long as made (its boxes in pixels); a grown fish is 0.6 blocks (my pick, bigger than life
+     * so it is seen: the user, 2026-11-14), its own
      * size and youth on top through the SCALE attribute.
      */
-    static final float SCALE = 0.35F / 1.725F;
+    static final float SCALE = 0.6F / 1.725F;
 
     private static final ResourceLocation[] TEXTURES = {
             texture("tilapia_young"), texture("tilapia"), texture("tilapia_breeding")};
@@ -28,7 +29,7 @@ public class TilapiaRenderer extends GeoEntityRenderer<TilapiaEntity> {
     public TilapiaRenderer(EntityRendererProvider.Context context) {
         super(context, new Model());
         withScale(SCALE);
-        shadowRadius = 0.12F;
+        shadowRadius = 0.2F;
     }
 
     private static ResourceLocation texture(String name) {
