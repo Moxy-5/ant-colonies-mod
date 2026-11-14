@@ -79,6 +79,10 @@ public class TreeCommands {
         for (var e : states.long2ObjectEntrySet()) {
             level.setBlock(foot.offset(BlockPos.of(e.getLongKey())), e.getValue(), net.minecraft.world.level.block.Block.UPDATE_CLIENTS);
         }
+        for (var e : states.long2ObjectEntrySet()) {
+            com.antcolonies.savanna.block.HangingFruit.litter(level, foot.offset(BlockPos.of(e.getLongKey())), e.getValue(),
+                    net.minecraft.world.level.block.Block.UPDATE_CLIENTS);
+        }
         source.sendSuccess(() -> Component.literal("A sycamore fig, " + age.id + ", seed " + s + ": " + states.size() + " blocks."), false);
         return 1;
     }

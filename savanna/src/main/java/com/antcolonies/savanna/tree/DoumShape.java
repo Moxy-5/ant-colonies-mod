@@ -226,6 +226,12 @@ public final class DoumShape {
                 }
                 set++;
             }
+            for (var e : blocks.long2ObjectEntrySet()) {
+                BlockPos pos = foot.offset(BlockPos.of(e.getLongKey()));
+                if (level.getBlockState(pos) == e.getValue()) {
+                    HangingFruit.litter(level, pos, e.getValue(), net.minecraft.world.level.block.Block.UPDATE_CLIENTS);
+                }
+            }
             return set;
         }
     }

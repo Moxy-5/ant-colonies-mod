@@ -25,6 +25,7 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.level.GameRules;
 import net.minecraft.world.level.Level;
+import net.minecraft.world.level.LevelAccessor;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.properties.IntegerProperty;
@@ -179,17 +180,22 @@ public final class HangingFruit {
      * adds to the heap, up to {@link FallenFruitBlock#MOST}.
      */
     public static void fall(Fruit fruit, ServerLevel level, BlockPos from, int count) {
+        drop(fruit, level, from, count, false, Block.UPDATE_ALL);
+    }
+
+    /** Fruit falling from {@code from} as {@link #fall}, lying fresh or {@code old}; true if it came to lie. */
+    private static boolean drop(Fruit fruit, LevelAccessor level, BlockPos from, int count, boolean old, int flags) {
         Block fallen = fruit.fallen();
         BlockPos.MutableBlockPos p = from.mutable();
         for (int i = 0; i < FALL && p.getY() > level.getMinBuildHeight(); i++) {
             p.move(Direction.DOWN);
             BlockState s = level.getBlockState(p);
             if (!s.getFluidState().isEmpty()) {
-                return;
+                return false;
             }
             if (s.is(fallen)) {
-                level.setBlock(p, FallenFruitBlock.more(s, count), Block.UPDATE_ALL);
-                return;
+                level.setBlock(p, FallenFruitBlock.more(s, count).setValue(FallenFruitBlock.OLD, old && s.getValue(FallenFruitBlock.OLD)), flags);
+                return true;
             }
             if (s.isAir() || s.is(BlockTags.LEAVES) || s.getCollisionShape(level, p).isEmpty()) {
                 continue;
@@ -197,14 +203,42 @@ public final class HangingFruit {
             BlockPos at = p.above();
             BlockState there = level.getBlockState(at);
             if (landsOn(level, p, s) && (there.isAir() || there.canBeReplaced() && there.getFluidState().isEmpty())) {
-                level.setBlock(at, FallenFruitBlock.more(fallen.defaultBlockState(), count - 1), Block.UPDATE_ALL);
+                level.setBlock(at, FallenFruitBlock.more(fallen.defaultBlockState(), count - 1).setValue(FallenFruitBlock.OLD, old), flags);
+                return true;
             }
+            return false;
+        }
+        return false;
+    }
+
+    /** Which fruit a block bears: a fig bunch or bark figs, a doum nut bunch; null for anything else. */
+    public static Fruit of(BlockState state) {
+        if (state.getBlock() instanceof FigBunchBlock || state.getBlock() instanceof TrunkFigsBlock) {
+            return Fruit.FIG;
+        }
+        return state.getBlock() instanceof DoumPieceBlock piece && piece.piece() == DoumPiece.Piece.BUNCH ? Fruit.DOUM : null;
+    }
+
+    /**
+     * A tree set down whole (new land, the commands) has been fruiting a while already, so the ground under it shows it
+     * (the user, 2026-11-14): under a ripe bunch fresh fallen fruit has already dropped, 2 bunches in 3; under a bare
+     * stalk, its crop just over, the last of it lies old (rotting figs, weathered nuts), 1 stalk in 2; 1 to 3 fruit a
+     * heap (my picks). By the place, so every chunk works it out the same. Call after the tree's blocks are down.
+     */
+    public static void litter(LevelAccessor level, BlockPos pos, BlockState state, int flags) {
+        Fruit fruit = of(state);
+        if (fruit == null) {
             return;
+        }
+        int stage = state.getValue(STAGE);
+        int roll = (int) Math.floorMod(mix(pos.asLong() * 0x9E3779B97F4A7C15L + 0x3B), 6L);
+        if (stage == RIPE && roll < 4 || stage == BARE && roll < 3) {
+            drop(fruit, level, pos, 1 + roll % 3, stage == BARE, flags);
         }
     }
 
     /** Ground fallen fruit may lie on: soil with a flat top. */
-    static boolean landsOn(Level level, BlockPos pos, BlockState ground) {
+    static boolean landsOn(LevelAccessor level, BlockPos pos, BlockState ground) {
         return ground.isFaceSturdy(level, pos, Direction.UP) && (ground.is(BlockTags.DIRT) || ground.is(BlockTags.SAND)
                 || ground.is(SavannaBlocks.SILT.get()) || ground.is(SavannaBlocks.WET_SILT.get()) || ground.is(SavannaBlocks.RIVER_MUD.get()));
     }

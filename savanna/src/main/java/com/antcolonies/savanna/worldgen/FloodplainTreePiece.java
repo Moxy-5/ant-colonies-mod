@@ -6,6 +6,7 @@ import java.util.Map;
 
 import com.antcolonies.savanna.block.DoumBlockEntity;
 import com.antcolonies.savanna.block.DoumLook;
+import com.antcolonies.savanna.block.HangingFruit;
 import com.antcolonies.savanna.registry.SavannaStructures;
 import com.antcolonies.savanna.registry.TreeBlocks;
 import com.antcolonies.savanna.tree.DoumShape;
@@ -134,6 +135,14 @@ public class FloodplainTreePiece extends StructurePiece {
             DoumLook look = shape.looks().get(k);
             if (look != null && level.getBlockEntity(pos) instanceof DoumBlockEntity piece) {
                 piece.setLook(look);
+            }
+        }
+        // the fruit this tree's crop has already dropped, now its blocks are down (each fruit block in this chunk's columns)
+        for (var e : shape.blocks().long2ObjectEntrySet()) {
+            long k = e.getLongKey();
+            pos.set(foot.getX() + BlockPos.getX(k), foot.getY() + BlockPos.getY(k), foot.getZ() + BlockPos.getZ(k));
+            if (box.isInside(pos) && HangingFruit.of(e.getValue()) != null && level.getBlockState(pos) == e.getValue()) {
+                HangingFruit.litter(level, pos.immutable(), e.getValue(), Block.UPDATE_CLIENTS);
             }
         }
     }
