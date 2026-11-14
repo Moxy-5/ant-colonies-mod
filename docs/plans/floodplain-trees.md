@@ -32,6 +32,36 @@ dead stages each.
 - **Dead (the user): 1 in 8**, split over the three stages (my pick: just died 3, breaking up 3, fallen or last snag 2).
   Dry trees keep their 28 in 100.
 
+## Fruit that ripens, falls and can be eaten (the user, 2026-11-13: "make it so the fruit can actually drop and ripen in stages and make it an item when broken that the player can eat")
+What the real trees do (general knowledge, not checked against papers):
+- **Sycamore fig:** fruits several times a year, each tree on its own timetable, so some tree along a river nearly
+  always has figs. The figs grow in bunches straight on the trunk and thick limbs. They turn from green to yellow to
+  red as they ripen over a few weeks. Ripe figs fall and rot in days, and bats, monkeys, birds and antelope eat them.
+- **Doum palm:** fruits once a year. The nuts take most of a year to ripen from green to glossy orange-brown and hang
+  on long after. The thin brown pulp is eaten (it tastes of gingerbread, hence "gingerbread palm"); the stone inside is
+  rock hard (vegetable ivory). Ripe nuts drop and lie for months without rotting, and elephants and baboons eat them.
+
+The picks (my picks unless marked):
+- **The fruit blocks keep their place and cycle**, like cocoa pods: a fig bunch (hanging under a limb) and figs on the
+  bark (on the trunk's side) go bare spur, green, yellow, ripe red (the three colours already in the viewer); a doum
+  nut bunch goes bare stalk, green, half, ripe orange-brown. Each block ticks on its own with random ticks (cheap, as
+  Minecraft's crops), never through the tree book. Each tree has a timetable from its seed, so neighbours ripen at
+  different times (figs about 6 game days from bare to ripe, a fresh crop soon after; doum about 20 game days, once a
+  cycle). The timing will ask the shared season source later (for now it answers "no season").
+- **Dropping:** a ripe bunch drops its fruit after a while (figs about 1 to 2 game days, doum about 5) and goes back to
+  bare. The fruit falls straight down and lands as a small **fallen fruit** block on the ground (a scatter of figs, or
+  a few nuts), not as loose items: loose items vanish after 5 minutes and cost the game more. Fallen figs rot away in
+  about 2 game days; fallen doum nuts last about 20. Nothing lands in water or on a mound.
+- **Items (the user):** breaking a fruit block or fallen fruit gives the fruit. Fig and doum nut are new food items;
+  a green fig or green nut is an item too but not food (my pick). A ripe bunch gives 2 to 4 figs or 1 to 3 nuts.
+  Right-clicking a ripe bunch also picks it without breaking it, like sweet berries (my pick).
+- **Food values, checked against Minecraft's:** fig 2 hunger and a little saturation, eaten fast (between sweet
+  berries and an apple; a fresh fig is small and sweet); doum nut 4 hunger, eaten slowly (gnawing the pulp off a hard
+  nut; slower to eat than an apple). Nobody can live well on figs alone, as with berries. Bone meal moves a bunch on a
+  stage.
+- **Insects:** termites eat dead plant material, not fresh fruit, and Matabele eat only termites, so no insect takes
+  the fruit (true to life). Fruit eaters come with the wildlife (M9.5): fallen fruit is ready for them.
+
 ## The hard part, said plainly: the palm crowns
 Counted from the viewer (average of 4 seeds):
 
@@ -69,11 +99,16 @@ is measured first. Either way the stems are full blocks you can climb.
 4. **The fig's shapes in Java** (`tree/FigShape`, from `fig()`, `figSeedling`, `figSapling`, `deadFig`, `figFallen`;
    one seed one tree, as in the viewer), checked block for block against the viewer for a few seeds (a small export
    from the viewer, compared in `./gradlew test`).
+4b. **Fig fruit:** the bunch and bark-fig blocks ripening in stages, dropping to fallen figs that rot, the fig and green
+   fig items, eating, picking, bone meal (section above). Test: a bunch in an arena goes through every stage, drops,
+   lands on the ground, the fallen figs rot; breaking gives the items.
 5. **The doum's blocks:** stem bark A and the dead grey bark, the frond pieces, the spear, the crown cap, nut bunch
    (ripe and green), leaf-base stub, seedling and rosette. Look checked in the viewer first: the frond pieces drawn the
    way the game will draw them (snapped to 16 directions) beside today's, for the user's OK.
 6. **The doum's shapes in Java** (`tree/DoumShape`, from `doum`, `doumSeedling` to `doumClump`, `deadDoum`), checked
    against the viewer the same way.
+6b. **Doum fruit:** the nut bunch the same way (stages, dropping, fallen nuts lasting about 20 days, the items,
+   eating slowly), with its test.
 7. **New land:** a floodplain tree structure (its own set, so it never crowds the dry trees' spacing), figs alone and
    doum groves by the spacing above, every age, dead 1 in 8; new checks in `worldgen`: only on floodplain ground, the
    spacing, the dead share, no tree in water. Then the user's look in a new world.

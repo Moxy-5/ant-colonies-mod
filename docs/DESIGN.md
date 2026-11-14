@@ -346,6 +346,7 @@ it.** If a decision changes, ask the user first, then update it here. The short 
 - They grow only on the floodplain biome (`antcolonies:savanna_floodplain`, the greener grass). **The dry trees (umbrella thorn, camel thorn, baobab) no longer stand or sprout on it** (the user), checked in one place for new land and seedlings.
 - **Dead: 1 in 8 of the floodplain trees** (the user); the dry trees keep their 28 in 100.
 - Spacing (my picks, to confirm): figs alone, one about every 60 to 80 blocks along the floodplain near the water; doum palms in groves of 2 to 5, groves about every 50 to 70 blocks; open grass between for the wildlife (the user's wish).
+- **Fruit (the user): it ripens in stages on the tree, drops, and is an item the player can eat when broken.** Fig bunches go green, yellow, ripe red over about 6 game days, each tree on its own timetable, and drop onto the ground as fallen figs that rot in about 2 days; doum nuts go green to orange-brown over about 20 days and lie fallen about 20. Fig 2 hunger eaten fast, doum nut 4 eaten slowly; green fruit is an item but not food; right-click picks a ripe bunch (my picks, numbers to confirm).
 - The palm's fronds become a frond block family turned to 16 directions (my pick; a drawn whole crown is the fallback), as Minecraft cannot place the viewer's sculpted boxes one by one.
 
 ## Core systems
