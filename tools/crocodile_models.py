@@ -296,6 +296,7 @@ import tilapia_models as tm
 
 LENGTH = (TAIL_END - SNOUT) * V       # the model's length, snout to tail tip (model pixels)
 WALK_LEN, SWIM_LEN = 1.0, 1.6         # one walking stride, one swimming beat (seconds)
+FLOP_LEN = 0.6                        # the drop onto its belly before basking (seconds)
 
 
 def wave_pose(t, amount, beat):
@@ -320,7 +321,7 @@ def clips():
     """idle (lying on the bank, breathing, the tail barely stirring), walk (a low crawl, the legs in diagonal pairs, the
     body and tail swinging; played faster or slower by its speed), swim (the tail sweeping, the legs folded back),
     float (hanging at the surface, the legs loose), bask (propped a little on its forelegs, the head raised and the
-    mouth held open, the lower jaw clear of the ground: the user's ask), death (rolls onto its back)."""
+    mouth held open, the lower jaw clear of the ground: the user's ask), flop (dropping onto its belly to bask), death (rolls onto its back)."""
     def idle(t):
         breath = math.sin(2 * math.pi * t / 4.0)
         p = wave_pose(t, 0.1, 2 * math.pi / 4.0)
@@ -359,6 +360,31 @@ def clips():
         p['jaw'] = {'rotation': [26 + breath, 0, 0]}
         return p
 
+    def flop(t):
+        # the crocodile's life step 3 (2026-11-15): stopping on the bank to bask, it drops from its high walk onto its
+        # belly with a little bounce, the legs splaying out, then props up on its forelegs, raises its head and opens its
+        # mouth; it ends on the bask clip's first pose (my picks: 0.6 s, the bounce 0.4 pixels)
+        def ease(a, b):
+            f = min(1.0, max(0.0, (t - a) / (b - a)))
+            return f * f * (3 - 2 * f)
+        drop = 1.0 - ease(0.0, 0.16) ** 0.5 if t < 0.16 else 0.0                # falls fast
+        bounce = 0.4 * math.sin(math.pi * min(1.0, max(0.0, (t - 0.16) / 0.22)))
+        splay = math.sin(math.pi * min(1.0, t / 0.4))                           # legs out at the thump, back in
+        prop = ease(0.3, 0.6)                                                   # propping up into the bask
+        p = wave_pose(t - FLOP_LEN, 0.06, 2 * math.pi / 6.0)
+        wiggle = wave_pose(t, 0.35 * (1 - ease(0.1, 0.6)), 2 * math.pi / 0.45)
+        for name in p:
+            p[name]['rotation'][1] += wiggle[name]['rotation'][1]
+        p['body'] = {'rotation': [-8 * prop, 0, 0], 'position': [0, drop + bounce, 0]}
+        p['hips'] = {'rotation': [8 * prop, p['hips']['rotation'][1], 0]}
+        for s, side in ((1, 'left'), (-1, 'right')):
+            p[f'arm_upper_{side}'] = {'rotation': [8 * prop, 0, s * 16 * splay], 'position': [0, -1.6 * prop, 0]}
+            p[f'leg_upper_{side}'] = {'rotation': [0, 0, s * 12 * splay]}
+        p['neck'] = {'rotation': [5 * splay * (1 - prop) - 12 * prop, 0, 0]}
+        p['head'] = {'rotation': [-16 * prop, 0, 0]}
+        p['jaw'] = {'rotation': [26 * ease(0.38, 0.6), 0, 0]}
+        return p
+
     def death(t):
         f = min(1.0, t / 1.0)
         f = f * f * (3 - 2 * f)
@@ -368,7 +394,8 @@ def clips():
         return p
 
     return {'idle': tm.clip(4.0, idle, 24), 'walk': tm.clip(WALK_LEN, walk, 20), 'swim': tm.clip(SWIM_LEN, swim, 24),
-            'float': tm.clip(4.0, floating, 24), 'bask': tm.clip(6.0, bask, 24), 'death': tm.clip(1.2, death, 12, 'hold')}
+            'float': tm.clip(4.0, floating, 24), 'bask': tm.clip(6.0, bask, 24),
+            'flop': tm.clip(FLOP_LEN, flop, 24, False), 'death': tm.clip(1.2, death, 12, 'hold')}
 
 
 def write_game():

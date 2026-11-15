@@ -1,0 +1,227 @@
+# The crocodile's life step 3 (2026-11-15): the flop onto its belly to bask, the startled plunge, the half-out rest.
+#   ./gradlew runFilm -PfilmScene=crocodile_life      pictures in run-film/screenshots/crocodile_life/
+cmd time set noon
+cmd weather clear
+cmd fill 26 -63 12 40 -61 22 minecraft:water
+lens 40
+wait 40
+# one in the pool wanting the sun climbs out, stops and flops down to bask
+camera 22.0 -60.0 11.0 0 10
+cmd summon antcolonies:crocodile 29.5 -60.5 17.0 {SunIn:0,Rotation:[90f,0f]}
+wait 40
+shot flop_040
+wait 4
+shot flop_044
+wait 4
+shot flop_048
+wait 4
+shot flop_052
+wait 4
+shot flop_056
+wait 4
+shot flop_060
+wait 4
+shot flop_064
+wait 4
+shot flop_068
+wait 4
+shot flop_072
+wait 4
+shot flop_076
+wait 4
+shot flop_080
+wait 4
+shot flop_084
+wait 4
+shot flop_088
+wait 4
+shot flop_092
+wait 4
+shot flop_096
+wait 4
+shot flop_100
+wait 4
+shot flop_104
+wait 4
+shot flop_108
+wait 4
+shot flop_112
+wait 4
+shot flop_116
+wait 4
+shot flop_120
+wait 4
+shot flop_124
+wait 4
+shot flop_128
+# then it is hit: it rushes back and lunges in
+cmd damage @e[type=antcolonies:crocodile,x=29,y=-60,z=17,distance=..14,sort=nearest,limit=1] 1
+wait 1
+shot plunge_000
+wait 3
+shot plunge_003
+wait 3
+shot plunge_006
+wait 3
+shot plunge_009
+wait 3
+shot plunge_012
+wait 3
+shot plunge_015
+wait 3
+shot plunge_018
+wait 3
+shot plunge_021
+wait 3
+shot plunge_024
+wait 3
+shot plunge_027
+wait 3
+shot plunge_030
+wait 3
+shot plunge_033
+wait 3
+shot plunge_036
+wait 3
+shot plunge_039
+wait 3
+shot plunge_042
+wait 3
+shot plunge_045
+wait 3
+shot plunge_048
+wait 3
+shot plunge_051
+wait 3
+shot plunge_054
+wait 3
+shot plunge_057
+wait 3
+shot plunge_060
+cmd tp @e[type=antcolonies:crocodile] 0 -120 0
+wait 10
+# one basking far back on the grass is hit: the rush and the lunge from farther
+camera 21.0 -60.0 10.0 0 10
+cmd summon antcolonies:crocodile 19.0 -60.0 17.0 {SunIn:0,Rotation:[-90f,0f]}
+wait 40
+shot rush_000
+cmd damage @e[type=antcolonies:crocodile,x=29,y=-60,z=17,distance=..14,sort=nearest,limit=1] 1
+wait 3
+shot rush_003
+wait 3
+shot rush_006
+wait 3
+shot rush_009
+wait 3
+shot rush_012
+wait 3
+shot rush_015
+wait 3
+shot rush_018
+wait 3
+shot rush_021
+wait 3
+shot rush_024
+wait 3
+shot rush_027
+wait 3
+shot rush_030
+wait 3
+shot rush_033
+wait 3
+shot rush_036
+wait 3
+shot rush_039
+wait 3
+shot rush_042
+wait 3
+shot rush_045
+wait 3
+shot rush_048
+wait 3
+shot rush_051
+wait 3
+shot rush_054
+wait 3
+shot rush_057
+wait 3
+shot rush_060
+wait 3
+shot rush_063
+wait 3
+shot rush_066
+wait 3
+shot rush_069
+cmd tp @e[type=antcolonies:crocodile] 0 -120 0
+wait 10
+# one in the pool wanting the sun rests half out on the bank
+camera 24.0 -60.0 11.0 0 10
+cmd summon antcolonies:crocodile 29.0 -60.5 17.0 {SunIn:0,HalfOut:1b,Rotation:[90f,0f]}
+wait 10
+shot half_010
+wait 10
+shot half_020
+wait 10
+shot half_030
+wait 10
+shot half_040
+wait 10
+shot half_050
+wait 10
+shot half_060
+wait 10
+shot half_070
+wait 10
+shot half_080
+wait 10
+shot half_090
+wait 10
+shot half_100
+wait 10
+shot half_110
+wait 10
+shot half_120
+wait 10
+shot half_130
+wait 10
+shot half_140
+wait 10
+shot half_150
+wait 10
+shot half_160
+wait 10
+shot half_170
+wait 10
+shot half_180
+wait 10
+shot half_190
+wait 10
+shot half_200
+camera 29.0 -58.0 13.5 40 30
+wait 5
+shot half_above
+camera 24.0 -60.0 11.0 0 10
+wait 5
+cmd damage @e[type=antcolonies:crocodile,x=29,y=-60,z=17,distance=..14,sort=nearest,limit=1] 1
+wait 1
+shot slip_000
+wait 4
+shot slip_004
+wait 4
+shot slip_008
+wait 4
+shot slip_012
+wait 4
+shot slip_016
+wait 4
+shot slip_020
+wait 4
+shot slip_024
+wait 4
+shot slip_028
+wait 4
+shot slip_032
+wait 4
+shot slip_036
+wait 4
+shot slip_040

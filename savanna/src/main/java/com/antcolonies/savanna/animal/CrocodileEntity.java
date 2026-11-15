@@ -8,6 +8,7 @@ import javax.annotation.Nullable;
 import com.antcolonies.entity.body.GroundBend;
 
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.syncher.EntityDataAccessor;
 import net.minecraft.network.syncher.EntityDataSerializers;
@@ -31,6 +32,7 @@ import net.minecraft.world.entity.ai.goal.Goal;
 import net.minecraft.world.entity.ai.goal.RandomSwimmingGoal;
 import net.minecraft.world.entity.ai.navigation.AmphibiousPathNavigation;
 import net.minecraft.world.entity.ai.navigation.PathNavigation;
+import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.LevelAccessor;
 import net.minecraft.world.level.ServerLevelAccessor;
@@ -62,6 +64,16 @@ public class CrocodileEntity extends PathfinderMob implements GeoEntity {
 
     /** How deep in the water it hangs when resting: the water this far up its box, so the brows and back are out (blocks, at the usual size). */
     private static final double AFLOAT = 0.42;
+    /** How deep it sinks while startled in the water, out of sight (blocks, at the usual size; my pick). */
+    private static final double HIDE_DEPTH = 1.4;
+    /** How long a fright lasts (ticks; my pick, 5 s). */
+    static final int STARTLED_TICKS = 100;
+    /** How near a player may come before it flees, and one creeping up crouched (blocks; my picks). */
+    static final double WARY_REACH = 6.0, SNEAK_REACH = 2.5;
+    /** How often, wanting the sun, it rests half out on the bank in place of climbing out (my pick). */
+    static final float HALF_OUT_SHARE = 0.4F;
+    /** The rush to the water and the lunge in ({@link PlungeGoal}; my picks: about 3 blocks through the air). */
+    static final double RUSH = 1.9, LUNGE_FORWARD = 0.45, LUNGE_UP = 0.2;
     /**
      * How the model is drawn: 6.75 blocks long as made (snout to tail tip, 108 pixels), drawn at 10/11 of that, so a usual
      * crocodile is about 6.1 blocks long (5 until the user asked for a longer tail, 2026-11-15; the body kept its size).
@@ -88,6 +100,10 @@ public class CrocodileEntity extends PathfinderMob implements GeoEntity {
     private float ownSize = 1.0F;
     /** Ticks until it next wants the sun (while it does not, a crocodile on land goes back to the water). */
     public int sunIn;
+    /** Ticks it is still startled for: on land it rushes for the water and lunges in, in the water it sinks out of sight. */
+    public int startled;
+    /** Whether this time it wants the sun it rests half out, head and chest on the bank and its back half afloat, in place of climbing out. */
+    boolean restHalfOut;
 
     public CrocodileEntity(EntityType<? extends CrocodileEntity> type, Level level) {
         super(type, level);
@@ -109,8 +125,10 @@ public class CrocodileEntity extends PathfinderMob implements GeoEntity {
 
     @Override
     protected void registerGoals() {
+        goalSelector.addGoal(0, new PlungeGoal(this));
         goalSelector.addGoal(1, new BaskGoal(this));
         goalSelector.addGoal(2, new ToWaterGoal(this));
+        goalSelector.addGoal(3, new HalfOutGoal(this));
         goalSelector.addGoal(3, new AshoreGoal(this));
         goalSelector.addGoal(4, new RandomSwimmingGoal(this, 1.0, 60));
     }
@@ -195,12 +213,17 @@ public class CrocodileEntity extends PathfinderMob implements GeoEntity {
         if (level().isClientSide) {
             return;
         }
-        if (sunIn > 0 && isInWater()) {
-            sunIn--;
+        if (sunIn > 0 && isInWater() && --sunIn == 0) {
+            restHalfOut = random.nextFloat() < HALF_OUT_SHARE;
         }
-        // resting in the water it rises to hang at the surface, eyes and back out
+        if (startled > 0) {
+            startled--;
+        } else if (tickCount % 10 == 0 && (!isInWater() || isBasking()) && playerTooNear()) {
+            startle();
+        }
+        // resting in the water it rises to hang at the surface, eyes and back out (startled, it sinks out of sight)
         if (isInWater() && getNavigation().isDone()) {
-            double depth = getFluidHeight(FluidTags.WATER) - AFLOAT * getScale();
+            double depth = getFluidHeight(FluidTags.WATER) - (startled > 0 ? HIDE_DEPTH : AFLOAT) * getScale();
             Vec3 v = getDeltaMovement();
             setDeltaMovement(v.x, Mth.clamp(depth * 0.1, -0.02, 0.03) + v.y * 0.5, v.z);
         }
@@ -209,10 +232,35 @@ public class CrocodileEntity extends PathfinderMob implements GeoEntity {
     @Override
     public boolean hurt(DamageSource source, float amount) {
         boolean hurt = super.hurt(source, amount);
-        if (hurt && isBasking()) {
-            sunIn = 600;        // startled off the bank
+        if (hurt && (!isInWater() || isBasking())) {
+            startle();
         }
         return hurt;
+    }
+
+    /**
+     * Startled (hit, or a player too near; the crocodile's life step 3): on the bank it rushes for the water and lunges
+     * in ({@link PlungeGoal}); resting half out it slips back; in the water it sinks out of sight a few seconds; and it
+     * keeps to the water at least half a minute.
+     */
+    public void startle() {
+        startled = STARTLED_TICKS;
+        sunIn = Math.max(sunIn, 600 + random.nextInt(600));
+        setBasking(false);          // the bask ends at once, mouth shut, not a tick later when its goal stops
+    }
+
+    /** Whether a player (not a spectator) is within reach: 6 blocks, or 2.5 for one creeping up crouched (my picks). */
+    private boolean playerTooNear() {
+        for (Player player : level().players()) {
+            if (player.isSpectator() || !player.isAlive()) {
+                continue;
+            }
+            double reach = player.isCrouching() ? SNEAK_REACH : WARY_REACH;
+            if (player.distanceToSqr(this) < reach * reach) {
+                return true;
+            }
+        }
+        return false;
     }
 
     @Override
@@ -229,6 +277,7 @@ public class CrocodileEntity extends PathfinderMob implements GeoEntity {
         super.addAdditionalSaveData(tag);
         tag.putFloat("OwnSize", ownSize);
         tag.putInt("SunIn", sunIn);
+        tag.putBoolean("HalfOut", restHalfOut);
     }
 
     @Override
@@ -241,6 +290,7 @@ public class CrocodileEntity extends PathfinderMob implements GeoEntity {
         if (tag.contains("SunIn")) {
             sunIn = tag.getInt("SunIn");
         }
+        restHalfOut = tag.getBoolean("HalfOut");
         if (isNoAi() && tag.getBoolean("Basking")) {     // for films and the summon command: a still crocodile basking
             setBasking(true);
         }
@@ -345,24 +395,8 @@ public class CrocodileEntity extends PathfinderMob implements GeoEntity {
                 return false;
             }
             wait = 40;
-            Level level = croc.level();
-            water = BlockPos.findClosestMatch(croc.blockPosition(), 16, 4,
-                    p -> level.getFluidState(p).is(FluidTags.WATER) && level.getFluidState(p.below()).is(FluidTags.WATER)).orElse(null);
-            if (water == null) {
-                return false;
-            }
-            // aim two blocks past the edge where that is water too: Minecraft ends a route within a block of its aim,
-            // which at the very edge is still dry land (seen in the first films: it stopped with its nose over the water)
-            BlockPos from = croc.blockPosition();
-            int dx = Integer.signum(water.getX() - from.getX()), dz = Integer.signum(water.getZ() - from.getZ());
-            for (int far = 2; far >= 1; far--) {
-                BlockPos in = water.offset(dx * far, 0, dz * far);
-                if (level.getFluidState(in).is(FluidTags.WATER)) {
-                    water = in;
-                    break;
-                }
-            }
-            return true;
+            water = waterAim(croc, 16);
+            return water != null;
         }
 
         @Override
@@ -395,6 +429,259 @@ public class CrocodileEntity extends PathfinderMob implements GeoEntity {
         }
     }
 
+    /**
+     * The nearest water to slide into, aimed two blocks past the edge where that is water too: Minecraft ends a route
+     * within a block of its aim, which at the very edge is still dry land (seen in the first films: it stopped with its
+     * nose over the water). Null if none within reach.
+     */
+    @Nullable
+    static BlockPos waterAim(CrocodileEntity croc, int reach) {
+        Level level = croc.level();
+        BlockPos water = BlockPos.findClosestMatch(croc.blockPosition(), reach, 4,
+                p -> level.getFluidState(p).is(FluidTags.WATER) && level.getFluidState(p.below()).is(FluidTags.WATER)).orElse(null);
+        if (water == null) {
+            return null;
+        }
+        BlockPos from = croc.blockPosition();
+        int dx = Integer.signum(water.getX() - from.getX()), dz = Integer.signum(water.getZ() - from.getZ());
+        for (int far = 2; far >= 1; far--) {
+            BlockPos in = water.offset(dx * far, 0, dz * far);
+            if (level.getFluidState(in).is(FluidTags.WATER)) {
+                return in;
+            }
+        }
+        return water;
+    }
+
+    /**
+     * Startled on land (the crocodile's life step 3, 2026-11-15): it rushes for the nearest water at nearly twice its
+     * walk and, a stride from the edge, lunges in belly first with a push forward and a little up. The body's bend tips
+     * the nose down into the water as it goes over the edge.
+     */
+    static class PlungeGoal extends Goal {
+        private final CrocodileEntity croc;
+        private BlockPos water;
+        private int left;
+        /** Ticks since the lunge, 0 before it; a lunge that lands back on the bank lets it try again. */
+        private int sinceLunge;
+
+        PlungeGoal(CrocodileEntity croc) {
+            this.croc = croc;
+            setFlags(EnumSet.of(Flag.MOVE, Flag.LOOK, Flag.JUMP));
+        }
+
+        @Override
+        public boolean canUse() {
+            if (croc.startled <= 0 || croc.isInWater()) {
+                return false;
+            }
+            water = waterAim(croc, 12);
+            return water != null;
+        }
+
+        @Override
+        public void start() {
+            left = 200;
+            sinceLunge = 0;
+            croc.setBasking(false);
+            croc.getNavigation().moveTo(water.getX() + 0.5, water.getY(), water.getZ() + 0.5, RUSH);
+        }
+
+        @Override
+        public boolean canContinueToUse() {
+            return !croc.isInWater() && left > 0;
+        }
+
+        @Override
+        public void tick() {
+            left--;
+            if (sinceLunge > 0 && (++sinceLunge < 6 || !croc.onGround())) {
+                return;         // in the air (a lunge that landed short, still on the bank, tries again)
+            }
+            sinceLunge = 0;
+            // toward the water it is making for, not where its body points: lying along the edge, its nose may
+            // only graze the water at a slant, and a lunge that way lands it back on the bank (seen in the test)
+            double tx = water.getX() + 0.5 - croc.getX(), tz = water.getZ() + 0.5 - croc.getZ();
+            double len = Math.sqrt(tx * tx + tz * tz);
+            if (len < 1.0E-3) {
+                return;
+            }
+            double fx = tx / len, fz = tz / len;
+            if (croc.onGround() && waterAhead(croc, fx, fz)) {
+                float face = (float) (Mth.atan2(fz, fx) * Mth.RAD_TO_DEG) - 90.0F;
+                croc.setYRot(face);
+                croc.yBodyRot = face;
+                croc.yHeadRot = face;
+                croc.getNavigation().stop();
+                croc.setDeltaMovement(fx * LUNGE_FORWARD, LUNGE_UP, fz * LUNGE_FORWARD);
+                croc.hasImpulse = true;
+                sinceLunge = 1;
+            } else if (croc.getNavigation().isDone() && left % 10 == 0) {
+                croc.getNavigation().moveTo(water.getX() + 0.5, water.getY(), water.getZ() + 0.5, RUSH);
+            }
+        }
+
+        /** Whether the water's edge is within a stride in front of it (water at its feet's level, or open water a block under). */
+        private static boolean waterAhead(CrocodileEntity croc, double fx, double fz) {
+            Level level = croc.level();
+            for (double a = 0.6; a <= 1.61; a += 0.5) {
+                BlockPos p = BlockPos.containing(croc.getX() + fx * a, croc.getY() + 0.1, croc.getZ() + fz * a);
+                if (level.getFluidState(p).is(FluidTags.WATER) || level.getFluidState(p.below()).is(FluidTags.WATER)
+                        && level.getBlockState(p).getCollisionShape(level, p).isEmpty()) {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        @Override
+        public boolean requiresUpdateEveryTick() {
+            return true;
+        }
+
+        @Override
+        public void stop() {
+            croc.getNavigation().stop();
+        }
+    }
+
+    /**
+     * In the water and wanting the sun, sometimes ({@link #HALF_OUT_SHARE}): it swims up to the bank and rests with its
+     * head and chest on it, the forelegs planted and its back half afloat, mouth open, 30 to 90 seconds (my picks), as
+     * real crocodiles often lie at the water's edge. The pose comes from the body lying on what is under it and the legs
+     * standing where they find a footing; this goal only brings it to the edge, nose to the bank, and holds it there.
+     * With no fitting edge near, it climbs out as usual.
+     */
+    static class HalfOutGoal extends Goal {
+        private final CrocodileEntity croc;
+        private Vec3 rest;
+        private float face;
+        private int wait, left;
+        private boolean arrived;
+
+        HalfOutGoal(CrocodileEntity croc) {
+            this.croc = croc;
+            setFlags(EnumSet.of(Flag.MOVE, Flag.LOOK));
+        }
+
+        @Override
+        public boolean canUse() {
+            if (!croc.isInWater() || !croc.sunTime() || !croc.restHalfOut || croc.startled > 0 || --wait > 0) {
+                return false;
+            }
+            wait = 100;
+            if (!findEdge()) {
+                croc.restHalfOut = false;       // no edge to lie at here: it climbs out as usual
+                return false;
+            }
+            return true;
+        }
+
+        /**
+         * The nearest edge: a surface water cell with water under it and two more water cells behind it (room for the body
+         * and tail), with dry bank right in front of it at the water's level or a block above. It rests with its box just
+         * clear of the bank, so its shoulders and forelegs reach over it.
+         */
+        private boolean findEdge() {
+            Level level = croc.level();
+            // searched round the surface over it, not round itself: sunk out of sight after a fright, or on the bottom
+            // of a deep river, a search round its own depth never reached the surface and found no edge (seen in the test)
+            BlockPos here = croc.blockPosition();
+            BlockPos at = here;
+            while (level.getFluidState(at.above()).is(FluidTags.WATER) && at.getY() - here.getY() < 16) {
+                at = at.above();
+            }
+            double best = Double.MAX_VALUE;
+            rest = null;
+            for (BlockPos w : BlockPos.betweenClosed(at.offset(-12, -3, -12), at.offset(12, 2, 12))) {
+                if (!level.getFluidState(w).is(FluidTags.WATER) || level.getFluidState(w.above()).is(FluidTags.WATER)
+                        || !level.getFluidState(w.below()).is(FluidTags.WATER)) {
+                    continue;
+                }
+                for (Direction dir : Direction.Plane.HORIZONTAL) {
+                    if (!level.getFluidState(w.relative(dir.getOpposite())).is(FluidTags.WATER)
+                            || !level.getFluidState(w.relative(dir.getOpposite(), 2)).is(FluidTags.WATER)) {
+                        continue;
+                    }
+                    BlockPos bank = w.above().relative(dir);
+                    if (!isBank(level, bank) && !isBank(level, bank.above())) {
+                        continue;
+                    }
+                    double d = w.distSqr(at);
+                    if (d < best) {
+                        best = d;
+                        double ahead = 0.5 - 0.45 * croc.getScale() - 0.1;
+                        rest = new Vec3(w.getX() + 0.5 + dir.getStepX() * ahead, w.getY(), w.getZ() + 0.5 + dir.getStepZ() * ahead);
+                        face = dir.toYRot();
+                    }
+                }
+            }
+            return rest != null;
+        }
+
+        @Override
+        public void start() {
+            arrived = false;
+            left = 400;
+            croc.getNavigation().moveTo(rest.x, rest.y, rest.z, 1.0);
+        }
+
+        @Override
+        public boolean canContinueToUse() {
+            return left > 0 && croc.isInWater() && croc.sunTime() && croc.startled <= 0;
+        }
+
+        @Override
+        public void tick() {
+            left--;
+            double dx = rest.x - croc.getX(), dz = rest.z - croc.getZ();
+            double far = Math.sqrt(dx * dx + dz * dz);
+            if (!arrived) {
+                if (far < 0.4 || croc.getNavigation().isDone() && far < 1.5) {
+                    arrived = true;
+                    croc.getNavigation().stop();
+                    left = 600 + croc.getRandom().nextInt(1200);
+                    croc.setBasking(true);
+                } else if (croc.getNavigation().isDone() && left % 20 == 0) {
+                    croc.getNavigation().moveTo(rest.x, rest.y, rest.z, 1.0);
+                }
+                return;
+            }
+            // held there nose to the bank, drifting gently onto its spot
+            croc.setYRot(face);
+            croc.yBodyRot = face;
+            croc.yHeadRot = face;
+            Vec3 v = croc.getDeltaMovement();
+            croc.setDeltaMovement(dx * 0.1, v.y, dz * 0.1);
+        }
+
+        @Override
+        public boolean requiresUpdateEveryTick() {
+            return true;
+        }
+
+        @Override
+        public void stop() {
+            croc.getNavigation().stop();
+            croc.restHalfOut = false;
+            if (arrived) {
+                croc.setBasking(false);
+                if (croc.startled > 0) {            // slips back off the bank into the water
+                    float yaw = face * Mth.DEG_TO_RAD;
+                    croc.setDeltaMovement(Mth.sin(yaw) * 0.3, -0.1, -Mth.cos(yaw) * 0.3);
+                } else if (croc.sunIn <= 0) {
+                    croc.sunIn = 1200 + croc.getRandom().nextInt(2400);      // in the water 1 to 3 minutes
+                }
+            }
+        }
+    }
+
+    /** For tests and films: this time it wants the sun it rests half out on the bank. */
+    public void wantSunHalfOut() {
+        sunIn = 0;
+        restHalfOut = true;
+    }
+
     /** In the water and wanting the sun: swims to a dry spot of bank near it and climbs out. */
     static class AshoreGoal extends Goal {
         private final CrocodileEntity croc;
@@ -407,7 +694,7 @@ public class CrocodileEntity extends PathfinderMob implements GeoEntity {
 
         @Override
         public boolean canUse() {
-            if (!croc.isInWater() || !croc.sunTime() || --wait > 0) {
+            if (!croc.isInWater() || !croc.sunTime() || croc.restHalfOut || --wait > 0) {
                 return false;
             }
             wait = 100;
@@ -439,7 +726,12 @@ public class CrocodileEntity extends PathfinderMob implements GeoEntity {
     private static final RawAnimation SWIM = RawAnimation.begin().thenLoop("swim");
     private static final RawAnimation FLOAT = RawAnimation.begin().thenLoop("float");
     private static final RawAnimation BASK = RawAnimation.begin().thenLoop("bask");
+    /** Basking on land: first the flop from its walk onto its belly, then the bask (the crocodile's life step 3). */
+    private static final RawAnimation FLOP_BASK = RawAnimation.begin().thenPlay("flop").thenLoop("bask");
     private static final RawAnimation DEATH = RawAnimation.begin().thenPlayAndHold("death");
+    /** Drawn only: when it last walked on land, and whether the bask now drawn began with the flop. */
+    private int walkedAt = -100;
+    private boolean drawnBasking, flopNow;
     /** The speeds the walk and swim clips are made for (blocks a tick); they play faster or slower by the real speed. */
     static final double WALK_CLIP_SPEED = 0.06, SWIM_CLIP_SPEED = 0.08;
 
@@ -454,10 +746,18 @@ public class CrocodileEntity extends PathfinderMob implements GeoEntity {
         if (isDeadOrDying()) {
             return state.setAndContinue(DEATH);
         }
-        if (isBasking()) {
-            return state.setAndContinue(BASK);
-        }
         double dx = getX() - xo, dy = getY() - yo, dz = getZ() - zo;
+        if (isBasking()) {
+            if (!drawnBasking) {        // it flops down only if it walked there (not lying down where it already lay, nor afloat)
+                drawnBasking = true;
+                flopNow = !isInWater() && tickCount - walkedAt < 20;
+            }
+            return state.setAndContinue(flopNow ? FLOP_BASK : BASK);
+        }
+        drawnBasking = false;
+        if (!isInWater() && dx * dx + dz * dz > 0.02 * 0.02) {
+            walkedAt = tickCount;
+        }
         if (isInWater()) {
             double speed = Math.sqrt(dx * dx + dy * dy + dz * dz);
             if (speed < 0.012) {

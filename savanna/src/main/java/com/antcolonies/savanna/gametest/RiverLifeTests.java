@@ -455,9 +455,11 @@ public class RiverLifeTests {
     /**
      * The Nile crocodile's first step (2026-11-15): put in the pond's deep end by day and wanting the sun, it swims to
      * the bank, climbs out and basks (the mouth-open pose is the synced basking flag); told it has had enough, it walks
-     * back and slides into the water. Its swimming and walking speeds go to the log.
+     * back and slides into the water. Its swimming and walking speeds go to the log. Then its life step 3 (2026-11-15):
+     * basking again and hit, it rushes back and lunges in within a few seconds, and sinks out of sight while startled;
+     * then wanting the sun to rest half out, it lies in the water nose to a bank, basking with its front over the bank.
      */
-    @GameTest(template = "arena", timeoutTicks = 2400)
+    @GameTest(template = "arena", timeoutTicks = 4800)
     public static void aCrocodileClimbsOutToBaskAndGoesBackIn(GameTestHelper helper) {
         ServerLevel level = helper.getLevel();
         buildPond(helper);
@@ -482,26 +484,69 @@ public class RiverLifeTests {
         com.antcolonies.savanna.animal.CrocodileEntity croc = helper.spawn(SavannaEntities.CROCODILE.get(), new BlockPos(X1 - 2, SURFACE + 4, Z0 + 3));
         croc.setPersistenceRequired();
         croc.wantSun();
-        int[] stage = {0};          // 0 not basked yet, 1 basking seen and sent back
+        // 0 not basked yet; 1 sent back; 2 back in, wanting the sun again; 3 basking again and hit; 4 in, startled; 5 resting half out
+        int[] stage = {0};
+        long[] hitAt = {0};
         double[] fastest = new double[2];
         helper.onEachTick(() -> {
             double dx = croc.getX() - croc.xo, dy = croc.getY() - croc.yo, dz = croc.getZ() - croc.zo;
             double speed = Math.sqrt(dx * dx + dy * dy + dz * dz);
             int where = croc.isInWater() ? 0 : 1;
             fastest[where] = Math.max(fastest[where], speed);
+            long now = helper.getTick();
+            switch (stage[0]) {
+                case 0 -> {
+                    if (croc.isBasking() && !croc.isInWater() && croc.onGround()) {
+                        stage[0] = 1;
+                        croc.sunIn = 100_000;        // enough sun
+                    }
+                }
+                case 1 -> {
+                    if (!croc.isBasking() && croc.isInWater()) {
+                        SavannaMod.LOGGER.info("[crocodile] fastest in water {} blocks a tick, on land {}",
+                                String.format(java.util.Locale.ROOT, "%.3f", fastest[0]), String.format(java.util.Locale.ROOT, "%.3f", fastest[1]));
+                        stage[0] = 2;
+                        croc.wantSun();
+                    }
+                }
+                case 2 -> {
+                    if (croc.isBasking() && !croc.isInWater() && croc.onGround()) {
+                        stage[0] = 3;
+                        hitAt[0] = now;
+                        croc.hurt(level.damageSources().generic(), 1.0F);
+                        helper.assertTrue(croc.startled > 0 && !croc.isBasking(), "hit while basking, the crocodile was not startled off the bank");
+                    }
+                }
+                case 3 -> {
+                    if (croc.isInWater()) {
+                        SavannaMod.LOGGER.info("[crocodile] in the water {} ticks after it was hit", now - hitAt[0]);
+                        stage[0] = 4;
+                    } else if (now - hitAt[0] > 120) {
+                        helper.fail("hit on the bank, the crocodile was not back in the water within 6 s: at "
+                                + croc.blockPosition().subtract(helper.absolutePos(BlockPos.ZERO)));
+                    }
+                }
+                case 4 -> {
+                    if (croc.startled == 0) {
+                        stage[0] = 5;
+                        croc.wantSunHalfOut();
+                    } else if (croc.startled < 30 && croc.getNavigation().isDone() && croc.getEyeY() > croc.getY() + croc.getFluidHeight(net.minecraft.tags.FluidTags.WATER)) {
+                        helper.fail("startled in the water, the crocodile did not sink out of sight: its eyes are above the surface");
+                    }
+                }
+                default -> { }
+            }
         });
         helper.succeedWhen(() -> {
             helper.assertTrue(croc.isAlive(), "the crocodile died");
-            if (stage[0] == 0) {
-                helper.assertTrue(croc.isBasking() && !croc.isInWater() && croc.onGround(),
-                        "the crocodile has not climbed out to bask: it is " + (croc.isInWater() ? "in the water" : "on land")
-                                + " at " + croc.blockPosition().subtract(helper.absolutePos(BlockPos.ZERO)));
-                stage[0] = 1;
-                croc.sunIn = 100_000;        // enough sun
-            }
-            helper.assertTrue(!croc.isBasking() && croc.isInWater(), "the crocodile has not gone back into the water after basking");
-            SavannaMod.LOGGER.info("[crocodile] fastest in water {} blocks a tick, on land {}",
-                    String.format(java.util.Locale.ROOT, "%.3f", fastest[0]), String.format(java.util.Locale.ROOT, "%.3f", fastest[1]));
+            helper.assertTrue(stage[0] == 5, "the crocodile is at stage " + stage[0] + " of 5 (0: not basked yet, 2: not out to bask again,"
+                    + " 3: not back in after being hit) at " + croc.blockPosition().subtract(helper.absolutePos(BlockPos.ZERO)));
+            float yaw = croc.yBodyRot * net.minecraft.util.Mth.DEG_TO_RAD;
+            BlockPos ahead = BlockPos.containing(croc.getX() - net.minecraft.util.Mth.sin(yaw) * 1.0, helper.absolutePos(BlockPos.ZERO).getY() + TOP,
+                    croc.getZ() + net.minecraft.util.Mth.cos(yaw) * 1.0);
+            helper.assertTrue(croc.isBasking() && croc.isInWater() && !level.getBlockState(ahead).isAir() && level.getFluidState(ahead).isEmpty(),
+                    "the crocodile is not resting half out, in the water nose to a bank: basking " + croc.isBasking() + ", in water "
+                            + croc.isInWater() + ", ahead " + level.getBlockState(ahead));
         });
     }
 }
