@@ -130,6 +130,16 @@ public class SavannaEntities {
                     .clientTrackingRange(6)
                     .build("catfish"));
 
+    // The Nile crocodile (M9 river life, 2026-11-15): drawn about 5 blocks long (my pick); its box much shorter than the
+    // drawn animal and under a block wide at every size (0.8 to 1.1), so its routes use 1-block squares (see the catfish).
+    public static final DeferredHolder<EntityType<?>, EntityType<com.antcolonies.savanna.animal.CrocodileEntity>> CROCODILE =
+            ENTITY_TYPES.register("crocodile", () -> EntityType.Builder
+                    .of(com.antcolonies.savanna.animal.CrocodileEntity::new, SavannaMobCategories.riverFish())
+                    .sized(0.9F, 0.6F)
+                    .eyeHeight(0.5F)
+                    .clientTrackingRange(8)
+                    .build("crocodile"));
+
     // M8 step 1c: the Matabele young and dead, for the shared brood and refuse code (no nest to raise young in yet, step
     // 1d; the dead are carried home in step 5). Drawn MATABELE_DRAW_SIZE times a small ant's grub and body.
     public static final float MATABELE_DRAW_SIZE = 2.0F * InsectSizes.MATABELE_MAJOR.factor();

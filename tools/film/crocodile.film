@@ -1,0 +1,52 @@
+# The Nile crocodile in the game (2026-11-15): basking on the ground (side, front), hanging at the surface of a tank
+# of water, then a live one walking to a pool and swimming in.
+#   ./gradlew runFilm -PfilmScene=crocodile      pictures in run-film/screenshots/crocodile/
+cmd time set noon
+cmd weather clear
+lens 40
+wait 40
+# (the camera's height is its feet: its eye is 1.62 higher)
+camera 0.0 -60.9 -4.0 0 4
+cmd summon antcolonies:crocodile 0.0 -60.0 3.0 {NoAI:1b,Basking:1b,Rotation:[-90f,0f]}
+wait 30
+shot bask_side
+camera 6.0 -60.6 0.2 65 8
+wait 5
+shot bask_front
+camera 0.0 -56.0 3.0 0 90
+wait 5
+shot bask_top
+cmd tp @e[type=antcolonies:crocodile] 0 -120 0
+wait 10
+# floating: a tank of water, the crocodile still at the surface
+cmd fill -6 -60 16 6 -55 24 minecraft:glass hollow
+cmd fill -5 -59 17 5 -56 23 minecraft:water
+cmd fill -5 -55 17 5 -55 23 minecraft:air
+cmd summon antcolonies:crocodile 0.0 -55.53 20.0 {NoAI:1b,NoGravity:1b,Rotation:[-90f,0f]}
+camera 0.0 -56.6 12.0 0 6
+wait 30
+shot float_side
+camera 5.5 -55.0 17.5 60 25
+wait 5
+shot float_above
+cmd tp @e[type=antcolonies:crocodile] 0 -120 0
+wait 10
+# a live one: walks from the grass to a pool and swims in
+cmd fill 26 -63 -4 34 -61 4 minecraft:water
+camera 20.0 -60.6 -8.0 0 6
+cmd summon antcolonies:crocodile 16.0 -60.0 0.0 {SunIn:50000,Rotation:[-90f,0f]}
+wait 30
+shot walk_1
+wait 7
+shot walk_2
+wait 7
+shot walk_3
+wait 20
+shot walk_4
+camera 30.0 -56.0 -9.0 0 35
+wait 80
+shot swim_1
+wait 12
+shot swim_2
+wait 60
+shot swim_3

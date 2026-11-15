@@ -285,7 +285,117 @@ def paint(bones, look='A'):
     return bones, rows, width, height
 
 
+# --- the game's clips --------------------------------------------------------------------------------------------------
+import math
+
+import tilapia_models as tm
+
+LENGTH = (TAIL_END - SNOUT) * V       # the model's length, snout to tail tip (model pixels)
+WALK_LEN, SWIM_LEN = 1.0, 1.6         # one walking stride, one swimming beat (seconds)
+
+
+def wave_pose(t, amount, beat):
+    """Each chain bone's sideways turn (degrees) in the body's wave at time t, bigger and later toward the tail."""
+    ab, out = {'body': 0.0}, {}
+    for name, parent, a, lag in WAVE:
+        ab[name] = amount * a * math.sin(beat * t - lag)
+        out[name] = {'rotation': [0.0, math.degrees(ab[name] - ab[parent]), 0.0]}
+    return out
+
+
+def folded(p, f=1.0):
+    """The legs folded back along the body (f 0 to 1), as it swims."""
+    for s, side in ((1, 'left'), (-1, 'right')):
+        for kind, back in (('arm', 65), ('leg', 58)):
+            p[f'{kind}_upper_{side}'] = {'rotation': [0, s * back * f, -s * 10 * f]}
+            p[f'{kind}_lower_{side}'] = {'rotation': [0, s * 20 * f, 0]}
+    return p
+
+
+def clips():
+    """idle (lying on the bank, breathing, the tail barely stirring), walk (a low crawl, the legs in diagonal pairs, the
+    body and tail swinging; played faster or slower by its speed), swim (the tail sweeping, the legs folded back),
+    float (hanging at the surface, the legs loose), bask (propped a little on its forelegs, the head raised and the
+    mouth held open, the lower jaw clear of the ground: the user's ask), death (rolls onto its back)."""
+    def idle(t):
+        breath = math.sin(2 * math.pi * t / 4.0)
+        p = wave_pose(t, 0.1, 2 * math.pi / 4.0)
+        p['neck'] = {'rotation': [-1.0 - breath, p['neck']['rotation'][1], 0]}
+        return p
+
+    def walk(t):
+        w = 2 * math.pi / WALK_LEN
+        p = wave_pose(t, 0.55, w)
+        p['body'] = {'rotation': [0, 0, 0], 'position': [0, 1.0, 0]}
+        for s, side in ((1, 'left'), (-1, 'right')):
+            for i, kind in enumerate(('arm', 'leg')):
+                ph = w * t + (0 if s > 0 else math.pi) + (math.pi if i else 0)      # diagonal pairs
+                swing, lift = math.sin(ph), max(0.0, math.cos(ph))
+                p[f'{kind}_upper_{side}'] = {'rotation': [0, s * 24 * swing, s * 9 * lift]}
+                p[f'{kind}_foot_{side}'] = {'rotation': [0, -s * 24 * swing, 0]}
+        return p
+
+    def swim(t):
+        return folded(wave_pose(t, 1.3, 2 * math.pi / SWIM_LEN))
+
+    def floating(t):
+        p = folded(wave_pose(t, 0.15, 2 * math.pi / 4.0), 0.45)
+        p['body'] = {'rotation': [0, 0, 0], 'position': [0, 0.3 * math.sin(2 * math.pi * t / 4.0), 0]}
+        return p
+
+    def bask(t):
+        breath = math.sin(2 * math.pi * t / 6.0)
+        p = wave_pose(t, 0.06, 2 * math.pi / 6.0)
+        p['body'] = {'rotation': [-8, 0, 0]}
+        p['hips'] = {'rotation': [8, p['hips']['rotation'][1], 0]}
+        for side in ('left', 'right'):
+            p[f'arm_upper_{side}'] = {'rotation': [8, 0, 0], 'position': [0, -1.6, 0]}
+        p['neck'] = {'rotation': [-12, 0, 0]}
+        p['head'] = {'rotation': [-16 - breath, 0, 0]}
+        p['jaw'] = {'rotation': [26 + breath, 0, 0]}
+        return p
+
+    def death(t):
+        f = min(1.0, t / 1.0)
+        f = f * f * (3 - 2 * f)
+        p = wave_pose(t, 0.8 * (1 - f), 2 * math.pi / 0.8)
+        p['body'] = {'rotation': [0, 0, 180 * f], 'position': [0, 3.0 * f, 0]}
+        p['jaw'] = {'rotation': [14 * f, 0, 0]}
+        return p
+
+    return {'idle': tm.clip(4.0, idle, 24), 'walk': tm.clip(WALK_LEN, walk, 20), 'swim': tm.clip(SWIM_LEN, swim, 24),
+            'float': tm.clip(4.0, floating, 24), 'bask': tm.clip(6.0, bask, 24), 'death': tm.clip(1.2, death, 12, 'hold')}
+
+
+def write_game():
+    """Writes the crocodile's model, texture and clips into the savanna mod."""
+    import json
+    import mod_paths
+    root = mod_paths.assets('savanna')
+    game_bones, rows, w, h = paint(model())
+    files = {'textures/entity/crocodile.png': png(rows)}
+    geo = {'format_version': '1.12.0', 'minecraft:geometry': [{
+        'description': {'identifier': 'geometry.crocodile', 'texture_width': w, 'texture_height': h,
+                        'visible_bounds_width': 8, 'visible_bounds_height': 2.5, 'visible_bounds_offset': [0, 0.75, 0]},
+        'bones': game_bones}]}
+    files['geo/entity/crocodile.geo.json'] = geo
+    files['animations/entity/crocodile.animation.json'] = {'format_version': '1.8.0', 'animations': clips()}
+    for rel, data in files.items():
+        path = root / rel
+        path.parent.mkdir(parents=True, exist_ok=True)
+        if isinstance(data, bytes):
+            path.write_bytes(data)
+        else:
+            with open(path, 'w', encoding='utf-8', newline='\n') as f:
+                json.dump(data, f, indent=1)
+        print('wrote', path.relative_to(mod_paths.PROJECT))
+
+
 if __name__ == '__main__':
+    import sys
+    if sys.argv[1:] == ['game']:
+        write_game()
+        sys.exit()
     bones = model()
     n = sum(len(b.get('cubes', [])) for b in bones)
     _, rows, w, h = paint(bones)

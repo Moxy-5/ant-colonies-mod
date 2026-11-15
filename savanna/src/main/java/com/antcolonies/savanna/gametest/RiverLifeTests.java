@@ -451,4 +451,57 @@ public class RiverLifeTests {
             }
         });
     }
+
+    /**
+     * The Nile crocodile's first step (2026-11-15): put in the pond's deep end by day and wanting the sun, it swims to
+     * the bank, climbs out and basks (the mouth-open pose is the synced basking flag); told it has had enough, it walks
+     * back and slides into the water. Its swimming and walking speeds go to the log.
+     */
+    @GameTest(template = "arena", timeoutTicks = 2400)
+    public static void aCrocodileClimbsOutToBaskAndGoesBackIn(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        buildPond(helper);
+        for (int x = X1 + 1; x <= X1 + 6; x++) {            // a bank beside the deep end, level with the pond's rim
+            for (int z = Z0 - 1; z <= Z1 + 1; z++) {
+                helper.setBlock(new BlockPos(x, TOP, z), Blocks.STONE);
+                helper.setBlock(new BlockPos(x, TOP + 1, z), Blocks.AIR);
+                helper.setBlock(new BlockPos(x, TOP + 2, z), Blocks.AIR);
+            }
+        }
+        helper.setDayTime(6000);
+        if (net.minecraft.world.entity.SpawnPlacements.getPlacementType(SavannaEntities.CROCODILE.get())
+                != net.minecraft.world.entity.SpawnPlacementTypes.IN_WATER) {
+            helper.fail("the crocodile's spawn placement is not signed up");
+        }
+        var biomes = level.registryAccess().registryOrThrow(net.minecraft.core.registries.Registries.BIOME);
+        if (biomes.getOrThrow(net.minecraft.world.level.biome.Biomes.SAVANNA).getMobSettings()
+                .getMobs(com.antcolonies.savanna.registry.SavannaMobCategories.riverFish())
+                .unwrap().stream().noneMatch(d -> d.type == SavannaEntities.CROCODILE.get())) {
+            helper.fail("the crocodile is not in the savanna's river fish spawn list");
+        }
+        com.antcolonies.savanna.animal.CrocodileEntity croc = helper.spawn(SavannaEntities.CROCODILE.get(), new BlockPos(X1 - 2, SURFACE + 4, Z0 + 3));
+        croc.setPersistenceRequired();
+        croc.wantSun();
+        int[] stage = {0};          // 0 not basked yet, 1 basking seen and sent back
+        double[] fastest = new double[2];
+        helper.onEachTick(() -> {
+            double dx = croc.getX() - croc.xo, dy = croc.getY() - croc.yo, dz = croc.getZ() - croc.zo;
+            double speed = Math.sqrt(dx * dx + dy * dy + dz * dz);
+            int where = croc.isInWater() ? 0 : 1;
+            fastest[where] = Math.max(fastest[where], speed);
+        });
+        helper.succeedWhen(() -> {
+            helper.assertTrue(croc.isAlive(), "the crocodile died");
+            if (stage[0] == 0) {
+                helper.assertTrue(croc.isBasking() && !croc.isInWater() && croc.onGround(),
+                        "the crocodile has not climbed out to bask: it is " + (croc.isInWater() ? "in the water" : "on land")
+                                + " at " + croc.blockPosition().subtract(helper.absolutePos(BlockPos.ZERO)));
+                stage[0] = 1;
+                croc.sunIn = 100_000;        // enough sun
+            }
+            helper.assertTrue(!croc.isBasking() && croc.isInWater(), "the crocodile has not gone back into the water after basking");
+            SavannaMod.LOGGER.info("[crocodile] fastest in water {} blocks a tick, on land {}",
+                    String.format(java.util.Locale.ROOT, "%.3f", fastest[0]), String.format(java.util.Locale.ROOT, "%.3f", fastest[1]));
+        });
+    }
 }

@@ -51,6 +51,7 @@ public class SavannaEvents {
         event.put(SavannaEntities.MATABELE_QUEEN.get(), com.antcolonies.savanna.entity.MatabeleQueenEntity.createAttributes().build());
         event.put(SavannaEntities.TILAPIA.get(), com.antcolonies.savanna.animal.TilapiaEntity.createAttributes().build());
         event.put(SavannaEntities.CATFISH.get(), com.antcolonies.savanna.animal.CatfishEntity.createAttributes().build());
+        event.put(SavannaEntities.CROCODILE.get(), com.antcolonies.savanna.animal.CrocodileEntity.createAttributes().build());
     }
 
     /** Where the river animals may spawn (M9): the tilapia and the catfish in the savanna's rivers, pans and oxbows. */
@@ -61,6 +62,9 @@ public class SavannaEvents {
                 net.neoforged.neoforge.event.entity.RegisterSpawnPlacementsEvent.Operation.REPLACE);
         event.register(SavannaEntities.CATFISH.get(), net.minecraft.world.entity.SpawnPlacementTypes.IN_WATER,
                 net.minecraft.world.level.levelgen.Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, com.antcolonies.savanna.animal.CatfishEntity::canSpawn,
+                net.neoforged.neoforge.event.entity.RegisterSpawnPlacementsEvent.Operation.REPLACE);
+        event.register(SavannaEntities.CROCODILE.get(), net.minecraft.world.entity.SpawnPlacementTypes.IN_WATER,
+                net.minecraft.world.level.levelgen.Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, com.antcolonies.savanna.animal.CrocodileEntity::canSpawn,
                 net.neoforged.neoforge.event.entity.RegisterSpawnPlacementsEvent.Operation.REPLACE);
     }
 
@@ -210,6 +214,7 @@ public class SavannaEvents {
             event.accept(SavannaItems.MATABELE_QUEEN_SPAWN_EGG);
             event.accept(SavannaItems.TILAPIA_SPAWN_EGG);
             event.accept(SavannaItems.CATFISH_SPAWN_EGG);
+            event.accept(SavannaItems.CROCODILE_SPAWN_EGG);
         });
     }
 }
