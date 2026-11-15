@@ -5,6 +5,8 @@ import java.util.Optional;
 
 import javax.annotation.Nullable;
 
+import com.antcolonies.entity.body.GroundBend;
+
 import net.minecraft.core.BlockPos;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.syncher.EntityDataAccessor;
@@ -60,8 +62,23 @@ public class CrocodileEntity extends PathfinderMob implements GeoEntity {
 
     /** How deep in the water it hangs when resting: the water this far up its box, so the brows and back are out (blocks, at the usual size). */
     private static final double AFLOAT = 0.42;
+    /**
+     * How the model is drawn: 6.75 blocks long as made (snout to tail tip, 108 pixels), drawn at 10/11 of that, so a usual
+     * crocodile is about 6.1 blocks long (5 until the user asked for a longer tail, 2026-11-15; the body kept its size).
+     */
+    public static final float MODEL_SCALE = 5.0F / 5.5F;
+    /**
+     * The joints along its middle line the body bends at to lie on what is under it ({@link GroundBend}; model z,
+     * pixels, from {@code tools/crocodile_models.py}): the anchor at the shoulders, where the neck and the chest hang
+     * from the body; forward to the snout (the neck bone); back through the hips and the five tail bones to the tip.
+     */
+    public static final double[] FRONT_JOINTS = {-14, -40}, REAR_JOINTS = {-14, 0, 12, 24, 36, 48, 60, 68};
+    /** The bones of those pieces, in the same order: front chain, then rear chain. */
+    public static final String[] BENT_BONES = {"neck", "chest", "hips", "tail1", "tail2", "tail3", "tail4", "tail5"};
 
     private final AnimatableInstanceCache cache = GeckoLibUtil.createInstanceCache(this);
+    /** The body lying on what is under it (worked out where it is drawn, each frame). */
+    private final GroundBend bend = new GroundBend(FRONT_JOINTS, REAR_JOINTS);
     /** Its own length against the usual crocodile. */
     private float ownSize = 1.0F;
     /** Ticks until it next wants the sun (while it does not, a crocodile on land goes back to the water). */
@@ -120,6 +137,16 @@ public class CrocodileEntity extends PathfinderMob implements GeoEntity {
 
     public float ownSize() {
         return ownSize;
+    }
+
+    /** Its body's bend over what is under it (for the model). */
+    public GroundBend bend() {
+        return bend;
+    }
+
+    /** How deep under the surface its feet hang when it rests afloat (blocks). */
+    public double floatDepth() {
+        return AFLOAT * getScale();
     }
 
     private void refresh() {

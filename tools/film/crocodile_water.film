@@ -1,0 +1,139 @@
+# The crocodile's body lying on what is under it (its life step 1, 2026-11-15): a pool with its bank a block above the
+# water, like a savanna river's floodplain. A still one on the bank with its head out over the water, a still one in the
+# water with its head on the bank, then a live one walking in and a live one climbing out to bask.
+#   ./gradlew runFilm -PfilmScene=crocodile_water      pictures in run-film/screenshots/crocodile_water/
+cmd time set noon
+cmd weather clear
+cmd fill 26 -61 -4 40 -61 4 minecraft:air
+cmd fill 26 -63 -4 40 -62 4 minecraft:water
+lens 40
+wait 40
+# (the camera's height is its feet: its eye is 1.62 higher)
+camera 25.5 -60.4 -7.0 0 8
+cmd summon antcolonies:crocodile 25.3 -60.0 0.0 {NoAI:1b,Rotation:[-90f,0f]}
+wait 30
+shot edge_side
+camera 29.0 -58.0 -3.5 40 30
+wait 5
+shot edge_above
+cmd tp @e[type=antcolonies:crocodile] 0 -120 0
+wait 10
+cmd summon antcolonies:crocodile 26.6 -61.53 0.0 {NoAI:1b,NoGravity:1b,Rotation:[90f,0f]}
+camera 25.5 -60.4 -7.0 0 8
+wait 30
+shot halfout_side
+camera 29.0 -58.0 -3.5 40 30
+wait 5
+shot halfout_above
+cmd tp @e[type=antcolonies:crocodile] 0 -120 0
+wait 10
+# a live one walks from the grass into the pool
+camera 23.0 -60.4 -9.0 0 8
+cmd summon antcolonies:crocodile 20.0 -60.0 0.0 {SunIn:50000,Rotation:[-90f,0f]}
+wait 40
+shot in_040
+wait 6
+shot in_046
+wait 6
+shot in_052
+wait 6
+shot in_058
+wait 6
+shot in_064
+wait 6
+shot in_070
+wait 6
+shot in_076
+wait 6
+shot in_082
+wait 6
+shot in_088
+wait 6
+shot in_094
+wait 6
+shot in_100
+wait 6
+shot in_106
+wait 6
+shot in_112
+wait 6
+shot in_118
+wait 6
+shot in_124
+wait 6
+shot in_130
+wait 6
+shot in_136
+wait 6
+shot in_142
+wait 6
+shot in_148
+wait 6
+shot in_154
+wait 6
+shot in_160
+cmd tp @e[type=antcolonies:crocodile] 0 -120 0
+wait 10
+# a live one in the water wanting the sun climbs out onto the bank
+camera 26.0 -60.4 -9.0 0 10
+cmd summon antcolonies:crocodile 28.0 -61.5 0.0 {SunIn:0,Rotation:[90f,0f]}
+wait 10
+shot out_010
+wait 10
+shot out_020
+wait 10
+shot out_030
+wait 10
+shot out_040
+wait 10
+shot out_050
+wait 10
+shot out_060
+wait 10
+shot out_070
+wait 10
+shot out_080
+wait 10
+shot out_090
+wait 10
+shot out_100
+wait 10
+shot out_110
+wait 10
+shot out_120
+wait 10
+shot out_130
+wait 10
+shot out_140
+wait 10
+shot out_150
+wait 10
+shot out_160
+wait 10
+shot out_170
+wait 10
+shot out_180
+wait 10
+shot out_190
+wait 10
+shot out_200
+wait 20
+shot out_220
+wait 20
+shot out_240
+wait 20
+shot out_260
+wait 20
+shot out_280
+wait 20
+shot out_300
+wait 20
+shot out_320
+wait 20
+shot out_340
+wait 20
+shot out_360
+wait 20
+shot out_380
+wait 20
+shot out_400
