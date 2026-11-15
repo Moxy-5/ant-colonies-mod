@@ -546,6 +546,14 @@ public class RiverLifeTests {
                 .unwrap().stream().noneMatch(d -> d.type == SavannaEntities.CROCODILE.get())) {
             helper.fail("the crocodile is not in the savanna's river hunter spawn list");
         }
+        // the world's own last checks on a natural spawn, in the pond's deep water (BUGS 218: a land mob's check refused water)
+        com.antcolonies.savanna.animal.CrocodileEntity trial = new com.antcolonies.savanna.animal.CrocodileEntity(SavannaEntities.CROCODILE.get(), level);
+        BlockPos trialAt = helper.absolutePos(new BlockPos(X1 - 2, SURFACE + 1, Z0 + 3));
+        trial.moveTo(trialAt.getX() + 0.5, trialAt.getY(), trialAt.getZ() + 0.5, 0, 0);
+        helper.assertTrue(level.getFluidState(trialAt).is(net.minecraft.tags.FluidTags.WATER), "the trial spot is not water");
+        if (!trial.checkSpawnRules(level, net.minecraft.world.entity.MobSpawnType.NATURAL) || !trial.checkSpawnObstruction(level)) {
+            helper.fail("the world would refuse a crocodile spawning in the water");
+        }
         com.antcolonies.savanna.animal.CrocodileEntity croc = helper.spawn(SavannaEntities.CROCODILE.get(), new BlockPos(X1 - 2, SURFACE + 4, Z0 + 3));
         croc.setPersistenceRequired();
         croc.wantSun();

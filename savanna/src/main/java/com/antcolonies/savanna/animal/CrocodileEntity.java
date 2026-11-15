@@ -685,6 +685,16 @@ public class CrocodileEntity extends PathfinderMob implements GeoEntity {
         return distanceToClosestPlayer > TilapiaEntity.KEEP_NEAR * TilapiaEntity.KEEP_NEAR;
     }
 
+    /**
+     * Its spawn spot may be water (BUGS 218): only blocks and other mobs stand in its way, as for Minecraft's water
+     * animals. A land mob's own check refuses any spot with water in its box, so the world never spawned a crocodile in
+     * the river (spawn eggs and commands skip this check).
+     */
+    @Override
+    public boolean checkSpawnObstruction(net.minecraft.world.level.LevelReader level) {
+        return level.isUnobstructed(this);
+    }
+
     /** Always wanders, as the river fish do (BUGS 216: Minecraft stops wandering with only a spectator near). */
     @Override
     public int getNoActionTime() {
