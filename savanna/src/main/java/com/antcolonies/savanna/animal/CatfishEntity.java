@@ -168,8 +168,11 @@ public class CatfishEntity extends AbstractFish implements GeoEntity {
         float yaw = getYRot() * Mth.DEG_TO_RAD;
         double ahead = 0.12 * entityData.get(DATA_HELD_SIZE);      // the half's middle, a little in front of the lips
         Vec3 at = new Vec3(m.x - Mth.sin(yaw) * ahead, m.y - 0.05 - 0.08 * entityData.get(DATA_HELD_SIZE), m.z + Mth.cos(yaw) * ahead);
-        RemainsEntity left = RemainsEntity.leave(server, RemainsEntity.Kind.TILAPIA_HALF, at, getYRot(), entityData.get(DATA_HELD_SIZE));
+        RemainsEntity left = RemainsEntity.leave(server, RemainsEntity.Kind.TILAPIA_HALF, at, getYRot(), entityData.get(DATA_HELD_SIZE), heldLook());
         if (left != null) {
+            if (!heldOnRight()) {       // it falls away on the side it lay on in the mouth
+                left.lieOnOtherSide();
+            }
             left.setDeltaMovement(getDeltaMovement().scale(0.3).add(0, -0.02, 0));
         }
         server.sendParticles(net.minecraft.core.particles.ParticleTypes.BUBBLE, m.x, m.y, m.z, 6, 0.15, 0.1, 0.15, 0.03);

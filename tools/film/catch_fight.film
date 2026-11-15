@@ -68,6 +68,27 @@ shot above_34
 cmd tp @e[type=antcolonies:catfish] 0 -120 0
 cmd kill @e[type=antcolonies:remains]
 wait 10
+camera 1.0 -57.0 0.5 90 90
+cmd summon antcolonies:catfish 0.0 -57.5 0.5 {NoAI:1b,NoGravity:1b,Rotation:[-90f,0f],HeldLook:0,HeldSize:1.0f,HeldOnRight:0b,HeldTicks:46,HeldCut:1b}
+wait 10
+shot left_10
+wait 5
+shot left_16
+wait 3
+shot left_20
+wait 3
+shot left_24
+wait 2
+shot left_27
+wait 1
+shot left_29
+shot left_30
+shot left_31
+wait 2
+shot left_34
+cmd tp @e[type=antcolonies:catfish] 0 -120 0
+cmd kill @e[type=antcolonies:remains]
+wait 10
 camera 0.7 -59.0 -1.9 0 0
 cmd summon antcolonies:catfish 0.0 -57.5 0.5 {NoAI:1b,NoGravity:1b,Rotation:[-90f,0f],HeldLook:0,HeldSize:0.5f,HeldTicks:46,HeldCut:1b}
 wait 10

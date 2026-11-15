@@ -18,6 +18,8 @@ public class RemainsRenderer extends GeoEntityRenderer<RemainsEntity> {
     private static final ResourceLocation ANIMATIONS = ResourceLocation.fromNamespaceAndPath(SavannaMod.MODID, "animations/entity/remains.animation.json");
     private static final ResourceLocation[][] MODELS = new ResourceLocation[RemainsEntity.Kind.values().length][4];
     private static final ResourceLocation[][] TEXTURES = new ResourceLocation[RemainsEntity.Kind.values().length][4];
+    /** A tilapia's remains in the young fish's and the breeding male's colours (by kind, look word, stage); the everyday fish wears {@link #TEXTURES}. */
+    private static final ResourceLocation[][][] LOOKS = new ResourceLocation[RemainsEntity.Kind.values().length][2][4];
 
     static {
         for (RemainsEntity.Kind kind : RemainsEntity.Kind.values()) {
@@ -25,6 +27,8 @@ public class RemainsRenderer extends GeoEntityRenderer<RemainsEntity> {
                 String name = "remains_" + kind.name + "_" + stage;
                 MODELS[kind.ordinal()][stage - 1] = ResourceLocation.fromNamespaceAndPath(SavannaMod.MODID, "geo/entity/" + name + ".geo.json");
                 TEXTURES[kind.ordinal()][stage - 1] = ResourceLocation.fromNamespaceAndPath(SavannaMod.MODID, "textures/entity/" + name + ".png");
+                LOOKS[kind.ordinal()][0][stage - 1] = ResourceLocation.fromNamespaceAndPath(SavannaMod.MODID, "textures/entity/" + name + "_young.png");
+                LOOKS[kind.ordinal()][1][stage - 1] = ResourceLocation.fromNamespaceAndPath(SavannaMod.MODID, "textures/entity/" + name + "_breeding.png");
             }
         }
     }
@@ -38,6 +42,11 @@ public class RemainsRenderer extends GeoEntityRenderer<RemainsEntity> {
 
             @Override
             public ResourceLocation getTextureResource(RemainsEntity remains) {
+                boolean tilapia = remains.kind() == RemainsEntity.Kind.TILAPIA || remains.kind() == RemainsEntity.Kind.TILAPIA_HALF;
+                int look = remains.look();
+                if (tilapia && look != com.antcolonies.savanna.animal.TilapiaEntity.EVERYDAY) {
+                    return LOOKS[remains.kind().ordinal()][look == com.antcolonies.savanna.animal.TilapiaEntity.YOUNG ? 0 : 1][remains.stage() - 1];
+                }
                 return TEXTURES[remains.kind().ordinal()][remains.stage() - 1];
             }
 
@@ -57,6 +66,6 @@ public class RemainsRenderer extends GeoEntityRenderer<RemainsEntity> {
         // south whatever way they were left; a bitten-off half fell away turned across the fish it came from)
         poseStack.mulPose(com.mojang.math.Axis.YP.rotationDegrees(-remains.getYRot()));
         float scale = (remains.kind() == RemainsEntity.Kind.TILAPIA || remains.kind() == RemainsEntity.Kind.TILAPIA_HALF ? TilapiaRenderer.SCALE : CatfishRenderer.SCALE) * remains.size();
-        poseStack.scale(scale, scale, scale);
+        poseStack.scale(remains.onOtherSide() ? -scale : scale, scale, scale);      // mirrored: lying on its other side
     }
 }

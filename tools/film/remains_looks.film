@@ -1,0 +1,20 @@
+# A tilapia's bitten-off half in the dead fish's colours (2026-11-15, the user's ask): the everyday fish, the young
+# fish and the breeding male, each fresh, fed on and picked over, lying on the bed, from above.
+#   ./gradlew runFilm -PfilmScene=remains_looks      pictures in run-film/screenshots/remains_looks/
+cmd time set noon
+cmd weather clear
+lens 30
+wait 20
+cmd summon antcolonies:remains -1.0 -60 -0.8 {kind:"tilapia_half",look:1,bites:3,NoGravity:1b}
+cmd summon antcolonies:remains -1.0 -60 0.0 {kind:"tilapia_half",look:1,bites:2,NoGravity:1b}
+cmd summon antcolonies:remains -1.0 -60 0.8 {kind:"tilapia_half",look:1,bites:1,NoGravity:1b}
+cmd summon antcolonies:remains 0.0 -60 -0.8 {kind:"tilapia_half",look:0,bites:3,NoGravity:1b}
+cmd summon antcolonies:remains 0.0 -60 0.0 {kind:"tilapia_half",look:0,bites:2,NoGravity:1b}
+cmd summon antcolonies:remains 0.0 -60 0.8 {kind:"tilapia_half",look:0,bites:1,NoGravity:1b}
+cmd summon antcolonies:remains 1.0 -60 -0.8 {kind:"tilapia_half",look:2,bites:3,NoGravity:1b}
+cmd summon antcolonies:remains 1.0 -60 0.0 {kind:"tilapia_half",look:2,bites:2,NoGravity:1b}
+cmd summon antcolonies:remains 1.0 -60 0.8 {kind:"tilapia_half",look:2,bites:1,NoGravity:1b}
+camera 0 -57.5 0 0 90
+wait 10
+shot above
+quit

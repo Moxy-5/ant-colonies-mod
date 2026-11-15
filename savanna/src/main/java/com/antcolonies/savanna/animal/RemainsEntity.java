@@ -71,6 +71,9 @@ public class RemainsEntity extends Entity implements GeoEntity {
 
     private static final EntityDataAccessor<Integer> DATA_KIND = SynchedEntityData.defineId(RemainsEntity.class, EntityDataSerializers.INT);
     private static final EntityDataAccessor<Integer> DATA_BITES = SynchedEntityData.defineId(RemainsEntity.class, EntityDataSerializers.INT);
+    private static final EntityDataAccessor<Integer> DATA_LOOK = SynchedEntityData.defineId(RemainsEntity.class, EntityDataSerializers.INT);
+    /** Lying on its other side: its back to the other hand (a tilapia a catfish held on its left side falls away as it lay). */
+    private static final EntityDataAccessor<Boolean> DATA_OTHER_SIDE = SynchedEntityData.defineId(RemainsEntity.class, EntityDataSerializers.BOOLEAN);
     private static final EntityDataAccessor<Float> DATA_SIZE = SynchedEntityData.defineId(RemainsEntity.class, EntityDataSerializers.FLOAT);
 
     private final AnimatableInstanceCache cache = GeckoLibUtil.createInstanceCache(this);
@@ -83,6 +86,11 @@ public class RemainsEntity extends Entity implements GeoEntity {
 
     /** Leaves remains of this kind at a place, lying along a heading (degrees, the fish's head that way), at a fish's size. */
     public static RemainsEntity leave(ServerLevel level, Kind kind, Vec3 at, float yaw, float size) {
+        return leave(level, kind, at, yaw, size, TilapiaEntity.EVERYDAY);
+    }
+
+    /** The same, in the dead fish's colours (a tilapia's look, {@link TilapiaEntity#look()}: the user, 2026-11-15). */
+    public static RemainsEntity leave(ServerLevel level, Kind kind, Vec3 at, float yaw, float size, int look) {
         RemainsEntity remains = SavannaEntities.REMAINS.get().create(level);
         if (remains == null) {
             return null;
@@ -90,10 +98,26 @@ public class RemainsEntity extends Entity implements GeoEntity {
         remains.entityData.set(DATA_KIND, kind.ordinal());
         remains.entityData.set(DATA_BITES, kind.bites);
         remains.entityData.set(DATA_SIZE, size);
+        remains.entityData.set(DATA_LOOK, look);
         remains.moveTo(at.x, at.y, at.z, yaw, 0.0F);
         remains.setYHeadRot(yaw);
         level.addFreshEntity(remains);
         return remains;
+    }
+
+    /** The colours of the fish it was (a tilapia's look, {@link TilapiaEntity#look()}; a catfish has only one). */
+    public int look() {
+        return entityData.get(DATA_LOOK);
+    }
+
+    /** Whether it lies on its other side (drawn mirrored, its back to the other hand). */
+    public boolean onOtherSide() {
+        return entityData.get(DATA_OTHER_SIDE);
+    }
+
+    /** Lays it on its other side. */
+    public void lieOnOtherSide() {
+        entityData.set(DATA_OTHER_SIDE, true);
     }
 
     public Kind kind() {
@@ -201,6 +225,8 @@ public class RemainsEntity extends Entity implements GeoEntity {
         builder.define(DATA_KIND, 0);
         builder.define(DATA_BITES, Kind.CATFISH.bites);
         builder.define(DATA_SIZE, 1.0F);
+        builder.define(DATA_OTHER_SIDE, false);
+        builder.define(DATA_LOOK, TilapiaEntity.EVERYDAY);
     }
 
     @Override
@@ -208,6 +234,8 @@ public class RemainsEntity extends Entity implements GeoEntity {
         entityData.set(DATA_KIND, Kind.byName(tag.getString("kind")).ordinal());
         setBitesLeft(tag.contains("bites") ? tag.getInt("bites") : kind().bites);     // a summon with no bites: fresh
         entityData.set(DATA_SIZE, tag.contains("size") ? tag.getFloat("size") : 1.0F);
+        entityData.set(DATA_LOOK, tag.contains("look") ? net.minecraft.util.Mth.clamp(tag.getInt("look"), TilapiaEntity.YOUNG, TilapiaEntity.BREEDING) : TilapiaEntity.EVERYDAY);
+        entityData.set(DATA_OTHER_SIDE, tag.getBoolean("other_side"));
         rot = tag.getInt("rot");
         bones = tag.getInt("bones");
     }
@@ -217,6 +245,8 @@ public class RemainsEntity extends Entity implements GeoEntity {
         tag.putString("kind", kind().name);
         tag.putInt("bites", bitesLeft());
         tag.putFloat("size", size());
+        tag.putInt("look", look());
+        tag.putBoolean("other_side", onOtherSide());
         tag.putInt("rot", rot);
         tag.putInt("bones", bones);
     }

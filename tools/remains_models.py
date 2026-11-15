@@ -461,6 +461,7 @@ def all_remains():
 # The game's names for the three kinds (the viewer's 'catfish_croc' is the game's 'catfish_torn').
 GAME_KINDS = {'catfish': ('catfish', False), 'catfish_torn': ('catfish', True), 'tilapia': ('tilapia', False),
               'tilapia_half': ('tilapia', True)}     # the front half a catfish bit off (2026-11-15)
+GAME_LOOKS = {'B': 'young', 'C': 'breeding'}      # the tilapia's other two looks (A, the everyday fish, has no word)
 LOOSE = ('barbel', 'pectoral', 'pelvic')      # limp parts that may sink into the silt, left out of the grounding
 
 
@@ -496,6 +497,9 @@ def write_game():
             bones, rows, w, h = fish_remains(kind, stage, torn=torn)
             name = f'remains_{game}_{stage}'
             files[f'textures/entity/{name}.png'] = tm.png(rows)
+            if kind == 'tilapia':       # a tilapia's remains keep the dead fish's colours (the user, 2026-11-15): the
+                for look, word in GAME_LOOKS.items():       # same model, painted as the young or the breeding male
+                    files[f'textures/entity/{name}_{word}.png'] = tm.png(fish_remains(kind, stage, look, torn)[1])
             files[f'geo/entity/{name}.geo.json'] = {'format_version': '1.12.0', 'minecraft:geometry': [{
                 'description': {'identifier': f'geometry.{name}', 'texture_width': w, 'texture_height': h,
                                 'visible_bounds_width': 4, 'visible_bounds_height': 1.5,
