@@ -522,7 +522,7 @@ def crocodile_page(out):
     blocks = {n: file_uri(n + ".png") for n in ("silt", "wet_silt", "algae_mat_3")}
     data = {"looks": looks, "catfish": catfish, "tilapia": {"bones": tb, "texture": uri(tm.png(rows)), "w": w, "h": h},
             "blocks": blocks, "wave": cr.WAVE, "catfishWave": cm.WAVE, "eyeTop": eye_top,
-            "afloat": 0.55 * cr.V,
+            "afloat": 1.65 * cr.V,
             "boxes": sum(len(b.get("cubes", [])) for b in bones)}
     template = (Path(__file__).resolve().parent / "crocodile_viewer.template.html").read_text(encoding="utf-8")
     out.parent.mkdir(parents=True, exist_ok=True)
