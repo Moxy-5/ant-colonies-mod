@@ -123,6 +123,18 @@ public class SavannaEvents {
     }
 
     /** The raid view forgets a player who leaves, and everyone when the server stops (the raid code review, finding 14). */
+    /**
+     * Held in a crocodile's jaws there is no stepping off (2026-11-15): the only way out is to hit it till it lets go,
+     * or for it to let go itself. Only a dismount is stopped, and only while the crocodile still holds it.
+     */
+    @SubscribeEvent
+    public static void onMount(net.neoforged.neoforge.event.entity.EntityMountEvent event) {
+        if (event.isDismounting() && event.getEntityBeingMounted() instanceof com.antcolonies.savanna.animal.CrocodileEntity croc
+                && croc.holds(event.getEntityMounting()) && croc.isAlive() && !croc.isRemoved() && event.getEntityMounting().isAlive()) {
+            event.setCanceled(true);
+        }
+    }
+
     @SubscribeEvent
     public static void onLogOut(net.neoforged.neoforge.event.entity.player.PlayerEvent.PlayerLoggedOutEvent event) {
         com.antcolonies.savanna.command.RaidView.forget(event.getEntity().getUUID());

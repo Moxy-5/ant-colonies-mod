@@ -398,7 +398,41 @@ def clips():
         p['jaw'] = {'rotation': [14 * f, 0, 0]}
         return p
 
-    return {'idle': tm.clip(4.0, idle, 24), 'walk': tm.clip(WALK_LEN, walk, 20), 'swim': tm.clip(SWIM_LEN, swim, 24),
+    def lunge(t):
+        # the hunt (2026-11-15): bursting out of the water at its prey, the tail driving hard, the legs back, the head
+        # up and the mouth thrown wide in the first tenth of a second (my picks: 0.4 s, the jaw 42 degrees)
+        f = min(1.0, t / 0.12)
+        f = f * f * (3 - 2 * f)
+        p = folded(wave_pose(t, 1.6, 2 * math.pi / 0.45), 0.8)
+        p['neck'] = {'rotation': [-6 * f, p['neck']['rotation'][1], 0]}
+        p['head'] = {'rotation': [-14 * f, 0, 0]}
+        p['jaw'] = {'rotation': [42 * f, 0, 0]}
+        return p
+
+    def hold(t):
+        # prey clamped crosswise in its jaws: the jaw shut on it (a little open round it), squeezing now and then, the
+        # head shaking the prey from side to side, the tail working (my picks: a 1 s beat)
+        w = 2 * math.pi / 1.0
+        p = folded(wave_pose(t, 0.7, w), 0.6)
+        p['neck'] = {'rotation': [-3, p['neck']['rotation'][1] + 7 * math.sin(w * t), 0]}
+        p['head'] = {'rotation': [-4, 9 * math.sin(w * t + 0.6), 0]}
+        p['jaw'] = {'rotation': [8 - 3 * max(0.0, math.sin(2 * w * t)), 0, 0]}
+        return p
+
+    def eat(t):
+        # tearing at its kill or gulping down what it swallowed: the head tossed up, the jaw opening and snapping shut
+        # as it comes down, again and again (my picks: a 1 s beat, the toss 24 degrees)
+        u = (t % 1.0) / 1.0
+        toss = math.sin(math.pi * min(1.0, u / 0.55))
+        snap = max(0.0, math.sin(math.pi * min(1.0, max(0.0, (u - 0.15) / 0.5))))
+        p = folded(wave_pose(t, 0.3, 2 * math.pi / 2.0), 0.5)
+        p['neck'] = {'rotation': [-10 * toss, p['neck']['rotation'][1], 0]}
+        p['head'] = {'rotation': [-24 * toss, 0, 0]}
+        p['jaw'] = {'rotation': [30 * snap, 0, 0]}
+        return p
+
+    return {'lunge': tm.clip(0.4, lunge, 24, 'hold'), 'hold': tm.clip(1.0, hold, 24), 'eat': tm.clip(1.0, eat, 24),
+            'idle': tm.clip(4.0, idle, 24), 'walk': tm.clip(WALK_LEN, walk, 20), 'swim': tm.clip(SWIM_LEN, swim, 24),
             'float': tm.clip(4.0, floating, 24), 'bask': tm.clip(6.0, bask, 24),
             'flop': tm.clip(FLOP_LEN, flop, 24, False), 'death': tm.clip(1.2, death, 12, 'hold')}
 

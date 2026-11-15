@@ -38,11 +38,23 @@ public class CrocodileModel extends DefaultedEntityGeoModel<CrocodileEntity> {
         super(ResourceLocation.fromNamespaceAndPath(SavannaMod.MODID, "crocodile"));
     }
 
+    /** Which way the body bone's turn goes against the world's turn round the spine (checked in film). */
+    static final float BODY_ROLL_SIGN = 1.0F;
+
     @Override
     public void setCustomAnimations(CrocodileEntity croc, long instanceId, AnimationState<CrocodileEntity> state) {
         super.setCustomAnimations(croc, instanceId, state);
         Vec3 camera = Minecraft.getInstance().gameRenderer.getMainCamera().getPosition();
         float pt = state.getPartialTick();
+        float roll = croc.rollAngle(pt);
+        GeoBone rolled = roll != 0.0F ? getAnimationProcessor().getBone("body") : null;
+        if (rolled != null) {         // the death roll: the whole body turns round its spine (the body bone's pivot)
+            boolean marked = rolled.hasRotationChanged() || rolled.hasPositionChanged() || rolled.hasScaleChanged();
+            rolled.setRotZ(rolled.getRotZ() + CrocodileRollClient.ROLL_SIGN * BODY_ROLL_SIGN * (float) Math.toRadians(roll));
+            if (!marked) {
+                rolled.resetStateChanges();
+            }
+        }
         double x = Mth.lerp(pt, croc.xo, croc.getX()), y = Mth.lerp(pt, croc.yo, croc.getY()), z = Mth.lerp(pt, croc.zo, croc.getZ());
         if (camera.distanceToSqr(x, y, z) > NEAR * NEAR) {
             return;

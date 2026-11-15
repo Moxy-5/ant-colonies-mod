@@ -549,4 +549,84 @@ public class RiverLifeTests {
                             + croc.isInWater() + ", ahead " + level.getBlockState(ahead));
         });
     }
+
+    /**
+     * The hunt (2026-11-15): a hungry crocodile in the pond and a cow standing at the water's edge on the bank. The
+     * crocodile creeps up, lunges and grabs the cow, drags it into the water and death-rolls it until it dies, then is
+     * fed and hunts no more. A chicken put at the edge after that is left alone (fed), and once hungry again it is
+     * swallowed whole, with no roll.
+     */
+    @GameTest(template = "arena", timeoutTicks = 3600)
+    public static void aHungryCrocodileGrabsDrownsAndRollsItsPrey(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        buildPond(helper);
+        for (int x = X1 + 1; x <= X1 + 6; x++) {            // a bank beside the deep end, level with the pond's rim
+            for (int z = Z0 - 1; z <= Z1 + 1; z++) {
+                helper.setBlock(new BlockPos(x, TOP, z), Blocks.STONE);
+                helper.setBlock(new BlockPos(x, TOP + 1, z), Blocks.AIR);
+                helper.setBlock(new BlockPos(x, TOP + 2, z), Blocks.AIR);
+            }
+        }
+        helper.setDayTime(18000);                            // night: no wish to bask
+        com.antcolonies.savanna.animal.CrocodileEntity croc = helper.spawn(SavannaEntities.CROCODILE.get(), new BlockPos(X0 + 3, SURFACE + 4, Z0 + 4));
+        croc.setPersistenceRequired();
+        croc.makeHungry();
+        net.minecraft.world.entity.animal.Cow cow = helper.spawn(net.minecraft.world.entity.EntityType.COW, new BlockPos(X1 + 1, TOP + 1, Z0 + 4));
+        cow.setNoAi(true);
+        // 0 stalking; 1 holding; 2 the cow dead, fed; 3 a chicken left alone while fed; 4 hungry again, the chicken swallowed
+        int[] stage = {0};
+        boolean[] rolled = {false}, rolledChicken = {false};
+        long[] at = {0};
+        net.minecraft.world.entity.animal.Chicken[] chicken = {null};
+        helper.onEachTick(() -> {
+            long now = helper.getTick();
+            switch (stage[0]) {
+                case 0 -> {
+                    if (croc.holds(cow)) {
+                        SavannaMod.LOGGER.info("[crocodile] grabbed the cow at tick {}", now);
+                        stage[0] = 1;
+                    } else if (!cow.isAlive()) {
+                        stage[0] = 2;       // killed by the bite itself
+                    }
+                }
+                case 1 -> {
+                    if (croc.rollAngle(0.0F) != 0.0F) {
+                        rolled[0] = true;
+                        helper.assertTrue(cow.getVehicle() == croc, "the cow is not in the crocodile's jaws while it rolls");
+                    }
+                    if (!cow.isAlive()) {
+                        SavannaMod.LOGGER.info("[crocodile] the cow died at tick {}", now);
+                        stage[0] = 2;
+                    }
+                }
+                case 2 -> {
+                    if (croc.held() == null && !croc.isHungry()) {
+                        helper.assertTrue(rolled[0], "the cow died without a death roll");
+                        chicken[0] = helper.spawn(net.minecraft.world.entity.EntityType.CHICKEN, new BlockPos(X1 + 1, TOP + 1, Z0 + 6));
+                        chicken[0].setNoAi(true);
+                        at[0] = now;
+                        stage[0] = 3;
+                    }
+                }
+                case 3 -> {
+                    helper.assertTrue(chicken[0].isAlive() && !croc.holds(chicken[0]), "a fed crocodile took the chicken");
+                    if (now - at[0] > 200) {
+                        croc.makeHungry();
+                        stage[0] = 4;
+                    }
+                }
+                case 4 -> {
+                    if (croc.rollAngle(0.0F) != 0.0F) {
+                        rolledChicken[0] = true;
+                    }
+                    if (chicken[0].isRemoved() && croc.held() == null && !croc.isHungry()) {
+                        helper.assertTrue(!rolledChicken[0], "the chicken was rolled, not swallowed");
+                        SavannaMod.LOGGER.info("[crocodile] swallowed the chicken at tick {}", now);
+                        helper.succeed();
+                    }
+                }
+                default -> { }
+            }
+        });
+    }
 }
