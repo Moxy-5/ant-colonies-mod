@@ -160,6 +160,9 @@ def model():
     for name, parent, z0, _ in CHAIN:
         out.append({'name': name, 'parent': parent, 'pivot': [0, MID, z0], 'cubes': bones[name]})
     out.append({'name': 'jaw', 'parent': 'head', 'pivot': [0, SPLIT, JAW_END], 'cubes': bones['jaw']})
+    # where a caught tilapia is held (no boxes: the game draws the tilapia's own model here, CatfishRenderer): at the
+    # jaw's hinge, moved and turned by the catch clip
+    out.append({'name': 'prey', 'parent': 'head', 'pivot': [0, SPLIT, JAW_END]})
     w0 = at(SNOUT + 1.0)[2]
     for s, side in ((1, 'left'), (-1, 'right')):
         # side fins: broad, held out flat, a pale stout spine along the front edge
@@ -380,8 +383,11 @@ def barbel_sway(t, out, k=1.0, period=None):
     return out
 
 
+CATCH_LEN = 2.6       # the catch clip (seconds; CatfishEntity.HOLD_TICKS is the same in ticks)
+
+
 def clips():
-    """swim (a full beat, 1.2 s, slower and longer than the tilapia's; played faster or slower by the speed), idle
+    """catch (a caught tilapia held in the open mouth, shaken, gulped down); swim (a full beat, 1.2 s, slower and longer than the tilapia's; played faster or slower by the speed), idle
     (hanging still, the tail barely moving, the whiskers feeling), strike (a lunge with the mouth thrown open, snapped
     shut, the whiskers swept back), flop (out of water it stays upright and wriggles in S-curves, as real catfish crawl
     over wet ground), death (rolls onto its side)."""
@@ -416,6 +422,26 @@ def clips():
         p['body'] = {'rotation': [-4, 0, 0], 'position': [0, -1.2, 0]}
         return p
 
+    def catch(t):
+        """A tilapia caught (2026-11-15, the user's ask): the mouth held open round the fish, whose tail end lies
+        between the jaws; two shakes of the head, then three gulps, the fish going in a step each, and the mouth shuts
+        over it. The 'prey' bone carries the fish: tilted to lie midway between the jaws, sliding in, gone at the end."""
+        ease = lambda x: (lambda v: v * v * (3 - 2 * v))(max(0.0, min(1.0, x)))
+        bump = lambda a, b: math.sin(math.pi * (t - a) / (b - a)) if a < t < b else 0.0
+        gulp = bump(1.25, 1.55) + bump(1.75, 2.05) + bump(2.1, 2.3)
+        shut = ease((t - 2.2) / 0.2)
+        gape = (1 + 0.3 * (1 - ease(t / 0.2)) + 0.3 * gulp) * (1 - shut)
+        # held 2 pixels past the hinge (the tail's tip hidden in the head), so the mouth is round the fish's body
+        slide = 2.0 + 3.5 * ease((t - 1.3) / 0.25) + 3.5 * ease((t - 1.8) / 0.25) + 3.0 * ease((t - 2.12) / 0.18)
+        shake = 13 * math.sin(2 * math.pi * (t - 0.3) / 0.4) * ease((t - 0.3) / 0.1) * (1 - ease((t - 1.0) / 0.1))
+        p = rot(barbel_sway(t, wave_pose(t, 0.6, 2 * math.pi / 1.3), 0.6))
+        p['jaw'] = {'rotation': [26 * gape, 0, 0]}
+        p['head'] = {'rotation': [-6 * gape - 4 * gulp, p['head']['rotation'][1] + shake, 0]}
+        seen = 1.0 if t < 2.32 else 0.0
+        p['prey'] = {'rotation': [13 * gape, 0, 0], 'position': [0, 0, slide], 'scale': [seen, seen, seen]}
+        p['body'] = {'rotation': [0, 0, 0], 'position': [0, 0, -4 * (1 - ease(t / 0.5)) - 1.2 * gulp]}
+        return p
+
     lie = 1.4
 
     def death(t):
@@ -429,7 +455,7 @@ def clips():
         return p
 
     return {'idle': tm.clip(4.0, idle, 40), 'swim': tm.clip(swim_len, swim, 24),
-            'strike': tm.clip(1.0, strike, 30, False), 'flop': tm.clip(0.8, flop, 16),
+            'strike': tm.clip(1.0, strike, 30, False), 'catch': tm.clip(CATCH_LEN, catch, 52, 'hold'), 'flop': tm.clip(0.8, flop, 16),
             'death': tm.clip(1.2, death, 12, 'hold')}
 
 

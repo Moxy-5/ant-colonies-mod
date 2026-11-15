@@ -422,6 +422,20 @@ def clips():
         p['body'] = {'rotation': [0, 0, 90], 'position': [0, -LIE + 0.8 * abs(math.sin(2 * math.pi * t / 0.6)), 0]}
         return p
 
+    def caught(t):
+        """Held by the tail in a catfish's mouth (2026-11-15): the tail end still, gripped, the front half thrashing
+        from side to side, fast; the game draws it lying flat between the jaws (CatfishRenderer)."""
+        w = 2 * math.pi / 0.25
+        swing = 15 * math.sin(w * t) * (0.75 + 0.25 * math.sin(2 * math.pi * t / 0.5))
+        p = rot_only(wave_pose(t, 1.0, w))          # the side fins' flutter
+        p['body'] = {'rotation': [0, swing, 0]}
+        p['mid'] = {'rotation': [0, -swing, 0]}     # the hind half stays where the jaws hold it
+        p['front'] = {'rotation': [0, 7 * math.sin(w * t - 0.6), 0]}
+        p['head'] = {'rotation': [0, 9 * math.sin(w * t - 1.2), 0]}
+        for i, name in enumerate(('rear', 'peduncle', 'tail')):
+            p[name] = {'rotation': [0, 2.5 * math.sin(w * t - 0.5 * i), 0]}
+        return p
+
     def death(t):
         f = min(1.0, t / 0.8)
         f = f * f * (3 - 2 * f)
@@ -430,7 +444,7 @@ def clips():
         return p
 
     return {'idle': clip(2.0, idle, 24), 'swim': clip(swim_len, lambda t: rot_only(wave_pose(t, 1.0, beat)), 18),
-            'graze': clip(1.8, graze, 36), 'flop': clip(0.6, flop, 12), 'death': clip(1.2, death, 12, 'hold')}
+            'graze': clip(1.8, graze, 36), 'flop': clip(0.6, flop, 12), 'caught': clip(0.5, caught, 20), 'death': clip(1.2, death, 12, 'hold')}
 
 
 def write_game():

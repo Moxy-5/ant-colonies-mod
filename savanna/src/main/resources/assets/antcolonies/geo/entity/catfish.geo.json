@@ -8389,6 +8389,15 @@
      ]
     },
     {
+     "name": "prey",
+     "parent": "head",
+     "pivot": [
+      0,
+      3.5,
+      -15.0
+     ]
+    },
+    {
      "name": "pectoral_left",
      "parent": "front",
      "pivot": [

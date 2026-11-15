@@ -1,0 +1,50 @@
+# The catfish's catch (2026-11-15, the user's ask): a catfish in a tank of water (walls no one sees) with a tilapia
+# just caught in its mouth; the mouth open round the fish, the tilapia's own model lying flat between the jaws, tail
+# end in, thrashing; two shakes, three gulps, the mouth shut. Seen from the side, then from the front and above.
+#   ./gradlew runFilm -PfilmScene=catch      pictures in run-film/screenshots/catch/
+cmd time set noon
+cmd weather clear
+cmd fill -5 -60 -5 5 -53 4 minecraft:barrier hollow
+cmd fill -4 -60 -4 4 -54 3 minecraft:water
+lens 30
+wait 40
+# (the camera's height is its feet: its eye is 1.62 higher)
+camera 0.7 -59.0 -1.9 0 0
+cmd summon antcolonies:catfish 0.0 -57.5 0.5 {NoAI:1b,NoGravity:1b,Rotation:[-90f,0f],HeldLook:1,HeldSize:1.0f,HeldTicks:52}
+wait 5
+shot side_05
+wait 6
+shot side_11
+wait 6
+shot side_17
+wait 6
+shot side_23
+wait 5
+shot side_28
+wait 5
+shot side_33
+wait 5
+shot side_38
+wait 5
+shot side_43
+wait 4
+shot side_47
+wait 6
+shot side_53
+cmd tp @e[type=antcolonies:catfish] 0 -120 0
+wait 10
+camera 2.5 -58.6 -0.9 51 9
+cmd summon antcolonies:catfish 0.0 -57.5 0.5 {NoAI:1b,NoGravity:1b,Rotation:[-90f,0f],HeldLook:2,HeldSize:1.0f,HeldTicks:52}
+wait 6
+shot front_06
+wait 8
+shot front_14
+wait 8
+shot front_22
+wait 8
+shot front_30
+wait 8
+shot front_38
+wait 6
+shot front_44
+quit

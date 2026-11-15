@@ -7,8 +7,6 @@ import javax.annotation.Nullable;
 
 import net.minecraft.core.particles.ParticleTypes;
 import net.minecraft.server.level.ServerLevel;
-import net.minecraft.sounds.SoundEvents;
-import net.minecraft.sounds.SoundSource;
 import net.minecraft.world.entity.ai.goal.Goal;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
@@ -16,8 +14,8 @@ import net.minecraft.world.phys.Vec3;
 /**
  * A hungry catfish hunts a tilapia (M9 river life, 2026-11-14, my picks): it picks the nearest wild tilapia it can see in
  * the water near it, glides after it, puts on a burst of speed for the last few blocks, then lunges with its mouth
- * thrown open ({@link CatfishEntity#strike}) and swallows the fish whole if it is still in front of its mouth when the
- * mouth snaps shut; the school round it scatters. Then it is fed for 4 to 8 minutes. A chase that takes longer than
+ * thrown open ({@link CatfishEntity#strike}) and catches the fish if it is still in front of its mouth when the
+ * mouth snaps: it is held in the open mouth, shaken and gulped down ({@link CatfishEntity#hold}); the school round it scatters. Then it is fed for 4 to 8 minutes. A chase that takes longer than
  * 30 s is given up for a minute. A tilapia from a bucket or with a name is never hunted (the player's own fish).
  *
  * <p>Balance (the rule that food chains must not crash): a few catfish round a player eat one tilapia each every 4 to 8
@@ -149,8 +147,8 @@ public class HuntTilapiaGoal extends Goal {
         if (fish.level() instanceof ServerLevel level) {
             Vec3 m = fish.mouth();
             level.sendParticles(ParticleTypes.BUBBLE, m.x, m.y, m.z, 12, 0.3, 0.2, 0.3, 0.05);
-            level.playSound(null, m.x, m.y, m.z, SoundEvents.DOLPHIN_EAT, SoundSource.NEUTRAL, 0.8F, 0.6F);
         }
+        fish.hold(target);      // shown in its mouth, shaken and gulped down; the gulp is heard then
         target.discard();
         fish.hungryIn = FED_MIN + fish.getRandom().nextInt(FED_MORE);
         prey = null;

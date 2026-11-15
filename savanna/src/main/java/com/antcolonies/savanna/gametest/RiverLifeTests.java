@@ -331,9 +331,24 @@ public class RiverLifeTests {
         wild.setUp(false, level.random);
         wild.setPersistenceRequired();
         boolean[] sawStrike = {false};
-        helper.onEachTick(() -> sawStrike[0] |= catfish.isStriking());
+        // the catch (2026-11-15): from the moment the tilapia is gone it is held in the catfish's mouth, in its own
+        // look, for the catch clip's length, then the mouth is empty again
+        int wildLook = wild.look();
+        int[] held = {0};
+        boolean[] wrongLook = {false};
+        helper.onEachTick(() -> {
+            sawStrike[0] |= catfish.isStriking();
+            if (catfish.isHolding()) {
+                held[0]++;
+                wrongLook[0] |= catfish.heldLook() != wildLook || !wild.isRemoved();
+            }
+        });
         helper.succeedWhen(() -> {
             helper.assertTrue(catfish.isAlive(), "the catfish died");
+            helper.assertTrue(!wrongLook[0], "the tilapia in the catfish's mouth was not the caught one's look, or the caught one still swam");
+            helper.assertTrue(wild.isRemoved() && !catfish.isHolding() && held[0] >= 45 && held[0] <= 60,
+                    "the caught tilapia was held in the mouth for " + held[0] + " ticks"
+                            + (catfish.isHolding() ? ", still held" : "") + " (about 52, then gone)");
             helper.assertTrue(wild.isRemoved() && sawStrike[0] && !catfish.isHungry(),
                     "the wild tilapia " + (wild.isRemoved() ? "is gone" : "still swims") + (sawStrike[0] ? "" : ", no strike seen")
                             + (catfish.isHungry() ? ", the catfish still hungry" : ""));

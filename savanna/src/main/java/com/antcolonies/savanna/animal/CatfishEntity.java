@@ -43,7 +43,8 @@ import software.bernie.geckolib.util.GeckoLibUtil;
  * The river catfish (M9 river life, the hunter, 2026-11-14; a generalized catfish, fun first, inspired by the African
  * sharptooth catfish of the user's picture): the top of the river's food chain, algae -> tilapia -> catfish. A big,
  * slow fish about 2 blocks long (the user's pick) that cruises alone and, when hungry, stalks a tilapia, then lunges
- * and swallows it whole ({@link HuntTilapiaGoal}); the school round it scatters.
+ * and catches it in its mouth ({@link HuntTilapiaGoal}, {@link #hold}), shakes it and gulps it down; the school round
+ * it scatters.
  *
  * <p>One look, A, grey-brown mottled (the user's pick). Each catfish has a length of its own, 0.85 to 1.15 of the usual
  * (my pick), drawn and boxed through {@link Attributes#SCALE}. It never starves (the balance rule): with no tilapia near
@@ -54,7 +55,16 @@ public class CatfishEntity extends AbstractFish implements GeoEntity {
     /** How long a strike is shown (ticks; the strike clip is 1 s, the mouth open from 0.05 to 0.38 s). */
     static final int STRIKE_TICKS = 20;
 
+    /**
+     * How long a caught tilapia is held in the open mouth before it is gone (ticks; the catch clip's 2.6 s,
+     * {@code tools/catfish_models.py}), and the tick of the hold the last gulp is heard.
+     */
+    static final int HOLD_TICKS = 52, GULP_AT = 44;
+
     private static final EntityDataAccessor<Boolean> DATA_STRIKING = SynchedEntityData.defineId(CatfishEntity.class, EntityDataSerializers.BOOLEAN);
+    /** The look of the tilapia held in its mouth ({@link TilapiaEntity#look()}), or -1 with nothing held; and its size. */
+    private static final EntityDataAccessor<Integer> DATA_HELD_LOOK = SynchedEntityData.defineId(CatfishEntity.class, EntityDataSerializers.INT);
+    private static final EntityDataAccessor<Float> DATA_HELD_SIZE = SynchedEntityData.defineId(CatfishEntity.class, EntityDataSerializers.FLOAT);
 
     private final AnimatableInstanceCache cache = GeckoLibUtil.createInstanceCache(this);
     /** Its own length against the usual catfish. */
@@ -63,6 +73,11 @@ public class CatfishEntity extends AbstractFish implements GeoEntity {
     int hungryIn;
     /** Ticks left of the strike being shown. */
     private int striking;
+    /** Ticks left of the caught tilapia being held in the mouth. */
+    private int holding;
+    /** The held tilapia as drawn (client only): a tilapia of the same look and size that is in no world. */
+    @Nullable
+    private TilapiaEntity heldDrawn;
     /** The drawn body's pitch (degrees, nose up positive), eased toward its swimming direction (client only). */
     private float swimPitch, swimPitchO;
 
@@ -85,6 +100,48 @@ public class CatfishEntity extends AbstractFish implements GeoEntity {
     protected void defineSynchedData(SynchedEntityData.Builder builder) {
         super.defineSynchedData(builder);
         builder.define(DATA_STRIKING, false);
+        builder.define(DATA_HELD_LOOK, -1);
+        builder.define(DATA_HELD_SIZE, 1.0F);
+    }
+
+    /** Whether a caught tilapia is in its mouth. */
+    public boolean isHolding() {
+        return entityData.get(DATA_HELD_LOOK) >= 0;
+    }
+
+    /** The look of the tilapia in its mouth ({@link TilapiaEntity#look()}), or -1. */
+    public int heldLook() {
+        return entityData.get(DATA_HELD_LOOK);
+    }
+
+    /**
+     * Takes a caught tilapia into its mouth (2026-11-15, the user's ask): the fish itself leaves the world
+     * ({@link HuntTilapiaGoal}), and for {@link #HOLD_TICKS} the catfish holds its mouth open round a tilapia of the
+     * same look and size, drawn with the tilapia's own model ({@code CatfishRenderer}), shakes it and gulps it down.
+     */
+    void hold(TilapiaEntity prey) {
+        entityData.set(DATA_HELD_SIZE, prey.getScale());
+        entityData.set(DATA_HELD_LOOK, prey.look());
+        holding = HOLD_TICKS;
+    }
+
+    /**
+     * The held tilapia to draw (client only), or none: a tilapia in no world, wearing the caught fish's look and size
+     * and playing its "caught" clip, so what is drawn in the mouth is the very same model.
+     */
+    @Nullable
+    public TilapiaEntity heldDrawn() {
+        int look = heldLook();
+        if (look < 0) {
+            heldDrawn = null;
+            return null;
+        }
+        if (heldDrawn == null) {
+            heldDrawn = new TilapiaEntity(com.antcolonies.savanna.registry.SavannaEntities.TILAPIA.get(), level());
+            heldDrawn.showCaught(look, entityData.get(DATA_HELD_SIZE));
+        }
+        heldDrawn.tickCount = tickCount;
+        return heldDrawn;
     }
 
     public boolean isStriking() {
@@ -141,6 +198,18 @@ public class CatfishEntity extends AbstractFish implements GeoEntity {
         if (striking > 0 && --striking == 0) {
             entityData.set(DATA_STRIKING, false);
         }
+        if (holding > 0) {
+            holding--;
+            if (holding == HOLD_TICKS - GULP_AT && level() instanceof net.minecraft.server.level.ServerLevel server) {
+                Vec3 m = mouth();
+                server.sendParticles(net.minecraft.core.particles.ParticleTypes.BUBBLE, m.x, m.y, m.z, 8, 0.2, 0.15, 0.2, 0.04);
+                server.playSound(null, m.x, m.y, m.z, SoundEvents.DOLPHIN_EAT, net.minecraft.sounds.SoundSource.NEUTRAL, 0.8F, 0.6F);
+            }
+            if (holding == 0 || !isAlive()) {
+                holding = 0;
+                entityData.set(DATA_HELD_LOOK, -1);
+            }
+        }
     }
 
     /** The drawn body's pitch this frame (degrees, nose up positive). */
@@ -162,6 +231,11 @@ public class CatfishEntity extends AbstractFish implements GeoEntity {
         super.addAdditionalSaveData(tag);
         tag.putFloat("OwnSize", ownSize);
         tag.putInt("HungryIn", hungryIn);
+        if (holding > 0) {
+            tag.putInt("HeldLook", heldLook());
+            tag.putFloat("HeldSize", entityData.get(DATA_HELD_SIZE));
+            tag.putInt("HeldTicks", holding);
+        }
     }
 
     @Override
@@ -171,6 +245,11 @@ public class CatfishEntity extends AbstractFish implements GeoEntity {
             ownSize = Mth.clamp(tag.getFloat("OwnSize"), 0.5F, 1.5F);
             hungryIn = tag.getInt("HungryIn");
             refresh();
+        }
+        if (tag.getInt("HeldTicks") > 0) {
+            entityData.set(DATA_HELD_SIZE, tag.contains("HeldSize") ? Mth.clamp(tag.getFloat("HeldSize"), 0.2F, 1.5F) : 1.0F);
+            entityData.set(DATA_HELD_LOOK, Mth.clamp(tag.getInt("HeldLook"), TilapiaEntity.YOUNG, TilapiaEntity.BREEDING));
+            holding = tag.getInt("HeldTicks");
         }
     }
 
@@ -245,7 +324,8 @@ public class CatfishEntity extends AbstractFish implements GeoEntity {
     private static final RawAnimation IDLE = RawAnimation.begin().thenLoop("idle");
     private static final RawAnimation SWIM = RawAnimation.begin().thenLoop("swim");
     private static final RawAnimation STRIKE = RawAnimation.begin().thenPlay("strike");
-    private static final RawAnimation FLOP = RawAnimation.begin().thenLoop("flop");
+    private static final RawAnimation CATCH = RawAnimation.begin().thenPlayAndHold("catch");
+    private static final RawAnimation FLOP =RawAnimation.begin().thenLoop("flop");
     private static final RawAnimation DEATH = RawAnimation.begin().thenPlayAndHold("death");
     /** The swim clip's beat is made for this speed (blocks a tick, about 1 a second); it plays faster or slower by it. */
     static final double SWIM_CLIP_SPEED = 0.05;
@@ -264,6 +344,10 @@ public class CatfishEntity extends AbstractFish implements GeoEntity {
         if (!isInWater()) {
             player.setAnimationSpeed(1.0);
             return state.setAndContinue(FLOP);
+        }
+        if (isHolding()) {
+            player.setAnimationSpeed(1.0);
+            return state.setAndContinue(CATCH);
         }
         if (isStriking()) {
             player.setAnimationSpeed(1.0);
