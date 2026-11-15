@@ -8,6 +8,7 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.util.Mth;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.player.Player;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
@@ -46,7 +47,9 @@ public final class CrocodileRollClient {
         float pt = event.getPartialTick();
         float roll = croc.rollAngle(pt);
         if (roll == 0.0F) {
-            if (croc.jaws() == CrocodileEntity.JAWS_DRAG) {
+            if (held instanceof Player) {
+                layAlong(event, croc, held, pt);
+            } else if (croc.jaws() == CrocodileEntity.JAWS_DRAG) {
                 struggle(event, croc, pt);
             }
             return;
@@ -66,6 +69,27 @@ public final class CrocodileRollClient {
         pose.translate(dx, dy, dz);
         pose.mulPose(Axis.of(forward).rotationDegrees(ROLL_SIGN * roll));
         pose.translate(-dx, -dy, -dz);
+        if (held instanceof Player) {
+            layAlong(event, croc, held, pt);
+        }
+    }
+
+    /**
+     * A held player (2026-11-15, the user's ask, for a server with friends): laid flat along the line of the
+     * crocodile's snout, gripped round the legs with the body and head sticking out in front, twisting from side to
+     * side; its arms and legs flail (the crocodile sets its walk swinging, {@link CrocodileEntity#tick}). Turned about
+     * the player's middle, which is held at the height of the crocodile's spine, so the roll spins it like a spit.
+     */
+    private static void layAlong(RenderLivingEvent.Pre<?, ?> event, CrocodileEntity croc, LivingEntity held, float pt) {
+        float time = croc.tickCount + pt;
+        float yaw = Mth.rotLerp(pt, croc.yBodyRotO, croc.yBodyRot) * Mth.DEG_TO_RAD;
+        float half = held.getBbHeight() * 0.5F;
+        var pose = event.getPoseStack();
+        pose.translate(0.0F, half, 0.0F);
+        // about the line across the snout: the head tipped forward, away from the crocodile, until the body lies level
+        pose.mulPose(Axis.of(new Vector3f(Mth.cos(yaw), 0.0F, Mth.sin(yaw))).rotationDegrees(90.0F + 8.0F * Mth.sin(time * Mth.TWO_PI / 9.0F)));
+        pose.mulPose(Axis.YP.rotationDegrees(14.0F * Mth.sin(time * Mth.TWO_PI / 6.0F)));
+        pose.translate(0.0F, -half, 0.0F);
     }
 
     /**

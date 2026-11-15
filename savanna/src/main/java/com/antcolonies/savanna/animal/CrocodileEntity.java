@@ -310,6 +310,15 @@ public class CrocodileEntity extends PathfinderMob implements GeoEntity {
         return null;
     }
 
+    /**
+     * What it holds is not sitting on it: a held player is drawn standing, not in the riding seat, so it can be laid
+     * along the jaws ({@code CrocodileRollClient}; the user's ask, 2026-11-15, for a server with friends).
+     */
+    @Override
+    public boolean shouldRiderSit() {
+        return false;
+    }
+
     /** A player in its jaws can hit it (Minecraft keeps a rider from hitting what it rides). */
     @Override
     public boolean canRiderInteract() {
@@ -426,6 +435,12 @@ public class CrocodileEntity extends PathfinderMob implements GeoEntity {
             heldY = Double.NaN;
         }
         if (level().isClientSide) {
+            for (Entity rider : getPassengers()) {
+                if (rider instanceof Player player) {
+                    // a held player flails: its arms and legs swing as hard as Minecraft's own walk lets them, about 3 times a second
+                    player.walkAnimation.update(1.4F, 1.0F);
+                }
+            }
             lookAround();
             return;
         }
