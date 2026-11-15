@@ -383,6 +383,10 @@ def barbel_sway(t, out, k=1.0, period=None):
     return out
 
 
+# The jaws' angle clamped on a caught tilapia lying flat (degrees, head and jaw together): a grown fish is about 1.5
+# catfish pixels thick at the lips, 5 pixels from the hinge, and about 1 thick 3 pixels from it; a small one (drawn
+# under 0.75 of a grown fish, CatfishEntity) about half that.
+BITE, BITE_SMALL = 18.0, 11.0
 CATCH_LEN = 2.6       # the catch clip (seconds; CatfishEntity.HOLD_TICKS is the same in ticks)
 
 
@@ -422,23 +426,28 @@ def clips():
         p['body'] = {'rotation': [-4, 0, 0], 'position': [0, -1.2, 0]}
         return p
 
-    def catch(t):
-        """A tilapia caught (2026-11-15, the user's ask): the mouth held open round the fish, whose tail end lies
-        between the jaws; two shakes of the head, then three gulps, the fish going in a step each, and the mouth shuts
-        over it. The 'prey' bone carries the fish: tilted to lie midway between the jaws, sliding in, gone at the end."""
+    def catch(t, bite):
+        """A tilapia caught (2026-11-15, the user's asks): the mouth, thrown wide by the strike, bites down on the
+        fish, whose tail end lies between the jaws, and stays clamped on it (bite: the jaws' angle that just touches a
+        fish lying flat, degrees; a squeeze past it at first); two shakes of the head, then three gulps, the jaws
+        letting go a little for each as the fish goes in a step, and the mouth shuts over it. The 'prey' bone carries
+        the fish: tilted to lie midway between the jaws, sliding in, gone at the end."""
         ease = lambda x: (lambda v: v * v * (3 - 2 * v))(max(0.0, min(1.0, x)))
         bump = lambda a, b: math.sin(math.pi * (t - a) / (b - a)) if a < t < b else 0.0
         gulp = bump(1.25, 1.55) + bump(1.75, 2.05) + bump(2.1, 2.3)
         shut = ease((t - 2.2) / 0.2)
-        gape = (1 + 0.3 * (1 - ease(t / 0.2)) + 0.3 * gulp) * (1 - shut)
+        down = ease((t - 0.04) / 0.1)                       # the bite: wide to clamped in a tenth of a second
+        squeeze = 0.12 * bump(0.1, 0.34)                    # and a squeeze, the jaws pressing into the fish
+        angle = (42 + (bite - 42) * down - bite * squeeze + 9 * gulp) * (1 - shut)
         # held 2 pixels past the hinge (the tail's tip hidden in the head), so the mouth is round the fish's body
         slide = 2.0 + 3.5 * ease((t - 1.3) / 0.25) + 3.5 * ease((t - 1.8) / 0.25) + 3.0 * ease((t - 2.12) / 0.18)
         shake = 13 * math.sin(2 * math.pi * (t - 0.3) / 0.4) * ease((t - 0.3) / 0.1) * (1 - ease((t - 1.0) / 0.1))
         p = rot(barbel_sway(t, wave_pose(t, 0.6, 2 * math.pi / 1.3), 0.6))
-        p['jaw'] = {'rotation': [26 * gape, 0, 0]}
-        p['head'] = {'rotation': [-6 * gape - 4 * gulp, p['head']['rotation'][1] + shake, 0]}
+        p['jaw'] = {'rotation': [0.8 * angle, 0, 0]}
+        p['head'] = {'rotation': [-0.2 * angle - 4 * gulp, p['head']['rotation'][1] + shake, 0]}
         seen = 1.0 if t < 2.32 else 0.0
-        p['prey'] = {'rotation': [13 * gape, 0, 0], 'position': [0, 0, slide], 'scale': [seen, seen, seen]}
+        # half the jaw's turn: the jaw hangs on the head, so this is midway between the two
+        p['prey'] = {'rotation': [0.4 * angle, 0, 0], 'position': [0, 0, slide], 'scale': [seen, seen, seen]}
         p['body'] = {'rotation': [0, 0, 0], 'position': [0, 0, -4 * (1 - ease(t / 0.5)) - 1.2 * gulp]}
         return p
 
@@ -455,7 +464,8 @@ def clips():
         return p
 
     return {'idle': tm.clip(4.0, idle, 40), 'swim': tm.clip(swim_len, swim, 24),
-            'strike': tm.clip(1.0, strike, 30, False), 'catch': tm.clip(CATCH_LEN, catch, 52, 'hold'), 'flop': tm.clip(0.8, flop, 16),
+            'strike': tm.clip(1.0, strike, 30, False), 'catch': tm.clip(CATCH_LEN, lambda t: catch(t, BITE), 52, 'hold'),
+            'catch_small': tm.clip(CATCH_LEN, lambda t: catch(t, BITE_SMALL), 52, 'hold'), 'flop': tm.clip(0.8, flop, 16),
             'death': tm.clip(1.2, death, 12, 'hold')}
 
 

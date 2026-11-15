@@ -10,8 +10,10 @@ lens 30
 wait 40
 # (the camera's height is its feet: its eye is 1.62 higher)
 camera 0.7 -59.0 -1.9 0 0
-cmd summon antcolonies:catfish 0.0 -57.5 0.5 {NoAI:1b,NoGravity:1b,Rotation:[-90f,0f],HeldLook:1,HeldSize:1.0f,HeldTicks:52}
-wait 5
+cmd summon antcolonies:catfish 0.0 -57.5 0.5 {NoAI:1b,NoGravity:1b,Rotation:[-90f,0f],HeldLook:1,HeldSize:1.0f,HeldTicks:52,HeldOnRight:1b}
+wait 2
+shot side_02
+wait 3
 shot side_05
 wait 6
 shot side_11
@@ -47,4 +49,22 @@ wait 8
 shot front_38
 wait 6
 shot front_44
+# from above, the two sides: on its right side (its back to the catfish's right), then on its left; then a small fish
+cmd tp @e[type=antcolonies:catfish] 0 -120 0
+wait 10
+camera 1.0 -57.0 0.5 90 90
+cmd summon antcolonies:catfish 0.0 -57.5 0.5 {NoAI:1b,NoGravity:1b,Rotation:[-90f,0f],HeldLook:2,HeldSize:1.0f,HeldTicks:52,HeldOnRight:1b}
+wait 14
+shot above_right
+cmd tp @e[type=antcolonies:catfish] 0 -120 0
+wait 10
+cmd summon antcolonies:catfish 0.0 -57.5 0.5 {NoAI:1b,NoGravity:1b,Rotation:[-90f,0f],HeldLook:2,HeldSize:1.0f,HeldTicks:52,HeldOnRight:0b}
+wait 14
+shot above_left
+cmd tp @e[type=antcolonies:catfish] 0 -120 0
+wait 10
+camera 0.7 -59.0 -1.9 0 0
+cmd summon antcolonies:catfish 0.0 -57.5 0.5 {NoAI:1b,NoGravity:1b,Rotation:[-90f,0f],HeldLook:0,HeldSize:0.5f,HeldTicks:52}
+wait 14
+shot small_side
 quit

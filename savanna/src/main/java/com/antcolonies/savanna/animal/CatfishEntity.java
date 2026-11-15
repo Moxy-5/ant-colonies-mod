@@ -65,6 +65,10 @@ public class CatfishEntity extends AbstractFish implements GeoEntity {
     /** The look of the tilapia held in its mouth ({@link TilapiaEntity#look()}), or -1 with nothing held; and its size. */
     private static final EntityDataAccessor<Integer> DATA_HELD_LOOK = SynchedEntityData.defineId(CatfishEntity.class, EntityDataSerializers.INT);
     private static final EntityDataAccessor<Float> DATA_HELD_SIZE = SynchedEntityData.defineId(CatfishEntity.class, EntityDataSerializers.FLOAT);
+    /** Whether the held tilapia lies on its right side (the catfish came at it from its right), else on its left. */
+    private static final EntityDataAccessor<Boolean> DATA_HELD_ON_RIGHT = SynchedEntityData.defineId(CatfishEntity.class, EntityDataSerializers.BOOLEAN);
+    /** A held tilapia drawn smaller than this (against a grown one) gets the tighter bite, the clip "catch_small". */
+    static final float SMALL_PREY = 0.75F;
 
     private final AnimatableInstanceCache cache = GeckoLibUtil.createInstanceCache(this);
     /** Its own length against the usual catfish. */
@@ -102,11 +106,17 @@ public class CatfishEntity extends AbstractFish implements GeoEntity {
         builder.define(DATA_STRIKING, false);
         builder.define(DATA_HELD_LOOK, -1);
         builder.define(DATA_HELD_SIZE, 1.0F);
+        builder.define(DATA_HELD_ON_RIGHT, false);
     }
 
     /** Whether a caught tilapia is in its mouth. */
     public boolean isHolding() {
         return entityData.get(DATA_HELD_LOOK) >= 0;
+    }
+
+    /** Whether the tilapia in its mouth lies on its right side (the catfish came from its right), else on its left. */
+    public boolean heldOnRight() {
+        return entityData.get(DATA_HELD_ON_RIGHT);
     }
 
     /** The look of the tilapia in its mouth ({@link TilapiaEntity#look()}), or -1. */
@@ -117,9 +127,15 @@ public class CatfishEntity extends AbstractFish implements GeoEntity {
     /**
      * Takes a caught tilapia into its mouth (2026-11-15, the user's ask): the fish itself leaves the world
      * ({@link HuntTilapiaGoal}), and for {@link #HOLD_TICKS} the catfish holds its mouth open round a tilapia of the
-     * same look and size, drawn with the tilapia's own model ({@code CatfishRenderer}), shakes it and gulps it down.
+     * same look and size, drawn with the tilapia's own model ({@code CatfishRenderer}): the jaws bite down on it and
+     * stay clamped, it shakes it and gulps it down.
      */
     void hold(TilapiaEntity prey) {
+        // which side of the tilapia the catfish came from (the user, 2026-11-15): from its right, it lies in the mouth
+        // on its right side; from its left, on its left. Facing yaw 0 (+Z), a fish's right is -X.
+        float yaw = prey.getYRot() * Mth.DEG_TO_RAD;
+        double toRight = (getX() - prey.getX()) * -Mth.cos(yaw) + (getZ() - prey.getZ()) * -Mth.sin(yaw);
+        entityData.set(DATA_HELD_ON_RIGHT, toRight > 0);
         entityData.set(DATA_HELD_SIZE, prey.getScale());
         entityData.set(DATA_HELD_LOOK, prey.look());
         holding = HOLD_TICKS;
@@ -235,6 +251,7 @@ public class CatfishEntity extends AbstractFish implements GeoEntity {
             tag.putInt("HeldLook", heldLook());
             tag.putFloat("HeldSize", entityData.get(DATA_HELD_SIZE));
             tag.putInt("HeldTicks", holding);
+            tag.putBoolean("HeldOnRight", heldOnRight());
         }
     }
 
@@ -250,6 +267,7 @@ public class CatfishEntity extends AbstractFish implements GeoEntity {
             entityData.set(DATA_HELD_SIZE, tag.contains("HeldSize") ? Mth.clamp(tag.getFloat("HeldSize"), 0.2F, 1.5F) : 1.0F);
             entityData.set(DATA_HELD_LOOK, Mth.clamp(tag.getInt("HeldLook"), TilapiaEntity.YOUNG, TilapiaEntity.BREEDING));
             holding = tag.getInt("HeldTicks");
+            entityData.set(DATA_HELD_ON_RIGHT, tag.getBoolean("HeldOnRight"));
         }
     }
 
@@ -325,6 +343,7 @@ public class CatfishEntity extends AbstractFish implements GeoEntity {
     private static final RawAnimation SWIM = RawAnimation.begin().thenLoop("swim");
     private static final RawAnimation STRIKE = RawAnimation.begin().thenPlay("strike");
     private static final RawAnimation CATCH = RawAnimation.begin().thenPlayAndHold("catch");
+    private static final RawAnimation CATCH_SMALL = RawAnimation.begin().thenPlayAndHold("catch_small");
     private static final RawAnimation FLOP =RawAnimation.begin().thenLoop("flop");
     private static final RawAnimation DEATH = RawAnimation.begin().thenPlayAndHold("death");
     /** The swim clip's beat is made for this speed (blocks a tick, about 1 a second); it plays faster or slower by it. */
@@ -347,7 +366,7 @@ public class CatfishEntity extends AbstractFish implements GeoEntity {
         }
         if (isHolding()) {
             player.setAnimationSpeed(1.0);
-            return state.setAndContinue(CATCH);
+            return state.setAndContinue(entityData.get(DATA_HELD_SIZE) < SMALL_PREY ? CATCH_SMALL : CATCH);
         }
         if (isStriking()) {
             player.setAnimationSpeed(1.0);

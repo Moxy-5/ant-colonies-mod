@@ -26,7 +26,8 @@ import software.bernie.geckolib.renderer.GeoEntityRenderer;
  *
  * <p>A caught tilapia (2026-11-15, the user's ask: "the same exact model") is drawn by the tilapia's own renderer, in
  * its own look and size, at the catfish model's {@code prey} bone, which the catch clip tilts between the open jaws and
- * slides in: tail end between the jaws, lying flat (a deep-bodied fish fits the wide flat mouth only on its side),
+ * slides in: tail end between the jaws, lying flat (a deep-bodied fish fits the wide flat mouth only on its side;
+ * on its right side if the catfish came at it from its right, else on its left: the user, 2026-11-15),
  * heading the way the catfish does (caught from behind). It is drawn after the catfish, from the bone's place noted
  * while the catfish was drawn, so the two models' buffers never mix.
  */
@@ -56,6 +57,12 @@ public class CatfishRenderer extends GeoEntityRenderer<CatfishEntity> {
 
     /** The tilapia model's tail tip behind its middle and its body's mid line over its feet (model pixels, tilapia_models.py). */
     private static final float TILAPIA_TAIL = 15.6F, TILAPIA_MID = 6.0F;
+    /** The tilapia model's length, snout to tail tip (model pixels). */
+    private static final float TILAPIA_LENGTH = 27.6F;
+    /** How far the mouth's front is from where the held fish's tail tip is at first (catfish model pixels: the hinge to the lips 5, the clip's 2 past the hinge). */
+    private static final float IN_THE_MOUTH = 7.0F;
+    /** The roll that lays the tilapia on its right side, its back to the catfish's right (degrees). */
+    private static final float ON_RIGHT = -90.0F;
 
     /** Where the prey bone was this frame (the jaw's hinge, in the catfish's drawn space), and whether it was drawn at all. */
     private final Matrix4f preyPose = new Matrix4f();
@@ -76,8 +83,12 @@ public class CatfishRenderer extends GeoEntityRenderer<CatfishEntity> {
         float undo = 1.0F / (SCALE * fish.getScale());      // out of the catfish's size, into blocks
         poseStack.scale(undo, undo, undo);
         float drawn = TilapiaRenderer.SCALE * prey.getScale();
-        poseStack.translate(0, 0, -TILAPIA_TAIL / 16.0F * drawn);       // its tail tip at the hinge, the fish ahead of it
-        poseStack.mulPose(Axis.ZP.rotationDegrees(90));                 // lying flat between the jaws
+        // its tail tip at the hinge, the fish ahead of it; and whatever its size, half of it between the jaws (the clip
+        // is made for a grown fish in a usual catfish: a young one would lie wholly inside the mouth, unseen)
+        float ahead = IN_THE_MOUTH / 16.0F * SCALE * fish.getScale() - TILAPIA_LENGTH / 16.0F * drawn / 2;
+        poseStack.translate(0, 0, -TILAPIA_TAIL / 16.0F * drawn - ahead);
+        // lying flat between the jaws, on the side the catfish came at it from
+        poseStack.mulPose(Axis.ZP.rotationDegrees(fish.heldOnRight() ? ON_RIGHT : -ON_RIGHT));
         poseStack.translate(0, -TILAPIA_MID / 16.0F * drawn, 0);        // turned about its own mid line
         entityRenderDispatcher.getRenderer(prey).render(prey, 0, partialTick, poseStack, bufferSource, packedLight);
         poseStack.popPose();

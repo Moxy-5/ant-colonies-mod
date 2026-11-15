@@ -336,15 +336,32 @@ public class RiverLifeTests {
         int wildLook = wild.look();
         int[] held = {0};
         boolean[] wrongLook = {false};
+        // the side it lies on: the side of the tilapia the catfish was on at the catch (0 not caught yet, 1 right, 2 wrong)
+        int[] side = {0};
+        double[] was = new double[5];
         helper.onEachTick(() -> {
             sawStrike[0] |= catfish.isStriking();
+            if (!wild.isRemoved()) {
+                was[0] = wild.getX();
+                was[1] = wild.getZ();
+                was[2] = wild.getYRot();
+                was[3] = catfish.getX();
+                was[4] = catfish.getZ();
+            }
             if (catfish.isHolding()) {
+                if (side[0] == 0) {
+                    double yaw = Math.toRadians(was[2]);
+                    double toRight = (was[3] - was[0]) * -Math.cos(yaw) + (was[4] - was[1]) * -Math.sin(yaw);
+                    // a catfish nearly dead astern may cross the line in the catch's own tick: only a clear side counts
+                    side[0] = Math.abs(toRight) < 0.15 || catfish.heldOnRight() == toRight > 0 ? 1 : 2;
+                }
                 held[0]++;
                 wrongLook[0] |= catfish.heldLook() != wildLook || !wild.isRemoved();
             }
         });
         helper.succeedWhen(() -> {
             helper.assertTrue(catfish.isAlive(), "the catfish died");
+            helper.assertTrue(side[0] != 2, "the caught tilapia lies on the side away from where the catfish came from");
             helper.assertTrue(!wrongLook[0], "the tilapia in the catfish's mouth was not the caught one's look, or the caught one still swam");
             helper.assertTrue(wild.isRemoved() && !catfish.isHolding() && held[0] >= 45 && held[0] <= 60,
                     "the caught tilapia was held in the mouth for " + held[0] + " ticks"
