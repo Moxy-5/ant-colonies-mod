@@ -183,8 +183,8 @@ def model():
         out.append({'name': f'barbel_long_tip_{side}', 'parent': f'barbel_long_{side}', 'pivot': tip,
                     'rotation': [-4, s * 24, 0], 'cubes': placed(strand(6.0, 0.24, 'barbel_tip', 4, droop=0.35), tip)})
         top = at(SNOUT + 1.5)[0]
-        p = [s * 1.1, MID + top - 0.1, SNOUT + 1.6]     # out of the snout, in front of the helmet
-        out.append({'name': f'barbel_nose_{side}', 'parent': 'head', 'pivot': p, 'rotation': [24, s * 30, 0],
+        p = [s * 1.1, MID + top, SNOUT + 1.6]     # out of the snout, in front of the helmet
+        out.append({'name': f'barbel_nose_{side}', 'parent': 'head', 'pivot': p, 'rotation': [50, s * 30, 0],
                     'cubes': placed(strand(3.0, 0.26, 'barbel', 3), p)})
         bot = at(SNOUT + 2.6)[1]
         p = [s * 1.9, MID + bot * 0.66 + 0.05, SNOUT + 2.6]
