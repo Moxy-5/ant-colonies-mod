@@ -134,7 +134,7 @@ public class SavannaEntities {
     // drawn animal and under a block wide at every size (0.8 to 1.1), so its routes use 1-block squares (see the catfish).
     public static final DeferredHolder<EntityType<?>, EntityType<com.antcolonies.savanna.animal.CrocodileEntity>> CROCODILE =
             ENTITY_TYPES.register("crocodile", () -> EntityType.Builder
-                    .of(com.antcolonies.savanna.animal.CrocodileEntity::new, SavannaMobCategories.riverFish())
+                    .of(com.antcolonies.savanna.animal.CrocodileEntity::new, SavannaMobCategories.riverHunter())
                     .sized(0.9F, 0.6F)
                     .eyeHeight(0.5F)
                     .clientTrackingRange(8)

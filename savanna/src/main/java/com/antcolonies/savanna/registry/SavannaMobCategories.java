@@ -12,7 +12,7 @@ import net.minecraft.world.entity.MobCategory;
 public final class SavannaMobCategories {
     private SavannaMobCategories() {}
 
-    private static MobCategory riverFish;
+    private static MobCategory riverFish, riverHunter;
 
     /** The river fish group (tilapia and catfish). */
     public static MobCategory riverFish() {
@@ -20,5 +20,18 @@ public final class SavannaMobCategories {
             riverFish = MobCategory.valueOf("ANTCOLONIES_RIVER_FISH");
         }
         return riverFish;
+    }
+
+    /**
+     * The river hunters' group (the crocodile, 2026-11-15, the user's ask that crocodiles spawn by themselves): in the
+     * river fish group they stood 1 pick in 19 against the tilapia and found the group's 60 places full, so hardly any
+     * came. Their own group, cap 6 round a player (my pick), each spawned alone and at least
+     * {@code CrocodileEntity.SPAWN_APART} blocks from another crocodile, so they are mostly solitary.
+     */
+    public static MobCategory riverHunter() {
+        if (riverHunter == null) {
+            riverHunter = MobCategory.valueOf("ANTCOLONIES_RIVER_HUNTER");
+        }
+        return riverHunter;
     }
 }

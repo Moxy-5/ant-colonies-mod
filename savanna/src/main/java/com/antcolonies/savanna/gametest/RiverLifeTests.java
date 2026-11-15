@@ -106,17 +106,21 @@ public class RiverLifeTests {
         }
         helper.assertBlockProperty(shallow, AlgaeBlock.GROWTH, AlgaeBlock.LUSH);
         helper.assertBlockProperty(deep, AlgaeBlock.GROWTH, AlgaeBlock.THIN);
-        // 3. grazing bites a stage off and never takes the last of it
+        // 3. a bite eats the whole mat down to the bare bed, never takes the bare specks, and the patch grows back
         BlockPos absShallow = helper.absolutePos(shallow);
-        for (int i = 0; i < 3; i++) {
-            if (!AlgaeBlock.graze(level, absShallow)) {
-                helper.fail("nothing to graze after " + i + " bites");
-            }
+        if (!AlgaeBlock.graze(level, absShallow)) {
+            helper.fail("nothing to graze on a lush mat");
         }
+        helper.assertBlockProperty(shallow, AlgaeBlock.GROWTH, AlgaeBlock.BARE);
         if (AlgaeBlock.graze(level, absShallow)) {
             helper.fail("a bare mat was grazed");
         }
-        helper.assertBlockProperty(shallow, AlgaeBlock.GROWTH, AlgaeBlock.BARE);
+        helper.assertTrue(helper.getBlockState(shallow).getBlock() instanceof AlgaeBlock, "a grazed mat is gone, it cannot grow back");
+        for (int i = 0; i < 400; i++) {
+            level.getBlockState(absShallow).randomTick(level, absShallow, level.random);
+        }
+        helper.assertBlockProperty(shallow, AlgaeBlock.GROWTH, AlgaeBlock.LUSH);
+        AlgaeBlock.graze(level, absShallow);
         // 4. spreading: the shelf cleared but one lush mat, which seeds the bare bed round it
         for (int x = X0; x <= SHALLOW_TO; x++) {
             for (int z = Z0; z <= Z1; z++) {
@@ -453,6 +457,57 @@ public class RiverLifeTests {
     }
 
     /**
+     * Mostly solitary, basking together (2026-11-15, the user's ask): the world spawns no crocodile within
+     * {@code SPAWN_APART} blocks of another (an egg or command still may); a crocodile basking on the bank, and a second
+     * one in the pond wanting the sun climbs out and lies beside it, side by side and facing the same way.
+     */
+    @GameTest(template = "arena", timeoutTicks = 2400)
+    public static void crocodilesSpawnApartAndBaskTogether(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        buildPond(helper);
+        for (int x = X1 + 1; x <= X1 + 7; x++) {            // a bank beside the deep end, level with the pond's rim
+            for (int z = Z0 - 1; z <= Z1 + 1; z++) {
+                helper.setBlock(new BlockPos(x, TOP, z), Blocks.STONE);
+                helper.setBlock(new BlockPos(x, TOP + 1, z), Blocks.AIR);
+                helper.setBlock(new BlockPos(x, TOP + 2, z), Blocks.AIR);
+            }
+        }
+        helper.setDayTime(6000);
+        com.antcolonies.savanna.animal.CrocodileEntity first = helper.spawn(SavannaEntities.CROCODILE.get(), new BlockPos(X1 + 4, TOP + 1, Z0 + 4));
+        first.setPersistenceRequired();
+        first.hungerIn = 100_000;
+        first.wantSun();
+        BlockPos inPond = helper.absolutePos(new BlockPos(X1 - 2, SURFACE + 3, Z0 + 3));
+        if (com.antcolonies.savanna.animal.CrocodileEntity.farFromOthers(level, inPond)) {
+            helper.fail("the world may spawn a crocodile " + Math.round(Math.sqrt(first.distanceToSqr(inPond.getCenter()))) + " blocks from another");
+        }
+        if (!com.antcolonies.savanna.animal.CrocodileEntity.farFromOthers(level, inPond.offset(40, 0, 0))) {
+            helper.fail("the world may not spawn a crocodile 40 blocks from another");
+        }
+        com.antcolonies.savanna.animal.CrocodileEntity second = helper.spawn(SavannaEntities.CROCODILE.get(), new BlockPos(X1 - 2, SURFACE + 3, Z0 + 3));
+        second.setPersistenceRequired();
+        second.hungerIn = 100_000;
+        second.sunIn = 100_000;
+        boolean[] called = {false};
+        helper.onEachTick(() -> {
+            if (!called[0] && first.isBasking() && !first.isInWater()) {
+                called[0] = true;
+                second.wantSun();
+            }
+        });
+        helper.succeedWhen(() -> {
+            helper.assertTrue(first.isBasking() && !first.isInWater(), "the first crocodile is not basking on the bank");
+            helper.assertTrue(second.isBasking() && !second.isInWater() && second.onGround(), "the second crocodile is not basking on the bank: at "
+                    + second.blockPosition().subtract(helper.absolutePos(BlockPos.ZERO)));
+            double apart = Math.sqrt(Math.pow(first.getX() - second.getX(), 2) + Math.pow(first.getZ() - second.getZ(), 2));
+            helper.assertTrue(apart > 1.2 && apart < 2.6, "the second crocodile lies " + String.format(java.util.Locale.ROOT, "%.1f", apart)
+                    + " blocks from the first (side by side is about 1.7)");
+            float turn = Math.abs(net.minecraft.util.Mth.degreesDifference(first.getYRot(), second.getYRot()));
+            helper.assertTrue(turn < 20.0F, "the second crocodile faces " + Math.round(turn) + " degrees off the first's way");
+        });
+    }
+
+    /**
      * The Nile crocodile's first step (2026-11-15): put in the pond's deep end by day and wanting the sun, it swims to
      * the bank, climbs out and basks (the mouth-open pose is the synced basking flag); told it has had enough, it walks
      * back and slides into the water. Its swimming and walking speeds go to the log. Then its life step 3 (2026-11-15):
@@ -477,9 +532,9 @@ public class RiverLifeTests {
         }
         var biomes = level.registryAccess().registryOrThrow(net.minecraft.core.registries.Registries.BIOME);
         if (biomes.getOrThrow(net.minecraft.world.level.biome.Biomes.SAVANNA).getMobSettings()
-                .getMobs(com.antcolonies.savanna.registry.SavannaMobCategories.riverFish())
+                .getMobs(com.antcolonies.savanna.registry.SavannaMobCategories.riverHunter())
                 .unwrap().stream().noneMatch(d -> d.type == SavannaEntities.CROCODILE.get())) {
-            helper.fail("the crocodile is not in the savanna's river fish spawn list");
+            helper.fail("the crocodile is not in the savanna's river hunter spawn list");
         }
         com.antcolonies.savanna.animal.CrocodileEntity croc = helper.spawn(SavannaEntities.CROCODILE.get(), new BlockPos(X1 - 2, SURFACE + 4, Z0 + 3));
         croc.setPersistenceRequired();

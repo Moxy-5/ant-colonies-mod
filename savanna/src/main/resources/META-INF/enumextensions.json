@@ -29,6 +29,18 @@
         false,
         128
       ]
+    },
+    {
+      "enum": "net/minecraft/world/entity/MobCategory",
+      "name": "ANTCOLONIES_RIVER_HUNTER",
+      "constructor": "(Ljava/lang/String;IZZI)V",
+      "parameters": [
+        "antcolonies:river_hunter",
+        6,
+        true,
+        false,
+        128
+      ]
     }
   ]
 }

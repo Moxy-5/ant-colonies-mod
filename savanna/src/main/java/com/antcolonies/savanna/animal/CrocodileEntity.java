@@ -167,6 +167,13 @@ public class CrocodileEntity extends PathfinderMob implements GeoEntity {
      * any other animal stirring within 10; it keeps its eyes on one for 2 to 5 s before it looks round for another.
      */
     static final double EYE_REACH = 16.0, EYE_REACH_SNEAK = 6.0, STIR_REACH = 10.0;
+    /**
+     * Mostly solitary, basking together (2026-11-15, the user's ask): a crocodile spawns only this many blocks or more
+     * from another (each keeps its own stretch of river), but wanting the sun it joins crocodiles already basking within
+     * {@link #JOIN_REACH} blocks, lying beside one {@link #SIDE_BY_SIDE} blocks off and facing the same way, so the
+     * favourite banks gather rows of them, as real Nile crocodiles do (my picks).
+     */
+    public static final double SPAWN_APART = 24.0, JOIN_REACH = 48.0, SIDE_BY_SIDE = 1.7;
     /** Its eyes and head turned toward what caught its eye, eased (degrees off straight ahead, its right positive); drawn only (the model sets them). */
     public double eyeAim, headAim;
     public long eyeNanos;
@@ -204,6 +211,10 @@ public class CrocodileEntity extends PathfinderMob implements GeoEntity {
     @Nullable
     Vec3 schoolAt;
     int schoolFor;
+    /** The spot beside a basking crocodile it is going to lie at, and the way it will face there (null: none). */
+    @Nullable
+    Vec3 joinAt;
+    float joinFace;
     /** For tests and films: 1 its hauled prey never slips free, -1 it always does, 0 the dice ({@link #SLIP_SHARE}). */
     public byte strikeLuck;
     /** For tests: how many animals have got away from it (slipped free of the haul, or a strike that fell short). */
@@ -219,7 +230,8 @@ public class CrocodileEntity extends PathfinderMob implements GeoEntity {
 
     public static AttributeSupplier.Builder createAttributes() {
         return PathfinderMob.createMobAttributes().add(Attributes.MAX_HEALTH, 40.0).add(Attributes.MOVEMENT_SPEED, 0.3)
-                .add(Attributes.STEP_HEIGHT, 1.0).add(Attributes.KNOCKBACK_RESISTANCE, 0.6);
+                .add(Attributes.STEP_HEIGHT, 1.0).add(Attributes.KNOCKBACK_RESISTANCE, 0.6)
+                .add(Attributes.FOLLOW_RANGE, JOIN_REACH);      // routes as far as the basking company it joins
     }
 
     @Override
@@ -685,11 +697,75 @@ public class CrocodileEntity extends PathfinderMob implements GeoEntity {
         return distanceSqr < reach * reach;
     }
 
-    /** Where it may spawn: the river fish's waters, with a block of water under it. */
+    /**
+     * Where it may spawn: the river fish's waters, with a block of water under it, and (spawned by the world, not an egg
+     * or a command) no other crocodile within {@link #SPAWN_APART} blocks: each its own stretch of river.
+     */
     public static boolean canSpawn(EntityType<CrocodileEntity> type, LevelAccessor level, MobSpawnType reason, BlockPos pos, RandomSource random) {
         int sea = level.getSeaLevel();
-        return pos.getY() >= sea - 6 && pos.getY() <= sea + 6 && level.getFluidState(pos).is(FluidTags.WATER)
-                && level.getFluidState(pos.below()).is(FluidTags.WATER);
+        if (pos.getY() < sea - 6 || pos.getY() > sea + 6 || !level.getFluidState(pos).is(FluidTags.WATER)
+                || !level.getFluidState(pos.below()).is(FluidTags.WATER)) {
+            return false;
+        }
+        return reason != MobSpawnType.NATURAL && reason != MobSpawnType.CHUNK_GENERATION || farFromOthers(level, pos);
+    }
+
+    /** Whether no crocodile is within {@link #SPAWN_APART} blocks of this spot (where the world may spawn one). */
+    public static boolean farFromOthers(LevelAccessor level, BlockPos pos) {
+        return level.getEntitiesOfClass(CrocodileEntity.class, new net.minecraft.world.phys.AABB(pos).inflate(SPAWN_APART)).isEmpty();
+    }
+
+    /**
+     * A spot to bask beside crocodiles already basking on land within {@link #JOIN_REACH} blocks: {@link #SIDE_BY_SIDE}
+     * blocks to either side of one (then twice that, the row growing), on dry bank, with no other crocodile lying there
+     * or heading there. Sets {@link #joinAt} and {@link #joinFace} (the basker's heading) and says whether it found one.
+     */
+    boolean findBaskingCompany() {
+        joinAt = null;
+        Level level = level();
+        java.util.List<CrocodileEntity> near = level.getEntitiesOfClass(CrocodileEntity.class,
+                getBoundingBox().inflate(JOIN_REACH, 8.0, JOIN_REACH), c -> c != this && c.isAlive() && c.isBasking() && !c.isInWater());
+        if (near.isEmpty()) {
+            return false;
+        }
+        near.sort(java.util.Comparator.comparingDouble(this::distanceToSqr));
+        java.util.List<CrocodileEntity> all = level.getEntitiesOfClass(CrocodileEntity.class,
+                getBoundingBox().inflate(JOIN_REACH + 4.0, 10.0, JOIN_REACH + 4.0), c -> c != this);
+        for (CrocodileEntity basker : near) {
+            float yaw = basker.getYRot() * Mth.DEG_TO_RAD;
+            double sideX = Mth.cos(yaw), sideZ = Mth.sin(yaw);
+            for (int k : new int[] {1, -1, 2, -2}) {
+                double x = basker.getX() + sideX * SIDE_BY_SIDE * k, z = basker.getZ() + sideZ * SIDE_BY_SIDE * k;
+                for (int dy : new int[] {0, 1, -1}) {
+                    BlockPos at = BlockPos.containing(x, basker.getY() + 0.1 + dy, z);
+                    if (!isBank(level, at) || level.getFluidState(at.below()).is(FluidTags.WATER) || taken(all, x, z)) {
+                        continue;
+                    }
+                    joinAt = new Vec3(x, at.getY(), z);
+                    joinFace = basker.getYRot();
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    /** Whether a crocodile lies at (x, z), or is heading there to lie, within about a block and a third. */
+    private static boolean taken(java.util.List<CrocodileEntity> crocs, double x, double z) {
+        for (CrocodileEntity c : crocs) {
+            double dx = c.getX() - x, dz = c.getZ() - z;
+            if (dx * dx + dz * dz < 1.8) {
+                return true;
+            }
+            if (c.joinAt != null) {
+                dx = c.joinAt.x - x;
+                dz = c.joinAt.z - z;
+                if (dx * dx + dz * dz < 1.8) {
+                    return true;
+                }
+            }
+        }
+        return false;
     }
 
     /** A dry place to lie: solid ground with air over it, under the open sky. */
@@ -703,6 +779,8 @@ public class CrocodileEntity extends PathfinderMob implements GeoEntity {
     static class BaskGoal extends Goal {
         private final CrocodileEntity croc;
         private int left;
+        /** Ticks it still shuffles onto its spot beside its company and turns to face their way (0: lying still). */
+        private int settling;
 
         BaskGoal(CrocodileEntity croc) {
             this.croc = croc;
@@ -720,6 +798,10 @@ public class CrocodileEntity extends PathfinderMob implements GeoEntity {
             left = 1200 + croc.getRandom().nextInt(2400);
             croc.getNavigation().stop();
             croc.setBasking(true);
+            settling = croc.joinAt != null && croc.joinAt.distanceToSqr(croc.position()) < 9.0 ? 40 : 0;
+            if (settling == 0) {
+                croc.joinAt = null;
+            }
         }
 
         @Override
@@ -730,6 +812,18 @@ public class CrocodileEntity extends PathfinderMob implements GeoEntity {
         @Override
         public void tick() {
             left--;
+            if (settling > 0 && croc.joinAt != null) {
+                settling--;
+                double dx = croc.joinAt.x - croc.getX(), dz = croc.joinAt.z - croc.getZ();
+                Vec3 v = croc.getDeltaMovement();
+                croc.setDeltaMovement(Mth.clamp(dx * 0.15, -0.08, 0.08), v.y, Mth.clamp(dz * 0.15, -0.08, 0.08));
+                float yaw = Mth.approachDegrees(croc.getYRot(), croc.joinFace, 6.0F);
+                croc.setYRot(yaw);
+                croc.yBodyRot = yaw;
+                if (settling == 0) {
+                    croc.joinAt = null;
+                }
+            }
         }
 
         @Override
@@ -739,6 +833,7 @@ public class CrocodileEntity extends PathfinderMob implements GeoEntity {
 
         @Override
         public void stop() {
+            croc.joinAt = null;
             croc.setBasking(false);
             if (croc.sunIn <= 0) {
                 croc.sunIn = 1200 + croc.getRandom().nextInt(2400);      // back in the water 1 to 3 minutes
@@ -941,6 +1036,10 @@ public class CrocodileEntity extends PathfinderMob implements GeoEntity {
                 return false;
             }
             wait = 100;
+            if (croc.findBaskingCompany()) {
+                croc.restHalfOut = false;       // others bask on the bank near: it climbs out to lie beside them
+                return false;
+            }
             if (!findEdge()) {
                 croc.restHalfOut = false;       // no edge to lie at here: it climbs out as usual
                 return false;
@@ -1069,6 +1168,9 @@ public class CrocodileEntity extends PathfinderMob implements GeoEntity {
                 return false;
             }
             wait = 100;
+            if (croc.findBaskingCompany()) {
+                return croc.getNavigation().moveTo(croc.joinAt.x, croc.joinAt.y, croc.joinAt.z, 1.0);
+            }
             Level level = croc.level();
             Optional<BlockPos> bank = BlockPos.findClosestMatch(croc.blockPosition(), 12, 3, p -> isBank(level, p)
                     && !level.getFluidState(p.below()).is(FluidTags.WATER) && waterBeside(level, p, 3) && !waterBeside(level, p, 1));

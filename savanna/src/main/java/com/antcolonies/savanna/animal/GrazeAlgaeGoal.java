@@ -12,7 +12,7 @@ import net.minecraft.world.level.block.state.BlockState;
 
 /**
  * A hungry tilapia swims down to the thickest river algae near it, noses into the mat and grazes it (M9 river life,
- * 2026-11-14): a few pecks, then {@link AlgaeBlock#graze} takes the mat down a stage, and it swims on. Hungry again
+ * 2026-11-14): a few pecks, then {@link AlgaeBlock#graze} tears the mat off down to the bare bed (it grows back), and it swims on. Hungry again
  * after 2 to 4 minutes (my picks). With nothing to eat near it simply swims on: a fish never starves, so the river's
  * food chain can never crash (the balance rule).
  */
