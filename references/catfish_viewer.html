@@ -186,7 +186,7 @@ function swim(fish, t, amount, beat, wave) {
 const TILAPIA_WAVE = [['head', 'body', -0.05, 0], ['front', 'body', 0.04, 0.6], ['mid', 'front', 0.1, 1.3],
                       ['rear', 'mid', 0.19, 2.0], ['peduncle', 'rear', 0.3, 2.6], ['tail', 'peduncle', 0.42, 3.1]];
 
-const settings = {size: 1.5, cam: 'overview'};
+const settings = {size: 2.0, cam: 'overview'};
 const TILAPIA = 0.6;
 location.hash.slice(1).split('&').filter(Boolean).forEach(kv => {
   const [k, v] = kv.split('=').map(decodeURIComponent);
