@@ -530,6 +530,43 @@ def crocodile_page(out):
     print("wrote", out)
 
 
+def remains_page(out):
+    """Remains (M9 river life, remains_models.py): a catfish, a tilapia and a cow in the four stages (fresh, half-eaten,
+    picked over, bones), meat in Minecraft's raw-meat style, on a silt bed with a player for scale."""
+    import remains_models as rm
+    import tilapia_models as tm
+
+    def length(bones):
+        zs = [z for b in bones for c in b.get('cubes', []) for z in (c['origin'][2], c['origin'][2] + c['size'][2])]
+        return max(zs) - min(zs)
+
+    game_length = {'catfish': 2.0, 'tilapia': 0.6, 'cow': None}
+    animals = {}
+    for kind, stages in rm.all_remains().items():
+        models = [{"bones": b, "texture": uri(tm.png(rows)), "w": w, "h": h,
+                   "boxes": sum(len(x.get('cubes', [])) for x in b)} for b, rows, w, h in stages]
+        scale = 1.0 if game_length[kind] is None else game_length[kind] * 16 / length(stages[0][0])
+        animals[kind] = {"models": models, "scale": scale, "sink": {'cow': 0.12, 'catfish': 0.05, 'tilapia': 0.02}[kind]}
+    notes = [
+        ("1 Fresh", "the whole animal on its side with one open patch of meat where the hunter fed (on the catfish a bite "
+         "out of the upper flank, on the cow its flank behind the ribs)."),
+        ("2 Half-eaten", "the upper side's skin and flesh gone: thick meat with the ribs and spine showing, the belly "
+         "eaten deeper, the upper fins and legs stripped; head and tail still whole."),
+        ("3 Picked over", "mostly the frame: spine and ribs with scraps of drier, darker meat, a strip of hide or skin "
+         "left lying underneath, the skin greying, the eyes gone. The crabs' stage."),
+        ("4 Bones", "a bare, bleached skeleton sinking a little into the bed, then gone."),
+        ("Meat", "Minecraft's raw-meat style (like raw beef): blocky pink-red with lighter streaks and a fat streak now "
+         "and then, darker and browner once old; never blood, splatter or guts."),
+        ("Tilapia", "a fish that died of old age (hunters swallow tilapia whole, so it never leaves a kill)."),
+    ]
+    blocks = {n: file_uri(n + ".png") for n in ("silt",)}
+    data = {"animals": animals, "stages": rm.STAGES, "blocks": blocks, "notes": notes}
+    template = (Path(__file__).resolve().parent / "remains_viewer.template.html").read_text(encoding="utf-8")
+    out.parent.mkdir(parents=True, exist_ok=True)
+    out.write_text(template.replace("/*DATA*/null", json.dumps(data)), encoding="utf-8")
+    print("wrote", out)
+
+
 def mix_soil(x, y):
     """Plain mound soil for the viewer's floor and walls."""
     rng = random.Random(x * 31 + y * 7)
@@ -544,6 +581,9 @@ def main():
         return
     if len(sys.argv) > 1 and sys.argv[1] == "floodplain":
         floodplain_page(Path(sys.argv[2]) if len(sys.argv) > 2 else ROOT / "references/floodplain_viewer.html")
+        return
+    if len(sys.argv) > 1 and sys.argv[1] == "remains":
+        remains_page(Path(sys.argv[2]) if len(sys.argv) > 2 else ROOT / "references/remains_viewer.html")
         return
     if len(sys.argv) > 1 and sys.argv[1] == "crocodile":
         crocodile_page(Path(sys.argv[2]) if len(sys.argv) > 2 else ROOT / "references/crocodile_viewer.html")

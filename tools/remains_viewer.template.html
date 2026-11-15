@@ -1,0 +1,239 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Remains Viewer</title>
+<style>
+  :root { --bg: #f2f0ea; --panel: #fdfcf9; --ink: #2a2622; --muted: #6c655c; --line: #ddd6ca; --accent: #9b4a3c; }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) { --bg: #1a1816; --panel: #24211e; --ink: #ece6dc; --muted: #a59d92; --line: #3a352f; --accent: #e08a77; }
+  }
+  :root[data-theme="dark"] { --bg: #1a1816; --panel: #24211e; --ink: #ece6dc; --muted: #a59d92; --line: #3a352f; --accent: #e08a77; }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font: 15px/1.45 system-ui, sans-serif; }
+  header { padding: 14px 16px 6px; }
+  h1 { margin: 0 0 4px; font-size: 20px; }
+  header p { margin: 0; color: var(--muted); max-width: 82ch; }
+  #wrap { position: relative; height: 64vh; min-height: 340px; margin: 10px 16px; border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
+  canvas { display: block; width: 100%; height: 100%; }
+  #labels { position: absolute; inset: 0; pointer-events: none; overflow: hidden; }
+  .tag { position: absolute; transform: translate(-50%, -100%); background: var(--panel); border: 1px solid var(--line); border-radius: 6px;
+         padding: 1px 6px; font-size: 12px; font-weight: 600; white-space: nowrap; }
+  .controls { display: flex; flex-wrap: wrap; gap: 8px 10px; padding: 0 16px 8px; align-items: center; }
+  .controls label { display: flex; gap: 8px; align-items: center; font-size: 14px; }
+  .readout { color: var(--muted); font-size: 13px; }
+  button { font: inherit; padding: 6px 12px; border-radius: 8px; border: 1px solid var(--line); background: var(--panel); color: var(--ink); cursor: pointer; }
+  button.on { border-color: var(--accent); color: var(--accent); font-weight: 600; }
+  ul { margin: 8px 16px 24px; padding-left: 22px; max-width: 82ch; }
+  li { margin: 4px 0; }
+  li b { color: var(--accent); }
+</style>
+</head>
+<body>
+<header>
+  <h1>Remains viewer</h1>
+  <p>What is left of a kill, in four stages from left to right: fresh, half-eaten, picked over, bones. Meat in
+     Minecraft's raw-meat style, no blood. The catfish and tilapia are the game's own fish models, cut open, at their game
+     sizes (2 and 0.6 blocks); the cow is a Minecraft-style cow. Each lies on its side. Drag to turn, scroll or pinch to
+     zoom, right-drag to slide.</p>
+</header>
+<div id="wrap"><canvas id="c"></canvas><div id="labels"></div></div>
+<div class="controls" id="cams"></div>
+<div class="controls">
+  <label><input id="water" type="checkbox"> Under water</label>
+  <span id="boxes" class="readout"></span>
+</div>
+<ul id="list"></ul>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+<script>
+const DATA = /*DATA*/null;
+const canvas = document.getElementById('c');
+const wrap = document.getElementById('wrap');
+const renderer = new THREE.WebGLRenderer({canvas, antialias: true, preserveDrawingBuffer: true});
+renderer.setPixelRatio(window.devicePixelRatio);
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+const scene = new THREE.Scene();
+const SKY = new THREE.Color('#bcd6e4'), WATER = new THREE.Color('#4f8f98');
+scene.background = SKY;
+const camera = new THREE.PerspectiveCamera(35, 1, 0.01, 200);
+const controls = new THREE.OrbitControls(camera, canvas);
+scene.add(new THREE.HemisphereLight('#f4f1e6', '#6b6248', 0.85));
+const sun = new THREE.DirectionalLight('#fffbe8', 0.6);
+sun.position.set(4, 12, 6);
+sun.castShadow = true;
+sun.shadow.mapSize.set(2048, 2048);
+sun.shadow.bias = -0.0004;
+Object.assign(sun.shadow.camera, {left: -10, right: 10, top: 10, bottom: -10, near: 0.5, far: 30});
+scene.add(sun);
+
+function deg(v) { return v * Math.PI / 180; }
+function setRot(obj, r) { obj.rotation.set(deg(-r[0]), deg(r[1]), deg(-r[2]), 'ZYX'); }
+function loadTexture(uri, repeat) {
+  const t = new THREE.TextureLoader().load(uri);
+  t.magFilter = THREE.NearestFilter;
+  t.minFilter = THREE.NearestFilter;
+  if (repeat) { t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(repeat, repeat); }
+  return t;
+}
+
+const bed = new THREE.Mesh(new THREE.PlaneGeometry(40, 40), new THREE.MeshLambertMaterial({map: loadTexture(DATA.blocks.silt, 40)}));
+bed.rotation.x = -Math.PI / 2;
+bed.receiveShadow = true;
+scene.add(bed);
+const surface = new THREE.Mesh(new THREE.PlaneGeometry(40, 40), new THREE.MeshLambertMaterial({color: '#9fd3d6', transparent: true, opacity: 0.35, side: THREE.DoubleSide}));
+surface.rotation.x = -Math.PI / 2; surface.position.y = 2.6; surface.visible = false;
+scene.add(surface);
+const waterIn = document.getElementById('water');
+waterIn.onchange = () => {
+  const on = waterIn.checked;
+  scene.background = on ? WATER : SKY;
+  scene.fog = on ? new THREE.Fog(WATER, 6, 24) : null;
+  surface.visible = on;
+};
+
+const FACES = ['east', 'west', 'up', 'down', 'south', 'north'];
+function boxGeometry(c, tw, th) {
+  const g = new THREE.BoxGeometry(Math.max(c.size[0], 0.02), Math.max(c.size[1], 0.02), Math.max(c.size[2], 0.02));
+  const uv = g.attributes.uv;
+  FACES.forEach((f, i) => {
+    const face = c.uv && c.uv[f];
+    if (!face) return;
+    const [u0, v0] = face.uv, [w, h] = face.uv_size;
+    for (let k = 0; k < 4; k++) {
+      const j = i * 4 + k;
+      uv.setXY(j, (u0 + uv.getX(j) * w) / tw, 1 - (v0 + (1 - uv.getY(j)) * h) / th);
+    }
+  });
+  uv.needsUpdate = true;
+  return g;
+}
+
+// One remains model, rolled onto its left side (its +X side up), the lowest point on the ground.
+function build(m, scale, sink) {
+  const mat = new THREE.MeshLambertMaterial({map: loadTexture(m.texture), alphaTest: 0.5});
+  const root = new THREE.Group(), groups = {}, byName = {};
+  m.bones.forEach(b => byName[b.name] = b);
+  m.bones.forEach(b => {
+    const g = new THREE.Group();
+    const p = b.parent && byName[b.parent] ? byName[b.parent].pivot : [0, 0, 0];
+    g.position.set(b.pivot[0] - p[0], b.pivot[1] - p[1], b.pivot[2] - p[2]);
+    if (b.rotation) setRot(g, b.rotation);
+    groups[b.name] = g;
+    (b.cubes || []).forEach(c => {
+      const mesh = new THREE.Mesh(boxGeometry(c, m.w, m.h), mat);
+      mesh.castShadow = true; mesh.receiveShadow = true;
+      mesh.userData.loose = /^(barbel|pectoral|pelvic)/.test(b.name);   // limp parts may sink into the silt
+      mesh.position.set(c.origin[0] + c.size[0] / 2 - b.pivot[0], c.origin[1] + c.size[1] / 2 - b.pivot[1], c.origin[2] + c.size[2] / 2 - b.pivot[2]);
+      g.add(mesh);
+    });
+  });
+  m.bones.forEach(b => (b.parent && groups[b.parent] ? groups[b.parent] : root).add(groups[b.name]));
+  root.scale.setScalar(scale / 16);
+  const roll = new THREE.Group();
+  roll.add(root);
+  roll.rotation.z = Math.PI / 2;        // lying on its left side
+  const holder = new THREE.Group();
+  holder.add(roll);
+  holder.updateMatrixWorld(true);
+  const b = new THREE.Box3();
+  holder.traverse(o => { if (o.isMesh && !o.userData.loose) b.expandByObject(o); });
+  const c = b.getCenter(new THREE.Vector3());
+  roll.position.set(-c.x, -b.min.y - sink, -c.z);
+  holder.rotation.y = Math.PI / 2;      // head to -x
+  scene.add(holder);
+  holder.userData.height = b.max.y - b.min.y - sink;
+  return holder;
+}
+
+const tags = [];
+function tag(text, obj) {
+  const el = document.createElement('div');
+  el.className = 'tag'; el.textContent = text;
+  document.getElementById('labels').appendChild(el);
+  tags.push({el, obj});
+}
+
+// rows: catfish, tilapia, cow; stages left to right
+const ROWS = [['catfish', 'Catfish', -3.2, 2.6], ['tilapia', 'Tilapia', 0.2, 1.6], ['cow', 'Cow', 3.6, 2.8]];
+const STAGES = DATA.stages;
+const placed = {};
+ROWS.forEach(([key, name, z, gap]) => {
+  const animal = DATA.animals[key];
+  placed[key] = [];
+  animal.models.forEach((m, i) => {
+    const sink = i === 3 ? animal.sink : 0;
+    const obj = build(m, animal.scale, sink);
+    obj.position.set((i - 1.5) * gap, 0, z);
+    tag(name + ' ' + (i + 1) + '. ' + STAGES[i], obj);
+    placed[key].push(obj);
+  });
+});
+document.getElementById('boxes').textContent = Object.entries(DATA.animals).map(([k, a]) => k + ' ' + a.models.map(m => m.boxes).join(', ') + ' boxes').join(' · ');
+
+const player = new THREE.Group();
+[[0.5, 0.75, 0.25, 0.375, '#3b4a8f'], [0.5, 0.75, 0.25, 1.125, '#2f9c9c'], [0.5, 0.5, 0.5, 1.55, '#b98a68']].forEach(([w, h, d, y, col]) => {
+  const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), new THREE.MeshLambertMaterial({color: col}));
+  m.position.y = y; m.castShadow = true; player.add(m);
+});
+player.userData.height = 1.8;
+player.position.set(-6.4, 0, 0.2);
+scene.add(player); tag('Player', player);
+
+const CAMS = {
+  everything: () => [[0, 7.5, 11.5], [0, 0, 0.3]],
+};
+ROWS.forEach(([key, name, z, gap]) => {
+  const span = gap * 2.2;
+  CAMS[name] = () => [[0, span * 0.55, z + span * 1.05], [0, 0.15, z]];
+  placed[key].forEach((o, i) => {
+    CAMS[name + ' ' + (i + 1)] = () => { const p = o.position, d = gap * 0.75; return [[p.x + d * 0.35, d * 0.75, p.z + d], [p.x, o.userData.height * 0.4, p.z]]; };
+  });
+});
+const camBox = document.getElementById('cams');
+function setCam(name) {
+  const [pos, target] = CAMS[name]();
+  camera.position.set(...pos); controls.target.set(...target); controls.update();
+  [...camBox.children].forEach(b => b.classList.toggle('on', b.textContent === name));
+}
+Object.keys(CAMS).forEach(name => {
+  const b = document.createElement('button');
+  b.textContent = name; b.onclick = () => setCam(name);
+  camBox.appendChild(b);
+});
+const list = document.getElementById('list');
+DATA.notes.forEach(([head, text]) => {
+  const li = document.createElement('li');
+  li.innerHTML = '<b>' + head + ':</b> ' + text;
+  list.appendChild(li);
+});
+
+function resize() {
+  const w = wrap.clientWidth, h = wrap.clientHeight;
+  renderer.setSize(w, h, false);
+  camera.aspect = w / h; camera.updateProjectionMatrix();
+}
+window.addEventListener('resize', resize);
+const v = new THREE.Vector3();
+function frame() {
+  controls.update();
+  renderer.render(scene, camera);
+  const w = wrap.clientWidth, h = wrap.clientHeight;
+  tags.forEach(({el, obj}) => {
+    v.set(obj.position.x, obj.position.y + (obj.userData.height || 0.2) + 0.08, obj.position.z).project(camera);
+    const show = v.z < 1 && Math.abs(v.x) < 1.1 && Math.abs(v.y) < 1.1;
+    el.style.display = show ? '' : 'none';
+    el.style.left = ((v.x + 1) / 2 * w) + 'px';
+    el.style.top = ((1 - v.y) / 2 * h) + 'px';
+  });
+  requestAnimationFrame(frame);
+}
+resize();
+const start = location.hash.slice(1);
+setCam(CAMS[decodeURIComponent(start)] ? decodeURIComponent(start) : 'everything');
+frame();
+</script>
+</body>
+</html>
