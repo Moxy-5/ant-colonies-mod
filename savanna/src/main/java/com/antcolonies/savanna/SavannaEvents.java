@@ -50,13 +50,17 @@ public class SavannaEvents {
         event.put(SavannaEntities.MATABELE_MINOR.get(), com.antcolonies.savanna.entity.MatabeleEntity.createMinorAttributes().build());
         event.put(SavannaEntities.MATABELE_QUEEN.get(), com.antcolonies.savanna.entity.MatabeleQueenEntity.createAttributes().build());
         event.put(SavannaEntities.TILAPIA.get(), com.antcolonies.savanna.animal.TilapiaEntity.createAttributes().build());
+        event.put(SavannaEntities.CATFISH.get(), com.antcolonies.savanna.animal.CatfishEntity.createAttributes().build());
     }
 
-    /** Where the river animals may spawn (M9): the tilapia in the savanna's rivers, pans and oxbows. */
+    /** Where the river animals may spawn (M9): the tilapia and the catfish in the savanna's rivers, pans and oxbows. */
     @SubscribeEvent
     public static void onSpawnPlacements(net.neoforged.neoforge.event.entity.RegisterSpawnPlacementsEvent event) {
         event.register(SavannaEntities.TILAPIA.get(), net.minecraft.world.entity.SpawnPlacementTypes.IN_WATER,
                 net.minecraft.world.level.levelgen.Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, com.antcolonies.savanna.animal.TilapiaEntity::canSpawn,
+                net.neoforged.neoforge.event.entity.RegisterSpawnPlacementsEvent.Operation.REPLACE);
+        event.register(SavannaEntities.CATFISH.get(), net.minecraft.world.entity.SpawnPlacementTypes.IN_WATER,
+                net.minecraft.world.level.levelgen.Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, com.antcolonies.savanna.animal.CatfishEntity::canSpawn,
                 net.neoforged.neoforge.event.entity.RegisterSpawnPlacementsEvent.Operation.REPLACE);
     }
 
@@ -191,6 +195,8 @@ public class SavannaEvents {
             event.accept(SavannaItems.DOUM_NUT);
             event.accept(SavannaItems.TILAPIA);
             event.accept(SavannaItems.COOKED_TILAPIA);
+            event.accept(SavannaItems.CATFISH);
+            event.accept(SavannaItems.COOKED_CATFISH);
         });
         ModEvents.addToCreativeTab(CreativeModeTabs.TOOLS_AND_UTILITIES, 20, event -> event.accept(SavannaItems.TILAPIA_BUCKET));
         ModEvents.addToCreativeTab(CreativeModeTabs.SPAWN_EGGS, 20, event -> {
@@ -203,6 +209,7 @@ public class SavannaEvents {
             event.accept(SavannaItems.MATABELE_MINOR_SPAWN_EGG);
             event.accept(SavannaItems.MATABELE_QUEEN_SPAWN_EGG);
             event.accept(SavannaItems.TILAPIA_SPAWN_EGG);
+            event.accept(SavannaItems.CATFISH_SPAWN_EGG);
         });
     }
 }

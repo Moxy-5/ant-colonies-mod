@@ -105,6 +105,15 @@ public class SavannaItems {
             () -> new net.minecraft.world.item.MobBucketItem(SavannaEntities.TILAPIA.get(), net.minecraft.world.level.material.Fluids.WATER,
                     net.minecraft.sounds.SoundEvents.BUCKET_EMPTY_FISH, new Item.Properties().stacksTo(1)
                             .component(net.minecraft.core.component.DataComponents.BUCKET_ENTITY_DATA, net.minecraft.world.item.component.CustomData.EMPTY)));
+    /* The river catfish (M9 river life, 2026-11-14, my picks): a bigger meal than the tilapia; no bucket (too big). */
+    public static final DeferredItem<Item> CATFISH = ITEMS.registerSimpleItem("catfish",
+            new Item.Properties().food(new FoodProperties.Builder().nutrition(3).saturationModifier(0.2F).build()));
+    public static final DeferredItem<Item> COOKED_CATFISH = ITEMS.registerSimpleItem("cooked_catfish",
+            new Item.Properties().food(new FoodProperties.Builder().nutrition(7).saturationModifier(0.7F).build()));
+    // Grey-brown with a cream belly (look A), my pick.
+    public static final DeferredItem<DeferredSpawnEggItem> CATFISH_SPAWN_EGG =
+            ITEMS.register("catfish_spawn_egg",
+                    () -> new DeferredSpawnEggItem(SavannaEntities.CATFISH, 0x423C34, 0xE2D6BA, new Item.Properties()));
     // Olive grey with a red throat (the breeding male's), my pick.
     public static final DeferredItem<DeferredSpawnEggItem> TILAPIA_SPAWN_EGG =
             ITEMS.register("tilapia_spawn_egg",

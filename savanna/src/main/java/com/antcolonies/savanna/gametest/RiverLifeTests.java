@@ -3,6 +3,7 @@ package com.antcolonies.savanna.gametest;
 import static com.antcolonies.savanna.gametest.TermiteMoundTests.SURFACE;
 
 import com.antcolonies.savanna.SavannaMod;
+import com.antcolonies.savanna.animal.CatfishEntity;
 import com.antcolonies.savanna.animal.TilapiaEntity;
 import com.antcolonies.savanna.block.AlgaeBlock;
 import com.antcolonies.savanna.registry.SavannaBlocks;
@@ -41,11 +42,16 @@ public class RiverLifeTests {
         algaeChecks(helper, level);
     }
 
-    /** The pond: stone walls, a shelf under 2 blocks of water up to {@link #SHALLOW_TO}, 7 blocks deep past it. */
+    /**
+     * The pond: a stone floor and walls, a shelf under 2 blocks of water up to {@link #SHALLOW_TO}, 7 blocks deep past it.
+     * The arena is empty air down to the test world's ground about 12 blocks lower, so without the floor the water poured
+     * out under the pond and its current dragged the fish down (the catfish test's misses, 2026-11-14).
+     */
     private static void buildPond(GameTestHelper helper) {
         for (int x = X0 - 1; x <= X1 + 1; x++) {
             for (int z = Z0 - 1; z <= Z1 + 1; z++) {
                 boolean wall = x < X0 || x > X1 || z < Z0 || z > Z1;
+                helper.setBlock(new BlockPos(x, SURFACE - 1, z), Blocks.STONE);
                 for (int y = SURFACE; y <= TOP + 1; y++) {
                     BlockPos at = new BlockPos(x, y, z);
                     if (wall) {
@@ -277,6 +283,61 @@ public class RiverLifeTests {
             }
             helper.assertTrue(sawGrazing[0] && full - left >= 3, "grazed " + (full - left) + " stages of " + full
                     + (sawGrazing[0] ? "" : ", no fish seen grazing"));
+        });
+    }
+
+    /**
+     * The catfish (2026-11-14): spawns in the river fish group in the savanna's waters, only in water at least 3 deep; a
+     * hungry one hunts a wild tilapia in the pond's deep end, strikes with its mouth open and swallows it, and is fed;
+     * a tilapia from a bucket (the player's own) is left alone; it is 2 blocks long at the usual size.
+     */
+    @GameTest(template = "arena", timeoutTicks = 900)
+    public static void aHungryCatfishHuntsAndSwallowsATilapia(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        buildPond(helper);
+        // wiring: the placement rule, the savanna waters' spawn list, the river fish group
+        if (net.minecraft.world.entity.SpawnPlacements.getPlacementType(SavannaEntities.CATFISH.get())
+                != net.minecraft.world.entity.SpawnPlacementTypes.IN_WATER) {
+            helper.fail("the catfish's spawn placement is not signed up");
+        }
+        var biomes = level.registryAccess().registryOrThrow(net.minecraft.core.registries.Registries.BIOME);
+        boolean listed = biomes.getOrThrow(net.minecraft.world.level.biome.Biomes.SAVANNA).getMobSettings()
+                .getMobs(com.antcolonies.savanna.registry.SavannaMobCategories.riverFish())
+                .unwrap().stream().anyMatch(d -> d.type == SavannaEntities.CATFISH.get());
+        if (!listed || SavannaEntities.CATFISH.get().getCategory() != com.antcolonies.savanna.registry.SavannaMobCategories.riverFish()) {
+            helper.fail("the catfish is not in the savanna's river fish spawn list");
+        }
+        // never in the shelf's 2 blocks of water (when the pond is in the spawn band), always in the deep end
+        BlockPos shelf = helper.absolutePos(new BlockPos(X0 + 1, TOP, Z0 + 1));
+        BlockPos deep = helper.absolutePos(new BlockPos(X1 - 1, SURFACE + 3, Z1 - 1));
+        if (Math.abs(deep.getY() - level.getSeaLevel()) <= 6) {
+            if (CatfishEntity.canSpawn(SavannaEntities.CATFISH.get(), level, MobSpawnType.NATURAL, shelf, level.random)) {
+                helper.fail("a catfish may spawn in 2 blocks of water");
+            }
+            if (!CatfishEntity.canSpawn(SavannaEntities.CATFISH.get(), level, MobSpawnType.NATURAL, deep, level.random)) {
+                helper.fail("a catfish may not spawn in the deep end");
+            }
+        }
+        CatfishEntity catfish = helper.spawn(SavannaEntities.CATFISH.get(), new BlockPos(X1 - 1, SURFACE + 3, Z0 + 1));
+        catfish.setPersistenceRequired();
+        catfish.makeHungry();
+        if (Math.abs(catfish.getAttributeValue(Attributes.SCALE) - 1.0) > 0.001) {
+            helper.fail("a spawned catfish's size is " + catfish.getAttributeValue(Attributes.SCALE) + " (1 before its own size is rolled)");
+        }
+        TilapiaEntity pet = helper.spawn(SavannaEntities.TILAPIA.get(), new BlockPos(X1 - 2, SURFACE + 3, Z0 + 2));
+        pet.setUp(false, level.random);
+        pet.setFromBucket(true);
+        TilapiaEntity wild = helper.spawn(SavannaEntities.TILAPIA.get(), new BlockPos(X1 - 1, SURFACE + 4, Z1 - 1));
+        wild.setUp(false, level.random);
+        wild.setPersistenceRequired();
+        boolean[] sawStrike = {false};
+        helper.onEachTick(() -> sawStrike[0] |= catfish.isStriking());
+        helper.succeedWhen(() -> {
+            helper.assertTrue(catfish.isAlive(), "the catfish died");
+            helper.assertTrue(wild.isRemoved() && sawStrike[0] && !catfish.isHungry(),
+                    "the wild tilapia " + (wild.isRemoved() ? "is gone" : "still swims") + (sawStrike[0] ? "" : ", no strike seen")
+                            + (catfish.isHungry() ? ", the catfish still hungry" : ""));
+            helper.assertTrue(pet.isAlive(), "the bucket tilapia was eaten");
         });
     }
 }

@@ -14,7 +14,7 @@ public final class SavannaMobCategories {
 
     private static MobCategory riverFish;
 
-    /** The river fish group (tilapia, the catfish later). */
+    /** The river fish group (tilapia and catfish). */
     public static MobCategory riverFish() {
         if (riverFish == null) {
             riverFish = MobCategory.valueOf("ANTCOLONIES_RIVER_FISH");

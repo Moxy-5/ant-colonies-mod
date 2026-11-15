@@ -118,6 +118,18 @@ public class SavannaEntities {
                     .clientTrackingRange(4)
                     .build("tilapia"));
 
+    // The river catfish (M9 river life, the hunter, 2026-11-14): drawn 2 blocks long (the user's pick); its box shorter
+    // than the drawn fish (my pick), so it can turn in narrow water; each fish's own size through its SCALE attribute.
+    // Under 0.87 wide so even the biggest (1.15) stays under 1: Minecraft plans a swimmer's route in squares of its
+    // width plus one, rounded down, and a 2-wide square never fits a corner or a bank (it could not reach prey there).
+    public static final DeferredHolder<EntityType<?>, EntityType<com.antcolonies.savanna.animal.CatfishEntity>> CATFISH =
+            ENTITY_TYPES.register("catfish", () -> EntityType.Builder
+                    .of(com.antcolonies.savanna.animal.CatfishEntity::new, SavannaMobCategories.riverFish())
+                    .sized(0.8F, 0.45F)
+                    .eyeHeight(0.25F)
+                    .clientTrackingRange(6)
+                    .build("catfish"));
+
     // M8 step 1c: the Matabele young and dead, for the shared brood and refuse code (no nest to raise young in yet, step
     // 1d; the dead are carried home in step 5). Drawn MATABELE_DRAW_SIZE times a small ant's grub and body.
     public static final float MATABELE_DRAW_SIZE = 2.0F * InsectSizes.MATABELE_MAJOR.factor();

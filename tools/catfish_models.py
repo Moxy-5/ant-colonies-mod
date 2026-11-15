@@ -15,6 +15,7 @@ first (animals are generalized, CLAUDE.md):
 
 Looks (my picks): A grey-brown mottled (the user's picture), B marbled olive, C dark slate.
 Units are model pixels (16 a block), the head points to -Z, up is +Y, left is +X; y = MID runs through the body's middle.
+`python tools/catfish_models.py game` writes the game's files (model, look A's texture, clips) into the savanna mod.
 """
 import copy
 import math
@@ -344,7 +345,123 @@ def paint(bones, look):
     return bones, rows, width, height
 
 
+# --- the game's files (the user, 2026-11-14: "A looks the best lets just do that for now and put it in the game") -------
+# One model in look A (grey-brown mottled, the user's picture); 2 blocks long in the game (the user's pick).
+GAME_TEXTURE = 'catfish'
+BARBELS = [f'barbel_{kind}_{side}' for side in ('left', 'right')
+           for kind in ('long', 'long_tip', 'nose', 'chin_out', 'chin_in')]
+
+
+def wave_pose(t, amount, beat, curl=0, lag_scale=1.0):
+    """Each bone's turn (degrees, the model file's rules) in the swim wave at time t, as the viewer swims it: the body
+    bones' sideways angles a sine, bigger and later toward the tail, each less its parent's; the side fins flutter."""
+    ab, out = {'body': 0.0}, {}
+    for name, parent, a, lag in WAVE:
+        wave = math.sin(beat * t - lag * lag_scale)
+        ab[name] = amount * a * (wave if not curl else curl * (0.5 + 0.5 * wave))
+        out[name] = [0.0, math.degrees(ab[name] - ab[parent]), 0.0]
+    for i, side in enumerate(('left', 'right')):
+        sign = -1 if i else 1
+        out[f'pectoral_{side}'] = [0.0, math.degrees(sign * (0.25 + 0.75 * amount) * 0.15 * math.sin(beat * 2 * t + i * 0.5)), 0.0]
+        out[f'pelvic_{side}'] = [-math.degrees(0.08 * math.sin(beat * t)), 0.0, 0.0]
+    return out
+
+
+def barbel_sway(t, out, k=1.0, period=None):
+    """The whiskers sway gently on their own slow clock, as in the viewer (the tips more). With period, the clock is
+    rounded to a whole number of sways in it, so a looping clip joins up."""
+    for i, name in enumerate(BARBELS):
+        a = (0.22 if 'tip' in name else 0.12) * k
+        w1, w2 = 1.7, 1.3
+        if period:
+            w1 = 2 * math.pi * max(1, round(w1 * period / (2 * math.pi))) / period
+            w2 = 2 * math.pi * max(1, round(w2 * period / (2 * math.pi))) / period
+        out[name] = [-math.degrees(a * 0.6 * math.sin(t * w2 + i * 1.7)), math.degrees(a * math.sin(t * w1 + i * 0.9)), 0.0]
+    return out
+
+
+def clips():
+    """swim (a full beat, 1.2 s, slower and longer than the tilapia's; played faster or slower by the speed), idle
+    (hanging still, the tail barely moving, the whiskers feeling), strike (a lunge with the mouth thrown open, snapped
+    shut, the whiskers swept back), flop (out of water it stays upright and wriggles in S-curves, as real catfish crawl
+    over wet ground), death (rolls onto its side)."""
+    rot = tm.rot_only
+    swim_len = 1.2
+    beat = 2 * math.pi / swim_len
+
+    def swim(t):
+        return rot(barbel_sway(t, wave_pose(t, 1.0, beat), 0.8, swim_len))
+
+    def idle(t):
+        p = rot(barbel_sway(t, wave_pose(t, 0.12, 2 * math.pi / 4.0), 1.0, 4.0))
+        p['body'] = {'rotation': [0, 0, 0], 'position': [0, 0.25 * math.sin(2 * math.pi * t / 4.0), 0]}
+        return p
+
+    def strike(t):
+        ease = lambda x: x * x * (3 - 2 * x)
+        lunge = ease(min(1, t / 0.25)) if t < 0.45 else ease(max(0.0, (1.0 - t) / 0.55))
+        gape = 0 if t < 0.05 else ease((t - 0.05) / 0.15) if t < 0.2 else ease(max(0.0, (0.38 - t) / 0.18)) if t < 0.38 else 0
+        p = rot(barbel_sway(t, wave_pose(t, 0.5 + 1.2 * (1 - min(1, t / 0.6)), 2 * math.pi / 0.5), 0.3))
+        p['jaw'] = {'rotation': [34 * gape, 0, 0]}
+        p['head'] = {'rotation': [-8 * gape, p['head']['rotation'][1], 0]}
+        for name in BARBELS:          # swept back by the rush of water
+            r = p[name]['rotation']
+            side = 1 if name.endswith('left') else -1
+            p[name] = {'rotation': [r[0], r[1] - side * 18 * lunge, r[2]]}
+        p['body'] = {'rotation': [0, 0, 0], 'position': [0, 0, -4 * lunge]}
+        return p
+
+    def flop(t):
+        p = rot(barbel_sway(t, wave_pose(t, 2.2, 2 * math.pi / 0.8, lag_scale=0.8), 0.5, 0.8))
+        p['body'] = {'rotation': [-4, 0, 0], 'position': [0, -1.2, 0]}
+        return p
+
+    lie = 1.4
+
+    def death(t):
+        f = min(1.0, t / 0.8)
+        f = f * f * (3 - 2 * f)
+        p = rot(wave_pose(t, 0.9 * (1 - f), 2 * math.pi / 0.8))
+        for s, side in ((1, 'left'), (-1, 'right')):
+            p[f'pectoral_{side}'] = {'rotation': [10 * f, -s * 30 * f, s * 10 * f]}
+        p['jaw'] = {'rotation': [10 * f, 0, 0]}
+        p['body'] = {'rotation': [0, 0, 80 * f], 'position': [0, -lie * f, 0]}
+        return p
+
+    return {'idle': tm.clip(4.0, idle, 40), 'swim': tm.clip(swim_len, swim, 24),
+            'strike': tm.clip(1.0, strike, 30, False), 'flop': tm.clip(0.8, flop, 16),
+            'death': tm.clip(1.2, death, 12, 'hold')}
+
+
+def write_game():
+    """Writes the catfish's model, look A's texture and its clips into the savanna mod."""
+    import json
+    import mod_paths
+    root = mod_paths.assets('savanna')
+    game_bones, rows, w, h = paint(model(), 'A')
+    files = {f'textures/entity/{GAME_TEXTURE}.png': png(rows)}
+    geo = {'format_version': '1.12.0', 'minecraft:geometry': [{
+        'description': {'identifier': 'geometry.catfish', 'texture_width': w, 'texture_height': h,
+                        'visible_bounds_width': 4, 'visible_bounds_height': 1.5, 'visible_bounds_offset': [0, 0.5, 0]},
+        'bones': game_bones}]}
+    files['geo/entity/catfish.geo.json'] = geo
+    files['animations/entity/catfish.animation.json'] = {'format_version': '1.8.0', 'animations': clips()}
+    for rel, data in files.items():
+        path = root / rel
+        path.parent.mkdir(parents=True, exist_ok=True)
+        if isinstance(data, bytes):
+            path.write_bytes(data)
+        else:
+            with open(path, 'w', encoding='utf-8', newline='\n') as f:
+                json.dump(data, f, indent=1)
+        print('wrote', path.relative_to(mod_paths.PROJECT))
+
+
 if __name__ == '__main__':
+    import sys
+    if sys.argv[1:] == ['game']:
+        write_game()
+        sys.exit()
     bones = model()
     n = sum(len(b.get('cubes', [])) for b in bones)
     _, rows, w, h = paint(bones, 'A')
