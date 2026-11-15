@@ -41,7 +41,7 @@
 </header>
 <div id="wrap"><canvas id="c"></canvas><div id="labels"></div></div>
 <div class="controls">
-  <label>Crocodile length <input id="size" type="range" min="1" max="7" step="0.1"> <span id="sizeOut" class="readout"></span></label>
+  <label>Crocodile length <input id="size" type="range" min="1" max="8" step="0.1"> <span id="sizeOut" class="readout"></span></label>
   <span id="boxes" class="readout"></span>
 </div>
 <div class="controls" id="cams"></div>
@@ -161,7 +161,7 @@ function wave(obj, t, amount, beat, table) {
 const TILAPIA_WAVE = [['head', 'body', -0.05, 0], ['front', 'body', 0.04, 0.6], ['mid', 'front', 0.1, 1.3],
                       ['rear', 'mid', 0.19, 2.0], ['peduncle', 'rear', 0.3, 2.6], ['tail', 'peduncle', 0.42, 3.1]];
 
-const settings = {size: 5.0, cam: 'overview'};
+const settings = {size: 6.1, cam: 'overview'};
 location.hash.slice(1).split('&').filter(Boolean).forEach(kv => {
   const [k, v] = kv.split('=').map(decodeURIComponent);
   settings[k] = isNaN(parseFloat(v)) ? v : parseFloat(v);

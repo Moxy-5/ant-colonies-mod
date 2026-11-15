@@ -13,7 +13,10 @@ import software.bernie.geckolib.renderer.GeoEntityRenderer;
  * The death clip rolls it over itself, so Minecraft's tip-over is off.
  */
 public class CrocodileRenderer extends GeoEntityRenderer<CrocodileEntity> {
-    /** The model is 5.5 blocks long as made (snout to tail tip, 88 pixels); a usual crocodile is 5 blocks (my pick). */
+    /**
+     * The model is 6.75 blocks long as made (snout to tail tip, 108 pixels) and drawn at 10/11 of that: a usual crocodile is
+     * about 6.1 blocks long (5 until the user asked for a longer tail, 2026-11-15; the body kept its size).
+     */
     static final float SCALE = 5.0F / 5.5F;
 
     public CrocodileRenderer(EntityRendererProvider.Context context) {

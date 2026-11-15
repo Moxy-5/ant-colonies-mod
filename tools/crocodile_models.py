@@ -6,7 +6,8 @@ slim and finely sliced, was "fine, just not what I'm looking for"). Fun first, i
 (animals are generalized, CLAUDE.md). What the picture shows, and so what this is:
 - Built of cubes, one flat colour a cube face in a loose checker of olives. The first try at this (25 big cubes
   long) was "too chunky"; the user asked for an in-between of it and the old slim model, so now smaller cubes
-  and more of them: 44 long, 8.5 wide, about 6 tall, long and low, with a long snout and a long tapering tail.
+  and more of them: 54 long (44 until the tail was lengthened), 8.5 wide, about 6 tall, long and low, with a long snout
+  and a long tapering tail.
   Everything here is measured in those cubes ("voxels", V model pixels each).
 - A big boxy head: a broad blunt snout with a raised nostril block on its tip, a taller skull with a brow block over
   each yellow, slit-pupilled eye, a few big white teeth hanging from the upper jaw, a cream lower jaw, a red mouth.
@@ -24,7 +25,7 @@ from tilapia_models import cube, mix, shade, faces, face_point, png  # noqa: F40
 
 V = 2.0               # model pixels a voxel
 TEXELS = 0.5          # texture pixels a model pixel: one flat colour a voxel face
-SNOUT, HINGE, TAIL_END = -20.0, -10.0, 24.0     # voxels
+SNOUT, HINGE, TAIL_END = -20.0, -10.0, 34.0     # voxels
 SPLIT = 2.25          # the mouth line (voxels up)
 
 # The swim wave (shared with the viewer): bone, parent, how far it swings, how late (radians).
@@ -36,11 +37,14 @@ WAVE = [('neck', 'body', -0.03, 0.0), ('chest', 'body', 0.02, 0.5), ('hips', 'ch
 TRUNK = [('neck', 'body', -10.0, -8.5, 3.0, 0.75, 4.75), ('neck', 'body', -8.5, -7.0, 3.25, 0.75, 5.0),
          ('chest', 'body', -7.0, -5.0, 3.75, 0.75, 5.5), ('chest', 'body', -5.0, 0.0, 4.25, 0.75, 5.75),
          ('hips', 'chest', 0.0, 4.0, 4.25, 0.75, 5.75), ('hips', 'chest', 4.0, 6.0, 3.75, 0.75, 5.5),
-         ('tail1', 'hips', 6.0, 8.0, 3.25, 0.75, 5.0), ('tail1', 'hips', 8.0, 10.0, 2.75, 0.75, 4.5),
-         ('tail2', 'tail1', 10.0, 12.0, 2.25, 0.75, 4.0), ('tail2', 'tail1', 12.0, 14.0, 1.9, 0.8, 3.6),
-         ('tail3', 'tail2', 14.0, 16.0, 1.5, 0.85, 3.2), ('tail3', 'tail2', 16.0, 18.0, 1.2, 0.9, 2.8),
-         ('tail4', 'tail3', 18.0, 20.0, 0.9, 0.95, 2.45), ('tail4', 'tail3', 20.0, 22.0, 0.7, 1.0, 2.15),
-         ('tail5', 'tail4', 22.0, 24.0, 0.5, 1.05, 1.85)]
+         # the tail (made 10 voxels longer on 2026-11-15, the user's ask: about 1.1 blocks more in the game)
+         ('tail1', 'hips', 6.0, 8.0, 3.25, 0.75, 5.0), ('tail1', 'hips', 8.0, 10.0, 2.9, 0.77, 4.7),
+         ('tail1', 'hips', 10.0, 12.0, 2.6, 0.8, 4.4), ('tail2', 'tail1', 12.0, 14.0, 2.3, 0.82, 4.1),
+         ('tail2', 'tail1', 14.0, 16.0, 2.0, 0.84, 3.8), ('tail2', 'tail1', 16.0, 18.0, 1.75, 0.87, 3.5),
+         ('tail3', 'tail2', 18.0, 20.0, 1.5, 0.89, 3.2), ('tail3', 'tail2', 20.0, 22.0, 1.3, 0.91, 2.95),
+         ('tail3', 'tail2', 22.0, 24.0, 1.1, 0.93, 2.7), ('tail4', 'tail3', 24.0, 26.0, 0.95, 0.96, 2.45),
+         ('tail4', 'tail3', 26.0, 28.0, 0.8, 0.98, 2.25), ('tail4', 'tail3', 28.0, 30.0, 0.65, 1.0, 2.05),
+         ('tail5', 'tail4', 30.0, 32.0, 0.55, 1.03, 1.9), ('tail5', 'tail4', 32.0, 34.0, 0.45, 1.05, 1.75)]
 
 
 def box(bones, name, x0, y0, z0, x1, y1, z1, part):
@@ -101,7 +105,7 @@ def scutes(bones):
     while z + 1.0 <= TAIL_END:
         name, _, _, _, hw, _, top = next(t for t in TRUNK if t[2] <= z + 0.5 < t[3])
         flat = hw - (1.0 if hw >= 2.0 else 0.5 if hw >= 1.0 else 0.25)      # the half-width of the back's top
-        tall = (0.7 if row % 2 == 0 else 0.5) if z < 6 else 0.9 - 0.4 * (z - 6) / 18
+        tall = (0.7 if row % 2 == 0 else 0.5) if z < 6 else 0.9 - 0.4 * (z - 6) / 28
         if z < 6:                                       # the neck and back: two or four across
             both(bones, name, 0.2, top, z, 1.2, top + tall, z + 1.0, 'scute')
             if flat >= 2.7:
