@@ -389,9 +389,10 @@ def barbel_sway(t, out, k=1.0, period=None):
 BITE, BITE_SMALL = 18.0, 11.0
 CATCH_LEN = 2.6       # the catch clip (seconds; CatfishEntity.HOLD_TICKS is the same in ticks)
 # The bite-off clip (the user, 2026-11-15: half the catches the mouth shuts early, the front half of the tilapia left):
-# the catch until the first gulp, the jaws snapping shut through the fish at CUT_AT, a last gulp, done at CUT_LEN
+# since the same day its own animation, the tilapia fighting until the catfish bites it through at its middle (fought,
+# below; the times are the tilapia's, tm.FIGHT_*): the jaws shut through the fish at CUT_AT, done at CUT_LEN
 # (seconds; CatfishEntity.CUT_TICKS and CUT_AT_TICK the same in ticks).
-CUT_AT, CUT_LEN = 1.5, 2.1
+CUT_AT, CUT_LEN = tm.FIGHT_CUT, tm.FIGHT_LEN
 
 
 def clips():
@@ -441,24 +442,55 @@ def clips():
         bump = lambda a, b: math.sin(math.pi * (t - a) / (b - a)) if a < t < b else 0.0
         gulp = bump(1.25, 1.55) + bump(1.75, 2.05) + bump(2.1, 2.3)
         shut = ease((t - 2.2) / 0.2)
-        if cut:     # the first gulp turns into a snap: the jaws slam shut through the fish, a last gulp of its half
-            gulp = bump(1.25, 1.42) + 0.7 * bump(1.7, 1.98)
-            shut = ease((t - 1.42) / 0.08)
         down = ease((t - 0.04) / 0.1)                       # the bite: wide to clamped in a tenth of a second
         squeeze = 0.12 * bump(0.1, 0.34)                    # and a squeeze, the jaws pressing into the fish
+        if cut:
+            return fought(t, bite, down, squeeze)
         angle = (42 + (bite - 42) * down - bite * squeeze + 9 * gulp) * (1 - shut)
         # held 2 pixels past the hinge (the tail's tip hidden in the head), so the mouth is round the fish's body
         slide = 2.0 + 3.5 * ease((t - 1.3) / 0.25) + 3.5 * ease((t - 1.8) / 0.25) + 3.0 * ease((t - 2.12) / 0.18)
-        if cut:
-            slide = 2.0 + 2.5 * ease((t - 1.28) / 0.14)
         shake = 13 * math.sin(2 * math.pi * (t - 0.3) / 0.4) * ease((t - 0.3) / 0.1) * (1 - ease((t - 1.0) / 0.1))
         p = rot(barbel_sway(t, wave_pose(t, 0.6, 2 * math.pi / 1.3), 0.6))
         p['jaw'] = {'rotation': [0.8 * angle, 0, 0]}
         p['head'] = {'rotation': [-0.2 * angle - 4 * gulp, p['head']['rotation'][1] + shake, 0]}
-        seen = 1.0 if t < (CUT_AT if cut else 2.32) else 0.0      # cut: the front half falls away as the remains
+        seen = 1.0 if t < 2.32 else 0.0
         # half the jaw's turn: the jaw hangs on the head, so this is midway between the two
         p['prey'] = {'rotation': [0.4 * angle, 0, 0], 'position': [0, 0, slide], 'scale': [seen, seen, seen]}
         p['body'] = {'rotation': [0, 0, 0], 'position': [0, 0, -4 * (1 - ease(t / 0.5)) - 1.2 * gulp]}
+        return p
+
+    def fought(t, bite, down, squeeze):
+        """The catch that ends bitten in two (the user, 2026-11-15: its own animation, "the tilapia fights more and
+        wiggles so the catfish closes early right where the indentation is on the remains"). The bite and one shake
+        as in the catch; then the tilapia fights (its own clip 'caught_fight', on the same clock, tm.fight): each beat
+        of its thrash pries the jaws a little apart and jolts the head, and it works itself a little way out of the
+        mouth; the catfish lunges after it, opens to take a new hold, and slams shut on the fish's middle, where the
+        remains' bitten end is (the lips over the fish 0.6 pixels in front of its middle, tm 'tear'), biting it
+        through. The front half falls away (the game puts the remains there), the head recoils, one gulp of its half."""
+        ease = lambda x: (lambda v: v * v * (3 - 2 * v))(max(0.0, min(1.0, x)))
+        bump = lambda a, b: math.sin(math.pi * (t - a) / (b - a)) if a < t < b else 0.0
+        f = tm.fight(t) * (1 - ease((t - tm.FIGHT_CLAMP + 0.12) / 0.1))      # the fight felt in the jaws, until the lunge
+        beat = math.sin(tm.fight_phase(t))
+        regrab = bump(tm.FIGHT_CLAMP - 0.14, tm.FIGHT_CLAMP + 0.02)          # the jaws open for a new hold
+        shut = ease((t - tm.FIGHT_CLAMP - 0.02) / (tm.FIGHT_CUT - tm.FIGHT_CLAMP - 0.02))
+        gulp = 0.7 * bump(1.72, 2.0)
+        pried = f * (2.0 + 2.5 * max(0.0, beat))
+        angle = (42 + (bite - 42) * down - bite * squeeze + pried + 8 * regrab) * (1 - shut) + 5 * gulp
+        # working its way out (2 is the fish's middle at the lips), then caught again a little deeper: the lips come
+        # down on the fish just in front of its middle, where the remains' bitten end is
+        slide = 2.0 - 0.9 * tm.fight(t) * (1 - ease((t - tm.FIGHT_CLAMP + 0.14) / 0.14)) + 0.65 * ease((t - tm.FIGHT_CLAMP + 0.14) / 0.14)
+        shake = 13 * math.sin(2 * math.pi * (t - 0.3) / 0.4) * ease((t - 0.3) / 0.1) * (1 - ease((t - 0.62) / 0.1))
+        lunge = bump(tm.FIGHT_CLAMP - 0.16, tm.FIGHT_CUT + 0.25)
+        recoil = bump(tm.FIGHT_CUT, tm.FIGHT_CUT + 0.3)                      # the head tossed up as the jaws meet
+        p = rot(barbel_sway(t, wave_pose(t, 0.6 + 0.5 * f, 2 * math.pi / 1.3), 0.6))
+        p['jaw'] = {'rotation': [0.8 * angle, 0, 0]}
+        p['head'] = {'rotation': [-0.2 * angle - 4 * gulp - 2.2 * f * beat - 5 * recoil, p['head']['rotation'][1] + shake, 1.5 * f * beat]}
+        seen = 1.0 if t < tm.FIGHT_CUT else 0.0                   # the front half falls away as the remains
+        p['prey'] = {'rotation': [0.4 * angle, 0, 0], 'position': [0, 0, slide], 'scale': [seen, seen, seen]}
+        p['body'] = {'rotation': [0, 0, 0], 'position': [0, 0.35 * f * beat, -4 * (1 - ease(t / 0.5)) - 1.8 * lunge - 1.0 * gulp]}
+        for s, side in ((1, 'left'), (-1, 'right')):              # the side fins braced out against the pull
+            r = p[f'pectoral_{side}']['rotation']
+            p[f'pectoral_{side}'] = {'rotation': [r[0], r[1] - s * 16 * max(f, lunge), r[2]]}
         return p
 
     lie = 1.4
@@ -476,8 +508,8 @@ def clips():
     return {'idle': tm.clip(4.0, idle, 40), 'swim': tm.clip(swim_len, swim, 24),
             'strike': tm.clip(1.0, strike, 30, False), 'catch': tm.clip(CATCH_LEN, lambda t: catch(t, BITE), 52, 'hold'),
             'catch_small': tm.clip(CATCH_LEN, lambda t: catch(t, BITE_SMALL), 52, 'hold'),
-            'bite_off': tm.clip(CUT_LEN, lambda t: catch(t, BITE, True), 42, 'hold'),
-            'bite_off_small': tm.clip(CUT_LEN, lambda t: catch(t, BITE_SMALL, True), 42, 'hold'), 'flop': tm.clip(0.8, flop, 16),
+            'bite_off': tm.clip(CUT_LEN, lambda t: catch(t, BITE, True), 84, 'hold'),
+            'bite_off_small': tm.clip(CUT_LEN, lambda t: catch(t, BITE_SMALL, True), 84, 'hold'), 'flop': tm.clip(0.8, flop, 16),
             'death': tm.clip(1.2, death, 12, 'hold')}
 
 

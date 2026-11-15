@@ -53,6 +53,9 @@ public class RemainsRenderer extends GeoEntityRenderer<RemainsEntity> {
     protected void applyRotations(RemainsEntity remains, PoseStack poseStack, float ageInTicks, float rotationYaw,
             float partialTick, float nativeScale) {
         super.applyRotations(remains, poseStack, ageInTicks, rotationYaw, partialTick, nativeScale);
+        // lying along its own heading (2026-11-15: remains are no living thing, so the renderer turned them all to face
+        // south whatever way they were left; a bitten-off half fell away turned across the fish it came from)
+        poseStack.mulPose(com.mojang.math.Axis.YP.rotationDegrees(-remains.getYRot()));
         float scale = (remains.kind() == RemainsEntity.Kind.TILAPIA || remains.kind() == RemainsEntity.Kind.TILAPIA_HALF ? TilapiaRenderer.SCALE : CatfishRenderer.SCALE) * remains.size();
         poseStack.scale(scale, scale, scale);
     }

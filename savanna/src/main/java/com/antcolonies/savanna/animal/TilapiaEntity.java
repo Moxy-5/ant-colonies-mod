@@ -132,10 +132,16 @@ public class TilapiaEntity extends AbstractSchoolingFish implements GeoEntity {
 
     /** Drawn in a catfish's mouth (client only, {@link CatfishEntity#heldDrawn}): it plays its "caught" clip. */
     private boolean caught;
+    /** Drawn in a catfish's mouth on a catch that ends bitten in two: it plays "caught_fight" once, beside the catfish's "bite_off". */
+    private boolean fighting;
 
-    /** Makes this a fish to draw in a catfish's mouth (client only, in no world): this look, this size, thrashing. */
-    void showCaught(int look, float size) {
+    /**
+     * Makes this a fish to draw in a catfish's mouth (client only, in no world): this look, this size, thrashing;
+     * fighting: the catch ends bitten in two, so it fights harder and harder until the jaws come down (the user, 2026-11-15).
+     */
+    void showCaught(int look, float size, boolean fighting) {
         caught = true;
+        this.fighting = fighting;
         entityData.set(DATA_LOOK, look);
         AttributeInstance scale = getAttribute(Attributes.SCALE);
         if (scale != null) {
@@ -366,6 +372,7 @@ public class TilapiaEntity extends AbstractSchoolingFish implements GeoEntity {
     private static final RawAnimation GRAZE = RawAnimation.begin().thenLoop("graze");
     private static final RawAnimation FLOP = RawAnimation.begin().thenLoop("flop");
     private static final RawAnimation CAUGHT = RawAnimation.begin().thenLoop("caught");
+    private static final RawAnimation CAUGHT_FIGHT = RawAnimation.begin().thenPlayAndHold("caught_fight");
     private static final RawAnimation DEATH =RawAnimation.begin().thenPlayAndHold("death");
     /** The swim clip's beat is made for this speed (blocks a tick, about 1.2 a second); it plays faster or slower by it. */
     static final double SWIM_CLIP_SPEED = 0.06;
@@ -377,6 +384,10 @@ public class TilapiaEntity extends AbstractSchoolingFish implements GeoEntity {
 
     private PlayState animate(AnimationState<TilapiaEntity> state) {
         AnimationController<TilapiaEntity> player = state.getController();
+        if (caught && fighting) {
+            player.setAnimationSpeed(1.0);
+            return state.setAndContinue(CAUGHT_FIGHT);
+        }
         if (caught || getVehicle() instanceof CrocodileEntity) {     // in a catfish's mouth, or held in a crocodile's jaws
             player.setAnimationSpeed(1.0);
             return state.setAndContinue(CAUGHT);

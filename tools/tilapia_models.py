@@ -370,6 +370,38 @@ def wave_pose(t, amount, beat, curl=0):
     return out
 
 
+# The fight in a catfish's mouth (the user, 2026-11-15; the tilapia's 'caught_fight' and the catfish's 'bite_off' are
+# made from the same clock, so the catfish's head is jolted by the very beats the tilapia makes): the tilapia thrashes
+# as in 'caught' until FIGHT_AT, fights harder and harder until the jaws start down on it at FIGHT_CLAMP, and is bitten
+# through at FIGHT_CUT (seconds; CatfishEntity.CUT_AT_TICK and CUT_TICKS are FIGHT_CUT and FIGHT_LEN in ticks).
+FIGHT_AT, FIGHT_CLAMP, FIGHT_CUT, FIGHT_LEN = 0.7, 1.4, 1.5, 2.1
+
+
+def _ease(x):
+    x = max(0.0, min(1.0, x))
+    return x * x * (3 - 2 * x)
+
+
+def fight(t):
+    """How hard the held tilapia fights at t, 0 (the usual thrash) to 1 (all it has)."""
+    return _ease((t - FIGHT_AT) / 0.45)
+
+
+def fight_stiff(t):
+    """The held tilapia going stiff as the jaws come down on it, 0 to 1."""
+    return _ease((t - FIGHT_CLAMP + 0.07) / (FIGHT_CUT - FIGHT_CLAMP + 0.05))     # straight a moment before the cut: the remains lie straight
+
+
+def fight_phase(t):
+    """The thrash's angle at t: a beat every 0.25 s at first, every 0.15 s in the full fight; worked out by adding the
+    beats up, so the thrash speeds up with no jump."""
+    steps = max(1, int(t / 0.005))
+    dt, ph = t / steps, 0.0
+    for k in range(steps):
+        ph += dt * 2 * math.pi / (0.25 - 0.10 * fight((k + 0.5) * dt))
+    return ph
+
+
 def clip(length, pose_at, steps, loop=True):
     """A clip from pose_at(t) -> {bone: {'rotation': [..], 'position': [..]}} sampled at steps + 1 times."""
     bones = {}
@@ -436,6 +468,27 @@ def clips():
             p[name] = {'rotation': [0, 2.5 * math.sin(w * t - 0.5 * i), 0]}
         return p
 
+    def caught_fight(t):
+        """The catch that ends bitten in two (the user, 2026-11-15: "the tilapia fights more and wiggles so the catfish
+        closes early"): held like 'caught' at first, then from FIGHT_AT it fights for its life, the thrash faster and
+        wider beat by beat, the body twisting about its length, the side fins spread; as the jaws come down on it
+        (FIGHT_CUT) it goes stiff and straight, quivering. Played once beside the catfish's 'bite_off'."""
+        f, stiff = fight(t), fight_stiff(t)
+        ph = fight_phase(t)
+        live = 1 - 0.94 * stiff
+        swing = (15 + 13 * f) * math.sin(ph) * live
+        p = rot_only(wave_pose(t, 1.0, 2 * math.pi / 0.25))
+        p['body'] = {'rotation': [0, swing, 11 * f * math.sin(0.5 * ph + 0.7) * live]}     # the twist
+        p['mid'] = {'rotation': [0, -swing, 0]}
+        p['front'] = {'rotation': [0, (7 + 6 * f) * math.sin(ph - 0.6) * live, 0]}
+        p['head'] = {'rotation': [0, (9 + 8 * f) * math.sin(ph - 1.2) * live, 0]}
+        for i, name in enumerate(('rear', 'peduncle', 'tail')):
+            p[name] = {'rotation': [0, (2.5 + 2.5 * f) * math.sin(ph - 0.5 * i) * live, 0]}
+        flare = max(f, stiff)
+        for s, side in ((1, 'left'), (-1, 'right')):       # the side fins spread wide, fluttering
+            p[f'pectoral_{side}'] = {'rotation': [0, s * (34 * flare + 9 * (1 - stiff) * math.sin(2 * ph + s)), 0]}
+        return p
+
     def death(t):
         f = min(1.0, t / 0.8)
         f = f * f * (3 - 2 * f)
@@ -444,7 +497,8 @@ def clips():
         return p
 
     return {'idle': clip(2.0, idle, 24), 'swim': clip(swim_len, lambda t: rot_only(wave_pose(t, 1.0, beat)), 18),
-            'graze': clip(1.8, graze, 36), 'flop': clip(0.6, flop, 12), 'caught': clip(0.5, caught, 20), 'death': clip(1.2, death, 12, 'hold')}
+            'graze': clip(1.8, graze, 36), 'flop': clip(0.6, flop, 12), 'caught': clip(0.5, caught, 20),
+            'caught_fight': clip(FIGHT_LEN, caught_fight, 84, 'hold'), 'death': clip(1.2, death, 12, 'hold')}
 
 
 def write_game():

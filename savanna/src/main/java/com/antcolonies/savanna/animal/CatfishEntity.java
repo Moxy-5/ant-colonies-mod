@@ -61,13 +61,16 @@ public class CatfishEntity extends AbstractFish implements GeoEntity {
      */
     static final int HOLD_TICKS = 52, GULP_AT = 44;
     /**
-     * The bite-off (the user, 2026-11-15): on this share of its catches the mouth shuts early, at the first gulp, biting
-     * the tilapia through; the front half, still out of the mouth, falls away as remains ({@link RemainsEntity.Kind#TILAPIA_HALF}).
+     * The bite-off (the user, 2026-11-15): on this share of its catches the tilapia fights harder and harder (its clip
+     * "caught_fight"), working itself a little way out, and the catfish lunges, takes a new hold and bites it through at
+     * its middle; the front half falls away as remains ({@link RemainsEntity.Kind#TILAPIA_HALF}).
      * The clip "bite_off" is {@link #CUT_TICKS} long and its jaws close through the fish at {@link #CUT_AT_TICK}
-     * ({@code tools/catfish_models.py}, CUT_AT and CUT_LEN).
+     * ({@code tools/catfish_models.py}, CUT_AT and CUT_LEN, 30 and 42 ticks), each {@link #CLIP_LAG} later: the clip
+     * starts once the animation player has blended into it, so the remains appear on the tick the jaws are seen to meet
+     * (filmed, {@code tools/film/catch_fight.film}: without it the front half fell away from a mouth still open).
      */
     static final float BITE_OFF_CHANCE = 0.5F;
-    static final int CUT_TICKS = 42, CUT_AT_TICK = 30;
+    static final int CLIP_LAG = 4, CUT_TICKS = 42 + CLIP_LAG, CUT_AT_TICK = 30 + CLIP_LAG;
 
     private static final EntityDataAccessor<Boolean> DATA_STRIKING = SynchedEntityData.defineId(CatfishEntity.class, EntityDataSerializers.BOOLEAN);
     /** The look of the tilapia held in its mouth ({@link TilapiaEntity#look()}), or -1 with nothing held; and its size. */
@@ -164,7 +167,7 @@ public class CatfishEntity extends AbstractFish implements GeoEntity {
         Vec3 m = mouth();
         float yaw = getYRot() * Mth.DEG_TO_RAD;
         double ahead = 0.12 * entityData.get(DATA_HELD_SIZE);      // the half's middle, a little in front of the lips
-        Vec3 at = new Vec3(m.x - Mth.sin(yaw) * ahead, m.y - 0.05, m.z + Mth.cos(yaw) * ahead);
+        Vec3 at = new Vec3(m.x - Mth.sin(yaw) * ahead, m.y - 0.05 - 0.08 * entityData.get(DATA_HELD_SIZE), m.z + Mth.cos(yaw) * ahead);
         RemainsEntity left = RemainsEntity.leave(server, RemainsEntity.Kind.TILAPIA_HALF, at, getYRot(), entityData.get(DATA_HELD_SIZE));
         if (left != null) {
             left.setDeltaMovement(getDeltaMovement().scale(0.3).add(0, -0.02, 0));
@@ -186,7 +189,7 @@ public class CatfishEntity extends AbstractFish implements GeoEntity {
         }
         if (heldDrawn == null) {
             heldDrawn = new TilapiaEntity(com.antcolonies.savanna.registry.SavannaEntities.TILAPIA.get(), level());
-            heldDrawn.showCaught(look, entityData.get(DATA_HELD_SIZE));
+            heldDrawn.showCaught(look, entityData.get(DATA_HELD_SIZE), heldCut());
         }
         heldDrawn.tickCount = tickCount;
         return heldDrawn;
