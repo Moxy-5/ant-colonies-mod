@@ -551,8 +551,8 @@ public class RiverLifeTests {
     }
 
     /**
-     * The hunt (2026-11-15): a hungry crocodile in the pond and a cow standing at the water's edge on the bank. Its
-     * first strike is made to miss: the cow is not held and the crocodile is back in the water, not hunting. Then the
+     * The hunt (2026-11-15): a hungry crocodile in the pond and a cow standing at the water's edge on the bank. The
+     * first time the cow is made to slip free of the haul: it lives, and the crocodile is back in the water, not hunting. Then the
      * crocodile creeps up, strikes and grabs the cow, hauls it backward into the water (the cow is in the water before
      * the first roll, and the crocodile was moved toward the water while it held it) and death-rolls it until it dies, then is
      * fed and hunts no more. A chicken put at the edge after that is left alone (fed), and once hungry again it is
@@ -587,10 +587,10 @@ public class RiverLifeTests {
             switch (stage[0]) {
                 case 0 -> {
                     if (!missed[0]) {
-                        helper.assertTrue(!croc.holds(cow) && cow.isAlive(), "a strike that misses took the cow");
+                        helper.assertTrue(cow.isAlive(), "the cow that was to slip free died");
                         if (croc.misses > 0 && croc.isInWater() && now - at[0] > 100) {
-                            helper.assertTrue(!croc.isHungry() || croc.held() == null, "after a miss the crocodile holds something");
-                            SavannaMod.LOGGER.info("[crocodile] missed the cow and was back in the water at tick {}", now);
+                            helper.assertTrue(croc.held() == null && cow.getVehicle() == null, "the cow slipped free but is still in the crocodile's jaws");
+                            SavannaMod.LOGGER.info("[crocodile] the cow slipped free and the crocodile was back in the water at tick {}", now);
                             missed[0] = true;
                             croc.strikeLuck = 1;
                             croc.makeHungry();

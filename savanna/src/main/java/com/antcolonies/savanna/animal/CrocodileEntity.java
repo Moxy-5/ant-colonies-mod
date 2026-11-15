@@ -83,8 +83,11 @@ public class CrocodileEntity extends PathfinderMob implements GeoEntity {
      * it at this pace, striking from this near; then it hauls the animal back to the water, heave by heave.
      */
     static final double CHARGE_REACH = 6.0, CHARGE_PACE = 1.7, STRIKE_REACH = 1.4;
-    /** One strike in four misses (the user's number): the jaws snap shut on air, the animal leaps back, the crocodile goes back into the water. */
-    static final float MISS_SHARE = 0.25F;
+    /**
+     * One big animal in four slips free while it is hauled down the bank (the user's number and pick, 2026-11-15, in
+     * place of a strike that misses): after 1 to 4 heaves (or at the water's edge, if it is there sooner) it tears loose and bolts, and the crocodile goes back into the water.
+     */
+    static final float SLIP_SHARE = 0.25F;
     /**
      * The tug of war on the bank: one heave every this many ticks. Of 20 heaves about 12 gain ground (this far for a
      * cow-sized animal, less for a heavier one), 5 gain nothing (the animal digs in), 3 lose ground (it drags the
@@ -173,9 +176,9 @@ public class CrocodileEntity extends PathfinderMob implements GeoEntity {
     private double heldY = Double.NaN;
     /** Whether it is in a hunt now (a player near does not frighten it off the bank then). */
     boolean hunting;
-    /** For tests and films: 1 its strikes never miss, -1 they always miss, 0 the dice ({@link #MISS_SHARE}). */
+    /** For tests and films: 1 its hauled prey never slips free, -1 it always does, 0 the dice ({@link #SLIP_SHARE}). */
     public byte strikeLuck;
-    /** For tests: how many strikes it has missed. */
+    /** For tests: how many animals have got away from it (slipped free of the haul, or a strike that fell short). */
     public int misses;
 
     public CrocodileEntity(EntityType<? extends CrocodileEntity> type, Level level) {
@@ -1037,7 +1040,7 @@ public class CrocodileEntity extends PathfinderMob implements GeoEntity {
      * ridden) at the water's edge or swimming within {@link #HUNT_REACH} blocks, and creeps up to the water nearest it with
      * only its eyes out. From {@link #LUNGE_REACH} blocks it lunges with its mouth wide and, if its jaws reach, grabs;
      * a big animal up on the bank it rushes out of the water at ({@link #CHARGE_REACH}) and strikes from close. One
-     * strike in four misses ({@link #MISS_SHARE}): the animal leaps back and the crocodile goes back into the water.
+     * hauled animal in four slips free on the bank ({@link #SLIP_SHARE}) and the crocodile goes back into the water.
      * Something small (a chicken, a rabbit, a calf) it shakes and swallows whole. Anything bigger it hauls back into the
      * water, a tug of war heave by heave while the animal digs in ({@code haul}), swims it out and death-rolls, spinning round its spine with the prey in its jaws, again and again with pauses under the
      * water, until the prey dies (or fights free, {@link #ESCAPE_HURT}); then it tears at the kill a few seconds (what the
@@ -1057,6 +1060,8 @@ public class CrocodileEntity extends PathfinderMob implements GeoEntity {
         private boolean hauling;
         private double pull;
         private int hauled;
+        /** The heave at which this animal slips free (0: it does not). */
+        private int slipAt;
 
         HuntGoal(CrocodileEntity croc) {
             this.croc = croc;
@@ -1113,12 +1118,7 @@ public class CrocodileEntity extends PathfinderMob implements GeoEntity {
                     t++;
                     face(prey);
                     if (prey.isAlive() && prey.getBoundingBox().inflate(0.7, 0.9, 0.7).contains(croc.jawPoint())) {
-                        boolean miss = croc.strikeLuck < 0 || croc.strikeLuck == 0 && croc.getRandom().nextFloat() < MISS_SHARE;
-                        if (miss) {
-                            miss(true);
-                        } else {
-                            grab();
-                        }
+                        grab();
                     } else if (t > 15) {
                         miss(false);
                     }
@@ -1204,14 +1204,17 @@ public class CrocodileEntity extends PathfinderMob implements GeoEntity {
         }
 
         /**
-         * A miss: the jaws snap shut on air. An animal they nearly had leaps back from them (and knows what went for it,
-         * so it bolts); the crocodile turns back to the water and does not hunt again for half a minute.
+         * The prey got away: a strike that fell short ({@code slipped} false), or an animal that tore itself out of the
+         * jaws while it was hauled down the bank (it is thrown back a step from the crocodile and knows what had it, so
+         * it bolts). The crocodile turns back to the water and does not hunt again for half a minute.
          */
-        private void miss(boolean near) {
+        private void miss(boolean slipped) {
             croc.misses++;
             croc.playSound(net.minecraft.sounds.SoundEvents.EVOKER_FANGS_ATTACK, 1.2F, 1.1F);
-            if (near) {
-                prey.knockback(0.6, croc.getX() - prey.getX(), croc.getZ() - prey.getZ());
+            if (slipped) {
+                croc.release();
+                hauling = false;
+                prey.knockback(0.8, croc.getX() - prey.getX(), croc.getZ() - prey.getZ());
                 prey.hurtMarked = true;
                 prey.setLastHurtByMob(croc);
             }
@@ -1243,6 +1246,10 @@ public class CrocodileEntity extends PathfinderMob implements GeoEntity {
                 dz = aim.getZ() + 0.5 - croc.getZ();
                 len = Math.sqrt(dx * dx + dz * dz);
             }
+            if (slipAt > 0 && prey.isInWater()) {
+                miss(true);     // one that was to slip free and is at the water already (seized right at the edge): it tears loose there
+                return;
+            }
             if (len < 0.5 || hauled > 600 || prey.isInWater() && deepEnough()) {
                 hauling = false;
                 t = 0;
@@ -1265,6 +1272,10 @@ public class CrocodileEntity extends PathfinderMob implements GeoEntity {
                 speed = HAUL_AFLOAT;
             } else {
                 int beat = hauled % HEAVE_TICKS;
+                if (beat == 1 && slipAt > 0 && hauled / HEAVE_TICKS >= slipAt) {
+                    miss(true);         // it wrenches its head out of the jaws as the crocodile gathers itself for the next heave
+                    return;
+                }
                 if (beat == 1) {
                     float dice = croc.getRandom().nextFloat();
                     // a heavier animal gives less ground (a cow 0.7 of the gain, a horse half, a pig all of it)
@@ -1332,6 +1343,8 @@ public class CrocodileEntity extends PathfinderMob implements GeoEntity {
                 hauling = ashore;       // seized on the bank: hauled back to the water; seized swimming: carried straight out
                 hauled = 0;
                 pull = 0.0;
+                boolean slips = croc.strikeLuck < 0 || croc.strikeLuck == 0 && croc.getRandom().nextFloat() < SLIP_SHARE;
+                slipAt = ashore && slips ? 1 + croc.getRandom().nextInt(4) : 0;
             }
         }
 
