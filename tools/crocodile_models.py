@@ -1,319 +1,249 @@
-"""The Nile crocodile (M9 river life, the river's top hunter: algae -> tilapia -> catfish -> crocodile), its model and
-three looks for the user to pick in the model viewer (python tools/model_viewer.py crocodile).
+"""The Nile crocodile (M9 river life, the river's top hunter: algae -> tilapia -> catfish -> crocodile), its model for
+the model viewer (python tools/model_viewer.py crocodile).
 
-From the user's inspiration picture (2026-11-15, a blocky Nile crocodile on a sandy bank) and the real animal, fun first
-(animals are generalized, CLAUDE.md):
-- A long, low body: a long flat snout with a raised nostril bump at the tip, a skull table with the eyes in raised
-  turrets on top (so it can lie with only eyes and nostrils above the water), rows of white teeth showing along both
-  jaws with the big fourth lower tooth outside the upper jaw, a lower jaw hinged far back so it gapes wide.
-- Armour: a cluster of nuchal scutes behind the head, keeled scutes in rows across the back, a double crest down the
-  tail that joins into one toward the tip.
-- Short sprawling legs, five fingers in front, four webbed toes behind, dark claws; the legs out to the side at rest
-  (lying on the bank), lifted under the body for the high walk.
-- Not rigid: head, neck, two trunk bones and five tail bones in a chain, the jaw its own bone, each leg three bones, so
-  it can swim with its tail, walk, gape and roll.
+Started over on 2026-11-15 from the user's picture (a blocky Minecraft Nile crocodile on a sandy bank; the first model,
+slim and finely sliced, was "fine, just not what I'm looking for"). Fun first, it only has to look good in the game
+(animals are generalized, CLAUDE.md). What the picture shows, and so what this is:
+- Chunky and built of big cubes: about 25 cubes long, 6 wide, 4 tall. Everything here is measured in those cubes
+  ("voxels", V model pixels each), and the texture is one flat colour a cube face, in a loose checker of olives.
+- A big boxy head: a broad blunt snout with a raised nostril block on its tip, a taller skull with a brow block over
+  each yellow, slit-pupilled eye, a few big white teeth hanging from the upper jaw, a cream lower jaw, a red mouth.
+- A thick body with rows of raised square scutes down the back, a long tapering tail with a double row of scutes that
+  joins into one, a tan stripe low along the side.
+- Short thick sprawling legs with big feet and white claws.
+- Not rigid: head, neck, chest, hips and five tail bones in a chain, the jaw its own bone, each leg three bones.
 
-Looks (my picks): A olive-bronze with dark bands (the user's picture), B an old dark male, C a young one, bright and
-boldly banded.
 Units are model pixels (16 a block), the head points to -Z, up is +Y, left is +X; y = 0 is the ground it lies on.
 """
 import copy
-import math
 import random
 
-from tilapia_models import curve, cube, mix, shade, faces, face_point, png
-from catfish_models import vnoise
+from tilapia_models import cube, mix, shade, faces, face_point, png  # noqa: F401 (png for the viewer)
 
-TEXELS = 1.0          # texture pixels a model pixel
-SNOUT, TAIL_END = -34.0, 34.0
-SPLIT = 2.6           # the mouth line, where the lower jaw parts from the head
-HINGE = -21.5         # the jaw's hinge, behind the eyes
-BELLY = 0.6           # lying on the bank, the belly just off the ground
+V = 2.0               # model pixels a voxel
+TEXELS = 1.0          # texture pixels a model pixel (so a voxel face is 2 x 2 texture pixels of one colour)
+SNOUT, HINGE, NECK, TAIL_END = -12.0, -6.0, -6.0, 13.0     # voxels
+SPLIT = 1.5           # the mouth line (voxels up)
 
-CHAIN = [('head', 'body', SNOUT, -22.0), ('neck', 'body', -22.0, -17.0), ('chest', 'body', -17.0, -7.0),
-         ('hips', 'chest', -7.0, 3.0), ('tail1', 'hips', 3.0, 9.0), ('tail2', 'tail1', 9.0, 15.0),
-         ('tail3', 'tail2', 15.0, 21.0), ('tail4', 'tail3', 21.0, 27.0), ('tail5', 'tail4', 27.0, TAIL_END)]
 # The swim wave (shared with the viewer): bone, parent, how far it swings, how late (radians).
 WAVE = [('neck', 'body', -0.03, 0.0), ('chest', 'body', 0.02, 0.5), ('hips', 'chest', 0.05, 1.0),
         ('tail1', 'hips', 0.12, 1.6), ('tail2', 'tail1', 0.2, 2.2), ('tail3', 'tail2', 0.28, 2.8),
         ('tail4', 'tail3', 0.36, 3.4), ('tail5', 'tail4', 0.44, 4.0)]
 
-# Profiles along the body, by z: top (y), bottom (y), half-width.
-TOP = [(-34, 3.5), (-30, 3.8), (-26, 4.5), (-23, 5.3), (-20, 5.9), (-15, 6.8), (-8, 7.5), (-2, 7.4), (3, 6.7),
-       (10, 5.6), (18, 4.5), (26, 3.4), (34, 2.4)]
-BOT = [(-34, 1.4), (-28, 1.1), (-22, 0.9), (-17, BELLY), (0, BELLY), (3, 0.7), (10, 0.9), (20, 1.2), (34, 1.5)]
-WIDE = [(-34, 1.75), (-32, 1.95), (-30, 1.85), (-26, 2.5), (-23, 3.3), (-21, 3.2), (-17, 4.1), (-9, 5.3), (-3, 5.1),
-        (3, 4.2), (10, 3.0), (18, 2.0), (26, 1.2), (34, 0.45)]
+# The trunk and tail: bone, parent, z from, z to, half-width, bottom, top (voxels).
+TRUNK = [('neck', 'body', -6.0, -4.0, 2.0, 0.5, 3.25),
+         ('chest', 'body', -4.0, -2.5, 2.5, 0.5, 3.75), ('chest', 'body', -2.5, 0.0, 3.0, 0.5, 4.0),
+         ('hips', 'chest', 0.0, 2.0, 3.0, 0.5, 4.0), ('hips', 'chest', 2.0, 3.5, 2.5, 0.5, 3.75),
+         ('tail1', 'hips', 3.5, 5.5, 2.0, 0.5, 3.25), ('tail2', 'tail1', 5.5, 7.5, 1.5, 0.5, 2.75),
+         ('tail3', 'tail2', 7.5, 9.5, 1.0, 0.6, 2.25), ('tail4', 'tail3', 9.5, 11.5, 0.75, 0.7, 1.8),
+         ('tail5', 'tail4', 11.5, 13.0, 0.5, 0.8, 1.45)]
 
 
-def prof(points, z):
-    if z <= points[0][0]:
-        return points[0][1]
-    for (z0, v0), (z1, v1) in zip(points, points[1:]):
-        if z <= z1:
-            return curve([(0, v0), (1, v1)], (z - z0) / (z1 - z0))
-    return points[-1][1]
+def box(bones, name, x0, y0, z0, x1, y1, z1, part):
+    """A box given in voxels."""
+    bones[name].append(cube([x0 * V, y0 * V, z0 * V], [x1 * V, y1 * V, z1 * V], part))
 
 
-def at(z):
-    return prof(TOP, z), prof(BOT, z), prof(WIDE, z)
+def both(bones, name, x0, y0, z0, x1, y1, z1, part):
+    """The same box on the left and on the right."""
+    box(bones, name, x0, y0, z0, x1, y1, z1, part)
+    box(bones, name, -x1, y0, z0, -x0, y1, z1, part)
 
 
-def owner(z):
-    for name, _, z0, z1 in CHAIN:
-        if z0 <= z < z1:
-            return name
-    return 'tail5'
+def head(bones):
+    # the upper jaw and skull
+    box(bones, 'head', -1.5, SPLIT, -12, 1.5, 2.5, -8, 'skin')            # the broad blunt snout
+    box(bones, 'head', -1.0, 2.5, -12, 1.0, 3.0, -11, 'skin')             # the nostril block on its tip
+    both(bones, 'head', 0.2, 3.0, -11.75, 0.7, 3.04, -11.25, 'nostril')
+    box(bones, 'head', -1.25, 2.5, -9, 1.25, 2.9, -8, 'skin')             # the step up to the skull
+    box(bones, 'head', -2.0, SPLIT, -8, 2.0, 3.25, HINGE, 'skin')         # the skull
+    both(bones, 'head', 0.75, 3.25, -7.75, 2.0, 3.9, -6.5, 'brow')        # a brow block over each eye
+    both(bones, 'head', 2.0, 2.5, -7.6, 2.04, 3.25, -6.6, 'iris')
+    both(bones, 'head', 2.04, 2.5, -7.25, 2.07, 3.25, -6.95, 'pupil')
+    # the lower jaw, hinged at the back of the skull
+    box(bones, 'jaw', -1.4, 0.75, -12, 1.4, SPLIT, -8, 'jaw')
+    box(bones, 'jaw', -1.9, 0.6, -8, 1.9, SPLIT, HINGE, 'jaw')
+    # a few big teeth: the upper ones hang down outside the lower jaw, the lower ones stand up inside the mouth
+    for z in (-11.9, -10.6, -9.3):
+        both(bones, 'head', 1.2, 0.85, z, 1.55, SPLIT, z + 0.5, 'tooth')
+    both(bones, 'head', 1.7, 0.85, -7.5, 2.05, SPLIT, -7.0, 'tooth')
+    both(bones, 'head', 0.3, 0.85, -12.05, 0.8, SPLIT, -11.7, 'tooth')
+    for z in (-11.2, -9.9, -8.7):
+        both(bones, 'jaw', 0.75, SPLIT, z, 1.15, 2.05, z + 0.45, 'tooth')
+    both(bones, 'jaw', 1.2, SPLIT, -7.9, 1.6, 2.0, -7.45, 'tooth')
+    both(bones, 'jaw', 0.15, SPLIT, -11.8, 0.6, 2.0, -11.4, 'tooth')
+    # inside the mouth, seen when it gapes: a red palate, a red floor and a paler tongue
+    box(bones, 'head', -1.3, SPLIT - 0.04, -11.8, 1.3, SPLIT, -8, 'mouth')
+    box(bones, 'head', -1.8, SPLIT - 0.04, -8, 1.8, SPLIT, HINGE, 'mouth')
+    box(bones, 'jaw', -1.2, SPLIT, -11.8, 1.2, SPLIT + 0.04, -8, 'mouth')
+    box(bones, 'jaw', -1.7, SPLIT, -8, 1.7, SPLIT + 0.04, HINGE, 'mouth')
+    box(bones, 'jaw', -0.75, SPLIT, -10.5, 0.75, SPLIT + 0.3, -6.3, 'tongue')
 
 
-def body_slices(bones):
-    """Rounded slices, each a narrow full-height box and a wide lower one (a broad back, a flat belly). In the head every
-    slice is cut at the mouth line, the lower part going to the jaw; the jaw runs back to its hinge."""
-    for name, _, z0, z1 in CHAIN:
-        step = 1.0 if name == 'head' else 1.25 if name == 'neck' else 2.0
-        n = max(1, round((z1 - z0) / step))
-        for i in range(n):
-            a, b = z0 + (z1 - z0) * i / n, z0 + (z1 - z0) * (i + 1) / n
-            top, bot, w = at((a + b) / 2)
-            part = 'head' if name == 'head' else 'body'
-            for hw, k in ((w * 0.72, 1.0), (w, 0.72)):
-                lo, hi = bot, bot + (top - bot) * k
-                if name == 'head' or (name == 'neck' and b <= HINGE + 1e-6):
-                    if hi > SPLIT:
-                        bones['head'].append(cube([-hw, SPLIT, a], [hw, hi, b], 'head'))
-                    bones['jaw'].append(cube([-hw * 0.96, lo, a], [hw * 0.96, SPLIT, b], 'jaw'))
-                else:
-                    bones[name].append(cube([-hw, lo, a], [hw, hi, b], part))
-
-
-def head_parts(bones):
-    h, j = bones['head'], bones['jaw']
-    # the nostril bump on the snout's tip, two dark nostrils on it
-    top = at(-32.5)[0]
-    h.append(cube([-1.0, top - 0.1, -33.6], [1.0, top + 0.55, -31.6], 'head'))
-    for s in (1, -1):
-        x0, x1 = sorted([s * 0.25, s * 0.75])
-        h.append(cube([x0, top + 0.55, -33.1], [x1, top + 0.6, -32.5], 'nostril'))
-    # the skull table and the eye turrets: raised, so it can lie with only these above the water
-    top = at(-24.5)[0]
-    h.append(cube([-2.6, top - 0.2, -26.0], [2.6, top + 0.35, -21.6], 'head'))
-    for s in (1, -1):
-        x0, x1 = sorted([s * 0.7, s * 2.5])
-        h.append(cube([x0, top + 0.2, -25.9], [x1, top + 1.6, -23.2], 'brow'))
-        x0, x1 = sorted([s * 2.45, s * 2.62])
-        h.append(cube([x0, top + 0.35, -25.5], [x1, top + 1.4, -23.6], 'iris'))
-        x0, x1 = sorted([s * 2.55, s * 2.66])
-        h.append(cube([x0, top + 0.4, -24.75], [x1, top + 1.35, -24.4], 'pupil'))
-    # teeth: the upper row down over the lower jaw's edge, the lower row up inside them, the big fourth lower tooth
-    # standing up outside the upper jaw in its notch
-    z = -33.4
-    while z < -23.5:
-        w = at(z + 0.2)[2]
-        for s in (1, -1):
-            x0, x1 = sorted([s * (w + 0.12), s * (w - 0.3)])
-            h.append(cube([x0, SPLIT - 0.95, z], [x1, SPLIT, z + 0.5], 'tooth'))
-        z += 1.15
-    z = -32.8
-    while z < -24.0:
-        w = at(z + 0.2)[2] * 0.96
-        for s in (1, -1):
-            x0, x1 = sorted([s * (w / 0.96 + 0.1), s * (w / 0.96 - 0.3)])
-            j.append(cube([x0, SPLIT, z], [x1, SPLIT + 0.8, z + 0.45], 'tooth'))
-        z += 1.15
-    w = at(-30.6)[2]
-    for s in (1, -1):
-        x0, x1 = sorted([s * (w - 0.2), s * (w + 0.25)])
-        j.append(cube([x0, SPLIT - 0.2, -31.0], [x1, SPLIT + 1.3, -30.3], 'tooth'))
-    # the inside of the mouth: a pale floor and a fleshy palate, seen when it gapes
-    for z0, z1 in ((-33.0, -28.0), (-28.0, -23.0)):
-        w = at((z0 + z1) / 2)[2] * 0.82
-        j.append(cube([-w, SPLIT, z0], [w, SPLIT + 0.05, z1], 'mouth'))
-        h.append(cube([-w, SPLIT - 0.05, z0], [w, SPLIT, z1], 'mouth'))
+def trunk(bones):
+    for name, _, z0, z1, hw, bot, top in TRUNK:
+        shoulder = 0.75 if hw >= 2.0 else 0.5 if hw >= 1.0 else 0.25
+        box(bones, name, -hw, bot, z0, hw, top - shoulder, z1, 'skin')             # the wide lower part
+        box(bones, name, -(hw - shoulder * 0.67), top - shoulder, z0, hw - shoulder * 0.67, top, z1, 'skin')   # the back
 
 
 def scutes(bones):
-    """The armour: nuchal scutes behind the head, rows of keeled scutes across the back, a double crest down the tail
-    joining into one."""
-    for x, z in ((1.0, -20.9), (-1.0, -20.9), (1.0, -19.5), (-1.0, -19.5), (2.5, -20.2), (-2.5, -20.2)):
-        top = at(z)[0]
-        bones[owner(z)].append(cube([x - 0.6, top - 0.1, z - 0.6], [x + 0.6, top + 0.75, z + 0.6], 'scute'))
-    z = -16.6
+    """The armour: raised square scutes in rows down the back, a double row on the tail joining into one."""
+    both(bones, 'neck', 0.2, 3.25, -4.9, 1.2, 3.75, -4.1, 'scute')
     row = 0
-    while z < 2.6:
-        top, _, w = at(z + 0.7)
-        across = [0.75, 2.05, 3.25] if w > 4.4 else [0.75, 2.05]
-        for k, x in enumerate(across):
-            x = x * min(1.0, w / 4.6) if k else x
-            hgt = 0.85 - 0.18 * k
-            for s in (1, -1):
-                x0, x1 = sorted([s * (x - 0.5), s * (x + 0.5)])
-                bones[owner(z)].append(cube([x0, top - 0.1, z], [x1, top + hgt, z + 1.35], 'scute'))
-        z += 1.75
-        row += 1
-    z = 3.0
-    while z < 33.0:
-        top, _, w = at(z + 0.6)
-        f = (z - 3.0) / 30.0
-        hgt = 1.35 - 0.85 * f
-        if z < 20.0:      # the double crest
-            x = max(0.55, w * 0.55)
-            for s in (1, -1):
-                x0, x1 = sorted([s * (x - 0.28), s * (x + 0.28)])
-                bones[owner(z + 0.6)].append(cube([x0, top - 0.1, z], [x1, top + hgt, z + 1.2], 'crest'))
-        else:             # one crest down the middle
-            bones[owner(z + 0.6)].append(cube([-0.3, top - 0.1, z], [0.3, top + hgt, z + 1.2], 'crest'))
+    z = -3.75
+    while z < 3.4:
+        name, _, _, _, hw, _, top = next(t for t in TRUNK if t[2] <= z + 0.5 < t[3])
+        tall = 0.6 if row % 2 == 0 else 0.45
+        both(bones, name, 0.15, top, z, 1.1, top + tall, z + 1.0, 'scute')
+        both(bones, name, 1.35, top, z, min(2.25, hw - 0.5), top + tall - 0.15, z + 1.0, 'scute')
         z += 1.5
-
-
-def toe(x, y, z, dx, dz, length, width, part='toe'):
-    """A finger or toe as a box from (x, y, z) running length along (dx, dz) (one of the four flat directions), with a
-    dark claw on its end."""
-    out = []
-    if dz:
-        z1 = z + dz * length
-        out.append(cube([x - width / 2, y, min(z, z1)], [x + width / 2, y + 0.38, max(z, z1)], part))
-        c = z1 + dz * 0.4
-        out.append(cube([x - width * 0.35, y, min(z1, c)], [x + width * 0.35, y + 0.25, max(z1, c)], 'claw'))
-    else:
-        x1 = x + dx * length
-        out.append(cube([min(x, x1), y, z - width / 2], [max(x, x1), y + 0.38, z + width / 2], part))
-        c = x1 + dx * 0.4
-        out.append(cube([min(x1, c), y, z - width * 0.35], [max(x1, c), y + 0.25, z + width * 0.35], 'claw'))
-    return out
+        row += 1
+    for name, _, z0, z1, hw, _, top in TRUNK[5:]:
+        z = z0 + 0.1
+        while z + 0.8 <= z1 + 1e-6:
+            f = (z - 3.5) / 9.5
+            tall = 0.8 - 0.35 * f
+            if hw >= 1.5:
+                both(bones, name, hw - 1.1, top, z, hw - 0.4, top + tall, z + 0.8, 'scute')
+            else:
+                box(bones, name, -0.3, top, z, 0.3, top + tall, z + 0.8, 'scute')
+            z += 1.0
 
 
 def legs(out):
-    """Each leg three bones (upper, lower, foot), at rest sprawled out to the side with the foot flat on the ground, as
-    it lies on a bank."""
+    """Each leg three bones (upper, lower, foot): short, thick and sprawled out to the side, the big foot flat on the
+    ground with white claws."""
     for s, side in ((1, 'left'), (-1, 'right')):
-        sx = lambda a, b: sorted([s * a, s * b])
-        for kind, z, sh, up, low, foot, digits, length, parent in (
-                ('arm', -14.0, 3.6, 4.2, 2.3, 1.9, 5, 1.2, 'chest'),
-                ('leg', 0.0, 3.8, 5.0, 2.8, 2.4, 4, 1.7, 'hips')):
-            elbow = sh + up
-            x0, x1 = sx(sh - 0.4, elbow + 0.5)
-            upper = [cube([x0, 1.0, z - low * 0.5], [x1, 1.0 + low, z + low * 0.5], 'leg')]
-            x0, x1 = sx(elbow - low * 0.4, elbow + low * 0.45)
-            lower = [cube([x0, 0.35, z - low * 0.42], [x1, 1.0 + low * 0.9, z + low * 0.42], 'leg')]
-            # the foot flat on the ground, turned a little out; the digits spread forward and out
-            fx = elbow + 0.3
-            x0, x1 = sx(fx - foot * 0.55, fx + foot * 0.65)
-            pad = [cube([x0, 0.0, z - foot * 0.9], [x1, 0.45, z + foot * 0.5], 'foot')]
-            spread = [(-0.5, -1), (0.0, -1), (0.5, -1), (1.0, -1), (1.1, 0)][:digits] if digits == 5 else \
-                [(-0.6, -1), (-0.05, -1), (0.5, -1), (1.0, -1)]
-            for i, (off, dz) in enumerate(spread):
-                if dz:
-                    pad += toe(s * (fx + off * foot * 0.6), 0.02, z - foot * 0.9, 0, -1,
-                               length * (0.85 + 0.25 * (1 - abs(i - 1.5) / 2)), 0.42, 'toe')
-                else:
-                    pad += toe(s * (fx + foot * 0.65), 0.02, z - foot * 0.1, s, 0, length * 0.7, 0.4, 'toe')
-            if digits == 4:   # the webbing between the hind toes
-                x0, x1 = sx(fx - foot * 0.45, fx + foot * 0.65)
-                pad.append(cube([x0, 0.02, z - foot * 0.9 - length * 0.8], [x1, 0.2, z - foot * 0.9], 'web'))
-            out.append({'name': f'{kind}_upper_{side}', 'parent': parent, 'pivot': [s * sh, 1.0 + low * 0.5, z],
-                        'cubes': upper})
+        for kind, parent, z, hw, reach, thick, foot_len in (('arm', 'chest', -3.25, 2.5, 1.6, 1.3, 1.7),
+                                                             ('leg', 'hips', 2.0, 2.75, 2.0, 1.6, 2.0)):
+            parts = {'u': [], 'l': [], 'f': []}
+
+            def b(key, x0, y0, z0, x1, y1, z1, part):
+                lo, hi = sorted([s * x0, s * x1])
+                parts[key].append(cube([lo * V, y0 * V, z0 * V], [hi * V, y1 * V, z1 * V], part))
+
+            elbow = hw + reach
+            b('u', hw - 0.3, 1.0, z - thick / 2, elbow, 1.0 + thick, z + thick / 2, 'leg')
+            b('l', elbow - 0.55, 0.3, z - thick / 2 - 0.35, elbow + 0.6, 1.0 + thick * 0.8, z + thick / 2 - 0.35, 'leg')
+            front = z - thick / 2 - 0.2 - foot_len
+            b('f', elbow - 0.75, 0.0, front, elbow + 0.85, 0.5, z - thick / 2 + 0.5, 'foot')
+            for i in range(4):
+                x = elbow - 0.7 + i * 0.42
+                b('f', x, 0.0, front - 0.4, x + 0.3, 0.35, front, 'claw')
+            sh = [s * hw * V, (1.0 + thick / 2) * V, z * V]
+            out.append({'name': f'{kind}_upper_{side}', 'parent': parent, 'pivot': sh, 'cubes': parts['u']})
             out.append({'name': f'{kind}_lower_{side}', 'parent': f'{kind}_upper_{side}',
-                        'pivot': [s * elbow, 1.0 + low * 0.5, z], 'cubes': lower})
-            out.append({'name': f'{kind}_foot_{side}', 'parent': f'{kind}_lower_{side}', 'pivot': [s * fx, 0.4, z],
-                        'cubes': pad})
+                        'pivot': [s * elbow * V, sh[1], z * V], 'cubes': parts['l']})
+            out.append({'name': f'{kind}_foot_{side}', 'parent': f'{kind}_lower_{side}',
+                        'pivot': [s * elbow * V, 0.4 * V, (z - thick / 2) * V], 'cubes': parts['f']})
 
 
 def model():
-    bones = {name: [] for name, *_ in CHAIN}
-    bones['jaw'] = []
-    body_slices(bones)
-    head_parts(bones)
+    names = ['head', 'jaw'] + list(dict.fromkeys(t[0] for t in TRUNK))
+    bones = {name: [] for name in names}
+    head(bones)
+    trunk(bones)
     scutes(bones)
-    out = [{'name': 'body', 'pivot': [0, 3.0, -6.0]}]
-    for name, parent, z0, _ in CHAIN:
-        if name == 'head':
-            parent, z0 = 'neck', -22.0
-        out.append({'name': name, 'parent': parent, 'pivot': [0, 3.0, z0], 'cubes': bones[name]})
-    out.append({'name': 'jaw', 'parent': 'head', 'pivot': [0, SPLIT, HINGE], 'cubes': bones['jaw']})
+    out = [{'name': 'body', 'pivot': [0, 2.0 * V, -1.0 * V]},
+           {'name': 'neck', 'parent': 'body', 'pivot': [0, 1.5 * V, -4.0 * V], 'cubes': bones['neck']},
+           {'name': 'head', 'parent': 'neck', 'pivot': [0, 1.5 * V, NECK * V], 'cubes': bones['head']},
+           {'name': 'jaw', 'parent': 'head', 'pivot': [0, SPLIT * V, HINGE * V], 'cubes': bones['jaw']}]
+    done = {'neck'}
+    for name, parent, z0, *_ in TRUNK:
+        if name not in done:
+            done.add(name)
+            out.append({'name': name, 'parent': parent, 'pivot': [0, 2.0 * V, z0 * V], 'cubes': bones[name]})
     legs(out)
     return out
 
 
 # --- colours -----------------------------------------------------------------------------------------------------------
-LOOKS = {
-    'A': {'name': 'Olive-bronze, banded', 'note': "your picture: a dark olive back, olive-bronze sides blotched darker, "
-          "dark bands across the back and the tail, a creamy yellow belly and lower jaw, darker scutes, a yellow eye "
-          "with a black slit",
-          'back': (70, 74, 40), 'flank': (122, 118, 60), 'belly': (218, 202, 138), 'band': 0.6, 'mottle': 0.78,
-          'scute': 0.8, 'iris': (226, 188, 40), 'claw': (52, 44, 34)},
-    'B': {'name': 'Old dark male', 'note': "a big old male: almost black-olive on the back, dull grey-olive sides, the "
-          "bands faded into the dark, a dirty cream belly; the look of the biggest crocodiles",
-          'back': (46, 48, 36), 'flank': (86, 86, 62), 'belly': (196, 186, 148), 'band': 0.82, 'mottle': 0.84,
-          'scute': 0.82, 'iris': (196, 160, 52), 'claw': (40, 36, 30)},
-    'C': {'name': 'Young, bright banded', 'note': "a young crocodile: bright yellow-olive with bold black bands and "
-          "spots, a pale belly; young Nile crocodiles are much more boldly marked than old ones",
-          'back': (96, 104, 46), 'flank': (150, 150, 70), 'belly': (232, 226, 182), 'band': 0.42, 'mottle': 0.62,
-          'scute': 0.82, 'iris': (220, 200, 70), 'claw': (50, 44, 34)},
-}
+LOOKS = {'A': {'name': 'Nile crocodile', 'note': "your picture: a dark olive back with raised darker scutes, sides in a "
+               "loose checker of olive and bronze, a tan stripe low along the side, a cream lower jaw and belly, white "
+               "teeth and claws, a yellow eye with a black slit, a red mouth"}}
+DARK, OLIVE, LIGHT, BRONZE, TAN, CREAM = ((58, 62, 30), (88, 92, 42), (120, 120, 54), (150, 136, 66), (200, 176, 112),
+                                          (226, 208, 152))
 
 
-def band(z):
-    """Dark cross bands on the back and tail: about every 5 pixels, wider and plainer toward the tail."""
-    if z < -18:
-        return False
-    period = 5.0 if z < 3 else 4.2
-    return (z + 40.0) % period < (1.5 if z < 3 else 1.8)
+def dice(a, b, c):
+    """0 to 1, the same for the same voxel every time."""
+    n = (int(a) * 374761393 + int(b) * 668265263 + int(c) * 1274126177) & 0xFFFFFFFF
+    n = ((n ^ (n >> 13)) * 1274126177) & 0xFFFFFFFF
+    return (n ^ (n >> 16)) / 4294967296.0
+
+
+def section(zv):
+    if zv < NECK:
+        return 0.75, 3.25
+    for _, _, z0, z1, _, bot, top in TRUNK:
+        if zv < z1:
+            return bot, top
+    return TRUNK[-1][5], TRUNK[-1][6]
+
+
+def pick(colours, r):
+    return colours[min(len(colours) - 1, int(r * len(colours)))]
 
 
 def colour(part, look, x, y, z, face, rnd):
-    L = LOOKS[look]
-    noise = rnd.uniform(0.94, 1.06)
-    if part == 'mouth':
-        return shade((206, 150, 120) if face == 'up' else (176, 104, 90), noise)
-    if part in ('head', 'jaw', 'body', 'scute', 'crest', 'brow'):
-        top, bot, w = at(max(SNOUT, min(z, TAIL_END)))
-        f = (y - bot) / max(0.1, top - bot)           # 0 at the belly, 1 at the back
-        if part == 'jaw':
-            f = min(f, 0.22)
-        if face == 'down' or f < 0.24:
-            c = L['belly']
-        elif f < 0.36:
-            c = mix(L['belly'], L['flank'], (f - 0.24) / 0.12)
-        else:
-            c = mix(L['flank'], L['back'], min(1, (f - 0.36) / 0.4))
-        if f >= 0.3 and face != 'down':
-            n = 0.65 * vnoise(x / 1.6, y / 1.6, z / 1.6, 3) + 0.35 * vnoise(x / 0.7, y / 0.7, z / 0.7, 4)
-            if n > 0.62:
-                c = shade(c, L['mottle'])
-            elif n < 0.3:
-                c = shade(c, 1.1)
-            if band(z) and f > 0.45:
-                c = shade(c, L['band'])
-        if part in ('scute', 'crest'):
-            c = shade(c, L['scute'] if face == 'up' else L['scute'] * 0.92)
-        if part == 'head' and z < -24 and face == 'up':
-            ix, iz = math.floor(x * 2), math.floor(z * 2)
-            c = shade(c, 0.9 if (ix * 5 + iz * 3) % 7 == 0 else 1.0)     # the snout's pitted skin
-        if part in ('head', 'jaw') and abs(y - SPLIT) < 0.2 and face not in ('up', 'down'):
-            c = shade(c, 0.55)                        # the mouth's line along the side
-        return shade(c, noise)
-    if part in ('leg', 'foot', 'toe', 'web'):
-        c = L['belly'] if face == 'down' else mix(L['flank'], L['back'], 0.35)
-        if face != 'down':
-            n = vnoise(x / 1.2, y / 1.2, z / 1.2, 5)
-            c = shade(c, L['mottle'] if n > 0.6 else 1.08 if n < 0.3 else 1.0)
-        if part == 'web':
-            c = shade(c, 0.85)
-        return shade(c, noise)
-    if part == 'claw':
-        return shade(L['claw'], noise)
-    if part == 'tooth':
-        return shade((238, 230, 206), noise)
-    if part == 'nostril':
-        return (24, 22, 18)
+    """One flat colour a voxel face: the voxel is found from the point (model pixels), and its dice pick the colour."""
+    import math
+    xv, yv, zv = x / V, y / V, z / V
+    cx, cy, cz = math.floor(xv + 1e-4), math.floor(yv * 2 + 1e-4), math.floor(zv + 1e-4)
+    if face in ('up', 'down'):
+        r = dice(cx, 77, cz)
+    elif face in ('east', 'west'):
+        r = dice(55, cy, cz)
+    else:
+        r = dice(cx, cy, 33)
+    grain = rnd.uniform(0.98, 1.02)
+    band = cz % 4 == 0 and zv > -4            # dark bands across the back and tail
+    if part == 'tooth' or part == 'claw':
+        return shade((240, 234, 214), grain)
+    if part == 'nostril' or part == 'pupil':
+        return (20, 18, 14)
     if part == 'iris':
-        return shade(L['iris'], noise)
-    if part == 'pupil':
-        return (14, 12, 10)
-    return (255, 0, 255)
+        return shade((236, 200, 36), grain)
+    if part == 'mouth':
+        return shade(pick([(168, 70, 62), (186, 84, 72), (176, 76, 66)], r), grain)
+    if part == 'tongue':
+        return shade(pick([(214, 132, 116), (204, 120, 106)], r), grain)
+    if part == 'jaw':
+        c = CREAM if face == 'down' else pick([CREAM, TAN, CREAM, mix(TAN, CREAM, 0.5)], r)
+        return shade(c, grain)
+    if part in ('scute', 'brow'):
+        c = pick([DARK, DARK, mix(DARK, OLIVE, 0.6), OLIVE], r)
+        if face != 'up':
+            c = shade(c, 0.9)
+        return shade(c, (0.85 if band and part == 'scute' else 1.0) * grain)
+    if part in ('leg', 'foot'):
+        if face == 'down':
+            c = CREAM
+        elif part == 'foot':
+            c = pick([BRONZE, LIGHT, mix(BRONZE, TAN, 0.5)], r)
+        else:
+            c = pick([OLIVE, LIGHT, OLIVE, BRONZE, mix(DARK, OLIVE, 0.5)], r)
+        return shade(c, grain)
+    # the skin of the head, body and tail, by how high up the side it is
+    bot, top = section(zv)
+    f = (yv - bot) / max(0.1, top - bot)
+    if face == 'down':
+        c = CREAM
+    elif face == 'up' and f > 0.6:
+        c = pick([DARK, mix(DARK, OLIVE, 0.5), OLIVE, DARK], r)
+    elif f < 0.26:
+        c = pick([TAN, CREAM, TAN, mix(TAN, BRONZE, 0.4)], r)
+    elif f < 0.5:
+        c = pick([BRONZE, LIGHT, mix(BRONZE, TAN, 0.4), OLIVE], r)
+    else:
+        c = pick([OLIVE, LIGHT, OLIVE, mix(DARK, OLIVE, 0.5), DARK], r)
+    if band and f >= 0.5:
+        c = shade(c, 0.8)
+    return shade(c, grain)
 
 
-def paint(bones, look):
+def paint(bones, look='A'):
     """(bones with every face's place on the texture, rows of (r, g, b, a), width, height)."""
     rnd = random.Random(23)
     bones = copy.deepcopy(bones)
@@ -355,5 +285,5 @@ def paint(bones, look):
 if __name__ == '__main__':
     bones = model()
     n = sum(len(b.get('cubes', [])) for b in bones)
-    _, rows, w, h = paint(bones, 'A')
+    _, rows, w, h = paint(bones)
     print(f'{n} boxes, texture {w} x {h}')

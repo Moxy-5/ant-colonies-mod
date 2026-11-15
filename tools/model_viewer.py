@@ -504,8 +504,8 @@ def catfish_page(out):
 
 
 def crocodile_page(out):
-    """The Nile crocodile (M9 river life, the top hunter, crocodile_models.py): looks A to C on a silt bank with the
-    game's catfish and tilapia in the water for scale, a size slider and poses (lying, high walk, basking, swimming)."""
+    """The Nile crocodile (M9 river life, the top hunter, crocodile_models.py): one basking on a silt bank with its
+    head raised, one swimming, the game's catfish and tilapia in the water for scale, a size slider."""
     import crocodile_models as cr
     import catfish_models as cm
     import tilapia_models as tm
@@ -522,6 +522,7 @@ def crocodile_page(out):
     blocks = {n: file_uri(n + ".png") for n in ("silt", "wet_silt", "algae_mat_3")}
     data = {"looks": looks, "catfish": catfish, "tilapia": {"bones": tb, "texture": uri(tm.png(rows)), "w": w, "h": h},
             "blocks": blocks, "wave": cr.WAVE, "catfishWave": cm.WAVE, "eyeTop": eye_top,
+            "afloat": 0.55 * cr.V,
             "boxes": sum(len(b.get("cubes", [])) for b in bones)}
     template = (Path(__file__).resolve().parent / "crocodile_viewer.template.html").read_text(encoding="utf-8")
     out.parent.mkdir(parents=True, exist_ok=True)

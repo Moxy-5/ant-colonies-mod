@@ -34,18 +34,16 @@
 <body>
 <header>
   <h1>Nile crocodile viewer</h1>
-  <p>The river's top hunter in three looks, A to C, on a silt bank by the water, with the game's catfish (2 blocks)
-     and tilapia (0.6 blocks) swimming below and a player for scale. Its head, neck, body and five tail bones are a
-     chain, the jaw and each leg's three parts are their own bones, so the poses below are only the model moving:
-     lying on the bank, the high walk, basking with the mouth open, and swimming with only the eyes, nostrils and back
-     above the water. Drag to turn, scroll or pinch to zoom, right-drag to slide.</p>
+  <p>The river's top hunter, built fresh from your picture: chunky, made of big cubes. One crocodile basks on the
+     silt bank with its head raised and its mouth open, one swims with only its eyes, nostrils and back above the
+     water. The game's catfish (2 blocks) and tilapia (0.6 blocks) swim below, a player stands by for scale. Drag to
+     turn, scroll or pinch to zoom, right-drag to slide.</p>
 </header>
 <div id="wrap"><canvas id="c"></canvas><div id="labels"></div></div>
 <div class="controls">
   <label>Crocodile length <input id="size" type="range" min="1" max="7" step="0.1"> <span id="sizeOut" class="readout"></span></label>
   <span id="boxes" class="readout"></span>
 </div>
-<div class="controls" id="poses"></div>
 <div class="controls" id="cams"></div>
 <ul id="list"></ul>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
@@ -163,7 +161,7 @@ function wave(obj, t, amount, beat, table) {
 const TILAPIA_WAVE = [['head', 'body', -0.05, 0], ['front', 'body', 0.04, 0.6], ['mid', 'front', 0.1, 1.3],
                       ['rear', 'mid', 0.19, 2.0], ['peduncle', 'rear', 0.3, 2.6], ['tail', 'peduncle', 0.42, 3.1]];
 
-const settings = {size: 5.0, pose: 'lie', cam: 'overview'};
+const settings = {size: 5.0, cam: 'overview'};
 location.hash.slice(1).split('&').filter(Boolean).forEach(kv => {
   const [k, v] = kv.split('=').map(decodeURIComponent);
   settings[k] = isNaN(parseFloat(v)) ? v : parseFloat(v);
@@ -178,11 +176,12 @@ function tag(text, obj, height) {
   tags.push({el, obj, height});
 }
 
-const crocs = Object.entries(DATA.looks).map(([key, look]) => {
-  const croc = build(look, 'ground');
+const LOOK = Object.values(DATA.looks)[0];
+const crocs = [['bask', 'Basking'], ['swim', 'Swimming']].map(([p, label]) => {
+  const croc = build(LOOK, 'ground');
   croc.rotation.y = Math.PI / 2;      // head to -x, the side to the water
-  tag(key + '. ' + look.name, croc, () => settings.size * 0.22);
-  return {key, look, croc};
+  tag(label, croc, () => settings.size * (p === 'bask' ? 0.34 : 0.2));
+  return {key: p, pose: p, look: LOOK, croc};
 });
 const catfish = build(DATA.catfish, 'middle');
 const school = [];
@@ -204,12 +203,12 @@ function layout() {
   const s = settings.size, gap = Math.max(0.8, s * 0.2);
   crocs.forEach((c, i) => {
     c.croc.scale.setScalar(k());
-    c.croc.userData.home = new THREE.Vector3((i - 1) * (s + gap), 0, -1.1 - s * 0.1);
+    c.croc.userData.home = new THREE.Vector3((i - 0.5) * (s * 0.5 + gap), 0, -1.1 - s * 0.12);
   });
   catfish.scale.setScalar(CATFISH / catfish.userData.length);
   school.forEach(f => f.scale.setScalar(TILAPIA / f.userData.length));
-  player.position.set(1.5 * (s + gap) + 1.5, BANK, -2.5);
-  block.position.set(1.5 * (s + gap) + 3, BANK + 0.5, -2.5);
+  player.position.set(s * 0.9 + 1.5, BANK, -2.5);
+  block.position.set(s * 0.9 + 3, BANK + 0.5, -2.5);
   document.getElementById('sizeOut').textContent = s.toFixed(1) + ' blocks long, ' + (s / CATFISH).toFixed(1) +
     ' catfish (a block a metre: grown Nile crocodiles are 3.5 to 5 m, big males 5 to 5.5 m, rare giants 6 m)';
 }
@@ -217,71 +216,53 @@ sizeIn.addEventListener('input', () => { settings.size = parseFloat(sizeIn.value
 document.getElementById('boxes').textContent = DATA.boxes + ' boxes a crocodile';
 
 // --- poses -------------------------------------------------------------------------------------------------------------
-const POSES = {lie: 'Lying on the bank', walk: 'High walk', bask: 'Basking, mouth open', swim: 'Swimming'};
-const poseBox = document.getElementById('poses');
-function setPose(p) {
-  settings.pose = p;
-  [...poseBox.children].forEach(b => b.classList.toggle('on', b.dataset.pose === p));
-}
-Object.entries(POSES).forEach(([p, label]) => {
-  const b = document.createElement('button');
-  b.textContent = label; b.dataset.pose = p; b.onclick = () => setPose(p);
-  poseBox.appendChild(b);
-});
-
 const LEGS = ['arm', 'leg'];
 const SIDES = [['left', 1], ['right', -1]];
 function rest(g) {
   Object.values(g).forEach(b => { b.rotation.copy(b.userData.base); b.position.copy(b.userData.basePos); });
 }
-// One pose at time t. The legs: for the left side a turn about z down (negative) folds the upper leg under the body.
+const SWIM_Z = () => 3.2 + settings.size * 0.15;
 function pose(c, t) {
-  const g = c.croc.userData.groups, ph = c.croc.userData.phase, p = settings.pose;
+  const g = c.croc.userData.groups, ph = c.croc.userData.phase, home = c.croc.userData.home;
   rest(g);
-  let lift = 0, y = 0, z = c.croc.userData.home.z;
-  if (p === 'lie') {
-    wave(c.croc, t, 0.18, 0.6, DATA.wave);           // the tail barely stirring
-    g.neck.rotation.y = 0.05 * Math.sin(t * 0.3 + ph);
-  } else if (p === 'bask') {
+  if (c.pose === 'bask') {
+    // sunbathing: the neck and head raised so the jaw hangs open clear of the ground, the tail barely stirring
     wave(c.croc, t, 0.08, 0.4, DATA.wave);
-    g.head.rotation.x = deg(8);                       // the head tipped up a little
-    g.jaw.rotation.x = -deg(42);                      // the jaw dropped wide
-  } else if (p === 'walk') {
-    const a = deg(55), beat = 2.6;
-    lift = 2.6;                                       // the body lifted off the ground (model pixels)
-    wave(c.croc, t, 0.5, beat, DATA.wave);
-    SIDES.forEach(([side, s]) => LEGS.forEach((kind, i) => {
-      const step = Math.sin(beat * t + ph + (s > 0 ? 0 : Math.PI) + (i ? Math.PI : 0));   // diagonal pairs
-      g[kind + '_upper_' + side].rotation.z = -s * a;
-      g[kind + '_upper_' + side].rotation.y = s * deg(28) * step;
-      g[kind + '_lower_' + side].rotation.z = s * a;
-      g[kind + '_foot_' + side].rotation.y = -s * deg(28) * step;
-    }));
-  } else if (p === 'swim') {
+    const breath = Math.sin(t * 0.8 + ph);
+    // propped up a little on the forelegs: the chest tipped up, the hips and tail flat on the bank, the hands down
+    g.body.rotation.x = deg(8);
+    g.hips.rotation.x = -deg(8);
+    SIDES.forEach(([side]) => {
+      g['arm_upper_' + side].rotation.x = -deg(8);
+      g['arm_upper_' + side].position.y -= 1.3;
+    });
+    g.neck.rotation.x = deg(12);
+    g.head.rotation.x = deg(16 + breath);
+    g.jaw.rotation.x = -deg(26 + breath);
+    c.croc.position.set(home.x, 0, home.z);
+  } else {
     wave(c.croc, t, 1.4, 2.2, DATA.wave);
     SIDES.forEach(([side, s]) => LEGS.forEach(kind => {
       g[kind + '_upper_' + side].rotation.y = s * deg(kind === 'arm' ? 70 : 60);    // folded back along the body
       g[kind + '_upper_' + side].rotation.z = s * deg(10);
       g[kind + '_lower_' + side].rotation.y = s * deg(20);
     }));
-    // floating: the eye turrets' tops just above the surface
-    y = SURFACE - DATA.eyeTop * k() / 16 + 0.04 * settings.size / 5;
+    // floating: the brows, nostril block and back scutes above the surface
+    c.croc.position.set(home.x, SURFACE - (DATA.eyeTop - DATA.afloat) * k() / 16, SWIM_Z());
   }
-  c.croc.position.set(c.croc.userData.home.x, y, p === 'swim' ? 3 + settings.size * 0.15 : z);
-  c.croc.userData.lift.position.y = lift / 16;
 }
 
 // --- cameras -----------------------------------------------------------------------------------------------------------
+const B = () => crocs[0].croc.position, W = () => crocs[1].croc.position;
 const CAMS = {
-  overview: () => { const s = settings.size; return [[0, 1.4 + s * 0.9, 6 + s * 2.6], [0, 0, -0.5]]; },
+  overview: () => { const s = settings.size; return [[-s * 0.5, 1.2 + s * 0.6, 5 + s * 1.7], [0, 0, 0.5]]; },
+  'basking, side': () => { const p = B(), s = settings.size; return [[p.x - s * 0.1, p.y + s * 0.2, p.z + s * 0.95 + 0.5], [p.x, p.y + s * 0.08, p.z]]; },
+  'basking, face': () => { const p = B(), s = settings.size; return [[p.x - s * 0.95, p.y + s * 0.2, p.z + s * 0.42], [p.x - s * 0.3, p.y + s * 0.1, p.z]]; },
+  'basking, top': () => { const p = B(), s = settings.size; return [[p.x + 0.001, p.y + s * 1.3, p.z + 0.001], [p.x, p.y, p.z]]; },
+  'swimming, at the surface': () => { const p = W(), s = settings.size; return [[p.x - s * 0.85, SURFACE + s * 0.09, p.z + s * 0.55], [p.x - s * 0.15, SURFACE, p.z]]; },
+  'swimming, from above': () => { const p = W(), s = settings.size; return [[p.x - s * 0.3, SURFACE + s * 0.7, p.z + s * 0.8], [p.x, SURFACE, p.z]]; },
+  'with the fish': () => [[0, 0.6, 14], [0, -1.6, 4]],
 };
-crocs.forEach(c => {
-  CAMS['side ' + c.key] = () => { const p = c.croc.position, s = settings.size; return [[p.x, p.y + s * 0.18, p.z + s * 0.75 + 0.5], [p.x, p.y + s * 0.07, p.z]]; };
-});
-CAMS.face = () => { const p = crocs[0].croc.position, s = settings.size; return [[p.x - s * 0.95, p.y + s * 0.16, p.z + s * 0.22], [p.x - s * 0.38, p.y + s * 0.05, p.z]]; };
-CAMS.top = () => { const p = crocs[1].croc.position, s = settings.size; return [[p.x + 0.001, p.y + s * 1.25, p.z + 0.001], [p.x, p.y, p.z]]; };
-CAMS['at the surface'] = () => { setPose('swim'); const x = crocs[1].croc.userData.home.x, s = settings.size, z = 3 + s * 0.15; return [[x - s * 0.95, SURFACE + 0.15, z + s * 0.45], [x - s * 0.3, SURFACE + 0.05, z]]; };
-CAMS['with the fish'] = () => [[0, 0.6, 14], [0, -1.6, 4]];
 const camBox = document.getElementById('cams');
 function setCam(name) {
   settings.cam = name;
@@ -294,12 +275,9 @@ Object.keys(CAMS).forEach(name => {
   b.textContent = name; b.onclick = () => setCam(name);
   camBox.appendChild(b);
 });
-const list = document.getElementById('list');
-crocs.forEach(c => {
-  const li = document.createElement('li');
-  li.innerHTML = '<b>' + c.key + '. ' + c.look.name + ':</b> ' + c.look.note;
-  list.appendChild(li);
-});
+const li = document.createElement('li');
+li.innerHTML = '<b>The look:</b> ' + LOOK.note;
+document.getElementById('list').appendChild(li);
 
 function resize() {
   const w = wrap.clientWidth, h = wrap.clientHeight;
@@ -336,7 +314,7 @@ function frame() {
 }
 layout();
 resize();
-setPose(POSES[settings.pose] ? settings.pose : 'lie');
+crocs.forEach(c => pose(c, 0));
 setCam(CAMS[settings.cam] ? settings.cam : 'overview');
 frame();
 </script>
