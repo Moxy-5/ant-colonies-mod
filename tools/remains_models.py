@@ -8,9 +8,9 @@ Stages (docs/DESIGN.md, "Remains, the crab and the Nile monitor"):
   3 picked over mostly the frame of bones with scraps of meat left on ribs, spine and legs (the crabs' stage)
   4 bones       a bare, bleached skeleton, sinking into the bed
 
-Three animals:
-  - the river catfish (the main river remains: a crocodile tears a catfish and leaves the rest), built from the game's
-    own catfish model (catfish_models.py) so it is the same fish, cut open;
+Shown (the cow left out by the user 2026-11-15: no remains for vanilla mobs; kept here for a cow of our own later):
+  - the river catfish, built from the game's own catfish model (catfish_models.py) so it is the same fish, cut open;
+  - the catfish a crocodile killed: torn in two, the front half left (fish_remains(..., torn=True));
   - the tilapia (a fish that died of old age; hunters swallow tilapia whole), from tilapia_models.py;
   - a cow (a big land kill a crocodile hauls in), a Minecraft-style cow made here, since the game's cow model is
     Minecraft's own.
@@ -103,18 +103,30 @@ def paint(bones, colour, texels):
 # --- fish ----------------------------------------------------------------------------------------------------------------
 FISH = {
     # module, the part of the body that is eaten (z), the wound in stage 1 (z), the ribs' span (z), the tail fin's part
-    'catfish': {'mod': cm, 'eaten': (-12.0, 15.0), 'wound': (-7.0, 1.5), 'ribs': (-10.0, 6.0), 'end': cm.HIND_END},
+    'catfish': {'mod': cm, 'eaten': (-12.0, 15.0), 'wound': (-7.0, 1.5), 'ribs': (-10.0, 6.0), 'end': cm.HIND_END,
+                'tear': 2.0},     # where a crocodile's head shake tears it in two (about the middle)
     'tilapia': {'mod': tm, 'eaten': (-5.0, 8.4), 'wound': (-2.5, 3.0), 'ribs': (-4.2, 4.0), 'end': tm.PEDUNCLE},
 }
 BODY_PARTS = ('body', 'head', 'jaw', 'helmet', 'gill')
 EYE_PARTS = ('iris', 'pupil')
 
 
-def fish_remains(kind, stage, look='A'):
-    """(bones, rows, width, height) of a fish's remains at stage 1 to 4."""
-    spec = FISH[kind]
+def fish_remains(kind, stage, look='A', torn=False):
+    """(bones, rows, width, height) of a fish's remains at stage 1 to 4.
+
+    torn: a crocodile's kill. A crocodile cannot chew: it holds the fish across the middle and shakes its head until the
+    fish tears in two, swallows the tail half and leaves the front half (head and chest) lying with a ragged torn end,
+    the spine sticking out of it and two rows of tooth holes in the skin in front of the tear (my picks). That piece then
+    goes through the same stages as any remains."""
+    spec = dict(FISH[kind])
     mod = spec['mod']
-    rnd = random.Random(31 + stage)
+    rnd = random.Random(31 + stage + (100 if torn else 0))
+    tear = spec.get('tear') if torn else None
+    if torn:
+        spec['end'] = tear
+        spec['eaten'] = (spec['eaten'][0], tear)
+        spec['ribs'] = (spec['ribs'][0], min(spec['ribs'][1], tear - 0.8))
+        spec['wound'] = (99.0, 99.0)        # the tear is the hunter's bite
     bones = mod.model()
     z0, z1 = spec['eaten']
     rz0, rz1 = spec['ribs']
@@ -193,9 +205,35 @@ def fish_remains(kind, stage, look='A'):
     for b in bones:
         if b['name'] in drop:
             b['cubes'] = []
+    if torn:    # everything behind a ragged line about the middle is gone down the crocodile
+        jag = random.Random(7)
+        jags = {}
+        for b in bones:
+            keep = []
+            for c in b.get('cubes', []):
+                (ox, oy, oz), (sx, sy, sz) = c['origin'], c['size']
+                key = (round(ox * 2), round(oy * 2))
+                t = tear + jags.setdefault(key, jag.uniform(-1.4, 1.4))
+                if oz >= t:
+                    continue
+                if oz + sz > t:
+                    c['size'][2] = round(t - oz, 3)
+                if c['_part'] in BODY_PARTS:
+                    if oz + c['size'][2] >= tear - 2.0:
+                        c['_meat'] = set(c.get('_meat', ())) | {'south'}     # the torn end, raw meat
+                    if tear - 5.5 <= oz + c['size'][2] / 2 <= tear:
+                        c['_teeth'] = True
+                keep.append(c)
+            b['cubes'] = keep
     # the skeleton showing: a spine down the eaten part, ribs, and (stage 3) scraps of meat on them
+    frame = []
+    if torn:    # the spine sticking out of the torn end, a rib or two torn short beside it
+        frame.append(cube([-0.4, mid - 0.4, tear - 1.5], [0.4, mid + 0.4, tear + 1.6], 'bone'))
+        top, bot, w = half(tear)
+        for dz, sgn in ((0.2, 1), (0.9, -1)):
+            xs = sorted([sgn * 0.3, sgn * w * 0.45])
+            frame.append(cube([xs[0], mid - 1.6, tear + dz], [xs[1], mid - 1.1, tear + dz + 0.35], 'bone'))
     if stage >= 2:
-        frame = []
         sz0 = z0 if stage == 2 else z0 + 1.0
         sz1 = spec['end'] if stage >= 3 else z1
         frame.append(cube([-0.45, mid - 0.4, sz0], [0.45 if stage >= 3 else 0.55, mid + 0.4, sz1], 'bone'))
@@ -227,9 +265,17 @@ def fish_remains(kind, stage, look='A'):
                 for _ in range(6 if kind == 'catfish' else 3):
                     z = rnd.uniform(z0 + 1.5, rz1)
                     frame.append(cube([-0.6, mid + 0.35, z], [0.6, mid + 0.95, z + rnd.uniform(0.8, 1.8)], 'scrap'))
+    if frame:
         bones.append({'name': 'frame', 'parent': 'body', 'pivot': [0, mid, 0], 'cubes': frame})
 
     takes_face = 'face' in inspect.signature(mod.colour).parameters
+
+    def teeth(x, y, z):
+        """Two rows of the crocodile's tooth holes across the body, a little in front of the tear."""
+        for row in (tear - 4.2, tear - 2.6):
+            if abs(z - (row + 0.4 * math.sin(y * 0.7 + x * 0.5))) < 0.28 and ((x + y) * 1.4) % 1.0 < 0.32:
+                return True
+        return False
 
     def colour(c, face, x, y, z, edge, rnd2):
         part = c['_part']
@@ -247,6 +293,8 @@ def fish_remains(kind, stage, look='A'):
             if c.get('_cavity'):
                 col = shade(col, 0.8)
             return col
+        if c.get('_teeth') and stage <= 2 and teeth(x, y, z):
+            return shade(MEAT_DARK, 0.75)                               # a tooth hole, dark meat showing
         if takes_face:
             col = mod.colour(part, look, x, y, z, face, edge, rnd2)
         else:
@@ -394,11 +442,17 @@ def cow_remains(stage):
     return paint(bones, colour, 1.0)
 
 
+def whole_length_bones(kind):
+    """The bones of the whole (untorn) fish, to size a torn one by."""
+    return fish_remains(kind.replace('_croc', ''), 1)[0]
+
+
 def all_remains():
-    """{'catfish': [stage 1..4], 'tilapia': [...], 'cow': [...]}, each (bones, rows, width, height)."""
+    """{'catfish': [stage 1..4], 'catfish_croc': [...], 'tilapia': [...]}, each (bones, rows, width, height).
+    The cow is left out (the user, 2026-11-15: vanilla mobs get no remains); cow_remains stays for a cow of our own."""
     return {'catfish': [fish_remains('catfish', s) for s in (1, 2, 3, 4)],
-            'tilapia': [fish_remains('tilapia', s) for s in (1, 2, 3, 4)],
-            'cow': [cow_remains(s) for s in (1, 2, 3, 4)]}
+            'catfish_croc': [fish_remains('catfish', s, torn=True) for s in (1, 2, 3, 4)],
+            'tilapia': [fish_remains('tilapia', s) for s in (1, 2, 3, 4)]}
 
 
 if __name__ == '__main__':

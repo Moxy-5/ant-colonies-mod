@@ -540,16 +540,21 @@ def remains_page(out):
         zs = [z for b in bones for c in b.get('cubes', []) for z in (c['origin'][2], c['origin'][2] + c['size'][2])]
         return max(zs) - min(zs)
 
-    game_length = {'catfish': 2.0, 'tilapia': 0.6, 'cow': None}
+    game_length = {'catfish': 2.0, 'catfish_croc': 2.0, 'tilapia': 0.6}
     animals = {}
     for kind, stages in rm.all_remains().items():
         models = [{"bones": b, "texture": uri(tm.png(rows)), "w": w, "h": h,
                    "boxes": sum(len(x.get('cubes', [])) for x in b)} for b, rows, w, h in stages]
-        scale = 1.0 if game_length[kind] is None else game_length[kind] * 16 / length(stages[0][0])
-        animals[kind] = {"models": models, "scale": scale, "sink": {'cow': 0.12, 'catfish': 0.05, 'tilapia': 0.02}[kind]}
+        scale = game_length[kind] * 16 / length(rm.whole_length_bones(kind))
+        animals[kind] = {"models": models, "scale": scale, "sink": {'catfish': 0.05, 'catfish_croc': 0.05, 'tilapia': 0.02}[kind]}
+    animals['catfish_croc']['stages'] = ['Torn', 'Fed on', 'Picked over', 'Bones']
     notes = [
-        ("1 Fresh", "the whole animal on its side with one open patch of meat where the hunter fed (on the catfish a bite "
-         "out of the upper flank, on the cow its flank behind the ribs)."),
+        ("1 Fresh", "the whole fish on its side with one open patch of meat where something fed (a bite out of the upper "
+         "flank): a catfish or tilapia that died, or one a player killed."),
+        ("Crocodile kill", "a crocodile cannot chew: it holds the catfish across the middle and shakes its head until the "
+         "fish tears in two, swallows the tail half and leaves the front half: head and chest with a ragged torn end of raw "
+         "meat, the spine and a torn rib sticking out, and two rows of tooth holes in the skin in front of the tear. Then "
+         "it is fed on (the meat eaten down to the ribs), picked over, and left as the front half's bones."),
         ("2 Half-eaten", "the upper side's skin and flesh gone: thick meat with the ribs and spine showing, the belly "
          "eaten deeper, the upper fins and legs stripped; head and tail still whole."),
         ("3 Picked over", "mostly the frame: spine and ribs with scraps of drier, darker meat, a strip of hide or skin "
@@ -557,7 +562,8 @@ def remains_page(out):
         ("4 Bones", "a bare, bleached skeleton sinking a little into the bed, then gone."),
         ("Meat", "Minecraft's raw-meat style (like raw beef): blocky pink-red with lighter streaks and a fat streak now "
          "and then, darker and browner once old; never blood, splatter or guts."),
-        ("Tilapia", "a fish that died of old age (hunters swallow tilapia whole, so it never leaves a kill)."),
+        ("Tilapia", "a fish that died (hunters swallow tilapia whole, so it never leaves a kill)."),
+        ("Cow", "left out: vanilla animals get no remains (the user); a cow of our own may come later."),
     ]
     blocks = {n: file_uri(n + ".png") for n in ("silt",)}
     data = {"animals": animals, "stages": rm.STAGES, "blocks": blocks, "notes": notes}

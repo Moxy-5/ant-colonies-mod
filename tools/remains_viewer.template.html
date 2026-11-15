@@ -35,7 +35,7 @@
   <h1>Remains viewer</h1>
   <p>What is left of a kill, in four stages from left to right: fresh, half-eaten, picked over, bones. Meat in
      Minecraft's raw-meat style, no blood. The catfish and tilapia are the game's own fish models, cut open, at their game
-     sizes (2 and 0.6 blocks); the cow is a Minecraft-style cow. Each lies on its side. Drag to turn, scroll or pinch to
+     sizes (2 and 0.6 blocks); the middle row is a catfish a crocodile tore in two, the front half left. Each lies on its side. Drag to turn, scroll or pinch to
      zoom, right-drag to slide.</p>
 </header>
 <div id="wrap"><canvas id="c"></canvas><div id="labels"></div></div>
@@ -156,8 +156,8 @@ function tag(text, obj) {
   tags.push({el, obj});
 }
 
-// rows: catfish, tilapia, cow; stages left to right
-const ROWS = [['catfish', 'Catfish', -3.2, 2.6], ['tilapia', 'Tilapia', 0.2, 1.6], ['cow', 'Cow', 3.6, 2.8]];
+// rows: catfish, the crocodile's catfish, tilapia; stages left to right
+const ROWS = [['catfish', 'Catfish', -3.0, 2.6], ['catfish_croc', 'Croc kill', 0.0, 2.6], ['tilapia', 'Tilapia', 2.6, 1.6]];
 const STAGES = DATA.stages;
 const placed = {};
 ROWS.forEach(([key, name, z, gap]) => {
@@ -167,7 +167,7 @@ ROWS.forEach(([key, name, z, gap]) => {
     const sink = i === 3 ? animal.sink : 0;
     const obj = build(m, animal.scale, sink);
     obj.position.set((i - 1.5) * gap, 0, z);
-    tag(name + ' ' + (i + 1) + '. ' + STAGES[i], obj);
+    tag(name + ' ' + (i + 1) + '. ' + (animal.stages || STAGES)[i], obj);
     placed[key].push(obj);
   });
 });
