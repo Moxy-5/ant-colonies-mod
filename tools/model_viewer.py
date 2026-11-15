@@ -503,6 +503,32 @@ def catfish_page(out):
     print("wrote", out)
 
 
+def crocodile_page(out):
+    """The Nile crocodile (M9 river life, the top hunter, crocodile_models.py): looks A to C on a silt bank with the
+    game's catfish and tilapia in the water for scale, a size slider and poses (lying, high walk, basking, swimming)."""
+    import crocodile_models as cr
+    import catfish_models as cm
+    import tilapia_models as tm
+    bones = cr.model()
+    looks = {}
+    for key, look in cr.LOOKS.items():
+        b, rows, w, h = cr.paint(bones, key)
+        looks[key] = {"name": look["name"], "note": look["note"], "bones": b, "texture": uri(tm.png(rows)), "w": w, "h": h}
+    head = next(b for b in bones if b["name"] == "head")
+    eye_top = max(c["origin"][1] + c["size"][1] for c in head["cubes"])
+    cb, rows, w, h = cm.paint(cm.model(), "A")
+    catfish = {"bones": cb, "texture": uri(tm.png(rows)), "w": w, "h": h}
+    tb, rows, w, h = tm.paint(tm.model(), "A")
+    blocks = {n: file_uri(n + ".png") for n in ("silt", "wet_silt", "algae_mat_3")}
+    data = {"looks": looks, "catfish": catfish, "tilapia": {"bones": tb, "texture": uri(tm.png(rows)), "w": w, "h": h},
+            "blocks": blocks, "wave": cr.WAVE, "catfishWave": cm.WAVE, "eyeTop": eye_top,
+            "boxes": sum(len(b.get("cubes", [])) for b in bones)}
+    template = (Path(__file__).resolve().parent / "crocodile_viewer.template.html").read_text(encoding="utf-8")
+    out.parent.mkdir(parents=True, exist_ok=True)
+    out.write_text(template.replace("/*DATA*/null", json.dumps(data)), encoding="utf-8")
+    print("wrote", out)
+
+
 def mix_soil(x, y):
     """Plain mound soil for the viewer's floor and walls."""
     rng = random.Random(x * 31 + y * 7)
@@ -517,6 +543,9 @@ def main():
         return
     if len(sys.argv) > 1 and sys.argv[1] == "floodplain":
         floodplain_page(Path(sys.argv[2]) if len(sys.argv) > 2 else ROOT / "references/floodplain_viewer.html")
+        return
+    if len(sys.argv) > 1 and sys.argv[1] == "crocodile":
+        crocodile_page(Path(sys.argv[2]) if len(sys.argv) > 2 else ROOT / "references/crocodile_viewer.html")
         return
     if len(sys.argv) > 1 and sys.argv[1] == "catfish":
         catfish_page(Path(sys.argv[2]) if len(sys.argv) > 2 else ROOT / "references/catfish_viewer.html")
