@@ -84,10 +84,11 @@ def head_parts(bones):
     ez = SNOUT + 4.0
     top, _, w = at(ez)
     ey = MID + top * 0.55
+    w = max(at(ez + d / 4)[2] for d in range(-6, 7))    # the widest slice the eye sits on, so it stands proud of it
     for s in (1, -1):
-        x0, x1 = sorted([s * (w * 0.86), s * (w * 0.86 + 0.25)])
+        x0, x1 = sorted([s * (w - 0.05), s * (w + 0.2)])
         h.append(cube([x0, ey - 0.45, ez - 0.45], [x1, ey + 0.45, ez + 0.45], 'iris'))
-        x0, x1 = sorted([s * (w * 0.86), s * (w * 0.86 + 0.4)])
+        x0, x1 = sorted([s * (w - 0.05), s * (w + 0.32)])
         h.append(cube([x0, ey - 0.25, ez - 0.2], [x1, ey + 0.25, ez + 0.25], 'pupil'))
     # the gill opening's edge, a little proud, low on the side behind the head
     gz = -12.6
@@ -182,7 +183,7 @@ def model():
         out.append({'name': f'barbel_long_tip_{side}', 'parent': f'barbel_long_{side}', 'pivot': tip,
                     'rotation': [-4, s * 24, 0], 'cubes': placed(strand(6.0, 0.24, 'barbel_tip', 4, droop=0.35), tip)})
         top = at(SNOUT + 1.6)[0]
-        p = [s * 1.1, MID + top - 0.1, SNOUT + 1.6]
+        p = [s * 1.1, MID + top + 0.2, SNOUT + 1.6]     # on top of the helmet, not under it
         out.append({'name': f'barbel_nose_{side}', 'parent': 'head', 'pivot': p, 'rotation': [24, s * 30, 0],
                     'cubes': placed(strand(3.0, 0.26, 'barbel', 3), p)})
         bot = at(SNOUT + 2.6)[1]
