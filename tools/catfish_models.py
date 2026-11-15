@@ -77,7 +77,7 @@ def head_parts(bones):
     h.append(cube([-w0 * 0.9, SPLIT, SNOUT - 0.4], [w0 * 0.9, SPLIT + 0.55, SNOUT + 0.8], 'lip'))
     j.append(cube([-w0 * 0.85, SPLIT - 0.5, SNOUT - 0.25], [w0 * 0.85, SPLIT, SNOUT + 0.8], 'lip'))
     # the grainy helmet on top of the head, running back in a point over the neck
-    for z0, z1, k in ((SNOUT + 1.0, -14.0, 0.7), (-14.0, -12.0, 0.45), (-12.0, -10.5, 0.2)):
+    for z0, z1, k in ((SNOUT + 2.4, -14.0, 0.7), (-14.0, -12.0, 0.45), (-12.0, -10.5, 0.2)):
         top, _, w = at((z0 + z1) / 2)
         bones[owner(z0)].append(cube([-w * k, MID + top - 0.15, z0], [w * k, MID + top + 0.22, z1], 'helmet'))
     # small eyes high on the head's sides
@@ -182,8 +182,8 @@ def model():
         tip = [p[0], p[1] - 0.3, p[2] + 6.0]
         out.append({'name': f'barbel_long_tip_{side}', 'parent': f'barbel_long_{side}', 'pivot': tip,
                     'rotation': [-4, s * 24, 0], 'cubes': placed(strand(6.0, 0.24, 'barbel_tip', 4, droop=0.35), tip)})
-        top = at(SNOUT + 1.6)[0]
-        p = [s * 1.1, MID + top + 0.2, SNOUT + 1.6]     # on top of the helmet, not under it
+        top = at(SNOUT + 1.5)[0]
+        p = [s * 1.1, MID + top - 0.1, SNOUT + 1.6]     # out of the snout, in front of the helmet
         out.append({'name': f'barbel_nose_{side}', 'parent': 'head', 'pivot': p, 'rotation': [24, s * 30, 0],
                     'cubes': placed(strand(3.0, 0.26, 'barbel', 3), p)})
         bot = at(SNOUT + 2.6)[1]
