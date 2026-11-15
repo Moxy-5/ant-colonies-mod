@@ -377,7 +377,7 @@ public class TilapiaEntity extends AbstractSchoolingFish implements GeoEntity {
 
     private PlayState animate(AnimationState<TilapiaEntity> state) {
         AnimationController<TilapiaEntity> player = state.getController();
-        if (caught) {
+        if (caught || getVehicle() instanceof CrocodileEntity) {     // in a catfish's mouth, or held in a crocodile's jaws
             player.setAnimationSpeed(1.0);
             return state.setAndContinue(CAUGHT);
         }

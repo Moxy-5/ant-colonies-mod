@@ -69,7 +69,7 @@ public class CrocodileEntity extends PathfinderMob implements GeoEntity {
     private static final EntityDataAccessor<Byte> DATA_JAWS = SynchedEntityData.defineId(CrocodileEntity.class, EntityDataSerializers.BYTE);
     /** The game tick a death roll began (cut to an int), or {@link #NO_ROLL}. */
     private static final EntityDataAccessor<Integer> DATA_ROLL = SynchedEntityData.defineId(CrocodileEntity.class, EntityDataSerializers.INT);
-    public static final byte JAWS_NONE = 0, JAWS_GAPE = 1, JAWS_HOLD = 2, JAWS_EAT = 3, JAWS_DRAG = 4;
+    public static final byte JAWS_NONE = 0, JAWS_GAPE = 1, JAWS_HOLD = 2, JAWS_EAT = 3, JAWS_DRAG = 4, JAWS_SNAP_LEFT = 5, JAWS_SNAP_RIGHT = 6;
     static final int NO_ROLL = Integer.MIN_VALUE;
 
     /**
@@ -107,6 +107,30 @@ public class CrocodileEntity extends PathfinderMob implements GeoEntity {
     public static final double JAWS_AHEAD = 20.0 * (5.0 / 5.5) / 16.0;
     /** How long it stays fed after a big kill and after something small (ticks; my picks: a day, half a day). */
     static final int FED_BIG = 24000, FED_SMALL = 12000;
+    /**
+     * Hunting fish (the crocodile's life step 4, 2026-11-15, the user's ask; my picks, fun first): wild tilapia and
+     * catfish in the water are prey too, swallowed whole. A tilapia feeds it 5 minutes, a catfish half a day (as
+     * anything small). With the river fish group refilling to 60 round a player and crocodiles rare, the river is not
+     * fished out.
+     */
+    static final int FED_TILAPIA = 6000;
+    /**
+     * The sideways snap at a fish beside its head: the head and neck swing round from the shoulders (this far behind its
+     * middle) by this much, the snout's tip this far from the shoulders, and the jaws slam shut on this tick of the
+     * snap's {@link #SNAP_TICKS} (the snap_left and snap_right clips: shut at 0.2 s). A fish more than this far off its
+     * nose (degrees) is snapped at sideways; nearer the nose it lunges straight at it.
+     */
+    static final double NECK_BACK = 6.0 * (5.0 / 5.5) / 16.0, HEAD_REACH = 26.0 * (5.0 / 5.5) / 16.0, SNAP_SWING = 54.0, SNAP_FROM_NOSE = 25.0;
+    static final int SNAP_TICKS = 10, SNAP_CATCH = 4;
+    /** How often the fish darts away just as the jaws come (my pick: about 1 strike in 3 misses), and how many misses before it gives up a while. */
+    static final float FISH_DODGE = 0.35F;
+    static final int FISH_MISSES = 3;
+    /**
+     * Crowding round a school (real crocodiles gather where fish run): a strike at a fish calls every hungry crocodile in
+     * the water within this many blocks to the place for 15 s; they hunt the fish round it (within {@link #SCHOOL_REACH}).
+     */
+    static final double CALL_REACH = 24.0, SCHOOL_REACH = 10.0;
+    static final int CALL_TICKS = 300;
 
     /** How deep in the water it hangs when resting: the water this far up its box, so the brows and back are out (blocks, at the usual size). */
     private static final double AFLOAT = 0.42;
@@ -176,6 +200,10 @@ public class CrocodileEntity extends PathfinderMob implements GeoEntity {
     private double heldY = Double.NaN;
     /** Whether it is in a hunt now (a player near does not frighten it off the bank then). */
     boolean hunting;
+    /** Where a nearby crocodile struck at fish (it heads there to hunt them too), and for how many ticks more. */
+    @Nullable
+    Vec3 schoolAt;
+    int schoolFor;
     /** For tests and films: 1 its hauled prey never slips free, -1 it always does, 0 the dice ({@link #SLIP_SHARE}). */
     public byte strikeLuck;
     /** For tests: how many animals have got away from it (slipped free of the haul, or a strike that fell short). */
@@ -275,6 +303,17 @@ public class CrocodileEntity extends PathfinderMob implements GeoEntity {
     public void makeHungry() {
         hungerIn = 0;
         huntWait = 0;
+    }
+
+    /** For tests: hungry but not hunting for this many ticks (it still answers another's call to a school). */
+    public void holdOffHunting(int ticks) {
+        hungerIn = 0;
+        huntWait = ticks;
+    }
+
+    /** For tests: whether another crocodile's strike at fish has called it to the school. */
+    public boolean calledToSchool() {
+        return schoolAt != null;
     }
 
     /** For tests: whether it holds its jaws on this (the dismount check reads it too). */
@@ -449,6 +488,9 @@ public class CrocodileEntity extends PathfinderMob implements GeoEntity {
         }
         if (huntWait > 0) {
             huntWait--;
+        }
+        if (schoolFor > 0 && --schoolFor == 0) {
+            schoolAt = null;
         }
         if (held != null && (held.isRemoved() || held.getVehicle() != this)) {
             held = null;
@@ -1062,13 +1104,20 @@ public class CrocodileEntity extends PathfinderMob implements GeoEntity {
      * animal drops is left in the water) and is fed for a day. A miss or an escape: it waits before it hunts again.
      */
     static class HuntGoal extends Goal {
-        private enum Phase { STALK, CHARGE, LUNGE, DRAG, ROLL, SWALLOW, EAT, DONE }
+        private enum Phase { STALK, CHARGE, LUNGE, SNAP, DRAG, ROLL, SWALLOW, EAT, DONE }
 
         private final CrocodileEntity croc;
         private LivingEntity prey;
         private Phase phase = Phase.DONE;
         private int left, t, rolls, look;
         private boolean small;
+        /** Hunting a fish (swallowed alive, struck at with snaps and lunges, tried again after a miss), and how many it has missed. */
+        private boolean fish;
+        private int fishMisses;
+        /** Which way the snap now under way swings. */
+        private boolean snapRight;
+        /** How far off it may stalk this prey before giving up (farther when called to a school). */
+        private double reach;
         @Nullable
         private BlockPos out;
         /** Hauling a big animal off the bank backward, and how far this heave pulls toward the water (blocks; under 0: the animal pulls it back). */
@@ -1085,19 +1134,28 @@ public class CrocodileEntity extends PathfinderMob implements GeoEntity {
 
         @Override
         public boolean canUse() {
-            if (!croc.isHungry() || croc.huntWait > 0 || !croc.isInWater() || croc.startled > 0 || croc.held != null || ++look % 10 != 0) {
+            boolean called = croc.schoolAt != null;
+            if (!croc.isHungry() || croc.huntWait > 0 || !croc.isInWater() || croc.startled > 0 || croc.held != null || ++look % 10 != 0 && !called) {
                 return false;
             }
             prey = null;
             double best = Double.MAX_VALUE;
-            for (LivingEntity seen : croc.level().getEntitiesOfClass(LivingEntity.class, croc.getBoundingBox().inflate(HUNT_REACH, 6.0, HUNT_REACH),
-                    e -> isPrey(croc, e))) {
-                double d = croc.distanceToSqr(seen);
-                if (d < best && d < HUNT_REACH * HUNT_REACH) {
+            // called to a school: the fish round where the other struck; else whatever is near it
+            Vec3 from = called ? croc.schoolAt : croc.position();
+            double around = called ? SCHOOL_REACH : HUNT_REACH;
+            for (LivingEntity seen : croc.level().getEntitiesOfClass(LivingEntity.class, new net.minecraft.world.phys.AABB(from, from).inflate(around, 6.0, around),
+                    e -> isPrey(croc, e) && (!called || isFish(e)))) {
+                double d = seen.distanceToSqr(from);
+                if (d < best && d < around * around) {
                     best = d;
                     prey = seen;
                 }
             }
+            if (called) {
+                croc.schoolAt = null;       // answered (or nothing left there)
+                croc.schoolFor = 0;
+            }
+            reach = called ? CALL_REACH + SCHOOL_REACH : HUNT_REACH;
             return prey != null;
         }
 
@@ -1108,6 +1166,8 @@ public class CrocodileEntity extends PathfinderMob implements GeoEntity {
             t = 0;
             rolls = 0;
             small = isSmall(prey);
+            fish = isFish(prey);
+            fishMisses = 0;
             hauling = false;
             croc.hunting = true;
             croc.setBasking(false);
@@ -1132,12 +1192,23 @@ public class CrocodileEntity extends PathfinderMob implements GeoEntity {
                 case LUNGE -> {
                     t++;
                     face(prey);
+                    if (fish) {         // shooting through the water at a fish, it keeps on down to it
+                        double dy = prey.getY() + prey.getBbHeight() * 0.5 - croc.jawPoint().y;
+                        if (dy < -0.3) {
+                            dive(dy);
+                        }
+                    }
                     if (prey.isAlive() && prey.getBoundingBox().inflate(0.7, 0.9, 0.7).contains(croc.jawPoint())) {
                         grab();
-                    } else if (t > 15) {
-                        miss(false);
+                    } else if (t > (fish ? 10 : 15)) {
+                        if (fish) {
+                            missedFish();
+                        } else {
+                            miss(false);
+                        }
                     }
                 }
+                case SNAP -> snap();
                 case DRAG -> {
                     t++;
                     if (croc.held == null) {
@@ -1166,7 +1237,7 @@ public class CrocodileEntity extends PathfinderMob implements GeoEntity {
                     if (t >= 40) {
                         croc.release();
                         prey.discard();         // swallowed whole
-                        eat(FED_SMALL, 30);
+                        eat(prey instanceof TilapiaEntity ? FED_TILAPIA : FED_SMALL, 30);
                     }
                 }
                 case EAT -> {
@@ -1181,9 +1252,13 @@ public class CrocodileEntity extends PathfinderMob implements GeoEntity {
         /** Creeping up through the water to the water nearest the prey, slowly (faster after a swimmer), then the lunge. */
         private void stalk() {
             left--;
-            if (!prey.isAlive() || prey.isRemoved() || croc.distanceTo(prey) > HUNT_REACH + 4 || !atWater(croc.level(), prey, 5)
-                    || prey.isPassenger() || left <= 0) {
+            if (!prey.isAlive() || prey.isRemoved() || croc.distanceTo(prey) > reach + 4 || !atWater(croc.level(), prey, 5)
+                    || prey.isPassenger() || left <= 0 || fish && !prey.isInWater()) {
                 giveUp(200);
+                return;
+            }
+            if (fish) {
+                stalkFish();
                 return;
             }
             Vec3 jaws = croc.jawPoint();
@@ -1315,6 +1390,127 @@ public class CrocodileEntity extends PathfinderMob implements GeoEntity {
             croc.setDeltaMovement(dx * speed, v.y, dz * speed);
         }
 
+        /**
+         * After a fish: it swims at it, and once the fish is within reach of its swinging head it strikes: a fish near its
+         * nose with a straight lunge, one beside its head with a sideways snap. Every strike scatters the school and
+         * calls the crocodiles round to it.
+         */
+        private void stalkFish() {
+            Vec3 pivot = shoulders();
+            Vec3 at = prey.position().add(0, prey.getBbHeight() * 0.5, 0);
+            double dx = at.x - pivot.x, dz = at.z - pivot.z, dy = at.y - pivot.y;
+            double flat = Math.sqrt(dx * dx + dz * dz);
+            double off = offNose(dx, dz);
+            double headReach = HEAD_REACH * croc.getScale() + prey.getBbWidth() * 0.5 + 0.3;
+            if (dy < -0.6 && flat < headReach + 3.0) {
+                dive(dy);       // a fish below it: it sinks down to it, as it does to hide, before it strikes
+            }
+            if (Math.abs(dy) < 1.2 && Math.abs(off) >= SNAP_FROM_NOSE && Math.abs(off) <= 110.0 && flat < headReach) {
+                startSnap(off > 0);
+            } else if (Math.abs(dy) < 1.5 && Math.abs(off) < SNAP_FROM_NOSE && flat < headReach + 1.2) {
+                strikeAtFish();
+                lunge();
+            } else if (left % 10 == 0 || croc.getNavigation().isDone()) {
+                croc.getNavigation().moveTo(prey, 1.3);
+            }
+        }
+
+        /** It sinks toward a fish lower in the water (its body floats, so it must swim down; never faster than it sinks to hide). */
+        private void dive(double dy) {
+            Vec3 v = croc.getDeltaMovement();
+            croc.setDeltaMovement(v.x, Math.min(v.y, Mth.clamp(dy * 0.08, -0.12, -0.03)), v.z);
+        }
+
+        /** Where its head swings from: its shoulders, a little behind its middle, at the height of its spine. */
+        private Vec3 shoulders() {
+            float yaw = croc.yBodyRot * Mth.DEG_TO_RAD;
+            double back = NECK_BACK * croc.getScale();
+            return new Vec3(croc.getX() + Mth.sin(yaw) * back, croc.getY() + ROLL_AXIS * croc.getScale(), croc.getZ() - Mth.cos(yaw) * back);
+        }
+
+        /**
+         * How far off its nose this way lies (degrees; its right positive, its left negative). Facing yaw 0 is facing +z,
+         * and its right hand is then -x; a direction's yaw grows turning to the right.
+         */
+        private double offNose(double dx, double dz) {
+            double want = Mth.atan2(dz, dx) * Mth.RAD_TO_DEG - 90.0;
+            return Mth.wrapDegrees(want - croc.yBodyRot);
+        }
+
+        /** The snap begins: it stops, the head swings to that side with the jaws thrown open, and the school scatters. */
+        private void startSnap(boolean right) {
+            croc.getNavigation().stop();
+            Vec3 v = croc.getDeltaMovement();
+            croc.setDeltaMovement(v.x * 0.3, v.y, v.z * 0.3);
+            croc.setJaws(right ? JAWS_SNAP_RIGHT : JAWS_SNAP_LEFT);
+            snapRight = right;
+            strikeAtFish();
+            phase = Phase.SNAP;
+            t = 0;
+        }
+
+        /** The jaws slam shut at {@link #SNAP_CATCH}: the fish is caught if it is still along the line of the swung head. */
+        private void snap() {
+            t++;
+            if (t == SNAP_CATCH) {
+                croc.playSound(net.minecraft.sounds.SoundEvents.EVOKER_FANGS_ATTACK, 1.0F, 1.2F);
+                float yaw = (croc.yBodyRot + (float) (snapRight ? SNAP_SWING : -SNAP_SWING)) * Mth.DEG_TO_RAD;
+                Vec3 from = shoulders();
+                double len = HEAD_REACH * croc.getScale();
+                Vec3 tip = from.add(-Mth.sin(yaw) * len, 0, Mth.cos(yaw) * len);
+                Vec3 at = prey.position().add(0, prey.getBbHeight() * 0.5, 0);
+                if (prey.isAlive() && !prey.isRemoved() && nearLine(at, from, tip) < 0.9 + prey.getBbWidth() * 0.5) {
+                    grab();
+                    return;
+                }
+            }
+            if (t >= SNAP_TICKS) {
+                missedFish();
+            }
+        }
+
+        /** How far a point lies from the line between two others (blocks). */
+        private static double nearLine(Vec3 p, Vec3 a, Vec3 b) {
+            Vec3 ab = b.subtract(a);
+            double k = Mth.clamp(p.subtract(a).dot(ab) / Math.max(1.0E-6, ab.lengthSqr()), 0.0, 1.0);
+            return p.distanceTo(a.add(ab.scale(k)));
+        }
+
+        /**
+         * Every strike at a fish: the school round it scatters, the fish itself now and then darts off just as the jaws
+         * come ({@link #FISH_DODGE}), and the hungry crocodiles round about head for the place.
+         */
+        private void strikeAtFish() {
+            HuntTilapiaGoal.scatter(croc, prey);
+            boolean dodges = croc.strikeLuck < 0 || croc.strikeLuck == 0 && croc.getRandom().nextFloat() < FISH_DODGE;
+            if (dodges) {
+                Vec3 away = prey.position().subtract(croc.jawPoint());
+                away = away.lengthSqr() < 1.0E-4 ? new Vec3(1, 0, 0) : away.normalize();
+                prey.setDeltaMovement(prey.getDeltaMovement().add(away.scale(0.6)));
+                prey.hurtMarked = true;
+            }
+            if (croc.level() instanceof net.minecraft.server.level.ServerLevel server) {
+                Vec3 at = croc.jawPoint();
+                server.sendParticles(net.minecraft.core.particles.ParticleTypes.SPLASH, at.x, croc.getY() + croc.getFluidHeight(FluidTags.WATER),
+                        at.z, 12, 0.6, 0.1, 0.6, 0.2);
+            }
+            croc.playSound(net.minecraft.sounds.SoundEvents.GENERIC_SPLASH, 0.8F, 1.1F);
+            callToSchool(croc, prey.position());
+        }
+
+        /** A fish got away: it swims after it again, or after a few misses gives up a while. */
+        private void missedFish() {
+            croc.misses++;
+            croc.setJaws(JAWS_NONE);
+            if (++fishMisses >= FISH_MISSES) {
+                giveUp(400);
+                return;
+            }
+            phase = Phase.STALK;
+            t = 0;
+            left = Math.max(left, 100);
+        }
+
         private void approach() {
             Level level = croc.level();
             BlockPos at = BlockPos.findClosestMatch(prey.blockPosition(), 3, 2, p -> level.getFluidState(p).is(FluidTags.WATER)).orElse(prey.blockPosition());
@@ -1327,7 +1523,9 @@ public class CrocodileEntity extends PathfinderMob implements GeoEntity {
             double h = Math.max(0.1, Math.sqrt(to.x * to.x + to.z * to.z));
             face(prey);
             croc.getNavigation().stop();
-            double v = Mth.clamp(h * 0.14, 0.3, 0.6), up = Mth.clamp(to.y * 0.12 + 0.18, 0.1, 0.45);
+            double v = Mth.clamp(h * 0.14, 0.3, 0.6);
+            // at a fish it shoots through the water at it; at anything else it bursts up out of the water
+            double up = fish ? Mth.clamp(to.y * 0.15, -0.15, 0.15) : Mth.clamp(to.y * 0.12 + 0.18, 0.1, 0.45);
             croc.setDeltaMovement(to.x / h * v, up, to.z / h * v);
             croc.hasImpulse = true;
             croc.setJaws(JAWS_GAPE);
@@ -1340,7 +1538,9 @@ public class CrocodileEntity extends PathfinderMob implements GeoEntity {
             Vec3 v = croc.getDeltaMovement();
             croc.setDeltaMovement(v.x * 0.2, Math.min(v.y, 0.0), v.z * 0.2);
             croc.playSound(net.minecraft.sounds.SoundEvents.EVOKER_FANGS_ATTACK, 1.2F, 0.7F);
-            prey.hurt(croc.damageSources().mobAttack(croc), BITE);
+            if (!fish) {        // a fish is swallowed alive
+                prey.hurt(croc.damageSources().mobAttack(croc), BITE);
+            }
             if (!prey.isAlive()) {
                 eat(small ? FED_SMALL : FED_BIG, 80);
                 return;
@@ -1470,6 +1670,8 @@ public class CrocodileEntity extends PathfinderMob implements GeoEntity {
             if (player.isCreative() || player.isSpectator()) {
                 return false;
             }
+        } else if (isFish(e)) {
+            return e.isInWater();       // a fish, in the water (never one the player brought in a bucket or named)
         } else if (!(e instanceof Animal) || e instanceof TamableAnimal pet && pet.isTame()) {
             return false;
         }
@@ -1514,9 +1716,25 @@ public class CrocodileEntity extends PathfinderMob implements GeoEntity {
         return best;
     }
 
-    /** Small enough to swallow whole (a chicken, a rabbit, a calf; never a player). */
+    /** Small enough to swallow whole (a chicken, a rabbit, a calf, any river fish; never a player). */
     static boolean isSmall(LivingEntity e) {
-        return !(e instanceof Player) && e.getBbWidth() < 0.75F && e.getBbHeight() < 0.95F;
+        return e instanceof net.minecraft.world.entity.animal.AbstractFish || !(e instanceof Player) && e.getBbWidth() < 0.75F && e.getBbHeight() < 0.95F;
+    }
+
+    /** A wild river fish it hunts: a tilapia or a catfish, not from a bucket and not named (the player's own fish). */
+    static boolean isFish(LivingEntity e) {
+        return (e instanceof TilapiaEntity || e instanceof CatfishEntity) && !((net.minecraft.world.entity.animal.AbstractFish) e).fromBucket()
+                && !e.hasCustomName();
+    }
+
+    /** A strike at fish here: every other hungry crocodile in the water within {@link #CALL_REACH} heads for the place to hunt them too. */
+    static void callToSchool(CrocodileEntity striker, Vec3 at) {
+        for (CrocodileEntity other : striker.level().getEntitiesOfClass(CrocodileEntity.class, striker.getBoundingBox().inflate(CALL_REACH, 8.0, CALL_REACH))) {
+            if (other != striker && other.isHungry() && other.isInWater() && other.held == null && !other.hunting) {
+                other.schoolAt = at;
+                other.schoolFor = CALL_TICKS;
+            }
+        }
     }
 
     /** Whether it is in the water, or has water within this many blocks at its feet's level or one under. */
@@ -1546,6 +1764,8 @@ public class CrocodileEntity extends PathfinderMob implements GeoEntity {
     private static final RawAnimation HOLD = RawAnimation.begin().thenLoop("hold");
     private static final RawAnimation EAT = RawAnimation.begin().thenLoop("eat");
     private static final RawAnimation DRAG = RawAnimation.begin().thenLoop("drag");
+    private static final RawAnimation SNAP_LEFT = RawAnimation.begin().thenPlayAndHold("snap_left");
+    private static final RawAnimation SNAP_RIGHT = RawAnimation.begin().thenPlayAndHold("snap_right");
     /** Drawn only: when it last walked on land, and whether the bask now drawn began with the flop. */
     private int walkedAt = -100;
     private boolean drawnBasking, flopNow;
@@ -1566,7 +1786,8 @@ public class CrocodileEntity extends PathfinderMob implements GeoEntity {
         byte jaws = jaws();
         if (jaws != JAWS_NONE) {
             drawnBasking = false;
-            return state.setAndContinue(jaws == JAWS_GAPE ? GAPE : jaws == JAWS_HOLD ? HOLD : jaws == JAWS_DRAG ? DRAG : EAT);
+            return state.setAndContinue(jaws == JAWS_GAPE ? GAPE : jaws == JAWS_HOLD ? HOLD : jaws == JAWS_DRAG ? DRAG
+                    : jaws == JAWS_SNAP_LEFT ? SNAP_LEFT : jaws == JAWS_SNAP_RIGHT ? SNAP_RIGHT : EAT);
         }
         double dx = getX() - xo, dy = getY() - yo, dz = getZ() - zo;
         if (isBasking()) {

@@ -558,6 +558,78 @@ public class RiverLifeTests {
      * fed and hunts no more. A chicken put at the edge after that is left alone (fed), and once hungry again it is
      * swallowed whole, with no roll.
      */
+    /**
+     * The crocodile hunts fish (its life step 4, 2026-11-15): a hungry crocodile in the pond with a school of wild
+     * tilapia and one from a bucket strikes at the school (a snap to the side or a lunge), catches a wild one, holds it
+     * and swallows it whole; its strike calls a second hungry crocodile to the school. Then, hungry again, it swallows a
+     * catfish whole too, with no death roll. The bucket fish is never taken.
+     */
+    @GameTest(template = "arena", timeoutTicks = 3000)
+    public static void aCrocodileSnapsUpFishAndCallsOthersToTheSchool(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        buildPond(helper);
+        helper.setDayTime(18000);                            // night: no wish to bask
+        com.antcolonies.savanna.animal.CrocodileEntity croc = helper.spawn(SavannaEntities.CROCODILE.get(), new BlockPos(X0 + 2, SURFACE + 5, Z0 + 3));
+        croc.setPersistenceRequired();
+        croc.makeHungry();
+        croc.strikeLuck = 1;        // no fish darts away: the test is about the catch, not the dice
+        com.antcolonies.savanna.animal.CrocodileEntity other = helper.spawn(SavannaEntities.CROCODILE.get(), new BlockPos(X0 + 2, SURFACE + 5, Z1 - 1));
+        other.setPersistenceRequired();
+        other.holdOffHunting(100000);
+        java.util.List<TilapiaEntity> school = new java.util.ArrayList<>();
+        for (int i = 0; i < 5; i++) {
+            TilapiaEntity fish = helper.spawn(SavannaEntities.TILAPIA.get(), new BlockPos(X1 - 1 - (i % 2), SURFACE + 3 + (i % 3), Z0 + 2 + i));
+            fish.setUp(false, level.random);
+            fish.setPersistenceRequired();
+            school.add(fish);
+        }
+        TilapiaEntity pet = helper.spawn(SavannaEntities.TILAPIA.get(), new BlockPos(X1 - 2, SURFACE + 4, Z0 + 4));
+        pet.setUp(false, level.random);
+        pet.setFromBucket(true);
+        // 0 hunting the school; 1 the catfish put in, hungry again; 2 done
+        int[] stage = {0};
+        boolean[] struck = {false}, heldFish = {false}, called = {false}, rolled = {false}, heldCatfish = {false};
+        CatfishEntity[] catfish = {null};
+        helper.onEachTick(() -> {
+            byte jaws = croc.jaws();
+            struck[0] |= jaws == com.antcolonies.savanna.animal.CrocodileEntity.JAWS_SNAP_LEFT
+                    || jaws == com.antcolonies.savanna.animal.CrocodileEntity.JAWS_SNAP_RIGHT
+                    || jaws == com.antcolonies.savanna.animal.CrocodileEntity.JAWS_GAPE;
+            called[0] |= other.calledToSchool();
+            rolled[0] |= croc.rollAngle(0.0F) != 0.0F;
+            helper.assertTrue(pet.isAlive() && !croc.holds(pet), "the crocodile took the bucket tilapia");
+            switch (stage[0]) {
+                case 0 -> {
+                    heldFish[0] |= croc.held() instanceof TilapiaEntity;
+                    if (school.stream().anyMatch(TilapiaEntity::isRemoved) && croc.held() == null && !croc.isHungry()) {
+                        helper.assertTrue(struck[0], "a tilapia was eaten with no strike seen");
+                        helper.assertTrue(heldFish[0], "the tilapia was never held in the jaws before it was swallowed");
+                        helper.assertTrue(called[0], "the strike at the school did not call the other crocodile");
+                        helper.assertTrue(!rolled[0], "the tilapia was rolled, not swallowed");
+                        SavannaMod.LOGGER.info("[crocodile] swallowed a tilapia at tick {}", helper.getTick());
+                        school.forEach(f -> { if (!f.isRemoved()) f.discard(); });
+                        catfish[0] = helper.spawn(SavannaEntities.CATFISH.get(), new BlockPos(X1 - 2, SURFACE + 3, Z0 + 4));
+                        catfish[0].setPersistenceRequired();
+                        catfish[0].setNoAi(true);
+                        croc.makeHungry();
+                        stage[0] = 1;
+                    }
+                }
+                case 1 -> {
+                    heldCatfish[0] |= croc.holds(catfish[0]);
+                    if (catfish[0].isRemoved() && croc.held() == null && !croc.isHungry()) {
+                        helper.assertTrue(heldCatfish[0], "the catfish was gone but never held in the jaws");
+                        helper.assertTrue(!rolled[0], "the catfish was rolled, not swallowed whole");
+                        SavannaMod.LOGGER.info("[crocodile] swallowed the catfish at tick {}", helper.getTick());
+                        stage[0] = 2;
+                        helper.succeed();
+                    }
+                }
+                default -> { }
+            }
+        });
+    }
+
     @GameTest(template = "arena", timeoutTicks = 4800)
     public static void aHungryCrocodileGrabsDrownsAndRollsItsPrey(GameTestHelper helper) {
         ServerLevel level = helper.getLevel();

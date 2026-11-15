@@ -409,6 +409,33 @@ def clips():
         p['jaw'] = {'rotation': [42 * f, 0, 0]}
         return p
 
+    def snap(side):
+        # hunting fish (2026-11-15, the user's ask; my picks, fun first): a fish beside its head is taken with a
+        # sideways snap, as real crocodiles take fish in the shallows: the head and neck swing hard to that side in a
+        # tenth of a second, the mouth thrown open on the way and slammed shut at 0.2 s (CrocodileEntity.SNAP_CATCH,
+        # tick 4), the tail kicking the other way to swing the head round; then it holds there, the jaws shut
+        # GeckoLib flips a clip's Y turns as it loads them (a +y here turns the bone to its right in the game, as the
+        # head turn in CrocodileModel.eyes shows), so a swing to its left is a negative y here
+        s = -1 if side == 'left' else 1
+
+        def pose(t):
+            f = min(1.0, t / 0.1)
+            f = f * f * (3 - 2 * f)
+            if t < 0.08:
+                o = t / 0.08
+            else:
+                o = max(0.0, 1.0 - (t - 0.08) / 0.12)
+            o = o * o * (3 - 2 * o)
+            p = folded(wave_pose(t, 0.4, 2 * math.pi / 0.8), 0.7)
+            p['neck'] = {'rotation': [-4 * f, p['neck']['rotation'][1] + s * 22 * f, 0]}
+            p['head'] = {'rotation': [-8 * o, s * 32 * f, 0]}
+            p['jaw'] = {'rotation': [4 + 38 * o, 0, 0]}
+            for name, a in (('tail1', 10), ('tail2', 8), ('tail3', 5)):
+                if name in p:
+                    p[name] = {'rotation': [0, p[name]['rotation'][1] - s * a * f, 0]}
+            return p
+        return pose
+
     def hold(t):
         # prey clamped crosswise in its jaws: the jaw shut on it (a little open round it), squeezing now and then, the
         # head shaking the prey from side to side, the tail working (my picks: a 1 s beat)
@@ -453,7 +480,8 @@ def clips():
                 p[f'{kind}_foot_{side}'] = {'rotation': [0, -s * 18 * swing, 0]}
         return p
 
-    return {'lunge': tm.clip(0.4, lunge, 24, 'hold'), 'hold': tm.clip(1.0, hold, 24), 'eat': tm.clip(1.0, eat, 24),
+    return {'snap_left': tm.clip(0.5, snap('left'), 24, 'hold'), 'snap_right': tm.clip(0.5, snap('right'), 24, 'hold'),
+            'lunge': tm.clip(0.4, lunge, 24, 'hold'), 'hold': tm.clip(1.0, hold, 24), 'eat': tm.clip(1.0, eat, 24),
             'drag': tm.clip(0.8, drag, 24),
             'idle': tm.clip(4.0, idle, 24), 'walk': tm.clip(WALK_LEN, walk, 20), 'swim': tm.clip(SWIM_LEN, swim, 24),
             'float': tm.clip(4.0, floating, 24), 'bask': tm.clip(6.0, bask, 24),

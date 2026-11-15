@@ -127,12 +127,16 @@ public class HuntTilapiaGoal extends Goal {
         scatter();
     }
 
-    /** The school round the strike darts away from it. */
     private void scatter() {
-        Vec3 at = fish.position();
-        List<TilapiaEntity> school = fish.level().getEntitiesOfClass(TilapiaEntity.class, fish.getBoundingBox().inflate(SCATTER_WITHIN));
+        scatter(fish, prey);
+    }
+
+    /** The school round a strike darts away from the hunter (the catfish's, and the crocodile's), all but the fish struck at. */
+    static void scatter(net.minecraft.world.entity.Entity hunter, @Nullable net.minecraft.world.entity.Entity struckAt) {
+        Vec3 at = hunter.position();
+        List<TilapiaEntity> school = hunter.level().getEntitiesOfClass(TilapiaEntity.class, hunter.getBoundingBox().inflate(SCATTER_WITHIN));
         for (TilapiaEntity other : school) {
-            if (other == prey) {
+            if (other == struckAt) {
                 continue;
             }
             Vec3 away = other.position().subtract(at);

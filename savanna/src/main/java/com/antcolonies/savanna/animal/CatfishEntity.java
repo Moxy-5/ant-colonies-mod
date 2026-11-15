@@ -360,7 +360,7 @@ public class CatfishEntity extends AbstractFish implements GeoEntity {
             player.setAnimationSpeed(1.0);
             return state.setAndContinue(DEATH);
         }
-        if (!isInWater()) {
+        if (!isInWater() || getVehicle() instanceof CrocodileEntity) {     // out of the water, or thrashing in a crocodile's jaws
             player.setAnimationSpeed(1.0);
             return state.setAndContinue(FLOP);
         }
