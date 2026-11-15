@@ -551,12 +551,14 @@ public class RiverLifeTests {
     }
 
     /**
-     * The hunt (2026-11-15): a hungry crocodile in the pond and a cow standing at the water's edge on the bank. The
-     * crocodile creeps up, lunges and grabs the cow, drags it into the water and death-rolls it until it dies, then is
+     * The hunt (2026-11-15): a hungry crocodile in the pond and a cow standing at the water's edge on the bank. Its
+     * first strike is made to miss: the cow is not held and the crocodile is back in the water, not hunting. Then the
+     * crocodile creeps up, strikes and grabs the cow, hauls it backward into the water (the cow is in the water before
+     * the first roll, and the crocodile was moved toward the water while it held it) and death-rolls it until it dies, then is
      * fed and hunts no more. A chicken put at the edge after that is left alone (fed), and once hungry again it is
      * swallowed whole, with no roll.
      */
-    @GameTest(template = "arena", timeoutTicks = 3600)
+    @GameTest(template = "arena", timeoutTicks = 4800)
     public static void aHungryCrocodileGrabsDrownsAndRollsItsPrey(GameTestHelper helper) {
         ServerLevel level = helper.getLevel();
         buildPond(helper);
@@ -571,9 +573,11 @@ public class RiverLifeTests {
         com.antcolonies.savanna.animal.CrocodileEntity croc = helper.spawn(SavannaEntities.CROCODILE.get(), new BlockPos(X0 + 3, SURFACE + 4, Z0 + 4));
         croc.setPersistenceRequired();
         croc.makeHungry();
+        croc.strikeLuck = -1;
         net.minecraft.world.entity.animal.Cow cow = helper.spawn(net.minecraft.world.entity.EntityType.COW, new BlockPos(X1 + 1, TOP + 1, Z0 + 4));
         cow.setNoAi(true);
-        // 0 stalking; 1 holding; 2 the cow dead, fed; 3 a chicken left alone while fed; 4 hungry again, the chicken swallowed
+        boolean[] missed = {false}, rolledYet = {false};
+        // -1 (missed[0] false): the strike that misses; 0 stalking; 1 holding; 2 the cow dead, fed; 3 a chicken left alone while fed; 4 hungry again, the chicken swallowed
         int[] stage = {0};
         boolean[] rolled = {false}, rolledChicken = {false};
         long[] at = {0};
@@ -582,8 +586,22 @@ public class RiverLifeTests {
             long now = helper.getTick();
             switch (stage[0]) {
                 case 0 -> {
+                    if (!missed[0]) {
+                        helper.assertTrue(!croc.holds(cow) && cow.isAlive(), "a strike that misses took the cow");
+                        if (croc.misses > 0 && croc.isInWater() && now - at[0] > 100) {
+                            helper.assertTrue(!croc.isHungry() || croc.held() == null, "after a miss the crocodile holds something");
+                            SavannaMod.LOGGER.info("[crocodile] missed the cow and was back in the water at tick {}", now);
+                            missed[0] = true;
+                            croc.strikeLuck = 1;
+                            croc.makeHungry();
+                        } else if (croc.misses == 0) {
+                            at[0] = now;
+                        }
+                        break;
+                    }
                     if (croc.holds(cow)) {
-                        SavannaMod.LOGGER.info("[crocodile] grabbed the cow at tick {}", now);
+                        SavannaMod.LOGGER.info("[crocodile] grabbed the cow at tick {}, the crocodile in the water: {}, the cow: {}", now,
+                                croc.isInWater(), cow.isInWater());
                         stage[0] = 1;
                     } else if (!cow.isAlive()) {
                         stage[0] = 2;       // killed by the bite itself
@@ -593,6 +611,12 @@ public class RiverLifeTests {
                     if (croc.rollAngle(0.0F) != 0.0F) {
                         rolled[0] = true;
                         helper.assertTrue(cow.getVehicle() == croc, "the cow is not in the crocodile's jaws while it rolls");
+                        if (!rolledYet[0]) {
+                            rolledYet[0] = true;
+                            SavannaMod.LOGGER.info("[crocodile] the first roll at tick {}", now);
+                            helper.assertTrue(cow.isInWater() && croc.isInWater(), "the cow was rolled before it was hauled into the water: the cow in water "
+                                    + cow.isInWater() + ", the crocodile " + croc.isInWater());
+                        }
                     }
                     if (!cow.isAlive()) {
                         SavannaMod.LOGGER.info("[crocodile] the cow died at tick {}", now);

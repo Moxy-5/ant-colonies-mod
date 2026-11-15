@@ -69,7 +69,7 @@ public class CrocodileEntity extends PathfinderMob implements GeoEntity {
     private static final EntityDataAccessor<Byte> DATA_JAWS = SynchedEntityData.defineId(CrocodileEntity.class, EntityDataSerializers.BYTE);
     /** The game tick a death roll began (cut to an int), or {@link #NO_ROLL}. */
     private static final EntityDataAccessor<Integer> DATA_ROLL = SynchedEntityData.defineId(CrocodileEntity.class, EntityDataSerializers.INT);
-    public static final byte JAWS_NONE = 0, JAWS_GAPE = 1, JAWS_HOLD = 2, JAWS_EAT = 3;
+    public static final byte JAWS_NONE = 0, JAWS_GAPE = 1, JAWS_HOLD = 2, JAWS_EAT = 3, JAWS_DRAG = 4;
     static final int NO_ROLL = Integer.MIN_VALUE;
 
     /**
@@ -78,6 +78,20 @@ public class CrocodileEntity extends PathfinderMob implements GeoEntity {
      * its eyes out, and from {@link #LUNGE_REACH} blocks lunges and grabs it ({@link HuntGoal}).
      */
     static final double HUNT_REACH = 14.0, LUNGE_REACH = 3.5;
+    /**
+     * Big prey on the bank (2026-11-15, the user's asks; my picks): from this far it bursts out of the water and rushes
+     * it at this pace, striking from this near; then it hauls the animal back to the water, heave by heave.
+     */
+    static final double CHARGE_REACH = 6.0, CHARGE_PACE = 1.7, STRIKE_REACH = 1.4;
+    /** One strike in four misses (the user's number): the jaws snap shut on air, the animal leaps back, the crocodile goes back into the water. */
+    static final float MISS_SHARE = 0.25F;
+    /**
+     * The tug of war on the bank: one heave every this many ticks. Of 20 heaves about 12 gain ground (this far for a
+     * cow-sized animal, less for a heavier one), 5 gain nothing (the animal digs in), 3 lose ground (it drags the
+     * crocodile back up the bank). Once the animal is in the water the crocodile has the better of it and pulls steadily.
+     */
+    public static final int HEAVE_TICKS = 16;
+    static final double HEAVE_GAIN = 0.75, HEAVE_LOST = 0.3, HAUL_AFLOAT = 0.07;
     /** How hard the grab bites, and how hard each death roll tears at an animal and at a player (hearts x 2; my picks: a player lasts about 4 rolls). */
     static final float BITE = 2.0F, ROLL_HURT = 6.0F, ROLL_HURT_PLAYER = 4.0F;
     /** How much its prey must hurt it to make it let go (my pick: a few good hits; a player can fight free). */
@@ -155,6 +169,14 @@ public class CrocodileEntity extends PathfinderMob implements GeoEntity {
     @Nullable
     private LivingEntity held;
     private float heldHurt;
+    /** The height its held prey is carried at, eased so the prey slides down a bank's edge and does not jump (worked out on both sides). */
+    private double heldY = Double.NaN;
+    /** Whether it is in a hunt now (a player near does not frighten it off the bank then). */
+    boolean hunting;
+    /** For tests and films: 1 its strikes never miss, -1 they always miss, 0 the dice ({@link #MISS_SHARE}). */
+    public byte strikeLuck;
+    /** For tests: how many strikes it has missed. */
+    public int misses;
 
     public CrocodileEntity(EntityType<? extends CrocodileEntity> type, Level level) {
         super(type, level);
@@ -292,21 +314,40 @@ public class CrocodileEntity extends PathfinderMob implements GeoEntity {
     }
 
     /**
-     * Its prey is held crosswise in its jaws: the prey's middle at the snout's tip, at the height of its spine (so the
-     * roll turns prey and crocodile round one line), the animal turned across the snout.
+     * Something small is held crosswise in its jaws, the prey's middle at the snout's tip. A big animal is held by the
+     * head, facing the crocodile, as it was seized and as it is hauled in. Afloat the prey's middle is at the height of
+     * the crocodile's spine (so the roll turns prey and crocodile round one line); on the bank it stands on the ground
+     * under it, and slides down the edge into the water as it is pulled over.
      */
     @Override
     protected void positionRider(Entity passenger, Entity.MoveFunction callback) {
         float yaw = yBodyRot * Mth.DEG_TO_RAD;
-        double ahead = JAWS_AHEAD * getScale() + passenger.getBbWidth() * 0.3;
-        double y = getY() + ROLL_AXIS * getScale() - passenger.getBbHeight() * 0.5;
-        callback.accept(passenger, getX() - Mth.sin(yaw) * ahead, y, getZ() + Mth.cos(yaw) * ahead);
+        boolean big = passenger instanceof LivingEntity l && !isSmall(l);
+        double ahead = JAWS_AHEAD * getScale() + passenger.getBbWidth() * (big ? 0.6 : 0.3);
+        double px = getX() - Mth.sin(yaw) * ahead, pz = getZ() + Mth.cos(yaw) * ahead;
+        double want = Math.max(getY() + ROLL_AXIS * getScale() - passenger.getBbHeight() * 0.5, floorAt(px, pz));
+        heldY = Double.isNaN(heldY) || Math.abs(want - heldY) > 3.0 ? want : heldY + Mth.clamp(want - heldY, -0.2, 0.2);
+        callback.accept(passenger, px, heldY, pz);
         if (!(passenger instanceof Player) && passenger instanceof LivingEntity living) {
-            float across = yBodyRot + 90.0F;
+            float across = yBodyRot + (big ? 180.0F : 90.0F);
             living.setYRot(across);
             living.yBodyRot = across;
             living.yHeadRot = across;
         }
+    }
+
+    /** The top of the ground at this spot, looked for from a block over its feet to two under (far below if there is none: open water). */
+    private double floorAt(double x, double z) {
+        BlockPos.MutableBlockPos p = new BlockPos.MutableBlockPos();
+        int top = Mth.floor(getY() + 1.0);
+        for (int y = top; y >= top - 3; y--) {
+            p.set(Mth.floor(x), y, Mth.floor(z));
+            var shape = level().getBlockState(p).getCollisionShape(level(), p);
+            if (!shape.isEmpty()) {
+                return y + shape.max(Direction.Axis.Y);
+            }
+        }
+        return -1.0E9;
     }
 
     /** Where its jaws close (the snout's tip, at the height of its mouth). */
@@ -378,6 +419,9 @@ public class CrocodileEntity extends PathfinderMob implements GeoEntity {
     @Override
     public void tick() {
         super.tick();
+        if (!isVehicle()) {
+            heldY = Double.NaN;
+        }
         if (level().isClientSide) {
             lookAround();
             return;
@@ -400,7 +444,7 @@ public class CrocodileEntity extends PathfinderMob implements GeoEntity {
         }
         if (startled > 0) {
             startled--;
-        } else if (tickCount % 10 == 0 && (!isInWater() || isBasking()) && playerTooNear()) {
+        } else if (tickCount % 10 == 0 && !hunting && (!isInWater() || isBasking()) && playerTooNear()) {
             startle();
         }
         // resting in the water it rises to hang at the surface, eyes and back out (startled, it sinks out of sight)
@@ -540,6 +584,9 @@ public class CrocodileEntity extends PathfinderMob implements GeoEntity {
         tag.putInt("SunIn", sunIn);
         tag.putBoolean("HalfOut", restHalfOut);
         tag.putInt("HungerIn", hungerIn);
+        if (strikeLuck != 0) {
+            tag.putByte("StrikeLuck", strikeLuck);
+        }
     }
 
     @Override
@@ -554,6 +601,7 @@ public class CrocodileEntity extends PathfinderMob implements GeoEntity {
         }
         restHalfOut = tag.getBoolean("HalfOut");
         hungerIn = tag.getInt("HungerIn");
+        strikeLuck = tag.getByte("StrikeLuck");
         if (isNoAi() && tag.getBoolean("Basking")) {     // for films and the summon command: a still crocodile basking
             setBasking(true);
         }
@@ -987,14 +1035,16 @@ public class CrocodileEntity extends PathfinderMob implements GeoEntity {
      * The hunt (2026-11-15, the user's ask; fun first, from what real crocodiles do; every number my pick). A hungry
      * crocodile in the water picks the nearest animal or player (not creative or a spectator; no tame pets, nothing being
      * ridden) at the water's edge or swimming within {@link #HUNT_REACH} blocks, and creeps up to the water nearest it with
-     * only its eyes out. From {@link #LUNGE_REACH} blocks it lunges with its mouth wide and, if its jaws reach, grabs.
-     * Something small (a chicken, a rabbit, a calf) it shakes and swallows whole. Anything bigger it drags into the
-     * water and death-rolls, spinning round its spine with the prey in its jaws, again and again with pauses under the
+     * only its eyes out. From {@link #LUNGE_REACH} blocks it lunges with its mouth wide and, if its jaws reach, grabs;
+     * a big animal up on the bank it rushes out of the water at ({@link #CHARGE_REACH}) and strikes from close. One
+     * strike in four misses ({@link #MISS_SHARE}): the animal leaps back and the crocodile goes back into the water.
+     * Something small (a chicken, a rabbit, a calf) it shakes and swallows whole. Anything bigger it hauls back into the
+     * water, a tug of war heave by heave while the animal digs in ({@code haul}), swims it out and death-rolls, spinning round its spine with the prey in its jaws, again and again with pauses under the
      * water, until the prey dies (or fights free, {@link #ESCAPE_HURT}); then it tears at the kill a few seconds (what the
      * animal drops is left in the water) and is fed for a day. A miss or an escape: it waits before it hunts again.
      */
     static class HuntGoal extends Goal {
-        private enum Phase { STALK, LUNGE, DRAG, ROLL, SWALLOW, EAT, DONE }
+        private enum Phase { STALK, CHARGE, LUNGE, DRAG, ROLL, SWALLOW, EAT, DONE }
 
         private final CrocodileEntity croc;
         private LivingEntity prey;
@@ -1003,6 +1053,10 @@ public class CrocodileEntity extends PathfinderMob implements GeoEntity {
         private boolean small;
         @Nullable
         private BlockPos out;
+        /** Hauling a big animal off the bank backward, and how far this heave pulls toward the water (blocks; under 0: the animal pulls it back). */
+        private boolean hauling;
+        private double pull;
+        private int hauled;
 
         HuntGoal(CrocodileEntity croc) {
             this.croc = croc;
@@ -1034,6 +1088,8 @@ public class CrocodileEntity extends PathfinderMob implements GeoEntity {
             t = 0;
             rolls = 0;
             small = isSmall(prey);
+            hauling = false;
+            croc.hunting = true;
             croc.setBasking(false);
             approach();
         }
@@ -1052,24 +1108,28 @@ public class CrocodileEntity extends PathfinderMob implements GeoEntity {
         public void tick() {
             switch (phase) {
                 case STALK -> stalk();
+                case CHARGE -> charge();
                 case LUNGE -> {
                     t++;
                     face(prey);
                     if (prey.isAlive() && prey.getBoundingBox().inflate(0.7, 0.9, 0.7).contains(croc.jawPoint())) {
-                        grab();
+                        boolean miss = croc.strikeLuck < 0 || croc.strikeLuck == 0 && croc.getRandom().nextFloat() < MISS_SHARE;
+                        if (miss) {
+                            miss(true);
+                        } else {
+                            grab();
+                        }
                     } else if (t > 15) {
-                        croc.setJaws(JAWS_NONE);
-                        giveUp(200);
+                        miss(false);
                     }
                 }
                 case DRAG -> {
                     t++;
                     if (croc.held == null) {
                         giveUp(600);
-                    } else if (t == 1) {
-                        out = openWater(croc, 12);
-                    }
-                    if (croc.held != null && phase == Phase.DRAG && t >= 1) {
+                    } else if (hauling) {
+                        haul();
+                    } else {
                         boolean there = out == null ? deepEnough()
                                 : croc.isInWater() && Math.abs(croc.getX() - out.getX() - 0.5) < 1.2 && Math.abs(croc.getZ() - out.getZ() - 0.5) < 1.2;
                         if (there || t > 160) {
@@ -1106,18 +1166,127 @@ public class CrocodileEntity extends PathfinderMob implements GeoEntity {
         /** Creeping up through the water to the water nearest the prey, slowly (faster after a swimmer), then the lunge. */
         private void stalk() {
             left--;
-            if (!prey.isAlive() || prey.isRemoved() || croc.distanceTo(prey) > HUNT_REACH + 4 || !atWater(croc.level(), prey, 4)
+            if (!prey.isAlive() || prey.isRemoved() || croc.distanceTo(prey) > HUNT_REACH + 4 || !atWater(croc.level(), prey, 5)
                     || prey.isPassenger() || left <= 0) {
                 giveUp(200);
                 return;
             }
             Vec3 jaws = croc.jawPoint();
             double dx = prey.getX() - jaws.x, dz = prey.getZ() - jaws.z, dy = prey.getY() - croc.getY();
-            if (Math.sqrt(dx * dx + dz * dz) < LUNGE_REACH + prey.getBbWidth() * 0.5 && Math.abs(dy) < 2.5) {
+            double flat = Math.sqrt(dx * dx + dz * dz) - prey.getBbWidth() * 0.5;
+            if (!small && !prey.isInWater() && flat < CHARGE_REACH && Math.abs(dy) < 2.5) {
+                // a big animal up on the bank: out of the water and at it (a lunge from the water would only reach its feet)
+                phase = Phase.CHARGE;
+                t = 0;
+                croc.playSound(net.minecraft.sounds.SoundEvents.PLAYER_SPLASH_HIGH_SPEED, 1.0F, 0.8F);
+                croc.getNavigation().moveTo(prey, CHARGE_PACE);
+            } else if ((small || prey.isInWater()) && flat < LUNGE_REACH && Math.abs(dy) < 2.5) {
                 lunge();
             } else if (left % 10 == 0 || croc.getNavigation().isDone()) {
                 approach();
             }
+        }
+
+        /** The rush up the bank at a big animal: it runs at it and strikes once its jaws are near; an animal that gets away from the water is left. */
+        private void charge() {
+            t++;
+            if (!prey.isAlive() || prey.isRemoved() || prey.isPassenger() || t > 80 || !atWater(croc.level(), prey, 6)) {
+                backOff();
+                return;
+            }
+            Vec3 jaws = croc.jawPoint();
+            double dx = prey.getX() - jaws.x, dz = prey.getZ() - jaws.z, dy = prey.getY() - croc.getY();
+            if (Math.sqrt(dx * dx + dz * dz) < STRIKE_REACH + prey.getBbWidth() * 0.5 && Math.abs(dy) < 1.5) {
+                lunge();
+            } else if (t % 5 == 0 || croc.getNavigation().isDone()) {
+                croc.getNavigation().moveTo(prey, CHARGE_PACE);
+            }
+        }
+
+        /**
+         * A miss: the jaws snap shut on air. An animal they nearly had leaps back from them (and knows what went for it,
+         * so it bolts); the crocodile turns back to the water and does not hunt again for half a minute.
+         */
+        private void miss(boolean near) {
+            croc.misses++;
+            croc.playSound(net.minecraft.sounds.SoundEvents.EVOKER_FANGS_ATTACK, 1.2F, 1.1F);
+            if (near) {
+                prey.knockback(0.6, croc.getX() - prey.getX(), croc.getZ() - prey.getZ());
+                prey.hurtMarked = true;
+                prey.setLastHurtByMob(croc);
+            }
+            Vec3 v = croc.getDeltaMovement();
+            croc.setDeltaMovement(v.x * 0.2, Math.min(v.y, 0.0), v.z * 0.2);
+            backOff();
+        }
+
+        /** The hunt is off: back into the water (not staying out to bask where its prey just got away), no hunting for half a minute. */
+        private void backOff() {
+            croc.setJaws(JAWS_NONE);
+            croc.sunIn = Math.max(croc.sunIn, 600);
+            giveUp(600);
+        }
+
+        /**
+         * The tug of war (2026-11-15, the user's ask: a cow is heavy, there should be a struggle). The crocodile has the
+         * animal by the head and backs toward the water, its tail to the river, in heaves: each heave it throws itself
+         * back and the animal, dug in and leaning away, is dragged a little way after it; some heaves gain nothing, and
+         * now and then the animal hauls the crocodile back up the bank. Once the animal is in the water it has no footing
+         * and is pulled steadily, and when the crocodile is out of its depth too the haul is over: it swims its prey out to roll it.
+         */
+        private void haul() {
+            hauled++;
+            BlockPos aim = out != null ? out : waterAim(croc, 16);
+            double dx = 0, dz = 0, len = 0;
+            if (aim != null) {
+                dx = aim.getX() + 0.5 - croc.getX();
+                dz = aim.getZ() + 0.5 - croc.getZ();
+                len = Math.sqrt(dx * dx + dz * dz);
+            }
+            if (len < 0.5 || hauled > 600 || prey.isInWater() && deepEnough()) {
+                hauling = false;
+                t = 0;
+                croc.setJaws(JAWS_HOLD);
+                return;
+            }
+            dx /= len;
+            dz /= len;
+            // its tail to the water, its head to its prey: it turns that way as it pulls, swinging the animal round
+            float face = Mth.approachDegrees(croc.getYRot(), (float) (Mth.atan2(-dz, -dx) * Mth.RAD_TO_DEG) - 90.0F, 4.0F);
+            croc.setYRot(face);
+            croc.yBodyRot = face;
+            croc.yHeadRot = face;
+            croc.getNavigation().stop();
+            double speed;
+            // the struggle lasts as long as the animal has its feet on the bank, whether the crocodile's own back half is
+            // still in the water or not (the first film: half out, it pulled the cow in with no fight at all)
+            boolean afloat = prey.isInWater();
+            if (afloat) {
+                speed = HAUL_AFLOAT;
+            } else {
+                int beat = hauled % HEAVE_TICKS;
+                if (beat == 1) {
+                    float dice = croc.getRandom().nextFloat();
+                    // a heavier animal gives less ground (a cow 0.7 of the gain, a horse half, a pig all of it)
+                    double weight = Mth.clamp(0.9 / (prey.getBbWidth() * prey.getBbHeight()), 0.5, 1.2);
+                    pull = dice < 0.6F ? HEAVE_GAIN * weight : dice < 0.85F ? 0.04 : -HEAVE_LOST;
+                    croc.playSound(pull < 0 ? net.minecraft.sounds.SoundEvents.RAVAGER_STEP : net.minecraft.sounds.SoundEvents.HORSE_STEP,
+                            0.9F, 0.6F);
+                    if (croc.level() instanceof net.minecraft.server.level.ServerLevel server) {      // dirt kicked up under the animal's feet
+                        BlockPos under = BlockPos.containing(prey.getX(), prey.getY() - 0.2, prey.getZ());
+                        var ground = croc.level().getBlockState(under);
+                        if (!ground.isAir()) {
+                            server.sendParticles(new net.minecraft.core.particles.BlockParticleOption(net.minecraft.core.particles.ParticleTypes.BLOCK, ground),
+                                    prey.getX(), prey.getY() + 0.1, prey.getZ(), 10, 0.3, 0.05, 0.3, 0.05);
+                        }
+                    }
+                }
+                // the heave: a hard pull in the first part of each beat (the drag clip's recoil), then bracing
+                speed = beat >= 2 && beat < 10 ? pull * Math.sin(Math.PI * (beat - 2) / 8.0) * Math.PI / 16.0 : 0.0;
+            }
+            croc.setJaws(afloat ? JAWS_HOLD : JAWS_DRAG);
+            Vec3 v = croc.getDeltaMovement();
+            croc.setDeltaMovement(dx * speed, v.y, dz * speed);
         }
 
         private void approach() {
@@ -1150,6 +1319,7 @@ public class CrocodileEntity extends PathfinderMob implements GeoEntity {
                 eat(small ? FED_SMALL : FED_BIG, 80);
                 return;
             }
+            boolean ashore = !prey.isInWater();
             if (!croc.grab(prey)) {
                 croc.setJaws(JAWS_NONE);
                 giveUp(200);
@@ -1157,6 +1327,12 @@ public class CrocodileEntity extends PathfinderMob implements GeoEntity {
             }
             phase = small ? Phase.SWALLOW : Phase.DRAG;
             t = 0;
+            if (!small) {
+                out = openWater(croc, 12);
+                hauling = ashore;       // seized on the bank: hauled back to the water; seized swimming: carried straight out
+                hauled = 0;
+                pull = 0.0;
+            }
         }
 
         /** Roll after roll, a pause between each, until the prey is dead (or after 12 rolls it lets go). */
@@ -1247,6 +1423,8 @@ public class CrocodileEntity extends PathfinderMob implements GeoEntity {
             croc.release();
             croc.setJaws(JAWS_NONE);
             croc.getNavigation().stop();
+            croc.hunting = false;
+            hauling = false;
             prey = null;
             phase = Phase.DONE;
         }
@@ -1254,7 +1432,7 @@ public class CrocodileEntity extends PathfinderMob implements GeoEntity {
 
     /**
      * Whether a crocodile hunts this: an animal (no tame pets) or a player (not in creative, not a spectator), not riding
-     * or ridden, in the water or within 2 blocks of it.
+     * or ridden, in the water or within 4 blocks of it (2 until the crocodile came out onto the bank after big prey, 2026-11-15).
      */
     static boolean isPrey(CrocodileEntity croc, LivingEntity e) {
         if (!e.isAlive() || e instanceof CrocodileEntity || e.isPassenger() || e.isVehicle()) {
@@ -1267,7 +1445,7 @@ public class CrocodileEntity extends PathfinderMob implements GeoEntity {
         } else if (!(e instanceof Animal) || e instanceof TamableAnimal pet && pet.isTame()) {
             return false;
         }
-        return atWater(croc.level(), e, 2);
+        return atWater(croc.level(), e, 4);
     }
 
     /**
@@ -1339,6 +1517,7 @@ public class CrocodileEntity extends PathfinderMob implements GeoEntity {
     private static final RawAnimation GAPE = RawAnimation.begin().thenPlayAndHold("lunge");
     private static final RawAnimation HOLD = RawAnimation.begin().thenLoop("hold");
     private static final RawAnimation EAT = RawAnimation.begin().thenLoop("eat");
+    private static final RawAnimation DRAG = RawAnimation.begin().thenLoop("drag");
     /** Drawn only: when it last walked on land, and whether the bask now drawn began with the flop. */
     private int walkedAt = -100;
     private boolean drawnBasking, flopNow;
@@ -1359,7 +1538,7 @@ public class CrocodileEntity extends PathfinderMob implements GeoEntity {
         byte jaws = jaws();
         if (jaws != JAWS_NONE) {
             drawnBasking = false;
-            return state.setAndContinue(jaws == JAWS_GAPE ? GAPE : jaws == JAWS_HOLD ? HOLD : EAT);
+            return state.setAndContinue(jaws == JAWS_GAPE ? GAPE : jaws == JAWS_HOLD ? HOLD : jaws == JAWS_DRAG ? DRAG : EAT);
         }
         double dx = getX() - xo, dy = getY() - yo, dz = getZ() - zo;
         if (isBasking()) {

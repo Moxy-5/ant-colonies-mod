@@ -38,8 +38,8 @@ public class CrocodileModel extends DefaultedEntityGeoModel<CrocodileEntity> {
         super(ResourceLocation.fromNamespaceAndPath(SavannaMod.MODID, "crocodile"));
     }
 
-    /** Which way the body bone's turn goes against the world's turn round the spine (checked in film). */
-    static final float BODY_ROLL_SIGN = 1.0F;
+    /** Which way the body bone's turn goes against the world's turn round the spine (see {@link CrocodileRollClient#ROLL_SIGN}; the crocodile's own roll is as it was). */
+    static final float BODY_ROLL_SIGN = -1.0F;
 
     @Override
     public void setCustomAnimations(CrocodileEntity croc, long instanceId, AnimationState<CrocodileEntity> state) {

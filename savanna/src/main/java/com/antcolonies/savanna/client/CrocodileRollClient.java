@@ -46,6 +46,9 @@ public final class CrocodileRollClient {
         float pt = event.getPartialTick();
         float roll = croc.rollAngle(pt);
         if (roll == 0.0F) {
+            if (croc.jaws() == CrocodileEntity.JAWS_DRAG) {
+                struggle(event, croc, pt);
+            }
             return;
         }
         // the pose is already at the held one's drawn place: turn round the line through the crocodile's spine
@@ -65,6 +68,27 @@ public final class CrocodileRollClient {
         pose.translate(-dx, -dy, -dz);
     }
 
-    /** Which way round the held one turns, to match the crocodile's body in {@link CrocodileModel} (checked in film). */
-    static final float ROLL_SIGN = 1.0F;
+    /**
+     * The tug of war on the bank (2026-11-15, the user's ask): the animal held by the head digs in and leans back
+     * from the crocodile, haunches down, rocking with each heave ({@link CrocodileEntity#HEAVE_TICKS}), and throws
+     * itself from side to side (my picks: 12 degrees of lean, 6 more in the heave, 7 each way).
+     */
+    private static void struggle(RenderLivingEvent.Pre<?, ?> event, CrocodileEntity croc, float pt) {
+        float time = croc.tickCount + pt;
+        float lean = 12.0F + 6.0F * Mth.sin(time * Mth.TWO_PI / CrocodileEntity.HEAVE_TICKS);
+        float thrash = 7.0F * Mth.sin(time * Mth.TWO_PI / 7.0F);
+        float yaw = Mth.rotLerp(pt, croc.yBodyRotO, croc.yBodyRot) * Mth.DEG_TO_RAD;
+        // about the line across the crocodile's snout, through the animal's feet: its top away from the crocodile
+        var pose = event.getPoseStack();
+        pose.mulPose(Axis.of(new Vector3f(Mth.cos(yaw), 0.0F, Mth.sin(yaw))).rotationDegrees(lean));
+        pose.mulPose(Axis.YP.rotationDegrees(thrash));
+    }
+
+    /**
+     * Which way round the held one turns, to match the crocodile's body in {@link CrocodileModel}. The body bone turns
+     * about the model's z, which GeckoLib draws turned by 180 less its yaw, so pointing backward along the crocodile:
+     * the held one, turned about the line pointing forward, must go the other way round (it was 1, and the animals
+     * rolled against the crocodile: the user's report, 2026-11-15).
+     */
+    static final float ROLL_SIGN = -1.0F;
 }

@@ -431,7 +431,30 @@ def clips():
         p['jaw'] = {'rotation': [30 * snap, 0, 0]}
         return p
 
+    def drag(t):
+        # the tug of war on the bank (2026-11-15, the user's ask): a big animal held by the head, the crocodile backing
+        # to the water in heaves, one every 0.8 s (CrocodileEntity.HEAVE_TICKS; the game moves it in the heave's first
+        # half). Braced high on splayed legs with the head up on its prey; in the heave it throws itself back and
+        # down, wrenching the head low and from side to side, the tail lashing against the pull, the legs stepping
+        # back; then it braces again, jaws squeezing (my picks)
+        u = (t % 0.8) / 0.8
+        heave = math.sin(math.pi * min(1.0, max(0.0, (u - 0.1) / 0.5)))
+        w = 2 * math.pi / 0.8
+        p = wave_pose(t, 0.5 + 0.7 * heave, w)
+        p['body'] = {'rotation': [-5 + 4 * heave, 0, 0], 'position': [0, 1.4 - 1.2 * heave, 1.8 * heave]}
+        p['neck'] = {'rotation': [-15 + 11 * heave, p['neck']['rotation'][1] + 9 * heave * math.sin(2 * w * t), 0]}
+        p['head'] = {'rotation': [-9 + 5 * heave, 11 * heave * math.sin(2 * w * t + 0.6), 6 * heave * math.sin(2 * w * t)]}
+        p['jaw'] = {'rotation': [9 - 4 * heave, 0, 0]}
+        for s, side in ((1, 'left'), (-1, 'right')):
+            for i, kind in enumerate(('arm', 'leg')):
+                ph = -w * t + (0 if s > 0 else math.pi) + (math.pi if i else 0)     # the walk's stride run backward
+                swing, lift = math.sin(ph), max(0.0, math.cos(ph))
+                p[f'{kind}_upper_{side}'] = {'rotation': [0, s * 18 * swing, s * (7 + 8 * lift)]}
+                p[f'{kind}_foot_{side}'] = {'rotation': [0, -s * 18 * swing, 0]}
+        return p
+
     return {'lunge': tm.clip(0.4, lunge, 24, 'hold'), 'hold': tm.clip(1.0, hold, 24), 'eat': tm.clip(1.0, eat, 24),
+            'drag': tm.clip(0.8, drag, 24),
             'idle': tm.clip(4.0, idle, 24), 'walk': tm.clip(WALK_LEN, walk, 20), 'swim': tm.clip(SWIM_LEN, swim, 24),
             'float': tm.clip(4.0, floating, 24), 'bask': tm.clip(6.0, bask, 24),
             'flop': tm.clip(FLOP_LEN, flop, 24, False), 'death': tm.clip(1.2, death, 12, 'hold')}
