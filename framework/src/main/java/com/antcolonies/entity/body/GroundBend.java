@@ -51,6 +51,8 @@ public final class GroundBend {
     /** How far the shoulders are lifted now (blocks). */
     private double lift;
     private long lastNanos;
+    /** Where the animal was and which way it pointed at the last {@link #update} (for {@link #footing}). */
+    private double atX, atY, atZ, alongX, alongZ = 1;
 
     public GroundBend(double[] front, double[] rear) {
         this.front = front.clone();
@@ -87,6 +89,11 @@ public final class GroundBend {
         double k = dt <= 0 ? 0 : dt > 0.5 ? 1.0 : 1.0 - Math.exp(-dt / EASE);
         double fx = -Mth.sin(yawDeg * Mth.DEG_TO_RAD), fz = Mth.cos(yawDeg * Mth.DEG_TO_RAD);
         double perBlock = scale / 16.0;
+        atX = x;
+        atY = y;
+        atZ = z;
+        alongX = fx;
+        alongZ = fz;
         // the shoulders (the anchor) lie on what is under them, never lower than the animal itself stands
         double wantLift = alive ? Mth.clamp(under(level, x, z, fx, fz, -front[0] * perBlock, y, inWater, floatDepth) - y, 0, MAX_LIFT) : 0;
         lift += (wantLift - lift) * k;
@@ -118,6 +125,36 @@ public final class GroundBend {
             h = Math.max(h, support(level, x + fx * a, z + fz * a, y, inWater, floatDepth));
         }
         return h;
+    }
+
+    /**
+     * Whether feet this far forward of the animal along its body (blocks; behind it is negative) find a footing, as
+     * worked out at the last {@link #update}: ground no more than {@code reach} under the body's own height (the animal's
+     * feet, lifted with the shoulders), with no water over it deeper than {@code wade}. Over deep water, or past a drop,
+     * there is nothing to stand on.
+     */
+    public boolean footing(BlockGetter level, double along, double reach, double wade) {
+        BlockPos.MutableBlockPos p = new BlockPos.MutableBlockPos();
+        int bx = Mth.floor(atX + alongX * along), bz = Mth.floor(atZ + alongZ * along);
+        double feet = atY + lift;
+        int by = Mth.floor(feet + 0.3);
+        for (int up = 0; up < 2 && top(level, p.set(bx, by, bz)) > 0.5; up++) {
+            by++;
+        }
+        double surface = Double.NaN;
+        for (int c = by; c >= Mth.floor(feet - reach); c--) {
+            p.set(bx, c, bz);
+            FluidState fluid = level.getFluidState(p);
+            if (Double.isNaN(surface) && fluid.is(FluidTags.WATER)) {
+                surface = c + fluid.getHeight(level, p);
+            }
+            double t = top(level, p);
+            if (t >= 0) {
+                double ground = c + t;
+                return ground >= feet - reach && (Double.isNaN(surface) || surface - ground <= wade);
+            }
+        }
+        return false;
     }
 
     /** How far the shoulders are lifted above the animal's own height (blocks): the whole body is raised by it before it bends. */

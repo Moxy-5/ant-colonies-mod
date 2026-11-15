@@ -1,25 +1,38 @@
-# The crocodile's body lying on what is under it (its life step 1, 2026-11-15): a pool with its bank a block above the
-# water, like a savanna river's floodplain. A still one on the bank with its head out over the water, a still one in the
-# water with its head on the bank, then a live one walking in and a live one climbing out to bask.
+# The crocodile going into and out of the water (its life steps 1 and 2, 2026-11-15): a level bank, the water flush with
+# the grass as on the mod's savanna rivers, and a pool with a bank a block above the water. The body lies on what is under
+# it and each leg pair folds over deep water and stands where its feet find ground.
 #   ./gradlew runFilm -PfilmScene=crocodile_water      pictures in run-film/screenshots/crocodile_water/
 cmd time set noon
 cmd weather clear
 cmd fill 26 -61 -4 40 -61 4 minecraft:air
 cmd fill 26 -63 -4 40 -62 4 minecraft:water
+cmd fill 26 -63 12 40 -61 22 minecraft:water
 lens 40
 wait 40
 # (the camera's height is its feet: its eye is 1.62 higher)
-camera 25.5 -60.4 -7.0 0 8
+# still ones on the level bank: one with its head out over the water, one in the water with its front on the bank
+camera 25.0 -60.0 11.0 0 12
+cmd summon antcolonies:crocodile 24.6 -60.0 17.0 {NoAI:1b,Rotation:[-90f,0f]}
+wait 30
+shot level_edge_side
+cmd tp @e[type=antcolonies:crocodile] 0 -120 0
+wait 10
+cmd summon antcolonies:crocodile 27.4 -60.5 17.0 {NoAI:1b,NoGravity:1b,Rotation:[90f,0f]}
+wait 30
+shot level_halfout_side
+camera 30.0 -58.0 13.5 40 30
+wait 5
+shot level_halfout_above
+cmd tp @e[type=antcolonies:crocodile] 0 -120 0
+wait 10
+# the same by the step bank
+camera 25.5 -60.4 -6.0 0 8
 cmd summon antcolonies:crocodile 25.3 -60.0 0.0 {NoAI:1b,Rotation:[-90f,0f]}
 wait 30
 shot edge_side
-camera 29.0 -58.0 -3.5 40 30
-wait 5
-shot edge_above
 cmd tp @e[type=antcolonies:crocodile] 0 -120 0
 wait 10
 cmd summon antcolonies:crocodile 26.6 -61.53 0.0 {NoAI:1b,NoGravity:1b,Rotation:[90f,0f]}
-camera 25.5 -60.4 -7.0 0 8
 wait 30
 shot halfout_side
 camera 29.0 -58.0 -3.5 40 30
@@ -27,56 +40,56 @@ wait 5
 shot halfout_above
 cmd tp @e[type=antcolonies:crocodile] 0 -120 0
 wait 10
-# a live one walks from the grass into the pool
-camera 23.0 -60.4 -9.0 0 8
-cmd summon antcolonies:crocodile 20.0 -60.0 0.0 {SunIn:50000,Rotation:[-90f,0f]}
-wait 40
-shot in_040
+# a live one walks off the grass into the level pool
+camera 24.0 -60.0 10.0 0 10
+cmd summon antcolonies:crocodile 20.0 -60.0 17.0 {SunIn:50000,Rotation:[-90f,0f]}
+wait 30
+shot in_030
 wait 6
-shot in_046
+shot in_036
 wait 6
-shot in_052
+shot in_042
 wait 6
-shot in_058
+shot in_048
 wait 6
-shot in_064
+shot in_054
 wait 6
-shot in_070
+shot in_060
 wait 6
-shot in_076
+shot in_066
 wait 6
-shot in_082
+shot in_072
 wait 6
-shot in_088
+shot in_078
 wait 6
-shot in_094
+shot in_084
 wait 6
-shot in_100
+shot in_090
 wait 6
-shot in_106
+shot in_096
 wait 6
-shot in_112
+shot in_102
 wait 6
-shot in_118
+shot in_108
 wait 6
-shot in_124
+shot in_114
 wait 6
-shot in_130
+shot in_120
 wait 6
-shot in_136
+shot in_126
 wait 6
-shot in_142
+shot in_132
 wait 6
-shot in_148
+shot in_138
 wait 6
-shot in_154
+shot in_144
 wait 6
-shot in_160
+shot in_150
 cmd tp @e[type=antcolonies:crocodile] 0 -120 0
 wait 10
-# a live one in the water wanting the sun climbs out onto the bank
-camera 26.0 -60.4 -9.0 0 10
-cmd summon antcolonies:crocodile 28.0 -61.5 0.0 {SunIn:0,Rotation:[90f,0f]}
+# a live one in the level pool wanting the sun walks out
+camera 25.0 -60.0 10.0 0 10
+cmd summon antcolonies:crocodile 29.5 -60.5 17.0 {SunIn:0,Rotation:[90f,0f]}
 wait 10
 shot out_010
 wait 10
@@ -117,23 +130,88 @@ wait 10
 shot out_190
 wait 10
 shot out_200
-wait 20
+wait 10
+shot out_210
+wait 10
 shot out_220
-wait 20
+wait 10
+shot out_230
+wait 10
 shot out_240
-wait 20
+wait 10
+shot out_250
+wait 10
 shot out_260
-wait 20
+wait 10
+shot out_270
+wait 10
 shot out_280
-wait 20
+wait 10
+shot out_290
+wait 10
 shot out_300
-wait 20
-shot out_320
-wait 20
-shot out_340
-wait 20
-shot out_360
-wait 20
-shot out_380
-wait 20
-shot out_400
+cmd tp @e[type=antcolonies:crocodile] 0 -120 0
+wait 10
+# and one climbing the step bank
+camera 25.0 -60.4 -7.0 0 10
+cmd summon antcolonies:crocodile 28.0 -61.5 0.0 {SunIn:0,Rotation:[90f,0f]}
+wait 10
+shot step_010
+wait 10
+shot step_020
+wait 10
+shot step_030
+wait 10
+shot step_040
+wait 10
+shot step_050
+wait 10
+shot step_060
+wait 10
+shot step_070
+wait 10
+shot step_080
+wait 10
+shot step_090
+wait 10
+shot step_100
+wait 10
+shot step_110
+wait 10
+shot step_120
+wait 10
+shot step_130
+wait 10
+shot step_140
+wait 10
+shot step_150
+wait 10
+shot step_160
+wait 10
+shot step_170
+wait 10
+shot step_180
+wait 10
+shot step_190
+wait 10
+shot step_200
+wait 10
+shot step_210
+wait 10
+shot step_220
+wait 10
+shot step_230
+wait 10
+shot step_240
+wait 10
+shot step_250
+wait 10
+shot step_260
+wait 10
+shot step_270
+wait 10
+shot step_280
+wait 10
+shot step_290
+wait 10
+shot step_300

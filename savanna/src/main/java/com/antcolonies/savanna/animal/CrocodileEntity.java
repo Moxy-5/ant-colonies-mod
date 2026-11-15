@@ -74,6 +74,11 @@ public class CrocodileEntity extends PathfinderMob implements GeoEntity {
      */
     public static final double[] FRONT_JOINTS = {-14, -40}, REAR_JOINTS = {-14, 0, 12, 24, 36, 48, 60, 68};
     /** The bones of those pieces, in the same order: front chain, then rear chain. */
+    /** Where each leg pair stands along the body (model z, pixels): the forelegs, then the hind legs (the crocodile's life step 2). */
+    public static final double[] LEG_PAIRS = {-11, 7};
+    /** How much each leg pair stands now (1) or is folded back along the body (0), eased; drawn only (the model sets it). */
+    public final double[] legStand = {1, 1};
+    public long legNanos;
     public static final String[] BENT_BONES = {"neck", "chest", "hips", "tail1", "tail2", "tail3", "tail4", "tail5"};
 
     private final AnimatableInstanceCache cache = GeckoLibUtil.createInstanceCache(this);
