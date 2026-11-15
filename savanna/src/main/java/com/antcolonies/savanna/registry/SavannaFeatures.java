@@ -30,6 +30,10 @@ public class SavannaFeatures {
     public static final DeferredHolder<Feature<?>, com.antcolonies.savanna.worldgen.RiverAlgaeFeature> RIVER_ALGAE =
             FEATURES.register("river_algae", () -> new com.antcolonies.savanna.worldgen.RiverAlgaeFeature(NoneFeatureConfiguration.CODEC));
 
+    /** A few old fish remains on the beds of the savanna's waters (switched on with the algae, .../biome_modifier/river_algae.json). */
+    public static final DeferredHolder<Feature<?>, com.antcolonies.savanna.worldgen.RiverRemainsFeature> RIVER_REMAINS =
+            FEATURES.register("river_remains", () -> new com.antcolonies.savanna.worldgen.RiverRemainsFeature(NoneFeatureConfiguration.CODEC));
+
     /** Oxbow lakes and pans on the floodplain (data/antcolonies/neoforge/biome_modifier/floodplain_pools.json). */
     public static final DeferredHolder<Feature<?>, com.antcolonies.savanna.worldgen.FloodplainPoolFeature> OXBOW =
             FEATURES.register("oxbow", () -> new com.antcolonies.savanna.worldgen.FloodplainPoolFeature(NoneFeatureConfiguration.CODEC, true));

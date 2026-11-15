@@ -137,9 +137,34 @@ public class RemainsEntity extends Entity implements GeoEntity {
 
     /** The look's stage: 1 fresh, 2 fed on, 3 picked over, 4 bones. */
     public int stage() {
-        int left = bitesLeft();
-        int all = kind().bites;
-        return left <= 0 ? 4 : 1 + Math.min(2, (all - left) * 3 / all);
+        return stageOf(kind(), bitesLeft());
+    }
+
+    /** The look's stage for remains of this kind with this many bites left. */
+    public static int stageOf(Kind kind, int left) {
+        return left <= 0 ? 4 : 1 + Math.min(2, (kind.bites - left) * 3 / kind.bites);
+    }
+
+    /**
+     * Sets up remains found already lying in new land ({@code worldgen/RiverRemainsFeature}): this kind, size and look,
+     * on either side, at a random number of bites within the stage, part way through its rotting (so remains made
+     * together never change look together), and bones already some way to crumbling (at most half their time).
+     */
+    public void setUp(Kind kind, float size, int look, int stage, boolean otherSide, net.minecraft.util.RandomSource random) {
+        entityData.set(DATA_KIND, kind.ordinal());
+        entityData.set(DATA_SIZE, size);
+        entityData.set(DATA_LOOK, look);
+        entityData.set(DATA_OTHER_SIDE, otherSide);
+        java.util.List<Integer> lefts = new java.util.ArrayList<>();
+        for (int left = 0; left <= kind.bites; left++) {
+            if (stageOf(kind, left) == stage) {
+                lefts.add(left);
+            }
+        }
+        int left = lefts.isEmpty() ? kind.bites : lefts.get(random.nextInt(lefts.size()));
+        entityData.set(DATA_BITES, left);
+        rot = random.nextInt(ROTS_TICKS / kind.bites);
+        bones = left == 0 ? random.nextInt(BONES_TICKS / 2) : 0;
     }
 
     /** Sets how many bites are left (for tests and the command). */

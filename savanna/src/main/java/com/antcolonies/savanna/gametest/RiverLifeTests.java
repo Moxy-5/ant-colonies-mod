@@ -161,6 +161,27 @@ public class RiverLifeTests {
         if (!helper.getBlockState(seed).is(Blocks.WATER)) {
             helper.fail("broken algae left " + helper.getBlockState(seed) + ", not water");
         }
+        // 6. new land's old remains (2026-11-15): laid on the bed (the shelf or the deep floor), never afloat, part eaten
+        // or bare, each set to its stage's bites
+        int remainsLaid = com.antcolonies.savanna.worldgen.RiverRemainsFeature.scatter(level, level.random,
+                corner.getX(), corner.getZ(), X1 - X0 + 1, Z1 - Z0 + 1, corner.getY(), 6, at -> true);
+        java.util.List<com.antcolonies.savanna.animal.RemainsEntity> lying = level.getEntitiesOfClass(
+                com.antcolonies.savanna.animal.RemainsEntity.class, net.minecraft.world.phys.AABB.encapsulatingFullBlocks(helper.absolutePos(new BlockPos(X0, SURFACE, Z0)),
+                        helper.absolutePos(new BlockPos(X1, TOP + 1, Z1))));
+        if (remainsLaid != 6 || lying.size() != 6) {
+            helper.fail("old remains: laid " + remainsLaid + ", found " + lying.size() + " (6 asked)");
+        }
+        for (com.antcolonies.savanna.animal.RemainsEntity r : lying) {
+            BlockPos cell = r.blockPosition().subtract(helper.absolutePos(BlockPos.ZERO));    // relativePos turns x and z round
+            int bed = cell.getX() <= SHALLOW_TO ? TOP - 1 : SURFACE;
+            if (cell.getY() != bed) {
+                helper.fail("old remains at " + cell + ", the bed is at " + bed);
+            }
+            if (com.antcolonies.savanna.animal.RemainsEntity.stageOf(r.kind(), r.bitesLeft()) != r.stage() || r.stage() < 1 || r.stage() > 4) {
+                helper.fail("old remains with a bad stage " + r.stage());
+            }
+            r.discard();
+        }
         helper.succeed();
     }
 
