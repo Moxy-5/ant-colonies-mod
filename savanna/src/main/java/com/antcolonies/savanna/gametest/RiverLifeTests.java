@@ -353,6 +353,8 @@ public class RiverLifeTests {
         // the side it lies on: the side of the tilapia the catfish was on at the catch (0 not caught yet, 1 right, 2 wrong)
         int[] side = {0};
         double[] was = new double[5];
+        // the bite-off (2026-11-15): half the catches the jaws shut early, the front half falling away as remains
+        boolean[] cut = {false};
         helper.onEachTick(() -> {
             sawStrike[0] |= catfish.isStriking();
             if (!wild.isRemoved()) {
@@ -370,6 +372,7 @@ public class RiverLifeTests {
                     side[0] = Math.abs(toRight) < 0.15 || catfish.heldOnRight() == toRight > 0 ? 1 : 2;
                 }
                 held[0]++;
+                cut[0] = catfish.heldCut();
                 wrongLook[0] |= catfish.heldLook() != wildLook || !wild.isRemoved();
             }
         });
@@ -377,13 +380,21 @@ public class RiverLifeTests {
             helper.assertTrue(catfish.isAlive(), "the catfish died");
             helper.assertTrue(side[0] != 2, "the caught tilapia lies on the side away from where the catfish came from");
             helper.assertTrue(!wrongLook[0], "the tilapia in the catfish's mouth was not the caught one's look, or the caught one still swam");
-            helper.assertTrue(wild.isRemoved() && !catfish.isHolding() && held[0] >= 45 && held[0] <= 60,
+            int want = cut[0] ? 42 : 52;
+            helper.assertTrue(wild.isRemoved() && !catfish.isHolding() && held[0] >= want - 7 && held[0] <= want + 8,
                     "the caught tilapia was held in the mouth for " + held[0] + " ticks"
-                            + (catfish.isHolding() ? ", still held" : "") + " (about 52, then gone)");
+                            + (catfish.isHolding() ? ", still held" : "") + " (about " + want + (cut[0] ? ", bitten off" : "") + ", then gone)");
+            var halves = level.getEntitiesOfClass(com.antcolonies.savanna.animal.RemainsEntity.class, catfish.getBoundingBox().inflate(4.0));
+            helper.assertTrue(halves.size() == (cut[0] ? 1 : 0) && (!cut[0] || halves.get(0).kind() == com.antcolonies.savanna.animal.RemainsEntity.Kind.TILAPIA_HALF
+                            && halves.get(0).stage() == 1),
+                    (cut[0] ? "bitten off, " : "swallowed whole, ") + halves.size() + " remains by the catfish"
+                            + (halves.isEmpty() ? "" : " (" + halves.get(0).kind() + ", stage " + halves.get(0).stage() + ")")
+                            + " (a bite-off leaves 1 fresh tilapia half, a swallow none)");
             helper.assertTrue(wild.isRemoved() && sawStrike[0] && !catfish.isHungry(),
                     "the wild tilapia " + (wild.isRemoved() ? "is gone" : "still swims") + (sawStrike[0] ? "" : ", no strike seen")
                             + (catfish.isHungry() ? ", the catfish still hungry" : ""));
             helper.assertTrue(pet.isAlive(), "the bucket tilapia was eaten");
+            SavannaMod.LOGGER.info("[catfish] the tilapia was {}", cut[0] ? "bitten off, its front half left" : "swallowed whole");
         });
     }
 

@@ -12,6 +12,7 @@ Shown (the cow left out by the user 2026-11-15: no remains for vanilla mobs; kep
   - the river catfish, built from the game's own catfish model (catfish_models.py) so it is the same fish, cut open;
   - the catfish a crocodile killed: torn in two, the front half left (fish_remains(..., torn=True));
   - the tilapia (a fish that died of old age; hunters swallow tilapia whole), from tilapia_models.py;
+  - the front half of a tilapia a catfish bit off (half its catches the mouth shuts early, the user 2026-11-15);
   - a cow (a big land kill a crocodile hauls in), a Minecraft-style cow made here, since the game's cow model is
     Minecraft's own.
 Meat in Minecraft's raw-meat style: blocky pink-red with lighter streaks and fat, never blood, splatter or guts.
@@ -105,7 +106,8 @@ FISH = {
     # module, the part of the body that is eaten (z), the wound in stage 1 (z), the ribs' span (z), the tail fin's part
     'catfish': {'mod': cm, 'eaten': (-12.0, 15.0), 'wound': (-7.0, 1.5), 'ribs': (-10.0, 6.0), 'end': cm.HIND_END,
                 'tear': 2.0},     # where a crocodile's head shake tears it in two (about the middle)
-    'tilapia': {'mod': tm, 'eaten': (-5.0, 8.4), 'wound': (-2.5, 3.0), 'ribs': (-4.2, 4.0), 'end': tm.PEDUNCLE},
+    'tilapia': {'mod': tm, 'eaten': (-5.0, 8.4), 'wound': (-2.5, 3.0), 'ribs': (-4.2, 4.0), 'end': tm.PEDUNCLE,
+                'tear': 0.5},     # where a catfish's jaws, snapping shut early, bite it through (about the middle)
 }
 BODY_PARTS = ('body', 'head', 'jaw', 'helmet', 'gill')
 EYE_PARTS = ('iris', 'pupil')
@@ -444,7 +446,7 @@ def cow_remains(stage):
 
 def whole_length_bones(kind):
     """The bones of the whole (untorn) fish, to size a torn one by."""
-    return fish_remains(kind.replace('_croc', ''), 1)[0]
+    return fish_remains(kind.replace('_croc', '').replace('_half', ''), 1)[0]
 
 
 def all_remains():
@@ -452,11 +454,13 @@ def all_remains():
     The cow is left out (the user, 2026-11-15: vanilla mobs get no remains); cow_remains stays for a cow of our own."""
     return {'catfish': [fish_remains('catfish', s) for s in (1, 2, 3, 4)],
             'catfish_croc': [fish_remains('catfish', s, torn=True) for s in (1, 2, 3, 4)],
-            'tilapia': [fish_remains('tilapia', s) for s in (1, 2, 3, 4)]}
+            'tilapia': [fish_remains('tilapia', s) for s in (1, 2, 3, 4)],
+            'tilapia_half': [fish_remains('tilapia', s, torn=True) for s in (1, 2, 3, 4)]}
 
 
 # The game's names for the three kinds (the viewer's 'catfish_croc' is the game's 'catfish_torn').
-GAME_KINDS = {'catfish': ('catfish', False), 'catfish_torn': ('catfish', True), 'tilapia': ('tilapia', False)}
+GAME_KINDS = {'catfish': ('catfish', False), 'catfish_torn': ('catfish', True), 'tilapia': ('tilapia', False),
+              'tilapia_half': ('tilapia', True)}     # the front half a catfish bit off (2026-11-15)
 LOOSE = ('barbel', 'pectoral', 'pelvic')      # limp parts that may sink into the silt, left out of the grounding
 
 

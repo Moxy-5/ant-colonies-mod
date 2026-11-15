@@ -37,13 +37,14 @@ import software.bernie.geckolib.util.GeckoLibUtil;
  * game day after that: remains never pile up, and nothing has to eat them to live (my picks, to check against the crab's
  * hunger when it comes). A player's hit breaks it at once.
  *
- * <p>The first maker is the crocodile, tearing a catfish in two and leaving the front half ({@link Kind#CATFISH_TORN});
+ * <p>The makers: the crocodile, tearing a catfish in two and leaving the front half ({@link Kind#CATFISH_TORN}), and the
+ * catfish, whose jaws snap shut early on half the tilapia it catches, the front half falling away ({@link Kind#TILAPIA_HALF});
  * whole fish that die and fish a player kills come later, their numbers tuned in a soak.
  */
 public class RemainsEntity extends Entity implements GeoEntity {
-    /** The three kinds, their game names (models {@code remains_<name>_<stage>}, {@code tools/remains_models.py game}) and bites (my picks). */
+    /** The kinds (the front half of a tilapia a catfish bit off, 2026-11-15), their game names (models {@code remains_<name>_<stage>}, {@code tools/remains_models.py game}) and bites (my picks). */
     public enum Kind {
-        CATFISH("catfish", 12), CATFISH_TORN("catfish_torn", 9), TILAPIA("tilapia", 6);
+        CATFISH("catfish", 12), CATFISH_TORN("catfish_torn", 9), TILAPIA("tilapia", 6), TILAPIA_HALF("tilapia_half", 3);
 
         public final String name;
         public final int bites;
@@ -136,7 +137,7 @@ public class RemainsEntity extends Entity implements GeoEntity {
 
     private void puff(int count) {
         if (level() instanceof ServerLevel server) {
-            ItemStack bits = new ItemStack(kind() == Kind.TILAPIA ? SavannaItems.TILAPIA.get() : SavannaItems.CATFISH.get());
+            ItemStack bits = new ItemStack(kind() == Kind.TILAPIA || kind() == Kind.TILAPIA_HALF ? SavannaItems.TILAPIA.get() : SavannaItems.CATFISH.get());
             server.sendParticles(new ItemParticleOption(ParticleTypes.ITEM, bits), getX(), getY() + 0.15, getZ(),
                     count, 0.25 * size(), 0.08, 0.25 * size(), 0.04);
         }

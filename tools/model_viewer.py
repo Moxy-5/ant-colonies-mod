@@ -540,14 +540,15 @@ def remains_page(out):
         zs = [z for b in bones for c in b.get('cubes', []) for z in (c['origin'][2], c['origin'][2] + c['size'][2])]
         return max(zs) - min(zs)
 
-    game_length = {'catfish': 2.0, 'catfish_croc': 2.0, 'tilapia': 0.6}
+    game_length = {'catfish': 2.0, 'catfish_croc': 2.0, 'tilapia': 0.6, 'tilapia_half': 0.6}
     animals = {}
     for kind, stages in rm.all_remains().items():
         models = [{"bones": b, "texture": uri(tm.png(rows)), "w": w, "h": h,
                    "boxes": sum(len(x.get('cubes', [])) for x in b)} for b, rows, w, h in stages]
         scale = game_length[kind] * 16 / length(rm.whole_length_bones(kind))
-        animals[kind] = {"models": models, "scale": scale, "sink": {'catfish': 0.05, 'catfish_croc': 0.05, 'tilapia': 0.02}[kind]}
+        animals[kind] = {"models": models, "scale": scale, "sink": {'catfish': 0.05, 'catfish_croc': 0.05, 'tilapia': 0.02, 'tilapia_half': 0.02}[kind]}
     animals['catfish_croc']['stages'] = ['Torn', 'Fed on', 'Picked over', 'Bones']
+    animals['tilapia_half']['stages'] = ['Bitten off', 'Fed on', 'Picked over', 'Bones']
     notes = [
         ("1 Fresh", "the whole fish on its side with one open patch of meat where something fed (a bite out of the upper "
          "flank): a catfish or tilapia that died, or one a player killed."),

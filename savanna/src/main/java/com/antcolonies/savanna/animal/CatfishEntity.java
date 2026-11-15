@@ -60,6 +60,14 @@ public class CatfishEntity extends AbstractFish implements GeoEntity {
      * {@code tools/catfish_models.py}), and the tick of the hold the last gulp is heard.
      */
     static final int HOLD_TICKS = 52, GULP_AT = 44;
+    /**
+     * The bite-off (the user, 2026-11-15): on this share of its catches the mouth shuts early, at the first gulp, biting
+     * the tilapia through; the front half, still out of the mouth, falls away as remains ({@link RemainsEntity.Kind#TILAPIA_HALF}).
+     * The clip "bite_off" is {@link #CUT_TICKS} long and its jaws close through the fish at {@link #CUT_AT_TICK}
+     * ({@code tools/catfish_models.py}, CUT_AT and CUT_LEN).
+     */
+    static final float BITE_OFF_CHANCE = 0.5F;
+    static final int CUT_TICKS = 42, CUT_AT_TICK = 30;
 
     private static final EntityDataAccessor<Boolean> DATA_STRIKING = SynchedEntityData.defineId(CatfishEntity.class, EntityDataSerializers.BOOLEAN);
     /** The look of the tilapia held in its mouth ({@link TilapiaEntity#look()}), or -1 with nothing held; and its size. */
@@ -67,6 +75,8 @@ public class CatfishEntity extends AbstractFish implements GeoEntity {
     private static final EntityDataAccessor<Float> DATA_HELD_SIZE = SynchedEntityData.defineId(CatfishEntity.class, EntityDataSerializers.FLOAT);
     /** Whether the held tilapia lies on its right side (the catfish came at it from its right), else on its left. */
     private static final EntityDataAccessor<Boolean> DATA_HELD_ON_RIGHT = SynchedEntityData.defineId(CatfishEntity.class, EntityDataSerializers.BOOLEAN);
+    /** Whether this catch is a bite-off ({@link #BITE_OFF_CHANCE}): the mouth shuts early and the front half falls away. */
+    private static final EntityDataAccessor<Boolean> DATA_HELD_CUT = SynchedEntityData.defineId(CatfishEntity.class, EntityDataSerializers.BOOLEAN);
     /** A held tilapia drawn smaller than this (against a grown one) gets the tighter bite, the clip "catch_small". */
     static final float SMALL_PREY = 0.75F;
 
@@ -107,6 +117,7 @@ public class CatfishEntity extends AbstractFish implements GeoEntity {
         builder.define(DATA_HELD_LOOK, -1);
         builder.define(DATA_HELD_SIZE, 1.0F);
         builder.define(DATA_HELD_ON_RIGHT, false);
+        builder.define(DATA_HELD_CUT, false);
     }
 
     /** Whether a caught tilapia is in its mouth. */
@@ -138,7 +149,28 @@ public class CatfishEntity extends AbstractFish implements GeoEntity {
         entityData.set(DATA_HELD_ON_RIGHT, toRight > 0);
         entityData.set(DATA_HELD_SIZE, prey.getScale());
         entityData.set(DATA_HELD_LOOK, prey.look());
-        holding = HOLD_TICKS;
+        boolean cut = getRandom().nextFloat() < BITE_OFF_CHANCE;
+        entityData.set(DATA_HELD_CUT, cut);
+        holding = cut ? CUT_TICKS : HOLD_TICKS;
+    }
+
+    /** Whether the catch in its mouth is a bite-off (the front half to fall away). */
+    public boolean heldCut() {
+        return entityData.get(DATA_HELD_CUT);
+    }
+
+    /** The jaws snap shut through the held tilapia: its front half falls away from the mouth as remains, head first. */
+    private void biteOff(net.minecraft.server.level.ServerLevel server) {
+        Vec3 m = mouth();
+        float yaw = getYRot() * Mth.DEG_TO_RAD;
+        double ahead = 0.12 * entityData.get(DATA_HELD_SIZE);      // the half's middle, a little in front of the lips
+        Vec3 at = new Vec3(m.x - Mth.sin(yaw) * ahead, m.y - 0.05, m.z + Mth.cos(yaw) * ahead);
+        RemainsEntity left = RemainsEntity.leave(server, RemainsEntity.Kind.TILAPIA_HALF, at, getYRot(), entityData.get(DATA_HELD_SIZE));
+        if (left != null) {
+            left.setDeltaMovement(getDeltaMovement().scale(0.3).add(0, -0.02, 0));
+        }
+        server.sendParticles(net.minecraft.core.particles.ParticleTypes.BUBBLE, m.x, m.y, m.z, 6, 0.15, 0.1, 0.15, 0.03);
+        server.playSound(null, m.x, m.y, m.z, SoundEvents.SLIME_SQUISH_SMALL, net.minecraft.sounds.SoundSource.NEUTRAL, 0.7F, 1.3F);
     }
 
     /**
@@ -216,7 +248,10 @@ public class CatfishEntity extends AbstractFish implements GeoEntity {
         }
         if (holding > 0) {
             holding--;
-            if (holding == HOLD_TICKS - GULP_AT && level() instanceof net.minecraft.server.level.ServerLevel server) {
+            if (heldCut() && holding == CUT_TICKS - CUT_AT_TICK && level() instanceof net.minecraft.server.level.ServerLevel server) {
+                biteOff(server);
+            }
+            if (!heldCut() && holding == HOLD_TICKS - GULP_AT && level() instanceof net.minecraft.server.level.ServerLevel server) {
                 Vec3 m = mouth();
                 server.sendParticles(net.minecraft.core.particles.ParticleTypes.BUBBLE, m.x, m.y, m.z, 8, 0.2, 0.15, 0.2, 0.04);
                 server.playSound(null, m.x, m.y, m.z, SoundEvents.DOLPHIN_EAT, net.minecraft.sounds.SoundSource.NEUTRAL, 0.8F, 0.6F);
@@ -252,6 +287,7 @@ public class CatfishEntity extends AbstractFish implements GeoEntity {
             tag.putFloat("HeldSize", entityData.get(DATA_HELD_SIZE));
             tag.putInt("HeldTicks", holding);
             tag.putBoolean("HeldOnRight", heldOnRight());
+            tag.putBoolean("HeldCut", heldCut());
         }
     }
 
@@ -268,6 +304,7 @@ public class CatfishEntity extends AbstractFish implements GeoEntity {
             entityData.set(DATA_HELD_LOOK, Mth.clamp(tag.getInt("HeldLook"), TilapiaEntity.YOUNG, TilapiaEntity.BREEDING));
             holding = tag.getInt("HeldTicks");
             entityData.set(DATA_HELD_ON_RIGHT, tag.getBoolean("HeldOnRight"));
+            entityData.set(DATA_HELD_CUT, tag.getBoolean("HeldCut"));
         }
     }
 
@@ -344,6 +381,8 @@ public class CatfishEntity extends AbstractFish implements GeoEntity {
     private static final RawAnimation STRIKE = RawAnimation.begin().thenPlay("strike");
     private static final RawAnimation CATCH = RawAnimation.begin().thenPlayAndHold("catch");
     private static final RawAnimation CATCH_SMALL = RawAnimation.begin().thenPlayAndHold("catch_small");
+    private static final RawAnimation BITE_OFF = RawAnimation.begin().thenPlayAndHold("bite_off");
+    private static final RawAnimation BITE_OFF_SMALL = RawAnimation.begin().thenPlayAndHold("bite_off_small");
     private static final RawAnimation FLOP =RawAnimation.begin().thenLoop("flop");
     private static final RawAnimation DEATH = RawAnimation.begin().thenPlayAndHold("death");
     /** The swim clip's beat is made for this speed (blocks a tick, about 1 a second); it plays faster or slower by it. */
@@ -366,7 +405,8 @@ public class CatfishEntity extends AbstractFish implements GeoEntity {
         }
         if (isHolding()) {
             player.setAnimationSpeed(1.0);
-            return state.setAndContinue(entityData.get(DATA_HELD_SIZE) < SMALL_PREY ? CATCH_SMALL : CATCH);
+            boolean small = entityData.get(DATA_HELD_SIZE) < SMALL_PREY;
+            return state.setAndContinue(heldCut() ? (small ? BITE_OFF_SMALL : BITE_OFF) : small ? CATCH_SMALL : CATCH);
         }
         if (isStriking()) {
             player.setAnimationSpeed(1.0);

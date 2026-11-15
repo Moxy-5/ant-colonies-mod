@@ -116,6 +116,8 @@ public class CrocodileEntity extends PathfinderMob implements GeoEntity {
     static final int FED_TILAPIA = 6000;
     /** How long it whips a catfish from side to side before it tears in two (ticks: 2 seconds, six shakes; my pick). */
     static final int TEAR_TICKS = 40;
+    /** With a catfish and a tilapia both in reach, the chance it goes for the catfish, the bigger meal (the user, 2026-11-15). */
+    static final float PREFERS_CATFISH = 0.6F;
     /**
      * The sideways snap at a fish beside its head: the head and neck swing round from the shoulders (this far behind its
      * middle) by this much, the snout's tip this far from the shoulders, and the jaws slam shut on this tick of the
@@ -1253,17 +1255,33 @@ public class CrocodileEntity extends PathfinderMob implements GeoEntity {
                 return false;
             }
             prey = null;
-            double best = Double.MAX_VALUE;
+            double best = Double.MAX_VALUE, bestCat = Double.MAX_VALUE, bestTilapia = Double.MAX_VALUE;
+            LivingEntity cat = null, tilapia = null;
             // called to a school: the fish round where the other struck; else whatever is near it
             Vec3 from = called ? croc.schoolAt : croc.position();
             double around = called ? SCHOOL_REACH : HUNT_REACH;
             for (LivingEntity seen : croc.level().getEntitiesOfClass(LivingEntity.class, new net.minecraft.world.phys.AABB(from, from).inflate(around, 6.0, around),
                     e -> isPrey(croc, e) && (!called || isFish(e)))) {
                 double d = seen.distanceToSqr(from);
-                if (d < best && d < around * around) {
+                if (d >= around * around) {
+                    continue;
+                }
+                if (d < best) {
                     best = d;
                     prey = seen;
                 }
+                if (seen instanceof CatfishEntity && d < bestCat) {
+                    bestCat = d;
+                    cat = seen;
+                } else if (seen instanceof TilapiaEntity && d < bestTilapia) {
+                    bestTilapia = d;
+                    tilapia = seen;
+                }
+            }
+            // a catfish is the bigger meal (the user, 2026-11-15): with both near, it goes for the nearest catfish
+            // 3 times in 5, else the nearest tilapia, however near either is
+            if (prey != null && isFish(prey) && cat != null && tilapia != null) {
+                prey = croc.getRandom().nextFloat() < PREFERS_CATFISH ? cat : tilapia;
             }
             if (called) {
                 croc.schoolAt = null;       // answered (or nothing left there)

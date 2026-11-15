@@ -53,7 +53,7 @@ public class RemainsRenderer extends GeoEntityRenderer<RemainsEntity> {
     protected void applyRotations(RemainsEntity remains, PoseStack poseStack, float ageInTicks, float rotationYaw,
             float partialTick, float nativeScale) {
         super.applyRotations(remains, poseStack, ageInTicks, rotationYaw, partialTick, nativeScale);
-        float scale = (remains.kind() == RemainsEntity.Kind.TILAPIA ? TilapiaRenderer.SCALE : CatfishRenderer.SCALE) * remains.size();
+        float scale = (remains.kind() == RemainsEntity.Kind.TILAPIA || remains.kind() == RemainsEntity.Kind.TILAPIA_HALF ? TilapiaRenderer.SCALE : CatfishRenderer.SCALE) * remains.size();
         poseStack.scale(scale, scale, scale);
     }
 }
