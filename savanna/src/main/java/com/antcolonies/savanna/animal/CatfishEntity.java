@@ -189,6 +189,19 @@ public class CatfishEntity extends AbstractFish implements GeoEntity {
     }
 
     /** Kept near a player like the tilapia ({@link TilapiaEntity#KEEP_NEAR}). */
+    /**
+     * Never counts as idle for its wandering (2026-11-14, the user's report: after the catfish's strikes the tilapia
+     * huddled in a corner and stood still). Minecraft lets a mob wander only while its idle clock is under 5 s, and
+     * winds that clock back only while a player who is not in spectator mode is within 32 blocks; with the user
+     * watching in spectator nothing wound it back, so the school's leader stopped wandering and its school sat by it (the catfish would too).
+     * River fish always wander (cheap: at most 60 near a player). Only the wandering reads this; Minecraft's own
+     * despawning still reads the real clock.
+     */
+    @Override
+    public int getNoActionTime() {
+        return 0;
+    }
+
     @Override
     public boolean removeWhenFarAway(double distanceToClosestPlayer) {
         return super.removeWhenFarAway(distanceToClosestPlayer)

@@ -250,6 +250,19 @@ public class TilapiaEntity extends AbstractSchoolingFish implements GeoEntity {
         return new ItemStack(SavannaItems.TILAPIA_BUCKET.get());
     }
 
+    /**
+     * Never counts as idle for its wandering (2026-11-14, the user's report: after the catfish's strikes the tilapia
+     * huddled in a corner and stood still). Minecraft lets a mob wander only while its idle clock is under 5 s, and
+     * winds that clock back only while a player who is not in spectator mode is within 32 blocks; with the user
+     * watching in spectator nothing wound it back, so the school's leader stopped wandering and its school sat by it.
+     * River fish always wander (cheap: at most 60 near a player). Only the wandering reads this; Minecraft's own
+     * despawning still reads the real clock.
+     */
+    @Override
+    public int getNoActionTime() {
+        return 0;
+    }
+
     /** Fish within this many blocks of a player are never removed (my pick); past 128 they always are. */
     public static final double KEEP_NEAR = 96.0;
 
@@ -272,6 +285,28 @@ public class TilapiaEntity extends AbstractSchoolingFish implements GeoEntity {
     public boolean shouldRenderAtSqrDistance(double distanceSqr) {
         double reach = DRAW_DISTANCE * getViewScale();
         return distanceSqr < reach * reach;
+    }
+
+    /** The fish it follows (Minecraft keeps its own copy private), or none. */
+    @Nullable
+    private AbstractSchoolingFish followed;
+
+    @Override
+    public AbstractSchoolingFish startFollowing(AbstractSchoolingFish leader) {
+        followed = leader;
+        return super.startFollowing(leader);
+    }
+
+    @Override
+    public void stopFollowing() {
+        super.stopFollowing();
+        followed = null;
+    }
+
+    /** For tests: the fish it follows, or none. */
+    @Nullable
+    public AbstractSchoolingFish followedForTests() {
+        return isFollower() ? followed : null;
     }
 
     @Override

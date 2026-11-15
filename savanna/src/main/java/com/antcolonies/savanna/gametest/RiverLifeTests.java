@@ -340,4 +340,83 @@ public class RiverLifeTests {
             helper.assertTrue(pet.isAlive(), "the bucket tilapia was eaten");
         });
     }
+
+    /**
+     * The school after a hunt (the user's report 2026-11-14: after the catfish struck at them a few times the tilapia
+     * huddled in a corner and stopped moving). A school of 8 in the deep end, a hungry catfish; once it has eaten, every
+     * tilapia left must still be swimming about: none stands still (moves less than half a block across) for 20 s. The fish are
+     * wild (not kept for ever) and no player is counted near, as with the user watching in spectator mode: Minecraft
+     * counts only non-spectators near a mob, and a mob with nobody counted near stops wandering after 5 s.
+     */
+    @GameTest(template = "arena", timeoutTicks = 3200)
+    public static void theSchoolSwimsOnAfterAHunt(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        buildPond(helper);
+        java.util.List<TilapiaEntity> school = new java.util.ArrayList<>();
+        for (int i = 0; i < 8; i++) {
+            // made by hand: helper.spawn marks a mob kept for ever, and Minecraft zeroes a kept mob's idle clock
+            TilapiaEntity t = SavannaEntities.TILAPIA.get().create(level);
+            net.minecraft.world.phys.Vec3 at = helper.absoluteVec(new net.minecraft.world.phys.Vec3(X1 - 0.5 - i % 3, SURFACE + 2 + i % 3, Z1 - 0.5 - i / 3));
+            t.moveTo(at.x, at.y, at.z);
+            t.setUp(false, level.random);
+            level.addFreshEntity(t);
+            school.add(t);   // not kept for ever: as wild fish with only a spectator near (no player counted)
+        }
+        for (int i = 1; i < school.size(); i++) {
+            school.get(i).startFollowing(school.get(0));
+        }
+        CatfishEntity catfish = helper.spawn(SavannaEntities.CATFISH.get(), new BlockPos(X1 - 1, SURFACE + 3, Z0 + 1));
+        catfish.setPersistenceRequired();
+        catfish.makeHungry();
+        int[] fedAt = {-1};
+        java.util.Map<TilapiaEntity, net.minecraft.world.phys.Vec3> lastAt = new java.util.HashMap<>();
+        java.util.Map<TilapiaEntity, Double> walked = new java.util.HashMap<>();
+        int[] tick = {0};
+        StringBuilder still = new StringBuilder();
+        helper.onEachTick(() -> {
+            tick[0]++;
+            if (fedAt[0] < 0 && !catfish.isHungry()) {
+                fedAt[0] = tick[0];
+            }
+            if (fedAt[0] < 0 || tick[0] < fedAt[0] + 100) {
+                return;
+            }
+            int since = tick[0] - fedAt[0] - 100;
+            for (TilapiaEntity t : school) {
+                if (t.isRemoved()) {
+                    continue;
+                }
+                net.minecraft.world.phys.Vec3 was = lastAt.put(t, t.position());
+                if (was != null) {
+                    walked.merge(t, Math.hypot(was.x - t.getX(), was.z - t.getZ()), Double::sum);   // across: an idle fish sinks
+                }
+            }
+            if (since > 0 && since % 400 == 0) {
+                for (TilapiaEntity t : school) {
+                    if (t.isRemoved()) {
+                        continue;
+                    }
+                    double w = walked.getOrDefault(t, 0.0);
+                    if (w < 0.5 && still.length() < 2000) {
+                        String goals = t.goalSelector.getAvailableGoals().stream().filter(g -> g.isRunning())
+                                .map(g -> g.getGoal().getClass().getSimpleName()).collect(java.util.stream.Collectors.joining(","));
+                        still.append(String.format(java.util.Locale.ROOT, " | tick %d: fish %d moved %.2f in 20 s at %s, follower %b, leads %b, nav done %b, idle %d, goals [%s], leader %s %.1f away, path %s",
+                                since, school.indexOf(t), w, helper.relativeVec(t.position()), t.isFollower(), t.hasFollowers(),
+                                t.getNavigation().isDone(), t.getNoActionTime(), goals,
+                                t.followedForTests() == null ? "-" : String.valueOf(school.indexOf(t.followedForTests())),
+                                t.followedForTests() == null ? 0.0 : t.distanceTo(t.followedForTests()),
+                                t.followedForTests() == null ? "-" : String.valueOf(t.getNavigation().createPath(t.followedForTests(), 0))));
+                    }
+                    walked.put(t, 0.0);
+                }
+            }
+            if (since >= 2000) {
+                if (still.length() > 0) {
+                    helper.fail("tilapia stood still after the hunt:" + still);
+                } else {
+                    helper.succeed();
+                }
+            }
+        });
+    }
 }
