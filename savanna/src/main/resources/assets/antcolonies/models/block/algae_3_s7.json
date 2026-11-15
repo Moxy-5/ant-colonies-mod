@@ -5,7 +5,8 @@
   "textures": {
     "particle": "antcolonies:block/algae_mat_3",
     "mat": "antcolonies:block/algae_mat_3",
-    "strands": "antcolonies:block/algae_strands_tall"
+    "a": "antcolonies:block/algae_strands_tall_a_7",
+    "b": "antcolonies:block/algae_strands_tall_b_7"
   },
   "elements": [
     {
@@ -71,7 +72,7 @@
             16,
             16
           ],
-          "texture": "#strands"
+          "texture": "#a"
         },
         "south": {
           "uv": [
@@ -80,7 +81,7 @@
             16,
             16
           ],
-          "texture": "#strands"
+          "texture": "#a"
         }
       }
     },
@@ -114,7 +115,7 @@
             16,
             16
           ],
-          "texture": "#strands"
+          "texture": "#b"
         },
         "south": {
           "uv": [
@@ -123,7 +124,7 @@
             16,
             16
           ],
-          "texture": "#strands"
+          "texture": "#b"
         }
       }
     }

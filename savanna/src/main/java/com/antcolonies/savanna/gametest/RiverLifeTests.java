@@ -105,11 +105,21 @@ public class RiverLifeTests {
             }
         }
         helper.assertBlockProperty(shallow, AlgaeBlock.GROWTH, AlgaeBlock.LUSH);
+        helper.assertBlockProperty(shallow, AlgaeBlock.STRANDS, AlgaeBlock.fullStrands(AlgaeBlock.LUSH));
         helper.assertBlockProperty(deep, AlgaeBlock.GROWTH, AlgaeBlock.THIN);
-        // 3. a bite eats the whole mat down to the bare bed, never takes the bare specks, and the patch grows back
+        helper.assertBlockProperty(deep, AlgaeBlock.STRANDS, 0);
+        // 3. each bite takes 2 strands (a pair, one off each plane), the mat staying lush; with the strands gone the next
+        // bite eats the mat down to the bare bed; the bare specks are never taken, and the patch grows back, strands too
         BlockPos absShallow = helper.absolutePos(shallow);
+        for (int left = AlgaeBlock.fullStrands(AlgaeBlock.LUSH) - 1; left >= 0; left--) {
+            if (!AlgaeBlock.graze(level, absShallow)) {
+                helper.fail("nothing to graze with " + (left + 1) + " strand pairs standing");
+            }
+            helper.assertBlockProperty(shallow, AlgaeBlock.STRANDS, left);
+            helper.assertBlockProperty(shallow, AlgaeBlock.GROWTH, AlgaeBlock.LUSH);
+        }
         if (!AlgaeBlock.graze(level, absShallow)) {
-            helper.fail("nothing to graze on a lush mat");
+            helper.fail("nothing to graze on a lush mat with its strands gone");
         }
         helper.assertBlockProperty(shallow, AlgaeBlock.GROWTH, AlgaeBlock.BARE);
         if (AlgaeBlock.graze(level, absShallow)) {
@@ -120,7 +130,9 @@ public class RiverLifeTests {
             level.getBlockState(absShallow).randomTick(level, absShallow, level.random);
         }
         helper.assertBlockProperty(shallow, AlgaeBlock.GROWTH, AlgaeBlock.LUSH);
+        helper.assertBlockProperty(shallow, AlgaeBlock.STRANDS, AlgaeBlock.fullStrands(AlgaeBlock.LUSH));
         AlgaeBlock.graze(level, absShallow);
+        helper.assertBlockProperty(shallow, AlgaeBlock.STRANDS, AlgaeBlock.fullStrands(AlgaeBlock.LUSH) - 1);
         // 4. spreading: the shelf cleared but one lush mat, which seeds the bare bed round it
         for (int x = X0; x <= SHALLOW_TO; x++) {
             for (int z = Z0; z <= Z1; z++) {
@@ -128,7 +140,7 @@ public class RiverLifeTests {
             }
         }
         BlockPos seed = new BlockPos(X0 + 2, TOP - 1, Z0 + 3);
-        helper.setBlock(seed, bare.setValue(AlgaeBlock.GROWTH, AlgaeBlock.LUSH));
+        helper.setBlock(seed, SavannaBlocks.ALGAE.get().whole(AlgaeBlock.LUSH));
         BlockPos absSeed = helper.absolutePos(seed);
         for (int i = 0; i < 1000; i++) {
             level.getBlockState(absSeed).randomTick(level, absSeed, level.random);
@@ -161,12 +173,12 @@ public class RiverLifeTests {
     public static void tilapiaGrazeGrowUpAndWearTheirLooks(GameTestHelper helper) {
         ServerLevel level = helper.getLevel();
         buildPond(helper);
-        BlockState lush = SavannaBlocks.ALGAE.get().defaultBlockState().setValue(AlgaeBlock.GROWTH, AlgaeBlock.LUSH);
+        BlockState lush = SavannaBlocks.ALGAE.get().whole(AlgaeBlock.LUSH);
         int start = 0;
         for (int x = X0; x <= SHALLOW_TO; x++) {
             for (int z = Z0; z <= Z1; z++) {
                 helper.setBlock(new BlockPos(x, TOP - 1, z), lush);
-                start += AlgaeBlock.LUSH;
+                start += AlgaeBlock.bitesLeft(lush);
             }
         }
         // the looks, from many fish never put in the world
@@ -280,12 +292,10 @@ public class RiverLifeTests {
             for (int x = X0; x <= SHALLOW_TO; x++) {
                 for (int z = Z0; z <= Z1; z++) {
                     BlockState state = helper.getBlockState(new BlockPos(x, TOP - 1, z));
-                    if (state.getBlock() instanceof AlgaeBlock) {
-                        left += state.getValue(AlgaeBlock.GROWTH);
-                    }
+                    left += AlgaeBlock.bitesLeft(state);
                 }
             }
-            helper.assertTrue(sawGrazing[0] && full - left >= 3, "grazed " + (full - left) + " stages of " + full
+            helper.assertTrue(sawGrazing[0] && full - left >= 3, "grazed " + (full - left) + " bites of " + full
                     + (sawGrazing[0] ? "" : ", no fish seen grazing"));
         });
     }

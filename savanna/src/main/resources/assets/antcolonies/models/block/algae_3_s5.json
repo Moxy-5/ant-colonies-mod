@@ -3,9 +3,10 @@
   "render_type": "minecraft:cutout",
   "ambientocclusion": false,
   "textures": {
-    "particle": "antcolonies:block/algae_mat_2",
-    "mat": "antcolonies:block/algae_mat_2",
-    "strands": "antcolonies:block/algae_strands_short"
+    "particle": "antcolonies:block/algae_mat_3",
+    "mat": "antcolonies:block/algae_mat_3",
+    "a": "antcolonies:block/algae_strands_tall_a_5",
+    "b": "antcolonies:block/algae_strands_tall_b_5"
   },
   "elements": [
     {
@@ -71,7 +72,7 @@
             16,
             16
           ],
-          "texture": "#strands"
+          "texture": "#a"
         },
         "south": {
           "uv": [
@@ -80,7 +81,7 @@
             16,
             16
           ],
-          "texture": "#strands"
+          "texture": "#a"
         }
       }
     },
@@ -114,7 +115,7 @@
             16,
             16
           ],
-          "texture": "#strands"
+          "texture": "#b"
         },
         "south": {
           "uv": [
@@ -123,7 +124,7 @@
             16,
             16
           ],
-          "texture": "#strands"
+          "texture": "#b"
         }
       }
     }

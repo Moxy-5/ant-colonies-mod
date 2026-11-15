@@ -76,7 +76,7 @@ public class RiverAlgaeFeature extends Feature<NoneFeatureConfiguration> {
                 if (growth < 0) {
                     continue;
                 }
-                BlockState algae = SavannaBlocks.ALGAE.get().defaultBlockState().setValue(AlgaeBlock.GROWTH, growth);
+                BlockState algae = SavannaBlocks.ALGAE.get().whole(growth);
                 if (algae.canSurvive(level, cell)) {
                     level.setBlock(cell, algae, Block.UPDATE_CLIENTS);
                     laid++;

@@ -12,7 +12,7 @@ import net.minecraft.world.level.block.state.BlockState;
 
 /**
  * A hungry tilapia swims down to the thickest river algae near it, noses into the mat and grazes it (M9 river life,
- * 2026-11-14): a few pecks, then {@link AlgaeBlock#graze} tears the mat off down to the bare bed (it grows back), and it swims on. Hungry again
+ * 2026-11-14): a few pecks, then {@link AlgaeBlock#graze} bites 2 strands off it (or, with none left, tears the mat off down to the bare bed; it grows back), and it swims on. Hungry again
  * after 2 to 4 minutes (my picks). With nothing to eat near it simply swims on: a fish never starves, so the river's
  * food chain can never crash (the balance rule).
  */
@@ -123,9 +123,9 @@ public class GrazeAlgaeGoal extends Goal {
         fish.getNavigation().moveTo(mat.getX() + 0.5, mat.getY() + 0.15, mat.getZ() + 0.5, 1.0);
     }
 
+    /** How much there is to eat here: the bites left (strand pairs, then the mat; 0 bare or no algae). */
     private int growth(BlockPos pos) {
-        BlockState state = fish.level().getBlockState(pos);
-        return state.getBlock() instanceof AlgaeBlock ? state.getValue(AlgaeBlock.GROWTH) : -1;
+        return AlgaeBlock.bitesLeft(fish.level().getBlockState(pos));
     }
 
     /** The thickest grazeable mat near it (the nearest of the thickest), or none. */

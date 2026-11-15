@@ -37,20 +37,27 @@ import net.minecraft.world.phys.shapes.VoxelShape;
  * <p>{@link #GROWTH}: 0 grazed bare (a few specks; it never goes, so a grazed patch grows back without seeding again),
  * 1 thin, 2 thick, 3 lush. It grows on random ticks (about one stage a game day, my pick), only as far as the water's
  * depth lets it ({@link #mostFor}: lush only in shallow water, thin at most in the deep channel, where little light
- * reaches), and a thick mat spreads to bare bed beside it. A grazing fish's bite eats the whole mat down to the bare
- * bed at once with a puff of torn algae ({@link #graze}; the user's ask 2026-11-15, it was a stage a bite and hardly
- * showed), and the bare patch grows back. Like seagrass it always holds water: broken, it leaves water.
+ * reaches), and a thick mat spreads to bare bed beside it.
+ *
+ * <p>{@link #STRANDS}: the streamers left standing on each of the two crossed planes a thick or lush mat is drawn with
+ * (up to 5 short ones on a thick mat, 7 tall ones on a lush mat; none on a thin or bare one). A grazing fish's bite
+ * ({@link #graze}) takes 2 strands, one off each plane (the user's ask, 2026-11-15), and once the strands are gone the
+ * next bite tears the mat off down to the bare bed. A thick mat regrows its strands one pair at a time before it
+ * thickens to lush. Like seagrass it always holds water: broken, it leaves water.
  */
 public class AlgaeBlock extends BushBlock implements LiquidBlockContainer, BonemealableBlock {
     public static final MapCodec<AlgaeBlock> CODEC = simpleCodec(AlgaeBlock::new);
     public static final IntegerProperty GROWTH = IntegerProperty.create("growth", 0, 3);
     public static final int BARE = 0, THIN = 1, THICK = 2, LUSH = 3;
+    /** Strand pairs standing (one strand on each crossed plane): see {@link #fullStrands}. */
+    public static final IntegerProperty STRANDS = IntegerProperty.create("strands", 0, 7);
+    /** The chance a random tick grows the mat a stage (about one stage a game day: a block gets ~17 random ticks a day). */
+    static final float GROW_CHANCE = 1 / 14f;
     /**
-     * The chance a random tick grows the mat a stage: about one stage every half game day (a block gets ~17 random ticks
-     * a day), so a grazed patch is lush again in about a day and a half (my pick, 2026-11-15; was a stage a day, made
-     * quicker when a bite began to eat the whole mat).
+     * The chance a random tick of a thick or lush mat grows back a pair of strands: about 6 pairs a game day, so a bitten
+     * tuft is whole again in about a day (my pick, 2026-11-15).
      */
-    static final float GROW_CHANCE = 1 / 7f;
+    static final float STRAND_CHANCE = 1 / 3f;
     /** The chance a random tick of a thick or lush mat seeds bare bed beside it. */
     static final float SPREAD_CHANCE = 1 / 10f;
     /** How deep the water is counted (deeper is all the same: the channel). */
@@ -59,7 +66,7 @@ public class AlgaeBlock extends BushBlock implements LiquidBlockContainer, Bonem
 
     public AlgaeBlock(Properties properties) {
         super(properties);
-        registerDefaultState(stateDefinition.any().setValue(GROWTH, THIN));
+        registerDefaultState(stateDefinition.any().setValue(GROWTH, THIN).setValue(STRANDS, 0));
     }
 
     @Override
@@ -69,7 +76,7 @@ public class AlgaeBlock extends BushBlock implements LiquidBlockContainer, Bonem
 
     @Override
     protected void createBlockStateDefinition(StateDefinition.Builder<Block, BlockState> builder) {
-        builder.add(GROWTH);
+        builder.add(GROWTH, STRANDS);
     }
 
     @Override
@@ -129,11 +136,42 @@ public class AlgaeBlock extends BushBlock implements LiquidBlockContainer, Bonem
         return depth <= 2 ? LUSH : depth <= 4 ? THICK : THIN;
     }
 
+    /** How many strand pairs a whole mat of this stage stands: 5 thick, 7 lush, none thin or bare (as the pictures draw). */
+    public static int fullStrands(int growth) {
+        return growth == LUSH ? 7 : growth == THICK ? 5 : 0;
+    }
+
+    /** A mat of this stage with all its strands standing. */
+    public BlockState whole(int growth) {
+        return defaultBlockState().setValue(GROWTH, growth).setValue(STRANDS, fullStrands(growth));
+    }
+
+    /** Bites a fish can still take here: one per strand pair, then one for the mat (none when bare). */
+    public static int bitesLeft(BlockState state) {
+        if (!(state.getBlock() instanceof AlgaeBlock) || state.getValue(GROWTH) == BARE) {
+            return 0;
+        }
+        return Math.min(state.getValue(STRANDS), fullStrands(state.getValue(GROWTH))) + 1;
+    }
+
+    /** The mat one step thicker: a thick or lush mat missing strands grows a pair back first, else it thickens a stage. */
+    private static BlockState grown(BlockState state) {
+        int growth = state.getValue(GROWTH), strands = state.getValue(STRANDS);
+        if (strands < fullStrands(growth)) {
+            return state.setValue(STRANDS, strands + 1);
+        }
+        return state.setValue(GROWTH, growth + 1);       // thick to lush keeps its strands; the rest grow back after
+    }
+
     @Override
     protected void randomTick(BlockState state, ServerLevel level, BlockPos pos, RandomSource random) {
         int growth = state.getValue(GROWTH);
-        if (growth < mostFor(depth(level, pos)) && random.nextFloat() < GROW_CHANCE) {
-            level.setBlock(pos, state.setValue(GROWTH, growth + 1), Block.UPDATE_CLIENTS);
+        if (state.getValue(STRANDS) < fullStrands(growth)) {
+            if (random.nextFloat() < STRAND_CHANCE) {
+                level.setBlock(pos, grown(state), Block.UPDATE_CLIENTS);
+            }
+        } else if (growth < mostFor(depth(level, pos)) && random.nextFloat() < GROW_CHANCE) {
+            level.setBlock(pos, grown(state), Block.UPDATE_CLIENTS);
         }
         if (growth >= THICK && random.nextFloat() < SPREAD_CHANCE) {
             spread(level, pos, random);
@@ -148,7 +186,7 @@ public class AlgaeBlock extends BushBlock implements LiquidBlockContainer, Bonem
             return;
         }
         BlockState there = level.getBlockState(to);
-        BlockState bare = level.getBlockState(pos).getBlock().defaultBlockState().setValue(GROWTH, BARE);
+        BlockState bare = level.getBlockState(pos).getBlock().defaultBlockState().setValue(GROWTH, BARE).setValue(STRANDS, 0);
         if (there.is(Blocks.WATER) && there.getFluidState().isSource() && bare.canSurvive(level, to)) {
             level.setBlock(to, bare, Block.UPDATE_CLIENTS);
         }
@@ -161,27 +199,36 @@ public class AlgaeBlock extends BushBlock implements LiquidBlockContainer, Bonem
     }
 
     /**
-     * A fish's bite: the mat here is torn off down to the bare bed, with a puff of algae bits and a few bubbles. Whether
-     * there was anything to eat (a bare mat has nothing; its specks stay, so the patch grows back without seeding again).
+     * A fish's bite: 2 strands off (one off each crossed plane), with a few torn bits; or, with no strands left, the mat
+     * torn off down to the bare bed, with a puff of algae bits and a few bubbles. Whether there was anything to eat (a
+     * bare mat has nothing; its specks stay, so the patch grows back without seeding again).
      */
     public static boolean graze(Level level, BlockPos pos) {
         BlockState state = level.getBlockState(pos);
-        if (!(state.getBlock() instanceof AlgaeBlock) || state.getValue(GROWTH) == BARE) {
+        if (bitesLeft(state) == 0) {
             return false;
         }
-        level.setBlock(pos, state.setValue(GROWTH, BARE), Block.UPDATE_CLIENTS);
+        int strands = Math.min(state.getValue(STRANDS), fullStrands(state.getValue(GROWTH)));
+        boolean mat = strands == 0;
+        level.setBlock(pos, mat ? state.setValue(GROWTH, BARE).setValue(STRANDS, 0) : state.setValue(STRANDS, strands - 1), Block.UPDATE_CLIENTS);
         if (level instanceof ServerLevel server) {
-            double x = pos.getX() + 0.5, y = pos.getY() + 0.15, z = pos.getZ() + 0.5;
-            server.sendParticles(new net.minecraft.core.particles.BlockParticleOption(net.minecraft.core.particles.ParticleTypes.BLOCK, state),
-                    x, y, z, 6 + 4 * state.getValue(GROWTH), 0.3, 0.1, 0.3, 0.05);
-            server.sendParticles(net.minecraft.core.particles.ParticleTypes.BUBBLE, x, y + 0.2, z, 4, 0.25, 0.1, 0.25, 0.02);
+            double x = pos.getX() + 0.5, z = pos.getZ() + 0.5;
+            if (mat) {
+                server.sendParticles(new net.minecraft.core.particles.BlockParticleOption(net.minecraft.core.particles.ParticleTypes.BLOCK, state),
+                        x, pos.getY() + 0.15, z, 6 + 4 * state.getValue(GROWTH), 0.3, 0.1, 0.3, 0.05);
+                server.sendParticles(net.minecraft.core.particles.ParticleTypes.BUBBLE, x, pos.getY() + 0.35, z, 4, 0.25, 0.1, 0.25, 0.02);
+            } else {
+                server.sendParticles(new net.minecraft.core.particles.BlockParticleOption(net.minecraft.core.particles.ParticleTypes.BLOCK, state),
+                        x, pos.getY() + 0.5, z, 3, 0.2, 0.25, 0.2, 0.03);
+                server.sendParticles(net.minecraft.core.particles.ParticleTypes.BUBBLE, x, pos.getY() + 0.5, z, 1, 0.2, 0.2, 0.2, 0.02);
+            }
         }
         return true;
     }
 
     @Override
     public boolean isValidBonemealTarget(LevelReader level, BlockPos pos, BlockState state) {
-        return state.getValue(GROWTH) < LUSH;
+        return state.getValue(GROWTH) < LUSH || state.getValue(STRANDS) < fullStrands(LUSH);
     }
 
     @Override
@@ -191,6 +238,6 @@ public class AlgaeBlock extends BushBlock implements LiquidBlockContainer, Bonem
 
     @Override
     public void performBonemeal(ServerLevel level, RandomSource random, BlockPos pos, BlockState state) {
-        level.setBlock(pos, state.setValue(GROWTH, state.getValue(GROWTH) + 1), Block.UPDATE_CLIENTS);
+        level.setBlock(pos, grown(state), Block.UPDATE_CLIENTS);
     }
 }

@@ -77,16 +77,23 @@ def strands_film(stage):
     return felt(stage)
 
 
-def streamer(tall, frame=0, frames=1):
+STRANDS = {2: 5, 3: 7}     # strands drawn on each crossed plane: thick (short) and lush (tall)
+
+
+def streamer(tall, frame=0, frames=1, keep=None):
     """The upright tuft for look C (drawn on two crossed planes, as Minecraft draws grass): thin wavy strands rising
     from the bottom edge, brighter at their tips; `tall` the stage (2 short, 3 long). `frame` of `frames`: the strands'
-    sway, a lean to and fro moving up them (the game plays the frames as an animated texture)."""
+    sway, a lean to and fro moving up them (the game plays the frames as an animated texture). `keep`: the strands
+    (by number) still standing, None for all; the dice are thrown for every strand either way, so the strands that stay
+    keep exactly their pixels when others are bitten off (2026-11-15)."""
     rows = [[(0, 0, 0, 0)] * S for _ in range(S)]
     rng = random.Random(400 + tall)
-    for i in range(7 if tall == 3 else 5):
+    for i in range(STRANDS[tall]):
         x0 = 1 + i * 2 + rng.randint(0, 1)
         top = rng.randint(2, 6) if tall == 3 else rng.randint(8, 11)
         phase = rng.uniform(0, 6.283)
+        if keep is not None and i not in keep:
+            continue
         for y in range(S - 1, top - 1, -1):
             t = (S - 1 - y) / max(1, S - 1 - top)          # 0 at the foot, 1 at the tip
             lean = 1.2 * t * math.sin(6.283 * frame / frames + phase * 0.3) if frames > 1 else 0
@@ -112,20 +119,88 @@ FRAMES = 8
 OUT = "savanna/src/main/resources/assets/antcolonies/textures/block"
 
 
+MODELS = "savanna/src/main/resources/assets/antcolonies/models/block"
+STATES = "savanna/src/main/resources/assets/antcolonies/blockstates"
+PANELS = {"a": 45, "b": -45}     # the two crossed planes, each with its own pictures
+
+
+def bite_order(tall, panel):
+    """The order a plane's strands are bitten off (the first bite takes the first): fixed per plane, so plane a and
+    plane b lose different strands (b in a's order backwards) and a bitten tuft looks ragged, not mirrored (my pick)."""
+    order = list(range(STRANDS[tall]))
+    random.Random(900 + 10 * tall).shuffle(order)
+    return order if panel == "a" else order[::-1]
+
+
+def left_standing(tall, panel, n):
+    """The strands still standing on a plane with `n` left."""
+    order = bite_order(tall, panel)
+    return set(order[len(order) - n:]) if n > 0 else set()
+
+
+def _write_film(path, rows_of):
+    import river_blocks_art
+    px = [p for f in range(FRAMES) for r in rows_of(f) for p in r]
+    river_blocks_art.write_png(path, S, S * FRAMES, px)
+    with open(path + ".mcmeta", "w", encoding="utf-8") as f:
+        f.write('{"animation": {"frametime": 5, "interpolate": false}}\n')
+
+
+def _model(stage, n):
+    """A block model: the mat, and (n > 0) the two crossed planes with n strands left on each."""
+    name = "short" if stage == 2 else "tall"
+    textures = {"particle": f"antcolonies:block/algae_mat_{stage}", "mat": f"antcolonies:block/algae_mat_{stage}"}
+    elements = [{"from": [0, 0, 0], "to": [16, 0.25, 16], "faces": {
+        "up": {"uv": [0, 0, 16, 16], "texture": "#mat"},
+        "down": {"uv": [0, 0, 16, 16], "texture": "#mat", "cullface": "down"}}}]
+    if n > 0:
+        for panel, angle in PANELS.items():
+            textures[panel] = f"antcolonies:block/algae_strands_{name}_{panel}_{n}"
+            face = {"uv": [0, 0, 16, 16], "texture": "#" + panel}
+            elements.append({"from": [0.8, 0, 8], "to": [15.2, 16, 8],
+                             "rotation": {"origin": [8, 8, 8], "axis": "y", "angle": angle, "rescale": True},
+                             "shade": False, "faces": {"north": face, "south": dict(face)}})
+    return {"parent": "block/block", "render_type": "minecraft:cutout", "ambientocclusion": False,
+            "textures": textures, "elements": elements}
+
+
 def main():
-    """Writes look C's textures into the savanna mod (the user's pick, 2026-11-14)."""
+    """Writes look C's textures into the savanna mod (the user's pick, 2026-11-14), and since the strands can be bitten
+    off two at a time (2026-11-15) a picture per plane for every count of strands left, a model per count and the block
+    states that pick them (`growth` and `strands`, the strands left on each plane)."""
+    import json
     import os
     import river_blocks_art
     os.makedirs(OUT, exist_ok=True)
     for stage in range(4):
         rows = strands_film(stage)
         river_blocks_art.write_png(os.path.join(OUT, f"algae_mat_{stage}.png"), S, S, [p for r in rows for p in r])
-    for name, tall in (("short", 2), ("tall", 3)):
-        px = [p for f in range(FRAMES) for r in streamer(tall, f, FRAMES) for p in r]
-        river_blocks_art.write_png(os.path.join(OUT, f"algae_strands_{name}.png"), S, S * FRAMES, px)
-        with open(os.path.join(OUT, f"algae_strands_{name}.png.mcmeta"), "w", encoding="utf-8") as f:
-            f.write('{"animation": {"frametime": 5, "interpolate": false}}\n')
-    print("wrote the algae textures into", OUT)
+    _write_film(os.path.join(OUT, "algae_strands_tall.png"), lambda f: streamer(3, f, FRAMES))     # the item's picture
+    for old in ("algae_strands_short.png", "algae_strands_short.png.mcmeta"):
+        if os.path.exists(os.path.join(OUT, old)):
+            os.remove(os.path.join(OUT, old))
+    for stage, name in ((2, "short"), (3, "tall")):
+        for panel in PANELS:
+            for n in range(1, STRANDS[stage] + 1):
+                keep = left_standing(stage, panel, n)
+                _write_film(os.path.join(OUT, f"algae_strands_{name}_{panel}_{n}.png"),
+                            lambda f, keep=keep, stage=stage: streamer(stage, f, FRAMES, keep))
+        old = os.path.join(MODELS, f"algae_{stage}.json")
+        if os.path.exists(old):
+            os.remove(old)
+        for n in range(STRANDS[stage] + 1):
+            with open(os.path.join(MODELS, f"algae_{stage}_s{n}.json"), "w", encoding="utf-8") as f:
+                json.dump(_model(stage, n), f, indent=2)
+                f.write("\n")
+    variants = {}
+    for stage in range(4):
+        for n in range(max(STRANDS.values()) + 1):
+            model = f"antcolonies:block/algae_{stage}" if stage < 2 else f"antcolonies:block/algae_{stage}_s{min(n, STRANDS[stage])}"
+            variants[f"growth={stage},strands={n}"] = [dict({"model": model}, **({"y": y} if y else {})) for y in (0, 90, 180, 270)]
+    with open(os.path.join(STATES, "algae.json"), "w", encoding="utf-8") as f:
+        json.dump({"variants": variants}, f, indent=2)
+        f.write("\n")
+    print("wrote the algae textures, models and block states")
 
 
 if __name__ == "__main__":
