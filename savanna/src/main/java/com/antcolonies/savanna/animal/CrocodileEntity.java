@@ -18,7 +18,9 @@ import net.minecraft.util.Mth;
 import net.minecraft.util.RandomSource;
 import net.minecraft.world.DifficultyInstance;
 import net.minecraft.world.damagesource.DamageSource;
+import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.MobSpawnType;
 import net.minecraft.world.entity.MoverType;
 import net.minecraft.world.entity.PathfinderMob;
@@ -92,6 +94,21 @@ public class CrocodileEntity extends PathfinderMob implements GeoEntity {
     public final double[] legStand = {1, 1};
     public long legNanos;
     public static final String[] BENT_BONES = {"neck", "chest", "hips", "tail1", "tail2", "tail3", "tail4", "tail5"};
+    /**
+     * How far off something catches its eye (2026-11-15, the user's ask; my picks): a player within 16 blocks (6 crouched),
+     * any other animal stirring within 10; it keeps its eyes on one for 2 to 5 s before it looks round for another.
+     */
+    static final double EYE_REACH = 16.0, EYE_REACH_SNEAK = 6.0, STIR_REACH = 10.0;
+    /** Its eyes and head turned toward what caught its eye, eased (degrees off straight ahead, its right positive); drawn only (the model sets them). */
+    public double eyeAim, headAim;
+    public long eyeNanos;
+    /** What its eyes are on (worked out where it is drawn: the client only), and how many ticks they stay on it at least. */
+    @Nullable
+    private Entity eyesOn;
+    private int eyesHeld;
+    /** With nothing to watch, where its eyes wander (degrees off straight ahead) and how many ticks till they move again. */
+    private float glance;
+    private int glanceIn;
 
     private final AnimatableInstanceCache cache = GeckoLibUtil.createInstanceCache(this);
     /** The body lying on what is under it (worked out where it is drawn, each frame). */
@@ -211,6 +228,7 @@ public class CrocodileEntity extends PathfinderMob implements GeoEntity {
     public void tick() {
         super.tick();
         if (level().isClientSide) {
+            lookAround();
             return;
         }
         if (sunIn > 0 && isInWater() && --sunIn == 0) {
@@ -247,6 +265,73 @@ public class CrocodileEntity extends PathfinderMob implements GeoEntity {
         startled = STARTLED_TICKS;
         sunIn = Math.max(sunIn, 600 + random.nextInt(600));
         setBasking(false);          // the bask ends at once, mouth shut, not a tick later when its goal stops
+    }
+
+    /**
+     * Where its eyes go (drawn only, on the client; 2026-11-15, the user's ask): a crocodile lies still but watches,
+     * its eyes jumping to whatever moves near it. A player catches its eye first (a spectator too: only its eyes follow,
+     * it does not flee one), then any other animal stirring near; it keeps its eyes on one a few seconds before it looks
+     * round again, and with nothing to watch its eyes wander now and then.
+     */
+    private void lookAround() {
+        if (eyesHeld > 0) {
+            eyesHeld--;
+        }
+        if (tickCount % 5 != 0) {
+            return;
+        }
+        if (eyesOn != null && (eyesOn.isRemoved() || !eyesOn.isAlive() || !catchesEye(eyesOn, false))) {
+            eyesOn = null;
+            eyesHeld = 0;
+        }
+        if (eyesOn == null || eyesHeld == 0) {
+            Entity best = null;
+            double bestScore = Double.MAX_VALUE;
+            for (Entity seen : level().getEntities(this, getBoundingBox().inflate(EYE_REACH), e -> e instanceof LivingEntity)) {
+                if (!catchesEye(seen, true) && seen != eyesOn) {
+                    continue;
+                }
+                double score = distanceTo(seen) * (seen instanceof Player ? 0.5 : 1.0) * (seen == eyesOn ? 0.7 : 1.0);
+                if (score < bestScore) {
+                    bestScore = score;
+                    best = seen;
+                }
+            }
+            eyesOn = best;
+            eyesHeld = 40 + random.nextInt(60);
+        }
+        if (eyesOn == null && (glanceIn -= 5) <= 0) {
+            glance = random.nextFloat() < 0.4F ? 0.0F : (random.nextFloat() * 2.0F - 1.0F) * 80.0F;
+            glanceIn = 40 + random.nextInt(80);
+        }
+    }
+
+    /** Whether this catches its eye: a player within reach, or another animal within reach that is moving (or that its eyes are already on). */
+    private boolean catchesEye(Entity seen, boolean starting) {
+        if (seen instanceof CrocodileEntity) {
+            return false;
+        }
+        double d2 = distanceToSqr(seen);
+        if (seen instanceof Player player) {
+            double reach = player.isCrouching() ? EYE_REACH_SNEAK : EYE_REACH;
+            return (player.isSpectator() || !player.isInvisible()) && d2 < reach * reach;
+        }
+        if (d2 >= STIR_REACH * STIR_REACH) {
+            return false;
+        }
+        double dx = seen.getX() - seen.xo, dy = seen.getY() - seen.yo, dz = seen.getZ() - seen.zo;
+        return !starting || dx * dx + dy * dy + dz * dz > 0.0004;
+    }
+
+    /** What its eyes are on now (null: nothing, they wander, {@link #glance()}); the client only. */
+    @Nullable
+    public Entity eyesOn() {
+        return eyesOn;
+    }
+
+    /** Where its eyes wander with nothing to watch (degrees off straight ahead, its right positive). */
+    public float glance() {
+        return glance;
     }
 
     /** Whether a player (not a spectator) is within reach: 6 blocks, or 2.5 for one creeping up crouched (my picks). */

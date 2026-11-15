@@ -1,0 +1,42 @@
+# The crocodile's eyes and feet (2026-11-15, the user's ask): its pupils and head follow the player (the camera, a
+# spectator), and basking its feet lie flat on the ground.
+#   ./gradlew runFilm -PfilmScene=crocodile_eyes      pictures in run-film/screenshots/crocodile_eyes/
+cmd time set noon
+cmd weather clear
+cmd fill 26 -63 12 40 -61 22 minecraft:water
+lens 40
+wait 40
+# basking on flat ground, facing west (its head toward -x)
+camera 20.5 -59.4 23.0 180 8
+cmd summon antcolonies:crocodile 20.5 -60 17.0 {SunIn:0,Rotation:[90f,0f],NoAI:0b}
+wait 100
+shot feet_side
+camera 14.0 -59.7 17.0 270 5
+wait 30
+shot feet_front
+# the eyes: the camera walks round it, close on the head (about x 19.1, y -59.55, z 17), each shot aimed at it
+lens 30
+camera 16.0 -60.4 19.5 -128.9 10.9
+wait 30
+shot eye_ahead_left
+camera 19.1 -60.4 20.5 -180.0 12.4
+wait 30
+shot eye_left
+camera 22.5 -60.4 19.5 -233.7 10.3
+wait 30
+shot eye_behind_left
+camera 16.0 -60.4 14.5 -51.1 10.9
+wait 30
+shot eye_ahead_right
+camera 22.5 -60.4 14.5 53.7 10.3
+wait 30
+shot eye_behind_right
+camera 15.5 -60.4 17.0 -90.0 12.1
+wait 30
+shot eye_ahead
+# basking at the water's edge, its back half over the pool
+lens 40
+cmd summon antcolonies:crocodile 25.6 -60 13.5 {SunIn:0,Rotation:[90f,0f]}
+camera 25.0 -60.3 6.5 -4.9 9.1
+wait 100
+shot edge_side

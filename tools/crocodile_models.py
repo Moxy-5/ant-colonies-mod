@@ -69,7 +69,10 @@ def head(bones):
     box(bones, 'head', -3.0, SPLIT, -13, 3.0, 4.75, HINGE, 'skin')        # the skull
     both(bones, 'head', 1.0, 4.75, -12.75, 3.0, 5.5, -11.0, 'brow')       # a brow block over each eye
     both(bones, 'head', 3.0, 3.75, -12.5, 3.04, 4.75, -11.25, 'iris')
-    both(bones, 'head', 3.04, 3.75, -12.05, 3.07, 4.75, -11.7, 'pupil')
+    # each slit pupil a bone of its own, so the eyes can turn to what catches its attention (2026-11-15, the user's ask):
+    # it slides along the iris, forward to look ahead, back to look behind
+    box(bones, 'pupil_left', 3.04, 3.75, -12.05, 3.07, 4.75, -11.7, 'pupil')
+    box(bones, 'pupil_right', -3.07, 3.75, -12.05, -3.04, 4.75, -11.7, 'pupil')
     # the lower jaw, hinged at the back of the skull
     box(bones, 'jaw', -1.65, 1.2, -20, 1.65, SPLIT, -18.5, 'jaw')
     box(bones, 'jaw', -1.9, 1.1, -18.5, 1.9, SPLIT, -15, 'jaw')
@@ -147,7 +150,7 @@ def legs(out):
 
 
 def model():
-    names = ['head', 'jaw'] + list(dict.fromkeys(t[0] for t in TRUNK))
+    names = ['head', 'jaw', 'pupil_left', 'pupil_right'] + list(dict.fromkeys(t[0] for t in TRUNK))
     bones = {name: [] for name in names}
     head(bones)
     trunk(bones)
@@ -155,7 +158,9 @@ def model():
     out = [{'name': 'body', 'pivot': [0, 3.0 * V, 0.0]},
            {'name': 'neck', 'parent': 'body', 'pivot': [0, 2.5 * V, -7.0 * V], 'cubes': bones['neck']},
            {'name': 'head', 'parent': 'neck', 'pivot': [0, SPLIT * V, HINGE * V], 'cubes': bones['head']},
-           {'name': 'jaw', 'parent': 'head', 'pivot': [0, SPLIT * V, HINGE * V], 'cubes': bones['jaw']}]
+           {'name': 'jaw', 'parent': 'head', 'pivot': [0, SPLIT * V, HINGE * V], 'cubes': bones['jaw']},
+           {'name': 'pupil_left', 'parent': 'head', 'pivot': [3.05 * V, 4.25 * V, -11.875 * V], 'cubes': bones['pupil_left']},
+           {'name': 'pupil_right', 'parent': 'head', 'pivot': [-3.05 * V, 4.25 * V, -11.875 * V], 'cubes': bones['pupil_right']}]
     done = {'neck'}
     for name, parent, z0, *_ in TRUNK:
         if name not in done:
