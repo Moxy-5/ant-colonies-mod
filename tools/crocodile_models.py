@@ -458,6 +458,21 @@ def clips():
         p['jaw'] = {'rotation': [30 * snap, 0, 0]}
         return p
 
+    def shake(t):
+        # tearing a catfish in two (2026-11-15, remains; my picks): it cannot chew, so it clamps the fish across the
+        # middle and whips its head hard from side to side, three times a second, the neck and the front of the body
+        # swinging with it and the tail lashing against it, the jaw clamped tight, until the fish tears
+        w = 2 * math.pi / 0.34
+        f = min(1.0, t / 0.15)
+        p = folded(wave_pose(t, 0.9, w), 0.6)
+        p['neck'] = {'rotation': [-5, p['neck']['rotation'][1] + 16 * f * math.sin(w * t), 0]}
+        p['head'] = {'rotation': [-8, 26 * f * math.sin(w * t + 0.5), 8 * f * math.sin(w * t + 0.5)]}
+        p['jaw'] = {'rotation': [6, 0, 0]}
+        for name, a in (('tail1', 8), ('tail2', 10), ('tail3', 8)):
+            if name in p:
+                p[name] = {'rotation': [0, p[name]['rotation'][1] - a * f * math.sin(w * t), 0]}
+        return p
+
     def drag(t):
         # the tug of war on the bank (2026-11-15, the user's ask): a big animal held by the head, the crocodile backing
         # to the water in heaves, one every 0.8 s (CrocodileEntity.HEAVE_TICKS; the game moves it in the heave's first
@@ -482,6 +497,7 @@ def clips():
 
     return {'snap_left': tm.clip(0.5, snap('left'), 24, 'hold'), 'snap_right': tm.clip(0.5, snap('right'), 24, 'hold'),
             'lunge': tm.clip(0.4, lunge, 24, 'hold'), 'hold': tm.clip(1.0, hold, 24), 'eat': tm.clip(1.0, eat, 24),
+            'shake': tm.clip(0.68, shake, 24),
             'drag': tm.clip(0.8, drag, 24),
             'idle': tm.clip(4.0, idle, 24), 'walk': tm.clip(WALK_LEN, walk, 20), 'swim': tm.clip(SWIM_LEN, swim, 24),
             'float': tm.clip(4.0, floating, 24), 'bask': tm.clip(6.0, bask, 24),

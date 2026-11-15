@@ -140,6 +140,15 @@ public class SavannaEntities {
                     .clientTrackingRange(8)
                     .build("crocodile"));
 
+    // Remains of a dead fish (M9 river life, 2026-11-15): meat on the bones, lying on the bed; a small box under the drawn
+    // fish (a usual catfish 2 blocks long), not a living thing.
+    public static final DeferredHolder<EntityType<?>, EntityType<com.antcolonies.savanna.animal.RemainsEntity>> REMAINS =
+            ENTITY_TYPES.register("remains", () -> EntityType.Builder
+                    .<com.antcolonies.savanna.animal.RemainsEntity>of(com.antcolonies.savanna.animal.RemainsEntity::new, MobCategory.MISC)
+                    .sized(0.7F, 0.25F)
+                    .clientTrackingRange(6)
+                    .build("remains"));
+
     // M8 step 1c: the Matabele young and dead, for the shared brood and refuse code (no nest to raise young in yet, step
     // 1d; the dead are carried home in step 5). Drawn MATABELE_DRAW_SIZE times a small ant's grub and body.
     public static final float MATABELE_DRAW_SIZE = 2.0F * InsectSizes.MATABELE_MAJOR.factor();

@@ -69,7 +69,7 @@ public class CrocodileEntity extends PathfinderMob implements GeoEntity {
     private static final EntityDataAccessor<Byte> DATA_JAWS = SynchedEntityData.defineId(CrocodileEntity.class, EntityDataSerializers.BYTE);
     /** The game tick a death roll began (cut to an int), or {@link #NO_ROLL}. */
     private static final EntityDataAccessor<Integer> DATA_ROLL = SynchedEntityData.defineId(CrocodileEntity.class, EntityDataSerializers.INT);
-    public static final byte JAWS_NONE = 0, JAWS_GAPE = 1, JAWS_HOLD = 2, JAWS_EAT = 3, JAWS_DRAG = 4, JAWS_SNAP_LEFT = 5, JAWS_SNAP_RIGHT = 6;
+    public static final byte JAWS_NONE = 0, JAWS_GAPE = 1, JAWS_HOLD = 2, JAWS_EAT = 3, JAWS_DRAG = 4, JAWS_SNAP_LEFT = 5, JAWS_SNAP_RIGHT = 6, JAWS_SHAKE = 7;
     static final int NO_ROLL = Integer.MIN_VALUE;
 
     /**
@@ -109,11 +109,13 @@ public class CrocodileEntity extends PathfinderMob implements GeoEntity {
     static final int FED_BIG = 24000, FED_SMALL = 12000;
     /**
      * Hunting fish (the crocodile's life step 4, 2026-11-15, the user's ask; my picks, fun first): wild tilapia and
-     * catfish in the water are prey too, swallowed whole. A tilapia feeds it 5 minutes, a catfish half a day (as
+     * catfish in the water are prey too, tilapia swallowed whole, a catfish torn in two (the front half left as remains). A tilapia feeds it 5 minutes, a catfish half a day (as
      * anything small). With the river fish group refilling to 60 round a player and crocodiles rare, the river is not
      * fished out.
      */
     static final int FED_TILAPIA = 6000;
+    /** How long it whips a catfish from side to side before it tears in two (ticks: 2 seconds, six shakes; my pick). */
+    static final int TEAR_TICKS = 40;
     /**
      * The sideways snap at a fish beside its head: the head and neck swing round from the shoulders (this far behind its
      * middle) by this much, the snout's tip this far from the shoulders, and the jaws slam shut on this tick of the
@@ -1343,7 +1345,9 @@ public class CrocodileEntity extends PathfinderMob implements GeoEntity {
                 case ROLL -> roll();
                 case SWALLOW -> {
                     t++;
-                    if (t == 20) {
+                    if (prey instanceof CatfishEntity) {
+                        tear();
+                    } else if (t == 20) {
                         croc.setJaws(JAWS_EAT);
                     }
                     if (t >= 40) {
@@ -1723,6 +1727,33 @@ public class CrocodileEntity extends PathfinderMob implements GeoEntity {
             croc.playSound(net.minecraft.sounds.SoundEvents.GENERIC_SPLASH, 1.0F, 0.7F);
         }
 
+        /**
+         * A catfish is too long to swallow whole (2026-11-15, remains; the user's plan): held across the middle, it is
+         * whipped from side to side until it tears in two ({@link #TEAR_TICKS}); the crocodile gulps down the tail half
+         * and the front half falls where it was, its torn end at the snout, as remains ({@link RemainsEntity}).
+         */
+        private void tear() {
+            if (t == 1) {
+                croc.setJaws(JAWS_SHAKE);
+            }
+            if (t % 7 == 3) {
+                croc.playSound(net.minecraft.sounds.SoundEvents.GENERIC_SPLASH, 0.5F, 1.3F);
+            }
+            if (t >= TEAR_TICKS && croc.level() instanceof net.minecraft.server.level.ServerLevel level) {
+                RemainsEntity left = RemainsEntity.leave(level, RemainsEntity.Kind.CATFISH_TORN, prey.position(),
+                        prey.getYRot(), prey.getScale());
+                if (left != null) {
+                    left.setDeltaMovement((croc.getRandom().nextDouble() - 0.5) * 0.08, 0.05, (croc.getRandom().nextDouble() - 0.5) * 0.08);
+                    left.bite(croc);        // the tear, with its puff of meat bits
+                    left.setBitesLeft(RemainsEntity.Kind.CATFISH_TORN.bites);
+                }
+                croc.playSound(net.minecraft.sounds.SoundEvents.SLIME_SQUISH, 0.9F, 0.8F);
+                croc.release();
+                prey.discard();         // the tail half swallowed
+                eat(FED_SMALL, 50);
+            }
+        }
+
         /** Tears at its kill (or gulps down the small one) a few seconds, then it is fed. */
         private void eat(int fed, int ticks) {
             croc.release();
@@ -1878,6 +1909,7 @@ public class CrocodileEntity extends PathfinderMob implements GeoEntity {
     private static final RawAnimation DRAG = RawAnimation.begin().thenLoop("drag");
     private static final RawAnimation SNAP_LEFT = RawAnimation.begin().thenPlayAndHold("snap_left");
     private static final RawAnimation SNAP_RIGHT = RawAnimation.begin().thenPlayAndHold("snap_right");
+    private static final RawAnimation SHAKE = RawAnimation.begin().thenLoop("shake");
     /** Drawn only: when it last walked on land, and whether the bask now drawn began with the flop. */
     private int walkedAt = -100;
     private boolean drawnBasking, flopNow;
@@ -1899,7 +1931,7 @@ public class CrocodileEntity extends PathfinderMob implements GeoEntity {
         if (jaws != JAWS_NONE) {
             drawnBasking = false;
             return state.setAndContinue(jaws == JAWS_GAPE ? GAPE : jaws == JAWS_HOLD ? HOLD : jaws == JAWS_DRAG ? DRAG
-                    : jaws == JAWS_SNAP_LEFT ? SNAP_LEFT : jaws == JAWS_SNAP_RIGHT ? SNAP_RIGHT : EAT);
+                    : jaws == JAWS_SNAP_LEFT ? SNAP_LEFT : jaws == JAWS_SNAP_RIGHT ? SNAP_RIGHT : jaws == JAWS_SHAKE ? SHAKE : EAT);
         }
         double dx = getX() - xo, dy = getY() - yo, dz = getZ() - zo;
         if (isBasking()) {

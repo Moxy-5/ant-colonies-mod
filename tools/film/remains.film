@@ -1,0 +1,181 @@
+# Fish remains in the game (2026-11-15): every kind at its four stages on the ground, then a crocodile tearing a catfish.
+#   ./gradlew runFilm -PfilmScene=remains      pictures in run-film/screenshots/remains/
+cmd time set noon
+cmd weather clear
+cmd kill @e[type=!player]
+lens 50
+wait 20
+cmd summon antcolonies:remains 20.5 -60 10.5 {kind:"catfish",bites:12,Rotation:[90f,0f]}
+cmd summon antcolonies:remains 24.5 -60 10.5 {kind:"catfish",bites:8,Rotation:[90f,0f]}
+cmd summon antcolonies:remains 28.5 -60 10.5 {kind:"catfish",bites:4,Rotation:[90f,0f]}
+cmd summon antcolonies:remains 32.5 -60 10.5 {kind:"catfish",bites:0,Rotation:[90f,0f]}
+cmd summon antcolonies:remains 20.5 -60 13.5 {kind:"catfish_torn",bites:9,Rotation:[90f,0f]}
+cmd summon antcolonies:remains 24.5 -60 13.5 {kind:"catfish_torn",bites:6,Rotation:[90f,0f]}
+cmd summon antcolonies:remains 28.5 -60 13.5 {kind:"catfish_torn",bites:3,Rotation:[90f,0f]}
+cmd summon antcolonies:remains 32.5 -60 13.5 {kind:"catfish_torn",bites:0,Rotation:[90f,0f]}
+cmd summon antcolonies:remains 20.5 -60 16.5 {kind:"tilapia",bites:6,Rotation:[90f,0f]}
+cmd summon antcolonies:remains 24.5 -60 16.5 {kind:"tilapia",bites:4,Rotation:[90f,0f]}
+cmd summon antcolonies:remains 28.5 -60 16.5 {kind:"tilapia",bites:2,Rotation:[90f,0f]}
+cmd summon antcolonies:remains 32.5 -60 16.5 {kind:"tilapia",bites:0,Rotation:[90f,0f]}
+wait 20
+camera 26.0 -55.0 4.0 0 38
+wait 4
+shot lineup
+camera 22.0 -58.2 8.5 0 30
+wait 4
+shot close_catfish
+camera 22.0 -58.8 11.6 0 30
+wait 4
+shot close_torn
+camera 21.0 -59.2 15.0 0 30
+wait 4
+shot close_tilapia
+camera 34.0 -57.0 13.0 90 40
+wait 4
+shot side
+cmd kill @e[type=antcolonies:remains]
+cmd fill 26 -63 8 44 -61 26 minecraft:water
+wait 20
+cmd summon antcolonies:crocodile 38.5 -62 17.0 {HungerIn:0,SunIn:100000,Rotation:[90f,0f]}
+cmd summon antcolonies:catfish 33.5 -62 17.5 {NoAI:1b,PersistenceRequired:1b,Rotation:[0f,0f]}
+camera 35.0 -57.5 9.0 10 35
+wait 3
+shot t00
+wait 3
+shot t01
+wait 3
+shot t02
+wait 3
+shot t03
+wait 3
+shot t04
+wait 3
+shot t05
+wait 3
+shot t06
+wait 3
+shot t07
+wait 3
+shot t08
+wait 3
+shot t09
+wait 3
+shot t10
+wait 3
+shot t11
+wait 3
+shot t12
+wait 3
+shot t13
+wait 3
+shot t14
+wait 3
+shot t15
+wait 3
+shot t16
+wait 3
+shot t17
+wait 3
+shot t18
+wait 3
+shot t19
+wait 3
+shot t20
+wait 3
+shot t21
+wait 3
+shot t22
+wait 3
+shot t23
+wait 3
+shot t24
+wait 3
+shot t25
+wait 3
+shot t26
+wait 3
+shot t27
+wait 3
+shot t28
+wait 3
+shot t29
+wait 3
+shot t30
+wait 3
+shot t31
+wait 3
+shot t32
+wait 3
+shot t33
+wait 3
+shot t34
+wait 3
+shot t35
+wait 3
+shot t36
+wait 3
+shot t37
+wait 3
+shot t38
+wait 3
+shot t39
+wait 3
+shot t40
+wait 3
+shot t41
+wait 3
+shot t42
+wait 3
+shot t43
+wait 3
+shot t44
+wait 3
+shot t45
+wait 3
+shot t46
+wait 3
+shot t47
+wait 3
+shot t48
+wait 3
+shot t49
+wait 3
+shot t50
+wait 3
+shot t51
+wait 3
+shot t52
+wait 3
+shot t53
+wait 3
+shot t54
+wait 3
+shot t55
+wait 3
+shot t56
+wait 3
+shot t57
+wait 3
+shot t58
+wait 3
+shot t59
+wait 3
+shot t60
+wait 3
+shot t61
+wait 3
+shot t62
+wait 3
+shot t63
+wait 3
+shot t64
+wait 3
+shot t65
+wait 3
+shot t66
+wait 3
+shot t67
+wait 3
+shot t68
+wait 3
+shot t69

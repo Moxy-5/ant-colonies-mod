@@ -634,8 +634,10 @@ public class RiverLifeTests {
     /**
      * The crocodile hunts fish (its life step 4, 2026-11-15): a hungry crocodile in the pond with a school of wild
      * tilapia and one from a bucket strikes at the school (a snap to the side or a lunge), catches a wild one, holds it
-     * and swallows it whole; its strike calls a second hungry crocodile to the school. Then, hungry again, it swallows a
-     * catfish whole too, with no death roll. The bucket fish is never taken.
+     * and swallows it whole; its strike calls a second hungry crocodile to the school. Then, hungry again, it takes a
+     * catfish, with no death roll: whips it from side to side, tears it in two and gulps the tail half, the front half
+     * left as remains (2026-11-15) that sink to the bed, lose a look's stage a third of their bites at a time, and break
+     * at a hit. The bucket fish is never taken.
      */
     @GameTest(template = "arena", timeoutTicks = 3000)
     public static void aCrocodileSnapsUpFishAndCallsOthersToTheSchool(GameTestHelper helper) {
@@ -661,7 +663,9 @@ public class RiverLifeTests {
         pet.setFromBucket(true);
         // 0 hunting the school; 1 the catfish put in, hungry again; 2 done
         int[] stage = {0};
-        boolean[] struck = {false}, heldFish = {false}, called = {false}, rolled = {false}, heldCatfish = {false};
+        boolean[] struck = {false}, heldFish = {false}, called = {false}, rolled = {false}, heldCatfish = {false}, shook = {false};
+        com.antcolonies.savanna.animal.RemainsEntity[] left = {null};
+        int[] tornAt = {0};
         CatfishEntity[] catfish = {null};
         helper.onEachTick(() -> {
             byte jaws = croc.jaws();
@@ -690,12 +694,44 @@ public class RiverLifeTests {
                 }
                 case 1 -> {
                     heldCatfish[0] |= croc.holds(catfish[0]);
+                    shook[0] |= jaws == com.antcolonies.savanna.animal.CrocodileEntity.JAWS_SHAKE;
                     if (catfish[0].isRemoved() && croc.held() == null && !croc.isHungry()) {
                         helper.assertTrue(heldCatfish[0], "the catfish was gone but never held in the jaws");
-                        helper.assertTrue(!rolled[0], "the catfish was rolled, not swallowed whole");
-                        SavannaMod.LOGGER.info("[crocodile] swallowed the catfish at tick {}", helper.getTick());
+                        helper.assertTrue(shook[0], "the catfish was never shaken before it tore");
+                        helper.assertTrue(!rolled[0], "the catfish was rolled, not torn");
+                        var found = level.getEntitiesOfClass(com.antcolonies.savanna.animal.RemainsEntity.class,
+                                croc.getBoundingBox().inflate(4.0));
+                        helper.assertTrue(found.size() == 1, "the torn catfish left " + found.size() + " remains, not 1");
+                        left[0] = found.get(0);
+                        helper.assertTrue(left[0].kind() == com.antcolonies.savanna.animal.RemainsEntity.Kind.CATFISH_TORN
+                                && left[0].stage() == 1, "the remains are " + left[0].kind() + " at stage " + left[0].stage()
+                                + ", not the torn catfish's front half, fresh");
+                        SavannaMod.LOGGER.info("[crocodile] tore the catfish at tick {}", helper.getTick());
+                        tornAt[0] = (int) helper.getTick();
                         stage[0] = 2;
+                    }
+                }
+                case 2 -> {
+                    com.antcolonies.savanna.animal.RemainsEntity r = left[0];
+                    if (r.onGround()) {
+                        helper.assertTrue(r.isInWater(), "the remains came to rest at " + r.getY() + ", not on the bed under the water");
+                        int all = com.antcolonies.savanna.animal.RemainsEntity.Kind.CATFISH_TORN.bites;
+                        int[] stages = new int[all + 1];
+                        for (int i = 0; i < all; i++) {
+                            stages[i] = r.stage();
+                            helper.assertTrue(r.bite(croc), "bite " + (i + 1) + " of " + all + " found no meat");
+                        }
+                        stages[all] = r.stage();
+                        helper.assertTrue(!r.bite(croc), "a bite took meat from bare bones");
+                        String seen = java.util.Arrays.toString(stages);
+                        helper.assertTrue(seen.equals("[1, 1, 1, 2, 2, 2, 3, 3, 3, 4]"), "the looks went " + seen + " bite by bite");
+                        net.minecraft.server.level.ServerPlayer player = helper.makeMockServerPlayerInLevel();
+                        r.hurt(level.damageSources().playerAttack(player), 1.0F);
+                        helper.assertTrue(r.isRemoved(), "a player's hit did not break the bones");
+                        stage[0] = 3;
                         helper.succeed();
+                    } else {
+                        helper.assertTrue(helper.getTick() - tornAt[0] < 200, "the remains never came to rest");
                     }
                 }
                 default -> { }

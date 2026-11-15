@@ -455,6 +455,63 @@ def all_remains():
             'tilapia': [fish_remains('tilapia', s) for s in (1, 2, 3, 4)]}
 
 
+# The game's names for the three kinds (the viewer's 'catfish_croc' is the game's 'catfish_torn').
+GAME_KINDS = {'catfish': ('catfish', False), 'catfish_torn': ('catfish', True), 'tilapia': ('tilapia', False)}
+LOOSE = ('barbel', 'pectoral', 'pelvic')      # limp parts that may sink into the silt, left out of the grounding
+
+
+def lying(bones):
+    """The bones laid on the fish's side as the viewer lays them (its +X side up, a 90-degree roll about Z), in one root
+    bone, every cube shifted first so that, rolled, the body's middle line is over the entity's feet and its lowest
+    (stiff) point is on the ground: the game then needs no offsets of its own."""
+    import copy as _copy
+    bones = _copy.deepcopy(bones)
+    stiff = [c for b in bones if not b['name'].startswith(LOOSE) for c in b.get('cubes', [])]
+    low_x = min(c['origin'][0] for c in stiff)
+    mid = (min(c['origin'][1] for c in stiff) + max(c['origin'][1] + c['size'][1] for c in stiff)) / 2
+    dx, dy = -low_x, -mid
+    for b in bones:
+        b['pivot'] = [b['pivot'][0] + dx, b['pivot'][1] + dy, b['pivot'][2]]
+        for c in b.get('cubes', []):
+            c['origin'] = [round(c['origin'][0] + dx, 4), round(c['origin'][1] + dy, 4), c['origin'][2]]
+            if 'pivot' in c:
+                c['pivot'] = [c['pivot'][0] + dx, c['pivot'][1] + dy, c['pivot'][2]]
+        if 'parent' not in b:
+            b['parent'] = 'lying'
+    return [{'name': 'lying', 'pivot': [0, 0, 0], 'rotation': [0, 0, -90]}] + bones
+
+
+def write_game():
+    """Writes every kind's four stages (geo and texture) and one empty clip file into the savanna mod."""
+    import json
+    import mod_paths
+    root = mod_paths.assets('savanna')
+    files = {'animations/entity/remains.animation.json': {'format_version': '1.8.0', 'animations': {}}}
+    for game, (kind, torn) in GAME_KINDS.items():
+        for stage in (1, 2, 3, 4):
+            bones, rows, w, h = fish_remains(kind, stage, torn=torn)
+            name = f'remains_{game}_{stage}'
+            files[f'textures/entity/{name}.png'] = tm.png(rows)
+            files[f'geo/entity/{name}.geo.json'] = {'format_version': '1.12.0', 'minecraft:geometry': [{
+                'description': {'identifier': f'geometry.{name}', 'texture_width': w, 'texture_height': h,
+                                'visible_bounds_width': 4, 'visible_bounds_height': 1.5,
+                                'visible_bounds_offset': [0, 0.5, 0]},
+                'bones': lying(bones)}]}
+    for rel, data in files.items():
+        path = root / rel
+        path.parent.mkdir(parents=True, exist_ok=True)
+        if isinstance(data, bytes):
+            path.write_bytes(data)
+        else:
+            with open(path, 'w', encoding='utf-8', newline='\n') as f:
+                json.dump(data, f, indent=1)
+        print('wrote', path.relative_to(mod_paths.PROJECT))
+
+
 if __name__ == '__main__':
+    import sys
+    if sys.argv[1:] == ['game']:
+        write_game()
+        sys.exit()
     for kind, stages in all_remains().items():
         print(kind, [sum(len(b.get('cubes', [])) for b in s[0]) for s in stages], 'boxes')
