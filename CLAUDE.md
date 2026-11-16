@@ -102,7 +102,8 @@ Every living thing in the mod, built or planned, plants and fungi included, in o
 - River snail (Garden spiral look): BUILT.
 - Helmeted terrapin (tears remains in groups, basks on crocodiles): PLANNED (next after the snail in the clean-up order).
 - Nile monitor (raids crocodile nests; later eggs in living termite mounds): PLANNED, with the crocodile nests.
-- Tigerfish (surface leaper in packs): HELD.
+- African tigerfish (fast pack hunter with big teeth, leaps at the surface, even at birds; was held back as a third hunter of the tilapia, now on the user's list; balance it against the catfish and crocodile): IDEA (user's list 2026-11-16).
+- Electric catfish (slow, chunky, stuns fish and anything that touches it with a shock): IDEA (user's list 2026-11-16).
 - Hippo (floodplain grazing at night, paths, hippo lawns): IDEA.
 - Bull shark (comes up wide rivers from the sea; fits the wide lower rivers near the coast, not the narrow far-inland ones): IDEA (user's list 2026-11-16).
 - Minecraft's cod, salmon, squid: kept out of savanna rivers (BUILT).
@@ -114,6 +115,12 @@ Every living thing in the mod, built or planned, plants and fungi included, in o
   - King baboon spider (big burrowing tarantula): user's list 2026-11-16.
   - Giant devil's flower mantis (sits on plants, catches flying insects): user's list 2026-11-16.
   - East African lowland honey bee (wild hives in hollow trees, swarms; ties to the honey badger and honeyguide; fun first, not a colony insect): user's list 2026-11-16.
+  - African spider wasp (big wasp that paralyses spiders, such as the king baboon spider, and drags them to its burrow; the user meant this, not the American tarantula hawk): user's list 2026-11-16.
+  - Savanna whipspider (flat, crab-like, long whip legs, hunts at night under bark and stones; harmless): user's list 2026-11-16.
+  - Sun spider (solifuge: fast, huge jaws, night hunter): user's list 2026-11-16.
+  - Transvaal thick-tailed scorpion (dry savanna, sprays venom): user's list 2026-11-16.
+  - Emperor scorpion (big glossy black scorpion; real home the wetter West African forest and savanna edges, a stretch for dry savanna, fine fun first): user's list 2026-11-16.
+  - Antlions (larvae in sand pits that trap ants; a real link to the colony insects, pits in loose sand such as the coming sand banks): user's list 2026-11-16.
   - Dead-wood tenants, centipedes, scorpions.
   - Dung beetle (an animal-kit proof pick).
 - *5b. Reptiles and amphibians:*
@@ -124,6 +131,7 @@ Every living thing in the mod, built or planned, plants and fungi included, in o
   - Sociable weaver (giant shared nests built in trees; in real life often in camel thorns, so ours can use the giant trees): user's list 2026-11-16.
   - Greater honeyguide (leads honey eaters to bee hives): user's list 2026-11-16.
   - Secretarybird (walks the grass, stamps on snakes): user's list 2026-11-16.
+  - Ostrich (biggest bird, runs fast, kicks, grazes the open grass; lays huge eggs): user's list 2026-11-16.
   - Red-billed oxpecker (rides rhinos, giraffes, zebras, picking ticks): user's list 2026-11-16.
   - Birds eating ants and termite flights; floodplain birds: carmine bee-eater (needs steep banks), herons, cranes, jacanas, flamingos, hornbills.
 - *5d. Termite eaters:* aardvark (the user's earlier pick as first land animal; burrows reused by Matabele), aardwolf, pangolin (M9 savanna life; wear termite colonies down).
@@ -140,7 +148,6 @@ Every living thing in the mod, built or planned, plants and fungi included, in o
 
 **6. Desert and jungle animals (their own mods, later)**
 - Desert: horned lizard (eats harvester ants), kangaroo rat, antlion, ant-eating spiders: IDEA.
-- Tarantula hawk (a huge wasp that paralyses tarantulas; lives in the Americas, not Africa, so placed here for the North American desert mod): IDEA (user's list 2026-11-16; moved here by Claude, the user may say otherwise).
 - Jungle: armadillo, giant anteater, tamandua; frogs, birds, lizards eating flying queens: IDEA.
 
 **7. Trees**
