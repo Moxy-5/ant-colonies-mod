@@ -80,6 +80,7 @@ Every living thing in the mod, built or planned, plants and fungi included, in o
 - Leafcutter ants (Atta, Acromyrmex): IDEA (jungle mod).
 - Army ants (Nomamyrmex, raiding leafcutters; savanna driver ants named only as a reason Matabele move): IDEA (jungle).
 - Honeypot ants (Myrmecocystus, neighbours of the harvester): IDEA (desert).
+- Driver ants (Dorylus, the savanna's army ants: huge nomadic swarms, one of the real reasons Matabele colonies move house; a real enemy of both our species): IDEA (user's list 2026-11-16). Savanna mod; strict realism as a colony insect.
 - Magnetic termites (Australian outback): HELD.
 
 **2. Fungi and microbes tied to colonies**
@@ -103,20 +104,43 @@ Every living thing in the mod, built or planned, plants and fungi included, in o
 - Nile monitor (raids crocodile nests; later eggs in living termite mounds): PLANNED, with the crocodile nests.
 - Tigerfish (surface leaper in packs): HELD.
 - Hippo (floodplain grazing at night, paths, hippo lawns): IDEA.
+- Bull shark (comes up wide rivers from the sea; fits the wide lower rivers near the coast, not the narrow far-inland ones): IDEA (user's list 2026-11-16).
 - Minecraft's cod, salmon, squid: kept out of savanna rivers (BUILT).
 
-**5. Savanna land animals**
-- Termite eaters, aardvark (the user's earlier pick as first land animal; burrows reused by Matabele), aardwolf, pangolin: IDEA (M9 savanna life; wear termite colonies down).
-- Tree shapers, elephant, giraffe; dung spreading acacia seed: IDEA.
-- Big grazers as crocodile prey at crossings, antelope, zebra, wildebeest, buffalo; floodplain grazers lechwe, puku, waterbuck, sitatunga: IDEA.
-- Dead-wood tenants, centipedes, scorpions (sizes beside the insects open): IDEA.
-- Ant predators, birds eating ants and termite flights: IDEA.
-- African bullfrog (out of the ground at the first rains): IDEA.
-- Dung beetle (an animal-kit proof pick): IDEA.
-- Birds of the floodplain, carmine bee-eater (needs steep banks), herons, cranes, jacanas, flamingos, hornbills; leopard, monkeys, bushbuck, pythons: IDEA (big floodplains list).
+**5. Savanna land animals** (fun first; all IDEA unless marked)
+- *5a. Bugs, spiders and other small creatures* (sizes beside the insects to pick by eye):
+  - Giant African millipede (dead-wood and leaf-litter eater, curls up when touched): user's list 2026-11-16.
+  - Giant African land snail (eats plants and rotting matter): user's list 2026-11-16.
+  - King baboon spider (big burrowing tarantula): user's list 2026-11-16.
+  - Giant devil's flower mantis (sits on plants, catches flying insects): user's list 2026-11-16.
+  - East African lowland honey bee (wild hives in hollow trees, swarms; ties to the honey badger and honeyguide; fun first, not a colony insect): user's list 2026-11-16.
+  - Dead-wood tenants, centipedes, scorpions.
+  - Dung beetle (an animal-kit proof pick).
+- *5b. Reptiles and amphibians:*
+  - Black mamba (fast snake, hunted by the secretarybird): user's list 2026-11-16.
+  - Giant African bullfrog (out of the ground at the first rains; was "African bullfrog"): user's list 2026-11-16.
+  - Pythons (floodplain).
+- *5c. Birds:*
+  - Sociable weaver (giant shared nests built in trees; in real life often in camel thorns, so ours can use the giant trees): user's list 2026-11-16.
+  - Greater honeyguide (leads honey eaters to bee hives): user's list 2026-11-16.
+  - Secretarybird (walks the grass, stamps on snakes): user's list 2026-11-16.
+  - Red-billed oxpecker (rides rhinos, giraffes, zebras, picking ticks): user's list 2026-11-16.
+  - Birds eating ants and termite flights; floodplain birds: carmine bee-eater (needs steep banks), herons, cranes, jacanas, flamingos, hornbills.
+- *5d. Termite eaters:* aardvark (the user's earlier pick as first land animal; burrows reused by Matabele), aardwolf, pangolin (M9 savanna life; wear termite colonies down).
+- *5e. Big plant eaters:*
+  - African savanna elephant (tree shaper: knocks down and strips trees): user's list 2026-11-16.
+  - Giraffe (browses the acacia crowns): user's list 2026-11-16.
+  - Black rhinoceros (browser of bushes): user's list 2026-11-16.
+  - Plains zebra (grazer, crocodile prey at crossings): user's list 2026-11-16.
+  - Antelope, wildebeest, buffalo; floodplain grazers lechwe, puku, waterbuck, sitatunga, bushbuck; monkeys; dung spreading acacia seed.
+- *5f. Big hunters and scavengers:*
+  - African lion (prides), cheetah (sprints), spotted hyena (clans, scavenge and hunt), African wild dog (packs): user's list 2026-11-16.
+  - Honey badger (digs, raids bee hives, fights snakes): user's list 2026-11-16.
+  - Leopard (gallery forest).
 
 **6. Desert and jungle animals (their own mods, later)**
 - Desert: horned lizard (eats harvester ants), kangaroo rat, antlion, ant-eating spiders: IDEA.
+- Tarantula hawk (a huge wasp that paralyses tarantulas; lives in the Americas, not Africa, so placed here for the North American desert mod): IDEA (user's list 2026-11-16; moved here by Claude, the user may say otherwise).
 - Jungle: armadillo, giant anteater, tamandua; frogs, birds, lizards eating flying queens: IDEA.
 
 **7. Trees**
@@ -131,6 +155,7 @@ Every living thing in the mod, built or planned, plants and fungi included, in o
 - Blue and black grama grass (harvester seed food, plains and badlands): BUILT.
 - Dry savanna grass ("Dry Grass" block, termite food, bare patches regrowing): BUILT.
 - Reeds and papyrus (cover for fish, floodplain reedbeds): IDEA.
+- Elephant grass (very tall grass, 2 to 4 m, of the wetter savanna and floodplain; cover for animals): IDEA (user's list 2026-11-16).
 - Water lilies on lagoons and oxbows: IDEA (big floodplains).
 - Desert wildflower, refuse-pile gardens round ant nests: IDEA (custom plants list).
 
