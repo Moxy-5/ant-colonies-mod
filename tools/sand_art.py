@@ -264,6 +264,7 @@ LOOKS = {
     "C": {"name": "C, veined river stones", "step": 0.25, "grid": 0.25, "cross": 1.25, "three": 4.0, "layers": 6, "dens": 4},
 }
 NEW_MAX_BOXES = 24
+STONE_GAME_LOOK = "B"  # the user's pick, 2026-11-16: fine pixels
 CROSS2 = ((1.0, 0.72), (0.72, 1.0))
 CROSS3 = ((1.0, 0.56), (0.9, 0.86), (0.56, 1.0))
 

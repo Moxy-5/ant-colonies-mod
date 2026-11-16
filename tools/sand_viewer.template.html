@@ -49,7 +49,7 @@ const OPTIONS = {
   tone: { label: "Sand tone", pick: 1, list: ["Far inland", "Mid inland", "Near the coast"] },
   pebbles: { label: "Pebbles", pick: 1, list: ["None", "Where real ones lie", "Everywhere (heavy case)"] },
   view: { label: "View", pick: 0, list: ["From above", "Under the water"] },
-  stone: { label: "Stone look", pick: 1, list: ["First look (today's)", "A, smooth and speckled", "B, fine pixels", "C, veined river stones"] },
+  stone: { label: "Stone look", pick: 2, list: ["First look (today's)", "A, smooth and speckled", "B, fine pixels (picked)", "C, veined river stones"] },
 };
 const state = {}; for (const k in OPTIONS) state[k] = OPTIONS[k].pick;
 const RIVER = 0x5C6E45;
