@@ -43,6 +43,9 @@ public class RiverRemainsFeature extends Feature<NoneFeatureConfiguration> {
             return false;
         }
         int x0 = context.origin().getX() & ~15, z0 = context.origin().getZ() & ~15;
+        if (!BigSavanna.lives(level.getLevel(), level.getBiome(context.origin()), x0 + 8, z0 + 8)) {
+            return false; // the gate: no river life in a savanna too small to live in
+        }
         int count = random.nextFloat() < SECOND ? 2 : 1;
         return scatter(level, random, x0, z0, 16, 16, level.getSeaLevel() - 1, count,
                 at -> level.getBiome(at).is(RiverBankFeature.WATERS)) > 0;

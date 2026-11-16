@@ -259,6 +259,10 @@ public final class MoundPlaces {
             if (!land.biomes().contains(biome)) {
                 return null;
             }
+            // the gate: no mound (so no Matabele) in a savanna too small to live in
+            if (!BigSavanna.livesAt(land.generator().getBiomeSource(), land.random().sampler(), x, z)) {
+                return null;
+            }
         }
         double chance = numbers.groundChance() * (1 - numbers.slopeCut() * uneven / numbers.maxUneven());
         int w = numbers.waterLook();

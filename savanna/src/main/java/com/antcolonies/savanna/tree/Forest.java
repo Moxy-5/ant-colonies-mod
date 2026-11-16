@@ -1249,8 +1249,9 @@ public class Forest extends SavedData {
             at.move(Direction.DOWN);
         }
         BlockPos foot = at.immutable();
-        if (underCrown || !level.getBiome(foot).is(BiomeTags.IS_SAVANNA)) {
-            return null; // under a crown (seedlings there are shaded and outcompeted), or not savanna
+        if (underCrown || !level.getBiome(foot).is(BiomeTags.IS_SAVANNA)
+                || !com.antcolonies.savanna.worldgen.BigSavanna.lives(level, level.getBiome(foot), x, z)) {
+            return null; // under a crown (seedlings there are shaded and outcompeted), not savanna, or a savanna too small to live in
         }
         BlockState ground = level.getBlockState(foot.below());
         if (!ground.is(BlockTags.DIRT) || !TreePlacer.isOpen(level.getBlockState(foot)) || !level.getFluidState(foot).isEmpty()) {

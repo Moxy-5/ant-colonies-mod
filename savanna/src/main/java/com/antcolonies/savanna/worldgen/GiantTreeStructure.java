@@ -124,6 +124,9 @@ public class GiantTreeStructure extends Structure {
         int x = context.chunkPos().getMinBlockX() + random.nextInt(16), z = context.chunkPos().getMinBlockZ() + random.nextInt(16);
         Pick pick = pick(size, random);
         TreeKind kind = TreePlacer.kind(pick.kind());
+        if (!BigSavanna.livesAt(context.biomeSource(), context.randomState().sampler(), x, z)) {
+            return Optional.empty(); // the gate: no giant trees in a savanna too small to live in
+        }
         // Its foot: the lowest ground round the trunk (so the trunk sits in the ground, not over it); never in water.
         int reach = pick.age() < 0.45 ? 0 : (int) Math.ceil(kind.trunk().radius() * (kind.isBaobab() ? 1 : 1.5));
         for (int spot = 0; spot < SPOTS; spot++) {

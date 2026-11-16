@@ -344,7 +344,8 @@ public class FloodplainTreeStructure extends Structure {
         }
         boolean land = TreeLands.mayStand(kind, context.biomeSource().getNoiseBiome(QuartPos.fromBlock(x), QuartPos.fromBlock(lowest),
                 QuartPos.fromBlock(z), context.randomState().sampler()));
-        return land ? new BlockPos(x, lowest, z) : null;
+        // the gate: no floodplain trees in a savanna too small to live in
+        return land && BigSavanna.livesAt(context.biomeSource(), context.randomState().sampler(), x, z) ? new BlockPos(x, lowest, z) : null;
     }
 
     private static int height(GenerationContext context, int x, int z, Heightmap.Types type) {

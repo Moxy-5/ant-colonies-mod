@@ -66,6 +66,8 @@ public class SavannaWorldTests {
     static final double SMALL_SHARE_MOST = 0.07;
     static final double LONELY_SHARE_MOST = 0.05;
     static final double OLD_SHARE = 0.75;
+    /** The gate's own check: savannas under this many blocks across (well under the room the gate asks for). */
+    static final int TINY = 500;
 
     /**
      * The real thing: TerraBlender's layout with our region for each seed, measured and drawn beside Minecraft's own; then
@@ -85,6 +87,8 @@ public class SavannaWorldTests {
         double smallShare = 0, lonelyShare = 0;
         int lonely = 0, lonelyBefore = 0, lonelyAfterPretend = 0;
         int[] otherKinds = new int[BiomeMaps.PLAINS + 1];
+        // the gate (worldgen/BigSavanna): savanna cells in big patches and in small ones, and how many of each are quiet
+        long bigCells = 0, bigQuiet = 0, smallCells = 0, smallQuiet = 0, tinyCells = 0, tinyQuiet = 0, gateNanos = 0;
         double landShare = 0;
         int land = 0;
         StringBuilder report = new StringBuilder();
@@ -128,8 +132,34 @@ public class SavannaWorldTests {
                 }
             }
             landShare += savanna.coverage();
+            byte[] gated = ours.clone();
+            int[] across = BiomeMaps.acrossOfCells(ours, BiomeMaps.SAVANNA);
+            long gateStart = System.nanoTime();
+            for (int c = 0; c < ours.length; c++) {
+                if (ours[c] != BiomeMaps.SAVANNA) {
+                    continue;
+                }
+                boolean lives = com.antcolonies.savanna.worldgen.BigSavanna.livesAt(source, sampler,
+                        -BiomeMaps.HALF + (c / BiomeMaps.SIDE) * BiomeMaps.STEP, -BiomeMaps.HALF + (c % BiomeMaps.SIDE) * BiomeMaps.STEP);
+                if (!lives) {
+                    gated[c] = BiomeMaps.QUIET;
+                }
+                if (across[c] >= BiomeMaps.SMALL) {
+                    bigCells++;
+                    bigQuiet += lives ? 0 : 1;
+                } else {
+                    smallCells++;
+                    smallQuiet += lives ? 0 : 1;
+                    if (across[c] < TINY) {
+                        tinyCells++;
+                        tinyQuiet += lives ? 0 : 1;
+                    }
+                }
+            }
+            gateNanos += System.nanoTime() - gateStart;
             try {
                 BiomeMaps.draw(FMLPaths.GAMEDIR.get().resolve("biome-maps").resolve("seed_" + seed + ".png"), vanilla, ours);
+                BiomeMaps.draw(FMLPaths.GAMEDIR.get().resolve("biome-maps").resolve("gate_seed_" + seed + ".png"), gated);
             } catch (java.io.IOException e) {
                 SavannaMod.LOGGER.warn("[biome maps] could not draw seed {}: {}", seed, e.toString());
             }
@@ -177,6 +207,16 @@ public class SavannaWorldTests {
         SavannaMod.LOGGER.info("[biome maps] {}", smallLine);
         helper.assertTrue(smallPatches <= SMALL_MOST && smallShare <= SMALL_SHARE_MOST && lonelyShare <= LONELY_SHARE_MOST,
                 "too many small savannas: " + smallLine + all);
+        // the gate: nearly all of a big savanna lives, most small-savanna ground is quiet
+        String gateLine = String.format("the gate: quiet %.2f%% of big savannas' ground (%d of %d cells), %.2f%% of small savannas' (%d of %d),"
+                        + " %.2f%% of savannas under %d across (%d of %d); %d ms for %d maps",
+                100.0 * bigQuiet / Math.max(1, bigCells), bigQuiet, bigCells, 100.0 * smallQuiet / Math.max(1, smallCells), smallQuiet, smallCells,
+                100.0 * tinyQuiet / Math.max(1, tinyCells), TINY, tinyQuiet, tinyCells, gateNanos / 1_000_000, SEEDS.length);
+        SavannaMod.LOGGER.info("[biome maps] {}", gateLine);
+        // measured 2026-11-16: 6.8 percent of big savannas' ground quiet (thin tips), 81 percent of savannas under 500 across
+        // (the rest are frayed bits beside a big savanna, which live on purpose); bands my picks, a little wider
+        helper.assertTrue(bigQuiet <= 0.10 * bigCells, "the gate silences too much of the big savannas: " + gateLine);
+        helper.assertTrue(tinyQuiet >= 0.70 * tinyCells, "the gate lets too many small savannas live: " + gateLine);
         // and the rest of the world still turns up
         int cells = SEEDS.length * BiomeMaps.SIDE * BiomeMaps.SIDE;
         StringBuilder kinds = new StringBuilder();

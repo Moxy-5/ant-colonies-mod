@@ -47,6 +47,8 @@ public final class BiomeMaps {
 
     /** Kinds of ground on a map. */
     static final byte OCEAN = 0, RIVER = 1, LAND = 2, SAVANNA = 3, DESERT = 4, FOREST = 5, JUNGLE = 6, COLD = 7, HILLS = 8, BADLANDS = 9, PLAINS = 10;
+    /** Only on a drawn map: savanna too small to live in (the gate, {@code worldgen/BigSavanna}). */
+    static final byte QUIET = 11;
 
     private BiomeMaps() {
     }
@@ -338,7 +340,50 @@ public final class BiomeMaps {
             0x8a8a80, // hills and mountains
             0xc8642c, // badlands
             0x9cc56a, // plains
+            0xd03030, // quiet savanna (the gate)
     };
+
+    /**
+     * For every cell of a kind, the size ("blocks across") of the patch it lies in, rivers joining a patch as in
+     * {@link #patches}; 0 for other cells.
+     */
+    public static int[] acrossOfCells(byte[] map, byte kindOf) {
+        int[] out = new int[map.length];
+        boolean[] seen = new boolean[map.length];
+        ArrayDeque<Integer> queue = new ArrayDeque<>();
+        List<Integer> cells = new ArrayList<>();
+        for (int c = 0; c < map.length; c++) {
+            if (map[c] != kindOf || seen[c]) {
+                continue;
+            }
+            cells.clear();
+            seen[c] = true;
+            queue.add(c);
+            while (!queue.isEmpty()) {
+                int at = queue.poll();
+                if (map[at] == kindOf) {
+                    cells.add(at);
+                }
+                int i = at / SIDE, j = at % SIDE;
+                int[][] next = {{i + 1, j}, {i - 1, j}, {i, j + 1}, {i, j - 1}};
+                for (int[] n : next) {
+                    if (n[0] < 0 || n[1] < 0 || n[0] >= SIDE || n[1] >= SIDE) {
+                        continue;
+                    }
+                    int k = n[0] * SIDE + n[1];
+                    if (!seen[k] && (map[k] == kindOf || (map[k] == RIVER && map[at] == kindOf))) {
+                        seen[k] = true;
+                        queue.add(k);
+                    }
+                }
+            }
+            int across = (int) Math.round(2 * Math.sqrt(cells.size() * (double) STEP * STEP / Math.PI));
+            for (int cell : cells) {
+                out[cell] = across;
+            }
+        }
+        return out;
+    }
 
     /** Draws maps side by side (one pixel a cell, a 16-pixel gap) into a picture. */
     public static void draw(Path file, byte[]... maps) throws java.io.IOException {

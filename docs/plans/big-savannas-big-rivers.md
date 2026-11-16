@@ -1,4 +1,4 @@
-# Big savannas, big rivers (the user, 2026-11-16; steps 1, 2 and 2a built)
+# Big savannas, big rivers (the user, 2026-11-16; steps 1, 2, 2a and 2c built)
 
 The user: "I want the river to have more life to it but it's gonna start getting cramped; it's also not exactly a
 realistic river; we will also have to make the savanna biome bigger, which I'm okay with because I'm planning a lot of
@@ -142,6 +142,35 @@ meets one of Minecraft's, so the zones' difference is removed instead of the scr
 - **Next, for the leftover slivers (the user's call, nothing built):** the cheap gate (mounds, giant trees, Matabele and
   river animals only where there is savanna all round for about 500 blocks, the spawn's own check), or step 2b's
   cleaner, now with a third of the ground to clean.
+
+**Step 2c, the gate (the user, 2026-11-16: "do the gate thats perfect and its kind of realistic when you think about
+it a biome too small to harbor an ecosystem would never begin to form one"; BUILT, branch
+`claude/no-small-savannas-20e8a5`; only new land changes). It replaces step 2b, the cleaner, which is not built.**
+- **What:** a savanna too small stays savanna grass but gets none of the ecosystem: no termite mounds (so no Matabele,
+  no mound trees), no giant or floodplain trees, no seedlings after rain, no algae or old remains on its river beds, no
+  tilapia, catfish, crocodiles, crabs or snails spawned by the world. Biomes are untouched (nothing of Minecraft's
+  biome code is changed); eggs, commands and a player's own seedlings work anywhere. Silt banks, pools, dry grass and
+  fallen sticks stay (scenery).
+- **The rule, one number, one place (`worldgen/BigSavanna`):** a place lives if there is at least as much savanna
+  within 640 blocks of it as a round savanna 800 blocks across holds (my picks). Counted from the biome noise on a
+  128-block grid, 4 looks a cell, a savanna's own river counting as savanna; answers kept per cell with a cap.
+- **A first rule was wrong and is gone:** "savanna all round at 200 and 400 blocks" (the spawn's kind of check)
+  silenced 39 percent of the big savannas' ground: real savannas are lobed and run along coasts, and the looks hit
+  ocean, beach, forest and plains. Measured before any number was tuned, then the rule itself replaced.
+- **Measured on the 4 maps:** quiet 6.8 percent of the big savannas' ground (the tips of thin points), 81 percent of
+  the ground of savannas under 500 across, 71 percent of all small savannas' ground. The small ground that still lives
+  is the frayed bits beside a big savanna, on purpose (the big one's animals reach them). Pictures:
+  `references/big_savannas/gate_seed_*.png` (quiet savanna in red).
+- **Cost:** about 5 millionths of a second a look; a cold answer at most 324 looks (about 2 ms), shared by everything
+  near; the 4 whole maps 5.6 s.
+- **Who asks:** `MoundPlaces.holds`, `GiantTreeStructure.plan`, `FloodplainTreeStructure.foot`, `Forest.sproutSite`,
+  `RiverAlgaeFeature`, `RiverRemainsFeature`, the five river animals' spawn rules (`SavannaEvents.inBigSavanna`).
+- **Known:** the land is flattened by the climate, so a quiet savanna is flat bare grass; villages and Minecraft's
+  animals still turn up there. A world of only savanna always lives.
+- Tests: the map test checks the bands (big savannas' quiet ground at most 10 percent, under-500 savannas' at least
+  70). `worldgen,mound,trees,river,colony` on 6 servers: all passed but two, the seedlings-after-rain test (the gate judged a test arena's hand-made savanna; fixed: savanna put there by hand is not judged; then 3 of 3) and the old half-built stage 14 flake (BUGS 151, 3 of 3 alone); the mound survey unchanged (1 mound in 2.8 looks dead, 1 in 3.6 Matabele).
+
+**Step 2b, the small-savanna cleaner (NOT BUILT: replaced by step 2c, the gate)**
 
 **Step 2b, the small-savanna cleaner (the user, 2026-11-16: "the ecosystem just wouldn't work on them"; nothing
 built).** Step 2 left 919 savannas under 1,000 blocks across on the 4 maps (14.7 percent of the savanna's area); a
