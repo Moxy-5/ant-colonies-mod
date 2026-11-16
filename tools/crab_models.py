@@ -6,12 +6,12 @@ From the user's picture of 2026-11-15 (a blocky "spiny Nile river crab" on a riv
 CLAUDE.md). Rebuilt the same day at half the cube size (the user: the legs stood at head level, the spines looked like
 white speckles, and the picture has finer detail). What the picture shows, and so what this is:
 - Built of small cubes ("voxels", V model pixels each), one flat colour a cube face.
-- A broad carapace, wider than deep, widest in its front third and narrowing behind, stepping up to a low dome; dark
-  purple in the middle, warmer red-brown toward the edge; real spikes (tan at the base, cream at the point) along the
-  front, round the corners and down the sides, pointing out and up.
+- A broad carapace, wider than deep, widest in its front third and narrowing behind; its own part over a narrower lower body, flaring up and out like a crown to a flat top, with open
+  space under its edge above the legs (the user, 2026-11-15); dark
+  purple in the middle, warmer red-brown toward the edge; six spikes a side on the top edge (tan at the base, cream at the point), pointing up and a little out.
 - A deep cream face under a dark front rim, nearly the whole front wide, with rows of mouthparts.
 - Two tall black eyes set wide apart on the front edge.
-- Two big chunky claws held forward and inward in front of the face, resting on the ground: a thick orange-brown arm
+- Two big claws, slimmer than long, held forward and inward in front of the face, resting on the ground: a thick orange-brown arm
   with an elbow, a purple-brown hand, thick cream fingers gaping open (dark between them), the upper one hinged; the
   right claw a little bigger.
 - Four walking legs a side, leaving from under the shell's edge: a thigh rising a little to a dark knee that stays
@@ -28,11 +28,12 @@ from tilapia_models import cube, mix, shade, faces, face_point, png  # noqa: F40
 V = 0.25              # model pixels a voxel (half the first model's: the picture's grain)
 TEXELS = 4.0          # texture pixels a model pixel: one flat colour a voxel face
 BIG = {'left': 1.0, 'right': 1.15}       # each claw's size (the right one bigger)
-LEG_Z = [-5.5, -1.5, 2.5, 5.6]           # where each walking leg leaves the body (voxels)
-LEG_YAW = [32, 9, -14, -40]              # how far each leg is turned forward (degrees, + forward)
+LEG_Z = [-4.8, -1.6, 1.6, 4.6]           # where each walking leg leaves the lower body (voxels)
+LEG_YAW = [34, 10, -14, -40]             # how far each leg is turned forward (degrees, + forward)
 LEG_LONG = [1.0, 1.06, 1.0, 0.9]         # each leg's length (the last pair shorter)
-LEG_Y = 9.4                              # the hips' height: under the shell's edge (the edge is 10 to 13)
-RISE, KNEE, ANKLE = 18, -70, -20         # the thigh rises this much, the shin bends down at the knee, the tip more
+LEG_Y = 9.0                              # the hips' height: on the lower body, well under the shell (its edge 13.5 up)
+BODY_IN = 5.5                            # how far the lower body's sides stand in from the shell's edge
+RISE, KNEE, ANKLE = 10, -55, -20         # the thigh rises this much, the shin bends down at the knee, the tip more
 
 # The shell's outline from above, front to back: (z from, z to, half its width), widest in the front third.
 OUTLINE = [(-10, -9, 9.5), (-9, -8, 12), (-8, -6, 13.5), (-6, -1, 14), (-1, 2, 13.5), (2, 4, 12.5), (4, 6, 11),
@@ -62,9 +63,10 @@ def layer(c, y0, y1, inset, part):
 
 
 def spine(c, x, y, z, dx, dz):
-    """A spike of three shrinking cubes from (x, y, z) on the shell's edge, pointing out along (dx, dz) and up."""
-    n = math.sqrt(dx * dx + dz * dz + 0.5 * 0.5)
-    d = (dx / n, 0.5 / n, dz / n)
+    """A spike of three shrinking cubes from (x, y, z) on the shell's top edge, pointing up and a little out along
+    (dx, dz): the crown's points."""
+    n = math.hypot(dx, dz)
+    d = (0.42 * dx / n, 0.9, 0.42 * dz / n)
     for i, (along, size) in enumerate(((0.3, 1.9), (1.7, 1.3), (2.8, 0.8))):
         px, py, pz = x + d[0] * along, y + d[1] * along, z + d[2] * along
         h = size / 2
@@ -72,71 +74,71 @@ def spine(c, x, y, z, dx, dz):
 
 
 def carapace(c):
-    layer(c, 7, 9, 3, 'under')                          # the cream underside
-    layer(c, 9, 10, 1, 'under')
-    layer(c, 10, 13, 0, 'shell')                        # the shell's broad edge
-    layer(c, 13, 15, 1.5, 'shell')                      # stepping up to the dome
-    layer(c, 15, 16.5, 3.5, 'shell')
-    layer(c, 16.5, 17.5, 6, 'shell')                    # the dome's crown
-    box(c, -9.8, 10.5, -10.6, 9.8, 12.2, -10, 'rim')    # the dark front rim, over the face
-    for x in (-2.6, -0.6, 1.4):                         # little teeth on the rim between the eyes
-        box(c, x, 12.2, -10.6, x + 1.2, 12.9, -9.8, 'rim')
-    box(c, -9.2, 7, -10.3, 9.2, 10.5, -9.5, 'face')     # the deep cream face under the rim, nearly the whole front
-    box(c, -7.5, 5.8, -9.8, 7.5, 7, -8, 'face')         # stepping down to the belly
-    for i, y in enumerate((7.3, 8.3, 9.3)):             # the mouthparts in rows
-        w = 3.6 + i * 0.7
-        box(c, -w, y, -10.7, w, y + 0.7, -10.3, 'mouth')
-    box(c, -0.4, 7.3, -10.8, 0.4, 10.0, -10.3, 'mouth')
-    # the spines: spikes along the front edge, at the front corners, down both sides and two behind
+    # Two parts (the user, 2026-11-15): a narrower lower body the legs and arms join, and over it the shell, its own
+    # part, flaring up and out like a crown to a flat top, so there is open space under its edge above the legs.
+    layer(c, 6, 7.2, BODY_IN + 1.5, 'under')            # the lower body, cream
+    layer(c, 7.2, 10.5, BODY_IN, 'under')
+    layer(c, 10.5, 12, 3.2, 'shell')                    # the shell flaring out and up
+    layer(c, 12, 13.5, 1.4, 'shell')
+    layer(c, 13.5, 15.8, 0, 'shell')                    # its broad edge
+    layer(c, 15.8, 16.4, 0.7, 'shell')                  # the flat top
+    box(c, -9.8, 13.5, -10.6, 9.8, 15.0, -10, 'rim')    # the dark front rim, over the face
+    box(c, -8.6, 7.6, -8.4, 8.6, 13.5, -6.0, 'face')    # the deep cream face under the rim, nearly the whole front
+    for i, y in enumerate((8.4, 9.7, 11.0)):            # the mouthparts in rows
+        w = 3.4 + i * 0.8
+        box(c, -w, y, -8.8, w, y + 0.8, -8.4, 'mouth')
+    box(c, -0.4, 8.4, -8.9, 0.4, 11.8, -8.4, 'mouth')
+    # the crown's points: one each side of the front, one at each front corner, three down each side, one behind
     for s in (1, -1):
-        spine(c, s * 7.8, 12.6, -9.8, s * 0.25, -1)
-        spine(c, s * 11.4, 12.6, -8.9, s * 0.7, -0.75)
-        for z in (-7, -4.4, -1.8, 0.8, 3.2, 5.4):
-            spine(c, s * (half_at(z) - 0.3), 12.6, z, s, 0.12 * z / 5)
-        spine(c, s * 8.6, 12.6, 7.4, s * 0.7, 0.7)
-        spine(c, s * 5.2, 12.6, 9.6, s * 0.2, 1)
+        spine(c, s * 8.6, 15.6, -9.4, s * 0.3, -1)
+        spine(c, s * 12.6, 15.6, -7.6, s * 0.8, -0.6)
+        for z in (-3.6, 0.6, 4.6):
+            spine(c, s * (half_at(z) - 0.9), 15.6, z, s, 0.1 * z)
+        spine(c, s * 7.4, 15.6, 8.0, s * 0.6, 0.8)
 
 
 def eye(s):
     c = []
-    box(c, s * 4.2, 12.6, -10.4, s * 6.0, 14.2, -8.8, 'stalk')
-    box(c, s * 3.9, 14.2, -10.8, s * 6.3, 18.0, -8.5, 'eye')
+    box(c, s * 4.2, 15.0, -10.4, s * 6.0, 16.6, -8.8, 'stalk')
+    box(c, s * 3.9, 16.2, -10.8, s * 6.3, 19.4, -8.5, 'eye')
     return c
 
 
 def claw(side, s):
     """The claw: the arm (out from under the shell's front corner to the elbow), the big hand with its fixed lower
     finger, and the hinged upper finger; the fingers thick and gaping, dark between them."""
-    f = BIG[side]
+    g = BIG[side]                               # the claw's length
+    f = 0.78 * g                                # its height (slimmer than long, as in the picture)
+    k = 0.72 * g                                # its width
     arm = []
-    box(arm, s * 9.5, 6, -11.5, s * 16, 9.6, -7.5, 'leg')
-    box(arm, s * 14, 4, -14.5, s * 19.5, 9.2, -10, 'leg')
-    box(arm, s * 13.7, 3.7, -11.8, s * 19.8, 9.5, -10.4, 'joint')         # the elbow's darker band
-    cx, y0 = 17.0, 0.4                          # the hand's middle across, its underside (resting on the ground)
+    box(arm, s * 6.5, 7.2, -9.6, s * 14.2, 9.8, -7.0, 'leg')              # out from the lower body, under the shell
+    box(arm, s * 13.2, 5.0, -13.4, s * 16.6, 8.8, -8.6, 'leg')            # the forearm, forward and down
+    box(arm, s * 13.0, 4.8, -10.2, s * 16.8, 9.0, -9.0, 'joint')          # the elbow's darker band
+    cx, y0 = 15.4, 0.4                          # the hand's middle across, its underside (resting on the ground)
     hand, finger = [], []
-    zb, zf = -12.5, -12.5 - 7.0 * f             # the palm's back and front
+    zb, zf = -12.0, -12.0 - 7.5 * g             # the palm's back and front
     top = y0 + 7.4 * f
-    box(hand, s * (cx - 4.0 * f), y0 + 0.8 * f, zf, s * (cx + 4.0 * f), top - 0.8 * f, zb, 'hand')
-    box(hand, s * (cx - 3.3 * f), y0, zf + 0.6, s * (cx + 3.3 * f), top, zb - 0.8, 'hand')      # rounded above and below
-    box(hand, s * (cx - 2.4 * f), top, zf + 1.6, s * (cx + 2.4 * f), top + 0.6 * f, zb - 1.8, 'hand')
-    box(hand, s * (cx - 3.0 * f), y0 + 1.4 * f, zb, s * (cx + 3.0 * f), top - 1.4 * f, zb + 1.2, 'hand')  # its heel
-    fx0, fx1 = cx - 3.2 * f, cx + 1.6 * f       # the fingers, on the hand's inner side
+    box(hand, s * (cx - 4.0 * k), y0 + 0.8 * f, zf, s * (cx + 4.0 * k), top - 0.8 * f, zb, 'hand')
+    box(hand, s * (cx - 3.3 * k), y0, zf + 0.6, s * (cx + 3.3 * k), top, zb - 0.8, 'hand')      # rounded above and below
+    box(hand, s * (cx - 2.4 * k), top, zf + 1.6, s * (cx + 2.4 * k), top + 0.5 * f, zb - 1.8, 'hand')
+    box(hand, s * (cx - 3.0 * k), y0 + 1.4 * f, zb, s * (cx + 3.0 * k), top - 1.4 * f, zb + 1.2, 'hand')  # its heel
+    fx0, fx1 = cx - 3.2 * k, cx + 1.6 * k       # the fingers, on the hand's inner side
     w = fx1 - fx0
-    box(hand, s * (fx0 + 0.5), y0 + 2.6 * f, zf - 1.0 * f, s * (fx1 - 0.5), y0 + 4.8 * f, zf, 'gape')
+    box(hand, s * (fx0 + 0.4), y0 + 2.6 * f, zf - 1.0 * g, s * (fx1 - 0.4), y0 + 4.8 * f, zf, 'gape')
     # the fixed finger: thick at the hand, narrowing in steps to a point that curves up
-    box(hand, s * fx0, y0, zf - 2.6 * f, s * fx1, y0 + 3.0 * f, zf, 'finger')
-    box(hand, s * (fx0 + 0.12 * w), y0 + 0.3 * f, zf - 4.6 * f, s * (fx1 - 0.12 * w), y0 + 2.7 * f, zf - 2.6 * f, 'finger')
-    box(hand, s * (fx0 + 0.25 * w), y0 + 0.9 * f, zf - 6.0 * f, s * (fx1 - 0.25 * w), y0 + 2.9 * f, zf - 4.6 * f, 'finger')
-    box(hand, s * (fx0 + 0.36 * w), y0 + 1.8 * f, zf - 6.8 * f, s * (fx1 - 0.36 * w), y0 + 3.3 * f, zf - 6.0 * f, 'finger')
+    box(hand, s * fx0, y0, zf - 2.6 * g, s * fx1, y0 + 3.0 * f, zf, 'finger')
+    box(hand, s * (fx0 + 0.12 * w), y0 + 0.3 * f, zf - 4.6 * g, s * (fx1 - 0.12 * w), y0 + 2.7 * f, zf - 2.6 * g, 'finger')
+    box(hand, s * (fx0 + 0.25 * w), y0 + 0.9 * f, zf - 6.0 * g, s * (fx1 - 0.25 * w), y0 + 2.9 * f, zf - 4.6 * g, 'finger')
+    box(hand, s * (fx0 + 0.36 * w), y0 + 1.8 * f, zf - 6.8 * g, s * (fx1 - 0.36 * w), y0 + 3.3 * f, zf - 6.0 * g, 'finger')
     for z in (1.2, 3.2):                        # teeth
-        box(hand, s * (fx0 + 0.3 * w), y0 + 2.8 * f, zf - (z + 0.8) * f, s * (fx1 - 0.3 * w), y0 + 3.5 * f, zf - z * f, 'finger')
+        box(hand, s * (fx0 + 0.3 * w), y0 + 2.8 * f, zf - (z + 0.8) * g, s * (fx1 - 0.3 * w), y0 + 3.5 * f, zf - z * g, 'finger')
     # the upper finger (the dactyl): from the hinge, narrowing to a point that hooks down over the fixed one
-    box(finger, s * fx0, y0 + 4.4 * f, zf - 2.6 * f, s * fx1, y0 + 7.3 * f, zf + 0.4, 'finger')
-    box(finger, s * (fx0 + 0.12 * w), y0 + 4.5 * f, zf - 4.6 * f, s * (fx1 - 0.12 * w), y0 + 6.9 * f, zf - 2.6 * f, 'finger')
-    box(finger, s * (fx0 + 0.25 * w), y0 + 4.1 * f, zf - 6.0 * f, s * (fx1 - 0.25 * w), y0 + 6.1 * f, zf - 4.6 * f, 'finger')
-    box(finger, s * (fx0 + 0.36 * w), y0 + 3.5 * f, zf - 7.0 * f, s * (fx1 - 0.36 * w), y0 + 5.0 * f, zf - 6.0 * f, 'finger')
+    box(finger, s * fx0, y0 + 4.4 * f, zf - 2.6 * g, s * fx1, y0 + 7.3 * f, zf + 0.4, 'finger')
+    box(finger, s * (fx0 + 0.12 * w), y0 + 4.5 * f, zf - 4.6 * g, s * (fx1 - 0.12 * w), y0 + 6.9 * f, zf - 2.6 * g, 'finger')
+    box(finger, s * (fx0 + 0.25 * w), y0 + 4.1 * f, zf - 6.0 * g, s * (fx1 - 0.25 * w), y0 + 6.1 * f, zf - 4.6 * g, 'finger')
+    box(finger, s * (fx0 + 0.36 * w), y0 + 3.5 * f, zf - 7.0 * g, s * (fx1 - 0.36 * w), y0 + 5.0 * f, zf - 6.0 * g, 'finger')
     for z in (0.9, 2.9):
-        box(finger, s * (fx0 + 0.3 * w), y0 + 3.8 * f, zf - (z + 0.8) * f, s * (fx1 - 0.3 * w), y0 + 4.5 * f, zf - z * f, 'finger')
+        box(finger, s * (fx0 + 0.3 * w), y0 + 3.8 * f, zf - (z + 0.8) * g, s * (fx1 - 0.3 * w), y0 + 4.5 * f, zf - z * g, 'finger')
     hinge = [s * cx * V, (y0 + 6.2 * f) * V, zf * V]
     return arm, hand, finger, hinge
 
@@ -147,12 +149,12 @@ def walking_leg(s, px, pz, f):
     Returns (thigh, shin, tip, the knee's x, the ankle's x)."""
     up, low, tip = [], [], []
     y = LEG_Y
-    knee = px + s * 8 * f
-    box(up, px - s * 1.0, y - 1.4, pz - 1.2, knee, y + 1.4, pz + 1.2, 'leg')
-    box(up, knee - s * 1.3, y - 1.65, pz - 1.4, knee + s * 1.2, y + 1.65, pz + 1.4, 'joint')
-    ankle = knee + s * 7 * f
-    box(low, knee, y - 1.25, pz - 1.05, knee + s * 4 * f, y + 1.25, pz + 1.05, 'leg')
-    box(low, knee + s * 4 * f, y - 1.0, pz - 0.9, ankle, y + 1.0, pz + 0.9, 'leg')
+    knee = px + s * 10 * f
+    box(up, px - s * 1.0, y - 1.3, pz - 1.1, knee, y + 1.3, pz + 1.1, 'leg')
+    box(up, knee - s * 1.3, y - 1.55, pz - 1.3, knee + s * 1.2, y + 1.55, pz + 1.3, 'joint')
+    ankle = knee + s * 6.5 * f
+    box(low, knee, y - 1.25, pz - 1.05, knee + s * 3.6 * f, y + 1.25, pz + 1.05, 'leg')
+    box(low, knee + s * 3.6 * f, y - 1.0, pz - 0.9, ankle, y + 1.0, pz + 0.9, 'leg')
     box(low, ankle - s * 0.9, y - 1.15, pz - 1.0, ankle + s * 0.5, y + 1.15, pz + 1.0, 'joint')
     box(tip, ankle - s * 0.2, y - 0.85, pz - 0.75, ankle + s * 2.4 * f, y + 0.85, pz + 0.75, 'tip0')
     box(tip, ankle + s * 2.4 * f, y - 0.6, pz - 0.55, ankle + s * 4.4 * f, y + 0.6, pz + 0.55, 'tip')
@@ -165,16 +167,16 @@ def model():
     carapace(body)
     out = [{'name': 'body', 'pivot': [0, 10 * V, 0], 'cubes': body}]
     for side, s in (('left', 1), ('right', -1)):
-        out.append({'name': f'eye_{side}', 'parent': 'body', 'pivot': [s * 5.1 * V, 13 * V, -9.6 * V], 'cubes': eye(s)})
+        out.append({'name': f'eye_{side}', 'parent': 'body', 'pivot': [s * 5.1 * V, 15.8 * V, -9.6 * V], 'cubes': eye(s)})
     for side, s in (('left', 1), ('right', -1)):
         arm, hand, finger, hinge = claw(side, s)
-        out.append({'name': f'claw_arm_{side}', 'parent': 'body', 'pivot': [s * 10 * V, 8 * V, -9.5 * V], 'cubes': arm})
-        out.append({'name': f'claw_hand_{side}', 'parent': f'claw_arm_{side}', 'pivot': [s * 17.0 * V, 6 * V, -12.5 * V],
+        out.append({'name': f'claw_arm_{side}', 'parent': 'body', 'pivot': [s * 7.5 * V, 8.5 * V, -8 * V], 'cubes': arm})
+        out.append({'name': f'claw_hand_{side}', 'parent': f'claw_arm_{side}', 'pivot': [s * 15.4 * V, 6 * V, -12 * V],
                     'rotation': [0, s * 24, 0], 'cubes': hand})
         out.append({'name': f'claw_finger_{side}', 'parent': f'claw_hand_{side}', 'pivot': hinge, 'cubes': finger})
     for i, (z, yaw, f) in enumerate(zip(LEG_Z, LEG_YAW, LEG_LONG)):
         for side, s in (('left', 1), ('right', -1)):
-            px = s * (half_at(z) - 2.6)
+            px = s * (half_at(z) - BODY_IN - 0.4)
             up, low, tip, knee, ankle = walking_leg(s, px, z, f)
             n = f'leg{i + 1}'
             out.append({'name': f'{n}_upper_{side}', 'parent': 'body', 'pivot': [px * V, LEG_Y * V, z * V],
@@ -188,8 +190,7 @@ def model():
 
 # --- colours -----------------------------------------------------------------------------------------------------------
 LOOKS = {'A': {'name': 'Spiny river crab', 'note': "your picture, at half the cube size: a shell dark purple in the "
-               "middle and red-brown toward the edge, real spikes round its front and sides (tan at the base, cream at "
-               "the point), a deep cream face under a dark rim, tall black eyes set wide apart, big purple-brown claws "
+               "middle and red-brown toward the edge, a flat-topped shell flaring up like a crown over a narrower body, spikes pointing up round its top edge, a deep cream face under a dark rim, tall black eyes set wide apart, big purple-brown claws "
                "with thick cream fingers held in front of the face (the right one bigger), orange-brown legs from under "
                "the shell's edge with dark knees and long cream tips"}}
 DARK, PURPLE, RED, ORANGE, TAN, CREAM = ((88, 60, 56), (104, 62, 76), (128, 76, 62), (172, 104, 60), (190, 146, 104),
@@ -257,8 +258,8 @@ def colour(part, look, x, y, z, face, rnd):
                 c = pick([RED, mix(RED, PURPLE, 0.5), mix(RED, ORANGE, 0.35), RED], r)
         else:
             c = shade(pick([RED, mix(RED, PURPLE, 0.5), mix(RED, ORANGE, 0.35), PURPLE], r), 0.92)
-            if yv < 11:
-                c = mix(c, ORANGE, 0.25)                        # the edge's lower lip warmer
+            if yv < 13.5:
+                c = shade(mix(c, ORANGE, 0.25), 0.9)            # the flare under the edge: warmer, in shadow
         return shade(c, grain)
     if part == 'hand':
         if face == 'down':
