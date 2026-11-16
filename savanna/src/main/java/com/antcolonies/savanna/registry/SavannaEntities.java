@@ -150,6 +150,16 @@ public class SavannaEntities {
                     .clientTrackingRange(4)
                     .build("crab"));
 
+    // The river snail (M9 river life, the clean-up crew, 2026-11-16): the Garden spiral, drawn 0.4 blocks long and about
+    // 0.3 tall with its shell; a small box (my pick); each snail's own size through its SCALE attribute.
+    public static final DeferredHolder<EntityType<?>, EntityType<com.antcolonies.savanna.animal.SnailEntity>> SNAIL =
+            ENTITY_TYPES.register("snail", () -> EntityType.Builder
+                    .of(com.antcolonies.savanna.animal.SnailEntity::new, SavannaMobCategories.riverFish())
+                    .sized(0.3F, 0.25F)
+                    .eyeHeight(0.2F)
+                    .clientTrackingRange(4)
+                    .build("snail"));
+
     // Remains of a dead fish (M9 river life, 2026-11-15): meat on the bones, lying on the bed; a small box under the drawn
     // fish (a usual catfish 2 blocks long), not a living thing.
     public static final DeferredHolder<EntityType<?>, EntityType<com.antcolonies.savanna.animal.RemainsEntity>> REMAINS =

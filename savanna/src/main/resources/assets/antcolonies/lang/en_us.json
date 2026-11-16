@@ -163,5 +163,7 @@
   "entity.antcolonies.crocodile": "Nile Crocodile",
   "item.antcolonies.crocodile_spawn_egg": "Nile Crocodile Spawn Egg",
   "entity.antcolonies.crab": "River Crab",
-  "item.antcolonies.crab_spawn_egg": "River Crab Spawn Egg"
+  "item.antcolonies.crab_spawn_egg": "River Crab Spawn Egg",
+  "entity.antcolonies.snail": "River Snail",
+  "item.antcolonies.snail_spawn_egg": "River Snail Spawn Egg"
 }

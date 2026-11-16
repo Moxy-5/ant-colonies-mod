@@ -945,4 +945,88 @@ public class RiverLifeTests {
             helper.assertBlockProperty(algae, AlgaeBlock.STRANDS, strands - 2);
         });
     }
+
+    /**
+     * The river snail (M9 river life, 2026-11-16): spawns on the bed of shallow savanna water only, in the river fish
+     * group; hungry, it creeps to the lush algae and rasps one bite (a strand) off it, then is fed; a crab coming
+     * up beside it makes it pull into its shell, and once the crab is gone it peeks out again.
+     */
+    @GameTest(template = "arena", timeoutTicks = 2400)
+    public static void aSnailGrazesAlgaeAndHidesFromACrab(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        buildPond(helper);
+        if (net.minecraft.world.entity.SpawnPlacements.getPlacementType(SavannaEntities.SNAIL.get())
+                != net.minecraft.world.entity.SpawnPlacementTypes.IN_WATER) {
+            helper.fail("the snail's spawn placement is not signed up");
+        }
+        var biomes = level.registryAccess().registryOrThrow(net.minecraft.core.registries.Registries.BIOME);
+        boolean listed = biomes.getOrThrow(net.minecraft.world.level.biome.Biomes.SAVANNA).getMobSettings()
+                .getMobs(com.antcolonies.savanna.registry.SavannaMobCategories.riverFish())
+                .unwrap().stream().anyMatch(d -> d.type == SavannaEntities.SNAIL.get());
+        if (!listed) {
+            helper.fail("the snail is not in the savanna's river fish spawn list");
+        }
+        BlockPos shelf = helper.absolutePos(new BlockPos(X0 + 1, TOP - 1, Z0 + 1));
+        BlockPos deep = helper.absolutePos(new BlockPos(X1 - 1, SURFACE, Z1 - 1));
+        if (Math.abs(deep.getY() - level.getSeaLevel()) <= 6) {
+            if (!com.antcolonies.savanna.animal.SnailEntity.canSpawn(SavannaEntities.SNAIL.get(), level, MobSpawnType.NATURAL, shelf, level.random)) {
+                helper.fail("a snail may not spawn on the shallow shelf");
+            }
+            if (com.antcolonies.savanna.animal.SnailEntity.canSpawn(SavannaEntities.SNAIL.get(), level, MobSpawnType.NATURAL, deep, level.random)) {
+                helper.fail("a snail may spawn under 7 blocks of water");
+            }
+        }
+        BlockPos algae = new BlockPos(X0 + 3, TOP - 1, Z0 + 2);
+        helper.setBlock(algae, SavannaBlocks.ALGAE.get().defaultBlockState().setValue(AlgaeBlock.GROWTH, AlgaeBlock.LUSH)
+                .setValue(AlgaeBlock.STRANDS, AlgaeBlock.fullStrands(AlgaeBlock.LUSH)));
+        int strands = AlgaeBlock.fullStrands(AlgaeBlock.LUSH);
+        com.antcolonies.savanna.animal.SnailEntity snail = helper.spawn(SavannaEntities.SNAIL.get(), new BlockPos(X0 + 1, TOP - 1, Z0 + 2));
+        snail.setPersistenceRequired();
+        snail.makeHungry();
+        // 0 grazing, 1 fed: crab sent, 2 hidden: crab gone, 3 peeked out
+        int[] stage = {0};
+        boolean[] sawGraze = {false};
+        com.antcolonies.savanna.animal.CrabEntity[] crab = {null};
+        long[] at = {0};
+        helper.onEachTick(() -> {
+            byte doing = snail.doing();
+            sawGraze[0] |= doing == com.antcolonies.savanna.animal.SnailEntity.GRAZE;
+            switch (stage[0]) {
+                case 0 -> {
+                    if (snail.isFed() && sawGraze[0]) {
+                        if (helper.getBlockState(algae).getValue(AlgaeBlock.STRANDS) != strands - 1) {
+                            helper.fail("the snail took " + (strands - helper.getBlockState(algae).getValue(AlgaeBlock.STRANDS))
+                                    + " strands off the algae (1 in one bite)");
+                        }
+                        BlockPos near = snail.blockPosition().subtract(helper.absolutePos(BlockPos.ZERO)).east();
+                        crab[0] = helper.spawn(SavannaEntities.CRAB.get(), near);
+                        crab[0].setPersistenceRequired();
+                        crab[0].setNoAi(true);
+                        stage[0] = 1;
+                    }
+                }
+                case 1 -> {
+                    if (snail.isHidden()) {
+                        crab[0].discard();
+                        stage[0] = 2;
+                        at[0] = helper.getTick();
+                    }
+                }
+                case 2 -> {
+                    if (doing == com.antcolonies.savanna.animal.SnailEntity.PEEK) {
+                        if (helper.getTick() - at[0] < 90) {
+                            helper.fail("the snail peeked out " + (helper.getTick() - at[0]) + " ticks after the crab left (5 to 10 s)");
+                        }
+                        stage[0] = 3;
+                    }
+                }
+                default -> { }
+            }
+        });
+        helper.succeedWhen(() -> helper.assertTrue(stage[0] == 3, "the snail got to stage " + stage[0]
+                + " (0 grazing, 1 hiding from the crab, 2 peeking out) at "
+                + snail.blockPosition().subtract(helper.absolutePos(BlockPos.ZERO)) + ", doing " + snail.doing() + ", fed " + snail.isFed()
+                + ", grazed " + sawGraze[0] + ", strands " + helper.getBlockState(algae).getValue(AlgaeBlock.STRANDS) + " of " + strands
+                + ", path " + (snail.getNavigation().getPath() == null ? "none" : snail.getNavigation().getPath().getEndNode())));
+    }
 }

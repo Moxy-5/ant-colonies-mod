@@ -413,7 +413,143 @@ def paint(bones, look):
     return bones, rows, width, height
 
 
+
+# --- the game (look A, the Garden spiral: the user's pick, 2026-11-16) --------------------------------------------------
+# Turns here are in the model file's own directions (the viewer shows them as (x, y, z) -> (-x, y, -z)): +x tips a part's
+# front down. For the game a root bone 'body' (no boxes) holds the foot, head and shell side by side, so the foot can
+# shrink and ripple without the shell shrinking with it. All timings my picks.
+CRAWL_LEN = 1.2       # one ripple of the foot (seconds; the game plays it faster or slower by the snail's speed)
+GRAZE_LEN = 1.2       # one rasp at the algae
+HIDE_LEN = 0.5        # pulling in (SnailEntity: then held)
+PEEK_LEN = 1.6        # coming back out, eyes first (SnailEntity.PEEK_TICKS)
+
+
+def game_model():
+    bones = model('A')
+    for b in bones:
+        if b['name'] in ('foot', 'shell'):
+            b['parent'] = 'body'
+        elif b['name'] == 'head':
+            b['parent'] = 'body'
+    return [{'name': 'body', 'pivot': [0, 0, 0], 'cubes': []}] + bones
+
+
+def clips():
+    """idle (the stalks swaying), crawl (the foot rippling, the head bobbing, the shell rocking), graze (the head down at
+    the algae, rasping), hide (everything pulled into the shell, held), peek (back out, eyes first), death (pulled in and
+    rolled onto the shell's side)."""
+    import tilapia_models as tm
+
+    def sm(a, b, x):
+        v = max(0.0, min(1.0, (x - a) / (b - a)))
+        return v * v * (3 - 2 * v)
+
+    def stalks(p, t, length, droop=0.0, k=1.0):
+        w = 2 * math.pi / length
+        for j, (side, s) in enumerate(SIDES):
+            p[f'eye_{side}'] = {'rotation': [9 * math.sin(w * t + j * 2.1) + droop, 0, -s * 7 * math.sin(w * t + j)]}
+            p[f'feeler_{side}'] = {'rotation': [0, s * 10 * math.sin(2 * w * t + j), 0]}
+        return p
+
+    def rest(p):
+        for name in ('foot', 'head', 'shell'):
+            p.setdefault(name, {})
+            p[name].setdefault('rotation', [0, 0, 0])
+            p[name].setdefault('position', [0, 0, 0])
+            p[name].setdefault('scale', [1, 1, 1])
+        for side, s in SIDES:
+            p[f'eye_{side}'].setdefault('scale', [1, 1, 1])
+            p[f'feeler_{side}'].setdefault('scale', [1, 1, 1])
+        p.setdefault('body', {'rotation': [0, 0, 0], 'position': [0, 0, 0]})
+        return p
+
+    def pulled(p, inside):
+        """Everything drawn into the shell (inside 0 out, 1 all in)."""
+        k = 1 - inside
+        p['head'] = {'rotation': [0, 0, 0], 'position': [0, -0.4 * inside, 2.0 * inside],
+                     'scale': [max(0.05, 1 - 0.8 * inside)] * 3}
+        p['foot'] = {'rotation': [0, 0, 0], 'position': [0, 0, 0],
+                     'scale': [1 - 0.25 * inside, 1 - 0.45 * inside, 1 - 0.45 * inside]}
+        p['shell'] = {'rotation': [0, 0, 0], 'position': [0, -0.35 * inside, 0], 'scale': [1, 1, 1]}
+        for side, s in SIDES:
+            p[f'eye_{side}']['scale'] = [1, max(0.04, k), 1]
+            p[f'feeler_{side}']['scale'] = [1, 1, max(0.04, k)]
+        return p
+
+    def idle(t):
+        p = stalks({}, t, 4.0)
+        p['head'] = {'rotation': [2 * math.sin(math.pi * t / 2), 3 * math.sin(math.pi * t / 4), 0]}
+        p['foot'] = {'scale': [1, 1 + 0.02 * math.sin(math.pi * t / 2), 1]}
+        return rest(p)
+
+    def crawl(t):
+        w = 2 * math.pi / CRAWL_LEN
+        wave = math.sin(w * t)
+        p = stalks({}, t, CRAWL_LEN * 3)
+        p['foot'] = {'scale': [1, 1, 1 + 0.05 * wave]}
+        p['head'] = {'rotation': [3 * math.sin(w * t / 2), 0, 0], 'position': [0, 0, -0.3 * wave]}
+        p['shell'] = {'rotation': [0, 0, -2.5 * math.sin(w * t / 2)], 'position': [0, 0.12 * max(0.0, wave), 0]}
+        return rest(p)
+
+    def graze(t):
+        nod = 0.5 + 0.5 * math.sin(2 * math.pi * t / GRAZE_LEN * 2)
+        p = stalks({}, t, GRAZE_LEN * 3, droop=14)
+        p['head'] = {'rotation': [16 + 8 * nod, 0, 0], 'position': [0, -0.15 * nod, -0.1]}
+        p['foot'] = {'scale': [1, 1, 1 + 0.02 * math.sin(2 * math.pi * t / GRAZE_LEN)]}
+        return rest(p)
+
+    def hide(t):
+        return rest(pulled(stalks({}, 0, 4.0), sm(0, HIDE_LEN, t)))
+
+    def peek(t):
+        u = t / PEEK_LEN
+        out = sm(0.3, 0.95, u)
+        p = rest(pulled(stalks({}, t, 4.0), 1 - out))
+        look = sm(0.0, 0.25, u) * (1 - out)           # the stalks poke out first, looking about
+        for side, s in SIDES:
+            p[f'eye_{side}']['scale'] = [1, max(0.04, min(1.0, out + 0.4 * look)), 1]
+        p['head']['scale'] = [max(0.05, 0.2 + 0.8 * out + 0.15 * look)] * 3
+        return p
+
+    def death(t):
+        f = sm(0, 0.6, t)
+        p = rest(pulled(stalks({}, 0, 4.0), min(1.0, t / 0.3)))
+        p['body'] = {'rotation': [0, 0, 90 * f], 'position': [0, 1.7 * f, 0]}
+        return p
+
+    return {'idle': tm.clip(4.0, idle, 48), 'crawl': tm.clip(CRAWL_LEN, crawl, 24), 'graze': tm.clip(GRAZE_LEN, graze, 24),
+            'hide': tm.clip(HIDE_LEN, hide, 10, 'hold'), 'peek': tm.clip(PEEK_LEN, peek, 32, False),
+            'death': tm.clip(1.0, death, 20, 'hold')}
+
+
+def write_game():
+    """Writes the Garden spiral's model, texture and clips into the savanna mod."""
+    import json
+    import mod_paths
+    root = mod_paths.assets('savanna')
+    game_bones, rows, w, h = paint(game_model(), 'A')
+    files = {'textures/entity/snail.png': png(rows)}
+    geo = {'format_version': '1.12.0', 'minecraft:geometry': [{
+        'description': {'identifier': 'geometry.snail', 'texture_width': w, 'texture_height': h,
+                        'visible_bounds_width': 1, 'visible_bounds_height': 1, 'visible_bounds_offset': [0, 0.25, 0]},
+        'bones': game_bones}]}
+    files['geo/entity/snail.geo.json'] = geo
+    files['animations/entity/snail.animation.json'] = {'format_version': '1.8.0', 'animations': clips()}
+    for rel, data in files.items():
+        path = root / rel
+        path.parent.mkdir(parents=True, exist_ok=True)
+        if isinstance(data, bytes):
+            path.write_bytes(data)
+        else:
+            with open(path, 'w', encoding='utf-8', newline='\n') as f:
+                json.dump(data, f, indent=1)
+        print('wrote', path.relative_to(mod_paths.PROJECT))
+
 if __name__ == '__main__':
+    import sys
+    if sys.argv[1:] == ['game']:
+        write_game()
+        sys.exit()
     for key in LOOKS:
         bones = model(key)
         n = sum(len(b.get('cubes', [])) for b in bones)
