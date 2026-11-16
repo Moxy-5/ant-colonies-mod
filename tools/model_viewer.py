@@ -574,6 +574,30 @@ def crab_page(out):
     print("wrote", out)
 
 
+def snail_page(out):
+    """The river snail (M9 river life, snail_models.py): four cute models to pick from (the user, 2026-11-16, looks
+    first, no realism), side by side on a silt bank, crawling, grazing or hiding in their shells, a crab, a tilapia, a
+    player and a block for scale, a length slider (0.4 blocks, my pick)."""
+    import snail_models as sm
+    import crab_models as cb
+    import tilapia_models as tm
+    snails = {}
+    for key, look in sm.LOOKS.items():
+        bones = sm.model(key)
+        b, rows, w, h = sm.paint(bones, key)
+        snails[key] = {"name": look["name"], "note": look["note"], "bones": b, "texture": uri(tm.png(rows)), "w": w,
+                       "h": h, "boxes": sum(len(x.get("cubes", [])) for x in bones)}
+    crb, rows, w, h = cb.paint(cb.model(), "A")
+    tb, trows, tw, th = tm.paint(tm.model(), "A")
+    blocks = {n: file_uri(n + ".png") for n in ("silt", "wet_silt", "algae_mat_3")}
+    data = {"snails": snails, "crab": {"bones": crb, "texture": uri(tm.png(rows)), "w": w, "h": h},
+            "tilapia": {"bones": tb, "texture": uri(tm.png(trows)), "w": tw, "h": th}, "blocks": blocks}
+    template = (Path(__file__).resolve().parent / "snail_viewer.template.html").read_text(encoding="utf-8")
+    out.parent.mkdir(parents=True, exist_ok=True)
+    out.write_text(template.replace("/*DATA*/null", json.dumps(data)), encoding="utf-8")
+    print("wrote", out)
+
+
 def remains_page(out):
     """Remains (M9 river life, remains_models.py): a catfish, a tilapia and a cow in the four stages (fresh, half-eaten,
     picked over, bones), meat in Minecraft's raw-meat style, on a silt bed with a player for scale."""
@@ -635,6 +659,9 @@ def main():
         return
     if len(sys.argv) > 1 and sys.argv[1] == "remains":
         remains_page(Path(sys.argv[2]) if len(sys.argv) > 2 else ROOT / "references/remains_viewer.html")
+        return
+    if len(sys.argv) > 1 and sys.argv[1] == "snail":
+        snail_page(Path(sys.argv[2]) if len(sys.argv) > 2 else ROOT / "references/snail_viewer.html")
         return
     if len(sys.argv) > 1 and sys.argv[1] == "crab":
         crab_page(Path(sys.argv[2]) if len(sys.argv) > 2 else ROOT / "references/crab_viewer.html")

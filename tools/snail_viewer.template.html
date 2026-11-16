@@ -1,0 +1,350 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>River Snail Viewer</title>
+<style>
+  :root { --bg: #f1efe8; --panel: #fdfcf8; --ink: #2a2a22; --muted: #6a675a; --line: #d9d4c4; --accent: #6b7a2f; }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) { --bg: #1a1a16; --panel: #23231e; --ink: #ecebe2; --muted: #a5a291; --line: #3a3930; --accent: #b6c86a; }
+  }
+  :root[data-theme="dark"] { --bg: #1a1a16; --panel: #23231e; --ink: #ecebe2; --muted: #a5a291; --line: #3a3930; --accent: #b6c86a; }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font: 15px/1.45 system-ui, sans-serif; }
+  header { padding: 14px 16px 6px; }
+  h1 { margin: 0 0 4px; font-size: 20px; }
+  header p { margin: 0; color: var(--muted); max-width: 82ch; }
+  #wrap { position: relative; height: 62vh; min-height: 340px; margin: 10px 16px; border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
+  canvas { display: block; width: 100%; height: 100%; }
+  #labels { position: absolute; inset: 0; pointer-events: none; overflow: hidden; }
+  .tag { position: absolute; transform: translate(-50%, -100%); background: var(--panel); border: 1px solid var(--line); border-radius: 6px;
+         padding: 1px 6px; font-size: 12px; font-weight: 600; white-space: nowrap; }
+  .controls { display: flex; flex-wrap: wrap; gap: 8px 14px; padding: 0 16px 8px; align-items: center; }
+  .controls label { display: flex; gap: 8px; align-items: center; font-size: 14px; }
+  .controls input[type=range] { width: 180px; max-width: 50vw; }
+  .readout { color: var(--muted); font-size: 13px; }
+  button { font: inherit; padding: 6px 12px; border-radius: 8px; border: 1px solid var(--line); background: var(--panel); color: var(--ink); cursor: pointer; }
+  button.on { border-color: var(--accent); color: var(--accent); font-weight: 600; }
+  ul { margin: 8px 16px 24px; padding-left: 22px; max-width: 82ch; }
+  li { margin: 4px 0; }
+  li b { color: var(--accent); }
+</style>
+</head>
+<body>
+<header>
+  <h1>River snail viewer</h1>
+  <p>Four cute river snails to pick from, made for looks (no realism): <b>A</b> Garden spiral, <b>B</b> Ruby ramshorn, <b>C</b> Striped steeple and
+     <b>D</b> Mossy nerite, side by side on a silt bank. Switch them between crawling, grazing algae and hiding in their shells. A river crab, a tilapia,
+     a player and a block stand by for scale. Drag to turn, scroll or pinch to zoom, right-drag to slide.</p>
+</header>
+<div id="wrap"><canvas id="c"></canvas><div id="labels"></div></div>
+<div class="controls">
+  <label>Snail length <input id="size" type="range" min="0.2" max="0.8" step="0.05"> <span id="sizeOut" class="readout"></span></label>
+</div>
+<div class="controls" id="poses"></div>
+<div class="controls" id="cams"></div>
+<ul id="list"></ul>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+<script>
+const DATA = /*DATA*/null;
+const canvas = document.getElementById('c');
+const wrap = document.getElementById('wrap');
+const renderer = new THREE.WebGLRenderer({canvas, antialias: true, preserveDrawingBuffer: true});
+renderer.setPixelRatio(window.devicePixelRatio);
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+const scene = new THREE.Scene();
+const SKY = new THREE.Color('#a9cde0');
+scene.background = SKY;
+scene.fog = new THREE.Fog(SKY, 30, 80);
+const camera = new THREE.PerspectiveCamera(35, 1, 0.01, 300);
+const controls = new THREE.OrbitControls(camera, canvas);
+scene.add(new THREE.HemisphereLight('#fff7e6', '#7a6a48', 0.75));
+const sun = new THREE.DirectionalLight('#fff4d8', 0.75);
+sun.position.set(8, 20, 10);
+sun.castShadow = true;
+sun.shadow.mapSize.set(2048, 2048);
+sun.shadow.bias = -0.0004;
+Object.assign(sun.shadow.camera, {left: -8, right: 8, top: 8, bottom: -8, near: 0.5, far: 60});
+scene.add(sun);
+
+function deg(v) { return v * Math.PI / 180; }
+function setRot(obj, r) { obj.rotation.set(deg(-r[0]), deg(r[1]), deg(-r[2]), 'ZYX'); }
+function loadTexture(uri, rx, ry) {
+  const t = new THREE.TextureLoader().load(uri);
+  t.magFilter = THREE.NearestFilter;
+  t.minFilter = THREE.NearestFilter;
+  if (rx) { t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(rx, ry || rx); }
+  return t;
+}
+const rand = (() => { let s = 7; return () => (s = (s * 16807) % 2147483647) / 2147483647; })();
+
+// The bank: silt land (z below 0) dropping into the river (z above 0), a silt bed 3 blocks down, the water's surface
+// just under the bank's top.
+const BANK = 0, SURFACE = -0.15, BED = -1.6;
+const land = new THREE.Mesh(new THREE.PlaneGeometry(80, 30), new THREE.MeshLambertMaterial({map: loadTexture(DATA.blocks.silt, 80, 30)}));
+land.rotation.x = -Math.PI / 2; land.position.set(0, BANK, -15); land.receiveShadow = true; scene.add(land);
+const edge = new THREE.Mesh(new THREE.PlaneGeometry(80, BANK - BED), new THREE.MeshLambertMaterial({map: loadTexture(DATA.blocks.wet_silt, 80, 2)}));
+edge.position.set(0, (BANK + BED) / 2, 0); scene.add(edge);
+const bed = new THREE.Mesh(new THREE.PlaneGeometry(80, 40), new THREE.MeshLambertMaterial({map: loadTexture(DATA.blocks.silt, 80, 40), color: '#b8b09a'}));
+bed.rotation.x = -Math.PI / 2; bed.position.set(0, BED, 20); bed.receiveShadow = true; scene.add(bed);
+const matMat = new THREE.MeshLambertMaterial({map: loadTexture(DATA.blocks.algae_mat_3), transparent: true, alphaTest: 0.3});
+for (let i = 0; i < 70; i++) {
+  const m = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), matMat);
+  m.rotation.x = -Math.PI / 2;
+  m.position.set(Math.floor(rand() * 40 - 20) + 0.5, BED + 0.01, Math.floor(rand() * 14 + 1) + 0.5);
+  scene.add(m);
+}
+const water = new THREE.Mesh(new THREE.PlaneGeometry(80, 40), new THREE.MeshLambertMaterial({color: '#6f8a5a', transparent: true, opacity: 0.55, side: THREE.DoubleSide, depthWrite: false}));
+water.rotation.x = -Math.PI / 2; water.position.set(0, SURFACE, 20); water.renderOrder = 2; scene.add(water);
+
+// --- models ------------------------------------------------------------------------------------------------------------
+const FACES = ['east', 'west', 'up', 'down', 'south', 'north'];
+function boxGeometry(c, tw, th) {
+  const g = new THREE.BoxGeometry(Math.max(c.size[0], 0.02), Math.max(c.size[1], 0.02), Math.max(c.size[2], 0.02));
+  const uv = g.attributes.uv;
+  FACES.forEach((f, i) => {
+    const face = c.uv && c.uv[f];
+    if (!face) return;
+    const [u0, v0] = face.uv, [w, h] = face.uv_size;
+    for (let k = 0; k < 4; k++) {
+      const j = i * 4 + k;
+      uv.setXY(j, (u0 + uv.getX(j) * w) / tw, 1 - (v0 + (1 - uv.getY(j)) * h) / th);
+    }
+  });
+  uv.needsUpdate = true;
+  return g;
+}
+
+// centre: 'middle' turns about the model's middle (the fish), 'ground' keeps y = 0 at the feet (the crocodile).
+function build(look, centre) {
+  const mat = new THREE.MeshLambertMaterial({map: loadTexture(look.texture), alphaTest: 0.5});
+  const root = new THREE.Group(), groups = {}, byName = {};
+  look.bones.forEach(b => byName[b.name] = b);
+  look.bones.forEach(b => {
+    const g = new THREE.Group();
+    const p = b.parent ? byName[b.parent].pivot : [0, 0, 0];
+    g.position.set(b.pivot[0] - p[0], b.pivot[1] - p[1], b.pivot[2] - p[2]);
+    if (b.rotation) setRot(g, b.rotation);
+    g.userData.base = g.rotation.clone();
+    g.userData.basePos = g.position.clone();
+    groups[b.name] = g;
+    (b.cubes || []).forEach(c => {
+      const mesh = new THREE.Mesh(boxGeometry(c, look.w, look.h), mat);
+      mesh.castShadow = true; mesh.receiveShadow = true;
+      mesh.position.set(c.origin[0] + c.size[0] / 2 - b.pivot[0], c.origin[1] + c.size[1] / 2 - b.pivot[1], c.origin[2] + c.size[2] / 2 - b.pivot[2]);
+      g.add(mesh);
+    });
+  });
+  look.bones.forEach(b => (b.parent ? groups[b.parent] : root).add(groups[b.name]));
+  root.scale.setScalar(1 / 16);
+  const bounds = new THREE.Box3().setFromObject(root);
+  const c = bounds.getCenter(new THREE.Vector3());
+  root.position.set(-c.x, centre === 'ground' ? 0 : -c.y, -c.z);
+  const lift = new THREE.Group(); lift.add(root);      // up and down, and the roll
+  const yaw = new THREE.Group(); yaw.add(lift);
+  yaw.userData = {groups, root, lift, length: bounds.max.z - bounds.min.z, width: bounds.max.x - bounds.min.x,
+                  height: bounds.max.y - bounds.min.y, phase: rand() * 6.28};
+  scene.add(yaw);
+  return yaw;
+}
+
+function wave(obj, t, amount, beat, table) {
+  const g = obj.userData.groups, abs = {body: 0}, ph = obj.userData.phase;
+  table.forEach(([name, parent, a, lag]) => {
+    abs[name] = amount * a * Math.sin(beat * t - lag + ph);
+    g[name].rotation.y = (g[name].userData.base.y || 0) + abs[name] - abs[parent];
+  });
+}
+const TILAPIA_WAVE = [['head', 'body', -0.05, 0], ['front', 'body', 0.04, 0.6], ['mid', 'front', 0.1, 1.3],
+                      ['rear', 'mid', 0.19, 2.0], ['peduncle', 'rear', 0.3, 2.6], ['tail', 'peduncle', 0.42, 3.1]];
+const settings = {size: 0.4, cam: 'overview', pose: 'crawling'};
+location.hash.slice(1).split('&').filter(Boolean).forEach(kv => {
+  const [k, v] = kv.split('=').map(decodeURIComponent);
+  settings[k] = isNaN(parseFloat(v)) ? v : parseFloat(v);
+});
+const tags = [];
+function tag(text, obj, height) {
+  const el = document.createElement('div');
+  el.className = 'tag'; el.textContent = text;
+  document.getElementById('labels').appendChild(el);
+  tags.push({el, obj, height});
+}
+
+// --- the snails: in a row along the bank, an algae mat in front of each for grazing --------------------------------------
+const KEYS = Object.keys(DATA.snails);
+const SPOT_X = [-1.05, -0.35, 0.35, 1.05], SPOT_Z = -0.8;
+const snails = KEYS.map((key, i) => {
+  const s = DATA.snails[key];
+  const obj = build(s, 'ground');
+  tag(key + ' ' + s.name, obj, () => obj.userData.height * obj.scale.x + 0.05);
+  const mat = new THREE.Mesh(new THREE.PlaneGeometry(0.5, 0.5), matMat);
+  mat.rotation.x = -Math.PI / 2; mat.position.set(SPOT_X[i], BANK + 0.004, SPOT_Z + 0.2);
+  mat.visible = false; scene.add(mat);
+  return {key, obj, mat, i};
+});
+const crab = build(DATA.crab, 'ground');
+tag('River crab, 0.8 blocks wide', crab, () => 0.36);
+const fish = build(DATA.tilapia, 'middle');
+tag('Tilapia, 0.6 blocks', fish, () => 0.2);
+const player = new THREE.Group();
+[[0.5, 0.75, 0.25, 0.375, '#3b4a8f'], [0.5, 0.75, 0.25, 1.125, '#2f9c9c'], [0.5, 0.5, 0.5, 1.55, '#b98a68']].forEach(([w, h, d, y, col]) => {
+  const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), new THREE.MeshLambertMaterial({color: col}));
+  m.position.y = y; m.castShadow = true; player.add(m);
+});
+scene.add(player); tag('Player, 1.8 blocks', player, () => 1.85);
+const block = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), new THREE.MeshLambertMaterial({map: loadTexture(DATA.blocks.wet_silt)}));
+block.castShadow = true; scene.add(block); tag('1 block', block, () => 0.55);
+
+const sizeIn = document.getElementById('size');
+sizeIn.value = settings.size;
+function layout() {
+  snails.forEach(s => s.obj.scale.setScalar(settings.size / s.obj.userData.length));
+  crab.scale.setScalar(0.8 / crab.userData.width);
+  crab.position.set(2.1, BANK, -1.0); crab.rotation.y = deg(200);
+  fish.scale.setScalar(0.6 / fish.userData.length);
+  player.position.set(3.2, BANK, -2.4);
+  block.position.set(-2.4, BANK + 0.5, -2.2);
+  const h = Math.max(...snails.map(s => s.obj.userData.height * s.obj.scale.x));
+  document.getElementById('sizeOut').textContent = settings.size.toFixed(2) + ' blocks long, up to ' + h.toFixed(2) +
+    ' tall with the eyes up (the crab: 0.8 wide, 0.3 tall)';
+}
+sizeIn.addEventListener('input', () => { settings.size = parseFloat(sizeIn.value); layout(); });
+
+// --- poses -------------------------------------------------------------------------------------------------------------
+const SIDES = [['left', 1], ['right', -1]];
+const sm = (a, b, x) => { const v = Math.max(0, Math.min(1, (x - a) / (b - a))); return v * v * (3 - 2 * v); };
+function rest(g) {
+  Object.values(g).forEach(b => { b.rotation.copy(b.userData.base); b.position.copy(b.userData.basePos); b.scale.set(1, 1, 1); });
+}
+function stalks(g, t, ph, droop) {
+  // the eye stalks (or B's feelers) sway each on its own
+  SIDES.forEach(([side, s], j) => {
+    const e = g['eye_' + side];
+    e.rotation.x = e.userData.base.x - deg(9 * Math.sin(t * 0.9 + ph + j * 2.1) + droop);
+    e.rotation.z = e.userData.base.z + s * deg(7 * Math.sin(t * 0.6 + ph * 1.3 + j));
+    const f = g['feeler_' + side];
+    f.rotation.y = f.userData.base.y + s * deg(10 * Math.sin(t * 1.4 + ph + j));
+  });
+}
+function pose(sn, t) {
+  const g = sn.obj.userData.groups, ph = sn.obj.userData.phase;
+  rest(g);
+  sn.mat.visible = settings.pose === 'grazing';
+  const home = new THREE.Vector3(SPOT_X[sn.i], BANK, SPOT_Z);
+  if (settings.pose === 'crawling') {
+    // gliding slowly round a little loop, the foot rippling, the shell rocking, the head nodding
+    const r = 0.16, a = t * 0.35 + sn.i * 1.6;
+    sn.obj.position.set(home.x + Math.cos(a) * r, BANK, home.z + Math.sin(a) * r);
+    sn.obj.rotation.y = Math.PI - a;     // its front (-Z) along the loop
+    const wave = Math.sin(t * 3.2 + ph);
+    g.foot.scale.z = 1 + 0.045 * wave;
+    g.head.position.z = g.head.userData.basePos.z - 0.12 * wave;
+    g.head.rotation.x = deg(3 * Math.sin(t * 1.6 + ph));
+    g.shell.position.y = g.shell.userData.basePos.y + 0.05 * Math.max(0, wave);
+    g.shell.rotation.z = deg(2.5 * Math.sin(t * 1.6 + ph));
+    stalks(g, t, ph, 0);
+  } else if (settings.pose === 'grazing') {
+    // still, the head down at the algae, nodding as it rasps, the stalks lowered forward
+    sn.obj.position.copy(home); sn.obj.rotation.y = Math.PI;     // facing the camera, the mat in front
+    const nod = 0.5 + 0.5 * Math.sin(t * 5 + ph);
+    g.head.rotation.x = g.head.userData.base.x + deg(16 + 8 * nod);
+    g.head.position.y = g.head.userData.basePos.y - 0.12 * nod;
+    g.foot.scale.z = 1 + 0.02 * Math.sin(t * 1.2 + ph);
+    stalks(g, t, ph, -14);
+  } else {
+    // hiding: every few seconds it pulls everything into the shell, waits, then peeks out stalks first
+    sn.obj.position.copy(home); sn.obj.rotation.y = Math.PI + deg(20 - sn.i * 12);
+    const u = (t * 0.22 + sn.i * 0.17) % 1;
+    const inside = sm(0.05, 0.14, u) - sm(0.55, 0.8, u);
+    const peek = sm(0.55, 0.68, u) - sm(0.8, 0.95, u);
+    const k = 1 - inside;
+    g.head.position.z = g.head.userData.basePos.z + 2.0 * inside;
+    g.head.position.y = g.head.userData.basePos.y - 0.4 * inside;
+    g.head.scale.setScalar(Math.max(0.05, 1 - 0.8 * inside));
+    g.foot.scale.set(1 - 0.25 * inside, 1 - 0.45 * inside, 1 - 0.45 * inside);
+    g.shell.position.y = g.shell.userData.basePos.y - 0.35 * inside;
+    SIDES.forEach(([side]) => {
+      g['eye_' + side].scale.set(1, Math.max(0.04, Math.min(1, k + peek * 0.4)), 1);
+      g['feeler_' + side].scale.set(1, 1, Math.max(0.04, k));
+    });
+    stalks(g, t, ph, 0);
+  }
+  if (g.tufts) g.tufts.rotation.z = deg(4 * Math.sin(t * 1.3 + ph));
+}
+
+const poseBox = document.getElementById('poses');
+['crawling', 'grazing', 'hiding'].forEach(name => {
+  const b = document.createElement('button');
+  b.textContent = name;
+  b.onclick = () => { settings.pose = name; [...poseBox.children].forEach(x => x.classList.toggle('on', x.textContent === name)); };
+  poseBox.appendChild(b);
+});
+[...poseBox.children].forEach(x => x.classList.toggle('on', x.textContent === settings.pose));
+
+// --- cameras -----------------------------------------------------------------------------------------------------------
+const P = i => snails[i].obj.position;
+const close = i => () => { const p = P(i); return [[p.x + 0.42, p.y + 0.26, p.z + 0.5], [p.x, p.y + 0.08, p.z]]; };
+const CAMS = {
+  overview: () => [[0, 0.75, 1.3], [0, 0.05, -0.8]],
+  'face to face': () => [[0, 0.16, 0.45], [0, 0.1, -0.8]],
+  'from the side': () => [[-2.1, 0.25, -0.75], [0, 0.08, -0.8]],
+  'A close': close(0), 'B close': close(1), 'C close': close(2), 'D close': close(3),
+  'with the crab': () => [[1.0, 0.8, 1.2], [1.0, 0.05, -0.9]],
+  'with the player': () => [[1.2, 1.4, 3.0], [1.2, 0.5, -1.4]],
+};
+const camBox = document.getElementById('cams');
+function setCam(name) {
+  settings.cam = name;
+  const [pos, target] = CAMS[name]();
+  camera.position.set(...pos); controls.target.set(...target); controls.update();
+  [...camBox.children].forEach(b => b.classList.toggle('on', b.textContent === name));
+}
+Object.keys(CAMS).forEach(name => {
+  const b = document.createElement('button');
+  b.textContent = name; b.onclick = () => setCam(name);
+  camBox.appendChild(b);
+});
+KEYS.forEach(key => {
+  const li = document.createElement('li');
+  li.innerHTML = '<b>' + key + ' ' + DATA.snails[key].name + ':</b> ' + DATA.snails[key].note + ' (' + DATA.snails[key].boxes + ' boxes)';
+  document.getElementById('list').appendChild(li);
+});
+
+function resize() {
+  const w = wrap.clientWidth, h = wrap.clientHeight;
+  renderer.setSize(w, h, false);
+  camera.aspect = w / h; camera.updateProjectionMatrix();
+}
+window.addEventListener('resize', resize);
+
+const v = new THREE.Vector3();
+function frame() {
+  const t = performance.now() / 1000;
+  snails.forEach(s => pose(s, t));
+  const b = t * 0.35;
+  fish.position.set(1.0 + Math.cos(b) * 1.3, -0.8, 2.6 + Math.sin(b) * 0.9);
+  fish.rotation.y = Math.PI - b;
+  wave(fish, t, 1, 9, TILAPIA_WAVE);
+  controls.update();
+  renderer.render(scene, camera);
+  const w = wrap.clientWidth, h = wrap.clientHeight;
+  tags.forEach(({el, obj, height}) => {
+    v.set(obj.position.x, obj.position.y + height() + 0.04, obj.position.z).project(camera);
+    const show = v.z < 1 && Math.abs(v.x) < 1.1 && Math.abs(v.y) < 1.1;
+    el.style.display = show ? '' : 'none';
+    el.style.left = ((v.x + 1) / 2 * w) + 'px';
+    el.style.top = ((1 - v.y) / 2 * h) + 'px';
+  });
+  requestAnimationFrame(frame);
+}
+layout();
+resize();
+snails.forEach(s => pose(s, 0));
+setCam(CAMS[settings.cam] ? settings.cam : 'overview');
+frame();
+</script>
+</body>
+</html>
