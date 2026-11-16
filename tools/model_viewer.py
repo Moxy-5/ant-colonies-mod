@@ -49,6 +49,9 @@ python tools/model_viewer.py floodplain [out.html]   (default references/floodpl
 Planks from the giant trees' wood (2026-11-11, plank_art.py; plank_viewer.template.html): three looks for each tree,
 a floor, a wall and the log beside, Minecraft's acacia and oak planks to compare:
 python tools/model_viewer.py planks [out.html]   (default references/plank_viewer.html)
+River sand, pebbles and the crocodile's nest (M9 river life, 2026-11-16, sand_art.py; sand_viewer.template.html): three
+sand tones by how far inland, wet sand, ripples, crocodile slides, seven 3D pebble looks, the nest covered and open:
+python tools/model_viewer.py sand [out.html]   (default references/sand_viewer.html)
 """
 import base64
 import json
@@ -489,6 +492,30 @@ def droppings_page(out):
     print("wrote", out)
 
 
+def sand_page(out):
+    """River sand, pebbles and the crocodile's nest (M9 river life, sand_art.py): the three sand tones by how far
+    inland (dry, wet, ripple, crocodile slide), the seven 3D pebble looks, the nest covered and dug open, on a sand bank
+    with a basking crocodile, a whole river from inland to the coast, and every look side by side."""
+    import zipfile
+    import sand_art
+    import crocodile_models as cr
+    import tilapia_models as tm
+    z = zipfile.ZipFile(sand_art.JAR)
+    blocks = {n: uri(z.read(f"assets/minecraft/textures/block/{n}.png"))
+              for n in ("grass_block_top", "grass_block_side_overlay", "dirt", "water_still")}
+    blocks["grass_colormap"] = uri(z.read("assets/minecraft/textures/colormap/grass.png"))
+    sand = {tone: {k: uri(png(rows)) for k, rows in looks.items()} for tone, looks in sand_art.all_textures().items()}
+    bones = cr.model()
+    b, rows, w, h = cr.paint(bones, "A")
+    data = {"blocks": blocks, "sand": sand, "toneNames": {k: v["name"] for k, v in sand_art.TONES.items()},
+            "pebbles": sand_art.all_pebbles(), "maxBoxes": sand_art.MAX_BOXES, "nest": sand_art.nest(),
+            "croc": {"bones": b, "texture": uri(tm.png(rows)), "w": w, "h": h}, "wave": cr.WAVE}
+    template = (Path(__file__).resolve().parent / "sand_viewer.template.html").read_text(encoding="utf-8")
+    out.parent.mkdir(parents=True, exist_ok=True)
+    out.write_text(template.replace("/*DATA*/null", json.dumps(data)), encoding="utf-8")
+    print("wrote", out)
+
+
 def tilapia_page(out):
     """The Nile tilapia (M9 river life, the grazing fish, tilapia_models.py): looks A to C swimming over a silt bed with
     the game's algae, with a size slider, the swim wave on or off, a graze, and a school."""
@@ -670,6 +697,9 @@ def main():
         return
     if len(sys.argv) > 1 and sys.argv[1] == "floodplain":
         floodplain_page(Path(sys.argv[2]) if len(sys.argv) > 2 else ROOT / "references/floodplain_viewer.html")
+        return
+    if len(sys.argv) > 1 and sys.argv[1] == "sand":
+        sand_page(Path(sys.argv[2]) if len(sys.argv) > 2 else ROOT / "references/sand_viewer.html")
         return
     if len(sys.argv) > 1 and sys.argv[1] == "remains":
         remains_page(Path(sys.argv[2]) if len(sys.argv) > 2 else ROOT / "references/remains_viewer.html")

@@ -1,0 +1,413 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>River Sand Viewer</title>
+<style>
+  :root { --bg: #f4f1ea; --panel: #fdfcf8; --fg: #2c2c2a; --muted: #6b6a64; --line: #d3d1c7; --pick: #8a5a1e; }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) { --bg: #1f1f1d; --panel: #2a2a26; --fg: #ecebe4; --muted: #a9a79e; --line: #44443f; --pick: #e2b46e; }
+  }
+  :root[data-theme="dark"] { --bg: #1f1f1d; --panel: #2a2a26; --fg: #ecebe4; --muted: #a9a79e; --line: #44443f; --pick: #e2b46e; }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--fg); font: 14px/1.5 system-ui, sans-serif; }
+  #panel { padding: 10px 16px; display: grid; gap: 6px; }
+  h1 { margin: 0; font-size: 19px; }
+  .row { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+  .row b { width: 120px; font-weight: 500; }
+  button { background: transparent; color: var(--fg); border: 1px solid var(--line); border-radius: 6px; padding: 3px 9px; cursor: pointer; font: inherit; }
+  button.on { border-color: var(--pick); color: var(--pick); font-weight: 600; }
+  #note, #count { color: var(--muted); font-size: 13px; max-width: 95ch; }
+  #count { color: var(--fg); }
+  #wrap { position: relative; margin: 0 16px 16px; border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
+  canvas { display: block; width: 100%; height: calc(100vh - 300px); min-height: 380px; }
+  #labels { position: absolute; inset: 0; pointer-events: none; overflow: hidden; }
+  .tag { position: absolute; transform: translate(-50%, -100%); background: var(--panel); color: var(--fg); border: 1px solid var(--line);
+         border-radius: 6px; padding: 1px 6px; font-size: 12px; font-weight: 600; white-space: nowrap; }
+</style>
+</head>
+<body>
+<div id="panel">
+  <h1>River sand, pebbles and the crocodile's nest</h1>
+  <div id="note">Rivers sort their sand: coarse red-ochre and pebbly far inland, golden mid inland, pale and fine near
+    the coast. The sand bank shows one tone on the inside of a bend: wet sand at the waterline, ripples on the shallow
+    bed, two crocodile slides into the water, a basking crocodile, a covered nest and a dug-open one beside it. Pebbles
+    lie where real ones do: thickest at the bar's upstream end (the left, where the water hits it) and along the deep
+    channel, fewer toward the coast. "Everywhere" is the heavy case, a pebble on every sand block, to judge the cost.
+    Drag to turn, scroll to zoom, right-drag to slide.</div>
+  <div id="count"></div>
+</div>
+<div id="wrap"><canvas id="c"></canvas><div id="labels"></div></div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+<script>
+const D = /*DATA*/null;
+const TONES = ["far", "mid", "coast"];
+const OPTIONS = {
+  scene: { label: "Show", pick: 0, list: ["Sand bank", "Whole river, inland to coast", "Every look side by side", "The 7 pebbles up close"] },
+  tone: { label: "Sand tone", pick: 1, list: ["Far inland", "Mid inland", "Near the coast"] },
+  pebbles: { label: "Pebbles", pick: 1, list: ["None", "Where real ones lie", "Everywhere (heavy case)"] },
+  view: { label: "View", pick: 0, list: ["From above", "Under the water"] },
+};
+const state = {}; for (const k in OPTIONS) state[k] = OPTIONS[k].pick;
+const RIVER = 0x5C6E45;
+const PEBBLE_CHANCE = { far: 0.5, mid: 0.25, coast: 0.07 };   // on the bar's upstream end and the channel (my picks)
+
+function load(src) { return new Promise(r => { const i = new Image(); i.onload = () => r(i); i.src = src; }); }
+function canvasOf(img, w, h) { const c = document.createElement("canvas"); c.width = w || img.width; c.height = h || img.height; c.getContext("2d").drawImage(img, 0, 0); return c; }
+function tinted(img, hex, w, h) {
+  const c = canvasOf(img, w, h), g = c.getContext("2d"), d = g.getImageData(0, 0, c.width, c.height);
+  const r = (hex >> 16 & 255) / 255, gg = (hex >> 8 & 255) / 255, b = (hex & 255) / 255;
+  for (let i = 0; i < d.data.length; i += 4) { d.data[i] *= r; d.data[i + 1] *= gg; d.data[i + 2] *= b; }
+  g.putImageData(d, 0, 0); return c;
+}
+function tex(c) { const t = new THREE.CanvasTexture(c); t.magFilter = THREE.NearestFilter; t.minFilter = THREE.NearestFilter; return t; }
+function hash(x, z) { const s = Math.sin(x * 127.1 + z * 311.7) * 43758.5453; return s - Math.floor(s); }
+function deg(v) { return v * Math.PI / 180; }
+
+const IMG = {}, SAND = {};
+let SAVANNA = 0x9EA75A;
+const renderer = new THREE.WebGLRenderer({ canvas: document.getElementById("c"), antialias: true });
+renderer.setPixelRatio(window.devicePixelRatio);
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(50, 1, 0.02, 400);
+const controls = new THREE.OrbitControls(camera, renderer.domElement);
+let croc = null, tags = [];
+
+// Minecraft's flat face shading: east/west, up, down, south/north
+const SHADE = [0.6, 0.6, 1, 0.5, 0.8, 0.8];
+const PSHADE = [0.72, 0.72, 1, 0.5, 0.86, 0.86];
+const MATS = {};
+function boxMats(map, shade) { return (shade || SHADE).map((s, i) => new THREE.MeshBasicMaterial({ map: Array.isArray(map) ? map[i] : map, color: new THREE.Color(s, s, s) })); }
+
+const SPECK = {};
+function speck(hex) {
+  if (SPECK[hex]) return SPECK[hex];
+  const c = document.createElement("canvas"); c.width = c.height = 4; const g = c.getContext("2d");
+  const base = new THREE.Color(hex);
+  for (let y = 0; y < 4; y++) for (let x = 0; x < 4; x++) {
+    const k = 0.9 + 0.16 * hash(x + parseInt(hex.slice(3, 5), 16), y + parseInt(hex.slice(1, 3), 16));
+    g.fillStyle = `rgb(${Math.min(255, base.r * 255 * k)},${Math.min(255, base.g * 255 * k)},${Math.min(255, base.b * 255 * k)})`;
+    g.fillRect(x, y, 1, 1);
+  }
+  return SPECK[hex] = boxMats(tex(c), PSHADE);
+}
+
+// one pebble block: look, quarter turn and a nudge off the middle (as Minecraft does for flowers), on the block below
+let pebbleBlocks = 0, pebbleBoxes = 0;
+function pebbles(look, x, y, z, quarter, nx, nz) {
+  const g = new THREE.Group();
+  for (const b of D.pebbles[look].boxes) {
+    const m = new THREE.Mesh(new THREE.BoxGeometry(b.w, b.h, b.d), speck(b.c));
+    m.position.set(b.x, b.y, b.z); m.rotation.y = b.turn; g.add(m);
+  }
+  g.scale.setScalar(1 / 16); g.rotation.y = quarter * Math.PI / 2;
+  g.position.set(x + 0.5 + nx, y, z + 0.5 + nz); scene.add(g);
+  pebbleBlocks++; pebbleBoxes += D.pebbles[look].boxes.length;
+}
+function randomPebbles(x, y, z) {
+  const look = Math.floor(hash(x + 3, z + 7) * 7), q = Math.floor(hash(x + 11, z + 5) * 4);
+  pebbles(look, x, y, z, q, (hash(x + 1, z + 9) - 0.5) * 0.4, (hash(x + 8, z + 2) - 0.5) * 0.4);
+}
+
+// pixel-space boxes (x, z round the block's middle, y up from y0), textured with one material set
+function pixelBoxes(list, x, y0, z, mats) {
+  const g = new THREE.Group();
+  for (const b of list) {
+    const m = new THREE.Mesh(new THREE.BoxGeometry(b.w, b.h, b.d), b.c === "sand" ? mats : speck(b.c));
+    m.position.set(b.x, b.y, b.z); m.rotation.y = b.turn; g.add(m);
+  }
+  g.scale.setScalar(1 / 16); g.position.set(x + 0.5, y0, z + 0.5); scene.add(g);
+}
+function nestCovered(tone, x, top, z) { pixelBoxes(D.nest.covered, x, top + 1, z, MATS[tone].nestBox); }
+function nestOpen(tone, x, top, z) {
+  // the block itself is cut: a floor 11 pixels up and walls round a pit 8 by 8, a heaped rim, eggs in the pit
+  const m = MATS[tone], P = 1 / 16, y = top;
+  const part = (x0, y0, z0, x1, y1, z1, mats) => {
+    const mesh = new THREE.Mesh(new THREE.BoxGeometry((x1 - x0) * P, (y1 - y0) * P, (z1 - z0) * P), mats);
+    mesh.position.set(x + (x0 + x1) / 2 * P, y + (y0 + y1) / 2 * P, z + (z0 + z1) / 2 * P); scene.add(mesh);
+  };
+  part(0, 0, 0, 16, 11, 16, m.pitFloor);
+  part(0, 11, 0, 16, 16, 4, m.dryBox); part(0, 11, 12, 16, 16, 16, m.dryBox);
+  part(0, 11, 4, 4, 16, 12, m.dryBox); part(12, 11, 4, 16, 16, 12, m.dryBox);
+  pixelBoxes(D.nest.open.rim, x, top + 1, z, m.nestBox);
+  pixelBoxes(D.nest.open.eggs, x, top + 11 / 16, z, null);
+}
+
+// --- the crocodile (the game's model, basking) ---------------------------------------------------------------------
+const FACES = ["east", "west", "up", "down", "south", "north"];
+function boxGeometry(c, tw, th) {
+  const g = new THREE.BoxGeometry(Math.max(c.size[0], 0.02), Math.max(c.size[1], 0.02), Math.max(c.size[2], 0.02));
+  const uv = g.attributes.uv;
+  FACES.forEach((f, i) => {
+    const face = c.uv && c.uv[f]; if (!face) return;
+    const [u0, v0] = face.uv, [w, h] = face.uv_size;
+    for (let k = 0; k < 4; k++) { const j = i * 4 + k; uv.setXY(j, (u0 + uv.getX(j) * w) / tw, 1 - (v0 + (1 - uv.getY(j)) * h) / th); }
+  });
+  uv.needsUpdate = true; return g;
+}
+function setRot(obj, r) { obj.rotation.set(deg(-r[0]), deg(r[1]), deg(-r[2]), "ZYX"); }
+let CROC_TEX = null;
+function buildCroc() {
+  const look = D.croc;
+  if (!CROC_TEX) { CROC_TEX = new THREE.TextureLoader().load(look.texture); CROC_TEX.magFilter = CROC_TEX.minFilter = THREE.NearestFilter; }
+  const mat = new THREE.MeshLambertMaterial({ map: CROC_TEX, alphaTest: 0.5 });
+  const root = new THREE.Group(), groups = {}, byName = {};
+  look.bones.forEach(b => byName[b.name] = b);
+  look.bones.forEach(b => {
+    const g = new THREE.Group(), p = b.parent ? byName[b.parent].pivot : [0, 0, 0];
+    g.position.set(b.pivot[0] - p[0], b.pivot[1] - p[1], b.pivot[2] - p[2]);
+    if (b.rotation) setRot(g, b.rotation);
+    g.userData.base = g.rotation.clone(); g.userData.basePos = g.position.clone();
+    groups[b.name] = g;
+    (b.cubes || []).forEach(c => {
+      const mesh = new THREE.Mesh(boxGeometry(c, look.w, look.h), mat);
+      mesh.position.set(c.origin[0] + c.size[0] / 2 - b.pivot[0], c.origin[1] + c.size[1] / 2 - b.pivot[1], c.origin[2] + c.size[2] / 2 - b.pivot[2]);
+      g.add(mesh);
+    });
+  });
+  look.bones.forEach(b => (b.parent ? groups[b.parent] : root).add(groups[b.name]));
+  root.scale.setScalar(1 / 16);
+  const bounds = new THREE.Box3().setFromObject(root), c = bounds.getCenter(new THREE.Vector3());
+  root.position.set(-c.x, 0, -c.z);
+  const yaw = new THREE.Group(); yaw.add(root);
+  yaw.userData = { groups, length: bounds.max.z - bounds.min.z };
+  yaw.scale.setScalar(6.1 / yaw.userData.length);
+  scene.add(yaw); return yaw;
+}
+function bask(t) {
+  if (!croc) return;
+  const g = croc.userData.groups;
+  Object.values(g).forEach(b => { b.rotation.copy(b.userData.base); b.position.copy(b.userData.basePos); });
+  const abs = { body: 0 };
+  D.wave.forEach(([name, parent, a, lag]) => { abs[name] = 0.08 * a * Math.sin(0.4 * t - lag); g[name].rotation.y = (g[name].userData.base.y || 0) + abs[name] - abs[parent]; });
+  const breath = Math.sin(t * 0.8);
+  g.body.rotation.x = deg(8); g.hips.rotation.x = -deg(8);
+  for (const side of ["left", "right"]) { g["arm_upper_" + side].rotation.x = -deg(8); g["arm_upper_" + side].position.y -= 1.6; }
+  g.neck.rotation.x = deg(12); g.head.rotation.x = deg(16 + breath); g.jaw.rotation.x = -deg(26 + breath);
+}
+
+// --- the land: columns of blocks; a column's top block is at y = top, the water's surface at 0.875 -------------------
+// kinds: grass, dry, wet, ripple, bed, slide, slideWet, nest, nestOpen (each in its column's tone)
+function bankColumns() {
+  const tone = TONES[state.tone], col = [], L = 40, Wd = 28;
+  for (let x = 0; x < L; x++) for (let z = 0; z < Wd; z++) {
+    const zc = 13 + 5 * Math.sin(Math.PI * x / L), d = z + 0.5 - zc, edge = -5;
+    const barW = 1.5 + 6 * Math.sin(Math.PI * x / L);
+    let c = { x, z, tone, top: 1, kind: "grass", water: false, peb: 0 };
+    if (Math.abs(d) < 5) {
+      c.water = true;
+      const thal = Math.abs(d - 2);
+      c.top = thal < 1.6 ? -3 : d < -3 ? -1 : -2;
+      c.kind = c.top === -1 ? "ripple" : "bed";
+      c.peb = thal < 1.6 ? 1 : 0.15;                          // along the deep channel
+    } else if (d <= edge && d > edge - barW) {
+      c.top = 0;
+      const fromWater = edge - d;
+      c.kind = fromWater < 1.5 ? "wet" : "dry";
+      c.peb = x < 12 ? 1.4 : 0.2;                              // the bar's upstream end
+      for (const sx of [10, 27]) if (x === sx) c.kind = fromWater < 1.5 ? "slideWet" : "slide";
+    }
+    col.push(c);
+  }
+  const at = (x, z) => col[x * Wd + z];
+  // the nests up the bar, near its top edge, above the wet sand
+  for (const [x, kind] of [[23, "nest"], [25, "nestOpen"]]) {
+    const zs = col.filter(c => c.x === x && c.top === 0 && c.kind === "dry").sort((a, b) => a.z - b.z);
+    if (zs.length) zs[Math.min(1, zs.length - 1)].kind = kind;
+  }
+  return { col, W: L, L: Wd, at };
+}
+
+function riverColumns() {
+  const col = [], L = 120, Wd = 26;
+  for (let x = 0; x < L; x++) {
+    const t = x / L;
+    for (let z = 0; z < Wd; z++) {
+      // the tone by how far inland, mixing over a long stretch where one meets the next
+      const j = t + (hash(x, z) - 0.5) * 0.18, tone = j < 1 / 3 ? "far" : j < 2 / 3 ? "mid" : "coast";
+      const half = 2.5 + 4 * t, zc = 13 + 3.5 * Math.sin(x / 10), d = z + 0.5 - zc;
+      const inside = Math.cos(x / 10) > 0 ? -1 : 1;           // the bar on the inside of each bend
+      const bar = 1 + 3 * Math.abs(Math.cos(x / 10));
+      let c = { x, z, tone, top: 1, kind: "grass", water: false, peb: 0 };
+      if (Math.abs(d) < half) {
+        c.water = true; c.top = Math.abs(d) < half * 0.4 ? -2 : -1; c.kind = c.top === -1 ? "ripple" : "bed";
+        c.peb = Math.abs(d) < half * 0.4 ? 1 : 0.1;
+      } else if (Math.sign(d) === inside && Math.abs(d) < half + bar) {
+        c.top = 0; c.kind = Math.abs(d) < half + 1.2 ? "wet" : "dry"; c.peb = 0.6;
+      } else if (Math.abs(d) < half + 1) { c.top = 0; c.kind = "wet"; c.peb = 0.3; }
+      col.push(c);
+    }
+  }
+  return { col, W: L, L: Wd, at: (x, z) => col[x * Wd + z] };
+}
+
+// side by side: three rows of tones, columns dry / wet / ripple / slide / wet slide / covered nest / open nest
+const SIDE_KINDS = [["dry", "Dry"], ["wet", "Wet"], ["ripple", "Ripples (under water)"], ["slide", "Crocodile slide"], ["slideWet", "Slide, wet"], ["nest", "Nest, covered"], ["nestOpen", "Nest, dug open"]];
+function sideColumns() {
+  // three blocks apart, so the labels never overlap: tones in rows (z 1, 4, 7), kinds in columns, pebbles in a row at z 11
+  const col = [], Wd = 13, L = 22;
+  for (let x = 0; x < L; x++) for (let z = 0; z < Wd; z++) {
+    let c = { x, z, tone: "mid", top: 0, kind: "grass", water: false, peb: 0 };
+    const k = (x - 1) / 3, t = (z - 1) / 3;
+    if (Number.isInteger(k) && k < SIDE_KINDS.length && Number.isInteger(t) && t < 3) { c.tone = TONES[t]; c.kind = SIDE_KINDS[k][0]; }
+    else if (z === 11 && Number.isInteger(k) && k < 7) { c.kind = "dry"; c.pebLook = k; }
+    col.push(c);
+  }
+  return { col, W: L, L: Wd, at: (x, z) => col[x * Wd + z] };
+}
+
+function closeColumns() {
+  const col = [], Wd = 5, L = 15;
+  for (let x = 0; x < L; x++) for (let z = 0; z < Wd; z++) {
+    let c = { x, z, tone: TONES[state.tone], top: 0, kind: "dry", water: false, peb: 0 };
+    if (x >= 1 && x % 2 === 1 && (z === 1 || z === 3)) c.pebLook = (x - 1) / 2;
+    col.push(c);
+  }
+  return { col, W: L, L: Wd, at: (x, z) => col[x * Wd + z] };
+}
+
+function tag(text, x, y, z) {
+  const el = document.createElement("div"); el.className = "tag"; el.textContent = text;
+  document.getElementById("labels").appendChild(el); tags.push({ el, p: new THREE.Vector3(x, y, z) });
+}
+
+function build() {
+  while (scene.children.length) scene.remove(scene.children[0]);
+  document.getElementById("labels").innerHTML = ""; tags = []; croc = null; pebbleBlocks = 0; pebbleBoxes = 0;
+  scene.add(new THREE.HemisphereLight(0xfff7e6, 0x7a6a48, 0.8));
+  const sun = new THREE.DirectionalLight(0xfff4d8, 0.6); sun.position.set(8, 20, 10); scene.add(sun);
+  const S = state.scene;
+  const land = S === 0 ? bankColumns() : S === 1 ? riverColumns() : S === 2 ? sideColumns() : closeColumns();
+  const { col, W, L, at } = land;
+  const cells = {};
+  const add = (key, x, y, z) => (cells[key] = cells[key] || []).push([x, y, z]);
+  for (const c of col) {
+    let low = c.top;
+    for (const [dx, dz] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+      const n = (c.x + dx < 0 || c.z + dz < 0 || c.x + dx >= W || c.z + dz >= L) ? null : at(c.x + dx, c.z + dz);
+      low = Math.min(low, n ? n.top + 1 : -4);
+    }
+    for (let y = Math.max(low, -4); y <= c.top; y++) {
+      if (y < c.top) add(c.kind === "grass" ? "dirt" : c.tone + ":under", c.x, y, c.z);
+      else if (c.kind === "nestOpen") nestOpen(c.tone, c.x, y, c.z);
+      else add(c.kind === "grass" ? "grass" : c.tone + ":" + c.kind, c.x, y, c.z);
+    }
+    if (c.kind === "nest") nestCovered(c.tone, c.x, c.top, c.z);
+    if (c.pebLook !== undefined) {
+      if (S === 3 && c.z === 3) pebbles(c.pebLook, c.x, c.top + 1, c.z, Math.floor(hash(c.x, 4) * 4), (hash(c.x, 1) - 0.5) * 0.4, (hash(c.x, 2) - 0.5) * 0.4);
+      else pebbles(c.pebLook, c.x, c.top + 1, c.z, 0, 0, 0);
+    } else if (c.kind !== "grass" && !c.kind.startsWith("slide") && !c.kind.startsWith("nest") && (S === 0 || S === 1)) {
+      const on = state.pebbles === 2 || (state.pebbles === 1 && hash(c.x + 5, c.z + 13) < PEBBLE_CHANCE[c.tone] * c.peb);
+      if (on) randomPebbles(c.x, c.top + 1, c.z);
+    }
+  }
+  const box = new THREE.BoxGeometry(1, 1, 1), m4 = new THREE.Matrix4();
+  for (const k in cells) {
+    let mats;
+    if (k === "grass") mats = MATS.grass; else if (k === "dirt") mats = MATS.dirt;
+    else { const [tone, kind] = k.split(":"); mats = MATS[tone][kind]; }
+    const mesh = new THREE.InstancedMesh(box, mats, cells[k].length);
+    cells[k].forEach(([x, y, z], i) => mesh.setMatrixAt(i, m4.makeTranslation(x + 0.5, y + 0.5, z + 0.5)));
+    scene.add(mesh);
+  }
+  const ws = col.filter(c => c.water);
+  if (ws.length) {
+    const plane = new THREE.PlaneGeometry(1, 1); plane.rotateX(-Math.PI / 2);
+    const mat = new THREE.MeshBasicMaterial({ map: tex(tinted(IMG.water_still, RIVER, 16, 16)), transparent: true, opacity: 0.74, depthWrite: false, side: THREE.DoubleSide });
+    const mesh = new THREE.InstancedMesh(plane, mat, ws.length);
+    ws.forEach((c, i) => mesh.setMatrixAt(i, m4.makeTranslation(c.x + 0.5, 0.875, c.z + 0.5)));
+    mesh.renderOrder = 2; scene.add(mesh);
+  }
+  // the scene's extras, labels and camera
+  const under = state.view === 1;
+  scene.fog = under ? new THREE.Fog(0x2A3020, 0.5, 18) : null;
+  scene.background = new THREE.Color(under ? 0x2A3020 : 0x9CC3E8);
+  if (S === 0) {
+    // basking on the bar facing the water, the open mouth a step from the wet sand
+    croc = buildCroc(); croc.rotation.y = Math.PI;
+    const zs = col.filter(c => c.x === 18 && c.top === 0).map(c => c.z);
+    croc.position.set(18.5, 1, Math.max(...zs) + 1 - 3.4);
+    const nz = z => col.find(c => c.x === z && (c.kind === "nest" || c.kind === "nestOpen"));
+    const n1 = nz(23), n2 = nz(25);
+    if (n1) tag("Nest, covered", 23.5, 1.7, n1.z + 0.5);
+    if (n2) tag("Nest, dug open", 25.5, 2.6, n2.z + 0.5);
+    tag("Crocodile slide", 10.5, 1.4, 6); tag("Upstream end: pebbly", 4, 1.6, 9);
+    if (under) { camera.position.set(12, 0.4, 19); controls.target.set(19, -0.2, 12); }
+    else { camera.position.set(20, 11, 30); controls.target.set(20, 0, 9); }
+  } else if (S === 1) {
+    tag("Far inland", 18, 2.5, 4); tag("Mid inland", 60, 2.5, 4); tag("Near the coast", 102, 2.5, 4);
+    tag("Flow", 3, 2.5, 13);
+    if (under) { camera.position.set(52, 0.3, 13); controls.target.set(60, -1, 13); }
+    else { camera.position.set(60, 34, 48); controls.target.set(60, 0, 13); }
+  } else if (S === 2) {
+    SIDE_KINDS.forEach(([, name], i) => tag(name, 3 * i + 1.5, 1.9 + 0.5 * (i % 2), 0.5));
+    TONES.forEach((t, i) => tag(["Far inland", "Mid inland", "Coast"][i], -0.6, 1.3, 3 * i + 1.5));
+    D.pebbles.forEach((p, i) => tag("Pebbles " + (i + 1) + ": " + p.boxes.length + " boxes", 3 * i + 1.5, 1.6, 11.5));
+    camera.position.set(11, 13, 21); controls.target.set(11, 0, 6);
+  } else {
+    D.pebbles.forEach((p, i) => tag(String(i + 1), 2 * i + 1.5, 1.4, 1.5));
+    tag("The same 7, turned and nudged as the game does", 7.5, 1.4, 3.5);
+    camera.position.set(7.5, 3.0, 6.2); controls.target.set(7.5, 0.9, 2.4);
+  }
+  controls.update();
+  const total = col.filter(c => c.kind !== "grass").length;
+  document.getElementById("count").textContent = (S === 0 || S === 1)
+    ? `${pebbleBlocks} pebble blocks on ${total} sand blocks here, ${pebbleBoxes} pebble boxes in all (a pebble block has ${Math.min(...D.pebbles.map(p => p.boxes.length))} to ${Math.max(...D.pebbles.map(p => p.boxes.length))} boxes; the limit is ${D.maxBoxes}).`
+    : `Pebble looks: ${D.pebbles.map((p, i) => (i + 1) + ". " + p.name.toLowerCase() + " (" + p.boxes.length + " boxes)").join("; ")}. The limit is ${D.maxBoxes} a block; turns and nudges are the ones Minecraft blocks can have.`;
+}
+
+function buttons() {
+  const panel = document.getElementById("panel");
+  for (const key in OPTIONS) {
+    const row = document.createElement("div"); row.className = "row";
+    row.innerHTML = `<b>${OPTIONS[key].label}</b>`;
+    OPTIONS[key].list.forEach((o, i) => {
+      const b = document.createElement("button"); b.textContent = o; b.className = state[key] === i ? "on" : "";
+      b.onclick = () => { state[key] = i; [...row.querySelectorAll("button")].forEach((x, j) => x.className = j === i ? "on" : ""); build(); };
+      row.appendChild(b);
+    });
+    panel.insertBefore(row, document.getElementById("count"));
+  }
+}
+
+function resize() { const c = renderer.domElement; renderer.setSize(c.clientWidth, c.clientHeight, false); camera.aspect = c.clientWidth / c.clientHeight; camera.updateProjectionMatrix(); }
+window.addEventListener("resize", resize);
+
+(async () => {
+  for (const k of ["grass_block_top", "grass_block_side_overlay", "dirt", "water_still", "grass_colormap"]) IMG[k] = await load(D.blocks[k]);
+  const cm = canvasOf(IMG.grass_colormap).getContext("2d"); const p = cm.getImageData(0, 255, 1, 1).data; SAVANNA = p[0] << 16 | p[1] << 8 | p[2];
+  const dirt = tex(canvasOf(IMG.dirt));
+  const side = (() => { const c = canvasOf(IMG.dirt); c.getContext("2d").drawImage(tinted(IMG.grass_block_side_overlay, SAVANNA), 0, 0); return tex(c); })();
+  MATS.grass = boxMats([side, side, tex(tinted(IMG.grass_block_top, SAVANNA)), dirt, side, side]);
+  MATS.dirt = boxMats(dirt);
+  for (const tone of TONES) {
+    const T = {};
+    for (const k in D.sand[tone]) T[k] = tex(canvasOf(await load(D.sand[tone][k])));
+    const topped = top => boxMats([T.dry, T.dry, top, T.dry, T.dry, T.dry]);
+    MATS[tone] = {
+      dry: boxMats(T.dry), wet: boxMats([T.wet, T.wet, T.wet, T.dry, T.wet, T.wet]), ripple: topped(T.ripple), bed: boxMats(T.wet),
+      slide: topped(T.slide), slideWet: boxMats([T.wet, T.wet, T.slideWet, T.dry, T.wet, T.wet]), nest: topped(T.nest),
+      under: boxMats(T.dry), nestBox: boxMats(T.nest, PSHADE), dryBox: boxMats(T.dry), pitFloor: boxMats([T.dry, T.dry, T.wet, T.dry, T.dry, T.dry]),
+    };
+  }
+  const h = location.hash.slice(1); if (h) h.split("&").forEach(kv => { const [k, v] = kv.split("="); if (k in state) state[k] = +v; });
+  buttons(); resize(); build();
+  const t0 = performance.now(), v = new THREE.Vector3(), wrap = document.getElementById("wrap");
+  (function loop() {
+    requestAnimationFrame(loop);
+    bask((performance.now() - t0) / 1000);
+    controls.update(); renderer.render(scene, camera);
+    const w = wrap.clientWidth, hh = wrap.clientHeight;
+    for (const { el, p } of tags) {
+      v.copy(p).project(camera);
+      const show = v.z < 1 && Math.abs(v.x) < 1.05 && Math.abs(v.y) < 1.05;
+      el.style.display = show ? "" : "none";
+      el.style.left = ((v.x + 1) / 2 * w) + "px"; el.style.top = ((1 - v.y) / 2 * hh) + "px";
+    }
+  })();
+})();
+</script>
+</body>
+</html>
