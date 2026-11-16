@@ -54,18 +54,18 @@ public class SavannaWorldTests {
     static final double COVERAGE_MOST = 0.30;
 
     /**
-     * No small savannas (2026-11-16, {@code docs/plans/no-small-savannas.md}, step 2 results): Minecraft's own zones no
-     * longer grow savannas, so what is left are our own savannas cut where our zones end and thin climate slivers. Measured
-     * on the 4 maps: 919 savannas under {@link BiomeMaps#SMALL} blocks across, 14.7 percent of the savanna's area; 584 of
-     * them "lonely" (no big savanna within {@link BiomeMaps#NEAR_BIG} cells), 10.9 percent of the area. The bands sit a
-     * little above that (my pick), to catch a change that makes more; step 3 (bigger savannas, a bigger share of the
-     * zones) is what brings them down, and tightens these. {@link #OUR_SHARE}: our share of the zones with no other biome
-     * mod (weight 30 against Minecraft's 10), for the pretend maps.
+     * No small savannas (2026-11-16, {@code docs/plans/big-savannas-big-rivers.md}, steps 2 and 2a): every zone has the
+     * big savannas' table (one recipe everywhere), so no zone edge cuts a savanna; what is left are thin climate slivers
+     * and ragged edges. Measured on the 4 maps: 637 savannas under {@link BiomeMaps#SMALL} blocks across, 5.2 percent of
+     * the savanna's area (919 and 14.7 while Minecraft's zones had their own table); 327 of them "lonely" (no big savanna
+     * within {@link BiomeMaps#NEAR_BIG} cells), 3.6 percent of the area (584 and 10.9). The bands sit a little above that
+     * (my pick), to catch a change that makes more. {@link #OLD_SHARE}: our share of the zones until then, with no other
+     * biome mod (weight 30 against Minecraft's 10), for the pretend maps of before.
      */
-    static final int SMALL_MOST = 1050;
-    static final double SMALL_SHARE_MOST = 0.18;
-    static final double LONELY_SHARE_MOST = 0.14;
-    static final double OUR_SHARE = 0.75;
+    static final int SMALL_MOST = 720;
+    static final double SMALL_SHARE_MOST = 0.07;
+    static final double LONELY_SHARE_MOST = 0.05;
+    static final double OLD_SHARE = 0.75;
 
     /**
      * The real thing: TerraBlender's layout with our region for each seed, measured and drawn beside Minecraft's own; then
@@ -95,13 +95,13 @@ public class SavannaWorldTests {
             Climate.TargetPoint[] climates = BiomeMaps.climates(sampler);
             byte[] vanilla = BiomeMaps.pretendMap(registries, seed, climates, 0, SavannaRegion.Shape.VANILLA);
             // how it was before 2026-11-16 (a pretend layout: our share of the zones, Minecraft's own table in the rest)
-            byte[] lastWeek = BiomeMaps.pretendMap(registries, seed, climates, OUR_SHARE, SavannaRegion.SHAPE, false);
+            byte[] lastWeek = BiomeMaps.pretendMap(registries, seed, climates, OLD_SHARE, SavannaRegion.SHAPE, false);
             BiomeMaps.Patches savanna = BiomeMaps.patches(ours, BiomeMaps.SAVANNA);
             BiomeMaps.Patches before = BiomeMaps.patches(vanilla, BiomeMaps.SAVANNA);
             BiomeMaps.Patches beforeNoSmall = BiomeMaps.patches(lastWeek, BiomeMaps.SAVANNA);
             // the same pretend layout with Minecraft's zones swapped (a fair before and after: the same zones)
             BiomeMaps.Patches afterPretend = BiomeMaps.patches(
-                    BiomeMaps.pretendMap(registries, seed, climates, OUR_SHARE, SavannaRegion.SHAPE, true), BiomeMaps.SAVANNA);
+                    BiomeMaps.pretendMap(registries, seed, climates, OLD_SHARE, SavannaRegion.SHAPE, true), BiomeMaps.SAVANNA);
             BiomeMaps.Patches desert = BiomeMaps.patches(ours, BiomeMaps.DESERT);
             report.append(String.format("%n  seed %d: savanna %s%n    (Minecraft's own: %s; desert now: %s)", seed, savanna, before, desert));
             report.append(String.format("%n    small savannas: now %d (%.2f%% of area), %d lonely (%.2f%%) %s;"

@@ -21,43 +21,35 @@ import terrablender.api.Regions;
 
 /**
  * No small savannas (the user, 2026-11-13, "I kinda need every one of them to be big if the ecosystem is supposed to run
- * properly"; {@code docs/plans/no-small-savannas.md}): TerraBlender splits the world into large zones, each one region's
- * biome table. About 1 zone in 4 was Minecraft's own region ({@code minecraft:overworld}), whose table grows small
- * savannas, savanna plateaus and windswept savannas (the user's small spawn savanna, BUGS 209, was one). Here those zones
- * get Minecraft's table with the savannas swapped out: savanna and savanna plateau become plains, windswept savanna
- * windswept hills (my picks, in the plan). Every other biome of those zones stays Minecraft's own, point for point.
+ * properly"; {@code docs/plans/big-savannas-big-rivers.md}): TerraBlender splits the world into large zones, each one
+ * region's biome table. About 1 zone in 4 was Minecraft's own region ({@code minecraft:overworld}), whose table grows
+ * small savannas, and wherever one of those zones met one of ours a big savanna was cut, leaving scraps.
+ *
+ * <p>One recipe everywhere (the user's OK, 2026-11-16): Minecraft's zones are given to {@link SavannaRegion}, whose
+ * weight grows by theirs, so with no other biome mod every zone has the same table and no zone edge cuts a savanna. (From
+ * 2026-11-16 until then those zones had {@link #table()}, Minecraft's table with savannas swapped for plains: no small
+ * savannas of Minecraft's, but our own still cut at the edges; the table is kept for the biome maps' before picture.)
  *
  * <p>How, read in TerraBlender 4.1.0.8's classes (2026-11-16): TerraBlender never asks the region at index 0 for its
  * biomes; that zone always uses the world preset's own list, Minecraft's table ({@code MixinParameterList
- * .initializeForTerraBlender}). So swapping the region object under the name {@code minecraft:overworld} alone would change
- * nothing. Instead index 0 keeps the name but becomes an empty region: TerraBlender leaves a region that gives no biomes
- * out of its zone picking ({@code InitialLayer.createEntries}), so no zone is ever Minecraft's own. Our region
- * {@link #NAME} then carries Minecraft's table without savannas, at the weight Minecraft's region had (the player's
- * {@code vanilla_overworld_region_weight}, default 10), so the zones keep their shares and sizes: only what grows in
- * Minecraft's zones changes.
+ * .initializeForTerraBlender}). So index 0 keeps the name but becomes an empty region: TerraBlender leaves a region that
+ * gives no biomes out of its zone picking ({@code InitialLayer.createEntries}), so no zone is ever Minecraft's own.
  *
  * <p>The index: TerraBlender keeps each region's index from when it was signed up, and a plain re-register under the same
  * name would give "regions minus 1", wrong once any other region exists. So the old one is removed and the empty one put
  * back at position 0 ({@code Regions.register(name, 0, region)}); {@link #indexProblems()} checks every region's index
  * against its place in the list (a game test and the log line {@code [biome regions]}).
  */
-public final class MinecraftZones extends Region {
-    public static final ResourceLocation NAME = ResourceLocation.fromNamespaceAndPath(SavannaMod.MODID, "minecraft_without_savannas");
+public final class MinecraftZones {
     public static final ResourceLocation MINECRAFT = ResourceLocation.withDefaultNamespace("overworld");
+
+    private MinecraftZones() {
+    }
 
     /** True once the zones were replaced (false if another mod had already moved Minecraft's region). */
     private static boolean replaced;
 
-    public MinecraftZones(int weight) {
-        super(NAME, RegionType.OVERWORLD, weight);
-    }
-
-    @Override
-    public void addBiomes(Registry<Biome> registry, Consumer<Pair<Climate.ParameterPoint, ResourceKey<Biome>>> mapper) {
-        table().forEach(mapper);
-    }
-
-    /** Minecraft's overworld table with its savannas swapped out. */
+    /** Minecraft's overworld table with its savannas swapped out (the biome maps' before picture). */
     public static List<Pair<Climate.ParameterPoint, ResourceKey<Biome>>> table() {
         List<Pair<Climate.ParameterPoint, ResourceKey<Biome>>> out = new ArrayList<>();
         new OverworldBiomeBuilder().addBiomes(pair -> out.add(pair.mapSecond(MinecraftZones::swap)));
@@ -85,20 +77,23 @@ public final class MinecraftZones extends Region {
         }
     }
 
-    /** Replaces Minecraft's zones (at common set-up, before {@link SavannaRegion} signs up). */
-    public static void replace() {
+    /**
+     * Empties Minecraft's zones (at common set-up, before {@link SavannaRegion} signs up) and returns the weight they had,
+     * for the big savannas to take; 0 if another mod had already moved Minecraft's region (its zones then stay its own).
+     */
+    public static int replace() {
         List<Region> regions = Regions.get(RegionType.OVERWORLD);
         if (regions.isEmpty() || !regions.get(0).getName().equals(MINECRAFT) || Regions.getIndex(RegionType.OVERWORLD, MINECRAFT) != 0) {
             SavannaMod.LOGGER.warn("[biome regions] Minecraft's region is not first ({}): its zones keep their small savannas",
                     regions.stream().map(Region::getName).toList());
-            return;
+            return 0;
         }
         int weight = regions.get(0).getWeight();
         Regions.remove(RegionType.OVERWORLD, MINECRAFT);
         Regions.register(MINECRAFT, 0, new Empty(weight)); // logs "Registered region minecraft:overworld to index 0"
-        Regions.register(new MinecraftZones(weight));
         replaced = true;
-        SavannaMod.LOGGER.info("[biome regions] Minecraft's zones replaced by {} (weight {}), no small savannas there", NAME, weight);
+        SavannaMod.LOGGER.info("[biome regions] Minecraft's zones (weight {}) given to the big savannas: one biome table everywhere", weight);
+        return weight;
     }
 
     public static boolean replaced() {
@@ -107,8 +102,8 @@ public final class MinecraftZones extends Region {
 
     /**
      * What is wrong with the regions' indices, empty if nothing: every region's index must be its place in the list (the
-     * layout looks a zone's region up by index), index 0 must be Minecraft's name with no biomes, and our region must be
-     * there.
+     * layout looks a zone's region up by index), index 0 must be Minecraft's name with no biomes, and the big savannas must
+     * be there.
      */
     public static List<String> indexProblems() {
         List<String> problems = new ArrayList<>();
@@ -124,8 +119,8 @@ public final class MinecraftZones extends Region {
         } else if (!(regions.get(0) instanceof Empty)) {
             problems.add("index 0 is still Minecraft's own region (its zones keep their small savannas)");
         }
-        if (regions.stream().noneMatch(r -> r.getName().equals(NAME))) {
-            problems.add(NAME + " is not signed up");
+        if (regions.stream().noneMatch(r -> r.getName().equals(SavannaRegion.NAME))) {
+            problems.add(SavannaRegion.NAME + " is not signed up");
         }
         return problems;
     }

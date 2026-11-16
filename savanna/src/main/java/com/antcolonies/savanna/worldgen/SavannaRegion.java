@@ -39,11 +39,12 @@ public final class SavannaRegion extends Region {
     public static final ResourceLocation NAME = ResourceLocation.fromNamespaceAndPath(SavannaMod.MODID, "big_savannas");
 
     /**
-     * Our region's weight against vanilla's 10 (TerraBlender's default; Biomes O' Plenty adds its own regions of about
-     * that weight each): about 3 zones in 4 are ours in a world with no other biome mod. My pick from the biome maps
-     * ({@code SavannaWorldTests}): the savannas end where our zones end, so a big share lets the climate set their size.
-     * TerraBlender's zone size is one setting for every mod ({@code config/terrablender.toml},
-     * {@code overworld_region_size}, default 3, about 512 blocks a zone); it is left to the player.
+     * Our region's own weight; Minecraft's zones' weight (10, TerraBlender's default) is added at sign-up
+     * ({@link #signUp()}), so with no other biome mod every zone is ours and the climate alone sets where a savanna ends
+     * (one recipe everywhere, 2026-11-16: a zone edge used to cut big savannas into small scraps). Biomes O' Plenty adds
+     * its own regions of about 10 each, where savannas are still cut. TerraBlender's zone size is one setting for every
+     * mod ({@code config/terrablender.toml}, {@code overworld_region_size}, default 3, about 512 blocks a zone); it is
+     * left to the player.
      */
     public static final int WEIGHT = 30;
 
@@ -82,17 +83,18 @@ public final class SavannaRegion extends Region {
     private static final float[] TEMPERATURE_EDGES = {-1F, -0.45F, -0.15F, 0.2F, 0.55F, 1F};
     private static final float[] HUMIDITY_EDGES = {-1F, -0.35F, -0.1F, 0.1F, 0.3F, 1F};
 
-    public SavannaRegion() {
-        super(NAME, RegionType.OVERWORLD, WEIGHT);
+    public SavannaRegion(int weight) {
+        super(NAME, RegionType.OVERWORLD, weight);
     }
 
     /**
-     * Signs our regions up with TerraBlender (at common set-up): first Minecraft's own zones replaced by its table without
-     * savannas ({@link MinecraftZones}, no small savannas), then the big savannas.
+     * Signs our region up with TerraBlender (at common set-up): Minecraft's own zones are emptied ({@link MinecraftZones})
+     * and their weight added to ours, so with no other biome mod every zone is ours and no zone edge cuts a savanna into
+     * small scraps (one recipe everywhere, the user's OK 2026-11-16). Beside another biome mod our share is 40 against its
+     * regions' weights.
      */
     public static void signUp() {
-        MinecraftZones.replace();
-        Regions.register(new SavannaRegion());
+        Regions.register(new SavannaRegion(WEIGHT + MinecraftZones.replace()));
         List<String> problems = MinecraftZones.indexProblems();
         if (problems.isEmpty()) {
             SavannaMod.LOGGER.info("[biome regions] indices right: {}", MinecraftZones.describe());

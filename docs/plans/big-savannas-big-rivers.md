@@ -1,4 +1,4 @@
-# Big savannas, big rivers (the user, 2026-11-16; steps 1 and 2 built)
+# Big savannas, big rivers (the user, 2026-11-16; steps 1, 2 and 2a built)
 
 The user: "I want the river to have more life to it but it's gonna start getting cramped; it's also not exactly a
 realistic river; we will also have to make the savanna biome bigger, which I'm okay with because I'm planning a lot of
@@ -108,6 +108,40 @@ pick), the leftover small patches counted on the biome maps and tuned.
 - Land fingerprints regenerated (a change on purpose): only the biome name moved, savanna to plains in 89 of 6,000
   columns; heights and ground the same. `worldgen,mound` pass on 6 servers; the mound survey (`MatabeleNewLandTests`)
   passes (real savanna 1 mound in 2.8 looks dead, 1 in 3.5 Matabele).
+
+**Step 2a, one recipe everywhere (the user's OK, 2026-11-16, "that sound perfect start"; BUILT, branch
+`claude/no-small-savannas-20e8a5`; only new land changes).** The user asked for another way than the cleaner. Step 2's
+own table already pointed at it (our share 1.00): the small savannas are mostly our big ones cut where a zone of ours
+meets one of Minecraft's, so the zones' difference is removed instead of the scraps cleaned up.
+- **What:** Minecraft's zones are emptied as before, but their weight (10) now goes to the big savannas' region (30 +
+  10), and the "Minecraft without savannas" region is gone. With no other biome mod every zone has the same table, so
+  no zone edge changes anything. Fewer rules: one region, no share to tune (`SavannaRegion.signUp`, `MinecraftZones`).
+- **Measured on the 4 maps (real TerraBlender layout):**
+  | | step 2 | one recipe |
+  |---|---|---|
+  | small savannas (under 1,000 across) | 919 | 637 |
+  | their share of the savanna's area | 14.7 percent | 5.2 |
+  | lonely ones | 584 | 327 |
+  | lonely share of the area | 10.9 percent | 3.6 |
+  | typical savanna | 1,839 | 2,792 (seeds 2,264 to 3,133) |
+  | biggest | 3,655 | 5,482 |
+  | savanna's share of land | 21.6 percent | 28.6 (the limit is 30) |
+  | a big one per | 3,752 blocks square | 4,147 |
+  Other ground still turns up: desert 1.6 percent of the maps, jungle 0.7 (was 1.4), plains 9.1, badlands 0.8, forest
+  18.6, cold 5.3.
+- **Not zero.** What is left are thin climate slivers and ragged edges, not cut savannas: many patches (637) but little
+  ground (5 percent of the savanna). No climate shape removes them (step 2: narrower shapes made more).
+- **Not tuned (to decide in step 3):** savanna at 28.6 percent of land is close to the 30 limit, and jungle halved; the
+  typical size (2,792) is on the way to step 3's 3,500 to 4,000 target but that target would push savanna past 30
+  percent of land, so step 3 must pick between them.
+- **With another biome mod** (Biomes O' Plenty) its zones still cut our savannas: out of reach.
+- Tests: bands tightened to a little over the new numbers (720 small, 7 percent, lonely 5 percent). Land fingerprints
+  regenerated on purpose: only biome names moved (111, 147 and 245 of 2,000 columns a seed, mostly to savanna; warm
+  oceans in the former Minecraft zones), heights and blocks the same. `worldgen,mound` on 6 servers: all passed but
+  the fingerprint, as it must before regenerating; not rerun after (the saved files are that run's own output).
+- **Next, for the leftover slivers (the user's call, nothing built):** the cheap gate (mounds, giant trees, Matabele and
+  river animals only where there is savanna all round for about 500 blocks, the spawn's own check), or step 2b's
+  cleaner, now with a third of the ground to clean.
 
 **Step 2b, the small-savanna cleaner (the user, 2026-11-16: "the ecosystem just wouldn't work on them"; nothing
 built).** Step 2 left 919 savannas under 1,000 blocks across on the 4 maps (14.7 percent of the savanna's area); a
