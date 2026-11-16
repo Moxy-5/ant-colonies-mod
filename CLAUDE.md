@@ -80,7 +80,7 @@ Every living thing in the mod, built or planned, plants and fungi included, in o
 - Leafcutter ants (Atta, Acromyrmex): IDEA (jungle mod).
 - Army ants (Nomamyrmex, raiding leafcutters; savanna driver ants named only as a reason Matabele move): IDEA (jungle).
 - Honeypot ants (Myrmecocystus, neighbours of the harvester): IDEA (desert).
-- Driver ants (Dorylus, the savanna's army ants: huge nomadic swarms, one of the real reasons Matabele colonies move house; a real enemy of both our species): IDEA (user's list 2026-11-16). Savanna mod; strict realism as a colony insect.
+- Driver ants (Dorylus, the savanna's army ants: huge nomadic swarms, one of the real reasons Matabele colonies move house; a real enemy of both our species): IDEA (user's list 2026-11-16). Savanna mod; strict realism as a colony insect. **Size of the job (talked over 2026-11-16):** likely well under the Matabele's, as the legs, bodies, fight system, prey pile, scent trails, the brain's away raids and moving house (M8 step 6, still to build, so it serves both) carry over; new are the swarm raid (a wide front sweeping all prey, no scouts or target, a new mind), the temporary underground nest, the carpet-of-ants look within the real-mob cap, and away swarms kept cheap (a moving patch worked out from the clock, as away raids are).
 - Magnetic termites (Australian outback): HELD.
 
 **2. Fungi and microbes tied to colonies**
