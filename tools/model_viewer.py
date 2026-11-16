@@ -568,6 +568,20 @@ def crab_page(out):
     blocks = {n: file_uri(n + ".png") for n in ("silt", "wet_silt", "algae_mat_3")}
     data = {"looks": looks, "tilapia": {"bones": tb, "texture": uri(tm.png(rows)), "w": w, "h": h}, "blocks": blocks,
             "boxes": sum(len(b.get("cubes", [])) for b in bones)}
+    # the snail cracking (2026-11-16): the game's own model (with the held shell and the bits) playing the game's own
+    # crack clip, sampled at its even steps, the snail before and the broken shell block after
+    import snail_models as sm
+    gb, grows, gw, gh = cb.paint(cb.model(game=True), "A")
+    crack = cb.clips()["crack"]
+    times = sorted({t for ch in crack["bones"].values() for keys in ch.values() for t in keys}, key=float)
+    frames = {bone: {ch: [keys[t] for t in times] for ch, keys in chans.items()} for bone, chans in crack["bones"].items()}
+    sb, srows, sw, sh = sm.paint(sm.model("A"), "A")
+    shell = json.loads((mod_paths.assets("savanna") / "models/block/crab_shell_0.json").read_text(encoding="utf-8"))
+    data["cracking"] = {"bones": gb, "texture": uri(tm.png(grows)), "w": gw, "h": gh,
+                        "clip": {"length": crack["animation_length"], "steps": len(times) - 1, "bones": frames},
+                        "crackAt": cb.CRACK_AT}
+    data["snail"] = {"bones": sb, "texture": uri(tm.png(srows)), "w": sw, "h": sh}
+    data["shell"] = {"elements": shell["elements"], "texture": file_uri("crab_shell_0.png")}
     template = (Path(__file__).resolve().parent / "crab_viewer.template.html").read_text(encoding="utf-8")
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(template.replace("/*DATA*/null", json.dumps(data)), encoding="utf-8")

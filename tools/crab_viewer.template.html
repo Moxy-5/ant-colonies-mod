@@ -36,7 +36,9 @@
   <h1>River crab viewer</h1>
   <p>The river's clean-up crew, built from your picture at half the first model's cube size: a spiny mottled shell, tall black eyes, big claws with
      cream fingers (the right one bigger) and four orange-brown walking legs a side. One crab stands as in your picture, one scuttles sideways along
-     the bank, one rears up with its claws raised, one picks algae off the river bed and puts it in its mouth, which opens. A tilapia (0.6 blocks), a
+     the bank, one rears up with its claws raised, one picks algae off the river bed and puts it in its mouth, which opens, and one cracks a snail: the game's own crack clip,
+     the snail on the bed first, then the claws lift its shell to the mouth, squeeze till it gives, pick the meat out in two
+     trips, and the broken shell is left lying. A tilapia (0.6 blocks), a
      player and a block stand by for scale. Drag to turn, scroll or pinch to zoom, right-drag to slide.</p>
 </header>
 <div id="wrap"><canvas id="c"></canvas><div id="labels"></div></div>
@@ -120,7 +122,7 @@ function boxGeometry(c, tw, th) {
 }
 
 // centre: 'middle' turns about the model's middle (the fish), 'ground' keeps y = 0 at the feet (the crocodile).
-function build(look, centre) {
+function build(look, centre, hide) {
   const mat = new THREE.MeshLambertMaterial({map: loadTexture(look.texture), alphaTest: 0.5});
   const root = new THREE.Group(), groups = {}, byName = {};
   look.bones.forEach(b => byName[b.name] = b);
@@ -140,6 +142,7 @@ function build(look, centre) {
     });
   });
   look.bones.forEach(b => (b.parent ? groups[b.parent] : root).add(groups[b.name]));
+  (hide || []).forEach(n => groups[n] && groups[n].scale.setScalar(0.0001));   // left out of the bounds (shown by a clip)
   root.scale.setScalar(1 / 16);
   const bounds = new THREE.Box3().setFromObject(root);
   const c = bounds.getCenter(new THREE.Vector3());
@@ -161,7 +164,7 @@ function wave(obj, t, amount, beat, table) {
 }
 const TILAPIA_WAVE = [['head', 'body', -0.05, 0], ['front', 'body', 0.04, 0.6], ['mid', 'front', 0.1, 1.3],
                       ['rear', 'mid', 0.19, 2.0], ['peduncle', 'rear', 0.3, 2.6], ['tail', 'peduncle', 0.42, 3.1]];
-const settings = {size: 0.8, cam: 'like your picture'};
+const settings = {size: 0.8, cam: 'cracking a snail'};
 location.hash.slice(1).split('&').filter(Boolean).forEach(kv => {
   const [k, v] = kv.split('=').map(decodeURIComponent);
   settings[k] = isNaN(parseFloat(v)) ? v : parseFloat(v);
@@ -195,6 +198,102 @@ const crabs = [['stand', 'Standing'], ['walk', 'Walking sideways'], ['threat', '
   }
   return out;
 });
+// the snail cracking: the game's model playing the game's crack clip (DATA.cracking.clip, sampled at even steps)
+const CR = DATA.cracking, CLIP = CR.clip;
+const CLIP_SHOWN = ['held_shell', 'bit_green_left', 'bit_green_right', 'bit_meat_left', 'bit_meat_right'];
+const cracker = build(CR, 'ground', CLIP_SHOWN);
+tag('Cracking a snail', cracker, () => settings.size * 0.5);
+const snail = build(DATA.snail, 'ground');
+const shellBlock = new THREE.Group();
+{
+  const mat = new THREE.MeshLambertMaterial({map: loadTexture(DATA.shell.texture)});
+  const inner = new THREE.Group();
+  DATA.shell.elements.forEach(el => {
+    const size = [0, 1, 2].map(i => Math.max(el.to[i] - el.from[i], 0.05));
+    const g = new THREE.BoxGeometry(...size), uv = g.attributes.uv;
+    FACES.forEach((f, i) => {
+      const [u0, v0, u1, v1] = el.faces[f].uv;
+      for (let k = 0; k < 4; k++) {
+        const j = i * 4 + k;
+        uv.setXY(j, (u0 + uv.getX(j) * (u1 - u0)) / 16, 1 - (v0 + (1 - uv.getY(j)) * (v1 - v0)) / 16);
+      }
+    });
+    const m = new THREE.Mesh(g, mat);
+    m.castShadow = true; m.receiveShadow = true;
+    m.position.set(...[0, 1, 2].map(i => (el.from[i] + el.to[i]) / 2));
+    if (el.rotation) {
+      const piv = new THREE.Group(), o = el.rotation.origin;
+      piv.position.set(o[0], o[1], o[2]); piv.rotation.y = deg(el.rotation.angle);
+      m.position.sub(piv.position); piv.add(m); inner.add(piv);
+    } else inner.add(m);
+  });
+  inner.position.set(-8, 0, -8);
+  shellBlock.add(inner);
+}
+scene.add(shellBlock);
+const chipMat = new THREE.MeshLambertMaterial({color: '#e9dcc0'}), chipMat2 = new THREE.MeshLambertMaterial({color: '#a86f42'});
+const chips = [];
+for (let i = 0; i < 7; i++) {
+  const m = new THREE.Mesh(new THREE.BoxGeometry(0.025, 0.02, 0.025), i % 2 ? chipMat : chipMat2);
+  const a = i / 7 * 6.28 + 0.4;
+  m.userData.v = [Math.cos(a) * (0.25 + 0.1 * (i % 3)), 0.55 + 0.12 * (i % 2), Math.sin(a) * (0.25 + 0.1 * (i % 3))];
+  m.visible = false; scene.add(m); chips.push(m);
+}
+const CR_AT = [1.0, BED, 2.1], CR_YAW = 200;
+const BEFORE = 1.6, AFTER = 2.4, CYCLE = BEFORE + CLIP.length + AFTER;
+function playClip(g, t) {
+  const f = Math.max(0, Math.min(CLIP.steps, t / CLIP.length * CLIP.steps)), i = Math.floor(f), a = f - i;
+  const j = Math.min(CLIP.steps, i + 1);
+  Object.entries(CLIP.bones).forEach(([name, chans]) => {
+    const b = g[name];
+    if (!b) return;
+    const at = ch => chans[ch] && chans[ch][i].map((v, n) => v + (chans[ch][j][n] - v) * a);
+    const r = at('rotation');
+    if (r) b.rotation.set(b.userData.base.x + deg(-r[0]), b.userData.base.y + deg(r[1]), b.userData.base.z + deg(-r[2]));
+    const p = at('position');
+    if (p) b.position.set(b.userData.basePos.x - p[0], b.userData.basePos.y + p[1], b.userData.basePos.z + p[2]);
+    const sc = at('scale');
+    if (sc) b.scale.set(...sc.map(x => Math.max(x, 0.0001)));
+  });
+}
+const heldAt = new THREE.Vector3();
+function crackFrame(now) {
+  const g = cracker.userData.groups, u = now % CYCLE, t = u - BEFORE;
+  rest(g);
+  cracker.position.set(...CR_AT);
+  cracker.rotation.y = deg(CR_YAW);
+  // where the shell sits on the bed: under the held shell's pivot, with the claws at rest
+  CLIP_SHOWN.forEach(n => g[n].scale.setScalar(0.0001));
+  eyes(g, now, cracker.userData.phase);
+  legs(g, now, 0.6, 0.12);
+  cracker.updateMatrixWorld(true);
+  g.held_shell.getWorldPosition(heldAt);
+  const ratio = settings.size / 0.8;
+  snail.visible = u < BEFORE;
+  snail.position.set(heldAt.x + (BEFORE - u) * 0.04 * ratio, BED, heldAt.z);
+  snail.rotation.y = deg(CR_YAW - 90);
+  shellBlock.visible = u > BEFORE + CLIP.length;
+  shellBlock.position.set(heldAt.x, BED + 0.002, heldAt.z);
+  shellBlock.scale.setScalar(ratio / 16);
+  if (t >= 0 && t <= CLIP.length) {
+    rest(g);
+    playClip(g, t);
+  }
+  const ct = t - CR.crackAt;
+  if (ct >= 0 && ct < 0.8) {
+    cracker.updateMatrixWorld(true);
+    g.held_shell.getWorldPosition(heldAt);
+  }
+  chips.forEach(m => {
+    m.visible = ct >= 0 && ct < 0.8;
+    if (!m.visible) return;
+    if (ct < 0.02) m.userData.from = heldAt.clone();
+    const [vx, vy, vz] = m.userData.v, o = m.userData.from || heldAt;
+    m.position.set(o.x + vx * ct * ratio, Math.max(BED + 0.01, o.y + (vy * ct - 2.2 * ct * ct) * ratio), o.z + vz * ct * ratio);
+    m.rotation.set(ct * 9, ct * 7, 0);
+  });
+}
+
 const school = [];
 for (let i = 0; i < 4; i++) school.push(build(DATA.tilapia, 'middle'));
 tag('Tilapia, 0.6 blocks', school[0], () => 0.2);
@@ -212,6 +311,8 @@ sizeIn.value = settings.size;
 function k() { return settings.size / crabs[0].crab.userData.width; }
 function layout() {
   crabs.forEach(c => c.crab.scale.setScalar(k()));
+  cracker.scale.setScalar(k());
+  snail.scale.setScalar(0.4 * settings.size / 0.8 / snail.userData.length);
   school.forEach(f => f.scale.setScalar(TILAPIA / f.userData.length));
   player.position.set(2.6, BANK, -2.2);
   block.position.set(-2.4, BANK + 0.5, -2.4);
@@ -316,6 +417,7 @@ const CAMS = {
   'claws up': () => { const p = P(2); return [[p.x - 0.35, p.y + 0.3, p.z - 0.95], [p.x, p.y + 0.12, p.z]]; },
   'from above': () => { const p = P(0); return [[p.x + 0.001, p.y + 1.4, p.z + 0.001], [p.x, p.y, p.z]]; },
   'on the river bed': () => { const p = P(3); return [[p.x + 0.9, p.y + 0.5, p.z + 1.2], [p.x, p.y + 0.1, p.z]]; },
+  'cracking a snail': () => { const p = cracker.position; return [[p.x + 0.75, p.y + 0.6, p.z + 1.1], [p.x - 0.05, p.y + 0.1, p.z - 0.15]]; },
   'eating, close': () => { const p = P(3); return [[p.x - 0.1, p.y + 0.3, p.z + 0.95], [p.x, p.y + 0.1, p.z]]; },
   'with the player': () => [[1.4, 1.4, 2.8], [1.4, 0.6, -1.6]],
 };
@@ -346,6 +448,7 @@ const v = new THREE.Vector3();
 function frame() {
   const t = performance.now() / 1000;
   crabs.forEach(c => pose(c, t));
+  crackFrame(t);
   school.forEach((f, i) => {
     const r = 1.2 + (i % 2) * 0.3, b = t * 0.35 + i * 1.5;
     f.position.set(2 + Math.cos(b) * r, -0.8 - (i % 2) * 0.25, 3 + Math.sin(b) * r * 0.7);
@@ -367,6 +470,7 @@ function frame() {
 layout();
 resize();
 crabs.forEach(c => pose(c, 0));
+crackFrame(0);
 setCam(CAMS[settings.cam] ? settings.cam : 'overview');
 frame();
 </script>
