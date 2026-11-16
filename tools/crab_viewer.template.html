@@ -1,0 +1,337 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>River Crab Viewer</title>
+<style>
+  :root { --bg: #f1efe8; --panel: #fdfcf8; --ink: #2a2a22; --muted: #6a675a; --line: #d9d4c4; --accent: #6b7a2f; }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) { --bg: #1a1a16; --panel: #23231e; --ink: #ecebe2; --muted: #a5a291; --line: #3a3930; --accent: #b6c86a; }
+  }
+  :root[data-theme="dark"] { --bg: #1a1a16; --panel: #23231e; --ink: #ecebe2; --muted: #a5a291; --line: #3a3930; --accent: #b6c86a; }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font: 15px/1.45 system-ui, sans-serif; }
+  header { padding: 14px 16px 6px; }
+  h1 { margin: 0 0 4px; font-size: 20px; }
+  header p { margin: 0; color: var(--muted); max-width: 82ch; }
+  #wrap { position: relative; height: 62vh; min-height: 340px; margin: 10px 16px; border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
+  canvas { display: block; width: 100%; height: 100%; }
+  #labels { position: absolute; inset: 0; pointer-events: none; overflow: hidden; }
+  .tag { position: absolute; transform: translate(-50%, -100%); background: var(--panel); border: 1px solid var(--line); border-radius: 6px;
+         padding: 1px 6px; font-size: 12px; font-weight: 600; white-space: nowrap; }
+  .controls { display: flex; flex-wrap: wrap; gap: 8px 14px; padding: 0 16px 8px; align-items: center; }
+  .controls label { display: flex; gap: 8px; align-items: center; font-size: 14px; }
+  .controls input[type=range] { width: 180px; max-width: 50vw; }
+  .readout { color: var(--muted); font-size: 13px; }
+  button { font: inherit; padding: 6px 12px; border-radius: 8px; border: 1px solid var(--line); background: var(--panel); color: var(--ink); cursor: pointer; }
+  button.on { border-color: var(--accent); color: var(--accent); font-weight: 600; }
+  ul { margin: 8px 16px 24px; padding-left: 22px; max-width: 82ch; }
+  li { margin: 4px 0; }
+  li b { color: var(--accent); }
+</style>
+</head>
+<body>
+<header>
+  <h1>River crab viewer</h1>
+  <p>The river's clean-up crew, built from your picture: a spiny mottled shell, black eyes on stalks, big claws with
+     cream fingers (the right one bigger) and four orange-brown walking legs a side. One crab scuttles sideways along
+     the bank, one rears up with its claws raised, one picks at the algae on the river bed. A tilapia (0.6 blocks), a
+     player and a block stand by for scale. Drag to turn, scroll or pinch to zoom, right-drag to slide.</p>
+</header>
+<div id="wrap"><canvas id="c"></canvas><div id="labels"></div></div>
+<div class="controls">
+  <label>Crab width <input id="size" type="range" min="0.3" max="1.6" step="0.05"> <span id="sizeOut" class="readout"></span></label>
+  <span id="boxes" class="readout"></span>
+</div>
+<div class="controls" id="cams"></div>
+<ul id="list"></ul>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+<script>
+const DATA = /*DATA*/null;
+const canvas = document.getElementById('c');
+const wrap = document.getElementById('wrap');
+const renderer = new THREE.WebGLRenderer({canvas, antialias: true, preserveDrawingBuffer: true});
+renderer.setPixelRatio(window.devicePixelRatio);
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+const scene = new THREE.Scene();
+const SKY = new THREE.Color('#a9cde0');
+scene.background = SKY;
+scene.fog = new THREE.Fog(SKY, 30, 80);
+const camera = new THREE.PerspectiveCamera(35, 1, 0.01, 300);
+const controls = new THREE.OrbitControls(camera, canvas);
+scene.add(new THREE.HemisphereLight('#fff7e6', '#7a6a48', 0.75));
+const sun = new THREE.DirectionalLight('#fff4d8', 0.75);
+sun.position.set(8, 20, 10);
+sun.castShadow = true;
+sun.shadow.mapSize.set(2048, 2048);
+sun.shadow.bias = -0.0004;
+Object.assign(sun.shadow.camera, {left: -8, right: 8, top: 8, bottom: -8, near: 0.5, far: 60});
+scene.add(sun);
+
+function deg(v) { return v * Math.PI / 180; }
+function setRot(obj, r) { obj.rotation.set(deg(-r[0]), deg(r[1]), deg(-r[2]), 'ZYX'); }
+function loadTexture(uri, rx, ry) {
+  const t = new THREE.TextureLoader().load(uri);
+  t.magFilter = THREE.NearestFilter;
+  t.minFilter = THREE.NearestFilter;
+  if (rx) { t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(rx, ry || rx); }
+  return t;
+}
+const rand = (() => { let s = 7; return () => (s = (s * 16807) % 2147483647) / 2147483647; })();
+
+// The bank: silt land (z below 0) dropping into the river (z above 0), a silt bed 3 blocks down, the water's surface
+// just under the bank's top.
+const BANK = 0, SURFACE = -0.15, BED = -1.6;
+const land = new THREE.Mesh(new THREE.PlaneGeometry(80, 30), new THREE.MeshLambertMaterial({map: loadTexture(DATA.blocks.silt, 80, 30)}));
+land.rotation.x = -Math.PI / 2; land.position.set(0, BANK, -15); land.receiveShadow = true; scene.add(land);
+const edge = new THREE.Mesh(new THREE.PlaneGeometry(80, BANK - BED), new THREE.MeshLambertMaterial({map: loadTexture(DATA.blocks.wet_silt, 80, 2)}));
+edge.position.set(0, (BANK + BED) / 2, 0); scene.add(edge);
+const bed = new THREE.Mesh(new THREE.PlaneGeometry(80, 40), new THREE.MeshLambertMaterial({map: loadTexture(DATA.blocks.silt, 80, 40), color: '#b8b09a'}));
+bed.rotation.x = -Math.PI / 2; bed.position.set(0, BED, 20); bed.receiveShadow = true; scene.add(bed);
+const matMat = new THREE.MeshLambertMaterial({map: loadTexture(DATA.blocks.algae_mat_3), transparent: true, alphaTest: 0.3});
+for (let i = 0; i < 70; i++) {
+  const m = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), matMat);
+  m.rotation.x = -Math.PI / 2;
+  m.position.set(Math.floor(rand() * 40 - 20) + 0.5, BED + 0.01, Math.floor(rand() * 14 + 1) + 0.5);
+  scene.add(m);
+}
+const water = new THREE.Mesh(new THREE.PlaneGeometry(80, 40), new THREE.MeshLambertMaterial({color: '#6f8a5a', transparent: true, opacity: 0.55, side: THREE.DoubleSide, depthWrite: false}));
+water.rotation.x = -Math.PI / 2; water.position.set(0, SURFACE, 20); water.renderOrder = 2; scene.add(water);
+
+// --- models ------------------------------------------------------------------------------------------------------------
+const FACES = ['east', 'west', 'up', 'down', 'south', 'north'];
+function boxGeometry(c, tw, th) {
+  const g = new THREE.BoxGeometry(Math.max(c.size[0], 0.02), Math.max(c.size[1], 0.02), Math.max(c.size[2], 0.02));
+  const uv = g.attributes.uv;
+  FACES.forEach((f, i) => {
+    const face = c.uv && c.uv[f];
+    if (!face) return;
+    const [u0, v0] = face.uv, [w, h] = face.uv_size;
+    for (let k = 0; k < 4; k++) {
+      const j = i * 4 + k;
+      uv.setXY(j, (u0 + uv.getX(j) * w) / tw, 1 - (v0 + (1 - uv.getY(j)) * h) / th);
+    }
+  });
+  uv.needsUpdate = true;
+  return g;
+}
+
+// centre: 'middle' turns about the model's middle (the fish), 'ground' keeps y = 0 at the feet (the crocodile).
+function build(look, centre) {
+  const mat = new THREE.MeshLambertMaterial({map: loadTexture(look.texture), alphaTest: 0.5});
+  const root = new THREE.Group(), groups = {}, byName = {};
+  look.bones.forEach(b => byName[b.name] = b);
+  look.bones.forEach(b => {
+    const g = new THREE.Group();
+    const p = b.parent ? byName[b.parent].pivot : [0, 0, 0];
+    g.position.set(b.pivot[0] - p[0], b.pivot[1] - p[1], b.pivot[2] - p[2]);
+    if (b.rotation) setRot(g, b.rotation);
+    g.userData.base = g.rotation.clone();
+    g.userData.basePos = g.position.clone();
+    groups[b.name] = g;
+    (b.cubes || []).forEach(c => {
+      const mesh = new THREE.Mesh(boxGeometry(c, look.w, look.h), mat);
+      mesh.castShadow = true; mesh.receiveShadow = true;
+      mesh.position.set(c.origin[0] + c.size[0] / 2 - b.pivot[0], c.origin[1] + c.size[1] / 2 - b.pivot[1], c.origin[2] + c.size[2] / 2 - b.pivot[2]);
+      g.add(mesh);
+    });
+  });
+  look.bones.forEach(b => (b.parent ? groups[b.parent] : root).add(groups[b.name]));
+  root.scale.setScalar(1 / 16);
+  const bounds = new THREE.Box3().setFromObject(root);
+  const c = bounds.getCenter(new THREE.Vector3());
+  root.position.set(-c.x, centre === 'ground' ? 0 : -c.y, -c.z);
+  const lift = new THREE.Group(); lift.add(root);      // up and down, and the roll
+  const yaw = new THREE.Group(); yaw.add(lift);
+  yaw.userData = {groups, root, lift, length: bounds.max.z - bounds.min.z, width: bounds.max.x - bounds.min.x,
+                  height: bounds.max.y - bounds.min.y, phase: rand() * 6.28};
+  scene.add(yaw);
+  return yaw;
+}
+
+function wave(obj, t, amount, beat, table) {
+  const g = obj.userData.groups, abs = {body: 0}, ph = obj.userData.phase;
+  table.forEach(([name, parent, a, lag]) => {
+    abs[name] = amount * a * Math.sin(beat * t - lag + ph);
+    g[name].rotation.y = (g[name].userData.base.y || 0) + abs[name] - abs[parent];
+  });
+}
+const TILAPIA_WAVE = [['head', 'body', -0.05, 0], ['front', 'body', 0.04, 0.6], ['mid', 'front', 0.1, 1.3],
+                      ['rear', 'mid', 0.19, 2.0], ['peduncle', 'rear', 0.3, 2.6], ['tail', 'peduncle', 0.42, 3.1]];
+const settings = {size: 0.8, cam: 'overview'};
+location.hash.slice(1).split('&').filter(Boolean).forEach(kv => {
+  const [k, v] = kv.split('=').map(decodeURIComponent);
+  settings[k] = isNaN(parseFloat(v)) ? v : parseFloat(v);
+});
+const TILAPIA = 0.6;
+const tags = [];
+function tag(text, obj, height) {
+  const el = document.createElement('div');
+  el.className = 'tag'; el.textContent = text;
+  document.getElementById('labels').appendChild(el);
+  tags.push({el, obj, height});
+}
+
+const LOOK = Object.values(DATA.looks)[0];
+const crabs = [['walk', 'Walking sideways'], ['threat', 'Claws up'], ['feed', 'Picking at algae']].map(([p, label]) => {
+  const crab = build(LOOK, 'ground');
+  tag(label, crab, () => settings.size * 0.5);
+  return {pose: p, crab};
+});
+const school = [];
+for (let i = 0; i < 4; i++) school.push(build(DATA.tilapia, 'middle'));
+tag('Tilapia, 0.6 blocks', school[0], () => 0.2);
+const player = new THREE.Group();
+[[0.5, 0.75, 0.25, 0.375, '#3b4a8f'], [0.5, 0.75, 0.25, 1.125, '#2f9c9c'], [0.5, 0.5, 0.5, 1.55, '#b98a68']].forEach(([w, h, d, y, col]) => {
+  const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), new THREE.MeshLambertMaterial({color: col}));
+  m.position.y = y; m.castShadow = true; player.add(m);
+});
+scene.add(player); tag('Player, 1.8 blocks', player, () => 1.85);
+const block = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), new THREE.MeshLambertMaterial({map: loadTexture(DATA.blocks.wet_silt)}));
+block.castShadow = true; scene.add(block); tag('1 block', block, () => 0.55);
+
+const sizeIn = document.getElementById('size');
+sizeIn.value = settings.size;
+function k() { return settings.size / crabs[0].crab.userData.width; }
+function layout() {
+  crabs.forEach(c => c.crab.scale.setScalar(k()));
+  school.forEach(f => f.scale.setScalar(TILAPIA / f.userData.length));
+  player.position.set(2.6, BANK, -2.2);
+  block.position.set(-2.4, BANK + 0.5, -2.4);
+  const h = crabs[0].crab.userData.height * k();
+  document.getElementById('sizeOut').textContent = settings.size.toFixed(2) + ' blocks wide with its legs, ' +
+    h.toFixed(2) + ' tall (your picture: about 0.8 by 0.3)';
+}
+sizeIn.addEventListener('input', () => { settings.size = parseFloat(sizeIn.value); layout(); });
+document.getElementById('boxes').textContent = DATA.boxes + ' boxes a crab';
+
+// --- poses -------------------------------------------------------------------------------------------------------------
+const SIDES = [['left', 1], ['right', -1]];
+function rest(g) {
+  Object.values(g).forEach(b => { b.rotation.copy(b.userData.base); b.position.copy(b.userData.basePos); });
+}
+function legs(g, t, speed, amount) {
+  // the four legs a side step in waves, the two sides out of step, each leg lifting and swinging
+  SIDES.forEach(([side, s]) => {
+    for (let i = 1; i <= 4; i++) {
+      const ph = t * speed + i * Math.PI / 2 + (s > 0 ? 0 : Math.PI);
+      const lift = Math.max(0, Math.sin(ph));
+      const up = g['leg' + i + '_upper_' + side];
+      up.rotation.z = s * lift * 0.45 * amount;
+      up.rotation.y = up.userData.base.y + s * Math.cos(ph) * 0.18 * amount;
+      g['leg' + i + '_lower_' + side].rotation.z = -s * lift * 0.25 * amount;
+    }
+  });
+}
+function eyes(g, t, ph) {
+  SIDES.forEach(([side], j) => {
+    g['eye_' + side].rotation.x = deg(8 * Math.sin(t * 0.7 + ph + j * 1.7));
+    g['eye_' + side].rotation.z = deg(6 * Math.sin(t * 0.45 + ph * 2 + j));
+  });
+}
+function pose(c, t) {
+  const g = c.crab.userData.groups, ph = c.crab.userData.phase;
+  rest(g);
+  eyes(g, t, ph);
+  if (c.pose === 'walk') {
+    // scuttles sideways along the bank and back, the claws held low in front
+    const x = Math.sin(t * 0.5) * 0.9, dir = Math.cos(t * 0.5);
+    legs(g, t, 14, Math.min(1, Math.abs(dir) * 2));
+    c.crab.position.set(x - 0.4, BANK + Math.abs(Math.sin(t * 14)) * 0.004, -0.9);
+    SIDES.forEach(([side]) => g['claw_finger_' + side].rotation.x = deg(4 + 4 * Math.sin(t * 3 + ph)));
+  } else if (c.pose === 'threat') {
+    // reared up on its legs, claws lifted and spread, fingers opening and snapping
+    SIDES.forEach(([side, s]) => {
+      for (let i = 1; i <= 4; i++) {
+        g['leg' + i + '_upper_' + side].rotation.z = -s * deg(10);
+        g['leg' + i + '_lower_' + side].rotation.z = s * deg(10);
+      }
+      g['claw_arm_' + side].rotation.x = deg(38 + 4 * Math.sin(t * 1.3 + ph));
+      g['claw_arm_' + side].rotation.y = s * deg(16);
+      g['claw_hand_' + side].rotation.x = deg(18);
+      const snap = Math.max(0, Math.sin(t * 2.2 + (s > 0 ? 0 : 1.4)));
+      g['claw_finger_' + side].rotation.x = deg(32 * snap);
+    });
+    g.body.rotation.x = deg(-6);
+    c.crab.position.set(1.7, BANK + 0.02 * settings.size, -1.9);
+    c.crab.rotation.y = deg(-20);
+  } else {
+    // on the river bed, picking: one claw then the other up to the mouth
+    legs(g, t, 0.6, 0.15);
+    SIDES.forEach(([side, s], j) => {
+      const pick = Math.max(0, Math.sin(t * 2.4 + j * Math.PI));
+      g['claw_arm_' + side].rotation.x = deg(22 * pick);
+      g['claw_arm_' + side].rotation.y = -s * deg(14 * pick);
+      g['claw_finger_' + side].rotation.x = deg(18 * (1 - pick));
+    });
+    c.crab.position.set(-0.6, BED, 1.4);
+    c.crab.rotation.y = deg(160);
+  }
+}
+
+// --- cameras -----------------------------------------------------------------------------------------------------------
+const P = i => crabs[i].crab.position;
+const CAMS = {
+  overview: () => [[0.3, 1.6, 3.6], [0, -0.3, -0.3]],
+  'walking, close': () => { const p = P(0); return [[p.x + 0.2, p.y + 0.55, p.z + 1.1], [p.x, p.y + 0.1, p.z]]; },
+  'face': () => { const p = P(1); return [[p.x - 0.35, p.y + 0.3, p.z - 0.95], [p.x, p.y + 0.12, p.z]]; },
+  'from above': () => { const p = P(0); return [[p.x + 0.001, p.y + 1.4, p.z + 0.001], [p.x, p.y, p.z]]; },
+  'on the river bed': () => { const p = P(2); return [[p.x + 0.9, p.y + 0.5, p.z + 1.2], [p.x, p.y + 0.1, p.z]]; },
+  'with the player': () => [[1.4, 1.4, 2.8], [1.4, 0.6, -1.6]],
+};
+const camBox = document.getElementById('cams');
+function setCam(name) {
+  settings.cam = name;
+  const [pos, target] = CAMS[name]();
+  camera.position.set(...pos); controls.target.set(...target); controls.update();
+  [...camBox.children].forEach(b => b.classList.toggle('on', b.textContent === name));
+}
+Object.keys(CAMS).forEach(name => {
+  const b = document.createElement('button');
+  b.textContent = name; b.onclick = () => setCam(name);
+  camBox.appendChild(b);
+});
+const li = document.createElement('li');
+li.innerHTML = '<b>The look:</b> ' + LOOK.note;
+document.getElementById('list').appendChild(li);
+
+function resize() {
+  const w = wrap.clientWidth, h = wrap.clientHeight;
+  renderer.setSize(w, h, false);
+  camera.aspect = w / h; camera.updateProjectionMatrix();
+}
+window.addEventListener('resize', resize);
+
+const v = new THREE.Vector3();
+function frame() {
+  const t = performance.now() / 1000;
+  crabs.forEach(c => pose(c, t));
+  school.forEach((f, i) => {
+    const r = 1.2 + (i % 2) * 0.3, b = t * 0.35 + i * 1.5;
+    f.position.set(2 + Math.cos(b) * r, -0.8 - (i % 2) * 0.25, 3 + Math.sin(b) * r * 0.7);
+    f.rotation.y = Math.PI - b;
+    wave(f, t, 1, 9, TILAPIA_WAVE);
+  });
+  controls.update();
+  renderer.render(scene, camera);
+  const w = wrap.clientWidth, h = wrap.clientHeight;
+  tags.forEach(({el, obj, height}) => {
+    v.set(obj.position.x, obj.position.y + height() + 0.1, obj.position.z).project(camera);
+    const show = v.z < 1 && Math.abs(v.x) < 1.1 && Math.abs(v.y) < 1.1;
+    el.style.display = show ? '' : 'none';
+    el.style.left = ((v.x + 1) / 2 * w) + 'px';
+    el.style.top = ((1 - v.y) / 2 * h) + 'px';
+  });
+  requestAnimationFrame(frame);
+}
+layout();
+resize();
+crabs.forEach(c => pose(c, 0));
+setCam(CAMS[settings.cam] ? settings.cam : 'overview');
+frame();
+</script>
+</body>
+</html>

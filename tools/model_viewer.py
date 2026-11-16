@@ -553,6 +553,27 @@ def crocodile_page(out):
     print("wrote", out)
 
 
+def crab_page(out):
+    """The river crab (M9 river life, the clean-up crew, crab_models.py), from the user's picture: one walking sideways
+    on a silt bank, one with its claws up, one picking at algae on the river bed, a tilapia, a player and a block for
+    scale, a width slider (0.8 blocks, the picture's)."""
+    import crab_models as cb
+    import tilapia_models as tm
+    bones = cb.model()
+    looks = {}
+    for key, look in cb.LOOKS.items():
+        b, rows, w, h = cb.paint(bones, key)
+        looks[key] = {"name": look["name"], "note": look["note"], "bones": b, "texture": uri(tm.png(rows)), "w": w, "h": h}
+    tb, rows, w, h = tm.paint(tm.model(), "A")
+    blocks = {n: file_uri(n + ".png") for n in ("silt", "wet_silt", "algae_mat_3")}
+    data = {"looks": looks, "tilapia": {"bones": tb, "texture": uri(tm.png(rows)), "w": w, "h": h}, "blocks": blocks,
+            "boxes": sum(len(b.get("cubes", [])) for b in bones)}
+    template = (Path(__file__).resolve().parent / "crab_viewer.template.html").read_text(encoding="utf-8")
+    out.parent.mkdir(parents=True, exist_ok=True)
+    out.write_text(template.replace("/*DATA*/null", json.dumps(data)), encoding="utf-8")
+    print("wrote", out)
+
+
 def remains_page(out):
     """Remains (M9 river life, remains_models.py): a catfish, a tilapia and a cow in the four stages (fresh, half-eaten,
     picked over, bones), meat in Minecraft's raw-meat style, on a silt bed with a player for scale."""
@@ -614,6 +635,9 @@ def main():
         return
     if len(sys.argv) > 1 and sys.argv[1] == "remains":
         remains_page(Path(sys.argv[2]) if len(sys.argv) > 2 else ROOT / "references/remains_viewer.html")
+        return
+    if len(sys.argv) > 1 and sys.argv[1] == "crab":
+        crab_page(Path(sys.argv[2]) if len(sys.argv) > 2 else ROOT / "references/crab_viewer.html")
         return
     if len(sys.argv) > 1 and sys.argv[1] == "crocodile":
         crocodile_page(Path(sys.argv[2]) if len(sys.argv) > 2 else ROOT / "references/crocodile_viewer.html")
