@@ -1,5 +1,7 @@
 # No small savannas (the user, 2026-11-13; nothing built)
 
+**Folded into `docs/plans/big-savannas-big-rivers.md` (2026-11-16) as its step 2.**
+
 The user: "I kinda need every one of them to be big if the ecosystem is supposed to run properly."
 
 ## Where small savannas come from today
