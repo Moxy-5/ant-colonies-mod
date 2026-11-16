@@ -47,6 +47,34 @@ public final class BiomeMaps {
 
     /** Kinds of ground on a map. */
     static final byte OCEAN = 0, RIVER = 1, LAND = 2, SAVANNA = 3, DESERT = 4, FOREST = 5, JUNGLE = 6, COLD = 7, HILLS = 8, BADLANDS = 9, PLAINS = 10;
+    /**
+     * How many river cells across a river may be and still join the land on its two banks into one patch (rivers widen
+     * toward the sea, 2026-11-16: a river 60 to 100 blocks wide is 2 or 3 cells of the map, and one savanna with a wide
+     * river through it is still one savanna).
+     */
+    static final int RIVER_CELLS = 3;
+
+    /** Is a cell of this kind reached from this river cell along a row or column, through river cells only? */
+    static boolean riverBeside(byte[] map, int c, byte kindOf) {
+        int i = c / SIDE, j = c % SIDE;
+        for (int[] d : new int[][] {{1, 0}, {-1, 0}, {0, 1}, {0, -1}}) {
+            for (int k = 1; k <= RIVER_CELLS; k++) {
+                int a = i + d[0] * k, b = j + d[1] * k;
+                if (a < 0 || b < 0 || a >= SIDE || b >= SIDE) {
+                    break;
+                }
+                byte there = map[a * SIDE + b];
+                if (there == kindOf) {
+                    return true;
+                }
+                if (there != RIVER) {
+                    break;
+                }
+            }
+        }
+        return false;
+    }
+
     /** Only on a drawn map: savanna too small to live in (the gate, {@code worldgen/BigSavanna}). */
     static final byte QUIET = 11;
 
@@ -228,6 +256,7 @@ public final class BiomeMaps {
      */
     public static Patches patches(byte[] map, byte kindOf) {
         boolean[] seen = new boolean[map.length];
+        int[] hops = new int[map.length];
         int[] patchOf = new int[map.length];
         java.util.Arrays.fill(patchOf, -1);
         List<Integer> areas = new ArrayList<>();
@@ -260,8 +289,9 @@ public final class BiomeMaps {
                         continue;
                     }
                     int k = n[0] * SIDE + n[1];
-                    if (!seen[k] && (map[k] == kindOf || (map[k] == RIVER && map[at] == kindOf))) {
+                    if (!seen[k] && (map[k] == kindOf || (map[k] == RIVER && (map[at] == kindOf || hops[at] < RIVER_CELLS)))) {
                         seen[k] = true;
+                        hops[k] = map[k] == kindOf ? 0 : hops[at] + 1;
                         queue.add(k);
                     }
                 }
@@ -349,6 +379,7 @@ public final class BiomeMaps {
      */
     public static int[] acrossOfCells(byte[] map, byte kindOf) {
         int[] out = new int[map.length];
+        int[] hops = new int[map.length];
         boolean[] seen = new boolean[map.length];
         ArrayDeque<Integer> queue = new ArrayDeque<>();
         List<Integer> cells = new ArrayList<>();
@@ -371,8 +402,9 @@ public final class BiomeMaps {
                         continue;
                     }
                     int k = n[0] * SIDE + n[1];
-                    if (!seen[k] && (map[k] == kindOf || (map[k] == RIVER && map[at] == kindOf))) {
+                    if (!seen[k] && (map[k] == kindOf || (map[k] == RIVER && (map[at] == kindOf || hops[at] < RIVER_CELLS)))) {
                         seen[k] = true;
+                        hops[k] = map[k] == kindOf ? 0 : hops[at] + 1;
                         queue.add(k);
                     }
                 }

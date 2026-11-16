@@ -247,3 +247,47 @@ table (`SavannaRegion`, the river and floodplain bands split by continentalness)
   the yearly flood"): later, it needs these big savannas first.
 - Dry sandy streambeds and seasonal rivers: with the seasons.
 - Hippos and other big river animals: M9 river life, after the rivers are wide.
+
+## Step 4, rivers widen toward the sea: BUILT 2026-11-16 (branch `claude/wide-rivers`)
+
+**What was built.** The land (`tools/flat_savannas/flat_offset.py ... wide`, regenerated; new parts `river_target.json`
+and `river_lift.json`) blends three river shapes by how far inland a spot is (continentalness): today's in the sea and
+far inland (from 0.30), the mid shape at 0.15, the wide shape from just inside the shore (-0.17) to -0.02. The biome
+table (`SavannaRegion.INLAND_EDGES`, `RIVER_HALF`, `FLOOD_HALF`) cuts the savanna into seven slices by how far inland
+and gives each its own width of savanna river and floodplain, so the river's biome and the floodplain follow the water.
+
+**Measured on generated land** (3 seeds, 900 river spots, `SavannaWorldTests.riverWidthIsMeasured`; water width across,
+the deepest point on that crossing, and how much of the crossing is 3 deep or less):
+
+| Stretch | Target | Width median (25% to 75%) | Deepest | Shallows |
+|---|---|---|---|---|
+| Far inland | 15 to 25, as today | 23 (14 to 34) | 7 | 38% |
+| Mid inland | about 40 | 42 (26 to 72) | 8 | 20% |
+| Near inland | 60 to 100 | 66 (47 to 105) | 9 | 19% |
+| Coast (few spots, 56) | 60 to 100 | 53 (44 to 76) | 9 | 20% |
+
+The coast band is only 5 percent of the savanna and takes in the last stretch where the river meets the sea's own
+floor; it measured 66 on the build before, so it swings with the sample. The floodplain beside the water is a median
+32 blocks wide (was 20), 24 percent of the savanna (was 22).
+
+**My picks:** the shapes' numbers (`WIDE_SHAPES`), found in four builds; the deep beds come out about 2 blocks
+shallower on real land than offset/128 says, so they are set lower (-0.605 and -0.598). The widths fade between the
+bands over the whole stretch from -0.02 to 0.30 (hundreds to thousands of blocks), never in a step; the biome follows in
+seven steps, so near a step a little water lies in floodplain biome or a little bank in river biome (the river's biome
+reaches past its water a median 8 blocks).
+
+**The measure fixed.** The first build seemed to come out narrow (near inland 41): the test picked its spots from
+river-biome map cells beside savanna, and the wider biome changed which stretches it met. Now it measures on the
+valley's own line (Minecraft's river band of weirdness), as before the biome widened: a wide stretch is met more often
+than a narrow one, the yardstick the targets were agreed by. On the maps a river up to 3 cells wide joins the savanna
+on its two banks into one patch (`BiomeMaps.RIVER_CELLS`); river cells do not count as savanna area, so the savanna's
+share of land reads 25.3 percent (was 28.6) with the same savannas (typical 2,634 across).
+
+**Checked on the wide water:** `RiverBankFeature`, the algae and the remains features work from the water they find
+(no width in their rules), their tests pass; floodplain trees 196 figs and 64 groves, none on wrong ground; remains lie
+only where the water is 8 deep or less, so beside the deep channel, not in it. **Not checked by a test, the user's
+look:** silt bars (they look for a bend within 12 blocks and may be rarer on broad water), how the wide river meets a
+narrow non-savanna river at a savanna's edge, and water colour at the biome steps.
+
+**Tests:** `worldgen,mound,river,trees` on 4 servers, all passed but the land fingerprint, regenerated on purpose
+(then passed). Only new land changes; old worlds get a step where new land meets old.

@@ -19,15 +19,16 @@ WIDE = len(sys.argv) > 5 and sys.argv[5] == "wide"
 CHANNEL, FLOOD_FROM, FLOOD_TO, PLAIN_AT = -0.86, -0.80, -0.55, 0.0
 # The wide shapes (my picks): (pv, bed height) across the channel, then the floodplain from FLOOD_AT to RISE_FROM.
 # Offset -0.500 is the floodplain, a block above the water; about 1/128 of offset a block, so -0.512 is the water's
-# surface, -0.52 a block deep, -0.535 about 3, -0.585 about 9.
+# surface, -0.52 a block deep, -0.535 about 3; measured on generated land (2026-11-16) the deep beds come out about 2 blocks
+# shallower than that rule says (-0.585 gave 7), so the wide bed is -0.605 and the mid bed -0.598 for 8 to 10.
 WIDE_SHAPES = {
-    "mid":  {"bed": [(-1.0, -0.570), (-0.86, -0.545), (-0.77, -0.522)], "flood_at": -0.70, "rise_from": -0.45},
-    "wide": {"bed": [(-1.0, -0.585), (-0.85, -0.570), (-0.72, -0.535), (-0.63, -0.520)], "flood_at": -0.56, "rise_from": -0.30},
+    "mid":  {"bed": [(-1.0, -0.598), (-0.88, -0.570), (-0.74, -0.522)], "flood_at": -0.67, "rise_from": -0.44},
+    "wide": {"bed": [(-1.0, -0.605), (-0.85, -0.585), (-0.62, -0.535), (-0.51, -0.520)], "flood_at": -0.44, "rise_from": -0.20},
 }
 # Where each shape holds, by continentalness (lower is nearer the sea): today's in the sea (up to -0.19, so no sea
-# floor is pulled up to a river bed), wide from the coast's inner edge -0.11 to -0.02 (most of near inland), mid at
+# floor is pulled up to a river bed), wide from just inside the shore, -0.17, to -0.02 (the coast and most of near inland), mid at
 # 0.15 (mid inland), today's from 0.30 (far inland); blended between.
-SEA_AT, WIDE_FROM, WIDE_AT, MID_AT, NARROW_AT = -0.19, -0.11, -0.02, 0.15, 0.30
+SEA_AT, WIDE_FROM, WIDE_AT, MID_AT, NARROW_AT = -0.19, -0.17, -0.02, 0.15, 0.30
 z = zipfile.ZipFile(jar)
 def w(path, obj):
     # every land part wrapped in antcolonies:shared (savanna loading round 2): the same part, wired once per wiring

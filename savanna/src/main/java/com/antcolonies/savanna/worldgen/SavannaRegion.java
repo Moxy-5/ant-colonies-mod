@@ -79,6 +79,20 @@ public final class SavannaRegion extends Region {
             ResourceLocation.fromNamespaceAndPath(SavannaMod.MODID, "savanna_floodplain"));
     public static final float FLOODPLAIN_WEIRDNESS = 0.15F;
 
+    /**
+     * Rivers widen toward the sea (2026-11-16, {@code docs/plans/big-savannas-big-rivers.md}, step 4): the land's river
+     * gets wider the nearer the sea ({@code flat_offset.py ... wide}, blended by continentalness), and the river and
+     * floodplain biomes follow it in slices of continentalness: {@link #INLAND_EDGES} cut the land from the sea to far
+     * inland, and in each slice the savanna within {@link #RIVER_HALF} of the valley's line (in weirdness) is the savanna
+     * river, out to {@link #FLOOD_HALF} the floodplain. Far inland and in the sea they are Minecraft's own river (0.05) and
+     * the old floodplain (0.15). The land changes smoothly and the biome in steps, so near a step a little water lies in
+     * floodplain biome or a little bank in river biome (my picks, from the land's shapes: the water's edge is at about
+     * weirdness (1 + pv) / 3).
+     */
+    static final float[] INLAND_EDGES = {-0.19F, -0.11F, 0.03F, 0.12F, 0.21F, 0.30F};
+    static final float[] RIVER_HALF = {0.05F, 0.15F, 0.17F, 0.125F, 0.10F, 0.07F, 0.05F};
+    static final float[] FLOOD_HALF = {0.15F, 0.24F, 0.26F, 0.22F, 0.19F, 0.165F, 0.15F};
+
     /** Minecraft's own band edges (OverworldBiomeBuilder's temperatures and humidities). */
     private static final float[] TEMPERATURE_EDGES = {-1F, -0.45F, -0.15F, 0.2F, 0.55F, 1F};
     private static final float[] HUMIDITY_EDGES = {-1F, -0.35F, -0.1F, 0.1F, 0.3F, 1F};
@@ -167,12 +181,30 @@ public final class SavannaRegion extends Region {
             return;
         }
         if (biome == Biomes.SAVANNA) {
-            long edge = Climate.quantizeCoord(FLOODPLAIN_WEIRDNESS);
-            long a = p.weirdness().min(), b = p.weirdness().max();
-            long[] cuts = {a, Math.max(a, Math.min(b, -edge)), Math.max(a, Math.min(b, edge)), b};
-            for (int k = 0; k < 3; k++) {
-                if (cuts[k + 1] > cuts[k] || (a == b && k == (a < -edge ? 0 : a < edge ? 1 : 2))) {
-                    out.add(point(temperature, humidity, p, new Climate.Parameter(cuts[k], cuts[k + 1]), k == 1 ? SAVANNA_FLOODPLAIN : Biomes.SAVANNA));
+            // by how far inland: the savanna nearest the valley's line is river, then floodplain, then savanna
+            long ca = p.continentalness().min(), cb = p.continentalness().max();
+            for (int slice = 0; slice <= INLAND_EDGES.length; slice++) {
+                long from = slice == 0 ? ca : Math.max(ca, Math.min(cb, Climate.quantizeCoord(INLAND_EDGES[slice - 1])));
+                long to = slice == INLAND_EDGES.length ? cb : Math.max(ca, Math.min(cb, Climate.quantizeCoord(INLAND_EDGES[slice])));
+                if (to <= from && !(ca == cb && slice == sliceOf(ca))) {
+                    continue;
+                }
+                Climate.Parameter inland = new Climate.Parameter(from, to);
+                long river = Climate.quantizeCoord(RIVER_HALF[slice]), flood = Climate.quantizeCoord(FLOOD_HALF[slice]);
+                long a = p.weirdness().min(), b = p.weirdness().max();
+                long[] edges = {-flood, -river, river, flood};
+                long[] cuts = new long[6];
+                cuts[0] = a;
+                cuts[5] = b;
+                for (int k = 0; k < 4; k++) {
+                    cuts[k + 1] = Math.max(a, Math.min(b, edges[k]));
+                }
+                for (int k = 0; k < 5; k++) {
+                    if (cuts[k + 1] > cuts[k] || (a == b && k == pieceOfWeirdness(a, edges))) {
+                        ResourceKey<Biome> here = k == 2 ? SAVANNA_RIVER : k == 1 || k == 3 ? SAVANNA_FLOODPLAIN : Biomes.SAVANNA;
+                        out.add(Pair.of(new Climate.ParameterPoint(temperature, humidity, inland, p.erosion(), p.depth(),
+                                new Climate.Parameter(cuts[k], cuts[k + 1]), p.offset()), here));
+                    }
                 }
             }
             return;
@@ -183,6 +215,22 @@ public final class SavannaRegion extends Region {
     private static Pair<Climate.ParameterPoint, ResourceKey<Biome>> point(Climate.Parameter temperature, Climate.Parameter humidity,
             Climate.ParameterPoint p, Climate.Parameter weirdness, ResourceKey<Biome> biome) {
         return Pair.of(new Climate.ParameterPoint(temperature, humidity, p.continentalness(), p.erosion(), p.depth(), weirdness, p.offset()), biome);
+    }
+
+    private static int sliceOf(long continentalness) {
+        int slice = 0;
+        while (slice < INLAND_EDGES.length && continentalness >= Climate.quantizeCoord(INLAND_EDGES[slice])) {
+            slice++;
+        }
+        return slice;
+    }
+
+    private static int pieceOfWeirdness(long value, long[] edges) {
+        int piece = 0;
+        while (piece < edges.length && value >= edges[piece]) {
+            piece++;
+        }
+        return piece;
     }
 
     private static int pieceOf(long value, long warmLow, long warmHigh) {

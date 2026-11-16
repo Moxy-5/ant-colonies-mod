@@ -364,8 +364,7 @@ public class SavannaWorldTests {
             for (int c = 0; c < map.length; c++) {
                 int i = c / BiomeMaps.SIDE, j = c % BiomeMaps.SIDE;
                 if (map[c] == BiomeMaps.RIVER && i > 0 && j > 0 && i < BiomeMaps.SIDE - 1 && j < BiomeMaps.SIDE - 1
-                        && (map[c - 1] == BiomeMaps.SAVANNA || map[c + 1] == BiomeMaps.SAVANNA
-                        || map[c - BiomeMaps.SIDE] == BiomeMaps.SAVANNA || map[c + BiomeMaps.SIDE] == BiomeMaps.SAVANNA)) {
+                        && BiomeMaps.riverBeside(map, c, BiomeMaps.SAVANNA)) {
                     cells.add(c);
                 }
             }
@@ -475,8 +474,7 @@ public class SavannaWorldTests {
                 if (map[c] != BiomeMaps.RIVER || i == 0 || j == 0 || i == side - 1 || j == side - 1) {
                     continue;
                 }
-                boolean bySavanna = map[c - 1] == BiomeMaps.SAVANNA || map[c + 1] == BiomeMaps.SAVANNA
-                        || map[c - side] == BiomeMaps.SAVANNA || map[c + side] == BiomeMaps.SAVANNA;
+                boolean bySavanna = BiomeMaps.riverBeside(map, c, BiomeMaps.SAVANNA);
                 if (bySavanna) {
                     riverCells++;
                     cells.add(c);
@@ -576,9 +574,10 @@ public class SavannaWorldTests {
             byBand.add(new ArrayList<>());
         }
         long[] savannaCells = new long[INLAND_NAMES.length], riverCells = new long[INLAND_NAMES.length];
-        List<List<Integer>> depthByBand = new ArrayList<>();
+        List<List<Integer>> depthByBand = new ArrayList<>(), shallowByBand = new ArrayList<>();
         for (int b = 0; b < INLAND_NAMES.length; b++) {
             depthByBand.add(new ArrayList<>());
+            shallowByBand.add(new ArrayList<>());
         }
         int spots = 0;
         StringBuilder report = new StringBuilder();
@@ -599,8 +598,11 @@ public class SavannaWorldTests {
                 if (map[c] != BiomeMaps.RIVER || i == 0 || j == 0 || i == side - 1 || j == side - 1) {
                     continue;
                 }
-                if (map[c - 1] == BiomeMaps.SAVANNA || map[c + 1] == BiomeMaps.SAVANNA
-                        || map[c - side] == BiomeMaps.SAVANNA || map[c + side] == BiomeMaps.SAVANNA) {
+                // the valley's own line only (Minecraft's river band of weirdness), as before the river's biome widened:
+                // a wide stretch is met more often than a narrow one, the yardstick the widths were agreed by
+                int px = -BiomeMaps.HALF + i * BiomeMaps.STEP, pz = -BiomeMaps.HALF + j * BiomeMaps.STEP;
+                float weird = Climate.unquantizeCoord(sampler.sample(QuartPos.fromBlock(px), qy, QuartPos.fromBlock(pz)).weirdness());
+                if (Math.abs(weird) < 0.05F && BiomeMaps.riverBeside(map, c, BiomeMaps.SAVANNA)) {
                     cells.add(c);
                     riverCells[inlandBand(sampler, -BiomeMaps.HALF + i * BiomeMaps.STEP, qy, -BiomeMaps.HALF + j * BiomeMaps.STEP)]++;
                 }
@@ -616,19 +618,33 @@ public class SavannaWorldTests {
                     continue; // the river's biome over dry ground
                 }
                 double across = Double.MAX_VALUE;
+                int deepest = 0, shallow = 0, wet = 1;
                 for (int[] d : lines) {
-                    int run = 1;
+                    int run = 1, deep = SEA_TOP + 1 - ground.height(x, z), low = deep <= 3 ? 1 : 0;
                     for (int sign : new int[] {1, -1}) {
-                        for (int k = 1; k <= WIDTH_LOOK && ground.height(x + sign * d[0] * k, z + sign * d[1] * k) <= SEA_TOP; k++) {
+                        for (int k = 1; k <= WIDTH_LOOK; k++) {
+                            int h = ground.height(x + sign * d[0] * k, z + sign * d[1] * k);
+                            if (h > SEA_TOP) {
+                                break;
+                            }
                             run++;
+                            deep = Math.max(deep, SEA_TOP + 1 - h);
+                            low += SEA_TOP + 1 - h <= 3 ? 1 : 0;
                         }
                     }
-                    across = Math.min(across, run * (d[0] != 0 && d[1] != 0 ? Math.sqrt(2) : 1));
+                    double length = run * (d[0] != 0 && d[1] != 0 ? Math.sqrt(2) : 1);
+                    if (length < across) {
+                        across = length;
+                        deepest = deep;
+                        shallow = low;
+                        wet = run;
+                    }
                 }
                 seedWidths.add((int) Math.round(across));
                 int band = inlandBand(sampler, x, qy, z);
                 byBand.get(band).add((int) Math.round(across));
-                depthByBand.get(band).add(SEA_TOP + 1 - ground.height(x, z));
+                depthByBand.get(band).add(deepest);
+                shallowByBand.get(band).add((int) Math.round(100.0 * shallow / wet));
             }
             spots += seedWidths.size();
             widths.addAll(seedWidths);
@@ -642,10 +658,11 @@ public class SavannaWorldTests {
         long allSavanna = java.util.Arrays.stream(savannaCells).sum(), allRiver = java.util.Arrays.stream(riverCells).sum();
         for (int b = 0; b < INLAND_NAMES.length; b++) {
             List<Integer> w = byBand.get(b);
-            bands.append(String.format("%n  %s: savanna %.0f%%, river beside savanna %.0f%%, %d spots, width median %d, 25%% %d, 75%% %d, 90%% %d, depth there median %d (90%% %d)",
+            bands.append(String.format("%n  %s: savanna %.0f%%, river beside savanna %.0f%%, %d spots, width median %d, 25%% %d, 75%% %d, 90%% %d, deepest across median %d (25%% %d, 90%% %d), shallows (3 deep or less) %d%% of the way across",
                     INLAND_NAMES[b], allSavanna == 0 ? 0 : 100.0 * savannaCells[b] / allSavanna, allRiver == 0 ? 0 : 100.0 * riverCells[b] / allRiver,
                     w.size(), middle(w, 0.5), middle(w, 0.25), middle(w, 0.75), middle(w, 0.9),
-                    middle(depthByBand.get(b), 0.5), middle(depthByBand.get(b), 0.9)));
+                    middle(depthByBand.get(b), 0.5), middle(depthByBand.get(b), 0.25), middle(depthByBand.get(b), 0.9),
+                    middle(shallowByBand.get(b), 0.5)));
         }
         all += String.format("%n by how far inland (Minecraft's continentalness bands):%s", bands);
         SavannaMod.LOGGER.info("[biome maps] river width: {}", all);
