@@ -67,11 +67,11 @@
 424 2011 63 warm_ocean ffffff154811025f -
 804 -1192 63 beach fffffe494a6bed19 -
 -2584 149 63 river 10d15e6645b ee284785d8e974b0
-2409 2941 65 savanna ffffff083490ce37 -
+2409 2941 65 plains ffffff083490ce37 -
 -1025 1669 63 warm_ocean 31f8d94490 -
 1840 -2699 65 ocean fffffe414072e11d -
 -2658 -1268 70 snowy_plains ffffff9b4093c2fa 8aed2404dc800871
-1146 994 71 savanna 12d2352c5d1 -
+1146 994 71 plains 12d2352c5d1 -
 1037 -763 63 ocean 1c7dc345282 -
 751 2706 63 warm_ocean 1367acfd922 -
 2972 2688 63 deep_lukewarm_ocean ffffff80ec787450 ce1c7d94f92d3af2
@@ -99,8 +99,8 @@
 -1454 1996 63 warm_ocean ffffff6593d6d4a8 -
 -2046 -263 63 deep_ocean ffffff5e06c4f6e2 -
 749 2356 63 warm_ocean 17c5d6d6d2e 2c242f3f60e5c821
-2454 2756 69 savanna fffffea1f5582483 -
-100 -2973 64 savanna 9162c4d301 -
+2454 2756 69 plains fffffea1f5582483 -
+100 -2973 64 plains 9162c4d301 -
 -2133 2369 63 lukewarm_ocean ffffff25622d8044 -
 1897 1156 72 savanna 994ceb169c 55f066001ad12cb1
 -44 1354 64 desert fffffefb221c0de1 -
@@ -262,7 +262,7 @@
 -1491 161 63 lukewarm_ocean fffffeeaf12fd2ad -
 234 -638 71 savanna 648850a95f -
 -2484 -633 63 forest 1930fdaa536 -
-1224 716 68 savanna 7381b52d83 667b28f250397051
+1224 716 68 plains 7381b52d83 667b28f250397051
 -1610 538 65 lukewarm_ocean f2a53446d7 -
 -1473 2001 63 warm_ocean bed407c450 -
 2501 2138 64 beach 97aec26ae3 -
@@ -278,7 +278,7 @@
 1971 606 64 savanna_river ffffff89cd5a6ef3 -
 363 -357 63 lukewarm_ocean ed3cf2dfd3 -
 805 802 63 river aef5384c9 -
-2431 2833 71 savanna 161988b6d86 e49102458d118344
+2431 2833 71 plains 161988b6d86 e49102458d118344
 1505 1413 64 beach 1227a8632ad -
 -2445 194 66 plains 1da138dfd81 -
 2701 -364 64 forest 4d830d9337 -
@@ -286,7 +286,7 @@
 -2635 -207 71 plains 1224bc1cd00 -
 786 -2270 64 river fffffea34b90fdfe -
 -2943 1269 63 savanna_floodplain 59c29918bf -
-2470 2851 71 savanna fffffea968b74aaf 69cc501753091eb0
+2470 2851 71 plains fffffea968b74aaf 69cc501753091eb0
 705 603 63 river fffffe86e3c1db3b -
 260 -68 67 savanna ffffff54a2ad3154 -
 618 -2315 64 savanna_river 494e3e3b88 -
@@ -309,7 +309,7 @@
 -2839 2890 63 cold_ocean fffffff542febac6 f3511585a3e4c4e1
 -2955 -1560 64 snowy_beach fffffe5e95ab15bb -
 662 -1470 69 forest ffffff792aa9eca4 -
-2418 2848 71 savanna 19d5f22abdc -
+2418 2848 71 plains 19d5f22abdc -
 -2808 -518 80 meadow 12a7fcb76ed 52af6c34fa4765f1
 800 2438 63 warm_ocean 100cef4d646 -
 -1319 1052 71 desert ffffff414eaf3fec -
@@ -350,7 +350,7 @@
 1543 -2601 75 dark_forest 134592cb2e7 -
 -1367 2422 64 warm_ocean ffffff3521eb14cd -
 990 47 65 lukewarm_ocean ffffffd048d4adc8 -
-1281 1147 70 savanna d11d912366 8aed2404dc800871
+1281 1147 70 plains d11d912366 8aed2404dc800871
 1112 -1471 64 forest ffffffe3697cdbd4 -
 -2109 -1352 63 frozen_river ffffff33dd9c99d6 -
 758 -1972 64 birch_forest 13c052cac55 -
@@ -474,7 +474,7 @@
 -744 -1740 95 plains ffffff2a7e0372d3 -
 130 596 68 desert 5e08d8d2e0 -
 -33 2599 63 warm_ocean 1678019521b -
-2529 2787 71 savanna d3e48fbd81 8c8bb7f8c286464f
+2529 2787 71 plains d3e48fbd81 8c8bb7f8c286464f
 612 -839 63 forest 1fe9c844dc -
 859 2677 64 desert 88b8be5fe2 -
 -1109 343 72 savanna fffffe2daaa7eb60 -
@@ -651,7 +651,7 @@
 -2510 -41 74 plains ffffff7b3276f82d -
 -2510 -1507 68 snowy_plains fffffff44749ba23 -
 -2022 -1723 66 plains 72a5a2d0c1 969ba851bb386031
-1036 822 65 savanna fffffea99d59f2fa -
+1036 822 65 plains fffffea99d59f2fa -
 836 726 63 river 1029e4541a0 -
 2375 -1882 63 deep_cold_ocean 173423c619b -
 -1279 701 64 savanna_floodplain eb316a71e3 4099cd82623ad811
@@ -661,7 +661,7 @@
 -881 564 74 desert fffffefbef2eb5ec d6a0e6e47265d0b1
 -308 285 71 desert b76ca9896e -
 2251 2055 70 savanna 648eea68a5 -
--498 -729 65 savanna 1210ada913 -
+-498 -729 65 plains 1210ada913 -
 -1828 -1660 67 forest fffffe959daad522 fffc2ced4b9167d0
 2831 69 65 plains fffffea40aac268d -
 -300 -60 71 savanna 111f69fdeef -
@@ -680,7 +680,7 @@
 -368 -2567 89 forest a719b5fe9a -
 -452 -433 68 savanna 4e7f2ea4ff 3fd5a179051673
 360 -2818 65 savanna fffffe7f445f31f4 -
--380 -724 64 savanna fffffe47e6da262d -
+-380 -724 64 plains fffffe47e6da262d -
 -399 2272 63 river fffffe82cac4236f -
 2218 111 93 dark_forest ffffff22a64d6946 8bb1ff2de4197230
 -2127 -1626 63 plains 1689583dc9e -
@@ -770,7 +770,7 @@
 2756 -1812 63 cold_ocean 5fbe3f5667 -
 1805 -698 63 cold_ocean 109db2cc7c8 -
 1448 1844 63 savanna 1561815ce64 -
-1443 778 67 savanna 1d656f6fcac 9ed0edbc120b66b1
+1443 778 67 plains 1d656f6fcac 9ed0edbc120b66b1
 -1468 -2592 71 forest c0231ee7f8 -
 876 -1143 63 ocean f6a9f3565e -
 1296 -1097 63 sunflower_plains ffffff6129e904c9 -
@@ -844,7 +844,7 @@
 -2421 2169 70 savanna 96b1e039f5 -
 970 462 63 lukewarm_ocean 53bedab104 9985841c29a0efb1
 -1981 -2976 75 old_growth_birch_forest fffffe2351cca579 -
-2259 2795 64 savanna 1157d16fdd3 -
+2259 2795 64 plains 1157d16fdd3 -
 -808 2177 69 stony_shore fffffeab6d0194dc -
 -2429 417 66 plains ffffff4b112844c6 d1b4057c946fc491
 960 -377 63 ocean a4dc1f50a3 -
@@ -896,7 +896,7 @@
 -1928 -521 63 cold_ocean 1c153980735 -
 2198 1611 71 savanna fffffe1fb82e82a8 8bfecdd20a93b790
 -2227 221 63 ocean ffffff1583ae6e30 -
-2383 2837 71 savanna ffffffdc2b549507 -
+2383 2837 71 plains ffffffdc2b549507 -
 2319 1817 72 savanna fffffe68243cb82e -
 2629 -1085 68 forest 1df6e8ecb69 10b374d7ba2cc7d0
 -114 1567 63 warm_ocean 1145f3485fb -
@@ -932,10 +932,10 @@
 -2076 -498 63 deep_cold_ocean ffffff8d51cf4e2a -
 -63 633 68 desert ffffff2adc292517 667b28f250397051
 -653 -1979 63 river f5100a05a1 -
-719 60 67 savanna ffffff891487755d -
+719 60 67 plains ffffff891487755d -
 1575 867 64 savanna_floodplain ffffffa0d25ebf57 -
 1557 71 71 savanna fffffe30a7ce42aa ebc311d1ab436dd0
-2270 2654 64 savanna fffffe113509b7d9 -
+2270 2654 64 plains fffffe113509b7d9 -
 -1511 -1900 75 taiga ffffffa6e8cd7274 -
 1910 -1556 64 plains f3eaad0062 -
 -2259 1912 69 savanna fffffe9b9962686a b3e2b19a7a59cd01
@@ -943,7 +943,7 @@
 31 -1570 69 birch_forest ffffff90ad491eec -
 799 -1921 64 river fffffe9a3e24558d -
 -555 -1289 63 river 1227cbf6057 8a2da9caa46ef882
-1388 1026 65 savanna 1be3c93d741 -
+1388 1026 65 plains 1be3c93d741 -
 1490 1814 70 savanna 69a89f518a -
 -2990 2552 63 ocean 82b529c3e0 -
 -2929 -1909 63 cold_ocean 48e2737c42 d89502e73ea206c1
@@ -1001,7 +1001,7 @@
 1726 2980 72 savanna 171ac395221 9449b24403ce2891
 1320 667 64 savanna_floodplain 1088a4a80e3 -
 -1858 2550 63 lukewarm_ocean ffffff5354f4d40e -
-1392 1111 65 savanna 12d55df5d90 -
+1392 1111 65 plains 12d55df5d90 -
 2333 2395 64 lukewarm_ocean 310dc6e455 240813e793ddc31
 2677 -927 87 forest ffffff121fb8dfdf -
 -2770 -2153 63 cold_ocean fffffee84e8caf4c -
@@ -1010,7 +1010,7 @@
 -2654 2780 63 ocean 656c39879a -
 403 1806 63 warm_ocean fffffed2f2812293 -
 100 -2270 85 forest 1d7b4faf1f9 -
--333 -801 70 savanna ffffff94d0c69e72 ac012aaf985e50
+-333 -801 70 plains ffffff94d0c69e72 ac012aaf985e50
 -1722 617 63 savanna_river fffffe51f03b73e2 -
 -2639 -752 63 forest 542c11417 -
 2865 1690 72 forest ffffffa1f98e12ed -
@@ -1036,7 +1036,7 @@
 2647 -2670 63 ocean 1264acf6c6d -
 259 -724 70 savanna ffffffc7c2e81c44 8aed2404dc800871
 -602 1389 66 desert 63ed235093 -
-2381 2910 72 savanna fffffe5b2ca8343e -
+2381 2910 72 plains fffffe5b2ca8343e -
 2757 516 87 birch_forest ffffff49d4a5e0d8 -
 1995 -1334 63 cold_ocean fffffff1c854c580 d89502e73ea206c1
 871 805 65 desert ffffffdc6470a2c4 -
@@ -1109,7 +1109,7 @@
 1497 -2746 63 ocean 22f9adbad2 5ef85b139ba4451
 1433 246 63 savanna_river cd969cc28 -
 2500 -2114 63 cold_ocean fffffe640c7ead41 -
-2611 2853 65 savanna 4f7553982e -
+2611 2853 65 plains 4f7553982e -
 -991 1421 63 river 1740661ee5e 51231bcde622bb1f
 346 56 71 savanna ffffff91cf1650e9 -
 -1254 2726 70 savanna fffffeae5aa74631 -
@@ -1209,7 +1209,7 @@
 1429 -438 64 forest 15ef118a2a3 4099cd82623ad811
 1340 2517 64 savanna_floodplain ffffffbeadc78397 -
 502 -37 63 savanna_river d50414db33 -
-1190 708 65 savanna fffffe10873a86f1 -
+1190 708 65 plains fffffe10873a86f1 -
 -1362 651 64 savanna_floodplain ffffff85342d1ceb 6753b0f6ff187390
 -2039 -1701 64 plains 1321490e13f -
 2047 -378 63 stony_shore fffffed4f2f06a7d -
@@ -1231,7 +1231,7 @@
 -828 151 65 savanna_floodplain ffffff0b274ffd57 -
 -134 -735 71 savanna ffffff9f43cd138b -
 2983 1204 63 river ffffff5593bc2f7b 58976813c74eacc2
--511 -737 64 savanna 9448107e85 -
+-511 -737 64 plains 9448107e85 -
 1159 -425 64 beach fffffff76a3af781 -
 158 -2731 71 savanna dbb7f9cfdd -
 -1971 -1150 68 forest fffffe8540196526 667b28f250397051
@@ -1242,7 +1242,7 @@
 -2601 2995 63 cold_ocean fffffeaf7806739f -
 2632 1927 73 forest 12e0ee128ad -
 -2188 -1580 64 plains ffffff0347835d62 -
-1439 982 71 savanna 1c0f4ca7132 6830189eec8636b0
+1439 982 71 plains 1c0f4ca7132 6830189eec8636b0
 1809 -1159 63 beach ffffff3e9ed704d5 -
 776 2897 63 savanna_river 16876fa9434 -
 1311 2631 64 savanna_floodplain ffffff63b2abfb67 -
@@ -1333,7 +1333,7 @@
 -1543 -1850 90 taiga 11bc4fa6e25 7c581898a16a31b1
 2981 -199 63 plains ffffff6db5ca8f23 -
 2089 -2159 61 plains fffffe7bc4b6a77a -
-2430 2900 71 savanna 29c8e8902d -
+2430 2900 71 plains 29c8e8902d -
 2220 1942 72 savanna ffffff0e2cbdb30b 9449b24403ce2891
 255 -289 65 savanna 1038b807084 -
 2917 1798 71 plains 17e2b948ad0 -
@@ -1421,7 +1421,7 @@
 -1137 -206 72 savanna ab804275f6 9449b24403ce2891
 963 2974 64 savanna_river ae019dae41 -
 -1153 705 66 desert ffffffee16bba260 -
-2600 2838 69 savanna 1abefe952c5 -
+2600 2838 69 plains 1abefe952c5 -
 -2166 2181 66 savanna ffffff96826c965b 75d287ee61c5b9f2
 2389 -883 69 plains ed4f2bd0e8 -
 269 -1951 64 birch_forest e585319abc -
@@ -1521,7 +1521,7 @@
 1466 -2625 63 dark_forest ffffffc4941ddfd7 fc9fc547a829b4cf
 -1809 -350 63 ocean 7e5a76d81e -
 720 2287 63 warm_ocean 69d84c2d1 -
-2453 2675 70 savanna ffffff0aed6c0022 -
+2453 2675 70 plains ffffff0aed6c0022 -
 2694 1779 66 old_growth_birch_forest 149e0123f98 969ba851bb386031
 -1476 -1231 69 forest 19e399174a0 -
 1383 2073 70 savanna ffffff6d990e97c3 -
@@ -1549,7 +1549,7 @@
 -1059 -439 72 savanna fffffe1c9c608934 371e08f53913c13
 -2813 2 63 plains ffffff848683deba -
 -256 -294 68 savanna 1b741ccdaa4 -
-1475 995 71 savanna e40ffd9b96 -
+1475 995 71 plains e40ffd9b96 -
 -2305 1456 63 lukewarm_ocean daf09f663d 481966d4edcb2f41
 112 1584 63 warm_ocean fffffe89c2d3b822 -
 -2084 2187 71 savanna 19e775b8690 -
@@ -1581,7 +1581,7 @@
 9 2260 63 warm_ocean fffffe5db69152ba 584604d280494190
 -466 1063 63 warm_ocean 52a98876e0 -
 -14 -2805 63 river fffffff2ca978abd -
--1607 2277 72 savanna ffffff537570ae79 -
+-1607 2277 72 plains ffffff537570ae79 -
 -2164 2460 63 deep_lukewarm_ocean 100a25f1be9 fae17ad3bb354900
 -133 1866 63 desert fb71972d5a -
 -1016 506 72 savanna e05b8c80f2 -
@@ -1804,7 +1804,7 @@
 195 1735 63 warm_ocean 19ec644dd5b -
 284 220 71 savanna fffffe67959142d6 8bfecdd20a93b790
 2696 -1273 63 beach fffffe9fcc58ceef -
--464 -676 64 savanna fffffeff05256b9f -
+-464 -676 64 plains fffffeff05256b9f -
 2207 -1938 63 ocean 13ebbd55 -
 1107 1378 65 lukewarm_ocean 1c4329bf987 d3eb997b407073f0
 -2291 -1400 68 plains fffffe1e59dcf268 -

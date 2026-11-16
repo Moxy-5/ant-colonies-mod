@@ -1,4 +1,4 @@
-# No small savannas (the user, 2026-11-13; nothing built)
+# No small savannas (the user, 2026-11-13; steps 1 to 3 built 2026-11-16 as step 2 of `big-savannas-big-rivers.md`)
 
 **Folded into `docs/plans/big-savannas-big-rivers.md` (2026-11-16) as its step 2.**
 
@@ -32,6 +32,18 @@ another biome mod brings in its own zones.
 2. The biome maps before and after: small patches counted (`BiomeMaps.patches`), a test band for them.
 3. The leftovers tuned, or the fallback, by what step 2 shows.
 4. The user's look in a new world. Only new land changes.
+
+## Step 2 results (2026-11-16, steps 1 to 3 here, built as step 2 of `docs/plans/big-savannas-big-rivers.md`)
+Full numbers in that plan's "Step 2 results". In short:
+- Step 1: Minecraft's zones replaced (`worldgen/MinecraftZones`). Found while building: TerraBlender never asks index 0
+  for biomes, so the plan's "a region of ours under Minecraft's name" alone would have changed nothing; index 0 is now an
+  empty region under Minecraft's name and our table a region of its own at Minecraft's weight. Index checked in the log
+  and the world test.
+- Step 2: 919 small savannas left on the 4 maps (14.7 percent of the savanna's area), 584 lonely (10.9 percent);
+  test bands set a little over that.
+- Step 3: the leftovers are our own savannas cut at our zones' edges; the climate shape does not help (narrower makes
+  more), a bigger share of the zones does, which is the big savannas plan's step 3. Fallback not built (a world-making
+  cost and a second size rule), to revisit after step 3.
 
 ## Your calls
 - What grows where Minecraft's savannas were (my pick: plains; windswept hills for the windswept ones).

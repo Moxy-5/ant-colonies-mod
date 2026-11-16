@@ -8,6 +8,7 @@ import com.antcolonies.savanna.registry.SavannaBlocks;
 import com.antcolonies.savanna.worldgen.FloodplainPoolFeature;
 import com.antcolonies.savanna.worldgen.FloodplainTreePiece;
 import com.antcolonies.savanna.worldgen.FloodplainTreeStructure;
+import com.antcolonies.savanna.worldgen.MinecraftZones;
 import com.antcolonies.savanna.worldgen.RiverBankFeature;
 import com.antcolonies.savanna.worldgen.SavannaRegion;
 import com.antcolonies.savanna.worldgen.SavannaSpawn;
@@ -53,6 +54,20 @@ public class SavannaWorldTests {
     static final double COVERAGE_MOST = 0.30;
 
     /**
+     * No small savannas (2026-11-16, {@code docs/plans/no-small-savannas.md}, step 2 results): Minecraft's own zones no
+     * longer grow savannas, so what is left are our own savannas cut where our zones end and thin climate slivers. Measured
+     * on the 4 maps: 919 savannas under {@link BiomeMaps#SMALL} blocks across, 14.7 percent of the savanna's area; 584 of
+     * them "lonely" (no big savanna within {@link BiomeMaps#NEAR_BIG} cells), 10.9 percent of the area. The bands sit a
+     * little above that (my pick), to catch a change that makes more; step 3 (bigger savannas, a bigger share of the
+     * zones) is what brings them down, and tightens these. {@link #OUR_SHARE}: our share of the zones with no other biome
+     * mod (weight 30 against Minecraft's 10), for the pretend maps.
+     */
+    static final int SMALL_MOST = 1050;
+    static final double SMALL_SHARE_MOST = 0.18;
+    static final double LONELY_SHARE_MOST = 0.14;
+    static final double OUR_SHARE = 0.75;
+
+    /**
      * The real thing: TerraBlender's layout with our region for each seed, measured and drawn beside Minecraft's own; then
      * the spawn search (spawn in the savanna) from the middle of each map finds a place well inside a savanna.
      * Its own batch: it holds the server some seconds reading the noise.
@@ -62,8 +77,14 @@ public class SavannaWorldTests {
         var registries = helper.getLevel().registryAccess();
         MultiNoiseBiomeSource vanillaSource = MultiNoiseBiomeSource.createFromPreset(registries.lookupOrThrow(
                 Registries.MULTI_NOISE_BIOME_SOURCE_PARAMETER_LIST).getOrThrow(MultiNoiseBiomeSourceParameterLists.OVERWORLD));
+        // no small savannas (2026-11-16): Minecraft's zones replaced by its table without savannas, at the right index
+        List<String> indexProblems = MinecraftZones.indexProblems();
+        helper.assertTrue(indexProblems.isEmpty(), "TerraBlender's regions: " + indexProblems + " (" + MinecraftZones.describe() + ")");
         List<Integer> typical = new ArrayList<>();
-        int biggest = 0, big = 0, tooFar = 0, small = 0;
+        int biggest = 0, big = 0, tooFar = 0, small = 0, smallPatches = 0, smallBefore = 0;
+        double smallShare = 0, lonelyShare = 0;
+        int lonely = 0, lonelyBefore = 0, lonelyAfterPretend = 0;
+        int[] otherKinds = new int[BiomeMaps.PLAINS + 1];
         double landShare = 0;
         int land = 0;
         StringBuilder report = new StringBuilder();
@@ -71,11 +92,33 @@ public class SavannaWorldTests {
             Climate.Sampler sampler = BiomeMaps.sampler(registries, seed);
             MultiNoiseBiomeSource source = BiomeMaps.bigSavannaSource(registries, seed);
             byte[] ours = BiomeMaps.map(source, sampler);
-            byte[] vanilla = BiomeMaps.pretendMap(registries, seed, BiomeMaps.climates(sampler), 0, SavannaRegion.Shape.VANILLA);
+            Climate.TargetPoint[] climates = BiomeMaps.climates(sampler);
+            byte[] vanilla = BiomeMaps.pretendMap(registries, seed, climates, 0, SavannaRegion.Shape.VANILLA);
+            // how it was before 2026-11-16 (a pretend layout: our share of the zones, Minecraft's own table in the rest)
+            byte[] lastWeek = BiomeMaps.pretendMap(registries, seed, climates, OUR_SHARE, SavannaRegion.SHAPE, false);
             BiomeMaps.Patches savanna = BiomeMaps.patches(ours, BiomeMaps.SAVANNA);
             BiomeMaps.Patches before = BiomeMaps.patches(vanilla, BiomeMaps.SAVANNA);
+            BiomeMaps.Patches beforeNoSmall = BiomeMaps.patches(lastWeek, BiomeMaps.SAVANNA);
+            // the same pretend layout with Minecraft's zones swapped (a fair before and after: the same zones)
+            BiomeMaps.Patches afterPretend = BiomeMaps.patches(
+                    BiomeMaps.pretendMap(registries, seed, climates, OUR_SHARE, SavannaRegion.SHAPE, true), BiomeMaps.SAVANNA);
             BiomeMaps.Patches desert = BiomeMaps.patches(ours, BiomeMaps.DESERT);
             report.append(String.format("%n  seed %d: savanna %s%n    (Minecraft's own: %s; desert now: %s)", seed, savanna, before, desert));
+            report.append(String.format("%n    small savannas: now %d (%.2f%% of area), %d lonely (%.2f%%) %s;"
+                    + " pretend layout before %d / %d lonely (%.2f%%), after %d / %d lonely (%.2f%%)",
+                    savanna.small(), 100 * savanna.smallShare(), savanna.lonely(), 100 * savanna.lonelyShare(), savanna.lonelySizes(),
+                    beforeNoSmall.small(), beforeNoSmall.lonely(), 100 * beforeNoSmall.lonelyShare(),
+                    afterPretend.small(), afterPretend.lonely(), 100 * afterPretend.lonelyShare()));
+            smallPatches += savanna.small();
+            smallBefore += beforeNoSmall.small();
+            smallShare += savanna.smallShare();
+            lonely += savanna.lonely();
+            lonelyBefore += beforeNoSmall.lonely();
+            lonelyAfterPretend += afterPretend.lonely();
+            lonelyShare += savanna.lonelyShare();
+            for (byte b : ours) {
+                otherKinds[b]++;
+            }
             typical.add(savanna.typical());
             biggest = Math.max(biggest, savanna.biggest());
             big += savanna.bigOnes();
@@ -124,6 +167,26 @@ public class SavannaWorldTests {
         helper.assertTrue(spacing <= SPACING_MOST, "big savannas too rare: " + all);
         helper.assertTrue(coverage <= COVERAGE_MOST, "too much savanna: " + all);
         helper.assertTrue(small == 0, "the spawn is not in a big savanna for " + small + " seeds: " + all);
+        // no small savannas: few small patches left (only our own savannas cut at a zone's edge and thin climate slivers)
+        smallShare /= SEEDS.length;
+        lonelyShare /= SEEDS.length;
+        String smallLine = String.format("small savannas (under %d across) on %d maps: %d, %.2f%% of savanna area (before 2026-11-16, pretend: %d);"
+                + " lonely (no big savanna within %d blocks): %d, %.2f%% of savanna area (pretend layout: %d before, %d after)",
+                BiomeMaps.SMALL, SEEDS.length, smallPatches, 100 * smallShare, smallBefore, BiomeMaps.NEAR_BIG * BiomeMaps.STEP,
+                lonely, 100 * lonelyShare, lonelyBefore, lonelyAfterPretend);
+        SavannaMod.LOGGER.info("[biome maps] {}", smallLine);
+        helper.assertTrue(smallPatches <= SMALL_MOST && smallShare <= SMALL_SHARE_MOST && lonelyShare <= LONELY_SHARE_MOST,
+                "too many small savannas: " + smallLine + all);
+        // and the rest of the world still turns up
+        int cells = SEEDS.length * BiomeMaps.SIDE * BiomeMaps.SIDE;
+        StringBuilder kinds = new StringBuilder();
+        for (byte k : new byte[] {BiomeMaps.DESERT, BiomeMaps.JUNGLE, BiomeMaps.PLAINS, BiomeMaps.BADLANDS, BiomeMaps.FOREST, BiomeMaps.COLD}) {
+            kinds.append(String.format(" %d:%.2f%%", k, 100.0 * otherKinds[k] / cells));
+        }
+        SavannaMod.LOGGER.info("[biome maps] other ground (desert 4, jungle 6, plains 10, badlands 9, forest 5, cold 7):{}", kinds);
+        for (byte k : new byte[] {BiomeMaps.DESERT, BiomeMaps.JUNGLE, BiomeMaps.PLAINS, BiomeMaps.BADLANDS, BiomeMaps.FOREST, BiomeMaps.COLD}) {
+            helper.assertTrue(otherKinds[k] >= cells / 1000, "ground kind " + k + " (almost) gone:" + kinds);
+        }
         helper.assertTrue(tooFar == 0, "the spawn search found no place well inside a savanna for every seed: " + all);
         helper.succeed();
     }

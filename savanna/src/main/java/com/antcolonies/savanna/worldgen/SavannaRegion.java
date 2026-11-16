@@ -86,9 +86,19 @@ public final class SavannaRegion extends Region {
         super(NAME, RegionType.OVERWORLD, WEIGHT);
     }
 
-    /** Signs our region up with TerraBlender (at common set-up). */
+    /**
+     * Signs our regions up with TerraBlender (at common set-up): first Minecraft's own zones replaced by its table without
+     * savannas ({@link MinecraftZones}, no small savannas), then the big savannas.
+     */
     public static void signUp() {
+        MinecraftZones.replace();
         Regions.register(new SavannaRegion());
+        List<String> problems = MinecraftZones.indexProblems();
+        if (problems.isEmpty()) {
+            SavannaMod.LOGGER.info("[biome regions] indices right: {}", MinecraftZones.describe());
+        } else {
+            SavannaMod.LOGGER.error("[biome regions] indices wrong: {} ({})", problems, MinecraftZones.describe());
+        }
     }
 
     @Override

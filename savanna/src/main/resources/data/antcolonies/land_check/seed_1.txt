@@ -867,7 +867,7 @@
 -2821 -612 71 plains ffffff4c2eb2a21a -
 -517 1754 63 deep_lukewarm_ocean 16a918939f -
 1506 -2291 64 savanna_floodplain fffffe390b9d1aae 4099cd82623ad811
-2114 -2922 69 savanna 12fd51bd8c7 -
+2114 -2922 69 plains 12fd51bd8c7 -
 2416 2721 63 deep_ocean ffffffe07c5db3ff -
 -219 -1587 114 dripstone_caves fffffeddce37e948 -
 804 1421 70 forest fffffe3d5f8737ef 8aed2404dc800871
@@ -1720,7 +1720,7 @@
 -1586 -1875 115 snowy_plains fffffe3604ceb7a6 -
 2233 862 63 cold_ocean 69cb164923 f32b90b5752768af
 2841 -1359 65 beach 13002c15a32 -
-2365 -2862 65 savanna ffffffc1e25f9384 -
+2365 -2862 65 plains ffffffc1e25f9384 -
 911 2962 63 ocean bb356effdf -
 -2510 965 70 savanna 16b3367b17 ff737853b6d420b2
 -441 232 65 deep_lukewarm_ocean 109dcb986f9 -

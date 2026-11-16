@@ -1,4 +1,4 @@
-# Big savannas, big rivers (the user, 2026-11-16; nothing built)
+# Big savannas, big rivers (the user, 2026-11-16; steps 1 and 2 built)
 
 The user: "I want the river to have more life to it but it's gonna start getting cramped; it's also not exactly a
 realistic river; we will also have to make the savanna biome bigger, which I'm okay with because I'm planning a lot of
@@ -70,6 +70,44 @@ This plan takes in `docs/plans/no-small-savannas.md` (its steps are step 2 here)
 **Step 2, no small savannas** (`docs/plans/no-small-savannas.md`, its steps 1 to 3): our own region in place of
 Minecraft's (the index check), Minecraft's savannas there turned to plains (windswept ones to windswept hills, my
 pick), the leftover small patches counted on the biome maps and tuned.
+
+**Step 2 results (2026-11-16, branch `claude/no-small-savannas-20e8a5`; only new land changes):**
+- **Minecraft's own zones grow no savannas any more** (`worldgen/MinecraftZones`): Minecraft's table there with savanna
+  and savanna plateau as plains, windswept savanna as windswept hills (my picks), at Minecraft's weight (10), so the
+  zones keep their shares and sizes. Read in TerraBlender 4.1.0.8: the region at index 0 is never asked for biomes (that
+  zone always uses Minecraft's own list), so index 0 keeps the name `minecraft:overworld` but gives no biomes (left out
+  of zone picking), and our `antcolonies:minecraft_without_savannas` carries the table. Index check: the log lines
+  "Registered region minecraft:overworld to index 0" and `[biome regions] indices right`, and the world test fails if
+  any region's index is not its place in the list.
+- **Big savannas unchanged:** typical 1,839 across, biggest 3,655, a big one per 3,752 blocks square, 21.6 percent of
+  land; the spawn search in a big savanna on every seed. Deserts, jungles, plains, badlands, forests and cold land all
+  still turn up (desert 1.8 percent of the maps, jungle 1.4, plains 11.1, badlands 0.8, forest 20.7, cold 5.3).
+- **Small savannas left (4 maps of 16,384 blocks square):** 919 under 1,000 across, 14.7 percent of the savanna's area;
+  584 of them "lonely" (no big savanna within 128 blocks; a bit closer is a big savanna's ragged edge, not a savanna of
+  its own), 10.9 percent of the area. **The swap alone did not cut them:** on the same pretend zones, lonely small
+  patches 516 before, 559 after (Minecraft's savannas used to join some of ours). Nearly all left are **our own savannas
+  cut where our zones end**, and thin climate slivers.
+- **Small and big savannas are one knob, our share of the zones** (step 3). Pretend layouts with Minecraft's zones
+  swapped, 4 seeds (lonely share of the savanna's area, typical size, savanna's share of land):
+  | our share (weight) | lonely | typical | land |
+  |---|---|---|---|
+  | 0.75 (30, today) | 7 to 12 percent | 1,532 to 1,972 (the real game) | 19 to 27 percent |
+  | 0.86 (60) | 4 to 10 | 2,076 to 2,842 | 22 to 32 |
+  | 0.90 (90) | 3 to 10 | 2,240 to 3,071 | 23 to 33 |
+  | 1.00 (Minecraft's zones gone) | 2 to 6 | 2,264 to 3,133 | 25 to 36 |
+  Narrower climate shapes made more small patches, not fewer. So step 3's bigger savannas are also the cure for the
+  small ones; it must keep savanna under 30 percent of land (one seed went over at share 1.0), likely by narrowing the
+  shape a little as the share rises.
+- **The fallback not built (my call):** no mounds or Matabele in a lonely small patch would need a flood fill of the
+  biome noise per mound place (up to about 770 samples, a new cost in world making, which the user has asked to keep
+  fast) and a second rule judging savanna size beside the spawn's; step 3 removes most of what it would catch. To
+  revisit after step 3 if small patches still matter in play.
+- Tests: `bigSavannasHaveTheAgreedSizeAndRarity` checks the index, prints small and lonely patches per seed (now, and
+  the pretend zones before and after), bands my picks a little over today's (at most 1,050 small, 18 percent of the
+  area, lonely 14 percent; step 3 tightens them); the other kinds of ground at least 0.1 percent of the maps.
+- Land fingerprints regenerated (a change on purpose): only the biome name moved, savanna to plains in 89 of 6,000
+  columns; heights and ground the same. `worldgen,mound` pass on 6 servers; the mound survey (`MatabeleNewLandTests`)
+  passes (real savanna 1 mound in 2.8 looks dead, 1 in 3.5 Matabele).
 
 **Step 3, bigger savannas.** Our region's weight and the savanna's climate shape (`WEIGHT`, `SHAPE`) tuned on the
 biome maps to a typical savanna of **3,500 to 4,000 blocks across** (my pick, about twice today's); checked that

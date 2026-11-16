@@ -10,6 +10,7 @@ import java.util.function.IntFunction;
 
 import javax.imageio.ImageIO;
 
+import com.antcolonies.savanna.worldgen.MinecraftZones;
 import com.antcolonies.savanna.worldgen.SavannaRegion;
 import com.antcolonies.savanna.worldgen.SavannaSpawn;
 
@@ -123,9 +124,20 @@ public final class BiomeMaps {
      * {@code share}) are not ours, the stretched table where they are.
      */
     public static byte[] pretendMap(RegistryAccess registries, long seed, Climate.TargetPoint[] climates, double share, SavannaRegion.Shape shape) {
+        return pretendMap(registries, seed, climates, share, shape, false);
+    }
+
+    /**
+     * The same, the other zones Minecraft's table without savannas ({@link MinecraftZones}) if {@code noSmallSavannas},
+     * Minecraft's own table if not (how the world was before 2026-11-16).
+     */
+    public static byte[] pretendMap(RegistryAccess registries, long seed, Climate.TargetPoint[] climates, double share, SavannaRegion.Shape shape,
+            boolean noSmallSavannas) {
         var biomes = registries.registryOrThrow(Registries.BIOME);
-        Climate.ParameterList<Holder<Biome>> vanilla = registries.lookupOrThrow(Registries.MULTI_NOISE_BIOME_SOURCE_PARAMETER_LIST)
-                .getOrThrow(MultiNoiseBiomeSourceParameterLists.OVERWORLD).value().parameters();
+        Climate.ParameterList<Holder<Biome>> vanilla = noSmallSavannas
+                ? new Climate.ParameterList<>(MinecraftZones.table().stream().map(p -> p.mapSecond(key -> (Holder<Biome>) biomes.getHolderOrThrow(key))).toList())
+                : registries.lookupOrThrow(Registries.MULTI_NOISE_BIOME_SOURCE_PARAMETER_LIST)
+                        .getOrThrow(MultiNoiseBiomeSourceParameterLists.OVERWORLD).value().parameters();
         Climate.ParameterList<Holder<Biome>> ours = new Climate.ParameterList<>(SavannaRegion.table(shape).stream()
                 .map(p -> p.mapSecond(key -> (Holder<Biome>) biomes.getHolderOrThrow(key))).toList());
         int scale = 1000;
@@ -178,14 +190,33 @@ public final class BiomeMaps {
         return LAND;
     }
 
-    /** What a map holds of one kind of ground. */
-    public record Patches(double coverage, int typical, int biggest, int bigOnes, int spacing, List<Integer> sizes) {
+    /**
+     * Under this many blocks across a savanna counts as small (no small savannas, 2026-11-16; my pick: an ecosystem of
+     * mounds about 60 blocks apart, Matabele scouting 96 out and river life wants at least this much room).
+     */
+    public static final int SMALL = 1000;
+
+    /**
+     * What a map holds of one kind of ground. {@code small}: patches under {@link #SMALL} across that do not touch the
+     * map's edge (a patch cut by the edge has an unknown size); {@code smallShare}: their share of the kind's area;
+     * {@code smallSizes}: their sizes, biggest first.
+     */
+    public record Patches(double coverage, int typical, int biggest, int bigOnes, int spacing, List<Integer> sizes, int small,
+            double smallShare, List<Integer> smallSizes, int lonely, double lonelyShare, List<Integer> lonelySizes) {
         @Override
         public String toString() {
-            return String.format("%.1f%% of land, typical %d blocks across, biggest %d, %d of 1000+ (one per %d blocks square)",
-                    100 * coverage, typical, biggest, bigOnes, spacing);
+            return String.format("%.1f%% of land, typical %d blocks across, biggest %d, %d of 1000+ (one per %d blocks square), "
+                    + "%d small (%.2f%% of its area), %d of them lonely (%.2f%%)", 100 * coverage, typical, biggest, bigOnes, spacing,
+                    small, 100 * smallShare, lonely, 100 * lonelyShare);
         }
     }
+
+    /**
+     * A small patch closer than this to a big one (in map cells of {@link #STEP} blocks, 4 = 128 blocks) is a stray bit at a
+     * big savanna's ragged edge, not a savanna of its own: its animals and ants live in the big one beside it. Only the
+     * others count as lonely (my pick).
+     */
+    public static final int NEAR_BIG = 4;
 
     /**
      * The patches of one kind on a map: each patch's size as the width of a circle of its area ("blocks across"),
@@ -195,7 +226,11 @@ public final class BiomeMaps {
      */
     public static Patches patches(byte[] map, byte kindOf) {
         boolean[] seen = new boolean[map.length];
+        int[] patchOf = new int[map.length];
+        java.util.Arrays.fill(patchOf, -1);
         List<Integer> areas = new ArrayList<>();
+        List<Integer> insideIds = new ArrayList<>();
+        List<Integer> inside = new ArrayList<>(); // areas of patches not touching the map's edge
         int land = 0, total = 0;
         ArrayDeque<Integer> queue = new ArrayDeque<>();
         for (int c = 0; c < map.length; c++) {
@@ -206,14 +241,17 @@ public final class BiomeMaps {
                 continue;
             }
             int area = 0;
+            boolean edge = false;
             seen[c] = true;
             queue.add(c);
             while (!queue.isEmpty()) {
                 int at = queue.poll();
+                patchOf[at] = areas.size();
                 if (map[at] == kindOf) {
                     area++;
                 }
                 int i = at / SIDE, j = at % SIDE;
+                edge |= i == 0 || j == 0 || i == SIDE - 1 || j == SIDE - 1;
                 int[][] next = {{i + 1, j}, {i - 1, j}, {i, j + 1}, {i, j - 1}};
                 for (int[] n : next) {
                     if (n[0] < 0 || n[1] < 0 || n[0] >= SIDE || n[1] >= SIDE) {
@@ -225,6 +263,10 @@ public final class BiomeMaps {
                         queue.add(k);
                     }
                 }
+            }
+            if (!edge) {
+                inside.add(area);
+                insideIds.add(areas.size());
             }
             areas.add(area);
             total += area;
@@ -242,8 +284,46 @@ public final class BiomeMaps {
         }
         int big = (int) sizes.stream().filter(s -> s >= 1000).count();
         double landArea = land * (double) STEP * STEP;
+        List<Integer> smallAreas = inside.stream().filter(a -> across.apply(a) < SMALL).sorted((a, b) -> b - a).toList();
+        int smallArea = smallAreas.stream().mapToInt(Integer::intValue).sum();
+        // lonely: a small patch with no big patch's cell within NEAR_BIG cells
+        boolean[] lonelyPatch = new boolean[areas.size()];
+        for (int id : insideIds) {
+            lonelyPatch[id] = across.apply(areas.get(id)) < SMALL;
+        }
+        for (int c = 0; c < map.length; c++) {
+            int id = patchOf[c];
+            if (id < 0 || !lonelyPatch[id]) {
+                continue;
+            }
+            int i = c / SIDE, j = c % SIDE;
+            search:
+            for (int di = -NEAR_BIG; di <= NEAR_BIG; di++) {
+                for (int dj = -NEAR_BIG; dj <= NEAR_BIG; dj++) {
+                    int a = i + di, b = j + dj;
+                    if (a < 0 || b < 0 || a >= SIDE || b >= SIDE) {
+                        continue;
+                    }
+                    int other = patchOf[a * SIDE + b];
+                    if (other >= 0 && other != id && across.apply(areas.get(other)) >= SMALL) {
+                        lonelyPatch[id] = false;
+                        break search;
+                    }
+                }
+            }
+        }
+        List<Integer> lonelyAreas = new ArrayList<>();
+        for (int id = 0; id < areas.size(); id++) {
+            if (lonelyPatch[id]) {
+                lonelyAreas.add(areas.get(id));
+            }
+        }
+        lonelyAreas.sort((a, b) -> b - a);
+        int lonelyArea = lonelyAreas.stream().mapToInt(Integer::intValue).sum();
         return new Patches(land == 0 ? 0 : total / (double) land, typical, sizes.isEmpty() ? 0 : sizes.get(0), big,
-                big == 0 ? -1 : (int) Math.sqrt(landArea / big), sizes);
+                big == 0 ? -1 : (int) Math.sqrt(landArea / big), sizes, smallAreas.size(), total == 0 ? 0 : smallArea / (double) total,
+                smallAreas.stream().map(across::apply).toList(), lonelyAreas.size(), total == 0 ? 0 : lonelyArea / (double) total,
+                lonelyAreas.stream().map(across::apply).toList());
     }
 
     private static final int[] COLOURS = {
