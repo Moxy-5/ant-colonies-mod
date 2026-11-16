@@ -64,6 +64,8 @@ This plan takes in `docs/plans/no-small-savannas.md` (its steps are step 2 here)
   middle's depth was measured).
 - **Found on the way: a memory leak in the land's wiring** (`docs/BUGS.md` 222): every ground height the land worked
   out stayed in memory for good, in play too; fixed (`FlatSavanna.Shared`), and the slow-tick watcher capped.
+  With today's land put back: `worldgen` 10 of 10 on 6 servers, the land fingerprint unchanged (the fix moves no
+  block), a ground height 1.86 ms in savanna (the same as before).
 
 **Step 2, no small savannas** (`docs/plans/no-small-savannas.md`, its steps 1 to 3): our own region in place of
 Minecraft's (the index check), Minecraft's savannas there turned to plains (windswept ones to windswept hills, my
