@@ -1,0 +1,16 @@
+# The broken snail shell's three ages (2026-11-16), on the bed of a pool.
+#   ./gradlew runFilm -PfilmScene=tools/film/crab_shells.film
+cmd time set noon
+cmd kill @e[type=!player]
+lens 40
+wait 30
+cmd fill 14 -62 -2 22 -61 4 minecraft:water
+cmd setblock 16 -62 3 antcolonies:crab_shell[age=0,waterlogged=true]
+cmd setblock 17 -62 3 antcolonies:crab_shell[age=1,waterlogged=true]
+cmd setblock 18 -62 3 antcolonies:crab_shell[age=2,waterlogged=true]
+camera 17.5 -61.9 1.9 0 45
+wait 10
+shot shell_ages
+camera 16.5 -62.3 2.3 0 35
+wait 5
+shot shell_fresh

@@ -5,11 +5,19 @@ import java.util.EnumSet;
 import javax.annotation.Nullable;
 
 import com.antcolonies.savanna.block.AlgaeBlock;
+import com.antcolonies.savanna.block.CrabShellBlock;
 import com.antcolonies.savanna.block.ScrapsBlock;
 import com.antcolonies.savanna.registry.SavannaBlocks;
+import com.antcolonies.savanna.registry.SavannaItems;
 
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.particles.ItemParticleOption;
+import net.minecraft.core.particles.ParticleTypes;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.sounds.SoundEvents;
+import net.minecraft.sounds.SoundSource;
 import net.minecraft.world.entity.ai.goal.Goal;
+import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.phys.Vec3;
 
@@ -19,9 +27,17 @@ import net.minecraft.world.phys.Vec3;
  * kind). Standing over it, facing it, it plays the pick clip once: the left claw pinches a bit off and carries it to
  * the mouth, then the right; each bit going into the mouth is one bite off the food ({@link #BITE_TICKS}). Then it is
  * fed for 2 to 4 minutes. With nothing to eat near it strolls on: a crab never starves (the balance rule). My picks.
+ *
+ * <p>Snails (2026-11-16, the user: "Yes, crabs eat snails"): after remains, a snail within {@link #LOOK_ACROSS} is the
+ * meal one time in {@link #SNAIL_ODDS} when scraps or algae are near too, every time when nothing else is (so a crab
+ * never clears a bed of snails while it has plants to pick). It walks up to it (a snail pulled into its shell is caught
+ * all the same), grabs it (the snail is gone, its shell now in the claws) and plays the crack clip: squeezing, the shell
+ * cracks with a few chips flying ({@link #CRACK_TICK}), the right claw picks the snail out into the mouth twice, and the
+ * broken shell is put down on the bed ({@link CrabShellBlock#leave}). Cut short after the grab, it still drops the shell
+ * and counts as fed. My picks.
  */
 public class CrabPickGoal extends Goal {
-    /** How far it smells remains, and looks for scraps and algae (blocks across; up or down). */
+    /** How far it smells remains, and looks for snails, scraps and algae (blocks across; up or down). */
     static final double SMELL = 8.0;
     static final int LOOK_ACROSS = 6, LOOK_UP_DOWN = 2;
     /** The pick clip's length, and when each claw's bit goes into the mouth (ticks; {@code crab_models.py} PICK_LEN, PICK_BITE, plus the clip's blend-in). */
@@ -29,6 +45,12 @@ public class CrabPickGoal extends Goal {
     static final int[] BITE_TICKS = {37, 65};
     /** How long it may take to walk there before giving up. */
     static final int GIVE_UP_TICKS = 300;
+    /** One meal in this many is a snail when other food is near (else every one). */
+    static final int SNAIL_ODDS = 3;
+    /** The crack clip's length and when the shell gives (ticks; {@code crab_models.py} CRACK_LEN, CRACK_AT, plus the clip's blend-in). */
+    static final int CRACK_TICKS = 84, CRACK_TICK = 28;
+    /** How far in front of the crab the shell is held (blocks at size 1; {@code crab_models.py} HELD_AT). */
+    static final double HELD_AHEAD = 0.3;
     /** How long until it is hungry again after a meal (ticks; 2 to 4 minutes). */
     static final int FED_MIN = 2400, FED_MORE = 2400;
 
@@ -37,8 +59,13 @@ public class CrabPickGoal extends Goal {
     private RemainsEntity remains;
     @Nullable
     private BlockPos block;
+    @Nullable
+    private SnailEntity snail;
+    /** Where the shell is held while it cracks one (null: not cracking). */
+    @Nullable
+    private Vec3 shellAt;
     private int ticks, picking;
-    private boolean fed;
+    private boolean fed, shellLeft;
 
     public CrabPickGoal(CrabEntity crab) {
         this.crab = crab;
@@ -59,17 +86,25 @@ public class CrabPickGoal extends Goal {
 
     @Override
     public boolean canContinueToUse() {
-        return !fed && food() != null && (picking > 0 || ticks < GIVE_UP_TICKS);
+        return !fed && food() != null && (picking > 0 || shellAt != null || ticks < GIVE_UP_TICKS);
     }
 
     @Override
     public void start() {
         ticks = picking = 0;
-        fed = false;
+        fed = shellLeft = false;
+        shellAt = null;
     }
 
     @Override
     public void stop() {
+        if (shellAt != null && !shellLeft) {
+            dropShell();   // cut short after the grab: the snail is eaten all the same
+            fed = true;
+            crab.hungryIn = FED_MIN + crab.getRandom().nextInt(FED_MORE);
+        }
+        shellAt = null;
+        snail = null;
         crab.setDoing(CrabEntity.CALM);
         crab.getNavigation().stop();
         if (!fed) {
@@ -91,11 +126,15 @@ public class CrabPickGoal extends Goal {
             return;
         }
         ticks++;
+        if (shellAt != null) {
+            crack();
+            return;
+        }
         double dx = food.x - crab.getX(), dz = food.z - crab.getZ();
         double far = Math.sqrt(dx * dx + dz * dz);
         // its claws reach about a third of a block in front of it; at remains it walks to the nearest part of the fish
         // (food() gives the nearest point along its spine) and stops with its claws over the fish's side
-        double reach = 0.45 * crab.getScale() + (remains != null ? 0.1 * remains.size() : 0.0);
+        double reach = 0.45 * crab.getScale() + (remains != null ? 0.1 * remains.size() : snail != null ? 0.1 : 0.0);
         if (picking == 0 && (far > reach + 0.15 || Math.abs(food.y - crab.getY()) > 1.2)) {
             if (far < 1.5) {       // the last stretch: a route counts as walked a little short of its end
                 crab.getNavigation().stop();
@@ -107,6 +146,10 @@ public class CrabPickGoal extends Goal {
         }
         crab.getNavigation().stop();
         crab.face(food.x, food.z);
+        if (snail != null) {
+            grab();
+            return;
+        }
         crab.setDoing(remains != null || isScraps() ? CrabEntity.PICK_MEAT : CrabEntity.PICK_ALGAE);
         picking++;
         for (int at : BITE_TICKS) {
@@ -123,6 +166,42 @@ public class CrabPickGoal extends Goal {
         if (fed) {
             crab.hungryIn = FED_MIN + crab.getRandom().nextInt(FED_MORE);
         }
+    }
+
+    /** Takes the snail into its claws: the snail is gone, its shell held in front of the crab. */
+    private void grab() {
+        double yaw = Math.toRadians(crab.getYRot());
+        double ahead = HELD_AHEAD * crab.getScale();
+        shellAt = new Vec3(crab.getX() - Math.sin(yaw) * ahead, crab.getY(), crab.getZ() + Math.cos(yaw) * ahead);
+        snail.discard();
+        snail = null;
+        picking = 0;
+        crab.setDoing(CrabEntity.CRACK);
+    }
+
+    /** One tick of cracking the shell and eating the snail. */
+    private void crack() {
+        crab.getNavigation().stop();
+        crab.setDoing(CrabEntity.CRACK);
+        picking++;
+        if (picking == CRACK_TICK && crab.level() instanceof ServerLevel server) {
+            server.sendParticles(new ItemParticleOption(ParticleTypes.ITEM, new ItemStack(SavannaItems.CRAB_SHELL.get())),
+                    shellAt.x, shellAt.y + 0.25 * crab.getScale(), shellAt.z, 6, 0.08, 0.05, 0.08, 0.04);
+            server.playSound(null, shellAt.x, shellAt.y, shellAt.z, SoundEvents.TURTLE_EGG_CRACK, SoundSource.NEUTRAL,
+                    0.5F, 1.4F + 0.2F * crab.getRandom().nextFloat());
+        }
+        if (picking >= CRACK_TICKS) {
+            dropShell();
+            fed = true;
+            crab.hungryIn = FED_MIN + crab.getRandom().nextInt(FED_MORE);
+        }
+    }
+
+    private void dropShell() {
+        if (!shellLeft && shellAt != null && crab.level() instanceof ServerLevel server) {
+            CrabShellBlock.leave(server, shellAt);
+        }
+        shellLeft = true;
     }
 
     private boolean isScraps() {
@@ -143,6 +222,12 @@ public class CrabPickGoal extends Goal {
     /** Where the food is, or null once it is gone. */
     @Nullable
     private Vec3 food() {
+        if (shellAt != null) {
+            return shellAt;
+        }
+        if (snail != null) {
+            return snail.isAlive() ? snail.position() : null;
+        }
         if (remains != null) {
             return remains.isAlive() && remains.bitesLeft() > 0 ? nearestOnSpine(remains) : null;
         }
@@ -175,10 +260,14 @@ public class CrabPickGoal extends Goal {
         return new Vec3(r.getX() + ax * along, r.getY(), r.getZ() + az * along);
     }
 
-    /** Picks the food: the nearest remains with meat on them, else the nearest scraps, else the nearest algae. */
+    /**
+     * Picks the food: the nearest remains with meat on them; else the nearest snail now and then (always with nothing else
+     * near); else the nearest scraps, else the nearest algae.
+     */
     private boolean find() {
         remains = null;
         block = null;
+        snail = null;
         double best = Double.MAX_VALUE;
         for (RemainsEntity r : crab.level().getEntitiesOfClass(RemainsEntity.class, crab.getBoundingBox().inflate(SMELL, 3.0, SMELL),
                 r -> r.bitesLeft() > 0)) {
@@ -206,6 +295,21 @@ public class CrabPickGoal extends Goal {
                 block = at.immutable();
                 scraps = isScraps;
             }
+        }
+        SnailEntity prey = null;
+        best = Double.MAX_VALUE;
+        for (SnailEntity s : crab.level().getEntitiesOfClass(SnailEntity.class,
+                crab.getBoundingBox().inflate(LOOK_ACROSS, LOOK_UP_DOWN, LOOK_ACROSS), SnailEntity::isAlive)) {
+            double d = s.distanceToSqr(crab);
+            if (d < best) {
+                best = d;
+                prey = s;
+            }
+        }
+        if (prey != null && (block == null || crab.getRandom().nextInt(SNAIL_ODDS) == 0)) {
+            snail = prey;
+            block = null;
+            return true;
         }
         return block != null;
     }

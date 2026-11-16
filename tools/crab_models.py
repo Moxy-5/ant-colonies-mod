@@ -169,6 +169,38 @@ def walking_leg(s, px, pz, f):
     return up, low, tip, knee, ankle
 
 
+# --- the snail it cracks (2026-11-16, the user: "Yes, crabs eat snails") -------------------------------------------------
+# The river snail's own shell (snail_models.py, look A, the Garden spiral) held up in front of the crab's mouth, between
+# its claws' fingertips, turned round so the opening faces the mouth, at HELD_SIZE of the snail's (a smaller snail than
+# the biggest: my pick, the crab's face stays seen). HELD_AT is where the coil's middle sits, in voxels; the crack clip's
+# grip (CRACK_GRIP) puts each claw's pinch against its flat sides (worked out with the posing maths, as bounds()).
+HELD_SIZE = 0.6
+HELD_AT = (0.0, 8.0, -19.5)
+
+
+def held_shell():
+    """The snail's shell cubes moved to HELD_AT, turned half round and shrunk; their parts renamed snail_*."""
+    import snail_models as sm
+    cx, cy, cz = (v * sm.V for v in sm.SPIRAL_A)
+    tx, ty, tz = (v * V for v in HELD_AT)
+    out = []
+    for c in sm.shell_a():
+        (ox, oy, oz), (sx, sy, sz) = c['origin'], c['size']
+        lo = [tx - HELD_SIZE * (ox + sx - cx), ty + HELD_SIZE * (oy - cy), tz - HELD_SIZE * (oz + sz - cz)]
+        hi = [tx - HELD_SIZE * (ox - cx), ty + HELD_SIZE * (oy + sy - cy), tz - HELD_SIZE * (oz - cz)]
+        out.append(cube(lo, hi, 'snail_' + c['_part']))
+    return out
+
+
+def held_colour(part, x, y, z, face, rnd):
+    """The held shell's colours: the snail's own, read at the point of the snail the held point came from."""
+    import snail_models as sm
+    cx, cy, cz = (v * sm.V for v in sm.SPIRAL_A)
+    tx, ty, tz = (v * V for v in HELD_AT)
+    sx, sy, sz = cx - (x - tx) / HELD_SIZE, cy + (y - ty) / HELD_SIZE, cz - (z - tz) / HELD_SIZE
+    return sm.colour(part[len('snail_'):], 'A', sx, sy, sz, face, rnd)
+
+
 def model(game=False):
     """The bones. For the game each claw hand also carries two small bits (algae green, meat pink) between its fingers'
     points, shown by the pick clip and CrabModel while it carries food to its mouth."""
@@ -192,6 +224,9 @@ def model(game=False):
                 px, py, pz = (v / V for v in pinch)
                 box(bit, px - 1, py - 0.8, pz - 1, px + 1, py + 0.8, pz + 1, 'bit_' + kind)
                 out.append({'name': f'bit_{kind}_{side}', 'parent': f'claw_hand_{side}', 'pivot': pinch, 'cubes': bit})
+    if game:
+        out.append({'name': 'held_shell', 'parent': 'body', 'pivot': [0, HELD_AT[1] * V, HELD_AT[2] * V],
+                    'cubes': held_shell()})
     for i, (z, yaw, f) in enumerate(zip(LEG_Z, LEG_YAW, LEG_LONG)):
         for side, s in (('left', 1), ('right', -1)):
             px = s * (half_at(z) - BODY_IN - 0.4)
@@ -238,6 +273,8 @@ def colour(part, look, x, y, z, face, rnd):
         r = dice(cx, cy, 33)
     grain = rnd.uniform(0.97, 1.03)
     blotch = dice(cx // 2, cy // 2 + 9, cz // 2)        # the same for 2 x 2 voxels: the shell's mottle in patches
+    if part.startswith('snail_'):
+        return held_colour(part, x, y, z, face, rnd)
     if part == 'eye':
         return (44, 42, 48) if face == 'up' else (18, 16, 20)
     if part == 'bit_green':
@@ -379,6 +416,16 @@ PICK_TRIP = 2.6       # one claw's trip (seconds); the right claw starts PICK_SE
 PICK_SECOND = 1.4
 PICK_BITE = 0.68      # how far through a trip the bit goes into the mouth (CrabEntity.BITE_TICKS: 35 and 63)
 SIDES = (('left', 1), ('right', -1))
+# the crack clip (2026-11-16, crabs eat snails; all timings my picks): both claws reach in and lift the snail up to the
+# mouth, squeeze till the shell cracks (CrabEntity: CRACK_AT, the bits and the sound), then the right claw makes two
+# trips from the shell to the mouth with meat while the left holds the shell; the goal then drops the broken shell.
+CRACK_LEN = 4.0
+CRACK_AT = 1.2        # when the shell gives (seconds)
+CRACK_TRIPS = (1.5, 2.7)
+CRACK_TRIP = 1.2
+CRACK_GRIP = {'left': (-18, 33), 'right': (-12, 19)}   # each claw hand's turn (pitch, yaw; the right's yaw mirrored) with
+#                                                         its pinch on the shell's flat side (the right claw is longer)
+CRACK_MOUTH = (-27, 72)   # the pick clip's turn with the pinch at the mouth
 
 
 def sm(a, b, x):
@@ -413,6 +460,7 @@ def clips():
             p.setdefault(f'mouth_{side}', {'rotation': [0, 0, 0]})
             for kind in ('green', 'meat'):
                 p.setdefault(f'bit_{kind}_{side}', {'scale': [0, 0, 0]})
+        p.setdefault('held_shell', {'scale': [0, 0, 0], 'position': [0, 0, 0], 'rotation': [0, 0, 0]})
         return p
 
     def idle(t):
@@ -464,6 +512,44 @@ def clips():
         p['mouth_right'] = {'rotation': [0, 64 * o, 0]}
         return still(p)
 
+    def crack(t):
+        p = eyes(legs({}, t, math.pi / 2, 0.1), t, CRACK_LEN)
+        grip = sm(0.0, 0.45, t)
+        squeeze = sm(0.5, 0.6, t) - sm(1.35, 1.5, t)
+        shake = math.sin(t * 2 * math.pi * 7) * squeeze
+        mp, my = CRACK_MOUTH
+        o = chew = 0.0
+        for side, s in SIDES:
+            gp, gy = CRACK_GRIP[side]
+            lift = 0.0
+            shown = 0.0
+            if s < 0:                                       # the right claw's two trips with meat
+                for start in CRACK_TRIPS:
+                    u = (t - start) / CRACK_TRIP
+                    if 0 <= u <= 1:
+                        lift = sm(0.1, 0.42, u) - sm(0.72, 0.95, u)
+                        shown = 1.0 if 0.08 < u < 0.55 else 0.0
+                        o = max(o, sm(0.3, 0.42, u) - sm(0.52, 0.62, u))
+                        chew = 1.0 if 0.6 < u < 0.98 else chew
+            pitch = gp * grip + (mp - gp) * lift
+            yaw = gy * grip + (my - gy) * lift + 3 * shake
+            p[f'claw_hand_{side}'] = {'rotation': [pitch, s * yaw, 0]}
+            p[f'claw_arm_{side}'] = {'rotation': [-6 * grip - 4 * lift, 0, 0]}
+            opened = 26 * (sm(0.0, 0.15, t) - sm(0.3, 0.5, t)) + 18 * (sm(0.05, 0.12, (t - CRACK_TRIPS[0]) / CRACK_TRIP)
+                                                                      - sm(0.15, 0.25, (t - CRACK_TRIPS[0]) / CRACK_TRIP)) * (s < 0)
+            p[f'claw_finger_{side}'] = {'rotation': [-(4 + opened) + 5 * squeeze, 0, 0]}
+            for kind in ('green', 'meat'):
+                v = shown if kind == 'meat' else 0.0
+                p[f'bit_{kind}_{side}'] = {'scale': [v, v, v]}
+        o = min(1.0, o + chew * 0.22 * (0.5 + 0.5 * math.sin(t * 17)))
+        p['mouth_left'] = {'rotation': [0, -64 * o, 0]}
+        p['mouth_right'] = {'rotation': [0, 64 * o, 0]}
+        pop = sm(CRACK_AT, CRACK_AT + 0.05, t) - sm(CRACK_AT + 0.05, CRACK_AT + 0.25, t)
+        p['held_shell'] = {'scale': [1, 1, 1], 'position': [0, -0.875 * (1 - sm(0.1, 0.55, t)), 0],
+                           'rotation': [-12 * pop, 0, 4 * shake]}
+        p['body'] = {'rotation': [2 * squeeze, 0, 0], 'position': [0, -0.08 * squeeze, 0]}
+        return still(p)
+
     def death(t):
         f = min(1.0, t / 0.5)
         f = f * f * (3 - 2 * f)
@@ -476,7 +562,7 @@ def clips():
         return still(p)
 
     return {'idle': tm.clip(4.0, idle, 48), 'walk': tm.clip(WALK_LEN, walk, 12), 'pick': tm.clip(PICK_LEN, pick, 120),
-            'threat': tm.clip(3.2, threat, 48), 'death': tm.clip(1.0, death, 12, 'hold')}
+            'crack': tm.clip(CRACK_LEN, crack, 120), 'threat': tm.clip(3.2, threat, 48), 'death': tm.clip(1.0, death, 12, 'hold')}
 
 
 def write_game():

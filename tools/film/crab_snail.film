@@ -1,0 +1,101 @@
+# A crab cracking a snail (2026-11-16): a hungry crab on the bed of a shallow pool walks to a snail, grabs it, squeezes
+# the shell till it cracks, picks the snail into its mouth and leaves the broken shell; then the shells' three ages.
+#   ./gradlew runFilm -PfilmScene=tools/film/crab_snail.film      pictures in run-film/screenshots/crab_snail/
+cmd time set noon
+cmd weather clear
+cmd kill @e[type=!player]
+lens 40
+wait 30
+cmd fill 14 -62 -2 22 -61 4 minecraft:water
+cmd summon antcolonies:snail 17.5 -62.0 1.5 {HungryIn:100000,Rotation:[90f,0f]}
+cmd summon antcolonies:crab 19.5 -62.0 1.5 {HungryIn:0,Rotation:[90f,0f]}
+camera 18.5 -62.4 -0.3 0 30
+wait 10
+shot crack_00
+wait 6
+shot crack_01
+wait 6
+shot crack_02
+wait 6
+shot crack_03
+wait 6
+shot crack_04
+wait 6
+shot crack_05
+wait 6
+shot crack_06
+wait 6
+shot crack_07
+wait 6
+shot crack_08
+wait 6
+shot crack_09
+wait 6
+shot crack_10
+wait 6
+shot crack_11
+wait 6
+shot crack_12
+wait 6
+shot crack_13
+wait 6
+shot crack_14
+wait 6
+shot crack_15
+wait 6
+shot crack_16
+wait 6
+shot crack_17
+wait 6
+shot crack_18
+wait 6
+shot crack_19
+wait 6
+shot crack_20
+wait 6
+shot crack_21
+wait 6
+shot crack_22
+wait 6
+shot crack_23
+wait 6
+shot crack_24
+wait 6
+shot crack_25
+wait 6
+shot crack_26
+wait 6
+shot crack_27
+wait 6
+shot crack_28
+wait 6
+shot crack_29
+wait 6
+shot crack_30
+wait 6
+shot crack_31
+wait 6
+shot crack_32
+wait 6
+shot crack_33
+wait 6
+shot crack_34
+wait 6
+shot crack_35
+wait 6
+shot crack_36
+wait 6
+shot crack_37
+wait 6
+shot crack_38
+wait 6
+shot crack_39
+wait 6
+cmd kill @e[type=antcolonies:crab]
+cmd kill @e[type=antcolonies:snail]
+cmd setblock 16 -62 3 antcolonies:crab_shell[age=0,waterlogged=true]
+cmd setblock 17 -62 3 antcolonies:crab_shell[age=1,waterlogged=true]
+cmd setblock 18 -62 3 antcolonies:crab_shell[age=2,waterlogged=true]
+camera 17.5 -61.9 1.9 0 45
+wait 10
+shot shell_ages

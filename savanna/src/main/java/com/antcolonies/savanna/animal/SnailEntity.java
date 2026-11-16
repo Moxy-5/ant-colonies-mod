@@ -44,8 +44,9 @@ import software.bernie.geckolib.util.GeckoLibUtil;
  * <li>A player, a crab or a crocodile coming close, or a hit, and it pulls everything into its shell and sits tight,
  * taking half the harm while in (the shell); a few seconds after the danger is gone it peeks out, eyes first, and
  * carries on ({@link SnailHideGoal}).</li>
+ * <li>A hungry crab may hunt it (hiding does not save it): it grabs it, cracks the shell, eats it and leaves the broken
+ * shell on the bed ({@link CrabPickGoal}).</li>
  * </ul>
- * Not yet: crabs cracking snails.
  */
 public class SnailEntity extends PathfinderMob implements GeoEntity {
     /** What it is doing, for the clips. */

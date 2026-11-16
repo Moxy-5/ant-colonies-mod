@@ -178,6 +178,14 @@ public class SavannaBlocks {
             com.antcolonies.savanna.block.CrocDroppingsBlock::new,
             BlockBehaviour.Properties.of().mapColor(MapColor.QUARTZ).noCollission().instabreak().noOcclusion()
                     .sound(SoundType.SAND).randomTicks().pushReaction(PushReaction.DESTROY).noLootTable());
+    /**
+     * A broken snail shell left where a crab cracked and ate a snail (M9 river life, 2026-11-16), holding water or not,
+     * bleaching and crumbling away in about 3 days (block/CrabShellBlock). Drops nothing.
+     */
+    public static final DeferredBlock<com.antcolonies.savanna.block.CrabShellBlock> CRAB_SHELL = BLOCKS.registerBlock("crab_shell",
+            com.antcolonies.savanna.block.CrabShellBlock::new,
+            BlockBehaviour.Properties.of().mapColor(MapColor.TERRACOTTA_BROWN).noCollission().instabreak().noOcclusion()
+                    .sound(SoundType.BONE_BLOCK).randomTicks().pushReaction(PushReaction.DESTROY).noLootTable());
 
     static {
         TreeBlocks.init(); // the giant savanna trees' blocks (M7.5), registered with the rest

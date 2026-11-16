@@ -1029,4 +1029,44 @@ public class RiverLifeTests {
                 + ", grazed " + sawGraze[0] + ", strands " + helper.getBlockState(algae).getValue(AlgaeBlock.STRANDS) + " of " + strands
                 + ", path " + (snail.getNavigation().getPath() == null ? "none" : snail.getNavigation().getPath().getEndNode())));
     }
+
+    /**
+     * Crabs eat snails (M9 river life, 2026-11-16): a hungry crab with a snail near it and nothing else to eat walks to
+     * it, grabs it (the snail is gone, the crack clip plays), and puts the broken shell down on the bed, holding water,
+     * then is fed.
+     */
+    @GameTest(template = "arena", timeoutTicks = 1200)
+    public static void aCrabCracksASnailAndLeavesItsShell(GameTestHelper helper) {
+        buildPond(helper);
+        com.antcolonies.savanna.animal.SnailEntity snail = helper.spawn(SavannaEntities.SNAIL.get(), new BlockPos(X0 + 1, TOP - 1, Z0 + 2));
+        snail.setPersistenceRequired();
+        com.antcolonies.savanna.animal.CrabEntity crab = helper.spawn(SavannaEntities.CRAB.get(), new BlockPos(X0 + 4, TOP - 1, Z0 + 2));
+        crab.setPersistenceRequired();
+        crab.makeHungry();
+        boolean[] cracked = {false};
+        helper.onEachTick(() -> {
+            if (crab.doing() == com.antcolonies.savanna.animal.CrabEntity.CRACK) {
+                cracked[0] = true;
+                if (snail.isAlive()) {
+                    helper.fail("the crab cracks a shell while the snail is still there");
+                }
+            }
+        });
+        helper.succeedWhen(() -> {
+            BlockPos shell = null;
+            for (BlockPos at : BlockPos.betweenClosed(helper.absolutePos(new BlockPos(X0, TOP - 3, Z0)), helper.absolutePos(new BlockPos(X1, TOP + 1, Z1)))) {
+                if (helper.getLevel().getBlockState(at).is(SavannaBlocks.CRAB_SHELL.get())) {
+                    shell = at.immutable();
+                    break;
+                }
+            }
+            helper.assertTrue(cracked[0] && shell != null && crab.isFed(), "cracked " + cracked[0] + ", shell " + shell
+                    + ", crab fed " + crab.isFed() + ", snail alive " + snail.isAlive() + " at "
+                    + snail.blockPosition().subtract(helper.absolutePos(BlockPos.ZERO)) + ", crab at "
+                    + crab.blockPosition().subtract(helper.absolutePos(BlockPos.ZERO)) + " doing " + crab.doing());
+            BlockState there = helper.getLevel().getBlockState(shell);
+            helper.assertTrue(there.getValue(com.antcolonies.savanna.block.CrabShellBlock.WATERLOGGED)
+                    && there.getValue(com.antcolonies.savanna.block.CrabShellBlock.AGE) == 0, "the shell is " + there + " (fresh, holding water)");
+        });
+    }
 }

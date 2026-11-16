@@ -45,12 +45,15 @@ import software.bernie.geckolib.util.GeckoLibUtil;
  * pinches a bit off and carries it to its mouth, which opens ({@link CrabPickGoal}). It never starves.</li>
  * <li>It scuttles away from a player or a crocodile that comes near; with a player right on top of it, or hit, it rears
  * up with its claws raised and pinches (half a heart; {@link CrabThreatGoal}).</li>
+ * <li>Now and then it hunts a river snail near it instead (2026-11-16, the user: "Yes, crabs eat snails"): it grabs the
+ * snail, its claws squeeze the shell till it cracks, it picks the snail out into its mouth and leaves the broken shell
+ * on the bed ({@link CrabPickGoal}, {@link com.antcolonies.savanna.block.CrabShellBlock}).</li>
  * </ul>
- * Not yet: its burrow, catfish eating it, snails.
+ * Not yet: its burrow (broken shells to gather outside it), catfish eating it.
  */
 public class CrabEntity extends PathfinderMob implements GeoEntity {
     /** What it is doing, for the clips and the look. */
-    public static final byte CALM = 0, PICK_ALGAE = 1, PICK_MEAT = 2, THREAT = 3;
+    public static final byte CALM = 0, PICK_ALGAE = 1, PICK_MEAT = 2, THREAT = 3, CRACK = 4;
     private static final EntityDataAccessor<Byte> DATA_DOING = SynchedEntityData.defineId(CrabEntity.class, EntityDataSerializers.BYTE);
 
     /** The model is made 0.82 blocks wide with its legs; drawn as made. */
@@ -243,6 +246,7 @@ public class CrabEntity extends PathfinderMob implements GeoEntity {
     private static final RawAnimation WALK = RawAnimation.begin().thenLoop("walk");
     private static final RawAnimation PICK = RawAnimation.begin().thenLoop("pick");
     private static final RawAnimation THREAT_CLIP = RawAnimation.begin().thenLoop("threat");
+    private static final RawAnimation CRACK_CLIP = RawAnimation.begin().thenPlayAndHold("crack");
     private static final RawAnimation DEATH = RawAnimation.begin().thenPlayAndHold("death");
 
     @Override
@@ -259,6 +263,9 @@ public class CrabEntity extends PathfinderMob implements GeoEntity {
         byte doing = doing();
         if (doing == THREAT) {
             return state.setAndContinue(THREAT_CLIP);
+        }
+        if (doing == CRACK) {
+            return state.setAndContinue(CRACK_CLIP);
         }
         if (doing == PICK_ALGAE || doing == PICK_MEAT) {
             return state.setAndContinue(PICK);

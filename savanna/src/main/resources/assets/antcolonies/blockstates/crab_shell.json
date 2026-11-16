@@ -1,0 +1,55 @@
+{
+  "variants": {
+    "age=0": [
+      {
+        "model": "antcolonies:block/crab_shell_0"
+      },
+      {
+        "model": "antcolonies:block/crab_shell_0",
+        "y": 90
+      },
+      {
+        "model": "antcolonies:block/crab_shell_0",
+        "y": 180
+      },
+      {
+        "model": "antcolonies:block/crab_shell_0",
+        "y": 270
+      }
+    ],
+    "age=1": [
+      {
+        "model": "antcolonies:block/crab_shell_1"
+      },
+      {
+        "model": "antcolonies:block/crab_shell_1",
+        "y": 90
+      },
+      {
+        "model": "antcolonies:block/crab_shell_1",
+        "y": 180
+      },
+      {
+        "model": "antcolonies:block/crab_shell_1",
+        "y": 270
+      }
+    ],
+    "age=2": [
+      {
+        "model": "antcolonies:block/crab_shell_2"
+      },
+      {
+        "model": "antcolonies:block/crab_shell_2",
+        "y": 90
+      },
+      {
+        "model": "antcolonies:block/crab_shell_2",
+        "y": 180
+      },
+      {
+        "model": "antcolonies:block/crab_shell_2",
+        "y": 270
+      }
+    ]
+  }
+}

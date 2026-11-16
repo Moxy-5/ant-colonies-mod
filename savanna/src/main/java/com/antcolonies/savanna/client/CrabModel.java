@@ -12,7 +12,7 @@ import software.bernie.geckolib.model.DefaultedEntityGeoModel;
  * The river crab's model (M9 river life, 2026-11-15), with two things on top of its clips: the whole body turned
  * sideways to its heading while it walks or stands (a crab walks sideways; it faces what it picks at or threatens), and
  * the bit of food between a claw's fingers shown in the right kind (algae green or meat pink; the pick clip shows and
- * hides it at the right moments).
+ * hides it at the right moments), and the snail shell in its claws only while it cracks one (2026-11-16).
  */
 public class CrabModel extends DefaultedEntityGeoModel<CrabEntity> {
     public CrabModel() {
@@ -34,8 +34,9 @@ public class CrabModel extends DefaultedEntityGeoModel<CrabEntity> {
         byte doing = crab.doing();
         for (String side : new String[] {"left", "right"}) {
             hide("bit_green_" + side, doing != CrabEntity.PICK_ALGAE);
-            hide("bit_meat_" + side, doing != CrabEntity.PICK_MEAT);
+            hide("bit_meat_" + side, doing != CrabEntity.PICK_MEAT && doing != CrabEntity.CRACK);
         }
+        hide("held_shell", doing != CrabEntity.CRACK);
     }
 
     private void hide(String name, boolean hidden) {
