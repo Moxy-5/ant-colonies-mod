@@ -34,8 +34,8 @@
 <body>
 <header>
   <h1>River crab viewer</h1>
-  <p>The river's clean-up crew, built from your picture: a spiny mottled shell, black eyes on stalks, big claws with
-     cream fingers (the right one bigger) and four orange-brown walking legs a side. One crab scuttles sideways along
+  <p>The river's clean-up crew, built from your picture at half the first model's cube size: a spiny mottled shell, tall black eyes, big claws with
+     cream fingers (the right one bigger) and four orange-brown walking legs a side. One crab stands as in your picture, one scuttles sideways along
      the bank, one rears up with its claws raised, one picks at the algae on the river bed. A tilapia (0.6 blocks), a
      player and a block stand by for scale. Drag to turn, scroll or pinch to zoom, right-drag to slide.</p>
 </header>
@@ -161,7 +161,7 @@ function wave(obj, t, amount, beat, table) {
 }
 const TILAPIA_WAVE = [['head', 'body', -0.05, 0], ['front', 'body', 0.04, 0.6], ['mid', 'front', 0.1, 1.3],
                       ['rear', 'mid', 0.19, 2.0], ['peduncle', 'rear', 0.3, 2.6], ['tail', 'peduncle', 0.42, 3.1]];
-const settings = {size: 0.8, cam: 'overview'};
+const settings = {size: 0.8, cam: 'like your picture'};
 location.hash.slice(1).split('&').filter(Boolean).forEach(kv => {
   const [k, v] = kv.split('=').map(decodeURIComponent);
   settings[k] = isNaN(parseFloat(v)) ? v : parseFloat(v);
@@ -176,7 +176,7 @@ function tag(text, obj, height) {
 }
 
 const LOOK = Object.values(DATA.looks)[0];
-const crabs = [['walk', 'Walking sideways'], ['threat', 'Claws up'], ['feed', 'Picking at algae']].map(([p, label]) => {
+const crabs = [['stand', 'Standing'], ['walk', 'Walking sideways'], ['threat', 'Claws up'], ['feed', 'Picking at algae']].map(([p, label]) => {
   const crab = build(LOOK, 'ground');
   tag(label, crab, () => settings.size * 0.5);
   return {pose: p, crab};
@@ -220,9 +220,10 @@ function legs(g, t, speed, amount) {
       const ph = t * speed + i * Math.PI / 2 + (s > 0 ? 0 : Math.PI);
       const lift = Math.max(0, Math.sin(ph));
       const up = g['leg' + i + '_upper_' + side];
-      up.rotation.z = s * lift * 0.45 * amount;
+      up.rotation.z = up.userData.base.z + s * lift * 0.45 * amount;
       up.rotation.y = up.userData.base.y + s * Math.cos(ph) * 0.18 * amount;
-      g['leg' + i + '_lower_' + side].rotation.z = -s * lift * 0.25 * amount;
+      const low = g['leg' + i + '_lower_' + side];
+      low.rotation.z = low.userData.base.z - s * lift * 0.25 * amount;
     }
   });
 }
@@ -236,7 +237,13 @@ function pose(c, t) {
   const g = c.crab.userData.groups, ph = c.crab.userData.phase;
   rest(g);
   eyes(g, t, ph);
-  if (c.pose === 'walk') {
+  if (c.pose === 'stand') {
+    // still, turned to the camera as in the picture, the claws low in front
+    legs(g, t, 0.5, 0.06);
+    c.crab.position.set(-2.5, BANK, -0.9);
+    c.crab.rotation.y = deg(205);
+    SIDES.forEach(([side]) => g['claw_finger_' + side].rotation.x = deg(6 + 5 * Math.sin(t * 1.5 + ph)));
+  } else if (c.pose === 'walk') {
     // scuttles sideways along the bank and back, the claws held low in front
     const x = Math.sin(t * 0.5) * 0.9, dir = Math.cos(t * 0.5);
     legs(g, t, 14, Math.min(1, Math.abs(dir) * 2));
@@ -246,8 +253,8 @@ function pose(c, t) {
     // reared up on its legs, claws lifted and spread, fingers opening and snapping
     SIDES.forEach(([side, s]) => {
       for (let i = 1; i <= 4; i++) {
-        g['leg' + i + '_upper_' + side].rotation.z = -s * deg(10);
-        g['leg' + i + '_lower_' + side].rotation.z = s * deg(10);
+        g['leg' + i + '_upper_' + side].rotation.z -= s * deg(10);
+        g['leg' + i + '_lower_' + side].rotation.z += s * deg(10);
       }
       g['claw_arm_' + side].rotation.x = deg(38 + 4 * Math.sin(t * 1.3 + ph));
       g['claw_arm_' + side].rotation.y = s * deg(16);
@@ -275,11 +282,13 @@ function pose(c, t) {
 // --- cameras -----------------------------------------------------------------------------------------------------------
 const P = i => crabs[i].crab.position;
 const CAMS = {
+  'like your picture': () => { const p = P(0); return [[p.x + 0.25, p.y + 0.42, p.z + 1.0], [p.x, p.y + 0.1, p.z]]; },
+  'its side': () => { const p = P(0); return [[p.x - 1.0, p.y + 0.2, p.z - 0.45], [p.x, p.y + 0.1, p.z]]; },
   overview: () => [[0.3, 1.6, 3.6], [0, -0.3, -0.3]],
-  'walking, close': () => { const p = P(0); return [[p.x + 0.2, p.y + 0.55, p.z + 1.1], [p.x, p.y + 0.1, p.z]]; },
-  'face': () => { const p = P(1); return [[p.x - 0.35, p.y + 0.3, p.z - 0.95], [p.x, p.y + 0.12, p.z]]; },
+  'walking, close': () => { const p = P(1); return [[p.x + 0.2, p.y + 0.55, p.z + 1.1], [p.x, p.y + 0.1, p.z]]; },
+  'claws up': () => { const p = P(2); return [[p.x - 0.35, p.y + 0.3, p.z - 0.95], [p.x, p.y + 0.12, p.z]]; },
   'from above': () => { const p = P(0); return [[p.x + 0.001, p.y + 1.4, p.z + 0.001], [p.x, p.y, p.z]]; },
-  'on the river bed': () => { const p = P(2); return [[p.x + 0.9, p.y + 0.5, p.z + 1.2], [p.x, p.y + 0.1, p.z]]; },
+  'on the river bed': () => { const p = P(3); return [[p.x + 0.9, p.y + 0.5, p.z + 1.2], [p.x, p.y + 0.1, p.z]]; },
   'with the player': () => [[1.4, 1.4, 2.8], [1.4, 0.6, -1.6]],
 };
 const camBox = document.getElementById('cams');
