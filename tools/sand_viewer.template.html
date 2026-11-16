@@ -49,6 +49,7 @@ const OPTIONS = {
   tone: { label: "Sand tone", pick: 1, list: ["Far inland", "Mid inland", "Near the coast"] },
   pebbles: { label: "Pebbles", pick: 1, list: ["None", "Where real ones lie", "Everywhere (heavy case)"] },
   view: { label: "View", pick: 0, list: ["From above", "Under the water"] },
+  stone: { label: "Stone look", pick: 1, list: ["First look (today's)", "A, smooth and speckled", "B, fine pixels", "C, veined river stones"] },
 };
 const state = {}; for (const k in OPTIONS) state[k] = OPTIONS[k].pick;
 const RIVER = 0x5C6E45;
@@ -94,17 +95,45 @@ function speck(hex) {
   return SPECK[hex] = boxMats(tex(c), PSHADE);
 }
 
+// the stone looks: 0 the first look (flat coloured boxes), 1 to 3 the new looks A to C with textures laid at true pixel
+// size. Each face's texture comes from the stone's atlas (2 by 2 parts of 16 pixels: sides, tops, damp band), at the
+// face's own size, so in the game every face's UV is just its size: texels never stretch.
+const STONE_MATS = {};
+function stoneMats(key, colour) {
+  const id = key + colour;
+  if (!STONE_MATS[id]) STONE_MATS[id] = boxMats(tex(canvasOf(STONE_IMG[key][colour])), PSHADE);
+  return STONE_MATS[id];
+}
+const STONE_IMG = {};
+function PEB() { return state.stone === 0 ? D.pebbles : D.stoneLooks[state.stone - 1].looks; }
+function stoneGeo(b) {
+  const g = new THREE.BoxGeometry(b.w, b.h, b.d), P = g.attributes.position, N = g.attributes.normal, U = g.attributes.uv;
+  const clamp = v => Math.min(15.98, Math.max(0.02, v));
+  for (let i = 0; i < P.count; i++) {
+    const x = P.getX(i), y = P.getY(i) + b.y, z = P.getZ(i), nx = N.getX(i), ny = N.getY(i);
+    let col, row, u, v;
+    if (Math.abs(ny) > 0.5) { col = 1; row = 0; u = x + 8 + b.ox; v = z + 8 + b.oz; }     // tops (and the hidden bottoms)
+    else {
+      col = 0; row = b.damp ? 1 : 0; v = 12 - y;
+      u = (Math.abs(nx) > 0.5 ? z + b.oz : x + b.ox) + 8;
+    }
+    U.setXY(i, (col + clamp(u) / 16) / 2, 1 - (row + clamp(v) / 16) / 2);
+  }
+  U.needsUpdate = true; return g;
+}
+
 // one pebble block: look, quarter turn and a nudge off the middle (as Minecraft does for flowers), on the block below
 let pebbleBlocks = 0, pebbleBoxes = 0;
 function pebbles(look, x, y, z, quarter, nx, nz) {
   const g = new THREE.Group();
-  for (const b of D.pebbles[look].boxes) {
-    const m = new THREE.Mesh(new THREE.BoxGeometry(b.w, b.h, b.d), speck(b.c));
+  const set = PEB(), key = state.stone ? D.stoneLooks[state.stone - 1].key : null;
+  for (const b of set[look].boxes) {
+    const m = key ? new THREE.Mesh(stoneGeo(b), stoneMats(key, b.c)) : new THREE.Mesh(new THREE.BoxGeometry(b.w, b.h, b.d), speck(b.c));
     m.position.set(b.x, b.y, b.z); m.rotation.y = b.turn; g.add(m);
   }
   g.scale.setScalar(1 / 16); g.rotation.y = quarter * Math.PI / 2;
   g.position.set(x + 0.5 + nx, y, z + 0.5 + nz); scene.add(g);
-  pebbleBlocks++; pebbleBoxes += D.pebbles[look].boxes.length;
+  pebbleBlocks++; pebbleBoxes += set[look].boxes.length;
 }
 function randomPebbles(x, y, z) {
   const look = Math.floor(hash(x + 3, z + 7) * 7), q = Math.floor(hash(x + 11, z + 5) * 4);
@@ -344,18 +373,18 @@ function build() {
   } else if (S === 2) {
     SIDE_KINDS.forEach(([, name], i) => tag(name, 3 * i + 1.5, 1.9 + 0.5 * (i % 2), 0.5));
     TONES.forEach((t, i) => tag(["Far inland", "Mid inland", "Coast"][i], -0.6, 1.3, 3 * i + 1.5));
-    D.pebbles.forEach((p, i) => tag("Pebbles " + (i + 1) + ": " + p.boxes.length + " boxes", 3 * i + 1.5, 1.6, 11.5));
+    PEB().forEach((p, i) => tag("Pebbles " + (i + 1) + ": " + p.boxes.length + " boxes", 3 * i + 1.5, 1.6, 11.5));
     camera.position.set(11, 13, 21); controls.target.set(11, 0, 6);
   } else {
-    D.pebbles.forEach((p, i) => tag(String(i + 1), 2 * i + 1.5, 1.4, 1.5));
+    PEB().forEach((p, i) => tag(String(i + 1), 2 * i + 1.5, 1.4, 1.5));
     tag("The same 7, turned and nudged as the game does", 7.5, 1.4, 3.5);
-    camera.position.set(7.5, 3.0, 6.2); controls.target.set(7.5, 0.9, 2.4);
+    camera.position.set(7.5, 2.2, 5.2); controls.target.set(7.5, 0.9, 2.3);
   }
   controls.update();
   const total = col.filter(c => c.kind !== "grass").length;
   document.getElementById("count").textContent = (S === 0 || S === 1)
-    ? `${pebbleBlocks} pebble blocks on ${total} sand blocks here, ${pebbleBoxes} pebble boxes in all (a pebble block has ${Math.min(...D.pebbles.map(p => p.boxes.length))} to ${Math.max(...D.pebbles.map(p => p.boxes.length))} boxes; the limit is ${D.maxBoxes}).`
-    : `Pebble looks: ${D.pebbles.map((p, i) => (i + 1) + ". " + p.name.toLowerCase() + " (" + p.boxes.length + " boxes)").join("; ")}. The limit is ${D.maxBoxes} a block; turns and nudges are the ones Minecraft blocks can have.`;
+    ? `${pebbleBlocks} pebble blocks on ${total} sand blocks here, ${pebbleBoxes} pebble boxes in all (a pebble block has ${Math.min(...PEB().map(p => p.boxes.length))} to ${Math.max(...PEB().map(p => p.boxes.length))} boxes in this stone look).`
+    : `${OPTIONS.stone.list[state.stone]}: ${PEB().map((p, i) => (i + 1) + ". " + p.name.toLowerCase() + " (" + p.boxes.length + " boxes)").join("; ")}; ${PEB().reduce((a, p) => a + p.boxes.length, 0)} boxes for all 7. Turns and nudges are the ones Minecraft blocks can have.`;
 }
 
 function buttons() {
@@ -392,6 +421,7 @@ window.addEventListener("resize", resize);
       under: boxMats(T.dry), nestBox: boxMats(T.nest, PSHADE), dryBox: boxMats(T.dry), pitFloor: boxMats([T.dry, T.dry, T.wet, T.dry, T.dry, T.dry]),
     };
   }
+  for (const key in D.stoneTex) { STONE_IMG[key] = {}; for (const c in D.stoneTex[key]) STONE_IMG[key][c] = await load(D.stoneTex[key][c]); }
   const h = location.hash.slice(1); if (h) h.split("&").forEach(kv => { const [k, v] = kv.split("="); if (k in state) state[k] = +v; });
   buttons(); resize(); build();
   const t0 = performance.now(), v = new THREE.Vector3(), wrap = document.getElementById("wrap");

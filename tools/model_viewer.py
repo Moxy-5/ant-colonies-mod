@@ -509,6 +509,8 @@ def sand_page(out):
     b, rows, w, h = cr.paint(bones, "A")
     data = {"blocks": blocks, "sand": sand, "toneNames": {k: v["name"] for k, v in sand_art.TONES.items()},
             "pebbles": sand_art.all_pebbles(), "maxBoxes": sand_art.MAX_BOXES, "nest": sand_art.nest(),
+            "stoneLooks": sand_art.new_looks(), "newMaxBoxes": sand_art.NEW_MAX_BOXES,
+            "stoneTex": {k: {c: uri(png(rows)) for c, rows in t.items()} for k, t in sand_art.stone_textures().items()},
             "croc": {"bones": b, "texture": uri(tm.png(rows)), "w": w, "h": h}, "wave": cr.WAVE}
     template = (Path(__file__).resolve().parent / "sand_viewer.template.html").read_text(encoding="utf-8")
     out.parent.mkdir(parents=True, exist_ok=True)

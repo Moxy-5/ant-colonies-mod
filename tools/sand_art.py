@@ -213,33 +213,212 @@ def pebble(x, z, w, d, h, colour, turn=0.0, sink=0.0, round_top=True):
             top]
 
 
-def _look(*pebbles):
-    return [b for p in pebbles for b in p]
+# The seven arrangements, written once (the user, 2026-11-16: "the variants of size and amount of them are perfect").
+# Each stone: x, z (pixels round the block's middle), w, d, h (pixels), colour, turn (degrees), sink (pixels into the
+# sand), tiny (a grain of a stone: one or two boxes).
+def _s(x, z, w, d, h, colour, turn, sink=0.0, tiny=False):
+    return {"x": x, "z": z, "w": w, "d": d, "h": h, "colour": colour, "turn": turn, "sink": sink, "tiny": tiny}
 
 
-PEBBLES = [
-    ("One big flat stone", _look(pebble(0.5, 0.0, 8.0, 6.0, 2.4, "grey", 22.5))),
-    ("Two medium stones", _look(pebble(-2.4, -1.0, 4.0, 3.0, 1.8, "ochre", -22.5),
-                                pebble(2.6, 1.6, 3.6, 3.0, 1.6, "dark", 22.5))),
-    ("A medium stone and two small", _look(pebble(-1.0, -0.5, 4.2, 3.2, 1.9, "tan", 0.0),
-                                          pebble(3.2, 2.4, 2.0, 1.6, 1.0, "grey", 45.0),
-                                          pebble(-4.4, 3.0, 1.8, 1.4, 0.9, "quartz", -22.5))),
-    ("A cluster of small pebbles", _look(pebble(-1.6, -1.2, 2.4, 2.0, 1.2, "grey", 22.5),
-                                         pebble(1.2, -1.8, 2.0, 1.6, 1.1, "rust", -45.0),
-                                         pebble(0.2, 1.2, 2.2, 1.8, 1.2, "ochre", 0.0),
-                                         pebble(-2.8, 1.6, 1.6, 1.4, 0.9, "dark", 45.0))),
-    ("A scatter of tiny ones", _look(*[pebble(x, z, s, s * 0.8, s * 0.6, c, t, round_top=False) for x, z, s, c, t in (
-        (-4.8, -3.2, 1.2, "grey", 22.5), (-1.0, -4.6, 1.0, "ochre", 0.0), (3.6, -2.6, 1.3, "dark", -22.5),
-        (-3.2, 2.0, 1.0, "quartz", 45.0), (1.4, 0.6, 1.1, "tan", 0.0), (4.6, 3.8, 1.0, "rust", 22.5))])),
-    ("A half-buried stone", _look(pebble(0.0, 0.5, 7.0, 5.4, 2.8, "dark", -22.5, sink=1.3))),
-    ("A mixed handful", _look(pebble(-2.0, 0.6, 3.4, 2.8, 1.6, "grey", 22.5),
-                              pebble(2.2, -2.0, 2.0, 1.6, 1.0, "ochre", 0.0),
-                              pebble(2.8, 2.6, 1.8, 1.5, 0.9, "rust", -45.0),
-                              *[pebble(x, z, s, s * 0.8, s * 0.6, c, t, round_top=False) for x, z, s, c, t in (
-                                  (-4.6, -3.4, 1.0, "quartz", 0.0), (-0.4, -4.4, 0.9, "tan", 22.5),
-                                  (-4.8, 4.0, 1.0, "dark", -22.5))])),
+def _tiny(x, z, size, colour, turn):
+    return _s(x, z, size, size * 0.8, size * 0.6, colour, turn, tiny=True)
+
+
+STONES = [
+    ("One big flat stone", [_s(0.5, 0.0, 8.0, 6.0, 2.4, "grey", 22.5)]),
+    ("Two medium stones", [_s(-2.4, -1.0, 4.0, 3.0, 1.8, "ochre", -22.5), _s(2.6, 1.6, 3.6, 3.0, 1.6, "dark", 22.5)]),
+    ("A medium stone and two small", [_s(-1.0, -0.5, 4.2, 3.2, 1.9, "tan", 0.0), _s(3.2, 2.4, 2.0, 1.6, 1.0, "grey", 45.0),
+                                      _s(-4.4, 3.0, 1.8, 1.4, 0.9, "quartz", -22.5)]),
+    ("A cluster of small pebbles", [_s(-1.6, -1.2, 2.4, 2.0, 1.2, "grey", 22.5), _s(1.2, -1.8, 2.0, 1.6, 1.1, "rust", -45.0),
+                                    _s(0.2, 1.2, 2.2, 1.8, 1.2, "ochre", 0.0), _s(-2.8, 1.6, 1.6, 1.4, 0.9, "dark", 45.0)]),
+    ("A scatter of tiny ones", [_tiny(-4.8, -3.2, 1.2, "grey", 22.5), _tiny(-1.0, -4.6, 1.0, "ochre", 0.0),
+                                _tiny(3.6, -2.6, 1.3, "dark", -22.5), _tiny(-3.2, 2.0, 1.0, "quartz", 45.0),
+                                _tiny(1.4, 0.6, 1.1, "tan", 0.0), _tiny(4.6, 3.8, 1.0, "rust", 22.5)]),
+    ("A half-buried stone", [_s(0.0, 0.5, 7.0, 5.4, 2.8, "dark", -22.5, sink=1.3)]),
+    ("A mixed handful", [_s(-2.0, 0.6, 3.4, 2.8, 1.6, "grey", 22.5), _s(2.2, -2.0, 2.0, 1.6, 1.0, "ochre", 0.0),
+                         _s(2.8, 2.6, 1.8, 1.5, 0.9, "rust", -45.0), _tiny(-4.6, -3.4, 1.0, "quartz", 0.0),
+                         _tiny(-0.4, -4.4, 0.9, "tan", 22.5), _tiny(-4.8, 4.0, 1.0, "dark", -22.5)]),
 ]
+
+
+def _old(st):
+    return pebble(st["x"], st["z"], st["w"], st["d"], st["h"], st["colour"], st["turn"], st["sink"], not st["tiny"])
+
+
+PEBBLES = [(name, [b for st in stones for b in _old(st)]) for name, stones in STONES]   # the first look, kept to compare
 MAX_BOXES = 12
+
+# ---- three new stone looks (the user, 2026-11-16: "more detail, more pixel, more round") ----
+# Each stone is a squashed egg built from layers: each layer a cross of two boxes (one long and narrow, one short and
+# wide; three boxes on the biggest stones), so from above it reads round and from the side it curves in over the top.
+# The textures are laid at true pixel size on every face (in the game: each face's UV the size of the face, so texels
+# never stretch), from a little atlas of three parts: the sides, the tops (lighter, where the sun and the wear are) and a
+# damp band where the stone sits in the sand. The UV picks the part per face; all of it is what a block model can do.
+#   A  smooth and speckled: half-pixel steps and half-pixel texels (a 32 by 32 texture), grains of other minerals.
+#   B  fine pixels: quarter-pixel steps and quarter-pixel texels (64 by 64), more layers, shaded rounder.
+#   C  veined river stones: B's shapes, quartz veins through the grey, dark and rust stones, bands in the ochre and tan
+#      ones, the quartz milky, a wet glint on top; quarter-pixel texels.
+LOOKS = {
+    "A": {"name": "A, smooth and speckled", "step": 0.5, "grid": 0.5, "cross": 1.5, "three": 99.0, "layers": 4, "dens": 2},
+    "B": {"name": "B, fine pixels", "step": 0.25, "grid": 0.25, "cross": 1.25, "three": 4.0, "layers": 6, "dens": 4},
+    "C": {"name": "C, veined river stones", "step": 0.25, "grid": 0.25, "cross": 1.25, "three": 4.0, "layers": 6, "dens": 4},
+}
+NEW_MAX_BOXES = 24
+CROSS2 = ((1.0, 0.72), (0.72, 1.0))
+CROSS3 = ((1.0, 0.56), (0.9, 0.86), (0.56, 1.0))
+
+
+def _snap(v, grid):
+    return max(grid, round(v / grid) * grid)
+
+
+def round_stone(st, look, seed):
+    """One stone in a new look: a list of boxes (x, y, z, w, h, d in pixels, y the box's middle up from the sand)."""
+    L = LOOKS[look]
+    rng = random.Random(seed)
+    room = max(0.0, (16 - max(st["w"], st["d"])) / 2 - 1)
+    if look == "A":
+        ox, oz = rng.uniform(-room, room), rng.uniform(-room, room)
+    else:
+        ox, oz = rng.uniform(-1, 1), rng.uniform(-1, 1)
+    base = {"x": st["x"], "z": st["z"], "c": st["colour"], "turn": st["turn"], "ox": ox, "oz": oz}
+    top = st["h"] - st["sink"]
+    if st["tiny"]:
+        g = L["grid"]
+        w, d = _snap(st["w"], g), _snap(st["d"], g)
+        body = top * 0.6
+        return [dict(base, y=body / 2, w=w, h=body, d=d, damp=True, cap=False),
+                dict(base, y=body + (top - body) / 2, w=max(g, w - 2 * g), h=top - body, d=max(g, d - 2 * g),
+                     damp=False, cap=True)]
+    # a squashed egg bedded in the sand: its full height runs from 70 percent of the stone's height under the sand line
+    # to the top, so it is widest just over the sand and curves in all the way up, like a pebble half sunk in a bar
+    bottom = -st["sink"] - 0.7 * st["h"]
+    yc, a = (top + bottom) / 2, (top - bottom) / 2
+    size = max(st["w"], st["d"])
+    most = L["layers"] if size >= 5 else min(L["layers"], 4 if size >= 3 else 3)   # small stones need fewer layers
+    n = min(most, max(2, math.ceil(top / L["step"] - 0.2)))
+    layers = []
+    # layers spaced round the curve: thin near the top where it bends most, thick lower down
+    t0 = math.asin(max(-1.0, -yc / a))
+    edges = [yc + a * math.sin(t0 + (math.pi / 2 - t0) * i / n) for i in range(n + 1)]
+    edges[0], edges[-1] = 0.0, top
+    for i in range(n):
+        y0, y1 = edges[i], edges[i + 1]
+        t = abs(((y0 + y1) / 2 - yc) / a)
+        k = math.sqrt(max(0.0, 1 - t * t))
+        w, d = _snap(st["w"] * k, L["grid"]), _snap(st["d"] * k, L["grid"])
+        if layers and layers[-1][2:] == (w, d):
+            layers[-1] = (layers[-1][0], y1, w, d)          # the same size as the layer under it: one taller box
+        else:
+            layers.append((y0, y1, w, d))
+    boxes = []
+    for j, (y0, y1, w, d) in enumerate(layers):
+        m = min(w, d)
+        parts = CROSS3 if m >= L["three"] else CROSS2 if m >= L["cross"] else ((1.0, 1.0),)
+        for fw, fd in parts:
+            boxes.append(dict(base, y=(y0 + y1) / 2, h=y1 - y0, w=_snap(w * fw, L["grid"]), d=_snap(d * fd, L["grid"]),
+                              damp=y0 <= 0.01, cap=j == len(layers) - 1))
+    return boxes
+
+
+def new_looks():
+    out = []
+    for key, L in LOOKS.items():
+        looks = []
+        for li, (name, stones) in enumerate(STONES):
+            boxes = [b for si, st in enumerate(stones) for b in round_stone(st, key, f"{key}{li}{si}")]
+            assert len(boxes) <= NEW_MAX_BOXES, (key, name, len(boxes))
+            looks.append({"name": name, "boxes": [dict(b, turn=math.radians(b["turn"])) for b in boxes]})
+        out.append({"key": key, "name": L["name"], "dens": L["dens"], "looks": looks})
+    return out
+
+
+def _noise(seed, scale):
+    """Smooth value noise in pixel units (smoothed between hashed lattice points)."""
+    rng = random.Random(seed)
+    grid = [[rng.random() for _ in range(40)] for _ in range(40)]
+
+    def g(a, b):
+        return grid[b % 40][a % 40]
+
+    def f(u, v):
+        u, v = u / scale + 7, v / scale + 7
+        i, j = int(u), int(v)
+        fu, fv = u - i, v - j
+        fu, fv = fu * fu * (3 - 2 * fu), fv * fv * (3 - 2 * fv)
+        return (g(i, j) * (1 - fu) + g(i + 1, j) * fu) * (1 - fv) + (g(i, j + 1) * (1 - fu) + g(i + 1, j + 1) * fu) * fv
+    return f
+
+
+VEIN = (222, 216, 202)
+
+
+def stone_texture(look, colour):
+    """The stone's atlas: 2 by 2 parts of 16 pixels each (sides, tops, damp band, spare), texels 1/dens of a pixel.
+    In a part, u runs along x (or z) and v down from 12 pixels over the sand line on the sides, so a side's row is a
+    height and the shading can follow the stone's curve."""
+    L = LOOKS[look]
+    dens = L["dens"]
+    R = 16 * dens
+    col = STONE[colour]
+    rng = random.Random(f"tex{look}{colour}")
+    smooth = _noise(f"n{look}{colour}", 2.2)
+    big = _noise(f"b{look}{colour}", 5.0)
+    veins = []
+    if look == "C" and colour in ("grey", "dark", "rust"):
+        for _ in range({"grey": 3, "dark": 2, "rust": 1}[colour]):    # each passes near the stone's middle and sides
+            t = rng.uniform(0.3, math.pi - 0.3)
+            cx, cz = math.cos(t), math.sin(t)
+            veins.append((cx, cz, 8 * cx + 9.5 * cz + rng.uniform(-2.5, 2.5), rng.uniform(0.3, 0.55)))
+    band = rng.uniform(0, math.pi)
+    rows = [[(0, 0, 0, 0)] * (2 * R) for _ in range(2 * R)]
+    for part, (pc, pr) in (("side", (0, 0)), ("top", (1, 0)), ("damp", (0, 1)), ("spare", (1, 1))):
+        for j in range(R):
+            for i in range(R):
+                u, v = (i + 0.5) / dens, (j + 0.5) / dens
+                grain = rng.random()
+                if look == "A":
+                    k = 1 + 0.06 * (rng.random() - 0.5) * 2 + 0.05 * (big(u, v) - 0.5) * 2
+                else:
+                    k = 1 + 0.09 * (smooth(u, v) - 0.5) * 2 + 0.05 * (big(u, v) - 0.5) * 2 + 0.03 * (rng.random() - 0.5)
+                if part in ("top", "spare"):
+                    k *= 1.10 if look == "A" else 1.04 + 0.14 * max(0.0, 1 - math.hypot(u - 8, v - 8) / 4.5)
+                elif part == "side":
+                    lo = 0.10 if look == "A" else 0.2
+                    k *= 1.05 - lo * min(1.0, max(0.0, (v - 9.5) / 3.0))      # lighter up the curve, darker down
+                c = [x * k for x in col]
+                if colour == "quartz":
+                    milk = big(u + 30, v)
+                    c = [x * (0.94 + 0.06 * milk) for x in c]
+                    if milk > 0.7 and look != "A":
+                        c = [c[0], c[1] * 0.95, c[2] * 0.93]       # a faint pink cloud
+                speck = 1 if look == "A" else 0.4                 # grains of other minerals
+                if grain < 0.08 * speck:
+                    c = [x * 0.66 for x in c]
+                elif grain < 0.13 * speck:
+                    c = [min(255, x * 1.22) for x in c]
+                elif grain < 0.15 * speck:
+                    c = [x * (0.5 if colour in ("tan", "quartz", "ochre") else 0.7) for x in c]
+                if look == "C":
+                    if colour in ("ochre", "tan"):
+                        t = u * math.cos(band) + v * math.sin(band)
+                        c = [x * (1 + 0.06 * (1 if math.sin(t * 2 * math.pi / 2.6) > 0 else -1)) for x in c]
+                    for cx, cz, off, width in veins:
+                        if abs(u * cx + v * cz - off - 2.5 * (smooth(u + 9, v) - 0.5)) < width:
+                            c = [x * 0.25 + y * 0.75 for x, y in zip(c, VEIN)]
+                if part == "damp":
+                    mean = sum(c) / 3
+                    c = [(mean + (x - mean) * 1.12) * 0.76 for x in c]
+                rows[pr * R + j][pc * R + i] = tuple(clamp(x) for x in c) + (255,)
+    if look == "C":                                   # a wet glint or two near the middle of the tops
+        for _ in range(3):
+            gi, gj = R + int(rng.uniform(6.5, 9.5) * dens), int(rng.uniform(6.5, 9.5) * dens)
+            rows[gj][gi] = (250, 250, 244, 255)
+    return rows
+
+
+def stone_textures():
+    return {key: {colour: stone_texture(key, colour) for colour in STONE} for key in LOOKS}
 
 
 def all_pebbles():
