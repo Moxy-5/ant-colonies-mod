@@ -1,4 +1,4 @@
-# The animal life cycle: babies, births and eggs (M9, the user, 2026-11-16; planned, nothing built)
+# The animal life cycle: babies, births and eggs (M9, the user, 2026-11-16; step 1 built)
 
 The user: "something really important for the savannah in general will be giving birth or laying eggs that hatch and
 making baby variants of each model, how can we make that process easier?" Picked by the user 2026-11-16: **babies are
@@ -62,6 +62,11 @@ there before they go in the game.
 ## Steps (a full run every 3 steps and before the merge)
 1. **The growing-up helper in the framework, the tilapia moved onto it.** Nothing changes in-game (the tilapia grows
    exactly as now); its tests keep passing. Proves the kit on an animal that already has young.
+   **BUILT 2026-11-16** (branch `claude/animal-life-cycle`): `framework/.../entity/life/GrowingUp` (a `Plan` of grow-up
+   ticks and birth size; age, `grown()`, `size()`, `tick()` asking for a refresh every 200 ticks and on growing up,
+   save and load under the animal's own name, `applySize` through Minecraft's size setting); the tilapia holds one
+   (`TilapiaEntity.GROWTH`), its save name `TilapiaAge` kept; the plan's numbers stay in code until step 2 brings the
+   animal's data file with the young shape (my pick); unit test `GrowingUpTest`.
 2. **The young shape and the age slider.** The data file, the shared model step, the viewer's slider; the first young
    shape is the crocodile hatchling (the user's look in the viewer), then the others.
 3. **Births and the brake.** Live and spawn births; tilapia fry first; a soak-style count test that every animal's

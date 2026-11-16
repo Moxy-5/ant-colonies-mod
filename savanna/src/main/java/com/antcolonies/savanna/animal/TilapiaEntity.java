@@ -2,6 +2,7 @@ package com.antcolonies.savanna.animal;
 
 import javax.annotation.Nullable;
 
+import com.antcolonies.entity.life.GrowingUp;
 import com.antcolonies.savanna.registry.SavannaItems;
 
 import net.minecraft.core.BlockPos;
@@ -61,13 +62,15 @@ public class TilapiaEntity extends AbstractSchoolingFish implements GeoEntity {
     static final float BREEDING_SHARE = 1 / 3F;
     /** The share of naturally spawned fish that are young (my pick). */
     static final float YOUNG_SHARE = 0.3F;
+    /** How a tilapia grows up (the shared growing-up helper, the animal life cycle step 1). */
+    public static final GrowingUp.Plan GROWTH = new GrowingUp.Plan(GROW_UP_TICKS, YOUNG_SIZE);
 
     private static final EntityDataAccessor<Integer> DATA_LOOK = SynchedEntityData.defineId(TilapiaEntity.class, EntityDataSerializers.INT);
     private static final EntityDataAccessor<Boolean> DATA_GRAZING = SynchedEntityData.defineId(TilapiaEntity.class, EntityDataSerializers.BOOLEAN);
 
     private final AnimatableInstanceCache cache = GeckoLibUtil.createInstanceCache(this);
-    /** Ticks since it hatched (counted on to {@link #GROW_UP_TICKS}). */
-    private int age = GROW_UP_TICKS;
+    /** Its age since it hatched and how grown it is (grown until {@link #setUp} makes it young). */
+    private final GrowingUp life = new GrowingUp(GROWTH);
     private boolean male;
     /** Its own length against the usual grown fish. */
     private float ownSize = 1.0F;
@@ -104,7 +107,7 @@ public class TilapiaEntity extends AbstractSchoolingFish implements GeoEntity {
     }
 
     public boolean isYoung() {
-        return age < GROW_UP_TICKS;
+        return life.isYoung();
     }
 
     public boolean isMale() {
@@ -123,7 +126,11 @@ public class TilapiaEntity extends AbstractSchoolingFish implements GeoEntity {
     public void setUp(boolean young, RandomSource random) {
         male = random.nextBoolean();
         ownSize = 0.85F + 0.3F * random.nextFloat();
-        age = young ? random.nextInt(GROW_UP_TICKS / 3) : GROW_UP_TICKS;
+        if (young) {
+            life.setAge(random.nextInt(GROW_UP_TICKS / 3));
+        } else {
+            life.setGrown();
+        }
         if (!young) {
             grownLook(random);
         }
@@ -164,7 +171,7 @@ public class TilapiaEntity extends AbstractSchoolingFish implements GeoEntity {
 
     /** For tests: makes it this many ticks from grown. */
     public void setTicksToGrow(int ticks) {
-        age = Math.max(0, GROW_UP_TICKS - ticks);
+        life.setTicksToGrow(ticks);
         refresh();
     }
 
@@ -183,11 +190,7 @@ public class TilapiaEntity extends AbstractSchoolingFish implements GeoEntity {
             grownLook(random);
         }
         entityData.set(DATA_LOOK, isYoung() ? YOUNG : breedingLook);
-        float grown = isYoung() ? YOUNG_SIZE + (1 - YOUNG_SIZE) * age / (float) GROW_UP_TICKS : 1.0F;
-        AttributeInstance scale = getAttribute(Attributes.SCALE);
-        if (scale != null && Math.abs(scale.getBaseValue() - grown * ownSize) > 0.005) {
-            scale.setBaseValue(grown * ownSize);
-        }
+        GrowingUp.applySize(this, life.size() * ownSize);
     }
 
     @Override
@@ -201,11 +204,8 @@ public class TilapiaEntity extends AbstractSchoolingFish implements GeoEntity {
             swimPitch += (want - swimPitch) * 0.15F;
             return;
         }
-        if (isYoung()) {
-            age++;
-            if (age % 200 == 0 || age == GROW_UP_TICKS) {
-                refresh();
-            }
+        if (life.tick()) {
+            refresh();
         }
         if (hungryIn > 0) {
             hungryIn--;
@@ -238,17 +238,16 @@ public class TilapiaEntity extends AbstractSchoolingFish implements GeoEntity {
     }
 
     private void writeLife(CompoundTag tag) {
-        tag.putInt("TilapiaAge", age);
+        life.save(tag, "TilapiaAge");
         tag.putBoolean("Male", male);
         tag.putFloat("OwnSize", ownSize);
         tag.putInt("GrownLook", breedingLook);
     }
 
     private void readLife(CompoundTag tag) {
-        if (!tag.contains("TilapiaAge")) {
+        if (!life.load(tag, "TilapiaAge")) {
             return;
         }
-        age = tag.getInt("TilapiaAge");
         male = tag.getBoolean("Male");
         ownSize = Mth.clamp(tag.getFloat("OwnSize"), 0.5F, 1.5F);
         breedingLook = tag.getInt("GrownLook");
