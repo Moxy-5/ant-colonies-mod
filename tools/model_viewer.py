@@ -466,6 +466,29 @@ def algae_page(out):
     print("wrote", out)
 
 
+def droppings_page(out):
+    """Crocodile droppings and riverbed scraps (M9 river life, droppings_art.py): droppings looks A to C at three ages
+    on a basking bank, scraps looks A to C at three amounts on the bed, and every look side by side."""
+    import zipfile
+    import algae_art
+    import droppings_art as da
+    jar = Path.home() / ".gradle/caches/neoformruntime/artifacts/minecraft_1.21.1_client.jar"
+    z = zipfile.ZipFile(jar)
+    blocks = {n: uri(z.read(f"assets/minecraft/textures/block/{n}.png"))
+              for n in ("grass_block_top", "grass_block_side_overlay", "dirt", "water_still")}
+    blocks["grass_colormap"] = uri(z.read("assets/minecraft/textures/colormap/grass.png"))
+    for n in ("silt", "wet_silt", "river_mud"):
+        blocks[n] = file_uri(n + ".png")
+    algae = [uri(png(r)) for r in algae_art.all_looks()["C"]["mat"]]
+    scraps = {k: {"name": v["name"], "amounts": [uri(png(r)) for r in v["amounts"]]} for k, v in da.all_scraps().items()}
+    data = {"blocks": blocks, "algae": algae, "droppings": da.all_droppings(), "scraps": scraps,
+            "ages": da.AGES, "amounts": da.AMOUNTS}
+    template = (Path(__file__).resolve().parent / "droppings_viewer.template.html").read_text(encoding="utf-8")
+    out.parent.mkdir(parents=True, exist_ok=True)
+    out.write_text(template.replace("/*DATA*/null", json.dumps(data)), encoding="utf-8")
+    print("wrote", out)
+
+
 def tilapia_page(out):
     """The Nile tilapia (M9 river life, the grazing fish, tilapia_models.py): looks A to C swimming over a silt bed with
     the game's algae, with a size slider, the swim wave on or off, a graze, and a school."""
@@ -600,6 +623,9 @@ def main():
         return
     if len(sys.argv) > 1 and sys.argv[1] == "tilapia":
         tilapia_page(Path(sys.argv[2]) if len(sys.argv) > 2 else ROOT / "references/tilapia_viewer.html")
+        return
+    if len(sys.argv) > 1 and sys.argv[1] == "droppings":
+        droppings_page(Path(sys.argv[2]) if len(sys.argv) > 2 else ROOT / "references/droppings_viewer.html")
         return
     if len(sys.argv) > 1 and sys.argv[1] == "algae":
         algae_page(Path(sys.argv[2]) if len(sys.argv) > 2 else ROOT / "references/algae_viewer.html")
