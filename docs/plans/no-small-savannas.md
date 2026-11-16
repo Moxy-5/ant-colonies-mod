@@ -45,6 +45,11 @@ Full numbers in that plan's "Step 2 results". In short:
   more), a bigger share of the zones does, which is the big savannas plan's step 3. Fallback not built (a world-making
   cost and a second size rule), to revisit after step 3.
 
+## Next: the small-savanna cleaner (the user, 2026-11-16)
+The leftovers above are to go too: every savanna patch under 1,000 blocks across becomes plains in new land. Planned as
+step 2b of `docs/plans/big-savannas-big-rivers.md`, before its bigger savannas. This replaces the mounds-only fallback
+(the whole small savanna goes, not just what lives on it).
+
 ## Your calls
 - What grows where Minecraft's savannas were (my pick: plains; windswept hills for the windswept ones).
 - Whether leftover small patches may stay as empty grass (the fallback) if tuning cannot remove them.

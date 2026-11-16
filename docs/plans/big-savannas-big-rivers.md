@@ -109,6 +109,32 @@ pick), the leftover small patches counted on the biome maps and tuned.
   columns; heights and ground the same. `worldgen,mound` pass on 6 servers; the mound survey (`MatabeleNewLandTests`)
   passes (real savanna 1 mound in 2.8 looks dead, 1 in 3.5 Matabele).
 
+**Step 2b, the small-savanna cleaner (the user, 2026-11-16: "the ecosystem just wouldn't work on them"; nothing
+built).** Step 2 left 919 savannas under 1,000 blocks across on the 4 maps (14.7 percent of the savanna's area); a
+small savanna has no room for the termites, the Matabele within reach of them and the river life. The cleaner removes
+every one:
+- **What:** in new land any savanna patch under 1,000 blocks across (the biome maps' `SMALL`, my pick) becomes plains:
+  savanna and floodplain plains, its savanna river Minecraft's river. Every savanna left is a big one.
+- **How:** where our biome answer is savanna, floodplain or savanna river, the patch round it is looked up on a 32-block
+  grid: a flood fill over the biome noise that stops as soon as it has counted enough cells for 1,000 across (about
+  770), so a big savanna is known big quickly and a small one is measured whole. Answers are saved per grid cell, in a
+  shared store with a cap (the memory leak lesson, `docs/BUGS.md` 222). The count of a patch does not depend on where
+  the fill starts, so every chunk gets the same answer whichever loads first: no seams.
+- **Where:** one place every biome question passes through (world making, `/locate`, the spawn search, the mounds'
+  biome check, the biome maps); to be read in TerraBlender's and Minecraft's code first (likely a hook on the biome
+  source's lookup). Only our own savanna biomes are touched: another mod's savannas (Biomes O' Plenty) are left alone.
+- **Checks:** the biome maps: 0 small savannas (the band goes to 0), the typical size and the share of land savanna
+  (the cleaner takes about 15 percent of the savanna's area: about 21.6 to 18 percent of land); the spawn search; the
+  land fingerprints (only biome names should move); the mound survey (`MatabeleNewLandTests`); loading time before and
+  after (`tools/flight.sh`, the ground height and spawn search timings), since loading has been slow before.
+- **Not known yet:** the cost (my guess small, as each patch is measured once; to measure, not to assume); thin necks
+  of savanna on the 32-block grid may be cut off from a big savanna and turn to plains (a cleaner edge in play); the
+  land is flattened by the climate, not the biome, so a former small savanna becomes flat plains (fine), and trees,
+  mounds and Matabele follow the biome, so they go with it.
+- **Why before step 3 (my pick):** step 3 tunes the savannas' size and their share of the land; with the cleaner in
+  first it tunes them once, on the final picture, and only has to make the big ones bigger, no longer chasing small
+  ones. Done after, step 3's numbers would all move again.
+
 **Step 3, bigger savannas.** Our region's weight and the savanna's climate shape (`WEIGHT`, `SHAPE`) tuned on the
 biome maps to a typical savanna of **3,500 to 4,000 blocks across** (my pick, about twice today's); checked that
 deserts, jungles and the rest still turn up; checked with Biomes O' Plenty's regions beside ours. TerraBlender's zone
