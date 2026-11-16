@@ -43,7 +43,7 @@ public class RiverRemainsFeature extends Feature<NoneFeatureConfiguration> {
             return false;
         }
         int x0 = context.origin().getX() & ~15, z0 = context.origin().getZ() & ~15;
-        if (!BigSavanna.lives(level.getLevel(), level.getBiome(context.origin()), x0 + 8, z0 + 8)) {
+        if (!BigSavanna.lives(level.getLevel(), level.getBiome(new net.minecraft.core.BlockPos(x0 + 8, level.getSeaLevel(), z0 + 8)), x0 + 8, z0 + 8)) {
             return false; // the gate: no river life in a savanna too small to live in
         }
         int count = random.nextFloat() < SECOND ? 2 : 1;

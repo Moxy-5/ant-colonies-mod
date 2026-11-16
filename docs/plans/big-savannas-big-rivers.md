@@ -1,4 +1,4 @@
-# Big savannas, big rivers (the user, 2026-11-16; steps 1, 2, 2a and 2c built)
+# Big savannas, big rivers (the user, 2026-11-16; steps 1, 2, 2a, 2c and 2d built)
 
 The user: "I want the river to have more life to it but it's gonna start getting cramped; it's also not exactly a
 realistic river; we will also have to make the savanna biome bigger, which I'm okay with because I'm planning a lot of
@@ -169,6 +169,16 @@ it a biome too small to harbor an ecosystem would never begin to form one"; BUIL
   animals still turn up there. A world of only savanna always lives.
 - Tests: the map test checks the bands (big savannas' quiet ground at most 10 percent, under-500 savannas' at least
   70). `worldgen,mound,trees,river,colony` on 6 servers: all passed but two, the seedlings-after-rain test (the gate judged a test arena's hand-made savanna; fixed: savanna put there by hand is not judged; then 3 of 3) and the old half-built stage 14 flake (BUGS 151, 3 of 3 alone); the mound survey unchanged (1 mound in 2.8 looks dead, 1 in 3.6 Matabele).
+
+**Step 2d, Minecraft's own trees in a quiet savanna (the user's idea, 2026-11-16: "then it would just look like
+Minecraft's normal savanna"; BUILT, same branch).** Where the gate keeps the ecosystem out, Minecraft's acacias (and
+the odd oak) come back, in Minecraft's own numbers, so a small patch is an ordinary Minecraft savanna, not bare grass
+(`worldgen/QuietSavannaTreesFeature`, `biome_modifier/quiet_savanna_trees.json`; Minecraft's own tree picker is run by
+our feature, as its own placement list refuses a biome the feature was taken off). They are plain Minecraft trees: no
+growing, dying or heart rot. Also fixed on the way: the algae and remains read their biome at the bottom of the world,
+where a cave biome under a savanna would have slipped past the gate; now at the water. **Not checked on real land by a
+test** (a test arena's hand-made savanna is never judged quiet): the user's look in a new world is the check.
+`worldgen,trees,river` on 6 servers: all passed but the old catfish scraps flake (BUGS 220, 3 of 3 alone).
 
 **Step 2b, the small-savanna cleaner (NOT BUILT: replaced by step 2c, the gate)**
 

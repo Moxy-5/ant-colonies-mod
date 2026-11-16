@@ -34,6 +34,10 @@ public class SavannaFeatures {
     public static final DeferredHolder<Feature<?>, com.antcolonies.savanna.worldgen.RiverRemainsFeature> RIVER_REMAINS =
             FEATURES.register("river_remains", () -> new com.antcolonies.savanna.worldgen.RiverRemainsFeature(NoneFeatureConfiguration.CODEC));
 
+    /** Minecraft's own savanna trees where a savanna is too small to live in (the gate; .../biome_modifier/quiet_savanna_trees.json). */
+    public static final DeferredHolder<Feature<?>, com.antcolonies.savanna.worldgen.QuietSavannaTreesFeature> QUIET_SAVANNA_TREES =
+            FEATURES.register("quiet_savanna_trees", () -> new com.antcolonies.savanna.worldgen.QuietSavannaTreesFeature(NoneFeatureConfiguration.CODEC));
+
     /** Oxbow lakes and pans on the floodplain (data/antcolonies/neoforge/biome_modifier/floodplain_pools.json). */
     public static final DeferredHolder<Feature<?>, com.antcolonies.savanna.worldgen.FloodplainPoolFeature> OXBOW =
             FEATURES.register("oxbow", () -> new com.antcolonies.savanna.worldgen.FloodplainPoolFeature(NoneFeatureConfiguration.CODEC, true));
