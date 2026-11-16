@@ -140,6 +140,16 @@ public class SavannaEntities {
                     .clientTrackingRange(8)
                     .build("crocodile"));
 
+    // The river crab (M9 river life, the clean-up crew, 2026-11-15): drawn about 0.8 blocks across with its legs and 0.3
+    // tall; its box a little narrower than the legs' spread (my pick); each crab's own size through its SCALE attribute.
+    public static final DeferredHolder<EntityType<?>, EntityType<com.antcolonies.savanna.animal.CrabEntity>> CRAB =
+            ENTITY_TYPES.register("crab", () -> EntityType.Builder
+                    .of(com.antcolonies.savanna.animal.CrabEntity::new, SavannaMobCategories.riverFish())
+                    .sized(0.6F, 0.3F)
+                    .eyeHeight(0.25F)
+                    .clientTrackingRange(4)
+                    .build("crab"));
+
     // Remains of a dead fish (M9 river life, 2026-11-15): meat on the bones, lying on the bed; a small box under the drawn
     // fish (a usual catfish 2 blocks long), not a living thing.
     public static final DeferredHolder<EntityType<?>, EntityType<com.antcolonies.savanna.animal.RemainsEntity>> REMAINS =

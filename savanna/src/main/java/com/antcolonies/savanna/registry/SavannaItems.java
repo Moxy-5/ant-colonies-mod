@@ -120,6 +120,10 @@ public class SavannaItems {
     public static final DeferredItem<DeferredSpawnEggItem> CROCODILE_SPAWN_EGG =
             ITEMS.register("crocodile_spawn_egg",
                     () -> new DeferredSpawnEggItem(SavannaEntities.CROCODILE, 0x4A4E26, 0xC8B070, new Item.Properties()));
+    // Mottled brown shell with cream claw tips (the user's picture), my pick.
+    public static final DeferredItem<DeferredSpawnEggItem> CRAB_SPAWN_EGG =
+            ITEMS.register("crab_spawn_egg",
+                    () -> new DeferredSpawnEggItem(SavannaEntities.CRAB, 0x5A4632, 0xE6D8B8, new Item.Properties()));
     // Olive grey with a red throat (the breeding male's), my pick.
     public static final DeferredItem<DeferredSpawnEggItem> TILAPIA_SPAWN_EGG =
             ITEMS.register("tilapia_spawn_egg",

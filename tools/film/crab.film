@@ -1,0 +1,101 @@
+# The river crab in the game (2026-11-15): standing on the grass (side, front, above), walking sideways, then a hungry
+# one picking algae off the bed of a shallow pool into its mouth.
+#   ./gradlew runFilm -PfilmScene=crab      pictures in run-film/screenshots/crab/
+cmd time set noon
+cmd weather clear
+cmd kill @e[type=!player]
+lens 40
+wait 30
+# (the camera's height is its feet: its eye is 1.62 higher)
+cmd summon antcolonies:crab 0.5 -60.0 3.5 {NoAI:1b,Rotation:[180f,0f]}
+camera 0.5 -61.1 1.6 0 20
+wait 30
+shot stand_front
+camera 2.4 -61.1 3.5 90 20
+wait 5
+shot stand_side
+camera 0.5 -59.8 3.5 0 89
+wait 5
+shot stand_top
+cmd kill @e[type=antcolonies:crab]
+wait 5
+# walking: a live one on the grass
+cmd summon antcolonies:crab 8.5 -60.0 3.5 {HungryIn:100000,Rotation:[180f,0f]}
+camera 8.5 -60.8 1.2 0 22
+wait 20
+shot walk_1
+wait 6
+shot walk_2
+wait 6
+shot walk_3
+wait 20
+shot walk_4
+cmd kill @e[type=antcolonies:crab]
+wait 5
+# picking: a shallow pool, lush algae, a hungry crab beside it
+cmd fill 16 -62 -2 22 -61 4 minecraft:water
+cmd setblock 19 -62 1 antcolonies:algae[growth=3,strands=7]
+cmd summon antcolonies:crab 17.5 -62.0 1.5 {HungryIn:0,Rotation:[-90f,0f]}
+camera 18.5 -60.2 -0.4 0 58
+wait 30
+shot pick_00
+wait 8
+shot pick_01
+wait 8
+shot pick_02
+wait 8
+shot pick_03
+wait 8
+shot pick_04
+wait 8
+shot pick_05
+wait 8
+shot pick_06
+wait 8
+shot pick_07
+wait 8
+shot pick_08
+wait 8
+shot pick_09
+wait 8
+shot pick_10
+wait 8
+shot pick_11
+cmd kill @e[type=antcolonies:crab]
+wait 5
+# picking on land, up close: a hungry crab beside tilapia remains on the grass
+cmd summon antcolonies:remains 30.5 -60 3.5 {kind:"tilapia",bites:6,Rotation:[0f,0f]}
+cmd summon antcolonies:crab 29.3 -60.0 3.5 {HungryIn:0,Rotation:[-90f,0f]}
+camera 31.6 -61.0 2.4 64 26
+wait 20
+shot meat_00
+wait 5
+shot meat_01
+wait 5
+shot meat_02
+wait 5
+shot meat_03
+wait 5
+shot meat_04
+wait 5
+shot meat_05
+wait 5
+shot meat_06
+wait 5
+shot meat_07
+wait 5
+shot meat_08
+wait 5
+shot meat_09
+wait 5
+shot meat_10
+wait 5
+shot meat_11
+wait 5
+shot meat_12
+wait 5
+shot meat_13
+wait 5
+shot meat_14
+wait 5
+shot meat_15

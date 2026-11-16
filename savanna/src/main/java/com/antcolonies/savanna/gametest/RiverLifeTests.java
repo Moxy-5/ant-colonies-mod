@@ -874,4 +874,75 @@ public class RiverLifeTests {
             }
         });
     }
+
+    /**
+     * The river crab (M9 river life, 2026-11-15): spawns on the bed of shallow savanna water only, in the river fish
+     * group; hungry, it walks over the bed to the remains before the algae beside it and picks two bits off them into its
+     * mouth (two bites), then, hungry again with the remains gone, picks two pairs of strands off the lush algae.
+     */
+    @GameTest(template = "arena", timeoutTicks = 2400)
+    public static void aHungryCrabPicksRemainsBeforeAlgae(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        buildPond(helper);
+        if (net.minecraft.world.entity.SpawnPlacements.getPlacementType(SavannaEntities.CRAB.get())
+                != net.minecraft.world.entity.SpawnPlacementTypes.IN_WATER) {
+            helper.fail("the crab's spawn placement is not signed up");
+        }
+        var biomes = level.registryAccess().registryOrThrow(net.minecraft.core.registries.Registries.BIOME);
+        boolean listed = biomes.getOrThrow(net.minecraft.world.level.biome.Biomes.SAVANNA).getMobSettings()
+                .getMobs(com.antcolonies.savanna.registry.SavannaMobCategories.riverFish())
+                .unwrap().stream().anyMatch(d -> d.type == SavannaEntities.CRAB.get());
+        if (!listed) {
+            helper.fail("the crab is not in the savanna's river fish spawn list");
+        }
+        BlockPos shelf = helper.absolutePos(new BlockPos(X0 + 1, TOP - 1, Z0 + 1));
+        BlockPos deep = helper.absolutePos(new BlockPos(X1 - 1, SURFACE, Z1 - 1));
+        if (Math.abs(deep.getY() - level.getSeaLevel()) <= 6) {
+            if (!com.antcolonies.savanna.animal.CrabEntity.canSpawn(SavannaEntities.CRAB.get(), level, MobSpawnType.NATURAL, shelf, level.random)) {
+                helper.fail("a crab may not spawn on the shallow shelf");
+            }
+            if (com.antcolonies.savanna.animal.CrabEntity.canSpawn(SavannaEntities.CRAB.get(), level, MobSpawnType.NATURAL, deep, level.random)) {
+                helper.fail("a crab may spawn under 7 blocks of water");
+            }
+        }
+        BlockPos algae = new BlockPos(X0 + 3, TOP - 1, Z0 + 2);
+        helper.setBlock(algae, SavannaBlocks.ALGAE.get().defaultBlockState().setValue(AlgaeBlock.GROWTH, AlgaeBlock.LUSH)
+                .setValue(AlgaeBlock.STRANDS, AlgaeBlock.fullStrands(AlgaeBlock.LUSH)));
+        com.antcolonies.savanna.animal.RemainsEntity remains = com.antcolonies.savanna.animal.RemainsEntity.leave(level,
+                com.antcolonies.savanna.animal.RemainsEntity.Kind.TILAPIA, helper.absolutePos(new BlockPos(X0 + 3, TOP - 1, Z1 - 1)).getBottomCenter(), 0, 1.0F);
+        if (remains == null) {
+            helper.fail("no remains made");
+            return;
+        }
+        int meat = remains.bitesLeft();
+        com.antcolonies.savanna.animal.CrabEntity crab = helper.spawn(SavannaEntities.CRAB.get(), new BlockPos(X0 + 1, TOP - 1, Z0 + 3));
+        crab.setPersistenceRequired();
+        crab.makeHungry();
+        int strands = AlgaeBlock.fullStrands(AlgaeBlock.LUSH);
+        boolean[] remainsDone = {false};
+        boolean[] sawPick = {false, false};
+        helper.onEachTick(() -> {
+            byte doing = crab.doing();
+            sawPick[0] |= doing == com.antcolonies.savanna.animal.CrabEntity.PICK_MEAT;
+            sawPick[1] |= doing == com.antcolonies.savanna.animal.CrabEntity.PICK_ALGAE;
+            if (!remainsDone[0] && crab.isFed()) {
+                remainsDone[0] = true;
+                if (meat - remains.bitesLeft() != 2) {
+                    helper.fail("the crab took " + (meat - remains.bitesLeft()) + " bites off the remains (2 in one pick)");
+                }
+                if (helper.getBlockState(algae).getValue(AlgaeBlock.STRANDS) != strands) {
+                    helper.fail("the crab picked at the algae before the remains");
+                }
+                remains.discard();
+                crab.makeHungry();
+            }
+        });
+        helper.succeedWhen(() -> {
+            helper.assertTrue(remainsDone[0] && sawPick[0], "the crab has not picked at the remains: at "
+                    + crab.blockPosition().subtract(helper.absolutePos(BlockPos.ZERO)));
+            helper.assertTrue(sawPick[1] && crab.isFed(), "the crab has not picked at the algae: at "
+                    + crab.blockPosition().subtract(helper.absolutePos(BlockPos.ZERO)));
+            helper.assertBlockProperty(algae, AlgaeBlock.STRANDS, strands - 2);
+        });
+    }
 }

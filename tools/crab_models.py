@@ -169,7 +169,9 @@ def walking_leg(s, px, pz, f):
     return up, low, tip, knee, ankle
 
 
-def model():
+def model(game=False):
+    """The bones. For the game each claw hand also carries two small bits (algae green, meat pink) between its fingers'
+    points, shown by the pick clip and CrabModel while it carries food to its mouth."""
     body = []
     carapace(body)
     out = [{'name': 'body', 'pivot': [0, 10 * V, 0], 'cubes': body}]
@@ -184,6 +186,12 @@ def model():
         out.append({'name': f'claw_hand_{side}', 'parent': f'claw_arm_{side}', 'pivot': [s * 15.4 * V, 6 * V, -12 * V],
                     'rotation': [0, s * 24, 0], 'cubes': hand, 'pinch': pinch})
         out.append({'name': f'claw_finger_{side}', 'parent': f'claw_hand_{side}', 'pivot': hinge, 'cubes': finger})
+        if game:
+            for kind in ('green', 'meat'):
+                bit = []
+                px, py, pz = (v / V for v in pinch)
+                box(bit, px - 1, py - 0.8, pz - 1, px + 1, py + 0.8, pz + 1, 'bit_' + kind)
+                out.append({'name': f'bit_{kind}_{side}', 'parent': f'claw_hand_{side}', 'pivot': pinch, 'cubes': bit})
     for i, (z, yaw, f) in enumerate(zip(LEG_Z, LEG_YAW, LEG_LONG)):
         for side, s in (('left', 1), ('right', -1)):
             px = s * (half_at(z) - BODY_IN - 0.4)
@@ -232,6 +240,10 @@ def colour(part, look, x, y, z, face, rnd):
     blotch = dice(cx // 2, cy // 2 + 9, cz // 2)        # the same for 2 x 2 voxels: the shell's mottle in patches
     if part == 'eye':
         return (44, 42, 48) if face == 'up' else (18, 16, 20)
+    if part == 'bit_green':
+        return shade(pick([(95, 146, 56), (78, 128, 48), (112, 160, 66)], r), grain)
+    if part == 'bit_meat':
+        return shade(pick([(206, 122, 112), (188, 100, 96), (222, 150, 136)], r), grain)
     if part == 'gape':
         return (46, 28, 32)
     if part == 'spine0':
@@ -359,7 +371,145 @@ def bounds(bones):
     return [min(p[k] for p in pts) for k in range(3)], [max(p[k] for p in pts) for k in range(3)]
 
 
+# --- the game's clips --------------------------------------------------------------------------------------------------
+# Turns here are in the model file's own directions, which the viewer's poses map to as (x, y, z) -> (-x, y, -z).
+WALK_LEN = 0.45       # one stride of the walk clip (seconds)
+PICK_LEN = 4.0        # the pick clip: the left claw's trip to the mouth, then the right's (CrabEntity.PICK_TICKS)
+PICK_TRIP = 2.6       # one claw's trip (seconds); the right claw starts PICK_SECOND after the left
+PICK_SECOND = 1.4
+PICK_BITE = 0.68      # how far through a trip the bit goes into the mouth (CrabEntity.BITE_TICKS: 35 and 63)
+SIDES = (('left', 1), ('right', -1))
+
+
+def sm(a, b, x):
+    v = max(0.0, min(1.0, (x - a) / (b - a)))
+    return v * v * (3 - 2 * v)
+
+
+def clips():
+    """idle (standing, eyes and fingers moving), walk (the legs stepping in waves; the game turns the body sideways),
+    pick (each claw in turn pinches a bit off, carries it to the mouth, the mouth's doors open and chew), threat
+    (reared up, claws raised and snapping), death (onto its back, legs curling in)."""
+    import tilapia_models as tm
+
+    def legs(p, t, speed, amount):
+        for side, s in SIDES:
+            for i in range(1, 5):
+                ph = t * speed + i * math.pi / 2 + (0 if s > 0 else math.pi)
+                lift = max(0.0, math.sin(ph))
+                p[f'leg{i}_upper_{side}'] = {'rotation': [0, s * math.cos(ph) * 10.3 * amount, -s * lift * 25.8 * amount]}
+                p[f'leg{i}_lower_{side}'] = {'rotation': [0, 0, s * lift * 14.3 * amount]}
+        return p
+
+    def eyes(p, t, length):
+        for j, (side, s) in enumerate(SIDES):
+            p[f'eye_{side}'] = {'rotation': [-8 * math.sin(2 * math.pi * t / length + j * 1.7), 0,
+                                             -6 * math.sin(4 * math.pi * t / length + j)]}
+        return p
+
+    def still(p):
+        p.setdefault('body', {'rotation': [0, 0, 0], 'position': [0, 0, 0]})
+        for side, s in SIDES:
+            p.setdefault(f'mouth_{side}', {'rotation': [0, 0, 0]})
+            for kind in ('green', 'meat'):
+                p.setdefault(f'bit_{kind}_{side}', {'scale': [0, 0, 0]})
+        return p
+
+    def idle(t):
+        p = eyes(legs({}, t, math.pi, 0.06), t, 4.0)
+        for side, s in SIDES:
+            p[f'claw_finger_{side}'] = {'rotation': [-(6 + 5 * math.sin(math.pi * t + (0 if s > 0 else 1.2))), 0, 0]}
+        return still(p)
+
+    def walk(t):
+        w = 2 * math.pi / WALK_LEN
+        p = eyes(legs({}, t, w, 1.0), t, WALK_LEN)
+        p['body'] = {'rotation': [0, 0, 0], 'position': [0, 0.12 * abs(math.sin(w * t)), 0]}
+        for side, s in SIDES:
+            p[f'claw_finger_{side}'] = {'rotation': [-(4 + 4 * math.sin(w * t)), 0, 0]}
+        return still(p)
+
+    def threat(t):
+        p = eyes({}, t, 3.2)
+        for side, s in SIDES:
+            for i in range(1, 5):
+                p[f'leg{i}_upper_{side}'] = {'rotation': [0, 0, s * 10]}
+                p[f'leg{i}_lower_{side}'] = {'rotation': [0, 0, -s * 10]}
+            p[f'claw_arm_{side}'] = {'rotation': [-(38 + 4 * math.sin(2 * math.pi * t / 1.6)), s * 16, 0]}
+            p[f'claw_hand_{side}'] = {'rotation': [-18, 0, 0]}
+            snap = max(0.0, math.sin(2 * math.pi * t / 1.6 + (0 if s > 0 else 1.4)))
+            p[f'claw_finger_{side}'] = {'rotation': [-32 * snap, 0, 0]}
+        p['body'] = {'rotation': [6, 0, 0], 'position': [0, 0.3, 0]}
+        return still(p)
+
+    def pick(t):
+        p = eyes(legs({}, t, math.pi / 2, 0.15), t, PICK_LEN)
+        o = chew = 0.0
+        for j, (side, s) in enumerate(SIDES):
+            u = max(0.0, min(1.0, (t - j * PICK_SECOND) / PICK_TRIP))
+            lift = sm(0.3, 0.55, u) - sm(0.78, 0.95, u)
+            dip = sm(0, 0.15, u) - sm(0.22, 0.32, u)
+            p[f'claw_hand_{side}'] = {'rotation': [-(27 * lift - 7 * dip), s * 72 * lift, 0]}
+            p[f'claw_arm_{side}'] = {'rotation': [-8 * lift, 0, 0]}
+            p[f'claw_finger_{side}'] = {'rotation': [-(4 + 24 * (sm(0, 0.12, u) - sm(0.2, 0.28, u))
+                                                       + 16 * (sm(0.6, 0.68, u) - sm(0.8, 0.9, u))), 0, 0]}
+            shown = 1.0 if 0.25 < u < PICK_BITE - 0.01 else 0.0
+            for kind in ('green', 'meat'):
+                p[f'bit_{kind}_{side}'] = {'scale': [shown, shown, shown]}
+            o = max(o, sm(0.46, 0.58, u) - sm(0.68, 0.76, u))
+            if 0.74 < u < 0.99:
+                chew = 1.0
+        o = min(1.0, o + chew * 0.22 * (0.5 + 0.5 * math.sin(t * 17)))
+        p['mouth_left'] = {'rotation': [0, -64 * o, 0]}
+        p['mouth_right'] = {'rotation': [0, 64 * o, 0]}
+        return still(p)
+
+    def death(t):
+        f = min(1.0, t / 0.5)
+        f = f * f * (3 - 2 * f)
+        p = {'body': {'rotation': [0, 0, 180 * f], 'position': [0, -0.9 * f + 2.0 * math.sin(math.pi * f), 0]}}
+        for side, s in SIDES:
+            for i in range(1, 5):
+                p[f'leg{i}_upper_{side}'] = {'rotation': [0, 0, -s * 20 * f]}
+                p[f'leg{i}_lower_{side}'] = {'rotation': [0, 0, s * 35 * f]}
+            p[f'claw_hand_{side}'] = {'rotation': [0, s * 30 * f, 0]}
+        return still(p)
+
+    return {'idle': tm.clip(4.0, idle, 48), 'walk': tm.clip(WALK_LEN, walk, 12), 'pick': tm.clip(PICK_LEN, pick, 120),
+            'threat': tm.clip(3.2, threat, 48), 'death': tm.clip(1.0, death, 12, 'hold')}
+
+
+def write_game():
+    """Writes the crab's model, texture and clips into the savanna mod."""
+    import json
+    import mod_paths
+    root = mod_paths.assets('savanna')
+    game_bones, rows, w, h = paint(model(game=True))
+    for b in game_bones:
+        b.pop('pinch', None)
+    files = {'textures/entity/crab.png': png(rows)}
+    geo = {'format_version': '1.12.0', 'minecraft:geometry': [{
+        'description': {'identifier': 'geometry.crab', 'texture_width': w, 'texture_height': h,
+                        'visible_bounds_width': 2, 'visible_bounds_height': 1.5, 'visible_bounds_offset': [0, 0.5, 0]},
+        'bones': game_bones}]}
+    files['geo/entity/crab.geo.json'] = geo
+    files['animations/entity/crab.animation.json'] = {'format_version': '1.8.0', 'animations': clips()}
+    for rel, data in files.items():
+        path = root / rel
+        path.parent.mkdir(parents=True, exist_ok=True)
+        if isinstance(data, bytes):
+            path.write_bytes(data)
+        else:
+            with open(path, 'w', encoding='utf-8', newline='\n') as f:
+                json.dump(data, f, indent=1)
+        print('wrote', path.relative_to(mod_paths.PROJECT))
+
+
 if __name__ == '__main__':
+    import sys
+    if sys.argv[1:] == ['game']:
+        write_game()
+        sys.exit()
     bones = model()
     n = sum(len(b.get('cubes', [])) for b in bones)
     lo, hi = bounds(bones)

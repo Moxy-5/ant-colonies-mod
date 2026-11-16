@@ -161,5 +161,7 @@
   "item.antcolonies.cooked_catfish": "Cooked Catfish",
   "item.antcolonies.catfish_spawn_egg": "River Catfish Spawn Egg",
   "entity.antcolonies.crocodile": "Nile Crocodile",
-  "item.antcolonies.crocodile_spawn_egg": "Nile Crocodile Spawn Egg"
+  "item.antcolonies.crocodile_spawn_egg": "Nile Crocodile Spawn Egg",
+  "entity.antcolonies.crab": "River Crab",
+  "item.antcolonies.crab_spawn_egg": "River Crab Spawn Egg"
 }
