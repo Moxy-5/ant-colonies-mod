@@ -36,7 +36,7 @@
   <h1>River crab viewer</h1>
   <p>The river's clean-up crew, built from your picture at half the first model's cube size: a spiny mottled shell, tall black eyes, big claws with
      cream fingers (the right one bigger) and four orange-brown walking legs a side. One crab stands as in your picture, one scuttles sideways along
-     the bank, one rears up with its claws raised, one picks at the algae on the river bed. A tilapia (0.6 blocks), a
+     the bank, one rears up with its claws raised, one picks algae off the river bed and puts it in its mouth, which opens. A tilapia (0.6 blocks), a
      player and a block stand by for scale. Drag to turn, scroll or pinch to zoom, right-drag to slide.</p>
 </header>
 <div id="wrap"><canvas id="c"></canvas><div id="labels"></div></div>
@@ -179,7 +179,21 @@ const LOOK = Object.values(DATA.looks)[0];
 const crabs = [['stand', 'Standing'], ['walk', 'Walking sideways'], ['threat', 'Claws up'], ['feed', 'Picking at algae']].map(([p, label]) => {
   const crab = build(LOOK, 'ground');
   tag(label, crab, () => settings.size * 0.5);
-  return {pose: p, crab};
+  const out = {pose: p, crab};
+  if (p === 'feed') {
+    // the bit of algae each claw pinches off, riding between its fingers' points
+    out.bits = ['left', 'right'].map(side => {
+      const b = LOOK.bones.find(x => x.name === 'claw_hand_' + side);
+      const bit = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.4, 0.5), new THREE.MeshLambertMaterial({color: '#5f9238'}));
+      bit.position.set(b.pinch[0] - b.pivot[0], b.pinch[1] - b.pivot[1], b.pinch[2] - b.pivot[2]);
+      bit.visible = false;
+      crab.userData.groups['claw_hand_' + side].add(bit);
+      return bit;
+    });
+    const mat = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), matMat);   // the algae it picks at, under its claws
+    mat.rotation.x = -Math.PI / 2; mat.position.set(-0.72, BED + 0.012, 1.72); scene.add(mat);
+  }
+  return out;
 });
 const school = [];
 for (let i = 0; i < 4; i++) school.push(build(DATA.tilapia, 'middle'));
@@ -233,6 +247,7 @@ function eyes(g, t, ph) {
     g['eye_' + side].rotation.z = deg(6 * Math.sin(t * 0.45 + ph * 2 + j));
   });
 }
+const sm = (a, b, x) => { const v = Math.max(0, Math.min(1, (x - a) / (b - a))); return v * v * (3 - 2 * v); };
 function pose(c, t) {
   const g = c.crab.userData.groups, ph = c.crab.userData.phase;
   rest(g);
@@ -266,14 +281,26 @@ function pose(c, t) {
     c.crab.position.set(1.7, BANK + 0.02 * settings.size, -1.9);
     c.crab.rotation.y = deg(-20);
   } else {
-    // on the river bed, picking: one claw then the other up to the mouth
+    // on the river bed, picking: each claw in turn opens, dips to the algae, pinches a bit off, swings in and up to
+    // the mouth; the mouth's two doors open, the bit goes in, the doors shut and chew while the claw goes back
     legs(g, t, 0.6, 0.15);
+    let open = 0, chew = 0;
     SIDES.forEach(([side, s], j) => {
-      const pick = Math.max(0, Math.sin(t * 2.4 + j * Math.PI));
-      g['claw_arm_' + side].rotation.x = deg(22 * pick);
-      g['claw_arm_' + side].rotation.y = -s * deg(14 * pick);
-      g['claw_finger_' + side].rotation.x = deg(18 * (1 - pick));
+      const u = (t * 0.3 + j * 0.5) % 1;
+      const lift = sm(0.3, 0.55, u) - sm(0.78, 0.95, u);
+      const dip = sm(0, 0.15, u) - sm(0.22, 0.32, u);
+      const hand = g['claw_hand_' + side];
+      hand.rotation.y = hand.userData.base.y + s * deg(72 * lift);
+      hand.rotation.x = deg(27 * lift - 7 * dip);
+      g['claw_arm_' + side].rotation.x = deg(8 * lift);
+      g['claw_finger_' + side].rotation.x = deg(4 + 24 * (sm(0, 0.12, u) - sm(0.2, 0.28, u)) + 16 * (sm(0.6, 0.68, u) - sm(0.8, 0.9, u)));
+      if (c.bits) c.bits[j].visible = u > 0.25 && u < 0.67;
+      open = Math.max(open, sm(0.46, 0.58, u) - sm(0.68, 0.76, u));
+      if (u > 0.74 && u < 0.99) chew = 1;
     });
+    const o = Math.min(1, open + chew * 0.22 * (0.5 + 0.5 * Math.sin(t * 17)));
+    g.mouth_left.rotation.y = -deg(64 * o);
+    g.mouth_right.rotation.y = deg(64 * o);
     c.crab.position.set(-0.6, BED, 1.4);
     c.crab.rotation.y = deg(160);
   }
@@ -289,6 +316,7 @@ const CAMS = {
   'claws up': () => { const p = P(2); return [[p.x - 0.35, p.y + 0.3, p.z - 0.95], [p.x, p.y + 0.12, p.z]]; },
   'from above': () => { const p = P(0); return [[p.x + 0.001, p.y + 1.4, p.z + 0.001], [p.x, p.y, p.z]]; },
   'on the river bed': () => { const p = P(3); return [[p.x + 0.9, p.y + 0.5, p.z + 1.2], [p.x, p.y + 0.1, p.z]]; },
+  'eating, close': () => { const p = P(3); return [[p.x - 0.1, p.y + 0.3, p.z + 0.95], [p.x, p.y + 0.1, p.z]]; },
   'with the player': () => [[1.4, 1.4, 2.8], [1.4, 0.6, -1.6]],
 };
 const camBox = document.getElementById('cams');

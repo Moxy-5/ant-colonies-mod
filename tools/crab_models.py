@@ -10,6 +10,7 @@ white speckles, and the picture has finer detail). What the picture shows, and s
   space under its edge above the legs (the user, 2026-11-15); dark
   purple in the middle, warmer red-brown toward the edge; six spikes a side on the top edge (tan at the base, cream at the point), pointing up and a little out.
 - A deep cream face under a dark front rim, nearly the whole front wide, with rows of mouthparts.
+- A mouth of two doors (bones mouth_left, mouth_right) that swing open forward over a dark mouth.
 - Two tall black eyes set wide apart on the front edge.
 - Two big claws, slimmer than long, held forward and inward in front of the face, resting on the ground: a thick orange-brown arm
   with an elbow, a purple-brown hand, thick cream fingers gaping open (dark between them), the upper one hinged; the
@@ -84,10 +85,7 @@ def carapace(c):
     layer(c, 15.8, 16.4, 0.7, 'shell')                  # the flat top
     box(c, -9.8, 13.5, -10.6, 9.8, 15.0, -10, 'rim')    # the dark front rim, over the face
     box(c, -8.6, 7.6, -8.4, 8.6, 13.5, -6.0, 'face')    # the deep cream face under the rim, nearly the whole front
-    for i, y in enumerate((8.4, 9.7, 11.0)):            # the mouthparts in rows
-        w = 3.4 + i * 0.8
-        box(c, -w, y, -8.8, w, y + 0.8, -8.4, 'mouth')
-    box(c, -0.4, 8.4, -8.9, 0.4, 11.8, -8.4, 'mouth')
+    box(c, -4.3, 8.4, -8.5, 4.3, 12.0, -8.38, 'gape')   # the dark mouth behind its two doors (mouth_door)
     # the crown's points: one each side of the front, one at each front corner, three down each side, one behind
     for s in (1, -1):
         spine(c, s * 8.6, 15.6, -9.4, s * 0.3, -1)
@@ -95,6 +93,14 @@ def carapace(c):
         for z in (-3.6, 0.6, 4.6):
             spine(c, s * (half_at(z) - 0.9), 15.6, z, s, 0.1 * z)
         spine(c, s * 7.4, 15.6, 8.0, s * 0.6, 0.8)
+
+
+def mouth_door(s):
+    """One of the mouth's two doors (the outer mouthparts): hinged at its outer edge, it swings forward to open."""
+    c = []
+    box(c, s * 0.15, 8.2, -8.95, s * 4.6, 12.2, -8.5, 'mouth')
+    box(c, s * 0.15, 9.4, -9.1, s * 3.8, 10.0, -8.95, 'mouth')      # a ridge across it
+    return c
 
 
 def eye(s):
@@ -140,7 +146,8 @@ def claw(side, s):
     for z in (0.9, 2.9):
         box(finger, s * (fx0 + 0.3 * w), y0 + 3.8 * f, zf - (z + 0.8) * g, s * (fx1 - 0.3 * w), y0 + 4.5 * f, zf - z * g, 'finger')
     hinge = [s * cx * V, (y0 + 6.2 * f) * V, zf * V]
-    return arm, hand, finger, hinge
+    pinch = [s * (fx0 + fx1) / 2 * V, (y0 + 3.7 * f) * V, (zf - 6.2 * g) * V]     # where the fingers' points meet
+    return arm, hand, finger, hinge, pinch
 
 
 def walking_leg(s, px, pz, f):
@@ -169,10 +176,13 @@ def model():
     for side, s in (('left', 1), ('right', -1)):
         out.append({'name': f'eye_{side}', 'parent': 'body', 'pivot': [s * 5.1 * V, 15.8 * V, -9.6 * V], 'cubes': eye(s)})
     for side, s in (('left', 1), ('right', -1)):
-        arm, hand, finger, hinge = claw(side, s)
+        out.append({'name': f'mouth_{side}', 'parent': 'body', 'pivot': [s * 4.6 * V, 10 * V, -8.5 * V],
+                    'cubes': mouth_door(s)})
+    for side, s in (('left', 1), ('right', -1)):
+        arm, hand, finger, hinge, pinch = claw(side, s)
         out.append({'name': f'claw_arm_{side}', 'parent': 'body', 'pivot': [s * 7.5 * V, 8.5 * V, -8 * V], 'cubes': arm})
         out.append({'name': f'claw_hand_{side}', 'parent': f'claw_arm_{side}', 'pivot': [s * 15.4 * V, 6 * V, -12 * V],
-                    'rotation': [0, s * 24, 0], 'cubes': hand})
+                    'rotation': [0, s * 24, 0], 'cubes': hand, 'pinch': pinch})
         out.append({'name': f'claw_finger_{side}', 'parent': f'claw_hand_{side}', 'pivot': hinge, 'cubes': finger})
     for i, (z, yaw, f) in enumerate(zip(LEG_Z, LEG_YAW, LEG_LONG)):
         for side, s in (('left', 1), ('right', -1)):
