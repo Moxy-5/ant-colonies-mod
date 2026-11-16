@@ -161,6 +161,24 @@ public class SavannaBlocks {
             BlockBehaviour.Properties.of().mapColor(MapColor.WATER).replaceable().noCollission().instabreak()
                     .sound(SoundType.WET_GRASS).randomTicks().pushReaction(PushReaction.DESTROY));
 
+    /**
+     * Scraps on the river bed (M9 river life, 2026-11-15): pale flecks of flesh and fish droppings left where a fish
+     * was eaten, food for the crab, fading in about a day (block/ScrapsBlock). Holds water; drops nothing.
+     */
+    public static final DeferredBlock<com.antcolonies.savanna.block.ScrapsBlock> SCRAPS = BLOCKS.registerBlock("scraps",
+            com.antcolonies.savanna.block.ScrapsBlock::new,
+            BlockBehaviour.Properties.of().mapColor(MapColor.WATER).replaceable().noCollission().instabreak()
+                    .sound(SoundType.WET_GRASS).randomTicks().pushReaction(PushReaction.DESTROY).noLootTable());
+
+    /**
+     * Crocodile droppings (M9 river life, 2026-11-15): a chalky crumbly patch where a crocodile basked on land,
+     * crumbling away in about 3 days (block/CrocDroppingsBlock). Drops nothing.
+     */
+    public static final DeferredBlock<com.antcolonies.savanna.block.CrocDroppingsBlock> CROC_DROPPINGS = BLOCKS.registerBlock("croc_droppings",
+            com.antcolonies.savanna.block.CrocDroppingsBlock::new,
+            BlockBehaviour.Properties.of().mapColor(MapColor.QUARTZ).noCollission().instabreak().noOcclusion()
+                    .sound(SoundType.SAND).randomTicks().pushReaction(PushReaction.DESTROY).noLootTable());
+
     static {
         TreeBlocks.init(); // the giant savanna trees' blocks (M7.5), registered with the rest
     }

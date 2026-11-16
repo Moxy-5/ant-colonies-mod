@@ -790,6 +790,9 @@ public class CrocodileEntity extends PathfinderMob implements GeoEntity {
     }
 
     /** Lies in the sun on the bank, its head raised and its mouth open, for 1 to 3 minutes (my pick). */
+    /** The chance a bask on land ends with droppings left by the tail (2026-11-15, my pick). */
+    static final float DROPPINGS_CHANCE = 0.25F;
+
     static class BaskGoal extends Goal {
         private final CrocodileEntity croc;
         private int left;
@@ -849,6 +852,14 @@ public class CrocodileEntity extends PathfinderMob implements GeoEntity {
         public void stop() {
             croc.joinAt = null;
             croc.setBasking(false);
+            if (!croc.isInWater() && croc.getRandom().nextFloat() < DROPPINGS_CHANCE
+                    && croc.level() instanceof net.minecraft.server.level.ServerLevel level) {
+                // Droppings by its tail where it lay (my pick: 1 bask on land in 4).
+                float yaw = croc.getYRot() * Mth.DEG_TO_RAD;
+                double back = 2.2 * croc.getScale();
+                com.antcolonies.savanna.block.CrocDroppingsBlock.drop(level,
+                        net.minecraft.core.BlockPos.containing(croc.getX() + Mth.sin(yaw) * back, croc.getY() + 0.1, croc.getZ() - Mth.cos(yaw) * back));
+            }
             if (croc.sunIn <= 0) {
                 croc.sunIn = 1200 + croc.getRandom().nextInt(2400);      // back in the water 1 to 3 minutes
             }
@@ -1369,6 +1380,9 @@ public class CrocodileEntity extends PathfinderMob implements GeoEntity {
                         croc.setJaws(JAWS_EAT);
                     }
                     if (t >= 40) {
+                        if (croc.level() instanceof net.minecraft.server.level.ServerLevel level) {
+                            com.antcolonies.savanna.block.ScrapsBlock.leave(level, prey.position());   // flecks sinking (in water only)
+                        }
                         croc.release();
                         prey.discard();         // swallowed whole
                         eat(prey instanceof TilapiaEntity ? FED_TILAPIA : FED_SMALL, 30);
@@ -1766,6 +1780,7 @@ public class CrocodileEntity extends PathfinderMob implements GeoEntity {
                     left.setBitesLeft(RemainsEntity.Kind.CATFISH_TORN.bites);
                 }
                 croc.playSound(net.minecraft.sounds.SoundEvents.SLIME_SQUISH, 0.9F, 0.8F);
+                com.antcolonies.savanna.block.ScrapsBlock.leave(level, prey.position());
                 croc.release();
                 prey.discard();         // the tail half swallowed
                 eat(FED_SMALL, 50);

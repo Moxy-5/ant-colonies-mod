@@ -177,6 +177,7 @@ public class CatfishEntity extends AbstractFish implements GeoEntity {
         }
         server.sendParticles(net.minecraft.core.particles.ParticleTypes.BUBBLE, m.x, m.y, m.z, 6, 0.15, 0.1, 0.15, 0.03);
         server.playSound(null, m.x, m.y, m.z, SoundEvents.SLIME_SQUISH_SMALL, net.minecraft.sounds.SoundSource.NEUTRAL, 0.7F, 1.3F);
+        com.antcolonies.savanna.block.ScrapsBlock.leave(server, m);     // flecks sinking to the bed
     }
 
     /**
@@ -261,6 +262,7 @@ public class CatfishEntity extends AbstractFish implements GeoEntity {
                 Vec3 m = mouth();
                 server.sendParticles(net.minecraft.core.particles.ParticleTypes.BUBBLE, m.x, m.y, m.z, 8, 0.2, 0.15, 0.2, 0.04);
                 server.playSound(null, m.x, m.y, m.z, SoundEvents.DOLPHIN_EAT, net.minecraft.sounds.SoundSource.NEUTRAL, 0.8F, 0.6F);
+                com.antcolonies.savanna.block.ScrapsBlock.leave(server, m);     // flecks sinking to the bed
             }
             if (holding == 0 || !isAlive()) {
                 holding = 0;

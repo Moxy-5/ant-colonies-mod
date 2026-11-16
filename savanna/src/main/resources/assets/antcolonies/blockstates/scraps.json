@@ -1,0 +1,55 @@
+{
+  "variants": {
+    "amount=0": [
+      {
+        "model": "antcolonies:block/scraps_0"
+      },
+      {
+        "model": "antcolonies:block/scraps_0",
+        "y": 90
+      },
+      {
+        "model": "antcolonies:block/scraps_0",
+        "y": 180
+      },
+      {
+        "model": "antcolonies:block/scraps_0",
+        "y": 270
+      }
+    ],
+    "amount=1": [
+      {
+        "model": "antcolonies:block/scraps_1"
+      },
+      {
+        "model": "antcolonies:block/scraps_1",
+        "y": 90
+      },
+      {
+        "model": "antcolonies:block/scraps_1",
+        "y": 180
+      },
+      {
+        "model": "antcolonies:block/scraps_1",
+        "y": 270
+      }
+    ],
+    "amount=2": [
+      {
+        "model": "antcolonies:block/scraps_2"
+      },
+      {
+        "model": "antcolonies:block/scraps_2",
+        "y": 90
+      },
+      {
+        "model": "antcolonies:block/scraps_2",
+        "y": 180
+      },
+      {
+        "model": "antcolonies:block/scraps_2",
+        "y": 270
+      }
+    ]
+  }
+}

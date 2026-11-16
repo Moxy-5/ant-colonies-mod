@@ -183,3 +183,99 @@ SCRAPS = {"A": "White flecks", "B": "Flecks and detritus", "C": "Flecks and scal
 
 def all_scraps():
     return {k: {"name": name, "amounts": [scraps(k, a) for a in range(3)]} for k, name in SCRAPS.items()}
+
+
+# ---- the game's files (the user's picks, 2026-11-15: droppings C, scraps B) ----
+
+GAME_DROPPINGS, GAME_SCRAPS = "C", "B"
+ROOT_ASSETS = "savanna/src/main/resources/assets/antcolonies"
+TINTS = (0.93, 1.0, 1.07)
+
+
+def _palette(age):
+    """Nine 4 x 4 speckled cells of a 16 x 16 texture: main, light and dark, each in three tints."""
+    main, dark, light = DUNG[age]
+    return [tuple(v * k for v in c) for c in (main, light, dark) for k in TINTS]
+
+
+def _palette_rows(age):
+    pal = _palette(age)
+    rng = random.Random(500 + age)
+    rows = [[(0, 0, 0, 0)] * S for _ in range(S)]
+    for i, c in enumerate(pal):
+        cx, cy = i % 4, i // 4
+        for y in range(4):
+            for x in range(4):
+                k = rng.uniform(0.92, 1.06)
+                rows[cy * 4 + y][cx * 4 + x] = tuple(clamp(v * k) for v in c) + (255,)
+    return [[p for p in r] for r in rows]
+
+
+def _nearest(pal, hexcol):
+    c = tuple(int(hexcol[i:i + 2], 16) for i in (1, 3, 5))
+    return min(range(len(pal)), key=lambda i: sum((a - b) ** 2 for a, b in zip(pal[i], c)))
+
+
+def _droppings_model(age):
+    pal = _palette(age)
+    tex = f"antcolonies:block/croc_droppings_{age}"
+    elements = []
+    for b in DROPPINGS[GAME_DROPPINGS][1](age):
+        lo = [8 + b["x"] - b["w"] / 2, max(0.0, b["y"] - b["h"] / 2), 8 + b["z"] - b["d"] / 2]
+        hi = [8 + b["x"] + b["w"] / 2, max(0.1, b["y"] + b["h"] / 2), 8 + b["z"] + b["d"] / 2]
+        lo = [round(max(0.0, min(16.0, v)), 2) for v in lo]
+        hi = [round(max(0.0, min(16.0, v)), 2) for v in hi]
+        cell = _nearest(pal, b["c"])
+        u, v = (cell % 4) * 4, (cell // 4) * 4
+        face = {"uv": [u, v, u + 4, v + 4], "texture": "#t"}
+        deg = math.degrees(b["turn"]) % 90
+        deg = deg - 90 if deg > 45 else deg
+        angle = min((-45, -22.5, 0, 22.5, 45), key=lambda a: abs(a - deg))
+        el = {"from": lo, "to": hi, "faces": {f: dict(face) for f in ("north", "south", "east", "west", "up", "down")}}
+        if angle:
+            el["rotation"] = {"origin": [round((lo[0] + hi[0]) / 2, 2), lo[1], round((lo[2] + hi[2]) / 2, 2)],
+                              "axis": "y", "angle": angle}
+        elements.append(el)
+    return {"parent": "block/block", "ambientocclusion": False, "textures": {"particle": tex, "t": tex},
+            "elements": elements}
+
+
+def _scraps_model(amount):
+    tex = f"antcolonies:block/scraps_{amount}"
+    return {"parent": "block/block", "render_type": "minecraft:cutout", "ambientocclusion": False,
+            "textures": {"particle": tex, "mat": tex},
+            "elements": [{"from": [0, 0, 0], "to": [16, 0.2, 16], "faces": {
+                "up": {"uv": [0, 0, 16, 16], "texture": "#mat"},
+                "down": {"uv": [0, 0, 16, 16], "texture": "#mat", "cullface": "down"}}}]}
+
+
+def main():
+    """Writes the picked looks into the savanna mod: textures, block models, block states and item models."""
+    import json
+    import os
+    import river_blocks_art
+
+    def dump(path, data):
+        with open(path, "w", encoding="utf-8") as f:
+            json.dump(data, f, indent=2)
+            f.write("\n")
+    tex, models, states, items = (os.path.join(ROOT_ASSETS, p) for p in ("textures/block", "models/block", "blockstates", "models/item"))
+    turns = (0, 90, 180, 270)
+    for age in range(3):
+        river_blocks_art.write_png(os.path.join(tex, f"croc_droppings_{age}.png"), S, S, [p for r in _palette_rows(age) for p in r])
+        dump(os.path.join(models, f"croc_droppings_{age}.json"), _droppings_model(age))
+    dump(os.path.join(states, "croc_droppings.json"), {"variants": {
+        f"age={a}": [dict({"model": f"antcolonies:block/croc_droppings_{a}"}, **({"y": y} if y else {})) for y in turns] for a in range(3)}})
+    dump(os.path.join(items, "croc_droppings.json"), {"parent": "antcolonies:block/croc_droppings_1"})
+    for amount in range(3):
+        rows = scraps(GAME_SCRAPS, amount)
+        river_blocks_art.write_png(os.path.join(tex, f"scraps_{amount}.png"), S, S, [p for r in rows for p in r])
+        dump(os.path.join(models, f"scraps_{amount}.json"), _scraps_model(amount))
+    dump(os.path.join(states, "scraps.json"), {"variants": {
+        f"amount={a}": [dict({"model": f"antcolonies:block/scraps_{a}"}, **({"y": y} if y else {})) for y in turns] for a in range(3)}})
+    dump(os.path.join(items, "scraps.json"), {"parent": "minecraft:item/generated", "textures": {"layer0": "antcolonies:block/scraps_0"}})
+    print("wrote the droppings and scraps textures, models and block states")
+
+
+if __name__ == "__main__":
+    main()

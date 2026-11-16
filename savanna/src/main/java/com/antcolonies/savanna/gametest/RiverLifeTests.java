@@ -411,6 +411,14 @@ public class RiverLifeTests {
                     (cut[0] ? "bitten off, " : "swallowed whole, ") + halves.size() + " remains by the catfish"
                             + (halves.isEmpty() ? "" : " (" + halves.get(0).kind() + ", stage " + halves.get(0).stage() + ")")
                             + " (a bite-off leaves 1 fresh tilapia half, a swallow none)");
+            // scraps (2026-11-15): every fish eaten in the water leaves a fresh film of flecks on the bed under it
+            int scraps = 0;
+            for (BlockPos at : BlockPos.betweenClosed(catfish.blockPosition().offset(-6, -8, -6), catfish.blockPosition().offset(6, 4, 6))) {
+                if (level.getBlockState(at).is(com.antcolonies.savanna.registry.SavannaBlocks.SCRAPS.get())) {
+                    scraps++;
+                }
+            }
+            helper.assertTrue(scraps >= 1, "no scraps on the bed after the meal (a fish eaten leaves flecks)");
             helper.assertTrue(wild.isRemoved() && sawStrike[0] && !catfish.isHungry(),
                     "the wild tilapia " + (wild.isRemoved() ? "is gone" : "still swims") + (sawStrike[0] ? "" : ", no strike seen")
                             + (catfish.isHungry() ? ", the catfish still hungry" : ""));
