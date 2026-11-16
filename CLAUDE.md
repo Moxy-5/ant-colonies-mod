@@ -70,6 +70,81 @@ A Minecraft mod where ants and termites live as real colonies: they dig, build, 
 - **Shared systems** (species-neutral, sections in `docs/DESIGN.md`): colony brain and virtual population; performance rules (real-mob cap, spawn where the player can see, no pushing); nest site scoring; founding and the colony life cycle; nest growth stages and starvation; seasons and daily schedule (Serene Seasons later); smart foraging (scouts, trails, offline timetable); digging; custom plants; hills and the ground reader; ants vs termites; alarm and hazards; player interaction.
 - **Performance goal:** a mature colony holds 1,000+ insects without lag: most of it is numbers in the brain, only up to about 50 to 60 are real mobs.
 
+## Living things: the master list (the user, 2026-11-16)
+Every living thing in the mod, built or planned, plants and fungi included, in one place. **Add new ones here as they are thought of** (status, then a pointer to where the detail lives); detail stays in `docs/DESIGN.md`. Status words: **BUILT** (in the game), **LOOKS** (in the model viewer only), **PLANNED** (agreed, not built), **IDEA** (talked about, not decided), **HELD** (set aside by the user), **DROPPED**. Realism rule: colony insects strict; everything else fun first, inspired by real life.
+
+**1. Colony insects (strict realism; each a species profile on the framework)**
+- Macrotermes (mound termite): workers, minor and major soldiers, king, queen BUILT; alates (winged) PLANNED (M9.5). Savanna mod.
+- Matabele ant (Megaponera analis): majors, minors, ergatoid queen BUILT; colony splitting PLANNED (M9.5); moving house PLANNED (M8 step 6). Savanna mod.
+- Red harvester ant (Pogonomyrmex): workers, queen BUILT; rework PLANNED with the desert mod. Desert mod.
+- Leafcutter ants (Atta, Acromyrmex): IDEA (jungle mod).
+- Army ants (Nomamyrmex, raiding leafcutters; savanna driver ants named only as a reason Matabele move): IDEA (jungle).
+- Honeypot ants (Myrmecocystus, neighbours of the harvester): IDEA (desert).
+- Magnetic termites (Australian outback): HELD.
+
+**2. Fungi and microbes tied to colonies**
+- Termitomyces (the termites' garden fungus, comb and mushrooms on the mound): BUILT.
+- Xylaria (takes a dead mound's garden, look B "antler forest"): BUILT.
+- Escovopsis (garden mould of leafcutters): IDEA (jungle).
+
+**3. Nest guests, parasites and insect enemies of colonies**
+- Rove beetles in Matabele nests: PLANNED (no step yet).
+- Snake-necked frog (lives in Matabele nests, breeds in pans): PLANNED with the guests.
+- Phorid flies (lay eggs in leafcutter heads), guest ants Megalomyrmex, parasite ant Acromyrmex insinuator: IDEA (jungle).
+- Seed-stealing guests of the harvester: IDEA (M6.5 backlog).
+
+**4. River animals (savanna rivers, pans, oxbows; food chain algae -> tilapia -> catfish -> crocodile, side chain algae -> snail -> crab)**
+- Nile tilapia (grazing schooling fish, 3 looks): BUILT.
+- River catfish (eats tilapia, bites it in half): BUILT.
+- Nile crocodile (basking, ambush, death roll, fishing, bank hauls): BUILT; nests in sand banks, mother carrying hatchlings, banded young PLANNED (`docs/plans/sand-banks.md` first).
+- River crab (eats remains, scraps, algae, snails): BUILT; burrow with shells outside PLANNED.
+- River snail (Garden spiral look): BUILT.
+- Helmeted terrapin (tears remains in groups, basks on crocodiles): PLANNED (next after the snail in the clean-up order).
+- Nile monitor (raids crocodile nests; later eggs in living termite mounds): PLANNED, with the crocodile nests.
+- Tigerfish (surface leaper in packs): HELD.
+- Hippo (floodplain grazing at night, paths, hippo lawns): IDEA.
+- Minecraft's cod, salmon, squid: kept out of savanna rivers (BUILT).
+
+**5. Savanna land animals**
+- Termite eaters, aardvark (the user's earlier pick as first land animal; burrows reused by Matabele), aardwolf, pangolin: IDEA (M9 savanna life; wear termite colonies down).
+- Tree shapers, elephant, giraffe; dung spreading acacia seed: IDEA.
+- Big grazers as crocodile prey at crossings, antelope, zebra, wildebeest, buffalo; floodplain grazers lechwe, puku, waterbuck, sitatunga: IDEA.
+- Dead-wood tenants, centipedes, scorpions (sizes beside the insects open): IDEA.
+- Ant predators, birds eating ants and termite flights: IDEA.
+- African bullfrog (out of the ground at the first rains): IDEA.
+- Dung beetle (an animal-kit proof pick): IDEA.
+- Birds of the floodplain, carmine bee-eater (needs steep banks), herons, cranes, jacanas, flamingos, hornbills; leopard, monkeys, bushbuck, pythons: IDEA (big floodplains list).
+
+**6. Desert and jungle animals (their own mods, later)**
+- Desert: horned lizard (eats harvester ants), kangaroo rat, antlion, ant-eating spiders: IDEA.
+- Jungle: armadillo, giant anteater, tamandua; frogs, birds, lizards eating flying queens: IDEA.
+
+**7. Trees**
+- Giant savanna trees, umbrella thorn (N4), camel thorn, baobab, every age, dead stages, falls, heart rot: BUILT (M7.5).
+- Floodplain trees, sycamore fig (with fruit) and doum palm (with nuts), every age, dead stages: BUILT in new land; growing and dying in play PLANNED (floodplain trees step 8).
+- Fever tree: DROPPED (the user, 2026-11-13).
+- Whistling thorn with its ants: IDEA.
+- Gallery forest trees (mahogany, ebony, sausage tree): IDEA (big floodplains).
+
+**8. Small plants, grasses and water plants**
+- River algae (look C, strands bitten off): BUILT.
+- Blue and black grama grass (harvester seed food, plains and badlands): BUILT.
+- Dry savanna grass ("Dry Grass" block, termite food, bare patches regrowing): BUILT.
+- Reeds and papyrus (cover for fish, floodplain reedbeds): IDEA.
+- Water lilies on lagoons and oxbows: IDEA (big floodplains).
+- Desert wildflower, refuse-pile gardens round ant nests: IDEA (custom plants list).
+
+**9. Fungi on wood and ground**
+- Bracket fungi of heart rot (knob, young, grown, old, tiers): BUILT.
+
+**10. What life leaves behind (not alive, but part of the food web)**
+- Prey pile and termite remains in Matabele nests: BUILT.
+- Fish remains (catfish, torn catfish, tilapia, tilapia half; 4 stages): BUILT.
+- Scraps film, crocodile droppings, broken snail shells: BUILT.
+- Dead wood, pulp heaps, baobab fibre, frass (termite food): BUILT.
+- Fallen figs and doum nuts: BUILT.
+- Remains of big land animals (our own only, never vanilla mobs): PLANNED with those animals.
+
 ## Models and animations (GeckoLib + Blockbench)
 - **Size (the user, 2026-11-05, real sizes):** one scale, a Matabele major 0.5 blocks long (1 block = 30 mm of ant), every savanna insect at its real length on it (termite worker 0.15, minor soldier 0.23, major soldier 0.40); insects keep a small gap, no stacking (`docs/DESIGN.md`, "Insect sizes"; plan `docs/plans/real-sizes.md`). The harvester worker keeps 0.3 wide x 0.2 tall until its rework.
 - Every mob needs: `idle`, `walk`, `attack`, `death`.
@@ -528,6 +603,7 @@ A Minecraft mod where ants and termites live as real colonies: they dig, build, 
 - **Pebble looks to pick in the sand viewer, 2026-11-16** (branch `claude/wide-rivers`, the user's ask "more detail, more pixel, more round"; `python tools/model_viewer.py sand`, "Stone look"): the 7 arrangements kept, three new looks: A smooth and speckled (half-pixel, 6 to 17 boxes a block), B fine pixels (quarter-pixel, 12 to 23), C veined river stones (B with quartz veins and wet glints); old look 3 to 9 boxes; waiting for the user's pick; nothing in-game yet.
 - **Pebble look B, fine pixels, picked by the user 2026-11-16** (quarter-pixel rounded stones, 12 to 23 boxes a spot; the viewer opens on it); it goes into the land with the sand banks after the wide rivers are merged; nothing in-game yet.
 - **Sand banks planned with the user 2026-11-16** (`docs/plans/sand-banks.md`): sand bars only on the inside of sharp bends (one side of the river, swapping from bend to bend), about one every 80 to 120 blocks of river, silt and mud elsewhere; crocodiles look for sand within 64 blocks when they bask, so 2 or 3 gather on each; pebbles (look B) go in with them; steps 1 measure the bends, 2 the blocks, 3 banks in new land, 4 crocodiles prefer sand, 5 check; to build after the wide rivers are merged; nothing built.
+- **Living things master list added 2026-11-16 (the user's ask):** every animal, plant, fungus and colony insect, built or planned, sorted into 10 categories with a status word, in "Living things: the master list" above; new living things get added there.
 
 ## Other notes files (read only when the task needs them)
 - `docs/DESIGN.md`: every design decision for the species and shared systems (read the section for a feature before working on it).
