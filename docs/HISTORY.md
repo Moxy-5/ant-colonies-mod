@@ -817,6 +817,8 @@ Moved here from CLAUDE.md on 2026-10-13 (it was loaded into every chat and took 
 
 - **Pebble look B, fine pixels, picked by the user 2026-11-16** (branch `claude/wide-rivers`): the viewer opens on it, `STONE_GAME_LOOK` in `tools/sand_art.py`; into the land with the sand banks after the wide rivers are merged; nothing in-game yet.
 
+- **Sand banks planned with the user 2026-11-16** (`docs/plans/sand-banks.md`, branch `claude/wide-rivers`): sand bars on the inside of sharp bends only (one side, swapping bend to bend), about one every 80 to 120 blocks of river; crocodiles look for sand within 64 blocks to bask, so a few gather on each bank; pebbles B go in with them; 5 steps after the wide rivers are merged; nothing built.
+
 ## Handover notes for a code reviewer (written at the end of a very long session)
 - State: branch `master`, all committed, `./gradlew build` passes, `./gradlew runGameTestServer` passes 47 tests (about 8 minutes, in one world, tests run in parallel arena grids). Some tests are timing-sensitive under load (`antsOnBumpyGroundReachTheFoodStore` and `aStarvingWorkerSlowsDownAndDies` have each failed once and passed on a re-run): re-run before blaming a change.
 - Confirmed in-game by the user so far: everything up to and including dead ants and the refuse chamber, rich bread, worker hunger, colony starvation, and the hill-jam fix. Older bullets in "Current status" that still say "waiting for the user to confirm" are probably stale (the user tested them and reported no problems), but this was never written down: do not rely on those flags.
