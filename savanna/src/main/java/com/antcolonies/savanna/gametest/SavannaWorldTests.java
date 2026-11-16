@@ -468,9 +468,19 @@ public class SavannaWorldTests {
     public static void riverWidthIsMeasured(GameTestHelper helper) {
         var registries = helper.getLevel().registryAccess();
         List<Integer> widths = new ArrayList<>();
+        List<List<Integer>> byBand = new ArrayList<>();
+        for (int b = 0; b < INLAND_NAMES.length; b++) {
+            byBand.add(new ArrayList<>());
+        }
+        long[] savannaCells = new long[INLAND_NAMES.length], riverCells = new long[INLAND_NAMES.length];
+        List<List<Integer>> depthByBand = new ArrayList<>();
+        for (int b = 0; b < INLAND_NAMES.length; b++) {
+            depthByBand.add(new ArrayList<>());
+        }
         int spots = 0;
         StringBuilder report = new StringBuilder();
         int[][] lines = {{1, 0}, {0, 1}, {1, 1}, {1, -1}};
+        int qy = QuartPos.fromBlock(SavannaSpawn.SAMPLE_Y);
         for (long seed : GROUND_SEEDS) {
             Climate.Sampler sampler = BiomeMaps.sampler(registries, seed);
             MultiNoiseBiomeSource source = BiomeMaps.bigSavannaSource(registries, seed);
@@ -480,18 +490,22 @@ public class SavannaWorldTests {
             List<Integer> cells = new ArrayList<>();
             for (int c = 0; c < map.length; c++) {
                 int i = c / side, j = c % side;
+                if (map[c] == BiomeMaps.SAVANNA) {
+                    savannaCells[inlandBand(sampler, -BiomeMaps.HALF + i * BiomeMaps.STEP, qy, -BiomeMaps.HALF + j * BiomeMaps.STEP)]++;
+                }
                 if (map[c] != BiomeMaps.RIVER || i == 0 || j == 0 || i == side - 1 || j == side - 1) {
                     continue;
                 }
                 if (map[c - 1] == BiomeMaps.SAVANNA || map[c + 1] == BiomeMaps.SAVANNA
                         || map[c - side] == BiomeMaps.SAVANNA || map[c + side] == BiomeMaps.SAVANNA) {
                     cells.add(c);
+                    riverCells[inlandBand(sampler, -BiomeMaps.HALF + i * BiomeMaps.STEP, qy, -BiomeMaps.HALF + j * BiomeMaps.STEP)]++;
                 }
             }
             java.util.Collections.shuffle(cells, new java.util.Random(seed));
             List<Integer> seedWidths = new ArrayList<>();
             for (int c : cells) {
-                if (seedWidths.size() >= RIVER_BANKS) {
+                if (seedWidths.size() >= RIVER_WIDTH_SPOTS) {
                     break;
                 }
                 int x = -BiomeMaps.HALF + (c / side) * BiomeMaps.STEP, z = -BiomeMaps.HALF + (c % side) * BiomeMaps.STEP;
@@ -509,6 +523,9 @@ public class SavannaWorldTests {
                     across = Math.min(across, run * (d[0] != 0 && d[1] != 0 ? Math.sqrt(2) : 1));
                 }
                 seedWidths.add((int) Math.round(across));
+                int band = inlandBand(sampler, x, qy, z);
+                byBand.get(band).add((int) Math.round(across));
+                depthByBand.get(band).add(SEA_TOP + 1 - ground.height(x, z));
             }
             spots += seedWidths.size();
             widths.addAll(seedWidths);
@@ -518,6 +535,16 @@ public class SavannaWorldTests {
         String all = String.format("%d spots; river water width across median %d, 10%% at most %d, 25%% %d, 75%% %d, 90%% %d, widest %d%s",
                 spots, middle(widths, 0.5), middle(widths, 0.1), middle(widths, 0.25), middle(widths, 0.75), middle(widths, 0.9),
                 middle(widths, 1.0), report);
+        StringBuilder bands = new StringBuilder();
+        long allSavanna = java.util.Arrays.stream(savannaCells).sum(), allRiver = java.util.Arrays.stream(riverCells).sum();
+        for (int b = 0; b < INLAND_NAMES.length; b++) {
+            List<Integer> w = byBand.get(b);
+            bands.append(String.format("%n  %s: savanna %.0f%%, river beside savanna %.0f%%, %d spots, width median %d, 25%% %d, 75%% %d, 90%% %d, depth there median %d (90%% %d)",
+                    INLAND_NAMES[b], allSavanna == 0 ? 0 : 100.0 * savannaCells[b] / allSavanna, allRiver == 0 ? 0 : 100.0 * riverCells[b] / allRiver,
+                    w.size(), middle(w, 0.5), middle(w, 0.25), middle(w, 0.75), middle(w, 0.9),
+                    middle(depthByBand.get(b), 0.5), middle(depthByBand.get(b), 0.9)));
+        }
+        all += String.format("%n by how far inland (Minecraft's continentalness bands):%s", bands);
         SavannaMod.LOGGER.info("[biome maps] river width: {}", all);
         helper.assertTrue(spots >= 30, "too few savanna river spots found to measure: " + all);
         helper.succeed();
@@ -525,6 +552,25 @@ public class SavannaWorldTests {
 
     /** How far each way along a line the river's water is followed, in blocks. */
     static final int WIDTH_LOOK = 120;
+    /** River spots measured a seed (more than {@link #RIVER_BANKS}, so each inland band gets enough). */
+    static final int RIVER_WIDTH_SPOTS = 300;
+
+    /**
+     * How far inland a spot is (big savannas, big rivers, step 1, 2026-11-16, {@code docs/plans/big-savannas-big-rivers.md}):
+     * Minecraft's own continentalness bands ({@code OverworldBiomeBuilder}): the ocean and the coast together (rivers
+     * reach the sea there), near inland, mid inland, far inland.
+     */
+    static final String[] INLAND_NAMES = {"coast", "near inland", "mid inland", "far inland"};
+    static final float[] INLAND_FROM = {-0.11F, 0.03F, 0.3F};
+
+    static int inlandBand(Climate.Sampler sampler, int x, int qy, int z) {
+        float c = Climate.unquantizeCoord(sampler.sample(QuartPos.fromBlock(x), qy, QuartPos.fromBlock(z)).continentalness());
+        int band = 0;
+        while (band < INLAND_FROM.length && c >= INLAND_FROM[band]) {
+            band++;
+        }
+        return band;
+    }
 
     /** How far out from the water the floodplain is followed, in blocks. */
     static final int FLOOD_LOOK = 400;

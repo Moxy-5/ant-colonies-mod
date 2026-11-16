@@ -41,11 +41,19 @@ public final class StallWatch {
     static final long LOOK_MS = 10;
     /** At most this many lines of calls in a stall's report. */
     static final int LINES = 40;
+    /**
+     * At most this many looks kept for one slow tick (100 s of looking): past it each new look replaces a kept one at
+     * random, so the looks stay spread over the whole tick and memory stays bounded (a world-making test holding one
+     * tick for minutes ran the server out of memory, big savannas step 1, 2026-11-16).
+     */
+    static final int MAX_LOOKS = 10_000;
 
     private static volatile Thread serverThread;
     private static volatile long tickStart;
     private static final Object LOCK = new Object();
     private static final List<StackTraceElement[]> looks = new ArrayList<>();
+    /** Looks taken during the slow tick now, kept or not (for the random replacement past {@link #MAX_LOOKS}). */
+    private static long looksTaken;
     private static Thread helper;
 
     /** Counts for a summary (the flight run): stalls, their total and longest time (ms). */
@@ -93,6 +101,7 @@ public final class StallWatch {
             }
             taken = new ArrayList<>(looks);
             looks.clear();
+            looksTaken = 0;
         }
         long ms = (System.nanoTime() - start) / 1_000_000;
         if (ms >= SPIKE_MS) {
@@ -111,6 +120,7 @@ public final class StallWatch {
         }
         synchronized (LOCK) {
             looks.clear();
+            looksTaken = 0;
         }
     }
 
@@ -139,7 +149,15 @@ public final class StallWatch {
             StackTraceElement[] stack = server.getStackTrace();
             synchronized (LOCK) {
                 if (tickStart == start) {
-                    looks.add(stack);
+                    looksTaken++;
+                    if (looks.size() < MAX_LOOKS) {
+                        looks.add(stack);
+                    } else {
+                        long j = java.util.concurrent.ThreadLocalRandom.current().nextLong(looksTaken);
+                        if (j < MAX_LOOKS) {
+                            looks.set((int) j, stack);
+                        }
+                    }
                 }
             }
         }

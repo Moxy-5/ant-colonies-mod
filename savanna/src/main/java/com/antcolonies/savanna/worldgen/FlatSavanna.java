@@ -85,7 +85,11 @@ public final class FlatSavanna {
      * Wrapped in this, a part is wired once per wiring and the same wired part handed to every place that uses it: the
      * very object Minecraft's own table would have handed back, so the wired recipe, and the land, are the same.
      *
-     * <p>Remembered per thread (land is made on several at once): the last wiring ({@code Visitor}) seen and its answer.
+     * <p>Remembered per thread (land is made on several at once): the last wiring ({@code Visitor}) seen and, for it,
+     * each part's answer. One memory per thread for every part ({@link #WIRING}), cleared when a new wiring starts, so
+     * at most one wiring per thread is held. (Until 2026-11-16 each part kept its own per-thread memory; the wired copies
+     * made their own too, and as a thread's memory of a copy held the copy's own wiring, none was ever let go: every
+     * ground height worked out kept its whole wiring, about 5 KB, for as long as the thread lived, BUGS 222.)
      */
     public static final class Shared implements DensityFunction {
         static final KeyDispatchDataCodec<Shared> CODEC = KeyDispatchDataCodec.of(
@@ -96,12 +100,16 @@ public final class FlatSavanna {
          */
         public static volatile boolean off = Boolean.getBoolean("antcolonies.landWiringOld");
 
-        private record Wired(Visitor visitor, DensityFunction result) {
+        /** A thread's memory: the wiring it is in and each part's wired answer in it (by the part itself, not equality). */
+        private static final class Wiring {
+            Visitor visitor;
+            final java.util.IdentityHashMap<Shared, DensityFunction> wired = new java.util.IdentityHashMap<>();
         }
+
+        private static final ThreadLocal<Wiring> WIRING = ThreadLocal.withInitial(Wiring::new);
 
         private final DensityFunction argument;
         private final int hash;
-        private volatile ThreadLocal<Wired> last;
 
         public Shared(DensityFunction argument) {
             this.argument = argument;
@@ -127,21 +135,22 @@ public final class FlatSavanna {
             if (off) {
                 return visitor.apply(new Shared(argument.mapAll(visitor)));
             }
-            ThreadLocal<Wired> memory = last;
-            if (memory == null) {
-                synchronized (this) {
-                    memory = last;
-                    if (memory == null) {
-                        memory = last = new ThreadLocal<>();
-                    }
-                }
+            Wiring memory = WIRING.get();
+            if (memory.visitor != visitor) {
+                memory.visitor = visitor;
+                memory.wired.clear();
             }
-            Wired wired = memory.get();
-            if (wired != null && wired.visitor == visitor) {
-                return wired.result;
+            DensityFunction known = memory.wired.get(this);
+            if (known != null) {
+                return known;
             }
             DensityFunction result = visitor.apply(new Shared(argument.mapAll(visitor)));
-            memory.set(new Wired(visitor, result));
+            if (memory.visitor != visitor) {
+                // another wiring ran inside this one (and cleared the memory): start this one's memory again
+                memory.visitor = visitor;
+                memory.wired.clear();
+            }
+            memory.wired.put(this, result);
             return result;
         }
 

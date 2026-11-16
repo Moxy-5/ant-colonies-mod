@@ -38,6 +38,33 @@ This plan takes in `docs/plans/no-small-savannas.md` (its steps are step 2 here)
 - a try-out of the channel edge set by continentalness on a test map, the land and the river biome lined up.
 - Nothing changes in-game.
 
+**Step 1 results (2026-11-16, branch `claude/big-rivers`; nothing changes in-game):**
+- **Savanna land by how far inland** (savanna cells of the biome maps, 3 seeds; `riverWidthIsMeasured` now prints it):
+  coast 5 percent, near inland 23, mid inland 38, far inland 34. River beside savanna splits the same way. So wide
+  rivers keyed on Minecraft's bands are near inland and the coast, about 28 percent of savanna river length, and the
+  mid-width ones about 38 percent: real wide rivers, not a rarity, and no need to move the bands.
+- **Today's widths do not follow inland at all:** median 22 to 26 in every band (Minecraft's one river pattern).
+- **The try-out works.** `tools/flat_savannas/flat_offset.py ... wide` (a new option; without it the land is
+  today's, byte for byte) gives each spot one of three river profiles across the river, blended by continentalness:
+  today's far inland (from 0.30), a channel to pv -0.72 with our own deeper bed at mid inland (0.15), a channel to pv
+  -0.58 near inland and at the coast's inner edge (-0.11 to -0.02), today's again in the sea (to -0.19, so no sea floor
+  is pulled up); the floodplain moved out as far, then the same rise to the plain. Measured on a test build of it:
+  | band | today | try-out |
+  |---|---|---|
+  | far inland | 22 to 26 | 22 (25 percent 13, 90 percent 51) |
+  | mid inland | 22 to 26 | 31 (75 percent 52, 90 percent 80) |
+  | near inland | 22 to 26 | 54 (75 percent 81, 90 percent 110) |
+  | coast | 22 to 26 | 36 (fading back to today's toward the sea) |
+  Depth at the river's middle a median 7 (far inland 5). On the try-out the other world tests passed (gentle ground,
+  floodplain a block over the water with no drops, the floodplain trees, the banks, the big savannas); only the land
+  fingerprint test failed, as it must for a land change. The river **biome** was not widened yet, so the wide water is
+  partly in floodplain and savanna biome: step 4 widens the biome band with the land.
+- **For step 4:** the widths came out lower than the targets (mid about 40, near 60 to 100): move the wide channel
+  edges out a little (mid to about pv -0.65, wide to about -0.50), and check the shallows along the sides (only the
+  middle's depth was measured).
+- **Found on the way: a memory leak in the land's wiring** (`docs/BUGS.md` 222): every ground height the land worked
+  out stayed in memory for good, in play too; fixed (`FlatSavanna.Shared`), and the slow-tick watcher capped.
+
 **Step 2, no small savannas** (`docs/plans/no-small-savannas.md`, its steps 1 to 3): our own region in place of
 Minecraft's (the index check), Minecraft's savannas there turned to plains (windswept ones to windswept hills, my
 pick), the leftover small patches counted on the biome maps and tuned.
