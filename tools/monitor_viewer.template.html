@@ -1,0 +1,356 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Nile Monitor Viewer</title>
+<style>
+  :root { --bg: #f1efe8; --panel: #fdfcf8; --ink: #2a2a22; --muted: #6a675a; --line: #d9d4c4; --accent: #8a6a12; }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) { --bg: #1a1a16; --panel: #23231e; --ink: #ecebe2; --muted: #a5a291; --line: #3a3930; --accent: #e2b84a; }
+  }
+  :root[data-theme="dark"] { --bg: #1a1a16; --panel: #23231e; --ink: #ecebe2; --muted: #a5a291; --line: #3a3930; --accent: #e2b84a; }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font: 15px/1.45 system-ui, sans-serif; }
+  header { padding: 14px 16px 6px; }
+  h1 { margin: 0 0 4px; font-size: 20px; }
+  header p { margin: 0; color: var(--muted); max-width: 82ch; }
+  #wrap { position: relative; height: 62vh; min-height: 340px; margin: 10px 16px; border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
+  canvas { display: block; width: 100%; height: 100%; }
+  #labels { position: absolute; inset: 0; pointer-events: none; overflow: hidden; }
+  .tag { position: absolute; transform: translate(-50%, -100%); background: var(--panel); border: 1px solid var(--line); border-radius: 6px;
+         padding: 1px 6px; font-size: 12px; font-weight: 600; white-space: nowrap; }
+  .controls { display: flex; flex-wrap: wrap; gap: 8px 14px; padding: 0 16px 8px; align-items: center; }
+  .controls label { display: flex; gap: 8px; align-items: center; font-size: 14px; }
+  .controls input[type=range] { width: 180px; max-width: 50vw; }
+  .readout { color: var(--muted); font-size: 13px; }
+  button { font: inherit; padding: 6px 12px; border-radius: 8px; border: 1px solid var(--line); background: var(--panel); color: var(--ink); cursor: pointer; }
+  button.on { border-color: var(--accent); color: var(--accent); font-weight: 600; }
+  ul { margin: 8px 16px 24px; padding-left: 22px; max-width: 82ch; }
+  li { margin: 4px 0; }
+  li b { color: var(--accent); }
+</style>
+</head>
+<body>
+<header>
+  <h1>Nile monitor viewer</h1>
+  <p>Built from your picture. One stands on the sand bank and watches you (its pupils and head follow the camera, it
+     blinks with its lower lids and flicks its tongue), one walks, one stands tall and hisses with its throat swollen
+     and its tail lashing, one swims. The game's crocodile, a player and a block stand by for scale. Drag to turn,
+     scroll or pinch to zoom, right-drag to slide.</p>
+</header>
+<div id="wrap"><canvas id="c"></canvas><div id="labels"></div></div>
+<div class="controls" id="looks"><span class="readout">Colours:</span></div>
+<div class="controls">
+  <label>Length <input id="size" type="range" min="0.8" max="4" step="0.1"> <span id="sizeOut" class="readout"></span></label>
+  <span id="boxes" class="readout"></span>
+</div>
+<div class="controls" id="cams"></div>
+<ul id="list"></ul>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+<script>
+const DATA = /*DATA*/null;
+const canvas = document.getElementById('c');
+const wrap = document.getElementById('wrap');
+const renderer = new THREE.WebGLRenderer({canvas, antialias: true, preserveDrawingBuffer: true});
+renderer.setPixelRatio(window.devicePixelRatio);
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+const scene = new THREE.Scene();
+const SKY = new THREE.Color('#a9cde0');
+scene.background = SKY;
+scene.fog = new THREE.Fog(SKY, 30, 80);
+const camera = new THREE.PerspectiveCamera(35, 1, 0.01, 300);
+const controls = new THREE.OrbitControls(camera, canvas);
+scene.add(new THREE.HemisphereLight('#fff7e6', '#7a6a48', 0.75));
+const sun = new THREE.DirectionalLight('#fff4d8', 0.75);
+sun.position.set(8, 20, 10);
+sun.castShadow = true;
+sun.shadow.mapSize.set(2048, 2048);
+sun.shadow.bias = -0.0004;
+Object.assign(sun.shadow.camera, {left: -22, right: 22, top: 22, bottom: -22, near: 0.5, far: 60});
+scene.add(sun);
+
+function deg(v) { return v * Math.PI / 180; }
+function clamp(v, a, b) { return Math.max(a, Math.min(b, v)); }
+function setRot(obj, r) { obj.rotation.set(deg(-r[0]), deg(r[1]), deg(-r[2]), 'ZYX'); }
+function loadTexture(uri, rx, ry) {
+  const t = new THREE.TextureLoader().load(uri);
+  t.magFilter = THREE.NearestFilter;
+  t.minFilter = THREE.NearestFilter;
+  if (rx) { t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(rx, ry || rx); }
+  return t;
+}
+const rand = (() => { let s = 11; return () => (s = (s * 16807) % 2147483647) / 2147483647; })();
+
+// The bank: river sand (z below 0) dropping into the river (z above 0), a silt bed 3 blocks down.
+const BANK = 0, SURFACE = -0.15, BED = -3;
+const land = new THREE.Mesh(new THREE.PlaneGeometry(80, 30), new THREE.MeshLambertMaterial({map: loadTexture(DATA.blocks.sand, 80, 30)}));
+land.rotation.x = -Math.PI / 2; land.position.set(0, BANK, -15); land.receiveShadow = true; scene.add(land);
+const edge = new THREE.Mesh(new THREE.PlaneGeometry(80, 3), new THREE.MeshLambertMaterial({map: loadTexture(DATA.blocks.wet_sand, 80, 3)}));
+edge.position.set(0, (BANK + BED) / 2, 0); scene.add(edge);
+const bed = new THREE.Mesh(new THREE.PlaneGeometry(80, 40), new THREE.MeshLambertMaterial({map: loadTexture(DATA.blocks.silt, 80, 40), color: '#b8b09a'}));
+bed.rotation.x = -Math.PI / 2; bed.position.set(0, BED, 20); bed.receiveShadow = true; scene.add(bed);
+const water = new THREE.Mesh(new THREE.PlaneGeometry(80, 40), new THREE.MeshLambertMaterial({color: '#6f8a5a', transparent: true, opacity: 0.55, side: THREE.DoubleSide, depthWrite: false}));
+water.rotation.x = -Math.PI / 2; water.position.set(0, SURFACE, 20); water.renderOrder = 2; scene.add(water);
+
+// --- models ------------------------------------------------------------------------------------------------------------
+const FACES = ['east', 'west', 'up', 'down', 'south', 'north'];
+function boxGeometry(c, tw, th) {
+  const g = new THREE.BoxGeometry(Math.max(c.size[0], 0.02), Math.max(c.size[1], 0.02), Math.max(c.size[2], 0.02));
+  const uv = g.attributes.uv;
+  FACES.forEach((f, i) => {
+    const face = c.uv && c.uv[f];
+    if (!face) return;
+    const [u0, v0] = face.uv, [w, h] = face.uv_size;
+    for (let k = 0; k < 4; k++) {
+      const j = i * 4 + k;
+      uv.setXY(j, (u0 + uv.getX(j) * w) / tw, 1 - (v0 + (1 - uv.getY(j)) * h) / th);
+    }
+  });
+  uv.needsUpdate = true;
+  return g;
+}
+
+// centre: 'origin' keeps the model's own middle (the monitor turns about its body), 'ground' centres it on its bounds.
+function build(look, mat, centre) {
+  const root = new THREE.Group(), groups = {}, byName = {};
+  look.bones.forEach(b => byName[b.name] = b);
+  look.bones.forEach(b => {
+    const g = new THREE.Group();
+    const p = b.parent ? byName[b.parent].pivot : [0, 0, 0];
+    g.position.set(b.pivot[0] - p[0], b.pivot[1] - p[1], b.pivot[2] - p[2]);
+    if (b.rotation) setRot(g, b.rotation);
+    g.userData.base = g.rotation.clone();
+    g.userData.basePos = g.position.clone();
+    groups[b.name] = g;
+    (b.cubes || []).forEach(c => {
+      const mesh = new THREE.Mesh(boxGeometry(c, look.w, look.h), mat);
+      mesh.castShadow = true; mesh.receiveShadow = true;
+      mesh.position.set(c.origin[0] + c.size[0] / 2 - b.pivot[0], c.origin[1] + c.size[1] / 2 - b.pivot[1], c.origin[2] + c.size[2] / 2 - b.pivot[2]);
+      g.add(mesh);
+    });
+  });
+  look.bones.forEach(b => (b.parent ? groups[b.parent] : root).add(groups[b.name]));
+  root.scale.setScalar(1 / 16);
+  const bounds = new THREE.Box3().setFromObject(root);
+  const c = bounds.getCenter(new THREE.Vector3());
+  if (centre === 'ground') root.position.set(-c.x, 0, -c.z);
+  const yaw = new THREE.Group(); yaw.add(root);
+  yaw.userData = {groups, root, length: bounds.max.z - bounds.min.z, phase: rand() * 6.28};
+  scene.add(yaw);
+  return yaw;
+}
+
+const settings = {size: 2.2, cam: 'overview', look: DATA.gameLook};
+location.hash.slice(1).split('&').filter(Boolean).forEach(kv => {
+  const [k, v] = kv.split('=').map(decodeURIComponent);
+  settings[k] = isNaN(parseFloat(v)) ? v : parseFloat(v);
+});
+
+const tags = [];
+function tag(text, obj, height) {
+  const el = document.createElement('div');
+  el.className = 'tag'; el.textContent = text;
+  document.getElementById('labels').appendChild(el);
+  tags.push({el, obj, height});
+}
+
+const textures = {};
+Object.entries(DATA.looks).forEach(([k, l]) => textures[k] = loadTexture(l.texture));
+const skin = new THREE.MeshLambertMaterial({map: textures[settings.look] || textures[DATA.gameLook], alphaTest: 0.5});
+const MODEL = {bones: DATA.bones, w: DATA.w, h: DATA.h};
+const monitors = [['idle', 'Watching you'], ['walk', 'Walking'], ['hiss', 'Hissing'], ['swim', 'Swimming']].map(([key, label]) => {
+  const m = build(MODEL, skin, 'origin');
+  m.userData.key = key;
+  m.userData.blinkAt = 1 + rand() * 3; m.userData.tongueAt = 0.5 + rand() * 2;
+  m.userData.blink = -9; m.userData.tongue = -9;
+  m.userData.eye = {left: [0, 0], right: [0, 0]}; m.userData.glance = [0, 0]; m.userData.glanceAt = 0; m.userData.turn = 0;
+  tag(label, m, () => settings.size * (key === 'hiss' ? 0.42 : 0.34));
+  return m;
+});
+const [idler, walker, hisser, swimmer] = monitors;
+const croc = build(DATA.croc, new THREE.MeshLambertMaterial({map: loadTexture(DATA.croc.texture), alphaTest: 0.5}), 'ground');
+tag('Crocodile, 6.1 blocks', croc, () => 1.0);
+const player = new THREE.Group();
+[[0.5, 0.75, 0.25, 0.375, '#3b4a8f'], [0.5, 0.75, 0.25, 1.125, '#2f9c9c'], [0.5, 0.5, 0.5, 1.55, '#b98a68']].forEach(([w, h, d, y, col]) => {
+  const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), new THREE.MeshLambertMaterial({color: col}));
+  m.position.y = y; m.castShadow = true; player.add(m);
+});
+scene.add(player); tag('Player, 1.8 blocks', player, () => 1.85);
+const block = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), new THREE.MeshLambertMaterial({map: loadTexture(DATA.blocks.wet_sand)}));
+block.castShadow = true; scene.add(block); tag('1 block', block, () => 0.55);
+
+const sizeIn = document.getElementById('size');
+sizeIn.value = settings.size;
+function k() { return settings.size / idler.userData.length; }       // blocks a model unit (after the 1/16)
+function layout() {
+  const s = settings.size;
+  monitors.forEach(m => m.scale.setScalar(k()));
+  idler.position.set(-s * 0.2, 0, -0.9 - s * 0.25); idler.rotation.y = deg(115);
+  hisser.position.set(-s * 1.9 - 0.8, 0, -1.6 - s * 0.5); hisser.rotation.y = deg(-70);
+  croc.scale.setScalar(6.1 / croc.userData.length);
+  croc.position.set(0, 0, -5.2 - s * 1.2); croc.rotation.y = Math.PI / 2;
+  player.position.set(s * 0.9 + 0.9, BANK, -1.1);
+  block.position.set(s * 0.9 + 2.1, BANK + 0.5, -1.1);
+  document.getElementById('sizeOut').textContent = s.toFixed(1) + ' blocks long (a block a metre: grown Nile monitors are 1.2 to 2.2 m, your picture says 2.0 to 2.7)';
+}
+sizeIn.addEventListener('input', () => { settings.size = parseFloat(sizeIn.value); layout(); });
+document.getElementById('boxes').textContent = DATA.boxes + ' boxes, ' + DATA.bones.length + ' bones';
+
+// --- clips -------------------------------------------------------------------------------------------------------------
+function rest(g) {
+  Object.values(g).forEach(b => { b.rotation.copy(b.userData.base); b.position.copy(b.userData.basePos); b.scale.setScalar(1); });
+}
+function play(g, name, t, once) {
+  const clip = DATA.clips[name];
+  const u = once ? clamp(t / clip.length, 0, 1) : ((t / clip.length) % 1 + 1) % 1;
+  const f = u * clip.steps, i = Math.min(clip.steps, Math.floor(f)), a = f - i, j = Math.min(clip.steps, i + 1);
+  Object.entries(clip.bones).forEach(([bone, chans]) => {
+    const b = g[bone];
+    if (!b) return;
+    const at = ch => chans[ch] && chans[ch][i].map((v, n) => v + (chans[ch][j][n] - v) * a);
+    const r = at('rotation');
+    if (r) b.rotation.set(b.rotation.x + deg(-r[0]), b.rotation.y + deg(r[1]), b.rotation.z + deg(-r[2]));
+    const p = at('position');
+    if (p) b.position.set(b.position.x - p[0], b.position.y + p[1], b.position.z + p[2]);
+    const sc = at('scale');
+    if (sc) b.scale.set(...sc);
+  });
+}
+const local = new THREE.Vector3();
+function animate(m, t) {
+  const u = m.userData, g = u.groups, key = u.key;
+  rest(g);
+  play(g, key, t + u.phase);
+  // blinking and the tongue, each a short clip over the other, at its own odd times
+  if (t > u.blinkAt) { u.blink = t; u.blinkAt = t + 2 + rand() * 4.5; }
+  if (settings.blink !== undefined) play(g, 'blink', settings.blink, true);     // #blink=0.15 holds a blink (pictures)
+  else if (t - u.blink < DATA.clips.blink.length) play(g, 'blink', t - u.blink, true);
+  if (settings.tongue !== undefined && key !== 'hiss') play(g, 'tongue', settings.tongue, true);   // #tongue=0.4 likewise
+  else if (key !== 'hiss') {
+    if (t > u.tongueAt) { u.tongue = t; u.tongueAt = t + (key === 'swim' ? 4 : 1.6) + rand() * 3; }
+    if (t - u.tongue < DATA.clips.tongue.length) play(g, 'tongue', t - u.tongue, true);
+  }
+  // the eyes: the one watching you turns its pupils and its head to the camera; the others glance about
+  let want = {left: u.glance, right: u.glance};
+  if (key === 'idle') {
+    m.updateMatrixWorld(true);
+    local.copy(camera.position); m.worldToLocal(local);
+    const turn = clamp(Math.atan2(-local.x, -local.z + 1.0), -deg(55), deg(55)) * 0.75;
+    u.turn += (turn - u.turn) * 0.06;
+    g.neck1.rotation.y += u.turn * 0.25; g.neck2.rotation.y += u.turn * 0.3; g.head.rotation.y += u.turn * 0.45;
+    m.updateMatrixWorld(true);
+    want = {};
+    [['left', 1], ['right', -1]].forEach(([side, s]) => {
+      local.copy(camera.position); g.head.worldToLocal(local);
+      local.x -= s * 2.6; local.y -= 1.0; local.z += 4.25;
+      local.normalize();
+      want[side] = local.x * s > -0.25 ? [clamp(local.z * 0.75, -0.5, 0.5), clamp(local.y * 0.45, -0.25, 0.25)] : [-0.35, 0];
+    });
+  } else if (t > u.glanceAt) {
+    u.glance = [rand() - 0.5, (rand() - 0.5) * 0.4]; u.glanceAt = t + 0.8 + rand() * 2.2;
+  }
+  ['left', 'right'].forEach(side => {
+    const e = u.eye[side], b = g['pupil_' + side];
+    e[0] += (want[side][0] - e[0]) * 0.2; e[1] += (want[side][1] - e[1]) * 0.2;
+    b.position.z = b.userData.basePos.z + e[0]; b.position.y = b.userData.basePos.y + e[1];
+  });
+}
+
+// --- cameras -----------------------------------------------------------------------------------------------------------
+const I = () => idler.position, HEAD = () => {
+  const s = settings.size, a = idler.rotation.y;
+  return [I().x - Math.sin(a) * s * 0.3, s * 0.13, I().z - Math.cos(a) * s * 0.3];
+};
+const CAMS = {
+  overview: () => { const s = settings.size; return [[-s * 0.6, 1.0 + s * 0.8, 3.2 + s * 2.0], [-s * 0.3, 0.2, -1.2 - s * 0.3]]; },
+  'side': () => { const p = I(), s = settings.size, a = idler.rotation.y; return [[p.x - Math.cos(a) * s * 0.95 - Math.sin(a) * s * 0.1, s * 0.22, p.z + Math.sin(a) * s * 0.95 - Math.cos(a) * s * 0.1], [p.x + Math.sin(a) * s * 0.12, s * 0.09, p.z + Math.cos(a) * s * 0.12]]; },
+  'other side': () => { const p = I(), s = settings.size, a = idler.rotation.y; return [[p.x + Math.cos(a) * s * 0.95 - Math.sin(a) * s * 0.1, s * 0.22, p.z - Math.sin(a) * s * 0.95 - Math.cos(a) * s * 0.1], [p.x + Math.sin(a) * s * 0.12, s * 0.09, p.z + Math.cos(a) * s * 0.12]]; },
+  'face, close': () => { const h = HEAD(), s = settings.size, a = idler.rotation.y; return [[h[0] - Math.cos(a) * s * 0.3 - Math.sin(a) * s * 0.22, h[1] + s * 0.08, h[2] + Math.sin(a) * s * 0.3 - Math.cos(a) * s * 0.22], h]; },
+  'eye': () => { const h = HEAD(), s = settings.size, a = idler.rotation.y; return [[h[0] - Math.cos(a) * s * 0.17 + Math.sin(a) * s * 0.02, h[1] + s * 0.03, h[2] + Math.sin(a) * s * 0.17 + Math.cos(a) * s * 0.02], [h[0] + Math.sin(a) * s * 0.06, h[1] + s * 0.01, h[2] + Math.cos(a) * s * 0.06]]; },
+  'front': () => { const h = HEAD(), s = settings.size, a = idler.rotation.y; return [[h[0] - Math.sin(a) * s * 0.75, s * 0.2, h[2] - Math.cos(a) * s * 0.75], [h[0], s * 0.1, h[2]]]; },
+  'back': () => { const p = I(), s = settings.size, a = idler.rotation.y; return [[p.x + Math.sin(a) * s * 1.4, s * 0.45, p.z + Math.cos(a) * s * 1.4], [p.x, s * 0.08, p.z]]; },
+  'top': () => { const p = I(), s = settings.size; return [[p.x + 0.001, s * 1.5, p.z + 0.001], [p.x, 0, p.z]]; },
+  'walking': () => { const p = walker.position, s = settings.size, a = walker.rotation.y; return [[p.x - Math.cos(a) * s * 0.9 + Math.sin(a) * s * 0.25, s * 0.3, p.z + Math.sin(a) * s * 0.9 + Math.cos(a) * s * 0.25], [p.x, s * 0.08, p.z]]; },
+  'hissing': () => { const p = hisser.position, s = settings.size; return [[p.x + s * 0.9, s * 0.3, p.z + s * 1.0], [p.x + s * 0.1, s * 0.14, p.z]]; },
+  'swimming': () => { const p = swimmer.position, s = settings.size, a = swimmer.rotation.y; return [[p.x - Math.cos(a) * s * 0.9 + Math.sin(a) * s * 0.3, SURFACE + s * 0.35, p.z + Math.sin(a) * s * 0.9 + Math.cos(a) * s * 0.3], [p.x, SURFACE, p.z]]; },
+  'with the crocodile': () => { const s = settings.size; return [[-s * 0.5, 1.6 + s * 0.6, 3.5 + s * 1.5], [0, 0.2, -3 - s * 0.6]]; },
+};
+const camBox = document.getElementById('cams');
+let follow = false;
+controls.addEventListener('start', () => { follow = false; });
+function setCam(name) {
+  settings.cam = name; follow = name === 'walking' || name === 'swimming';
+  const [pos, target] = CAMS[name]();
+  camera.position.set(...pos); controls.target.set(...target); controls.update();
+  [...camBox.children].forEach(b => b.classList.toggle('on', b.textContent === name));
+}
+Object.keys(CAMS).forEach(name => {
+  const b = document.createElement('button');
+  b.textContent = name; b.onclick = () => setCam(name);
+  camBox.appendChild(b);
+});
+const lookBox = document.getElementById('looks'), list = document.getElementById('list');
+function setLook(key) {
+  settings.look = key;
+  skin.map = textures[key]; skin.needsUpdate = true;
+  [...lookBox.querySelectorAll('button')].forEach(b => b.classList.toggle('on', b.dataset.key === key));
+  list.innerHTML = '';
+  Object.entries(DATA.looks).forEach(([kk, l]) => {
+    const li = document.createElement('li');
+    li.innerHTML = '<b>' + kk + ', ' + l.name + (kk === key ? ' (shown)' : '') + ':</b> ' + l.note;
+    list.appendChild(li);
+  });
+}
+Object.entries(DATA.looks).forEach(([key, l]) => {
+  const b = document.createElement('button');
+  b.textContent = key + ': ' + l.name; b.dataset.key = key; b.onclick = () => setLook(key);
+  lookBox.appendChild(b);
+});
+
+function resize() {
+  const w = wrap.clientWidth, h = wrap.clientHeight;
+  renderer.setSize(w, h, false);
+  camera.aspect = w / h; camera.updateProjectionMatrix();
+}
+window.addEventListener('resize', resize);
+
+const v = new THREE.Vector3();
+const FROZEN = settings.t !== undefined;      // #t=1.5 holds the clips at that time (for pictures)
+function frame() {
+  const t = FROZEN ? settings.t : performance.now() / 1000, s = settings.size;
+  // the walker goes round a ring on the bank, as fast as its feet take it
+  const R = s * 1.05, speed = DATA.stride * k() / 16 / DATA.clips.walk.length, a = (t + walker.userData.phase) * speed / R;
+  walker.position.set(s * 1.3 + Math.cos(a) * R, 0, -1.6 - s * 1.0 + Math.sin(a) * R * 0.999);
+  walker.rotation.y = Math.PI - a;
+  const b = t * 0.16;
+  swimmer.position.set(Math.cos(b) * s * 1.3, SURFACE - 0.58 * s / 2.2 * 0.5, 2.6 + s * 0.9 + Math.sin(b) * s * 0.7);
+  swimmer.rotation.y = Math.PI - b;
+  monitors.forEach(m => animate(m, t));
+  if (follow) {   // the walking and swimming cameras keep beside their monitor until you drag them
+    const [pos, target] = CAMS[settings.cam]();
+    camera.position.set(...pos); controls.target.set(...target);
+  }
+  controls.update();
+  renderer.render(scene, camera);
+  const w = wrap.clientWidth, h = wrap.clientHeight;
+  tags.forEach(({el, obj, height}) => {
+    v.set(obj.position.x, obj.position.y + height() + 0.1, obj.position.z).project(camera);
+    const show = v.z < 1 && Math.abs(v.x) < 1.1 && Math.abs(v.y) < 1.1 && !settings.notags;
+    el.style.display = show ? '' : 'none';
+    el.style.left = ((v.x + 1) / 2 * w) + 'px';
+    el.style.top = ((1 - v.y) / 2 * h) + 'px';
+  });
+  requestAnimationFrame(frame);
+}
+if (settings.big) { wrap.style.height = '96vh'; wrap.style.margin = '4px'; document.querySelector('header').style.display = 'none'; }
+layout();
+resize();
+setLook(DATA.looks[settings.look] ? settings.look : DATA.gameLook);
+setCam(CAMS[settings.cam] ? settings.cam : 'overview');
+frame();
+</script>
+</body>
+</html>

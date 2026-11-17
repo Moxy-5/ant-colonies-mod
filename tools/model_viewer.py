@@ -582,6 +582,37 @@ def crocodile_page(out):
     print("wrote", out)
 
 
+def monitor_page(out):
+    """The Nile monitor (M9 river life, monitor_models.py), from the user's picture: one standing on a sand bank whose
+    eyes and head follow the camera, one walking, one hissing, one swimming, each playing the model's own clips, with
+    the game's crocodile, a player and a block for scale, three yellows to compare and a size slider."""
+    import monitor_models as mm
+    import crocodile_models as cr
+    import tilapia_models as tm
+    bones = mm.model()
+    looks, painted = {}, None
+    for key, look in mm.LOOKS.items():
+        painted, rows, w, h = mm.paint(bones, key)
+        looks[key] = {"name": look["name"], "note": look["note"], "texture": uri(tm.png(rows))}
+    clips = {}
+    for name, c in mm.clips().items():
+        times = sorted({t for ch in c["bones"].values() for keys in ch.values() for t in keys}, key=float)
+        clips[name] = {"length": c["animation_length"], "steps": len(times) - 1,
+                       "bones": {bone: {ch: [keys[t] for t in times] for ch, keys in chans.items()}
+                                 for bone, chans in c["bones"].items()}}
+    cb, rows, cw, ch = cr.paint(cr.model(), "A")
+    blocks = {"sand": file_uri("golden_river_sand.png"), "wet_sand": file_uri("wet_golden_river_sand.png"),
+              "silt": file_uri("silt.png")}
+    data = {"looks": looks, "gameLook": mm.GAME_LOOK, "bones": painted, "w": w, "h": h, "clips": clips,
+            "stride": mm.stride(), "blocks": blocks,
+            "croc": {"bones": cb, "texture": uri(tm.png(rows)), "w": cw, "h": ch},
+            "boxes": sum(len(b.get("cubes", [])) for b in bones)}
+    template = (Path(__file__).resolve().parent / "monitor_viewer.template.html").read_text(encoding="utf-8")
+    out.parent.mkdir(parents=True, exist_ok=True)
+    out.write_text(template.replace("/*DATA*/null", json.dumps(data)), encoding="utf-8")
+    print("wrote", out)
+
+
 def crab_page(out):
     """The river crab (M9 river life, the clean-up crew, crab_models.py), from the user's picture: one walking sideways
     on a silt bank, one with its claws up, one picking at algae on the river bed, a tilapia, a player and a block for
@@ -708,6 +739,9 @@ def main():
         return
     if len(sys.argv) > 1 and sys.argv[1] == "snail":
         snail_page(Path(sys.argv[2]) if len(sys.argv) > 2 else ROOT / "references/snail_viewer.html")
+        return
+    if len(sys.argv) > 1 and sys.argv[1] == "monitor":
+        monitor_page(Path(sys.argv[2]) if len(sys.argv) > 2 else ROOT / "references/monitor_viewer.html")
         return
     if len(sys.argv) > 1 and sys.argv[1] == "crab":
         crab_page(Path(sys.argv[2]) if len(sys.argv) > 2 else ROOT / "references/crab_viewer.html")
