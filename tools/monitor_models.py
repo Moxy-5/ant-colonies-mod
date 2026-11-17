@@ -7,7 +7,8 @@ models. The user's rule for this one: only some parts need heavy detail. So:
   cross-section (three overlapping boxes, wide, tall and between, so it reads as round), and the chain is BENT a few
   degrees at every joint (bone rest rotations), so the tail curves down to the ground and the neck sweeps up into the
   head with no staircase. The head narrows into the snout in one-pixel slices, its top and bottom edges bevelled.
-- The body and legs stay chunky boxes, as in the picture (that is its Minecraft look).
+- The body stays a chunky box, as in the picture (that is its Minecraft look); the legs are round, tapering
+  from the muscle to round joints (the user's ask, 2026-11-17).
 - Colours are plain for now (step 2, the shape only); the pattern is step 3, the clips step 4.
 
 Units are model pixels (16 a block), 96 long (6 blocks, the user's size for now). The head points to -Z, up is +Y,
@@ -60,7 +61,7 @@ def rounded(cubes, cx, cy, rw, rh, z0, z1, part):
     cubes.append(cube([cx - rw * 0.85, cy - rh * 0.85, z0], [cx + rw * 0.85, cy + rh * 0.85, z1], part))
 
 
-# --- the body and legs: chunky boxes ---------------------------------------------------------------------------------
+# --- the body: chunky boxes; the legs: round pieces ------------------------------------------------------------------------------
 def body():
     z0, z1 = BODY_Z
     y0, y1 = BODY_Y
@@ -123,14 +124,18 @@ def _len(v):
 # Where each leg's joints sit (the left side; the right is the mirror), in model pixels: shoulder or hip, elbow or
 # knee, wrist or ankle. The upper part runs out and down from the body, the elbow or knee sticking out to the side; the
 # fore arm slants down and forward to the hand, the shin down and back to the foot (as in the user's picture), the
-# feet flat and turned out, the toes fanned. Then the thicknesses (upper, lower), the joint knob, the foot's turn and
-# palm, and the five toes (inner to outer): length and fan angle (outward +); every toe raised a little at the knuckle.
+# feet flat and turned out, the toes fanned. Then each piece's roundness: 'upper' and 'lower' are its radius along it
+# (fraction along, radius in pixels: thick at the muscle, slimmer toward the next joint), 'knob' and 'wrist' the radius
+# of the round elbow or knee and wrist or ankle; then the foot's turn and palm, and the five toes (inner to outer):
+# length and fan angle (outward +); every toe raised a little at the knuckle.
 LEG_PLANS = {
     'arm': {'joints': ((4.0, 11.0, -21.5), (10.5, 7.5, -22.5), (10.8, 2.3, -25.0)),
-            'thick': (4.0, 3.4), 'knob': 4.0, 'wrist': 4.2, 'turn': 18.0, 'palm': (4.6, 3.6),
+            'upper': ((0.0, 2.0), (0.35, 2.2), (1.0, 1.55)), 'lower': ((0.0, 1.7), (0.25, 1.85), (1.0, 1.25)),
+            'knob': 1.95, 'wrist': 1.55, 'turn': 18.0, 'palm': (4.6, 3.6),
             'toes': ((2.6, -34.0), (3.4, -14.0), (3.9, 2.0), (3.6, 18.0), (2.8, 38.0)), 'raise': 14.0},
-    'leg': {'joints': ((4.0, 10.5, -4.0), (11.2, 8.5, -6.0), (11.8, 3.0, -2.6)),
-            'thick': (4.6, 3.8), 'knob': 5.0, 'wrist': 4.0, 'hinge': True, 'turn': 38.0, 'palm': (5.0, 4.4),
+    'leg': {'joints': ((4.0, 10.5, -4.0), (11.2, 8.5, -6.0), (11.8, 2.6, -2.6)),
+            'upper': ((0.0, 2.3), (0.35, 2.55), (1.0, 1.8)), 'lower': ((0.0, 1.95), (0.25, 2.1), (1.0, 1.35)),
+            'knob': 2.25, 'wrist': 1.75, 'hinge': True, 'turn': 38.0, 'palm': (5.0, 4.4),
             'toes': ((2.6, -30.0), (3.6, -12.0), (4.2, 4.0), (4.6, 20.0), (3.0, 46.0)), 'raise': 14.0},
 }
 CLAW_DROP = 23.0     # how far each claw bends down from its toe (degrees); the hook below curves it on to the ground
@@ -161,6 +166,71 @@ def _cross(a, b):
     return [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]]
 
 
+# Round leg pieces (the user, 2026-11-17: the legs needed more pixels and to be round to look good). A cross-section
+# is four boxes at quarter-pixel sizes (wide, tall and two between), close to a circle; a piece is cut into half-pixel
+# slices along its own line, each slice's radius read off its profile and rounded to a quarter pixel, and slices of the
+# same size joined into one, so a taper costs boxes only where it really changes.
+ROUND = ((1.0, 0.4), (0.4, 1.0), (0.93, 0.68), (0.68, 0.93))
+
+
+def _q(r):
+    return round(r * 4) / 4
+
+
+def _disc(cubes, axis, centre, r, a0, a1, part):
+    """One round slice of radius r along an axis (0 x, 1 y, 2 z) from a0 to a1, its middle at centre (a point)."""
+    u, v = [i for i in range(3) if i != axis]
+    lo, hi = sorted((a0, a1))
+    for fu, fv in (ROUND if r >= 0.9 else ((1.0, 1.0),)):
+        a, b = list(centre), list(centre)
+        a[axis], b[axis] = lo, hi
+        a[u], b[u] = centre[u] - _q(r * fu), centre[u] + _q(r * fu)
+        a[v], b[v] = centre[v] - _q(r * fv), centre[v] + _q(r * fv)
+        if a[u] < b[u] and a[v] < b[v]:
+            cubes.append(cube(a, b, part))
+
+
+def _profile(prof, t):
+    for (t0, r0), (t1, r1) in zip(prof, prof[1:]):
+        if t <= t1:
+            return r0 + (r1 - r0) * smooth((t - t0) / (t1 - t0))
+    return prof[-1][1]
+
+
+def _limb(cubes, axis, centre, a0, a1, prof, part, lead=0.0):
+    """A round piece from a0 (fraction 0) to a1 (fraction 1) along an axis, its radius following prof; lead runs the
+    first slice that far back past a0 (into the body)."""
+    n = max(1, round(abs(a1 - a0) / 0.5))
+    runs = []
+    for i in range(n):
+        r = _q(_profile(prof, (i + 0.5) / n))
+        s0, s1 = a0 + (a1 - a0) * i / n, a0 + (a1 - a0) * (i + 1) / n
+        if runs and runs[-1][0] == r:
+            runs[-1][2] = s1
+        else:
+            runs.append([r, s0, s1])
+    if lead:
+        runs[0][1] -= lead * (1 if a1 > a0 else -1)
+    for r, s0, s1 in runs:
+        _disc(cubes, axis, centre, r, s0, s1, part)
+
+
+def _ball(cubes, axis, centre, r, part):
+    """A round joint: half-pixel slices along an axis, each as wide as the ball is there."""
+    n = max(2, round(2 * r / 0.5))
+    runs = []
+    for i in range(n):
+        z0, z1 = -r + 2 * r * i / n, -r + 2 * r * (i + 1) / n
+        zm = max(abs(z0), abs(z1)) if i not in (n // 2 - 1, n // 2) else 0.0
+        rr = _q(math.sqrt(max(0.0, r * r - (zm * 0.85) ** 2)))
+        if runs and runs[-1][0] == rr:
+            runs[-1][2] = z1
+        else:
+            runs.append([rr, z0, z1])
+    for rr, z0, z1 in runs:
+        _disc(cubes, axis, centre, rr, centre[axis] + z0, centre[axis] + z1, part)
+
+
 def legs():
     """Each leg: an upper piece and a lower one aimed between its joints, a foot flat on the ground turned out, and five
     fanned toes, each raised a little at the knuckle with a long claw hooking down from its tip to the ground (a claw is
@@ -170,7 +240,6 @@ def legs():
         for kind, plan in LEG_PLANS.items():
             (sx, sy, sz), (ex, ey, ez), (wx, wy, wz) = plan['joints']
             S, E, W = (s * sx, sy, sz), (s * ex, ey, ez), (s * wx, wy, wz)
-            t1, t2 = plan['thick']
             l1, l2 = _len(_sub(E, S)), _len(_sub(W, E))
             r1 = _aim((s, 0, 0), _sub(E, S))                        # the upper part's own axis is straight out
             r2 = _aim((0, -1, 0), _sub(W, E))                       # the lower part's is straight down
@@ -188,22 +257,21 @@ def legs():
             e_rest = (S[0] + s * l1, S[1], S[2])                     # the joints before the turns are applied
             w_rest = (e_rest[0], e_rest[1] - l2, e_rest[2])
 
-            # Each joint is one block a little bigger than the pieces meeting there, and both pieces end at its middle,
-            # so no box corner pokes out past another (the user's report: corners stuck out at the elbow and wrist).
-            ux = sorted([S[0] - s * 1.0, S[0] + s * l1])
-            k = plan['knob'] / 2
+            # Round pieces tapering from the muscle to the next joint, and a round ball at each joint a little bigger
+            # than the ends meeting there, both pieces ending at its middle, so nothing pokes out at the bend.
             ex_, ey_, ez_ = e_rest
-            up = [cube([ux[0], S[1] - t1 / 2, S[2] - t1 / 2], [ux[1], S[1] + t1 / 2, S[2] + t1 / 2], 'leg'),
-                  cube([ex_ - k, ey_ - k, ez_ - k], [ex_ + k, ey_ + k, ez_ + k], 'leg')]          # elbow or knee
-            low = [cube([ex_ - t2 / 2, ey_ - l2 + 0.4, ez_ - t2 / 2], [ex_ + t2 / 2, ey_, ez_ + t2 / 2], 'leg')]
+            up, low = [], []
+            _limb(up, 0, S, S[0], S[0] + s * l1, plan['upper'], 'leg', lead=1.0)
+            _ball(up, 0, e_rest, plan['knob'], 'leg')                                              # elbow or knee
+            _limb(low, 1, e_rest, ey_, ey_ - l2, plan['lower'], 'leg')
             pw, pl = plan['palm']
             g = -W[1]                                                # the ground, below the wrist
             fx, fy, fz = w_rest
-            wk = plan['wrist'] / 2
-            ankle = cube([fx - wk, fy - wk, fz - wk], [fx + wk, fy + wk, fz + wk], 'leg')           # wrist or ankle
+            ankle = []
+            _ball(ankle, 1, w_rest, plan['wrist'], 'leg')                                          # wrist or ankle
             if plan.get('hinge'):
-                low.append(ankle)
-            foot = ([] if plan.get('hinge') else [ankle]) + [
+                low += ankle
+            foot = ([] if plan.get('hinge') else ankle) + [
                     cube([fx - pw / 2, fy + g, fz - pl + 1.0], [fx + pw / 2, fy + g + 1.6, fz + 1.4], 'leg'),             # palm
                     cube([fx - pw / 2 + 0.5, fy + g + 1.6, fz - pl + 1.6], [fx + pw / 2 - 0.5, fy + g + 2.4, fz + 1.2], 'leg')]
 
@@ -367,9 +435,9 @@ NOTES = [
     ('Body', 'blocky on purpose, as in your picture: a deep body with the belly hanging low'),
     ('Legs', 'angled like your picture: the upper part slants out and down from the body, the elbow or knee sticking '
              'out to the side; the fore arm slants down and forward to the hand, the shin down and back to the foot'),
-    ('Joints', 'each elbow, knee, wrist and ankle is one block a little bigger than the pieces meeting there, so no box '
-               'corner pokes out past another; the hind thigh and shin turn on one knee hinge so they never twist '
-               'against each other, and the ankle block sits in line with the shin, resting on the foot'),
+    ('Joints', 'each leg piece is round, cut in half-pixel slices that taper from the muscle to the next joint, and '
+               'each elbow, knee, wrist and ankle is a round ball a little bigger than the ends meeting there, so '
+               'nothing pokes out at the bend; the hind thigh and shin turn on one knee hinge'),
     ('Feet and claws', 'flat on the ground and turned out (the hind feet more), five long toes fanned out, each raised '
                        'a little at the knuckle; each claw a hook in small steps, a dark sheath at the toe, thick and dark '
                        'at the root, thinner and browner as it curves down, a dull horn point touching the ground; every '
