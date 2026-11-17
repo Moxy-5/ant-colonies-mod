@@ -127,13 +127,24 @@ def _len(v):
 # palm, and the five toes (inner to outer): length and fan angle (outward +); every toe raised a little at the knuckle.
 LEG_PLANS = {
     'arm': {'joints': ((4.0, 11.0, -21.5), (10.5, 7.5, -22.5), (10.8, 2.3, -25.0)),
-            'thick': (4.0, 3.4), 'knob': 4.0, 'turn': 18.0, 'palm': (4.6, 3.6),
+            'thick': (4.0, 3.4), 'knob': 4.0, 'wrist': 4.2, 'turn': 18.0, 'palm': (4.6, 3.6),
             'toes': ((2.6, -34.0), (3.4, -14.0), (3.9, 2.0), (3.6, 18.0), (2.8, 38.0)), 'raise': 14.0},
     'leg': {'joints': ((4.0, 10.5, -4.0), (11.0, 7.5, -6.0), (11.6, 2.3, -2.6)),
-            'thick': (4.6, 3.8), 'knob': 4.4, 'turn': 38.0, 'palm': (5.0, 4.4),
+            'thick': (4.6, 3.8), 'knob': 5.0, 'wrist': 5.0, 'turn': 38.0, 'palm': (5.0, 4.4),
             'toes': ((2.6, -30.0), (3.6, -12.0), (4.2, 4.0), (4.6, 20.0), (3.0, 46.0)), 'raise': 14.0},
 }
-CLAW_LEN, CLAW_DROP = 2.0, 50.0       # each claw this long, bending this far down from its toe (degrees)
+CLAW_DROP = 23.0     # how far each claw bends down from its toe (degrees); the hook below curves it on to the ground
+# A claw from root to point, as a hook in small steps (along its length from the toe's tip, width, bottom and top
+# against the toe's middle line, colour): a dark sheath where it leaves the toe, thick and dark at the root, thinner and
+# browner as it curves down, a dull horn point turning down at the end. Each step is quarter-pixel sized.
+CLAW_SHAPE = (
+    (-0.25, 0.30, 0.86, -0.43, 0.43, 'clawbase'),
+    (0.30, 0.90, 0.64, -0.34, 0.34, 'claw'),
+    (0.90, 1.40, 0.52, -0.38, 0.22, 'claw'),
+    (1.40, 1.85, 0.40, -0.46, 0.02, 'clawmid'),
+    (1.85, 2.20, 0.28, -0.64, -0.20, 'clawtip'),
+    (2.10, 2.32, 0.16, -0.88, -0.42, 'clawtip'),
+)
 
 
 def legs():
@@ -153,16 +164,19 @@ def legs():
             e_rest = (S[0] + s * l1, S[1], S[2])                     # the joints before the turns are applied
             w_rest = (e_rest[0], e_rest[1] - l2, e_rest[2])
 
-            ux = sorted([S[0] - s * 1.0, S[0] + s * (l1 + 0.4)])
-            up = [cube([ux[0], S[1] - t1 / 2, S[2] - t1 / 2 - 0.3], [ux[1], S[1] + t1 / 2, S[2] + t1 / 2 + 0.3], 'leg')]
+            # Each joint is one block a little bigger than the pieces meeting there, and both pieces end at its middle,
+            # so no box corner pokes out past another (the user's report: corners stuck out at the elbow and wrist).
+            ux = sorted([S[0] - s * 1.0, S[0] + s * l1])
             k = plan['knob'] / 2
             ex_, ey_, ez_ = e_rest
-            low = [cube([ex_ - k, ey_ - k, ez_ - k], [ex_ + k, ey_ + k, ez_ + k], 'leg'),
-                   cube([ex_ - t2 / 2, ey_ - l2 - 0.6, ez_ - t2 / 2], [ex_ + t2 / 2, ey_, ez_ + t2 / 2], 'leg')]
+            up = [cube([ux[0], S[1] - t1 / 2, S[2] - t1 / 2], [ux[1], S[1] + t1 / 2, S[2] + t1 / 2], 'leg'),
+                  cube([ex_ - k, ey_ - k, ez_ - k], [ex_ + k, ey_ + k, ez_ + k], 'leg')]          # elbow or knee
+            low = [cube([ex_ - t2 / 2, ey_ - l2 + 0.4, ez_ - t2 / 2], [ex_ + t2 / 2, ey_, ez_ + t2 / 2], 'leg')]
             pw, pl = plan['palm']
             g = -W[1]                                                # the ground, below the wrist
             fx, fy, fz = w_rest
-            foot = [cube([fx - t2 / 2 - 0.1, fy - 0.6, fz - t2 / 2], [fx + t2 / 2 + 0.1, fy + 0.8, fz + t2 / 2], 'leg'),   # wrist
+            wk = plan['wrist'] / 2
+            foot = [cube([fx - wk, fy - wk, fz - wk], [fx + wk, fy + wk, fz + wk], 'leg'),                  # wrist
                     cube([fx - pw / 2, fy + g, fz - pl + 1.0], [fx + pw / 2, fy + g + 1.6, fz + 1.4], 'leg'),             # palm
                     cube([fx - pw / 2 + 0.5, fy + g + 1.6, fz - pl + 1.6], [fx + pw / 2 - 0.5, fy + g + 2.4, fz + 1.2], 'leg')]
 
@@ -180,8 +194,8 @@ def legs():
                 toe = [cube([tx - 0.55, ty - 0.55, tz - tl * 0.55], [tx + 0.55, ty + 0.55, tz + 0.4], 'leg'),
                        cube([tx - 0.42, ty - 0.45, tz - tl], [tx + 0.42, ty + 0.4, tz - tl * 0.5], 'leg')]
                 cy, cz = ty + 0.05, tz - tl + 0.1                    # the claw's root, at the toe's tip
-                claw = [cube([tx - 0.34, cy - 0.38, cz - CLAW_LEN * 0.6], [tx + 0.34, cy + 0.4, cz + 0.2], 'claw'),
-                        cube([tx - 0.24, cy - 0.42, cz - CLAW_LEN], [tx + 0.24, cy + 0.12, cz - CLAW_LEN * 0.55], 'clawtip')]
+                claw = [cube([tx - w / 2, cy + lo, cz - z1], [tx + w / 2, cy + hi, cz - z0], part)
+                        for z0, z1, w, lo, hi, part in CLAW_SHAPE]
                 out.append({'name': name(f'toe{i + 1}'), 'parent': name('foot'), 'pivot': [tx, ty, tz],
                             'rotation': rot(_mul(_ry(-s * fan), _rx(plan['raise']))), 'cubes': toe})
                 out.append({'name': name(f'claw{i + 1}'), 'parent': name(f'toe{i + 1}'), 'pivot': [tx, cy, cz],
@@ -313,7 +327,7 @@ def model():
 
 # --- plain colours (step 2: shape only) --------------------------------------------------------------------------------
 LOOKS = {'plain': {'name': 'Plain colours', 'note': 'shape only: charcoal skin, a cream throat and belly, yellow eyes, '
-                   'dark claws with pale points; the pattern comes in step 3'}}
+                   'dark hooked claws with horn points; the pattern comes in step 3'}}
 GAME_LOOK = 'plain'
 NOTES = [
     ('Tail', 'a chain of 12 short pieces, each a rounded cross-section of overlapping boxes, each turned a few degrees '
@@ -326,9 +340,12 @@ NOTES = [
     ('Body', 'blocky on purpose, as in your picture: a deep body with the belly hanging low'),
     ('Legs', 'angled like your picture: the upper part slants out and down from the body, the elbow or knee sticking '
              'out to the side; the fore arm slants down and forward to the hand, the shin down and back to the foot'),
+    ('Joints', 'each elbow, knee, wrist and ankle is one block a little bigger than the pieces meeting there, so no box '
+               'corner pokes out past another'),
     ('Feet and claws', 'flat on the ground and turned out (the hind feet more), five long toes fanned out, each raised '
-                       'a little at the knuckle, with a long dark claw hooking down to the ground, pale at its point; '
-                       'every toe and claw is its own piece, so the walk can spread and grip them later'),
+                       'a little at the knuckle; each claw a hook in small steps, a dark sheath at the toe, thick and dark '
+                       'at the root, thinner and browner as it curves down, a dull horn point touching the ground; every '
+                       'toe and claw is its own piece, so the walk can spread and grip them later'),
     ('Still to come', 'step 3, the paint (yellow spots, the banded tail, cream throat, one pixel size everywhere); '
                       'step 4, the animations (walk, tongue, swim)'),
 ]
@@ -340,10 +357,14 @@ def colour(part, face):
         return (226, 186, 54)
     if part == 'nostril':
         return (18, 16, 14)
+    if part == 'clawbase':
+        return (28, 24, 21)                  # the dark sheath where the claw leaves the toe
     if part == 'claw':
-        return (44, 40, 36)                  # dark horn, as in the picture
+        return (46, 38, 33)                  # dark horn, as in the picture
+    if part == 'clawmid':
+        return (88, 72, 55)                  # browner as it thins
     if part == 'clawtip':
-        return (204, 192, 166)               # worn pale at the point, so each claw shows against the toes
+        return (156, 134, 102)               # a dull horn point, not white
     if part in ('belly', 'throat') or face == 'down':
         return CREAM if face != 'up' else CHARCOAL
     return CHARCOAL

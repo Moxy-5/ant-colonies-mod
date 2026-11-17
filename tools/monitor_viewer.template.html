@@ -195,6 +195,7 @@ const CAMS = {
   'head, side': () => { const s = settings.size; return [[-s * 0.36, H(), s * 0.42], [-s * 0.38, H(), 0]]; },
   'tail, close': () => { const s = settings.size; return [[s * 0.15, H() * 1.6, s * 0.55], [s * 0.3, H() * 0.3, 0]]; },
   'from behind': () => { const s = settings.size; return [[s * 1.0, H() * 1.5, s * 0.3], [0, H() * 0.6, 0]]; },
+  'feet, close': () => { const s = settings.size; return [[-s * 0.37, s * 0.09, s * 0.27], [-s * 0.22, s * 0.01, s * 0.125]]; },
 };
 const camBox = document.getElementById('cams');
 function setCam(name) {
