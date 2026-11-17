@@ -245,12 +245,12 @@ function animate(m, t) {
     want = {};
     [['left', 1], ['right', -1]].forEach(([side, s]) => {
       local.copy(camera.position); g.head.worldToLocal(local);
-      local.x -= s * 2.6; local.y -= 1.0; local.z += 4.25;
+      local.x -= s * 2.1; local.y -= 0.75; local.z += 1.375;
       local.normalize();
-      want[side] = local.x * s > -0.25 ? [clamp(local.z * 0.75, -0.5, 0.5), clamp(local.y * 0.45, -0.25, 0.25)] : [-0.35, 0];
+      want[side] = local.x * s > -0.25 ? [clamp(local.z * 0.55, -0.35, 0.35), clamp(local.y * 0.35, -0.2, 0.2)] : [-0.3, 0];
     });
   } else if (t > u.glanceAt) {
-    u.glance = [rand() - 0.5, (rand() - 0.5) * 0.4]; u.glanceAt = t + 0.8 + rand() * 2.2;
+    u.glance = [(rand() - 0.5) * 0.7, (rand() - 0.5) * 0.35]; u.glanceAt = t + 0.8 + rand() * 2.2;
   }
   ['left', 'right'].forEach(side => {
     const e = u.eye[side], b = g['pupil_' + side];
@@ -260,16 +260,29 @@ function animate(m, t) {
 }
 
 // --- cameras -----------------------------------------------------------------------------------------------------------
-const I = () => idler.position, HEAD = () => {
-  const s = settings.size, a = idler.rotation.y;
-  return [I().x - Math.sin(a) * s * 0.3, s * 0.13, I().z - Math.cos(a) * s * 0.3];
+// HEAD: between the watching monitor's eyes, wherever its neck has turned its head (so the close cameras keep on it)
+const I = () => idler.position, eyeL = new THREE.Vector3(), eyeR = new THREE.Vector3(), HEAD = () => {
+  const g = idler.userData.groups;
+  idler.updateMatrixWorld(true);
+  g.pupil_left.getWorldPosition(eyeL); g.pupil_right.getWorldPosition(eyeR);
+  return [(eyeL.x + eyeR.x) / 2, (eyeL.y + eyeR.y) / 2, (eyeL.z + eyeR.z) / 2];
 };
+// a close camera set in the head's own frame: out to its right side, ahead of it, up; it looks at a point the same
+// way. The head turns to watch the camera, so a camera set by the body would end up looking down its snout.
+const headQ = new THREE.Quaternion(), hx = new THREE.Vector3(), hz = new THREE.Vector3();
+function headCam(out, ahead, up, aimOut, aimAhead, aimUp) {
+  const h = HEAD(), s = settings.size;
+  idler.userData.groups.head.getWorldQuaternion(headQ);
+  hx.set(-1, 0, 0).applyQuaternion(headQ); hz.set(0, 0, -1).applyQuaternion(headQ);
+  const at = (o, f, u) => [h[0] + (hx.x * o + hz.x * f) * s, h[1] + u * s, h[2] + (hx.z * o + hz.z * f) * s];
+  return [at(out, ahead, up), at(aimOut, aimAhead, aimUp)];
+}
 const CAMS = {
   overview: () => { const s = settings.size; return [[-s * 0.6, 1.0 + s * 0.8, 3.2 + s * 2.0], [-s * 0.3, 0.2, -1.2 - s * 0.3]]; },
   'side': () => { const p = I(), s = settings.size, a = idler.rotation.y; return [[p.x - Math.cos(a) * s * 0.95 - Math.sin(a) * s * 0.1, s * 0.22, p.z + Math.sin(a) * s * 0.95 - Math.cos(a) * s * 0.1], [p.x + Math.sin(a) * s * 0.12, s * 0.09, p.z + Math.cos(a) * s * 0.12]]; },
   'other side': () => { const p = I(), s = settings.size, a = idler.rotation.y; return [[p.x + Math.cos(a) * s * 0.95 - Math.sin(a) * s * 0.1, s * 0.22, p.z - Math.sin(a) * s * 0.95 - Math.cos(a) * s * 0.1], [p.x + Math.sin(a) * s * 0.12, s * 0.09, p.z + Math.cos(a) * s * 0.12]]; },
-  'face, close': () => { const h = HEAD(), s = settings.size, a = idler.rotation.y; return [[h[0] - Math.cos(a) * s * 0.3 - Math.sin(a) * s * 0.22, h[1] + s * 0.08, h[2] + Math.sin(a) * s * 0.3 - Math.cos(a) * s * 0.22], h]; },
-  'eye': () => { const h = HEAD(), s = settings.size, a = idler.rotation.y; return [[h[0] - Math.cos(a) * s * 0.17 + Math.sin(a) * s * 0.02, h[1] + s * 0.03, h[2] + Math.sin(a) * s * 0.17 + Math.cos(a) * s * 0.02], [h[0] + Math.sin(a) * s * 0.06, h[1] + s * 0.01, h[2] + Math.cos(a) * s * 0.06]]; },
+  'face, close': () => headCam(0.3, 0.22, 0.08, 0, 0, 0),
+  'eye': () => headCam(0.2, 0.02, 0.03, 0.04, 0.0, 0.0),
   'front': () => { const h = HEAD(), s = settings.size, a = idler.rotation.y; return [[h[0] - Math.sin(a) * s * 0.75, s * 0.2, h[2] - Math.cos(a) * s * 0.75], [h[0], s * 0.1, h[2]]]; },
   'back': () => { const p = I(), s = settings.size, a = idler.rotation.y; return [[p.x + Math.sin(a) * s * 1.4, s * 0.45, p.z + Math.cos(a) * s * 1.4], [p.x, s * 0.08, p.z]]; },
   'top': () => { const p = I(), s = settings.size; return [[p.x + 0.001, s * 1.5, p.z + 0.001], [p.x, 0, p.z]]; },
@@ -282,7 +295,7 @@ const camBox = document.getElementById('cams');
 let follow = false;
 controls.addEventListener('start', () => { follow = false; });
 function setCam(name) {
-  settings.cam = name; follow = name === 'walking' || name === 'swimming';
+  settings.cam = name; follow = ['walking', 'swimming', 'face, close', 'eye'].includes(name);
   const [pos, target] = CAMS[name]();
   camera.position.set(...pos); controls.target.set(...target); controls.update();
   [...camBox.children].forEach(b => b.classList.toggle('on', b.textContent === name));
@@ -329,7 +342,7 @@ function frame() {
   swimmer.position.set(Math.cos(b) * s * 1.3, SURFACE - 0.58 * s / 2.2 * 0.5, 2.6 + s * 0.9 + Math.sin(b) * s * 0.7);
   swimmer.rotation.y = Math.PI - b;
   monitors.forEach(m => animate(m, t));
-  if (follow) {   // the walking and swimming cameras keep beside their monitor until you drag them
+  if (follow) {   // the walking, swimming and close cameras keep beside their monitor until you drag them
     const [pos, target] = CAMS[settings.cam]();
     camera.position.set(...pos); controls.target.set(...target);
   }
