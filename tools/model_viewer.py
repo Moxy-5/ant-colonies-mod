@@ -610,8 +610,8 @@ def monitor_page(out):
             "stride": mm.stride(), "blocks": blocks,
             "croc": {"bones": cb, "texture": uri(tm.png(rows)), "w": cw, "h": ch},
             "boxes": sum(len(b.get("cubes", [])) for b in bones)}
-    try:            # the old sculpted monitor beside the blocky rebuild, until the user picks (2026-11-17)
-        import monitor_models_sculpted as old
+    try:            # the last blocky monitor beside the fresh one, until the user picks (2026-11-17)
+        import monitor_models_blocky as old
         ob = old.model()
         op, orows, ow, oh = old.paint(ob, old.GAME_LOOK)
         data["old"] = {"bones": op, "texture": uri(tm.png(orows)), "w": ow, "h": oh, "clips": clip_data(old.clips()),

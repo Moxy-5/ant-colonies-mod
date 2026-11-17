@@ -143,7 +143,7 @@ function build(look, mat, centre) {
   return yaw;
 }
 
-const settings = {size: 2.2, cam: 'overview', look: DATA.gameLook};
+const settings = {size: 2.7, cam: 'overview', look: DATA.gameLook};
 location.hash.slice(1).split('&').filter(Boolean).forEach(kv => {
   const [k, v] = kv.split('=').map(decodeURIComponent);
   settings[k] = isNaN(parseFloat(v)) ? v : parseFloat(v);
@@ -177,7 +177,7 @@ if (before) {
   Object.assign(before.userData, {key: 'idle', clips: DATA.old.clips, blinkAt: 2, tongueAt: 1.3, blink: -9, tongue: -9,
     eye: {left: [0, 0], right: [0, 0]}, glance: [0, 0], glanceAt: 0, turn: 0});
   monitors.push(before);
-  tag('Before (the sculpted one)', before, () => settings.size * 0.3);
+  tag('Before (the last blocky one)', before, () => settings.size * 0.3);
 }
 const croc = build(DATA.croc, new THREE.MeshLambertMaterial({map: loadTexture(DATA.croc.texture), alphaTest: 0.5}), 'ground');
 tag('Crocodile, 6.1 blocks', croc, () => 1.0);
