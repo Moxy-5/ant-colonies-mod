@@ -121,6 +121,7 @@ Every living thing in the mod, built or planned, plants and fungi included, in o
 - Electric catfish (slow, chunky, stuns fish and anything that touches it with a shock): IDEA (user's list 2026-11-16).
 - Hippo (floodplain grazing at night, paths, hippo lawns): IDEA.
 - Bull shark (comes up wide rivers from the sea; fits the wide lower rivers near the coast, not the narrow far-inland ones): IDEA (user's list 2026-11-16).
+- African lungfish (seals itself in a slime cocoon in drying mud, found by digging), annual killifish (eggs wait in dry mud, hatch when it rains): IDEA (mud pits, 2026-11-17; `docs/DESIGN.md`, "Mud pits and wallows").
 - Minecraft's cod, salmon, squid: kept out of savanna rivers (BUILT).
 
 **5. Savanna land animals** (fun first; all IDEA unless marked)
@@ -138,6 +139,7 @@ Every living thing in the mod, built or planned, plants and fungi included, in o
   - Antlions (larvae in sand pits that trap ants; a real link to the colony insects, pits in loose sand such as the coming sand banks): user's list 2026-11-16.
   - Dead-wood tenants, centipedes, scorpions.
   - Dung beetle (an animal-kit proof pick).
+  - Tadpole shrimp (eggs wait in dry mud), butterflies sipping at wet mud (mud-puddling, drawn as particles), mud wasps collecting mud balls: IDEA (mud pits, 2026-11-17).
 - *5b. Reptiles and amphibians:*
   - Black mamba (fast snake, hunted by the secretarybird): user's list 2026-11-16.
   - Giant African bullfrog (out of the ground at the first rains; was "African bullfrog"): user's list 2026-11-16.
@@ -155,6 +157,7 @@ Every living thing in the mod, built or planned, plants and fungi included, in o
   - Giraffe (browses the acacia crowns): user's list 2026-11-16.
   - Black rhinoceros (browser of bushes): user's list 2026-11-16.
   - Plains zebra (grazer, crocodile prey at crossings): user's list 2026-11-16.
+  - Warthog (the king of mud wallowing: kneels and slides on its face; rubs on termite mounds after): IDEA (mud pits, 2026-11-17).
   - Antelope, wildebeest, buffalo; floodplain grazers lechwe, puku, waterbuck, sitatunga, bushbuck; monkeys; dung spreading acacia seed.
 - *5f. Big hunters and scavengers:*
   - African lion (prides), cheetah (sprints), spotted hyena (clans, scavenge and hunt), African wild dog (packs): user's list 2026-11-16.
@@ -191,6 +194,7 @@ Every living thing in the mod, built or planned, plants and fungi included, in o
 - Dead wood, pulp heaps, baobab fibre, frass (termite food): BUILT.
 - Fallen figs and doum nuts: BUILT.
 - Remains of big land animals (our own only, never vanilla mobs): PLANNED with those animals.
+- Mud pits and wallows (spawn near water, some made after rain, dry and crack; animals roll in them, mud on their bodies, rubbing posts on trees and termite mounds, life waiting in the mud): IDEA (the user, 2026-11-17; `docs/DESIGN.md`, "Mud pits and wallows").
 
 ## Models and animations (GeckoLib + Blockbench)
 - **Size (the user, 2026-11-05, real sizes):** one scale, a Matabele major 0.5 blocks long (1 block = 30 mm of ant), every savanna insect at its real length on it (termite worker 0.15, minor soldier 0.23, major soldier 0.40); insects keep a small gap, no stacking (`docs/DESIGN.md`, "Insect sizes"; plan `docs/plans/real-sizes.md`). The harvester worker keeps 0.3 wide x 0.2 tall until its rework.
@@ -675,6 +679,7 @@ Every living thing in the mod, built or planned, plants and fungi included, in o
 - **Crocodile 7.5 blocks, monitor 4.5, crocodiles a little rarer, 2026-11-17** (branch `claude/hopeful-kirch-74f4d5`, the user's ask): the crocodile drawn 7.5 blocks long (was about 6.1) and the monitor 4.5 (was 6), each still 0.8 to 1.15 of that by animal; every distance on their bodies now follows the one size number (the crocodile's jaws, head, roll and float depth had the old size typed in), so jaws, grabs, floating and the walk's stride grow and shrink with them; crocodiles at most 5 round a player (was 6); not tried in-game yet.
 - **The Nile monitor in the game and the new sizes (crocodile 7.5 blocks, monitor 4.5, crocodile cap 5) confirmed in-game by the user 2026-11-17 ("everything works");** the user now wants monitors rarer (being decided).
 - **Nile monitors rarer, 2026-11-17** (branch `claude/hopeful-kirch-74f4d5`, the user's pick): at most 2 round a player (was 4) and each at least 80 blocks from another (was 48), so about one every 150 to 250 blocks of river (an estimate from how the spawner works, not measured); still on every part of the rivers, as real Nile monitors live by water everywhere, coast included; `river` 15 of 15 on 6 servers; not tried in-game yet (spawns only in new or reloaded land).
+- **Mud pits and wallows added to the ideas 2026-11-17 (the user, from videos of pangolins playing in mud):** pits spawn naturally near water and some are made after rain (animals do not dig them, the user's call); stages from soupy to cracked, mud on animals, rubbing posts on termite mounds, life waiting in the mud (lungfish, killifish, tadpole shrimp, puddling butterflies), and how to keep it cheap; `docs/DESIGN.md`, "Mud pits and wallows"; new IDEA lines in the master list (warthog among them); savanna life (M9); nothing built.
 
 ## Other notes files (read only when the task needs them)
 - `docs/DESIGN.md`: every design decision for the species and shared systems (read the section for a feature before working on it).

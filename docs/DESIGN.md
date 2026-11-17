@@ -410,6 +410,25 @@ it.** If a decision changes, ask the user first, then update it here. The short 
 - **Waterfall: later, maybe, not planned.** It needs the river higher on one side than the other, so a redo of how rivers are made, and falling water is changing water, the dear kind. The cheapest form would be a rare one-off gorge structure, not a change to every river.
 - **When:** after the sand banks (my pick); planned with the user first.
 
+### Mud pits and wallows (the user, 2026-11-17, from videos of pangolins and many other animals playing in mud; ideas for savanna life, M9, nothing planned in detail or built)
+- **Where they come from (the user's call):** mud pits spawn naturally in new land near water (river banks, the floodplain, pans and oxbows), and some are made after rain (a dip fills and turns to mud, then dries away). Animals do not dig or deepen them (the user removed that idea).
+- **Real things worth copying (from memory, not source-checked; animals are fun first):**
+  - *Stages:* a soupy pool, sticky mud, drying from the edges into cracked plates, hard bare ground or dust. Pits made after rain go through all of it and vanish (my pick); pits near water stay wet longer (my pick). With seasons they follow the shared season source (the seasons rule); until then, rain.
+  - *Mud on an animal:* dark and glossy wet, pale and cracked dry, flaking off in patches; the colour of the local soil (red elephants in Kenya), so it could follow the sand banks' red, golden and pale bands by how far inland.
+  - *Rolling:* each wallower its own way (pangolin curling and rolling, warthog kneeling and sliding on its face, buffalo flopping on its side, elephant spraying mud over its back).
+  - *Rubbing posts:* after wallowing, rhinos, elephants and warthogs rub on trees, rocks and **termite mounds**, which get polished smooth with a mud line at shoulder height: a link back to the colonies.
+  - *Life that waits in the mud:* African lungfish sealed in a slime cocoon through the dry season; annual killifish whose eggs lie in dry mud and hatch when it rains, a whole life in one wet season; tadpole shrimp the same; the bullfrog (on the master list) buried till the rains; a shrinking pool crowding the fish and drawing storks and herons; butterflies sipping salts at wet mud edges (mud-puddling); wasps and swallows collecting mud balls for nests.
+- **Making it cheap (my ideas; costs are estimates, to measure when built):**
+  - *One record per pit,* like the tree book (middle, size, wetness, age, what lives in it), checked once a second for all pits; blocks change only when a pit moves to its next stage, a few at a time.
+  - *Mud as stages of one block* (slurry, sticky, drying, cracked, hard pan), never flowing water (changing water is the dear kind, see "What Minecraft water costs" below).
+  - *A slurry block in place of water* for the soupy stage: looks like brown water with a shimmering drawn surface, but feet sink half a block, it slows, squelches and sucks, and the screen goes brown with the head under (like powder snow); the same drawn-layer idea as the flood.
+  - *Footprints* as a state of the mud block (kind and direction: crocodile drag, monitor, hoof, the player's boots), filled by rain, then smoothed away.
+  - *Mud on bodies* as two numbers per animal (how muddy, how dry) drawn as an extra skin layer; flakes when shaking off; the player's legs too.
+  - *Rubbing posts* as a mud-polished version of the tree or mound block at the animal's shoulder height.
+  - *Life as numbers, not mobs* (the colony brain's trick): the pit's record counts eggs, tadpoles, killifish, shrimp; only what a player looks at closely is shown (tadpoles and shrimp as particles drawn on the player's side only, a buried lungfish as a hidden block found by digging, killifish as a few real fish when rain refills the pit; butterflies puddling and dusk mosquito swarms as particles that flutter up when the player comes close).
+  - *Avoid:* flowing water in pits, a real mob per tadpole, changing a whole pit at once in sight, mud splashed onto blocks around (particles instead).
+- **When:** savanna life (M9), built once as a shared mud system with the first animal that wallows (the pangolin on the master list; buffalo, elephants, rhinos and the warthog would too).
+
 ### Floodplain trees (the user, 2026-11-13; plan `docs/plans/floodplain-trees.md`)
 - The sycamore fig and the doum palm, shape B and bark A for both (picked in `python tools/model_viewer.py floodplain`), every age and three dead stages each.
 - They grow only on the floodplain biome (`antcolonies:savanna_floodplain`, the greener grass). **The dry trees (umbrella thorn, camel thorn, baobab) no longer stand or sprout on it** (the user), checked in one place for new land and seedlings.
