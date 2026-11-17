@@ -1,0 +1,15 @@
+# The crocodile and the Nile monitor side by side on land, with a player-sized armour stand, to check their sizes (2026-11-17).
+#   ./gradlew runFilm -PfilmScene=croc_monitor_sizes      pictures in run-film/screenshots/croc_monitor_sizes/
+cmd time set noon
+cmd weather clear
+lens 50
+wait 40
+cmd summon antcolonies:crocodile 30.5 -60 14.5 {NoAI:1b,OwnSize:1.0f,Rotation:[90f,0f]}
+cmd summon antcolonies:monitor 30.5 -60 19.5 {NoAI:1b,OwnSize:1.0f,Rotation:[90f,0f]}
+cmd summon minecraft:armor_stand 34.5 -60 22.5 {NoGravity:1b}
+camera 29.0 -52.0 30.0 180 40
+wait 10
+shot side
+camera 29.0 -45.0 17.0 180 85
+wait 4
+shot above

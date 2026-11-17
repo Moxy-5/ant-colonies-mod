@@ -84,7 +84,7 @@ public class MonitorEntity extends PathfinderMob implements GeoEntity {
      * The model is made 6 blocks long, nose to tail tip (the user's length "for now"); drawn and boxed at this share of
      * that. 0.6 would make it 3.6 blocks.
      */
-    public static final float MODEL_SCALE = 1.0F;
+    public static final float MODEL_SCALE = 0.75F;
     /** How far its jaws reach ahead of its middle (blocks, at size 1): the snout's tip is 3 blocks out on a 6-block monitor. */
     static final double JAWS_AHEAD = 2.9 * MODEL_SCALE;
     /** How far it looks for food (blocks). */
@@ -92,7 +92,7 @@ public class MonitorEntity extends PathfinderMob implements GeoEntity {
     /** How near a survival player makes it hiss (blocks from its jaws; crouching, nearer). */
     static final double HISS_REACH = 4.0, HISS_REACH_CROUCHING = 2.0;
     /** How near a player at its jaws gets bitten (blocks from the snout's tip). */
-    static final double BITE_REACH = 1.3;
+    static final double BITE_REACH = 1.3 * MODEL_SCALE;
     /** How hard it bites (1.5 hearts). */
     static final float BITE_DAMAGE = 3.0F;
     /** How far from the water it last swam in it may wander (blocks). */
@@ -105,12 +105,12 @@ public class MonitorEntity extends PathfinderMob implements GeoEntity {
     /** How far from a bank the world may spawn one in the water (blocks). */
     public static final int BANK_REACH = 3;
     /** Afloat, its feet hang this far under the surface (blocks, at size 1): head and back out. */
-    static final double AFLOAT = 0.75;
+    static final double AFLOAT = 0.75 * MODEL_SCALE;
     /** Startled in the water, it sinks out of sight to this depth (blocks). */
-    static final double HIDE_DEPTH = 1.6;
+    static final double HIDE_DEPTH = 1.6 * MODEL_SCALE;
     static final int STARTLED_TICKS = 300;
     /** The walk clip's stride (0.86 blocks a 1.2 s step) is made for this speed (blocks a tick, at size 1). */
-    static final double WALK_CLIP_SPEED = 0.036;
+    static final double WALK_CLIP_SPEED = 0.036 * MODEL_SCALE;
     /** Ticks into the bite clip its jaws snap shut (0.28 s). */
     static final int SNAP_TICK = 6, BITE_TICKS = 14, EAT_TICKS = 40;
 

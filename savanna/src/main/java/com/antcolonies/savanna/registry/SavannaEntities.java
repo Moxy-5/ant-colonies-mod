@@ -140,13 +140,13 @@ public class SavannaEntities {
                     .clientTrackingRange(8)
                     .build("crocodile"));
 
-    // The Nile monitor (M9 river life, 2026-11-17): drawn 6 blocks long nose to tail (the user's length "for now"),
+    // The Nile monitor (M9 river life, 2026-11-17): drawn 4.5 blocks long nose to tail (the user, 2026-11-17; was 6),
     // most of it a thin tail; its box covers the body only, under a block wide, so its routes use 1-block squares.
     public static final DeferredHolder<EntityType<?>, EntityType<com.antcolonies.savanna.animal.MonitorEntity>> MONITOR =
             ENTITY_TYPES.register("monitor", () -> EntityType.Builder
                     .of(com.antcolonies.savanna.animal.MonitorEntity::new, SavannaMobCategories.riverBank())
-                    .sized(0.9F, 0.7F)
-                    .eyeHeight(0.6F)
+                    .sized(0.7F, 0.55F)
+                    .eyeHeight(0.45F)
                     .clientTrackingRange(8)
                     .build("monitor"));
 

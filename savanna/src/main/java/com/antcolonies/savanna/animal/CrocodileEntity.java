@@ -102,9 +102,9 @@ public class CrocodileEntity extends PathfinderMob implements GeoEntity {
     /** One death roll: this many ticks, this many full turns, then a pause under the water before the next (my picks: 3 turns in 2 s). */
     public static final int ROLL_TICKS = 40, ROLL_TURNS = 3, ROLL_PAUSE = 30;
     /** How high its spine is, the line it rolls round (blocks, at size 1: the body bone's pivot, 6 model pixels). */
-    public static final double ROLL_AXIS = 6.0 * (5.0 / 5.5) / 16.0;
+    public static final double ROLL_AXIS = 6.0 * CrocodileEntity.MODEL_SCALE / 16.0;
     /** How far ahead of its middle its jaws close (blocks, at size 1: the snout's tip, 20 model pixels). */
-    public static final double JAWS_AHEAD = 20.0 * (5.0 / 5.5) / 16.0;
+    public static final double JAWS_AHEAD = 20.0 * CrocodileEntity.MODEL_SCALE / 16.0;
     /** How long it stays fed after a big kill and after something small (ticks; my picks: a day, half a day). */
     static final int FED_BIG = 24000, FED_SMALL = 12000;
     /**
@@ -124,7 +124,7 @@ public class CrocodileEntity extends PathfinderMob implements GeoEntity {
      * snap's {@link #SNAP_TICKS} (the snap_left and snap_right clips: shut at 0.2 s). A fish more than this far off its
      * nose (degrees) is snapped at sideways; nearer the nose it lunges straight at it.
      */
-    static final double NECK_BACK = 6.0 * (5.0 / 5.5) / 16.0, HEAD_REACH = 26.0 * (5.0 / 5.5) / 16.0, SNAP_SWING = 54.0, SNAP_FROM_NOSE = 25.0;
+    static final double NECK_BACK = 6.0 * CrocodileEntity.MODEL_SCALE / 16.0, HEAD_REACH = 26.0 * CrocodileEntity.MODEL_SCALE / 16.0, SNAP_SWING = 54.0, SNAP_FROM_NOSE = 25.0;
     static final int SNAP_TICKS = 10, SNAP_CATCH = 4;
     /** How often the fish darts away just as the jaws come (my pick: about 1 strike in 3 misses), and how many misses before it gives up a while. */
     static final float FISH_DODGE = 0.35F;
@@ -137,9 +137,9 @@ public class CrocodileEntity extends PathfinderMob implements GeoEntity {
     static final int CALL_TICKS = 300;
 
     /** How deep in the water it hangs when resting: the water this far up its box, so the brows and back are out (blocks, at the usual size). */
-    private static final double AFLOAT = 0.42;
+    private static final double AFLOAT = 0.462 * CrocodileEntity.MODEL_SCALE;
     /** How deep it sinks while startled in the water, out of sight (blocks, at the usual size; my pick). */
-    private static final double HIDE_DEPTH = 1.4;
+    private static final double HIDE_DEPTH = 1.54 * CrocodileEntity.MODEL_SCALE;
     /** How long a fright lasts (ticks; my pick, 5 s). */
     static final int STARTLED_TICKS = 100;
     /** How near a player may come before it flees, and one creeping up crouched (blocks; my picks). */
@@ -149,10 +149,11 @@ public class CrocodileEntity extends PathfinderMob implements GeoEntity {
     /** The rush to the water and the lunge in ({@link PlungeGoal}; my picks: about 3 blocks through the air). */
     static final double RUSH = 1.9, LUNGE_FORWARD = 0.45, LUNGE_UP = 0.2;
     /**
-     * How the model is drawn: 6.75 blocks long as made (snout to tail tip, 108 pixels), drawn at 10/11 of that, so a usual
-     * crocodile is about 6.1 blocks long (5 until the user asked for a longer tail, 2026-11-15; the body kept its size).
+     * How the model is drawn: 6.75 blocks long as made (snout to tail tip, 108 pixels), drawn so a usual crocodile is
+     * 7.5 blocks long (the user, 2026-11-17; was 6.1, and 5 before the longer tail of 2026-11-15). Every distance on the
+     * body (jaws, head, roll, how deep it floats, the walk's stride) is worked out from this, so it is the one size knob.
      */
-    public static final float MODEL_SCALE = 5.0F / 5.5F;
+    public static final float MODEL_SCALE = 7.5F / 6.75F;
     /**
      * The joints along its middle line the body bends at to lie on what is under it ({@link GroundBend}; model z,
      * pixels, from {@code tools/crocodile_models.py}): the anchor at the shoulders, where the neck and the chest hang
@@ -177,7 +178,7 @@ public class CrocodileEntity extends PathfinderMob implements GeoEntity {
      * {@link #JOIN_REACH} blocks, lying beside one {@link #SIDE_BY_SIDE} blocks off and facing the same way, so the
      * favourite banks gather rows of them, as real Nile crocodiles do (my picks).
      */
-    public static final double SPAWN_APART = 24.0, JOIN_REACH = 48.0, SIDE_BY_SIDE = 1.7;
+    public static final double SPAWN_APART = 24.0, JOIN_REACH = 48.0, SIDE_BY_SIDE = 1.87 * MODEL_SCALE;
     /**
      * Sand to bask on (sand banks, 2026-11-16, {@code docs/plans/sand-banks.md}): with no company basking near, a
      * crocodile wanting the sun looks for a river sand bank within this many blocks before it takes the nearest bank, so
@@ -2044,7 +2045,7 @@ public class CrocodileEntity extends PathfinderMob implements GeoEntity {
     private int walkedAt = -100;
     private boolean drawnBasking, flopNow;
     /** The speeds the walk and swim clips are made for (blocks a tick); they play faster or slower by the real speed. */
-    static final double WALK_CLIP_SPEED = 0.06, SWIM_CLIP_SPEED = 0.08;
+    static final double WALK_CLIP_SPEED = 0.066 * MODEL_SCALE, SWIM_CLIP_SPEED = 0.088 * MODEL_SCALE;
 
     @Override
     public void registerControllers(AnimatableManager.ControllerRegistrar controllers) {

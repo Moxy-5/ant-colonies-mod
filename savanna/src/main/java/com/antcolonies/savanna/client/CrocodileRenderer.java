@@ -13,7 +13,7 @@ public class CrocodileRenderer extends GeoEntityRenderer<CrocodileEntity> {
     public CrocodileRenderer(EntityRendererProvider.Context context) {
         super(context, new CrocodileModel());
         withScale(CrocodileEntity.MODEL_SCALE);
-        shadowRadius = 0.9F;
+        shadowRadius = 1.1F;
     }
 
     @Override

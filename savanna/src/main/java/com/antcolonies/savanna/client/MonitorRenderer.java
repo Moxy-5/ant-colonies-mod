@@ -16,7 +16,7 @@ public class MonitorRenderer extends GeoEntityRenderer<MonitorEntity> {
     public MonitorRenderer(EntityRendererProvider.Context context) {
         super(context, new DefaultedEntityGeoModel<>(ResourceLocation.fromNamespaceAndPath(SavannaMod.MODID, "monitor")));
         withScale(MonitorEntity.MODEL_SCALE);
-        shadowRadius = 0.7F;
+        shadowRadius = 0.55F;
     }
 
     @Override
