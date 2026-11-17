@@ -9,7 +9,7 @@ models. The user's rule for this one: only some parts need heavy detail. So:
   head with no staircase. The head narrows into the snout in one-pixel slices, its top and bottom edges bevelled.
 - The body stays a chunky box, as in the picture (that is its Minecraft look); the legs are round, tapering
   from the muscle to round joints (the user's ask, 2026-11-17).
-- Colours are plain for now (step 2, the shape only); the pattern is step 3, the clips step 4.
+- The paint (step 3) is worked out pixel by pixel from where each pixel lies on the model; the clips are step 4.
 
 Units are model pixels (16 a block), 96 long (6 blocks, the user's size for now). The head points to -Z, up is +Y,
 left is +X; y = 0 is the ground. A rest rotation is given here as a pitch in degrees, positive turning the bone's
@@ -405,6 +405,7 @@ def head():
         def xs(a, b):
             return sorted([s * a, s * b])
         upper.append(cube([xs(w - 0.2, w + 0.25)[0], y + 2.4, ez - 0.7], [xs(w - 0.2, w + 0.25)[1], y + 3.4, ez + 0.7], 'eye'))
+        upper.append(cube([xs(w + 0.25, w + 0.32)[0], y + 2.7, ez - 0.3], [xs(w + 0.25, w + 0.32)[1], y + 3.15, ez + 0.2], 'pupil'))
         upper.append(cube([xs(w - 1.3, w + 0.15)[0], y + 3.4, ez - 1.2], [xs(w - 1.3, w + 0.15)[1], y + 4.1, ez + 1.0], 'skin'))
         nw, ntop, _ = head_shape(0.88)
         nz = z0 - 0.88 * HEAD_LEN
@@ -420,10 +421,17 @@ def model():
     return [body()] + neck() + head() + tail() + legs()
 
 
-# --- plain colours (step 2: shape only) --------------------------------------------------------------------------------
-LOOKS = {'plain': {'name': 'Plain colours', 'note': 'shape only: charcoal skin, a cream throat and belly, yellow eyes, '
-                   'dark hooked claws with horn points; the pattern comes in step 3'}}
-GAME_LOOK = 'plain'
+# --- the paint (step 3) --------------------------------------------------------------------------------------------
+# Every texture pixel is coloured from where it lies on the model (each piece's own straight-out position: the tail laid
+# straight back, the legs straight out and down), so a spot or band carries across the overlapping boxes of a round
+# piece, and the pattern is drawn on one even grid of one model pixel everywhere, whatever a box's size.
+LOOKS = {
+    'nile': {'name': 'Painted', 'note': 'dark charcoal-olive scales with rows of yellow spots across the back, yellow '
+             'rings down the tail, a speckled head, a pale yellow lip line, a cream throat and belly with dark bars, '
+             'yellow-dotted legs, amber eyes'},
+    'plain': {'name': 'Plain colours', 'note': 'shape only: charcoal skin, a cream throat and belly'},
+}
+GAME_LOOK = 'nile'
 NOTES = [
     ('Tail', 'a chain of 12 short pieces, each a rounded cross-section of overlapping boxes, each turned a few degrees '
              'from the last, so it curves down off the hips and lies along the sand to a thin tip without stair steps'),
@@ -442,37 +450,122 @@ NOTES = [
                        'a little at the knuckle; each claw a hook in small steps, a dark sheath at the toe, thick and dark '
                        'at the root, thinner and browner as it curves down, a dull horn point touching the ground; every '
                        'toe and claw is its own piece, so the walk can spread and grip them later'),
-    ('Still to come', 'step 3, the paint (yellow spots, the banded tail, cream throat, one pixel size everywhere); '
-                      'step 4, the animations (walk, tongue, swim)'),
+    ('The paint', 'dark charcoal-olive scales, each pixel a shade different; rows of yellow spots across the back every '
+                  '4 pixels, running down the flanks and breaking into a yellow net low on the sides; yellow rings down '
+                  'the tail, spotty near the hips and solid toward the tip, the underside pale; a dark head speckled '
+                  'yellow with a pale lip line; a cream throat and belly crossed by grey bars; yellow dots on the legs, '
+                  'the feet darker; amber eyes with a dark pupil'),
+    ('Still to come', 'step 4, the animations (walk, tongue, swim)'),
 ]
 CHARCOAL, CREAM = (62, 58, 54), (214, 196, 150)
+SKIN = (52, 51, 43)          # charcoal with a little olive
+SKIN_DARK = (40, 38, 33)
+YELLOW = (214, 176, 58)
+YELLOW_DULL = (150, 128, 62)
+PALE = (222, 206, 150)       # throat and belly
+BAR = (128, 120, 98)         # the grey bars across them
 
 
-def colour(part, face):
+def _h(*k):
+    """A steady random number 0 to 1 for a pixel of the grid (the same every build)."""
+    n = 0x9E3779B1
+    for v in k:
+        n = ((n ^ (int(v) & 0xFFFFFFFF)) * 0x85EBCA6B) & 0xFFFFFFFF
+        n ^= n >> 13
+    n = (n * 0xC2B2AE35) & 0xFFFFFFFF
+    return (n ^ (n >> 16)) / 0xFFFFFFFF
+
+
+def _grain(c, gx, gy, gz, amount=0.07):
+    return shade(c, 1 - amount + 2 * amount * _h(gx, gy, gz, 7))
+
+
+def plain_colour(part, face):
     if part == 'eye':
         return (226, 186, 54)
-    if part == 'nostril':
+    if part in ('nostril', 'pupil'):
         return (18, 16, 14)
     if part == 'clawbase':
-        return (28, 24, 21)                  # the dark sheath where the claw leaves the toe
+        return (28, 24, 21)
     if part == 'claw':
-        return (46, 38, 33)                  # dark horn, as in the picture
+        return (46, 38, 33)
     if part == 'clawmid':
-        return (88, 72, 55)                  # browner as it thins
+        return (88, 72, 55)
     if part == 'clawtip':
-        return (156, 134, 102)               # a dull horn point, not white
+        return (156, 134, 102)
     if part in ('belly', 'throat') or face == 'down':
         return CREAM if face != 'up' else CHARCOAL
     return CHARCOAL
 
 
-def paint(bones, look='plain'):
+def colour(part, face, bone, x, y, z):
+    """The painted colour at a point of a piece (its own straight-out model pixels)."""
+    if part == 'eye':
+        return (204, 124, 34)                            # amber
+    if part in ('nostril', 'pupil') or part.startswith('claw'):
+        return plain_colour(part, face)
+    gx, gy, gz = math.floor(x), math.floor(y), math.floor(z)
+    ax = math.floor(abs(x))                               # pixels out from the middle line (both sides alike)
+    spot = _h(ax, gy, gz, 1)
+    if bone == 'body':
+        if part == 'belly' or face == 'down' or y < BODY_Y[0] + 0.6:
+            return _grain(BAR if gz % 3 == 0 and _h(ax, gz, 5) < 0.8 else PALE, ax, gy, gz, 0.04)
+        if y < BODY_Y[0] + 3.5:                           # low on the flank: a yellow net fading to the belly
+            net = (gz % 2 == 0) != (gy % 2 == 0)
+            return _grain(YELLOW_DULL if net and spot < 0.7 else SKIN, ax, gy, gz)
+        if face == 'up':
+            if (gz - 1) % 4 == 0 and spot < 0.62:        # rows of spots across the back, every 4 pixels
+                return _grain(YELLOW, ax, gy, gz, 0.05)
+        elif (gz - 1) % 4 in (0, 1) and (gy // 2 + gz // 4) % 2 == 0 and spot < 0.8:
+            return _grain(YELLOW, ax, gy, gz, 0.05)      # on the flanks the rows break into 2-pixel spots
+        if spot < 0.035:
+            return _grain(YELLOW_DULL, ax, gy, gz)
+        return _grain(SKIN_DARK if y > BODY_Y[1] - 0.5 else SKIN, ax, gy, gz)
+    if bone.startswith('tail'):
+        t = (z - BODY_Z[1]) / TAIL_LEN                   # 0 at the hips, 1 at the tip
+        r = tail_radius(min(1.0, max(0.0, t)))
+        if y - TAIL_AXIS < -0.5 * r or face == 'down':   # the pale underside, banded faintly
+            return _grain(PALE if (gz // 3) % 2 else shade(PALE, 0.86), ax, gy, gz, 0.04)
+        ring = gz % 6 in (1, 2) if t < 0.7 else gz % 5 in (1, 2)
+        if ring and spot < 0.45 + 0.6 * t:               # spotty rings near the hips, solid toward the tip
+            return _grain(YELLOW, ax, gy, gz, 0.05)
+        if spot < 0.03:
+            return _grain(YELLOW_DULL, ax, gy, gz)
+        return _grain(SKIN, ax, gy, gz)
+    if bone.startswith('neck'):
+        if y - NECK_AXIS < -2.0 or face == 'down':       # the throat: cream with grey bars
+            return _grain(BAR if gz % 2 == 0 and _h(ax, gz, 6) < 0.7 else PALE, ax, gy, gz, 0.04)
+        if gz % 3 == 0 and (gy + gz // 3) % 2 == 0 and spot < 0.6:   # small rows of spots
+            return _grain(YELLOW, ax, gy, gz, 0.05)
+        return _grain(SKIN, ax, gy, gz)
+    if bone in ('head', 'jaw'):
+        if part == 'throat':
+            if y > NECK_AXIS + MOUTH - 0.6 and face != 'down':
+                return _grain(PALE, ax, gy, gz, 0.04)     # the lower lip
+            return _grain(BAR if gz % 2 == 0 and _h(ax, gz, 6) < 0.6 else PALE, ax, gy, gz, 0.04)
+        if y < NECK_AXIS + MOUTH + 0.35 and face != 'up':  # the pale upper lip line
+            return _grain(shade(PALE, 0.92), ax, gy, gz, 0.04)
+        if spot < 0.16:                                  # fine yellow speckles
+            return _grain(YELLOW if spot < 0.08 else YELLOW_DULL, ax, gy, gz, 0.05)
+        return _grain(SKIN_DARK if face == 'up' else SKIN, ax, gy, gz)
+    # the legs: dark with yellow dots, the feet and toes darker
+    if '_foot_' in bone or '_toe' in bone:
+        if face == 'down':
+            return _grain(SKIN_DARK, ax, gy, gz, 0.04)
+        return _grain(YELLOW_DULL if spot < 0.06 else SKIN_DARK, ax, gy, gz)
+    if spot < 0.14:
+        return _grain(YELLOW if spot < 0.08 else YELLOW_DULL, ax, gy, gz, 0.05)
+    return _grain(SKIN, ax, gy, gz)
+
+
+def paint(bones, look='nile'):
     """(bones with every face's place on the texture, rows of (r, g, b, a), width, height)."""
     bones = copy.deepcopy(bones)
     patches = []
     for b in bones:
         for c in b.get('cubes', []):
             c['uv'] = {}
+            c['_bone'] = b['name']
             for face, (w, h) in faces(c).items():
                 patches.append((max(1, round(w * TEXELS)), max(1, round(h * TEXELS)), c, face))
     patches.sort(key=lambda p: (-p[1], -p[0]))
@@ -492,13 +585,18 @@ def paint(bones, look='plain'):
     rows = [[(0, 0, 0, 0)] * width for _ in range(height)]
     for x0, y0, w, h, c, face in places:
         c['uv'][face] = {'uv': [x0, y0], 'uv_size': [w, h]}
-        rgb = colour(c['_part'], face)
         for jj in range(h):
             for ii in range(w):
-                rows[y0 + jj][x0 + ii] = tuple(rgb) + (255,)
+                if look == 'plain':
+                    rgb = plain_colour(c['_part'], face)
+                else:
+                    px, py, pz = face_point(c, face, (ii + 0.5) / w, (jj + 0.5) / h)
+                    rgb = colour(c['_part'], face, c['_bone'], px, py, pz)
+                rows[y0 + jj][x0 + ii] = tuple(round(v) for v in rgb) + (255,)
     for b in bones:
         for c in b.get('cubes', []):
             c.pop('_part')
+            c.pop('_bone')
     return bones, rows, width, height
 
 
