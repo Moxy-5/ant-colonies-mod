@@ -1,29 +1,32 @@
 """The Nile monitor (M9 river life, planned with the crocodile's nests, which it raids), its model for the model viewer
 (python tools/model_viewer.py monitor).
 
-Made on 2026-11-16 from the user's picture (a blocky Minecraft Nile monitor on a sand bank: charcoal with golden-yellow
-bands of blotches, a cream belly and throat, a long neck, a wedge head, a pink forked tongue, long clawed toes, a long
-banded tail). Fun first, it only has to look good in the game (animals are generalized, CLAUDE.md). What it is:
-- Reworked 2026-11-17 (the user: "it kind of looks like a normal lizard instead of a nile monitor"; a second picture
-  of a heavy blocky monitor): bigger cubes, a boxy heavy build. 50 cubes long (the head 6, the neck 6, the body 13,
-  the tail 25), 7 wide at the belly, 11 tall at the head. Measured in model pixels, one a cube; the texture has 2
-  pixels a cube so half cubes come out exact. About 2.2 blocks long in the viewer (my pick).
-- The monitor's outline: the neck rising thick from the shoulders so the head is carried above the back, a deep barrel
-  widest in the middle with the belly sagging between the legs (1.5 cubes off the ground there), thick legs held out
-  wide with big pale claws, the tail tall and thick at its base, flattened side to side, lying on the ground from
-  about its middle. The head kept narrow and pointed with the neck a head long, so it stays a Nile monitor and not a
-  Komodo dragon.
-- Boxy: every slice of the neck, body and tail is a box with flat sides and only a half-cube bevel at the belly and
-  back, the tail taller than wide with a low crest.
-- The colours are the thing to get right (the user: "depending on the shade of yellow it can look bad"): a warm
-  charcoal (never pure black), a golden yellow with more red than a lemon has (never greenish), in four close shades
-  each so no face is flat; mostly dark, the yellow in rows of blotches across the back, rings on the tail, a net of
-  yellow and dark low on the flank, cream underneath with faint bars; dark lips with yellow bars, a yellow stripe
-  behind the eye. LOOKS has two other yellows to compare.
+Rebuilt 2026-11-17 from the user's picture (a big blocky Minecraft Nile monitor on a sand bank) after two sculpted
+versions: the user, "to sculpted ... to many pixels it looks really bad", "this image is perfect". So the shape is now
+a few big plain boxes, as Minecraft's own mobs are, and the detail is in the paint; the colours and the pattern of the
+sculpted model are kept (the user liked them; the old model is in monitor_models_sculpted.py until the user picks).
+Fun first, it only has to look good in the game (animals are generalized, CLAUDE.md). What it is:
+- About 73 cubes long, measured off the picture: the head 8, long and low (a skull box, a snout box, a blunt tip, each a
+  little lower than the one behind; only about 4 tall with the jaw, half the body's depth), the neck 7 in two boxes
+  rising gently so the head rides a little above the back, the body 23.5 in a chest box and a hips box with a sagging
+  belly box under them, the tail 35 in twelve boxes, taller than wide (a monitor's tail is flattened from the sides),
+  stepping down and in to a point, lying on the ground from about its middle.
+- Heavy and high: the body deep and wide with the belly clear of the ground, standing on thick bent legs (the picture's
+  monitor stands up, it does not drag its belly).
+- The legs as the picture has them (the user, 2026-11-17: "see how the back legs come out at a different angle than
+  front legs to brace itself"): the front legs go out from the shoulders to elbows held wide and a little back, the
+  forearms down to the feet, which point forward and a little out; the hind legs sprawl wider, the thighs out to the
+  side, knees out, high and forward, the shins down and back, the feet turned out and back, bracing. Each foot is a broad palm with five thick toes fanned out (each toe its own bone),
+  each ending in a long pale claw that comes out and then down to the ground (the user: "claws actually come out and
+  down").
+- The colours: a warm charcoal (never pure black), a golden yellow with more red than a lemon has, in four close shades
+  each; mostly dark, yellow in rows of blotches across the back, rings on the tail, a net of yellow and dark low on the
+  flank, cream underneath with faint bars; dark lips with yellow bars, a yellow stripe back from the eye, a cream jaw
+  with dark spots. LOOKS has two other yellows to compare.
 - Not rigid: neck in two bones, head, jaw, a throat pouch that pumps and swells, a tongue in two bones with two tines
   that slides out of the closed mouth, each pupil and each lower eyelid a bone (lizards blink with the lower lid),
-  chest and hips that bend against each other, six tail bones, each leg three bones (upper, lower, foot) bent like a
-  lizard's: the elbows out and back, the knees out and forward.
+  chest and hips that bend against each other, six tail bones, each leg three bones (upper, lower, foot) and a bone a
+  toe.
 - The legs are placed by where the foot should stand (reach), so in the walk each foot stays planted on the ground
   while the body passes over it, then lifts and swings forward.
 
@@ -37,72 +40,71 @@ import random
 from tilapia_models import cube, mix, shade, faces, face_point, png, clip  # noqa: F401 (png for the viewer)
 
 TEXELS = 2.0          # texture pixels a model pixel
-SPLIT = 8.5           # the mouth line
-HZ = 0.0              # (the first model slid its head's boxes; this one writes them where they are)
-HEAD_BACK, SNOUT, TAIL_END = -13.0, -19.0, 31.0
+SPLIT = 9.0           # the mouth line
+HZ = 0.0              # (kept for the viewer's old head offset; this model writes the head where it is)
+HEAD_BACK = -19.5     # where the head meets the neck
+SKULL, SNOUT, TIP, TIP_END = -19.5, -23.5, -26.5, -27.5     # the head's three boxes, back to front
+EYE_Z, EYE_Y = (-23.5, -22.0), (10.5, 11.5)
+NECK, TAIL_Z, TAIL_END = -12.5, 11.0, 46.0    # where the neck ends, the tail starts and ends
+SEG = 6.0                                     # each tail bone's length (the last is shorter)
+FAR_TAIL = 29.0                               # from here the tail is ringed all the way round
+BODY_Y = 7.5                                  # the chest's and hips' pivot height
 
-# The neck, body and tail's shape: (z, the middle's height, half its height, half its width), read between the rows.
-# Heavy (the user's second picture, 2026-11-17): a deep barrel widest in the middle with the belly sagging between the
-# legs, the neck rising thick from the shoulders so the head is carried above the back, the tail tall and thick at its
-# base and flattened side to side.
-PROFILE = [(-13.0, 8.4, 1.7, 1.75), (-11.0, 7.9, 1.9, 1.9), (-9.0, 7.0, 2.2, 2.2), (-7.0, 6.0, 2.6, 2.7),
-           (-4.5, 5.0, 2.9, 3.3), (-1.0, 4.6, 3.1, 3.6), (3.0, 4.7, 2.9, 3.4), (6.0, 4.8, 2.6, 2.6),
-           (9.0, 4.2, 2.3, 2.0), (13.0, 3.1, 1.9, 1.6), (18.0, 1.9, 1.5, 1.15), (23.0, 1.2, 1.1, 0.85),
-           (27.0, 0.8, 0.75, 0.6), (31.0, 0.5, 0.5, 0.4)]
-# The chain: bone, parent, the z of each slice's edges.
-CHAIN = [('neck2', 'neck1', [-13, -11.5, -10]), ('neck1', 'chest', [-10, -8.5, -7]),
-         ('chest', 'body', [-7, -5.5, -4, -2.5, -1, 0]), ('hips', 'body', [0, 1.5, 3, 4.5, 6]),
-         ('tail1', 'hips', [6, 7.5, 9, 10.5]), ('tail2', 'tail1', [10.5, 12, 13.5, 15]),
-         ('tail3', 'tail2', [15, 16.5, 18, 19.5]), ('tail4', 'tail3', [19.5, 21, 22.5, 24]),
-         ('tail5', 'tail4', [24, 25.5, 27.5]), ('tail6', 'tail5', [27.5, 29.25, 31])]
-PIVOT_Z = {'neck2': -10, 'neck1': -7, 'chest': 0, 'hips': 0, 'tail1': 6, 'tail2': 10.5, 'tail3': 15, 'tail4': 19.5,
-           'tail5': 24, 'tail6': 27.5}
-NECK, TAIL_Z = -7.0, 6.0                      # where the neck ends and the tail starts
-FAR_TAIL = 19.0                               # from here the tail is ringed all the way round
-CREST = (7.0, 27.5)                           # the tail's crest runs between these
+# The big boxes of the neck and body: (bone, z from, z to, bottom, top, half-width).
+NECK_BOXES = [('neck2', -19.5, -16.0, 6.75, 12.0, 2.75), ('neck1', -16.0, -12.5, 5.75, 11.75, 3.25)]
+BODY_BOXES = [('chest', -12.5, -9.5, 5.0, 11.0, 3.75), ('chest', -9.5, 0.0, 4.5, 11.25, 4.75),
+              ('hips', 0.0, 7.5, 4.75, 11.0, 4.75), ('hips', 7.5, 11.0, 5.0, 10.75, 3.75)]
+BELLY = [('chest', -9.0, 0.0, 4.0, 4.5, 4.0), ('hips', 0.0, 6.0, 4.25, 4.75, 3.75)]   # the belly sagging between the legs
+# The tail's outline at a few places (z, bottom, top, half-width); each tail bone holds two boxes read off it. Taller
+# than wide all the way, as a monitor's tail is.
+TAIL_SHAPE = [(11.0, 5.0, 10.75, 3.25), (15.0, 4.25, 10.0, 2.75), (19.0, 3.5, 9.0, 2.45), (23.0, 2.75, 8.0, 2.2),
+              (27.0, 2.0, 7.0, 2.0), (32.0, 1.25, 5.75, 1.75), (36.0, 0.5, 4.5, 1.5), (40.0, 0.0, 3.25, 1.15),
+              (43.0, 0.0, 2.25, 0.8), (46.0, 0.0, 1.25, 0.45)]
+TAIL = ['tail1', 'tail2', 'tail3', 'tail4', 'tail5', 'tail6']
 
 # The legs: where each leaves the body, its upper and lower parts' lengths and thicknesses, where its wrist stands at
-# rest (the sole on the ground), which way the elbow or knee points (out and back for the arm, out and forward for the
-# leg, as a lizard's do), and how far the toes point outward. For the left side; the right is its mirror. Thick and
-# strong, the elbows and knees held out wide, big clawed feet (the user's picture).
-LEGS = {'arm': dict(parent='chest', at=(2.5, 5.0, -4.5), upper=3.25, thick=2.5, lower=3.0, thin=2.25,
-                    hand=(5.25, 0.5, -4.25), pole=(1.0, 0.1, 0.9), toe_out=20, toes=(1.0, 1.5, 1.75, 1.5, 1.0)),
-        'leg': dict(parent='hips', at=(2.5, 4.75, 3.25), upper=3.5, thick=3.0, lower=3.25, thin=2.5,
-                    hand=(5.5, 0.5, 3.75), pole=(1.0, 0.25, -0.8), toe_out=35, toes=(1.0, 1.5, 1.75, 2.0, 1.25))}
+# rest (well inside the leg's full reach, so it stands bent), which way the elbow or knee points (out, up and back for
+# the arm, out, up and forward for the leg, as a lizard's do), how far the foot turns out (the front foot forward and a
+# little out, the hind foot out and back, bracing), the five toes' lengths (inner to outer) and how far they fan. For
+# the left side; the right is its mirror.
+LEGS = {'arm': dict(parent='chest', at=(4.0, 8.25, -9.5), upper=4.25, thick=4.5, lower=5.5, thin=4.0,
+                    hand=(7.5, 1.5, -11.25), pole=(1.0, 1.2, 0.5), toe_out=18,
+                    toes=(1.5, 2.0, 2.5, 2.25, 1.75), fan=14),
+        'leg': dict(parent='hips', at=(4.0, 8.25, 9.25), upper=4.5, thick=5.0, lower=5.5, thin=4.25,
+                    hand=(7.5, 1.5, 12.75), pole=(1.0, 1.0, -0.8), toe_out=90,
+                    toes=(1.25, 2.0, 2.25, 2.5, 1.75), fan=14)}
+WRIST_UP = 1.5        # the wrist (the foot's pivot) above the sole
 SIDES = (('left', 1), ('right', -1))
 
 
-def prof(z):
-    """(the middle's height, half the height, half the width) at z."""
-    for (z0, *a), (z1, *b) in zip(PROFILE, PROFILE[1:]):
+def lerp_shape(z):
+    """(bottom, top, half-width) of the tail at z."""
+    for (z0, *a), (z1, *b) in zip(TAIL_SHAPE, TAIL_SHAPE[1:]):
         if z <= z1:
-            f = min(1.0, max(0.0, (z - z0) / (z1 - z0)))
-            f = f * f * (3 - 2 * f)
+            f = max(0.0, min(1.0, (z - z0) / (z1 - z0)))
             return tuple(p + (q - p) * f for p, q in zip(a, b))
-    return tuple(PROFILE[-1][1:])
+    return tuple(TAIL_SHAPE[-1][1:])
 
 
-def half(v):
-    return round(v * 2) / 2
+def q(v):
+    return round(v * 4) / 4
 
 
-def slices():
-    """Every slice of the neck, body and tail: (bone, z from, z to, bottom, top, half-width), on the half-cube grid."""
+def tail_boxes():
+    """Every tail box: (bone, z from, z to, bottom, top, half-width), two to a bone, the last bone with the tip."""
     out = []
-    for bone, _, zs in CHAIN:
-        for z0, z1 in zip(zs, zs[1:]):
-            cy, hh, hw = prof((z0 + z1) / 2)
-            out.append((bone, z0, z1, max(0.0, half(cy - hh)), half(cy + hh), max(0.5, half(hw))))
+    for i, bone in enumerate(TAIL):
+        z0 = TAIL_Z + SEG * i
+        z1 = TAIL_END if bone == 'tail6' else z0 + SEG
+        cuts = [z0, (z0 + z1) / 2, z1]
+        for a, b in zip(cuts, cuts[1:]):
+            bot, top, hw = lerp_shape((a + b) / 2)
+            out.append((bone, a, b, q(bot), q(top), max(0.25, q(hw))))
     return out
 
 
-SLICES = slices()
-
-
-def cut(hw):
-    """How much a slice's belly and back are narrower than its flanks: only a small bevel, so the trunk is a box with
-    flat sides (heavy, as in the user's picture) rather than a rounded tube."""
-    return 0.5 if hw >= 1.5 else 0.0
+TAIL_BOXES = tail_boxes()
+SLICES = sorted(NECK_BOXES + BODY_BOXES + TAIL_BOXES, key=lambda s: s[1])
 
 
 def box(cubes, x0, y0, z0, x1, y1, z1, part):
@@ -115,62 +117,42 @@ def both(cubes, x0, y0, z0, x1, y1, z1, part):
 
 
 def trunk(bones):
-    for bone, z0, z1, bot, top, hw in SLICES:
-        c, cubes = cut(hw), bones[bone]
-        if c:
-            box(cubes, -(hw - c), bot, z0, hw - c, bot + c, z1, 'skin')
-            box(cubes, -hw, bot + c, z0, hw, top - c, z1, 'skin')
-            box(cubes, -(hw - c), top - c, z0, hw - c, top, z1, 'skin')
-        else:
-            box(cubes, -hw, bot, z0, hw, top, z1, 'skin')
-        if z0 >= CREST[0] and z1 <= CREST[1]:  # the tail's low crest
-            box(cubes, -0.25, top, z0, 0.25, top + (0.5 if z0 < FAR_TAIL else 0.25), z1, 'crest')
-    # the back's ridge over the shoulders and hips, so the back is not one flat plank
-    for bone, z0, z1 in (('chest', -5.5, 0.0), ('hips', 0.0, 4.5)):
-        top = max(t for b, a0, a1, _, t, _ in SLICES if b == bone and a0 >= z0 - 0.01 and a1 <= z1 + 0.01)
-        box(bones[bone], -1.0, top, z0, 1.0, top + 0.5, z1, 'ridge')
+    for bone, z0, z1, bot, top, hw in NECK_BOXES + BODY_BOXES + BELLY + TAIL_BOXES:
+        box(bones[bone], -hw, bot, z0, hw, top, z1, 'skin')
 
 
 def head(bones):
-    def hb(cubes, x0, y0, z0, x1, y1, z1, part):
-        box(cubes, x0, y0, z0 + HZ, x1, y1, z1 + HZ, part)
-
-    def hboth(cubes, x0, y0, z0, x1, y1, z1, part):
-        both(cubes, x0, y0, z0 + HZ, x1, y1, z1 + HZ, part)
     h, j = bones['head'], bones['jaw']
-    # the upper head: a narrow pointed wedge, four steps from the skull to the snout's tip, each with a narrower cap
-    hb(h, -2.0, SPLIT, -15.5, 2.0, 10.5, -13.0, 'head')
-    hb(h, -1.5, 10.5, -15.5, 1.5, 11.0, -13.0, 'head')
-    hb(h, -1.5, SPLIT, -17.5, 1.5, 10.0, -15.5, 'head')
-    hb(h, -1.0, 10.0, -17.5, 1.0, 10.5, -15.5, 'head')
-    hb(h, -1.0, SPLIT, -18.5, 1.0, 9.5, -17.5, 'head')
-    hb(h, -0.5, 9.5, -18.5, 0.5, 10.0, -17.5, 'head')
-    hb(h, -0.5, SPLIT, -19.0, 0.5, 9.5, -18.5, 'head')
-    hboth(h, 1.25, 10.5, -15.75, 2.25, 11.0, -13.75, 'brow')         # a brow ridge over each eye
-    hboth(h, 1.5, 9.25, -16.75, 1.56, 9.75, -16.25, 'nostril')     # set back toward the eye, as a Nile monitor's are
-    hboth(h, 2.0, 9.25, -15.0, 2.06, 10.25, -13.75, 'iris')
+    # the upper head: a long low skull, a narrower snout, a blunt tip, each a little lower than the one behind (the
+    # picture's long flat head, its top only a little over the back); a low brow ledge over each eye
+    box(h, -2.75, SPLIT, SNOUT, 2.75, 12.5, SKULL, 'head')
+    box(h, -2.25, SPLIT, TIP, 2.25, 11.75, SNOUT, 'head')
+    box(h, -1.75, SPLIT, TIP_END, 1.75, 11.0, TIP, 'head')
+    both(h, 2.5, 11.5, -24.0, 3.0, 12.0, -21.75, 'brow')
+    both(h, 2.25, 10.75, -26.25, 2.31, 11.25, -25.75, 'nostril')
+    both(h, 2.75, EYE_Y[0], EYE_Z[0], 2.81, EYE_Y[1], EYE_Z[1], 'iris')
     # the eyes: each pupil a bone that slides over the iris, with a white glint; each lower lid a bone, a low rim
     # under the eye that grows up over it to blink
     for side, s in SIDES:
         p = bones[f'pupil_{side}']
-        hb(p, s * 2.06, 9.5, -14.625, s * 2.12, 10.0, -14.125, 'pupil')
-        hb(p, s * 2.12, 9.75, -14.625, s * 2.15, 10.0, -14.375, 'glint')
-        hb(bones[f'eyelid_{side}'], s * 2.0, 9.0, -15.1, s * 2.2, 9.25, -13.65, 'lid')
-    # the lower jaw, hinged at the back of the skull, a little shorter and narrower than the head over it
-    hb(j, -1.75, 7.5, -15.5, 1.75, SPLIT, -13.5, 'jaw')
-    hb(j, -1.25, 7.75, -17.5, 1.25, SPLIT, -15.5, 'jaw')
-    hb(j, -0.75, 8.0, -18.75, 0.75, SPLIT, -17.5, 'jaw')
+        box(p, s * 2.81, 10.7, -23.15, s * 2.87, 11.3, -22.35, 'pupil')
+        box(p, s * 2.87, 11.05, -23.15, s * 2.9, 11.3, -22.9, 'glint')
+        box(bones[f'eyelid_{side}'], s * 2.75, 10.5, -23.6, s * 2.97, 10.75, -21.9, 'lid')
+    # the lower jaw, hinged at the back of the skull, a little narrower than the head over it
+    box(j, -2.5, 7.75, SNOUT, 2.5, SPLIT, SKULL - 0.25, 'jaw')
+    box(j, -2.0, 8.0, TIP + 0.25, 2.0, SPLIT, SNOUT, 'jaw')
+    box(j, -1.5, 8.25, TIP_END + 0.25, 1.5, SPLIT, TIP + 0.25, 'jaw')
     # inside the mouth, seen when it gapes
-    for z0, z1, w in ((-18.5, -17.5, 0.5), (-17.5, -15.5, 1.0), (-15.5, -13.75, 1.25)):
-        hb(h, -w, SPLIT - 0.04, z0, w, SPLIT, z1, 'mouth')
-        hb(j, -w, SPLIT, z0, w, SPLIT + 0.04, z1, 'mouth')
+    for z0, z1, w in ((TIP_END + 0.5, TIP, 1.0), (TIP, SNOUT, 1.5), (SNOUT, SKULL - 0.75, 2.0)):
+        box(h, -w, SPLIT - 0.04, z0, w, SPLIT, z1, 'mouth')
+        box(j, -w, SPLIT, z0, w, SPLIT + 0.04, z1, 'mouth')
     # the tongue, hidden in the closed mouth until it slides out: a stem in two bones and two tines
-    hb(bones['tongue'], -0.25, 8.375, -16.0, 0.25, 8.625, -14.5, 'tongue')
-    hb(bones['tongue_mid'], -0.25, 8.375, -17.5, 0.25, 8.625, -16.0, 'tongue')
+    box(bones['tongue'], -0.3, SPLIT - 0.15, -23.5, 0.3, SPLIT + 0.15, -21.0, 'tongue')
+    box(bones['tongue_mid'], -0.3, SPLIT - 0.15, -26.0, 0.3, SPLIT + 0.15, -23.5, 'tongue')
     for side, s in SIDES:
-        hb(bones[f'tongue_{side}'], s * 0.02, 8.375, -18.5, s * 0.25, 8.625, -17.5, 'tongue_tip')
+        box(bones[f'tongue_{side}'], s * 0.02, SPLIT - 0.15, -27.0, s * 0.3, SPLIT + 0.15, -26.0, 'tongue_tip')
     # the throat pouch under the neck
-    hb(bones['throat'], -1.25, 6.0, -13.25, 1.25, 7.0, -10.5, 'throat')
+    box(bones['throat'], -2.5, 6.0, -19.5, 2.5, 7.0, -15.5, 'throat')
 
 
 # --- the legs ----------------------------------------------------------------------------------------------------------
@@ -238,14 +220,14 @@ def reach(kind, s, wrist):
     h = math.sqrt(max(0.0, l1 * l1 - a * a))
     p = [s * d['pole'][0], d['pole'][1], d['pole'][2]]
     k = sum(x * y for x, y in zip(p, u))
-    q = unit([x - k * y for x, y in zip(p, u)])
-    elbow = [S[i] + a * u[i] + h * q[i] for i in range(3)]
+    qv = unit([x - k * y for x, y in zip(p, u)])
+    elbow = [S[i] + a * u[i] + h * qv[i] for i in range(3)]
     end = [S[i] + far * u[i] for i in range(3)]
     return along(unit([e - a0 for e, a0 in zip(elbow, S)]), s), along(unit([w - e for w, e in zip(end, elbow)]), s)
 
 
 def foot_flat(kind, s, yaw=0.0, pitch=0.0):
-    """The foot's matrix when it lies flat, toes out by the leg's own angle (and turned or tipped a little more)."""
+    """The foot's matrix when it lies flat, turned out by the leg's own angle (and turned or tipped a little more)."""
     return rot([pitch, -s * LEGS[kind]['toe_out'] + yaw, 0])
 
 
@@ -260,58 +242,65 @@ def rest_turns(kind, s):
 
 
 def leg(kind, side, s):
-    """One leg's three bones (upper, lower, foot). The upper and lower parts are drawn straight out to the side from
-    the shoulder and the bones' own turns bend them into place (rest_turns), the foot's turn lays it flat again."""
+    """One leg's bones: upper, lower, foot and a bone for each toe. The upper and lower parts are each one thick box
+    drawn straight out to the side from the shoulder; the bones' own turns bend them into place (rest_turns), the
+    foot's turn lays it flat again. The foot is drawn pointing forward (-Z) round the wrist: a broad palm and five
+    toes, each toe its own bone turned to fan them out, each ending in a claw that comes out and then down."""
     d = LEGS[kind]
     x0, y0, z0 = shoulder(kind, s)
     up, low, foot = [], [], []
     t, n = d['thick'] / 2, d['thin'] / 2
     elbow = x0 + s * d['upper']
-    box(up, x0 - s * 0.75, y0 - t, z0 - t, x0 + s * d['upper'] * 0.55, y0 + t, z0 + t, 'limb')
-    box(up, x0 + s * d['upper'] * 0.55, y0 - t + 0.25, z0 - t + 0.25, elbow + s * 0.75, y0 + t - 0.25, z0 + t - 0.25, 'limb')
     wrist = elbow + s * d['lower']
-    box(low, elbow - s * 0.75, y0 - n, z0 - n, elbow + s * d['lower'] * 0.6, y0 + n, z0 + n, 'limb')
-    box(low, elbow + s * d['lower'] * 0.6, y0 - n + 0.25, z0 - n + 0.25, wrist + s * 0.25, y0 + n - 0.25, z0 + n - 0.25, 'limb')
-    # the foot, drawn pointing forward (-Z) round the wrist: a palm and five toes fanned by starting the outer ones
-    # farther back and farther out, each ending in a pale claw
-    sole = y0 - 0.5
-    box(foot, wrist - 1.5, sole, z0 - 1.5, wrist + 1.5, sole + 1.0, z0 + 1.0, 'foot')
-    for i, length in enumerate(d['toes']):
-        x = wrist + s * (i - 2) * 0.625
-        back = z0 - 1.5 + abs(i - 2) * 0.5
-        box(foot, x - 0.25, sole, back - length, x + 0.25, sole + 0.5, back, 'toe')
-        box(foot, x - 0.25, sole, back - length - 0.75, x + 0.25, sole + 0.5, back - length, 'claw')
-    r = [[round(v, 3) for v in t3] for t3 in rest_turns(kind, s)]
+    box(up, x0 - s * 1.25, y0 - t, z0 - t, elbow + s * n * 0.8, y0 + t, z0 + t, 'limb')
+    box(low, elbow - s * n * 0.4, y0 - n, z0 - n, wrist - s * 0.6, y0 + n, z0 + n, 'limb')
+    sole = y0 - WRIST_UP
+    box(foot, wrist - 2.25, sole, z0 - 1.5, wrist + 2.25, sole + 1.75, z0 + 1.75, 'foot')
     name = f'{kind}_{{}}_{side}'
+    toes = []
+    for i, length in enumerate(d['toes']):
+        tx = wrist + s * (i - 2) * 0.95
+        back = z0 - 1.0 + abs(i - 2) * 0.4
+        cubes = []
+        box(cubes, tx - 0.5, sole + 0.1, back - length, tx + 0.5, sole + 1.2, back, 'toe')
+        box(cubes, tx - 0.45, sole + 0.3, back - length - 0.9, tx + 0.45, sole + 1.2, back - length, 'claw')
+        box(cubes, tx - 0.38, sole, back - length - 1.65, tx + 0.38, sole + 0.85, back - length - 0.85, 'claw')
+        toes.append({'name': name.format(f'toe{i}'), 'parent': name.format('foot'), 'pivot': [tx, sole, back],
+                     'rotation': [0, round(-s * (i - 2) * d['fan'], 3), 0], 'cubes': cubes})
+    r = [[round(v, 3) for v in t3] for t3 in rest_turns(kind, s)]
     return [{'name': name.format('upper'), 'parent': d['parent'], 'pivot': [x0, y0, z0], 'rotation': r[0], 'cubes': up},
             {'name': name.format('lower'), 'parent': name.format('upper'), 'pivot': [elbow, y0, z0], 'rotation': r[1],
              'cubes': low},
             {'name': name.format('foot'), 'parent': name.format('lower'), 'pivot': [wrist, y0, z0], 'rotation': r[2],
-             'cubes': foot}]
+             'cubes': foot}] + toes
 
 
 def model():
     names = ['head', 'jaw', 'throat', 'tongue', 'tongue_mid', 'tongue_left', 'tongue_right', 'pupil_left',
-             'pupil_right', 'eyelid_left', 'eyelid_right'] + [c[0] for c in CHAIN]
+             'pupil_right', 'eyelid_left', 'eyelid_right', 'neck1', 'neck2', 'chest', 'hips'] + TAIL
     bones = {n: [] for n in names}
     trunk(bones)
     head(bones)
-    out = [{'name': 'body', 'pivot': [0, round(prof(0)[0], 2), 0]}]
-    parents = {c[0]: c[1] for c in CHAIN}
-    for name in ('chest', 'hips', 'neck1', 'neck2', 'tail1', 'tail2', 'tail3', 'tail4', 'tail5', 'tail6'):
-        out.append({'name': name, 'parent': parents[name], 'pivot': [0, round(prof(PIVOT_Z[name])[0], 2), PIVOT_Z[name]],
-                    'cubes': bones[name]})
-    out += [{'name': 'head', 'parent': 'neck2', 'pivot': [0, 9.0, HEAD_BACK], 'cubes': bones['head']},
-            {'name': 'jaw', 'parent': 'head', 'pivot': [0, SPLIT, -13.5], 'cubes': bones['jaw']},
-            {'name': 'throat', 'parent': 'neck2', 'pivot': [0, 7.0, -12.0], 'cubes': bones['throat']},
-            {'name': 'tongue', 'parent': 'head', 'pivot': [0, 8.5, -14.5], 'cubes': bones['tongue']},
-            {'name': 'tongue_mid', 'parent': 'tongue', 'pivot': [0, 8.5, -16.0], 'cubes': bones['tongue_mid']}]
+    mid = {b: (bot + top) / 2 for b, z0, z1, bot, top, hw in TAIL_BOXES if z0 == TAIL_Z + SEG * TAIL.index(b)}
+    out = [{'name': 'body', 'pivot': [0, BODY_Y, 0]},
+           {'name': 'chest', 'parent': 'body', 'pivot': [0, BODY_Y, 0], 'cubes': bones['chest']},
+           {'name': 'hips', 'parent': 'body', 'pivot': [0, BODY_Y, 0], 'cubes': bones['hips']},
+           {'name': 'neck1', 'parent': 'chest', 'pivot': [0, 8.5, NECK], 'cubes': bones['neck1']},
+           {'name': 'neck2', 'parent': 'neck1', 'pivot': [0, 9.25, -16.0], 'cubes': bones['neck2']}]
+    for i, name in enumerate(TAIL):
+        out.append({'name': name, 'parent': 'hips' if i == 0 else TAIL[i - 1],
+                    'pivot': [0, round(mid[name], 2), TAIL_Z + SEG * i], 'cubes': bones[name]})
+    out += [{'name': 'head', 'parent': 'neck2', 'pivot': [0, 10.0, HEAD_BACK], 'cubes': bones['head']},
+            {'name': 'jaw', 'parent': 'head', 'pivot': [0, SPLIT, SKULL - 0.25], 'cubes': bones['jaw']},
+            {'name': 'throat', 'parent': 'neck2', 'pivot': [0, 7.0, -17.5], 'cubes': bones['throat']},
+            {'name': 'tongue', 'parent': 'head', 'pivot': [0, SPLIT, -21.0], 'cubes': bones['tongue']},
+            {'name': 'tongue_mid', 'parent': 'tongue', 'pivot': [0, SPLIT, -23.5], 'cubes': bones['tongue_mid']}]
     for side, s in SIDES:
-        out += [{'name': f'tongue_{side}', 'parent': 'tongue_mid', 'pivot': [s * 0.12, 8.5, -17.5],
+        out += [{'name': f'tongue_{side}', 'parent': 'tongue_mid', 'pivot': [s * 0.15, SPLIT, -26.0],
                  'rotation': [0, -s * 7, 0], 'cubes': bones[f'tongue_{side}']},
-                {'name': f'pupil_{side}', 'parent': 'head', 'pivot': [s * 2.1, 9.75, -14.375],
+                {'name': f'pupil_{side}', 'parent': 'head', 'pivot': [s * 2.84, 11.0, -22.75],
                  'cubes': bones[f'pupil_{side}']},
-                {'name': f'eyelid_{side}', 'parent': 'head', 'pivot': [s * 2.1, 9.0, -14.375],
+                {'name': f'eyelid_{side}', 'parent': 'head', 'pivot': [s * 2.84, 10.5, -22.75],
                  'cubes': bones[f'eyelid_{side}']}]
     for kind in LEGS:
         for side, s in SIDES:
@@ -361,46 +350,60 @@ def tone(shades, r):
 
 
 def skin(x, y, z, face):
-    """The neck, body and tail: 'Y' yellow, 'D' dark, 'T' tan, 'C' cream, 'B' a faint belly bar."""
+    """The neck, body and tail, texel by texel (the picture's pattern is as fine as its pixels): 'Y' yellow, 'D' dark,
+    'T' tan, 'C' cream, 'B' a faint belly bar."""
     bot, top, hw = section(z)
+    bot = min(bot, y)                         # the sagging belly lies below its slice
     g = abs(x) + (top - y)                    # how far round the body from the spine
     around = hw + (top - bot)                 # the spine to the belly's middle, about
     u = g / around
     side = 1 if x >= 0 else -1
-    cz, cg = math.floor(z + 1e-4), math.floor(g + 1e-4)
-    r = dice(cz, cg, side)
+    tz, tg = math.floor(z * TEXELS + 1e-4), math.floor(g * TEXELS + 1e-4)
+    r = dice(tz, tg, side + 3)
     tail = z >= TAIL_Z
-    if tail:                                  # rings: 2 cubes yellow in every 6, closer toward the tip
-        period, start = (5, TAIL_Z) if z < 16 else (4, 16) if z < 24 else (3, 24)
+    if tail:                                  # rings, closer toward the tip (texels from one to the next)
+        period, start = (7, TAIL_Z) if z < 23 else (6, 23) if z < 35 else (5, 35)
     elif z < NECK:
-        period, start = 3, HEAD_BACK          # the neck: closer rows
+        period, start = 5, HEAD_BACK          # the neck: closer rows
     else:
-        period, start = 4, NECK + 1
-    band = (cz - start) // period
-    # a row of blotches: each blotch 2 cubes wide round the body with 1 dark between, 1 or 2 cubes long, set a cube
-    # forward or back of its neighbours so the row wanders
-    cell = (cg + (band % 3)) // 3
-    at = (cz - start) % period
-    first = int(dice(band, cell, 5) * 2)
-    long = 2 if tail or dice(band, cell, 6) < 0.6 else 1
-    blotch = first <= at < first + long and ((cg + (band % 3)) % 3 != 2 or tail)
-    if face == 'down' or u > 0.88:            # underneath: cream with faint bars
+        period, start = 6, NECK
+    k = tz - math.floor(start * TEXELS)
+    if not tail:                              # the rows wander a texel forward or back as they go round
+        k += int(dice(tg // 3, k // period, side + 7) * 3) - 1
+    band, at = k // period, k % period
+    if tail:                                  # a ring 2 or 3 texels long, its edges ragged
+        edge = int(dice(tg // 2, band, side + 19) < 0.3)
+        blotch = edge <= at < (3 if period >= 6 else 2) + edge
+    else:
+        # a row of blotches across the back: each 2 to 4 texels round and 2 to 4 along, a dark texel or two between,
+        # set a texel forward or back of its neighbours; now and then one missing, now and then two run together, and
+        # a corner nipped off so they are not all squares
+        lane = tg + 2 * (band % 2)
+        cell = lane // 4
+        wide = 4 if dice(band, cell, side + 21) < 0.22 else 2 + (dice(band, cell, side + 11) < 0.55)
+        long = 2 + int(dice(band, cell, side + 13) * 2.4)
+        first = int(dice(band, cell, side + 15) * 2)
+        blotch = lane % 4 < wide and first <= at < first + long and dice(band, cell, side + 17) > 0.12
+        if blotch and lane % 4 in (0, wide - 1) and at in (first, first + long - 1) and r < 0.4:
+            blotch = False
+    if face == 'down' or u > 0.88:            # underneath: cream with faint bars and a little dark mottling
         if z > FAR_TAIL:                            # the far tail is ringed all the way round
-            return 'Y' if at < 2 and r < 0.8 else 'D'
-        return 'B' if at == period - 1 and r < 0.6 else 'C'
-    if u > 0.76:                              # the edge of the belly: tan breaking into the dark
+            return 'Y' if blotch and r < 0.85 else 'D'
+        return 'B' if (at == period - 1 and r < 0.5) or r < 0.06 else 'C'
+    if u > 0.75:                              # the edge of the belly: tan breaking into the dark
         if z > FAR_TAIL:
-            return 'Y' if at < 2 and r < 0.85 else 'D'
-        return 'T' if r < 0.5 else 'C' if r < 0.7 else 'D' if r < 0.9 else 'Y'
-    if u > 0.58:                              # low on the flank: a net of yellow and dark
+            return 'Y' if blotch and r < 0.85 else 'D'
+        return 'T' if r < 0.5 else 'C' if r < 0.68 else 'D' if r < 0.88 else 'Y'
+    if u > 0.57:                              # low on the flank: a net, yellow round dark spots
         if z > FAR_TAIL:
-            return 'Y' if at < 2 and r < 0.85 else 'D'
-        if blotch:
-            return 'Y' if r < 0.65 else 'T'
-        return ('Y' if r < 0.3 else 'T' if r < 0.5 else 'D') if (cz + cg) % 3 == 0 else 'D'
+            return 'Y' if blotch and r < 0.85 else 'D'
+        hole = (tz + 2 * ((tg // 3) % 2)) % 4 < 2 and tg % 3 < 2
+        if hole:
+            return 'D' if r < 0.85 else 'T'
+        return 'Y' if r < 0.78 else 'T' if r < 0.9 else 'D'
     if blotch:
         return 'Y' if r < 0.92 else 'D'
-    return 'Y' if r < 0.04 else 'D'
+    return 'Y' if r < 0.035 else 'D'
 
 
 def colour(part, look, x, y, z, face, rnd):
@@ -409,18 +412,17 @@ def colour(part, look, x, y, z, face, rnd):
     r = dice(cx * 3 + cy * 7, cz, 21 if face in ('up', 'down') else 22 if face in ('east', 'west') else 23)
     grain = rnd.uniform(0.985, 1.015)
     dark, yellow, cream, tan = tone(P['dark'], r), tone(P['yellow'], r), P['cream'], P['tan']
-    paint_of = {'Y': yellow, 'D': dark, 'T': mix(tan, yellow, 0.25), 'C': cream if r < 0.75 else mix(cream, tan, 0.5),
+    paint_of = {'Y': yellow, 'D': dark, 'T': mix(tan, yellow, 0.55), 'C': cream if r < 0.75 else mix(cream, tan, 0.5),
                 'B': mix(cream, P['dark'][1], 0.3)}
     if part == 'pupil' or part == 'nostril':
         return (14, 13, 15)
     if part == 'glint':
         return (250, 248, 240)
     if part == 'iris':
-        hz = z - HZ
-        edge = y < 9.5 or y > 10.0 or hz < -14.75 or hz > -14.0
+        edge = y < EYE_Y[0] + 0.25 or y > EYE_Y[1] - 0.25 or z < EYE_Z[0] + 0.25 or z > EYE_Z[1] - 0.25
         return shade((156, 96, 34) if edge else (206, 142, 50), grain)
     if part == 'lid':
-        return shade(mix(P['yellow'][2], P['dark'][1], 0.45), grain)
+        return shade(mix(P['yellow'][2], P['dark'][1], 0.2), grain)
     if part == 'mouth':
         return shade((206, 124, 128) if r < 0.5 else (194, 110, 116), grain)
     if part == 'tongue':
@@ -429,51 +431,50 @@ def colour(part, look, x, y, z, face, rnd):
         return shade((190, 98, 122), grain)
     if part == 'claw':
         return shade((236, 226, 200) if face == 'up' else (216, 202, 170), grain)
-    if part == 'toe':
-        return shade(tan if face == 'down' else yellow if cz % 2 == 0 else dark, grain)
+    tx, ty, tw = (math.floor(v * TEXELS + 1e-4) for v in (x, y, z))
+    spot = dice(tx * 31 + ty, ty * 17 + tw, 61) < 0.17          # single yellow dots, now and then two together
+    limb_dark = mix(dark, P['dark'][3], 0.35)
+    if part == 'toe':                         # dark with yellow bands across the knuckles
+        return shade(tan if face == 'down' else yellow if tw % 3 == 0 and r < 0.8 else limb_dark, grain)
     if part == 'foot':
-        return shade(tan if face == 'down' else yellow if r < 0.22 else dark, grain)
+        return shade(tan if face == 'down' else yellow if spot else limb_dark, grain)
     if part == 'limb':                        # spotted: yellow dots on dark, a paler underside
         if face == 'down':
-            return shade(mix(tan, P['dark'][1], 0.35), grain)
-        spot = (cx + 2 * cy + 3 * cz) % 5 == 0 and dice(cx, cy, cz) < 0.8 or dice(cx, cy + 9, cz) < 0.06
-        return shade(yellow if spot else dark, grain)
+            return shade(yellow if spot else mix(limb_dark, tan, 0.2), grain)
+        return shade(yellow if spot else limb_dark, grain)
     if part == 'throat':
         return shade(cream if face == 'down' or r < 0.7 else mix(cream, tan, 0.6), grain)
-    hz = z - HZ
-    chz = math.floor(hz + 1e-4)
-    if part == 'jaw':                         # cream with dark bars up the lips
+    fx, fy, fz = (math.floor(v * 2 + 1e-4) for v in (x, y, z))
+    if part == 'jaw':                         # cream with dark flecks, the lip's edge dark
         if face == 'down':
-            return shade(cream, grain)
-        bar = chz % 2 == 0 and hz < -14
-        return shade(dark if bar and y > 7.75 else cream if r < 0.7 else mix(cream, tan, 0.6), grain)
-    if part == 'brow':
-        if face in ('east', 'west') and y < 10.75:
-            return shade(yellow, grain)
-        return shade(dark, grain)
+            return shade(cream if r < 0.85 else mix(cream, tan, 0.6), grain)
+        if y > SPLIT - 0.5 and face in ('east', 'west'):
+            return shade(dark if dice(fz, 3, 44) < 0.7 else mix(cream, tan, 0.6), grain)
+        fleck = dice(fx * 7 + fy, fz, 43) < 0.12
+        return shade(dark if fleck else cream if r < 0.7 else mix(cream, tan, 0.6), grain)
+    if part == 'brow':                        # the yellow line over the eye
+        return shade(yellow if face in ('east', 'west') else dark, grain)
     if part == 'head':
-        ax = abs(x)
         if face in ('up', 'south', 'north'):  # fine speckles, a little thicker toward the back of the skull
-            fx, fz = math.floor(x * 2 + 1e-4), math.floor(hz * 2 + 1e-4)
-            fleck = dice(fx, fz, 41) < (0.10 if hz < -16.5 else 0.17)
+            fleck = dice(fx, fz, 41) < (0.10 if z < SNOUT else 0.17)
             return shade(yellow if fleck else dark, grain)
         if face == 'down':
             return shade(dark, grain)
-        if y < 9.0:                           # the upper lip: dark with yellow bars
-            return shade(yellow if chz % 2 == 1 and hz < -14 else dark, grain)
-        if y < 10.0 and hz > -13.75:          # the stripe from the eye back along the temple
+        if y < SPLIT + 0.5:                   # the upper lip: a yellow line, broken here and there
+            return shade(yellow if dice(fz, 1, 45) < 0.82 and z < SKULL - 0.5 else dark, grain)
+        if EYE_Y[0] - 0.25 < y < EYE_Y[1] - 0.5 and z > EYE_Z[1]:     # the stripe from the eye back along the temple
             return shade(yellow, grain)
-        if y < 10.0 and -16.5 < hz < -15.0 and chz % 2 == 0:    # dashes from the eye toward the nostril
+        if EYE_Y[0] - 0.75 < y < EYE_Y[0] and EYE_Z[0] - 0.5 < z < EYE_Z[1] + 0.25:   # yellow under the eye
             return shade(yellow, grain)
-        return shade(dark, grain)
-    if part == 'crest' or part == 'ridge':
-        k = skin(x, section(z)[1], z, 'up')
-        return shade(yellow if k == 'Y' else shade(P['dark'][2], 0.92) if part == 'crest' else dark, grain)
+        if EYE_Y[0] - 0.25 < y < EYE_Y[1] and EYE_Z[0] - 0.75 < z < EYE_Z[0]:          # and just in front of it
+            return shade(yellow, grain)
+        fleck = dice(fy, fz, 47) < 0.1
+        return shade(yellow if fleck else dark, grain)
     # the neck, body and tail
     k = skin(x, y, z, face)
-    if z < -11 and face in ('east', 'west'):
+    if z < -15.5 and face in ('east', 'west'):
         bot, top, _ = section(z)              # the temple's stripe runs on a little way down the neck
-        if 0.28 < (top - y) / (top - bot) < 0.55:
+        if 0.2 < (top - y) / (top - bot) < 0.4:
             k = 'Y'
     return shade(paint_of[k], grain)
 
@@ -521,13 +522,11 @@ def paint(bones, look=GAME_LOOK):
 # --- clips -------------------------------------------------------------------------------------------------------------
 WALK_LEN, SWIM_LEN, HISS_LEN, IDLE_LEN = 1.0, 1.1, 2.4, 8.0
 TONGUE_LEN, BLINK_LEN = 0.8, 0.3
-TONGUE_OUT = 3.5                              # how far the tongue slides out (cubes)
-STEP, ON_GROUND, STEP_UP = 2.0, 0.6, 1.0      # the walk: half a step's length (cubes), the share of the stride a foot
+TONGUE_OUT = 4.0                              # how far the tongue slides out (cubes)
+STEP, ON_GROUND, STEP_UP = 2.5, 0.6, 1.5      # the walk: half a step's length (cubes), the share of the stride a foot
 #                                               stands, how high a foot lifts
 BEND = 8.0                                    # how far chest and hips turn against each other in the walk (degrees)
-TAIL = ['tail1', 'tail2', 'tail3', 'tail4', 'tail5', 'tail6']
 REST = {(kind, s): rest_turns(kind, s) for kind in LEGS for _, s in SIDES}
-BODY_Y = round(prof(0)[0], 2)                 # the chest's and hips' pivot height
 
 
 def sm(a, b, x):
@@ -564,13 +563,11 @@ def stand(p, kind, side, s, wrist=None, part_yaw=0.0, lifted=0.0, foot_yaw=0.0, 
 
 def trail(p, kind, side, s):
     """A leg folded back along the body, the foot in line with it: swimming."""
-    S, d = shoulder(kind, s), LEGS[kind]
     first = unit([s * 0.55, -0.22, 1.0])
     second = unit([s * 0.12, -0.12, 1.0])
     f = unit([second[0], 0.0, second[2]])
     foot = [[-f[2], 0, -f[0]], [0, 1, 0], [f[0], 0, -f[2]]]        # level, the toes pointing along the lower leg
     set_leg(p, kind, side, s, along(first, s), along(second, s), foot)
-    del S, d
 
 
 def tail_wave(p, t, beat, amounts, lag, lead=0.0):
@@ -594,7 +591,7 @@ def clips():
              'neck1': {'rotation': [1.5 * math.sin(2 * w * t), 5 * math.sin(w * t), 0]},
              'neck2': {'rotation': [0, 6 * math.sin(w * t + 0.4), 0]},
              'head': {'rotation': [3 * math.sin(2 * w * t + 1.0), 8 * math.sin(w * t + 0.8), 0]},
-             'throat': {'scale': [1 + 0.12 * pump, 1 + 0.45 * pump, 1]}}
+             'throat': {'scale': [1 + 0.1 * pump, 1 + 0.4 * pump, 1]}}
         tail_wave(p, t, w, [1, 2, 3, 5, 7, 9], 0.6)
         for kind in LEGS:
             for side, s in SIDES:
@@ -604,7 +601,7 @@ def clips():
     def walk(t):
         ph = t / WALK_LEN
         bend = BEND * math.cos(2 * math.pi * (ph - 0.05))
-        up = 0.2 * abs(math.sin(2 * math.pi * ph))
+        up = 0.25 * abs(math.sin(2 * math.pi * ph))
         p = {'body': {'rotation': [0, 0, 0], 'position': [0, up, 0]},
              'chest': {'rotation': [0, bend, 0]}, 'hips': {'rotation': [0, -bend, 0]},
              'neck1': {'rotation': [0, -0.45 * bend, 0]}, 'neck2': {'rotation': [0, -0.35 * bend, 0]},
@@ -621,7 +618,7 @@ def clips():
                     f = (a - ON_GROUND) / (1 - ON_GROUND)
                     z += STEP - 2 * STEP * sm(0.0, 1.0, f)
                     y += STEP_UP * math.sin(math.pi * f)
-                    x += s * 0.4 * math.sin(math.pi * f)
+                    x += s * 0.5 * math.sin(math.pi * f)
                     pitch = 15 * math.sin(math.pi * f)
                 stand(p, kind, side, s, [x, y, z], part_yaw=bend if kind == 'arm' else -bend, lifted=up, foot_pitch=pitch)
         return p
@@ -641,14 +638,14 @@ def clips():
     def hiss(t):
         w = 2 * math.pi / HISS_LEN
         breath = 0.5 + 0.5 * math.sin(2 * w * t)
-        up = 0.8 + 0.08 * breath
+        up = 1.2 + 0.1 * breath
         sway = 3 * math.sin(w * t)
         p = {'body': {'rotation': [0, 0, 0], 'position': [0, up, 0]},
              'chest': {'rotation': [0, sway, 0]},
              'neck1': {'rotation': [-20, 0, 0]}, 'neck2': {'rotation': [-8, 0, 0]},
              'head': {'rotation': [24 + 2 * breath, 4 * math.sin(w * t + 1.0), 0]},
              'jaw': {'rotation': [20 + 6 * breath, 0, 0]},
-             'throat': {'scale': [1.5 + 0.2 * breath, 2.0 + 0.4 * breath, 1.1]}}
+             'throat': {'scale': [1.35 + 0.15 * breath, 1.8 + 0.3 * breath, 1.1]}}
         tail_wave(p, t, 2 * w, [10, 14, 18, 20, 22, 22], 0.6)
         for kind in LEGS:
             for side, s in SIDES:
@@ -668,7 +665,8 @@ def clips():
     def blink(t):
         u = t / BLINK_LEN
         shut = sm(0.0, 0.3, u) - sm(0.55, 1.0, u)
-        return {f'eyelid_{side}': {'scale': [1, 1 + 5.2 * shut, 1]} for side, _ in SIDES}
+        cover = (EYE_Y[1] - EYE_Y[0] + 0.05) / 0.25 - 1     # the lid is 0.25 tall; grown, it covers the eye
+        return {f'eyelid_{side}': {'scale': [1, 1 + cover * shut, 1]} for side, _ in SIDES}
 
     return {'idle': clip(IDLE_LEN, idle, 64), 'walk': clip(WALK_LEN, walk, 40), 'swim': clip(SWIM_LEN, swim, 24),
             'hiss': clip(HISS_LEN, hiss, 48), 'tongue': clip(TONGUE_LEN, tongue, 32, False),
@@ -684,5 +682,5 @@ if __name__ == '__main__':
     print(f'{n} boxes, {len(bones)} bones, texture {w} x {h}')
     print('lowest', [round(v, 2) for v in lo], 'highest', [round(v, 2) for v in hi], 'stride', round(stride(), 2))
     for b in bones:
-        if 'rotation' in b:
+        if 'rotation' in b and 'toe' not in b['name']:
             print(' ', b['name'], b['rotation'])

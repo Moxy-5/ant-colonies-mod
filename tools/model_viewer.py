@@ -594,12 +594,15 @@ def monitor_page(out):
     for key, look in mm.LOOKS.items():
         painted, rows, w, h = mm.paint(bones, key)
         looks[key] = {"name": look["name"], "note": look["note"], "texture": uri(tm.png(rows))}
-    clips = {}
-    for name, c in mm.clips().items():
-        times = sorted({t for ch in c["bones"].values() for keys in ch.values() for t in keys}, key=float)
-        clips[name] = {"length": c["animation_length"], "steps": len(times) - 1,
-                       "bones": {bone: {ch: [keys[t] for t in times] for ch, keys in chans.items()}
-                                 for bone, chans in c["bones"].items()}}
+    def clip_data(made):
+        clips = {}
+        for name, c in made.items():
+            times = sorted({t for ch in c["bones"].values() for keys in ch.values() for t in keys}, key=float)
+            clips[name] = {"length": c["animation_length"], "steps": len(times) - 1,
+                           "bones": {bone: {ch: [keys[t] for t in times] for ch, keys in chans.items()}
+                                     for bone, chans in c["bones"].items()}}
+        return clips
+    clips = clip_data(mm.clips())
     cb, rows, cw, ch = cr.paint(cr.model(), "A")
     blocks = {"sand": file_uri("golden_river_sand.png"), "wet_sand": file_uri("wet_golden_river_sand.png"),
               "silt": file_uri("silt.png")}
@@ -607,6 +610,14 @@ def monitor_page(out):
             "stride": mm.stride(), "blocks": blocks,
             "croc": {"bones": cb, "texture": uri(tm.png(rows)), "w": cw, "h": ch},
             "boxes": sum(len(b.get("cubes", [])) for b in bones)}
+    try:            # the old sculpted monitor beside the blocky rebuild, until the user picks (2026-11-17)
+        import monitor_models_sculpted as old
+        ob = old.model()
+        op, orows, ow, oh = old.paint(ob, old.GAME_LOOK)
+        data["old"] = {"bones": op, "texture": uri(tm.png(orows)), "w": ow, "h": oh, "clips": clip_data(old.clips()),
+                       "boxes": sum(len(b.get("cubes", [])) for b in ob)}
+    except ImportError:
+        pass
     template = (Path(__file__).resolve().parent / "monitor_viewer.template.html").read_text(encoding="utf-8")
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(template.replace("/*DATA*/null", json.dumps(data)), encoding="utf-8")

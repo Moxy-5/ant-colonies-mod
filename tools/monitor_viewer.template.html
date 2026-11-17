@@ -171,6 +171,14 @@ const monitors = [['idle', 'Watching you'], ['walk', 'Walking'], ['hiss', 'Hissi
   return m;
 });
 const [idler, walker, hisser, swimmer] = monitors;
+// the old sculpted monitor, standing beside the new one until you pick (it watches you too)
+const before = DATA.old ? build(DATA.old, new THREE.MeshLambertMaterial({map: loadTexture(DATA.old.texture), alphaTest: 0.5}), 'origin') : null;
+if (before) {
+  Object.assign(before.userData, {key: 'idle', clips: DATA.old.clips, blinkAt: 2, tongueAt: 1.3, blink: -9, tongue: -9,
+    eye: {left: [0, 0], right: [0, 0]}, glance: [0, 0], glanceAt: 0, turn: 0});
+  monitors.push(before);
+  tag('Before (the sculpted one)', before, () => settings.size * 0.3);
+}
 const croc = build(DATA.croc, new THREE.MeshLambertMaterial({map: loadTexture(DATA.croc.texture), alphaTest: 0.5}), 'ground');
 tag('Crocodile, 6.1 blocks', croc, () => 1.0);
 const player = new THREE.Group();
@@ -189,6 +197,12 @@ function layout() {
   const s = settings.size;
   monitors.forEach(m => m.scale.setScalar(k()));
   idler.position.set(-s * 0.2, 0, -0.9 - s * 0.25); idler.rotation.y = deg(115);
+  if (before) {      // in front of the new one, nose to tail, the same way round: side by side from its left
+    before.scale.setScalar(s / before.userData.length);
+    const a = idler.rotation.y;
+    before.position.set(idler.position.x - Math.sin(a) * s * 1.2, 0, idler.position.z - Math.cos(a) * s * 1.2);
+    before.rotation.y = a;
+  }
   hisser.position.set(-s * 1.9 - 0.8, 0, -1.6 - s * 0.5); hisser.rotation.y = deg(-70);
   croc.scale.setScalar(6.1 / croc.userData.length);
   croc.position.set(0, 0, -5.2 - s * 1.2); croc.rotation.y = Math.PI / 2;
@@ -197,14 +211,15 @@ function layout() {
   document.getElementById('sizeOut').textContent = s.toFixed(1) + ' blocks long (a block a metre: grown Nile monitors are 1.2 to 2.2 m, your picture says 2.0 to 2.7)';
 }
 sizeIn.addEventListener('input', () => { settings.size = parseFloat(sizeIn.value); layout(); });
-document.getElementById('boxes').textContent = DATA.boxes + ' boxes, ' + DATA.bones.length + ' bones';
+document.getElementById('boxes').textContent = DATA.boxes + ' boxes, ' + DATA.bones.length + ' bones' +
+  (DATA.old ? ' (the sculpted one beside it: ' + DATA.old.boxes + ' boxes)' : '');
 
 // --- clips -------------------------------------------------------------------------------------------------------------
 function rest(g) {
   Object.values(g).forEach(b => { b.rotation.copy(b.userData.base); b.position.copy(b.userData.basePos); b.scale.setScalar(1); });
 }
-function play(g, name, t, once) {
-  const clip = DATA.clips[name];
+function play(g, name, t, once, clips) {
+  const clip = (clips || DATA.clips)[name];
   const u = once ? clamp(t / clip.length, 0, 1) : ((t / clip.length) % 1 + 1) % 1;
   const f = u * clip.steps, i = Math.min(clip.steps, Math.floor(f)), a = f - i, j = Math.min(clip.steps, i + 1);
   Object.entries(clip.bones).forEach(([bone, chans]) => {
@@ -221,17 +236,17 @@ function play(g, name, t, once) {
 }
 const local = new THREE.Vector3();
 function animate(m, t) {
-  const u = m.userData, g = u.groups, key = u.key;
+  const u = m.userData, g = u.groups, key = u.key, C = u.clips || DATA.clips;
   rest(g);
-  play(g, key, t + u.phase);
+  play(g, key, t + u.phase, false, C);
   // blinking and the tongue, each a short clip over the other, at its own odd times
   if (t > u.blinkAt) { u.blink = t; u.blinkAt = t + 2 + rand() * 4.5; }
-  if (settings.blink !== undefined) play(g, 'blink', settings.blink, true);     // #blink=0.15 holds a blink (pictures)
-  else if (t - u.blink < DATA.clips.blink.length) play(g, 'blink', t - u.blink, true);
-  if (settings.tongue !== undefined && key !== 'hiss') play(g, 'tongue', settings.tongue, true);   // #tongue=0.4 likewise
+  if (settings.blink !== undefined) play(g, 'blink', settings.blink, true, C);     // #blink=0.15 holds a blink (pictures)
+  else if (t - u.blink < C.blink.length) play(g, 'blink', t - u.blink, true, C);
+  if (settings.tongue !== undefined && key !== 'hiss') play(g, 'tongue', settings.tongue, true, C);   // #tongue=0.4 likewise
   else if (key !== 'hiss') {
     if (t > u.tongueAt) { u.tongue = t; u.tongueAt = t + (key === 'swim' ? 4 : 1.6) + rand() * 3; }
-    if (t - u.tongue < DATA.clips.tongue.length) play(g, 'tongue', t - u.tongue, true);
+    if (t - u.tongue < C.tongue.length) play(g, 'tongue', t - u.tongue, true, C);
   }
   // the eyes: the one watching you turns its pupils and its head to the camera; the others glance about
   let want = {left: u.glance, right: u.glance};
@@ -245,7 +260,7 @@ function animate(m, t) {
     want = {};
     [['left', 1], ['right', -1]].forEach(([side, s]) => {
       local.copy(camera.position); g.head.worldToLocal(local);
-      local.x -= s * 2.1; local.y -= 0.75; local.z += 1.375;
+      local.sub(g['pupil_' + side].userData.basePos);
       local.normalize();
       want[side] = local.x * s > -0.25 ? [clamp(local.z * 0.55, -0.35, 0.35), clamp(local.y * 0.35, -0.2, 0.2)] : [-0.3, 0];
     });
@@ -277,6 +292,12 @@ function headCam(out, ahead, up, aimOut, aimAhead, aimUp) {
   const at = (o, f, u) => [h[0] + (hx.x * o + hz.x * f) * s, h[1] + u * s, h[2] + (hx.z * o + hz.z * f) * s];
   return [at(out, ahead, up), at(aimOut, aimAhead, aimUp)];
 }
+// a camera set by a monitor's own heading: out to its left side, ahead of its middle, up (blocks over its length)
+function around(m, out, ahead, up, aimAhead, aimUp) {
+  const s = settings.size, a = m.rotation.y, p = m.position;
+  const at = (o, f, u) => [p.x + (Math.cos(a) * o - Math.sin(a) * f) * s, u * s, p.z + (-Math.sin(a) * o - Math.cos(a) * f) * s];
+  return [at(out, ahead, up), at(0, aimAhead, aimUp)];
+}
 const CAMS = {
   overview: () => { const s = settings.size; return [[-s * 0.6, 1.0 + s * 0.8, 3.2 + s * 2.0], [-s * 0.3, 0.2, -1.2 - s * 0.3]]; },
   'side': () => { const p = I(), s = settings.size, a = idler.rotation.y; return [[p.x - Math.cos(a) * s * 0.95 - Math.sin(a) * s * 0.1, s * 0.22, p.z + Math.sin(a) * s * 0.95 - Math.cos(a) * s * 0.1], [p.x + Math.sin(a) * s * 0.12, s * 0.09, p.z + Math.cos(a) * s * 0.12]]; },
@@ -289,6 +310,10 @@ const CAMS = {
   'walking': () => { const p = walker.position, s = settings.size, a = walker.rotation.y; return [[p.x - Math.cos(a) * s * 0.9 + Math.sin(a) * s * 0.25, s * 0.3, p.z + Math.sin(a) * s * 0.9 + Math.cos(a) * s * 0.25], [p.x, s * 0.08, p.z]]; },
   'hissing': () => { const p = hisser.position, s = settings.size; return [[p.x + s * 0.9, s * 0.3, p.z + s * 1.0], [p.x + s * 0.1, s * 0.14, p.z]]; },
   'swimming': () => { const p = swimmer.position, s = settings.size, a = swimmer.rotation.y; return [[p.x - Math.cos(a) * s * 0.9 + Math.sin(a) * s * 0.3, SURFACE + s * 0.35, p.z + Math.sin(a) * s * 0.9 + Math.cos(a) * s * 0.3], [p.x, SURFACE, p.z]]; },
+  'like your picture': () => around(idler, 0.95, 0.55, 0.42, -0.08, 0.08),
+  'before and after': () => { const s = settings.size, a = idler.rotation.y, p = I();
+    const mx = p.x - Math.sin(a) * s * 0.6, mz = p.z - Math.cos(a) * s * 0.6;
+    return [[mx + Math.cos(a) * s * 1.55, s * 0.35, mz - Math.sin(a) * s * 1.55], [mx, s * 0.1, mz]]; },
   'with the crocodile': () => { const s = settings.size; return [[-s * 0.5, 1.6 + s * 0.6, 3.5 + s * 1.5], [0, 0.2, -3 - s * 0.6]]; },
 };
 const camBox = document.getElementById('cams');
