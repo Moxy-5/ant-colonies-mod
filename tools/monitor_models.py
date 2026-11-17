@@ -404,9 +404,15 @@ def head():
     for s in (1, -1):
         def xs(a, b):
             return sorted([s * a, s * b])
-        upper.append(cube([xs(w - 0.2, w + 0.25)[0], y + 2.4, ez - 0.7], [xs(w - 0.2, w + 0.25)[1], y + 3.4, ez + 0.7], 'eye'))
-        upper.append(cube([xs(w + 0.25, w + 0.32)[0], y + 2.7, ez - 0.3], [xs(w + 0.25, w + 0.32)[1], y + 3.15, ez + 0.2], 'pupil'))
-        upper.append(cube([xs(w - 1.3, w + 0.15)[0], y + 3.4, ez - 1.2], [xs(w - 1.3, w + 0.15)[1], y + 4.1, ez + 1.0], 'skin'))
+        # a narrow eye set in under a heavy brow: the brow juts out past it and slants down toward the snout (a hard,
+        # hooded stare), a thick lower lid narrows it from below, and the pupil sits at the front, staring ahead
+        def box(x0, x1, y0, y1, z0_, z1_, part):
+            upper.append(cube([xs(x0, x1)[0], y + y0, ez + z0_], [xs(x0, x1)[1], y + y1, ez + z1_], part))
+        box(w - 0.2, w + 0.12, 2.55, 3.2, -0.9, 0.7, 'eye')
+        box(w + 0.12, w + 0.17, 2.6, 3.15, -0.62, -0.08, 'pupil')
+        box(w - 0.2, w + 0.24, 2.3, 2.62, -1.0, 0.8, 'brow')            # the lower lid
+        box(w - 1.3, w + 0.42, 3.15, 4.0, -0.2, 1.2, 'brow')            # the brow over the back of the eye
+        box(w - 1.3, w + 0.42, 2.98, 3.85, -1.3, -0.2, 'brow')          # lower toward the snout: the scowl
         nw, ntop, _ = head_shape(0.88)
         nz = z0 - 0.88 * HEAD_LEN
         upper.append(cube([xs(nw - 1.1, nw - 0.35)[0], y + ntop - 0.75, nz - 0.4],      # on the top's side edge
@@ -501,7 +507,9 @@ def plain_colour(part, face):
 def colour(part, face, bone, x, y, z):
     """The painted colour at a point of a piece (its own straight-out model pixels)."""
     if part == 'eye':
-        return (204, 124, 34)                            # amber
+        return (168, 92, 22)                             # a deep amber
+    if part == 'brow':
+        return _grain(SKIN_DARK, math.floor(abs(x)), math.floor(y), math.floor(z), 0.05)
     if part in ('nostril', 'pupil') or part.startswith('claw'):
         return plain_colour(part, face)
     gx, gy, gz = math.floor(x), math.floor(y), math.floor(z)
@@ -545,6 +553,10 @@ def colour(part, face, bone, x, y, z):
             return _grain(BAR if gz % 2 == 0 and _h(ax, gz, 6) < 0.6 else PALE, ax, gy, gz, 0.04)
         if y < NECK_AXIS + MOUTH + 0.35 and face != 'up':  # the pale upper lip line
             return _grain(shade(PALE, 0.92), ax, gy, gz, 0.04)
+        ez = NECK_Z0 - NECK_LEN - 0.19 * HEAD_LEN        # the eye: a dark mask round it, a dark streak back from it
+        if face != 'up' and ((abs(z - ez) < 2.0 and y > NECK_AXIS + 0.9) or
+                             (ez < z < ez + 6.0 and NECK_AXIS + 2.0 < y < NECK_AXIS + 3.2)):
+            return _grain(shade(SKIN_DARK, 0.8), ax, gy, gz, 0.05)
         if spot < 0.16:                                  # fine yellow speckles
             return _grain(YELLOW if spot < 0.08 else YELLOW_DULL, ax, gy, gz, 0.05)
         return _grain(SKIN_DARK if face == 'up' else SKIN, ax, gy, gz)
