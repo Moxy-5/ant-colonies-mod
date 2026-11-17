@@ -53,6 +53,18 @@
         false,
         128
       ]
+    },
+    {
+      "enum": "net/minecraft/world/entity/MobCategory",
+      "name": "ANTCOLONIES_RIVER_BANK",
+      "constructor": "(Ljava/lang/String;IZZI)V",
+      "parameters": [
+        "antcolonies:river_bank",
+        4,
+        true,
+        false,
+        128
+      ]
     }
   ]
 }

@@ -90,6 +90,7 @@ public class CrabEntity extends PathfinderMob implements GeoEntity {
     protected void registerGoals() {
         goalSelector.addGoal(1, new CrabThreatGoal(this));
         goalSelector.addGoal(2, new AvoidEntityGoal<>(this, CrocodileEntity.class, 6.0F, 1.2, 1.5));
+        goalSelector.addGoal(2, new AvoidEntityGoal<>(this, MonitorEntity.class, 5.0F, 1.2, 1.5));
         goalSelector.addGoal(3, new AvoidEntityGoal<>(this, Player.class, 5.0F, 1.2, 1.5, EntitySelector.NO_CREATIVE_OR_SPECTATOR::test));
         goalSelector.addGoal(4, new CrabPickGoal(this));
         // never stopped by Minecraft's "nothing happened for 5 s and no player within 32" rule (docs/BUGS.md 216)

@@ -52,6 +52,7 @@ public class SavannaEvents {
         event.put(SavannaEntities.TILAPIA.get(), com.antcolonies.savanna.animal.TilapiaEntity.createAttributes().build());
         event.put(SavannaEntities.CATFISH.get(), com.antcolonies.savanna.animal.CatfishEntity.createAttributes().build());
         event.put(SavannaEntities.CROCODILE.get(), com.antcolonies.savanna.animal.CrocodileEntity.createAttributes().build());
+        event.put(SavannaEntities.MONITOR.get(), com.antcolonies.savanna.animal.MonitorEntity.createAttributes().build());
         event.put(SavannaEntities.CRAB.get(), com.antcolonies.savanna.animal.CrabEntity.createAttributes().build());
         event.put(SavannaEntities.SNAIL.get(), com.antcolonies.savanna.animal.SnailEntity.createAttributes().build());
     }
@@ -67,6 +68,9 @@ public class SavannaEvents {
                 net.neoforged.neoforge.event.entity.RegisterSpawnPlacementsEvent.Operation.REPLACE);
         event.register(SavannaEntities.CROCODILE.get(), net.minecraft.world.entity.SpawnPlacementTypes.IN_WATER,
                 net.minecraft.world.level.levelgen.Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, inBigSavanna(com.antcolonies.savanna.animal.CrocodileEntity::canSpawn),
+                net.neoforged.neoforge.event.entity.RegisterSpawnPlacementsEvent.Operation.REPLACE);
+        event.register(SavannaEntities.MONITOR.get(), net.minecraft.world.entity.SpawnPlacementTypes.IN_WATER,
+                net.minecraft.world.level.levelgen.Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, inBigSavanna(com.antcolonies.savanna.animal.MonitorEntity::canSpawn),
                 net.neoforged.neoforge.event.entity.RegisterSpawnPlacementsEvent.Operation.REPLACE);
         event.register(SavannaEntities.CRAB.get(), net.minecraft.world.entity.SpawnPlacementTypes.IN_WATER,
                 net.minecraft.world.level.levelgen.Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, inBigSavanna(com.antcolonies.savanna.animal.CrabEntity::canSpawn),
@@ -251,6 +255,7 @@ public class SavannaEvents {
             event.accept(SavannaItems.TILAPIA_SPAWN_EGG);
             event.accept(SavannaItems.CATFISH_SPAWN_EGG);
             event.accept(SavannaItems.CROCODILE_SPAWN_EGG);
+            event.accept(SavannaItems.MONITOR_SPAWN_EGG);
             event.accept(SavannaItems.CRAB_SPAWN_EGG);
             event.accept(SavannaItems.SNAIL_SPAWN_EGG);
         });

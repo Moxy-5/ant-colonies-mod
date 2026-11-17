@@ -123,6 +123,10 @@ public class SavannaItems {
             ITEMS.register("catfish_spawn_egg",
                     () -> new DeferredSpawnEggItem(SavannaEntities.CATFISH, 0x423C34, 0xE2D6BA, new Item.Properties()));
     // Dark olive with tan spots (the crocodile's back and side stripe), my pick.
+    // Charcoal with yellow spots (the monitor's back and spot rows), my pick.
+    public static final DeferredItem<DeferredSpawnEggItem> MONITOR_SPAWN_EGG =
+            ITEMS.register("monitor_spawn_egg",
+                    () -> new DeferredSpawnEggItem(SavannaEntities.MONITOR, 0x34332B, 0xD6B03A, new Item.Properties()));
     public static final DeferredItem<DeferredSpawnEggItem> CROCODILE_SPAWN_EGG =
             ITEMS.register("crocodile_spawn_egg",
                     () -> new DeferredSpawnEggItem(SavannaEntities.CROCODILE, 0x4A4E26, 0xC8B070, new Item.Properties()));

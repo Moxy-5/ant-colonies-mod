@@ -1322,4 +1322,136 @@ public class RiverLifeTests {
         }
         helper.succeed();
     }
+
+    // --- the Nile monitor (2026-11-17) ---------------------------------------------------------------------------------
+    private static final int MX0 = 16, MX1 = 40, MZ0 = 34, MZ1 = 44;    // a stone bank to hunt on, clear of the pond and channel
+
+    /**
+     * A hungry Nile monitor goes to a snail, crushes it (the broken shell left where it was) and is fed; hungry again, it
+     * takes bites off remains lying on the bank.
+     */
+    @GameTest(template = "arena", timeoutTicks = 1600)
+    public static void aHungryMonitorCrushesASnailAndBitesRemains(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        for (int x = MX0; x <= MX1; x++) {
+            for (int z = MZ0; z <= MZ1; z++) {
+                helper.setBlock(new BlockPos(x, TOP, z), Blocks.STONE);
+                for (int y = TOP + 1; y <= TOP + 4; y++) {
+                    helper.setBlock(new BlockPos(x, y, z), Blocks.AIR);
+                }
+            }
+        }
+        com.antcolonies.savanna.animal.MonitorEntity monitor = helper.spawn(SavannaEntities.MONITOR.get(), new BlockPos(MX0 + 3, TOP + 1, MZ0 + 5));
+        monitor.setPersistenceRequired();
+        monitor.makeHungry();
+        com.antcolonies.savanna.animal.SnailEntity snail = helper.spawn(SavannaEntities.SNAIL.get(), new BlockPos(MX0 + 12, TOP + 1, MZ0 + 5));
+        snail.setPersistenceRequired();
+        BlockPos snailAt = snail.blockPosition();
+        com.antcolonies.savanna.animal.RemainsEntity[] remains = {null};
+        int[] meat = {0};
+        boolean[] sawBite = {false};
+        helper.onEachTick(() -> {
+            sawBite[0] |= monitor.doing() == com.antcolonies.savanna.animal.MonitorEntity.BITE;
+            if (remains[0] == null && !snail.isAlive() && monitor.isFed()) {
+                remains[0] = com.antcolonies.savanna.animal.RemainsEntity.leave(level, com.antcolonies.savanna.animal.RemainsEntity.Kind.CATFISH,
+                        helper.absolutePos(new BlockPos(MX1 - 4, TOP + 1, MZ0 + 5)).getBottomCenter(), 0, 1.0F);
+                if (remains[0] == null) {
+                    helper.fail("no remains made");
+                    return;
+                }
+                meat[0] = remains[0].bitesLeft();
+                monitor.makeHungry();
+            }
+        });
+        helper.succeedWhen(() -> {
+            helper.assertTrue(!snail.isAlive() && sawBite[0], "the monitor has not eaten the snail: monitor at "
+                    + monitor.blockPosition().subtract(helper.absolutePos(BlockPos.ZERO)) + " doing " + monitor.doing() + ", snail at "
+                    + snail.blockPosition().subtract(helper.absolutePos(BlockPos.ZERO)));
+            BlockPos shell = null;
+            for (BlockPos at : BlockPos.betweenClosed(snailAt.offset(-6, -1, -6), snailAt.offset(6, 2, 6))) {
+                if (level.getBlockState(at).is(SavannaBlocks.CRAB_SHELL.get())) {
+                    shell = at.immutable();
+                    break;
+                }
+            }
+            helper.assertTrue(shell != null, "the crushed snail left no shell");
+            helper.assertTrue(remains[0] != null && meat[0] - remains[0].bitesLeft() >= 2 && monitor.isFed(), "the monitor has not fed on the remains: bites "
+                    + (remains[0] == null ? "-" : meat[0] - remains[0].bitesLeft()) + ", monitor at "
+                    + monitor.blockPosition().subtract(helper.absolutePos(BlockPos.ZERO)) + " doing " + monitor.doing());
+        });
+    }
+
+    /**
+     * Monitors spawn by themselves (the spawning check list): the world's own checks over a river at sea level pass in
+     * the water within {@code BANK_REACH} blocks of a bank and nowhere farther out, a spawn is set down on the bank, none
+     * comes within {@code SPAWN_APART} blocks of another, and the kind is in its own group's list in the savanna's waters.
+     */
+    @GameTest(template = "arena", timeoutTicks = 200)
+    public static void monitorsSpawnInTheWaterByBanksByThemselves(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        int top = buildChannel(helper, false);
+        BlockPos corner = helper.absolutePos(new BlockPos(CX0, 0, CZ0));
+        int reach = com.antcolonies.savanna.animal.MonitorEntity.BANK_REACH;
+        var monitorType = SavannaEntities.MONITOR.get();
+        // 1. its spots over the channel: only in the water near a bank (and the others' for comparison)
+        int spots = 0, crocs = 0, crabs = 0;
+        StringBuilder wrong = new StringBuilder();
+        for (int i = 0; i < CHANNEL_DEPTHS.length; i++) {
+            for (int dz = 0; dz <= CZ1 - CZ0; dz++) {
+                int fromBank = Math.min(Math.min(i + 1, CHANNEL_DEPTHS.length - i), Math.min(dz + 1, CZ1 - CZ0 + 1 - dz));
+                for (int y = top - 8; y <= top + 1; y++) {
+                    BlockPos at = new BlockPos(corner.getX() + i, y, corner.getZ() + dz);
+                    if (worldWouldSpawn(level, monitorType, at)) {
+                        spots++;
+                        if (fromBank > reach) {
+                            wrong.append(" ").append(i).append(",").append(dz).append(" (").append(fromBank).append(" from the bank)");
+                        }
+                    }
+                    crocs += worldWouldSpawn(level, SavannaEntities.CROCODILE.get(), at) ? 1 : 0;
+                    crabs += worldWouldSpawn(level, SavannaEntities.CRAB.get(), at) ? 1 : 0;
+                }
+            }
+        }
+        SavannaMod.LOGGER.info("[bank spawns] spots the world would spawn at over the channel: monitor {}, crocodile {}, crab {}", spots, crocs, crabs);
+        if (spots == 0) {
+            helper.fail("the world would spawn a monitor nowhere over the river");
+        }
+        if (!wrong.isEmpty()) {
+            helper.fail("monitors would spawn too far from a bank:" + wrong);
+        }
+        // 2. the world's own spawn in the water by the bank: set down on the bank
+        BlockPos drawn = new BlockPos(corner.getX() + 1, top - 1, corner.getZ() + 3);
+        net.minecraft.world.entity.Mob mob = monitorType.create(level);
+        mob.moveTo(drawn.getX() + 0.5, drawn.getY(), drawn.getZ() + 0.5, 0, 0);
+        if (!net.neoforged.neoforge.event.EventHooks.checkSpawnPosition(mob, level, MobSpawnType.NATURAL)) {
+            helper.fail("the world refuses a monitor in the water by a bank");
+        }
+        mob.finalizeSpawn(level, level.getCurrentDifficultyAt(drawn), MobSpawnType.NATURAL, null);
+        BlockPos stood = mob.blockPosition();
+        if (stood.getY() != top + 1 || !level.getFluidState(stood.below()).isEmpty() || !level.getBlockState(stood.below()).isSolid()) {
+            helper.fail("a monitor spawned by the world stands at " + stood.subtract(corner) + ", not on the bank (y " + (top + 1) + ")");
+        }
+        // 3. none within SPAWN_APART of another
+        level.addFreshEntity(mob);
+        BlockPos other = new BlockPos(corner.getX() + CHANNEL_DEPTHS.length - 2, top - 1, corner.getZ() + 3);
+        if (worldWouldSpawn(level, monitorType, other)) {
+            helper.fail("a monitor would spawn " + (int) Math.sqrt(other.distSqr(stood)) + " blocks from another");
+        }
+        mob.discard();
+        buildChannel(helper, true);
+        // 4. its own spawning group, listed in the savanna's waters
+        if (monitorType.getCategory() != com.antcolonies.savanna.registry.SavannaMobCategories.riverBank()) {
+            helper.fail("the monitor is in the " + monitorType.getCategory().getName() + " group, not the river bank group");
+        }
+        var biomes = level.registryAccess().registryOrThrow(net.minecraft.core.registries.Registries.BIOME);
+        var river = net.minecraft.resources.ResourceKey.create(net.minecraft.core.registries.Registries.BIOME,
+                net.minecraft.resources.ResourceLocation.fromNamespaceAndPath(SavannaMod.MODID, "savanna_river"));
+        for (var key : java.util.List.of(net.minecraft.world.level.biome.Biomes.SAVANNA, river)) {
+            if (biomes.getOrThrow(key).getMobSettings().getMobs(com.antcolonies.savanna.registry.SavannaMobCategories.riverBank())
+                    .unwrap().stream().noneMatch(d -> d.type == monitorType)) {
+                helper.fail("the monitor is not in " + key.location() + "'s river bank spawn list");
+            }
+        }
+        helper.succeed();
+    }
 }

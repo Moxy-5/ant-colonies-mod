@@ -796,9 +796,9 @@ def clips():
     from tilapia_models import clip
     out, worst = {}, {}
 
-    def body(p, ry=0.0, rx=0.0, dy=0.0):
-        p['body'] = {'rotation': [round(rx, 3), round(ry, 3), 0.0], 'position': [0.0, round(dy, 3), 0.0]}
-        return _euler_m([rx, ry, 0.0]), [0.0, dy, 0.0]
+    def body(p, ry=0.0, rx=0.0, dy=0.0, dz=0.0):
+        p['body'] = {'rotation': [round(rx, 3), round(ry, 3), 0.0], 'position': [0.0, round(dy, 3), round(dz, 3)]}
+        return _euler_m([rx, ry, 0.0]), [0.0, dy, dz]
 
     def stand(P, p, bm, bd):
         for L in P.legs:
@@ -951,10 +951,132 @@ def clips():
         return p
     out['hiss'] = clip(2.0, hiss, 60)
     worst['hiss'] = P.worst
+
+    # --- the game's clips (into the game, 2026-11-17) ---------------------------------------------------------------
+    # Lying flat to bask: the belly down on the sand, the legs splayed out and back, the head resting low, the tail
+    # straightened so it lies along the ground; slow breathing, a blink, the eyes half watching.
+    P = _Poser()
+    LOW = -5.4
+
+    def flat_legs(P, p, bm, bd, slack=0.0):
+        for L in P.legs:
+            x, y, z = L['W']
+            if L['kind'] == 'arm':
+                wrist = [x * 1.25, y, z + 2.0 + slack]
+            else:
+                wrist = [x * 1.2, y, z + 4.5 + slack]
+            P.leg(p, L, bm, bd, wrist, L['foot'], curl=4.0)
+
+    def flat_tail(p, P, k=0.55, sway=None):
+        for i in range(TAIL_SEGS):
+            yaw = 0.0 if sway is None else sway(i)
+            p[f'tail{i + 1}'] = {'rotation': [round(-k * P.rest[f'tail{i + 1}'][0], 3), round(yaw, 3), 0.0]}
+
+    def bask(t):
+        p = {}
+        bm, bd = body(p, dy=LOW + 0.15 * math.sin(2 * math.pi * t / 4.0))
+        flat_legs(P, p, bm, bd)
+        neck_turn(p, _ramp(t, ((0, 0), (2.0, 0), (3.0, 10), (5.0, 10), (6.0, 0))), 0.0, extra=(7.0, 4.0, 2.0))
+        flat_tail(p, P, sway=lambda i: 1.5 * (i / TAIL_SEGS) * math.sin(2 * math.pi * t / 8.0 - 0.4 * i))
+        blink = _pulse(t, 4.2, 0.08, 0.1, 0.12)
+        for side in ('left', 'right'):
+            p[f'pupil_{side}'] = {'position': [0.0, 0.0, round(_ramp(t, ((0, 0.1), (2.0, 0.1), (3.0, -0.3), (6.0, -0.3), (7.0, 0.1))), 3)]}
+            p[f'lid_{side}'] = {'scale': [1.0, round(1.6 + 1.8 * blink, 3), 1.0]}
+        return p
+    out['bask'] = clip(8.0, bask, 96)
+    worst['bask'] = P.worst
+
+    # The bite: a quick lunge, the body thrown forward over planted feet, the neck shooting out, the jaws open wide
+    # and snapping shut on the prey (shut at 0.28 s, the moment the game counts the bite).
+    P = _Poser()
+
+    def bite(t):
+        p = {}
+        go = _ramp(t, ((0, 0), (0.12, -0.3), (0.26, 1.0), (0.42, 1.0), (0.7, 0.0)))
+        bm, bd = body(p, rx=3.0 * go, dy=0.4 * go, dz=-3.0 * go)
+        stand(P, p, bm, bd)
+        neck_turn(p, 0.0, extra=(-10.0 * go + 6.0 * max(go, 0), -4.0 * go, 6.0 * go))
+        p['jaw'] = {'rotation': [round(_ramp(t, ((0, 0), (0.1, 6), (0.2, 34), (0.28, 0), (0.7, 0))), 3), 0.0, 0.0]}
+        for i in range(TAIL_SEGS):
+            p[f'tail{i + 1}'] = {'rotation': [0.0, round(4.0 * go * math.sin(0.6 * i), 3), 0.0]}
+        return p
+    out['bite'] = clip(0.7, bite, 28, loop=False)
+    worst['bite'] = P.worst
+
+    # Eating: the head held up, the jaws working the food (four chomps), then two gulps with the head tossed up and
+    # forward to throw it down the throat.
+    P = _Poser()
+
+    def eat(t):
+        p = {}
+        bm, bd = body(p, rx=-2.0, dy=0.3)
+        stand(P, p, bm, bd)
+        chomp = max(0.0, math.sin(2 * math.pi * t / 0.3)) if t < 1.2 else 0.0
+        toss = max(_pulse(t, 1.25, 0.12, 0.05, 0.18), _pulse(t, 1.65, 0.12, 0.05, 0.18))
+        neck_turn(p, 4.0 * math.sin(2 * math.pi * t / 0.6) * (t < 1.2), 0.0,
+                  extra=(-6.0 - 8.0 * toss, -4.0 - 6.0 * toss, -2.0 - 10.0 * toss))
+        p['jaw'] = {'rotation': [round(10 * chomp + 18 * toss, 3), 0.0, 0.0]}
+        for i in range(8, TAIL_SEGS):
+            p[f'tail{i + 1}'] = {'rotation': [0.0, round(2.0 * math.sin(2 * math.pi * t / 2 - 0.5 * i), 3), 0.0]}
+        return p
+    out['eat'] = clip(2.0, eat, 60, loop=False)
+    worst['eat'] = P.worst
+
+    # Death: it sinks flat onto its belly, the legs slack and splayed, the head down on the sand with the mouth a
+    # little open, the tail limp; held.
+    P = _Poser()
+
+    def death(t):
+        p = {}
+        f = _ease(min(1.0, t / 1.0))
+        bm, bd = body(p, rx=1.5 * f, dy=LOW * f - 0.2 * f)
+        if f < 1.0:
+            for L in P.legs:
+                x, y, z = L['W']
+                tw = [x * 1.25, y, z + 2.0] if L['kind'] == 'arm' else [x * 1.2, y, z + 4.5]
+                P.leg(p, L, bm, bd, [a + (b - a) * f for a, b in zip(L['W'], tw)], L['foot'], curl=10.0 * f)
+        else:
+            flat_legs(P, p, bm, bd)
+        neck_turn(p, 12.0 * f, 0.0, extra=(9.0 * f, 6.0 * f, 3.0 * f))
+        p['jaw'] = {'rotation': [round(8.0 * f, 3), 0.0, 0.0]}
+        flat_tail(p, P, k=0.55 * f, sway=lambda i: 6.0 * f * math.sin(0.35 * i))
+        for side in ('left', 'right'):
+            p[f'lid_{side}'] = {'scale': [1.0, round(1 + 2.4 * f, 3), 1.0]}
+        return p
+    out['death'] = clip(1.2, death, 36, loop='hold')
+    worst['death'] = P.worst
     return out, worst
 
 
+def write_game():
+    """Writes the monitor's model, texture and clips into the savanna mod."""
+    import json
+    import mod_paths
+    root = mod_paths.assets('savanna')
+    game_bones, rows, w, h = paint(model(), GAME_LOOK)
+    files = {'textures/entity/monitor.png': png(rows)}
+    geo = {'format_version': '1.12.0', 'minecraft:geometry': [{
+        'description': {'identifier': 'geometry.monitor', 'texture_width': w, 'texture_height': h,
+                        'visible_bounds_width': 8, 'visible_bounds_height': 2.5, 'visible_bounds_offset': [0, 0.75, 0]},
+        'bones': game_bones}]}
+    files['geo/entity/monitor.geo.json'] = geo
+    files['animations/entity/monitor.animation.json'] = {'format_version': '1.8.0', 'animations': clips()[0]}
+    for rel, data in files.items():
+        path = root / rel
+        path.parent.mkdir(parents=True, exist_ok=True)
+        if isinstance(data, bytes):
+            path.write_bytes(data)
+        else:
+            with open(path, 'w', encoding='utf-8', newline=chr(10)) as f:
+                json.dump(data, f, indent=1)
+        print('wrote', path.relative_to(mod_paths.PROJECT))
+
+
 if __name__ == '__main__':
+    import sys
+    if sys.argv[1:] == ['game']:
+        write_game()
+        sys.exit()
     bs = model()
     print(len(bs), 'bones,', sum(len(b.get('cubes', [])) for b in bs), 'boxes')
     for b in bs:

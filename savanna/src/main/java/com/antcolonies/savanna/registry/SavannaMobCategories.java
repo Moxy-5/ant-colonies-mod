@@ -12,7 +12,7 @@ import net.minecraft.world.entity.MobCategory;
 public final class SavannaMobCategories {
     private SavannaMobCategories() {}
 
-    private static MobCategory riverFish, riverHunter, riverBed;
+    private static MobCategory riverFish, riverHunter, riverBed, riverBank;
 
     /** The river fish group (tilapia and catfish). */
     public static MobCategory riverFish() {
@@ -45,5 +45,17 @@ public final class SavannaMobCategories {
             riverBed = MobCategory.valueOf("ANTCOLONIES_RIVER_BED");
         }
         return riverBed;
+    }
+
+    /**
+     * The bank dwellers' group (the Nile monitor, 2026-11-17, the user's "between uncommon and rare, nearer uncommon"):
+     * a group of its own so neither the fish nor the crocodiles fill its places, cap 4 round a player (my pick), each
+     * spawned alone and at least {@code MonitorEntity.SPAWN_APART} blocks from another monitor, removed past 128 blocks.
+     */
+    public static MobCategory riverBank() {
+        if (riverBank == null) {
+            riverBank = MobCategory.valueOf("ANTCOLONIES_RIVER_BANK");
+        }
+        return riverBank;
     }
 }

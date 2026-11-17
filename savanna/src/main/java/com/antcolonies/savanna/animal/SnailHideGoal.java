@@ -84,7 +84,7 @@ public class SnailHideGoal extends Goal {
             return true;
         }
         List<Entity> near = snail.level().getEntities(snail, snail.getBoundingBox().inflate(CROCODILE),
-                e -> e instanceof Player || e instanceof CrabEntity || e instanceof CrocodileEntity);
+                e -> e instanceof Player || e instanceof CrabEntity || e instanceof CrocodileEntity || e instanceof MonitorEntity);
         for (Entity e : near) {
             double d = e.distanceTo(snail);
             if (e instanceof Player p) {
