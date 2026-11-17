@@ -430,7 +430,24 @@ def head():
         upper.append(cube([xs(nw - 1.1, nw - 0.35)[0], y + ntop - 0.75, nz - 0.4],      # on the top's side edge
                           [xs(nw - 1.1, nw - 0.35)[1], y + ntop + 0.1, nz + 0.4], 'nostril'))
     hinge = [0.0, y + MOUTH, z0 - GAPE * HEAD_LEN]
-    # the forked tongue, lying hidden along the mouth line inside the snout; a flick slides it out 7 pixels through the
+    # the teeth: a row of small pointed ivory teeth along each jaw, set just in from the lips (the upper row outside the
+    # lower, the two staggered), hidden inside the closed mouth and showing when it opens
+    k = 0
+    zt = z0 - (GAPE + 0.07) * HEAD_LEN
+    while zt > z0 - 0.9 * HEAD_LEN:
+        t = (z0 - zt) / HEAD_LEN
+        w = head_shape(min(1.0, t + 0.06))[0]            # the narrower of the slices it may touch
+        for s in (1, -1):
+            if k % 2 == 0:                                # an upper tooth hanging down
+                upper.append(cube([min(s * (w - 0.78), s * (w - 0.33)), y + MOUTH - 0.7, zt - 0.22],
+                                  [max(s * (w - 0.78), s * (w - 0.33)), y + MOUTH + 0.1, zt + 0.22], 'tooth'))
+            else:                                         # a lower one pointing up, a little further in
+                jaw.append(cube([min(s * (w - 1.2), s * (w - 0.78)), y + MOUTH - 0.1, zt - 0.2],
+                                [max(s * (w - 1.2), s * (w - 0.78)), y + MOUTH + 0.55, zt + 0.2], 'tooth'))
+        k += 1
+        zt -= 0.65
+    # the forked tongue, lying hidden along the mouth line inside the snout (it rides in the lower jaw, so an open
+    # mouth shows it lying on the floor); a flick slides it out 7 pixels through the
     # closed lips, as a monitor's does
     tip = z0 - HEAD_LEN
     tongue = [cube([-0.25, y + MOUTH - 0.12, tip + 1.0], [0.25, y + MOUTH + 0.12, tip + 9.0], 'tongue')]
@@ -440,7 +457,7 @@ def head():
     return [{'name': 'head', 'parent': f'neck{NECK_SEGS}', 'pivot': [0.0, y, z0],
              'rotation': pitch(HEAD_PITCH - sum(NECK_TURNS)), 'cubes': upper},
             {'name': 'jaw', 'parent': 'head', 'pivot': hinge, 'cubes': jaw},
-            {'name': 'tongue', 'parent': 'head', 'pivot': [0.0, y + MOUTH, tip + 8.5], 'cubes': tongue}] + extra
+            {'name': 'tongue', 'parent': 'jaw', 'pivot': [0.0, y + MOUTH, tip + 8.5], 'cubes': tongue}] + extra
 
 
 def model():
@@ -465,7 +482,8 @@ NOTES = [
              'so it sweeps up from the shoulders and holds the head above the back'),
     ('Head', '14 pixels long. It narrows toward the snout in one-pixel slices, top and bottom edges bevelled, '
              'ending in a blunt rounded tip. The eyes sit far back under a brow ridge, the nostrils near the tip, '
-             'and the lower jaw is its own piece, so it opens in the hiss'),
+             'and the lower jaw is its own piece, so it opens in the hiss. Inside the mouth: a pink ridged roof, a pale gum '
+             'line along the lips, rows of small ivory teeth, a dark throat at the back, and the tongue lying on the floor'),
     ('Body', 'blocky on purpose, as in your picture: a deep body with the belly hanging low'),
     ('Legs', 'angled like your picture: the upper part slants out and down from the body, the elbow or knee sticking '
              'out to the side; the fore arm slants down and forward to the hand, the shin down and back to the foot'),
@@ -484,7 +502,9 @@ NOTES = [
     ('Clips', 'Walk: diagonal legs step together, the feet stay put on the ground, the body swings side to side, the '
               'head stays steady and the tail waves. Standing about: breathing, looking round, the eyes glancing, blinks '
               'and tongue flicks. Tongue: two flicks of the forked tongue. Swim: legs folded back along the body, the '
-              'tail sweeping it along. Hiss: body raised, neck arched, mouth wide, the tail lashing'),
+              'tail sweeping it along, in three versions to pick from, each keeping the tail off the hind feet: A the '
+              'tail held stiff at the hips, B the hind feet held out wide, C the hind feet pressed to the flanks ahead '
+              'of the hips. Hiss: body raised, neck arched, mouth wide, the tail lashing'),
     ('Still to come', 'into the game: an attack and a death clip, and how it behaves (raiding crocodile nests)'),
 ]
 CHARCOAL, CREAM = (62, 58, 54), (214, 196, 150)
@@ -494,6 +514,9 @@ YELLOW = (214, 176, 58)
 YELLOW_DULL = (150, 128, 62)
 PALE = (222, 206, 150)       # throat and belly
 BAR = (128, 120, 98)         # the grey bars across them
+MOUTH_PINK = (196, 116, 118)  # inside the mouth
+MOUTH_GUM = (206, 160, 140)   # the gum line along the lips
+GULLET = (70, 30, 34)         # the throat at the back of the mouth
 
 
 def _h(*k):
@@ -515,6 +538,8 @@ def plain_colour(part, face):
         return (226, 186, 54)
     if part in ('nostril', 'pupil'):
         return (18, 16, 14)
+    if part == 'tooth':
+        return (232, 224, 196)       # ivory
     if part == 'tongue':
         return (58, 64, 92)          # a dark blue-grey tongue
     if part == 'tonguetip':
@@ -575,6 +600,20 @@ def colour(part, face, bone, x, y, z):
             return _grain(YELLOW, ax, gy, gz, 0.05)
         return _grain(SKIN, ax, gy, gz)
     if bone in ('head', 'jaw'):
+        # inside the mouth: a pink palate with ridges across it and a pink floor, a pale gum line along the lips, and a
+        # dark throat at the back (seen only when the mouth opens)
+        if part == 'tooth':
+            return plain_colour(part, face)
+        mouth_face = (face == 'down' and part == 'skin') or (face == 'up' and bone == 'jaw')
+        if mouth_face and abs(y - (NECK_AXIS + MOUTH)) < 0.05:
+            t = (NECK_Z0 - NECK_LEN - z) / HEAD_LEN
+            if abs(x) > head_shape(min(1.0, max(0.0, t)))[0] * (0.97 if bone == 'jaw' else 1.0) - 1.0:
+                return _grain(MOUTH_GUM, ax, gy, gz, 0.04)
+            if bone == 'jaw':
+                return _grain(MOUTH_PINK, ax, gy, gz, 0.05)
+            return _grain(shade(MOUTH_PINK, 0.86) if gz % 2 == 0 else MOUTH_PINK, ax, gy, gz, 0.04)
+        if part == 'throat' and bone == 'head' and face == 'north':
+            return _grain(GULLET, ax, gy, gz, 0.05)
         if part == 'throat':
             if y > NECK_AXIS + MOUTH - 0.6 and face != 'down':
                 return _grain(PALE, ax, gy, gz, 0.04)     # the lower lip
@@ -854,33 +893,57 @@ def clips():
     out['tongue'] = clip(2.0, tongue, 80)
     worst['tongue'] = 0.0
 
-    # Swimming: the legs folded back flat along the sides, feet turned back, and the body and the straightened tail
-    # thrown into a wave from side to side, growing toward the tip; the head held up at the surface, steady.
-    P = _Poser()
+    # Swimming: the legs folded back flat along the sides, the body and the straightened tail thrown into a wave from
+    # side to side, growing toward the tip; the head held up at the surface, steady. Three ways to keep the tail clear
+    # of the folded hind feet, to pick from in the viewer:
+    #   A  the tail stiff at the hips: the wave starts small there and grows toward the tip (the feet as before);
+    #   B  the hind feet held out wide, trailing beside the tail and turned away from it;
+    #   C  the hind legs pulled forward, the feet pressed flat to the flanks ahead of the hips, toes back.
+    def make_swim(way):
+        P = _Poser()
 
-    def swim(t):
-        p = {}
-        w = 2 * math.pi * t / SWIM_LEN
-        yaw = 5.0 * math.cos(w)
-        bm, bd = body(p, ry=yaw)
-        for L in P.legs:
-            s = L['s']
-            wrist = (s * 6.3, 9.6, -10.0) if L['kind'] == 'arm' else (s * 6.8, 9.6, 8.5)
-            P.leg(p, L, bm, bd, wrist, _cols((0, s, 0), (s, 0, 0), (0, 0, -1)), in_body=True, curl=20.0)
-        neck_turn(p, 0.0, extra=(0.0, -3.0, -3.0))
-        p['neck1']['rotation'][1] = round(-0.55 * yaw, 3)
-        p['neck2']['rotation'][1] = round(-0.3 * yaw, 3)
-        p['head']['rotation'][1] = round(-0.15 * yaw, 3)
-        for i in range(TAIL_SEGS):
-            sway = (4.0 + 7.0 * i / (TAIL_SEGS - 1)) * math.sin(w - 0.5 * i - 0.8)
-            if i == 0:
-                sway -= 1.4 * yaw
-            p[f'tail{i + 1}'] = {'rotation': [round(-P.rest[f'tail{i + 1}'][0], 3), round(sway, 3), 0.0]}
-        for side in ('left', 'right'):
-            p[f'pupil_{side}'] = {'position': [0.0, 0.0, -0.25]}
-        return p
-    out['swim'] = clip(SWIM_LEN, swim, 32)
-    worst['swim'] = P.worst
+        def swim(t):
+            p = {}
+            w = 2 * math.pi * t / SWIM_LEN
+            yaw = 5.0 * math.cos(w)
+            bm, bd = body(p, ry=yaw)
+            for L in P.legs:
+                s = L['s']
+                foot = _cols((0, s, 0), (s, 0, 0), (0, 0, -1))
+                if L['kind'] == 'arm':
+                    wrist = (s * 6.3, 9.6, -10.0)
+                elif way == 'B':
+                    wrist = (s * 9.0, 9.4, 7.5)
+                    a = math.radians(22.0)                          # toes swung out, away from the tail
+                    c, sn = math.cos(a), math.sin(a)
+                    foot = _cols((0, s, 0), (s * c, 0, -sn), (-s * sn, 0, -c))
+                elif way == 'C':
+                    wrist = (s * 8.1, 9.8, -9.5)
+                else:
+                    wrist = (s * 6.8, 9.6, 8.5)
+                P.leg(p, L, bm, bd, wrist, foot, in_body=True, curl=20.0)
+            neck_turn(p, 0.0, extra=(0.0, -3.0, -3.0))
+            p['neck1']['rotation'][1] = round(-0.55 * yaw, 3)
+            p['neck2']['rotation'][1] = round(-0.3 * yaw, 3)
+            p['head']['rotation'][1] = round(-0.15 * yaw, 3)
+            for i in range(TAIL_SEGS):
+                f = i / (TAIL_SEGS - 1)
+                if way == 'A':
+                    amp = 0.6 + 10.4 * f ** 1.5                     # barely moving at the hips
+                    sway = amp * math.sin(w - 0.5 * i - 0.8)
+                else:
+                    sway = (4.0 + 7.0 * f) * math.sin(w - 0.5 * i - 0.8)
+                    if i == 0:
+                        sway -= 1.4 * yaw
+                p[f'tail{i + 1}'] = {'rotation': [round(-P.rest[f'tail{i + 1}'][0], 3), round(sway, 3), 0.0]}
+            for side in ('left', 'right'):
+                p[f'pupil_{side}'] = {'position': [0.0, 0.0, -0.25]}
+            return p
+        return clip(SWIM_LEN, swim, 32), P.worst
+
+    for way in 'ABC':
+        name = 'swim' if way == 'A' else 'swim_' + way.lower()
+        out[name], worst[name] = make_swim(way)
 
     # The threat: standing tall on straightened legs, the front raised, the neck stretched up and the head tipped down
     # at the threat, the mouth gaping and closing with the hiss, the tail arched up off the ground and lashing.

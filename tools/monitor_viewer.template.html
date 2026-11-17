@@ -37,7 +37,7 @@
   <p>Built fresh from your picture and the outline, now painted: dark scales, yellow spot rows and tail rings, a cream
      belly and throat with grey bars. "Plain colours" shows the bare shape again.
      The tail, neck, face and legs are rounded and curve smoothly. The body is blocky on purpose.
-     The clip buttons play its animations: walking, standing about, the tongue, swimming and the hiss.
+     The clip buttons play its animations: walking, standing about, the tongue, swimming and the hiss. Three swims to pick from, each a way of keeping the tail clear of the folded hind feet: A the tail stiff at the hips, B the hind feet held out wide, C the hind feet pressed to the flanks ahead of the hips.
      Drag to turn, scroll or pinch to zoom, right-drag to slide.</p>
 </header>
 <div id="wrap"><canvas id="c"></canvas><div id="labels"></div></div>
@@ -220,7 +220,7 @@ Object.entries(DATA.clips).forEach(([name, c]) => {
   });
   CLIPS[name] = {length: c.animation_length, loop: !!c.loop, bones};
 });
-const CLIP_NAMES = {still: 'Still', walk: 'Walk', idle: 'Standing about', tongue: 'Tongue', swim: 'Swim', hiss: 'Hiss'};
+const CLIP_NAMES = {still: 'Still', walk: 'Walk', idle: 'Standing about', tongue: 'Tongue', swim: 'Swim A', swim_b: 'Swim B', swim_c: 'Swim C', hiss: 'Hiss'};
 function sample(list, t) {
   if (t <= list[0][0]) return list[0][1];
   for (let i = 1; i < list.length; i++) {
@@ -236,7 +236,7 @@ function pose(dt) {
   const groups = mon.userData.groups;
   Object.values(groups).forEach(g => { setRot(g, g.userData.rest); g.position.copy(g.userData.base); g.scale.set(1, 1, 1); });
   const c = CLIPS[settings.clip];
-  water.visible = settings.clip === 'swim';
+  water.visible = settings.clip.startsWith('swim');
   if (!c) { document.getElementById('clipOut').textContent = ''; return; }
   if (!paused) clipTime += dt * (settings.slow ? 0.25 : 1);
   const t = c.loop ? clipTime % c.length : Math.min(clipTime, c.length);
