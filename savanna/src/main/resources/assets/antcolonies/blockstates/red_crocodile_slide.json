@@ -1,0 +1,18 @@
+{
+  "variants": {
+    "axis=z,wet=false": {
+      "model": "antcolonies:block/red_crocodile_slide"
+    },
+    "axis=z,wet=true": {
+      "model": "antcolonies:block/wet_red_crocodile_slide"
+    },
+    "axis=x,wet=false": {
+      "model": "antcolonies:block/red_crocodile_slide",
+      "y": 90
+    },
+    "axis=x,wet=true": {
+      "model": "antcolonies:block/wet_red_crocodile_slide",
+      "y": 90
+    }
+  }
+}

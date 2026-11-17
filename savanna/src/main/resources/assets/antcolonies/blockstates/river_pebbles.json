@@ -1,0 +1,123 @@
+{
+  "variants": {
+    "look=0": [
+      {
+        "model": "antcolonies:block/river_pebbles_0"
+      },
+      {
+        "model": "antcolonies:block/river_pebbles_0",
+        "y": 90
+      },
+      {
+        "model": "antcolonies:block/river_pebbles_0",
+        "y": 180
+      },
+      {
+        "model": "antcolonies:block/river_pebbles_0",
+        "y": 270
+      }
+    ],
+    "look=1": [
+      {
+        "model": "antcolonies:block/river_pebbles_1"
+      },
+      {
+        "model": "antcolonies:block/river_pebbles_1",
+        "y": 90
+      },
+      {
+        "model": "antcolonies:block/river_pebbles_1",
+        "y": 180
+      },
+      {
+        "model": "antcolonies:block/river_pebbles_1",
+        "y": 270
+      }
+    ],
+    "look=2": [
+      {
+        "model": "antcolonies:block/river_pebbles_2"
+      },
+      {
+        "model": "antcolonies:block/river_pebbles_2",
+        "y": 90
+      },
+      {
+        "model": "antcolonies:block/river_pebbles_2",
+        "y": 180
+      },
+      {
+        "model": "antcolonies:block/river_pebbles_2",
+        "y": 270
+      }
+    ],
+    "look=3": [
+      {
+        "model": "antcolonies:block/river_pebbles_3"
+      },
+      {
+        "model": "antcolonies:block/river_pebbles_3",
+        "y": 90
+      },
+      {
+        "model": "antcolonies:block/river_pebbles_3",
+        "y": 180
+      },
+      {
+        "model": "antcolonies:block/river_pebbles_3",
+        "y": 270
+      }
+    ],
+    "look=4": [
+      {
+        "model": "antcolonies:block/river_pebbles_4"
+      },
+      {
+        "model": "antcolonies:block/river_pebbles_4",
+        "y": 90
+      },
+      {
+        "model": "antcolonies:block/river_pebbles_4",
+        "y": 180
+      },
+      {
+        "model": "antcolonies:block/river_pebbles_4",
+        "y": 270
+      }
+    ],
+    "look=5": [
+      {
+        "model": "antcolonies:block/river_pebbles_5"
+      },
+      {
+        "model": "antcolonies:block/river_pebbles_5",
+        "y": 90
+      },
+      {
+        "model": "antcolonies:block/river_pebbles_5",
+        "y": 180
+      },
+      {
+        "model": "antcolonies:block/river_pebbles_5",
+        "y": 270
+      }
+    ],
+    "look=6": [
+      {
+        "model": "antcolonies:block/river_pebbles_6"
+      },
+      {
+        "model": "antcolonies:block/river_pebbles_6",
+        "y": 90
+      },
+      {
+        "model": "antcolonies:block/river_pebbles_6",
+        "y": 180
+      },
+      {
+        "model": "antcolonies:block/river_pebbles_6",
+        "y": 270
+      }
+    ]
+  }
+}

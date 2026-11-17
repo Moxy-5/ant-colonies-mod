@@ -460,3 +460,123 @@ def nest():
     for x, z in ((-0.8, -0.6), (1.2, 0.8)):                     # a second layer showing on top
         eggs += [dict(b, y=b["y"] + 1.9) for b in _egg(x, z, math.radians(rng.choice(TURNS)))]
     return {"covered": covered, "open": {"rim": rim, "eggs": eggs, "pit": {"w": 8, "d": 8, "depth": 5}}}
+
+
+# ---- into the game (sand banks step 2, 2026-11-16) ----
+# python tools/sand_art.py game   writes the textures, models and blockstates of the river sand (dry, wet, rippled and
+# the crocodile slide in three tones) and the river pebbles (look B, the user's pick, seven arrangements) into the
+# savanna mod. The block names give the tones plain colour words: far inland "red", mid inland "golden", coast "pale".
+
+import json
+import sys
+
+GAME_TONES = {"far": "red", "mid": "golden", "coast": "pale"}
+ASSETS = Path(__file__).resolve().parent.parent / "savanna/src/main/resources/assets/antcolonies"
+
+
+def _write_json(path, data):
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
+
+
+def _write_tex(name, rows):
+    path = ASSETS / "textures/block" / f"{name}.png"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    rba.write_png(str(path), len(rows[0]), len(rows), [p for r in rows for p in r])
+
+
+def _cube(name, textures, parent="minecraft:block/cube_all"):
+    _write_json(ASSETS / "models/block" / f"{name}.json", {"parent": parent, "textures": textures})
+    _write_json(ASSETS / "models/item" / f"{name}.json", {"parent": f"antcolonies:block/{name}"})
+
+
+def _single(name):
+    _write_json(ASSETS / "blockstates" / f"{name}.json", {"variants": {"": {"model": f"antcolonies:block/{name}"}}})
+
+
+def _uv_clamp(v):
+    return round(max(0.01, min(7.99, v)), 4)
+
+
+def _pebble_element(b):
+    """One box of a look-B stone as a block model element. The atlas (stone_texture) is 2 by 2 parts of 16 pixels, each
+    part 8 UV units wide: sides top-left, tops top-right, the damp band bottom-left. Texels keep their true size."""
+    x0, x1 = 8 + b["x"] - b["w"] / 2, 8 + b["x"] + b["w"] / 2
+    z0, z1 = 8 + b["z"] - b["d"] / 2, 8 + b["z"] + b["d"] / 2
+    y0, y1 = b["y"] - b["h"] / 2, b["y"] + b["h"] / 2
+    tex = "#" + b["c"]
+    side_v0 = 8 if b["damp"] else 0
+    vs = [round(side_v0 + _uv_clamp((12 - y1) / 2), 4), round(side_v0 + _uv_clamp((12 - y0) / 2), 4)]
+
+    def along(a0, a1, shift):
+        return [_uv_clamp((a0 - 8 + shift + 8) / 2), _uv_clamp((a1 - 8 + shift + 8) / 2)]
+
+    ux = along(x0, x1, b["ox"])
+    uz = along(z0, z1, b["oz"])
+    top = [round(8 + ux[0], 4), uz[0], round(8 + ux[1], 4), uz[1]]
+    faces = {
+        "up": {"uv": top, "texture": tex},
+        "north": {"uv": [ux[0], vs[0], ux[1], vs[1]], "texture": tex},
+        "south": {"uv": [ux[0], vs[0], ux[1], vs[1]], "texture": tex},
+        "west": {"uv": [uz[0], vs[0], uz[1], vs[1]], "texture": tex},
+        "east": {"uv": [uz[0], vs[0], uz[1], vs[1]], "texture": tex},
+    }
+    if y0 > 0.01:
+        faces["down"] = {"uv": [ux[0], round(8 + uz[0], 4), ux[1], round(8 + uz[1], 4)], "texture": tex}
+    el = {"from": [round(x0, 4), round(y0, 4), round(z0, 4)], "to": [round(x1, 4), round(y1, 4), round(z1, 4)],
+          "faces": faces}
+    if b["turn"]:
+        el["rotation"] = {"origin": [round(8 + b["x"], 4), round(y0, 4), round(8 + b["z"], 4)], "axis": "y",
+                          "angle": b["turn"]}
+    return el
+
+
+def game():
+    for tone, word in GAME_TONES.items():
+        _write_tex(f"{word}_river_sand", dry(tone))
+        _write_tex(f"wet_{word}_river_sand", wet(tone))
+        _write_tex(f"rippled_{word}_river_sand", ripple(tone))
+        _write_tex(f"{word}_crocodile_slide", slide(tone, False))
+        _write_tex(f"wet_{word}_crocodile_slide", slide(tone, True))
+        for name in (f"{word}_river_sand", f"wet_{word}_river_sand", f"rippled_{word}_river_sand"):
+            _cube(name, {"all": f"antcolonies:block/{name}"})
+            _single(name)
+        slide_name = f"{word}_crocodile_slide"
+        for wetness, prefix, sand in ((False, "", f"{word}_river_sand"), (True, "wet_", f"wet_{word}_river_sand")):
+            model = f"{prefix}{slide_name}"
+            _write_json(ASSETS / "models/block" / f"{model}.json", {
+                "parent": "minecraft:block/cube_bottom_top",
+                "textures": {"top": f"antcolonies:block/{prefix}{slide_name}", "side": f"antcolonies:block/{sand}",
+                             "bottom": f"antcolonies:block/{sand}"}})
+        _write_json(ASSETS / "models/item" / f"{slide_name}.json", {"parent": f"antcolonies:block/{slide_name}"})
+        variants = {}
+        for axis, rot in (("z", 0), ("x", 90)):
+            for wetness in ("false", "true"):
+                v = {"model": f"antcolonies:block/{'wet_' if wetness == 'true' else ''}{slide_name}"}
+                if rot:
+                    v["y"] = rot
+                variants[f"axis={axis},wet={wetness}"] = v
+        _write_json(ASSETS / "blockstates" / f"{slide_name}.json", {"variants": variants})
+    for colour in STONE:
+        _write_tex(f"river_pebble_{colour}", stone_texture(STONE_GAME_LOOK, colour))
+    variants = {}
+    for li, (name, stones) in enumerate(STONES):
+        boxes = [b for si, st in enumerate(stones) for b in round_stone(st, STONE_GAME_LOOK, f"{STONE_GAME_LOOK}{li}{si}")]
+        colours = sorted({b["c"] for b in boxes})
+        textures = {c: f"antcolonies:block/river_pebble_{c}" for c in colours}
+        textures["particle"] = textures[colours[0]]
+        _write_json(ASSETS / "models/block" / f"river_pebbles_{li}.json", {
+            "ambientocclusion": False, "textures": textures, "elements": [_pebble_element(b) for b in boxes]})
+        variants[f"look={li}"] = [{"model": f"antcolonies:block/river_pebbles_{li}", **({"y": r} if r else {})}
+                                  for r in (0, 90, 180, 270)]
+    _write_json(ASSETS / "blockstates" / "river_pebbles.json", {"variants": variants})
+    _write_json(ASSETS / "models/item" / "river_pebbles.json", {
+        "parent": "antcolonies:block/river_pebbles_6",
+        "display": {"gui": {"rotation": [30, 45, 0], "translation": [0, 3, 0], "scale": [1.4, 1.4, 1.4]},
+                    "ground": {"translation": [0, 3, 0], "scale": [0.5, 0.5, 0.5]},
+                    "fixed": {"scale": [1, 1, 1]}}})
+    print("river sand and pebbles written into", ASSETS)
+
+
+if __name__ == "__main__" and len(sys.argv) > 1 and sys.argv[1] == "game":
+    game()

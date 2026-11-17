@@ -218,6 +218,8 @@ public class SavannaEvents {
             event.accept(SavannaItems.SCRAPS);
             event.accept(SavannaItems.CROC_DROPPINGS);
             event.accept(SavannaItems.CRAB_SHELL);
+            SavannaItems.RIVER_SAND.forEach(event::accept);
+            event.accept(SavannaItems.RIVER_PEBBLES);
             // The giant savanna trees' blocks (M7.5).
             SavannaItems.TREE_ITEMS.forEach(event::accept);
             SavannaItems.WOOD_ITEMS.forEach(items -> items.all().forEach(event::accept));

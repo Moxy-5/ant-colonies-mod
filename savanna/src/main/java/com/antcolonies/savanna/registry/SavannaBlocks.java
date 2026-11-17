@@ -187,6 +187,21 @@ public class SavannaBlocks {
             BlockBehaviour.Properties.of().mapColor(MapColor.TERRACOTTA_BROWN).noCollission().instabreak().noOcclusion()
                     .sound(SoundType.BONE_BLOCK).randomTicks().pushReaction(PushReaction.DESTROY).noLootTable());
 
+    /**
+     * River sand in three tones by how far inland, and river pebbles (sand banks, 2026-11-16, docs/plans/sand-banks.md;
+     * block/RiverSand, block/RiverPebblesBlock): the sand bars on the inside of sharp bends where the crocodiles bask.
+     */
+    public static final com.antcolonies.savanna.block.RiverSand.Tone RED_SAND = com.antcolonies.savanna.block.RiverSand.register(BLOCKS,
+            "red", MapColor.TERRACOTTA_ORANGE, MapColor.TERRACOTTA_RED, 0xB4784E, 0x7E5436);
+    public static final com.antcolonies.savanna.block.RiverSand.Tone GOLDEN_SAND = com.antcolonies.savanna.block.RiverSand.register(BLOCKS,
+            "golden", MapColor.SAND, MapColor.TERRACOTTA_YELLOW, 0xD2B076, 0x937B52);
+    public static final com.antcolonies.savanna.block.RiverSand.Tone PALE_SAND = com.antcolonies.savanna.block.RiverSand.register(BLOCKS,
+            "pale", MapColor.QUARTZ, MapColor.TERRACOTTA_WHITE, 0xE0D4BA, 0x9D9482);
+    public static final DeferredBlock<com.antcolonies.savanna.block.RiverPebblesBlock> RIVER_PEBBLES = BLOCKS.registerBlock("river_pebbles",
+            com.antcolonies.savanna.block.RiverPebblesBlock::new,
+            BlockBehaviour.Properties.of().mapColor(MapColor.STONE).noCollission().instabreak().noOcclusion()
+                    .offsetType(BlockBehaviour.OffsetType.XZ).sound(SoundType.STONE).pushReaction(PushReaction.DESTROY));
+
     static {
         TreeBlocks.init(); // the giant savanna trees' blocks (M7.5), registered with the rest
     }

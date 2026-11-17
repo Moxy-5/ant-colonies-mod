@@ -670,6 +670,292 @@ public class SavannaWorldTests {
         helper.succeed();
     }
 
+    /**
+     * Sand banks step 1 (2026-11-16, {@code docs/plans/sand-banks.md}): how the savanna rivers bend, on {@link #GROUND_SEEDS}.
+     * From river spots beside savanna, the river's middle line (weirdness 0) is walked both ways in {@link #BEND_STEP}-block
+     * steps while it stays in savanna or its river. The real bend at a step is the walked line's turn over a window either
+     * side ({@link #BEND_WINDOWS}, blocks each way); the report gives, for each window and radius limit, how often a bend
+     * comes, by how far inland; and how often the noise read at one point ({@link com.antcolonies.savanna.worldgen.RiverBends},
+     * slopes {@link #BEND_SPANS} apart) puts the inside on the same side as the walked line. The noise only (no ground
+     * heights: an earlier version that also asked the water took 11 minutes). Only measures.
+     */
+    @GameTest(template = "arena", timeoutTicks = 400, batch = "savanna_maps")
+    public static void riverBendsAreMeasured(GameTestHelper helper) {
+        var registries = helper.getLevel().registryAccess();
+        int[] limits = {40, 60, 80, 110, 150};
+        int[] windows = BEND_WINDOWS, spans = BEND_SPANS;
+        int bands = INLAND_NAMES.length;
+        double[] length = new double[bands];
+        int[][][] bends = new int[windows.length][limits.length][bands];
+        List<List<List<Integer>>> bendLengths = new ArrayList<>();
+        for (int w = 0; w < windows.length; w++) {
+            bendLengths.add(new ArrayList<>());
+            for (int L = 0; L < limits.length; L++) {
+                bendLengths.get(w).add(new ArrayList<>());
+            }
+        }
+        // agreement of the point reading with the walked turn (when the walked radius is under 120), and of the water
+        int[][] pointSame = new int[windows.length][spans.length], pointAll = new int[windows.length][spans.length];
+        int walks = 0;
+        // sand banks ({@code worldgen/SandBanks}): runs of steps where a bank 12 blocks off the middle line is sand
+        int[] sandBanks = new int[bands];
+        List<Integer> sandLengths = new ArrayList<>();
+        long start = System.nanoTime();
+        int qy = QuartPos.fromBlock(SavannaSpawn.SAMPLE_Y);
+        for (long seed : GROUND_SEEDS) {
+            Climate.Sampler sampler = BiomeMaps.sampler(registries, seed);
+            MultiNoiseBiomeSource source = BiomeMaps.bigSavannaSource(registries, seed);
+            var weird = sampler.weirdness();
+            byte[] map = BiomeMaps.map(source, sampler);
+            int side = BiomeMaps.SIDE;
+            List<Integer> starts = new ArrayList<>();
+            for (int c = 0; c < map.length; c++) {
+                int i = c / side, j = c % side;
+                if (map[c] == BiomeMaps.RIVER && i > 0 && j > 0 && i < side - 1 && j < side - 1 && BiomeMaps.riverBeside(map, c, BiomeMaps.SAVANNA)) {
+                    starts.add(c);
+                }
+            }
+            java.util.Collections.shuffle(starts, new java.util.Random(seed));
+            java.util.Set<Long> walked = new java.util.HashSet<>();
+            int seedWalks = 0;
+            for (int c : starts) {
+                if (seedWalks >= BEND_WALKS) {
+                    break;
+                }
+                double[] p = {-BiomeMaps.HALF + (c / side) * BiomeMaps.STEP, -BiomeMaps.HALF + (c % side) * BiomeMaps.STEP};
+                if (!toMiddle(weird, p) || walked.contains(cellKey(p))) {
+                    continue;
+                }
+                walks++;
+                seedWalks++;
+                java.util.Set<Long> mine = new java.util.HashSet<>();
+                // the walked line, both ways joined: x, z, band, then the point reading's curvature for each span
+                java.util.ArrayDeque<double[]> line = new java.util.ArrayDeque<>();
+                for (int dir : new int[] {1, -1}) {
+                    double[] q = p.clone();
+                    for (int s = 0; s < BEND_WALK / BEND_STEP; s++) {
+                        int ci = (int) Math.floor((q[0] + BiomeMaps.HALF) / BiomeMaps.STEP + 0.5), cj = (int) Math.floor((q[1] + BiomeMaps.HALF) / BiomeMaps.STEP + 0.5);
+                        if (ci < 0 || cj < 0 || ci >= side || cj >= side) {
+                            break;
+                        }
+                        int cc = ci * side + cj;
+                        if (map[cc] != BiomeMaps.SAVANNA && !(map[cc] == BiomeMaps.RIVER && BiomeMaps.riverBeside(map, cc, BiomeMaps.SAVANNA))) {
+                            break;
+                        }
+                        long key = cellKey(q);
+                        if (walked.contains(key) && !mine.contains(key)) {
+                            break; // another walk's river
+                        }
+                        mine.add(key);
+                        int x = (int) Math.floor(q[0]), z = (int) Math.floor(q[1]);
+                        double[] row = new double[6 + spans.length];
+                        row[0] = q[0];
+                        row[1] = q[1];
+                        row[2] = inlandBand(sampler, x, qy, z);
+                        var r = com.antcolonies.savanna.worldgen.RiverBends.read(weird, x, z);
+                        double g = Math.hypot(r.gx(), r.gz());
+                        row[3] = g < 1e-12 ? 0 : r.gx() / g;
+                        row[4] = g < 1e-12 ? 0 : r.gz() / g;
+                        for (int h = 0; h < spans.length; h++) {
+                            row[5 + h] = com.antcolonies.savanna.worldgen.RiverBends.read(weird, x, z, spans[h]).curvature();
+                        }
+                        row[5 + spans.length] = sandSide(sampler, seed, x, z, row[3], row[4]);
+                        if (s > 0 || dir == 1) {
+                            if (dir == 1) {
+                                line.addLast(row);
+                            } else {
+                                line.addFirst(row);
+                            }
+                        }
+                        double tx = -r.gz() * dir, tz = r.gx() * dir, tl = Math.hypot(tx, tz);
+                        if (tl < 1e-12) {
+                            break;
+                        }
+                        q[0] += BEND_STEP * tx / tl;
+                        q[1] += BEND_STEP * tz / tl;
+                        if (!toMiddle(weird, q)) {
+                            break;
+                        }
+                    }
+                }
+                walked.addAll(mine);
+                double[][] pts = line.toArray(new double[0][]);
+                int n = pts.length;
+                for (double[] pt : pts) {
+                    length[(int) pt[2]] += BEND_STEP;
+                }
+                if (n < 3) {
+                    continue;
+                }
+                int sandRun = 0, sandSide = 0;
+                for (int i = 0; i <= n; i++) {
+                    int here = i < n ? (int) pts[i][5 + spans.length] : 0;
+                    if (here != 0 && here == sandSide) {
+                        sandRun++;
+                        continue;
+                    }
+                    if (sandSide != 0) {
+                        sandLengths.add(sandRun * BEND_STEP);
+                    }
+                    sandSide = here;
+                    sandRun = here != 0 ? 1 : 0;
+                    if (here != 0) {
+                        sandBanks[(int) pts[i][2]]++;
+                    }
+                }
+                // the walked direction at each step
+                double[][] dirs = new double[n][2];
+                for (int i = 0; i < n; i++) {
+                    int a = Math.max(0, i - 1), b = Math.min(n - 1, i + 1);
+                    double dx = pts[b][0] - pts[a][0], dz = pts[b][1] - pts[a][1], dl = Math.hypot(dx, dz);
+                    dirs[i][0] = dl < 1e-9 ? 0 : dx / dl;
+                    dirs[i][1] = dl < 1e-9 ? 0 : dz / dl;
+                }
+                for (int w = 0; w < windows.length; w++) {
+                    int m = windows[w] / BEND_STEP;
+                    // each step's walked bend: radius and the inside's weirdness side (+1: the positive side)
+                    double[] radius = new double[n];
+                    int[] inside = new int[n];
+                    for (int i = 0; i < n; i++) {
+                        int a = i - m, b = i + m;
+                        if (a < 0 || b >= n) {
+                            radius[i] = Double.MAX_VALUE;
+                            continue;
+                        }
+                        double ddx = dirs[b][0] - dirs[a][0], ddz = dirs[b][1] - dirs[a][1], d = Math.hypot(ddx, ddz);
+                        double turn = 2 * Math.asin(Math.min(1, d / 2));
+                        radius[i] = turn < 1e-6 ? Double.MAX_VALUE : 2.0 * m * BEND_STEP / turn;
+                        inside[i] = ddx * pts[i][3] + ddz * pts[i][4] > 0 ? 1 : -1;
+                        if (radius[i] < 120) {
+                            for (int h = 0; h < spans.length; h++) {
+                                double k = pts[i][5 + h];
+                                if (Math.abs(k) > 1.0 / 400) {
+                                    pointAll[w][h]++;
+                                    pointSame[w][h] += (k > 0 ? -1 : 1) == inside[i] ? 1 : 0;
+                                }
+                            }
+                        }
+                    }
+                    for (int L = 0; L < limits.length; L++) {
+                        int run = 0, runSide = 0;
+                        for (int i = 0; i <= n; i++) {
+                            boolean holds = i < n && radius[i] < limits[L];
+                            if (holds && (runSide == 0 || runSide == inside[i])) {
+                                if (runSide == 0) {
+                                    bends[w][L][(int) pts[i][2]]++;
+                                }
+                                runSide = inside[i];
+                                run++;
+                            } else {
+                                if (runSide != 0) {
+                                    bendLengths.get(w).get(L).add(run * BEND_STEP);
+                                }
+                                runSide = holds ? inside[i] : 0;
+                                run = holds ? 1 : 0;
+                                if (holds) {
+                                    bends[w][L][(int) pts[i][2]]++;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        double all = java.util.Arrays.stream(length).sum();
+        StringBuilder report = new StringBuilder(String.format("%d walks, %.0f blocks of river; %d ms", walks, all, (System.nanoTime() - start) / 1_000_000));
+        for (int h = 0; h < spans.length; h++) {
+            report.append(String.format("%n point reading, slopes %d apart:", spans[h]));
+            for (int w = 0; w < windows.length; w++) {
+                report.append(String.format(" the walked line over %d agrees in %d of %d;", windows[w], pointSame[w][h], pointAll[w][h]));
+            }
+        }
+        for (int w = 0; w < windows.length; w++) {
+            report.append(String.format("%n walked line, turn over %d blocks each way:", windows[w]));
+            for (int L = 0; L < limits.length; L++) {
+                int nb = java.util.Arrays.stream(bends[w][L]).sum();
+                report.append(String.format("%n  radius under %d: a bend every %.0f blocks of river (bends %d, length median %d, 90%% %d);",
+                        limits[L], nb == 0 ? 0 : all / nb, nb, middle(bendLengths.get(w).get(L), 0.5), middle(bendLengths.get(w).get(L), 0.9)));
+                for (int b = 0; b < bands; b++) {
+                    report.append(String.format(" %s %s", INLAND_NAMES[b], bends[w][L][b] == 0 ? "-" : String.format("%.0f", length[b] / bends[w][L][b])));
+                }
+            }
+        }
+        for (int b = 0; b < bands; b++) {
+            report.append(String.format("%n  %s: %.0f blocks walked", INLAND_NAMES[b], length[b]));
+        }
+        int banks = java.util.Arrays.stream(sandBanks).sum();
+        double sandEvery = banks == 0 ? Double.MAX_VALUE : all / banks;
+        report.append(String.format("%n sand banks: one every %.0f blocks of river (%d banks, length along the river median %d, 90%% %d);",
+                sandEvery, banks, middle(sandLengths, 0.5), middle(sandLengths, 0.9)));
+        for (int b = 0; b < bands; b++) {
+            report.append(String.format(" %s %s", INLAND_NAMES[b], sandBanks[b] == 0 ? "-" : String.format("%.0f", length[b] / sandBanks[b])));
+        }
+        SavannaMod.LOGGER.info("[biome maps] river bends: {}", report);
+        helper.assertTrue(walks >= 20 && all > 5000, "too little savanna river walked to measure: " + report);
+        helper.assertTrue(sandEvery >= SAND_EVERY[0] && sandEvery <= SAND_EVERY[1], "sand banks do not come about every 80 to 120 blocks: " + report);
+        helper.succeed();
+    }
+
+    /** How often a sand bank must come along the savanna's rivers, in blocks of river (the plan's 80 to 120, with room for chance). */
+    static final double[] SAND_EVERY = {70, 140};
+
+    /**
+     * Which bank of the river is sand at a point on its middle line: +1 the bank on the side of positive weirdness, -1 the
+     * other, 0 neither ({@code worldgen/SandBanks}, read 12 blocks out each way along the slope {@code nx, nz}).
+     */
+    private static int sandSide(Climate.Sampler sampler, long seed, int x, int z, double nx, double nz) {
+        for (int sign : new int[] {1, -1}) {
+            int bx = (int) Math.floor(x + sign * 12 * nx), bz = (int) Math.floor(z + sign * 12 * nz);
+            var chooser = com.antcolonies.savanna.worldgen.SandBanks.over(sampler.weirdness(), sampler.continentalness(), seed, bx & ~15, bz & ~15);
+            if (chooser.at(bx, bz).strength() > 0.5) {
+                return sign;
+            }
+        }
+        return 0;
+    }
+
+    /** Walks along a river's middle line a seed and how far each walk goes each way, in blocks; the step. */
+    static final int BEND_WALKS = 25, BEND_WALK = 2400, BEND_STEP = 4;
+    /** How far each way along the walked line its turn is measured, in blocks. */
+    static final int[] BEND_WINDOWS = {32, 64};
+    /** The slope spacings the point reading is tried at. */
+    static final int[] BEND_SPANS = {16, 32, 64};
+
+    /** Moves the point onto the weirdness' zero line (a few Newton steps); false if it found none near. */
+    private static boolean toMiddle(net.minecraft.world.level.levelgen.DensityFunction weird, double[] p) {
+        for (int k = 0; k < 6; k++) {
+            var r = com.antcolonies.savanna.worldgen.RiverBends.read(weird, (int) Math.floor(p[0]), (int) Math.floor(p[1]));
+            double g2 = r.gx() * r.gx() + r.gz() * r.gz();
+            if (g2 < 1e-18) {
+                return false;
+            }
+            double sx = r.w() * r.gx() / g2, sz = r.w() * r.gz() / g2;
+            if (Math.hypot(sx, sz) > 64) {
+                return false;
+            }
+            p[0] -= sx;
+            p[1] -= sz;
+            if (Math.hypot(sx, sz) < 1) {
+                return true;
+            }
+        }
+        return Math.abs(com.antcolonies.savanna.worldgen.RiverBends.read(weird, (int) Math.floor(p[0]), (int) Math.floor(p[1])).offset()) < 3;
+    }
+
+    private static long cellKey(double[] p) {
+        return ((long) Math.floor(p[0] / 16) << 32) ^ ((long) Math.floor(p[1] / 16) & 0xffffffffL);
+    }
+
+    /** How many blocks of water from a spot along a direction (at most 80). */
+    private static int waterRun(BiomeMaps.Ground ground, int x, int z, double dx, double dz) {
+        for (int k = 1; k <= 80; k++) {
+            if (ground.height((int) Math.floor(x + 0.5 + dx * k), (int) Math.floor(z + 0.5 + dz * k)) > SEA_TOP) {
+                return k - 1;
+            }
+        }
+        return 80;
+    }
+
     /** How far each way along a line the river's water is followed, in blocks. */
     static final int WIDTH_LOOK = 120;
     /** River spots measured a seed (more than {@link #RIVER_BANKS}, so each inland band gets enough). */
@@ -1034,6 +1320,88 @@ public class SavannaWorldTests {
             helper.assertTrue(spilled == 0 && still == poolWater, "the pools spilled: " + spilled + " flowing, " + still + " of " + poolWater + " still");
             helper.succeed();
         });
+    }
+
+    /**
+     * Sand banks (2026-11-16, {@code docs/plans/sand-banks.md}) as the river banks' decoration lays them, on the river of
+     * the test above, with the sand put on the inside of its bends by the test's own rule (the world's rule reads the land's
+     * noise, measured in {@link #riverBendsAreMeasured}): sand on the inside banks and none on the outside, wet sand at the
+     * waterline, dry sand over the plain past the low strip a block up, a crocodile slide or more by the deep water, and
+     * nothing farther out than the widest bank.
+     */
+    @GameTest(template = "arena", timeoutTicks = 100, batch = "savanna_rivers")
+    public static void sandBanksLieOnTheInsideOfBends(GameTestHelper helper) {
+        var level = helper.getLevel();
+        int plain = 6, water = plain - 1;
+        java.util.function.IntUnaryOperator mid = x -> (int) Math.round(50 + 5 * Math.sin(x / 7.0));
+        for (int x = 1; x < 64; x++) {
+            for (int z = 1; z < 64; z++) {
+                boolean river = Math.abs(z - mid.applyAsInt(x)) <= 3; // 7 wide, 3 deep
+                for (int y = 1; y <= plain; y++) {
+                    Block b = river && y >= water - 2 ? (y <= water ? Blocks.WATER : Blocks.AIR) : y == plain ? Blocks.GRASS_BLOCK : Blocks.DIRT;
+                    helper.setBlock(x, y, z, b);
+                }
+            }
+        }
+        BlockPos a = helper.absolutePos(new BlockPos(1, water, 1));
+        int ox = a.getX() - 1, oz = a.getZ() - 1;
+        // the inside of the bend is the side the river curves round (z'' = -5/49 sin(x/7)); a coast bank, the widest
+        com.antcolonies.savanna.worldgen.SandBanks.Chooser rule = (x, z) -> {
+            double curve = -Math.sin((x - ox) / 7.0);
+            boolean inside = Math.abs(curve) > 0.5 && Math.signum(z - oz - mid.applyAsInt(x - ox)) == Math.signum(curve);
+            return new com.antcolonies.savanna.worldgen.SandBanks.Choice(inside ? 1 : 0, 0, 0);
+        };
+        RiverBankFeature.shape(level, a.getX(), a.getZ(), 63, 63, a.getY(), p -> true, rule);
+        var tone = SavannaBlocks.RED_SAND;
+        java.util.function.Predicate<BlockState> sand = st -> tone.all().stream().anyMatch(b -> st.is(b.get()));
+        int inner = 0, innerSand = 0, outerSand = 0, wet = 0, waterline = 0, raised = 0, past = 0, tooFar = 0, slides = 0;
+        for (int x = 14; x < 50; x++) {
+            int m = mid.applyAsInt(x);
+            double curve = -Math.sin(x / 7.0);
+            for (int z = 30; z < 64; z++) {
+                int out = Math.abs(z - m) - 3;
+                if (out <= 0) {
+                    continue;
+                }
+                BlockState low = helper.getBlockState(new BlockPos(x, water, z)), high = helper.getBlockState(new BlockPos(x, plain, z));
+                boolean any = sand.test(low) || sand.test(high);
+                boolean inside = Math.signum(z - m) == Math.signum(curve);
+                if (!inside) {
+                    outerSand += any ? 1 : 0;
+                    continue;
+                }
+                if (Math.abs(curve) > 0.8 && out <= 8) {
+                    inner++;
+                    innerSand += any ? 1 : 0;
+                    if (out == 1) {
+                        waterline++;
+                        wet += low.is(tone.wet().get()) || low.getBlock() instanceof com.antcolonies.savanna.block.RiverSand.Slide ? 1 : 0;
+                    } else if (out >= 6) {
+                        past++;
+                        raised += high.is(tone.dry().get()) ? 1 : 0;
+                    }
+                }
+                if (out >= 13) {
+                    tooFar += any ? 1 : 0;
+                }
+            }
+        }
+        for (int x = 1; x < 64; x++) { // slides are rare (about 1 waterline column of a bank in 12): counted over the whole river
+            for (int z = 1; z < 64; z++) {
+                slides += helper.getBlockState(new BlockPos(x, water, z)).getBlock() instanceof com.antcolonies.savanna.block.RiverSand.Slide ? 1 : 0;
+            }
+        }
+        String report = String.format("inside sharp bends %d of %d columns sand, %d sand columns outside; wet sand on %d of %d waterline"
+                + " columns, dry sand a block up on %d of %d past the strip, %d slides, %d sand columns too far out", innerSand, inner,
+                outerSand, wet, waterline, raised, past, slides, tooFar);
+        SavannaMod.LOGGER.info("[sand banks] {}", report);
+        helper.assertTrue(innerSand >= inner * 0.8, "the inside of the bends is not sand: " + report);
+        helper.assertTrue(outerSand == 0, "sand on the outside of the bends: " + report);
+        helper.assertTrue(wet >= waterline * 0.8, "no wet sand at the waterline: " + report);
+        helper.assertTrue(raised >= past * 0.6, "no dry sand over the plain past the strip: " + report);
+        helper.assertTrue(slides >= 1, "no crocodile slide: " + report);
+        helper.assertTrue(tooFar == 0, "sand farther out than the widest bank: " + report);
+        helper.succeed();
     }
 
     /** Still water blocks at the plain's top in the arena's northern part, where the test puts its pools. */

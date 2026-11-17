@@ -1,10 +1,12 @@
 package com.antcolonies.savanna.worldgen;
 
 import com.antcolonies.savanna.SavannaMod;
+import com.antcolonies.savanna.block.RiverSand;
 import com.antcolonies.savanna.registry.SavannaBlocks;
 import com.mojang.serialization.Codec;
 
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.tags.BlockTags;
@@ -52,21 +54,28 @@ public class RiverBankFeature extends Feature<NoneFeatureConfiguration> {
     public boolean place(FeaturePlaceContext<NoneFeatureConfiguration> context) {
         WorldGenLevel level = context.level();
         int x0 = context.origin().getX() & ~15, z0 = context.origin().getZ() & ~15;
-        return shape(level, x0, z0, 16, 16, level.getSeaLevel() - 1, at -> level.getBiome(at).is(WATERS)) > 0;
+        return shape(level, x0, z0, 16, 16, level.getSeaLevel() - 1, at -> level.getBiome(at).is(WATERS), SandBanks.forChunk(level, x0, z0)) > 0;
+    }
+
+    /** {@link #shape(WorldGenLevel, int, int, int, int, int, java.util.function.Predicate, SandBanks.Chooser)} with no sand banks. */
+    public static int shape(WorldGenLevel level, int x0, int z0, int w, int d, int top, java.util.function.Predicate<BlockPos> ours) {
+        return shape(level, x0, z0, w, d, top, ours, SandBanks.NONE);
     }
 
     /**
      * Shapes the banks of the columns {@code x0..x0+w-1, z0..z0+d-1} round water whose surface is at {@code top} (sea
-     * level in the world; any height in a game test), only columns {@code ours} says yes to. How many it changed.
+     * level in the world; any height in a game test), only columns {@code ours} says yes to, with sand banks and pebbles
+     * where {@code sand} says ({@link SandBanks}). How many it changed.
      */
-    public static int shape(WorldGenLevel level, int x0, int z0, int w, int d, int top, java.util.function.Predicate<BlockPos> ours) {
+    public static int shape(WorldGenLevel level, int x0, int z0, int w, int d, int top, java.util.function.Predicate<BlockPos> ours,
+            SandBanks.Chooser sand) {
         Waters waters = new Waters(level, x0 - BEND_LOOK - 1, z0 - BEND_LOOK - 1, Math.max(w, d) + 2 * (BEND_LOOK + 1), top);
         int changed = 0;
         BlockPos.MutableBlockPos at = new BlockPos.MutableBlockPos();
         for (int x = x0; x < x0 + w; x++) {
             for (int z = z0; z < z0 + d; z++) {
                 at.set(x, top, z);
-                if (ours.test(at) && (waters.isWater(x, z) ? silt(level, x, z, waters) : bank(level, x, z, waters))) {
+                if (ours.test(at) && (waters.isWater(x, z) ? silt(level, x, z, waters, sand) : bank(level, x, z, waters, sand))) {
                     changed++;
                 }
             }
@@ -87,21 +96,59 @@ public class RiverBankFeature extends Feature<NoneFeatureConfiguration> {
         return from - 40;
     }
 
-    /** The river bed under sea-level water: silt in place of the soil. */
-    private static boolean silt(WorldGenLevel level, int x, int z, Waters waters) {
+    /**
+     * The river bed under sea-level water: silt in place of the soil; rippled sand in the shallows off a sand bank, and
+     * now and then river pebbles on the bed, more far inland ({@link SandBanks}).
+     */
+    private static boolean silt(WorldGenLevel level, int x, int z, Waters waters, SandBanks.Chooser sand) {
         int g = ground(level, x, z, waters.top);
         BlockPos bed = new BlockPos(x, g, z);
         if (g < waters.top - 16 || !soft(level.getBlockState(bed))) {
             return false;
         }
-        level.setBlock(bed, SavannaBlocks.SILT.get().defaultBlockState(), Block.UPDATE_CLIENTS);
+        SandBanks.Choice choice = sand.at(x, z);
+        boolean shallow = g >= waters.top - 2;
+        BlockState floor = shallow && isSand(choice, x, z) ? choice.sand().rippled().get().defaultBlockState()
+                : SavannaBlocks.SILT.get().defaultBlockState();
+        level.setBlock(bed, floor, Block.UPDATE_CLIENTS);
+        BlockPos over = bed.above();
+        if (g <= waters.top - 2 && hash(x - 11, z + 5) < choice.bedPebbles() * (shallow ? 2 : 1)
+                && level.getBlockState(over).is(Blocks.WATER) && level.getBlockState(over).getFluidState().isSource()) {
+            level.setBlock(over, SavannaBlocks.RIVER_PEBBLES.get().at(over, true), Block.UPDATE_CLIENTS);
+        }
         return true;
     }
 
-    /** A land column near the water: cut flush with the water and given its look. */
-    private static boolean bank(WorldGenLevel level, int x, int z, Waters waters) {
-        double out = waters.distance(x, z, LOOK) - 0.5; // from the water's edge (a column beside the water is half a block from it)
-        if (out >= STRIP + 0.25 * wobble(x * 0.7, z * 0.7)) {
+    /** Whether a column with this choice is sand: sure at a bank's heart, mixing into silt where the bank fades. */
+    static boolean isSand(SandBanks.Choice choice, int x, int z) {
+        return choice.strength() > 0.12 + 0.4 * hash(x + 7, z - 5);
+    }
+
+    /**
+     * A land column near the water: cut flush with the water and given its look. On a sand bank ({@link SandBanks}) it is
+     * sand out to the bank's width: wet sand at the waterline (now and then a crocodile slide), dry sand on the low strip,
+     * and dry sand laid over the floodplain past it, a block up; river pebbles lie about on it, more far inland.
+     */
+    private static boolean bank(WorldGenLevel level, int x, int z, Waters waters, SandBanks.Chooser sand) {
+        double near = waters.distance(x, z, LOOK);
+        SandBanks.Choice choice = null;
+        boolean sandy = false;
+        double width = STRIP;
+        if (near > LOOK && sand == SandBanks.NONE) {
+            return false;
+        }
+        choice = sand.at(x, z);
+        // the noise picks the side; the water may only veto it where it clearly says "the outside of a bend"
+        if (isSand(choice, x, z) && (near <= LOOK || choice.width() > LOOK - 1.5) && waters.share(x, z) >= 0.4) {
+            sandy = true;
+            width = Math.max(STRIP, choice.width());
+            if (near > LOOK) {
+                near = waters.distance(x, z, (int) Math.ceil(width + 1.5));
+            }
+        }
+        double out = near - 0.5; // from the water's edge (a column beside the water is half a block from it)
+        double strip = STRIP + 0.25 * wobble(x * 0.7, z * 0.7);
+        if (out >= (sandy ? width + 0.5 * wobble(x * 0.8, z * 0.8) : strip)) {
             return false;
         }
         int top = waters.top;
@@ -110,21 +157,24 @@ public class RiverBankFeature extends Feature<NoneFeatureConfiguration> {
                 || !soft(level.getBlockState(new BlockPos(x, top, z)))) {
             return false;
         }
+        if (sandy) {
+            return sandBank(level, x, z, waters, choice, out, out >= strip, g);
+        }
         for (int y = top + 1; y <= g; y++) {
             level.setBlock(new BlockPos(x, y, z), Blocks.AIR.defaultBlockState(), Block.UPDATE_CLIENTS);
         }
         // look 6: the bars on the inside of bends, wider the sharper the bend; a thin wet line on the outside
         double bend = waters.bend(x, z);
         boolean inner = bend > 0.1;
-        double width = inner ? Math.min(STRIP, 0.6 + 3.6 * Math.pow(bend, 0.8)) : 0.15;
+        double barWidth = inner ? Math.min(STRIP, 0.6 + 3.6 * Math.pow(bend, 0.8)) : 0.15;
         BlockState surface = Blocks.GRASS_BLOCK.defaultBlockState();
         boolean silty = false;
-        if (out < width + 0.5 * wobble(x, z)) {
+        if (out < barWidth + 0.5 * wobble(x, z)) {
             silty = true;
             Block kind = out < 1.1 ? SavannaBlocks.WET_SILT.get() : SavannaBlocks.SILT.get();
             if (out < 1.1 && hash(x, z) < 0.45) {
                 kind = SavannaBlocks.RIVER_MUD.get(); // trampled at the waterline
-            } else if (width > 2.4 && out > 1.6 && out < 2.4 + 0.4 * wobble(z, x) && hash(x + 3, z) < 0.75) {
+            } else if (barWidth > 2.4 && out > 1.6 && out < 2.4 + 0.4 * wobble(z, x) && hash(x + 3, z) < 0.75) {
                 kind = SavannaBlocks.RIVER_MUD.get(); // the fine mud in the hollow between the bar's ridges
             }
             surface = kind.defaultBlockState();
@@ -140,6 +190,55 @@ public class RiverBankFeature extends Feature<NoneFeatureConfiguration> {
             level.setBlock(new BlockPos(x, top - 1, z), SavannaBlocks.SILT.get().defaultBlockState(), Block.UPDATE_CLIENTS);
         }
         return true;
+    }
+
+    /** Chance a waterline column of a sand bank beside deep water is a crocodile slide (my pick: 1 to 3 a bank). */
+    static final double SLIDE = 0.08;
+
+    /**
+     * One column of a sand bank, {@code out} blocks from the water, its old ground at {@code g}; past the low strip
+     * ({@code pastStrip}) the sand lies over the floodplain a block up where the land is that high.
+     */
+    private static boolean sandBank(WorldGenLevel level, int x, int z, Waters waters, SandBanks.Choice choice, double out,
+            boolean pastStrip, int g) {
+        int top = waters.top;
+        RiverSand.Tone tone = choice.sand();
+        int surfaceY = pastStrip && g > top ? top + 1 : top;
+        for (int y = surfaceY + 1; y <= g; y++) {
+            level.setBlock(new BlockPos(x, y, z), Blocks.AIR.defaultBlockState(), Block.UPDATE_CLIENTS);
+        }
+        BlockState surface = (out < 1.1 ? tone.wet() : tone.dry()).get().defaultBlockState();
+        if (out < 1.1 && hash(x - 3, z + 9) < SLIDE) {
+            Direction.Axis axis = slideAxis(level, waters, x, z, top);
+            if (axis != null) {
+                surface = tone.slide().get().defaultBlockState().setValue(RiverSand.Slide.AXIS, axis).setValue(RiverSand.Slide.WET, true);
+            }
+        }
+        level.setBlock(new BlockPos(x, surfaceY, z), surface, Block.UPDATE_CLIENTS);
+        for (int y = surfaceY - 1; y >= top - 1; y--) {
+            BlockPos under = new BlockPos(x, y, z);
+            if (soft(level.getBlockState(under))) {
+                level.setBlock(under, tone.dry().get().defaultBlockState(), Block.UPDATE_CLIENTS);
+            }
+        }
+        // pebbles: thicker along the channel, more far inland
+        double pebbles = choice.bankPebbles() * (out < 2 ? 2 : 1);
+        BlockPos on = new BlockPos(x, surfaceY + 1, z);
+        if (!(surface.getBlock() instanceof RiverSand.Slide) && hash(x + 17, z - 13) < pebbles && level.getBlockState(on).isAir()) {
+            level.setBlock(on, SavannaBlocks.RIVER_PEBBLES.get().at(on, false), Block.UPDATE_CLIENTS);
+        }
+        return true;
+    }
+
+    /** The way to deep water (2 or more) beside a waterline column, for a slide running down to it; null with none. */
+    private static Direction.Axis slideAxis(WorldGenLevel level, Waters waters, int x, int z, int top) {
+        for (int[] s : new int[][] {{1, 0}, {-1, 0}, {0, 1}, {0, -1}}) {
+            int nx = x + s[0], nz = z + s[1];
+            if (waters.isWater(nx, nz) && ground(level, nx, nz, top) <= top - 2) {
+                return s[0] != 0 ? Direction.Axis.X : Direction.Axis.Z;
+            }
+        }
+        return null;
     }
 
     /** Whether water put at this cell stays: every side solid or water. */
@@ -224,6 +323,11 @@ public class RiverBankFeature extends Feature<NoneFeatureConfiguration> {
          * about half of them, the inside of a bend more, the outside less.
          */
         double bend(int x, int z) {
+            return Math.max(0, Math.min(1, (share(x, z) - 0.5) / 0.25));
+        }
+
+        /** The share of {@link #RAYS} rays that find water within {@link #BEND_LOOK}: about half on a straight bank. */
+        double share(int x, int z) {
             int hits = 0;
             for (int r = 0; r < RAYS; r++) {
                 double a = r * 2 * Math.PI / RAYS, dx = Math.cos(a), dz = Math.sin(a);
@@ -234,7 +338,7 @@ public class RiverBankFeature extends Feature<NoneFeatureConfiguration> {
                     }
                 }
             }
-            return Math.max(0, Math.min(1, (hits / (double) RAYS - 0.5) / 0.25));
+            return hits / (double) RAYS;
         }
     }
 }

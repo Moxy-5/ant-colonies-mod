@@ -58,6 +58,11 @@ public class SavannaItems {
     public static final DeferredItem<BlockItem> SCRAPS = ITEMS.registerSimpleBlockItem(SavannaBlocks.SCRAPS);
     public static final DeferredItem<BlockItem> CROC_DROPPINGS = ITEMS.registerSimpleBlockItem(SavannaBlocks.CROC_DROPPINGS);
     public static final DeferredItem<BlockItem> CRAB_SHELL = ITEMS.registerSimpleBlockItem(SavannaBlocks.CRAB_SHELL);
+    /** River sand in its three tones (dry, wet, rippled, crocodile slide each) and river pebbles (sand banks, 2026-11-16). */
+    public static final java.util.List<DeferredItem<BlockItem>> RIVER_SAND = java.util.stream.Stream.of(
+                    SavannaBlocks.RED_SAND, SavannaBlocks.GOLDEN_SAND, SavannaBlocks.PALE_SAND)
+            .flatMap(tone -> tone.all().stream()).map(b -> ITEMS.registerSimpleBlockItem(b)).toList();
+    public static final DeferredItem<BlockItem> RIVER_PEBBLES = ITEMS.registerSimpleBlockItem(SavannaBlocks.RIVER_PEBBLES);
 
     /**
      * A piece of forage: dead plant material a termite cut off a plant (dry grass, a dead bush, dying leaves, a hay

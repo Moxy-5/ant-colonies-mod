@@ -39,7 +39,69 @@ public class RiverLifeTests {
     public static void algaeGrowsByDepthSpreadsAndIsGrazed(GameTestHelper helper) {
         ServerLevel level = helper.getLevel();
         buildPond(helper);
+        sandBankBlockChecks(helper);
         algaeChecks(helper, level);
+    }
+
+    /**
+     * The sand banks' blocks (2026-11-16, {@code docs/plans/sand-banks.md} step 2), checked beside the pond: every river
+     * sand stands on stone, the crocodile slide keeps the way it was turned, pebbles take a look by position (a row is
+     * not all one look), hold water, and wash away when the ground under them goes.
+     */
+    private static void sandBankBlockChecks(GameTestHelper helper) {
+        int y = SURFACE;
+        for (int x = 14; x <= 30; x++) {
+            for (int z = 2; z <= 6; z++) {
+                helper.setBlock(new BlockPos(x, y - 1, z), Blocks.STONE);
+            }
+        }
+        int x = 14;
+        for (var tone : java.util.List.of(SavannaBlocks.RED_SAND, SavannaBlocks.GOLDEN_SAND, SavannaBlocks.PALE_SAND)) {
+            for (var block : tone.all()) {
+                BlockPos at = new BlockPos(x++, y, 2);
+                helper.setBlock(at, block.get());
+                if (!helper.getBlockState(at).is(block.get())) {
+                    helper.fail(block.getId() + " did not stay where it was put");
+                }
+            }
+        }
+        BlockPos slide = new BlockPos(14, y, 3);
+        helper.setBlock(slide, SavannaBlocks.GOLDEN_SAND.slide().get().defaultBlockState()
+                .setValue(com.antcolonies.savanna.block.RiverSand.Slide.AXIS, net.minecraft.core.Direction.Axis.X)
+                .setValue(com.antcolonies.savanna.block.RiverSand.Slide.WET, true));
+        BlockState turned = helper.getBlockState(slide);
+        if (turned.getValue(com.antcolonies.savanna.block.RiverSand.Slide.AXIS) != net.minecraft.core.Direction.Axis.X
+                || !turned.getValue(com.antcolonies.savanna.block.RiverSand.Slide.WET)) {
+            helper.fail("the crocodile slide lost its turn or its wetness: " + turned);
+        }
+        var pebbles = SavannaBlocks.RIVER_PEBBLES.get();
+        java.util.Set<Integer> looks = new java.util.HashSet<>();
+        for (int px = 14; px <= 30; px++) {
+            BlockPos at = new BlockPos(px, y, 4);
+            BlockState state = pebbles.at(helper.absolutePos(at), false);
+            looks.add(state.getValue(com.antcolonies.savanna.block.RiverPebblesBlock.LOOK));
+            helper.setBlock(at, state);
+            if (!helper.getBlockState(at).is(pebbles)) {
+                helper.fail("pebbles did not stay on stone at " + at);
+            }
+        }
+        if (looks.size() < 4) {
+            helper.fail("a row of 17 pebble blocks showed only " + looks.size() + " of the 7 looks");
+        }
+        BlockPos wet = new BlockPos(14, y, 5);
+        helper.setBlock(wet, pebbles.at(helper.absolutePos(wet), true));
+        if (!helper.getLevel().getFluidState(helper.absolutePos(wet)).is(net.minecraft.tags.FluidTags.WATER)) {
+            helper.fail("wet pebbles hold no water");
+        }
+        helper.setBlock(new BlockPos(14, y - 1, 4), Blocks.AIR);
+        if (helper.getBlockState(new BlockPos(14, y, 4)).is(pebbles)) {
+            helper.fail("pebbles stayed hanging in the air after the ground under them went");
+        }
+        for (int cx = 14; cx <= 30; cx++) {                     // cleared, so nothing falls or flows into the pond's checks
+            for (int cz = 2; cz <= 6; cz++) {
+                helper.setBlock(new BlockPos(cx, y, cz), Blocks.AIR);
+            }
+        }
     }
 
     /**
@@ -504,6 +566,58 @@ public class RiverLifeTests {
                 }
             }
         });
+    }
+
+    /**
+     * Sand to bask on (sand banks, 2026-11-16): a crocodile in a long channel beside grass banks, wanting the sun with no
+     * company near, swims past the grass to a sand bank 40 blocks off and basks there, never on the grass.
+     */
+    @GameTest(template = "arena", timeoutTicks = 2400)
+    public static void aCrocodileSwimsToASandBankToBask(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        int floor = TOP - 4;
+        for (int x = 1; x <= 59; x++) {
+            for (int z = 4; z <= 26; z++) {
+                boolean channel = x >= 2 && x <= 58 && z >= 12 && z <= 17;
+                boolean sand = x >= 42 && x <= 54 && z >= 18 && z <= 22;
+                for (int y = floor; y <= TOP + 2; y++) {
+                    BlockState b;
+                    if (y == floor) {
+                        b = Blocks.STONE.defaultBlockState();
+                    } else if (channel) {
+                        b = (y <= TOP ? Blocks.WATER : Blocks.AIR).defaultBlockState();
+                    } else if (y < TOP) {
+                        b = (sand ? (net.minecraft.world.level.block.Block) SavannaBlocks.GOLDEN_SAND.dry().get() : Blocks.DIRT).defaultBlockState();
+                    } else if (y == TOP) {
+                        b = sand ? (z == 18 ? SavannaBlocks.GOLDEN_SAND.wet() : SavannaBlocks.GOLDEN_SAND.dry()).get().defaultBlockState()
+                                : Blocks.GRASS_BLOCK.defaultBlockState();
+                    } else {
+                        b = Blocks.AIR.defaultBlockState();
+                    }
+                    helper.setBlock(new BlockPos(x, y, z), b);
+                }
+            }
+        }
+        helper.setDayTime(6000);
+        com.antcolonies.savanna.animal.CrocodileEntity croc = helper.spawn(SavannaEntities.CROCODILE.get(), new BlockPos(6, TOP - 1, 14));
+        croc.setPersistenceRequired();
+        croc.wantSun();
+        long[] at = {-1};
+        helper.onEachTick(() -> {
+            if (at[0] >= 0 || !croc.isBasking() || croc.isInWater() || !croc.onGround()) {
+                return;
+            }
+            BlockState under = level.getBlockState(croc.blockPosition().below());
+            if (!under.is(SavannaBlocks.GOLDEN_SAND.dry().get()) && !under.is(SavannaBlocks.GOLDEN_SAND.wet().get())) {
+                helper.fail("the crocodile basks on " + under.getBlock().getName().getString() + " at "
+                        + croc.blockPosition().subtract(helper.absolutePos(BlockPos.ZERO)) + ", not on the sand bank");
+            }
+            at[0] = helper.getTick();
+            SavannaMod.LOGGER.info("[crocodile] basking on the sand bank {} ticks after wanting the sun", at[0]);
+        });
+        helper.succeedWhen(() -> helper.assertTrue(at[0] >= 0, "the crocodile has not basked on the sand bank: at "
+                + croc.blockPosition().subtract(helper.absolutePos(BlockPos.ZERO)) + ", sand spot "
+                + (croc.sandAt == null ? "none" : croc.sandAt.subtract(helper.absolutePos(BlockPos.ZERO)))));
     }
 
     /**

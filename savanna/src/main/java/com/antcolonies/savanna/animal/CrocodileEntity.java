@@ -178,6 +178,13 @@ public class CrocodileEntity extends PathfinderMob implements GeoEntity {
      * favourite banks gather rows of them, as real Nile crocodiles do (my picks).
      */
     public static final double SPAWN_APART = 24.0, JOIN_REACH = 48.0, SIDE_BY_SIDE = 1.7;
+    /**
+     * Sand to bask on (sand banks, 2026-11-16, {@code docs/plans/sand-banks.md}): with no company basking near, a
+     * crocodile wanting the sun looks for a river sand bank within this many blocks before it takes the nearest bank, so
+     * the sand bars on the inside of the bends gather two or three of them, as real Nile crocodiles crowd the sand bars.
+     * It looks at most once a minute ({@link #SAND_LOOK_WAIT}, ticks) and keeps going back to the sand it found (my picks).
+     */
+    public static final int SAND_REACH = 64, SAND_LOOK_WAIT = 1200;
     /** Its eyes and head turned toward what caught its eye, eased (degrees off straight ahead, its right positive); drawn only (the model sets them). */
     public double eyeAim, headAim;
     public long eyeNanos;
@@ -219,6 +226,10 @@ public class CrocodileEntity extends PathfinderMob implements GeoEntity {
     @Nullable
     Vec3 joinAt;
     float joinFace;
+    /** The spot on a river sand bank it goes to bask at (null: none known), and ticks before it may look for sand again. */
+    @Nullable
+    public BlockPos sandAt;
+    int sandLookIn;
     /** For tests and films: 1 its hauled prey never slips free, -1 it always does, 0 the dice ({@link #SLIP_SHARE}). */
     public byte strikeLuck;
     /** For tests: how many animals have got away from it (slipped free of the haul, or a strike that fell short). */
@@ -235,7 +246,7 @@ public class CrocodileEntity extends PathfinderMob implements GeoEntity {
     public static AttributeSupplier.Builder createAttributes() {
         return PathfinderMob.createMobAttributes().add(Attributes.MAX_HEALTH, 40.0).add(Attributes.MOVEMENT_SPEED, 0.3)
                 .add(Attributes.STEP_HEIGHT, 1.0).add(Attributes.KNOCKBACK_RESISTANCE, 0.6)
-                .add(Attributes.FOLLOW_RANGE, JOIN_REACH);      // routes as far as the basking company it joins
+                .add(Attributes.FOLLOW_RANGE, Math.max(JOIN_REACH, SAND_REACH)); // routes as far as its company or the sand
     }
 
     @Override
@@ -504,6 +515,9 @@ public class CrocodileEntity extends PathfinderMob implements GeoEntity {
         }
         if (huntWait > 0) {
             huntWait--;
+        }
+        if (sandLookIn > 0) {
+            sandLookIn--;
         }
         if (schoolFor > 0 && --schoolFor == 0) {
             schoolAt = null;
@@ -778,8 +792,84 @@ public class CrocodileEntity extends PathfinderMob implements GeoEntity {
                     return true;
                 }
             }
+            if (c.sandAt != null) {
+                dx = c.sandAt.getX() + 0.5 - x;
+                dz = c.sandAt.getZ() + 0.5 - z;
+                if (dx * dx + dz * dz < 1.8) {
+                    return true;
+                }
+            }
         }
         return false;
+    }
+
+    /**
+     * A spot to bask on a river sand bank within {@link #SAND_REACH} blocks ({@link #sandAt}): the one it found before
+     * while it is still free, else (at most once a minute) the nearest dry sand spot a block or two back from the water
+     * that no other crocodile lies at or is heading to, looked for every other column round the water's surface, in
+     * loaded land only. Says whether it has one.
+     */
+    boolean findSandBank() {
+        Level level = level();
+        java.util.List<CrocodileEntity> all = level.getEntitiesOfClass(CrocodileEntity.class,
+                getBoundingBox().inflate(SAND_REACH + 4.0, 12.0, SAND_REACH + 4.0), c -> c != this);
+        if (sandAt != null && level.isLoaded(sandAt) && sandBank(level, sandAt) && !taken(all, sandAt.getX() + 0.5, sandAt.getZ() + 0.5)) {
+            return true;
+        }
+        sandAt = null;
+        if (sandLookIn > 0) {
+            return false;
+        }
+        sandLookIn = SAND_LOOK_WAIT;
+        BlockPos at = blockPosition();
+        for (int up = 0; up < 16 && level.getFluidState(at.above()).is(FluidTags.WATER); up++) {
+            at = at.above();        // the water's surface over it
+        }
+        BlockPos.MutableBlockPos p = new BlockPos.MutableBlockPos();
+        int best = Integer.MAX_VALUE;
+        for (int dx = -SAND_REACH; dx <= SAND_REACH; dx += 2) {
+            for (int dz = -SAND_REACH; dz <= SAND_REACH; dz += 2) {
+                int d = dx * dx + dz * dz;
+                if (d > SAND_REACH * SAND_REACH || d >= best) {
+                    continue;
+                }
+                for (int dy = 0; dy <= 3; dy++) {   // a bank flush with the water or a block or two over it
+                    p.set(at.getX() + dx, at.getY() + dy, at.getZ() + dz);
+                    if (!level.isLoaded(p)) {
+                        break;
+                    }
+                    if (sandBank(level, p) && !taken(all, p.getX() + 0.5, p.getZ() + 0.5)) {
+                        best = d;
+                        sandAt = p.immutable();
+                        break;
+                    }
+                }
+            }
+        }
+        return sandAt != null;
+    }
+
+    /** Whether a crocodile could lie at this spot on a river sand bank: dry sand under it, water near but not right beside it. */
+    static boolean sandBank(Level level, BlockPos pos) {
+        return isRiverSand(level.getBlockState(pos.below())) && isBank(level, pos)
+                && AshoreGoal.waterBeside(level, pos, 3) && !AshoreGoal.waterBeside(level, pos, 1);
+    }
+
+    private static java.util.Set<net.minecraft.world.level.block.Block> riverSand;
+
+    /** River sand a crocodile lies on: dry or wet sand or a crocodile slide, of any tone. */
+    static boolean isRiverSand(net.minecraft.world.level.block.state.BlockState state) {
+        if (riverSand == null) {
+            java.util.Set<net.minecraft.world.level.block.Block> set = new java.util.HashSet<>();
+            for (var tone : java.util.List.of(com.antcolonies.savanna.registry.SavannaBlocks.RED_SAND,
+                    com.antcolonies.savanna.registry.SavannaBlocks.GOLDEN_SAND, com.antcolonies.savanna.registry.SavannaBlocks.PALE_SAND)) {
+                set.add(tone.dry().get());
+                set.add(tone.wet().get());
+                set.add(tone.slide().get());
+            }
+            riverSand = set;
+        }
+        return riverSand.contains(state.getBlock());
     }
 
     /** A dry place to lie: solid ground with air over it, under the open sky. */
@@ -1196,6 +1286,13 @@ public class CrocodileEntity extends PathfinderMob implements GeoEntity {
             if (croc.findBaskingCompany()) {
                 return croc.getNavigation().moveTo(croc.joinAt.x, croc.joinAt.y, croc.joinAt.z, 1.0);
             }
+            if (croc.findSandBank()) {
+                var path = croc.getNavigation().createPath(croc.sandAt, 0);
+                if (path != null && path.canReach()) {
+                    return croc.getNavigation().moveTo(path, 1.0);
+                }
+                croc.sandAt = null;     // no way there: the nearest bank, and a fresh look in a minute
+            }
             Level level = croc.level();
             Optional<BlockPos> bank = BlockPos.findClosestMatch(croc.blockPosition(), 12, 3, p -> isBank(level, p)
                     && !level.getFluidState(p.below()).is(FluidTags.WATER) && waterBeside(level, p, 3) && !waterBeside(level, p, 1));
@@ -1203,7 +1300,7 @@ public class CrocodileEntity extends PathfinderMob implements GeoEntity {
         }
 
         /** Whether there is water within this many blocks at the spot's level or one below. */
-        private static boolean waterBeside(Level level, BlockPos pos, int reach) {
+        static boolean waterBeside(Level level, BlockPos pos, int reach) {
             for (BlockPos p : BlockPos.betweenClosed(pos.offset(-reach, -1, -reach), pos.offset(reach, 0, reach))) {
                 if (level.getFluidState(p).is(FluidTags.WATER)) {
                     return true;
