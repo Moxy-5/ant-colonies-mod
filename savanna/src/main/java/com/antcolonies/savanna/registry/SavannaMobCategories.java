@@ -12,7 +12,7 @@ import net.minecraft.world.entity.MobCategory;
 public final class SavannaMobCategories {
     private SavannaMobCategories() {}
 
-    private static MobCategory riverFish, riverHunter;
+    private static MobCategory riverFish, riverHunter, riverBed;
 
     /** The river fish group (tilapia and catfish). */
     public static MobCategory riverFish() {
@@ -33,5 +33,17 @@ public final class SavannaMobCategories {
             riverHunter = MobCategory.valueOf("ANTCOLONIES_RIVER_HUNTER");
         }
         return riverHunter;
+    }
+
+    /**
+     * The bed dwellers' group (the crab and the snail, 2026-11-16, BUGS 224: in the river fish group the tilapia, kept
+     * near a player, filled the 60 places and took about 9 spawns in 10, so crabs and snails were hardly ever seen). Cap
+     * 24 round a player (my pick), friendly, removed past 128 blocks like the fish.
+     */
+    public static MobCategory riverBed() {
+        if (riverBed == null) {
+            riverBed = MobCategory.valueOf("ANTCOLONIES_RIVER_BED");
+        }
+        return riverBed;
     }
 }

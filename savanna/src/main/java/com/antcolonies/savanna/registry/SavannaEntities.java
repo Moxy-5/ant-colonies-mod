@@ -144,7 +144,7 @@ public class SavannaEntities {
     // tall; its box a little narrower than the legs' spread (my pick); each crab's own size through its SCALE attribute.
     public static final DeferredHolder<EntityType<?>, EntityType<com.antcolonies.savanna.animal.CrabEntity>> CRAB =
             ENTITY_TYPES.register("crab", () -> EntityType.Builder
-                    .of(com.antcolonies.savanna.animal.CrabEntity::new, SavannaMobCategories.riverFish())
+                    .of(com.antcolonies.savanna.animal.CrabEntity::new, SavannaMobCategories.riverBed())
                     .sized(0.6F, 0.3F)
                     .eyeHeight(0.25F)
                     .clientTrackingRange(4)
@@ -154,7 +154,7 @@ public class SavannaEntities {
     // 0.3 tall with its shell; a small box (my pick); each snail's own size through its SCALE attribute.
     public static final DeferredHolder<EntityType<?>, EntityType<com.antcolonies.savanna.animal.SnailEntity>> SNAIL =
             ENTITY_TYPES.register("snail", () -> EntityType.Builder
-                    .of(com.antcolonies.savanna.animal.SnailEntity::new, SavannaMobCategories.riverFish())
+                    .of(com.antcolonies.savanna.animal.SnailEntity::new, SavannaMobCategories.riverBed())
                     .sized(0.3F, 0.25F)
                     .eyeHeight(0.2F)
                     .clientTrackingRange(4)

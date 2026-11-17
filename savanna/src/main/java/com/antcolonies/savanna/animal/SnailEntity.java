@@ -7,7 +7,6 @@ import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.syncher.EntityDataAccessor;
 import net.minecraft.network.syncher.EntityDataSerializers;
 import net.minecraft.network.syncher.SynchedEntityData;
-import net.minecraft.tags.FluidTags;
 import net.minecraft.util.Mth;
 import net.minecraft.util.RandomSource;
 import net.minecraft.world.DifficultyInstance;
@@ -176,6 +175,7 @@ public class SnailEntity extends PathfinderMob implements GeoEntity {
     @Override
     public SpawnGroupData finalizeSpawn(ServerLevelAccessor level, DifficultyInstance difficulty, MobSpawnType spawnType, @Nullable SpawnGroupData data) {
         SpawnGroupData out = super.finalizeSpawn(level, difficulty, spawnType, data);
+        RiverBed.settle(this, level, spawnType);
         ownSize = 0.8F + 0.35F * level.getRandom().nextFloat();
         refresh();
         return out;
@@ -214,14 +214,9 @@ public class SnailEntity extends PathfinderMob implements GeoEntity {
         return hungryIn > 0;
     }
 
-    /** Where it may spawn: on the bed of the savanna's rivers, pans and oxbows, in water at most 4 deep (as the crab). */
+    /** Where it may spawn: as the crab, in the water over a shallow bed, set down on the bed ({@link RiverBed}, BUGS 224). */
     public static boolean canSpawn(EntityType<SnailEntity> type, LevelAccessor level, MobSpawnType reason, BlockPos pos, RandomSource random) {
-        int sea = level.getSeaLevel();
-        if (pos.getY() < sea - 13 || pos.getY() > sea + 6 || !level.getFluidState(pos).is(FluidTags.WATER)
-                || !level.getBlockState(pos.below()).isSolidRender(level, pos.below())) {
-            return false;
-        }
-        return !level.getFluidState(pos.above(4)).is(FluidTags.WATER);
+        return RiverBed.maySpawnAt(level, pos);
     }
 
     // --- animations --------------------------------------------------------------------------------------------------

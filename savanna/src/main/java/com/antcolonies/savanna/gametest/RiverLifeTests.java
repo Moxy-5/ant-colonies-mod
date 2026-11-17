@@ -1004,10 +1004,10 @@ public class RiverLifeTests {
         }
         var biomes = level.registryAccess().registryOrThrow(net.minecraft.core.registries.Registries.BIOME);
         boolean listed = biomes.getOrThrow(net.minecraft.world.level.biome.Biomes.SAVANNA).getMobSettings()
-                .getMobs(com.antcolonies.savanna.registry.SavannaMobCategories.riverFish())
+                .getMobs(com.antcolonies.savanna.registry.SavannaMobCategories.riverBed())
                 .unwrap().stream().anyMatch(d -> d.type == SavannaEntities.CRAB.get());
         if (!listed) {
-            helper.fail("the crab is not in the savanna's river fish spawn list");
+            helper.fail("the crab is not in the savanna's river bed spawn list");
         }
         BlockPos shelf = helper.absolutePos(new BlockPos(X0 + 1, TOP - 1, Z0 + 1));
         BlockPos deep = helper.absolutePos(new BlockPos(X1 - 1, SURFACE, Z1 - 1));
@@ -1075,10 +1075,10 @@ public class RiverLifeTests {
         }
         var biomes = level.registryAccess().registryOrThrow(net.minecraft.core.registries.Registries.BIOME);
         boolean listed = biomes.getOrThrow(net.minecraft.world.level.biome.Biomes.SAVANNA).getMobSettings()
-                .getMobs(com.antcolonies.savanna.registry.SavannaMobCategories.riverFish())
+                .getMobs(com.antcolonies.savanna.registry.SavannaMobCategories.riverBed())
                 .unwrap().stream().anyMatch(d -> d.type == SavannaEntities.SNAIL.get());
         if (!listed) {
-            helper.fail("the snail is not in the savanna's river fish spawn list");
+            helper.fail("the snail is not in the savanna's river bed spawn list");
         }
         BlockPos shelf = helper.absolutePos(new BlockPos(X0 + 1, TOP - 1, Z0 + 1));
         BlockPos deep = helper.absolutePos(new BlockPos(X1 - 1, SURFACE, Z1 - 1));
@@ -1182,5 +1182,144 @@ public class RiverLifeTests {
             helper.assertTrue(there.getValue(com.antcolonies.savanna.block.CrabShellBlock.WATERLOGGED)
                     && there.getValue(com.antcolonies.savanna.block.CrabShellBlock.AGE) == 0, "the shell is " + there + " (fresh, holding water)");
         });
+    }
+
+    // --- the bed dwellers spawning by themselves (2026-11-16) -------------------------------------------------------------
+    private static final int[] CHANNEL_DEPTHS = {1, 2, 3, 4, 5, 6, 7, 7, 6, 5, 4, 3, 2, 1}; // a river's cross-section, bank to bank
+    private static final int CX0 = 20, CZ0 = 20, CZ1 = 27;
+
+    /**
+     * A stretch of river over the arena, its water's top at the world's sea level (where the river animals' height rules
+     * let them spawn; the arena itself lies far below): sloping beds from 1 block of water at the banks to 7 in the
+     * channel. Built with absolute positions over the arena's own ground, and taken away again by {@link #clearChannel}.
+     * Returns the water's top.
+     */
+    private static int buildChannel(GameTestHelper helper, boolean clear) {
+        ServerLevel level = helper.getLevel();
+        int top = level.getSeaLevel() - 1;
+        BlockPos corner = helper.absolutePos(new BlockPos(CX0, 0, CZ0));
+        for (int i = -1; i <= CHANNEL_DEPTHS.length; i++) {
+            for (int dz = -1; dz <= CZ1 - CZ0 + 1; dz++) {
+                boolean wall = i < 0 || i >= CHANNEL_DEPTHS.length || dz < 0 || dz > CZ1 - CZ0;
+                int depth = wall ? 0 : CHANNEL_DEPTHS[i];
+                for (int y = top - 8; y <= top + 2; y++) {
+                    BlockState state = clear ? Blocks.AIR.defaultBlockState()
+                            : (y <= top - depth ? Blocks.STONE : y <= top ? Blocks.WATER : Blocks.AIR).defaultBlockState();
+                    level.setBlock(new BlockPos(corner.getX() + i, y, corner.getZ() + dz), state, 2);
+                }
+            }
+        }
+        return top;
+    }
+
+    /**
+     * Whether the world itself would spawn this kind here (every check Minecraft's natural spawner makes at a spot but the
+     * biome's list and the distance to a player): the placement, the kind's own rule (with the quiet-savanna gate), room
+     * for its box, then the mob's own last checks.
+     */
+    static boolean worldWouldSpawn(ServerLevel level, net.minecraft.world.entity.EntityType<? extends net.minecraft.world.entity.Mob> type, BlockPos at) {
+        if (!net.minecraft.world.entity.SpawnPlacements.isSpawnPositionOk(type, level, at)
+                || !net.minecraft.world.entity.SpawnPlacements.checkSpawnRules(type, level, MobSpawnType.NATURAL, at, level.random)
+                || !level.noCollision(type.getSpawnAABB(at.getX() + 0.5, at.getY(), at.getZ() + 0.5))) {
+            return false;
+        }
+        net.minecraft.world.entity.Mob trial = type.create(level);
+        if (trial == null) {
+            return false;
+        }
+        trial.moveTo(at.getX() + 0.5, at.getY(), at.getZ() + 0.5, 0, 0);
+        boolean ok = net.neoforged.neoforge.event.EventHooks.checkSpawnPosition(trial, level, MobSpawnType.NATURAL);
+        trial.discard();
+        return ok;
+    }
+
+    /**
+     * Crabs and snails spawn by themselves on shallow river beds (the user's report 2026-11-16: never seen without an egg).
+     * Minecraft's natural spawner draws one random height per try in a column and keeps it; a bed dweller on the old rule
+     * passed only at the one height just over the bed. The test counts, over a river's cross-section, the spots each kind
+     * passes every world check at (the share of the spawner's draws it can use), and spawns a crab and snails the world's
+     * way to see them settle on the bed.
+     */
+    @GameTest(template = "arena", timeoutTicks = 200)
+    public static void crabsAndSnailsSpawnOnShallowBedsByThemselves(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        int top = buildChannel(helper, false);
+        BlockPos corner = helper.absolutePos(new BlockPos(CX0, 0, CZ0));
+        var kinds = java.util.List.<net.minecraft.world.entity.EntityType<? extends net.minecraft.world.entity.Mob>>of(
+                SavannaEntities.TILAPIA.get(), SavannaEntities.CATFISH.get(), SavannaEntities.CRAB.get(), SavannaEntities.SNAIL.get());
+        // 1. every kind's spots over the channel (the share of the spawner's draws it can use)
+        int[] total = new int[kinds.size()];
+        int[] crabs = new int[CHANNEL_DEPTHS.length], snails = new int[CHANNEL_DEPTHS.length];
+        StringBuilder byDepth = new StringBuilder();
+        for (int i = 0; i < CHANNEL_DEPTHS.length; i++) {
+            int[] column = new int[kinds.size()];
+            for (int dz = 0; dz <= CZ1 - CZ0; dz++) {
+                for (int y = top - 8; y <= top + 1; y++) {
+                    BlockPos at = new BlockPos(corner.getX() + i, y, corner.getZ() + dz);
+                    for (int k = 0; k < kinds.size(); k++) {
+                        if (worldWouldSpawn(level, kinds.get(k), at)) {
+                            column[k]++;
+                            total[k]++;
+                        }
+                    }
+                }
+            }
+            crabs[i] = column[2];
+            snails[i] = column[3];
+            if (i < CHANNEL_DEPTHS.length / 2) {
+                byDepth.append(" depth ").append(CHANNEL_DEPTHS[i]).append(": crab ").append(column[2]).append(" snail ").append(column[3]);
+            }
+        }
+        SavannaMod.LOGGER.info("[bed spawns] spots the world would spawn at over the channel: tilapia {}, catfish {}, crab {}, snail {};{}",
+                total[0], total[1], total[2], total[3], byDepth);
+        // 2. the world's own spawn, drawn at the water's top over a shallow bed: set down on the bed
+        int[][] trials = {{3, 4}, {1, 2}};             // {column, its depth}: the crab over 4 blocks of water, the snail over 2
+        for (int t = 0; t < 2; t++) {
+            var type = t == 0 ? SavannaEntities.CRAB.get() : SavannaEntities.SNAIL.get();
+            BlockPos drawn = new BlockPos(corner.getX() + trials[t][0], top, corner.getZ() + 3);
+            net.minecraft.world.entity.Mob mob = type.create(level);
+            mob.moveTo(drawn.getX() + 0.5, drawn.getY(), drawn.getZ() + 0.5, 0, 0);
+            if (!net.neoforged.neoforge.event.EventHooks.checkSpawnPosition(mob, level, MobSpawnType.NATURAL)) {
+                helper.fail("the world refuses a " + type.toShortString() + " at the water's top over a shallow bed");
+            }
+            mob.finalizeSpawn(level, level.getCurrentDifficultyAt(drawn), MobSpawnType.NATURAL, null);
+            int bed = top - trials[t][1] + 1;
+            if (mob.getBlockY() != bed) {
+                helper.fail("a " + type.toShortString() + " spawned by the world stays at y " + mob.getBlockY() + ", not on the bed at " + bed);
+            }
+            mob.discard();
+        }
+        buildChannel(helper, true);
+        // 3. on the channel's spots: everywhere in the water of a shallow column, never over deeper water
+        StringBuilder wrong = new StringBuilder();
+        for (int i = 0; i < CHANNEL_DEPTHS.length; i++) {
+            int want = CHANNEL_DEPTHS[i] <= com.antcolonies.savanna.animal.RiverBed.SHALLOW ? CHANNEL_DEPTHS[i] * (CZ1 - CZ0 + 1) : 0;
+            if (crabs[i] != want || snails[i] != want) {
+                wrong.append(" depth ").append(CHANNEL_DEPTHS[i]).append(": crab ").append(crabs[i]).append(", snail ")
+                        .append(snails[i]).append(", want ").append(want);
+            }
+        }
+        if (!wrong.isEmpty()) {
+            helper.fail("bed dwellers spawn at the wrong spots:" + wrong);
+        }
+        // 4. their own spawning group, listed in the savanna's waters (not the fish group, which the tilapia fill)
+        var biomes = level.registryAccess().registryOrThrow(net.minecraft.core.registries.Registries.BIOME);
+        var river = net.minecraft.resources.ResourceKey.create(net.minecraft.core.registries.Registries.BIOME,
+                net.minecraft.resources.ResourceLocation.fromNamespaceAndPath(SavannaMod.MODID, "savanna_river"));
+        for (var type : java.util.List.of(SavannaEntities.CRAB.get(), SavannaEntities.SNAIL.get())) {
+            if (type.getCategory() != com.antcolonies.savanna.registry.SavannaMobCategories.riverBed()) {
+                helper.fail(type.toShortString() + " is in the " + type.getCategory().getName() + " group, not the river bed group");
+            }
+            for (var key : java.util.List.of(net.minecraft.world.level.biome.Biomes.SAVANNA, river)) {
+                var settings = biomes.getOrThrow(key).getMobSettings();
+                if (settings.getMobs(com.antcolonies.savanna.registry.SavannaMobCategories.riverBed()).unwrap().stream().noneMatch(d -> d.type == type)) {
+                    helper.fail(type.toShortString() + " is not in " + key.location() + "'s river bed spawn list");
+                }
+                if (settings.getMobs(com.antcolonies.savanna.registry.SavannaMobCategories.riverFish()).unwrap().stream().anyMatch(d -> d.type == type)) {
+                    helper.fail(type.toShortString() + " is still in " + key.location() + "'s river fish spawn list");
+                }
+            }
+        }
+        helper.succeed();
     }
 }

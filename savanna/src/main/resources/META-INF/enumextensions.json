@@ -41,6 +41,18 @@
         false,
         128
       ]
+    },
+    {
+      "enum": "net/minecraft/world/entity/MobCategory",
+      "name": "ANTCOLONIES_RIVER_BED",
+      "constructor": "(Ljava/lang/String;IZZI)V",
+      "parameters": [
+        "antcolonies:river_bed",
+        24,
+        true,
+        false,
+        128
+      ]
     }
   ]
 }
