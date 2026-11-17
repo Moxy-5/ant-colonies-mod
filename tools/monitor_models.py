@@ -126,17 +126,17 @@ def _len(v):
 # fore arm slants down and forward to the hand, the shin down and back to the foot (as in the user's picture), the
 # feet flat and turned out, the toes fanned. Then each piece's roundness: 'upper' and 'lower' are its radius along it
 # (fraction along, radius in pixels: thick at the muscle, slimmer toward the next joint), 'knob' and 'wrist' the radius
-# of the round elbow or knee and wrist or ankle; then the foot's turn and palm, and the five toes (inner to outer):
+# of the round elbow or knee and wrist or ankle; then the foot's turn and palm, and the four toes (inner to outer; real monitors have five, four looks better):
 # length and fan angle (outward +); every toe raised a little at the knuckle.
 LEG_PLANS = {
     'arm': {'joints': ((4.0, 11.0, -21.5), (10.5, 7.5, -22.5), (10.8, 2.3, -25.0)),
             'upper': ((0.0, 2.0), (0.35, 2.2), (1.0, 1.55)), 'lower': ((0.0, 1.7), (0.25, 1.85), (1.0, 1.25)),
             'knob': 1.95, 'wrist': 1.55, 'turn': 18.0, 'palm': (4.6, 3.6),
-            'toes': ((2.6, -34.0), (3.4, -14.0), (3.9, 2.0), (3.6, 18.0), (2.8, 38.0)), 'raise': 14.0},
+            'toes': ((2.9, -32.0), (3.8, -9.0), (3.8, 13.0), (3.0, 36.0)), 'raise': 14.0},
     'leg': {'joints': ((4.0, 10.5, -4.0), (11.2, 8.5, -6.0), (11.8, 2.6, -2.6)),
             'upper': ((0.0, 2.3), (0.35, 2.55), (1.0, 1.8)), 'lower': ((0.0, 1.95), (0.25, 2.1), (1.0, 1.35)),
             'knob': 2.25, 'wrist': 1.75, 'hinge': True, 'turn': 38.0, 'palm': (5.0, 4.4),
-            'toes': ((2.6, -30.0), (3.6, -12.0), (4.2, 4.0), (4.6, 20.0), (3.0, 46.0)), 'raise': 14.0},
+            'toes': ((3.0, -28.0), (4.1, -6.0), (4.6, 17.0), (3.3, 44.0)), 'raise': 14.0},
 }
 CLAW_DROP = 23.0     # how far each claw bends down from its toe (degrees); the hook below curves it on to the ground
 # A claw from root to point, as a hook in small steps (along its length from the toe's tip, width, bottom and top
@@ -232,7 +232,7 @@ def _ball(cubes, axis, centre, r, part):
 
 
 def legs():
-    """Each leg: an upper piece and a lower one aimed between its joints, a foot flat on the ground turned out, and five
+    """Each leg: an upper piece and a lower one aimed between its joints, a foot flat on the ground turned out, and four
     fanned toes, each raised a little at the knuckle with a long claw hooking down from its tip to the ground (a claw is
     its own little piece so it can bend down while the toe lifts, and so the clips can flex them later)."""
     out = []
@@ -452,7 +452,7 @@ NOTES = [
     ('Joints', 'each leg piece is round, cut in half-pixel slices that taper from the muscle to the next joint, and '
                'each elbow, knee, wrist and ankle is a round ball a little bigger than the ends meeting there, so '
                'nothing pokes out at the bend; the hind thigh and shin turn on one knee hinge'),
-    ('Feet and claws', 'flat on the ground and turned out (the hind feet more), five long toes fanned out, each raised '
+    ('Feet and claws', 'flat on the ground and turned out (the hind feet more), four long toes fanned out (real monitors have five; four picked by the user for the look), each raised '
                        'a little at the knuckle; each claw a hook in small steps, a dark sheath at the toe, thick and dark '
                        'at the root, thinner and browner as it curves down, a dull horn point touching the ground; every '
                        'toe and claw is its own piece, so the walk can spread and grip them later'),
