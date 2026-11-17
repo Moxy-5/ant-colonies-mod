@@ -100,8 +100,8 @@ public class MonitorEntity extends PathfinderMob implements GeoEntity {
     /** Kept while a player is within this many blocks (as the river animals are), gone past the group's 128. */
     static final double KEEP_NEAR = 96.0;
     static final double DRAW_DISTANCE = 64.0;
-    /** No world-spawned monitor within this many blocks of another: each its own stretch of river. */
-    public static final int SPAWN_APART = 48;
+    /** No world-spawned monitor within this many blocks of another: each its own stretch of river (80; 48 until the user asked for rarer, 2026-11-17). */
+    public static final int SPAWN_APART = 80;
     /** How far from a bank the world may spawn one in the water (blocks). */
     public static final int BANK_REACH = 3;
     /** Afloat, its feet hang this far under the surface (blocks, at size 1): head and back out. */

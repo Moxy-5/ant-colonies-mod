@@ -86,7 +86,7 @@ Every living thing in the mod, built or planned, plants and fungi included, in o
 | `antcolonies:river_fish` | 60 | within 96, gone past 128 | tilapia, catfish |
 | `antcolonies:river_hunter` | 5 | within 96, gone past 128 | crocodile |
 | `antcolonies:river_bed` | 24 | within 96, gone past 128 | crab, snail |
-| `antcolonies:river_bank` | 4 | within 96, gone past 128 | Nile monitor (alone, 48 apart) |
+| `antcolonies:river_bank` | 2 | within 96, gone past 128 | Nile monitor (alone, 80 apart) |
 
 **1. Colony insects (strict realism; each a species profile on the framework)**
 - Macrotermes (mound termite): workers, minor and major soldiers, king, queen BUILT; alates (winged) PLANNED (M9.5). Savanna mod.
@@ -674,6 +674,7 @@ Every living thing in the mod, built or planned, plants and fungi included, in o
 - **The Nile monitor in the game, BUILT 2026-11-17** (branch `claude/hopeful-kirch-74f4d5`, the user's ask): `/summon antcolonies:monitor` or its spawn egg; 6 blocks long; walks the banks, swims, basks by day; a hungry one eats crabs, snails (leaving the broken shell) and fish remains; hisses at a near survival player and bites if they come close; hit, it bites back and dives; keeps off crocodiles, crabs and snails keep off it; its own spawning group `antcolonies:river_bank`, at most 4 round a player, alone, 48 blocks apart, on savanna river banks (the user's "uncommon, nearly rare"); found: goals checking `tickCount % 20` never start for animals with odd ids; my picks in `docs/HISTORY.md`; not tried in-game yet (natural spawns need a new world).
 - **Crocodile 7.5 blocks, monitor 4.5, crocodiles a little rarer, 2026-11-17** (branch `claude/hopeful-kirch-74f4d5`, the user's ask): the crocodile drawn 7.5 blocks long (was about 6.1) and the monitor 4.5 (was 6), each still 0.8 to 1.15 of that by animal; every distance on their bodies now follows the one size number (the crocodile's jaws, head, roll and float depth had the old size typed in), so jaws, grabs, floating and the walk's stride grow and shrink with them; crocodiles at most 5 round a player (was 6); not tried in-game yet.
 - **The Nile monitor in the game and the new sizes (crocodile 7.5 blocks, monitor 4.5, crocodile cap 5) confirmed in-game by the user 2026-11-17 ("everything works");** the user now wants monitors rarer (being decided).
+- **Nile monitors rarer, 2026-11-17** (branch `claude/hopeful-kirch-74f4d5`, the user's pick): at most 2 round a player (was 4) and each at least 80 blocks from another (was 48), so about one every 150 to 250 blocks of river (an estimate from how the spawner works, not measured); still on every part of the rivers, as real Nile monitors live by water everywhere, coast included; `river` 15 of 15 on 6 servers; not tried in-game yet (spawns only in new or reloaded land).
 
 ## Other notes files (read only when the task needs them)
 - `docs/DESIGN.md`: every design decision for the species and shared systems (read the section for a feature before working on it).

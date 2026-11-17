@@ -60,7 +60,7 @@
       "constructor": "(Ljava/lang/String;IZZI)V",
       "parameters": [
         "antcolonies:river_bank",
-        4,
+        2,
         true,
         false,
         128

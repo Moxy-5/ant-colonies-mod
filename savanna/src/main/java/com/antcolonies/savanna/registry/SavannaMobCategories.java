@@ -49,7 +49,7 @@ public final class SavannaMobCategories {
 
     /**
      * The bank dwellers' group (the Nile monitor, 2026-11-17, the user's "between uncommon and rare, nearer uncommon"):
-     * a group of its own so neither the fish nor the crocodiles fill its places, cap 4 round a player (my pick), each
+     * a group of its own so neither the fish nor the crocodiles fill its places, cap 2 round a player (4 until the user asked for rarer, 2026-11-17), each
      * spawned alone and at least {@code MonitorEntity.SPAWN_APART} blocks from another monitor, removed past 128 blocks.
      */
     public static MobCategory riverBank() {
