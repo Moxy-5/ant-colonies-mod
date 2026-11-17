@@ -1,0 +1,245 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Nile Monitor Viewer</title>
+<style>
+  :root { --bg: #f1efe8; --panel: #fdfcf8; --ink: #2a2a22; --muted: #6a675a; --line: #d9d4c4; --accent: #8a6a1e; }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) { --bg: #1a1a16; --panel: #23231e; --ink: #ecebe2; --muted: #a5a291; --line: #3a3930; --accent: #e0b850; }
+  }
+  :root[data-theme="dark"] { --bg: #1a1a16; --panel: #23231e; --ink: #ecebe2; --muted: #a5a291; --line: #3a3930; --accent: #e0b850; }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font: 15px/1.45 system-ui, sans-serif; }
+  header { padding: 14px 16px 6px; }
+  h1 { margin: 0 0 4px; font-size: 20px; }
+  header p { margin: 0; color: var(--muted); max-width: 82ch; }
+  #wrap { position: relative; height: 64vh; min-height: 340px; margin: 10px 16px; border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
+  canvas { display: block; width: 100%; height: 100%; }
+  #labels { position: absolute; inset: 0; pointer-events: none; overflow: hidden; }
+  .tag { position: absolute; transform: translate(-50%, -100%); background: var(--panel); border: 1px solid var(--line); border-radius: 6px;
+         padding: 1px 6px; font-size: 12px; font-weight: 600; white-space: nowrap; }
+  .controls { display: flex; flex-wrap: wrap; gap: 8px 14px; padding: 0 16px 8px; align-items: center; }
+  .controls label { display: flex; gap: 8px; align-items: center; font-size: 14px; }
+  .controls input[type=range] { width: 180px; max-width: 50vw; }
+  .readout { color: var(--muted); font-size: 13px; }
+  button { font: inherit; padding: 6px 12px; border-radius: 8px; border: 1px solid var(--line); background: var(--panel); color: var(--ink); cursor: pointer; }
+  button.on { border-color: var(--accent); color: var(--accent); font-weight: 600; }
+  ul { margin: 8px 16px 24px; padding-left: 22px; max-width: 82ch; }
+  li { margin: 4px 0; }
+  li b { color: var(--accent); }
+</style>
+</head>
+<body>
+<header>
+  <h1>Nile monitor viewer (step 2: the shape)</h1>
+  <p>Built fresh from your picture and the outline. The colours are plain because this step is only about the shape.
+     The tail, neck and face are rounded and curve smoothly. The body and legs are blocky on purpose.
+     Drag to turn, scroll or pinch to zoom, right-drag to slide.</p>
+</header>
+<div id="wrap"><canvas id="c"></canvas><div id="labels"></div></div>
+<div class="controls">
+  <label>Length <input id="size" type="range" min="2" max="8" step="0.1"> <span id="sizeOut" class="readout"></span></label>
+  <button id="pieces">Show the pieces</button>
+  <span id="boxes" class="readout"></span>
+</div>
+<div class="controls" id="cams"></div>
+<ul id="list"></ul>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+<script>
+const DATA = /*DATA*/null;
+const canvas = document.getElementById('c');
+const wrap = document.getElementById('wrap');
+const renderer = new THREE.WebGLRenderer({canvas, antialias: true, preserveDrawingBuffer: true});
+renderer.setPixelRatio(window.devicePixelRatio);
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+const scene = new THREE.Scene();
+const SKY = new THREE.Color('#b4d3e3');
+scene.background = SKY;
+scene.fog = new THREE.Fog(SKY, 30, 80);
+const camera = new THREE.PerspectiveCamera(35, 1, 0.01, 300);
+const controls = new THREE.OrbitControls(camera, canvas);
+scene.add(new THREE.HemisphereLight('#fff7e6', '#7a6a48', 0.8));
+const sun = new THREE.DirectionalLight('#fff4d8', 0.7);
+sun.position.set(6, 18, 10);
+sun.castShadow = true;
+sun.shadow.mapSize.set(2048, 2048);
+sun.shadow.bias = -0.0004;
+Object.assign(sun.shadow.camera, {left: -14, right: 14, top: 14, bottom: -14, near: 0.5, far: 60});
+scene.add(sun);
+
+function deg(v) { return v * Math.PI / 180; }
+function setRot(obj, r) { obj.rotation.set(deg(-r[0]), deg(r[1]), deg(-r[2]), 'ZYX'); }
+function loadTexture(uri, rx, ry) {
+  const t = new THREE.TextureLoader().load(uri);
+  t.magFilter = THREE.NearestFilter;
+  t.minFilter = THREE.NearestFilter;
+  if (rx) { t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(rx, ry || rx); }
+  return t;
+}
+
+// a sand bank: dry golden sand, a wet strip, the river beyond
+const sand = new THREE.Mesh(new THREE.PlaneGeometry(60, 30), new THREE.MeshLambertMaterial({map: loadTexture(DATA.blocks.golden_river_sand, 60, 30)}));
+sand.rotation.x = -Math.PI / 2; sand.position.set(0, 0, -11); sand.receiveShadow = true; scene.add(sand);
+const wet = new THREE.Mesh(new THREE.PlaneGeometry(60, 4), new THREE.MeshLambertMaterial({map: loadTexture(DATA.blocks.wet_golden_river_sand, 60, 4)}));
+wet.rotation.x = -Math.PI / 2; wet.position.set(0, 0, 6); wet.receiveShadow = true; scene.add(wet);
+const river = new THREE.Mesh(new THREE.PlaneGeometry(60, 30), new THREE.MeshLambertMaterial({color: '#6f8a5a'}));
+river.rotation.x = -Math.PI / 2; river.position.set(0, -0.15, 23); scene.add(river);
+
+// --- the model ---------------------------------------------------------------------------------------------------------
+const FACES = ['east', 'west', 'up', 'down', 'south', 'north'];
+function boxGeometry(c, tw, th) {
+  const g = new THREE.BoxGeometry(Math.max(c.size[0], 0.02), Math.max(c.size[1], 0.02), Math.max(c.size[2], 0.02));
+  const uv = g.attributes.uv;
+  FACES.forEach((f, i) => {
+    const face = c.uv && c.uv[f];
+    if (!face) return;
+    const [u0, v0] = face.uv, [w, h] = face.uv_size;
+    for (let k = 0; k < 4; k++) {
+      const j = i * 4 + k;
+      uv.setXY(j, (u0 + uv.getX(j) * w) / tw, 1 - (v0 + (1 - uv.getY(j)) * h) / th);
+    }
+  });
+  uv.needsUpdate = true;
+  return g;
+}
+
+// every bone a tint of its own, for "Show the pieces"
+const TINTS = ['#e8a33d', '#4f9fd8', '#e05d5d', '#5fbf6a', '#b57be0', '#e0d24f', '#46c4b8', '#d97aa6'];
+function build(look) {
+  const mat = new THREE.MeshLambertMaterial({map: loadTexture(look.texture), alphaTest: 0.5});
+  const root = new THREE.Group(), groups = {}, byName = {}, meshes = [];
+  look.bones.forEach(b => byName[b.name] = b);
+  look.bones.forEach((b, bi) => {
+    const g = new THREE.Group();
+    const p = b.parent ? byName[b.parent].pivot : [0, 0, 0];
+    g.position.set(b.pivot[0] - p[0], b.pivot[1] - p[1], b.pivot[2] - p[2]);
+    if (b.rotation) setRot(g, b.rotation);
+    groups[b.name] = g;
+    const tint = new THREE.MeshLambertMaterial({color: TINTS[bi % TINTS.length]});
+    (b.cubes || []).forEach(c => {
+      const mesh = new THREE.Mesh(boxGeometry(c, look.w, look.h), mat);
+      mesh.userData = {mat, tint};
+      mesh.castShadow = true; mesh.receiveShadow = true;
+      mesh.position.set(c.origin[0] + c.size[0] / 2 - b.pivot[0], c.origin[1] + c.size[1] / 2 - b.pivot[1], c.origin[2] + c.size[2] / 2 - b.pivot[2]);
+      g.add(mesh); meshes.push(mesh);
+    });
+  });
+  look.bones.forEach(b => (b.parent ? groups[b.parent] : root).add(groups[b.name]));
+  root.scale.setScalar(1 / 16);
+  const bounds = new THREE.Box3().setFromObject(root);
+  const c = bounds.getCenter(new THREE.Vector3());
+  root.position.set(-c.x, 0, -c.z);
+  const yaw = new THREE.Group(); yaw.add(root);
+  yaw.userData = {groups, meshes, length: bounds.max.z - bounds.min.z, height: bounds.max.y};
+  scene.add(yaw);
+  return yaw;
+}
+
+const settings = {size: 6, cam: 'three-quarter', pieces: 0};
+location.hash.slice(1).split('&').filter(Boolean).forEach(kv => {
+  const [k, v] = kv.split('=').map(decodeURIComponent);
+  settings[k] = isNaN(parseFloat(v)) ? v : parseFloat(v);
+});
+
+const tags = [];
+function tag(text, obj, height) {
+  const el = document.createElement('div');
+  el.className = 'tag'; el.textContent = text;
+  document.getElementById('labels').appendChild(el);
+  tags.push({el, obj, height});
+}
+
+const LOOK = Object.values(DATA.looks)[0];
+const mon = build(LOOK);
+mon.rotation.y = Math.PI / 2;      // the head to -x, its left side toward the camera's usual place
+const player = new THREE.Group();
+[[0.5, 0.75, 0.25, 0.375, '#3b4a8f'], [0.5, 0.75, 0.25, 1.125, '#2f9c9c'], [0.5, 0.5, 0.5, 1.55, '#b98a68']].forEach(([w, h, d, y, col]) => {
+  const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), new THREE.MeshLambertMaterial({color: col}));
+  m.position.y = y; m.castShadow = true; player.add(m);
+});
+scene.add(player); tag('Player, 1.8 blocks', player, () => 1.85);
+const block = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), new THREE.MeshLambertMaterial({map: loadTexture(DATA.blocks.golden_river_sand)}));
+block.castShadow = true; scene.add(block); tag('1 block', block, () => 0.55);
+
+const sizeIn = document.getElementById('size');
+sizeIn.value = settings.size;
+function k() { return settings.size / mon.userData.length; }
+function layout() {
+  const s = settings.size;
+  mon.scale.setScalar(k());
+  player.position.set(s * 0.5 + 1.6, 0, -1.5);
+  block.position.set(s * 0.5 + 3.1, 0.5, -1.5);
+  document.getElementById('sizeOut').textContent = s.toFixed(1) + ' blocks long (6 is your size for now)';
+}
+sizeIn.addEventListener('input', () => { settings.size = parseFloat(sizeIn.value); layout(); });
+document.getElementById('boxes').textContent = DATA.boxes + ' boxes';
+const piecesBtn = document.getElementById('pieces');
+function showPieces() {
+  mon.userData.meshes.forEach(m => m.material = settings.pieces ? m.userData.tint : m.userData.mat);
+  piecesBtn.classList.toggle('on', !!settings.pieces);
+}
+piecesBtn.onclick = () => { settings.pieces = settings.pieces ? 0 : 1; showPieces(); };
+
+// --- cameras -----------------------------------------------------------------------------------------------------------
+const H = () => settings.size * 0.09;           // about the back's height
+const CAMS = {
+  'three-quarter': () => { const s = settings.size; return [[-s * 0.55, s * 0.42, s * 0.9], [0, H() * 0.6, 0]]; },
+  side: () => { const s = settings.size; return [[0, H() * 0.7, s * 1.35], [0, H() * 0.7, 0]]; },
+  front: () => { const s = settings.size; return [[-s * 1.1, H() * 0.9, 0.001], [0, H() * 0.7, 0]]; },
+  top: () => { const s = settings.size; return [[0, s * 1.5, 0.01], [0, 0, 0]]; },
+  'head, close': () => { const s = settings.size; return [[-s * 0.72, H() * 1.5, s * 0.3], [-s * 0.42, H(), 0]]; },
+  'head, side': () => { const s = settings.size; return [[-s * 0.36, H(), s * 0.42], [-s * 0.38, H(), 0]]; },
+  'tail, close': () => { const s = settings.size; return [[s * 0.15, H() * 1.6, s * 0.55], [s * 0.3, H() * 0.3, 0]]; },
+  'from behind': () => { const s = settings.size; return [[s * 1.0, H() * 1.5, s * 0.3], [0, H() * 0.6, 0]]; },
+};
+const camBox = document.getElementById('cams');
+function setCam(name) {
+  settings.cam = name;
+  const [pos, target] = CAMS[name]();
+  camera.position.set(...pos); controls.target.set(...target); controls.update();
+  [...camBox.children].forEach(b => b.classList.toggle('on', b.textContent === name));
+}
+Object.keys(CAMS).forEach(name => {
+  const b = document.createElement('button');
+  b.textContent = name; b.onclick = () => setCam(name);
+  camBox.appendChild(b);
+});
+DATA.notes.forEach(([head, text]) => {
+  const li = document.createElement('li');
+  li.innerHTML = '<b>' + head + ':</b> ' + text;
+  document.getElementById('list').appendChild(li);
+});
+
+function resize() {
+  const w = wrap.clientWidth, h = wrap.clientHeight;
+  renderer.setSize(w, h, false);
+  camera.aspect = w / h; camera.updateProjectionMatrix();
+}
+window.addEventListener('resize', resize);
+
+const v = new THREE.Vector3();
+function frame() {
+  controls.update();
+  renderer.render(scene, camera);
+  const w = wrap.clientWidth, h = wrap.clientHeight;
+  tags.forEach(({el, obj, height}) => {
+    v.set(obj.position.x, obj.position.y + height() + 0.1, obj.position.z).project(camera);
+    const show = v.z < 1 && Math.abs(v.x) < 1.1 && Math.abs(v.y) < 1.1;
+    el.style.display = show ? '' : 'none';
+    el.style.left = ((v.x + 1) / 2 * w) + 'px';
+    el.style.top = ((1 - v.y) / 2 * h) + 'px';
+  });
+  requestAnimationFrame(frame);
+}
+layout();
+resize();
+showPieces();
+setCam(CAMS[settings.cam] ? settings.cam : 'three-quarter');
+frame();
+</script>
+</body>
+</html>
