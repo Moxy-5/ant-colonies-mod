@@ -502,9 +502,7 @@ NOTES = [
     ('Clips', 'Walk: diagonal legs step together, the feet stay put on the ground, the body swings side to side, the '
               'head stays steady and the tail waves. Standing about: breathing, looking round, the eyes glancing, blinks '
               'and tongue flicks. Tongue: two flicks of the forked tongue. Swim: legs folded back along the body, the '
-              'tail sweeping it along, in three versions to pick from, each keeping the tail off the hind feet: A the '
-              'tail held stiff at the hips, B the hind feet held out wide, C the hind feet pressed to the flanks ahead '
-              'of the hips. Hiss: body raised, neck arched, mouth wide, the tail lashing'),
+              'hind feet held out wide so the tail swings between them, the tail sweeping it along. Hiss: body raised, neck arched, mouth wide, the tongue lifting and quivering inside, the tail lashing'),
     ('Still to come', 'into the game: an attack and a death clip, and how it behaves (raiding crocodile nests)'),
 ]
 CHARCOAL, CREAM = (62, 58, 54), (214, 196, 150)
@@ -894,56 +892,41 @@ def clips():
     worst['tongue'] = 0.0
 
     # Swimming: the legs folded back flat along the sides, the body and the straightened tail thrown into a wave from
-    # side to side, growing toward the tip; the head held up at the surface, steady. Three ways to keep the tail clear
-    # of the folded hind feet, to pick from in the viewer:
-    #   A  the tail stiff at the hips: the wave starts small there and grows toward the tip (the feet as before);
-    #   B  the hind feet held out wide, trailing beside the tail and turned away from it;
-    #   C  the hind legs pulled forward, the feet pressed flat to the flanks ahead of the hips, toes back.
-    def make_swim(way):
-        P = _Poser()
+    # side to side, growing toward the tip; the head held up at the surface, steady. The hind feet are held out wide
+    # and turned away from the tail, so the tail swings between them without touching (the user's pick of three).
+    P = _Poser()
 
-        def swim(t):
-            p = {}
-            w = 2 * math.pi * t / SWIM_LEN
-            yaw = 5.0 * math.cos(w)
-            bm, bd = body(p, ry=yaw)
-            for L in P.legs:
-                s = L['s']
+    def swim(t):
+        p = {}
+        w = 2 * math.pi * t / SWIM_LEN
+        yaw = 5.0 * math.cos(w)
+        bm, bd = body(p, ry=yaw)
+        for L in P.legs:
+            s = L['s']
+            if L['kind'] == 'arm':
+                wrist = (s * 6.3, 9.6, -10.0)
                 foot = _cols((0, s, 0), (s, 0, 0), (0, 0, -1))
-                if L['kind'] == 'arm':
-                    wrist = (s * 6.3, 9.6, -10.0)
-                elif way == 'B':
-                    wrist = (s * 9.0, 9.4, 7.5)
-                    a = math.radians(22.0)                          # toes swung out, away from the tail
-                    c, sn = math.cos(a), math.sin(a)
-                    foot = _cols((0, s, 0), (s * c, 0, -sn), (-s * sn, 0, -c))
-                elif way == 'C':
-                    wrist = (s * 8.1, 9.8, -9.5)
-                else:
-                    wrist = (s * 6.8, 9.6, 8.5)
-                P.leg(p, L, bm, bd, wrist, foot, in_body=True, curl=20.0)
-            neck_turn(p, 0.0, extra=(0.0, -3.0, -3.0))
-            p['neck1']['rotation'][1] = round(-0.55 * yaw, 3)
-            p['neck2']['rotation'][1] = round(-0.3 * yaw, 3)
-            p['head']['rotation'][1] = round(-0.15 * yaw, 3)
-            for i in range(TAIL_SEGS):
-                f = i / (TAIL_SEGS - 1)
-                if way == 'A':
-                    amp = 0.6 + 10.4 * f ** 1.5                     # barely moving at the hips
-                    sway = amp * math.sin(w - 0.5 * i - 0.8)
-                else:
-                    sway = (4.0 + 7.0 * f) * math.sin(w - 0.5 * i - 0.8)
-                    if i == 0:
-                        sway -= 1.4 * yaw
-                p[f'tail{i + 1}'] = {'rotation': [round(-P.rest[f'tail{i + 1}'][0], 3), round(sway, 3), 0.0]}
-            for side in ('left', 'right'):
-                p[f'pupil_{side}'] = {'position': [0.0, 0.0, -0.25]}
-            return p
-        return clip(SWIM_LEN, swim, 32), P.worst
-
-    for way in 'ABC':
-        name = 'swim' if way == 'A' else 'swim_' + way.lower()
-        out[name], worst[name] = make_swim(way)
+            else:
+                wrist = (s * 9.0, 9.4, 7.5)
+                a = math.radians(22.0)                              # toes swung out, away from the tail
+                c, sn = math.cos(a), math.sin(a)
+                foot = _cols((0, s, 0), (s * c, 0, -sn), (-s * sn, 0, -c))
+            P.leg(p, L, bm, bd, wrist, foot, in_body=True, curl=20.0)
+        neck_turn(p, 0.0, extra=(0.0, -3.0, -3.0))
+        p['neck1']['rotation'][1] = round(-0.55 * yaw, 3)
+        p['neck2']['rotation'][1] = round(-0.3 * yaw, 3)
+        p['head']['rotation'][1] = round(-0.15 * yaw, 3)
+        for i in range(TAIL_SEGS):
+            f = i / (TAIL_SEGS - 1)
+            sway = (4.0 + 7.0 * f) * math.sin(w - 0.5 * i - 0.8)
+            if i == 0:
+                sway -= 1.4 * yaw
+            p[f'tail{i + 1}'] = {'rotation': [round(-P.rest[f'tail{i + 1}'][0], 3), round(sway, 3), 0.0]}
+        for side in ('left', 'right'):
+            p[f'pupil_{side}'] = {'position': [0.0, 0.0, -0.25]}
+        return p
+    out['swim'] = clip(SWIM_LEN, swim, 32)
+    worst['swim'] = P.worst
 
     # The threat: standing tall on straightened legs, the front raised, the neck stretched up and the head tipped down
     # at the threat, the mouth gaping and closing with the hiss, the tail arched up off the ground and lashing.
@@ -956,13 +939,17 @@ def clips():
         stand(P, p, bm, bd)
         neck_turn(p, 0.0, extra=(-7.0 - 2.0 * gape, -3.0, 5.0))
         p['jaw'] = {'rotation': [round(14 + 16 * gape, 3), 0.0, 0.0]}
+        # The tongue lifts off the jaw's floor as the mouth opens, arches up and quivers from side to side.
+        quiver = math.sin(2 * math.pi * t / 0.3)
+        p['tongue'] = {'rotation': [round(-9.0 * gape + 2.0 * gape * quiver, 3), round(7.0 * gape * quiver, 3), 0.0],
+                       'position': [0.0, round(0.3 * gape, 3), round(-1.0 * gape, 3)]}
         for i in range(TAIL_SEGS):
             lash = (3.0 + 6.0 * i / (TAIL_SEGS - 1)) * math.sin(2 * math.pi * t / 0.5 - 0.55 * i)
             p[f'tail{i + 1}'] = {'rotation': [5.0 if i < 3 else 0.0, round(lash, 3), 0.0]}
         for side in ('left', 'right'):
             p[f'pupil_{side}'] = {'position': [0.0, 0.0, -0.25]}
         return p
-    out['hiss'] = clip(2.0, hiss, 40)
+    out['hiss'] = clip(2.0, hiss, 60)
     worst['hiss'] = P.worst
     return out, worst
 
