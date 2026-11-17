@@ -584,7 +584,7 @@ def crocodile_page(out):
 
 def monitor_page(out):
     """The Nile monitor (M9 river life), third start (monitor_models.py): the 3D shape in plain colours on a sand bank,
-    a player and a block for scale, a length slider, cameras round it and a "show the pieces" switch."""
+    a player and a block for scale, a length slider, cameras round it, a "show the pieces" switch and the clips."""
     import monitor_models as mm
     import tilapia_models as tm
     bones = mm.model()
@@ -593,7 +593,7 @@ def monitor_page(out):
         b, rows, w, h = mm.paint(bones, key)
         looks[key] = {"name": look["name"], "note": look["note"], "bones": b, "texture": uri(tm.png(rows)), "w": w, "h": h}
     blocks = {n: file_uri(n + ".png") for n in ("golden_river_sand", "wet_golden_river_sand")}
-    data = {"looks": looks, "blocks": blocks, "notes": mm.NOTES,
+    data = {"looks": looks, "blocks": blocks, "notes": mm.NOTES, "clips": mm.clips()[0],
             "boxes": sum(len(b.get("cubes", [])) for b in bones)}
     template = (Path(__file__).resolve().parent / "monitor_viewer.template.html").read_text(encoding="utf-8")
     out.parent.mkdir(parents=True, exist_ok=True)

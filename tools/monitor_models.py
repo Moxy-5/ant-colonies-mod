@@ -9,7 +9,7 @@ models. The user's rule for this one: only some parts need heavy detail. So:
   head with no staircase. The head narrows into the snout in one-pixel slices, its top and bottom edges bevelled.
 - The body stays a chunky box, as in the picture (that is its Minecraft look); the legs are round, tapering
   from the muscle to round joints (the user's ask, 2026-11-17).
-- The paint (step 3) is worked out pixel by pixel from where each pixel lies on the model; the clips are step 4.
+- The paint (step 3) is worked out pixel by pixel from where each pixel lies on the model; the clips (step 4) are made here too, in clips().
 
 Units are model pixels (16 a block), 96 long (6 blocks, the user's size for now). The head points to -Z, up is +Y,
 left is +X; y = 0 is the ground. A rest rotation is given here as a pitch in degrees, positive turning the bone's
@@ -231,6 +231,23 @@ def _ball(cubes, axis, centre, r, part):
         _disc(cubes, axis, centre, rr, centre[axis] + z0, centre[axis] + z1, part)
 
 
+def _leg_frames(s, plan, S, E, W):
+    """The upper and lower pieces' turns for joints S, E, W (shared by the model and the clips)."""
+    r1 = _aim((s, 0, 0), _sub(E, S))                        # the upper part's own axis is straight out
+    r2 = _aim((0, -1, 0), _sub(W, E))                       # the lower part's is straight down
+    if plan.get('hinge'):
+        # The hind leg bends a long way at the knee, so the thigh and shin share one hinge line there (the line
+        # across both): their boxes then turn about it like a real knee instead of twisting against each other
+        # (the user's report: the hind leg looked broken). The ankle block then sits in the shin's line.
+        d1, d2 = _unit(_sub(E, S)), _unit(_sub(W, E))
+        h = _unit(_cross(d1, d2))
+        x1 = [s * c for c in d1]
+        r1 = _cols(x1, _cross(h, x1), h)
+        y2 = [-c for c in d2]
+        r2 = _cols(_cross(y2, h), y2, h)
+    return r1, r2
+
+
 def legs():
     """Each leg: an upper piece and a lower one aimed between its joints, a foot flat on the ground turned out, and four
     fanned toes, each raised a little at the knuckle with a long claw hooking down from its tip to the ground (a claw is
@@ -241,18 +258,7 @@ def legs():
             (sx, sy, sz), (ex, ey, ez), (wx, wy, wz) = plan['joints']
             S, E, W = (s * sx, sy, sz), (s * ex, ey, ez), (s * wx, wy, wz)
             l1, l2 = _len(_sub(E, S)), _len(_sub(W, E))
-            r1 = _aim((s, 0, 0), _sub(E, S))                        # the upper part's own axis is straight out
-            r2 = _aim((0, -1, 0), _sub(W, E))                       # the lower part's is straight down
-            if plan.get('hinge'):
-                # The hind leg bends a long way at the knee, so the thigh and shin share one hinge line there (the line
-                # across both): their boxes then turn about it like a real knee instead of twisting against each other
-                # (the user's report: the hind leg looked broken). The ankle block then sits in the shin's line.
-                d1, d2 = _unit(_sub(E, S)), _unit(_sub(W, E))
-                h = _unit(_cross(d1, d2))
-                x1 = [s * c for c in d1]
-                r1 = _cols(x1, _cross(h, x1), h)
-                y2 = [-c for c in d2]
-                r2 = _cols(_cross(y2, h), y2, h)
+            r1, r2 = _leg_frames(s, plan, S, E, W)
             r3 = _ry(-s * plan['turn'])                              # the foot: flat, turned out
             e_rest = (S[0] + s * l1, S[1], S[2])                     # the joints before the turns are applied
             w_rest = (e_rest[0], e_rest[1] - l2, e_rest[2])
@@ -401,15 +407,21 @@ def head():
     # the eyes, far back and high, under a brow ridge; the nostrils near the tip
     ez = z0 - 0.19 * HEAD_LEN
     w, top, _ = head_shape(0.19)
-    for s in (1, -1):
+    extra = []
+    for s, side in ((1, 'left'), (-1, 'right')):
         def xs(a, b):
             return sorted([s * a, s * b])
         # a narrow eye set in under a heavy brow: the brow juts out past it and slants down toward the snout (a hard,
         # hooded stare), a thick lower lid narrows it from below, and the pupil sits at the front, staring ahead
-        def box(x0, x1, y0, y1, z0_, z1_, part):
-            upper.append(cube([xs(x0, x1)[0], y + y0, ez + z0_], [xs(x0, x1)[1], y + y1, ez + z1_], part))
+        def box(x0, x1, y0, y1, z0_, z1_, part, into=upper):
+            into.append(cube([xs(x0, x1)[0], y + y0, ez + z0_], [xs(x0, x1)[1], y + y1, ez + z1_], part))
         box(w - 0.2, w + 0.12, 2.55, 3.2, -0.9, 0.7, 'eye')
-        box(w + 0.12, w + 0.17, 2.6, 3.15, -0.62, -0.08, 'pupil')
+        pupil, lid = [], []
+        box(w + 0.12, w + 0.17, 2.6, 3.15, -0.62, -0.08, 'pupil', pupil)   # its own piece: it slides to glance
+        box(w - 0.2, w + 0.19, 2.32, 2.6, -0.9, 0.7, 'brow', lid)          # the blinking lid, hidden in the lower lid;
+        extra.append({'name': f'pupil_{side}', 'parent': 'head',            # a blink stretches it up over the eye
+                      'pivot': [s * (w + 0.15), y + 2.875, ez], 'cubes': pupil})
+        extra.append({'name': f'lid_{side}', 'parent': 'head', 'pivot': [s * w, y + 2.32, ez], 'cubes': lid})
         box(w - 0.2, w + 0.24, 2.3, 2.62, -1.0, 0.8, 'brow')            # the lower lid
         box(w - 1.3, w + 0.42, 3.15, 4.0, -0.2, 1.2, 'brow')            # the brow over the back of the eye
         box(w - 1.3, w + 0.42, 2.98, 3.85, -1.3, -0.2, 'brow')          # lower toward the snout: the scowl
@@ -418,9 +430,17 @@ def head():
         upper.append(cube([xs(nw - 1.1, nw - 0.35)[0], y + ntop - 0.75, nz - 0.4],      # on the top's side edge
                           [xs(nw - 1.1, nw - 0.35)[1], y + ntop + 0.1, nz + 0.4], 'nostril'))
     hinge = [0.0, y + MOUTH, z0 - GAPE * HEAD_LEN]
+    # the forked tongue, lying hidden along the mouth line inside the snout; a flick slides it out 7 pixels through the
+    # closed lips, as a monitor's does
+    tip = z0 - HEAD_LEN
+    tongue = [cube([-0.25, y + MOUTH - 0.12, tip + 1.0], [0.25, y + MOUTH + 0.12, tip + 9.0], 'tongue')]
+    for s in (1, -1):
+        tongue.append(cube([min(s * 0.1, s * 0.42), y + MOUTH - 0.1, tip + 0.1],
+                           [max(s * 0.1, s * 0.42), y + MOUTH + 0.1, tip + 1.4], 'tonguetip'))
     return [{'name': 'head', 'parent': f'neck{NECK_SEGS}', 'pivot': [0.0, y, z0],
              'rotation': pitch(HEAD_PITCH - sum(NECK_TURNS)), 'cubes': upper},
-            {'name': 'jaw', 'parent': 'head', 'pivot': hinge, 'cubes': jaw}]
+            {'name': 'jaw', 'parent': 'head', 'pivot': hinge, 'cubes': jaw},
+            {'name': 'tongue', 'parent': 'head', 'pivot': [0.0, y + MOUTH, tip + 8.5], 'cubes': tongue}] + extra
 
 
 def model():
@@ -445,7 +465,7 @@ NOTES = [
              'so it sweeps up from the shoulders and holds the head above the back'),
     ('Head', '14 pixels long. It narrows toward the snout in one-pixel slices, top and bottom edges bevelled, '
              'ending in a blunt rounded tip. The eyes sit far back under a brow ridge, the nostrils near the tip, '
-             'and the lower jaw is its own piece for the clips later'),
+             'and the lower jaw is its own piece, so it opens in the hiss'),
     ('Body', 'blocky on purpose, as in your picture: a deep body with the belly hanging low'),
     ('Legs', 'angled like your picture: the upper part slants out and down from the body, the elbow or knee sticking '
              'out to the side; the fore arm slants down and forward to the hand, the shin down and back to the foot'),
@@ -461,7 +481,11 @@ NOTES = [
                   'the tail, spotty near the hips and solid toward the tip, the underside pale; a dark head speckled '
                   'yellow with a pale lip line; a cream throat and belly crossed by grey bars; yellow dots on the legs, '
                   'the feet darker; amber eyes with a dark pupil'),
-    ('Still to come', 'step 4, the animations (walk, tongue, swim)'),
+    ('Clips', 'Walk: diagonal legs step together, the feet stay put on the ground, the body swings side to side, the '
+              'head stays steady and the tail waves. Standing about: breathing, looking round, the eyes glancing, blinks '
+              'and tongue flicks. Tongue: two flicks of the forked tongue. Swim: legs folded back along the body, the '
+              'tail sweeping it along. Hiss: body raised, neck arched, mouth wide, the tail lashing'),
+    ('Still to come', 'into the game: an attack and a death clip, and how it behaves (raiding crocodile nests)'),
 ]
 CHARCOAL, CREAM = (62, 58, 54), (214, 196, 150)
 SKIN = (52, 51, 43)          # charcoal with a little olive
@@ -491,6 +515,10 @@ def plain_colour(part, face):
         return (226, 186, 54)
     if part in ('nostril', 'pupil'):
         return (18, 16, 14)
+    if part == 'tongue':
+        return (58, 64, 92)          # a dark blue-grey tongue
+    if part == 'tonguetip':
+        return (84, 90, 122)
     if part == 'clawbase':
         return (28, 24, 21)
     if part == 'claw':
@@ -510,7 +538,7 @@ def colour(part, face, bone, x, y, z):
         return (168, 92, 22)                             # a deep amber
     if part == 'brow':
         return _grain(SKIN_DARK, math.floor(abs(x)), math.floor(y), math.floor(z), 0.05)
-    if part in ('nostril', 'pupil') or part.startswith('claw'):
+    if part in ('nostril', 'pupil') or part.startswith(('claw', 'tongue')):
         return plain_colour(part, face)
     gx, gy, gz = math.floor(x), math.floor(y), math.floor(z)
     ax = math.floor(abs(x))                               # pixels out from the middle line (both sides alike)
@@ -610,6 +638,270 @@ def paint(bones, look='nile'):
             c.pop('_part')
             c.pop('_bone')
     return bones, rows, width, height
+
+
+# --- the clips (step 4): walk, idle, tongue, swim, hiss ----------------------------------------------------------------
+# Every clip is worked out pose by pose from what the animal does, not keyed by hand: the feet are placed on the ground
+# and the legs are bent to reach them (two-piece leg reaching: the elbow or knee bends out the way it does at rest), so
+# a planted foot stays put while the body sways over it. A clip's value for a bone is its turn ADDED to the bone's rest
+# turn, in the bone file's degrees (as GeckoLib and the viewer read them).
+BODY_PIVOT = (0.0, TAIL_AXIS, -13.0)
+WALK_LEN, SWIM_LEN = 1.2, 1.6          # one full stride, one full tail beat (seconds; the game will scale them by speed)
+
+
+def _rz(d):
+    c, s = math.cos(math.radians(d)), math.sin(math.radians(d))
+    return [[c, -s, 0], [s, c, 0], [0, 0, 1]]
+
+
+def _euler_m(r):
+    """A bone's turn in file degrees back to a matrix (the viewer's setRot: x and z negated, the order Z, Y, X)."""
+    return _mul(_mul(_rz(-r[2]), _ry(r[1])), _rx(-r[0]))
+
+
+def _mv(m, v):
+    return [sum(m[i][k] * v[k] for k in range(3)) for i in range(3)]
+
+
+def _add(a, b):
+    return [x + y for x, y in zip(a, b)]
+
+
+def _ease(x):
+    return smooth(x)
+
+
+def _pulse(t, start, rise, hold, fall):
+    """0 before start, easing up to 1 over rise, held, easing back to 0 over fall."""
+    if t < start:
+        return 0.0
+    if t < start + rise:
+        return _ease((t - start) / rise)
+    if t < start + rise + hold:
+        return 1.0
+    return 1.0 - _ease((t - start - rise - hold) / fall)
+
+
+def _ramp(t, keys):
+    """A value easing from key to key ((time, value), ...); held before the first and after the last."""
+    if t <= keys[0][0]:
+        return keys[0][1]
+    for (t0, v0), (t1, v1) in zip(keys, keys[1:]):
+        if t <= t1:
+            return v0 + (v1 - v0) * _ease((t - t0) / (t1 - t0))
+    return keys[-1][1]
+
+
+class _Poser:
+    """Turns wanted bone turns (matrices) into clip values, and bends the legs to reach wanted foot places."""
+
+    def __init__(self):
+        bones = model()
+        self.rest = {b['name']: b.get('rotation', [0.0, 0.0, 0.0]) for b in bones}
+        self.last = {}
+        self.worst = 0.0
+        self.legs = []
+        for s, side in ((1, 'left'), (-1, 'right')):
+            for kind, plan in LEG_PLANS.items():
+                (sx, sy, sz), (ex, ey, ez), (wx, wy, wz) = plan['joints']
+                S, E, W = (s * sx, sy, sz), (s * ex, ey, ez), (s * wx, wy, wz)
+                self.legs.append({'s': s, 'side': side, 'kind': kind, 'plan': plan, 'S': S, 'E': E, 'W': W,
+                                  'l1': _len(_sub(E, S)), 'l2': _len(_sub(W, E)), 'foot': _ry(-s * plan['turn'])})
+
+    def value(self, name, m):
+        """The clip value for a bone whose wanted turn (against its parent) is m: the difference from rest, kept
+        within half a turn of the last value so the keys never spin round the long way."""
+        r, rest = rot(m), self.rest[name]
+        last = self.last.get(name, [0.0, 0.0, 0.0])
+        v = []
+        for a, b, l in zip(r, rest, last):
+            d = a - b
+            d += 360.0 * round((l - d) / 360.0)
+            v.append(round(d, 3))
+        self.last[name] = v
+        return v
+
+    def leg(self, p, L, body_m, body_d, wrist, foot_m, in_body=False, curl=0.0):
+        """Bends leg L so its wrist or ankle is at wrist and its foot turned foot_m (both on the ground's axes, or the
+        body's if in_body), the body turned body_m about its pivot and moved body_d."""
+        s, plan, S = L['s'], L['plan'], list(L['S'])
+        if in_body:
+            Wb, Fb = list(wrist), foot_m
+        else:
+            Wb = _add(_mv(_tr(body_m), _sub(_sub(wrist, body_d), BODY_PIVOT)), BODY_PIVOT)
+            Fb = _mul(_tr(body_m), foot_m)
+        d = _sub(Wb, S)
+        D = _len(d)
+        reach = 0.985 * (L['l1'] + L['l2'])
+        if D > reach:                                   # out of reach: as far as it goes (and remember by how much)
+            self.worst = max(self.worst, D - reach)
+            d = [c * reach / D for c in d]
+            Wb, D = _add(S, d), reach
+        D = max(D, abs(L['l1'] - L['l2']) * 1.02)
+        dh = [c / D for c in d]
+        a = (L['l1'] ** 2 - L['l2'] ** 2 + D * D) / (2 * D)
+        h = math.sqrt(max(0.0, L['l1'] ** 2 - a * a))
+        pole = _sub(L['E'], S)                           # the elbow or knee bends out the way it does at rest
+        k = sum(x * y for x, y in zip(pole, dh))
+        pole = _unit([x - k * y for x, y in zip(pole, dh)])
+        E = [S[i] + a * dh[i] + h * pole[i] for i in range(3)]
+        r1, r2 = _leg_frames(s, plan, S, E, Wb)
+        name = f"{L['kind']}_%s_{L['side']}"
+        p[name % 'upper'] = {'rotation': self.value(name % 'upper', r1)}
+        p[name % 'lower'] = {'rotation': self.value(name % 'lower', _mul(_tr(r1), r2))}
+        p[name % 'foot'] = {'rotation': self.value(name % 'foot', _mul(_tr(r2), Fb))}
+        for i in range(len(plan['toes'])):
+            p[name % f'claw{i + 1}'] = {'rotation': [round(curl, 3), 0.0, 0.0]}
+
+
+def clips():
+    """(clips by name, how far a wanted foot place lay out of reach in each, in pixels)."""
+    from tilapia_models import clip
+    out, worst = {}, {}
+
+    def body(p, ry=0.0, rx=0.0, dy=0.0):
+        p['body'] = {'rotation': [round(rx, 3), round(ry, 3), 0.0], 'position': [0.0, round(dy, 3), 0.0]}
+        return _euler_m([rx, ry, 0.0]), [0.0, dy, 0.0]
+
+    def stand(P, p, bm, bd):
+        for L in P.legs:
+            P.leg(p, L, bm, bd, L['W'], L['foot'])
+
+    def neck_turn(p, yaw, lift=0.0, extra=(0.0, 0.0, 0.0)):
+        """The neck and head turned yaw (degrees, + to its right) between them, raised lift; extra pitches added."""
+        for (bone, share), ex in zip((('neck1', 0.4), ('neck2', 0.3), ('head', 0.3)), extra):
+            up = -0.5 * lift if bone != 'neck1' else 0.0
+            p[bone] = {'rotation': [round(ex + up, 3), round(share * yaw, 3), 0.0]}
+
+    # The walk: a lizard's trot, the diagonal legs nearly together (left fore with right hind, right fore with left
+    # hind, the hind a touch late), each foot on the ground 62 percent of the stride. The body swings from side to
+    # side with the stride, bringing each shoulder forward as its foot reaches; the neck turns against the swing so the
+    # head stays nearly steady, and a wave runs down the tail.
+    P = _Poser()
+    phases = {('arm', 'left'): 0.0, ('leg', 'right'): 0.05, ('arm', 'right'): 0.5, ('leg', 'left'): 0.55}
+    reach = {'arm': (-27.0, -18.5, 2.5), 'leg': (-7.0, 1.5, 3.0)}      # where the foot lands, leaves, how high it lifts
+    duty = 0.62
+
+    def walk(t):
+        p = {}
+        w = 2 * math.pi * t / WALK_LEN
+        yaw = 6.0 * math.cos(w)
+        bm, bd = body(p, ry=yaw, dy=0.25 * math.cos(2 * w))
+        for L in P.legs:
+            front, back, lift = reach[L['kind']]
+            u = (t / WALK_LEN - phases[(L['kind'], L['side'])]) % 1.0
+            if u < duty:                                 # planted, the body passing over it
+                z, up = front + (back - front) * u / duty, 0.0
+            else:                                        # swinging forward, lifted, toes hanging
+                f = _ease((u - duty) / (1 - duty))
+                z, up = back + (front - back) * f, math.sin(math.pi * f)
+            wrist = [L['W'][0], L['W'][1] + lift * up, z]
+            P.leg(p, L, bm, bd, wrist, _mul(L['foot'], _rx(-28 * up)), curl=18 * up)
+        neck_turn(p, 0.0)
+        p['neck1']['rotation'][1] = round(-0.55 * yaw, 3)
+        p['neck2']['rotation'][1] = round(-0.3 * yaw, 3)
+        p['head']['rotation'][1] = round(-0.1 * yaw, 3)
+        for i in range(TAIL_SEGS):
+            sway = (2.5 + 7.0 * i / (TAIL_SEGS - 1)) * math.sin(w - 0.45 * i - 0.6)
+            if i == 0:
+                sway -= 1.2 * yaw
+            p[f'tail{i + 1}'] = {'rotation': [0.0, round(sway, 3), 0.0]}
+        return p
+    out['walk'] = clip(WALK_LEN, walk, 48)
+    worst['walk'] = P.worst
+
+    # Standing: breathing, the head turning slowly to look one way and the other, the eyes glancing, two blinks,
+    # three flicks of the tongue (tasting the air, as monitors do all the time), the tail tip stirring.
+    P = _Poser()
+    look = ((0, 0), (1.6, 0), (2.4, 16), (4.0, 16), (4.9, -14), (7.2, -14), (8.1, 0))
+    lift = ((0, 0), (1.6, 0), (2.4, 6), (4.0, 6), (4.9, 2), (7.2, 2), (8.1, 0))
+    glance = ((0, 0.1), (0.8, 0.1), (1.0, -0.25), (2.6, -0.25), (2.9, 0.3), (3.8, 0.3), (4.1, -0.2), (6.5, -0.2),
+              (6.8, 0.45), (7.6, 0.45), (8.0, 0.1))
+    flicks = (1.0, 5.4, 5.9)
+
+    def flick(p, t, starts):
+        f, st = 0.0, 0.0
+        for s0 in starts:
+            v = _pulse(t, s0, 0.1, 0.3, 0.12)
+            if v > f:
+                f, st = v, s0
+        wave = math.sin(2 * math.pi * (t - st) / 0.15)
+        p['tongue'] = {'rotation': [round(5 * f + 4 * f * wave, 3), round(6 * f * wave, 3), 0.0],
+                       'position': [0.0, 0.0, round(-7.0 * f, 3)]}
+
+    def idle(t):
+        p = {}
+        bm, bd = body(p, dy=0.18 * math.sin(2 * math.pi * t / 2.5))
+        stand(P, p, bm, bd)
+        neck_turn(p, _ramp(t, look), _ramp(t, lift))
+        g = _ramp(t, glance)
+        blink = max(_pulse(t, 3.0, 0.06, 0.04, 0.08), _pulse(t, 8.4, 0.06, 0.04, 0.08))
+        for side in ('left', 'right'):
+            p[f'pupil_{side}'] = {'position': [0.0, 0.0, round(g, 3)]}
+            p[f'lid_{side}'] = {'scale': [1.0, round(1 + 2.4 * blink, 3), 1.0]}
+        flick(p, t, flicks)
+        for i in range(8, TAIL_SEGS):
+            p[f'tail{i + 1}'] = {'rotation': [0.0, round(2.0 * (i - 7) / 4 * math.sin(2 * math.pi * t / 5 - 0.5 * i), 3), 0.0]}
+        return p
+    out['idle'] = clip(10.0, idle, 200)
+    worst['idle'] = P.worst
+
+    # The tongue alone (the game plays it over the other clips): two quick flicks.
+    def tongue(t):
+        p = {}
+        flick(p, t, (0.2, 0.75))
+        return p
+    out['tongue'] = clip(2.0, tongue, 80)
+    worst['tongue'] = 0.0
+
+    # Swimming: the legs folded back flat along the sides, feet turned back, and the body and the straightened tail
+    # thrown into a wave from side to side, growing toward the tip; the head held up at the surface, steady.
+    P = _Poser()
+
+    def swim(t):
+        p = {}
+        w = 2 * math.pi * t / SWIM_LEN
+        yaw = 5.0 * math.cos(w)
+        bm, bd = body(p, ry=yaw)
+        for L in P.legs:
+            s = L['s']
+            wrist = (s * 6.3, 9.6, -10.0) if L['kind'] == 'arm' else (s * 6.8, 9.6, 8.5)
+            P.leg(p, L, bm, bd, wrist, _cols((0, s, 0), (s, 0, 0), (0, 0, -1)), in_body=True, curl=20.0)
+        neck_turn(p, 0.0, extra=(0.0, -3.0, -3.0))
+        p['neck1']['rotation'][1] = round(-0.55 * yaw, 3)
+        p['neck2']['rotation'][1] = round(-0.3 * yaw, 3)
+        p['head']['rotation'][1] = round(-0.15 * yaw, 3)
+        for i in range(TAIL_SEGS):
+            sway = (4.0 + 7.0 * i / (TAIL_SEGS - 1)) * math.sin(w - 0.5 * i - 0.8)
+            if i == 0:
+                sway -= 1.4 * yaw
+            p[f'tail{i + 1}'] = {'rotation': [round(-P.rest[f'tail{i + 1}'][0], 3), round(sway, 3), 0.0]}
+        for side in ('left', 'right'):
+            p[f'pupil_{side}'] = {'position': [0.0, 0.0, -0.25]}
+        return p
+    out['swim'] = clip(SWIM_LEN, swim, 32)
+    worst['swim'] = P.worst
+
+    # The threat: standing tall on straightened legs, the front raised, the neck stretched up and the head tipped down
+    # at the threat, the mouth gaping and closing with the hiss, the tail arched up off the ground and lashing.
+    P = _Poser()
+
+    def hiss(t):
+        p = {}
+        gape = 0.5 - 0.5 * math.cos(math.pi * t)
+        bm, bd = body(p, rx=-3.0, dy=1.0 + 0.25 * gape)
+        stand(P, p, bm, bd)
+        neck_turn(p, 0.0, extra=(-7.0 - 2.0 * gape, -3.0, 5.0))
+        p['jaw'] = {'rotation': [round(14 + 16 * gape, 3), 0.0, 0.0]}
+        for i in range(TAIL_SEGS):
+            lash = (3.0 + 6.0 * i / (TAIL_SEGS - 1)) * math.sin(2 * math.pi * t / 0.5 - 0.55 * i)
+            p[f'tail{i + 1}'] = {'rotation': [5.0 if i < 3 else 0.0, round(lash, 3), 0.0]}
+        for side in ('left', 'right'):
+            p[f'pupil_{side}'] = {'position': [0.0, 0.0, -0.25]}
+        return p
+    out['hiss'] = clip(2.0, hiss, 40)
+    worst['hiss'] = P.worst
+    return out, worst
 
 
 if __name__ == '__main__':
