@@ -70,34 +70,122 @@ def body():
     return {'name': 'body', 'pivot': [0.0, TAIL_AXIS, -13.0], 'cubes': c}
 
 
+# A little rotation maths for the legs: each leg piece is aimed from one joint to the next, so its rest rotation is
+# worked out from where its joints should be. Matrices are in the viewer's axes (three.js, the order Z then Y then X,
+# as GeckoLib turns bones); rot() turns one into the bone file's degrees (x and z negated, as the viewer reads them).
+def _mul(a, b):
+    return [[sum(a[i][k] * b[k][j] for k in range(3)) for j in range(3)] for i in range(3)]
+
+
+def _tr(a):
+    return [list(r) for r in zip(*a)]
+
+
+def _rx(d):
+    c, s = math.cos(math.radians(d)), math.sin(math.radians(d))
+    return [[1, 0, 0], [0, c, -s], [0, s, c]]
+
+
+def _ry(d):
+    c, s = math.cos(math.radians(d)), math.sin(math.radians(d))
+    return [[c, 0, s], [0, 1, 0], [-s, 0, c]]
+
+
+def _aim(a, b):
+    """The smallest turn taking direction a onto direction b."""
+    na, nb = math.sqrt(sum(v * v for v in a)), math.sqrt(sum(v * v for v in b))
+    a, b = [v / na for v in a], [v / nb for v in b]
+    v = [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]]
+    c = sum(x * y for x, y in zip(a, b))
+    k = [[0, -v[2], v[1]], [v[2], 0, -v[0]], [-v[1], v[0], 0]]
+    k2 = _mul(k, k)
+    return [[(i == j) + k[i][j] + k2[i][j] / (1 + c) for j in range(3)] for i in range(3)]
+
+
+def rot(m):
+    """A turn matrix as a bone's rest rotation in degrees."""
+    ay = math.asin(max(-1.0, min(1.0, -m[2][0])))
+    if abs(m[2][0]) < 0.9999999:
+        ax, az = math.atan2(m[2][1], m[2][2]), math.atan2(m[1][0], m[0][0])
+    else:
+        ax, az = 0.0, math.atan2(-m[0][1], m[1][1])
+    return [round(-math.degrees(ax), 3), round(math.degrees(ay), 3), round(-math.degrees(az), 3)]
+
+
+def _sub(a, b):
+    return [x - y for x, y in zip(a, b)]
+
+
+def _len(v):
+    return math.sqrt(sum(x * x for x in v))
+
+
+# Where each leg's joints sit (the left side; the right is the mirror), in model pixels: shoulder or hip, elbow or
+# knee, wrist or ankle. The upper part runs out and down from the body, the elbow or knee sticking out to the side; the
+# fore arm slants down and forward to the hand, the shin down and back to the foot (as in the user's picture), the
+# feet flat and turned out, the toes fanned. Then the thicknesses (upper, lower), the joint knob, the foot's turn and
+# palm, and the five toes (inner to outer): length and fan angle (outward +); every toe raised a little at the knuckle.
+LEG_PLANS = {
+    'arm': {'joints': ((4.0, 11.0, -21.5), (10.5, 7.5, -22.5), (10.8, 2.3, -25.0)),
+            'thick': (4.0, 3.4), 'knob': 4.0, 'turn': 18.0, 'palm': (4.6, 3.6),
+            'toes': ((2.6, -34.0), (3.4, -14.0), (3.9, 2.0), (3.6, 18.0), (2.8, 38.0)), 'raise': 14.0},
+    'leg': {'joints': ((4.0, 10.5, -4.0), (11.0, 7.5, -6.0), (11.6, 2.3, -2.6)),
+            'thick': (4.6, 3.8), 'knob': 4.4, 'turn': 38.0, 'palm': (5.0, 4.4),
+            'toes': ((2.6, -30.0), (3.6, -12.0), (4.2, 4.0), (4.6, 20.0), (3.0, 46.0)), 'raise': 14.0},
+}
+CLAW_LEN, CLAW_DROP = 2.0, 50.0       # each claw this long, bending this far down from its toe (degrees)
+
+
 def legs():
-    """Each leg three bones (upper, lower, foot), bracing the body: the upper part straight out from the side, the
-    lower straight down, the foot flat with five toes and pale claws, turned out (the hind feet more)."""
+    """Each leg: an upper piece and a lower one aimed between its joints, a foot flat on the ground turned out, and five
+    fanned toes, each raised a little at the knuckle with a long claw hooking down from its tip to the ground (a claw is
+    its own little piece so it can bend down while the toe lifts, and so the clips can flex them later)."""
     out = []
     for s, side in ((1, 'left'), (-1, 'right')):
-        for kind, (uz, lz, fz, ux, lx, fx, turn) in (
-                ('arm', ((-24, -19), (-24, -20), (-25, -19), (4.5, 10), (8, 12), (7.5, 13), 15)),
-                ('leg', ((-8, -1), (-6, -1), (-6, 0), (4.5, 11), (9, 13), (8.5, 14.5), 35))):
-            def x(a, b):
-                return sorted([s * a, s * b])
-            u = [cube([x(*ux)[0], 9.0, uz[0]], [x(*ux)[1], 13.0, uz[1]], 'leg')]
-            low = [cube([x(*lx)[0], 2.0, lz[0]], [x(*lx)[1], 10.0, lz[1]], 'leg')]
-            foot = [cube([x(*fx)[0], 0.0, fz[0]], [x(*fx)[1], 2.0, fz[1]], 'leg')]
-            width = fx[1] - fx[0]
-            for i, reach in enumerate((2.2, 3.0, 3.6, 3.2, 2.4)):           # five toes, the middle ones longest
-                tx = fx[0] + 0.35 + i * (width - 1.5) / 4
-                a, b = x(tx, tx + 0.8)
-                foot.append(cube([a, 0.0, fz[0] - reach], [b, 1.0, fz[0]], 'leg'))
-                a, b = x(tx + 0.1, tx + 0.7)
-                foot.append(cube([a, 0.0, fz[0] - reach - 1.1], [b, 0.8, fz[0] - reach], 'claw'))
-            mid = (lambda r: s * (r[0] + r[1]) / 2)
-            out.append({'name': f'{kind}_upper_{side}', 'parent': 'body',
-                        'pivot': [s * ux[0], 11.0, (uz[0] + uz[1]) / 2], 'cubes': u})
-            out.append({'name': f'{kind}_lower_{side}', 'parent': f'{kind}_upper_{side}',
-                        'pivot': [mid(lx), 10.0, (lz[0] + lz[1]) / 2], 'cubes': low})
-            out.append({'name': f'{kind}_foot_{side}', 'parent': f'{kind}_lower_{side}',
-                        'pivot': [mid(fx), 1.0, (fz[0] + fz[1]) / 2], 'rotation': [0.0, -s * turn, 0.0],
-                        'cubes': foot})
+        for kind, plan in LEG_PLANS.items():
+            (sx, sy, sz), (ex, ey, ez), (wx, wy, wz) = plan['joints']
+            S, E, W = (s * sx, sy, sz), (s * ex, ey, ez), (s * wx, wy, wz)
+            t1, t2 = plan['thick']
+            l1, l2 = _len(_sub(E, S)), _len(_sub(W, E))
+            r1 = _aim((s, 0, 0), _sub(E, S))                        # the upper part's own axis is straight out
+            r2 = _aim((0, -1, 0), _sub(W, E))                       # the lower part's is straight down
+            r3 = _ry(-s * plan['turn'])                              # the foot: flat, turned out
+            e_rest = (S[0] + s * l1, S[1], S[2])                     # the joints before the turns are applied
+            w_rest = (e_rest[0], e_rest[1] - l2, e_rest[2])
+
+            ux = sorted([S[0] - s * 1.0, S[0] + s * (l1 + 0.4)])
+            up = [cube([ux[0], S[1] - t1 / 2, S[2] - t1 / 2 - 0.3], [ux[1], S[1] + t1 / 2, S[2] + t1 / 2 + 0.3], 'leg')]
+            k = plan['knob'] / 2
+            ex_, ey_, ez_ = e_rest
+            low = [cube([ex_ - k, ey_ - k, ez_ - k], [ex_ + k, ey_ + k, ez_ + k], 'leg'),
+                   cube([ex_ - t2 / 2, ey_ - l2 - 0.6, ez_ - t2 / 2], [ex_ + t2 / 2, ey_, ez_ + t2 / 2], 'leg')]
+            pw, pl = plan['palm']
+            g = -W[1]                                                # the ground, below the wrist
+            fx, fy, fz = w_rest
+            foot = [cube([fx - t2 / 2 - 0.1, fy - 0.6, fz - t2 / 2], [fx + t2 / 2 + 0.1, fy + 0.8, fz + t2 / 2], 'leg'),   # wrist
+                    cube([fx - pw / 2, fy + g, fz - pl + 1.0], [fx + pw / 2, fy + g + 1.6, fz + 1.4], 'leg'),             # palm
+                    cube([fx - pw / 2 + 0.5, fy + g + 1.6, fz - pl + 1.6], [fx + pw / 2 - 0.5, fy + g + 2.4, fz + 1.2], 'leg')]
+
+            def name(piece):
+                return f'{kind}_{piece}_{side}'
+            out.append({'name': name('upper'), 'parent': 'body', 'pivot': list(S), 'rotation': rot(r1), 'cubes': up})
+            out.append({'name': name('lower'), 'parent': name('upper'), 'pivot': list(e_rest),
+                        'rotation': rot(_mul(_tr(r1), r2)), 'cubes': low})
+            out.append({'name': name('foot'), 'parent': name('lower'), 'pivot': list(w_rest),
+                        'rotation': rot(_mul(_tr(r2), r3)), 'cubes': foot})
+            n = len(plan['toes'])
+            for i, (tl, fan) in enumerate(plan['toes']):
+                tx = fx + s * (-pw / 2 + 0.55 + i * (pw - 1.1) / (n - 1))
+                ty, tz = fy + g + 0.55, fz - pl + 1.2                # the knuckle, at the palm's front edge
+                toe = [cube([tx - 0.55, ty - 0.55, tz - tl * 0.55], [tx + 0.55, ty + 0.55, tz + 0.4], 'leg'),
+                       cube([tx - 0.42, ty - 0.45, tz - tl], [tx + 0.42, ty + 0.4, tz - tl * 0.5], 'leg')]
+                cy, cz = ty + 0.05, tz - tl + 0.1                    # the claw's root, at the toe's tip
+                claw = [cube([tx - 0.34, cy - 0.38, cz - CLAW_LEN * 0.6], [tx + 0.34, cy + 0.4, cz + 0.2], 'claw'),
+                        cube([tx - 0.24, cy - 0.42, cz - CLAW_LEN], [tx + 0.24, cy + 0.12, cz - CLAW_LEN * 0.55], 'clawtip')]
+                out.append({'name': name(f'toe{i + 1}'), 'parent': name('foot'), 'pivot': [tx, ty, tz],
+                            'rotation': rot(_mul(_ry(-s * fan), _rx(plan['raise']))), 'cubes': toe})
+                out.append({'name': name(f'claw{i + 1}'), 'parent': name(f'toe{i + 1}'), 'pivot': [tx, cy, cz],
+                            'rotation': rot(_rx(-CLAW_DROP)), 'cubes': claw})
     return out
 
 
@@ -225,7 +313,7 @@ def model():
 
 # --- plain colours (step 2: shape only) --------------------------------------------------------------------------------
 LOOKS = {'plain': {'name': 'Plain colours', 'note': 'shape only: charcoal skin, a cream throat and belly, yellow eyes, '
-                   'pale claws; the pattern comes in step 3'}}
+                   'dark claws with pale points; the pattern comes in step 3'}}
 GAME_LOOK = 'plain'
 NOTES = [
     ('Tail', 'a chain of 12 short pieces, each a rounded cross-section of overlapping boxes, each turned a few degrees '
@@ -235,9 +323,12 @@ NOTES = [
     ('Head', '14 pixels long. It narrows toward the snout in one-pixel slices, top and bottom edges bevelled, '
              'ending in a blunt rounded tip. The eyes sit far back under a brow ridge, the nostrils near the tip, '
              'and the lower jaw is its own piece for the clips later'),
-    ('Body and legs', 'blocky on purpose, as in your picture: a deep body with the belly hanging low, the legs out '
-                      'from the sides, then straight down, with flat feet, five toes and pale claws (the hind feet '
-                      'turned out more)'),
+    ('Body', 'blocky on purpose, as in your picture: a deep body with the belly hanging low'),
+    ('Legs', 'angled like your picture: the upper part slants out and down from the body, the elbow or knee sticking '
+             'out to the side; the fore arm slants down and forward to the hand, the shin down and back to the foot'),
+    ('Feet and claws', 'flat on the ground and turned out (the hind feet more), five long toes fanned out, each raised '
+                       'a little at the knuckle, with a long dark claw hooking down to the ground, pale at its point; '
+                       'every toe and claw is its own piece, so the walk can spread and grip them later'),
     ('Still to come', 'step 3, the paint (yellow spots, the banded tail, cream throat, one pixel size everywhere); '
                       'step 4, the animations (walk, tongue, swim)'),
 ]
@@ -250,7 +341,9 @@ def colour(part, face):
     if part == 'nostril':
         return (18, 16, 14)
     if part == 'claw':
-        return (226, 218, 196)
+        return (44, 40, 36)                  # dark horn, as in the picture
+    if part == 'clawtip':
+        return (204, 192, 166)               # worn pale at the point, so each claw shows against the toes
     if part in ('belly', 'throat') or face == 'down':
         return CREAM if face != 'up' else CHARCOAL
     return CHARCOAL
