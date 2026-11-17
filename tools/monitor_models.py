@@ -129,8 +129,8 @@ LEG_PLANS = {
     'arm': {'joints': ((4.0, 11.0, -21.5), (10.5, 7.5, -22.5), (10.8, 2.3, -25.0)),
             'thick': (4.0, 3.4), 'knob': 4.0, 'wrist': 4.2, 'turn': 18.0, 'palm': (4.6, 3.6),
             'toes': ((2.6, -34.0), (3.4, -14.0), (3.9, 2.0), (3.6, 18.0), (2.8, 38.0)), 'raise': 14.0},
-    'leg': {'joints': ((4.0, 10.5, -4.0), (11.0, 7.5, -6.0), (11.6, 2.3, -2.6)),
-            'thick': (4.6, 3.8), 'knob': 5.0, 'wrist': 5.0, 'turn': 38.0, 'palm': (5.0, 4.4),
+    'leg': {'joints': ((4.0, 10.5, -4.0), (11.2, 8.5, -6.0), (11.8, 3.0, -2.6)),
+            'thick': (4.6, 3.8), 'knob': 5.0, 'wrist': 4.0, 'hinge': True, 'turn': 38.0, 'palm': (5.0, 4.4),
             'toes': ((2.6, -30.0), (3.6, -12.0), (4.2, 4.0), (4.6, 20.0), (3.0, 46.0)), 'raise': 14.0},
 }
 CLAW_DROP = 23.0     # how far each claw bends down from its toe (degrees); the hook below curves it on to the ground
@@ -147,6 +147,20 @@ CLAW_SHAPE = (
 )
 
 
+def _cols(x, y, z):
+    """A turn matrix from where its three axes go."""
+    return [[x[i], y[i], z[i]] for i in range(3)]
+
+
+def _unit(v):
+    n = _len(v)
+    return [c / n for c in v]
+
+
+def _cross(a, b):
+    return [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]]
+
+
 def legs():
     """Each leg: an upper piece and a lower one aimed between its joints, a foot flat on the ground turned out, and five
     fanned toes, each raised a little at the knuckle with a long claw hooking down from its tip to the ground (a claw is
@@ -160,6 +174,16 @@ def legs():
             l1, l2 = _len(_sub(E, S)), _len(_sub(W, E))
             r1 = _aim((s, 0, 0), _sub(E, S))                        # the upper part's own axis is straight out
             r2 = _aim((0, -1, 0), _sub(W, E))                       # the lower part's is straight down
+            if plan.get('hinge'):
+                # The hind leg bends a long way at the knee, so the thigh and shin share one hinge line there (the line
+                # across both): their boxes then turn about it like a real knee instead of twisting against each other
+                # (the user's report: the hind leg looked broken). The ankle block then sits in the shin's line.
+                d1, d2 = _unit(_sub(E, S)), _unit(_sub(W, E))
+                h = _unit(_cross(d1, d2))
+                x1 = [s * c for c in d1]
+                r1 = _cols(x1, _cross(h, x1), h)
+                y2 = [-c for c in d2]
+                r2 = _cols(_cross(y2, h), y2, h)
             r3 = _ry(-s * plan['turn'])                              # the foot: flat, turned out
             e_rest = (S[0] + s * l1, S[1], S[2])                     # the joints before the turns are applied
             w_rest = (e_rest[0], e_rest[1] - l2, e_rest[2])
@@ -176,7 +200,10 @@ def legs():
             g = -W[1]                                                # the ground, below the wrist
             fx, fy, fz = w_rest
             wk = plan['wrist'] / 2
-            foot = [cube([fx - wk, fy - wk, fz - wk], [fx + wk, fy + wk, fz + wk], 'leg'),                  # wrist
+            ankle = cube([fx - wk, fy - wk, fz - wk], [fx + wk, fy + wk, fz + wk], 'leg')           # wrist or ankle
+            if plan.get('hinge'):
+                low.append(ankle)
+            foot = ([] if plan.get('hinge') else [ankle]) + [
                     cube([fx - pw / 2, fy + g, fz - pl + 1.0], [fx + pw / 2, fy + g + 1.6, fz + 1.4], 'leg'),             # palm
                     cube([fx - pw / 2 + 0.5, fy + g + 1.6, fz - pl + 1.6], [fx + pw / 2 - 0.5, fy + g + 2.4, fz + 1.2], 'leg')]
 
@@ -341,7 +368,8 @@ NOTES = [
     ('Legs', 'angled like your picture: the upper part slants out and down from the body, the elbow or knee sticking '
              'out to the side; the fore arm slants down and forward to the hand, the shin down and back to the foot'),
     ('Joints', 'each elbow, knee, wrist and ankle is one block a little bigger than the pieces meeting there, so no box '
-               'corner pokes out past another'),
+               'corner pokes out past another; the hind thigh and shin turn on one knee hinge so they never twist '
+               'against each other, and the ankle block sits in line with the shin, resting on the foot'),
     ('Feet and claws', 'flat on the ground and turned out (the hind feet more), five long toes fanned out, each raised '
                        'a little at the knuckle; each claw a hook in small steps, a dark sheath at the toe, thick and dark '
                        'at the root, thinner and browner as it curves down, a dull horn point touching the ground; every '
