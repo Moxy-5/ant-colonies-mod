@@ -88,6 +88,7 @@ and its loading speed, and touches the termite mound and tree surveys.
 1. **Measure** (done, above).
 2. **Looks in the model viewer:** an oxbow at its four ages beside a piece of river, a pan with its rings, at the
    measured sizes, with a hippo-sized and a crocodile-sized box for scale; the user picks.
+   **Built 2026-11-18:** `python tools/model_viewer.py oxbows` (`references/oxbow_viewer.html`); waiting for the user's look.
 3. **Oxbows in new land:** a structure (carved to the water's level, bed, banks, ages); today's oxbow feature removed;
    kept out of quiet savannas (`worldgen/BigSavanna` gate); trees and mounds kept off the water.
 4. **Pans in new land:** a structure; today's pan feature removed; same gate; mounds and trees kept off.

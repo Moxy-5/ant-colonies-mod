@@ -52,6 +52,10 @@ python tools/model_viewer.py planks [out.html]   (default references/plank_viewe
 River sand, pebbles and the crocodile's nest (M9 river life, 2026-11-16, sand_art.py; sand_viewer.template.html): three
 sand tones by how far inland, wet sand, ripples, crocodile slides, seven 3D pebble looks, the nest covered and open:
 python tools/model_viewer.py sand [out.html]   (default references/sand_viewer.html)
+Oxbows and pans rework (docs/plans/oxbows-and-pans.md step 2, 2026-11-18; oxbow_viewer.template.html): an oxbow lake by
+a river at its four ages and three river widths, every age along one river, a pan at four sizes, today's tiny ponds to
+compare, with a hippo, a crocodile and a player for scale:
+python tools/model_viewer.py oxbows [out.html]   (default references/oxbow_viewer.html)
 """
 import base64
 import json
@@ -492,6 +496,26 @@ def droppings_page(out):
     print("wrote", out)
 
 
+def oxbow_page(out):
+    """Oxbows and pans rework (docs/plans/oxbows-and-pans.md step 2): an oxbow lake by a savanna river at its four ages
+    (fresh, silting, old, scar) beside three river widths, every age along one river, a pan at four sizes on the open
+    savanna, and today's tiny ponds to compare."""
+    import zipfile
+    import algae_art
+    jar = Path.home() / ".gradle/caches/neoformruntime/artifacts/minecraft_1.21.1_client.jar"
+    z = zipfile.ZipFile(jar)
+    blocks = {n: uri(z.read(f"assets/minecraft/textures/block/{n}.png"))
+              for n in ("grass_block_top", "grass_block_side_overlay", "dirt", "coarse_dirt", "short_grass", "water_still")}
+    blocks["grass_colormap"] = uri(z.read("assets/minecraft/textures/colormap/grass.png"))
+    for n in ("silt", "wet_silt", "river_mud"):
+        blocks[n] = file_uri(n + ".png")
+    algae = [uri(png(r)) for r in algae_art.all_looks()["C"]["mat"]]
+    template = (Path(__file__).resolve().parent / "oxbow_viewer.template.html").read_text(encoding="utf-8")
+    out.parent.mkdir(parents=True, exist_ok=True)
+    out.write_text(template.replace("/*DATA*/null", json.dumps({"blocks": blocks, "algae": algae})), encoding="utf-8")
+    print("wrote", out)
+
+
 def sand_page(out):
     """River sand, pebbles and the crocodile's nest (M9 river life, sand_art.py): the three sand tones by how far
     inland (dry, wet, ripple, crocodile slide), the seven 3D pebble looks, the nest covered and dug open, on a sand bank
@@ -718,6 +742,9 @@ def main():
         return
     if len(sys.argv) > 1 and sys.argv[1] == "floodplain":
         floodplain_page(Path(sys.argv[2]) if len(sys.argv) > 2 else ROOT / "references/floodplain_viewer.html")
+        return
+    if len(sys.argv) > 1 and sys.argv[1] == "oxbows":
+        oxbow_page(Path(sys.argv[2]) if len(sys.argv) > 2 else ROOT / "references/oxbow_viewer.html")
         return
     if len(sys.argv) > 1 and sys.argv[1] == "sand":
         sand_page(Path(sys.argv[2]) if len(sys.argv) > 2 else ROOT / "references/sand_viewer.html")
