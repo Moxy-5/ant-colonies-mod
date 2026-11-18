@@ -189,6 +189,9 @@ public class CrocodileEntity extends PathfinderMob implements GeoEntity {
     /** Its eyes and head turned toward what caught its eye, eased (degrees off straight ahead, its right positive); drawn only (the model sets them). */
     public double eyeAim, headAim;
     public long eyeNanos;
+    /** Its blinks (2026-11-17, the user's ask), drawn only: when the last blink began and the next is due (nano time), and whether its eyes were under water last frame (it blinks as they go under). */
+    public long blinkStart, blinkNext;
+    public boolean eyesWereUnder;
     /** What its eyes are on (worked out where it is drawn: the client only), and how many ticks they stay on it at least. */
     @Nullable
     private Entity eyesOn;

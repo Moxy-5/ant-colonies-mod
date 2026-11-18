@@ -1382,6 +1382,60 @@ public class RiverLifeTests {
     }
 
     /**
+     * A Nile monitor watches a survival player (2026-11-17, the user's ask): 11 blocks off it stops and faces them; when
+     * they step back to 13.5 it trails them back toward 6; when they walk right up to its jaws it hisses, then lunges and
+     * bites ({@code bite_player}).
+     */
+    @GameTest(template = "arena", timeoutTicks = 900)
+    public static void aMonitorWatchesTrailsAndBitesAPlayer(GameTestHelper helper) {
+        for (int x = MX0; x <= MX1; x++) {
+            for (int z = MZ0; z <= MZ1; z++) {
+                helper.setBlock(new BlockPos(x, TOP, z), Blocks.STONE);
+                for (int y = TOP + 1; y <= TOP + 4; y++) {
+                    helper.setBlock(new BlockPos(x, y, z), Blocks.AIR);
+                }
+            }
+        }
+        com.antcolonies.savanna.animal.MonitorEntity monitor = helper.spawn(SavannaEntities.MONITOR.get(), new BlockPos(MX0 + 2, TOP + 1, MZ0 + 5));
+        monitor.setPersistenceRequired();
+        net.minecraft.nbt.CompoundTag tag = new net.minecraft.nbt.CompoundTag();
+        monitor.saveWithoutId(tag);
+        tag.putInt("SunIn", 99999);                      // no basking, no hunting: only the player
+        tag.putInt("HungryIn", 99999);
+        monitor.load(tag);
+        net.minecraft.server.level.ServerPlayer player = MatabeleDefenceTests.survivalPlayer(helper);
+        double z = monitor.getZ(), y = monitor.getY();
+        player.moveTo(monitor.getX() + 11.0, y, z, 90.0F, 0.0F);
+        int[] stage = {0}, at = {0};
+        double[] startX = {0};
+        boolean[] bit = {false};
+        helper.onEachTick(() -> {
+            long t = helper.getTick();
+            byte doing = monitor.doing();
+            bit[0] |= doing == com.antcolonies.savanna.animal.MonitorEntity.BITE_PLAYER;
+            if (stage[0] == 0 && doing == com.antcolonies.savanna.animal.MonitorEntity.WATCH) {
+                stage[0] = 1;
+                at[0] = (int) t;
+                startX[0] = monitor.getX();
+                player.moveTo(monitor.getX() + 13.5, y, z, 90.0F, 0.0F);
+            } else if (stage[0] == 0 && t > 300) {
+                helper.fail("the monitor never watched the player: doing " + doing + ", player " + String.format("%.1f", player.distanceTo(monitor)) + " away, survival " + net.minecraft.world.entity.EntitySelector.NO_CREATIVE_OR_SPECTATOR.test(player) + ", on ground " + monitor.onGround() + ", in water " + monitor.isInWater() + ", players " + helper.getLevel().players().size());
+            } else if (stage[0] == 1 && monitor.getX() - startX[0] > 3.0) {
+                stage[0] = 2;
+                at[0] = (int) t;
+                player.moveTo(monitor.getX() + 2.8, y, monitor.getZ(), 90.0F, 0.0F);
+            } else if (stage[0] == 1 && t - at[0] > 200) {
+                helper.fail("the monitor did not trail the player: moved " + String.format("%.1f", monitor.getX() - startX[0])
+                        + " blocks, doing " + doing + ", player " + String.format("%.1f", player.distanceTo(monitor)) + " away");
+            } else if (stage[0] == 2 && bit[0]) {
+                helper.succeed();
+            } else if (stage[0] == 2 && t - at[0] > 200) {
+                helper.fail("the monitor did not bite the player at its jaws: doing " + doing);
+            }
+        });
+    }
+
+    /**
      * Monitors spawn by themselves (the spawning check list): the world's own checks over a river at sea level pass in
      * the water within {@code BANK_REACH} blocks of a bank and nowhere farther out, a spawn is set down on the bank, none
      * comes within {@code SPAWN_APART} blocks of another, and the kind is in its own group's list in the savanna's waters.

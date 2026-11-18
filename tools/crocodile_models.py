@@ -73,6 +73,10 @@ def head(bones):
     # it slides along the iris, forward to look ahead, back to look behind
     box(bones, 'pupil_left', 3.04, 3.75, -12.05, 3.07, 4.75, -11.7, 'pupil')
     box(bones, 'pupil_right', -3.07, 3.75, -12.05, -3.04, 4.75, -11.7, 'pupil')
+    # each eyelid a bone of its own (2026-11-17, the user's ask, "crocodiles blinking"): a flap of skin over the whole
+    # eye, hinged under the brow; the game hides it while the eye is open and drops it down over the eye to blink
+    box(bones, 'lid_left', 3.0, 3.7, -12.55, 3.1, 4.75, -11.2, 'lid')
+    box(bones, 'lid_right', -3.1, 3.7, -12.55, -3.0, 4.75, -11.2, 'lid')
     # the lower jaw, hinged at the back of the skull
     box(bones, 'jaw', -1.65, 1.2, -20, 1.65, SPLIT, -18.5, 'jaw')
     box(bones, 'jaw', -1.9, 1.1, -18.5, 1.9, SPLIT, -15, 'jaw')
@@ -149,8 +153,10 @@ def legs(out):
                         'pivot': [s * elbow * V, 0.5 * V, (z - thick / 2) * V], 'cubes': parts['f']})
 
 
-def model():
-    names = ['head', 'jaw', 'pupil_left', 'pupil_right'] + list(dict.fromkeys(t[0] for t in TRUNK))
+def model(lids=False):
+    """The bones. With lids, the eyelid bones too (the game hides them while the eyes are open; the viewers show the
+    eyes open, so they leave them out)."""
+    names = ['head', 'jaw', 'pupil_left', 'pupil_right', 'lid_left', 'lid_right'] + list(dict.fromkeys(t[0] for t in TRUNK))
     bones = {name: [] for name in names}
     head(bones)
     trunk(bones)
@@ -160,13 +166,17 @@ def model():
            {'name': 'head', 'parent': 'neck', 'pivot': [0, SPLIT * V, HINGE * V], 'cubes': bones['head']},
            {'name': 'jaw', 'parent': 'head', 'pivot': [0, SPLIT * V, HINGE * V], 'cubes': bones['jaw']},
            {'name': 'pupil_left', 'parent': 'head', 'pivot': [3.05 * V, 4.25 * V, -11.875 * V], 'cubes': bones['pupil_left']},
-           {'name': 'pupil_right', 'parent': 'head', 'pivot': [-3.05 * V, 4.25 * V, -11.875 * V], 'cubes': bones['pupil_right']}]
+           {'name': 'pupil_right', 'parent': 'head', 'pivot': [-3.05 * V, 4.25 * V, -11.875 * V], 'cubes': bones['pupil_right']},
+           {'name': 'lid_left', 'parent': 'head', 'pivot': [3.05 * V, 4.75 * V, -11.875 * V], 'cubes': bones['lid_left']},
+           {'name': 'lid_right', 'parent': 'head', 'pivot': [-3.05 * V, 4.75 * V, -11.875 * V], 'cubes': bones['lid_right']}]
     done = {'neck'}
     for name, parent, z0, *_ in TRUNK:
         if name not in done:
             done.add(name)
             out.append({'name': name, 'parent': parent, 'pivot': [0, 3.0 * V, z0 * V], 'cubes': bones[name]})
     legs(out)
+    if not lids:
+        out = [b for b in out if not b['name'].startswith('lid_')]
     return out
 
 
@@ -224,6 +234,8 @@ def colour(part, look, x, y, z, face, rnd):
     if part == 'jaw':
         c = CREAM if face == 'down' else pick([CREAM, TAN, CREAM, mix(TAN, CREAM, 0.5)], r)
         return shade(c, grain)
+    if part == 'lid':                         # the eyelid: the head's olive-bronze skin, a shade darker at its rim
+        return shade(pick([OLIVE, mix(OLIVE, BRONZE, 0.5), LIGHT], r), (0.92 if face in ('down', 'north', 'south') else 1.0) * grain)
     if part in ('scute', 'brow'):
         c = pick([DARK, DARK, mix(DARK, OLIVE, 0.6), OLIVE], r)
         if face != 'up':
@@ -509,7 +521,7 @@ def write_game():
     import json
     import mod_paths
     root = mod_paths.assets('savanna')
-    game_bones, rows, w, h = paint(model())
+    game_bones, rows, w, h = paint(model(lids=True))
     files = {'textures/entity/crocodile.png': png(rows)}
     geo = {'format_version': '1.12.0', 'minecraft:geometry': [{
         'description': {'identifier': 'geometry.crocodile', 'texture_width': w, 'texture_height': h,

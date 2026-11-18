@@ -56,6 +56,7 @@ public class CrocodileModel extends DefaultedEntityGeoModel<CrocodileEntity> {
             }
         }
         double x = Mth.lerp(pt, croc.xo, croc.getX()), y = Mth.lerp(pt, croc.yo, croc.getY()), z = Mth.lerp(pt, croc.zo, croc.getZ());
+        lids(croc, camera.distanceToSqr(x, y, z) <= NEAR * NEAR);
         if (camera.distanceToSqr(x, y, z) > NEAR * NEAR) {
             return;
         }
@@ -84,6 +85,51 @@ public class CrocodileModel extends DefaultedEntityGeoModel<CrocodileEntity> {
             legs(croc, bend, scale, pt, x, y, z, yaw);
             eyes(croc, scale, pt, x, z, yaw);
         }
+    }
+
+    /** How long a blink takes: the lids coming down, held shut, going up (seconds), and the wait between blinks (seconds; my picks). */
+    private static final double LID_DOWN = 0.07, LID_SHUT = 0.08, LID_UP = 0.16, BLINK_GAP_MIN = 4.0, BLINK_GAP_MAX = 9.0;
+
+    /**
+     * The eyelids (2026-11-17, the user's ask, "crocodiles blinking"): every 4 to 9 seconds both lids drop down over the
+     * eyes from under the brow and go up again, and once more as its eyes go under the water (a crocodile shuts its eyes
+     * as it dives). Dead, they stay shut. The lid bones are shared by every crocodile drawn, so this sets them for each
+     * one, hidden while open.
+     */
+    private void lids(CrocodileEntity croc, boolean near) {
+        long now = System.nanoTime();
+        double shut;
+        if (croc.isDeadOrDying()) {
+            shut = 1.0;
+        } else if (!near) {
+            shut = 0.0;
+        } else {
+            boolean under = croc.isEyeInFluid(net.minecraft.tags.FluidTags.WATER);
+            if (under && !croc.eyesWereUnder) {
+                croc.blinkStart = now;
+            }
+            croc.eyesWereUnder = under;
+            if (croc.blinkNext == 0) {
+                croc.blinkNext = now + gap(croc);
+            } else if (now >= croc.blinkNext) {
+                croc.blinkStart = now;
+                croc.blinkNext = now + gap(croc);
+            }
+            double t = croc.blinkStart == 0 ? 99.0 : (now - croc.blinkStart) / 1.0E9;
+            shut = t < LID_DOWN ? t / LID_DOWN : t < LID_DOWN + LID_SHUT ? 1.0
+                    : t < LID_DOWN + LID_SHUT + LID_UP ? 1.0 - (t - LID_DOWN - LID_SHUT) / LID_UP : 0.0;
+        }
+        for (String name : new String[] {"lid_left", "lid_right"}) {
+            GeoBone lid = getAnimationProcessor().getBone(name);
+            if (lid != null) {
+                lid.setHidden(shut < 0.05);
+                lid.setScaleY((float) Math.max(0.05, shut));
+            }
+        }
+    }
+
+    private static long gap(CrocodileEntity croc) {
+        return (long) ((BLINK_GAP_MIN + (BLINK_GAP_MAX - BLINK_GAP_MIN) * croc.getRandom().nextDouble()) * 1.0E9);
     }
 
     /**

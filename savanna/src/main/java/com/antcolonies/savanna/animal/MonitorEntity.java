@@ -77,7 +77,7 @@ import software.bernie.geckolib.util.GeckoLibUtil;
  */
 public class MonitorEntity extends PathfinderMob implements GeoEntity {
     /** What it is doing, for the clips. */
-    public static final byte CALM = 0, BASK = 1, HISS = 2, BITE = 3, EAT = 4;
+    public static final byte CALM = 0, BASK = 1, HISS = 2, BITE = 3, EAT = 4, WATCH = 5, BITE_PLAYER = 6;
     private static final EntityDataAccessor<Byte> DATA_DOING = SynchedEntityData.defineId(MonitorEntity.class, EntityDataSerializers.BYTE);
 
     /**
@@ -113,12 +113,23 @@ public class MonitorEntity extends PathfinderMob implements GeoEntity {
     static final double WALK_CLIP_SPEED = 0.036 * MODEL_SCALE;
     /** Ticks into the bite clip its jaws snap shut (0.28 s). */
     static final int SNAP_TICK = 6, BITE_TICKS = 14, EAT_TICKS = 40;
+    /** The bite at a player ({@code bite_player}, 1.4 s): the jaws clamp shut at 0.42 s, then the head shake. */
+    static final int SNAP_PLAYER_TICK = 8, BITE_PLAYER_TICKS = 28;
+    /** A player's bite reaches a little farther: the lunge throws the head forward (blocks). */
+    static final double BITE_PLAYER_REACH = BITE_REACH + 0.4;
+    /** Curious (2026-11-17, the user's ask): a survival player within WATCH_REACH blocks is watched, and trailed back to TRAIL_NEAR if farther than TRAIL_FAR. */
+    static final double WATCH_REACH = 14.0, TRAIL_FAR = 8.0, TRAIL_NEAR = 6.0;
 
     int hungryIn;
     int sunIn;
     int startled;
     /** Ticks before it may hiss again. */
     int hissWait;
+    /** Ticks before it takes an interest in a player again. */
+    int watchWait;
+    /** Where its head and eyes are turned (degrees from its heading) and when last drawn: drawing only (MonitorModel). */
+    public double headAim, eyeAim;
+    public long lookNanos;
     /** Who just hurt it, to bite back if at its jaws. */
     @Nullable
     LivingEntity biteBack;
@@ -153,9 +164,10 @@ public class MonitorEntity extends PathfinderMob implements GeoEntity {
         goalSelector.addGoal(1, new ThreatGoal(this));
         goalSelector.addGoal(1, new AvoidEntityGoal<>(this, CrocodileEntity.class, 8.0F, 1.0, 1.5));
         goalSelector.addGoal(2, new HuntGoal(this));
-        goalSelector.addGoal(3, new BaskGoal(this));
+        goalSelector.addGoal(3, new WatchGoal(this));
+        goalSelector.addGoal(4, new BaskGoal(this));
         // never stopped by Minecraft's "nothing happened for 5 s and no player within 32" rule (docs/BUGS.md 216)
-        goalSelector.addGoal(4, new RandomStrollGoal(this, 0.8, 100, false));
+        goalSelector.addGoal(5, new RandomStrollGoal(this, 0.8, 100, false));
     }
 
     @Override
@@ -200,7 +212,7 @@ public class MonitorEntity extends PathfinderMob implements GeoEntity {
         startled = STARTLED_TICKS;
         scare = by;
         sunIn = Math.max(sunIn, 600 + random.nextInt(600));
-        if (doing() == BASK || doing() == HISS) {
+        if (doing() == BASK || doing() == HISS || doing() == WATCH) {
             setDoing(CALM);
         }
     }
@@ -241,6 +253,9 @@ public class MonitorEntity extends PathfinderMob implements GeoEntity {
         if (hissWait > 0) {
             hissWait--;
         }
+        if (watchWait > 0) {
+            watchWait--;
+        }
         if (startled > 0 && --startled == 0) {
             scare = null;
         }
@@ -271,9 +286,28 @@ public class MonitorEntity extends PathfinderMob implements GeoEntity {
 
     /** Bites: the clip, and the bite counts when the jaws shut (the goals call {@link #snapAt} then). */
     void biteAt(LivingEntity target) {
-        if (target.isAlive() && atJaws(target, BITE_REACH) && target.hurt(damageSources().mobAttack(this), BITE_DAMAGE)) {
+        double reach = target instanceof Player ? BITE_PLAYER_REACH : BITE_REACH;
+        if (target.isAlive() && atJaws(target, reach) && target.hurt(damageSources().mobAttack(this), BITE_DAMAGE)) {
             playSound(SoundEvents.FOX_BITE, 1.0F, 0.7F);
         }
+    }
+
+    /** The bite's clip for this target: a player gets the lunge, clamp and head shake ({@code bite_player}). */
+    static byte biteKind(Entity target) {
+        return target instanceof Player ? BITE_PLAYER : BITE;
+    }
+
+    static int biteTicks(byte kind) {
+        return kind == BITE_PLAYER ? BITE_PLAYER_TICKS : BITE_TICKS;
+    }
+
+    static int snapTick(byte kind) {
+        return kind == BITE_PLAYER ? SNAP_PLAYER_TICK : SNAP_TICK;
+    }
+
+    /** Biting, either kind. */
+    public boolean isBiting() {
+        return doing() == BITE || doing() == BITE_PLAYER;
     }
 
     /** It breathes in water as on land (NeoForge's socket). */
@@ -444,6 +478,7 @@ public class MonitorEntity extends PathfinderMob implements GeoEntity {
         private final MonitorEntity m;
         private BlockPos water;
         private int biting, left;
+        private byte kind = BITE;
 
         FleeGoal(MonitorEntity m) {
             this.m = m;
@@ -463,8 +498,9 @@ public class MonitorEntity extends PathfinderMob implements GeoEntity {
             LivingEntity foe = m.biteBack;
             m.biteBack = null;
             if (foe != null && foe.isAlive() && m.atJaws(foe, BITE_REACH + 0.5)) {
-                biting = BITE_TICKS;
-                m.setDoing(BITE);
+                kind = biteKind(foe);
+                biting = biteTicks(kind);
+                m.setDoing(kind);
                 m.getNavigation().stop();
                 m.biteTarget = foe;
             } else {
@@ -502,7 +538,7 @@ public class MonitorEntity extends PathfinderMob implements GeoEntity {
                 if (foe != null) {
                     m.face(foe.getX(), foe.getZ(), 30.0F);
                 }
-                if (BITE_TICKS - biting == SNAP_TICK && foe != null) {
+                if (biteTicks(kind) - biting == snapTick(kind) && foe != null) {
                     m.biteAt(foe);
                 }
                 if (--biting == 0) {
@@ -524,7 +560,7 @@ public class MonitorEntity extends PathfinderMob implements GeoEntity {
         @Override
         public void stop() {
             m.biteTarget = null;
-            if (m.doing() == BITE) {
+            if (m.isBiting()) {
                 m.setDoing(CALM);
             }
         }
@@ -591,7 +627,7 @@ public class MonitorEntity extends PathfinderMob implements GeoEntity {
         public void tick() {
             if (biting > 0) {
                 m.face(player.getX(), player.getZ(), 30.0F);
-                if (BITE_TICKS - biting == SNAP_TICK) {
+                if (BITE_PLAYER_TICKS - biting == SNAP_PLAYER_TICK) {
                     m.biteAt(player);
                 }
                 if (--biting == 0) {
@@ -604,9 +640,9 @@ public class MonitorEntity extends PathfinderMob implements GeoEntity {
             if (left % 30 == 0) {
                 m.playSound(SoundEvents.CAT_HISS, 1.0F, 0.55F);
             }
-            if (m.atJaws(player, BITE_REACH)) {          // right at its jaws: it bites
-                biting = BITE_TICKS;
-                m.setDoing(BITE);
+            if (m.atJaws(player, BITE_REACH)) {          // right at its jaws: it lunges, clamps on and shakes its head
+                biting = BITE_PLAYER_TICKS;
+                m.setDoing(BITE_PLAYER);
             } else if (left == 0) {
                 if (near() == player) {                  // still near after the hiss: it gives up and runs
                     m.startle(player);
@@ -626,7 +662,7 @@ public class MonitorEntity extends PathfinderMob implements GeoEntity {
         @Override
         public void stop() {
             m.hissWait = 100;
-            if (m.doing() == HISS || m.doing() == BITE) {
+            if (m.doing() == HISS || m.isBiting()) {
                 m.setDoing(CALM);
             }
         }
@@ -776,6 +812,95 @@ public class MonitorEntity extends PathfinderMob implements GeoEntity {
         }
     }
 
+    /**
+     * Curious (2026-11-17, the user's ask; fun first): a survival player on land within {@link #WATCH_REACH} blocks, but not
+     * near enough to hiss at, is watched: it stops, turns to face them and flicks its tongue, and if they walk off past
+     * {@link #TRAIL_FAR} it follows slowly back to about {@link #TRAIL_NEAR}, never out of its stretch of bank. After 15 to
+     * 30 s it loses interest for 20 to 50 s. Coming close still makes it hiss and bite ({@link ThreatGoal}); a basking
+     * monitor only turns its head (the model).
+     */
+    static class WatchGoal extends Goal {
+        private final MonitorEntity m;
+        private Player player;
+        private int left, repath;
+
+        WatchGoal(MonitorEntity m) {
+            this.m = m;
+            setFlags(EnumSet.of(Flag.MOVE, Flag.LOOK));
+        }
+
+        private boolean watchable(Player p) {
+            return p != null && p.isAlive() && EntitySelector.NO_CREATIVE_OR_SPECTATOR.test(p) && p.distanceTo(m) < WATCH_REACH;
+        }
+
+        @Override
+        public boolean canUse() {
+            if (m.startled > 0 || m.isInWater() || !m.onGround() || m.watchWait > 0 || m.doing() != CALM
+                    || m.getRandom().nextInt(10) != 0) {
+                return false;
+            }
+            player = null;
+            double best = Double.MAX_VALUE;
+            for (Player p : m.level().players()) {
+                double d = p.distanceTo(m);
+                if (watchable(p) && d > HISS_REACH + 1.5 && d < best) {
+                    best = d;
+                    player = p;
+                }
+            }
+            return player != null;
+        }
+
+        @Override
+        public void start() {
+            left = 300 + m.getRandom().nextInt(300);
+            repath = 0;
+            m.getNavigation().stop();
+            m.setDoing(WATCH);
+        }
+
+        @Override
+        public boolean canContinueToUse() {
+            return left > 0 && m.startled == 0 && !m.isInWater() && m.doing() == WATCH && watchable(player);
+        }
+
+        @Override
+        public void tick() {
+            left--;
+            double d = player.distanceTo(m);
+            if (d > TRAIL_FAR) {
+                if (--repath <= 0) {
+                    repath = 20;
+                    Vec3 to = player.position().add(m.position().subtract(player.position()).normalize().scale(TRAIL_NEAR));
+                    if (m.isWithinRestriction(BlockPos.containing(to))) {
+                        m.getNavigation().moveTo(to.x, to.y, to.z, 1.0);
+                    }
+                }
+            } else if (d < TRAIL_NEAR + 0.5) {
+                m.getNavigation().stop();
+            }
+            if (m.getNavigation().isDone()) {
+                m.face(player.getX(), player.getZ(), 6.0F);
+            }
+            m.getLookControl().setLookAt(player, 20.0F, 20.0F);
+        }
+
+        @Override
+        public boolean requiresUpdateEveryTick() {
+            return true;
+        }
+
+        @Override
+        public void stop() {
+            m.watchWait = 400 + m.getRandom().nextInt(600);
+            m.getNavigation().stop();
+            if (m.doing() == WATCH) {
+                m.setDoing(CALM);
+            }
+            player = null;
+        }
+    }
+
     /** By day, dry, on a bank under the sky: lies flat in the sun 1 to 3 minutes; at night on land it lies still till dawn. */
     static class BaskGoal extends Goal {
         private final MonitorEntity m;
@@ -839,6 +964,7 @@ public class MonitorEntity extends PathfinderMob implements GeoEntity {
     private static final RawAnimation BASK_CLIP = RawAnimation.begin().thenLoop("bask");
     private static final RawAnimation HISS_CLIP = RawAnimation.begin().thenLoop("hiss");
     private static final RawAnimation BITE_CLIP = RawAnimation.begin().thenPlayAndHold("bite");
+    private static final RawAnimation BITE_PLAYER_CLIP = RawAnimation.begin().thenPlayAndHold("bite_player");
     private static final RawAnimation EAT_CLIP = RawAnimation.begin().thenPlayAndHold("eat");
     private static final RawAnimation DEATH = RawAnimation.begin().thenPlayAndHold("death");
     private static final RawAnimation TONGUE = RawAnimation.begin().thenLoop("tongue");
@@ -867,6 +993,8 @@ public class MonitorEntity extends PathfinderMob implements GeoEntity {
                 return state.setAndContinue(HISS_CLIP);
             case BITE:
                 return state.setAndContinue(BITE_CLIP);
+            case BITE_PLAYER:
+                return state.setAndContinue(BITE_PLAYER_CLIP);
             case EAT:
                 return state.setAndContinue(EAT_CLIP);
             default:
@@ -885,10 +1013,10 @@ public class MonitorEntity extends PathfinderMob implements GeoEntity {
         return state.setAndContinue(IDLE);
     }
 
-    /** Walking on land it flicks its tongue now and then (two flicks in each of its own 5-second windows). */
+    /** Walking on land, or watching a player, it flicks its tongue now and then (two flicks in each of its own 5-second windows). */
     private PlayState tongue(AnimationState<MonitorEntity> state) {
         boolean window = (tickCount + getId() * 37) % 100 < 40;
-        if (window && walking() && doing() == CALM && !isInWater() && !isDeadOrDying()) {
+        if (window && (walking() && doing() == CALM || doing() == WATCH) && !isInWater() && !isDeadOrDying()) {
             return state.setAndContinue(TONGUE);
         }
         state.getController().forceAnimationReset();

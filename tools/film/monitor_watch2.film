@@ -1,0 +1,94 @@
+# Second take: trailing a player who steps back to 13 blocks, then the bite from just inside its reach.
+cmd time set noon
+cmd weather clear
+cmd kill @e[type=!player]
+cmd fill 6 -63 4 14 -61 30 minecraft:water
+lens 50
+wait 30
+cmd summon antcolonies:monitor 20.5 -60 17.0 {OwnSize:1.0f,HungryIn:99999,SunIn:99999,Rotation:[90f,0f]}
+camera 20.5 -60 27 180 8
+cmd gamemode survival
+wait 60
+camera 20.5 -60 30.5 180 8
+wait 2
+shot trail_00
+wait 10
+shot trail_01
+wait 10
+shot trail_02
+wait 10
+shot trail_03
+wait 10
+shot trail_04
+wait 10
+shot trail_05
+wait 10
+shot trail_06
+wait 10
+shot trail_07
+wait 10
+shot trail_08
+wait 10
+shot trail_09
+wait 10
+shot trail_10
+wait 10
+shot trail_11
+wait 10
+cmd kill @e[type=antcolonies:monitor]
+cmd gamemode spectator
+wait 5
+cmd summon antcolonies:monitor 20.5 -60 17.0 {OwnSize:1.0f,HungryIn:99999,SunIn:99999,Rotation:[90f,0f]}
+wait 20
+lens 70
+camera 17.6 -60 18.0 -109 22
+cmd gamemode survival
+wait 1
+shot bite_00
+wait 2
+shot bite_01
+wait 2
+shot bite_02
+wait 2
+shot bite_03
+wait 2
+shot bite_04
+wait 2
+shot bite_05
+wait 2
+shot bite_06
+wait 2
+shot bite_07
+wait 2
+shot bite_08
+wait 2
+shot bite_09
+wait 2
+shot bite_10
+wait 2
+shot bite_11
+wait 2
+shot bite_12
+wait 2
+shot bite_13
+wait 2
+shot bite_14
+wait 2
+shot bite_15
+wait 2
+shot bite_16
+wait 2
+shot bite_17
+wait 2
+shot bite_18
+wait 2
+shot bite_19
+wait 2
+shot bite_20
+wait 2
+shot bite_21
+wait 2
+shot bite_22
+wait 2
+shot bite_23
+wait 2

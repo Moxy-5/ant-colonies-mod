@@ -1,0 +1,127 @@
+# The monitor watches and bites a player (2026-11-17, the user's ask): the camera is a survival player; it turns its
+# head and eyes to them, faces them, trails them when they walk off, and bites when they come to its jaws.
+#   ./gradlew runFilm -PfilmScene=tools/film/monitor_watch.film      pictures in run-film/screenshots/monitor_watch/
+cmd time set noon
+cmd weather clear
+cmd kill @e[type=!player]
+cmd fill 6 -63 4 14 -61 30 minecraft:water
+lens 50
+wait 30
+cmd summon antcolonies:monitor 20.5 -60 17.0 {OwnSize:1.0f,HungryIn:99999,SunIn:99999,Rotation:[90f,0f]}
+camera 20.5 -60 29 180 8
+cmd gamemode survival
+wait 20
+shot face_00
+wait 10
+shot face_01
+wait 10
+shot face_02
+wait 10
+shot face_03
+wait 10
+shot face_04
+wait 10
+shot face_05
+wait 10
+shot face_06
+wait 10
+shot face_07
+wait 10
+camera 30 -60 24 135 10
+wait 2
+shot side_00
+wait 8
+shot side_01
+wait 8
+shot side_02
+wait 8
+shot side_03
+wait 8
+shot side_04
+wait 8
+shot side_05
+wait 8
+shot side_06
+wait 8
+shot side_07
+wait 8
+camera 34 -60 30 135 12
+wait 2
+shot trail_00
+wait 15
+shot trail_01
+wait 15
+shot trail_02
+wait 15
+shot trail_03
+wait 15
+shot trail_04
+wait 15
+shot trail_05
+wait 15
+shot trail_06
+wait 15
+shot trail_07
+wait 15
+shot trail_08
+wait 15
+shot trail_09
+wait 15
+lens 70
+# the bite: a fresh monitor, the player stepping right up to its jaws (from a little to one side, to see the lunge)
+cmd kill @e[type=antcolonies:monitor]
+cmd gamemode spectator
+wait 5
+cmd summon antcolonies:monitor 20.5 -60 17.0 {OwnSize:1.0f,HungryIn:99999,SunIn:99999,Rotation:[90f,0f]}
+wait 20
+camera 17.0 -60 18.3 -120 25
+cmd gamemode survival
+wait 1
+shot bite_00
+wait 2
+shot bite_01
+wait 2
+shot bite_02
+wait 2
+shot bite_03
+wait 2
+shot bite_04
+wait 2
+shot bite_05
+wait 2
+shot bite_06
+wait 2
+shot bite_07
+wait 2
+shot bite_08
+wait 2
+shot bite_09
+wait 2
+shot bite_10
+wait 2
+shot bite_11
+wait 2
+shot bite_12
+wait 2
+shot bite_13
+wait 2
+shot bite_14
+wait 2
+shot bite_15
+wait 2
+shot bite_16
+wait 2
+shot bite_17
+wait 2
+shot bite_18
+wait 2
+shot bite_19
+wait 2
+shot bite_20
+wait 2
+shot bite_21
+wait 2
+shot bite_22
+wait 2
+shot bite_23
+wait 2

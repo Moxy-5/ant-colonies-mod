@@ -1003,6 +1003,31 @@ def clips():
     out['bite'] = clip(0.7, bite, 28, loop=False)
     worst['bite'] = P.worst
 
+    # The bite at a player (2026-11-17, the user's ask; venom comes later): it draws back with the mouth opening, lunges
+    # up and forward with the jaws thrown wide, clamps on (shut at 0.42 s, the moment the game counts the bite), shakes
+    # its head hard from side to side three times with the jaws held shut, lets go and pulls back. Timings my picks.
+    P = _Poser()
+
+    def bite_player(t):
+        p = {}
+        go = _ramp(t, ((0, 0), (0.22, -0.45), (0.38, 1.0), (1.0, 0.85), (1.15, 0.6), (1.4, 0.0)))
+        shake = 0.0
+        if 0.42 < t < 1.0:
+            shake = math.sin(2 * math.pi * (t - 0.42) / 0.19) * math.sin(math.pi * (t - 0.42) / 0.58)
+        bm, bd = body(p, rx=-4.0 * go, ry=3.0 * shake, dy=1.1 * max(go, 0.0), dz=-3.5 * go)
+        stand(P, p, bm, bd)
+        neck_turn(p, 26.0 * shake, 0.0, extra=(-13.0 * go, -7.0 * go, -2.0 * go))
+        p['jaw'] = {'rotation': [round(_ramp(t, ((0, 0), (0.22, 18), (0.33, 38), (0.42, 3), (1.0, 3), (1.1, 22),
+                                                  (1.25, 10), (1.4, 0))), 3), 0.0, 0.0]}
+        for i in range(TAIL_SEGS):
+            lash = (2.0 + 5.0 * i / (TAIL_SEGS - 1)) * math.sin(2 * math.pi * t / 0.38 - 0.55 * i) * min(1.0, 2 * abs(go))
+            p[f'tail{i + 1}'] = {'rotation': [0.0, round(lash, 3), 0.0]}
+        for side in ('left', 'right'):
+            p[f'pupil_{side}'] = {'position': [0.0, 0.0, -0.25]}
+        return p
+    out['bite_player'] = clip(1.4, bite_player, 56, loop=False)
+    worst['bite_player'] = P.worst
+
     # Eating: the head held up, the jaws working the food (four chomps), then two gulps with the head tossed up and
     # forward to throw it down the throat.
     P = _Poser()
