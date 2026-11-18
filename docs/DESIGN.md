@@ -410,6 +410,27 @@ it.** If a decision changes, ask the user first, then update it here. The short 
 - **Waterfall: later, maybe, not planned.** It needs the river higher on one side than the other, so a redo of how rivers are made, and falling water is changing water, the dear kind. The cheapest form would be a rare one-off gorge structure, not a change to every river.
 - **When:** after the sand banks (my pick); planned with the user first.
 
+### River zones: who lives where along a river (the user, 2026-11-18, "those sound perfect"; planned in outline for the bull shark and the hippo, nothing built)
+- **Why (the user):** bull sharks and hippos are coming, and big animals swimming past each other all the time would look goofy, not like a serious ecosystem; they are territorial. Fun first (the animals rule), but these real habits make the game look better, so they are used.
+- **Real facts that shape it:** hippos eat grass, not meat, but are the most aggressive, territorial animal in the river (played like a top animal); real hippos and crocodiles **do** share pools, crocodiles basking beside a pod, the hippos putting up with grown crocodiles but charging or killing any near their calves. So the aim is not "never together" but **keeping their distance and reacting to each other**, never drifting past one another as if the other were not there.
+- **How real rivers keep them apart, four ways, all used:**
+  1. **Where along the river:** bull sharks come up from the sea into the wide, deep lower rivers and thin out inland; hippos want slow deep pools with gentle banks for their night grazing; crocodiles live nearly everywhere, most on the sand bars of wide slow rivers.
+  2. **Depth inside one stretch:** sharks keep to the deep middle channel and never leave the water; crocodiles to the edges and bars; hippos to their pool by day and the land by night.
+  3. **Time of day:** crocodiles bask by day, hippos graze on land at night, sharks hunt most at dusk and night.
+  4. **Territory:** a big bull hippo holds a stretch of river and his pod packs into one pool (one tight group, open water round it); crocodiles keep clear of a pod; bull sharks have no territory, they pass through alone.
+- **The zones, by how far inland (the wide rivers' bands, measured 2026-11-16; my picks):**
+  - **Coast** (water about 53 wide): bull sharks (rare), a few crocodiles.
+  - **Near inland** (about 66 wide): bull sharks thinning out, hippo pods in the pools, crocodiles on the bars.
+  - **Mid inland** (about 42 wide): hippo pods and crocodiles, the main mix.
+  - **Far inland** (about 23 wide): crocodiles only and fewer; later the tigerfish at the rapids.
+  - **Oxbows and pans:** hippo pods, young crocodiles. **Gap to fix when hippos are built:** today's oxbows are 1 deep (2 down the middle) and pans 1 deep, too shallow for a hippo to sink out of sight; some oxbows need deeper water (my pick: 3 deep down the middle in about 1 oxbow in 2).
+- **In Minecraft (my picks, to plan in detail with each animal):**
+  - **Own spawning groups** (the spawning check list in `CLAUDE.md`): hippos one pod at a time round a player; bull sharks at most 1 or 2, far apart (as the monitor's 80 blocks); crocodiles' spawns weighted the same way (common on the wide rivers, rare on the narrow far-inland ones, present on oxbows and pans; today they spawn on any savanna river).
+  - **Spawn zones** read from the "how far inland" the land already works out (the same number the rivers' width follows).
+  - **Simple reactions, not hard walls:** crocodiles steer clear of a hippo pod (as the monitor keeps off crocodiles); a hippo charges a crocodile that comes too close, harder with calves near; sharks stay in the deep channel. So a crocodile near hippos is seen sliding away from a charging bull.
+  - **Game balancer:** every new kind keeps the river's food chain from crashing (sharks eat catfish and tilapia, rarely; numbers per stretch checked in a soak).
+- **When:** with the bull shark and the hippo (M9 savanna life, both IDEA on the master list); the crocodile's zone weighting may come earlier (my offer, 2026-11-18).
+
 ### Mud pits and wallows (the user, 2026-11-17, from videos of pangolins and many other animals playing in mud; ideas for savanna life, M9, nothing planned in detail or built)
 - **Where they come from (the user's call):** mud pits spawn naturally in new land near water (river banks, the floodplain, pans and oxbows), and some are made after rain (a dip fills and turns to mud, then dries away). Animals do not dig or deepen them (the user removed that idea).
 - **Real things worth copying (from memory, not source-checked; animals are fun first):**
