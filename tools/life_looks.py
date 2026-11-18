@@ -139,11 +139,109 @@ def croc_hatchling_colour(orig):
     return colour
 
 
+def croc_teen_colour(orig):
+    """A teen: halfway from the hatchling to the grown crocodile, the yellow fading and the bands faint."""
+    hatch = croc_hatchling_colour(orig)
+
+    def colour(part, look, x, y, z, face, rnd):
+        a = orig(part, look, x, y, z, face, random.Random(0))
+        b = hatch(part, look, x, y, z, face, random.Random(0))
+        return tm.mix(a, b, 0.45)
+    return colour
+
+
+def croc_old_colour(orig):
+    """An old giant: the grown crocodile's own colours a very little lighter (the user, "very slightly"), a few pale
+    old scars across the back and sides, the teeth and claws yellowed, a duller eye."""
+    scars = ((3.0, -4.0, 0.8), (-5.0, 6.0, -0.6), (1.0, 18.0, 1.2), (-6.0, -13.0, 0.4), (4.0, 30.0, -1.0))
+
+    def colour(part, look, x, y, z, face, rnd):
+        c = orig(part, look, x, y, z, face, rnd)
+        if part in ('nostril', 'pupil', 'mouth', 'tongue'):
+            return c
+        if part in ('tooth', 'claw'):
+            return tm.mix(c, (206, 184, 128), 0.45)
+        if part == 'iris':
+            return tm.mix(c, (170, 150, 70), 0.3)
+        c = tm.mix(c, (176, 172, 140), 0.12)
+        if face != 'down':
+            for sx, sz, slope in scars:
+                if abs((x - sx) * slope - (z - sz)) < 0.7 and abs(z - sz) < 5.0:
+                    return tm.mix(c, (196, 186, 150), 0.5)
+        return c
+    return colour
+
+
+def scale_bones(bones, fx, fy, per_bone=None):
+    """Scale cubes and pivots sideways (from the middle line) and upward (from the ground), so the feet stay on the
+    ground and lengths stay; per_bone gives some bones their own (fx, fy)."""
+    for b in bones:
+        bx, by = (per_bone or {}).get(b['name'], (fx, fy))
+        if 'pivot' in b:
+            b['pivot'] = [b['pivot'][0] * bx, b['pivot'][1] * by, b['pivot'][2]]
+        for c in b.get('cubes', []):
+            (ox, oy, oz), (sx, sy, sz) = c['origin'], c['size']
+            c['origin'] = [ox * bx, oy * by, oz]
+            c['size'] = [sx * bx, sy * by, sz]
+
+
+HEAD_BONES = ('head', 'jaw', 'pupil_left', 'pupil_right')
+
+
+def croc_old_model():
+    """The old giant from the crocodile's own model: much bulkier than it is longer (a real giant grows bulk far more
+    than length), a broad heavy head with jowls, knobs on the snout and lumps over the eyes, big uneven teeth (some
+    broken, two gone), scutes worn low and blunt, the tail tip bitten off and a toe gone."""
+    bones = cr.model()
+    head = bone(bones, 'head')['cubes']
+    jaw = bone(bones, 'jaw')['cubes']
+    # knobs on the snout's top and lumps on the brows, jowls behind the gape (before the scaling, so they grow too)
+    for x, z in ((-2.2, -35.5), (1.6, -34.0), (-0.8, -32.4), (2.4, -31.0), (-2.8, -29.2), (0.6, -36.4)):
+        head.append(tm.cube([x - 0.6, 6.8, z - 0.6], [x + 0.6, 7.4, z + 0.6], 'skin'))
+    for sgn in (1, -1):
+        lo, hi = sorted((sgn * 2.6, sgn * 5.4))
+        head.append(tm.cube([lo, 11.0, -25.0], [hi, 11.6, -22.6], 'brow'))
+        lo, hi = sorted((sgn * 5.8, sgn * 6.6))
+        head.append(tm.cube([lo, 4.6, -24.0], [hi, 7.6, -20.2], 'skin'))
+    # bulk: the body 1.32 wider and 1.3 taller, the head and jaw broader still
+    scale_bones(bones, 1.32, 1.3, {'head': (1.5, 1.32), 'jaw': (1.5, 1.38), 'pupil_left': (1.5, 1.32),
+                                   'pupil_right': (1.5, 1.32)})
+    # worn scutes: lower and blunter
+    for b in bones:
+        for c in b.get('cubes', []):
+            if c['_part'] == 'scute':
+                c['size'][1] *= 0.55
+    # teeth: two gone, the rest longer and uneven, a few broken short
+    rng = random.Random(41)
+    for c in [c for c in head if c['_part'] == 'tooth'][4:6]:
+        head.remove(c)
+    for c in head + jaw:
+        if c['_part'] == 'tooth':
+            k = rng.uniform(1.1, 1.4) if rng.random() > 0.15 else 0.55
+            if c in head:                                   # upper teeth hang down: grow them downward
+                c['origin'][1] -= c['size'][1] * (k - 1)
+            c['size'][1] *= k
+    # the tail tip bitten off
+    t5 = bone(bones, 'tail5')
+    t5['cubes'] = [c for c in t5['cubes'] if c['origin'][2] < 64.0]
+    # a toe gone from the right front foot
+    foot = bone(bones, 'arm_foot_right')['cubes']
+    foot.remove([c for c in foot if c['_part'] == 'claw'][1])
+    return bones
+
+
 def crocodile_looks():
     base = cr.model()
     out = {'croc_adult': cr.paint(base, 'A')}
     with Recolour(cr, wrap=croc_hatchling_colour):
         out['croc_hatchling'] = cr.paint(base, 'A')
+    teen = copy.deepcopy(base)
+    # a teen: slimmer, so its head looks a little big for it
+    scale_bones(teen, 0.88, 0.9, {b: (1.0, 1.0) for b in HEAD_BONES})
+    with Recolour(cr, wrap=croc_teen_colour):
+        out['croc_teen'] = cr.paint(teen, 'A')
+    with Recolour(cr, wrap=croc_old_colour):
+        out['croc_old'] = cr.paint(croc_old_model(), 'A')
     return out
 
 
@@ -192,6 +290,10 @@ def monitor_looks():
     with Recolour(mm, consts={'SKIN': (24, 24, 22), 'SKIN_DARK': (14, 14, 12), 'YELLOW': (240, 210, 46),
                               'YELLOW_DULL': (214, 182, 40), 'PALE': (240, 222, 150)}):
         out['monitor_hatchling'] = mm.paint(base, mm.GAME_LOOK)
+    # a teen: halfway, the bright bands dulling toward the grown monitor's
+    with Recolour(mm, consts={'SKIN': (38, 38, 33), 'SKIN_DARK': (27, 26, 22), 'YELLOW': (228, 194, 52),
+                              'YELLOW_DULL': (184, 156, 52), 'PALE': (232, 214, 150)}):
+        out['monitor_teen'] = mm.paint(base, mm.GAME_LOOK)
     return out
 
 
@@ -382,9 +484,11 @@ def groups():
     g.append({'key': 'crocodile', 'name': 'Crocodile', 'x': 12,
               'note': 'The male is the big one (8 blocks), the female smaller (5.9): the same look, the size tells them '
                       'apart. Her nest on a sand bank, the covered heap she guards and the same nest dug open with its '
-                      'eggs; the banded hatchlings by the nest and in the crèche in the shallows.',
+                      'eggs; the banded hatchlings by the nest and in the crèche in the shallows; a teen (3.2) in '
+                      'the water, slim, its bands fading, its head a little big for it.',
               'items': [item('croc_adult', 8.0, -2.5, BANK, -7.5, 'Male, 8 blocks', 90),
                         item('croc_adult', 5.9, 2.5, BANK, -1.5, 'Female guarding, 5.9', 250),
+                        item('croc_teen', 3.2, -0.8, SURFACE - 0.2, 1.3, 'Teen, 3.2', 75),
                         *croc_babies],
               'props': crocodile_props(), 'labels': [('Nest, covered', -1.0, BANK + 0.15, -4.0),
                                                      ('Nest, dug open', 3.0, BANK + 0.2, -4.6)],
@@ -394,16 +498,29 @@ def groups():
     g.append({'key': 'monitor', 'name': 'Monitor', 'x': 38,
               'note': 'The male bigger with a heavier head (4.7 blocks), the female smaller (3.7). Her eggs in a living '
                       'termite mound, cut in half here: the pocket she dug at the foot, her tunnel sealed from outside '
-                      'by the termites with fresh mud. Bright yellow-banded hatchlings.',
+                      'by the termites with fresh mud. Bright yellow-banded hatchlings, and a teen (2.3) dulling toward '
+                      'the grown look.',
               'player': [-8.0, -5.5],
               'items': [item('monitor_adult', 4.7, -8.0, BANK, -2.0, 'Male, 4.7, heavier head', 90,
                              scale={'head': 1.18, 'neck2': 1.08}),
                         item('monitor_adult', 3.7, 6.5, BANK, -4.5, 'Female, 3.7', 200),
+                        item('monitor_teen', 2.3, 5.4, BANK, -2.6, 'Teen, 2.3', 215, scale={'head': 1.12}),
                         *mon_babies],
               'props': mound_props(), 'labels': [('Living termite mound, cut open', 0, 8.6, MOUND_Z - 0.5),
                                                  ('Eggs in the wall', 1.5, 1.45, MOUND_Z + 0.2),
                                                  ('Her tunnel, sealed with fresh mud', 3.0, 2.15, MOUND_Z + 0.4)],
               'cam': [[-0.5, 5.0, 11.0], [-0.5, 1.5, -3.0]]})
+    g.append({'key': 'oldcroc', 'name': 'Old giant', 'x': 70,
+              'note': 'The old giant, the river\'s boss, beside a grown male (8 blocks): 10.5 blocks long but about '
+                      '1.7 times as bulky, as real giants grow bulk far more than length. A broad heavy head with '
+                      'jowls, knobs on the snout and lumps over the eyes, big uneven yellowed teeth (some broken, two '
+                      'gone), scutes worn low, pale old scars, the tail tip bitten off and a toe missing; its colours '
+                      'a very little lighter. Very rare: only 1 or 2 in a whole river system.',
+              'player': [-6.8, 0.6],
+              'items': [item('croc_old', 10.5, 0.5, BANK, -2.2, 'Old giant, 10.5 blocks', 90),
+                        item('croc_adult', 8.0, 0.0, BANK, -7.5, 'Grown male, 8 blocks', 90)],
+              'props': [], 'labels': [],
+              'cam': [[-12.5, 6.5, 9.5], [-0.5, 0.6, -4.5]]})
     return g
 
 
