@@ -82,12 +82,19 @@ public class CatfishEntity extends AbstractFish implements GeoEntity {
     private static final EntityDataAccessor<Boolean> DATA_HELD_CUT = SynchedEntityData.defineId(CatfishEntity.class, EntityDataSerializers.BOOLEAN);
     /** A held tilapia drawn smaller than this (against a grown one) gets the tighter bite, the clip "catch_small". */
     static final float SMALL_PREY = 0.75F;
+    /** Up at the surface for a gulp of air ({@link AirGulpGoal}): the clip "gulp" is 1.5 s, plus the blend in. */
+    static final int GULP_TICKS = 30 + CLIP_LAG;
+    private static final EntityDataAccessor<Boolean> DATA_GULPING = SynchedEntityData.defineId(CatfishEntity.class, EntityDataSerializers.BOOLEAN);
+    /** How far the drawn body tips nose up for the gulp (degrees). */
+    static final float GULP_PITCH = 35;
 
     private final AnimatableInstanceCache cache = GeckoLibUtil.createInstanceCache(this);
     /** Its own length against the usual catfish. */
     private float ownSize = 1.0F;
     /** Ticks until it is hungry again ({@link HuntTilapiaGoal}). */
     int hungryIn;
+    /** Ticks until it comes up for air again ({@link AirGulpGoal}). */
+    int gulpIn;
     /** Ticks left of the strike being shown. */
     private int striking;
     /** Ticks left of the caught tilapia being held in the mouth. */
@@ -101,6 +108,7 @@ public class CatfishEntity extends AbstractFish implements GeoEntity {
     public CatfishEntity(EntityType<? extends CatfishEntity> type, Level level) {
         super(type, level);
         hungryIn = 600 + level.random.nextInt(2400);
+        gulpIn = 600 + level.random.nextInt(AirGulpGoal.EVERY_MORE);
     }
 
     public static AttributeSupplier.Builder createAttributes() {
@@ -111,6 +119,7 @@ public class CatfishEntity extends AbstractFish implements GeoEntity {
     protected void registerGoals() {
         super.registerGoals();
         goalSelector.addGoal(2, new HuntTilapiaGoal(this));
+        goalSelector.addGoal(1, new AirGulpGoal(this));     // above the fish's fleeing from players (2), so it is seen
     }
 
     @Override
@@ -121,6 +130,26 @@ public class CatfishEntity extends AbstractFish implements GeoEntity {
         builder.define(DATA_HELD_SIZE, 1.0F);
         builder.define(DATA_HELD_ON_RIGHT, false);
         builder.define(DATA_HELD_CUT, false);
+        builder.define(DATA_GULPING, false);
+    }
+
+    /** Whether it is up at the surface gulping air. */
+    public boolean isGulping() {
+        return entityData.get(DATA_GULPING);
+    }
+
+    void setGulping(boolean gulping) {
+        entityData.set(DATA_GULPING, gulping);
+    }
+
+    /** Whether it is out hunting a tilapia ({@link HuntTilapiaGoal}). */
+    boolean isHunting() {
+        return goalSelector.getAvailableGoals().stream().anyMatch(g -> g.isRunning() && g.getGoal() instanceof HuntTilapiaGoal);
+    }
+
+    /** For tests and films: comes up for air at the next chance. */
+    public void makeWantAir() {
+        gulpIn = 0;
     }
 
     /** Whether a caught tilapia is in its mouth. */
@@ -244,11 +273,17 @@ public class CatfishEntity extends AbstractFish implements GeoEntity {
             double dx = getX() - xo, dy = getY() - yo, dz = getZ() - zo;
             double flat = Math.sqrt(dx * dx + dz * dz);
             float want = isInWater() && flat + Math.abs(dy) > 0.01 ? (float) Mth.clamp(Math.toDegrees(Math.atan2(dy, flat)), -25, 25) : 0;
-            swimPitch += (want - swimPitch) * 0.1F;
+            if (isGulping()) {
+                want = GULP_PITCH;
+            }
+            swimPitch += (want - swimPitch) * (isGulping() ? 0.25F : 0.1F);
             return;
         }
         if (hungryIn > 0) {
             hungryIn--;
+        }
+        if (gulpIn > 0) {
+            gulpIn--;
         }
         if (striking > 0 && --striking == 0) {
             entityData.set(DATA_STRIKING, false);
@@ -290,6 +325,7 @@ public class CatfishEntity extends AbstractFish implements GeoEntity {
         super.addAdditionalSaveData(tag);
         tag.putFloat("OwnSize", ownSize);
         tag.putInt("HungryIn", hungryIn);
+        tag.putInt("GulpIn", gulpIn);
         if (holding > 0) {
             tag.putInt("HeldLook", heldLook());
             tag.putFloat("HeldSize", entityData.get(DATA_HELD_SIZE));
@@ -306,6 +342,9 @@ public class CatfishEntity extends AbstractFish implements GeoEntity {
             ownSize = Mth.clamp(tag.getFloat("OwnSize"), 0.5F, 1.5F);
             hungryIn = tag.getInt("HungryIn");
             refresh();
+        }
+        if (tag.contains("GulpIn")) {
+            gulpIn = tag.getInt("GulpIn");
         }
         if (tag.getInt("HeldTicks") > 0) {
             entityData.set(DATA_HELD_SIZE, tag.contains("HeldSize") ? Mth.clamp(tag.getFloat("HeldSize"), 0.2F, 1.5F) : 1.0F);
@@ -391,7 +430,8 @@ public class CatfishEntity extends AbstractFish implements GeoEntity {
     private static final RawAnimation CATCH_SMALL = RawAnimation.begin().thenPlayAndHold("catch_small");
     private static final RawAnimation BITE_OFF = RawAnimation.begin().thenPlayAndHold("bite_off");
     private static final RawAnimation BITE_OFF_SMALL = RawAnimation.begin().thenPlayAndHold("bite_off_small");
-    private static final RawAnimation FLOP =RawAnimation.begin().thenLoop("flop");
+    private static final RawAnimation GULP = RawAnimation.begin().thenPlayAndHold("gulp");
+    private static final RawAnimation FLOP = RawAnimation.begin().thenLoop("flop");
     private static final RawAnimation DEATH = RawAnimation.begin().thenPlayAndHold("death");
     /** The swim clip's beat is made for this speed (blocks a tick, about 1 a second); it plays faster or slower by it. */
     static final double SWIM_CLIP_SPEED = 0.05;
@@ -419,6 +459,10 @@ public class CatfishEntity extends AbstractFish implements GeoEntity {
         if (isStriking()) {
             player.setAnimationSpeed(1.0);
             return state.setAndContinue(STRIKE);
+        }
+        if (isGulping()) {
+            player.setAnimationSpeed(1.0);
+            return state.setAndContinue(GULP);
         }
         double dx = getX() - xo, dy = getY() - yo, dz = getZ() - zo;
         double speed = Math.sqrt(dx * dx + dy * dy + dz * dz);

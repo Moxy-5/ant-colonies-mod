@@ -5,6 +5,7 @@ import java.util.List;
 
 import javax.annotation.Nullable;
 
+import com.antcolonies.entity.body.GroundBend;
 import com.antcolonies.savanna.block.CrabShellBlock;
 import com.antcolonies.savanna.registry.SavannaItems;
 
@@ -130,6 +131,24 @@ public class MonitorEntity extends PathfinderMob implements GeoEntity {
     /** Where its head and eyes are turned (degrees from its heading) and when last drawn: drawing only (MonitorModel). */
     public double headAim, eyeAim;
     public long lookNanos;
+    /**
+     * The joints along its middle line the body bends at to lie on what is under it ({@link GroundBend}, as the
+     * crocodile's; model z, pixels, from {@code tools/monitor_models.py}; 2026-11-18, the user's ask: over a step or a
+     * bank's edge the body curves instead of tipping like a plank, most of all going into the river): the anchor at the
+     * body's middle, where chest and hips turn; forward through the chest, the two neck bones and the head to the snout
+     * tip; back through the hips and the twelve tail bones to the tail tip.
+     */
+    public static final double[] FRONT_JOINTS = {-13, -26, -30, -34, -47},
+            REAR_JOINTS = {-13, 0, 4, 8, 12, 16, 20, 24, 28, 32, 36, 40, 44, 48};
+    /** The bones of those pieces, in the same order: front chain, then rear chain. */
+    public static final String[] BENT_BONES = {"chest", "neck1", "neck2", "head", "hips", "tail1", "tail2", "tail3", "tail4",
+            "tail5", "tail6", "tail7", "tail8", "tail9", "tail10", "tail11", "tail12"};
+    /** Where each leg pair's feet stand along the body (model z, pixels): the forelegs, then the hind legs. */
+    public static final double[] LEG_PAIRS = {-25, -3};
+    /** How much each leg pair stands now (1) or is folded back along the body as it swims (0), eased; drawing only (MonitorModel). */
+    public final double[] legStand = {1, 1};
+    public long legNanos;
+    private final GroundBend bend = new GroundBend(FRONT_JOINTS, REAR_JOINTS);
     /** Who just hurt it, to bite back if at its jaws. */
     @Nullable
     LivingEntity biteBack;
@@ -359,6 +378,16 @@ public class MonitorEntity extends PathfinderMob implements GeoEntity {
 
     public float ownSize() {
         return ownSize;
+    }
+
+    /** Its body's lie on what is under it, worked out and drawn by its model only. */
+    public GroundBend bend() {
+        return bend;
+    }
+
+    /** How deep its feet hang under the surface when it rests afloat (blocks; the drawing's guess: the client does not know if it was startled). */
+    public double floatDepth() {
+        return AFLOAT * getScale();
     }
 
     private void refresh() {

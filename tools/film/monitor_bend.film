@@ -1,0 +1,77 @@
+# The Nile monitor's body lying on what is under it (2026-11-18, the user's ask): over a block step, at a level bank's
+# edge (the water flush with the grass, as on the mod's rivers), half out with its chest on the bank, and a live one
+# scared into the water (it runs and dives).
+#   ./gradlew runFilm -PfilmScene=tools/film/monitor_bend.film      pictures in run-film/screenshots/monitor_bend/
+cmd time set noon
+cmd weather clear
+cmd kill @e[type=!player]
+cmd fill 26 -63 12 40 -61 22 minecraft:water
+cmd fill 10 -60 -6 16 -60 6 minecraft:stone
+lens 40
+wait 40
+# (the camera's height is its feet: its eye is 1.62 higher)
+# a step down: its front off the step's edge, its back on top
+camera 16.0 -59.5 -8.0 0 6
+cmd summon antcolonies:monitor 16.2 -59.0 0.0 {NoAI:1b,OwnSize:1.0f,Rotation:[-90f,0f]}
+wait 30
+shot step_down_side
+cmd tp @e[type=antcolonies:monitor] 0 -120 0
+wait 10
+# a step up: its front up on the step, its back below
+cmd summon antcolonies:monitor 18.4 -60.0 0.0 {NoAI:1b,OwnSize:1.0f,Rotation:[90f,0f]}
+wait 30
+shot step_up_side
+cmd tp @e[type=antcolonies:monitor] 0 -120 0
+wait 10
+# the level bank: head out over the water, then in the water with its chest on the bank
+camera 25.0 -60.0 10.0 0 12
+cmd summon antcolonies:monitor 24.8 -60.0 17.0 {NoAI:1b,OwnSize:1.0f,Rotation:[-90f,0f]}
+wait 30
+shot bank_edge_side
+cmd tp @e[type=antcolonies:monitor] 0 -120 0
+wait 10
+cmd summon antcolonies:monitor 27.0 -60.5 17.0 {NoAI:1b,NoGravity:1b,OwnSize:1.0f,Rotation:[90f,0f]}
+wait 30
+shot bank_halfout_side
+camera 29.0 -58.0 13.5 40 30
+wait 5
+shot bank_halfout_above
+cmd tp @e[type=antcolonies:monitor] 0 -120 0
+wait 10
+# a live one scared into the water: it runs for it and dives
+camera 23.0 -60.0 10.0 0 10
+cmd summon antcolonies:monitor 20.0 -60.0 17.0 {OwnSize:1.0f,HungryIn:99999,SunIn:99999,Rotation:[-90f,0f]}
+wait 30
+cmd execute positioned 20 -60 17 run damage @e[type=antcolonies:monitor,limit=1,sort=nearest] 0.5 minecraft:cactus
+wait 2
+shot in_00
+wait 3
+shot in_01
+wait 3
+shot in_02
+wait 3
+shot in_03
+wait 3
+shot in_04
+wait 3
+shot in_05
+wait 3
+shot in_06
+wait 3
+shot in_07
+wait 3
+shot in_08
+wait 3
+shot in_09
+wait 3
+shot in_10
+wait 3
+shot in_11
+wait 3
+shot in_12
+wait 3
+shot in_13
+wait 3
+shot in_14
+wait 3
+shot in_15

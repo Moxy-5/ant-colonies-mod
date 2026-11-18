@@ -490,6 +490,43 @@ public class RiverLifeTests {
     }
 
     /**
+     * The catfish comes up for a gulp of air (2026-11-18, the user's ask): a catfish on the bottom of the pond's deep
+     * end that wants air swims up, gulps with its body at the surface (its snout out), and goes back down; then it waits
+     * 2 to 5 minutes before the next.
+     */
+    @GameTest(template = "arena", timeoutTicks = 500)
+    public static void aCatfishComesUpToGulpAir(GameTestHelper helper) {
+        buildPond(helper);
+        CatfishEntity catfish = helper.spawn(SavannaEntities.CATFISH.get(), new BlockPos(X1 - 1, SURFACE, Z0 + 3));
+        catfish.setPersistenceRequired();
+        catfish.makeWantAir();
+        double top = helper.absolutePos(new BlockPos(0, TOP, 0)).getY() + 8 / 9.0;
+        double[] gulpY = {Double.NaN};
+        boolean[] down = {false};
+        StringBuilder path = new StringBuilder();
+        int[] tick = {0};
+        helper.onEachTick(() -> {
+            if (tick[0]++ % 20 == 0) {
+                path.append(String.format(java.util.Locale.ROOT, " %.1f", top - catfish.getY()));
+            }
+            if (catfish.isGulping() && Double.isNaN(gulpY[0])) {
+                gulpY[0] = catfish.getY();
+            }
+            if (!Double.isNaN(gulpY[0]) && !catfish.isGulping() && catfish.getY() < gulpY[0] - 1.0) {
+                down[0] = true;
+            }
+        });
+        helper.succeedWhen(() -> {
+            helper.assertTrue(!Double.isNaN(gulpY[0]), "the catfish never gulped (depth under the surface every second:" + path + ")");
+            helper.assertTrue(top - gulpY[0] < 0.8, "the catfish gulped " + (top - gulpY[0]) + " under the surface");
+            helper.assertTrue(down[0], "the catfish did not go back down after its gulp (depths:" + path + ")");
+            helper.assertTrue(catfish.isAlive() && catfish.isInWater(), "the catfish is out of the water");
+            SavannaMod.LOGGER.info("[catfish] gulped air after {} ticks, {} under the surface; depths every second:{}",
+                    tick[0], String.format(java.util.Locale.ROOT, "%.2f", top - gulpY[0]), path);
+        });
+    }
+
+    /**
      * The school after a hunt (the user's report 2026-11-14: after the catfish struck at them a few times the tilapia
      * huddled in a corner and stopped moving). A school of 8 in the deep end, a hungry catfish; once it has eaten, every
      * tilapia left must still be swimming about: none stands still (moves less than half a block across) for 20 s. The fish are

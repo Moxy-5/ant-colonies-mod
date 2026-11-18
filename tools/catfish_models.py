@@ -393,6 +393,7 @@ CATCH_LEN = 2.6       # the catch clip (seconds; CatfishEntity.HOLD_TICKS is the
 # below; the times are the tilapia's, tm.FIGHT_*): the jaws shut through the fish at CUT_AT, done at CUT_LEN
 # (seconds; CatfishEntity.CUT_TICKS and CUT_AT_TICK the same in ticks).
 CUT_AT, CUT_LEN = tm.FIGHT_CUT, tm.FIGHT_LEN
+GULP_LEN = 1.5       # the gulp of air (seconds; CatfishEntity.GULP_TICKS is the same in ticks, plus its CLIP_LAG)
 
 
 def clips():
@@ -493,6 +494,28 @@ def clips():
             p[f'pectoral_{side}'] = {'rotation': [r[0], r[1] - s * 16 * max(f, lunge), r[2]]}
         return p
 
+    def gulp(t):
+        """Up for a gulp of air (the user, 2026-11-18, "catfish coming up to gulp air to breathe"; real air-breathing
+        catfish do this, fun first, my timings): the body is already tipped nose up by the game (CatfishEntity, about 35
+        degrees); the tail drives it up, the head lifts the last bit so the snout breaks the surface, the whiskers fan
+        out flat on the water, the mouth opens wide (0.35 to 0.55 s), hangs open a moment, snaps shut with a jerk of
+        the head (0.75 s), then the head drops and the tail turns it down again."""
+        ease = lambda x: (lambda v: v * v * (3 - 2 * v))(max(0.0, min(1.0, x)))
+        up = ease(t / 0.35) * (1 - ease((t - 0.95) / 0.45))           # the head lifted to the air
+        gape = ease((t - 0.35) / 0.2) * (1 - ease((t - 0.75) / 0.08))
+        snap = math.sin(math.pi * (t - 0.75) / 0.25) if 0.75 < t < 1.0 else 0.0
+        quiver = 0.08 * math.sin(2 * math.pi * t / 0.07) if 0.55 < t < 0.75 else 0.0
+        drive = 0.9 * (1 - ease((t - 0.3) / 0.3)) + 0.35 + 0.4 * ease((t - 0.9) / 0.3)
+        p = rot(barbel_sway(t, wave_pose(t, drive, 2 * math.pi / 0.6), 0.4))
+        p['jaw'] = {'rotation': [36 * (gape + quiver * gape), 0, 0]}
+        p['head'] = {'rotation': [-12 * up - 8 * gape + 7 * snap, p['head']['rotation'][1], 0]}
+        for name in BARBELS:          # fanned out flat on the surface while the head is up
+            r = p[name]['rotation']
+            side = 1 if name.endswith('left') else -1
+            p[name] = {'rotation': [r[0] - 14 * up, r[1] + side * 16 * up, r[2]]}
+        p['body'] = {'rotation': [0, 0, 0], 'position': [0, 1.2 * up - 0.6 * snap, 0]}
+        return p
+
     lie = 1.4
 
     def death(t):
@@ -510,7 +533,7 @@ def clips():
             'catch_small': tm.clip(CATCH_LEN, lambda t: catch(t, BITE_SMALL), 52, 'hold'),
             'bite_off': tm.clip(CUT_LEN, lambda t: catch(t, BITE, True), 84, 'hold'),
             'bite_off_small': tm.clip(CUT_LEN, lambda t: catch(t, BITE_SMALL, True), 84, 'hold'), 'flop': tm.clip(0.8, flop, 16),
-            'death': tm.clip(1.2, death, 12, 'hold')}
+            'gulp': tm.clip(GULP_LEN, gulp, 30, 'hold'), 'death': tm.clip(1.2, death, 12, 'hold')}
 
 
 def write_game():

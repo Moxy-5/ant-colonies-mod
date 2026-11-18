@@ -65,10 +65,17 @@ def rounded(cubes, cx, cy, rw, rh, z0, z1, part):
 def body():
     z0, z1 = BODY_Z
     y0, y1 = BODY_Y
-    c = [cube([-BODY_HW, y0, z0], [BODY_HW, y1 - 1.0, z1], 'skin'),
-         cube([-BODY_HW + 0.7, y1 - 1.0, z0], [BODY_HW - 0.7, y1, z1], 'skin'),        # the back's edge softened
-         cube([-4.5, 5.0, -21.0], [4.5, y0, -7.0], 'belly')]                          # the belly hanging low
-    return {'name': 'body', 'pivot': [0.0, TAIL_AXIS, -13.0], 'cubes': c}
+    zm = BODY_PIVOT[2]                                  # the body bends here: chest in front, hips behind
+
+    def half(a, b):
+        return [cube([-BODY_HW, y0, a], [BODY_HW, y1 - 1.0, b], 'skin'),
+                cube([-BODY_HW + 0.7, y1 - 1.0, a], [BODY_HW - 0.7, y1, b], 'skin'),   # the back's edge softened
+                cube([-4.5, 5.0, max(a, -21.0)], [4.5, y0, min(b, -7.0)], 'belly')]   # the belly hanging low
+    # The root holds nothing; chest and hips turn at its pivot (the game bends them to the ground under them, so the
+    # monitor curves over a bank's edge), with no rest turn, so every clip and the legs' reach work as before.
+    return [{'name': 'body', 'pivot': list(BODY_PIVOT), 'cubes': []},
+            {'name': 'chest', 'parent': 'body', 'pivot': list(BODY_PIVOT), 'cubes': half(z0, zm)},
+            {'name': 'hips', 'parent': 'body', 'pivot': list(BODY_PIVOT), 'cubes': half(zm, z1)}]
 
 
 # A little rotation maths for the legs: each leg piece is aimed from one joint to the next, so its rest rotation is
@@ -283,7 +290,7 @@ def legs():
 
             def name(piece):
                 return f'{kind}_{piece}_{side}'
-            out.append({'name': name('upper'), 'parent': 'body', 'pivot': list(S), 'rotation': rot(r1), 'cubes': up})
+            out.append({'name': name('upper'), 'parent': 'chest' if kind == 'arm' else 'hips', 'pivot': list(S), 'rotation': rot(r1), 'cubes': up})
             out.append({'name': name('lower'), 'parent': name('upper'), 'pivot': list(e_rest),
                         'rotation': rot(_mul(_tr(r1), r2)), 'cubes': low})
             out.append({'name': name('foot'), 'parent': name('lower'), 'pivot': list(w_rest),
@@ -324,7 +331,7 @@ def tail():
     for i in range(TAIL_SEGS):
         drop = tail_height(i / TAIL_SEGS) - tail_height((i + 1) / TAIL_SEGS)
         angles.append(math.degrees(math.asin(max(-0.9, min(0.9, drop / L)))))
-    out, prev, parent = [], 0.0, 'body'
+    out, prev, parent = [], 0.0, 'hips'
     for i in range(TAIL_SEGS):
         z0, z1 = BODY_Z[1] + i * L, BODY_Z[1] + (i + 1) * L
         t = (i + 0.5) / TAIL_SEGS
@@ -345,7 +352,7 @@ def neck():
     to exactly the head's back (narrower, centred higher), on two bones: the first turns up, the second a little more,
     so the neck sweeps up out of the shoulders. Each bone's first slice reaches back into the piece before it far enough
     to close the wedge its turn opens."""
-    out, parent = [], 'body'
+    out, parent = [], 'chest'
     L = NECK_LEN / NECK_SEGS
     hw, htop, hbot = head_shape(0.0)
     start = (4.5, 4.7, (BODY_Y[0] + BODY_Y[1]) / 2 - NECK_AXIS)           # half width, half height, centre (relative)
@@ -461,7 +468,7 @@ def head():
 
 
 def model():
-    return [body()] + neck() + head() + tail() + legs()
+    return body() + neck() + head() + tail() + legs()
 
 
 # --- the paint (step 3) --------------------------------------------------------------------------------------------
@@ -566,7 +573,7 @@ def colour(part, face, bone, x, y, z):
     gx, gy, gz = math.floor(x), math.floor(y), math.floor(z)
     ax = math.floor(abs(x))                               # pixels out from the middle line (both sides alike)
     spot = _h(ax, gy, gz, 1)
-    if bone == 'body':
+    if bone in ('body', 'chest', 'hips'):
         if part == 'belly' or face == 'down' or y < BODY_Y[0] + 0.6:
             return _grain(BAR if gz % 3 == 0 and _h(ax, gz, 5) < 0.8 else PALE, ax, gy, gz, 0.04)
         if y < BODY_Y[0] + 3.5:                           # low on the flank: a yellow net fading to the belly
