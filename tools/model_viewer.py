@@ -660,6 +660,16 @@ def crab_page(out):
     print("wrote", out)
 
 
+def life_page(out):
+    """The river animals' life cycle (docs/plans/animal-life-cycle.md, step 0): males and females, young, eggs, nests."""
+    import life_looks
+    data = life_looks.data(uri, png, file_uri)
+    template = (Path(__file__).resolve().parent / "life_viewer.template.html").read_text(encoding="utf-8")
+    out.parent.mkdir(parents=True, exist_ok=True)
+    out.write_text(template.replace("/*DATA*/null", json.dumps(data)), encoding="utf-8")
+    print("wrote", out)
+
+
 def snail_page(out):
     """The river snail (M9 river life, snail_models.py): four cute models to pick from (the user, 2026-11-16, looks
     first, no realism), side by side on a silt bank, crawling, grazing or hiding in their shells, a crab, a tilapia, a
@@ -751,6 +761,9 @@ def main():
         return
     if len(sys.argv) > 1 and sys.argv[1] == "remains":
         remains_page(Path(sys.argv[2]) if len(sys.argv) > 2 else ROOT / "references/remains_viewer.html")
+        return
+    if len(sys.argv) > 1 and sys.argv[1] == "life":
+        life_page(Path(sys.argv[2]) if len(sys.argv) > 2 else ROOT / "references/life_viewer.html")
         return
     if len(sys.argv) > 1 and sys.argv[1] == "snail":
         snail_page(Path(sys.argv[2]) if len(sys.argv) > 2 else ROOT / "references/snail_viewer.html")

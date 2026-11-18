@@ -1,0 +1,305 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>River Life Cycle</title>
+<style>
+  :root { --bg: #f1efe8; --panel: #fdfcf8; --ink: #2a2a22; --muted: #6a675a; --line: #d9d4c4; --accent: #6b7a2f; }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) { --bg: #1a1a16; --panel: #23231e; --ink: #ecebe2; --muted: #a5a291; --line: #3a3930; --accent: #b6c86a; }
+  }
+  :root[data-theme="dark"] { --bg: #1a1a16; --panel: #23231e; --ink: #ecebe2; --muted: #a5a291; --line: #3a3930; --accent: #b6c86a; }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font: 15px/1.45 system-ui, sans-serif; }
+  header { padding: 14px 16px 6px; }
+  h1 { margin: 0 0 4px; font-size: 20px; }
+  header p { margin: 0; color: var(--muted); max-width: 82ch; }
+  #wrap { position: relative; height: 64vh; min-height: 340px; margin: 10px 16px; border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
+  canvas { display: block; width: 100%; height: 100%; }
+  #labels { position: absolute; inset: 0; pointer-events: none; overflow: hidden; }
+  .tag { position: absolute; transform: translate(-50%, -100%); background: var(--panel); border: 1px solid var(--line); border-radius: 6px;
+         padding: 1px 6px; font-size: 12px; font-weight: 600; white-space: nowrap; }
+  .controls { display: flex; flex-wrap: wrap; gap: 8px 10px; padding: 0 16px 8px; align-items: center; }
+  .controls span.k { color: var(--muted); font-size: 13px; margin-right: 2px; }
+  button { font: inherit; padding: 6px 12px; border-radius: 8px; border: 1px solid var(--line); background: var(--panel); color: var(--ink); cursor: pointer; }
+  button.on { border-color: var(--accent); color: var(--accent); font-weight: 600; }
+  #note { margin: 4px 16px 6px; max-width: 82ch; }
+  ul { margin: 6px 16px 24px; padding-left: 22px; max-width: 82ch; color: var(--muted); font-size: 14px; }
+  li { margin: 3px 0; }
+</style>
+</head>
+<body>
+<header>
+  <h1>River life cycle viewer</h1>
+  <p>Each river animal's male and female side by side, its young, its eggs and its nest, on a savanna riverbank (land, a shallow shelf of water,
+     then the deep bed). Pick an animal below. Everything is made from the game's own models with small changes; the poses are still,
+     the courtship and care moves come with each animal's step. A player and a block stand by for scale. Drag to turn, scroll or pinch to zoom,
+     right-drag to slide.</p>
+</header>
+<div id="wrap"><canvas id="c"></canvas><div id="labels"></div></div>
+<div class="controls" id="animals"><span class="k">Animal</span></div>
+<div class="controls" id="cams"><span class="k">View</span></div>
+<p id="note"></p>
+<ul id="list"></ul>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+<script>
+const DATA = /*DATA*/null;
+const canvas = document.getElementById('c');
+const wrap = document.getElementById('wrap');
+const renderer = new THREE.WebGLRenderer({canvas, antialias: true, preserveDrawingBuffer: true});
+renderer.setPixelRatio(window.devicePixelRatio);
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+const scene = new THREE.Scene();
+const SKY = new THREE.Color('#a9cde0');
+scene.background = SKY;
+scene.fog = new THREE.Fog(SKY, 40, 110);
+const camera = new THREE.PerspectiveCamera(35, 1, 0.01, 400);
+const controls = new THREE.OrbitControls(camera, canvas);
+scene.add(new THREE.HemisphereLight('#fff7e6', '#7a6a48', 0.75));
+const sun = new THREE.DirectionalLight('#fff4d8', 0.75);
+sun.castShadow = true;
+sun.shadow.mapSize.set(2048, 2048);
+sun.shadow.bias = -0.0004;
+Object.assign(sun.shadow.camera, {left: -14, right: 14, top: 14, bottom: -14, near: 0.5, far: 80});
+scene.add(sun); scene.add(sun.target);
+
+function deg(v) { return v * Math.PI / 180; }
+function setRot(obj, r) { obj.rotation.set(deg(-r[0]), deg(r[1]), deg(-r[2]), 'ZYX'); }
+function loadTexture(uri, rx, ry) {
+  const t = new THREE.TextureLoader().load(uri);
+  t.magFilter = THREE.NearestFilter;
+  t.minFilter = THREE.NearestFilter;
+  if (rx) { t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(rx, ry || rx); }
+  return t;
+}
+
+// The bank: silt land for z below 0, a shallow shelf of water out to z = shelfTo, then the deep bed.
+const S = DATA.scene, W = 200;
+function flat(tex, w, d, x, y, z, colour) {
+  const m = new THREE.Mesh(new THREE.PlaneGeometry(w, d),
+    new THREE.MeshLambertMaterial({map: loadTexture(DATA.blocks[tex], w, d), color: colour || '#ffffff'}));
+  m.rotation.x = -Math.PI / 2; m.position.set(x, y, z); m.receiveShadow = true; scene.add(m); return m;
+}
+function wall(tex, w, h, x, y, z, colour) {
+  const m = new THREE.Mesh(new THREE.PlaneGeometry(w, h),
+    new THREE.MeshLambertMaterial({map: loadTexture(DATA.blocks[tex], w, Math.max(1, Math.round(h))), color: colour || '#ffffff'}));
+  m.position.set(x, y, z); scene.add(m); return m;
+}
+flat('silt', W, 40, 0, S.bank, -20);
+wall('wet_silt', W, S.bank - S.shelf, 0, (S.bank + S.shelf) / 2, 0);
+flat('silt', W, S.shelfTo, 0, S.shelf, S.shelfTo / 2, '#c8c0a8');
+wall('wet_silt', W, S.shelf - S.bed, 0, (S.shelf + S.bed) / 2, S.shelfTo, '#b0a890');
+flat('silt', W, 40, 0, S.bed, S.shelfTo + 20, '#a8a08a');
+const water = new THREE.Mesh(new THREE.PlaneGeometry(W, 44), new THREE.MeshLambertMaterial({color: '#6f8a5a', transparent: true, opacity: 0.5, side: THREE.DoubleSide, depthWrite: false}));
+water.rotation.x = -Math.PI / 2; water.position.set(0, S.surface, 22); water.renderOrder = 2; scene.add(water);
+
+// --- models ------------------------------------------------------------------------------------------------------------
+const FACES = ['east', 'west', 'up', 'down', 'south', 'north'];
+function boxGeometry(c, tw, th) {
+  const g = new THREE.BoxGeometry(Math.max(c.size[0], 0.02), Math.max(c.size[1], 0.02), Math.max(c.size[2], 0.02));
+  const uv = g.attributes.uv;
+  FACES.forEach((f, i) => {
+    const face = c.uv && c.uv[f];
+    if (!face) return;
+    const [u0, v0] = face.uv, [w, h] = face.uv_size;
+    for (let k = 0; k < 4; k++) {
+      const j = i * 4 + k;
+      uv.setXY(j, (u0 + uv.getX(j) * w) / tw, 1 - (v0 + (1 - uv.getY(j)) * h) / th);
+    }
+  });
+  uv.needsUpdate = true;
+  return g;
+}
+const mats = {};
+// One animal: the model drawn at `size` blocks (its length, or its width for the crab), turned `yaw` degrees,
+// some bones scaled (a heavier head), maybe rolled over to show its belly.
+function build(it) {
+  const look = DATA.models[it.model];
+  const mat = mats[it.model] || (mats[it.model] = new THREE.MeshLambertMaterial({map: loadTexture(look.texture), alphaTest: 0.5}));
+  const root = new THREE.Group(), groups = {}, byName = {};
+  look.bones.forEach(b => byName[b.name] = b);
+  look.bones.forEach(b => {
+    const g = new THREE.Group();
+    const p = b.parent ? byName[b.parent].pivot : [0, 0, 0];
+    g.position.set(b.pivot[0] - p[0], b.pivot[1] - p[1], b.pivot[2] - p[2]);
+    if (b.rotation) setRot(g, b.rotation);
+    const s = it.scale && it.scale[b.name];
+    if (s) Array.isArray(s) ? g.scale.set(...s) : g.scale.setScalar(s);
+    groups[b.name] = g;
+    (b.cubes || []).forEach(c => {
+      const mesh = new THREE.Mesh(boxGeometry(c, look.w, look.h), mat);
+      mesh.castShadow = true; mesh.receiveShadow = true;
+      mesh.position.set(c.origin[0] + c.size[0] / 2 - b.pivot[0], c.origin[1] + c.size[1] / 2 - b.pivot[1], c.origin[2] + c.size[2] / 2 - b.pivot[2]);
+      g.add(mesh);
+    });
+  });
+  look.bones.forEach(b => (b.parent ? groups[b.parent] : root).add(groups[b.name]));
+  root.scale.setScalar(1 / 16);
+  let bounds = new THREE.Box3().setFromObject(root);
+  const along = it.measure === 'width' ? bounds.max.x - bounds.min.x : bounds.max.z - bounds.min.z;
+  const k = it.size / along;
+  root.scale.setScalar(k / 16);
+  bounds = new THREE.Box3().setFromObject(root);
+  const c = bounds.getCenter(new THREE.Vector3());
+  const height = bounds.max.y - bounds.min.y;
+  root.position.set(-c.x, it.centre === 'ground' ? -bounds.min.y : -c.y, -c.z);
+  const lift = new THREE.Group(); lift.add(root);
+  let shown = it.centre === 'ground' ? height : height / 2;
+  if (it.tilt) {                      // stood on its back edge, belly toward the camera
+    lift.rotation.x = deg(it.tilt);
+    const tilted = new THREE.Box3().setFromObject(lift);
+    lift.position.y = -tilted.min.y;
+    shown = tilted.max.y - tilted.min.y;
+  }
+  const yaw = new THREE.Group(); yaw.add(lift);
+  yaw.rotation.y = deg(it.yaw || 0);
+  yaw.userData.height = shown;
+  return yaw;
+}
+
+// Props: boxes (eggs, rims, nest heaps), flat patches, and whole blocks (the termite mound).
+const blockMats = {
+  mound: ['termite_mound_dry_side', 'termite_mound_dry_side', 'termite_mound_dry_top', 'termite_mound_dry_top',
+          'termite_mound_dry_side', 'termite_mound_dry_side'].map(n => new THREE.MeshLambertMaterial({map: loadTexture(DATA.blocks[n])})),
+  mud: new THREE.MeshLambertMaterial({map: loadTexture(DATA.blocks.mud_crust_fresh_0)}),
+};
+const texMats = {};
+function texMat(name) { return texMats[name] || (texMats[name] = new THREE.MeshLambertMaterial({map: loadTexture(DATA.blocks[name]), alphaTest: 0.3, transparent: name.startsWith('algae')})); }
+const unitBox = new THREE.BoxGeometry(1, 1, 1);
+function prop(p) {
+  let m;
+  if (p.block) {
+    m = new THREE.Mesh(unitBox, blockMats[p.block]);
+    m.position.set(p.x, p.y + 0.5, p.z);
+  } else if (p.plane) {
+    // A texture tiles once a block, as the game draws it.
+    const mat = p.tex ? (p.w > 1 || p.d > 1
+        ? new THREE.MeshLambertMaterial({map: loadTexture(DATA.blocks[p.tex], p.w, p.d), alphaTest: 0.3})
+        : texMat(p.tex)) : new THREE.MeshLambertMaterial({color: p.c});
+    m = new THREE.Mesh(new THREE.PlaneGeometry(p.w, p.d), mat);
+    m.rotation.x = -Math.PI / 2; m.position.set(p.x, p.y, p.z); m.receiveShadow = true;
+    return m;
+  } else {
+    const mat = p.tex ? texMat(p.tex) : new THREE.MeshLambertMaterial({color: p.c, transparent: !!p.opacity, opacity: p.opacity || 1});
+    m = new THREE.Mesh(new THREE.BoxGeometry(p.w, p.h, p.d), mat);
+    m.position.set(p.x, p.y + p.h / 2, p.z);
+    m.rotation.y = deg(p.turn || 0);
+  }
+  m.castShadow = true; m.receiveShadow = true;
+  return m;
+}
+
+const tags = [];
+function tag(text, x, y, z, group) {
+  const el = document.createElement('div');
+  el.className = 'tag'; el.textContent = text;
+  document.getElementById('labels').appendChild(el);
+  tags.push({el, pos: new THREE.Vector3(x, y, z), group});
+}
+
+// A player and a block for scale (moved to the shown animal).
+const player = new THREE.Group();
+[[0.5, 0.75, 0.25, 0.375, '#3b4a8f'], [0.5, 0.75, 0.25, 1.125, '#2f9c9c'], [0.5, 0.5, 0.5, 1.55, '#b98a68']].forEach(([w, h, d, y, col]) => {
+  const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), new THREE.MeshLambertMaterial({color: col}));
+  m.position.y = y; m.castShadow = true; player.add(m);
+});
+scene.add(player);
+const block = new THREE.Mesh(unitBox, new THREE.MeshLambertMaterial({map: loadTexture(DATA.blocks.wet_silt)}));
+block.castShadow = true; scene.add(block);
+const scaleTags = [];
+
+const shown = {};
+DATA.groups.forEach(g => {
+  const holder = new THREE.Group(); holder.position.x = g.x; scene.add(holder);
+  g.items.forEach(it => {
+    const obj = build(it);
+    obj.position.set(it.x, it.y, it.z);
+    holder.add(obj);
+    if (it.label) tag(it.label, g.x + it.x, it.y + obj.userData.height + 0.06, it.z, g.key);
+  });
+  g.props.forEach(p => holder.add(prop(p)));
+  (g.labels || []).forEach(([text, x, y, z]) => tag(text, g.x + x, y, z, g.key));
+  shown[g.key] = holder;
+});
+tag('Player, 1.8 blocks', 0, 1.9, 0, 'scale');
+tag('1 block', 0, 1.05, 0, 'scale');
+
+const settings = {animal: DATA.groups[0].key, cam: 'close'};
+location.hash.slice(1).split('&').filter(Boolean).forEach(kv => {
+  const [k, v] = kv.split('=').map(decodeURIComponent);
+  settings[k] = v;
+});
+function group() { return DATA.groups.find(g => g.key === settings.animal) || DATA.groups[0]; }
+const CAMS = {
+  close: g => [g.cam[0].map((v, i) => v + (i === 0 ? g.x : 0)), g.cam[1].map((v, i) => v + (i === 0 ? g.x : 0))],
+  'from above': g => [[g.x + g.cam[1][0], g.cam[1][1] + Math.max(3, g.cam[0][1] * 2.2), g.cam[1][2] + 0.6], [g.x + g.cam[1][0], g.cam[1][1], g.cam[1][2]]],
+  'from the water': g => [[g.x + g.cam[1][0] - 0.4 * (g.cam[0][2] - g.cam[1][2]), S.surface + 0.15, g.cam[1][2] + 1.2 * (g.cam[0][2] - g.cam[1][2])], [g.x + g.cam[1][0], g.cam[1][1], g.cam[1][2]]],
+  overview: g => [[g.x, 8, 16], [g.x, 0, -2]],
+};
+const animalBox = document.getElementById('animals'), camBox = document.getElementById('cams');
+function show() {
+  const g = group();
+  Object.entries(shown).forEach(([k, h]) => h.visible = k === g.key);
+  const ps = g.player || [-3.5, -2.5];
+  player.position.set(g.x + ps[0], S.bank, ps[1]);
+  block.position.set(g.x + ps[0] - 1.3, S.bank + 0.5, ps[1]);
+  tags.filter(t => t.group === 'scale').forEach((t, i) => t.pos.set(i ? block.position.x : player.position.x, i ? 1.05 : 1.9, ps[1]));
+  sun.position.set(g.x + 8, 20, 10); sun.target.position.set(g.x, 0, -2);
+  document.getElementById('note').textContent = g.note;
+  const list = document.getElementById('list'); list.innerHTML = '';
+  [...new Set(g.items.map(it => it.model))].forEach(key => {
+    const li = document.createElement('li');
+    li.textContent = key.replace(/_/g, ' ') + ': ' + DATA.models[key].boxes + ' boxes';
+    list.appendChild(li);
+  });
+  [...animalBox.querySelectorAll('button')].forEach(b => b.classList.toggle('on', b.dataset.key === g.key));
+  setCam(settings.cam);
+}
+function setCam(name) {
+  settings.cam = CAMS[name] ? name : 'close';
+  const [pos, target] = CAMS[settings.cam](group());
+  camera.position.set(...pos); controls.target.set(...target); controls.update();
+  [...camBox.querySelectorAll('button')].forEach(b => b.classList.toggle('on', b.textContent === settings.cam));
+}
+DATA.groups.forEach(g => {
+  const b = document.createElement('button');
+  b.textContent = g.name; b.dataset.key = g.key;
+  b.onclick = () => { settings.animal = g.key; show(); };
+  animalBox.appendChild(b);
+});
+Object.keys(CAMS).forEach(name => {
+  const b = document.createElement('button');
+  b.textContent = name; b.onclick = () => setCam(name);
+  camBox.appendChild(b);
+});
+
+function resize() {
+  const w = wrap.clientWidth, h = wrap.clientHeight;
+  renderer.setSize(w, h, false);
+  camera.aspect = w / h; camera.updateProjectionMatrix();
+}
+window.addEventListener('resize', resize);
+
+const v = new THREE.Vector3();
+function frame() {
+  controls.update();
+  renderer.render(scene, camera);
+  const w = wrap.clientWidth, h = wrap.clientHeight, key = group().key;
+  tags.forEach(({el, pos, group}) => {
+    v.copy(pos).project(camera);
+    const show = (group === key || group === 'scale') && v.z < 1 && Math.abs(v.x) < 1.1 && Math.abs(v.y) < 1.1;
+    el.style.display = show ? '' : 'none';
+    el.style.left = ((v.x + 1) / 2 * w) + 'px';
+    el.style.top = ((1 - v.y) / 2 * h) + 'px';
+  });
+  requestAnimationFrame(frame);
+}
+resize();
+show();
+frame();
+</script>
+</body>
+</html>
