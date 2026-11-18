@@ -660,6 +660,50 @@ def crab_page(out):
     print("wrote", out)
 
 
+CROC_CLIP_NOTES = [
+    "Every one of the crocodile's 14 game clips played on the old giant (10.5 blocks, about 1.7 times as bulky) beside "
+    "a grown male (8 blocks). The giant uses the same clip file as every crocodile.",
+    "Measured over each whole clip, in model pixels: the giant meets the ground as the male does (lying, basking, the "
+    "flop, the haul and the death roll), its feet dip at most 0.44 pixels into the ground mid-stride (the game's foot "
+    "planting levels them), and no long upper tooth pokes through the shut lower jaw.",
+    "In the water, with its eyes and nostrils as high out as a grown one's, the giant's back shows a little less "
+    "(3.9 pixels against 5.2), as its broad head is deeper: it lies lower, heavy and half sunk. Kept.",
+    "Left for the game, not the clips: a slower, heavier pace for an old giant is set by its walking speed, and its float "
+    "depth by the crocodile's one size number, as for every crocodile.",
+]
+
+
+def croc_clips_page(out):
+    """Every game clip of the crocodile played on the old giant beside a grown male (animal life cycle, step 0b: the
+    old giant's clips checked on its bulkier body: they all fit, nothing changed); crocodile_models.clips()."""
+    import crocodile_models as cr
+    import life_looks
+    import tilapia_models as tm
+
+    def model(bones, colour, length):
+        head = next(b for b in bones if b["name"] == "head")
+        eye_top = max(c["origin"][1] + c["size"][1] for c in head["cubes"])
+        if colour:
+            with life_looks.Recolour(cr, wrap=colour):
+                b, rows, w, h = cr.paint(bones, "A")
+        else:
+            b, rows, w, h = cr.paint(bones, "A")
+        return {"bones": b, "texture": uri(tm.png(rows)), "w": w, "h": h, "length": length, "eyeTop": eye_top}
+    adult = model(cr.model(), None, 8.0)
+    adult["afloat"] = 1.65 * cr.V
+    old = model(life_looks.croc_old_model(), life_looks.croc_old_colour, 10.5)
+    old["afloat"] = 1.65 * cr.V
+    sets = {"adult": cr.clips()}
+    data = {"models": {"adult": adult, "old": old}, "clipSets": sets,
+            "water": ["swim", "float", "lunge", "snap_left", "snap_right", "hold", "eat", "shake"],
+            "blocks": {n: file_uri(n + ".png") for n in ("silt", "wet_silt")},
+            "notes": CROC_CLIP_NOTES}
+    template = (Path(__file__).resolve().parent / "croc_clips_viewer.template.html").read_text(encoding="utf-8")
+    out.parent.mkdir(parents=True, exist_ok=True)
+    out.write_text(template.replace("/*DATA*/null", json.dumps(data)), encoding="utf-8")
+    print("wrote", out)
+
+
 def life_page(out):
     """The river animals' life cycle (docs/plans/animal-life-cycle.md, step 0): males and females, young, eggs, nests."""
     import life_looks
@@ -761,6 +805,9 @@ def main():
         return
     if len(sys.argv) > 1 and sys.argv[1] == "remains":
         remains_page(Path(sys.argv[2]) if len(sys.argv) > 2 else ROOT / "references/remains_viewer.html")
+        return
+    if len(sys.argv) > 1 and sys.argv[1] == "crocclips":
+        croc_clips_page(Path(sys.argv[2]) if len(sys.argv) > 2 else ROOT / "references/croc_clips_viewer.html")
         return
     if len(sys.argv) > 1 and sys.argv[1] == "life":
         life_page(Path(sys.argv[2]) if len(sys.argv) > 2 else ROOT / "references/life_viewer.html")
