@@ -5,6 +5,10 @@ import java.util.Optional;
 
 import javax.annotation.Nullable;
 
+import com.antcolonies.animal.AnimalLife;
+import com.antcolonies.animal.HasLife;
+import com.antcolonies.animal.SeekMateGoal;
+
 import com.antcolonies.entity.body.GroundBend;
 
 import net.minecraft.core.BlockPos;
@@ -63,7 +67,7 @@ import software.bernie.geckolib.util.GeckoLibUtil;
  * {@link Attributes#SCALE}. Its box is under a block wide at every size, so its routes use 1-block squares (the
  * catfish's lesson). It breathes under water (my pick: a crocodile holding its breath for an hour is not worth a rule).
  */
-public class CrocodileEntity extends PathfinderMob implements GeoEntity {
+public class CrocodileEntity extends PathfinderMob implements GeoEntity, HasLife {
     private static final EntityDataAccessor<Boolean> DATA_BASKING = SynchedEntityData.defineId(CrocodileEntity.class, EntityDataSerializers.BOOLEAN);
     /** What its jaws are doing in a hunt: {@link #JAWS_NONE}, gaping in the lunge, clamped on its prey, or tearing at a kill. */
     private static final EntityDataAccessor<Byte> DATA_JAWS = SynchedEntityData.defineId(CrocodileEntity.class, EntityDataSerializers.BYTE);
@@ -204,7 +208,9 @@ public class CrocodileEntity extends PathfinderMob implements GeoEntity {
     /** The body lying on what is under it (worked out where it is drawn, each frame). */
     private final GroundBend bend = new GroundBend(FRONT_JOINTS, REAR_JOINTS);
     /** Its own length against the usual crocodile. */
-    private float ownSize = 1.0F;
+    private static final EntityDataAccessor<Byte> DATA_LIFE = AnimalLife.dataFor(CrocodileEntity.class);
+    /** Its life: sex, stage, own size (the animal life kit). */
+    private final AnimalLife life;
     /** Ticks until it next wants the sun (while it does not, a crocodile on land goes back to the water). */
     public int sunIn;
     /** Ticks it is still startled for: on land it rushes for the water and lunges in, in the water it sinks out of sight. */
@@ -241,6 +247,7 @@ public class CrocodileEntity extends PathfinderMob implements GeoEntity {
 
     public CrocodileEntity(EntityType<? extends CrocodileEntity> type, Level level) {
         super(type, level);
+        life = new AnimalLife(this, DATA_LIFE);
         moveControl = new SmoothSwimmingMoveControl(this, 85, 10, 0.1F, 0.55F, false);
         lookControl = new SmoothSwimmingLookControl(this, 20);
         setPathfindingMalus(PathType.WATER, 0.0F);
@@ -266,12 +273,19 @@ public class CrocodileEntity extends PathfinderMob implements GeoEntity {
         goalSelector.addGoal(2, new ToWaterGoal(this));
         goalSelector.addGoal(3, new HalfOutGoal(this));
         goalSelector.addGoal(3, new AshoreGoal(this));
+        goalSelector.addGoal(4, new SeekMateGoal<>(this, 1.0));
         goalSelector.addGoal(4, new RandomSwimmingGoal(this, 1.0, 60));
+    }
+
+    @Override
+    public AnimalLife life() {
+        return life;
     }
 
     @Override
     protected void defineSynchedData(SynchedEntityData.Builder builder) {
         super.defineSynchedData(builder);
+        AnimalLife.define(builder, DATA_LIFE);
         builder.define(DATA_BASKING, false);
         builder.define(DATA_JAWS, JAWS_NONE);
         builder.define(DATA_ROLL, NO_ROLL);
@@ -450,7 +464,7 @@ public class CrocodileEntity extends PathfinderMob implements GeoEntity {
     }
 
     public float ownSize() {
-        return ownSize;
+        return life.ownSize();
     }
 
     /** Its body's bend over what is under it (for the model). */
@@ -464,10 +478,7 @@ public class CrocodileEntity extends PathfinderMob implements GeoEntity {
     }
 
     private void refresh() {
-        AttributeInstance scale = getAttribute(Attributes.SCALE);
-        if (scale != null && Math.abs(scale.getBaseValue() - ownSize) > 0.005) {
-            scale.setBaseValue(ownSize);
-        }
+        life.apply();
     }
 
     @Override
@@ -665,7 +676,7 @@ public class CrocodileEntity extends PathfinderMob implements GeoEntity {
     @Nullable
     public SpawnGroupData finalizeSpawn(ServerLevelAccessor level, DifficultyInstance difficulty, MobSpawnType spawnType, @Nullable SpawnGroupData data) {
         SpawnGroupData out = super.finalizeSpawn(level, difficulty, spawnType, data);
-        ownSize = 0.8F + 0.3F * level.getRandom().nextFloat();
+        life.setUp(false, level.getRandom());
         hungerIn = level.getRandom().nextInt(2400);     // hungry within 2 minutes or so (my pick)
         refresh();
         return out;
@@ -674,7 +685,7 @@ public class CrocodileEntity extends PathfinderMob implements GeoEntity {
     @Override
     public void addAdditionalSaveData(CompoundTag tag) {
         super.addAdditionalSaveData(tag);
-        tag.putFloat("OwnSize", ownSize);
+        life.save(tag);
         tag.putInt("SunIn", sunIn);
         tag.putBoolean("HalfOut", restHalfOut);
         tag.putInt("HungerIn", hungerIn);
@@ -686,10 +697,7 @@ public class CrocodileEntity extends PathfinderMob implements GeoEntity {
     @Override
     public void readAdditionalSaveData(CompoundTag tag) {
         super.readAdditionalSaveData(tag);
-        if (tag.contains("OwnSize")) {
-            ownSize = Mth.clamp(tag.getFloat("OwnSize"), 0.5F, 1.1F);
-            refresh();
-        }
+        life.load(tag);
         if (tag.contains("SunIn")) {
             sunIn = tag.getInt("SunIn");
         }

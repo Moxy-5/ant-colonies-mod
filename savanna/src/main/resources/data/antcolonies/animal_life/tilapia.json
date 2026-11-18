@@ -1,0 +1,10 @@
+{
+  "_note": "The Nile tilapia's life (the animal life kit, docs/plans/animal-life-cycle.md). Sizes are shares of its usual size (0.6 blocks grown); days are game days. Young hatch at half size and grow up in 3 days; 3 in 10 of the world's own spawns are young. Breeding comes in step 2 of the plan.",
+  "sexes": "two",
+  "male_share": 0.5,
+  "size": [0.85, 1.15],
+  "young_size": 0.5,
+  "young_days": 3,
+  "young_at_spawn": 0.3,
+  "breeds": false
+}

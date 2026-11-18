@@ -45,6 +45,8 @@ public class ColonyFrameworkMod {
         NeoForge.EVENT_BUS.addListener((ServerAboutToStartEvent event) -> TestFilter.apply(event.getServer()));
         // Species profiles (data/<namespace>/species/*.json), loaded with the world's data and on /reload.
         NeoForge.EVENT_BUS.addListener((AddReloadListenerEvent event) -> event.addListener(SpeciesProfiles.INSTANCE));
+        // Animal life files (data/<namespace>/animal_life/*.json): sexes, sizes, growing up, breeding (the animal life kit).
+        NeoForge.EVENT_BUS.addListener((AddReloadListenerEvent event) -> event.addListener(com.antcolonies.animal.AnimalLives.INSTANCE));
         LOGGER.info("Colony Framework loaded");
     }
 }

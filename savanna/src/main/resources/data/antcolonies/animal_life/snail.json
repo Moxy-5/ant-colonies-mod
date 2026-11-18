@@ -1,0 +1,6 @@
+{
+  "_note": "The river snail's life (the animal life kit). Every snail is both male and female (my pick, as many snails). Sizes are shares of its usual size (0.4 blocks). Born grown for now; clutches and babies come in step 2 of the plan.",
+  "sexes": "both",
+  "size": [0.8, 1.15],
+  "breeds": false
+}

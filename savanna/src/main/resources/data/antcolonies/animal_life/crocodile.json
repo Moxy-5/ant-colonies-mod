@@ -1,0 +1,7 @@
+{
+  "_note": "The Nile crocodile's life (the animal life kit). Sizes are shares of its usual size (7.5 blocks); no larger than 1.1, so its box stays what its legs can walk. Born grown for now; males and females, young, teens and nests come in step 4 of the plan.",
+  "sexes": "two",
+  "size": [0.8, 1.1],
+  "max_size": 1.1,
+  "breeds": false
+}

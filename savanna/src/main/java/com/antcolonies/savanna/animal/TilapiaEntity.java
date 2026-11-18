@@ -2,6 +2,9 @@ package com.antcolonies.savanna.animal;
 
 import javax.annotation.Nullable;
 
+import com.antcolonies.animal.AnimalLife;
+import com.antcolonies.animal.HasLife;
+import com.antcolonies.animal.SeekMateGoal;
 import com.antcolonies.savanna.registry.SavannaItems;
 
 import net.minecraft.core.BlockPos;
@@ -44,33 +47,25 @@ import software.bernie.geckolib.util.GeckoLibUtil;
  * the river algae ({@link GrazeAlgaeGoal}, {@code AlgaeBlock.graze}), the second link of the food chain.
  *
  * <p>Three looks from one model (the user, 2026-11-14, "do them all for variation"; my picks): a young fish is pale and
- * strongly barred with the black "tilapia spot" ({@link #YOUNG}) and small; after {@link #GROW_UP_TICKS} it is grown
+ * strongly barred with the black "tilapia spot" ({@link #YOUNG}) and small; after 3 game days (its life file) it is grown
  * ({@link #EVERYDAY}, olive-silver), and about 1 grown male in 3 wears the breeding colours ({@link #BREEDING}: dark
  * blue-grey, red throat, red-edged fins). A young fish grows its size little by little. Each grown fish has a length of
  * its own (0.85 to 1.15 of the usual, my pick), drawn and boxed through {@link Attributes#SCALE}.
  *
  * <p>It never starves (my pick: the food chain must never crash): a hungry fish with no algae near just swims on.
  */
-public class TilapiaEntity extends AbstractSchoolingFish implements GeoEntity {
+public class TilapiaEntity extends AbstractSchoolingFish implements GeoEntity, HasLife {
     public static final int YOUNG = 0, EVERYDAY = 1, BREEDING = 2;
-    /** Three game days from hatching to grown (my pick). */
-    public static final int GROW_UP_TICKS = 3 * 24000;
-    /** A young fish's size against a grown one's at hatching (it grows to 1 by {@link #GROW_UP_TICKS}). */
-    public static final float YOUNG_SIZE = 0.5F;
     /** How many grown males wear the breeding colours (my pick: about 1 in 3). */
     static final float BREEDING_SHARE = 1 / 3F;
-    /** The share of naturally spawned fish that are young (my pick). */
-    static final float YOUNG_SHARE = 0.3F;
 
     private static final EntityDataAccessor<Integer> DATA_LOOK = SynchedEntityData.defineId(TilapiaEntity.class, EntityDataSerializers.INT);
     private static final EntityDataAccessor<Boolean> DATA_GRAZING = SynchedEntityData.defineId(TilapiaEntity.class, EntityDataSerializers.BOOLEAN);
+    private static final EntityDataAccessor<Byte> DATA_LIFE = AnimalLife.dataFor(TilapiaEntity.class);
 
     private final AnimatableInstanceCache cache = GeckoLibUtil.createInstanceCache(this);
-    /** Ticks since it hatched (counted on to {@link #GROW_UP_TICKS}). */
-    private int age = GROW_UP_TICKS;
-    private boolean male;
-    /** Its own length against the usual grown fish. */
-    private float ownSize = 1.0F;
+    /** Its life: sex, age (young for 3 days from half size, its life file), own size (the animal life kit). */
+    private final AnimalLife life;
     /** Ticks until it is hungry again ({@link GrazeAlgaeGoal}). */
     int hungryIn;
     /** The drawn body's pitch (degrees, nose up positive), eased toward its swimming direction (client only). */
@@ -78,6 +73,7 @@ public class TilapiaEntity extends AbstractSchoolingFish implements GeoEntity {
 
     public TilapiaEntity(EntityType<? extends TilapiaEntity> type, Level level) {
         super(type, level);
+        life = new AnimalLife(this, DATA_LIFE);
         hungryIn = 200 + level.random.nextInt(1200);
     }
 
@@ -89,6 +85,7 @@ public class TilapiaEntity extends AbstractSchoolingFish implements GeoEntity {
     protected void registerGoals() {
         super.registerGoals();
         goalSelector.addGoal(3, new GrazeAlgaeGoal(this));
+        goalSelector.addGoal(4, new SeekMateGoal<>(this, 1.0));
     }
 
     @Override
@@ -96,6 +93,7 @@ public class TilapiaEntity extends AbstractSchoolingFish implements GeoEntity {
         super.defineSynchedData(builder);
         builder.define(DATA_LOOK, EVERYDAY);
         builder.define(DATA_GRAZING, false);
+        AnimalLife.define(builder, DATA_LIFE);
     }
 
     /** {@link #YOUNG}, {@link #EVERYDAY} or {@link #BREEDING} (the texture it wears). */
@@ -103,12 +101,17 @@ public class TilapiaEntity extends AbstractSchoolingFish implements GeoEntity {
         return entityData.get(DATA_LOOK);
     }
 
+    @Override
+    public AnimalLife life() {
+        return life;
+    }
+
     public boolean isYoung() {
-        return age < GROW_UP_TICKS;
+        return life.isYoung();
     }
 
     public boolean isMale() {
-        return male;
+        return life.isMale();
     }
 
     public boolean isGrazing() {
@@ -121,9 +124,8 @@ public class TilapiaEntity extends AbstractSchoolingFish implements GeoEntity {
 
     /** Hatches it as a young fish (or makes it grown), its sex and grown size rolled. */
     public void setUp(boolean young, RandomSource random) {
-        male = random.nextBoolean();
-        ownSize = 0.85F + 0.3F * random.nextFloat();
-        age = young ? random.nextInt(GROW_UP_TICKS / 3) : GROW_UP_TICKS;
+        life.setUp(young, random);
+        breedingLook = -1;
         if (!young) {
             grownLook(random);
         }
@@ -159,19 +161,19 @@ public class TilapiaEntity extends AbstractSchoolingFish implements GeoEntity {
 
     /** Its own grown length against the usual. */
     public float ownSize() {
-        return ownSize;
+        return life.ownSize();
     }
 
     /** For tests: makes it this many ticks from grown. */
     public void setTicksToGrow(int ticks) {
-        age = Math.max(0, GROW_UP_TICKS - ticks);
+        life.setAge(life.numbers().grownAge() - ticks);
         refresh();
     }
 
     private int breedingLook;   // -1 not rolled yet, else the grown look
 
     private void grownLook(RandomSource random) {
-        breedingLook = male && random.nextFloat() < BREEDING_SHARE ? BREEDING : EVERYDAY;
+        breedingLook = isMale() && random.nextFloat() < BREEDING_SHARE ? BREEDING : EVERYDAY;
     }
 
     /** Its look and size from its age (and the grown look rolled once). */
@@ -183,11 +185,7 @@ public class TilapiaEntity extends AbstractSchoolingFish implements GeoEntity {
             grownLook(random);
         }
         entityData.set(DATA_LOOK, isYoung() ? YOUNG : breedingLook);
-        float grown = isYoung() ? YOUNG_SIZE + (1 - YOUNG_SIZE) * age / (float) GROW_UP_TICKS : 1.0F;
-        AttributeInstance scale = getAttribute(Attributes.SCALE);
-        if (scale != null && Math.abs(scale.getBaseValue() - grown * ownSize) > 0.005) {
-            scale.setBaseValue(grown * ownSize);
-        }
+        life.apply();
     }
 
     @Override
@@ -201,11 +199,8 @@ public class TilapiaEntity extends AbstractSchoolingFish implements GeoEntity {
             swimPitch += (want - swimPitch) * 0.15F;
             return;
         }
-        if (isYoung()) {
-            age++;
-            if (age % 200 == 0 || age == GROW_UP_TICKS) {
-                refresh();
-            }
+        if (life.tick()) {
+            refresh();
         }
         if (hungryIn > 0) {
             hungryIn--;
@@ -221,7 +216,7 @@ public class TilapiaEntity extends AbstractSchoolingFish implements GeoEntity {
     @Nullable
     public SpawnGroupData finalizeSpawn(ServerLevelAccessor level, DifficultyInstance difficulty, MobSpawnType spawnType, @Nullable SpawnGroupData data) {
         SpawnGroupData out = super.finalizeSpawn(level, difficulty, spawnType, data);
-        setUp(spawnType != MobSpawnType.BUCKET && level.getRandom().nextFloat() < YOUNG_SHARE, level.getRandom());
+        setUp(spawnType != MobSpawnType.BUCKET && life.spawnsYoung(level.getRandom()), level.getRandom());
         return out;
     }
 
@@ -238,20 +233,20 @@ public class TilapiaEntity extends AbstractSchoolingFish implements GeoEntity {
     }
 
     private void writeLife(CompoundTag tag) {
-        tag.putInt("TilapiaAge", age);
-        tag.putBoolean("Male", male);
-        tag.putFloat("OwnSize", ownSize);
+        life.save(tag);
         tag.putInt("GrownLook", breedingLook);
     }
 
+    /** Its life from its data (a fish saved before the kit kept its age as "TilapiaAge"); a fish with none keeps what it has. */
     private void readLife(CompoundTag tag) {
-        if (!tag.contains("TilapiaAge")) {
+        boolean has = tag.contains("Life") || tag.contains("TilapiaAge") || tag.contains("sex") || tag.contains("young");
+        life.load(tag, "TilapiaAge");
+        if (!has) {
             return;
         }
-        age = tag.getInt("TilapiaAge");
-        male = tag.getBoolean("Male");
-        ownSize = Mth.clamp(tag.getFloat("OwnSize"), 0.5F, 1.5F);
-        breedingLook = tag.getInt("GrownLook");
+        if (tag.contains("GrownLook")) {
+            breedingLook = tag.getInt("GrownLook");
+        }
         refresh();
     }
 

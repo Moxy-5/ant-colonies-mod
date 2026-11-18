@@ -2,6 +2,10 @@ package com.antcolonies.savanna.animal;
 
 import javax.annotation.Nullable;
 
+import com.antcolonies.animal.AnimalLife;
+import com.antcolonies.animal.HasLife;
+import com.antcolonies.animal.SeekMateGoal;
+
 import net.minecraft.core.BlockPos;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.syncher.EntityDataAccessor;
@@ -51,7 +55,7 @@ import software.bernie.geckolib.util.GeckoLibUtil;
  * it swims on. Too big for a bucket (my pick). Out of water it stays upright and wriggles, as real catfish crawl over wet
  * ground between pools (it still dries out like any fish).
  */
-public class CatfishEntity extends AbstractFish implements GeoEntity {
+public class CatfishEntity extends AbstractFish implements GeoEntity, HasLife {
     /** How long a strike is shown (ticks; the strike clip is 1 s, the mouth open from 0.05 to 0.38 s). */
     static final int STRIKE_TICKS = 20;
 
@@ -90,7 +94,9 @@ public class CatfishEntity extends AbstractFish implements GeoEntity {
 
     private final AnimatableInstanceCache cache = GeckoLibUtil.createInstanceCache(this);
     /** Its own length against the usual catfish. */
-    private float ownSize = 1.0F;
+    private static final EntityDataAccessor<Byte> DATA_LIFE = AnimalLife.dataFor(CatfishEntity.class);
+    /** Its life: sex, stage, own size (the animal life kit). */
+    private final AnimalLife life;
     /** Ticks until it is hungry again ({@link HuntTilapiaGoal}). */
     int hungryIn;
     /** Ticks until it comes up for air again ({@link AirGulpGoal}). */
@@ -107,6 +113,7 @@ public class CatfishEntity extends AbstractFish implements GeoEntity {
 
     public CatfishEntity(EntityType<? extends CatfishEntity> type, Level level) {
         super(type, level);
+        life = new AnimalLife(this, DATA_LIFE);
         hungryIn = 600 + level.random.nextInt(2400);
         gulpIn = 600 + level.random.nextInt(AirGulpGoal.EVERY_MORE);
     }
@@ -119,12 +126,19 @@ public class CatfishEntity extends AbstractFish implements GeoEntity {
     protected void registerGoals() {
         super.registerGoals();
         goalSelector.addGoal(2, new HuntTilapiaGoal(this));
+        goalSelector.addGoal(5, new SeekMateGoal<>(this, 1.0));
         goalSelector.addGoal(1, new AirGulpGoal(this));     // above the fish's fleeing from players (2), so it is seen
+    }
+
+    @Override
+    public AnimalLife life() {
+        return life;
     }
 
     @Override
     protected void defineSynchedData(SynchedEntityData.Builder builder) {
         super.defineSynchedData(builder);
+        AnimalLife.define(builder, DATA_LIFE);
         builder.define(DATA_STRIKING, false);
         builder.define(DATA_HELD_LOOK, -1);
         builder.define(DATA_HELD_SIZE, 1.0F);
@@ -248,7 +262,7 @@ public class CatfishEntity extends AbstractFish implements GeoEntity {
     }
 
     public float ownSize() {
-        return ownSize;
+        return life.ownSize();
     }
 
     /** Where its mouth is: the front of the snout, about 0.85 blocks ahead of its middle at the usual size. */
@@ -259,10 +273,7 @@ public class CatfishEntity extends AbstractFish implements GeoEntity {
     }
 
     private void refresh() {
-        AttributeInstance scale = getAttribute(Attributes.SCALE);
-        if (scale != null && Math.abs(scale.getBaseValue() - ownSize) > 0.005) {
-            scale.setBaseValue(ownSize);
-        }
+        life.apply();
     }
 
     @Override
@@ -315,7 +326,7 @@ public class CatfishEntity extends AbstractFish implements GeoEntity {
     @Nullable
     public SpawnGroupData finalizeSpawn(ServerLevelAccessor level, DifficultyInstance difficulty, MobSpawnType spawnType, @Nullable SpawnGroupData data) {
         SpawnGroupData out = super.finalizeSpawn(level, difficulty, spawnType, data);
-        ownSize = 0.85F + 0.3F * level.getRandom().nextFloat();
+        life.setUp(false, level.getRandom());
         refresh();
         return out;
     }
@@ -323,7 +334,7 @@ public class CatfishEntity extends AbstractFish implements GeoEntity {
     @Override
     public void addAdditionalSaveData(CompoundTag tag) {
         super.addAdditionalSaveData(tag);
-        tag.putFloat("OwnSize", ownSize);
+        life.save(tag);
         tag.putInt("HungryIn", hungryIn);
         tag.putInt("GulpIn", gulpIn);
         if (holding > 0) {
@@ -338,10 +349,9 @@ public class CatfishEntity extends AbstractFish implements GeoEntity {
     @Override
     public void readAdditionalSaveData(CompoundTag tag) {
         super.readAdditionalSaveData(tag);
-        if (tag.contains("OwnSize")) {
-            ownSize = Mth.clamp(tag.getFloat("OwnSize"), 0.5F, 1.5F);
+        life.load(tag);
+        if (tag.contains("HungryIn")) {
             hungryIn = tag.getInt("HungryIn");
-            refresh();
         }
         if (tag.contains("GulpIn")) {
             gulpIn = tag.getInt("GulpIn");

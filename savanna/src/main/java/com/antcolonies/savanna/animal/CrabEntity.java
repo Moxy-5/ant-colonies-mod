@@ -2,6 +2,10 @@ package com.antcolonies.savanna.animal;
 
 import javax.annotation.Nullable;
 
+import com.antcolonies.animal.AnimalLife;
+import com.antcolonies.animal.HasLife;
+import com.antcolonies.animal.SeekMateGoal;
+
 import net.minecraft.core.BlockPos;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.syncher.EntityDataAccessor;
@@ -50,7 +54,7 @@ import software.bernie.geckolib.util.GeckoLibUtil;
  * </ul>
  * Not yet: its burrow (broken shells to gather outside it), catfish eating it.
  */
-public class CrabEntity extends PathfinderMob implements GeoEntity {
+public class CrabEntity extends PathfinderMob implements GeoEntity, HasLife {
     /** What it is doing, for the clips and the look. */
     public static final byte CALM = 0, PICK_ALGAE = 1, PICK_MEAT = 2, THREAT = 3, CRACK = 4;
     private static final EntityDataAccessor<Byte> DATA_DOING = SynchedEntityData.defineId(CrabEntity.class, EntityDataSerializers.BYTE);
@@ -68,7 +72,9 @@ public class CrabEntity extends PathfinderMob implements GeoEntity {
 
     /** Ticks until it is hungry again (0: hungry). */
     int hungryIn;
-    private float ownSize = 1.0F;
+    private static final EntityDataAccessor<Byte> DATA_LIFE = AnimalLife.dataFor(CrabEntity.class);
+    /** Its life: sex, stage, own size (the animal life kit). */
+    private final AnimalLife life;
     /** The body's turn against its heading (degrees): 90 to one side while it walks or stands, 0 facing what it picks at or threatens. Drawing only. */
     private float sideTurn, sideTurnO;
 
@@ -76,6 +82,7 @@ public class CrabEntity extends PathfinderMob implements GeoEntity {
 
     public CrabEntity(EntityType<? extends CrabEntity> type, Level level) {
         super(type, level);
+        life = new AnimalLife(this, DATA_LIFE);
         setPathfindingMalus(PathType.WATER, 0.0F);        // the bed is its ground: it walks under water as on land
         hungryIn = random.nextInt(600);
         sideTurn = sideTurnO = side() * 90.0F;
@@ -94,12 +101,19 @@ public class CrabEntity extends PathfinderMob implements GeoEntity {
         goalSelector.addGoal(3, new AvoidEntityGoal<>(this, Player.class, 5.0F, 1.2, 1.5, EntitySelector.NO_CREATIVE_OR_SPECTATOR::test));
         goalSelector.addGoal(4, new CrabPickGoal(this));
         // never stopped by Minecraft's "nothing happened for 5 s and no player within 32" rule (docs/BUGS.md 216)
+        goalSelector.addGoal(5, new SeekMateGoal<>(this, 0.6));
         goalSelector.addGoal(5, new RandomStrollGoal(this, 0.6, 100, false));
+    }
+
+    @Override
+    public AnimalLife life() {
+        return life;
     }
 
     @Override
     protected void defineSynchedData(SynchedEntityData.Builder builder) {
         super.defineSynchedData(builder);
+        AnimalLife.define(builder, DATA_LIFE);
         builder.define(DATA_DOING, CALM);
     }
 
@@ -191,31 +205,26 @@ public class CrabEntity extends PathfinderMob implements GeoEntity {
     public SpawnGroupData finalizeSpawn(ServerLevelAccessor level, DifficultyInstance difficulty, MobSpawnType spawnType, @Nullable SpawnGroupData data) {
         SpawnGroupData out = super.finalizeSpawn(level, difficulty, spawnType, data);
         RiverBed.settle(this, level, spawnType);
-        ownSize = 0.85F + 0.3F * level.getRandom().nextFloat();
+        life.setUp(false, level.getRandom());
         refresh();
         return out;
     }
 
     private void refresh() {
-        AttributeInstance scale = getAttribute(Attributes.SCALE);
-        if (scale != null) {
-            scale.setBaseValue(ownSize);
-        }
+        life.apply();
     }
 
     @Override
     public void addAdditionalSaveData(CompoundTag tag) {
         super.addAdditionalSaveData(tag);
-        tag.putFloat("OwnSize", ownSize);
+        life.save(tag);
         tag.putInt("HungryIn", hungryIn);
     }
 
     @Override
     public void readAdditionalSaveData(CompoundTag tag) {
         super.readAdditionalSaveData(tag);
-        if (tag.contains("OwnSize")) {
-            ownSize = Mth.clamp(tag.getFloat("OwnSize"), 0.5F, 1.5F);
-        }
+        life.load(tag);
         hungryIn = tag.getInt("HungryIn");
         refresh();
     }

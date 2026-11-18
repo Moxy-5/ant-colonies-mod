@@ -5,6 +5,10 @@ import java.util.List;
 
 import javax.annotation.Nullable;
 
+import com.antcolonies.animal.AnimalLife;
+import com.antcolonies.animal.HasLife;
+import com.antcolonies.animal.SeekMateGoal;
+
 import com.antcolonies.entity.body.GroundBend;
 import com.antcolonies.savanna.block.CrabShellBlock;
 import com.antcolonies.savanna.registry.SavannaItems;
@@ -76,7 +80,7 @@ import software.bernie.geckolib.util.GeckoLibUtil;
  * </ul>
  * Not yet: raiding crocodile nests and its own eggs (they come with the crocodile's nests), burrows.
  */
-public class MonitorEntity extends PathfinderMob implements GeoEntity {
+public class MonitorEntity extends PathfinderMob implements GeoEntity, HasLife {
     /** What it is doing, for the clips. */
     public static final byte CALM = 0, BASK = 1, HISS = 2, BITE = 3, EAT = 4, WATCH = 5, BITE_PLAYER = 6;
     private static final EntityDataAccessor<Byte> DATA_DOING = SynchedEntityData.defineId(MonitorEntity.class, EntityDataSerializers.BYTE);
@@ -177,11 +181,14 @@ public class MonitorEntity extends PathfinderMob implements GeoEntity {
     /** What startled it last (to run from where there is no water). */
     @Nullable
     Entity scare;
-    private float ownSize = 1.0F;
+    private static final EntityDataAccessor<Byte> DATA_LIFE = AnimalLife.dataFor(MonitorEntity.class);
+    /** Its life: sex, stage, own size (the animal life kit). */
+    private final AnimalLife life;
     private final AnimatableInstanceCache cache = GeckoLibUtil.createInstanceCache(this);
 
     public MonitorEntity(EntityType<? extends MonitorEntity> type, Level level) {
         super(type, level);
+        life = new AnimalLife(this, DATA_LIFE);
         moveControl = new SmoothSwimmingMoveControl(this, 85, 10, 0.1F, 0.6F, false);
         lookControl = new SmoothSwimmingLookControl(this, 20);
         setPathfindingMalus(PathType.WATER, 0.0F);
@@ -208,12 +215,19 @@ public class MonitorEntity extends PathfinderMob implements GeoEntity {
         goalSelector.addGoal(3, new WatchGoal(this));
         goalSelector.addGoal(4, new BaskGoal(this));
         // never stopped by Minecraft's "nothing happened for 5 s and no player within 32" rule (docs/BUGS.md 216)
+        goalSelector.addGoal(5, new SeekMateGoal<>(this, 0.8));
         goalSelector.addGoal(5, new RandomStrollGoal(this, 0.8, 100, false));
+    }
+
+    @Override
+    public AnimalLife life() {
+        return life;
     }
 
     @Override
     protected void defineSynchedData(SynchedEntityData.Builder builder) {
         super.defineSynchedData(builder);
+        AnimalLife.define(builder, DATA_LIFE);
         builder.define(DATA_DOING, CALM);
     }
 
@@ -228,7 +242,7 @@ public class MonitorEntity extends PathfinderMob implements GeoEntity {
     /** Where its jaws close: the snout's tip, a little over the ground. */
     Vec3 jawPoint() {
         float yaw = yBodyRot * Mth.DEG_TO_RAD;
-        double ahead = JAWS_AHEAD * ownSize;
+        double ahead = JAWS_AHEAD * life.ownSize();
         return new Vec3(getX() - Mth.sin(yaw) * ahead, getY() + 0.5 * getScale(), getZ() + Mth.cos(yaw) * ahead);
     }
 
@@ -393,13 +407,13 @@ public class MonitorEntity extends PathfinderMob implements GeoEntity {
                 moveTo(bank.getX() + 0.5, bank.getY(), bank.getZ() + 0.5, random.nextFloat() * 360.0F, 0.0F);
             }
         }
-        ownSize = 0.85F + 0.3F * level.getRandom().nextFloat();
+        life.setUp(false, level.getRandom());
         refresh();
         return out;
     }
 
     public float ownSize() {
-        return ownSize;
+        return life.ownSize();
     }
 
     /** Its body's lie on what is under it, worked out and drawn by its model only. */
@@ -413,16 +427,13 @@ public class MonitorEntity extends PathfinderMob implements GeoEntity {
     }
 
     private void refresh() {
-        AttributeInstance scale = getAttribute(Attributes.SCALE);
-        if (scale != null) {
-            scale.setBaseValue(ownSize);
-        }
+        life.apply();
     }
 
     @Override
     public void addAdditionalSaveData(CompoundTag tag) {
         super.addAdditionalSaveData(tag);
-        tag.putFloat("OwnSize", ownSize);
+        life.save(tag);
         tag.putInt("HungryIn", hungryIn);
         tag.putInt("SunIn", sunIn);
     }
@@ -430,9 +441,7 @@ public class MonitorEntity extends PathfinderMob implements GeoEntity {
     @Override
     public void readAdditionalSaveData(CompoundTag tag) {
         super.readAdditionalSaveData(tag);
-        if (tag.contains("OwnSize")) {
-            ownSize = Mth.clamp(tag.getFloat("OwnSize"), 0.5F, 1.5F);
-        }
+        life.load(tag);
         hungryIn = tag.getInt("HungryIn");
         sunIn = tag.getInt("SunIn");
         refresh();
@@ -807,9 +816,9 @@ public class MonitorEntity extends PathfinderMob implements GeoEntity {
             }
             // close: walk the last bit with its head turned onto the prey (its jaws are 3 blocks ahead of its middle)
             double d = Math.sqrt(m.distanceToSqr(prey.getX(), m.getY(), prey.getZ()));
-            if (d < JAWS_AHEAD * m.ownSize + 1.5) {
+            if (d < JAWS_AHEAD * m.ownSize() + 1.5) {
                 m.face(prey.getX(), prey.getZ(), 15.0F);
-                if (d < JAWS_AHEAD * m.ownSize - 0.2) {      // too close for its jaws: back off a little
+                if (d < JAWS_AHEAD * m.ownSize() - 0.2) {      // too close for its jaws: back off a little
                     float yaw = m.getYRot() * Mth.DEG_TO_RAD;
                     m.setDeltaMovement(m.getDeltaMovement().add(Mth.sin(yaw) * 0.05, 0, -Mth.cos(yaw) * 0.05));
                 } else {
