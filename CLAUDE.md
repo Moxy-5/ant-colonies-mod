@@ -122,6 +122,7 @@ Every living thing in the mod, built or planned, plants and fungi included, in o
 - Hippo (floodplain grazing at night, paths, hippo lawns; pods in the deep pools of the near and mid-inland rivers and oxbows, territorial, charging crocodiles that come near): IDEA (river zones, `docs/DESIGN.md`, "River zones").
 - Bull shark (comes up wide rivers from the sea; the coast and near-inland rivers only, the deep middle channel, alone and rare): IDEA (user's list 2026-11-16; river zones, `docs/DESIGN.md`, "River zones").
 - African lungfish (seals itself in a slime cocoon in drying mud, found by digging), annual killifish (eggs wait in dry mud, hatch when it rains): IDEA (mud pits, 2026-11-17; `docs/DESIGN.md`, "Mud pits and wallows").
+- African clawless otter (playful, eats mostly crabs, feeling for them with its fingers under stones; also fish and frogs; a real link to our river crab): IDEA (user's list 2026-11-18).
 - Minecraft's cod, salmon, squid: kept out of savanna rivers (BUILT).
 
 **5. Savanna land animals** (fun first; all IDEA unless marked)
@@ -138,18 +139,21 @@ Every living thing in the mod, built or planned, plants and fungi included, in o
   - Emperor scorpion (big glossy black scorpion; real home the wetter West African forest and savanna edges, a stretch for dry savanna, fine fun first): user's list 2026-11-16.
   - Antlions (larvae in sand pits that trap ants; a real link to the colony insects, pits in loose sand such as the coming sand banks): user's list 2026-11-16.
   - Dead-wood tenants, centipedes, scorpions.
-  - Dung beetle (an animal-kit proof pick).
+  - African dung beetle (rolls dung balls away and buries them; an animal-kit proof pick; ties to the big plant eaters' dung and dung spreading acacia seed): user's list 2026-11-18.
   - Tadpole shrimp (eggs wait in dry mud), butterflies sipping at wet mud (mud-puddling, drawn as particles), mud wasps collecting mud balls: IDEA (mud pits, 2026-11-17).
 - *5b. Reptiles and amphibians:*
   - Black mamba (fast snake, hunted by the secretarybird): user's list 2026-11-16.
   - Giant African bullfrog (out of the ground at the first rains; was "African bullfrog"): user's list 2026-11-16.
   - Pythons (floodplain).
+  - Flap-necked chameleon (slow swaying walk, eyes turning on their own, colour changes, shoots its tongue at insects from bushes and acacias): user's list 2026-11-18.
+  - Southern foam-nest tree frog (whips up white foam nests on branches over pans and the river; the tadpoles drop into the water below; a link to the pans): user's list 2026-11-18.
 - *5c. Birds:*
   - Sociable weaver (giant shared nests built in trees; in real life often in camel thorns, so ours can use the giant trees): user's list 2026-11-16.
   - Greater honeyguide (leads honey eaters to bee hives): user's list 2026-11-16.
   - Secretarybird (walks the grass, stamps on snakes): user's list 2026-11-16.
   - Ostrich (biggest bird, runs fast, kicks, grazes the open grass; lays huge eggs): user's list 2026-11-16.
   - Red-billed oxpecker (rides rhinos, giraffes, zebras, picking ticks): user's list 2026-11-16.
+  - Martial eagle (Africa's biggest eagle; soars high, stoops on monitor lizards, small antelope and game birds; a link to our Nile monitor): user's list 2026-11-18.
   - Birds eating ants and termite flights; floodplain birds: carmine bee-eater (needs steep banks), herons, cranes, jacanas, flamingos, hornbills.
 - *5d. Termite eaters:* aardvark (the user's earlier pick as first land animal; burrows reused by Matabele), aardwolf, pangolin (M9 savanna life; wear termite colonies down).
 - *5e. Big plant eaters:*
@@ -163,6 +167,8 @@ Every living thing in the mod, built or planned, plants and fungi included, in o
   - African lion (prides), cheetah (sprints), spotted hyena (clans, scavenge and hunt), African wild dog (packs): user's list 2026-11-16.
   - Honey badger (digs, raids bee hives, fights snakes): user's list 2026-11-16.
   - Leopard (gallery forest).
+- *5g. Small mammals:*
+  - Meerkat (mobs on dry open ground, a sentinel standing guard, digging burrows; eats scorpions, beetles and termites; real home the dry southern savanna, a stretch here, fine fun first): user's list 2026-11-18.
 
 **6. Desert and jungle animals (their own mods, later)**
 - Desert: horned lizard (eats harvester ants), kangaroo rat, antlion, ant-eating spiders: IDEA.
