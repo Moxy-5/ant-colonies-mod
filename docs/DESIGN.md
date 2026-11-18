@@ -431,6 +431,12 @@ it.** If a decision changes, ask the user first, then update it here. The short 
   - **Game balancer:** every new kind keeps the river's food chain from crashing (sharks eat catfish and tilapia, rarely; numbers per stretch checked in a soak).
 - **When:** with the bull shark and the hippo (M9 savanna life, both IDEA on the master list); the crocodile's zone weighting may come earlier (my offer, 2026-11-18).
 
+### Oxbows and pans rework (the user, 2026-11-18, "there more like tiny ponds"; measured, planned in `docs/plans/oxbows-and-pans.md`, nothing built)
+- Today's oxbows and pans are tiny ponds (an oxbow a ditch 3 to 5 wide and 2 deep, a pan a puddle 5 to 12 across and 1 deep, both on the floodplain only).
+- Oxbows become crescents beside the river, sized from it (half real size) and shrunk to fit the floodplain, only where it is wide enough (as real oxbows form on wide meander belts), in four ages (fresh 4 deep, silting 3, old 1 to 2, a dry scar); fresh and silting ones deep enough for hippos.
+- Pans become hollows 16 to 40 across on the open savanna away from rivers, 2 deep in the middle, with a bare trampled ring; filling and drying wait for the seasons.
+- Both become structures (too big for a chunk feature). Measured on real land (2026-11-18): floodplain a median 24 to 40 blocks from the water; pans up to 40 across fit at a quarter to a half of open savanna spots.
+
 ### Mud pits and wallows (the user, 2026-11-17, from videos of pangolins and many other animals playing in mud; ideas for savanna life, M9, nothing planned in detail or built)
 - **Where they come from (the user's call):** mud pits spawn naturally in new land near water (river banks, the floodplain, pans and oxbows), and some are made after rain (a dip fills and turns to mud, then dries away). Animals do not dig or deepen them (the user removed that idea).
 - **Real things worth copying (from memory, not source-checked; animals are fun first):**

@@ -5,6 +5,7 @@ import java.util.List;
 
 import com.antcolonies.savanna.SavannaMod;
 import com.antcolonies.savanna.registry.SavannaBlocks;
+import com.antcolonies.savanna.worldgen.MoundPlaces;
 import com.antcolonies.savanna.worldgen.FloodplainPoolFeature;
 import com.antcolonies.savanna.worldgen.FloodplainTreePiece;
 import com.antcolonies.savanna.worldgen.FloodplainTreeStructure;
@@ -668,6 +669,245 @@ public class SavannaWorldTests {
         SavannaMod.LOGGER.info("[biome maps] river width: {}", all);
         helper.assertTrue(spots >= 30, "too few savanna river spots found to measure: " + all);
         helper.succeed();
+    }
+
+    /** Oxbows and pans rework, step 1: river banks per seed, dry spots per seed, floodplain spots per seed. */
+    static final int POOL_BANKS = 60, PAN_SPOTS = 100, POOL_TRIES = 80;
+    static final int[] POOL_FLOOD = {32, 48, 64, 96, 128};
+    static final int[] PAN_RADII = {10, 20, 30, 40};
+
+    /**
+     * Oxbows and pans rework, step 1 (the user, 2026-11-18: "there more like tiny ponds", "start measuring"; plan
+     * {@code docs/plans/oxbows-and-pans.md}), read from the noise on {@link #GROUND_SEEDS}. Only measures, no limit but
+     * enough spots:
+     * <ul>
+     * <li><b>room for oxbows</b>: from savanna river banks, by how far inland, how far the floodplain biome reaches out
+     * from the water's edge, and how far from the edge the ground stays within one block (flat enough for a lake);</li>
+     * <li><b>room for pans</b>: at dry savanna spots off the floodplain, how often the ground within 10, 20, 30, 40 blocks
+     * stays within 1, 2, 3 blocks of height, how often no termite mound place ({@link MoundPlaces}) lies that near, and
+     * how far the nearest river is;</li>
+     * <li><b>today's pools</b>: at floodplain spots, how often today's oxbow and pan (sizes and rules of
+     * {@code FloodplainPoolFeature}, a square of their usual size) would fit: level within a block, above the water, no
+     * water within 8 blocks.</li>
+     * </ul>
+     */
+    @GameTest(template = "arena", timeoutTicks = 400, batch = "savanna_maps")
+    public static void oxbowAndPanRoomIsMeasured(GameTestHelper helper) {
+        var registries = helper.getLevel().registryAccess();
+        int bands = INLAND_NAMES.length, qy = QuartPos.fromBlock(SavannaSpawn.SAMPLE_Y);
+        List<List<Integer>> floodBy = new ArrayList<>(), flatBy = new ArrayList<>();
+        for (int b = 0; b < bands; b++) {
+            floodBy.add(new ArrayList<>());
+            flatBy.add(new ArrayList<>());
+        }
+        int panSpots = 0;
+        int[][] panRelief = new int[PAN_RADII.length][4]; // within 1, 2, 3 blocks; clear of mound places
+        int[] panFlatAndClear = new int[PAN_RADII.length];
+        List<Integer> riverFar = new ArrayList<>();
+        int tries = 0, oxbowFits = 0, panFits = 0, oxbowLevel = 0, panLevel = 0;
+        for (long seed : GROUND_SEEDS) {
+            Climate.Sampler sampler = BiomeMaps.sampler(registries, seed);
+            MultiNoiseBiomeSource source = BiomeMaps.bigSavannaSource(registries, seed);
+            BiomeMaps.Ground ground = BiomeMaps.ground(registries, source, seed, helper.getLevel());
+            byte[] map = BiomeMaps.map(source, sampler);
+            int side = BiomeMaps.SIDE;
+            List<Integer> rivers = new ArrayList<>(), dry = new ArrayList<>(), flood = new ArrayList<>();
+            for (int c = 0; c < map.length; c++) {
+                int i = c / side, j = c % side;
+                if (i < 2 || j < 2 || i >= side - 2 || j >= side - 2) {
+                    continue;
+                }
+                int x = -BiomeMaps.HALF + i * BiomeMaps.STEP, z = -BiomeMaps.HALF + j * BiomeMaps.STEP;
+                if (map[c] == BiomeMaps.RIVER && BiomeMaps.riverBeside(map, c, BiomeMaps.SAVANNA)) {
+                    rivers.add(c);
+                } else if (map[c] == BiomeMaps.SAVANNA) {
+                    (floodplain(source, sampler, x, z) ? flood : dry).add(c);
+                }
+            }
+            java.util.Random dice = new java.util.Random(seed);
+            java.util.Collections.shuffle(rivers, dice);
+            java.util.Collections.shuffle(dry, dice);
+            java.util.Collections.shuffle(flood, dice);
+            // room for oxbows
+            int seedBanks = 0;
+            for (int c : rivers) {
+                if (seedBanks >= POOL_BANKS) {
+                    break;
+                }
+                int x = -BiomeMaps.HALF + (c / side) * BiomeMaps.STEP, z = -BiomeMaps.HALF + (c % side) * BiomeMaps.STEP;
+                if (ground.height(x, z) > SEA_TOP) {
+                    continue;
+                }
+                int band = inlandBand(sampler, x, qy, z);
+                for (int[] d : new int[][] {{1, 0}, {-1, 0}, {0, 1}, {0, -1}}) {
+                    int edge = -1;
+                    for (int k = 0; k <= 64; k++) {
+                        if (ground.height(x + d[0] * k, z + d[1] * k) > SEA_TOP) {
+                            edge = k;
+                            break;
+                        }
+                    }
+                    if (edge < 0 || !source.getNoiseBiome(QuartPos.fromBlock(x + d[0] * (edge + 300)), qy,
+                            QuartPos.fromBlock(z + d[1] * (edge + 300)), sampler).is(BiomeTags.IS_SAVANNA)) {
+                        continue;
+                    }
+                    seedBanks++;
+                    int start = 0, width = 0;
+                    while (start < 64 && source.getNoiseBiome(QuartPos.fromBlock(x + d[0] * (edge + start)), qy,
+                            QuartPos.fromBlock(z + d[1] * (edge + start)), sampler).is(BiomeTags.IS_RIVER)) {
+                        start += 4;
+                    }
+                    for (int k = start; k <= FLOOD_LOOK; k += 4) {
+                        if (!floodplain(source, sampler, x + d[0] * (edge + k), z + d[1] * (edge + k))) {
+                            break;
+                        }
+                        width = k + 4;
+                    }
+                    // how far out the ground stays within a block (and dry)
+                    int first = ground.height(x + d[0] * edge, z + d[1] * edge), lo = first, hi = first, flat = 0;
+                    for (int k = 2; k <= 160; k += 2) {
+                        int h = ground.height(x + d[0] * (edge + k), z + d[1] * (edge + k));
+                        lo = Math.min(lo, h);
+                        hi = Math.max(hi, h);
+                        if (hi - lo > 1 || h <= SEA_TOP) {
+                            break;
+                        }
+                        flat = k;
+                    }
+                    floodBy.get(band).add(width);
+                    flatBy.get(band).add(flat);
+                }
+            }
+            // room for pans
+            int seedPans = 0;
+            for (int c : dry) {
+                if (seedPans >= PAN_SPOTS) {
+                    break;
+                }
+                int i = c / side, j = c % side;
+                int x = -BiomeMaps.HALF + i * BiomeMaps.STEP, z = -BiomeMaps.HALF + j * BiomeMaps.STEP;
+                int mid = ground.height(x, z);
+                if (mid <= SEA_TOP + 2) {
+                    continue;
+                }
+                seedPans++;
+                int[] lo = new int[PAN_RADII.length], hi = new int[PAN_RADII.length];
+                java.util.Arrays.fill(lo, mid);
+                java.util.Arrays.fill(hi, mid);
+                int far = PAN_RADII[PAN_RADII.length - 1];
+                for (int dx = -far; dx <= far; dx += 5) {
+                    for (int dz = -far; dz <= far; dz += 5) {
+                        double r = Math.sqrt(dx * dx + dz * dz);
+                        if (r > far) {
+                            continue;
+                        }
+                        int h = ground.height(x + dx, z + dz);
+                        for (int k = 0; k < PAN_RADII.length; k++) {
+                            if (r <= PAN_RADII[k]) {
+                                lo[k] = Math.min(lo[k], h);
+                                hi[k] = Math.max(hi[k], h);
+                            }
+                        }
+                    }
+                }
+                List<MoundPlaces.Place> mounds = MoundPlaces.near(seed, x, z, far + 24, MoundPlaces.Numbers.DEFAULT);
+                for (int k = 0; k < PAN_RADII.length; k++) {
+                    int relief = hi[k] - lo[k];
+                    for (int t = 1; t <= 3; t++) {
+                        panRelief[k][t - 1] += relief <= t ? 1 : 0;
+                    }
+                    final int reach = PAN_RADII[k] + 8;
+                    boolean clear = mounds.stream()
+                            .noneMatch(p -> Math.hypot(p.middle().getX() - x, p.middle().getZ() - z) <= reach);
+                    panRelief[k][3] += clear ? 1 : 0;
+                    panFlatAndClear[k] += clear && relief <= 2 ? 1 : 0;
+                }
+                int near = -1;
+                for (int r = 0; r <= 40 && near < 0; r++) {
+                    for (int a = -r; a <= r && near < 0; a++) {
+                        for (int b : new int[] {-r, r}) {
+                            int[][] cells = {{i + a, j + b}, {i + b, j + a}};
+                            for (int[] q : cells) {
+                                if (q[0] >= 0 && q[1] >= 0 && q[0] < side && q[1] < side && map[q[0] * side + q[1]] == BiomeMaps.RIVER) {
+                                    near = r * BiomeMaps.STEP;
+                                }
+                            }
+                        }
+                    }
+                }
+                riverFar.add(near < 0 ? 9999 : near);
+            }
+            panSpots += seedPans;
+            // today's pools
+            int seedTries = 0;
+            for (int c : flood) {
+                if (seedTries >= POOL_TRIES) {
+                    break;
+                }
+                seedTries++;
+                int x = -BiomeMaps.HALF + (c / side) * BiomeMaps.STEP, z = -BiomeMaps.HALF + (c % side) * BiomeMaps.STEP;
+                boolean oxLevel = todayLevel(ground, x, z, 20), pLevel = todayLevel(ground, x, z, 9);
+                oxbowLevel += oxLevel ? 1 : 0;
+                panLevel += pLevel ? 1 : 0;
+                oxbowFits += oxLevel && todayDry(ground, x, z, 20) ? 1 : 0;
+                panFits += pLevel && todayDry(ground, x, z, 9) ? 1 : 0;
+            }
+            tries += seedTries;
+        }
+        StringBuilder out = new StringBuilder("room for oxbows (floodplain width from the water's edge, and how far the ground stays within a block):");
+        for (int b = 0; b < bands; b++) {
+            List<Integer> w = floodBy.get(b), f = flatBy.get(b);
+            out.append(String.format("%n  %s: %d banks, floodplain median %d (25%% %d, 75%% %d, 90%% %d), none %.0f%%;", INLAND_NAMES[b], w.size(),
+                    middle(w, 0.5), middle(w, 0.25), middle(w, 0.75), middle(w, 0.9), 100.0 * (1 - share(w, 4))));
+            for (int t : POOL_FLOOD) {
+                out.append(String.format(" %d+ %.0f%%", t, 100.0 * share(w, t)));
+            }
+            out.append(String.format("; flat median %d (75%% %d, 90%% %d)", middle(f, 0.5), middle(f, 0.75), middle(f, 0.9)));
+        }
+        out.append(String.format("%nroom for pans (%d dry savanna spots off the floodplain; ground within r stays within 1 / 2 / 3 blocks; "
+                + "no mound place within r+8; both within 2 and clear):", panSpots));
+        for (int k = 0; k < PAN_RADII.length; k++) {
+            out.append(String.format("%n  r %d: %.0f%% / %.0f%% / %.0f%%; clear of mounds %.0f%%; flat and clear %.0f%%", PAN_RADII[k],
+                    pct(panRelief[k][0], panSpots), pct(panRelief[k][1], panSpots), pct(panRelief[k][2], panSpots),
+                    pct(panRelief[k][3], panSpots), pct(panFlatAndClear[k], panSpots)));
+        }
+        out.append(String.format("%n  nearest river (on the 32-block map) median %d, 25%% %d, 75%% %d", middle(riverFar, 0.5),
+                middle(riverFar, 0.25), middle(riverFar, 0.75)));
+        out.append(String.format("%ntoday's pools at %d floodplain spots: an oxbow (20 square) level %.0f%%, fits %.0f%%; a pan (9 square) level %.0f%%, fits %.0f%%",
+                tries, pct(oxbowLevel, tries), pct(oxbowFits, tries), pct(panLevel, tries), pct(panFits, tries)));
+        SavannaMod.LOGGER.info("[biome maps] oxbow and pan room: {}", out);
+        helper.assertTrue(floodBy.stream().mapToInt(List::size).sum() >= 30 && panSpots >= 30, "too few spots found to measure: " + out);
+        helper.succeed();
+    }
+
+    private static double pct(int part, int all) {
+        return all == 0 ? 0 : 100.0 * part / all;
+    }
+
+    /** Today's pool rule: the ground over a square of {@code size} within a block, above the river's water, at most 4 over it. */
+    private static boolean todayLevel(BiomeMaps.Ground ground, int x, int z, int size) {
+        int lo = Integer.MAX_VALUE, hi = Integer.MIN_VALUE;
+        for (int dx = -size / 2 - 1; dx <= size / 2 + 1; dx += 3) {
+            for (int dz = -size / 2 - 1; dz <= size / 2 + 1; dz += 3) {
+                int h = ground.height(x + dx, z + dz);
+                lo = Math.min(lo, h);
+                hi = Math.max(hi, h);
+            }
+        }
+        return hi - lo <= 1 && lo > SEA_TOP && lo <= SEA_TOP + 4;
+    }
+
+    /** Today's pool rule: no water within 8 blocks of the square (read every 4 blocks). */
+    private static boolean todayDry(BiomeMaps.Ground ground, int x, int z, int size) {
+        int reach = size / 2 + 1 + 8;
+        for (int dx = -reach; dx <= reach; dx += 4) {
+            for (int dz = -reach; dz <= reach; dz += 4) {
+                if (ground.height(x + dx, z + dz) <= SEA_TOP) {
+                    return false;
+                }
+            }
+        }
+        return true;
     }
 
     /**
