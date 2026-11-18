@@ -1,0 +1,25 @@
+# The Nile monitor's folded legs (2026-11-18): afloat in deep water (the swim clip), and standing on the bank with its
+# hind legs out over deep water (folded by the model), side and from above, to compare the two folds.
+#   ./gradlew runFilm -PfilmScene=tools/film/monitor_fold.film      pictures in run-film/screenshots/monitor_fold/
+cmd time set noon
+cmd weather clear
+cmd kill @e[type=!player]
+cmd fill 26 -63 12 40 -61 22 minecraft:water
+lens 40
+wait 40
+camera 31.0 -60.0 11.0 0 10
+cmd summon antcolonies:monitor 31.0 -60.6 17.0 {NoAI:1b,NoGravity:1b,OwnSize:1.0f,Rotation:[-90f,0f]}
+wait 40
+shot afloat_side
+camera 31.0 -56.5 14.0 0 50
+wait 5
+shot afloat_above
+cmd tp @e[type=antcolonies:monitor] 0 -120 0
+wait 10
+camera 25.0 -60.0 11.0 0 10
+cmd summon antcolonies:monitor 24.6 -60.0 17.0 {NoAI:1b,OwnSize:1.0f,Rotation:[90f,0f]}
+wait 40
+shot hind_out_side
+camera 25.0 -56.5 14.0 0 50
+wait 5
+shot hind_out_above

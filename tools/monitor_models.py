@@ -25,6 +25,7 @@ TEXELS = 1.0          # texture pixels a model pixel (plain colours for now)
 # --- the outline's numbers (tools/monitor_outline.py), turned into the model's axes: z = 48 - outline x -------------
 BODY_Z = (-26.0, 0.0)          # the body, front to back
 BODY_Y = (6.0, 16.0)           # belly to back
+TRUNK_JOINTS = (-17.5, -22.0)  # where the front half's three pieces meet (waist | ribs | chest), back to front
 BODY_HW = 5.0                  # half width
 
 TAIL_SEGS, TAIL_LEN = 12, 48.0         # 12 pieces of 4 px
@@ -73,8 +74,14 @@ def body():
                 cube([-4.5, 5.0, max(a, -21.0)], [4.5, y0, min(b, -7.0)], 'belly')]   # the belly hanging low
     # The root holds nothing; chest and hips turn at its pivot (the game bends them to the ground under them, so the
     # monitor curves over a bank's edge), with no rest turn, so every clip and the legs' reach work as before.
+    # The front half is three short pieces, each hanging from the one behind (2026-11-18, the user: one stiff chest
+    # made a peak or looked rigid going down a bank), so it bends in a curve: waist, ribs, then the chest that carries
+    # the forelegs and the neck.
+    za, zb = TRUNK_JOINTS
     return [{'name': 'body', 'pivot': list(BODY_PIVOT), 'cubes': []},
-            {'name': 'chest', 'parent': 'body', 'pivot': list(BODY_PIVOT), 'cubes': half(z0, zm)},
+            {'name': 'waist', 'parent': 'body', 'pivot': list(BODY_PIVOT), 'cubes': half(za, zm)},
+            {'name': 'ribs', 'parent': 'waist', 'pivot': [0.0, BODY_PIVOT[1], za], 'cubes': half(zb, za)},
+            {'name': 'chest', 'parent': 'ribs', 'pivot': [0.0, BODY_PIVOT[1], zb], 'cubes': half(z0, zb)},
             {'name': 'hips', 'parent': 'body', 'pivot': list(BODY_PIVOT), 'cubes': half(zm, z1)}]
 
 
@@ -573,7 +580,7 @@ def colour(part, face, bone, x, y, z):
     gx, gy, gz = math.floor(x), math.floor(y), math.floor(z)
     ax = math.floor(abs(x))                               # pixels out from the middle line (both sides alike)
     spot = _h(ax, gy, gz, 1)
-    if bone in ('body', 'chest', 'hips'):
+    if bone in ('body', 'waist', 'ribs', 'chest', 'hips'):
         if part == 'belly' or face == 'down' or y < BODY_Y[0] + 0.6:
             return _grain(BAR if gz % 3 == 0 and _h(ax, gz, 5) < 0.8 else PALE, ax, gy, gz, 0.04)
         if y < BODY_Y[0] + 3.5:                           # low on the flank: a yellow net fading to the belly
@@ -691,6 +698,7 @@ def paint(bones, look='nile'):
 # turn, in the bone file's degrees (as GeckoLib and the viewer read them).
 BODY_PIVOT = (0.0, TAIL_AXIS, -13.0)
 WALK_LEN, SWIM_LEN = 1.2, 1.6          # one full stride, one full tail beat (seconds; the game will scale them by speed)
+ENTER_LEN = 1.2                        # going into the water (seconds; MonitorEntity.ENTER_TICKS keeps step with it)
 
 
 def _rz(d):
@@ -713,6 +721,16 @@ def _add(a, b):
 
 def _ease(x):
     return smooth(x)
+
+
+def _blend_m(a, b, k):
+    """A turn part way (k, 0 to 1) from matrix a to matrix b: the two mixed, then squared up again."""
+    m = [[a[i][j] * (1 - k) + b[i][j] * k for j in range(3)] for i in range(3)]
+    c0 = _unit([m[0][0], m[1][0], m[2][0]])
+    c1 = [m[0][1], m[1][1], m[2][1]]
+    d = sum(x * y for x, y in zip(c0, c1))
+    c1 = _unit([x - d * y for x, y in zip(c1, c0)])
+    return _cols(c0, c1, _cross(c0, c1))
 
 
 def _pulse(t, start, rise, hold, fall):
@@ -903,21 +921,22 @@ def clips():
     # and turned away from the tail, so the tail swings between them without touching (the user's pick of three).
     P = _Poser()
 
+    def swim_leg(L):
+        """Where a leg's wrist or ankle lies folded for swimming, and its foot's turn (both on the body's axes)."""
+        s = L['s']
+        if L['kind'] == 'arm':
+            return (s * 6.3, 9.6, -10.0), _cols((0, s, 0), (s, 0, 0), (0, 0, -1))
+        a = math.radians(22.0)                              # toes swung out, away from the tail
+        c, sn = math.cos(a), math.sin(a)
+        return (s * 9.0, 9.4, 7.5), _cols((0, s, 0), (s * c, 0, -sn), (-s * sn, 0, -c))
+
     def swim(t):
         p = {}
         w = 2 * math.pi * t / SWIM_LEN
         yaw = 5.0 * math.cos(w)
         bm, bd = body(p, ry=yaw)
         for L in P.legs:
-            s = L['s']
-            if L['kind'] == 'arm':
-                wrist = (s * 6.3, 9.6, -10.0)
-                foot = _cols((0, s, 0), (s, 0, 0), (0, 0, -1))
-            else:
-                wrist = (s * 9.0, 9.4, 7.5)
-                a = math.radians(22.0)                              # toes swung out, away from the tail
-                c, sn = math.cos(a), math.sin(a)
-                foot = _cols((0, s, 0), (s * c, 0, -sn), (-s * sn, 0, -c))
+            wrist, foot = swim_leg(L)
             P.leg(p, L, bm, bd, wrist, foot, in_body=True, curl=20.0)
         neck_turn(p, 0.0, extra=(0.0, -3.0, -3.0))
         p['neck1']['rotation'][1] = round(-0.55 * yaw, 3)
@@ -934,6 +953,54 @@ def clips():
         return p
     out['swim'] = clip(SWIM_LEN, swim, 32)
     worst['swim'] = P.worst
+
+    # Going in (2026-11-18, the user's ask: "an actual animation of the monitor pushing down into the water before
+    # taking swimming form"): at the water's edge it leans out, the front going down and the neck dipping to the water,
+    # the forelegs reaching forward and down over it; the hind legs, still on the bank, straighten and shove it forward
+    # and down; the forelegs sweep back along its sides first, then the hind legs as they leave the bank, the tail
+    # straightening behind; it ends in the swim clip's first pose, so the swim goes on from it. The game plays it once
+    # as the forelegs lose the bank over water while the hind legs still stand (MonitorModel).
+    swim0 = swim(0.0)
+    P = _Poser()
+
+    def enter(t):
+        p = {}
+        lean = _ramp(t, ((0.0, 0.0), (0.4, 1.0)))
+        push = _ramp(t, ((0.25, 0.0), (0.7, 1.0)))
+        glide = _ramp(t, ((0.6, 0.0), (ENTER_LEN, 1.0)))
+        fore = _ramp(t, ((0.4, 0.0), (0.85, 1.0)))        # the forelegs folding
+        hind = _ramp(t, ((0.7, 0.0), (1.1, 1.0)))         # the hind legs folding, as they leave the bank
+        down = max(lean, push) * (1 - glide)
+        yaw = 5.0 * glide
+        bm, bd = body(p, ry=yaw, rx=9.0 * down, dy=-1.4 * down, dz=-2.5 * push * (1 - glide))
+        for L in P.legs:
+            x, y, z = L['W']
+            if L['kind'] == 'arm':                         # reaching forward and down over the water, toes hanging
+                wrist, foot, fold = [x * 1.1, y - 2.5 * lean, z - 3.5 * lean], _mul(L['foot'], _rx(-24 * lean)), fore
+            else:                                          # planted on the bank, shoving back
+                wrist, foot, fold = [x, y, z + 3.0 * push], L['foot'], hind
+            # the ground place on the body's axes (as leg() works it out), then part way to the folded place
+            wb = _add(_mv(_tr(bm), _sub(_sub(wrist, bd), BODY_PIVOT)), BODY_PIVOT)
+            fb = _mul(_tr(bm), foot)
+            sw, sf = swim_leg(L)
+            wb = [a + (b - a) * fold for a, b in zip(wb, sw)]
+            P.leg(p, L, bm, bd, wb, _blend_m(fb, sf, fold), in_body=True, curl=20.0 * fold + 10.0 * lean * (1 - fold))
+        dip = 7.0 * down
+        neck_turn(p, 0.0, extra=(dip - 0.0 * glide, dip * 0.9 - 3.0 * glide, dip * 0.4 - 3.0 * glide))
+        p['neck1']['rotation'][1] = round(-0.55 * yaw, 3)
+        p['neck2']['rotation'][1] = round(-0.3 * yaw, 3)
+        p['head']['rotation'][1] = round(-0.15 * yaw, 3)
+        for i in range(TAIL_SEGS):
+            name = f'tail{i + 1}'
+            end = swim0[name]['rotation']
+            swish = 3.0 * (i / (TAIL_SEGS - 1)) * math.sin(2 * math.pi * t / 0.6 - 0.5 * i) * push * (1 - glide)
+            lift = (4.0 if i < 3 else 0.0) * push * (1 - glide)        # the tail base raised as the hind legs shove
+            p[name] = {'rotation': [round(end[0] * glide + lift, 3), round(end[1] * glide + swish, 3), 0.0]}
+        for side in ('left', 'right'):
+            p[f'pupil_{side}'] = {'position': [0.0, 0.0, round(-0.25 * glide, 3)]}
+        return p
+    out['enter'] = clip(ENTER_LEN, enter, 36, loop='hold')
+    worst['enter'] = P.worst
 
     # The threat: standing tall on straightened legs, the front raised, the neck stretched up and the head tipped down
     # at the threat, the mouth gaping and closing with the hiss, the tail arched up off the ground and lashing.

@@ -48,6 +48,14 @@ public final class GroundBend {
     private final double[] front, rear;
     /** Each piece's lie now (degrees; its far end up is positive), front chain then rear chain. */
     private final double[] lie;
+    /**
+     * The trunk: the front chain's first {@code trunkPieces} pieces each bend at most {@code trunk} degrees against the
+     * piece behind (the first against the rear chain's first, the hips), so the body curves a little at each joint and the
+     * neck and head take the rest of a dip (2026-11-18, the user's reports on the monitor: one chest tipping up to 50
+     * degrees off the hips made a peak in its back, and one chest held to a small bend looked rigid); none, as before.
+     */
+    private final int trunkPieces;
+    private final double trunk;
     /** How far the shoulders are lifted now (blocks). */
     private double lift;
     private long lastNanos;
@@ -55,6 +63,13 @@ public final class GroundBend {
     private double atX, atY, atZ, alongX, alongZ = 1;
 
     public GroundBend(double[] front, double[] rear) {
+        this(front, rear, 0, MAX_JOINT);
+    }
+
+    /** As {@link #GroundBend(double[], double[])}, the front chain's first {@code trunkPieces} pieces a trunk (see {@link #trunk}). */
+    public GroundBend(double[] front, double[] rear, int trunkPieces, double trunk) {
+        this.trunkPieces = trunkPieces;
+        this.trunk = trunk;
         this.front = front.clone();
         this.rear = rear.clone();
         this.lie = new double[(front.length - 1) + (rear.length - 1)];
@@ -97,8 +112,11 @@ public final class GroundBend {
         // the shoulders (the anchor) lie on what is under them, never lower than the animal itself stands
         double wantLift = alive ? Mth.clamp(under(level, x, z, fx, fz, -front[0] * perBlock, y, inWater, floatDepth) - y, 0, MAX_LIFT) : 0;
         lift += (wantLift - lift) * k;
-        int i = 0;
-        for (double[] chain : new double[][] {front, rear}) {
+        // the rear chain first, so the chest can be held within the trunk's bend of the hips
+        double hips = 0;
+        for (int c = 1; c >= 0; c--) {
+            double[] chain = c == 0 ? front : rear;
+            int i = c == 0 ? 0 : front.length - 1;
             int n = chain.length - 1;
             double[] targets = new double[n];
             double[] lengths = new double[n];
@@ -108,7 +126,17 @@ public final class GroundBend {
             }
             double[] want = new double[n];
             if (alive) {
-                solve(y + wantLift, targets, lengths, MAX_JOINT, MAX_STEEP, want);
+                // a straight trunk is its first piece lying at minus the hips' lie (each lie is its far end up)
+                boolean stiff = c == 0 && trunkPieces > 0;
+                double lo = stiff ? -hips - trunk : -MAX_STEEP, hi = stiff ? -hips + trunk : MAX_STEEP;
+                double[] joints = new double[n];
+                for (int j = 0; j < n; j++) {
+                    joints[j] = c == 0 && j < trunkPieces ? trunk : MAX_JOINT;
+                }
+                solve(y + wantLift, targets, lengths, joints, MAX_STEEP, Math.max(lo, -MAX_STEEP), Math.min(hi, MAX_STEEP), want);
+                if (c == 1) {
+                    hips = want[0];
+                }
             }
             for (int j = 0; j < n; j++, i++) {
                 lie[i] += (want[j] - lie[i]) * k;
@@ -157,6 +185,26 @@ public final class GroundBend {
         return false;
     }
 
+    /**
+     * Whether water lies under the point this far along the body (blocks, + forward), from just over the feet down to
+     * {@code reach} under them (2026-11-18: the monitor's push into the water starts where its forelegs lose the bank over
+     * water, not over a drop).
+     */
+    public boolean overWater(BlockGetter level, double along, double reach) {
+        BlockPos.MutableBlockPos p = new BlockPos.MutableBlockPos();
+        int bx = Mth.floor(atX + alongX * along), bz = Mth.floor(atZ + alongZ * along);
+        double feet = atY + lift;
+        for (int c = Mth.floor(feet + 0.3); c >= Mth.floor(feet - reach); c--) {
+            if (level.getFluidState(p.set(bx, c, bz)).is(FluidTags.WATER)) {
+                return true;
+            }
+            if (top(level, p) >= 0) {
+                return false;
+            }
+        }
+        return false;
+    }
+
     /** How far the shoulders are lifted above the animal's own height (blocks): the whole body is raised by it before it bends. */
     public double lift() {
         return lift;
@@ -182,14 +230,22 @@ public final class GroundBend {
      * @param out each piece's lie (degrees, its far end up is positive)
      */
     public static void solve(double anchorY, double[] targets, double[] lengths, double maxJoint, double maxSteep, double[] out) {
+        double[] joints = new double[targets.length];
+        java.util.Arrays.fill(joints, maxJoint);
+        solve(anchorY, targets, lengths, joints, maxSteep, -maxSteep, maxSteep, out);
+    }
+
+    /** As above, each joint with its own reach (the first entry unused), the first piece between {@code firstLo} and {@code firstHi}. */
+    public static void solve(double anchorY, double[] targets, double[] lengths, double[] maxJoint, double maxSteep,
+            double firstLo, double firstHi, double[] out) {
         double h = anchorY;
         double before = 0;
         for (int j = 0; j < targets.length; j++) {
             double angle = Math.toDegrees(Math.asin(Mth.clamp((targets[j] - h) / lengths[j], -1.0, 1.0)));
             if (j > 0) {            // the first piece hangs from the stiff body, which a long neck or a chest turns far on
-                angle = Mth.clamp(angle, before - maxJoint, before + maxJoint);
+                angle = Mth.clamp(angle, before - maxJoint[j], before + maxJoint[j]);
             }
-            angle = Mth.clamp(angle, -maxSteep, maxSteep);
+            angle = j == 0 ? Mth.clamp(angle, firstLo, firstHi) : Mth.clamp(angle, -maxSteep, maxSteep);
             out[j] = angle;
             h += lengths[j] * Math.sin(Math.toRadians(angle));
             before = angle;

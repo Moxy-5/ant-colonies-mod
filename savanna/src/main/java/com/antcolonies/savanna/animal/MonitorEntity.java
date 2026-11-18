@@ -138,17 +138,39 @@ public class MonitorEntity extends PathfinderMob implements GeoEntity {
      * body's middle, where chest and hips turn; forward through the chest, the two neck bones and the head to the snout
      * tip; back through the hips and the twelve tail bones to the tail tip.
      */
-    public static final double[] FRONT_JOINTS = {-13, -26, -30, -34, -47},
+    public static final double[] FRONT_JOINTS = {-13, -17.5, -22, -26, -30, -34, -47},
             REAR_JOINTS = {-13, 0, 4, 8, 12, 16, 20, 24, 28, 32, 36, 40, 44, 48};
     /** The bones of those pieces, in the same order: front chain, then rear chain. */
-    public static final String[] BENT_BONES = {"chest", "neck1", "neck2", "head", "hips", "tail1", "tail2", "tail3", "tail4",
+    public static final String[] BENT_BONES = {"waist", "ribs", "chest", "neck1", "neck2", "head", "hips", "tail1", "tail2", "tail3", "tail4",
             "tail5", "tail6", "tail7", "tail8", "tail9", "tail10", "tail11", "tail12"};
     /** Where each leg pair's feet stand along the body (model z, pixels): the forelegs, then the hind legs. */
     public static final double[] LEG_PAIRS = {-25, -3};
     /** How much each leg pair stands now (1) or is folded back along the body as it swims (0), eased; drawing only (MonitorModel). */
     public final double[] legStand = {1, 1};
     public long legNanos;
-    private final GroundBend bend = new GroundBend(FRONT_JOINTS, REAR_JOINTS);
+    /**
+     * Both leg pairs are folded this far (stand under this) before the swim clip plays (2026-11-18, the user's report: going
+     * into the water the hind legs swung up over the back for a moment). Until then the walk or idle clip plays and the
+     * model folds each pair itself as its feet lose the ground, so the clip never switches under a leg still on the bank.
+     */
+    public static final double FOLDED = 0.05;
+    /**
+     * Going into the water (2026-11-18, the user's ask): the "enter" clip's length (ticks; {@code ENTER_LEN} in
+     * {@code tools/monitor_models.py}), played once from {@link #enterTick}, which the model sets (drawing only) as the
+     * forelegs lose the bank over water while the hind legs still stand: it leans out, shoves off with the hind legs and
+     * folds into the swim.
+     */
+    public static final int ENTER_TICKS = 24;
+    public int enterTick = -1000;
+    /**
+     * The front half is three pieces (waist, ribs, chest: the first {@link #TRUNK_PIECES} of {@link #BENT_BONES}), each
+     * bending at most {@link #TRUNK_BEND} degrees against the one behind (my picks, 2026-11-18, the user's reports: one
+     * chest bending far made a peak in the back going down a bank, held to a small bend it looked rigid), so the body
+     * curves; the neck and head take the rest of a dip.
+     */
+    public static final int TRUNK_PIECES = 3;
+    public static final double TRUNK_BEND = 15.0;
+    private final GroundBend bend = new GroundBend(FRONT_JOINTS, REAR_JOINTS, TRUNK_PIECES, TRUNK_BEND);
     /** Who just hurt it, to bite back if at its jaws. */
     @Nullable
     LivingEntity biteBack;
@@ -990,6 +1012,7 @@ public class MonitorEntity extends PathfinderMob implements GeoEntity {
     private static final RawAnimation IDLE = RawAnimation.begin().thenLoop("idle");
     private static final RawAnimation WALK = RawAnimation.begin().thenLoop("walk");
     private static final RawAnimation SWIM = RawAnimation.begin().thenLoop("swim");
+    private static final RawAnimation ENTER = RawAnimation.begin().thenPlayAndHold("enter");
     private static final RawAnimation BASK_CLIP = RawAnimation.begin().thenLoop("bask");
     private static final RawAnimation HISS_CLIP = RawAnimation.begin().thenLoop("hiss");
     private static final RawAnimation BITE_CLIP = RawAnimation.begin().thenPlayAndHold("bite");
@@ -1004,7 +1027,20 @@ public class MonitorEntity extends PathfinderMob implements GeoEntity {
         controllers.add(new AnimationController<>(this, "tongue", 0, this::tongue));
     }
 
-    private boolean walking() {
+    /**
+     * Whether the swim clip plays (drawing only): afloat, with both leg pairs folded ({@link #FOLDED}). The model eases
+     * {@link #legStand} by each pair's own footing, and sets it straight from "afloat" when drawn too far to bend.
+     */
+    public boolean swimClip() {
+        return isInWater() && !onGround() && legStand[0] < FOLDED && legStand[1] < FOLDED;
+    }
+
+    /** Whether the going-in clip plays (drawing only). */
+    public boolean entering() {
+        return tickCount >= enterTick && tickCount - enterTick < ENTER_TICKS && !isDeadOrDying();
+    }
+
+    public boolean walking() {
         double dx = getX() - xo, dz = getZ() - zo;
         return dx * dx + dz * dz > 0.004 * 0.004;
     }
@@ -1031,7 +1067,10 @@ public class MonitorEntity extends PathfinderMob implements GeoEntity {
         }
         double dx = getX() - xo, dz = getZ() - zo;
         double speed = Math.sqrt(dx * dx + dz * dz);
-        if (isInWater() && !onGround()) {
+        if (entering()) {
+            return state.setAndContinue(ENTER);
+        }
+        if (swimClip()) {
             player.setAnimationSpeed(Mth.clamp(0.6 + speed / 0.08, 0.6, 2.0));
             return state.setAndContinue(SWIM);
         }

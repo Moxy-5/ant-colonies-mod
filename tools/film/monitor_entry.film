@@ -1,0 +1,110 @@
+# The Nile monitor going into the water, one picture a tick (2026-11-18, the user's report: the hind legs swung up as it
+# went in, and the body opened a wedge across the shoulders at the bank's edge). A live one scared on a level bank runs
+# for the water and dives; side view, close.
+#   ./gradlew runFilm -PfilmScene=tools/film/monitor_entry.film      pictures in run-film/screenshots/monitor_entry/
+cmd time set noon
+cmd weather clear
+cmd kill @e[type=!player]
+cmd fill 26 -63 12 40 -61 22 minecraft:water
+lens 40
+wait 40
+camera 25.0 -60.3 12.0 0 10
+cmd summon antcolonies:monitor 20.0 -60.0 17.0 {OwnSize:1.0f,HungryIn:99999,SunIn:99999,Rotation:[-90f,0f]}
+wait 30
+cmd execute positioned 20 -60 17 run damage @e[type=antcolonies:monitor,limit=1,sort=nearest] 0.5 minecraft:cactus
+wait 12
+shot e_00
+wait 1
+shot e_01
+wait 1
+shot e_02
+wait 1
+shot e_03
+wait 1
+shot e_04
+wait 1
+shot e_05
+wait 1
+shot e_06
+wait 1
+shot e_07
+wait 1
+shot e_08
+wait 1
+shot e_09
+wait 1
+shot e_10
+wait 1
+shot e_11
+wait 1
+shot e_12
+wait 1
+shot e_13
+wait 1
+shot e_14
+wait 1
+shot e_15
+wait 1
+shot e_16
+wait 1
+shot e_17
+wait 1
+shot e_18
+wait 1
+shot e_19
+wait 1
+shot e_20
+wait 1
+shot e_21
+wait 1
+shot e_22
+wait 1
+shot e_23
+wait 1
+shot e_24
+wait 1
+shot e_25
+wait 1
+shot e_26
+wait 1
+shot e_27
+wait 1
+shot e_28
+wait 1
+shot e_29
+wait 1
+shot e_30
+wait 1
+shot e_31
+wait 1
+shot e_32
+wait 1
+shot e_33
+wait 1
+shot e_34
+wait 1
+shot e_35
+wait 1
+shot e_36
+wait 1
+shot e_37
+wait 1
+shot e_38
+wait 1
+shot e_39
+wait 1
+shot e_40
+wait 1
+shot e_41
+wait 1
+shot e_42
+wait 1
+shot e_43
+wait 1
+shot e_44
+wait 1
+shot e_45
+wait 1
+shot e_46
+wait 1
+shot e_47
