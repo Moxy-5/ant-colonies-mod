@@ -83,6 +83,19 @@ dragged from the hips (framework, species-neutral, any number of pieces):
 Checks every stage: the measuring course (`python tools/body_course.py run monitor`), its findings read before the
 user sees anything; the side films. Animal-only work: no guard films. Two strikes inside a stage: stop and rethink.
 
+### Stage B as built (2026-11-19; waiting for the user's look)
+- The clip (`_climb_keys`, `climb_up` in `tools/monitor_models.py`): one for each of five sizes (a block is a different
+  number of model pixels at each), **4.4 s** (slower than the 2.5 s above: the hind feet needed three holds, the
+  ground, the step's face half way up with the toes up against it, and the top; one number to quicken in stage D).
+  Look up and flick (0 to 1.2 s), rear to 42 degrees with the forefeet onto the top (to 2.1 s), the hind feet onto the
+  face and the push (to 2.85 s), the haul over the edge, the hind feet onto the top, stand (4.1 s).
+- The path: the maker writes it into `MonitorClimb.java`; `MonitorEntity.Climb` (synced) moves the box along it,
+  `MonitorModel.place` draws along it, the clip plays on the climb's own clock (`SteadyController.clock`).
+- Starts only when it arrives straight (within 40 degrees) at the climb's start; arriving too close or at an angle it
+  steps up the old way (stage D: turn and back up to the start instead).
+- Climbing, the elbows and knees bend the way they point standing, raised (`CLIMB_RAISED`): the rest way lay along a
+  reaching foot's line, and the joint flipped round between two keys.
+
 ## The numbers (the balancer check)
 - At its size: 4.5 blocks long; the box 0.7 wide at the middle of the body; the snout 2.2 blocks ahead of the box,
   the forefeet about 0.55, the hind feet about 0.45 behind, the tail 2.25 blocks from about 0.6 behind.

@@ -587,6 +587,28 @@ class Clip:
         # A clip played over a hole (an attack down into a broken tunnel) says where the hole starts ("hole -11.9": in
         # front of that z, model units): parts there may go below the floor.
         self.hole = next((float(w.split()[1]) for w in self.notes.values() if w.startswith('hole ')), None)
+        # A move with its own path (the monitor's climb, the Animal Maker Engine step 2, 2026-11-19): the root bone's
+        # travel is kept out of the clip and played by the game along the path ("path body t dy dz t dy dz ...", model
+        # units); the lab adds it back. Its scene's step ("step <face z> <height>"): a block in front of that z, that high.
+        self.path, self.step = None, None
+        for w in self.notes.values():
+            if w.startswith('path '):
+                words = w.split()
+                v = list(map(float, words[2:]))
+                self.path = (words[1], [tuple(v[i:i + 3]) for i in range(0, len(v) - 2, 3)])
+            elif w.startswith('step '):
+                self.step = tuple(map(float, w.split()[1:3]))
+
+    def travel(self, t):
+        """(dy, dz) the path has moved the root by at time t (model units)."""
+        keys = self.path[1]
+        if t <= keys[0][0]:
+            return keys[0][1:]
+        for (t0, y0, z0), (t1, y1, z1) in zip(keys, keys[1:]):
+            if t <= t1:
+                f = (t - t0) / (t1 - t0) if t1 > t0 else 1.0
+                return y0 + (y1 - y0) * f, z0 + (z1 - z0) * f
+        return keys[-1][1:]
 
     def pose(self, t):
         if self.loop:
@@ -597,6 +619,11 @@ class Clip:
             pos = sample_channel(chans['position'], t) if 'position' in chans else (0, 0, 0)
             scl = sample_channel(chans['scale'], t) if 'scale' in chans else (1, 1, 1)
             out[bone] = (tuple(rot), tuple(pos), tuple(scl))
+        if self.path:
+            root = self.path[0]
+            rot, pos, scl = out.get(root, ((0, 0, 0), (0, 0, 0), (1, 1, 1)))
+            dy, dz = self.travel(t)
+            out[root] = (rot, (pos[0], pos[1] + dy, pos[2] + dz), scl)
         return out
 
 
@@ -916,6 +943,8 @@ def film(model, clip, frames=8, views=('side', 'front', 'top', 'three'), treadmi
     gait = gait_of(model, clip)
     speed = gait.speed if treadmill is None else treadmill
     ext = floor_extent(model)
+    if clip.path:                                   # the floor reaches as far as the path goes
+        ext = (ext[0], (ext[1][0] + min(0.0, min(k[2] for k in clip.path[1])), ext[1][1]))
     ground = gait.ground if model.feet else 0.0
     floor_pts = [(x, ground, z) for x in ext[0] for z in ext[1]]
     title_h, label_h = 34, 22
@@ -933,11 +962,31 @@ def film(model, clip, frames=8, views=('side', 'front', 'top', 'three'), treadmi
             cell = (x0 + 1, y0 + label_h, cw - 2, ch - 1)
             fr = Frame(cv, cell, view, bounds)
             pose = clip.pose(t)
+            if clip.step:
+                fr.boxes([step_box(clip.step, ground, ext)])
             fr.boxes(model.posed(pose))
             fr.grid(ground, (speed * t) % 4.0 - 4.0 if speed else 0.0, ext)
             draw_trails(fr, model, gait, t, speed)
-            mark_below(fr, model, pose, ground)
+            mark_below(fr, model, pose, ground, clip.step)
     return cv
+
+
+STEP_GREY = (150, 150, 146)
+
+
+def step_box(step, ground, ext):
+    """The step in a clip's scene as a box to draw: a block in front of its face, as wide as the floor."""
+    face, high = step
+    (lx, hx), (lz, _) = ext
+    lo, hi = (lx, ground, min(lz, face - 40.0)), (hx, ground + high, face)
+    corners = [(lo[0] if not k >> 2 & 1 else hi[0], lo[1] if not k >> 1 & 1 else hi[1], lo[2] if not k & 1 else hi[2])
+               for k in range(8)]
+    return 'step', corners, {f: STEP_GREY for f in FACE_CORNERS}
+
+
+def in_step(p, step, ground, margin=0.35):
+    """Whether a point is inside the clip's step (deeper than the margin)."""
+    return step is not None and p[2] < step[0] - margin and p[1] < ground + step[1] - margin
 
 
 def draw_trails(fr, model, gait, t, speed):
@@ -957,10 +1006,10 @@ def draw_trails(fr, model, gait, t, speed):
         fr.canvas.dot(x, y, 3, col, fr.cell)
 
 
-def mark_below(fr, model, pose, ground):
+def mark_below(fr, model, pose, ground, step=None):
     for _, corners, _ in model.posed(pose):
         for p in corners:
-            if p[1] < ground - 0.35:
+            if p[1] < ground - 0.35 or in_step(p, step, ground):
                 x, y, _ = fr.px(p)
                 fr.canvas.dot(x, y, 2, BAD, fr.cell)
 

@@ -5,6 +5,7 @@ import com.antcolonies.client.DraggedTail;
 import com.antcolonies.entity.body.GroundBend;
 import com.antcolonies.entity.body.TailDrag;
 import com.antcolonies.savanna.SavannaMod;
+import com.antcolonies.savanna.animal.MonitorClimb;
 import com.antcolonies.savanna.animal.MonitorEntity;
 
 import net.minecraft.client.Minecraft;
@@ -20,6 +21,7 @@ import software.bernie.geckolib.model.DefaultedEntityGeoModel;
 import java.util.function.Function;
 
 import org.joml.Matrix4f;
+import org.joml.Vector3d;
 import org.joml.Quaternionf;
 import org.joml.Vector3f;
 
@@ -46,6 +48,12 @@ import org.joml.Vector3f;
  * standing on land, each joint is held in the world and pulled after the one in front, so round a turn the tail sweeps
  * after the body and over a step it drapes from the edge and is pulled up after the hips. The other clips (bask, hiss,
  * bite, eat, swim, going in, death) keep their own tail with the body's lie as before, eased over.
+ * <p>
+ * Climbing a block (stage B, 2026-11-19, {@link MonitorEntity.Climb}) it is drawn on the climb's own path: its place
+ * worked out from where the climb started and how far into the clip it is, not from its box (which steps up all at once
+ * at the face), the body's lie on the ground eased away and the legs left to the clip; the tail hangs from the reared
+ * hips and is dragged up after them. Where the drawing hands over between its box and the path it slides across
+ * ({@link #HAND_OVER}) instead of jumping.
  */
 public class MonitorModel extends DefaultedEntityGeoModel<MonitorEntity> {
     /** Who it looks at: a player within this many blocks (my pick, a little past the watch goal's reach). */
@@ -86,6 +94,8 @@ public class MonitorModel extends DefaultedEntityGeoModel<MonitorEntity> {
             {{56.749, -52.764, -1.292}, {0.0, 0.0, 19.231}, {-56.661, 24.419, -131.013}}};
     private static final String[] PIECES = {"upper", "lower", "foot"};
     /** The tail, base to tip, dragged ({@link TailDrag}). */
+    /** How quickly the drawing slides from its box onto the climb's path, or back (seconds; my pick). */
+    private static final double HAND_OVER = 0.12;
     private static final DraggedTail TAIL = new DraggedTail("tail1", "tail2", "tail3", "tail4", "tail5", "tail6", "tail7",
             "tail8", "tail9", "tail10", "tail11", "tail12");
 
@@ -117,13 +127,15 @@ public class MonitorModel extends DefaultedEntityGeoModel<MonitorEntity> {
             double afloat = monitor.isInWater() && !monitor.onGround() ? 0 : 1;
             monitor.legStand[0] = afloat;
             monitor.legStand[1] = afloat;
+            monitor.drawnNanos = 0;
             return;
         }
         float yaw = Mth.rotLerp(pt, monitor.yBodyRotO, monitor.yBodyRot);
         double scale = MonitorEntity.MODEL_SCALE * monitor.getScale();
+        MonitorEntity.Climb climb = monitor.climb();
         GroundBend bend = monitor.bend();
-        bend.update(monitor.level(), x, y, z, yaw, scale, monitor.isInWater(), monitor.floatDepth(), !monitor.isDeadOrDying(),
-                System.nanoTime());
+        bend.update(monitor.level(), x, y, z, yaw, scale, monitor.isInWater(), monitor.floatDepth(),
+                !monitor.isDeadOrDying() && climb == null, System.nanoTime());
         GeoBone body = getAnimationProcessor().getBone("body");
         if (body != null && bend.lift() > 1.0E-3) {      // the shoulders lifted onto a bank: the whole body up, in model pixels
             boolean marked = body.hasRotationChanged() || body.hasPositionChanged() || body.hasScaleChanged();
@@ -150,20 +162,73 @@ public class MonitorModel extends DefaultedEntityGeoModel<MonitorEntity> {
             }
         }
         byte doing = monitor.doing();
-        if (!monitor.isDeadOrDying() && (doing == MonitorEntity.CALM || doing == MonitorEntity.WATCH)) {
+        if (!monitor.isDeadOrDying() && climb == null && (doing == MonitorEntity.CALM || doing == MonitorEntity.WATCH)) {
             legs(monitor, bend, scale, x, y, z, yaw);
         }
-        tail(monitor, bend, scale, x, y, z, yaw);
+        Vector3d moved = place(monitor, climb, scale, x, y, z, yaw);
+        tail(monitor, bend, climb, moved, scale, x, y, z, yaw);
         look(monitor, pt, x, z, yaw);
+    }
+
+    /**
+     * Where it is drawn (2026-11-19): at its box, or climbing, on the climb's path (where the climb started, and how far
+     * forward and up the clip has come by the moment it is drawn at), sliding over from one to the other when it starts
+     * or ends ({@link #HAND_OVER}). Moves the whole model there by its root bone; says by how much (model blocks).
+     */
+    private Vector3d place(MonitorEntity monitor, MonitorEntity.Climb climb, double scale, double x, double y, double z, float yaw) {
+        double wx = x, wy = y, wz = z;
+        if (climb != null) {
+            double t = Math.max(0.0, monitor.climbClipTicks());
+            double along = MonitorClimb.along(climb.size(), t) * scale / 16.0;
+            wx = climb.x() + climb.dirX() * along;
+            wy = climb.y() + MonitorClimb.rise(climb.size(), t);
+            wz = climb.z() + climb.dirZ() * along;
+        }
+        long now = System.nanoTime();
+        boolean climbing = climb != null;
+        if (monitor.drawnNanos == 0) {           // first drawn (or drawn again after a while far off): no hand over
+            monitor.shiftX = monitor.shiftY = monitor.shiftZ = 0;
+        } else if (climbing != monitor.drawnClimbing) {     // handing over: from where it was drawn, sliding to its new place
+            monitor.shiftX = monitor.drawnX - wx;
+            monitor.shiftY = monitor.drawnY - wy;
+            monitor.shiftZ = monitor.drawnZ - wz;
+        }
+        double dt = monitor.drawnNanos == 0 ? 1.0 : (now - monitor.drawnNanos) / 1.0E9;
+        double keep = dt <= 0 ? 1.0 : dt > 0.5 ? 0.0 : Math.exp(-dt / HAND_OVER);
+        monitor.shiftX *= keep;
+        monitor.shiftY *= keep;
+        monitor.shiftZ *= keep;
+        monitor.drawnClimbing = climbing;
+        monitor.drawnNanos = now;
+        monitor.drawnX = wx + monitor.shiftX;
+        monitor.drawnY = wy + monitor.shiftY;
+        monitor.drawnZ = wz + monitor.shiftZ;
+        // from the world into the model (the drawing is turned by 180 less its yaw and scaled, as BoneFrames.placement)
+        Vector3d m = new Vector3d(monitor.drawnX - x, monitor.drawnY - y, monitor.drawnZ - z)
+                .rotateY(-Math.toRadians(180.0 - yaw)).div(scale);
+        GeoBone body = getAnimationProcessor().getBone("body");
+        if (body == null || m.lengthSquared() < 1.0E-10) {
+            return new Vector3d();
+        }
+        boolean marked = body.hasRotationChanged() || body.hasPositionChanged() || body.hasScaleChanged();
+        body.setPosX((float) (body.getPosX() - m.x * 16.0));       // GeckoLib draws a bone's x move the other way
+        body.setPosY((float) (body.getPosY() + m.y * 16.0));
+        body.setPosZ((float) (body.getPosZ() + m.z * 16.0));
+        if (!marked) {
+            body.resetStateChanges();
+        }
+        return m;
     }
 
     /**
      * The tail dragged behind it ({@link TailDrag}): walking or standing on land (the walk and idle clips) the drag has it;
      * in the other clips and in the water the clip and the body's lie have it, as before (the engine's step 4 redoes the
      * water). The frame it hangs from is the hips as the body lies on the ground, lifted with the shoulders, without the
-     * clips' own swing and bob, so on flat ground the tail is exactly the clip's.
+     * clips' own swing and bob, so on flat ground the tail is exactly the clip's; climbing, the hips as the climb clip
+     * rears the body, where the climb has moved it ({@code moved}, model blocks).
      */
-    private void tail(MonitorEntity monitor, GroundBend bend, double scale, double x, double y, double z, float yaw) {
+    private void tail(MonitorEntity monitor, GroundBend bend, MonitorEntity.Climb climb, Vector3d moved, double scale, double x,
+            double y, double z, float yaw) {
         Function<String, GeoBone> bones = getAnimationProcessor()::getBone;
         GeoBone hips = bones.apply("hips");
         if (hips == null) {
@@ -178,8 +243,13 @@ public class MonitorModel extends DefaultedEntityGeoModel<MonitorEntity> {
         byte doing = monitor.doing();
         boolean on = !monitor.isDeadOrDying() && (doing == MonitorEntity.CALM || doing == MonitorEntity.WATCH)
                 && !monitor.isInWater() && !monitor.swimClip() && !monitor.entering();
-        Matrix4f parent = BoneFrames.placement(x, y, z, yaw, scale).translate(0f, (float) (bend.lift() / scale), 0f)
-                .mul(BoneFrames.local(hips, false));
+        Matrix4f parent = BoneFrames.placement(x, y, z, yaw, scale).translate((float) moved.x, (float) moved.y, (float) moved.z)
+                .translate(0f, (float) (bend.lift() / scale), 0f);
+        GeoBone body = bones.apply("body");
+        if (climb != null && body != null) {     // the climb's rear (its body turn about the body's pivot)
+            parent.mul(BoneFrames.local(new Vector3f(), BoneFrames.pivot(body), body.getRotZ(), body.getRotY(), body.getRotX()));
+        }
+        parent.mul(BoneFrames.local(hips, false));
         TAIL.pose(bones, parent, monitor.tail, TailDrag.Ground.of(monitor.level(), y, monitor.isInWater(), monitor.floatDepth()),
                 scale / 16.0, on, System.nanoTime());
     }
@@ -423,7 +493,7 @@ public class MonitorModel extends DefaultedEntityGeoModel<MonitorEntity> {
     /** The nearest player it would look at: alive, resting, basking or watching, on land, and the player not a spectator. */
     private static Player watched(MonitorEntity monitor) {
         byte doing = monitor.doing();
-        if (!monitor.isAlive() || monitor.isInWater()
+        if (!monitor.isAlive() || monitor.isInWater() || monitor.climb() != null
                 || doing != MonitorEntity.CALM && doing != MonitorEntity.BASK && doing != MonitorEntity.WATCH) {
             return null;
         }

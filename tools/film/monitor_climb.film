@@ -1,0 +1,40 @@
+# The Nile monitor's climb up a block (the Animal Maker Engine step 2, stage B, 2026-11-19; docs/plans/engine-step2-climb.md):
+# it walks east to a one-block step (its west face at x 10) and climbs it: looks up, rears, forefeet on top, hind feet
+# on the face, hauls up, stands, walks on. Side on, every 6 ticks, then from behind and above.
+#   ./gradlew runFilm -PfilmScene=tools/film/monitor_climb.film      pictures in run-film/screenshots/monitor_climb/
+cmd time set noon
+cmd weather clear
+cmd kill @e[type=!player]
+cmd fill 10 -60 -6 16 -60 6 minecraft:stone
+lens 40
+wait 40
+walker antcolonies:monitor 2.5 -60 0.5 -90 OwnSize:1.0f,HungryIn:99999,SunIn:99999
+# (the camera's height is its feet: its eye is 1.62 higher)
+camera 8.0 -60.2 -7.0 0 4
+cmd tick unfreeze
+go 14 -59 0 0.8
+wait 20
+repeat 30
+wait 6
+shot side_{i}
+end
+cmd kill @e[type=antcolonies:monitor]
+wait 10
+# again from behind and a little above, three quarters
+walker antcolonies:monitor 2.5 -60 0.5 -90 OwnSize:1.0f,HungryIn:99999,SunIn:99999
+camera 3.5 -58.5 -4.0 -40 18
+cmd tick unfreeze
+go 14 -59 0 0.8
+wait 20
+repeat 20
+wait 12
+shot back_{i}
+end
+# on along the top (the first route reached only a block past the edge: the start lies past the monitor's route range)
+go 15 -59 0 0.8
+repeat 12
+wait 12
+shot after_{i}
+end
+cmd kill @e[type=antcolonies:monitor]
+quit
