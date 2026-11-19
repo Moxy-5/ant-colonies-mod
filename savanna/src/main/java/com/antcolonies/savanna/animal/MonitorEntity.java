@@ -10,6 +10,7 @@ import com.antcolonies.animal.HasLife;
 import com.antcolonies.animal.SeekMateGoal;
 
 import com.antcolonies.entity.body.GroundBend;
+import com.antcolonies.entity.body.Footing;
 import com.antcolonies.savanna.block.CrabShellBlock;
 import com.antcolonies.savanna.registry.SavannaItems;
 
@@ -156,6 +157,12 @@ public class MonitorEntity extends PathfinderMob implements GeoEntity, HasLife {
     /** How much each leg pair stands now (1) or is folded back along the body as it swims (0), eased; drawing only (MonitorModel). */
     public final double[] legStand = {1, 1};
     public long legNanos;
+    /**
+     * Where its feet stand, held in the world (the Animal Maker Engine step 2, feet first, 2026-11-19); drawing only, made
+     * by {@code MonitorModel} on first draw (it needs the model's rest pose).
+     */
+    @Nullable
+    public Footing footing;
     /**
      * Both leg pairs are folded this far (stand under this) before the swim clip plays (2026-11-18, the user's report: going
      * into the water the hind legs swung up over the back for a moment). Until then the walk or idle clip plays and the

@@ -1,5 +1,7 @@
 package com.antcolonies.savanna.client;
 
+import com.antcolonies.client.LegReach;
+import com.antcolonies.entity.body.Footing;
 import com.antcolonies.entity.body.GroundBend;
 import com.antcolonies.savanna.SavannaMod;
 import com.antcolonies.savanna.animal.MonitorEntity;
@@ -14,6 +16,9 @@ import software.bernie.geckolib.animation.state.BoneSnapshot;
 import software.bernie.geckolib.cache.object.GeoBone;
 import software.bernie.geckolib.model.DefaultedEntityGeoModel;
 
+import java.util.function.Function;
+
+import org.joml.Matrix3f;
 import org.joml.Quaternionf;
 import org.joml.Vector3f;
 
@@ -57,10 +62,21 @@ public class MonitorModel extends DefaultedEntityGeoModel<MonitorEntity> {
      * legs fold back only over deep water, never over a drop on land, where folded forelegs stuck up like spikes).
      */
     private static final double REACH = 1.3, WADE = 0.4;
-    /** How far a standing leg reaches down, or draws up, to keep its foot on the ground as the body bends (model pixels; my pick). */
-    private static final double PLANT = 4.0;
-    /** How far out from the middle line each pair's feet stand (model pixels; from the leg plans). */
-    private static final double FOOT_OUT = 11.0;
+    /**
+     * The four legs, each reaching for where its foot stands ({@link Footing}): left fore, right fore, left hind, right
+     * hind, the order of {@link #GAIT}.
+     */
+    private static final LegReach[] LEGS = {leg("arm", "_left"), leg("arm", "_right"), leg("leg", "_left"), leg("leg", "_right")};
+    /**
+     * The walk's gait, from its clip ({@code tools/monitor_models.py}, the walk; kept in step with it by hand): a trot,
+     * each foot down 62 percent of the stride; per foot (the order of {@link #LEGS}) its place in the stride, where its
+     * wrist lands and lifts along the body (model z, pixels) and how high it lifts (pixels).
+     */
+    private static final double DUTY = 0.62;
+    private static final double[][] GAIT = {{0.0, -27.0, -18.5, 2.5}, {0.5, -27.0, -18.5, 2.5}, {0.55, -7.0, 1.5, 3.0},
+            {0.05, -7.0, 1.5, 3.0}};
+    /** A swinging foot tips toes-down this far and curls its claws this far at the top of its step (degrees; the walk clip's). */
+    private static final float TIP = -28.0F, CURL = 18.0F;
     /** The body's bend pivot (model pixels: height, length), where chest and hips meet; its height as the model has it. */
     private static final double PIVOT_Y = 11.0, PIVOT_Z = -13.0;
     /** The body boxes' top and bottom (model pixels): the chest turns on the joint's outer edge, one or the other. */
@@ -100,6 +116,9 @@ public class MonitorModel extends DefaultedEntityGeoModel<MonitorEntity> {
             monitor.lookNanos = 0;
             monitor.headAim = 0;
             monitor.legNanos = 0;
+            if (monitor.footing != null) {
+                monitor.footing.forget();
+            }
             double afloat = monitor.isInWater() && !monitor.onGround() ? 0 : 1;
             monitor.legStand[0] = afloat;
             monitor.legStand[1] = afloat;
@@ -136,6 +155,8 @@ public class MonitorModel extends DefaultedEntityGeoModel<MonitorEntity> {
         byte doing = monitor.doing();
         if (!monitor.isDeadOrDying() && (doing == MonitorEntity.CALM || doing == MonitorEntity.WATCH)) {
             legs(monitor, bend, scale, x, y, z, yaw);
+        } else if (monitor.footing != null) {
+            monitor.footing.forget();               // its own clip moves the legs: the feet start again from where it leaves them
         }
         look(monitor, pt, x, z, yaw);
     }
@@ -167,6 +188,13 @@ public class MonitorModel extends DefaultedEntityGeoModel<MonitorEntity> {
             monitor.enterTick = monitor.tickCount;
         }
         boolean entering = monitor.entering();
+        if (swimming || entering) {
+            if (monitor.footing != null) {
+                monitor.footing.forget();
+            }
+        } else {
+            stand(monitor, x, y, z, yaw, scale, now);
+        }
         for (int pair = 0; pair < feet.length; pair++) {
             // going in, both pairs count as folding (the clip folds them), so the swim clip follows it at once
             double want = feet[pair] && !entering ? 1.0 : 0.0;
@@ -187,62 +215,56 @@ public class MonitorModel extends DefaultedEntityGeoModel<MonitorEntity> {
                         turnToward(bone, -f[0], -s * f[1], s * f[2], fold);
                     }
                 }
-                if (monitor.legStand[pair] > 1.0E-3) {
-                    plant(monitor, bend, pair, kind + "_upper" + side, s, monitor.legStand[pair], scale, x, y, z, yaw);
-                }
             }
         }
     }
 
     /**
-     * Keeps a standing foot on the ground as the body bends (2026-11-18): the clips set the feet on level ground, and
-     * when the chest or hips tip over a step, or the shoulders lift onto a bank, the feet would come off it or sink in;
-     * the leg reaches down or draws up (at most {@link #PLANT} pixels) until the sole rests on the ground under it again.
-     * Only what the bend added is worked out (the clips' own steps and bobbing are left alone), in the side view.
+     * The feet first (the Animal Maker Engine step 2, stage A, 2026-11-19): each foot holds its spot on the ground and
+     * steps to the next in the walk's own gait ({@link Footing}), and each leg reaches for its foot ({@link LegReach}), in
+     * place of the walk and standing clips' legs. Put down afresh, the feet start where the clips had them, so nothing jumps.
      */
-    private void plant(MonitorEntity monitor, GroundBend bend, int pair, String upperName, int side, double amount, double scale,
-            double x, double y, double z, float yaw) {
-        GeoBone upper = getAnimationProcessor().getBone(upperName);
-        if (upper == null) {
-            return;
-        }
-        double hipsTurn = -Math.toRadians(bend.turn(bend.frontPieces()));
-        // where the leg's root is once the bend has turned the trunk or hips (as the drawing does): the forelegs ride on
-        // the chest, turned at each trunk joint from the front one back to the waist's on the hips
-        double ry = 0, rz = MonitorEntity.LEG_PAIRS[pair], a = hipsTurn;
-        if (pair == 0) {
-            a = 0;
-            for (int i = MonitorEntity.TRUNK_PIECES - 1; i >= 0; i--) {
-                double t = Math.toRadians(bend.turn(i));
-                a += t;
-                double e = outerEdge(t), j = MonitorEntity.FRONT_JOINTS[i];
-                double[] at = i == 0 ? jointCorner(t, hipsTurn) : new double[] {e, j, e, j};
-                double dy = ry - at[0], dz = rz - at[1];
-                ry = at[2] + dy * Math.cos(t) - dz * Math.sin(t);
-                rz = at[3] + dy * Math.sin(t) + dz * Math.cos(t);
+    private void stand(MonitorEntity monitor, double x, double y, double z, float yaw, double scale, long now) {
+        Function<String, GeoBone> bones = getAnimationProcessor()::getBone;
+        Footing feet = monitor.footing;
+        if (feet == null) {
+            double[][] legs = new double[LEGS.length][];
+            for (int i = 0; i < LEGS.length; i++) {
+                Vector3f rest = LEGS[i].restWrist(bones);
+                if (rest == null) {
+                    return;
+                }
+                double[] g = GAIT[i];
+                legs[i] = new double[] {rest.x, g[1] / 16.0, g[2] / 16.0, g[0], g[3] / 16.0};
             }
-        } else {
-            double dy = -PIVOT_Y, dz = rz - PIVOT_Z;
-            ry = PIVOT_Y + dy * Math.cos(a) - dz * Math.sin(a);
-            rz = PIVOT_Z + dy * Math.sin(a) + dz * Math.cos(a);
+            feet = monitor.footing = new Footing(DUTY, legs);
         }
-        double perBlock = scale / 16.0;
-        double sy = ry + bend.lift() / perBlock;
-        double sz = rz;
-        // the ground under the foot (the drawn model turned by 180 less its yaw, as GeckoLib draws it)
-        double turn = Math.toRadians(180.0 - yaw), mx = side * FOOT_OUT;
-        double wx = x + (mx * Math.cos(turn) + sz * Math.sin(turn)) * perBlock;
-        double wz = z + (-mx * Math.sin(turn) + sz * Math.cos(turn)) * perBlock;
-        double ground = (GroundBend.support(monitor.level(), wx, wz, y + sy * perBlock, false, 100.0) - y) / perBlock;
-        double reach = Mth.clamp(sy - ground, -PLANT, PLANT) * amount / Math.max(0.5, Math.cos(a));
-        if (Math.abs(reach) < 1.0E-3) {
-            return;
+        LegReach.Placement at = new LegReach.Placement(x, y, z, yaw, scale);
+        if (feet.update(monitor.level(), x, y, z, yaw, scale, now)) {
+            for (int i = 0; i < LEGS.length; i++) {
+                Vector3f w = LEGS[i].wristNow(bones, at);
+                if (w != null) {
+                    feet.place(monitor.level(), i, w.x, y, w.z);
+                }
+            }
         }
-        boolean marked = upper.hasRotationChanged() || upper.hasPositionChanged() || upper.hasScaleChanged();
-        upper.setPosY((float) (upper.getPosY() - reach));
-        if (!marked) {
-            upper.resetStateChanges();
+        for (int i = 0; i < LEGS.length; i++) {
+            if (monitor.legStand[i / 2] <= 1.0E-3) {
+                continue;
+            }
+            Vector3f rest = LEGS[i].restWrist(bones);
+            double up = feet.up(i);
+            LEGS[i].reach(bones, at, (float) feet.x(i), (float) (feet.y(i) + rest.y * scale), (float) feet.z(i),
+                    (float) Math.toRadians(TIP * up), (float) Math.toRadians(CURL * up));
         }
+    }
+
+    private static LegReach leg(String kind, String side) {
+        String[] claws = new String[4];
+        for (int i = 0; i < claws.length; i++) {
+            claws[i] = kind + "_claw" + (i + 1) + side;
+        }
+        return new LegReach(kind + "_upper" + side, kind + "_lower" + side, kind + "_foot" + side, claws);
     }
 
     /**
@@ -260,7 +282,8 @@ public class MonitorModel extends DefaultedEntityGeoModel<MonitorEntity> {
         Quaternionf from = new Quaternionf().rotationZYX(bone.getRotZ(), bone.getRotY(), bone.getRotX());
         Quaternionf to = new Quaternionf().rotationZYX(rest.getRotZ() + (float) Math.toRadians(z),
                 rest.getRotY() + (float) Math.toRadians(y), rest.getRotX() + (float) Math.toRadians(x));
-        Vector3f turn = from.slerp(to, (float) Mth.clamp(amount, 0.0, 1.0)).getEulerAnglesZYX(new Vector3f());
+        // through a matrix: JOML 1.10.5's quaternion getEulerAnglesZYX is wrong for big turns (2026-11-19, LegReach)
+        Vector3f turn = new Matrix3f().set(from.slerp(to, (float) Mth.clamp(amount, 0.0, 1.0))).getEulerAnglesZYX(new Vector3f());
         bone.setRotX(turn.x);
         bone.setRotY(turn.y);
         bone.setRotZ(turn.z);

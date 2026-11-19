@@ -1,0 +1,18 @@
+# A close side look at the monitor's feet (Animal Maker Engine step 2, feet first, stage A): a level walk, a stop, a
+# turn round and a walk back; a picture every 2 ticks (10 a second), made into a video by hand with ffmpeg.
+lens 50
+walker antcolonies:monitor -5.5 -60 0.5 -90 OwnSize:1.0f,HungryIn:99999,SunIn:99999
+follow 0 1.0 -4.5 0 8
+cmd tick unfreeze
+record on 3
+wait 20
+go 3 -60 0 0.8
+repeat 150
+shot w{i}
+wait 2
+end
+go -4 -60 0 0.8
+repeat 150
+shot t{i}
+wait 2
+end
