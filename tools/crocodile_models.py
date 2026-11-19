@@ -18,10 +18,9 @@ slim and finely sliced, was "fine, just not what I'm looking for"). Fun first, i
 
 Units are model pixels (16 a block), the head points to -Z, up is +Y, left is +X; y = 0 is the ground it lies on.
 """
-import copy
 import random
 
-from tilapia_models import cube, mix, shade, faces, face_point, png  # noqa: F401 (png for the viewer)
+from model_parts import cube, mix, shade, png, clip, paint_faces, geo, animations, write_assets  # noqa: F401 (png for the viewer)
 
 V = 2.0               # model pixels a voxel
 TEXELS = 0.5          # texture pixels a model pixel: one flat colour a voxel face
@@ -270,46 +269,11 @@ def colour(part, look, x, y, z, face, rnd):
 def paint(bones, look='A'):
     """(bones with every face's place on the texture, rows of (r, g, b, a), width, height)."""
     rnd = random.Random(23)
-    bones = copy.deepcopy(bones)
-    patches = []
-    for b in bones:
-        for c in b.get('cubes', []):
-            c['uv'] = {}
-            for face, (w, h) in faces(c).items():
-                patches.append((max(1, round(w * TEXELS)), max(1, round(h * TEXELS)), c, face))
-    patches.sort(key=lambda p: (-p[1], -p[0]))
-    for width in (64, 128, 256, 512, 1024):
-        x = y = shelf = 0
-        places = []
-        for w, h, c, face in patches:
-            if x + w > width:
-                x, y, shelf = 0, y + shelf, 0
-            places.append((x, y, w, h, c, face))
-            x, shelf = x + w, max(shelf, h)
-        if y + shelf <= width:
-            break
-    height = 16
-    while height < y + shelf:
-        height *= 2
-    rows = [[(0, 0, 0, 0)] * width for _ in range(height)]
-    for x0, y0, w, h, c, face in places:
-        c['uv'][face] = {'uv': [x0, y0], 'uv_size': [w, h]}
-        part = c['_part']
-        for jj in range(h):
-            for ii in range(w):
-                px, py, pz = face_point(c, face, (ii + 0.5) / w, (jj + 0.5) / h)
-                rgb = colour(part, look, px, py, pz, face, rnd)
-                rows[y0 + jj][x0 + ii] = tuple(max(0, min(255, int(v))) for v in rgb) + (255,)
-    for b in bones:
-        for c in b.get('cubes', []):
-            c.pop('_part')
-    return bones, rows, width, height
+    return paint_faces(bones, TEXELS, lambda c, face, px, py, pz: colour(c['_part'], look, px, py, pz, face, rnd))
 
 
 # --- the game's clips --------------------------------------------------------------------------------------------------
 import math
-
-import tilapia_models as tm
 
 LENGTH = (TAIL_END - SNOUT) * V       # the model's length, snout to tail tip (model pixels)
 WALK_LEN, SWIM_LEN = 1.0, 1.6         # one walking stride, one swimming beat (seconds)
@@ -507,37 +471,22 @@ def clips():
                 p[f'{kind}_foot_{side}'] = {'rotation': [0, -s * 18 * swing, 0]}
         return p
 
-    return {'snap_left': tm.clip(0.5, snap('left'), 24, 'hold'), 'snap_right': tm.clip(0.5, snap('right'), 24, 'hold'),
-            'lunge': tm.clip(0.4, lunge, 24, 'hold'), 'hold': tm.clip(1.0, hold, 24), 'eat': tm.clip(1.0, eat, 24),
-            'shake': tm.clip(0.68, shake, 24),
-            'drag': tm.clip(0.8, drag, 24),
-            'idle': tm.clip(4.0, idle, 24), 'walk': tm.clip(WALK_LEN, walk, 20), 'swim': tm.clip(SWIM_LEN, swim, 24),
-            'float': tm.clip(4.0, floating, 24), 'bask': tm.clip(6.0, bask, 24),
-            'flop': tm.clip(FLOP_LEN, flop, 24, False), 'death': tm.clip(1.2, death, 12, 'hold')}
+    return {'snap_left': clip(0.5, snap('left'), 24, 'hold'), 'snap_right': clip(0.5, snap('right'), 24, 'hold'),
+            'lunge': clip(0.4, lunge, 24, 'hold'), 'hold': clip(1.0, hold, 24), 'eat': clip(1.0, eat, 24),
+            'shake': clip(0.68, shake, 24),
+            'drag': clip(0.8, drag, 24),
+            'idle': clip(4.0, idle, 24), 'walk': clip(WALK_LEN, walk, 20), 'swim': clip(SWIM_LEN, swim, 24),
+            'float': clip(4.0, floating, 24), 'bask': clip(6.0, bask, 24),
+            'flop': clip(FLOP_LEN, flop, 24, False), 'death': clip(1.2, death, 12, 'hold')}
 
 
 def write_game():
     """Writes the crocodile's model, texture and clips into the savanna mod."""
-    import json
-    import mod_paths
-    root = mod_paths.assets('savanna')
     game_bones, rows, w, h = paint(model(lids=True))
     files = {'textures/entity/crocodile.png': png(rows)}
-    geo = {'format_version': '1.12.0', 'minecraft:geometry': [{
-        'description': {'identifier': 'geometry.crocodile', 'texture_width': w, 'texture_height': h,
-                        'visible_bounds_width': 8, 'visible_bounds_height': 2.5, 'visible_bounds_offset': [0, 0.75, 0]},
-        'bones': game_bones}]}
-    files['geo/entity/crocodile.geo.json'] = geo
-    files['animations/entity/crocodile.animation.json'] = {'format_version': '1.8.0', 'animations': clips()}
-    for rel, data in files.items():
-        path = root / rel
-        path.parent.mkdir(parents=True, exist_ok=True)
-        if isinstance(data, bytes):
-            path.write_bytes(data)
-        else:
-            with open(path, 'w', encoding='utf-8', newline='\n') as f:
-                json.dump(data, f, indent=1)
-        print('wrote', path.relative_to(mod_paths.PROJECT))
+    files['geo/entity/crocodile.geo.json'] = geo('crocodile', game_bones, w, h, (8, 2.5, [0, 0.75, 0]))
+    files['animations/entity/crocodile.animation.json'] = animations(clips())
+    write_assets(files)
 
 
 if __name__ == '__main__':

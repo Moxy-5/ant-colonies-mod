@@ -22,11 +22,10 @@ Every face is painted pixel by pixel from where that pixel lies on the fish (pai
 tail's stripes run across the boxes as they would on the real fish.
 `python tools/tilapia_models.py game` writes the game's files (model, three textures, clips) into the savanna mod.
 """
-import copy
 import math
 import random
-import struct
-import zlib
+
+from model_parts import curve, cube, mix, shade, png, clip, rot_only, paint_faces, geo, animations, write_assets
 
 TEXELS = 2.0          # texture pixels a model pixel (a 27-pixel fish is about 54 texture pixels long, as in the picture)
 MID = 6.0             # the lateral line's height (the pelvic fins' tips come down near y = 0)
@@ -43,24 +42,10 @@ CHAIN = [('head', 'body', SNOUT, -5.0), ('front', 'body', -5.0, 0.0), ('mid', 'f
          ('rear', 'mid', 4.0, 7.4), ('peduncle', 'rear', 7.4, PEDUNCLE), ('tail', 'peduncle', PEDUNCLE, TAIL_END)]
 
 
-def curve(points, t):
-    t = max(0.0, min(1.0, t))
-    for (t0, v0), (t1, v1) in zip(points, points[1:]):
-        if t <= t1:
-            f = (t - t0) / (t1 - t0)
-            f = f * f * (3 - 2 * f)
-            return v0 + (v1 - v0) * f
-    return points[-1][1]
-
-
 def at(z):
     """(top, bottom, half-width) of the body at z (relative to the lateral line)."""
     t = (z - SNOUT) / (PEDUNCLE - SNOUT)
     return curve(TOP, t), curve(BOT, t), curve(WIDE, t)
-
-
-def cube(lo, hi, part):
-    return {'origin': [round(v, 3) for v in lo], 'size': [round(b - a, 3) for a, b in zip(lo, hi)], '_part': part}
 
 
 def owner(z):
@@ -201,14 +186,6 @@ LOOKS = {
 BARS = [-3.6, -1.2, 1.2, 3.5, 5.8, 8.2]       # the dark bars across the flank (z)
 
 
-def mix(a, b, f):
-    return tuple(p + (q - p) * f for p, q in zip(a, b))
-
-
-def shade(c, k):
-    return tuple(v * k for v in c)
-
-
 def colour(part, look, x, y, z, edge, rnd):
     """The colour of the fish at this point (model pixels), edge: how near the top or outer edge of a fin (0 to 1)."""
     L = LOOKS[look]
@@ -268,83 +245,21 @@ def colour(part, look, x, y, z, edge, rnd):
     return (255, 0, 255)
 
 
-def faces(c):
-    sx, sy, sz = c['size']
-    return {'north': (sx, sy), 'south': (sx, sy), 'east': (sz, sy), 'west': (sz, sy), 'up': (sx, sz), 'down': (sx, sz)}
-
-
-def face_point(c, face, u, v):
-    """Where texture pixel (u, v) (0 to 1 across the face, v down from the top) lies on the box, in the box's own
-    model space (the viewer's and the game's face layout)."""
-    (ox, oy, oz), (sx, sy, sz) = c['origin'], c['size']
-    if face == 'east':
-        return ox + sx, oy + sy * (1 - v), oz + sz * (1 - u)
-    if face == 'west':
-        return ox, oy + sy * (1 - v), oz + sz * u
-    if face == 'up':
-        return ox + sx * u, oy + sy, oz + sz * v
-    if face == 'down':
-        return ox + sx * u, oy, oz + sz * (1 - v)
-    if face == 'south':
-        return ox + sx * u, oy + sy * (1 - v), oz + sz
-    return ox + sx * (1 - u), oy + sy * (1 - v), oz
-
-
 def paint(bones, look):
     """(bones with every face's place on the texture, rows of (r, g, b, a), width, height)."""
     rnd = random.Random(7)
-    bones = copy.deepcopy(bones)
-    patches = []
-    for b in bones:
-        for c in b.get('cubes', []):
-            c['uv'] = {}
-            for face, (w, h) in faces(c).items():
-                patches.append((max(1, round(w * TEXELS)), max(1, round(h * TEXELS)), c, face))
-    patches.sort(key=lambda p: (-p[1], -p[0]))
-    for width in (64, 128, 256, 512):
-        x = y = shelf = 0
-        places = []
-        for w, h, c, face in patches:
-            if x + w > width:
-                x, y, shelf = 0, y + shelf, 0
-            places.append((x, y, w, h, c, face))
-            x, shelf = x + w, max(shelf, h)
-        if y + shelf <= width:
-            break
-    height = 16
-    while height < y + shelf:
-        height *= 2
-    rows = [[(0, 0, 0, 0)] * width for _ in range(height)]
-    for x0, y0, w, h, c, face in places:
-        c['uv'][face] = {'uv': [x0, y0], 'uv_size': [w, h]}
+
+    def pixel(c, face, px, py, pz):
         part = c['_part']
-        for j in range(h):
-            for i in range(w):
-                px, py, pz = face_point(c, face, (i + 0.5) / w, (j + 0.5) / h)
-                lo, hi = c['origin'][1], c['origin'][1] + c['size'][1]
-                if part == 'anal':
-                    edge = (hi - py) / max(0.1, hi - lo)
-                elif part == 'caudal':
-                    edge = abs(py - MID) / max(0.1, (hi - lo) / 2)
-                else:
-                    edge = (py - lo) / max(0.1, hi - lo)
-                rgb = colour(part, look, px, py, pz, edge, rnd)
-                rows[y0 + j][x0 + i] = tuple(max(0, min(255, int(v))) for v in rgb) + (255,)
-    for b in bones:
-        for c in b.get('cubes', []):
-            c.pop('_part')
-    return bones, rows, width, height
-
-
-def png(rows):
-    height, width = len(rows), len(rows[0])
-    raw = b''.join(b'\x00' + bytes(c for px in row for c in px) for row in rows)
-
-    def chunk(kind, data):
-        return struct.pack('>I', len(data)) + kind + data + struct.pack('>I', zlib.crc32(kind + data) & 0xFFFFFFFF)
-
-    header = struct.pack('>IIBBBBB', width, height, 8, 6, 0, 0, 0)
-    return b'\x89PNG\r\n\x1a\n' + chunk(b'IHDR', header) + chunk(b'IDAT', zlib.compress(raw, 9)) + chunk(b'IEND', b'')
+        lo, hi = c['origin'][1], c['origin'][1] + c['size'][1]
+        if part == 'anal':
+            edge = (hi - py) / max(0.1, hi - lo)
+        elif part == 'caudal':
+            edge = abs(py - MID) / max(0.1, (hi - lo) / 2)
+        else:
+            edge = (py - lo) / max(0.1, hi - lo)
+        return colour(part, look, px, py, pz, edge, rnd)
+    return paint_faces(bones, TEXELS, pixel)
 
 
 # --- the game's files (built in the game 2026-11-14, the user's "sounds good build it in game") -----------------------
@@ -400,26 +315,6 @@ def fight_phase(t):
     for k in range(steps):
         ph += dt * 2 * math.pi / (0.25 - 0.10 * fight((k + 0.5) * dt))
     return ph
-
-
-def clip(length, pose_at, steps, loop=True):
-    """A clip from pose_at(t) -> {bone: {'rotation': [..], 'position': [..]}} sampled at steps + 1 times."""
-    bones = {}
-    for k in range(steps + 1):
-        t = length * k / steps
-        for bone, chans in pose_at(t).items():
-            for ch, v in chans.items():
-                bones.setdefault(bone, {}).setdefault(ch, {})[f'{t:.4f}'.rstrip('0').rstrip('.') or '0'] = [round(x, 3) for x in v]
-    out = {'animation_length': round(length, 4), 'bones': bones}
-    if loop is True:
-        out['loop'] = True
-    elif loop == 'hold':
-        out['loop'] = 'hold_on_last_frame'
-    return out
-
-
-def rot_only(pose):
-    return {b: {'rotation': r} for b, r in pose.items()}
 
 
 def clips():
@@ -503,29 +398,14 @@ def clips():
 
 def write_game():
     """Writes the tilapia's model, its three textures and its clips into the savanna mod."""
-    import json
-    import mod_paths
-    root = mod_paths.assets('savanna')
     bones = model()
     files = {}
     for look, name in GAME_TEXTURES.items():
         game_bones, rows, w, h = paint(bones, look)
         files[f'textures/entity/{name}.png'] = png(rows)
-    geo = {'format_version': '1.12.0', 'minecraft:geometry': [{
-        'description': {'identifier': 'geometry.tilapia', 'texture_width': w, 'texture_height': h,
-                        'visible_bounds_width': 2, 'visible_bounds_height': 1.5, 'visible_bounds_offset': [0, 0.5, 0]},
-        'bones': game_bones}]}
-    files['geo/entity/tilapia.geo.json'] = geo
-    files['animations/entity/tilapia.animation.json'] = {'format_version': '1.8.0', 'animations': clips()}
-    for rel, data in files.items():
-        path = root / rel
-        path.parent.mkdir(parents=True, exist_ok=True)
-        if isinstance(data, bytes):
-            path.write_bytes(data)
-        else:
-            with open(path, 'w', encoding='utf-8', newline='\n') as f:
-                json.dump(data, f, indent=1)
-        print('wrote', path.relative_to(mod_paths.PROJECT))
+    files['geo/entity/tilapia.geo.json'] = geo('tilapia', game_bones, w, h, (2, 1.5, [0, 0.5, 0]))
+    files['animations/entity/tilapia.animation.json'] = animations(clips())
+    write_assets(files)
 
 
 if __name__ == '__main__':

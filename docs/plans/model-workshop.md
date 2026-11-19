@@ -148,6 +148,27 @@ inside, eyes with lids; the crocodile's parts; later heads, necks, wings. They l
 picture (PNG) writer and box maker (today copied in several files), so the next reptile starts from approved parts.
 Never built all at once: each new animal adds what it needed.
 
+- **BUILT 2026-11-19** (branch `claude/viewer-foundation`): `tools/model_parts.py`, the one shared library.
+  - Moved in: the box maker, faces, colour mixing, curves, the picture (PNG) writer and the clip sampler (they lived in
+    `tilapia_models.py`); the texture painter `paint_faces()` (laying faces out and colouring them, word for word the
+    same in seven makers; each maker now keeps only its own colouring rule); `geo()`, `animations()` and
+    `write_assets()` (the game-file writing, copied in seven makers); the turn maths.
+  - The monitor's approved parts, with settings: `rounded()` (three-box round section), `disc()`, `limb()` and
+    `ball()` (quarter-pixel round slices: a tapering piece, a joint), `bent_chain()` (a tail as a chain of bones bent to
+    follow a curve: length, pieces, radius and height along it), `round_leg()` (a whole leg from three joints: round
+    pieces and joints, a flat foot turned out, any number of fanned toes with hooked claws; the leg plan holds the
+    settings). The monitor now builds its tail and legs with them (1,182 lines to 908).
+  - Switched to it: the tilapia, catfish, crab, crocodile, monitor, snail and remains makers, `life_looks.py` and
+    `model_viewer.py`.
+  - Proved the same: every game file the seven makers write (441 files) byte for byte before and after; 49 checks of
+    every model, look, paint and clip from the old scripts against the new; `workshop.py snapshot monitor` says "no
+    change since v1"; the viewer pages they build are the same as the old scripts build (three pages in git were out
+    of date and are refreshed).
+  - Not moved yet (my pick, as the plan says: the next animal that needs one moves it): the monitor's jaw with teeth
+    and tongue and its eyes with lids (woven into its head shape), the crocodile's parts. Left alone on purpose: the
+    block-art scripts' own PNG writers (about 15, different shapes, not models) and the insect makers' (`ant_models`,
+    `matabele_models`, `termite_models`; they have body plans and their own pipeline).
+
 **Animations (stage 5) are not in this plan:** they use the clip tools; the pose viewer for any model is the tools
 review's K6.
 

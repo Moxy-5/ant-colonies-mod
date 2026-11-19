@@ -18,11 +18,10 @@ left is +X; y = 0 is the ground it crawls on. Bones: foot (the root), head, eye_
 feelers), feeler_left/feeler_right (the short lower feelers), shell (and D's tufts). The viewer scales every model to
 the same length, so the voxel size only sets the grain.
 """
-import copy
 import math
 import random
 
-from tilapia_models import cube, mix, shade, faces, face_point, png  # noqa: F401 (png for the viewer)
+from model_parts import cube, mix, shade, png, clip, paint_faces, geo, animations, write_assets  # noqa: F401 (png for the viewer)
 
 V = 0.25              # model pixels a voxel
 TEXELS = 4.0          # texture pixels a model pixel: one flat colour a voxel face
@@ -377,40 +376,7 @@ def colour(part, look, x, y, z, face, rnd):
 def paint(bones, look):
     """(bones with every face's place on the texture, rows of (r, g, b, a), width, height)."""
     rnd = random.Random(41)
-    bones = copy.deepcopy(bones)
-    patches = []
-    for b in bones:
-        for c in b.get('cubes', []):
-            c['uv'] = {}
-            for face, (w, h) in faces(c).items():
-                patches.append((max(1, round(w * TEXELS)), max(1, round(h * TEXELS)), c, face))
-    patches.sort(key=lambda p: (-p[1], -p[0]))
-    for width in (64, 128, 256, 512, 1024):
-        x = y = shelf = 0
-        places = []
-        for w, h, c, face in patches:
-            if x + w > width:
-                x, y, shelf = 0, y + shelf, 0
-            places.append((x, y, w, h, c, face))
-            x, shelf = x + w, max(shelf, h)
-        if y + shelf <= width:
-            break
-    height = 16
-    while height < y + shelf:
-        height *= 2
-    rows = [[(0, 0, 0, 0)] * width for _ in range(height)]
-    for x0, y0, w, h, c, face in places:
-        c['uv'][face] = {'uv': [x0, y0], 'uv_size': [w, h]}
-        part = c['_part']
-        for jj in range(h):
-            for ii in range(w):
-                px, py, pz = face_point(c, face, (ii + 0.5) / w, (jj + 0.5) / h)
-                rgb = colour(part, look, px, py, pz, face, rnd)
-                rows[y0 + jj][x0 + ii] = tuple(max(0, min(255, int(v))) for v in rgb) + (255,)
-    for b in bones:
-        for c in b.get('cubes', []):
-            c.pop('_part')
-    return bones, rows, width, height
+    return paint_faces(bones, TEXELS, lambda c, face, px, py, pz: colour(c['_part'], look, px, py, pz, face, rnd))
 
 
 
@@ -438,7 +404,6 @@ def clips():
     """idle (the stalks swaying), crawl (the foot rippling, the head bobbing, the shell rocking), graze (the head down at
     the algae, rasping), hide (everything pulled into the shell, held), peek (back out, eyes first), death (pulled in and
     rolled onto the shell's side)."""
-    import tilapia_models as tm
 
     def sm(a, b, x):
         v = max(0.0, min(1.0, (x - a) / (b - a)))
@@ -517,33 +482,18 @@ def clips():
         p['body'] = {'rotation': [0, 0, 90 * f], 'position': [0, 1.7 * f, 0]}
         return p
 
-    return {'idle': tm.clip(4.0, idle, 48), 'crawl': tm.clip(CRAWL_LEN, crawl, 24), 'graze': tm.clip(GRAZE_LEN, graze, 24),
-            'hide': tm.clip(HIDE_LEN, hide, 10, 'hold'), 'peek': tm.clip(PEEK_LEN, peek, 32, False),
-            'death': tm.clip(1.0, death, 20, 'hold')}
+    return {'idle': clip(4.0, idle, 48), 'crawl': clip(CRAWL_LEN, crawl, 24), 'graze': clip(GRAZE_LEN, graze, 24),
+            'hide': clip(HIDE_LEN, hide, 10, 'hold'), 'peek': clip(PEEK_LEN, peek, 32, False),
+            'death': clip(1.0, death, 20, 'hold')}
 
 
 def write_game():
     """Writes the Garden spiral's model, texture and clips into the savanna mod."""
-    import json
-    import mod_paths
-    root = mod_paths.assets('savanna')
     game_bones, rows, w, h = paint(game_model(), 'A')
     files = {'textures/entity/snail.png': png(rows)}
-    geo = {'format_version': '1.12.0', 'minecraft:geometry': [{
-        'description': {'identifier': 'geometry.snail', 'texture_width': w, 'texture_height': h,
-                        'visible_bounds_width': 1, 'visible_bounds_height': 1, 'visible_bounds_offset': [0, 0.25, 0]},
-        'bones': game_bones}]}
-    files['geo/entity/snail.geo.json'] = geo
-    files['animations/entity/snail.animation.json'] = {'format_version': '1.8.0', 'animations': clips()}
-    for rel, data in files.items():
-        path = root / rel
-        path.parent.mkdir(parents=True, exist_ok=True)
-        if isinstance(data, bytes):
-            path.write_bytes(data)
-        else:
-            with open(path, 'w', encoding='utf-8', newline='\n') as f:
-                json.dump(data, f, indent=1)
-        print('wrote', path.relative_to(mod_paths.PROJECT))
+    files['geo/entity/snail.geo.json'] = geo('snail', game_bones, w, h, (1, 1, [0, 0.25, 0]))
+    files['animations/entity/snail.animation.json'] = animations(clips())
+    write_assets(files)
 
 if __name__ == '__main__':
     import sys

@@ -20,14 +20,13 @@ Meat in Minecraft's raw-meat style: blocky pink-red with lighter streaks and fat
 The animal lies on its left side, so its right side (+X in model space) faces up; the viewer rolls it over.
 Units are model pixels (16 a block); fish heads point to -Z, up is +Y.
 """
-import copy
 import inspect
 import math
 import random
 
 import catfish_models as cm
 import tilapia_models as tm
-from tilapia_models import cube, faces, face_point, mix, shade
+from model_parts import cube, faces, mix, shade, png, paint_faces, geo, animations, write_assets
 
 STAGES = ['Fresh', 'Half-eaten', 'Picked over', 'Bones']
 
@@ -63,42 +62,11 @@ def bone_colour(x, y, z, stage, rnd):
 def paint(bones, colour, texels):
     """Lays every face out on one texture and colours it pixel by pixel: colour(cube, face, x, y, z, edge, rnd)."""
     rnd = random.Random(13)
-    bones = copy.deepcopy(bones)
-    patches = []
-    for b in bones:
-        for c in b.get('cubes', []):
-            c['uv'] = {}
-            for face, (w, h) in faces(c).items():
-                patches.append((max(1, round(w * texels)), max(1, round(h * texels)), c, face))
-    patches.sort(key=lambda p: (-p[1], -p[0]))
-    for width in (64, 128, 256, 512, 1024):
-        x = y = shelf = 0
-        places = []
-        for w, h, c, face in patches:
-            if x + w > width:
-                x, y, shelf = 0, y + shelf, 0
-            places.append((x, y, w, h, c, face))
-            x, shelf = x + w, max(shelf, h)
-        if y + shelf <= width:
-            break
-    height = 16
-    while height < y + shelf:
-        height *= 2
-    rows = [[(0, 0, 0, 0)] * width for _ in range(height)]
-    for x0, y0, w, h, c, face in places:
-        c['uv'][face] = {'uv': [x0, y0], 'uv_size': [w, h]}
+
+    def pixel(c, face, px, py, pz):
         lo, hi = c['origin'][1], c['origin'][1] + c['size'][1]
-        for j in range(h):
-            for i in range(w):
-                px, py, pz = face_point(c, face, (i + 0.5) / w, (j + 0.5) / h)
-                edge = (py - lo) / max(0.1, hi - lo)
-                rgb = colour(c, face, px, py, pz, edge, rnd)
-                rows[y0 + j][x0 + i] = tuple(max(0, min(255, int(v))) for v in rgb) + (255,)
-    for b in bones:
-        for c in b.get('cubes', []):
-            for k in [k for k in c if k.startswith('_')]:
-                c.pop(k)
-    return bones, rows, width, height
+        return colour(c, face, px, py, pz, (py - lo) / max(0.1, hi - lo), rnd)
+    return paint_faces(bones, texels, pixel)
 
 
 # --- fish ----------------------------------------------------------------------------------------------------------------
@@ -488,32 +456,17 @@ def lying(bones):
 
 def write_game():
     """Writes every kind's four stages (geo and texture) and one empty clip file into the savanna mod."""
-    import json
-    import mod_paths
-    root = mod_paths.assets('savanna')
-    files = {'animations/entity/remains.animation.json': {'format_version': '1.8.0', 'animations': {}}}
+    files = {'animations/entity/remains.animation.json': animations({})}
     for game, (kind, torn) in GAME_KINDS.items():
         for stage in (1, 2, 3, 4):
             bones, rows, w, h = fish_remains(kind, stage, torn=torn)
             name = f'remains_{game}_{stage}'
-            files[f'textures/entity/{name}.png'] = tm.png(rows)
+            files[f'textures/entity/{name}.png'] = png(rows)
             if kind == 'tilapia':       # a tilapia's remains keep the dead fish's colours (the user, 2026-11-15): the
                 for look, word in GAME_LOOKS.items():       # same model, painted as the young or the breeding male
-                    files[f'textures/entity/{name}_{word}.png'] = tm.png(fish_remains(kind, stage, look, torn)[1])
-            files[f'geo/entity/{name}.geo.json'] = {'format_version': '1.12.0', 'minecraft:geometry': [{
-                'description': {'identifier': f'geometry.{name}', 'texture_width': w, 'texture_height': h,
-                                'visible_bounds_width': 4, 'visible_bounds_height': 1.5,
-                                'visible_bounds_offset': [0, 0.5, 0]},
-                'bones': lying(bones)}]}
-    for rel, data in files.items():
-        path = root / rel
-        path.parent.mkdir(parents=True, exist_ok=True)
-        if isinstance(data, bytes):
-            path.write_bytes(data)
-        else:
-            with open(path, 'w', encoding='utf-8', newline='\n') as f:
-                json.dump(data, f, indent=1)
-        print('wrote', path.relative_to(mod_paths.PROJECT))
+                    files[f'textures/entity/{name}_{word}.png'] = png(fish_remains(kind, stage, look, torn)[1])
+            files[f'geo/entity/{name}.geo.json'] = geo(name, lying(bones), w, h, (4, 1.5, [0, 0.5, 0]))
+    write_assets(files)
 
 
 if __name__ == '__main__':

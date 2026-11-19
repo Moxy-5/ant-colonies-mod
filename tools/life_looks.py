@@ -15,6 +15,7 @@ import random
 import catfish_models as cm
 import crab_models as cb
 import crocodile_models as cr
+import model_parts as mp
 import monitor_models as mm
 import sand_art
 import snail_models as sm
@@ -130,11 +131,11 @@ def croc_hatchling_colour(orig):
         if part in ('tooth', 'claw', 'nostril', 'pupil', 'iris', 'mouth', 'tongue', 'jaw') or face == 'down':
             return c
         zv = z / cr.V
-        c = tm.mix(c, (170, 160, 60), 0.4)
+        c = mp.mix(c, (170, 160, 60), 0.4)
         if zv > -8 and math.floor(zv) % 5 < 2 and (face != 'down'):
-            c = tm.shade(c, 0.42)                          # the bands
+            c = mp.shade(c, 0.42)                          # the bands
         elif zv <= -8 and cr.dice(math.floor(x), math.floor(y), math.floor(z)) < 0.28:
-            c = tm.shade(c, 0.5)                           # head speckles
+            c = mp.shade(c, 0.5)                           # head speckles
         return c
     return colour
 
@@ -146,7 +147,7 @@ def croc_teen_colour(orig):
     def colour(part, look, x, y, z, face, rnd):
         a = orig(part, look, x, y, z, face, random.Random(0))
         b = hatch(part, look, x, y, z, face, random.Random(0))
-        return tm.mix(a, b, 0.45)
+        return mp.mix(a, b, 0.45)
     return colour
 
 
@@ -160,14 +161,14 @@ def croc_old_colour(orig):
         if part in ('nostril', 'pupil', 'mouth', 'tongue'):
             return c
         if part in ('tooth', 'claw'):
-            return tm.mix(c, (206, 184, 128), 0.45)
+            return mp.mix(c, (206, 184, 128), 0.45)
         if part == 'iris':
-            return tm.mix(c, (170, 150, 70), 0.3)
-        c = tm.mix(c, (176, 172, 140), 0.12)
+            return mp.mix(c, (170, 150, 70), 0.3)
+        c = mp.mix(c, (176, 172, 140), 0.12)
         if face != 'down':
             for sx, sz, slope in scars:
                 if abs((x - sx) * slope - (z - sz)) < 0.7 and abs(z - sz) < 5.0:
-                    return tm.mix(c, (196, 186, 150), 0.5)
+                    return mp.mix(c, (196, 186, 150), 0.5)
         return c
     return colour
 
@@ -197,12 +198,12 @@ def croc_old_model():
     jaw = bone(bones, 'jaw')['cubes']
     # knobs on the snout's top and lumps on the brows, jowls behind the gape (before the scaling, so they grow too)
     for x, z in ((-2.2, -35.5), (1.6, -34.0), (-0.8, -32.4), (2.4, -31.0), (-2.8, -29.2), (0.6, -36.4)):
-        head.append(tm.cube([x - 0.6, 6.8, z - 0.6], [x + 0.6, 7.4, z + 0.6], 'skin'))
+        head.append(mp.cube([x - 0.6, 6.8, z - 0.6], [x + 0.6, 7.4, z + 0.6], 'skin'))
     for sgn in (1, -1):
         lo, hi = sorted((sgn * 2.6, sgn * 5.4))
-        head.append(tm.cube([lo, 11.0, -25.0], [hi, 11.6, -22.6], 'brow'))
+        head.append(mp.cube([lo, 11.0, -25.0], [hi, 11.6, -22.6], 'brow'))
         lo, hi = sorted((sgn * 5.8, sgn * 6.6))
-        head.append(tm.cube([lo, 4.6, -24.0], [hi, 7.6, -20.2], 'skin'))
+        head.append(mp.cube([lo, 4.6, -24.0], [hi, 7.6, -20.2], 'skin'))
     # bulk: the body 1.32 wider and 1.3 taller, the head and jaw broader still
     scale_bones(bones, 1.32, 1.3, {'head': (1.5, 1.32), 'jaw': (1.5, 1.38), 'pupil_left': (1.5, 1.32),
                                    'pupil_right': (1.5, 1.32)})
@@ -529,7 +530,7 @@ def data(uri, png, block_uri):
     looks = {}
     for fn in (tilapia_looks, catfish_looks, crocodile_looks, crab_looks, snail_looks, monitor_looks):
         for key, (b, rows, w, h) in fn().items():
-            looks[key] = {'bones': b, 'texture': uri(tm.png(rows)), 'w': w, 'h': h,
+            looks[key] = {'bones': b, 'texture': uri(mp.png(rows)), 'w': w, 'h': h,
                           'boxes': sum(len(x.get('cubes', [])) for x in b)}
     names = ('silt', 'wet_silt', 'algae_mat_3', 'golden_river_sand', 'wet_golden_river_sand', 'river_pebble_grey',
              'termite_mound_dry_side', 'termite_mound_dry_top', 'mud_crust_fresh_0')
