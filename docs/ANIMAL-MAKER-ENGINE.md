@@ -22,6 +22,12 @@ its checks are about things that look broken (gaps, sliding feet, pops), never a
 3. **Measure before fixing.** A movement bug is first caught by a check or a course scene (a number, a graph, a
    flagged frame), then fixed, then the same check proves it gone. A fix that needs a fix of its own: stop and rethink
    (CLAUDE.md, "prefer fewer rules").
+   **Two strikes, then rethink (the user, 2026-11-19; CLAUDE.md).** Two tries on the same starting idea that the user
+   (or the checks) still find wrong: no third try. Write the starting idea down in one sentence (the monitor's step
+   climb: "the body bends to the ground each frame, the feet are fixed up after"), ask whether the real animal moves
+   that way (a climbing lizard places its foot on the step first, the body follows), and bring the user a new starting
+   idea before any code. Early strikes: the same number tuned a third time (the climb's ramp, 0.2 then 0.11 then 0.08),
+   or a fix whose only job is to hide an earlier fix's side effect.
 4. **Built family by family, when the first animal of that family arrives.** No building the whole engine first.
    Each new animal pays for its own new piece; the rest it reuses (the families table below).
 5. **Share ways of building, never the motion itself** (memory "unique animals, shared methods"). Every animal keeps
