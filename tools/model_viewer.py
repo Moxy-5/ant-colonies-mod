@@ -5,6 +5,10 @@ dead_wood_concepts.py; D the user's reference, a darker Minecraft-style dead log
 now in the game, see dead_wood_art.py; E a mix: D's strips in A's sun-bleached silver), with the termite-eaten mud
 stages on top. Textures are drawn here and put into the page as data, so the page is one file.
 
+New pages (2026-11-19, docs/plans/model-workshop.md step 1): build them on the shared viewer script with
+viewer_page.build(template, data, out): the template has <!--VIEWER--> where the shared 3D code goes (works offline,
+flat views and Compare with the fill score); see monitor_viewer.template.html. Old pages move over when next touched.
+
 To show something else, change what main() puts into DATA and the build() function in model_viewer.template.html
 (three.js boxes: one per block, 6 textures each). The page needs the internet for three.js (from cdnjs/jsdelivr).
 
@@ -68,6 +72,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import dead_wood_concepts as concepts  # noqa: E402
 import mod_paths  # noqa: E402  (where each mod's files are: tools/mod_paths.py)
+import viewer_page  # noqa: E402  (pages on the shared viewer script, model workshop step 1)
 
 ROOT = Path(__file__).resolve().parent.parent
 TEXTURES = mod_paths.assets("savanna") / "textures/block"
@@ -618,11 +623,12 @@ def monitor_page(out):
         looks[key] = {"name": look["name"], "note": look["note"], "bones": b, "texture": uri(tm.png(rows)), "w": w, "h": h}
     blocks = {n: file_uri(n + ".png") for n in ("golden_river_sand", "wet_golden_river_sand")}
     data = {"looks": looks, "blocks": blocks, "notes": mm.NOTES, "clips": mm.clips()[0],
-            "boxes": sum(len(b.get("cubes", [])) for b in bones)}
-    template = (Path(__file__).resolve().parent / "monitor_viewer.template.html").read_text(encoding="utf-8")
-    out.parent.mkdir(parents=True, exist_ok=True)
-    out.write_text(template.replace("/*DATA*/null", json.dumps(data)), encoding="utf-8")
-    print("wrote", out)
+            "boxes": sum(len(b.get("cubes", [])) for b in bones),
+            # Compare (model workshop step 1): the user's picture once it is in references/inspiration/, and the
+            # approved outline (python tools/monitor_outline.py picture)
+            "pictures": viewer_page.pictures(("references/inspiration/monitor", "picture", "Your picture"),
+                                             ("references/outlines/monitor", "outline", "The approved outline"))}
+    viewer_page.build("monitor_viewer.template.html", data, out)
 
 
 def crab_page(out):

@@ -501,3 +501,4 @@ Every "Current status" bullet CLAUDE.md held up to 2026-11-19, word for word, ol
 
 ## New status bullets (from 2026-11-19 on; add at the end)
 - **The model workshop plan looked over and merged 2026-11-19 (the user's OK):** one plan for the model viewer and making models (`docs/plans/model-workshop.md`), with the tools review's V1 to V6 folded in and a shared viewer script as step 0; nothing built yet.
+- **Model workshop step 1, the viewer foundation, built 2026-11-19** (branch `claude/viewer-foundation`): a shared offline viewer script, Compare with the fill score in side, top and front views, and headless screenshots for Claude's own checks; the monitor page is the first on it, compared with its approved outline (91/84, 91/84, 92/75 percent); waiting for the user's look and the monitor picture saved in `references/inspiration/`.

@@ -51,6 +51,19 @@ Regrouped 2026-11-19 at the user's ask (fewer, bigger steps): the small pieces r
   with the fill scores. Claude looks at these and fixes what is off before showing the user.
 - Done when: the monitor page is rebuilt on it, looks the same, and its Compare shots come out against the monitor's
   picture.
+- **BUILT 2026-11-19** (branch `claude/viewer-foundation`): `tools/viewer_common.js` (the shared 3D code: model
+  builder, clips, stage, scale things, buttons, Compare), `tools/viewer_page.py` (`build()` puts the data and the
+  shared scripts into a template at `<!--VIEWER-->`; `pictures()` cuts the views out of a picture with a
+  `<name>.views.json` beside it), three.js r128 and OrbitControls in `tools/vendor/`, `tools/viewer_shot.py` (Edge
+  headless pictures of every Compare view and picture, scores printed and in `scores.json`, in
+  `references/viewer_shots/`, not kept in git). The monitor page is the first on it (same scene, no internet needed),
+  compared with the approved outline made into a picture (`python tools/monitor_outline.py picture` ->
+  `references/outlines/monitor.png`) and with the user's picture once it is saved as
+  `references/inspiration/monitor.png` with its views file. First scores, the 3D monitor against its outline: side 91
+  percent of the outline covered / 84 percent of the model inside it, top 91 / 84, front 92 / 75 (the 3D tail curves
+  lower than the outline's and the belly hangs below it seen from the front; the toes and claws stick out, as the
+  outline had none). Limits: a see-through part of a texture counts as model in the score; the picture's scale comes
+  from its side view only.
 
 **2. Picture to outline: the brief and an outline the 3D shape is built from (was V5's loft, V6).**
 - The picture goes in `references/inspiration/<animal>.png`. A script finds each shape on the plain background; which

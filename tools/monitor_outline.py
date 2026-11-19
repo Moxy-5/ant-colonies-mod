@@ -1,7 +1,9 @@
 """The Nile monitor, third start (2026-11-17): the flat outline, side, top and front, drawn from the user's picture
 alone, beside a block and a player, to agree on the shape before anything is 3D.
 
-    python tools/monitor_outline.py        -> references/monitor_outline.html
+    python tools/monitor_outline.py           -> references/monitor_outline.html
+    python tools/monitor_outline.py picture   -> references/outlines/monitor.png and its views file, the outline as a
+                                                 picture for the monitor viewer's Compare (2026-11-19)
 
 Units are model pixels, 16 to a block; the monitor is 96 long (6 blocks, the user's size for now). x runs along the
 body from the tail tip (0) to the snout (96), y up from the ground, z across (0 the middle line). The boxes here are
@@ -42,6 +44,8 @@ LEGS = {
         "foot":  {"side": (46, 55, 0, 2), "top": (46, 55, 9, 15), "front": (9, 15, 0, 2)},      # turned out
     },
 }
+# the front view's middle parts (x0, x1 across, y0, y1 up): body, belly, neck, head, snout end
+FRONT_BODY = [(-5, 5, 6, 16), (-4.5, 4.5, 5, 6), (-3.5, 3.5, 8, 17), (-3.5, 3.5, 11, 17), (-2.5, 2.5, 11, 16)]
 EYE = (85, 86, 15, 16)
 NOSTRIL = (95, 96, 15, 16)
 
@@ -117,13 +121,13 @@ def front():
         return rect(x0, x1, y0, y1, fill) + rect(-x1, -x0, y0, y1, fill)
     for piece in ("upper", "lower", "foot"):        # hind legs behind, lighter
         parts.append(both(*LEGS["hind"][piece]["front"], "#6a645f"))
-    parts.append(rect(-5, 5, 6, 16, DARK))          # body
-    parts.append(rect(-4.5, 4.5, 5, 6, BELLY))
+    parts.append(rect(*FRONT_BODY[0], DARK))        # body
+    parts.append(rect(*FRONT_BODY[1], BELLY))
     for piece in ("upper", "lower", "foot"):
         parts.append(both(*LEGS["front"][piece]["front"], LEG))
-    parts.append(rect(-3.5, 3.5, 8, 17, DARK))      # neck
-    parts.append(rect(-3.5, 3.5, 11, 17, DARK))     # head
-    parts.append(rect(-2.5, 2.5, 11, 16, "#4d4844"))  # snout end
+    parts.append(rect(*FRONT_BODY[2], DARK))        # neck
+    parts.append(rect(*FRONT_BODY[3], DARK))        # head
+    parts.append(rect(*FRONT_BODY[4], "#4d4844"))   # snout end
     parts.append(rect(-3.8, -3.2, 15, 16, "#e8c547") + rect(3.2, 3.8, 15, 16, "#e8c547"))
     return svg(parts, -15.5, 15.5, -1, 18.5)
 
@@ -161,5 +165,61 @@ def main(out=ROOT / "references/monitor_outline.html"):
     print("wrote", out)
 
 
+def view_boxes():
+    """Every box of each view, (x0, x1, y0, y1) in model pixels (top view: x along, z across as y)."""
+    side_v = [(x0, x1, y0, y1) for _, x0, x1, y0, y1, _ in BODY]
+    top_v = [(x0, x1, -hw, hw) for name, x0, x1, _, _, hw in BODY if name != "belly"]
+    front_v = list(FRONT_BODY)
+    for leg in LEGS.values():
+        for piece in ("upper", "lower", "foot"):
+            side_v.append(leg[piece]["side"])
+            x0, x1, z0, z1 = leg[piece]["top"]
+            top_v += [(x0, x1, z0, z1), (x0, x1, -z1, -z0)]
+            a, b, y0, y1 = leg[piece]["front"]
+            front_v += [(a, b, y0, y1), (-b, -a, y0, y1)]
+    return {"side": side_v, "top": top_v, "front": front_v}
+
+
+def outline_picture(scale=10, out=ROOT / "references/outlines/monitor.png"):
+    """The approved outline as a picture to compare the 3D model with (the viewer's Compare, model-workshop step 1):
+    the side, top and front views in plain dark on white, laid out like an inspiration picture, with its views file.
+    Snout to the right, as in the outline page."""
+    from PIL import Image, ImageDraw
+    import json
+    gap = 4 * scale
+    views, boxes = view_boxes(), {}
+    sizes = {}
+    for name, rects in views.items():
+        xs = [r[0] for r in rects] + [r[1] for r in rects]
+        ys = [r[2] for r in rects] + [r[3] for r in rects]
+        sizes[name] = (min(xs), max(xs), min(ys), max(ys))
+    def wh(name):
+        x0, x1, y0, y1 = sizes[name]
+        return round((x1 - x0) * scale), round((y1 - y0) * scale)
+    (sw, sh), (tw, th), (fw, fh) = wh("side"), wh("top"), wh("front")
+    W, H = gap * 3 + max(sw, tw) + fw, gap * 3 + sh + th
+    img = Image.new("RGB", (W, H), (255, 255, 255))
+    draw = ImageDraw.Draw(img)
+    spots = {"side": (gap, gap), "top": (gap, gap * 2 + sh), "front": (gap * 2 + max(sw, tw), gap)}
+    for name, (ox, oy) in spots.items():
+        x0, x1, y0, y1 = sizes[name]
+        w, h = wh(name)
+        for a, b, c, d in views[name]:
+            draw.rectangle([ox + (a - x0) * scale, oy + (y1 - d) * scale, ox + (b - x0) * scale - 1, oy + (y1 - c) * scale - 1],
+                           fill=(58, 54, 51))
+        boxes[name] = {"box": [ox - gap // 2, oy - gap // 2, ox + w + gap // 2, oy + h + gap // 2]}
+    boxes["side"]["head"] = boxes["top"]["head"] = "right"
+    out.parent.mkdir(parents=True, exist_ok=True)
+    img.save(out)
+    spec = {"length_blocks": (sizes["side"][1] - sizes["side"][0]) / 16, "views": boxes,
+            "made_by": "python tools/monitor_outline.py picture (from the approved outline, 2026-11-17)"}
+    out.with_suffix(".views.json").write_text(json.dumps(spec, indent=2) + "\n", encoding="utf-8")
+    print("wrote", out, "and its views file")
+
+
 if __name__ == "__main__":
-    main()
+    import sys
+    if sys.argv[1:] == ["picture"]:
+        outline_picture()
+    else:
+        main()
