@@ -127,6 +127,10 @@ public class MonitorEntity extends PathfinderMob implements GeoEntity, HasLife {
 
     int hungryIn;
     int sunIn;
+    /** A hunt is on: the hunt steers it in the water, not the float at the surface. */
+    boolean hunting;
+    /** A hunt that ends with nothing caught (given up, the prey gone, startled): it hunts again after this many ticks (a minute, as the catfish). */
+    static final int REST_AFTER_GIVING_UP = 1200;
     int startled;
     /** Ticks before it may hiss again. */
     int hissWait;
@@ -317,8 +321,8 @@ public class MonitorEntity extends PathfinderMob implements GeoEntity, HasLife {
         if (tickCount % 20 == 0 && isInWater()) {
             restrictTo(blockPosition(), NEAR_WATER);       // its strolls stay near the water it last swam in
         }
-        // resting in the water it hangs at the surface, head and back out (startled, it dives out of sight)
-        if (isInWater() && getNavigation().isDone()) {
+        // resting in the water it hangs at the surface, head and back out (startled, it dives out of sight); hunting, the hunt steers it
+        if (isInWater() && getNavigation().isDone() && !hunting) {
             double depth = getFluidHeight(FluidTags.WATER) - (startled > 0 ? HIDE_DEPTH : AFLOAT) * getScale();
             Vec3 v = getDeltaMovement();
             setDeltaMovement(v.x, Mth.clamp(depth * 0.1, -0.02, 0.03) + v.y * 0.5, v.z);
@@ -731,7 +735,8 @@ public class MonitorEntity extends PathfinderMob implements GeoEntity, HasLife {
     /**
      * Hungry: goes to the nearest crab, snail or remains within {@link #HUNT_REACH} blocks and, with it at its jaws, bites;
      * a crab is swallowed whole, a snail crushed (its broken shell left), remains take three bites. Then it eats, and is
-     * fed 5 to 10 minutes. It gives up a chase after 20 s.
+     * fed 5 to 10 minutes. Swimming, it dives to prey on the bed under it (2026-11-19, BUGS 230: it used to hang at the
+     * surface over it). It gives up a chase after 20 s and, with nothing caught, rests a minute before it hunts again.
      */
     static class HuntGoal extends Goal {
         private final MonitorEntity m;
@@ -773,6 +778,7 @@ public class MonitorEntity extends PathfinderMob implements GeoEntity, HasLife {
             left = 400;
             biting = eating = bites = repath = 0;
             m.setDoing(CALM);
+            m.hunting = true;
         }
 
         @Override
@@ -782,7 +788,6 @@ public class MonitorEntity extends PathfinderMob implements GeoEntity, HasLife {
 
         @Override
         public void tick() {
-            left--;
             if (eating > 0) {
                 if (--eating == 0) {
                     m.setDoing(CALM);
@@ -808,6 +813,7 @@ public class MonitorEntity extends PathfinderMob implements GeoEntity, HasLife {
             if (prey == null || !prey.isAlive()) {
                 return;
             }
+            left--;                                       // only the chase counts against its 20 s, not biting and eating
             if (m.atJaws(prey, 0.5)) {
                 m.getNavigation().stop();
                 biting = BITE_TICKS;
@@ -818,7 +824,12 @@ public class MonitorEntity extends PathfinderMob implements GeoEntity, HasLife {
             double d = Math.sqrt(m.distanceToSqr(prey.getX(), m.getY(), prey.getZ()));
             if (d < JAWS_AHEAD * m.ownSize() + 1.5) {
                 m.face(prey.getX(), prey.getZ(), 15.0F);
-                if (d < JAWS_AHEAD * m.ownSize() - 0.2) {      // too close for its jaws: back off a little
+                if (m.isInWater()) {                      // swimming: it steers its jaws onto the prey, diving to the bed if it lies there
+                    m.getNavigation().stop();
+                    Vec3 to = new Vec3(prey.getX(), prey.getY() + prey.getBbHeight() * 0.5, prey.getZ()).subtract(m.jawPoint()).scale(0.1);
+                    double most = 0.08;
+                    m.setDeltaMovement(to.lengthSqr() > most * most ? to.normalize().scale(most) : to);
+                } else if (d < JAWS_AHEAD * m.ownSize() - 0.2) {      // too close for its jaws: back off a little
                     float yaw = m.getYRot() * Mth.DEG_TO_RAD;
                     m.setDeltaMovement(m.getDeltaMovement().add(Mth.sin(yaw) * 0.05, 0, -Mth.cos(yaw) * 0.05));
                 } else {
@@ -866,6 +877,10 @@ public class MonitorEntity extends PathfinderMob implements GeoEntity, HasLife {
         @Override
         public void stop() {
             prey = null;
+            m.hunting = false;
+            if (bites == 0) {
+                m.hungryIn = REST_AFTER_GIVING_UP;        // caught nothing: it rests a minute, so it never stays on prey it cannot reach
+            }
             if (m.doing() == BITE || m.doing() == EAT) {
                 m.setDoing(CALM);
             }

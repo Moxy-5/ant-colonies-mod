@@ -1417,6 +1417,35 @@ public class RiverLifeTests {
     }
 
     /**
+     * A hungry monitor afloat dives for a snail on the bed under it (2026-11-19, the user's report of a monitor stuck in the
+     * river: it hung at the surface over a snail 3 blocks down, its jaws never reaching, and picked the same snail again
+     * every time it gave up). The report's scene: water 4 deep, the monitor afloat, the snail on the bed 2 blocks across.
+     */
+    @GameTest(template = "arena", timeoutTicks = 900)
+    public static void aHungryMonitorDivesForASnailOnTheBed(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        int bed = TOP - 4;
+        for (int x = MX0; x <= MX0 + 12; x++) {
+            for (int z = MZ0; z <= MZ1; z++) {
+                boolean wall = x == MX0 || x == MX0 + 12 || z == MZ0 || z == MZ1;
+                helper.setBlock(new BlockPos(x, bed, z), Blocks.STONE);
+                for (int y = bed + 1; y <= TOP + 3; y++) {
+                    helper.setBlock(new BlockPos(x, y, z), wall && y <= TOP + 1 ? Blocks.STONE : y <= TOP ? Blocks.WATER : Blocks.AIR);
+                }
+            }
+        }
+        com.antcolonies.savanna.animal.SnailEntity snail = helper.spawn(SavannaEntities.SNAIL.get(), new BlockPos(MX0 + 5, bed + 1, MZ0 + 5));
+        snail.setPersistenceRequired();
+        com.antcolonies.savanna.animal.MonitorEntity monitor = helper.spawn(SavannaEntities.MONITOR.get(),
+                new net.minecraft.world.phys.Vec3(MX0 + 7.5, TOP + 0.4, MZ0 + 5.5));
+        monitor.setPersistenceRequired();
+        monitor.makeHungry();
+        helper.succeedWhen(() -> helper.assertTrue(!snail.isAlive() && monitor.isFed(), "the monitor has not dived for the snail: monitor at "
+                + String.format("%.2f", monitor.getY() - helper.absolutePos(BlockPos.ZERO).getY()) + " up, in water " + monitor.isInWater()
+                + ", doing " + monitor.doing() + ", snail at " + snail.blockPosition().subtract(helper.absolutePos(BlockPos.ZERO))));
+    }
+
+    /**
      * A Nile monitor watches a survival player (2026-11-17, the user's ask): 11 blocks off it stops and faces them; when
      * they step back to 13.5 it trails them back toward 6; when they walk right up to its jaws it hisses, then lunges and
      * bites ({@code bite_player}).

@@ -111,7 +111,7 @@ Every animal, plant, fungus and colony insect, built or planned, with its status
 - **Backup:** private GitHub repository `https://github.com/Moxy-5/ant-colonies-mod` (remote `origin`); push after every commit. Nothing runs by itself on GitHub (workflows by hand only).
 - **Latest:** animal life cycle step 2, tilapia and snail breeding (nest pits, mouthbrooding, snail clutches), built 2026-11-19; step 1 the kit 2026-11-18. The model workshop (all four steps: shared offline viewer and Compare, `tools/workshop.py` picture to outline, versions and sliders, the parts library `tools/model_parts.py`) built 2026-11-19 and merged into this branch.
 - **Next:** animal life cycle step 3, crab and catfish (`docs/plans/animal-life-cycle.md`); the workshop's first real try waits for the user's monitor picture (`references/inspiration/monitor.png`).
-- **Built but not tried in-game yet** (on this branch): tilapia and snail breeding; the Nile monitor's back and water entry, the animation polish (crocodile blinks, monitor watching and biting, monitors bending on steps, catfish gulping air). Waiting for the user's look: oxbows and pans in the model viewer.
+- **Built but not tried in-game yet** (on this branch): tilapia and snail breeding; the monitor diving for food on the river bed (BUGS 230, the stuck monitor); the Nile monitor's back and water entry, the animation polish (crocodile blinks, monitor watching and biting, monitors bending on steps, catfish gulping air). Waiting for the user's look: oxbows and pans in the model viewer.
 - **Unconfirmed picks:** many numbers in `docs/HISTORY.md` are marked "my pick"; search for them before relying on one.
 
 ## Other notes files (read only when the task needs them)
