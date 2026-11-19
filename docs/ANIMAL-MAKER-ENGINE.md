@@ -258,6 +258,12 @@ steps are for the checks; to settle with the user before the first small creatur
    **Rethought, 2026-11-19 (plan only, the user's go): `docs/plans/engine-step2-feet-first.md`.** Each foot holds its
    spot on the ground and picks where it lands next; the body is held up by where the feet are. Steps 3 and 4 wait for
    it (both ride on planted feet).
+   **Started over, 2026-11-19 (the user: "start over completely ... from scratch" on going up and down a block; walk,
+   hiss, bite, eyelids good): `docs/plans/engine-step2-climb.md`, replacing the feet-first plan (its unfinished stage A
+   kept on branch `claude/monitor-feet-first-tries`).** The climb is a move of its own, made once for a one-block step
+   (every Minecraft step is the same), the game moving the monitor along the move's own path; the user's idea at its
+   heart: it rears up first, then pushes itself up with its feet on the block. The tail becomes a chain dragged from
+   the hips (follows the path, drapes over edges). Stages: A the tail, B up, C down, D hills and clean-up.
 3. **The back curves sideways.** The `walk` and `swim` clips swing shoulders and hips opposite ways across the three
    trunk pieces (`tools/monitor_models.py`), the S-curve; the lab's checks extended to four legs and a tail (K5).
 4. **Smooth water entry.** The `enter` clip and its start rule go; legs and tail blend from walking to swimming by

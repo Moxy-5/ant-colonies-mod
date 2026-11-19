@@ -1,5 +1,9 @@
 # Animal Maker Engine step 2, rethought: feet first (plan, 2026-11-19)
 
+**Replaced, 2026-11-19, the same day: `docs/plans/engine-step2-climb.md`** (the user started the step animations over
+from scratch: the climb a move of its own, the tail dragged). Stage A was begun and left unfinished; kept on branch
+`claude/monitor-feet-first-tries`. Kept here for its reasoning.
+
 Not built. The user asked for the rethink as a plan, no code (2026-11-19, after the first tries failed; the "two
 strikes, then rethink" rule came from it). Read `docs/ANIMAL-MAKER-ENGINE.md` (step 2 and its first tries) first.
 
