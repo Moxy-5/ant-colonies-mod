@@ -255,6 +255,9 @@ steps are for the checks; to settle with the user before the first small creatur
    reared. Lesson for the rethink: the feet must be placed by where the step is (each foot's next landing chosen
    onto the step, the body following the feet), not the body bent first and the feet patched after; the climb is a
    move of its own, timed from the feet (idea (c) above), not a pose worked out each frame.
+   **Rethought, 2026-11-19 (plan only, the user's go): `docs/plans/engine-step2-feet-first.md`.** Each foot holds its
+   spot on the ground and picks where it lands next; the body is held up by where the feet are. Steps 3 and 4 wait for
+   it (both ride on planted feet).
 3. **The back curves sideways.** The `walk` and `swim` clips swing shoulders and hips opposite ways across the three
    trunk pieces (`tools/monitor_models.py`), the S-curve; the lab's checks extended to four legs and a tail (K5).
 4. **Smooth water entry.** The `enter` clip and its start rule go; legs and tail blend from walking to swimming by
