@@ -284,3 +284,6 @@ first bird, K1 and K6 as soon as clip making feels slow.
   engine's design from the start (the families table above).
 - Open: which animal after the monitor (decides which family is built next).
 - Open: the size scale for small creatures (above).
+
+## Hard rule: offline and in-game checks for every animation (the user, 2026-11-19)
+After the monitor's climb up came out right this way ("a combination of the animation engine and in game was perfect"), every new or changed animation or movement, any animal, is checked both ways before the user sees it: offline as the game draws it (`tools/climb_check.py` for the monitor's climbs; a checker of the same kind for other clips), then the real game frozen and stepped a few ticks a picture from three sides (`tools/film/monitor_climb_frames.film` as the pattern, `tools/film_sheet.py` for contact sheets), every phase judged, joints measured over time when a limb looks wrong, and the course scenes it touches run. How-to: `docs/plans/engine-step2-climb.md`, "How stage B was got right".
