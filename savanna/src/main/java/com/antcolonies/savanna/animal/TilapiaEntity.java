@@ -1,5 +1,6 @@
 package com.antcolonies.savanna.animal;
 
+import com.antcolonies.entity.body.SteadyController;
 import javax.annotation.Nullable;
 
 import java.util.List;
@@ -674,7 +675,7 @@ public class TilapiaEntity extends AbstractSchoolingFish implements GeoEntity, H
 
     @Override
     public void registerControllers(AnimatableManager.ControllerRegistrar controllers) {
-        controllers.add(new AnimationController<>(this, "body", 4, this::animate));
+        controllers.add(new SteadyController<>(this, "body", 4, this::animate));
     }
 
     private PlayState animate(AnimationState<TilapiaEntity> state) {

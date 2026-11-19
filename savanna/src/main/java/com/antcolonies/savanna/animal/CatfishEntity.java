@@ -1,5 +1,6 @@
 package com.antcolonies.savanna.animal;
 
+import com.antcolonies.entity.body.SteadyController;
 import javax.annotation.Nullable;
 
 import com.antcolonies.animal.AnimalLife;
@@ -448,7 +449,7 @@ public class CatfishEntity extends AbstractFish implements GeoEntity, HasLife {
 
     @Override
     public void registerControllers(AnimatableManager.ControllerRegistrar controllers) {
-        controllers.add(new AnimationController<>(this, "body", 3, this::animate));
+        controllers.add(new SteadyController<>(this, "body", 3, this::animate));
     }
 
     private PlayState animate(AnimationState<CatfishEntity> state) {

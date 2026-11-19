@@ -212,8 +212,13 @@ public class MonitorModel extends DefaultedEntityGeoModel<MonitorEntity> {
         }
         boolean entering = monitor.entering();
         for (int pair = 0; pair < feet.length; pair++) {
-            // going in, both pairs count as folding (the clip folds them), so the swim clip follows it at once
-            double want = feet[pair] && !entering ? 1.0 : 0.0;
+            // going in, both pairs count as folding (the clip folds them), so the swim clip follows it at once. A pair
+            // folds only for water (in it, or water under that pair): on land over a drop the legs stay standing
+            // (BUGS 235: after a step up, the hind pair found no ground under the still-lifted body for a moment and
+            // folded toward the swimming pose, a hind foot twisting round backwards)
+            boolean water = monitor.isInWater() || !feet[pair]
+                    && bend.overWater(monitor.level(), -MonitorEntity.LEG_PAIRS[pair] * perBlock, REACH * monitor.getScale());
+            double want = (feet[pair] || !water) && !entering ? 1.0 : 0.0;
             monitor.legStand[pair] += (want - monitor.legStand[pair]) * k;
             if (swimming || entering) {              // those clips set every leg themselves
                 continue;

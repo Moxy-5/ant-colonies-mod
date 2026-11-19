@@ -1,5 +1,6 @@
 package com.antcolonies.savanna.animal;
 
+import com.antcolonies.entity.body.SteadyController;
 import java.util.EnumSet;
 import java.util.List;
 
@@ -157,6 +158,10 @@ public class MonitorEntity extends PathfinderMob implements GeoEntity, HasLife {
     /** How much each leg pair stands now (1) or is folded back along the body as it swims (0), eased; drawing only (MonitorModel). */
     public final double[] legStand = {1, 1};
     public long legNanos;
+    /** How many ticks still it may stand before its walk stops (my pick: 0.15 s); the last tick it moved; how far a tick, eased. */
+    static final int WALK_HOLD = 3;
+    private int movedTick = -100;
+    private double stride;
     /**
      * Its tail dragged behind it (the Animal Maker Engine step 2, stage A, 2026-11-19; {@link TailDrag}); drawing only,
      * made by {@code MonitorModel} on first draw (it reads the model's rest pose).
@@ -319,6 +324,12 @@ public class MonitorEntity extends PathfinderMob implements GeoEntity, HasLife {
     @Override
     public void tick() {
         super.tick();
+        // its walk, for the clips (both sides): the last tick it moved and how far a tick, eased (BUGS 234)
+        double dx = getX() - xo, dz = getZ() - zo, moved = Math.sqrt(dx * dx + dz * dz);
+        if (moved > 0.004) {
+            movedTick = tickCount;
+            stride += (moved - stride) * 0.5;
+        }
         if (level().isClientSide) {
             return;
         }
@@ -1066,7 +1077,7 @@ public class MonitorEntity extends PathfinderMob implements GeoEntity, HasLife {
 
     @Override
     public void registerControllers(AnimatableManager.ControllerRegistrar controllers) {
-        controllers.add(new AnimationController<>(this, "body", 4, this::animate));
+        controllers.add(new SteadyController<>(this, "body", 4, this::animate));
         controllers.add(new AnimationController<>(this, "tongue", 0, this::tongue));
     }
 
@@ -1083,9 +1094,13 @@ public class MonitorEntity extends PathfinderMob implements GeoEntity, HasLife {
         return tickCount >= enterTick && tickCount - enterTick < ENTER_TICKS && !isDeadOrDying();
     }
 
+    /**
+     * Whether it walks (drawing only): it moved within the last {@link #WALK_HOLD} ticks. One tick still is not enough
+     * to stop: on a player's screen its place comes from the server in steps, and a late one left it standing for a
+     * tick now and then, which flicked the walk to idle and back, the walk starting over (BUGS 234).
+     */
     public boolean walking() {
-        double dx = getX() - xo, dz = getZ() - zo;
-        return dx * dx + dz * dz > 0.004 * 0.004;
+        return tickCount - movedTick <= WALK_HOLD;
     }
 
     private PlayState animate(AnimationState<MonitorEntity> state) {
@@ -1118,7 +1133,7 @@ public class MonitorEntity extends PathfinderMob implements GeoEntity, HasLife {
             return state.setAndContinue(SWIM);
         }
         if (walking()) {
-            player.setAnimationSpeed(Mth.clamp(speed / (WALK_CLIP_SPEED * getScale()), 0.5, 3.0));
+            player.setAnimationSpeed(Mth.clamp(stride / (WALK_CLIP_SPEED * getScale()), 0.5, 3.0));
             return state.setAndContinue(WALK);
         }
         return state.setAndContinue(IDLE);
