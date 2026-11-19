@@ -47,4 +47,5 @@ run-soak/
 run-flight/
 __pycache__/
 references/anim_lab/
+references/viewer_shots/
 run-film/

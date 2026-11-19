@@ -1,0 +1,317 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Model Versions</title>
+<style>
+  :root { --bg: #f1efe8; --panel: #fdfcf8; --ink: #2a2a22; --muted: #6a675a; --line: #d9d4c4; --accent: #8a6a1e; --b: #3c78e6; }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) { --bg: #1a1a16; --panel: #23231e; --ink: #ecebe2; --muted: #a5a291; --line: #3a3930; --accent: #e0b850; --b: #7aa6f0; }
+  }
+  :root[data-theme="dark"] { --bg: #1a1a16; --panel: #23231e; --ink: #ecebe2; --muted: #a5a291; --line: #3a3930; --accent: #e0b850; --b: #7aa6f0; }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font: 15px/1.45 system-ui, sans-serif; }
+  header { padding: 14px 16px 6px; }
+  h1 { margin: 0 0 4px; font-size: 20px; }
+  header p { margin: 0; color: var(--muted); max-width: 86ch; }
+  #wrap { position: relative; height: 60vh; min-height: 320px; margin: 10px 16px; border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
+  canvas { display: block; width: 100%; height: 100%; }
+  #labels { position: absolute; inset: 0; pointer-events: none; overflow: hidden; }
+  .tag { position: absolute; transform: translate(-50%, -100%); background: var(--panel); border: 1px solid var(--line); border-radius: 6px;
+         padding: 1px 6px; font-size: 12px; font-weight: 600; white-space: nowrap; }
+  .controls { display: flex; flex-wrap: wrap; gap: 8px 12px; padding: 0 16px 8px; align-items: center; }
+  .controls > b { min-width: 7.5em; }
+  .controls label { display: flex; gap: 8px; align-items: center; font-size: 14px; }
+  .readout { color: var(--muted); font-size: 13px; }
+  button { font: inherit; padding: 5px 11px; border-radius: 8px; border: 1px solid var(--line); background: var(--panel); color: var(--ink); cursor: pointer; }
+  button.on { border-color: var(--accent); color: var(--accent); font-weight: 600; }
+  #partRows button.on.b { border-color: var(--b); color: var(--b); }
+  .info { margin: 0 16px 10px; padding: 8px 10px; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; max-width: 900px; font-size: 14px; }
+  .info .b { color: var(--b); font-weight: 600; } .info .a { color: var(--accent); font-weight: 600; }
+  #sliders { display: grid; grid-template-columns: minmax(180px, 330px) minmax(120px, 260px) 4.5em; gap: 6px 12px; align-items: center; margin: 0 16px 10px; }
+  #sliders input[type=range] { width: 100%; }
+  #sliders .changed { color: var(--accent); font-weight: 600; }
+  .note { margin: 0 16px 10px; color: var(--muted); font-size: 14px; max-width: 86ch; }
+  input[type=text] { font: inherit; padding: 5px 8px; border-radius: 8px; border: 1px solid var(--line); background: var(--panel); color: var(--ink); width: min(360px, 70vw); }
+  code { background: var(--panel); border: 1px solid var(--line); border-radius: 4px; padding: 0 4px; }
+  @media (max-width: 600px) { #sliders { grid-template-columns: 1fr 4em; } #sliders .lab { grid-column: 1 / -1; } }
+</style>
+</head>
+<body>
+<header>
+  <h1 id="title">Versions</h1>
+  <p>Every kept version of the model, exactly as the game would get it. Pick version A, and a version B to set beside
+     it, lay over it in see-through blue, or take parts from. Drag to turn, scroll or pinch to zoom, right-drag to slide.</p>
+</header>
+<div id="wrap"><canvas id="c"></canvas><div id="labels"></div></div>
+<div class="controls"><b>Version A</b><span id="aBtns"></span></div>
+<div class="controls"><b>Version B</b><span id="bBtns"></span></div>
+<div class="controls"><b>Show</b><span id="modeBtns"></span><button id="pieces">Show the pieces</button></div>
+<div class="controls" id="partRows" style="display:none"></div>
+<div class="info" id="info"></div>
+<div class="controls" id="cams"></div>
+<div id="compare"></div>
+<h2 class="note" style="color:var(--ink);font-size:16px;margin-top:14px">Shape sliders</h2>
+<p class="note" id="sliderNote"></p>
+<div id="sliders"></div>
+<div class="controls" id="keepRow" style="display:none">
+  <input id="keepNote" type="text" placeholder="What changed (for the version's note)">
+  <button id="keep">Keep as a new version</button><button id="reset">Back to A's numbers</button>
+  <span id="liveOut" class="readout"></span>
+</div>
+<!--VIEWER-->
+<script>
+const DATA = /*DATA*/null;
+document.getElementById('title').textContent = DATA.title + ': versions';
+document.title = DATA.title + ' Versions';
+const wrap = document.getElementById('wrap');
+const st = Viewer.stage({canvas: document.getElementById('c'), wrap, labels: document.getElementById('labels')});
+const keys = DATA.versions.map(v => v.key);
+const settings = Viewer.settingsFromHash({a: keys[keys.length - 1], b: keys.length > 1 ? keys[keys.length - 2] : 'none',
+                                          mode: 'one', cam: 'three-quarter', pieces: 0});
+let cmp = null;
+
+// plain ground (a scenery prop, hidden while comparing)
+const ground = st.prop(new THREE.Mesh(new THREE.PlaneGeometry(80, 80), new THREE.MeshLambertMaterial({color: '#a99c78'})));
+ground.rotation.x = -Math.PI / 2; ground.receiveShadow = true;
+
+// --- the versions: each built once, when first shown ------------------------------------------------------------------
+const byKey = {};
+DATA.versions.forEach(v => byKey[v.key] = v);
+const built = {};                 // key + '|' + place -> model
+let liveLook = null;              // the sliders' model (key 'now'), from the helper
+function look(key) { return key === 'now' ? liveLook : byKey[key].look; }
+function centreOf() { return model(settings.a, 'own').userData.centre; }
+// place: 'own' (centred on itself; 'apart' is the same for B, its own copy even when B is A's version) or 'shared'
+// (centred where A is, so two versions line up piece for piece)
+function model(key, place) {
+  const id = key + '|' + place;
+  if (!built[id]) {
+    const m = Viewer.buildModel(look(key), st.scene, place === 'shared' ? {centre: centreOf()} : {});
+    m.rotation.y = Math.PI / 2;            // the head to -x, the left side toward the camera's usual place
+    m.userData.key = key;
+    m.userData.part = partsOf(m);
+    built[id] = m;
+  }
+  return built[id];
+}
+function forget(key) {
+  Object.keys(built).filter(id => id.startsWith(key + '|')).forEach(id => {
+    const m = built[id];
+    st.scene.remove(m);
+    m.userData.meshes.forEach(x => x.geometry.dispose());
+    delete built[id];
+  });
+}
+// each bone's part: walk up its parents to the first bone a part starts at
+function partsOf(m) {
+  const starts = {};
+  Object.entries(DATA.parts).forEach(([part, bones]) => bones.forEach(b => starts[b] = part));
+  const of = {};
+  Object.keys(m.userData.parents).forEach(bone => {
+    let b = bone;
+    while (b && !(b in starts)) b = m.userData.parents[b];
+    of[bone] = b ? starts[b] : 'body';
+  });
+  return of;
+}
+
+// --- what is shown ------------------------------------------------------------------------------------------------------
+const mix = {};                   // part -> 'a' or 'b'
+Object.keys(DATA.parts).forEach(p => mix[p] = 'a');
+const ghost = new THREE.MeshLambertMaterial({color: '#3c78e6', transparent: true, opacity: 0.35, depthWrite: false});
+let shown = [], shownB = null;    // the meshes Compare measures; B's model when it stands apart or over A
+function show() {
+  Object.values(built).forEach(m => m.visible = false);
+  shown = []; shownB = null;
+  const hasB = settings.b !== 'none' && (settings.b in byKey || (settings.b === 'now' && liveLook));
+  const mode = hasB ? settings.mode : 'one';
+  const A = model(settings.a, 'own');
+  A.visible = true; A.position.set(0, 0, 0);
+  A.userData.meshes.forEach(x => { x.visible = true; x.renderOrder = 0; x.material = settings.pieces ? x.userData.tint : x.userData.mat; });
+  if (mode === 'one' || mode === 'side' || mode === 'over') shown = A.userData.meshes.slice();
+  if (mode === 'side') {
+    const B = model(settings.b, 'apart');
+    // nose to tail, A in front: both seen whole from the side and from above
+    B.visible = true; shownB = B;
+    A.position.set(-(A.userData.length + GAP) / 2, 0, 0);
+    B.position.set((B.userData.length + GAP) / 2, 0, 0);
+    B.userData.meshes.forEach(x => { x.visible = true; x.renderOrder = 0; x.material = settings.pieces ? x.userData.tint : x.userData.mat; });
+  }
+  if (mode === 'over') {
+    const B = model(settings.b, 'shared');
+    B.visible = true; B.position.set(0, 0, 0); shownB = B;
+    B.userData.meshes.forEach(x => { x.visible = true; x.material = ghost; x.renderOrder = 5; });
+  }
+  if (mode === 'mix') {
+    const B = model(settings.b, 'shared');
+    B.visible = true; B.position.set(0, 0, 0);
+    [[A, 'a'], [B, 'b']].forEach(([m, side]) => m.userData.meshes.forEach(x => {
+      x.visible = mix[m.userData.part[x.userData.bone]] === side;
+      x.material = settings.pieces ? x.userData.tint : x.userData.mat; x.renderOrder = 0;
+      if (x.visible) shown.push(x);
+    }));
+  }
+  document.getElementById('partRows').style.display = mode === 'mix' ? '' : 'none';
+  showA(settings.a); showB(settings.b); showMode(mode);
+  document.getElementById('pieces').classList.toggle('on', !!settings.pieces);
+  info(mode, hasB);
+}
+const GAP = 1.0;                  // blocks between A's tail and B's snout, side by side
+// the model Compare measures: the meshes now shown as A (or the mix)
+const compareModel = {userData: {get meshes() { return shown; }}, updateMatrixWorld() { Object.values(built).forEach(m => m.updateMatrixWorld(true)); }};
+
+// --- the controls -----------------------------------------------------------------------------------------------------
+function label(key) { return key === 'now' ? 'Sliders now' : key; }
+const allKeys = () => keys.concat(liveLook ? ['now'] : []);
+let showA = () => {}, showB = () => {};
+function versionButtons() {
+  ['aBtns', 'bBtns'].forEach(id => document.getElementById(id).innerHTML = '');
+  showA = Viewer.buttons(document.getElementById('aBtns'), allKeys().map(k => [k, label(k), tip(k)]), k => { settings.a = k; show(); });
+  showB = Viewer.buttons(document.getElementById('bBtns'), [['none', 'None']].concat(allKeys().map(k => [k, label(k), tip(k)])),
+                         k => { settings.b = k; if (k !== 'none' && settings.mode === 'one') settings.mode = 'side'; show(); });
+}
+function tip(k) { const v = byKey[k]; return v ? (v.date + ', ' + v.boxes + ' boxes' + (v.note ? ': ' + v.note : '')) : 'the sliders\' numbers, not kept yet'; }
+const MODES = [['one', 'A alone'], ['side', 'Side by side'], ['over', 'B over A, see-through'], ['mix', 'Mix parts']];
+const showMode = Viewer.buttons(document.getElementById('modeBtns'), MODES, k => {
+  settings.mode = k;
+  if (k !== 'one' && settings.b === 'none') settings.b = allKeys().find(x => x !== settings.a) || 'none';
+  show();
+  setCam(settings.cam);                 // side by side needs a wider view
+});
+document.getElementById('pieces').onclick = () => { settings.pieces = settings.pieces ? 0 : 1; show(); };
+Object.keys(DATA.parts).forEach(part => {
+  const span = document.createElement('span');
+  span.innerHTML = '<span class="readout">' + part + '</span> ';
+  const a = document.createElement('button'), b = document.createElement('button');
+  a.textContent = 'A'; b.textContent = 'B'; b.className = 'b';
+  const paint = () => { a.classList.toggle('on', mix[part] === 'a'); b.classList.toggle('on', mix[part] === 'b'); };
+  a.onclick = () => { mix[part] = 'a'; paint(); show(); };
+  b.onclick = () => { mix[part] = 'b'; paint(); show(); };
+  paint(); span.appendChild(a); span.appendChild(b);
+  document.getElementById('partRows').appendChild(span);
+});
+
+// what each shown version is, and how its shape numbers differ
+function numbersOf(key) { return key === 'now' ? liveLook.numbers : byKey[key].numbers; }
+function info(mode, hasB) {
+  const line = (key, cls) => {
+    const v = byKey[key];
+    const boxes = key === 'now' ? liveLook.boxes : v.boxes;
+    return '<span class="' + cls + '">' + (cls === 'a' ? 'A' : 'B') + ': ' + label(key) + '</span> ' +
+      (v ? v.date + ', ' : '') + boxes + ' boxes' + (v && v.note ? '. ' + v.note : '');
+  };
+  let html = line(settings.a, 'a');
+  if (hasB && mode !== 'one') {
+    html += '<br>' + line(settings.b, 'b');
+    const na = numbersOf(settings.a), nb = numbersOf(settings.b), diffs = [];
+    DATA.shape.forEach(s => { if (na[s.key] !== nb[s.key]) diffs.push(s.label + ': ' + na[s.key] + ' in A, ' + nb[s.key] + ' in B'); });
+    html += '<br><span class="readout">' + (diffs.length ? diffs.join('; ') : 'Same slider numbers (any change is in the maker itself).') + '</span>';
+    if (mode === 'mix') html += '<br><span class="readout">Each part sits where its own version put it, so a part ' +
+      'from a version with a longer neck or body may float or overlap a little.</span>';
+  }
+  document.getElementById('info').innerHTML = html;
+}
+
+// --- cameras (sized to version A) ---------------------------------------------------------------------------------------
+// sized to A, or to both when they stand nose to tail
+const L = () => model(settings.a, 'own').userData.length + (shownB && settings.mode === 'side' ? shownB.userData.length + GAP : 0);
+const Hh = () => model(settings.a, 'own').userData.height;
+const CAMS = {
+  'three-quarter': () => [[-L() * 0.55, L() * 0.42, L() * 0.9], [0, Hh() * 0.4, -0.3]],
+  side: () => [[0, Hh() * 0.5, L() * 1.35], [0, Hh() * 0.5, 0]],
+  'from above': () => [[0, L() * 1.5, 0.01], [0, 0, 0]],
+  front: () => [[-L() * 1.1, Hh() * 0.6, 0.001], [0, Hh() * 0.5, 0]],
+  'head, close': () => { const a = model(settings.a, 'own'), l = a.userData.length, x = a.position.x;
+                         return [[x - l * 0.75, Hh() * 1.4, l * 0.35], [x - l * 0.4, Hh() * 0.7, 0]]; },
+};
+const showCam = Viewer.buttons(document.getElementById('cams'), Object.keys(CAMS).map(n => [n, n]), setCam);
+function setCam(name) {
+  settings.cam = name;
+  if (cmp && settings.compare in Viewer.VIEWS) { settings.compare = 'off'; cmp.refresh(); }
+  st.setView(st.camera, CAMS[name]());
+  showCam(name);
+}
+
+// --- the shape sliders (live only with the helper: python tools/workshop.py serve <animal>) -----------------------------
+const live = location.protocol.startsWith('http');
+const sliderNote = document.getElementById('sliderNote');
+const inputs = {};
+if (!DATA.shape.length) sliderNote.textContent = 'This model has no sliders.';
+else if (!live) sliderNote.innerHTML = 'The sliders rebuild the model as they move, so they need the little helper ' +
+  'that reruns the maker. In PowerShell, in the project folder: <code>python tools/workshop.py serve ' + DATA.animal +
+  '</code>, then open <code>http://localhost:' + DATA.port + '/</code>. Here they only show version A\'s numbers.';
+else sliderNote.textContent = 'Drag a slider: the model is rebuilt with that number (shown as "Sliders now", in version A\'s ' +
+  'place). Keep it as a new version when it looks right, then tell Claude which version to make the game\'s.';
+DATA.shape.forEach(s => {
+  const lab = document.createElement('span'); lab.className = 'lab'; lab.textContent = s.label;
+  const inp = document.createElement('input');
+  Object.assign(inp, {type: 'range', min: s.min, max: s.max, step: s.step, disabled: !live});
+  const out = document.createElement('span'); out.className = 'readout';
+  inputs[s.key] = {inp, out, lab};
+  inp.oninput = () => { out.textContent = inp.value; changed(); };
+  [lab, inp, out].forEach(e => document.getElementById('sliders').appendChild(e));
+});
+function setSliders(key) {
+  const n = numbersOf(key);
+  DATA.shape.forEach(s => { const {inp, out} = inputs[s.key]; inp.value = n[s.key]; out.textContent = n[s.key]; });
+  markChanged();
+}
+function markChanged() {
+  const base = numbersOf(baseKey);
+  DATA.shape.forEach(s => inputs[s.key].lab.classList.toggle('changed', parseFloat(inputs[s.key].inp.value) !== base[s.key]));
+}
+let baseKey = settings.a, timer = null, asked = 0;
+const liveOut = document.getElementById('liveOut');
+function numbersNow() { const n = {}; DATA.shape.forEach(s => n[s.key] = parseFloat(inputs[s.key].inp.value)); return n; }
+function changed() {
+  if (settings.a !== 'now') baseKey = settings.a;
+  markChanged();
+  clearTimeout(timer);
+  timer = setTimeout(rebuild, 200);
+}
+async function rebuild() {
+  const n = numbersNow(), mine = ++asked;
+  liveOut.textContent = 'rebuilding...';
+  try {
+    const r = await fetch('/make?' + new URLSearchParams(n));
+    if (!r.ok) throw new Error(await r.text());
+    const lk = await r.json();
+    if (mine !== asked) return;            // a newer ask is on its way
+    forget('now'); liveLook = lk;
+    settings.a = 'now';
+    versionButtons(); show();
+    liveOut.textContent = lk.boxes + ' boxes';
+  } catch (e) { liveOut.textContent = 'the helper said: ' + e.message; }
+}
+if (live && DATA.shape.length) {
+  document.getElementById('keepRow').style.display = '';
+  document.getElementById('reset').onclick = () => { forget('now'); liveLook = null; settings.a = baseKey; versionButtons(); setSliders(baseKey); show(); liveOut.textContent = ''; };
+  document.getElementById('keep').onclick = async () => {
+    liveOut.textContent = 'keeping...';
+    try {
+      const r = await fetch('/keep', {method: 'POST', body: JSON.stringify({numbers: numbersNow(), note: document.getElementById('keepNote').value})});
+      if (!r.ok) throw new Error(await r.text());
+      const {key} = await r.json();
+      location.hash = 'a=' + key;
+      location.reload();
+    } catch (e) { liveOut.textContent = 'the helper said: ' + e.message; }
+  };
+}
+
+// while comparing, only A (or the mix) is measured and seen: B standing apart or over A steps out
+st.onFrame.push(() => { if (shownB) shownB.visible = !(settings.compare in Viewer.VIEWS); });
+
+versionButtons();
+if (!(settings.a in byKey)) settings.a = keys[keys.length - 1];
+if (settings.b !== 'none' && !(settings.b in byKey)) settings.b = 'none';
+show();
+setSliders(settings.a);
+st.resize();
+setCam(CAMS[settings.cam] ? settings.cam : 'three-quarter');
+cmp = Viewer.compare(st, settings, () => compareModel, DATA.pictures, document.getElementById('compare'));
+st.start();
+</script>
+</body>
+</html>

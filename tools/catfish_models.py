@@ -17,12 +17,11 @@ Looks (my picks): A grey-brown mottled (the user's picture), B marbled olive, C 
 Units are model pixels (16 a block), the head points to -Z, up is +Y, left is +X; y = MID runs through the body's middle.
 `python tools/catfish_models.py game` writes the game's files (model, look A's texture, clips) into the savanna mod.
 """
-import copy
 import math
 import random
 
 import tilapia_models as tm
-from tilapia_models import curve, cube, mix, shade, faces, face_point, png
+from model_parts import curve, cube, mix, shade, png, clip, rot_only, paint_faces, geo, animations, write_assets
 
 TEXELS = 1.5          # texture pixels a model pixel
 MID = 4.0
@@ -303,49 +302,20 @@ def colour(part, look, x, y, z, face, edge, rnd):
 def paint(bones, look):
     """(bones with every face's place on the texture, rows of (r, g, b, a), width, height)."""
     rnd = random.Random(11)
-    bones = copy.deepcopy(bones)
-    patches = []
-    for b in bones:
-        for c in b.get('cubes', []):
-            c['uv'] = {}
-            for face, (w, h) in faces(c).items():
-                patches.append((max(1, round(w * TEXELS)), max(1, round(h * TEXELS)), c, face))
-    patches.sort(key=lambda p: (-p[1], -p[0]))
-    for width in (64, 128, 256, 512):
-        x = y = shelf = 0
-        places = []
-        for w, h, c, face in patches:
-            if x + w > width:
-                x, y, shelf = 0, y + shelf, 0
-            places.append((x, y, w, h, c, face))
-            x, shelf = x + w, max(shelf, h)
-        if y + shelf <= width:
-            break
-    height = 16
-    while height < y + shelf:
-        height *= 2
-    rows = [[(0, 0, 0, 0)] * width for _ in range(height)]
-    for x0, y0, w, h, c, face in places:
-        c['uv'][face] = {'uv': [x0, y0], 'uv_size': [w, h]}
+
+    def pixel(c, face, px, py, pz):
         part = c['_part']
-        for j in range(h):
-            for i in range(w):
-                px, py, pz = face_point(c, face, (i + 0.5) / w, (j + 0.5) / h)
-                lo, hi = c['origin'][1], c['origin'][1] + c['size'][1]
-                if part == 'anal':
-                    edge = (hi - py) / max(0.1, hi - lo)
-                elif part == 'caudal':
-                    edge = max(abs(py - MID) / max(0.1, (hi - lo) / 2), (pz - HIND_END) / (TAIL_END - HIND_END))
-                elif part in ('pectoral', 'pelvic'):
-                    edge = 0
-                else:
-                    edge = (py - lo) / max(0.1, hi - lo)
-                rgb = colour(part, look, px, py, pz, face, edge, rnd)
-                rows[y0 + j][x0 + i] = tuple(max(0, min(255, int(v))) for v in rgb) + (255,)
-    for b in bones:
-        for c in b.get('cubes', []):
-            c.pop('_part')
-    return bones, rows, width, height
+        lo, hi = c['origin'][1], c['origin'][1] + c['size'][1]
+        if part == 'anal':
+            edge = (hi - py) / max(0.1, hi - lo)
+        elif part == 'caudal':
+            edge = max(abs(py - MID) / max(0.1, (hi - lo) / 2), (pz - HIND_END) / (TAIL_END - HIND_END))
+        elif part in ('pectoral', 'pelvic'):
+            edge = 0
+        else:
+            edge = (py - lo) / max(0.1, hi - lo)
+        return colour(part, look, px, py, pz, face, edge, rnd)
+    return paint_faces(bones, TEXELS, pixel)
 
 
 # --- the game's files (the user, 2026-11-14: "A looks the best lets just do that for now and put it in the game") -------
@@ -402,7 +372,7 @@ def clips():
     (hanging still, the tail barely moving, the whiskers feeling), strike (a lunge with the mouth thrown open, snapped
     shut, the whiskers swept back), flop (out of water it stays upright and wriggles in S-curves, as real catfish crawl
     over wet ground), death (rolls onto its side)."""
-    rot = tm.rot_only
+    rot = rot_only
     swim_len = 1.2
     beat = 2 * math.pi / swim_len
 
@@ -528,36 +498,21 @@ def clips():
         p['body'] = {'rotation': [0, 0, 80 * f], 'position': [0, -lie * f, 0]}
         return p
 
-    return {'idle': tm.clip(4.0, idle, 40), 'swim': tm.clip(swim_len, swim, 24),
-            'strike': tm.clip(1.0, strike, 30, False), 'catch': tm.clip(CATCH_LEN, lambda t: catch(t, BITE), 52, 'hold'),
-            'catch_small': tm.clip(CATCH_LEN, lambda t: catch(t, BITE_SMALL), 52, 'hold'),
-            'bite_off': tm.clip(CUT_LEN, lambda t: catch(t, BITE, True), 84, 'hold'),
-            'bite_off_small': tm.clip(CUT_LEN, lambda t: catch(t, BITE_SMALL, True), 84, 'hold'), 'flop': tm.clip(0.8, flop, 16),
-            'gulp': tm.clip(GULP_LEN, gulp, 30, 'hold'), 'death': tm.clip(1.2, death, 12, 'hold')}
+    return {'idle': clip(4.0, idle, 40), 'swim': clip(swim_len, swim, 24),
+            'strike': clip(1.0, strike, 30, False), 'catch': clip(CATCH_LEN, lambda t: catch(t, BITE), 52, 'hold'),
+            'catch_small': clip(CATCH_LEN, lambda t: catch(t, BITE_SMALL), 52, 'hold'),
+            'bite_off': clip(CUT_LEN, lambda t: catch(t, BITE, True), 84, 'hold'),
+            'bite_off_small': clip(CUT_LEN, lambda t: catch(t, BITE_SMALL, True), 84, 'hold'), 'flop': clip(0.8, flop, 16),
+            'gulp': clip(GULP_LEN, gulp, 30, 'hold'), 'death': clip(1.2, death, 12, 'hold')}
 
 
 def write_game():
     """Writes the catfish's model, look A's texture and its clips into the savanna mod."""
-    import json
-    import mod_paths
-    root = mod_paths.assets('savanna')
     game_bones, rows, w, h = paint(model(), 'A')
     files = {f'textures/entity/{GAME_TEXTURE}.png': png(rows)}
-    geo = {'format_version': '1.12.0', 'minecraft:geometry': [{
-        'description': {'identifier': 'geometry.catfish', 'texture_width': w, 'texture_height': h,
-                        'visible_bounds_width': 4, 'visible_bounds_height': 1.5, 'visible_bounds_offset': [0, 0.5, 0]},
-        'bones': game_bones}]}
-    files['geo/entity/catfish.geo.json'] = geo
-    files['animations/entity/catfish.animation.json'] = {'format_version': '1.8.0', 'animations': clips()}
-    for rel, data in files.items():
-        path = root / rel
-        path.parent.mkdir(parents=True, exist_ok=True)
-        if isinstance(data, bytes):
-            path.write_bytes(data)
-        else:
-            with open(path, 'w', encoding='utf-8', newline='\n') as f:
-                json.dump(data, f, indent=1)
-        print('wrote', path.relative_to(mod_paths.PROJECT))
+    files['geo/entity/catfish.geo.json'] = geo('catfish', game_bones, w, h, (4, 1.5, [0, 0.5, 0]))
+    files['animations/entity/catfish.animation.json'] = animations(clips())
+    write_assets(files)
 
 
 if __name__ == '__main__':

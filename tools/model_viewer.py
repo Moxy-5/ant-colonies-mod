@@ -5,6 +5,10 @@ dead_wood_concepts.py; D the user's reference, a darker Minecraft-style dead log
 now in the game, see dead_wood_art.py; E a mix: D's strips in A's sun-bleached silver), with the termite-eaten mud
 stages on top. Textures are drawn here and put into the page as data, so the page is one file.
 
+New pages (2026-11-19, docs/plans/model-workshop.md step 1): build them on the shared viewer script with
+viewer_page.build(template, data, out): the template has <!--VIEWER--> where the shared 3D code goes (works offline,
+flat views and Compare with the fill score); see monitor_viewer.template.html. Old pages move over when next touched.
+
 To show something else, change what main() puts into DATA and the build() function in model_viewer.template.html
 (three.js boxes: one per block, 6 textures each). The page needs the internet for three.js (from cdnjs/jsdelivr).
 
@@ -67,7 +71,9 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import dead_wood_concepts as concepts  # noqa: E402
+import model_parts as mp  # noqa: E402  (the shared parts library, model workshop step 4)
 import mod_paths  # noqa: E402  (where each mod's files are: tools/mod_paths.py)
+import viewer_page  # noqa: E402  (pages on the shared viewer script, model workshop step 1)
 
 ROOT = Path(__file__).resolve().parent.parent
 TEXTURES = mod_paths.assets("savanna") / "textures/block"
@@ -535,7 +541,7 @@ def sand_page(out):
             "pebbles": sand_art.all_pebbles(), "maxBoxes": sand_art.MAX_BOXES, "nest": sand_art.nest(),
             "stoneLooks": sand_art.new_looks(), "newMaxBoxes": sand_art.NEW_MAX_BOXES,
             "stoneTex": {k: {c: uri(png(rows)) for c, rows in t.items()} for k, t in sand_art.stone_textures().items()},
-            "croc": {"bones": b, "texture": uri(tm.png(rows)), "w": w, "h": h}, "wave": cr.WAVE}
+            "croc": {"bones": b, "texture": uri(mp.png(rows)), "w": w, "h": h}, "wave": cr.WAVE}
     template = (Path(__file__).resolve().parent / "sand_viewer.template.html").read_text(encoding="utf-8")
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(template.replace("/*DATA*/null", json.dumps(data)), encoding="utf-8")
@@ -550,7 +556,7 @@ def tilapia_page(out):
     looks = {}
     for key, look in tm.LOOKS.items():
         b, rows, w, h = tm.paint(bones, key)
-        looks[key] = {"name": look["name"], "note": look["note"], "bones": b, "texture": uri(tm.png(rows)), "w": w, "h": h}
+        looks[key] = {"name": look["name"], "note": look["note"], "bones": b, "texture": uri(mp.png(rows)), "w": w, "h": h}
     blocks = {n: file_uri(n + ".png") for n in ("silt", "wet_silt", "algae_mat_3", "algae_mat_2", "algae_strands_tall")}
     data = {"looks": looks, "blocks": blocks, "boxes": sum(len(b.get("cubes", [])) for b in bones)}
     template = (Path(__file__).resolve().parent / "tilapia_viewer.template.html").read_text(encoding="utf-8")
@@ -568,10 +574,10 @@ def catfish_page(out):
     looks = {}
     for key, look in cm.LOOKS.items():
         b, rows, w, h = cm.paint(bones, key)
-        looks[key] = {"name": look["name"], "note": look["note"], "bones": b, "texture": uri(tm.png(rows)), "w": w, "h": h}
+        looks[key] = {"name": look["name"], "note": look["note"], "bones": b, "texture": uri(mp.png(rows)), "w": w, "h": h}
     tb, rows, w, h = tm.paint(tm.model(), "A")
     blocks = {n: file_uri(n + ".png") for n in ("silt", "wet_silt", "algae_mat_3", "algae_mat_2", "algae_strands_tall")}
-    data = {"looks": looks, "tilapia": {"bones": tb, "texture": uri(tm.png(rows)), "w": w, "h": h}, "blocks": blocks,
+    data = {"looks": looks, "tilapia": {"bones": tb, "texture": uri(mp.png(rows)), "w": w, "h": h}, "blocks": blocks,
             "wave": cm.WAVE, "boxes": sum(len(b.get("cubes", [])) for b in bones)}
     template = (Path(__file__).resolve().parent / "catfish_viewer.template.html").read_text(encoding="utf-8")
     out.parent.mkdir(parents=True, exist_ok=True)
@@ -589,14 +595,14 @@ def crocodile_page(out):
     looks = {}
     for key, look in cr.LOOKS.items():
         b, rows, w, h = cr.paint(bones, key)
-        looks[key] = {"name": look["name"], "note": look["note"], "bones": b, "texture": uri(tm.png(rows)), "w": w, "h": h}
+        looks[key] = {"name": look["name"], "note": look["note"], "bones": b, "texture": uri(mp.png(rows)), "w": w, "h": h}
     head = next(b for b in bones if b["name"] == "head")
     eye_top = max(c["origin"][1] + c["size"][1] for c in head["cubes"])
     cb, rows, w, h = cm.paint(cm.model(), "A")
-    catfish = {"bones": cb, "texture": uri(tm.png(rows)), "w": w, "h": h}
+    catfish = {"bones": cb, "texture": uri(mp.png(rows)), "w": w, "h": h}
     tb, rows, w, h = tm.paint(tm.model(), "A")
     blocks = {n: file_uri(n + ".png") for n in ("silt", "wet_silt", "algae_mat_3")}
-    data = {"looks": looks, "catfish": catfish, "tilapia": {"bones": tb, "texture": uri(tm.png(rows)), "w": w, "h": h},
+    data = {"looks": looks, "catfish": catfish, "tilapia": {"bones": tb, "texture": uri(mp.png(rows)), "w": w, "h": h},
             "blocks": blocks, "wave": cr.WAVE, "catfishWave": cm.WAVE, "eyeTop": eye_top,
             "afloat": 1.65 * cr.V,
             "boxes": sum(len(b.get("cubes", [])) for b in bones)}
@@ -615,14 +621,15 @@ def monitor_page(out):
     looks = {}
     for key, look in mm.LOOKS.items():
         b, rows, w, h = mm.paint(bones, key)
-        looks[key] = {"name": look["name"], "note": look["note"], "bones": b, "texture": uri(tm.png(rows)), "w": w, "h": h}
+        looks[key] = {"name": look["name"], "note": look["note"], "bones": b, "texture": uri(mp.png(rows)), "w": w, "h": h}
     blocks = {n: file_uri(n + ".png") for n in ("golden_river_sand", "wet_golden_river_sand")}
     data = {"looks": looks, "blocks": blocks, "notes": mm.NOTES, "clips": mm.clips()[0],
-            "boxes": sum(len(b.get("cubes", [])) for b in bones)}
-    template = (Path(__file__).resolve().parent / "monitor_viewer.template.html").read_text(encoding="utf-8")
-    out.parent.mkdir(parents=True, exist_ok=True)
-    out.write_text(template.replace("/*DATA*/null", json.dumps(data)), encoding="utf-8")
-    print("wrote", out)
+            "boxes": sum(len(b.get("cubes", [])) for b in bones),
+            # Compare (model workshop step 1): the user's picture once it is in references/inspiration/, and the
+            # approved outline (python tools/workshop.py outline monitor, from references/outlines/monitor.json)
+            "pictures": viewer_page.pictures(("references/inspiration/monitor", "picture", "Your picture"),
+                                             ("references/outlines/monitor", "outline", "The approved outline"))}
+    viewer_page.build("monitor_viewer.template.html", data, out)
 
 
 def crab_page(out):
@@ -635,10 +642,10 @@ def crab_page(out):
     looks = {}
     for key, look in cb.LOOKS.items():
         b, rows, w, h = cb.paint(bones, key)
-        looks[key] = {"name": look["name"], "note": look["note"], "bones": b, "texture": uri(tm.png(rows)), "w": w, "h": h}
+        looks[key] = {"name": look["name"], "note": look["note"], "bones": b, "texture": uri(mp.png(rows)), "w": w, "h": h}
     tb, rows, w, h = tm.paint(tm.model(), "A")
     blocks = {n: file_uri(n + ".png") for n in ("silt", "wet_silt", "algae_mat_3")}
-    data = {"looks": looks, "tilapia": {"bones": tb, "texture": uri(tm.png(rows)), "w": w, "h": h}, "blocks": blocks,
+    data = {"looks": looks, "tilapia": {"bones": tb, "texture": uri(mp.png(rows)), "w": w, "h": h}, "blocks": blocks,
             "boxes": sum(len(b.get("cubes", [])) for b in bones)}
     # the snail cracking (2026-11-16): the game's own model (with the held shell and the bits) playing the game's own
     # crack clip, sampled at its even steps, the snail before and the broken shell block after
@@ -649,10 +656,10 @@ def crab_page(out):
     frames = {bone: {ch: [keys[t] for t in times] for ch, keys in chans.items()} for bone, chans in crack["bones"].items()}
     sb, srows, sw, sh = sm.paint(sm.model("A"), "A")
     shell = json.loads((mod_paths.assets("savanna") / "models/block/crab_shell_0.json").read_text(encoding="utf-8"))
-    data["cracking"] = {"bones": gb, "texture": uri(tm.png(grows)), "w": gw, "h": gh,
+    data["cracking"] = {"bones": gb, "texture": uri(mp.png(grows)), "w": gw, "h": gh,
                         "clip": {"length": crack["animation_length"], "steps": len(times) - 1, "bones": frames},
                         "crackAt": cb.CRACK_AT}
-    data["snail"] = {"bones": sb, "texture": uri(tm.png(srows)), "w": sw, "h": sh}
+    data["snail"] = {"bones": sb, "texture": uri(mp.png(srows)), "w": sw, "h": sh}
     data["shell"] = {"elements": shell["elements"], "texture": file_uri("crab_shell_0.png")}
     template = (Path(__file__).resolve().parent / "crab_viewer.template.html").read_text(encoding="utf-8")
     out.parent.mkdir(parents=True, exist_ok=True)
@@ -688,7 +695,7 @@ def croc_clips_page(out):
                 b, rows, w, h = cr.paint(bones, "A")
         else:
             b, rows, w, h = cr.paint(bones, "A")
-        return {"bones": b, "texture": uri(tm.png(rows)), "w": w, "h": h, "length": length, "eyeTop": eye_top}
+        return {"bones": b, "texture": uri(mp.png(rows)), "w": w, "h": h, "length": length, "eyeTop": eye_top}
     adult = model(cr.model(), None, 8.0)
     adult["afloat"] = 1.65 * cr.V
     old = model(life_looks.croc_old_model(), life_looks.croc_old_colour, 10.5)
@@ -725,13 +732,13 @@ def snail_page(out):
     for key, look in sm.LOOKS.items():
         bones = sm.model(key)
         b, rows, w, h = sm.paint(bones, key)
-        snails[key] = {"name": look["name"], "note": look["note"], "bones": b, "texture": uri(tm.png(rows)), "w": w,
+        snails[key] = {"name": look["name"], "note": look["note"], "bones": b, "texture": uri(mp.png(rows)), "w": w,
                        "h": h, "boxes": sum(len(x.get("cubes", [])) for x in bones)}
     crb, rows, w, h = cb.paint(cb.model(), "A")
     tb, trows, tw, th = tm.paint(tm.model(), "A")
     blocks = {n: file_uri(n + ".png") for n in ("silt", "wet_silt", "algae_mat_3")}
-    data = {"snails": snails, "crab": {"bones": crb, "texture": uri(tm.png(rows)), "w": w, "h": h},
-            "tilapia": {"bones": tb, "texture": uri(tm.png(trows)), "w": tw, "h": th}, "blocks": blocks}
+    data = {"snails": snails, "crab": {"bones": crb, "texture": uri(mp.png(rows)), "w": w, "h": h},
+            "tilapia": {"bones": tb, "texture": uri(mp.png(trows)), "w": tw, "h": th}, "blocks": blocks}
     template = (Path(__file__).resolve().parent / "snail_viewer.template.html").read_text(encoding="utf-8")
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(template.replace("/*DATA*/null", json.dumps(data)), encoding="utf-8")
@@ -751,7 +758,7 @@ def remains_page(out):
     game_length = {'catfish': 2.0, 'catfish_croc': 2.0, 'tilapia': 0.6, 'tilapia_half': 0.6}
     animals = {}
     for kind, stages in rm.all_remains().items():
-        models = [{"bones": b, "texture": uri(tm.png(rows)), "w": w, "h": h,
+        models = [{"bones": b, "texture": uri(mp.png(rows)), "w": w, "h": h,
                    "boxes": sum(len(x.get('cubes', [])) for x in b)} for b, rows, w, h in stages]
         scale = game_length[kind] * 16 / length(rm.whole_length_bones(kind))
         animals[kind] = {"models": models, "scale": scale, "sink": {'catfish': 0.05, 'catfish_croc': 0.05, 'tilapia': 0.02, 'tilapia_half': 0.02}[kind]}

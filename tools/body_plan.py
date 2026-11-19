@@ -46,6 +46,8 @@ Run from the project folder:
   python tools/body_plan.py new <model>      a starter plan for a model whose bones follow the placeholder names
   python tools/body_plan.py rename-test      proves a model with other bone names reads, checks and walks the same
   python tools/body_plan.py measure <model>  (or all) works out its climb and spine numbers from the model and writes them
+  python tools/body_plan.py boxes            every model's boxes, slanted boxes and bones against the box budget
+                                             (docs/plans/model-workshop.md, step 2; it warns, it never fails)
 """
 import json, math, os, re, sys
 
@@ -452,6 +454,50 @@ def rename_test(model='worker_ant'):
           f'({len(anims["animations"])} clips)')
 
 
+# --- the box budget (docs/plans/model-workshop.md, step 2, 2026-11-19) --------------------------------------------------
+# Boxes cost drawing time for every one on screen, so what a model may spend depends on how many are seen at once and
+# how big it is in the game (a geo file does not say: insects are drawn scaled down). My picks: a colony insect may
+# be up to about 60 on screen, so it stays lean (the Matabele's far look, 54 boxes, is what most of a raid column
+# shows); small animals come in numbers; a big animal is one or two at a time and earns the most. Remains count as
+# the animal they come from. A model over its budget is a warning to look at, not an error.
+BOX_BUDGET = {'colony insect': 250, 'small animal': 150, 'medium animal': 250, 'large animal': 400}
+BOX_KIND = [('worker_ant', 'colony insect'), ('termite_', 'colony insect'), ('matabele_', 'colony insect'),
+            ('snail', 'small animal'), ('crab', 'small animal'), ('tilapia', 'small animal'),
+            ('remains_tilapia', 'small animal'), ('catfish', 'medium animal'), ('remains_catfish', 'medium animal'),
+            ('crocodile', 'large animal'), ('monitor', 'large animal')]
+
+
+def box_kind(model):
+    """The budget's kind for a model: the longest matching name start in BOX_KIND (None if it is not listed)."""
+    hits = [(len(k), kind) for k, kind in BOX_KIND if model.startswith(k)]
+    return max(hits)[1] if hits else None
+
+
+def box_counts(model, mod):
+    geo = json.load(open(os.path.join(mod_paths.assets(mod), 'geo', 'entity', f'{model}.geo.json'), encoding='utf-8'))
+    bones = geo['minecraft:geometry'][0]['bones']
+    cubes = [c for b in bones for c in b.get('cubes', [])]
+    slanted = sum(1 for c in cubes if any(abs(r) > 1e-6 for r in c.get('rotation', (0, 0, 0))))
+    return len(cubes), slanted, len(bones)
+
+
+def boxes_report():
+    """Prints every model's boxes against its budget; returns the models over it (or not listed)."""
+    flagged = []
+    print(f'{"model":28} {"kind":14} {"boxes":>5} {"budget":>6} {"slanted":>7} {"bones":>5}')
+    for model, mod in mod_paths.models():
+        n, slanted, bones = box_counts(model, mod)
+        kind = box_kind(model)
+        budget = BOX_BUDGET.get(kind)
+        note = '' if budget and n <= budget else ('  OVER by %d' % (n - budget) if budget else '  not in the budget table')
+        if note:
+            flagged.append(model)
+        print(f'{model:28} {kind or "?":14} {n:5} {budget or "-":>6} {slanted:7} {bones:5}{note}')
+    print(f'\n{len(flagged)} to look at' + (': ' + ', '.join(flagged) if flagged else '') +
+          ' (a warning only; budgets in BOX_BUDGET, tools/body_plan.py)')
+    return flagged
+
+
 if __name__ == '__main__':
     args = sys.argv[1:]
     if args[:1] == ['rename-test']:
@@ -464,6 +510,8 @@ if __name__ == '__main__':
     elif args[:1] == ['measure'] and len(args) == 2:
         for name in [m for m, _ in all_plans()] if args[1] == 'all' else [args[1]]:
             measure(name)
+    elif args[:1] == ['boxes']:
+        boxes_report()
     elif args[:1] in (['check'], []):
         sys.exit(1 if check_all() else 0)
     else:

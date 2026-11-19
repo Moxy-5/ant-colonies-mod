@@ -1,7 +1,7 @@
 """The Nile monitor (M9 river life), third start (2026-11-17), its 3D model in plain colours for the model viewer
 (python tools/model_viewer.py monitor).
 
-Built from the user's picture and the agreed flat outline (tools/monitor_outline.py) alone; nothing from the old
+Built from the user's picture and the agreed flat outline (references/outlines/monitor.json) alone; nothing from the old
 models. The user's rule for this one: only some parts need heavy detail. So:
 - The tail, the neck and the face are made close to round: each is a chain of short pieces, every piece a rounded
   cross-section (three overlapping boxes, wide, tall and between, so it reads as round), and the chain is BENT a few
@@ -15,51 +15,38 @@ Units are model pixels (16 a block), 96 long (6 blocks, the user's size for now)
 left is +X; y = 0 is the ground. A rest rotation is given here as a pitch in degrees, positive turning the bone's
 far end DOWN for the tail and UP for the neck (see pitch()).
 """
-import copy
+import json
 import math
+from pathlib import Path
 
-from tilapia_models import cube, faces, face_point, png, shade  # noqa: F401 (png for the viewer)
+from model_parts import (png, shade, smooth, pitch, mat_mul, transpose, turn_x, turn_y, rot, vsub, vadd,  # noqa: F401
+                         vlen, unit, from_axes, mat_vec, euler, blend_turn, leg_frames, round_leg, bent_chain,
+                         cube, rounded, paint_faces, geo, animations, write_assets)  # png for the viewer
 
 TEXELS = 1.0          # texture pixels a model pixel (plain colours for now)
 
-# --- the outline's numbers (tools/monitor_outline.py), turned into the model's axes: z = 48 - outline x -------------
-BODY_Z = (-26.0, 0.0)          # the body, front to back
-BODY_Y = (6.0, 16.0)           # belly to back
+# --- the outline's numbers (references/outlines/monitor.json, the approved outline; python tools/workshop.py outline
+# monitor draws it), turned into the model's axes: z = HIPS - outline x, the hips where the tail meets the body --------
+_OUTLINE = json.loads((Path(__file__).resolve().parent.parent / "references/outlines/monitor.json").read_text(encoding="utf-8"))
+_PART = {p["name"]: p for p in _OUTLINE["parts"]}
+HIPS = _PART["body"]["side"][0]                                     # 48: the tail is outline x 0 to 48
+BODY_Z = (float(HIPS - _PART["body"]["side"][1]), float(HIPS - _PART["body"]["side"][0]))   # the body, front to back
+BODY_Y = tuple(float(v) for v in _PART["body"]["side"][2:])         # belly to back
 TRUNK_JOINTS = (-17.5, -22.0)  # where the front half's three pieces meet (waist | ribs | chest), back to front
-BODY_HW = 5.0                  # half width
+BODY_HW = float(_PART["body"]["half_width"])                        # half width
 
-TAIL_SEGS, TAIL_LEN = 12, 48.0         # 12 pieces of 4 px
+TAIL_SEGS, TAIL_LEN = 12, float(HIPS)  # 12 pieces of 4 px
 TAIL_AXIS = 11.0                       # the tail's middle line where it leaves the body
 TAIL_R0, TAIL_R1 = 4.6, 0.6            # radius at the base and the tip
 TAIL_LIES = 0.62                       # how far along the tail it is lying on the ground
 
 NECK_SEGS = 2                          # two neck bones, each 4 px of round slices
 NECK_AXIS = 11.5
-NECK_Z0, NECK_LEN = -26.0, 8.0
+NECK_Z0 = float(HIPS - _PART["neck"]["side"][0])
+NECK_LEN = float(_PART["neck"]["side"][1] - _PART["neck"]["side"][0])
 NECK_TURNS = (15.0, 3.0)               # how much each neck bone turns up from the one before (degrees)
-HEAD_LEN = 14.0
+HEAD_LEN = float(_PART["snout"]["side"][1] - _PART["head"]["side"][0])   # head and snout
 HEAD_PITCH = -2.0                      # the head's own angle to level ground, a little nose down (degrees)
-
-
-def pitch(deg):
-    """A bone's rest rotation from a pitch (degrees): for a piece reaching to +Z (the tail) positive bends it down,
-    for one reaching to -Z (neck, head) positive raises it (GeckoLib's x turn is the viewer's negated)."""
-    return [-deg, 0.0, 0.0]
-
-
-def smooth(x):
-    x = max(0.0, min(1.0, x))
-    return x * x * (3 - 2 * x)
-
-
-def rounded(cubes, cx, cy, rw, rh, z0, z1, part):
-    """A round cross-section from z0 to z1: a wide box, a tall box and one between (an eight-sided outline)."""
-    if min(rw, rh) < 0.9:
-        cubes.append(cube([cx - rw, cy - rh, z0], [cx + rw, cy + rh, z1], part))
-        return
-    cubes.append(cube([cx - rw, cy - rh * 0.55, z0], [cx + rw, cy + rh * 0.55, z1], part))
-    cubes.append(cube([cx - rw * 0.55, cy - rh, z0], [cx + rw * 0.55, cy + rh, z1], part))
-    cubes.append(cube([cx - rw * 0.85, cy - rh * 0.85, z0], [cx + rw * 0.85, cy + rh * 0.85, z1], part))
 
 
 # --- the body: chunky boxes; the legs: round pieces ------------------------------------------------------------------------------
@@ -83,56 +70,6 @@ def body():
             {'name': 'ribs', 'parent': 'waist', 'pivot': [0.0, BODY_PIVOT[1], za], 'cubes': half(zb, za)},
             {'name': 'chest', 'parent': 'ribs', 'pivot': [0.0, BODY_PIVOT[1], zb], 'cubes': half(z0, zb)},
             {'name': 'hips', 'parent': 'body', 'pivot': list(BODY_PIVOT), 'cubes': half(zm, z1)}]
-
-
-# A little rotation maths for the legs: each leg piece is aimed from one joint to the next, so its rest rotation is
-# worked out from where its joints should be. Matrices are in the viewer's axes (three.js, the order Z then Y then X,
-# as GeckoLib turns bones); rot() turns one into the bone file's degrees (x and z negated, as the viewer reads them).
-def _mul(a, b):
-    return [[sum(a[i][k] * b[k][j] for k in range(3)) for j in range(3)] for i in range(3)]
-
-
-def _tr(a):
-    return [list(r) for r in zip(*a)]
-
-
-def _rx(d):
-    c, s = math.cos(math.radians(d)), math.sin(math.radians(d))
-    return [[1, 0, 0], [0, c, -s], [0, s, c]]
-
-
-def _ry(d):
-    c, s = math.cos(math.radians(d)), math.sin(math.radians(d))
-    return [[c, 0, s], [0, 1, 0], [-s, 0, c]]
-
-
-def _aim(a, b):
-    """The smallest turn taking direction a onto direction b."""
-    na, nb = math.sqrt(sum(v * v for v in a)), math.sqrt(sum(v * v for v in b))
-    a, b = [v / na for v in a], [v / nb for v in b]
-    v = [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]]
-    c = sum(x * y for x, y in zip(a, b))
-    k = [[0, -v[2], v[1]], [v[2], 0, -v[0]], [-v[1], v[0], 0]]
-    k2 = _mul(k, k)
-    return [[(i == j) + k[i][j] + k2[i][j] / (1 + c) for j in range(3)] for i in range(3)]
-
-
-def rot(m):
-    """A turn matrix as a bone's rest rotation in degrees."""
-    ay = math.asin(max(-1.0, min(1.0, -m[2][0])))
-    if abs(m[2][0]) < 0.9999999:
-        ax, az = math.atan2(m[2][1], m[2][2]), math.atan2(m[1][0], m[0][0])
-    else:
-        ax, az = 0.0, math.atan2(-m[0][1], m[1][1])
-    return [round(-math.degrees(ax), 3), round(math.degrees(ay), 3), round(-math.degrees(az), 3)]
-
-
-def _sub(a, b):
-    return [x - y for x, y in zip(a, b)]
-
-
-def _len(v):
-    return math.sqrt(sum(x * x for x in v))
 
 
 # Where each leg's joints sit (the left side; the right is the mirror), in model pixels: shoulder or hip, elbow or
@@ -166,156 +103,12 @@ CLAW_SHAPE = (
 )
 
 
-def _cols(x, y, z):
-    """A turn matrix from where its three axes go."""
-    return [[x[i], y[i], z[i]] for i in range(3)]
-
-
-def _unit(v):
-    n = _len(v)
-    return [c / n for c in v]
-
-
-def _cross(a, b):
-    return [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]]
-
-
-# Round leg pieces (the user, 2026-11-17: the legs needed more pixels and to be round to look good). A cross-section
-# is four boxes at quarter-pixel sizes (wide, tall and two between), close to a circle; a piece is cut into half-pixel
-# slices along its own line, each slice's radius read off its profile and rounded to a quarter pixel, and slices of the
-# same size joined into one, so a taper costs boxes only where it really changes.
-ROUND = ((1.0, 0.4), (0.4, 1.0), (0.93, 0.68), (0.68, 0.93))
-
-
-def _q(r):
-    return round(r * 4) / 4
-
-
-def _disc(cubes, axis, centre, r, a0, a1, part):
-    """One round slice of radius r along an axis (0 x, 1 y, 2 z) from a0 to a1, its middle at centre (a point)."""
-    u, v = [i for i in range(3) if i != axis]
-    lo, hi = sorted((a0, a1))
-    for fu, fv in (ROUND if r >= 0.9 else ((1.0, 1.0),)):
-        a, b = list(centre), list(centre)
-        a[axis], b[axis] = lo, hi
-        a[u], b[u] = centre[u] - _q(r * fu), centre[u] + _q(r * fu)
-        a[v], b[v] = centre[v] - _q(r * fv), centre[v] + _q(r * fv)
-        if a[u] < b[u] and a[v] < b[v]:
-            cubes.append(cube(a, b, part))
-
-
-def _profile(prof, t):
-    for (t0, r0), (t1, r1) in zip(prof, prof[1:]):
-        if t <= t1:
-            return r0 + (r1 - r0) * smooth((t - t0) / (t1 - t0))
-    return prof[-1][1]
-
-
-def _limb(cubes, axis, centre, a0, a1, prof, part, lead=0.0):
-    """A round piece from a0 (fraction 0) to a1 (fraction 1) along an axis, its radius following prof; lead runs the
-    first slice that far back past a0 (into the body)."""
-    n = max(1, round(abs(a1 - a0) / 0.5))
-    runs = []
-    for i in range(n):
-        r = _q(_profile(prof, (i + 0.5) / n))
-        s0, s1 = a0 + (a1 - a0) * i / n, a0 + (a1 - a0) * (i + 1) / n
-        if runs and runs[-1][0] == r:
-            runs[-1][2] = s1
-        else:
-            runs.append([r, s0, s1])
-    if lead:
-        runs[0][1] -= lead * (1 if a1 > a0 else -1)
-    for r, s0, s1 in runs:
-        _disc(cubes, axis, centre, r, s0, s1, part)
-
-
-def _ball(cubes, axis, centre, r, part):
-    """A round joint: half-pixel slices along an axis, each as wide as the ball is there."""
-    n = max(2, round(2 * r / 0.5))
-    runs = []
-    for i in range(n):
-        z0, z1 = -r + 2 * r * i / n, -r + 2 * r * (i + 1) / n
-        zm = max(abs(z0), abs(z1)) if i not in (n // 2 - 1, n // 2) else 0.0
-        rr = _q(math.sqrt(max(0.0, r * r - (zm * 0.85) ** 2)))
-        if runs and runs[-1][0] == rr:
-            runs[-1][2] = z1
-        else:
-            runs.append([rr, z0, z1])
-    for rr, z0, z1 in runs:
-        _disc(cubes, axis, centre, rr, centre[axis] + z0, centre[axis] + z1, part)
-
-
-def _leg_frames(s, plan, S, E, W):
-    """The upper and lower pieces' turns for joints S, E, W (shared by the model and the clips)."""
-    r1 = _aim((s, 0, 0), _sub(E, S))                        # the upper part's own axis is straight out
-    r2 = _aim((0, -1, 0), _sub(W, E))                       # the lower part's is straight down
-    if plan.get('hinge'):
-        # The hind leg bends a long way at the knee, so the thigh and shin share one hinge line there (the line
-        # across both): their boxes then turn about it like a real knee instead of twisting against each other
-        # (the user's report: the hind leg looked broken). The ankle block then sits in the shin's line.
-        d1, d2 = _unit(_sub(E, S)), _unit(_sub(W, E))
-        h = _unit(_cross(d1, d2))
-        x1 = [s * c for c in d1]
-        r1 = _cols(x1, _cross(h, x1), h)
-        y2 = [-c for c in d2]
-        r2 = _cols(_cross(y2, h), y2, h)
-    return r1, r2
-
-
 def legs():
-    """Each leg: an upper piece and a lower one aimed between its joints, a foot flat on the ground turned out, and four
-    fanned toes, each raised a little at the knuckle with a long claw hooking down from its tip to the ground (a claw is
-    its own little piece so it can bend down while the toe lifts, and so the clips can flex them later)."""
-    out = []
-    for s, side in ((1, 'left'), (-1, 'right')):
-        for kind, plan in LEG_PLANS.items():
-            (sx, sy, sz), (ex, ey, ez), (wx, wy, wz) = plan['joints']
-            S, E, W = (s * sx, sy, sz), (s * ex, ey, ez), (s * wx, wy, wz)
-            l1, l2 = _len(_sub(E, S)), _len(_sub(W, E))
-            r1, r2 = _leg_frames(s, plan, S, E, W)
-            r3 = _ry(-s * plan['turn'])                              # the foot: flat, turned out
-            e_rest = (S[0] + s * l1, S[1], S[2])                     # the joints before the turns are applied
-            w_rest = (e_rest[0], e_rest[1] - l2, e_rest[2])
-
-            # Round pieces tapering from the muscle to the next joint, and a round ball at each joint a little bigger
-            # than the ends meeting there, both pieces ending at its middle, so nothing pokes out at the bend.
-            ex_, ey_, ez_ = e_rest
-            up, low = [], []
-            _limb(up, 0, S, S[0], S[0] + s * l1, plan['upper'], 'leg', lead=1.0)
-            _ball(up, 0, e_rest, plan['knob'], 'leg')                                              # elbow or knee
-            _limb(low, 1, e_rest, ey_, ey_ - l2, plan['lower'], 'leg')
-            pw, pl = plan['palm']
-            g = -W[1]                                                # the ground, below the wrist
-            fx, fy, fz = w_rest
-            ankle = []
-            _ball(ankle, 1, w_rest, plan['wrist'], 'leg')                                          # wrist or ankle
-            if plan.get('hinge'):
-                low += ankle
-            foot = ([] if plan.get('hinge') else ankle) + [
-                    cube([fx - pw / 2, fy + g, fz - pl + 1.0], [fx + pw / 2, fy + g + 1.6, fz + 1.4], 'leg'),             # palm
-                    cube([fx - pw / 2 + 0.5, fy + g + 1.6, fz - pl + 1.6], [fx + pw / 2 - 0.5, fy + g + 2.4, fz + 1.2], 'leg')]
-
-            def name(piece):
-                return f'{kind}_{piece}_{side}'
-            out.append({'name': name('upper'), 'parent': 'chest' if kind == 'arm' else 'hips', 'pivot': list(S), 'rotation': rot(r1), 'cubes': up})
-            out.append({'name': name('lower'), 'parent': name('upper'), 'pivot': list(e_rest),
-                        'rotation': rot(_mul(_tr(r1), r2)), 'cubes': low})
-            out.append({'name': name('foot'), 'parent': name('lower'), 'pivot': list(w_rest),
-                        'rotation': rot(_mul(_tr(r2), r3)), 'cubes': foot})
-            n = len(plan['toes'])
-            for i, (tl, fan) in enumerate(plan['toes']):
-                tx = fx + s * (-pw / 2 + 0.55 + i * (pw - 1.1) / (n - 1))
-                ty, tz = fy + g + 0.55, fz - pl + 1.2                # the knuckle, at the palm's front edge
-                toe = [cube([tx - 0.55, ty - 0.55, tz - tl * 0.55], [tx + 0.55, ty + 0.55, tz + 0.4], 'leg'),
-                       cube([tx - 0.42, ty - 0.45, tz - tl], [tx + 0.42, ty + 0.4, tz - tl * 0.5], 'leg')]
-                cy, cz = ty + 0.05, tz - tl + 0.1                    # the claw's root, at the toe's tip
-                claw = [cube([tx - w / 2, cy + lo, cz - z1], [tx + w / 2, cy + hi, cz - z0], part)
-                        for z0, z1, w, lo, hi, part in CLAW_SHAPE]
-                out.append({'name': name(f'toe{i + 1}'), 'parent': name('foot'), 'pivot': [tx, ty, tz],
-                            'rotation': rot(_mul(_ry(-s * fan), _rx(plan['raise']))), 'cubes': toe})
-                out.append({'name': name(f'claw{i + 1}'), 'parent': name(f'toe{i + 1}'), 'pivot': [tx, cy, cz],
-                            'rotation': rot(_rx(-CLAW_DROP)), 'cubes': claw})
-    return out
+    """The four legs (model_parts.round_leg): round upper and lower pieces aimed between the joints, a foot flat on the
+    ground turned out, and four fanned toes, each raised a little at the knuckle with a long claw hooking down to the
+    ground (its own little bone, so it can bend down while the toe lifts)."""
+    return [b for s, side in ((1, 'left'), (-1, 'right')) for kind, plan in LEG_PLANS.items()
+            for b in round_leg(kind, plan, s, side, 'chest' if kind == 'arm' else 'hips', CLAW_SHAPE, CLAW_DROP)]
 
 
 # --- the tail: a bent chain of round pieces ----------------------------------------------------------------------------
@@ -331,26 +124,9 @@ def tail_height(t):
 
 
 def tail():
-    """Built straight back from the body at TAIL_AXIS; each bone then bends down by the angle that puts the curve where
-    tail_height says."""
-    L = TAIL_LEN / TAIL_SEGS
-    angles = []
-    for i in range(TAIL_SEGS):
-        drop = tail_height(i / TAIL_SEGS) - tail_height((i + 1) / TAIL_SEGS)
-        angles.append(math.degrees(math.asin(max(-0.9, min(0.9, drop / L)))))
-    out, prev, parent = [], 0.0, 'hips'
-    for i in range(TAIL_SEGS):
-        z0, z1 = BODY_Z[1] + i * L, BODY_Z[1] + (i + 1) * L
-        t = (i + 0.5) / TAIL_SEGS
-        r = tail_radius(t)
-        c = []
-        back = r * 1.2 * math.tan(math.radians(abs(angles[i] - prev))) + 0.3     # close the joint's wedge
-        rounded(c, 0.0, TAIL_AXIS, r, r * (1 + 0.2 * t), z0 - back, z1, 'skin')   # a little taller than wide toward the tip
-        name = f'tail{i + 1}'
-        out.append({'name': name, 'parent': parent, 'pivot': [0.0, TAIL_AXIS, z0],
-                    'rotation': pitch(angles[i] - prev), 'cubes': c})
-        prev, parent = angles[i], name
-    return out
+    """A bent chain (model_parts.bent_chain) straight back from the body at TAIL_AXIS; each bone bends down by the
+    angle that puts the curve where tail_height says."""
+    return bent_chain('tail', 'hips', BODY_Z[1], TAIL_AXIS, TAIL_LEN, TAIL_SEGS, tail_radius, tail_height)
 
 
 # --- the neck and head: round, rising, then a long smooth wedge into the snout ----------------------------------------
@@ -476,6 +252,31 @@ def head():
 
 def model():
     return body() + neck() + head() + tail() + legs()
+
+
+# --- the model workshop (docs/plans/model-workshop.md, step 3): versions and sliders ----------------------------------
+# The shape numbers the versions page shows a slider for (python tools/workshop.py serve monitor): the name of the
+# number in this file (a tuple's item as NAME[i]), its label, lowest, highest and step. Only numbers the makers read
+# when they run (not ones worked out from others at the top of the file), so moving one rebuilds the model fully.
+WORKSHOP_SHAPE = [
+    ('HEAD_LEN', 'Head length (model pixels)', 10, 20, 0.5),
+    ('NECK_LEN', 'Neck length (model pixels)', 4, 14, 0.5),
+    ('NECK_TURNS[0]', 'Neck lift at the shoulders (degrees)', 0, 30, 1),
+    ('HEAD_PITCH', 'Head tilt, minus is nose down (degrees)', -10, 10, 0.5),
+    ('TAIL_LEN', 'Tail length (model pixels)', 32, 64, 1),
+    ('TAIL_R0', 'Tail thickness at the hips (model pixels)', 3, 6, 0.1),
+    ('TAIL_LIES', 'Where the tail reaches the ground (share of its length)', 0.3, 0.9, 0.01),
+]
+# The parts the versions page can take from one version or the other: each part is its bones and everything below
+# them, down to the next part's first bone.
+WORKSHOP_PARTS = {'head': ['head'], 'neck': ['neck1'], 'body': ['body'], 'tail': ['tail1'],
+                  'front legs': ['arm_upper_left', 'arm_upper_right'], 'hind legs': ['leg_upper_left', 'leg_upper_right']}
+
+
+def workshop_look():
+    """The model as the game has it (painted), for the workshop: bones, PNG bytes, texture width and height."""
+    bones, rows, w, h = paint(model(), GAME_LOOK)
+    return bones, png(rows), w, h
 
 
 # --- the paint (step 3) --------------------------------------------------------------------------------------------
@@ -651,44 +452,11 @@ def colour(part, face, bone, x, y, z):
 
 def paint(bones, look='nile'):
     """(bones with every face's place on the texture, rows of (r, g, b, a), width, height)."""
-    bones = copy.deepcopy(bones)
-    patches = []
-    for b in bones:
-        for c in b.get('cubes', []):
-            c['uv'] = {}
-            c['_bone'] = b['name']
-            for face, (w, h) in faces(c).items():
-                patches.append((max(1, round(w * TEXELS)), max(1, round(h * TEXELS)), c, face))
-    patches.sort(key=lambda p: (-p[1], -p[0]))
-    for width in (64, 128, 256, 512, 1024):
-        x = y = shelf = 0
-        places = []
-        for w, h, c, face in patches:
-            if x + w > width:
-                x, y, shelf = 0, y + shelf, 0
-            places.append((x, y, w, h, c, face))
-            x, shelf = x + w, max(shelf, h)
-        if y + shelf <= width:
-            break
-    height = 16
-    while height < y + shelf:
-        height *= 2
-    rows = [[(0, 0, 0, 0)] * width for _ in range(height)]
-    for x0, y0, w, h, c, face in places:
-        c['uv'][face] = {'uv': [x0, y0], 'uv_size': [w, h]}
-        for jj in range(h):
-            for ii in range(w):
-                if look == 'plain':
-                    rgb = plain_colour(c['_part'], face)
-                else:
-                    px, py, pz = face_point(c, face, (ii + 0.5) / w, (jj + 0.5) / h)
-                    rgb = colour(c['_part'], face, c['_bone'], px, py, pz)
-                rows[y0 + jj][x0 + ii] = tuple(round(v) for v in rgb) + (255,)
-    for b in bones:
-        for c in b.get('cubes', []):
-            c.pop('_part')
-            c.pop('_bone')
-    return bones, rows, width, height
+    def pixel(c, face, px, py, pz):
+        if look == 'plain':
+            return plain_colour(c['_part'], face)
+        return colour(c['_part'], face, c['_bone'], px, py, pz)
+    return paint_faces(bones, TEXELS, pixel, to_byte=round)
 
 
 # --- the clips (step 4): walk, idle, tongue, swim, hiss ----------------------------------------------------------------
@@ -701,36 +469,8 @@ WALK_LEN, SWIM_LEN = 1.2, 1.6          # one full stride, one full tail beat (se
 ENTER_LEN = 1.2                        # going into the water (seconds; MonitorEntity.ENTER_TICKS keeps step with it)
 
 
-def _rz(d):
-    c, s = math.cos(math.radians(d)), math.sin(math.radians(d))
-    return [[c, -s, 0], [s, c, 0], [0, 0, 1]]
-
-
-def _euler_m(r):
-    """A bone's turn in file degrees back to a matrix (the viewer's setRot: x and z negated, the order Z, Y, X)."""
-    return _mul(_mul(_rz(-r[2]), _ry(r[1])), _rx(-r[0]))
-
-
-def _mv(m, v):
-    return [sum(m[i][k] * v[k] for k in range(3)) for i in range(3)]
-
-
-def _add(a, b):
-    return [x + y for x, y in zip(a, b)]
-
-
 def _ease(x):
     return smooth(x)
-
-
-def _blend_m(a, b, k):
-    """A turn part way (k, 0 to 1) from matrix a to matrix b: the two mixed, then squared up again."""
-    m = [[a[i][j] * (1 - k) + b[i][j] * k for j in range(3)] for i in range(3)]
-    c0 = _unit([m[0][0], m[1][0], m[2][0]])
-    c1 = [m[0][1], m[1][1], m[2][1]]
-    d = sum(x * y for x, y in zip(c0, c1))
-    c1 = _unit([x - d * y for x, y in zip(c1, c0)])
-    return _cols(c0, c1, _cross(c0, c1))
 
 
 def _pulse(t, start, rise, hold, fall):
@@ -768,7 +508,7 @@ class _Poser:
                 (sx, sy, sz), (ex, ey, ez), (wx, wy, wz) = plan['joints']
                 S, E, W = (s * sx, sy, sz), (s * ex, ey, ez), (s * wx, wy, wz)
                 self.legs.append({'s': s, 'side': side, 'kind': kind, 'plan': plan, 'S': S, 'E': E, 'W': W,
-                                  'l1': _len(_sub(E, S)), 'l2': _len(_sub(W, E)), 'foot': _ry(-s * plan['turn'])})
+                                  'l1': vlen(vsub(E, S)), 'l2': vlen(vsub(W, E)), 'foot': turn_y(-s * plan['turn'])})
 
     def value(self, name, m):
         """The clip value for a bone whose wanted turn (against its parent) is m: the difference from rest, kept
@@ -790,40 +530,40 @@ class _Poser:
         if in_body:
             Wb, Fb = list(wrist), foot_m
         else:
-            Wb = _add(_mv(_tr(body_m), _sub(_sub(wrist, body_d), BODY_PIVOT)), BODY_PIVOT)
-            Fb = _mul(_tr(body_m), foot_m)
-        d = _sub(Wb, S)
-        D = _len(d)
+            Wb = vadd(mat_vec(transpose(body_m), vsub(vsub(wrist, body_d), BODY_PIVOT)), BODY_PIVOT)
+            Fb = mat_mul(transpose(body_m), foot_m)
+        d = vsub(Wb, S)
+        D = vlen(d)
         reach = 0.985 * (L['l1'] + L['l2'])
         if D > reach:                                   # out of reach: as far as it goes (and remember by how much)
             self.worst = max(self.worst, D - reach)
             d = [c * reach / D for c in d]
-            Wb, D = _add(S, d), reach
+            Wb, D = vadd(S, d), reach
         D = max(D, abs(L['l1'] - L['l2']) * 1.02)
         dh = [c / D for c in d]
         a = (L['l1'] ** 2 - L['l2'] ** 2 + D * D) / (2 * D)
         h = math.sqrt(max(0.0, L['l1'] ** 2 - a * a))
-        pole = _sub(L['E'], S)                           # the elbow or knee bends out the way it does at rest
+        pole = vsub(L['E'], S)                           # the elbow or knee bends out the way it does at rest
         k = sum(x * y for x, y in zip(pole, dh))
-        pole = _unit([x - k * y for x, y in zip(pole, dh)])
+        pole = unit([x - k * y for x, y in zip(pole, dh)])
         E = [S[i] + a * dh[i] + h * pole[i] for i in range(3)]
-        r1, r2 = _leg_frames(s, plan, S, E, Wb)
+        r1, r2 = leg_frames(s, plan, S, E, Wb)
         name = f"{L['kind']}_%s_{L['side']}"
         p[name % 'upper'] = {'rotation': self.value(name % 'upper', r1)}
-        p[name % 'lower'] = {'rotation': self.value(name % 'lower', _mul(_tr(r1), r2))}
-        p[name % 'foot'] = {'rotation': self.value(name % 'foot', _mul(_tr(r2), Fb))}
+        p[name % 'lower'] = {'rotation': self.value(name % 'lower', mat_mul(transpose(r1), r2))}
+        p[name % 'foot'] = {'rotation': self.value(name % 'foot', mat_mul(transpose(r2), Fb))}
         for i in range(len(plan['toes'])):
             p[name % f'claw{i + 1}'] = {'rotation': [round(curl, 3), 0.0, 0.0]}
 
 
 def clips():
     """(clips by name, how far a wanted foot place lay out of reach in each, in pixels)."""
-    from tilapia_models import clip
+    from model_parts import clip
     out, worst = {}, {}
 
     def body(p, ry=0.0, rx=0.0, dy=0.0, dz=0.0):
         p['body'] = {'rotation': [round(rx, 3), round(ry, 3), 0.0], 'position': [0.0, round(dy, 3), round(dz, 3)]}
-        return _euler_m([rx, ry, 0.0]), [0.0, dy, dz]
+        return euler([rx, ry, 0.0]), [0.0, dy, dz]
 
     def stand(P, p, bm, bd):
         for L in P.legs:
@@ -858,7 +598,7 @@ def clips():
                 f = _ease((u - duty) / (1 - duty))
                 z, up = back + (front - back) * f, math.sin(math.pi * f)
             wrist = [L['W'][0], L['W'][1] + lift * up, z]
-            P.leg(p, L, bm, bd, wrist, _mul(L['foot'], _rx(-28 * up)), curl=18 * up)
+            P.leg(p, L, bm, bd, wrist, mat_mul(L['foot'], turn_x(-28 * up)), curl=18 * up)
         neck_turn(p, 0.0)
         p['neck1']['rotation'][1] = round(-0.55 * yaw, 3)
         p['neck2']['rotation'][1] = round(-0.3 * yaw, 3)
@@ -925,10 +665,10 @@ def clips():
         """Where a leg's wrist or ankle lies folded for swimming, and its foot's turn (both on the body's axes)."""
         s = L['s']
         if L['kind'] == 'arm':
-            return (s * 6.3, 9.6, -10.0), _cols((0, s, 0), (s, 0, 0), (0, 0, -1))
+            return (s * 6.3, 9.6, -10.0), from_axes((0, s, 0), (s, 0, 0), (0, 0, -1))
         a = math.radians(22.0)                              # toes swung out, away from the tail
         c, sn = math.cos(a), math.sin(a)
-        return (s * 9.0, 9.4, 7.5), _cols((0, s, 0), (s * c, 0, -sn), (-s * sn, 0, -c))
+        return (s * 9.0, 9.4, 7.5), from_axes((0, s, 0), (s * c, 0, -sn), (-s * sn, 0, -c))
 
     def swim(t):
         p = {}
@@ -976,15 +716,15 @@ def clips():
         for L in P.legs:
             x, y, z = L['W']
             if L['kind'] == 'arm':                         # reaching forward and down over the water, toes hanging
-                wrist, foot, fold = [x * 1.1, y - 2.5 * lean, z - 3.5 * lean], _mul(L['foot'], _rx(-24 * lean)), fore
+                wrist, foot, fold = [x * 1.1, y - 2.5 * lean, z - 3.5 * lean], mat_mul(L['foot'], turn_x(-24 * lean)), fore
             else:                                          # planted on the bank, shoving back
                 wrist, foot, fold = [x, y, z + 3.0 * push], L['foot'], hind
             # the ground place on the body's axes (as leg() works it out), then part way to the folded place
-            wb = _add(_mv(_tr(bm), _sub(_sub(wrist, bd), BODY_PIVOT)), BODY_PIVOT)
-            fb = _mul(_tr(bm), foot)
+            wb = vadd(mat_vec(transpose(bm), vsub(vsub(wrist, bd), BODY_PIVOT)), BODY_PIVOT)
+            fb = mat_mul(transpose(bm), foot)
             sw, sf = swim_leg(L)
             wb = [a + (b - a) * fold for a, b in zip(wb, sw)]
-            P.leg(p, L, bm, bd, wb, _blend_m(fb, sf, fold), in_body=True, curl=20.0 * fold + 10.0 * lean * (1 - fold))
+            P.leg(p, L, bm, bd, wb, blend_turn(fb, sf, fold), in_body=True, curl=20.0 * fold + 10.0 * lean * (1 - fold))
         dip = 7.0 * down
         neck_turn(p, 0.0, extra=(dip - 0.0 * glide, dip * 0.9 - 3.0 * glide, dip * 0.4 - 3.0 * glide))
         p['neck1']['rotation'][1] = round(-0.55 * yaw, 3)
@@ -1149,26 +889,10 @@ def clips():
 
 def write_game():
     """Writes the monitor's model, texture and clips into the savanna mod."""
-    import json
-    import mod_paths
-    root = mod_paths.assets('savanna')
     game_bones, rows, w, h = paint(model(), GAME_LOOK)
-    files = {'textures/entity/monitor.png': png(rows)}
-    geo = {'format_version': '1.12.0', 'minecraft:geometry': [{
-        'description': {'identifier': 'geometry.monitor', 'texture_width': w, 'texture_height': h,
-                        'visible_bounds_width': 8, 'visible_bounds_height': 2.5, 'visible_bounds_offset': [0, 0.75, 0]},
-        'bones': game_bones}]}
-    files['geo/entity/monitor.geo.json'] = geo
-    files['animations/entity/monitor.animation.json'] = {'format_version': '1.8.0', 'animations': clips()[0]}
-    for rel, data in files.items():
-        path = root / rel
-        path.parent.mkdir(parents=True, exist_ok=True)
-        if isinstance(data, bytes):
-            path.write_bytes(data)
-        else:
-            with open(path, 'w', encoding='utf-8', newline=chr(10)) as f:
-                json.dump(data, f, indent=1)
-        print('wrote', path.relative_to(mod_paths.PROJECT))
+    write_assets({'textures/entity/monitor.png': png(rows),
+                  'geo/entity/monitor.geo.json': geo('monitor', game_bones, w, h, (8, 2.5, [0, 0.75, 0])),
+                  'animations/entity/monitor.animation.json': animations(clips()[0])})
 
 
 if __name__ == '__main__':

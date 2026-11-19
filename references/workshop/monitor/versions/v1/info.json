@@ -1,0 +1,14 @@
+{
+ "note": "the approved monitor, as in the game",
+ "date": "2026-11-19",
+ "boxes": 665,
+ "numbers": {
+  "HEAD_LEN": 14.0,
+  "NECK_LEN": 8.0,
+  "NECK_TURNS[0]": 15.0,
+  "HEAD_PITCH": -2.0,
+  "TAIL_LEN": 48.0,
+  "TAIL_R0": 4.6,
+  "TAIL_LIES": 0.62
+ }
+}

@@ -1,0 +1,32 @@
+{
+  "length_blocks": 6.0,
+  "views": {
+    "side": {
+      "box": [
+        20,
+        20,
+        1020,
+        230
+      ],
+      "head": "right"
+    },
+    "top": {
+      "box": [
+        20,
+        230,
+        1020,
+        570
+      ],
+      "head": "right"
+    },
+    "front": {
+      "box": [
+        1020,
+        20,
+        1360,
+        230
+      ]
+    }
+  },
+  "made_by": "python tools/workshop.py outline monitor (from references/outlines/monitor.json)"
+}

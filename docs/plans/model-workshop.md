@@ -51,6 +51,19 @@ Regrouped 2026-11-19 at the user's ask (fewer, bigger steps): the small pieces r
   with the fill scores. Claude looks at these and fixes what is off before showing the user.
 - Done when: the monitor page is rebuilt on it, looks the same, and its Compare shots come out against the monitor's
   picture.
+- **BUILT 2026-11-19** (branch `claude/viewer-foundation`): `tools/viewer_common.js` (the shared 3D code: model
+  builder, clips, stage, scale things, buttons, Compare), `tools/viewer_page.py` (`build()` puts the data and the
+  shared scripts into a template at `<!--VIEWER-->`; `pictures()` cuts the views out of a picture with a
+  `<name>.views.json` beside it), three.js r128 and OrbitControls in `tools/vendor/`, `tools/viewer_shot.py` (Edge
+  headless pictures of every Compare view and picture, scores printed and in `scores.json`, in
+  `references/viewer_shots/`, not kept in git). The monitor page is the first on it (same scene, no internet needed),
+  compared with the approved outline made into a picture (now `python tools/workshop.py outline monitor` ->
+  `references/outlines/monitor.png`) and with the user's picture once it is saved as
+  `references/inspiration/monitor.png` with its views file. First scores, the 3D monitor against its outline: side 91
+  percent of the outline covered / 84 percent of the model inside it, top 91 / 84, front 93 / 82 (front first read 92
+  / 75 from the old outline picture, which left the tail out of the front view; the 3D tail curves lower than the
+  outline's, the legs splay wider seen from the front, the toes and claws stick out, as the outline had none). Limits: a see-through part of a texture counts as model in the score; the picture's scale comes
+  from its side view only.
 
 **2. Picture to outline: the brief and an outline the 3D shape is built from (was V5's loft, V6).**
 - The picture goes in `references/inspiration/<animal>.png`. A script finds each shape on the plain background; which
@@ -67,6 +80,37 @@ Regrouped 2026-11-19 at the user's ask (fewer, bigger steps): the small pieces r
   pixels, part names from the body plan) and the 3D maker reads it, so the body is a stack of boxes following the
   outline from the start. A shape change is made in one place and flows on; no retyping.
 
+- **BUILT 2026-11-19** (branch `claude/viewer-foundation`). `tools/workshop.py`:
+  - `brief <animal>` measures `references/inspiration/<animal>.png` by its views file and writes
+    `references/workshop/<animal>/brief.html`: length, height, widest, belly off the ground, head and tail shares
+    (from marks in the views file: picture x of the snout, the back of the head, the tail's base), the top line and
+    belly line drawn over the side view, the main colours; the brief's words come from `<animal>.brief.md` beside the
+    picture (Claude writes it). Numbers also in `measure.json`.
+  - `starter <animal>` cuts a first outline from the picture into `references/outlines/<animal>.json`: the body as
+    slices along its length, each with the side view's top and belly and the top view's width; legs left out (the
+    slice's middle column for the belly and its narrowest column for the width, so legs joined to the body in the
+    picture do not count), for Claude to name, join and add legs to.
+  - `outline <animal>` draws `references/outlines/<animal>.json` over the picture's views (snout right) with fill
+    scores and a difference picture per view (`references/workshop/<animal>/outline.html`), and writes the outline
+    as a picture with its views file for the 3D viewer's Compare.
+  - The outline format: model pixels, x from the tail tip (0) to the snout, y up, z across; a middle part has `side`
+    `[x0, x1, y0, y1]` and `half_width`, any other part `side`, `top`, `front` and `mirror`; `marks` are drawn, not
+    scored.
+  - The monitor's approved outline moved word for word into `references/outlines/monitor.json`;
+    `tools/monitor_models.py` reads its body, neck, head and tail sizes from it (its model, paint and clips proved
+    the same before and after); `tools/monitor_outline.py` and `references/monitor_outline.html` retired.
+  - The box budget: `python tools/body_plan.py boxes` lists every model's boxes, slanted boxes and bones against
+    its kind's budget (my picks: colony insect 250, small animal 150, medium 250, large 400; remains count as their
+    animal). It warns, never fails. Today over: the monitor (665, 265 over) and the crab (248, 98 over).
+  - Checked by a round trip: flat pictures of the 3D monitor (`viewer_shot.py --hash "...&snap=1"`, new: the page
+    puts its own canvas picture beside the score, so the picture and its scale come from one browser run; two runs
+    had laid the page out at different sizes) stitched into a test picture: Compare of the model against them 97 /
+    97, 97 / 100, 96 / 98; the brief read 6.00 blocks long, 1.15 tall, 2.62 wide; the starter's body 91 to 99
+    percent. Bugs found and fixed on the way: the outline page drew the picture snout left under a snout-right
+    outline; the legs' spread was taken for the body's width.
+  - Limits: the starter is a start, not a model (legs, eyes and part names are Claude's); a picture with views that
+    disagree (AI pictures often do) scores lower in the view that is off.
+
 **3. Faster rounds: versions and sliders (was V3 and V2).**
 - Each build keeps a numbered snapshot (the model's data, texture and numbers) in `references/workshop/<animal>/v1,
   v2, ...`, not in git commits; the viewer switches between them or shows two side by side. Parts are named by the
@@ -76,11 +120,54 @@ Regrouped 2026-11-19 at the user's ask (fewer, bigger steps): the small pieces r
   maker). The user drags and reads off the numbers; Claude writes them into the maker, so the game's model is still
   made and checked the same way. Sliders only on models that need them.
 
+- **BUILT 2026-11-19** (branch `claude/viewer-foundation`), the monitor first:
+  - `python tools/workshop.py snapshot <animal> --note "..."` keeps the model as the game would get it (bones,
+    texture, boxes, the slider numbers, the note and date) as the next version in
+    `references/workshop/<animal>/versions/v<n>/` (kept in git, about 250 KB each, so a deleted worktree loses none;
+    nothing kept when nothing changed). v1 of the monitor is the approved one.
+  - `python tools/workshop.py versions <animal>` builds `references/workshop/<animal>/versions.html`: version A, and
+    a version B shown nose to tail beside it, laid over it in see-through blue, or mixed part by part (head, neck,
+    body, tail, front legs, hind legs: each from A or B; a part sits where its own version put it). The page lists
+    the slider numbers that differ between A and B, has camera buttons and Compare (with Compare on, only A or the
+    mix is measured and seen).
+  - `python tools/workshop.py serve <animal>` serves the same page at `http://localhost:8790/` (this computer only)
+    with live shape sliders: each move reruns the maker with that number (0.2 s for the monitor) and shows it as
+    "Sliders now"; "Keep as a new version" saves it with a note. The user reads off the numbers or names the version;
+    Claude writes them into the maker, so the game's model is still made and checked the same way.
+  - A maker joins in by having `workshop_look()`, `WORKSHOP_SHAPE` (the slider numbers: only ones the maker reads
+    when it runs) and `WORKSHOP_PARTS` in `tools/<animal>_models.py`. The monitor's sliders (my picks): head length,
+    neck length, neck lift, head tilt, tail length, tail thickness at the hips, where the tail reaches the ground.
+    The monitor's model and paint proved unchanged.
+  - Parts are named in the maker (the monitor has no body plan); a model with a body plan can name them by its roles.
+  - Checked in the browser pane with the helper running: sliders rebuild, B over A, mix (head from B: 119 of 665
+    boxes swapped), Compare with B stepped out (same score as A alone), keeping a version, phone width.
+
 **4. The parts library, growing with each animal (was V5's part makers).** Approved parts become reusable makers with
 settings (length, thickness, toe count): the monitor's round legs, clawed feet, tail chain, jaw with teeth and mouth
 inside, eyes with lids; the crocodile's parts; later heads, necks, wings. They live in one shared library with the one
 picture (PNG) writer and box maker (today copied in several files), so the next reptile starts from approved parts.
 Never built all at once: each new animal adds what it needed.
+
+- **BUILT 2026-11-19** (branch `claude/viewer-foundation`): `tools/model_parts.py`, the one shared library.
+  - Moved in: the box maker, faces, colour mixing, curves, the picture (PNG) writer and the clip sampler (they lived in
+    `tilapia_models.py`); the texture painter `paint_faces()` (laying faces out and colouring them, word for word the
+    same in seven makers; each maker now keeps only its own colouring rule); `geo()`, `animations()` and
+    `write_assets()` (the game-file writing, copied in seven makers); the turn maths.
+  - The monitor's approved parts, with settings: `rounded()` (three-box round section), `disc()`, `limb()` and
+    `ball()` (quarter-pixel round slices: a tapering piece, a joint), `bent_chain()` (a tail as a chain of bones bent to
+    follow a curve: length, pieces, radius and height along it), `round_leg()` (a whole leg from three joints: round
+    pieces and joints, a flat foot turned out, any number of fanned toes with hooked claws; the leg plan holds the
+    settings). The monitor now builds its tail and legs with them (1,182 lines to 908).
+  - Switched to it: the tilapia, catfish, crab, crocodile, monitor, snail and remains makers, `life_looks.py` and
+    `model_viewer.py`.
+  - Proved the same: every game file the seven makers write (441 files) byte for byte before and after; 49 checks of
+    every model, look, paint and clip from the old scripts against the new; `workshop.py snapshot monitor` says "no
+    change since v1"; the viewer pages they build are the same as the old scripts build (three pages in git were out
+    of date and are refreshed).
+  - Not moved yet (my pick, as the plan says: the next animal that needs one moves it): the monitor's jaw with teeth
+    and tongue and its eyes with lids (woven into its head shape), the crocodile's parts. Left alone on purpose: the
+    block-art scripts' own PNG writers (about 15, different shapes, not models) and the insect makers' (`ant_models`,
+    `matabele_models`, `termite_models`; they have body plans and their own pipeline).
 
 **Animations (stage 5) are not in this plan:** they use the clip tools; the pose viewer for any model is the tools
 review's K6.
