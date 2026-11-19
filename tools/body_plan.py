@@ -36,6 +36,11 @@ The files are <mod>/src/main/resources/assets/<mod name>/body_plans/<model>.json
             where the measuring rule does not fit the body): kept by `measure` like the approved ones.
   forebody  the bone that carries the thorax, the head and the legs (it sways with the stride).
   root      the bone that holds everything (the body's rise and fall goes there).
+  family    (animals, the Animal Maker Engine 2026-11-19, docs/ANIMAL-MAKER-ENGINE.md) the body family it belongs to
+            (four_legged_long_body: the monitor, the crocodile); a plan with a family is an animal's, read by the
+            measuring course (tools/body_course.py), and has no climb or spine numbers to measure.
+  chain     (animals) the body's bones from the head to the tail tip, each the next one along: the course checks the
+            seams and bends between neighbours.
 
 Inside the tools everything works in role names: a model read from the game's geo file has its bones renamed to their
 roles as it is read (Plan.model_to_roles), clips read from the game's animation file the same (Plan.clip_to_roles),
@@ -213,6 +218,9 @@ def problems(plan, bones):
         other = ('r' if key[0] == 'l' else 'l') + key[1:]
         if other not in plan.legs:
             out.append(f'leg {key} has no partner {other} on the other side (a lost leg is the gait maker\'s job, not the plan\'s)')
+    for role in plan.data.get('chain', []):
+        if role not in plan.to_bone:
+            out.append(f'role "{role}" is in the chain but missing from its bones table')
     parents = {b['name']: b.get('parent') for b in bones}
     for i, piece in enumerate(plan.spine):
         if abs(sum(s for _, s in piece['joints']) - 1.0) > 1e-6:
@@ -233,6 +241,8 @@ def problems(plan, bones):
 def stale(plan):
     """The plan's measured numbers that no longer match its model (a model changed since `measure`): sentences."""
     out = []
+    if 'family' in plan.data:
+        return out                              # an animal's plan: no climb or spine numbers (only insects have them)
     numbers = measured(plan.model)
     for key, value in numbers.items():
         if key in plan.approved or key in plan.hand_set:

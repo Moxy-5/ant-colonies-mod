@@ -1,0 +1,34 @@
+# The measuring course (a walk with two right-angle turns (the back bending sideways)) for the crocodile: written by tools/body_course.py films, do not edit.
+lens 50
+walker antcolonies:crocodile -6.5 -60 -4.5 -90 OwnSize:1.0f
+follow 0 3.5 -6 0 25
+cmd tick unfreeze
+record on 3
+go 2 -60 -5 1.0
+wait 60
+shot p00
+wait 60
+shot p01
+wait 60
+shot p02
+wait 58
+shot p03
+go 2 -60 4 1.0
+wait 60
+shot p04
+wait 60
+shot p05
+wait 60
+shot p06
+wait 58
+shot p07
+go -6 -60 4 1.0
+wait 60
+shot p08
+wait 60
+shot p09
+wait 60
+shot p10
+wait 36
+shot p11
+record off

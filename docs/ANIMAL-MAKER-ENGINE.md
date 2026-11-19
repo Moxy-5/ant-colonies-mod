@@ -34,6 +34,13 @@ its checks are about things that look broken (gaps, sliding feet, pops), never a
    the checks drawn on it (a red mark where the back opens or a foot slides), and the course film.
 8. **Old checks stay.** A check that once caught a real bug is never removed; each new body bug gets its own course
    scene or guard film.
+9. **Real ideas, Minecraft looks (the user, 2026-11-19: "use realistic ideas for the motions but for the actual
+   motions ... just go with whatever looks good in minecraft", above all going up blocks).** Real animals give the
+   ideas (head in first, legs folding as it floats, the back's S-curve); the motion itself is whatever looks best on
+   one-block steps and in Minecraft's light, never a copy of the real animal's geometry. So the course's numbers are
+   evidence for the eye, not pass marks: a body easing over a step like a ramp may graze a block corner if that reads
+   smoother than bending sharply round every edge. The final judge is the film. (Ants and termites keep strict
+   realism.)
 
 ## What exists today (2026-11-19)
 - **Looks, built (the model workshop, steps 1 to 4):** `tools/workshop.py` (brief, starter outline, outline, versions,
@@ -101,6 +108,51 @@ the tail's walking sway turns into the swimming wave, legs folded, head up at th
 plunges in head first and swims off under the water. No separate dive move: smooth entry comes from the body
 following its own path.
 
+## Baseline: the measuring course on today's monitor and crocodile (2026-11-19, step 1)
+Measured by `tools/body_course.py` from the game's own frame-by-frame record (3 samples a tick, every bone); reports
+`run-film/course/course_<animal>.txt`, graphs `run-film/course/course_<animal>_<scene>/graph.png`. Nothing about the
+looks changed. Numbers are evidence for the eye (rule 9), not pass marks. Ranked by how bad it looks, worst first.
+
+1. **The step up (monitor; sure; the back's finding 1 confirmed and worse than suspected).** One step, in order
+   (`step_up`, ticks): t 210 the front feet jump 0.3 blocks up in one tick (the leg folding finds the step); t 218 to
+   222 the chest rises about 0.9 blocks and the hips 0.6 in four ticks, **16 ticks before the game's box steps**, so
+   for most of a second the monitor stands on stretched hind legs with its hips about 0.8 blocks over the lower ground;
+   t 228 the hind feet jump 0.35 blocks; t 238 to 241 the box climbs the block in three ticks and the whole drawn body
+   rides up with it on top of the lift it already had: the head and chest **overshoot about 0.6 blocks** above where
+   they end up, then sink back over about 8 ticks (a bounce); the tail tip dips and takes about 15 ticks to come up.
+   The same at every step of `stairs`. The crocodile shows it smaller (a 6 px foot pop, an 11 degree chest-hips snap).
+   Cause: the lift rules (whole-body lift, edge hinges, leg folding) act ahead of the box, then the bend's easing acts
+   again when the box jumps; two systems each lift the body. Step down: no bounce, but the tail is drawn up to 9.5 px
+   inside the upper block as the hips drop.
+2. **Claws jump at every clip change (monitor; sure; the water finding 2 confirmed).** Walk to `enter` (`bank_level`,
+   t 207) and walk to `swim` (`bank_high`, t 237): the front claws move about 1.3 blocks in one frame. The leg folding
+   is drawn over the clip only while walking; the new clip starts from its own pose.
+3. **`enter`, walk, `enter` (monitor; sure; the water finding 1 confirmed).** Walking into level water: `enter` 180.7,
+   walk 204, `enter` 207, walk 230, `swim` 231, each change with the claw jump of 2. From a high bank there is no
+   `enter` at all: it walks off and falls 2 blocks into the water in walking pose. The dash and the real scare go
+   walk, `enter`, `swim` once (fine).
+4. **Clip speed changes jump the clip (all four river animals; sure; new, BUGS 232).** GeckoLib plays a clip at "speed
+   x time since it started", so changing the speed moves the clip to another moment. The monitor's tail swings 0.4
+   blocks sideways in one frame as it slows at its goal (`flat` and `step_up`, t 319: hips-tail1 snaps 17 degrees,
+   tail9 to 12 snap 10 to 16).
+5. **The crocodile's neck at the water (sure).** Off a high bank its neck-chest joint snaps 29 degrees in one frame
+   (t 150) and the neck-chest seam opens 6.8 px; its tail4-tail5 joint snaps 21 to 23 degrees going into and out of
+   water (`bank_level`, `dash`, `climb_out`).
+6. **Feet barely lift (monitor; sure; small).** On the flat the feet lift about 1.7 px (0.08 blocks) a step and the
+   claws graze about 1 px into the ground mid-swing; planted feet hardly slide (good). Over steps the slide rises to
+   0.3 to 0.4 of the body's speed.
+7. **Neck seams open (monitor; sure; small).** About 1 to 1.5 px between neck1, neck2, chest and head on the flat,
+   4.9 px climbing out.
+8. **Turning (monitor; partly measured).** The tail tip pops up to 12 px on the turns; sweeping of the whole body
+   about the hips not yet measured as such (needs a path-following check, step 2).
+
+Dropped or not seen: none of the suspected findings was wrong. Not yet measured: the bob after falling into the water
+(water finding 3; the course has no bob measure yet) and the off-screen leg states (finding 4).
+
+**Ideas for steps, judged by this baseline:** finding 1 is two lifts stacked; (b) of plan step 2 (ease the drawn
+height after the box jumps) alone would remove the bounce, and (a) (one smoothed ground line) would replace the early
+lift, the hind legs left on stilts and the separate edge rules. So (a) with (b) stays my pick to try first.
+
 ## Concerns
 1. **Scope.** The whole engine is weeks of tools. Building it all before the next animal would stall the fun part.
    Answer: rule 4, grow it through real animals, the monitor first.
@@ -160,10 +212,25 @@ steps are for the checks; to settle with the user before the first small creatur
    turn round on land. Run on today's monitor and crocodile: **a baseline report**, the findings above confirmed or
    dropped and ranked by size. Nothing about the looks changes in this step. Built for the whole list: the checks
    take the legs, feet and body chain from each model's body plan (any number of legs, none for a snake, dozens for
-   the millipede), never from a four-legged layout.
+   the millipede), never from a four-legged layout. **Built 2026-11-19:** the camera's `BodyRecorder`
+   (`framework/.../client/BodyRecorder.java`) writes every bone of the walker each sample (`record on 3` in a shot
+   list; any mob can be the walker now); `tools/body_course.py films|run|check [animal]` writes the course scenes
+   (`tools/film/course/`), films them and judges them (parts inside blocks, seams, joint snaps, pops, feet over the
+   ground and sliding, clip changes, graphs). The legs, feet and chain come from each model's body plan (`family`,
+   `chain`; monitor and crocodile plans added). The baseline is the section above. The gentle slope is `stairs` (a
+   step every three blocks); a real scare is `scared`. `FilmChecks` itself is unchanged (the course does its job for
+   animals).
 2. **The body follows its path (shared, review A3).** One framework rule in place of the pile above: the body's
-   joints are placed in the world along the path the head took, never through the ground, eased as places in the world
-   (not angles against the box). Fixes the step pops, turning on the spot and going in head first, from one rule. The
+   joints are placed in the world along the path the head took, eased as places in the world (not angles against the
+   box); over a block step the path is smoothed into a short ramp (rule 9: what looks good, not a sharp corner round
+   every block edge, grazing a corner allowed where it reads smoother). The user, 2026-11-19: block steps up and down
+   are where most of the jank is and will stay the biggest problem for every animal ("blocks aren't realistic, so we
+   will have to get creative"). Ideas to weigh against the course's step scenes (my picks to test, none decided):
+   (a) one smoothed ground line, the block tops blurred over about a body length, that the whole body lies on, the
+   feet still reaching down or up to the real block top under them; (b) the animal's drawn height eased over a few
+   ticks after its box jumps a block (the box's one-tick jump hidden, the game's movement untouched); (c) a climbing
+   move timed by where the step is under each leg pair: front legs reach up, the chest rises, then the hips follow.
+   Fewer rules wins: (a) and (b) together may replace most of today's pile. Fixes the step pops, turning on the spot and going in head first, from one rule. The
    crocodile moves to it too. The rules it replaces are removed, not kept beside it. Built for any chain length (the
    snake and the millipede are long chains of this; the millipede's coil winds the same chain up), and cheap enough
    for many animals on screen.
@@ -182,8 +249,7 @@ that needs the insect engine or the live layer, A1 and A2 with the first upright
 first bird, K1 and K6 as soon as clip making feels slow.
 
 ## Decisions and open calls
-- **Decided (the user, 2026-11-19):** step 1 is built as the shared version for every animal. Not started yet: the
-  user starts it (waiting for their quota to reset).
+- **Decided (the user, 2026-11-19):** step 1 is built as the shared version for every animal. Built 2026-11-19.
 - **Decided (the user, 2026-11-19):** the giant African millipede and the rest of the master list are part of the
   engine's design from the start (the families table above).
 - Open: which animal after the monitor (decides which family is built next).

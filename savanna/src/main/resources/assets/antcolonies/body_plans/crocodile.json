@@ -1,0 +1,75 @@
+{
+  "model": "crocodile",
+  "about": "The crocodile's body plan (the Animal Maker Engine, 2026-11-19): its family, its body chain from the head to the tail tip (each bone the next one along, for the measuring course's seam and bend checks) and its legs (front pair 1, hind pair 2: upper, lower, foot; a foot's toes and claws hang off it). Read by tools/body_course.py and tools/body_plan.py; the game reads only its bones table.",
+  "family": "four_legged_long_body",
+  "root": "body",
+  "forebody": "chest",
+  "head": {
+    "bone": "head",
+    "jaws": [
+      "jaw"
+    ]
+  },
+  "chain": [
+    "head",
+    "neck",
+    "chest",
+    "hips",
+    "tail1",
+    "tail2",
+    "tail3",
+    "tail4",
+    "tail5"
+  ],
+  "legs": {
+    "l1": [
+      "arm_upper_left",
+      "arm_lower_left",
+      "arm_foot_left"
+    ],
+    "l2": [
+      "leg_upper_left",
+      "leg_lower_left",
+      "leg_foot_left"
+    ],
+    "r1": [
+      "arm_upper_right",
+      "arm_lower_right",
+      "arm_foot_right"
+    ],
+    "r2": [
+      "leg_upper_right",
+      "leg_lower_right",
+      "leg_foot_right"
+    ]
+  },
+  "bones": {
+    "body": "body",
+    "neck": "neck",
+    "head": "head",
+    "jaw": "jaw",
+    "pupil_left": "pupil_left",
+    "pupil_right": "pupil_right",
+    "lid_left": "lid_left",
+    "lid_right": "lid_right",
+    "chest": "chest",
+    "hips": "hips",
+    "tail1": "tail1",
+    "tail2": "tail2",
+    "tail3": "tail3",
+    "tail4": "tail4",
+    "tail5": "tail5",
+    "arm_upper_left": "arm_upper_left",
+    "arm_lower_left": "arm_lower_left",
+    "arm_foot_left": "arm_foot_left",
+    "leg_upper_left": "leg_upper_left",
+    "leg_lower_left": "leg_lower_left",
+    "leg_foot_left": "leg_foot_left",
+    "arm_upper_right": "arm_upper_right",
+    "arm_lower_right": "arm_lower_right",
+    "arm_foot_right": "arm_foot_right",
+    "leg_upper_right": "leg_upper_right",
+    "leg_lower_right": "leg_lower_right",
+    "leg_foot_right": "leg_foot_right"
+  }
+}

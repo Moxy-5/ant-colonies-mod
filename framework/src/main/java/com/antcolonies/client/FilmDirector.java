@@ -24,6 +24,7 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.Mob;
 import net.minecraft.world.phys.Vec3;
 import net.minecraft.world.Difficulty;
 import net.minecraft.world.level.DataPackConfig;
@@ -85,6 +86,9 @@ import net.neoforged.neoforge.event.tick.ServerTickEvent;
  * follow 0 0.1 -7 0 0             the camera rides along with the walker, this far off it, with this turn and tilt,
  *                                 for every shot from now ("follow off" stops it)
  * log climb                       one line a tick about the walker's drawn body into climb.txt ("log off" ends it)
+ * record on 3                     every moment the walker is drawn (at most 3 a tick) into body.jsonl.gz, for
+ *                                 tools/body_course.py ({@link BodyRecorder}); "record off" ends it. The walker may be
+ *                                 any animal (an animal's "forget" takes all its goals away, "go" uses its own legs)
  * repeat 100 ... end              the lines between written out 100 times, {i} in them 000, 001, ... (shot side_{i})
  * quit
  * </pre>
@@ -259,6 +263,7 @@ public final class FilmDirector {
     private static void endScene() {
         Minecraft mc = Minecraft.getInstance();
         writeLog(mc);
+        BodyRecorder.stop();
         if (checks.isEmpty()) {
             return;
         }
@@ -306,6 +311,9 @@ public final class FilmDirector {
             return;
         }
         FilmWatch.tick(mc, !(filmed && steps.isEmpty() && waitTicks == 0 && pendingShot == null && burstLeft == 0));
+        if (BodyRecorder.recording()) {
+            followWalker(mc);                  // recording, the camera rides along every tick (it must see it)
+        }
         if (pendingShot != null) {
             return;                            // waiting for the frame to be drawn
         }
@@ -399,6 +407,7 @@ public final class FilmDirector {
         FilmStep.cancel();
         logName = null;
         logLines.setLength(0);
+        BodyRecorder.stop();
         checks = new FilmChecks();
         filmed = true;
     }
@@ -454,15 +463,20 @@ public final class FilmDirector {
                     w.length > 3 ? Double.parseDouble(w[3]) : 1.1);
             case "walker" -> putWalker(w[1], w[2], w[3], w[4], w[5], w.length > 6 ? w[6] : null);
             case "freshclocks" -> freshClocks();
-            case "forget" -> onWalker(mc, ant -> {
-                ant.forgetGoalsForFilm();
-                ant.getNavigator().stop();
+            case "forget" -> onWalker(mc, mob -> {
+                if (mob instanceof AbstractAntEntity ant) {
+                    ant.forgetGoalsForFilm();
+                    ant.getNavigator().stop();
+                } else {
+                    forgetGoals(mob);
+                }
             });
             case "go" -> {
                 BlockPos goal = new BlockPos(Integer.parseInt(w[1]), Integer.parseInt(w[2]), Integer.parseInt(w[3]));
                 double speed = w.length > 4 ? Double.parseDouble(w[4]) : 1.0;
-                onWalker(mc, ant -> LOG.info("Film: walker to {}: {}", goal,
-                        ant.getNavigator().moveTo(goal, speed) ? "route found" : "NO ROUTE"));
+                onWalker(mc, mob -> LOG.info("Film: walker to {}: {}", goal, (mob instanceof AbstractAntEntity ant
+                        ? ant.getNavigator().moveTo(goal, speed)
+                        : mob.getNavigation().moveTo(goal.getX() + 0.5, goal.getY(), goal.getZ() + 0.5, speed)) ? "route found" : "NO ROUTE"));
             }
             case "look" -> lookAt = w[1].equals("off") ? null
                     : new Vec3(Double.parseDouble(w[1]), Double.parseDouble(w[2]), Double.parseDouble(w[3]));
@@ -471,6 +485,13 @@ public final class FilmDirector {
             case "log" -> {
                 writeLog(mc);
                 logName = w[1].equals("off") ? null : w[1];
+            }
+            case "record" -> {
+                if (w[1].equals("off")) {
+                    BodyRecorder.stop();
+                } else {
+                    BodyRecorder.start(folder(mc).resolve("body.jsonl.gz"), w.length > 2 ? Integer.parseInt(w[2]) : 3);
+                }
             }
             case "quit" -> {
                 // the end of this scene: on to the next one, if any
@@ -591,13 +612,31 @@ public final class FilmDirector {
         }
     }
 
-    private static boolean isWalker(Entity entity) {
-        return entity instanceof AbstractAntEntity && entity.getCustomName() != null
-                && WALKER.equals(entity.getCustomName().getString());
+    /** The walker: an insect or any other animal (a mob) with the walker's name. */
+    static boolean isWalker(Entity entity) {
+        return entity instanceof Mob && entity.getCustomName() != null && WALKER.equals(entity.getCustomName().getString());
+    }
+
+    /**
+     * An animal walker's "forget": every goal and target goal taken away (an insect has its own way), so it only goes
+     * where it is sent, with its own legs (its navigation and move control). Its goal lists are read by name: the
+     * camera runs only in development, where the game's names are Mojang's.
+     */
+    private static void forgetGoals(Mob mob) {
+        try {
+            for (String name : new String[] {"goalSelector", "targetSelector"}) {
+                Field field = Mob.class.getDeclaredField(name);
+                field.setAccessible(true);
+                ((net.minecraft.world.entity.ai.goal.GoalSelector) field.get(mob)).removeAllGoals(goal -> true);
+            }
+        } catch (ReflectiveOperationException e) {
+            LOG.warn("Film: cannot take the walker's goals away", e);
+        }
+        mob.getNavigation().stop();
     }
 
     /** Runs this on the game's own (server) side, for the walker there: its mind and legs live on that side. */
-    private static void onWalker(Minecraft mc, java.util.function.Consumer<AbstractAntEntity> action) {
+    private static void onWalker(Minecraft mc, java.util.function.Consumer<Mob> action) {
         MinecraftServer server = mc.getSingleplayerServer();
         if (server == null) {
             LOG.warn("Film: no game server for the walker");
@@ -607,7 +646,7 @@ public final class FilmDirector {
             boolean found = false;
             for (Entity entity : server.overworld().getAllEntities()) {
                 if (isWalker(entity)) {
-                    action.accept((AbstractAntEntity) entity);
+                    action.accept((Mob) entity);
                     found = true;
                 }
             }
@@ -617,11 +656,16 @@ public final class FilmDirector {
         });
     }
 
-    /** The walker as this side draws it, or null. */
+    /** The walker as this side draws it, if it is an insect, or null. */
     private static AbstractAntEntity drawnWalker(Minecraft mc) {
+        return drawnWalkerOfAnyKind(mc) instanceof AbstractAntEntity ant ? ant : null;
+    }
+
+    /** The walker as this side draws it (an insect or an animal), or null. */
+    private static Entity drawnWalkerOfAnyKind(Minecraft mc) {
         for (Entity entity : mc.level.entitiesForRendering()) {
             if (isWalker(entity)) {
-                return (AbstractAntEntity) entity;
+                return entity;
             }
         }
         return null;
@@ -638,7 +682,7 @@ public final class FilmDirector {
         }
         for (Entity entity : event.getServer().overworld().getAllEntities()) {
             if (isWalker(entity)) {
-                ((AbstractAntEntity) entity).getLookControl().setLookAt(target.x, target.y, target.z);
+                ((Mob) entity).getLookControl().setLookAt(target.x, target.y, target.z);
             }
         }
     }
@@ -648,7 +692,7 @@ public final class FilmDirector {
 
     /** Puts the camera (the player, on this side, so at once) where "follow" says, for the next shot. */
     private static void followWalker(Minecraft mc) {
-        AbstractAntEntity walker = follow == null ? null : drawnWalker(mc);
+        Entity walker = follow == null ? null : drawnWalkerOfAnyKind(mc);
         if (walker == null) {
             return;
         }
