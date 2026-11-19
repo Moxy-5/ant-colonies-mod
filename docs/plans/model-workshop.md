@@ -147,6 +147,11 @@ settings (length, thickness, toe count): the monitor's round legs, clawed feet, 
 inside, eyes with lids; the crocodile's parts; later heads, necks, wings. They live in one shared library with the one
 picture (PNG) writer and box maker (today copied in several files), so the next reptile starts from approved parts.
 Never built all at once: each new animal adds what it needed.
+**Every animal stays its own shape (the user, 2026-11-19: "all of the animals I'm choosing are unique").** The library
+holds ways of building (round slices, a bent chain, a leg from three joints), never an animal's body: every shape number
+(joints, toe lengths, thickness, curves) stays in the animal's own maker. A part is used only where it fits the new
+animal's real build; where it does not (a chameleon's grasping feet, its coiled tail), the animal gets its own new part
+and that part joins the library. Each model is still judged against its own picture.
 
 - **BUILT 2026-11-19** (branch `claude/viewer-foundation`): `tools/model_parts.py`, the one shared library.
   - Moved in: the box maker, faces, colour mixing, curves, the picture (PNG) writer and the clip sampler (they lived in
