@@ -1,0 +1,69 @@
+# a close look at the monitor (step 2), every 3 ticks
+lens 50
+cmd fill -12 -60 -7 0 -60 7 minecraft:grass_block
+walker antcolonies:monitor -5.5 -59 0.5 -90 OwnSize:1.0f,HungryIn:99999,SunIn:99999
+follow 0 1.0 -4.5 0 8
+cmd tick unfreeze
+record on 3
+go 7 -60 0 0.8
+wait 140
+shot f00
+wait 3
+shot f01
+wait 3
+shot f02
+wait 3
+shot f03
+wait 3
+shot f04
+wait 3
+shot f05
+wait 3
+shot f06
+wait 3
+shot f07
+wait 3
+shot f08
+wait 3
+shot f09
+wait 3
+shot f10
+wait 3
+shot f11
+wait 3
+shot f12
+wait 3
+shot f13
+wait 3
+shot f14
+wait 3
+shot f15
+wait 3
+shot f16
+wait 3
+shot f17
+wait 3
+shot f18
+wait 3
+shot f19
+wait 3
+shot f20
+wait 3
+shot f21
+wait 3
+shot f22
+wait 3
+shot f23
+wait 3
+shot f24
+wait 3
+shot f25
+wait 3
+shot f26
+wait 3
+shot f27
+wait 3
+shot f28
+wait 3
+shot f29
+wait 3

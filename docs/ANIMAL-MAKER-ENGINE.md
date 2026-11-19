@@ -234,6 +234,21 @@ steps are for the checks; to settle with the user before the first small creatur
    crocodile moves to it too. The rules it replaces are removed, not kept beside it. Built for any chain length (the
    snake and the millipede are long chains of this; the millipede's coil winds the same chain up), and cheap enough
    for many animals on screen.
+   **First tries, 2026-11-19 (not kept; saved on branch `claude/monitor-step2-tries`; the user: "its not very good I think we need to rethink the animation
+   entirely the legs jump up last second everytime thats the issue of jankiness", then stopped for the day).** Built
+   and filmed: (a) the smoothed ground line in world heights (`GroundBend.line`, `RAMP` 0.08, `CLEAR`
+   0.3): the bounce went (biggest per-sample height jump on the course 0.11 to 0.22 blocks before, 0.015 to 0.04
+   after); (b) feet reach by swinging the upper leg at the shoulder (`client/LegSwing`, up to about 10 px up, 4 down)
+   instead of sliding it; the foot stands on the highest ground its toes find 0.3 blocks ahead (`GroundBend.TOES`);
+   (c) the user's idea, the torso raised as one piece to higher ground ahead (`GroundBend.raise`). What the side films
+   (`tools/film/look/`, low side camera) showed: the monitor is 4.5 blocks long and a step is three times its
+   shoulder height, so with both pairs of feet on the ground the trunk must tilt about 45 degrees for about a block of
+   walking (2 s at its stroll); the snout is a block ahead of the forefeet, so the head must rise before the feet
+   arrive. The look still fails because the **feet jump up at the last moment**: each foot follows the walk clip's
+   fixed stride and only finds the step when its own place crosses the edge, so it pops up as the body is already
+   reared. Lesson for the rethink: the feet must be placed by where the step is (each foot's next landing chosen
+   onto the step, the body following the feet), not the body bent first and the feet patched after; the climb is a
+   move of its own, timed from the feet (idea (c) above), not a pose worked out each frame.
 3. **The back curves sideways.** The `walk` and `swim` clips swing shoulders and hips opposite ways across the three
    trunk pieces (`tools/monitor_models.py`), the S-curve; the lab's checks extended to four legs and a tail (K5).
 4. **Smooth water entry.** The `enter` clip and its start rule go; legs and tail blend from walking to swimming by

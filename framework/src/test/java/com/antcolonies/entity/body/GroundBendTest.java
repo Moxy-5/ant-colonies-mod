@@ -52,4 +52,29 @@ class GroundBendTest {
             assertTrue(Math.abs(lie[j]) <= GroundBend.MAX_STEEP + 1.0E-9, "a piece lies at " + lie[j]);
         }
     }
+
+    /**
+     * The ground line (the Animal Maker Engine step 2, 2026-11-19): a one-block step becomes a ramp with no jump in it,
+     * rising all the way from one level to the other, its middle a little toward the low side so the belly clears the
+     * corner, and flat ground stays flat.
+     */
+    @Test
+    void aStepBecomesASmoothRampTowardTheLowSide() {
+        int n = 200, edge = 100, widen = 8, ramp = 20;
+        double[] read = new double[n], wide = new double[n], sums = new double[n + 1];
+        for (int i = 0; i < n; i++) {
+            read[i] = i < edge ? 64 : 65;
+        }
+        GroundBend.line(read, n, widen, wide, sums);
+        double before = GroundBend.average(sums, n, 0, ramp);
+        assertEquals(64, before, 1.0E-9);
+        assertEquals(65, GroundBend.average(sums, n, n - 1, ramp), 1.0E-9);
+        for (int i = 1; i < n; i++) {
+            double h = GroundBend.average(sums, n, i, ramp);
+            assertTrue(h >= before - 1.0E-9, "the ramp only rises: " + h + " after " + before);
+            assertTrue(h - before <= 1.0 / (2 * ramp + 1) + 1.0E-9, "no jump bigger than one point's share: " + (h - before));
+            before = h;
+        }
+        assertTrue(GroundBend.average(sums, n, edge, ramp) > 64.6, "at the edge the line is past half way up");
+    }
 }

@@ -1,5 +1,6 @@
 package com.antcolonies.savanna.client;
 
+import com.antcolonies.client.LegSwing;
 import com.antcolonies.entity.body.GroundBend;
 import com.antcolonies.savanna.SavannaMod;
 import com.antcolonies.savanna.animal.MonitorEntity;
@@ -57,8 +58,6 @@ public class MonitorModel extends DefaultedEntityGeoModel<MonitorEntity> {
      * legs fold back only over deep water, never over a drop on land, where folded forelegs stuck up like spikes).
      */
     private static final double REACH = 1.3, WADE = 0.4;
-    /** How far a standing leg reaches down, or draws up, to keep its foot on the ground as the body bends (model pixels; my pick). */
-    private static final double PLANT = 4.0;
     /** How far out from the middle line each pair's feet stand (model pixels; from the leg plans). */
     private static final double FOOT_OUT = 11.0;
     /** The body's bend pivot (model pixels: height, length), where chest and hips meet; its height as the model has it. */
@@ -111,7 +110,7 @@ public class MonitorModel extends DefaultedEntityGeoModel<MonitorEntity> {
         bend.update(monitor.level(), x, y, z, yaw, scale, monitor.isInWater(), monitor.floatDepth(), !monitor.isDeadOrDying(),
                 System.nanoTime());
         GeoBone body = getAnimationProcessor().getBone("body");
-        if (body != null && bend.lift() > 1.0E-3) {      // the shoulders lifted onto a bank: the whole body up, in model pixels
+        if (body != null && Math.abs(bend.lift()) > 1.0E-3) {      // the body drawn on the ground line, above or under its box (model pixels)
             boolean marked = body.hasRotationChanged() || body.hasPositionChanged() || body.hasScaleChanged();
             body.setPosY(body.getPosY() + (float) (bend.lift() * 16.0 / scale));
             if (!marked) {
@@ -197,13 +196,16 @@ public class MonitorModel extends DefaultedEntityGeoModel<MonitorEntity> {
     /**
      * Keeps a standing foot on the ground as the body bends (2026-11-18): the clips set the feet on level ground, and
      * when the chest or hips tip over a step, or the shoulders lift onto a bank, the feet would come off it or sink in;
-     * the leg reaches down or draws up (at most {@link #PLANT} pixels) until the sole rests on the ground under it again.
-     * Only what the bend added is worked out (the clips' own steps and bobbing are left alone), in the side view.
+     * the leg swings down or up at the shoulder or hip ({@link LegSwing}, 2026-11-19: sliding the leg up or down reached
+     * only 4 pixels, and the forefeet hung in the air as the chest reared up a step) until the sole rests on the ground
+     * under it again. Only what the bend added is worked out (the clips' own steps and bobbing are left alone), in the
+     * side view.
      */
     private void plant(MonitorEntity monitor, GroundBend bend, int pair, String upperName, int side, double amount, double scale,
             double x, double y, double z, float yaw) {
         GeoBone upper = getAnimationProcessor().getBone(upperName);
-        if (upper == null) {
+        GeoBone lower = getAnimationProcessor().getBone(upperName.replace("_upper", "_lower"));
+        if (upper == null || lower == null) {
             return;
         }
         double hipsTurn = -Math.toRadians(bend.turn(bend.frontPieces()));
@@ -233,16 +235,8 @@ public class MonitorModel extends DefaultedEntityGeoModel<MonitorEntity> {
         double turn = Math.toRadians(180.0 - yaw), mx = side * FOOT_OUT;
         double wx = x + (mx * Math.cos(turn) + sz * Math.sin(turn)) * perBlock;
         double wz = z + (-mx * Math.sin(turn) + sz * Math.cos(turn)) * perBlock;
-        double ground = (GroundBend.support(monitor.level(), wx, wz, y + sy * perBlock, false, 100.0) - y) / perBlock;
-        double reach = Mth.clamp(sy - ground, -PLANT, PLANT) * amount / Math.max(0.5, Math.cos(a));
-        if (Math.abs(reach) < 1.0E-3) {
-            return;
-        }
-        boolean marked = upper.hasRotationChanged() || upper.hasPositionChanged() || upper.hasScaleChanged();
-        upper.setPosY((float) (upper.getPosY() - reach));
-        if (!marked) {
-            upper.resetStateChanges();
-        }
+        double ground = (bend.groundNear(monitor.level(), wx, wz, y + sy * perBlock) - y) / perBlock;
+        LegSwing.reach(upper, lower, (ground - sy) * amount / Math.max(0.5, Math.cos(a)));
     }
 
     /**

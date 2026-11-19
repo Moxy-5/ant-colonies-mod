@@ -1,5 +1,6 @@
 package com.antcolonies.savanna.client;
 
+import com.antcolonies.client.LegSwing;
 import com.antcolonies.entity.body.GroundBend;
 import com.antcolonies.savanna.SavannaMod;
 import com.antcolonies.savanna.animal.CrocodileEntity;
@@ -27,8 +28,6 @@ public class CrocodileModel extends DefaultedEntityGeoModel<CrocodileEntity> {
     private static final double REACH = 0.6, WADE = 0.5;
     /** How far Minecraft's walk counter runs in one stride of the walk clip (one stride a second at 0.06 blocks a tick, 4 a block). */
     private static final double STRIDE = 4.8;
-    /** How far a standing leg reaches down, or draws up, to set its foot on the ground (model pixels; my pick: farther and it would come away from the body). */
-    private static final double PLANT = 5.0;
     /** How far forward of the body's middle its eyes are (model pixels), how far a pupil slides along its eye (pixels), and how far the head turns toward what it watches (degrees; my picks). */
     private static final double EYES_AHEAD = 24.0, PUPIL_SLIDE = 0.84, HEAD_TURN = 14.0;
     /** How quickly the eyes jump to a new sight and the head follows (seconds; my picks: a crocodile's eyes flick, its head turns slowly). */
@@ -65,7 +64,7 @@ public class CrocodileModel extends DefaultedEntityGeoModel<CrocodileEntity> {
                 croc.isInWater(), croc.floatDepth(), !croc.isDeadOrDying(), System.nanoTime());
         double scale = CrocodileEntity.MODEL_SCALE * croc.getScale();
         GeoBone body = getAnimationProcessor().getBone("body");
-        if (body != null && bend.lift() > 1.0E-3) {      // the shoulders lifted onto a bank: the whole body up, in model pixels
+        if (body != null && Math.abs(bend.lift()) > 1.0E-3) {      // the body drawn on the ground line, above or under its box (model pixels)
             boolean marked = body.hasRotationChanged() || body.hasPositionChanged() || body.hasScaleChanged();
             body.setPosY(body.getPosY() + (float) (bend.lift() * 16.0 / scale));
             if (!marked) {
@@ -227,8 +226,8 @@ public class CrocodileModel extends DefaultedEntityGeoModel<CrocodileEntity> {
     /**
      * Sets a standing foot flat on the ground (2026-11-15, the user's report: basking, the feet stayed slanted and off
      * the ground): the body and the leg tip with the clips and with the body lying on what is under it, and the foot
-     * tipped with them; here the foot is turned back level, and the leg reaches down or draws up (at most
-     * {@link #PLANT} pixels) until the sole rests on the ground under it. Worked out in the side view (model height and
+     * tipped with them; here the foot is turned back level, and the leg swings down or up at the shoulder or hip
+     * ({@link LegSwing}) until the sole rests on the ground under it. Worked out in the side view (model height and
      * length) through the bones the leg hangs from, by {@code amount} (how much the pair stands).
      */
     private void plant(CrocodileEntity croc, String[] parents, String leg, double amount, double scale, double x, double y, double z, float yaw) {
@@ -271,16 +270,8 @@ public class CrocodileModel extends DefaultedEntityGeoModel<CrocodileEntity> {
         double wx = x + (mx * Math.cos(turn) + pz * Math.sin(turn)) * perBlock;
         double wz = z + (-mx * Math.sin(turn) + pz * Math.cos(turn)) * perBlock;
         double sole = py - foot.getPivotY();          // the sole lies at the model's floor, under the foot's pivot
-        double ground = (GroundBend.support(croc.level(), wx, wz, y + sole * perBlock, false, 100.0) - y) / perBlock;
-        double reach = Mth.clamp(sole - ground, -PLANT, PLANT) * amount / Math.max(0.5, Math.cos(above));
-        if (Math.abs(reach) < 1.0E-3) {
-            return;
-        }
-        marked = upper.hasRotationChanged() || upper.hasPositionChanged() || upper.hasScaleChanged();
-        upper.setPosY((float) (upper.getPosY() - reach));
-        if (!marked) {
-            upper.resetStateChanges();
-        }
+        double ground = (croc.bend().groundNear(croc.level(), wx, wz, y + sole * perBlock) - y) / perBlock;
+        LegSwing.reach(upper, lower, (ground - sole) * amount / Math.max(0.5, Math.cos(above)));
     }
 
     /** Moves a bone's turn from its clip's toward this one (degrees), by {@code amount} (0 to 1), leaving the marks as they were. */
