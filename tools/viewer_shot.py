@@ -4,6 +4,9 @@ user's picture before showing it (docs/plans/model-workshop.md, step 1, 2026-11-
     python tools/viewer_shot.py references/monitor_viewer.html                   side, top and front, every picture
     python tools/viewer_shot.py references/monitor_viewer.html side --picture outline
     python tools/viewer_shot.py references/monitor_viewer.html --hash "cam=head, close"   any page view, no Compare
+    python tools/viewer_shot.py references/monitor_viewer.html --hash "compare=top&see=1&over=1&bare=1&snap=1"
+        also saves <name>.canvas.png, the view alone, whose scale is the printed screenPxPerBlock (the model's own
+        flat pictures, e.g. to test the workshop tools on a picture whose answer is known)
 
 Uses Microsoft Edge's built-in headless mode (comes with Windows; Chrome works too), drawing with its software
 renderer, so it needs no screen and nothing installed. Pictures go to references/viewer_shots/<page>/ (one per view
@@ -11,6 +14,7 @@ and picture); the fill scores (how much of the picture the model covers, how muc
 are printed and written to scores.json there. Works for pages built with viewer_page.build (they have Compare).
 """
 import argparse
+import base64
 import json
 import re
 import subprocess
@@ -45,7 +49,15 @@ def shoot(page, hash_, out, size, profile, wait_ms):
     run(page, hash_, [f"--screenshot={out}", f"--window-size={size}"], profile, wait_ms)
     dom = run(page, hash_, ["--dump-dom", f"--window-size={size}"], profile, wait_ms).stdout
     m = re.search(r'<pre id="viewer-state"[^>]*>(.*?)</pre>', dom, re.S)
+    snap = re.search(r'<pre id="viewer-snap"[^>]*>data:image/png;base64,(.*?)</pre>', dom, re.S)
+    if snap:                                   # #snap=1: the canvas alone, from the same run as the score
+        out.with_suffix(".canvas.png").write_bytes(base64.b64decode(snap.group(1)))
     return json.loads(m.group(1)) if m and m.group(1).strip() else None
+
+
+def shown(path):
+    """A path as short as it can be shown: inside the project relative to it, else in full."""
+    return path.relative_to(ROOT) if path.is_relative_to(ROOT) else path
 
 
 def pictures_of(page):
@@ -66,12 +78,15 @@ def main():
     ap.add_argument("--out", help="folder (default references/viewer_shots/<page>)")
     a = ap.parse_args()
     page = Path(a.page) if Path(a.page).is_absolute() else ROOT / a.page
-    out_dir = Path(a.out) if a.out else ROOT / "references/viewer_shots" / page.stem
+    out_dir = (Path(a.out).resolve() if a.out else ROOT / "references/viewer_shots" / page.stem)
     with tempfile.TemporaryDirectory() as profile:
         if a.hash is not None:
             name = re.sub(r"[^a-z0-9]+", "_", a.hash.lower()).strip("_") or "page"
-            shoot(page, a.hash, out_dir / f"{name}.png", a.size, profile, a.wait)
+            state = shoot(page, a.hash, out_dir / f"{name}.png", a.size, profile, a.wait)
             print("wrote", out_dir / f"{name}.png")
+            if state:
+                (out_dir / f"{name}.json").write_text(json.dumps(state) + "\n", encoding="utf-8")
+                print(json.dumps(state))
             return
         pics = a.picture or pictures_of(page)
         if not pics:
@@ -84,9 +99,9 @@ def main():
                 if state:
                     scores.append(state)
                     print(f"{pic:>10} {view:>6}: {state['cover']:.0%} of the picture covered, "
-                          f"{state['inside']:.0%} of the model inside it   {out.relative_to(ROOT)}")
+                          f"{state['inside']:.0%} of the model inside it   {shown(out)}")
                 else:
-                    print(f"{pic:>10} {view:>6}: no score (no such view, or the page did not finish)   {out.relative_to(ROOT)}")
+                    print(f"{pic:>10} {view:>6}: no score (no such view, or the page did not finish)   {shown(out)}")
         (out_dir / "scores.json").write_text(json.dumps(scores, indent=1) + "\n", encoding="utf-8")
 
 

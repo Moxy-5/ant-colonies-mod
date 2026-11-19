@@ -625,7 +625,7 @@ def monitor_page(out):
     data = {"looks": looks, "blocks": blocks, "notes": mm.NOTES, "clips": mm.clips()[0],
             "boxes": sum(len(b.get("cubes", [])) for b in bones),
             # Compare (model workshop step 1): the user's picture once it is in references/inspiration/, and the
-            # approved outline (python tools/monitor_outline.py picture)
+            # approved outline (python tools/workshop.py outline monitor, from references/outlines/monitor.json)
             "pictures": viewer_page.pictures(("references/inspiration/monitor", "picture", "Your picture"),
                                              ("references/outlines/monitor", "outline", "The approved outline"))}
     viewer_page.build("monitor_viewer.template.html", data, out)

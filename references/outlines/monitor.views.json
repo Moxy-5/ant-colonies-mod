@@ -28,5 +28,5 @@
       ]
     }
   },
-  "made_by": "python tools/monitor_outline.py picture (from the approved outline, 2026-11-17)"
+  "made_by": "python tools/workshop.py outline monitor (from references/outlines/monitor.json)"
 }

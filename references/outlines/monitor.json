@@ -1,0 +1,299 @@
+{
+ "animal": "monitor",
+ "length_px": 96,
+ "note": "The Nile monitor's outline, drawn from the user's picture alone and approved 2026-11-17 (\"this outline is great\"); 6 blocks long. Moved here from tools/monitor_outline.py 2026-11-19, the same numbers.",
+ "parts": [
+  {
+   "name": "tail 6",
+   "side": [
+    0,
+    8,
+    0,
+    1
+   ],
+   "half_width": 0.5
+  },
+  {
+   "name": "tail 5",
+   "side": [
+    8,
+    16,
+    0,
+    2
+   ],
+   "half_width": 1.0
+  },
+  {
+   "name": "tail 4",
+   "side": [
+    16,
+    24,
+    1,
+    4
+   ],
+   "half_width": 1.5
+  },
+  {
+   "name": "tail 3",
+   "side": [
+    24,
+    32,
+    2,
+    7
+   ],
+   "half_width": 2.5
+  },
+  {
+   "name": "tail 2",
+   "side": [
+    32,
+    40,
+    4,
+    11
+   ],
+   "half_width": 3.5
+  },
+  {
+   "name": "tail 1",
+   "side": [
+    40,
+    48,
+    6,
+    15
+   ],
+   "half_width": 4.5
+  },
+  {
+   "name": "body",
+   "side": [
+    48,
+    74,
+    6,
+    16
+   ],
+   "half_width": 5.0
+  },
+  {
+   "name": "belly",
+   "side": [
+    55,
+    69,
+    5,
+    6
+   ],
+   "half_width": 4.5
+  },
+  {
+   "name": "neck",
+   "side": [
+    74,
+    82,
+    8,
+    17
+   ],
+   "half_width": 3.5
+  },
+  {
+   "name": "head",
+   "side": [
+    82,
+    90,
+    11,
+    17
+   ],
+   "half_width": 3.5
+  },
+  {
+   "name": "snout",
+   "side": [
+    90,
+    96,
+    11,
+    16
+   ],
+   "half_width": 2.5
+  },
+  {
+   "name": "front upper",
+   "side": [
+    67,
+    72,
+    9,
+    13
+   ],
+   "top": [
+    67,
+    72,
+    5,
+    10
+   ],
+   "front": [
+    5,
+    10,
+    9,
+    13
+   ],
+   "mirror": true
+  },
+  {
+   "name": "front lower",
+   "side": [
+    68,
+    72,
+    2,
+    10
+   ],
+   "top": [
+    68,
+    72,
+    8,
+    12
+   ],
+   "front": [
+    8,
+    12,
+    2,
+    10
+   ],
+   "mirror": true
+  },
+  {
+   "name": "front foot",
+   "side": [
+    66,
+    74,
+    0,
+    2
+   ],
+   "top": [
+    66,
+    74,
+    7.5,
+    13
+   ],
+   "front": [
+    7.5,
+    13,
+    0,
+    2
+   ],
+   "mirror": true
+  },
+  {
+   "name": "hind upper",
+   "side": [
+    49,
+    56,
+    9,
+    13
+   ],
+   "top": [
+    49,
+    55,
+    5,
+    11
+   ],
+   "front": [
+    5,
+    11,
+    8,
+    12
+   ],
+   "mirror": true
+  },
+  {
+   "name": "hind lower",
+   "side": [
+    49,
+    54,
+    2,
+    10
+   ],
+   "top": [
+    49,
+    54,
+    9,
+    13
+   ],
+   "front": [
+    9,
+    13,
+    2,
+    9
+   ],
+   "mirror": true
+  },
+  {
+   "name": "hind foot",
+   "side": [
+    46,
+    55,
+    0,
+    2
+   ],
+   "top": [
+    46,
+    55,
+    9,
+    15
+   ],
+   "front": [
+    9,
+    15,
+    0,
+    2
+   ],
+   "mirror": true
+  }
+ ],
+ "marks": [
+  {
+   "name": "eye",
+   "side": [
+    85,
+    86,
+    15,
+    16
+   ],
+   "top": [
+    85,
+    86,
+    2.5,
+    3.5
+   ],
+   "front": [
+    3.2,
+    3.8,
+    15,
+    16
+   ],
+   "colour": "#e8c547"
+  },
+  {
+   "name": "eye (right)",
+   "top": [
+    85,
+    86,
+    -3.5,
+    -2.5
+   ],
+   "front": [
+    -3.8,
+    -3.2,
+    15,
+    16
+   ],
+   "colour": "#e8c547"
+  },
+  {
+   "name": "nostril",
+   "side": [
+    95,
+    96,
+    15,
+    16
+   ],
+   "colour": "#111111"
+  }
+ ]
+}

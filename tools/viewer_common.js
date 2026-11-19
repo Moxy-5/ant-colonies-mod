@@ -300,6 +300,7 @@ const Viewer = (() => {
     const scoreOut = document.createElement('div');
     row3.appendChild(diff); row3.appendChild(scoreOut);
     st.renderer.domElement.parentElement.appendChild(row3);
+    if (settings.bare) row3.style.display = 'none';      // #bare=1: the model alone, for a clean picture
     const state = document.createElement('pre'); state.id = 'viewer-state'; state.hidden = true;
     document.body.appendChild(state);
 
@@ -404,16 +405,30 @@ const Viewer = (() => {
         `<span style="color:#666">${pic.label}, ${VIEWS[settings.compare].label.toLowerCase()}: grey both, ` +
         `<span style="color:#3c78e6">blue</span> picture only, <span style="color:#e1463c">red</span> model only</span>`;
       const result = {view: settings.compare, picture: settings.picture, cover: +cover.toFixed(4), inside: +inside.toFixed(4),
-                      pixels: {both, pictureOnly: picOnly, modelOnly}};
+                      pixels: {both, pictureOnly: picOnly, modelOnly},
+                      // screen pixels a block in the shown view, so a shot can be measured
+                      screenPxPerBlock: +(st.renderer.domElement.clientWidth / (ortho.right - ortho.left)).toFixed(3),
+                      canvas: [st.renderer.domElement.clientWidth, st.renderer.domElement.clientHeight]};
       window.viewerState = result;
       state.textContent = JSON.stringify(result);
+      // #snap=1: the shown view's own picture beside the score, so a shot and its scale come from one run
+      // (tools/viewer_shot.py saves it; two browser runs can lay the page out at different sizes)
+      if (settings.snap) {
+        const ready = getModel().userData.meshes.every(m => !m.material.map || m.material.map.image);
+        if (!ready) { dirty = true; return; }               // the skin is still loading: the model would draw clear
+        st.renderer.render(st.scene, ortho);
+        let snap = document.getElementById('viewer-snap');
+        if (!snap) { snap = document.createElement('pre'); snap.id = 'viewer-snap'; snap.hidden = true; document.body.appendChild(snap); }
+        snap.textContent = st.renderer.domElement.toDataURL('image/png');
+      }
       dirty = false;
     }
 
     function refresh() {
       const on = settings.compare in VIEWS;
       viewBtns(on ? settings.compare : 'off'); picBtns(settings.picture);
-      row2.style.display = row3.style.display = on ? '' : 'none';
+      row2.style.display = on ? '' : 'none';
+      row3.style.display = on && !settings.bare ? '' : 'none';
       st.props.forEach(p => p.visible = !on);
       st.scene.background = on ? BACK : saved.background;
       st.scene.fog = on ? null : saved.fog;

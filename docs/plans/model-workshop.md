@@ -57,12 +57,12 @@ Regrouped 2026-11-19 at the user's ask (fewer, bigger steps): the small pieces r
   `<name>.views.json` beside it), three.js r128 and OrbitControls in `tools/vendor/`, `tools/viewer_shot.py` (Edge
   headless pictures of every Compare view and picture, scores printed and in `scores.json`, in
   `references/viewer_shots/`, not kept in git). The monitor page is the first on it (same scene, no internet needed),
-  compared with the approved outline made into a picture (`python tools/monitor_outline.py picture` ->
+  compared with the approved outline made into a picture (now `python tools/workshop.py outline monitor` ->
   `references/outlines/monitor.png`) and with the user's picture once it is saved as
   `references/inspiration/monitor.png` with its views file. First scores, the 3D monitor against its outline: side 91
-  percent of the outline covered / 84 percent of the model inside it, top 91 / 84, front 92 / 75 (the 3D tail curves
-  lower than the outline's and the belly hangs below it seen from the front; the toes and claws stick out, as the
-  outline had none). Limits: a see-through part of a texture counts as model in the score; the picture's scale comes
+  percent of the outline covered / 84 percent of the model inside it, top 91 / 84, front 93 / 82 (front first read 92
+  / 75 from the old outline picture, which left the tail out of the front view; the 3D tail curves lower than the
+  outline's, the legs splay wider seen from the front, the toes and claws stick out, as the outline had none). Limits: a see-through part of a texture counts as model in the score; the picture's scale comes
   from its side view only.
 
 **2. Picture to outline: the brief and an outline the 3D shape is built from (was V5's loft, V6).**
@@ -79,6 +79,37 @@ Regrouped 2026-11-19 at the user's ask (fewer, bigger steps): the small pieces r
   views with their fill scores. The approved outline is saved as data (`references/outlines/<animal>.json`, model
   pixels, part names from the body plan) and the 3D maker reads it, so the body is a stack of boxes following the
   outline from the start. A shape change is made in one place and flows on; no retyping.
+
+- **BUILT 2026-11-19** (branch `claude/viewer-foundation`). `tools/workshop.py`:
+  - `brief <animal>` measures `references/inspiration/<animal>.png` by its views file and writes
+    `references/workshop/<animal>/brief.html`: length, height, widest, belly off the ground, head and tail shares
+    (from marks in the views file: picture x of the snout, the back of the head, the tail's base), the top line and
+    belly line drawn over the side view, the main colours; the brief's words come from `<animal>.brief.md` beside the
+    picture (Claude writes it). Numbers also in `measure.json`.
+  - `starter <animal>` cuts a first outline from the picture into `references/outlines/<animal>.json`: the body as
+    slices along its length, each with the side view's top and belly and the top view's width; legs left out (the
+    slice's middle column for the belly and its narrowest column for the width, so legs joined to the body in the
+    picture do not count), for Claude to name, join and add legs to.
+  - `outline <animal>` draws `references/outlines/<animal>.json` over the picture's views (snout right) with fill
+    scores and a difference picture per view (`references/workshop/<animal>/outline.html`), and writes the outline
+    as a picture with its views file for the 3D viewer's Compare.
+  - The outline format: model pixels, x from the tail tip (0) to the snout, y up, z across; a middle part has `side`
+    `[x0, x1, y0, y1]` and `half_width`, any other part `side`, `top`, `front` and `mirror`; `marks` are drawn, not
+    scored.
+  - The monitor's approved outline moved word for word into `references/outlines/monitor.json`;
+    `tools/monitor_models.py` reads its body, neck, head and tail sizes from it (its model, paint and clips proved
+    the same before and after); `tools/monitor_outline.py` and `references/monitor_outline.html` retired.
+  - The box budget: `python tools/body_plan.py boxes` lists every model's boxes, slanted boxes and bones against
+    its kind's budget (my picks: colony insect 250, small animal 150, medium 250, large 400; remains count as their
+    animal). It warns, never fails. Today over: the monitor (665, 265 over) and the crab (248, 98 over).
+  - Checked by a round trip: flat pictures of the 3D monitor (`viewer_shot.py --hash "...&snap=1"`, new: the page
+    puts its own canvas picture beside the score, so the picture and its scale come from one browser run; two runs
+    had laid the page out at different sizes) stitched into a test picture: Compare of the model against them 97 /
+    97, 97 / 100, 96 / 98; the brief read 6.00 blocks long, 1.15 tall, 2.62 wide; the starter's body 91 to 99
+    percent. Bugs found and fixed on the way: the outline page drew the picture snout left under a snout-right
+    outline; the legs' spread was taken for the body's width.
+  - Limits: the starter is a start, not a model (legs, eyes and part names are Claude's); a picture with views that
+    disagree (AI pictures often do) scores lower in the view that is off.
 
 **3. Faster rounds: versions and sliders (was V3 and V2).**
 - Each build keeps a numbered snapshot (the model's data, texture and numbers) in `references/workshop/<animal>/v1,

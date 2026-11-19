@@ -1,7 +1,7 @@
 """The Nile monitor (M9 river life), third start (2026-11-17), its 3D model in plain colours for the model viewer
 (python tools/model_viewer.py monitor).
 
-Built from the user's picture and the agreed flat outline (tools/monitor_outline.py) alone; nothing from the old
+Built from the user's picture and the agreed flat outline (references/outlines/monitor.json) alone; nothing from the old
 models. The user's rule for this one: only some parts need heavy detail. So:
 - The tail, the neck and the face are made close to round: each is a chain of short pieces, every piece a rounded
   cross-section (three overlapping boxes, wide, tall and between, so it reads as round), and the chain is BENT a few
@@ -16,28 +16,35 @@ left is +X; y = 0 is the ground. A rest rotation is given here as a pitch in deg
 far end DOWN for the tail and UP for the neck (see pitch()).
 """
 import copy
+import json
 import math
+from pathlib import Path
 
 from tilapia_models import cube, faces, face_point, png, shade  # noqa: F401 (png for the viewer)
 
 TEXELS = 1.0          # texture pixels a model pixel (plain colours for now)
 
-# --- the outline's numbers (tools/monitor_outline.py), turned into the model's axes: z = 48 - outline x -------------
-BODY_Z = (-26.0, 0.0)          # the body, front to back
-BODY_Y = (6.0, 16.0)           # belly to back
+# --- the outline's numbers (references/outlines/monitor.json, the approved outline; python tools/workshop.py outline
+# monitor draws it), turned into the model's axes: z = HIPS - outline x, the hips where the tail meets the body --------
+_OUTLINE = json.loads((Path(__file__).resolve().parent.parent / "references/outlines/monitor.json").read_text(encoding="utf-8"))
+_PART = {p["name"]: p for p in _OUTLINE["parts"]}
+HIPS = _PART["body"]["side"][0]                                     # 48: the tail is outline x 0 to 48
+BODY_Z = (float(HIPS - _PART["body"]["side"][1]), float(HIPS - _PART["body"]["side"][0]))   # the body, front to back
+BODY_Y = tuple(float(v) for v in _PART["body"]["side"][2:])         # belly to back
 TRUNK_JOINTS = (-17.5, -22.0)  # where the front half's three pieces meet (waist | ribs | chest), back to front
-BODY_HW = 5.0                  # half width
+BODY_HW = float(_PART["body"]["half_width"])                        # half width
 
-TAIL_SEGS, TAIL_LEN = 12, 48.0         # 12 pieces of 4 px
+TAIL_SEGS, TAIL_LEN = 12, float(HIPS)  # 12 pieces of 4 px
 TAIL_AXIS = 11.0                       # the tail's middle line where it leaves the body
 TAIL_R0, TAIL_R1 = 4.6, 0.6            # radius at the base and the tip
 TAIL_LIES = 0.62                       # how far along the tail it is lying on the ground
 
 NECK_SEGS = 2                          # two neck bones, each 4 px of round slices
 NECK_AXIS = 11.5
-NECK_Z0, NECK_LEN = -26.0, 8.0
+NECK_Z0 = float(HIPS - _PART["neck"]["side"][0])
+NECK_LEN = float(_PART["neck"]["side"][1] - _PART["neck"]["side"][0])
 NECK_TURNS = (15.0, 3.0)               # how much each neck bone turns up from the one before (degrees)
-HEAD_LEN = 14.0
+HEAD_LEN = float(_PART["snout"]["side"][1] - _PART["head"]["side"][0])   # head and snout
 HEAD_PITCH = -2.0                      # the head's own angle to level ground, a little nose down (degrees)
 
 
