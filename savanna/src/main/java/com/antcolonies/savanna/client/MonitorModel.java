@@ -1,6 +1,9 @@
 package com.antcolonies.savanna.client;
 
+import com.antcolonies.client.BoneFrames;
+import com.antcolonies.client.DraggedTail;
 import com.antcolonies.entity.body.GroundBend;
+import com.antcolonies.entity.body.TailDrag;
 import com.antcolonies.savanna.SavannaMod;
 import com.antcolonies.savanna.animal.MonitorEntity;
 
@@ -14,6 +17,9 @@ import software.bernie.geckolib.animation.state.BoneSnapshot;
 import software.bernie.geckolib.cache.object.GeoBone;
 import software.bernie.geckolib.model.DefaultedEntityGeoModel;
 
+import java.util.function.Function;
+
+import org.joml.Matrix4f;
 import org.joml.Quaternionf;
 import org.joml.Vector3f;
 
@@ -35,6 +41,11 @@ import org.joml.Vector3f;
  * between its two poses, the swim clip starting only once both pairs are folded ({@link MonitorEntity#swimClip}); and
  * where the forelegs lose the bank over water while the hind legs stand it plays the going-in clip, leaning out and
  * shoving off into the swim ({@link MonitorEntity#entering}).
+ * <p>
+ * Its tail is dragged behind it (the Animal Maker Engine step 2, stage A, 2026-11-19, {@link TailDrag}): walking and
+ * standing on land, each joint is held in the world and pulled after the one in front, so round a turn the tail sweeps
+ * after the body and over a step it drapes from the edge and is pulled up after the hips. The other clips (bask, hiss,
+ * bite, eat, swim, going in, death) keep their own tail with the body's lie as before, eased over.
  */
 public class MonitorModel extends DefaultedEntityGeoModel<MonitorEntity> {
     /** Who it looks at: a player within this many blocks (my pick, a little past the watch goal's reach). */
@@ -74,6 +85,9 @@ public class MonitorModel extends DefaultedEntityGeoModel<MonitorEntity> {
             {{-16.981, -61.241, 1.022}, {121.979, 45.687, 27.192}, {-107.544, -55.625, 158.836}},
             {{56.749, -52.764, -1.292}, {0.0, 0.0, 19.231}, {-56.661, 24.419, -131.013}}};
     private static final String[] PIECES = {"upper", "lower", "foot"};
+    /** The tail, base to tip, dragged ({@link TailDrag}). */
+    private static final DraggedTail TAIL = new DraggedTail("tail1", "tail2", "tail3", "tail4", "tail5", "tail6", "tail7",
+            "tail8", "tail9", "tail10", "tail11", "tail12");
 
     public MonitorModel() {
         super(ResourceLocation.fromNamespaceAndPath(SavannaMod.MODID, "monitor"));
@@ -119,10 +133,12 @@ public class MonitorModel extends DefaultedEntityGeoModel<MonitorEntity> {
             }
         }
         int front = bend.frontPieces();
+        // the tail bends with the body's lie only as far as the drag does not have it (TailDrag; the hand-over eased)
+        double dragged = monitor.tail == null ? 0.0 : monitor.tail.weight();
         for (int i = 0; i < MonitorEntity.BENT_BONES.length; i++) {
             GeoBone bone = getAnimationProcessor().getBone(MonitorEntity.BENT_BONES[i]);
             if (bone != null) {
-                double turn = Math.toRadians(bend.turn(i));
+                double turn = Math.toRadians(bend.turn(i)) * (i > front ? 1.0 - dragged : 1.0);
                 turnBy(bone, (float) (i < front ? turn : -turn));
             }
         }
@@ -137,7 +153,35 @@ public class MonitorModel extends DefaultedEntityGeoModel<MonitorEntity> {
         if (!monitor.isDeadOrDying() && (doing == MonitorEntity.CALM || doing == MonitorEntity.WATCH)) {
             legs(monitor, bend, scale, x, y, z, yaw);
         }
+        tail(monitor, bend, scale, x, y, z, yaw);
         look(monitor, pt, x, z, yaw);
+    }
+
+    /**
+     * The tail dragged behind it ({@link TailDrag}): walking or standing on land (the walk and idle clips) the drag has it;
+     * in the other clips and in the water the clip and the body's lie have it, as before (the engine's step 4 redoes the
+     * water). The frame it hangs from is the hips as the body lies on the ground, lifted with the shoulders, without the
+     * clips' own swing and bob, so on flat ground the tail is exactly the clip's.
+     */
+    private void tail(MonitorEntity monitor, GroundBend bend, double scale, double x, double y, double z, float yaw) {
+        Function<String, GeoBone> bones = getAnimationProcessor()::getBone;
+        GeoBone hips = bones.apply("hips");
+        if (hips == null) {
+            return;
+        }
+        if (monitor.tail == null) {
+            monitor.tail = TAIL.newDrag(bones, MonitorEntity.TAIL_LOWEST);
+            if (monitor.tail == null) {
+                return;
+            }
+        }
+        byte doing = monitor.doing();
+        boolean on = !monitor.isDeadOrDying() && (doing == MonitorEntity.CALM || doing == MonitorEntity.WATCH)
+                && !monitor.isInWater() && !monitor.swimClip() && !monitor.entering();
+        Matrix4f parent = BoneFrames.placement(x, y, z, yaw, scale).translate(0f, (float) (bend.lift() / scale), 0f)
+                .mul(BoneFrames.local(hips, false));
+        TAIL.pose(bones, parent, monitor.tail, TailDrag.Ground.of(monitor.level(), y, monitor.isInWater(), monitor.floatDepth()),
+                scale / 16.0, on, System.nanoTime());
     }
 
     /**

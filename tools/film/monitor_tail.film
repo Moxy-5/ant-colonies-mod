@@ -1,0 +1,72 @@
+# The Nile monitor's dragged tail (the Animal Maker Engine step 2, stage A, 2026-11-19; docs/plans/engine-step2-climb.md):
+# standing on flat ground (the tail as the model has it), with its hips up on a block and its tail lying down over the
+# edge (side on and from behind), its front up a block, its front off a block, and from above walking round a corner
+# (the tail sweeping after the body).
+#   ./gradlew runFilm -PfilmScene=tools/film/monitor_tail.film      pictures in run-film/screenshots/monitor_tail/
+cmd time set noon
+cmd weather clear
+cmd kill @e[type=!player]
+cmd fill 10 -60 -6 16 -60 6 minecraft:stone
+lens 40
+wait 40
+# (the camera's height is its feet: its eye is 1.62 higher)
+# flat: standing on the grass, side on
+camera 3.0 -59.5 -8.0 0 6
+cmd summon antcolonies:monitor 3.0 -60.0 0.0 {NoAI:1b,OwnSize:1.0f,Rotation:[-90f,0f]}
+wait 30
+shot flat_side
+cmd tp @e[type=antcolonies:monitor] 0 -120 0
+wait 10
+# its hips just up on the block (its west face at x 10), the tail's base over the edge, the tail lying down over it
+camera 10.0 -59.5 -8.0 0 6
+cmd summon antcolonies:monitor 11.0 -59.0 0.0 {NoAI:1b,OwnSize:1.0f,Rotation:[-90f,0f]}
+wait 30
+shot hips_up_side
+camera 6.5 -59.0 -3.5 -45 15
+wait 5
+shot hips_up_behind
+cmd tp @e[type=antcolonies:monitor] 0 -120 0
+wait 10
+# farther up: the tail's base a block past the edge, its back half lying on top
+camera 11.0 -59.5 -8.0 0 6
+cmd summon antcolonies:monitor 12.2 -59.0 0.0 {NoAI:1b,OwnSize:1.0f,Rotation:[-90f,0f]}
+wait 30
+shot hips_on_side
+cmd tp @e[type=antcolonies:monitor] 0 -120 0
+wait 10
+# its front up on the block, its back below: the tail on the grass as on flat ground
+camera 8.5 -59.5 -8.0 0 6
+cmd summon antcolonies:monitor 8.4 -60.0 0.0 {NoAI:1b,OwnSize:1.0f,Rotation:[-90f,0f]}
+wait 30
+shot front_up_side
+cmd tp @e[type=antcolonies:monitor] 0 -120 0
+wait 10
+# its front off the block's east edge (x 17), its back and tail on top
+camera 16.0 -59.0 -8.0 0 6
+cmd summon antcolonies:monitor 16.2 -59.0 0.0 {NoAI:1b,OwnSize:1.0f,Rotation:[-90f,0f]}
+wait 30
+shot front_off_side
+cmd tp @e[type=antcolonies:monitor] 0 -120 0
+wait 10
+# walking round a corner, from above: the tail sweeps after the body and eases straight
+walker antcolonies:monitor -6.5 -60 -4.5 -90 OwnSize:1.0f,HungryIn:99999,SunIn:99999
+follow 0 7 -1 0 75
+cmd tick unfreeze
+go 2 -60 -5 0.8
+wait 140
+shot turn_00
+go 2 -60 4 0.8
+wait 12
+shot turn_01
+wait 12
+shot turn_02
+wait 12
+shot turn_03
+wait 12
+shot turn_04
+wait 20
+shot turn_05
+wait 40
+shot turn_06
+wait 60
+shot turn_07

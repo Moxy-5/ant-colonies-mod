@@ -10,6 +10,7 @@ import com.antcolonies.animal.HasLife;
 import com.antcolonies.animal.SeekMateGoal;
 
 import com.antcolonies.entity.body.GroundBend;
+import com.antcolonies.entity.body.TailDrag;
 import com.antcolonies.savanna.block.CrabShellBlock;
 import com.antcolonies.savanna.registry.SavannaItems;
 
@@ -156,6 +157,24 @@ public class MonitorEntity extends PathfinderMob implements GeoEntity, HasLife {
     /** How much each leg pair stands now (1) or is folded back along the body as it swims (0), eased; drawing only (MonitorModel). */
     public final double[] legStand = {1, 1};
     public long legNanos;
+    /**
+     * Its tail dragged behind it (the Animal Maker Engine step 2, stage A, 2026-11-19; {@link TailDrag}); drawing only,
+     * made by {@code MonitorModel} on first draw (it reads the model's rest pose).
+     */
+    @Nullable
+    public TailDrag tail;
+    /**
+     * The least each tail joint lies over the ground, base to tip (model pixels): the tail's own thickness there and a
+     * little, as the model's lying tail has it ({@code tail_radius} and {@code tail_height} in {@code tools/monitor_models.py},
+     * 4.6 px at the base to 0.6 at the tip, 0.25 clear; kept in step with it by hand).
+     */
+    public static final double[] TAIL_LOWEST = new double[12];
+
+    static {
+        for (int i = 0; i < TAIL_LOWEST.length; i++) {
+            TAIL_LOWEST[i] = 4.6 + (0.6 - 4.6) * (i + 1) / TAIL_LOWEST.length + 0.25;
+        }
+    }
     /**
      * Both leg pairs are folded this far (stand under this) before the swim clip plays (2026-11-18, the user's report: going
      * into the water the hind legs swung up over the back for a moment). Until then the walk or idle clip plays and the
