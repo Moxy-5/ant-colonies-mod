@@ -121,17 +121,34 @@ following its own path.
    comes first so fixes target what is really there.
 
 ## Body families (built when each first animal arrives)
-| Family | Animals planned or asked about | Reuses | New for it |
-|---|---|---|---|
-| Sprawling four legs | Nile monitor, crocodile | everything below starts here | the S-curve of the back, legs folding to swim |
-| Legless | snakes | the body following its head's path, the steady head | a sideways wave; almost nothing else |
-| Eight legs | king baboon spider | the insect leg engine (feet planted, walls) | the engine freed from the ant class (G1); 8 legs instead of 6 |
-| Upright four legs | lion, African elephant | spine, steady head, ground bend, checks | legs of more joints bending the right way (A1), gaits from real numbers (A2): the elephant's walk, the lion's trot and gallop with all feet off the ground (new for the engine) |
-| Elephant extras | African elephant | the bending, following chain (the tail's) | the trunk on that chain, ear flaps, looking heavy |
-| Two legs and wings | birds | two-legged walk (A1), steady head | the head bob; flight, its own job, with the first bird |
+Every animal on the master list (`docs/LIVING-THINGS.md`, looked over 2026-11-19 for this) fits one of these families.
+The engine is designed for the whole list from the start (nothing in it may assume four legs, one tail or a short
+body), but each family's own piece is built only with its first animal.
 
-Hardest, as far as known now: bird flight and the lion's gallop (moments with no feet down, new to the engine).
-Cheapest: the snake and the spider.
+| Family | Animals on the list | Reuses | New for it |
+|---|---|---|---|
+| Sprawling four legs | Nile monitor, crocodile, helmeted terrapin, flap-necked chameleon (desert: horned lizard) | everything starts here (phase 1) | the S-curve of the back, legs folding to swim; the terrapin's shell is a back that does not bend; the chameleon's slow rocking walk, gripping feet on branches, eyes turning each on its own, the shooting tongue |
+| Legless | black mamba, pythons | the body following its head's path, the steady head | a sideways wave; climbing and coiling later; almost nothing else |
+| Many legs on a long body | giant African millipede (the user, 2026-11-19), centipedes | the body following its path (as the snake), the insect leg engine for the legs | dozens of legs in waves along the body (in real millipedes the waves run forward along the body, centipedes' run back; to check when built), and the millipede **curling into a tight coil when touched**: the follow-the-path chain wound into a spiral and unwound again |
+| Six legs (the insect engine today) | African dung beetle, giant devil's flower mantis, antlion larvae, spider wasp, bees and mud wasps on foot | the whole insect engine | freed from the ant class (G1); the dung beetle walking backward on its front legs with its hind legs on the ball; the mantis's strike |
+| Eight legs | king baboon spider, sun spider, both scorpions, savanna whipspider | the insect leg engine (feet planted, walls) | 8 legs (G1); the sun spider's feeler legs held up front, the scorpion's pincers and tail held over the back, the whipspider's long feeling legs |
+| Upright four legs | lion, cheetah, leopard, hyena, wild dog, honey badger, meerkat, aardvark, aardwolf, pangolin, elephant, giraffe, rhino, zebra, warthog, hippo, antelope, buffalo, clawless otter | spine, steady head, ground bend, checks | legs of more joints bending the right way (A1); gaits from real numbers (A2): walk, trot, gallop with all feet off the ground (new to the engine), the giraffe's pace (both legs of a side together); the cheetah's flexing sprint |
+| Upright four legs, extras | elephant, giraffe, meerkat, pangolin, warthog, otter | the bending, following chain (the tail's) | the elephant's trunk on that chain, ear flaps, looking heavy; the giraffe's long neck; the meerkat sitting up on guard and the pangolin walking on its hind legs (both lean on the two-legs piece); the pangolin rolling into a ball (as the millipede's coil); the warthog kneeling; the otter swimming |
+| Two legs | ostrich, secretarybird (birds on the ground) | the two-legged walk (A1), the steady head | the head bob; the ostrich's run; the secretarybird's stamp |
+| Fliers | every bird, bees, wasps, termite alates (M9.5), butterflies | the steady head, the checks | flight, its own job with the first flier: wingbeats, gliding, soaring (the martial eagle), the stoop |
+| Hoppers | giant bullfrog, foam-nest tree frog, snake-necked frog | the checks, swimming from the fish | the hop and landing, swimming with the hind legs |
+| Fish | tilapia and catfish (built, outside the engine today), tigerfish, electric catfish, bull shark, lungfish, killifish | the sideways wave of the snake, in water | bringing the built fish into the engine's checks; the tigerfish's leap; the lungfish curled in its mud cocoon |
+| Shells | river snail (built), giant African land snail | little; the checks | the foot's glide, the eye stalks |
+
+Hardest, as far as known now: flight and the gallop (moments with no feet down, new to the engine) and the many-legged
+body with its coil. Cheapest: the snake (once the monitor's path-following body exists) and the eight-legged ones
+(once the insect engine is freed from the ant class). The millipede is the snake's body plus the insect engine's legs,
+so it comes cheap once both are there.
+
+**Size scale, an open call the engine meets (`docs/DESIGN.md`, "The animal kit"):** animals are drawn a block a metre,
+insects at 1 block = 30 mm. Small creatures that meet the insects body to body (the millipede about 30 cm, scorpions,
+spiders, centipedes, frogs) are tiny at a block a metre, smaller than some ants. This decides how big their legs and
+steps are for the checks; to settle with the user before the first small creature.
 
 ## The plan
 **Phase 1: the monitor, the engine's first animal.** Each step builds the shared version, not a monitor-only one.
@@ -141,11 +158,15 @@ Cheapest: the snake and the spider.
    tail tip height over time. Course scenes filmed every tick: a one-block step up, a step down, a level bank into
    deep water, a bank a block above the water, a gentle shallow slope, a scared dash in, swimming out onto a bank, a
    turn round on land. Run on today's monitor and crocodile: **a baseline report**, the findings above confirmed or
-   dropped and ranked by size. Nothing about the looks changes in this step.
+   dropped and ranked by size. Nothing about the looks changes in this step. Built for the whole list: the checks
+   take the legs, feet and body chain from each model's body plan (any number of legs, none for a snake, dozens for
+   the millipede), never from a four-legged layout.
 2. **The body follows its path (shared, review A3).** One framework rule in place of the pile above: the body's
    joints are placed in the world along the path the head took, never through the ground, eased as places in the world
    (not angles against the box). Fixes the step pops, turning on the spot and going in head first, from one rule. The
-   crocodile moves to it too. The rules it replaces are removed, not kept beside it.
+   crocodile moves to it too. The rules it replaces are removed, not kept beside it. Built for any chain length (the
+   snake and the millipede are long chains of this; the millipede's coil winds the same chain up), and cheap enough
+   for many animals on screen.
 3. **The back curves sideways.** The `walk` and `swim` clips swing shoulders and hips opposite ways across the three
    trunk pieces (`tools/monitor_models.py`), the S-curve; the lab's checks extended to four legs and a tail (K5).
 4. **Smooth water entry.** The `enter` clip and its start rule go; legs and tail blend from walking to swimming by
@@ -160,6 +181,10 @@ course scenes added. The review's ideas come in with the animal that needs them:
 that needs the insect engine or the live layer, A1 and A2 with the first upright four-legged one, flight with the
 first bird, K1 and K6 as soon as clip making feels slow.
 
-## Open calls for the user
-- Whether step 1 is built shared (my pick) or monitor only first.
-- Which animal after the monitor (decides which family is built next).
+## Decisions and open calls
+- **Decided (the user, 2026-11-19):** step 1 is built as the shared version for every animal. Not started yet: the
+  user starts it (waiting for their quota to reset).
+- **Decided (the user, 2026-11-19):** the giant African millipede and the rest of the master list are part of the
+  engine's design from the start (the families table above).
+- Open: which animal after the monitor (decides which family is built next).
+- Open: the size scale for small creatures (above).
