@@ -120,6 +120,28 @@ Regrouped 2026-11-19 at the user's ask (fewer, bigger steps): the small pieces r
   maker). The user drags and reads off the numbers; Claude writes them into the maker, so the game's model is still
   made and checked the same way. Sliders only on models that need them.
 
+- **BUILT 2026-11-19** (branch `claude/viewer-foundation`), the monitor first:
+  - `python tools/workshop.py snapshot <animal> --note "..."` keeps the model as the game would get it (bones,
+    texture, boxes, the slider numbers, the note and date) as the next version in
+    `references/workshop/<animal>/versions/v<n>/` (kept in git, about 250 KB each, so a deleted worktree loses none;
+    nothing kept when nothing changed). v1 of the monitor is the approved one.
+  - `python tools/workshop.py versions <animal>` builds `references/workshop/<animal>/versions.html`: version A, and
+    a version B shown nose to tail beside it, laid over it in see-through blue, or mixed part by part (head, neck,
+    body, tail, front legs, hind legs: each from A or B; a part sits where its own version put it). The page lists
+    the slider numbers that differ between A and B, has camera buttons and Compare (with Compare on, only A or the
+    mix is measured and seen).
+  - `python tools/workshop.py serve <animal>` serves the same page at `http://localhost:8790/` (this computer only)
+    with live shape sliders: each move reruns the maker with that number (0.2 s for the monitor) and shows it as
+    "Sliders now"; "Keep as a new version" saves it with a note. The user reads off the numbers or names the version;
+    Claude writes them into the maker, so the game's model is still made and checked the same way.
+  - A maker joins in by having `workshop_look()`, `WORKSHOP_SHAPE` (the slider numbers: only ones the maker reads
+    when it runs) and `WORKSHOP_PARTS` in `tools/<animal>_models.py`. The monitor's sliders (my picks): head length,
+    neck length, neck lift, head tilt, tail length, tail thickness at the hips, where the tail reaches the ground.
+    The monitor's model and paint proved unchanged.
+  - Parts are named in the maker (the monitor has no body plan); a model with a body plan can name them by its roles.
+  - Checked in the browser pane with the helper running: sliders rebuild, B over A, mix (head from B: 119 of 665
+    boxes swapped), Compare with B stepped out (same score as A alone), keeping a version, phone width.
+
 **4. The parts library, growing with each animal (was V5's part makers).** Approved parts become reusable makers with
 settings (length, thickness, toe count): the monitor's round legs, clawed feet, tail chain, jaw with teeth and mouth
 inside, eyes with lids; the crocodile's parts; later heads, necks, wings. They live in one shared library with the one

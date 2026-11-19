@@ -1,10 +1,14 @@
-"""The model workshop, step 2: from the user's inspiration picture to the brief and the outline
-(docs/plans/model-workshop.md, built 2026-11-19).
+"""The model workshop, steps 2 and 3: from the user's inspiration picture to the brief and the outline; numbered
+versions and shape sliders (docs/plans/model-workshop.md, built 2026-11-19).
 
     python tools/workshop.py brief <animal>     measure the picture, build the one-page brief
     python tools/workshop.py starter <animal>   a first outline cut from the picture (only if none exists; --force)
     python tools/workshop.py outline <animal>   the outline over the picture's views with fill scores, and the outline
                                                 as a picture for the 3D viewer's Compare
+    python tools/workshop.py snapshot <animal> --note "longer neck"   keep the model as it is now as the next version
+    python tools/workshop.py versions <animal>  the versions page (references/workshop/<animal>/versions.html): one
+                                                version or two side by side, one over the other, parts mixed, Compare
+    python tools/workshop.py serve <animal>     the same page with live shape sliders, at http://localhost:8790/
 
 The picture is references/inspiration/<animal>.png with its views file beside it (<animal>.views.json, written by
 Claude after looking at the picture; its format is in tools/viewer_page.py). The views file may also hold "marks":
@@ -527,12 +531,187 @@ def outline_picture(animal, outline, scale=10):
     print("wrote", out.relative_to(ROOT), "and its views file (Compare in the 3D viewer)")
 
 
+# --- step 3: versions and sliders --------------------------------------------------------------------------------
+# A maker is tools/<animal>_models.py with workshop_look() (bones, PNG bytes, texture width, height), WORKSHOP_SHAPE
+# (the slider numbers: name in the file, NAME[i] for a tuple's item, label, low, high, step) and WORKSHOP_PARTS (part
+# name: its first bones). Versions are references/workshop/<animal>/versions/v<n>/ (look.json, texture.png,
+# info.json: the note, the date, the boxes and the shape numbers), kept in git so a deleted worktree loses none.
+PORT = 8790
+import threading  # noqa: E402
+_MAKER_LOCK = threading.Lock()      # the helper may get two asks at once; the maker is one module with one set of numbers
+
+
+def maker(animal, numbers=None):
+    """The animal's maker module, freshly loaded, with these shape numbers set ({name: value}) if given."""
+    import importlib
+    name = f"{animal}_models"
+    mod = importlib.reload(sys.modules[name]) if name in sys.modules else importlib.import_module(name)
+    for key, value in (numbers or {}).items():
+        set_shape(mod, key, value)
+    return mod
+
+
+def _split(key):
+    if key.endswith("]"):
+        name, i = key[:-1].split("[")
+        return name, int(i)
+    return key, None
+
+
+def get_shape(mod, key):
+    name, i = _split(key)
+    v = getattr(mod, name)
+    return v[i] if i is not None else v
+
+
+def set_shape(mod, key, value):
+    name, i = _split(key)
+    if not any(row[0] == key for row in getattr(mod, "WORKSHOP_SHAPE", [])):
+        raise ValueError(f"{key} is not one of the maker's slider numbers")
+    if i is None:
+        setattr(mod, name, float(value))
+    else:
+        v = list(getattr(mod, name)); v[i] = float(value); setattr(mod, name, tuple(v))
+
+
+def make(animal, numbers=None):
+    """The model with these shape numbers: {bones, texture (data uri), w, h, boxes, numbers}; the png bytes too."""
+    with _MAKER_LOCK:
+        mod = maker(animal, numbers)
+        bones, png_bytes, w, h = mod.workshop_look()
+        shape = {row[0]: round(float(get_shape(mod, row[0])), 4) for row in getattr(mod, "WORKSHOP_SHAPE", [])}
+        maker(animal)                                   # back to the file's own numbers
+    look = {"bones": bones, "texture": "data:image/png;base64," + base64.b64encode(png_bytes).decode(), "w": w, "h": h,
+            "boxes": sum(len(b.get("cubes", [])) for b in bones), "numbers": shape}
+    return look, png_bytes
+
+
+def versions_dir(animal):
+    return WORKSHOP / animal / "versions"
+
+
+def versions(animal):
+    """Every kept version, oldest first: (key, folder)."""
+    d = versions_dir(animal)
+    found = [(int(f.name[1:]), f) for f in d.glob("v*") if f.is_dir() and f.name[1:].isdigit()] if d.is_dir() else []
+    return [(f"v{n}", f) for n, f in sorted(found)]
+
+
+def snapshot(animal, note="", numbers=None):
+    """Keeps the model as it is now (with these shape numbers, if given) as the next version; returns its key, or the
+    newest version's key when nothing changed since it."""
+    look, png_bytes = make(animal, numbers)
+    shape = look.pop("numbers"); boxes = look.pop("boxes"); look.pop("texture")
+    body = json.dumps(look, sort_keys=True)
+    have = versions(animal)
+    if have:
+        key, last = have[-1]
+        if (last / "look.json").read_text(encoding="utf-8") == body and (last / "texture.png").read_bytes() == png_bytes:
+            print(f"no change since {key}; nothing kept")
+            return key
+    n = int(have[-1][0][1:]) + 1 if have else 1
+    out = versions_dir(animal) / f"v{n}"
+    out.mkdir(parents=True)
+    (out / "look.json").write_text(body, encoding="utf-8")
+    (out / "texture.png").write_bytes(png_bytes)
+    import datetime
+    info = {"note": note or ("as it was when versions began" if n == 1 else ""), "date": datetime.date.today().isoformat(),
+            "boxes": boxes, "numbers": shape}
+    (out / "info.json").write_text(json.dumps(info, indent=1) + "\n", encoding="utf-8")
+    print(f"kept {animal} v{n} ({boxes} boxes){': ' + note if note else ''}  -> {out.relative_to(ROOT)}")
+    return f"v{n}"
+
+
+def versions_data(animal, live=False):
+    if not versions(animal):
+        snapshot(animal)
+    mod = maker(animal)
+    out = []
+    for key, folder in versions(animal):
+        look = json.loads((folder / "look.json").read_text(encoding="utf-8"))
+        look["texture"] = "data:image/png;base64," + base64.b64encode((folder / "texture.png").read_bytes()).decode()
+        info = json.loads((folder / "info.json").read_text(encoding="utf-8"))
+        out.append({"key": key, **info, "look": look})
+    return {"animal": animal, "title": animal.replace("_", " ").title(), "live": live, "port": PORT,
+            "versions": out,
+            "shape": [{"key": k, "label": label, "min": lo, "max": hi, "step": step}
+                      for k, label, lo, hi, step in getattr(mod, "WORKSHOP_SHAPE", [])],
+            "parts": getattr(mod, "WORKSHOP_PARTS", {}),
+            "pictures": viewer_page.pictures((f"references/inspiration/{animal}", "picture", "Your picture"),
+                                             (f"references/outlines/{animal}", "outline", "The approved outline"))}
+
+
+def versions_page(animal, live=False):
+    out = WORKSHOP / animal / "versions.html"
+    viewer_page.build("versions_viewer.template.html", versions_data(animal, live), out)
+    return out
+
+
+def serve(animal, port=PORT):
+    """The versions page with live sliders: a tiny web server on this computer only (127.0.0.1), which reruns the
+    maker with the sliders' numbers and keeps a version when asked. Stop it with Ctrl+C."""
+    from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+    from urllib.parse import parse_qsl, urlparse
+
+    class Helper(BaseHTTPRequestHandler):
+        def reply(self, code, kind, body):
+            data = body.encode("utf-8") if isinstance(body, str) else body
+            self.send_response(code)
+            self.send_header("Content-Type", kind); self.send_header("Content-Length", str(len(data)))
+            self.send_header("Cache-Control", "no-store")
+            self.end_headers(); self.wfile.write(data)
+
+        def do_GET(self):
+            url = urlparse(self.path)
+            try:
+                if url.path in ("/", "/index.html"):
+                    self.reply(200, "text/html; charset=utf-8", versions_page(animal, live=True).read_bytes())
+                elif url.path == "/make":
+                    look, _ = make(animal, dict(parse_qsl(url.query)))
+                    self.reply(200, "application/json", json.dumps(look))
+                else:
+                    self.reply(404, "text/plain", "not here")
+            except Exception as e:                       # a bad number: say so in the page, keep serving
+                self.reply(400, "text/plain; charset=utf-8", f"{type(e).__name__}: {e}")
+
+        def do_POST(self):
+            try:
+                if urlparse(self.path).path != "/keep":
+                    return self.reply(404, "text/plain", "not here")
+                ask = json.loads(self.rfile.read(int(self.headers.get("Content-Length", 0))) or b"{}")
+                key = snapshot(animal, str(ask.get("note", ""))[:300], ask.get("numbers") or None)
+                self.reply(200, "application/json", json.dumps({"key": key}))
+            except Exception as e:
+                self.reply(400, "text/plain; charset=utf-8", f"{type(e).__name__}: {e}")
+
+        def log_message(self, *a):
+            pass
+
+    server = ThreadingHTTPServer(("127.0.0.1", port), Helper)
+    print(f"{animal} versions with sliders: open http://localhost:{port}/   (Ctrl+C stops it)")
+    try:
+        server.serve_forever()
+    except KeyboardInterrupt:
+        pass
+
+
 def main():
-    args = [a for a in sys.argv[1:] if not a.startswith("--")]
-    if len(args) != 2 or args[0] not in ("brief", "starter", "outline"):
+    argv = sys.argv[1:]
+    note = ""
+    if "--note" in argv:                                   # snapshot <animal> --note "what changed"
+        i = argv.index("--note"); note = argv[i + 1] if i + 1 < len(argv) else ""; del argv[i:i + 2]
+    args = [a for a in argv if not a.startswith("--")]
+    if len(args) != 2 or args[0] not in ("brief", "starter", "outline", "snapshot", "versions", "serve"):
         raise SystemExit(__doc__.split("\n\n")[1])
     cmd, animal = args
-    if cmd == "brief":
+    if cmd == "snapshot":
+        snapshot(animal, note)
+        print("wrote", versions_page(animal).relative_to(ROOT))
+    elif cmd == "versions":
+        print("wrote", versions_page(animal).relative_to(ROOT))
+    elif cmd == "serve":
+        serve(animal)
+    elif cmd == "brief":
         m = brief_page(animal)
         print(json.dumps({k: v for k, v in m.items() if not k.endswith("profile") and k != "views"}, indent=1))
     elif cmd == "starter":

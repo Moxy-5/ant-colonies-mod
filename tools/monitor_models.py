@@ -485,6 +485,31 @@ def model():
     return body() + neck() + head() + tail() + legs()
 
 
+# --- the model workshop (docs/plans/model-workshop.md, step 3): versions and sliders ----------------------------------
+# The shape numbers the versions page shows a slider for (python tools/workshop.py serve monitor): the name of the
+# number in this file (a tuple's item as NAME[i]), its label, lowest, highest and step. Only numbers the makers read
+# when they run (not ones worked out from others at the top of the file), so moving one rebuilds the model fully.
+WORKSHOP_SHAPE = [
+    ('HEAD_LEN', 'Head length (model pixels)', 10, 20, 0.5),
+    ('NECK_LEN', 'Neck length (model pixels)', 4, 14, 0.5),
+    ('NECK_TURNS[0]', 'Neck lift at the shoulders (degrees)', 0, 30, 1),
+    ('HEAD_PITCH', 'Head tilt, minus is nose down (degrees)', -10, 10, 0.5),
+    ('TAIL_LEN', 'Tail length (model pixels)', 32, 64, 1),
+    ('TAIL_R0', 'Tail thickness at the hips (model pixels)', 3, 6, 0.1),
+    ('TAIL_LIES', 'Where the tail reaches the ground (share of its length)', 0.3, 0.9, 0.01),
+]
+# The parts the versions page can take from one version or the other: each part is its bones and everything below
+# them, down to the next part's first bone.
+WORKSHOP_PARTS = {'head': ['head'], 'neck': ['neck1'], 'body': ['body'], 'tail': ['tail1'],
+                  'front legs': ['arm_upper_left', 'arm_upper_right'], 'hind legs': ['leg_upper_left', 'leg_upper_right']}
+
+
+def workshop_look():
+    """The model as the game has it (painted), for the workshop: bones, PNG bytes, texture width and height."""
+    bones, rows, w, h = paint(model(), GAME_LOOK)
+    return bones, png(rows), w, h
+
+
 # --- the paint (step 3) --------------------------------------------------------------------------------------------
 # Every texture pixel is coloured from where it lies on the model (each piece's own straight-out position: the tail laid
 # straight back, the legs straight out and down), so a spot or band carries across the overlapping boxes of a round

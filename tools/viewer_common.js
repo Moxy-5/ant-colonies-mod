@@ -56,8 +56,10 @@ const Viewer = (() => {
 
   // look = {bones, texture, w, h}. Returns a group (yaw) holding the model centred over x and z, feet at y = 0, at
   // 1/16 scale (a model pixel to a block's sixteenth); its userData has the bone groups, the meshes, its length along
-  // the model's own z and its height. Every mesh is also on layer 1, which the fill score draws alone.
-  function buildModel(look, scene) {
+  // the model's own z and its height. Every mesh is also on layer 1, which the fill score draws alone, and knows its
+  // bone (userData.bone). opts.centre ([x, z] in blocks, another model's userData.centre) centres it there instead,
+  // so two versions of one model line up piece for piece.
+  function buildModel(look, scene, opts = {}) {
     const mat = new THREE.MeshLambertMaterial({map: loadTexture(look.texture), alphaTest: 0.5});
     const root = new THREE.Group(), groups = {}, byName = {}, meshes = [];
     look.bones.forEach(b => byName[b.name] = b);
@@ -71,7 +73,7 @@ const Viewer = (() => {
       const tint = new THREE.MeshLambertMaterial({color: TINTS[bi % TINTS.length]});
       (b.cubes || []).forEach(c => {
         const mesh = new THREE.Mesh(boxGeometry(c, look.w, look.h), mat);
-        mesh.userData = {mat, tint};
+        mesh.userData = {mat, tint, bone: b.name};
         mesh.castShadow = true; mesh.receiveShadow = true;
         mesh.layers.enable(1);
         mesh.position.set(c.origin[0] + c.size[0] / 2 - b.pivot[0], c.origin[1] + c.size[1] / 2 - b.pivot[1],
@@ -83,9 +85,12 @@ const Viewer = (() => {
     root.scale.setScalar(1 / 16);
     const bounds = new THREE.Box3().setFromObject(root);
     const c = bounds.getCenter(new THREE.Vector3());
-    root.position.set(-c.x, 0, -c.z);
+    const centre = opts.centre || [c.x, c.z];
+    root.position.set(-centre[0], 0, -centre[1]);
     const yaw = new THREE.Group(); yaw.add(root);
-    yaw.userData = {groups, meshes, length: bounds.max.z - bounds.min.z, height: bounds.max.y};
+    const parents = {};
+    look.bones.forEach(b => parents[b.name] = b.parent || null);
+    yaw.userData = {groups, meshes, parents, centre, length: bounds.max.z - bounds.min.z, height: bounds.max.y};
     scene.add(yaw);
     return yaw;
   }
