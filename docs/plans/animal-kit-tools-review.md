@@ -244,8 +244,8 @@ to the jaws at every key through the same solver. Python's profiler on the walks
 # Part 2: FASTER TO MAKE, the models and looks
 
 **Moved (2026-11-19, the user's OK):** V1 to V6 are merged into the model workshop plan,
-`docs/plans/model-workshop.md`, which is now the one plan for them (V4 its step 0, V1 step 1, V5 steps 4 and 8, V3
-step 5, V2 step 6, V6 step 7). Kept below as written for the record; build from the workshop plan.
+`docs/plans/model-workshop.md`, which is now the one plan for them (V4 and V1 its step 1, V5's loft and V6
+step 2, V3 and V2 step 3, V5's part makers step 4). Kept below as written for the record; build from the workshop plan.
 
 ### V1. The photo outline behind the model (from the M9.4 ideas in `docs/DESIGN.md`)
 - **What today:** the user's photos are looked at by me and turned into numbers by eye; the user compares the page

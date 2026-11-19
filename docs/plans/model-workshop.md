@@ -33,54 +33,50 @@ goes back to the stage it belongs to: "the head is too small" fixes the outline,
   (`tools/monitor_models.py`, 1,182 lines) was then written again to match it by hand.
 - PIL (Python's picture library) is installed; numpy is not (not needed).
 
-### The steps, in order (about one session for 0 to 3, as before)
-**0. One shared viewer script, working offline (was V4).** One `tools/viewer_common.js` with the model builder, the
-ground and real-size block grid, lights, the cameras (step 1), Compare (step 1) and versions (step 5); a copy of
-three.js r128 kept in `tools/` and put into each page when it is built, so pages open with no internet; one Python
-helper for "build a page from a template and its data" that every page function uses. New pages use it from now on;
-an old page moves over only when it is next worked on (no big rewrite). Done when: the monitor page is rebuilt on it
-and looks the same.
+### The steps, in order (four steps; 1 and 2 together about one session, as before)
+Regrouped 2026-11-19 at the user's ask (fewer, bigger steps): the small pieces ride with the step they belong to.
 
-**1. Side, top and front views and Compare (was V1).** Buttons for flat side, top and front views with an
-orthographic camera (everything drawn at its true size, no perspective), the picture's matching view behind or beside
-the model at the same scale, a see-through slider, and a **fill score** per view: the share of the picture's outline
-the model covers and the share of the model inside the picture's outline (both 100 percent is a perfect match). The
-scale comes from the length the user writes on the picture.
+**1. The viewer foundation: shared, offline, Compare, self-check (was V4 and V1).**
+- One `tools/viewer_common.js` with the model builder, the ground and real-size block grid, lights and cameras; a copy
+  of three.js r128 kept in `tools/` and put into each page when it is built, so pages open with no internet; one
+  Python helper for "build a page from a template and its data" that every page function uses. New pages use it from
+  now on; an old page moves over only when it is next worked on (no big rewrite).
+- Buttons for flat side, top and front views with an orthographic camera (everything drawn at its true size, no
+  perspective), the picture's matching view behind or beside the model at the same scale, a see-through slider, and a
+  **fill score** per view: the share of the picture's outline the model covers and the share of the model inside the
+  picture's outline (both 100 percent is a perfect match). The scale comes from the length the user writes on the
+  picture.
+- A small script (`tools/viewer_shot.py`) opens a page with Edge's built-in headless mode (comes with Windows, nothing
+  to install) and saves pictures of the Compare views, chosen by the page's address (for example `#compare=side`),
+  with the fill scores. Claude looks at these and fixes what is off before showing the user.
+- Done when: the monitor page is rebuilt on it, looks the same, and its Compare shots come out against the monitor's
+  picture.
 
-**2. Claude checks its own pages.** A small script (`tools/viewer_shot.py`) opens a page with Edge's built-in
-headless mode (comes with Windows, nothing to install) and saves pictures of the Compare views, chosen by the page's
-address (for example `#compare=side`), with the fill scores. Claude looks at these and fixes what is off before
-showing the user, so fewer bad rounds reach the user.
+**2. Picture to outline: the brief and an outline the 3D shape is built from (was V5's loft, V6).**
+- The picture goes in `references/inspiration/<animal>.png`. A script finds each shape on the plain background; which
+  shape is which view is written once by Claude in a tiny file beside it (`<animal>.views.json`: the box of each view
+  and the length in blocks), as a script cannot reliably tell a side view from a top view. The posed picture is for
+  the look only, never measured. The script cuts each view's outline, measures it (length against height and width,
+  head length, how high the legs hold the body, the tail's share of the length) and takes the colours.
+- Claude writes the one-page brief: length in blocks, cube size (the pixel grid), the key features, and the **box
+  budget** (per family and size: an animal a block or more long may earn more boxes than an ant; a herd of 10 should
+  cost no more than 50 ants); `body_plan.py check` reports each model's boxes, slanted boxes and bones against it. The
+  user OKs the brief; "too chunky" or "too slim" is caught here, before any model.
+- The outline stage generalises `monitor_outline.py`: the parts' boxes in side, top and front, over the picture's
+  views with their fill scores. The approved outline is saved as data (`references/outlines/<animal>.json`, model
+  pixels, part names from the body plan) and the 3D maker reads it, so the body is a stack of boxes following the
+  outline from the start. A shape change is made in one place and flows on; no retyping.
 
-**3. Picture in, one-page brief out (about 10 minutes).** The picture goes in `references/inspiration/<animal>.png`.
-A script finds each shape on the plain background; which shape is which view is written once by Claude in a tiny file
-beside it (`references/inspiration/<animal>.views.json`: the box of each view and the length in blocks), as a script
-cannot reliably tell a side view from a top view. The posed picture is for the look only, never measured. The script
-cuts each view's outline, measures it (length against height and width, head length, how high the legs hold the body,
-the tail's share of the length) and takes the colours. Claude writes the brief: length in blocks, cube size (the
-pixel grid), the box budget (step 7), the key features. The user OKs it; "too chunky" or "too slim" is caught here,
-before any model.
+**3. Faster rounds: versions and sliders (was V3 and V2).**
+- Each build keeps a numbered snapshot (the model's data, texture and numbers) in `references/workshop/<animal>/v1,
+  v2, ...`, not in git commits; the viewer switches between them or shows two side by side. Parts are named by the
+  body plan's role names, so "v3's head with v7's body" can be picked.
+- Each maker marks its main shape numbers (head length, leg length, tail length, body depth); the page shows a slider
+  for each and rebuilds the model as it moves (simplest form first: the page asks a tiny local helper to rerun the
+  maker). The user drags and reads off the numbers; Claude writes them into the maker, so the game's model is still
+  made and checked the same way. Sliders only on models that need them.
 
-**4. An outline that feeds the 3D shape (was V5's loft, first half).** The outline stage generalises
-`monitor_outline.py`: the parts' boxes in side, top and front, drawn over the picture's views with their fill scores.
-The approved outline is saved as data (`references/outlines/<animal>.json`, model pixels, part names from the body
-plan) and the 3D maker reads it, so the body is a stack of boxes following the outline from the start. A change to
-the shape is made in one place and flows on to the later stages; no retyping.
-
-**5. Every version kept (was V3).** Each build keeps a numbered snapshot (the model's data, texture and numbers) in
-`references/workshop/<animal>/v1, v2, ...`, not in git commits; the viewer switches between them or shows two side by
-side. Parts are named by the body plan's role names, so "v3's head with v7's body" can be picked.
-
-**6. Sliders for the main shape numbers (was V2), when a model needs them.** Each maker marks its main shape numbers
-(head length, leg length, tail length, body depth); the page shows a slider for each and rebuilds the model as it
-moves. The user drags and reads off the numbers; Claude writes them into the maker, so the game's model is still made
-and checked the same way. Simplest form first: the page asks a tiny local helper to rerun the maker.
-
-**7. A box budget (was V6).** `body_plan.py check` reports each model's boxes, slanted boxes and bones against a
-budget per family and size (an animal a block or more long may earn more boxes than an ant; a herd of 10 should cost
-no more than 50 ants). The brief (step 3) states the budget.
-
-**8. The parts library (was V5's part makers), growing with each animal.** Approved parts become reusable makers with
+**4. The parts library, growing with each animal (was V5's part makers).** Approved parts become reusable makers with
 settings (length, thickness, toe count): the monitor's round legs, clawed feet, tail chain, jaw with teeth and mouth
 inside, eyes with lids; the crocodile's parts; later heads, necks, wings. They live in one shared library with the one
 picture (PNG) writer and box maker (today copied in several files), so the next reptile starts from approved parts.
