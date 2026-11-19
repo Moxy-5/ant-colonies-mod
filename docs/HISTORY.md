@@ -905,6 +905,8 @@ Moved here from CLAUDE.md on 2026-10-13 (it was loaded into every chat and took 
     - In-game films from three sides. The tail drapes down off the edge with its tip on the ground while it stands on top.
   - Every number my pick.
 
+- **Confirmed by the user in-game (2026-11-19): the monitor's climb up, second version, "it look perfect now".** The way it was made is kept for stage C (the climb down) and the water entry: the offline checker `tools/climb_check.py` and the contact sheet maker `tools/film_sheet.py` (moved from the session's scratch folder), with the frame-by-frame game film `tools/film/monitor_climb_frames.film`; how-to in `docs/plans/engine-step2-climb.md`.
+
 ## Handover notes for a code reviewer (written at the end of a very long session)
 - State: branch `master`, all committed, `./gradlew build` passes, `./gradlew runGameTestServer` passes 47 tests (about 8 minutes, in one world, tests run in parallel arena grids). Some tests are timing-sensitive under load (`antsOnBumpyGroundReachTheFoodStore` and `aStarvingWorkerSlowsDownAndDies` have each failed once and passed on a re-run): re-run before blaming a change.
 - Confirmed in-game by the user so far: everything up to and including dead ants and the refuse chamber, rich bread, worker hunger, colony starvation, and the hill-jam fix. Older bullets in "Current status" that still say "waiting for the user to confirm" are probably stale (the user tested them and reported no problems), but this was never written down: do not rely on those flags.

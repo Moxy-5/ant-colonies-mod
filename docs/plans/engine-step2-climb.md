@@ -83,7 +83,7 @@ dragged from the hips (framework, species-neutral, any number of pieces):
 Checks every stage: the measuring course (`python tools/body_course.py run monitor`), its findings read before the
 user sees anything; the side films. Animal-only work: no guard films. Two strikes inside a stage: stop and rethink.
 
-### Stage B as built (2026-11-19; second version after frame-by-frame films, waiting for the user's look)
+### Stage B as built (2026-11-19; second version after frame-by-frame films; **confirmed by the user in-game 2026-11-19: "it look perfect now"**)
 - **First version (4.4 s):** the in-game films frame by frame (`tools/film/monitor_climb_frames.film`, side, front on
   top, behind, 2 ticks apart) showed it looking straight up like a periscope, climbing as one stiff plank and folding
   its hind legs up under it, slowly, its tail hanging.
@@ -110,6 +110,16 @@ user sees anything; the side films. Animal-only work: no guard films. Two strike
   a reaching foot's line, and the joint flipped round between two keys.
 - **After the climb** it stands 0.4 s on top (`CLIMB_REST`) before walking on. The tail drapes down off the edge, its
   tip on the ground, and slides up as it walks.
+
+### How stage B was got right (use it for stage C and the water entry; the user: "a combination of the animation engine and in game was perfect")
+- Offline first: `python tools/climb_check.py [size] [times] [views]` builds the clip in memory and checks it as the game
+  draws it (the trunk's hinges, a dragged tail): reach misses, lifts, parts inside the step, and a zoomed film strip of
+  chosen moments from the side, three quarters and the front.
+- Then the real game, frame by frame: `./gradlew runFilm -PfilmScene=tools/film/monitor_climb_frames.film` (the game
+  frozen and stepped 2 ticks a picture, side on, from the front on top, from behind), contact sheets with
+  `python tools/film_sheet.py`, every phase judged from all three sides; then the course scenes.
+- Measure the joints (shoulder, elbow, wrist) over time when a limb looks wrong: the forelegs flung up because the foot
+  rose on the spot while the body went on, which only the numbers showed plainly.
 
 ## The numbers (the balancer check)
 - At its size: 4.5 blocks long; the box 0.7 wide at the middle of the body; the snout 2.2 blocks ahead of the box,
