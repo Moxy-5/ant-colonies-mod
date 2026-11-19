@@ -83,18 +83,33 @@ dragged from the hips (framework, species-neutral, any number of pieces):
 Checks every stage: the measuring course (`python tools/body_course.py run monitor`), its findings read before the
 user sees anything; the side films. Animal-only work: no guard films. Two strikes inside a stage: stop and rethink.
 
-### Stage B as built (2026-11-19; waiting for the user's look)
-- The clip (`_climb_keys`, `climb_up` in `tools/monitor_models.py`): one for each of five sizes (a block is a different
-  number of model pixels at each), **4.4 s** (slower than the 2.5 s above: the hind feet needed three holds, the
-  ground, the step's face half way up with the toes up against it, and the top; one number to quicken in stage D).
-  Look up and flick (0 to 1.2 s), rear to 42 degrees with the forefeet onto the top (to 2.1 s), the hind feet onto the
-  face and the push (to 2.85 s), the haul over the edge, the hind feet onto the top, stand (4.1 s).
-- The path: the maker writes it into `MonitorClimb.java`; `MonitorEntity.Climb` (synced) moves the box along it,
-  `MonitorModel.place` draws along it, the clip plays on the climb's own clock (`SteadyController.clock`).
-- Starts only when it arrives straight (within 40 degrees) at the climb's start; arriving too close or at an angle it
-  steps up the old way (stage D: turn and back up to the start instead).
-- Climbing, the elbows and knees bend the way they point standing, raised (`CLIMB_RAISED`): the rest way lay along a
-  reaching foot's line, and the joint flipped round between two keys.
+### Stage B as built (2026-11-19; second version after frame-by-frame films, waiting for the user's look)
+- **First version (4.4 s):** the in-game films frame by frame (`tools/film/monitor_climb_frames.film`, side, front on
+  top, behind, 2 ticks apart) showed it looking straight up like a periscope, climbing as one stiff plank and folding
+  its hind legs up under it, slowly, its tail hanging.
+- **Second version (the user gave full freedom over the look; my picks): a wall climb, 3.3 s.** A one-block step is
+  taller than the monitor's back, so it climbs it as monitors climb a trunk:
+  1. A short look (to 0.9 s): neck up, head over the edge, a tongue flick.
+  2. It walks in rearing, the tail flat on the ground.
+  3. The chest rears first; the forefeet reach forward and up in one arc and hook over the top once the shoulders
+     are about level with it (0.75 to 1.3 s). They never rise on the spot (that threw the elbows up over the back).
+  4. The hind feet go onto the face half way up, splayed, toes up against it (1.35 to 1.75 s).
+  5. The hips rise close to upright (70 degrees) with the front half bent over the top: the spine bends at its three
+     trunk joints (waist, ribs, chest; `TRUNK_HINGES`), each turned on its outer edge as the game turns it.
+  6. The hips roll over the edge, the hind feet step onto the top (toes flattening as each foot comes over the edge),
+     one walking step, stand.
+- **The maker:** `_climb_keys(B)`, `_trunk` (the trunk's pieces placed as the game draws them) and `_clearance` (the
+  hips lifted if any underside point would go into the step) in `tools/monitor_models.py`.
+- **Checked offline** for every size: reach misses at most 1.3 px; nothing inside the step except the smallest
+  monitor's jaw (0.7 px at 0.8 s) and a claw tip (1.2 px) for one frame.
+- **The game side is as before:** the path in `MonitorClimb.java`, `MonitorEntity.Climb` moving the box,
+  `MonitorModel.place` drawing along it, and the clip played on the climb's own clock.
+- **Starts** only when it arrives straight (within 40 degrees) at the climb's start; arriving too close or at an angle
+  it steps up the old way (stage D: turn and back up to the start instead).
+- **Climbing, the elbows and knees bend the way they point standing, raised** (`CLIMB_RAISED`): the rest way lay along
+  a reaching foot's line, and the joint flipped round between two keys.
+- **After the climb** it stands 0.4 s on top (`CLIMB_REST`) before walking on. The tail drapes down off the edge, its
+  tip on the ground, and slides up as it walks.
 
 ## The numbers (the balancer check)
 - At its size: 4.5 blocks long; the box 0.7 wide at the middle of the body; the snout 2.2 blocks ahead of the box,

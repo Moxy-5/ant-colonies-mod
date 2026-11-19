@@ -247,7 +247,8 @@ public class MonitorModel extends DefaultedEntityGeoModel<MonitorEntity> {
                 .translate(0f, (float) (bend.lift() / scale), 0f);
         GeoBone body = bones.apply("body");
         if (climb != null && body != null) {     // the climb's rear (its body turn about the body's pivot)
-            parent.mul(BoneFrames.local(new Vector3f(), BoneFrames.pivot(body), body.getRotZ(), body.getRotY(), body.getRotX()));
+            // only the rear: the walk's body sway still easing out as the climb starts flicked the tail base 20 degrees
+            parent.mul(BoneFrames.local(new Vector3f(), BoneFrames.pivot(body), 0f, 0f, body.getRotX()));
         }
         parent.mul(BoneFrames.local(hips, false));
         TAIL.pose(bones, parent, monitor.tail, TailDrag.Ground.of(monitor.level(), y, monitor.isInWater(), monitor.floatDepth()),

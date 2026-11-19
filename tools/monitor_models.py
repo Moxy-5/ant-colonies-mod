@@ -568,15 +568,18 @@ class _Poser:
 
 
 # --- the climb up a block (the Animal Maker Engine step 2, stage B, 2026-11-19; docs/plans/engine-step2-climb.md) ------
-# A move of its own, made once for a one-block step (every Minecraft step is exactly one block with square edges). It
-# stands with its snout just short of the step's face, lifts its head and looks up over the edge (a flick of the
-# tongue), walks in with its head held high, rears up on its hind legs with its tail base pressed down behind as a third
-# leg while its forefeet reach up onto the top, hooks its claws in, hauls itself forward with its belly sliding over the
-# edge as the hind feet push off the face, steps its hind feet up one at a time and stands on top. In model pixels: the
-# step is one block high, so its height in pixels hangs on the monitor's size (a clip for each of CLIMB_SIZES, the game
-# plays the nearest). The root's travel is not in the clip but in its path ('path' note, and MonitorClimb.java made from
-# it): the game moves the monitor along the path (its box on the server, its drawing on the client), so the end pose
-# hands over to the walk with nothing to slide back. Every number my pick.
+# A move of its own, made once for a one-block step (every Minecraft step is exactly one block with square edges). The
+# step is taller than the monitor's trunk is long (hip to shoulder), so it climbs it as a lizard climbs a wall: it stands
+# with its snout just short of the face and looks up at the edge (a flick of the tongue), walks in rearing up on its hind
+# legs until its forefeet reach up onto the top and hook over the edge, hauls itself up with its forelegs while its hind
+# feet go onto the face, splayed out to the sides, and push, its body near upright against the face with the front half
+# bending over the edge onto the top; then its hips roll over the edge, the hind feet step up onto the top, it walks on
+# a step and stands (the tail is not the clip's: the game drags it up after the hips). In model pixels: the step is one
+# block high, so its height in pixels hangs on the monitor's size (a clip for each of CLIMB_SIZES, the game plays the
+# nearest). The root's travel is not in the clip but in its path ('path' note, and MonitorClimb.java made from it): the
+# game moves the monitor along the path (its box on the server, its drawing on the client), so the end pose hands over
+# to the walk with nothing to slide back. Every number my pick (second version, 2026-11-19, after the frame by frame
+# films: the first looked straight up like a periscope, climbed as a stiff plank and folded the hind legs up under it).
 GAME_SCALE = 0.75                       # MonitorEntity.MODEL_SCALE: the model is drawn at this share
 CLIMB_SIZES = (0.85, 0.925, 1.0, 1.075, 1.15)
 CLIMB_FACE = 50.0                       # the step's face this far ahead of where the climb starts (px): the snout 2 px short
@@ -587,6 +590,11 @@ HIP_JOINT = (0.0, 10.5, -4.0)           # the hip joint at rest (the leg plans):
 # along in the clip (at least 33 degrees off for the forelegs, 46 for the hind legs; the rest way came within 7)
 CLIMB_RAISED = {'arm': 1.1, 'leg': 0.5}
 UNDERSIDE = ((5.0, -21.0, -7.0), (6.0, -26.0, 0.0))   # the body's underside: the belly, then the trunk (height, from, to)
+# The front half's three joints (where each piece turns, back to front, and its share of the bend over the edge). The game
+# turns each on its outer edge so the pieces stay closed (MonitorModel: the top bending nose down, the bottom nose up):
+# the clip is worked out turning them the same way, so the forefeet land where the clip puts them.
+TRUNK_HINGES = (('waist', BODY_PIVOT[2], 0.3), ('ribs', TRUNK_JOINTS[0], 0.35), ('chest', TRUNK_JOINTS[1], 0.35))
+BODY_TOP, BODY_BOTTOM = 16.0, 5.0
 
 
 def block_px(size):
@@ -600,35 +608,38 @@ def climb_name(size):
 
 def _climb_keys(B):
     """The climb's course for a step B pixels high: each thing as (time, value) keys. The hind feet hold three places
-    on the way up: the ground, the step's face (half way up, toes up against it), the top."""
+    on the way up: the ground, the step's face (splayed out to the side, toes up against it), the top."""
     zf = -CLIMB_FACE
     up = B + 2.3                                     # a forefoot's wrist standing on top; a hind ankle 0.3 higher
-    face = (0.5 * B + 3.0, zf + 5.5, 75.0)           # a hind ankle against the face: its height, its place along, the foot turned toes up
+    face = (B - 11.5, zf + 6.0, 85.0)                # a hind ankle on the face: its height, its place along, the foot turned toes up
     end = -4.0 - CLIMB_END
+    k = B - block_px(1.0)                            # how much taller the step is for a smaller monitor than a middling one (px)
     return {
-        # the hip joint's place along (z, forward is minus) and height, and how far the body is reared (degrees, nose
-        # up): eased through the keys without stopping at each (a monotone spline)
-        'hips_z': ((0.35, -4.0), (1.3, -18.0), (2.1, -29.0), (2.5, -34.0), (2.85, -39.0), (3.2, -44.0), (3.7, -49.0),
-                   (4.1, end)),
-        'hips_y': ((1.2, 10.5), (2.1, 12.0), (2.5, 12.5), (2.85, 14.0), (3.2, face[0] + 10.5), (3.7, B + 7.0),
-                   (4.1, B + 10.5)),
-        'rear': ((1.2, 0.0), (2.1, 42.0), (2.5, 42.0), (2.85, 34.0), (3.2, 20.0), (3.7, 5.0), (4.1, 0.0)),
-        # the neck and head (degrees on top of rest, minus is up): looking up over the edge, then level over the top
-        'neck1': ((0.0, 0.0), (0.45, -40.0), (1.5, -40.0), (2.2, 30.0), (2.5, 30.0), (3.2, 10.0), (4.0, 0.0)),
-        'neck2': ((0.0, 0.0), (0.45, -5.0), (1.5, -5.0), (2.2, 8.0), (2.5, 8.0), (3.2, 3.0), (4.0, 0.0)),
-        'head': ((0.0, 0.0), (0.45, -2.0), (1.2, -2.0), (2.1, 2.0), (3.2, 0.0)),
+        # the hip joint's place along (z, forward is minus) and height; how far the hips are reared (degrees, nose up);
+        # how far the front half bends down over the edge on top of that (degrees, nose down): each eased through its
+        # keys without stopping at each (a monotone spline)
+        'hips_z': ((0.2, -4.0), (0.7, -14.0), (1.2, -29.0), (1.6, -36.0), (1.9, -40.5), (2.45, -44.1), (2.8, -51.0), (3.15, end)),
+        'hips_y': ((0.3, 10.5), (1.2, 10.8), (1.6, 12.5 + k), (1.9, 14.5 + k), (2.45, face[0] + 11.0), (2.8, B + 7.0),
+                   (3.15, B + 10.5)),
+        'rear': ((0.0, 0.0), (0.4, 4.0), (0.75, 9.0), (1.1, 38.0), (1.3, 46.0), (1.6, 55.0), (1.9, 64.0), (2.45, 70.0), (2.8, 35.0), (3.15, 0.0)),
+        'bend': ((1.2, 0.0), (1.6, 10.0), (1.9, 25.0), (2.45, 45.0), (2.8, 25.0), (3.15, 0.0)),
+        # where the neck and the head point (degrees above level, whatever the body does): looking up at the edge, then
+        # across the top
+        'neck': ((0.0, 18.0), (0.3, 42.0 + 3.5 * k), (0.9, 42.0 + 3.5 * k), (1.2, 28.0), (1.6, 20.0), (2.4, 16.0), (3.0, 18.0)),
+        'head': ((0.0, -2.0), (0.3, 28.0 + 2.0 * k), (0.9, 26.0 + 2.0 * k), (1.2, 6.0),
+                 (1.5, -2.0), (2.6, -6.0), (3.1, -2.0)),
+        'flicks': (0.1, 2.75),
         # the feet: where each wrist or ankle starts, then its steps (lift, land, place); a place may carry the foot's
         # turn (degrees, toes up)
-        ('arm', 'left'): ((10.8, 2.3, -25.0), (0.4, 0.7, (10.8, 2.3, -33.0)), (1.35, 1.9, (10.8, up, zf - 1.0)),
-                          (2.9, 3.2, (10.8, up, -65.0)), (3.55, 3.85, (10.8, up, end - 21.0))),
-        ('arm', 'right'): ((-10.8, 2.3, -25.0), (0.7, 1.0, (-10.8, 2.3, -37.0)), (1.45, 1.95, (-10.8, up, zf - 1.0)),
-                           (3.15, 3.45, (-10.8, up, -66.0)), (3.75, 4.05, (-10.8, up, end - 21.0))),
-        ('leg', 'left'): ((11.8, 2.6, -2.6), (0.75, 1.05, (11.8, 2.6, -13.0)), (1.4, 1.7, (11.8, 2.6, -23.0)),
-                          (2.15, 2.5, (11.8, face[0], face[1], face[2])), (3.1, 3.4, (11.8, up + 0.3, end + 1.4))),
-        ('leg', 'right'): ((-11.8, 2.6, -2.6), (0.45, 0.75, (-11.8, 2.6, -10.0)), (1.05, 1.35, (-11.8, 2.6, -19.0)),
-                           (1.75, 2.05, (-11.8, 2.6, -29.0)), (2.35, 2.75, (-11.8, face[0], face[1], face[2])),
-                           (3.3, 3.6, (-11.8, up + 0.3, end + 1.4))),
-        'length': 4.4,
+        ('arm', 'left'): ((10.8, 2.3, -25.0), (0.3, 0.55, (10.8, 2.3, -33.0)), (0.75, 1.2, (9.5, up, zf - 1.5)),
+                          (2.5, 2.8, (10.3, up, -64.0)), (2.85, 3.15, (10.8, up, end - 21.0))),
+        ('arm', 'right'): ((-10.8, 2.3, -25.0), (0.4, 0.65, (-10.8, 2.3, -35.0)), (0.8, 1.3, (-9.5, up, zf - 1.5)),
+                           (2.6, 2.9, (-10.3, up, -66.0)), (2.95, 3.25, (-10.8, up, end - 21.0))),
+        ('leg', 'left'): ((11.8, 2.6, -2.6), (0.55, 0.85, (11.8, 2.6, -16.0)), (0.95, 1.25, (11.8, 2.6, -28.0)),
+                          (1.45, 1.75, (11.5, face[0], face[1], face[2])), (2.55, 2.85, (11.8, up + 0.3, end + 1.4))),
+        ('leg', 'right'): ((-11.8, 2.6, -2.6), (0.4, 0.7, (-11.8, 2.6, -14.0)), (0.8, 1.1, (-11.8, 2.6, -25.0)),
+                           (1.35, 1.65, (-11.5, face[0], face[1], face[2])), (2.45, 2.75, (-11.8, up + 0.3, end + 1.4))),
+        'length': 3.3,
     }
 
 
@@ -654,10 +665,12 @@ def _spline(t, keys):
     return keys[-1][1]
 
 
-def _foot_at(t, plan, lift):
+def _foot_at(t, plan, lift, reach=False):
     """Where a foot's wrist or ankle is at time t on its plan (its first place, then its steps: lift time, land time,
     place), how far it is lifted (0 to 1) and how far the foot is turned toes up (degrees, a place's fourth value). A
-    step up onto something lifts first and reaches forward over it after."""
+    hind foot stepping up a face lifts first and reaches forward over it after; a forefoot reaching up (reach) goes
+    forward and up together in one arc, the rise a little ahead, so it stays in front of its shoulder (rising first on
+    the spot while the body went on, it ended up above and behind the shoulder, the elbow thrown up over the back)."""
     at = list(plan[0][:3])
     pitch = plan[0][3] if len(plan[0]) > 3 else 0.0
     for t0, t1, to in plan[1:]:
@@ -667,26 +680,55 @@ def _foot_at(t, plan, lift):
         if t < t1:
             f = (t - t0) / (t1 - t0)
             rise = to[1] - at[1]
-            fy, fz = (_ease(min(1.0, f / 0.6)), _ease(max(0.0, (f - 0.35) / 0.65))) if rise > 2.0 else (_ease(f), _ease(f))
+            if rise <= 2.0:
+                fy = fz = _ease(f)
+            elif reach:
+                fy, fz = _ease(min(1.0, f / 0.65)), _ease(f)
+            else:
+                fy, fz = _ease(min(1.0, f / 0.6)), _ease(max(0.0, (f - 0.35) / 0.65))
             arc = math.sin(math.pi * f)
+            # toes turning up onto a face follow the reach forward (never into the face); toes coming off a face
+            # flatten in the last of the rise, as the foot comes over the edge (not a hand waving above it)
+            turn = (_ease(max(0.0, (fy - 0.6) / 0.4)) if goes < pitch else fz) if rise > 2.0 else _ease(f)
             return ([at[0] + (to[0] - at[0]) * _ease(f), at[1] + rise * fy + lift * arc, at[2] + (to[2] - at[2]) * fz],
-                    arc, pitch + (goes - pitch) * _ease(f))
+                    arc, pitch + (goes - pitch) * turn)
         at, pitch = list(to[:3]), goes
     return at, 0.0, pitch
 
 
-def _lowest_hips(theta, hz, B, margin=0.4):
-    """How high the hip joint must be (px) for the body's underside to clear what is under it, the body reared theta
-    (degrees) with its hip joint at hz along: the step's top in front of the face, the ground behind it."""
-    c, s = math.cos(math.radians(theta)), math.sin(math.radians(theta))
-    need = -1e9
+def _trunk(rear, bend, hy, hz):
+    """The climb's trunk: the hips reared rear (degrees, nose up) with the hip joint at height hy and place hz, the front
+    half bent bend more nose down over its three joints, each turned on its outer edge as the game turns it. Returns the
+    body's turn and move (as body() gives them), each front piece's clip turn, and where each trunk piece is carried in
+    the world as (M, t), a point p going to M p + t: the hips (the body's), then waist, ribs and chest."""
+    bm = euler([-rear, 0.0, 0.0])
+    bd = vsub(vsub([0.0, hy, hz], BODY_PIVOT), mat_vec(bm, vsub(HIP_JOINT, BODY_PIVOT)))
+    bd[0] = 0.0
+    M, t = bm, vadd(vsub(BODY_PIVOT, mat_vec(bm, BODY_PIVOT)), bd)
+    turns, places = {}, [(M, t)]
+    for name, z, share in TRUNK_HINGES:
+        b = bend * share
+        turns[name] = b
+        c = [0.0, BODY_TOP if b > 0 else BODY_BOTTOM, z]
+        R = euler([b, 0.0, 0.0])
+        t = vadd(mat_vec(M, vsub(c, mat_vec(R, c))), t)
+        M = mat_mul(M, R)
+        places.append((M, t))
+    return bm, bd, turns, places
+
+
+def _clearance(places, B, margin=0.4):
+    """How far the trunk must go up (px) for its underside to clear what is under it: the step's top in front of the
+    face, the ground behind it (each underside point carried by the trunk piece it belongs to)."""
+    need = 0.0
     for yb, z0, z1 in UNDERSIDE:
-        dy = yb - HIP_JOINT[1]
         for k in range(17):
-            dz = z0 + (z1 - z0) * k / 16 - HIP_JOINT[2]
-            wz = hz + s * dy + c * dz
-            floor = B if wz < -CLIMB_FACE + 0.3 else 0.0
-            need = max(need, floor + margin - (c * dy - s * dz))
+            z = z0 + (z1 - z0) * k / 16
+            piece = 0 if z > TRUNK_HINGES[0][1] else 1 if z > TRUNK_HINGES[1][1] else 2 if z > TRUNK_HINGES[2][1] else 3
+            M, t = places[piece]
+            w = vadd(mat_vec(M, [0.0, yb, z]), t)
+            floor = B if w[2] < -CLIMB_FACE - 0.2 else 0.0     # (a point against the face is beside it, not over it)
+            need = max(need, floor + margin - w[1])
     return need
 
 
@@ -1029,21 +1071,31 @@ def clips():
 
         def pose(t):
             p = {}
-            theta = _spline(t, keys['rear'])
-            hz = _spline(t, keys['hips_z'])
-            hy = max(_spline(t, keys['hips_y']), _lowest_hips(theta, hz, B))
-            rx = -theta
-            bm = euler([rx, 0.0, 0.0])
-            bd = vsub(vsub([0.0, hy, hz], BODY_PIVOT), mat_vec(bm, vsub(HIP_JOINT, BODY_PIVOT)))
-            bd[0] = 0.0
-            p['body'] = {'rotation': [round(rx, 3), 0.0, 0.0], 'position': [0.0, 0.0, 0.0]}
+            rear, bend = _spline(t, keys['rear']), _spline(t, keys['bend'])
+            hy, hz = _spline(t, keys['hips_y']), _spline(t, keys['hips_z'])
+            bm, bd, turns, places = _trunk(rear, bend, hy, hz)
+            lift = _clearance(places, B)
+            if lift > 0.0:
+                bm, bd, turns, places = _trunk(rear, bend, hy + lift, hz)
+            p['body'] = {'rotation': [round(-rear, 3), 0.0, 0.0], 'position': [0.0, 0.0, 0.0]}
+            for name, b in turns.items():
+                p[name] = {'rotation': [round(b, 3), 0.0, 0.0]}
             path.append((t, bd[1], bd[2]))
+            # the forelegs hang from the chest: its place in the world, as a body turn and move for the leg reaching
+            cm, ct = places[-1]
+            cd = vsub(vadd(ct, mat_vec(cm, BODY_PIVOT)), BODY_PIVOT)
             for L in P.legs:
-                wrist, up, pitch = _foot_at(t, keys[(L['kind'], L['side'])], lifts[L['kind']])
-                P.leg(p, L, bm, bd, wrist, mat_mul(L['foot'], turn_x(pitch - 28 * up)), curl=18 * up,
+                wrist, up, pitch = _foot_at(t, keys[(L['kind'], L['side'])], lifts[L['kind']], reach=L['kind'] == 'arm')
+                fm, fd = (cm, cd) if L['kind'] == 'arm' else (bm, bd)
+                P.leg(p, L, fm, fd, wrist, mat_mul(L['foot'], turn_x(pitch - 28 * up)), curl=18 * up,
                       raised=CLIMB_RAISED[L['kind']])
-            neck_turn(p, 0.0, extra=(_ramp(t, keys['neck1']), _ramp(t, keys['neck2']), _ramp(t, keys['head'])))
-            flick(p, t, (0.3, 0.75))
+            # the neck and head point where wanted whatever the chest does (rest: the neck 15 and 3 degrees up from the
+            # chest, the head 20 down from the neck): the neck's turn shared between its two pieces
+            chest_up = rear - bend
+            neck_up, head_up = _ramp(t, keys['neck']), _ramp(t, keys['head'])
+            x = chest_up + 18.0 - neck_up
+            neck_turn(p, 0.0, extra=(0.55 * x, 0.45 * x, neck_up - 20.0 - head_up))
+            flick(p, t, keys['flicks'])
             for side in ('left', 'right'):
                 p[f'pupil_{side}'] = {'position': [0.0, 0.0, -0.25]}
             return p
