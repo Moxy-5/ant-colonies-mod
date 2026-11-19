@@ -1,6 +1,6 @@
 # Where we are (one page)
 
-Keep this short. The full story is in `docs/HISTORY.md`; the long status is at the bottom of `CLAUDE.md`.
+Keep this short. The full story is in `docs/HISTORY.md`; every status bullet is in `docs/status-log.md`.
 
 ## Finish line
 **M8 playable = the mod done for now** (the user, 2026-10-25): Matabele scouts find termites, raid columns go out, fight, and carry prey home. Everything after that is optional.

@@ -10,3 +10,4 @@ src/generated/**/*.json text eol=lf
 docs/HISTORY.md merge=union
 docs/BUGS.md merge=union
 CLAUDE.md merge=union
+docs/status-log.md merge=union
