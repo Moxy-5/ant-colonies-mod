@@ -249,8 +249,9 @@ public class RiverLifeTests {
 
     /**
      * The tilapia (2026-11-14): hungry fish over a shelf of lush algae graze it down; a young fish is small and barred
-     * and grows into a grown look; about 1 grown male in 3 wears the breeding colours, never a female; a bucket keeps a
-     * fish's look and size; it spawns only in water.
+     * and grows into a grown look; no fish wears the breeding colours away from a nest pit (since step 2 of the animal life
+     * cycle only a male holding a pit does: AnimalLifeTests); a bucket keeps a fish's look, youth and size; it spawns
+     * only in water.
      */
     @GameTest(template = "arena", timeoutTicks = 1200)
     public static void tilapiaGrazeGrowUpAndWearTheirLooks(GameTestHelper helper) {
@@ -265,12 +266,12 @@ public class RiverLifeTests {
             }
         }
         // the looks, from many fish never put in the world
-        int males = 0, breeding = 0;
+        int males = 0;
         for (int i = 0; i < 400; i++) {
             TilapiaEntity fish = new TilapiaEntity(SavannaEntities.TILAPIA.get(), level);
             fish.setUp(false, level.random);
-            if (fish.look() == TilapiaEntity.BREEDING && !fish.isMale()) {
-                helper.fail("a female wears the breeding colours");
+            if (fish.look() == TilapiaEntity.BREEDING) {
+                helper.fail("a fish with no nest pit wears the breeding colours");
             }
             if (fish.look() == TilapiaEntity.YOUNG) {
                 helper.fail("a grown fish wears the young look");
@@ -281,25 +282,21 @@ public class RiverLifeTests {
             }
             if (fish.isMale()) {
                 males++;
-                if (fish.look() == TilapiaEntity.BREEDING) {
-                    breeding++;
-                }
             }
         }
-        if (males < 150 || breeding < males * 0.2 || breeding > males * 0.47) {
-            helper.fail(breeding + " of " + males + " males in breeding colours (about 1 in 3 wanted)");
+        if (males < 150 || males > 250) {
+            helper.fail(males + " males of 400 (about half wanted)");
         }
-        // a bucket keeps a fish's look and size
+        // a bucket keeps a fish's look, youth and size
         TilapiaEntity caught = new TilapiaEntity(SavannaEntities.TILAPIA.get(), level);
-        do {
-            caught.setUp(false, level.random);
-        } while (caught.look() != TilapiaEntity.BREEDING);
+        caught.setUp(true, level.random);
         ItemStack bucket = caught.getBucketItemStack();
         caught.saveToBucketTag(bucket);
         TilapiaEntity poured = new TilapiaEntity(SavannaEntities.TILAPIA.get(), level);
-        poured.setUp(true, level.random);
+        poured.setUp(false, level.random);
         poured.loadFromBucketTag(bucket.get(net.minecraft.core.component.DataComponents.BUCKET_ENTITY_DATA).copyTag());
-        if (poured.look() != TilapiaEntity.BREEDING || Math.abs(poured.ownSize() - caught.ownSize()) > 0.001F) {
+        if (poured.look() != TilapiaEntity.YOUNG || !poured.isYoung() || Math.abs(poured.ownSize() - caught.ownSize()) > 0.001F
+                || Math.abs(poured.getAttributeBaseValue(Attributes.SCALE) - caught.getAttributeBaseValue(Attributes.SCALE)) > 0.001) {
             helper.fail("out of the bucket: look " + poured.look() + ", size " + poured.ownSize() + " (was " + caught.ownSize() + ")");
         }
         // spawning: in the pond's water (when its height is in the spawn band), never in the air
@@ -918,6 +915,7 @@ public class RiverLifeTests {
                         helper.assertTrue(seen.equals("[1, 1, 1, 2, 2, 2, 3, 3, 3, 4]"), "the looks went " + seen + " bite by bite");
                         net.minecraft.server.level.ServerPlayer player = helper.makeMockServerPlayerInLevel();
                         r.hurt(level.damageSources().playerAttack(player), 1.0F);
+                        level.getServer().getPlayerList().remove(player);   // a player left in the world changes spawning caps for later tests
                         helper.assertTrue(r.isRemoved(), "a player's hit did not break the bones");
                         stage[0] = 3;
                         helper.succeed();

@@ -501,6 +501,16 @@ def clips():
             'caught_fight': clip(FIGHT_LEN, caught_fight, 84, 'hold'), 'death': clip(1.2, death, 12, 'hold')}
 
 
+def brooding_model():
+    """The model with the throat swollen with eggs (tools/life_looks.py's look: the underside of the head and the front
+    of the belly bulge down and out)."""
+    import life_looks
+    bones = copy.deepcopy(model())
+    life_looks.swell(bones, ('head', 'front'), MID,
+                     lambda z: (1 + 0.24 * life_looks.bump(z, -7.5, 2.6), 1 + 0.8 * life_looks.bump(z, -7.5, 2.4)))
+    return bones
+
+
 def write_game():
     """Writes the tilapia's model, its three textures and its clips into the savanna mod."""
     import json
@@ -516,6 +526,15 @@ def write_game():
                         'visible_bounds_width': 2, 'visible_bounds_height': 1.5, 'visible_bounds_offset': [0, 0.5, 0]},
         'bones': game_bones}]}
     files['geo/entity/tilapia.geo.json'] = geo
+    # a female brooding eggs or fry in her mouth (animal life cycle step 2): her throat swollen, the look the user
+    # confirmed in the life viewer (tools/life_looks.py), in her everyday colours; its own texture (the swelled boxes
+    # take other places on it)
+    brood_bones, rows, bw, bh = paint(brooding_model(), 'A')
+    files['textures/entity/tilapia_brooding.png'] = png(rows)
+    files['geo/entity/tilapia_brooding.geo.json'] = {'format_version': '1.12.0', 'minecraft:geometry': [{
+        'description': {'identifier': 'geometry.tilapia_brooding', 'texture_width': bw, 'texture_height': bh,
+                        'visible_bounds_width': 2, 'visible_bounds_height': 1.5, 'visible_bounds_offset': [0, 0.5, 0]},
+        'bones': brood_bones}]}
     files['animations/entity/tilapia.animation.json'] = {'format_version': '1.8.0', 'animations': clips()}
     for rel, data in files.items():
         path = root / rel

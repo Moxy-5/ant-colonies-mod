@@ -1,10 +1,19 @@
 {
-  "_note": "The Nile tilapia's life (the animal life kit, docs/plans/animal-life-cycle.md). Sizes are shares of its usual size (0.6 blocks grown); days are game days. Young hatch at half size and grow up in 3 days; 3 in 10 of the world's own spawns are young. Breeding comes in step 2 of the plan.",
+  "_note": "The Nile tilapia's life (the animal life kit, docs/plans/animal-life-cycle.md, step 2: breeding on, 2026-11-19; all numbers my picks, fun first). Sizes are shares of its usual size (0.6 blocks grown); days are game days. A ready male fans a nest pit out of a shallow bed and holds it; a ready female comes to him, they circle over the pit for 6 seconds and she takes 4 to 6 eggs into her mouth for a day; the fry (0.13 blocks) stay round her face for 2 days, darting back into her mouth from danger, then school as young fish and are grown 5 days after hatching. The world's own young spawns are 2 to 3 days old (as big as before step 2). Breeds only while fewer than 40 tilapia live within 48 blocks and the river fish group is under its cap.",
   "sexes": "two",
   "male_share": 0.5,
   "size": [0.85, 1.15],
-  "young_size": 0.5,
-  "young_days": 3,
+  "young_size": 0.22,
+  "young_days": 5,
   "young_at_spawn": 0.3,
-  "breeds": false
+  "young_at_spawn_days": [2, 3],
+  "breeds": true,
+  "breed_every_days": 4,
+  "clutch": [4, 6],
+  "hatch_days": 1,
+  "care": "carry_young",
+  "care_days": 2,
+  "mate_reach": 16,
+  "local_limit": 40,
+  "courtship_ticks": 120
 }

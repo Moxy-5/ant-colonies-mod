@@ -501,3 +501,4 @@ Every "Current status" bullet CLAUDE.md held up to 2026-11-19, word for word, ol
 
 ## New status bullets (from 2026-11-19 on; add at the end)
 - **The model workshop plan looked over and merged 2026-11-19 (the user's OK):** one plan for the model viewer and making models (`docs/plans/model-workshop.md`), with the tools review's V1 to V6 folded in and a shared viewer script as step 0; nothing built yet.
+- **Animal life cycle step 2 built 2026-11-19 (not tried in-game yet):** tilapia breed (a male fans a nest pit and wears breeding colours only on it, the female mouthbroods eggs then fry for 2 days) and snails lay pearly clutches at the waterline that hatch in 2 days; room to breed stops both at their local limit. Next: step 3, crab and catfish.

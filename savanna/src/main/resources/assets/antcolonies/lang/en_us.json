@@ -164,6 +164,8 @@
   "block.antcolonies.scraps": "Scraps",
   "block.antcolonies.croc_droppings": "Crocodile Droppings",
   "block.antcolonies.crab_shell": "Broken Snail Shell",
+  "block.antcolonies.tilapia_nest": "Tilapia Nest Pit",
+  "block.antcolonies.snail_eggs": "Snail Eggs",
   "entity.antcolonies.tilapia": "Nile Tilapia",
   "item.antcolonies.tilapia": "Raw Tilapia",
   "item.antcolonies.cooked_tilapia": "Cooked Tilapia",

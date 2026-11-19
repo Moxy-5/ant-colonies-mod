@@ -69,4 +69,22 @@ class LifeRulesTest {
                 "long past hatching unseen: only shells");
         assertTrue(ClutchClock.SHELLS_AFTER > hatch);
     }
+
+    @Test
+    void youngSpawnsHaveTheirOwnAgeAndCareHasItsDays() {
+        int day = LifeNumbers.DAY;
+        LifeNumbers n = file("{\"young_size\": 0.22, \"young_days\": 5, \"young_at_spawn_days\": [2, 3], \"care_days\": 2}");
+        net.minecraft.util.RandomSource random = net.minecraft.util.RandomSource.create(5);
+        for (int i = 0; i < 50; i++) {
+            int age = n.spawnYoungAge(random);
+            assertTrue(age >= 2 * day && age <= 3 * day, "a young spawn " + age + " ticks old");
+        }
+        assertEquals(2L * day, n.careTicks());
+        LifeNumbers plain = file("{\"young_days\": 3}");
+        for (int i = 0; i < 50; i++) {
+            assertTrue(plain.spawnYoungAge(random) <= day, "with no spawn days, a young spawn is in its first third");
+        }
+        assertEquals(0L, plain.careTicks());
+        assertThrows(IllegalArgumentException.class, () -> file("{\"young_days\": 3, \"young_at_spawn_days\": [3, 2]}"));
+    }
 }

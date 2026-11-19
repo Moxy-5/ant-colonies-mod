@@ -14,7 +14,9 @@ import net.minecraft.world.entity.ai.goal.Goal;
  * of its own kind it can mate with ({@link Sex#matesWith}) within its life file's mate reach, and the pair court side by
  * side for the file's courtship time (each animal's {@link HasLife#courting} hook plays its own part). Then both have
  * bred: {@link HasLife#mated} is called once on each and their wait before the next breeding starts. A kind whose life
- * file does not breed never starts it.
+ * file does not breed never starts it. An animal that waits for its mate ({@link HasLife#seeksMate} false) never runs
+ * it; only one that takes a mate now ({@link HasLife#takesMate}) is picked. Both of the pair are marked as courting, so a
+ * second suitor looks elsewhere.
  */
 public class SeekMateGoal<T extends Mob & HasLife> extends Goal {
     /** How often a ready animal looks round for a mate (ticks). */
@@ -37,7 +39,7 @@ public class SeekMateGoal<T extends Mob & HasLife> extends Goal {
 
     @Override
     public boolean canUse() {
-        if ((animal.tickCount + animal.getId()) % LOOK_EVERY != 0 || !animal.life().readyToBreed()) {
+        if ((animal.tickCount + animal.getId()) % LOOK_EVERY != 0 || !animal.seeksMate() || !animal.life().readyToBreed()) {
             return false;
         }
         if (!RoomToBreed.here(animal, animal.life().numbers().localLimit())) {
@@ -50,7 +52,7 @@ public class SeekMateGoal<T extends Mob & HasLife> extends Goal {
     @Override
     public boolean canContinueToUse() {
         return mate != null && mate.isAlive() && walked < GIVE_UP && animal.life().readyToBreed()
-                && mate instanceof HasLife other && other.life().readyToBreed();
+                && mate instanceof HasLife other && other.life().readyToBreed() && other.takesMate();
     }
 
     @Override
@@ -59,11 +61,15 @@ public class SeekMateGoal<T extends Mob & HasLife> extends Goal {
         walked = 0;
         if (mate != null) {
             animal.life().setPartner(mate.getUUID());
+            ((HasLife) mate).life().setPartner(animal.getUUID());
         }
     }
 
     @Override
     public void stop() {
+        if (mate instanceof HasLife other && animal.getUUID().equals(other.life().partner())) {
+            other.life().setPartner(null);
+        }
         animal.life().setPartner(null);
         mate = null;
         animal.getNavigation().stop();
@@ -79,20 +85,29 @@ public class SeekMateGoal<T extends Mob & HasLife> extends Goal {
         if (animal.distanceTo(mate) > touch) {
             walked++;
             if (animal.getNavigation().isDone() || walked % 20 == 0) {
-                animal.getNavigation().moveTo(mate, speed);
+                GoExactly.to(animal, mate.getX(), mate.getY(), mate.getZ(), speed);
+            }
+            if (animal.getNavigation().isDone()) {
+                // in the mate's block and still not touching: the last bit straight in
+                animal.getMoveControl().setWantedPosition(mate.getX(), mate.getY(), mate.getZ(), speed);
             }
             return;
         }
-        animal.getNavigation().stop();
+        if (courted == 0) {
+            animal.getNavigation().stop();      // once: a species' courtship may move the pair about after
+        }
         animal.courting(mate, courted);
         if (++courted >= animal.life().numbers().courtshipTicks()) {
             Mob partner = mate;
             HasLife other = (HasLife) partner;
+            mate = null;
+            if (!animal.life().readyToBreed() || !other.life().readyToBreed()) {
+                return;                         // both were courting each other and the other's courtship ended it first
+            }
             animal.life().bred();
             other.life().bred();
             animal.mated(partner);
             other.mated(animal);
-            mate = null;
         }
     }
 
@@ -103,7 +118,7 @@ public class SeekMateGoal<T extends Mob & HasLife> extends Goal {
         Sex sex = animal.life().sex();
         List<Mob> near = animal.level().getEntitiesOfClass(Mob.class, animal.getBoundingBox().inflate(numbers.mateReach()),
                 m -> m != animal && m.getType() == animal.getType() && m instanceof HasLife other
-                        && other.life().readyToBreed() && sex.matesWith(other.life().sex())
+                        && other.life().readyToBreed() && other.takesMate() && sex.matesWith(other.life().sex())
                         && (other.life().partner() == null || other.life().partner().equals(animal.getUUID())));
         Mob best = null;
         double bestDistance = Double.MAX_VALUE;

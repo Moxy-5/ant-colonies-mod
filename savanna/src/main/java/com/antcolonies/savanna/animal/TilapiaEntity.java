@@ -2,12 +2,20 @@ package com.antcolonies.savanna.animal;
 
 import javax.annotation.Nullable;
 
+import java.util.List;
+import java.util.UUID;
+
 import com.antcolonies.animal.AnimalLife;
+import com.antcolonies.animal.Carried;
 import com.antcolonies.animal.HasLife;
+import com.antcolonies.animal.RoomToBreed;
 import com.antcolonies.animal.SeekMateGoal;
+import com.antcolonies.savanna.registry.SavannaEntities;
 import com.antcolonies.savanna.registry.SavannaItems;
 
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.particles.ParticleTypes;
+import net.minecraft.server.level.ServerLevel;
 import net.minecraft.core.component.DataComponents;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.syncher.EntityDataAccessor;
@@ -20,18 +28,22 @@ import net.minecraft.util.Mth;
 import net.minecraft.util.RandomSource;
 import net.minecraft.world.DifficultyInstance;
 import net.minecraft.world.damagesource.DamageSource;
+import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.entity.Mob;
 import net.minecraft.world.entity.MobSpawnType;
 import net.minecraft.world.entity.SpawnGroupData;
 import net.minecraft.world.entity.ai.attributes.AttributeInstance;
 import net.minecraft.world.entity.ai.attributes.AttributeSupplier;
 import net.minecraft.world.entity.ai.attributes.Attributes;
 import net.minecraft.world.entity.animal.AbstractSchoolingFish;
+import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.component.CustomData;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.LevelAccessor;
 import net.minecraft.world.level.ServerLevelAccessor;
+import net.minecraft.world.phys.Vec3;
 import software.bernie.geckolib.animatable.GeoEntity;
 import software.bernie.geckolib.animatable.instance.AnimatableInstanceCache;
 import software.bernie.geckolib.animation.AnimatableManager;
@@ -47,21 +59,36 @@ import software.bernie.geckolib.util.GeckoLibUtil;
  * the river algae ({@link GrazeAlgaeGoal}, {@code AlgaeBlock.graze}), the second link of the food chain.
  *
  * <p>Three looks from one model (the user, 2026-11-14, "do them all for variation"; my picks): a young fish is pale and
- * strongly barred with the black "tilapia spot" ({@link #YOUNG}) and small; after 3 game days (its life file) it is grown
- * ({@link #EVERYDAY}, olive-silver), and about 1 grown male in 3 wears the breeding colours ({@link #BREEDING}: dark
- * blue-grey, red throat, red-edged fins). A young fish grows its size little by little. Each grown fish has a length of
- * its own (0.85 to 1.15 of the usual, my pick), drawn and boxed through {@link Attributes#SCALE}.
+ * strongly barred with the black "tilapia spot" ({@link #YOUNG}) and small; grown it is olive-silver ({@link #EVERYDAY}),
+ * and a male wears the breeding colours ({@link #BREEDING}: dark blue-grey, red throat, red-edged fins) only while he
+ * holds a nest pit (animal life cycle step 2, 2026-11-19; before, 1 male in 3 wore them for life). A young fish grows its
+ * size little by little. Each grown fish has a length of its own (0.85 to 1.15 of the usual, my pick), drawn and boxed
+ * through {@link Attributes#SCALE}.
+ *
+ * <p>Breeding (animal life cycle step 2, {@code docs/plans/animal-life-cycle.md}; numbers in its life file): a ready male
+ * fans a nest pit out of the shallow bed and holds it ({@link TilapiaNestGoal}); a ready female comes to him
+ * ({@link SeekMateGoal}), they circle over the pit, and she takes the eggs into her <b>mouth</b> (the real tilapia's
+ * mouthbrooding): her throat swells (its own model) and she does not eat. After the hatching days she lets out 4 to 6
+ * tiny fry that stay round her face ({@link TilapiaFryGoal}); when a catfish, a crocodile, a monitor or a player comes
+ * near she takes them back into her mouth (the kit's carrying hook, {@link Carried}) and lets them out again when it is
+ * gone. After the care days they school on their own as young fish. Fish busy breeding neither lead nor join a school.
  *
  * <p>It never starves (my pick: the food chain must never crash): a hungry fish with no algae near just swims on.
  */
 public class TilapiaEntity extends AbstractSchoolingFish implements GeoEntity, HasLife {
     public static final int YOUNG = 0, EVERYDAY = 1, BREEDING = 2;
-    /** How many grown males wear the breeding colours (my pick: about 1 in 3). */
-    static final float BREEDING_SHARE = 1 / 3F;
+    /** How near a danger makes a mother take her fry into her mouth (blocks). */
+    static final double DANGER_NEAR = 6;
+    /** How long after the danger is gone she lets them out again (ticks). */
+    static final int CALM_TICKS = 60;
+    /** How near her a fry must be to be taken in (blocks). */
+    static final double TAKE_WITHIN = 4;
 
     private static final EntityDataAccessor<Integer> DATA_LOOK = SynchedEntityData.defineId(TilapiaEntity.class, EntityDataSerializers.INT);
     private static final EntityDataAccessor<Boolean> DATA_GRAZING = SynchedEntityData.defineId(TilapiaEntity.class, EntityDataSerializers.BOOLEAN);
     private static final EntityDataAccessor<Byte> DATA_LIFE = AnimalLife.dataFor(TilapiaEntity.class);
+    /** Her mouth full of eggs or fry: drawn with the swollen throat. */
+    private static final EntityDataAccessor<Boolean> DATA_MOUTH_FULL = SynchedEntityData.defineId(TilapiaEntity.class, EntityDataSerializers.BOOLEAN);
 
     private final AnimatableInstanceCache cache = GeckoLibUtil.createInstanceCache(this);
     /** Its life: sex, age (young for 3 days from half size, its life file), own size (the animal life kit). */
@@ -70,6 +97,25 @@ public class TilapiaEntity extends AbstractSchoolingFish implements GeoEntity, H
     int hungryIn;
     /** The drawn body's pitch (degrees, nose up positive), eased toward its swimming direction (client only). */
     private float swimPitch, swimPitchO;
+
+    // --- breeding (animal life cycle step 2) ---
+    /** A male's nest pit while he holds it, and since when (game time). */
+    @Nullable
+    private BlockPos nest;
+    private long nestSince;
+    /** For tests: the next look round starts a nest at once (skips the chance). */
+    public boolean wantsNestNow;
+    /** A female's eggs in her mouth, and since when they were laid (game time). */
+    private int eggs;
+    private long eggsSince;
+    /** Until when (game time) she cares for her fry. */
+    private long caringUntil;
+    /** Her fry taken back into her mouth from danger. */
+    private final Carried mouth = new Carried();
+    private int calm;
+    /** A fry's mother. */
+    @Nullable
+    private UUID mother;
 
     public TilapiaEntity(EntityType<? extends TilapiaEntity> type, Level level) {
         super(type, level);
@@ -84,6 +130,8 @@ public class TilapiaEntity extends AbstractSchoolingFish implements GeoEntity, H
     @Override
     protected void registerGoals() {
         super.registerGoals();
+        goalSelector.addGoal(1, new TilapiaFryGoal(this));
+        goalSelector.addGoal(2, new TilapiaNestGoal(this));
         goalSelector.addGoal(3, new GrazeAlgaeGoal(this));
         goalSelector.addGoal(4, new SeekMateGoal<>(this, 1.0));
     }
@@ -93,6 +141,7 @@ public class TilapiaEntity extends AbstractSchoolingFish implements GeoEntity, H
         super.defineSynchedData(builder);
         builder.define(DATA_LOOK, EVERYDAY);
         builder.define(DATA_GRAZING, false);
+        builder.define(DATA_MOUTH_FULL, false);
         AnimalLife.define(builder, DATA_LIFE);
     }
 
@@ -125,10 +174,6 @@ public class TilapiaEntity extends AbstractSchoolingFish implements GeoEntity, H
     /** Hatches it as a young fish (or makes it grown), its sex and grown size rolled. */
     public void setUp(boolean young, RandomSource random) {
         life.setUp(young, random);
-        breedingLook = -1;
-        if (!young) {
-            grownLook(random);
-        }
         refresh();
     }
 
@@ -170,22 +215,248 @@ public class TilapiaEntity extends AbstractSchoolingFish implements GeoEntity, H
         refresh();
     }
 
-    private int breedingLook;   // -1 not rolled yet, else the grown look
-
-    private void grownLook(RandomSource random) {
-        breedingLook = isMale() && random.nextFloat() < BREEDING_SHARE ? BREEDING : EVERYDAY;
-    }
-
-    /** Its look and size from its age (and the grown look rolled once). */
+    /** Its look and size from its age, its nest and its mouth. */
     private void refresh() {
         if (level().isClientSide) {
             return;
         }
-        if (!isYoung() && breedingLook != BREEDING && breedingLook != EVERYDAY) {
-            grownLook(random);
-        }
-        entityData.set(DATA_LOOK, isYoung() ? YOUNG : breedingLook);
+        entityData.set(DATA_LOOK, isYoung() ? YOUNG : holdsNest() ? BREEDING : EVERYDAY);
+        entityData.set(DATA_MOUTH_FULL, mouthFull());
         life.apply();
+    }
+
+    // --- breeding ------------------------------------------------------------------------------------------------------
+
+    /** Whether her mouth is full, of eggs or of fry (drawn with the swollen throat; she does not eat). */
+    public boolean mouthFull() {
+        return level().isClientSide ? entityData.get(DATA_MOUTH_FULL) : eggs > 0 || !mouth.isEmpty();
+    }
+
+    /** A male's nest pit, if he holds one. */
+    @Nullable
+    public BlockPos nest() {
+        return nest;
+    }
+
+    public boolean holdsNest() {
+        return nest != null;
+    }
+
+    long nestSince() {
+        return nestSince;
+    }
+
+    /** He has fanned out a pit here and holds it. */
+    void takeNest(BlockPos at) {
+        nest = at.immutable();
+        nestSince = level().getGameTime();
+        leaveSchool();
+        refresh();
+    }
+
+    /** He leaves his pit (it stays and fades). */
+    void leaveNest() {
+        nest = null;
+        refresh();
+    }
+
+    /** How many eggs she carries in her mouth. */
+    public int eggsInMouth() {
+        return eggs;
+    }
+
+    /** How many fry she has taken back into her mouth. */
+    public int fryInMouth() {
+        return mouth.count();
+    }
+
+    /** Whether she is caring for fry now. */
+    public boolean caring() {
+        return caringUntil > level().getGameTime();
+    }
+
+    /** A fry's mother, if it has one. */
+    @Nullable
+    public UUID motherId() {
+        return mother;
+    }
+
+    /** Whether it is a fry still kept by its mother (young, within its first care days). */
+    public boolean withMother() {
+        return mother != null && isYoung() && life.age() < life.numbers().careTicks();
+    }
+
+    void loseMother() {
+        mother = null;
+    }
+
+    /** Whether it is busy breeding: then it neither leads nor joins a school. */
+    public boolean busyBreeding() {
+        return holdsNest() || eggs > 0 || !mouth.isEmpty() || caring() || withMother();
+    }
+
+    /** A tilapia male waits on his pit for the female to come; only a female goes looking. */
+    @Override
+    public boolean seeksMate() {
+        return !isMale();
+    }
+
+    /** A female may pick a male only while he holds a nest pit. */
+    @Override
+    public boolean takesMate() {
+        return isMale() && holdsNest();
+    }
+
+    /** The pair circle slowly over his pit, side by side head to tail (her goal steers them both). */
+    @Override
+    public void courting(Mob mate, int ticks) {
+        if (!(mate instanceof TilapiaEntity male) || male.nest() == null || ticks % 4 != 0) {
+            return;
+        }
+        Vec3 middle = Vec3.atBottomCenterOf(male.nest()).add(0, 0.4, 0);
+        double a = ticks * 0.06;
+        Vec3 her = middle.add(Math.cos(a) * 0.35, 0, Math.sin(a) * 0.35);
+        Vec3 him = middle.add(-Math.cos(a) * 0.35, 0, -Math.sin(a) * 0.35);
+        getNavigation().moveTo(her.x, her.y, her.z, 0.6);
+        male.getNavigation().moveTo(him.x, him.y, him.z, 0.6);
+        male.getLookControl().setLookAt(this, 30, 30);
+        if (ticks % 20 == 0 && level() instanceof ServerLevel server) {
+            server.sendParticles(ParticleTypes.BUBBLE, middle.x, middle.y, middle.z, 3, 0.3, 0.1, 0.3, 0.02);
+        }
+    }
+
+    /** She takes the eggs into her mouth; he leaves his pit. */
+    @Override
+    public void mated(Mob mate) {
+        if (isMale()) {
+            leaveNest();
+            return;
+        }
+        int[] clutch = {life.numbers().clutchMin(), life.numbers().clutchMax()};
+        eggs = clutch[0] + random.nextInt(clutch[1] - clutch[0] + 1);
+        eggsSince = level().getGameTime();
+        leaveSchool();
+        refresh();
+    }
+
+    /** Stops following and lets its own followers go (a fish busy breeding has no school). */
+    private void leaveSchool() {
+        stopFollowing();
+        if (hasFollowers()) {
+            for (TilapiaEntity other : level().getEntitiesOfClass(TilapiaEntity.class, getBoundingBox().inflate(16),
+                    t -> t.followedForTests() == this)) {
+                other.stopFollowing();
+            }
+        }
+    }
+
+    /** Where her face is: just in front of her snout (the fry's cloud, where they are let out). */
+    Vec3 facePoint() {
+        float yaw = yBodyRot * Mth.DEG_TO_RAD;
+        double ahead = 0.35 * getScale();
+        return new Vec3(getX() - Mth.sin(yaw) * ahead, getY() + getBbHeight() * 0.45, getZ() + Mth.cos(yaw) * ahead);
+    }
+
+    /** For tests: her eggs have been in her mouth this many ticks already. */
+    public void ageEggs(long ticks) {
+        eggsSince = level().getGameTime() - ticks;
+    }
+
+    /**
+     * A mother's day (server, every tick): her eggs hatch into fry round her face after the hatching days (or are lost
+     * when the river has no room for them); while she cares for her fry she takes them into her mouth when danger comes
+     * near and lets them out a few seconds after it has gone.
+     */
+    private void motherTick() {
+        long now = level().getGameTime();
+        if (eggs > 0 && now - eggsSince >= life.numbers().hatchTicks()) {
+            if (RoomToBreed.here(this, life.numbers().localLimit())) {
+                letOutFry(eggs);
+                caringUntil = now + life.numbers().careTicks();
+            }
+            eggs = 0;
+            refresh();
+        }
+        if (!caring()) {
+            if (!mouth.isEmpty()) {
+                letOutCarried();
+            }
+            return;
+        }
+        if (tickCount % 5 != 0) {
+            return;
+        }
+        if (dangerNear()) {
+            calm = 0;
+            if (mouth.isEmpty()) {
+                takeFryIn();
+            }
+        } else if (!mouth.isEmpty() && (calm += 5) >= CALM_TICKS) {
+            letOutCarried();
+        }
+    }
+
+    private boolean dangerNear() {
+        return !level().getEntities(this, getBoundingBox().inflate(DANGER_NEAR), e -> e.isAlive()
+                && (e instanceof CatfishEntity || e instanceof CrocodileEntity || e instanceof MonitorEntity
+                || e instanceof Player p && !p.isSpectator())).isEmpty();
+    }
+
+    private void takeFryIn() {
+        List<TilapiaEntity> fry = level().getEntitiesOfClass(TilapiaEntity.class, getBoundingBox().inflate(TAKE_WITHIN),
+                t -> t.isAlive() && getUUID().equals(t.motherId()) && t.withMother());
+        for (TilapiaEntity f : fry) {
+            mouth.take(f);
+        }
+        if (!fry.isEmpty()) {
+            refresh();
+        }
+    }
+
+    private void letOutCarried() {
+        if (level() instanceof ServerLevel server) {
+            mouth.letOut(server, facePoint());
+        }
+        calm = 0;
+        refresh();
+    }
+
+    private void letOutFry(int count) {
+        Vec3 face = facePoint();
+        for (int i = 0; i < count; i++) {
+            TilapiaEntity fry = SavannaEntities.TILAPIA.get().create(level());
+            if (fry == null) {
+                return;
+            }
+            fry.moveTo(face.x + (random.nextDouble() - 0.5) * 0.3, face.y, face.z + (random.nextDouble() - 0.5) * 0.3, random.nextFloat() * 360, 0);
+            fry.setUp(true, random);
+            fry.life().setAge(0);
+            fry.mother = getUUID();
+            fry.refresh();
+            level().addFreshEntity(fry);
+        }
+    }
+
+    /** Her fry in her mouth swim out if she is caught or taken away (fun first: some fry escape the catfish). */
+    @Override
+    public void remove(Entity.RemovalReason reason) {
+        if (!level().isClientSide && !mouth.isEmpty() && (reason == Entity.RemovalReason.KILLED || reason == Entity.RemovalReason.DISCARDED)) {
+            letOutCarried();
+        }
+        super.remove(reason);
+    }
+
+    // a fish busy breeding never leads nor joins a school
+    @Override
+    public boolean canBeFollowed() {
+        return !busyBreeding() && super.canBeFollowed();
+    }
+
+    @Override
+    public void addFollowers(java.util.stream.Stream<? extends AbstractSchoolingFish> followers) {
+        if (!busyBreeding()) {
+            super.addFollowers(followers.filter(f -> !(f instanceof TilapiaEntity t) || !t.busyBreeding()));
+        }
     }
 
     @Override
@@ -204,6 +475,12 @@ public class TilapiaEntity extends AbstractSchoolingFish implements GeoEntity, H
         }
         if (hungryIn > 0) {
             hungryIn--;
+        }
+        if (eggs > 0 || caringUntil > 0 || !mouth.isEmpty()) {
+            motherTick();
+            if (!caring() && eggs == 0 && mouth.isEmpty()) {
+                caringUntil = 0;
+            }
         }
     }
 
@@ -224,30 +501,48 @@ public class TilapiaEntity extends AbstractSchoolingFish implements GeoEntity, H
     public void addAdditionalSaveData(CompoundTag tag) {
         super.addAdditionalSaveData(tag);
         writeLife(tag);
+        if (nest != null) {
+            tag.putLong("Nest", nest.asLong());
+            tag.putLong("NestSince", nestSince);
+        }
+        if (eggs > 0) {
+            tag.putInt("Eggs", eggs);
+            tag.putLong("EggsSince", eggsSince);
+        }
+        if (caringUntil > 0) {
+            tag.putLong("CaringUntil", caringUntil);
+        }
+        mouth.save(tag, "Mouth");
+        if (mother != null) {
+            tag.putUUID("Mother", mother);
+        }
     }
 
     @Override
     public void readAdditionalSaveData(CompoundTag tag) {
         super.readAdditionalSaveData(tag);
+        nest = tag.contains("Nest") ? BlockPos.of(tag.getLong("Nest")) : null;
+        nestSince = tag.getLong("NestSince");
+        eggs = tag.getInt("Eggs");
+        eggsSince = tag.getLong("EggsSince");
+        caringUntil = tag.getLong("CaringUntil");
+        mouth.load(tag, "Mouth");
+        mother = tag.hasUUID("Mother") ? tag.getUUID("Mother") : null;
         readLife(tag);
+        refresh();
     }
 
     private void writeLife(CompoundTag tag) {
         life.save(tag);
-        tag.putInt("GrownLook", breedingLook);
     }
 
     /** Its life from its data (a fish saved before the kit kept its age as "TilapiaAge"); a fish with none keeps what it has. */
     private void readLife(CompoundTag tag) {
         boolean has = tag.contains("Life") || tag.contains("TilapiaAge") || tag.contains("sex") || tag.contains("young");
         life.load(tag, "TilapiaAge");
-        if (!has) {
-            return;
+        if (has) {
+            refresh();
         }
-        if (tag.contains("GrownLook")) {
-            breedingLook = tag.getInt("GrownLook");
-        }
-        refresh();
     }
 
     @Override
@@ -310,13 +605,18 @@ public class TilapiaEntity extends AbstractSchoolingFish implements GeoEntity, H
 
     @Override
     public AbstractSchoolingFish startFollowing(AbstractSchoolingFish leader) {
+        if (busyBreeding() || leader instanceof TilapiaEntity t && t.busyBreeding()) {
+            return leader;          // busy breeding: no school
+        }
         followed = leader;
         return super.startFollowing(leader);
     }
 
     @Override
     public void stopFollowing() {
-        super.stopFollowing();
+        if (followed != null) {
+            super.stopFollowing();
+        }
         followed = null;
     }
 

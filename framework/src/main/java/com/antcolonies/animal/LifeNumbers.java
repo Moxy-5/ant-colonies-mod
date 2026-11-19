@@ -26,6 +26,8 @@ import com.google.gson.JsonObject;
  * @param teenSize       the size a teen starts at (a share of grown)
  * @param teenDays       days a teen (0: no teen stage, the young grow straight up)
  * @param youngAtSpawn   how many of the world's own spawns are young
+ * @param spawnYoungDays how old the world's own young spawns are, youngest and oldest (days; null: in the first third
+ *                       of the young days)
  * @param breeds         whether it breeds at all (off until its own step of the plan)
  * @param breedEveryDays days after breeding before it is ready again
  * @param clutchMin      fewest eggs or young a breeding gives
@@ -36,21 +38,22 @@ import com.google.gson.JsonObject;
  * @param mateReach      how far it looks for a mate (blocks)
  * @param localLimit     it breeds only while fewer of its own kind than this live within {@link RoomToBreed#REACH}
  * @param care           what a parent does for its eggs or young
+ * @param careDays       days a parent keeps caring for its young after they hatch (the tilapia's fry round her head)
  * @param courtshipTicks how long the pair court before mating
  * @param courtshipClip  the courtship clip each plays (empty: the species' own hook decides)
  */
 public record LifeNumbers(boolean twoSexes, float maleShare, float[] maleSize, float[] femaleSize, float maxSize,
                           float youngSize, double youngDays, float teenSize, double teenDays, float youngAtSpawn,
-                          boolean breeds, double breedEveryDays, int clutchMin, int clutchMax, double hatchDays,
+                          double[] spawnYoungDays, boolean breeds, double breedEveryDays, int clutchMin, int clutchMax, double hatchDays,
                           Set<Season> seasons, Weather weather, double mateReach, int localLimit, Care care,
-                          int courtshipTicks, String courtshipClip) {
+                          double careDays, int courtshipTicks, String courtshipClip) {
 
     public static final int DAY = 24000;
 
     /** The numbers of an animal with no life file: two sexes, born grown, 0.85 to 1.15 of its size, no breeding. */
     public static final LifeNumbers DEFAULT = new LifeNumbers(true, 0.5F, new float[] {0.85F, 1.15F},
-            new float[] {0.85F, 1.15F}, 1.5F, 1.0F, 0, 1.0F, 0, 0, false, 10, 1, 1, 2, EnumSet.of(Season.RAINS),
-            Weather.ANY, 16, 4, Care.NONE, 100, "");
+            new float[] {0.85F, 1.15F}, 1.5F, 1.0F, 0, 1.0F, 0, 0, null, false, 10, 1, 1, 2, EnumSet.of(Season.RAINS),
+            Weather.ANY, 16, 4, Care.NONE, 0, 100, "");
 
     /** The weather it breeds in. */
     public enum Weather {
@@ -127,6 +130,27 @@ public record LifeNumbers(boolean twoSexes, float maleShare, float[] maleSize, f
         return (int) Math.round(breedEveryDays * DAY);
     }
 
+    /** Ticks a parent cares for its young after they hatch. */
+    public int careTicks() {
+        return (int) Math.round(careDays * DAY);
+    }
+
+    /**
+     * The age (ticks) of a young one the world spawns: between its file's {@code young_at_spawn_days}, or else
+     * somewhere in the first third of its young days.
+     */
+    public int spawnYoungAge(net.minecraft.util.RandomSource random) {
+        int young = youngTicks();
+        if (young <= 0) {
+            return grownAge();
+        }
+        if (spawnYoungDays == null) {
+            return random.nextInt(Math.max(1, young / 3));
+        }
+        double days = spawnYoungDays[0] + (spawnYoungDays[1] - spawnYoungDays[0]) * random.nextDouble();
+        return Math.min(young - 1, (int) Math.round(days * DAY));
+    }
+
     /** Ticks from laying to hatching. */
     public int hatchTicks() {
         return (int) Math.round(hatchDays * DAY);
@@ -159,11 +183,12 @@ public record LifeNumbers(boolean twoSexes, float maleShare, float[] maleSize, f
         LifeNumbers out = new LifeNumbers(two, f(o, "male_share", d.maleShare), male, female, f(o, "max_size", d.maxSize),
                 f(o, "young_size", d.youngSize), dbl(o, "young_days", d.youngDays), f(o, "teen_size", d.teenSize),
                 dbl(o, "teen_days", d.teenDays), f(o, "young_at_spawn", d.youngAtSpawn),
+                o.has("young_at_spawn_days") ? days(o.get("young_at_spawn_days")) : d.spawnYoungDays,
                 o.has("breeds") ? o.get("breeds").getAsBoolean() : d.breeds, dbl(o, "breed_every_days", d.breedEveryDays),
                 Math.round(clutch[0]), Math.round(clutch[1]), dbl(o, "hatch_days", d.hatchDays), Set.copyOf(seasons),
                 o.has("weather") ? Weather.fromFile(o.get("weather").getAsString()) : d.weather,
                 dbl(o, "mate_reach", d.mateReach), o.has("local_limit") ? o.get("local_limit").getAsInt() : d.localLimit,
-                o.has("care") ? Care.fromFile(o.get("care").getAsString()) : d.care,
+                o.has("care") ? Care.fromFile(o.get("care").getAsString()) : d.care, dbl(o, "care_days", d.careDays),
                 o.has("courtship_ticks") ? o.get("courtship_ticks").getAsInt() : d.courtshipTicks,
                 o.has("courtship_clip") ? o.get("courtship_clip").getAsString() : d.courtshipClip);
         out.check();
@@ -177,6 +202,14 @@ public record LifeNumbers(boolean twoSexes, float maleShare, float[] maleSize, f
         if (youngSize <= 0 || youngSize > 1 || teenSize <= 0 || teenSize > 1 || youngDays < 0 || teenDays < 0) {
             throw new IllegalArgumentException("young and teen sizes must be over 0 and at most 1, days 0 or more");
         }
+    }
+
+    private static double[] days(JsonElement e) {
+        float[] r = range(e);
+        if (r[0] < 0 || r[0] > r[1]) {
+            throw new IllegalArgumentException("young_at_spawn_days must be two days, smallest first: " + e);
+        }
+        return new double[] {r[0], r[1]};
     }
 
     private static float[] range(JsonElement e) {

@@ -1,6 +1,15 @@
 {
-  "_note": "The river snail's life (the animal life kit). Every snail is both male and female (my pick, as many snails). Sizes are shares of its usual size (0.4 blocks). Born grown for now; clutches and babies come in step 2 of the plan.",
+  "_note": "The river snail's life (the animal life kit, step 2: breeding on, 2026-11-19; numbers my picks). Every snail is both male and female: two ready snails meet, touch heads for 8 seconds and both lay 2 to 4 pearly eggs at the waterline; they hatch in 2 days into babies a quarter of the size (0.1 blocks), grown in 3 days. Sizes are shares of its usual size (0.4 blocks). The world's own spawns stay grown. Breeds only while fewer than 10 snails live within 48 blocks and the river bed group (shared with the crabs) is under its cap.",
   "sexes": "both",
   "size": [0.8, 1.15],
-  "breeds": false
+  "young_size": 0.25,
+  "young_days": 3,
+  "breeds": true,
+  "breed_every_days": 3,
+  "clutch": [2, 4],
+  "hatch_days": 2,
+  "care": "none",
+  "mate_reach": 8,
+  "local_limit": 10,
+  "courtship_ticks": 160
 }

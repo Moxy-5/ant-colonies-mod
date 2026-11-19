@@ -202,6 +202,20 @@ public class SavannaBlocks {
             BlockBehaviour.Properties.of().mapColor(MapColor.STONE).noCollission().instabreak().noOcclusion()
                     .offsetType(BlockBehaviour.OffsetType.XZ).sound(SoundType.STONE).pushReaction(PushReaction.DESTROY));
 
+    /**
+     * The tilapia's nest pit and the river snail's eggs (M9, animal life cycle step 2, 2026-11-19; block/TilapiaNestBlock,
+     * block/SnailEggsBlock): a breeding male's saucer in the bed, fading in about 3 days; a pearly clutch at the
+     * waterline that hatches into baby snails. Both drop nothing.
+     */
+    public static final DeferredBlock<com.antcolonies.savanna.block.TilapiaNestBlock> TILAPIA_NEST = BLOCKS.registerBlock("tilapia_nest",
+            com.antcolonies.savanna.block.TilapiaNestBlock::new,
+            BlockBehaviour.Properties.of().mapColor(MapColor.WATER).replaceable().noCollission().instabreak().noOcclusion()
+                    .sound(SoundType.SAND).randomTicks().pushReaction(PushReaction.DESTROY).noLootTable());
+    public static final DeferredBlock<com.antcolonies.savanna.block.SnailEggsBlock> SNAIL_EGGS = BLOCKS.registerBlock("snail_eggs",
+            com.antcolonies.savanna.block.SnailEggsBlock::new,
+            BlockBehaviour.Properties.of().mapColor(MapColor.TERRACOTTA_PINK).noCollission().instabreak().noOcclusion()
+                    .sound(SoundType.FROGSPAWN).randomTicks().pushReaction(PushReaction.DESTROY).noLootTable());
+
     static {
         TreeBlocks.init(); // the giant savanna trees' blocks (M7.5), registered with the rest
     }

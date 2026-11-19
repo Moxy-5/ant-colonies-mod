@@ -1,0 +1,56 @@
+{
+  "variants": {
+    "facing=up,waterlogged=false": {
+      "model": "antcolonies:block/snail_eggs"
+    },
+    "facing=up,waterlogged=true": {
+      "model": "antcolonies:block/snail_eggs"
+    },
+    "facing=down,waterlogged=false": {
+      "model": "antcolonies:block/snail_eggs",
+      "x": 180
+    },
+    "facing=down,waterlogged=true": {
+      "model": "antcolonies:block/snail_eggs",
+      "x": 180
+    },
+    "facing=north,waterlogged=false": {
+      "model": "antcolonies:block/snail_eggs",
+      "x": 90
+    },
+    "facing=north,waterlogged=true": {
+      "model": "antcolonies:block/snail_eggs",
+      "x": 90
+    },
+    "facing=south,waterlogged=false": {
+      "model": "antcolonies:block/snail_eggs",
+      "x": 90,
+      "y": 180
+    },
+    "facing=south,waterlogged=true": {
+      "model": "antcolonies:block/snail_eggs",
+      "x": 90,
+      "y": 180
+    },
+    "facing=west,waterlogged=false": {
+      "model": "antcolonies:block/snail_eggs",
+      "x": 90,
+      "y": 270
+    },
+    "facing=west,waterlogged=true": {
+      "model": "antcolonies:block/snail_eggs",
+      "x": 90,
+      "y": 270
+    },
+    "facing=east,waterlogged=false": {
+      "model": "antcolonies:block/snail_eggs",
+      "x": 90,
+      "y": 90
+    },
+    "facing=east,waterlogged=true": {
+      "model": "antcolonies:block/snail_eggs",
+      "x": 90,
+      "y": 90
+    }
+  }
+}

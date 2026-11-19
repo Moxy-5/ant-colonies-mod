@@ -38,7 +38,7 @@ public class GrazeAlgaeGoal extends Goal {
 
     @Override
     public boolean canUse() {
-        if (fish.hungryIn > 0 || !fish.isInWater() || fish.getRandom().nextInt(10) != 0) {
+        if (fish.hungryIn > 0 || !fish.isInWater() || fish.mouthFull() || fish.holdsNest() || fish.getRandom().nextInt(10) != 0) {
             return false;
         }
         mat = findMat();

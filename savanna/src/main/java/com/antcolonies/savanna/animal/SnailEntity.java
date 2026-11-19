@@ -49,6 +49,10 @@ import software.bernie.geckolib.util.GeckoLibUtil;
  * carries on ({@link SnailHideGoal}).</li>
  * <li>A hungry crab may hunt it (hiding does not save it): it grabs it, cracks the shell, eats it and leaves the broken
  * shell on the bed ({@link CrabPickGoal}).</li>
+ * <li>Breeding (animal life cycle step 2, 2026-11-19; its life file): every snail is both male and female, so any two
+ * ready snails creep together ({@link SeekMateGoal}), touch heads for a while, and both lay a pearly clutch at the
+ * waterline ({@link SnailLayGoal}); the eggs hatch into baby snails a quarter of the size, which grow up in a few
+ * days.</li>
  * </ul>
  */
 public class SnailEntity extends PathfinderMob implements GeoEntity, HasLife {
@@ -72,6 +76,8 @@ public class SnailEntity extends PathfinderMob implements GeoEntity, HasLife {
     private static final EntityDataAccessor<Byte> DATA_LIFE = AnimalLife.dataFor(SnailEntity.class);
     /** Its life: sex, stage, own size (the animal life kit). */
     private final AnimalLife life;
+    /** Eggs it is to lay after mating (0: none). */
+    private int eggsToLay;
 
     private final AnimatableInstanceCache cache = GeckoLibUtil.createInstanceCache(this);
 
@@ -90,6 +96,7 @@ public class SnailEntity extends PathfinderMob implements GeoEntity, HasLife {
     @Override
     protected void registerGoals() {
         goalSelector.addGoal(1, new SnailHideGoal(this));
+        goalSelector.addGoal(2, new SnailLayGoal(this));
         goalSelector.addGoal(2, new SnailGrazeGoal(this));
         // never stopped by Minecraft's "nothing happened for 5 s and no player within 32" rule (docs/BUGS.md 216)
         goalSelector.addGoal(3, new SeekMateGoal<>(this, 1.0));
@@ -99,6 +106,28 @@ public class SnailEntity extends PathfinderMob implements GeoEntity, HasLife {
     @Override
     public AnimalLife life() {
         return life;
+    }
+
+    /** Eggs it is to lay (0: none). */
+    public int eggsToLay() {
+        return eggsToLay;
+    }
+
+    void laidEggs() {
+        eggsToLay = 0;
+    }
+
+    /** The pair touch heads, still, face to face. */
+    @Override
+    public void courting(Mob mate, int ticks) {
+        face(mate.getX(), mate.getZ());
+        setDoing(CALM);
+    }
+
+    /** Both of the pair lay (every snail is both male and female). */
+    @Override
+    public void mated(Mob mate) {
+        eggsToLay = life.numbers().clutchMin() + random.nextInt(life.numbers().clutchMax() - life.numbers().clutchMin() + 1);
     }
 
     @Override
@@ -204,6 +233,9 @@ public class SnailEntity extends PathfinderMob implements GeoEntity, HasLife {
         super.addAdditionalSaveData(tag);
         life.save(tag);
         tag.putInt("HungryIn", hungryIn);
+        if (eggsToLay > 0) {
+            tag.putInt("EggsToLay", eggsToLay);
+        }
     }
 
     @Override
@@ -211,6 +243,7 @@ public class SnailEntity extends PathfinderMob implements GeoEntity, HasLife {
         super.readAdditionalSaveData(tag);
         life.load(tag);
         hungryIn = tag.getInt("HungryIn");
+        eggsToLay = tag.getInt("EggsToLay");
         refresh();
     }
 

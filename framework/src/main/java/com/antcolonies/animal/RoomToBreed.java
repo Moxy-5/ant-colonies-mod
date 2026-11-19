@@ -43,11 +43,13 @@ public final class RoomToBreed {
 
     /**
      * Whether this spawning group is under its cap at this chunk, by the spawner's own last count (the world's cap and
-     * the cap round the players near). With no count yet (the spawner has not run) there is room.
+     * the cap round the players near). With no count yet (the spawner has not run), or no player anywhere near enough
+     * for the spawner to count (a game test server, an empty world: the spawner's cap is then 0), there is room: the
+     * local limit alone holds.
      */
     public static boolean groupHasRoom(ServerLevel level, MobCategory group, ChunkPos at) {
         NaturalSpawner.SpawnState state = level.getChunkSource().getLastSpawnState();
-        if (state == null) {
+        if (state == null || state.getSpawnableChunkCount() == 0) {
             return true;
         }
         if (UNDER_CAP != null) {

@@ -41,11 +41,11 @@ Every living thing in the mod, built or planned, plants and fungi included, in o
 - Seed-stealing guests of the harvester: IDEA (M6.5 backlog).
 
 **4. River animals (savanna rivers, pans, oxbows; food chain algae -> tilapia -> catfish -> crocodile, side chain algae -> snail -> crab)**
-- Nile tilapia (grazing schooling fish, 3 looks): BUILT.
+- Nile tilapia (grazing schooling fish, 3 looks): BUILT; breeding (nest pit, mouthbrooding, fry) BUILT 2026-11-19.
 - River catfish (eats tilapia, bites it in half): BUILT.
 - Nile crocodile (basking, ambush, death roll, fishing, bank hauls): BUILT; nests in sand banks, mother carrying hatchlings, banded young, teens and old giants (only 1 or 2 in a whole river system, huge and worn, the river's boss) PLANNED (`docs/plans/animal-life-cycle.md`).
 - River crab (eats remains, scraps, algae, snails): BUILT; burrow with shells outside PLANNED.
-- River snail (Garden spiral look): BUILT.
+- River snail (Garden spiral look): BUILT; breeding (clutches at the waterline) BUILT 2026-11-19.
 - Helmeted terrapin (tears remains in groups, basks on crocodiles): PLANNED (next after the snail in the clean-up order).
 - Nile monitor (eats crabs, snails and remains on the banks, hisses at players, basks; later raids crocodile nests and lays eggs in living termite mounds): BUILT 2026-11-17 (before the crocodile nests, the user's ask).
 - African tigerfish (fast pack hunter with big teeth, leaps at the surface, even at birds; was held back as a third hunter of the tilapia, now on the user's list; balance it against the catfish and crocodile): IDEA (user's list 2026-11-16).

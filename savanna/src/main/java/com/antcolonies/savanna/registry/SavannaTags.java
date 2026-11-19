@@ -34,6 +34,10 @@ public class SavannaTags {
      * break open the termites' soil sheeting over a feeding site; they do not dig down through the ground, so grass and
      * dirt left this tag; a Matabele shut in may still bite dirt to get out, {@code MatabeleEntity.mayBiteOut}).
      */
+    /** The beds a tilapia male may fan his nest pit out of (silt, mud and sand; animal life cycle step 2). */
+    public static final TagKey<Block> TILAPIA_NEST_GROUND = TagKey.create(Registries.BLOCK,
+            ResourceLocation.fromNamespaceAndPath(SavannaMod.MODID, "tilapia_nest_ground"));
+
     public static final TagKey<Block> MATABELE_BREAKS_OPEN = TagKey.create(Registries.BLOCK,
             ResourceLocation.fromNamespaceAndPath(SavannaMod.MODID, "matabele_breaks_open"));
 }

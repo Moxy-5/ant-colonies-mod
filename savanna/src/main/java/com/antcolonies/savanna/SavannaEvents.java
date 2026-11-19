@@ -222,6 +222,8 @@ public class SavannaEvents {
             event.accept(SavannaItems.SCRAPS);
             event.accept(SavannaItems.CROC_DROPPINGS);
             event.accept(SavannaItems.CRAB_SHELL);
+            event.accept(SavannaItems.TILAPIA_NEST);
+            event.accept(SavannaItems.SNAIL_EGGS);
             SavannaItems.RIVER_SAND.forEach(event::accept);
             event.accept(SavannaItems.RIVER_PEBBLES);
             // The giant savanna trees' blocks (M7.5).

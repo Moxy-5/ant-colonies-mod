@@ -109,9 +109,9 @@ Every animal, plant, fungus and colony insect, built or planned, with its status
 ## Current status (short: rewrite in place, keep under about 15 lines; the log of every status bullet is `docs/status-log.md`)
 - **Branch:** `C:\Ant Mod` is on `claude/hopeful-kirch-74f4d5`, 57 commits ahead of `master` (not merged): the Nile monitor, crocodile and monitor sizes, animation polish, river zones and oxbows planned, the animal life cycle.
 - **Backup:** private GitHub repository `https://github.com/Moxy-5/ant-colonies-mod` (remote `origin`); push after every commit. Nothing runs by itself on GitHub (workflows by hand only).
-- **Latest:** animal life cycle step 1, the shared animal life kit (`com.antcolonies.animal`), built 2026-11-18, nothing changes in-game; the model workshop planned 2026-11-18, looked over and merged with the tools review 2026-11-19; teens and the old giant crocodile approved in the life viewer.
-- **Next:** animal life cycle step 2, tilapia and snail breeding (`docs/plans/animal-life-cycle.md`).
-- **Built but not tried in-game yet** (on this branch): the Nile monitor's back and water entry, the animation polish (crocodile blinks, monitor watching and biting, monitors bending on steps, catfish gulping air). Waiting for the user's look: oxbows and pans in the model viewer.
+- **Latest:** animal life cycle step 2, tilapia and snail breeding (nest pits, mouthbrooding, snail clutches), built 2026-11-19; step 1 the kit 2026-11-18; the model workshop planned and merged with the tools review 2026-11-19.
+- **Next:** animal life cycle step 3, crab and catfish (`docs/plans/animal-life-cycle.md`).
+- **Built but not tried in-game yet** (on this branch): tilapia and snail breeding; the Nile monitor's back and water entry, the animation polish (crocodile blinks, monitor watching and biting, monitors bending on steps, catfish gulping air). Waiting for the user's look: oxbows and pans in the model viewer.
 - **Unconfirmed picks:** many numbers in `docs/HISTORY.md` are marked "my pick"; search for them before relying on one.
 
 ## Other notes files (read only when the task needs them)

@@ -1,0 +1,106 @@
+{
+  "variants": {
+    "age=0,sandy=false": [
+      {
+        "model": "antcolonies:block/tilapia_nest"
+      },
+      {
+        "model": "antcolonies:block/tilapia_nest",
+        "y": 90
+      },
+      {
+        "model": "antcolonies:block/tilapia_nest",
+        "y": 180
+      },
+      {
+        "model": "antcolonies:block/tilapia_nest",
+        "y": 270
+      }
+    ],
+    "age=1,sandy=false": [
+      {
+        "model": "antcolonies:block/tilapia_nest"
+      },
+      {
+        "model": "antcolonies:block/tilapia_nest",
+        "y": 90
+      },
+      {
+        "model": "antcolonies:block/tilapia_nest",
+        "y": 180
+      },
+      {
+        "model": "antcolonies:block/tilapia_nest",
+        "y": 270
+      }
+    ],
+    "age=2,sandy=false": [
+      {
+        "model": "antcolonies:block/tilapia_nest"
+      },
+      {
+        "model": "antcolonies:block/tilapia_nest",
+        "y": 90
+      },
+      {
+        "model": "antcolonies:block/tilapia_nest",
+        "y": 180
+      },
+      {
+        "model": "antcolonies:block/tilapia_nest",
+        "y": 270
+      }
+    ],
+    "age=0,sandy=true": [
+      {
+        "model": "antcolonies:block/tilapia_nest_sandy"
+      },
+      {
+        "model": "antcolonies:block/tilapia_nest_sandy",
+        "y": 90
+      },
+      {
+        "model": "antcolonies:block/tilapia_nest_sandy",
+        "y": 180
+      },
+      {
+        "model": "antcolonies:block/tilapia_nest_sandy",
+        "y": 270
+      }
+    ],
+    "age=1,sandy=true": [
+      {
+        "model": "antcolonies:block/tilapia_nest_sandy"
+      },
+      {
+        "model": "antcolonies:block/tilapia_nest_sandy",
+        "y": 90
+      },
+      {
+        "model": "antcolonies:block/tilapia_nest_sandy",
+        "y": 180
+      },
+      {
+        "model": "antcolonies:block/tilapia_nest_sandy",
+        "y": 270
+      }
+    ],
+    "age=2,sandy=true": [
+      {
+        "model": "antcolonies:block/tilapia_nest_sandy"
+      },
+      {
+        "model": "antcolonies:block/tilapia_nest_sandy",
+        "y": 90
+      },
+      {
+        "model": "antcolonies:block/tilapia_nest_sandy",
+        "y": 180
+      },
+      {
+        "model": "antcolonies:block/tilapia_nest_sandy",
+        "y": 270
+      }
+    ]
+  }
+}

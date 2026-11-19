@@ -71,16 +71,15 @@ public final class AnimalLife {
     }
 
     /**
-     * Rolls a new life when it spawns: its sex, its own size within its sex's range, and its age (grown, or young and
-     * somewhere in the first third of its young days: today's tilapia rule, my pick).
+     * Rolls a new life when it spawns: its sex, its own size within its sex's range, and its age (grown, or young at its
+     * file's age for young spawns, {@link LifeNumbers#spawnYoungAge}). Hatched young set their age to 0 after.
      */
     public void setUp(boolean young, RandomSource random) {
         LifeNumbers numbers = numbers();
         sex = rollSex(numbers, random);
         float[] size = numbers.sizeOf(sex);
         ownSize = size[0] + (size[1] - size[0]) * random.nextFloat();
-        int youngTicks = numbers.youngTicks();
-        age = young && youngTicks > 0 ? random.nextInt(Math.max(1, youngTicks / 3)) : numbers.grownAge();
+        age = young ? numbers.spawnYoungAge(random) : numbers.grownAge();
         readyIn = 0;
         old = false;
         apply();

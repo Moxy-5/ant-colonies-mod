@@ -3,17 +3,23 @@ package com.antcolonies.savanna.gametest;
 import java.util.List;
 
 import com.antcolonies.animal.AnimalLife;
+import com.antcolonies.animal.AnimalLives;
+import com.antcolonies.animal.EggClutchBlockEntity;
 import com.antcolonies.animal.HasLife;
 import com.antcolonies.animal.LifeNumbers;
 import com.antcolonies.animal.Sex;
 import com.antcolonies.savanna.SavannaMod;
+import com.antcolonies.savanna.animal.SnailEntity;
 import com.antcolonies.savanna.animal.TilapiaEntity;
+import com.antcolonies.savanna.registry.SavannaBlocks;
 import com.antcolonies.savanna.registry.SavannaEntities;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.gametest.framework.GameTest;
 import net.minecraft.gametest.framework.GameTestHelper;
 import net.minecraft.nbt.CompoundTag;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.Mob;
 import net.minecraft.world.entity.ai.attributes.Attributes;
@@ -23,7 +29,8 @@ import net.neoforged.neoforge.gametest.PrefixGameTestTemplate;
 /**
  * The animal life kit (M9, step 1 of {@code docs/plans/animal-life-cycle.md}): every river animal holds its life
  * (sex, age, own size) through the kit, read from its life file, saved and loaded whole; animals saved before the kit
- * keep their size and sex; a summon's {@code sex} and {@code young} are obeyed; nothing changes in how they look.
+ * keep their size and sex; a summon's {@code sex} and {@code young} are obeyed. Step 2: the tilapia and the snail breed
+ * (a nest pit and mouthbrooding; clutches at the waterline), and room to breed stops them at the local limit.
  */
 @GameTestHolder(SavannaMod.MODID)
 @PrefixGameTestTemplate(false)
@@ -52,7 +59,8 @@ public class AnimalLifeTests {
             helper.assertTrue(Math.abs(mob.getAttributeBaseValue(Attributes.SCALE) - life.ownSize()) < 0.01,
                     name + " is not drawn at its own size when grown");
             helper.assertTrue(numbers.twoSexes() == (life.sex() != Sex.NONE), name + "'s sex does not fit its kind: " + life.sex());
-            helper.assertTrue(!numbers.breeds(), name + " breeds already (breeding is off in step 1)");
+            boolean breeds = kind == SavannaEntities.TILAPIA.get() || kind == SavannaEntities.SNAIL.get();
+            helper.assertTrue(numbers.breeds() == breeds, name + (breeds ? " does not breed (on since step 2)" : " breeds already (not before its own step)"));
 
             // Saved and loaded whole.
             CompoundTag saved = mob.saveWithoutId(new CompoundTag());
@@ -85,8 +93,12 @@ public class AnimalLifeTests {
         helper.succeed();
     }
 
+    /**
+     * A tilapia hatches as a fry a little over a fifth of its grown size (step 2: the fry round their mother's face) and
+     * grows; the world's own young spawns are 2 to 3 days old, as big as young spawns were before (half to two thirds).
+     */
     @GameTest(template = "arena", timeoutTicks = 40)
-    public static void aYoungTilapiaStillGrowsFromHalfSizeAsBefore(GameTestHelper helper) {
+    public static void aTilapiaHatchesAsAFryAndTheWorldsYoungAreAsBefore(GameTestHelper helper) {
         TilapiaEntity fish = helper.spawn(SavannaEntities.TILAPIA.get(), new BlockPos(6, 2, 6));
         CompoundTag asked = fish.saveWithoutId(new CompoundTag());
         asked.remove("Life");
@@ -96,7 +108,13 @@ public class AnimalLifeTests {
         helper.assertTrue(fish.isYoung() && fish.isMale(), "a summon's young:true sex:\"male\" not obeyed");
         helper.assertTrue(fish.look() == TilapiaEntity.YOUNG, "a young tilapia does not wear the young look");
         double hatched = fish.getAttributeBaseValue(Attributes.SCALE) / fish.ownSize();
-        helper.assertTrue(Math.abs(hatched - 0.5) < 0.01, "a hatched tilapia is not half its grown size: " + hatched);
+        helper.assertTrue(Math.abs(hatched - 0.22) < 0.01, "a hatched tilapia is not a fry of 0.22 its grown size: " + hatched);
+        for (int i = 0; i < 40; i++) {
+            TilapiaEntity spawned = new TilapiaEntity(SavannaEntities.TILAPIA.get(), helper.getLevel());
+            spawned.setUp(true, helper.getLevel().random);
+            double share = spawned.getAttributeBaseValue(Attributes.SCALE) / spawned.ownSize();
+            helper.assertTrue(spawned.isYoung() && share > 0.5 && share < 0.7, "a young spawn of the world at " + share + " of grown (0.5 to 0.7 wanted)");
+        }
         fish.setTicksToGrow(0);
         helper.assertTrue(!fish.isYoung() && fish.look() != TilapiaEntity.YOUNG, "a tilapia with no ticks left to grow is still young");
         helper.assertTrue(Math.abs(fish.getAttributeBaseValue(Attributes.SCALE) - fish.ownSize()) < 0.01,
@@ -112,5 +130,271 @@ public class AnimalLifeTests {
         helper.assertTrue(older.isYoung() && older.life().age() == LifeNumbers.DAY && older.isMale(),
                 "a tilapia saved before the kit lost its age or sex");
         helper.succeed();
+    }
+
+    // --- breeding (step 2: the tilapia and the snail) --------------------------------------------------------------------
+
+    private static final int P0 = 2, P1 = 13;              // the pond's inside, x and z
+    private static final int BED = TermiteMoundTests.SURFACE, WATER_TOP = BED + 2;   // a silt bed at the arena's ground, two blocks of water over it
+
+    /**
+     * A small pond for breeding: a silt bed with two blocks of water over it, a block-deep shelf of silt along its west
+     * bank (the shallows), walled with stone one block higher than the water (a bank face just over the waterline for
+     * snail eggs), on a stone floor so no water leaks out.
+     */
+    private static void breedingPond(GameTestHelper helper) {
+        for (int x = P0 - 1; x <= P1 + 1; x++) {
+            for (int z = P0 - 1; z <= P1 + 1; z++) {
+                boolean wall = x < P0 || x > P1 || z < P0 || z > P1;
+                helper.setBlock(new BlockPos(x, BED - 1, z), Blocks.STONE);
+                helper.setBlock(new BlockPos(x, BED, z), wall ? Blocks.STONE : SavannaBlocks.SILT.get());
+                for (int y = BED + 1; y <= WATER_TOP + 2; y++) {
+                    BlockPos at = new BlockPos(x, y, z);
+                    if (wall) {
+                        helper.setBlock(at, y <= WATER_TOP + 1 ? Blocks.STONE : Blocks.AIR);
+                    } else if (x == P0 && y == BED + 1) {
+                        helper.setBlock(at, SavannaBlocks.SILT.get());
+                    } else {
+                        helper.setBlock(at, y <= WATER_TOP ? Blocks.WATER : Blocks.AIR);
+                    }
+                }
+            }
+        }
+    }
+
+    /**
+     * Clears animals of this kind left round the arena by tests of earlier batches (room to breed counts every one within
+     * {@link com.antcolonies.animal.RoomToBreed#REACH}); only for a test alone in its batch.
+     */
+    private static void clearLeftovers(GameTestHelper helper, EntityType<?> kind) {
+        net.minecraft.world.phys.AABB round = new net.minecraft.world.phys.AABB(helper.absolutePos(new BlockPos(8, BED, 8)))
+                .inflate(com.antcolonies.animal.RoomToBreed.REACH + 16);
+        helper.getLevel().getEntities(kind, round, e -> true).forEach(net.minecraft.world.entity.Entity::discard);
+    }
+
+    /** A grown animal of this sex ("male", "female" or "none"), ready to breed. */
+    private static <T extends Mob & HasLife> T grown(GameTestHelper helper, EntityType<T> kind, String sex, BlockPos at) {
+        T animal = helper.spawn(kind, at);
+        animal.life().setUp(false, animal.getRandom());
+        CompoundTag asked = new CompoundTag();
+        asked.putString("sex", sex);
+        animal.life().load(asked);
+        return animal;
+    }
+
+    /**
+     * The tilapia's breeding: a ready male fans a nest pit out of the silt and wears his breeding colours on it; a ready
+     * female comes, they court, she takes the eggs into her mouth (her throat swells) and he leaves the pit in his everyday
+     * colours; a day on, 4 to 6 fry come out round her face, fry-sized; a player coming near sends them into her mouth,
+     * and when they are gone she lets them out again.
+     */
+    @GameTest(template = "arena", timeoutTicks = 3000, batch = "breeding_tilapia")
+    public static void tilapiaBreedInANestPitAndTheMotherKeepsHerFryInHerMouth(GameTestHelper helper) {
+        breedingPond(helper);
+        clearLeftovers(helper, SavannaEntities.TILAPIA.get());
+        TilapiaEntity male = grown(helper, SavannaEntities.TILAPIA.get(), "male", new BlockPos(5, BED + 1, 5));
+        TilapiaEntity female = grown(helper, SavannaEntities.TILAPIA.get(), "female", new BlockPos(10, BED + 2, 10));
+        helper.assertTrue(male.look() == TilapiaEntity.EVERYDAY, "a grown male with no nest wears the breeding colours");
+        male.wantsNestNow = true;
+        int[] stage = {0};
+        long[] since = {0};
+        int[] fryAt = {0};
+        net.minecraft.server.level.ServerPlayer[] danger = {null};
+        helper.runAtTickTime(2990, () -> helper.fail("stuck at stage " + stage[0] + " (players " + helper.getLevel().players().size()
+                + ", room " + com.antcolonies.animal.RoomToBreed.here(male, male.life().numbers().localLimit()) + "): male nest " + male.nest() + " wants " + male.wantsNestNow
+                + " ready " + male.life().readyToBreed() + " in water " + male.isInWater() + " at " + helper.relativePos(male.blockPosition())
+                + "; female ready " + female.life().readyToBreed() + " partner " + female.life().partner() + " eggs " + female.eggsInMouth()
+                + " at " + helper.relativePos(female.blockPosition()) + " stage " + female.life().stage() + " age " + female.life().age()
+                + "; his id " + male.getUUID() + " his partner " + male.life().partner() + " d " + female.distanceTo(male) + " fpos " + female.position()
+                + " mpos " + male.position() + " fnav done " + female.getNavigation().isDone() + " fpath " + female.getNavigation().getPath()
+                + " fgoals " + female.goalSelector.getAvailableGoals().stream().filter(g -> g.isRunning()).map(g -> g.getGoal().getClass().getSimpleName()).toList()
+                + " mgoals " + male.goalSelector.getAvailableGoals().stream().filter(g -> g.isRunning()).map(g -> g.getGoal().getClass().getSimpleName()).toList()
+                + " fry " + fryOf(helper, female).size()));
+        helper.onEachTick(() -> {
+            ServerLevel level = helper.getLevel();
+            long now = level.getGameTime();
+            switch (stage[0]) {
+                case 0 -> {                         // he digs his pit
+                    if (male.holdsNest()) {
+                        helper.assertTrue(level.getBlockState(male.nest()).is(SavannaBlocks.TILAPIA_NEST.get()), "he holds a nest with no pit");
+                        helper.assertTrue(male.look() == TilapiaEntity.BREEDING, "a male on his pit not in breeding colours");
+                        stage[0] = 1;
+                    }
+                }
+                case 1 -> {                         // she comes, they court, she takes the eggs
+                    if (female.eggsInMouth() > 0) {
+                        int eggs = female.eggsInMouth();
+                        helper.assertTrue(eggs >= 4 && eggs <= 6, eggs + " eggs (4 to 6 wanted)");
+                        helper.assertTrue(female.mouthFull(), "her mouth full of eggs is not drawn swollen");
+                        helper.assertTrue(!male.holdsNest() && male.look() == TilapiaEntity.EVERYDAY, "he still holds his pit after mating");
+                        fryAt[0] = eggs;
+                        female.ageEggs(female.life().numbers().hatchTicks());
+                        stage[0] = 2;
+                    }
+                }
+                case 2 -> {                         // the fry come out round her face
+                    List<TilapiaEntity> fry = fryOf(helper, female);
+                    if (!fry.isEmpty()) {
+                        helper.assertTrue(fry.size() == fryAt[0], fry.size() + " fry from " + fryAt[0] + " eggs");
+                        for (TilapiaEntity f : fry) {
+                            double share = f.getAttributeBaseValue(Attributes.SCALE) / f.ownSize();
+                            helper.assertTrue(f.isYoung() && f.withMother() && Math.abs(share - 0.22) < 0.02, "a fry not fry-sized or not with her: " + share);
+                        }
+                        helper.assertTrue(female.caring() && !female.mouthFull(), "her mouth still full with her fry out");
+                        stage[0] = 3;
+                        since[0] = now;
+                    }
+                }
+                case 3 -> {                         // the fry keep round her; then a catfish comes
+                    if (now - since[0] == 100) {
+                        for (TilapiaEntity f : fryOf(helper, female)) {
+                            helper.assertTrue(f.distanceTo(female) < 3, "a fry strayed " + f.distanceTo(female) + " from its mother");
+                        }
+                        // a player comes near (a catfish spawned here would be hungry and might grab her instead)
+                        net.minecraft.server.level.ServerPlayer player = helper.makeMockServerPlayerInLevel();
+                        player.moveTo(female.getX() + 2, female.getY() + 1, female.getZ());
+                        danger[0] = player;
+                        stage[0] = 4;
+                        since[0] = now;
+                    }
+                }
+                case 4 -> {                         // she takes them into her mouth
+                    if (female.fryInMouth() > 0) {
+                        helper.assertTrue(female.mouthFull(), "her mouth full of fry is not drawn swollen");
+                        helper.getLevel().getServer().getPlayerList().remove(danger[0]);   // and goes
+                        stage[0] = 5;
+                        since[0] = now;
+                    } else if (now - since[0] > 40) {
+                        helper.fail("a player beside her and her fry not taken into her mouth");
+                    }
+                }
+                case 5 -> {                         // and lets them out when it is gone
+                    if (female.fryInMouth() == 0 && fryOf(helper, female).size() == fryAt[0]) {
+                        helper.succeed();
+                    } else if (now - since[0] > 200) {
+                        helper.fail("the player gone and her fry not let out again (" + female.fryInMouth() + " in her mouth)");
+                    }
+                }
+                default -> {
+                }
+            }
+        });
+    }
+
+    private static List<TilapiaEntity> fryOf(GameTestHelper helper, TilapiaEntity mother) {
+        return helper.getLevel().getEntitiesOfClass(TilapiaEntity.class, mother.getBoundingBox().inflate(16),
+                t -> t.isAlive() && mother.getUUID().equals(t.motherId()));
+    }
+
+    /** Room to breed: with as many tilapia round as the local limit, a ready male never digs a pit. */
+    @GameTest(template = "arena", timeoutTicks = 400, batch = "breeding_full")
+    public static void noTilapiaNestWhileTheRiverIsFull(GameTestHelper helper) {
+        breedingPond(helper);
+        TilapiaEntity male = grown(helper, SavannaEntities.TILAPIA.get(), "male", new BlockPos(5, BED + 1, 5));
+        int limit = male.life().numbers().localLimit();
+        for (int i = 1; i < limit; i++) {
+            grown(helper, SavannaEntities.TILAPIA.get(), "female", new BlockPos(P0 + i % 12, BED + 1 + i % 2, P0 + 1 + i / 12 * 3));
+        }
+        helper.onEachTick(() -> male.wantsNestNow = true);
+        helper.runAfterDelay(300, () -> {
+            helper.assertTrue(!male.holdsNest(), "a male dug a pit with " + limit + " tilapia round");
+            helper.succeed();
+        });
+    }
+
+    /**
+     * The river snail's breeding: two ready snails meet and both lay a pearly clutch, at least one just over the
+     * waterline on the bank's face; old enough and watched the eggs hatch into baby snails a quarter of the size; with
+     * the local limit of snails round they wait, and long unwatched they are gone.
+     */
+    @GameTest(template = "arena", timeoutTicks = 3600, batch = "breeding")
+    public static void snailsMeetLayAtTheWaterlineAndHatch(GameTestHelper helper) {
+        breedingPond(helper);
+        clearLeftovers(helper, SavannaEntities.SNAIL.get());
+        SnailEntity a = grown(helper, SavannaEntities.SNAIL.get(), "none", new BlockPos(P0 + 1, BED + 1, P0 + 3));
+        SnailEntity b = grown(helper, SavannaEntities.SNAIL.get(), "none", new BlockPos(P0 + 3, BED + 1, P0 + 3));
+        boolean[] laying = {false};
+        helper.runAtTickTime(3590, () -> helper.fail("snails stuck: laying " + laying[0] + " a " + a.eggsToLay() + " ready " + a.life().readyToBreed()
+                + " partner " + a.life().partner() + " at " + helper.relativePos(a.blockPosition()) + "; b " + b.eggsToLay() + " ready "
+                + b.life().readyToBreed() + " at " + helper.relativePos(b.blockPosition()) + " hidden " + a.isHidden() + "/" + b.isHidden()));
+        helper.onEachTick(() -> {
+            if (a.eggsToLay() > 0 || b.eggsToLay() > 0) {
+                laying[0] = true;
+            }
+            if (!laying[0] || a.eggsToLay() > 0 || b.eggsToLay() > 0) {
+                return;
+            }
+            List<BlockPos> clutches = new java.util.ArrayList<>();
+            boolean atTheWaterline = false;
+            for (BlockPos rel : BlockPos.betweenClosed(new BlockPos(P0 - 1, BED, P0 - 1), new BlockPos(P1 + 1, WATER_TOP + 2, P1 + 1))) {
+                if (helper.getBlockState(rel).is(SavannaBlocks.SNAIL_EGGS.get())) {
+                    clutches.add(helper.absolutePos(rel));
+                    atTheWaterline |= rel.getY() == WATER_TOP + 1;
+                }
+            }
+            StringBuilder seen = new StringBuilder();
+            for (BlockPos c : clutches) {
+                EggClutchBlockEntity e = (EggClutchBlockEntity) helper.getLevel().getBlockEntity(c);
+                seen.append(helper.relativePos(c).toShortString()).append(" ").append(helper.getLevel().getBlockState(c).getValue(com.antcolonies.savanna.block.SnailEggsBlock.FACING))
+                        .append(" x").append(e == null ? -1 : e.count()).append(" at ").append(e == null ? -1 : helper.getLevel().getGameTime() - e.laid()).append("; ");
+            }
+            helper.assertTrue(clutches.size() == 2, clutches.size() + " clutches laid by the pair (2 wanted): " + seen);
+            helper.assertTrue(atTheWaterline, "no clutch just over the waterline: " + clutches);
+            hatchChecks(helper, clutches);
+            helper.succeed();
+        });
+    }
+
+    private static void hatchChecks(GameTestHelper helper, List<BlockPos> clutches) {
+        ServerLevel level = helper.getLevel();
+        EntityType<SnailEntity> kind = SavannaEntities.SNAIL.get();
+        long hatch = AnimalLives.get(kind).hatchTicks();
+        BlockPos first = clutches.get(0), second = clutches.get(1);
+        net.minecraft.world.phys.Vec3 eye = net.minecraft.world.phys.Vec3.atCenterOf(first);
+        try {
+            // old enough but unwatched: waits
+            age(level, first, hatch);
+            tick(level, first);
+            helper.assertTrue(level.getBlockState(first).is(SavannaBlocks.SNAIL_EGGS.get()), "a clutch hatched with nobody near");
+            // watched: hatches into babies
+            com.antcolonies.colony.Watchers.setPretend(List.of(eye));
+            int eggs = ((EggClutchBlockEntity) level.getBlockEntity(first)).count();
+            tick(level, first);
+            helper.assertTrue(!level.getBlockState(first).is(SavannaBlocks.SNAIL_EGGS.get()), "a clutch old enough and watched did not hatch");
+            List<SnailEntity> babies = level.getEntitiesOfClass(SnailEntity.class, new net.minecraft.world.phys.AABB(first).inflate(1.5),
+                    s -> s.life().isYoung());
+            helper.assertTrue(babies.size() == eggs, babies.size() + " babies from " + eggs + " eggs");
+            for (SnailEntity baby : babies) {
+                double share = baby.getAttributeBaseValue(Attributes.SCALE) / baby.life().ownSize();
+                helper.assertTrue(Math.abs(share - 0.25) < 0.01, "a baby snail at " + share + " of grown (0.25 wanted)");
+            }
+            // room to breed: the local limit of snails round, the second clutch waits
+            int limit = AnimalLives.get(kind).localLimit();
+            int near = level.getEntities(kind, new net.minecraft.world.phys.AABB(second).inflate(com.antcolonies.animal.RoomToBreed.REACH), e -> e.isAlive()).size();
+            for (int i = near; i < limit; i++) {
+                grown(helper, kind, "none", new BlockPos(P1 - 1, BED + 1, P1 - 1 - i % 4));
+            }
+            age(level, second, hatch);
+            tick(level, second);
+            helper.assertTrue(level.getBlockState(second).is(SavannaBlocks.SNAIL_EGGS.get()), "a clutch hatched with " + limit + " snails round");
+            // long unwatched: gone
+            com.antcolonies.colony.Watchers.setPretend(List.of());
+            age(level, second, com.antcolonies.animal.ClutchClock.SHELLS_AFTER);
+            tick(level, second);
+            helper.assertTrue(!level.getBlockState(second).is(SavannaBlocks.SNAIL_EGGS.get()), "a clutch 10 days old and unwatched is still there");
+        } finally {
+            com.antcolonies.colony.Watchers.setPretend(List.of());
+        }
+    }
+
+    /** Makes a clutch this many ticks old. */
+    private static void age(ServerLevel level, BlockPos at, long ticks) {
+        EggClutchBlockEntity clutch = (EggClutchBlockEntity) level.getBlockEntity(at);
+        clutch.lay(clutch.motherKind(), clutch.count(), level.getGameTime() - ticks);
+    }
+
+    /** One random tick of the clutch (Minecraft gives one now and then; here at once). */
+    private static void tick(ServerLevel level, BlockPos at) {
+        level.getBlockState(at).randomTick(level, at, level.random);
     }
 }
