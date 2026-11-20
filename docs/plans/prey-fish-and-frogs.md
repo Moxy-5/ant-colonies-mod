@@ -197,6 +197,8 @@ user: a detailed webbed foot model comes later). Fun first, inspired by the real
   a touch lighter, the head's green almost the back's (its flat top catches the light and read pale), and the dark marks
   thin out over the shoulders instead of stopping. v23 (v21, v22 on the way), `painted_blend.png`. Waiting for the
   user's look.
+- 2026-11-20, **the paint approved by the user** ("Looks good", on v23): the paint stage is done. Next for the frog:
+  the workshop's last stage, its clips (idle with the throat pumping, walk, the lunge-hop, swim, float, call, bite).
 
 ## My picks the user may change
 The barb's name and look, every size and number above (the bullfrog's size is the user's call), barbs with no hunger,
