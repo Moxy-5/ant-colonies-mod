@@ -536,3 +536,4 @@ Every "Current status" bullet CLAUDE.md held up to 2026-11-19, word for word, ol
 - 2026-11-20: The bullfrog's C2 eyes deleted (detail copied on each face) and redone as one eye wrapping the corner (v17); C stays v16, the default; waiting for the user's look.
 - 2026-11-20: The bullfrog's eyes approved by the user: C2, one painted eye wrapping each head corner (v17), now the official model.
 - 2026-11-20: The bullfrog painted from the side photo (v20): dark olive back with dark wavy marks, yellow lip and mottled yellow throat, orange armpits, cream belly, barred legs; waiting for the user's look.
+- 2026-11-20: The bullfrog's head blended into the back (v23): one skin colour shifting over the shoulders, the dark marks thinning out, no hard edge; waiting for the user's look.

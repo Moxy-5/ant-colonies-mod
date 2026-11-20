@@ -354,9 +354,9 @@ def plain_colour(c, face_, x, y, z):
 # Minecraft's own textures have. The eyes keep their approved pixel art (eye_colour). All colours my picks from the
 # photo; fun first.
 PAINT = {
-    'back': (60, 80, 32),         # dark olive green
-    'head': (90, 120, 46),        # the head a brighter, smoother green
-    'snout': (98, 128, 50),
+    'back': (66, 88, 34),         # dark olive green
+    'head': (66, 92, 34),         # the head barely greener than the back: its top is one flat face that catches
+    'snout': (66, 92, 34),        # the light, so it reads lighter than the stepped back in the same colour
     'dash': (30, 40, 18),         # the dark dashes along the back and flanks
     'wart': (118, 128, 58),       # pale warts
     'flank': (176, 168, 58),      # yellow-green low on the sides
@@ -407,13 +407,27 @@ def _dash(along, across, chance, seed):
     return across == c0 + wave
 
 
+def _top_skin(along):
+    """The back's colour blending into the head's over the shoulders (the outline's x 22 to 34), and how likely a
+    dark mark is there (fading out onto the head): one rule for the body, the head and the brows, so there is no edge
+    where the head's bone begins (the user, 2026-11-20: the change from dark to light green looked odd)."""
+    from model_parts import smooth
+    f = smooth((along - 22) / 12)
+    base = tuple(a + (b - a) * f for a, b in zip(PAINT['back'], PAINT['head']))
+    return base, 0.8 * (1 - smooth((along - 24) / 10))
+
+
 def paint_colour(c, face_, x, y, z):
-    if '_eye' in c:
-        return eye_colour(c, face_, x, y, z)
     part, bone = c['_part'], c['_bone']
     ix, iy, iz = int(x // 1), int(y // 1), int(z // 1)
     along = int((LENGTH / 2 - z) // 1)                         # the outline's x: rump 0 to snout 40
     across = ix if face_ in ('up', 'down') else iy             # the second direction on the skin
+    if '_eye' in c:                                            # the approved eye art; its skin in the painted skin
+        col = eye_colour(c, face_, x, y, z)
+        if col != PLAIN['skin']:
+            return col
+        base, _ = _top_skin(along)
+        return _noise(base, ix, iy, iz, amount=5)
     if part == 'pupil':                                        # the nostrils
         return PAINT['nostril']
     if part == 'ear':
@@ -429,8 +443,11 @@ def paint_colour(c, face_, x, y, z):
         if _hash(ix, iy, iz, 7) < 0.02:
             return PAINT['wart']
         return _noise(PAINT['leg'], ix, iy, iz)
-    if bone.startswith('eye'):                                 # the brow over each eye: plain head green
-        return _noise(PAINT['head'], ix, iy, iz, amount=5)
+    if bone.startswith('eye'):                                 # the brow over each eye: the head's skin
+        base, chance = _top_skin(along)
+        if _dash(along, across, chance, 31):
+            return _noise(PAINT['dash'], ix, iy, iz, amount=4)
+        return _noise(base, ix, iy, iz, amount=5)
     if bone in ('head', 'jaw', 'throat'):
         # The mouth follows each slice's own jaw edge (the boxes step down slice by slice; a smooth painted line
         # crossed the steps and showed twice): the dark line along the top of the jaw's boxes, the yellow lip along
@@ -447,8 +464,8 @@ def paint_colour(c, face_, x, y, z):
                 return _noise(PAINT['belly'], ix, iy, iz, amount=5)
             blot = _hash(ix // 2, iy // 2, iz // 2, 3) < 0.28
             return _noise(PAINT['blotch'] if blot else PAINT['throat'], ix, iy, iz, amount=6)
-        base = PAINT['snout'] if along >= 36 else PAINT['head']
-        if along < 31 and _dash(along, across, 0.25, 11):       # a few marks behind the eyes
+        base, chance = _top_skin(along)
+        if _dash(along, across, chance, 31):
             return _noise(PAINT['dash'], ix, iy, iz, amount=4)
         return _noise(base, ix, iy, iz)
     # the body
@@ -464,11 +481,12 @@ def paint_colour(c, face_, x, y, z):
         if _dash(along, across, 0.5, 21):
             return _noise(PAINT['dash'], ix, iy, iz, amount=4)
         return _noise(PAINT['flank'], ix, iy, iz)
-    if _dash(along, across, 0.8, 31):
+    base, chance = _top_skin(along)
+    if _dash(along, across, chance, 31):
         return _noise(PAINT['dash'], ix, iy, iz, amount=4)
     if _hash(ix, iy, iz, 5) < 0.025:
         return PAINT['wart']
-    return _noise(PAINT['back'], ix, iy, iz)
+    return _noise(base, ix, iy, iz)
 
 
 LOOKS = {'painted': paint_colour, 'plain': plain_colour}

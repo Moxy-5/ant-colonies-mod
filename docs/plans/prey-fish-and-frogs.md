@@ -191,6 +191,12 @@ user: a detailed webbed foot model comes later). Fun first, inspired by the real
   groin; a cream belly; barred legs, pale toes; a tan eardrum. The eyes keep their approved art. v20 (v18, v19 on the
   way). Waiting for the user's look. My idea for later, not built: a browner, drabber look for females (real females
   are duller than males; the life kit already has sexes).
+- 2026-11-20, **the head blended in** (the user, on v20 from above: "the change from dark green to light green looks
+  odd maybe tone back the dark green"): the trouble was the hard edge more than the dark, the head a flat lighter green
+  starting at the head bone with no marks. Now one skin colour for the back, head and eye plates (`_top_skin`), the back
+  a touch lighter, the head's green almost the back's (its flat top catches the light and read pale), and the dark marks
+  thin out over the shoulders instead of stopping. v23 (v21, v22 on the way), `painted_blend.png`. Waiting for the
+  user's look.
 
 ## My picks the user may change
 The barb's name and look, every size and number above (the bullfrog's size is the user's call), barbs with no hunger,
