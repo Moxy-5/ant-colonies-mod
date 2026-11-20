@@ -1,0 +1,12 @@
+{
+ "note": "same shape in fewer boxes: one-pixel slices for the legs and eyes (725 to 405)",
+ "date": "2026-11-20",
+ "boxes": 405,
+ "numbers": {
+  "ROUNDNESS": 2.4,
+  "FLAT_BELLY": 0.5,
+  "EYE_HEIGHT": 17.4,
+  "EYE_APART": 5.0,
+  "EYE_R": 2.1
+ }
+}

@@ -141,6 +141,14 @@ user: a detailed webbed foot model comes later). Fun first, inspired by the real
   judge as flat boxes over an AI picture drawn a little in perspective (the user), so its plain 3D shape was built
   next (`tools/bullfrog_models.py`, v4) and set beside the sheet's side, angle and front views; waiting for the
   user's look.
+- 2026-11-20, the remake (the user, with two real photos: "all frogs' mouths have this V shape", "the 2 front legs
+  aren't connected", "it may be better for you to remake the model instead of trying to patch it"): the AI sheet's
+  proportions were the wrong start (a tall box head, a straight mouth), so the model was rebuilt from the photos
+  (`references/inspiration/bullfrog_photo_side.png`, `_front.png`), read on a model-pixel grid: low and long (half as
+  tall as long), the head a rounded V from above with the mouth sloping from the snout tip down to its corner (the
+  grumpy frown from the front), eyes high and close on top with lid ridges, eardrums, the arms down from under the jaw
+  corners with the elbows back, the haunches folded at the sides; every leg a chain of turned round pieces from inside
+  the body. v7, 405 boxes (round pieces in one-pixel slices for this small animal). The AI sheet stays for the colours.
 
 ## My picks the user may change
 The barb's name and look, every size and number above (the bullfrog's size is the user's call), barbs with no hunger,
