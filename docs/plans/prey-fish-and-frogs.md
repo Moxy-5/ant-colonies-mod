@@ -63,11 +63,10 @@ user: a detailed webbed foot model comes later). Fun first, inspired by the real
   a pale cream belly with orange-yellow at the sides and in the armpits, big golden eyes set high. Real feet for the
   later foot model: the front feet plain fingers, the hind feet webbed with a hard spade on each heel for digging
   backward into the ground.
-- **Size: the user's call (asked 2026-11-20).** The sheet says 2.5 blocks long and 1.5 tall, bigger than a sheep and
-  bigger than the catfish. On the river's own scale (a tilapia 0.6 blocks, the catfish 2, the monitor 4.5, the
-  crocodile 7.5: about 1.6 to 2 blocks a metre), a big real bullfrog (about 22 cm) is about 0.45 blocks. My
-  recommendation: **males 0.65 blocks, females 0.5** (real males are much bigger than females, rare among frogs),
-  bigger than life like the tilapia and still a frog beside the fish.
+- **Size (the user, 2026-11-20, "males 0.80 females 0.65"):** males 0.8 blocks long, females 0.65, each 0.9 to 1.1
+  of that (my pick); froglets 0.25, tadpoles 0.15 (my picks). The sheet's 2.5 blocks were turned down: bigger than
+  the catfish. Real males are much bigger than females, rare among frogs. The model is made at the sheet's 2.5 blocks
+  (40 model pixels, room for detail) and drawn at 0.32 of that for a male.
 - **Where:** pans, oxbows, the floodplain's shallows and slow river edges. By day it sits **half dug into wet mud or
   sand at the edge**, only its back and eyes showing (it shuffles backward into the ground with its hind feet); it
   comes out at dusk and in rain.

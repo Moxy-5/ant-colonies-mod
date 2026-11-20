@@ -1,0 +1,217 @@
+{
+ "animal": "bullfrog",
+ "length_px": 40,
+ "note": "The African bullfrog's outline, drawn by Claude from the user's sheet (references/inspiration/bullfrog.png), 2026-11-20. Made 40 model pixels long (the sheet's 2.5 blocks), drawn in the game at 0.8 blocks for a male, 0.65 for a female. x from the back end (0) to the snout. The sheet's views are a little in perspective, so the scores cannot reach 100. Front feet drawn simply: the detailed webbed feet come later (the user). The sheet's top view is drawn smaller than its side and front (about 35 pixels long against 40), so the outline follows the side and front, and the top score stays low.",
+ "marks": [
+  {
+   "name": "eye",
+   "side": [
+    33,
+    35,
+    20,
+    23
+   ],
+   "top": [
+    32,
+    35,
+    6,
+    9
+   ],
+   "front": [
+    6,
+    9,
+    20,
+    23
+   ],
+   "colour": "#1a1208"
+  },
+  {
+   "name": "eye (right)",
+   "top": [
+    32,
+    35,
+    -9,
+    -6
+   ],
+   "front": [
+    -9,
+    -6,
+    20,
+    23
+   ],
+   "colour": "#1a1208"
+  }
+ ],
+ "parts": [
+  {
+   "name": "rump",
+   "side": [
+    0,
+    6,
+    4,
+    17
+   ],
+   "half_width": 11
+  },
+  {
+   "name": "back",
+   "side": [
+    6,
+    12,
+    3,
+    22
+   ],
+   "half_width": 13
+  },
+  {
+   "name": "body",
+   "side": [
+    12,
+    28,
+    3,
+    25
+   ],
+   "half_width": 14
+  },
+  {
+   "name": "head",
+   "side": [
+    28,
+    37,
+    6,
+    24
+   ],
+   "half_width": 13
+  },
+  {
+   "name": "snout",
+   "side": [
+    37,
+    40,
+    10,
+    18
+   ],
+   "half_width": 9
+  },
+  {
+   "name": "throat",
+   "side": [
+    30,
+    37,
+    4,
+    6
+   ],
+   "half_width": 10
+  },
+  {
+   "name": "eye bump",
+   "side": [
+    31,
+    36,
+    22,
+    26
+   ],
+   "top": [
+    31,
+    36,
+    5,
+    10
+   ],
+   "front": [
+    5,
+    10,
+    22,
+    26
+   ],
+   "mirror": true
+  },
+  {
+   "name": "upper arm",
+   "side": [
+    29,
+    34,
+    3,
+    12
+   ],
+   "top": [
+    29,
+    34,
+    12,
+    16
+   ],
+   "front": [
+    12,
+    16,
+    3,
+    12
+   ],
+   "mirror": true
+  },
+  {
+   "name": "front foot",
+   "side": [
+    28,
+    37,
+    0,
+    3
+   ],
+   "top": [
+    30,
+    38,
+    13,
+    18
+   ],
+   "front": [
+    13,
+    18,
+    0,
+    3
+   ],
+   "mirror": true
+  },
+  {
+   "name": "thigh",
+   "side": [
+    3,
+    18,
+    4,
+    16
+   ],
+   "top": [
+    4,
+    18,
+    11,
+    16
+   ],
+   "front": [
+    12,
+    17,
+    4,
+    16
+   ],
+   "mirror": true
+  },
+  {
+   "name": "hind foot",
+   "side": [
+    2,
+    17,
+    0,
+    4
+   ],
+   "top": [
+    0,
+    14,
+    12,
+    18
+   ],
+   "front": [
+    12,
+    18,
+    0,
+    4
+   ],
+   "mirror": true
+  }
+ ]
+}

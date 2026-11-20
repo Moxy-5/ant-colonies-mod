@@ -1,0 +1,32 @@
+{
+  "length_blocks": 1.875,
+  "views": {
+    "side": {
+      "box": [
+        20,
+        20,
+        360,
+        180
+      ],
+      "head": "right"
+    },
+    "top": {
+      "box": [
+        20,
+        180,
+        360,
+        290
+      ],
+      "head": "right"
+    },
+    "front": {
+      "box": [
+        360,
+        20,
+        470,
+        180
+      ]
+    }
+  },
+  "made_by": "python tools/workshop.py outline barb (from references/outlines/barb.json)"
+}

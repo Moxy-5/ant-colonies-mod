@@ -1,0 +1,189 @@
+{
+ "animal": "barb",
+ "length_px": 30,
+ "note": "The river barb's outline, Claude's design (references/inspiration/barb.png, tools/barb_sheet.py), 2026-11-20. Made 30 model pixels long, drawn in the game at 0.25 blocks. x from the tail tip (0) to the snout.",
+ "marks": [
+  {
+   "name": "eye",
+   "side": [
+    26,
+    28,
+    6,
+    8
+   ],
+   "top": [
+    26,
+    27,
+    2,
+    3
+   ],
+   "front": [
+    2,
+    3,
+    6,
+    8
+   ],
+   "colour": "#d6a840"
+  },
+  {
+   "name": "eye (right)",
+   "top": [
+    26,
+    27,
+    -3,
+    -2
+   ],
+   "front": [
+    -3,
+    -2,
+    6,
+    8
+   ],
+   "colour": "#d6a840"
+  },
+  {
+   "name": "tail spot",
+   "side": [
+    7,
+    9,
+    5,
+    6
+   ],
+   "colour": "#1c1e22"
+  }
+ ],
+ "parts": [
+  {
+   "name": "tail upper",
+   "side": [
+    0,
+    5,
+    6,
+    11
+   ],
+   "half_width": 0.25
+  },
+  {
+   "name": "tail lower",
+   "side": [
+    0,
+    5,
+    0,
+    5
+   ],
+   "half_width": 0.25
+  },
+  {
+   "name": "tail base",
+   "side": [
+    5,
+    7,
+    2,
+    9
+   ],
+   "half_width": 0.25
+  },
+  {
+   "name": "tail root",
+   "side": [
+    7,
+    11,
+    4,
+    7
+   ],
+   "half_width": 0.5
+  },
+  {
+   "name": "body rear",
+   "side": [
+    11,
+    17,
+    2,
+    9
+   ],
+   "half_width": 1.5
+  },
+  {
+   "name": "body",
+   "side": [
+    17,
+    23,
+    1,
+    10
+   ],
+   "half_width": 2.5
+  },
+  {
+   "name": "head",
+   "side": [
+    23,
+    28,
+    2,
+    9
+   ],
+   "half_width": 2.0
+  },
+  {
+   "name": "snout",
+   "side": [
+    28,
+    30,
+    4,
+    7
+   ],
+   "half_width": 1.0
+  },
+  {
+   "name": "back fin",
+   "side": [
+    18,
+    21,
+    10,
+    12
+   ],
+   "half_width": 0.25
+  },
+  {
+   "name": "belly fin",
+   "side": [
+    18,
+    20,
+    0,
+    1
+   ],
+   "half_width": 1.0
+  },
+  {
+   "name": "anal fin",
+   "side": [
+    12,
+    14,
+    0,
+    2
+   ],
+   "half_width": 0.25
+  },
+  {
+   "name": "breast fin",
+   "side": [
+    21,
+    23,
+    3,
+    4
+   ],
+   "top": [
+    21,
+    23,
+    2.5,
+    3.5
+   ],
+   "front": [
+    2.5,
+    3.5,
+    3,
+    4
+   ],
+   "mirror": true
+  }
+ ]
+}

@@ -1,0 +1,32 @@
+{
+  "length_blocks": 2.5,
+  "views": {
+    "side": {
+      "box": [
+        20,
+        20,
+        460,
+        320
+      ],
+      "head": "right"
+    },
+    "top": {
+      "box": [
+        20,
+        320,
+        460,
+        720
+      ],
+      "head": "right"
+    },
+    "front": {
+      "box": [
+        460,
+        20,
+        860,
+        320
+      ]
+    }
+  },
+  "made_by": "python tools/workshop.py outline bullfrog (from references/outlines/bullfrog.json)"
+}
