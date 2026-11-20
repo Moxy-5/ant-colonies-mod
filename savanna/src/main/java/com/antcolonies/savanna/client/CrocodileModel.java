@@ -103,7 +103,7 @@ public class CrocodileModel extends DefaultedEntityGeoModel<CrocodileEntity> {
         }
         GroundBend bend = croc.bend();
         bend.update(croc.level(), x, y, z, Mth.rotLerp(pt, croc.yBodyRotO, croc.yBodyRot), CrocodileEntity.MODEL_SCALE * croc.getScale(),
-                croc.isInWater(), croc.floatDepth(), !croc.isDeadOrDying(), System.nanoTime());
+                croc.isInWater(), croc.floatDepth(), !croc.isDeadOrDying(), System.nanoTime(), croc.growth());
         double scale = CrocodileEntity.MODEL_SCALE * croc.getScale();
         GeoBone body = getAnimationProcessor().getBone("body");
         if (body != null && bend.lift() > 1.0E-3) {      // the shoulders lifted onto a bank: the whole body up, in model pixels
@@ -232,7 +232,7 @@ public class CrocodileModel extends DefaultedEntityGeoModel<CrocodileEntity> {
         double walked = croc.walkAnimation.position(pt) * 2.0 * Math.PI / STRIDE;
         double stepping = Mth.clamp(croc.walkAnimation.speed(pt) / 0.2, 0.0, 1.0);
         for (int pair = 0; pair < CrocodileEntity.LEG_PAIRS.length; pair++) {
-            boolean feet = bend.footing(croc.level(), -CrocodileEntity.LEG_PAIRS[pair] * scale / 16.0, REACH * croc.getScale(), WADE);
+            boolean feet = bend.footing(croc.level(), -CrocodileEntity.LEG_PAIRS[pair] * scale / 16.0, REACH * croc.getScale(), WADE * croc.growth());
             croc.legStand[pair] += ((feet ? 1.0 : 0.0) - croc.legStand[pair]) * k;
             double amount = clipFolds ? croc.legStand[pair] : 1.0 - croc.legStand[pair];
             String kind = pair == 0 ? "arm" : "leg";

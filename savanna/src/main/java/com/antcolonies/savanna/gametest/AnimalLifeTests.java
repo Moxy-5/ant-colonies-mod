@@ -807,7 +807,9 @@ public class AnimalLifeTests {
         helper.assertTrue(croc.life().stage() == com.antcolonies.animal.LifeStage.YOUNG, "a hatched crocodile is not young");
         double length = croc.getScale() * 7.5;
         helper.assertTrue(length > 0.3 && length < 0.7, "a hatchling " + length + " blocks long");
-        helper.assertTrue(croc.getAttributeBaseValue(Attributes.MOVEMENT_SPEED) < 0.15, "a hatchling as fast as a grown crocodile");
+        // its pace goes as its speed setting squared (Minecraft counts the setting twice): about a third of a grown one's
+        double pace = Math.pow(croc.getAttributeBaseValue(Attributes.MOVEMENT_SPEED) / 0.3, 2);
+        helper.assertTrue(pace > 0.2 && pace < 0.45, "a hatchling's pace " + pace + " of a grown crocodile's (about a third)");
         croc.life().setAge(n.youngTicks());
         helper.assertTrue(croc.life().stage() == com.antcolonies.animal.LifeStage.TEEN, "not a teen after its young days");
         double share = croc.getAttributeBaseValue(Attributes.SCALE) / croc.life().ownSize();

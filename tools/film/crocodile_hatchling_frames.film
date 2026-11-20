@@ -1,0 +1,75 @@
+# The hatchling's own moves in the game, frame by frame, the camera following it close (2026-11-20; with
+# crocodile_young_frames.film, which films the young on a step and dying): the bound (sent at a run), the swim, the
+# float and the idle's chirp and fly snap; the game frozen and stepped a few ticks a picture.
+#   ./gradlew runFilm -PfilmScene=tools/film/crocodile_hatchling_frames.film   pictures in run-film/screenshots/crocodile_hatchling_frames/
+cmd time set noon
+cmd weather clear
+cmd kill @e[type=!player]
+cmd fill 30 -63 -8 44 -61 8 minecraft:water
+lens 40
+wait 40
+# the bound: sent east at a run, the camera beside it and a little above (side on), then from three quarters ahead
+walker antcolonies:crocodile 0.5 -60 0.5 -90 Life:{Sex:"female",Age:0,Grown:0b,OwnSize:1.0f}
+follow 0 0.35 -1.1 0 18
+cmd tick unfreeze
+go 12 -60 0 1.9
+wait 30
+cmd tick freeze
+burst h_run_side 16 1
+cmd tick unfreeze
+follow 1.0 0.4 -0.8 50 22
+wait 10
+cmd tick freeze
+burst h_run_threequarter 16 1
+cmd tick unfreeze
+cmd kill @e[type=antcolonies:crocodile]
+wait 5
+# the walk the same way, for comparison
+walker antcolonies:crocodile 0.5 -60 0.5 -90 Life:{Sex:"female",Age:0,Grown:0b,OwnSize:1.0f}
+follow 0 0.35 -1.1 0 18
+cmd tick unfreeze
+go 12 -60 0 1.0
+wait 30
+cmd tick freeze
+burst h_walk_side 16 1
+cmd tick unfreeze
+cmd kill @e[type=antcolonies:crocodile]
+wait 5
+# the swim across the pool, the camera just over the water beside it, then three quarters from above
+walker antcolonies:crocodile 31.5 -60.1 0.5 -90 Life:{Sex:"female",Age:0,Grown:0b,OwnSize:1.0f}
+follow 0 0.4 -1.0 0 22
+cmd tick unfreeze
+go 42 -61 0 1.0
+wait 40
+cmd tick freeze
+burst h_swim_side 16 1
+cmd tick unfreeze
+follow 0.9 0.7 -0.9 45 35
+wait 10
+cmd tick freeze
+burst h_swim_threequarter 8 2
+cmd tick unfreeze
+# resting afloat at the end, from the front and from above
+wait 360
+follow 1.1 0.3 0 90 20
+wait 10
+shot h_float_front
+follow 0.6 0.8 -0.6 45 45
+wait 20
+shot h_float_above
+cmd kill @e[type=antcolonies:crocodile]
+follow off
+wait 5
+# the idle: a still hatchling on the grass (its own mind, kept still by a wall of nothing to do), close from the side
+cmd summon antcolonies:crocodile 4.5 -60 6.5 {NoAI:1b,Rotation:[-90f,0f],Life:{Sex:"female",Age:0,Grown:0b,OwnSize:1.0f}}
+camera 4.5 -61.25 5.4 0 16
+wait 2
+cmd tick freeze
+burst h_idle_side 40 3
+cmd tick unfreeze
+camera 5.6 -61.3 6.5 90 14
+wait 2
+cmd tick freeze
+burst h_idle_front 40 3
+cmd tick unfreeze
+quit

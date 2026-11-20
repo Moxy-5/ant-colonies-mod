@@ -59,6 +59,11 @@ public final class GroundBend {
     /** How far the shoulders are lifted now (blocks). */
     private double lift;
     private long lastNanos;
+    /**
+     * How big the animal is against the grown body {@link #SPREAD} and {@link #MAX_LIFT} were made for (1, or under for
+     * the young: a hatchling crocodile half a block long reads the ground and lifts its shoulders by its own size).
+     */
+    private double size = 1.0;
     /** Where the animal was and which way it pointed at the last {@link #update} (for {@link #footing}). */
     private double atX, atY, atZ, alongX, alongZ = 1;
 
@@ -99,6 +104,17 @@ public final class GroundBend {
      */
     public void update(BlockGetter level, double x, double y, double z, float yawDeg, double scale, boolean inWater,
             double floatDepth, boolean alive, long nanos) {
+        update(level, x, y, z, yawDeg, scale, inWater, floatDepth, alive, nanos, 1.0);
+    }
+
+    /**
+     * As {@link #update(BlockGetter, double, double, double, float, double, boolean, double, boolean, long)}, for an
+     * animal smaller than the grown body the chain's distances were made for ({@code size} under 1: a young one; the
+     * animal life kit, 2026-11-20).
+     */
+    public void update(BlockGetter level, double x, double y, double z, float yawDeg, double scale, boolean inWater,
+            double floatDepth, boolean alive, long nanos, double size) {
+        this.size = Mth.clamp(size, 0.01, 1.0);
         double dt = lastNanos == 0 ? 1.0 : (nanos - lastNanos) / 1.0E9;
         lastNanos = nanos;
         double k = dt <= 0 ? 0 : dt > 0.5 ? 1.0 : 1.0 - Math.exp(-dt / EASE);
@@ -110,7 +126,7 @@ public final class GroundBend {
         alongX = fx;
         alongZ = fz;
         // the shoulders (the anchor) lie on what is under them, never lower than the animal itself stands
-        double wantLift = alive ? Mth.clamp(under(level, x, z, fx, fz, -front[0] * perBlock, y, inWater, floatDepth) - y, 0, MAX_LIFT) : 0;
+        double wantLift = alive ? Mth.clamp(under(level, x, z, fx, fz, -front[0] * perBlock, y, inWater, floatDepth) - y, 0, MAX_LIFT * this.size) : 0;
         lift += (wantLift - lift) * k;
         // the rear chain first, so the chest can be held within the trunk's bend of the hips
         double hips = 0;
@@ -145,11 +161,11 @@ public final class GroundBend {
     }
 
     /** The highest resting height round a point this far forward of the animal along its body (blocks). */
-    private static double under(BlockGetter level, double x, double z, double fx, double fz, double along, double y, boolean inWater,
+    private double under(BlockGetter level, double x, double z, double fx, double fz, double along, double y, boolean inWater,
             double floatDepth) {
         double h = Double.NEGATIVE_INFINITY;
         for (int s = -1; s <= 1; s++) {
-            double a = along + s * SPREAD;
+            double a = along + s * SPREAD * size;
             h = Math.max(h, support(level, x + fx * a, z + fz * a, y, inWater, floatDepth));
         }
         return h;

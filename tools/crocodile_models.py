@@ -563,6 +563,108 @@ def clips():
             'flop': clip(FLOP_LEN, flop, 24, False), 'death': clip(1.2, death, 12, 'hold')}
 
 
+YOUNG_WALK_LEN, YOUNG_RUN_LEN, YOUNG_SWIM_LEN = 1.0, 0.5, 0.9    # a hatchling's stride, bound and tail beat (seconds)
+YOUNG_DUTY = 0.65                     # the share of a step a hatchling's foot stays planted (my pick)
+# a left leg's upper bone turned + about y carries its foot forward (-z), and + about z lowers it (measured on the
+# model; the right side mirrored): FORE and DOWN carry those signs into the clips
+FORE, DOWN = 1, 1
+
+
+def _stride(ph, duty):
+    """One foot's step at phase ph (0 to 1): its swing (+1 forward, -1 back) and lift (0 to 1). Planted for the first
+    duty share, going back evenly (so it stays put on the ground while the body goes on), then lifted and swung forward."""
+    ph %= 1.0
+    if ph < duty:
+        return 1.0 - 2.0 * ph / duty, 0.0
+    u = (ph - duty) / (1.0 - duty)
+    return -1.0 + 2.0 * (0.5 - 0.5 * math.cos(math.pi * u)), math.sin(math.pi * u)
+
+
+def young_clips():
+    """The hatchlings' own moves (animal life cycle step 4, 2026-11-20; the user: "full creative freedom to change any
+    animation for the babys to be unique"; fun first, from what real hatchlings do; all my picks):
+    young_walk (a quick high scurry: the body held up off the ground, long leg swings with each foot planted for most of
+    its step and whisked forward, the body wiggling and the head up and bobbing), young_run (a bound: the hind legs
+    pushing together, the forelegs catching it, the back arching and the tail up; young crocodiles really gallop when
+    they flee; teens use it too), young_swim (a quick wriggling tail beat, the head held up), young_float (lying spread
+    out at the surface, the legs held wide for balance as real hatchlings float, a gentle bob), young_idle (the
+    hatchling's chirp, the jaw popping open with the throat lifting, a head tilt, now and then a snap at a passing fly)."""
+    def legs_walk(p, t, length, sweep, raise_px, lift_deg, pairs):
+        # the body held raise_px over the grown walk's height: each upper leg turned down until its elbow drops that far
+        # (the arm reaches 2.3 voxels out, the leg 2.7), the lower leg turned back upright under it
+        w = 1.0 / length
+        for s, side in ((1, 'left'), (-1, 'right')):
+            for i, kind in enumerate(('arm', 'leg')):
+                tuck = math.degrees(math.asin(min(0.9, raise_px / ((2.7 if i else 2.3) * V))))
+                swing, lift = _stride(w * t + pairs(s, i), YOUNG_DUTY)
+                p[f'{kind}_upper_{side}'] = {'rotation': [0, FORE * s * sweep * swing, DOWN * s * (tuck - lift_deg * lift)]}
+                p[f'{kind}_lower_{side}'] = {'rotation': [0, 0, -DOWN * s * tuck]}
+                p[f'{kind}_foot_{side}'] = {'rotation': [0, -FORE * s * sweep * swing, 0]}
+
+    def young_walk(t):
+        w = 2 * math.pi / YOUNG_WALK_LEN
+        p = wave_pose(t, 0.8, w)
+        bob = 0.35 * math.cos(2 * w * t)
+        p['body'] = {'rotation': [0, 0, 2.0 * math.sin(w * t)], 'position': [0, YOUNG_HIGH + bob, 0]}
+        p['neck'] = {'rotation': [-7.0 + 1.5 * math.cos(2 * w * t), p['neck']['rotation'][1], 0]}
+        legs_walk(p, t, YOUNG_WALK_LEN, 36, YOUNG_HIGH - 1.0, 16,
+                  lambda s, i: (0 if s > 0 else 0.5) + (0.5 if i else 0))          # diagonal pairs
+        return p
+
+    def young_run(t):
+        w = 2 * math.pi / YOUNG_RUN_LEN
+        ph = t / YOUNG_RUN_LEN
+        p = wave_pose(t, 0.25, w)
+        arch = math.sin(w * t)
+        p['body'] = {'rotation': [8.0 * arch, 0, 0], 'position': [0, YOUNG_HIGH + 0.8 + 2.0 * max(0.0, math.sin(w * t - 0.6)), 0]}
+        p['neck'] = {'rotation': [-9.0 - 5.0 * arch, p['neck']['rotation'][1], 0]}
+        p['hips'] = {'rotation': [-9.0 * arch, p['hips']['rotation'][1], 0]}
+        p['tail1'] = {'rotation': [8.0, p['tail1']['rotation'][1], 0]}
+        legs_walk(p, t, YOUNG_RUN_LEN, 42, YOUNG_HIGH - 1.0, 22,
+                  lambda s, i: (0.06 if s > 0 else 0.0) + (0.0 if i else 0.4))      # hind pair together, the forelegs after
+        return p
+
+    def young_swim(t):
+        p = folded(wave_pose(t, 1.7, 2 * math.pi / YOUNG_SWIM_LEN))
+        p['neck'] = {'rotation': [-6.0, p['neck']['rotation'][1], 0]}
+        return p
+
+    def young_float(t):
+        breath = math.sin(2 * math.pi * t / 3.0)
+        p = wave_pose(t, 0.2, 2 * math.pi / 3.0)
+        p['body'] = {'rotation': [0, 0, 0], 'position': [0, 0.3 * breath, 0]}
+        p['neck'] = {'rotation': [-5.0 - breath, p['neck']['rotation'][1], 0]}
+        for s, side in ((1, 'left'), (-1, 'right')):
+            p[f'arm_upper_{side}'] = {'rotation': [0, FORE * s * 25, -DOWN * s * (6 + 2 * breath)]}
+            p[f'arm_foot_{side}'] = {'rotation': [0, -FORE * s * 10, 0]}
+            p[f'leg_upper_{side}'] = {'rotation': [0, -FORE * s * 35, -DOWN * s * (6 + 2 * breath)]}
+            p[f'leg_foot_{side}'] = {'rotation': [0, FORE * s * 20, 0]}
+        return p
+
+    def young_idle(t):
+        def bump(a, b):         # 0 outside a..b, a smooth hump inside
+            return math.sin(math.pi * (t - a) / (b - a)) ** 2 if a < t < b else 0.0
+        breath = math.sin(2 * math.pi * t / 2.0)
+        p = wave_pose(t, 0.15, 2 * math.pi / 3.0)
+        p['body'] = {'rotation': [0, 0, 0], 'position': [0, 0.4, 0]}
+        chirp = bump(0.8, 1.7)
+        pops = sum(bump(0.85 + 0.25 * k, 1.05 + 0.25 * k) for k in range(3))
+        tilt = bump(2.6, 4.0)
+        look = bump(4.4, 5.4)
+        snap = bump(4.95, 5.15)
+        p['neck'] = {'rotation': [-3.0 - 0.6 * breath - 7.0 * chirp - 13.0 * look, p['neck']['rotation'][1] + 22.0 * look, 0]}
+        p['head'] = {'rotation': [0, 0, 9.0 * tilt]}
+        p['jaw'] = {'rotation': [14.0 * pops + 26.0 * bump(4.75, 5.0), 0, 0]}
+        return p
+
+    return {'young_walk': clip(YOUNG_WALK_LEN, young_walk, 40), 'young_run': clip(YOUNG_RUN_LEN, young_run, 30),
+            'young_swim': clip(YOUNG_SWIM_LEN, young_swim, 24), 'young_float': clip(3.0, young_float, 24),
+            'young_idle': clip(6.0, young_idle, 60)}
+
+
+YOUNG_HIGH = 2.2                      # a hatchling's body over the ground while it walks (pixels; the grown walk's 1.0)
+
+
 def carried(bones):
     """Hatchlings carried in a mother's mouth (animal life cycle step 4, 2026-11-20): two tiny banded young lying across
     the lower jaw between the teeth, a head poking out one side and a tail the other (each about 0.5 blocks long at the
@@ -615,7 +717,7 @@ def write_game():
         files[f'textures/entity/{name}.png'] = png(rows)
         if name != 'crocodile_hatchling':
             files[f'geo/entity/{name}.geo.json'] = geo(name, game_bones, w, h, (8, 2.5, [0, 0.75, 0]))
-    files['animations/entity/crocodile.animation.json'] = animations(clips())
+    files['animations/entity/crocodile.animation.json'] = animations({**clips(), **young_clips()})
     write_assets(files)
 
 

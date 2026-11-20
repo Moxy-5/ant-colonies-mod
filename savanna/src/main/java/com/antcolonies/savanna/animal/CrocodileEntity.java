@@ -10,6 +10,7 @@ import com.antcolonies.animal.AnimalLife;
 import com.antcolonies.animal.Carried;
 import com.antcolonies.animal.GuardPlaceGoal;
 import com.antcolonies.animal.HasLife;
+import com.antcolonies.animal.LifeStage;
 import com.antcolonies.animal.SeekMateGoal;
 
 import com.antcolonies.entity.body.GroundBend;
@@ -454,18 +455,26 @@ public class CrocodileEntity extends PathfinderMob implements GeoEntity, HasLife
 
     /**
      * Its walking pace by its size: a crocodile under 0.7 of the usual size (the young and the teens) walks and swims
-     * slower, by the root of how much smaller it is (a hatchling about a quarter as fast); grown ones are as before.
+     * slower, by the root of how much smaller it is (a hatchling about a third as fast); grown ones are as before. A
+     * mob's speed setting counts twice in Minecraft (its move control sets both the push and the stride from it), so its
+     * pace goes as the setting squared: the setting is the root of the pace (2026-11-20: set to the pace itself, a
+     * hatchling crawled at a tenth of a grown one's pace and was drawn standing while it slid along).
      */
     private void sizeChanged() {
         AttributeInstance speed = getAttribute(Attributes.MOVEMENT_SPEED);
         if (speed != null) {
-            speed.setBaseValue(0.3 * sizePace());
+            speed.setBaseValue(0.3 * Math.sqrt(sizePace()));
         }
     }
 
-    /** How fast it moves and its clips play against a grown crocodile's (1 at 0.7 of the usual size and over). */
+    /** How grown its body is: its size against the smallest grown one (0.7 of the usual size), at most 1. */
+    public double growth() {
+        return Math.min(1.0, getScale() / 0.7);
+    }
+
+    /** How fast it moves against a grown crocodile (1 at 0.7 of the usual size and over). */
     double sizePace() {
-        return Math.min(1.0, Math.sqrt(getScale() / 0.7));
+        return Math.sqrt(growth());
     }
 
     /** Whether it is sunbathing: lying on the bank with its head raised and its mouth open. */
@@ -2302,6 +2311,12 @@ public class CrocodileEntity extends PathfinderMob implements GeoEntity, HasLife
     private static final RawAnimation WALK = RawAnimation.begin().thenLoop("walk");
     private static final RawAnimation SWIM = RawAnimation.begin().thenLoop("swim");
     private static final RawAnimation FLOAT = RawAnimation.begin().thenLoop("float");
+    /** The hatchlings' own moves (2026-11-20, tools/crocodile_models.py young_clips); the teens bound too. */
+    private static final RawAnimation YOUNG_IDLE = RawAnimation.begin().thenLoop("young_idle");
+    private static final RawAnimation YOUNG_WALK = RawAnimation.begin().thenLoop("young_walk");
+    private static final RawAnimation YOUNG_RUN = RawAnimation.begin().thenLoop("young_run");
+    private static final RawAnimation YOUNG_SWIM = RawAnimation.begin().thenLoop("young_swim");
+    private static final RawAnimation YOUNG_FLOAT = RawAnimation.begin().thenLoop("young_float");
     private static final RawAnimation BASK = RawAnimation.begin().thenLoop("bask");
     /** Basking on land: first the flop from its walk onto its belly, then the bask (the crocodile's life step 3). */
     private static final RawAnimation FLOP_BASK = RawAnimation.begin().thenPlay("flop").thenLoop("bask");
@@ -2325,6 +2340,17 @@ public class CrocodileEntity extends PathfinderMob implements GeoEntity, HasLife
     private boolean drawnBasking, flopNow;
     /** The speeds the walk and swim clips are made for (blocks a tick); they play faster or slower by the real speed. */
     static final double WALK_CLIP_SPEED = 0.066 * MODEL_SCALE, SWIM_CLIP_SPEED = 0.088 * MODEL_SCALE;
+    /**
+     * The young's clips' speeds (at the usual size, as above; my picks for the look, 2026-11-20): a hatchling scurries
+     * about 4.5 strides a second at its own walking pace (its feet slip a little: a stride without any slip would be a
+     * blur at half a block long, and the game keeps its feet on the ground anyway) and bounds about 3.5 times a second
+     * running; a teen bounding goes slower, by its size.
+     */
+    static final double YOUNG_WALK_CLIP_SPEED = 0.0535 * MODEL_SCALE, YOUNG_RUN_CLIP_SPEED = 0.26 * MODEL_SCALE;
+    /** A grown crocodile's walk on the measuring course (blocks a tick); a young one runs past 1.5 times its own share of it. */
+    private static final double GROWN_WALK = 0.059;
+    /** Drawn only: whether a young one is drawn bounding now (from 1.5 times its walking pace, back to walking under 1.25). */
+    private boolean drawnRunning;
 
     @Override
     public void registerControllers(AnimatableManager.ControllerRegistrar controllers) {
@@ -2356,8 +2382,9 @@ public class CrocodileEntity extends PathfinderMob implements GeoEntity, HasLife
             });
         }
         double dx = getX() - xo, dy = getY() - yo, dz = getZ() - zo;
-        // the clips' strides are made for a grown crocodile: a small one's legs and tail beat for its size (sizePace)
-        double clipScale = Math.max(0.05, Math.min(1.0, getScale() / 0.7));
+        // the clips' strides are made for a crocodile of the usual size (scale 1): a smaller one's legs and tail beat
+        // faster by how much shorter they are, and its quickest beat (the cap) and its stillness go by its own pace
+        double clipScale = Math.max(0.03, getScale()), pace = sizePace();
         if (isBasking()) {
             if (!drawnBasking) {        // it flops down only if it walked there (not lying down where it already lay, nor afloat)
                 drawnBasking = true;
@@ -2369,19 +2396,35 @@ public class CrocodileEntity extends PathfinderMob implements GeoEntity, HasLife
         if (!isInWater() && dx * dx + dz * dz > 0.02 * 0.02) {
             walkedAt = tickCount;
         }
+        LifeStage stage = life.stage();
+        boolean hatchling = stage == LifeStage.YOUNG;
         if (isInWater()) {
+            drawnRunning = false;
             double speed = Math.sqrt(dx * dx + dy * dy + dz * dz);
-            if (speed < 0.012) {
-                return state.setAndContinue(FLOAT);
+            if (speed < 0.012 * pace) {
+                return state.setAndContinue(hatchling ? YOUNG_FLOAT : FLOAT);
             }
-            player.setAnimationSpeed(Mth.clamp(speed / (SWIM_CLIP_SPEED * clipScale), 0.5, 2.5));
-            return state.setAndContinue(SWIM);
+            player.setAnimationSpeed(Mth.clamp(speed / (SWIM_CLIP_SPEED * clipScale), 0.5, 2.5 / pace));
+            return state.setAndContinue(hatchling ? YOUNG_SWIM : SWIM);
         }
         double speed = Math.sqrt(dx * dx + dz * dz);
-        if (speed < 0.005) {
-            return state.setAndContinue(IDLE);
+        if (speed < 0.005 * pace) {
+            drawnRunning = false;
+            return state.setAndContinue(hatchling ? YOUNG_IDLE : IDLE);
         }
-        player.setAnimationSpeed(Mth.clamp(speed / (WALK_CLIP_SPEED * clipScale), 0.5, 2.5));
+        if (hatchling || stage == LifeStage.TEEN) {
+            double walking = GROWN_WALK * pace;
+            drawnRunning = speed > walking * (drawnRunning ? 1.25 : 1.5);
+            if (drawnRunning) {
+                player.setAnimationSpeed(Mth.clamp(speed / (YOUNG_RUN_CLIP_SPEED * clipScale), 0.5, 2.5 / pace));
+                return state.setAndContinue(YOUNG_RUN);
+            }
+        }
+        if (hatchling) {
+            player.setAnimationSpeed(Mth.clamp(speed / (YOUNG_WALK_CLIP_SPEED * clipScale), 0.5, 2.5 / pace));
+            return state.setAndContinue(YOUNG_WALK);
+        }
+        player.setAnimationSpeed(Mth.clamp(speed / (WALK_CLIP_SPEED * clipScale), 0.5, 2.5 / pace));
         return state.setAndContinue(WALK);
     }
 

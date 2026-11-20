@@ -1,0 +1,24 @@
+# The measuring course (swimming to a bank one block above the water and climbing out) for the croc_teen: written by tools/body_course.py films, do not edit.
+lens 50
+cmd fill -12 -63 -7 0 -62 7 minecraft:water
+cmd fill -12 -61 -7 0 -61 7 minecraft:air
+walker antcolonies:crocodile -6.5 -62 0.5 -90 Life:{Sex:"female",Age:168000,Grown:0b,OwnSize:1.0f}
+follow 0 3.5 -6 0 25
+cmd tick unfreeze
+record on 3
+go 6 -60 0 1.0
+wait 60
+shot p00
+wait 60
+shot p01
+wait 60
+shot p02
+wait 60
+shot p03
+wait 60
+shot p04
+wait 60
+shot p05
+wait 49
+shot p06
+record off

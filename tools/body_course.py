@@ -47,7 +47,18 @@ ANIMALS = {
     # bpt: blocks a tick it walks at speed 1.0, measured on the course (the monitor strolls at 0.8: 0.031 a tick)
     'monitor': dict(id='antcolonies:monitor', data='OwnSize:1.0f,HungryIn:99999,SunIn:99999', walk=0.8, dash=1.7, bpt=0.039),
     'crocodile': dict(id='antcolonies:crocodile', data='OwnSize:1.0f', walk=1.0, dash=1.9, bpt=0.059),
+    # the young (animal life cycle step 4, 2026-11-20): a hatchling just out of the egg (0.07 of the grown size) and a
+    # teen a day into its teens (0.43); the grown body plan (same bones); bpt by CrocodileEntity.sizePace
+    'croc_hatchling': dict(id='antcolonies:crocodile', plan='crocodile', walk=1.0, dash=1.9, bpt=0.059 * (0.07 / 0.7) ** 0.5,
+                           data='Life:{Sex:"female",Age:0,Grown:0b,OwnSize:1.0f}'),
+    'croc_teen': dict(id='antcolonies:crocodile', plan='crocodile', walk=1.0, dash=1.9, bpt=0.059 * (0.43 / 0.7) ** 0.5,
+                      data='Life:{Sex:"female",Age:168000,Grown:0b,OwnSize:1.0f}'),
 }
+
+
+def plan_of(animal):
+    """The body plan's name for a course animal (its own name, or the grown one's for the young)."""
+    return ANIMALS[animal].get('plan', animal)
 
 # The flat world's ground: grass at y -61, so an animal stands at -60. The camera clears x and z -12..12 each scene.
 G = -60
@@ -577,7 +588,7 @@ def check_scene(job):
     """One scene of the course checked (run side by side, one scene a process): its report lines, its findings
     (size, sentence) and the size of a model pixel."""
     animal, scene = job
-    plan = json.load(open(body_plan.plan_path(animal), encoding='utf-8'))
+    plan = json.load(open(body_plan.plan_path(plan_of(animal)), encoding='utf-8'))
     lines, summary = [], []
     folder = os.path.join(KEPT, scene_name(animal, scene))
     path = os.path.join(folder, 'body.jsonl.gz')
@@ -652,7 +663,7 @@ def check_scene(job):
 
 
 def report(animal):
-    plan = json.load(open(body_plan.plan_path(animal), encoding='utf-8'))
+    plan = json.load(open(body_plan.plan_path(plan_of(animal)), encoding='utf-8'))
     lines = [f'The measuring course for the {animal} (tools/body_course.py; 1 model px = {{px}} blocks)', '']
     summary = []
     px = None

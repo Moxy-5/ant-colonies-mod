@@ -1,0 +1,78 @@
+# The measuring course (a walk with two right-angle turns (the back bending sideways)) for the croc_hatchling: written by tools/body_course.py films, do not edit.
+lens 50
+walker antcolonies:crocodile -6.5 -60 -4.5 -90 Life:{Sex:"female",Age:0,Grown:0b,OwnSize:1.0f}
+follow 0 3.5 -6 0 25
+cmd tick unfreeze
+record on 3
+go 2 -60 -5 1.0
+wait 60
+shot p00
+wait 60
+shot p01
+wait 60
+shot p02
+wait 60
+shot p03
+wait 60
+shot p04
+wait 60
+shot p05
+wait 60
+shot p06
+wait 60
+shot p07
+wait 60
+shot p08
+wait 60
+shot p09
+wait 60
+shot p10
+wait 7
+shot p11
+go 2 -60 4 1.0
+wait 60
+shot p12
+wait 60
+shot p13
+wait 60
+shot p14
+wait 60
+shot p15
+wait 60
+shot p16
+wait 60
+shot p17
+wait 60
+shot p18
+wait 60
+shot p19
+wait 60
+shot p20
+wait 60
+shot p21
+wait 60
+shot p22
+wait 7
+shot p23
+go -6 -60 4 1.0
+wait 60
+shot p24
+wait 60
+shot p25
+wait 60
+shot p26
+wait 60
+shot p27
+wait 60
+shot p28
+wait 60
+shot p29
+wait 60
+shot p30
+wait 60
+shot p31
+wait 60
+shot p32
+wait 57
+shot p33
+record off

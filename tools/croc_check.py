@@ -1,7 +1,7 @@
 """The crocodile's breeding clips checked offline, as the game draws them (animal life cycle step 4, 2026-11-20; made
 like tools/water_check.py; CLAUDE.md's hard rule: every animation checked offline and in the game frame by frame).
 Reads the game's own files (python tools/crocodile_models.py game first).
-  python tools/croc_check.py [clip ...] [--times 0,0.5,1] [--views side,three,front]
+  python tools/croc_check.py [clip ...] [--model crocodile_teen] [--times 0,0.5,1] [--views side,three,front]
 With no clip names, checks the six breeding clips: head_slap, rumble, snout_up, court_roll (in the water), hiss, dig
 (on land). Prints for each: parts under the ground (land clips; the game sets standing feet down up to 5 pixels, so
 feet a little over the ground are fine), where the snout, the back's top and the tail's top lie against the water's
@@ -16,19 +16,25 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import anim_lab as lab
 import json
 
-WATER = ('head_slap', 'rumble', 'snout_up', 'court_roll')
-LAND = ('hiss', 'dig')
+WATER = ('head_slap', 'rumble', 'snout_up', 'court_roll', 'swim', 'float', 'lunge', 'snap_left', 'snap_right', 'hold', 'eat', 'shake',
+         'young_swim', 'young_float')
+LAND = ('hiss', 'dig', 'idle', 'walk', 'bask', 'flop', 'death', 'drag', 'young_walk', 'young_run', 'young_idle')
+BREEDING = ('head_slap', 'rumble', 'snout_up', 'court_roll', 'hiss', 'dig')
 # The water's surface over the model's floor when it rests afloat (CrocodileEntity.AFLOAT, 0.462 of its usual size in
 # blocks, is 7.4 model pixels: the brows, the eyes and the back out, the flanks under).
 SURFACE = 0.462 * 16.0
 
 args = sys.argv[1:]
 times, views = None, ('side', 'three', 'front')
+model_name = 'crocodile'
 names = []
 i = 0
 while i < len(args):
     if args[i] == '--times':
         times = [float(x) for x in args[i + 1].split(',')]
+        i += 2
+    elif args[i] == '--model':
+        model_name = args[i + 1]
         i += 2
     elif args[i] == '--views':
         views = tuple(args[i + 1].split(','))
@@ -36,9 +42,9 @@ while i < len(args):
     else:
         names.append(args[i])
         i += 1
-names = names or list(WATER + LAND)
+names = names or list(BREEDING)
 
-model = lab.Model('crocodile')
+model = lab.Model(model_name)
 data = json.load(open(lab.model_file('crocodile', 'animations', 'entity', 'crocodile.animation.json'), encoding='utf-8'))['animations']
 
 
@@ -118,7 +124,7 @@ for name in names:
         cw, ch, lh = 380, 260, 20
         rows_n = (len(times) + cols - 1) // cols
         cv = lab.Canvas(cw * cols, (ch + lh) * rows_n * len(views) + 30)
-        cv.text(10, 8, f'CROCODILE {name.upper()}  {clip.length:g} S', scale=2)
+        cv.text(10, 8, f'{model_name.upper()} {name.upper()}  {clip.length:g} S', scale=2)
         for vi, vname in enumerate(views):
             view = lab.VIEWS[vname]
             pts = [(x, y, z) for x in (-30, 30) for y in (-4, 40) for z in (-45, 72)]
@@ -137,6 +143,6 @@ for name in names:
                         fr.canvas.line(fr.px((xx, SURFACE, -45.0)), fr.px((xx, SURFACE, 72.0)), (40, 110, 230), fr.cell, depth=False)
                 else:
                     fr.grid(0.0, 0.0, ((-24.0, 24.0), (-45.0, 72.0)), step=4.0)
-        png = os.path.abspath(f'cc_croc_{name}.png')
+        png = os.path.abspath(f'cc_{model_name}_{name}.png')
         cv.save(png)
         print('  wrote', png)

@@ -1,0 +1,41 @@
+# The measuring course (a one-block step up) for the croc_hatchling: written by tools/body_course.py films, do not edit.
+lens 50
+cmd fill 1 -60 -7 12 -60 7 minecraft:grass_block
+walker antcolonies:crocodile -5.5 -60 0.5 -90 Life:{Sex:"female",Age:0,Grown:0b,OwnSize:1.0f}
+follow 0 3.5 -6 0 25
+cmd tick unfreeze
+record on 3
+go 7 -59 0 1.0
+wait 60
+shot p00
+wait 60
+shot p01
+wait 60
+shot p02
+wait 60
+shot p03
+wait 60
+shot p04
+wait 60
+shot p05
+wait 60
+shot p06
+wait 60
+shot p07
+wait 60
+shot p08
+wait 60
+shot p09
+wait 60
+shot p10
+wait 60
+shot p11
+wait 60
+shot p12
+wait 60
+shot p13
+wait 60
+shot p14
+wait 48
+shot p15
+record off

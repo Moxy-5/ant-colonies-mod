@@ -1,0 +1,105 @@
+# The young crocodiles' everyday moves in the game, frame by frame (animal life cycle step 4, 2026-11-20; CLAUDE.md's
+# hard rule): a hatchling just out of the egg (0.07 of the usual size, half a block long) and a teen a day into its teens
+# (0.43), each walking up to a one-block step and over it (side on and three quarters), swimming across a pool and
+# resting afloat (side on and from the front), and dying on land; the game frozen and stepped a few ticks a picture.
+#   ./gradlew runFilm -PfilmScene=tools/film/crocodile_young_frames.film   pictures in run-film/screenshots/crocodile_young_frames/
+cmd time set noon
+cmd weather clear
+cmd kill @e[type=!player]
+# the step: stone from x 10 east, one block up; the pool: x 30..44, 3 deep, flush with the grass
+cmd fill 10 -60 -8 20 -60 8 minecraft:stone
+cmd fill 30 -63 -8 44 -61 8 minecraft:water
+lens 40
+wait 40
+# --- the hatchling: up the step, side on (the camera's height is its feet: its eye 1.62 higher) ---
+walker antcolonies:crocodile 8.6 -60 0.5 -90 Life:{Sex:"female",Age:0,Grown:0b,OwnSize:1.0f}
+camera 9.6 -61.35 -0.9 0 8
+cmd tick unfreeze
+go 13 -59 0 1.0
+wait 20
+cmd tick freeze
+burst h_step_side 30 3
+cmd tick unfreeze
+cmd kill @e[type=antcolonies:crocodile]
+wait 5
+walker antcolonies:crocodile 8.6 -60 0.5 -90 Life:{Sex:"female",Age:0,Grown:0b,OwnSize:1.0f}
+camera 8.4 -60.9 -0.4 -40 30
+cmd tick unfreeze
+go 13 -59 0 1.0
+wait 20
+cmd tick freeze
+burst h_step_threequarter 30 3
+cmd tick unfreeze
+cmd kill @e[type=antcolonies:crocodile]
+wait 5
+# the hatchling swimming, side on, then afloat from the front
+walker antcolonies:crocodile 33.5 -60.2 0.5 -90 Life:{Sex:"female",Age:0,Grown:0b,OwnSize:1.0f}
+camera 34.6 -61.55 -0.9 0 6
+cmd tick unfreeze
+go 40 -61 0 1.0
+wait 30
+cmd tick freeze
+burst h_swim_side 12 3
+cmd tick unfreeze
+wait 200
+camera 41.7 -61.5 0.5 90 10
+shot h_float_front_a
+wait 20
+shot h_float_front_b
+cmd kill @e[type=antcolonies:crocodile]
+wait 5
+# the hatchling dying on the grass
+cmd summon antcolonies:crocodile 4.5 -60 4.5 {NoAI:1b,Rotation:[-90f,0f],Life:{Sex:"female",Age:0,Grown:0b,OwnSize:1.0f}}
+camera 4.5 -61.3 3.1 0 14
+wait 10
+cmd kill @e[type=antcolonies:crocodile]
+cmd tick freeze
+burst h_death_side 10 3
+cmd tick unfreeze
+wait 30
+# --- the teen: up the step, side on and three quarters ---
+walker antcolonies:crocodile 5.6 -60 0.5 -90 Life:{Sex:"female",Age:168000,Grown:0b,OwnSize:1.0f}
+camera 8.6 -60.9 -4.6 0 8
+cmd tick unfreeze
+go 14 -59 0 1.0
+wait 40
+cmd tick freeze
+burst t_step_side 30 3
+cmd tick unfreeze
+cmd kill @e[type=antcolonies:crocodile]
+wait 5
+walker antcolonies:crocodile 5.6 -60 0.5 -90 Life:{Sex:"female",Age:168000,Grown:0b,OwnSize:1.0f}
+camera 4.0 -59.6 -3.0 -40 26
+cmd tick unfreeze
+go 14 -59 0 1.0
+wait 40
+cmd tick freeze
+burst t_step_threequarter 30 3
+cmd tick unfreeze
+cmd kill @e[type=antcolonies:crocodile]
+wait 5
+# the teen swimming, side on, then afloat from the front
+walker antcolonies:crocodile 32.5 -60.4 0.5 -90 Life:{Sex:"female",Age:168000,Grown:0b,OwnSize:1.0f}
+camera 35.5 -61.3 -4.0 0 6
+cmd tick unfreeze
+go 42 -61 0 1.0
+wait 30
+cmd tick freeze
+burst t_swim_side 12 3
+cmd tick unfreeze
+wait 200
+camera 46.8 -61.0 0.5 90 10
+shot t_float_front_a
+wait 20
+shot t_float_front_b
+cmd kill @e[type=antcolonies:crocodile]
+wait 5
+# the teen dying on the grass
+cmd summon antcolonies:crocodile 4.5 -60 4.5 {NoAI:1b,Rotation:[-90f,0f],Life:{Sex:"female",Age:168000,Grown:0b,OwnSize:1.0f}}
+camera 4.5 -60.6 0.0 0 14
+wait 10
+cmd kill @e[type=antcolonies:crocodile]
+cmd tick freeze
+burst t_death_side 10 3
+cmd tick unfreeze
+quit
