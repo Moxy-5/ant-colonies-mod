@@ -166,6 +166,12 @@ user: a detailed webbed foot model comes later). Fun first, inspired by the real
 - 2026-11-20, **the body approved by the user** ("I really like the body", v13 without its eyes). **The eyes: fun
   first, not realism** (the user: "for the eyes it will be better to stray from realism and just do whatever looks
   good in Minecraft"); they get their own session, starting from v13's angled eye bones.
+- 2026-11-20, **the eyes started over, Minecraft style** (the user: "throw out all realism ... remake them to be more
+  like Minecraft with 3 options", and every earlier eye try deleted, nothing taken from it or any picture): straight
+  square boxes on whole pixels, never tilted, the eye painted on as pixel art (white, a square black pupil, a green
+  lid row); `EYE_LOOKS` in `tools/bullfrog_models.py`. A pop-up cubes on the head's top (v14), B side cubes poking
+  out of the head's sides (v15), C painted on a flat plate under a square brow (v16); pictures in
+  `references/workshop/bullfrog/eyes_minecraft_options.png`. Waiting for the user's pick.
 
 ## My picks the user may change
 The barb's name and look, every size and number above (the bullfrog's size is the user's call), barbs with no hunger,

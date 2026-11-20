@@ -17,9 +17,8 @@ Read off the side photo on a model-pixel grid (13.9 photo pixels a model pixel):
   back and down to its corner under the eardrum (8.4 high, 13 pixels behind the snout); from above the snout is a
   rounded V, the head narrowing from the jaw corners to the tip. The lower jaw and the throat below it are their own
   bones (the gape for the lunge and the bite, the throat for calling).
-- **Eyes high and close together on top** (the front photo: their middles 0.38 of the head's width apart), big and
-  bulging, a bronze eye with a dark bar of a pupil, a lid ridge over each; a round eardrum behind each eye; two small
-  nostrils near the tip.
+- **Eyes:** Minecraft style, not from the photos (the user, 2026-11-20; EYE_LOOKS below); a round eardrum behind each
+  eye; two small nostrils near the tip.
 - **Legs joined and bent:** each is a chain of round pieces turned from joint to joint (the shoulder or hip inside the
   body, so nothing floats). The arm: the upper arm down and back from under the jaw corner to the elbow near the ground,
   the forearm forward to the wrist, the hand flat with four long plain fingers (no webbing on a frog's hand). The hind
@@ -73,15 +72,6 @@ HEAD_FROM = 27.0         # the head and jaw bones start at the mouth's corner
 THROAT_BELOW = 6.0       # the throat bone is the jaw below this height
 ROUNDNESS = 2.4          # the cross-section's superellipse power: 2 an ellipse, higher squarer
 FLAT_BELLY = 0.5         # how much of the lower half keeps its full width
-# The eyes (the user, 2026-11-20: "they're at an angle, perfectly placed to look in all directions"): each a dome
-# set into the head's top corner, its own bone, built pointing straight up and turned so it points out, up and a
-# little forward at once, the way a real frog's eye gives it nearly all-round sight; boxes in a turned bone sit at
-# any angle in the game, as the legs' do. It sits up on the head's top near the corner (the front photo: the eyes'
-# middles 0.38 of the head's width apart, 7 behind the snout), set on the surface there; the tilt out makes it look
-# to the side as the side photo shows. EYE_APART is how far out its base sits, EYE_OUT its tilt out from straight up,
-# EYE_FORWARD its tilt toward the snout, EYE_R the eyeball's radius, EYE_SINK how deep its base sits in the head.
-EYE_AT, EYE_APART, EYE_R = 33.0, 5.4, 1.7
-EYE_OUT, EYE_FORWARD, EYE_SINK = 40.0, 28.0, 0.6
 EAR_AT, EAR_HEIGHT, EAR_R = 27.6, 13.2, 1.2
 SLICE = 2.0
 LAYER = 2.0
@@ -150,37 +140,70 @@ def _box(cubes, x_a, x_b, y0, y1, z0, z1, part):
     cubes.append(cube([lo, y0, z0], [hi, y1, z1], part))
 
 
+# --- the eyes: Minecraft style (the user, 2026-11-20: "throw out all realism, I want them to look good in Minecraft";
+# every earlier eye try deleted, nothing taken from it or from any picture). Straight square boxes on whole model
+# pixels, never tilted, and the eye painted on their flat faces as pixel art, the way Minecraft's own mobs have them.
+# Each eye is still its own bone, so it can blink later. A look is: the box (x from the middle line out, y, z with the
+# snout to -z, all whole pixels; for the left eye, mirrored for the right), the pixel art on its front face and on
+# its outer face (rows from the box's top; 'g' skin, 'w' white, 'k' black; anything outside the art is skin), and
+# extra skin boxes (a brow).
+EYE_LOOKS = {
+    # A, pop-up cubes: a cube standing up on top of the head at each front corner, a green lid on top.
+    'cubes': {'box': ((2, 8), (15, 22), (-15, -9)),
+              'front': ('gggggg', 'wwwwww', 'wwkkww', 'wwkkww', 'wwwwww'),
+              'outer': ('gggggg', 'wwwwww', 'wkkwww', 'wkkwww', 'wwwwww'),
+              'extra': ()},
+    # B, side cubes: a cube poking straight out of each side of the head, its top level with the head's top, so the
+    # head reads wide and flat from ahead.
+    'sides': {'box': ((6, 12), (13, 19), (-15, -9)),
+              'front': ('gggggg', 'wwwwww', 'wwwkkw', 'wwwkkw', 'wwwwww', 'gggggg'),
+              'outer': ('gggggg', 'wwwwww', 'wkkwww', 'wkkwww', 'wwwwww', 'gggggg'),
+              'extra': ()},
+    # C, painted on: a flat plate set into each upper corner of the head, standing a pixel or two proud, the eye
+    # painted on it the way a Minecraft cow's or pig's is (a white square and a black one), the black wrapping round
+    # the front corner so it reads from ahead and from the side, under a square brow.
+    'painted': {'box': ((6, 11), (12, 18), (-16, -8)),
+                'front': ('ggggg', 'ggwkk', 'ggwkk', 'ggwkk', 'ggggg'),
+                'outer': ('gggggggg', 'kkkwwwgg', 'kkkwwwgg', 'kkkwwwgg', 'gggggggg'),
+                'extra': (((5, 12), (18, 19), (-17, -8)),)},
+}
+EYE_LOOK = 'cubes'
+
+
 def eye_bones(s):
-    """One eye's bone (s = 1 left, -1 right): built pointing up from its pivot on the head's top, then turned out
-    and forward. In its own unturned space: skin round its base (the socket), the eyeball as a short rounded block
-    whose flat top is the eye's face (a pale iris, a wide dark pupil running front to back), and a skin lid over its
-    back edge, so from any side it shows as an oval face under a brow, looking out at an angle."""
-    import math
-    y = at(TOP, EYE_AT)
-    while y > 0 and half_width_at(EYE_AT, y) < EYE_APART:            # down the head's top to where it is that wide
-        y -= 0.05
-    p = [s * EYE_APART, y - 0.3, outline_z(EYE_AT)]                   # just under the surface there
-    px, py, pz = p
-    c = []
-    base = py + EYE_SINK - 0.6                                        # where the eyeball leaves the head
-    disc(c, 1, p, EYE_R + 0.3, py - 1.2, base + 0.2, 'skin')          # the socket: skin round the eyeball's base
-    # the eyeball: a short rounded block whose flat top is the eye's face (turned with the bone, it looks out, up and
-    # forward); an eight-sided outline, a slightly smaller cap so its rim is rounded
-    r = EYE_R
-    c.append(cube([px - r, base, pz - r * 0.7], [px + r, base + 1.1, pz + r * 0.7], 'eye'))
-    c.append(cube([px - r * 0.7, base, pz - r], [px + r * 0.7, base + 1.1, pz + r], 'eye'))
-    c.append(cube([px - r * 0.8, base + 1.1, pz - r * 0.8], [px + r * 0.8, base + 1.5, pz + r * 0.8], 'eye'))
-    top = base + 1.5
-    c.append(cube([px - 0.42, top, pz - r * 0.62], [px + 0.42, top + 0.04, pz + r * 0.62], 'pupil'))   # wide pupil
-    # the lid: skin over the eye's back edge (the brow knob the photo shows), the front left open so the eye is seen
-    # from ahead too (the front photo)
-    c.append(cube([px - r - 0.15, base, pz + r * 0.45], [px + r + 0.15, top + 0.35, pz + r + 0.25], 'skin'))
-    t = math.radians
-    d = [s * math.sin(t(EYE_OUT)) * math.cos(t(EYE_FORWARD)), math.cos(t(EYE_OUT)) * math.cos(t(EYE_FORWARD)),
-         -math.sin(t(EYE_FORWARD))]
+    """One eye's bone (s = 1 left, -1 right), untilted, its boxes and pixel art from EYE_LOOKS[EYE_LOOK]."""
+    look = EYE_LOOKS[EYE_LOOK]
+    (x0, x1), (y0, y1), (z0, z1) = look['box']
+    xa, xb = sorted((s * x0, s * x1))
+    info = {'s': s, 'x_in': s * x0, 'y1': y1, 'z0': z0, 'front': look['front'], 'outer': look['outer']}
+    eye = cube([xa, y0, z0], [xb, y1, z1], 'eye')
+    eye['_eye'] = info
+    c = [eye]
+    for (ex0, ex1), (ey0, ey1), (ez0, ez1) in look['extra']:
+        ea, eb = sorted((s * ex0, s * ex1))
+        c.append(cube([ea, ey0, ez0], [eb, ey1, ez1], 'skin'))
     name = 'eye_left' if s > 0 else 'eye_right'
-    return {'name': name, 'parent': 'head', 'pivot': [round(v, 3) for v in p], 'rotation': rot(aim((0, 1, 0), d)),
-            'cubes': c}
+    return {'name': name, 'parent': 'head', 'pivot': [s * (x0 + x1) / 2, y0, (z0 + z1) / 2], 'cubes': c}
+
+
+ART = {'g': 'skin', 'w': 'eye_white', 'k': 'pupil'}
+
+
+def eye_colour(c, face_, x, y, z):
+    """An eye box's face, pixel by pixel, from its pixel art: the front face's columns counted from the inner edge,
+    the outer face's from the front edge; rows from the top."""
+    e = c['_eye']
+    outer = 'east' if e['s'] > 0 else 'west'
+    if face_ == 'north':
+        art, col = e['front'], int((x - e['x_in']) * e['s'])
+    elif face_ == outer:
+        art, col = e['outer'], int(z - e['z0'])
+    else:
+        return PLAIN['skin']
+    row = int(e['y1'] - y)
+    if 0 <= row < len(art) and 0 <= col < len(art[row]):
+        return PLAIN[ART[art[row][col]]]
+    return PLAIN['skin']
 
 
 def face(cubes):
@@ -281,8 +304,8 @@ PLAIN = {
     'leg': (100, 116, 56),
     'jaw': (196, 190, 92),        # yellow-green lip and lower jaw
     'throat': (226, 206, 112),    # pale yellow throat
-    'eye': (226, 214, 180),       # a pale iris (the side photo)
-    'pupil': (16, 14, 12),
+    'eye_white': (238, 236, 222),
+    'pupil': (20, 18, 16),
     'ear': (74, 88, 46),          # the eardrum, a shade darker
     'toe': (176, 168, 110),
     'web': (110, 122, 64),
@@ -290,6 +313,8 @@ PLAIN = {
 
 
 def plain_colour(c, face_, x, y, z):
+    if '_eye' in c:
+        return eye_colour(c, face_, x, y, z)
     col = PLAIN[c['_part']]
     if c['_part'] in ('jaw', 'skin') and c['_bone'] in ('head', 'jaw'):
         mouth = at(MOUTH, max(HEAD_FROM, LENGTH / 2 - z))
@@ -304,11 +329,6 @@ def plain_colour(c, face_, x, y, z):
 WORKSHOP_SHAPE = [
     ('ROUNDNESS', 'Cross-section squareness (2 round, 4 boxy)', 2.0, 4.0, 0.1),
     ('FLAT_BELLY', 'Flat belly (0 round, 1 flat)', 0.0, 0.9, 0.05),
-    ('EYE_APART', 'Eye base out from the middle (model pixels)', 3.5, 8, 0.1),
-    ('EYE_R', 'Eyeball radius (model pixels)', 1.2, 2.6, 0.05),
-    ('EYE_OUT', 'Eye tilted out from straight up (degrees)', 20, 80, 1),
-    ('EYE_FORWARD', 'Eye tilted toward the snout (degrees)', 0, 40, 1),
-    ('EYE_SINK', 'Eyeball base sunk into the head (model pixels)', 0, 1.5, 0.05),
 ]
 WORKSHOP_PARTS = {'head': ['head'], 'eyes': ['eye_left', 'eye_right'], 'body': ['body'], 'front legs': ['arm_left_1', 'arm_right_1'],
                   'hind legs': ['leg_left_1', 'leg_right_1']}
