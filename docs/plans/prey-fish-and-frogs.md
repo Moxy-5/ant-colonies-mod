@@ -245,6 +245,8 @@ user: a detailed webbed foot model comes later). Fun first, inspired by the real
   back of the mouth (2.5 px from the corner): it lies forward along the floor, pad at the front, and in the `tongue`
   clip shoots straight out of the mouth (stretching 3.9 times, the mouth open 38 degrees) instead of flipping over the
   jaw; the pad lands on the ground 18.5 px past the snout. Waiting for the user's look.
+- 2026-11-20, **the tongue approved by the user** ("Looks great", v26): the bullfrog's model, paint and clips are
+  done offline. Left: the in-game frame check of every clip once the frog is in the game (step 3).
 
 ## My picks the user may change
 The barb's name and look, every size and number above (the bullfrog's size is the user's call), barbs with no hunger,
