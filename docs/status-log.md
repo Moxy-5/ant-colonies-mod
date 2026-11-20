@@ -542,3 +542,4 @@ Every "Current status" bullet CLAUDE.md held up to 2026-11-19, word for word, ol
 - 2026-11-20: The bullfrog's knees kept out of its body in the walk, puff and swim (pushed out as a foot moves; sitting unchanged); frog_check measures it; waiting for the user's look.
 - 2026-11-20: The bullfrog's knees-out fix approved by the user; next the tongue and a smoother inside of the mouth.
 - 2026-11-20: The bullfrog's detailed tongue (flick clip), smooth mouth lining and bony jaw points (v25); waiting for the user's look.
+- 2026-11-20: The bullfrog's mouth as the user asked: no white flecks, no bony points, the tongue shooting out from the back of the mouth (v26); waiting for the user's look.

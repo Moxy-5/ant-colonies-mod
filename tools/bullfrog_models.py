@@ -245,12 +245,15 @@ def face(cubes):
 # (nearly straight, MOUTH_SLOPE), standing a little proud of the steps and inset from the skin, so the open mouth shows
 # one smooth surface and the shut mouth hides it. The tongue lies folded back on the floor as a real frog's does, fixed
 # at the front of the mouth, its free end with the sticky pad toward the throat: three bones (root, middle, pad) so it
-# can flip out over the jaw, stretch and curl. On the floor's front edge the bullfrog's three bony "fangs" (real: the
-# odontoids of Pyxicephalus, the points on its lower jaw that give its bite its grip), hidden in the shut mouth.
+# can flip out over the jaw, stretch and curl.
+# The user, 2026-11-20 (looks over realism): no white flecks in the mouth, no bony points on the jaw (the real
+# odontoids, my addition, taken out), and the tongue coming out from further back in the mouth: its root now near the
+# mouth's corner, the tongue lying forward along the floor with its pad at the front, shooting straight out of the mouth
+# (a real frog's is fixed at the front and flips over).
 MOUTH_SLOPE = math.degrees(math.atan2(MOUTH[-1][1] - MOUTH[0][1], MOUTH[-1][0] - MOUTH[0][0]))
 MOUTH_LONG = (MOUTH[-1][0] - MOUTH[0][0]) / math.cos(math.radians(MOUTH_SLOPE))   # the line's length, corner to tip
 FLOOR_UP, ROOF_DOWN, MOUTH_INSET = 0.4, 0.65, 1.3      # how far the plates stand past the slices' steps, the inset
-TONGUE_AT = 10.0         # the tongue's root: this far along the mouth line from the corner (near the front)
+TONGUE_AT = 2.5          # the tongue's root: this far along the mouth line from the corner (at the back: the user)
 TONGUE = ((3.5, 1.5, 0.9), (3.0, 2.0, 1.0))            # the root piece and the middle: length, half width, thickness
 PAD = (3.2, 2.6, 1.3)                                   # the sticky pad at the free end
 
@@ -261,7 +264,7 @@ def _mouth_along(d):
 
 
 def mouth_bones():
-    """The mouth's floor (on the jaw) with the tongue and the fangs on it, and the roof (on the head). Each plate's bone
+    """The mouth's floor (on the jaw) with the tongue on it, and the roof (on the head). Each plate's bone
     is turned along the mouth line, so in its own space the line runs straight forward (to -z) from the corner at the
     pivot, level at the corner's height."""
     corner = outline_z(HEAD_FROM)
@@ -277,27 +280,24 @@ def mouth_bones():
             floor.append(cube([-hw, y0 - 0.6, corner - d1], [hw, y0 + FLOOR_UP, corner - d], 'floor'))
             roof.append(cube([-hw, y0 - ROOF_DOWN, corner - d1], [hw, y0 + 0.35, corner - d], 'roof'))
         d = d1
-    fz = corner - (MOUTH_LONG - 1.9)                       # the fangs, on the floor's front edge
-    for x, w, h in ((-1.7, 0.7, 1.4), (0.0, 0.6, 1.0), (1.7, 0.7, 1.4)):
-        floor.append(cube([x - w / 2, y0 + FLOOR_UP - 0.1, fz - 0.35], [x + w / 2, y0 + FLOOR_UP + h, fz + 0.35], 'fang'))
     tilt = [-round(MOUTH_SLOPE, 3), 0.0, 0.0]
     bones = [{'name': 'mouth_floor', 'parent': 'jaw', 'pivot': [0, y0, corner], 'rotation': tilt, 'cubes': floor},
              {'name': 'mouth_roof', 'parent': 'head', 'pivot': [0, y0, corner], 'rotation': tilt, 'cubes': roof}]
-    # the tongue, lying back along the floor from its root (built along +z, toward the throat)
+    # the tongue, lying forward along the floor from its root at the back (built along -z, toward the snout)
     top = y0 + FLOOR_UP
     z = corner - TONGUE_AT
     parent = 'mouth_floor'
     for i, (ln, hw, th) in enumerate(TONGUE):
-        c = [cube([-hw, top, z - 0.3], [hw, top + th, z + ln], 'tongue'),
-             cube([-hw + 0.5, top + th, z], [hw - 0.5, top + th + 0.25, z + ln], 'tongue')]   # rounded on top
+        c = [cube([-hw, top, z - ln], [hw, top + th, z + 0.3], 'tongue'),
+             cube([-hw + 0.5, top + th, z - ln], [hw - 0.5, top + th + 0.25, z], 'tongue')]   # rounded on top
         name = f'tongue_{i + 1}'
         bones.append({'name': name, 'parent': parent, 'pivot': [0, top, round(z, 3)], 'cubes': c})
-        parent, z = name, z + ln
+        parent, z = name, z - ln
     ln, hw, th = PAD                                         # the pad: wide and thick, rounded, notched at its end
-    pad = [cube([-hw, top, z - 0.3], [hw, top + th, z + ln - 0.7], 'pad'),
-           cube([-hw + 0.6, top, z + ln - 0.7], [-0.45, top + th - 0.15, z + ln], 'pad'),
-           cube([0.45, top, z + ln - 0.7], [hw - 0.6, top + th - 0.15, z + ln], 'pad'),
-           cube([-hw + 0.5, top + th, z + 0.2], [hw - 0.5, top + th + 0.3, z + ln - 0.9], 'pad')]
+    pad = [cube([-hw, top, z - ln + 0.7], [hw, top + th, z + 0.3], 'pad'),
+           cube([-hw + 0.6, top, z - ln], [-0.45, top + th - 0.15, z - ln + 0.7], 'pad'),
+           cube([0.45, top, z - ln], [hw - 0.6, top + th - 0.15, z - ln + 0.7], 'pad'),
+           cube([-hw + 0.5, top + th, z - ln + 0.9], [hw - 0.5, top + th + 0.3, z - 0.2], 'pad')]
     bones.append({'name': 'tongue_pad', 'parent': parent, 'pivot': [0, top, round(z, 3)], 'cubes': pad})
     return bones
 
@@ -434,12 +434,10 @@ PAINT = {
     'inside': (196, 112, 104),    # the inside of the mouth, seen only in the gape (the animations stage)
     'floor': (186, 100, 98),      # the smooth floor of the mouth, a little darker than the roof
     'roof': (214, 140, 134),
-    'fang': (236, 228, 200),      # the bony points on the lower jaw
     'tongue': (232, 128, 138),    # the tongue: pink, a darker groove down its middle, paler edges
     'groove': (190, 84, 100),
     'edge': (246, 168, 172),
-    'pad': (214, 86, 106),        # the sticky pad: deeper rose, with wet shine
-    'shine': (255, 222, 226),
+    'pad': (214, 86, 106),        # the sticky pad: deeper rose
     'throat': (226, 204, 96),     # the yellow throat
     'blotch': (150, 156, 66),     # its olive mottling
     'leg': (74, 96, 38),
@@ -503,13 +501,9 @@ def paint_colour(c, face_, x, y, z):
             return col
         base, _ = _top_skin(along)
         return _noise(base, ix, iy, iz, amount=5)
-    if part in ('floor', 'roof'):                              # the inside of the mouth: smooth, a few wet flecks
-        if _hash(ix, iy, iz, 41) < 0.05:
-            return _noise(PAINT['shine'], ix, iy, iz, amount=4)
+    if part in ('floor', 'roof'):                              # the inside of the mouth: smooth, plain pink
         return _noise(PAINT[part], ix, iy, iz, amount=5)
-    if part == 'fang':
-        return _noise(PAINT['fang'], ix, iy, iz, amount=5)
-    if part in ('tongue', 'pad'):                              # the groove down the middle, paler edges, wet shine
+    if part in ('tongue', 'pad'):                              # the groove down the middle, paler edges
         col = PAINT[part]
         if face_ in ('up', 'down'):
             ax = abs(x)
@@ -517,8 +511,6 @@ def paint_colour(c, face_, x, y, z):
                 col = PAINT['groove']
             elif ax > (2.0 if part == 'pad' else 1.1):
                 col = PAINT['edge']
-            if _hash(ix, iy, iz, 43) < (0.18 if part == 'pad' else 0.07):
-                col = PAINT['shine']
         return _noise(col, ix, iy, iz, amount=5)
     if part == 'pupil':                                        # the nostrils
         return PAINT['nostril']
@@ -632,7 +624,7 @@ from model_parts import (clip as _sample, smooth, turn_x, turn_y, turn_z, mat_ve
 
 BODY_PIVOT = (0.0, 6.0, 0.0)
 IDLE_LEN, WALK_LEN, HOP_LEN, LEAP_LEN, SWIM_LEN, FLOAT_LEN = 6.0, 1.4, 0.8, 1.1, 1.0, 3.0
-TONGUE_LEN, TONGUE_FLIP, TONGUE_STRETCH, TONGUE_GAPE, TONGUE_LEAN = 0.7, 185.0, 2.6, 30.0, 4.0
+TONGUE_LEN, TONGUE_FLIP, TONGUE_STRETCH, TONGUE_GAPE, TONGUE_LEAN = 0.7, -3.5, 3.9, 38.0, 4.0
 CALL_LEN, PUFF_LEN, ATTACK_LEN, DEATH_LEN, DIG_LEN, DUG_LEN, DIG_OUT_LEN = 3.0, 2.0, 0.8, 1.0, 3.0, 6.0, 1.2
 WALK_SWEEP, WALK_DUTY, WALK_LIFT = 5.0, 0.7, 1.4       # each foot's sweep under the body, the time down, the body raised
 KNEE_OUT, ELBOW_OUT, KNEE_EASE = 1.6, 1.0, 2.5                         # knees and elbows pushed out, fully once a foot is 2.5 px from its rest (my picks, measured)
@@ -1025,15 +1017,15 @@ def clips():
         return p
     make('attack', ATTACK_LEN, attack, 40, False)
 
-    # tongue: the flick for small prey close by (the user, 2026-11-20: "the iconic tongue"): the mouth opens, the tongue
-    # flips out over the jaw from its root at the front, stretching, slaps its sticky pad down on the prey, holds a
-    # moment, flips back in with it, the mouth shuts and the eyes pull down to swallow
+    # tongue: the flick for small prey close by (the user, 2026-11-20: "the iconic tongue"): the mouth opens wide, the
+    # tongue shoots straight out from the back of the mouth along its floor, stretching, the pad dipping onto the prey
+    # and slapping down, holds a moment, snaps back in with it, the mouth shuts and the eyes pull down to swallow
     P = _Poser()
 
     def tongue(t):
         opened = _ramp(t, ((0.0, 0.0), (0.06, 1.0), (0.34, 1.0), (0.4, 0.0)))
-        flip = _ramp(t, ((0.04, 0.0), (0.15, 1.0), (0.23, 1.0), (0.36, 0.0)))
-        lag = _pulse(t, 0.04, 0.04, 0.0, 0.07) - _pulse(t, 0.23, 0.05, 0.0, 0.08)   # the outer half trailing
+        flip = _ramp(t, ((0.05, 0.0), (0.14, 1.0), (0.23, 1.0), (0.34, 0.0)))     # how far out
+        lag = _pulse(t, 0.05, 0.04, 0.0, 0.06) - _pulse(t, 0.23, 0.04, 0.0, 0.07)   # the outer half trailing
         press = _pulse(t, 0.14, 0.03, 0.05, 0.04)                                     # the pad slapped down
         swallow = _pulse(t, 0.4, 0.06, 0.1, 0.12)
         lean = _ramp(t, ((0.0, 0.0), (0.12, 1.0), (0.3, 1.0), (0.5, 0.0)))
@@ -1042,10 +1034,10 @@ def clips():
         P.all_rest(p)
         _face(p, t, jaw=TONGUE_GAPE * opened, gape=6.0 * opened, blink=swallow)
         stretch = 1.0 + (TONGUE_STRETCH - 1.0) * flip
-        p['tongue_1'] = {'rotation': [round(TONGUE_FLIP * flip, 3), 0.0, 0.0],
+        p['tongue_1'] = {'rotation': [round(TONGUE_FLIP * flip, 3), 0.0, 0.0],      # aimed a little down to the prey
                          'scale': [1.0, 1.0, round(stretch, 4)]}              # longer, still fat and fleshy
-        p['tongue_2'] = {'rotation': [round(-40.0 * lag, 3), 0.0, 0.0]}
-        p['tongue_pad'] = {'rotation': [round(22.0 * press - 25.0 * lag, 3), 0.0, 0.0],
+        p['tongue_2'] = {'rotation': [round(-8.0 * lag, 3), 0.0, 0.0]}
+        p['tongue_pad'] = {'rotation': [round(30.0 * press + 10.0 * lag, 3), 0.0, 0.0],
                            'scale': [round(1.0 + 0.25 * press, 4), round(1.0 - 0.3 * press, 4), round(1.0 / stretch, 4)]}
         return p
     make('tongue', TONGUE_LEN, tongue, 60, False)
@@ -1143,7 +1135,7 @@ WORKSHOP_CLIP_INFO = {
         'float': 'Resting at the surface, legs spread, a slow bob.',
         'call': 'The deep whoop: it lifts, the throat swells big, holds with a tremble, sinks.',
         'puff': 'Its threat: blown up and risen on straight front legs, mouth a little open.',
-        'tongue': 'The flick for small prey close by: the tongue flips out over the jaw, slaps its sticky pad down, flips back in.',
+        'tongue': 'The flick for small prey close by: the tongue shoots out from the back of the mouth, slaps its pad down, snaps back.',
         'attack': 'The ambush lunge: huge gape, snapped shut, hands push the food in, eyes pulled down to swallow.',
         'death': 'Rolls onto its back, legs spread.',
         'dig_in': 'Shuffles backward into the mud, hind feet scraping in turn, until only the back and eyes show.',

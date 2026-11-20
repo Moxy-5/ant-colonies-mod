@@ -114,7 +114,7 @@ def grounded(name, u):
 REST_DEPTH = joint_depths({})
 # the inside of the mouth, the tongue and the fangs must hide in the shut mouth (the frog sitting): each part's least
 # depth inside the skin, at rest
-MOUTH_PARTS = ('mouth_floor', 'mouth_roof', 'fang', 'tongue_1', 'tongue_2', 'tongue_pad')
+MOUTH_PARTS = ('mouth_floor', 'mouth_roof', 'tongue_1', 'tongue_2', 'tongue_pad')
 hidden = {}
 for b, cs, _ in model.posed({}):
     if b in MOUTH_PARTS:

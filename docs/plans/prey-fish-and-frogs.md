@@ -240,6 +240,11 @@ user: a detailed webbed foot model comes later). Fun first, inspired by the real
   gape now shows the smooth floor, the tongue and the points. `frog_check` checks the mouth parts hide in the shut
   mouth and where the pad lands. Not smoothed: the jaw's outer edge still shows its slice steps when open (it is the
   same stepped skin as the whole body). Waiting for the user's look.
+- 2026-11-20, **the user's mouth changes** ("its not realistic but it just look better in game"; v26, 389 boxes):
+  no white flecks in the mouth or on the tongue, the three bony points taken out, and the tongue's root moved to the
+  back of the mouth (2.5 px from the corner): it lies forward along the floor, pad at the front, and in the `tongue`
+  clip shoots straight out of the mouth (stretching 3.9 times, the mouth open 38 degrees) instead of flipping over the
+  jaw; the pad lands on the ground 18.5 px past the snout. Waiting for the user's look.
 
 ## My picks the user may change
 The barb's name and look, every size and number above (the bullfrog's size is the user's call), barbs with no hunger,
