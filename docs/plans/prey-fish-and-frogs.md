@@ -199,6 +199,23 @@ user: a detailed webbed foot model comes later). Fun first, inspired by the real
   user's look.
 - 2026-11-20, **the paint approved by the user** ("Looks good", on v23): the paint stage is done. Next for the frog:
   the workshop's last stage, its clips (idle with the throat pumping, walk, the lunge-hop, swim, float, call, bite).
+- 2026-11-20, **the clips** (the user: "Start animations"): 13 clips in `tools/bullfrog_models.py` (`clips()`, written
+  into the savanna mod by `python tools/bullfrog_models.py game`; no entity uses them until step 3): idle (throat
+  pumping, a blink pulling the eyes down), walk (the crawl, one leg at a time), hop, leap (into the water, holds), swim
+  (the frog kick), float, call (the throat swelling into a big yellow pouch under the chin), puff (the threat), attack
+  (the ambush lunge: gape, snap, the hands pushing the food in, eyes pulled down to swallow), death (onto its back),
+  dig_in, dug, dig_out. Made the monitor's way: each hand and foot placed, the leg bent to reach it, each joint a real
+  hinge. The inside of the mouth painted pink for the gape (v24). Checked offline by the new `tools/frog_check.py`
+  (parts under the ground, planted feet sliding, jumps, joint turns, film strips in `references/anim_lab/bullfrog/`):
+  nothing left under the ground but a moment's graze (the hop's toes 2 px as the legs fold; the death roll's shin 4 px
+  on its side), the planted feet slide back at one speed, the fastest turns are real quick swings (an arm swept back in
+  a tenth of a second), smooth key to key. **For the game step (3):** the game must launch the hop and leap as the kick
+  starts and land them as the clip's flight ends (the checks assume it: the hop 0.12 to 0.6 of the clip, the leap 0.12
+  to 0.7), stretching the clip to the real flight; the walk's planted feet match 5.1 model pixels a second (0.10 blocks a
+  second for a male: a slow crawl; the game scales the clip by speed); the leap ends with the feet turned 160 degrees,
+  so its change to the swim must be checked for a spin. **The in-game half of the hard rule (frozen frames from three
+  sides) waits for step 3**, when the frog has a body in the game. The versions page now plays every clip (a Clips row,
+  slow motion, the hop's arc, the water for the swim and float). Waiting for the user's look.
 
 ## My picks the user may change
 The barb's name and look, every size and number above (the bullfrog's size is the user's call), barbs with no hunger,

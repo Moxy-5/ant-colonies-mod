@@ -49,6 +49,8 @@
 <div class="controls"><b>Version B</b><span id="bBtns"></span></div>
 <div class="controls"><b>Show</b><span id="modeBtns"></span><button id="pieces">Show the pieces</button></div>
 <div class="controls" id="partRows" style="display:none"></div>
+<div class="controls" id="clipRow" style="display:none"><b>Clips</b><span id="clipBtns"></span><button id="slow">Slow motion</button>
+  <span id="clipNote" class="readout"></span></div>
 <div class="info" id="info"></div>
 <div class="controls" id="cams"></div>
 <div id="compare"></div>
@@ -69,7 +71,7 @@ const wrap = document.getElementById('wrap');
 const st = Viewer.stage({canvas: document.getElementById('c'), wrap, labels: document.getElementById('labels')});
 const keys = DATA.versions.map(v => v.key);
 const settings = Viewer.settingsFromHash({a: keys[keys.length - 1], b: keys.length > 1 ? keys[keys.length - 2] : 'none',
-                                          mode: 'one', cam: 'three-quarter', pieces: 0});
+                                          mode: 'one', cam: 'three-quarter', pieces: 0, clip: 'still', slow: 0, t: -1});
 let cmp = null;
 
 // plain ground (a scenery prop, hidden while comparing)
@@ -219,7 +221,7 @@ function info(mode, hasB) {
 const L = () => model(settings.a, 'own').userData.length + (shownB && settings.mode === 'side' ? shownB.userData.length + GAP : 0);
 const Hh = () => model(settings.a, 'own').userData.height;
 // D: the size the cameras stand back by: the length, or for a short tall animal (a frog) its height, so it all fits
-const D = () => Math.max(L(), Hh() * 2.4);
+const D = () => Math.max(L(), Hh() * 2.4) * (((DATA.clipInfo || {}).flight || {})[settings.clip] ? 2.6 : 1);  // wider for a thrown clip
 const CAMS = {
   'three-quarter': () => [[-D() * 0.55, D() * 0.42, D() * 0.9], [0, Hh() * 0.4, -0.3]],
   side: () => [[0, Hh() * 0.5, D() * 1.35], [0, Hh() * 0.5, 0]],
@@ -300,6 +302,49 @@ if (live && DATA.shape.length) {
       location.reload();
     } catch (e) { liveOut.textContent = 'the helper said: ' + e.message; }
   };
+}
+
+// --- the clips (the workshop's stage 5): the maker's game clips played on version A (made for the newest version; an
+// older one with other bones may not fit them). One-shot clips play, hold a second and play again. Clips the game throws
+// through the air (a frog's hop) rise on the game's arc; clips in the water show its surface. #t=1.2 freezes a moment.
+const CLIPS = Viewer.readClips(DATA.clips || {});
+const CI = DATA.clipInfo || {};
+let clipT = 0;
+const water = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1),
+  new THREE.MeshLambertMaterial({color: '#3d7fb0', transparent: true, opacity: 0.45, depthWrite: false}));
+water.visible = false; st.scene.add(water);
+function rise(name, t, length) {              // CI.flight[name] = [launch, land] in parts of the clip; blocks at made size
+  const f = (CI.flight || {})[name];
+  if (!f) return 0;
+  const a = f[0] * length, b = f[1] * length;
+  if (!(t > a && t < b)) return 0;
+  const dt = t - a, v = 32 * (b - a) / 2;
+  return (v * dt - 16 * dt * dt) / (CI.scale || 1);
+}
+if (Object.keys(CLIPS).length) {
+  document.getElementById('clipRow').style.display = '';
+  const showClip = Viewer.buttons(document.getElementById('clipBtns'), [['still', 'Still']].concat(Object.keys(CLIPS).map(n => [n, n])),
+                                  k => { settings.clip = k; clipT = 0; showClip(k); note(); setCam(settings.cam); });
+  const slow = document.getElementById('slow');
+  slow.onclick = () => { settings.slow = settings.slow ? 0 : 1; slow.classList.toggle('on', !!settings.slow); };
+  slow.classList.toggle('on', !!settings.slow);
+  const note = () => document.getElementById('clipNote').textContent = (CI.notes || {})[settings.clip] || '';
+  showClip(settings.clip in CLIPS ? settings.clip : 'still'); note();
+  st.onFrame.push(dt => {
+    const A = model(settings.a, 'own');
+    const c = CLIPS[settings.clip];
+    water.visible = false;
+    if (!c) { Viewer.pose(A, null, 0); A.position.y = 0; return; }
+    clipT += dt * (settings.slow ? 0.25 : 1);
+    const loops = DATA.clips[settings.clip].loop === true;
+    const t = settings.t >= 0 ? Math.min(settings.t, c.length) : loops ? clipT % c.length : Math.min(clipT % (c.length + 1), c.length);
+    Viewer.pose(A, c, t);
+    A.position.y = rise(settings.clip, t, c.length);
+    if ((CI.water || []).includes(settings.clip) && !(settings.compare in Viewer.VIEWS)) {
+      const top = CI.surface || 0.5, w = A.userData.length * 2.2;
+      water.scale.set(w, top, w); water.position.set(A.position.x, top / 2, 0); water.visible = true;
+    }
+  });
 }
 
 // while comparing, only A (or the mix) is measured and seen: B standing apart or over A steps out

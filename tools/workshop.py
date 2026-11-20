@@ -637,6 +637,9 @@ def versions_data(animal, live=False):
             "shape": [{"key": k, "label": label, "min": lo, "max": hi, "step": step}
                       for k, label, lo, hi, step in getattr(mod, "WORKSHOP_SHAPE", [])],
             "parts": getattr(mod, "WORKSHOP_PARTS", {}),
+            # the game clips, once the animal has them (the animations stage): played on version A
+            "clips": mod.WORKSHOP_CLIPS() if hasattr(mod, "WORKSHOP_CLIPS") else {},
+            "clipInfo": getattr(mod, "WORKSHOP_CLIP_INFO", {}),
             "pictures": viewer_page.pictures((f"references/inspiration/{animal}", "picture", "Your picture"),
                                              (f"references/outlines/{animal}", "outline", "The approved outline"))}
 

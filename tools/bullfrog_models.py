@@ -26,6 +26,7 @@ Read off the side photo on a model-pixel grid (13.9 photo pixels a model pixel):
   back under it to the heel, the foot forward again, flat and webbed with five toes (the user's detailed webbed foot
   comes later).
 """
+import math
 import sys
 from pathlib import Path
 
@@ -365,6 +366,7 @@ PAINT = {
     'belly': (232, 214, 140),     # cream
     'lip': (196, 196, 72),        # the yellow line along the upper lip
     'mouth': (52, 40, 24),
+    'inside': (196, 112, 104),    # the inside of the mouth, seen only in the gape (the animations stage)
     'throat': (226, 204, 96),     # the yellow throat
     'blotch': (150, 156, 66),     # its olive mottling
     'leg': (74, 96, 38),
@@ -455,6 +457,10 @@ def paint_colour(c, face_, x, y, z):
         (ox, oy, oz), (sx, sy, sz) = c['origin'], c['size']
         mid = LENGTH / 2 - (oz + sz / 2)
         mouth = at(MOUTH, mid)
+        if bone == 'jaw' and abs(oy + sy - mouth) < 0.05 and face_ == 'up':
+            return _noise(PAINT['inside'], ix, iy, iz, amount=6)          # the floor of the mouth, seen in the gape
+        if bone == 'head' and abs(oy - mouth) < 0.05 and face_ == 'down':
+            return _noise(PAINT['inside'], ix, iy, iz, amount=6)          # the roof of the mouth
         if bone == 'jaw' and abs(oy + sy - mouth) < 0.05 and y > oy + sy - 0.6:
             return PAINT['mouth']
         if bone == 'head' and abs(oy - mouth) < 0.05 and y < oy + 0.9:
@@ -506,6 +512,531 @@ def workshop_look():
     return bones, png(rows), w, h
 
 
+# --- the clips (the workshop's stage 5, 2026-11-20; the user: "Start animations") -----------------------------------
+# Worked out pose by pose, as the monitor's are (tools/monitor_models.py): each hand and foot is put where it should be
+# (on the ground, or where the move wants it) and its leg is bent to reach it, the elbow or knee bending the way it
+# does at rest; a clip's value for a bone is its turn ADDED to the bone's rest turn, in the file's degrees. Fun first,
+# inspired by the real bullfrog (docs/plans/prey-fish-and-frogs.md); every length and size my pick.
+#   idle     sitting: the throat pumping (frogs breathe by pumping the floor of the mouth), a blink now and then (a frog
+#            blinks by pulling its eyes down into its head), a small shift of weight.
+#   walk     the heavy crawl: one leg at a time, hind left, front left, hind right, front right, the body rocking.
+#   hop      a short hop: crouch, the hind legs kick out straight, the body flies stretched with the front legs
+#            reaching, lands on its hands and folds up. The game throws the body; it stretches the clip to the flight.
+#   leap     the long leap into the water from danger: a bigger kick, stretched long in the air, then nose down into
+#            the water, arms forward; holds its last pose (the swim takes over).
+#   swim     the frog kick: both hind legs together, kick, glide, draw up; the arms along the sides.
+#   float    resting at the surface, legs spread out, a slow bob.
+#   call     the deep whoop: the body lifts, the throat swells big and yellow, holds with a tremble, sinks.
+#   puff     its threat at a player or anything big coming near: blown up, risen on straight front legs, mouth a
+#            little open (the game holds it while the threat lasts).
+#   attack   the ambush lunge and bite: a lurch forward with a huge gape, snapped shut, then the hands push the food in
+#            while the eyes pull down to help swallow.
+#   death    rolls onto its back, legs spread.
+#   dig_in   shuffles backward into the mud or sand, the hind feet scraping in turn, the body rocking, sinking until
+#            only the back and eyes show; holds there.
+#   dug      dug in: still, only the throat and eyes moving.
+#   dig_out  pushes up out of the ground and shakes off.
+from model_parts import (clip as _sample, smooth, turn_x, turn_y, turn_z, mat_vec, vadd, unit, blend_turn, cross,  # noqa: E402
+                         from_axes,
+                         animations, geo, write_assets)
+
+BODY_PIVOT = (0.0, 6.0, 0.0)
+IDLE_LEN, WALK_LEN, HOP_LEN, LEAP_LEN, SWIM_LEN, FLOAT_LEN = 6.0, 1.4, 0.8, 1.1, 1.0, 3.0
+CALL_LEN, PUFF_LEN, ATTACK_LEN, DEATH_LEN, DIG_LEN, DUG_LEN, DIG_OUT_LEN = 3.0, 2.0, 0.8, 1.0, 3.0, 6.0, 1.2
+WALK_SWEEP, WALK_DUTY, WALK_LIFT = 5.0, 0.7, 1.4       # each foot's sweep under the body, the time down, the body raised
+DUG_DEPTH = 10.0                                        # how deep it sits dug in: the back and the eyes out
+
+
+def _pulse(t, start, rise, hold, fall):
+    """0 before start, easing up to 1 over rise, held, easing back to 0 over fall."""
+    if t < start:
+        return 0.0
+    if t < start + rise:
+        return smooth((t - start) / rise)
+    if t < start + rise + hold:
+        return 1.0
+    return 1.0 - smooth((t - start - rise - hold) / fall)
+
+
+def _ramp(t, keys):
+    """A value easing from key to key ((time, value), ...); held before the first and after the last."""
+    if t <= keys[0][0]:
+        return keys[0][1]
+    for (t0, v0), (t1, v1) in zip(keys, keys[1:]):
+        if t <= t1:
+            return v0 + (v1 - v0) * smooth((t - t0) / (t1 - t0))
+    return keys[-1][1]
+
+
+def _bend_way(pole, dh):
+    k = sum(x * y for x, y in zip(pole, dh))
+    return unit([x - k * y for x, y in zip(pole, dh)])
+
+
+SIDES = ((1, 'left'), (-1, 'right'))
+
+
+def _frame(along, hinge):
+    """A turn whose first axis lies along a limb piece and whose second along the hinge line (square to it)."""
+    a = unit(along)
+    k = sum(x * y for x, y in zip(hinge, a))
+    b = unit([x - k * y for x, y in zip(hinge, a)])
+    return from_axes(a, b, cross(a, b))
+
+
+class _Poser:
+    """Turns wanted bone turns into clip values, places the body, and bends each leg to reach a wanted hand or foot
+    place (its wrist or heel, given on the ground's axes or the body's)."""
+
+    def __init__(self):
+        bones = model()
+        self.rest = {b['name']: b.get('rotation', [0.0, 0.0, 0.0]) for b in bones}
+        self.last = {}
+        self.limbs = {}
+        for s, side in SIDES:
+            for kind, joints, prefix, end in (('arm', ARM, f'arm_{side}_', f'hand_{side}'),
+                                              ('leg', LEG, f'leg_{side}_', f'foot_{side}')):
+                S, E, W = [world(x, y, o, s) for x, y, o in joints]
+                self.limbs[kind, side] = {'s': s, 'prefix': prefix, 'end': end, 'S': S, 'E': E, 'W': W,
+                                          'l1': vlen(vsub(E, S)), 'l2': vlen(vsub(W, E)),
+                                          'T1': aim((0, -1, 0), vsub(E, S)), 'T2': aim((0, -1, 0), vsub(W, E))}
+                L = self.limbs[kind, side]
+                dh = unit(vsub(W, S))
+                hinge = cross(dh, _bend_way(vsub(E, S), dh))
+                L['H1'] = _frame(vsub(E, S), hinge)
+                L['H2'] = _frame(vsub(W, E), hinge)
+        self.body()
+
+    def value(self, name, m):
+        """The clip value for a bone whose wanted turn against its parent is m: the difference from rest, kept within
+        half a turn of the last value so the keys never spin round the long way. Every turn has two sets of three
+        angles (x - 180, 180 - y, z - 180 is the same turn); the one nearer the last value is kept, so a hand turning
+        past pointing straight up or down does not jump to the other set between two keys (the game blends the
+        angles straight between keys, and a jump there spins the part round for a frame)."""
+        r, rest = rot(m), self.rest[name]
+        last = self.last.get(name, [0.0, 0.0, 0.0])
+        best = None
+        for cand in (r, [r[0] - 180.0, 180.0 - r[1], r[2] - 180.0]):
+            v = []
+            for a, b, l in zip(cand, rest, last):
+                d = a - b
+                d += 360.0 * round((l - d) / 360.0)
+                v.append(round(d, 3))
+            far = max(abs(x - l) for x, l in zip(v, last))
+            if best is None or far < best[0]:
+                best = (far, v)
+        self.last[name] = best[1]
+        return best[1]
+
+    def body(self, p=None, pitch=0.0, roll=0.0, yaw=0.0, lift=0.0, fwd=0.0, scale=None):
+        """Places the body: pitch raises the snout, roll lifts the left side, yaw turns the snout to the right, lift
+        and fwd move it up and forward, scale blows it up (everything on it grows with it)."""
+        self.B = mat_mul(mat_mul(turn_y(yaw), turn_x(pitch)), turn_z(roll))
+        self.d = [0.0, lift, -fwd]
+        self.sc = scale or [1.0, 1.0, 1.0]
+        if p is not None:
+            p['body'] = {'rotation': self.value('body', self.B), 'position': [0.0, round(lift, 3), round(-fwd, 3)]}
+            if scale:
+                p['body']['scale'] = [round(v, 4) for v in scale]
+
+    def to_body(self, w):
+        q = mat_vec(transpose(self.B), vsub(vsub(w, self.d), BODY_PIVOT))
+        return [BODY_PIVOT[i] + q[i] / self.sc[i] for i in range(3)]
+
+    def rest_end(self, kind, side):
+        """Where the wrist or heel is at rest (the ground's axes)."""
+        return list(self.limbs[kind, side]['W'])
+
+    def limb(self, p, kind, side, W=None, F=None, in_body=False, way=None):
+        """Bends the limb so its wrist or heel is at W and its hand or foot turned F (both on the ground's axes, or
+        the body's if in_body); W and F default to rest. The elbow or knee bends out the way it does at rest, or
+        toward way."""
+        L = self.limbs[kind, side]
+        S = list(L['S'])
+        if W is None and not in_body:
+            W = self.planted(kind, side)
+        F = F or [[1, 0, 0], [0, 1, 0], [0, 0, 1]]
+        if in_body:
+            Wb, Fb = list(W), F
+        else:
+            Wb, Fb = self.to_body(W), mat_mul(transpose(self.B), F)
+        d = vsub(Wb, S)
+        D = vlen(d)
+        reach = 0.985 * (L['l1'] + L['l2'])
+        if D > reach:
+            d = [c * reach / D for c in d]
+            Wb, D = vadd(S, d), reach
+        D = max(D, abs(L['l1'] - L['l2']) * 1.02 + 0.01)
+        dh = [c / D for c in d]
+        a = (L['l1'] ** 2 - L['l2'] ** 2 + D * D) / (2 * D)
+        h = math.sqrt(max(0.0, L['l1'] ** 2 - a * a))
+        pole = _bend_way(way or vsub(L['E'], S), dh)
+        E = [S[i] + a * dh[i] + h * pole[i] for i in range(3)]
+        # both pieces turned in the plane of the bend, the joint a real hinge: each piece's frame (its length and the
+        # hinge line) now, against the same at rest (aiming each piece on its own spun the forearm round its length
+        # when it pointed back against its rest way, and the hand flipped with it)
+        hinge = cross(dh, pole)
+        T1 = mat_mul(mat_mul(_frame(vsub(E, S), hinge), transpose(L['H1'])), L['T1'])
+        T2 = mat_mul(mat_mul(_frame(vsub(Wb, E), hinge), transpose(L['H2'])), L['T2'])
+        pre = L['prefix']
+        p[pre + '1'] = {'rotation': self.value(pre + '1', T1)}
+        p[pre + '2'] = {'rotation': self.value(pre + '2', mat_mul(transpose(T1), T2))}
+        p[L['end']] = {'rotation': self.value(L['end'], mat_mul(transpose(T2), Fb))}
+
+    def limb_blend(self, p, kind, side, down, W, F, way=None):
+        """A limb part way (down, 0 to 1) between planted (on the ground where it rests, turned flat) and free (W and F
+        against the body)."""
+        if down >= 0.999:
+            return self.limb(p, kind, side)
+        if way is not None:                         # the joint's way eased from its rest way as the limb lifts
+            L = self.limbs[kind, side]
+            rest_way = vsub(L['E'], L['S'])
+            way = [rest_way[i] * down + way[i] * (1 - down) * vlen(rest_way) for i in range(3)]
+        if down > 0.001:
+            Wp = self.to_body(self.planted(kind, side))
+            W = [Wp[i] + (W[i] - Wp[i]) * (1 - down) for i in range(3)]
+            F = blend_turn(transpose(self.B), F, 1 - down)
+        self.limb(p, kind, side, W, F, in_body=True, way=way)
+
+    def planted(self, kind, side):
+        """Where the wrist or heel goes for the hand or foot to lie flat on the ground at rest, the body blown up as it
+        is (the sole lies further under a bigger limb)."""
+        W = self.rest_end(kind, side)
+        W[1] *= self.sc[1]
+        return W
+
+    def all_rest(self, p):
+        """Every limb at its rest place on the ground (under the body as it is placed now)."""
+        for s, side in SIDES:
+            for kind in ('arm', 'leg'):
+                self.limb(p, kind, side)
+
+
+def _face(p, t, pump=0.0, blink=0.0, jaw=0.0, gape=0.0, throat=None):
+    """The head's small parts: the throat (pump 0 to 1 a breath; or throat, a full scale), the eyes pulled down
+    (blink 0 to 1), the jaw open (degrees) and the head tipped up (gape, degrees)."""
+    sc = throat or [1.0 + 0.04 * pump, 1.0 + 0.16 * pump, 1.0 + 0.03 * pump]
+    p['throat'] = {'scale': [round(v, 4) for v in sc]}
+    p['jaw'] = {'rotation': [round(jaw, 3), 0.0, 0.0]}
+    p['head'] = {'rotation': [round(-gape, 3), 0.0, 0.0]}
+    for s, side in SIDES:
+        p[f'eye_{side}'] = {'position': [0.0, round(-1.8 * blink, 3), round(0.4 * blink, 3)]}
+
+
+def _breath(t, period=0.55):
+    """The throat's quick pumping (frogs pump air in with the floor of the mouth, about two a second)."""
+    return 0.5 - 0.5 * math.cos(2 * math.pi * t / period)
+
+
+def _blink(t, at, length=0.32):
+    return _pulse(t, at, length * 0.35, length * 0.15, length * 0.5)
+
+
+def clips():
+    out = {}
+
+    def make(name, length, pose_at, steps_per_s=20, loop=True):
+        out[name] = _sample(length, pose_at, max(4, round(length * steps_per_s)), loop)
+
+    # idle: sitting, the throat pumping, a blink at 2.2 s, a slow small shift of weight
+    P = _Poser()
+
+    def idle(t):
+        p = {}
+        w = 2 * math.pi * t / IDLE_LEN
+        P.body(p, pitch=0.8 * math.sin(w), roll=0.6 * math.sin(w + 1.0), lift=0.15 * math.sin(2 * w))
+        P.all_rest(p)
+        _face(p, t, pump=_breath(t), blink=_blink(t, 2.2) + _blink(t, 4.9))
+        return p
+    make('idle', IDLE_LEN, idle)
+
+    # walk: the crawl, one leg at a time (hind left, front left, hind right, front right), each foot down 0.7 of the
+    # stride; in the body's frame a planted foot slides back at the walking speed (the game moves the frog forward at
+    # it: WALK_SWEEP / (WALK_DUTY x WALK_LEN) model pixels a second)
+    P = _Poser()
+    order = {('leg', 'left'): 0.0, ('arm', 'left'): 0.25, ('leg', 'right'): 0.5, ('arm', 'right'): 0.75}
+
+    def walk(t):
+        p = {}
+        u0 = t / WALK_LEN
+        w = 2 * math.pi * u0
+        P.body(p, pitch=1.5 + 0.8 * math.sin(2 * w), roll=2.5 * math.sin(w - 0.6), yaw=2.0 * math.sin(w + 0.9),
+               lift=WALK_LIFT + 0.35 * math.sin(2 * w + 0.5))
+        for (kind, side), ph in order.items():
+            u = (u0 - ph) % 1.0
+            W = P.rest_end(kind, side)
+            if u < WALK_DUTY:                           # down: sliding back under the body
+                W[2] += WALK_SWEEP * (u / WALK_DUTY - 0.5)
+                F = None
+            else:                                       # lifted and swung forward
+                b = (u - WALK_DUTY) / (1 - WALK_DUTY)
+                W[2] += WALK_SWEEP * (0.5 - smooth(b))
+                W[1] += (2.4 if kind == 'leg' else 2.0) * math.sin(math.pi * b)
+                F = turn_x((8 if kind == 'leg' else -12) * math.sin(math.pi * b))   # toes clear of the ground
+            P.limb(p, kind, side, W, F)
+        _face(p, t, pump=0.4 * _breath(t, 0.7))
+        p['head']['rotation'][1] = round(-1.6 * math.sin(w + 0.9), 3)
+        return p
+    make('walk', WALK_LEN, walk, 30)
+
+    def jump(t, length, air_from, air_to, land_to, dive):
+        """The hop and the leap: crouch, kick, fly stretched, land (the hop on its hands, then folding up; the leap nose
+        down into the water, arms forward, held). Times in parts of the clip. Each limb is either planted (on the
+        ground under the frog as at rest) or free (placed against the body), blended over a few frames at take-off and
+        landing, so nothing snaps as the frog leaves the ground."""
+        u = t / length
+        crouch = _pulse(u, 0.0, 0.12, 0.0, 0.08) if u < 0.2 else 0.0
+        kick = smooth(min(1.0, max(0.0, (u - 0.12) / (air_from - 0.12))))
+        fold_from = (air_from + air_to) / 2 + 0.05             # the hind legs drawn in from late in the flight
+        fold = 0.0 if dive else smooth(min(1.0, max(0.0, (u - fold_from) / (land_to - fold_from))))
+        if dive:
+            pitch = _ramp(u, ((0.0, 0.0), (0.12, 4.0), (air_from, 30.0), ((air_from + air_to) / 2, 0.0), (air_to, -34.0)))
+        else:
+            pitch = _ramp(u, ((0.0, 0.0), (0.12, 4.0), (air_from, 26.0), ((air_from + air_to) / 2, 2.0),
+                              (air_to, -12.0), (land_to, -5.0), (1.0, 0.0)))
+        r = math.radians(pitch)
+        # the hips stay up as the snout rises (the frog tips about its hind end), the chest as it falls (onto its hands)
+        lift = -0.4 * crouch + 4.0 * kick * (1 - fold) + 15.0 * math.sin(max(0.0, r)) * 0.9             + (0.0 if dive else 11.0 * math.sin(max(0.0, -r)))
+        p = {}
+        P.body(p, pitch=pitch, lift=lift)
+        ext = kick * (1 - fold)                                 # how straight the hind legs are
+        hind_down = 1.0 - smooth(min(1.0, max(0.0, (u - 0.12) / 0.08)))
+        if not dive:
+            hind_down = max(hind_down, smooth(min(1.0, max(0.0, (u - land_to) / (1.0 - land_to)))))
+        sweep = _ramp(u, ((0.1, 0.0), (air_from, 1.0), ((air_from + air_to) / 2, 0.0), (air_to, -1.0),
+                          (1.0, -1.0 if dive else 0.0)))
+        hands_down = 1.0 - smooth(min(1.0, max(0.0, (u - 0.1) / 0.1)))
+        if not dive:
+            hands_down = max(hands_down, smooth(min(1.0, max(0.0, (u - air_to + 0.05) / 0.07))))
+        for s, side in SIDES:
+            L = P.limbs['leg', side]
+            R = L['l1'] + L['l2']
+            rest = list(L['W'])
+            back = [L['S'][i] + c * 0.97 * R for i, c in enumerate(unit([s * 3.0 / R, -0.3, 0.95]))]
+            free = [rest[i] + (back[i] - rest[i]) * ext for i in range(3)]
+            if fold > 0:                                        # drawn in: the heel kept high enough for the toes,
+                a = math.radians(165 * ext)                     # pointing down as they pass, to clear the ground
+                heel = mat_vec(P.B, vsub(free, BODY_PIVOT))[1] + BODY_PIVOT[1] + P.d[1]
+                free[1] += max(0.0, 13.5 * math.sin(a) + 1.0 - heel) * smooth(min(1.0, fold * 4))
+            # the foot opens out behind as the leg straightens (toes passing down: pushing off on their tips), and
+            # folds back the same way as the legs are drawn in at the end of the flight
+            P.limb_blend(p, 'leg', side, hind_down, free, turn_x(-165 * ext))
+            ar = list(P.limbs['arm', side]['W'])
+            if sweep >= 0:                                      # swept back along the flank, fingers trailing
+                Wa = [ar[0] - s * 2.0 * sweep, ar[1] + 3.0 * sweep, ar[2] + 9.0 * sweep]
+                Fa = turn_x(110 * sweep)
+            else:                                               # reaching forward (and down, to land)
+                k = -sweep
+                Wa = [ar[0] - s * (2.5 if dive else 0.0) * k, ar[1] + (2.5 if dive else -0.5) * k,
+                      ar[2] - (10.0 if dive else 5.0) * k]
+                Fa = turn_x(-20 * k)
+            P.limb_blend(p, 'arm', side, hands_down, Wa, Fa, way=[s * 1.0, 0.3, 0.0])   # the elbow out to the side
+        _face(p, t, blink=_pulse(u, air_to - 0.08, 0.05, 0.05, 0.1) if dive else 0.0)
+        return p
+
+    P = _Poser()
+    make('hop', HOP_LEN, lambda t: jump(t, HOP_LEN, 0.3, 0.6, 0.8, False), 40, False)
+    P = _Poser()
+    make('leap', LEAP_LEN, lambda t: jump(t, LEAP_LEN, 0.25, 0.7, 0.85, True), 40, 'hold')
+
+    # swim: the frog kick, both hind legs together; the arms along the sides
+    P = _Poser()
+
+    def swim(t):
+        u = t / SWIM_LEN
+        kick = _ramp(u, ((0.0, 0.0), (0.25, 1.0), (0.55, 1.0), (0.95, 0.0), (1.0, 0.0)))
+        p = {}
+        P.body(p, pitch=4.0 - 3.0 * kick, lift=0.0, fwd=0.6 * math.sin(2 * math.pi * u))
+        for s, side in SIDES:
+            L = P.limbs['leg', side]
+            folded = [s * 13.0, 6.5, 12.0]                       # drawn up beside the hips, feet turned out
+            straight = [s * 9.0, 4.0, L['S'][2] + 0.97 * (L['l1'] + L['l2']) - 1.0]
+            W = [folded[i] + (straight[i] - folded[i]) * kick for i in range(3)]
+            F = turn_y(-s * (130 + 50 * kick)) if kick < 0.999 else turn_y(-s * 180)
+            P.limb(p, 'leg', side, W, F, in_body=True)
+            ar = P.rest_end('arm', side)
+            P.limb(p, 'arm', side, [ar[0] - s * 1.5, 4.5, ar[2] + 7.0], turn_x(60), in_body=True)
+        _face(p, t)
+        return p
+    make('swim', SWIM_LEN, swim, 30)
+
+    # float: at the surface, the legs spread out, a slow bob
+    P = _Poser()
+
+    def float_(t):
+        w = 2 * math.pi * t / FLOAT_LEN
+        p = {}
+        P.body(p, pitch=2.0 + 1.0 * math.sin(w), roll=1.0 * math.sin(w + 1.3), lift=0.4 * math.sin(w))
+        for s, side in SIDES:
+            drift = 0.6 * math.sin(w + (0 if s > 0 else 1.5))
+            P.limb(p, 'leg', side, [s * (19.0 + drift), 3.0 + drift * 0.5, 26.0], turn_y(-s * 150), in_body=True)
+            P.limb(p, 'arm', side, [s * (16.0 + drift * 0.5), 3.0, -12.0], turn_y(s * 30), in_body=True)
+        _face(p, t, pump=_breath(t, 1.0), blink=_blink(t, 1.7))
+        return p
+    make('float', FLOAT_LEN, float_)
+
+    # call: the body lifts, the throat swells big, holds with a tremble, sinks
+    P = _Poser()
+
+    def call(t):
+        swell = _pulse(t, 0.25, 0.3, 0.9, 0.45)
+        up = _pulse(t, 0.0, 0.3, 1.3, 0.5)
+        tremble = 0.06 * math.sin(2 * math.pi * 12 * t) * _pulse(t, 0.55, 0.05, 0.85, 0.05)
+        p = {}
+        P.body(p, pitch=7.0 * up, lift=1.2 * up, scale=[1.0 - 0.03 * swell, 1.0 - 0.02 * swell, 1.0])
+        P.all_rest(p)
+        _face(p, t, pump=0.0 if swell > 0.01 else _breath(t, 0.6),
+              throat=[1.0 + 0.08 * swell + tremble, 1.0 + 1.0 * swell + tremble, 1.0 + 0.35 * swell])   # down under the chin
+        return p
+    make('call', CALL_LEN, call, 30)
+
+    # puff: blown up, risen on straight front legs, the mouth a little open, rocking toward the threat
+    P = _Poser()
+
+    def puff(t):
+        w = 2 * math.pi * t / PUFF_LEN
+        p = {}
+        P.body(p, pitch=10.0 + 1.5 * math.sin(w), lift=2.6 + 0.4 * math.sin(w), fwd=0.5 * math.sin(w),
+               scale=[1.14, 1.12, 1.06])
+        P.all_rest(p)
+        _face(p, t, jaw=10.0 + 3.0 * math.sin(w), gape=3.0, throat=[1.2, 1.5, 1.15])
+        return p
+    make('puff', PUFF_LEN, puff)
+
+    # attack: the lunge, a huge gape, snapped shut, the hands pushing the food in, the eyes pulled down to swallow
+    P = _Poser()
+
+    def attack(t):
+        lunge = _ramp(t, ((0.0, 0.0), (0.07, -0.15), (0.2, 1.0), (0.32, 1.0), (0.62, 0.0)))
+        gape = _ramp(t, ((0.06, 0.0), (0.17, 1.0), (0.22, 1.0), (0.26, 0.0)))
+        swallow = _pulse(t, 0.3, 0.08, 0.18, 0.12)
+        p = {}
+        P.body(p, pitch=-7.0 * max(0.0, lunge) + 4.0 * swallow, fwd=6.0 * lunge,
+               lift=2.6 * max(0.0, lunge) + 15.0 * math.sin(math.radians(4.0 * swallow)))   # hips up as it swallows
+        for s, side in SIDES:
+            P.limb(p, 'leg', side)
+            ar = P.rest_end('arm', side)
+            reach = max(0.0, lunge) * (1 - swallow)
+            push = _pulse(t, 0.3 + (0.0 if s > 0 else 0.08), 0.08, 0.06, 0.1)   # one hand, then the other
+            W = [ar[0], ar[1] + 1.5 * reach, ar[2] - 7.0 * reach]
+            W = [W[0] - s * 3.0 * push, W[1] + 4.0 * push, W[2] - 4.0 * push]
+            P.limb(p, 'arm', side, W, turn_x(-20 * reach + 35 * push) if (reach or push) else None,
+                   way=[s * 1.0, 0.0, 0.6])                    # the elbow out and back as the hand comes up
+        _face(p, t, jaw=38.0 * gape, gape=12.0 * gape, blink=swallow)
+        return p
+    make('attack', ATTACK_LEN, attack, 40, False)
+
+    # death: rolls onto its back, the legs spread out and up
+    P = _Poser()
+
+    def death(t):
+        """Rolls onto its back. The body is lifted by how far its side would reach under the ground at each angle of
+        the roll (its cross-section, with the big haunch drawn in beside it, about 14 pixels to the side of the middle, 0.4 to 19 high round the pivot at 6),
+        so it rolls on its side instead of through the ground or floating, and every leg is drawn in close to the body
+        while it rolls, then spread out and up once it lies on its back."""
+        f = smooth(min(1.0, t / 0.7))
+        th = math.radians(180.0 * f)
+        low = BODY_PIVOT[1] - 14.0 * abs(math.sin(th)) + min((0.4 - BODY_PIVOT[1]) * math.cos(th),
+                                                              (19.0 - BODY_PIVOT[1]) * math.cos(th))
+        p = {}
+        P.body(p, roll=180.0 * f, lift=max(0.0, -low))
+        tuck = math.sin(math.pi * f)                           # drawn in during the roll
+        spread = smooth(max(0.0, (f - 0.6) / 0.4))             # spread out on its back
+        for s, side in SIDES:
+            rest_b = P.rest_end('leg', side)
+            P.limb(p, 'leg', side, [rest_b[0] + s * (6.0 * spread - 4.0 * tuck), rest_b[1] + 3.0 * spread + 4.0 * tuck,
+                                    rest_b[2] + 6.0 * spread], turn_x(-30 * spread), in_body=True)
+            ra = P.rest_end('arm', side)
+            P.limb(p, 'arm', side, [ra[0] + s * (3.0 * spread - 3.5 * tuck), ra[1] + 2.0 * spread + 3.0 * tuck,
+                                    ra[2] - 1.0 * spread + 2.0 * tuck], None, in_body=True)
+        _face(p, t, jaw=8.0 * f, blink=f)
+        return p
+    make('death', DEATH_LEN, death, 30, 'hold')
+
+    # dig_in: backward into the ground, the hind feet scraping in turn, rocking, sinking until the back and eyes show
+    P = _Poser()
+
+    def dig_pose(p, t, sink, scrape_amount):
+        w = 2 * math.pi * t / 0.75
+        P.body(p, pitch=5.0 * math.sin(math.pi * min(1.0, sink)) + 1.0, roll=5.0 * math.sin(w) * scrape_amount,
+               lift=-DUG_DEPTH * sink, fwd=0.0)
+        for s, side in SIDES:
+            rest_b = list(P.limbs['leg', side]['W'])
+            sc = max(0.0, math.sin(w + (0 if s > 0 else math.pi))) * scrape_amount   # each foot in turn
+            P.limb(p, 'leg', side, [rest_b[0] + s * 2.5 * sc, rest_b[1] + 0.5 * sc, rest_b[2] + 3.5 * sc],
+                   turn_y(-s * 30 * sc), in_body=True)
+            ra = P.limbs['arm', side]['W']
+            P.limb(p, 'arm', side, [ra[0] - s * 1.5 * sink, ra[1] + 1.0 * sink, ra[2] + 2.0 * sink], None, in_body=True)
+
+    def dig_in(t):
+        p = {}
+        sink = smooth(min(1.0, t / (DIG_LEN * 0.9)))
+        dig_pose(p, t, sink, 1.0 - smooth(max(0.0, (t - DIG_LEN * 0.8) / (DIG_LEN * 0.2))))
+        _face(p, t, pump=_breath(t))
+        return p
+    make('dig_in', DIG_LEN, dig_in, 30, 'hold')
+
+    P = _Poser()
+
+    def dug(t):
+        p = {}
+        dig_pose(p, t, 1.0, 0.0)
+        _face(p, t, pump=0.6 * _breath(t, 0.8), blink=_blink(t, 3.1))
+        return p
+    make('dug', DUG_LEN, dug)
+
+    P = _Poser()
+
+    def dig_out(t):
+        p = {}
+        rise = 1.0 - smooth(min(1.0, t / (DIG_OUT_LEN * 0.6)))
+        shake = math.sin(2 * math.pi * t / 0.18) * _pulse(t, DIG_OUT_LEN * 0.55, 0.08, 0.15, 0.15)
+        dig_pose(p, t, rise, 0.0)
+        p['body']['rotation'][2] = round(p['body']['rotation'][2] + 7.0 * shake, 3)
+        _face(p, t, blink=_pulse(t, DIG_OUT_LEN * 0.5, 0.08, 0.2, 0.1))
+        return p
+    make('dig_out', DIG_OUT_LEN, dig_out, 30, False)
+    return out
+
+
+def WORKSHOP_CLIPS():
+    return clips()
+
+
+# For the versions page's clip player: the game's arc for the thrown clips (launch and landing as parts of the clip,
+# as tools/frog_check.py), the made size against the game's (a male drawn at 0.32), the water clips and their surface
+# (blocks at made size: the back and the eyes out), and a line about each clip.
+WORKSHOP_CLIP_INFO = {
+    'flight': {'hop': [0.12, 0.6], 'leap': [0.12, 0.7]}, 'scale': 0.32, 'water': ['swim', 'float'], 'surface': 0.7,
+    'notes': {
+        'idle': 'Sitting: the throat pumping, a blink (it pulls its eyes down), a slow shift of weight.',
+        'walk': 'The heavy crawl, one leg at a time; the game slides it forward so planted feet stay put.',
+        'hop': 'A short hop: crouch, kick, fly stretched, land on its hands, fold up. The game throws it on this arc.',
+        'leap': 'The long leap into the water from danger, nose down, arms forward; holds (the swim takes over).',
+        'swim': 'The frog kick: both hind legs together, glide, draw up.',
+        'float': 'Resting at the surface, legs spread, a slow bob.',
+        'call': 'The deep whoop: it lifts, the throat swells big, holds with a tremble, sinks.',
+        'puff': 'Its threat: blown up and risen on straight front legs, mouth a little open.',
+        'attack': 'The ambush lunge: huge gape, snapped shut, hands push the food in, eyes pulled down to swallow.',
+        'death': 'Rolls onto its back, legs spread.',
+        'dig_in': 'Shuffles backward into the mud, hind feet scraping in turn, until only the back and eyes show.',
+        'dug': 'Dug in: only the throat and eyes move (the ground hides the rest in the game).',
+        'dig_out': 'Pushes up out of the ground and shakes off.',
+    }}
+
+
+def write_game():
+    """Writes the bullfrog's model, texture and clips into the savanna mod (no entity uses them yet: that is the plan's
+    step 3; the files let the clip checks read the model as the game will)."""
+    bones, rows, w, h = paint_faces(model(), 1, LOOKS[GAME_LOOK])
+    write_assets({'textures/entity/bullfrog.png': png(rows),
+                  'geo/entity/bullfrog.geo.json': geo('bullfrog', bones, w, h, (3, 2, [0, 0.6, 0])),
+                  'animations/entity/bullfrog.animation.json': animations(clips())})
+
+
 if __name__ == '__main__':
+    if sys.argv[1:] == ['game']:
+        write_game()
+        sys.exit()
     bones = model()
     print(sum(len(b['cubes']) for b in bones), 'boxes,', len(bones), 'bones')
