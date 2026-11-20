@@ -185,5 +185,7 @@
   "entity.antcolonies.crab": "River Crab",
   "item.antcolonies.crab_spawn_egg": "River Crab Spawn Egg",
   "entity.antcolonies.snail": "River Snail",
-  "item.antcolonies.snail_spawn_egg": "River Snail Spawn Egg"
+  "item.antcolonies.snail_spawn_egg": "River Snail Spawn Egg",
+  "entity.antcolonies.barb": "River Barb",
+  "item.antcolonies.barb_spawn_egg": "River Barb Spawn Egg"
 }

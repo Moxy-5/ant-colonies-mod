@@ -6,13 +6,24 @@ import net.minecraft.world.entity.MobCategory;
  * Spawning groups of our own (M9 river life, 2026-11-14). Minecraft limits each group of mobs round a player; its
  * water fish group (cod, salmon, tropical fish) allows 20, which left the savanna rivers with specks of fish. River
  * fish get their own group, added to Minecraft's list through NeoForge's enum extension
- * ({@code META-INF/enumextensions.json}): cap 60 round a player (my pick, to raise after a look in-game if the frame
- * rate allows), friendly, spawned every tick like water mobs, removed past 128 blocks.
+ * ({@code META-INF/enumextensions.json}): cap 45 round a player (60 until the user lowered it, 2026-11-20, to make room
+ * for the barbs), friendly, spawned every tick like water mobs, removed past 128 blocks.
  */
 public final class SavannaMobCategories {
     private SavannaMobCategories() {}
 
-    private static MobCategory riverFish, riverHunter, riverBed, riverBank;
+    private static MobCategory riverFish, riverHunter, riverBed, riverBank, riverSchool;
+
+    /**
+     * The small schooling fish's group (the barb, 2026-11-20, the spawning check list): a common fish kept near the
+     * player, so never in a group with a rarer kind. Cap 40 round a player (my pick), friendly, removed past 128 blocks.
+     */
+    public static MobCategory riverSchool() {
+        if (riverSchool == null) {
+            riverSchool = MobCategory.valueOf("ANTCOLONIES_RIVER_SCHOOL");
+        }
+        return riverSchool;
+    }
 
     /** The river fish group (tilapia and catfish). */
     public static MobCategory riverFish() {

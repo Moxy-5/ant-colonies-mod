@@ -8,6 +8,7 @@ import javax.annotation.Nullable;
 import net.minecraft.core.particles.ParticleTypes;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.entity.ai.goal.Goal;
+import net.minecraft.world.entity.animal.AbstractSchoolingFish;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
 
@@ -17,10 +18,12 @@ import net.minecraft.world.phys.Vec3;
  * thrown open ({@link CatfishEntity#strike}) and catches the fish if it is still in front of its mouth when the
  * mouth snaps: it is held in the open mouth, shaken and gulped down ({@link CatfishEntity#hold}); the school round it scatters. Then it is fed for 4 to 8 minutes. A chase that takes longer than
  * 30 s is given up for a minute. A tilapia from a bucket or with a name is never hunted (the player's own fish).
+ * A barb (2026-11-20) is hunted the same way, the nearest of either, but gulped down whole at the snap, a snack: fed
+ * for 2 to 4 minutes.
  *
  * <p>Balance (the rule that food chains must not crash): a few catfish round a player eat one tilapia each every 4 to 8
- * minutes, while the river fish group of 60 refills from natural spawning; a catfish with nothing to hunt just swims on
- * and never starves.
+ * minutes, while the river fish group of 45 (and the barbs' of 40) refills from natural spawning; a catfish with
+ * nothing to hunt just swims on and never starves.
  */
 public class HuntTilapiaGoal extends Goal {
     /** How far it looks for a tilapia (blocks across and up or down). */
@@ -37,14 +40,14 @@ public class HuntTilapiaGoal extends Goal {
     static final double SWALLOW_WITHIN = 1.6;
     /** How long a chase may last before it gives up (ticks), and how long it then waits before hunting again. */
     static final int GIVE_UP_TICKS = 600, REST_AFTER_GIVING_UP = 1200;
-    /** How long a meal lasts (ticks; 4 to 8 minutes). */
-    static final int FED_MIN = 4800, FED_MORE = 4800;
+    /** How long a meal lasts (ticks; 4 to 8 minutes), and a barb (2 to 4 minutes, my pick). */
+    static final int FED_MIN = 4800, FED_MORE = 4800, FED_BARB_MIN = 2400, FED_BARB_MORE = 2400;
     /** How far the school round a strike scatters from (blocks), and how hard. */
     static final double SCATTER_WITHIN = 6, SCATTER_PUSH = 0.4;
 
     private final CatfishEntity fish;
     @Nullable
-    private TilapiaEntity prey;
+    private AbstractSchoolingFish prey;
     private int ticks, strikeTick = -1;
 
     public HuntTilapiaGoal(CatfishEntity fish) {
@@ -95,7 +98,7 @@ public class HuntTilapiaGoal extends Goal {
     @Override
     public void tick() {
         ticks++;
-        TilapiaEntity target = prey;
+        AbstractSchoolingFish target = prey;
         if (target == null) {
             return;
         }
@@ -120,7 +123,7 @@ public class HuntTilapiaGoal extends Goal {
         }
     }
 
-    private void lunge(TilapiaEntity target) {
+    private void lunge(AbstractSchoolingFish target) {
         strikeTick = 0;
         fish.strike();
         fish.getNavigation().stop();
@@ -133,12 +136,20 @@ public class HuntTilapiaGoal extends Goal {
         scatter(fish, prey);
     }
 
-    /** The school round a strike darts away from the hunter (the catfish's, and the crocodile's), all but the fish struck at. */
+    /**
+     * The school round a strike darts away from the hunter (the catfish's, and the crocodile's), all but the fish struck
+     * at: tilapia pushed away, barbs bursting outward with their fast start ({@link BarbEntity#startle}).
+     */
     static void scatter(net.minecraft.world.entity.Entity hunter, @Nullable net.minecraft.world.entity.Entity struckAt) {
         Vec3 at = hunter.position();
-        List<TilapiaEntity> school = hunter.level().getEntitiesOfClass(TilapiaEntity.class, hunter.getBoundingBox().inflate(SCATTER_WITHIN));
-        for (TilapiaEntity other : school) {
+        List<AbstractSchoolingFish> school = hunter.level().getEntitiesOfClass(AbstractSchoolingFish.class, hunter.getBoundingBox().inflate(SCATTER_WITHIN),
+                f -> f instanceof TilapiaEntity || f instanceof BarbEntity);
+        for (AbstractSchoolingFish other : school) {
             if (other == struckAt) {
+                continue;
+            }
+            if (other instanceof BarbEntity barb) {
+                barb.startle(at);
                 continue;
             }
             Vec3 away = other.position().subtract(at);
@@ -149,23 +160,28 @@ public class HuntTilapiaGoal extends Goal {
         }
     }
 
-    private void swallow(TilapiaEntity target) {
+    private void swallow(AbstractSchoolingFish target) {
         if (fish.level() instanceof ServerLevel level) {
             Vec3 m = fish.mouth();
-            level.sendParticles(ParticleTypes.BUBBLE, m.x, m.y, m.z, 12, 0.3, 0.2, 0.3, 0.05);
+            level.sendParticles(ParticleTypes.BUBBLE, m.x, m.y, m.z, target instanceof BarbEntity ? 5 : 12, 0.3, 0.2, 0.3, 0.05);
         }
-        fish.hold(target);      // shown in its mouth, shaken and gulped down; the gulp is heard then
+        if (target instanceof TilapiaEntity tilapia) {
+            fish.hold(tilapia);      // shown in its mouth, shaken and gulped down; the gulp is heard then
+            fish.hungryIn = FED_MIN + fish.getRandom().nextInt(FED_MORE);
+        } else {
+            fish.playSound(net.minecraft.sounds.SoundEvents.GENERIC_EAT, 0.6F, 1.4F);       // a barb, gulped at the snap
+            fish.hungryIn = FED_BARB_MIN + fish.getRandom().nextInt(FED_BARB_MORE);
+        }
         target.discard();
-        fish.hungryIn = FED_MIN + fish.getRandom().nextInt(FED_MORE);
         prey = null;
     }
 
     @Nullable
-    private TilapiaEntity findPrey() {
+    private AbstractSchoolingFish findPrey() {
         AABB around = fish.getBoundingBox().inflate(LOOK_ACROSS, LOOK_UP_DOWN, LOOK_ACROSS);
-        TilapiaEntity best = null;
+        AbstractSchoolingFish best = null;
         double bestDist = Double.MAX_VALUE;
-        for (TilapiaEntity t : fish.level().getEntitiesOfClass(TilapiaEntity.class, around, this::huntable)) {
+        for (AbstractSchoolingFish t : fish.level().getEntitiesOfClass(AbstractSchoolingFish.class, around, this::huntable)) {
             double d = t.distanceToSqr(fish);
             if (d < bestDist && fish.hasLineOfSight(t)) {
                 best = t;
@@ -175,8 +191,9 @@ public class HuntTilapiaGoal extends Goal {
         return best;
     }
 
-    private boolean huntable(TilapiaEntity t) {
-        return t.isAlive() && t.isInWater() && !t.fromBucket() && !t.hasCustomName()
+    /** A wild tilapia or barb in the water near it (never the player's own fish, from a bucket or named). */
+    private boolean huntable(AbstractSchoolingFish t) {
+        return (t instanceof TilapiaEntity || t instanceof BarbEntity) && t.isAlive() && t.isInWater() && !t.fromBucket() && !t.hasCustomName()
                 && t.distanceToSqr(fish) < (LOOK_ACROSS + 4) * (LOOK_ACROSS + 4);
     }
 }

@@ -118,6 +118,16 @@ public class SavannaEntities {
                     .clientTrackingRange(4)
                     .build("tilapia"));
 
+    // The river barb (M9 river life, the small prey fish, 2026-11-20): drawn 0.25 blocks long (my pick); a small box
+    // (my pick), each fish's own size through its SCALE attribute. Its own spawning group, river schools.
+    public static final DeferredHolder<EntityType<?>, EntityType<com.antcolonies.savanna.animal.BarbEntity>> BARB =
+            ENTITY_TYPES.register("barb", () -> EntityType.Builder
+                    .of(com.antcolonies.savanna.animal.BarbEntity::new, SavannaMobCategories.riverSchool())
+                    .sized(0.3F, 0.2F)
+                    .eyeHeight(0.1F)
+                    .clientTrackingRange(4)
+                    .build("barb"));
+
     // The river catfish (M9 river life, the hunter, 2026-11-14): drawn 2 blocks long (the user's pick); its box shorter
     // than the drawn fish (my pick), so it can turn in narrow water; each fish's own size through its SCALE attribute.
     // Under 0.87 wide so even the biggest (1.15) stays under 1: Minecraft plans a swimmer's route in squares of its

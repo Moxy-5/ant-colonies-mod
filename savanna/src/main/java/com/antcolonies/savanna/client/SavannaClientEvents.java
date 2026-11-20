@@ -156,6 +156,7 @@ public class SavannaClientEvents {
         event.registerEntityRenderer(SavannaEntities.MONITOR.get(), MonitorRenderer::new);
         event.registerEntityRenderer(SavannaEntities.CRAB.get(), CrabRenderer::new);
         event.registerEntityRenderer(SavannaEntities.SNAIL.get(), SnailRenderer::new);
+        event.registerEntityRenderer(SavannaEntities.BARB.get(), BarbRenderer::new);
         event.registerEntityRenderer(SavannaEntities.REMAINS.get(), RemainsRenderer::new);
         event.registerEntityRenderer(SavannaEntities.MATABELE_LARVA.get(), context -> new com.antcolonies.client.AntLarvaRenderer(context,
                 ResourceLocation.fromNamespaceAndPath(SavannaMod.MODID, "textures/entity/matabele_larva.png"), SavannaEntities.MATABELE_DRAW_SIZE));

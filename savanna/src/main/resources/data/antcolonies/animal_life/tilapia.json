@@ -14,6 +14,6 @@
   "care": "carry_young",
   "care_days": 2,
   "mate_reach": 16,
-  "local_limit": 40,
+  "local_limit": 30,
   "courtship_ticks": 120
 }

@@ -5,8 +5,8 @@
     {
       "type": "antcolonies:tilapia",
       "weight": 15,
-      "minCount": 3,
-      "maxCount": 6
+      "minCount": 2,
+      "maxCount": 5
     }
   ]
 }

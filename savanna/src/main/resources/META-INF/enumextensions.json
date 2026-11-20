@@ -24,7 +24,7 @@
       "constructor": "(Ljava/lang/String;IZZI)V",
       "parameters": [
         "antcolonies:river_fish",
-        60,
+        45,
         true,
         false,
         128
@@ -61,6 +61,18 @@
       "parameters": [
         "antcolonies:river_bank",
         2,
+        true,
+        false,
+        128
+      ]
+    },
+    {
+      "enum": "net/minecraft/world/entity/MobCategory",
+      "name": "ANTCOLONIES_RIVER_SCHOOL",
+      "constructor": "(Ljava/lang/String;IZZI)V",
+      "parameters": [
+        "antcolonies:river_school",
+        40,
         true,
         false,
         128

@@ -125,6 +125,12 @@ public class CrocodileEntity extends PathfinderMob implements GeoEntity, HasLife
      * fished out.
      */
     static final int FED_TILAPIA = 6000;
+    /**
+     * The young's first meals (2026-11-20, the barb's plan; my picks): a hatchling snaps at a barb passing within this
+     * many blocks of it (it keeps to its crèche shallows), a teen hunts barbs with the other fish; a grown crocodile
+     * ignores barbs (too small to bother). A barb feeds a young one as anything small does (10 minutes).
+     */
+    static final double YOUNG_HUNT_REACH = 4.0;
     /** How long it whips a catfish from side to side before it tears in two (ticks: 2 seconds, six shakes; my pick). */
     static final int TEAR_TICKS = 40;
     /** With a catfish and a tilapia both in reach, the chance it goes for the catfish, the bigger meal (the user, 2026-11-15). */
@@ -1633,16 +1639,17 @@ public class CrocodileEntity extends PathfinderMob implements GeoEntity, HasLife
         @Override
         public boolean canUse() {
             boolean called = croc.schoolAt != null;
+            boolean hatchling = croc.life().isYoung();
             if (!croc.isHungry() || croc.huntWait > 0 || !croc.isInWater() || croc.startled > 0 || croc.held != null || ++look % 10 != 0 && !called
-                    || croc.life().isYoung() || croc.guardPlace() != null || !croc.carried.isEmpty() || croc.life().partner() != null) {
-                return false;       // young do not hunt; a mother guarding or carrying, and a courting pair, neither
+                    || croc.isPassenger() || croc.guardPlace() != null || !croc.carried.isEmpty() || croc.life().partner() != null) {
+                return false;       // a mother guarding or carrying, a hatchling in her mouth, and a courting pair do not hunt
             }
             prey = null;
             double best = Double.MAX_VALUE, bestCat = Double.MAX_VALUE, bestTilapia = Double.MAX_VALUE;
             LivingEntity cat = null, tilapia = null;
             // called to a school: the fish round where the other struck; else whatever is near it
             Vec3 from = called ? croc.schoolAt : croc.position();
-            double around = called ? SCHOOL_REACH : HUNT_REACH;
+            double around = hatchling ? YOUNG_HUNT_REACH : called ? SCHOOL_REACH : HUNT_REACH;
             for (LivingEntity seen : croc.level().getEntitiesOfClass(LivingEntity.class, new net.minecraft.world.phys.AABB(from, from).inflate(around, 6.0, around),
                     e -> isPrey(croc, e) && (!called || isFish(e)))) {
                 double d = seen.distanceToSqr(from);
@@ -1670,7 +1677,7 @@ public class CrocodileEntity extends PathfinderMob implements GeoEntity, HasLife
                 croc.schoolAt = null;       // answered (or nothing left there)
                 croc.schoolFor = 0;
             }
-            reach = called ? CALL_REACH + SCHOOL_REACH : HUNT_REACH;
+            reach = hatchling ? YOUNG_HUNT_REACH : called ? CALL_REACH + SCHOOL_REACH : HUNT_REACH;
             return prey != null;
         }
 
@@ -2009,13 +2016,16 @@ public class CrocodileEntity extends PathfinderMob implements GeoEntity, HasLife
                 prey.setDeltaMovement(prey.getDeltaMovement().add(away.scale(0.6)));
                 prey.hurtMarked = true;
             }
+            float size = Math.min(1.0F, croc.getScale());
             if (croc.level() instanceof net.minecraft.server.level.ServerLevel server) {
                 Vec3 at = croc.jawPoint();
                 server.sendParticles(net.minecraft.core.particles.ParticleTypes.SPLASH, at.x, croc.getY() + croc.getFluidHeight(FluidTags.WATER),
-                        at.z, 12, 0.6, 0.1, 0.6, 0.2);
+                        at.z, Math.max(3, (int) (12 * size)), 0.6 * size, 0.1, 0.6 * size, 0.2);
             }
-            croc.playSound(net.minecraft.sounds.SoundEvents.GENERIC_SPLASH, 0.8F, 1.1F);
-            callToSchool(croc, prey.position());
+            croc.playSound(net.minecraft.sounds.SoundEvents.GENERIC_SPLASH, 0.8F * size, 1.1F + (1.0F - size));
+            if (!croc.life().isYoung()) {
+                callToSchool(croc, prey.position());       // a hatchling's strike calls no one
+            }
         }
 
         /** A fish got away: it swims after it again, or after a few misses gives up a while. */
@@ -2043,7 +2053,7 @@ public class CrocodileEntity extends PathfinderMob implements GeoEntity, HasLife
             double h = Math.max(0.1, Math.sqrt(to.x * to.x + to.z * to.z));
             face(prey);
             croc.getNavigation().stop();
-            double v = Mth.clamp(h * 0.14, 0.3, 0.6);
+            double v = Mth.clamp(h * 0.14, 0.3, 0.6) * Math.min(1.0, 0.4 + croc.getScale());     // a young one's lunge is shorter
             // at a fish it shoots through the water at it; at anything else it bursts up out of the water
             double up = fish ? Mth.clamp(to.y * 0.15, -0.15, 0.15) : Mth.clamp(to.y * 0.12 + 0.18, 0.1, 0.45);
             croc.setDeltaMovement(to.x / h * v, up, to.z / h * v);
@@ -2214,6 +2224,13 @@ public class CrocodileEntity extends PathfinderMob implements GeoEntity, HasLife
         if (!e.isAlive() || e.isPassenger() || e.isVehicle()) {
             return false;
         }
+        if (e instanceof BarbEntity barb) {
+            // the young's food (a hatchling's only prey); a grown crocodile ignores barbs
+            return !croc.life().stage().grown() && barb.isInWater() && isFish(e);
+        }
+        if (croc.life().isYoung()) {
+            return false;           // a hatchling hunts barbs only
+        }
         if (!croc.life().stage().grown() && !isFish(e)) {
             return false;           // a teen hunts fish only (animal life cycle step 4)
         }
@@ -2276,16 +2293,16 @@ public class CrocodileEntity extends PathfinderMob implements GeoEntity, HasLife
         return e instanceof net.minecraft.world.entity.animal.AbstractFish || !(e instanceof Player) && e.getBbWidth() < 0.75F && e.getBbHeight() < 0.95F;
     }
 
-    /** A wild river fish it hunts: a tilapia or a catfish, not from a bucket and not named (the player's own fish). */
+    /** A wild river fish it hunts: a tilapia, a catfish or a barb, not from a bucket and not named (the player's own fish). */
     static boolean isFish(LivingEntity e) {
-        return (e instanceof TilapiaEntity || e instanceof CatfishEntity) && !((net.minecraft.world.entity.animal.AbstractFish) e).fromBucket()
+        return (e instanceof TilapiaEntity || e instanceof CatfishEntity || e instanceof BarbEntity) && !((net.minecraft.world.entity.animal.AbstractFish) e).fromBucket()
                 && !e.hasCustomName();
     }
 
     /** A strike at fish here: every other hungry crocodile in the water within {@link #CALL_REACH} heads for the place to hunt them too. */
     static void callToSchool(CrocodileEntity striker, Vec3 at) {
         for (CrocodileEntity other : striker.level().getEntitiesOfClass(CrocodileEntity.class, striker.getBoundingBox().inflate(CALL_REACH, 8.0, CALL_REACH))) {
-            if (other != striker && other.isHungry() && other.isInWater() && other.held == null && !other.hunting) {
+            if (other != striker && other.isHungry() && other.isInWater() && other.held == null && !other.hunting && !other.life().isYoung()) {
                 other.schoolAt = at;
                 other.schoolFor = CALL_TICKS;
             }

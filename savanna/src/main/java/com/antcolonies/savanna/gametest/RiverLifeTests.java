@@ -3,6 +3,7 @@ package com.antcolonies.savanna.gametest;
 import static com.antcolonies.savanna.gametest.TermiteMoundTests.SURFACE;
 
 import com.antcolonies.savanna.SavannaMod;
+import com.antcolonies.savanna.animal.BarbEntity;
 import com.antcolonies.savanna.animal.CatfishEntity;
 import com.antcolonies.savanna.animal.TilapiaEntity;
 import com.antcolonies.savanna.block.AlgaeBlock;
@@ -1571,5 +1572,123 @@ public class RiverLifeTests {
             }
         }
         helper.succeed();
+    }
+
+    // --- the river barb (2026-11-20) -----------------------------------------------------------------------------------
+
+    /**
+     * Barbs spawn by themselves in the shallows (the spawning check list): over a river's cross-section the world would
+     * spawn a barb at every water spot of a column 1 to 3 blocks deep and nowhere deeper; barbs are in their own group,
+     * river schools (cap 40), listed in the savanna's waters in schools of 8 to 14; the river fish group is down to 45
+     * and the tilapia come in groups of 2 to 5 (the user, 2026-11-20).
+     */
+    @GameTest(template = "arena", timeoutTicks = 200)
+    public static void barbsSpawnInTheShallowsByThemselves(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        int top = buildChannel(helper, false);
+        BlockPos corner = helper.absolutePos(new BlockPos(CX0, 0, CZ0));
+        int[] barbs = new int[CHANNEL_DEPTHS.length];
+        int tilapia = 0;
+        for (int i = 0; i < CHANNEL_DEPTHS.length; i++) {
+            for (int dz = 0; dz <= CZ1 - CZ0; dz++) {
+                for (int y = top - 8; y <= top + 1; y++) {
+                    BlockPos at = new BlockPos(corner.getX() + i, y, corner.getZ() + dz);
+                    barbs[i] += worldWouldSpawn(level, SavannaEntities.BARB.get(), at) ? 1 : 0;
+                    tilapia += worldWouldSpawn(level, SavannaEntities.TILAPIA.get(), at) ? 1 : 0;
+                }
+            }
+        }
+        buildChannel(helper, true);
+        int total = java.util.Arrays.stream(barbs).sum();
+        SavannaMod.LOGGER.info("[barb spawns] spots over the channel: barb {} (by column {}), tilapia {}", total, java.util.Arrays.toString(barbs), tilapia);
+        StringBuilder wrong = new StringBuilder();
+        for (int i = 0; i < CHANNEL_DEPTHS.length; i++) {
+            int want = CHANNEL_DEPTHS[i] <= 3 ? CHANNEL_DEPTHS[i] * (CZ1 - CZ0 + 1) : 0;
+            if (barbs[i] != want) {
+                wrong.append(" depth ").append(CHANNEL_DEPTHS[i]).append(": ").append(barbs[i]).append(", want ").append(want);
+            }
+        }
+        if (!wrong.isEmpty()) {
+            helper.fail("barbs spawn at the wrong spots:" + wrong);
+        }
+        var school = com.antcolonies.savanna.registry.SavannaMobCategories.riverSchool();
+        var fish = com.antcolonies.savanna.registry.SavannaMobCategories.riverFish();
+        helper.assertTrue(SavannaEntities.BARB.get().getCategory() == school, "the barb is in the " + SavannaEntities.BARB.get().getCategory().getName() + " group");
+        helper.assertTrue(school.getMaxInstancesPerChunk() == 40, "the river school group's cap is " + school.getMaxInstancesPerChunk() + " (40 wanted)");
+        helper.assertTrue(fish.getMaxInstancesPerChunk() == 45, "the river fish group's cap is " + fish.getMaxInstancesPerChunk() + " (45 wanted)");
+        var biomes = level.registryAccess().registryOrThrow(net.minecraft.core.registries.Registries.BIOME);
+        var river = net.minecraft.resources.ResourceKey.create(net.minecraft.core.registries.Registries.BIOME,
+                net.minecraft.resources.ResourceLocation.fromNamespaceAndPath(SavannaMod.MODID, "savanna_river"));
+        for (var key : java.util.List.of(net.minecraft.world.level.biome.Biomes.SAVANNA, river)) {
+            var settings = biomes.getOrThrow(key).getMobSettings();
+            var barb = settings.getMobs(school).unwrap().stream().filter(d -> d.type == SavannaEntities.BARB.get()).findFirst();
+            helper.assertTrue(barb.isPresent() && barb.get().minCount == 8 && barb.get().maxCount == 14,
+                    "barbs in " + key.location() + "'s river school list: " + barb.map(d -> d.minCount + " to " + d.maxCount).orElse("none") + " (8 to 14 wanted)");
+            var t = settings.getMobs(fish).unwrap().stream().filter(d -> d.type == SavannaEntities.TILAPIA.get()).findFirst();
+            helper.assertTrue(t.isPresent() && t.get().minCount == 2 && t.get().maxCount == 5,
+                    "tilapia in " + key.location() + "'s river fish list: " + t.map(d -> d.minCount + " to " + d.maxCount).orElse("none") + " (2 to 5 wanted)");
+        }
+        helper.succeed();
+    }
+
+    /**
+     * A hungry hatchling crocodile in the shallows snaps up a barb passing it (young crocodiles' first meal, 2026-11-20)
+     * and is fed; a barb is not frightened of a hatchling.
+     */
+    @GameTest(template = "arena", timeoutTicks = 600)
+    public static void aHatchlingCrocodileSnapsUpABarb(GameTestHelper helper) {
+        buildPond(helper);
+        var croc = helper.spawn(SavannaEntities.CROCODILE.get(), new BlockPos(3, TOP - 1, 5));
+        croc.life().setUp(true, croc.getRandom());
+        croc.life().setAge(0);
+        croc.load(croc.saveWithoutId(new net.minecraft.nbt.CompoundTag()));       // its size and pace as it loads
+        croc.setPersistenceRequired();
+        croc.makeHungry();
+        croc.strikeLuck = 1;        // the barb never darts off at the snap (the hunt is under test, not the dodge)
+        BarbEntity barb = helper.spawn(SavannaEntities.BARB.get(), new BlockPos(5, TOP - 1, 5));
+        barb.setNoAi(true);
+        barb.setPersistenceRequired();
+        helper.succeedWhen(() -> {
+            helper.assertTrue(croc.isAlive(), "the hatchling died");
+            helper.assertTrue(croc.life().isYoung(), "the crocodile is not a hatchling");
+            helper.assertTrue(barb.isRemoved() && !croc.isHungry(),
+                    "the barb " + (barb.isRemoved() ? "is gone" : "still swims " + String.format("%.1f", barb.distanceTo(croc)) + " blocks off")
+                            + (croc.isHungry() ? ", the hatchling still hungry" : ""));
+        });
+    }
+
+    /**
+     * A hungry catfish takes a barb out of a school (a snack, 2026-11-20): one barb is gone, the catfish is fed, and at
+     * the strike the others burst outward with their fast start.
+     */
+    @GameTest(template = "arena", timeoutTicks = 1200)
+    public static void aCatfishTakesABarbAndTheSchoolBursts(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        buildPond(helper);
+        CatfishEntity catfish = helper.spawn(SavannaEntities.CATFISH.get(), new BlockPos(X1 - 1, SURFACE + 2, Z0 + 1));
+        catfish.setPersistenceRequired();
+        catfish.makeHungry();
+        java.util.List<BarbEntity> school = new java.util.ArrayList<>();
+        for (int i = 0; i < 6; i++) {
+            BarbEntity barb = helper.spawn(SavannaEntities.BARB.get(), new BlockPos(X1 - 2 - i % 2, SURFACE + 3 + i / 3, Z1 - 1 - i % 3));
+            barb.setPersistenceRequired();
+            school.add(barb);
+        }
+        double[] fastest = {0};
+        helper.onEachTick(() -> {
+            for (BarbEntity b : school) {
+                if (!b.isRemoved()) {
+                    fastest[0] = Math.max(fastest[0], b.getDeltaMovement().length());
+                }
+            }
+        });
+        helper.succeedWhen(() -> {
+            long gone = school.stream().filter(BarbEntity::isRemoved).count();
+            helper.assertTrue(gone == 1 && !catfish.isHungry() && catfish.isAlive(),
+                    gone + " barbs gone" + (catfish.isHungry() ? ", the catfish still hungry" : "") + " (one eaten, the catfish fed)");
+            helper.assertTrue(fastest[0] > 0.35, "the school never burst at the strike (fastest barb " + String.format("%.2f", fastest[0]) + " blocks a tick)");
+            helper.assertTrue(level.getEntitiesOfClass(com.antcolonies.savanna.animal.RemainsEntity.class, catfish.getBoundingBox().inflate(6)).isEmpty(),
+                    "a barb left remains (it is gulped whole)");
+        });
     }
 }
