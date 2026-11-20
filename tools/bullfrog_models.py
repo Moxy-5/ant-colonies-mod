@@ -181,7 +181,7 @@ EYE_LOOKS = {
                                  'gggll' 'llllllgg'),
                        'extra': (((5, 11), (18, 19), (-17, -8)), ((11, 12), (18, 18.5), (-16, -8)))},
 }
-EYE_LOOK = 'painted'
+EYE_LOOK = 'painted_detail'        # approved by the user 2026-11-20 ("YES that's perfect", v17)
 
 
 def eye_bones(s):

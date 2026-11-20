@@ -180,6 +180,8 @@ user: a detailed webbed foot model comes later). Fun first, inspired by the real
   `EYE_LOOKS`), never the same art on each face. C2 redone so (v17): one pupil across the corner, one glint on the
   corner itself (seen from ahead, the side and between), lid lines unbroken round it, the brow tapering. C stays v16
   and the default. Waiting for the user's look.
+- 2026-11-20, **the eyes approved by the user: C2** ("YES that's perfect", v17), now the official model (the
+  maker's `EYE_LOOK`). Next for the frog: the workshop's paint stage, then its clips.
 
 ## My picks the user may change
 The barb's name and look, every size and number above (the bullfrog's size is the user's call), barbs with no hunger,
