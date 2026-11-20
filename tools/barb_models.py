@@ -21,7 +21,9 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from model_parts import cube, curve, paint_faces, png   # noqa: E402
+import math  # noqa: E402
+
+from model_parts import cube, curve, paint_faces, png, clip, smooth, geo, animations, write_assets   # noqa: E402
 
 # --- shape numbers (model pixels; along the outline's x, tail tip 0 to snout 30) -------------------------------------
 LENGTH = 30.0
@@ -262,6 +264,169 @@ def workshop_look():
     return bones, png(rows), w, h
 
 
+# --- the clips (the workshop's stage 5, 2026-11-20; the user: the paint "perfect, start the animations") -------------
+# Fun first, inspired by real small schooling fish (CLAUDE.md: animals are generalized): the swim is a quick wave
+# carried back along the body, the head swinging a little against it and the tail fin the most, late; the breast fins
+# held back along the body while cruising and sculling out while hovering. Each clip gives a bone's turn ADDED to its
+# rest turn, in the model file's degrees: y the sideways swing, z the roll about the length, x the pitch.
+SWIM_LEN = 0.45          # one tail beat at cruising speed (the game plays it faster or slower with the speed)
+IDLE_LEN = 1.6
+TURN_LEN = 0.6
+BANK = 38.0              # how far a turning fish rolls its flank to the light (the flash)
+SIP_LEN = 1.4
+SCATTER_LEN = 0.4
+DEATH_LEN = 1.0
+FLOP_LEN = 0.5
+LIE = 5.5 - 3.6          # how far the fish comes down lying on its side: its middle line (5.5 up) to its half width
+
+# the wave: bone, its parent, how far it swings (radians, against the fish's line), how late (radians of the beat)
+WAVE = (('body', None, 0.035, 0.9), ('head', 'body', 0.06, 0.0), ('tail_stalk', 'body', 0.24, 1.7),
+        ('tail_fin', 'tail_stalk', 0.46, 2.5))
+
+
+def _ease(x):
+    return smooth(x)
+
+
+def _wave(p, t, beat, amount, curl=0.0):
+    """The swim wave at t: each bone's swing, its parent's taken off (curl bends every bone one way as well, a fish
+    curving round as it turns or flops)."""
+    ab = {None: 0.0}
+    for name, parent, a, lag in WAVE:
+        ab[name] = amount * a * math.sin(beat * t - lag) + curl * a * 2.2
+        p.setdefault(name, {})['rotation'] = [0.0, round(math.degrees(ab[name] - ab[parent]), 3), 0.0]
+    return p
+
+
+def _fins(p, t, out=0.0, flutter=0.0, rate=8.0, back_fin=0.0):
+    """The breast fins: held back along the flank (out 0) or spread out sculling (out 1), fluttering; the back fin
+    raised (0) or folded flat back (1)."""
+    for s, name in ((1, 'fin_left'), (-1, 'fin_right')):
+        f = flutter * math.sin(2 * math.pi * rate * t + (0.6 if s < 0 else 0.0))
+        p[name] = {'rotation': [0.0, round(s * (-28.0 + 30.0 * out + 10.0 * f), 3), round(s * (12.0 * f), 3)]}
+    p['back_fin'] = {'rotation': [round(-55.0 * back_fin, 3), 0.0, 0.0]}
+    return p
+
+
+def clips():
+    out = {}
+
+    def make(name, length, pose_at, steps_per_s=40, loop=True):
+        out[name] = clip(length, pose_at, max(8, round(length * steps_per_s)), loop)
+
+    # idle: hanging in the water, a slow small wave, the breast fins sculling to hold it still, a gentle bob
+    def idle(t):
+        w = 2 * math.pi / IDLE_LEN
+        p = _wave({}, t, w, 0.28)
+        p['body']['position'] = [0.0, round(0.25 * math.sin(w * t), 3), 0.0]
+        return _fins(p, t, out=0.7, flutter=1.0, rate=2 / IDLE_LEN * 2)
+    make('idle', IDLE_LEN, idle)
+
+    # swim: the quick wave, fins tucked back, a tiny flick of the breast fins each beat
+    def swim(t):
+        w = 2 * math.pi / SWIM_LEN
+        return _fins(_wave({}, t, w, 1.0), t, out=0.0, flutter=0.25, rate=1 / SWIM_LEN, back_fin=0.15)
+    make('swim', SWIM_LEN, swim)
+
+    # turn: played once as the fish turns hard (the game turns the fish; the clip curves the body round the turn and
+    # rolls it onto its side so the flank catches the light; the game swaps in the flash look while it plays)
+    def turn(side):
+        def pose(t):
+            k = _ease(t / (TURN_LEN * 0.3)) * (1 - _ease((t - TURN_LEN * 0.7) / (TURN_LEN * 0.3)))
+            w = 2 * math.pi / (SWIM_LEN * 0.8)
+            p = _wave({}, t, w, 1.0 - 0.4 * k, curl=side * 0.6 * k)
+            p['body']['rotation'][2] = round(side * BANK * k, 3)
+            return _fins(p, t, out=0.3 * k, flutter=0.4, rate=1 / SWIM_LEN, back_fin=0.1)
+        return pose
+    make('turn_left', TURN_LEN, turn(1), loop=False)
+    make('turn_right', TURN_LEN, turn(-1), loop=False)
+
+    # sip: tips its nose up to the surface, a quick gulp (the head jerks up), and down again (the game puts the fish
+    # just under the surface first; the rings on the water are the game's)
+    def sip(t):
+        up = _ease(t / (SIP_LEN * 0.35)) * (1 - _ease((t - SIP_LEN * 0.68) / (SIP_LEN * 0.32)))
+        gulp = math.sin(math.pi * min(1.0, max(0.0, (t - SIP_LEN * 0.42) / 0.16)))
+        p = _wave({}, t, 2 * math.pi / IDLE_LEN, 0.35)
+        p['body']['rotation'][0] = round(-28.0 * up, 3)
+        p['body']['position'] = [0.0, round(2.5 * up, 3), 0.0]
+        p['head']['rotation'][0] = round(-9.0 * gulp, 3)
+        return _fins(p, t, out=0.8 * up, flutter=1.0, rate=4.0)
+    make('sip', SIP_LEN, sip, loop=False)
+
+    # scatter: the fast start when a hunter strikes: the body snaps into a C, the tail whips back the other way (the
+    # push that throws it clear), then fast beats; fins folded flat (the game shoots the fish away as it plays)
+    def scatter(t):
+        bend_end, snap_end = 0.08, 0.18
+        if t < bend_end:
+            c = _ease(t / bend_end)
+        elif t < snap_end:
+            c = 1 - 2 * _ease((t - bend_end) / (snap_end - bend_end))
+        else:
+            c = -1 * (1 - _ease((t - snap_end) / (SCATTER_LEN - snap_end)))
+        settle = _ease((t - snap_end) / (SCATTER_LEN - snap_end))
+        p = _wave({}, t, 2 * math.pi / (SWIM_LEN * 0.6), settle, curl=1.2 * c)
+        p['body']['rotation'][2] = round(12.0 * c, 3)
+        return _fins(p, t, out=0.0, back_fin=1.0 - 0.8 * settle)
+    make('scatter', SCATTER_LEN, scatter, 60, loop=False)
+
+    # flop: stranded out of water, on its side, curling and springing (the game hops it about)
+    def flop(t):
+        w = 2 * math.pi / FLOP_LEN
+        p = _wave({}, t, w, 1.4, curl=-0.6 * (0.5 + 0.5 * math.sin(w * t)))   # curls up off the ground
+        p['body']['rotation'][2] = 90.0
+        p['body']['position'] = [0.0, round(-LIE + 1.2 * abs(math.sin(w * t)), 3), 0.0]
+        return _fins(p, t, out=-1.7, back_fin=1.0)
+    make('flop', FLOP_LEN, flop)
+
+    # death: the wave dies away as it rolls onto its side and settles
+    def death(t):
+        f = _ease(t / (DEATH_LEN * 0.8))
+        down = _ease((t - DEATH_LEN * 0.25) / (DEATH_LEN * 0.6))      # rolls first, then settles (the tail clear)
+        p = _wave({}, t, 2 * math.pi / 0.5, 0.9 * (1 - f), curl=-0.25 * f)
+        p['body']['rotation'][2] = round(90.0 * f, 3)
+        p['body']['position'] = [0.0, round(-LIE * down, 3), 0.0]
+        return _fins(p, t, out=-1.7 * f, back_fin=f)
+    make('death', DEATH_LEN, death, loop='hold')
+    return out
+
+
+def WORKSHOP_CLIPS():
+    return clips()
+
+
+# For the versions page's clip player: the made size against the game's (0.25 blocks of the made 1.875), the water
+# clips and their surface (blocks at made size), and a line about each clip.
+WORKSHOP_CLIP_INFO = {
+    'scale': 0.25 / (LENGTH / 16), 'water': ['idle', 'swim', 'turn_left', 'turn_right', 'sip', 'scatter'],
+    'surface': 1.0,
+    'notes': {
+        'idle': 'Hanging in the water: a slow small wave, the breast fins sculling to hold it still, a gentle bob.',
+        'swim': 'The quick tail beat, the wave running back along the body; the game plays it faster the faster it swims.',
+        'turn_left': 'A hard turn: the body curves round and rolls its flank to the light (the flash; the game swaps in the bright look).',
+        'turn_right': 'The same turn the other way.',
+        'sip': 'Nose up to the surface, a quick gulp, back down (dawn and dusk).',
+        'scatter': 'The escape when a hunter strikes: snaps into a C, the tail whips it clear, fast beats.',
+        'flop': 'Stranded on land: on its side, curling and springing.',
+        'death': 'The wave dies away as it rolls onto its side.',
+    }}
+
+
+def write_game():
+    """Writes the barb's model, its two textures (everyday and the turning flash) and its clips into the savanna mod
+    (no entity uses them yet: that is the plan's step 1; the files let the clip checks read the model as the game
+    will)."""
+    files = {}
+    for look, name in (('everyday', 'barb'), ('flash', 'barb_flash')):
+        bones, rows, w, h = paint_faces(model(), 2, LOOKS[look])
+        files[f'textures/entity/{name}.png'] = png(rows)
+    files['geo/entity/barb.geo.json'] = geo('barb', bones, w, h, (2, 1, [0, 0.4, 0]))
+    files['animations/entity/barb.animation.json'] = animations(clips())
+    write_assets(files)
+
+
 if __name__ == '__main__':
+    if sys.argv[1:] == ['game']:
+        write_game()
+        sys.exit()
     bones = model()
     print(sum(len(b['cubes']) for b in bones), 'boxes,', len(bones), 'bones')

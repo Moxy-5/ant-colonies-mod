@@ -268,6 +268,16 @@ user: a detailed webbed foot model comes later). Fun first, inspired by the real
   fins with orange tips (back fin, belly fins, the fin under the tail, breast fins) and the forked tail's red tips.
   The flash (the flank white as the fish turns) is a second look, `LOOKS['flash']`, for the game stage. Waiting for
   the user's look (`references/workshop/barb/painted_v4.png`).
+- 2026-11-20: **the barb's paint approved by the user ("that's perfect, start the animations").** Clips in
+  `tools/barb_models.py` (`clips()`; game files by `python tools/barb_models.py game`, no entity uses them yet): idle
+  (hanging still, breast fins sculling, a bob), swim (0.45 s a beat, the wave carried back along the body, the tail fin
+  most and last), turn_left and turn_right (played once on a hard turn: the body curves round it and rolls 38 degrees
+  so the flank catches the light; the game swaps in the flash look `barb_flash.png`), sip (nose up 28 degrees, a gulp,
+  back down), scatter (the fast start: a C bend, the tail whipping back, fins flat), flop (stranded, on its side,
+  curling up) and death (the wave dies as it rolls onto its side). Checked offline with `python tools/anim_lab.py all
+  barb` (film strips from four sides, every frame's jumps and turns): flop and death clean on the ground; the water
+  clips dip the tail a fraction of a pixel under the model's floor, which has no meaning for a swimming fish. The
+  in-game frame-by-frame films wait for the barb's entity (step 1). Overview `references/workshop/barb/clips_v4.png`.
 
 ## My picks the user may change
 The barb's name and look, every size and number above (the bullfrog's size is the user's call), barbs with no hunger,
