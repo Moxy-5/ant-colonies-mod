@@ -1,0 +1,13 @@
+{
+ "note": "plumper (7 wide like the sheet's front); eyes seated in one head slice, joined to the head all round",
+ "date": "2026-11-20",
+ "boxes": 38,
+ "numbers": {
+  "CORE_WIDTH": 0.55,
+  "FLANK_DEPTH": 0.62,
+  "EYE_AT": 26.0,
+  "EYE_HEIGHT": 7.0,
+  "EYE_SIZE": 1.0,
+  "FORK": 2.0
+ }
+}

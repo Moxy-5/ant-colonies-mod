@@ -253,6 +253,14 @@ user: a detailed webbed foot model comes later). Fun first, inspired by the real
   of three steps a lobe. Against the sheet: side 93% covered / 90% inside, from above 86 / 91, front 67 / 98 (the
   sheet's front view is drawn 7 wide but its top view 5; the approved outline follows the top). Waiting for the
   user's look (`references/workshop/barb/plain_vs_sheet.png`, versions page).
+- 2026-11-20, the user on v2: "half the eyes are covered" and "the top left of them don't connect", "make it plumper so
+  there's more space for the eyes" (the eyes themselves look good). Cause: each eye sat across the edge of two head
+  slices (the wider one covered its back half) and rose above the round flank beside the narrow ridge (its top corner
+  hung in the air). v3: the body as wide as the sheet's front view (7 at the deepest, the head broad back from the
+  eyes); each eye one block inside a single head slice, from the ridge out a quarter pixel past the cheek, its outer
+  face the gold ring and pupil and its other faces head skin. Side 93 / 90, front 87 / 94, from above 94 / 72 (now
+  wider than the sheet's top view, on purpose). Still 38 boxes. Waiting for the user's look
+  (`references/workshop/barb/plumper_v3.png`).
 
 ## My picks the user may change
 The barb's name and look, every size and number above (the bullfrog's size is the user's call), barbs with no hunger,

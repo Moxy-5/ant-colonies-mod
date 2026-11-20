@@ -28,15 +28,17 @@ LENGTH = 30.0
 # (x, top, belly, half width), eased between: the tail root's narrow waist, the body deepest at x 20 (a third back
 # from the snout), the head a little shallower, the snout blunt. Read off the outline's parts (tail root y 4-7, body
 # rear 2-9, body 1-10, head 2-9, snout 4-7; half widths 0.5, 1.5, 2.5, 2.0, 1.0).
-# The head's top and chin follow the sheet's steps (deep to x 25, rising only at the blunt snout).
-PROFILE = ((7, 6.9, 4.1, 0.5), (9, 7.0, 4.0, 0.6), (11.5, 8.0, 3.0, 1.0), (14, 9.0, 2.0, 1.5), (17, 9.8, 1.2, 2.2),
-           (20, 10.0, 1.0, 2.5), (23, 9.6, 1.1, 2.4), (25.5, 9.0, 1.8, 2.1), (27.5, 8.0, 2.8, 1.6),
-           (29, 7.0, 3.6, 1.1), (30, 6.2, 4.0, 0.8))
+# The head's top and chin follow the sheet's steps (deep to x 25, rising only at the blunt snout). Plumper than the
+# outline (the user, 2026-11-20, "make it plumper so there's more space for the eyes"): as wide as the sheet's front
+# view (7 at the deepest), the head kept broad back from the eyes so they sit on a flat cheek.
+PROFILE = ((7, 6.9, 4.1, 0.5), (9, 7.0, 4.0, 0.7), (11.5, 8.0, 3.0, 1.3), (14, 9.0, 2.0, 2.2), (17, 9.8, 1.2, 3.0),
+           (20, 10.0, 1.0, 3.5), (23, 9.6, 1.1, 3.4), (25.5, 9.0, 1.8, 3.1), (27.5, 8.0, 2.8, 2.6),
+           (29, 7.0, 3.6, 1.8), (30, 6.2, 4.0, 1.2))
 CORE_WIDTH = 0.55        # the tall box's share of the width (the back and belly ridges)
 FLANK_DEPTH = 0.62       # the wide box's share of the depth (the round flank)
 SLICE = 2.0
 BODY_FROM, HEAD_FROM, TAIL_ROOT = 11.0, 23.0, 7.0    # the body bone from x 11, the head bone from 23, tail fin before 7
-EYE_AT, EYE_HEIGHT, EYE_SIZE = 27.0, 7.0, 1.0        # the eye's middle (outline x, y) and its half size
+EYE_AT, EYE_HEIGHT, EYE_SIZE = 26.0, 7.0, 1.0        # the eye's middle (outline x, y) and its half size
 FORK = 2.0               # where the lobes' tip pieces begin (model pixels from the tail tip's line)
 
 
@@ -57,11 +59,20 @@ def box(x0, x1, half, y0, y1, part, across=0.0):
     return cube([across - half, y0, z0], [across + half, y1, z1], part)
 
 
-def slice_boxes(x0, x1, part='body'):
+def slice_of(x):
+    """The body slice holding outline x: (x0, x1, core half width, flank half width, flank bottom, flank top)."""
+    x0 = BODY_FROM + SLICE * int((x - BODY_FROM) // SLICE)
+    x1 = min(LENGTH, x0 + SLICE)
     top, belly, hw = at((x0 + x1) / 2)
     mid, half_d = (top + belly) / 2, (top - belly) / 2
-    return [box(x0, x1, round(hw * CORE_WIDTH * 4) / 4, belly, top, part),
-            box(x0, x1, round(hw * 4) / 4, mid - half_d * FLANK_DEPTH, mid + half_d * FLANK_DEPTH, part)]
+    return (x0, x1, round(hw * CORE_WIDTH * 4) / 4, round(hw * 4) / 4,
+            mid - half_d * FLANK_DEPTH, mid + half_d * FLANK_DEPTH)
+
+
+def slice_boxes(x0, x1, part='body'):
+    top, belly, _ = at((x0 + x1) / 2)
+    _, _, core, flank, f0, f1 = slice_of(x0)
+    return [box(x0, x1, core, belly, top, part), box(x0, x1, flank, f0, f1, part)]
 
 
 def body(bones):
@@ -77,12 +88,16 @@ def body(bones):
 
 
 def eyes(bones):
-    """Each eye a thin box set into the side of the head, a quarter pixel proud: the gold ring with the black pupil in
-    its middle, looking out to the side (from the front only its edge shows, as on the sheet's front view)."""
-    hw = at(EYE_AT)[2]
+    """Each eye a block in one head slice (never across a slice's edge, where the next slice would cover half of it),
+    from the narrow core out to a quarter pixel past the cheek, so it is joined to the head all round even where it
+    rises above the round flank. Its outer face is the gold ring with the black pupil; its other faces are painted as
+    the head's skin."""
+    x0, x1, core, flank, _, _ = slice_of(EYE_AT)
+    a, b = max(x0, EYE_AT - EYE_SIZE), min(x1, EYE_AT + EYE_SIZE)
     for s in (1, -1):
-        bones['head'].append(box(EYE_AT - EYE_SIZE, EYE_AT + EYE_SIZE, 0.35, EYE_HEIGHT - EYE_SIZE,
-                                 EYE_HEIGHT + EYE_SIZE, 'eye', across=s * (hw - 0.1)))
+        lo, hi = sorted((s * (core - 0.25), s * (flank + 0.25)))
+        bones['head'].append(box(a, b, (hi - lo) / 2, EYE_HEIGHT - EYE_SIZE, EYE_HEIGHT + EYE_SIZE, 'eye',
+                                 across=(hi + lo) / 2))
 
 
 def tail(bones):
@@ -147,12 +162,12 @@ PLAIN = {
 
 def plain_colour(c, face, x, y, z):
     part = c['_part']
-    if part == 'eye':
+    if part == 'eye' and face in ('east', 'west'):
         ox = LENGTH / 2 - z
-        if abs(ox - EYE_AT) < 0.5 and abs(y - EYE_HEIGHT) < 0.5 and face in ('east', 'west', 'north'):
+        if abs(ox - EYE_AT) < 0.5 and abs(y - EYE_HEIGHT) < 0.5:
             return PLAIN['pupil']
         return PLAIN['eye']
-    if part == 'body':
+    if part in ('body', 'eye'):
         ox = LENGTH / 2 - z
         top, belly, _ = at(min(LENGTH, max(TAIL_ROOT, ox)))
         f = (y - belly) / max(0.5, top - belly)
