@@ -278,6 +278,13 @@ user: a detailed webbed foot model comes later). Fun first, inspired by the real
   barb` (film strips from four sides, every frame's jumps and turns): flop and death clean on the ground; the water
   clips dip the tail a fraction of a pixel under the model's floor, which has no meaning for a swimming fish. The
   in-game frame-by-frame films wait for the barb's entity (step 1). Overview `references/workshop/barb/clips_v4.png`.
+- 2026-11-20, the user: "the mouth opening for algae". v6: the snout's last 2 pixels split at the mouth line into the
+  upper lip and a lower jaw (its own bone, hinged at x 27.5, opens 40 degrees: a first try with a 1-pixel jaw opened
+  to a speck, too small to read on a quarter-block fish), with the dark red inside of the mouth hidden behind the lips
+  while shut; 39 boxes, 9 bones. New clip `nibble` (1.8 s, loops while grazing: nose down 30 degrees to the algae,
+  three pecks, the mouth opening as the head reaches in, snapping shut on a strand and tugging back; the snout just
+  meets the bed); the `sip` now opens the mouth at the gulp. Checked offline (`anim_lab.py all barb`). Picture
+  `references/workshop/barb/mouth_v6.png`.
 
 ## My picks the user may change
 The barb's name and look, every size and number above (the bullfrog's size is the user's call), barbs with no hunger,

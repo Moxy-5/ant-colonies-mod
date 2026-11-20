@@ -548,3 +548,4 @@ Every "Current status" bullet CLAUDE.md held up to 2026-11-19, word for word, ol
 - 2026-11-20: The barb made plumper with its eyes seated in the head (v3); waiting for the user's look.
 - 2026-11-20: The barb's v3 shape approved by the user; painted from the design sheet (v4); waiting for the user's look.
 - 2026-11-20: The barb's paint approved by the user; its 8 clips made and checked offline (not in the game yet: no entity); waiting for the user's look.
+- 2026-11-20: The barb's mouth opens (a lower jaw): new nibble clip for algae, the sip gulps open (v6); checked offline.

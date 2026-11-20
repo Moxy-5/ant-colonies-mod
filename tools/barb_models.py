@@ -41,6 +41,7 @@ FLANK_DEPTH = 0.62       # the wide box's share of the depth (the round flank)
 SLICE = 2.0
 BODY_FROM, HEAD_FROM, TAIL_ROOT = 11.0, 23.0, 7.0    # the body bone from x 11, the head bone from 23, tail fin before 7
 EYE_AT, EYE_HEIGHT, EYE_SIZE = 26.0, 7.0, 1.0        # the eye's middle (outline x, y) and its half size
+MOUTH_Y, JAW_FROM, SNOUT = 5.0, 27.5, 2.0   # the mouth line's height, where the lower jaw hinges, the snout's length
 FORK = 2.0               # where the lobes' tip pieces begin (model pixels from the tail tip's line)
 
 
@@ -80,13 +81,24 @@ def slice_boxes(x0, x1, part='body'):
 def body(bones):
     """The body and head as slices, the tail root as two narrow single boxes (it is a thin stalk, flat sided)."""
     x = BODY_FROM
-    while x < LENGTH - 1e-6:
-        x1 = min(LENGTH, x + SLICE)
+    while x < LENGTH - SNOUT - 1e-6:                  # the last two pixels are the snout with its mouth (mouth())
+        x1 = min(LENGTH - SNOUT, x + SLICE)
         bones['head' if x >= HEAD_FROM else 'body'] += slice_boxes(x, x1)
         x = x1
     for x0, x1 in ((TAIL_ROOT, 9.0), (9.0, BODY_FROM)):
         top, belly, hw = at((x0 + x1) / 2)
         bones['tail_stalk'].append(box(x0, x1, max(0.5, round(hw * 4) / 4), belly, top, 'body'))
+
+
+def mouth(bones):
+    """The snout's last two pixels split at the mouth line: the upper lip on the head, the lower jaw its own bone hinged
+    a little behind (it drops to open the mouth: nibbling algae, sipping at the surface), and the dark inside of the
+    mouth behind the lips, hidden while the mouth is shut (the user, 2026-11-20, "the mouth opening for algae")."""
+    x0, x1 = LENGTH - SNOUT, LENGTH
+    top, belly, hw = at(x0 + SNOUT / 2)
+    bones['head'].append(box(x0, x1, round(hw * 0.85 * 4) / 4, MOUTH_Y, top, 'body'))
+    bones['jaw'].append(box(JAW_FROM, x1, round(hw * 0.7 * 4) / 4, belly, MOUTH_Y, 'body'))
+    bones['head'].append(box(JAW_FROM + 0.3, x1 - 0.4, round(hw * 0.5 * 4) / 4, belly + 0.4, MOUTH_Y + 0.25, 'mouth'))
 
 
 def eyes(bones):
@@ -131,9 +143,10 @@ def fins(bones):
 
 
 def model():
-    names = ('body', 'head', 'tail_stalk', 'tail_fin', 'back_fin', 'fin_left', 'fin_right')
+    names = ('body', 'head', 'jaw', 'tail_stalk', 'tail_fin', 'back_fin', 'fin_left', 'fin_right')
     bones_c = {n: [] for n in names}
     body(bones_c)
+    mouth(bones_c)
     eyes(bones_c)
     tail(bones_c)
     fins(bones_c)
@@ -143,6 +156,7 @@ def model():
         {'name': 'root', 'pivot': [0, 0, 0], 'cubes': []},
         {'name': 'body', 'parent': 'root', 'pivot': [0, mid_y, z_of(17.0)], 'cubes': bones_c['body']},
         {'name': 'head', 'parent': 'body', 'pivot': [0, mid_y, z_of(HEAD_FROM)], 'cubes': bones_c['head']},
+        {'name': 'jaw', 'parent': 'head', 'pivot': [0, MOUTH_Y, z_of(JAW_FROM)], 'cubes': bones_c['jaw']},
         {'name': 'tail_stalk', 'parent': 'body', 'pivot': [0, mid_y, z_of(BODY_FROM)], 'cubes': bones_c['tail_stalk']},
         {'name': 'tail_fin', 'parent': 'tail_stalk', 'pivot': [0, mid_y, z_of(TAIL_ROOT)], 'cubes': bones_c['tail_fin']},
         {'name': 'back_fin', 'parent': 'body', 'pivot': [0, at(19.5)[0], z_of(21.0)], 'cubes': bones_c['back_fin']},
@@ -159,6 +173,7 @@ PLAIN = {
     'fin': (178, 186, 182),       # see-through grey
     'eye': (210, 166, 62),        # the gold ring
     'pupil': (18, 18, 20),
+    'mouth': (96, 44, 46),        # the dark inside of the mouth
 }
 
 
@@ -186,7 +201,7 @@ SHEET = {
     'back': (92, 104, 96), 'upper': (122, 134, 124), 'silver': (196, 204, 208), 'shade': (168, 176, 182),
     'belly': (236, 236, 228), 'line': (120, 128, 134), 'spot': (28, 30, 34), 'eye': (214, 168, 64),
     'pupil': (16, 16, 18), 'fin': (178, 186, 182), 'orange': (222, 132, 52), 'red': (200, 46, 40),
-    'mouth': (70, 72, 70), 'flash': (250, 252, 255),
+    'mouth': (70, 72, 70), 'flash': (250, 252, 255), 'inside': (96, 44, 46),
 }
 LINE = (9.0, 22.0, 6.0, 6.5)        # the dark line along the side: from x, to x, from y, to y (half a pixel thin)
 SPOT = (7.0, 9.0, 5.5, 6.5)         # the dark spot at the tail's base (on the sides only), the line running into it
@@ -213,6 +228,8 @@ def paint(c, face, x, y, z, flash=False):
     col = SHEET
     if part == 'eye' and face in ('east', 'west'):
         return col['pupil'] if abs(ox - EYE_AT) < 0.5 and abs(y - EYE_HEIGHT) < 0.5 else col['eye']
+    if part == 'mouth':
+        return col['inside']
     if part in ('body', 'flank', 'eye'):
         if face == 'up':
             return col['back'] if part == 'body' or y >= 9.0 else col['upper']
@@ -277,6 +294,8 @@ SIP_LEN = 1.4
 SCATTER_LEN = 0.4
 DEATH_LEN = 1.0
 FLOP_LEN = 0.5
+NIBBLE_LEN = 1.8         # three pecks at the algae
+JAW_OPEN = 40.0          # how far the lower jaw drops, wide open (degrees): big enough to read on a quarter-block fish
 LIE = 5.5 - 3.6          # how far the fish comes down lying on its side: its middle line (5.5 up) to its half width
 
 # the wave: bone, its parent, how far it swings (radians, against the fish's line), how late (radians of the beat)
@@ -350,8 +369,24 @@ def clips():
         p['body']['rotation'][0] = round(-28.0 * up, 3)
         p['body']['position'] = [0.0, round(2.5 * up, 3), 0.0]
         p['head']['rotation'][0] = round(-9.0 * gulp, 3)
+        p['jaw'] = {'rotation': [round(JAW_OPEN * gulp, 3), 0.0, 0.0]}
         return _fins(p, t, out=0.8 * up, flutter=1.0, rate=4.0)
     make('sip', SIP_LEN, sip, loop=False)
+
+    # nibble: nose down to the algae (strands on the bed or on a stone), held there by small tail beats and sculling
+    # breast fins; three pecks: the mouth opens as the head reaches in, snaps shut on a strand and tugs back
+    def nibble(t):
+        k = 3 * t / NIBBLE_LEN % 1.0                     # where in the peck
+        reach = math.sin(math.pi * min(1.0, k / 0.55))   # the head reaching in, then drawing back
+        open_ = _ease(k / 0.3) * (1 - _ease((k - 0.38) / 0.1))   # opens as it reaches, snaps shut at the strand
+        tug = math.sin(math.pi * min(1.0, max(0.0, (k - 0.48) / 0.3)))
+        p = _wave({}, t, 2 * math.pi / (NIBBLE_LEN / 2), 0.4)
+        p['body']['rotation'][0] = round(30.0 + 4.0 * reach - 3.0 * tug, 3)
+        p['body']['position'] = [0.0, round(4.1 - 0.2 * reach, 3), round(-0.6 * reach + 0.4 * tug, 3)]   # the snout just reaches the bed
+        p['head']['rotation'][0] = round(6.0 * reach - 5.0 * tug, 3)
+        p['jaw'] = {'rotation': [round(JAW_OPEN * open_, 3), 0.0, 0.0]}
+        return _fins(p, t, out=0.9, flutter=1.0, rate=3 / NIBBLE_LEN * 2)
+    make('nibble', NIBBLE_LEN, nibble)
 
     # scatter: the fast start when a hunter strikes: the body snaps into a C, the tail whips back the other way (the
     # push that throws it clear), then fast beats; fins folded flat (the game shoots the fish away as it plays)
@@ -397,14 +432,15 @@ def WORKSHOP_CLIPS():
 # For the versions page's clip player: the made size against the game's (0.25 blocks of the made 1.875), the water
 # clips and their surface (blocks at made size), and a line about each clip.
 WORKSHOP_CLIP_INFO = {
-    'scale': 0.25 / (LENGTH / 16), 'water': ['idle', 'swim', 'turn_left', 'turn_right', 'sip', 'scatter'],
+    'scale': 0.25 / (LENGTH / 16), 'water': ['idle', 'swim', 'turn_left', 'turn_right', 'sip', 'nibble', 'scatter'],
     'surface': 1.0,
     'notes': {
         'idle': 'Hanging in the water: a slow small wave, the breast fins sculling to hold it still, a gentle bob.',
         'swim': 'The quick tail beat, the wave running back along the body; the game plays it faster the faster it swims.',
         'turn_left': 'A hard turn: the body curves round and rolls its flank to the light (the flash; the game swaps in the bright look).',
         'turn_right': 'The same turn the other way.',
-        'sip': 'Nose up to the surface, a quick gulp, back down (dawn and dusk).',
+        'sip': 'Nose up to the surface, the mouth opens for a quick gulp, back down (dawn and dusk).',
+        'nibble': 'Nose down to the algae, three pecks: the mouth opens as it reaches in, snaps shut on a strand, tugs.',
         'scatter': 'The escape when a hunter strikes: snaps into a C, the tail whips it clear, fast beats.',
         'flop': 'Stranded on land: on its side, curling and springing.',
         'death': 'The wave dies away as it rolls onto its side.',
