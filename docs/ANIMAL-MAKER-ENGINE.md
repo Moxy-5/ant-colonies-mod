@@ -62,6 +62,10 @@ its checks are about things that look broken (gaps, sliding feet, pops), never a
   `GroundBendTest`), and each animal's own model class with its own extra rules (`MonitorModel`: leg folding, foot
   planting, joint closing, head look; `CrocodileModel`: its own). Clips are made per animal by its own maker
   (`tools/monitor_models.py`, `tools/crocodile_models.py`, ...).
+- **Built since (to 2026-11-20):** shared: the measuring course, `SteadyController` (clip speed), `TailDrag` and
+  `DraggedTail` (the dragged tail), `game_compare.py`, body plans for the monitor, crocodile and bullfrog. The
+  monitor's own: `MonitorClimb` (its climbs and water moves). One checker per animal: `climb_check.py`,
+  `water_check.py` (monitor), `croc_check.py`, `frog_check.py`. The plan's steps A and B make the per-animal ones shared.
 - **Planned, not built:** the tools review `docs/plans/animal-kit-tools-review.md` (2026-11-08) holds the animation
   half of this engine as ideas: K1 clips remade only when changed, K5 lab checks for every family, K6 the pose viewer
   for any model, G1 an animated body for any creature (not an ant), G2 an animal's clips listed in data, G4 the live
@@ -161,7 +165,8 @@ lift, the hind legs left on stilts and the separate edge rules. So (a) with (b) 
 
 ## Concerns
 1. **Scope.** The whole engine is weeks of tools. Building it all before the next animal would stall the fun part.
-   Answer: rule 4, grow it through real animals, the monitor first.
+   Answer: rule 4, grow it through real animals. (2026-11-20: growing it through one animal made it that animal's;
+   the plan now builds each piece shared from the start and proves it on two or more animals.)
 2. **Three languages.** Rules duplicated in Python and Java can drift apart. Answer: rule 1 (the game's record is the
    truth, match checks for anything duplicated).
 3. **The insect engine is welded to the ant class.** The animation players, live layer and renderer need
@@ -208,85 +213,111 @@ insects at 1 block = 30 mm. Small creatures that meet the insects body to body (
 spiders, centipedes, frogs) are tiny at a block a metre, smaller than some ants. This decides how big their legs and
 steps are for the checks; to settle with the user before the first small creature.
 
-## The plan
-**Phase 1: the monitor, the engine's first animal.** Each step builds the shared version, not a monitor-only one.
-1. **The measuring course (shared, any animal).** `FilmChecks` records any animal model, not only insects (gaps
-   between neighbouring body boxes, parts inside blocks, pops, feet sliding, sinking or floating, which clip plays
-   each tick); the camera writes the frame-by-frame record of every part (rule 1); graphs of snout, chest, hips and
-   tail tip height over time. Course scenes filmed every tick: a one-block step up, a step down, a level bank into
-   deep water, a bank a block above the water, a gentle shallow slope, a scared dash in, swimming out onto a bank, a
-   turn round on land. Run on today's monitor and crocodile: **a baseline report**, the findings above confirmed or
-   dropped and ranked by size. Nothing about the looks changes in this step. Built for the whole list: the checks
-   take the legs, feet and body chain from each model's body plan (any number of legs, none for a snake, dozens for
-   the millipede), never from a four-legged layout. **Built 2026-11-19:** the camera's `BodyRecorder`
-   (`framework/.../client/BodyRecorder.java`) writes every bone of the walker each sample (`record on 3` in a shot
-   list; any mob can be the walker now); `tools/body_course.py films|run|check [animal]` writes the course scenes
-   (`tools/film/course/`), films them and judges them (parts inside blocks, seams, joint snaps, pops, feet over the
-   ground and sliding, clip changes, graphs). The legs, feet and chain come from each model's body plan (`family`,
-   `chain`; monitor and crocodile plans added). The baseline is the section above. The gentle slope is `stairs` (a
-   step every three blocks); a real scare is `scared`. `FilmChecks` itself is unchanged (the course does its job for
-   animals).
-2. **The body follows its path (shared, review A3).** One framework rule in place of the pile above: the body's
-   joints are placed in the world along the path the head took, eased as places in the world (not angles against the
-   box); over a block step the path is smoothed into a short ramp (rule 9: what looks good, not a sharp corner round
-   every block edge, grazing a corner allowed where it reads smoother). The user, 2026-11-19: block steps up and down
-   are where most of the jank is and will stay the biggest problem for every animal ("blocks aren't realistic, so we
-   will have to get creative"). Ideas to weigh against the course's step scenes (my picks to test, none decided):
-   (a) one smoothed ground line, the block tops blurred over about a body length, that the whole body lies on, the
-   feet still reaching down or up to the real block top under them; (b) the animal's drawn height eased over a few
-   ticks after its box jumps a block (the box's one-tick jump hidden, the game's movement untouched); (c) a climbing
-   move timed by where the step is under each leg pair: front legs reach up, the chest rises, then the hips follow.
-   Fewer rules wins: (a) and (b) together may replace most of today's pile. Fixes the step pops, turning on the spot and going in head first, from one rule. The
-   crocodile moves to it too. The rules it replaces are removed, not kept beside it. Built for any chain length (the
-   snake and the millipede are long chains of this; the millipede's coil winds the same chain up), and cheap enough
-   for many animals on screen.
-   **First tries, 2026-11-19 (not kept; saved on branch `claude/monitor-step2-tries`; the user: "its not very good I think we need to rethink the animation
-   entirely the legs jump up last second everytime thats the issue of jankiness", then stopped for the day).** Built
-   and filmed: (a) the smoothed ground line in world heights (`GroundBend.line`, `RAMP` 0.08, `CLEAR`
-   0.3): the bounce went (biggest per-sample height jump on the course 0.11 to 0.22 blocks before, 0.015 to 0.04
-   after); (b) feet reach by swinging the upper leg at the shoulder (`client/LegSwing`, up to about 10 px up, 4 down)
-   instead of sliding it; the foot stands on the highest ground its toes find 0.3 blocks ahead (`GroundBend.TOES`);
-   (c) the user's idea, the torso raised as one piece to higher ground ahead (`GroundBend.raise`). What the side films
-   (`tools/film/look/`, low side camera) showed: the monitor is 4.5 blocks long and a step is three times its
-   shoulder height, so with both pairs of feet on the ground the trunk must tilt about 45 degrees for about a block of
-   walking (2 s at its stroll); the snout is a block ahead of the forefeet, so the head must rise before the feet
-   arrive. The look still fails because the **feet jump up at the last moment**: each foot follows the walk clip's
-   fixed stride and only finds the step when its own place crosses the edge, so it pops up as the body is already
-   reared. Lesson for the rethink: the feet must be placed by where the step is (each foot's next landing chosen
-   onto the step, the body following the feet), not the body bent first and the feet patched after; the climb is a
-   move of its own, timed from the feet (idea (c) above), not a pose worked out each frame.
-   **Rethought, 2026-11-19 (plan only, the user's go): `docs/plans/engine-step2-feet-first.md`.** Each foot holds its
-   spot on the ground and picks where it lands next; the body is held up by where the feet are. Steps 3 and 4 wait for
-   it (both ride on planted feet).
-   **Started over, 2026-11-19 (the user: "start over completely ... from scratch" on going up and down a block; walk,
-   hiss, bite, eyelids good): `docs/plans/engine-step2-climb.md`, replacing the feet-first plan (its unfinished stage A
-   kept on branch `claude/monitor-feet-first-tries`).** The climb is a move of its own, made once for a one-block step
-   (every Minecraft step is the same), the game moving the monitor along the move's own path; the user's idea at its
-   heart: it rears up first, then pushes itself up with its feet on the block. The tail becomes a chain dragged from
-   the hips (follows the path, drapes over edges). Stages: A the tail, B up, C down, D hills and clean-up.
-3. **The back curves sideways.** The `walk` and `swim` clips swing shoulders and hips opposite ways across the three
-   trunk pieces (`tools/monitor_models.py`), the S-curve; the lab's checks extended to four legs and a tail (K5).
-4. **Smooth water entry.** The `enter` clip and its start rule go; legs and tail blend from walking to swimming by
-   how much of the body is really afloat, each leg pair walking until its own feet lose the bottom; the fall and bob
-   into the water and the hop out made a steady glide. **Built for the monitor 2026-11-19 the climbs' way instead
-   (the user's ask): six moves of their own (walk in, dash in, slide in off a block, dive in off two, swim out onto a
-   level bank, climb out a block up), each leg hanging as it loses the bottom and folding a while after (the user's
-   rethink); `docs/plans/engine-step4-water.md`; checker `tools/water_check.py`, films
-   `tools/film/monitor_water_*_frames.film`. Not yet tried in-game by the user.**
-5. **Prove it.** The course again, before and after side by side; guard films for the monitor and crocodile; then the
-   user tries it in-game.
+## The plan (rethought 2026-11-20 for every animal)
+**Why rethought (the user, 2026-11-20: "it should be for every single animal insect fish bird").** The rules and the
+families table above were written for every animal, but the old plan's steps were the monitor's, and the work followed
+the steps: the climb became the monitor's own (`savanna/.../animal/MonitorClimb.java`), the water moves the monitor's
+own, and each animal got its own offline checker (`climb_check.py`, `water_check.py`, `croc_check.py`,
+`frog_check.py`). The barb, the fly clouds and the bullfrog were made beside the engine, not through it. The old plan
+said step 2 would build "the shared version, not a monitor-only one"; it did not. This plan puts every animal first and
+the monitor's leftovers in its own row.
 
-**Phase 2 onward: one family per new animal**, in whatever order the user picks animals (the table above), each
-starting with the workshop's stages and ending with its family's piece built, checked by the course, and its own
-course scenes added. The review's ideas come in with the animal that needs them: G1 and G4 with the first animal
-that needs the insect engine or the live layer, A1 and A2 with the first upright four-legged one, flight with the
-first bird, K1 and K6 as soon as clip making feels slow.
+**What the monitor taught, kept as the engine's methods** (each proved on it; how-tos in the plans named):
+- **M1. Moves of their own for Minecraft's fixed shapes.** Every step is one block and every bank edge alike, so going
+  up a step, down a step, into the water and out of it are moves made once (per animal, per size), the game moving the
+  animal along the move's own path. Bending a body to the ground every frame failed twice (the two strikes,
+  2026-11-19: the feet jumped up at the last moment); the move made once was confirmed in-game ("it look perfect
+  now"). `docs/plans/engine-step2-climb.md`, `docs/plans/engine-step4-water.md`.
+- **M2. The body hangs from where it really is.** The tail a chain dragged after the hips, draping over edges and lying
+  on the water (`framework/.../entity/body/TailDrag`, `client/DraggedTail`); legs hanging as they lose the bottom and
+  folding a while after.
+- **M3. Checked offline as the game draws it, then in the game frame by frame from three sides** (the hard rule
+  below), and the look in the game matched to the approved viewer version from the same camera (`tools/game_compare.py`,
+  `docs/plans/model-workshop.md`, "Lesson").
+- **M4. A clip's play speed changes its rate, never its position** (`framework/.../entity/body/SteadyController`, BUGS
+  232 and 234; already shared by every animal).
+
+### The path every animal goes through (new or old)
+1. The workshop's stages with the user's OK: brief, outline, plain 3D shape, detail, paint (`docs/plans/model-workshop.md`).
+2. A body plan (`assets/.../body_plans/<animal>.json`) naming its family, legs, feet, body chain, jaw, wings or fins:
+   everything the checks read. No checker learns an animal by its name.
+3. Its clips, checked by the one offline checker (step A) as the game draws them.
+4. Its family's course scenes (step A), run and read before the user sees it.
+5. If it walks on land: its own moves for a step up, a step down, into and out of the water (step B), or a reason it
+   needs none (a frog's hop already clears a block).
+6. In the game, frozen and stepped, from three sides; its look compared with the approved version (`game_compare.py`).
+7. If it spawns by itself: the spawning check list (CLAUDE.md).
+8. The user tries it in-game.
+
+### The steps (in this order; each builds the shared piece, the animal it is proved on is named)
+**A. One checker and one course for any animal.**
+- `tools/clip_check.py` (name my pick) in place of the four checkers: reads the clip files the game reads and the
+  body plan, any number of legs (none for a snake), any chain length. Its checks are the four old ones' put together:
+  parts under the ground or inside the step, where the snout, back and tail lie against the water's surface, feet out
+  of their leg's reach, planted feet sliding, knees and elbows into the body, the jaw opening, the biggest jump of any
+  part between frames, the fastest joint turn; film strips from the side, three quarters and the front. What differs
+  per animal (which clips are in water, on land or dug in; where the water's surface is when it floats; when a jump
+  means it to be off the ground) goes in its body plan, not the checker.
+- The monitor's moves are made in memory by its maker today; the checker reads them from the game's files like every
+  other clip (rule 1: the game's files are the truth).
+- Done when the monitor, crocodile and bullfrog give the same findings through it as through their old checkers; then
+  the old four go (rule 8: every check they had lives on in the new one).
+- The course (`tools/body_course.py`, already any animal) gets scenes by family, not by animal: walkers (today's
+  steps, banks and turn), swimmers (open water, the shallows, coming up for air, a school turning), hoppers (hops on
+  the flat, over a step, into and out of water); fliers when the first flier comes. The fish, crab and snail join it.
+
+**B. Shared moves in the framework.**
+- `MonitorClimb` becomes a species-neutral move player in `framework/.../entity/body/` (`BlockMoves`, my pick): it
+  plays any animal's moves (the path tables, how far ahead the edge must be, the splash tick, starting or ending
+  afloat, the sizes), never naming one. The general half of the monitor's move maker (the path writer, the sizes, the
+  Java table writer) moves into `tools/model_parts.py`; each animal's moves stay its own clips and paths (rule 5: the
+  monitor rears and pushes up, a crocodile shoves its belly over, a frog hops).
+- The monitor moves onto it unchanged (its game files byte for byte the same, its course the same).
+- Hills (steps every one to three blocks, the old stage D): one move running into the next without a stop, proved on
+  the course's `stairs`.
+- Then the rules the moves replaced are removed, not kept beside them (old stage D's clean-up): the step parts of
+  `GroundBend` and `EdgeOver` for the monitor, then for the crocodile when it has moves of its own.
+
+**C. Every built animal through the path, one row each** (what the checker and course find is fixed or written into
+`docs/BUGS.md`):
+| Animal | Its to-dos |
+|---|---|
+| Nile monitor | its in-game test of the climb down and the water moves (built, not tried); hills (B); the back's S-curve (old step 3: shoulders and hips turning opposite ways in the walk and swim, on planted feet) |
+| Crocodile (and its young) | moves of its own on the shared player (B), off the old step rules; the neck snap at the water (baseline 5); BUGS 243 (a hatchling sinks and sits); game faces (BUGS 245) |
+| Bullfrog | through the one checker and the hopper scenes; its polish plan (`docs/plans/bullfrog-polish.md`) goes on as planned |
+| Tilapia, catfish, barb | swimmer scenes; the body's sideways wave checked (the fish family's piece) |
+| Crab, river snail | walker scenes on the bed and banks (sideways walking for the crab, the foot's glide for the snail) |
+| Fly clouds | a swarm, not a body: its own films only |
+| Remains | still, nothing to move: the look check only |
+
+**D. Families as their first animal arrives** (the families table above). Each adds its course scenes, its checks in
+the one checker, and its own shared piece: the snake's wave, flight, the gallop, the coil, and the insect engine freed
+from the ant class (G1) with the first six- or eight-legged animal that is not a colony insect. Ants and termites stay
+untouched (guard films: no changed pictures).
+
+**Done for the engine (for now):** A, B and C built; the user has tried the monitor, crocodile and bullfrog in-game.
+From then on every new animal is only the path above plus its family's piece.
+
+### How phase 1 went (the monitor, 2026-11-19; the old steps, for the record)
+1. **The measuring course: built** (`tools/body_course.py`, the camera's `BodyRecorder`; the baseline above).
+2. **The body over block steps:** first tries (a smoothed ground line, leg swing, toes reaching, the torso raised as one)
+   filmed and not kept (branch `claude/monitor-step2-tries`; the feet jumped up at the last moment); a feet-first plan
+   (`docs/plans/engine-step2-feet-first.md`, stage A kept on `claude/monitor-feet-first-tries`); then started over as a
+   move of its own (`docs/plans/engine-step2-climb.md`): stage A the dragged tail, B the climb up (confirmed in-game),
+   C the climb down (liked on the films, not tried in-game) built; D (hills, clean-up) not built, now step B above.
+3. **The back's S-curve:** not built, now in the monitor's row.
+4. **Into and out of the water:** built as six moves (`docs/plans/engine-step4-water.md`), not tried in-game.
+5. **Prove it:** not done, now part of step C.
 
 ## Decisions and open calls
 - **Decided (the user, 2026-11-19):** step 1 is built as the shared version for every animal. Built 2026-11-19.
 - **Decided (the user, 2026-11-19):** the giant African millipede and the rest of the master list are part of the
   engine's design from the start (the families table above).
-- Open: which animal after the monitor (decides which family is built next).
+- **Decided (the user, 2026-11-20):** the plan is rethought for every animal (insects, fish, birds, all): the path every
+  animal goes through, then steps A (one checker and course), B (shared moves), C (every built animal through it), D
+  (families as they come). The monitor's leftovers are its own row in C.
+- Open: which animal after the monitor (decides which family is built next). The bullfrog and the barb came first in
+  practice; step C brings them in.
 - Open: the size scale for small creatures (above).
 
 ## Hard rule: offline and in-game checks for every animation (the user, 2026-11-19)
