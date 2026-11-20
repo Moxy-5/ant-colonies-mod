@@ -61,6 +61,7 @@ Every living thing in the mod, built or planned, plants and fungi included, in o
 - African clawless otter (playful, eats mostly crabs, feeling for them with its fingers under stones; also fish and frogs; a real link to our river crab): IDEA (user's list 2026-11-18).
 - River barb (small silver schooling prey fish, shallow water, flashes as it turns, bursts from a strike; food for young crocodiles and catfish; the tilapia cut back to make room): PLANNED 2026-11-20 (the user, "these sound perfect for right now"; `docs/plans/prey-fish-and-frogs.md`), waiting for the user's picture.
 - African bullfrog and tadpoles (big ambush frog of pans and slow edges, half dug into the mud by day, bites a player who keeps coming, deep calling and wrestling males, the father guarding his tadpole school; tadpoles graze the algae; food for young crocodiles, the monitor and catfish): PLANNED 2026-11-20 (the user's pick and picture, `references/inspiration/bullfrog.png`; same plan; was "river frog"). Was on the land list as "Giant African bullfrog".
+- Fly clouds (a cloud of 6 to 10 darting, buzzing flies drawn by one mob; bottle fly and house fly looks; food for the bullfrog's tongue, barbs and young crocodiles; later on remains, dung and termite flights): PLANNED 2026-11-20 (the user, "go for it"; `docs/plans/fly-clouds.md`), the look in the preview.
 - Minecraft's cod, salmon, squid: kept out of savanna rivers (BUILT).
 
 **5. Savanna land animals** (fun first; all IDEA unless marked)

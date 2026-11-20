@@ -1,0 +1,337 @@
+<title>Savanna Fly Cloud</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&family=Space+Grotesk:wght@500;700&display=swap">
+<style>
+/* Layout: one column, the living scene first and large, the controls under it, a short "what to watch" list last. */
+:root {
+  --bg: #eef1ec; --panel: #e2e8e1; --fg: #1b231f; --muted: #57655c; --line: #c9d3cb; --accent: #2c7d55; --on-accent: #ffffff;
+  --display: "Space Grotesk", "Segoe UI", system-ui, sans-serif;
+  --body: "Inter", "Segoe UI", system-ui, sans-serif;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) { --bg: #111714; --panel: #1a221e; --fg: #e2eae4; --muted: #9caaa1; --line: #2c3832;
+    --accent: #5cc48a; --on-accent: #0c1410; color-scheme: dark; }
+}
+:root[data-theme="dark"] { --bg: #111714; --panel: #1a221e; --fg: #e2eae4; --muted: #9caaa1; --line: #2c3832;
+  --accent: #5cc48a; --on-accent: #0c1410; color-scheme: dark; }
+body { background: var(--bg); color: var(--fg); font-family: var(--body); line-height: 1.5; }
+.page { max-width: 1100px; margin: 0 auto; padding-block: 20px 40px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+  display: grid; gap: 16px; }
+h1 { font-family: var(--display); font-weight: 700; font-size: 1.6rem; margin: 0; text-wrap: balance; }
+.lede { margin: 2px 0 0; color: var(--muted); max-width: 65ch; }
+#stage { position: relative; width: 100%; aspect-ratio: 16 / 10; max-height: 72vh; border-radius: 10px; overflow: hidden;
+  background: #bcd6dc; border: 1px solid var(--line); }
+#stage canvas { display: block; width: 100%; height: 100%; touch-action: none; }
+.scale { position: absolute; left: 10px; bottom: 8px; font: 600 12px/1.3 var(--body); color: #1b231f;
+  background: rgba(255, 255, 255, 0.72); padding: 4px 8px; border-radius: 6px; font-variant-numeric: tabular-nums; }
+.controls { display: flex; flex-wrap: wrap; gap: 12px 20px; align-items: center; }
+.group { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; min-width: 0; }
+.label { font-size: 0.72rem; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); }
+.seg { display: inline-flex; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; background: var(--panel); }
+.seg button { font: 600 0.88rem var(--body); color: var(--fg); background: transparent; border: 0; padding: 7px 12px;
+  cursor: pointer; }
+.seg button + button { border-left: 1px solid var(--line); }
+.seg button[aria-pressed="true"] { background: var(--accent); color: var(--on-accent); }
+.seg button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+input[type="range"] { accent-color: var(--accent); width: 130px; }
+.count { font-variant-numeric: tabular-nums; min-width: 2ch; font-weight: 600; }
+.notes { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px; }
+.note { background: var(--panel); border-radius: 8px; padding: 12px 14px; min-width: 0; }
+.note h2 { font: 600 0.95rem var(--display); margin: 0 0 4px; }
+.note p { margin: 0; color: var(--muted); font-size: 0.9rem; }
+</style>
+
+<div class="page">
+  <header>
+    <h1>Savanna Fly Cloud</h1>
+    <p class="lede">A cloud of flies over a river bank, next to a bullfrog for scale. Drag to turn the view, pinch or
+      scroll to zoom. The sand cube under everything is one Minecraft block.</p>
+  </header>
+
+  <div id="stage">
+    <canvas id="scene" aria-label="A 3D scene of flies buzzing over a sand bank by the water, with a bullfrog"></canvas>
+    <div class="scale">Fly 0.1 blocks long · bullfrog 0.8</div>
+  </div>
+
+  <div class="controls">
+    <div class="group"><span class="label">View</span>
+      <div class="seg" id="view"><button id="view-cloud" data-v="cloud">Whole cloud</button><button id="view-close" data-v="close">Follow one fly</button><button id="view-still" data-v="still">Still fly</button></div></div>
+    <div class="group"><span class="label">Look</span>
+      <div class="seg" id="look"><button id="look-a" data-v="A">Bottle fly</button><button id="look-b" data-v="B">House fly</button><button id="look-mix" data-v="mix">Both</button></div></div>
+    <div class="group"><label class="label" for="count">Flies</label>
+      <input type="range" id="count" min="1" max="12" value="8"><span class="count" id="count-out">8</span></div>
+    <div class="group"><span class="label">Speed</span>
+      <div class="seg" id="speed"><button id="speed-1" data-v="1">Real time</button><button id="speed-q" data-v="0.25">Slow motion</button></div></div>
+  </div>
+
+  <div class="notes">
+    <div class="note"><h2>Darting and hovering</h2><p>Each fly zips to a new spot every fifth to half a second,
+      overshoots a little, stops dead and hovers with a small wobble, often turning on the spot.</p></div>
+    <div class="note"><h2>Wing buzz</h2><p>The see-through wings swap between two angles every frame, so they read as a
+      blur. Landed flies fold them back in a V over the body.</p></div>
+    <div class="note"><h2>Still fly</h2><p>One landed fly on a stone away from the cloud, turning slowly, to judge
+      the paint up close: the eyes, the sheen, the wings.</p></div>
+    <div class="note"><h2>Landing</h2><p>Now and then a fly lands on the bank for a few seconds, shuffles round and
+      often rubs its front legs together before taking off again.</p></div>
+  </div>
+</div>
+
+<!--VIEWER-->
+<script>
+const D = /*DATA*/null;
+(() => {
+  const canvas = document.getElementById('scene'), wrap = document.getElementById('stage');
+  const renderer = new THREE.WebGLRenderer({canvas, antialias: true, preserveDrawingBuffer: true});
+  renderer.setPixelRatio(Math.min(2, window.devicePixelRatio || 1));
+  renderer.shadowMap.enabled = true;
+  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+  const scene = new THREE.Scene();
+  const SKY = new THREE.Color('#bcd6dc');
+  scene.background = SKY;
+  scene.fog = new THREE.Fog(SKY, 4, 11);
+  const camera = new THREE.PerspectiveCamera(40, 1, 0.004, 40);
+  const controls = new THREE.OrbitControls(camera, canvas);
+  controls.enableDamping = true;
+  controls.dampingFactor = 0.12;
+  scene.add(new THREE.HemisphereLight('#fff6e0', '#6f6248', 0.85));
+  const sun = new THREE.DirectionalLight('#fff1d0', 0.75);
+  sun.position.set(1.6, 4, 1.2);
+  sun.castShadow = true;
+  sun.shadow.mapSize.set(2048, 2048);
+  sun.shadow.bias = -0.0004;
+  Object.assign(sun.shadow.camera, {left: -1.6, right: 1.6, top: 1.6, bottom: -1.6, near: 0.5, far: 8});
+  scene.add(sun);
+
+  // --- the bank and the water, at Minecraft's scale (a 16-pixel texture to a block) ---------------------------------
+  function blockTexture(base, spread, seed) {
+    const c = document.createElement('canvas'); c.width = c.height = 16;
+    const x = c.getContext('2d');
+    let s = seed;
+    const rnd = () => (s = (s * 16807) % 2147483647) / 2147483647;
+    for (let i = 0; i < 16; i++) for (let j = 0; j < 16; j++) {
+      const k = (rnd() - 0.5) * spread;
+      x.fillStyle = `rgb(${base[0] + k},${base[1] + k * 0.9},${base[2] + k * 0.7})`;
+      x.fillRect(i, j, 1, 1);
+    }
+    const t = new THREE.CanvasTexture(c);
+    t.magFilter = t.minFilter = THREE.NearestFilter;
+    t.wrapS = t.wrapT = THREE.RepeatWrapping;
+    return t;
+  }
+  const sand = blockTexture([196, 176, 132], 34, 7), mud = blockTexture([112, 92, 66], 30, 11);
+  for (let i = -3; i <= 0; i++) for (let k = -2; k <= 1; k++) {        // the bank: whole blocks, top at y 0
+    const b = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), new THREE.MeshLambertMaterial({map: i === 0 ? mud : sand}));
+    b.position.set(i + 0.5 - 0.7, -0.5, k + 0.5);
+    b.receiveShadow = true;
+    scene.add(b);
+  }
+  const bed = new THREE.Mesh(new THREE.BoxGeometry(3, 1, 4), new THREE.MeshLambertMaterial({map: mud}));
+  bed.position.set(1.8, -1.5, 0); bed.receiveShadow = true; scene.add(bed);
+  mud.repeat.set(1, 1);
+  const water = new THREE.Mesh(new THREE.BoxGeometry(3, 0.875, 4),
+    new THREE.MeshLambertMaterial({color: '#3d74a8', transparent: true, opacity: 0.62, depthWrite: false}));
+  water.position.set(1.8, -0.125 - 0.4375, 0); water.receiveShadow = true; scene.add(water);
+
+  // --- the bullfrog, sitting on the bank facing the water -------------------------------------------------------------
+  const frog = Viewer.buildModel(D.frog, scene);
+  frog.scale.setScalar(D.frogScale);
+  frog.position.set(-0.42, 0, 0.18);
+  frog.rotation.y = -Math.PI / 2;
+
+  // --- the flies --------------------------------------------------------------------------------------------------------
+  const CENTRE = new THREE.Vector3(0.3, 0.42, 0.05);
+  const RADIUS = new THREE.Vector3(0.5, 0.24, 0.5);
+  const centre = new THREE.Vector3();
+  let flies = [], frame = 0, t = 0, speed = 1, look = 'A', view = 'cloud';
+
+  function inEllipsoid(out) {
+    let x, y, z;
+    for (let tries = 0; tries < 20; tries++) {
+      do { x = Math.random() * 2 - 1; y = Math.random() * 2 - 1; z = Math.random() * 2 - 1; } while (x * x + y * y + z * z > 1);
+      out.set(centre.x + x * RADIUS.x, Math.max(0.06, centre.y + y * RADIUS.y), centre.z + z * RADIUS.z);
+      if (!(out.x < 0.05 && out.x > -0.9 && Math.abs(out.z - 0.18) < 0.38 && out.y < 0.45)) break;   // not in the frog
+    }
+    return out;
+  }
+
+  function makeFly(key, i) {
+    const m = Viewer.buildModel(D.looks[key], scene);
+    scene.remove(m);
+    const holder = new THREE.Group();
+    holder.add(m);
+    holder.scale.setScalar(D.flyScale);
+    scene.add(holder);
+    const wingMat = new THREE.MeshLambertMaterial({map: m.userData.meshes[0].material.map, transparent: true,
+      depthWrite: false, side: THREE.DoubleSide, alphaTest: 0.01});
+    m.userData.meshes.forEach(mesh => {
+      if (mesh.userData.bone.startsWith('wing')) { mesh.material = wingMat; mesh.castShadow = false; }
+    });
+    const f = {holder, g: m.userData.groups, wingMat, pos: new THREE.Vector3(), vel: new THREE.Vector3(),
+               acc: new THREE.Vector3(), target: new THREE.Vector3(), mode: 'fly', timer: Math.random() * 0.4,
+               yaw: Math.random() * 6.28, yawT: 0, perch: 0, rub: 0, rubAt: 0, seed: i * 1.7, flick: i % 2};
+    f.yawT = f.yaw;
+    inEllipsoid(f.pos); f.target.copy(f.pos); holder.position.copy(f.pos);
+    return f;
+  }
+
+  function rebuild() {
+    flies.forEach(f => scene.remove(f.holder));
+    const n = +document.getElementById('count').value;
+    flies = [];
+    for (let i = 0; i < n; i++) flies.push(makeFly(look === 'mix' ? (i % 2 ? 'B' : 'A') : look, i));
+  }
+
+  function retarget(f) { inEllipsoid(f.target); f.timer = 0.18 + Math.random() * 0.45; }
+
+  function startLanding(f) {
+    f.mode = 'landing';
+    // a spot on the bank near the cloud, clear of the frog
+    do { f.target.set(-0.95 + Math.random() * 1.15, 0, -0.55 + Math.random() * 1.1); }
+    while (Math.hypot(f.target.x + 0.42, f.target.z - 0.18) < 0.42);
+  }
+
+  function spring(f, k, c, dt) {
+    f.acc.copy(f.target).sub(f.pos).multiplyScalar(k).addScaledVector(f.vel, -c);
+    f.vel.addScaledVector(f.acc, dt);
+    const sp = f.vel.length();
+    if (sp > 3.2) f.vel.multiplyScalar(3.2 / sp);
+    f.pos.addScaledVector(f.vel, dt);
+  }
+
+  const angle = (a, b, rate) => { let d = b - a; d = Math.atan2(Math.sin(d), Math.cos(d)); return a + d * Math.min(1, rate); };
+
+  function pose(g, r) { Viewer.setRot(g, r); }
+
+  function update(f, dt) {
+    if (f.mode === 'fly') {
+      f.timer -= dt;
+      if (f.timer <= 0) {
+        const down = flies.filter(o => o.mode !== 'fly').length;
+        if (Math.random() < 0.06 && down < flies.length / 2) startLanding(f); else retarget(f);
+      }
+      spring(f, 75, 9.5, dt);
+    } else if (f.mode === 'landing') {
+      spring(f, 30, 9, dt);
+      if (f.pos.distanceTo(f.target) < 0.008 && f.vel.length() < 0.2) {
+        f.mode = 'perched'; f.pos.copy(f.target); f.vel.set(0, 0, 0); f.acc.set(0, 0, 0);
+        f.perch = 1.4 + Math.random() * 3; f.rubAt = 0.3 + Math.random() * 0.6;
+        f.rub = Math.random() < 0.65 ? 0.7 + Math.random() * 1.0 : 0;
+      }
+    } else {
+      f.perch -= dt; f.rubAt -= dt;
+      if (f.rubAt < 0 && f.rub > 0) f.rub -= dt;
+      if (Math.random() < dt * 0.7) f.yawT += (Math.random() - 0.5) * 1.6;
+      if (f.perch <= 0) { f.mode = 'fly'; f.vel.set(Math.random() - 0.5, 1.6, Math.random() - 0.5); retarget(f); }
+    }
+    // heading: into the dash, or turning on the spot while hovering
+    const hs = Math.hypot(f.vel.x, f.vel.z);
+    if (f.mode !== 'perched' && hs > 0.3) f.yawT = Math.atan2(-f.vel.x, -f.vel.z);
+    else if (f.mode === 'fly' && Math.random() < dt * 1.6) f.yawT += (Math.random() - 0.5) * 2.2;
+    f.yaw = angle(f.yaw, f.yawT, dt * 18);
+    // lean: nose down speeding up, rolled into a turn
+    const fx = -Math.sin(f.yaw), fz = -Math.cos(f.yaw), lx = Math.cos(f.yaw), lz = -Math.sin(f.yaw);
+    const fwd = f.acc.x * fx + f.acc.z * fz, lat = f.acc.x * lx + f.acc.z * lz;
+    const clamp = (v, a) => Math.max(-a, Math.min(a, v));
+    const tiltX = f.mode === 'perched' ? 0 : clamp(-fwd * 0.012, 0.4);
+    const tiltZ = f.mode === 'perched' ? 0 : clamp(-lat * 0.01, 0.5);
+    const s = f.seed, flying = f.mode !== 'perched';
+    f.holder.position.copy(f.pos);
+    if (f.mode === 'fly') f.holder.position.add(new THREE.Vector3(0.011 * Math.sin(11 * t + s), 0.008 * Math.sin(14 * t + 2 * s),
+                                                                    0.011 * Math.sin(9 * t + 3 * s)));
+    f.holder.rotation.set(tiltX, f.yaw, tiltZ, 'YXZ');
+    // wings: a blur of two angles while flying, folded back in a V when landed
+    const up = (frame + f.flick) % 2 === 0;
+    for (const [side, sg] of [['left', 1], ['right', -1]]) {
+      const g = f.g['wing_' + side];
+      pose(g, flying ? (up ? [0, sg * 74, -sg * 48] : [0, sg * 86, sg * 22]) : g.userData.rest);
+    }
+    f.wingMat.opacity = flying ? 0.72 : 1;
+    // legs: hanging under it in flight, standing when landed, the front pair rubbing now and then
+    for (let i = 1; i <= 3; i++) for (const [side, sg] of [['left', 1], ['right', -1]]) {
+      const g = f.g[`leg_${side}_${i}`], r = g.userData.rest;
+      if (flying) pose(g, [r[0], r[1] * 0.4 - sg * 18, sg * 42]);
+      else if (i === 1 && f.rub > 0 && f.rubAt < 0) pose(g, [0, sg * (80 + 12 * Math.sin(26 * t)), -sg * 34]);
+      else pose(g, r);
+    }
+  }
+
+  // --- the still fly: one landed fly on a stone, turning slowly, for judging the paint ---------------------------------
+  const STONE = new THREE.Vector3(-1.6, 0.0625, -1.1);
+  const stone = new THREE.Mesh(new THREE.BoxGeometry(0.25, 0.125, 0.25), new THREE.MeshLambertMaterial({map: blockTexture([128, 126, 120], 30, 5)}));
+  stone.position.set(STONE.x, 0, STONE.z); stone.receiveShadow = true; stone.castShadow = true; scene.add(stone);
+  let still = null;
+  function makeStill() {
+    if (still) scene.remove(still.holder);
+    still = makeFly(look === 'B' ? 'B' : 'A', 0);
+    still.holder.position.copy(STONE).setY(0.125);
+  }
+  function updateStill(dt) {
+    still.yaw += dt * 0.35;
+    still.holder.rotation.set(0, still.yaw, 0);
+    for (const side of ['left', 'right']) pose(still.g['wing_' + side], still.g['wing_' + side].userData.rest);
+    still.wingMat.opacity = 1;
+  }
+
+  // --- the camera ---------------------------------------------------------------------------------------------------
+  const followed = new THREE.Vector3();
+  function setView(v) {
+    view = v;
+    document.querySelectorAll('#view button').forEach(b => b.setAttribute('aria-pressed', b.dataset.v === v));
+    if (v === 'cloud') { camera.position.set(0.95, 0.62, 1.2); controls.target.set(-0.1, 0.25, 0.05); }
+    else if (v === 'still') { controls.target.set(STONE.x, 0.16, STONE.z);
+           camera.position.set(STONE.x + 0.2, 0.27, STONE.z + 0.24); }
+    else { const f = flies[0]; followed.copy(f.holder.position); controls.target.copy(followed);
+           camera.position.copy(followed).add(new THREE.Vector3(0.42, 0.16, 0.46)); }
+    controls.update();
+  }
+
+  function resize() {
+    const w = wrap.clientWidth, h = wrap.clientHeight;
+    renderer.setSize(w, h, false);
+    camera.aspect = w / h; camera.updateProjectionMatrix();
+  }
+  window.addEventListener('resize', resize);
+
+  let last = performance.now();
+  function loop() {
+    const now = performance.now(), dt = Math.min(0.05, (now - last) / 1000) * speed;
+    last = now; t += dt; frame++;
+    centre.copy(CENTRE).add(new THREE.Vector3(0.2 * Math.sin(0.13 * t), 0.05 * Math.sin(0.21 * t), 0.25 * Math.sin(0.09 * t + 1)));
+    flies.forEach(f => update(f, dt));
+    if (still) updateStill(dt);
+    if (view === 'close' && flies[0]) {          // keep the followed fly in the middle, the user's angle kept
+      const p = flies[0].holder.position, d = p.clone().sub(followed).multiplyScalar(0.25);
+      followed.add(d); controls.target.add(d); camera.position.add(d);
+    }
+    controls.update();
+    renderer.render(scene, camera);
+    requestAnimationFrame(loop);
+  }
+
+  function seg(id, value, on) {
+    const el = document.getElementById(id);
+    const mark = v => el.querySelectorAll('button').forEach(b => b.setAttribute('aria-pressed', b.dataset.v === String(v)));
+    el.addEventListener('click', e => { const b = e.target.closest('button'); if (b) { on(b.dataset.v); mark(b.dataset.v); } });
+    mark(value);
+  }
+  const reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  speed = reduce ? 0.25 : 1;
+  const start = location.hash.slice(1);
+  if (start === 'house') look = 'B';
+  if (start === 'both') look = 'mix';
+  if (start === 'still-house') look = 'B';
+  seg('look', look, v => { look = v; rebuild(); makeStill(); if (view === 'close') setView('close'); });
+  seg('speed', speed, v => { speed = parseFloat(v); });
+  seg('view', 'cloud', v => setView(v));
+  const count = document.getElementById('count'), out = document.getElementById('count-out');
+  count.addEventListener('input', () => { out.textContent = count.value; rebuild(); if (view === 'close') setView('close'); });
+  controls.minDistance = 0.06;
+  rebuild();
+  makeStill();
+  resize();
+  setView(['close', 'still'].includes(start) ? start : start === 'still-house' ? 'still' : 'cloud');
+  requestAnimationFrame(loop);
+})();
+</script>
