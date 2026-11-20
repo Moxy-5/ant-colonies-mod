@@ -213,6 +213,38 @@ def eye_bones(s):
     return {'name': name, 'parent': 'head', 'pivot': [s * (x0 + x1) / 2, y0, (z0 + z1) / 2], 'cubes': c}
 
 
+# The blink (the bullfrog polish, 2026-11-20; docs/plans/bullfrog-polish.md, step 2). A real frog blinks by pulling its
+# eyes down while a lower lid rises over them; the eye dipping alone read in the game as the eye ducking, never shutting.
+# So each eye gets a lower lid, in two pieces, standing a hair in front of the eye plate (LID_PROUD), at rest exactly
+# over the eye art's light lower-lid row so the approved look is unchanged:
+#   lid_<side>      the lid itself, the skin's colour, one pixel high, its pivot on its bottom edge: a blink stretches it
+#                   up LID_RISE pixels over the white and the pupil (scale, as the monitor's approved lids);
+#   lid_rim_<side>  the lid's light edge, painted from that lower-lid row, a hair in front of the lid: a blink slides it
+#                   up with the lid's top edge (stretched, a one-row lid read as a blank patch: the first film).
+# Shut, the eye reads brow, dark upper lid line, light lid edge, skin: a closed eye. Both are children of the eye (they
+# ride the swallow's eye pull) and are moved by the blink clip only (a layer of its own in the game, in every pose).
+LID_ROW, LID_FROM, LID_SIDE_TO, LID_PROUD, LID_RISE = 4, 2, 7, 0.1, 3.0
+
+
+def lid_bones(s):
+    """One eye's lower lid and its rim (s = 1 left, -1 right): from front column LID_FROM round the corner to side
+    column LID_SIDE_TO of the art's lower-lid row, a pixel high."""
+    look = EYE_LOOKS[EYE_LOOK]
+    (x0, x1), (y0, y1), (z0, z1) = look['box']
+    w = x1 - x0
+    row = look['strip'][LID_ROW]
+    top = y1 - LID_ROW                                     # the row's top edge (rows count down from the plate's top)
+    side = 'left' if s > 0 else 'right'
+    pivot = [s * (x0 + x1) / 2, top - 1, (z0 + z1) / 2]
+    bones = []
+    for name, proud, art in ((f'lid_{side}', LID_PROUD, 'g' * len(row)), (f'lid_rim_{side}', 2 * LID_PROUD, row)):
+        xa, xb = sorted((s * (x0 + LID_FROM), s * (x1 + proud)))
+        c = cube([xa, top - 1, z0 - proud], [xb, top, z0 + LID_SIDE_TO], 'eye')
+        c['_eye'] = {'s': s, 'x_in': s * x0, 'y1': top, 'z0': z0, 'front': (art[:w],), 'outer': (art[w:],)}
+        bones.append({'name': name, 'parent': f'eye_{side}', 'pivot': pivot, 'cubes': [c]})
+    return bones
+
+
 ART = {'g': 'skin', 'w': 'eye_white', 'k': 'pupil', 'h': 'glint', 'd': 'lid_dark', 'l': 'lid_light'}
 
 
@@ -384,6 +416,7 @@ def model():
     ]
     for s in (1, -1):
         bones.append(eye_bones(s))
+        bones += lid_bones(s)
     bones += mouth_bones()
     for s in (1, -1):
         bones += front_leg(s) + hind_leg(s)
@@ -635,6 +668,9 @@ TONGUE_LEN, TONGUE_FLIP, TONGUE_STRETCH, TONGUE_GAPE, TONGUE_LEAN = 0.7, -3.5, 3
 CALL_LEN, PUFF_LEN, ATTACK_LEN, DEATH_LEN, DIG_LEN, DUG_LEN, DIG_OUT_LEN = 3.0, 2.0, 0.8, 1.0, 3.0, 6.0, 1.2
 WALK_SWEEP, WALK_DUTY, WALK_LIFT = 5.0, 0.7, 1.4       # each foot's sweep under the body, the time down, the body raised
 KNEE_OUT, ELBOW_OUT, KNEE_EASE = 1.6, 1.0, 2.5                         # knees and elbows pushed out, fully once a foot is 2.5 px from its rest (my picks, measured)
+BLINK_UP, BLINK_HOLD, BLINK_DOWN = 0.08, 0.06, 0.14       # the lids up, held shut, down (s; my picks: quick, a
+                                                        # touch slower opening, as the crocodile's)
+BLINK_LEN = BLINK_UP + BLINK_HOLD + BLINK_DOWN + 0.02
 DUG_DEPTH = 10.0                                        # how deep it sits dug in: the back and the eyes out
 
 
@@ -844,7 +880,7 @@ def clips():
         w = 2 * math.pi * t / IDLE_LEN
         P.body(p, pitch=0.8 * math.sin(w), roll=0.6 * math.sin(w + 1.0), lift=0.15 * math.sin(2 * w))
         P.all_rest(p)
-        _face(p, t, pump=_breath(t), blink=_blink(t, 2.2) + _blink(t, 4.9))
+        _face(p, t, pump=_breath(t))      # its blinks are the lids' own layer (the blink clip)
         return p
     make('idle', IDLE_LEN, idle)
 
@@ -969,7 +1005,7 @@ def clips():
             drift = 0.6 * math.sin(w + (0 if s > 0 else 1.5))
             P.limb(p, 'leg', side, [s * (19.0 + drift), 3.0 + drift * 0.5, 26.0], turn_y(-s * 150), in_body=True)
             P.limb(p, 'arm', side, [s * (16.0 + drift * 0.5), 3.0, -12.0], turn_y(s * 30), in_body=True)
-        _face(p, t, pump=_breath(t, 1.0), blink=_blink(t, 1.7))
+        _face(p, t, pump=_breath(t, 1.0))
         return p
     make('float', FLOAT_LEN, float_)
 
@@ -1106,7 +1142,7 @@ def clips():
     def dug(t):
         p = {}
         dig_pose(p, t, 1.0, 0.0)
-        _face(p, t, pump=0.6 * _breath(t, 0.8), blink=_blink(t, 3.1))
+        _face(p, t, pump=0.6 * _breath(t, 0.8))
         return p
     make('dug', DUG_LEN, dug)
 
@@ -1121,6 +1157,17 @@ def clips():
         _face(p, t, blink=_pulse(t, DIG_OUT_LEN * 0.5, 0.08, 0.2, 0.1))
         return p
     make('dig_out', DIG_OUT_LEN, dig_out, 30, False)
+
+    # blink: the lower lids (and their light rims) rise over the eyes and drop again (2026-11-20, the polish's step 2). Only the lids move, so
+    # the game plays it on a layer of its own over any other clip (BullfrogEntity's blink controller, every 4 to 10 s).
+    def blink(t):
+        shut = _pulse(t, 0.0, BLINK_UP, BLINK_HOLD, BLINK_DOWN)
+        p = {}
+        for _, side in SIDES:
+            p[f'lid_{side}'] = {'scale': [1.0, round(1.0 + LID_RISE * shut, 3), 1.0]}
+            p[f'lid_rim_{side}'] = {'position': [0.0, round(LID_RISE * shut, 3), 0.0]}
+        return p
+    make('blink', BLINK_LEN, blink, 60, False)
     return out
 
 
@@ -1134,7 +1181,8 @@ def WORKSHOP_CLIPS():
 WORKSHOP_CLIP_INFO = {
     'flight': {'hop': [0.12, 0.6], 'leap': [0.12, 0.7]}, 'scale': 0.32, 'water': ['swim', 'float'], 'surface': 0.7,
     'notes': {
-        'idle': 'Sitting: the throat pumping, a blink (it pulls its eyes down), a slow shift of weight.',
+        'idle': 'Sitting: the throat pumping, a slow shift of weight (its blinks are the blink clip, played over any pose).',
+        'blink': 'The blink: the lower lids rise over the eyes and drop. The game plays it over every pose, every 4 to 10 s.',
         'walk': 'The heavy crawl, one leg at a time; the game slides it forward so planted feet stay put.',
         'hop': 'A short hop: crouch, kick, fly stretched, land on its hands, fold up. The game throws it on this arc.',
         'leap': 'The long leap into the water from danger, nose down, arms forward; holds (the swim takes over).',

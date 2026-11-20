@@ -51,6 +51,11 @@ ANIMALS = {
     # teen a day into its teens (0.43); the grown body plan (same bones); bpt by CrocodileEntity.sizePace
     'croc_hatchling': dict(id='antcolonies:crocodile', plan='crocodile', walk=1.0, dash=1.9, bpt=0.059 * (0.07 / 0.7) ** 0.5,
                            data='Life:{Sex:"female",Age:0,Grown:0b,OwnSize:1.0f}'),
+    # the bullfrog (the hoppers, the polish's step 1, 2026-11-20): a male of size 1, never hungry on the course; it
+    # hops, so its pace is hops and rests (about 0.7 blocks a hop, a hop and rest about 18 ticks; my measure to check)
+    # (filmed at 8:00: at noon by water it digs in, at night males call)
+    'bullfrog': dict(id='antcolonies:bullfrog', data='Male:1b,HungryIn:99999', walk=1.0, dash=1.6, bpt=0.035,
+                     setup=['cmd time set 2000']),
     'croc_teen': dict(id='antcolonies:crocodile', plan='crocodile', walk=1.0, dash=1.9, bpt=0.059 * (0.43 / 0.7) ** 0.5,
                       data='Life:{Sex:"female",Age:168000,Grown:0b,OwnSize:1.0f}'),
 }
@@ -111,7 +116,7 @@ def write_films(animals):
         for scene, (about, setup, start, places, speed) in SCENES.items():
             x, y, z = start
             lines = [f'# The measuring course ({about}) for the {animal}: written by tools/body_course.py films, do not edit.',
-                     'lens 50'] + setup + [
+                     'lens 50'] + a.get('setup', []) + setup + [
                 f'walker {a["id"]} {x} {y} {z} -90 {a["data"]}',
                 'follow 0 3.5 -6 0 25',                  # from the north, a little above: the side of it, walking east
                 'cmd tick unfreeze',
@@ -134,7 +139,7 @@ def write_films(animals):
             out.append(path)
         # the real thing: its own mind, scared on a level bank, runs for the water
         lines = [f'# The measuring course (a real scare into water: its own mind, not sent) for the {animal}: written by '
-                 'tools/body_course.py films, do not edit.', 'lens 50', WATER_POOL, 'cmd tick unfreeze', 'wait 20',
+                 'tools/body_course.py films, do not edit.', 'lens 50'] + a.get('setup', []) + [WATER_POOL, 'cmd tick unfreeze', 'wait 20',
                  f'cmd summon {a["id"]} -4.5 {G} 0.5 {{{a["data"]},PersistenceRequired:1b,Rotation:[-90f,0f],'
                  "CustomName:'\"film-walker\"'}",
                  'wait 30', 'follow 0 3.5 -6 0 25', 'record on 3',

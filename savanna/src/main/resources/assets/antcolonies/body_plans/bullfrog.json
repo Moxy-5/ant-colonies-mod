@@ -1,0 +1,69 @@
+{
+  "model": "bullfrog",
+  "about": "The bullfrog's body plan (the Animal Maker Engine, the hoppers' family, 2026-11-20, the polish's step 1): its family, its body chain (head to rump) and its legs (front pair 1: upper arm, forearm, hand; hind pair 2: thigh, shin, foot). Read by tools/body_course.py and tools/body_plan.py; the game reads only its bones table.",
+  "family": "hopper",
+  "root": "root",
+  "forebody": "body",
+  "head": {
+    "bone": "head",
+    "jaws": [
+      "jaw"
+    ]
+  },
+  "chain": [
+    "head",
+    "body"
+  ],
+  "legs": {
+    "l1": [
+      "arm_left_1",
+      "arm_left_2",
+      "hand_left"
+    ],
+    "l2": [
+      "leg_left_1",
+      "leg_left_2",
+      "foot_left"
+    ],
+    "r1": [
+      "arm_right_1",
+      "arm_right_2",
+      "hand_right"
+    ],
+    "r2": [
+      "leg_right_1",
+      "leg_right_2",
+      "foot_right"
+    ]
+  },
+  "bones": {
+    "root": "root",
+    "body": "body",
+    "head": "head",
+    "jaw": "jaw",
+    "throat": "throat",
+    "eye_left": "eye_left",
+    "lid_left": "lid_left",
+    "lid_rim_left": "lid_rim_left",
+    "eye_right": "eye_right",
+    "lid_right": "lid_right",
+    "lid_rim_right": "lid_rim_right",
+    "mouth_floor": "mouth_floor",
+    "mouth_roof": "mouth_roof",
+    "tongue_1": "tongue_1",
+    "tongue_2": "tongue_2",
+    "tongue_pad": "tongue_pad",
+    "arm_left_1": "arm_left_1",
+    "arm_left_2": "arm_left_2",
+    "hand_left": "hand_left",
+    "leg_left_1": "leg_left_1",
+    "leg_left_2": "leg_left_2",
+    "foot_left": "foot_left",
+    "arm_right_1": "arm_right_1",
+    "arm_right_2": "arm_right_2",
+    "hand_right": "hand_right",
+    "leg_right_1": "leg_right_1",
+    "leg_right_2": "leg_right_2",
+    "foot_right": "foot_right"
+  }
+}

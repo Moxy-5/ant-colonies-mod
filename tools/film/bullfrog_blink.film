@@ -1,0 +1,39 @@
+# The bullfrog's blink (the polish's step 2, 2026-11-20): the lower lids rising over the eyes, filmed close and frozen,
+# one picture a tick, from the side, three quarters and the front (the cameras of bullfrog_eyes.film); then a frog
+# held still with its own idle and its own random blink layer, to see the blink played over another clip.
+#   ./gradlew runFilm -PfilmScene=tools/film/bullfrog_blink.film      pictures in run-film/screenshots/bullfrog_blink/
+cmd time set noon
+cmd weather clear
+cmd kill @e[type=!player]
+cmd fill 33 -60 11 40 -57 18 minecraft:air
+lens 40
+wait 40
+cmd summon antcolonies:bullfrog 36.5 -60.0 14.5 {NoAI:1b,PersistenceRequired:1b,Male:1b,Rotation:[-90f,0f],CustomName:'"film:blink"'}
+wait 10
+camera 37.158 -61.216 13.912 45 10
+wait 6
+cmd tick freeze
+burst blink_three 8 1
+cmd tick unfreeze
+camera 36.74 -61.32 13.73 0 0
+wait 6
+cmd tick freeze
+burst blink_side 8 1
+cmd tick unfreeze
+camera 37.34 -61.32 14.50 90 0
+wait 6
+cmd tick freeze
+burst blink_front 8 1
+cmd tick unfreeze
+camera 37.84 -61.38 14.50 90 0
+wait 6
+cmd tick freeze
+burst blink_head_front 8 1
+cmd tick unfreeze
+cmd tp @e[type=antcolonies:bullfrog] 36 -140 14
+wait 3
+# its own layer over the idle: a still frog not named for a clip blinks by itself every 4 to 10 s
+cmd summon antcolonies:bullfrog 36.5 -60.0 14.5 {NoAI:1b,PersistenceRequired:1b,Male:1b,Rotation:[-90f,0f]}
+camera 37.52 -61.19 13.72 45 10
+wait 10
+burst idle_layer 100 2

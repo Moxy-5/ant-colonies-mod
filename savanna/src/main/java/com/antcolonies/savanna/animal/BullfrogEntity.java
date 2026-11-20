@@ -494,9 +494,39 @@ public class BullfrogEntity extends Animal implements GeoEntity {
     private static final java.util.Map<String, RawAnimation> FILM_CLIPS = new java.util.HashMap<>();
     private int animatedActionId = -1;
 
+    private static final RawAnimation BLINK_CLIP = RawAnimation.begin().thenPlay("blink");
+    /** The blink clip's length (ticks, its 0.3 s), and the wait between blinks (ticks: 4 to 10 s; my picks). */
+    static final int BLINK_TICKS = 6, BLINK_GAP_MIN = 80, BLINK_GAP_MORE = 120;
+    // client: when the last blink began and the next is due (its own ticks)
+    private int blinkStart = -100, blinkNext = -1;
+
     @Override
     public void registerControllers(AnimatableManager.ControllerRegistrar controllers) {
         controllers.add(new SteadyController<>(this, "body", 3, this::animate));
+        controllers.add(new AnimationController<>(this, "blink", 0, this::blink));
+    }
+
+    /**
+     * The blink (the polish's step 2, 2026-11-20): the lower lids rise over the eyes every 4 to 10 seconds, a layer of
+     * its own over whatever the body is doing (the blink clip moves only the lids), so it blinks sitting, puffed up,
+     * floating, calling or dug in alike. None for a frog being filmed in a set clip, or a dead one.
+     */
+    private PlayState blink(AnimationState<BullfrogEntity> state) {
+        Component name = getCustomName();
+        if (isDeadOrDying() || name != null && name.getString().startsWith("film")) {
+            return PlayState.STOP;
+        }
+        if (blinkNext < 0) {
+            blinkNext = tickCount + BLINK_GAP_MIN + random.nextInt(BLINK_GAP_MORE);
+        } else if (tickCount >= blinkNext) {
+            blinkStart = tickCount;
+            blinkNext = tickCount + BLINK_GAP_MIN + random.nextInt(BLINK_GAP_MORE);
+            state.getController().forceAnimationReset();
+        }
+        if (tickCount - blinkStart > BLINK_TICKS + 1) {
+            return PlayState.STOP;
+        }
+        return state.setAndContinue(BLINK_CLIP);
     }
 
     private PlayState animate(AnimationState<BullfrogEntity> state) {
