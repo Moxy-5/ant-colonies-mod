@@ -218,11 +218,13 @@ function info(mode, hasB) {
 // sized to A, or to both when they stand nose to tail
 const L = () => model(settings.a, 'own').userData.length + (shownB && settings.mode === 'side' ? shownB.userData.length + GAP : 0);
 const Hh = () => model(settings.a, 'own').userData.height;
+// D: the size the cameras stand back by: the length, or for a short tall animal (a frog) its height, so it all fits
+const D = () => Math.max(L(), Hh() * 2.4);
 const CAMS = {
-  'three-quarter': () => [[-L() * 0.55, L() * 0.42, L() * 0.9], [0, Hh() * 0.4, -0.3]],
-  side: () => [[0, Hh() * 0.5, L() * 1.35], [0, Hh() * 0.5, 0]],
-  'from above': () => [[0, L() * 1.5, 0.01], [0, 0, 0]],
-  front: () => [[-L() * 1.1, Hh() * 0.6, 0.001], [0, Hh() * 0.5, 0]],
+  'three-quarter': () => [[-D() * 0.55, D() * 0.42, D() * 0.9], [0, Hh() * 0.4, -0.3]],
+  side: () => [[0, Hh() * 0.5, D() * 1.35], [0, Hh() * 0.5, 0]],
+  'from above': () => [[0, D() * 1.5, 0.01], [0, 0, 0]],
+  front: () => [[-D() * 1.1, Hh() * 0.6, 0.001], [0, Hh() * 0.5, 0]],
   'head, close': () => { const a = model(settings.a, 'own'), l = a.userData.length, x = a.position.x;
                          return [[x - l * 0.75, Hh() * 1.4, l * 0.35], [x - l * 0.4, Hh() * 0.7, 0]]; },
 };

@@ -136,6 +136,12 @@ user: a detailed webbed foot model comes later). Fun first, inspired by the real
 5. **Balance:** joins the animal life cycle's step 6 soak (counts of every river kind per game day level off; time per
    tick before and after), then the user's in-game test in a new world.
 
+## Progress
+- 2026-11-20: the barb's outline approved by the user ("the fish looks perfect"). The bullfrog's outline was hard to
+  judge as flat boxes over an AI picture drawn a little in perspective (the user), so its plain 3D shape was built
+  next (`tools/bullfrog_models.py`, v4) and set beside the sheet's side, angle and front views; waiting for the
+  user's look.
+
 ## My picks the user may change
 The barb's name and look, every size and number above (the bullfrog's size is the user's call), barbs with no hunger,
 grown crocodiles ignoring barbs, the bullfrog's bite of 1 heart, bullfrogs not eating colony insects.

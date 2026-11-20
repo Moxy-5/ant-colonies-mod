@@ -79,7 +79,7 @@ def main():
     a = ap.parse_args()
     page = Path(a.page) if Path(a.page).is_absolute() else ROOT / a.page
     out_dir = (Path(a.out).resolve() if a.out else ROOT / "references/viewer_shots" / page.stem)
-    with tempfile.TemporaryDirectory() as profile:
+    with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as profile:   # Edge may still hold a file in it
         if a.hash is not None:
             name = re.sub(r"[^a-z0-9]+", "_", a.hash.lower()).strip("_") or "page"
             state = shoot(page, a.hash, out_dir / f"{name}.png", a.size, profile, a.wait)
