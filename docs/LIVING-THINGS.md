@@ -18,6 +18,10 @@ Every living thing in the mod, built or planned, plants and fungi included, in o
 | `antcolonies:river_hunter` | 5 | within 96, gone past 128 | crocodile |
 | `antcolonies:river_bed` | 24 | within 96, gone past 128 | crab, snail |
 | `antcolonies:river_bank` | 2 | within 96, gone past 128 | Nile monitor (alone, 80 apart) |
+| `antcolonies:river_school` (PLANNED) | 40 | within 96, gone past 128 | river barb (schools of 8 to 14) |
+| `antcolonies:river_frog` (PLANNED) | 12 | within 96, gone past 128 | river frog and its tadpoles (groups of 2 to 4) |
+
+(PLANNED 2026-11-20 with the barb: `river_fish` cap 60 -> 36 and tilapia groups 2 to 4, to make room for the barbs; `docs/plans/prey-fish-and-frogs.md`.)
 
 **1. Colony insects (strict realism; each a species profile on the framework)**
 - Macrotermes (mound termite): workers, minor and major soldiers, king, queen BUILT; alates (winged) PLANNED (M9.5). Savanna mod.
@@ -55,6 +59,8 @@ Every living thing in the mod, built or planned, plants and fungi included, in o
 - Bull shark (comes up wide rivers from the sea; the coast and near-inland rivers only, the deep middle channel, alone and rare): IDEA (user's list 2026-11-16; river zones, `docs/DESIGN.md`, "River zones").
 - African lungfish (seals itself in a slime cocoon in drying mud, found by digging), annual killifish (eggs wait in dry mud, hatch when it rains): IDEA (mud pits, 2026-11-17; `docs/DESIGN.md`, "Mud pits and wallows").
 - African clawless otter (playful, eats mostly crabs, feeling for them with its fingers under stones; also fish and frogs; a real link to our river crab): IDEA (user's list 2026-11-18).
+- River barb (small silver schooling prey fish, shallow water, flashes as it turns, bursts from a strike; food for young crocodiles and catfish; the tilapia cut back to make room): PLANNED 2026-11-20 (the user, "these sound perfect for right now"; `docs/plans/prey-fish-and-frogs.md`), waiting for the user's picture.
+- River frog and tadpoles (sits at the waterline, leaps in from danger, calls in a chorus at dusk and hushes near a player; tadpoles graze the algae; food for young crocodiles, the monitor and catfish): PLANNED 2026-11-20 (same plan), waiting for the user's picture.
 - Minecraft's cod, salmon, squid: kept out of savanna rivers (BUILT).
 
 **5. Savanna land animals** (fun first; all IDEA unless marked)
