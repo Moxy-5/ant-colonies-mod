@@ -73,8 +73,11 @@ HEAD_FROM = 27.0         # the head and jaw bones start at the mouth's corner
 THROAT_BELOW = 6.0       # the throat bone is the jaw below this height
 ROUNDNESS = 2.4          # the cross-section's superellipse power: 2 an ellipse, higher squarer
 FLAT_BELLY = 0.5         # how much of the lower half keeps its full width
-EYE_AT, EYE_HEIGHT, EYE_APART, EYE_R = 34.3, 17.4, 5.0, 2.1
-EAR_AT, EAR_HEIGHT, EAR_R = 30.0, 13.6, 1.4
+# The eyes on the upper sides of the head looking out (the user, 2026-11-20, from the side photo: the front photo's
+# forward look was its angle): measured on the side photo, the eye 3 pixels long and 2.5 tall, its middle 16.3 high
+# and 7 back from the snout; EYE_APART is how far out its middle sits, EYE_R half its height.
+EYE_AT, EYE_HEIGHT, EYE_APART, EYE_R = 33.0, 16.3, 7.6, 1.4
+EAR_AT, EAR_HEIGHT, EAR_R = 27.6, 13.2, 1.2
 SLICE = 2.0
 LAYER = 2.0
 
@@ -143,25 +146,28 @@ def _box(cubes, x_a, x_b, y0, y1, z0, z1, part):
 
 
 def face(cubes):
-    """Eyes (a bump, the bronze eyeball, a lid ridge over it, a dark bar of a pupil looking out and forward),
-    eardrums behind them and the nostrils."""
+    """The eyes on the upper sides of the head, each a round eye facing out (a pale iris, a wide dark pupil), in a
+    swelling of the head's side, under a knobbly brow crest rising over the head's top line; the eardrum behind and
+    below each eye; the nostrils on the upper sides of the snout."""
     z = outline_z(EYE_AT)
+    y = EYE_HEIGHT
     for s in (1, -1):
-        ex = s * EYE_APART
-        ball(cubes, 1, [ex, EYE_HEIGHT - 0.6, z], EYE_R + 0.6, 'skin')            # the bump the eye sits in
-        ball(cubes, 0, [ex + s * 0.5, EYE_HEIGHT + 0.3, z - 0.6], EYE_R, 'eye')   # the eyeball, bulging up, out, forward
-        _box(cubes, ex - s * 1.6, ex + s * 1.4, EYE_HEIGHT + 1.5, EYE_HEIGHT + 2.3, z - 1.0, z + 2.0, 'skin')  # lid
-        po = ex + s * (0.5 + EYE_R)
-        _box(cubes, po - s * 0.1, po + s * 0.12, EYE_HEIGHT, EYE_HEIGHT + 0.7, z - 1.1, z + 1.1, 'pupil')   # side
-        _box(cubes, ex - s * 0.6, ex + s * 1.7, EYE_HEIGHT - 0.1, EYE_HEIGHT + 0.8, z - 0.6 - EYE_R - 0.12,
-             z - 0.6 - EYE_R + 0.2, 'pupil')                                                                # front
-        # the eardrum: a round patch flat on the side of the head behind the eye
+        surface = half_width_at(EYE_AT, y)                                     # the head's side at the eye
+        out = EYE_APART + EYE_R * 0.9                                          # the eye's outer face
+        _box(cubes, s * (surface - 1.6), s * (out - 0.3), y - 1.9, y + 1.7, z - 2.0, z + 2.0, 'skin')   # the swelling
+        _box(cubes, s * (out - 1.0), s * out, y - EYE_R * 0.8, y + EYE_R * 0.8, z - 1.7, z + 1.7, 'eye')  # the eye,
+        _box(cubes, s * (out - 1.0), s * out, y - EYE_R, y + EYE_R, z - 1.2, z + 1.2, 'eye')             # rounded
+        _box(cubes, s * out, s * (out + 0.1), y - 0.4, y + 0.45, z - 1.05, z + 1.05, 'pupil')           # wide pupil
+        # the brow: a low lid over the eye's top and a small knob on it, a pixel over the head's top line at most
+        _box(cubes, s * (EYE_APART - 1.2), s * (out + 0.05), y + EYE_R * 0.85, y + EYE_R + 0.9, z - 2.0, z + 1.0,
+             'skin')
+        _box(cubes, s * (EYE_APART - 0.6), s * (out - 0.6), y + EYE_R + 0.9, y + EYE_R + 1.5, z - 1.6, z + 0.2, 'skin')
         ez = outline_z(EAR_AT)
         side = half_width_at(EAR_AT, EAR_HEIGHT)
         _box(cubes, s * (side - 0.2), s * (side + 0.15), EAR_HEIGHT - EAR_R, EAR_HEIGHT + EAR_R, ez - EAR_R, ez + EAR_R,
              'ear')
-        nz, ny = outline_z(38.6), at(TOP, 38.6)
-        _box(cubes, s * 1.3, s * 2.0, ny - 0.3, ny + 0.15, nz - 0.35, nz + 0.35, 'pupil')                  # nostril
+        nz, ny = outline_z(37.2), at(TOP, 37.2)
+        _box(cubes, s * 2.0, s * 2.8, ny - 0.4, ny + 0.1, nz - 0.35, nz + 0.35, 'pupil')                  # nostril
 
 
 def chain(prefix, parent, joints, profiles, part):
@@ -248,7 +254,7 @@ PLAIN = {
     'leg': (100, 116, 56),
     'jaw': (196, 190, 92),        # yellow-green lip and lower jaw
     'throat': (226, 206, 112),    # pale yellow throat
-    'eye': (196, 160, 92),        # bronze
+    'eye': (226, 214, 180),       # a pale iris (the side photo)
     'pupil': (16, 14, 12),
     'ear': (74, 88, 46),          # the eardrum, a shade darker
     'toe': (176, 168, 110),
@@ -271,9 +277,9 @@ def plain_colour(c, face_, x, y, z):
 WORKSHOP_SHAPE = [
     ('ROUNDNESS', 'Cross-section squareness (2 round, 4 boxy)', 2.0, 4.0, 0.1),
     ('FLAT_BELLY', 'Flat belly (0 round, 1 flat)', 0.0, 0.9, 0.05),
-    ('EYE_HEIGHT', 'Eye height (model pixels)', 15, 20, 0.25),
-    ('EYE_APART', 'Eyes apart, each from the middle (model pixels)', 3.5, 7.5, 0.25),
-    ('EYE_R', 'Eye size (model pixels)', 1.2, 2.6, 0.1),
+    ('EYE_HEIGHT', 'Eye height (model pixels)', 14, 18, 0.25),
+    ('EYE_APART', 'Eye out from the middle (model pixels)', 5.5, 9, 0.25),
+    ('EYE_R', 'Eye size, half its height (model pixels)', 0.9, 1.8, 0.05),
 ]
 WORKSHOP_PARTS = {'head': ['head'], 'body': ['body'], 'front legs': ['arm_left_1', 'arm_right_1'],
                   'hind legs': ['leg_left_1', 'leg_right_1']}

@@ -149,6 +149,10 @@ user: a detailed webbed foot model comes later). Fun first, inspired by the real
   grumpy frown from the front), eyes high and close on top with lid ridges, eardrums, the arms down from under the jaw
   corners with the elbows back, the haunches folded at the sides; every leg a chain of turned round pieces from inside
   the body. v7, 405 boxes (round pieces in one-pixel slices for this small animal). The AI sheet stays for the colours.
+- 2026-11-20, the eyes (the user: the shape "looks perfect", the eyes are on the sides, the front photo's forward
+  look being its angle): moved to the upper sides of the head looking out, measured on the side photo (3 pixels long,
+  2.5 tall, middle 16.3 high and 7 behind the snout), a pale iris with a wide dark pupil, a low brow knob over each,
+  the eardrum behind and below, the nostrils on the snout's upper sides (v9, 363 boxes).
 
 ## My picks the user may change
 The barb's name and look, every size and number above (the bullfrog's size is the user's call), barbs with no hunger,

@@ -528,3 +528,4 @@ Every "Current status" bullet CLAUDE.md held up to 2026-11-19, word for word, ol
 - 2026-11-20: The bullfrog's size picked by the user: males 0.8 blocks long, females 0.65.
 - 2026-11-20: The barb's outline approved by the user. The bullfrog's plain 3D shape built (`tools/bullfrog_models.py`, v4) and set beside the user's sheet from the side, three quarters and the front; waiting for the user's look.
 - 2026-11-20: The bullfrog remade from the user's two real photos (v7, 405 boxes): a V head with the mouth sloping to its corner, joined bent legs, low long body; waiting for the user's look.
+- 2026-11-20: The bullfrog's shape confirmed by the user except the eyes; the eyes moved to the upper sides of the head looking out (v9).
