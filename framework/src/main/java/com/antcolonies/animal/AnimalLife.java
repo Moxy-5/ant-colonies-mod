@@ -4,6 +4,7 @@ import java.util.UUID;
 
 import org.jetbrains.annotations.Nullable;
 
+import com.antcolonies.colony.Colony;
 import com.antcolonies.season.Seasons;
 
 import net.minecraft.nbt.CompoundTag;
@@ -186,21 +187,42 @@ public final class AnimalLife {
 
     /**
      * Whether it is ready to breed: its kind breeds, it is grown, its wait since its last breeding is over, and the
-     * season ({@link Seasons}) and the weather are its kind's. Room to breed ({@link RoomToBreed}) is asked apart.
+     * season ({@link Seasons}), the weather and the time of day (the shared day clock) are its kind's. Room to breed ({@link RoomToBreed}) is asked apart.
      */
     public boolean readyToBreed() {
         LifeNumbers numbers = numbers();
-        if (!numbers.breeds() || readyIn > 0 || !stageNow().grown()) {
+        if (!ripe()) {
             return false;
         }
-        if (!numbers.seasons().contains(Seasons.now(mob.level(), mob.blockPosition()))) {
-            return false;
-        }
-        return switch (numbers.weather()) {
+        boolean raining = rainForTests != null ? rainForTests : mob.level().isRaining();
+        boolean weather = switch (numbers.weather()) {
             case ANY -> true;
-            case RAIN -> mob.level().isRaining();
-            case DRY -> !mob.level().isRaining();
+            case RAIN -> raining;
+            case DRY -> !raining;
         };
+        if (!weather || numbers.time() == LifeNumbers.Time.ANY) {
+            return weather;
+        }
+        boolean day = Colony.isSunUp(mob.level(), Colony.dayTimeAt(mob.level(), mob.blockPosition()));
+        return day == (numbers.time() == LifeNumbers.Time.DAY);
+    }
+
+    /** A test's own weather for breeding (true: raining, false: dry, null: the world's). Tests only. */
+    @Nullable
+    private static volatile Boolean rainForTests;
+
+    public static void setRainForTests(@Nullable Boolean raining) {
+        rainForTests = raining;
+    }
+
+    /**
+     * Whether it is ripe to breed, all but the weather and the time of day: its kind breeds, it is grown, its wait is
+     * over and it is its kind's season (a catfish female ripe with eggs looks plump while she waits for a rainy night).
+     */
+    public boolean ripe() {
+        LifeNumbers numbers = numbers();
+        return numbers.breeds() && readyIn <= 0 && stageNow().grown()
+                && numbers.seasons().contains(Seasons.now(mob.level(), mob.blockPosition()));
     }
 
     /** It has bred: the wait before it is ready again starts. */

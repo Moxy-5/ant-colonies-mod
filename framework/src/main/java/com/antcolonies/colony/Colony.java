@@ -492,6 +492,14 @@ public class Colony {
         return testTime != null ? testTime.dayTimeAt(level, center) : level.getDayTime();
     }
 
+    /**
+     * The day time at a spot by the one shared day clock (Level#getDayTime's scale; on the game test server, the spot's
+     * test clock): what anything outside a colony that goes by day and night asks (an animal's breeding time).
+     */
+    public static long dayTimeAt(net.minecraft.world.level.Level level, BlockPos pos) {
+        return testTime != null ? testTime.dayTimeAt(level, pos) : level.getDayTime();
+    }
+
     /** Game test server only: what each test's clock shows at a spot (Level#getDayTime's scale: 0 is 6:00, 1000 an hour). */
     public interface TestTime {
         long dayTimeAt(net.minecraft.world.level.Level level, BlockPos pos);

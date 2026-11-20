@@ -50,6 +50,15 @@ class LifeRulesTest {
     }
 
     @Test
+    void theCatfishSpawnsOnRainyNightsAndTheTimeDefaultsToAny() {
+        LifeNumbers n = file("{\"weather\": \"rain\", \"time\": \"night\"}");
+        assertEquals(LifeNumbers.Weather.RAIN, n.weather());
+        assertEquals(LifeNumbers.Time.NIGHT, n.time());
+        assertEquals(LifeNumbers.Time.ANY, file("{}").time(), "a file without a time breeds at any hour");
+        assertThrows(IllegalArgumentException.class, () -> file("{\"time\": \"noon\"}"));
+    }
+
+    @Test
     void snailsAreBothSexesAndWrongWordsStopTheLoad() {
         assertFalse(file("{\"sexes\": \"both\"}").twoSexes());
         assertThrows(IllegalArgumentException.class, () -> file("{\"sexes\": \"three\"}"));

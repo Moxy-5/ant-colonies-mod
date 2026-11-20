@@ -1,0 +1,61 @@
+# The river crab's breeding in the game, frame by frame (animal life cycle step 3, 2026-11-19; CLAUDE.md's hard rule):
+# a male and a female courting face to face (he holds out his big claws round her, she folds hers in), the game frozen
+# and stepped 2 ticks between pictures, from the side, the front of the male and three quarters; a mother whose eggs
+# hatch, the babies riding on her back and scattering; and a hungry male picking algae with his re-aimed big claws.
+#   ./gradlew runFilm -PfilmScene=tools/film/crab_breeding_frames.film   pictures in run-film/screenshots/crab_breeding_frames/
+cmd time set noon
+cmd weather clear
+cmd kill @e[type=!player]
+lens 40
+wait 30
+# the courtship, side on (the camera's height is its feet: its eye is 1.62 higher)
+cmd summon antcolonies:crab 0.5 -60 0.5 {sex:"male",HungryIn:99999,Rotation:[-90f,0f]}
+cmd summon antcolonies:crab 1.3 -60 0.5 {sex:"female",HungryIn:99999,Rotation:[90f,0f]}
+camera 0.9 -61.1 -1.3 0 16
+wait 90
+cmd tick freeze
+burst side 30 2
+cmd tick unfreeze
+cmd kill @e[type=antcolonies:crab]
+wait 10
+# from in front of the male (behind the female's shoulder)
+cmd summon antcolonies:crab 0.5 -60 0.5 {sex:"male",HungryIn:99999,Rotation:[-90f,0f]}
+cmd summon antcolonies:crab 1.3 -60 0.5 {sex:"female",HungryIn:99999,Rotation:[90f,0f]}
+camera 2.6 -60.7 0.9 100 26
+wait 90
+cmd tick freeze
+burst front 30 2
+cmd tick unfreeze
+cmd kill @e[type=antcolonies:crab]
+wait 10
+# three quarters, from above
+cmd summon antcolonies:crab 0.5 -60 0.5 {sex:"male",HungryIn:99999,Rotation:[-90f,0f]}
+cmd summon antcolonies:crab 1.3 -60 0.5 {sex:"female",HungryIn:99999,Rotation:[90f,0f]}
+camera -0.3 -59.9 -0.6 -48 45
+wait 90
+cmd tick freeze
+burst threequarter 30 2
+cmd tick unfreeze
+cmd kill @e[type=antcolonies:crab]
+wait 10
+# a mother whose eggs hatch at once (they have been under her flap long enough; NoAI: she stands still, her eggs
+# still tick): babies on her back, then off
+cmd summon antcolonies:crab 6.5 -60 0.5 {sex:"female",NoAI:1b,Eggs:6,EggsSince:-500000L,Rotation:[0f,0f]}
+camera 6.5 -59.9 -0.5 0 50
+wait 2
+shot berried
+cmd tick freeze
+burst babies 30 4
+cmd tick unfreeze
+cmd kill @e[type=antcolonies:crab]
+wait 10
+# a hungry male picking at remains on the grass: his big claws carry the bits to his mouth, not past it
+cmd summon antcolonies:remains 30.5 -60 3.5 {kind:"tilapia",bites:6,Rotation:[0f,0f]}
+cmd summon antcolonies:crab 29.3 -60.0 3.5 {sex:"male",HungryIn:0,Rotation:[-90f,0f]}
+camera 31.4 -60.9 2.3 60 22
+wait 20
+cmd tick freeze
+burst pick 45 2
+cmd tick unfreeze
+cmd kill @e[type=antcolonies:crab]
+quit

@@ -22,12 +22,14 @@ Units are model pixels (16 a block), the front points to -Z, up is +Y, left is +
 """
 import math
 import random
+import sys
 
 from model_parts import cube, mix, shade, png, clip, paint_faces, geo, animations, write_assets  # noqa: F401 (png for the viewer)
 
 V = 0.25              # model pixels a voxel (half the first model's: the picture's grain)
 TEXELS = 4.0          # texture pixels a model pixel: one flat colour a voxel face
 BIG = {'left': 1.0, 'right': 1.15}       # each claw's size (the right one bigger)
+USUAL_BIG = dict(BIG)                    # the usual crab's, which the clips were made for
 LEG_Z = [-4.8, -1.6, 1.6, 4.6]           # where each walking leg leaves the lower body (voxels)
 LEG_YAW = [34, 10, -14, -40]             # how far each leg is turned forward (degrees, + forward)
 LEG_LONG = [1.0, 1.06, 1.0, 0.9]         # each leg's length (the last pair shorter)
@@ -399,10 +401,23 @@ def sm(a, b, x):
     return v * v * (3 - 2 * v)
 
 
-def clips():
+def clips(big=None):
     """idle (standing, eyes and fingers moving), walk (the legs stepping in waves; the game turns the body sideways),
     pick (each claw in turn pinches a bit off, carries it to the mouth, the mouth's doors open and chew), threat
-    (reared up, claws raised and snapping), death (onto its back, legs curling in)."""
+    (reared up, claws raised and snapping), court (face to face with a mate, claws raised and reaching, the fingers
+    slowly clasping; animal life cycle step 3), death (onto its back, legs curling in).
+
+    With big (a male's or female's claw sizes, SEXES), the pick and crack clips are re-aimed for those claws: each hand's
+    turn at the mouth and on the shell is corrected so its pinch lands where the usual claws' pinch does (reaim), so a
+    male's big claws do not overshoot the mouth and a female's small ones do not fall short."""
+    fix = reaim(big) if big else None
+
+    def fixed(side, name, k):
+        """The correction (arm pitch, arm yaw, hand pitch, hand yaw; final turns) for this claw at this pose, times k
+        (0 none, 1 all)."""
+        if not fix:
+            return 0.0, 0.0, 0.0, 0.0
+        return tuple(v * k for v in fix[name][side])
 
     def legs(p, t, speed, amount):
         for side, s in SIDES:
@@ -462,8 +477,10 @@ def clips():
             u = max(0.0, min(1.0, (t - j * PICK_SECOND) / PICK_TRIP))
             lift = sm(0.3, 0.55, u) - sm(0.78, 0.95, u)
             dip = sm(0, 0.15, u) - sm(0.22, 0.32, u)
-            p[f'claw_hand_{side}'] = {'rotation': [-(27 * lift - 7 * dip), s * 72 * lift, 0]}
-            p[f'claw_arm_{side}'] = {'rotation': [-8 * lift, 0, 0]}
+            ap, ay, fp, fy = fixed(side, 'pick_mouth', lift)
+            dip *= min(1.0, USUAL_BIG[side] / big[side]) if big else 1.0    # a longer claw dips less to reach the bed
+            p[f'claw_hand_{side}'] = {'rotation': [-(27 * lift - 7 * dip) + fp, s * 72 * lift + fy, 0]}
+            p[f'claw_arm_{side}'] = {'rotation': [-8 * lift + ap, ay, 0]}
             p[f'claw_finger_{side}'] = {'rotation': [-(4 + 24 * (sm(0, 0.12, u) - sm(0.2, 0.28, u))
                                                        + 16 * (sm(0.6, 0.68, u) - sm(0.8, 0.9, u))), 0, 0]}
             shown = 1.0 if 0.25 < u < PICK_BITE - 0.01 else 0.0
@@ -498,8 +515,10 @@ def clips():
                         chew = 1.0 if 0.6 < u < 0.98 else chew
             pitch = gp * grip + (mp - gp) * lift
             yaw = gy * grip + (my - gy) * lift + 3 * shake
-            p[f'claw_hand_{side}'] = {'rotation': [pitch, s * yaw, 0]}
-            p[f'claw_arm_{side}'] = {'rotation': [-6 * grip - 4 * lift, 0, 0]}
+            g, m = fixed(side, 'crack_grip', 1.0), fixed(side, 'crack_mouth', 1.0)
+            f = [g[i] * grip + (m[i] - g[i]) * lift for i in range(4)]
+            p[f'claw_hand_{side}'] = {'rotation': [pitch + f[2], s * yaw + f[3], 0]}
+            p[f'claw_arm_{side}'] = {'rotation': [-6 * grip - 4 * lift + f[0], f[1], 0]}
             opened = 26 * (sm(0.0, 0.15, t) - sm(0.3, 0.5, t)) + 18 * (sm(0.05, 0.12, (t - CRACK_TRIPS[0]) / CRACK_TRIP)
                                                                       - sm(0.15, 0.25, (t - CRACK_TRIPS[0]) / CRACK_TRIP)) * (s < 0)
             p[f'claw_finger_{side}'] = {'rotation': [-(4 + opened) + 5 * squeeze, 0, 0]}
@@ -526,18 +545,188 @@ def clips():
             p[f'claw_hand_{side}'] = {'rotation': [0, s * 30 * f, 0]}
         return still(p)
 
+    def court(t):
+        """His part of the courtship (animal life cycle step 3, 2026-11-19; fun first, my picks): face to face with the
+        female, his body raised a little on his legs and rocking slowly, both claws reaching forward a little lifted,
+        round the front corners of her shell, the fingers slowly clasping and letting go. The game stands the pair face
+        to face (CrabEntity.COURT_APART); hers is court_female."""
+        w = 2 * math.pi / COURT_LEN
+        p = eyes(legs({}, t, w, 0.08), t, COURT_LEN)
+        for side, s in SIDES:
+            ph = 0 if s > 0 else 0.9
+            p[f'claw_arm_{side}'] = {'rotation': [-COURT_ARM - 2 * math.sin(w * t + ph), -s * 4, 0]}
+            p[f'claw_hand_{side}'] = {'rotation': [-COURT_HAND + 2 * math.sin(w * t + ph), s * 6, 0]}
+            p[f'claw_finger_{side}'] = {'rotation': [-(6 + 9 * (0.5 + 0.5 * math.sin(2 * w * t + ph))), 0, 0]}
+        p['body'] = {'rotation': [-2, 0, 2 * math.sin(w * t)], 'position': [0, 0.3 + 0.06 * math.sin(2 * w * t), 0]}
+        return still(p)
+
+    def court_female(t):
+        """Her part: still and low, her small claws folded in under her face out of his way, the eyes raised to him."""
+        w = 2 * math.pi / COURT_LEN
+        p = eyes(legs({}, t, w, 0.04), t, COURT_LEN)
+        for side, s in SIDES:
+            p[f'claw_arm_{side}'] = {'rotation': [-4, s * 10, 0]}
+            p[f'claw_hand_{side}'] = {'rotation': [-8, s * 40, 0]}
+            p[f'claw_finger_{side}'] = {'rotation': [-2, 0, 0]}
+            p[f'eye_{side}'] = {'rotation': [-12, 0, -3 * math.sin(w * t + s)]}
+        p['body'] = {'rotation': [1.5, 0, -1.5 * math.sin(w * t)], 'position': [0, -0.1, 0]}
+        return still(p)
+
     return {'idle': clip(4.0, idle, 48), 'walk': clip(WALK_LEN, walk, 12), 'pick': clip(PICK_LEN, pick, 120),
-            'crack': clip(CRACK_LEN, crack, 120), 'threat': clip(3.2, threat, 48), 'death': clip(1.0, death, 12, 'hold')}
+            'crack': clip(CRACK_LEN, crack, 120), 'threat': clip(3.2, threat, 48), 'court': clip(COURT_LEN, court, 36),
+            'court_female': clip(COURT_LEN, court_female, 36),
+            'death': clip(1.0, death, 12, 'hold')}
+
+
+# --- males and females (animal life cycle step 3, 2026-11-19; the looks the user confirmed in the life viewer) -----------
+# A male's big claws (both bigger, the right one much bigger) and narrow belly flap; a female's small claws and broad
+# flap; a female carrying eggs (berried) has an orange egg mass bulging from under her flap. tools/life_looks.py makes
+# these models (crab_model); the game's young crabs use the usual model above.
+SEXES = {'male': {'left': 1.35, 'right': 1.7}, 'female': {'left': 0.8, 'right': 0.85}}
+COURT_LEN = 3.0        # the court clip (seconds, a loop)
+COURT_ARM, COURT_HAND = 6, 2     # how far his claws are lifted in it (degrees)
+
+
+def with_claws(big, game=False):
+    """The bones built with these claw sizes."""
+    saved = dict(BIG)
+    BIG.update(big)
+    try:
+        return model(game=game)
+    finally:
+        BIG.clear()
+        BIG.update(saved)
+
+
+def posed(bones, name, point, pose):
+    """Where a point of a bone lies with the bones turned (their own turn plus the clip's pose), model pixels."""
+    by = {b['name']: b for b in bones}
+    b = by[name]
+    p = list(point)
+    while b:
+        r = [x + y for x, y in zip(b.get('rotation', [0, 0, 0]), pose.get(b['name'], [0, 0, 0]))]
+        rx, ry, rz = math.radians(-r[0]), math.radians(r[1]), math.radians(-r[2])
+        ca, sa, cb_, sb, cc, sc = math.cos(rx), math.sin(rx), math.cos(ry), math.sin(ry), math.cos(rz), math.sin(rz)
+        # Z, then Y, then X (bounds' rot)
+        m = [[cc * cb_, cc * sb * sa - sc * ca, cc * sb * ca + sc * sa],
+             [sc * cb_, sc * sb * sa + cc * ca, sc * sb * ca - cc * sa],
+             [-sb, cb_ * sa, cb_ * ca]]
+        piv = b['pivot']
+        d = [p[i] - piv[i] for i in range(3)]
+        p = [piv[i] + sum(m[i][k] * d[k] for k in range(3)) for i in range(3)]
+        b = by.get(b.get('parent'))
+    return p
+
+
+def pinch_at(bones, side, pose):
+    by = {b['name']: b for b in bones}
+    return posed(bones, f'claw_hand_{side}', by[f'claw_hand_{side}']['pinch'], pose)
+
+
+# the poses re-aimed (re aim): (each hand's turn, its arm's turn) as the clips hold them there
+REAIM_POSES = {'pick_mouth': (lambda s: [-27, s * 72, 0], [-8, 0, 0]),
+               'crack_grip': (lambda s: [CRACK_GRIP['left' if s > 0 else 'right'][0],
+                                         s * CRACK_GRIP['left' if s > 0 else 'right'][1], 0], [-6, 0, 0]),
+               'crack_mouth': (lambda s: [CRACK_MOUTH[0], s * CRACK_MOUTH[1], 0], [-10, 0, 0])}
+
+
+def fixed_pose(side, s, name, fix):
+    """The pose REAIM_POSES names with a correction (arm pitch, arm yaw, hand pitch, hand yaw) added."""
+    hand, arm = REAIM_POSES[name]
+    h = hand(s)
+    return {f'claw_hand_{side}': [h[0] + fix[2], h[1] + fix[3], 0], f'claw_arm_{side}': [arm[0] + fix[0], arm[1] + fix[1], 0]}
+
+
+_REAIMED = {}
+# A claw too long to bring its tip to the mouth holds the bit just in front of it (real crabs pass food to the mouthparts
+# from the claw's tip): up to this far in front counts as at the mouth (model pixels). Every degree of correction costs
+# a little, so the claws keep their own pose as far as they can (my picks).
+MOUTH_SLACK = 1.2
+TURN_COST = 3e-4
+
+
+def reaim(big):
+    """For each pose in REAIM_POSES and each claw, the correction (arm pitch, arm yaw, hand pitch, hand yaw; degrees)
+    that puts these claws' pinch where the usual claws' pinch is in that pose: a longer claw bends in more at the elbow,
+    a shorter one reaches out (a rotation of the hand alone cannot shorten a claw). Searched by halving steps, the
+    smallest turns that do it."""
+    key = tuple(sorted(big.items()))
+    if key in _REAIMED:
+        return _REAIMED[key]
+    usual, these = model(), with_claws(big)
+    out = {}
+    for name in REAIM_POSES:
+        out[name] = {}
+        for side, s in SIDES:
+            want = pinch_at(usual, side, fixed_pose(side, s, name, (0, 0, 0, 0)))
+
+            slack = MOUTH_SLACK if name.endswith('mouth') else 0.0
+
+            def cost(f):
+                got = pinch_at(these, side, fixed_pose(side, s, name, f))
+                ahead = want[2] - got[2]                    # how far in front of the wanted point (-Z is forward)
+                dz = 0.0 if 0 <= ahead <= slack else min(abs(ahead), abs(ahead - slack))
+                return (got[0] - want[0]) ** 2 + (got[1] - want[1]) ** 2 + dz * dz + TURN_COST * sum(v * v for v in f)
+            f, c = [0.0] * 4, None
+            c = cost(f)
+            step = 16.0
+            while step > 0.2:
+                better = True
+                while better:
+                    better = False
+                    for i in range(4):
+                        for d in (step, -step):
+                            g = list(f)
+                            g[i] += d
+                            cg = cost(g)
+                            if cg < c:
+                                f, c, better = g, cg, True
+                step /= 2
+            out[name][side] = tuple(round(v, 1) for v in f)
+    _REAIMED[key] = out
+    return out
+
+
+def check_sexes():
+    """The offline check of the re-aimed clips (CLAUDE.md's hard rule): for each sex and claw, how far its pinch lands
+    from the usual claws' pinch at the mouth and on the shell, before and after re-aiming (model pixels)."""
+    usual = model()
+    for sex, big in SEXES.items():
+        these, fix = with_claws(big), reaim(big)
+        for name in REAIM_POSES:
+            for side, s in SIDES:
+                none = fixed_pose(side, s, name, (0, 0, 0, 0))
+                want = pinch_at(usual, side, none)
+                before = pinch_at(these, side, none)
+                after = pinch_at(these, side, fixed_pose(side, s, name, fix[name][side]))
+                ahead = want[2] - after[2]
+                print(f'{sex:6} {name:11} {side:5} fix {fix[name][side]}  off by {math.dist(before, want):.2f} px'
+                      f' -> {math.dist(after, want):.2f} px ({ahead:+.2f} in front; across {after[0] - want[0]:+.2f}, '
+                      f'up {after[1] - want[1]:+.2f})')
 
 
 def write_game():
-    """Writes the crab's model, texture and clips into the savanna mod."""
-    game_bones, rows, w, h = paint(model(game=True))
-    for b in game_bones:
-        b.pop('pinch', None)
-    files = {'textures/entity/crab.png': png(rows)}
-    files['geo/entity/crab.geo.json'] = geo('crab', game_bones, w, h, (2, 1.5, [0, 0.5, 0]))
+    """Writes the crab's models, textures and clips into the savanna mod: the usual crab (the young), and since the
+    animal life cycle step 3 (2026-11-19) the male (big claws, narrow flap), the female (small claws, broad flap) and
+    the female carrying eggs under her flap (crab_berried), the looks the user confirmed in the life viewer
+    (tools/life_looks.py); the male's and the female's clips re-aimed for their claws (crab_male, crab_female; the
+    berried female plays the female's)."""
+    import life_looks
+
+    def game_files(name, bones):
+        game_bones, rows, w, h = paint(bones)
+        for b in game_bones:
+            b.pop('pinch', None)
+        return {f'textures/entity/{name}.png': png(rows), f'geo/entity/{name}.geo.json': geo(name, game_bones, w, h, (2, 1.5, [0, 0.5, 0]))}
+
+    files = game_files('crab', model(game=True))
     files['animations/entity/crab.animation.json'] = animations(clips())
+    with life_looks.Recolour(sys.modules[__name__], wrap=life_looks.extra_parts(life_looks.CRAB_EXTRA)):
+        files.update(game_files('crab_male', life_looks.crab_model(SEXES['male'], 'narrow', game=True)))
+        files.update(game_files('crab_female', life_looks.crab_model(SEXES['female'], 'broad', game=True)))
+        files.update(game_files('crab_berried', life_looks.crab_model(SEXES['female'], 'broad', eggs=True, game=True)))
+    for sex, big in SEXES.items():
+        files[f'animations/entity/crab_{sex}.animation.json'] = animations(clips(big))
     write_assets(files)
 
 

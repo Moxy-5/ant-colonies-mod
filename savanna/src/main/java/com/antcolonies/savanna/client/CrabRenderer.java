@@ -20,4 +20,10 @@ public class CrabRenderer extends GeoEntityRenderer<CrabEntity> {
     protected float getDeathMaxRotation(CrabEntity crab) {
         return 0;
     }
+
+    /** The shadow follows the animal's own size (a hatchling's is a hatchling's; animal life cycle step 3, 2026-11-19). */
+    @Override
+    protected float getShadowRadius(CrabEntity animal) {
+        return super.getShadowRadius(animal) * animal.getScale();
+    }
 }

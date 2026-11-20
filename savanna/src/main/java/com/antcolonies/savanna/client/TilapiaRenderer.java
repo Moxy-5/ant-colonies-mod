@@ -75,4 +75,10 @@ public class TilapiaRenderer extends GeoEntityRenderer<TilapiaEntity> {
             return TEXTURES[look >= 0 && look < TEXTURES.length ? look : TilapiaEntity.EVERYDAY];
         }
     }
+
+    /** The shadow follows the animal's own size (a hatchling's is a hatchling's; animal life cycle step 3, 2026-11-19). */
+    @Override
+    protected float getShadowRadius(TilapiaEntity animal) {
+        return super.getShadowRadius(animal) * animal.getScale();
+    }
 }

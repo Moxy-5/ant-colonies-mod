@@ -1,6 +1,19 @@
 {
-  "_note": "The river catfish's life (the animal life kit). Sizes are shares of its usual size (2 blocks). Born grown for now; young and breeding come in step 3 of the plan.",
+  "_note": "The river catfish's life (the animal life kit, docs/plans/animal-life-cycle.md, step 3: breeding on, 2026-11-19; all numbers my picks, fun first). Courtship ticks count every other game tick (the mating goal's own ticks), so 120 is 12 seconds. Sizes are shares of its usual size (2 blocks); females a little bigger, and plump while ripe. They spawn only in the rains, at night, while it rains: a pair meets, she leads him into the shallows by the algae, they court 12 seconds (he curls round her tail, splashing), and she scatters 6 to 10 sticky eggs over the algae mats, 2 to 4 a mat; tilapia and crabs eat many; the rest hatch in a day into young 0.4 blocks long that hide in the shallows, grown in 4 days. The world's own spawns stay grown. Breeds only while fewer than 6 catfish live within 48 blocks and the river fish group (shared with the tilapia) is under its cap.",
   "sexes": "two",
-  "size": [0.85, 1.15],
-  "breeds": false
+  "male_size": [0.85, 1.05],
+  "female_size": [0.95, 1.15],
+  "young_size": 0.2,
+  "young_days": 4,
+  "breeds": true,
+  "breed_every_days": 4,
+  "clutch": [6, 10],
+  "hatch_days": 1,
+  "seasons": ["rains"],
+  "weather": "rain",
+  "time": "night",
+  "care": "none",
+  "mate_reach": 24,
+  "local_limit": 6,
+  "courtship_ticks": 120
 }

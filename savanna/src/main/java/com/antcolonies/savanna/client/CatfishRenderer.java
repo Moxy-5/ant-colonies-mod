@@ -36,7 +36,7 @@ public class CatfishRenderer extends GeoEntityRenderer<CatfishEntity> {
     static final float SCALE = 2.0F / 2.9F;
 
     public CatfishRenderer(EntityRendererProvider.Context context) {
-        super(context, new DefaultedEntityGeoModel<>(ResourceLocation.fromNamespaceAndPath(SavannaMod.MODID, "catfish")));
+        super(context, new Model());
         withScale(SCALE);
         shadowRadius = 0.5F;
         addRenderLayer(new GeoRenderLayer<>(this) {
@@ -53,6 +53,34 @@ public class CatfishRenderer extends GeoEntityRenderer<CatfishEntity> {
                 }
             }
         });
+    }
+
+    /**
+     * The catfish's model and look (animal life cycle step 3, 2026-11-19; {@code tools/catfish_models.py game}, the looks
+     * the user confirmed in the life viewer): a female ripe to spawn plump (her own swelled model and texture), the
+     * young near-black; every one plays the catfish's clips.
+     */
+    static class Model extends DefaultedEntityGeoModel<CatfishEntity> {
+        private static final ResourceLocation PLUMP_MODEL = ResourceLocation.fromNamespaceAndPath(SavannaMod.MODID, "geo/entity/catfish_plump.geo.json");
+        private static final ResourceLocation PLUMP_TEXTURE = ResourceLocation.fromNamespaceAndPath(SavannaMod.MODID, "textures/entity/catfish_plump.png");
+        private static final ResourceLocation YOUNG_TEXTURE = ResourceLocation.fromNamespaceAndPath(SavannaMod.MODID, "textures/entity/catfish_young.png");
+
+        Model() {
+            super(ResourceLocation.fromNamespaceAndPath(SavannaMod.MODID, "catfish"));
+        }
+
+        @Override
+        public ResourceLocation getModelResource(CatfishEntity fish) {
+            return fish.isPlump() ? PLUMP_MODEL : super.getModelResource(fish);
+        }
+
+        @Override
+        public ResourceLocation getTextureResource(CatfishEntity fish) {
+            if (fish.isPlump()) {
+                return PLUMP_TEXTURE;
+            }
+            return fish.life().isYoung() ? YOUNG_TEXTURE : super.getTextureResource(fish);
+        }
     }
 
     /** The tilapia model's tail tip behind its middle and its body's mid line over its feet (model pixels, tilapia_models.py). */
@@ -107,5 +135,11 @@ public class CatfishRenderer extends GeoEntityRenderer<CatfishEntity> {
     @Override
     protected float getDeathMaxRotation(CatfishEntity fish) {
         return 0;
+    }
+
+    /** The shadow follows the animal's own size (a hatchling's is a hatchling's; animal life cycle step 3, 2026-11-19). */
+    @Override
+    protected float getShadowRadius(CatfishEntity animal) {
+        return super.getShadowRadius(animal) * animal.getScale();
     }
 }

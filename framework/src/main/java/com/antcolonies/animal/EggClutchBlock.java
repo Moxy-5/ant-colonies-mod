@@ -60,8 +60,8 @@ public abstract class EggClutchBlock extends Block implements EntityBlock {
     }
 
     /**
-     * Hatches: each egg becomes a young animal of its mother's kind at the clutch, then the block is gone. A species
-     * may let its young out its own way (carried, in water).
+     * Hatches: each egg becomes a young animal of its mother's kind at the clutch, then the block is what a clutch
+     * leaves ({@link #toShells}). A species may let its young out its own way (carried, in water).
      */
     protected void hatch(ServerLevel level, BlockPos pos, BlockState state, EggClutchBlockEntity clutch, EntityType<?> kind, RandomSource random) {
         for (int i = 0; i < clutch.count(); i++) {
@@ -80,7 +80,23 @@ public abstract class EggClutchBlock extends Block implements EntityBlock {
             }
             level.addFreshEntity(young);
         }
-        level.removeBlock(pos, false);
+        toShells(level, pos, state);       // nothing left but the shells
+    }
+
+    /**
+     * Eaten eggs (the animal life kit, step 3): an animal takes up to this many eggs off the clutch here. Whether it took
+     * any. With none left the clutch is gone as if long past hatching ({@link #toShells}).
+     */
+    public static boolean eat(ServerLevel level, BlockPos pos, int eggs) {
+        BlockState state = level.getBlockState(pos);
+        if (!(state.getBlock() instanceof EggClutchBlock clutchBlock) || !(level.getBlockEntity(pos) instanceof EggClutchBlockEntity clutch)
+                || clutch.count() <= 0) {
+            return false;
+        }
+        if (clutch.takeEggs(eggs)) {
+            clutchBlock.toShells(level, pos, state);
+        }
+        return true;
     }
 
     /** What is left of a clutch long past hatching: here nothing (a species may leave a shells block). */

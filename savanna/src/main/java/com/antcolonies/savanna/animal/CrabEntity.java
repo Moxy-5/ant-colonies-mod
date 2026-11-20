@@ -4,7 +4,9 @@ import com.antcolonies.entity.body.SteadyController;
 import javax.annotation.Nullable;
 
 import com.antcolonies.animal.AnimalLife;
+import com.antcolonies.animal.ClutchClock;
 import com.antcolonies.animal.HasLife;
+import com.antcolonies.animal.RoomToBreed;
 import com.antcolonies.animal.SeekMateGoal;
 
 import net.minecraft.core.BlockPos;
@@ -53,12 +55,31 @@ import software.bernie.geckolib.util.GeckoLibUtil;
  * snail, its claws squeeze the shell till it cracks, it picks the snail out into its mouth and leaves the broken shell
  * on the bed ({@link CrabPickGoal}, {@link com.antcolonies.savanna.block.CrabShellBlock}).</li>
  * </ul>
- * Not yet: its burrow (broken shells to gather outside it), catfish eating it.
+ * <li>Breeding (animal life cycle step 3, 2026-11-19; its life file; the looks the user confirmed in the life viewer):
+ * males have big claws (the right one much bigger) and a narrow belly flap, females small claws and a broad flap. Two
+ * ready crabs of the two sexes walk together ({@link SeekMateGoal}) and court face to face for a while, he holding her
+ * with his claws round the front of her shell, she still with hers folded in ({@link #courting}). Then she carries an
+ * orange egg mass under her flap for the hatching days (the kit's carrying care, {@code carry_eggs}), and lets out 4 to
+ * 8 tiny crabs that ride on her back a few seconds and scatter (no larvae, as real freshwater crabs). They grow up in a
+ * few days.</li>
+ * Not yet: its burrow (broken shells to gather outside it; a female brooding in it), catfish eating it.
  */
 public class CrabEntity extends PathfinderMob implements GeoEntity, HasLife {
     /** What it is doing, for the clips and the look. */
-    public static final byte CALM = 0, PICK_ALGAE = 1, PICK_MEAT = 2, THREAT = 3, CRACK = 4;
+    public static final byte CALM = 0, PICK_ALGAE = 1, PICK_MEAT = 2, THREAT = 3, CRACK = 4, COURT = 5;
     private static final EntityDataAccessor<Byte> DATA_DOING = SynchedEntityData.defineId(CrabEntity.class, EntityDataSerializers.BYTE);
+    /** A female carrying eggs under her flap (drawn with the egg mass). */
+    private static final EntityDataAccessor<Boolean> DATA_BERRIED = SynchedEntityData.defineId(CrabEntity.class, EntityDataSerializers.BOOLEAN);
+    /**
+     * How far apart a courting pair stand, middle to middle, at size 1 (blocks): his claws' pinches then close just past
+     * her folded claws, round the front of her shell ({@code crab_models.py} court and court_female; my pick), and their
+     * boxes (0.6 across) do not touch, so they are not shoved apart.
+     */
+    static final double COURT_APART = 0.65;
+    /** How long a hatched baby rides on its mother's back before it scatters (ticks; 3 to 5 s, my pick). */
+    static final int RIDE_TICKS = 60, RIDE_MORE = 40;
+    /** The most babies on her back at once. */
+    static final int MOST_RIDERS = 8;
 
     /** The model is made 0.82 blocks wide with its legs; drawn as made. */
     public static final float MODEL_SCALE = 1.0F;
@@ -76,6 +97,11 @@ public class CrabEntity extends PathfinderMob implements GeoEntity, HasLife {
     private static final EntityDataAccessor<Byte> DATA_LIFE = AnimalLife.dataFor(CrabEntity.class);
     /** Its life: sex, stage, own size (the animal life kit). */
     private final AnimalLife life;
+    /** A female's eggs under her flap, and when she got them (game time). */
+    private int eggs;
+    private long eggsSince;
+    /** A baby riding its mother: ticks until it scatters. */
+    private int rideLeft;
     /** The body's turn against its heading (degrees): 90 to one side while it walks or stands, 0 facing what it picks at or threatens. Drawing only. */
     private float sideTurn, sideTurnO;
 
@@ -102,7 +128,8 @@ public class CrabEntity extends PathfinderMob implements GeoEntity, HasLife {
         goalSelector.addGoal(3, new AvoidEntityGoal<>(this, Player.class, 5.0F, 1.2, 1.5, EntitySelector.NO_CREATIVE_OR_SPECTATOR::test));
         goalSelector.addGoal(4, new CrabPickGoal(this));
         // never stopped by Minecraft's "nothing happened for 5 s and no player within 32" rule (docs/BUGS.md 216)
-        goalSelector.addGoal(5, new SeekMateGoal<>(this, 0.6));
+        // above its strolls (a stroll of the same rank would block it, and it looks only once in 2 s), below eating
+        goalSelector.addGoal(4, new SeekMateGoal<>(this, 0.6));
         goalSelector.addGoal(5, new RandomStrollGoal(this, 0.6, 100, false));
     }
 
@@ -116,6 +143,130 @@ public class CrabEntity extends PathfinderMob implements GeoEntity, HasLife {
         super.defineSynchedData(builder);
         AnimalLife.define(builder, DATA_LIFE);
         builder.define(DATA_DOING, CALM);
+        builder.define(DATA_BERRIED, false);
+    }
+
+    /** Whether she carries eggs under her flap (on the client as the server told it). */
+    public boolean isBerried() {
+        return entityData.get(DATA_BERRIED);
+    }
+
+    /** Eggs under her flap (server). */
+    public int eggsUnderFlap() {
+        return eggs;
+    }
+
+    /** For tests: her eggs have been under her flap this many ticks already. */
+    public void ageEggs(long ticks) {
+        eggsSince = level().getGameTime() - ticks;
+    }
+
+    /** Whether it is a baby riding on its mother's back. */
+    public boolean ridesMother() {
+        return getVehicle() instanceof CrabEntity && rideLeft > 0;
+    }
+
+    /**
+     * The pair court face to face, still (animal life cycle step 3): each faces the other and plays its part of the
+     * court clip (he holds out his claws round her, she folds hers in), and he steps in or back to stand
+     * {@link #COURT_APART} from her, walking backwards or forwards as a crab can (a small push, never turning away).
+     */
+    @Override
+    public void courting(Mob mate, int ticks) {
+        face(mate.getX(), mate.getZ());
+        setDoing(COURT);
+        if (!life.isMale()) {
+            return;
+        }
+        double apart = COURT_APART * (getScale() + mate.getScale()) / 2;
+        double dx = getX() - mate.getX(), dz = getZ() - mate.getZ();
+        double d = Math.sqrt(dx * dx + dz * dz);
+        if (d > 0.01 && Math.abs(d - apart) > 0.04) {
+            double push = Mth.clamp((apart - d) * 0.15, -0.04, 0.04) / d;
+            setDeltaMovement(getDeltaMovement().add(dx * push, 0, dz * push));
+        }
+    }
+
+    /** She takes the eggs under her flap (her clutch from the life file); he goes on his way. */
+    @Override
+    public void mated(Mob mate) {
+        setDoing(CALM);
+        if (life.isMale()) {
+            return;
+        }
+        eggs = life.numbers().clutchMin() + random.nextInt(life.numbers().clutchMax() - life.numbers().clutchMin() + 1);
+        eggsSince = level().getGameTime();
+        entityData.set(DATA_BERRIED, true);
+    }
+
+    /**
+     * A mother's eggs (server, once a second): after the hatching days, with room for crabs here, they hatch into babies
+     * on her back ({@link #letOutBabies}); with no room for the kit's 10 days they are lost (the kit's clutch clock; she
+     * is near a player by being in the world at all, so she always counts as watched).
+     */
+    private void eggsTick() {
+        if (eggs <= 0 || tickCount % 20 != 0) {
+            return;
+        }
+        long hatch = life.numbers().hatchTicks();
+        boolean room = RoomToBreed.here(this, life.numbers().localLimit());
+        switch (ClutchClock.decide(level().getGameTime(), eggsSince, hatch, true, room)) {
+            case HATCH -> letOutBabies();
+            case SHELLS -> {
+                eggs = 0;
+                entityData.set(DATA_BERRIED, false);
+            }
+            case WAIT -> {
+            }
+        }
+    }
+
+    /** Her eggs hatch: each becomes a tiny crab riding on her back for a few seconds. */
+    private void letOutBabies() {
+        int count = eggs;
+        eggs = 0;
+        entityData.set(DATA_BERRIED, false);
+        for (int i = 0; i < count; i++) {
+            CrabEntity baby = com.antcolonies.savanna.registry.SavannaEntities.CRAB.get().create(level());
+            if (baby == null) {
+                break;
+            }
+            baby.moveTo(getX(), getY() + getBbHeight(), getZ(), random.nextFloat() * 360, 0);
+            baby.life.setUp(true, random);
+            baby.life.setAge(0);
+            baby.rideLeft = RIDE_TICKS + random.nextInt(RIDE_MORE);
+            if (level().addFreshEntity(baby) && !baby.startRiding(this, true)) {
+                baby.rideLeft = 0;
+            }
+        }
+    }
+
+    @Override
+    protected boolean canAddPassenger(net.minecraft.world.entity.Entity passenger) {
+        return passenger instanceof CrabEntity baby && baby.life.isYoung() && getPassengers().size() < MOST_RIDERS;
+    }
+
+    /** Babies on her back never steer her. */
+    @Override
+    @Nullable
+    public net.minecraft.world.entity.LivingEntity getControllingPassenger() {
+        return null;
+    }
+
+    /** Her babies keep their hold in the water (she walks on the bed). */
+    @Override
+    public boolean dismountsUnderwater() {
+        return false;
+    }
+
+    /** Her babies sit round the top of her shell, spaced evenly, turning with her. */
+    @Override
+    protected void positionRider(net.minecraft.world.entity.Entity passenger, MoveFunction move) {
+        java.util.List<net.minecraft.world.entity.Entity> riders = getPassengers();
+        int i = Math.max(0, riders.indexOf(passenger));
+        double a = Math.toRadians(yBodyRot) + i * Math.PI * 2 / Math.max(1, riders.size()) + 0.4;
+        double r = 0.13 * getScale();
+        move.accept(passenger, getX() + Math.cos(a) * r, getY() + 0.27 * getScale(), getZ() + Math.sin(a) * r);
     }
 
     public byte doing() {
@@ -146,6 +297,15 @@ public class CrabEntity extends PathfinderMob implements GeoEntity, HasLife {
         }
         if (hungryIn > 0) {
             hungryIn--;
+        }
+        if (doing() == COURT && life.partner() == null) {
+            setDoing(CALM);            // the courtship is over (mated or broken off)
+        }
+        eggsTick();
+        if (rideLeft > 0 && --rideLeft == 0 && isPassenger()) {
+            stopRiding();              // off her back and away
+            float a = random.nextFloat() * Mth.TWO_PI;
+            setDeltaMovement(Mth.cos(a) * 0.12, 0.15, Mth.sin(a) * 0.12);
         }
         if (tickCount % 20 == 0 && isInWater()) {
             restrictTo(blockPosition(), NEAR_WATER);      // its strolls and flights stay near the water it was last in
@@ -220,6 +380,13 @@ public class CrabEntity extends PathfinderMob implements GeoEntity, HasLife {
         super.addAdditionalSaveData(tag);
         life.save(tag);
         tag.putInt("HungryIn", hungryIn);
+        if (eggs > 0) {
+            tag.putInt("Eggs", eggs);
+            tag.putLong("EggsSince", eggsSince);
+        }
+        if (rideLeft > 0) {
+            tag.putInt("RideLeft", rideLeft);
+        }
     }
 
     @Override
@@ -227,6 +394,10 @@ public class CrabEntity extends PathfinderMob implements GeoEntity, HasLife {
         super.readAdditionalSaveData(tag);
         life.load(tag);
         hungryIn = tag.getInt("HungryIn");
+        eggs = tag.getInt("Eggs");
+        eggsSince = tag.getLong("EggsSince");
+        rideLeft = tag.getInt("RideLeft");
+        entityData.set(DATA_BERRIED, eggs > 0);
         refresh();
     }
 
@@ -254,6 +425,8 @@ public class CrabEntity extends PathfinderMob implements GeoEntity, HasLife {
     private static final RawAnimation PICK = RawAnimation.begin().thenLoop("pick");
     private static final RawAnimation THREAT_CLIP = RawAnimation.begin().thenLoop("threat");
     private static final RawAnimation CRACK_CLIP = RawAnimation.begin().thenPlayAndHold("crack");
+    private static final RawAnimation COURT_CLIP = RawAnimation.begin().thenLoop("court");
+    private static final RawAnimation COURT_FEMALE_CLIP = RawAnimation.begin().thenLoop("court_female");
     private static final RawAnimation DEATH = RawAnimation.begin().thenPlayAndHold("death");
 
     @Override
@@ -273,6 +446,9 @@ public class CrabEntity extends PathfinderMob implements GeoEntity, HasLife {
         }
         if (doing == CRACK) {
             return state.setAndContinue(CRACK_CLIP);
+        }
+        if (doing == COURT) {
+            return state.setAndContinue(life.isMale() ? COURT_CLIP : COURT_FEMALE_CLIP);
         }
         if (doing == PICK_ALGAE || doing == PICK_MEAT) {
             return state.setAndContinue(PICK);

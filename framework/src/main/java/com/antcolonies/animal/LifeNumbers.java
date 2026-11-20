@@ -35,6 +35,7 @@ import com.google.gson.JsonObject;
  * @param hatchDays      days from laying to hatching
  * @param seasons        the seasons it breeds in ({@link com.antcolonies.season.Seasons})
  * @param weather        the weather it breeds in
+ * @param time           the time of day it breeds at (by the shared day clock, {@link com.antcolonies.colony.Colony#dayTimeAt})
  * @param mateReach      how far it looks for a mate (blocks)
  * @param localLimit     it breeds only while fewer of its own kind than this live within {@link RoomToBreed#REACH}
  * @param care           what a parent does for its eggs or young
@@ -45,7 +46,7 @@ import com.google.gson.JsonObject;
 public record LifeNumbers(boolean twoSexes, float maleShare, float[] maleSize, float[] femaleSize, float maxSize,
                           float youngSize, double youngDays, float teenSize, double teenDays, float youngAtSpawn,
                           double[] spawnYoungDays, boolean breeds, double breedEveryDays, int clutchMin, int clutchMax, double hatchDays,
-                          Set<Season> seasons, Weather weather, double mateReach, int localLimit, Care care,
+                          Set<Season> seasons, Weather weather, Time time, double mateReach, int localLimit, Care care,
                           double careDays, int courtshipTicks, String courtshipClip) {
 
     public static final int DAY = 24000;
@@ -53,13 +54,22 @@ public record LifeNumbers(boolean twoSexes, float maleShare, float[] maleSize, f
     /** The numbers of an animal with no life file: two sexes, born grown, 0.85 to 1.15 of its size, no breeding. */
     public static final LifeNumbers DEFAULT = new LifeNumbers(true, 0.5F, new float[] {0.85F, 1.15F},
             new float[] {0.85F, 1.15F}, 1.5F, 1.0F, 0, 1.0F, 0, 0, null, false, 10, 1, 1, 2, EnumSet.of(Season.RAINS),
-            Weather.ANY, 16, 4, Care.NONE, 0, 100, "");
+            Weather.ANY, Time.ANY, 16, 4, Care.NONE, 0, 100, "");
 
     /** The weather it breeds in. */
     public enum Weather {
         ANY, RAIN, DRY;
 
         static Weather fromFile(String name) {
+            return valueOf(name.toUpperCase(Locale.ROOT));
+        }
+    }
+
+    /** The time of day it breeds at (the river catfish spawn at night, step 3 of the plan). */
+    public enum Time {
+        ANY, DAY, NIGHT;
+
+        static Time fromFile(String name) {
             return valueOf(name.toUpperCase(Locale.ROOT));
         }
     }
@@ -187,6 +197,7 @@ public record LifeNumbers(boolean twoSexes, float maleShare, float[] maleSize, f
                 o.has("breeds") ? o.get("breeds").getAsBoolean() : d.breeds, dbl(o, "breed_every_days", d.breedEveryDays),
                 Math.round(clutch[0]), Math.round(clutch[1]), dbl(o, "hatch_days", d.hatchDays), Set.copyOf(seasons),
                 o.has("weather") ? Weather.fromFile(o.get("weather").getAsString()) : d.weather,
+                o.has("time") ? Time.fromFile(o.get("time").getAsString()) : d.time,
                 dbl(o, "mate_reach", d.mateReach), o.has("local_limit") ? o.get("local_limit").getAsInt() : d.localLimit,
                 o.has("care") ? Care.fromFile(o.get("care").getAsString()) : d.care, dbl(o, "care_days", d.careDays),
                 o.has("courtship_ticks") ? o.get("courtship_ticks").getAsInt() : d.courtshipTicks,

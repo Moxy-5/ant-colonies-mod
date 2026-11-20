@@ -9,6 +9,7 @@ import com.antcolonies.animal.HasLife;
 import com.antcolonies.animal.LifeNumbers;
 import com.antcolonies.animal.Sex;
 import com.antcolonies.savanna.SavannaMod;
+import com.antcolonies.savanna.animal.CrabEntity;
 import com.antcolonies.savanna.animal.SnailEntity;
 import com.antcolonies.savanna.animal.TilapiaEntity;
 import com.antcolonies.savanna.registry.SavannaBlocks;
@@ -59,8 +60,9 @@ public class AnimalLifeTests {
             helper.assertTrue(Math.abs(mob.getAttributeBaseValue(Attributes.SCALE) - life.ownSize()) < 0.01,
                     name + " is not drawn at its own size when grown");
             helper.assertTrue(numbers.twoSexes() == (life.sex() != Sex.NONE), name + "'s sex does not fit its kind: " + life.sex());
-            boolean breeds = kind == SavannaEntities.TILAPIA.get() || kind == SavannaEntities.SNAIL.get();
-            helper.assertTrue(numbers.breeds() == breeds, name + (breeds ? " does not breed (on since step 2)" : " breeds already (not before its own step)"));
+            boolean breeds = kind == SavannaEntities.TILAPIA.get() || kind == SavannaEntities.SNAIL.get()
+                    || kind == SavannaEntities.CRAB.get() || kind == SavannaEntities.CATFISH.get();
+            helper.assertTrue(numbers.breeds() == breeds, name + (breeds ? " does not breed (on since step 2 or 3)" : " breeds already (not before its own step)"));
 
             // Saved and loaded whole.
             CompoundTag saved = mob.saveWithoutId(new CompoundTag());
@@ -396,5 +398,233 @@ public class AnimalLifeTests {
     /** One random tick of the clutch (Minecraft gives one now and then; here at once). */
     private static void tick(ServerLevel level, BlockPos at) {
         level.getBlockState(at).randomTick(level, at, level.random);
+    }
+
+    // --- breeding (step 3: the crab and the catfish; eaten eggs) ---------------------------------------------------------
+
+    /**
+     * The crab's breeding: a ready male and female walk together and court face to face, he standing his courting
+     * distance from her, both in their courting clips; then she carries 4 to 8 eggs under her flap (drawn berried) and
+     * he none; when they hatch the babies ride on her back, crab-baby sized, then scatter off her and live on.
+     */
+    @GameTest(template = "arena", timeoutTicks = 2000, batch = "breeding")
+    public static void crabsCourtFaceToFaceAndTheBabiesRideOnTheirMother(GameTestHelper helper) {
+        breedingPond(helper);
+        clearLeftovers(helper, SavannaEntities.CRAB.get());
+        CrabEntity male = grown(helper, SavannaEntities.CRAB.get(), "male", new BlockPos(P0 + 3, BED + 1, P0 + 3));
+        CrabEntity female = grown(helper, SavannaEntities.CRAB.get(), "female", new BlockPos(P0 + 8, BED + 1, P0 + 7));
+        long started = helper.getLevel().getGameTime();
+        int[] stage = {0};
+        long[] since = {0};
+        double[] nearest = {Double.MAX_VALUE};
+        int[] eggs = {0};
+        helper.runAtTickTime(1990, () -> helper.fail("crabs stuck at stage " + stage[0] + ": male ready " + male.life().readyToBreed()
+                + " doing " + male.doing() + " at " + helper.relativePos(male.blockPosition()) + "; female ready "
+                + female.life().readyToBreed() + " doing " + female.doing() + " eggs " + female.eggsUnderFlap() + " at "
+                + helper.relativePos(female.blockPosition()) + " riders " + female.getPassengers().size()
+                + "; closest to the courting distance " + nearest[0]));
+        helper.onEachTick(() -> {
+            long now = helper.getLevel().getGameTime();
+            switch (stage[0]) {
+                case 0 -> {                         // they court face to face
+                    if (male.doing() == CrabEntity.COURT && female.doing() == CrabEntity.COURT) {
+                        double want = 0.65 * (male.getScale() + female.getScale()) / 2;
+                        nearest[0] = Math.min(nearest[0], Math.abs(male.distanceTo(female) - want));
+                    }
+                    if (female.eggsUnderFlap() > 0) {
+                        com.antcolonies.ColonyFrameworkMod.LOGGER.info("[life] crabs mated after {} ticks, closest to the courting distance {}",
+                                now - started, nearest[0]);
+                        helper.assertTrue(now - started >= female.life().numbers().courtshipTicks(), "they mated after only " + (now - started) + " ticks");
+                        helper.assertTrue(nearest[0] < 0.12, "he never stood his courting distance from her (off by " + nearest[0] + ")");
+                        eggs[0] = female.eggsUnderFlap();
+                        helper.assertTrue(eggs[0] >= 4 && eggs[0] <= 8, eggs[0] + " eggs under her flap (4 to 8 wanted)");
+                        helper.assertTrue(female.isBerried() && !male.isBerried() && male.eggsUnderFlap() == 0, "the wrong one carries the eggs");
+                        female.ageEggs(female.life().numbers().hatchTicks());
+                        stage[0] = 1;
+                    }
+                }
+                case 1 -> {                         // the babies ride on her back
+                    if (!female.getPassengers().isEmpty()) {
+                        helper.assertTrue(female.getPassengers().size() == eggs[0], female.getPassengers().size() + " babies on her back from " + eggs[0] + " eggs");
+                        for (net.minecraft.world.entity.Entity e : female.getPassengers()) {
+                            CrabEntity baby = (CrabEntity) e;
+                            double share = baby.getAttributeBaseValue(Attributes.SCALE) / baby.life().ownSize();
+                            helper.assertTrue(baby.life().isYoung() && Math.abs(share - 0.15) < 0.01, "a baby crab at " + share + " of grown (0.15 wanted)");
+                            helper.assertTrue(baby.getY() > female.getY(), "a baby rides below its mother's back");
+                        }
+                        helper.assertTrue(!female.isBerried() && female.eggsUnderFlap() == 0, "her eggs still under her flap with the babies out");
+                        stage[0] = 2;
+                        since[0] = now;
+                    }
+                }
+                case 2 -> {                         // and scatter
+                    if (female.getPassengers().isEmpty()) {
+                        List<CrabEntity> babies = helper.getLevel().getEntitiesOfClass(CrabEntity.class, female.getBoundingBox().inflate(6),
+                                c -> c.isAlive() && c.life().isYoung());
+                        helper.assertTrue(babies.size() == eggs[0], babies.size() + " babies scattered from " + eggs[0]);
+                        helper.assertTrue(now - since[0] >= 55, "the babies left her back after only " + (now - since[0]) + " ticks");
+                        helper.succeed();
+                    } else if (now - since[0] > 140) {
+                        helper.fail("the babies still ride her after 7 s");
+                    }
+                }
+                default -> {
+                }
+            }
+        });
+    }
+
+    /** Room to breed: with as many crabs round as the local limit, a ready pair never courts. */
+    @GameTest(template = "arena", timeoutTicks = 400, batch = "breeding_full")
+    public static void noCrabCourtshipWhileTheRiverIsFull(GameTestHelper helper) {
+        breedingPond(helper);
+        CrabEntity male = grown(helper, SavannaEntities.CRAB.get(), "male", new BlockPos(P0 + 3, BED + 1, P0 + 3));
+        CrabEntity female = grown(helper, SavannaEntities.CRAB.get(), "female", new BlockPos(P0 + 4, BED + 1, P0 + 3));
+        int limit = male.life().numbers().localLimit();
+        for (int i = 2; i < limit; i++) {
+            grown(helper, SavannaEntities.CRAB.get(), "male", new BlockPos(P0 + 2 + i % 9, BED + 1, P0 + 8 + i / 9 * 2));
+        }
+        boolean[] courted = {false};
+        helper.onEachTick(() -> courted[0] |= male.doing() == CrabEntity.COURT || female.doing() == CrabEntity.COURT);
+        helper.runAfterDelay(300, () -> {
+            helper.assertTrue(!courted[0] && female.eggsUnderFlap() == 0, "a pair courted with " + limit + " crabs round");
+            helper.succeed();
+        });
+    }
+
+    /**
+     * The catfish's breeding: a ready pair stays apart by day or in the dry and the ripe female is drawn plump; on a
+     * rainy night they meet, she leads him to the shallows and he curls round her tail; then she scatters 6 to 10 eggs
+     * over the algae mats, a few to a mat; a mat's eggs, old enough and watched, hatch into dark young catfish a fifth of
+     * the size that hide near the mat, and the mat is the same algae again.
+     */
+    @GameTest(template = "arena", timeoutTicks = 3600, batch = "breeding")
+    public static void catfishSpawnOnARainyNightAndScatterEggsOnTheAlgae(GameTestHelper helper) {
+        breedingPond(helper);
+        clearLeftovers(helper, SavannaEntities.CATFISH.get());
+        for (int x = P0 + 2; x <= P1 - 1; x += 2) {
+            for (int z = P0 + 1; z <= P1 - 1; z += 3) {
+                helper.setBlock(new BlockPos(x, BED + 1, z), SavannaBlocks.ALGAE.get().whole(com.antcolonies.savanna.block.AlgaeBlock.LUSH));
+            }
+        }
+        com.antcolonies.savanna.animal.CatfishEntity male = grown(helper, SavannaEntities.CATFISH.get(), "male", new BlockPos(P0 + 3, BED + 2, P0 + 3));
+        com.antcolonies.savanna.animal.CatfishEntity female = grown(helper, SavannaEntities.CATFISH.get(), "female", new BlockPos(P1 - 2, BED + 2, P1 - 2));
+        // by day, in the rain, and by night, in the dry: not ready; a rainy night: ready
+        com.antcolonies.gametest.TestClock.still(helper, 12.0);
+        AnimalLife.setRainForTests(true);
+        helper.assertTrue(!female.life().readyToBreed(), "a catfish ready to spawn by day");
+        com.antcolonies.gametest.TestClock.still(helper, 23.0);
+        AnimalLife.setRainForTests(false);
+        helper.assertTrue(!female.life().readyToBreed(), "a catfish ready to spawn in the dry");
+        AnimalLife.setRainForTests(true);
+        helper.assertTrue(female.life().readyToBreed() && male.life().readyToBreed(), "a grown catfish not ready on a rainy night");
+        long started = helper.getLevel().getGameTime();
+        int[] stage = {0};
+        boolean[] curled = {false};
+        long[] since = {0};
+        helper.runAtTickTime(3590, () -> {
+            AnimalLife.setRainForTests(null);
+            helper.fail("catfish stuck at stage " + stage[0] + ": female ready " + female.life().readyToBreed() + " partner "
+                    + female.life().partner() + " eggs " + female.eggsToScatter() + " at " + helper.relativePos(female.blockPosition())
+                    + " shallows " + female.shallows() + "; male partner " + male.life().partner() + " curled " + curled[0]
+                    + " at " + helper.relativePos(male.blockPosition()) + " d " + male.distanceTo(female));
+        });
+        helper.onEachTick(() -> {
+            curled[0] |= male.isCourting();
+            switch (stage[0]) {
+                case 0 -> {
+                    helper.assertTrue(female.isPlump() || female.tickCount < 25, "a ripe female not drawn plump");
+                    helper.assertTrue(!male.isPlump(), "a male drawn plump");
+                    if (female.eggsToScatter() > 0) {
+                        AnimalLife.setRainForTests(null);
+                        helper.assertTrue(curled[0], "he never curled round her tail");
+                        long took = helper.getLevel().getGameTime() - started;
+                        helper.assertTrue(took >= female.life().numbers().courtshipTicks(), "they mated after only " + took + " ticks");
+                        com.antcolonies.ColonyFrameworkMod.LOGGER.info("[life] catfish mated after {} ticks, she leading to {}", took, female.shallows());
+                        int eggs = female.eggsToScatter();
+                        helper.assertTrue(eggs >= 6 && eggs <= 10, eggs + " eggs (6 to 10 wanted)");
+                        since[0] = eggs;
+                        stage[0] = 1;
+                    }
+                }
+                case 1 -> {
+                    if (female.eggsToScatter() == 0) {
+                        List<BlockPos> mats = new java.util.ArrayList<>();
+                        int laid = 0;
+                        for (BlockPos rel : BlockPos.betweenClosed(new BlockPos(P0, BED + 1, P0), new BlockPos(P1, BED + 1, P1))) {
+                            if (helper.getBlockState(rel).is(SavannaBlocks.CATFISH_EGGS.get())) {
+                                BlockPos at = helper.absolutePos(rel);
+                                mats.add(at);
+                                int n = ((EggClutchBlockEntity) helper.getLevel().getBlockEntity(at)).count();
+                                helper.assertTrue(n >= 1 && n <= 4, n + " eggs on one mat (1 to 4 wanted)");
+                                laid += n;
+                            }
+                        }
+                        helper.assertTrue(mats.size() >= 2 && laid == since[0], laid + " eggs on " + mats.size() + " mats from " + since[0]);
+                        catfishHatchChecks(helper, mats.get(0));
+                        helper.succeed();
+                    }
+                }
+                default -> {
+                }
+            }
+        });
+    }
+
+    private static void catfishHatchChecks(GameTestHelper helper, BlockPos mat) {
+        ServerLevel level = helper.getLevel();
+        net.minecraft.world.level.block.state.BlockState before = level.getBlockState(mat);
+        int eggs = ((EggClutchBlockEntity) level.getBlockEntity(mat)).count();
+        try {
+            age(level, mat, AnimalLives.get(SavannaEntities.CATFISH.get()).hatchTicks());
+            com.antcolonies.colony.Watchers.setPretend(List.of(net.minecraft.world.phys.Vec3.atCenterOf(mat)));
+            tick(level, mat);
+            net.minecraft.world.level.block.state.BlockState after = level.getBlockState(mat);
+            helper.assertTrue(after.is(SavannaBlocks.ALGAE.get())
+                    && after.getValue(com.antcolonies.savanna.block.AlgaeBlock.GROWTH) == before.getValue(com.antcolonies.savanna.block.AlgaeBlock.GROWTH),
+                    "a hatched mat is not the same algae again: " + after);
+            List<com.antcolonies.savanna.animal.CatfishEntity> young = level.getEntitiesOfClass(com.antcolonies.savanna.animal.CatfishEntity.class,
+                    new net.minecraft.world.phys.AABB(mat).inflate(1.5), c -> c.life().isYoung());
+            helper.assertTrue(young.size() == eggs, young.size() + " young from " + eggs + " eggs");
+            for (com.antcolonies.savanna.animal.CatfishEntity c : young) {
+                double share = c.getAttributeBaseValue(Attributes.SCALE) / c.life().ownSize();
+                helper.assertTrue(Math.abs(share - 0.2) < 0.01, "a young catfish at " + share + " of grown (0.2 wanted)");
+            }
+        } finally {
+            com.antcolonies.colony.Watchers.setPretend(List.of());
+        }
+    }
+
+    /**
+     * Eaten eggs: a hungry tilapia goes for catfish eggs on a mat before the plain algae round it and bites some off, and
+     * a hungry crab picks at a snail clutch on the bed; a clutch eaten to nothing is gone (the mat left as algae).
+     */
+    @GameTest(template = "arena", timeoutTicks = 900, batch = "breeding")
+    public static void tilapiaAndCrabsEatTheEggs(GameTestHelper helper) {
+        breedingPond(helper);
+        ServerLevel level = helper.getLevel();
+        com.antcolonies.savanna.block.AlgaeBlock algae = SavannaBlocks.ALGAE.get();
+        BlockPos mat = helper.absolutePos(new BlockPos(P1 - 2, BED + 1, P1 - 2));
+        for (BlockPos rel : List.of(new BlockPos(P1 - 4, BED + 1, P1 - 2), new BlockPos(P1 - 2, BED + 1, P1 - 4), new BlockPos(P1 - 2, BED + 1, P1 - 2))) {
+            helper.setBlock(rel, algae.whole(com.antcolonies.savanna.block.AlgaeBlock.LUSH));
+        }
+        com.antcolonies.savanna.block.CatfishEggsBlock.lay(level, mat, SavannaEntities.CATFISH.get(), 3);
+        BlockPos clutch = helper.absolutePos(new BlockPos(P0 + 3, BED + 1, P0 + 3));
+        com.antcolonies.savanna.block.SnailEggsBlock.lay(level, clutch, net.minecraft.core.Direction.UP, SavannaEntities.SNAIL.get(), 4);
+        helper.assertTrue(level.getBlockState(mat).is(SavannaBlocks.CATFISH_EGGS.get())
+                && level.getBlockState(clutch).is(SavannaBlocks.SNAIL_EGGS.get()), "the eggs were not laid for the test");
+        TilapiaEntity fish = grown(helper, SavannaEntities.TILAPIA.get(), "female", new BlockPos(P1 - 3, BED + 2, P1 - 5));
+        fish.makeHungry();
+        CrabEntity crab = grown(helper, SavannaEntities.CRAB.get(), "male", new BlockPos(P0 + 4, BED + 1, P0 + 3));
+        crab.makeHungry();
+        helper.succeedWhen(() -> {
+            int matEggs = level.getBlockEntity(mat) instanceof EggClutchBlockEntity e ? e.count() : 0;
+            int snailEggs = level.getBlockEntity(clutch) instanceof EggClutchBlockEntity e ? e.count() : 0;
+            helper.assertTrue(matEggs < 3, "the tilapia has not eaten the catfish eggs yet (" + matEggs + " left)");
+            helper.assertTrue(snailEggs < 4, "the crab has not eaten the snail eggs yet (" + snailEggs + " left)");
+            if (matEggs == 0) {
+                helper.assertTrue(level.getBlockState(mat).is(algae), "a mat eaten bare of eggs is not algae again");
+            }
+        });
     }
 }

@@ -1,6 +1,16 @@
 {
-  "_note": "The river crab's life (the animal life kit). Sizes are shares of its usual size. Born grown for now; claws, the egg flap and babies come in step 3 of the plan.",
+  "_note": "The river crab's life (the animal life kit, docs/plans/animal-life-cycle.md, step 3: breeding on, 2026-11-19; all numbers my picks, fun first). Sizes are shares of its usual size (0.82 blocks across with its legs); males a little bigger, with big claws (their own model), females smaller with small claws and a broad flap. Two ready crabs court face to face for 10 seconds (courtship ticks count every other game tick); she carries 4 to 8 eggs under her flap for 2 days, then lets out tiny crabs (0.12 blocks) that ride on her back a few seconds and scatter, grown in 3 days. The world's own spawns stay grown. Breeds only while fewer than 12 crabs live within 48 blocks and the river bed group (shared with the snails) is under its cap.",
   "sexes": "two",
-  "size": [0.85, 1.15],
-  "breeds": false
+  "male_size": [0.95, 1.15],
+  "female_size": [0.8, 1.0],
+  "young_size": 0.15,
+  "young_days": 3,
+  "breeds": true,
+  "breed_every_days": 3,
+  "clutch": [4, 8],
+  "hatch_days": 2,
+  "care": "carry_eggs",
+  "mate_reach": 10,
+  "local_limit": 12,
+  "courtship_ticks": 100
 }

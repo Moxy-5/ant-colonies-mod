@@ -22,6 +22,7 @@ import net.minecraft.world.InteractionHand;
 import net.minecraft.world.InteractionResult;
 import net.minecraft.world.damagesource.DamageSource;
 import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.entity.Mob;
 import net.minecraft.world.entity.MobSpawnType;
 import net.minecraft.world.entity.SpawnGroupData;
 import net.minecraft.world.entity.ai.attributes.AttributeInstance;
@@ -55,6 +56,14 @@ import software.bernie.geckolib.util.GeckoLibUtil;
  * (my pick), drawn and boxed through {@link Attributes#SCALE}. It never starves (the balance rule): with no tilapia near
  * it swims on. Too big for a bucket (my pick). Out of water it stays upright and wriggles, as real catfish crawl over wet
  * ground between pools (it still dries out like any fish).
+ *
+ * <p>Breeding (animal life cycle step 3, 2026-11-19; its life file; fun first, inspired by real catfish that spawn in
+ * the flooded shallows after the first rains): females are a little bigger, and a female ripe to spawn is plump (her
+ * own swelled model). On a rainy night ready catfish seek each other out ({@link SeekMateGoal}); the female leads her
+ * male into the shallows near the algae and he curls round her tail, splashing at the surface ({@link #courting}); then
+ * she scatters her sticky eggs over the algae mats ({@link CatfishScatterEggsGoal}) and leaves them. Tilapia and crabs
+ * eat many ({@link EggMeals}); the rest hatch in a day into tiny dark young that hide in the shallows and never hunt,
+ * grown in a few days.
  */
 public class CatfishEntity extends AbstractFish implements GeoEntity, HasLife {
     /** How long a strike is shown (ticks; the strike clip is 1 s, the mouth open from 0.05 to 0.38 s). */
@@ -90,6 +99,13 @@ public class CatfishEntity extends AbstractFish implements GeoEntity, HasLife {
     /** Up at the surface for a gulp of air ({@link AirGulpGoal}): the clip "gulp" is 1.5 s, plus the blend in. */
     static final int GULP_TICKS = 30 + CLIP_LAG;
     private static final EntityDataAccessor<Boolean> DATA_GULPING = SynchedEntityData.defineId(CatfishEntity.class, EntityDataSerializers.BOOLEAN);
+    /** A female ripe to spawn (drawn plump), and a male curled round his female's tail (the court clip). */
+    private static final EntityDataAccessor<Boolean> DATA_PLUMP = SynchedEntityData.defineId(CatfishEntity.class, EntityDataSerializers.BOOLEAN);
+    private static final EntityDataAccessor<Boolean> DATA_COURTING = SynchedEntityData.defineId(CatfishEntity.class, EntityDataSerializers.BOOLEAN);
+    /** How far round the pair she looks for the shallows to spawn in (blocks), and how deep they may be (blocks of water). */
+    static final int SHALLOWS_REACH = 12, SHALLOWS_DEEP = 2;
+    /** How far a young catfish strays from where it hatched (blocks): it hides in the shallows. */
+    static final int YOUNG_STAY = 6;
     /** How far the drawn body tips nose up for the gulp (degrees). */
     static final float GULP_PITCH = 35;
 
@@ -102,6 +118,13 @@ public class CatfishEntity extends AbstractFish implements GeoEntity, HasLife {
     int hungryIn;
     /** Ticks until it comes up for air again ({@link AirGulpGoal}). */
     int gulpIn;
+    /** Her eggs still to scatter over the algae after mating. */
+    private int eggsToScatter;
+    /** Where she leads her male to spawn: the shallows (not saved: a courtship is short). */
+    @Nullable
+    private BlockPos shallows;
+    /** Whether it is kept near where it hatched while young. */
+    private boolean hiding;
     /** Ticks left of the strike being shown. */
     private int striking;
     /** Ticks left of the caught tilapia being held in the mouth. */
@@ -126,8 +149,10 @@ public class CatfishEntity extends AbstractFish implements GeoEntity, HasLife {
     @Override
     protected void registerGoals() {
         super.registerGoals();
+        goalSelector.addGoal(2, new CatfishScatterEggsGoal(this));
         goalSelector.addGoal(2, new HuntTilapiaGoal(this));
-        goalSelector.addGoal(5, new SeekMateGoal<>(this, 1.0));
+        // above the fish's own random swimming (4), which would otherwise keep it from ever setting off to a mate
+        goalSelector.addGoal(3, new SeekMateGoal<>(this, 1.0));
         goalSelector.addGoal(1, new AirGulpGoal(this));     // above the fish's fleeing from players (2), so it is seen
     }
 
@@ -146,6 +171,107 @@ public class CatfishEntity extends AbstractFish implements GeoEntity, HasLife {
         builder.define(DATA_HELD_ON_RIGHT, false);
         builder.define(DATA_HELD_CUT, false);
         builder.define(DATA_GULPING, false);
+        builder.define(DATA_PLUMP, false);
+        builder.define(DATA_COURTING, false);
+    }
+
+    /** Whether she is ripe to spawn (drawn plump). */
+    public boolean isPlump() {
+        return entityData.get(DATA_PLUMP);
+    }
+
+    /** Whether he is curled round his female's tail. */
+    public boolean isCourting() {
+        return entityData.get(DATA_COURTING);
+    }
+
+    /** Her eggs still to scatter. */
+    public int eggsToScatter() {
+        return eggsToScatter;
+    }
+
+    void scattered(int eggs) {
+        eggsToScatter = Math.max(0, eggsToScatter - eggs);
+    }
+
+    /** Where she leads her male to spawn, if anywhere. */
+    @Nullable
+    public BlockPos shallows() {
+        return shallows;
+    }
+
+    /**
+     * The pair's courtship (animal life cycle step 3): she leads him to the shallows (her spot, {@link #findShallows})
+     * and slowly circles there; he keeps alongside her tail, curled round it (the court clip), and now and then the two
+     * break the surface with a splash where it is shallow enough.
+     */
+    @Override
+    public void courting(Mob mate, int ticks) {
+        if (!life.isMale()) {
+            if (ticks == 0 || shallows == null) {
+                shallows = findShallows();
+            }
+            if (shallows != null && (ticks % 20 == 0 || getNavigation().isDone())) {
+                getNavigation().moveTo(shallows.getX() + 0.5, shallows.getY() + 0.3, shallows.getZ() + 0.5, 0.6);
+            }
+            return;
+        }
+        entityData.set(DATA_COURTING, true);
+        float yaw = mate.getYRot() * Mth.DEG_TO_RAD;
+        double fx = -Mth.sin(yaw), fz = Mth.cos(yaw);          // her heading
+        double back = 0.5 * mate.getScale(), aside = 0.3 * mate.getScale();
+        getMoveControl().setWantedPosition(mate.getX() - fx * back + fz * aside, mate.getY(), mate.getZ() - fz * back - fx * aside, 1.0);
+        getLookControl().setLookAt(mate, 30, 30);
+        if (ticks % 15 == 0 && level() instanceof net.minecraft.server.level.ServerLevel server) {
+            BlockPos top = blockPosition();
+            for (int i = 0; i < 3 && level().getFluidState(top.above()).is(FluidTags.WATER); i++) {
+                top = top.above();
+            }
+            if (!level().getFluidState(top.above()).is(FluidTags.WATER)) {    // the surface is near: a splash
+                double y = top.getY() + 0.95;
+                server.sendParticles(net.minecraft.core.particles.ParticleTypes.SPLASH, getX(), y, getZ(), 12, 0.4, 0.05, 0.4, 0.1);
+                server.playSound(null, getX(), y, getZ(), SoundEvents.GENERIC_SPLASH, net.minecraft.sounds.SoundSource.NEUTRAL,
+                        0.4F, 1.1F + 0.3F * random.nextFloat());
+            }
+        }
+    }
+
+    /** She takes her eggs to the algae to scatter them; he goes on his way. */
+    @Override
+    public void mated(Mob mate) {
+        entityData.set(DATA_COURTING, false);
+        if (!life.isMale()) {
+            eggsToScatter = life.numbers().clutchMin() + random.nextInt(life.numbers().clutchMax() - life.numbers().clutchMin() + 1);
+        }
+        shallows = null;
+    }
+
+    /**
+     * The shallows to spawn in: the nearest water over the bed at most {@link #SHALLOWS_DEEP} deep within
+     * {@link #SHALLOWS_REACH} with an algae mat on its bed (for her eggs), else the nearest shallow water; null with none
+     * (they court where they are).
+     */
+    @Nullable
+    BlockPos findShallows() {
+        BlockPos home = blockPosition();
+        BlockPos withAlgae = null, plain = null;
+        double bestAlgae = Double.MAX_VALUE, bestPlain = Double.MAX_VALUE;
+        for (BlockPos at : BlockPos.betweenClosed(home.offset(-SHALLOWS_REACH, -4, -SHALLOWS_REACH), home.offset(SHALLOWS_REACH, 4, SHALLOWS_REACH))) {
+            if (!level().getFluidState(at).is(FluidTags.WATER) || level().getFluidState(at.below()).is(FluidTags.WATER)
+                    || com.antcolonies.savanna.block.AlgaeBlock.depth(level(), at) > SHALLOWS_DEEP) {
+                continue;
+            }
+            double d = at.distSqr(home);
+            boolean algae = level().getBlockState(at).is(com.antcolonies.savanna.registry.SavannaBlocks.ALGAE.get());
+            if (algae && d < bestAlgae) {
+                bestAlgae = d;
+                withAlgae = at.immutable();
+            } else if (!algae && d < bestPlain) {
+                bestPlain = d;
+                plain = at.immutable();
+            }
+        }
+        return withAlgae != null ? withAlgae : plain;
     }
 
     /** Whether it is up at the surface gulping air. */
@@ -294,6 +420,9 @@ public class CatfishEntity extends AbstractFish implements GeoEntity, HasLife {
         if (hungryIn > 0) {
             hungryIn--;
         }
+        if (tickCount % 20 == 0) {
+            lifeTick();
+        }
         if (gulpIn > 0) {
             gulpIn--;
         }
@@ -318,6 +447,27 @@ public class CatfishEntity extends AbstractFish implements GeoEntity, HasLife {
         }
     }
 
+    /**
+     * Its life once a second (server): a female ripe to spawn, or still carrying eggs to scatter, is plump; a male out
+     * of courtship stops curling; a young catfish keeps to the shallows where it hatched, set free when grown.
+     */
+    private void lifeTick() {
+        entityData.set(DATA_PLUMP, !life.isMale() && !life.isYoung() && (life.ripe() || eggsToScatter > 0));
+        if (isCourting() && life.partner() == null) {
+            entityData.set(DATA_COURTING, false);
+        }
+        if (!life.isMale() && life.partner() == null) {
+            shallows = null;
+        }
+        if (life.isYoung() && !hiding) {
+            restrictTo(blockPosition(), YOUNG_STAY);
+            hiding = true;
+        } else if (!life.isYoung() && hiding) {
+            clearRestriction();
+            hiding = false;
+        }
+    }
+
     /** The drawn body's pitch this frame (degrees, nose up positive). */
     public float swimPitch(float partialTick) {
         return Mth.lerp(partialTick, swimPitchO, swimPitch);
@@ -338,6 +488,9 @@ public class CatfishEntity extends AbstractFish implements GeoEntity, HasLife {
         life.save(tag);
         tag.putInt("HungryIn", hungryIn);
         tag.putInt("GulpIn", gulpIn);
+        if (eggsToScatter > 0) {
+            tag.putInt("EggsToScatter", eggsToScatter);
+        }
         if (holding > 0) {
             tag.putInt("HeldLook", heldLook());
             tag.putFloat("HeldSize", entityData.get(DATA_HELD_SIZE));
@@ -351,6 +504,7 @@ public class CatfishEntity extends AbstractFish implements GeoEntity, HasLife {
     public void readAdditionalSaveData(CompoundTag tag) {
         super.readAdditionalSaveData(tag);
         life.load(tag);
+        eggsToScatter = tag.getInt("EggsToScatter");
         if (tag.contains("HungryIn")) {
             hungryIn = tag.getInt("HungryIn");
         }
@@ -442,6 +596,7 @@ public class CatfishEntity extends AbstractFish implements GeoEntity, HasLife {
     private static final RawAnimation BITE_OFF = RawAnimation.begin().thenPlayAndHold("bite_off");
     private static final RawAnimation BITE_OFF_SMALL = RawAnimation.begin().thenPlayAndHold("bite_off_small");
     private static final RawAnimation GULP = RawAnimation.begin().thenPlayAndHold("gulp");
+    private static final RawAnimation COURT = RawAnimation.begin().thenLoop("court");
     private static final RawAnimation FLOP = RawAnimation.begin().thenLoop("flop");
     private static final RawAnimation DEATH = RawAnimation.begin().thenPlayAndHold("death");
     /** The swim clip's beat is made for this speed (blocks a tick, about 1 a second); it plays faster or slower by it. */
@@ -474,6 +629,10 @@ public class CatfishEntity extends AbstractFish implements GeoEntity, HasLife {
         if (isGulping()) {
             player.setAnimationSpeed(1.0);
             return state.setAndContinue(GULP);
+        }
+        if (isCourting()) {
+            player.setAnimationSpeed(1.0);
+            return state.setAndContinue(COURT);
         }
         double dx = getX() - xo, dy = getY() - yo, dz = getZ() - zo;
         double speed = Math.sqrt(dx * dx + dy * dy + dz * dz);

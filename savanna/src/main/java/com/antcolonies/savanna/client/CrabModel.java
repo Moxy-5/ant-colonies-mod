@@ -19,6 +19,41 @@ public class CrabModel extends DefaultedEntityGeoModel<CrabEntity> {
         super(ResourceLocation.fromNamespaceAndPath(SavannaMod.MODID, "crab"));
     }
 
+    /**
+     * Which look a crab wears (animal life cycle step 3, 2026-11-19; {@code tools/crab_models.py game}): the young the
+     * usual crab; a male his big claws and narrow flap; a female her small claws and broad flap, with the orange egg
+     * mass under it while she carries eggs. Each grown look plays clips re-aimed for its own claws.
+     */
+    private static String look(CrabEntity crab) {
+        if (crab.life().isYoung()) {
+            return "crab";
+        }
+        if (crab.life().isMale()) {
+            return "crab_male";
+        }
+        return crab.isBerried() ? "crab_berried" : "crab_female";
+    }
+
+    private static ResourceLocation file(String path) {
+        return ResourceLocation.fromNamespaceAndPath(SavannaMod.MODID, path);
+    }
+
+    @Override
+    public ResourceLocation getModelResource(CrabEntity crab) {
+        return file("geo/entity/" + look(crab) + ".geo.json");
+    }
+
+    @Override
+    public ResourceLocation getTextureResource(CrabEntity crab) {
+        return file("textures/entity/" + look(crab) + ".png");
+    }
+
+    @Override
+    public ResourceLocation getAnimationResource(CrabEntity crab) {
+        String look = look(crab);
+        return file("animations/entity/" + (look.equals("crab_berried") ? "crab_female" : look) + ".animation.json");
+    }
+
     @Override
     public void setCustomAnimations(CrabEntity crab, long instanceId, AnimationState<CrabEntity> state) {
         super.setCustomAnimations(crab, instanceId, state);

@@ -4,7 +4,9 @@ The looks the user confirmed in the life viewer (tools/life_looks.py, "they all 
 - the tilapia's nest pit (TilapiaNestBlock): a saucer a block across fanned out of the bed, a darker hollow inside a
   low ragged rim of the dug-up ground; in silt (wet silt hollow, silt rim) or, on a sandy bed, golden river sand;
 - the river snail's eggs (SnailEggsBlock): a small cluster of pearly pink-white eggs stuck to a face, made facing up
-  and turned by the block state to stick to any side.
+  and turned by the block state to stick to any side;
+- the river catfish's eggs on an algae mat (CatfishEggsBlock, step 3, 2026-11-19): sticky pale-yellow eggs scattered
+  over the mat (the life viewer's), drawn over the very algae model the mat had (the same growth and strands).
 
 Writes the egg texture, the block models, block states and item models into the savanna mod:
     python tools/breeding_art.py
@@ -95,6 +97,57 @@ def eggs_model():
             "textures": {"particle": tex, "t": tex}, "elements": els}
 
 
+CATFISH_EGG = [(236, 222, 142), (230, 214, 128), (242, 232, 160), (224, 206, 120)]
+
+
+def catfish_egg_texture():
+    """16 x 16: 4 x 4 cells of sticky pale-yellow egg colours, each a lit top-left and a darker edge."""
+    rng = random.Random(6)
+    rows = [[None] * 16 for _ in range(16)]
+    for cy in range(4):
+        for cx in range(4):
+            base = CATFISH_EGG[(cx * 3 + cy) % 4]
+            for y in range(4):
+                for x in range(4):
+                    k = 1.06 if (x, y) in ((1, 1), (1, 2), (2, 1)) else (0.88 if x in (0, 3) or y in (0, 3) else 1.0)
+                    k *= rng.uniform(0.97, 1.02)
+                    rows[cy * 4 + y][cx * 4 + x] = tuple(max(0, min(255, round(v * k))) for v in base) + (255,)
+    return [p for r in rows for p in r]
+
+
+def catfish_eggs_model():
+    """About 16 little round eggs (a pixel or so across, the life viewer's 0.06-block eggs) scattered over the mat,
+    some in twos stuck together, a few lifted a little where they cling to the mat's tufts."""
+    rng = random.Random(5)
+    els = []
+    for i in range(16):
+        x, z = rng.uniform(2.0, 14.0), rng.uniform(2.0, 14.0)
+        s = rng.uniform(0.8, 1.1)
+        y0 = 0.3 + (rng.uniform(0.3, 1.6) if i % 5 == 0 else 0.0)
+        c = rng.randrange(16)
+        u, v = (c % 4) * 4, (c // 4) * 4
+        uv = (u, v, u + 4, v + 4)
+        els.append(box(x - s / 2, y0, z - s / 2, x + s / 2, y0 + s * 0.9, z + s / 2, "#t", uv))
+        if i % 4 == 1:          # a second egg stuck to it
+            els.append(box(x + s * 0.3, y0, z + s * 0.2, x + s * 1.2, y0 + s * 0.8, z + s * 1.1, "#t", uv))
+    tex = "antcolonies:block/catfish_eggs"
+    return {"parent": "block/block", "ambientocclusion": False, "render_type": "minecraft:cutout",
+            "textures": {"particle": tex, "t": tex}, "elements": els}
+
+
+def catfish_eggs_states(states):
+    """The eggs' block states: for each growth and strands, the algae mat's own model (the very variants algae.json
+    gives it, turned the same ways) and the eggs over it."""
+    with open(os.path.join(states, "algae.json"), encoding="utf-8") as f:
+        algae = json.load(f)["variants"]
+    parts = []
+    for key, variants in algae.items():
+        when = dict(kv.split("=") for kv in key.split(","))
+        parts.append({"when": when, "apply": variants})
+        parts.append({"when": when, "apply": {"model": "antcolonies:block/catfish_eggs"}})
+    return {"multipart": parts}
+
+
 def main():
     def dump(path, data):
         with open(path, "w", encoding="utf-8", newline="\n") as f:
@@ -120,7 +173,11 @@ def main():
         f"facing={f},waterlogged={w}": dict({"model": "antcolonies:block/snail_eggs"}, **t)
         for f, t in turns.items() for w in ("false", "true")}})
     dump(os.path.join(items, "snail_eggs.json"), {"parent": "antcolonies:block/snail_eggs"})
-    print("wrote the tilapia nest pit and the snail eggs: textures, models, block states, item models")
+    river_blocks_art.write_png(os.path.join(tex, "catfish_eggs.png"), 16, 16, catfish_egg_texture())
+    dump(os.path.join(models, "catfish_eggs.json"), catfish_eggs_model())
+    dump(os.path.join(states, "catfish_eggs.json"), catfish_eggs_states(states))
+    dump(os.path.join(items, "catfish_eggs.json"), {"parent": "antcolonies:block/catfish_eggs"})
+    print("wrote the tilapia nest pit, the snail eggs and the catfish eggs: textures, models, block states, item models")
 
 
 if __name__ == "__main__":

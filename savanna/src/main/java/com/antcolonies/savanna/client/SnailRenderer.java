@@ -23,4 +23,10 @@ public class SnailRenderer extends GeoEntityRenderer<SnailEntity> {
     protected float getDeathMaxRotation(SnailEntity snail) {
         return 0;
     }
+
+    /** The shadow follows the animal's own size (a hatchling's is a hatchling's; animal life cycle step 3, 2026-11-19). */
+    @Override
+    protected float getShadowRadius(SnailEntity animal) {
+        return super.getShadowRadius(animal) * animal.getScale();
+    }
 }

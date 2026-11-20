@@ -54,7 +54,9 @@ public class HuntTilapiaGoal extends Goal {
 
     @Override
     public boolean canUse() {
-        if (!fish.isHungry() || !fish.isInWater() || fish.getRandom().nextInt(20) != 0) {
+        // the young never hunt (they hide in the shallows); a female scattering her eggs or courting does not either
+        if (!fish.isHungry() || !fish.isInWater() || fish.life().isYoung() || fish.eggsToScatter() > 0
+                || fish.life().partner() != null || fish.getRandom().nextInt(20) != 0) {
             return false;
         }
         prey = findPrey();

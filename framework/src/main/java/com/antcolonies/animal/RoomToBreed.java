@@ -44,12 +44,12 @@ public final class RoomToBreed {
     /**
      * Whether this spawning group is under its cap at this chunk, by the spawner's own last count (the world's cap and
      * the cap round the players near). With no count yet (the spawner has not run), or no player anywhere near enough
-     * for the spawner to count (a game test server, an empty world: the spawner's cap is then 0), there is room: the
-     * local limit alone holds.
+     * for the spawner to count (a game test server, an empty world, only a spectator watching: the spawner's cap is
+     * then 0), there is room: the local limit alone holds.
      */
     public static boolean groupHasRoom(ServerLevel level, MobCategory group, ChunkPos at) {
         NaturalSpawner.SpawnState state = level.getChunkSource().getLastSpawnState();
-        if (state == null || state.getSpawnableChunkCount() == 0) {
+        if (state == null || state.getSpawnableChunkCount() == 0 || !countingPlayerNear(level, at)) {
             return true;
         }
         if (UNDER_CAP != null) {
@@ -62,6 +62,26 @@ public final class RoomToBreed {
         int cap = group.getMaxInstancesPerChunk() * state.getSpawnableChunkCount() / CHUNKS_PER_CAP;
         return state.getMobCategoryCounts().getInt(group) < cap;
     }
+
+    /**
+     * Whether a player the spawner counts (any but a spectator) is within its reach of this chunk. Minecraft's own cap
+     * check says "no room" wherever no such player is near (its cap round each player is the only one it asks there),
+     * so with only a spectator watching nothing could ever breed (found 2026-11-19 filming the crabs: the user watches
+     * in spectator). There the spawner spawns nothing either, and the local limit alone holds.
+     */
+    private static boolean countingPlayerNear(ServerLevel level, ChunkPos at) {
+        double x = at.getMiddleBlockX(), z = at.getMiddleBlockZ();
+        for (net.minecraft.server.level.ServerPlayer player : level.players()) {
+            double dx = player.getX() - x, dz = player.getZ() - z;
+            if (!player.isSpectator() && dx * dx + dz * dz < SPAWNER_REACH * SPAWNER_REACH) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /** How far from a player the spawner counts a chunk as near it (Minecraft's 128 blocks). */
+    private static final double SPAWNER_REACH = 128;
 
     private static Method underCap() {
         try {

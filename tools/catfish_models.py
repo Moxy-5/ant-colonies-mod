@@ -363,6 +363,7 @@ CATCH_LEN = 2.6       # the catch clip (seconds; CatfishEntity.HOLD_TICKS is the
 # below; the times are the tilapia's, tm.FIGHT_*): the jaws shut through the fish at CUT_AT, done at CUT_LEN
 # (seconds; CatfishEntity.CUT_TICKS and CUT_AT_TICK the same in ticks).
 CUT_AT, CUT_LEN = tm.FIGHT_CUT, tm.FIGHT_LEN
+COURT_LEN, COURT_BEAT, COURT_CURL = 2.0, 1.0, 4.0   # the courtship clip (seconds; its pulse; how hard the curl)
 GULP_LEN = 1.5       # the gulp of air (seconds; CatfishEntity.GULP_TICKS is the same in ticks, plus its CLIP_LAG)
 
 
@@ -486,6 +487,28 @@ def clips():
         p['body'] = {'rotation': [0, 0, 0], 'position': [0, 1.2 * up - 0.6 * snap, 0]}
         return p
 
+    def court(t):
+        """The male's courtship (animal life cycle step 3, 2026-11-19; fun first, my picks; real catfish spawn this
+        way in flooded shallows after rain): his body curled hard to one side in a C round the female's tail, the curl
+        pulsing in quick shivers, the whiskers swept back, the side fins fanning. The game keeps him alongside her tail
+        while they court (CatfishEntity.courting)."""
+        pose = wave_pose(t, 0.3, 2 * math.pi / COURT_BEAT)       # the side fins' and pelvic fins' flutter
+        ab, beat = {'body': 0.0}, 2 * math.pi / COURT_BEAT
+        for name, parent, a, lag in WAVE:      # a held C, tighter toward the tail, pulsing a little
+            ab[name] = COURT_CURL * a * (0.8 + 0.2 * math.sin(beat * t - lag))
+            pose[name] = [0.0, math.degrees(ab[name] - ab[parent]), 0.0]
+        p = rot(barbel_sway(t, pose, 0.5, COURT_LEN))
+        shiver = 0.6 * math.sin(2 * math.pi * t / 0.12)
+        for name in ('mid', 'rear', 'hind'):
+            r = p[name]['rotation']
+            p[name] = {'rotation': [r[0], r[1] + shiver, r[2]]}
+        for name in BARBELS:
+            r = p[name]['rotation']
+            side = 1 if name.endswith('left') else -1
+            p[name] = {'rotation': [r[0], r[1] - side * 10, r[2]]}
+        p['body'] = {'rotation': [0, 0, 6 * math.sin(2 * math.pi * t / COURT_BEAT)], 'position': [0, 0, 0]}
+        return p
+
     lie = 1.4
 
     def death(t):
@@ -503,7 +526,8 @@ def clips():
             'catch_small': clip(CATCH_LEN, lambda t: catch(t, BITE_SMALL), 52, 'hold'),
             'bite_off': clip(CUT_LEN, lambda t: catch(t, BITE, True), 84, 'hold'),
             'bite_off_small': clip(CUT_LEN, lambda t: catch(t, BITE_SMALL, True), 84, 'hold'), 'flop': clip(0.8, flop, 16),
-            'gulp': clip(GULP_LEN, gulp, 30, 'hold'), 'death': clip(1.2, death, 12, 'hold')}
+            'gulp': clip(GULP_LEN, gulp, 30, 'hold'), 'court': clip(COURT_LEN, court, 40),
+            'death': clip(1.2, death, 12, 'hold')}
 
 
 def write_game():
@@ -512,6 +536,16 @@ def write_game():
     files = {f'textures/entity/{GAME_TEXTURE}.png': png(rows)}
     files['geo/entity/catfish.geo.json'] = geo('catfish', game_bones, w, h, (4, 1.5, [0, 0.5, 0]))
     files['animations/entity/catfish.animation.json'] = animations(clips())
+    # the animal life cycle step 3 (2026-11-19), the looks the user confirmed in the life viewer (tools/life_looks.py):
+    # a female ready to spawn, plump (her belly swelled; her own texture, the swelled boxes take other places on it),
+    # and the young, tiny and near-black (look Y, the usual model's layout, so only a texture)
+    import life_looks
+    plump_bones, rows, pw, ph = paint(life_looks.catfish_plump(), 'A')
+    files['textures/entity/catfish_plump.png'] = png(rows)
+    files['geo/entity/catfish_plump.geo.json'] = geo('catfish_plump', plump_bones, pw, ph, (4, 1.5, [0, 0.5, 0]))
+    LOOKS.setdefault('Y', life_looks.cm.LOOKS['Y'])      # (run as a script, this module is not the one life_looks set it in)
+    _, rows, _, _ = paint(model(), 'Y')
+    files['textures/entity/catfish_young.png'] = png(rows)
     write_assets(files)
 
 

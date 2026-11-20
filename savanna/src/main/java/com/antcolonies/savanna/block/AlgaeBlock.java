@@ -146,12 +146,23 @@ public class AlgaeBlock extends BushBlock implements LiquidBlockContainer, Bonem
         return defaultBlockState().setValue(GROWTH, growth).setValue(STRANDS, fullStrands(growth));
     }
 
-    /** Bites a fish can still take here: one per strand pair, then one for the mat (none when bare). */
+    /**
+     * Bites a fish can still take here: one per strand pair, then one for the mat (none when bare); a mat with catfish
+     * eggs on it ({@link CatfishEggsBlock}, animal life cycle step 3) one more for its eggs.
+     */
     public static int bitesLeft(BlockState state) {
-        if (!(state.getBlock() instanceof AlgaeBlock) || state.getValue(GROWTH) == BARE) {
+        boolean eggs = state.getBlock() instanceof CatfishEggsBlock;
+        if (!(state.getBlock() instanceof AlgaeBlock || eggs)) {
             return 0;
         }
-        return Math.min(state.getValue(STRANDS), fullStrands(state.getValue(GROWTH))) + 1;
+        int growth = state.getValue(GROWTH);
+        int mat = growth == BARE ? 0 : Math.min(state.getValue(STRANDS), fullStrands(growth)) + 1;
+        return mat + (eggs ? 1 : 0);
+    }
+
+    /** Whether there are catfish eggs on the mat here. */
+    public static boolean hasEggs(BlockState state) {
+        return state.getBlock() instanceof CatfishEggsBlock;
     }
 
     /** The mat one step thicker: a thick or lush mat missing strands grows a pair back first, else it thickens a stage. */
@@ -208,6 +219,19 @@ public class AlgaeBlock extends BushBlock implements LiquidBlockContainer, Bonem
         if (bitesLeft(state) == 0) {
             return false;
         }
+        if (hasEggs(state)) {
+            // catfish eggs on the mat (animal life cycle step 3): the bite takes a strand with a few eggs stuck to it,
+            // with a puff of egg bits; once the eggs are gone the mat is as it was
+            int strands = Math.min(state.getValue(STRANDS), fullStrands(state.getValue(GROWTH)));
+            if (strands > 0) {
+                level.setBlock(pos, state.setValue(STRANDS, strands - 1), Block.UPDATE_CLIENTS);
+            }
+            if (level instanceof ServerLevel server) {
+                eggPuff(server, pos);
+                com.antcolonies.animal.EggClutchBlock.eat(server, pos, EGGS_A_BITE);
+            }
+            return true;
+        }
         int strands = Math.min(state.getValue(STRANDS), fullStrands(state.getValue(GROWTH)));
         boolean mat = strands == 0;
         level.setBlock(pos, mat ? state.setValue(GROWTH, BARE).setValue(STRANDS, 0) : state.setValue(STRANDS, strands - 1), Block.UPDATE_CLIENTS);
@@ -224,6 +248,19 @@ public class AlgaeBlock extends BushBlock implements LiquidBlockContainer, Bonem
             }
         }
         return true;
+    }
+
+    /** Eggs a grazer's bite takes off a mat (my pick: a clutch of 2 or 3 eggs lasts a fish about two bites). */
+    static final int EGGS_A_BITE = 2;
+    /** The catfish eggs' colour, pale yellow (the life viewer's), for the puff when they are eaten. */
+    private static final org.joml.Vector3f EGG_COLOUR = new org.joml.Vector3f(0.91F, 0.86F, 0.54F);
+
+    /** A puff of egg bits where eggs are eaten (pale, a few, drifting up). */
+    public static void eggPuff(ServerLevel server, BlockPos pos) {
+        server.sendParticles(new net.minecraft.core.particles.DustParticleOptions(EGG_COLOUR, 0.6F),
+                pos.getX() + 0.5, pos.getY() + 0.2, pos.getZ() + 0.5, 6, 0.2, 0.08, 0.2, 0.01);
+        server.sendParticles(net.minecraft.core.particles.ParticleTypes.BUBBLE, pos.getX() + 0.5, pos.getY() + 0.35, pos.getZ() + 0.5,
+                2, 0.2, 0.1, 0.2, 0.02);
     }
 
     @Override

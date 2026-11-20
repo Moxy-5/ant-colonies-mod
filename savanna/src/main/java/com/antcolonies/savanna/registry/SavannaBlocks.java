@@ -215,6 +215,14 @@ public class SavannaBlocks {
             com.antcolonies.savanna.block.SnailEggsBlock::new,
             BlockBehaviour.Properties.of().mapColor(MapColor.TERRACOTTA_PINK).noCollission().instabreak().noOcclusion()
                     .sound(SoundType.FROGSPAWN).randomTicks().pushReaction(PushReaction.DESTROY).noLootTable());
+    /**
+     * A river catfish's eggs on an algae mat (M9, animal life cycle step 3, 2026-11-19; block/CatfishEggsBlock): the mat
+     * with pale-yellow eggs stuck to it, back to the mat when they hatch or are eaten. Drops nothing.
+     */
+    public static final DeferredBlock<com.antcolonies.savanna.block.CatfishEggsBlock> CATFISH_EGGS = BLOCKS.registerBlock("catfish_eggs",
+            com.antcolonies.savanna.block.CatfishEggsBlock::new,
+            BlockBehaviour.Properties.of().mapColor(MapColor.WATER).replaceable().noCollission().instabreak().noOcclusion()
+                    .sound(SoundType.FROGSPAWN).randomTicks().pushReaction(PushReaction.DESTROY).noLootTable());
 
     static {
         TreeBlocks.init(); // the giant savanna trees' blocks (M7.5), registered with the rest

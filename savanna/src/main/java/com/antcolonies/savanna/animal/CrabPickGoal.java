@@ -150,7 +150,7 @@ public class CrabPickGoal extends Goal {
             grab();
             return;
         }
-        crab.setDoing(remains != null || isScraps() ? CrabEntity.PICK_MEAT : CrabEntity.PICK_ALGAE);
+        crab.setDoing(remains != null || isScraps() || isSnailEggs() ? CrabEntity.PICK_MEAT : CrabEntity.PICK_ALGAE);
         picking++;
         for (int at : BITE_TICKS) {
             if (picking == at && !bite()) {
@@ -204,6 +204,10 @@ public class CrabPickGoal extends Goal {
         shellLeft = true;
     }
 
+    private boolean isSnailEggs() {
+        return block != null && EggMeals.isSnailEggs(crab.level().getBlockState(block));
+    }
+
     private boolean isScraps() {
         return block != null && crab.level().getBlockState(block).is(SavannaBlocks.SCRAPS.get());
     }
@@ -216,7 +220,7 @@ public class CrabPickGoal extends Goal {
         if (block == null) {
             return false;
         }
-        return ScrapsBlock.nibble(crab.level(), block) || AlgaeBlock.graze(crab.level(), block);
+        return ScrapsBlock.nibble(crab.level(), block) || EggMeals.bite(crab.level(), block);
     }
 
     /** Where the food is, or null once it is gone. */
@@ -235,7 +239,7 @@ public class CrabPickGoal extends Goal {
             return null;
         }
         BlockState state = crab.level().getBlockState(block);
-        if (!state.is(SavannaBlocks.SCRAPS.get()) && AlgaeBlock.bitesLeft(state) == 0) {
+        if (!state.is(SavannaBlocks.SCRAPS.get()) && AlgaeBlock.bitesLeft(state) == 0 && !EggMeals.forCrab(state)) {
             return null;
         }
         return new Vec3(block.getX() + 0.5, block.getY(), block.getZ() + 0.5);
@@ -261,8 +265,9 @@ public class CrabPickGoal extends Goal {
     }
 
     /**
-     * Picks the food: the nearest remains with meat on them; else the nearest snail now and then (always with nothing else
-     * near); else the nearest scraps, else the nearest algae.
+     * Picks the food: the nearest remains with meat on them; else the nearest eggs (catfish eggs on the algae or a snail
+     * clutch, a treat: animal life cycle step 3); else the nearest snail now and then (always with nothing else near);
+     * else the nearest scraps, else the nearest algae.
      */
     private boolean find() {
         remains = null;
@@ -281,6 +286,21 @@ public class CrabPickGoal extends Goal {
             return true;
         }
         BlockPos home = crab.blockPosition();
+        // eggs first, the nearest (animal life cycle step 3: catfish eggs on the algae, snail clutches)
+        for (BlockPos at : BlockPos.betweenClosed(home.offset(-LOOK_ACROSS, -LOOK_UP_DOWN, -LOOK_ACROSS),
+                home.offset(LOOK_ACROSS, LOOK_UP_DOWN, LOOK_ACROSS))) {
+            // only eggs its claws reach from the bed (a clutch high on a bank would hold it there for good)
+            if (Math.abs(at.getY() - home.getY()) <= 1 && EggMeals.forCrab(crab.level().getBlockState(at))) {
+                double d = at.distSqr(home);
+                if (d < best) {
+                    best = d;
+                    block = at.immutable();
+                }
+            }
+        }
+        if (block != null) {
+            return true;
+        }
         boolean scraps = false;
         for (BlockPos at : BlockPos.betweenClosed(home.offset(-LOOK_ACROSS, -LOOK_UP_DOWN, -LOOK_ACROSS),
                 home.offset(LOOK_ACROSS, LOOK_UP_DOWN, LOOK_ACROSS))) {

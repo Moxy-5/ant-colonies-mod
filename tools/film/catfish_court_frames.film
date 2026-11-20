@@ -1,0 +1,47 @@
+# The river catfish's courtship in the game, frame by frame (animal life cycle step 3, 2026-11-19; CLAUDE.md's hard
+# rule): a rainy night (night vision on the camera), a shallow pool with algae; a ripe female (plump) and a male meet,
+# she leads him over the algae and he curls round her tail (the court clip), splashing; the game frozen and stepped 2
+# ticks between pictures, from above, from the side (under water) and three quarters; then the eggs on the algae.
+#   ./gradlew runFilm -PfilmScene=tools/film/catfish_court_frames.film   pictures in run-film/screenshots/catfish_court_frames/
+cmd time set midnight
+cmd weather rain
+cmd kill @e[type=!player]
+cmd effect give @s minecraft:night_vision infinite 0 true
+cmd fill -6 -62 -6 8 -61 8 minecraft:water
+cmd fill -2 -62 -2 4 -62 4 antcolonies:algae[growth=3,strands=7]
+lens 50
+wait 30
+# from above
+cmd summon antcolonies:catfish -1.5 -61.6 1.5 {sex:"male",HungryIn:99999,GulpIn:99999,Rotation:[-90f,0f]}
+cmd summon antcolonies:catfish 3.5 -61.6 1.5 {sex:"female",HungryIn:99999,GulpIn:99999,Rotation:[90f,0f]}
+wait 10
+shot plump_female
+camera 1.0 -58.6 -1.5 0 62
+wait 120
+cmd tick freeze
+burst above 40 2
+cmd tick unfreeze
+wait 160
+shot eggs_above
+cmd kill @e[type=antcolonies:catfish]
+wait 10
+# from the side, under water
+cmd summon antcolonies:catfish -1.5 -61.6 1.5 {sex:"male",HungryIn:99999,GulpIn:99999,Rotation:[-90f,0f]}
+cmd summon antcolonies:catfish 3.5 -61.6 1.5 {sex:"female",HungryIn:99999,GulpIn:99999,Rotation:[90f,0f]}
+camera 1.0 -62.2 -4.0 0 0
+wait 120
+cmd tick freeze
+burst side 40 2
+cmd tick unfreeze
+cmd kill @e[type=antcolonies:catfish]
+wait 10
+# three quarters, from above the water
+cmd summon antcolonies:catfish -1.5 -61.6 1.5 {sex:"male",HungryIn:99999,GulpIn:99999,Rotation:[-90f,0f]}
+cmd summon antcolonies:catfish 3.5 -61.6 1.5 {sex:"female",HungryIn:99999,GulpIn:99999,Rotation:[90f,0f]}
+camera -2.0 -59.4 -2.0 -45 42
+wait 120
+cmd tick freeze
+burst threequarter 40 2
+cmd tick unfreeze
+cmd kill @e[type=antcolonies:catfish]
+quit

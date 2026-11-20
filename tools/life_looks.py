@@ -112,14 +112,19 @@ cm.LOOKS['Y'] = dict(cm.LOOKS['C'], name='Young catfish', note="tiny, near-black
                      tip=(170, 158, 150))
 
 
+def catfish_plump():
+    """A female ready to spawn: the belly swelled down and out, the pelvic fins lowered outside it (the game's too)."""
+    plump = copy.deepcopy(cm.model())
+    swell(plump, ('front', 'mid', 'rear'), cm.MID, lambda z: (1 + 0.14 * bump(z, -3.0, 8.0), 1 + 0.34 * bump(z, -3.0, 7.0)))
+    lower(plump, ('pelvic_left', 'pelvic_right'), 0.8)
+    return plump
+
+
 def catfish_looks():
     """Male (look A), a female ready to spawn (A, plump), young (dark)."""
     base = cm.model()
     out = {'catfish_male': cm.paint(base, 'A')}
-    plump = copy.deepcopy(base)
-    swell(plump, ('front', 'mid', 'rear'), cm.MID, lambda z: (1 + 0.14 * bump(z, -3.0, 8.0), 1 + 0.34 * bump(z, -3.0, 7.0)))
-    lower(plump, ('pelvic_left', 'pelvic_right'), 0.8)
-    out['catfish_female'] = cm.paint(plump, 'A')
+    out['catfish_female'] = cm.paint(catfish_plump(), 'A')
     out['catfish_young'] = cm.paint(base, 'Y')
     return out
 
@@ -246,16 +251,10 @@ def crocodile_looks():
     return out
 
 
-def crab_model(claws, flap, eggs=False):
+def crab_model(claws, flap, eggs=False, game=False):
     """The crab with claws of these sizes, a belly flap (narrow for a male, broad for a female) and maybe an orange egg
-    mass bulging from under the female's flap."""
-    saved = dict(cb.BIG)
-    cb.BIG.update(claws)
-    try:
-        bones = cb.model()
-    finally:
-        cb.BIG.clear()
-        cb.BIG.update(saved)
+    mass bulging from under the female's flap (game: with the game model's extra bones, the food bits and the shell)."""
+    bones = cb.with_claws(claws, game=game)
     body = bone(bones, 'body')['cubes']
     if flap == 'narrow':
         cb.box(body, -2.2, 5.6, -3.0, 2.2, 6.0, 5.5, 'flap')
@@ -271,9 +270,12 @@ def crab_model(claws, flap, eggs=False):
     return bones
 
 
+CRAB_EXTRA = {'flap': (214, 196, 164), 'egg': (226, 112, 40)}     # the flap's and the eggs' colours
+
+
 def crab_looks():
     out = {}
-    with Recolour(cb, wrap=extra_parts({'flap': (214, 196, 164), 'egg': (226, 112, 40)})):
+    with Recolour(cb, wrap=extra_parts(CRAB_EXTRA)):
         out['crab_male'] = cb.paint(crab_model({'left': 1.35, 'right': 1.7}, 'narrow'), 'A')
         out['crab_female'] = cb.paint(crab_model({'left': 0.8, 'right': 0.85}, 'broad'), 'A')
         out['crab_berried'] = cb.paint(crab_model({'left': 0.8, 'right': 0.85}, 'broad', eggs=True), 'A')

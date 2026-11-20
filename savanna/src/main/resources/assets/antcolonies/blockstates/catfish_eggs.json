@@ -1,0 +1,1028 @@
+{
+  "multipart": [
+    {
+      "when": {
+        "growth": "0",
+        "strands": "0"
+      },
+      "apply": [
+        {
+          "model": "antcolonies:block/algae_0"
+        },
+        {
+          "model": "antcolonies:block/algae_0",
+          "y": 90
+        },
+        {
+          "model": "antcolonies:block/algae_0",
+          "y": 180
+        },
+        {
+          "model": "antcolonies:block/algae_0",
+          "y": 270
+        }
+      ]
+    },
+    {
+      "when": {
+        "growth": "0",
+        "strands": "0"
+      },
+      "apply": {
+        "model": "antcolonies:block/catfish_eggs"
+      }
+    },
+    {
+      "when": {
+        "growth": "0",
+        "strands": "1"
+      },
+      "apply": [
+        {
+          "model": "antcolonies:block/algae_0"
+        },
+        {
+          "model": "antcolonies:block/algae_0",
+          "y": 90
+        },
+        {
+          "model": "antcolonies:block/algae_0",
+          "y": 180
+        },
+        {
+          "model": "antcolonies:block/algae_0",
+          "y": 270
+        }
+      ]
+    },
+    {
+      "when": {
+        "growth": "0",
+        "strands": "1"
+      },
+      "apply": {
+        "model": "antcolonies:block/catfish_eggs"
+      }
+    },
+    {
+      "when": {
+        "growth": "0",
+        "strands": "2"
+      },
+      "apply": [
+        {
+          "model": "antcolonies:block/algae_0"
+        },
+        {
+          "model": "antcolonies:block/algae_0",
+          "y": 90
+        },
+        {
+          "model": "antcolonies:block/algae_0",
+          "y": 180
+        },
+        {
+          "model": "antcolonies:block/algae_0",
+          "y": 270
+        }
+      ]
+    },
+    {
+      "when": {
+        "growth": "0",
+        "strands": "2"
+      },
+      "apply": {
+        "model": "antcolonies:block/catfish_eggs"
+      }
+    },
+    {
+      "when": {
+        "growth": "0",
+        "strands": "3"
+      },
+      "apply": [
+        {
+          "model": "antcolonies:block/algae_0"
+        },
+        {
+          "model": "antcolonies:block/algae_0",
+          "y": 90
+        },
+        {
+          "model": "antcolonies:block/algae_0",
+          "y": 180
+        },
+        {
+          "model": "antcolonies:block/algae_0",
+          "y": 270
+        }
+      ]
+    },
+    {
+      "when": {
+        "growth": "0",
+        "strands": "3"
+      },
+      "apply": {
+        "model": "antcolonies:block/catfish_eggs"
+      }
+    },
+    {
+      "when": {
+        "growth": "0",
+        "strands": "4"
+      },
+      "apply": [
+        {
+          "model": "antcolonies:block/algae_0"
+        },
+        {
+          "model": "antcolonies:block/algae_0",
+          "y": 90
+        },
+        {
+          "model": "antcolonies:block/algae_0",
+          "y": 180
+        },
+        {
+          "model": "antcolonies:block/algae_0",
+          "y": 270
+        }
+      ]
+    },
+    {
+      "when": {
+        "growth": "0",
+        "strands": "4"
+      },
+      "apply": {
+        "model": "antcolonies:block/catfish_eggs"
+      }
+    },
+    {
+      "when": {
+        "growth": "0",
+        "strands": "5"
+      },
+      "apply": [
+        {
+          "model": "antcolonies:block/algae_0"
+        },
+        {
+          "model": "antcolonies:block/algae_0",
+          "y": 90
+        },
+        {
+          "model": "antcolonies:block/algae_0",
+          "y": 180
+        },
+        {
+          "model": "antcolonies:block/algae_0",
+          "y": 270
+        }
+      ]
+    },
+    {
+      "when": {
+        "growth": "0",
+        "strands": "5"
+      },
+      "apply": {
+        "model": "antcolonies:block/catfish_eggs"
+      }
+    },
+    {
+      "when": {
+        "growth": "0",
+        "strands": "6"
+      },
+      "apply": [
+        {
+          "model": "antcolonies:block/algae_0"
+        },
+        {
+          "model": "antcolonies:block/algae_0",
+          "y": 90
+        },
+        {
+          "model": "antcolonies:block/algae_0",
+          "y": 180
+        },
+        {
+          "model": "antcolonies:block/algae_0",
+          "y": 270
+        }
+      ]
+    },
+    {
+      "when": {
+        "growth": "0",
+        "strands": "6"
+      },
+      "apply": {
+        "model": "antcolonies:block/catfish_eggs"
+      }
+    },
+    {
+      "when": {
+        "growth": "0",
+        "strands": "7"
+      },
+      "apply": [
+        {
+          "model": "antcolonies:block/algae_0"
+        },
+        {
+          "model": "antcolonies:block/algae_0",
+          "y": 90
+        },
+        {
+          "model": "antcolonies:block/algae_0",
+          "y": 180
+        },
+        {
+          "model": "antcolonies:block/algae_0",
+          "y": 270
+        }
+      ]
+    },
+    {
+      "when": {
+        "growth": "0",
+        "strands": "7"
+      },
+      "apply": {
+        "model": "antcolonies:block/catfish_eggs"
+      }
+    },
+    {
+      "when": {
+        "growth": "1",
+        "strands": "0"
+      },
+      "apply": [
+        {
+          "model": "antcolonies:block/algae_1"
+        },
+        {
+          "model": "antcolonies:block/algae_1",
+          "y": 90
+        },
+        {
+          "model": "antcolonies:block/algae_1",
+          "y": 180
+        },
+        {
+          "model": "antcolonies:block/algae_1",
+          "y": 270
+        }
+      ]
+    },
+    {
+      "when": {
+        "growth": "1",
+        "strands": "0"
+      },
+      "apply": {
+        "model": "antcolonies:block/catfish_eggs"
+      }
+    },
+    {
+      "when": {
+        "growth": "1",
+        "strands": "1"
+      },
+      "apply": [
+        {
+          "model": "antcolonies:block/algae_1"
+        },
+        {
+          "model": "antcolonies:block/algae_1",
+          "y": 90
+        },
+        {
+          "model": "antcolonies:block/algae_1",
+          "y": 180
+        },
+        {
+          "model": "antcolonies:block/algae_1",
+          "y": 270
+        }
+      ]
+    },
+    {
+      "when": {
+        "growth": "1",
+        "strands": "1"
+      },
+      "apply": {
+        "model": "antcolonies:block/catfish_eggs"
+      }
+    },
+    {
+      "when": {
+        "growth": "1",
+        "strands": "2"
+      },
+      "apply": [
+        {
+          "model": "antcolonies:block/algae_1"
+        },
+        {
+          "model": "antcolonies:block/algae_1",
+          "y": 90
+        },
+        {
+          "model": "antcolonies:block/algae_1",
+          "y": 180
+        },
+        {
+          "model": "antcolonies:block/algae_1",
+          "y": 270
+        }
+      ]
+    },
+    {
+      "when": {
+        "growth": "1",
+        "strands": "2"
+      },
+      "apply": {
+        "model": "antcolonies:block/catfish_eggs"
+      }
+    },
+    {
+      "when": {
+        "growth": "1",
+        "strands": "3"
+      },
+      "apply": [
+        {
+          "model": "antcolonies:block/algae_1"
+        },
+        {
+          "model": "antcolonies:block/algae_1",
+          "y": 90
+        },
+        {
+          "model": "antcolonies:block/algae_1",
+          "y": 180
+        },
+        {
+          "model": "antcolonies:block/algae_1",
+          "y": 270
+        }
+      ]
+    },
+    {
+      "when": {
+        "growth": "1",
+        "strands": "3"
+      },
+      "apply": {
+        "model": "antcolonies:block/catfish_eggs"
+      }
+    },
+    {
+      "when": {
+        "growth": "1",
+        "strands": "4"
+      },
+      "apply": [
+        {
+          "model": "antcolonies:block/algae_1"
+        },
+        {
+          "model": "antcolonies:block/algae_1",
+          "y": 90
+        },
+        {
+          "model": "antcolonies:block/algae_1",
+          "y": 180
+        },
+        {
+          "model": "antcolonies:block/algae_1",
+          "y": 270
+        }
+      ]
+    },
+    {
+      "when": {
+        "growth": "1",
+        "strands": "4"
+      },
+      "apply": {
+        "model": "antcolonies:block/catfish_eggs"
+      }
+    },
+    {
+      "when": {
+        "growth": "1",
+        "strands": "5"
+      },
+      "apply": [
+        {
+          "model": "antcolonies:block/algae_1"
+        },
+        {
+          "model": "antcolonies:block/algae_1",
+          "y": 90
+        },
+        {
+          "model": "antcolonies:block/algae_1",
+          "y": 180
+        },
+        {
+          "model": "antcolonies:block/algae_1",
+          "y": 270
+        }
+      ]
+    },
+    {
+      "when": {
+        "growth": "1",
+        "strands": "5"
+      },
+      "apply": {
+        "model": "antcolonies:block/catfish_eggs"
+      }
+    },
+    {
+      "when": {
+        "growth": "1",
+        "strands": "6"
+      },
+      "apply": [
+        {
+          "model": "antcolonies:block/algae_1"
+        },
+        {
+          "model": "antcolonies:block/algae_1",
+          "y": 90
+        },
+        {
+          "model": "antcolonies:block/algae_1",
+          "y": 180
+        },
+        {
+          "model": "antcolonies:block/algae_1",
+          "y": 270
+        }
+      ]
+    },
+    {
+      "when": {
+        "growth": "1",
+        "strands": "6"
+      },
+      "apply": {
+        "model": "antcolonies:block/catfish_eggs"
+      }
+    },
+    {
+      "when": {
+        "growth": "1",
+        "strands": "7"
+      },
+      "apply": [
+        {
+          "model": "antcolonies:block/algae_1"
+        },
+        {
+          "model": "antcolonies:block/algae_1",
+          "y": 90
+        },
+        {
+          "model": "antcolonies:block/algae_1",
+          "y": 180
+        },
+        {
+          "model": "antcolonies:block/algae_1",
+          "y": 270
+        }
+      ]
+    },
+    {
+      "when": {
+        "growth": "1",
+        "strands": "7"
+      },
+      "apply": {
+        "model": "antcolonies:block/catfish_eggs"
+      }
+    },
+    {
+      "when": {
+        "growth": "2",
+        "strands": "0"
+      },
+      "apply": [
+        {
+          "model": "antcolonies:block/algae_2_s0"
+        },
+        {
+          "model": "antcolonies:block/algae_2_s0",
+          "y": 90
+        },
+        {
+          "model": "antcolonies:block/algae_2_s0",
+          "y": 180
+        },
+        {
+          "model": "antcolonies:block/algae_2_s0",
+          "y": 270
+        }
+      ]
+    },
+    {
+      "when": {
+        "growth": "2",
+        "strands": "0"
+      },
+      "apply": {
+        "model": "antcolonies:block/catfish_eggs"
+      }
+    },
+    {
+      "when": {
+        "growth": "2",
+        "strands": "1"
+      },
+      "apply": [
+        {
+          "model": "antcolonies:block/algae_2_s1"
+        },
+        {
+          "model": "antcolonies:block/algae_2_s1",
+          "y": 90
+        },
+        {
+          "model": "antcolonies:block/algae_2_s1",
+          "y": 180
+        },
+        {
+          "model": "antcolonies:block/algae_2_s1",
+          "y": 270
+        }
+      ]
+    },
+    {
+      "when": {
+        "growth": "2",
+        "strands": "1"
+      },
+      "apply": {
+        "model": "antcolonies:block/catfish_eggs"
+      }
+    },
+    {
+      "when": {
+        "growth": "2",
+        "strands": "2"
+      },
+      "apply": [
+        {
+          "model": "antcolonies:block/algae_2_s2"
+        },
+        {
+          "model": "antcolonies:block/algae_2_s2",
+          "y": 90
+        },
+        {
+          "model": "antcolonies:block/algae_2_s2",
+          "y": 180
+        },
+        {
+          "model": "antcolonies:block/algae_2_s2",
+          "y": 270
+        }
+      ]
+    },
+    {
+      "when": {
+        "growth": "2",
+        "strands": "2"
+      },
+      "apply": {
+        "model": "antcolonies:block/catfish_eggs"
+      }
+    },
+    {
+      "when": {
+        "growth": "2",
+        "strands": "3"
+      },
+      "apply": [
+        {
+          "model": "antcolonies:block/algae_2_s3"
+        },
+        {
+          "model": "antcolonies:block/algae_2_s3",
+          "y": 90
+        },
+        {
+          "model": "antcolonies:block/algae_2_s3",
+          "y": 180
+        },
+        {
+          "model": "antcolonies:block/algae_2_s3",
+          "y": 270
+        }
+      ]
+    },
+    {
+      "when": {
+        "growth": "2",
+        "strands": "3"
+      },
+      "apply": {
+        "model": "antcolonies:block/catfish_eggs"
+      }
+    },
+    {
+      "when": {
+        "growth": "2",
+        "strands": "4"
+      },
+      "apply": [
+        {
+          "model": "antcolonies:block/algae_2_s4"
+        },
+        {
+          "model": "antcolonies:block/algae_2_s4",
+          "y": 90
+        },
+        {
+          "model": "antcolonies:block/algae_2_s4",
+          "y": 180
+        },
+        {
+          "model": "antcolonies:block/algae_2_s4",
+          "y": 270
+        }
+      ]
+    },
+    {
+      "when": {
+        "growth": "2",
+        "strands": "4"
+      },
+      "apply": {
+        "model": "antcolonies:block/catfish_eggs"
+      }
+    },
+    {
+      "when": {
+        "growth": "2",
+        "strands": "5"
+      },
+      "apply": [
+        {
+          "model": "antcolonies:block/algae_2_s5"
+        },
+        {
+          "model": "antcolonies:block/algae_2_s5",
+          "y": 90
+        },
+        {
+          "model": "antcolonies:block/algae_2_s5",
+          "y": 180
+        },
+        {
+          "model": "antcolonies:block/algae_2_s5",
+          "y": 270
+        }
+      ]
+    },
+    {
+      "when": {
+        "growth": "2",
+        "strands": "5"
+      },
+      "apply": {
+        "model": "antcolonies:block/catfish_eggs"
+      }
+    },
+    {
+      "when": {
+        "growth": "2",
+        "strands": "6"
+      },
+      "apply": [
+        {
+          "model": "antcolonies:block/algae_2_s5"
+        },
+        {
+          "model": "antcolonies:block/algae_2_s5",
+          "y": 90
+        },
+        {
+          "model": "antcolonies:block/algae_2_s5",
+          "y": 180
+        },
+        {
+          "model": "antcolonies:block/algae_2_s5",
+          "y": 270
+        }
+      ]
+    },
+    {
+      "when": {
+        "growth": "2",
+        "strands": "6"
+      },
+      "apply": {
+        "model": "antcolonies:block/catfish_eggs"
+      }
+    },
+    {
+      "when": {
+        "growth": "2",
+        "strands": "7"
+      },
+      "apply": [
+        {
+          "model": "antcolonies:block/algae_2_s5"
+        },
+        {
+          "model": "antcolonies:block/algae_2_s5",
+          "y": 90
+        },
+        {
+          "model": "antcolonies:block/algae_2_s5",
+          "y": 180
+        },
+        {
+          "model": "antcolonies:block/algae_2_s5",
+          "y": 270
+        }
+      ]
+    },
+    {
+      "when": {
+        "growth": "2",
+        "strands": "7"
+      },
+      "apply": {
+        "model": "antcolonies:block/catfish_eggs"
+      }
+    },
+    {
+      "when": {
+        "growth": "3",
+        "strands": "0"
+      },
+      "apply": [
+        {
+          "model": "antcolonies:block/algae_3_s0"
+        },
+        {
+          "model": "antcolonies:block/algae_3_s0",
+          "y": 90
+        },
+        {
+          "model": "antcolonies:block/algae_3_s0",
+          "y": 180
+        },
+        {
+          "model": "antcolonies:block/algae_3_s0",
+          "y": 270
+        }
+      ]
+    },
+    {
+      "when": {
+        "growth": "3",
+        "strands": "0"
+      },
+      "apply": {
+        "model": "antcolonies:block/catfish_eggs"
+      }
+    },
+    {
+      "when": {
+        "growth": "3",
+        "strands": "1"
+      },
+      "apply": [
+        {
+          "model": "antcolonies:block/algae_3_s1"
+        },
+        {
+          "model": "antcolonies:block/algae_3_s1",
+          "y": 90
+        },
+        {
+          "model": "antcolonies:block/algae_3_s1",
+          "y": 180
+        },
+        {
+          "model": "antcolonies:block/algae_3_s1",
+          "y": 270
+        }
+      ]
+    },
+    {
+      "when": {
+        "growth": "3",
+        "strands": "1"
+      },
+      "apply": {
+        "model": "antcolonies:block/catfish_eggs"
+      }
+    },
+    {
+      "when": {
+        "growth": "3",
+        "strands": "2"
+      },
+      "apply": [
+        {
+          "model": "antcolonies:block/algae_3_s2"
+        },
+        {
+          "model": "antcolonies:block/algae_3_s2",
+          "y": 90
+        },
+        {
+          "model": "antcolonies:block/algae_3_s2",
+          "y": 180
+        },
+        {
+          "model": "antcolonies:block/algae_3_s2",
+          "y": 270
+        }
+      ]
+    },
+    {
+      "when": {
+        "growth": "3",
+        "strands": "2"
+      },
+      "apply": {
+        "model": "antcolonies:block/catfish_eggs"
+      }
+    },
+    {
+      "when": {
+        "growth": "3",
+        "strands": "3"
+      },
+      "apply": [
+        {
+          "model": "antcolonies:block/algae_3_s3"
+        },
+        {
+          "model": "antcolonies:block/algae_3_s3",
+          "y": 90
+        },
+        {
+          "model": "antcolonies:block/algae_3_s3",
+          "y": 180
+        },
+        {
+          "model": "antcolonies:block/algae_3_s3",
+          "y": 270
+        }
+      ]
+    },
+    {
+      "when": {
+        "growth": "3",
+        "strands": "3"
+      },
+      "apply": {
+        "model": "antcolonies:block/catfish_eggs"
+      }
+    },
+    {
+      "when": {
+        "growth": "3",
+        "strands": "4"
+      },
+      "apply": [
+        {
+          "model": "antcolonies:block/algae_3_s4"
+        },
+        {
+          "model": "antcolonies:block/algae_3_s4",
+          "y": 90
+        },
+        {
+          "model": "antcolonies:block/algae_3_s4",
+          "y": 180
+        },
+        {
+          "model": "antcolonies:block/algae_3_s4",
+          "y": 270
+        }
+      ]
+    },
+    {
+      "when": {
+        "growth": "3",
+        "strands": "4"
+      },
+      "apply": {
+        "model": "antcolonies:block/catfish_eggs"
+      }
+    },
+    {
+      "when": {
+        "growth": "3",
+        "strands": "5"
+      },
+      "apply": [
+        {
+          "model": "antcolonies:block/algae_3_s5"
+        },
+        {
+          "model": "antcolonies:block/algae_3_s5",
+          "y": 90
+        },
+        {
+          "model": "antcolonies:block/algae_3_s5",
+          "y": 180
+        },
+        {
+          "model": "antcolonies:block/algae_3_s5",
+          "y": 270
+        }
+      ]
+    },
+    {
+      "when": {
+        "growth": "3",
+        "strands": "5"
+      },
+      "apply": {
+        "model": "antcolonies:block/catfish_eggs"
+      }
+    },
+    {
+      "when": {
+        "growth": "3",
+        "strands": "6"
+      },
+      "apply": [
+        {
+          "model": "antcolonies:block/algae_3_s6"
+        },
+        {
+          "model": "antcolonies:block/algae_3_s6",
+          "y": 90
+        },
+        {
+          "model": "antcolonies:block/algae_3_s6",
+          "y": 180
+        },
+        {
+          "model": "antcolonies:block/algae_3_s6",
+          "y": 270
+        }
+      ]
+    },
+    {
+      "when": {
+        "growth": "3",
+        "strands": "6"
+      },
+      "apply": {
+        "model": "antcolonies:block/catfish_eggs"
+      }
+    },
+    {
+      "when": {
+        "growth": "3",
+        "strands": "7"
+      },
+      "apply": [
+        {
+          "model": "antcolonies:block/algae_3_s7"
+        },
+        {
+          "model": "antcolonies:block/algae_3_s7",
+          "y": 90
+        },
+        {
+          "model": "antcolonies:block/algae_3_s7",
+          "y": 180
+        },
+        {
+          "model": "antcolonies:block/algae_3_s7",
+          "y": 270
+        }
+      ]
+    },
+    {
+      "when": {
+        "growth": "3",
+        "strands": "7"
+      },
+      "apply": {
+        "model": "antcolonies:block/catfish_eggs"
+      }
+    }
+  ]
+}
