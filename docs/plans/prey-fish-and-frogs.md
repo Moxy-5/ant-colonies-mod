@@ -172,6 +172,9 @@ user: a detailed webbed foot model comes later). Fun first, inspired by the real
   lid row); `EYE_LOOKS` in `tools/bullfrog_models.py`. A pop-up cubes on the head's top (v14), B side cubes poking
   out of the head's sides (v15), C painted on a flat plate under a square brow (v16); pictures in
   `references/workshop/bullfrog/eyes_minecraft_options.png`. Waiting for the user's pick.
+- 2026-11-20, **the user picked C, painted on** ("exactly what I wanted", kept as v16, now the maker's default);
+  asked for a little more life and detail, less blocky lids: C2 (v17) adds a glint in the pupil, a dark upper lid
+  line, a lighter lower lid rounding the eye, and a brow tapering at its outer edge. Waiting for the user's look.
 
 ## My picks the user may change
 The barb's name and look, every size and number above (the bullfrog's size is the user's call), barbs with no hunger,

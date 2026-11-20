@@ -145,7 +145,7 @@ def _box(cubes, x_a, x_b, y0, y1, z0, z1, part):
 # pixels, never tilted, and the eye painted on their flat faces as pixel art, the way Minecraft's own mobs have them.
 # Each eye is still its own bone, so it can blink later. A look is: the box (x from the middle line out, y, z with the
 # snout to -z, all whole pixels; for the left eye, mirrored for the right), the pixel art on its front face and on
-# its outer face (rows from the box's top; 'g' skin, 'w' white, 'k' black; anything outside the art is skin), and
+# its outer face (rows from the box's top; 'g' skin, 'w' white, 'k' black, 'h' glint, 'd' dark lid, 'l' light lid; anything outside the art is skin), and
 # extra skin boxes (a brow).
 EYE_LOOKS = {
     # A, pop-up cubes: a cube standing up on top of the head at each front corner, a green lid on top.
@@ -166,8 +166,16 @@ EYE_LOOKS = {
                 'front': ('ggggg', 'ggwkk', 'ggwkk', 'ggwkk', 'ggggg'),
                 'outer': ('gggggggg', 'kkkwwwgg', 'kkkwwwgg', 'kkkwwwgg', 'gggggggg'),
                 'extra': (((5, 12), (18, 19), (-17, -8)),)},
+    # C2, painted on with more life (the user, 2026-11-20: "C is perfect, just edit it", less blocky, more detail;
+    # C itself kept as v16): the same plate and brow, the eye drawn rounder (a dark upper lid line under the brow, a
+    # lighter lower lid cutting the eye's lower corners), a white glint in the pupil (at its outer top from ahead),
+    # and the brow tapering: its outer edge half as thick and a pixel shorter at the front, so it is less of a slab.
+    'painted_detail': {'box': ((6, 11), (12, 18), (-16, -8)),
+                       'front': ('ggddd', 'ggwkh', 'ggwkk', 'gglkk', 'ggllg'),
+                       'outer': ('ddddddgg', 'khkwwwdg', 'kkkwwwwg', 'kkkwwllg', 'llllllgg'),
+                       'extra': (((5, 11), (18, 19), (-17, -8)), ((11, 12), (18, 18.5), (-16, -8)))},
 }
-EYE_LOOK = 'cubes'
+EYE_LOOK = 'painted'
 
 
 def eye_bones(s):
@@ -186,7 +194,7 @@ def eye_bones(s):
     return {'name': name, 'parent': 'head', 'pivot': [s * (x0 + x1) / 2, y0, (z0 + z1) / 2], 'cubes': c}
 
 
-ART = {'g': 'skin', 'w': 'eye_white', 'k': 'pupil'}
+ART = {'g': 'skin', 'w': 'eye_white', 'k': 'pupil', 'h': 'glint', 'd': 'lid_dark', 'l': 'lid_light'}
 
 
 def eye_colour(c, face_, x, y, z):
@@ -306,6 +314,9 @@ PLAIN = {
     'throat': (226, 206, 112),    # pale yellow throat
     'eye_white': (238, 236, 222),
     'pupil': (20, 18, 16),
+    'glint': (255, 255, 255),     # the shine in the pupil
+    'lid_dark': (58, 72, 32),     # the upper lid line under the brow
+    'lid_light': (130, 148, 72),  # the lower lid
     'ear': (74, 88, 46),          # the eardrum, a shade darker
     'toe': (176, 168, 110),
     'web': (110, 122, 64),

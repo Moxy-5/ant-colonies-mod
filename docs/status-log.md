@@ -532,3 +532,4 @@ Every "Current status" bullet CLAUDE.md held up to 2026-11-19, word for word, ol
 - 2026-11-20: The bullfrog's eyes remade at an angle (the user's ask): each its own bone tilted out, up and forward, a flat eye face with the pupil under a brow lid (v13); waiting for the user's look.
 - 2026-11-20: The bullfrog's body approved by the user; its eyes move to their own session, fun first (whatever looks good in Minecraft, not strict realism).
 - 2026-11-20: The bullfrog's eyes started over in Minecraft style (old eye tries deleted): three options, pop-up cubes (v14), side cubes (v15), painted on (v16); waiting for the user's pick.
+- 2026-11-20: The user picked the bullfrog's painted-on eyes (C, v16); a livelier copy C2 (v17: pupil glint, lid lines, tapered brow) waits for the user's look.
