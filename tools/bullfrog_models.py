@@ -145,7 +145,7 @@ def _box(cubes, x_a, x_b, y0, y1, z0, z1, part):
 # pixels, never tilted, and the eye painted on their flat faces as pixel art, the way Minecraft's own mobs have them.
 # Each eye is still its own bone, so it can blink later. A look is: the box (x from the middle line out, y, z with the
 # snout to -z, all whole pixels; for the left eye, mirrored for the right), the pixel art on its front face and on
-# its outer face (rows from the box's top; 'g' skin, 'w' white, 'k' black, 'h' glint, 'd' dark lid, 'l' light lid; anything outside the art is skin), and
+# its outer face, or one 'strip' running from the front face round the corner onto the outer face (rows from the box's top; 'g' skin, 'w' white, 'k' black, 'h' glint, 'd' dark lid, 'l' light lid; anything outside the art is skin), and
 # extra skin boxes (a brow).
 EYE_LOOKS = {
     # A, pop-up cubes: a cube standing up on top of the head at each front corner, a green lid on top.
@@ -167,12 +167,18 @@ EYE_LOOKS = {
                 'outer': ('gggggggg', 'kkkwwwgg', 'kkkwwwgg', 'kkkwwwgg', 'gggggggg'),
                 'extra': (((5, 12), (18, 19), (-17, -8)),)},
     # C2, painted on with more life (the user, 2026-11-20: "C is perfect, just edit it", less blocky, more detail;
-    # C itself kept as v16): the same plate and brow, the eye drawn rounder (a dark upper lid line under the brow, a
-    # lighter lower lid cutting the eye's lower corners), a white glint in the pupil (at its outer top from ahead),
-    # and the brow tapering: its outer edge half as thick and a pixel shorter at the front, so it is less of a slab.
+    # C itself kept as v16). The eye is ONE eye wrapping round the plate's front outer corner (the user: the first C2
+    # painted the front and the side each as its own eye, two glints, lids starting over at the corner): its art is
+    # one strip, the front face's columns (from the inner edge to the corner) running straight on into the outer
+    # face's (from the corner back). One pupil across the corner, one glint sitting on the corner itself (so it shows from ahead,
+    # from the side and between), a dark upper lid line and a lighter lower
+    # lid running unbroken round the corner and rounding the eye's ends; the brow tapers at its outer edge.
     'painted_detail': {'box': ((6, 11), (12, 18), (-16, -8)),
-                       'front': ('ggddd', 'ggwkh', 'ggwkk', 'gglkk', 'ggllg'),
-                       'outer': ('ddddddgg', 'khkwwwdg', 'kkkwwwwg', 'kkkwwllg', 'llllllgg'),
+                       'strip': ('ggddd' 'ddddddgg',
+                                 'ggwkh' 'hkkwwwdg',
+                                 'ggwkk' 'kkkwwwwg',
+                                 'gglkk' 'kkkwwllg',
+                                 'gggll' 'llllllgg'),
                        'extra': (((5, 11), (18, 19), (-17, -8)), ((11, 12), (18, 18.5), (-16, -8)))},
 }
 EYE_LOOK = 'painted'
@@ -183,7 +189,12 @@ def eye_bones(s):
     look = EYE_LOOKS[EYE_LOOK]
     (x0, x1), (y0, y1), (z0, z1) = look['box']
     xa, xb = sorted((s * x0, s * x1))
-    info = {'s': s, 'x_in': s * x0, 'y1': y1, 'z0': z0, 'front': look['front'], 'outer': look['outer']}
+    if 'strip' in look:                    # one eye round the corner: the front face's columns, then the side's
+        w = x1 - x0
+        front, outer = [r[:w] for r in look['strip']], [r[w:] for r in look['strip']]
+    else:
+        front, outer = look['front'], look['outer']
+    info = {'s': s, 'x_in': s * x0, 'y1': y1, 'z0': z0, 'front': front, 'outer': outer}
     eye = cube([xa, y0, z0], [xb, y1, z1], 'eye')
     eye['_eye'] = info
     c = [eye]

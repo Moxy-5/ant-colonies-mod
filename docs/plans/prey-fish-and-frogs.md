@@ -175,6 +175,11 @@ user: a detailed webbed foot model comes later). Fun first, inspired by the real
 - 2026-11-20, **the user picked C, painted on** ("exactly what I wanted", kept as v16, now the maker's default);
   asked for a little more life and detail, less blocky lids: C2 (v17) adds a glint in the pupil, a dark upper lid
   line, a lighter lower lid rounding the eye, and a brow tapering at its outer edge. Waiting for the user's look.
+- 2026-11-20, **that C2 deleted** (the user: the detail was copied onto the front and the side face as if each were
+  its own eye). **Lesson: an eye that wraps a box's corner is drawn as one picture across both faces** (`strip` in
+  `EYE_LOOKS`), never the same art on each face. C2 redone so (v17): one pupil across the corner, one glint on the
+  corner itself (seen from ahead, the side and between), lid lines unbroken round it, the brow tapering. C stays v16
+  and the default. Waiting for the user's look.
 
 ## My picks the user may change
 The barb's name and look, every size and number above (the bullfrog's size is the user's call), barbs with no hunger,
