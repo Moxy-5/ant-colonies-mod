@@ -26,13 +26,32 @@ inspired by real flies.
   `cloud_publish.html`, published for the user at https://claude.ai/artifact/1YqPfzWhZtsy9rALV3i5ri (views: the whole
   cloud, follow one fly, a still fly on a stone; looks A, B or both; 1 to 12 flies; slow motion).
 
+## Height and the long tongue (the user, 2026-11-20)
+- **The tongue reaches 2 blocks** (the user: "start with 2 block range but the height goes up to 2 blocks"; they first
+  thought of 3; fun first, a cartoon tongue: real frog tongues reach a third to one body length, and the real African
+  bullfrog mostly gulps with its lunge). For a male (0.8 blocks) that is 2.5 body lengths; a female's reaches less, by
+  her size (the clip scales with the model; my pick). It shoots into a cone in front of the frog and above it (a fly
+  behind it: the frog turns first), only along a clear line (no tongue through blocks or leaves).
+- **The swarms hover high** (the user: "fly swarms hover 2 blocks in the sky and sometimes 3 blocks so they're
+  unreachable"): the cloud's middle drifts slowly between about 1.7 and 3 blocks over the ground or water under it,
+  mostly near 2, a rise and fall every minute or two (my picks). So a frog waits under a cloud, head tipped up, and
+  flicks when the cloud sinks into reach; when it rises, it cannot eat. A frog is full after a few flies and rests a
+  minute or two (its existing fed time, no new rule).
+- **Landed flies** (single flies dropping out of the cloud for a few seconds) are the easy pickings: on the bank and on
+  the water's surface, where frogs flick at them, barbs sip them and young crocodiles snap at them (those two never
+  reach the swarm).
+- **The tongue drawn as a rope (a Minecraft-coder point):** stretching the model's tongue pieces six times over would
+  smear their pixels into long streaks, so the bullfrog's renderer draws the shot tongue the way Minecraft draws a lead:
+  a pink ribbon from the mouth to the fly, thinner as it stretches, the sticky pad on its end, any length and way,
+  wobbling like elastic on the way back. The mouth, head tilt and swallow stay a clip.
+
 ## The frog eating a fly (a Minecraft-coder point)
 The flies' places exist only on the player's computer, so the server cannot see which fly is near the frog. So the
-server decides it: while a cloud's middle is within about 0.8 blocks of a bullfrog's mouth, a fly "comes within reach"
-by chance every few seconds (the tongue reaches 0.32 blocks for a male); the frog plays `tongue`, the server takes a
-fly from the cloud and tells the players' computers, and the renderer steers one fly into the tongue's path and hides it
-as the tongue snaps back. The cloud refills slowly (my pick: one fly a minute); an empty cloud drifts away and is gone.
-Barbs can sip a fly off the surface the same way; young crocodiles snap at low flies.
+server decides it: while the cloud's lowest flies are within the tongue's 2 blocks of a bullfrog's mouth (or a landed fly
+is), a fly "comes within reach" by chance every few seconds; the frog plays `tongue`, the server takes a fly from the
+cloud and tells the players' computers, and the renderer steers one fly into the tongue's path and hides it as the
+tongue snaps back; some flicks miss and the fly zips off (my pick: 1 in 4). The cloud refills slowly (my pick: one fly a
+minute); an empty cloud drifts away and is gone.
 
 ## Where and when
 - **For now (the user, 2026-11-20: "make them around all day for now just for testing"):** over the shallows, pans,
@@ -57,3 +76,6 @@ Barbs can sip a fly off the surface the same way; young crocodiles snap at low f
 - 2026-11-20: **both looks approved by the user** ("wow those look amazing, both sound good"): the clouds mix bottle
   flies and house flies (my pick for the mix: half and half, each cloud its own mix). Step 1 done; next, the clouds in
   the game (step 2).
+- 2026-11-20: the user's heights: the tongue reaches 2 blocks (up to 2 blocks high), the swarms hover about 2 blocks up
+  and sometimes 3, out of reach ("Height and the long tongue" above). The preview's clouds still hover low; they go up
+  with the game step.

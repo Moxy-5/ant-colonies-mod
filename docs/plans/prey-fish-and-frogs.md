@@ -252,6 +252,9 @@ user: a detailed webbed foot model comes later). Fun first, inspired by the real
   strip of the floor showed. v27: the upper lip is never narrower than the jaw under it (`body_slices`), the user's own
   idea ("cover them with the top lip"); the shut mouth clean from the front, side and three quarters, the open mouth
   and tongue unchanged; still 389 boxes. Picture `references/workshop/bullfrog/lip_v27.png`.
+- 2026-11-20, the user: **the tongue reaches 2 blocks** (up to 2 blocks high, aimed at the fly), for the fly clouds
+  that hover about 2 blocks up and sometimes 3; drawn as a rope by the renderer, the clip keeping the mouth, head and
+  swallow (`docs/plans/fly-clouds.md`, "Height and the long tongue"). Built with the bullfrog in the game (step 3).
 - 2026-11-20: the barb's plain 3D shape (`tools/barb_models.py`, v2, 38 boxes of the 40 budget, 8 bones: body,
   head, tail stalk, tail fin, back fin, two breast fins), built from the approved outline and the sheet's head steps:
   2-pixel slices of two boxes each (a rounded spindle from the front), eyes set into the head's sides, a swallow tail
