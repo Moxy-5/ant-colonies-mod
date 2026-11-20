@@ -112,6 +112,15 @@ def grounded(name, u):
 
 
 REST_DEPTH = joint_depths({})
+# the inside of the mouth, the tongue and the fangs must hide in the shut mouth (the frog sitting): each part's least
+# depth inside the skin, at rest
+MOUTH_PARTS = ('mouth_floor', 'mouth_roof', 'fang', 'tongue_1', 'tongue_2', 'tongue_pad')
+hidden = {}
+for b, cs, _ in model.posed({}):
+    if b in MOUTH_PARTS:
+        hidden[b] = min([hidden.get(b, 99.0)] + [skin_depth(p) for p in cs])
+print('mouth parts inside the shut mouth (least px inside the skin; below 0.3 flagged): ' + ', '.join(
+    f'{b} {d:.1f}' + (' FLAGGED' if d < 0.3 else '') for b, d in hidden.items()))
 for name in names:
     clip = lab.Clip(name, data[name])
     deepest = {}
@@ -179,6 +188,14 @@ for name in names:
                       f'{max(vz):5.2f}, sideways {min(vx):5.2f} to {max(vx):5.2f}')
             else:
                 print(f'    {e:11s} never down')
+    if name == 'tongue':
+        reach = []
+        for k in range(0, steps + 1, 2):
+            pad = [p for b, cs, _ in model.posed(clip.pose(k / 80)) if b == 'tongue_pad' for p in cs]
+            reach.append((min(p[2] for p in pad), min(p[1] for p in pad), k / 80))
+        far = min(reach)
+        print(f'  the tongue: its pad reaches {-bm.LENGTH / 2 - far[0]:.1f} px past the snout at {far[2]:.2f}, '
+              f'{far[1]:.1f} px over the ground there')
     worst = sorted(deepest.items(), key=lambda kv: -kv[1][0])[:2]
     if name in DIG or name == 'death':      # limbs tucked in on purpose: under the ground, or as it rolls over
         worst = []

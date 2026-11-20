@@ -227,6 +227,19 @@ user: a detailed webbed foot model comes later). Fun first, inspired by the real
   than at rest in any clip; `tools/frog_check.py` measures it every run (flags over 0.5 px; the dig clips and the death
   roll, tucked in on purpose, left out). Idea 2 (the haunch moved 1.5 px out in the model) kept in reserve if the
   haunch still looks swallowed. Waiting for the user's look.
+- 2026-11-20, **the knees-out fix approved by the user** ("yes thats perfect"). Next, the user's ask: the iconic tongue,
+  detailed, and the inside of the mouth smoothed a little.
+- 2026-11-20, **the tongue and a smooth mouth** (v25): the inside of the mouth was the stepped tops of the 2-pixel
+  slices; now a flat floor plate on the jaw and a roof plate on the head, each tilted along the mouth line, pink with wet
+  flecks, hidden 0.9 px inside the shut mouth. The tongue (three bones: root, middle, sticky pad) lies folded back on
+  the floor, fixed at the front as a real frog's; pink with a darker groove down the middle, paler edges, the pad deeper
+  rose with wet shine and a notch at its end. New clip `tongue` (0.7 s; for small prey close by): the mouth opens, the
+  tongue flips out over the jaw stretching 2.6 times, the pad slaps down 16 px past the snout (0.3 of a block for a
+  male), holds, flips back in, the mouth shuts and the eyes pull down to swallow. My addition, real: the bullfrog's three
+  bony points on the lower jaw (its odontoids, what gives its bite its grip), shown when the mouth opens. The attack's
+  gape now shows the smooth floor, the tongue and the points. `frog_check` checks the mouth parts hide in the shut
+  mouth and where the pad lands. Not smoothed: the jaw's outer edge still shows its slice steps when open (it is the
+  same stepped skin as the whole body). Waiting for the user's look.
 
 ## My picks the user may change
 The barb's name and look, every size and number above (the bullfrog's size is the user's call), barbs with no hunger,
