@@ -1,7 +1,20 @@
 {
-  "_note": "The Nile crocodile's life (the animal life kit). Sizes are shares of its usual size (7.5 blocks); no larger than 1.1, so its box stays what its legs can walk. Born grown for now; males and females, young, teens and nests come in step 4 of the plan.",
+  "_note": "The Nile crocodile's life (the animal life kit, docs/plans/animal-life-cycle.md, step 4: breeding on, 2026-11-20; all numbers my picks, fun first). Sizes are shares of its usual size (7.5 blocks); no larger than 1.1, so its box stays what its legs can walk (the old giant, bigger, waits for its own step). Males are the big ones, females smaller; the same look, the size tells them apart. Young hatch at 0.07 of grown (about half a block), banded; teens from 0.35 (slimmer, the bands fading) after 6 days, grown 8 days later. The world's own spawns stay grown. In the water a ready male courts a ready female (head slaps, the water dancing on his back, then they roll; courtship ticks count every other game tick, so 210 is 21 seconds); she nests on a sand bank above the water, lays 6 to 10 eggs and guards them 4 days; she digs the hatchlings out and carries them to the water, keeping them in a creche 2 days. Only as many hatch as the local limit has room for: fewer than 6 crocodiles within 48 blocks (the river hunter group's cap of 5 round a player holds too). A male looks for a female up to 48 blocks off: crocodiles spawn 24 apart.",
   "sexes": "two",
-  "size": [0.8, 1.1],
+  "male_size": [0.95, 1.1],
+  "female_size": [0.7, 0.85],
   "max_size": 1.1,
-  "breeds": false
+  "young_size": 0.07,
+  "young_days": 6,
+  "teen_size": 0.35,
+  "teen_days": 8,
+  "breeds": true,
+  "breed_every_days": 8,
+  "clutch": [6, 10],
+  "hatch_days": 4,
+  "care": "guard",
+  "care_days": 2,
+  "mate_reach": 48,
+  "local_limit": 6,
+  "courtship_ticks": 210
 }

@@ -1,0 +1,106 @@
+{
+  "variants": {
+    "open=false,tone=red": [
+      {
+        "model": "antcolonies:block/red_crocodile_nest"
+      },
+      {
+        "model": "antcolonies:block/red_crocodile_nest",
+        "y": 90
+      },
+      {
+        "model": "antcolonies:block/red_crocodile_nest",
+        "y": 180
+      },
+      {
+        "model": "antcolonies:block/red_crocodile_nest",
+        "y": 270
+      }
+    ],
+    "open=true,tone=red": [
+      {
+        "model": "antcolonies:block/red_crocodile_nest_open"
+      },
+      {
+        "model": "antcolonies:block/red_crocodile_nest_open",
+        "y": 90
+      },
+      {
+        "model": "antcolonies:block/red_crocodile_nest_open",
+        "y": 180
+      },
+      {
+        "model": "antcolonies:block/red_crocodile_nest_open",
+        "y": 270
+      }
+    ],
+    "open=false,tone=golden": [
+      {
+        "model": "antcolonies:block/golden_crocodile_nest"
+      },
+      {
+        "model": "antcolonies:block/golden_crocodile_nest",
+        "y": 90
+      },
+      {
+        "model": "antcolonies:block/golden_crocodile_nest",
+        "y": 180
+      },
+      {
+        "model": "antcolonies:block/golden_crocodile_nest",
+        "y": 270
+      }
+    ],
+    "open=true,tone=golden": [
+      {
+        "model": "antcolonies:block/golden_crocodile_nest_open"
+      },
+      {
+        "model": "antcolonies:block/golden_crocodile_nest_open",
+        "y": 90
+      },
+      {
+        "model": "antcolonies:block/golden_crocodile_nest_open",
+        "y": 180
+      },
+      {
+        "model": "antcolonies:block/golden_crocodile_nest_open",
+        "y": 270
+      }
+    ],
+    "open=false,tone=pale": [
+      {
+        "model": "antcolonies:block/pale_crocodile_nest"
+      },
+      {
+        "model": "antcolonies:block/pale_crocodile_nest",
+        "y": 90
+      },
+      {
+        "model": "antcolonies:block/pale_crocodile_nest",
+        "y": 180
+      },
+      {
+        "model": "antcolonies:block/pale_crocodile_nest",
+        "y": 270
+      }
+    ],
+    "open=true,tone=pale": [
+      {
+        "model": "antcolonies:block/pale_crocodile_nest_open"
+      },
+      {
+        "model": "antcolonies:block/pale_crocodile_nest_open",
+        "y": 90
+      },
+      {
+        "model": "antcolonies:block/pale_crocodile_nest_open",
+        "y": 180
+      },
+      {
+        "model": "antcolonies:block/pale_crocodile_nest_open",
+        "y": 270
+      }
+    ]
+  }
+}

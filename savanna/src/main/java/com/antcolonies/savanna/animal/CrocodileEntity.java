@@ -7,6 +7,8 @@ import java.util.Optional;
 import javax.annotation.Nullable;
 
 import com.antcolonies.animal.AnimalLife;
+import com.antcolonies.animal.Carried;
+import com.antcolonies.animal.GuardPlaceGoal;
 import com.antcolonies.animal.HasLife;
 import com.antcolonies.animal.SeekMateGoal;
 
@@ -74,6 +76,9 @@ public class CrocodileEntity extends PathfinderMob implements GeoEntity, HasLife
     private static final EntityDataAccessor<Byte> DATA_JAWS = SynchedEntityData.defineId(CrocodileEntity.class, EntityDataSerializers.BYTE);
     /** The game tick a death roll began (cut to an int), or {@link #NO_ROLL}. */
     private static final EntityDataAccessor<Integer> DATA_ROLL = SynchedEntityData.defineId(CrocodileEntity.class, EntityDataSerializers.INT);
+    /** What it shows in its breeding ({@link CrocodileBreeding}): courting, hissing at an intruder, digging, carrying young. */
+    private static final EntityDataAccessor<Byte> DATA_SHOW = SynchedEntityData.defineId(CrocodileEntity.class, EntityDataSerializers.BYTE);
+    public static final byte SHOW_NONE = 0, SHOW_SLAP = 1, SHOW_RUMBLE = 2, SHOW_SNOUT_UP = 3, SHOW_ROLL = 4, SHOW_HISS = 5, SHOW_DIG = 6, SHOW_CARRY = 7;
     public static final byte JAWS_NONE = 0, JAWS_GAPE = 1, JAWS_HOLD = 2, JAWS_EAT = 3, JAWS_DRAG = 4, JAWS_SNAP_LEFT = 5, JAWS_SNAP_RIGHT = 6, JAWS_SHAKE = 7;
     static final int NO_ROLL = Integer.MIN_VALUE;
 
@@ -245,6 +250,25 @@ public class CrocodileEntity extends PathfinderMob implements GeoEntity, HasLife
     public byte strikeLuck;
     /** For tests: how many animals have got away from it (slipped free of the haul, or a strike that fell short). */
     public int misses;
+    /**
+     * Its breeding (animal life cycle step 4, {@link CrocodileBreeding}): a female ripe with eggs to lay; her nest; the
+     * nest her young hatched from (while she fetches them); the crèche in the shallows and when her care ends (a young one
+     * keeps these too); a young one's mother and how long it still waits in the nest for her; the young in her mouth.
+     */
+    public boolean gravid;
+    @Nullable
+    BlockPos nestAt, hatchSite;
+    @Nullable
+    Vec3 crecheAt;
+    long crecheUntil;
+    @Nullable
+    java.util.UUID motherId;
+    int waitForMother;
+    final Carried carried = new Carried();
+    /** For tests: how many times it has bitten something it saw off its nest or crèche. */
+    public int guardBites;
+    /** Ticks it still gapes at a rival male. */
+    private int gapeFor;
 
     public CrocodileEntity(EntityType<? extends CrocodileEntity> type, Level level) {
         super(type, level);
@@ -268,13 +292,20 @@ public class CrocodileEntity extends PathfinderMob implements GeoEntity, HasLife
 
     @Override
     protected void registerGoals() {
+        goalSelector.addGoal(-1, new CrocodileBreeding.ChaseOffGoal(this));
+        goalSelector.addGoal(0, new GuardPlaceGoal(this, this::guardPlace, CrocodileBreeding.GUARD_STAY, CrocodileBreeding.GUARD_SEE_OFF,
+                e -> CrocodileBreeding.intruder(this, e), 1.0));
+        goalSelector.addGoal(0, new CrocodileBreeding.HeldForMateGoal(this));
+        goalSelector.addGoal(0, new CrocodileBreeding.WaitForMotherGoal(this));
         goalSelector.addGoal(0, new PlungeGoal(this));
+        goalSelector.addGoal(1, new CrocodileBreeding.MotherGoal(this));
+        goalSelector.addGoal(1, new SeekMateGoal<>(this, 1.0));      // over the sun and the wandering: a courtship is not left for a bask
         goalSelector.addGoal(1, new BaskGoal(this));
         goalSelector.addGoal(1, new HuntGoal(this));
         goalSelector.addGoal(2, new ToWaterGoal(this));
         goalSelector.addGoal(3, new HalfOutGoal(this));
         goalSelector.addGoal(3, new AshoreGoal(this));
-        goalSelector.addGoal(4, new SeekMateGoal<>(this, 1.0));
+        goalSelector.addGoal(2, new GuardPlaceGoal(this, this::crecheSpot, CrocodileBreeding.CRECHE_STAY, 0.0, e -> false, 1.0));
         goalSelector.addGoal(4, new RandomSwimmingGoal(this, 1.0, 60));
     }
 
@@ -290,6 +321,151 @@ public class CrocodileEntity extends PathfinderMob implements GeoEntity, HasLife
         builder.define(DATA_BASKING, false);
         builder.define(DATA_JAWS, JAWS_NONE);
         builder.define(DATA_ROLL, NO_ROLL);
+        builder.define(DATA_SHOW, SHOW_NONE);
+    }
+
+    /** What it shows now in its breeding ({@link #SHOW_NONE}: nothing). */
+    public byte show() {
+        return entityData.get(DATA_SHOW);
+    }
+
+    void setShow(byte show) {
+        if (show() != show) {
+            entityData.set(DATA_SHOW, show);
+        }
+    }
+
+    /** Gapes at a rival male a moment. */
+    void gape(int ticks) {
+        if (held == null && !hunting) {
+            setJaws(JAWS_GAPE);
+            gapeFor = ticks;
+        }
+    }
+
+    // --- breeding (animal life cycle step 4, CrocodileBreeding) -----------------------------------------------------------
+
+    /** A male goes looking for a mate in the water; a female waits there for one (and not while she has eggs or young to see to). */
+    @Override
+    public boolean seeksMate() {
+        return life.isMale() && isInWater() && startled <= 0;
+    }
+
+    @Override
+    public boolean takesMate() {
+        return isInWater() && (life.isMale() || !busyMother());
+    }
+
+    @Override
+    public void courting(net.minecraft.world.entity.Mob mate, int ticks) {
+        CrocodileBreeding.court(this, mate, ticks);
+    }
+
+    @Override
+    public void mated(net.minecraft.world.entity.Mob mate) {
+        if (!life.isMale()) {
+            gravid = true;
+        }
+    }
+
+    /** Her nest, if she has one. */
+    @Nullable
+    public BlockPos nestAt() {
+        return nestAt;
+    }
+
+    /** For tests: the crèche she keeps her young in, or a young one keeps to (null: none now). */
+    @Nullable
+    public Vec3 crecheAt() {
+        return crecheAt != null && level().getGameTime() < crecheUntil ? crecheAt : null;
+    }
+
+    /** For tests: how many young she carries in her mouth now. */
+    public int carrying() {
+        return carried.count();
+    }
+
+    /** For tests: this young one's mother. */
+    @Nullable
+    public java.util.UUID motherId() {
+        return motherId;
+    }
+
+    /**
+     * Whether she has work at her nest now (eggs to lay, a nest to cover or dig open, young to carry or fetch): she does
+     * not lie down to bask then.
+     */
+    boolean motherWork() {
+        if (gravid || !carried.isEmpty() || hatchSite != null) {
+            return true;
+        }
+        if (nestAt == null) {
+            return false;
+        }
+        var state = level().getBlockState(nestAt);
+        return state.getBlock() instanceof com.antcolonies.savanna.block.CrocodileNestBlock
+                && (state.getValue(com.antcolonies.savanna.block.CrocodileNestBlock.OPEN) || com.antcolonies.savanna.block.CrocodileNestBlock.hatching(state));
+    }
+
+    /** For tests: she guards a nest here (one laid by the test). */
+    public void guardNestForTests(BlockPos nest) {
+        nestAt = nest;
+        gravid = false;
+    }
+
+    /** Whether she has eggs to lay, a nest, young in her mouth or a crèche to see to. */
+    boolean busyMother() {
+        return gravid || nestAt != null || !carried.isEmpty() || hatchSite != null || guardPlace() != null;
+    }
+
+    /** Just hatched from a mother's nest: it waits in the nest for her (none: it makes for the water alone). */
+    public void hatchedBy(@Nullable CrocodileEntity mother) {
+        if (mother != null) {
+            motherId = mother.getUUID();
+            waitForMother = CrocodileBreeding.YOUNG_WAIT;
+        }
+    }
+
+    /** Let out of its mother's mouth into her crèche: it keeps near it while she cares for it. */
+    void joinCreche(CrocodileEntity mother) {
+        motherId = mother.getUUID();
+        crecheAt = mother.crecheAt;
+        crecheUntil = mother.crecheUntil;
+        waitForMother = 0;
+    }
+
+    /** What a grown female guards now: her nest, else her crèche while her care lasts (null: nothing). */
+    @Nullable
+    public BlockPos guardPlace() {
+        if (life.isMale() || !life.stage().grown()) {
+            return null;
+        }
+        if (nestAt != null) {
+            return nestAt;
+        }
+        return crecheAt != null && level().getGameTime() < crecheUntil ? BlockPos.containing(crecheAt) : null;
+    }
+
+    /** The crèche a young one keeps to while its mother cares for it (null: none). */
+    @Nullable
+    private BlockPos crecheSpot() {
+        return life.isYoung() && crecheAt != null && level().getGameTime() < crecheUntil ? BlockPos.containing(crecheAt) : null;
+    }
+
+    /**
+     * Its walking pace by its size: a crocodile under 0.7 of the usual size (the young and the teens) walks and swims
+     * slower, by the root of how much smaller it is (a hatchling about a quarter as fast); grown ones are as before.
+     */
+    private void sizeChanged() {
+        AttributeInstance speed = getAttribute(Attributes.MOVEMENT_SPEED);
+        if (speed != null) {
+            speed.setBaseValue(0.3 * sizePace());
+        }
+    }
+
+    /** How fast it moves and its clips play against a grown crocodile's (1 at 0.7 of the usual size and over). */
+    double sizePace() {
+        return Math.min(1.0, Math.sqrt(getScale() / 0.7));
     }
 
     /** Whether it is sunbathing: lying on the bank with its head raised and its mouth open. */
@@ -480,6 +656,7 @@ public class CrocodileEntity extends PathfinderMob implements GeoEntity, HasLife
 
     private void refresh() {
         life.apply();
+        sizeChanged();
     }
 
     @Override
@@ -526,6 +703,10 @@ public class CrocodileEntity extends PathfinderMob implements GeoEntity, HasLife
             lookAround();
             return;
         }
+        if (life.tick()) {
+            sizeChanged();          // growing up
+        }
+        breedingTick();
         if (hungerIn > 0) {
             hungerIn--;
         }
@@ -550,7 +731,7 @@ public class CrocodileEntity extends PathfinderMob implements GeoEntity, HasLife
         }
         if (startled > 0) {
             startled--;
-        } else if (tickCount % 10 == 0 && !hunting && (!isInWater() || isBasking()) && playerTooNear()) {
+        } else if (tickCount % 10 == 0 && !hunting && guardPlace() == null && (!isInWater() || isBasking()) && playerTooNear()) {
             startle();
         }
         // resting in the water it rises to hang at the surface, eyes and back out (startled, it sinks out of sight)
@@ -562,9 +743,53 @@ public class CrocodileEntity extends PathfinderMob implements GeoEntity, HasLife
         }
     }
 
+    /**
+     * Its breeding's tick: a courtship's look ends with the courtship, a gape at a rival ends, a hatchling stops waiting
+     * in the nest when its time is up or its mother is gone, and a crèche whose care is over is let go.
+     */
+    private void breedingTick() {
+        byte show = show();
+        // (a still one, NoAI, keeps the look a film gave it)
+        if ((show == SHOW_SLAP || show == SHOW_RUMBLE || show == SHOW_SNOUT_UP || show == SHOW_ROLL) && life.partner() == null && !isNoAi()) {
+            setShow(SHOW_NONE);
+        }
+        if (gapeFor > 0 && --gapeFor == 0 && jaws() == JAWS_GAPE && held == null) {
+            setJaws(JAWS_NONE);
+        }
+        if (waitForMother > 0) {
+            waitForMother--;
+            if (tickCount % 20 == 0 && mother() == null) {
+                waitForMother = 0;
+            }
+        }
+        if (crecheAt != null && level().getGameTime() >= crecheUntil) {
+            crecheAt = null;
+        }
+    }
+
+    /** This young one's mother, if she is near (within 32 blocks). */
+    @Nullable
+    CrocodileEntity mother() {
+        if (motherId == null || !(level() instanceof net.minecraft.server.level.ServerLevel level)
+                || !(level.getEntity(motherId) instanceof CrocodileEntity mother) || !mother.isAlive() || mother.distanceToSqr(this) > 32 * 32) {
+            return null;
+        }
+        return mother;
+    }
+
     @Override
     public boolean hurt(DamageSource source, float amount) {
         boolean hurt = super.hurt(source, amount);
+        if (hurt && source.getEntity() instanceof LivingEntity attacker && attacker != this) {
+            if (guardPlace() != null && held == null) {
+                setTarget(attacker);        // a mother hit at her nest or crèche turns on what hit her, she does not flee
+                return true;
+            }
+            CrocodileEntity mother = life.isYoung() ? mother() : null;
+            if (mother != null && mother.guardPlace() != null) {
+                mother.setTarget(attacker); // a young one hurt: its mother comes at what hurt it
+            }
+        }
         if (hurt && held != null) {
             // its prey fighting back, or anything hurting it enough, makes it let go and sink away (a player can fight free)
             heldHurt += amount;
@@ -687,6 +912,22 @@ public class CrocodileEntity extends PathfinderMob implements GeoEntity, HasLife
     public void addAdditionalSaveData(CompoundTag tag) {
         super.addAdditionalSaveData(tag);
         life.save(tag);
+        if (gravid) {
+            tag.putBoolean("Gravid", true);
+        }
+        if (nestAt != null) {
+            tag.putLong("NestAt", nestAt.asLong());
+        }
+        if (crecheAt != null) {
+            tag.putDouble("CrecheX", crecheAt.x);
+            tag.putDouble("CrecheY", crecheAt.y);
+            tag.putDouble("CrecheZ", crecheAt.z);
+            tag.putLong("CrecheUntil", crecheUntil);
+        }
+        if (motherId != null) {
+            tag.putUUID("Mother", motherId);
+        }
+        carried.save(tag, "CarriedYoung");
         tag.putInt("SunIn", sunIn);
         tag.putBoolean("HalfOut", restHalfOut);
         tag.putInt("HungerIn", hungerIn);
@@ -699,6 +940,13 @@ public class CrocodileEntity extends PathfinderMob implements GeoEntity, HasLife
     public void readAdditionalSaveData(CompoundTag tag) {
         super.readAdditionalSaveData(tag);
         life.load(tag);
+        gravid = tag.getBoolean("Gravid");
+        nestAt = tag.contains("NestAt") ? BlockPos.of(tag.getLong("NestAt")) : null;
+        crecheAt = tag.contains("CrecheX") ? new Vec3(tag.getDouble("CrecheX"), tag.getDouble("CrecheY"), tag.getDouble("CrecheZ")) : null;
+        crecheUntil = tag.getLong("CrecheUntil");
+        motherId = tag.hasUUID("Mother") ? tag.getUUID("Mother") : null;
+        carried.load(tag, "CarriedYoung");
+        sizeChanged();
         if (tag.contains("SunIn")) {
             sunIn = tag.getInt("SunIn");
         }
@@ -708,12 +956,16 @@ public class CrocodileEntity extends PathfinderMob implements GeoEntity, HasLife
         if (isNoAi() && tag.getBoolean("Basking")) {     // for films and the summon command: a still crocodile basking
             setBasking(true);
         }
+        if (isNoAi() && tag.contains("Show")) {          // for films: a still crocodile showing a breeding move (SHOW_ numbers)
+            setShow(tag.getByte("Show"));
+        }
     }
 
     /** Kept near a player like the river fish ({@link TilapiaEntity#KEEP_NEAR}). */
     @Override
     public boolean removeWhenFarAway(double distanceToClosestPlayer) {
-        return distanceToClosestPlayer > TilapiaEntity.KEEP_NEAR * TilapiaEntity.KEEP_NEAR;
+        // a mother with eggs, a nest or young to see to stays (her story would be lost)
+        return !busyMother() && distanceToClosestPlayer > TilapiaEntity.KEEP_NEAR * TilapiaEntity.KEEP_NEAR;
     }
 
     /**
@@ -910,7 +1162,7 @@ public class CrocodileEntity extends PathfinderMob implements GeoEntity, HasLife
         @Override
         public boolean canUse() {
             return croc.sunTime() && croc.onGround() && !croc.isInWater() && croc.getNavigation().isDone()
-                    && isBank(croc.level(), croc.blockPosition());
+                    && isBank(croc.level(), croc.blockPosition()) && !croc.motherWork();
         }
 
         @Override
@@ -926,7 +1178,7 @@ public class CrocodileEntity extends PathfinderMob implements GeoEntity, HasLife
 
         @Override
         public boolean canContinueToUse() {
-            return left > 0 && croc.sunTime() && !croc.isInWater();
+            return left > 0 && croc.sunTime() && !croc.isInWater() && (croc.tickCount % 20 != 0 || !croc.motherWork());
         }
 
         @Override
@@ -1372,8 +1624,9 @@ public class CrocodileEntity extends PathfinderMob implements GeoEntity, HasLife
         @Override
         public boolean canUse() {
             boolean called = croc.schoolAt != null;
-            if (!croc.isHungry() || croc.huntWait > 0 || !croc.isInWater() || croc.startled > 0 || croc.held != null || ++look % 10 != 0 && !called) {
-                return false;
+            if (!croc.isHungry() || croc.huntWait > 0 || !croc.isInWater() || croc.startled > 0 || croc.held != null || ++look % 10 != 0 && !called
+                    || croc.life().isYoung() || croc.guardPlace() != null || !croc.carried.isEmpty() || croc.life().partner() != null) {
+                return false;       // young do not hunt; a mother guarding or carrying, and a courting pair, neither
             }
             prey = null;
             double best = Double.MAX_VALUE, bestCat = Double.MAX_VALUE, bestTilapia = Double.MAX_VALUE;
@@ -1949,8 +2202,15 @@ public class CrocodileEntity extends PathfinderMob implements GeoEntity, HasLife
      * or ridden, in the water or within 4 blocks of it (2 until the crocodile came out onto the bank after big prey, 2026-11-15).
      */
     static boolean isPrey(CrocodileEntity croc, LivingEntity e) {
-        if (!e.isAlive() || e instanceof CrocodileEntity || e.isPassenger() || e.isVehicle()) {
+        if (!e.isAlive() || e.isPassenger() || e.isVehicle()) {
             return false;
+        }
+        if (!croc.life().stage().grown() && !isFish(e)) {
+            return false;           // a teen hunts fish only (animal life cycle step 4)
+        }
+        if (e instanceof CrocodileEntity young) {
+            // a grown crocodile eats another's hatchlings in the water (real crocodiles do; their mother guards them)
+            return young.life().isYoung() && !croc.getUUID().equals(young.motherId) && young.isInWater();
         }
         if (e instanceof Player player) {
             if (player.isCreative() || player.isSpectator()) {
@@ -2053,6 +2313,13 @@ public class CrocodileEntity extends PathfinderMob implements GeoEntity, HasLife
     private static final RawAnimation SNAP_LEFT = RawAnimation.begin().thenPlayAndHold("snap_left");
     private static final RawAnimation SNAP_RIGHT = RawAnimation.begin().thenPlayAndHold("snap_right");
     private static final RawAnimation SHAKE = RawAnimation.begin().thenLoop("shake");
+    /** Its breeding (animal life cycle step 4): the male's head slap (once, then held) and rumble, the female's raised snout, the pair's roll, a mother's hiss and her digging. */
+    private static final RawAnimation HEAD_SLAP = RawAnimation.begin().thenPlayAndHold("head_slap");
+    private static final RawAnimation RUMBLE = RawAnimation.begin().thenLoop("rumble");
+    private static final RawAnimation SNOUT_UP = RawAnimation.begin().thenLoop("snout_up");
+    private static final RawAnimation COURT_ROLL = RawAnimation.begin().thenLoop("court_roll");
+    private static final RawAnimation HISS = RawAnimation.begin().thenLoop("hiss");
+    private static final RawAnimation DIG = RawAnimation.begin().thenLoop("dig");
     /** Drawn only: when it last walked on land, and whether the bask now drawn began with the flop. */
     private int walkedAt = -100;
     private boolean drawnBasking, flopNow;
@@ -2076,7 +2343,21 @@ public class CrocodileEntity extends PathfinderMob implements GeoEntity, HasLife
             return state.setAndContinue(jaws == JAWS_GAPE ? GAPE : jaws == JAWS_HOLD ? HOLD : jaws == JAWS_DRAG ? DRAG
                     : jaws == JAWS_SNAP_LEFT ? SNAP_LEFT : jaws == JAWS_SNAP_RIGHT ? SNAP_RIGHT : jaws == JAWS_SHAKE ? SHAKE : EAT);
         }
+        byte show = show();
+        if (show != SHOW_NONE && show != SHOW_CARRY) {
+            drawnBasking = false;
+            return state.setAndContinue(switch (show) {
+                case SHOW_SLAP -> HEAD_SLAP;
+                case SHOW_RUMBLE -> RUMBLE;
+                case SHOW_SNOUT_UP -> SNOUT_UP;
+                case SHOW_ROLL -> COURT_ROLL;
+                case SHOW_HISS -> HISS;
+                default -> DIG;
+            });
+        }
         double dx = getX() - xo, dy = getY() - yo, dz = getZ() - zo;
+        // the clips' strides are made for a grown crocodile: a small one's legs and tail beat for its size (sizePace)
+        double clipScale = Math.max(0.05, Math.min(1.0, getScale() / 0.7));
         if (isBasking()) {
             if (!drawnBasking) {        // it flops down only if it walked there (not lying down where it already lay, nor afloat)
                 drawnBasking = true;
@@ -2093,14 +2374,14 @@ public class CrocodileEntity extends PathfinderMob implements GeoEntity, HasLife
             if (speed < 0.012) {
                 return state.setAndContinue(FLOAT);
             }
-            player.setAnimationSpeed(Mth.clamp(speed / SWIM_CLIP_SPEED, 0.5, 2.5));
+            player.setAnimationSpeed(Mth.clamp(speed / (SWIM_CLIP_SPEED * clipScale), 0.5, 2.5));
             return state.setAndContinue(SWIM);
         }
         double speed = Math.sqrt(dx * dx + dz * dz);
         if (speed < 0.005) {
             return state.setAndContinue(IDLE);
         }
-        player.setAnimationSpeed(Mth.clamp(speed / WALK_CLIP_SPEED, 0.5, 2.5));
+        player.setAnimationSpeed(Mth.clamp(speed / (WALK_CLIP_SPEED * clipScale), 0.5, 2.5));
         return state.setAndContinue(WALK);
     }
 

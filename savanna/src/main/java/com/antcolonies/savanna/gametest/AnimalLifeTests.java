@@ -61,7 +61,7 @@ public class AnimalLifeTests {
                     name + " is not drawn at its own size when grown");
             helper.assertTrue(numbers.twoSexes() == (life.sex() != Sex.NONE), name + "'s sex does not fit its kind: " + life.sex());
             boolean breeds = kind == SavannaEntities.TILAPIA.get() || kind == SavannaEntities.SNAIL.get()
-                    || kind == SavannaEntities.CRAB.get() || kind == SavannaEntities.CATFISH.get();
+                    || kind == SavannaEntities.CRAB.get() || kind == SavannaEntities.CATFISH.get() || kind == SavannaEntities.CROCODILE.get();
             helper.assertTrue(numbers.breeds() == breeds, name + (breeds ? " does not breed (on since step 2 or 3)" : " breeds already (not before its own step)"));
 
             // Saved and loaded whole.
@@ -626,5 +626,204 @@ public class AnimalLifeTests {
                 helper.assertTrue(level.getBlockState(mat).is(algae), "a mat eaten bare of eggs is not algae again");
             }
         });
+    }
+
+    // --- breeding (step 4: the crocodile) --------------------------------------------------------------------------------
+
+    /** The crocodile's river: water 2 deep over silt, x 2 to 24, then a golden sand bank a block over the water, x 25 to 34. */
+    private static final int CROC_WATER_TO = 24, CROC_BANK_TO = 34;
+
+    private static void crocRiver(GameTestHelper helper) {
+        net.minecraft.world.level.block.Block sand = SavannaBlocks.GOLDEN_SAND.dry().get();
+        for (int x = 1; x <= CROC_BANK_TO + 1; x++) {
+            for (int z = 1; z <= 15; z++) {
+                boolean wall = x == 1 || x == CROC_BANK_TO + 1 || z == 1 || z == 15;
+                helper.setBlock(new BlockPos(x, BED - 1, z), Blocks.STONE);
+                for (int y = BED; y <= WATER_TOP + 3; y++) {
+                    BlockPos at = new BlockPos(x, y, z);
+                    if (wall) {
+                        helper.setBlock(at, y <= WATER_TOP + 2 ? Blocks.STONE : Blocks.AIR);
+                    } else if (x <= CROC_WATER_TO) {
+                        helper.setBlock(at, y == BED ? SavannaBlocks.SILT.get() : y <= WATER_TOP ? Blocks.WATER : Blocks.AIR);
+                    } else {
+                        helper.setBlock(at, y <= WATER_TOP ? sand : Blocks.AIR);
+                    }
+                }
+            }
+        }
+    }
+
+    /** A grown crocodile of this sex in the crocodile's river, never hungry (it hunts nothing in the test). */
+    private static com.antcolonies.savanna.animal.CrocodileEntity croc(GameTestHelper helper, String sex, BlockPos at) {
+        com.antcolonies.savanna.animal.CrocodileEntity c = grown(helper, SavannaEntities.CROCODILE.get(), sex, at);
+        c.hungerIn = 1_000_000;
+        return c;
+    }
+
+    /**
+     * The crocodile's breeding, whole: a ready male swims to a ready female and courts her (his head slaps and rumbles,
+     * her snout raised, then both roll), she comes out onto the sand bank, digs, lays 6 to 10 eggs and covers them (a
+     * closed nest a block or two back from the water, on the sand); old enough and watched, the eggs call, she digs them
+     * out (as many young as the local limit has room for), carries them to the water in her mouth and keeps them in a
+     * crèche, every young one in the water there, half-block banded hatchlings that know her.
+     */
+    @GameTest(template = "arena", timeoutTicks = 6000, batch = "breeding_croc")
+    public static void crocodilesCourtNestAndTheMotherCarriesHerYoungToTheWater(GameTestHelper helper) {
+        crocRiver(helper);
+        clearLeftovers(helper, SavannaEntities.CROCODILE.get());
+        ServerLevel level = helper.getLevel();
+        var male = croc(helper, "male", new BlockPos(8, BED + 1, 8));
+        var female = croc(helper, "female", new BlockPos(17, BED + 1, 8));
+        int[] stage = {0};
+        boolean[] seen = new boolean[4];       // slap, rumble, snout up, roll
+        int[] eggs = {0};
+        int[] carried = {0, 0};             // most at once, now
+        BlockPos[] nest = {null};
+        long started = level.getGameTime();
+        helper.runAtTickTime(5990, () -> {
+            com.antcolonies.colony.Watchers.setPretend(List.of());
+            helper.fail("crocodiles stuck at stage " + stage[0] + ": seen " + java.util.Arrays.toString(seen) + "; female gravid "
+                    + female.gravid + " nest " + female.nestAt() + " show " + female.show() + " carrying " + female.carrying()
+                    + " at " + helper.relativePos(female.blockPosition()) + " in water " + female.isInWater()
+                    + "; male ready " + male.life().readyToBreed() + " show " + male.show() + " at " + helper.relativePos(male.blockPosition()));
+        });
+        helper.onEachTick(() -> {
+            switch (stage[0]) {
+                case 0 -> {                         // the courtship
+                    seen[0] |= male.show() == com.antcolonies.savanna.animal.CrocodileEntity.SHOW_SLAP;
+                    seen[1] |= male.show() == com.antcolonies.savanna.animal.CrocodileEntity.SHOW_RUMBLE;
+                    seen[2] |= female.show() == com.antcolonies.savanna.animal.CrocodileEntity.SHOW_SNOUT_UP;
+                    seen[3] |= female.show() == com.antcolonies.savanna.animal.CrocodileEntity.SHOW_ROLL && male.show() == com.antcolonies.savanna.animal.CrocodileEntity.SHOW_ROLL;
+                    if (female.gravid) {
+                        com.antcolonies.ColonyFrameworkMod.LOGGER.info("[life] crocodiles mated after {} ticks", level.getGameTime() - started);
+                        helper.assertTrue(seen[0] && seen[1] && seen[2] && seen[3], "a courtship part was missing (slap, rumble, snout up, roll): "
+                                + java.util.Arrays.toString(seen));
+                        helper.assertTrue(!male.gravid && !male.life().readyToBreed(), "the male carries eggs or is ready again at once");
+                        male.discard();                 // his part done (he would eat the hatchlings: real, but not this test)
+                        stage[0] = 1;
+                    }
+                }
+                case 1 -> {                         // the nest: dug, laid, covered on the sand bank
+                    BlockPos at = female.nestAt();
+                    if (at != null && level.getBlockState(at).is(SavannaBlocks.CROCODILE_NEST.get())
+                            && !level.getBlockState(at).getValue(com.antcolonies.savanna.block.CrocodileNestBlock.OPEN)) {
+                        // (absolute places compared: relativePos does not turn back a test placed turned round)
+                        BlockPos rel = null;
+                        for (int x = CROC_WATER_TO + 2; x <= CROC_WATER_TO + 3 && rel == null; x++) {
+                            for (int z = 2; z <= 14 && rel == null; z++) {
+                                if (helper.absolutePos(new BlockPos(x, WATER_TOP + 1, z)).equals(at)) {
+                                    rel = new BlockPos(x, WATER_TOP + 1, z);
+                                }
+                            }
+                        }
+                        helper.assertTrue(rel != null, "the nest is not on the sand bank a block or two back from the water: " + at);
+                        helper.assertTrue(level.getBlockState(at.below()).is(SavannaBlocks.GOLDEN_SAND.dry().get()), "the nest is not on sand");
+                        EggClutchBlockEntity clutch = (EggClutchBlockEntity) level.getBlockEntity(at);
+                        eggs[0] = clutch.count();
+                        helper.assertTrue(eggs[0] >= 6 && eggs[0] <= 10, eggs[0] + " eggs (6 to 10 wanted)");
+                        helper.assertTrue(!female.gravid, "she still carries her eggs after laying");
+                        com.antcolonies.ColonyFrameworkMod.LOGGER.info("[life] the crocodile nested at {} with {} eggs after {} ticks", rel, eggs[0],
+                                level.getGameTime() - started);
+                        nest[0] = at;
+                        age(level, at, female.life().numbers().hatchTicks());
+                        com.antcolonies.colony.Watchers.setPretend(List.of(net.minecraft.world.phys.Vec3.atCenterOf(at)));
+                        tick(level, at);            // the eggs call
+                        helper.assertTrue(com.antcolonies.savanna.block.CrocodileNestBlock.hatching(level.getBlockState(at)),
+                                "the eggs did not call with their mother near");
+                        stage[0] = 2;
+                    }
+                }
+                case 2 -> {                         // she digs them out and carries them
+                    if (female.carrying() != carried[1]) {
+                        com.antcolonies.ColonyFrameworkMod.LOGGER.info("[life] the mother carries {} after {} ticks", female.carrying(),
+                                level.getGameTime() - started);
+                        carried[1] = female.carrying();
+                    }
+                    carried[0] = Math.max(carried[0], female.carrying());
+                    List<com.antcolonies.savanna.animal.CrocodileEntity> young = level.getEntitiesOfClass(com.antcolonies.savanna.animal.CrocodileEntity.class,
+                            new net.minecraft.world.phys.AABB(nest[0]).inflate(24), c -> c.isAlive() && c.life().isYoung());
+                    int expect = Math.min(eggs[0], female.life().numbers().localLimit() - 1);
+                    if (!level.getBlockState(nest[0]).is(SavannaBlocks.CROCODILE_NEST.get()) && young.size() + female.carrying() < expect) {
+                        helper.fail((young.size() + female.carrying()) + " hatchlings from " + eggs[0] + " eggs (" + expect + " wanted: room for that many)");
+                    }
+                    if (female.carrying() == 0 && young.size() == expect && young.stream().allMatch(y -> y.isInWater() && y.crecheAt() != null)) {
+                        com.antcolonies.colony.Watchers.setPretend(List.of());
+                        helper.assertTrue(carried[0] > 0, "she never carried a hatchling in her mouth");
+                        helper.assertTrue(female.crecheAt() != null, "she keeps no crèche");
+                        for (var y : young) {
+                            helper.assertTrue(female.getUUID().equals(y.motherId()), "a hatchling does not know its mother");
+                            double size = y.getScale() * 7.5;
+                            helper.assertTrue(size > 0.3 && size < 0.7, "a hatchling " + size + " blocks long (about half a block wanted)");
+                        }
+                        com.antcolonies.ColonyFrameworkMod.LOGGER.info("[life] {} hatchlings carried to the water, at most {} at once, after {} ticks",
+                                young.size(), carried[0], level.getGameTime() - started);
+                        helper.succeed();
+                    }
+                }
+                default -> {
+                }
+            }
+        });
+    }
+
+    /** A mother guarding her nest sees off a monitor coming near it: she hisses and charges, and bites it or it runs. */
+    @GameTest(template = "arena", timeoutTicks = 600, batch = "breeding_croc")
+    public static void aCrocodileMotherSeesOffAMonitorFromHerNest(GameTestHelper helper) {
+        crocRiver(helper);
+        ServerLevel level = helper.getLevel();
+        BlockPos nest = helper.absolutePos(new BlockPos(CROC_WATER_TO + 2, WATER_TOP + 1, 8));
+        helper.assertTrue(com.antcolonies.savanna.block.CrocodileNestBlock.lay(level, nest, SavannaEntities.CROCODILE.get(), 6), "no nest laid");
+        com.antcolonies.savanna.block.CrocodileNestBlock.cover(level, nest, false);
+        var female = croc(helper, "female", new BlockPos(CROC_WATER_TO + 3, WATER_TOP + 1, 11));
+        female.guardNestForTests(nest);
+        var monitor = helper.spawn(SavannaEntities.MONITOR.get(), new BlockPos(CROC_WATER_TO + 5, WATER_TOP + 1, 8));
+        float full = monitor.getHealth();
+        boolean[] hissed = {false};
+        helper.onEachTick(() -> hissed[0] |= female.show() == com.antcolonies.savanna.animal.CrocodileEntity.SHOW_HISS);
+        helper.succeedWhen(() -> {
+            helper.assertTrue(hissed[0], "she has not hissed at the monitor");
+            // seen off: bitten, or driven well away from the nest (a monitor hissed at often runs, as a real one would)
+            double fled = monitor.distanceToSqr(net.minecraft.world.phys.Vec3.atCenterOf(nest));
+            helper.assertTrue(female.guardBites > 0 || fled > 9 * 9, "she has not seen the monitor off: she at " + female.position() + " show " + female.show()
+                    + " target " + female.getTarget() + "; the monitor at " + monitor.position() + " health " + monitor.getHealth() + " of " + full
+                    + "; the nest at " + nest);
+            helper.assertTrue(female.distanceToSqr(net.minecraft.world.phys.Vec3.atCenterOf(nest)) < 10 * 10, "she left her nest far behind");
+        });
+    }
+
+    /**
+     * A crocodile's growing (the life file's stages): a hatchling about half a block, slower than a grown one; a teen
+     * from 6 days at a third of grown; grown at 14 days; and a crocodile saved before step 4 (its age 0, when they were
+     * born grown) loads grown, not as a hatchling.
+     */
+    @GameTest(template = "arena", timeoutTicks = 40)
+    public static void crocodilesGrowThroughHatchlingAndTeenAndOldOnesLoadGrown(GameTestHelper helper) {
+        var croc = helper.spawn(SavannaEntities.CROCODILE.get(), new BlockPos(6, 2, 6));
+        LifeNumbers n = croc.life().numbers();
+        croc.life().setUp(true, croc.getRandom());
+        croc.life().setAge(0);
+        CompoundTag tag = croc.saveWithoutId(new CompoundTag());
+        croc.load(tag);         // its pace is set from its size as it loads
+        helper.assertTrue(croc.life().stage() == com.antcolonies.animal.LifeStage.YOUNG, "a hatched crocodile is not young");
+        double length = croc.getScale() * 7.5;
+        helper.assertTrue(length > 0.3 && length < 0.7, "a hatchling " + length + " blocks long");
+        helper.assertTrue(croc.getAttributeBaseValue(Attributes.MOVEMENT_SPEED) < 0.15, "a hatchling as fast as a grown crocodile");
+        croc.life().setAge(n.youngTicks());
+        helper.assertTrue(croc.life().stage() == com.antcolonies.animal.LifeStage.TEEN, "not a teen after its young days");
+        double share = croc.getAttributeBaseValue(Attributes.SCALE) / croc.life().ownSize();
+        helper.assertTrue(Math.abs(share - 0.35) < 0.01, "a new teen at " + share + " of grown (0.35 wanted)");
+        croc.life().setAge(n.grownAge());
+        helper.assertTrue(croc.life().stage() == com.antcolonies.animal.LifeStage.GROWN, "not grown after its teen days");
+        helper.assertTrue(Math.abs(n.grownAge() - 14 * LifeNumbers.DAY) < 2, "grown at " + n.grownAge() / (double) LifeNumbers.DAY + " days (14 wanted)");
+        // saved before step 4: grown, its age 0
+        CompoundTag old = new CompoundTag();
+        CompoundTag life = new CompoundTag();
+        life.putString("Sex", "female");
+        life.putInt("Age", 0);
+        life.putFloat("OwnSize", 0.9F);
+        old.put("Life", life);
+        croc.life().load(old);
+        helper.assertTrue(croc.life().stage() == com.antcolonies.animal.LifeStage.GROWN, "a crocodile saved before step 4 loaded as a " + croc.life().stage());
+        helper.succeed();
     }
 }

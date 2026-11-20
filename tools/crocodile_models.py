@@ -471,20 +471,150 @@ def clips():
                 p[f'{kind}_foot_{side}'] = {'rotation': [0, -s * 18 * swing, 0]}
         return p
 
+    # --- breeding (animal life cycle step 4, 2026-11-20; my picks, fun first, from what real Nile crocodiles do) ---
+    def ease(t, a, b):
+        f = min(1.0, max(0.0, (t - a) / (b - a)))
+        return f * f * (3 - 2 * f)
+
+    def head_slap(t):
+        # the male's head slap in the water: he lifts his head (jaws a little open) and arches his tail up out of the
+        # water, holds it, then slams his jaws down onto the surface with a bang at 1.3 s (CrocodileBreeding.SLAP_AT;
+        # the splash and the sound come from the game), and sinks back level (2.5 s, played once)
+        up = ease(t, 0.0, 0.6) * (1 - ease(t, 1.18, 1.3))
+        slam = ease(t, 1.18, 1.3) * (1 - ease(t, 1.5, 2.3))
+        p = folded(wave_pose(t, 0.12, 2 * math.pi / 2.5), 0.45)
+        p['body'] = {'rotation': [-4 * up + 3 * slam, 0, 0]}
+        p['neck'] = {'rotation': [-14 * up + 6 * slam, p['neck']['rotation'][1], 0]}
+        p['head'] = {'rotation': [-22 * up + 5 * slam, 0, 0]}
+        p['jaw'] = {'rotation': [18 * up * (1 - ease(t, 1.1, 1.3)), 0, 0]}
+        for name, a in (('tail1', 8), ('tail2', 10), ('tail3', 8), ('tail4', 4)):
+            p[name] = {'rotation': [a * up, p[name]['rotation'][1], 0]}
+        return p
+
+    def rumble(t):
+        # after the slap he lies low, the back just awash, and rumbles too deep to hear: the water dances on his back
+        # (the droplets are the game's); here only a fine shiver of the body and the throat (2.5 s loop)
+        shiver = math.sin(2 * math.pi * 6.0 * t)
+        p = folded(wave_pose(t, 0.06, 2 * math.pi / 2.5), 0.45)
+        p['body'] = {'rotation': [0, 0, 0], 'position': [0, -4.0 + 0.12 * shiver, 0]}
+        p['neck'] = {'rotation': [-8 + 0.6 * shiver, p['neck']['rotation'][1], 0]}
+        p['jaw'] = {'rotation': [1.0, 0, 0]}
+        return p
+
+    def snout_up(t):
+        # the willing female: she lies at the surface with her snout raised to him, jaws a crack open (2.5 s loop)
+        breath = math.sin(2 * math.pi * t / 2.5)
+        p = folded(wave_pose(t, 0.1, 2 * math.pi / 2.5), 0.45)
+        p['neck'] = {'rotation': [-10 - breath, p['neck']['rotation'][1], 0]}
+        p['head'] = {'rotation': [-24, 0, 0]}
+        p['jaw'] = {'rotation': [6 + breath, 0, 0]}
+        return p
+
+    def court_roll(t):
+        # the pair at the end of courting: side by side, rolling half onto a side and back at the surface, the tail
+        # stirring (3 s loop; both play it)
+        lean = (1 - math.cos(2 * math.pi * t / 3.0)) / 2
+        p = folded(wave_pose(t, 0.35, 2 * math.pi / 3.0), 0.6)
+        p['body'] = {'rotation': [0, 0, -32 * lean]}
+        p['neck'] = {'rotation': [-4 * lean, p['neck']['rotation'][1], 0]}
+        p['head'] = {'rotation': [-6 * lean, 0, 0]}
+        return p
+
+    def hiss(t):
+        # a mother seeing an intruder off her nest or her young: up high on her legs, the front raised, head up and
+        # the mouth thrown wide, hissing in pulses, the tail lashing slowly (1.6 s loop; the game sets her feet down)
+        pulse = 0.5 + 0.5 * math.sin(2 * math.pi * t / 0.8)
+        p = wave_pose(t, 0.35, 2 * math.pi / 1.6)
+        p['body'] = {'rotation': [-6, 0, 0], 'position': [0, 1.6 + 0.3 * pulse, 0]}
+        p['hips'] = {'rotation': [6, p['hips']['rotation'][1], 0]}
+        p['neck'] = {'rotation': [-12, p['neck']['rotation'][1], 0]}
+        p['head'] = {'rotation': [-14 - 3 * pulse, 0, 0]}
+        p['jaw'] = {'rotation': [34 + 8 * pulse, 0, 0]}
+        for s, side in ((1, 'left'), (-1, 'right')):
+            for kind in ('arm', 'leg'):
+                p[f'{kind}_upper_{side}'] = {'rotation': [0, 0, -s * 12]}      # the legs drawn in under the raised body
+        return p
+
+    def dig(t):
+        # a mother digging her nest, and later scraping the sand back over it: the front low, the hind legs scraping
+        # back and out in turn, the tail lifted clear (1.2 s loop; the sand flying is the game's)
+        w = 2 * math.pi / 1.2
+        p = wave_pose(t, 0.15, w)
+        p['body'] = {'rotation': [3, 0, 0], 'position': [0, 1.4, 0]}
+        p['neck'] = {'rotation': [-3, p['neck']['rotation'][1], 0]}
+        p['hips'] = {'rotation': [-4, p['hips']['rotation'][1], 0]}
+        p['tail1'] = {'rotation': [6, p['tail1']['rotation'][1], 0]}
+        for s, side in ((1, 'left'), (-1, 'right')):
+            ph = w * t + (0 if s > 0 else math.pi)
+            scrape, lift = math.sin(ph), max(0.0, math.cos(ph))
+            p[f'leg_upper_{side}'] = {'rotation': [0, -s * 34 * scrape, s * 12 * lift]}
+            p[f'leg_foot_{side}'] = {'rotation': [0, s * 30 * scrape, 0]}
+        return p
+
     return {'snap_left': clip(0.5, snap('left'), 24, 'hold'), 'snap_right': clip(0.5, snap('right'), 24, 'hold'),
             'lunge': clip(0.4, lunge, 24, 'hold'), 'hold': clip(1.0, hold, 24), 'eat': clip(1.0, eat, 24),
             'shake': clip(0.68, shake, 24),
             'drag': clip(0.8, drag, 24),
+            'head_slap': clip(2.5, head_slap, 24, 'hold'), 'rumble': clip(2.5, rumble, 24),
+            'snout_up': clip(2.5, snout_up, 24), 'court_roll': clip(3.0, court_roll, 24),
+            'hiss': clip(1.6, hiss, 24), 'dig': clip(1.2, dig, 24),
             'idle': clip(4.0, idle, 24), 'walk': clip(WALK_LEN, walk, 20), 'swim': clip(SWIM_LEN, swim, 24),
             'float': clip(4.0, floating, 24), 'bask': clip(6.0, bask, 24),
             'flop': clip(FLOP_LEN, flop, 24, False), 'death': clip(1.2, death, 12, 'hold')}
 
 
+def carried(bones):
+    """Hatchlings carried in a mother's mouth (animal life cycle step 4, 2026-11-20): two tiny banded young lying across
+    the lower jaw between the teeth, a head poking out one side and a tail the other (each about 0.5 blocks long at the
+    usual size, as the hatchlings are). A bone of its own on the jaw; the game shows it only while she carries young."""
+    cubes = []
+    for z, x0, x1, head_left in ((-16.6, -3.5, 0.5, True), (-13.9, -0.6, 3.6, False)):
+        y0 = SPLIT + 0.02
+        cubes.append(cube([x0 * V, y0 * V, z * V], [x1 * V, (y0 + 0.45) * V, (z + 0.5) * V], 'young'))
+        hx = x0 if head_left else x1 - 0.9
+        cubes.append(cube([hx * V, y0 * V, (z - 0.08) * V], [(hx + 0.9) * V, (y0 + 0.6) * V, (z + 0.58) * V], 'young_head'))
+    bones.append({'name': 'carried', 'parent': 'jaw', 'pivot': [0, SPLIT * V, HINGE * V], 'cubes': cubes})
+    return bones
+
+
+def young_colour(orig):
+    """The carried young's colours: the hatchlings' bold bands, yellow-olive and near black, along their length (x)."""
+    def colour(part, look, x, y, z, face, rnd):
+        if part in ('young', 'young_head'):
+            band = math.floor(x / V * 1.5) % 2 == 0
+            c = (60, 56, 24) if band and part == 'young' else (176, 164, 70)
+            return shade(c, rnd.uniform(0.95, 1.05))
+        return orig(part, look, x, y, z, face, rnd)
+    return colour
+
+
+def game_looks():
+    """The crocodile's game looks (animal life cycle step 4, 2026-11-20; the life viewer's looks the user confirmed,
+    tools/life_looks.py): the grown crocodile (with the carried young on its jaw, hidden in the game unless a mother
+    carries), the banded hatchling (the same bones, its own colours) and the slimmer teen with its fading bands.
+    Painted through this module as imported (life_looks swaps its colours there), so each look's texture fits its bones."""
+    import crocodile_models as me
+    import life_looks
+    out = {}
+    with life_looks.Recolour(me, wrap=young_colour):
+        out['crocodile'] = me.paint(me.carried(me.model(lids=True)), 'A')
+    with life_looks.Recolour(me, wrap=life_looks.croc_hatchling_colour):       # on the grown bones: its texture fits them
+        out['crocodile_hatchling'] = me.paint(me.carried(me.model(lids=True)), 'A')
+    teen = me.model(lids=True)
+    life_looks.scale_bones(teen, 0.88, 0.9, {b: (1.0, 1.0) for b in life_looks.HEAD_BONES + ('lid_left', 'lid_right')})
+    with life_looks.Recolour(me, wrap=life_looks.croc_teen_colour):
+        out['crocodile_teen'] = me.paint(teen, 'A')
+    return out
+
+
 def write_game():
-    """Writes the crocodile's model, texture and clips into the savanna mod."""
-    game_bones, rows, w, h = paint(model(lids=True))
-    files = {'textures/entity/crocodile.png': png(rows)}
-    files['geo/entity/crocodile.geo.json'] = geo('crocodile', game_bones, w, h, (8, 2.5, [0, 0.75, 0]))
+    """Writes the crocodile's models, textures and clips into the savanna mod: the grown crocodile, the hatchling's
+    texture (on the grown model) and the teen's model and texture; one clip file for all."""
+    files = {}
+    for name, (game_bones, rows, w, h) in game_looks().items():
+        files[f'textures/entity/{name}.png'] = png(rows)
+        if name != 'crocodile_hatchling':
+            files[f'geo/entity/{name}.geo.json'] = geo(name, game_bones, w, h, (8, 2.5, [0, 0.75, 0]))
     files['animations/entity/crocodile.animation.json'] = animations(clips())
     write_assets(files)
 

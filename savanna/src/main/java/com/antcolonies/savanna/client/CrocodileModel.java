@@ -40,10 +40,51 @@ public class CrocodileModel extends DefaultedEntityGeoModel<CrocodileEntity> {
 
     /** Which way the body bone's turn goes against the world's turn round the spine (see {@link CrocodileRollClient#ROLL_SIGN}; the crocodile's own roll is as it was). */
     static final float BODY_ROLL_SIGN = -1.0F;
+    /** How far a mother carrying young holds her jaws open round them (degrees; my pick). */
+    private static final float CARRY_JAW = 9.0F;
+
+    private static ResourceLocation file(String path) {
+        return ResourceLocation.fromNamespaceAndPath(SavannaMod.MODID, path);
+    }
+
+    /**
+     * Its look by its age (animal life cycle step 4, 2026-11-20; {@code tools/crocodile_models.py game}): a hatchling the
+     * grown bones in its bold bands, a teen its own slimmer model with fading bands, the grown crocodile. All play the
+     * one clip file.
+     */
+    @Override
+    public ResourceLocation getModelResource(CrocodileEntity croc) {
+        return file(croc.life().stage() == com.antcolonies.animal.LifeStage.TEEN ? "geo/entity/crocodile_teen.geo.json" : "geo/entity/crocodile.geo.json");
+    }
+
+    @Override
+    public ResourceLocation getTextureResource(CrocodileEntity croc) {
+        return file(switch (croc.life().stage()) {
+            case YOUNG -> "textures/entity/crocodile_hatchling.png";
+            case TEEN -> "textures/entity/crocodile_teen.png";
+            default -> "textures/entity/crocodile.png";
+        });
+    }
 
     @Override
     public void setCustomAnimations(CrocodileEntity croc, long instanceId, AnimationState<CrocodileEntity> state) {
         super.setCustomAnimations(croc, instanceId, state);
+        // her young in her mouth (only while she carries them), the jaws a little open round them
+        boolean carrying = croc.show() == CrocodileEntity.SHOW_CARRY;
+        GeoBone young = getAnimationProcessor().getBone("carried");
+        if (young != null) {
+            young.setHidden(!carrying);
+        }
+        if (carrying) {
+            GeoBone jaw = getAnimationProcessor().getBone("jaw");
+            if (jaw != null) {
+                boolean marked = jaw.hasRotationChanged() || jaw.hasPositionChanged() || jaw.hasScaleChanged();
+                jaw.setRotX(jaw.getRotX() + (float) Math.toRadians(CARRY_JAW));
+                if (!marked) {
+                    jaw.resetStateChanges();
+                }
+            }
+        }
         Vec3 camera = Minecraft.getInstance().gameRenderer.getMainCamera().getPosition();
         float pt = state.getPartialTick();
         float roll = croc.rollAngle(pt);

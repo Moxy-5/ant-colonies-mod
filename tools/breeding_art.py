@@ -148,6 +148,54 @@ def catfish_eggs_states(states):
     return {"multipart": parts}
 
 
+CROC_EGG = [(240, 236, 222), (232, 228, 212), (244, 240, 230), (226, 220, 204)]
+
+
+def croc_egg_texture():
+    """16 x 16: 4 x 4 cells of the crocodile's chalky white eggs, each a lit top-left and a darker edge."""
+    rng = random.Random(7)
+    rows = [[None] * 16 for _ in range(16)]
+    for cy in range(4):
+        for cx in range(4):
+            base = CROC_EGG[(cx + cy * 3) % 4]
+            for y in range(4):
+                for x in range(4):
+                    k = 1.04 if (x, y) in ((1, 1), (1, 2), (2, 1)) else (0.9 if x in (0, 3) or y in (0, 3) else 1.0)
+                    k *= rng.uniform(0.98, 1.02)
+                    rows[cy * 4 + y][cx * 4 + x] = tuple(max(0, min(255, round(v * k))) for v in base) + (255,)
+    return [p for r in rows for p in r]
+
+
+def _nest_box(b, tex):
+    """A box of the sand viewer's nest (pixels round the block's middle, y its middle up from the sand's top) as a block
+    model element; its turn kept to the steps a block model allows."""
+    x0, x1 = 8 + b["x"] - b["w"] / 2, 8 + b["x"] + b["w"] / 2
+    z0, z1 = 8 + b["z"] - b["d"] / 2, 8 + b["z"] + b["d"] / 2
+    y0, y1 = b["y"] - b["h"] / 2, b["y"] + b["h"] / 2
+    turn = round(math.degrees(b["turn"]) / 22.5) * 22.5
+    uv = (max(0, x0), max(0, z0), min(16, x1), min(16, z1)) if tex != "#egg" else (0, 0, 4, 4)
+    return box(x0, max(0.0, y0), z0, x1, y1, z1, tex, uv, turn)
+
+
+def croc_nest_models(word):
+    """The crocodile's nest on a sand bank (animal life cycle step 4, 2026-11-20; the sand viewer's nest the user saw in
+    the life viewer, tools/sand_art.py nest()): covered, a low loose heap of churned sand she guards; dug open, a
+    shallow pit of damp sand inside a heaped rim with the white eggs showing (a block model cannot cut into the sand
+    under it, so the pit is the damp floor inside the rim)."""
+    import sand_art
+    n = sand_art.nest()
+    tex = {"particle": f"antcolonies:block/{word}_crocodile_nest", "nest": f"antcolonies:block/{word}_crocodile_nest",
+           "wet": f"antcolonies:block/wet_{word}_river_sand", "egg": "antcolonies:block/crocodile_eggs"}
+    covered = [_nest_box(b, "#nest") for b in n["covered"]]
+    pit = n["open"]["pit"]
+    floor = box(8 - pit["w"] / 2, 0.0, 8 - pit["d"] / 2, 8 + pit["w"] / 2, 0.05, 8 + pit["d"] / 2, "#wet",
+                (4, 4, 12, 12), faces=("up",))
+    open_ = [floor] + [_nest_box(b, "#nest") for b in n["open"]["rim"]]
+    open_ += [_nest_box(dict(b, y=b["y"] - 0.4), "#egg") for b in n["open"]["eggs"]]
+    base = {"parent": "block/block", "ambientocclusion": False}
+    return dict(base, textures=tex, elements=covered), dict(base, textures=tex, elements=open_)
+
+
 def main():
     def dump(path, data):
         with open(path, "w", encoding="utf-8", newline="\n") as f:
@@ -177,7 +225,21 @@ def main():
     dump(os.path.join(models, "catfish_eggs.json"), catfish_eggs_model())
     dump(os.path.join(states, "catfish_eggs.json"), catfish_eggs_states(states))
     dump(os.path.join(items, "catfish_eggs.json"), {"parent": "antcolonies:block/catfish_eggs"})
-    print("wrote the tilapia nest pit, the snail eggs and the catfish eggs: textures, models, block states, item models")
+    import sand_art
+    river_blocks_art.write_png(os.path.join(tex, "crocodile_eggs.png"), 16, 16, croc_egg_texture())
+    variants = {}
+    for tone, word in sand_art.GAME_TONES.items():
+        sand_art._write_tex(f"{word}_crocodile_nest", sand_art.nest_top(tone))
+        covered, open_ = croc_nest_models(word)
+        dump(os.path.join(models, f"{word}_crocodile_nest.json"), covered)
+        dump(os.path.join(models, f"{word}_crocodile_nest_open.json"), open_)
+        for is_open in ("false", "true"):
+            m = f"antcolonies:block/{word}_crocodile_nest" + ("_open" if is_open == "true" else "")
+            variants[f"open={is_open},tone={word}"] = [dict({"model": m}, **({"y": y} if y else {})) for y in (0, 90, 180, 270)]
+    dump(os.path.join(states, "crocodile_nest.json"), {"variants": variants})
+    dump(os.path.join(items, "crocodile_nest.json"), {"parent": "antcolonies:block/golden_crocodile_nest"})
+    print("wrote the tilapia nest pit, the snail eggs, the catfish eggs and the crocodile's nest: textures, models, "
+          "block states, item models")
 
 
 if __name__ == "__main__":

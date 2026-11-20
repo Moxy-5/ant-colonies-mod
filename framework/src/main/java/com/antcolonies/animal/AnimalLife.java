@@ -251,6 +251,7 @@ public final class AnimalLife {
         CompoundTag life = new CompoundTag();
         life.putString("Sex", sex.fileName());
         life.putInt("Age", age);
+        life.putBoolean("Grown", age >= numbers().grownAge());
         life.putFloat("OwnSize", ownSize);
         if (readyIn > 0) {
             life.putInt("ReadyIn", readyIn);
@@ -280,6 +281,12 @@ public final class AnimalLife {
                 sex = saved;
             }
             age = life.getInt("Age");
+            // saved grown, it stays grown though its kind's life file has since given it a young stage (or a longer one):
+            // the crocodile was born grown until step 4, so every crocodile then saved its age as 0 (2026-11-20). An
+            // age of 0 with no mark is one of those (every save since says whether it is grown).
+            if (life.getBoolean("Grown") || !life.contains("Grown") && age == 0) {
+                age = numbers.grownAge();
+            }
             ownSize = life.getFloat("OwnSize");
             readyIn = life.getInt("ReadyIn");
             old = life.getBoolean("Old");

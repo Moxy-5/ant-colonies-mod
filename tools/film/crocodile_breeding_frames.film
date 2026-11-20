@@ -1,0 +1,137 @@
+# The Nile crocodile's breeding in the game, frame by frame (animal life cycle step 4, 2026-11-20; CLAUDE.md's hard
+# rule): each new move on a still crocodile (NoAI, its move set by "Show": 1 head slap, 2 rumble, 3 the female's raised
+# snout, 4 the roll, 5 the hiss, 6 digging, 7 carrying young), the game frozen and stepped 2 ticks between pictures, from
+# the side, the front and three quarters; then a live pair courting in a pool (the slap's splash and the droplets
+# dancing on his back are the game's own, not the clip's); the hatchling and the teen beside a grown female; the nest
+# covered and dug open on sand.
+#   ./gradlew runFilm -PfilmScene=tools/film/crocodile_breeding_frames.film   pictures in run-film/screenshots/crocodile_breeding_frames/
+cmd time set noon
+cmd weather clear
+cmd kill @e[type=!player]
+# a pool, the water flush with the grass, 3 deep (the water's top at -60.11: a still crocodile's feet afloat at -60.62)
+cmd fill 50 -63 -8 74 -61 8 minecraft:water
+# a sand patch for the land moves and the nest
+cmd fill 50 -61 14 62 -61 24 antcolonies:golden_river_sand
+lens 40
+wait 40
+# the head slap, side on (the camera's height is its feet: its eye is 1.62 higher)
+cmd summon antcolonies:crocodile 60.0 -60.62 0.5 {NoAI:1b,NoGravity:1b,Show:1b,Rotation:[-90f,0f]}
+camera 60.0 -60.4 -7.5 0 6
+wait 2
+cmd tick freeze
+burst slap_side 26 2
+cmd tick unfreeze
+cmd kill @e[type=antcolonies:crocodile]
+wait 5
+cmd summon antcolonies:crocodile 60.0 -60.62 0.5 {NoAI:1b,NoGravity:1b,Show:1b,Rotation:[-90f,0f]}
+camera 66.5 -60.3 0.5 90 8
+wait 2
+cmd tick freeze
+burst slap_front 26 2
+cmd tick unfreeze
+cmd kill @e[type=antcolonies:crocodile]
+wait 5
+cmd summon antcolonies:crocodile 60.0 -60.62 0.5 {NoAI:1b,NoGravity:1b,Show:1b,Rotation:[-90f,0f]}
+camera 65.0 -57.5 -4.5 45 28
+wait 2
+cmd tick freeze
+burst slap_threequarter 26 2
+cmd tick unfreeze
+cmd kill @e[type=antcolonies:crocodile]
+wait 5
+# the rumble (lying low, the back just awash), the female's raised snout, the roll: three quarters, a few pictures each
+cmd summon antcolonies:crocodile 60.0 -60.62 0.5 {NoAI:1b,NoGravity:1b,Show:2b,Rotation:[-90f,0f]}
+camera 60.0 -60.4 -7.5 0 6
+wait 10
+shot rumble_side
+camera 65.0 -57.5 -4.5 45 28
+wait 2
+shot rumble_threequarter
+cmd kill @e[type=antcolonies:crocodile]
+wait 5
+cmd summon antcolonies:crocodile 60.0 -60.62 0.5 {NoAI:1b,NoGravity:1b,Show:3b,Rotation:[-90f,0f],Life:{Sex:"female",Age:400000,OwnSize:0.8f}}
+camera 60.0 -60.4 -6.5 0 6
+wait 10
+shot snout_up_side
+camera 64.5 -60.3 0.5 90 8
+wait 2
+shot snout_up_front
+cmd kill @e[type=antcolonies:crocodile]
+wait 5
+cmd summon antcolonies:crocodile 60.0 -60.62 -0.5 {NoAI:1b,NoGravity:1b,Show:4b,Rotation:[-90f,0f]}
+cmd summon antcolonies:crocodile 60.0 -60.62 1.6 {NoAI:1b,NoGravity:1b,Show:4b,Rotation:[-90f,0f],Life:{Sex:"female",Age:400000,OwnSize:0.8f}}
+camera 66.5 -60.2 0.5 90 10
+wait 2
+cmd tick freeze
+burst roll_front 16 4
+cmd tick unfreeze
+camera 60.0 -59.0 -8.0 0 14
+wait 2
+shot roll_side
+cmd kill @e[type=antcolonies:crocodile]
+wait 5
+# on the sand: the hiss, side, front and three quarters
+cmd summon antcolonies:crocodile 56.0 -60.0 19.5 {NoAI:1b,Show:5b,Rotation:[-90f,0f]}
+camera 56.0 -60.0 12.5 0 8
+wait 2
+cmd tick freeze
+burst hiss_side 16 2
+cmd tick unfreeze
+camera 61.5 -59.8 19.5 90 10
+wait 2
+shot hiss_front
+camera 60.5 -57.0 14.5 45 28
+wait 2
+shot hiss_threequarter
+cmd kill @e[type=antcolonies:crocodile]
+wait 5
+# digging the nest, side and from behind three quarters
+cmd summon antcolonies:crocodile 56.0 -60.0 19.5 {NoAI:1b,Show:6b,Rotation:[-90f,0f]}
+camera 56.0 -60.0 12.5 0 8
+wait 2
+cmd tick freeze
+burst dig_side 12 2
+cmd tick unfreeze
+camera 50.5 -57.5 15.0 -60 28
+wait 2
+cmd tick freeze
+burst dig_behind 12 2
+cmd tick unfreeze
+cmd kill @e[type=antcolonies:crocodile]
+wait 5
+# carrying young: the hatchlings in her mouth, the jaws a little open round them
+cmd summon antcolonies:crocodile 56.0 -60.0 19.5 {NoAI:1b,Show:7b,Rotation:[-90f,0f],Life:{Sex:"female",Age:400000,OwnSize:0.8f}}
+camera 60.0 -59.4 16.5 31 14
+wait 10
+shot carry_front
+camera 61.5 -58.5 21.5 121 24
+wait 2
+shot carry_threequarter
+cmd kill @e[type=antcolonies:crocodile]
+wait 5
+# the hatchling and the teen beside a grown female, still, on the sand
+cmd summon antcolonies:crocodile 56.0 -60.0 22.0 {NoAI:1b,Rotation:[-90f,0f],Life:{Sex:"female",Age:400000,OwnSize:0.8f}}
+cmd summon antcolonies:crocodile 56.0 -60.0 18.5 {NoAI:1b,Rotation:[-90f,0f],Life:{Sex:"female",Age:200000,OwnSize:0.8f}}
+cmd summon antcolonies:crocodile 56.5 -60.0 16.2 {NoAI:1b,Rotation:[-90f,0f],young:1b}
+cmd summon antcolonies:crocodile 55.6 -60.0 16.4 {NoAI:1b,Rotation:[-60f,0f],young:1b}
+camera 56.0 -56.0 10.5 0 32
+wait 10
+shot young_and_teen
+camera 57.0 -59.7 15.0 30 20
+wait 2
+shot hatchlings_close
+cmd kill @e[type=antcolonies:crocodile]
+wait 5
+# the nest, covered and dug open
+cmd setblock 53 -60 15 antcolonies:crocodile_nest[open=false,tone=golden]
+cmd setblock 55 -60 15 antcolonies:crocodile_nest[open=true,tone=golden]
+camera 54.0 -59.2 12.8 0 30
+wait 10
+shot nests
+# a live pair courting in the pool (the splash and the dancing water): three quarters, a picture every half second
+cmd summon antcolonies:crocodile 56.0 -61.5 0.5 {sex:"male",HungerIn:999999,Rotation:[-90f,0f]}
+cmd summon antcolonies:crocodile 66.0 -61.5 2.5 {sex:"female",HungerIn:999999,Rotation:[90f,0f]}
+camera 61.0 -56.0 -8.0 0 30
+wait 20
+burst live_court 70 10
+quit

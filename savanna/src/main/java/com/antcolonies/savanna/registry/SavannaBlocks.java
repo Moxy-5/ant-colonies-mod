@@ -223,6 +223,14 @@ public class SavannaBlocks {
             com.antcolonies.savanna.block.CatfishEggsBlock::new,
             BlockBehaviour.Properties.of().mapColor(MapColor.WATER).replaceable().noCollission().instabreak().noOcclusion()
                     .sound(SoundType.FROGSPAWN).randomTicks().pushReaction(PushReaction.DESTROY).noLootTable());
+    /**
+     * The Nile crocodile's nest on a sand bank (M9, animal life cycle step 4, 2026-11-20; block/CrocodileNestBlock): a low
+     * heap of churned sand over her eggs, dug open when they hatch. Drops nothing.
+     */
+    public static final DeferredBlock<com.antcolonies.savanna.block.CrocodileNestBlock> CROCODILE_NEST = BLOCKS.registerBlock("crocodile_nest",
+            com.antcolonies.savanna.block.CrocodileNestBlock::new,
+            BlockBehaviour.Properties.of().mapColor(MapColor.SAND).noCollission().instabreak().noOcclusion()
+                    .sound(SoundType.SAND).randomTicks().pushReaction(PushReaction.DESTROY).noLootTable());
 
     static {
         TreeBlocks.init(); // the giant savanna trees' blocks (M7.5), registered with the rest

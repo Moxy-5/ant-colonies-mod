@@ -20,4 +20,10 @@ public class CrocodileRenderer extends GeoEntityRenderer<CrocodileEntity> {
     protected float getDeathMaxRotation(CrocodileEntity crocodile) {
         return 0;
     }
+
+    /** A hatchling's or a teen's shadow follows its size (animal life cycle step 4, 2026-11-20); a grown one's is as before. */
+    @Override
+    protected float getShadowRadius(CrocodileEntity crocodile) {
+        return super.getShadowRadius(crocodile) * Math.min(1.0F, crocodile.getScale() / 0.7F);
+    }
 }
