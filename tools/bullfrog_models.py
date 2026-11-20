@@ -348,6 +348,133 @@ def plain_colour(c, face_, x, y, z):
     return col
 
 
+# --- the paint (the workshop's stage 4, 2026-11-20): read off the user's side photo, Minecraft style -------------------
+# Every texture pixel (one a model pixel) is coloured from where it lies on the model, in its own bone's unturned
+# space, so a mark carries on across the overlapping boxes of the sliced body. A little noise on every pixel, as
+# Minecraft's own textures have. The eyes keep their approved pixel art (eye_colour). All colours my picks from the
+# photo; fun first.
+PAINT = {
+    'back': (60, 80, 32),         # dark olive green
+    'head': (90, 120, 46),        # the head a brighter, smoother green
+    'snout': (98, 128, 50),
+    'dash': (30, 40, 18),         # the dark dashes along the back and flanks
+    'wart': (118, 128, 58),       # pale warts
+    'flank': (176, 168, 58),      # yellow-green low on the sides
+    'yellow': (220, 190, 60),     # the yellow edge along the belly
+    'orange': (232, 128, 36),     # behind the arm and in the groin
+    'belly': (232, 214, 140),     # cream
+    'lip': (196, 196, 72),        # the yellow line along the upper lip
+    'mouth': (52, 40, 24),
+    'throat': (226, 204, 96),     # the yellow throat
+    'blotch': (150, 156, 66),     # its olive mottling
+    'leg': (74, 96, 38),
+    'bar': (48, 62, 26),          # dark bars on the legs
+    'toe': (196, 182, 112),
+    'web': (128, 136, 70),
+    'ear': (120, 104, 62),        # the eardrum, tan
+    'nostril': (24, 20, 14),
+}
+
+
+def _hash(*v):
+    """A steady random number 0 to 1 for whole-number coordinates (the same pixel always gets the same)."""
+    h = 2166136261
+    for n in v:
+        h = ((h ^ (int(n) & 0xFFFFFFFF)) * 16777619) & 0xFFFFFFFF
+    h ^= h >> 13
+    h = (h * 0x5bd1e995) & 0xFFFFFFFF
+    return (h ^ (h >> 15)) / 0xFFFFFFFF
+
+
+def _noise(col, *v, amount=7):
+    d = (_hash(*v, 99) - 0.5) * 2 * amount
+    return tuple(max(0, min(255, c + d)) for c in col)
+
+
+def _dash(along, across, chance, seed):
+    """True where a dark dash lies: the skin is cut into cells 5 along and 3 across, and in some cells a dash 3 to 5
+    long and 1 wide sits at a steady random place, stepping a pixel up or down along the way in some (the photo's dark
+    wavy marks running front to back)."""
+    ca, cc = along // 5, across // 3
+    if _hash(ca, cc, seed) > chance:
+        return False
+    a0 = ca * 5 + int(_hash(ca, cc, seed, 1) * 2)
+    length = 3 + int(_hash(ca, cc, seed, 3) * 3)
+    c0 = cc * 3 + int(_hash(ca, cc, seed, 2) * 3)
+    if not a0 <= along < a0 + length:
+        return False
+    wave = 1 if _hash(ca, cc, seed, 4) < 0.4 and along >= a0 + 2 else 0
+    return across == c0 + wave
+
+
+def paint_colour(c, face_, x, y, z):
+    if '_eye' in c:
+        return eye_colour(c, face_, x, y, z)
+    part, bone = c['_part'], c['_bone']
+    ix, iy, iz = int(x // 1), int(y // 1), int(z // 1)
+    along = int((LENGTH / 2 - z) // 1)                         # the outline's x: rump 0 to snout 40
+    across = ix if face_ in ('up', 'down') else iy             # the second direction on the skin
+    if part == 'pupil':                                        # the nostrils
+        return PAINT['nostril']
+    if part == 'ear':
+        return _noise(PAINT['ear'], ix, iy, iz, amount=5)
+    if part in ('toe',):
+        return _noise(PAINT['toe'], ix, iy, iz, amount=6)
+    if part == 'web':
+        return _noise(PAINT['web'], ix, iy, iz)
+    if part == 'leg':
+        # dark bars across the leg along its own length (each leg piece is built straight down in its own space)
+        if bone.startswith(('arm', 'leg')) and int(y // 1.5) % 3 == 0 and _hash(ix, int(y // 1.5), iz) < 0.8:
+            return _noise(PAINT['bar'], ix, iy, iz, amount=5)
+        if _hash(ix, iy, iz, 7) < 0.02:
+            return PAINT['wart']
+        return _noise(PAINT['leg'], ix, iy, iz)
+    if bone.startswith('eye'):                                 # the brow over each eye: plain head green
+        return _noise(PAINT['head'], ix, iy, iz, amount=5)
+    if bone in ('head', 'jaw', 'throat'):
+        # The mouth follows each slice's own jaw edge (the boxes step down slice by slice; a smooth painted line
+        # crossed the steps and showed twice): the dark line along the top of the jaw's boxes, the yellow lip along
+        # the bottom of the head's lowest boxes.
+        (ox, oy, oz), (sx, sy, sz) = c['origin'], c['size']
+        mid = LENGTH / 2 - (oz + sz / 2)
+        mouth = at(MOUTH, mid)
+        if bone == 'jaw' and abs(oy + sy - mouth) < 0.05 and y > oy + sy - 0.6:
+            return PAINT['mouth']
+        if bone == 'head' and abs(oy - mouth) < 0.05 and y < oy + 0.9:
+            return _noise(PAINT['lip'], ix, iy, iz, amount=5)
+        if bone in ('jaw', 'throat'):                          # the jaw and throat: yellow, mottled with olive
+            if face_ == 'down' and y < 4:
+                return _noise(PAINT['belly'], ix, iy, iz, amount=5)
+            blot = _hash(ix // 2, iy // 2, iz // 2, 3) < 0.28
+            return _noise(PAINT['blotch'] if blot else PAINT['throat'], ix, iy, iz, amount=6)
+        base = PAINT['snout'] if along >= 36 else PAINT['head']
+        if along < 31 and _dash(along, across, 0.25, 11):       # a few marks behind the eyes
+            return _noise(PAINT['dash'], ix, iy, iz, amount=4)
+        return _noise(base, ix, iy, iz)
+    # the body
+    if face_ == 'down' or y < 1.2:
+        return _noise(PAINT['belly'], ix, iy, iz, amount=5)
+    if y < 3.0:                                                # the yellow edge, orange behind the arm and in the groin
+        if 24 <= along <= 28 or 2 <= along <= 7:
+            return _noise(PAINT['orange'], ix, iy, iz, amount=8)
+        return _noise(PAINT['yellow'], ix, iy, iz, amount=6)
+    if y < 5.5:
+        if 24 <= along <= 28 and y < 4.5:
+            return _noise(PAINT['orange'], ix, iy, iz, amount=8)
+        if _dash(along, across, 0.5, 21):
+            return _noise(PAINT['dash'], ix, iy, iz, amount=4)
+        return _noise(PAINT['flank'], ix, iy, iz)
+    if _dash(along, across, 0.8, 31):
+        return _noise(PAINT['dash'], ix, iy, iz, amount=4)
+    if _hash(ix, iy, iz, 5) < 0.025:
+        return PAINT['wart']
+    return _noise(PAINT['back'], ix, iy, iz)
+
+
+LOOKS = {'painted': paint_colour, 'plain': plain_colour}
+GAME_LOOK = 'painted'
+
+
 WORKSHOP_SHAPE = [
     ('ROUNDNESS', 'Cross-section squareness (2 round, 4 boxy)', 2.0, 4.0, 0.1),
     ('FLAT_BELLY', 'Flat belly (0 round, 1 flat)', 0.0, 0.9, 0.05),
@@ -357,7 +484,7 @@ WORKSHOP_PARTS = {'head': ['head'], 'eyes': ['eye_left', 'eye_right'], 'body': [
 
 
 def workshop_look():
-    bones, rows, w, h = paint_faces(model(), 1, plain_colour)
+    bones, rows, w, h = paint_faces(model(), 1, LOOKS[GAME_LOOK])
     return bones, png(rows), w, h
 
 

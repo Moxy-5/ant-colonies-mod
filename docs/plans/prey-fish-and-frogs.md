@@ -182,6 +182,15 @@ user: a detailed webbed foot model comes later). Fun first, inspired by the real
   and the default. Waiting for the user's look.
 - 2026-11-20, **the eyes approved by the user: C2** ("YES that's perfect", v17), now the official model (the
   maker's `EYE_LOOK`). Next for the frog: the workshop's paint stage, then its clips.
+- 2026-11-20, **the paint** (the user: "I made the version of the eye I want ... we can start painting"): `PAINT` and
+  `paint_colour` in `tools/bullfrog_models.py`, read off the side photo, Minecraft style (one texture pixel a model
+  pixel, a little noise on each): a dark olive back with dark wavy dashes running front to back in rough rows (the
+  photo's ridges) and a few pale warts; a brighter green head; a yellow line along the upper lip over a dark mouth
+  line that follows each slice's own jaw edge (a smooth painted line crossed the slices' steps and showed twice);
+  the jaw and throat yellow mottled with olive; the low flanks yellow-green to yellow, orange behind the arm and in the
+  groin; a cream belly; barred legs, pale toes; a tan eardrum. The eyes keep their approved art. v20 (v18, v19 on the
+  way). Waiting for the user's look. My idea for later, not built: a browner, drabber look for females (real females
+  are duller than males; the life kit already has sexes).
 
 ## My picks the user may change
 The barb's name and look, every size and number above (the bullfrog's size is the user's call), barbs with no hunger,
