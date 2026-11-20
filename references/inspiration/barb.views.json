@@ -1,0 +1,37 @@
+{
+  "length_blocks": 1.875,
+  "_note": "Drawn by tools/barb_sheet.py: one cell is one model pixel, so length_blocks is the made size (30 pixels); the game draws it at 0.25 blocks.",
+  "views": {
+    "side": {
+      "box": [
+        20,
+        70,
+        480,
+        292
+      ],
+      "head": "left"
+    },
+    "top": {
+      "box": [
+        20,
+        360,
+        480,
+        526
+      ],
+      "head": "left"
+    },
+    "front": {
+      "box": [
+        540,
+        70,
+        706,
+        292
+      ]
+    }
+  },
+  "marks": {
+    "snout": 40,
+    "head_back": 138,
+    "tail_base": 376
+  }
+}

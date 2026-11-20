@@ -1,0 +1,32 @@
+{
+  "length_blocks": 2.5,
+  "_note": "The user's bullfrog sheet (2026-11-20). length_blocks is the sheet's own 2.5 until the user picks the game size; the views are the small renders in the bottom row, a little in perspective, so measures are rough. Front feet drawn wrong (the user): a detailed webbed foot comes later.",
+  "views": {
+    "side": {
+      "box": [
+        220,
+        806,
+        425,
+        942
+      ],
+      "head": "left"
+    },
+    "top": {
+      "box": [
+        862,
+        766,
+        1018,
+        947
+      ],
+      "head": "up"
+    },
+    "front": {
+      "box": [
+        8,
+        806,
+        211,
+        944
+      ]
+    }
+  }
+}

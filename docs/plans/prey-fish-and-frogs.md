@@ -1,4 +1,4 @@
-# Small prey fish, frogs and tadpoles, and fewer tilapia (M9 river life; planned 2026-11-20, nothing built)
+# Small prey fish, the African bullfrog and tadpoles, and fewer tilapia (M9 river life; planned 2026-11-20, nothing built)
 
 The user, 2026-11-20 ("these sound perfect for right now, we should reduce the amount of tilapia in the river to make
 room for the smaller schooling fish"): two new prey for the river, picked from six options (terrapin, tigerfish,
@@ -46,42 +46,57 @@ real rivers; no source checking; the game-balancer rule holds. Every number here
   crab and monitor can take it up later with only a far model each. Checked in the game: the switch must not pop
   (the barb's far model is made from its near one, same outline and colours).
 
-## Fewer tilapia (the user's ask)
-- `antcolonies:river_fish` (tilapia and catfish) cap 60 -> **36**; tilapia spawn groups 3-6 -> **2-4**; the tilapia's
-  local breeding limit 40 -> **20**. Catfish unchanged (weight 3, alone, local limit 6).
-- So round a player: about 20 tilapia, 3 to 6 catfish, up to 40 barbs, up to 12 frogs and tadpoles, at most 5
-  crocodiles. Fish in all about 76 against 60 today; the barbs are small and simple, and the soak measures the
-  server's time per tick before and after. If it costs too much, the barbs' cap comes down first.
+## Fewer tilapia (the user's ask; the number the user's, 2026-11-20, "lower the tilapia to 45")
+- `antcolonies:river_fish` (tilapia and catfish) cap 60 -> **45** (the user's number, in place of my 36); tilapia
+  spawn groups 3-6 -> **2-5**; the tilapia's local breeding limit 40 -> **30** (my pick, kept in step with the cap).
+  Catfish unchanged (weight 3, alone, local limit 6).
+- So round a player: about 30 tilapia, 3 to 6 catfish, up to 40 barbs, up to 12 bullfrogs and tadpoles, at most 5
+  crocodiles. Fish in all about 85 against 60 today: the barbs are small, drawn with the far look past 12 blocks, and
+  the soak measures the server's time per tick before and after. If it costs too much, the barbs' cap comes down first.
 - Grown crocodiles and catfish still hunt tilapia; with fewer, they hunt a little less often. Neither ever starves
   (both swim on when nothing is near), so nothing crashes.
 
-## The river frog and its tadpoles (generalized, inspired by African river frogs)
-- **Look (to draw from the user's picture):** olive-brown with dark blotches, a pale stripe down the middle of the
-  back, long barred hind legs, a white throat that swells into a ball while calling. Grown 0.3 blocks long sitting
-  (bigger than life, as the tilapia). Tadpole 0.12 blocks; a froglet stage between (back legs, then front legs, the
-  tail shrinking).
-- **Where:** the waterline of pans, oxbows, slow river edges and sand banks: sitting at the edge facing the water, or
-  floating in the shallows with only the eyes and nose up.
-- **Escape (the real frog's one move):** anything big within 4 blocks (a player, a monitor, a crocodile) and it makes
-  one long leap into the water with a plop and a ring, swims down to the bed for a few seconds, then its eyes break
-  the surface again; it climbs back out later.
-- **Calling:** from dusk into the night the males sit at the edge and call, the throat ballooning: a short rattling
-  croak (a sound made with a script, as `tools/matabele_squeak.py` made the Matabele's). One male starts and others
-  answer (a chorus). **They hush when a player comes near** and start again after a few still seconds (real, and a
-  good moment in play).
-- **Food: no hunger (fewer rules).** At dusk a frog snaps at a gnat over the water now and then (a tiny particle bug,
-  looks only). Not ants or termites: frogs eating colony insects would change the colonies' balance. **Socket for
-  M9.5:** real frogs gorge on termite flights; when alates come, frogs come to the flight holes.
-- **Eaten by:** young crocodiles (frogs at the edge, tadpoles), the Nile monitor (a frog on the bank, added to its
-  food list beside crabs and snails), catfish (tadpoles and frogs in the water). Later herons, the otter.
-- **Breeding (the animal life kit):** rainy nights in the rains (the shared season source). A calling male draws a
-  female; he clasps her from behind (amplexus) and she lays a jelly clump of eggs in the shallows (a new clutch block:
-  clear jelly with dark dots). Hatch in a day into a wriggling cluster of tadpoles that **graze the algae** (the
-  tilapia's grazing goal, a bite rarely, so they never strip a mat): the link algae -> tadpole -> frog. Tadpoles
-  grow legs on day 3 and climb out as froglets, grown 2 days later. Every 4 days, clutch 6 to 10 tadpoles (most are
-  eaten), local limit 12.
-- **Spawning:** its own group `antcolonies:river_frog`, cap 12, groups of 2 to 4, kept within 96. A frog sits on land
-  and in water, so its spawn check takes the water animals' answer (`checkSpawnObstruction`, BUGS 218).
+## The African bullfrog and its tadpoles (the user, 2026-11-20: "I was thinking of the African bullfrog"; was a generic river frog)
+The user's picture: `references/inspiration/bullfrog.png` (views file beside it; the front feet are drawn wrong, the
+user: a detailed webbed foot model comes later). Fun first, inspired by the real bullfrog's big character.
+- **Look (from the picture):** a huge round frog, broad flat head, olive green with darker blotches and pale patches,
+  a pale cream belly with orange-yellow at the sides and in the armpits, big golden eyes set high. Real feet for the
+  later foot model: the front feet plain fingers, the hind feet webbed with a hard spade on each heel for digging
+  backward into the ground.
+- **Size: the user's call (asked 2026-11-20).** The sheet says 2.5 blocks long and 1.5 tall, bigger than a sheep and
+  bigger than the catfish. On the river's own scale (a tilapia 0.6 blocks, the catfish 2, the monitor 4.5, the
+  crocodile 7.5: about 1.6 to 2 blocks a metre), a big real bullfrog (about 22 cm) is about 0.45 blocks. My
+  recommendation: **males 0.65 blocks, females 0.5** (real males are much bigger than females, rare among frogs),
+  bigger than life like the tilapia and still a frog beside the fish.
+- **Where:** pans, oxbows, the floodplain's shallows and slow river edges. By day it sits **half dug into wet mud or
+  sand at the edge**, only its back and eyes showing (it shuffles backward into the ground with its hind feet); it
+  comes out at dusk and in rain.
+- **An ambush eater (its big character):** it sits still and lunges with a huge gape at small things passing within
+  about 1.5 blocks: barbs in the shallows, snails, baby crabs, tadpoles (its own kind's too: real bullfrogs are
+  cannibals). Then it is fed a while; with nothing near it waits and never starves. Not ants or termites now (that
+  would change the colonies' balance). **Socket for M9.5:** real bullfrogs gorge on termite flights.
+- **Bold, not shy:** a player coming near makes it puff up and gape; one who keeps coming gets a barking lunge and a
+  small bite (my pick: 1 heart). It leaps into the water only from something big that can eat it (a monitor, a
+  crocodile).
+- **Calling:** from dusk and on rainy nights the males call, the throat swelling: a deep lowing whoop, like a
+  distant cow (a sound made with a script, as `tools/matabele_squeak.py` made the Matabele's), others answering.
+- **Breeding (the animal life kit):** in the rains, after rain, males gather in a shallow pan or edge, call and
+  wrestle (shoving and biting) for the middle; a female comes to the male holding it; he clasps her from behind
+  (amplexus) and she lays a film of eggs in the shallow water (a new clutch block). They hatch in a day into a dense
+  black school of tadpoles that **graze the algae** (the tilapia's grazing goal, a bite rarely, so they never strip a
+  mat): the link algae -> tadpole -> frog. **The father guards the school** (real, and the bullfrog's most famous
+  habit): he stays with it and bites anything that comes near, the player too. Tadpoles grow legs on day 3, climb out
+  as froglets and are grown 3 days later. Every 4 days, clutch 8 to 12 tadpoles (most are eaten), local limit 12.
+- **Sockets for the seasons (M9.5, Serene Seasons):** the dry season spent buried in a cocoon underground, out with
+  the first heavy rains; the father digging a channel with his hind feet to lead his tadpoles from a drying puddle to
+  deeper water (needs pans that dry, which waits for the seasons).
+- **Eaten by:** young crocodiles (tadpoles and froglets), the Nile monitor (bullfrogs on the bank, added to its food
+  list beside crabs and snails), catfish (tadpoles). Later the marabou stork and the herons.
+- **Movement:** mostly a heavy crawl and short hops on land; a long leap into the water from danger.
+- **Spawning:** its own group `antcolonies:bullfrog`, cap 12, groups of 1 to 3, kept within 96. It sits on land and
+  in water, so its spawn check takes the water animals' answer (`checkSpawnObstruction`, BUGS 218).
+- Not the other frogs on the master list (the snake-necked frog of the Matabele nests, the foam-nest tree frog):
+  those stay their own animals. Minecraft's own frog does not spawn in savannas.
 - **The hard part, said plainly:** hopping on land and the jump into the water is new movement for our animals (the
   monitor's water entry took long work). Its own clips and checks, offline and frame by frame in the game, as the
   rule asks; two strikes, then rethink.
@@ -100,29 +115,28 @@ real rivers; no source checking; the game-balancer rule holds. Every number here
     switched between a land body and a water body; our frog starts from those (the monitor's own climbing legs are
     for its size and the bank's walls, which a frog does not need). Its floating pose in water and its 3-second croak
     with the throat swelling are its other clips; ours do the same things in our own style.
-- Not the other frogs on the master list (the snake-necked frog of the Matabele nests, the bullfrog, the foam-nest
-  tree frog): those stay their own animals. Minecraft's own frog does not spawn in savannas.
 
 ## Steps
-0. **The user's pictures, the briefs, the outlines (the model workshop, `docs/plans/model-workshop.md`).** The user
-   makes two inspiration pictures, `references/inspiration/barb.png` and `references/inspiration/river_frog.png`
-   (side, top, front, back on a plain background, a posed picture, the length written on it; the frog's picture with
-   a tadpole and a froglet beside it). Then for each: brief, outline, plain 3D shape, detail, paint, animations, each
-   with the user's OK (barb clips: swim, turn, sip, scatter, death; frog: sit, hop, leap, swim, float, call, snap,
-   clasp, death; tadpole: wriggle, graze).
-1. **The barb in the game, and fewer tilapia.** Entity, school, flash, scatter and fountain, sipping; the spawning
-   check list (group, spawn check, quiet-savanna gate, a `worldWouldSpawn` test, the groups table); the tilapia's
-   numbers; young crocodiles and catfish eat barbs. Tests in `river`: barbs spawn by themselves on shallow water, a
-   hatchling crocodile catches a barb, a catfish takes a barb, the school bursts on a strike.
+0. **Pictures, briefs, outlines (the model workshop, `docs/plans/model-workshop.md`).** The bullfrog from the user's
+   picture (`references/inspiration/bullfrog.png`, once its size is picked); the barb designed by Claude (the user,
+   2026-11-20, "I let you design the small fish"): Claude draws its sheet, `references/inspiration/barb.png`. Then for
+   each: brief, outline, plain 3D shape, detail, paint, animations, each with the user's OK (barb clips: swim, turn,
+   sip, scatter, death; bullfrog: sit, dig in, crawl, hop, leap, swim, float, call, puff up, lunge, clasp, wrestle,
+   death; tadpole: wriggle, graze; froglet). The detailed webbed hind foot is a later job (the user).
+1. **The barb in the game, and fewer tilapia.** Entity, school, flash, scatter and fountain, sipping, the far look;
+   the spawning check list (group, spawn check, quiet-savanna gate, a `worldWouldSpawn` test, the groups table); the
+   tilapia's numbers; young crocodiles and catfish eat barbs. Tests in `river`: barbs spawn by themselves on shallow
+   water, a hatchling crocodile catches a barb, a catfish takes a barb, the school bursts on a strike.
 2. **The barb breeds** (`life`): the dawn spawning over algae, eggs eaten, fry. Tests: a school spawns and fry
    appear; room to breed stops at the limit.
-3. **The frog in the game.** Sitting, the escape leap, swimming and floating, calling and the chorus, hushing, the
-   sound; the spawning check list; monitor, young crocodiles and catfish eat frogs. Tests in `river`.
-4. **The frog breeds** (`life`): calling, amplexus, jelly eggs, tadpoles grazing, froglets climbing out. A full run
-   here (3 steps since the last).
+3. **The bullfrog in the game.** Sitting dug in, crawling and hops, the leap into the water, swimming and floating,
+   the ambush lunge, puffing up and biting a player, calling, the sound; the spawning check list; monitor, young
+   crocodiles and catfish eat bullfrogs and tadpoles. Tests in `river`.
+4. **The bullfrog breeds** (`life`): calling and wrestling, amplexus, eggs, the tadpole school guarded by its father,
+   froglets climbing out. A full run here (3 steps since the last).
 5. **Balance:** joins the animal life cycle's step 6 soak (counts of every river kind per game day level off; time per
    tick before and after), then the user's in-game test in a new world.
 
 ## My picks the user may change
-The names (river barb, river frog), every size and number above, barbs and frogs with no hunger, grown crocodiles
-ignoring barbs, frogs not eating colony insects.
+The barb's name and look, every size and number above (the bullfrog's size is the user's call), barbs with no hunger,
+grown crocodiles ignoring barbs, the bullfrog's bite of 1 heart, bullfrogs not eating colony insects.

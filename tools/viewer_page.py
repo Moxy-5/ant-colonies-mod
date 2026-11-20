@@ -13,7 +13,8 @@ reads pictures to compare a model with. Each is a PNG with a views file beside i
 
     {"length_blocks": 6,                     the animal's length the picture means (the user writes it on the picture)
      "views": {"side":  {"box": [x0, y0, x1, y1], "head": "left"},     where each view is in the picture, in pixels,
-               "top":   {"box": [...], "head": "right"},               and which way its head points
+               "top":   {"box": [...], "head": "right"},               and which way its head points ("left", "right",
+                                                                         or "up"/"down" for a view drawn standing up)
                "front": {"box": [...]}},
      "background_tolerance": 40}             optional: how far a colour may be from the background and still count as it
 
@@ -72,6 +73,10 @@ def cut_view(img, box, head=None, tolerance=40):
     framed = framed.crop(shape)
     if head == "right":
         framed = framed.transpose(Image.Transpose.FLIP_LEFT_RIGHT)
+    elif head == "up":       # a top view drawn standing up (the bullfrog's sheet): turned so the head is left
+        framed = framed.transpose(Image.Transpose.ROTATE_90)
+    elif head == "down":
+        framed = framed.transpose(Image.Transpose.ROTATE_270)
     return framed
 
 
