@@ -35,6 +35,16 @@ real rivers; no source checking; the game-balancer rule holds. Every number here
   blocks that hide in the shallowest water, grown in 3 days. Every 2 days, clutch 10 to 16, local limit 30, no care.
 - **Spawning:** its own group `antcolonies:river_school`, cap 40 round a player, kept within 96, gone past 128;
   groups of 8 to 14 (`getMaxSchoolSize` 14).
+- **A far look (the user, 2026-11-20, "make it so the models become less detailed from far away"):** the cost of
+  many small fish is mostly in drawing them: GeckoLib works out every box of every model each frame on the CPU (the
+  tilapia has 105 boxes, the catfish 176, the crab 248, the monitor 665), so 40 barbs at tilapia detail would be about
+  4,000 boxes a frame. The thinking each fish does on the server is small beside it (about 0.02 ms each, measured for
+  the insects: 16 more fish about 0.3 ms of a tick's 50). So past a set distance (my pick: 12 blocks, where a
+  0.25-block fish is a few dots on the screen) the barb is drawn with a far model of a few boxes and the same bone
+  names, so its swim clip still moves it; beyond Minecraft's own entity draw distance it is not drawn at all. Built
+  once as a shared renderer helper (`FarLook`: a far model per animal and its distance), so the tilapia, catfish,
+  crab and monitor can take it up later with only a far model each. Checked in the game: the switch must not pop
+  (the barb's far model is made from its near one, same outline and colours).
 
 ## Fewer tilapia (the user's ask)
 - `antcolonies:river_fish` (tilapia and catfish) cap 60 -> **36**; tilapia spawn groups 3-6 -> **2-4**; the tilapia's
@@ -75,6 +85,21 @@ real rivers; no source checking; the game-balancer rule holds. Every number here
 - **The hard part, said plainly:** hopping on land and the jump into the water is new movement for our animals (the
   monitor's water entry took long work). Its own clips and checks, offline and frame by frame in the game, as the
   rule asks; two strikes, then rethink.
+- **What Minecraft's own frog teaches (read from its code, 2026-11-20, the user's question):**
+  - **Its jump clip is not worth copying:** it is one still pose held half a second (body tipped up 22.5 degrees, front
+    legs swung forward, hind legs back); the whole leap is the game throwing the body along an arc. Ours gets a real
+    clip: crouch, the hind legs kick out straight, the body stretched in the air with the front legs reaching, then
+    landing on the front legs and folding up; its length stretched to the flight time of each leap, as walks follow
+    their speed.
+  - **Its jump aiming is worth using as it is:** Minecraft's `LongJumpUtil.calculateJumpVectorForAngle` takes a
+    landing spot, tries launch angles of 65 to 80 degrees, works out the speed, and checks the whole arc is clear of
+    blocks before the frog leaves the ground. Our escape leap calls it to pick a clear arc into the water (no frog
+    smacking into a bank's lip), and falls back to a nearer spot or a plain dive in when no arc is clear.
+  - **Land and water in one:** Minecraft's frog walks and swims with one amphibious route finder
+    (`AmphibiousPathNavigation`) and a swimming move control (`SmoothSwimmingMoveControl`), so it never has to be
+    switched between a land body and a water body; our frog starts from those (the monitor's own climbing legs are
+    for its size and the bank's walls, which a frog does not need). Its floating pose in water and its 3-second croak
+    with the throat swelling are its other clips; ours do the same things in our own style.
 - Not the other frogs on the master list (the snake-necked frog of the Matabele nests, the bullfrog, the foam-nest
   tree frog): those stay their own animals. Minecraft's own frog does not spawn in savannas.
 
