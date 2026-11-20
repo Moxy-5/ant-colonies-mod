@@ -27,6 +27,9 @@ import net.minecraft.world.level.BlockGetter;
  * carried rest heights lifted it into an arch); with the hips tipped nose down holding the tail's root up, the root may
  * bend down twice as far (it arched up behind them: the user, "the back popping out when its going down").</li>
  * <li>On flat ground, going straight, every joint lies exactly at its rest place: the tail looks as the clips made it.</li>
+ * <li>Over water (a ground that says where it floats, {@link Ground#afloat}; step 4, 2026-11-19) a joint eases to lie along
+ * the surface instead: dragged into the water the tail slides off the bank and floats out straight behind, as a swimming
+ * tail lies, and coming out it is dragged up the bank from there.</li>
  * </ul>
  * Species-neutral (any tail of any number of pieces; a lizard's, a crocodile's, later a rat's); it only reads the
  * ground. Nothing here decides anything. One per animal; drawing only.
@@ -38,9 +41,35 @@ public final class TailDrag {
         /** The height a piece of the tail rests at, at this place (blocks). */
         double at(double x, double z);
 
+        /**
+         * Over water, the height a joint of the tail floats at here (blocks): it lies along the surface there instead of
+         * resting on the bottom; NaN where there is no water (the Animal Maker Engine step 4, 2026-11-19).
+         */
+        default double afloat(double x, double z) {
+            return Double.NaN;
+        }
+
         /** The level's ground near the animal's own height {@code y}, as {@link GroundBend#support} reads it (water: afloat). */
         static Ground of(BlockGetter level, double y, boolean inWater, double floatDepth) {
             return (x, z) -> GroundBend.support(level, x, z, y, inWater, floatDepth);
+        }
+
+        /**
+         * The level's ground under any water near the animal's own height {@code y}, and over water the tail afloat, its
+         * middle line {@code under} blocks under the surface: a tail dragged into the water slides off the bank and floats.
+         */
+        static Ground floating(BlockGetter level, double y, double under) {
+            return new Ground() {
+                @Override
+                public double at(double x, double z) {
+                    return GroundBend.support(level, x, z, y, false, Double.MAX_VALUE);
+                }
+
+                @Override
+                public double afloat(double x, double z) {
+                    return GroundBend.surface(level, x, z, y) - under;
+                }
+            };
         }
     }
 
@@ -55,6 +84,8 @@ public final class TailDrag {
     private static final double SLANT = Math.tan(Math.toRadians(MAX_STEEP));
     /** How quickly a joint eases to its height, the tail eases back to straight, and the drag takes over from the clip or hands back (seconds; my picks). */
     static final double EASE = 0.15, STRAIGHTEN = 3.0, WEIGH = 0.25;
+    /** How fast ground past the tail's own reach stops holding a joint up (blocks lower a block further: my pick). */
+    static final double BEYOND = 3.0;
     /** Moved farther than this in a frame (blocks: a teleport, a knockback), or not drawn for half a second: laid out afresh. */
     static final double RESET = 2.0;
 
@@ -180,8 +211,13 @@ public final class TailDrag {
         // (eased, as the root crossing a block's face would move it a block at once and snap the tail)
         double ground0 = ground.at(bx, bz);
         home = fresh ? ground0 : home + (ground0 - home) * k;
+        double behind = 0;          // the tail's length behind the joint being placed (blocks)
+        for (int i = 0; i < n; i++) {
+            behind += lengthPx[i] * perBlock;
+        }
         for (int i = 1; i <= n; i++) {
             double len = lengthPx[i - 1] * perBlock;
+            behind -= len;
             // its bend from the drag, eased a little back toward straight
             double side = bend[i - 1] * (1.0 - straighten);
             double c = Math.cos(Math.toRadians(side)), s = Math.sin(Math.toRadians(side));
@@ -192,8 +228,13 @@ public final class TailDrag {
             double px = x[i - 1] + ux * reach, pz = z[i - 1] + uz * reach, spread = 0.5 * len;
             double here = ground.at(px, pz);
             double under = Math.max(here, Math.max(ground.at(px + ux * spread, pz + uz * spread), ground.at(px - ux * spread, pz - uz * spread)));
-            double floor = floor(ground, px, pz, ux, uz, lowestPx[i - 1] * perBlock, len);
-            double height = Math.max(y[i] + (Math.min(under, home) + restPx[i - 1] * perBlock - y[i]) * k, floor);
+            double floor = floor(ground, px, pz, ux, uz, lowestPx[i - 1] * perBlock, len, behind);
+            // over water it floats along the surface (as the swimming tail lies), else it lies on the ground as at rest
+            double wet = ground.afloat(px, pz);
+            // (no higher than a little over the hips, as it lies swimming at the surface: an animal swimming under, hiding after a scare, keeps its
+            // tail down with it; floated to the surface, the tail zig-zagged up from the sunk hips and snapped, 2026-11-19)
+            double rest = Double.isNaN(wet) ? Math.min(under, home) + restPx[i - 1] * perBlock : Math.min(wet, by + 0.25 * lengthPx[0] * perBlock);
+            double height = Math.max(y[i] + (rest - y[i]) * k, floor);
             // (after a piece the ground raised, this one may fold back down over the top)
             // (and with the hips tipped nose down, holding its root up, the root may bend down twice as far)
             double down = i == 1 && before > 0 ? 2 * MAX_JOINT : MAX_JOINT;
@@ -210,7 +251,7 @@ public final class TailDrag {
             forced = false;
             for (;;) {
                 double r = len * Math.cos(Math.toRadians(angle));
-                double need = floor(ground, x[i - 1] + ux * r, z[i - 1] + uz * r, ux, uz, lowestPx[i - 1] * perBlock, len);
+                double need = floor(ground, x[i - 1] + ux * r, z[i - 1] + uz * r, ux, uz, lowestPx[i - 1] * perBlock, len, behind);
                 if (y[i - 1] + len * Math.sin(Math.toRadians(angle)) >= need - 1.0E-9) {
                     break;
                 }
@@ -237,9 +278,12 @@ public final class TailDrag {
     /**
      * The least height a joint at (x, z) lies at, its tail going on back along (ux, uz): its thickness over the ground
      * there, and over ground rising behind it (a block it came down off) high enough already that the tail behind can
-     * slant up over it no steeper than its steepest, rather than having to stand up the face at the last joint.
+     * slant up over it no steeper than its steepest, rather than having to stand up the face at the last joint; only
+     * ground the tail behind the joint ({@code behind}, blocks) still reaches counts in full, past it less and less
+     * ({@link #BEYOND}; pulled off a bank into the water, the tail's end stood propped up against the face for a top it
+     * no longer reached, 2026-11-19).
      */
-    private static double floor(Ground ground, double x, double z, double ux, double uz, double lowest, double len) {
+    private static double floor(Ground ground, double x, double z, double ux, double uz, double lowest, double len, double behind) {
         double floor = ground.at(x, z) + lowest;
         // the ground changes only at block borders: read it just past each one the tail crosses within reach
         double most = 3.0 * len, dx = x, dz = z, d = 0;
@@ -256,7 +300,8 @@ public final class TailDrag {
             }
             dx = x + ux * (d + 1.0E-6);
             dz = z + uz * (d + 1.0E-6);
-            floor = Math.max(floor, ground.at(dx, dz) + lowest - d * SLANT);
+            // (ground past what the tail behind reaches counts less and less, smoothly: cut off, the tip snapped)
+            floor = Math.max(floor, ground.at(dx, dz) + lowest - d * SLANT - Math.max(0.0, d - behind) * BEYOND);
         }
     }
 

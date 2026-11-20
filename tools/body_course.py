@@ -69,7 +69,8 @@ SCENES = {
                   (-4.5, G + 2, 0.5), [(8, -61, 0)], 'walk'),
     'dash': ('running into water from a level bank', [WATER_POOL], (-4.5, G, 0.5), [(8, -61, 0)], 'dash'),
     'climb_out': ('swimming to a bank one block above the water and climbing out', [
-        'cmd fill -12 -63 -7 0 -62 7 minecraft:water'], (-6.5, -62, 0.5), [(6, G, 0)], 'walk'),
+        'cmd fill -12 -63 -7 0 -62 7 minecraft:water', 'cmd fill -12 -61 -7 0 -61 7 minecraft:air'], (-6.5, -62, 0.5),
+        [(6, G, 0)], 'walk'),    # (the air: the grass layer left over the water made it a covered channel, 2026-11-19)
     'turn': ('a walk with two right-angle turns (the back bending sideways)', [], (-6.5, G, -4.5),
              [(2, G, -5), (2, G, 4), (-6, G, 4)], 'walk'),
 }

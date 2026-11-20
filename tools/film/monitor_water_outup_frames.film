@@ -1,0 +1,44 @@
+# The Nile monitor climbing out onto a bank a block over the water, frame by frame (the Animal Maker Engine step 4, 2026-11-19; docs/plans/engine-step4-water.md):
+# the game frozen and stepped 2 ticks between pictures through the move, from the side, from the water in front and from
+# behind. The bank's edge (or face) at x 1, the water on one side of it.
+#   ./gradlew runFilm -PfilmScene=tools/film/monitor_water_outup_frames.film   pictures in run-film/screenshots/monitor_water_outup_frames/
+cmd time set noon
+cmd weather clear
+cmd kill @e[type=!player]
+cmd fill -12 -63 -7 12 -62 7 minecraft:dirt
+cmd fill -12 -61 -7 12 -61 7 minecraft:grass_block
+cmd fill -12 -60 -7 12 -56 7 minecraft:air
+cmd fill -12 -63 -7 0 -62 7 minecraft:water
+cmd fill -12 -61 -7 0 -61 7 minecraft:air
+lens 40
+wait 40
+# side
+walker antcolonies:monitor -4.5 -62 0.5 -90 OwnSize:1.0f,HungryIn:99999,SunIn:99999
+camera 1.2 -60.6 -4.8 0 4
+cmd tick unfreeze
+go 6 -60 0 0.8
+wait 40
+cmd tick freeze
+burst side 100 2
+cmd kill @e[type=antcolonies:monitor]
+wait 10
+# front
+walker antcolonies:monitor -4.5 -62 0.5 -90 OwnSize:1.0f,HungryIn:99999,SunIn:99999
+camera 5.2 -60.9 3.0 122 6
+cmd tick unfreeze
+go 6 -60 0 0.8
+wait 40
+cmd tick freeze
+burst front 100 2
+cmd kill @e[type=antcolonies:monitor]
+wait 10
+# back
+walker antcolonies:monitor -4.5 -62 0.5 -90 OwnSize:1.0f,HungryIn:99999,SunIn:99999
+camera -3.6 -59.4 -2.6 -55 18
+cmd tick unfreeze
+go 6 -60 0 0.8
+wait 40
+cmd tick freeze
+burst back 100 2
+cmd kill @e[type=antcolonies:monitor]
+quit

@@ -285,6 +285,30 @@ public final class GroundBend {
         return Math.max(ground, selfInWater ? y : surface - floatDepth);
     }
 
+    /**
+     * The water's surface over (x, z) near height {@code y} (blocks): the top of the highest water there, looked for as
+     * {@link #support} looks for the ground; NaN if there is no water before the ground.
+     */
+    public static double surface(BlockGetter level, double x, double z, double y) {
+        BlockPos.MutableBlockPos p = new BlockPos.MutableBlockPos();
+        int bx = Mth.floor(x), bz = Mth.floor(z);
+        int by = Mth.floor(y + 0.3);
+        for (int up = 0; up < 3 && top(level, p.set(bx, by, bz)) > 0.5; up++) {
+            by++;
+        }
+        for (int c = by; c > by - 5; c--) {
+            p.set(bx, c, bz);
+            FluidState fluid = level.getFluidState(p);
+            if (fluid.is(FluidTags.WATER)) {
+                return c + fluid.getHeight(level, p);
+            }
+            if (top(level, p) >= 0) {
+                return Double.NaN;
+            }
+        }
+        return Double.NaN;
+    }
+
     /** The top of what one stands on in this block (0 to 1), or -1 if nothing. */
     private static double top(BlockGetter level, BlockPos pos) {
         BlockState state = level.getBlockState(pos);

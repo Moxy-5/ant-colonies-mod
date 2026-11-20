@@ -466,7 +466,6 @@ def paint(bones, look='nile'):
 # turn, in the bone file's degrees (as GeckoLib and the viewer read them).
 BODY_PIVOT = (0.0, TAIL_AXIS, -13.0)
 WALK_LEN, SWIM_LEN = 1.2, 1.6          # one full stride, one full tail beat (seconds; the game will scale them by speed)
-ENTER_LEN = 1.2                        # going into the water (seconds; MonitorEntity.ENTER_TICKS keeps step with it)
 
 
 def _ease(x):
@@ -509,6 +508,7 @@ class _Poser:
         self.rest = {b['name']: b.get('rotation', [0.0, 0.0, 0.0]) for b in bones}
         self.last = {}
         self.worst = 0.0
+        self.now, self.log = 0.0, None      # the clip's time, and (when a list) every reach miss as (time, leg, px)
         self.legs = []
         for s, side in ((1, 'left'), (-1, 'right')):
             for kind, plan in LEG_PLANS.items():
@@ -531,7 +531,7 @@ class _Poser:
         self.last[name] = v
         return v
 
-    def leg(self, p, L, body_m, body_d, wrist, foot_m, in_body=False, curl=0.0, raised=None):
+    def leg(self, p, L, body_m, body_d, wrist, foot_m, in_body=False, curl=0.0, raised=None, way=None):
         """Bends leg L so its wrist or ankle is at wrist and its foot turned foot_m (both on the ground's axes, or the
         body's if in_body), the body turned body_m about its pivot and moved body_d. The elbow or knee bends out the way
         it does at rest; or with raised (the climb) the way it points standing, raised that much higher against the
@@ -549,13 +549,16 @@ class _Poser:
         reach = 0.985 * (L['l1'] + L['l2'])
         if D > reach:                                   # out of reach: as far as it goes (and remember by how much)
             self.worst = max(self.worst, D - reach)
+            if self.log is not None:
+                self.log.append((self.now, L['kind'][0] + L['side'][0], D - reach))
             d = [c * reach / D for c in d]
             Wb, D = vadd(S, d), reach
         D = max(D, abs(L['l1'] - L['l2']) * 1.02)
         dh = [c / D for c in d]
         a = (L['l1'] ** 2 - L['l2'] ** 2 + D * D) / (2 * D)
         h = math.sqrt(max(0.0, L['l1'] ** 2 - a * a))
-        way = vsub(L['E'], S) if raised is None else [a - raised * b for a, b in zip(L['stand'], L['reach'])]
+        if way is None:
+            way = vsub(L['E'], S) if raised is None else [a - raised * b for a, b in zip(L['stand'], L['reach'])]
         pole = _bend_way(way, dh)
         E = [S[i] + a * dh[i] + h * pole[i] for i in range(3)]
         r1, r2 = leg_frames(s, plan, S, E, Wb)
@@ -685,16 +688,503 @@ def _descend_keys(B):
     }
 
 
-def _spline(t, keys):
+# --- going into and out of the water (the Animal Maker Engine step 4, 2026-11-19; docs/plans/engine-step4-water.md) ----
+# Made as the climbs are: each a move of its own, made once (per size), the game moving the monitor along the move's own
+# path; the tail is the game's (dragged, TailDrag; afloat it lies along the water's surface). A Minecraft river's water
+# is source blocks, its surface 1/9 of a block under the top of its block, so a bank is either level with the water's
+# block (its top a ninth of a block over the surface) or a whole number of blocks higher: one move for each. In a move's
+# scene the bank's top is at height 0 (a block higher for the climb out a block up), the water's block's top at 0 too.
+# Going in, it ends afloat as the swim floats it (its feet's line WATER_FLOAT under the surface) in the swim's first pose
+# and gliding on, so the swim goes on from it; coming out, it starts afloat in the swim's first pose. Every number my
+# pick (fun and good-looking first: the user, 2026-11-19, "it's an animal").
+WATER_FLOAT = 12.0          # afloat, its feet's line this far under the surface (px; MonitorEntity.AFLOAT: 12 px at every size)
+TAIL_FLOAT = 1.0            # afloat, the tail's middle line this far under the surface (the swim's straight tail; MonitorEntity.TAIL_FLOAT)
+WATER_EDGE = 30.0           # going in, the bank's edge this far ahead of where it starts (px): its fore claws at it
+WATER_FACE = 50.0           # coming out, the bank's face this far ahead of where it starts (px): its snout 3 px short
+WATER_FACE_UP = 58.0        # climbing out a block up, further (px): room to rear as it swims the last of the way in
+WATER_KINDS = ('in', 'drop', 'drop2', 'dash', 'out', 'outup')
+GLIDE = 0.035               # how fast it swims calmly (blocks a tick: measured in the course, 2026-11-19); a dash, RUN on land
+RUN, DASH_SWIM = 0.077, 0.11
+
+
+def water_name(kind, size):
+    return f'water_{kind}_{round(size * 1000)}'
+
+
+def px_per_tick(blocks, size):
+    """A speed in blocks a tick as model pixels a second, at this size."""
+    return blocks * 20.0 * block_px(size)
+
+
+def water_scene(kind, B):
+    """The scene a water move is made in: the bank (its top's height, its edge or face along z, which side it is on: going
+    in it is behind the edge, coming out ahead of the face), the water's surface and the bottom (one block deep under the
+    water's block: the shallowest that floats it)."""
+    s0 = -B / 9.0
+    h = {'drop': 1, 'drop2': 2}.get(kind, 0)
+    if kind in ('out', 'outup'):
+        return {'kind': kind, 'edge': -(WATER_FACE_UP if kind == 'outup' else WATER_FACE), 'land_ahead': True, 'top': B if kind == 'outup' else 0.0,
+                'surface': s0, 'bottom': -B, 'float': s0 - WATER_FLOAT}
+    return {'kind': kind, 'edge': -WATER_EDGE, 'land_ahead': False, 'top': 0.0, 'surface': s0 - h * B, 'bottom': -(h + 1) * B,
+            'float': s0 - h * B - WATER_FLOAT}
+
+
+def scene_solid(sc, y, z):
+    """How deep (px) a point lies inside the bank or the bottom (0 if not)."""
+    land = z < sc['edge'] if sc['land_ahead'] else z > sc['edge']
+    if land:
+        if y < sc['top']:
+            return min(sc['top'] - y, abs(z - sc['edge']))
+        return 0.0
+    return max(0.0, sc['bottom'] - y)
+
+
+def scene_floor(sc, z):
+    """What the body's underside must clear at z: the bank's top over the bank, the bottom over the water."""
+    land = z < sc['edge'] - 0.2 if sc['land_ahead'] else z > sc['edge'] + 0.2
+    return sc['top'] if land else sc['bottom']
+
+
+def _water_keys(kind, B, size):
+    """A water move's course (keys as _climb_keys; 'fold' says how far each leg is folded for swimming, 0 to 1, and
+    'swim' when the swim's own motion eases in at the end or out at the start)."""
+    sc = water_scene(kind, B)
+    F, ze = sc['float'], sc['edge']
+    glide = px_per_tick(GLIDE, size)
+    if kind == 'in':
+        # Walking in off a level bank: it stops with its fore claws at the edge and dips its head to the water (a flick of
+        # the tongue on it), walks on: each forefoot steps to the lip, reaches out and down into the water, finds no
+        # bottom and sweeps back along the body, folding; the chest slides into the water while the hips still walk on
+        # the bank, the hind legs crouching so the belly slides over the lip; the hind feet push off the edge and fold,
+        # the hips settle, it floats level and glides on, the tail's swimming wave easing in. 4.4 s.
+        return {
+            # (the hips stay over the lip until the folded hind feet, trailing 12 px behind the hip joint, are past it)
+            'hips_z': ((0.9, -4.0), (1.6, -11.0), (2.3, -19.5), (3.0, -28.5), (3.6, -36.5), (4.1, -43.0), (4.5, -48.5),
+                       (5.0, -55.5), (6.3, -55.5 - 1.3 * glide)),
+            'hips_z_end': -glide,
+            'hips_y': ((0.9, 10.5), (1.8, 9.6), (2.5, 8.2), (3.0, 6.4), (3.6, 4.8), (4.1, 3.2), (4.5, 1.6), (4.85, F + 11.2),
+                       (5.0, F + 10.5)),
+            'rear': ((0.0, 0.0), (0.9, 0.0), (1.8, -3.0), (2.5, -9.0), (3.0, -14.0), (3.6, -12.0), (4.1, -9.0), (4.5, -5.0),
+                     (4.85, -1.0), (5.0, 0.0)),
+            'bend': ((0.9, 0.0), (1.6, 6.0), (2.2, 17.0), (2.7, 20.0), (3.1, 10.0), (3.6, 2.0), (4.1, -3.0), (4.6, 0.0)),
+            'neck': ((0.0, 18.0), (0.35, -8.0), (0.85, -8.0), (1.4, 10.0), (2.4, 6.0), (3.4, 12.0), (5.0, 18.0)),
+            'head': ((0.0, -2.0), (0.35, -36.0), (0.85, -34.0), (1.4, -10.0), (2.4, -6.0), (3.4, -2.0)),
+            'flicks': (0.4,),
+            ('arm', 'left'): ((10.8, 2.3, -25.0), (0.95, 1.3, (10.8, 2.3, -28.0)), (1.5, 1.9, (11.0, -3.0, -35.0))),
+            ('arm', 'right'): ((-10.8, 2.3, -25.0), (1.15, 1.5, (-10.8, 2.3, -28.5)), (1.75, 2.15, (-11.0, -3.5, -36.5))),
+            ('leg', 'left'): ((11.8, 2.6, -2.6), (1.2, 1.5, (11.8, 2.6, -11.5)), (1.9, 2.2, (11.8, 2.6, -20.5)),
+                              (2.6, 2.9, (11.8, 2.6, -28.0))),
+            ('leg', 'right'): ((-11.8, 2.6, -2.6), (1.0, 1.3, (-11.8, 2.6, -9.5)), (1.7, 2.0, (-11.8, 2.6, -18.5)),
+                               (2.4, 2.7, (-11.8, 2.6, -27.0))),
+            'hang': {('arm', 'left'): ((2.2, 0.0), (2.7, 1.0)), ('arm', 'right'): ((2.45, 0.0), (2.95, 1.0)),
+                     ('leg', 'left'): ((3.5, 0.0), (4.0, 1.0)), ('leg', 'right'): ((3.35, 0.0), (3.85, 1.0))},
+            'fold': {('arm', 'left'): ((4.5, 0.0), (5.4, 1.0)), ('arm', 'right'): ((4.7, 0.0), (5.6, 1.0)),
+                     ('leg', 'left'): ((5.1, 0.0), (6.2, 1.0)), ('leg', 'right'): ((5.0, 0.0), (6.1, 1.0))},
+            'swim': (5.0, 6.3, 'in'),
+            'knees': KNEES, 'elbows': ELBOWS,
+            'length': 6.3,
+        }
+    if kind == 'dash':
+        # Running in (scared): no stop; it runs off the edge, plunging head first, the forelegs sweeping back at once,
+        # the hind legs giving a last shove off the lip and folding, the body following its head under the surface and
+        # gliding off fast. 1.3 s.
+        v0, dash = px_per_tick(RUN, size), px_per_tick(DASH_SWIM, size)
+        t_edge = 26.0 / v0
+        return {
+            'hips_z': ((0.0, -4.0), (t_edge, -30.0), (1.3, -30.0 - 0.75 * dash * (1.3 - t_edge) - 4.0),
+                       (1.9, -30.0 - 0.75 * dash * (1.3 - t_edge) - 4.0 - 0.6 * dash)),
+            'hips_z_start': -v0, 'hips_z_end': -px_per_tick(DASH_SWIM, size),
+            'hips_y': ((0.0, 10.5), (0.45, 10.0), (t_edge + 0.05, 6.8), (t_edge + 0.3, F + 9.0), (1.3, F + 10.0), (1.9, F + 10.5)),
+            'rear': ((0.0, 0.0), (0.35, -5.0), (t_edge, -20.0), (t_edge + 0.25, -10.0), (1.3, 0.0)),
+            'bend': ((0.0, 0.0), (0.3, 14.0), (0.55, 22.0), (t_edge + 0.05, 2.0), (1.1, -6.0), (1.3, 0.0)),
+            'neck': ((0.0, 18.0), (0.3, 6.0), (0.65, -10.0), (1.0, 4.0), (1.3, 14.0)),
+            'head': ((0.0, -2.0), (0.35, -18.0), (0.7, -26.0), (1.0, -8.0), (1.3, -2.0)),
+            'flicks': (),
+            ('arm', 'left'): ((10.8, 2.3, -25.0), (0.03, 0.3, (10.8, 0.5, -36.0))),
+            ('arm', 'right'): ((-10.8, 2.3, -25.0), (0.12, 0.4, (-10.8, 0.0, -38.0))),
+            ('leg', 'left'): ((11.8, 2.6, -2.6), (0.12, 0.35, (11.8, 2.6, -17.0)), (0.48, t_edge - 0.05, (11.8, 2.6, -28.5))),
+            ('leg', 'right'): ((-11.8, 2.6, -2.6), (0.0, 0.22, (-11.8, 2.6, -10.0)), (0.27, 0.47, (-11.8, 2.6, -19.0)),
+                               (0.53, 0.74, (-11.8, 2.6, -28.0))),
+            'hang': {('arm', 'left'): ((0.42, 0.0), (0.67, 1.0)), ('arm', 'right'): ((0.5, 0.0), (0.75, 1.0)),
+                     ('leg', 'left'): ((t_edge + 0.14, 0.0), (t_edge + 0.39, 1.0)), ('leg', 'right'): ((t_edge + 0.11, 0.0), (t_edge + 0.36, 1.0))},
+            'fold': {('arm', 'left'): ((0.9, 0.0), (1.45, 1.0)), ('arm', 'right'): ((0.95, 0.0), (1.5, 1.0)),
+                     ('leg', 'left'): ((1.3, 0.0), (1.9, 1.0)), ('leg', 'right'): ((1.25, 0.0), (1.85, 1.0))},
+            'swim': (1.0, 1.9, 'in'),
+            'knees': KNEES, 'elbows': ELBOWS,
+            'length': 1.9,
+        }
+    if kind == 'drop':
+        # Sliding in off a bank a block over the water's block, as it climbs down a block (the climb down's course, the
+        # user's OK): stops with its fore claws at the edge, looks down at the water, steps its forefeet over and down the
+        # face (palms on it, toes down), the chest tipping down after them while the hind legs brake on top; the forefeet
+        # reach on down into the water and find no bottom, hanging; the head and chest slide in, the hind feet come down
+        # the face and let go, hanging; the body levels out afloat and glides on, the legs folding a while after. 5.1 s.
+        k = B - block_px(1.0)
+        return {
+            'hips_z': ((0.3, -4.0), (1.0, -12.0), (1.5, -20.5), (2.0, -27.5 - 0.3 * k), (2.4, -33.0 - 0.6 * k),
+                       (2.8, -38.0 - 0.3 * k), (3.2, -43.0), (3.6, -48.0), (3.9, -51.5), (5.1, -51.5 - 1.2 * glide)),
+            'hips_z_end': -glide,
+            'hips_y': ((0.3, 10.5), (1.0, 10.2), (1.5, 9.5), (2.0, 7.0 - 0.3 * k), (2.4, 0.0 - 0.6 * k), (2.8, -9.0 - k),
+                       (3.2, F + 13.0), (3.6, F + 11.0), (3.9, F + 10.5)),
+            'rear': ((0.0, 0.0), (0.6, -2.0), (1.0, -8.0), (1.5, -20.0), (2.0, -38.0), (2.4, -46.0), (2.8, -38.0),
+                     (3.2, -20.0), (3.6, -5.0), (3.9, 0.0)),
+            'bend': ((0.6, 0.0), (1.0, 18.0), (1.5, 45.0), (2.0, 30.0), (2.4, 0.0), (2.8, -15.0), (3.2, -10.0), (3.6, 0.0)),
+            'neck': ((0.0, 18.0), (0.3, -15.0), (0.9, -15.0), (1.3, 2.0), (2.0, -8.0), (2.4, 0.0), (2.9, 12.0), (3.4, 18.0)),
+            'head': ((0.0, -2.0), (0.3, -45.0), (0.9, -50.0), (1.3, -30.0), (2.0, -15.0), (2.4, -8.0), (2.9, -2.0)),
+            'flicks': (0.4,),
+            ('arm', 'left'): ((10.8, 2.3, -25.0), (0.45, 0.75, (10.8, 2.3, -27.5)), (1.0, 1.4, (10.0, -4.0, ze - 3.2, -75.0)),
+                              (2.05, 2.4, (10.0, -B, ze - 12.0))),
+            ('arm', 'right'): ((-10.8, 2.3, -25.0), (0.55, 0.85, (-10.8, 2.3, -27.5)), (1.1, 1.5, (-10.0, -4.0, ze - 3.2, -75.0)),
+                               (2.15, 2.5, (-10.0, -B, ze - 12.0))),
+            ('leg', 'left'): ((11.8, 2.6, -2.6), (0.9, 1.2, (11.8, 2.6, -12.0)), (1.55, 1.85, (11.8, 2.6, ze + 5.0)),
+                              (2.5 - 0.04 * k, 2.8 - 0.04 * k, (11.5, -8.5, ze - 5.0, -75.0))),
+            ('leg', 'right'): ((-11.8, 2.6, -2.6), (0.8, 1.1, (-11.8, 2.6, -11.0)), (1.45, 1.75, (-11.8, 2.6, ze + 5.0)),
+                               (2.6 - 0.04 * k, 2.9 - 0.04 * k, (-11.5, -8.5, ze - 5.0, -75.0))),
+            'hang': {('arm', 'left'): ((2.5, 0.0), (2.9, 1.0)), ('arm', 'right'): ((2.6, 0.0), (3.0, 1.0)),
+                     ('leg', 'left'): ((2.95, 0.0), (3.35, 1.0)), ('leg', 'right'): ((3.0, 0.0), (3.4, 1.0))},
+            'fold': {('arm', 'left'): ((3.6, 0.0), (4.4, 1.0)), ('arm', 'right'): ((3.7, 0.0), (4.5, 1.0)),
+                     ('leg', 'left'): ((4.0, 0.0), (5.0, 1.0)), ('leg', 'right'): ((3.9, 0.0), (4.9, 1.0))},
+            'swim': (3.9, 5.1, 'in'),
+            'raised': True,             # (the elbows and knees held as the climb down holds them: low, an elbow flipped)
+            'length': 5.1,
+        }
+    if kind == 'drop2':
+        # Diving in off a bank two blocks over the water's block (hanging down a face twice its height looked wrong; a
+        # monitor drops into water off banks and branches): stops at the edge, looks down at the water (a flick of the
+        # tongue), steps its forefeet onto the lip and crouches; springs off head first, the legs hanging loose as it
+        # falls, the chest going in first with a splash, the body going a little under and rising to float level, gliding
+        # on, the legs folding a while after. 4.6 s.
+        surf = sc['surface']
+        return {
+            'hips_z': ((0.3, -4.0), (1.0, -12.0), (1.45, -18.0), (1.75, -20.0), (2.0, -29.0), (2.25, -40.0), (2.5, -51.0),
+                       (2.8, -60.0), (3.2, -67.0), (4.6, -67.0 - 1.4 * glide)),
+            'hips_z_end': -glide,
+            'hips_y': ((0.3, 10.5), (1.0, 10.2), (1.45, 8.5), (1.75, 7.0), (2.0, 12.0), (2.2, 9.5), (2.4, -6.0),
+                       (2.6, surf - 2.0), (2.8, F + 10.0), (3.1, F + 9.2), (3.6, F + 10.2), (4.0, F + 10.5)),
+            'rear': ((0.0, 0.0), (0.6, -2.0), (1.0, -8.0), (1.45, -14.0), (1.75, -18.0), (2.0, -12.0), (2.3, -30.0),
+                     (2.45, -32.0), (2.6, -20.0), (2.8, -9.0), (3.1, -3.0), (3.6, 0.0)),
+            'bend': ((1.0, 0.0), (1.45, 8.0), (1.75, 6.0), (2.0, 0.0), (2.5, 8.0), (2.9, -10.0), (3.3, 0.0)),
+            'neck': ((0.0, 18.0), (0.3, -15.0), (0.9, -15.0), (1.45, -6.0), (1.75, -2.0), (2.4, 8.0), (3.0, 16.0), (3.4, 18.0)),
+            'head': ((0.0, -2.0), (0.3, -45.0), (0.9, -50.0), (1.45, -35.0), (1.75, -25.0), (2.4, -10.0), (3.0, -2.0)),
+            'flicks': (0.4,),
+            ('arm', 'left'): ((10.8, 2.3, -25.0), (0.45, 0.75, (10.8, 2.3, -27.5)), (1.05, 1.35, (10.8, 2.3, ze + 1.5))),
+            ('arm', 'right'): ((-10.8, 2.3, -25.0), (0.55, 0.85, (-10.8, 2.3, -27.5)), (1.15, 1.45, (-10.8, 2.3, ze + 1.0))),
+            ('leg', 'left'): ((11.8, 2.6, -2.6), (0.9, 1.2, (11.8, 2.6, -11.0)), (1.3, 1.6, (11.8, 2.6, -17.5))),
+            ('leg', 'right'): ((-11.8, 2.6, -2.6), (0.8, 1.1, (-11.8, 2.6, -10.0)), (1.2, 1.5, (-11.8, 2.6, -16.5))),
+            'hang': {('arm', 'left'): ((1.85, 0.0), (2.2, 1.0)), ('arm', 'right'): ((1.9, 0.0), (2.25, 1.0)),
+                     ('leg', 'left'): ((1.98, 0.0), (2.33, 1.0)), ('leg', 'right'): ((1.98, 0.0), (2.33, 1.0))},
+            # (the forelegs tucked back as it hits the water, the dive's streamlining: hanging they struck the bottom of
+            # a one-block pool)
+            'fold': {('arm', 'left'): ((2.25, 0.0), (3.05, 1.0)), ('arm', 'right'): ((2.3, 0.0), (3.1, 1.0)),
+                     ('leg', 'left'): ((3.6, 0.0), (4.6, 1.0)), ('leg', 'right'): ((3.55, 0.0), (4.55, 1.0))},
+            'swim': (3.4, 4.6, 'in'),
+            'raised': True,
+            'length': 4.6,
+        }
+    if kind == 'out':
+        # Coming out onto a level bank: it swims up to the bank, its head lifting over the top, the forefeet unfold and
+        # reach out onto the top (claws in), the chest rises out of the water, it hauls; the hind feet unfold onto the
+        # bank's face under water and push, the hips slide up over the lip, the hind feet step up onto the top, it
+        # walks a step on and stands, the water running off it (the game's drips) and the tail dragged out last. 4.6 s.
+        end = -64.0
+        zf = ze
+        return {
+            'hips_z': ((0.0, -4.0), (0.8, -14.0), (1.4, -20.5), (2.0, -25.0), (2.6, -32.0), (3.1, -40.0), (3.6, -48.0),
+                       (4.1, -56.0), (4.6, end)),
+            'hips_z_start': -glide,
+            'hips_y': ((0.0, F + 10.5), (1.4, F + 11.0), (2.0, F + 13.0), (2.6, F + 16.5), (3.1, 6.0), (3.6, 9.2), (4.1, 10.5)),
+            'rear': ((0.0, 0.0), (0.8, 6.0), (1.4, 20.0), (2.0, 28.0), (2.6, 28.0), (3.1, 20.0), (3.6, 9.0), (4.1, 0.0)),
+            'bend': ((1.4, 0.0), (2.0, 8.0), (2.6, 16.0), (3.1, 12.0), (3.6, 4.0), (4.1, 0.0)),
+            'neck': ((0.0, 21.0), (0.6, 34.0), (1.4, 26.0), (2.0, 18.0), (3.0, 14.0), (4.1, 18.0)),
+            'head': ((0.0, 4.0), (0.6, 8.0), (1.4, 0.0), (2.0, -4.0), (3.0, -4.0), (4.1, -2.0)),
+            'flicks': (4.25,),
+            ('arm', 'left'): ((10.5, 2.3, zf - 1.5), (2.6, 2.9, (10.5, 2.3, zf - 12.0)), (3.25, 3.55, (10.8, 2.3, zf - 23.0)),
+                              (3.9, 4.2, (10.8, 2.3, end - 21.0))),
+            ('arm', 'right'): ((-10.5, 2.3, zf - 1.0), (2.75, 3.05, (-10.5, 2.3, zf - 11.0)), (3.4, 3.7, (-10.8, 2.3, zf - 22.0)),
+                               (4.05, 4.35, (-10.8, 2.3, end - 21.0))),
+            # (the hind legs unfold to hanging, then come up out of the water onto the lip as the hips slide over it)
+            ('leg', 'left'): ((11.8, 2.9, zf - 1.5), (3.85, 4.15, (11.8, 2.9, end + 1.4))),
+            ('leg', 'right'): ((-11.8, 2.9, zf - 2.0), (4.0, 4.3, (-11.8, 2.9, end + 1.4))),
+            'fold': {('arm', 'left'): ((0.9, 1.0), (1.5, 0.0)), ('arm', 'right'): ((1.0, 1.0), (1.6, 0.0)),
+                     ('leg', 'left'): ((1.8, 1.0), (2.5, 0.0)), ('leg', 'right'): ((1.9, 1.0), (2.6, 0.0))},
+            'hang': {('arm', 'left'): ((1.5, 1.0), (2.0, 0.0)), ('arm', 'right'): ((1.6, 1.0), (2.1, 0.0)),
+                     ('leg', 'left'): ((2.9, 1.0), (3.4, 0.0)), ('leg', 'right'): ((3.0, 1.0), (3.5, 0.0))},
+            'raised': True,
+            'swim': (0.0, 0.8, 'out'),
+            'length': 4.6,
+        }
+    # 'outup': coming out onto a bank a block over the water's block, as it climbs up a block: it swims up to the face,
+    # its head lifting, rears up in the water against it, the forefeet unfold and reach up and hook over the top; the
+    # hind feet unfold onto the face under water, then step up the face, it hauls itself up near upright, the front half
+    # bending over the top; the hips roll over the edge, the hind feet step onto the top, a step on, stand. 4.5 s.
+    u = WATER_FACE_UP - WATER_FACE                  # (the face further off: the course moved on by as much)
+    end = -4.0 - CLIMB_END - u
+    zf = ze
+    k = B - block_px(1.0)
+    return {
+        # (rearing as it comes up to the face, the head lifting clear of it; the hips coming in close under the face for
+        # the hind feet to find it: further off, the snout ran into the face and the hind feet fell short of it)
+        'hips_z': ((0.0, -4.0), (0.6, -12.0), (1.1, -17.0), (1.6, -30.0), (2.0, -40.0), (2.3, -46.0),
+                   (2.6, -39.5 - u), (3.1, -42.5 - u), (3.5, -45.0 - u), (3.9, -51.0 - u), (4.3, end)),
+        'hips_z_start': -glide,
+        'hips_y': ((0.0, F + 10.5), (0.8, F + 11.0), (1.5, F + 12.5), (1.9, F + 15.4), (2.2, 6.0 + k), (2.45, 10.6 + k), (2.7, 13.5 + k),
+                   (3.1, B - 2.5), (3.5, B - 1.0), (3.9, B + 7.0), (4.3, B + 10.5)),
+        'rear': ((0.0, 0.0), (0.4, 10.0), (0.8, 30.0), (1.1, 46.0), (1.4, 56.0), (1.8, 62.0), (2.2, 66.0), (2.6, 68.0), (3.1, 70.0),
+                 (3.5, 62.0), (3.9, 32.0), (4.3, 0.0)),
+        'bend': ((1.5, 0.0), (2.1, 14.0), (2.6, 28.0), (3.1, 42.0), (3.5, 40.0), (3.9, 22.0), (4.3, 0.0)),
+        'neck': ((0.0, 21.0), (0.5, 40.0 + k), (1.4, 32.0 + 1.5 * k), (2.1, 24.0 + k), (2.6, 20.0), (3.4, 16.0), (4.1, 18.0)),
+        'head': ((0.0, 4.0), (0.5, 16.0 + k), (1.4, 8.0 + 2.0 * k), (2.1, 0.0 + k), (2.6, -4.0), (3.4, -6.0), (4.1, -2.0)),
+        'flicks': (),
+        ('arm', 'left'): ((9.5, B + 2.3, zf - 1.5), (3.35, 3.65, (10.3, B + 2.3, -64.0 - u)), (3.95, 4.25, (10.8, B + 2.3, end - 21.0))),
+        ('arm', 'right'): ((-9.5, B + 2.3, zf - 1.5), (3.45, 3.75, (-10.3, B + 2.3, -66.0 - u)), (4.05, 4.35, (-10.8, B + 2.3, end - 21.0))),
+        ('leg', 'left'): ((11.5, F + 12.5 + 0.8 * k, zf + 2.5, 85.0), (2.45, 2.75, (11.5, B - 11.5, zf + 6.0, 85.0)),
+                          (3.5, 3.9, (11.8, B + 2.9, end + 1.4))),
+        ('leg', 'right'): ((-11.5, F + 11.5 + 0.8 * k, zf + 2.5, 85.0), (2.35, 2.65, (-11.5, B - 11.5, zf + 6.0, 85.0)),
+                           (3.35, 3.85, (-11.8, B + 2.9, end + 1.4))),
+        # every leg unfolds to hanging (the way it folds going in, backwards), then the forefeet reach up and over onto
+        # the top and the hind feet find the face
+        'fold': {('arm', 'left'): ((0.9, 1.0), (1.5, 0.0)), ('arm', 'right'): ((1.0, 1.0), (1.6, 0.0)),
+                 ('leg', 'left'): ((1.0, 1.0), (1.6, 0.0)), ('leg', 'right'): ((1.0, 1.0), (1.6, 0.0))},
+        'hang': {('arm', 'left'): ((1.6, 1.0), (2.2, 0.0)), ('arm', 'right'): ((1.7, 1.0), (2.3, 0.0)),
+                 ('leg', 'left'): ((1.9, 1.0), (2.35, 0.0)), ('leg', 'right'): ((1.8, 1.0), (2.25, 0.0))},
+        'raised': True,
+        'swim': (0.0, 0.8, 'out'),
+        'length': 4.5,
+    }
+
+
+TOES_OUT = {'arm': 80.0, 'leg': 95.0}    # half way through a fold the foot lies flat, toes this far round out to the side
+
+
+def _water_clearance(places, sc, margin=0.4):
+    """How far the trunk must go up (px) for its underside to clear the bank (the water does not hold it up)."""
+    need = 0.0
+    for yb, z0, z1 in UNDERSIDE:
+        for k in range(17):
+            z = z0 + (z1 - z0) * k / 16
+            piece = 0 if z > TRUNK_HINGES[0][1] else 1 if z > TRUNK_HINGES[1][1] else 2 if z > TRUNK_HINGES[2][1] else 3
+            M, t = places[piece]
+            w = vadd(mat_vec(M, [0.0, yb, z]), t)
+            need = max(need, scene_floor(sc, w[2]) + margin - w[1])
+    return need
+
+
+KNEES = 0.5     # my pick: going in, the knees held up this much (as CLIMB_RAISED) until the legs fold
+ELBOWS = 0.5    # my pick: and the elbows (reaching forward past the shoulder into the water, an elbow flipped)
+HANG = {'arm': ((1.0, 1.5, 2.5), -55.0), 'leg': ((1.5, 2.5, 0.0), -65.0)}  # my picks: in, up, back (px); toes down
+
+
+def _hang_leg(L):
+    """Where a leg hanging loose in the water has its wrist or ankle, and its foot's turn (on the body's axes): a little
+    in, up and back from standing, the toes drooping."""
+    (dx, dy, dz), toes = HANG[L['kind']]
+    w = L['W']
+    return [w[0] - L['s'] * dx, w[1] + dy, w[2] + dz], mat_mul(L['foot'], turn_x(toes))
+
+
+def _wrap(d):
+    return (d + 180.0) % 360.0 - 180.0
+
+
+def _slerp_turn(a, b, k):
+    """A turn part way (k, 0 to 1) from matrix a to matrix b along the shortest turn between them (blend_turn mixes the
+    matrices, which breaks down near half a turn apart: a folding foot flipped over)."""
+    def quat(m):
+        # (from the biggest of w, x, y, z: the signs taken from the others' sums held at half a turn too, where w is 0;
+        # signs read off w alone lost them and turned the right forefoot's swim pose into the left's, 2026-11-19)
+        tr = m[0][0] + m[1][1] + m[2][2]
+        if tr > max(m[0][0], m[1][1], m[2][2]):
+            r = math.sqrt(1.0 + tr) * 2.0
+            return [r / 4.0, (m[2][1] - m[1][2]) / r, (m[0][2] - m[2][0]) / r, (m[1][0] - m[0][1]) / r]
+        if m[0][0] >= m[1][1] and m[0][0] >= m[2][2]:
+            r = math.sqrt(1.0 + m[0][0] - m[1][1] - m[2][2]) * 2.0
+            return [(m[2][1] - m[1][2]) / r, r / 4.0, (m[0][1] + m[1][0]) / r, (m[0][2] + m[2][0]) / r]
+        if m[1][1] >= m[2][2]:
+            r = math.sqrt(1.0 + m[1][1] - m[0][0] - m[2][2]) * 2.0
+            return [(m[0][2] - m[2][0]) / r, (m[0][1] + m[1][0]) / r, r / 4.0, (m[1][2] + m[2][1]) / r]
+        r = math.sqrt(1.0 + m[2][2] - m[0][0] - m[1][1]) * 2.0
+        return [(m[1][0] - m[0][1]) / r, (m[0][2] + m[2][0]) / r, (m[1][2] + m[2][1]) / r, r / 4.0]
+    qa, qb = quat(a), quat(b)
+    d = sum(p * q for p, q in zip(qa, qb))
+    if d < 0:
+        qb, d = [-q for q in qb], -d
+    th = math.acos(min(1.0, d))
+    q = qa if th < 1e-6 else [(math.sin((1 - k) * th) * p + math.sin(k * th) * r) / math.sin(th) for p, r in zip(qa, qb)]
+    n = math.sqrt(sum(c * c for c in q))
+    w, x, y, z = (c / n for c in q)
+    return [[1 - 2 * (y * y + z * z), 2 * (x * y - z * w), 2 * (x * z + y * w)],
+            [2 * (x * y + z * w), 1 - 2 * (x * x + z * z), 2 * (y * z - x * w)],
+            [2 * (x * z - y * w), 2 * (y * z + x * w), 1 - 2 * (x * x + y * y)]]
+
+
+def water_move(kind, size, swim_table, swim_leg, flick, log=None):
+    """One water move's clip for a monitor of this size: (clip, worst reach miss, its scene, its path as (time, up, along)
+    in px). log, a list, gets every reach miss as (time, leg, px)."""
+    from model_parts import clip
+    P = _Poser()
+    P.log = log
+    B = block_px(size)
+    sc = water_scene(kind, B)
+    keys = _water_keys(kind, B, size)
+    length = keys['length']
+    path, marks = [], {}
+    t0s, t1s, way = keys['swim']
+    beat = round(SWIM_LEN / 0.05)
+    lifts = {'arm': 3.0, 'leg': 3.0}
+    if way == 'out':        # (the turns go on from the swim's own values: started afresh they came out a turn apart)
+        P.last.update({bone: list(chans['rotation']) for bone, chans in swim_table[0].items() if 'rotation' in chans})
+
+    def pose(t):
+        P.now = t
+        p = {}
+        rear, bend = _spline(t, keys['rear']), _spline(t, keys['bend'])
+        hy = _spline(t, keys['hips_y'])
+        hz = _spline(t, keys['hips_z'], keys.get('hips_z_start', 0.0), keys.get('hips_z_end', 0.0))
+        bm, bd, turns, places = _trunk(rear, bend, hy, hz)
+        lift = _water_clearance(places, sc)
+        if lift > 0.0:
+            bm, bd, turns, places = _trunk(rear, bend, hy + lift, hz)
+        p['body'] = {'rotation': [round(-rear, 3), 0.0, 0.0], 'position': [0.0, 0.0, 0.0]}
+        for name, b in turns.items():
+            p[name] = {'rotation': [round(b, 3), 0.0, 0.0]}
+        path.append((t, bd[1], bd[2]))
+        cm, ct = places[-1]
+        cd = vsub(vadd(ct, mat_vec(cm, BODY_PIVOT)), BODY_PIVOT)
+        # the wet moment: going in, the chest's underside first under the surface (a splash); coming out, the hips'
+        # underside first over it (from then the water runs off)
+        if 'wet' not in marks:
+            if way == 'in':
+                y = vadd(mat_vec(cm, [0.0, BODY_Y[0], -24.0]), ct)[1]
+                if y < sc['surface']:
+                    marks['wet'] = t
+            else:
+                hm, ht = places[0]
+                if t > 0.5 and vadd(mat_vec(hm, [0.0, BODY_Y[0], -6.0]), ht)[1] > sc['surface']:
+                    marks['wet'] = t
+        folded = {}
+        for L in P.legs:
+            side = (L['kind'], L['side'])
+            wrist, up, pitch_ = _foot_at(t, keys[side], lifts[L['kind']], reach=L['kind'] == 'arm' and keys.get('raised', False))
+            fold = _ramp(t, keys['fold'][side])
+            fm, fd = (cm, cd) if L['kind'] == 'arm' else (bm, bd)
+            # (a foot turned flat against a face lifts its claws straight off it: curled or drooped as on the ground,
+            # they went into the face)
+            flat_ish = max(0.0, 1.0 - abs(pitch_) / 90.0)
+            foot_m = mat_mul(L['foot'], turn_x(pitch_ - 28 * up * flat_ish))
+            bend_way = None
+            # reaching onto the bank the elbows and knees held as the climbs hold them; stepping to the lip the knees
+            # held up a little (crouched with the foot lifted near the hip, the knee flipped from front to back); each
+            # eased to the swim's own way as the leg folds (held so folded, the knee started out twisted against the
+            # swim's and the foot unfolded a whole turn round)
+            raise_by = CLIMB_RAISED[L['kind']] if keys.get('raised') else keys.get('knees' if L['kind'] == 'leg' else 'elbows', 0.0)
+            if raise_by:
+                held = [a - raise_by * b for a, b in zip(L['stand'], L['reach'])]
+                own = vsub(L['E'], L['S'])
+                bend_way = [a + (b - a) * fold for a, b in zip(held, own)]
+            # the leg on its place (the ground, the bank's face, or reaching into the water); a leg folding for swimming
+            # goes from there to its folded place as a paddle stroke: a forefoot sweeps back low first, then up into its
+            # place (unfolding, up and forward first); a hind foot sweeps back and up together; the foot turned along
+            # the shortest turn between the two
+            hangs = side in keys.get('hang', {})
+            hang = _ramp(t, keys['hang'][side]) if hangs else 0.0
+            P.log = log if fold < 0.999 else None
+            leg_p = {}
+            if fold > 0.0 or hang > 0.0:
+                wb = vadd(mat_vec(transpose(fm), vsub(vsub(wrist, fd), BODY_PIVOT)), BODY_PIVOT)
+                fb = mat_mul(transpose(fm), foot_m)
+                sw, sf = swim_leg(L)
+                if hangs:
+                    # a leg that has lost the bottom hangs loose under the body, its toes drooping, and only folds
+                    # for swimming a while after (folded at once the feet swung up over the back, the user's ask)
+                    hw, hf = _hang_leg(L)
+                    # (off the lip forward and out first, then down: straight down to it the foot went through the
+                    # bank's edge)
+                    h, hz, hy = _ease(hang), _ease(min(1.0, hang / 0.6)), _ease(max(0.0, (hang - 0.25) / 0.75))
+                    wb = [wb[0] + (hw[0] - wb[0]) * hz, wb[1] + (hw[1] - wb[1]) * hy, wb[2] + (hw[2] - wb[2]) * hz]
+                    # (turned only once off the ground or the face: turned on it, the toes swung through it)
+                    fb = _slerp_turn(fb, hf, _ease(min(1.0, max(0.0, (hang - 0.4) / 0.6))))
+                    # never under the ground it is still over (a foot letting go lifts off first): the wrist kept its
+                    # standing height over the bank's top or the bottom, more as the toes droop
+                    w = vadd(vadd(mat_vec(fm, vsub(wb, BODY_PIVOT)), BODY_PIVOT), fd)
+                    # (its toes too, ahead of it, when it is up near a ledge's top: low against a face it keeps off it)
+                    under, ahead = scene_floor(sc, w[2]), scene_floor(sc, w[2] - 6.0)
+                    least = (ahead if ahead > under and w[1] > ahead - 8.0 else under) + 2.3 + 5.0 * h
+                    if w[1] < least:
+                        w[1] = least
+                        wb = vadd(mat_vec(transpose(fm), vsub(vsub(w, fd), BODY_PIVOT)), BODY_PIVOT)
+                early, late = _ease(min(1.0, fold / 0.6)), _ease(max(0.0, (fold - 0.35) / 0.65))
+                if L['kind'] == 'leg':           # (lifted first, the knee stood up over the hips like a horn)
+                    fa = fy = _ease(fold)
+                else:
+                    # (unfolding to hang it goes back along the very curve it folds by; unfolding straight onto a bank,
+                    # up and forward first)
+                    fa, fy = (early, late) if keys['swim'][2] == 'in' or hangs else (late, early)
+                wb = [wb[0] + (sw[0] - wb[0]) * fa, wb[1] + (sw[1] - wb[1]) * fy, wb[2] + (sw[2] - wb[2]) * fa]
+                # the foot swung round flat, its toes out to the side half way (straight from one turn to the other it
+                # stood on its toes, the claws up over the back like spikes)
+                if hangs:                        # (from hanging, toes down, the turn to toes back is a short one)
+                    ft = _slerp_turn(fb, sf, fold)
+                    curl = 18.0 * up * flat_ish * (1.0 - hang) + (12.0 + 8.0 * fold) * hang
+                else:
+                    flat = turn_y(-L['s'] * TOES_OUT[L['kind']])
+                    ft = _slerp_turn(fb, flat, fold / 0.5) if fold < 0.5 else _slerp_turn(flat, sf, (fold - 0.5) / 0.5)
+                    curl = 18 * up * (1.0 - fold) + 20.0 * fold
+                P.leg(leg_p, L, fm, fd, wb, ft, in_body=True, curl=curl, way=bend_way)
+            else:
+                P.leg(leg_p, L, fm, fd, wrist, foot_m, curl=18 * up * flat_ish, way=bend_way)
+            p.update(leg_p)
+            folded[side] = fold
+        chest_up = rear - bend
+        neck_up, head_up = _ramp(t, keys['neck']), _ramp(t, keys['head'])
+        x = chest_up + 18.0 - neck_up
+        for (bone, share), ex in zip((('neck1', 0.55), ('neck2', 0.45), ('head', 0.0)), (0.0, 0.0, neck_up - 20.0 - head_up)):
+            p[bone] = {'rotation': [round(share * x + ex, 3), 0.0, 0.0]}
+        if keys['flicks']:
+            flick(p, t, keys['flicks'])
+        for s in ('left', 'right'):
+            p[f'pupil_{s}'] = {'position': [0.0, 0.0, -0.25]}
+        # the swim's own motion (its sway, its tail's wave, its pose) easing in at the end, or out at the start
+        f = min(1.0, max(0.0, (t - t0s) / (t1s - t0s)))
+        w = _ease(f) if way == 'in' else 1.0 - _ease(f)
+        if w > 0.0:
+            u = round((t - (length - SWIM_LEN) if way == 'in' else t) / 0.05) % beat
+            sp = swim_table[u]
+            for bone, chans in sp.items():
+                # (a leg's own fold brings it to the swim's pose; mixed with the swim's angles part way, a foot turned
+                # the long way round between the two)
+                limb = bone.split('_')[0], bone.rsplit('_', 1)[-1]
+                if limb in folded and folded[limb] < 1.0:
+                    continue
+                mine = p.setdefault(bone, {})
+                for ch, v in chans.items():
+                    a = mine.get(ch, [1.0, 1.0, 1.0] if ch == 'scale' else [0.0, 0.0, 0.0])
+                    if w >= 1.0:
+                        mine[ch] = list(v)
+                    elif ch == 'rotation':
+                        mine[ch] = [round(x + _wrap(y - x) * w, 3) for x, y in zip(a, v)]
+                    else:
+                        mine[ch] = [round(x + (y - x) * w, 3) for x, y in zip(a, v)]
+        return p
+    steps = round(length * 20)
+    made = clip(length, pose, steps, loop='hold')
+    path = path[-(steps + 1):]
+    made['timeline'] = {'0': f'water {kind} {sc["edge"]:g} {sc["top"]:.3f} {sc["surface"]:.3f} {sc["bottom"]:.3f}',
+                        '0.05': 'path body ' + ' '.join(f'{t:.4f} {dy:.3f} {dz:.3f}' for t, dy, dz in path),
+                        '0.1': f'wet {marks.get("wet", -1.0):.2f}'}
+    return made, P.worst, sc, path
+
+
+def _spline(t, keys, start=0.0, end=0.0):
     """A value passing smoothly through its keys ((time, value), ...) with no overshoot (a monotone cubic); held
-    before the first and after the last."""
+    before the first and after the last (going on at the end slope after it, when one is given)."""
     if t <= keys[0][0]:
-        return keys[0][1]
+        return keys[0][1] + start * (t - keys[0][0])
     if t >= keys[-1][0]:
-        return keys[-1][1]
+        return keys[-1][1] + end * (t - keys[-1][0])
     n = len(keys)
     d = [(keys[i + 1][1] - keys[i][1]) / (keys[i + 1][0] - keys[i][0]) for i in range(n - 1)]
-    m = [0.0] * n                                    # the first and last keys start and stop at rest
+    m = [0.0] * n                                    # the first and last keys start and stop at rest (or at the slopes given)
+    m[0], m[-1] = start, end
     for i in range(1, n - 1):
         m[i] = 0.0 if d[i - 1] * d[i] <= 0 else 2.0 / (1.0 / d[i - 1] + 1.0 / d[i])
     for i in range(n - 1):
@@ -909,65 +1399,39 @@ def clips():
         p['neck1']['rotation'][1] = round(-0.55 * yaw, 3)
         p['neck2']['rotation'][1] = round(-0.3 * yaw, 3)
         p['head']['rotation'][1] = round(-0.15 * yaw, 3)
+        # (the tail's wave only: afloat, the game drags it level along the water's surface, TailDrag, 2026-11-19;
+        # until then the clip straightened it, -rest, which the drag would have bent twice)
         for i in range(TAIL_SEGS):
             f = i / (TAIL_SEGS - 1)
             sway = (4.0 + 7.0 * f) * math.sin(w - 0.5 * i - 0.8)
             if i == 0:
                 sway -= 1.4 * yaw
-            p[f'tail{i + 1}'] = {'rotation': [round(-P.rest[f'tail{i + 1}'][0], 3), round(sway, 3), 0.0]}
+            p[f'tail{i + 1}'] = {'rotation': [0.0, round(sway, 3), 0.0]}
         for side in ('left', 'right'):
             p[f'pupil_{side}'] = {'position': [0.0, 0.0, -0.25]}
         return p
     out['swim'] = clip(SWIM_LEN, swim, 32)
     worst['swim'] = P.worst
 
-    # Going in (2026-11-18, the user's ask: "an actual animation of the monitor pushing down into the water before
-    # taking swimming form"): at the water's edge it leans out, the front going down and the neck dipping to the water,
-    # the forelegs reaching forward and down over it; the hind legs, still on the bank, straighten and shove it forward
-    # and down; the forelegs sweep back along its sides first, then the hind legs as they leave the bank, the tail
-    # straightening behind; it ends in the swim clip's first pose, so the swim goes on from it. The game plays it once
-    # as the forelegs lose the bank over water while the hind legs still stand (MonitorModel).
-    swim0 = swim(0.0)
-    P = _Poser()
-
-    def enter(t):
-        p = {}
-        lean = _ramp(t, ((0.0, 0.0), (0.4, 1.0)))
-        push = _ramp(t, ((0.25, 0.0), (0.7, 1.0)))
-        glide = _ramp(t, ((0.6, 0.0), (ENTER_LEN, 1.0)))
-        fore = _ramp(t, ((0.4, 0.0), (0.85, 1.0)))        # the forelegs folding
-        hind = _ramp(t, ((0.7, 0.0), (1.1, 1.0)))         # the hind legs folding, as they leave the bank
-        down = max(lean, push) * (1 - glide)
-        yaw = 5.0 * glide
-        bm, bd = body(p, ry=yaw, rx=9.0 * down, dy=-1.4 * down, dz=-2.5 * push * (1 - glide))
-        for L in P.legs:
-            x, y, z = L['W']
-            if L['kind'] == 'arm':                         # reaching forward and down over the water, toes hanging
-                wrist, foot, fold = [x * 1.1, y - 2.5 * lean, z - 3.5 * lean], mat_mul(L['foot'], turn_x(-24 * lean)), fore
-            else:                                          # planted on the bank, shoving back
-                wrist, foot, fold = [x, y, z + 3.0 * push], L['foot'], hind
-            # the ground place on the body's axes (as leg() works it out), then part way to the folded place
-            wb = vadd(mat_vec(transpose(bm), vsub(vsub(wrist, bd), BODY_PIVOT)), BODY_PIVOT)
-            fb = mat_mul(transpose(bm), foot)
-            sw, sf = swim_leg(L)
-            wb = [a + (b - a) * fold for a, b in zip(wb, sw)]
-            P.leg(p, L, bm, bd, wb, blend_turn(fb, sf, fold), in_body=True, curl=20.0 * fold + 10.0 * lean * (1 - fold))
-        dip = 7.0 * down
-        neck_turn(p, 0.0, extra=(dip - 0.0 * glide, dip * 0.9 - 3.0 * glide, dip * 0.4 - 3.0 * glide))
-        p['neck1']['rotation'][1] = round(-0.55 * yaw, 3)
-        p['neck2']['rotation'][1] = round(-0.3 * yaw, 3)
-        p['head']['rotation'][1] = round(-0.15 * yaw, 3)
-        for i in range(TAIL_SEGS):
-            name = f'tail{i + 1}'
-            end = swim0[name]['rotation']
-            swish = 3.0 * (i / (TAIL_SEGS - 1)) * math.sin(2 * math.pi * t / 0.6 - 0.5 * i) * push * (1 - glide)
-            lift = (4.0 if i < 3 else 0.0) * push * (1 - glide)        # the tail base raised as the hind legs shove
-            p[name] = {'rotation': [round(end[0] * glide + lift, 3), round(end[1] * glide + swish, 3), 0.0]}
-        for side in ('left', 'right'):
-            p[f'pupil_{side}'] = {'position': [0.0, 0.0, round(-0.25 * glide, 3)]}
-        return p
-    out['enter'] = clip(ENTER_LEN, enter, 36, loop='hold')
-    worst['enter'] = P.worst
+    # The swim's poses every 0.05 s (a whole beat), for the water moves to blend into and out of (going in it ends in the
+    # swim's first pose, coming out it starts from it; the old "enter" clip, 2026-11-18, went with the water moves,
+    # 2026-11-19). Made with the swim's own poser right after its clip, so the values are the clip's own.
+    swim_table = [swim(k * 0.05) for k in range(round(SWIM_LEN / 0.05) + 1)]
+    # Each folded leg's angles written the way a fold from standing arrives at them (the same pose: a foot's roll of
+    # -201 degrees is one of +159), so the game, easing angle by angle from a water move's last frame into the swim,
+    # never spins a foot round; read from the walk-in's fold.
+    probe = water_move('in', 1.0, swim_table, swim_leg, flick)[0]['bones']
+    for bone, chans in out['swim']['bones'].items():
+        if not (bone.startswith('arm_') or bone.startswith('leg_')) or 'rotation' not in chans or bone not in probe:
+            continue
+        keys = probe[bone]['rotation']
+        came = keys[sorted(keys, key=float)[-2]]
+        shift = [360.0 * round((c - s) / 360.0) for c, s in zip(came, swim_table[0][bone]['rotation'])]
+        if any(shift):
+            for k, v in chans['rotation'].items():
+                chans['rotation'][k] = [round(a + b, 3) for a, b in zip(v, shift)]
+            for row in swim_table:
+                row[bone]['rotation'] = [round(a + b, 3) for a, b in zip(row[bone]['rotation'], shift)]
 
     # The threat: standing tall on straightened legs, the front raised, the neck stretched up and the head tipped down
     # at the threat, the mouth gaping and closing with the hiss, the tail arched up off the ground and lashing.
@@ -1163,61 +1627,79 @@ def clips():
         for size in CLIMB_SIZES:
             name = climb_name(size, down)
             out[name], worst[name] = climb(size, down)
+    # Going into and out of the water (see _water_keys), one clip for each size.
+    for kind in WATER_KINDS:
+        for size in CLIMB_SIZES:
+            name = water_name(kind, size)
+            out[name], worst[name] = water_move(kind, size, swim_table, swim_leg, flick)[:2]
     return out, worst
 
 
 def climb_java(made):
-    """MonitorClimb.java: the climb clips' paths for the game (the server moves the box along them, the drawing the
-    model), the climb up's and the climb down's."""
-    def move(down):
-        rises, alongs, blocks, ticks = [], [], [], None
+    """MonitorClimb.java: the moves' paths for the game (the server moves the box along them, the drawing the model):
+    the climbs up and down a block, and going into and out of the water."""
+    kinds = [('UP', lambda s: climb_name(s, False), CLIMB_FACE, False, False), ('DOWN', lambda s: climb_name(s, True), DOWN_EDGE, False, False)]
+    for kind in WATER_KINDS:
+        kinds.append((kind.upper().replace('OUTUP', 'OUT_UP'), lambda s, k=kind: water_name(k, s),
+                      WATER_FACE_UP if kind == 'outup' else WATER_FACE if kind == 'out' else WATER_EDGE, kind not in ('out', 'outup'), kind in ('out', 'outup')))
+    rises, alongs, ticks, seconds, wets = [], [], [], [], []
+    for _, name_of, _, _, _ in kinds:
+        note = next((v for v in made[name_of(1.0)].get('timeline', {}).values() if v.startswith('wet ')), 'wet -1')
+        wets.append(round(float(note.split()[1]) * 20))
+        r_k, a_k = [], []
         for size in CLIMB_SIZES:
-            name = climb_name(size, down)
+            name = name_of(size)
             B = block_px(size)
             note = next(v for v in made[name]['timeline'].values() if v.startswith('path '))
             v = list(map(float, note.split()[2:]))
             rows = [v[i:i + 3] for i in range(0, len(v) - 2, 3)]
-            ticks = len(rows) - 1
-            blocks.append(B)
-            rises.append([dy / B for _, dy, _ in rows])         # how far up (down below 0), as a share of a block
-            alongs.append([-dz for _, _, dz in rows])           # how far forward, model pixels
-        return rises, alongs, blocks, ticks, made[climb_name(CLIMB_SIZES[0], down)]['animation_length']
-    up, dn = move(False), move(True)
+            r_k.append([dy / B for _, dy, _ in rows])         # how far up (down below 0), a share of a block
+            a_k.append([-dz for _, _, dz in rows])            # how far forward, model pixels
+        rises.append(r_k)
+        alongs.append(a_k)
+        ticks.append(len(r_k[0]) - 1)
+        seconds.append(made[name_of(CLIMB_SIZES[0])]['animation_length'])
 
     def table(rows):
         return ',\n'.join('            {' + ', '.join(f'{round(x, 4) + 0.0:.4f}F' for x in r) + '}' for r in rows)
-    return f'''package com.antcolonies.savanna.animal;
+
+    def tables(per_kind):
+        return ',\n'.join('        {\n' + table(rows) + '}' for rows in per_kind)
+    names = ', '.join(f'{k} = {i}' for i, (k, _, _, _, _) in enumerate(kinds))
+    clips = ', '.join('"' + n(CLIMB_SIZES[0]).rsplit('_', 1)[0] + '_"' for _, n, _, _, _ in kinds)
+    return f"""package com.antcolonies.savanna.animal;
 
 /**
- * The Nile monitor's climbs up and down a block (the Animal Maker Engine step 2, stages B and C): the paths its clips
- * {{@code climb_up_*}} and {{@code climb_down_*}} move it along, one for each of {{@link #SIZES}}. Made by
- * {{@code python tools/monitor_models.py game}} with the clips: never edit by hand.
+ * The Nile monitor's moves, each made once (for each of {{@link #SIZES}}) with its clip: the climbs up and down a block
+ * (the Animal Maker Engine step 2, stages B and C) and going into and out of the water (step 4): the paths the clips
+ * move it along. Made by {{@code python tools/monitor_models.py game}} with the clips: never edit by hand.
  */
 public final class MonitorClimb {{
     private MonitorClimb() {{
     }}
 
-    /** Climbing up, the step's face this far ahead of where the climb starts (model pixels). */
-    public static final double FACE_PX = {CLIMB_FACE:g};
-    /** Climbing down, the edge this far ahead of where the climb starts (model pixels). */
-    public static final double EDGE_PX = {DOWN_EDGE:g};
+    /** The moves: up and down a block; into the water off a level bank, off a bank one or two blocks over it, running; out onto a level bank, onto a bank a block up. */
+    public static final int {names};
+    /** Each move's clips' names, less the size. */
+    private static final String[] CLIP = {{{clips}}};
+    /** How far ahead of where a move starts the step's face, the edge or the bank's face is (model pixels). */
+    private static final double[] AHEAD_PX = {{{', '.join(f'{a:g}' for _, _, a, _, _ in kinds)}}};
+    /** Whether a move ends afloat (it glides on into the swim), and whether it starts afloat. */
+    private static final boolean[] ENDS_AFLOAT = {{{', '.join('true' if w else 'false' for _, _, _, w, _ in kinds)}}};
+    private static final boolean[] STARTS_AFLOAT = {{{', '.join('true' if w else 'false' for _, _, _, _, w in kinds)}}};
     /** The sizes a clip is made for, and a block's height in model pixels at each. */
     public static final double[] SIZES = {{{', '.join(f'{x:g}' for x in CLIMB_SIZES)}}};
-    public static final double[] BLOCK_PX = {{{', '.join(f'{x:.4f}' for x in up[2])}}};
-    /** The clips' length (ticks; up {up[4]:g} s, down {dn[4]:g} s). */
-    public static final int TICKS_UP = {up[3]}, TICKS_DOWN = {dn[3]};
-    /** Up, for each size, tick by tick: how far up the body has come (a share of a block). */
-    private static final float[][] RISE_UP = {{
-{table(up[0])}}};
-    /** Up, for each size, tick by tick: how far forward it has come (model pixels). */
-    private static final float[][] ALONG_UP = {{
-{table(up[1])}}};
-    /** Down, for each size, tick by tick: how far up the body has come (a share of a block, below 0 going down). */
-    private static final float[][] RISE_DOWN = {{
-{table(dn[0])}}};
-    /** Down, for each size, tick by tick: how far forward it has come (model pixels). */
-    private static final float[][] ALONG_DOWN = {{
-{table(dn[1])}}};
+    public static final double[] BLOCK_PX = {{{', '.join(f'{block_px(x):.4f}' for x in CLIMB_SIZES)}}};
+    /** The tick going in the chest meets the water (a splash), coming out the hips leave it (the water runs off); -20 for none. */
+    private static final int[] WET = {{{', '.join(str(w) for w in wets)}}};
+    /** Each move's clip's length (ticks; {', '.join(f'{k} {s:g} s' for (k, _, _, _, _), s in zip(kinds, seconds))}). */
+    private static final int[] TICKS = {{{', '.join(str(t) for t in ticks)}}};
+    /** For each move and size, tick by tick: how far up the body has come (a share of a block, below 0 going down). */
+    private static final float[][][] RISE = {{
+{tables(rises)}}};
+    /** For each move and size, tick by tick: how far forward it has come (model pixels). */
+    private static final float[][][] ALONG = {{
+{tables(alongs)}}};
 
     /** The clip made for the size nearest this one. */
     public static int nearest(double size) {{
@@ -1230,28 +1712,57 @@ public final class MonitorClimb {{
         return best;
     }}
 
-    public static String clip(boolean down, int size) {{
-        return (down ? "climb_down_" : "climb_up_") + Math.round(SIZES[size] * 1000);
+    public static String clip(int move, int size) {{
+        return CLIP[move] + Math.round(SIZES[size] * 1000);
     }}
 
-    /** How far ahead of where the climb starts the step's face (up) or the edge (down) is (model pixels). */
-    public static double ahead(boolean down) {{
-        return down ? EDGE_PX : FACE_PX;
+    /** How far ahead of where the move starts the step's face, the edge or the bank's face is (model pixels). */
+    public static double ahead(int move) {{
+        return AHEAD_PX[move];
     }}
 
     /** The clip's length (ticks). */
-    public static int ticks(boolean down) {{
-        return down ? TICKS_DOWN : TICKS_UP;
+    public static int ticks(int move) {{
+        return TICKS[move];
+    }}
+
+    /** The tick going in the chest meets the water, or coming out the hips leave it (below 0 for a climb). */
+    public static int wetTick(int move) {{
+        return WET[move];
+    }}
+
+    public static boolean endsAfloat(int move) {{
+        return ENDS_AFLOAT[move];
+    }}
+
+    public static boolean startsAfloat(int move) {{
+        return STARTS_AFLOAT[move];
+    }}
+
+    /** Whether the move goes down (its box stays on the bank it leaves until its back has passed the edge). */
+    public static boolean goesDown(int move) {{
+        return move == DOWN || ENDS_AFLOAT[move];
     }}
 
     /** How far up at this many ticks into the clip (a share of a block, below 0 going down; held before and after). */
-    public static double rise(boolean down, int size, double ticks) {{
-        return at((down ? RISE_DOWN : RISE_UP)[size], ticks);
+    public static double rise(int move, int size, double ticks) {{
+        return at(RISE[move][size], ticks);
     }}
 
-    /** How far forward at this many ticks into the clip (model pixels; held before and after). */
-    public static double along(boolean down, int size, double ticks) {{
-        return at((down ? ALONG_DOWN : ALONG_UP)[size], ticks);
+    /** How far forward at this many ticks into the clip (model pixels; held before, and after it goes on at its last speed). */
+    public static double along(int move, int size, double ticks) {{
+        float[] row = ALONG[move][size];
+        int last = row.length - 1;
+        if (ticks > last) {{
+            return row[last] + (row[last] - row[last - 1]) * (ticks - last);
+        }}
+        return at(row, ticks);
+    }}
+
+    /** How fast it goes at the end of the move (model pixels a tick). */
+    public static double endSpeed(int move, int size) {{
+        float[] row = ALONG[move][size];
+        return row[row.length - 1] - row[row.length - 2];
     }}
 
     private static double at(float[] row, double ticks) {{
@@ -1267,7 +1778,7 @@ public final class MonitorClimb {{
         return row[i] + (row[i + 1] - row[i]) * f;
     }}
 }}
-'''
+"""
 
 
 def write_game():
