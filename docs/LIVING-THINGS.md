@@ -42,9 +42,9 @@ Every living thing in the mod, built or planned, plants and fungi included, in o
 
 **4. River animals (savanna rivers, pans, oxbows; food chain algae -> tilapia -> catfish -> crocodile, side chain algae -> snail -> crab)**
 - Nile tilapia (grazing schooling fish, 3 looks): BUILT; breeding (nest pit, mouthbrooding, fry) BUILT 2026-11-19.
-- River catfish (eats tilapia, bites it in half): BUILT.
+- River catfish (eats tilapia, bites it in half): BUILT; breeding (rainy-night spawning in the shallows, eggs on the algae, dark young) BUILT 2026-11-19.
 - Nile crocodile (basking, ambush, death roll, fishing, bank hauls): BUILT; nests in sand banks, mother carrying hatchlings, banded young, teens and old giants (only 1 or 2 in a whole river system, huge and worn, the river's boss) PLANNED (`docs/plans/animal-life-cycle.md`).
-- River crab (eats remains, scraps, algae, snails): BUILT; burrow with shells outside PLANNED.
+- River crab (eats remains, scraps, algae, snails, and eggs since 2026-11-19): BUILT; breeding (big-clawed males, eggs under the female's flap, babies riding on her back) BUILT 2026-11-19; burrow with shells outside PLANNED.
 - River snail (Garden spiral look): BUILT; breeding (clutches at the waterline) BUILT 2026-11-19.
 - Helmeted terrapin (tears remains in groups, basks on crocodiles): PLANNED (next after the snail in the clean-up order).
 - Nile monitor (eats crabs, snails and remains on the banks, hisses at players, basks; later raids crocodile nests and lays eggs in living termite mounds): BUILT 2026-11-17 (before the crocodile nests, the user's ask).
