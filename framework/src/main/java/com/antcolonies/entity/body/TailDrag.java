@@ -18,6 +18,14 @@ import net.minecraft.world.level.BlockGetter;
  * ground; where the bends cannot keep a joint out of the ground, the ground wins. When the hips go up a block, the
  * joints behind keep their places and are pulled up after them: the tail hangs from the hips and slides up over the
  * edge; off a drop it drapes from the edge and falls softly.</li>
+ * <li>Coming down a block (stage C, 2026-11-19), the tail still on top behind the hips (it went through the block):
+ * each joint is already high enough that the tail behind it can slant up over the ground behind no steeper than its
+ * steepest ({@link #floor}), so it runs up from the hips over the edge; where the ground still forces a piece up, it
+ * tips up only as far as it must and the piece after it may fold back down over the top, each bend short of a right
+ * angle ({@link #MAX_FOLD}: past it the drawn piece turned over, the user saw the tail "flipping upside down"). Over
+ * ground rising behind the hips a joint lies on it, no higher than it would over the ground under the hips (the base's
+ * carried rest heights lifted it into an arch); with the hips tipped nose down holding the tail's root up, the root may
+ * bend down twice as far (it arched up behind them: the user, "the back popping out when its going down").</li>
  * <li>On flat ground, going straight, every joint lies exactly at its rest place: the tail looks as the clips made it.</li>
  * </ul>
  * Species-neutral (any tail of any number of pieces; a lizard's, a crocodile's, later a rat's); it only reads the
@@ -38,6 +46,13 @@ public final class TailDrag {
 
     /** How far a joint bends up or down against the piece in front, sideways, and how steep a piece lies, at most (degrees; my picks). */
     public static final double MAX_JOINT = 30.0, MAX_SIDE = 20.0, MAX_STEEP = 60.0;
+    /**
+     * How far a joint bends at most where the ground forces it (up a block's face, back over its top; degrees): short
+     * of a right angle, as the drawing turns a piece bent that far against the one in front over (DraggedTail).
+     */
+    public static final double MAX_FOLD = 85.0;
+    /** The rise a block along the steepest a piece lies (tan of {@link #MAX_STEEP}). */
+    private static final double SLANT = Math.tan(Math.toRadians(MAX_STEEP));
     /** How quickly a joint eases to its height, the tail eases back to straight, and the drag takes over from the clip or hands back (seconds; my picks). */
     static final double EASE = 0.15, STRAIGHTEN = 3.0, WEIGH = 0.25;
     /** Moved farther than this in a frame (blocks: a teleport, a knockback), or not drawn for half a second: laid out afresh. */
@@ -50,7 +65,7 @@ public final class TailDrag {
     private final double[] x, y, z;
     /** Each joint's sideways bend from this frame's drag (degrees; a scratch row). */
     private final double[] bend;
-    private double weight;
+    private double weight, home;
     private long last;
     private boolean placed;
 
@@ -160,6 +175,11 @@ public final class TailDrag {
         ax = hx;
         az = hz;
         double before = Mth.clamp(pitch, -MAX_STEEP, MAX_STEEP);
+        boolean forced = false;
+        // the ground under the hips, eased: over ground rising behind them the tail lies on it, no higher than over this
+        // (eased, as the root crossing a block's face would move it a block at once and snap the tail)
+        double ground0 = ground.at(bx, bz);
+        home = fresh ? ground0 : home + (ground0 - home) * k;
         for (int i = 1; i <= n; i++) {
             double len = lengthPx[i - 1] * perBlock;
             // its bend from the drag, eased a little back toward straight
@@ -172,27 +192,72 @@ public final class TailDrag {
             double px = x[i - 1] + ux * reach, pz = z[i - 1] + uz * reach, spread = 0.5 * len;
             double here = ground.at(px, pz);
             double under = Math.max(here, Math.max(ground.at(px + ux * spread, pz + uz * spread), ground.at(px - ux * spread, pz - uz * spread)));
-            double floor = here + lowestPx[i - 1] * perBlock;
-            double height = Math.max(y[i] + (under + restPx[i - 1] * perBlock - y[i]) * k, floor);
-            double lo = Math.max(before - MAX_JOINT, -MAX_STEEP), hi = Math.min(before + MAX_JOINT, MAX_STEEP);
+            double floor = floor(ground, px, pz, ux, uz, lowestPx[i - 1] * perBlock, len);
+            double height = Math.max(y[i] + (Math.min(under, home) + restPx[i - 1] * perBlock - y[i]) * k, floor);
+            // (after a piece the ground raised, this one may fold back down over the top)
+            // (and with the hips tipped nose down, holding its root up, the root may bend down twice as far)
+            double down = i == 1 && before > 0 ? 2 * MAX_JOINT : MAX_JOINT;
+            double lo = Math.max(before - (forced ? MAX_FOLD : down), -MAX_STEEP), hi = Math.min(before + MAX_JOINT, MAX_STEEP);
             double angle = Mth.clamp(Math.toDegrees(Math.asin(Mth.clamp((height - y[i - 1]) / len, -1.0, 1.0))), lo, hi);
             // never into the ground: no steeper down than the joints after it can level out from, above the ground here
             while (angle < hi && y[i - 1] + len * Math.sin(Math.toRadians(angle)) - levelling(angle, len) < floor) {
                 angle = Math.min(hi, angle + 2.0);
             }
-            // and where its bend cannot keep it up (the ground rising behind), the ground wins over the bend
-            if (y[i - 1] + len * Math.sin(Math.toRadians(angle)) < floor) {
-                angle = Math.min(MAX_STEEP, Math.toDegrees(Math.asin(Mth.clamp((floor - y[i - 1]) / len, -1.0, 1.0))));
+            // and where its bend cannot keep it up (the ground rising behind), the ground wins over the bend and the
+            // steepest: the piece tips up only as far as it must for its far end, where it really ends up, to lie over
+            // the ground there (short of a right angle against the one in front, MAX_FOLD)
+            double cap = Math.max(angle, Math.min(before + MAX_FOLD, MAX_FOLD));
+            forced = false;
+            for (;;) {
+                double r = len * Math.cos(Math.toRadians(angle));
+                double need = floor(ground, x[i - 1] + ux * r, z[i - 1] + uz * r, ux, uz, lowestPx[i - 1] * perBlock, len);
+                if (y[i - 1] + len * Math.sin(Math.toRadians(angle)) >= need - 1.0E-9) {
+                    break;
+                }
+                forced = true;
+                floor = need;
+                if (angle >= cap) {
+                    break;
+                }
+                angle = Math.min(cap, angle + 2.0);
             }
             double flat = len * Math.cos(Math.toRadians(angle));
             x[i] = x[i - 1] + ux * flat;
             y[i] = y[i - 1] + len * Math.sin(Math.toRadians(angle));
+            // raised by the ground (rising, held at the least height the ground behind allows): the next may fold over
+            forced |= angle > 0 && y[i] <= floor + 0.05 * len;
             z[i] = z[i - 1] + uz * flat;
             ax = ux;
             az = uz;
             before = angle;
         }
         placed = true;
+    }
+
+    /**
+     * The least height a joint at (x, z) lies at, its tail going on back along (ux, uz): its thickness over the ground
+     * there, and over ground rising behind it (a block it came down off) high enough already that the tail behind can
+     * slant up over it no steeper than its steepest, rather than having to stand up the face at the last joint.
+     */
+    private static double floor(Ground ground, double x, double z, double ux, double uz, double lowest, double len) {
+        double floor = ground.at(x, z) + lowest;
+        // the ground changes only at block borders: read it just past each one the tail crosses within reach
+        double most = 3.0 * len, dx = x, dz = z, d = 0;
+        while (true) {
+            double toX = ux > 1.0E-9 ? (Math.floor(dx) + 1 - dx) / ux : ux < -1.0E-9 ? (Math.ceil(dx) - 1 - dx) / ux : Double.MAX_VALUE;
+            double toZ = uz > 1.0E-9 ? (Math.floor(dz) + 1 - dz) / uz : uz < -1.0E-9 ? (Math.ceil(dz) - 1 - dz) / uz : Double.MAX_VALUE;
+            double step = Math.min(toX, toZ);
+            if (step <= 0) {
+                step = 1.0E-6;
+            }
+            d += step;
+            if (d > most) {
+                return floor;
+            }
+            dx = x + ux * (d + 1.0E-6);
+            dz = z + uz * (d + 1.0E-6);
+            floor = Math.max(floor, ground.at(dx, dz) + lowest - d * SLANT);
+        }
     }
 
     /** How much lower the tail goes after a piece lying {@code angle} down before it lies level again, each joint after it bending its most. */

@@ -2,7 +2,8 @@
 with it and the frame-by-frame game films, tools/film/monitor_climb_frames.film + tools/film_sheet.py): the trunk
 joints turned on their outer edge (the game's hinge), the tail dragged roughly as TailDrag does (a chain pulled after
 the hips, sagging onto what is under it). Builds the clip in memory from tools/monitor_models.py, nothing written.
-  python tools/climb_check.py [size] [times comma separated] [views side,three,front,top]
+  python tools/climb_check.py [down] [size] [times comma separated] [views side,three,front,top]
+(down: the climb down, stage C; heights there are from the top it starts on, the lower ground at minus a block)
 prints reach misses, lifts, parts inside the step; with times, draws a zoomed film strip next to this file's run
 (cc_<clip>.png in the current folder)."""
 import sys, math, os
@@ -10,6 +11,9 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import monitor_models as mm
 import anim_lab as lab
 
+down = len(sys.argv) > 1 and sys.argv[1] in ('down', 'up')
+if down:
+    down = sys.argv.pop(1) == 'down'
 size = float(sys.argv[1]) if len(sys.argv) > 1 else 1.0
 times = [float(x) for x in sys.argv[2].split(',')] if len(sys.argv) > 2 and sys.argv[2] else None
 views = tuple(sys.argv[3].split(',')) if len(sys.argv) > 3 else ('side', 'three')
@@ -32,8 +36,8 @@ def leg(self, p, L, body_m, body_d, wrist, foot_m, in_body=False, curl=0.0, rais
     self.worst = max(before, self.worst)
 
 
-def clearance(places, B, margin=0.4):
-    v = orig_clear(places, B, margin)
+def clearance(places, B, margin=0.4, down=False):
+    v = orig_clear(places, B, margin, down)
     if v > 0.05:
         lift_log.append((now[0], v))
     return v
@@ -42,10 +46,10 @@ def clearance(places, B, margin=0.4):
 mm._foot_at, mm._Poser.leg, mm._clearance = foot_at, leg, clearance
 mm.CLIMB_SIZES = (size,)
 out, worst = mm.clips()
-name = mm.climb_name(size)
+name = mm.climb_name(size, down)
 data = out[name]
 B = mm.block_px(size)
-zf = -mm.CLIMB_FACE
+zf = -(mm.DOWN_EDGE if down else mm.CLIMB_FACE)
 print(name, 'block px', round(B, 2), 'length', data['animation_length'], 'worst reach', round(worst[name], 2))
 
 
@@ -91,6 +95,8 @@ R0, R1 = mm.TAIL_R0, mm.TAIL_R1
 
 
 def floor(z):
+    if down:
+        return 0.0 if z > zf else -B
     return B if z < zf else 0.0
 
 
@@ -152,7 +158,10 @@ while t <= clip2.length + 1e-6:
         pts = list(corners) + [tuple((a + b) / 2 for a, b in zip(corners[i], corners[j]))
                                for i in range(8) for j in range(i + 1, 8) if bin(i ^ j).count('1') == 1]
         for x, y, z in pts:
-            d = min(B - y, zf - z) if z < zf and y < B else (-y if y < 0 else 0.0)
+            if down:      # inside the block it starts on (behind the edge, below 0), or under the lower ground
+                d = max(min(-y, z - zf) if z > zf and y < 0 else 0.0, -B - y)
+            else:
+                d = min(B - y, zf - z) if z < zf and y < B else (-y if y < 0 else 0.0)
             if 'claw' in bone and d <= 1.05:
                 continue
             if d > 0.4:
@@ -177,10 +186,11 @@ if times:
     stepb = lab.step_box(clip.step, 0.0, ext)
     for vi, vname in enumerate(views):
         view = lab.VIEWS[vname]
+        lo_y = -B - 3.0 if down else -3.0
         if vname == 'side':
-            bounds = ((-12.0, 88.0), (-3.0, 47.0))
+            bounds = ((-12.0, 88.0), (lo_y, lo_y + 50.0))
         else:
-            pts = [(x, y, z) for x in (-14, 14) for y in (0, 40) for z in (-80, 10)]
+            pts = [(x, y, z) for x in (-14, 14) for y in (lo_y, lo_y + 43) for z in (-80, 10)]
             pr = [view.project(q) for q in pts]
             bounds = ((min(a for a, _, _ in pr), max(a for a, _, _ in pr)), (min(b for _, b, _ in pr), max(b for _, b, _ in pr)))
         for k, t in enumerate(times):
@@ -193,7 +203,7 @@ if times:
             pose = clip2.pose(t)
             fr.boxes([stepb])
             fr.boxes(model.posed(pose))
-            fr.grid(0.0, 0.0, ext, step=21.333, bold=1)
+            fr.grid(-B if down else 0.0, 0.0, ext, step=21.333, bold=1)
             lab.mark_below(fr, model, pose, 0.0, clip.step)
     png = os.path.abspath(f'cc_{name}.png')
     cv.save(png)

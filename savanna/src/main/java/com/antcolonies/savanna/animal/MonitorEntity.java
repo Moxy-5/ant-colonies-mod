@@ -89,6 +89,9 @@ import software.bernie.geckolib.util.GeckoLibUtil;
  * over the edge, rears up, sets its forefeet on top, hauls itself up with its hind feet on the step's face and stands on
  * top ({@link Climb}). The game moves it along the move's own path ({@link MonitorClimb}, made with the clips), its box
  * here and its drawing on each player's screen from the same start, so the clip and its place never drift apart.
+ * Climbing down a block is the same kind of move (stage C, 2026-11-19): it stops with its fore claws at the edge, looks
+ * down over it, reaches its forefeet down the face to the lower ground, tips its chest down while its hind legs brake on
+ * top, then its hips go over and its hind feet step down the face; the tail slides off the edge last.
  */
 public class MonitorEntity extends PathfinderMob implements GeoEntity, HasLife {
     /** What it is doing, for the clips. */
@@ -226,13 +229,14 @@ public class MonitorEntity extends PathfinderMob implements GeoEntity, HasLife {
     private final AnimatableInstanceCache cache = GeckoLibUtil.createInstanceCache(this);
 
     /**
-     * A climb up a block (stage B, 2026-11-19): where it started (its box, squared to the step's face and exactly
-     * {@link MonitorClimb#FACE_PX} model pixels short of it), which way it climbs (a yaw straight at the face), the game
-     * tick it started and the clip's size ({@link MonitorClimb#nearest}). It first eases into the clip ({@link #CLIMB_LEAD}
-     * ticks), plays it, then stands a moment on top ({@link #CLIMB_REST}) before walking on: by then every player's
-     * screen has its box on top too, so the hand back to the walk shows no jump.
+     * A climb up a block (stage B, 2026-11-19) or down one ({@code down}, stage C): where it started (its box, squared to
+     * the step's face, or the edge, and exactly {@link MonitorClimb#ahead} model pixels short of it), which way it climbs
+     * (a yaw straight at the face or edge), the game tick it started and the clip's size ({@link MonitorClimb#nearest}).
+     * It first eases into the clip ({@link #CLIMB_LEAD} ticks), plays it, then stands a moment ({@link #CLIMB_REST})
+     * before walking on: by then every player's screen has its box at its new height too, so the hand back to the walk
+     * shows no jump.
      */
-    public record Climb(double x, double y, double z, float yaw, long start, int size) {
+    public record Climb(double x, double y, double z, float yaw, long start, int size, boolean down) {
         /** The clip's easing in, and the standing still after it (ticks; my picks: the body clip player's own easing, and 0.4 s). */
         public static final int CLIMB_LEAD = 4, CLIMB_REST = 8;
 
@@ -244,13 +248,14 @@ public class MonitorEntity extends PathfinderMob implements GeoEntity, HasLife {
             tag.putFloat("yaw", yaw);
             tag.putLong("start", start);
             tag.putInt("size", size);
+            tag.putBoolean("down", down);
             return tag;
         }
 
         @Nullable
         static Climb of(CompoundTag tag) {
             return tag.isEmpty() ? null : new Climb(tag.getDouble("x"), tag.getDouble("y"), tag.getDouble("z"),
-                    tag.getFloat("yaw"), tag.getLong("start"), tag.getInt("size"));
+                    tag.getFloat("yaw"), tag.getLong("start"), tag.getInt("size"), tag.getBoolean("down"));
         }
 
         /** Which way it climbs (a unit step along the ground). */
@@ -260,6 +265,11 @@ public class MonitorEntity extends PathfinderMob implements GeoEntity, HasLife {
 
         public double dirZ() {
             return Mth.cos(yaw * Mth.DEG_TO_RAD);
+        }
+
+        /** Its clip's name. */
+        public String clip() {
+            return MonitorClimb.clip(down, size);
         }
 
         /** How far into its clip it is at this game time (ticks; below 0 while it eases in). */
@@ -392,7 +402,7 @@ public class MonitorEntity extends PathfinderMob implements GeoEntity, HasLife {
     public double climbClipTicks() {
         Climb c = climb();
         if (c == null || bodyClips == null || bodyClips.getCurrentAnimation() == null
-                || !bodyClips.getCurrentAnimation().animation().name().equals(MonitorClimb.clip(c.size()))) {
+                || !bodyClips.getCurrentAnimation().animation().name().equals(c.clip())) {
             return -1.0;
         }
         // easing in, nothing played yet; held on its last frame (GeckoLib's "paused"), still its clip time
@@ -402,16 +412,16 @@ public class MonitorEntity extends PathfinderMob implements GeoEntity, HasLife {
     /** The body clip player's clock: the climb clip plays at the climb's own time since its start ({@link SteadyController.Clock}). */
     private double climbClock(String clip, double tick) {
         Climb c = climb();
-        if (c == null || !clip.equals(MonitorClimb.clip(c.size()))) {
+        if (c == null || !clip.equals(c.clip())) {
             return -1.0;
         }
         return Math.max(0.0, c.ticks(level().getGameTime() + (tick - Math.floor(tick))));
     }
 
     /**
-     * Starts a climb when its route goes up a whole block straight ahead and it has come to the climb's start: on land,
-     * walking calmly or trailing a player, heading near enough at the face, with the top under both its feet and room on
-     * top for its body. Else it steps up the old way (Minecraft's own step).
+     * Starts a climb when its route goes up or down a whole block straight ahead and it has come to the climb's start: on
+     * land, walking calmly or trailing a player, heading near enough at the face or edge, with ground under both its feet
+     * where it goes and room there for its body. Else it steps up or drops down the old way (Minecraft's own).
      */
     private boolean startClimb() {
         if (!onGround() || isInWater() || isPassenger() || isDeadOrDying() || doing() != CALM && doing() != WATCH) {
@@ -426,8 +436,8 @@ public class MonitorEntity extends PathfinderMob implements GeoEntity, HasLife {
         for (int i = Math.max(0, path.getNextNodeIndex() - 1); i <= last; i++) {
             Node a = path.getNode(i), b = path.getNode(i + 1);
             int dx = b.x - a.x, dz = b.z - a.z;
-            if (b.y == a.y + 1 && a.y == floor && Math.abs(dx) + Math.abs(dz) == 1) {
-                Climb c = climbAt(a, b, dx, dz);
+            if (Math.abs(b.y - a.y) == 1 && a.y == floor && Math.abs(dx) + Math.abs(dz) == 1) {
+                Climb c = climbAt(a, b, dx, dz, b.y < a.y);
                 if (c != null) {
                     entityData.set(DATA_CLIMB, c.save());
                     return true;
@@ -438,10 +448,10 @@ public class MonitorEntity extends PathfinderMob implements GeoEntity, HasLife {
         return false;
     }
 
-    /** The climb up from node a to b ahead of it, if it is at its start and the step has room; else null. */
+    /** The climb up (or down) from node a to b ahead of it, if it is at its start and the step has room; else null. */
     @Nullable
-    private Climb climbAt(Node a, Node b, int dx, int dz) {
-        double scale = MODEL_SCALE * getScale(), back = MonitorClimb.FACE_PX * scale / 16.0;
+    private Climb climbAt(Node a, Node b, int dx, int dz, boolean down) {
+        double scale = MODEL_SCALE * getScale(), back = MonitorClimb.ahead(down) * scale / 16.0;
         int sign = dx + dz;
         double face = dx != 0 ? (dx > 0 ? a.x + 1 : a.x) : (dz > 0 ? a.z + 1 : a.z);
         double dist = (face - (dx != 0 ? getX() : getZ())) * sign;
@@ -453,13 +463,15 @@ public class MonitorEntity extends PathfinderMob implements GeoEntity, HasLife {
         if (Math.abs(Mth.wrapDegrees(yBodyRot - yaw)) > CLIMB_TURN) {
             return null;
         }
-        // its feet on the top: where it walks, else slid sideways to the middle of the step's column (half a block at most)
+        // its feet on the top (or the lower ground): where it walks, else slid sideways to the middle of the step's
+        // column (half a block at most)
         double side = dx != 0 ? getZ() : getX(), middle = (dx != 0 ? b.z : b.x) + 0.5;
         for (double across : new double[] {side, middle}) {
-            if (Math.abs(across - side) <= 0.5 && roomToClimb(a.y, dx != 0, face, sign, across, scale)) {
+            if (Math.abs(across - side) <= 0.5 && (down ? roomToClimbDown(a.y, dx != 0, face, sign, across, scale)
+                    : roomToClimb(a.y, dx != 0, face, sign, across, scale))) {
                 double along = face - back * sign;
                 return new Climb(dx != 0 ? along : across, getY(), dx != 0 ? across : along, yaw, level().getGameTime(),
-                        MonitorClimb.nearest(getScale()));
+                        MonitorClimb.nearest(getScale()), down);
             }
         }
         return null;
@@ -487,6 +499,38 @@ public class MonitorEntity extends PathfinderMob implements GeoEntity, HasLife {
         return true;
     }
 
+    /**
+     * Whether the edge at {@code face} (its top at {@code y}) drops one block onto a whole block under both feet for the
+     * two blocks past it, dry and open, with room for the body going down and on along the lower ground; and the top it
+     * walks off is a whole block.
+     */
+    private boolean roomToClimbDown(int y, boolean alongX, double face, int sign, double across, double scale) {
+        double out = CLIMB_FEET_OUT * scale / 16.0;
+        for (double side : new double[] {across - out, across + out}) {
+            BlockPos top = climbCell(alongX, face - 0.5 * sign, side, y - 1);
+            if (!level().getBlockState(top).isCollisionShapeFullBlock(level(), top)) {
+                return false;
+            }
+            for (double ahead : new double[] {0.5, 1.5}) {
+                BlockPos low = climbCell(alongX, face + ahead * sign, side, y - 2);
+                if (!level().getBlockState(low).isCollisionShapeFullBlock(level(), low) || !dryOpen(low.above())
+                        || !dryOpen(low.above(2))) {
+                    return false;
+                }
+            }
+        }
+        for (double ahead : new double[] {0.5, 1.5, 2.5}) {
+            if (!dryOpen(climbCell(alongX, face + ahead * sign, across, y - 1)) || !open(climbCell(alongX, face + ahead * sign, across, y))) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private boolean dryOpen(BlockPos pos) {
+        return open(pos) && level().getFluidState(pos).isEmpty();
+    }
+
     private static BlockPos climbCell(boolean alongX, double along, double across, int y) {
         return alongX ? new BlockPos(Mth.floor(along), y, Mth.floor(across)) : new BlockPos(Mth.floor(across), y, Mth.floor(along));
     }
@@ -497,21 +541,24 @@ public class MonitorEntity extends PathfinderMob implements GeoEntity, HasLife {
 
     /**
      * Moves it on along its climb this tick: its box along the move's path, at the ground until its front would reach the
-     * step's face, then on top (the drawing works its own place out from the path, so the box only has to stay out of the
-     * block). Ends it once done, or if it dies, lands in water or the step goes.
+     * step's face, then on top; climbing down, on top until its back has passed the edge, then on the lower ground (the
+     * drawing works its own place out from the path, so the box only has to stay out of the block). Ends it once done,
+     * or if it dies, lands in water or the step goes.
      */
     private boolean climbOn(Climb c) {
         double ticks = c.ticks(level().getGameTime());
-        double scale = MODEL_SCALE * getScale(), back = MonitorClimb.FACE_PX * scale / 16.0;
-        BlockPos step = BlockPos.containing(c.x() + c.dirX() * (back + 0.5), c.y() + 0.5, c.z() + c.dirZ() * (back + 0.5));
-        if (isDeadOrDying() || isInWater() || ticks > MonitorClimb.TICKS + Climb.CLIMB_REST
+        double scale = MODEL_SCALE * getScale(), back = MonitorClimb.ahead(c.down()) * scale / 16.0;
+        // the step's block: up, the one past the face; down, the one it walks off
+        double to = c.down() ? back - 0.5 : back + 0.5;
+        BlockPos step = BlockPos.containing(c.x() + c.dirX() * to, c.y() + (c.down() ? -0.5 : 0.5), c.z() + c.dirZ() * to);
+        if (isDeadOrDying() || isInWater() || ticks > MonitorClimb.ticks(c.down()) + Climb.CLIMB_REST
                 || !level().getBlockState(step).isCollisionShapeFullBlock(level(), step)) {
             entityData.set(DATA_CLIMB, new CompoundTag());
             return false;
         }
-        double along = MonitorClimb.along(c.size(), ticks) * scale / 16.0;
-        boolean up = along + getBbWidth() / 2.0 > back;
-        setPos(c.x() + c.dirX() * along, c.y() + (up ? 1.0 : 0.0), c.z() + c.dirZ() * along);
+        double along = MonitorClimb.along(c.down(), c.size(), ticks) * scale / 16.0;
+        double height = c.down() ? (along - getBbWidth() / 2.0 > back ? -1.0 : 0.0) : (along + getBbWidth() / 2.0 > back ? 1.0 : 0.0);
+        setPos(c.x() + c.dirX() * along, c.y() + height, c.z() + c.dirZ() * along);
         setDeltaMovement(Vec3.ZERO);
         fallDistance = 0.0F;
         setYRot(c.yaw());
@@ -1299,11 +1346,13 @@ public class MonitorEntity extends PathfinderMob implements GeoEntity, HasLife {
     private static final RawAnimation EAT_CLIP = RawAnimation.begin().thenPlayAndHold("eat");
     private static final RawAnimation DEATH = RawAnimation.begin().thenPlayAndHold("death");
     private static final RawAnimation TONGUE = RawAnimation.begin().thenLoop("tongue");
-    private static final RawAnimation[] CLIMB_UP = new RawAnimation[MonitorClimb.SIZES.length];
+    private static final RawAnimation[] CLIMB_UP = new RawAnimation[MonitorClimb.SIZES.length],
+            CLIMB_DOWN = new RawAnimation[MonitorClimb.SIZES.length];
 
     static {
         for (int i = 0; i < CLIMB_UP.length; i++) {
-            CLIMB_UP[i] = RawAnimation.begin().thenPlayAndHold(MonitorClimb.clip(i));
+            CLIMB_UP[i] = RawAnimation.begin().thenPlayAndHold(MonitorClimb.clip(false, i));
+            CLIMB_DOWN[i] = RawAnimation.begin().thenPlayAndHold(MonitorClimb.clip(true, i));
         }
     }
 
@@ -1346,7 +1395,7 @@ public class MonitorEntity extends PathfinderMob implements GeoEntity, HasLife {
         }
         Climb c = climb();
         if (c != null) {                        // the climb wins over everything else it does
-            return state.setAndContinue(CLIMB_UP[c.size()]);
+            return state.setAndContinue((c.down() ? CLIMB_DOWN : CLIMB_UP)[c.size()]);
         }
         switch (doing()) {
             case BASK:

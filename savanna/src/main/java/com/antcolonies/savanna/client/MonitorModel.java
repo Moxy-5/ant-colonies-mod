@@ -179,9 +179,9 @@ public class MonitorModel extends DefaultedEntityGeoModel<MonitorEntity> {
         double wx = x, wy = y, wz = z;
         if (climb != null) {
             double t = Math.max(0.0, monitor.climbClipTicks());
-            double along = MonitorClimb.along(climb.size(), t) * scale / 16.0;
+            double along = MonitorClimb.along(climb.down(), climb.size(), t) * scale / 16.0;
             wx = climb.x() + climb.dirX() * along;
-            wy = climb.y() + MonitorClimb.rise(climb.size(), t);
+            wy = climb.y() + MonitorClimb.rise(climb.down(), climb.size(), t);
             wz = climb.z() + climb.dirZ() * along;
         }
         long now = System.nanoTime();

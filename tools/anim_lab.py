@@ -975,17 +975,24 @@ STEP_GREY = (150, 150, 146)
 
 
 def step_box(step, ground, ext):
-    """The step in a clip's scene as a box to draw: a block in front of its face, as wide as the floor."""
+    """The step in a clip's scene as a box to draw: a block in front of its face, as wide as the floor; a drop (a
+    height below 0, the climb down): the block it starts on, behind the edge, its top at the ground."""
     face, high = step
     (lx, hx), (lz, _) = ext
-    lo, hi = (lx, ground, min(lz, face - 40.0)), (hx, ground + high, face)
+    if high < 0:
+        lo, hi = (lx, ground + high, face), (hx, ground, face + 60.0)
+    else:
+        lo, hi = (lx, ground, min(lz, face - 40.0)), (hx, ground + high, face)
     corners = [(lo[0] if not k >> 2 & 1 else hi[0], lo[1] if not k >> 1 & 1 else hi[1], lo[2] if not k & 1 else hi[2])
                for k in range(8)]
     return 'step', corners, {f: STEP_GREY for f in FACE_CORNERS}
 
 
 def in_step(p, step, ground, margin=0.35):
-    """Whether a point is inside the clip's step (deeper than the margin)."""
+    """Whether a point is inside the clip's step (deeper than the margin); for a drop, inside the block it starts on,
+    or below the lower ground past the edge."""
+    if step is not None and step[1] < 0:
+        return p[1] < ground - margin and p[2] > step[0] + margin or p[1] < ground + step[1] - margin
     return step is not None and p[2] < step[0] - margin and p[1] < ground + step[1] - margin
 
 
@@ -1009,7 +1016,7 @@ def draw_trails(fr, model, gait, t, speed):
 def mark_below(fr, model, pose, ground, step=None):
     for _, corners, _ in model.posed(pose):
         for p in corners:
-            if p[1] < ground - 0.35 or in_step(p, step, ground):
+            if (p[1] < ground - 0.35 and not (step and step[1] < 0 and p[2] < step[0])) or in_step(p, step, ground):
                 x, y, _ = fr.px(p)
                 fr.canvas.dot(x, y, 2, BAD, fr.cell)
 

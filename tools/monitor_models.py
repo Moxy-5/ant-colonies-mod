@@ -602,8 +602,21 @@ def block_px(size):
     return 16.0 / (GAME_SCALE * size)
 
 
-def climb_name(size):
-    return f'climb_up_{round(size * 1000)}'
+def climb_name(size, down=False):
+    return f'climb_{"down" if down else "up"}_{round(size * 1000)}'
+
+
+# --- the climb down a block (stage C, 2026-11-19): the climb up's mirror, made the same way --------------------------
+# It stops with its fore claws at the edge and dips its head to look down over it (a flick of the tongue), steps its
+# forefeet to the lip, reaches them over and down the face (palms on the face, toes down) and on down to the lower
+# ground, the chest tipping down after them while the hind legs brake on top (stepping up to the edge, toes hooked over
+# it); then the hips go over the edge, the hind feet step down onto the face and on to the ground, it walks a step on
+# and stands (the tail slides off the edge last, dragged by the game). In the clip's scene the top it starts on is at
+# height 0 and the lower ground a block below (-B); the edge DOWN_EDGE ahead of where it starts. Every number my pick.
+DOWN_EDGE = 30.0                        # the edge this far ahead of where the climb down starts (px): the fore claws at it
+# How far it has come at the end (px): far enough that its box (0.35 blocks either side of its middle, 7.5 px at
+# every size) is past the edge, so the game sets the box down on the lower ground with nothing of it inside the step
+DOWN_END = 40.0
 
 
 def _climb_keys(B):
@@ -640,6 +653,35 @@ def _climb_keys(B):
         ('leg', 'right'): ((-11.8, 2.6, -2.6), (0.4, 0.7, (-11.8, 2.6, -14.0)), (0.8, 1.1, (-11.8, 2.6, -25.0)),
                            (1.35, 1.65, (-11.5, face[0], face[1], face[2])), (2.45, 2.75, (-11.8, up + 0.3, end + 1.4))),
         'length': 3.3,
+    }
+
+
+def _descend_keys(B):
+    """The climb down's course from a top B pixels above the lower ground (keys as _climb_keys; heights from the top)."""
+    ze = -DOWN_EDGE
+    low = 2.3 - B                                    # a forefoot's wrist standing on the lower ground; a hind ankle 0.3 higher
+    end = -4.0 - DOWN_END
+    k = B - block_px(1.0)                            # how much taller the drop is for a smaller monitor than a middling one (px)
+    return {
+        'hips_z': ((0.3, -4.0), (1.0, -12.0), (1.5, -20.5), (2.0, -27.5 - 0.3 * k), (2.4, -33.0 - 0.6 * k), (2.8, -38.0 - 0.3 * k), (3.15, -41.5),
+                   (3.45, end)),
+        'hips_y': ((0.3, 10.5), (1.0, 10.2), (1.5, 9.5), (2.0, 7.0 - 0.3 * k), (2.4, 2.0 - 0.6 * k), (2.8, -5.0 - k),
+                   (3.15, 10.5 - B + 0.4), (3.45, 10.5 - B)),
+        'rear': ((0.0, 0.0), (0.6, -2.0), (1.0, -8.0), (1.5, -20.0), (2.0, -38.0), (2.4, -46.0), (2.8, -36.0),
+                 (3.15, -10.0), (3.45, 0.0)),
+        'bend': ((0.6, 0.0), (1.0, 18.0), (1.5, 45.0), (2.0, 30.0), (2.4, 0.0), (2.8, -20.0), (3.15, -8.0), (3.45, 0.0)),
+        'neck': ((0.0, 18.0), (0.3, -15.0), (0.9, -15.0), (1.3, 2.0), (2.0, -8.0), (2.4, 0.0), (2.9, 12.0), (3.4, 18.0)),
+        'head': ((0.0, -2.0), (0.3, -45.0), (0.9, -50.0), (1.3, -30.0), (2.0, -15.0), (2.4, -8.0), (2.9, -2.0)),
+        'flicks': (0.4, 3.0),
+        ('arm', 'left'): ((10.8, 2.3, -25.0), (0.45, 0.75, (10.8, 2.3, -27.5)), (1.0, 1.4, (10.0, -4.0, ze - 3.2, -75.0)),
+                          (2.05, 2.4, (10.0, low, ze - 12.0)), (2.6, 2.85, (10.3, low, -52.0)), (3.05, 3.35, (10.8, low, end - 21.0))),
+        ('arm', 'right'): ((-10.8, 2.3, -25.0), (0.55, 0.85, (-10.8, 2.3, -27.5)), (1.1, 1.5, (-10.0, -4.0, ze - 3.2, -75.0)),
+                           (2.15, 2.5, (-10.0, low, ze - 12.0)), (2.7, 2.95, (-10.3, low, -54.0)), (3.12, 3.42, (-10.8, low, end - 21.0))),
+        ('leg', 'left'): ((11.8, 2.6, -2.6), (0.9, 1.2, (11.8, 2.6, -12.0)), (1.55, 1.85, (11.8, 2.6, ze + 5.0)),
+                          (2.5 - 0.04 * k, 2.8 - 0.04 * k, (11.5, -8.5, ze - 5.0, -75.0)), (3.05, 3.35, (11.8, low + 0.3, end + 1.4))),
+        ('leg', 'right'): ((-11.8, 2.6, -2.6), (0.8, 1.1, (-11.8, 2.6, -11.0)), (1.45, 1.75, (-11.8, 2.6, ze + 5.0)),
+                           (2.6 - 0.04 * k, 2.9 - 0.04 * k, (-11.5, -8.5, ze - 5.0, -75.0)), (3.12, 3.42, (-11.8, low + 0.3, end + 1.4))),
+        'length': 3.45,
     }
 
 
@@ -680,7 +722,9 @@ def _foot_at(t, plan, lift, reach=False):
         if t < t1:
             f = (t - t0) / (t1 - t0)
             rise = to[1] - at[1]
-            if rise <= 2.0:
+            if rise < -2.0:                          # going down an edge: out over it first, then down (never into it)
+                fy, fz = _ease(max(0.0, (f - 0.3) / 0.7)), _ease(min(1.0, f / 0.5))
+            elif rise <= 2.0:
                 fy = fz = _ease(f)
             elif reach:
                 fy, fz = _ease(min(1.0, f / 0.65)), _ease(f)
@@ -689,7 +733,10 @@ def _foot_at(t, plan, lift, reach=False):
             arc = math.sin(math.pi * f)
             # toes turning up onto a face follow the reach forward (never into the face); toes coming off a face
             # flatten in the last of the rise, as the foot comes over the edge (not a hand waving above it)
-            turn = (_ease(max(0.0, (fy - 0.6) / 0.4)) if goes < pitch else fz) if rise > 2.0 else _ease(f)
+            # going down, the toes turn down onto a face as the foot starts down it, and flatten as it nears the ground
+            turn = ((_ease(max(0.0, (fy - 0.6) / 0.4)) if goes < pitch else fz) if rise > 2.0
+                    else (_ease(min(1.0, 1.5 * fy)) if goes < pitch else _ease(min(1.0, max(0.0, (fy - 0.2) / 0.6)))) if rise < -2.0
+                    else _ease(f))
             return ([at[0] + (to[0] - at[0]) * _ease(f), at[1] + rise * fy + lift * arc, at[2] + (to[2] - at[2]) * fz],
                     arc, pitch + (goes - pitch) * turn)
         at, pitch = list(to[:3]), goes
@@ -717,9 +764,10 @@ def _trunk(rear, bend, hy, hz):
     return bm, bd, turns, places
 
 
-def _clearance(places, B, margin=0.4):
+def _clearance(places, B, margin=0.4, down=False):
     """How far the trunk must go up (px) for its underside to clear what is under it: the step's top in front of the
-    face, the ground behind it (each underside point carried by the trunk piece it belongs to)."""
+    face, the ground behind it (each underside point carried by the trunk piece it belongs to); going down, the top it
+    started on behind the edge and the lower ground a block down past it."""
     need = 0.0
     for yb, z0, z1 in UNDERSIDE:
         for k in range(17):
@@ -727,7 +775,10 @@ def _clearance(places, B, margin=0.4):
             piece = 0 if z > TRUNK_HINGES[0][1] else 1 if z > TRUNK_HINGES[1][1] else 2 if z > TRUNK_HINGES[2][1] else 3
             M, t = places[piece]
             w = vadd(mat_vec(M, [0.0, yb, z]), t)
-            floor = B if w[2] < -CLIMB_FACE - 0.2 else 0.0     # (a point against the face is beside it, not over it)
+            if down:
+                floor = 0.0 if w[2] > -DOWN_EDGE + 0.2 else -B
+            else:
+                floor = B if w[2] < -CLIMB_FACE - 0.2 else 0.0     # (a point against the face is beside it, not over it)
             need = max(need, floor + margin - w[1])
     return need
 
@@ -1061,11 +1112,12 @@ def clips():
     out['death'] = clip(1.2, death, 36, loop='hold')
     worst['death'] = P.worst
 
-    # The climb up a block, one clip for each size (see _climb_keys): the path it moves along is in its notes.
-    def climb_up(size):
+    # The climb up and the climb down a block, one clip for each size (see _climb_keys, _descend_keys): the path it
+    # moves along is in its notes.
+    def climb(size, down=False):
         P = _Poser()
         B = block_px(size)
-        keys = _climb_keys(B)
+        keys = _descend_keys(B) if down else _climb_keys(B)
         path = []
         lifts = {'arm': 3.0, 'leg': 3.0}
 
@@ -1074,7 +1126,7 @@ def clips():
             rear, bend = _spline(t, keys['rear']), _spline(t, keys['bend'])
             hy, hz = _spline(t, keys['hips_y']), _spline(t, keys['hips_z'])
             bm, bd, turns, places = _trunk(rear, bend, hy, hz)
-            lift = _clearance(places, B)
+            lift = _clearance(places, B, down=down)
             if lift > 0.0:
                 bm, bd, turns, places = _trunk(rear, bend, hy + lift, hz)
             p['body'] = {'rotation': [round(-rear, 3), 0.0, 0.0], 'position': [0.0, 0.0, 0.0]}
@@ -1103,57 +1155,69 @@ def clips():
         steps = round(length * 20)
         made = clip(length, pose, steps, loop='hold')
         path = path[-(steps + 1):]
-        made['timeline'] = {'0': f'step {-CLIMB_FACE:g} {B:.3f}',
+        made['timeline'] = {'0': f'step {-DOWN_EDGE:g} {-B:.3f}' if down else f'step {-CLIMB_FACE:g} {B:.3f}',
                             '0.05': 'path body ' + ' '.join(f'{t:.4f} {dy:.3f} {dz:.3f}' for t, dy, dz in path)}
         return made, P.worst
 
-    for size in CLIMB_SIZES:
-        name = climb_name(size)
-        out[name], worst[name] = climb_up(size)
+    for down in (False, True):
+        for size in CLIMB_SIZES:
+            name = climb_name(size, down)
+            out[name], worst[name] = climb(size, down)
     return out, worst
 
 
 def climb_java(made):
-    """MonitorClimb.java: the climb clips' path for the game (the server moves the box along it, the drawing the model)."""
-    rises, alongs, blocks, ticks = [], [], [], None
-    for size in CLIMB_SIZES:
-        name = climb_name(size)
-        B = block_px(size)
-        note = next(v for v in made[name]['timeline'].values() if v.startswith('path '))
-        v = list(map(float, note.split()[2:]))
-        rows = [v[i:i + 3] for i in range(0, len(v) - 2, 3)]
-        ticks = len(rows) - 1
-        blocks.append(B)
-        rises.append([dy / B for _, dy, _ in rows])         # how far up, as a share of a block
-        alongs.append([-dz for _, _, dz in rows])           # how far forward, model pixels
-    length = made[climb_name(CLIMB_SIZES[0])]['animation_length']
+    """MonitorClimb.java: the climb clips' paths for the game (the server moves the box along them, the drawing the
+    model), the climb up's and the climb down's."""
+    def move(down):
+        rises, alongs, blocks, ticks = [], [], [], None
+        for size in CLIMB_SIZES:
+            name = climb_name(size, down)
+            B = block_px(size)
+            note = next(v for v in made[name]['timeline'].values() if v.startswith('path '))
+            v = list(map(float, note.split()[2:]))
+            rows = [v[i:i + 3] for i in range(0, len(v) - 2, 3)]
+            ticks = len(rows) - 1
+            blocks.append(B)
+            rises.append([dy / B for _, dy, _ in rows])         # how far up (down below 0), as a share of a block
+            alongs.append([-dz for _, _, dz in rows])           # how far forward, model pixels
+        return rises, alongs, blocks, ticks, made[climb_name(CLIMB_SIZES[0], down)]['animation_length']
+    up, dn = move(False), move(True)
 
     def table(rows):
         return ',\n'.join('            {' + ', '.join(f'{round(x, 4) + 0.0:.4f}F' for x in r) + '}' for r in rows)
     return f'''package com.antcolonies.savanna.animal;
 
 /**
- * The Nile monitor's climb up a block (the Animal Maker Engine step 2, stage B): the path its clips {{@code climb_up_*}}
- * move it along, one for each of {{@link #SIZES}}. Made by {{@code python tools/monitor_models.py game}} with the clips:
- * never edit by hand.
+ * The Nile monitor's climbs up and down a block (the Animal Maker Engine step 2, stages B and C): the paths its clips
+ * {{@code climb_up_*}} and {{@code climb_down_*}} move it along, one for each of {{@link #SIZES}}. Made by
+ * {{@code python tools/monitor_models.py game}} with the clips: never edit by hand.
  */
 public final class MonitorClimb {{
     private MonitorClimb() {{
     }}
 
-    /** The step's face this far ahead of where the climb starts (model pixels). */
+    /** Climbing up, the step's face this far ahead of where the climb starts (model pixels). */
     public static final double FACE_PX = {CLIMB_FACE:g};
+    /** Climbing down, the edge this far ahead of where the climb starts (model pixels). */
+    public static final double EDGE_PX = {DOWN_EDGE:g};
     /** The sizes a clip is made for, and a block's height in model pixels at each. */
     public static final double[] SIZES = {{{', '.join(f'{x:g}' for x in CLIMB_SIZES)}}};
-    public static final double[] BLOCK_PX = {{{', '.join(f'{x:.4f}' for x in blocks)}}};
-    /** The clips' length (ticks; {length:g} s). */
-    public static final int TICKS = {ticks};
-    /** For each size, tick by tick: how far up the body has come (a share of a block). */
-    private static final float[][] RISE = {{
-{table(rises)}}};
-    /** For each size, tick by tick: how far forward it has come (model pixels). */
-    private static final float[][] ALONG = {{
-{table(alongs)}}};
+    public static final double[] BLOCK_PX = {{{', '.join(f'{x:.4f}' for x in up[2])}}};
+    /** The clips' length (ticks; up {up[4]:g} s, down {dn[4]:g} s). */
+    public static final int TICKS_UP = {up[3]}, TICKS_DOWN = {dn[3]};
+    /** Up, for each size, tick by tick: how far up the body has come (a share of a block). */
+    private static final float[][] RISE_UP = {{
+{table(up[0])}}};
+    /** Up, for each size, tick by tick: how far forward it has come (model pixels). */
+    private static final float[][] ALONG_UP = {{
+{table(up[1])}}};
+    /** Down, for each size, tick by tick: how far up the body has come (a share of a block, below 0 going down). */
+    private static final float[][] RISE_DOWN = {{
+{table(dn[0])}}};
+    /** Down, for each size, tick by tick: how far forward it has come (model pixels). */
+    private static final float[][] ALONG_DOWN = {{
+{table(dn[1])}}};
 
     /** The clip made for the size nearest this one. */
     public static int nearest(double size) {{
@@ -1166,26 +1230,37 @@ public final class MonitorClimb {{
         return best;
     }}
 
-    public static String clip(int size) {{
-        return "climb_up_" + Math.round(SIZES[size] * 1000);
+    public static String clip(boolean down, int size) {{
+        return (down ? "climb_down_" : "climb_up_") + Math.round(SIZES[size] * 1000);
     }}
 
-    /** How far up at this many ticks into the clip (a share of a block; held before and after). */
-    public static double rise(int size, double ticks) {{
-        return at(RISE[size], ticks);
+    /** How far ahead of where the climb starts the step's face (up) or the edge (down) is (model pixels). */
+    public static double ahead(boolean down) {{
+        return down ? EDGE_PX : FACE_PX;
+    }}
+
+    /** The clip's length (ticks). */
+    public static int ticks(boolean down) {{
+        return down ? TICKS_DOWN : TICKS_UP;
+    }}
+
+    /** How far up at this many ticks into the clip (a share of a block, below 0 going down; held before and after). */
+    public static double rise(boolean down, int size, double ticks) {{
+        return at((down ? RISE_DOWN : RISE_UP)[size], ticks);
     }}
 
     /** How far forward at this many ticks into the clip (model pixels; held before and after). */
-    public static double along(int size, double ticks) {{
-        return at(ALONG[size], ticks);
+    public static double along(boolean down, int size, double ticks) {{
+        return at((down ? ALONG_DOWN : ALONG_UP)[size], ticks);
     }}
 
     private static double at(float[] row, double ticks) {{
+        int last = row.length - 1;
         if (ticks <= 0) {{
             return row[0];
         }}
-        if (ticks >= TICKS) {{
-            return row[TICKS];
+        if (ticks >= last) {{
+            return row[last];
         }}
         int i = (int) ticks;
         double f = ticks - i;
@@ -1196,7 +1271,7 @@ public final class MonitorClimb {{
 
 
 def write_game():
-    """Writes the monitor's model, texture and clips into the savanna mod, and the climb's path into its code."""
+    """Writes the monitor's model, texture and clips into the savanna mod, and the climbs' paths into its code."""
     import mod_paths
     game_bones, rows, w, h = paint(model(), GAME_LOOK)
     made = clips()[0]

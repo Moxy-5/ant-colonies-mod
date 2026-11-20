@@ -111,6 +111,23 @@ user sees anything; the side films. Animal-only work: no guard films. Two strike
 - **After the climb** it stands 0.4 s on top (`CLIMB_REST`) before walking on. The tail drapes down off the edge, its
   tip on the ground, and slides up as it walks.
 
+### Stage C as built (2026-11-19; the user on the films: "it looks really good I love it"; not yet tried in-game)
+- **The move (3.45 s, my picks):** it starts with its fore claws at the edge (`DOWN_EDGE` 30 px ahead of the start),
+  looks down over it with a tongue flick (to 0.9 s), steps its forefeet to the lip, reaches them over and down the face
+  (palms on the face, toes down, 1.0 to 1.5 s), slides forward with the chest tipping down while the hind feet step up
+  to the edge and brake, puts the forefeet on the lower ground once the hips are at the edge tipped about 45 degrees
+  (2.05 to 2.5 s), the hips go over, the hind feet step onto the face (toes down) and on to the ground, a step on,
+  stand (`DOWN_END` 40 px: its box then lies wholly past the edge, so the game sets it down a block with nothing inside
+  the step).
+- **Why the hips tip:** the monitor's front half is too short to reach a block down with the hips level on top (the
+  first try missed by 12 px); the belly also rests on the lip (the trunk is lifted up to 2.8 px to clear it).
+- **Game side:** `MonitorClimb` holds both moves; `MonitorEntity.Climb` has `down`; a route dropping one whole block
+  straight ahead starts it (`roomToClimbDown`); the box stays on top until its back has passed the edge.
+- **The tail (`TailDrag`) had to learn coming down a block:** it slants up from the hips over the edge and lies on the
+  top (see its class comment; it went through the block, arched and flipped upside down before).
+- **Checked:** `python tools/climb_check.py down [size]` (reach misses at most 0.93 px, nothing inside the step);
+  `tools/film/monitor_descend_frames.film` frame by frame from three sides; the course's step_down scene.
+
 ### How stage B was got right (use it for stage C and the water entry; the user: "a combination of the animation engine and in game was perfect")
 - Offline first: `python tools/climb_check.py [size] [times] [views]` builds the clip in memory and checks it as the game
   draws it (the trunk's hinges, a dragged tail): reach misses, lifts, parts inside the step, and a zoomed film strip of

@@ -1,0 +1,40 @@
+# The Nile monitor's climb down a block, frame by frame (stage C, 2026-11-19; docs/plans/engine-step2-climb.md): the game
+# frozen and stepped 2 ticks between pictures through the climb, close up, side on, from the front on the lower ground,
+# and from behind on top. The block's east edge at x 11 (top y -59), the lower ground y -60 east of it.
+#   ./gradlew runFilm -PfilmScene=tools/film/monitor_descend_frames.film   pictures in run-film/screenshots/monitor_descend_frames/
+cmd time set noon
+cmd weather clear
+cmd kill @e[type=!player]
+cmd fill 0 -60 -2 10 -60 3 minecraft:stone
+lens 40
+wait 40
+# side on, close (the camera's height is its feet: its eye is 1.62 higher)
+walker antcolonies:monitor 8.3 -59 0.5 -90 OwnSize:1.0f,HungryIn:99999,SunIn:99999
+camera 11.0 -60.2 -4.6 0 4
+cmd tick unfreeze
+go 16 -60 0 0.8
+wait 24
+cmd tick freeze
+burst side 60 2
+cmd kill @e[type=antcolonies:monitor]
+wait 10
+# from the front, on the lower ground
+walker antcolonies:monitor 8.3 -59 0.5 -90 OwnSize:1.0f,HungryIn:99999,SunIn:99999
+camera 14.5 -60 -2.5 53 6
+cmd tick unfreeze
+go 16 -60 0 0.8
+wait 24
+cmd tick freeze
+burst front 60 2
+cmd kill @e[type=antcolonies:monitor]
+wait 10
+# from behind, three quarters, on top
+walker antcolonies:monitor 8.3 -59 0.5 -90 OwnSize:1.0f,HungryIn:99999,SunIn:99999
+camera 7.0 -59 -2.8 -56 16
+cmd tick unfreeze
+go 16 -60 0 0.8
+wait 24
+cmd tick freeze
+burst back 60 2
+cmd kill @e[type=antcolonies:monitor]
+quit

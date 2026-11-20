@@ -130,6 +130,60 @@ class TailDragTest {
         }
     }
 
+    /**
+     * Come down a block (stage C, 2026-11-19): the hips go down off the edge with the tail still on top behind them. The
+     * tail slants up from the hips over the edge and lies on the top, never through the block (as it went, the game films
+     * showed), never arched up over it, and never bent a right angle or more at a joint (the drawing then turns a piece
+     * over: the user saw it "flipping upside down"), and no joint snapping round from one frame to the next; then it
+     * slides off as it walks on and lies on the low ground as at rest. Played at 20 and at 60 frames a second (the game
+     * draws at its own rate), the hips tipped nose down as they go over the edge as in the climb down clip.
+     */
+    @Test
+    void comeDownABlockItSlantsOverTheEdgeNeverThroughTheBlock() {
+        comeDown(20);
+        comeDown(60);
+    }
+
+    private static void comeDown(int fps) {
+        TailDrag t = drag();
+        // the block it came off behind it: its face (on a block border, as in the game) 10 px behind where the tail's
+        // base ends up
+        double off = 1.0 - 10 * PB;
+        TailDrag.Ground step = (x, z) -> z > 1.0 ? 1.0 : 0.0;
+        long frame = 1_000_000_000L / fps, now = 1;
+        double[] bends = new double[12];
+        // the hips walk forward 20 px and down a block in 2 s (the climb down), then on along the low ground at 10 px a second
+        for (int f = 0; f <= 12 * fps; f++, now += frame) {
+            double s = (double) f / fps, along = Math.min(s, 2.0) / 2.0;
+            double bz = off + 20 * PB * (1 - along) - 10 * PB * Math.max(0, s - 2.0), by = 11 * PB + (1 - along);
+            double pitch = 45 * Math.sin(Math.PI * Math.min(1, s / 2.2));     // the hips' tilt, the tail end up
+            t.update(step, 0, by, bz, 0, 1, pitch, PB, true, now);
+            String when = fps + " fps, " + String.format("%.2f", s) + " s";
+            double[] p = pitches(t);
+            for (int i = 1; i <= 12; i++) {
+                double bend = p[i - 1] - (i > 1 ? p[i - 2] : pitch);
+                if (fps == 60 && f > 0) {
+                    assertTrue(Math.abs(bend - bends[i - 1]) < 25, when + ": joint " + i + " snaps from " + bends[i - 1] + " to " + bend);
+                }
+                bends[i - 1] = bend;
+            }
+            for (int i = 1; i <= 12; i++) {
+                assertTrue(t.y(i) >= step.at(t.x(i), t.z(i)) - 1.0E-9, when + ": joint " + i + " inside the block");
+                double my = (t.y(i) + t.y(i - 1)) / 2, mz = (t.z(i) + t.z(i - 1)) / 2;
+                assertTrue(my >= step.at(0, mz) - 0.5 * PB, when + ": piece " + i + " through the block");
+                assertTrue(Math.abs(bends[i - 1]) < TailDrag.MAX_FOLD + 1.0E-6, when + ": joint " + i + " bent " + bends[i - 1]);
+                // down, what still lies on the block lies on it, not arched up over it
+                if (s >= 2.0 && t.z(i) > 1.0 + PB) {
+                    assertTrue(t.y(i) <= 1 + (LOWEST[i - 1] + 1.5) * PB, when + ": joint " + i + " arched "
+                            + (t.y(i) - 1) / PB + " px over the block");
+                }
+            }
+        }
+        for (int i = 1; i <= 12; i++) {
+            assertEquals(REST[i - 1] * PB, t.y(i), 0.02 * PB, fps + " fps: joint " + i + " lies on the low ground as at rest");
+        }
+    }
+
     @Test
     void handedBackToTheClipItEasesOver() {
         TailDrag t = drag();
