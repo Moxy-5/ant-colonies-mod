@@ -72,7 +72,7 @@ def slice_of(x):
 def slice_boxes(x0, x1, part='body'):
     top, belly, _ = at((x0 + x1) / 2)
     _, _, core, flank, f0, f1 = slice_of(x0)
-    return [box(x0, x1, core, belly, top, part), box(x0, x1, flank, f0, f1, part)]
+    return [box(x0, x1, core, belly, top, part), box(x0, x1, flank, f0, f1, 'flank')]
 
 
 def body(bones):
@@ -167,12 +167,82 @@ def plain_colour(c, face, x, y, z):
         if abs(ox - EYE_AT) < 0.5 and abs(y - EYE_HEIGHT) < 0.5:
             return PLAIN['pupil']
         return PLAIN['eye']
-    if part in ('body', 'eye'):
+    if part in ('body', 'flank', 'eye'):
         ox = LENGTH / 2 - z
         top, belly, _ = at(min(LENGTH, max(TAIL_ROOT, ox)))
         f = (y - belly) / max(0.5, top - belly)
         return PLAIN['back'] if f > 0.72 else PLAIN['belly'] if f < 0.3 else PLAIN['body']
     return PLAIN[part]
+
+
+# --- paint (the workshop's stage 4, 2026-11-20; the user: v3 "that's perfect, color it") ----------------------------
+# The colours of the design sheet (tools/barb_sheet.py), placed by where each texture pixel lies on the fish. The sheet's
+# rows are fixed heights on the level fish (row r is y 11 - r to 12 - r), so the flank's bands are read by height: the
+# olive-grey back, a paler upper flank, the silver flank with the thin dark line along the middle, silver in shade low
+# down, the white belly. From above the back is olive, the flank's shoulders paler; from below white.
+SHEET = {
+    'back': (92, 104, 96), 'upper': (122, 134, 124), 'silver': (196, 204, 208), 'shade': (168, 176, 182),
+    'belly': (236, 236, 228), 'line': (120, 128, 134), 'spot': (28, 30, 34), 'eye': (214, 168, 64),
+    'pupil': (16, 16, 18), 'fin': (178, 186, 182), 'orange': (222, 132, 52), 'red': (200, 46, 40),
+    'mouth': (70, 72, 70), 'flash': (250, 252, 255),
+}
+LINE = (9.0, 22.0, 6.0, 6.5)        # the dark line along the side: from x, to x, from y, to y (half a pixel thin)
+SPOT = (7.0, 9.0, 5.5, 6.5)         # the dark spot at the tail's base (on the sides only), the line running into it
+GILL = 22.75                        # the gill cover's back edge, a shaded line down the cheek
+
+
+def flank_band(y, flash=False):
+    """The side's colour at height y (the sheet's rows); flash: the flank turned to the light (the sheet's turning
+    fish: the silver goes white, the shaded silver and the line go silver)."""
+    if y >= 9.0:
+        return 'back'
+    if y >= 8.0:
+        return 'upper'
+    if y >= 5.0:
+        return 'flash' if flash else 'silver'
+    if y >= 4.0:
+        return 'silver' if flash else 'shade'
+    return 'belly'
+
+
+def paint(c, face, x, y, z, flash=False):
+    part, bone = c['_part'], c['_bone']
+    ox = LENGTH / 2 - z
+    col = SHEET
+    if part == 'eye' and face in ('east', 'west'):
+        return col['pupil'] if abs(ox - EYE_AT) < 0.5 and abs(y - EYE_HEIGHT) < 0.5 else col['eye']
+    if part in ('body', 'flank', 'eye'):
+        if face == 'up':
+            return col['back'] if part == 'body' or y >= 9.0 else col['upper']
+        if face == 'down':
+            return col['belly']
+        if ox > LENGTH - 0.99 and 4.75 <= y < 5.25:
+            return col['mouth']                                   # the mouth line round the snout
+        if SPOT[0] <= ox < SPOT[1] and SPOT[2] <= y < SPOT[3] and face in ('east', 'west'):
+            return col['spot']
+        if LINE[0] <= ox < LINE[1] and LINE[2] <= y < LINE[3]:
+            return col['silver'] if flash else col['line']
+        band = flank_band(y, flash)
+        if abs(ox - GILL) < 0.25 and band in ('silver', 'flash', 'shade') and face in ('east', 'west'):
+            return col['shade'] if not flash else col['silver']   # the gill cover's edge
+        return col[band]
+    # the fins: pale grey, the back fin's tip and front edge, the belly fins' and the tail fin's back tips orange, the
+    # forked tail's two tips red
+    if bone == 'back_fin':
+        return col['orange'] if y >= 11.0 or (ox >= 20.5 and y >= 10.5) else col['fin']
+    if bone in ('fin_left', 'fin_right'):
+        return col['orange'] if ox < 21.0 else col['fin']
+    if bone == 'tail_fin':
+        return col['red'] if ox < FORK and (y >= 9.25 or y < 1.75) else col['fin']
+    if bone == 'body' and y < 1.0 and ((17.5 < ox < 19.0) or (11.5 < ox < 13.0)):
+        return col['orange']                                      # the belly fins' and the fin under the tail's tips
+    return col['fin']
+
+
+LOOKS = {'everyday': lambda c, f, x, y, z: paint(c, f, x, y, z),
+         'flash': lambda c, f, x, y, z: paint(c, f, x, y, z, flash=True),
+         'plain': plain_colour}
+WORKSHOP_LOOK = 'everyday'
 
 
 WORKSHOP_SHAPE = [
@@ -188,7 +258,7 @@ WORKSHOP_PARTS = {'head': ['head'], 'body': ['body'], 'tail': ['tail_stalk'], 'b
 
 
 def workshop_look():
-    bones, rows, w, h = paint_faces(model(), 2, plain_colour)
+    bones, rows, w, h = paint_faces(model(), 2, LOOKS[WORKSHOP_LOOK])
     return bones, png(rows), w, h
 
 

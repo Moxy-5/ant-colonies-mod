@@ -261,6 +261,13 @@ user: a detailed webbed foot model comes later). Fun first, inspired by the real
   face the gold ring and pupil and its other faces head skin. Side 93 / 90, front 87 / 94, from above 94 / 72 (now
   wider than the sheet's top view, on purpose). Still 38 boxes. Waiting for the user's look
   (`references/workshop/barb/plumper_v3.png`).
+- 2026-11-20: **the barb's v3 shape approved by the user ("that's perfect, color it")**, so the detail stage was
+  skipped. v4 painted from the design sheet (`paint()` in `tools/barb_models.py`): the olive-grey back, a paler upper
+  flank, silver sides with the thin dark line along the middle running into the dark spot at the tail's base, shaded
+  silver low down, the white belly; the gill cover's edge, the mouth line, the gold eye with its black pupil; pale grey
+  fins with orange tips (back fin, belly fins, the fin under the tail, breast fins) and the forked tail's red tips.
+  The flash (the flank white as the fish turns) is a second look, `LOOKS['flash']`, for the game stage. Waiting for
+  the user's look (`references/workshop/barb/painted_v4.png`).
 
 ## My picks the user may change
 The barb's name and look, every size and number above (the bullfrog's size is the user's call), barbs with no hunger,
