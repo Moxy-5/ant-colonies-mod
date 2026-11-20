@@ -544,3 +544,4 @@ Every "Current status" bullet CLAUDE.md held up to 2026-11-19, word for word, ol
 - 2026-11-20: The bullfrog's detailed tongue (flick clip), smooth mouth lining and bony jaw points (v25); waiting for the user's look.
 - 2026-11-20: The bullfrog's mouth as the user asked: no white flecks, no bony points, the tongue shooting out from the back of the mouth (v26); waiting for the user's look.
 - 2026-11-20: The bullfrog's tongue approved by the user (v26); its model, paint and clips are done offline.
+- 2026-11-20: The barb's plain 3D shape built from its approved outline (v2, 38 boxes); waiting for the user's look.
