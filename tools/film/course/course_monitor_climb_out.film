@@ -1,6 +1,7 @@
 # The measuring course (swimming to a bank one block above the water and climbing out) for the monitor: written by tools/body_course.py films, do not edit.
 lens 50
 cmd fill -12 -63 -7 0 -62 7 minecraft:water
+cmd fill -12 -61 -7 0 -61 7 minecraft:air
 walker antcolonies:monitor -6.5 -62 0.5 -90 OwnSize:1.0f,HungryIn:99999,SunIn:99999
 follow 0 3.5 -6 0 25
 cmd tick unfreeze

@@ -127,6 +127,8 @@ public class MonitorEntity extends PathfinderMob implements GeoEntity, HasLife {
     public static final int BANK_REACH = 3;
     /** Afloat, its feet hang this far under the surface (blocks, at size 1): head and back out. */
     static final double AFLOAT = 0.75 * MODEL_SCALE;
+    /** Afloat, its tail's middle line lies this far under the surface (model pixels; the swim's straight tail; TAIL_FLOAT in tools/monitor_models.py). */
+    public static final double TAIL_FLOAT = 1.0;
     /** Startled in the water, it sinks out of sight to this depth (blocks). */
     static final double HIDE_DEPTH = 1.6 * MODEL_SCALE;
     static final int STARTLED_TICKS = 300;
@@ -201,14 +203,6 @@ public class MonitorEntity extends PathfinderMob implements GeoEntity, HasLife {
      */
     public static final double FOLDED = 0.05;
     /**
-     * Going into the water (2026-11-18, the user's ask): the "enter" clip's length (ticks; {@code ENTER_LEN} in
-     * {@code tools/monitor_models.py}), played once from {@link #enterTick}, which the model sets (drawing only) as the
-     * forelegs lose the bank over water while the hind legs still stand: it leans out, shoves off with the hind legs and
-     * folds into the swim.
-     */
-    public static final int ENTER_TICKS = 24;
-    public int enterTick = -1000;
-    /**
      * The front half is three pieces (waist, ribs, chest: the first {@link #TRUNK_PIECES} of {@link #BENT_BONES}), each
      * bending at most {@link #TRUNK_BEND} degrees against the one behind (my picks, 2026-11-18, the user's reports: one
      * chest bending far made a peak in the back going down a bank, held to a small bend it looked rigid), so the body
@@ -229,16 +223,19 @@ public class MonitorEntity extends PathfinderMob implements GeoEntity, HasLife {
     private final AnimatableInstanceCache cache = GeckoLibUtil.createInstanceCache(this);
 
     /**
-     * A climb up a block (stage B, 2026-11-19) or down one ({@code down}, stage C): where it started (its box, squared to
-     * the step's face, or the edge, and exactly {@link MonitorClimb#ahead} model pixels short of it), which way it climbs
-     * (a yaw straight at the face or edge), the game tick it started and the clip's size ({@link MonitorClimb#nearest}).
-     * It first eases into the clip ({@link #CLIMB_LEAD} ticks), plays it, then stands a moment ({@link #CLIMB_REST})
-     * before walking on: by then every player's screen has its box at its new height too, so the hand back to the walk
-     * shows no jump.
+     * A move made once with its clip (the Animal Maker Engine): a climb up a block (stage B, 2026-11-19) or down one
+     * (stage C), or going into or out of the water (step 4, 2026-11-19; {@link MonitorClimb} names them): where it
+     * started (its box squared to the step's face, the edge or the bank's face, and exactly {@link MonitorClimb#ahead}
+     * model pixels short of it; its height the bank's top, or for a climb up or out the lower level), which way it goes (a
+     * yaw straight at the face or edge), the yaw it had when it started (going into or out of the water it turns from it
+     * over {@link #YAW_EASE} ticks), the game tick it started, the clip's size ({@link MonitorClimb#nearest}) and the move.
+     * It first eases into the clip ({@link #CLIMB_LEAD} ticks), plays it, then, ending on land, stands a moment
+     * ({@link #CLIMB_REST}) before walking on: by then every player's screen has its box at its new height too, so the
+     * hand back to the walk shows no jump. Ending afloat it glides straight on into the swim.
      */
-    public record Climb(double x, double y, double z, float yaw, long start, int size, boolean down) {
-        /** The clip's easing in, and the standing still after it (ticks; my picks: the body clip player's own easing, and 0.4 s). */
-        public static final int CLIMB_LEAD = 4, CLIMB_REST = 8;
+    public record Climb(double x, double y, double z, float yaw, float yaw0, long start, int size, int move) {
+        /** The clip's easing in, the standing still after it, the turn onto the move's heading (ticks; my picks: the body clip player's own easing, 0.4 s, 0.4 s). */
+        public static final int CLIMB_LEAD = 4, CLIMB_REST = 8, YAW_EASE = 8;
 
         CompoundTag save() {
             CompoundTag tag = new CompoundTag();
@@ -246,19 +243,20 @@ public class MonitorEntity extends PathfinderMob implements GeoEntity, HasLife {
             tag.putDouble("y", y);
             tag.putDouble("z", z);
             tag.putFloat("yaw", yaw);
+            tag.putFloat("yaw0", yaw0);
             tag.putLong("start", start);
             tag.putInt("size", size);
-            tag.putBoolean("down", down);
+            tag.putInt("move", move);
             return tag;
         }
 
         @Nullable
         static Climb of(CompoundTag tag) {
             return tag.isEmpty() ? null : new Climb(tag.getDouble("x"), tag.getDouble("y"), tag.getDouble("z"),
-                    tag.getFloat("yaw"), tag.getLong("start"), tag.getInt("size"), tag.getBoolean("down"));
+                    tag.getFloat("yaw"), tag.getFloat("yaw0"), tag.getLong("start"), tag.getInt("size"), tag.getInt("move"));
         }
 
-        /** Which way it climbs (a unit step along the ground). */
+        /** Which way it goes (a unit step along the ground). */
         public double dirX() {
             return -Mth.sin(yaw * Mth.DEG_TO_RAD);
         }
@@ -269,12 +267,18 @@ public class MonitorEntity extends PathfinderMob implements GeoEntity, HasLife {
 
         /** Its clip's name. */
         public String clip() {
-            return MonitorClimb.clip(down, size);
+            return MonitorClimb.clip(move, size);
         }
 
         /** How far into its clip it is at this game time (ticks; below 0 while it eases in). */
         public double ticks(double gameTime) {
             return gameTime - start - CLIMB_LEAD;
+        }
+
+        /** Where it faces at this game time: turning from where it faced to the move's heading (into or out of the water), else the heading. */
+        public float facing(double gameTime) {
+            double f = Mth.clamp((gameTime - start) / YAW_EASE, 0.0, 1.0);
+            return yaw0 + Mth.wrapDegrees(yaw - yaw0) * (float) (f * f * (3 - 2 * f));
         }
     }
 
@@ -285,6 +289,8 @@ public class MonitorEntity extends PathfinderMob implements GeoEntity, HasLife {
     private CompoundTag climbRead;
     /** How far out from its middle line its feet stand, and the steepest it turns into a climb (model pixels, degrees; my picks). */
     static final double CLIMB_FEET_OUT = 12.0, CLIMB_TURN = 40.0;
+    /** Faster than this it runs into the water (the dash) rather than walking in (blocks a tick; a stroll is 0.031, a run 0.077). */
+    static final double DASH_SPEED = 0.05;
     /** The body's clip player (the climb's clock and clip time are read from it by the model). */
     @Nullable
     public SteadyController<MonitorEntity> bodyClips;
@@ -419,12 +425,18 @@ public class MonitorEntity extends PathfinderMob implements GeoEntity, HasLife {
     }
 
     /**
-     * Starts a climb when its route goes up or down a whole block straight ahead and it has come to the climb's start: on
-     * land, walking calmly or trailing a player, heading near enough at the face or edge, with ground under both its feet
-     * where it goes and room there for its body. Else it steps up or drops down the old way (Minecraft's own).
+     * Starts a move when its route ahead calls for one and it has come to the move's start, heading near enough at the
+     * step's face, the edge or the bank's face, with room for it: on land, a whole block up or down (a climb), or into
+     * water off a bank level with it or one or two blocks over it (running, the dash off a level bank); afloat, out onto
+     * a bank level with the water or a block over it. Calm or watching only (running away is calm too: the flee goal
+     * only sets its route). Else it goes the old way (Minecraft's own step, its fall, its hop out of the water).
      */
-    private boolean startClimb() {
-        if (!onGround() || isInWater() || isPassenger() || isDeadOrDying() || doing() != CALM && doing() != WATCH) {
+    private boolean startMove() {
+        if (isPassenger() || isDeadOrDying() || doing() != CALM && doing() != WATCH) {
+            return false;
+        }
+        boolean afloat = isInWater() && !onGround();
+        if (!afloat && (!onGround() || isInWater())) {
             return false;
         }
         Path path = getNavigation().getPath();
@@ -436,8 +448,57 @@ public class MonitorEntity extends PathfinderMob implements GeoEntity, HasLife {
         for (int i = Math.max(0, path.getNextNodeIndex() - 1); i <= last; i++) {
             Node a = path.getNode(i), b = path.getNode(i + 1);
             int dx = b.x - a.x, dz = b.z - a.z;
-            if (Math.abs(b.y - a.y) == 1 && a.y == floor && Math.abs(dx) + Math.abs(dz) == 1) {
-                Climb c = climbAt(a, b, dx, dz, b.y < a.y);
+            if (Math.abs(dx) + Math.abs(dz) != 1) {
+                continue;
+            }
+            int move = afloat ? outOf(a, b) : a.y == floor ? intoWater(b, floor) : -1;
+            if (afloat && move < 0) {
+                if (dryStand(b)) {
+                    return false;            // a bank it has no move for: the old hop
+                }
+                continue;
+            }
+            if (move < 0 && !afloat) {
+                if (Math.abs(b.y - a.y) != 1 || a.y != floor) {
+                    continue;
+                }
+                move = b.y < a.y ? MonitorClimb.DOWN : MonitorClimb.UP;
+            }
+            Climb c = climbAt(a, b, dx, dz, move);
+            if (c != null) {
+                entityData.set(DATA_CLIMB, c.save());
+                return true;
+            }
+            return false;
+        }
+        return afloat && outPastRoute(path);
+    }
+
+    /**
+     * Afloat, a route that ends at the water's edge short of its goal (Minecraft's route maker cannot step up out of
+     * the water onto a bank a block or more above it: the route stopped at the last water square and the climb out
+     * never started): the bank square past its last node, toward the goal, read as the next node.
+     */
+    private boolean outPastRoute(Path path) {
+        if (path.getNodeCount() < 2 || path.getNextNodeIndex() < path.getNodeCount() - 4) {
+            return false;
+        }
+        Node a = path.getEndNode();
+        BlockPos goal = path.getTarget();
+        int gx = goal.getX() - a.x, gz = goal.getZ() - a.z;
+        if (gx == 0 && gz == 0) {
+            return false;
+        }
+        int dx = Math.abs(gx) >= Math.abs(gz) ? Integer.signum(gx) : 0, dz = dx == 0 ? Integer.signum(gz) : 0;
+        int top = waterTop();
+        if (top == Integer.MIN_VALUE) {
+            return false;
+        }
+        for (int y = top; y <= top + 1; y++) {
+            Node b = new Node(a.x + dx, y, a.z + dz);
+            int move = outOf(a, b);
+            if (move >= 0) {
+                Climb c = climbAt(a, b, dx, dz, move);
                 if (c != null) {
                     entityData.set(DATA_CLIMB, c.save());
                     return true;
@@ -448,10 +509,63 @@ public class MonitorEntity extends PathfinderMob implements GeoEntity, HasLife {
         return false;
     }
 
-    /** The climb up (or down) from node a to b ahead of it, if it is at its start and the step has room; else null. */
+    /** The way into the water at the column of node b, from a bank whose top is at {@code floor}: -1 if b is not water. */
+    private int intoWater(Node b, int floor) {
+        for (int down = 1; down <= 3; down++) {
+            BlockPos at = new BlockPos(b.x, floor - down, b.z);
+            if (level().getFluidState(at).is(FluidTags.WATER)) {
+                if (!level().getFluidState(at.above()).isEmpty() || level().getFluidState(at).getAmount() < 8) {
+                    return -1;               // a slope of flowing water, or water over its block: not a bank's edge
+                }
+                if (down == 1) {
+                    // (its eased step from tick(): here, before this tick's move, getX() - xo was always 0 and a
+                    // running monitor stopped at the edge and walked in)
+                    boolean running = tickCount - movedTick <= 2 && stride > DASH_SPEED * getScale();
+                    return running ? MonitorClimb.DASH : MonitorClimb.IN;
+                }
+                return down == 2 ? MonitorClimb.DROP : MonitorClimb.DROP2;
+            }
+            if (!open(at)) {
+                return -1;
+            }
+        }
+        return -1;
+    }
+
+    /** Out of the water from node a (afloat) onto node b: onto a bank level with the water's block, or a block over it; -1 else. */
+    private int outOf(Node a, Node b) {
+        int top = waterTop();
+        if (top == Integer.MIN_VALUE || !dryStand(b)) {
+            return -1;
+        }
+        return b.y == top ? MonitorClimb.OUT : b.y == top + 1 ? MonitorClimb.OUT_UP : -1;
+    }
+
+    /** The top of the water's block it floats in (the height of its upper face), or MIN_VALUE if not in still water. */
+    private int waterTop() {
+        BlockPos.MutableBlockPos p = BlockPos.containing(getX(), getY() + 0.3, getZ()).mutable();
+        if (!level().getFluidState(p).is(FluidTags.WATER)) {
+            return Integer.MIN_VALUE;
+        }
+        while (level().getFluidState(p.above()).is(FluidTags.WATER)) {
+            p.move(0, 1, 0);
+        }
+        return level().getFluidState(p).getAmount() < 8 ? Integer.MIN_VALUE : p.getY() + 1;
+    }
+
+    /** Whether node b stands on a whole dry block with open air over it. */
+    private boolean dryStand(Node b) {
+        BlockPos at = new BlockPos(b.x, b.y, b.z);
+        return dryOpen(at) && level().getBlockState(at.below()).isCollisionShapeFullBlock(level(), at.below());
+    }
+
+    /**
+     * The move from node a to b ahead of it, if it is at its start and there is room; else null. Its height is the bank's
+     * top (going down, in or along level water) or the lower level (going up, or out: the water's block's top).
+     */
     @Nullable
-    private Climb climbAt(Node a, Node b, int dx, int dz, boolean down) {
-        double scale = MODEL_SCALE * getScale(), back = MonitorClimb.ahead(down) * scale / 16.0;
+    private Climb climbAt(Node a, Node b, int dx, int dz, int move) {
+        double scale = MODEL_SCALE * getScale(), back = MonitorClimb.ahead(move) * scale / 16.0;
         int sign = dx + dz;
         double face = dx != 0 ? (dx > 0 ? a.x + 1 : a.x) : (dz > 0 ? a.z + 1 : a.z);
         double dist = (face - (dx != 0 ? getX() : getZ())) * sign;
@@ -463,18 +577,39 @@ public class MonitorEntity extends PathfinderMob implements GeoEntity, HasLife {
         if (Math.abs(Mth.wrapDegrees(yBodyRot - yaw)) > CLIMB_TURN) {
             return null;
         }
-        // its feet on the top (or the lower ground): where it walks, else slid sideways to the middle of the step's
-        // column (half a block at most)
+        int level = move == MonitorClimb.OUT || move == MonitorClimb.OUT_UP ? waterTop() : Mth.floor(getY() + 1.0E-3);
+        if (MonitorClimb.startsAfloat(move)) {
+            // afloat at its resting depth (the float holds it there), not diving or still sinking in
+            double want = level - 1.0 / 9.0 - AFLOAT * getScale();
+            if (Math.abs(getY() - want) > 0.2) {
+                return null;
+            }
+        }
+        // its feet on the top (or the lower ground, or the water): where it goes, else slid sideways to the middle of
+        // the column (half a block at most)
         double side = dx != 0 ? getZ() : getX(), middle = (dx != 0 ? b.z : b.x) + 0.5;
         for (double across : new double[] {side, middle}) {
-            if (Math.abs(across - side) <= 0.5 && (down ? roomToClimbDown(a.y, dx != 0, face, sign, across, scale)
-                    : roomToClimb(a.y, dx != 0, face, sign, across, scale))) {
+            if (Math.abs(across - side) <= 0.5 && room(move, level, dx != 0, face, sign, across, scale)) {
                 double along = face - back * sign;
-                return new Climb(dx != 0 ? along : across, getY(), dx != 0 ? across : along, yaw, level().getGameTime(),
-                        MonitorClimb.nearest(getScale()), down);
+                return new Climb(dx != 0 ? along : across, MonitorClimb.startsAfloat(move) ? level : getY(), dx != 0 ? across : along, yaw, yBodyRot, level().getGameTime(), MonitorClimb.nearest(getScale()), move);
             }
         }
         return null;
+    }
+
+    /** Whether the move has room where it goes (see the moves' own checks). */
+    private boolean room(int move, int level, boolean alongX, double face, int sign, double across, double scale) {
+        switch (move) {
+            case MonitorClimb.UP:
+                return roomToClimb(level, alongX, face, sign, across, scale);
+            case MonitorClimb.DOWN:
+                return roomToClimbDown(level, alongX, face, sign, across, scale);
+            case MonitorClimb.OUT:
+            case MonitorClimb.OUT_UP:
+                return roomToLeave(move == MonitorClimb.OUT_UP ? level + 1 : level, alongX, face, sign, across, scale);
+            default:
+                return roomToEnter(move, level, alongX, face, sign, across, scale);
+        }
     }
 
     /**
@@ -527,6 +662,63 @@ public class MonitorEntity extends PathfinderMob implements GeoEntity, HasLife {
         return true;
     }
 
+    /**
+     * Going into the water off the bank at {@code face} (its top at {@code y}): the bank under both forefeet a whole
+     * block, and past the edge for two blocks, under both feet and the middle, still water at its height for the move
+     * (the water's block's top level with the bank, or one or two blocks lower) with open air over it up to over the bank.
+     */
+    private boolean roomToEnter(int move, int y, boolean alongX, double face, int sign, double across, double scale) {
+        double out = CLIMB_FEET_OUT * scale / 16.0;
+        int drop = move == MonitorClimb.DROP ? 1 : move == MonitorClimb.DROP2 ? 2 : 0;
+        for (double side : new double[] {across - out, across, across + out}) {
+            BlockPos top = climbCell(alongX, face - 0.5 * sign, side, y - 1);
+            if (!level().getBlockState(top).isCollisionShapeFullBlock(level(), top) || !dryOpen(top.above())) {
+                return false;
+            }
+            for (double ahead : new double[] {0.5, 1.5}) {
+                BlockPos water = climbCell(alongX, face + ahead * sign, side, y - 1 - drop);
+                if (!level().getFluidState(water).is(FluidTags.WATER) || level().getFluidState(water).getAmount() < 8
+                        || !open(water)) {
+                    return false;
+                }
+                for (int up = 1; up <= drop + 1; up++) {
+                    if (!dryOpen(water.above(up))) {
+                        return false;
+                    }
+                }
+            }
+        }
+        return true;
+    }
+
+    /**
+     * Coming out onto the bank at {@code face} (its top at {@code y}): a whole dry block under both feet for the two
+     * blocks past the face with room over it, and open over the water where the body rises against the face.
+     */
+    private boolean roomToLeave(int y, boolean alongX, double face, int sign, double across, double scale) {
+        double out = CLIMB_FEET_OUT * scale / 16.0;
+        for (double side : new double[] {across - out, across + out}) {
+            for (double ahead : new double[] {0.5, 1.5}) {
+                BlockPos top = climbCell(alongX, face + ahead * sign, side, y - 1);
+                if (!level().getBlockState(top).isCollisionShapeFullBlock(level(), top) || !dryOpen(top.above())) {
+                    return false;
+                }
+            }
+        }
+        for (double ahead : new double[] {-0.5, 0.5, 1.5, 2.5}) {
+            if (!open(climbCell(alongX, face + ahead * sign, across, y)) || !open(climbCell(alongX, face + ahead * sign, across, y + 1))) {
+                return false;
+            }
+        }
+        // and nothing over the water it rears up out of (a bank a block up: the layer level with the bank's block)
+        for (double ahead : new double[] {-1.5, -0.5}) {
+            if (!open(climbCell(alongX, face + ahead * sign, across, y - 1))) {
+                return false;
+            }
+        }
+        return true;
+    }
+
     private boolean dryOpen(BlockPos pos) {
         return open(pos) && level().getFluidState(pos).isEmpty();
     }
@@ -540,30 +732,58 @@ public class MonitorEntity extends PathfinderMob implements GeoEntity, HasLife {
     }
 
     /**
-     * Moves it on along its climb this tick: its box along the move's path, at the ground until its front would reach the
-     * step's face, then on top; climbing down, on top until its back has passed the edge, then on the lower ground (the
-     * drawing works its own place out from the path, so the box only has to stay out of the block). Ends it once done,
-     * or if it dies, lands in water or the step goes.
+     * Moves it on along its move this tick: its box along the move's path. Climbing up (or out) its box is on the lower
+     * level (or in the water at the path's height) until its front would reach the face, then on top; going down (or in)
+     * on top until its back has passed the edge, then on the lower level (or at the path's height, into the water): the
+     * drawing works its own place out from the path, so the box only has to stay out of the blocks. Ends it once done
+     * (ending afloat, it glides on at the move's last speed), or if it dies, a climb lands in water or the bank goes.
      */
     private boolean climbOn(Climb c) {
-        double ticks = c.ticks(level().getGameTime());
-        double scale = MODEL_SCALE * getScale(), back = MonitorClimb.ahead(c.down()) * scale / 16.0;
-        // the step's block: up, the one past the face; down, the one it walks off
-        double to = c.down() ? back - 0.5 : back + 0.5;
-        BlockPos step = BlockPos.containing(c.x() + c.dirX() * to, c.y() + (c.down() ? -0.5 : 0.5), c.z() + c.dirZ() * to);
-        if (isDeadOrDying() || isInWater() || ticks > MonitorClimb.ticks(c.down()) + Climb.CLIMB_REST
-                || !level().getBlockState(step).isCollisionShapeFullBlock(level(), step)) {
+        double now = level().getGameTime();
+        double ticks = c.ticks(now);
+        int m = c.move();
+        double scale = MODEL_SCALE * getScale(), back = MonitorClimb.ahead(m) * scale / 16.0;
+        boolean down = MonitorClimb.goesDown(m), water = MonitorClimb.endsAfloat(m) || MonitorClimb.startsAfloat(m);
+        // the bank's block: up and out, the one past the face; down and in, the one it leaves
+        double to = down ? back - 0.5 : back + 0.5;
+        double blockY = m == MonitorClimb.OUT ? -0.5 : down ? -0.5 : 0.5;
+        BlockPos step = BlockPos.containing(c.x() + c.dirX() * to, c.y() + blockY, c.z() + c.dirZ() * to);
+        int end = MonitorClimb.ticks(m) + (MonitorClimb.endsAfloat(m) ? 0 : Climb.CLIMB_REST);
+        if (isDeadOrDying() || !water && isInWater() || ticks > end || !level().getBlockState(step).isCollisionShapeFullBlock(level(), step)) {
             entityData.set(DATA_CLIMB, new CompoundTag());
+            if (MonitorClimb.startsAfloat(m) && !getNavigation().isDone()) {
+                // out on the bank, its route made in the water (which may end at the water's edge: outPastRoute) made
+                // afresh from here: followed on, it walked back to that last water square and fell in (the course, 2026-11-19)
+                getNavigation().recomputePath();
+            }
             return false;
         }
-        double along = MonitorClimb.along(c.down(), c.size(), ticks) * scale / 16.0;
-        double height = c.down() ? (along - getBbWidth() / 2.0 > back ? -1.0 : 0.0) : (along + getBbWidth() / 2.0 > back ? 1.0 : 0.0);
+        double along = MonitorClimb.along(m, c.size(), ticks) * scale / 16.0, rise = MonitorClimb.rise(m, c.size(), ticks);
+        double half = getBbWidth() / 2.0, height;
+        if (m == MonitorClimb.UP) {
+            height = along + half > back ? 1.0 : 0.0;
+        } else if (m == MonitorClimb.DOWN) {
+            height = along - half > back ? -1.0 : 0.0;
+        } else if (down) {
+            height = along - half > back ? rise : 0.0;
+        } else {
+            height = along + half > back ? (m == MonitorClimb.OUT_UP ? 1.0 : 0.0) : rise;
+        }
         setPos(c.x() + c.dirX() * along, c.y() + height, c.z() + c.dirZ() * along);
-        setDeltaMovement(Vec3.ZERO);
         fallDistance = 0.0F;
-        setYRot(c.yaw());
-        yBodyRot = c.yaw();
-        yHeadRot = c.yaw();
+        float yaw = water ? c.facing(now) : c.yaw();
+        setYRot(yaw);
+        yBodyRot = yaw;
+        yHeadRot = yaw;
+        if (ticks >= MonitorClimb.ticks(m) && MonitorClimb.endsAfloat(m)) {
+            // afloat: it glides on at the move's last speed into the swim
+            double v = MonitorClimb.endSpeed(m, c.size()) * scale / 16.0;
+            setDeltaMovement(c.dirX() * v, 0.0, c.dirZ() * v);
+            setOnGround(false);
+            entityData.set(DATA_CLIMB, new CompoundTag());
+            return true;
+        }
+        setDeltaMovement(Vec3.ZERO);
         return true;
     }
 
@@ -572,7 +792,7 @@ public class MonitorEntity extends PathfinderMob implements GeoEntity, HasLife {
     public void travel(Vec3 travelVector) {
         if (isControlledByLocalInstance() && !level().isClientSide) {
             Climb c = climb();
-            if (c != null ? climbOn(c) : startClimb()) {
+            if (c != null ? climbOn(c) : startMove()) {
                 if (c == null) {
                     climbOn(climb());
                 }
@@ -603,6 +823,7 @@ public class MonitorEntity extends PathfinderMob implements GeoEntity, HasLife {
             stride += (moved - stride) * 0.5;
         }
         if (level().isClientSide) {
+            wetLooks();
             return;
         }
         if (hungryIn > 0) {
@@ -623,12 +844,77 @@ public class MonitorEntity extends PathfinderMob implements GeoEntity, HasLife {
         if (tickCount % 20 == 0 && isInWater()) {
             restrictTo(blockPosition(), NEAR_WATER);       // its strolls stay near the water it last swam in
         }
-        // resting in the water it hangs at the surface, head and back out (startled, it dives out of sight); hunting, the hunt steers it
-        if (isInWater() && getNavigation().isDone() && !hunting) {
+        // in the water it hangs at the surface, head and back out, resting or swimming somewhere (2026-11-19: swimming,
+        // its route's nodes pulled it under after going in); startled, it dives out of sight; hunting, the hunt steers it
+        if (isInWater() && !hunting && climb() == null) {
             double depth = getFluidHeight(FluidTags.WATER) - (startled > 0 ? HIDE_DEPTH : AFLOAT) * getScale();
             Vec3 v = getDeltaMovement();
             setDeltaMovement(v.x, Mth.clamp(depth * 0.1, -0.02, 0.03) + v.y * 0.5, v.z);
         }
+    }
+
+    /** Drawing only: until when the water runs off it after coming out (its tick). */
+    private int wetUntil;
+
+    /**
+     * Drawing only (2026-11-19, my picks, fun first): going into the water a splash where its chest meets the water (the
+     * move's wet tick, {@link MonitorClimb#wetTick}), a bigger one dropping or running in; coming out, from the moment
+     * its hips leave the water, drops running off its belly and tail for two and a half seconds.
+     */
+    private void wetLooks() {
+        Climb c = climb();
+        int m = c == null ? -1 : c.move();
+        double size = getScale();
+        if (m >= 0 && MonitorClimb.wetTick(m) >= 0) {
+            double t = c.ticks(level().getGameTime()), wet = MonitorClimb.wetTick(m);
+            if (MonitorClimb.endsAfloat(m) && t >= wet && t < wet + 3) {
+                double ahead = (m == MonitorClimb.DASH ? 1.4 : 1.1) * size;
+                double x = drawnX(c) + c.dirX() * ahead, z = drawnZ(c) + c.dirZ() * ahead;
+                double surface = surfaceUnder(x, c.y() + 0.5, z);
+                if (!Double.isNaN(surface)) {
+                    int n = m == MonitorClimb.IN ? 4 : 9;
+                    for (int i = 0; i < n; i++) {
+                        level().addParticle(ParticleTypes.SPLASH, x + (random.nextDouble() - 0.5) * 0.9 * size, surface + 0.05,
+                                z + (random.nextDouble() - 0.5) * 0.9 * size, 0.0, 0.1, 0.0);
+                    }
+                    if (t < wet + 1) {
+                        level().playLocalSound(x, surface, z, SoundEvents.GENERIC_SPLASH, getSoundSource(),
+                                m == MonitorClimb.IN ? 0.25F : 0.5F, 1.0F + (random.nextFloat() - 0.5F) * 0.3F, false);
+                    }
+                }
+            } else if (MonitorClimb.startsAfloat(m) && t >= wet) {
+                wetUntil = tickCount + 50;
+            }
+        }
+        if (tickCount < wetUntil && !isInWater() && random.nextInt(3) > 0) {
+            // somewhere along its body or tail, under its belly line
+            float yaw = yBodyRot * Mth.DEG_TO_RAD;
+            double along = (random.nextDouble() * 4.0 - 2.0) * size * MODEL_SCALE / 0.75;
+            double y = (c != null ? drawnY : getY()) + (0.2 + 0.2 * random.nextDouble()) * size;
+            double x = (c != null ? drawnX : getX()) - Mth.sin(yaw) * along + (random.nextDouble() - 0.5) * 0.4 * size;
+            double z = (c != null ? drawnZ : getZ()) + Mth.cos(yaw) * along + (random.nextDouble() - 0.5) * 0.4 * size;
+            level().addParticle(ParticleTypes.DRIPPING_WATER, x, y, z, 0.0, 0.0, 0.0);
+        }
+    }
+
+    private double drawnX(Climb c) {
+        return drawnNanos != 0 ? drawnX : getX();
+    }
+
+    private double drawnZ(Climb c) {
+        return drawnNanos != 0 ? drawnZ : getZ();
+    }
+
+    /** The water's surface in the column at (x, z) from height y down a few blocks; NaN if no water. */
+    private double surfaceUnder(double x, double y, double z) {
+        BlockPos.MutableBlockPos p = BlockPos.containing(x, y, z).mutable();
+        for (int i = 0; i < 5; i++, p.move(0, -1, 0)) {
+            net.minecraft.world.level.material.FluidState f = level().getFluidState(p);
+            if (f.is(FluidTags.WATER)) {
+                return p.getY() + f.getHeight(level(), p);
+            }
+        }
+        return Double.NaN;
     }
 
     @Override
@@ -1338,7 +1624,6 @@ public class MonitorEntity extends PathfinderMob implements GeoEntity, HasLife {
     private static final RawAnimation IDLE = RawAnimation.begin().thenLoop("idle");
     private static final RawAnimation WALK = RawAnimation.begin().thenLoop("walk");
     private static final RawAnimation SWIM = RawAnimation.begin().thenLoop("swim");
-    private static final RawAnimation ENTER = RawAnimation.begin().thenPlayAndHold("enter");
     private static final RawAnimation BASK_CLIP = RawAnimation.begin().thenLoop("bask");
     private static final RawAnimation HISS_CLIP = RawAnimation.begin().thenLoop("hiss");
     private static final RawAnimation BITE_CLIP = RawAnimation.begin().thenPlayAndHold("bite");
@@ -1346,13 +1631,14 @@ public class MonitorEntity extends PathfinderMob implements GeoEntity, HasLife {
     private static final RawAnimation EAT_CLIP = RawAnimation.begin().thenPlayAndHold("eat");
     private static final RawAnimation DEATH = RawAnimation.begin().thenPlayAndHold("death");
     private static final RawAnimation TONGUE = RawAnimation.begin().thenLoop("tongue");
-    private static final RawAnimation[] CLIMB_UP = new RawAnimation[MonitorClimb.SIZES.length],
-            CLIMB_DOWN = new RawAnimation[MonitorClimb.SIZES.length];
+    /** Every move's clip for each size ({@link MonitorClimb}). */
+    private static final RawAnimation[][] MOVES = new RawAnimation[MonitorClimb.OUT_UP + 1][MonitorClimb.SIZES.length];
 
     static {
-        for (int i = 0; i < CLIMB_UP.length; i++) {
-            CLIMB_UP[i] = RawAnimation.begin().thenPlayAndHold(MonitorClimb.clip(false, i));
-            CLIMB_DOWN[i] = RawAnimation.begin().thenPlayAndHold(MonitorClimb.clip(true, i));
+        for (int m = 0; m < MOVES.length; m++) {
+            for (int i = 0; i < MonitorClimb.SIZES.length; i++) {
+                MOVES[m][i] = RawAnimation.begin().thenPlayAndHold(MonitorClimb.clip(m, i));
+            }
         }
     }
 
@@ -1360,7 +1646,7 @@ public class MonitorEntity extends PathfinderMob implements GeoEntity, HasLife {
     public void registerControllers(AnimatableManager.ControllerRegistrar controllers) {
         bodyClips = new SteadyController<>(this, "body", Climb.CLIMB_LEAD, this::animate).clock(MonitorEntity::climbClock);
         bodyClips.setCustomInstructionKeyframeHandler(note -> {
-        });         // the climb clips' notes (their path) are for the tools only
+        });         // the moves' clips' notes (their path) are for the tools only
         controllers.add(bodyClips);
         controllers.add(new AnimationController<>(this, "tongue", 0, this::tongue));
     }
@@ -1371,11 +1657,6 @@ public class MonitorEntity extends PathfinderMob implements GeoEntity, HasLife {
      */
     public boolean swimClip() {
         return isInWater() && !onGround() && legStand[0] < FOLDED && legStand[1] < FOLDED;
-    }
-
-    /** Whether the going-in clip plays (drawing only). */
-    public boolean entering() {
-        return tickCount >= enterTick && tickCount - enterTick < ENTER_TICKS && !isDeadOrDying();
     }
 
     /**
@@ -1394,8 +1675,8 @@ public class MonitorEntity extends PathfinderMob implements GeoEntity, HasLife {
             return state.setAndContinue(DEATH);
         }
         Climb c = climb();
-        if (c != null) {                        // the climb wins over everything else it does
-            return state.setAndContinue((c.down() ? CLIMB_DOWN : CLIMB_UP)[c.size()]);
+        if (c != null) {                        // a move wins over everything else it does
+            return state.setAndContinue(MOVES[c.move()][c.size()]);
         }
         switch (doing()) {
             case BASK:
@@ -1413,9 +1694,6 @@ public class MonitorEntity extends PathfinderMob implements GeoEntity, HasLife {
         }
         double dx = getX() - xo, dz = getZ() - zo;
         double speed = Math.sqrt(dx * dx + dz * dz);
-        if (entering()) {
-            return state.setAndContinue(ENTER);
-        }
         if (swimClip()) {
             player.setAnimationSpeed(Mth.clamp(0.6 + speed / 0.08, 0.6, 2.0));
             return state.setAndContinue(SWIM);

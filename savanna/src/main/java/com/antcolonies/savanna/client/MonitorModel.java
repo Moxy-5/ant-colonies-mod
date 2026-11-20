@@ -40,14 +40,20 @@ import org.joml.Vector3f;
  * joint's outer edge (the top as the body crests, the bottom in a dip) and moved so that edge stays on the hips' own
  * (turning both on the middle of the body's height opened a dark wedge across the shoulders, and each on its own edge
  * pushed the front of the hips up out of the back going down a bank); a leg folds or unfolds along the shortest turn
- * between its two poses, the swim clip starting only once both pairs are folded ({@link MonitorEntity#swimClip}); and
- * where the forelegs lose the bank over water while the hind legs stand it plays the going-in clip, leaning out and
- * shoving off into the swim ({@link MonitorEntity#entering}).
+ * between its two poses, the swim clip starting only once both pairs are folded ({@link MonitorEntity#swimClip}).
+ * <p>
+ * Going into and out of the water are moves of their own (the Animal Maker Engine step 4, 2026-11-19), made as the climbs
+ * are ({@link com.antcolonies.savanna.animal.MonitorClimb}, played and placed like them): walking in off a level bank, a dash in, sliding in off a bank a
+ * block up, diving in off one two blocks up, swimming out onto a level bank and climbing out onto one a block up. Going
+ * in, each leg hangs loose as it loses the bottom and folds for swimming a while after (the user's ask); coming out the
+ * legs unfold to hanging and then find the bank.
  * <p>
  * Its tail is dragged behind it (the Animal Maker Engine step 2, stage A, 2026-11-19, {@link TailDrag}): walking and
  * standing on land, each joint is held in the world and pulled after the one in front, so round a turn the tail sweeps
- * after the body and over a step it drapes from the edge and is pulled up after the hips. The other clips (bask, hiss,
- * bite, eat, swim, going in, death) keep their own tail with the body's lie as before, eased over.
+ * after the body and over a step it drapes from the edge and is pulled up after the hips; afloat (step 4) it is dragged
+ * too, each joint easing to just under the water's surface ({@link MonitorEntity#TAIL_FLOAT}), so it slides off the bank
+ * into the water, and out of it after the hips. The other clips (bask, hiss, bite, eat, death) keep their own tail with
+ * the body's lie as before, eased over.
  * <p>
  * Climbing a block (stage B, 2026-11-19, {@link MonitorEntity.Climb}) it is drawn on the climb's own path: its place
  * worked out from where the climb started and how far into the clip it is, not from its box (which steps up all at once
@@ -164,6 +170,11 @@ public class MonitorModel extends DefaultedEntityGeoModel<MonitorEntity> {
         byte doing = monitor.doing();
         if (!monitor.isDeadOrDying() && climb == null && (doing == MonitorEntity.CALM || doing == MonitorEntity.WATCH)) {
             legs(monitor, bend, scale, x, y, z, yaw);
+        } else if (climb != null) {          // a move's clip has the legs: as it ends, folded afloat or standing on land
+            double end = MonitorClimb.endsAfloat(climb.move()) ? 0.0 : 1.0;
+            monitor.legStand[0] = end;
+            monitor.legStand[1] = end;
+            monitor.legNanos = 0;
         }
         Vector3d moved = place(monitor, climb, scale, x, y, z, yaw);
         tail(monitor, bend, climb, moved, scale, x, y, z, yaw);
@@ -179,9 +190,9 @@ public class MonitorModel extends DefaultedEntityGeoModel<MonitorEntity> {
         double wx = x, wy = y, wz = z;
         if (climb != null) {
             double t = Math.max(0.0, monitor.climbClipTicks());
-            double along = MonitorClimb.along(climb.down(), climb.size(), t) * scale / 16.0;
+            double along = MonitorClimb.along(climb.move(), climb.size(), t) * scale / 16.0;
             wx = climb.x() + climb.dirX() * along;
-            wy = climb.y() + MonitorClimb.rise(climb.down(), climb.size(), t);
+            wy = climb.y() + MonitorClimb.rise(climb.move(), climb.size(), t);
             wz = climb.z() + climb.dirZ() * along;
         }
         long now = System.nanoTime();
@@ -241,8 +252,7 @@ public class MonitorModel extends DefaultedEntityGeoModel<MonitorEntity> {
             }
         }
         byte doing = monitor.doing();
-        boolean on = !monitor.isDeadOrDying() && (doing == MonitorEntity.CALM || doing == MonitorEntity.WATCH)
-                && !monitor.isInWater() && !monitor.swimClip() && !monitor.entering();
+        boolean on = !monitor.isDeadOrDying() && (doing == MonitorEntity.CALM || doing == MonitorEntity.WATCH);
         Matrix4f parent = BoneFrames.placement(x, y, z, yaw, scale).translate((float) moved.x, (float) moved.y, (float) moved.z)
                 .translate(0f, (float) (bend.lift() / scale), 0f);
         GeoBone body = bones.apply("body");
@@ -251,7 +261,7 @@ public class MonitorModel extends DefaultedEntityGeoModel<MonitorEntity> {
             parent.mul(BoneFrames.local(new Vector3f(), BoneFrames.pivot(body), 0f, 0f, body.getRotX()));
         }
         parent.mul(BoneFrames.local(hips, false));
-        TAIL.pose(bones, parent, monitor.tail, TailDrag.Ground.of(monitor.level(), y, monitor.isInWater(), monitor.floatDepth()),
+        TAIL.pose(bones, parent, monitor.tail, TailDrag.Ground.floating(monitor.level(), y, MonitorEntity.TAIL_FLOAT * scale / 16.0),
                 scale / 16.0, on, System.nanoTime());
     }
 
@@ -275,23 +285,16 @@ public class MonitorModel extends DefaultedEntityGeoModel<MonitorEntity> {
                     WADE * monitor.getScale());
         }
         boolean swimming = monitor.swimClip();
-        // walking off the bank into the water: the forelegs over water, the hind legs still on the bank
-        if (!swimming && !monitor.entering() && monitor.onGround() && monitor.walking() && !feet[0] && feet[1]
-                && monitor.legStand[1] > 0.5
-                && bend.overWater(monitor.level(), -MonitorEntity.LEG_PAIRS[0] * perBlock, REACH * monitor.getScale())) {
-            monitor.enterTick = monitor.tickCount;
-        }
-        boolean entering = monitor.entering();
         for (int pair = 0; pair < feet.length; pair++) {
-            // going in, both pairs count as folding (the clip folds them), so the swim clip follows it at once. A pair
-            // folds only for water (in it, or water under that pair): on land over a drop the legs stay standing
+            // a pair folds only for water (in it, or water under that pair): on land over a drop the legs stay standing
             // (BUGS 235: after a step up, the hind pair found no ground under the still-lifted body for a moment and
-            // folded toward the swimming pose, a hind foot twisting round backwards)
+            // folded toward the swimming pose, a hind foot twisting round backwards). Into and out of the water the
+            // moves fold and unfold the legs (step 4, 2026-11-19); this is for a way in or out no move fits
             boolean water = monitor.isInWater() || !feet[pair]
                     && bend.overWater(monitor.level(), -MonitorEntity.LEG_PAIRS[pair] * perBlock, REACH * monitor.getScale());
-            double want = (feet[pair] || !water) && !entering ? 1.0 : 0.0;
+            double want = feet[pair] || !water ? 1.0 : 0.0;
             monitor.legStand[pair] += (want - monitor.legStand[pair]) * k;
-            if (swimming || entering) {              // those clips set every leg themselves
+            if (swimming) {                          // the swim clip sets every leg itself
                 continue;
             }
             double fold = 1.0 - monitor.legStand[pair];

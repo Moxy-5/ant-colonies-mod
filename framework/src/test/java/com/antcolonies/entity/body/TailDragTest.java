@@ -184,6 +184,32 @@ class TailDragTest {
         }
     }
 
+    /** Swimming under the surface (hiding after a scare), the tail stays down with the hips, not up at the surface (2026-11-19). */
+    @Test
+    void swimmingUnderTheTailStaysDownWithTheHips() {
+        TailDrag t = drag();
+        TailDrag.Ground water = new TailDrag.Ground() {
+            @Override
+            public double at(double x, double z) {
+                return -3.0;
+            }
+
+            @Override
+            public double afloat(double x, double z) {
+                return -0.1;
+            }
+        };
+        long now = 1;
+        for (int f = 0; f < 60; f++, now += FRAME) {
+            t.update(water, 0, -1.0, -0.5 * PB * f, 0, 1, 0, PB, true, now);
+        }
+        double[] p = pitches(t);
+        for (int i = 1; i <= 12; i++) {
+            assertTrue(t.y(i) < -0.6, "joint " + i + " at " + t.y(i) + " floated up from the sunk hips");
+            assertTrue(Math.abs(p[i - 1]) < 15, "piece " + i + " lies " + p[i - 1]);
+        }
+    }
+
     @Test
     void handedBackToTheClipItEasesOver() {
         TailDrag t = drag();

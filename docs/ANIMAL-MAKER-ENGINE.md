@@ -268,7 +268,11 @@ steps are for the checks; to settle with the user before the first small creatur
    trunk pieces (`tools/monitor_models.py`), the S-curve; the lab's checks extended to four legs and a tail (K5).
 4. **Smooth water entry.** The `enter` clip and its start rule go; legs and tail blend from walking to swimming by
    how much of the body is really afloat, each leg pair walking until its own feet lose the bottom; the fall and bob
-   into the water and the hop out made a steady glide.
+   into the water and the hop out made a steady glide. **Built for the monitor 2026-11-19 the climbs' way instead
+   (the user's ask): six moves of their own (walk in, dash in, slide in off a block, dive in off two, swim out onto a
+   level bank, climb out a block up), each leg hanging as it loses the bottom and folding a while after (the user's
+   rethink); `docs/plans/engine-step4-water.md`; checker `tools/water_check.py`, films
+   `tools/film/monitor_water_*_frames.film`. Not yet tried in-game by the user.**
 5. **Prove it.** The course again, before and after side by side; guard films for the monitor and crocodile; then the
    user tries it in-game.
 
@@ -286,4 +290,4 @@ first bird, K1 and K6 as soon as clip making feels slow.
 - Open: the size scale for small creatures (above).
 
 ## Hard rule: offline and in-game checks for every animation (the user, 2026-11-19)
-After the monitor's climb up came out right this way ("a combination of the animation engine and in game was perfect"), every new or changed animation or movement, any animal, is checked both ways before the user sees it: offline as the game draws it (`tools/climb_check.py` for the monitor's climbs; a checker of the same kind for other clips), then the real game frozen and stepped a few ticks a picture from three sides (`tools/film/monitor_climb_frames.film` as the pattern, `tools/film_sheet.py` for contact sheets), every phase judged, joints measured over time when a limb looks wrong, and the course scenes it touches run. How-to: `docs/plans/engine-step2-climb.md`, "How stage B was got right".
+After the monitor's climb up came out right this way ("a combination of the animation engine and in game was perfect"), every new or changed animation or movement, any animal, is checked both ways before the user sees it: offline as the game draws it (`tools/climb_check.py` for the monitor's climbs, `tools/water_check.py` for its water moves, with a fastest-joint-turn check that catches an elbow or knee flipping; a checker of the same kind for other clips), then the real game frozen and stepped a few ticks a picture from three sides (`tools/film/monitor_climb_frames.film` as the pattern, `tools/film_sheet.py` for contact sheets), every phase judged, joints measured over time when a limb looks wrong, and the course scenes it touches run. How-to: `docs/plans/engine-step2-climb.md`, "How stage B was got right".
