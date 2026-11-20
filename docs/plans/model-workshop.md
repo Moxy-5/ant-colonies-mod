@@ -177,6 +177,11 @@ and that part joins the library. Each model is still judged against its own pict
 **Animations (stage 5) are not in this plan:** they use the clip tools; the pose viewer for any model is the tools
 review's K6.
 
+### Lesson: the game is checked against the approved look, from the same camera (2026-11-20, the bullfrog's eyes)
+The bullfrog's eyes were approved in the viewer over many rounds, then drawn wrong in the game for a day: GeckoLib turns a model over left to right on loading but lays each face's picture out by its own rule, so a face painted on one side of a box only (an eye's art round its outer corner) ended up inside the head, and every face's picture came out back to front (BUGS 245). Two rules from it:
+- **Every game export passes its bones through `model_parts.game_faces`** (the face places as GeckoLib needs them; the texture is not touched), so the game draws the exact mirror image of the viewer's model, paint and all. The bullfrog is the first; each older animal switches over with its own in-game films (BUGS 245 lists what each one shows).
+- **When a look reaches the game, film it and compare with the approved version from the same cameras:** `tools/game_compare.py <animal> <version> <scene.film> --px <model pixel in blocks>` draws the approved viewer version from the film scene's own summon and camera lines and lays game and viewer side by side (see its top comment; `tools/film/bullfrog_eyes.film` is the pattern: a still animal named `film:none` in its rest pose, near and far, side, three quarters and front). A look is done when the two match, not when the viewer shows it.
+
 ### Tips for the user's pictures
 Keep front, side, back and top on a plain background, apart from each other; write the wanted length in blocks (the
 crocodile picture said 5 to 6, the game's is 7.5); add one line on what matters most (for example "heavy and

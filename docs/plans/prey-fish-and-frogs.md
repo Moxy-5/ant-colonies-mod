@@ -303,6 +303,7 @@ user: a detailed webbed foot model comes later). Fun first, inspired by the real
   rain), spawning check list done (group `bullfrog`, cap 12); the monitor eats bullfrogs. Not yet: young crocodiles and
   catfish eating frogs (no frog in their food yet), barbs and young crocodiles eating landed flies, tadpoles (step 4).
   Changes in `docs/HISTORY.md`. Not tried in-game by the user yet.
+- 2026-11-20, the user: the in-game eyes are not their design. **Fixed:** GeckoLib drew each box's paint the other way round from the viewer (east and west swapped, every face's picture back to front), so the eyes' art sat on the faces inside the head and the front's was turned over. The frog's export now passes its faces through `model_parts.game_faces`; texture (v27 byte for byte), shape and clips unchanged. Filmed in the game (`tools/film/bullfrog_eyes.film`) and put beside the v27 viewer from the same cameras (`tools/game_compare.py`): the eyes match the approved C2 look pixel for pixel from the side, three quarters, front and the other side; the idle blink, the attack's swallow and the tongue move them right. Picture `references/workshop/bullfrog/eyes_game_vs_v27.png`. BUGS 245 (the other animals' smaller swaps left open).
 
 ## My picks the user may change
 The barb's name and look, every size and number above (the bullfrog's size is the user's call), barbs with no hunger,

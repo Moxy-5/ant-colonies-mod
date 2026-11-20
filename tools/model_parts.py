@@ -161,6 +161,38 @@ def paint_faces(bones, texels, colour, to_byte=_byte):
     return bones, rows, width, height
 
 
+def game_faces(bones):
+    """The bones with every face's place on the texture as GeckoLib needs it, so the game draws each face the way the
+    viewers do (2026-11-20, the bullfrog's eyes: in the game their art was on the faces inside the head).
+
+    GeckoLib turns a model over left to right on loading (a box from x to x + w is drawn from -(x + w) to -x), and the
+    viewers draw that mirror image too (tools/viewer_common.js), but it does not turn the paint over: it lays each face's
+    picture out by its own rule in the turned-over model. So, read from its own code (4.9.3: BakedModelFactory,
+    VertexSet, GeoQuad.build): the face named east is drawn on the box's side toward the middle line where the viewer
+    draws it on the far side (east and west swap), and every face's picture comes out back to front (side faces and
+    the front and back left to right, the top and bottom front to back). A box that is the same on both its sides
+    never shows it; one-sided art (an eye painted round its outer corner) does. This hands each face the other side's
+    picture, read the other way (a negative size reads a picture backwards; GeckoLib and Blockbench's own Bedrock files
+    do the same), so the game draws the exact mirror image of the viewer's model, paint and all: for an animal whose
+    two sides match, the same animal. The texture is not touched. Only for the game's files: the viewers draw the
+    faces as they are."""
+    out = copy.deepcopy(bones)
+    for b in out:
+        for c in b.get('cubes', []):
+            uv = c.get('uv')
+            if not isinstance(uv, dict):
+                continue
+            turned = {}
+            for face, source in (('east', 'west'), ('west', 'east'), ('north', 'north'), ('south', 'south'),
+                                 ('up', 'up'), ('down', 'down')):
+                if source in uv:
+                    (x, y), (w, h) = uv[source]['uv'], uv[source]['uv_size']
+                    turned[face] = ({'uv': [x, y + h], 'uv_size': [w, -h]} if face in ('up', 'down')
+                                    else {'uv': [x + w, y], 'uv_size': [-w, h]})
+            c['uv'] = turned
+    return out
+
+
 def geo(name, bones, w, h, bounds):
     """A GeckoLib model file: bounds is (visible width, visible height, [offset x, y, z]) in blocks."""
     bw, bh, offset = bounds

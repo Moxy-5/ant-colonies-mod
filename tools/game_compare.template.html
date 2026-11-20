@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Game Compare</title>
+<!-- Built by tools/game_compare.py: an approved viewer version drawn from one camera of an in-game film scene
+     (#shot=<name>), for the picture beside the game's. -->
+<style>
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #b4d3e3; }
+  #wrap { position: absolute; inset: 0; }
+  canvas { width: 100%; height: 100%; display: block; }
+  #labels { display: none; }
+</style>
+</head>
+<body>
+<div id="wrap"><canvas id="c"></canvas></div>
+<div id="labels"></div>
+<!--VIEWER-->
+<script>
+const DATA = /*DATA*/null;
+const st = Viewer.stage({canvas: document.getElementById('c'), wrap: document.getElementById('wrap'),
+                         labels: document.getElementById('labels'), sky: DATA.sky || '#b4d3e3', fog: null});
+// the model where the game has it: unturned, a model pixel a sixteenth, not centred (the cameras are in its own space)
+Viewer.buildModel({bones: DATA.look.bones, texture: DATA.look.texture, w: DATA.look.w, h: DATA.look.h}, st.scene,
+                  {centre: [0, 0]});
+const ground = new THREE.Mesh(new THREE.PlaneGeometry(80, 80), new THREE.MeshLambertMaterial({color: '#6f9a45'}));
+ground.rotation.x = -Math.PI / 2; ground.receiveShadow = true;
+st.prop(ground);
+const settings = Viewer.settingsFromHash({shot: Object.keys(DATA.shots)[0]});
+const shot = DATA.shots[settings.shot];
+st.camera.fov = shot.fov;
+st.camera.near = 0.003;
+st.camera.updateProjectionMatrix();
+st.setView(st.camera, [shot.pos, shot.target]);
+st.start();
+</script>
+</body>
+</html>

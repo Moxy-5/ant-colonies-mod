@@ -30,11 +30,25 @@ FLAGS = ["--headless=new", "--use-angle=swiftshader", "--enable-unsafe-swiftshad
          "--force-device-scale-factor=1"]
 
 
+_ANSWERS = []
+
+
 def browser():
-    for b in BROWSERS:
-        if b.exists():
-            return b
-    raise SystemExit("No Edge or Chrome found")
+    """The first browser that answers (2026-11-20: Edge waiting to finish an update quits at once with no picture and
+    no error, until it is restarted; then Chrome is used)."""
+    if not _ANSWERS:
+        for b in BROWSERS:
+            if not b.exists():
+                continue
+            with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as profile:
+                r = subprocess.run([str(b), "--headless=new", f"--user-data-dir={profile}", "--dump-dom",
+                                    "data:text/html,<p>ok</p>"], capture_output=True, text=True, timeout=120)
+            if "<p>ok</p>" in r.stdout:
+                _ANSWERS.append(b)
+                break
+        else:
+            raise SystemExit("No Edge or Chrome that answers")
+    return _ANSWERS[0]
 
 
 def run(page, hash_, extra, profile, wait_ms):

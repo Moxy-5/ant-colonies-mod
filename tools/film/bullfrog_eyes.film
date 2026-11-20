@@ -1,0 +1,63 @@
+# The bullfrog's eyes in the game, close (2026-11-20, the eye fix): a still frog in its rest pose (named film:none, a
+# clip it does not have, so GeckoLib draws the bind pose the viewer's "still" shows), filmed from the side, three
+# quarters and the front, near (the eye alone, 0.6 blocks) and at head size (1.1 blocks), then the clips that pull the
+# eyes down (idle's blink, the attack's swallow) and the tongue. tools/game_compare.py renders the approved viewer
+# version from these same cameras, for the Compare picture.
+#   ./gradlew runFilm -PfilmScene=tools/film/bullfrog_eyes.film      pictures in run-film/screenshots/bullfrog_eyes/
+# The frog stands at 36.5 -60 14.5 facing +x (yaw -90), size 1 (a summon with data skips the random size); a model
+# pixel is 0.02 blocks there (the renderer's 0.32 / 16). Its left eye's middle (model x -8.5, y 15, z -12) is at
+# 36.74 -59.70 14.33. A camera's height is its feet: the eye is 1.62 above.
+cmd time set noon
+cmd weather clear
+cmd kill @e[type=!player]
+cmd fill 33 -60 11 40 -57 18 minecraft:air
+lens 40
+wait 40
+cmd summon antcolonies:bullfrog 36.5 -60.0 14.5 {NoAI:1b,PersistenceRequired:1b,Male:1b,Rotation:[-90f,0f],CustomName:'"film:none"'}
+wait 10
+camera 36.74 -61.32 13.73 0 0
+wait 6
+shot eye_side
+camera 37.158 -61.216 13.912 45 10
+wait 6
+shot eye_threequarter
+camera 37.34 -61.32 14.50 90 0
+wait 6
+shot eye_front
+camera 36.74 -61.32 15.27 180 0
+wait 6
+shot eye_side_right
+camera 36.74 -61.38 13.40 0 0
+wait 6
+shot head_side
+camera 37.52 -61.19 13.72 45 10
+wait 6
+shot head_threequarter
+camera 37.84 -61.38 14.50 90 0
+wait 6
+shot head_front
+cmd tp @e[type=antcolonies:bullfrog] 36 -140 14
+wait 3
+# the clips that move the eyes: idle (the blink pulls them down) and the attack's swallow, near, three quarters
+cmd summon antcolonies:bullfrog 36.5 -60.0 14.5 {NoAI:1b,PersistenceRequired:1b,Male:1b,Rotation:[-90f,0f],CustomName:'"film:idle"'}
+camera 37.158 -61.216 13.912 45 10
+wait 10
+cmd tick freeze
+burst idle_eye 40 2
+cmd tick unfreeze
+cmd tp @e[type=antcolonies:bullfrog] 36 -140 14
+wait 3
+cmd summon antcolonies:bullfrog 36.5 -60.0 14.5 {NoAI:1b,PersistenceRequired:1b,Male:1b,Rotation:[-90f,0f],CustomName:'"film:attack"'}
+camera 37.52 -61.19 13.72 45 10
+wait 10
+cmd tick freeze
+burst attack_eye 16 1
+cmd tick unfreeze
+cmd tp @e[type=antcolonies:bullfrog] 36 -140 14
+wait 3
+cmd summon antcolonies:bullfrog 36.5 -60.0 14.5 {NoAI:1b,PersistenceRequired:1b,Male:1b,Rotation:[-90f,0f],CustomName:'"film-act:tongue"'}
+camera 37.52 -61.19 13.72 45 10
+wait 10
+cmd tick freeze
+burst tongue_eye 20 1
+cmd tick unfreeze

@@ -627,7 +627,7 @@ def workshop_look():
 #   dig_out  pushes up out of the ground and shakes off.
 from model_parts import (clip as _sample, smooth, turn_x, turn_y, turn_z, mat_vec, vadd, unit, blend_turn, cross,  # noqa: E402
                          from_axes,
-                         animations, geo, write_assets)
+                         animations, geo, game_faces, write_assets)
 
 BODY_PIVOT = (0.0, 6.0, 0.0)
 IDLE_LEN, WALK_LEN, HOP_LEN, LEAP_LEN, SWIM_LEN, FLOAT_LEN = 6.0, 1.4, 0.8, 1.1, 1.0, 3.0
@@ -1152,11 +1152,12 @@ WORKSHOP_CLIP_INFO = {
 
 
 def write_game():
-    """Writes the bullfrog's model, texture and clips into the savanna mod (no entity uses them yet: that is the plan's
-    step 3; the files let the clip checks read the model as the game will)."""
+    """Writes the bullfrog's model, texture and clips into the savanna mod. The texture is the approved one byte for
+    byte; the model's faces go through model_parts.game_faces, so the game draws them as the viewer does (2026-11-20:
+    without it the eyes' art was on the faces inside the head, the outer sides plain green, the front turned over)."""
     bones, rows, w, h = paint_faces(model(), 1, LOOKS[GAME_LOOK])
     write_assets({'textures/entity/bullfrog.png': png(rows),
-                  'geo/entity/bullfrog.geo.json': geo('bullfrog', bones, w, h, (3, 2, [0, 0.6, 0])),
+                  'geo/entity/bullfrog.geo.json': geo('bullfrog', game_faces(bones), w, h, (3, 2, [0, 0.6, 0])),
                   'animations/entity/bullfrog.animation.json': animations(clips())})
 
 
