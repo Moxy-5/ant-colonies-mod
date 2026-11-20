@@ -54,3 +54,6 @@ Barbs can sip a fly off the surface the same way; young crocodiles snap at low f
 ## Progress
 - 2026-11-20: planned with the user; the fly model (23 boxes, 10 bones) with looks A and B, and the moving preview
   published. Waiting for the user's look.
+- 2026-11-20: **both looks approved by the user** ("wow those look amazing, both sound good"): the clouds mix bottle
+  flies and house flies (my pick for the mix: half and half, each cloud its own mix). Step 1 done; next, the clouds in
+  the game (step 2).

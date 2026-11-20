@@ -550,3 +550,4 @@ Every "Current status" bullet CLAUDE.md held up to 2026-11-19, word for word, ol
 - 2026-11-20: The barb's paint approved by the user; its 8 clips made and checked offline (not in the game yet: no entity); waiting for the user's look.
 - 2026-11-20: The barb's mouth opens (a lower jaw): new nibble clip for algae, the sip gulps open (v6); checked offline.
 - 2026-11-20: Fly clouds planned with the user (`docs/plans/fly-clouds.md`); the fly model with bottle fly and house fly looks and a moving preview published; waiting for the user's look.
+- 2026-11-20: Both fly looks approved by the user (mixed clouds); the bullfrog's upper lip now covers the pink slits at the mouth's sides (v27).

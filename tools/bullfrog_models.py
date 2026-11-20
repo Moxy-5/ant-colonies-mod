@@ -115,12 +115,19 @@ def body_slices(cubes_by_bone):
         in_head = xm >= HEAD_FROM
         mouth = at(MOUTH, xm) if in_head else None
         y = belly
+        jaw_top = 0.0           # the half width of the jaw's top layer in this slice
         while y < top - 0.01:
             y1 = min(top, y + LAYER)
             if mouth is not None and y < mouth - 0.01 and mouth < y1 - 0.01:
                 y1 = mouth
             ym = (y + y1) / 2
             hw = round(half_width_at(xm, ym) * 4) / 4
+            if mouth is not None and abs(y1 - mouth) < 0.01:
+                jaw_top = hw
+            if mouth is not None and abs(y - mouth) < 0.01:
+                # the upper lip: never narrower than the jaw under it, so the mouth's pink floor (the jaw's top face)
+                # cannot show as a slit at the sides when the mouth is shut (the user, 2026-11-20)
+                hw = max(hw, jaw_top)
             if hw >= 0.5:
                 if not in_head:
                     bone, part = 'body', 'skin'

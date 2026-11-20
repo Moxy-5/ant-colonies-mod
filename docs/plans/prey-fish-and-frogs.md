@@ -247,6 +247,11 @@ user: a detailed webbed foot model comes later). Fun first, inspired by the real
   jaw; the pad lands on the ground 18.5 px past the snout. Waiting for the user's look.
 - 2026-11-20, **the tongue approved by the user** ("Looks great", v26): the bullfrog's model, paint and clips are
   done offline. Left: the in-game frame check of every clip once the frog is in the game (step 3).
+- 2026-11-20, the user: two little pink slits at the mouth's sides. Cause: the jaw's top face is painted as the
+  mouth's floor, and in some head slices the upper lip's box was a quarter pixel narrower than the jaw's under it, so a
+  strip of the floor showed. v27: the upper lip is never narrower than the jaw under it (`body_slices`), the user's own
+  idea ("cover them with the top lip"); the shut mouth clean from the front, side and three quarters, the open mouth
+  and tongue unchanged; still 389 boxes. Picture `references/workshop/bullfrog/lip_v27.png`.
 - 2026-11-20: the barb's plain 3D shape (`tools/barb_models.py`, v2, 38 boxes of the 40 budget, 8 bones: body,
   head, tail stalk, tail fin, back fin, two breast fins), built from the approved outline and the sheet's head steps:
   2-pixel slices of two boxes each (a rounded spindle from the front), eyes set into the head's sides, a swallow tail
