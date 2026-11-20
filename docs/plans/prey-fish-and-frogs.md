@@ -163,6 +163,9 @@ user: a detailed webbed foot model comes later). Fun first, inspired by the real
   pupil sits up on the head (the side photo). Own bones also let the eyes sink into the head when swallowing (real
   frogs pull their eyes down to help push food down) and blink, in the animation stage. v13, 369 boxes. Tried on the
   way: a stepped dome of round slices (read as a white pyramid), then too far out (horns from the front).
+- 2026-11-20, **the body approved by the user** ("I really like the body", v13 without its eyes). **The eyes: fun
+  first, not realism** (the user: "for the eyes it will be better to stray from realism and just do whatever looks
+  good in Minecraft"); they get their own session, starting from v13's angled eye bones.
 
 ## My picks the user may change
 The barb's name and look, every size and number above (the bullfrog's size is the user's call), barbs with no hunger,
