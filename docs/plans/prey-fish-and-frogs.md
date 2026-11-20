@@ -216,6 +216,17 @@ user: a detailed webbed foot model comes later). Fun first, inspired by the real
   so its change to the swim must be checked for a spin. **The in-game half of the hard rule (frozen frames from three
   sides) waits for step 3**, when the frog has a body in the game. The versions page now plays every clip (a Clips row,
   slow motion, the hop's arc, the water for the swim and float). Waiting for the user's look.
+- 2026-11-20, **knees out** (the user: in the walk, the puff and the swim "the knees or legs go inside of the model";
+  picked idea 1 of three): measured first. The elbows stayed out; the hind knees sank in up to 5.2 px (swim), 2.5
+  (walk), 0.6 (puff, attack). Two causes: the thigh is built half inside the body (the hip deep in, the knee's middle
+  right on the skin: fine sitting, no room to spare), and the clips bent each knee the way it bends at rest against the
+  hip-to-foot line, which swung it into the flank as a foot came forward or up. Fix (clips only, the approved model
+  unchanged): the knees, and the elbows a little, are pushed out to the side more the further a foot or hand moves
+  from where it rests (`KNEE_OUT`, `ELBOW_OUT`, `KNEE_EASE`), so the sitting pose stays exactly the model's (pushing
+  out always raised the haunch's round end even sitting); the death roll stays limp. Now no knee or elbow sits deeper in
+  than at rest in any clip; `tools/frog_check.py` measures it every run (flags over 0.5 px; the dig clips and the death
+  roll, tucked in on purpose, left out). Idea 2 (the haunch moved 1.5 px out in the model) kept in reserve if the
+  haunch still looks swallowed. Waiting for the user's look.
 
 ## My picks the user may change
 The barb's name and look, every size and number above (the bullfrog's size is the user's call), barbs with no hunger,

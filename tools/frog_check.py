@@ -7,7 +7,7 @@ game's own files (python tools/bullfrog_models.py game first).
 With no clip names, checks every clip. Prints for each, in model pixels (the game draws the frog at 0.32 of them for
 a male): parts under the ground (on land, only while the frog is meant to be on the ground; the dig clips sink on
 purpose, so for them how much of the back and the eyes still shows), the highest hand or foot over the ground while it
-sits, the walk's planted feet (each should slide back at the walking speed, none sideways), the biggest jump of any
+sits, the knees and elbows against the body's skin (none deeper in than at rest), the walk's planted feet (each should slide back at the walking speed, none sideways), the biggest jump of any
 part between two frames and the fastest joint turn. With --times, draws a film strip (fc_<clip>.png in
 references/anim_lab/bullfrog/): the ground grey, the water's surface a blue line on water clips."""
 import json
@@ -71,13 +71,50 @@ def top_of(posed, prefix):
     return max((p[1] for b, cs, _ in posed if b.startswith(prefix) for p in cs), default=float('nan'))
 
 
+JOINTS = {'knee': ('leg_left_2', 'leg_right_2'), 'elbow': ('arm_left_2', 'arm_right_2')}
+
+
+def skin_depth(q):
+    """How far a point (the body's own unturned space) lies inside the body's skin; below 0 outside it."""
+    x, y, z = q
+    along = bm.LENGTH / 2 - z
+    if not 0 <= along <= bm.LENGTH:
+        return -99.0
+    top, belly = bm.at(bm.TOP, along), bm.at(bm.BELLY, along)
+    if not belly <= y <= top:
+        return -min(abs(y - belly), abs(y - top))
+    return bm.half_width_at(along, y) - abs(x)
+
+
+def joint_depths(pose):
+    """Each knee's and elbow's middle against the body's skin (the user, 2026-11-20: the knees sank into the body in
+    the walk, the puff and the swim): the joint carried into the body's own space, then measured."""
+    P = model.by['body']['pivot']
+    Pw = model.world('body', P, pose)
+    cols = [[a - b for a, b in zip(model.world('body', [P[0] + (i == 0), P[1] + (i == 1), P[2] + (i == 2)], pose), Pw)]
+            for i in range(3)]
+    out = {}
+    for kind, bones in JOINTS.items():
+        for bone in bones:
+            w = model.world(bone, model.by[bone]['pivot'], pose)
+            rel = [a - b for a, b in zip(w, Pw)]
+            q = [P[i] + sum(c * r for c, r in zip(cols[i], rel)) / sum(c * c for c in cols[i]) for i in range(3)]
+            out[bone] = skin_depth(q)
+    return out
+
+
+REST_DEPTH = None
+
+
 def grounded(name, u):
     spans = ON_GROUND.get(name)
     return spans is None or any(a <= u <= b for a, b in spans)
 
 
+REST_DEPTH = joint_depths({})
 for name in names:
     clip = lab.Clip(name, data[name])
+    deepest = {}
     water = name in WATER
     print(f'== {name}  {clip.length:g} s  ({"in the water" if water else "digging" if name in DIG else "on land"})')
     under, jumps, last = {}, {}, None
@@ -98,6 +135,10 @@ for name in names:
                     under[b] = max(under.get(b, (0, 0)), (d, t))
             if name not in ('walk', 'hop', 'leap', 'death', 'attack'):
                 feet_high = max(feet_high, max(low_of(posed, e) for e in ENDS))
+        if k % 4 == 0:
+            for bone, d in joint_depths(clip.pose(t)).items():
+                if d - REST_DEPTH[bone] > deepest.get(bone, (-99, 0))[0]:
+                    deepest[bone] = (d - REST_DEPTH[bone], t)
         if name in DIG and k % 8 == 0:
             shows.append((t, top_of(posed, 'body'), top_of(posed, 'eye'), min(p[1] for cs in now.values() for p in cs)))
         if name == 'walk':
@@ -138,6 +179,11 @@ for name in names:
                       f'{max(vz):5.2f}, sideways {min(vx):5.2f} to {max(vx):5.2f}')
             else:
                 print(f'    {e:11s} never down')
+    worst = sorted(deepest.items(), key=lambda kv: -kv[1][0])[:2]
+    if name in DIG or name == 'death':      # limbs tucked in on purpose: under the ground, or as it rolls over
+        worst = []
+    print('  knees and elbows deeper into the body than at rest (px at time; over 0.5 flagged): ' + ', '.join(
+        f'{b} {d:.1f} at {t:.2f}' + (' FLAGGED' if d > 0.5 else '') for b, (d, t) in worst))
     top = sorted(jumps.items(), key=lambda kv: -kv[1][0])[:5]
     print('  biggest jump in 1/80 s (px at time): ' + ', '.join(f'{b} {d:.1f} at {t:.2f}' for b, (d, t) in top))
     turns = {}

@@ -539,3 +539,4 @@ Every "Current status" bullet CLAUDE.md held up to 2026-11-19, word for word, ol
 - 2026-11-20: The bullfrog's head blended into the back (v23): one skin colour shifting over the shoulders, the dark marks thinning out, no hard edge; waiting for the user's look.
 - 2026-11-20: The bullfrog's paint approved by the user (v23); next for the frog, its clips.
 - 2026-11-20: The bullfrog's 13 clips made and checked offline (tools/frog_check.py); the versions page plays them; the in-game frame check waits for the frog's entity (step 3); waiting for the user's look.
+- 2026-11-20: The bullfrog's knees kept out of its body in the walk, puff and swim (pushed out as a foot moves; sitting unchanged); frog_check measures it; waiting for the user's look.

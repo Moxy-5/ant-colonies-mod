@@ -544,6 +544,7 @@ BODY_PIVOT = (0.0, 6.0, 0.0)
 IDLE_LEN, WALK_LEN, HOP_LEN, LEAP_LEN, SWIM_LEN, FLOAT_LEN = 6.0, 1.4, 0.8, 1.1, 1.0, 3.0
 CALL_LEN, PUFF_LEN, ATTACK_LEN, DEATH_LEN, DIG_LEN, DUG_LEN, DIG_OUT_LEN = 3.0, 2.0, 0.8, 1.0, 3.0, 6.0, 1.2
 WALK_SWEEP, WALK_DUTY, WALK_LIFT = 5.0, 0.7, 1.4       # each foot's sweep under the body, the time down, the body raised
+KNEE_OUT, ELBOW_OUT, KNEE_EASE = 1.6, 1.0, 2.5                         # knees and elbows pushed out, fully once a foot is 2.5 px from its rest (my picks, measured)
 DUG_DEPTH = 10.0                                        # how deep it sits dug in: the back and the eyes out
 
 
@@ -604,6 +605,10 @@ class _Poser:
                 dh = unit(vsub(W, S))
                 hinge = cross(dh, _bend_way(vsub(E, S), dh))
                 L['H1'] = _frame(vsub(E, S), hinge)
+                # how far a knee is pushed out to the side, beyond bending the way it does at rest (bending only as
+                # at rest swung the knees into the flank as a foot came forward or up: the user, 2026-11-20; a real
+                # frog's knees point outward)
+                L['out'] = (KNEE_OUT if kind == 'leg' else ELBOW_OUT) * vlen(vsub(E, S))
                 L['H2'] = _frame(vsub(W, E), hinge)
         self.body()
 
@@ -670,7 +675,10 @@ class _Poser:
         dh = [c / D for c in d]
         a = (L['l1'] ** 2 - L['l2'] ** 2 + D * D) / (2 * D)
         h = math.sqrt(max(0.0, L['l1'] ** 2 - a * a))
-        pole = _bend_way(way or vsub(L['E'], S), dh)
+        if way is None:                 # as at rest while the foot is where it rests; pushed out as the foot moves
+            k = min(1.0, vlen(vsub(Wb, L['W'])) / KNEE_EASE) if L['out'] else 0.0
+            way = vadd(vsub(L['E'], S), [L['s'] * L['out'] * k, 0.0, 0.0])
+        pole = _bend_way(way, dh)
         E = [S[i] + a * dh[i] + h * pole[i] for i in range(3)]
         # both pieces turned in the plane of the bend, the joint a real hinge: each piece's frame (its length and the
         # hinge line) now, against the same at rest (aiming each piece on its own spun the forearm round its length
@@ -945,10 +953,12 @@ def clips():
         for s, side in SIDES:
             rest_b = P.rest_end('leg', side)
             P.limb(p, 'leg', side, [rest_b[0] + s * (6.0 * spread - 4.0 * tuck), rest_b[1] + 3.0 * spread + 4.0 * tuck,
-                                    rest_b[2] + 6.0 * spread], turn_x(-30 * spread), in_body=True)
+                                    rest_b[2] + 6.0 * spread], turn_x(-30 * spread), in_body=True,
+                   way=vsub(P.limbs['leg', side]['E'], P.limbs['leg', side]['S']))   # limp: no knee pushed out
             ra = P.rest_end('arm', side)
             P.limb(p, 'arm', side, [ra[0] + s * (3.0 * spread - 3.5 * tuck), ra[1] + 2.0 * spread + 3.0 * tuck,
-                                    ra[2] - 1.0 * spread + 2.0 * tuck], None, in_body=True)
+                                    ra[2] - 1.0 * spread + 2.0 * tuck], None, in_body=True,
+                   way=vsub(P.limbs['arm', side]['E'], P.limbs['arm', side]['S']))
         _face(p, t, jaw=8.0 * f, blink=f)
         return p
     make('death', DEATH_LEN, death, 30, 'hold')
