@@ -1,0 +1,14 @@
+{
+ "note": "eyes up on the head's top nearer the middle, tilted 40 out and 15 forward; pupil a dark oval on the crown",
+ "date": "2026-11-20",
+ "boxes": 389,
+ "numbers": {
+  "ROUNDNESS": 2.4,
+  "FLAT_BELLY": 0.5,
+  "EYE_APART": 5.4,
+  "EYE_R": 1.7,
+  "EYE_OUT": 40.0,
+  "EYE_FORWARD": 15.0,
+  "EYE_SINK": 0.6
+ }
+}

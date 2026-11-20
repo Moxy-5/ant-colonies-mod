@@ -1,0 +1,14 @@
+{
+ "note": "eyes remade as domes in their own bones, turned to point out, up and forward (the user: frog eyes sit at an angle)",
+ "date": "2026-11-20",
+ "boxes": 389,
+ "numbers": {
+  "ROUNDNESS": 2.4,
+  "FLAT_BELLY": 0.5,
+  "EYE_HEIGHT": 16.6,
+  "EYE_R": 1.9,
+  "EYE_OUT": 50.0,
+  "EYE_FORWARD": 18.0,
+  "EYE_SINK": 0.6
+ }
+}

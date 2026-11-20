@@ -1,0 +1,14 @@
+{
+ "note": "eyes tilted 28 degrees toward the snout, the front rim lid taken off so they show from ahead",
+ "date": "2026-11-20",
+ "boxes": 369,
+ "numbers": {
+  "ROUNDNESS": 2.4,
+  "FLAT_BELLY": 0.5,
+  "EYE_APART": 5.4,
+  "EYE_R": 1.7,
+  "EYE_OUT": 40.0,
+  "EYE_FORWARD": 28.0,
+  "EYE_SINK": 0.6
+ }
+}

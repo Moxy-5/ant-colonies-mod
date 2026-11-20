@@ -1,0 +1,14 @@
+{
+ "note": "each eye a rounded eyeball with one flat face carrying the pupil, framed by skin lids, the bone tilted out, up and forward",
+ "date": "2026-11-20",
+ "boxes": 371,
+ "numbers": {
+  "ROUNDNESS": 2.4,
+  "FLAT_BELLY": 0.5,
+  "EYE_APART": 5.4,
+  "EYE_R": 1.7,
+  "EYE_OUT": 40.0,
+  "EYE_FORWARD": 15.0,
+  "EYE_SINK": 0.6
+ }
+}

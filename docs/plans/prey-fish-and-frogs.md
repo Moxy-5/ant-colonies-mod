@@ -153,6 +153,16 @@ user: a detailed webbed foot model comes later). Fun first, inspired by the real
   look being its angle): moved to the upper sides of the head looking out, measured on the side photo (3 pixels long,
   2.5 tall, middle 16.3 high and 7 behind the snout), a pale iris with a wide dark pupil, a low brow knob over each,
   the eardrum behind and below, the nostrils on the snout's upper sides (v9, 363 boxes).
+- 2026-11-20, the eyes at an angle (the user: "frog eyes are more complicated to put in Minecraft because they're at
+  an angle, perfectly placed to look in all directions"). Rethought: both earlier tries assumed an eye is a face
+  pointing along one axis (forward, then sideways), and Minecraft's boxes only face along the axes. Now each eye is its
+  own bone (`eye_left`, `eye_right`), built pointing up from its base on the head's top (5.4 out from the middle, 7
+  behind the snout) and turned 40 degrees out and 28 toward the snout: a short rounded eyeball whose flat face carries
+  the pale iris and a wide pupil running front to back, a skin lid over its back edge (the brow), skin round its base.
+  Seen from the front the pupils show under the brows (the front photo's look), from the side the pale eye with its
+  pupil sits up on the head (the side photo). Own bones also let the eyes sink into the head when swallowing (real
+  frogs pull their eyes down to help push food down) and blink, in the animation stage. v13, 369 boxes. Tried on the
+  way: a stepped dome of round slices (read as a white pyramid), then too far out (horns from the front).
 
 ## My picks the user may change
 The barb's name and look, every size and number above (the bullfrog's size is the user's call), barbs with no hunger,
