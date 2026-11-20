@@ -1,4 +1,4 @@
-# Small prey fish, the African bullfrog and tadpoles, and fewer tilapia (M9 river life; planned 2026-11-20, nothing built)
+# Small prey fish, the African bullfrog and tadpoles, and fewer tilapia (M9 river life; planned 2026-11-20; steps 1 and 3 built 2026-11-20)
 
 The user, 2026-11-20 ("these sound perfect for right now, we should reduce the amount of tilapia in the river to make
 room for the smaller schooling fish"): two new prey for the river, picked from six options (terrapin, tigerfish,
@@ -293,6 +293,16 @@ user: a detailed webbed foot model comes later). Fun first, inspired by the real
   three pecks, the mouth opening as the head reaches in, snapping shut on a strand and tugging back; the snout just
   meets the bed); the `sip` now opens the mouth at the gulp. Checked offline (`anim_lab.py all barb`). Picture
   `references/workshop/barb/mouth_v6.png`.
+- 2026-11-20, the user: "put everything in game the flies, bullfrog and fish". **Step 1 built:** the barb in the game
+  (schools of 8 to 14 in the shallows, the flash on hard turns, the burst on a strike, sips at dawn and dusk and nibbles
+  on algae), the tilapia cut to 45 (groups 2 to 5), hatchling and teen crocodiles and catfish eating barbs; its spawning
+  check list done (group `river_school`, cap 40). The far look is left for later (39 boxes; 40 barbs cost about a third
+  of the tilapia's drawing). **Step 3 built:** the bullfrog in the game (hops, swims and floats, leaps into the water
+  from a monitor or grown crocodile, lunges at barbs, snails and young crabs, the 2-block tongue at fly clouds drawn as
+  a rope, puffs up and bites a player for 1 heart, digs in from 10:00 to 14:00 on dry days, males call at night and in
+  rain), spawning check list done (group `bullfrog`, cap 12); the monitor eats bullfrogs. Not yet: young crocodiles and
+  catfish eating frogs (no frog in their food yet), barbs and young crocodiles eating landed flies, tadpoles (step 4).
+  Changes in `docs/HISTORY.md`. Not tried in-game by the user yet.
 
 ## My picks the user may change
 The barb's name and look, every size and number above (the bullfrog's size is the user's call), barbs with no hunger,

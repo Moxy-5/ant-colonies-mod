@@ -12,7 +12,29 @@ import net.minecraft.world.entity.MobCategory;
 public final class SavannaMobCategories {
     private SavannaMobCategories() {}
 
-    private static MobCategory riverFish, riverHunter, riverBed, riverBank, riverSchool;
+    private static MobCategory riverFish, riverHunter, riverBed, riverBank, riverSchool, flyCloud, bullfrog;
+
+    /**
+     * The bullfrogs' group (prey plan step 3, 2026-11-20, the spawning check list): its own, cap 12 round a player (the
+     * plan), friendly, removed past 128 blocks.
+     */
+    public static MobCategory bullfrog() {
+        if (bullfrog == null) {
+            bullfrog = MobCategory.valueOf("ANTCOLONIES_BULLFROG");
+        }
+        return bullfrog;
+    }
+
+    /**
+     * The fly clouds' group (fly clouds step 2, 2026-11-20, the spawning check list): its own, so neither the fish nor
+     * anything else fills its places. Cap 6 round a player (my pick), friendly, removed past 128 blocks.
+     */
+    public static MobCategory flyCloud() {
+        if (flyCloud == null) {
+            flyCloud = MobCategory.valueOf("ANTCOLONIES_FLY_CLOUD");
+        }
+        return flyCloud;
+    }
 
     /**
      * The small schooling fish's group (the barb, 2026-11-20, the spawning check list): a common fish kept near the

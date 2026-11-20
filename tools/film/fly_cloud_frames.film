@@ -1,0 +1,137 @@
+# Fly clouds in the game (fly clouds step 2, 2026-11-20; CLAUDE.md's hard rule): clouds held still with NoAI (their
+# flies swarm as ever), seen from the bank (wide, close, from above and from under it, a frog's view), the game frozen
+# and stepped a tick a picture; one fly alone close up; a cloud over the grass, watched from above for landings.
+#   ./gradlew runFilm -PfilmScene=tools/film/fly_cloud_frames.film   pictures in run-film/screenshots/fly_cloud_frames/
+cmd time set noon
+cmd weather clear
+cmd kill @e[type=!player]
+cmd fill 30 -63 -8 44 -61 8 minecraft:water
+lens 40
+wait 20
+# the cloud's middle 1.9 over the water's top (-60.1): eye level -58
+cmd summon antcolonies:fly_cloud 37.5 -58 4.5 {NoAI:1b,Flies:12,Most:12}
+wait 60
+camera 37.5 -59.62 2.0 0 0
+shot wide_0
+wait 10
+shot wide_1
+wait 10
+shot wide_2
+wait 10
+shot wide_3
+wait 10
+cmd tick freeze
+burst wide_burst 20 1
+cmd tick unfreeze
+camera 37.5 -59.62 3.3 0 0
+cmd tick freeze
+burst close_burst 20 1
+cmd tick unfreeze
+camera 36.4 -58.9 3.4 -45 25
+cmd tick freeze
+burst above_burst 12 1
+cmd tick unfreeze
+# a bullfrog's view: from the water's edge under the cloud, looking up
+camera 37.5 -61.4 3.2 0 -50
+shot frog_view_0
+wait 10
+shot frog_view_1
+wait 10
+shot frog_view_2
+wait 10
+shot frog_view_3
+wait 10
+cmd kill @e[type=antcolonies:fly_cloud]
+wait 5
+# one fly alone, close up
+cmd summon antcolonies:fly_cloud 37.5 -58 4.5 {NoAI:1b,Flies:1,Most:4,Refill:20000}
+wait 40
+camera 37.5 -59.62 3.6 0 0
+lens 50
+cmd tick freeze
+burst one_fly 30 1
+cmd tick unfreeze
+shot one_fly_0
+wait 5
+shot one_fly_1
+wait 5
+shot one_fly_2
+wait 5
+shot one_fly_3
+wait 5
+shot one_fly_4
+wait 5
+shot one_fly_5
+wait 5
+shot one_fly_6
+wait 5
+shot one_fly_7
+wait 5
+cmd kill @e[type=antcolonies:fly_cloud]
+wait 5
+# a cloud over the grass beside the pool, watched from above for landings
+lens 40
+cmd summon antcolonies:fly_cloud 26.5 -58 0.5 {NoAI:1b,Flies:12,Most:12}
+wait 60
+camera 26.5 -59.12 -1.5 0 51
+shot landing_00
+wait 6
+shot landing_01
+wait 6
+shot landing_02
+wait 6
+shot landing_03
+wait 6
+shot landing_04
+wait 6
+shot landing_05
+wait 6
+shot landing_06
+wait 6
+shot landing_07
+wait 6
+shot landing_08
+wait 6
+shot landing_09
+wait 6
+shot landing_10
+wait 6
+shot landing_11
+wait 6
+shot landing_12
+wait 6
+shot landing_13
+wait 6
+shot landing_14
+wait 6
+shot landing_15
+wait 6
+shot landing_16
+wait 6
+shot landing_17
+wait 6
+shot landing_18
+wait 6
+shot landing_19
+wait 6
+shot landing_20
+wait 6
+shot landing_21
+wait 6
+shot landing_22
+wait 6
+shot landing_23
+wait 6
+shot landing_24
+wait 6
+shot landing_25
+wait 6
+shot landing_26
+wait 6
+shot landing_27
+wait 6
+shot landing_28
+wait 6
+shot landing_29
+wait 6
+quit

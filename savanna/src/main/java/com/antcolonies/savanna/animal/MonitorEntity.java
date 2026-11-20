@@ -1321,8 +1321,8 @@ public class MonitorEntity extends PathfinderMob implements GeoEntity, HasLife {
     }
 
     /**
-     * Hungry: goes to the nearest crab, snail or remains within {@link #HUNT_REACH} blocks and, with it at its jaws, bites;
-     * a crab is swallowed whole, a snail crushed (its broken shell left), remains take three bites. Then it eats, and is
+     * Hungry: goes to the nearest crab, snail, bullfrog (2026-11-20, the prey plan; it leaps into the water from the
+     * monitor) or remains within {@link #HUNT_REACH} blocks and, with it at its jaws, bites; a crab or a frog is swallowed whole, a snail crushed (its broken shell left), remains take three bites. Then it eats, and is
      * fed 5 to 10 minutes. Swimming, it dives to prey on the bed under it (2026-11-19, BUGS 230: it used to hang at the
      * surface over it). It gives up a chase after 20 s and, with nothing caught, rests a minute before it hunts again.
      */
@@ -1348,7 +1348,8 @@ public class MonitorEntity extends PathfinderMob implements GeoEntity, HasLife {
         @Nullable
         private Entity nearest() {
             List<Entity> near = m.level().getEntities(m, m.getBoundingBox().inflate(HUNT_REACH, 4.0, HUNT_REACH), e -> e.isAlive()
-                    && (e instanceof CrabEntity || e instanceof SnailEntity || e instanceof RemainsEntity r && r.bitesLeft() > 0));
+                    && (e instanceof CrabEntity || e instanceof SnailEntity || e instanceof BullfrogEntity f && !f.hasCustomName()
+                    || e instanceof RemainsEntity r && r.bitesLeft() > 0));
             Entity best = null;
             double bestD = Double.MAX_VALUE;
             for (Entity e : near) {
@@ -1451,7 +1452,7 @@ public class MonitorEntity extends PathfinderMob implements GeoEntity, HasLife {
                 server.playSound(null, at.x, at.y, at.z, SoundEvents.TURTLE_EGG_CRACK, SoundSource.NEUTRAL, 1.0F, 0.8F);
                 bites = 3;
             } else {
-                prey.discard();                           // a crab, swallowed whole
+                prey.discard();                           // a crab or a bullfrog (2026-11-20), swallowed whole
                 m.playSound(SoundEvents.FOX_BITE, 1.0F, 0.8F);
                 bites = 3;
             }

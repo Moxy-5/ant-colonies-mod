@@ -128,6 +128,27 @@ public class SavannaEntities {
                     .clientTrackingRange(4)
                     .build("barb"));
 
+    // A cloud of flies (fly clouds step 2, 2026-11-20): one mob for the whole cloud, its flies drawn by its renderer; a
+    // small box round its middle (my pick), not collided with, not hurt by fire. Its own spawning group, fly clouds.
+    public static final DeferredHolder<EntityType<?>, EntityType<com.antcolonies.savanna.animal.FlyCloudEntity>> FLY_CLOUD =
+            ENTITY_TYPES.register("fly_cloud", () -> EntityType.Builder
+                    .of(com.antcolonies.savanna.animal.FlyCloudEntity::new, SavannaMobCategories.flyCloud())
+                    .sized(0.6F, 0.6F)
+                    .eyeHeight(0.3F)
+                    .fireImmune()
+                    .clientTrackingRange(3)
+                    .build("fly_cloud"));
+
+    // The African bullfrog (M9 river life, prey plan step 3, 2026-11-20): a male drawn 0.8 blocks long, a female 0.65 (the
+    // user's sizes) through SCALE; its box a male's body (my pick), under a block wide so its routes use 1-block squares.
+    public static final DeferredHolder<EntityType<?>, EntityType<com.antcolonies.savanna.animal.BullfrogEntity>> BULLFROG =
+            ENTITY_TYPES.register("bullfrog", () -> EntityType.Builder
+                    .of(com.antcolonies.savanna.animal.BullfrogEntity::new, SavannaMobCategories.bullfrog())
+                    .sized(0.6F, 0.4F)
+                    .eyeHeight(0.32F)
+                    .clientTrackingRange(6)
+                    .build("bullfrog"));
+
     // The river catfish (M9 river life, the hunter, 2026-11-14): drawn 2 blocks long (the user's pick); its box shorter
     // than the drawn fish (my pick), so it can turn in narrow water; each fish's own size through its SCALE attribute.
     // Under 0.87 wide so even the biggest (1.15) stays under 1: Minecraft plans a swimmer's route in squares of its

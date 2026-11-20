@@ -54,7 +54,7 @@ tongue snaps back; some flicks miss and the fly zips off (my pick: 1 in 4). The 
 minute); an empty cloud drifts away and is gone.
 
 ## Where and when
-- **For now (the user, 2026-11-20: "make them around all day for now just for testing"):** over the shallows, pans,
+- **For now (the user, 2026-11-20: "make them around all day for now just for testing"; 4 to 12 flies a cloud, the user):** over the shallows, pans,
   oxbows and slow river edges at any time of day. Own spawning group `antcolonies:fly_cloud` (my pick: cap 6 round a
   player, kept within 64), with the spawning check list (CLAUDE.md) and the quiet-savanna gate.
 - **Later, as more is added:** remains on land and dung (the user: "flies are all over the savanna on remains"),
@@ -79,3 +79,10 @@ minute); an empty cloud drifts away and is gone.
 - 2026-11-20: the user's heights: the tongue reaches 2 blocks (up to 2 blocks high), the swarms hover about 2 blocks up
   and sometimes 3, out of reach ("Height and the long tongue" above). The preview's clouds still hover low; they go up
   with the game step.
+- 2026-11-20, the user: "make it so the fly swarms range from 4-12 and start building them". **Step 2 built:** the
+  cloud in the game (4 to 12 flies, each cloud its own number; refills one fly a minute), hanging about 2 blocks over
+  the water and rising to 3 now and then, the flies drawn from the fly model with the preview's darting, landing,
+  buzzing wings and rubbing legs; legs only within 4 blocks, nothing past 24 (the plan's 12 was too short: a fly is still
+  about 6 pixels there); the buzz heard within 5. Spawning check list done (group `fly_cloud`, cap 6). **Step 3, the
+  tongue part, built** with the bullfrog: the frog's tongue takes a fly, which rides the tongue into the mouth. Not yet:
+  barbs and young crocodiles taking landed flies. Filmed in the game (`tools/film/fly_cloud_frames.film`).

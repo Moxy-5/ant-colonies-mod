@@ -4,7 +4,9 @@ import static com.antcolonies.savanna.gametest.TermiteMoundTests.SURFACE;
 
 import com.antcolonies.savanna.SavannaMod;
 import com.antcolonies.savanna.animal.BarbEntity;
+import com.antcolonies.savanna.animal.BullfrogEntity;
 import com.antcolonies.savanna.animal.CatfishEntity;
+import com.antcolonies.savanna.animal.FlyCloudEntity;
 import com.antcolonies.savanna.animal.TilapiaEntity;
 import com.antcolonies.savanna.block.AlgaeBlock;
 import com.antcolonies.savanna.registry.SavannaBlocks;
@@ -1689,6 +1691,326 @@ public class RiverLifeTests {
             helper.assertTrue(fastest[0] > 0.35, "the school never burst at the strike (fastest barb " + String.format("%.2f", fastest[0]) + " blocks a tick)");
             helper.assertTrue(level.getEntitiesOfClass(com.antcolonies.savanna.animal.RemainsEntity.class, catfish.getBoundingBox().inflate(6)).isEmpty(),
                     "a barb left remains (it is gulped whole)");
+        });
+    }
+
+    // --- the fly clouds (2026-11-20) -----------------------------------------------------------------------------------
+
+    /**
+     * Fly clouds spawn by themselves over the shallows and the banks beside them (the spawning check list): over a
+     * river's cross-section the world would spawn one at every spot of a column within 2 blocks of water 1 to 3 deep
+     * (the water there or the free block over the top), nowhere over the deep middle; a cloud spawned the world's way is
+     * set up to hang 1.7 to 3 blocks over the water with 4 to 12 flies; its own group (cap 6) in the savanna's waters.
+     */
+    @GameTest(template = "arena", timeoutTicks = 200)
+    public static void flyCloudsSpawnOverTheShallowsByThemselves(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        int top = buildChannel(helper, false);
+        BlockPos corner = helper.absolutePos(new BlockPos(CX0, 0, CZ0));
+        var type = SavannaEntities.FLY_CLOUD.get();
+        int[] spots = new int[CHANNEL_DEPTHS.length];
+        for (int i = 0; i < CHANNEL_DEPTHS.length; i++) {
+            for (int dz = 0; dz <= CZ1 - CZ0; dz++) {
+                for (int y = top - 8; y <= top + 1; y++) {
+                    spots[i] += worldWouldSpawn(level, type, new BlockPos(corner.getX() + i, y, corner.getZ() + dz)) ? 1 : 0;
+                }
+            }
+        }
+        // the world's own spawn, drawn in the water over a shallow bed: set up over the water, full of flies
+        BlockPos drawn = new BlockPos(corner.getX() + 1, top - 1, corner.getZ() + 3);
+        FlyCloudEntity cloud = type.create(level);
+        cloud.moveTo(drawn.getX() + 0.5, drawn.getY(), drawn.getZ() + 0.5, 0, 0);
+        helper.assertTrue(net.neoforged.neoforge.event.EventHooks.checkSpawnPosition(cloud, level, MobSpawnType.NATURAL),
+                "the world refuses a fly cloud in the water over a shallow bed");
+        cloud.finalizeSpawn(level, level.getCurrentDifficultyAt(drawn), MobSpawnType.NATURAL, null);
+        double over = cloud.getY() - (top + 1);
+        int flies = cloud.flies();
+        cloud.discard();
+        buildChannel(helper, true);
+        SavannaMod.LOGGER.info("[fly clouds] spots over the channel by column {}; a new cloud {} blocks over the water with {} flies",
+                java.util.Arrays.toString(spots), String.format("%.2f", over), flies);
+        helper.assertTrue(over >= 1.65 && over <= 3.05, "a new cloud hangs " + over + " blocks over the water (1.7 to 3 wanted)");
+        helper.assertTrue(flies >= 4 && flies <= 12, "a new cloud holds " + flies + " flies (4 to 12 wanted)");
+        StringBuilder wrong = new StringBuilder();
+        for (int i = 0; i < CHANNEL_DEPTHS.length; i++) {
+            boolean nearShallow = false;
+            for (int j = Math.max(0, i - 2); j <= Math.min(CHANNEL_DEPTHS.length - 1, i + 2); j++) {
+                nearShallow |= CHANNEL_DEPTHS[j] <= 3;
+            }
+            int want = nearShallow ? (CHANNEL_DEPTHS[i] + 1) * (CZ1 - CZ0 + 1) : 0;
+            if (spots[i] != want) {
+                wrong.append(" column ").append(i).append(" (depth ").append(CHANNEL_DEPTHS[i]).append("): ").append(spots[i]).append(", want ").append(want);
+            }
+        }
+        if (!wrong.isEmpty()) {
+            helper.fail("fly clouds spawn at the wrong spots:" + wrong);
+        }
+        var group = com.antcolonies.savanna.registry.SavannaMobCategories.flyCloud();
+        helper.assertTrue(type.getCategory() == group && group.getMaxInstancesPerChunk() == 6,
+                "the fly cloud is in the " + type.getCategory().getName() + " group, cap " + type.getCategory().getMaxInstancesPerChunk() + " (its own, 6 wanted)");
+        var biomes = level.registryAccess().registryOrThrow(net.minecraft.core.registries.Registries.BIOME);
+        helper.assertTrue(biomes.getOrThrow(net.minecraft.world.level.biome.Biomes.SAVANNA).getMobSettings().getMobs(group).unwrap().stream()
+                .anyMatch(d -> d.type == type), "the fly cloud is not in the savanna's fly cloud spawn list");
+        helper.succeed();
+    }
+
+    /**
+     * A fly cloud hangs over the water between about 1.7 and 3 blocks up, wanders slowly round its spot, and cannot be
+     * hurt or pushed (only /kill removes it).
+     */
+    @GameTest(template = "arena", timeoutTicks = 400)
+    public static void aFlyCloudHangsOverTheWater(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        buildPond(helper);
+        FlyCloudEntity cloud = helper.spawn(SavannaEntities.FLY_CLOUD.get(), new BlockPos(4, TOP + 1, 5));
+        double water = helper.absolutePos(new BlockPos(0, TOP + 1, 0)).getY();     // the pond's top (the free block over it)
+        double[] low = {99}, high = {-99}, farthest = {0};
+        net.minecraft.world.phys.Vec3[] home = {null};
+        helper.onEachTick(() -> {
+            if (cloud.tickCount < 120) {
+                return;     // rising to its height first
+            }
+            double over = cloud.getY() - water;
+            low[0] = Math.min(low[0], over);
+            high[0] = Math.max(high[0], over);
+            if (home[0] == null) {
+                home[0] = cloud.home();
+            }
+            farthest[0] = Math.max(farthest[0], Math.hypot(cloud.getX() - home[0].x, cloud.getZ() - home[0].z));
+        });
+        helper.runAtTickTime(380, () -> {
+            boolean hurt = cloud.hurt(level.damageSources().generic(), 5.0F);
+            helper.assertTrue(!hurt && cloud.isAlive() && !cloud.isPickable() && !cloud.isPushable(), "the fly cloud can be hurt, hit or pushed");
+            helper.assertTrue(low[0] >= 1.6 && high[0] <= 3.1, String.format("the cloud hung %.2f to %.2f blocks over the water (1.7 to 3 wanted)", low[0], high[0]));
+            helper.assertTrue(farthest[0] <= 2.8, String.format("the cloud wandered %.2f blocks from its spot (2.5 at most)", farthest[0]));
+            SavannaMod.LOGGER.info("[fly clouds] hung {} to {} over the water, wandered {} from its spot",
+                    String.format("%.2f", low[0]), String.format("%.2f", high[0]), String.format("%.2f", farthest[0]));
+            helper.succeed();
+        });
+    }
+
+    // --- the African bullfrog (2026-11-20) -----------------------------------------------------------------------------
+
+    /** A stone bank (the monitor tests' ground) with a pool one block deep in it; returns nothing, the pool at x 6..9, z 3..7. */
+    private static void bankWithPool(GameTestHelper helper) {
+        for (int x = MX0; x <= MX1; x++) {
+            for (int z = MZ0; z <= MZ1; z++) {
+                boolean pool = x >= MX0 + 6 && x <= MX0 + 9 && z >= MZ0 + 3 && z <= MZ0 + 7;
+                helper.setBlock(new BlockPos(x, TOP - 1, z), Blocks.STONE);
+                helper.setBlock(new BlockPos(x, TOP, z), pool ? Blocks.WATER : Blocks.STONE);
+                for (int y = TOP + 1; y <= TOP + 5; y++) {
+                    helper.setBlock(new BlockPos(x, y, z), Blocks.AIR);
+                }
+            }
+        }
+    }
+
+    private static BullfrogEntity frogOnBank(GameTestHelper helper, int x, int z, float yaw) {
+        BullfrogEntity frog = helper.spawn(SavannaEntities.BULLFROG.get(), new BlockPos(x, TOP + 1, z));
+        frog.setPersistenceRequired();
+        frog.setYRot(yaw);
+        frog.yBodyRot = yaw;
+        frog.yHeadRot = yaw;
+        return frog;
+    }
+
+    /**
+     * Bullfrogs spawn by themselves at the shallows' edges (the spawning check list): over a river's cross-section the
+     * world would spawn one at every spot of a column within 2 blocks of water 1 to 3 deep (the water there or the free
+     * block over the top), never over the deep middle; one spawned the world's way is set down afloat on the water, a
+     * male 0.8 blocks long or a female 0.65 (each 0.9 to 1.1 of that); its own group (cap 12) in the savanna's waters.
+     */
+    @GameTest(template = "arena", timeoutTicks = 200)
+    public static void bullfrogsSpawnAtTheShallowsByThemselves(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        int top = buildChannel(helper, false);
+        BlockPos corner = helper.absolutePos(new BlockPos(CX0, 0, CZ0));
+        var type = SavannaEntities.BULLFROG.get();
+        int[] spots = new int[CHANNEL_DEPTHS.length];
+        for (int i = 0; i < CHANNEL_DEPTHS.length; i++) {
+            for (int dz = 0; dz <= CZ1 - CZ0; dz++) {
+                for (int y = top - 8; y <= top + 1; y++) {
+                    spots[i] += worldWouldSpawn(level, type, new BlockPos(corner.getX() + i, y, corner.getZ() + dz)) ? 1 : 0;
+                }
+            }
+        }
+        BlockPos drawn = new BlockPos(corner.getX() + 1, top - 1, corner.getZ() + 3);
+        StringBuilder sizes = new StringBuilder();
+        for (int n = 0; n < 6; n++) {
+            BullfrogEntity frog = type.create(level);
+            frog.moveTo(drawn.getX() + 0.5, drawn.getY(), drawn.getZ() + 0.5, 0, 0);
+            helper.assertTrue(net.neoforged.neoforge.event.EventHooks.checkSpawnPosition(frog, level, MobSpawnType.NATURAL),
+                    "the world refuses a bullfrog in the water over a shallow bed");
+            frog.finalizeSpawn(level, level.getCurrentDifficultyAt(drawn), MobSpawnType.NATURAL, null);
+            double length = 0.8 * frog.getScale(), usual = frog.isMale() ? 0.8 : 0.65;
+            sizes.append(frog.isMale() ? " male " : " female ").append(String.format("%.2f", length));
+            helper.assertTrue(length > usual * 0.89 && length < usual * 1.11, "a " + (frog.isMale() ? "male" : "female") + " " + length + " blocks long");
+            helper.assertTrue(Math.abs(frog.getY() - (top + 1 - 0.4)) < 0.01, "a new bullfrog set at y " + frog.getY() + ", not afloat on the water");
+            frog.discard();
+        }
+        buildChannel(helper, true);
+        SavannaMod.LOGGER.info("[bullfrog] spots over the channel by column {}; new frogs:{}", java.util.Arrays.toString(spots), sizes);
+        StringBuilder wrong = new StringBuilder();
+        for (int i = 0; i < CHANNEL_DEPTHS.length; i++) {
+            boolean nearShallow = false;
+            for (int j = Math.max(0, i - 2); j <= Math.min(CHANNEL_DEPTHS.length - 1, i + 2); j++) {
+                nearShallow |= CHANNEL_DEPTHS[j] <= 3;
+            }
+            int want = nearShallow ? (CHANNEL_DEPTHS[i] + 1) * (CZ1 - CZ0 + 1) : 0;
+            if (spots[i] != want) {
+                wrong.append(" column ").append(i).append(" (depth ").append(CHANNEL_DEPTHS[i]).append("): ").append(spots[i]).append(", want ").append(want);
+            }
+        }
+        if (!wrong.isEmpty()) {
+            helper.fail("bullfrogs spawn at the wrong spots:" + wrong);
+        }
+        var group = com.antcolonies.savanna.registry.SavannaMobCategories.bullfrog();
+        helper.assertTrue(type.getCategory() == group && group.getMaxInstancesPerChunk() == 12,
+                "the bullfrog is in the " + type.getCategory().getName() + " group, cap " + type.getCategory().getMaxInstancesPerChunk() + " (its own, 12 wanted)");
+        var biomes = level.registryAccess().registryOrThrow(net.minecraft.core.registries.Registries.BIOME);
+        var listed = biomes.getOrThrow(net.minecraft.world.level.biome.Biomes.SAVANNA).getMobSettings().getMobs(group).unwrap().stream()
+                .filter(d -> d.type == type).findFirst();
+        helper.assertTrue(listed.isPresent() && listed.get().minCount == 1 && listed.get().maxCount == 3,
+                "bullfrogs in the savanna's list: " + listed.map(d -> d.minCount + " to " + d.maxCount).orElse("none") + " (1 to 3 wanted)");
+        helper.succeed();
+    }
+
+    /** A hungry bullfrog at the water's edge lunges at a barb in the water in front of it and swallows it. */
+    @GameTest(template = "arena", timeoutTicks = 300)
+    public static void aHungryBullfrogLungesAtABarb(GameTestHelper helper) {
+        bankWithPool(helper);
+        BullfrogEntity frog = frogOnBank(helper, MX0 + 5, MZ0 + 5, -90);
+        frog.makeHungry();
+        BarbEntity barb = helper.spawn(SavannaEntities.BARB.get(), new BlockPos(MX0 + 6, TOP, MZ0 + 5));
+        barb.setNoAi(true);
+        barb.setPersistenceRequired();
+        boolean[] lunged = {false};
+        helper.onEachTick(() -> lunged[0] |= frog.action() == BullfrogEntity.LUNGE);
+        helper.succeedWhen(() -> {
+            helper.assertTrue(lunged[0], "the bullfrog never lunged (barb " + String.format("%.2f", barb.distanceTo(frog)) + " blocks off)");
+            helper.assertTrue(barb.isRemoved() && !frog.isHungry(), "the barb " + (barb.isRemoved() ? "is gone" : "still swims")
+                    + (frog.isHungry() ? ", the frog still hungry" : ""));
+        });
+    }
+
+    /**
+     * The long tongue (the user's 2 blocks): a hungry bullfrog under a fly cloud hanging within reach flicks at it and
+     * eats flies; another under a cloud hanging 3 blocks up (out of reach) never flicks.
+     */
+    @GameTest(template = "arena", timeoutTicks = 400)
+    public static void aBullfrogTonguesFliesOnlyFromACloudInReach(GameTestHelper helper) {
+        bankWithPool(helper);
+        BullfrogEntity near = frogOnBank(helper, MX0 + 2, MZ0 + 2, -90);
+        BullfrogEntity far = frogOnBank(helper, MX0 + 14, MZ0 + 8, -90);
+        near.makeHungry();
+        far.makeHungry();
+        FlyCloudEntity low = cloudAt(helper, near.position().add(1.0, 1.9, 0));
+        FlyCloudEntity high = cloudAt(helper, far.position().add(0.6, 3.5, 0));
+        boolean[] flicked = {false, false};
+        helper.onEachTick(() -> {
+            flicked[0] |= near.action() == BullfrogEntity.TONGUE;
+            flicked[1] |= far.action() == BullfrogEntity.TONGUE;
+        });
+        helper.runAtTickTime(380, () -> {
+            helper.assertTrue(flicked[0] && low.flies() < 4, "the frog under the low cloud " + (flicked[0] ? "flicked" : "never flicked")
+                    + ", its cloud holds " + low.flies() + " of 4 flies");
+            helper.assertTrue(!flicked[1] && high.flies() == 4, "the frog under the cloud 3 blocks up flicked at it (out of reach)");
+            SavannaMod.LOGGER.info("[bullfrog] the frog under the low cloud ate {} flies", 4 - low.flies());
+            helper.succeed();
+        });
+    }
+
+    private static FlyCloudEntity cloudAt(GameTestHelper helper, net.minecraft.world.phys.Vec3 at) {
+        FlyCloudEntity cloud = SavannaEntities.FLY_CLOUD.get().create(helper.getLevel());
+        net.minecraft.nbt.CompoundTag tag = new net.minecraft.nbt.CompoundTag();
+        cloud.saveWithoutId(tag);
+        tag.putBoolean("NoAI", true);
+        tag.putInt("Flies", 4);
+        tag.putInt("Most", 4);
+        tag.putInt("Refill", 99999);
+        cloud.load(tag);
+        cloud.moveTo(at.x, at.y, at.z, 0, 0);
+        cloud.setPersistenceRequired();
+        helper.getLevel().addFreshEntity(cloud);
+        return cloud;
+    }
+
+    /** Bold, not shy: a player standing close makes a bullfrog puff up, then lunge and bite (1 heart). */
+    @GameTest(template = "arena", timeoutTicks = 300)
+    public static void aBullfrogPuffsUpAndBitesAPlayerWhoStaysClose(GameTestHelper helper) {
+        bankWithPool(helper);
+        BullfrogEntity frog = frogOnBank(helper, MX0 + 3, MZ0 + 8, -90);
+        frog.makeHungry();
+        net.minecraft.server.level.ServerPlayer player = MatabeleDefenceTests.survivalPlayer(helper);
+        boolean[] puffed = {false};
+        helper.onEachTick(() -> {
+            player.moveTo(frog.getX() + 1.2, frog.getY(), frog.getZ(), 90.0F, 0.0F);
+            puffed[0] |= frog.action() == BullfrogEntity.PUFF;
+        });
+        helper.succeedWhen(() -> {
+            helper.assertTrue(puffed[0], "the bullfrog never puffed up at the player");
+            helper.assertTrue(player.getHealth() < player.getMaxHealth(), "the bullfrog never bit the player");
+            helper.assertTrue(player.getMaxHealth() - player.getHealth() <= 2.01F, "the bite took " + (player.getMaxHealth() - player.getHealth()) + " health (1 heart wanted)");
+        });
+    }
+
+    /** A Nile monitor coming at a bullfrog on the bank makes it leap into the water (Minecraft's long-jump aim). */
+    @GameTest(template = "arena", timeoutTicks = 300)
+    public static void aBullfrogLeapsIntoTheWaterFromAMonitor(GameTestHelper helper) {
+        bankWithPool(helper);
+        BullfrogEntity frog = frogOnBank(helper, MX0 + 4, MZ0 + 5, -90);
+        frog.ateMeal();
+        var monitor = helper.spawn(SavannaEntities.MONITOR.get(), new BlockPos(MX0 + 1, TOP + 1, MZ0 + 5));
+        monitor.setPersistenceRequired();
+        boolean[] leapt = {false}, wet = {false};
+        helper.onEachTick(() -> {
+            leapt[0] |= frog.action() == BullfrogEntity.LEAP;
+            wet[0] |= leapt[0] && frog.isInWater();     // it may flee on out of so small a pool afterwards
+        });
+        helper.succeedWhen(() -> {
+            helper.assertTrue(leapt[0], "the bullfrog never leapt (monitor " + String.format("%.1f", monitor.distanceTo(frog)) + " blocks off)");
+            helper.assertTrue(wet[0], "the bullfrog leapt but never came down in the water (at " + frog.blockPosition() + ")");
+        });
+    }
+
+    /**
+     * At midday a bullfrog on soft ground by the water digs in backward (only its back and eyes out) and stays dug; a
+     * player coming within 3 blocks brings it out, and once its digging-out clip is over it is a free frog again (a bug
+     * found while building: the digging out never ended, 2026-11-20).
+     */
+    @GameTest(template = "arena", timeoutTicks = 900)
+    public static void aBullfrogDigsInAtMiddayAndComesOutForAPlayer(GameTestHelper helper) {
+        bankWithPool(helper);
+        com.antcolonies.gametest.TestClock.still(helper, 12.0);
+        for (int x = MX0; x <= MX0 + 5; x++) {
+            for (int z = MZ0 + 2; z <= MZ0 + 8; z++) {
+                helper.setBlock(new BlockPos(x, TOP, z), Blocks.DIRT);
+            }
+        }
+        BullfrogEntity frog = frogOnBank(helper, MX0 + 4, MZ0 + 5, 90);
+        frog.ateMeal();
+        net.minecraft.server.level.ServerPlayer player = MatabeleDefenceTests.survivalPlayer(helper);
+        player.moveTo(frog.getX() + 9, frog.getY(), frog.getZ() + 6);
+        int[] dugAt = {-1}, outAt = {-1};
+        helper.onEachTick(() -> {
+            long tick = helper.getTick();
+            if (dugAt[0] < 0 && frog.action() == BullfrogEntity.DUG) {
+                dugAt[0] = (int) tick;
+            }
+            if (dugAt[0] >= 0 && tick < dugAt[0] + 60) {
+                player.moveTo(frog.getX() + 9, frog.getY(), frog.getZ() + 6);       // far off a while: it stays dug
+                helper.assertTrue(frog.isDug(), "the bullfrog came out of the ground with nobody near");
+            } else if (dugAt[0] >= 0) {
+                player.moveTo(frog.getX() + 1.5, frog.getY(), frog.getZ(), 90.0F, 0.0F);
+                if (outAt[0] < 0 && !frog.isDug()) {
+                    outAt[0] = (int) tick;
+                }
+            }
+        });
+        helper.succeedWhen(() -> {
+            helper.assertTrue(dugAt[0] >= 0, "the bullfrog never dug in at midday on soft ground (action " + frog.action() + ")");
+            helper.assertTrue(outAt[0] >= 0, "the bullfrog never finished coming out of the ground for a close player (action " + frog.action() + ")");
+            SavannaMod.LOGGER.info("[bullfrog] dug in at tick {}, out at {}", dugAt[0], outAt[0]);
         });
     }
 }

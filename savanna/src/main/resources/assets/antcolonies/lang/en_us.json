@@ -187,5 +187,12 @@
   "entity.antcolonies.snail": "River Snail",
   "item.antcolonies.snail_spawn_egg": "River Snail Spawn Egg",
   "entity.antcolonies.barb": "River Barb",
-  "item.antcolonies.barb_spawn_egg": "River Barb Spawn Egg"
+  "item.antcolonies.barb_spawn_egg": "River Barb Spawn Egg",
+  "entity.antcolonies.fly_cloud": "Fly Cloud",
+  "item.antcolonies.fly_cloud_spawn_egg": "Fly Cloud Spawn Egg",
+  "subtitles.antcolonies.fly_buzz": "Flies buzz",
+  "entity.antcolonies.bullfrog": "African Bullfrog",
+  "item.antcolonies.bullfrog_spawn_egg": "African Bullfrog Spawn Egg",
+  "subtitles.antcolonies.bullfrog_call": "Bullfrog calls",
+  "subtitles.antcolonies.bullfrog_bark": "Bullfrog barks"
 }

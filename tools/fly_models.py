@@ -24,7 +24,7 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from model_parts import cube, mix, paint_faces, face_point, png   # noqa: E402
+from model_parts import cube, mix, paint_faces, face_point, png, geo, write_assets   # noqa: E402
 
 ROOT = Path(__file__).resolve().parent.parent
 TEXELS = 4               # texture pixels a model pixel: the fly is tiny in the game, so this is only for close up
@@ -265,7 +265,21 @@ def build_cloud_pages():
     print('wrote', out_dir / 'cloud.html', 'and cloud_publish.html')
 
 
+def write_game():
+    """Writes the fly's model and its two textures into the savanna mod (fly clouds step 2, 2026-11-20): the bottle fly
+    (look A) and the house fly (look B), one model; no clips (the cloud's renderer poses each fly itself)."""
+    files = {}
+    for which, name in (('A', 'fly_bottle'), ('B', 'fly_house')):
+        bones, data, w, h = look(which)
+        files[f'textures/entity/{name}.png'] = data
+    files['geo/entity/fly.geo.json'] = geo('fly', bones, w, h, (1, 1, [0, 0.3, 0]))
+    write_assets(files)
+
+
 if __name__ == '__main__':
+    if sys.argv[1:] == ['game']:
+        write_game()
+        sys.exit()
     if sys.argv[1:] == ['cloud']:
         build_cloud_pages()
         sys.exit()

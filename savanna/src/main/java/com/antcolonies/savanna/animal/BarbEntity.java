@@ -159,8 +159,21 @@ public class BarbEntity extends AbstractSchoolingFish implements GeoEntity {
 
     /** Whether it flashes silver now (drawn with the bright flank): in a hard turn or a fast start (client only). */
     public boolean flashing() {
-        return turnTicks > 0 || scatterTicks > 0;
+        String film = filmClip();
+        return turnTicks > 0 || scatterTicks > 0 || film != null && (film.startsWith("turn") || film.equals("scatter"));
     }
+
+    /**
+     * For the in-game camera ({@code client/FilmDirector}, development only): a barb named {@code film:<clip>} plays
+     * only that clip, looping, so every clip can be filmed frame by frame on a still fish. Null for every other barb.
+     */
+    @Nullable
+    private String filmClip() {
+        net.minecraft.network.chat.Component name = getCustomName();
+        return name != null && name.getString().startsWith("film:") ? name.getString().substring(5) : null;
+    }
+
+    private static final java.util.Map<String, RawAnimation> FILM_CLIPS = new java.util.HashMap<>();
 
     @Override
     public void tick() {
@@ -306,6 +319,10 @@ public class BarbEntity extends AbstractSchoolingFish implements GeoEntity {
     private PlayState animate(AnimationState<BarbEntity> state) {
         AnimationController<BarbEntity> player = state.getController();
         player.setAnimationSpeed(1.0);
+        String film = filmClip();
+        if (film != null) {
+            return state.setAndContinue(FILM_CLIPS.computeIfAbsent(film, c -> RawAnimation.begin().thenLoop(c)));
+        }
         if (getVehicle() != null) {         // in a crocodile's jaws: thrashing
             return state.setAndContinue(STRUGGLE);
         }

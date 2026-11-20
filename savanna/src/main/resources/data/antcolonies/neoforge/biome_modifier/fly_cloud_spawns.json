@@ -1,0 +1,12 @@
+{
+  "type": "neoforge:add_spawns",
+  "biomes": "#antcolonies:savanna_waters",
+  "spawners": [
+    {
+      "type": "antcolonies:fly_cloud",
+      "weight": 10,
+      "minCount": 1,
+      "maxCount": 1
+    }
+  ]
+}

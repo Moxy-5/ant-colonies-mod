@@ -2,9 +2,67 @@
   "matabele_squeak": {
     "subtitle": "subtitles.antcolonies.matabele_squeak",
     "sounds": [
-      { "name": "antcolonies:entity/matabele_squeak", "volume": 0.7 },
-      { "name": "antcolonies:entity/matabele_squeak", "volume": 0.7, "pitch": 1.15 },
-      { "name": "antcolonies:entity/matabele_squeak", "volume": 0.7, "pitch": 0.9 }
+      {
+        "name": "antcolonies:entity/matabele_squeak",
+        "volume": 0.7
+      },
+      {
+        "name": "antcolonies:entity/matabele_squeak",
+        "volume": 0.7,
+        "pitch": 1.15
+      },
+      {
+        "name": "antcolonies:entity/matabele_squeak",
+        "volume": 0.7,
+        "pitch": 0.9
+      }
+    ]
+  },
+  "fly_buzz": {
+    "subtitle": "subtitles.antcolonies.fly_buzz",
+    "sounds": [
+      {
+        "name": "antcolonies:entity/fly_buzz",
+        "volume": 0.5,
+        "attenuation_distance": 5,
+        "stream": false
+      }
+    ]
+  },
+  "bullfrog_call": {
+    "subtitle": "subtitles.antcolonies.bullfrog_call",
+    "sounds": [
+      {
+        "name": "antcolonies:entity/bullfrog_call",
+        "volume": 1.0,
+        "attenuation_distance": 32
+      },
+      {
+        "name": "antcolonies:entity/bullfrog_call",
+        "volume": 1.0,
+        "pitch": 0.9,
+        "attenuation_distance": 32
+      },
+      {
+        "name": "antcolonies:entity/bullfrog_call",
+        "volume": 1.0,
+        "pitch": 1.1,
+        "attenuation_distance": 32
+      }
+    ]
+  },
+  "bullfrog_bark": {
+    "subtitle": "subtitles.antcolonies.bullfrog_bark",
+    "sounds": [
+      {
+        "name": "antcolonies:entity/bullfrog_bark",
+        "volume": 0.9
+      },
+      {
+        "name": "antcolonies:entity/bullfrog_bark",
+        "volume": 0.9,
+        "pitch": 1.15
+      }
     ]
   }
 }

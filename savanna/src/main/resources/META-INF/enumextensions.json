@@ -77,6 +77,30 @@
         false,
         128
       ]
+    },
+    {
+      "enum": "net/minecraft/world/entity/MobCategory",
+      "name": "ANTCOLONIES_FLY_CLOUD",
+      "constructor": "(Ljava/lang/String;IZZI)V",
+      "parameters": [
+        "antcolonies:fly_cloud",
+        6,
+        true,
+        false,
+        128
+      ]
+    },
+    {
+      "enum": "net/minecraft/world/entity/MobCategory",
+      "name": "ANTCOLONIES_BULLFROG",
+      "constructor": "(Ljava/lang/String;IZZI)V",
+      "parameters": [
+        "antcolonies:bullfrog",
+        12,
+        true,
+        false,
+        128
+      ]
     }
   ]
 }

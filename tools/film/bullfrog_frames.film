@@ -1,0 +1,363 @@
+# The African bullfrog in the game, frame by frame (prey plan step 3, 2026-11-20; CLAUDE.md's hard rule): every clip
+# on a still frog named film:<clip> (it plays only that clip) from the side, three quarters (front) and the front, the
+# game frozen and stepped a tick or more a picture; the tongue as the real action (film-act:tongue: clip and rope);
+# then free frogs at the pool with a fly cloud. (A camera's height is its feet: the eye is 1.62 above.)
+#   ./gradlew runFilm -PfilmScene=tools/film/bullfrog_frames.film   pictures in run-film/screenshots/bullfrog_frames/
+cmd time set noon
+cmd weather clear
+cmd kill @e[type=!player]
+# the pool: x 30..44, z -8..8, 3 deep, flush with the grass (its top -60); the land frog stands at 36.5 -60 14.5
+cmd fill 30 -63 -8 44 -61 8 minecraft:water
+cmd fill 33 -60 11 40 -57 18 minecraft:air
+lens 40
+wait 40
+cmd summon antcolonies:bullfrog 36.5 -60.0 14.5 {NoAI:1b,PersistenceRequired:1b,Rotation:[-90f,0f],CustomName:'"film:idle"'}
+camera 36.50 -61.42 12.90 0 3
+wait 10
+cmd tick freeze
+burst idle_side 12 10
+cmd tick unfreeze
+cmd tp @e[type=antcolonies:bullfrog] 36 -140 14
+wait 3
+cmd summon antcolonies:bullfrog 36.5 -60.0 14.5 {NoAI:1b,PersistenceRequired:1b,Rotation:[-90f,0f],CustomName:'"film:idle"'}
+camera 37.65 -61.12 13.35 45 12
+wait 10
+cmd tick freeze
+burst idle_threequarter 12 10
+cmd tick unfreeze
+cmd tp @e[type=antcolonies:bullfrog] 36 -140 14
+wait 3
+cmd summon antcolonies:bullfrog 36.5 -60.0 14.5 {NoAI:1b,PersistenceRequired:1b,Rotation:[-90f,0f],CustomName:'"film:idle"'}
+camera 38.10 -61.42 14.50 90 3
+wait 10
+cmd tick freeze
+burst idle_front 12 10
+cmd tick unfreeze
+cmd tp @e[type=antcolonies:bullfrog] 36 -140 14
+wait 3
+cmd summon antcolonies:bullfrog 36.5 -60.0 14.5 {NoAI:1b,PersistenceRequired:1b,Rotation:[-90f,0f],CustomName:'"film:walk"'}
+camera 36.50 -61.42 12.90 0 3
+wait 10
+cmd tick freeze
+burst walk_side 14 2
+cmd tick unfreeze
+cmd tp @e[type=antcolonies:bullfrog] 36 -140 14
+wait 3
+cmd summon antcolonies:bullfrog 36.5 -60.0 14.5 {NoAI:1b,PersistenceRequired:1b,Rotation:[-90f,0f],CustomName:'"film:walk"'}
+camera 37.65 -61.12 13.35 45 12
+wait 10
+cmd tick freeze
+burst walk_threequarter 14 2
+cmd tick unfreeze
+cmd tp @e[type=antcolonies:bullfrog] 36 -140 14
+wait 3
+cmd summon antcolonies:bullfrog 36.5 -60.0 14.5 {NoAI:1b,PersistenceRequired:1b,Rotation:[-90f,0f],CustomName:'"film:walk"'}
+camera 38.10 -61.42 14.50 90 3
+wait 10
+cmd tick freeze
+burst walk_front 14 2
+cmd tick unfreeze
+cmd tp @e[type=antcolonies:bullfrog] 36 -140 14
+wait 3
+cmd summon antcolonies:bullfrog 36.5 -60.0 14.5 {NoAI:1b,PersistenceRequired:1b,Rotation:[-90f,0f],CustomName:'"film:hop"'}
+camera 36.50 -61.42 12.90 0 3
+wait 10
+cmd tick freeze
+burst hop_side 16 1
+cmd tick unfreeze
+cmd tp @e[type=antcolonies:bullfrog] 36 -140 14
+wait 3
+cmd summon antcolonies:bullfrog 36.5 -60.0 14.5 {NoAI:1b,PersistenceRequired:1b,Rotation:[-90f,0f],CustomName:'"film:hop"'}
+camera 37.65 -61.12 13.35 45 12
+wait 10
+cmd tick freeze
+burst hop_threequarter 16 1
+cmd tick unfreeze
+cmd tp @e[type=antcolonies:bullfrog] 36 -140 14
+wait 3
+cmd summon antcolonies:bullfrog 36.5 -60.0 14.5 {NoAI:1b,PersistenceRequired:1b,Rotation:[-90f,0f],CustomName:'"film:hop"'}
+camera 38.10 -61.42 14.50 90 3
+wait 10
+cmd tick freeze
+burst hop_front 16 1
+cmd tick unfreeze
+cmd tp @e[type=antcolonies:bullfrog] 36 -140 14
+wait 3
+cmd summon antcolonies:bullfrog 36.5 -60.0 14.5 {NoAI:1b,PersistenceRequired:1b,Rotation:[-90f,0f],CustomName:'"film:leap"'}
+camera 36.50 -61.42 12.90 0 3
+wait 10
+cmd tick freeze
+burst leap_side 11 2
+cmd tick unfreeze
+cmd tp @e[type=antcolonies:bullfrog] 36 -140 14
+wait 3
+cmd summon antcolonies:bullfrog 36.5 -60.0 14.5 {NoAI:1b,PersistenceRequired:1b,Rotation:[-90f,0f],CustomName:'"film:leap"'}
+camera 37.65 -61.12 13.35 45 12
+wait 10
+cmd tick freeze
+burst leap_threequarter 11 2
+cmd tick unfreeze
+cmd tp @e[type=antcolonies:bullfrog] 36 -140 14
+wait 3
+cmd summon antcolonies:bullfrog 36.5 -60.0 14.5 {NoAI:1b,PersistenceRequired:1b,Rotation:[-90f,0f],CustomName:'"film:leap"'}
+camera 38.10 -61.42 14.50 90 3
+wait 10
+cmd tick freeze
+burst leap_front 11 2
+cmd tick unfreeze
+cmd tp @e[type=antcolonies:bullfrog] 36 -140 14
+wait 3
+cmd summon antcolonies:bullfrog 36.5 -60.0 14.5 {NoAI:1b,PersistenceRequired:1b,Rotation:[-90f,0f],CustomName:'"film:call"'}
+camera 36.50 -61.42 12.90 0 3
+wait 10
+cmd tick freeze
+burst call_side 15 4
+cmd tick unfreeze
+cmd tp @e[type=antcolonies:bullfrog] 36 -140 14
+wait 3
+cmd summon antcolonies:bullfrog 36.5 -60.0 14.5 {NoAI:1b,PersistenceRequired:1b,Rotation:[-90f,0f],CustomName:'"film:call"'}
+camera 37.65 -61.12 13.35 45 12
+wait 10
+cmd tick freeze
+burst call_threequarter 15 4
+cmd tick unfreeze
+cmd tp @e[type=antcolonies:bullfrog] 36 -140 14
+wait 3
+cmd summon antcolonies:bullfrog 36.5 -60.0 14.5 {NoAI:1b,PersistenceRequired:1b,Rotation:[-90f,0f],CustomName:'"film:call"'}
+camera 38.10 -61.42 14.50 90 3
+wait 10
+cmd tick freeze
+burst call_front 15 4
+cmd tick unfreeze
+cmd tp @e[type=antcolonies:bullfrog] 36 -140 14
+wait 3
+cmd summon antcolonies:bullfrog 36.5 -60.0 14.5 {NoAI:1b,PersistenceRequired:1b,Rotation:[-90f,0f],CustomName:'"film:puff"'}
+camera 36.50 -61.42 12.90 0 3
+wait 10
+cmd tick freeze
+burst puff_side 10 4
+cmd tick unfreeze
+cmd tp @e[type=antcolonies:bullfrog] 36 -140 14
+wait 3
+cmd summon antcolonies:bullfrog 36.5 -60.0 14.5 {NoAI:1b,PersistenceRequired:1b,Rotation:[-90f,0f],CustomName:'"film:puff"'}
+camera 37.65 -61.12 13.35 45 12
+wait 10
+cmd tick freeze
+burst puff_threequarter 10 4
+cmd tick unfreeze
+cmd tp @e[type=antcolonies:bullfrog] 36 -140 14
+wait 3
+cmd summon antcolonies:bullfrog 36.5 -60.0 14.5 {NoAI:1b,PersistenceRequired:1b,Rotation:[-90f,0f],CustomName:'"film:puff"'}
+camera 38.10 -61.42 14.50 90 3
+wait 10
+cmd tick freeze
+burst puff_front 10 4
+cmd tick unfreeze
+cmd tp @e[type=antcolonies:bullfrog] 36 -140 14
+wait 3
+cmd summon antcolonies:bullfrog 36.5 -60.0 14.5 {NoAI:1b,PersistenceRequired:1b,Rotation:[-90f,0f],CustomName:'"film:attack"'}
+camera 36.50 -61.42 12.90 0 3
+wait 10
+cmd tick freeze
+burst attack_side 16 1
+cmd tick unfreeze
+cmd tp @e[type=antcolonies:bullfrog] 36 -140 14
+wait 3
+cmd summon antcolonies:bullfrog 36.5 -60.0 14.5 {NoAI:1b,PersistenceRequired:1b,Rotation:[-90f,0f],CustomName:'"film:attack"'}
+camera 37.65 -61.12 13.35 45 12
+wait 10
+cmd tick freeze
+burst attack_threequarter 16 1
+cmd tick unfreeze
+cmd tp @e[type=antcolonies:bullfrog] 36 -140 14
+wait 3
+cmd summon antcolonies:bullfrog 36.5 -60.0 14.5 {NoAI:1b,PersistenceRequired:1b,Rotation:[-90f,0f],CustomName:'"film:attack"'}
+camera 38.10 -61.42 14.50 90 3
+wait 10
+cmd tick freeze
+burst attack_front 16 1
+cmd tick unfreeze
+cmd tp @e[type=antcolonies:bullfrog] 36 -140 14
+wait 3
+cmd summon antcolonies:bullfrog 36.5 -60.0 14.5 {NoAI:1b,PersistenceRequired:1b,Rotation:[-90f,0f],CustomName:'"film-act:tongue"'}
+camera 36.50 -61.37 12.90 0 3
+wait 10
+cmd tick freeze
+burst tongue_side 20 1
+cmd tick unfreeze
+cmd tp @e[type=antcolonies:bullfrog] 36 -140 14
+wait 3
+cmd summon antcolonies:bullfrog 36.5 -60.0 14.5 {NoAI:1b,PersistenceRequired:1b,Rotation:[-90f,0f],CustomName:'"film-act:tongue"'}
+camera 37.65 -61.07 13.35 45 12
+wait 10
+cmd tick freeze
+burst tongue_threequarter 20 1
+cmd tick unfreeze
+cmd tp @e[type=antcolonies:bullfrog] 36 -140 14
+wait 3
+cmd summon antcolonies:bullfrog 36.5 -60.0 14.5 {NoAI:1b,PersistenceRequired:1b,Rotation:[-90f,0f],CustomName:'"film-act:tongue"'}
+camera 38.10 -61.37 14.50 90 3
+wait 10
+cmd tick freeze
+burst tongue_front 20 1
+cmd tick unfreeze
+cmd tp @e[type=antcolonies:bullfrog] 36 -140 14
+wait 3
+# the tongue seen wider (it reaches 1.8 blocks up and ahead)
+lens 60
+cmd summon antcolonies:bullfrog 36.5 -60.0 14.5 {NoAI:1b,PersistenceRequired:1b,Rotation:[-90f,0f],CustomName:'"film-act:tongue"'}
+camera 36.50 -61.02 12.90 0 3
+wait 10
+cmd tick freeze
+burst tongue_wide_side 20 1
+cmd tick unfreeze
+cmd tp @e[type=antcolonies:bullfrog] 36 -140 14
+wait 3
+lens 40
+cmd summon antcolonies:bullfrog 36.5 -60.0 14.5 {NoAI:1b,PersistenceRequired:1b,Rotation:[-90f,0f],CustomName:'"film:death"'}
+camera 36.50 -61.42 12.90 0 3
+wait 10
+cmd tick freeze
+burst death_side 10 2
+cmd tick unfreeze
+cmd tp @e[type=antcolonies:bullfrog] 36 -140 14
+wait 3
+cmd summon antcolonies:bullfrog 36.5 -60.0 14.5 {NoAI:1b,PersistenceRequired:1b,Rotation:[-90f,0f],CustomName:'"film:death"'}
+camera 37.65 -61.12 13.35 45 12
+wait 10
+cmd tick freeze
+burst death_threequarter 10 2
+cmd tick unfreeze
+cmd tp @e[type=antcolonies:bullfrog] 36 -140 14
+wait 3
+cmd summon antcolonies:bullfrog 36.5 -60.0 14.5 {NoAI:1b,PersistenceRequired:1b,Rotation:[-90f,0f],CustomName:'"film:dig_in"'}
+camera 36.50 -61.42 12.90 0 3
+wait 10
+cmd tick freeze
+burst dig_in_side 15 4
+cmd tick unfreeze
+cmd tp @e[type=antcolonies:bullfrog] 36 -140 14
+wait 3
+cmd summon antcolonies:bullfrog 36.5 -60.0 14.5 {NoAI:1b,PersistenceRequired:1b,Rotation:[-90f,0f],CustomName:'"film:dig_in"'}
+camera 37.65 -61.12 13.35 45 12
+wait 10
+cmd tick freeze
+burst dig_in_threequarter 15 4
+cmd tick unfreeze
+cmd tp @e[type=antcolonies:bullfrog] 36 -140 14
+wait 3
+cmd summon antcolonies:bullfrog 36.5 -60.0 14.5 {NoAI:1b,PersistenceRequired:1b,Rotation:[-90f,0f],CustomName:'"film:dug"'}
+camera 36.50 -61.42 12.90 0 3
+wait 10
+cmd tick freeze
+burst dug_side 12 10
+cmd tick unfreeze
+cmd tp @e[type=antcolonies:bullfrog] 36 -140 14
+wait 3
+cmd summon antcolonies:bullfrog 36.5 -60.0 14.5 {NoAI:1b,PersistenceRequired:1b,Rotation:[-90f,0f],CustomName:'"film:dug"'}
+camera 37.65 -61.12 13.35 45 12
+wait 10
+cmd tick freeze
+burst dug_threequarter 12 10
+cmd tick unfreeze
+cmd tp @e[type=antcolonies:bullfrog] 36 -140 14
+wait 3
+cmd summon antcolonies:bullfrog 36.5 -60.0 14.5 {NoAI:1b,PersistenceRequired:1b,Rotation:[-90f,0f],CustomName:'"film:dig_out"'}
+camera 36.50 -61.42 12.90 0 3
+wait 10
+cmd tick freeze
+burst dig_out_side 12 2
+cmd tick unfreeze
+cmd tp @e[type=antcolonies:bullfrog] 36 -140 14
+wait 3
+cmd summon antcolonies:bullfrog 36.5 -60.0 14.5 {NoAI:1b,PersistenceRequired:1b,Rotation:[-90f,0f],CustomName:'"film:dig_out"'}
+camera 37.65 -61.12 13.35 45 12
+wait 10
+cmd tick freeze
+burst dig_out_threequarter 12 2
+cmd tick unfreeze
+cmd tp @e[type=antcolonies:bullfrog] 36 -140 14
+wait 3
+cmd summon antcolonies:bullfrog 36.5 -60.0 14.5 {NoAI:1b,PersistenceRequired:1b,Rotation:[-90f,0f],CustomName:'"film:dig_out"'}
+camera 38.10 -61.42 14.50 90 3
+wait 10
+cmd tick freeze
+burst dig_out_front 12 2
+cmd tick unfreeze
+cmd tp @e[type=antcolonies:bullfrog] 36 -140 14
+wait 3
+cmd summon antcolonies:bullfrog 37.5 -60.62 2.5 {NoAI:1b,PersistenceRequired:1b,Rotation:[-90f,0f],CustomName:'"film:swim"'}
+camera 37.50 -62.14 0.90 0 3
+wait 10
+cmd tick freeze
+burst swim_side 10 2
+cmd tick unfreeze
+cmd tp @e[type=antcolonies:bullfrog] 36 -140 14
+wait 3
+cmd summon antcolonies:bullfrog 37.5 -60.62 2.5 {NoAI:1b,PersistenceRequired:1b,Rotation:[-90f,0f],CustomName:'"film:swim"'}
+camera 38.65 -61.84 1.35 45 12
+wait 10
+cmd tick freeze
+burst swim_threequarter 10 2
+cmd tick unfreeze
+cmd tp @e[type=antcolonies:bullfrog] 36 -140 14
+wait 3
+cmd summon antcolonies:bullfrog 37.5 -60.62 2.5 {NoAI:1b,PersistenceRequired:1b,Rotation:[-90f,0f],CustomName:'"film:swim"'}
+camera 39.10 -62.14 2.50 90 3
+wait 10
+cmd tick freeze
+burst swim_front 10 2
+cmd tick unfreeze
+cmd tp @e[type=antcolonies:bullfrog] 36 -140 14
+wait 3
+cmd summon antcolonies:bullfrog 37.5 -60.3 2.5 {NoAI:1b,PersistenceRequired:1b,Rotation:[-90f,0f],CustomName:'"film:float"'}
+camera 37.50 -61.52 0.90 0 3
+wait 10
+cmd tick freeze
+burst float_side 10 6
+cmd tick unfreeze
+cmd tp @e[type=antcolonies:bullfrog] 36 -140 14
+wait 3
+cmd summon antcolonies:bullfrog 37.5 -60.3 2.5 {NoAI:1b,PersistenceRequired:1b,Rotation:[-90f,0f],CustomName:'"film:float"'}
+camera 38.65 -61.22 1.35 45 12
+wait 10
+cmd tick freeze
+burst float_threequarter 10 6
+cmd tick unfreeze
+cmd tp @e[type=antcolonies:bullfrog] 36 -140 14
+wait 3
+# free frogs at the pool's edge with a fly cloud over the shallows: hops, floats and flicks as they come
+cmd fill 30 -61 9 44 -61 10 minecraft:mud
+cmd summon antcolonies:fly_cloud 37.5 -58.2 7.5 {NoAI:1b,Flies:12,Most:12}
+cmd summon antcolonies:bullfrog 36.5 -60 10.5 {PersistenceRequired:1b,Rotation:[180f,0f]}
+cmd summon antcolonies:bullfrog 38.5 -60 10.5 {PersistenceRequired:1b,Rotation:[180f,0f]}
+cmd summon antcolonies:bullfrog 37.5 -60.3 6.5 {PersistenceRequired:1b}
+camera 41.5 -60.02 13.5 135 22
+wait 20
+shot live_00
+wait 20
+shot live_01
+wait 20
+shot live_02
+wait 20
+shot live_03
+wait 20
+shot live_04
+wait 20
+shot live_05
+wait 20
+shot live_06
+wait 20
+shot live_07
+wait 20
+shot live_08
+wait 20
+shot live_09
+wait 20
+shot live_10
+wait 20
+shot live_11
+wait 20
+cmd tick freeze
+burst live_burst 20 1
+cmd tick unfreeze

@@ -42,8 +42,8 @@ public class BarbFeedGoal extends Goal {
     }
 
     /** Dawn (5:00 to 7:30) or dusk (17:30 to 20:00): the hours small fish rise to the surface. */
-    static boolean dawnOrDusk(Level level) {
-        long time = level.getDayTime() % 24000L;
+    static boolean dawnOrDusk(Level level, net.minecraft.core.BlockPos at) {
+        long time = com.antcolonies.colony.Colony.dayTimeAt(level, at) % 24000L;      // the one shared day clock
         return time >= 23000L || time < 1500L || time >= 11500L && time < 14000L;
     }
 
@@ -52,7 +52,7 @@ public class BarbFeedGoal extends Goal {
         if (!fish.isInWater() || fish.getVehicle() != null) {
             return false;
         }
-        if (dawnOrDusk(fish.level())) {
+        if (dawnOrDusk(fish.level(), fish.blockPosition())) {
             if (fish.getRandom().nextInt(SIP_CHANCE) != 0) {
                 return false;
             }

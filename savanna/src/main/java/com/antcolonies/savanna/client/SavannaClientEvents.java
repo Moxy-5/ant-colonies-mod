@@ -64,6 +64,7 @@ public class SavannaClientEvents {
     /** The camel thorn and baobab sign pictures (Minecraft makes the sign list once; this adds ours if it was early). */
     @SubscribeEvent
     public static void onClientSetup(net.neoforged.fml.event.lifecycle.FMLClientSetupEvent event) {
+        com.antcolonies.savanna.animal.FlyCloudEntity.startBuzz = FlyBuzzSound::start;      // a fly cloud's buzz
         event.enqueueWork(() -> com.antcolonies.savanna.registry.TreeBlocks.WOOD_SETS
                 .forEach(set -> net.minecraft.client.renderer.Sheets.addWoodType(set.type())));
     }
@@ -157,6 +158,8 @@ public class SavannaClientEvents {
         event.registerEntityRenderer(SavannaEntities.CRAB.get(), CrabRenderer::new);
         event.registerEntityRenderer(SavannaEntities.SNAIL.get(), SnailRenderer::new);
         event.registerEntityRenderer(SavannaEntities.BARB.get(), BarbRenderer::new);
+        event.registerEntityRenderer(SavannaEntities.FLY_CLOUD.get(), FlyCloudRenderer::new);
+        event.registerEntityRenderer(SavannaEntities.BULLFROG.get(), BullfrogRenderer::new);
         event.registerEntityRenderer(SavannaEntities.REMAINS.get(), RemainsRenderer::new);
         event.registerEntityRenderer(SavannaEntities.MATABELE_LARVA.get(), context -> new com.antcolonies.client.AntLarvaRenderer(context,
                 ResourceLocation.fromNamespaceAndPath(SavannaMod.MODID, "textures/entity/matabele_larva.png"), SavannaEntities.MATABELE_DRAW_SIZE));

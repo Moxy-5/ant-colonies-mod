@@ -1,0 +1,232 @@
+# The river barb in the game, frame by frame (prey fish plan step 1, 2026-11-20; CLAUDE.md's hard rule): every clip on
+# a still barb named film:<clip> (it plays only that clip), side on, three quarters and (the swimming clips) from the
+# front, the game frozen and stepped a tick or two a picture; then a free school swimming in the pool.
+#   ./gradlew runFilm -PfilmScene=tools/film/barb_frames.film   pictures in run-film/screenshots/barb_frames/
+cmd time set noon
+cmd weather clear
+cmd kill @e[type=!player]
+# the pool: x 30..44, 3 deep, flush with the grass
+cmd fill 30 -63 -8 44 -61 8 minecraft:water
+lens 30
+wait 40
+cmd summon antcolonies:barb 33.5 -62.2 0.5 {NoAI:1b,Rotation:[-90f,0f],CustomName:'"film:idle"'}
+camera 33.50 -63.72 -0.45 0 0
+wait 10
+cmd tick freeze
+burst idle_side 16 2
+cmd tick unfreeze
+cmd tp @e[type=antcolonies:barb] 33 -140 0
+wait 3
+cmd summon antcolonies:barb 33.5 -62.2 0.5 {NoAI:1b,Rotation:[-90f,0f],CustomName:'"film:idle"'}
+camera 32.88 -63.56 -0.12 -45 10
+wait 10
+cmd tick freeze
+burst idle_threequarter 16 2
+cmd tick unfreeze
+cmd tp @e[type=antcolonies:barb] 33 -140 0
+wait 3
+cmd summon antcolonies:barb 33.5 -62.2 0.5 {NoAI:1b,Rotation:[-90f,0f],CustomName:'"film:swim"'}
+camera 33.50 -63.72 -0.45 0 0
+wait 10
+cmd tick freeze
+burst swim_side 9 1
+cmd tick unfreeze
+cmd tp @e[type=antcolonies:barb] 33 -140 0
+wait 3
+cmd summon antcolonies:barb 33.5 -62.2 0.5 {NoAI:1b,Rotation:[-90f,0f],CustomName:'"film:swim"'}
+camera 32.88 -63.56 -0.12 -45 10
+wait 10
+cmd tick freeze
+burst swim_threequarter 9 1
+cmd tick unfreeze
+cmd tp @e[type=antcolonies:barb] 33 -140 0
+wait 3
+cmd summon antcolonies:barb 33.5 -62.2 0.5 {NoAI:1b,Rotation:[-90f,0f],CustomName:'"film:swim"'}
+camera 34.45 -63.72 0.50 90 0
+wait 10
+cmd tick freeze
+burst swim_front 9 1
+cmd tick unfreeze
+cmd tp @e[type=antcolonies:barb] 33 -140 0
+wait 3
+cmd summon antcolonies:barb 33.5 -62.2 0.5 {NoAI:1b,Rotation:[-90f,0f],CustomName:'"film:turn_left"'}
+camera 33.50 -63.72 -0.45 0 0
+wait 10
+cmd tick freeze
+burst turn_left_side 12 1
+cmd tick unfreeze
+cmd tp @e[type=antcolonies:barb] 33 -140 0
+wait 3
+cmd summon antcolonies:barb 33.5 -62.2 0.5 {NoAI:1b,Rotation:[-90f,0f],CustomName:'"film:turn_left"'}
+camera 32.88 -63.56 -0.12 -45 10
+wait 10
+cmd tick freeze
+burst turn_left_threequarter 12 1
+cmd tick unfreeze
+cmd tp @e[type=antcolonies:barb] 33 -140 0
+wait 3
+cmd summon antcolonies:barb 33.5 -62.2 0.5 {NoAI:1b,Rotation:[-90f,0f],CustomName:'"film:turn_left"'}
+camera 34.45 -63.72 0.50 90 0
+wait 10
+cmd tick freeze
+burst turn_left_front 12 1
+cmd tick unfreeze
+cmd tp @e[type=antcolonies:barb] 33 -140 0
+wait 3
+cmd summon antcolonies:barb 33.5 -62.2 0.5 {NoAI:1b,Rotation:[-90f,0f],CustomName:'"film:turn_right"'}
+camera 33.50 -63.72 -0.45 0 0
+wait 10
+cmd tick freeze
+burst turn_right_side 12 1
+cmd tick unfreeze
+cmd tp @e[type=antcolonies:barb] 33 -140 0
+wait 3
+cmd summon antcolonies:barb 33.5 -62.2 0.5 {NoAI:1b,Rotation:[-90f,0f],CustomName:'"film:turn_right"'}
+camera 32.88 -63.56 -0.12 -45 10
+wait 10
+cmd tick freeze
+burst turn_right_threequarter 12 1
+cmd tick unfreeze
+cmd tp @e[type=antcolonies:barb] 33 -140 0
+wait 3
+cmd summon antcolonies:barb 33.5 -62.2 0.5 {NoAI:1b,Rotation:[-90f,0f],CustomName:'"film:turn_right"'}
+camera 34.45 -63.72 0.50 90 0
+wait 10
+cmd tick freeze
+burst turn_right_front 12 1
+cmd tick unfreeze
+cmd tp @e[type=antcolonies:barb] 33 -140 0
+wait 3
+cmd summon antcolonies:barb 33.5 -62.2 0.5 {NoAI:1b,Rotation:[-90f,0f],CustomName:'"film:sip"'}
+camera 33.50 -63.72 -0.45 0 0
+wait 10
+cmd tick freeze
+burst sip_side 14 2
+cmd tick unfreeze
+cmd tp @e[type=antcolonies:barb] 33 -140 0
+wait 3
+cmd summon antcolonies:barb 33.5 -62.2 0.5 {NoAI:1b,Rotation:[-90f,0f],CustomName:'"film:sip"'}
+camera 32.88 -63.56 -0.12 -45 10
+wait 10
+cmd tick freeze
+burst sip_threequarter 14 2
+cmd tick unfreeze
+cmd tp @e[type=antcolonies:barb] 33 -140 0
+wait 3
+cmd summon antcolonies:barb 33.5 -62.2 0.5 {NoAI:1b,Rotation:[-90f,0f],CustomName:'"film:nibble"'}
+camera 33.50 -63.72 -0.45 0 0
+wait 10
+cmd tick freeze
+burst nibble_side 18 2
+cmd tick unfreeze
+cmd tp @e[type=antcolonies:barb] 33 -140 0
+wait 3
+cmd summon antcolonies:barb 33.5 -62.2 0.5 {NoAI:1b,Rotation:[-90f,0f],CustomName:'"film:nibble"'}
+camera 32.88 -63.56 -0.12 -45 10
+wait 10
+cmd tick freeze
+burst nibble_threequarter 18 2
+cmd tick unfreeze
+cmd tp @e[type=antcolonies:barb] 33 -140 0
+wait 3
+cmd summon antcolonies:barb 33.5 -62.2 0.5 {NoAI:1b,Rotation:[-90f,0f],CustomName:'"film:scatter"'}
+camera 33.50 -63.72 -0.45 0 0
+wait 10
+cmd tick freeze
+burst scatter_side 8 1
+cmd tick unfreeze
+cmd tp @e[type=antcolonies:barb] 33 -140 0
+wait 3
+cmd summon antcolonies:barb 33.5 -62.2 0.5 {NoAI:1b,Rotation:[-90f,0f],CustomName:'"film:scatter"'}
+camera 32.88 -63.56 -0.12 -45 10
+wait 10
+cmd tick freeze
+burst scatter_threequarter 8 1
+cmd tick unfreeze
+cmd tp @e[type=antcolonies:barb] 33 -140 0
+wait 3
+cmd summon antcolonies:barb 33.5 -62.2 0.5 {NoAI:1b,Rotation:[-90f,0f],CustomName:'"film:scatter"'}
+camera 34.45 -63.72 0.50 90 0
+wait 10
+cmd tick freeze
+burst scatter_front 8 1
+cmd tick unfreeze
+cmd tp @e[type=antcolonies:barb] 33 -140 0
+wait 3
+# on the grass: stranded and dying
+cmd summon antcolonies:barb 26.5 -60.0 0.5 {NoAI:1b,Rotation:[-90f,0f],CustomName:'"film:flop"'}
+camera 26.50 -61.55 -0.45 0 4
+wait 10
+cmd tick freeze
+burst flop_side 10 1
+cmd tick unfreeze
+cmd tp @e[type=antcolonies:barb] 33 -140 0
+wait 3
+cmd summon antcolonies:barb 26.5 -60.0 0.5 {NoAI:1b,Rotation:[-90f,0f],CustomName:'"film:flop"'}
+camera 25.88 -61.30 -0.12 -45 18
+wait 10
+cmd tick freeze
+burst flop_threequarter 10 1
+cmd tick unfreeze
+cmd tp @e[type=antcolonies:barb] 33 -140 0
+wait 3
+cmd summon antcolonies:barb 26.5 -60.0 0.5 {NoAI:1b,Rotation:[-90f,0f],CustomName:'"film:death"'}
+camera 26.50 -61.55 -0.45 0 4
+wait 10
+cmd tick freeze
+burst death_side 10 2
+cmd tick unfreeze
+cmd tp @e[type=antcolonies:barb] 33 -140 0
+wait 3
+cmd summon antcolonies:barb 26.5 -60.0 0.5 {NoAI:1b,Rotation:[-90f,0f],CustomName:'"film:death"'}
+camera 25.88 -61.30 -0.12 -45 18
+wait 10
+cmd tick freeze
+burst death_threequarter 10 2
+cmd tick unfreeze
+cmd tp @e[type=antcolonies:barb] 33 -140 0
+wait 3
+# a free school of 10 swimming in the pool; the camera rides along with one of them (named film-walker, it lives as
+# usual), from under the water and from the bank above
+cmd summon antcolonies:barb 36.0 -62 -2.0 {CustomName:'"film-walker"'}
+cmd summon antcolonies:barb 36.4 -62 -2.0
+cmd summon antcolonies:barb 36.8 -62 -2.0
+cmd summon antcolonies:barb 36.0 -62 -1.6
+cmd summon antcolonies:barb 36.4 -62 -1.6
+cmd summon antcolonies:barb 36.8 -62 -1.6
+cmd summon antcolonies:barb 36.0 -62 -1.2
+cmd summon antcolonies:barb 36.4 -62 -1.2
+cmd summon antcolonies:barb 36.8 -62 -1.2
+cmd summon antcolonies:barb 36.0 -62 -0.8
+wait 60
+lens 50
+follow 0 0.05 -2.6 0 0
+shot school_under_0
+wait 8
+shot school_under_1
+wait 8
+shot school_under_2
+wait 8
+shot school_under_3
+wait 8
+shot school_under_4
+wait 8
+shot school_under_5
+wait 8
+cmd tick freeze
+burst school_under_burst 16 1
+cmd tick unfreeze
+follow 0 2.2 -2.2 0 42
+shot school_above_0
+wait 8
+shot school_above_1
+wait 8
+shot school_above_2
+wait 8
+shot school_above_3
+wait 8
+shot school_above_4
+wait 8
+shot school_above_5
+follow off
+quit
