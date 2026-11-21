@@ -1,0 +1,159 @@
+{
+ "animal": "otter",
+ "length_px": 41.6,
+ "note": "African River Otter outline (confirmed 2026-11-21): user target 2.6 blocks long (41.6 model px at 16 px/block), with +0.4 blocks (6.4 px) in the sleek arched torso between hips and shoulders. ~1.0 block tall at crown (16.0 px; 12.3 px arched back), ~0.60 blocks wide (9.6 px). x from tail tip (0) to snout tip (41.6).",
+ "marks": [
+  {
+   "name": "eye",
+   "side": [36.8, 38.2, 12.6, 14.0],
+   "top": [36.8, 38.2, 2.2, 3.6],
+   "front": [2.2, 3.6, 12.6, 14.0],
+   "colour": "#111111"
+  },
+  {
+   "name": "eye (right)",
+   "top": [36.8, 38.2, -3.6, -2.2],
+   "front": [-3.6, -2.2, 12.6, 14.0],
+   "colour": "#111111"
+  },
+  {
+   "name": "nose",
+   "side": [40.6, 41.6, 11.4, 12.8],
+   "top": [40.6, 41.6, -1.3, 1.3],
+   "front": [-1.3, 1.3, 11.4, 12.8],
+   "colour": "#241914"
+  },
+  {
+   "name": "surface waterline",
+   "side": [0, 41.6, 11.0, 11.3],
+   "front": [-5.5, 5.5, 11.0, 11.3],
+   "colour": "#2b7de9"
+  }
+ ],
+ "parts": [
+  {
+   "name": "tail tip",
+   "side": [0.0, 2.8, 1.6, 3.8],
+   "half_width": 1.1
+  },
+  {
+   "name": "tail outer",
+   "side": [2.8, 5.5, 1.6, 5.0],
+   "half_width": 1.7
+  },
+  {
+   "name": "tail mid",
+   "side": [5.5, 8.2, 1.8, 6.9],
+   "half_width": 2.3
+  },
+  {
+   "name": "tail inner",
+   "side": [8.2, 10.8, 2.6, 9.2],
+   "half_width": 3.0
+  },
+  {
+   "name": "rump",
+   "side": [10.8, 14.5, 3.4, 11.6],
+   "half_width": 4.3
+  },
+  {
+   "name": "hips",
+   "side": [14.5, 18.8, 3.1, 12.0],
+   "half_width": 4.65
+  },
+  {
+   "name": "waist",
+   "side": [18.8, 24.0, 3.2, 12.3],
+   "half_width": 4.6
+  },
+  {
+   "name": "ribs",
+   "side": [24.0, 29.0, 3.1, 12.1],
+   "half_width": 4.6
+  },
+  {
+   "name": "chest",
+   "side": [29.0, 32.6, 3.5, 12.4],
+   "half_width": 4.6
+  },
+  {
+   "name": "neck lower",
+   "side": [32.0, 34.8, 5.5, 14.4],
+   "half_width": 4.2
+  },
+  {
+   "name": "neck upper",
+   "side": [33.8, 36.6, 7.6, 15.2],
+   "half_width": 4.1
+  },
+  {
+   "name": "head skull",
+   "side": [34.4, 39.2, 9.0, 15.6],
+   "half_width": 4.4
+  },
+  {
+   "name": "head crown",
+   "side": [35.0, 38.8, 15.0, 16.0],
+   "half_width": 3.6
+  },
+  {
+   "name": "muzzle",
+   "side": [38.6, 41.4, 9.6, 13.6],
+   "half_width": 3.8
+  },
+  {
+   "name": "nose pad",
+   "side": [40.8, 41.6, 11.4, 13.0],
+   "half_width": 1.4
+  },
+  {
+   "name": "ear",
+   "side": [33.9, 35.7, 13.4, 15.2],
+   "top": [33.9, 35.7, 3.6, 4.8],
+   "front": [3.6, 4.8, 13.4, 15.2],
+   "mirror": true
+  },
+  {
+   "name": "hind upper",
+   "side": [12.0, 16.5, 3.5, 9.5],
+   "top": [12.0, 16.5, 1.5, 4.7],
+   "front": [1.5, 4.7, 3.5, 9.5],
+   "mirror": true
+  },
+  {
+   "name": "hind lower",
+   "side": [11.6, 14.4, 1.4, 4.2],
+   "top": [11.6, 14.4, 1.5, 4.2],
+   "front": [1.5, 4.2, 1.4, 4.2],
+   "mirror": true
+  },
+  {
+   "name": "hind paw",
+   "side": [12.2, 16.5, 0.0, 1.7],
+   "top": [12.2, 16.5, 1.2, 4.5],
+   "front": [1.2, 4.5, 0.0, 1.7],
+   "mirror": true
+  },
+  {
+   "name": "front upper",
+   "side": [28.2, 32.0, 3.8, 9.8],
+   "top": [28.2, 32.0, 1.4, 4.7],
+   "front": [1.4, 4.7, 3.8, 9.8],
+   "mirror": true
+  },
+  {
+   "name": "front lower",
+   "side": [29.2, 32.0, 1.4, 4.5],
+   "top": [29.2, 32.0, 1.4, 4.3],
+   "front": [1.4, 4.3, 1.4, 4.5],
+   "mirror": true
+  },
+  {
+   "name": "front paw",
+   "side": [30.0, 34.0, 0.0, 1.7],
+   "top": [30.0, 34.0, 1.2, 4.6],
+   "front": [1.2, 4.6, 0.0, 1.7],
+   "mirror": true
+  }
+ ]
+}

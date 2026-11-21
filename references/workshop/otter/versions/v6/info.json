@@ -1,0 +1,16 @@
+{
+ "note": "v6: sculpted outer haunches + tucked flanks, zero leg phasing",
+ "date": "2026-11-21",
+ "boxes": 101,
+ "numbers": {
+  "BODY_EXTRA": 6.4,
+  "BACK_H": 12.0,
+  "ARCH_DEG": 3.5,
+  "BODY_HW": 4.65,
+  "NECK_PITCH": 34.0,
+  "NECK_LEN": 4.6,
+  "HEAD_PITCH": 2.0,
+  "TAIL_LEN": 12.2,
+  "WHISKER_LEN": 3.2
+ }
+}

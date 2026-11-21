@@ -1,0 +1,31 @@
+{
+  "length_blocks": 2.2,
+  "_note": "African River Otter (Aonyx capensis) ortho sheet cut from user AI inspiration sheet (otter_sheet.png, 2026-11-21). User target length: 2.2 blocks.",
+  "views": {
+    "side": {
+      "box": [
+        14,
+        26,
+        463,
+        241
+      ],
+      "head": "left"
+    },
+    "front": {
+      "box": [
+        467,
+        20,
+        604,
+        241
+      ]
+    }
+  },
+  "marks": {
+    "snout": 24,
+    "head_back": 132,
+    "shoulders": 189,
+    "hips": 306,
+    "tail_base": 330
+  },
+  "background_tolerance": 25
+}

@@ -1,0 +1,175 @@
+{
+ "animal": "otter",
+ "length_blocks": 2.2,
+ "picture_px_per_block": 195.0,
+ "views": {
+  "side": {
+   "width_blocks": 2.2,
+   "height_blocks": 1.0
+  },
+  "front": {
+   "width_blocks": 0.6,
+   "height_blocks": 1.031
+  }
+ },
+ "side_profile": [
+  {
+   "at": 0.021,
+   "top": 1.0,
+   "under": 0.108
+  },
+  {
+   "at": 0.062,
+   "top": 0.246,
+   "under": 0.092
+  },
+  {
+   "at": 0.104,
+   "top": 0.292,
+   "under": 0.092
+  },
+  {
+   "at": 0.146,
+   "top": 0.338,
+   "under": 0.092
+  },
+  {
+   "at": 0.188,
+   "top": 0.4,
+   "under": 0.108
+  },
+  {
+   "at": 0.229,
+   "top": 0.477,
+   "under": 0.108
+  },
+  {
+   "at": 0.271,
+   "top": 0.554,
+   "under": 0.138
+  },
+  {
+   "at": 0.312,
+   "top": 0.646,
+   "under": 0.169
+  },
+  {
+   "at": 0.354,
+   "top": 0.708,
+   "under": 0.015
+  },
+  {
+   "at": 0.396,
+   "top": 0.738,
+   "under": 0.015
+  },
+  {
+   "at": 0.438,
+   "top": 0.738,
+   "under": 0.0
+  },
+  {
+   "at": 0.479,
+   "top": 0.738,
+   "under": 0.215
+  },
+  {
+   "at": 0.521,
+   "top": 0.738,
+   "under": 0.2
+  },
+  {
+   "at": 0.562,
+   "top": 0.738,
+   "under": 0.185
+  },
+  {
+   "at": 0.604,
+   "top": 0.723,
+   "under": 0.185
+  },
+  {
+   "at": 0.646,
+   "top": 0.738,
+   "under": 0.092
+  },
+  {
+   "at": 0.688,
+   "top": 0.8,
+   "under": 0.0
+  },
+  {
+   "at": 0.729,
+   "top": 0.908,
+   "under": 0.0
+  },
+  {
+   "at": 0.771,
+   "top": 0.938,
+   "under": 0.323
+  },
+  {
+   "at": 0.812,
+   "top": 0.954,
+   "under": 0.4
+  },
+  {
+   "at": 0.854,
+   "top": 0.954,
+   "under": 0.492
+  },
+  {
+   "at": 0.896,
+   "top": 0.954,
+   "under": 0.554
+  },
+  {
+   "at": 0.938,
+   "top": 0.938,
+   "under": 0.585
+  },
+  {
+   "at": 0.979,
+   "top": 0.862,
+   "under": 0.646
+  }
+ ],
+ "height_blocks": 1.0,
+ "belly_clearance_blocks": 0.092,
+ "length_to_height": 2.2,
+ "marks": {
+  "snout": 1.0,
+  "head_back": 0.748,
+  "shoulders": 0.615,
+  "hips": 0.343,
+  "tail_base": 0.287
+ },
+ "head_share": 0.252,
+ "tail_share": 0.287,
+ "colours": [
+  {
+   "hex": "#563a2e",
+   "share": 0.234
+  },
+  {
+   "hex": "#34221a",
+   "share": 0.195
+  },
+  {
+   "hex": "#4d3126",
+   "share": 0.173
+  },
+  {
+   "hex": "#3d2e26",
+   "share": 0.158
+  },
+  {
+   "hex": "#6a4e41",
+   "share": 0.128
+  },
+  {
+   "hex": "#a4846b",
+   "share": 0.112
+  }
+ ]
+}

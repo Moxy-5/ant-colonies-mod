@@ -1,0 +1,32 @@
+{
+  "length_blocks": 2.6,
+  "views": {
+    "side": {
+      "box": [
+        20,
+        20,
+        476,
+        220
+      ],
+      "head": "right"
+    },
+    "top": {
+      "box": [
+        20,
+        220,
+        476,
+        356
+      ],
+      "head": "right"
+    },
+    "front": {
+      "box": [
+        476,
+        20,
+        612,
+        220
+      ]
+    }
+  },
+  "made_by": "python tools/workshop.py outline otter (from references/outlines/otter.json)"
+}

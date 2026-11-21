@@ -1,0 +1,199 @@
+{
+  "model": "otter",
+  "about": "The African river otter's body plan (the Animal Maker Engine, Upright Four Legs + Aquatic Extras): 2.6 blocks long (41.6 px) x 1.0 block tall at crown (16.0 px) at scale 1.0 (16 px = 1 block). Read by tools/clip_check.py, tools/body_plan.py and the game.",
+  "family": "upright_four_legs",
+  "root": "root",
+  "forebody": "chest",
+  "head": {
+    "bone": "head",
+    "jaws": [
+      "jaw"
+    ],
+    "sockets": {
+      "carry": "carry"
+    }
+  },
+  "chain": [
+    "head",
+    "neck",
+    "chest",
+    "ribs",
+    "waist",
+    "hips",
+    "tail_1",
+    "tail_2",
+    "tail_3",
+    "tail_4",
+    "tail_5"
+  ],
+  "legs": {
+    "l1": [
+      "leg_fl_1",
+      "leg_fl_2",
+      "leg_fl_paw"
+    ],
+    "r1": [
+      "leg_fr_1",
+      "leg_fr_2",
+      "leg_fr_paw"
+    ],
+    "l2": [
+      "leg_bl_1",
+      "leg_bl_2",
+      "leg_bl_paw"
+    ],
+    "r2": [
+      "leg_br_1",
+      "leg_br_2",
+      "leg_br_paw"
+    ]
+  },
+  "bones": {
+    "root": "root",
+    "body": "body",
+    "hips": "hips",
+    "rump": "rump",
+    "tail_1": "tail_1",
+    "tail_2": "tail_2",
+    "tail_3": "tail_3",
+    "tail_4": "tail_4",
+    "tail_5": "tail_5",
+    "waist": "waist",
+    "ribs": "ribs",
+    "chest": "chest",
+    "neck": "neck",
+    "head": "head",
+    "snout_bridge": "snout_bridge",
+    "ear_left": "ear_left",
+    "ear_right": "ear_right",
+    "eye_left": "eye_left",
+    "eye_right": "eye_right",
+    "lid_left": "lid_left",
+    "lid_right": "lid_right",
+    "whisker_left": "whisker_left",
+    "whisker_right": "whisker_right",
+    "jaw": "jaw",
+    "tongue": "tongue",
+    "carry": "carry",
+    "leg_fl_1": "leg_fl_1",
+    "leg_fl_2": "leg_fl_2",
+    "leg_fl_paw": "leg_fl_paw",
+    "leg_fr_1": "leg_fr_1",
+    "leg_fr_2": "leg_fr_2",
+    "leg_fr_paw": "leg_fr_paw",
+    "leg_bl_1": "leg_bl_1",
+    "leg_bl_2": "leg_bl_2",
+    "leg_bl_paw": "leg_bl_paw",
+    "leg_br_1": "leg_br_1",
+    "leg_br_2": "leg_br_2",
+    "leg_br_paw": "leg_br_paw"
+  },
+  "checks": {
+    "about": "Offline checks for tools/clip_check.py (adult scale 1.0: 1 px = 0.0625 blocks). Update controller once OtterEntity.java lands.",
+    "px": 0.0625,
+    "blend": 4,
+    "water": [
+      "swim",
+      "dive_swim"
+    ],
+    "surface": 11.3,
+    "float_depth": 11.3,
+    "surface_marks": [
+      {
+        "label": "eyes",
+        "prefix": "eye",
+        "edge": "top"
+      },
+      {
+        "label": "ears",
+        "prefix": "ear",
+        "edge": "top"
+      },
+      {
+        "label": "back",
+        "prefix": "waist",
+        "edge": "top"
+      }
+    ],
+    "feet_parts": [
+      "paw"
+    ],
+    "feet_free": [
+      "walk",
+      "bound",
+      "swim",
+      "dive_swim",
+      "forage_feel",
+      "play_up",
+      "play_rear",
+      "play_down",
+      "rest_down",
+      "rest",
+      "rest_up",
+      "death"
+    ],
+    "tuck_ok": [
+      "swim",
+      "dive_swim",
+      "rest_down",
+      "rest",
+      "rest_up",
+      "death",
+      "enter_water_1000",
+      "dive_in_1000",
+      "exit_water_1000"
+    ],
+    "body_bones": [
+      "hips",
+      "waist",
+      "ribs",
+      "chest"
+    ],
+    "walks": {
+      "walk": 17.969,
+      "bound": 32.0
+    },
+    "switches": [
+      ["idle", "walk"],
+      ["walk", "idle"],
+      ["walk", "bound"],
+      ["bound", "walk"],
+      ["bound", "bite"],
+      ["bite", "idle"],
+      ["idle", "bite"],
+      ["idle", "forage_feel"],
+      ["forage_feel", "idle"],
+      ["forage_feel", "bite"],
+      ["idle", "eat"],
+      ["eat", "idle"],
+      ["idle", "play_up"],
+      ["play_up", "play_rear"],
+      ["play_rear", "play_down"],
+      ["play_down", "idle"],
+      ["idle", "shake_dry"],
+      ["shake_dry", "idle"],
+      ["idle", "rest_down"],
+      ["rest_down", "rest"],
+      ["rest", "rest_up"],
+      ["rest_up", "idle"],
+      ["swim", "dive_swim"],
+      ["dive_swim", "swim"],
+      ["walk", "swim"],
+      ["swim", "walk"],
+      ["walk", "step_up_1000"],
+      ["step_up_1000", "idle"],
+      ["step_up_1000", "walk"],
+      ["walk", "step_down_1000"],
+      ["step_down_1000", "idle"],
+      ["step_down_1000", "walk"],
+      ["walk", "enter_water_1000"],
+      ["enter_water_1000", "swim"],
+      ["walk", "dive_in_1000"],
+      ["bound", "dive_in_1000"],
+      ["dive_in_1000", "dive_swim"],
+      ["swim", "exit_water_1000"],
+      ["exit_water_1000", "idle"],
+      ["exit_water_1000", "walk"]
+    ]
+  }
+}

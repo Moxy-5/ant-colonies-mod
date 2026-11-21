@@ -1,0 +1,16 @@
+{
+ "note": "stage 3+4 polish: flush snout bridge, smooth whiskers, feathered cheeks & brighter speckled chest bib",
+ "date": "2026-11-21",
+ "boxes": 98,
+ "numbers": {
+  "BODY_EXTRA": 6.4,
+  "BACK_H": 12.0,
+  "ARCH_DEG": 3.5,
+  "BODY_HW": 4.65,
+  "NECK_PITCH": 34.0,
+  "NECK_LEN": 4.6,
+  "HEAD_PITCH": 2.0,
+  "TAIL_LEN": 12.2,
+  "WHISKER_LEN": 3.2
+ }
+}

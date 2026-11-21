@@ -1,0 +1,14 @@
+{
+ "note": "stage 2: plain 3D shape",
+ "date": "2026-11-21",
+ "boxes": 99,
+ "numbers": {
+  "BACK_H": 12.0,
+  "BODY_HW": 4.65,
+  "NECK_PITCH": 34.0,
+  "NECK_LEN": 4.6,
+  "HEAD_PITCH": 2.0,
+  "TAIL_LEN": 12.2,
+  "WHISKER_LEN": 3.2
+ }
+}
