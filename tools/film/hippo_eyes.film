@@ -1,0 +1,50 @@
+# The hippo's eyes (2026-11-21, the user's ask): its pupils slide and its head turns toward what catches its eye, the
+# player (the camera, a spectator) or a crocodile come near. A bull standing still facing west (its head toward -x, its
+# eyes about x 18.8, y -58.45, z 17); the camera walks round its head, then stands far off while a crocodile lies to its
+# right, and last jumps from ahead to behind its left side, stepped 2 ticks a picture to see the dart and the head follow.
+#   ./gradlew runFilm -PfilmScene=tools/film/hippo_eyes.film      pictures in run-film/screenshots/hippo_eyes/
+cmd time set noon
+cmd weather clear
+cmd kill @e[type=!player]
+cmd fill 0 -61 0 40 -50 34 minecraft:air
+cmd fill 0 -61 0 40 -61 34 minecraft:grass_block
+lens 40
+wait 40
+cmd summon antcolonies:hippo 20.5 -60 17.0 {NoAI:1b,Rotation:[90f,0f],OwnSize:1.0f}
+lens 30
+camera 15.3 -60.0 17.0 -90 1
+wait 40
+shot eye_ahead
+camera 16.3 -60.0 19.5 -135 1
+wait 30
+shot eye_ahead_left
+camera 18.8 -60.0 20.5 180 1
+wait 30
+shot eye_left
+camera 22.3 -60.0 19.5 125.5 1
+wait 30
+shot eye_behind_left
+camera 16.3 -60.0 14.5 -45 1
+wait 30
+shot eye_ahead_right
+camera 22.3 -60.0 14.5 54.5 1
+wait 30
+shot eye_behind_right
+# a crocodile 6 blocks to its left (south), lying still: watched before the player (the camera 11 blocks off
+# to its right front); then the crocodile gone, the same camera: its eyes come back to the player
+cmd summon antcolonies:crocodile 18.5 -60 23.0 {NoAI:1b,Rotation:[180f,0f]}
+lens 18
+camera 12.0 -60.0 8.0 -37 0
+wait 60
+shot croc_there
+cmd kill @e[type=antcolonies:crocodile]
+wait 60
+shot croc_gone
+# the jump: from ahead to behind its left side, stepped
+lens 30
+camera 15.3 -60.0 17.0 -90 1
+wait 60
+camera 22.3 -60.0 19.5 125.5 1
+cmd tick freeze
+burst jump 12 2
+cmd tick unfreeze

@@ -77,7 +77,7 @@ function loadTexture(uri, rx, ry) {
 }
 
 // The bank: silt land for z below 0, a shallow shelf of water out to z = shelfTo, then the deep bed.
-const S = DATA.scene, W = 200;
+const S = DATA.scene, W = 260;
 function flat(tex, w, d, x, y, z, colour) {
   const m = new THREE.Mesh(new THREE.PlaneGeometry(w, d),
     new THREE.MeshLambertMaterial({map: loadTexture(DATA.blocks[tex], w, d), color: colour || '#ffffff'}));

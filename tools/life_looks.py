@@ -300,6 +300,140 @@ def monitor_looks():
     return out
 
 
+# ---- the hippo's calf and teen (the user, 2026-11-21: "I love baby hippos") -----------------------------------------
+# Real hippos: a newborn is about a quarter of a bull's length, rounder, with a big head, a short blunt snout, big
+# eyes and ears for its size, no tusks showing and pinker, smoother skin; it rests on its mother's back in deep water.
+# A teen (a few years old) is the gangly stage: slimmer, longer in the leg, the snout lengthening, small tusks, the
+# skin darkening to the grown slate. Both are made from the grown model's own sliders and bones (my picks).
+
+HIPPO_HEAD = ('head', 'ear_left', 'ear_right', 'eye_left', 'eye_right', 'lid_left', 'lid_right', 'jaw', 'tongue',
+              'pupil_left', 'pupil_right')
+
+HIPPO_CALF = {'sliders': {'HEIGHT': 30.0, 'BARREL_HW': 15.5, 'MUZZLE_LEN': 7.0, 'MUZZLE_HW': 9.0, 'LEG_H': 11.5},
+              'head': 1.38, 'ears': 1.1, 'eyes': 1.0, 'stubby': 0.8, 'tusks': 0.0, 'brow_lift': 1.0,
+              'colours': {'C_HIDE_DARK': (124, 94, 96), 'C_HIDE_MID': (150, 114, 112), 'C_HIDE_LIGHT': (166, 128, 124),
+                          'C_MUZZLE': (150, 112, 112), 'C_MUZZLE_DOT': (128, 94, 96),
+                          'C_PINK_BELLY': (204, 144, 142), 'C_PINK_FOLD': (190, 130, 128)}}
+HIPPO_TEEN = {'sliders': {'HEIGHT': 30.0, 'BARREL_HW': 13.5, 'MUZZLE_LEN': 9.5, 'MUZZLE_HW': 9.5, 'LEG_H': 14.5},
+              'head': 1.08, 'ears': 1.08, 'eyes': 1.0, 'stubby': 1.0, 'tusks': 0.55,
+              'colours': {'C_HIDE_DARK': (100, 80, 84), 'C_HIDE_MID': (124, 99, 101), 'C_HIDE_LIGHT': (138, 110, 112),
+                          'C_MUZZLE': (120, 96, 99), 'C_MUZZLE_DOT': (94, 74, 78),
+                          'C_PINK_BELLY': (182, 126, 128), 'C_PINK_FOLD': (166, 112, 114)}}
+
+
+def _grow_about(b, centre, k):
+    """Scale a bone's pivot and cubes by k in every direction about centre."""
+    def at(p):
+        return [centre[i] + (p[i] - centre[i]) * k for i in range(3)]
+    b['pivot'] = at(b['pivot'])
+    for c in b.get('cubes', []):
+        c['origin'] = at(c['origin'])
+        c['size'] = [s * k for s in c['size']]
+        if 'pivot' in c:
+            c['pivot'] = at(c['pivot'])
+        if '_eye' in c:                                  # the eye's paint strip follows its box
+            e = c['_eye']
+            e['x_in'] = centre[0] + (e['x_in'] - centre[0]) * k
+            e['y1'] = centre[1] + (e['y1'] - centre[1]) * k
+            e['z0'] = centre[2] + (e['z0'] - centre[2]) * k
+            for n in ('h', 'w_front', 'w_outer'):
+                e[n] *= k
+
+
+def _soften_brow(bones, r):
+    """The calf's softer brow (the user, 2026-11-21, "soften it"): each eye r px taller at the top, the brow ridge over
+    it r px thinner from below (its top stays) and no longer jutting past the eye's front, so the eye looks open, not
+    frowning. The eyelid stays hidden in the thinner brow at rest, so it is cut to fit; a calf blink in the game will
+    need its own lid move (the grown clip drops the lid 2.65 px, sized for the grown eye)."""
+    for name in ('eye_left', 'eye_right'):
+        for c in bone(bones, name)['cubes']:
+            c['size'][1] += r
+            c['_eye']['y1'] += r
+            c['_eye']['h'] += r
+    brow_top = None
+    for c in bone(bones, 'head')['cubes']:
+        if c['_part'] == 'hide_top' and abs(c['size'][0] - 5.65) < 0.01:      # the two brow ridges over the eyes
+            c['origin'][1] += r
+            c['size'][1] -= r
+            front = c['origin'][2]
+            c['origin'][2] = front + 0.3                                       # flush with the eye's front, no overhang
+            c['size'][2] -= 0.3
+            brow_top = c['origin'][1] + c['size'][1]
+    for name in ('pupil_left', 'pupil_right'):                              # a bigger pupil
+        for c in bone(bones, name)['cubes']:
+            c['size'][1] += r * 0.7
+            c['size'][2] += 0.6
+    for name in ('lid_left', 'lid_right'):
+        b = bone(bones, name)
+        b['pivot'][1] += r
+        for c in b['cubes']:
+            c['origin'][1] += r
+            c['size'][1] = brow_top - 0.05 - c['origin'][1]
+
+
+def hippo_young_model(spec):
+    """The calf or teen bones from the hippo's model maker: its sliders set for the young body, the head (and the ears,
+    a little more) grown about the head's pivot, the tusks shrunk or gone."""
+    import hippo_models as hm
+    with Recolour(hm, consts=spec['sliders']):
+        bones = hm.build_bones()
+    if spec.get('brow_lift'):
+        _soften_brow(bones, spec['brow_lift'])
+    k = spec['stubby']                       # a shorter, rounder body (lengths along z only)
+    if k != 1.0:
+        for b in bones:
+            b['pivot'][2] *= k
+            for c in b.get('cubes', []):
+                c['origin'][2] *= k
+                c['size'][2] *= k
+                if 'pivot' in c:
+                    c['pivot'][2] *= k
+                if '_eye' in c:
+                    c['_eye']['z0'] *= k
+                    c['_eye']['w_outer'] *= k
+    head_pivot = list(bone(bones, 'head')['pivot'])
+    for b in bones:
+        if b['name'] in HIPPO_HEAD:
+            _grow_about(b, head_pivot, spec['head'])
+    for name in ('ear_left', 'ear_right'):
+        b = bone(bones, name)
+        _grow_about(b, list(b['pivot']), spec['ears'] / spec['head'])
+    for name in ('eye_left', 'eye_right', 'lid_left', 'lid_right'):
+        b = bone(bones, name)
+        _grow_about(b, list(b['pivot']), spec['eyes'])
+    for b in bones:
+        keep = []
+        for c in b.get('cubes', []):
+            if c['_part'] != 'tusk':
+                keep.append(c)
+            elif spec['tusks'] > 0:
+                c['size'] = [c['size'][0] * spec['tusks'] ** 0.5, c['size'][1] * spec['tusks'], c['size'][2]]
+                keep.append(c)
+        b['cubes'] = keep
+    return bones, spec
+
+
+def hippo_paint(bones, colours=None):
+    import hippo_models as hm
+    with Recolour(hm, consts=colours or {}):
+        return mp.paint_faces(bones, texels=1, colour=hm.paint_colour)
+
+
+# The calf's eyes (the user, 2026-11-21: "cuter, mostly in the eyes ... black and white instead of amber"): a big
+# glossy black pupil on white, a white glint wrapping the top front corner, no hooded brow shadow.
+CALF_EYE = {"front": ["BBB", "BBB", "BBB"], "outer": ["BBB", "BBB", "BBK"]}     # white; the pupil is its own box
+
+
+def hippo_looks():
+    import hippo_models as hm
+    out = {'hippo_adult': hippo_paint(hm.build_bones())}
+    calf_eyes = {'EYE_STYLES': dict(hm.EYE_STYLES, calf=CALF_EYE), 'EYE_STYLE': 'calf'}
+    for key, spec, extra in (('hippo_calf', HIPPO_CALF, calf_eyes), ('hippo_teen', HIPPO_TEEN, {})):
+        bones, spec = hippo_young_model(spec)
+        out[key] = hippo_paint(bones, dict(spec['colours'], **extra))
+    return out
+
+
 # ---- the props: eggs, nests, the mound --------------------------------------------------------------------------------
 
 EGG_CREAM = '#efe9d8'
@@ -524,13 +658,44 @@ def groups():
                         item('croc_adult', 8.0, 0.0, BANK, -7.5, 'Grown male, 8 blocks', 90)],
               'props': [], 'labels': [],
               'cam': [[-12.5, 6.5, 9.5], [-0.5, 0.6, -4.5]]})
+    g.append({'key': 'hippo', 'name': 'Hippo', 'x': 100,
+              'note': 'The bull (5 blocks) and a cow (4.6) on the bank. A newborn calf (1.6) pressed to her side: '
+                      'round, big-headed, a short blunt snout, big eyes and ears, no tusks, pinker skin. In the deep '
+                      'water a cow afloat with an older calf (2.25) resting on her back, as real calves do. A teen '
+                      '(3.5) by the water: gangly, slimmer and longer in the leg, the snout lengthening, small tusks, '
+                      'the skin darkening toward the grown slate.',
+              'player': [-8.0, -2.5],
+              'items': [item('hippo_adult', 5.0, -3.0, BANK, -7.0, 'Bull, 5 blocks', 90),
+                        item('hippo_teen', 3.5, -3.5, BANK, -4.0, 'Teen, 3.5', 100),
+                        item('hippo_adult', 4.6, 1.0, BANK, -1.9, 'Cow, 4.6', 80),
+                        item('hippo_calf', 1.6, 2.6, BANK, -0.5, 'Newborn calf, 1.6', 70),
+                        item('hippo_adult', 4.6, 0.0, SURFACE - 1.24, 6.0, 'Cow afloat', 260),
+                        item('hippo_calf', 2.25, -0.2, SURFACE - 1.24 + 1.65, 6.0, 'Calf on her back, 2.25', 260)],
+              'props': [], 'labels': [],
+              'cam': [[-2.0, 8.5, 17.0], [-0.5, 0.0, -0.5]]})
+    g.append({'key': 'hippoyoung', 'name': 'Hippo young, close', 'x': 115,
+              'note': 'The newborn calf, the older calf and the teen side by side, close up.',
+              'player': [-4.5, -1.5],
+              'items': [item('hippo_calf', 1.6, -1.6, BANK, -1.2, 'Newborn, 1.6', 90),
+                        item('hippo_calf', 2.25, 1.0, BANK, -1.2, 'Calf, 2.25', 90),
+                        item('hippo_teen', 3.5, -0.5, BANK, -3.6, 'Teen, 3.5', 90)],
+              'props': [], 'labels': [],
+              'cam': [[-0.3, 1.6, 4.4], [-0.3, 0.5, -2.0]]})
+    g.append({'key': 'hippoface', 'name': 'Calf face', 'x': 128,
+              'note': 'The calf face close up: big black pupils on white (the user idea), beside the '
+                      'teen amber eyes.',
+              'player': [-4.5, -3.0],
+              'items': [item('hippo_calf', 2.25, 0.0, BANK, 0.0, 'Calf', 90),
+                        item('hippo_teen', 3.5, 0.6, BANK, -2.6, 'Teen', 90)],
+              'props': [], 'labels': [],
+              'cam': [[-2.6, 1.0, 1.9], [-1.0, 0.55, -0.4]]})
     return g
 
 
 def data(uri, png, block_uri):
     """Everything the page needs. uri, png: model_viewer's; block_uri(name): a game block texture."""
     looks = {}
-    for fn in (tilapia_looks, catfish_looks, crocodile_looks, crab_looks, snail_looks, monitor_looks):
+    for fn in (tilapia_looks, catfish_looks, crocodile_looks, crab_looks, snail_looks, monitor_looks, hippo_looks):
         for key, (b, rows, w, h) in fn().items():
             looks[key] = {'bones': b, 'texture': uri(mp.png(rows)), 'w': w, 'h': h,
                           'boxes': sum(len(x.get('cubes', [])) for x in b)}

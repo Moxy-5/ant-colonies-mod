@@ -26,6 +26,11 @@ public class HippoModel extends DefaultedEntityGeoModel<HippoEntity> {
     private static final double NEAR = 64.0;
     /** How quickly the drawing slides from its box onto the move's path, or back (seconds; the monitor's). */
     private static final double HAND_OVER = 0.12;
+    /**
+     * How far forward of its middle its eyes are (model pixels), how far a pupil slides back along its eye to look
+     * behind (pixels; the eye is 3.3 long, the pupil 1.2), and how far the head turns toward what it watches (degrees).
+     */
+    private static final double EYES_AHEAD = 27.5, PUPIL_SLIDE = 2.1, HEAD_TURN = 18.0;
 
     public HippoModel() {
         super(ResourceLocation.fromNamespaceAndPath(SavannaMod.MODID, "hippo"));
@@ -44,7 +49,39 @@ public class HippoModel extends DefaultedEntityGeoModel<HippoEntity> {
             return;
         }
         float yaw = Mth.rotLerp(pt, hippo.yBodyRotO, hippo.yBodyRot);
-        place(hippo, climb, HippoEntity.MODEL_SCALE * hippo.getScale(), x, y, z, yaw);
+        double scale = HippoEntity.MODEL_SCALE * hippo.getScale();
+        place(hippo, climb, scale, x, y, z, yaw);
+        eyes(hippo, climb == null, scale, pt, x, z, yaw);
+    }
+
+    /**
+     * The eyes and head on what caught its eye ({@link HippoEntity#attention}; 2026-11-21, the user's ask, as the
+     * crocodile's): each pupil sits at its eye's front corner looking ahead and slides back along the eye's side to look
+     * aside and behind, darting there; the head turns a little toward it, slowly (not on a block move, whose clip
+     * carries the whole body).
+     */
+    private void eyes(HippoEntity hippo, boolean turnHead, double scale, float pt, double x, double z, float yaw) {
+        double ahead = EYES_AHEAD * scale / 16.0;
+        hippo.attention.aim(pt, x - Mth.sin(yaw * Mth.DEG_TO_RAD) * ahead, z + Mth.cos(yaw * Mth.DEG_TO_RAD) * ahead, yaw, HEAD_TURN);
+        double back = PUPIL_SLIDE * (1.0 - Math.cos(Math.toRadians(hippo.attention.eyeAim))) / 2.0;
+        for (String name : new String[] {"pupil_left", "pupil_right"}) {
+            GeoBone pupil = getAnimationProcessor().getBone(name);
+            if (pupil != null) {
+                boolean marked = pupil.hasRotationChanged() || pupil.hasPositionChanged() || pupil.hasScaleChanged();
+                pupil.setPosZ((float) back);
+                if (!marked) {
+                    pupil.resetStateChanges();
+                }
+            }
+        }
+        GeoBone neck = getAnimationProcessor().getBone("neck");
+        if (turnHead && neck != null && Math.abs(hippo.attention.headAim) > 1.0E-3) {
+            boolean marked = neck.hasRotationChanged() || neck.hasPositionChanged() || neck.hasScaleChanged();
+            neck.setRotY(neck.getRotY() - (float) Math.toRadians(hippo.attention.headAim));
+            if (!marked) {
+                neck.resetStateChanges();
+            }
+        }
     }
 
     /** Where it is drawn: at its box, or on a move, on the move's path, sliding from one to the other ({@link #HAND_OVER}). */

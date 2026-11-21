@@ -9,7 +9,7 @@ Keep this short (~40 lines). Remove finished items once merged or picked up. Det
 
 ## In progress right now
 - **Neon:** *(ready for next animal)*
-- **Claude:** Hippo into the game (`HippoEntity`, branch `claude/engine-every-animal`; v8 and its block moves approved/made 2026-11-21, `docs/handoff/hippo.md`). World eggs step 2 after.
+- **Claude:** Hippo into the game (`HippoEntity`, branch `claude/engine-every-animal`; v8 and its block moves approved/made 2026-11-21, `docs/handoff/hippo.md`). Hippo calf and teen looks (2026-11-21, `tools/life_looks.py` `hippo_looks`, life viewer "Hippo" groups), waiting for the user's look before they go into the game. World eggs step 2 after.
 
 ## Ready for Claude (from Neon)
 <!-- Format: - **<animal or tool>** (branch `<name>`): summary + `docs/handoff/<animal>.md` -->

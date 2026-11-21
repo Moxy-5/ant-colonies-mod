@@ -51,6 +51,9 @@ WORKSHOP_PARTS = {
     "hind legs":  ["leg_bl_1", "leg_br_1"],
 }
 
+PUPIL_W = 1.2          # pupil length along the eye's side (px); the game slides it back up to 3.3 - 1.2 = 2.1 px
+PUPIL_H = 1.7          # pupil height (px): the eye's lower two rows
+
 WORKSHOP_LOOK = "bull"
 EYE_STYLE = "b"         # approved by user 2026-11-21: "b" River-Boss Amber ("a" warm hazel, "c" classic, "v3" original)
 
@@ -234,6 +237,13 @@ def build_bones():
         # Full-height eyelid tucked 100% inside brow at rest; +0.15 px outside eye so dropping -2.65 px covers eye cleanly!
         lx0, lx1 = (ex_in - 0.1, ex_out + 0.15) if s > 0 else (-(ex_out + 0.15), -(ex_in - 0.1))
         box(lc, lx0, lx1, ey1 + 0.05, ey1 + 2.65, ez_ox0 - 0.05, ez_ox1 + 0.15, "hide_top")
+    # Pupils (2026-11-21, the user's ask: eyes that move to what catches its attention, as the crocodile's): each a
+    # bone of its own wrapping the eye's front outer corner, 0.06 px proud of the eye, the lower two rows; the game
+    # slides it back along the eye's side (up to PUPIL_SLIDE px) to look aside and behind. The lid still covers it.
+    pupil_l_cubes, pupil_r_cubes = [], []
+    for s, pc in ((1, pupil_l_cubes), (-1, pupil_r_cubes)):
+        px0, px1 = (ex_out - 1.1, ex_out + 0.06) if s > 0 else (-(ex_out + 0.06), -(ex_out - 1.1))
+        box(pc, px0, px1, ey0 + 0.05, ey0 + 0.05 + PUPIL_H, ez_ox1 - PUPIL_W + 0.06, ez_ox1 + 0.06, "pupil")
 
     # --- EARS (own bones! Small upright ears with dusty-pink inner cups, perched high!) -------------------------------
     ear_l_cubes, ear_r_cubes = [], []
@@ -324,6 +334,8 @@ def build_bones():
         {"name": "eye_right", "parent": "head", "pivot": [-7.8, round((ey0 + ey1) / 2, 2), round(oz(67.5), 2)], "cubes": eye_r_cubes},
         {"name": "lid_left",  "parent": "head", "pivot": [7.8, round(ey1, 2), round(oz(67.5), 2)], "cubes": lid_l_cubes},
         {"name": "lid_right", "parent": "head", "pivot": [-7.8, round(ey1, 2), round(oz(67.5), 2)], "cubes": lid_r_cubes},
+        {"name": "pupil_left",  "parent": "head", "pivot": [9.1, round(ey0 + PUPIL_H / 2, 2), round(oz(ez_ox1), 2)], "cubes": pupil_l_cubes},
+        {"name": "pupil_right", "parent": "head", "pivot": [-9.1, round(ey0 + PUPIL_H / 2, 2), round(oz(ez_ox1), 2)], "cubes": pupil_r_cubes},
         {"name": "jaw", "parent": "head", "pivot": [0, round(jaw_pivot_y, 2), round(oz(jaw_pivot_ox), 2)],
          "rotation": [round(JAW_OPEN, 2), 0, 0] if JAW_OPEN else [0, 0, 0], "cubes": jaw_cubes},
         {"name": "tongue", "parent": "jaw", "pivot": [0, round(hy(14.8), 2), round(oz(66.5), 2)], "cubes": tongue_cubes},
@@ -395,9 +407,11 @@ EYE_STYLES = {
         "outer": ["GPK", "PIK", "IRK"],
     },
     # B: Territorial river boss — hooded dark brow shadow, glowing warm amber-gold iris + sharp pupil + ivory glint
+    # (2026-11-21: the pupil is now its own sliding box over the lower front corner, so the eye under it is iris all
+    # round and the glint sits in the hooded top row; the approved art was front DDD/APG/HPP, outer DDK/GPA/PHR)
     "b": {
-        "front": ["DDD", "APG", "HPP"],
-        "outer": ["DDK", "GPA", "PHR"],
+        "front": ["DDD", "AAA", "HHA"],
+        "outer": ["DGK", "AAA", "HHR"],
     },
     # C: Expressive Minecraft classic — bold white sclera + big glossy dark pupil + clean catchlight (high readability!)
     "c": {
@@ -429,6 +443,9 @@ def paint_colour(c, face_, x, y, z):
             col = max(0, min(2, int(math.floor((z - e["z0"]) / (e["w_outer"] / 3.0)))))
             return EYE_PAL[style["outer"][row][col]]
         return _jitter(C_HIDE_DARK, x, y, z, 6.0)
+
+    if part == "pupil":
+        return EYE_PAL["P"]
 
     if part == "nostril":
         return _jitter(C_NOSTRIL, x, y, z, 5.0)

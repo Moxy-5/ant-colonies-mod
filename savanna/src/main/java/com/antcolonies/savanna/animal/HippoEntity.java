@@ -6,6 +6,7 @@ import java.util.List;
 import javax.annotation.Nullable;
 
 import com.antcolonies.animal.AnimalLife;
+import com.antcolonies.animal.Attention;
 import com.antcolonies.animal.HasLife;
 import com.antcolonies.entity.body.BlockMoves;
 import com.antcolonies.entity.body.SteadyController;
@@ -165,6 +166,25 @@ public class HippoEntity extends PathfinderMob implements GeoEntity, HasLife {
     public boolean drawnClimbing;
     public double shiftX, shiftY, shiftZ, drawnX, drawnY, drawnZ;
     public long drawnNanos;
+    /**
+     * Where its eyes go (2026-11-21, the user's ask; drawn only, {@link HippoModel}): a player within 16 blocks (6
+     * crouching), a crocodile within 14 even lying still (the danger, watched first), or any other animal stirring
+     * within 10; never another hippo. Hippos graze, so there is no prey to watch. My picks.
+     */
+    public final Attention attention = new Attention(16.0, HippoEntity::catchesEye);
+
+    private static double catchesEye(Entity seen, double distance, boolean moving) {
+        if (seen instanceof HippoEntity) {
+            return 0;
+        }
+        if (seen instanceof Player player) {
+            return Attention.playerInReach(player, distance, 16.0, 6.0) ? 0.5 : 0;
+        }
+        if (seen instanceof CrocodileEntity) {
+            return distance < 14.0 ? 0.4 : 0;
+        }
+        return moving && distance < 10.0 ? 1.0 : 0;
+    }
     /** Where its head is turned (degrees from its heading) and when last drawn: drawing only (HippoModel). */
     public double headAim;
     public long lookNanos;
@@ -567,6 +587,7 @@ public class HippoEntity extends PathfinderMob implements GeoEntity, HasLife {
         }
         if (level().isClientSide) {
             splashes();
+            attention.tick(this);
             return;
         }
         if (chargeWait > 0) {

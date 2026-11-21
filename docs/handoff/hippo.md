@@ -46,6 +46,7 @@
 ## Special Bones (for Java / Renderer)
 - **Head look:** `head` (optional slight share on `neck`)
 - **Mouth / jaw:** `jaw` (plus `tongue` child of `jaw`)
+- **Pupils (2026-11-21, Claude):** `pupil_left`, `pupil_right` (children of `head`, a 1.2 x 1.7 px box over each eye's lower front corner, 0.06 px proud; `HippoModel` slides them back along the eye up to 2.1 px to look aside and behind; keep them out of clips). Eye style `b` now paints the eye without its pupil.
 - **Eyelids:** `lid_left`, `lid_right` (animated via position `y: 0 -> -2.65` in clips; hidden inside brow at rest)
 - **Ears & Tail:** `ear_left`, `ear_right`, `tail_1`, `tail_2`, `tail_3` (3-bone muscular dock -> flat paddle -> coarse bristled fan tip; Java can also layer live turn-inertia swing on `tail_1/2/3`!)
 - **Legs:** `leg_fl_1/2/foot`, `leg_fr_1/2/foot`, `leg_bl_1/2/foot`, `leg_br_1/2/foot`
