@@ -433,6 +433,25 @@ public class CrocodileEntity extends PathfinderMob implements GeoEntity, HasLife
         }
     }
 
+    /**
+     * Hatchlings in her mouth come out where she is if she is killed or taken out of the world (as the tilapia's fry do),
+     * on their own from then on; never on a plain unload, which saves them with her (code review 2026-11-21: they were
+     * deleted with her).
+     */
+    @Override
+    public void remove(Entity.RemovalReason reason) {
+        if (!level().isClientSide && !carried.isEmpty() && level() instanceof net.minecraft.server.level.ServerLevel server
+                && (reason == Entity.RemovalReason.KILLED || reason == Entity.RemovalReason.DISCARDED)) {
+            Vec3 at = server.getFluidState(BlockPos.containing(jawPoint())).is(FluidTags.WATER) ? jawPoint() : position().add(0, 0.2, 0);
+            for (Entity e : carried.letOut(server, at)) {
+                if (e instanceof CrocodileEntity young) {
+                    young.waitForMother = 0;
+                }
+            }
+        }
+        super.remove(reason);
+    }
+
     /** Let out of its mother's mouth into her crèche: it keeps near it while she cares for it. */
     void joinCreche(CrocodileEntity mother) {
         motherId = mother.getUUID();

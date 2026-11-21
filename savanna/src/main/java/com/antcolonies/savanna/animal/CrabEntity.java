@@ -223,7 +223,9 @@ public class CrabEntity extends PathfinderMob implements GeoEntity, HasLife {
 
     /** Her eggs hatch: each becomes a tiny crab riding on her back for a few seconds. */
     private void letOutBabies() {
-        int count = eggs;
+        // only as many as the local limit has room for; the rest fail (code review 2026-11-21)
+        int count = level() instanceof net.minecraft.server.level.ServerLevel server
+                ? Math.min(eggs, RoomToBreed.left(server, this, life.numbers().localLimit())) : 0;
         eggs = 0;
         entityData.set(DATA_BERRIED, false);
         for (int i = 0; i < count; i++) {

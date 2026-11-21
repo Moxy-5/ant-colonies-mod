@@ -371,8 +371,8 @@ public class TilapiaEntity extends AbstractSchoolingFish implements GeoEntity, H
     private void motherTick() {
         long now = level().getGameTime();
         if (eggs > 0 && now - eggsSince >= life.numbers().hatchTicks()) {
-            if (RoomToBreed.here(this, life.numbers().localLimit())) {
-                letOutFry(eggs);
+            if (RoomToBreed.here(this, life.numbers().localLimit()) && level() instanceof ServerLevel server) {
+                letOutFry(Math.min(eggs, RoomToBreed.left(server, this, life.numbers().localLimit())));   // the rest fail (code review 2026-11-21)
                 caringUntil = now + life.numbers().careTicks();
             }
             eggs = 0;

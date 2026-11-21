@@ -55,16 +55,18 @@ public abstract class EggClutchBlock extends Block implements EntityBlock {
 
     /** Whether its kind has room here: fewer than its local limit near, its spawning group under its cap. */
     protected boolean roomFor(ServerLevel level, BlockPos pos, EntityType<?> kind) {
-        int near = level.getEntities(kind, new AABB(pos).inflate(RoomToBreed.REACH), Entity::isAlive).size();
-        return near < AnimalLives.get(kind).localLimit() && RoomToBreed.groupHasRoom(level, kind.getCategory(), new ChunkPos(pos));
+        return RoomToBreed.leftAt(level, pos, kind, AnimalLives.get(kind).localLimit()) > 0
+                && RoomToBreed.groupHasRoom(level, kind.getCategory(), new ChunkPos(pos));
     }
 
     /**
-     * Hatches: each egg becomes a young animal of its mother's kind at the clutch, then the block is what a clutch
-     * leaves ({@link #toShells}). A species may let its young out its own way (carried, in water).
+     * Hatches: each egg the local limit has room for ({@link RoomToBreed#leftAt}) becomes a young animal of its
+     * mother's kind at the clutch, the rest failing, then the block is what a clutch leaves ({@link #toShells}). A
+     * species may let its young out its own way (carried, in water).
      */
     protected void hatch(ServerLevel level, BlockPos pos, BlockState state, EggClutchBlockEntity clutch, EntityType<?> kind, RandomSource random) {
-        for (int i = 0; i < clutch.count(); i++) {
+        int count = Math.min(clutch.count(), RoomToBreed.leftAt(level, pos, kind, AnimalLives.get(kind).localLimit()));
+        for (int i = 0; i < count; i++) {
             Entity young = kind.create(level);
             if (young == null) {
                 break;

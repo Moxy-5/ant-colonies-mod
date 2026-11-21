@@ -76,8 +76,17 @@ public final class AnimalLife {
      * file's age for young spawns, {@link LifeNumbers#spawnYoungAge}). Hatched young set their age to 0 after.
      */
     public void setUp(boolean young, RandomSource random) {
+        setUp(young, null, random);
+    }
+
+    /**
+     * Rolls a new life as {@link #setUp(boolean, RandomSource)}, but of this sex when one is given (and its kind has it),
+     * so its size is rolled in its own sex's range (a world nest's mother, code review 2026-11-21: made female after
+     * the roll, half of them kept a male's size).
+     */
+    public void setUp(boolean young, @Nullable Sex asked, RandomSource random) {
         LifeNumbers numbers = numbers();
-        sex = rollSex(numbers, random);
+        sex = asked != null && (asked == Sex.NONE) != numbers.twoSexes() ? asked : rollSex(numbers, random);
         float[] size = numbers.sizeOf(sex);
         ownSize = size[0] + (size[1] - size[0]) * random.nextFloat();
         age = young ? numbers.spawnYoungAge(random) : numbers.grownAge();

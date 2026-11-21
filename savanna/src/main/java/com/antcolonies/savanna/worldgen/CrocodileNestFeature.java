@@ -15,7 +15,6 @@ import com.antcolonies.savanna.registry.SavannaEntities;
 import com.mojang.serialization.Codec;
 
 import net.minecraft.core.BlockPos;
-import net.minecraft.nbt.CompoundTag;
 import net.minecraft.tags.FluidTags;
 import net.minecraft.util.Mth;
 import net.minecraft.util.RandomSource;
@@ -162,10 +161,7 @@ public class CrocodileNestFeature extends Feature<NoneFeatureConfiguration> {
         float yaw = (float) (Mth.atan2(nest.getZ() - water.getZ(), nest.getX() - water.getX()) * Mth.RAD_TO_DEG) - 90.0F;
         croc.moveTo(water.getX() + 0.5, water.getY() + 0.3, water.getZ() + 0.5, yaw, 0.0F);     // facing her nest
         croc.finalizeSpawn(level, level.getCurrentDifficultyAt(water), MobSpawnType.CHUNK_GENERATION, null);
-        CompoundTag sex = new CompoundTag();
-        sex.putString("sex", "female");
-        croc.life().setUp(false, random);
-        croc.life().load(sex);
+        croc.life().setUp(false, com.antcolonies.animal.Sex.FEMALE, random);     // female first, so her size is a female's
         croc.guardNest(nest);
         level.addFreshEntity(croc);
     }

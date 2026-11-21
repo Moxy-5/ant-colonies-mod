@@ -239,6 +239,12 @@ public final class CrocodileBreeding {
         @Nullable
         private BlockPos water;
         private int work, left, look, waitSite;
+        /**
+         * Nest spots she could not reach in time or that would not hold a nest: passed by while she looks for another, so
+         * she never paces after one she cannot get to (code review 2026-11-21: she picked the same nearest spot again
+         * every minute, for good). Cleared when she lays, or when nothing else is left to try.
+         */
+        private final java.util.Set<BlockPos> failedSites = new java.util.HashSet<>();
 
         MotherGoal(CrocodileEntity croc) {
             this.croc = croc;
@@ -304,6 +310,9 @@ public final class CrocodileBreeding {
         @Override
         public void stop() {
             croc.getNavigation().stop();
+            if (job == Job.NEST && site != null && left <= 0) {
+                failedSites.add(site);          // out of time on the way there (or digging): another spot next time
+            }
             if (croc.show() == CrocodileEntity.SHOW_DIG || croc.show() == CrocodileEntity.SHOW_CARRY && croc.carried.isEmpty()) {
                 croc.setShow(CrocodileEntity.SHOW_NONE);
             }
@@ -330,9 +339,10 @@ public final class CrocodileBreeding {
 
         private void nest() {
             if (site == null) {
-                site = nestSite(croc);
+                site = nestSite(croc, failedSites);
                 if (site == null) {
-                    waitSite = 600;             // nowhere yet: she looks again in half a minute
+                    waitSite = 600;             // nowhere yet: she looks again in half a minute, every spot worth a new try
+                    failedSites.clear();
                     job = null;
                     return;
                 }
@@ -348,10 +358,12 @@ public final class CrocodileBreeding {
                 if (croc.level() instanceof ServerLevel level && CrocodileNestBlock.lay(level, site, croc.getType(), eggs)) {
                     croc.nestAt = site;
                     croc.gravid = false;
+                    failedSites.clear();
                     job = Job.COVER;
                     work = -LAY_TICKS;          // lying still over the pit while she lays
                     left = 1200;
                 } else {
+                    failedSites.add(site);
                     site = null;                // the spot would not hold a nest: another
                     work = 0;
                 }
@@ -524,6 +536,12 @@ public final class CrocodileBreeding {
      */
     @Nullable
     static BlockPos nestSite(CrocodileEntity croc) {
+        return nestSite(croc, java.util.Set.of());
+    }
+
+    /** {@link #nestSite(CrocodileEntity)}, passing by the spots in {@code skip}. */
+    @Nullable
+    static BlockPos nestSite(CrocodileEntity croc, java.util.Set<BlockPos> skip) {
         Level level = croc.level();
         BlockPos at = croc.blockPosition();
         for (int up = 0; up < 16 && level.getFluidState(at.above()).is(FluidTags.WATER); up++) {
@@ -545,7 +563,7 @@ public final class CrocodileBreeding {
                             || !CrocodileEntity.AshoreGoal.waterBeside(level, p, 3) || CrocodileEntity.AshoreGoal.waterBeside(level, p, 1)) {
                         continue;
                     }
-                    if (nestNear(level, p)) {
+                    if (skip.contains(p) || nestNear(level, p)) {
                         break;
                     }
                     if (CrocodileEntity.isRiverSand(level.getBlockState(p.below()))) {

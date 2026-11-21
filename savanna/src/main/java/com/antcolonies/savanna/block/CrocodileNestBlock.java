@@ -187,9 +187,8 @@ public class CrocodileNestBlock extends EggClutchBlock {
             return out;
         }
         EntityType<CrocodileEntity> kind = SavannaEntities.CROCODILE.get();
-        int near = level.getEntities(kind, new AABB(pos).inflate(RoomToBreed.REACH), e -> e.isAlive()).size();
-        int room = Math.max(1, AnimalLives.get(kind).localLimit() - near);
-        int count = Math.min(clutch.count(), room);
+        // no room left (crocodiles came while the eggs called): none hatch, the eggs fail (code review 2026-11-21: it was at least one)
+        int count = Math.min(clutch.count(), RoomToBreed.leftAt(level, pos, kind, AnimalLives.get(kind).localLimit()));
         RandomSource random = level.getRandom();
         for (int i = 0; i < count; i++) {
             CrocodileEntity young = kind.create(level);
