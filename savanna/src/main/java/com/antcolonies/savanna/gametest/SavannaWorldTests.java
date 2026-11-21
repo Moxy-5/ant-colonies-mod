@@ -1899,4 +1899,46 @@ public class SavannaWorldTests {
         }
         helper.succeed();
     }
+
+    /**
+     * No vanilla mobs in the savanna (the user, 2026-11-21): the savanna's biomes and its own river and floodplain list no
+     * Minecraft mob in any spawn group but the chicken (it hunts termites) and the armadillo; plains keep their cows; no
+     * savanna village grows there and no patrol comes.
+     */
+    @GameTest(template = "arena", timeoutTicks = 20)
+    public static void savannaHasNoVanillaMobs(GameTestHelper helper) {
+        var biomes = helper.getLevel().registryAccess().registryOrThrow(Registries.BIOME);
+        java.util.Set<String> kept = java.util.Set.of("minecraft:chicken", "minecraft:armadillo");
+        StringBuilder wrong = new StringBuilder();
+        for (String id : List.of("minecraft:savanna", "minecraft:savanna_plateau", "minecraft:windswept_savanna", "antcolonies:savanna_river",
+                "antcolonies:savanna_floodplain")) {
+            var biome = biomes.getHolderOrThrow(net.minecraft.resources.ResourceKey.create(Registries.BIOME, net.minecraft.resources.ResourceLocation.parse(id)));
+            for (net.minecraft.world.entity.MobCategory group : net.minecraft.world.entity.MobCategory.values()) {
+                for (var spawn : biome.value().getMobSettings().getMobs(group).unwrap()) {
+                    String kind = net.minecraft.core.registries.BuiltInRegistries.ENTITY_TYPE.getKey(spawn.type).toString();
+                    if (kind.startsWith("minecraft:") && !kept.contains(kind)) {
+                        wrong.append(" ").append(id).append(" ").append(kind);
+                    }
+                }
+            }
+            if (biome.is(BiomeTags.HAS_VILLAGE_SAVANNA)) {
+                wrong.append(" ").append(id).append(" still grows villages");
+            }
+            if (!biome.is(BiomeTags.WITHOUT_PATROL_SPAWNS)) {
+                wrong.append(" ").append(id).append(" still gets patrols");
+            }
+        }
+        var savanna = biomes.getHolderOrThrow(net.minecraft.world.level.biome.Biomes.SAVANNA).value().getMobSettings().getMobs(net.minecraft.world.entity.MobCategory.CREATURE).unwrap();
+        if (savanna.stream().noneMatch(s -> s.type == net.minecraft.world.entity.EntityType.CHICKEN)) {
+            wrong.append(" the savanna lost its chickens");
+        }
+        if (biomes.getHolderOrThrow(net.minecraft.world.level.biome.Biomes.PLAINS).value().getMobSettings().getMobs(net.minecraft.world.entity.MobCategory.CREATURE).unwrap()
+                .stream().noneMatch(s -> s.type == net.minecraft.world.entity.EntityType.COW)) {
+            wrong.append(" plains lost their cows (only the savanna should change)");
+        }
+        if (!wrong.isEmpty()) {
+            throw new GameTestAssertException("vanilla mobs left in the savanna:" + wrong);
+        }
+        helper.succeed();
+    }
 }

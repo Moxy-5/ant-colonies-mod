@@ -1,6 +1,4 @@
 {
-  "replace": false,
-  "values": [
-    "antcolonies:savanna_floodplain"
-  ]
+  "replace": true,
+  "values": []
 }

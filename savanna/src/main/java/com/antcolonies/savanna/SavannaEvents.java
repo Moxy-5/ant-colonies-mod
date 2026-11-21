@@ -107,6 +107,18 @@ public class SavannaEvents {
                         || com.antcolonies.savanna.worldgen.BigSavanna.lives(level.getLevel(), level.getBiome(pos), pos.getX(), pos.getZ()));
     }
 
+    /**
+     * No vanilla mobs in the savanna (the user, 2026-11-21: room for the ecosystem's own animals): the spawn lists lose
+     * them in {@code biome_modifier/no_vanilla_mobs.json} (chickens and armadillos stay), villages and patrols go by biome
+     * tags; phantoms come from not sleeping, not from a list, so they are refused here over the savanna and its rivers.
+     */
+    @SubscribeEvent
+    public static void onPhantoms(net.neoforged.neoforge.event.entity.player.PlayerSpawnPhantomsEvent event) {
+        if (event.getEntity().level().getBiome(event.getEntity().blockPosition()).is(com.antcolonies.savanna.worldgen.RiverBankFeature.WATERS)) {
+            event.setResult(net.neoforged.neoforge.event.entity.player.PlayerSpawnPhantomsEvent.Result.DENY);
+        }
+    }
+
     /** Chickens hunt termite workers out on the surface (step 6c; see {@link HuntTermitesGoal}). */
     @SubscribeEvent
     public static void onJoinLevel(EntityJoinLevelEvent event) {
