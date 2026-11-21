@@ -360,7 +360,9 @@ user: a detailed webbed foot model comes later). Fun first, inspired by the real
   cute as well"): v5 (v6 with the day-3 legs), the body about a fifth less deep and wide (top 5.6, belly 1.4, half
   width 2.2 at its widest, was 6.0, 1.0, 2.6), so it flows into the tail's root as on the sheet; the eyes round and
   high on the sides with a gold ring and a white shine spot, as the fry's (texture 4 pixels a model pixel). Same
-  25 boxes (29 with legs). Picture `references/workshop/tadpole/slimmer_v3_v5.png`.
+  25 boxes (29 with legs). Then the user: "the model actually looks better with the eyes in the 2D image", so v5 and v6 were
+  rebuilt with the sheet's eyes (black, a gold patch just behind), keeping the slimmer body. Picture
+  `references/workshop/tadpole/slimmer_v5.png`.
 
 ## My picks the user may change
 The barb's name and look, every size and number above (the bullfrog's size is the user's call), barbs with no hunger,

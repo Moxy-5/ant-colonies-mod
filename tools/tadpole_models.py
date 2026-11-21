@@ -32,7 +32,8 @@ PROFILE = ((11.0, 5.0, 2.2, 1.4), (12.0, 5.4, 1.6, 1.9), (13.5, 5.6, 1.4, 2.2), 
 CORE_WIDTH = 0.55        # the tall box's share of the width
 FLANK_DEPTH = 0.6        # the wide box's share of the depth
 BODY_FROM = 11.0
-EYE = (15.0, 16.5, 3.25, 4.75)      # the eye high on the flank: from x, to x, from y, to y (round, ringed, a shine spot)
+EYE = (14.0, 16.0, 3.75, 4.75)      # the eye high on the flank (the sheet's: black at 15-16, a gold patch behind
+                                    # at 14-15; the user, 2026-11-21: "looks better with the eyes in the 2D image")
 TEXELS = 4               # texture pixels a model pixel (4, so the round eye has room)
 LEGS = 0.0               # 1: the day-3 hind legs shown
 
@@ -132,7 +133,6 @@ def plain_colour(c, face, x, y, z):
 # --- the paint (stage 4, 2026-11-21, from the sheet's colours) --------------------------------------------------------
 PAINT = {
     'body': (50, 50, 40), 'fleck': (80, 78, 58), 'gold': (176, 150, 80), 'eye': (10, 10, 10), 'ring': (196, 168, 88),
-    'shine': (250, 250, 244),
     'belly': (104, 106, 96), 'belly_fleck': (128, 128, 116), 'gut': (66, 62, 50), 'beak': (28, 26, 22),
     'lip': (150, 140, 116), 'muscle': (64, 62, 50), 'mottle': (94, 90, 70), 'fin': (134, 142, 132),
     'fin_speck': (84, 90, 84), 'leg': (70, 70, 52), 'toe': (46, 46, 36),
@@ -158,14 +158,7 @@ def paint_colour(c, face, x, y, z):
             return PAINT['toe']                                           # the foot's dark toe tips
         return PAINT['fleck'] if n < 0.25 else PAINT['leg']
     if face in ('east', 'west') and EYE[0] <= ox < EYE[1] and EYE[2] <= y < EYE[3]:
-        cx, cy = (EYE[0] + EYE[1]) / 2, (EYE[2] + EYE[3]) / 2
-        if cx + 0.25 <= ox < cx + 0.5 and cy + 0.25 <= y < cy + 0.5:
-            return PAINT['shine']                                         # the shine spot, up and to the front
-        r = ((ox - cx) ** 2 + (y - cy) ** 2) ** 0.5
-        if r < 0.56:
-            return PAINT['eye']
-        if r < 0.8:
-            return PAINT['ring']                                          # the gold ring round the pupil
+        return PAINT['eye'] if ox >= EYE[0] + 1.0 else PAINT['ring']    # the sheet's eye: black, a gold patch behind
     if face == 'down':
         if ox > LENGTH - 1.5 and abs(x) < 1.0:
             return PAINT['beak'] if abs(x) < 0.5 else PAINT['lip']       # the mouth underneath at the front
