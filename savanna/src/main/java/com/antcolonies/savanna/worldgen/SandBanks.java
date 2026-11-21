@@ -44,7 +44,6 @@ public final class SandBanks {
     /** Pebbles on a bank and on the river bed, by how far inland (coast, near, mid, far): thicker far inland (my picks). */
     static final double[] BANK_PEBBLES = {0.01, 0.02, 0.04, 0.08};
     static final double[] BED_PEBBLES = {0.003, 0.006, 0.012, 0.025};
-    private static final double[] INLAND_FROM = {-0.11, 0.03, 0.3};
     /** Farther than this from the river's middle line (blocks) no column is sand (the bend of the noise far from a river means nothing). */
     static final double NEAR_LINE = 70;
 
@@ -133,10 +132,7 @@ public final class SandBanks {
         @Override
         public Choice at(int x, int z) {
             double c = blend(inland, x, z);
-            int band = 0;
-            while (band < INLAND_FROM.length && c >= INLAND_FROM[band]) {
-                band++;
-            }
+            int band = RiverZones.band(c);       // the river zones' one reading of how far inland
             double toned = c + 0.035 * (2 * noise(x / 40.0, z / 40.0, seed ^ 0x51DEL) - 1); // tones blend over a long stretch
             int tone = toned >= TONE_FROM[1] ? 0 : toned >= TONE_FROM[0] ? 1 : 2;
             if (!anyBend) {

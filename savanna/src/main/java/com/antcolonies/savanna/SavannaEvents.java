@@ -76,9 +76,6 @@ public class SavannaEvents {
         event.register(SavannaEntities.MONITOR.get(), net.minecraft.world.entity.SpawnPlacementTypes.IN_WATER,
                 net.minecraft.world.level.levelgen.Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, inBigSavanna(com.antcolonies.savanna.animal.MonitorEntity::canSpawn),
                 net.neoforged.neoforge.event.entity.RegisterSpawnPlacementsEvent.Operation.REPLACE);
-        event.register(SavannaEntities.HIPPO.get(), net.minecraft.world.entity.SpawnPlacementTypes.IN_WATER,
-                net.minecraft.world.level.levelgen.Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, inBigSavanna(com.antcolonies.savanna.animal.HippoEntity::canSpawn),
-                net.neoforged.neoforge.event.entity.RegisterSpawnPlacementsEvent.Operation.REPLACE);
         event.register(SavannaEntities.CRAB.get(), net.minecraft.world.entity.SpawnPlacementTypes.IN_WATER,
                 net.minecraft.world.level.levelgen.Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, inBigSavanna(com.antcolonies.savanna.animal.CrabEntity::canSpawn),
                 net.neoforged.neoforge.event.entity.RegisterSpawnPlacementsEvent.Operation.REPLACE);
@@ -98,13 +95,16 @@ public class SavannaEvents {
 
     /**
      * The gate ({@link com.antcolonies.savanna.worldgen.BigSavanna}): the world itself spawns no river animal in a savanna
-     * too small to live in; eggs, commands and buckets are not asked.
+     * too small to live in; and the river zones ({@link com.antcolonies.savanna.worldgen.RiverZones}, 2026-11-21): none in
+     * water shut off from the sky, and each kind only up to its share of its group's cap in its stretch of river. Eggs,
+     * commands and buckets are not asked. (Hippos are not spawned by the world at all: new land places their pods.)
      */
     private static <T extends net.minecraft.world.entity.Entity> net.minecraft.world.entity.SpawnPlacements.SpawnPredicate<T> inBigSavanna(
             net.minecraft.world.entity.SpawnPlacements.SpawnPredicate<T> rule) {
         return (type, level, reason, pos, random) -> rule.test(type, level, reason, pos, random)
                 && (reason != net.minecraft.world.entity.MobSpawnType.NATURAL && reason != net.minecraft.world.entity.MobSpawnType.CHUNK_GENERATION
-                        || com.antcolonies.savanna.worldgen.BigSavanna.lives(level.getLevel(), level.getBiome(pos), pos.getX(), pos.getZ()));
+                        || com.antcolonies.savanna.worldgen.BigSavanna.lives(level.getLevel(), level.getBiome(pos), pos.getX(), pos.getZ())
+                                && com.antcolonies.savanna.worldgen.RiverZones.room(type, level, pos));
     }
 
     /** Chickens hunt termite workers out on the surface (step 6c; see {@link HuntTermitesGoal}). */

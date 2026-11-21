@@ -63,15 +63,18 @@ import software.bernie.geckolib.util.GeckoLibUtil;
  * {@code tools/hippo_models.py game}, v8 approved by the user 2026-11-21). An animal: generalized and fun first, every
  * number my pick, real habits used where they make the river look right ({@code docs/DESIGN.md}, "River zones"):
  * <ul>
- * <li>Pods live in the river's pools, 2 to 5 together. By day each rests in its pool, afloat with only its eyes, ears
+ * <li>Pods live in the pools of the near and mid-inland rivers, a lone bull or a bull with one or two cows, placed with new
+ * land and kept for good ({@code worldgen/HippoPodFeature}, the user 2026-11-21; never spawned by the world's spawner,
+ * BUGS 271). The pod shares the bull's pool and packs into it. By day each rests in its pool, afloat with only its eyes, ears
  * and back out where the water is deep, standing on the bed where it is shallow, and now and then wanders the pool,
  * bounding along the bed under the water ({@code underwater_walk}); it yawns its great territorial yawn now and then,
  * and flicks its ears coming up.</li>
  * <li>At dusk it walks out of the water and grazes the land near its pool all night ({@code graze}), eating the grass
  * plants in front of it, flicking its dung about now and then; at dawn it walks back to its pool.</li>
  * <li>The most dangerous animal in the river: a survival player coming near gets a yawn as a warning; coming nearer,
- * or staying, or hitting it, it charges and bites hard (5 hearts). A grown crocodile coming near is charged at once,
- * and crocodiles keep clear of hippos.</li>
+ * or staying, or hitting it, it charges and bites hard (5 hearts). Grown crocodiles are put up with, as real pods let
+ * them bask close by: only a bull minds one coming right up to him, yawning first, then a short bluff charge that ends
+ * once it is off, one bite at most (BUGS 272); crocodiles swim clear of a hippo.</li>
  * <li>Climbing up or down a block and walking out of the shallows onto a bank are moves of its own (the Animal Maker
  * Engine, made once with their clips, played by the shared {@link BlockMoves} as the monitor's): it stops short of the
  * step, rises and sets its forefeet on top before its body touches it, then heaves its hind legs up.</li>
@@ -109,22 +112,17 @@ public class HippoEntity extends PathfinderMob implements GeoEntity, HasLife {
     static final double BITE_REACH = 0.9;
     /** A survival player this near gets the warning yawn, this near (or staying) the charge (blocks from its middle). */
     static final double WARN_REACH = 9.0, CHARGE_REACH = 5.5;
-    /** A grown crocodile this near is charged (blocks from its middle), and one smaller than this share of grown is let be. */
-    static final double CROC_REACH = 6.0;
+    /** A grown crocodile this near a bull (blocks from his middle: about 3 from his snout) gets his yawn, and charged if it stays; he gives up once it is this far. */
+    static final double CROC_REACH = 5.5, CROC_GIVE_UP = 8.0;
     /** A charge gives up when its target is this far, or after this many ticks; then it waits this long before another. */
     static final double CHARGE_GIVE_UP = 16.0;
     static final int CHARGE_TICKS = 240, CHARGE_REST = 200, WARN_AGAIN = 200;
-    /** How far from its pool it grazes at night (blocks), and how near it wanders in its pool by day. */
-    static final int GRAZE_NEAR = 6, GRAZE_FAR = 24, POOL_WANDER = 8;
+    /** How far from its pool it grazes at night (blocks), and how near it wanders in its pool by day (a tight pod, open water round it). */
+    static final int GRAZE_NEAR = 6, GRAZE_FAR = 24, POOL_WANDER = 5;
     /** Water at least this deep (blocks) is a pool it may rest in. */
     public static final int POOL_DEPTH = 2;
-    /** Kept while a player is within this many blocks (as the river animals are), gone past the group's 128. */
-    static final double KEEP_NEAR = 96.0;
-    static final double DRAW_DISTANCE = 96.0;
-    /** No world-spawned pod within this many blocks of another (the members of one pod spawn within POD_SPREAD of each other). */
-    public static final int SPAWN_APART = 64, POD_SPREAD = 16;
-    /** How far from a bank the world may spawn one (blocks; in its pool). */
-    public static final int BANK_REACH = 8;
+    /** Drawn this far off (blocks): pods are few and big, seen across the river. */
+    static final double DRAW_DISTANCE = 128.0;
 
     /**
      * Its moves made once with their clips (the Animal Maker Engine): up and down a block, and out of the shallows onto a
@@ -669,9 +667,31 @@ public class HippoEntity extends PathfinderMob implements GeoEntity, HasLife {
         return 0;
     }
 
+    /** Kept for good, as Minecraft's villagers: the pod a player left is there when they come back (BUGS 271). */
     @Override
     public boolean removeWhenFarAway(double distanceToClosestPlayer) {
-        return distanceToClosestPlayer > KEEP_NEAR * KEEP_NEAR;
+        return false;
+    }
+
+    /**
+     * Drawn whenever any of its body is in view: its box is only the barrel of its body, so its head and rump (2.5 blocks
+     * out from its middle) blinked away at the screen's edge with the box (BUGS 271).
+     */
+    @Override
+    public AABB getBoundingBoxForCulling() {
+        double s = getScale();
+        return getBoundingBox().inflate(1.7 * s, 0.4 * s, 1.7 * s);
+    }
+
+    /** Joins a pod resting in the pool at {@code pool} (new land's pods: the bull's spot). */
+    public void joinPod(BlockPos pool) {
+        this.pool = pool.immutable();
+    }
+
+    /** Its pool (for tests). */
+    @Nullable
+    public BlockPos pool() {
+        return pool;
     }
 
     @Override
@@ -719,30 +739,6 @@ public class HippoEntity extends PathfinderMob implements GeoEntity, HasLife {
         pool = NbtUtils.readBlockPos(tag, "Pool").orElse(null);
         led = tag.getBoolean("Led");             // the film camera's walkers and game tests ("Led:1b")
         life.apply();
-    }
-
-    /**
-     * Where it may spawn: in the water of the savanna's rivers, pans and oxbows at least {@link #POOL_DEPTH} deep (a pool),
-     * within {@link #BANK_REACH} blocks of a bank it can walk out onto, in the river animals' height band, and (spawned
-     * by the world) no hippo of another pod within {@link #SPAWN_APART} blocks (those within {@link #POD_SPREAD} are its
-     * own pod, spawned with it). Any height in the water passes (Minecraft's spawner keeps one random height for a try);
-     * the world's spawns are set on the bed after ({@link #finalizeSpawn}).
-     */
-    public static boolean canSpawn(EntityType<HippoEntity> type, LevelAccessor level, MobSpawnType reason, BlockPos pos, RandomSource random) {
-        int sea = level.getSeaLevel();
-        if (pos.getY() < sea - 10 || pos.getY() > sea + 6 || !level.getFluidState(pos).is(FluidTags.WATER)
-                || depthAt(level, pos) < POOL_DEPTH || MonitorEntity.bankNear(level, pos, BANK_REACH) == null) {
-            return false;
-        }
-        if (reason != MobSpawnType.NATURAL && reason != MobSpawnType.CHUNK_GENERATION) {
-            return true;
-        }
-        for (HippoEntity other : level.getEntitiesOfClass(HippoEntity.class, new AABB(pos).inflate(SPAWN_APART))) {
-            if (other.distanceToSqr(Vec3.atCenterOf(pos)) > POD_SPREAD * POD_SPREAD) {
-                return false;
-            }
-        }
-        return true;
     }
 
     /** How deep the water is in the column at pos (blocks of water from the surface down to the bed). */
@@ -854,15 +850,17 @@ public class HippoEntity extends PathfinderMob implements GeoEntity, HasLife {
 
     /**
      * Its territory: a survival player coming within {@link #WARN_REACH} blocks gets a yawn as a warning (facing them);
-     * still within {@link #CHARGE_REACH} after it, or coming nearer, or whoever hurt it, or a grown crocodile within
-     * {@link #CROC_REACH}, is charged: it runs at them and bites (the crushing hit at the clip's {@link #BITE_HIT}) until
-     * they are {@link #CHARGE_GIVE_UP} blocks off or {@link #CHARGE_TICKS} have passed; then it rests a while before another.
+     * still within {@link #CHARGE_REACH} after it, or coming nearer, or whoever hurt it, is charged: it runs at them and
+     * bites (the crushing hit at the clip's {@link #BITE_HIT}) until they are {@link #CHARGE_GIVE_UP} blocks off or
+     * {@link #CHARGE_TICKS} have passed; then it rests a while before another. A grown crocodile is minded by bulls only,
+     * and only within {@link #CROC_REACH}: the yawn first, then, if it stays, a bluff charge that ends once it is
+     * {@link #CROC_GIVE_UP} off, with one bite at most (real pods let crocodiles bask beside them; BUGS 272).
      */
     static class TerritoryGoal extends Goal {
         private final HippoEntity h;
         @Nullable
         private LivingEntity target;
-        private boolean charge;
+        private boolean charge, bitten;
         private int ticks, repath;
 
         TerritoryGoal(HippoEntity h) {
@@ -883,19 +881,16 @@ public class HippoEntity extends PathfinderMob implements GeoEntity, HasLife {
             if (h.chargeWait > 0 || h.getRandom().nextInt(3) != 0) {
                 return false;
             }
-            LivingEntity croc = nearestCroc();
-            if (croc != null) {
-                target = croc;
-                charge = true;
-                return true;
+            LivingEntity p = h.life().isMale() ? nearestCroc() : null;
+            if (p == null) {
+                p = h.level().getNearestPlayer(h.getX(), h.getY(), h.getZ(), WARN_REACH * h.getScale(),
+                        e -> EntitySelector.NO_CREATIVE_OR_SPECTATOR.test(e) && EntitySelector.LIVING_ENTITY_STILL_ALIVE.test(e));
             }
-            Player p = h.level().getNearestPlayer(h.getX(), h.getY(), h.getZ(), WARN_REACH * h.getScale(),
-                    e -> EntitySelector.NO_CREATIVE_OR_SPECTATOR.test(e) && EntitySelector.LIVING_ENTITY_STILL_ALIVE.test(e));
             if (p == null) {
                 return false;
             }
             target = p;
-            charge = p.distanceTo(h) < CHARGE_REACH * h.getScale() && h.warnWait > 0;
+            charge = p.distanceTo(h) < chargeReach(p) && h.warnWait > 0;
             if (!charge && h.warnWait > 0) {
                 return false;
             }
@@ -914,10 +909,21 @@ public class HippoEntity extends PathfinderMob implements GeoEntity, HasLife {
             return best;
         }
 
+        /** Within this it charges a target that stayed after the warning (a crocodile: right up to him). */
+        private double chargeReach(LivingEntity t) {
+            return (t instanceof CrocodileEntity ? CROC_REACH : CHARGE_REACH) * h.getScale();
+        }
+
+        /** Past this a charge gives up (a crocodile: once it has backed off). */
+        private double giveUp(LivingEntity t) {
+            return (t instanceof CrocodileEntity ? CROC_GIVE_UP : CHARGE_GIVE_UP) * h.getScale();
+        }
+
         @Override
         public void start() {
             ticks = 0;
             repath = 0;
+            bitten = false;
             h.getNavigation().stop();
             if (!charge) {
                 h.setDoing(YAWN);                   // the warning: the great yawn, facing them
@@ -935,7 +941,10 @@ public class HippoEntity extends PathfinderMob implements GeoEntity, HasLife {
             if (!charge) {
                 return h.doing() == YAWN || ticks < YAWN_TICKS;
             }
-            return ticks < CHARGE_TICKS && target.distanceTo(h) < CHARGE_GIVE_UP * h.getScale();
+            if (bitten && target instanceof CrocodileEntity && h.doing() != BITE) {
+                return false;                           // one bite sees a crocodile off
+            }
+            return ticks < CHARGE_TICKS && target.distanceTo(h) < giveUp(target);
         }
 
         @Override
@@ -944,7 +953,7 @@ public class HippoEntity extends PathfinderMob implements GeoEntity, HasLife {
             if (!charge) {
                 h.face(target.getX(), target.getZ(), 6.0F);
                 h.getLookControl().setLookAt(target);
-                if (ticks >= YAWN_TICKS - 2 && target.distanceTo(h) < CHARGE_REACH * h.getScale()) {
+                if (ticks >= YAWN_TICKS - 2 && target.distanceTo(h) < chargeReach(target)) {
                     charge = true;                  // stayed near after the warning
                     ticks = 0;
                     h.setDoing(CALM);
@@ -956,6 +965,7 @@ public class HippoEntity extends PathfinderMob implements GeoEntity, HasLife {
                 h.face(target.getX(), target.getZ(), 10.0F);
                 if (h.doingFor() == BITE_HIT) {
                     h.biteHits(target);
+                    bitten = true;
                 }
                 return;
             }
@@ -1110,8 +1120,9 @@ public class HippoEntity extends PathfinderMob implements GeoEntity, HasLife {
 
     /**
      * By day in the water: it rests afloat (or on the bed in the shallows), and every half minute to a minute and a half
-     * wanders to another spot of its pool along the bed; now and then it yawns. Resting in the water a while makes that
-     * pool its home.
+     * wanders to another spot of its pool along the bed, within {@link #POOL_WANDER} of its middle, so the pod stays
+     * packed together; now and then it yawns. Its pool moves only when the pool itself is gone (the pod's members
+     * drifting each to its own pool spread a pod over half a river, BUGS 272).
      */
     static class PoolGoal extends Goal {
         private final HippoEntity h;
@@ -1143,8 +1154,8 @@ public class HippoEntity extends PathfinderMob implements GeoEntity, HasLife {
                 return;
             }
             if (h.doing() == CALM && --restFor <= 0) {
-                if (h.pool == null || h.depthHere() >= POOL_DEPTH && h.blockPosition().distSqr(h.pool) > 100) {
-                    h.pool = h.blockPosition();
+                if (h.pool == null || h.poolGone()) {
+                    h.pool = h.blockPosition();         // its pool dried or filled in: here is its pool now
                 }
                 if (h.getRandom().nextInt(4) == 0) {
                     h.setDoing(YAWN);
@@ -1158,6 +1169,11 @@ public class HippoEntity extends PathfinderMob implements GeoEntity, HasLife {
                 restFor = 200 + h.getRandom().nextInt(1200);
             }
         }
+    }
+
+    /** Whether its pool is gone: no water left at it. */
+    boolean poolGone() {
+        return pool != null && !level().getFluidState(pool).is(FluidTags.WATER) && !level().getFluidState(pool.above()).is(FluidTags.WATER);
     }
 
     /** How deep the water is where it stands (blocks). */

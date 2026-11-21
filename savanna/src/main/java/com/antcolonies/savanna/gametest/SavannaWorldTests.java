@@ -1172,10 +1172,56 @@ public class SavannaWorldTests {
      */
     @GameTest(template = "arena", timeoutTicks = 600, batch = "savanna_maps")
     public static void crocodileNestSitesComeEvery250To350BlocksOfRiver(GameTestHelper helper) {
+        List<Integer> gaps = new ArrayList<>();
+        double[] r = walkSites(helper, com.antcolonies.savanna.worldgen.NestSites::site, (source, sampler, x, z) -> true, gaps);
+        double length = r[0], every = r[1] == 0 ? Double.MAX_VALUE : length / r[1];
+        int shortGaps = (int) gaps.stream().filter(g -> g < 150).count();
+        SavannaMod.LOGGER.info("[nest sites] {} blocks of river walked, {} sites: one every {} blocks; gaps along a walk (n {}): 10% {}, 25% {}, middle {}, 75% {}, 90% {}; under 150: {} ({} s)",
+                (int) length, (int) r[1], String.format("%.0f", every), gaps.size(), pct(gaps, 10), pct(gaps, 25), pct(gaps, 50), pct(gaps, 75), pct(gaps, 90),
+                shortGaps, String.format("%.0f", r[2]));
+        helper.assertTrue(every >= 230 && every <= 400, String.format("a crocodile nest site every %.0f blocks of river (250 to 350 wanted)", every));
+        helper.assertTrue(shortGaps * 10 <= gaps.size(), shortGaps + " of " + gaps.size() + " gaps between sites under 150 blocks");
+        helper.succeed();
+    }
+
+    /**
+     * Hippo pod sites ({@link com.antcolonies.savanna.worldgen.PodSites}, 2026-11-21) come about every 250 blocks of the
+     * near and mid-inland rivers (my pick: a bull's stretch), walked as the nest sites are and counted along the hippos'
+     * stretches only. Fails when a site comes on average less than every 180 or more than every 380 blocks of those
+     * rivers, or one gap in 10 is under 120.
+     */
+    @GameTest(template = "arena", timeoutTicks = 600, batch = "savanna_maps")
+    public static void hippoPodSitesComeAbout250BlocksApartOnTheirRivers(GameTestHelper helper) {
+        List<Integer> gaps = new ArrayList<>();
+        double[] r = walkSites(helper, com.antcolonies.savanna.worldgen.PodSites::site, com.antcolonies.savanna.worldgen.PodSites::hippoRiver, gaps);
+        double length = r[0], every = r[1] == 0 ? Double.MAX_VALUE : length / r[1];
+        int shortGaps = (int) gaps.stream().filter(g -> g < 120).count();
+        SavannaMod.LOGGER.info("[pod sites] {} blocks of hippo river walked, {} sites: one every {} blocks; gaps along a walk (n {}): 10% {}, 25% {}, middle {}, 75% {}, 90% {}; under 120: {} ({} s)",
+                (int) length, (int) r[1], String.format("%.0f", every), gaps.size(), pct(gaps, 10), pct(gaps, 25), pct(gaps, 50), pct(gaps, 75), pct(gaps, 90),
+                shortGaps, String.format("%.0f", r[2]));
+        helper.assertTrue(every >= 180 && every <= 380, String.format("a hippo pod site every %.0f blocks of their river (about 250 wanted)", every));
+        helper.assertTrue(shortGaps * 10 <= gaps.size(), shortGaps + " of " + gaps.size() + " gaps between pod sites under 120 blocks");
+        helper.succeed();
+    }
+
+    /** A kind of river site's test of a chunk, and the stretches of river its sites are counted along. */
+    private interface SiteTest {
+        boolean site(MultiNoiseBiomeSource source, Climate.Sampler sampler, long seed, int cx, int cz);
+    }
+
+    private interface Stretch {
+        boolean counts(MultiNoiseBiomeSource source, Climate.Sampler sampler, int x, int z);
+    }
+
+    /**
+     * Walks the rivers' middle lines on {@link #GROUND_SEEDS} (as the bend survey walks them) and meets every site chunk
+     * within two chunks of the line once; returns the blocks of river walked where {@code stretch} counts and the sites
+     * met, and fills {@code gaps} with the blocks along a walk from one site to the next (sorted).
+     */
+    private static double[] walkSites(GameTestHelper helper, SiteTest test, Stretch stretch, List<Integer> gaps) {
         var registries = helper.getLevel().registryAccess();
         double length = 0;
         int sites = 0;
-        List<Integer> gaps = new ArrayList<>();
         long start = System.nanoTime();
         for (long seed : GROUND_SEEDS) {
             Climate.Sampler sampler = BiomeMaps.sampler(registries, seed);
@@ -1220,14 +1266,14 @@ public class SavannaWorldTests {
                             break;      // another walk's river
                         }
                         mine.add(key);
-                        if (s > 0 || dir == 1) {
+                        if ((s > 0 || dir == 1) && stretch.counts(source, sampler, (int) Math.floor(q[0]), (int) Math.floor(q[1]))) {
                             length += BEND_STEP;
                         }
                         int cx = Math.floorDiv((int) Math.floor(q[0]), 16), cz = Math.floorDiv((int) Math.floor(q[1]), 16);
                         for (int dx = -2; dx <= 2; dx++) {
                             for (int dz = -2; dz <= 2; dz++) {
                                 long site = ((long) (cx + dx) << 32) ^ ((cz + dz) & 0xffffffffL);
-                                if (!met.contains(site) && com.antcolonies.savanna.worldgen.NestSites.site(source, sampler, seed, cx + dx, cz + dz)) {
+                                if (!met.contains(site) && test.site(source, sampler, seed, cx + dx, cz + dz)) {
                                     met.add(site);
                                     sites++;
                                     if (lastSite >= 0) {
@@ -1254,14 +1300,7 @@ public class SavannaWorldTests {
             }
         }
         java.util.Collections.sort(gaps);
-        double every = sites == 0 ? Double.MAX_VALUE : length / sites;
-        int shortGaps = (int) gaps.stream().filter(g -> g < 150).count();
-        SavannaMod.LOGGER.info("[nest sites] {} blocks of river walked, {} sites: one every {} blocks; gaps along a walk (n {}): 10% {}, 25% {}, middle {}, 75% {}, 90% {}; under 150: {} ({} s)",
-                (int) length, sites, String.format("%.0f", every), gaps.size(), pct(gaps, 10), pct(gaps, 25), pct(gaps, 50), pct(gaps, 75), pct(gaps, 90),
-                shortGaps, String.format("%.0f", (System.nanoTime() - start) / 1e9));
-        helper.assertTrue(every >= 230 && every <= 400, String.format("a crocodile nest site every %.0f blocks of river (250 to 350 wanted)", every));
-        helper.assertTrue(shortGaps * 10 <= gaps.size(), shortGaps + " of " + gaps.size() + " gaps between sites under 150 blocks");
-        helper.succeed();
+        return new double[] {length, sites, (System.nanoTime() - start) / 1e9};
     }
 
     private static int pct(List<Integer> sorted, int p) {

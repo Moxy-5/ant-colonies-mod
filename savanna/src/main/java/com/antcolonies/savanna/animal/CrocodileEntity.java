@@ -305,8 +305,9 @@ public class CrocodileEntity extends PathfinderMob implements GeoEntity, HasLife
         goalSelector.addGoal(0, new CrocodileBreeding.HeldForMateGoal(this));
         goalSelector.addGoal(0, new CrocodileBreeding.WaitForMotherGoal(this));
         goalSelector.addGoal(0, new PlungeGoal(this));
-        // hippos charge crocodiles that come near them (2026-11-21, "River zones"): it keeps clear of any within 8 blocks
-        goalSelector.addGoal(0, new net.minecraft.world.entity.ai.goal.AvoidEntityGoal<>(this, HippoEntity.class, 8.0F, 1.0, 1.4));
+        // hippo bulls see off crocodiles that come right up to them (2026-11-21, "River zones"): it swims clear (BUGS 272),
+        // over its plunge: bitten on a bank, a plunge into the nearest water took it straight back beside the bull
+        goalSelector.addGoal(-1, new KeepClearGoal(this));
         goalSelector.addGoal(1, new CrocodileBreeding.MotherGoal(this));
         goalSelector.addGoal(1, new SeekMateGoal<>(this, 1.0));      // over the sun and the wandering: a courtship is not left for a bask
         goalSelector.addGoal(1, new BaskGoal(this));
@@ -1308,6 +1309,101 @@ public class CrocodileEntity extends PathfinderMob implements GeoEntity, HasLife
         @Override
         public void stop() {
             croc.getNavigation().stop();
+        }
+    }
+
+    /**
+     * Keeping clear of hippos (2026-11-21, BUGS 272): a hippo within {@link #NEAR} blocks, or one charging within
+     * {@link #CHARGING} (a bull seeing a crocodile off), and it heads {@link #AWAY} blocks off, straight away from the
+     * hippo or a little to one side, to water or out onto a bank, until it is {@link #CLEAR} off. (Minecraft's
+     * own avoid goal looked for a land spot to run to and often found none in the river, so the crocodile stayed by the
+     * pod and was bitten again and again.) Pods let crocodiles rest close by in real rivers, so it keeps only this far.
+     */
+    static class KeepClearGoal extends Goal {
+        static final double NEAR = 7.0, CHARGING = 14.0, CLEAR = 10.0;
+        static final int AWAY = 12;
+        private final CrocodileEntity croc;
+        @Nullable
+        private HippoEntity hippo;
+        @Nullable
+        private BlockPos to;
+        private int wait, left;
+
+        KeepClearGoal(CrocodileEntity croc) {
+            this.croc = croc;
+            setFlags(EnumSet.of(Flag.MOVE));
+        }
+
+        @Override
+        public boolean canUse() {
+            if (--wait > 0) {
+                return false;
+            }
+            wait = 10;
+            hippo = null;
+            for (HippoEntity h : croc.level().getEntitiesOfClass(HippoEntity.class, croc.getBoundingBox().inflate(CHARGING))) {
+                double d = h.distanceTo(croc);
+                if (h.isAlive() && (d < NEAR * h.getScale() || h.charging() && d < CHARGING) && (hippo == null || d < hippo.distanceTo(croc))) {
+                    hippo = h;
+                }
+            }
+            if (hippo == null) {
+                return false;
+            }
+            to = away(hippo);
+            return to != null;
+        }
+
+        /** A spot {@link #AWAY} blocks off, away from the hippo (water where it swims, else ground), or null if none. */
+        @Nullable
+        private BlockPos away(HippoEntity from) {
+            Level level = croc.level();
+            double dx = croc.getX() - from.getX(), dz = croc.getZ() - from.getZ(), l = Math.hypot(dx, dz);
+            double base = l < 1.0E-3 ? croc.getRandom().nextDouble() * Math.PI * 2 : Math.atan2(dz, dx);
+            for (double turn : new double[] {0, 0.6, -0.6, 1.2, -1.2}) {
+                for (int far : new int[] {AWAY, AWAY - 4}) {
+                    int x = Mth.floor(croc.getX() + Math.cos(base + turn) * far), z = Mth.floor(croc.getZ() + Math.sin(base + turn) * far);
+                    int top = level.getHeight(net.minecraft.world.level.levelgen.Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, x, z) - 1;
+                    BlockPos at = new BlockPos(x, top, z);
+                    if (Math.abs(top - croc.getBlockY()) > 4) {
+                        continue;
+                    }
+                    if (level.getFluidState(at).is(FluidTags.WATER)) {
+                        return at;
+                    }
+                    if (level.getBlockState(at).isFaceSturdy(level, at, net.minecraft.core.Direction.UP)) {     // out onto a bank, as real ones do
+                        return at.above();
+                    }
+                }
+            }
+            return null;
+        }
+
+        @Override
+        public void start() {
+            left = 200;
+            croc.getNavigation().moveTo(to.getX() + 0.5, to.getY(), to.getZ() + 0.5, 1.4);
+        }
+
+        @Override
+        public boolean canContinueToUse() {
+            return left > 0 && hippo != null && hippo.isAlive() && hippo.distanceTo(croc) < CLEAR * hippo.getScale() + (hippo.charging() ? 4 : 0);
+        }
+
+        @Override
+        public void tick() {
+            if (--left % 20 == 0 && croc.getNavigation().isDone()) {
+                to = away(hippo);
+                if (to != null) {
+                    croc.getNavigation().moveTo(to.getX() + 0.5, to.getY(), to.getZ() + 0.5, 1.4);
+                }
+            }
+        }
+
+        @Override
+        public void stop() {
+            croc.getNavigation().stop();
+            hippo = null;
         }
     }
 
