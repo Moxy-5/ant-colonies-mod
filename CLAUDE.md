@@ -130,3 +130,4 @@ Every animal, plant, fungus and colony insect, built or planned, with its status
 - `docs/STATUS.md`: the one-page "where we are" for the user.
 - `docs/status-log.md`: every status bullet, oldest first (CLAUDE.md's long "Current status" until 2026-11-19); new status bullets go at its end.
 - `docs/LIVING-THINGS.md`: the living things master list and the spawning groups table. `docs/ROADMAP.md`: the full roadmap and milestones. `docs/TESTING.md`: every testing tip in full.
+- **Agent handoff (`docs/HANDOFF.md` and `docs/handoff/`):** Neon handles the Model Workshop & Animal Maker Engine (`tools/`, `references/`, model `assets/`); Claude handles Java gameplay, worldgen, `data/` and tests. Check `docs/HANDOFF.md` at session start for ready animal cards (`docs/handoff/<animal>.md`: exact paths, scales, clip names, event ticks and bone sockets) or to leave model/clip requests for Neon.
