@@ -1,0 +1,15 @@
+# The measuring course (walking along a river bed four blocks under water) for the crab: written by tools/body_course.py films, do not edit.
+lens 50
+cmd fill -12 -63 -7 12 -60 7 minecraft:water
+walker antcolonies:crab -4.5 -63 0.5 -90
+follow 0 3.5 -6 0 25
+cmd tick unfreeze
+record on 3
+go 3 -63 0 1.0
+wait 60
+shot p00
+wait 60
+shot p01
+wait 28
+shot p02
+record off

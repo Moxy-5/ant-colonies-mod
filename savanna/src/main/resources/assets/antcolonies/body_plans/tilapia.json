@@ -1,0 +1,88 @@
+{
+  "model": "tilapia",
+  "about": "The tilapia's body plan (the Animal Maker Engine step A, 2026-11-20): its family, its body chain (head to tail) and legs, what tools/clip_check.py needs (checks) and its course entry (course). Read by tools/body_course.py, tools/clip_check.py and tools/body_plan.py; the game reads only its bones table. Numbers marked my pick in docs/HISTORY.md (step A): bpt measured on the course 2026-11-20 (the snail's still a guess).",
+  "family": "fish",
+  "root": "body",
+  "forebody": "front",
+  "head": {
+    "bone": "head",
+    "jaws": []
+  },
+  "chain": [
+    "head",
+    "front",
+    "mid",
+    "rear",
+    "peduncle",
+    "tail"
+  ],
+  "legs": {},
+  "bones": {
+    "body": "body",
+    "head": "head",
+    "front": "front",
+    "mid": "mid",
+    "rear": "rear",
+    "peduncle": "peduncle",
+    "tail": "tail",
+    "pectoral_left": "pectoral_left",
+    "pelvic_left": "pelvic_left",
+    "pectoral_right": "pectoral_right",
+    "pelvic_right": "pelvic_right"
+  },
+  "checks": {
+    "px": 0.0625,
+    "controller": "savanna/src/main/java/com/antcolonies/savanna/animal/TilapiaEntity.java",
+    "water": [
+      "idle",
+      "swim",
+      "graze",
+      "caught",
+      "caught_fight",
+      "death"
+    ],
+    "switches": [
+      [
+        "idle",
+        "swim"
+      ],
+      [
+        "swim",
+        "idle"
+      ],
+      [
+        "swim",
+        "graze"
+      ],
+      [
+        "graze",
+        "swim"
+      ],
+      [
+        "swim",
+        "flop"
+      ],
+      [
+        "flop",
+        "swim"
+      ],
+      [
+        "swim",
+        "caught"
+      ],
+      [
+        "caught",
+        "caught_fight"
+      ]
+    ]
+  },
+  "course": {
+    "tilapia": {
+      "id": "antcolonies:tilapia",
+      "data": "",
+      "walk": 1.0,
+      "dash": 1.6,
+      "bpt": 0.14
+    }
+  }
+}

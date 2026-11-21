@@ -3,12 +3,13 @@ docs/plans/model-workshop.md): renders an animal's approved viewer version from 
 scene, and lays each film picture beside its render in one Compare picture, so a difference between what the game
 draws and what the user approved in the viewer shows at a glance.
 
-    python tools/game_compare.py bullfrog v27 tools/film/bullfrog_eyes.film --px 0.02 \\
+    python tools/game_compare.py bullfrog v27 tools/film/bullfrog_eyes.film \\
         --game "In the game=run-film/screenshots/bullfrog_eyes" --shots eye_side,eye_threequarter,eye_front \\
         --out references/workshop/bullfrog/eyes_game_vs_v27.png
 
   --game "label=folder"   a folder of the scene's pictures (several: one column each, e.g. before and after a fix)
-  --px                    a model pixel in blocks in the game (the renderer's scale / 16, times the animal's own size)
+  --px                    a model pixel in blocks in the game (the renderer's scale / 16, times the animal's own size);
+                          by default the animal's body plan's "checks.px" (a grown animal of size 1)
   --shots                 which "shot" lines to compare (default all of them; bursts are clips, not compared)
   --crop x0,y0,x1,y1      cut every picture to this part (of the film's 960 x 540) before laying them out
 
@@ -139,13 +140,19 @@ def main():
     ap.add_argument('animal')
     ap.add_argument('version')
     ap.add_argument('film')
-    ap.add_argument('--px', type=float, required=True)
+    ap.add_argument('--px', type=float, help='a model pixel in blocks (default: the body plan checks.px)')
     ap.add_argument('--game', action='append', default=[], help='"label=folder" of the scene\'s pictures')
     ap.add_argument('--shots')
     ap.add_argument('--crop')
     ap.add_argument('--out', required=True)
     ap.add_argument('--title')
     a = ap.parse_args()
+    if a.px is None:
+        # one source of truth per animal (the Animal Maker Engine step A): the body plan's model pixel in blocks
+        import body_plan
+        a.px = json.load(open(body_plan.plan_path(a.animal), encoding='utf-8')).get('checks', {}).get('px')
+        if a.px is None:
+            ap.error(f'no --px given and the {a.animal} body plan has no checks.px')
     shots = shots_of(ROOT / a.film)
     if a.shots:
         shots = {n: shots[n] for n in a.shots.split(',')}

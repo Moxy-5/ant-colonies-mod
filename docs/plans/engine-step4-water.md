@@ -77,7 +77,10 @@ bite and eyelids stay. Fun and good-looking first (it is an animal). Every numbe
 - The course's `climb_out` scene and my first climb-out film had the water under the flat world's grass layer (a
   covered channel): the air over it added.
 
-## The offline checker (`tools/water_check.py`)
+## The offline checker (`tools/water_check.py`, since 2026-11-20 `tools/clip_check.py`)
+(Since the Animal Maker Engine step A, 2026-11-20: `python tools/clip_check.py monitor 'water_*' [--switches] [--times ...]`,
+the one checker for every animal, reading the moves from the game's files; every check below lives on there, the two
+ends against the clips they hand over to as its blend check.) It was
 `python tools/water_check.py <in|dash|drop|drop2|out|outup> [size] [times] [views]` (run in a scratch folder): reach
 misses, parts inside the bank or bottom, the tail inside the bank (a rough offline drag: the game's is the truth), the
 biggest jump of a part, **the fastest joint turn** (degrees in 0.05 s; flagged over 90, the confirmed climbs reach 80;

@@ -1,0 +1,48 @@
+# The measuring course (a one-block step up on the river bed) for the snail: written by tools/body_course.py films, do not edit.
+lens 50
+cmd fill -12 -63 -7 12 -60 7 minecraft:water
+cmd fill 1 -63 -7 12 -63 7 minecraft:dirt
+walker antcolonies:snail -4.5 -63 0.5 -90
+follow 0 3.5 -6 0 25
+cmd tick unfreeze
+record on 3
+go 5 -62 0 1.0
+wait 60
+shot p00
+wait 60
+shot p01
+wait 60
+shot p02
+wait 60
+shot p03
+wait 60
+shot p04
+wait 60
+shot p05
+wait 60
+shot p06
+wait 60
+shot p07
+wait 60
+shot p08
+wait 60
+shot p09
+wait 60
+shot p10
+wait 60
+shot p11
+wait 60
+shot p12
+wait 60
+shot p13
+wait 60
+shot p14
+wait 60
+shot p15
+wait 60
+shot p16
+wait 60
+shot p17
+wait 48
+shot p18
+record off

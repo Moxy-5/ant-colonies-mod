@@ -65,5 +65,232 @@
     "leg_right_1": "leg_right_1",
     "leg_right_2": "leg_right_2",
     "foot_right": "foot_right"
+  },
+  "checks": {
+    "about": "What tools/clip_check.py needs (tools/body_plan.py explains every key): a male is drawn at 0.32 (a model pixel is 0.02 blocks); the hop and the leap are thrown by the game (docs/plans/prey-fish-and-frogs.md); the game does not read this section.",
+    "px": 0.02,
+    "controller": "savanna/src/main/java/com/antcolonies/savanna/animal/BullfrogEntity.java",
+    "water": [
+      "swim",
+      "float"
+    ],
+    "dig": [
+      "dig_in",
+      "dug",
+      "dig_out"
+    ],
+    "surface": 8.0,
+    "surface_marks": [
+      {
+        "label": "eyes",
+        "prefix": "eye",
+        "edge": "top"
+      },
+      {
+        "label": "back",
+        "prefix": "body",
+        "edge": "top"
+      }
+    ],
+    "on_ground": {
+      "leap": [
+        [
+          0.0,
+          0.7
+        ]
+      ],
+      "hop_dive": [
+        [
+          0.0,
+          0.6
+        ]
+      ],
+      "climb_out": [
+        [
+          0.9,
+          1.0
+        ]
+      ]
+    },
+    "flight": {
+      "hop": [
+        0.12,
+        0.6
+      ],
+      "hop_dive": [
+        0.12,
+        0.6
+      ],
+      "leap": [
+        0.12,
+        0.7
+      ]
+    },
+    "feet_free": [
+      "walk",
+      "hop",
+      "leap",
+      "death",
+      "attack"
+    ],
+    "tuck_ok": [
+      "dig_in",
+      "dug",
+      "dig_out",
+      "death"
+    ],
+    "body_bones": [
+      "body"
+    ],
+    "hide_in": [
+      "head",
+      "jaw"
+    ],
+    "hidden_at_rest": [
+      "mouth_floor",
+      "mouth_roof",
+      "tongue_1",
+      "tongue_2",
+      "tongue_pad"
+    ],
+    "walks": {
+      "walk": 5.102
+    },
+    "reach": [
+      {
+        "clip": "tongue",
+        "bone": "tongue_pad",
+        "past_z": -20.0,
+        "past_label": "the snout",
+        "label": "the tongue's pad"
+      }
+    ],
+    "dig_marks": [
+      {
+        "label": "back",
+        "prefix": "body",
+        "edge": "top"
+      },
+      {
+        "label": "eyes",
+        "prefix": "eye",
+        "edge": "top"
+      },
+      {
+        "label": "lowest",
+        "prefix": "",
+        "edge": "low"
+      }
+    ],
+    "switches": [
+      [
+        "idle",
+        "walk"
+      ],
+      [
+        "walk",
+        "idle"
+      ],
+      [
+        "idle",
+        "hop"
+      ],
+      [
+        "hop",
+        "idle"
+      ],
+      [
+        "idle",
+        "stalk"
+      ],
+      [
+        "stalk",
+        "tongue"
+      ],
+      [
+        "tongue",
+        "idle"
+      ],
+      [
+        "idle",
+        "leap"
+      ],
+      [
+        "leap",
+        "swim"
+      ],
+      [
+        "idle",
+        "hop_dive"
+      ],
+      [
+        "hop_dive",
+        "swim"
+      ],
+      [
+        "swim",
+        "float"
+      ],
+      [
+        "float",
+        "swim"
+      ],
+      [
+        "swim",
+        "climb_out"
+      ],
+      [
+        "climb_out",
+        "idle"
+      ],
+      [
+        "idle",
+        "call"
+      ],
+      [
+        "call",
+        "idle"
+      ],
+      [
+        "idle",
+        "puff"
+      ],
+      [
+        "puff",
+        "idle"
+      ],
+      [
+        "idle",
+        "attack"
+      ],
+      [
+        "idle",
+        "dig_in"
+      ],
+      [
+        "dig_in",
+        "dug"
+      ],
+      [
+        "dug",
+        "dig_out"
+      ],
+      [
+        "dig_out",
+        "idle"
+      ]
+    ]
+  },
+  "course": {
+    "bullfrog": {
+      "id": "antcolonies:bullfrog",
+      "data": "Male:1b,HungryIn:99999",
+      "walk": 1.0,
+      "dash": 1.6,
+      "bpt": 0.035,
+      "setup": [
+        "cmd time set 2000"
+      ]
+    }
   }
 }

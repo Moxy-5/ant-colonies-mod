@@ -70,6 +70,190 @@
     "arm_foot_right": "arm_foot_right",
     "leg_upper_right": "leg_upper_right",
     "leg_lower_right": "leg_lower_right",
-    "leg_foot_right": "leg_foot_right"
+    "leg_foot_right": "leg_foot_right",
+    "carried": "carried"
+  },
+  "checks": {
+    "about": "What tools/clip_check.py needs (tools/body_plan.py explains every key): the surface afloat is CrocodileEntity.AFLOAT (0.462 of its size in blocks, 7.4 model px); the game does not read this section.",
+    "px": 0.0625,
+    "controller": "savanna/src/main/java/com/antcolonies/savanna/animal/CrocodileEntity.java",
+    "water": [
+      "head_slap",
+      "rumble",
+      "snout_up",
+      "court_roll",
+      "swim",
+      "float",
+      "lunge",
+      "snap_left",
+      "snap_right",
+      "hold",
+      "eat",
+      "shake",
+      "young_swim",
+      "young_float"
+    ],
+    "surface": 7.392,
+    "surface_marks": [
+      {
+        "label": "snout",
+        "prefix": "head",
+        "edge": "top"
+      },
+      {
+        "label": "jaw",
+        "prefix": "jaw",
+        "edge": "low"
+      },
+      {
+        "label": "back",
+        "prefix": "chest",
+        "edge": "top"
+      },
+      {
+        "label": "tail1",
+        "prefix": "tail1",
+        "edge": "top"
+      },
+      {
+        "label": "tail3",
+        "prefix": "tail3",
+        "edge": "top"
+      }
+    ],
+    "feet_parts": [
+      "foot"
+    ],
+    "feet_reach_down": 5,
+    "skip_bones": [
+      "carried"
+    ],
+    "jaw": {
+      "bone": "jaw",
+      "flag_below": -0.5
+    },
+    "body_bones": [
+      "chest",
+      "hips"
+    ],
+    "tuck_ok": [
+      "death",
+      "flop",
+      "court_roll"
+    ],
+    "walk_clips": [
+      "walk",
+      "young_walk",
+      "young_run"
+    ],
+    "switches": [
+      [
+        "idle",
+        "walk"
+      ],
+      [
+        "walk",
+        "idle"
+      ],
+      [
+        "walk",
+        "swim"
+      ],
+      [
+        "swim",
+        "walk"
+      ],
+      [
+        "swim",
+        "float"
+      ],
+      [
+        "float",
+        "swim"
+      ],
+      [
+        "float",
+        "lunge"
+      ],
+      [
+        "lunge",
+        "hold"
+      ],
+      [
+        "hold",
+        "shake"
+      ],
+      [
+        "hold",
+        "eat"
+      ],
+      [
+        "idle",
+        "bask"
+      ],
+      [
+        "bask",
+        "walk"
+      ],
+      [
+        "walk",
+        "drag"
+      ],
+      [
+        "idle",
+        "hiss"
+      ],
+      [
+        "idle",
+        "dig"
+      ],
+      [
+        "float",
+        "head_slap"
+      ],
+      [
+        "float",
+        "snout_up"
+      ],
+      [
+        "young_walk",
+        "young_swim"
+      ],
+      [
+        "young_swim",
+        "young_walk"
+      ],
+      [
+        "young_idle",
+        "young_walk"
+      ],
+      [
+        "young_swim",
+        "young_float"
+      ]
+    ]
+  },
+  "course": {
+    "crocodile": {
+      "id": "antcolonies:crocodile",
+      "data": "OwnSize:1.0f",
+      "walk": 1.0,
+      "dash": 1.9,
+      "bpt": 0.059
+    },
+    "croc_hatchling": {
+      "id": "antcolonies:crocodile",
+      "data": "Life:{Sex:\"female\",Age:0,Grown:0b,OwnSize:1.0f}",
+      "walk": 1.0,
+      "dash": 1.9,
+      "bpt": 0.018657438194993436
+    },
+    "croc_teen": {
+      "id": "antcolonies:crocodile",
+      "data": "Life:{Sex:\"female\",Age:168000,Grown:0b,OwnSize:1.0f}",
+      "walk": 1.0,
+      "dash": 1.9,
+      "bpt": 0.04624206495636382
+    }
   }
 }

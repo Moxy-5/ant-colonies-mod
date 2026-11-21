@@ -64,8 +64,9 @@ its checks are about things that look broken (gaps, sliding feet, pops), never a
   (`tools/monitor_models.py`, `tools/crocodile_models.py`, ...).
 - **Built since (to 2026-11-20):** shared: the measuring course, `SteadyController` (clip speed), `TailDrag` and
   `DraggedTail` (the dragged tail), `game_compare.py`, body plans for the monitor, crocodile and bullfrog. The
-  monitor's own: `MonitorClimb` (its climbs and water moves). One checker per animal: `climb_check.py`,
-  `water_check.py` (monitor), `croc_check.py`, `frog_check.py`. The plan's steps A and B make the per-animal ones shared.
+  monitor's own: `MonitorClimb` (its climbs and water moves). One checker per animal (`climb_check.py`,
+  `water_check.py` for the monitor, `croc_check.py`, `frog_check.py`) until step A (2026-11-20) made them one,
+  `tools/clip_check.py`; step B makes the moves shared.
 - **Planned, not built:** the tools review `docs/plans/animal-kit-tools-review.md` (2026-11-08) holds the animation
   half of this engine as ideas: K1 clips remade only when changed, K5 lab checks for every family, K6 the pose viewer
   for any model, G1 an animated body for any creature (not an ant), G2 an animal's clips listed in data, G4 the live
@@ -250,7 +251,67 @@ the monitor's leftovers in its own row.
 8. The user tries it in-game.
 
 ### The steps (in this order; each builds the shared piece, the animal it is proved on is named)
-**A. One checker and one course for any animal.**
+**A. One checker and one course for any animal. BUILT 2026-11-20** (overnight, branch `claude/engine-every-animal`;
+`tools/clip_check.py`, `tools/body_course.py` by family, `tools/body_plan.py`'s "checks" and "course" fields, body
+plans for the tilapia, catfish, barb, crab and river snail; `climb_check.py`, `water_check.py`, `croc_check.py` and
+`frog_check.py` deleted after the proof below). How to use it:
+  `python tools/clip_check.py <animal> [clips or patterns] [--switches] [--times 0,0.5,1] [--model <young model>]`
+  `python tools/body_course.py run <animals> [--quick] [--family <family>] [--scenes a,b]`
+**Quick or full course:** `--quick` (walkers `step_up`, `step_down`, `bank_level`; hoppers `step_up`, `bank_level`,
+`climb_out`; swimmers `school_turn`, `shallows`; bed walkers `bed_step_up`, `shore_out`) after a small change to an
+animal's clips or body code; the full course after a big change (a new move, a new body rule, a new animal) and before
+a merge into `master`. About a minute a scene either way.
+
+*The proof (2026-11-20):* every monitor clip (all ten climbs and thirty water moves, five sizes), every crocodile clip
+on the grown and the teen model, and every bullfrog clip went through both the old checkers and the new one (outputs
+saved and compared line by line). Same findings: the same parts inside the step or bank at the same moments and
+depths, the same surface tables, path speeds, jaw openings, joint turns, the bullfrog's walk slide (to the hundredth)
+and dig and tongue numbers. The differences, each explained: (1) the old monitor checkers' "out of reach" lists came
+from the maker's own working (patched in, built in memory) and were wrong: every clip the maker built logged into one
+list, so the climb up and the climb down printed the same list, with times past the clip's end; the old
+`climb_check.py` also no longer ran (the maker's leg had grown a `way` setting its patch did not pass on). The new
+check reads the game's files and asks the same question of what is drawn: a foot standing still in the world more than
+1 px (the game's own reach-down for the crocodile, 5 px) over what is under it, a foot pressed on a step's face allowed
+(proved on a lifted test foot: caught at 8 px). (2) The new checker samples the ground every 1/40 s, not 1/20, so it
+finds a few more grazes at the limit (a claw 1.2 px into the step on the climb up at 1.0 s, the tongue 0.4 px). (3)
+Biggest jumps a little bigger: the old crocodile checker kept only the last box of each bone, the new one every box.
+(4) Knees and elbows are judged against the torso's own boxes from the geo file (rule 7 below), not the bullfrog's
+skin maths: the same numbers on most clips, a little deeper in a few (the stalk's elbows 0.7 px against 0.4, now
+flagged); the mouth parts are judged as "how far they stick out of the head's boxes" (all hidden). New findings the
+old ones never looked for, for step C to judge on films: the crocodile's and the monitor's swimming legs folded up to
+2.7 and 3.9 px into the flanks (folded on purpose; to look at), the monitor's dragged tail on the climbs (up to 4.6 px
+into the step at the end of the climb down; the old climb checker skipped the tail), and the clip changes below.
+
+*Clip changes found (the blend check, item 6 below):* the bullfrog's `swim` to `float`, `float` to `swim` and
+`climb_out` to `idle` have feet whose angles are about 355 degrees apart in the files: the same pose written once as
+-178 and once as +177, which GeckoLib's straight blend turns as a whole spin of the foot in 3 ticks; `leap` and
+`hop_dive` to `swim` turn the hands 165 degrees in 3 ticks. The monitor's `walk` to `swim` (both ways) moves a claw
+12.8 px in a tick (the course's baseline finding 2, now caught offline). The crocodile: none flagged. Written into
+`docs/BUGS.md`.
+
+*The course by family (a first baseline for the five new ones below).* The monitor's, crocodile's and bullfrog's shot
+lists come out byte for byte the same as before, and checking the same recordings gives the same reports; their new
+run (2026-11-20, 21:00) shows the same kinds of findings as their last reports, the numbers moved only by game changes
+made since (the crocodile's last report was from 2026-11-19, the bullfrog's from before its polish: its feet now slide
+about half as much on the turn).
+
+*First baselines (2026-11-20, worst first; `run-film/course/course_<animal>.txt`; offline `clip_check.py`):*
+- **Tilapia** (swimmers): course: the tail pops 4.4 px once in the scare; the head 2 px into a block at the school's
+  turn; the head/front seam open 1.2 px in every scene (a model gap, not motion). Offline: nothing inside, no flagged
+  turn; 4 clip changes flagged, all the roll to its side for `flop` and the body's 38 to 44 degree bend into and out
+  of `graze` (to judge on film). Swims about 0.14 blocks a tick at speed 1.
+- **Catfish** (swimmers): course: the tail pops 4.7 px at the school's turn; a chin barbel 3.9 px into the bed in the
+  shallows and rising; the head/front seam 1.3 px. Offline: `flop` starts 2 px into the ground; `idle` to `court`
+  moves the tail 7 px in a tick of the blend. About 0.145 blocks a tick.
+- **Barb** (swimmers): course: the tail fin's joint snaps 11 to 21 degrees in every scene (its tail beat; the worst
+  finding of the three fish); the jaw 4.1 px into a block at the school's turn. Offline: `idle` to `nibble` and `swim`
+  to `flop` flagged at the blend. About 0.14 blocks a tick.
+- **Crab** (bed walkers): course: walking out onto the shore every planted foot slides 0.9 to 1.2 times the body's
+  speed (the walk clip played faster than its stride); leg tips up to 2.9 px into the step on the bed. Offline: leg tips
+  1.9 px into the ground as it falls in `death`; no flagged changes. About 0.096 blocks a tick.
+- **River snail** (bed walkers): course: 15 to 92 clip flickers a scene between `crawl` and `idle` (BUGS 250);
+  nothing else. Offline: the head 0.5 px into the ground in `graze`. Slow (about 0.012 blocks a tick, a guess).
+
 - `tools/clip_check.py` (name my pick) in place of the four checkers: reads the clip files the game reads and the
   body plan, any number of legs (none for a snake), any chain length. Its checks are the four old ones' put together:
   parts under the ground or inside the step, where the snout, back and tail lie against the water's surface, feet out
@@ -264,7 +325,39 @@ the monitor's leftovers in its own row.
   the old four go (rule 8: every check they had lives on in the new one).
 - The course (`tools/body_course.py`, already any animal) gets scenes by family, not by animal: walkers (today's
   steps, banks and turn), swimmers (open water, the shallows, coming up for air, a school turning), hoppers (hops on
-  the flat, over a step, into and out of water); fliers when the first flier comes. The fish, crab and snail join it.
+  the flat, over a step, into and out of water); fliers when the first flier comes. The fish, crab and snail join it
+  (built: swimmers `open_water`, `shallows`, `surface`, `school_turn`; bed walkers for the crab and snail `bed_flat`,
+  `bed_step_up`, `bed_step_down`, `bed_turn`, `shore_out`; hoppers the walkers' land and water scenes, hopped; each set
+  with its own scare).
+- **Added from a second review (the user had another AI look at the plan, 2026-11-20; each checked against the code):**
+  6. *Clip changes checked offline.* Some of the monitor's worst bugs were at the switch between two clips, not inside
+     one (baseline finding 2; the bullfrog's `leap` to `swim`). `clip_check.py --switches` plays GeckoLib's blend
+     between every pair of clips the plan lists (its "switches", my pick; the blend length read from the animal's Java
+     controller: monitor 4 ticks, crocodile 8, bullfrog 3, crab, snail and tilapia 4, catfish and barb 3) and flags a
+     part jumping further in a tick of the blend than either clip moves it (and over 3 px), or a joint turning over 90
+     degrees a tick. What it cannot see: rules the Java model draws over the clip (the monitor's leg folding); only the
+     course sees those.
+  7. *Self-clipping checked generically.* Knees and elbows (each leg's middle joint) against the model's own torso
+     and head boxes read from its geo file (the plan's "body_bones"), never per-animal skin maths.
+  8. *Quick course presets.* `--quick` and `--family <name>` (above, "Quick or full course").
+  9. *Failures drawn on the film strips:* the ground and the step or bank grey, the water's surface and the bottom blue,
+     every part inside a block a red dot, the planted feet's trails (green, red where a planted foot slides), a red
+     frame and red time on any picture within a frame of a flagged jump or joint snap; `--switches --times` draws each
+     blend as a strip with the parts jumping more than 3 px dotted red.
+  10. *One source of truth per animal (for the tools):* the summon id, data, speeds and blocks a tick (`body_course`'s
+      old ANIMALS table), the model pixel in blocks (`game_compare.py`'s `--px`, now optional), the float depth, the
+      family and the bone roles all come from the body plan, so a new animal is plugged into the checker, the course
+      and the compare by its body plan alone. The game keeps its own numbers in Java for now; it could read them from
+      the plan later (a step for when one of them changes).
+  11. *(Lowest priority)* `tools/viewer_shot.py` taking all a page's views and scores in one browser launch, and one
+      contact sheet (flat side, top and front over the reference with a red and blue difference, the scores stamped
+      on, three quarters front and back, a head close-up, the underside, an optional ruler and labelled pivots).
+- **Ideas waiting for their animal** (rule 4: built with the first animal that needs them, written down 2026-11-20):
+  shape makers in `model_parts.py` with a detail setting, so a small fish, a frog and the 6-block monitor share them
+  under their box budgets (the bullfrog had to copy `limb()` and `ball()`); pixel-art stamps for crisp painted features
+  (eyes, nostrils, stripes) instead of colour maths; a first paint draft projected from the reference picture;
+  click-to-pin notes on the viewer page so the user can point at a spot; gait builders (trot, gallop, the many-legged
+  wave); freeing the insect animation tools from the ant class (G1) when a non-colony insect or spider comes.
 
 **B. Shared moves in the framework.**
 - `MonitorClimb` becomes a species-neutral move player in `framework/.../entity/body/` (`BlockMoves`, my pick): it
@@ -321,4 +414,4 @@ From then on every new animal is only the path above plus its family's piece.
 - Open: the size scale for small creatures (above).
 
 ## Hard rule: offline and in-game checks for every animation (the user, 2026-11-19)
-After the monitor's climb up came out right this way ("a combination of the animation engine and in game was perfect"), every new or changed animation or movement, any animal, is checked both ways before the user sees it: offline as the game draws it (`tools/climb_check.py` for the monitor's climbs, `tools/water_check.py` for its water moves, with a fastest-joint-turn check that catches an elbow or knee flipping; a checker of the same kind for other clips), then the real game frozen and stepped a few ticks a picture from three sides (`tools/film/monitor_climb_frames.film` as the pattern, `tools/film_sheet.py` for contact sheets), every phase judged, joints measured over time when a limb looks wrong, and the course scenes it touches run. How-to: `docs/plans/engine-step2-climb.md`, "How stage B was got right".
+After the monitor's climb up came out right this way ("a combination of the animation engine and in game was perfect"), every new or changed animation or movement, any animal, is checked both ways before the user sees it: offline as the game draws it (`python tools/clip_check.py <animal> <clips> --switches --times ...`, one checker for every animal since 2026-11-20, step A: parts inside the ground, step or bank, planted feet hanging, the water's surface, knees and elbows into the body, a fastest-joint-turn check that catches an elbow or knee flipping, the blends between clips, film strips with the faults in red), then the real game frozen and stepped a few ticks a picture from three sides (`tools/film/monitor_climb_frames.film` as the pattern, `tools/film_sheet.py` for contact sheets), every phase judged, joints measured over time when a limb looks wrong, and the course scenes it touches run. How-to: `docs/plans/engine-step2-climb.md`, "How stage B was got right".

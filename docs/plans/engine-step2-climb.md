@@ -125,13 +125,16 @@ user sees anything; the side films. Animal-only work: no guard films. Two strike
   straight ahead starts it (`roomToClimbDown`); the box stays on top until its back has passed the edge.
 - **The tail (`TailDrag`) had to learn coming down a block:** it slants up from the hips over the edge and lies on the
   top (see its class comment; it went through the block, arched and flipped upside down before).
-- **Checked:** `python tools/climb_check.py down [size]` (reach misses at most 0.93 px, nothing inside the step);
+- **Checked:** `python tools/climb_check.py down [size]` (reach misses at most 0.93 px, nothing inside the step; since
+  2026-11-20 `python tools/clip_check.py monitor 'climb_down_*'`, the one checker for every animal);
   `tools/film/monitor_descend_frames.film` frame by frame from three sides; the course's step_down scene.
 
 ### How stage B was got right (use it for stage C and the water entry; the user: "a combination of the animation engine and in game was perfect")
-- Offline first: `python tools/climb_check.py [size] [times] [views]` builds the clip in memory and checks it as the game
-  draws it (the trunk's hinges, a dragged tail): reach misses, lifts, parts inside the step, and a zoomed film strip of
-  chosen moments from the side, three quarters and the front.
+- Offline first: `python tools/clip_check.py monitor climb_up_1000 --times 0.5,1,1.5,2,2.5,3` (since 2026-11-20, the
+  Animal Maker Engine step A; it was `tools/climb_check.py`, now deleted) reads the clip from the game's files and checks
+  it as the game draws it (the trunk's hinges, a dragged tail, both from the body plan's "checks"): planted feet
+  hanging (a foot out of its leg's reach), parts inside the step, joint turns, and a film strip of chosen moments from
+  the side, three quarters and the front, the faults marked red.
 - Then the real game, frame by frame: `./gradlew runFilm -PfilmScene=tools/film/monitor_climb_frames.film` (the game
   frozen and stepped 2 ticks a picture, side on, from the front on top, from behind), contact sheets with
   `python tools/film_sheet.py`, every phase judged from all three sides; then the course scenes.

@@ -41,6 +41,46 @@ The files are <mod>/src/main/resources/assets/<mod name>/body_plans/<model>.json
             measuring course (tools/body_course.py), and has no climb or spine numbers to measure.
   chain     (animals) the body's bones from the head to the tail tip, each the next one along: the course checks the
             seams and bends between neighbours.
+            Families so far (2026-11-20, step A): four_legged_long_body, hopper, fish, crab, shell; the course picks its
+            scene set by the family (tools/body_course.py, FAMILY_SETS).
+  course    (animals; the Animal Maker Engine step A, 2026-11-20) its entries on the measuring course, one per course
+            animal (usually one, named as the plan; the crocodile's young are entries of its plan): "id" (summon id),
+            "data" (summon data: its size fixed), "walk" and "dash" (the speeds its goals send it at), "bpt" (blocks a
+            tick at speed 1.0, measured on the course), optional "setup" (camera commands before each scene).
+  checks    (animals; step A) what the one offline checker (tools/clip_check.py) needs to know about the animal, so the
+            checker never names one. The game does not read it (it keeps its own copies of these numbers in Java for
+            now; the game could read them from here later). Every key is optional:
+              px            a model pixel in blocks in the game, a grown animal of size 1 (also game_compare.py's --px)
+              controller    the Java file whose body controller sets GeckoLib's blend length between clips (read from
+                            it: "new SteadyController<>(this, "body", N" or a constant it names)
+              animations    the animation file's name when it is not the model's
+              water, dig    clip names or patterns played in open water or digging in (others are on land); a move
+                            with its own scene in its notes (step, water) is judged against that scene
+              surface       open water's surface over the model's floor when it floats (model px)
+              float_depth   how far the feet line hangs under the surface afloat (a move's end height is judged by it)
+              surface_marks the points judged against the water's surface: {"label", "bone", "at": [x, y, z]} a point
+                            on a bone, or {"label", "prefix", "edge": "top"|"low"} the top or the lowest of the bones
+                            starting with the prefix
+              dig_marks     the same against the ground, for digging clips
+              hinge         trunk joints the game turns on their outer edge: {"bones", "top", "bottom"} (y of each)
+              tail_drag     a tail dragged after the hips on moves with a path, as the game's TailDrag: {"from" (the
+                            chain's first tail bone), "root", "axis" (its middle line's height), "r0", "r1" (its
+                            radius at base and tip), "link" (joint spacing), "sag", "float" (under the surface afloat)}
+              on_ground     {clip: [[from, to], ...]} the parts of a clip (0 to 1) meant on the ground (others fly)
+              flight        {clip: [launch, land]} a thrown clip: the game throws the body on Minecraft's gravity
+              feet_parts    bone name parts of feet, toes or claws allowed to graze 1.05 px into the ground
+              feet_reach_down  how far the game sets a standing foot down by itself (px)
+              feet_free     clips whose feet may leave the ground on purpose (the highest-foot check skips them)
+              tuck_ok       clips whose limbs tuck into the body on purpose (the knee and elbow check skips them)
+              body_bones    the torso's bones: knees and elbows (each leg's middle bone) are judged against their boxes
+              hide_in, hidden_at_rest  parts that must hide inside body_bones and hide_in at rest (a shut mouth)
+              skip_bones    bones not judged (a carried prey)
+              jaw           {"bone", "flag_below"}: the jaw's least opening (under it: teeth through the jaw)
+              reach         [{"clip", "bone", "past_z", "past_label", "label"}]: how far a part reaches past a point
+              walks         {clip: px a second}: a walk's planted feet should slide back at it; or "walk_clips" (clips
+                            whose own "stride" note gives it)
+              switches      [[from, to], ...] the clip changes the game makes (patterns; a sized move changes into the
+                            same size's next move): GeckoLib's blend between them is checked
 
 Inside the tools everything works in role names: a model read from the game's geo file has its bones renamed to their
 roles as it is read (Plan.model_to_roles), clips read from the game's animation file the same (Plan.clip_to_roles),

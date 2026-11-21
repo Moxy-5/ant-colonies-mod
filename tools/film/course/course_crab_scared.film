@@ -1,0 +1,21 @@
+# The measuring course (a real scare into water: its own mind, not sent) for the crab: written by tools/body_course.py films, do not edit.
+lens 50
+cmd fill -12 -63 -7 12 -60 7 minecraft:water
+cmd tick unfreeze
+wait 20
+cmd summon antcolonies:crab -4.5 -63 0.5 {PersistenceRequired:1b,Rotation:[-90f,0f],CustomName:'"film-walker"'}
+wait 30
+follow 0 3.5 -6 0 25
+record on 3
+cmd execute positioned -4.5 -63 0.5 run damage @e[name=film-walker,limit=1,sort=nearest] 0.5 minecraft:cactus
+wait 60
+shot p00
+wait 60
+shot p01
+wait 60
+shot p02
+wait 60
+shot p03
+wait 60
+shot p04
+record off

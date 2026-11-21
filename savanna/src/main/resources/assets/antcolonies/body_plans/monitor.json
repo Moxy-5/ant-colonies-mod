@@ -124,5 +124,211 @@
     "leg_claw3_right": "leg_claw3_right",
     "leg_toe4_right": "leg_toe4_right",
     "leg_claw4_right": "leg_claw4_right"
+  },
+  "checks": {
+    "about": "What tools/clip_check.py needs (tools/body_plan.py explains every key): the numbers are the game's (MonitorModel's hinge, TailDrag's chain, MonitorEntity.AFLOAT) and the monitor maker's; the game does not read this section.",
+    "px": 0.046875,
+    "controller": "savanna/src/main/java/com/antcolonies/savanna/animal/MonitorEntity.java",
+    "water": [
+      "swim"
+    ],
+    "surface": 12.0,
+    "float_depth": 12.0,
+    "surface_marks": [
+      {
+        "label": "snout",
+        "bone": "head",
+        "at": [
+          0,
+          11.5,
+          -48.0
+        ]
+      },
+      {
+        "label": "chest top",
+        "bone": "chest",
+        "at": [
+          0,
+          16.0,
+          -24.0
+        ]
+      },
+      {
+        "label": "hips top",
+        "bone": "hips",
+        "at": [
+          0,
+          16.0,
+          -6.0
+        ]
+      }
+    ],
+    "hinge": {
+      "bones": [
+        "waist",
+        "ribs",
+        "chest"
+      ],
+      "top": 16.0,
+      "bottom": 5.0
+    },
+    "tail_drag": {
+      "from": "tail1",
+      "root": "body",
+      "axis": 11.0,
+      "r0": 4.6,
+      "r1": 0.6,
+      "link": 4.0,
+      "sag": 0.6,
+      "float": 1.0
+    },
+    "feet_parts": [
+      "claw",
+      "toe"
+    ],
+    "feet_free": [
+      "walk",
+      "bite",
+      "bite_player",
+      "death",
+      "hiss",
+      "eat",
+      "tongue"
+    ],
+    "tuck_ok": [
+      "death"
+    ],
+    "body_bones": [
+      "chest",
+      "ribs",
+      "waist",
+      "hips"
+    ],
+    "walk_clips": [
+      "walk"
+    ],
+    "switches": [
+      [
+        "idle",
+        "walk"
+      ],
+      [
+        "walk",
+        "idle"
+      ],
+      [
+        "walk",
+        "swim"
+      ],
+      [
+        "swim",
+        "walk"
+      ],
+      [
+        "walk",
+        "bite"
+      ],
+      [
+        "idle",
+        "hiss"
+      ],
+      [
+        "walk",
+        "climb_up_*"
+      ],
+      [
+        "climb_up_*",
+        "walk"
+      ],
+      [
+        "walk",
+        "climb_down_*"
+      ],
+      [
+        "climb_down_*",
+        "walk"
+      ],
+      [
+        "walk",
+        "water_in_*"
+      ],
+      [
+        "idle",
+        "water_in_*"
+      ],
+      [
+        "water_in_*",
+        "swim"
+      ],
+      [
+        "walk",
+        "water_drop_*"
+      ],
+      [
+        "idle",
+        "water_drop_*"
+      ],
+      [
+        "water_drop_*",
+        "swim"
+      ],
+      [
+        "walk",
+        "water_drop2_*"
+      ],
+      [
+        "idle",
+        "water_drop2_*"
+      ],
+      [
+        "water_drop2_*",
+        "swim"
+      ],
+      [
+        "walk",
+        "water_dash_*"
+      ],
+      [
+        "idle",
+        "water_dash_*"
+      ],
+      [
+        "water_dash_*",
+        "swim"
+      ],
+      [
+        "swim",
+        "water_out_*"
+      ],
+      [
+        "water_out_*",
+        "walk"
+      ],
+      [
+        "water_out_*",
+        "idle"
+      ],
+      [
+        "swim",
+        "water_outup_*"
+      ],
+      [
+        "water_outup_*",
+        "walk"
+      ],
+      [
+        "water_outup_*",
+        "idle"
+      ]
+    ]
+  },
+  "course": {
+    "monitor": {
+      "id": "antcolonies:monitor",
+      "data": "OwnSize:1.0f,HungryIn:99999,SunIn:99999",
+      "walk": 0.8,
+      "dash": 1.7,
+      "bpt": 0.039
+    }
   }
 }

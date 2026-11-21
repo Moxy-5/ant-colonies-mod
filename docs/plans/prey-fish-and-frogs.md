@@ -224,7 +224,7 @@ user: a detailed webbed foot model comes later). Fun first, inspired by the real
   unchanged): the knees, and the elbows a little, are pushed out to the side more the further a foot or hand moves
   from where it rests (`KNEE_OUT`, `ELBOW_OUT`, `KNEE_EASE`), so the sitting pose stays exactly the model's (pushing
   out always raised the haunch's round end even sitting); the death roll stays limp. Now no knee or elbow sits deeper in
-  than at rest in any clip; `tools/frog_check.py` measures it every run (flags over 0.5 px; the dig clips and the death
+  than at rest in any clip; `tools/frog_check.py` (since 2026-11-20 `python tools/clip_check.py bullfrog`) measures it every run (flags over 0.5 px; the dig clips and the death
   roll, tucked in on purpose, left out). Idea 2 (the haunch moved 1.5 px out in the model) kept in reserve if the
   haunch still looks swallowed. Waiting for the user's look.
 - 2026-11-20, **the knees-out fix approved by the user** ("yes thats perfect"). Next, the user's ask: the iconic tongue,

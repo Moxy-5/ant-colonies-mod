@@ -1,0 +1,938 @@
+"""One offline checker for any animal's clips (the Animal Maker Engine, step A, 2026-11-20; docs/ANIMAL-MAKER-ENGINE.md).
+It replaces the four checkers made one per animal (climb_check.py and water_check.py for the monitor, croc_check.py,
+frog_check.py; their every check lives on here, rule 8). CLAUDE.md's hard rule: every animation is checked offline as
+the game draws it, then in the game frame by frame.
+
+    python tools/clip_check.py <animal> [clip or pattern ...] [--model <geo>] [--times 0,0.5,1] [--views side,three,front]
+                               [--switches] [--out <folder>]
+
+  <animal>     a body plan's name (assets/.../body_plans/<animal>.json). Everything about the animal comes from its plan
+               (its "checks" section, documented in tools/body_plan.py's top comment); no animal is known by name here.
+  clips        names or patterns (water_in_*): with none, every clip in the animal's animation file.
+  --model      another model the clips play on (the young: crocodile_teen).
+  --times      draws a film strip of each clip at those times (clip seconds), from the views named (default side,
+               three quarters and front): cc_<model>_<clip>.png in --out (default references/anim_lab/<animal>/).
+               Marked on it: the ground grey (a step or a bank as a grey block), the water's surface and the bottom
+               as blue lines, every part inside a block a red dot, the planted feet's trails (green, red where a planted
+               foot slides), and a red frame round a picture taken within a frame of a flagged jump or joint snap.
+  --switches   also (or, with no clip named, only) checks the clip changes the plan lists, GeckoLib's blend between
+               them played as the game plays it (the blend length read from the animal's Java code), and draws each
+               blend as a strip (sw_<from>_<to>.png) with --times.
+
+Reads only the game's own files: the geo model, the animation file (the moves' own paths and scenes are in their
+clips' notes: "path <root> t dy dz ...", "step <face z> <height>", "water <kind> <edge z> <bank top> <surface>
+<bottom>"), the body plan and the controller's blend length in the Java code.
+
+What it prints for each clip (model pixels; a block is 1 / the plan's "px" of them on a grown animal of size 1):
+  inside       parts inside the ground, the step, the bank or the bottom (deepest per moment; the plan's foot parts
+               may graze up to 1.05 px, as the game sets a standing foot down); the dragged tail on its own line
+  feet         the highest foot over the ground while it stands (clips not in "feet_free"), planted feet left
+               hanging over the ground or the step (a foot standing still in the world for 0.05 s, more than 1 px, or
+               the plan's "feet_reach_down", over the highest ground under any part of it, a foot pressed on a step's
+               or bank's face allowed: how a foot place out of its leg's reach shows in the game's files; the old
+               monitor checkers asked the maker instead, whose log mixed every clip it built), and on a walk each planted
+               foot's slide (back at the walking speed, none sideways)
+  body         knees and elbows (each leg's middle bone's joint) deeper into the body's own boxes than at rest (the
+               plan's "body_bones", read from the geo file); parts that must hide inside the body at rest
+  surface      in the water, where the plan's marks (snout, back, tail ...) lie against the surface over time; a move's
+               root height, its path's speed at its start and end and its end height against afloat
+  dug          for digging clips, the plan's marks against the ground
+  jaw          the jaw's least opening (under the plan's limit: the teeth through the lower jaw)
+  reach        how far a part reaches past a point (the tongue past the snout)
+  jumps        the biggest jump of any part between two frames (1/80 s; a walking foot moves about 1)
+  turns        the fastest joint turn between two keys (degrees in 0.05 s; over 90 flagged: an elbow or knee
+               flipping barely moves a part's place, so the jumps miss it)
+  switches     for each clip change the plan lists: the end pose of one against the first of the next, the biggest
+               part jump and joint turn per tick through the blend, flagged when it beats both clips' own
+"""
+import fnmatch
+import json
+import math
+import os
+import re
+import sys
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import anim_lab as lab  # noqa: E402
+import body_plan  # noqa: E402
+
+PROJECT = lab.PROJECT
+BLUE, DEEP_BLUE, GREEN, RED = (40, 110, 230), (20, 60, 140), (40, 160, 60), (235, 20, 20)
+GRAVITY = 32.0          # Minecraft's fall, blocks a second squared (0.08 a tick, squared over 20 ticks a second)
+
+
+# --- the animal ---------------------------------------------------------------------------------------------------------
+class Animal:
+    """An animal as its body plan and the game's files describe it."""
+
+    def __init__(self, name, model=None):
+        self.name = name
+        self.plan_data = json.load(open(body_plan.plan_path(name), encoding='utf-8'))
+        self.checks = self.plan_data.get('checks', {})
+        self.model_name = model or self.plan_data['model']
+        self.anim_stem = self.checks.get('animations', self.plan_data['model'])
+        self.model = HingedModel(self.model_name, self.checks.get('hinge'))
+        self.data = json.load(open(lab.model_file(self.anim_stem, 'animations', 'entity', f'{self.anim_stem}.animation.json'),
+                                   encoding='utf-8'))['animations']
+        self.legs = self.plan_data.get('legs', {})
+        self.feet = {k: chain[-1] for k, chain in self.legs.items()}
+        self.px = self.checks.get('px', 1 / 16)          # a model pixel in blocks in the game (a grown animal of size 1)
+
+    def kind(self, clip):
+        """'water', 'dig' or 'land' (the plan's lists of patterns; land when none matches)."""
+        for kind in ('water', 'dig'):
+            if any(fnmatch.fnmatch(clip, p) for p in self.checks.get(kind, [])):
+                return kind
+        return 'land'
+
+    def matches(self, clip, key):
+        return any(fnmatch.fnmatch(clip, p) for p in self.checks.get(key, []))
+
+    def blend_ticks(self):
+        """GeckoLib's blend between two clips, as the animal's controller sets it: the plan names the Java file
+        ("controller": a path from the project folder); the number (or the constant it names) is read from it."""
+        src = self.checks.get('controller')
+        if not src:
+            return self.checks.get('blend', 4), 'the plan (no controller named)'
+        text = open(os.path.join(PROJECT, src), encoding='utf-8').read()
+        m = re.search(r'new SteadyController<>\(this,\s*"body",\s*([\w.]+)', text) or \
+            re.search(r'new AnimationController<>\(this,\s*"body",\s*([\w.]+)', text)
+        if not m:
+            return self.checks.get('blend', 4), f'{src}: no body controller found, the plan\'s'
+        word = m.group(1)
+        if word.isdigit():
+            return int(word), os.path.basename(src)
+        const = word.split('.')[-1]
+        c = re.search(rf'\b{const}\s*=\s*(\d+)', text)
+        return (int(c.group(1)), f'{os.path.basename(src)} ({word})') if c else (self.checks.get('blend', 4), 'the plan')
+
+
+class HingedModel(lab.Model):
+    """The model as the game draws it: trunk joints the game turns on their outer edge (the plan's "hinge": a bone
+    bending up turns about the back's top, down about the belly), as the monitor's model class hinges them."""
+
+    def __init__(self, name, hinge):
+        super().__init__(name)
+        self.hinge = hinge
+
+    def transforms(self, pose, names=None):
+        xf = super().transforms(pose, names)
+        if self.hinge:
+            for bone in self.hinge['bones']:
+                if bone in xf and bone in pose:
+                    rx = pose[bone][0][0]
+                    if abs(rx) > 1e-6:
+                        e = list(xf[bone])
+                        e[1] = self.hinge['top'] if rx > 0 else self.hinge['bottom']
+                        xf[bone] = tuple(e)
+        return xf
+
+
+# --- the scene a clip is made for -------------------------------------------------------------------------------------
+class Scene:
+    """What is solid round the animal, in the clip's own model pixels (forward is -z): flat ground at 0 (land clips),
+    open water (water clips: no ground judged, the surface at the plan's "surface"), a step ("step <face z> <height>":
+    the ground that high in front of the face for a step up, below it behind for a step down) or a bank and water
+    ("water <kind> <edge> <top> <surface> <bottom>": the bank on the side the animal starts on, or the side it climbs
+    out to when it starts afloat)."""
+
+    def __init__(self, clip, kind, animal):
+        self.kind, self.surface, self.step, self.bank = 'flat', None, None, None
+        for note in clip.notes.values():
+            w = note.split()
+            if w[0] == 'step':
+                self.kind, self.step = 'step', (float(w[1]), float(w[2]))
+            elif w[0] == 'water' and len(w) >= 6:
+                edge, top, surface, bottom = map(float, w[2:6])
+                start_y = clip.path[1][0][1] if clip.path else 0.0
+                # it climbs out (the bank ahead) when it starts afloat, below the bank's top (my pick: read from the
+                # path, as the note does not say which side the bank is on)
+                self.kind = 'water'
+                self.bank = dict(edge=edge, top=top, bottom=bottom, land_ahead=start_y < top - 1.0)
+                self.surface = surface
+        # a block in this clip's model pixels: the step's height, or (Minecraft's water: one block deep, its surface 8/9
+        # of the way up) the surface over the bottom; else the plan's grown animal of size 1
+        self.block = 1.0 / animal.px
+        if self.step:
+            self.block = abs(self.step[1])
+        elif self.bank:
+            self.block = (self.surface - self.bank['bottom']) * 9 / 8
+        if self.kind == 'flat' and kind == 'water':
+            self.kind, self.surface = 'open_water', animal.checks.get('surface', 8.0)
+
+    def land(self, z):
+        b = self.bank
+        return z < b['edge'] if b['land_ahead'] else z > b['edge']
+
+    def solid(self, y, z):
+        """How deep (px) a point lies inside the ground, the step, the bank or the bottom (0 if not)."""
+        if self.kind == 'flat':
+            return max(0.0, -y)
+        if self.kind == 'open_water':
+            return 0.0
+        if self.kind == 'step':
+            zf, h = self.step
+            hi, lo = max(h, 0.0), min(h, 0.0)
+            d = max(0.0, lo - y)
+            high_side = z < zf if h > 0 else z > zf
+            if high_side and y < hi:
+                d = max(d, min(hi - y, abs(z - zf)))
+            return d
+        b = self.bank
+        if self.land(z):
+            return min(b['top'] - y, abs(z - b['edge'])) if y < b['top'] else 0.0
+        return max(0.0, b['bottom'] - y)
+
+    def floor(self, z):
+        """The ground's height under z (the bank's top or the bottom in the water)."""
+        if self.kind == 'step':
+            zf, h = self.step
+            return h if z < zf else 0.0
+        if self.kind == 'water':
+            return self.bank['top'] if self.land(z) else self.bank['bottom']
+        return 0.0 if self.kind == 'flat' else -1e9
+
+    def on_face(self, zs, y, near=1.5):
+        """Whether a foot spanning z from zs[0] to zs[1], its lowest point at y, lies against the face of the step or
+        the bank (within `near` px of it, between the two grounds' heights): a foot can stand on a face."""
+        if self.kind == 'step':
+            zf, h = self.step
+        elif self.kind == 'water':
+            zf, h = self.bank['edge'], self.bank['top']
+        else:
+            return False
+        lo, hi = min(self.floor(zf - 0.01), self.floor(zf + 0.01)), max(self.floor(zf - 0.01), self.floor(zf + 0.01))
+        return zs[0] - near <= zf <= zs[1] + near and lo - near <= y <= hi + near
+
+    def water_at(self, z):
+        if self.kind == 'open_water':
+            return True
+        return self.kind == 'water' and not self.land(z)
+
+
+# --- a clip as the game draws it: its path, the dragged tail, a thrown flight --------------------------------------
+class Played:
+    """A clip posed as the game draws it: the move's path added to the root, the tail dragged after the hips as the
+    game's TailDrag does (the plan's "tail_drag", on clips with a path), and a thrown flight's rise (the plan's "flight":
+    the parts of the clip between launch and landing, on Minecraft's gravity)."""
+
+    def __init__(self, animal, name):
+        self.animal, self.name = animal, name
+        plan = animal.model.plan
+        data = animal.data[name]
+        self.clip = lab.Clip(name, plan.clip_to_roles(data) if plan else data)
+        self.length = self.clip.length
+        self.kind = animal.kind(name)
+        self.scene = Scene(self.clip, self.kind, animal)
+        self.tail = None
+        drag = animal.checks.get('tail_drag')
+        if drag and self.clip.path:
+            self.tail = self._drag(drag)
+        flight = animal.checks.get('flight', {}).get(name)
+        self.flight = (flight[0] * self.length, flight[1] * self.length) if flight else None
+
+    def rise(self, t):
+        if not self.flight:
+            return 0.0
+        a, b = self.flight
+        if not a < t < b:
+            return 0.0
+        v = GRAVITY * (b - a) / 2
+        dt = t - a
+        return (v * dt - GRAVITY / 2 * dt * dt) / self.animal.px
+
+    def pose(self, t):
+        p = self.clip.pose(t)
+        if self.tail:
+            bones, rows = self.tail
+            vals = rows[min(len(rows) - 1, max(0, round(t * 20)))]
+            for b, v in zip(bones, vals):
+                yaw = p.get(b['name'], ((0, 0, 0),))[0][1]
+                p[b['name']] = ((v, yaw, 0.0), (0, 0, 0), (1, 1, 1))
+        return p
+
+    def posed(self, t):
+        up = self.rise(t)
+        out = self.animal.model.posed(self.pose(min(t, self.length)))
+        if up:
+            out = [(b, [(q[0], q[1] + up, q[2]) for q in cs], c) for b, cs, c in out]
+        return out
+
+    def world(self, bone, point, t):
+        p = self.animal.model.world(bone, point, self.pose(t))
+        return (p[0], p[1] + self.rise(t), p[2])
+
+    def _drag(self, drag):
+        """The tail chain tick by tick (20 a second), as TailDrag pulls it: each joint pulled after the one in front a
+        link's length behind, sagging onto what is under it, afloat eased to the water's surface, never in the ground;
+        turned into each piece's turn (degrees, against its rest bend)."""
+        model, sc, clip = self.animal.model, self.scene, self.clip
+        chain = self.animal.plan_data.get('chain', [])
+        bones = [model.by[n] for n in chain[chain.index(drag['from']):]] if drag['from'] in chain else []
+        rest = [b.get('rotation', [0, 0, 0])[0] for b in bones]
+        n, link = len(bones), drag.get('link', 4.0)
+        r0, r1 = drag['r0'], drag['r1']
+        pose0 = clip.pose(0.0)
+        joints = [list(model.world(b['name'], b['pivot'], pose0)[1:]) for b in bones]
+        joints.append(list(model.world(bones[-1]['name'], [0, drag['axis'], bones[-1]['pivot'][2] + link], pose0)[1:]))
+        float_y = None if sc.surface is None else sc.surface - drag.get('float', 1.0)
+        if sc.kind == 'water' and sc.bank['land_ahead']:     # it starts afloat: the tail level along the surface behind
+            z0 = joints[0][1]
+            joints = [[float_y, z0 + link * i] for i in range(n + 1)]
+        rows = []
+        for k in range(round(clip.length * 20) + 1):
+            pose = clip.pose(k / 20)
+            joints[0] = list(model.world(bones[0]['name'], bones[0]['pivot'], pose)[1:])
+            for i in range(1, n + 1):
+                r = r0 + (r1 - r0) * i / n
+                y, z = joints[i]
+                if sc.water_at(z) and float_y is not None:
+                    y += (float_y - y) * 0.5                    # afloat: eased to the surface
+                else:
+                    y -= drag.get('sag', 0.6)                   # sagging onto the ground
+                py, pz = joints[i - 1]
+                dy, dz = y - py, z - pz
+                d = math.hypot(dy, dz) or 1.0
+                y, z = py + link * dy / d, pz + link * dz / d
+                y = max(y, sc.floor(z) + r)
+                joints[i] = [y, z]
+            prev, vals = pose[drag.get('root', 'body')][0][0], []
+            for i in range(n):
+                (y0, z0), (y1, z1) = joints[i], joints[i + 1]
+                elev = math.degrees(math.atan2(y1 - y0, z1 - z0))
+                vals.append(elev - prev - rest[i])
+                prev = elev
+            rows.append(vals)
+        return bones, rows
+
+
+# --- geometry -------------------------------------------------------------------------------------------------------
+def box_depth(p, corners):
+    """How far a point lies inside a posed box (its 8 corners, any turn; below 0 outside it)."""
+    o = corners[0]
+    best = 1e9
+    for k in (4, 2, 1):
+        e = [b - a for a, b in zip(o, corners[k])]
+        L = math.sqrt(sum(c * c for c in e)) or 1e-9
+        s = sum((pc - oc) * ec for pc, oc, ec in zip(p, o, e)) / L
+        best = min(best, s, L - s)
+    return best
+
+
+def body_depth(p, boxes):
+    """How far a point lies inside the body's boxes (the deepest box it is in; below 0 outside all)."""
+    return max((box_depth(p, cs) for cs in boxes), default=-99.0)
+
+
+def with_edges(corners):
+    """A box's corners and the middles of its edges (a box lying across a block's corner shows at an edge's middle)."""
+    return list(corners) + [tuple((a + b) / 2 for a, b in zip(corners[i], corners[j]))
+                            for i in range(8) for j in range(i + 1, 8) if bin(i ^ j).count('1') == 1]
+
+
+def keys_of(chans):
+    keys = chans.get('rotation', {})
+    if not isinstance(keys, dict):
+        return []
+    out = []
+    for k in sorted(keys, key=float):
+        v = keys[k]
+        if isinstance(v, dict):
+            v = v.get('vector', v.get('post'))
+        out.append((float(k), v))
+    return out
+
+
+# --- the checks of one clip -----------------------------------------------------------------------------------------
+def check_clip(animal, name, flagged):
+    """Prints the clip's findings; returns its flagged moments (for the strips) and the lines."""
+    pl = Played(animal, name)
+    ck = animal.checks
+    sc = pl.scene
+    lines = []
+    out = lines.append
+    where = {'flat': 'on land', 'open_water': 'in the water', 'step': 'a step', 'water': 'a bank and water'}[sc.kind]
+    if pl.kind == 'dig':
+        where = 'digging'
+    out(f'== {name}  {pl.length:g} s  ({where}' + (', tail dragged' if pl.tail else '') + (', thrown' if pl.flight else '') + ')')
+    if sc.step:
+        out(f'  scene: a step at z {sc.step[0]:g}, {sc.step[1]:.2f} px high')
+    if sc.bank:
+        b = sc.bank
+        out(f'  scene: edge z {b["edge"]:g}, bank top {b["top"]:.1f}, surface {sc.surface:.2f}, bottom {b["bottom"]:.1f}, '
+            f'bank {"ahead" if b["land_ahead"] else "behind"}')
+    grounded_spans = ck.get('on_ground', {}).get(name)
+    feet_parts = ck.get('feet_parts', [])
+    skip = set(ck.get('skip_bones', []))
+    tail_bones = {b['name'] for b in pl.tail[0]} if pl.tail else set()
+    judge_ground = pl.kind != 'dig' and sc.kind != 'open_water'
+
+    def grounded(t):
+        u = t / pl.length
+        return grounded_spans is None or any(a <= u <= b for a, b in grounded_spans)
+
+    body_bones = set(ck.get('body_bones', []))
+    joints = {k: chain[1] for k, chain in animal.legs.items() if len(chain) >= 3}
+    rest_posed = animal.model.posed({})
+    rest_body = [cs for b, cs, _ in rest_posed if b in body_bones]
+    rest_joint = {k: body_depth(animal.model.world(j, animal.model.by[j]['pivot'], {}), rest_body) for k, j in joints.items()}
+
+    hits, tail_hits, jumps, deepest = {}, {}, {}, {}
+    feet_high = 0.0
+    hang = {}
+    planted = {k: [] for k in animal.feet}
+    last = None
+    marks_dug = []
+    steps = round(pl.length * 80)
+    foot_parts = {k: lab_descendants(animal.model, f) for k, f in animal.feet.items()}
+    for k in range(steps + 1):
+        t = k / 80
+        posed = pl.posed(t)
+        now = {}
+        for b, cs, _ in posed:
+            now.setdefault(b, []).extend(cs)
+        if judge_ground and k % 2 == 0 and grounded(t):
+            for b, cs in now.items():
+                if b in skip:
+                    continue
+                d = max(sc.solid(p[1], p[2]) for p in with_edges(cs[:8])) if len(cs) == 8 else \
+                    max(sc.solid(p[1], p[2]) for i in range(0, len(cs), 8) for p in with_edges(cs[i:i + 8]))
+                if b in tail_bones:
+                    if d > 0.5:
+                        tail_hits[b] = max(tail_hits.get(b, (0, 0)), (d, t))
+                    continue
+                if any(f in b for f in feet_parts) and d <= 1.05:
+                    continue
+                if d > 0.4:
+                    key = round(t, 3)
+                    hits.setdefault(key, {})
+                    hits[key][b] = max(hits[key].get(b, 0), d)
+            if sc.kind == 'flat' and animal.feet and not animal.matches(name, 'feet_free'):
+                feet_high = max(feet_high, max(min(p[1] for p in now[f]) for f in animal.feet.values() if f in now))
+        if animal.feet:
+            # each foot's middle (the foot bone's own boxes) and lowest point (with its toes and claws), every 1/80 s
+            for key, parts in foot_parts.items():
+                pts = [p for b in parts if b in now for p in now[b]]
+                own = now.get(animal.feet[key], pts)
+                if not pts:
+                    continue
+                low = min(pts, key=lambda p: p[1])
+                mid = (sum(p[0] for p in own) / len(own), low[1], sum(p[2] for p in own) / len(own))
+                planted[key].append((t, mid, low, (min(p[2] for p in pts), max(p[2] for p in pts))))
+        if body_bones and joints and k % 4 == 0 and not animal.matches(name, 'tuck_ok'):
+            bodies = [cs[i:i + 8] for b, cs in now.items() if b in body_bones for i in range(0, len(cs), 8)]
+            for key, j in joints.items():
+                d = body_depth(pl.world(j, animal.model.by[j]['pivot'], t), bodies) - rest_joint[key]
+                if d > deepest.get(j, (-99, 0))[0]:
+                    deepest[j] = (d, t)
+        if pl.kind == 'dig' and k % 8 == 0:
+            marks_dug.append((t, [mark_value(m, posed, pl, t) for m in ck.get('dig_marks', [])]))
+        if last:
+            for b, cs in now.items():
+                if b in last and len(cs) == len(last[b]):
+                    d = max(math.dist(a, c) for a, c in zip(cs, last[b]))
+                    if d > jumps.get(b, (0, 0))[0]:
+                        jumps[b] = (d, t)
+        last = now
+
+    # inside
+    if judge_ground:
+        if hits:
+            out('  inside the ground, the step or the bank (time, bone, px):')
+            rows = {}
+            for t, bones in sorted(hits.items()):
+                tt = round(round(t / 0.05) * 0.05, 2)
+                for b, d in bones.items():
+                    rows.setdefault(tt, {})
+                    rows[tt][b] = max(rows[tt].get(b, 0), d)
+            for tt, r in rows.items():
+                items = sorted(r.items(), key=lambda kv: -kv[1])
+                out(f'    {tt:4.2f} ' + ' '.join(f'{b}:{d:.1f}' for b, d in items[:7]) + (' ...' if len(items) > 7 else ''))
+                flagged.add(tt)
+        else:
+            out('  inside the ground, the step or the bank: nothing')
+        if tail_hits:
+            out('  the dragged tail inside the ground (bone: px at time): ' + ', '.join(
+                f'{b} {d:.1f} at {t:.2f}' for b, (d, t) in sorted(tail_hits.items(), key=lambda kv: chain_rank(animal, kv[0]))))
+        if sc.kind == 'flat' and animal.feet and not animal.matches(name, 'feet_free') and feet_high:
+            reach = ck.get('feet_reach_down')
+            out(f'  highest foot over the ground while standing: {feet_high:.2f} px'
+                + (f' (the game sets a standing foot down up to {reach:g} px)' if reach else ''))
+
+    # feet: planted feet hanging, and a walk's planted feet sliding
+    if animal.feet and judge_ground:
+        hung = []
+        tol = max(1.0, ck.get('feet_reach_down', 0.0))
+        for key, track in planted.items():
+            worst = (0.0, 0.0)
+            for i in range(2, len(track) - 2):
+                t1, m1, l1 = track[i][:3]
+                if not grounded(t1):
+                    continue
+                # standing still in the world over 0.05 s (a foot at the top of its swing stops only for a moment)
+                if math.dist(track[i - 2][2], track[i + 2][2]) >= 0.15:
+                    continue
+                if sc.water_at(l1[2]) and sc.kind in ('water', 'open_water'):
+                    continue                                  # in the water a foot may hang: it swims
+                # the highest ground under any part of the foot (a foot on a step's lip, its claws over the edge)
+                ground = max(sc.floor(z) for z in track[i][3])
+                if sc.on_face(track[i][3], l1[1]):
+                    continue                                  # a foot pressed on a step's or bank's face holds on there
+                over = l1[1] - ground
+                if over > worst[0]:
+                    worst = (over, t1)
+            if worst[0] > tol:
+                hung.append(f'{key} {worst[0]:.1f} at {worst[1]:.2f}')
+        out(f'  planted feet hanging over the ground (more than {tol:g} px; a foot place out of its leg reach; px at time): '
+            + (', '.join(hung) if hung else 'none'))
+    walk_speed = ck.get('walks', {}).get(name)
+    if walk_speed is None and pl.clip.stride and animal.matches(name, 'walk_clips'):
+        walk_speed = pl.clip.stride / pl.length
+    if walk_speed is not None and animal.feet:
+        out(f'  planted feet: should slide back at {walk_speed:.2f} px/s (the walking speed, '
+            f'{walk_speed * animal.px:.3f} blocks/s), none sideways')
+        for key, track in planted.items():
+            vz, vx, down = [], [], 0
+            for a, b in zip(track, track[1:]):
+                if a[2][1] < 0.1 and b[2][1] < 0.1:
+                    vz.append((b[1][2] - a[1][2]) * 80)
+                    vx.append((b[1][0] - a[1][0]) * 80)
+            for e in track[:-1]:
+                down += e[2][1] < 0.1
+            foot = animal.feet[key]
+            if vz:
+                out(f'    {foot:16s} down {down / max(1, len(track) - 1):4.0%} of the stride, back {min(vz):5.2f} to '
+                    f'{max(vz):5.2f}, sideways {min(vx):5.2f} to {max(vx):5.2f}')
+            else:
+                out(f'    {foot:16s} never down')
+
+    # the body: knees and elbows into it
+    if body_bones and joints:
+        if animal.matches(name, 'tuck_ok'):
+            out('  knees and elbows against the body: not judged (tucked in on purpose)')
+        else:
+            worst = sorted(deepest.items(), key=lambda kv: -kv[1][0])[:2]
+            out('  knees and elbows deeper into the body than at rest (px at time; over 0.5 flagged): ' + ', '.join(
+                f'{b} {d:.1f} at {t:.2f}' + (' FLAGGED' if d > 0.5 else '') for b, (d, t) in worst))
+            for b, (d, t) in worst:
+                if d > 0.5:
+                    flagged.add(round(t, 2))
+
+    # the water's surface
+    marks = ck.get('surface_marks', [])
+    if sc.surface is not None and marks:
+        every = 0.25 if sc.kind == 'water' else 0.1
+        out('  against the surface (px over it; time: ' + ', '.join(m['label'] for m in marks)
+            + (', root' if pl.clip.path else '') + '):')
+        n = round(pl.length / every)
+        for i in range(n + 1):
+            t = min(pl.length, i * every)
+            posed = pl.posed(t)
+            vals = '  '.join(f'{m["label"]} {mark_value(m, posed, pl, t) - sc.surface:6.1f}' for m in marks)
+            if pl.clip.path:
+                dy, dz = pl.clip.travel(t)
+                vals += f'  root {dy - sc.surface:6.1f} at z {dz:6.1f}'
+            out(f'    {t:4.2f}: {vals}')
+    if pl.clip.path:
+        path = pl.clip.path[1]
+        per_tick = lambda a, b: -(b[2] - a[2]) / max(1e-6, (b[0] - a[0]) * 20)  # noqa: E731
+        v0, v1 = per_tick(path[0], path[1]), per_tick(path[-2], path[-1])
+        bpp = 1.0 / sc.block
+        line = (f'  path speed: start {v0:.2f} px/tick ({v0 * bpp:.3f} blocks/tick), end {v1:.2f} px/tick '
+                f'({v1 * bpp:.3f} blocks/tick); end height {path[-1][1]:.2f} px')
+        fd = ck.get('float_depth')
+        if sc.surface is not None and fd is not None:
+            line += f' (afloat {sc.surface - fd:.2f})'
+        out(line)
+    if marks_dug:
+        out('  dug in (time: ' + ', '.join(m['label'] for m in ck.get('dig_marks', [])) + '; px against the ground):')
+        for t, vals in marks_dug[::3] + [marks_dug[-1]]:
+            out(f'    {t:4.2f}: ' + '  '.join(f'{m["label"]} {v:5.1f}' for m, v in zip(ck['dig_marks'], vals)))
+
+    # the jaw, reaches
+    jaw = ck.get('jaw')
+    if jaw:
+        least = (999.0, 0.0)
+        for k in range(steps + 1):
+            v = pl.pose(k / 80).get(jaw['bone'], ((0, 0, 0),))[0][0]
+            if v < least[0]:
+                least = (v, k / 80)
+        out(f'  jaw least open: {least[0]:.1f} deg at {least[1]:.2f}'
+            + ('  TEETH THROUGH THE JAW' if least[0] < jaw.get('flag_below', -0.5) else ''))
+    for r in ck.get('reach', []):
+        if name != r['clip']:
+            continue
+        best = None
+        for k in range(0, steps + 1, 2):
+            pts = [p for b, cs, _ in pl.posed(k / 80) if b == r['bone'] for p in cs]
+            far = (min(p[2] for p in pts), min(p[1] for p in pts), k / 80)
+            best = far if best is None or far < best else best
+        out(f'  {r["label"]}: reaches {r["past_z"] - best[0]:.1f} px past {r["past_label"]} at {best[2]:.2f}, '
+            f'{best[1]:.1f} px over the ground there')
+
+    # jumps, turns
+    top = sorted(jumps.items(), key=lambda kv: -kv[1][0])[:6]
+    out('  biggest jump of a part in 1/80 s (px at time; a walking foot moves about 1): '
+        + ', '.join(f'{b} {d:.1f} at {t:.2f}' for b, (d, t) in top))
+    turns = fastest_turns(animal.data[name]['bones'])
+    leg_bones = {b for chain in animal.legs.values() for b in chain}
+    kinds = (('legs', lambda b: b in leg_bones),) if leg_bones else ()
+    for label, pick in kinds + (('any joint', lambda b: True),):
+        top = sorted(((b, v) for b, v in turns.items() if pick(b)), key=lambda kv: -kv[1][0])[:4]
+        if top:
+            out(f'  fastest joint turn, {label} (deg in 0.05 s at time; over 90 flagged): ' + ', '.join(
+                f'{b} {d:.0f} at {t:.2f}' + (' FLAGGED' if d > 90 else '') for b, (d, t) in top))
+            for b, (d, t) in top:
+                if d > 90:
+                    flagged.add(round(t, 2))
+    return pl, planted, lines
+
+
+def lab_descendants(model, bone):
+    out = {bone}
+    for b in model.bones:
+        p = b.get('parent')
+        while p:
+            if p == bone:
+                out.add(b['name'])
+                break
+            p = model.by.get(p, {}).get('parent')
+    return out
+
+
+def chain_rank(animal, bone):
+    chain = animal.plan_data.get('chain', [])
+    return chain.index(bone) if bone in chain else 99
+
+
+def mark_value(m, posed, pl, t):
+    """A mark's height: a point on a bone ("at"), or the top or the lowest of the bones starting with "prefix"."""
+    if 'at' in m:
+        return pl.world(m['bone'], m['at'], t)[1]
+    ys = [p[1] for b, cs, _ in posed if (b.startswith(m['prefix']) if m.get('prefix') else True) for p in cs]
+    if not ys:
+        return float('nan')
+    return max(ys) if m.get('edge', 'top') == 'top' else min(ys)
+
+
+def fastest_turns(bones):
+    """Each bone's fastest turn between two keys: the biggest angle of the change, scaled to 0.05 s."""
+    turns = {}
+    for bone, chans in bones.items():
+        ks = keys_of(chans)
+        for (ta, va), (tb, vb) in zip(ks, ks[1:]):
+            if not (isinstance(va, list) and isinstance(vb, list)):
+                continue
+            d = max(abs(x - y) for x, y in zip(va, vb)) * 0.05 / max(1e-6, tb - ta)
+            if d > turns.get(bone, (0.0, 0.0))[0]:
+                turns[bone] = (d, tb)
+    return turns
+
+
+def hidden_at_rest(animal):
+    """Parts the plan says hide inside the body at rest (the inside of a shut mouth): how far each one's farthest corner
+    sticks out of the body's boxes (the plan's body bones and "hide_in"; px, over 0.3 flagged; 0 or below: hidden)."""
+    parts = animal.checks.get('hidden_at_rest')
+    if not parts:
+        return None
+    posed = animal.model.posed({})
+    hide = set(animal.checks.get('body_bones', [])) | set(animal.checks.get('hide_in', []))
+    body = [cs for b, cs, _ in posed if b in hide]
+    out = {}
+    for b, cs, _ in posed:
+        if b in parts:
+            out[b] = max([out.get(b, -99.0)] + [-body_depth(p, body) for p in cs])
+    return 'parts hidden in the body at rest (px the farthest corner sticks out; over 0.3 flagged): ' + ', '.join(
+        f'{b} {d:.1f}' + (' FLAGGED' if d > 0.3 else '') for b, d in out.items())
+
+
+# --- clip changes (GeckoLib's blend) ------------------------------------------------------------------------------
+def switch_poses(animal, a, b, ticks, phase=None):
+    """The poses a tick apart from the end of clip a, through GeckoLib's blend (each bone's turn, place and size eased
+    straight from where clip a left it to clip b's first frame over the blend's ticks), into clip b's first ticks.
+    A looping clip a is left at `phase` (seconds); a played one at its end. The move's path is the entity's, not a
+    bone's, so it is left out."""
+    plan = animal.model.plan
+    ca = lab.Clip(a, plan.clip_to_roles(animal.data[a]) if plan else animal.data[a])
+    cb = lab.Clip(b, plan.clip_to_roles(animal.data[b]) if plan else animal.data[b])
+    ca.path = cb.path = None
+    ta = (phase if phase is not None else 0.0) if ca.loop else ca.length
+    before = [ca.pose(max(0.0, ta - (3 - i) * 0.05)) for i in range(4)]
+    start, goal = before[-1], cb.pose(0.0)
+    names = set(start) | set(goal)
+    rest = ((0, 0, 0), (0, 0, 0), (1, 1, 1))
+    blend = []
+    for k in range(1, ticks + 1):
+        f = k / ticks
+        blend.append({n: tuple(tuple(x + (y - x) * f for x, y in zip(start.get(n, rest)[c], goal.get(n, rest)[c]))
+                               for c in range(3)) for n in names})
+    after = [cb.pose(i * 0.05) for i in range(1, 4)]
+    return before, blend, after, ca, cb
+
+
+def check_switch(animal, a, b, ticks):
+    """One clip change: how far apart the two clips' poses are, and how hard the blend jumps against the clips' own
+    moves. Returns (lines, worst jump, worst turn)."""
+    model = animal.model
+    lines = []
+    phases = [None]
+    ca_loop = animal.data[a].get('loop') in (True, 'loop', 'true')
+    if ca_loop:
+        L = float(animal.data[a].get('animation_length', 1.0))
+        phases = [L * i / 4 for i in range(4)]
+    worst = None
+    for ph in phases:
+        before, blend, after, ca, cb = switch_poses(animal, a, b, ticks, ph)
+        seq = before + blend + after
+        corners = [{bn: cs for bn, cs, _ in model.posed(p)} for p in seq]
+        own, blend_jump = 0.0, (0.0, '', 0)
+        for i in range(1, len(seq)):
+            for bn, cs in corners[i].items():
+                d = max(math.dist(p, q) for p, q in zip(cs, corners[i - 1][bn]))
+                in_blend = len(before) <= i <= len(before) + len(blend)
+                if in_blend:
+                    if d > blend_jump[0]:
+                        blend_jump = (d, bn, i - len(before) + 1)
+                else:
+                    own = max(own, d)
+        turn = (0.0, '')
+        for bn in set(before[-1]) | set(blend[-1]):
+            r0 = before[-1].get(bn, ((0, 0, 0),))[0]
+            r1 = blend[-1].get(bn, ((0, 0, 0),))[0]
+            d = max(abs(x - y) for x, y in zip(r0, r1)) / ticks
+            if d > turn[0]:
+                turn = (d, bn)
+        gap = sorted(((max(abs(x - y) for x, y in zip(before[-1].get(bn, ((0, 0, 0),))[0], blend[-1].get(bn, ((0, 0, 0),))[0])), bn)
+                      for bn in set(before[-1]) | set(blend[-1])), reverse=True)
+        if worst is None or blend_jump[0] > worst[1][0]:
+            worst = (ph, blend_jump, own, turn, gap)
+    ph, (jump, jb, jt), own, (turn, tb), gap = worst
+    flag = jump > max(2.0 * own, 3.0) or turn > 90
+    when = f' (left at {ph:.2f} s of the loop)' if ph is not None else ''
+    big = [f'{bn} {d:.0f}' for d, bn in gap if d > 0.5][:6]
+    lines.append(f'  {a} -> {b}{when}: angles apart ' + (', '.join(big) if big else 'the same')
+                 + f'; blend jump {jump:.1f} px ({jb}, tick {jt}) against {own:.1f} in the clips; fastest turn {turn:.0f} deg a tick ({tb})'
+                 + ('  FLAGGED' if flag else ''))
+    return lines, flag
+
+
+def pairs(animal, names):
+    out = []
+    for a_pat, b_pat in animal.checks.get('switches', []):
+        As = [n for n in names if fnmatch.fnmatch(n, a_pat)]
+        Bs = [n for n in names if fnmatch.fnmatch(n, b_pat)]
+        sized = '*' in a_pat and '*' in b_pat
+        for a in As:
+            for b in Bs:
+                if a == b:
+                    continue
+                # a move made per size changes into the same size's next move (water_in_1000 -> water_out_1000 never)
+                if sized and a.rsplit('_', 1)[-1] != b.rsplit('_', 1)[-1]:
+                    continue
+                out.append((a, b))
+    return out
+
+
+# --- film strips ----------------------------------------------------------------------------------------------------
+def scene_boxes(sc, ext_z):
+    lo, hi = ext_z
+    out = []
+    if sc.kind == 'step':
+        zf, h = sc.step
+        z0, z1 = (lo, zf) if h > 0 else (zf, hi)
+        top, bot = (h, 0.0) if h > 0 else (0.0, h)
+        out.append((-16.0, bot, z0, 16.0, top, z1))
+    elif sc.kind == 'water':
+        b = sc.bank
+        if b['land_ahead']:
+            out.append((-16.0, b['bottom'] - 6, lo, 16.0, b['top'], b['edge']))
+        else:
+            out.append((-16.0, b['bottom'] - 6, b['edge'], 16.0, b['top'], hi))
+    boxes = []
+    for x0, y0, z0, x1, y1, z1 in out:
+        boxes.append(('ground', [(x0 if not q >> 2 & 1 else x1, y0 if not q >> 1 & 1 else y1, z0 if not q & 1 else z1)
+                                 for q in range(8)], {f: lab.STEP_GREY for f in lab.FACE_CORNERS}))
+    return boxes
+
+
+def strip(animal, pl, planted, times, views, flagged, path, title):
+    pts = [p for t in times for _, cs, _ in pl.posed(t) for p in cs]
+    xs, ys, zs = [p[0] for p in pts], [p[1] for p in pts], [p[2] for p in pts]
+    sc = pl.scene
+    lo_y = min(min(ys), 0.0 if sc.kind != 'water' else sc.bank['bottom']) - 4
+    if sc.kind == 'step':
+        lo_y = min(lo_y, sc.step[1] - 4)
+    hi_y = max(ys) + 6
+    ext_z = (min(zs) - 6, max(zs) + 6)
+    ext_x = (min(xs) - 6, max(xs) + 6)
+    cols = min(6, len(times))
+    cw, ch, lh = 380, 270, 20
+    rows_n = (len(times) + cols - 1) // cols
+    cv = lab.Canvas(cw * cols, (ch + lh) * rows_n * len(views) + 30)
+    cv.text(10, 8, title, scale=2)
+    ground = scene_boxes(sc, ext_z)
+    for vi, vname in enumerate(views):
+        view = lab.VIEWS[vname]
+        corners = [(x, y, z) for x in ext_x for y in (lo_y, hi_y) for z in ext_z]
+        pr = [view.project(q) for q in corners]
+        bounds = ((min(a for a, _, _ in pr), max(a for a, _, _ in pr)), (min(b for _, b, _ in pr), max(b for _, b, _ in pr)))
+        for k, t in enumerate(times):
+            x0 = cw * (k % cols)
+            y0 = 30 + (ch + lh) * (vi * rows_n + k // cols)
+            bad = any(abs(t - f) <= 0.051 for f in flagged)
+            cv.frame(x0, y0, cw, ch + lh)
+            if bad:
+                for d in range(3):
+                    cv.frame(x0 + d, y0 + d, cw - 2 * d, ch + lh - 2 * d)
+                cv.rect(x0, y0, cw, 3, RED)
+                cv.rect(x0, y0 + ch + lh - 3, cw, 3, RED)
+                cv.rect(x0, y0, 3, ch + lh, RED)
+                cv.rect(x0 + cw - 3, y0, 3, ch + lh, RED)
+            cv.text(x0 + 8, y0 + 6, f'{view.title} {t:.2f} S', rgb=RED if bad else (40, 30, 25))
+            fr = lab.Frame(cv, (x0 + 4, y0 + lh, cw - 8, ch - 4), view, bounds)
+            posed = pl.posed(t)
+            if ground:
+                fr.boxes(ground)
+            fr.boxes([c for c in posed if c[0] not in set(animal.checks.get('skip_bones', []))])
+            if sc.kind == 'flat':
+                fr.grid(0.0, 0.0, (ext_x, ext_z), step=4.0)
+            # the water's surface and the bottom, over the water
+            if sc.surface is not None:
+                if sc.kind == 'water':
+                    b = sc.bank
+                    wz = (b['edge'], ext_z[1]) if b['land_ahead'] else (ext_z[0], b['edge'])
+                    lines = ((sc.surface, BLUE), (b['bottom'], DEEP_BLUE))
+                else:
+                    wz, lines = ext_z, ((sc.surface, BLUE),)
+                for yy, col in lines:
+                    for xx in ext_x:
+                        fr.canvas.line(fr.px((xx, yy, wz[0])), fr.px((xx, yy, wz[1])), col, fr.cell, depth=False)
+            # parts inside a block: red dots
+            if sc.kind not in ('open_water',) and pl.kind != 'dig':
+                feet_parts = animal.checks.get('feet_parts', [])
+                for bone, cs, _ in posed:
+                    allowed = 1.05 if any(f in bone for f in feet_parts) else 0.6
+                    for p in cs:
+                        if sc.solid(p[1], p[2]) > allowed:
+                            x, y, _ = fr.px(p)
+                            fr.canvas.dot(x, y, 3, RED, fr.cell)
+            # planted feet's trails over the last 0.4 s: green, red where a planted foot slides
+            for key, track in planted.items():
+                seg = [(e[0], e[1], e[2]) for e in track if t - 0.4 <= e[0] <= t]
+                for (ta, ma, la), (tb, mb, lb) in zip(seg, seg[1:]):
+                    standing = la[1] - sc.floor(la[2]) < 1.0 and lb[1] - sc.floor(lb[2]) < 1.0
+                    if not standing:
+                        continue
+                    col = RED if math.dist(la, lb) > 0.3 else GREEN
+                    fr.canvas.line(fr.px(la), fr.px(lb), col, fr.cell, width=2, depth=False)
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    cv.save(path)
+    return path
+
+
+def switch_strip(animal, a, b, ticks, views, path):
+    before, blend, after, ca, cb = switch_poses(animal, a, b, ticks)
+    seq = [('end of ' + a, p) for p in before[-2:]] + [(f'blend {i + 1}/{ticks}', p) for i, p in enumerate(blend)] + \
+          [(b + f' +{i + 1}', p) for i, p in enumerate(after[:2])]
+    model = animal.model
+    corners_all = [p for _, pose in seq for _, cs, _ in model.posed(pose) for p in cs]
+    cols = min(6, len(seq))
+    cw, ch, lh = 330, 240, 20
+    rows_n = (len(seq) + cols - 1) // cols
+    cv = lab.Canvas(cw * cols, (ch + lh) * rows_n * len(views) + 30)
+    cv.text(10, 8, f'{a} -> {b}  ({ticks} tick blend)', scale=2)
+    last = None
+    for vi, vname in enumerate(views):
+        view = lab.VIEWS[vname]
+        pr = [view.project(q) for q in corners_all]
+        bounds = ((min(x for x, _, _ in pr) - 4, max(x for x, _, _ in pr) + 4), (min(y for _, y, _ in pr) - 4, max(y for _, y, _ in pr) + 4))
+        last = None
+        for k, (label, pose) in enumerate(seq):
+            x0 = cw * (k % cols)
+            y0 = 30 + (ch + lh) * (vi * rows_n + k // cols)
+            cv.frame(x0, y0, cw, ch + lh)
+            cv.text(x0 + 6, y0 + 5, f'{view.title} {label}')
+            fr = lab.Frame(cv, (x0 + 1, y0 + lh, cw - 2, ch - 1), view, bounds)
+            posed = model.posed(pose)
+            fr.boxes(posed)
+            now = {bn: cs for bn, cs, _ in posed}
+            if last:
+                for bn, cs in now.items():
+                    if bn in last and max(math.dist(p, q) for p, q in zip(cs, last[bn])) > 3.0:
+                        c = [sum(p[i] for p in cs) / 8 for i in range(3)]
+                        x, y, _ = fr.px(c)
+                        fr.canvas.dot(x, y, 4, RED, fr.cell)
+            last = now
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    cv.save(path)
+    return path
+
+
+# --- the command ------------------------------------------------------------------------------------------------------
+def main(argv):
+    if not argv or argv[0] in ('-h', '--help'):
+        print(__doc__)
+        return 1
+    animal_name, args = argv[0], argv[1:]
+    times, views, model, out_dir, names, switches = None, ('side', 'three', 'front'), None, None, [], False
+    i = 0
+    while i < len(args):
+        a = args[i]
+        if a == '--times':
+            times = [float(x) for x in args[i + 1].split(',')]
+            i += 2
+        elif a == '--views':
+            views = tuple(args[i + 1].split(','))
+            i += 2
+        elif a == '--model':
+            model = args[i + 1]
+            i += 2
+        elif a == '--out':
+            out_dir = args[i + 1]
+            i += 2
+        elif a == '--switches':
+            switches = True
+            i += 1
+        else:
+            names.append(a)
+            i += 1
+    animal = Animal(animal_name, model)
+    out_dir = out_dir or os.path.join(PROJECT, 'references', 'anim_lab', animal_name)
+    every = list(animal.data)
+    chosen = [n for n in every if any(fnmatch.fnmatch(n, p) for p in names)] if names else ([] if switches else every)
+    if names and not chosen:
+        print(f'no clip of {animal.anim_stem} matches {" ".join(names)}')
+        return 1
+    print(f'{animal_name} on model {animal.model_name}, clips of {animal.anim_stem} (a model pixel {animal.px:.4f} blocks)')
+    hid = hidden_at_rest(animal)
+    if hid:
+        print(hid)
+    for name in chosen:
+        flagged = set()
+        pl, planted, lines = check_clip(animal, name, flagged)
+        print('\n'.join(lines))
+        if times:
+            ts = [min(t, pl.length) for t in times]
+            png = strip(animal, pl, planted, ts, views, flagged, os.path.join(out_dir, f'cc_{animal.model_name}_{name}.png'),
+                        f'{animal.model_name} {name}  {pl.length:g} S')
+            print('  wrote', png)
+    if switches:
+        ticks, source = animal.blend_ticks()
+        todo = pairs(animal, every)
+        if names:
+            todo = [(a, b) for a, b in todo if a in chosen or b in chosen]
+        print(f'== clip changes (GeckoLib\'s blend: {ticks} ticks, from {source}; {len(todo)} changes)')
+        bad = 0
+        for a, b in todo:
+            lines, flag = check_switch(animal, a, b, ticks)
+            bad += flag
+            print('\n'.join(lines))
+            if times or flag:
+                png = switch_strip(animal, a, b, ticks, views, os.path.join(out_dir, f'sw_{a}_{b}.png'))
+                print('    drew', png)
+        print(f'  {bad} change(s) flagged')
+    return 0
+
+
+if __name__ == '__main__':
+    sys.exit(main(sys.argv[1:]))

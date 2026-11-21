@@ -1,0 +1,73 @@
+{
+  "model": "snail",
+  "about": "The snail's body plan (the Animal Maker Engine step A, 2026-11-20): its family, its body chain (head to tail) and legs, what tools/clip_check.py needs (checks) and its course entry (course). Read by tools/body_course.py, tools/clip_check.py and tools/body_plan.py; the game reads only its bones table. Numbers marked my pick in docs/HISTORY.md (step A): its bpt still a guess (the course run 2026-11-20 flickered between crawl and idle, BUGS 250).",
+  "family": "shell",
+  "root": "body",
+  "forebody": "body",
+  "head": {
+    "bone": "head",
+    "jaws": []
+  },
+  "chain": [
+    "head",
+    "body",
+    "shell"
+  ],
+  "legs": {},
+  "bones": {
+    "body": "body",
+    "foot": "foot",
+    "head": "head",
+    "eye_left": "eye_left",
+    "feeler_left": "feeler_left",
+    "eye_right": "eye_right",
+    "feeler_right": "feeler_right",
+    "shell": "shell"
+  },
+  "checks": {
+    "px": 0.0625,
+    "controller": "savanna/src/main/java/com/antcolonies/savanna/animal/SnailEntity.java",
+    "feet_parts": [
+      "foot"
+    ],
+    "switches": [
+      [
+        "idle",
+        "crawl"
+      ],
+      [
+        "crawl",
+        "idle"
+      ],
+      [
+        "crawl",
+        "graze"
+      ],
+      [
+        "graze",
+        "crawl"
+      ],
+      [
+        "idle",
+        "hide"
+      ],
+      [
+        "hide",
+        "peek"
+      ],
+      [
+        "peek",
+        "idle"
+      ]
+    ]
+  },
+  "course": {
+    "snail": {
+      "id": "antcolonies:snail",
+      "data": "",
+      "walk": 1.0,
+      "dash": 1.0,
+      "bpt": 0.012
+    }
+  }
+}

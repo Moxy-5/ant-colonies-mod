@@ -1,10 +1,25 @@
 """
-The measuring course (the Animal Maker Engine, phase 1 step 1, 2026-11-19; docs/ANIMAL-MAKER-ENGINE.md).
+The measuring course (the Animal Maker Engine, phase 1 step 1, 2026-11-19; by family since step A, 2026-11-20;
+docs/ANIMAL-MAKER-ENGINE.md).
 
-The same course for every animal: the in-game camera sends the animal over a flat walk, a step up, a step down, a
-stair slope, into water from a level bank and from a high one, a dash into water, a climb out and a turn, and a real
-scare into water with its own mind; while it goes, the game writes down every bone where it drew it
-(client/BodyRecorder.java, "record on" in a shot list). This tool judges those recordings; the game decides nothing.
+One course for every animal, its scenes chosen by the animal's body family (its body plan's "family"), never by the
+animal: the in-game camera sends it through its family's scenes (below); while it goes, the game writes down every
+bone where it drew it (client/BodyRecorder.java, "record on" in a shot list). This tool judges those recordings; the
+game decides nothing.
+
+The scene sets (FAMILY_SETS says which family gets which):
+  walkers      (the monitor, the crocodile) a flat walk, a step up, a step down, a stair slope, into water from a level
+               bank and from a high one, a dash into water, a climb out, a turn, and a real scare into water (its own mind)
+  hoppers      (the bullfrog) the same land and water scenes, each one hops (over the step, into and out of the water)
+  swimmers     (tilapia, catfish, barb) open water across a deep pool, the shallows (one block deep), rising from the
+               bottom to the surface (coming up for air), a school turning (four more of its kind with their own minds
+               round the one sent through two turns), and a scare in the pool
+  bed walkers  (crab, river snail) along a river bed under water, a step up and a step down on the bed, a turn on the
+               bed, walking out of the water onto the shore, and a scare on the bed
+Quick presets (--quick: the two or three scenes of each set that catch the most) for day-to-day changes: walkers
+step_up, step_down, bank_level; hoppers step_up, bank_level, climb_out; swimmers school_turn, shallows; bed walkers
+bed_step_up, shore_out. **Use --quick after a small change to an animal's clips or body code; the full course after a
+big change (a new move, a new body rule, a new animal) and before a merge into master.** About a minute a scene.
 
 The checks (any body: they read the legs, feet and body chain from the animal's body plan, any number of legs):
   inside   a part drawn inside a block (its box corners in the blocks' collision boxes), deepest first
@@ -21,13 +36,19 @@ Run from the project folder:
   python tools/body_course.py films [animal ...]   (re)writes the course's shot lists, tools/film/course/course_<animal>_<scene>.film
   python tools/body_course.py run [animal ...]     films the course (./gradlew runFilm) and checks it; about a minute a scene
   python tools/body_course.py check [animal ...]   checks the recordings already made (run-film/course/course_*/)
+  options (any of the three): --quick (the quick preset of each animal's set), --family <family> (every animal of
+  that body family, in place of naming them), --scenes a,b (only those scenes)
 A run moves its scenes' folders from run-film/screenshots/ (which the guard films clear) into run-film/course/. Each
 animal gets run-film/course/course_<animal>.txt (every finding, worst first) and one picture a scene,
 run-film/course/<scene>/graph.png: heights over time (the animal, its head, chest, hips and tail tip, and the
-ground or water under it), the chain's bends, the feet over the ground, pops marked in red.
+ground or water under it), the chain's bends, the feet over the ground, pops marked in red. A --quick or --scenes
+check writes only those scenes into the report.
 
-An animal joins the course with a line in ANIMALS (its id, its summon data, its walking and dashing speeds) and a body
-plan with a family, a chain and legs (tools/body_plan.py).
+An animal joins the course by its body plan alone (tools/body_plan.py): a family, a chain, its legs, and a "course"
+section: one entry per course animal (usually one, named as the plan; the crocodile's young are entries of its plan),
+each its summon id, its summon data (its size fixed, so every run is the same animal), its walking and dashing speeds
+(as its goals send it), "bpt" (blocks a tick it goes at speed 1.0, measured on the course) and optional "setup"
+(camera commands before the scene).
 """
 import gzip, json, math, os, statistics, subprocess, sys
 
@@ -41,29 +62,22 @@ SHOTS = os.path.join(PROJECT, 'run-film', 'screenshots')
 # the course's own folder: each run's scenes are moved here from the camera's screenshots (which other films clear)
 KEPT = os.path.join(PROJECT, 'run-film', 'course')
 
-# The animals on the course: id, extra summon data (its size fixed, so every run is the same animal), its own walking
-# speed (as its goals send it) and its running one (its flight to water).
-ANIMALS = {
-    # bpt: blocks a tick it walks at speed 1.0, measured on the course (the monitor strolls at 0.8: 0.031 a tick)
-    'monitor': dict(id='antcolonies:monitor', data='OwnSize:1.0f,HungryIn:99999,SunIn:99999', walk=0.8, dash=1.7, bpt=0.039),
-    'crocodile': dict(id='antcolonies:crocodile', data='OwnSize:1.0f', walk=1.0, dash=1.9, bpt=0.059),
-    # the young (animal life cycle step 4, 2026-11-20): a hatchling just out of the egg (0.07 of the grown size) and a
-    # teen a day into its teens (0.43); the grown body plan (same bones); bpt by CrocodileEntity.sizePace
-    'croc_hatchling': dict(id='antcolonies:crocodile', plan='crocodile', walk=1.0, dash=1.9, bpt=0.059 * (0.07 / 0.7) ** 0.5,
-                           data='Life:{Sex:"female",Age:0,Grown:0b,OwnSize:1.0f}'),
-    # the bullfrog (the hoppers, the polish's step 1, 2026-11-20): a male of size 1, never hungry on the course; it
-    # hops, so its pace is hops and rests (about 0.7 blocks a hop, a hop and rest about 18 ticks; my measure to check)
-    # (filmed at 8:00: at noon by water it digs in, at night males call)
-    'bullfrog': dict(id='antcolonies:bullfrog', data='Male:1b,HungryIn:99999', walk=1.0, dash=1.6, bpt=0.035,
-                     setup=['cmd time set 2000']),
-    'croc_teen': dict(id='antcolonies:crocodile', plan='crocodile', walk=1.0, dash=1.9, bpt=0.059 * (0.43 / 0.7) ** 0.5,
-                      data='Life:{Sex:"female",Age:168000,Grown:0b,OwnSize:1.0f}'),
-}
+def load_animals():
+    """The animals on the course, read from the body plans' "course" sections (each entry knows its plan and family)."""
+    out = {}
+    for model, _mod in body_plan.all_plans(drafts=False):
+        data = json.load(open(body_plan.plan_path(model), encoding='utf-8'))
+        for name, entry in data.get('course', {}).items():
+            out[name] = dict(entry, plan=model, family=data.get('family'))
+    return out
+
+
+ANIMALS = load_animals()
 
 
 def plan_of(animal):
     """The body plan's name for a course animal (its own name, or the grown one's for the young)."""
-    return ANIMALS[animal].get('plan', animal)
+    return ANIMALS[animal]['plan']
 
 # The flat world's ground: grass at y -61, so an animal stands at -60. The camera clears x and z -12..12 each scene.
 G = -60
@@ -91,6 +105,50 @@ SCENES = {
              [(2, G, -5), (2, G, 4), (-6, G, 4)], 'walk'),
 }
 
+# The swimmers' and the bed walkers' scenes (step A, 2026-11-20; my picks): a pool three blocks deep across the cleared
+# square (y -63 to -61 over the bedrock, its surface at -60.1), or one block deep for the shallows; the bed walkers' pool
+# is four deep (to -60).
+POOL = 'cmd fill -12 -63 -7 12 -61 7 minecraft:water'
+SHALLOWS = 'cmd fill -12 -61 -7 12 -61 7 minecraft:water'
+D = -62          # where a swimmer starts in the pool: the middle of its three blocks of water
+BED = -63        # the river bed's floor under the pool: a bed walker stands on the dirt at -63 (the pool one deeper here)
+BED_POOL = 'cmd fill -12 -63 -7 12 -60 7 minecraft:water'
+SCENES.update({
+    'open_water': ('swimming straight across a deep pool', [POOL], (-8.5, D, 0.5), [(8, D, 0)], 'walk'),
+    'shallows': ('swimming through water one block deep', [SHALLOWS], (-8.5, -61, 0.5), [(8, -61, 0)], 'walk'),
+    'surface': ('rising from the bottom of a deep pool to its surface (coming up for air)', [POOL], (-8.5, -63, 0.5),
+                [(0, -63, 0), (8, -61, 0)], 'walk'),
+    'school_turn': ('a school turning: four more of its kind (their own minds) round the one sent through two turns',
+                    [POOL, 'school'], (-6.5, D, -4.5), [(2, D, -5), (2, D, 4), (-6, D, 4)], 'walk'),
+    'bed_flat': ('walking along a river bed four blocks under water', [BED_POOL], (-4.5, BED, 0.5), [(3, BED, 0)], 'walk'),
+    'bed_step_up': ('a one-block step up on the river bed', [BED_POOL, 'cmd fill 1 -63 -7 12 -63 7 minecraft:dirt'],
+                    (-4.5, BED, 0.5), [(5, BED + 1, 0)], 'walk'),
+    'bed_step_down': ('a one-block step down on the river bed', [BED_POOL, 'cmd fill -12 -63 -7 0 -63 7 minecraft:dirt'],
+                      (-4.5, BED + 1, 0.5), [(5, BED, 0)], 'walk'),
+    'bed_turn': ('a walk on the river bed with two right-angle turns', [BED_POOL], (-4.5, BED, -3.5),
+                 [(2, BED, -4), (2, BED, 3), (-4, BED, 3)], 'walk'),
+    'shore_out': ('walking from a river bed one block under water up a one-block bank onto the shore',
+                  ['cmd fill -12 -61 -7 0 -61 7 minecraft:water'], (-4.5, -61, 0.5), [(5, G, 0)], 'walk'),
+})
+# The scene sets by body family, and each set's quick preset (the scenes that catch the most).
+SETS = {
+    'walkers': ['flat', 'step_up', 'step_down', 'stairs', 'bank_level', 'bank_high', 'dash', 'climb_out', 'turn'],
+    'hoppers': ['flat', 'step_up', 'step_down', 'stairs', 'bank_level', 'bank_high', 'dash', 'climb_out', 'turn'],
+    'swimmers': ['open_water', 'shallows', 'surface', 'school_turn'],
+    'bed_walkers': ['bed_flat', 'bed_step_up', 'bed_step_down', 'bed_turn', 'shore_out'],
+}
+QUICK = {'walkers': ['step_up', 'step_down', 'bank_level'], 'hoppers': ['step_up', 'bank_level', 'climb_out'],
+         'swimmers': ['school_turn', 'shallows'], 'bed_walkers': ['bed_step_up', 'shore_out']}
+FAMILY_SETS = {'four_legged_long_body': 'walkers', 'hopper': 'hoppers', 'fish': 'swimmers', 'crab': 'bed_walkers',
+               'shell': 'bed_walkers'}
+# where each set's scare starts: on a level bank by water (it runs for it), in the pool, or on the bed
+SCARES = {'walkers': ([WATER_POOL], (-4.5, G, 0.5)), 'hoppers': ([WATER_POOL], (-4.5, G, 0.5)),
+          'swimmers': ([POOL], (-4.5, D, 0.5)), 'bed_walkers': ([BED_POOL], (-4.5, BED, 0.5))}
+
+
+def set_of(animal):
+    return FAMILY_SETS.get(ANIMALS[animal].get('family'), 'walkers')
+
 
 def ticks_for(animal, speed, start, goal):
     """The ticks this animal needs to walk from start to goal at that speed (straight, a third more) and 2 s more."""
@@ -113,11 +171,15 @@ def write_films(animals):
     out = []
     for animal in animals:
         a = ANIMALS[animal]
-        for scene, (about, setup, start, places, speed) in SCENES.items():
+        for scene in scenes_of(animal, scare=False):
+            about, setup, start, places, speed = SCENES[scene]
             x, y, z = start
+            school = [f'cmd summon {a["id"]} {x + dx} {y} {z + dz}' + (f' {{{a["data"]},PersistenceRequired:1b}}' if a['data']
+                      else ' {PersistenceRequired:1b}') for dx, dz in ((-1, -1), (-1, 1), (1, -1), (1, 1))] if 'school' in setup else []
+            setup = [c for c in setup if c != 'school']
             lines = [f'# The measuring course ({about}) for the {animal}: written by tools/body_course.py films, do not edit.',
                      'lens 50'] + a.get('setup', []) + setup + [
-                f'walker {a["id"]} {x} {y} {z} -90 {a["data"]}',
+                f'walker {a["id"]} {x} {y} {z} -90' + (f' {a["data"]}' if a['data'] else '')] + school + [
                 'follow 0 3.5 -6 0 25',                  # from the north, a little above: the side of it, walking east
                 'cmd tick unfreeze',
                 'record on 3']
@@ -137,13 +199,17 @@ def write_films(animals):
             path = os.path.join(COURSE, scene_name(animal, scene) + '.film')
             write_film(path, lines)
             out.append(path)
-        # the real thing: its own mind, scared on a level bank, runs for the water
+        if 'scared' not in scenes_of(animal):
+            continue
+        # the real thing: its own mind, scared (on a level bank it runs for the water; a swimmer in the pool, a bed
+        # walker on the bed)
+        scare_setup, (sx, sy, sz) = SCARES[set_of(animal)]
         lines = [f'# The measuring course (a real scare into water: its own mind, not sent) for the {animal}: written by '
-                 'tools/body_course.py films, do not edit.', 'lens 50'] + a.get('setup', []) + [WATER_POOL, 'cmd tick unfreeze', 'wait 20',
-                 f'cmd summon {a["id"]} -4.5 {G} 0.5 {{{a["data"]},PersistenceRequired:1b,Rotation:[-90f,0f],'
+                 'tools/body_course.py films, do not edit.', 'lens 50'] + a.get('setup', []) + scare_setup + ['cmd tick unfreeze', 'wait 20',
+                 f'cmd summon {a["id"]} {sx} {sy} {sz} {{' + (f'{a["data"]},' if a['data'] else '') + 'PersistenceRequired:1b,Rotation:[-90f,0f],'
                  "CustomName:'\"film-walker\"'}",
                  'wait 30', 'follow 0 3.5 -6 0 25', 'record on 3',
-                 f'cmd execute positioned -4.5 {G} 0.5 run damage @e[name=film-walker,limit=1,sort=nearest] 0.5 minecraft:cactus']
+                 f'cmd execute positioned {sx} {sy} {sz} run damage @e[name=film-walker,limit=1,sort=nearest] 0.5 minecraft:cactus']
         for i in range(5):
             lines += ['wait 60', f'shot p{i:02d}']
         lines.append('record off')
@@ -153,8 +219,18 @@ def write_films(animals):
     return out
 
 
-def scenes_of(animal):
-    return list(SCENES) + ['scared']
+# which scenes this run takes (main sets them from --quick and --scenes)
+ONLY = {'quick': False, 'scenes': None}
+
+
+def scenes_of(animal, scare=True):
+    """The animal's scenes: its family's set (or its quick preset, or the scenes named), and the scare."""
+    which = SETS[set_of(animal)]
+    if ONLY['quick']:
+        which = QUICK[set_of(animal)]
+    if ONLY['scenes']:
+        return [x for x in ONLY['scenes'] if x in which + ['scared'] and (scare or x != 'scared')]
+    return which + (['scared'] if scare and not ONLY['quick'] else [])
 
 
 # --- reading a recording ----------------------------------------------------------------------------------------------
@@ -690,10 +766,30 @@ def main(args):
     if not args or args[0] not in ('films', 'run', 'check'):
         print(__doc__)
         return 1
-    animals = args[1:] or list(ANIMALS)
+    rest, family = [], None
+    i = 1
+    while i < len(args):
+        if args[i] == '--quick':
+            ONLY['quick'] = True
+            i += 1
+        elif args[i] == '--family':
+            family = args[i + 1]
+            i += 2
+        elif args[i] == '--scenes':
+            ONLY['scenes'] = args[i + 1].split(',')
+            i += 2
+        else:
+            rest.append(args[i])
+            i += 1
+    if family:
+        rest += [a for a, e in ANIMALS.items() if e.get('family') == family and a not in rest]
+        if not rest:
+            print(f'no animal of the family {family} on the course (families: {", ".join(sorted({e.get("family") for e in ANIMALS.values()}))})')
+            return 1
+    animals = rest or list(ANIMALS)
     for a in animals:
         if a not in ANIMALS:
-            print(f'no animal {a} on the course (ANIMALS has {", ".join(ANIMALS)})')
+            print(f'no animal {a} on the course (the body plans give {", ".join(ANIMALS)})')
             return 1
     if args[0] in ('films', 'run'):
         films = write_films(animals)
