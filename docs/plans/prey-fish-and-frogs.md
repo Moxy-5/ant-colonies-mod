@@ -339,6 +339,16 @@ user: a detailed webbed foot model comes later). Fun first, inspired by the real
   out); side 96 / 97, from above 94 / 88, front 86 / 96. Plain colours, the sheets'. Pictures
   `references/workshop/barb_fry/plain_v1.png`, `references/workshop/tadpole/plain_v1_v2.png`. Waiting for the
   user's look; next the paint (my pick for the game: the fry drawn see-through).
+- 2026-11-21, **the fry and the tadpole painted** (the user: "they look good we can start painting"; Neon busy
+  with the hippo, so done in a worktree of its own, only the two makers touched, no shared tool). Tadpole v3 (v4
+  with the day-3 legs): the sheet's near-black olive with pale and gold flecks, small eyes with a gold ring, a grey
+  speckled belly with the coiled gut, the dark beak and pale lips underneath, a mottled tail muscle, clear fins
+  with dark speckles, the legs' toe tips dark. Fry v2: glassy body, big dark eyes with one glint (showing from above
+  and the front as on the sheet), the silver swim bladder over the gold gut, the backbone showing through the clear
+  rear body, dark dots along the back and under the belly, the tail spot starting. My pick for the game: the fry's
+  glass, belly and fins drawn see-through (gut, bladder, eyes, dots solid). Pictures
+  `references/workshop/tadpole/paint_v3_v4.png`, `references/workshop/barb_fry/paint_v2.png`. Next: the user's
+  look, then the clips (tadpole: wriggle down its three tail bones, graze; the fry reuses the barb's).
 
 ## My picks the user may change
 The barb's name and look, every size and number above (the bullfrog's size is the user's call), barbs with no hunger,

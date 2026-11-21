@@ -126,8 +126,53 @@ def plain_colour(c, face, x, y, z):
     return PLAIN['body']
 
 
-LOOKS = {'plain': plain_colour}
-WORKSHOP_LOOK = 'plain'
+# --- the paint (stage 4, 2026-11-21, from the sheet's colours) --------------------------------------------------------
+PAINT = {
+    'body': (50, 50, 40), 'fleck': (80, 78, 58), 'gold': (176, 150, 80), 'eye': (10, 10, 10), 'ring': (176, 150, 80),
+    'belly': (104, 106, 96), 'belly_fleck': (128, 128, 116), 'gut': (66, 62, 50), 'beak': (28, 26, 22),
+    'lip': (150, 140, 116), 'muscle': (64, 62, 50), 'mottle': (94, 90, 70), 'fin': (134, 142, 132),
+    'fin_speck': (84, 90, 84), 'leg': (70, 70, 52), 'toe': (46, 46, 36),
+}
+
+
+def noise(x, y, z, seed):
+    """A steady 0-1 number for each texture pixel, so the flecks stay put from build to build."""
+    ix, iy, iz = (int(round(v * 4)) for v in (x, y, z))
+    return ((ix * 73856093) ^ (iy * 19349663) ^ (iz * 83492791) ^ (seed * 2654435761)) % 1000 / 1000
+
+
+def paint_colour(c, face, x, y, z):
+    part = c['_part']
+    ox = LENGTH / 2 - z
+    n = noise(x, y, z, 1)
+    if part == 'fin':
+        return PAINT['fin_speck'] if n < 0.14 else PAINT['fin']          # clear fins, dark speckles
+    if part == 'muscle':
+        return PAINT['mottle'] if n < 0.3 else PAINT['muscle']           # the tail's mottled muscle
+    if part == 'leg':
+        if ox < 8.0:
+            return PAINT['toe']                                           # the foot's dark toe tips
+        return PAINT['fleck'] if n < 0.25 else PAINT['leg']
+    if face in ('east', 'west') and EYE[0] <= ox < EYE[1] and EYE[2] <= y < EYE[3]:
+        return PAINT['eye'] if ox < EYE[0] + 0.5 else PAINT['ring']     # small eye, its gold ring behind
+    if face == 'down':
+        if ox > LENGTH - 1.5 and abs(x) < 1.0:
+            return PAINT['beak'] if abs(x) < 0.5 else PAINT['lip']       # the mouth underneath at the front
+        r = ((ox - 13.75) ** 2 + (x * 1.1) ** 2) ** 0.5
+        if r < 0.35 or 0.7 < r < 1.15 or 1.5 < r < 1.85 and ox < 13.75:
+            return PAINT['gut']                                           # the coiled gut showing through
+        return PAINT['belly_fleck'] if n < 0.2 else PAINT['belly']
+    if y < 1.75:
+        return PAINT['belly']
+    if face in ('east', 'west') and 14.0 <= ox < 16.0 and y < 2.75:
+        return PAINT['gut']                                               # the gut's edge seen from the side
+    if n < 0.05 and face != 'north' and (face == 'up' or y >= 3.0):
+        return PAINT['gold']                                              # the gold flecks
+    return PAINT['fleck'] if n < 0.2 else PAINT['body']
+
+
+LOOKS = {'painted': paint_colour, 'plain': plain_colour}
+WORKSHOP_LOOK = 'painted'
 WORKSHOP_SHAPE = [
     ('CORE_WIDTH', 'Back and belly ridge width (share of the full width)', 0.3, 0.9, 0.05),
     ('FLANK_DEPTH', 'Round flank depth (share of the full depth)', 0.4, 0.9, 0.05),

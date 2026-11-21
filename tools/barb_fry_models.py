@@ -88,8 +88,52 @@ def plain_colour(c, face, x, y, z):
     return PLAIN['glass']
 
 
-LOOKS = {'plain': plain_colour}
-WORKSHOP_LOOK = 'plain'
+# --- the paint (stage 4, 2026-11-21, from the sheet's colours). Kept solid here; my pick for the game: the glass, belly
+# and fins drawn see-through (the gut, bladder, eyes and dots solid), as real fry are clear but for those. ----------
+PAINT = {
+    'glass': (196, 210, 212), 'back': (164, 178, 180), 'head_top': (150, 162, 164), 'spine': (180, 194, 196), 'belly': (222, 228, 226),
+    'silver': (236, 240, 244), 'gut': (206, 170, 92), 'gut_dark': (176, 136, 64), 'eye': (16, 16, 18),
+    'glint': (200, 214, 222), 'dot': (78, 86, 84), 'spot': (98, 104, 110), 'fin': (160, 178, 182),
+    'fin_edge': (140, 160, 168),
+}
+
+
+def paint_colour(c, face, x, y, z):
+    part = c['_part']
+    ox = LENGTH / 2 - z
+    if part == 'fin':
+        return PAINT['fin_edge'] if (c['_bone'] == 'tail_fin' and ox < 0.5) else PAINT['fin']
+    if face in ('east', 'west'):
+        if part == 'head' and EYE[0] <= ox < EYE[1] and EYE[2] <= y < EYE[3]:
+            return PAINT['glint'] if (ox >= EYE[1] - 0.5 and y >= EYE[3] - 0.5) else PAINT['eye']   # one bright glint
+        if 2.0 <= ox < 4.0 and 2.0 <= y < 3.0:
+            return PAINT['spot']                      # the tail spot, just starting
+        if 6.0 <= ox < 8.0 and y < 2.0:
+            return PAINT['gut_dark'] if (ox < 6.5 or y < 1.5) else PAINT['gut']   # the gold gut, shaded below
+        if 6.0 <= ox < 8.0 and y < 3.0:
+            return PAINT['silver']                    # the swim bladder over the gut
+        if 3.0 <= ox < 6.0 and 2.25 <= y < 2.75:
+            return PAINT['spine']                     # the backbone showing through the clear rear body
+    if face == 'up' and part == 'head' and abs(x) > HEAD_HALF - 0.5 and EYE[0] <= ox < EYE[1]:
+        return PAINT['eye']                           # the big eyes bulge, so they show from above and the front too
+    if face == 'north' and part == 'head' and abs(x) > HEAD_HALF - 0.5 and EYE[2] <= y < EYE[3]:
+        return PAINT['eye']
+    if face == 'up':
+        if part == 'body' and int(ox) in (4, 6) and abs(x) < 0.5:
+            return PAINT['dot']                       # the dark dots along the back
+        if part == 'head':
+            return PAINT['head_top']                  # a little pigment on the head's top
+        if part == 'body':
+            return PAINT['back']                      # the back a touch darker than the clear sides
+    if face == 'down' and part == 'body' and int(ox) in (3, 5, 7) and abs(x) < 0.5:
+        return PAINT['dot']                           # and a row under the belly
+    if face == 'down' or y < 1.6:
+        return PAINT['belly']
+    return PAINT['glass']
+
+
+LOOKS = {'painted': paint_colour, 'plain': plain_colour}
+WORKSHOP_LOOK = 'painted'
 WORKSHOP_SHAPE = [
     ('HEAD_HALF', 'Head half width (the eyes on its sides)', 1.0, 2.0, 0.25),
     ('BELLY_HALF', 'Body half width round the gut', 0.5, 1.5, 0.25),
