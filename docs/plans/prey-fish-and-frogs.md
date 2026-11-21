@@ -377,6 +377,24 @@ user: a detailed webbed foot model comes later). Fun first, inspired by the real
   body now rises 5.5 px as it tips). **Not yet checked:** `tools/clip_check.py` and the in-game frame films (the
   hard rule's second half): the checker is on `claude/engine-every-animal`, and both need the game's files and an
   entity, which come with plan steps 2 and 4 (the fry and tadpole in the game).
+- 2026-11-21, **step 2 built: the barb breeds** (the user: "Barb first"). On the animal life kit: its life file
+  `animal_life/barb.json` (all my picks: males 0.85-1.05, females 0.95-1.15; every 2 days in the rains at first
+  light; clutch 10-16; hatch in a day; fry 0.32 of grown for a day, then a teen drawn as a small barb from 0.55, grown
+  on day 3; local limit 30; no care). A new shared breeding time, `dawn` (`LifeNumbers.Time.DAWN`,
+  `AnimalLife.isDawn`, 5:00 to 6:30: first light; not 7:30, as the game tests' still 7:00 would set every barb in
+  them breeding). At first light a ready male colours up (the v8 breeding look) and a ripe female is drawn plump (her
+  v7 model, `barb_plump`); a pair meets (`SeekMateGoal`) and shivers side by side 6 s (a new `shiver` clip, checked
+  offline and in the game); she scatters her eggs over the algae mats a few to a mat, by the catfish's way made
+  shared (`ScatterEggsGoal`, `ScattersEggs`) and its egg block (the same look, my pick; tilapia and crabs eat them).
+  The fry: their own model, look and clips (`barb_fry`, drawn by the barb's renderer while young, scaled to 0.08
+  blocks), kept within 6 blocks of their mat, schooling only with fry; they peck at the algae, never sip; slow
+  swimming is the looping burst-and-glide `dart`; a new `flop` clip for a stranded fry. A slim female wears the
+  female colours (v7's) on the grown model. Tests (`life`): `barbsSpawnAtDawnAndScatterEggsOnTheAlgae` (not ready at
+  noon, ready at dawn, the looks, the shiver, 10-16 eggs on 3 or more mats, hatching into fry at 0.32 that school
+  only with fry, a teen at 0.55) and `noBarbSpawningWhileTheRiverIsFull`; the barb joins the save-and-load test.
+  `life,river` run: all passed but three flakes that passed alone 3 of 3 (BUGS 227, 244 and a new 257). Filmed in
+  the game (`tools/film/barb_young_frames.film`, `references/workshop/barb_fry/game_frames.png`): the fry at a third
+  of a grown barb's length, nothing in blocks; first light is dim, so the colours are best judged in a real world.
 
 ## My picks the user may change
 The barb's name and look, every size and number above (the bullfrog's size is the user's call), barbs with no hunger,

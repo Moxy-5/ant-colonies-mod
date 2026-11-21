@@ -61,11 +61,11 @@ import software.bernie.geckolib.util.GeckoLibUtil;
  * the flooded shallows after the first rains): females are a little bigger, and a female ripe to spawn is plump (her
  * own swelled model). On a rainy night ready catfish seek each other out ({@link SeekMateGoal}); the female leads her
  * male into the shallows near the algae and he curls round her tail, splashing at the surface ({@link #courting}); then
- * she scatters her sticky eggs over the algae mats ({@link CatfishScatterEggsGoal}) and leaves them. Tilapia and crabs
+ * she scatters her sticky eggs over the algae mats ({@link ScatterEggsGoal}) and leaves them. Tilapia and crabs
  * eat many ({@link EggMeals}); the rest hatch in a day into tiny dark young that hide in the shallows and never hunt,
  * grown in a few days.
  */
-public class CatfishEntity extends AbstractFish implements GeoEntity, HasLife {
+public class CatfishEntity extends AbstractFish implements GeoEntity, HasLife, ScattersEggs {
     /** How long a strike is shown (ticks; the strike clip is 1 s, the mouth open from 0.05 to 0.38 s). */
     static final int STRIKE_TICKS = 20;
 
@@ -149,7 +149,7 @@ public class CatfishEntity extends AbstractFish implements GeoEntity, HasLife {
     @Override
     protected void registerGoals() {
         super.registerGoals();
-        goalSelector.addGoal(2, new CatfishScatterEggsGoal(this));
+        goalSelector.addGoal(2, new ScatterEggsGoal<>(this));
         goalSelector.addGoal(2, new HuntTilapiaGoal(this));
         // above the fish's own random swimming (4), which would otherwise keep it from ever setting off to a mate
         goalSelector.addGoal(3, new SeekMateGoal<>(this, 1.0));
@@ -186,11 +186,13 @@ public class CatfishEntity extends AbstractFish implements GeoEntity, HasLife {
     }
 
     /** Her eggs still to scatter. */
+    @Override
     public int eggsToScatter() {
         return eggsToScatter;
     }
 
-    void scattered(int eggs) {
+    @Override
+    public void scattered(int eggs) {
         eggsToScatter = Math.max(0, eggsToScatter - eggs);
     }
 

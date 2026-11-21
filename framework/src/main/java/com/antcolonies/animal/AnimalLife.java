@@ -203,8 +203,17 @@ public final class AnimalLife {
         if (!weather || numbers.time() == LifeNumbers.Time.ANY) {
             return weather;
         }
+        if (numbers.time() == LifeNumbers.Time.DAWN) {
+            return isDawn(mob.level(), mob.blockPosition());
+        }
         boolean day = Colony.isSunUp(mob.level(), Colony.dayTimeAt(mob.level(), mob.blockPosition()));
         return day == (numbers.time() == LifeNumbers.Time.DAY);
+    }
+
+    /** Dawn by the shared day clock, first light: 5:00 to 6:30 (23000 to 500 ticks; the barb spawns then). */
+    public static boolean isDawn(net.minecraft.world.level.Level level, net.minecraft.core.BlockPos at) {
+        long time = Colony.dayTimeAt(level, at) % 24000L;
+        return time >= 23000L || time < 500L;
     }
 
     /** A test's own weather for breeding (true: raining, false: dry, null: the world's). Tests only. */

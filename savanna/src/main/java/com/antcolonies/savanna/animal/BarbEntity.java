@@ -2,9 +2,14 @@ package com.antcolonies.savanna.animal;
 
 import javax.annotation.Nullable;
 
+import com.antcolonies.animal.AnimalLife;
+import com.antcolonies.animal.HasLife;
+import com.antcolonies.animal.LifeStage;
+import com.antcolonies.animal.SeekMateGoal;
 import com.antcolonies.entity.body.SteadyController;
 
 import net.minecraft.core.BlockPos;
+import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.syncher.EntityDataAccessor;
 import net.minecraft.network.syncher.EntityDataSerializers;
 import net.minecraft.network.syncher.SynchedEntityData;
@@ -19,9 +24,9 @@ import net.minecraft.world.InteractionResult;
 import net.minecraft.world.damagesource.DamageSource;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.Mob;
 import net.minecraft.world.entity.MobSpawnType;
 import net.minecraft.world.entity.SpawnGroupData;
-import net.minecraft.world.entity.ai.attributes.AttributeInstance;
 import net.minecraft.world.entity.ai.attributes.AttributeSupplier;
 import net.minecraft.world.entity.ai.attributes.Attributes;
 import net.minecraft.world.entity.ai.goal.AvoidEntityGoal;
@@ -54,11 +59,24 @@ import software.bernie.geckolib.util.GeckoLibUtil;
  *
  * <p>No hunger and no blocks eaten (fewer rules: the algae stays the tilapia's): at dawn and dusk barbs rise to sip at
  * the surface, and now and then they pick at an algae mat, for looks only ({@link BarbFeedGoal}). Each fish has its own
- * length (0.85 to 1.15 of the usual, my pick) through {@link Attributes#SCALE}. Breeding is the plan's next step.
+ * length through {@link Attributes#SCALE}, from its life (the animal life kit: males 0.85 to 1.05, females 0.95 to 1.15).
+ *
+ * <p>Breeding (2026-11-21, {@code docs/plans/prey-fish-and-frogs.md} step 2; its life file {@code animal_life/barb.json};
+ * fun first, inspired by real barbs that spawn in groups over water plants in the rains): at dawn ready males colour up
+ * (the breeding look) and a male and a ripe female (plump with eggs, her own fuller model) find each other
+ * ({@link SeekMateGoal}) and shiver side by side ({@link #SHIVER}); then she scatters her tiny eggs over the algae mats
+ * ({@link ScatterEggsGoal}, the catfish's way and egg block), where tilapia and crabs eat many. The rest hatch in a day
+ * into glassy fry (the young stage, their own model) that keep near the mat and school only with other fry; after a day
+ * they look like small barbs (the teen stage) and join the grown schools.
  */
-public class BarbEntity extends AbstractSchoolingFish implements GeoEntity {
-    /** What it is doing to be seen (synced): nothing, sipping at the surface, or nibbling algae. */
-    public static final byte NONE = 0, SIP = 1, NIBBLE = 2;
+public class BarbEntity extends AbstractSchoolingFish implements GeoEntity, HasLife, ScattersEggs {
+    /** What it is doing to be seen (synced): nothing, sipping at the surface, nibbling algae, or shivering beside its mate. */
+    public static final byte NONE = 0, SIP = 1, NIBBLE = 2, SHIVER = 3;
+    private static final EntityDataAccessor<Byte> DATA_LIFE = AnimalLife.dataFor(BarbEntity.class);
+    /** In its spawning dress (synced): a male in his breeding colours, a female plump with eggs. */
+    private static final EntityDataAccessor<Boolean> DATA_DRESSED = SynchedEntityData.defineId(BarbEntity.class, EntityDataSerializers.BOOLEAN);
+    /** How far a fry strays from where it hatched (blocks; my pick): it keeps to the shallows by its mat. */
+    static final int FRY_STAY = 6;
     private static final EntityDataAccessor<Byte> DATA_ACTION = SynchedEntityData.defineId(BarbEntity.class, EntityDataSerializers.BYTE);
     /** The entity event that tells the players' computers it was startled (plays the fast start, flashing). */
     private static final byte STARTLED_EVENT = 61;
@@ -74,6 +92,12 @@ public class BarbEntity extends AbstractSchoolingFish implements GeoEntity {
     static final float PART_FROM = 3.0F;
 
     private final AnimatableInstanceCache cache = GeckoLibUtil.createInstanceCache(this);
+    /** Its life: sex, stage, own size (the animal life kit). */
+    private final AnimalLife life;
+    /** Eggs she still carries to scatter over the algae. */
+    private int eggsToScatter;
+    /** Whether a fry is kept near where it hatched. */
+    private boolean keptNear;
     /** The drawn body's pitch (degrees, nose up positive), eased toward its swimming direction (client only). */
     private float swimPitch, swimPitchO;
     // client only: the hard turn and the fast start now under way
@@ -83,6 +107,62 @@ public class BarbEntity extends AbstractSchoolingFish implements GeoEntity {
 
     public BarbEntity(EntityType<? extends BarbEntity> type, Level level) {
         super(type, level);
+        life = new AnimalLife(this, DATA_LIFE);
+    }
+
+    @Override
+    public AnimalLife life() {
+        return life;
+    }
+
+    /** A fry: the young stage, its own glassy look (client and server). */
+    public boolean isFry() {
+        return life.isYoung();
+    }
+
+    /** In its spawning dress: a male in his breeding colours, a female plump with eggs. */
+    public boolean dressed() {
+        return entityData.get(DATA_DRESSED);
+    }
+
+    @Override
+    public int eggsToScatter() {
+        return eggsToScatter;
+    }
+
+    @Override
+    public void scattered(int eggs) {
+        eggsToScatter = Math.max(0, eggsToScatter - eggs);
+    }
+
+    /** The pair shiver side by side, he pressed along her flank (each tick of the courtship). */
+    @Override
+    public void courting(Mob mate, int ticks) {
+        setAction(SHIVER);
+        setDeltaMovement(getDeltaMovement().scale(0.7));
+    }
+
+    /** Mated: she has her clutch to scatter over the algae; both stop shivering. */
+    @Override
+    public void mated(Mob mate) {
+        setAction(NONE);
+        if (!life.isMale()) {
+            eggsToScatter = life.numbers().clutchMin() + random.nextInt(life.numbers().clutchMax() - life.numbers().clutchMin() + 1);
+        }
+    }
+
+    /** A fry schools only with fry, an older barb only with older ones (so the fry keep to their shallows). */
+    @Override
+    public AbstractSchoolingFish startFollowing(AbstractSchoolingFish leader) {
+        if (leader instanceof BarbEntity other && other.isFry() != isFry()) {
+            return leader;
+        }
+        return super.startFollowing(leader);
+    }
+
+    @Override
+    public boolean canBeFollowed() {
+        return super.canBeFollowed() && eggsToScatter == 0;
     }
 
     public static AttributeSupplier.Builder createAttributes() {
@@ -94,6 +174,8 @@ public class BarbEntity extends AbstractSchoolingFish implements GeoEntity {
         super.registerGoals();
         // the fountain: a hunter swimming through makes the school part round it (players are Minecraft's own fish rule)
         goalSelector.addGoal(2, new AvoidEntityGoal<>(this, LivingEntity.class, PART_FROM, 1.4, 1.6, BarbEntity::isHunter));
+        goalSelector.addGoal(3, new ScatterEggsGoal<>(this));
+        goalSelector.addGoal(3, new SeekMateGoal<>(this, 1.0));
         goalSelector.addGoal(4, new BarbFeedGoal(this));
     }
 
@@ -109,6 +191,8 @@ public class BarbEntity extends AbstractSchoolingFish implements GeoEntity {
     protected void defineSynchedData(SynchedEntityData.Builder builder) {
         super.defineSynchedData(builder);
         builder.define(DATA_ACTION, NONE);
+        builder.define(DATA_DRESSED, false);
+        AnimalLife.define(builder, DATA_LIFE);
     }
 
     /** {@link #NONE}, {@link #SIP} or {@link #NIBBLE}. */
@@ -120,18 +204,6 @@ public class BarbEntity extends AbstractSchoolingFish implements GeoEntity {
         entityData.set(DATA_ACTION, action);
     }
 
-    /** Its own length against the usual. */
-    public float ownSize() {
-        return getScale();
-    }
-
-    /** For tests: gives it this length. */
-    public void setOwnSize(float size) {
-        AttributeInstance scale = getAttribute(Attributes.SCALE);
-        if (scale != null) {
-            scale.setBaseValue(size);
-        }
-    }
 
     /**
      * A strike nearby (a catfish's lunge, a crocodile's snap): it darts straight away from where the hunter is with a
@@ -179,6 +251,9 @@ public class BarbEntity extends AbstractSchoolingFish implements GeoEntity {
     public void tick() {
         super.tick();
         if (!level().isClientSide) {
+            if (life.tick() || tickCount % 20 == 0) {
+                lifeTick();
+            }
             return;
         }
         swimPitchO = swimPitch;
@@ -197,7 +272,7 @@ public class BarbEntity extends AbstractSchoolingFish implements GeoEntity {
             turnTicks--;
         } else if (turnRest > 0) {
             turnRest--;
-        } else if (isInWater() && action() == NONE && Math.abs(turnRate) > TURN_FROM) {
+        } else if (isInWater() && action() == NONE && !isFry() && Math.abs(turnRate) > TURN_FROM) {
             turnTicks = TURN_TICKS;
             turnRest = TURN_REST;
             turnRight = turnRate > 0;       // a yaw growing is a turn to the right (Minecraft's yaw runs clockwise from above)
@@ -209,12 +284,49 @@ public class BarbEntity extends AbstractSchoolingFish implements GeoEntity {
         return Mth.lerp(partialTick, swimPitchO, swimPitch);
     }
 
+    /**
+     * Its life once a second (server): a male colours up while he is ready to spawn or courting, a female is plump while
+     * ripe or still carrying eggs; the shiver ends with the courtship; a fry keeps near where it hatched, set free once
+     * it looks like a small barb.
+     */
+    private void lifeTick() {
+        boolean grown = life.stage() == LifeStage.GROWN;
+        entityData.set(DATA_DRESSED, grown && (life.isMale() ? life.readyToBreed() || life.partner() != null
+                : life.ripe() || eggsToScatter > 0));
+        if (action() == SHIVER && life.partner() == null) {
+            setAction(NONE);
+        }
+        if (isFry() && !keptNear) {
+            restrictTo(blockPosition(), FRY_STAY);
+            keptNear = true;
+        } else if (!isFry() && keptNear) {
+            clearRestriction();
+            keptNear = false;
+        }
+    }
+
     @Override
     @Nullable
     public SpawnGroupData finalizeSpawn(ServerLevelAccessor level, DifficultyInstance difficulty, MobSpawnType spawnType, @Nullable SpawnGroupData data) {
         SpawnGroupData out = super.finalizeSpawn(level, difficulty, spawnType, data);
-        setOwnSize(0.85F + level.getRandom().nextFloat() * 0.3F);
+        life.setUp(false, level.getRandom());
         return out;
+    }
+
+    @Override
+    public void addAdditionalSaveData(CompoundTag tag) {
+        super.addAdditionalSaveData(tag);
+        life.save(tag);
+        if (eggsToScatter > 0) {
+            tag.putInt("EggsToScatter", eggsToScatter);
+        }
+    }
+
+    @Override
+    public void readAdditionalSaveData(CompoundTag tag) {
+        super.readAdditionalSaveData(tag);
+        life.load(tag);
+        eggsToScatter = tag.getInt("EggsToScatter");
     }
 
     /** No barb bucket (yet): a water bucket does nothing to a barb. */
@@ -308,8 +420,16 @@ public class BarbEntity extends AbstractSchoolingFish implements GeoEntity {
     private static final RawAnimation STRUGGLE = RawAnimation.begin().thenLoop("scatter");
     private static final RawAnimation FLOP = RawAnimation.begin().thenLoop("flop");
     private static final RawAnimation DEATH = RawAnimation.begin().thenPlayAndHold("death");
+    private static final RawAnimation SHIVER_CLIP = RawAnimation.begin().thenLoop("shiver");
+    // the fry's own clips (its own animation file): bursts and glides, and pecking at specks on the algae
+    private static final RawAnimation FRY_DART = RawAnimation.begin().thenLoop("dart");
+    private static final RawAnimation FRY_PECK = RawAnimation.begin().thenLoop("peck");
     /** The swim clip's beat is made for this speed (blocks a tick, 1 a second); it plays faster or slower by it. */
     static final double SWIM_CLIP_SPEED = 0.05;
+    /** A fry's size against a grown barb's (its life file's young size), for its swim beat. */
+    static final double FRY_SHARE = 0.32;
+    /** Below this speed (blocks a tick) a fry swims in bursts and glides (my pick). */
+    static final double FRY_DART_BELOW = 0.03;
 
     @Override
     public void registerControllers(AnimatableManager.ControllerRegistrar controllers) {
@@ -340,7 +460,10 @@ public class BarbEntity extends AbstractSchoolingFish implements GeoEntity {
             return state.setAndContinue(SIP_CLIP);
         }
         if (action == NIBBLE) {
-            return state.setAndContinue(NIBBLE_CLIP);
+            return state.setAndContinue(isFry() ? FRY_PECK : NIBBLE_CLIP);
+        }
+        if (action == SHIVER) {
+            return state.setAndContinue(SHIVER_CLIP);
         }
         if (turnTicks > 0) {
             return state.setAndContinue(turnRight ? TURN_RIGHT : TURN_LEFT);
@@ -350,7 +473,10 @@ public class BarbEntity extends AbstractSchoolingFish implements GeoEntity {
         if (speed < 0.006) {
             return state.setAndContinue(IDLE);
         }
-        player.setAnimationSpeed(Mth.clamp(speed / SWIM_CLIP_SPEED, 0.6, 3.0));
+        if (isFry() && speed < FRY_DART_BELOW) {
+            return state.setAndContinue(FRY_DART);      // a fry's slow swimming is bursts and glides
+        }
+        player.setAnimationSpeed(Mth.clamp(speed / (isFry() ? SWIM_CLIP_SPEED * FRY_SHARE : SWIM_CLIP_SPEED), 0.6, 3.0));
         return state.setAndContinue(SWIM);
     }
 

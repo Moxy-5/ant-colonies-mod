@@ -326,6 +326,7 @@ BANK = 38.0              # how far a turning fish rolls its flank to the light (
 SIP_LEN = 1.4
 SCATTER_LEN = 0.4
 DEATH_LEN = 1.0
+SHIVER_LEN = 0.5         # the spawning shiver's loop (2026-11-21)
 FLOP_LEN = 0.5
 NIBBLE_LEN = 1.8         # three pecks at the algae
 JAW_OPEN = 40.0          # how far the lower jaw drops, wide open (degrees): big enough to read on a quarter-block fish
@@ -446,6 +447,16 @@ def clips():
         return _fins(p, t, out=-1.7, back_fin=1.0)
     make('flop', FLOP_LEN, flop)
 
+    # shiver: spawning (2026-11-21): side by side over the algae, the body quivering fast in small beats, rolled a
+    # little toward the mate, the fins spread and fluttering (real spawning barbs press together and quiver)
+    def shiver(t):
+        w = 2 * math.pi / (SHIVER_LEN / 5)
+        p = _wave({}, t, w, 0.35)
+        p['body']['rotation'][2] = round(12.0 + 3.0 * math.sin(w * t), 3)
+        p['body']['position'] = [0.0, round(0.15 * math.sin(w * t * 0.5), 3), 0.0]
+        return _fins(p, t, out=0.8, flutter=1.0, rate=10 / SHIVER_LEN)
+    make('shiver', SHIVER_LEN, shiver)
+
     # death: the wave dies away as it rolls onto its side and settles
     def death(t):
         f = _ease(t / (DEATH_LEN * 0.8))
@@ -477,18 +488,28 @@ WORKSHOP_CLIP_INFO = {
         'scatter': 'The escape when a hunter strikes: snaps into a C, the tail whips it clear, fast beats.',
         'flop': 'Stranded on land: on its side, curling and springing.',
         'death': 'The wave dies away as it rolls onto its side.',
+        'shiver': 'Spawning: side by side over the algae, quivering fast, rolled a little toward the mate, fins fluttering.',
     }}
 
 
 def write_game():
-    """Writes the barb's model, its two textures (everyday and the turning flash) and its clips into the savanna mod
-    (no entity uses them yet: that is the plan's step 1; the files let the clip checks read the model as the game
-    will)."""
+    """Writes the barb's models, textures and clips into the savanna mod: the slim model (the male's, the approved v6)
+    in the everyday, flash, breeding (v8) and female (v7's colours) looks, each with its flash; the plump model (a
+    female ripe with eggs, v7) in the female look and its flash; one clip file for both (the same bones)."""
+    global PLUMP
     files = {}
-    for look, name in (('everyday', 'barb'), ('flash', 'barb_flash')):
-        bones, rows, w, h = paint_faces(model(), 2, LOOKS[look])
-        files[f'textures/entity/{name}.png'] = png(rows)
-    files['geo/entity/barb.geo.json'] = geo('barb', bones, w, h, (2, 1, [0, 0.4, 0]))
+    for plump, model_name, looks in ((0.0, 'barb', (('everyday', 'barb'), ('flash', 'barb_flash'),
+                                                    ('breeding', 'barb_breeding'), ('breeding_flash', 'barb_breeding_flash'),
+                                                    ('female', 'barb_female'), ('female_flash', 'barb_female_flash'))),
+                                     (1.0, 'barb_plump', (('female', 'barb_plump'), ('female_flash', 'barb_plump_flash')))):
+        kept, PLUMP = PLUMP, plump
+        try:
+            for look, name in looks:
+                bones, rows, w, h = paint_faces(model(), 2, LOOKS[look])
+                files[f'textures/entity/{name}.png'] = png(rows)
+            files[f'geo/entity/{model_name}.geo.json'] = geo(model_name, bones, w, h, (2, 1, [0, 0.4, 0]))
+        finally:
+            PLUMP = kept
     files['animations/entity/barb.animation.json'] = animations(clips())
     write_assets(files)
 

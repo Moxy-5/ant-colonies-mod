@@ -16,13 +16,13 @@ import net.minecraft.world.entity.ai.goal.Goal;
 import net.minecraft.world.level.block.state.BlockState;
 
 /**
- * A river catfish female scatters her eggs (M9, animal life cycle step 3, 2026-11-19; fun first, my picks; real
- * catfish scatter sticky eggs over flooded plants after rain and leave them): after mating ({@link CatfishEntity#mated})
- * she swims from algae mat to algae mat near her, nosing down over each and leaving a few eggs stuck to it
+ * A fish female scatters her eggs over the algae (M9, animal life cycle step 3, 2026-11-19, the catfish; shared with
+ * the barb 2026-11-21; fun first, my picks; real catfish and barbs scatter sticky eggs over water plants and leave
+ * them): after mating she swims from algae mat to algae mat near her, nosing down over each and leaving a few eggs stuck to it
  * ({@link CatfishEggsBlock#lay}), the nearest mats first, until her eggs are gone. Mats already with eggs are passed by.
  * With no mat near, or after {@link #GIVE_UP} ticks, the eggs left drift off and are lost. No care after.
  */
-public class CatfishScatterEggsGoal extends Goal {
+public class ScatterEggsGoal<T extends net.minecraft.world.entity.Mob & ScattersEggs> extends Goal {
     /** How far round her she looks for mats (blocks across; up or down). */
     static final int LOOK_ACROSS = 8, LOOK_UP_DOWN = 3;
     /** Eggs left on one mat (my picks), and how long she noses over it. */
@@ -30,13 +30,13 @@ public class CatfishScatterEggsGoal extends Goal {
     /** She gives up after this long and the eggs left are lost. */
     static final int GIVE_UP = 900;
 
-    private final CatfishEntity fish;
+    private final T fish;
     private final Set<BlockPos> tried = new HashSet<>();
     @Nullable
     private BlockPos mat;
     private int ticks, over, toMat;
 
-    public CatfishScatterEggsGoal(CatfishEntity fish) {
+    public ScatterEggsGoal(T fish) {
         this.fish = fish;
         setFlags(EnumSet.of(Flag.MOVE, Flag.LOOK));
     }

@@ -19,7 +19,7 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from model_parts import clip, cube, paint_faces, png, smooth   # noqa: E402
+from model_parts import animations, clip, cube, geo, paint_faces, png, smooth, write_assets   # noqa: E402
 
 LENGTH = 12.0
 HEAD_HALF = 1.25         # the head's half width (the eyes on its sides)
@@ -170,7 +170,7 @@ WORKSHOP_PARTS = {'head': ['head'], 'body': ['body'], 'tail': ['tail_stalk'], 'b
 # time (a fry's fins never rest), move in short darting bursts with a glide between, pick at specks in the water with a
 # quick lunge, and scatter in a flash. Their own clips (not the grown barb's: the barb's moves are measured to its own
 # body, its snout to the bed and its mouth to the surface). The game moves the fry; the clips only bend it. -----------
-IDLE_LEN, SWIM_LEN, DART_LEN, PECK_LEN, SCATTER_LEN, DEATH_LEN = 1.2, 0.2, 0.9, 0.8, 0.4, 1.0
+IDLE_LEN, SWIM_LEN, DART_LEN, PECK_LEN, SCATTER_LEN, DEATH_LEN, FLOP_LEN = 1.2, 0.2, 0.9, 0.8, 0.4, 1.0, 0.4
 WAVE = (('body', None, 0.04, 0.9), ('head', 'body', 0.06, 0.0), ('tail_stalk', 'body', 0.30, 1.7),
         ('tail_fin', 'tail_stalk', 0.55, 2.5))
 LIE = 2.5 - (HEAD_HALF + EYE_BULGE)   # how far it comes down lying on its side: its middle line to its eye's edge
@@ -216,13 +216,14 @@ def clips():
         return _fins(_wave({}, t, 2 * math.pi / SWIM_LEN, 1.0), t, out=0.0, flutter=0.3, rate=1 / SWIM_LEN)
     make('swim', SWIM_LEN, swim)
 
-    # dart: three quick hard beats, then a glide with the fins spreading to brake (fry move in short bursts)
+    # dart: three quick hard beats, then a glide with the fins spreading to brake (fry move in short bursts); looped by
+    # the game as a fry's slow swimming (2026-11-21), so the beats ease in from the glide's straight body
     def dart(t):
         burst = 3 * SWIM_LEN * 0.8
-        k = 1 - _ease((t - burst) / 0.25)
+        k = _ease(t / 0.06) * (1 - _ease((t - burst) / 0.25))
         p = _wave({}, t, 2 * math.pi / (SWIM_LEN * 0.8), 1.2 * k)
         return _fins(p, t, out=0.8 * (1 - k), flutter=0.6 * (1 - k), rate=6.0)
-    make('dart', DART_LEN, dart, loop=False)
+    make('dart', DART_LEN, dart)
 
     # peck: a quick lunge at a speck in the water, the head snapping forward, then backing off fanning
     def peck(t):
@@ -249,6 +250,15 @@ def clips():
         return _fins(p, t, out=0.0, back_fin=1.0 - 0.8 * settle)
     make('scatter', SCATTER_LEN, scatter, 60, loop=False)
 
+    # flop: stranded, on its side, curling and springing (the game hops it about; 2026-11-21, for the game)
+    def flop(t):
+        w = 2 * math.pi / FLOP_LEN
+        p = _wave({}, t, w, 1.4, curl=-0.6 * (0.5 + 0.5 * math.sin(w * t)))
+        p['body']['rotation'][2] = 90.0
+        p['body']['position'] = [0.0, round(-LIE + 0.6 * abs(math.sin(w * t)), 3), 0.0]
+        return _fins(p, t, out=-1.5, back_fin=1.0)
+    make('flop', FLOP_LEN, flop)
+
     # death: the wave dies away as it rolls onto its side and settles
     def death(t):
         f = _ease(t / (DEATH_LEN * 0.8))
@@ -270,7 +280,8 @@ WORKSHOP_CLIP_INFO = {
     'notes': {
         'idle': 'Hovering: the breast fins fanning fast, the tail barely moving, a tiny bob.',
         'swim': 'The quick tail beat, fins tucked; the game plays it faster the faster it swims.',
-        'dart': 'A short burst: three hard beats, then a glide with the fins spreading to brake.',
+        'dart': "Bursts and glides (a fry's slow swimming): three hard beats, then a glide with the fins spreading to brake.",
+        'flop': 'Stranded on land: on its side, curling and springing.',
         'peck': 'A quick lunge at a speck in the water, then backing off fanning.',
         'scatter': 'Startled: snaps into a C, whips the other way, darts off.',
         'death': 'The wave dies away as it rolls onto its side.',
@@ -282,6 +293,17 @@ def workshop_look():
     return bones, png(rows), w, h
 
 
+def write_game():
+    """Writes the fry's model, texture and clips into the savanna mod (drawn by the barb's renderer while young)."""
+    bones, rows, w, h = paint_faces(model(), TEXELS, LOOKS['painted'])
+    write_assets({'textures/entity/barb_fry.png': png(rows),
+                  'geo/entity/barb_fry.geo.json': geo('barb_fry', bones, w, h, (1, 0.5, [0, 0.2, 0])),
+                  'animations/entity/barb_fry.animation.json': animations(clips())})
+
+
 if __name__ == '__main__':
+    if sys.argv[1:] == ['game']:
+        write_game()
+        sys.exit()
     bones = model()
     print(sum(len(b['cubes']) for b in bones), 'boxes,', len(bones), 'bones')

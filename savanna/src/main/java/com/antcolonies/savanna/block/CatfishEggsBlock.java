@@ -31,7 +31,7 @@ import net.minecraft.world.phys.shapes.VoxelShape;
 /**
  * A river catfish's eggs on an algae mat (M9, animal life cycle step 3, 2026-11-19; the look the user confirmed in the
  * life viewer, {@code tools/breeding_art.py}): after a rainy night's spawning in the shallows the female scatters her
- * sticky pale-yellow eggs over the algae mats, a few to a mat ({@code CatfishScatterEggsGoal}). This block is the mat
+ * sticky pale-yellow eggs over the algae mats, a few to a mat ({@code ScatterEggsGoal}; the barb's eggs too, 2026-11-21, a smaller sprinkle by the same block). This block is the mat
  * with its eggs: it keeps the mat's {@link AlgaeBlock#GROWTH} and {@link AlgaeBlock#STRANDS} (drawn as the same mat
  * with the eggs on it) and turns back into that mat when the eggs hatch, are all eaten, or are long gone. It always
  * holds water, as the mat does.

@@ -1,0 +1,78 @@
+# The barb's breeding looks and the fry in the game, frame by frame (prey fish plan step 2, 2026-11-21; CLAUDE.md's
+# hard rule): at first light (5:30) a male in his breeding colours shivering (film:shiver) and a ripe female drawn plump
+# (her own fuller model), side on and three quarters; then a fry (summoned young) at its real 0.08 blocks, its own model
+# and clips (idle, the burst-and-glide dart, the swim), side on, three quarters and from above, the camera close.
+#   ./gradlew runFilm -PfilmScene=tools/film/barb_young_frames.film   pictures in run-film/screenshots/barb_young_frames/
+cmd time set 23500
+cmd weather clear
+cmd kill @e[type=!player]
+# the pool: x 30..44, 3 deep, flush with the grass
+cmd fill 30 -63 -8 44 -61 8 minecraft:water
+lens 30
+wait 40
+# the breeding male, shivering
+cmd summon antcolonies:barb 33.5 -62.2 0.5 {NoAI:1b,Rotation:[-90f,0f],sex:"male",CustomName:'"film:shiver"'}
+camera 33.50 -63.72 -0.45 0 0
+wait 30
+cmd tick freeze
+burst shiver_side 10 1
+cmd tick unfreeze
+camera 32.88 -63.56 -0.12 -45 10
+wait 5
+cmd tick freeze
+burst shiver_threequarter 10 1
+cmd tick unfreeze
+cmd tp @e[type=antcolonies:barb] 33 -140 0
+wait 3
+# the ripe female, plump with eggs
+cmd summon antcolonies:barb 33.5 -62.2 0.5 {NoAI:1b,Rotation:[-90f,0f],sex:"female",CustomName:'"film:idle"'}
+camera 33.50 -63.72 -0.45 0 0
+wait 30
+cmd tick freeze
+burst plump_side 4 4
+cmd tick unfreeze
+camera 32.88 -63.56 -0.12 -45 10
+wait 5
+cmd tick freeze
+burst plump_threequarter 4 4
+cmd tick unfreeze
+cmd tp @e[type=antcolonies:barb] 33 -140 0
+wait 3
+# a fry, 0.08 blocks long: the camera a third as far
+cmd summon antcolonies:barb 33.5 -62.2 0.5 {NoAI:1b,Rotation:[-90f,0f],young:1b,CustomName:'"film:idle"'}
+camera 33.50 -63.77 0.15 0 0
+wait 30
+cmd tick freeze
+burst fry_idle_side 8 3
+cmd tick unfreeze
+camera 33.30 -63.72 0.30 -45 10
+wait 5
+cmd tick freeze
+burst fry_idle_threequarter 6 4
+cmd tick unfreeze
+cmd tp @e[type=antcolonies:barb] 33 -140 0
+wait 3
+cmd summon antcolonies:barb 33.5 -62.2 0.5 {NoAI:1b,Rotation:[-90f,0f],young:1b,CustomName:'"film:dart"'}
+camera 33.50 -63.77 0.15 0 0
+wait 10
+cmd tick freeze
+burst fry_dart_side 18 1
+cmd tick unfreeze
+camera 33.50 -63.42 0.50 0 90
+wait 5
+cmd tick freeze
+burst fry_dart_above 18 1
+cmd tick unfreeze
+cmd tp @e[type=antcolonies:barb] 33 -140 0
+wait 3
+cmd summon antcolonies:barb 33.5 -62.2 0.5 {NoAI:1b,Rotation:[-90f,0f],young:1b,CustomName:'"film:swim"'}
+camera 33.50 -63.42 0.50 0 90
+wait 10
+cmd tick freeze
+burst fry_swim_above 4 1
+cmd tick unfreeze
+camera 33.30 -63.72 0.30 -45 10
+wait 5
+cmd tick freeze
+burst fry_swim_threequarter 4 1
+cmd tick unfreeze

@@ -52,7 +52,7 @@ public class BarbFeedGoal extends Goal {
         if (!fish.isInWater() || fish.getVehicle() != null) {
             return false;
         }
-        if (dawnOrDusk(fish.level(), fish.blockPosition())) {
+        if (dawnOrDusk(fish.level(), fish.blockPosition()) && !fish.isFry()) {      // a fry only pecks at the algae
             if (fish.getRandom().nextInt(SIP_CHANCE) != 0) {
                 return false;
             }

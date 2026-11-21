@@ -65,9 +65,9 @@ public record LifeNumbers(boolean twoSexes, float maleShare, float[] maleSize, f
         }
     }
 
-    /** The time of day it breeds at (the river catfish spawn at night, step 3 of the plan). */
+    /** The time of day it breeds at (the river catfish spawn at night, step 3 of the plan; the barb at dawn). */
     public enum Time {
-        ANY, DAY, NIGHT;
+        ANY, DAY, NIGHT, DAWN;
 
         static Time fromFile(String name) {
             return valueOf(name.toUpperCase(Locale.ROOT));

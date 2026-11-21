@@ -41,7 +41,7 @@ public class AnimalLifeTests {
     public static void everyRiverAnimalKeepsItsLifeThroughASaveAndLoad(GameTestHelper helper) {
         List<EntityType<? extends Mob>> kinds = List.of(SavannaEntities.TILAPIA.get(), SavannaEntities.CATFISH.get(),
                 SavannaEntities.CROCODILE.get(), SavannaEntities.CRAB.get(), SavannaEntities.SNAIL.get(),
-                SavannaEntities.MONITOR.get());
+                SavannaEntities.MONITOR.get(), SavannaEntities.BARB.get());
         int x = 2;
         for (EntityType<? extends Mob> kind : kinds) {
             Mob mob = helper.spawn(kind, new BlockPos(x, 2, 4));
@@ -61,7 +61,8 @@ public class AnimalLifeTests {
                     name + " is not drawn at its own size when grown");
             helper.assertTrue(numbers.twoSexes() == (life.sex() != Sex.NONE), name + "'s sex does not fit its kind: " + life.sex());
             boolean breeds = kind == SavannaEntities.TILAPIA.get() || kind == SavannaEntities.SNAIL.get()
-                    || kind == SavannaEntities.CRAB.get() || kind == SavannaEntities.CATFISH.get() || kind == SavannaEntities.CROCODILE.get();
+                    || kind == SavannaEntities.CRAB.get() || kind == SavannaEntities.CATFISH.get() || kind == SavannaEntities.CROCODILE.get()
+                    || kind == SavannaEntities.BARB.get();
             helper.assertTrue(numbers.breeds() == breeds, name + (breeds ? " does not breed (on since step 2 or 3)" : " breeds already (not before its own step)"));
 
             // Saved and loaded whole.
@@ -568,6 +569,129 @@ public class AnimalLifeTests {
                 default -> {
                 }
             }
+        });
+    }
+
+    /**
+     * The barb's breeding (2026-11-21, {@code docs/plans/prey-fish-and-frogs.md} step 2): a ready pair is not ready at
+     * noon but is at dawn; at dawn the male colours up and the ripe female is plump; they meet and shiver side by side;
+     * she scatters 10 to 16 eggs over the algae mats, a few to a mat (the catfish's egg block, the barb's eggs); a mat's
+     * eggs, old enough and watched, hatch into fry at 0.32 of grown that keep near the mat and school only with fry;
+     * a day on a fry is a teen, drawn as a small barb at 0.55 of grown.
+     */
+    @GameTest(template = "arena", timeoutTicks = 2400, batch = "breeding")
+    public static void barbsSpawnAtDawnAndScatterEggsOnTheAlgae(GameTestHelper helper) {
+        breedingPond(helper);
+        clearLeftovers(helper, SavannaEntities.BARB.get());
+        for (int x = P0 + 2; x <= P1 - 1; x += 2) {
+            for (int z = P0 + 1; z <= P1 - 1; z += 3) {
+                helper.setBlock(new BlockPos(x, BED + 1, z), SavannaBlocks.ALGAE.get().whole(com.antcolonies.savanna.block.AlgaeBlock.LUSH));
+            }
+        }
+        com.antcolonies.savanna.animal.BarbEntity male = grown(helper, SavannaEntities.BARB.get(), "male", new BlockPos(P0 + 3, BED + 2, P0 + 3));
+        com.antcolonies.savanna.animal.BarbEntity female = grown(helper, SavannaEntities.BARB.get(), "female", new BlockPos(P0 + 8, BED + 2, P0 + 7));
+        com.antcolonies.gametest.TestClock.still(helper, 12.0);
+        helper.assertTrue(!female.life().readyToBreed(), "a barb ready to spawn at noon");
+        com.antcolonies.gametest.TestClock.still(helper, 6.0);
+        helper.assertTrue(female.life().readyToBreed() && male.life().readyToBreed(), "a grown barb not ready at dawn");
+        long started = helper.getLevel().getGameTime();
+        int[] stage = {0};
+        boolean[] shivered = {false};
+        int[] eggs = {0};
+        helper.runAtTickTime(2390, () -> helper.fail("barbs stuck at stage " + stage[0] + ": female ready " + female.life().readyToBreed()
+                + " partner " + female.life().partner() + " eggs " + female.eggsToScatter() + " at " + helper.relativePos(female.blockPosition())
+                + "; male partner " + male.life().partner() + " shivered " + shivered[0] + " d " + male.distanceTo(female)));
+        helper.onEachTick(() -> {
+            shivered[0] |= male.action() == com.antcolonies.savanna.animal.BarbEntity.SHIVER;
+            switch (stage[0]) {
+                case 0 -> {
+                    if (helper.getLevel().getGameTime() - started == 30) {
+                        helper.assertTrue(male.dressed(), "a ready male not in his breeding colours at dawn");
+                        helper.assertTrue(female.dressed(), "a ripe female not drawn plump");
+                    }
+                    if (female.eggsToScatter() > 0) {
+                        helper.assertTrue(shivered[0], "the pair never shivered side by side");
+                        long took = helper.getLevel().getGameTime() - started;
+                        helper.assertTrue(took >= female.life().numbers().courtshipTicks(), "they spawned after only " + took + " ticks");
+                        eggs[0] = female.eggsToScatter();
+                        helper.assertTrue(eggs[0] >= 10 && eggs[0] <= 16, eggs[0] + " eggs (10 to 16 wanted)");
+                        com.antcolonies.ColonyFrameworkMod.LOGGER.info("[life] barbs spawned after {} ticks, {} eggs", took, eggs[0]);
+                        stage[0] = 1;
+                    }
+                }
+                case 1 -> {
+                    if (female.eggsToScatter() == 0) {
+                        List<BlockPos> mats = new java.util.ArrayList<>();
+                        int laid = 0;
+                        for (BlockPos rel : BlockPos.betweenClosed(new BlockPos(P0, BED + 1, P0), new BlockPos(P1, BED + 1, P1))) {
+                            if (helper.getBlockState(rel).is(SavannaBlocks.CATFISH_EGGS.get())) {
+                                BlockPos at = helper.absolutePos(rel);
+                                EggClutchBlockEntity clutch = (EggClutchBlockEntity) helper.getLevel().getBlockEntity(at);
+                                helper.assertTrue(clutch.motherKind() == SavannaEntities.BARB.get(), "a barb clutch of " + clutch.motherKind());
+                                mats.add(at);
+                                laid += clutch.count();
+                            }
+                        }
+                        helper.assertTrue(mats.size() >= 3 && laid == eggs[0], laid + " eggs on " + mats.size() + " mats from " + eggs[0]);
+                        barbHatchChecks(helper, mats.get(0), male);
+                        helper.succeed();
+                    }
+                }
+                default -> {
+                }
+            }
+        });
+    }
+
+    private static void barbHatchChecks(GameTestHelper helper, BlockPos mat, com.antcolonies.savanna.animal.BarbEntity grownOne) {
+        ServerLevel level = helper.getLevel();
+        int eggs = ((EggClutchBlockEntity) level.getBlockEntity(mat)).count();
+        try {
+            age(level, mat, AnimalLives.get(SavannaEntities.BARB.get()).hatchTicks());
+            com.antcolonies.colony.Watchers.setPretend(List.of(net.minecraft.world.phys.Vec3.atCenterOf(mat)));
+            tick(level, mat);
+            helper.assertTrue(level.getBlockState(mat).is(SavannaBlocks.ALGAE.get()), "a hatched mat is not algae again");
+            List<com.antcolonies.savanna.animal.BarbEntity> fry = level.getEntitiesOfClass(com.antcolonies.savanna.animal.BarbEntity.class,
+                    new net.minecraft.world.phys.AABB(mat).inflate(1.5), com.antcolonies.savanna.animal.BarbEntity::isFry);
+            helper.assertTrue(fry.size() == eggs, fry.size() + " fry from " + eggs + " eggs");
+            com.antcolonies.savanna.animal.BarbEntity one = fry.get(0);
+            double share = one.getAttributeBaseValue(Attributes.SCALE) / one.life().ownSize();
+            helper.assertTrue(Math.abs(share - 0.32) < 0.01, "a fry at " + share + " of grown (0.32 wanted)");
+            // a fry schools only with fry
+            one.startFollowing(grownOne);
+            helper.assertTrue(!one.isFollower(), "a fry joined a grown barb's school");
+            if (fry.size() > 1) {
+                fry.get(1).startFollowing(one);
+                helper.assertTrue(fry.get(1).isFollower(), "a fry would not school with another fry");
+            }
+            // a day on: a teen, drawn as a small barb
+            one.life().setAge(one.life().numbers().youngTicks());
+            one.life().apply();
+            double teen = one.getAttributeBaseValue(Attributes.SCALE) / one.life().ownSize();
+            helper.assertTrue(!one.isFry() && Math.abs(teen - 0.55) < 0.01, "a day-old fry at stage " + one.life().stage() + ", " + teen + " of grown (a teen at 0.55 wanted)");
+        } finally {
+            com.antcolonies.colony.Watchers.setPretend(List.of());
+        }
+    }
+
+    /** No barb spawning while 30 barbs (the life file's local limit) already live round the pond. */
+    @GameTest(template = "arena", timeoutTicks = 400, batch = "breeding_full")
+    public static void noBarbSpawningWhileTheRiverIsFull(GameTestHelper helper) {
+        breedingPond(helper);
+        clearLeftovers(helper, SavannaEntities.BARB.get());
+        com.antcolonies.savanna.animal.BarbEntity male = grown(helper, SavannaEntities.BARB.get(), "male", new BlockPos(P0 + 3, BED + 2, P0 + 3));
+        com.antcolonies.savanna.animal.BarbEntity female = grown(helper, SavannaEntities.BARB.get(), "female", new BlockPos(P0 + 4, BED + 2, P0 + 3));
+        int limit = male.life().numbers().localLimit();
+        for (int i = 2; i < limit; i++) {
+            grown(helper, SavannaEntities.BARB.get(), "male", new BlockPos(P0 + 2 + i % 10, BED + 1 + i / 20, P0 + 6 + i / 10 * 2));
+        }
+        com.antcolonies.gametest.TestClock.still(helper, 6.0);
+        boolean[] shivered = {false};
+        helper.onEachTick(() -> shivered[0] |= male.action() == com.antcolonies.savanna.animal.BarbEntity.SHIVER
+                || female.action() == com.antcolonies.savanna.animal.BarbEntity.SHIVER);
+        helper.runAfterDelay(300, () -> {
+            helper.assertTrue(!shivered[0] && female.eggsToScatter() == 0, "a pair spawned with " + limit + " barbs round");
+            helper.succeed();
         });
     }
 

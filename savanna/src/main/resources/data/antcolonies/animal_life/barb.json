@@ -1,0 +1,21 @@
+{
+  "_note": "The river barb's life (the animal life kit, docs/plans/animal-life-cycle.md; breeding on 2026-11-21, docs/plans/prey-fish-and-frogs.md step 2; all numbers my picks, fun first). They spawn in the rains at first light (5:00 to 6:30): ready males colour up (deeper orange-red fins, scarlet tail tips), a male and a ripe female (plump with eggs) shiver side by side 6 seconds (courtship ticks count every other game tick), and she scatters 10 to 16 tiny sticky eggs over the algae mats, a few to a mat (the catfish's way and egg block); tilapia and crabs eat many. The rest hatch in a day into glassy fry 0.08 blocks long (0.32 of grown) that keep near the mat and school only with other fry; after a day they look like small barbs (the teen stage, from 0.55 of grown), grown in 3 days. Every 2 days; breeds only while fewer than 30 barbs live within 48 blocks and the river school group is under its cap. The world's own spawns stay grown. Males 0.85 to 1.05, females a little bigger, 0.95 to 1.15 (real female barbs are the bigger).",
+  "sexes": "two",
+  "male_size": [0.85, 1.05],
+  "female_size": [0.95, 1.15],
+  "young_size": 0.32,
+  "young_days": 1,
+  "teen_size": 0.55,
+  "teen_days": 2,
+  "breeds": true,
+  "breed_every_days": 2,
+  "clutch": [10, 16],
+  "hatch_days": 1,
+  "seasons": ["rains"],
+  "weather": "any",
+  "time": "dawn",
+  "care": "none",
+  "mate_reach": 12,
+  "local_limit": 30,
+  "courtship_ticks": 60
+}
