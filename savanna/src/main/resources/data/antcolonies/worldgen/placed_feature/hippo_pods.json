@@ -1,0 +1,5 @@
+{
+  "_note": "Hippo pods (2026-11-21): once per chunk; the feature itself asks whether the chunk is a pod site (worldgen/PodSites).",
+  "feature": "antcolonies:hippo_pods",
+  "placement": []
+}

@@ -1,8 +1,5 @@
 package com.antcolonies.savanna.worldgen;
 
-import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
-
 import net.minecraft.core.QuartPos;
 import net.minecraft.world.level.biome.BiomeSource;
 import net.minecraft.world.level.biome.Climate;
@@ -28,61 +25,20 @@ public final class NestSites {
     /** How far round the chunk's middle the sand is read (blocks). */
     static final int READ = 8;
 
-    private static final int CACHE_MOST = 200_000;
-    private static final Map<Long, Boolean> CANDIDATES = new ConcurrentHashMap<>(), SITES = new ConcurrentHashMap<>();
-    private static volatile long cachedSeed;
+    /** The sites, worked out the shared way ({@link RiverSites}). */
+    private static final RiverSites SITES = new RiverSites(APART, 0x6E657374L, NestSites::work);
 
     private NestSites() {
     }
 
-    /**
-     * Whether the chunk {@code cx, cz} is a crocodile nest site: a candidate with no site of higher rank within
-     * {@link #APART} (remembered per seed). (The first try, "no <i>candidate</i> of higher rank within", gave one site
-     * per 1,082 blocks of river: a winding river puts dozens of candidates in that circle, so almost none won.)
-     */
+    /** Whether the chunk {@code cx, cz} is a crocodile nest site: a candidate with no site of higher rank within {@link #APART}. */
     public static boolean site(BiomeSource biomes, Climate.Sampler sampler, long seed, int cx, int cz) {
-        if (!candidate(biomes, sampler, seed, cx, cz)) {
-            return false;
-        }
-        long key = (long) cx << 32 ^ (cz & 0xFFFFFFFFL);
-        Boolean known = SITES.get(key);
-        if (known != null) {
-            return known;
-        }
-        long own = rank(seed, cx, cz);
-        int r = (APART + 15) / 16;
-        boolean is = true;
-        for (int dx = -r; dx <= r && is; dx++) {
-            for (int dz = -r; dz <= r; dz++) {
-                if (dx == 0 && dz == 0 || dx * dx + dz * dz > (APART / 16.0) * (APART / 16.0)) {
-                    continue;
-                }
-                // a better-ranked site too near: this bank is not one (ranks only go up, so this always ends)
-                if (rank(seed, cx + dx, cz + dz) > own && site(biomes, sampler, seed, cx + dx, cz + dz)) {
-                    is = false;
-                    break;
-                }
-            }
-        }
-        SITES.put(key, is);
-        return is;
+        return SITES.site(biomes, sampler, seed, cx, cz);
     }
 
-    /** Whether the chunk is a candidate: savanna water at its middle, a sand bank beside it (remembered per seed). */
+    /** Whether the chunk is a candidate: savanna water at its middle, a sand bank beside it. */
     static boolean candidate(BiomeSource biomes, Climate.Sampler sampler, long seed, int cx, int cz) {
-        if (cachedSeed != seed || CANDIDATES.size() > CACHE_MOST) {
-            CANDIDATES.clear();
-            SITES.clear();
-            cachedSeed = seed;
-        }
-        long key = (long) cx << 32 ^ (cz & 0xFFFFFFFFL);
-        Boolean known = CANDIDATES.get(key);
-        if (known != null) {
-            return known;
-        }
-        boolean is = work(biomes, sampler, seed, cx, cz);
-        CANDIDATES.put(key, is);
-        return is;
+        return SITES.candidate(biomes, sampler, seed, cx, cz);
     }
 
     private static boolean work(BiomeSource biomes, Climate.Sampler sampler, long seed, int cx, int cz) {
@@ -99,15 +55,5 @@ public final class NestSites {
             }
         }
         return false;
-    }
-
-    /** A chunk's rank among candidates, from the seed alone. */
-    static long rank(long seed, int cx, int cz) {
-        long h = seed ^ 0x6E657374L ^ (cx * 0x9E3779B97F4A7C15L) ^ (cz * 0xC2B2AE3D27D4EB4FL);
-        h ^= h >>> 33;
-        h *= 0xFF51AFD7ED558CCDL;
-        h ^= h >>> 33;
-        h *= 0xC4CEB9FE1A85EC53L;
-        return h ^ h >>> 33;
     }
 }

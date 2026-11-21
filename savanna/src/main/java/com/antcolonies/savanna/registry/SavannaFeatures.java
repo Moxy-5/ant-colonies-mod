@@ -38,6 +38,10 @@ public class SavannaFeatures {
     public static final DeferredHolder<Feature<?>, com.antcolonies.savanna.worldgen.CrocodileNestFeature> CROCODILE_NESTS =
             FEATURES.register("crocodile_nests", () -> new com.antcolonies.savanna.worldgen.CrocodileNestFeature(NoneFeatureConfiguration.CODEC));
 
+    /** New land's hippo pods in the pools of pod sites, kept for good (2026-11-21; switched on with the algae, .../biome_modifier/river_algae.json). */
+    public static final DeferredHolder<Feature<?>, com.antcolonies.savanna.worldgen.HippoPodFeature> HIPPO_PODS =
+            FEATURES.register("hippo_pods", () -> new com.antcolonies.savanna.worldgen.HippoPodFeature(NoneFeatureConfiguration.CODEC));
+
     /** Minecraft's own savanna trees where a savanna is too small to live in (the gate; .../biome_modifier/quiet_savanna_trees.json). */
     public static final DeferredHolder<Feature<?>, com.antcolonies.savanna.worldgen.QuietSavannaTreesFeature> QUIET_SAVANNA_TREES =
             FEATURES.register("quiet_savanna_trees", () -> new com.antcolonies.savanna.worldgen.QuietSavannaTreesFeature(NoneFeatureConfiguration.CODEC));

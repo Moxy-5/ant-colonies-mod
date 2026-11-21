@@ -15,9 +15,9 @@ public final class SavannaMobCategories {
     private static MobCategory riverFish, riverHunter, riverBed, riverBank, riverSchool, flyCloud, bullfrog, hippoPod;
 
     /**
-     * The hippos' group (2026-11-21, the spawning check list; {@code docs/DESIGN.md}, "River zones": "hippos one pod at a
-     * time round a player"): its own, cap 6 round a player, so one pod of 2 to 5 (each spawned at least
-     * {@code HippoEntity.SPAWN_APART} blocks from another pod), friendly, removed past 128 blocks.
+     * The hippos' group (2026-11-21): its own, with no spawn list since the same day (the user: pods placed with new land
+     * and kept for good, {@code worldgen/HippoPodFeature}; BUGS 271), so the world's spawner never adds a hippo; kept so
+     * hippos count apart from every other kind.
      */
     public static MobCategory hippoPod() {
         if (hippoPod == null) {

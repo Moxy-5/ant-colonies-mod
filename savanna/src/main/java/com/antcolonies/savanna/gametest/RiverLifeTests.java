@@ -1874,70 +1874,211 @@ public class RiverLifeTests {
     }
 
     /**
-     * Hippos spawn by themselves in pods (the spawning check list): the world's own checks over a river at sea level pass
-     * only in water at least two deep within {@code BANK_REACH} of a bank, never where it is shallower; a pod's members
-     * may spawn near each other but no hippo of another pod within {@code SPAWN_APART}; the kind is in its own group
-     * (hippo pods, cap 6), listed in the savanna's waters in pods of 2 to 5.
+     * Hippo pods are laid with new land and kept for good (the user, 2026-11-21; BUGS 271): in a flat-bedded pool three
+     * deep a pod of one to three is laid, the bull (male) first, his cows (female) within reach of him, all sharing his
+     * pool, never despawning; every one rests with its whole body clear of the ground and is unhurt after a while there
+     * (the old spawner set them on the bed under their middle only, half in a sloping bank). No spot fits a hippo on a bed
+     * sloping a block a column (the river channel), beside a wall, or in water under a roof (an underground pocket); the
+     * hippo is in no biome's spawn list.
      */
-    @GameTest(template = "arena", timeoutTicks = 200)
-    public static void hipposSpawnInPoolsByThemselves(GameTestHelper helper) {
+    @GameTest(template = "arena", timeoutTicks = 300)
+    public static void hippoPodsAreLaidWithTheLandAndKeptForGood(GameTestHelper helper) {
         ServerLevel level = helper.getLevel();
-        int top = buildChannel(helper, false);
-        BlockPos corner = helper.absolutePos(new BlockPos(CX0, 0, CZ0));
-        var type = SavannaEntities.HIPPO.get();
-        int spots = 0;
-        StringBuilder wrong = new StringBuilder();
-        for (int i = 0; i < CHANNEL_DEPTHS.length; i++) {
-            for (int dz = 0; dz <= CZ1 - CZ0; dz++) {
-                for (int y = top - 8; y <= top + 1; y++) {
-                    BlockPos at = new BlockPos(corner.getX() + i, y, corner.getZ() + dz);
-                    if (worldWouldSpawn(level, type, at)) {
-                        spots++;
-                        if (CHANNEL_DEPTHS[i] < com.antcolonies.savanna.animal.HippoEntity.POOL_DEPTH) {
-                            wrong.append(" ").append(i).append(",").append(dz).append(" (").append(CHANNEL_DEPTHS[i]).append(" deep)");
-                        }
-                    }
+        // a pool 15 by 15, three deep over a flat stone bed, stone walls round it up to the water's top
+        for (int x = 2; x <= 18; x++) {
+            for (int z = 2; z <= 18; z++) {
+                boolean wall = x == 2 || x == 18 || z == 2 || z == 18;
+                for (int y = TOP - 4; y <= TOP + 4; y++) {
+                    BlockState state = y <= TOP - 3 || wall && y <= TOP ? Blocks.STONE.defaultBlockState()
+                            : y <= TOP ? Blocks.WATER.defaultBlockState() : Blocks.AIR.defaultBlockState();
+                    helper.setBlock(new BlockPos(x, y, z), state);
                 }
             }
         }
-        SavannaMod.LOGGER.info("[pod spawns] spots the world would spawn a hippo at over the channel: {}", spots);
-        if (spots == 0) {
-            helper.fail("the world would spawn a hippo nowhere over the river");
-        }
-        if (!wrong.isEmpty()) {
-            helper.fail("hippos would spawn in water too shallow:" + wrong);
-        }
-        // a pod mate near, then a hippo of another pod far off
-        BlockPos first = new BlockPos(corner.getX() + 6, top - 2, corner.getZ() + 3);
-        net.minecraft.world.entity.Mob mob = type.create(level);
-        mob.moveTo(first.getX() + 0.5, first.getY(), first.getZ() + 0.5, 0, 0);
-        mob.finalizeSpawn(level, level.getCurrentDifficultyAt(first), MobSpawnType.NATURAL, null);
-        if (!level.getBlockState(mob.blockPosition().below()).isSolid()) {
-            helper.fail("a hippo spawned by the world is not set on the bed, at " + mob.blockPosition().subtract(corner));
-        }
-        level.addFreshEntity(mob);
-        if (!worldWouldSpawn(level, type, new BlockPos(corner.getX() + 8, top - 2, corner.getZ() + 4))) {
-            helper.fail("a pod mate would not spawn beside the first hippo");
-        }
-        mob.setPos(mob.getX() + 40, mob.getY(), mob.getZ());
-        if (worldWouldSpawn(level, type, new BlockPos(corner.getX() + 7, top - 2, corner.getZ() + 4))) {
-            helper.fail("a hippo would spawn 40 blocks from another pod's");
-        }
-        mob.discard();
-        buildChannel(helper, true);
-        if (type.getCategory() != com.antcolonies.savanna.registry.SavannaMobCategories.hippoPod()) {
-            helper.fail("the hippo is in the " + type.getCategory().getName() + " group, not the hippo pod group");
-        }
-        var biomes = level.registryAccess().registryOrThrow(net.minecraft.core.registries.Registries.BIOME);
-        var river = net.minecraft.resources.ResourceKey.create(net.minecraft.core.registries.Registries.BIOME,
-                net.minecraft.resources.ResourceLocation.fromNamespaceAndPath(SavannaMod.MODID, "savanna_river"));
-        for (var key : java.util.List.of(net.minecraft.world.level.biome.Biomes.SAVANNA, river)) {
-            var list = biomes.getOrThrow(key).getMobSettings().getMobs(com.antcolonies.savanna.registry.SavannaMobCategories.hippoPod()).unwrap();
-            if (list.stream().noneMatch(d -> d.type == type && d.minCount == 2 && d.maxCount == 5)) {
-                helper.fail("the hippo is not in " + key.location() + "'s hippo pod spawn list in pods of 2 to 5");
+        // an underground pocket of water: a roof of stone three thick over it
+        for (int x = 44; x <= 50; x++) {
+            for (int z = 4; z <= 10; z++) {
+                boolean wall = x == 44 || x == 50 || z == 4 || z == 10;
+                for (int y = TOP - 4; y <= TOP + 3; y++) {
+                    helper.setBlock(new BlockPos(x, y, z), (y <= TOP - 3 || wall || y > TOP ? Blocks.STONE : Blocks.WATER).defaultBlockState());
+                }
             }
         }
+        int top = buildChannel(helper, false);
+        BlockPos origin = helper.absolutePos(BlockPos.ZERO);
+        int absTop = helper.absolutePos(new BlockPos(0, TOP, 0)).getY();
+        StringBuilder wrong = new StringBuilder();
+        for (int x = 3; x <= 17; x++) {
+            for (int z = 3; z <= 17; z++) {
+                boolean fits = com.antcolonies.savanna.worldgen.HippoPodFeature.standSpot(level, origin.getX() + x, origin.getZ() + z, absTop) != null;
+                boolean shouldFit = x > 3 && x < 17 && z > 3 && z < 17;
+                if (fits != shouldFit) {
+                    wrong.append(" ").append(x).append(",").append(z).append(fits ? " fits" : " does not fit");
+                }
+            }
+        }
+        helper.assertTrue(wrong.isEmpty(), "where a hippo fits in the flat pool (all but beside the walls):" + wrong);
+        BlockPos corner = helper.absolutePos(new BlockPos(CX0, 0, CZ0));
+        for (int i = 0; i < CHANNEL_DEPTHS.length; i++) {
+            for (int dz = 0; dz <= CZ1 - CZ0; dz++) {
+                helper.assertTrue(com.antcolonies.savanna.worldgen.HippoPodFeature.standSpot(level, corner.getX() + i, corner.getZ() + dz, top) == null,
+                        "a hippo fits on the sloping river bed at " + i + "," + dz + " (" + CHANNEL_DEPTHS[i] + " deep): it would lie half in the bank");
+            }
+        }
+        for (int x = 45; x <= 49; x++) {
+            for (int z = 5; z <= 9; z++) {
+                helper.assertTrue(com.antcolonies.savanna.worldgen.HippoPodFeature.standSpot(level, origin.getX() + x, origin.getZ() + z, absTop) == null,
+                        "a hippo fits in the water under the roof at " + x + "," + z);
+                helper.assertFalse(com.antcolonies.savanna.worldgen.RiverZones.openToSky(level, helper.absolutePos(new BlockPos(x, TOP, z))),
+                        "the water under the roof reads as open to the sky");
+            }
+        }
+        // the pod
+        int laid = com.antcolonies.savanna.worldgen.HippoPodFeature.lay(level, net.minecraft.util.RandomSource.create(11),
+                origin.getX() + 3, origin.getZ() + 3, absTop);
+        java.util.List<com.antcolonies.savanna.animal.HippoEntity> pod = level.getEntitiesOfClass(com.antcolonies.savanna.animal.HippoEntity.class,
+                new net.minecraft.world.phys.AABB(helper.absolutePos(new BlockPos(2, TOP - 4, 2))).expandTowards(17, 9, 17));
+        helper.assertTrue(laid >= 1 && laid <= 3 && pod.size() == laid, "a pod of " + laid + " laid (" + pod.size() + " found), not 1 to 3");
+        pod.sort(java.util.Comparator.comparing(h -> !h.life().isMale()));
+        com.antcolonies.savanna.animal.HippoEntity bull = pod.get(0);
+        helper.assertTrue(bull.life().isMale() && pod.stream().skip(1).noneMatch(h -> h.life().isMale()), "a pod is one bull and his cows");
+        for (com.antcolonies.savanna.animal.HippoEntity h : pod) {
+            helper.assertTrue(bull.pool() != null && bull.pool().equals(h.pool()), "a pod member's pool " + h.pool() + " is not the bull's " + bull.pool());
+            helper.assertTrue(h.distanceTo(bull) <= 7.5, "a cow rests " + String.format("%.1f", h.distanceTo(bull)) + " from her bull");
+            helper.assertFalse(h.removeWhenFarAway(1.0E9), "a pod hippo would despawn far from a player");
+        }
+        var biomes = level.registryAccess().registryOrThrow(net.minecraft.core.registries.Registries.BIOME);
+        for (var key : java.util.List.of(net.minecraft.world.level.biome.Biomes.SAVANNA, com.antcolonies.savanna.worldgen.RiverZones.RIVER)) {
+            for (net.minecraft.world.entity.MobCategory group : net.minecraft.world.entity.MobCategory.values()) {
+                helper.assertTrue(biomes.getOrThrow(key).getMobSettings().getMobs(group).unwrap().stream()
+                        .noneMatch(d -> d.type == SavannaEntities.HIPPO.get()), "the hippo is in " + key.location() + "'s " + group.getName() + " spawn list");
+            }
+        }
+        helper.runAtTickTime(200, () -> {
+            for (com.antcolonies.savanna.animal.HippoEntity h : pod) {
+                helper.assertTrue(h.isAlive() && h.getHealth() >= h.getMaxHealth(), "a pod hippo was hurt resting in its pool: health " + h.getHealth());
+                helper.assertTrue(level.noCollision(h, h.getBoundingBox().deflate(0.01)), "a pod hippo is inside a block at " + h.position().subtract(
+                        net.minecraft.world.phys.Vec3.atLowerCornerOf(origin)));
+            }
+            helper.succeed();
+        });
+    }
+
+    /**
+     * River zones (2026-11-21, {@code worldgen/RiverZones}): the savanna river reads as coast, near, mid or far inland by
+     * how far inland (the sand's bands), the floodplain's and savanna's other waters as still water, anywhere else as no
+     * zone (the whole cap, as the quiet gate); each kind keeps its share of its group's cap there: hippos none at the
+     * coast, far inland or (until the oxbows are reworked) the still waters; crocodiles a quarter of theirs far inland;
+     * crabs most far inland; bullfrogs only the still waters, a little mid inland; kinds not listed everywhere.
+     */
+    @GameTest(template = "arena", timeoutTicks = 20)
+    public static void riverZonesShareEachKindsGroupByStretch(GameTestHelper helper) {
+        var biomes = helper.getLevel().registryAccess().registryOrThrow(net.minecraft.core.registries.Registries.BIOME);
+        var river = biomes.getHolderOrThrow(com.antcolonies.savanna.worldgen.RiverZones.RIVER);
+        var floodplain = biomes.getHolderOrThrow(net.minecraft.resources.ResourceKey.create(net.minecraft.core.registries.Registries.BIOME,
+                net.minecraft.resources.ResourceLocation.fromNamespaceAndPath(SavannaMod.MODID, "savanna_floodplain")));
+        var plains = biomes.getHolderOrThrow(net.minecraft.world.level.biome.Biomes.PLAINS);
+        {
+            double[][] reads = {{-0.3, 0}, {-0.11, 1}, {0.0, 1}, {0.03, 2}, {0.29, 2}, {0.3, 3}, {0.8, 3}};
+            for (double[] r : reads) {
+                var zone = com.antcolonies.savanna.worldgen.RiverZones.zoneOf(river, () -> r[0]);
+                helper.assertTrue(zone.ordinal() == (int) r[1], "the river " + r[0] + " inland reads " + zone);
+            }
+        }
+        helper.assertTrue(com.antcolonies.savanna.worldgen.RiverZones.zoneOf(floodplain, () -> 0) == com.antcolonies.savanna.worldgen.RiverZones.Zone.STILL,
+                "the floodplain's water is not still water");
+        helper.assertTrue(com.antcolonies.savanna.worldgen.RiverZones.zoneOf(plains, () -> 0) == com.antcolonies.savanna.worldgen.RiverZones.Zone.UNKNOWN,
+                "a plains spot has a river zone");
+        var Z = com.antcolonies.savanna.worldgen.RiverZones.Zone.values();
+        var hippo = SavannaEntities.HIPPO.get();
+        var croc = SavannaEntities.CROCODILE.get();
+        var crab = SavannaEntities.CRAB.get();
+        var frog = SavannaEntities.BULLFROG.get();
+        var flies = SavannaEntities.FLY_CLOUD.get();
+        for (var z : Z) {
+            boolean hippoRiver = z == com.antcolonies.savanna.worldgen.RiverZones.Zone.NEAR || z == com.antcolonies.savanna.worldgen.RiverZones.Zone.MID
+                    || z == com.antcolonies.savanna.worldgen.RiverZones.Zone.UNKNOWN;
+            helper.assertTrue(com.antcolonies.savanna.worldgen.RiverZones.allows(hippo, z, 0) == hippoRiver, "hippos " + (hippoRiver ? "not " : "") + "allowed " + z);
+            helper.assertTrue(com.antcolonies.savanna.worldgen.RiverZones.allows(flies, z, 1000), "fly clouds held back " + z);
+        }
+        var far = com.antcolonies.savanna.worldgen.RiverZones.Zone.FAR;
+        int crocsFar = com.antcolonies.savanna.worldgen.RiverZones.most(croc, far);
+        helper.assertTrue(crocsFar == Math.max(1, Math.round(croc.getCategory().getMaxInstancesPerChunk() * 0.25F)), "crocodiles far inland: " + crocsFar);
+        helper.assertTrue(com.antcolonies.savanna.worldgen.RiverZones.allows(croc, far, crocsFar - 1)
+                && !com.antcolonies.savanna.worldgen.RiverZones.allows(croc, far, crocsFar), "the far-inland crocodiles' limit is not " + crocsFar);
+        helper.assertTrue(com.antcolonies.savanna.worldgen.RiverZones.allows(crab, far, 1000), "crabs held back far inland");
+        helper.assertTrue(com.antcolonies.savanna.worldgen.RiverZones.allows(frog, com.antcolonies.savanna.worldgen.RiverZones.Zone.STILL, 1000)
+                && !com.antcolonies.savanna.worldgen.RiverZones.allows(frog, com.antcolonies.savanna.worldgen.RiverZones.Zone.COAST, 0),
+                "bullfrogs are not the still waters' alone");
         helper.succeed();
+    }
+
+    /** A grown crocodile of this sex for the hippo's tests, never hungry. */
+    private static com.antcolonies.savanna.animal.CrocodileEntity grownCroc(GameTestHelper helper, double x, double y, double z) {
+        com.antcolonies.savanna.animal.CrocodileEntity croc = helper.spawn(SavannaEntities.CROCODILE.get(), new net.minecraft.world.phys.Vec3(x, y, z));
+        croc.life().setUp(false, com.antcolonies.animal.Sex.MALE, helper.getLevel().random);
+        croc.life().apply();
+        croc.hungerIn = 1_000_000;
+        return croc;
+    }
+
+    /**
+     * A bull sees off a grown crocodile that comes right up to him with a bluff, not a fight (BUGS 272): he yawns first,
+     * bites at most once, gives up once it is off, and the crocodile swims clear and lives.
+     */
+    @GameTest(template = "arena", timeoutTicks = 800)
+    public static void aBullSeesOffACrocodileWithABluffNotAFight(GameTestHelper helper) {
+        hippoGround(helper, HippoGround.POOL);
+        var bull = hippoAt(helper, MX0 + 2.5, TOP - 1, -90.0F);
+        bull.life().setUp(false, com.antcolonies.animal.Sex.MALE, helper.getLevel().random);
+        bull.life().apply();
+        var croc = grownCroc(helper, MX0 + 6.5, TOP, MZ0 + 5.5);
+        float health = croc.getMaxHealth();
+        boolean[] yawned = {false};
+        helper.onEachTick(() -> {
+            yawned[0] |= bull.doing() == com.antcolonies.savanna.animal.HippoEntity.YAWN;
+            helper.assertTrue(bull.doing() != com.antcolonies.savanna.animal.HippoEntity.BITE || yawned[0], "the bull bit before his warning yawn");
+            helper.assertTrue(croc.getHealth() >= health - 10.5F, "the bull bit the crocodile more than once: health " + croc.getHealth());
+        });
+        helper.succeedWhen(() -> {
+            helper.assertTrue(yawned[0], "the bull never yawned at the crocodile " + String.format("%.1f", croc.distanceTo(bull)) + " away");
+            helper.assertTrue(croc.isAlive() && croc.distanceTo(bull) >= 8.0 && !bull.charging(),
+                    "the crocodile is not seen off: " + String.format("%.1f", croc.distanceTo(bull)) + " away, charging " + bull.charging());
+        });
+    }
+
+    /**
+     * A crocodile afloat in water two deep, sent to the bank past a shelf a block under the surface, rises over the shelf
+     * and walks out (BUGS 273: its climb-out lift asked Minecraft's isFree, which refuses water too, so against the
+     * shelf it never rose and drifted along the lip).
+     */
+    @GameTest(template = "arena", timeoutTicks = 400)
+    public static void aCrocodileAfloatClimbsOverAnUnderwaterLedge(GameTestHelper helper) {
+        hippoGround(helper, HippoGround.POOL);
+        var croc = grownCroc(helper, MX0 + 4.5, TOP, MZ0 + 5.5);
+        BlockPos bank = helper.absolutePos(new BlockPos(STEP_X + 5, TOP + 1, MZ0 + 5));
+        boolean[] out = {false};
+        helper.onEachTick(() -> {
+            if (croc.getNavigation().isDone() && croc.tickCount % 20 == 0) {
+                croc.getNavigation().moveTo(bank.getX() + 0.5, bank.getY(), bank.getZ() + 0.5, 1.0);
+            }
+            out[0] |= croc.getX() - helper.absolutePos(BlockPos.ZERO).getX() >= STEP_X + 0.5 && !croc.isInWater();
+        });
+        helper.succeedWhen(() -> helper.assertTrue(out[0], "the crocodile never got over the ledge onto the bank: at "
+                + croc.position().subtract(net.minecraft.world.phys.Vec3.atLowerCornerOf(helper.absolutePos(BlockPos.ZERO))) + ", in water " + croc.isInWater()));
+    }
+
+    /** A cow lets a grown crocodile be (until calves come, only bulls mind them). */
+    @GameTest(template = "arena", timeoutTicks = 300)
+    public static void aCowLetsACrocodileBe(GameTestHelper helper) {
+        hippoGround(helper, HippoGround.POOL);
+        var cow = hippoAt(helper, MX0 + 2.5, TOP - 1, -90.0F);
+        cow.life().setUp(false, com.antcolonies.animal.Sex.FEMALE, helper.getLevel().random);
+        cow.life().apply();
+        var croc = grownCroc(helper, MX0 + 6.5, TOP, MZ0 + 5.5);
+        helper.onEachTick(() -> helper.assertTrue(!cow.charging() && cow.doing() != com.antcolonies.savanna.animal.HippoEntity.YAWN,
+                "the cow went for the crocodile " + String.format("%.1f", croc.distanceTo(cow)) + " away"));
+        helper.runAtTickTime(240, helper::succeed);
     }
 
     // --- the river barb (2026-11-20) -----------------------------------------------------------------------------------
