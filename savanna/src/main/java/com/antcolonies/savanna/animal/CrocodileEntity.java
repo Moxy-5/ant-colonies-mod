@@ -714,8 +714,10 @@ public class CrocodileEntity extends PathfinderMob implements GeoEntity, HasLife
             double before = getY();
             move(MoverType.SELF, getDeltaMovement());
             Vec3 v = getDeltaMovement().scale(0.9);
-            // against a bank with room above it: up and out, as every swimming mob of Minecraft's climbs out
-            if (horizontalCollision && isFree(v.x, v.y + 0.6 - getY() + before, v.z)) {
+            // against a bank or a ledge under the water with room above it: up and over, as every swimming mob of
+            // Minecraft's climbs out. Room means no block in the way, water allowed: Minecraft's own isFree also refuses
+            // water, so a crocodile afloat against a shelf a block under the surface never rose onto it (BUGS 273)
+            if (horizontalCollision && level().noCollision(this, getBoundingBox().move(v.x, v.y + 0.6 - getY() + before, v.z))) {
                 v = new Vec3(v.x, 0.3, v.z);
             }
             setDeltaMovement(v);

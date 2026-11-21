@@ -114,6 +114,8 @@ public class HippoEntity extends PathfinderMob implements GeoEntity, HasLife {
     static final double WARN_REACH = 9.0, CHARGE_REACH = 5.5;
     /** A grown crocodile this near a bull (blocks from his middle: about 3 from his snout) gets his yawn, and charged if it stays; he gives up once it is this far. */
     static final double CROC_REACH = 5.5, CROC_GIVE_UP = 8.0;
+    /** After biting a crocodile a bull lets crocodiles be this long (ticks: a minute), whether or not it got away (BUGS 273). */
+    static final int CROC_CALM = 1200;
     /** A charge gives up when its target is this far, or after this many ticks; then it waits this long before another. */
     static final double CHARGE_GIVE_UP = 16.0;
     static final int CHARGE_TICKS = 240, CHARGE_REST = 200, WARN_AGAIN = 200;
@@ -142,8 +144,8 @@ public class HippoEntity extends PathfinderMob implements GeoEntity, HasLife {
     @Nullable
     LivingEntity angryAt;
     int angryUntil;
-    /** Ticks before it may charge again, or yawn a warning at the same player. */
-    int chargeWait, warnWait;
+    /** Ticks before it may charge again, or yawn a warning at the same player, or mind a crocodile again. */
+    int chargeWait, warnWait, crocWait;
     /** The game tick its doing started (for its clips' lengths and moments). */
     int doingSince;
     /** The last tick it moved, and how far a tick, eased (for the clips). */
@@ -573,6 +575,9 @@ public class HippoEntity extends PathfinderMob implements GeoEntity, HasLife {
         if (warnWait > 0) {
             warnWait--;
         }
+        if (crocWait > 0) {
+            crocWait--;
+        }
         if (angryAt != null && (tickCount > angryUntil || !angryAt.isAlive())) {
             angryAt = null;
         }
@@ -854,7 +859,8 @@ public class HippoEntity extends PathfinderMob implements GeoEntity, HasLife {
      * bites (the crushing hit at the clip's {@link #BITE_HIT}) until they are {@link #CHARGE_GIVE_UP} blocks off or
      * {@link #CHARGE_TICKS} have passed; then it rests a while before another. A grown crocodile is minded by bulls only,
      * and only within {@link #CROC_REACH}: the yawn first, then, if it stays, a bluff charge that ends once it is
-     * {@link #CROC_GIVE_UP} off, with one bite at most (real pods let crocodiles bask beside them; BUGS 272).
+     * {@link #CROC_GIVE_UP} off, with one bite at most, after which he lets crocodiles be for {@link #CROC_CALM} ticks
+     * even if one could not get away (real pods let crocodiles bask beside them; BUGS 272, 273).
      */
     static class TerritoryGoal extends Goal {
         private final HippoEntity h;
@@ -881,7 +887,7 @@ public class HippoEntity extends PathfinderMob implements GeoEntity, HasLife {
             if (h.chargeWait > 0 || h.getRandom().nextInt(3) != 0) {
                 return false;
             }
-            LivingEntity p = h.life().isMale() ? nearestCroc() : null;
+            LivingEntity p = h.life().isMale() && h.crocWait == 0 ? nearestCroc() : null;
             if (p == null) {
                 p = h.level().getNearestPlayer(h.getX(), h.getY(), h.getZ(), WARN_REACH * h.getScale(),
                         e -> EntitySelector.NO_CREATIVE_OR_SPECTATOR.test(e) && EntitySelector.LIVING_ENTITY_STILL_ALIVE.test(e));
@@ -987,6 +993,9 @@ public class HippoEntity extends PathfinderMob implements GeoEntity, HasLife {
             h.setCharging(false);
             if (h.doing() == YAWN || h.doing() == BITE) {
                 h.setDoing(CALM);
+            }
+            if (bitten && target instanceof CrocodileEntity) {
+                h.crocWait = CROC_CALM;                 // one bite, then he lets crocodiles be a while
             }
             if (charge) {
                 h.chargeWait = CHARGE_REST;

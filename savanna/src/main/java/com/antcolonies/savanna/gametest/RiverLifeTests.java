@@ -2047,6 +2047,27 @@ public class RiverLifeTests {
         });
     }
 
+    /**
+     * A crocodile afloat in water two deep, sent to the bank past a shelf a block under the surface, rises over the shelf
+     * and walks out (BUGS 273: its climb-out lift asked Minecraft's isFree, which refuses water too, so against the
+     * shelf it never rose and drifted along the lip).
+     */
+    @GameTest(template = "arena", timeoutTicks = 400)
+    public static void aCrocodileAfloatClimbsOverAnUnderwaterLedge(GameTestHelper helper) {
+        hippoGround(helper, HippoGround.POOL);
+        var croc = grownCroc(helper, MX0 + 4.5, TOP, MZ0 + 5.5);
+        BlockPos bank = helper.absolutePos(new BlockPos(STEP_X + 5, TOP + 1, MZ0 + 5));
+        boolean[] out = {false};
+        helper.onEachTick(() -> {
+            if (croc.getNavigation().isDone() && croc.tickCount % 20 == 0) {
+                croc.getNavigation().moveTo(bank.getX() + 0.5, bank.getY(), bank.getZ() + 0.5, 1.0);
+            }
+            out[0] |= croc.getX() - helper.absolutePos(BlockPos.ZERO).getX() >= STEP_X + 0.5 && !croc.isInWater();
+        });
+        helper.succeedWhen(() -> helper.assertTrue(out[0], "the crocodile never got over the ledge onto the bank: at "
+                + croc.position().subtract(net.minecraft.world.phys.Vec3.atLowerCornerOf(helper.absolutePos(BlockPos.ZERO))) + ", in water " + croc.isInWater()));
+    }
+
     /** A cow lets a grown crocodile be (until calves come, only bulls mind them). */
     @GameTest(template = "arena", timeoutTicks = 300)
     public static void aCowLetsACrocodileBe(GameTestHelper helper) {
