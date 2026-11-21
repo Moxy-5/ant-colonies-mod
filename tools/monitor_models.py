@@ -1176,6 +1176,44 @@ def _clearance(places, B, margin=0.4, down=False):
     return need
 
 
+# --- the back's S-curve (the Animal Maker Engine step C, 2026-11-20; old step 3) --------------------------------------
+# A walking lizard's shoulders and hips turn opposite ways with each step (the trunk bends into a C one way, then the
+# other, with the girdles near its ends), and with the neck turning back and the tail's wave the whole body makes an S.
+# The trunk's middle line is laid as a curve through the body's bend point (its pivot) and each trunk piece placed along
+# it at its own length (motion_kit.follow_path: places along the curve, never angles), so the pieces turn by what the
+# curve does; the legs reach their planted feet from the turned shoulders and hips. My picks: a 0 turns it off (the old
+# plank walk, byte for byte); the whole-body swing is cut to TRUNK_SWAY so the girdles do the turning.
+TRUNK_S = {'walk': 7.0, 'swim': 5.0}            # how far the shoulders turn one way and the hips the other (degrees)
+TRUNK_SWAY = {'walk': 2.0, 'swim': 2.0}         # the whole body's swing left with it (degrees; was 6 and 5)
+GIRDLE = 8.5                                     # the shoulder joint's distance in front of the bend point (px)
+
+
+def _trunk_s(p, bm, bd, turn):
+    """The trunk bent into a C turning the shoulders turn degrees (+: to its right) and the hips the other way, the
+    body turned bm and moved bd (as body() gives them). Writes the trunk pieces' turns into the pose p and returns the
+    chest's and the hips' places as a body turn and move each (for the legs' reaching), and the chest's and the hips'
+    headings (degrees, the body's swing included is the caller's)."""
+    from motion_kit import follow_path, curve
+    a = -math.tan(math.radians(turn)) / (2 * GIRDLE)            # x = a (z - pivot)^2: a C through the bend point
+    z0 = BODY_PIVOT[2]
+    ahead = follow_path(curve(lambda u: [a * u * u, 0.0, z0 - u], 0.0, 20.0, 80),
+                        [z0 - TRUNK_JOINTS[0], TRUNK_JOINTS[0] - TRUNK_JOINTS[1], TRUNK_JOINTS[1] - BODY_Z[0]])
+    behind = follow_path(curve(lambda u: [a * u * u, 0.0, z0 + u], 0.0, 20.0, 80), [BODY_Z[1] - z0])
+    heads = [math.degrees(math.atan2(-(b[0] - c[0]), -(b[2] - c[2]))) for c, b in zip(ahead, ahead[1:])]
+    hips = math.degrees(math.atan2(behind[1][0] - behind[0][0], behind[1][2] - behind[0][2]))
+    M, t = bm, vadd(vsub(BODY_PIVOT, mat_vec(bm, BODY_PIVOT)), bd)
+    last = 0.0
+    for (name, z), h in zip((('waist', z0), ('ribs', TRUNK_JOINTS[0]), ('chest', TRUNK_JOINTS[1])), heads):
+        p[name] = {'rotation': [0.0, round(h - last, 3), 0.0]}
+        R = euler([0.0, h - last, 0.0])
+        c = [0.0, BODY_PIVOT[1], z]
+        t = vadd(mat_vec(M, vsub(c, mat_vec(R, c))), t)
+        M, last = mat_mul(M, R), h
+    p['hips'] = {'rotation': [0.0, round(hips, 3), 0.0]}
+    hm = mat_mul(bm, euler([0.0, hips, 0.0]))
+    return ((M, vsub(vadd(t, mat_vec(M, BODY_PIVOT)), BODY_PIVOT)), (hm, bd), last, hips)
+
+
 def clips():
     """(clips by name, how far a wanted foot place lay out of reach in each, in pixels)."""
     from model_parts import clip
@@ -1207,8 +1245,12 @@ def clips():
     def walk(t):
         p = {}
         w = 2 * math.pi * t / WALK_LEN
-        yaw = 6.0 * math.cos(w)
+        yaw = (TRUNK_SWAY['walk'] if TRUNK_S['walk'] else 6.0) * math.cos(w)
         bm, bd = body(p, ry=yaw, dy=0.25 * math.cos(2 * w))
+        frames, chest, hips = {'arm': (bm, bd), 'leg': (bm, bd)}, yaw, yaw
+        if TRUNK_S['walk']:
+            fa, fl, ch, hh = _trunk_s(p, bm, bd, TRUNK_S['walk'] * math.cos(w))
+            frames, chest, hips = {'arm': fa, 'leg': fl}, yaw + ch, yaw + hh
         for L in P.legs:
             front, back, lift = reach[L['kind']]
             u = (t / WALK_LEN - phases[(L['kind'], L['side'])]) % 1.0
@@ -1218,15 +1260,16 @@ def clips():
                 f = _ease((u - duty) / (1 - duty))
                 z, up = back + (front - back) * f, math.sin(math.pi * f)
             wrist = [L['W'][0], L['W'][1] + lift * up, z]
-            P.leg(p, L, bm, bd, wrist, mat_mul(L['foot'], turn_x(-28 * up)), curl=18 * up)
+            fm, fd = frames[L['kind']]
+            P.leg(p, L, fm, fd, wrist, mat_mul(L['foot'], turn_x(-28 * up)), curl=18 * up)
         neck_turn(p, 0.0)
-        p['neck1']['rotation'][1] = round(-0.55 * yaw, 3)
-        p['neck2']['rotation'][1] = round(-0.3 * yaw, 3)
-        p['head']['rotation'][1] = round(-0.1 * yaw, 3)
+        p['neck1']['rotation'][1] = round(-0.55 * chest, 3)
+        p['neck2']['rotation'][1] = round(-0.3 * chest, 3)
+        p['head']['rotation'][1] = round(-0.1 * chest, 3)
         for i in range(TAIL_SEGS):
             sway = (2.5 + 7.0 * i / (TAIL_SEGS - 1)) * math.sin(w - 0.45 * i - 0.6)
             if i == 0:
-                sway -= 1.2 * yaw
+                sway -= 1.2 * hips
             p[f'tail{i + 1}'] = {'rotation': [0.0, round(sway, 3), 0.0]}
         return p
     out['walk'] = clip(WALK_LEN, walk, 48)
@@ -1293,22 +1336,26 @@ def clips():
     def swim(t):
         p = {}
         w = 2 * math.pi * t / SWIM_LEN
-        yaw = 5.0 * math.cos(w)
+        yaw = (TRUNK_SWAY['swim'] if TRUNK_S['swim'] else 5.0) * math.cos(w)
         bm, bd = body(p, ry=yaw)
+        chest, hips = yaw, yaw
+        if TRUNK_S['swim']:                 # (the folded legs ride on their girdles: placed on the body's axes as before)
+            _, _, ch, hh = _trunk_s(p, bm, bd, TRUNK_S['swim'] * math.cos(w - 0.4))
+            chest, hips = yaw + ch, yaw + hh
         for L in P.legs:
             wrist, foot = swim_leg(L)
             P.leg(p, L, bm, bd, wrist, foot, in_body=True, curl=20.0)
         neck_turn(p, 0.0, extra=(0.0, -3.0, -3.0))
-        p['neck1']['rotation'][1] = round(-0.55 * yaw, 3)
-        p['neck2']['rotation'][1] = round(-0.3 * yaw, 3)
-        p['head']['rotation'][1] = round(-0.15 * yaw, 3)
+        p['neck1']['rotation'][1] = round(-0.55 * chest, 3)
+        p['neck2']['rotation'][1] = round(-0.3 * chest, 3)
+        p['head']['rotation'][1] = round(-0.15 * chest, 3)
         # (the tail's wave only: afloat, the game drags it level along the water's surface, TailDrag, 2026-11-19;
         # until then the clip straightened it, -rest, which the drag would have bent twice)
         for i in range(TAIL_SEGS):
             f = i / (TAIL_SEGS - 1)
             sway = (4.0 + 7.0 * f) * math.sin(w - 0.5 * i - 0.8)
             if i == 0:
-                sway -= 1.4 * yaw
+                sway -= 1.4 * hips
             p[f'tail{i + 1}'] = {'rotation': [0.0, round(sway, 3), 0.0]}
         for side in ('left', 'right'):
             p[f'pupil_{side}'] = {'position': [0.0, 0.0, -0.25]}
@@ -1536,7 +1583,7 @@ def clips():
     for kind in WATER_KINDS:
         for size in CLIMB_SIZES:
             name = water_name(kind, size)
-            out[name], worst[name] = cached('monitor', name, fingerprint(name, files=[__file__]),
+            out[name], worst[name] = cached('monitor', name, fingerprint(name, swim_table, files=[__file__]),
                                             lambda: list(water_move(kind, size, swim_table, swim_leg, flick)[:2]))
     return out, worst
 

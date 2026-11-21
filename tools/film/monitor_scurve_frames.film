@@ -1,0 +1,56 @@
+# The Nile monitor's back S-curve (the Animal Maker Engine step C, 2026-11-20): walking on the flat and swimming, frozen
+# and stepped 2 ticks a picture, side on, from above (where the S shows) and from the front.
+#   ./gradlew runFilm -PfilmScene=tools/film/monitor_scurve_frames.film   pictures in run-film/screenshots/monitor_scurve_frames/
+cmd time set noon
+cmd weather clear
+cmd kill @e[type=!player]
+cmd fill -4 -60 -8 22 -50 8 minecraft:air
+cmd fill -4 -61 -8 22 -61 8 minecraft:grass_block
+cmd fill -4 -64 14 22 -61 24 minecraft:water
+lens 40
+wait 40
+walker antcolonies:monitor 2.5 -60 0.5 -90 OwnSize:1.0f,HungryIn:99999,SunIn:99999
+camera 7.5 -60.1 -6.0 0 6
+cmd tick unfreeze
+go 18 -60 0 0.8
+wait 30
+cmd tick freeze
+burst walk_side 30 2
+cmd kill @e[type=antcolonies:monitor]
+wait 10
+walker antcolonies:monitor 2.5 -60 0.5 -90 OwnSize:1.0f,HungryIn:99999,SunIn:99999
+camera 8.0 -52.5 0.5 0 89
+cmd tick unfreeze
+go 18 -60 0 0.8
+wait 30
+cmd tick freeze
+burst walk_top 30 2
+cmd kill @e[type=antcolonies:monitor]
+wait 10
+walker antcolonies:monitor 2.5 -60 0.5 -90 OwnSize:1.0f,HungryIn:99999,SunIn:99999
+camera 13.5 -60.0 0.5 90 8
+cmd tick unfreeze
+go 18 -60 0 0.8
+wait 30
+cmd tick freeze
+burst walk_front 30 2
+cmd kill @e[type=antcolonies:monitor]
+wait 10
+walker antcolonies:monitor 0.5 -62 19.5 -90 OwnSize:1.0f,HungryIn:99999,SunIn:99999
+camera 8.0 -53.0 19.5 0 89
+cmd tick unfreeze
+go 20 -62 19 0.8
+wait 50
+cmd tick freeze
+burst swim_top 30 2
+cmd kill @e[type=antcolonies:monitor]
+wait 10
+walker antcolonies:monitor 0.5 -62 19.5 -90 OwnSize:1.0f,HungryIn:99999,SunIn:99999
+camera 9.0 -61.2 13.0 0 10
+cmd tick unfreeze
+go 20 -62 19 0.8
+wait 50
+cmd tick freeze
+burst swim_side 30 2
+cmd kill @e[type=antcolonies:monitor]
+quit
