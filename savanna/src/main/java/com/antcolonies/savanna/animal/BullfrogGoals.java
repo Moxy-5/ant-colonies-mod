@@ -44,6 +44,14 @@ final class BullfrogGoals {
      */
     static final double STALK_REACH = 3.0, STALK_LOSE = 1.5;
     static final int STALK_TICKS = 400;
+    /**
+     * The hunt (the user, 2026-11-20: "hunting the snails underwater", frogs too slow when hunting; my picks): a hungry
+     * frog goes after a snail or a young crab it sees within this many blocks, on land or on the bed under the water
+     * (diving to it), for at most this many ticks (15 s), then rests from hunting this many ticks (5 s) before it looks
+     * again. Barbs are too quick to chase: they are only ambushed as they pass.
+     */
+    static final double HUNT_REACH = 10.0;
+    static final int HUNT_TICKS = 300, HUNT_REST = 100;
     /** How near a monitor or a grown crocodile sends it leaping for the water, and how far it looks for water. */
     static final double DANGER_NEAR = 5.0;
     static final int WATER_REACH = 6;
@@ -236,14 +244,21 @@ final class BullfrogGoals {
      * its mouth: a barb in the water, a snail, a young crab. Mouth wide, a push forward, the jaws shut; caught, it is
      * swallowed (the clip's hands push it in) and the frog is fed. Prey on land seen a little farther off, within
      * {@link #STALK_REACH}, gets a slow creep first (the polish's step 4: real frogs creep up on prey just out of reach,
-     * body low, eyes fixed), then the lunge; a frog in the water only waits (it floats, and lunges at what comes close).
+     * body low, eyes fixed), then the lunge.
+     *
+     * <p>The hunt (2026-11-20, the user: frogs sat still while hungry, and should hunt the snails under the water): a
+     * snail or a young crab seen within {@link #HUNT_REACH} blocks it goes after, hopping on land and swimming in the
+     * water, diving to the bed for one there (seen from the bank through the water's top), creeping the last bit on land
+     * and lunging once in reach (under the water the lunge goes down at it too); after a meal on the bed it floats back
+     * up. Barbs dart off too fast to chase: those it only ambushes.
      */
     static final class LungeGoal extends Goal {
         private final BullfrogEntity frog;
         @Nullable
         private LivingEntity prey;
-        private int stalked;
+        private int stalked, hunted, restUntil, noRoute;
         private double startFar;
+        private boolean chasing;
 
         LungeGoal(BullfrogEntity frog) {
             this.frog = frog;
@@ -269,6 +284,29 @@ final class BullfrogGoals {
             return !e.isInWater() && frog.onGround() && !frog.isInWater();
         }
 
+        /** Prey worth going after from afar: slow things (a snail, a young crab), not the darting barbs. */
+        private static boolean chased(LivingEntity e) {
+            return !(e instanceof BarbEntity);
+        }
+
+        /**
+         * Whether it sees this prey: a clear line from its mouth to it, or, for prey under the water, to the water's top
+         * over it (a frog on the bank looks down through the water; the bank's edge would hide the bed itself).
+         */
+        private boolean sees(LivingEntity e) {
+            if (clearFromMouth(frog, middle(e))) {
+                return true;
+            }
+            if (!e.isInWater()) {
+                return false;
+            }
+            BlockPos.MutableBlockPos at = e.blockPosition().mutable();
+            for (int up = 0; up < 5 && frog.level().getFluidState(at).is(FluidTags.WATER); up++) {
+                at.move(0, 1, 0);
+            }
+            return frog.level().getBlockState(at).isAir() && clearFromMouth(frog, new Vec3(e.getX(), at.getY() - 0.1, e.getZ()));
+        }
+
         @Override
         public boolean canUse() {
             if (!frog.isHungry() || frog.isDug() || frog.busy() || !now(frog, 4)) {
@@ -276,11 +314,15 @@ final class BullfrogGoals {
             }
             Vec3 mouth = frog.mouth();
             double reach = LUNGE_REACH * frog.getScale(), far = STALK_REACH * frog.getScale();
+            boolean hunting = frog.tickCount >= restUntil;
+            double look = hunting ? HUNT_REACH : far;
             prey = null;
             double best = Double.MAX_VALUE;
-            for (LivingEntity e : frog.level().getEntitiesOfClass(LivingEntity.class, frog.getBoundingBox().inflate(far + 0.5), LungeGoal::isPrey)) {
+            for (LivingEntity e : frog.level().getEntitiesOfClass(LivingEntity.class, frog.getBoundingBox().inflate(look + 0.5), LungeGoal::isPrey)) {
                 double d = middle(e).distanceTo(mouth);
-                if ((d < reach || d < far && stalkable(e)) && d < best && clearFromMouth(frog, middle(e))) {
+                boolean wanted = d < reach && clearFromMouth(frog, middle(e)) || d < far && stalkable(e) && clearFromMouth(frog, middle(e))
+                        || hunting && d < HUNT_REACH && chased(e) && sees(e);
+                if (wanted && d < best) {
                     best = d;
                     prey = e;
                 }
@@ -292,23 +334,45 @@ final class BullfrogGoals {
         public void start() {
             frog.getNavigation().stop();
             stalked = 0;
+            hunted = 0;
+            noRoute = 0;
+            chasing = false;
             startFar = middle(prey).distanceTo(frog.mouth());
-            if (startFar < LUNGE_REACH * frog.getScale()) {
+            if (startFar < LUNGE_REACH * frog.getScale() && clearFromMouth(frog, middle(prey))) {
                 lunge();
-            } else {
+            } else if (startFar < STALK_REACH * frog.getScale() && stalkable(prey) && clearFromMouth(frog, middle(prey))) {
                 frog.act(BullfrogEntity.STALK);
+            } else {
+                chasing = true;         // after it: hopping, swimming, diving
+                frog.getNavigation().moveTo(prey, 1.0);
             }
         }
 
         private void lunge() {
+            chasing = false;
+            frog.getNavigation().stop();
             turnTo(frog, prey.position(), 360);
             frog.act(BullfrogEntity.LUNGE);
+        }
+
+        /**
+         * Lost it (it got away, no route, too long): it rests from hunting a while (it still lunges at what comes close).
+         * Prey that is simply gone (eaten by another) is no failure: it looks again at once.
+         */
+        private void giveUp() {
+            if (prey != null && prey.isAlive()) {
+                restUntil = frog.tickCount + HUNT_REST;
+            }
+            chasing = false;
+            prey = null;
+            frog.getNavigation().stop();
         }
 
         @Override
         public boolean canContinueToUse() {
             byte a = frog.action();
-            return a == BullfrogEntity.STALK || a == BullfrogEntity.LUNGE && frog.actionTicks < LUNGE_END;
+            return a == BullfrogEntity.STALK || a == BullfrogEntity.LUNGE && frog.actionTicks < LUNGE_END
+                    || chasing && prey != null && a == BullfrogEntity.NONE || chasing && (a == BullfrogEntity.HOP || a == BullfrogEntity.HOP_DIVE);
         }
 
         @Override
@@ -322,15 +386,28 @@ final class BullfrogGoals {
                 stalkTick();
                 return;
             }
+            if (chasing) {
+                chaseTick();
+                return;
+            }
             int t = frog.actionTicks;
             if (prey == null) {
                 return;
             }
             if (t == LUNGE_PUSH) {
+                if (frog.isInWater()) {
+                    // under the water the lunge goes straight at it, down to the bed too
+                    Vec3 to = middle(prey).subtract(frog.mouth());
+                    double far = Math.max(0.05, to.length());
+                    double push = Math.min(0.3, far * 0.35) * frog.getScale();
+                    frog.setDeltaMovement(frog.getDeltaMovement().add(to.scale(push / far)));
+                    frog.hasImpulse = true;
+                    return;
+                }
                 Vec3 to = prey.position().subtract(frog.position());
                 double flat = Math.max(0.05, Math.sqrt(to.x * to.x + to.z * to.z));
                 double push = Math.min(0.3, flat * 0.35) * frog.getScale();
-                frog.setDeltaMovement(frog.getDeltaMovement().add(to.x / flat * push, frog.isInWater() ? 0 : 0.12, to.z / flat * push));
+                frog.setDeltaMovement(frog.getDeltaMovement().add(to.x / flat * push, 0.12, to.z / flat * push));
                 frog.hasImpulse = true;
             } else if (t == LUNGE_SNAP) {
                 Vec3 mouth = frog.mouth();
@@ -344,6 +421,44 @@ final class BullfrogGoals {
             }
         }
 
+        /**
+         * After it (its legs: hops on land, swimming in the water; the route kept on the prey, a new one every half
+         * second): the lunge once in reach, the creep for the last bit on land; it gives up after {@link #HUNT_TICKS}, if
+         * the prey gets well away or no route reaches it.
+         */
+        private void chaseTick() {
+            hunted++;
+            if (prey == null || !prey.isAlive() || !isPrey(prey) || hunted > HUNT_TICKS || prey.distanceTo(frog) > HUNT_REACH + 4) {
+                giveUp();
+                return;
+            }
+            byte a = frog.action();
+            if (a == BullfrogEntity.HOP || a == BullfrogEntity.HOP_DIVE) {
+                return;         // in the air: the hop carries it
+            }
+            double d = middle(prey).distanceTo(frog.mouth());
+            frog.getLookControl().setLookAt(prey, 30, 30);
+            if (d < LUNGE_REACH * frog.getScale() && clearFromMouth(frog, middle(prey))) {
+                lunge();
+                return;
+            }
+            if (d < STALK_REACH * frog.getScale() && frog.onGround() && stalkable(prey) && clearFromMouth(frog, middle(prey))) {
+                chasing = false;
+                frog.getNavigation().stop();
+                startFar = d;
+                stalked = 0;
+                frog.act(BullfrogEntity.STALK);
+                return;
+            }
+            if (hunted % 10 == 0 || frog.getNavigation().isDone()) {
+                // no way to it for 2 s: it gives up (one failed route alone is no matter: none is found mid-splash)
+                noRoute = frog.getNavigation().moveTo(prey, 1.0) ? 0 : noRoute + 1;
+                if (noRoute > 4) {
+                    giveUp();
+                }
+            }
+        }
+
         /** The creep: toward the prey at the clip's pace (its legs'), the lunge once it is in reach; or it gives up. */
         private void stalkTick() {
             stalked++;
@@ -351,6 +466,7 @@ final class BullfrogGoals {
             if (prey == null || !prey.isAlive() || stalked > STALK_TICKS || frog.isInWater() || prey.isInWater()
                     || d > startFar + STALK_LOSE * frog.getScale() || frog.horizontalCollision || !clearFromMouth(frog, middle(prey))) {
                 frog.stopActing();          // lost it: sits again
+                restUntil = frog.tickCount + HUNT_REST;
                 return;
             }
             frog.getLookControl().setLookAt(prey, 10, 10);
@@ -367,6 +483,10 @@ final class BullfrogGoals {
             if (a == BullfrogEntity.LUNGE || a == BullfrogEntity.STALK) {
                 frog.stopActing();
             }
+            if (chasing) {
+                frog.getNavigation().stop();
+            }
+            chasing = false;
             prey = null;
         }
     }

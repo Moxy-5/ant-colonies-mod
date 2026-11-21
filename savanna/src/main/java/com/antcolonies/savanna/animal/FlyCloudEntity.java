@@ -41,7 +41,8 @@ import net.minecraft.world.phys.Vec3;
  * its legs), so a cloud costs the server almost nothing and the network nothing per fly.
  *
  * <p>Where (the user: "around all day for now, just for testing"): over the shallows and the banks beside them, any time
- * of day, in a spawning group of its own (cap 6 round a player). The cloud wanders slowly round the spot it came to
+ * of day, in a spawning group of its own (cap 18 round a player, one or two clouds at a spot; was 6 one at a time, tripled
+ * 2026-11-20 when the user asked for more flies round the river). The cloud wanders slowly round the spot it came to
  * ({@link #DRIFT} blocks), its middle between about 1.7 and 3 blocks over the ground or water under it, mostly near 2,
  * rising and sinking every minute or two (the user's heights: in reach of a bullfrog's 2-block tongue when it sinks,
  * out of reach when it rises). Eaten flies come back one a minute ({@link #REFILL_TICKS}); the bullfrog's tongue, barbs
@@ -57,8 +58,8 @@ public class FlyCloudEntity extends Mob {
     static final double DRIFT = 2.5, MOST_SPEED = 0.04;
     /** One eaten fly comes back every this many ticks (a minute, my pick). */
     static final int REFILL_TICKS = 1200;
-    /** Clouds within this many blocks of a player are never removed (my pick); past 128 they always are. */
-    static final double KEEP_NEAR = 64.0;
+    /** Clouds within this many blocks of a player are never removed (as the river animals; was 64); past 128 they always are. */
+    static final double KEEP_NEAR = 96.0;
 
     private static final EntityDataAccessor<Integer> DATA_FLIES = SynchedEntityData.defineId(FlyCloudEntity.class, EntityDataSerializers.INT);
 

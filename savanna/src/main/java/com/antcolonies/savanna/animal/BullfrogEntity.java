@@ -484,7 +484,7 @@ public class BullfrogEntity extends Animal implements GeoEntity {
 
     /** In the water, still: it floats with its eyes and back out (a frog's lungs), bobbing a little. */
     private void floatTick() {
-        if (!isInWater() || action() == LEAP || !getNavigation().isDone()) {
+        if (!isInWater() || action() == LEAP || action() == LUNGE || !getNavigation().isDone()) {     // (a lunge may go down at the bed)
             return;
         }
         double under = getFluidHeight(FluidTags.WATER);

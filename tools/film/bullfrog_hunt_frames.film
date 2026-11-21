@@ -1,0 +1,47 @@
+# The bullfrog's dive for a snail on the bed, frame by frame (the hunt, 2026-11-20; the animation checks rule): a
+# hungry frog afloat over a pool 3 deep sees a snail on the bed 3 blocks off and 2 down, swims down to it and lunges;
+# filmed with the game frozen and stepped 2 ticks a picture from the side (in the water), ahead and three quarters
+# (the scene played again for each camera).
+#   ./gradlew runFilm -PfilmScene=tools/film/bullfrog_hunt_frames.film   pictures in run-film/screenshots/bullfrog_hunt_frames/
+cmd time set 2000
+cmd weather clear
+lens 50
+# the dive, side
+cmd kill @e[type=!player]
+cmd fill -12 -63 -7 12 -55 7 minecraft:air
+cmd fill -12 -64 -7 12 -61 7 minecraft:grass_block
+cmd fill -6 -63 -6 8 -61 6 minecraft:water
+wait 10
+cmd summon antcolonies:bullfrog -1.5 -61.4 0.5 {PersistenceRequired:1b,Male:1b,HungryIn:0,Rotation:[-90f,0f]}
+cmd summon antcolonies:snail 1.5 -63 0.5 {NoAI:1b,PersistenceRequired:1b,Rotation:[90f,0f]}
+camera 0.5 -63.6 -3.2 0 0
+wait 4
+cmd tick freeze
+burst dive_side 90 2
+cmd tick unfreeze
+# the dive, ahead
+cmd kill @e[type=!player]
+cmd fill -12 -63 -7 12 -55 7 minecraft:air
+cmd fill -12 -64 -7 12 -61 7 minecraft:grass_block
+cmd fill -6 -63 -6 8 -61 6 minecraft:water
+wait 10
+cmd summon antcolonies:bullfrog -1.5 -61.4 0.5 {PersistenceRequired:1b,Male:1b,HungryIn:0,Rotation:[-90f,0f]}
+cmd summon antcolonies:snail 1.5 -63 0.5 {NoAI:1b,PersistenceRequired:1b,Rotation:[90f,0f]}
+camera 4.2 -63.6 0.5 90 0
+wait 4
+cmd tick freeze
+burst dive_ahead 90 2
+cmd tick unfreeze
+# the dive, three
+cmd kill @e[type=!player]
+cmd fill -12 -63 -7 12 -55 7 minecraft:air
+cmd fill -12 -64 -7 12 -61 7 minecraft:grass_block
+cmd fill -6 -63 -6 8 -61 6 minecraft:water
+wait 10
+cmd summon antcolonies:bullfrog -1.5 -61.4 0.5 {PersistenceRequired:1b,Male:1b,HungryIn:0,Rotation:[-90f,0f]}
+cmd summon antcolonies:snail 1.5 -63 0.5 {NoAI:1b,PersistenceRequired:1b,Rotation:[90f,0f]}
+camera 3.2 -63.6 -2.4 45 0
+wait 4
+cmd tick freeze
+burst dive_three 90 2
+cmd tick unfreeze

@@ -84,7 +84,7 @@
       "constructor": "(Ljava/lang/String;IZZI)V",
       "parameters": [
         "antcolonies:fly_cloud",
-        6,
+        18,
         true,
         false,
         128

@@ -1700,7 +1700,7 @@ public class RiverLifeTests {
      * Fly clouds spawn by themselves over the shallows and the banks beside them (the spawning check list): over a
      * river's cross-section the world would spawn one at every spot of a column within 2 blocks of water 1 to 3 deep
      * (the water there or the free block over the top), nowhere over the deep middle; a cloud spawned the world's way is
-     * set up to hang 1.7 to 3 blocks over the water with 4 to 12 flies; its own group (cap 6) in the savanna's waters.
+     * set up to hang 1.7 to 3 blocks over the water with 4 to 12 flies; its own group (cap 18) in the savanna's waters.
      */
     @GameTest(template = "arena", timeoutTicks = 200)
     public static void flyCloudsSpawnOverTheShallowsByThemselves(GameTestHelper helper) {
@@ -1746,8 +1746,8 @@ public class RiverLifeTests {
             helper.fail("fly clouds spawn at the wrong spots:" + wrong);
         }
         var group = com.antcolonies.savanna.registry.SavannaMobCategories.flyCloud();
-        helper.assertTrue(type.getCategory() == group && group.getMaxInstancesPerChunk() == 6,
-                "the fly cloud is in the " + type.getCategory().getName() + " group, cap " + type.getCategory().getMaxInstancesPerChunk() + " (its own, 6 wanted)");
+        helper.assertTrue(type.getCategory() == group && group.getMaxInstancesPerChunk() == 18,
+                "the fly cloud is in the " + type.getCategory().getName() + " group, cap " + type.getCategory().getMaxInstancesPerChunk() + " (its own, 18 wanted)");
         var biomes = level.registryAccess().registryOrThrow(net.minecraft.core.registries.Registries.BIOME);
         helper.assertTrue(biomes.getOrThrow(net.minecraft.world.level.biome.Biomes.SAVANNA).getMobSettings().getMobs(group).unwrap().stream()
                 .anyMatch(d -> d.type == type), "the fly cloud is not in the savanna's fly cloud spawn list");
@@ -2069,6 +2069,96 @@ public class RiverLifeTests {
             });
         }
         helper.runAtTickTime(480, helper::succeed);
+    }
+
+    /**
+     * A stone bank with a pond in it (the hunt, 2026-11-20): x {@code MX0+6..MX0+14}, z {@code MZ0+1..MZ0+9}, the water's
+     * top at {@code TOP}; a shelf 2 blocks deep up to {@code MX0+9}, 3 deep past it; the bank level with the water. Past
+     * {@code MX0+17} a second pool (x {@code MX0+19..MX0+22}, z {@code MZ0+3..MZ0+7}, 2 deep) whose banks stand a block
+     * over its water all round: a frog in it cannot get out (too heavy to climb, the user).
+     */
+    private static void bankWithPond(GameTestHelper helper) {
+        for (int x = MX0; x <= MX1; x++) {
+            for (int z = MZ0; z <= MZ1; z++) {
+                boolean pond = x >= MX0 + 6 && x <= MX0 + 14 && z >= MZ0 + 1 && z <= MZ0 + 9;
+                boolean pool = x >= MX0 + 19 && x <= MX0 + 22 && z >= MZ0 + 3 && z <= MZ0 + 7;
+                boolean poolBank = !pool && x >= MX0 + 17 && x <= MX0 + 24 && z >= MZ0 + 1 && z <= MZ0 + 9;
+                int bed = pond ? (x <= MX0 + 9 ? TOP - 2 : TOP - 3) : pool ? TOP - 2 : TOP;
+                for (int y = TOP - 4; y <= TOP + 5; y++) {
+                    BlockState state = y <= bed || poolBank && y == TOP + 1 ? Blocks.STONE.defaultBlockState()
+                            : y <= TOP && (pond || pool) ? Blocks.WATER.defaultBlockState() : Blocks.AIR.defaultBlockState();
+                    helper.setBlock(new BlockPos(x, y, z), state);
+                }
+            }
+        }
+    }
+
+    /**
+     * Hungry bullfrogs hunt (the user, 2026-11-20: "hunting the snails underwater", and frogs too slow to act when
+     * hunting): one on the bank 6 blocks from a snail on the bed of a pond 2 blocks deep goes to it, dives and eats it;
+     * one afloat over the deep end dives 2 blocks to a snail on the bed there. Logs every second what each frog does, and
+     * how long a frog that is hungry sits doing nothing, and how long one in a pool it cannot leave (banks a block high)
+     * swims against a bank.
+     */
+    @GameTest(template = "arena", timeoutTicks = 1000)
+    public static void hungryBullfrogsHuntSnailsOnThePondBed(GameTestHelper helper) {
+        bankWithPond(helper);
+        BullfrogEntity onBank = frogOnBank(helper, MX0 + 3, MZ0 + 5, -90);
+        onBank.setUp(true, 1.0F);
+        BullfrogEntity afloat = helper.spawn(SavannaEntities.BULLFROG.get(), new BlockPos(MX0 + 13, TOP, MZ0 + 2));
+        afloat.setPersistenceRequired();
+        afloat.setUp(false, 1.0F);
+        BullfrogEntity trapped = helper.spawn(SavannaEntities.BULLFROG.get(), new BlockPos(MX0 + 20, TOP, MZ0 + 5));
+        trapped.setPersistenceRequired();
+        trapped.setUp(true, 1.0F);
+        trapped.ateMeal();
+        onBank.makeHungry();
+        afloat.makeHungry();
+        com.antcolonies.savanna.animal.SnailEntity near = helper.spawn(SavannaEntities.SNAIL.get(), new BlockPos(MX0 + 9, TOP - 1, MZ0 + 5));
+        com.antcolonies.savanna.animal.SnailEntity deep = helper.spawn(SavannaEntities.SNAIL.get(), new BlockPos(MX0 + 12, TOP - 2, MZ0 + 7));
+        near.setPersistenceRequired();
+        deep.setPersistenceRequired();
+        BullfrogEntity[] frogs = {onBank, afloat, trapped};
+        String[] names = {"bank", "afloat", "trapped"};
+        int[] idleHungry = new int[2], pushing = {0};
+        int[] ateAt = {-1, -1};
+        helper.runAtTickTime(20, () -> {
+            BlockPos out = helper.absolutePos(new BlockPos(MX0 + 25, TOP + 1, MZ0 + 5));       // over the high bank
+            trapped.getNavigation().moveTo(out.getX() + 0.5, out.getY(), out.getZ() + 0.5, 1.0);
+        });
+        helper.onEachTick(() -> {
+            long tick = helper.getTick();
+            for (int i = 0; i < 2; i++) {
+                BullfrogEntity f = frogs[i];
+                if (f.isHungry() && f.action() == BullfrogEntity.NONE && f.getNavigation().isDone()) {     // sitting or afloat, going nowhere
+                    idleHungry[i]++;
+                }
+                if (ateAt[i] < 0 && !f.isHungry()) {
+                    ateAt[i] = (int) tick;
+                }
+            }
+            if (!trapped.getNavigation().isDone() && trapped.horizontalCollision) {
+                pushing[0]++;
+            }
+            if (tick % 20 == 0) {
+                for (int i = 0; i < 3; i++) {
+                    BullfrogEntity f = frogs[i];
+                    SavannaMod.LOGGER.info("[bullfrog hunt] tick {} {}: at {} action {} hungry {} water {} route {}{}", tick, names[i],
+                            String.format("%.2f %.2f %.2f", f.getX(), f.getY(), f.getZ()), f.action(), f.isHungry(), f.isInWater(),
+                            f.getNavigation().isDone() ? "done" : "on", f.horizontalCollision ? " bumping" : "");
+                }
+            }
+        });
+        helper.runAtTickTime(980, () -> {
+            SavannaMod.LOGGER.info("[bullfrog hunt] ate at ticks {} and {}; hungry and idle {} and {} ticks; the trapped frog pushed at a bank {} ticks; snails {} {}",
+                    ateAt[0], ateAt[1], idleHungry[0], idleHungry[1], pushing[0], near.isRemoved() ? "eaten" : "alive", deep.isRemoved() ? "eaten" : "alive");
+            helper.assertTrue(near.isRemoved() && deep.isRemoved(), "the snails on the bed: " + (near.isRemoved() ? "eaten" : "alive")
+                    + " (2 deep), " + (deep.isRemoved() ? "eaten" : "alive") + " (3 deep); frogs ate at ticks " + ateAt[0] + ", " + ateAt[1]);
+            helper.assertTrue(idleHungry[0] < 40 && idleHungry[1] < 40, "hungry frogs sat going nowhere " + idleHungry[0] + " and "
+                    + idleHungry[1] + " ticks with a snail in sight (2 s at most wanted)");
+            helper.assertTrue(pushing[0] < 60, "the frog in the pool it cannot leave swam against its bank " + pushing[0] + " ticks");
+            helper.succeed();
+        });
     }
 
     /** A Nile monitor coming at a bullfrog on the bank makes it leap into the water (Minecraft's long-jump aim). */
