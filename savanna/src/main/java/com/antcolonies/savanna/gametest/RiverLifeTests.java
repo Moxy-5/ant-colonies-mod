@@ -1906,15 +1906,24 @@ public class RiverLifeTests {
         far.makeHungry();
         FlyCloudEntity low = cloudAt(helper, near.position().add(1.0, 1.9, 0));
         FlyCloudEntity high = cloudAt(helper, far.position().add(0.6, 3.5, 0));
-        boolean[] flicked = {false, false};
+        boolean[] flicked = {false, false, false};
+        int[] flicks = {0, -1};         // flicks by the near frog (each a new action), and the action id last counted
         helper.onEachTick(() -> {
             flicked[0] |= near.action() == BullfrogEntity.TONGUE;
             flicked[1] |= far.action() == BullfrogEntity.TONGUE;
+            flicked[2] |= near.action() == BullfrogEntity.AIM;
+            if (near.action() == BullfrogEntity.TONGUE && near.actionId() != flicks[1]) {
+                flicks[0]++;
+                flicks[1] = near.actionId();
+            }
         });
         helper.runAtTickTime(380, () -> {
             helper.assertTrue(flicked[0] && low.flies() < 4, "the frog under the low cloud " + (flicked[0] ? "flicked" : "never flicked")
                     + ", its cloud holds " + low.flies() + " of 4 flies");
             helper.assertTrue(!flicked[1] && high.flies() == 4, "the frog under the cloud 3 blocks up flicked at it (out of reach)");
+            // the polish's step 3: it fixes its eyes on a fly before flicking, and flicks again while flies stay in reach
+            helper.assertTrue(flicked[2], "the frog flicked without aiming at a fly first");
+            helper.assertTrue(flicks[0] >= 2, "the frog under the low cloud flicked only " + flicks[0] + " time(s), not flick after flick");
             SavannaMod.LOGGER.info("[bullfrog] the frog under the low cloud ate {} flies", 4 - low.flies());
             helper.succeed();
         });
@@ -1952,6 +1961,114 @@ public class RiverLifeTests {
             helper.assertTrue(player.getHealth() < player.getMaxHealth(), "the bullfrog never bit the player");
             helper.assertTrue(player.getMaxHealth() - player.getHealth() <= 2.01F, "the bite took " + (player.getMaxHealth() - player.getHealth()) + " health (1 heart wanted)");
         });
+    }
+
+    /**
+     * A bullfrog sent somewhere gets there (the polish's step 1, 2026-11-20): over 5 blocks of bank and up two one-block
+     * steps two blocks apart, hopping (its legs: BullfrogMoveControl), never giving up half way and never sliding up a
+     * step without a hop. The course film found it stopping for good after 2.2 blocks, then (the user) stuck hopping
+     * straight up and down against the stairs' second step.
+     */
+    @GameTest(template = "arena", timeoutTicks = 700)
+    public static void aBullfrogHopsWhereItIsSentAndUpAStep(GameTestHelper helper) {
+        bankWithPool(helper);
+        int z = MZ0 + 9;
+        for (int x = MX0 + 19; x <= MX1; x++) {
+            for (int zz = MZ0; zz <= MZ1; zz++) {
+                helper.setBlock(new BlockPos(x, TOP + 1, zz), Blocks.STONE);
+                if (x >= MX0 + 21) {
+                    helper.setBlock(new BlockPos(x, TOP + 2, zz), Blocks.STONE);
+                }
+            }
+        }
+        BullfrogEntity frog = frogOnBank(helper, MX0 + 14, z, -90);
+        frog.setUp(true, 1.0F);
+        BlockPos goal = helper.absolutePos(new BlockPos(MX0 + 23, TOP + 3, z));
+        boolean[] hopped = {false};
+        double[] slid = {0};
+        net.minecraft.world.phys.Vec3[] stopped = {null};       // where its route ended (it may wander on after)
+        helper.runAtTickTime(5, () -> frog.getNavigation().moveTo(goal.getX() + 0.5, goal.getY(), goal.getZ() + 0.5, 1.0));
+        helper.onEachTick(() -> {
+            byte a = frog.action();
+            hopped[0] |= a == BullfrogEntity.HOP;
+            // up the step: every rise happens in a hop (a rise of over 0.3 in one tick outside a hop is a slide up)
+            double rise = frog.getY() - frog.yo;
+            if (rise > 0.3 && a != BullfrogEntity.HOP) {
+                slid[0] = Math.max(slid[0], rise);
+            }
+            if (stopped[0] == null && helper.getTick() > 10 && frog.getNavigation().isDone() && a == BullfrogEntity.NONE) {
+                stopped[0] = frog.position();
+            }
+            if (helper.getTick() % 40 == 0) {
+                SavannaMod.LOGGER.info("[bullfrog] sent: tick {} at {} action {} route {}", helper.getTick(),
+                        frog.position(), a, frog.getNavigation().isDone() ? "done" : "on");
+            }
+        });
+        helper.runAtTickTime(680, () -> {
+            net.minecraft.world.phys.Vec3 at = stopped[0] == null ? frog.position() : stopped[0];
+            double off = Math.hypot(at.x - (goal.getX() + 0.5), at.z - (goal.getZ() + 0.5));
+            // a route ends within a block of where it was sent (Minecraft's own moveTo), so within 1.6 of the goal's middle
+            helper.assertTrue(off < 1.6 && at.y > goal.getY() - 0.5, "the bullfrog sent 9 blocks and up two steps stopped at "
+                    + at + ", " + String.format("%.1f", off) + " blocks short of " + goal);
+            helper.assertTrue(hopped[0], "the bullfrog got there without a single hop");
+            helper.assertTrue(slid[0] == 0, "the bullfrog slid up " + slid[0] + " blocks in a tick without hopping");
+            helper.succeed();
+        });
+    }
+
+    /**
+     * A bullfrog in the water sent onto a bank about level with the water hauls itself out (the polish's step 5, a move
+     * of its own: arms onto the bank, the pull, the kick), never gliding up it; one sent onto a bank a block over the
+     * water stays in (the user, 2026-11-20: African bullfrogs are too heavy to climb).
+     */
+    @GameTest(template = "arena", timeoutTicks = 500)
+    public static void aBullfrogClimbsOutOfTheWaterOntoTheBank(GameTestHelper helper) {
+        bankWithPool(helper);
+        // the second frog's bank a block above the water: too high (the user, 2026-11-20: African bullfrogs are too
+        // heavy to climb), so it gets out where the pool's edge is low (it may then hop up the step on land)
+        for (int x = MX0 + 10; x <= MX1; x++) {
+            for (int zz = MZ0 + 6; zz <= MZ1; zz++) {
+                helper.setBlock(new BlockPos(x, TOP + 1, zz), Blocks.STONE);
+            }
+        }
+        int[][] scenes = {{MZ0 + 4, TOP + 1}, {MZ0 + 6, TOP + 2}};     // (row, the bank top) level, then high
+        for (int[] scene : scenes) {
+            int z = scene[0];
+            BullfrogEntity frog = helper.spawn(SavannaEntities.BULLFROG.get(), new BlockPos(MX0 + 7, TOP, z));
+            frog.setPersistenceRequired();
+            frog.setUp(true, 1.0F);
+            BlockPos goal = helper.absolutePos(new BlockPos(MX0 + 12, scene[1], z));
+            String bank = scene[1] == TOP + 1 ? "level bank" : "bank a block up";
+            boolean[] climbed = {false};
+            boolean[] out = {false};        // out of the water, on the bank, when its route ended (it may wander back in after)
+            double[] highestClimb = {-999};  // the highest a climb out ever ended (never onto a bank a block over the water)
+            byte[] last = {BullfrogEntity.NONE};
+            helper.runAtTickTime(20, () -> frog.getNavigation().moveTo(goal.getX() + 0.5, goal.getY(), goal.getZ() + 0.5, 1.0));
+            helper.onEachTick(() -> {
+                climbed[0] |= frog.action() == BullfrogEntity.CLIMB_OUT;
+                if (last[0] == BullfrogEntity.CLIMB_OUT && frog.action() != BullfrogEntity.CLIMB_OUT) {
+                    highestClimb[0] = Math.max(highestClimb[0], frog.getY());
+                }
+                last[0] = frog.action();
+                if (climbed[0] && frog.action() == BullfrogEntity.NONE && frog.getNavigation().isDone()) {
+                    out[0] |= !frog.isInWater() && frog.getY() >= goal.getY() - 0.05;
+                }
+                if (helper.getTick() % 10 == 0) {
+                    SavannaMod.LOGGER.info("[bullfrog] out ({}): tick {} at {} action {} water {} route {}", bank, helper.getTick(),
+                            frog.position(), frog.action(), frog.isInWater(), frog.getNavigation().isDone() ? "done" : "on");
+                }
+            });
+            double levelTop = helper.absolutePos(new BlockPos(0, TOP + 1, 0)).getY();
+            helper.runAtTickTime(479, () -> {
+                helper.assertTrue(climbed[0], "the bullfrog sent onto the " + bank + " never climbed out (it is at " + frog.position()
+                        + ", in the water: " + frog.isInWater() + ")");
+                helper.assertTrue(highestClimb[0] < levelTop + 0.1, "the bullfrog climbed out onto a bank a block over the water (to y "
+                        + highestClimb[0] + "; too heavy to climb, it should get out where the edge is low)");
+                helper.assertTrue(out[0], "the bullfrog sent onto the " + bank + " never ended up on it (now at " + frog.position()
+                        + ", in the water: " + frog.isInWater() + ")");
+            });
+        }
+        helper.runAtTickTime(480, helper::succeed);
     }
 
     /** A Nile monitor coming at a bullfrog on the bank makes it leap into the water (Minecraft's long-jump aim). */

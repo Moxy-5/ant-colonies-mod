@@ -30,8 +30,10 @@ final class FlySwarm {
     static final double STEP = 1.0 / 60.0;
 
     enum Mode { FLY, LANDING, PERCHED, ON_TONGUE }
-    /** A fly on a bullfrog's tongue: a stiff spring to the tongue's pad, and it may go fast (blocks a second). */
-    static final double TONGUE_K = 600, TONGUE_C = 45, TONGUE_SPEED = 14;
+    /** A fly dodging a bullfrog's tongue: its burst of speed (blocks a second; my pick, a fly's fastest dart). */
+    static final double DODGE_SPEED = 3.2;
+    /** A fly held on a tongue whose frog stopped drawing it is let go after this long (seconds; the frog went away). */
+    static final double HELD_LONGEST = 1.5;
 
     static final class Fly {
         final boolean lookB;
@@ -44,6 +46,10 @@ final class FlySwarm {
         double timer, yaw, yawT, perch, rub, rubAt;
         /** Drawn this frame: its place (world), lean, and whether its wings are up. */
         double drawX, drawY, drawZ, tiltX, tiltZ;
+        /** The bullfrog whose eyes are on it (no other frog picks it), and when it was last held on a tongue (seconds). */
+        @javax.annotation.Nullable
+        Object hunter;
+        double heldAt;
 
         Fly(boolean lookB, double seed, int flick) {
             this.lookB = lookB;
@@ -65,11 +71,6 @@ final class FlySwarm {
     int frame;
     /** The time now (seconds), for the legs' rubbing. */
     double time;
-    /** The fly a bullfrog's tongue has, and where the tongue is (world), or none. */
-    @javax.annotation.Nullable
-    private Fly onTongue;
-    @javax.annotation.Nullable
-    private Vec3 tongue;
 
     FlySwarm(long seed) {
         rng = new Random(seed);
@@ -77,37 +78,22 @@ final class FlySwarm {
     }
 
     /**
-     * Brings the swarm to this frame: as many flies as the cloud holds, each moved on by the time gone since. A
-     * bullfrog's tongue in the cloud takes the fly nearest it; a fly fewer is the one on the tongue (swallowed).
+     * Brings the swarm to this frame: as many flies as the cloud holds, each moved on by the time gone since. A fly
+     * fewer is first one a bullfrog's tongue holds (swallowed).
      */
-    void update(Level level, Vec3 middle, double now, int count, @javax.annotation.Nullable Vec3 tongueAt) {
-        tongue = tongueAt;
-        if (tongueAt != null && (onTongue == null || !flies.contains(onTongue))) {
-            Fly nearest = null;
-            double best = Double.MAX_VALUE;
+    void update(Level level, Vec3 middle, double now, int count) {
+        while (flies.size() > count) {
+            Fly held = null;
             for (Fly f : flies) {
-                double d = (f.x - tongueAt.x) * (f.x - tongueAt.x) + (f.y - tongueAt.y) * (f.y - tongueAt.y) + (f.z - tongueAt.z) * (f.z - tongueAt.z);
-                if (f.mode == Mode.FLY && d < best) {
-                    nearest = f;
-                    best = d;
+                if (f.mode == Mode.ON_TONGUE) {
+                    held = f;
+                    break;
                 }
             }
-            onTongue = nearest;
-            if (nearest != null) {
-                nearest.mode = Mode.ON_TONGUE;
+            if (held == null) {
+                break;
             }
-        } else if (tongueAt == null && onTongue != null) {
-            // let go: it zips off into the cloud again
-            onTongue.mode = Mode.FLY;
-            onTongue.vx += (rng.nextDouble() - 0.5) * 4;
-            onTongue.vy += 1.5;
-            onTongue.vz += (rng.nextDouble() - 0.5) * 4;
-            inCloud(onTongue);
-            onTongue = null;
-        }
-        if (flies.size() > count && onTongue != null) {
-            flies.remove(onTongue);         // swallowed
-            onTongue = null;
+            flies.remove(held);         // swallowed
         }
         while (flies.size() < count) {
             Fly f = new Fly(rng.nextFloat() < shareB, flies.size() * 1.7, flies.size() % 2);
@@ -209,8 +195,8 @@ final class FlySwarm {
                 }
             }
             case ON_TONGUE -> {
-                if (tongue != null) {
-                    springFast(f, tongue);
+                if (time - f.heldAt > HELD_LONGEST) {
+                    letGo(f);           // its frog stopped holding it (gone, or out of sight)
                 }
             }
             case PERCHED -> {
@@ -244,24 +230,85 @@ final class FlySwarm {
         return change;
     }
 
-    /** On the tongue: held to its pad (it moves far faster than a fly flies). */
-    private void springFast(Fly f, Vec3 at) {
-        double dt = STEP;
-        f.ax = (at.x - f.x) * TONGUE_K - f.vx * TONGUE_C;
-        f.ay = (at.y - f.y) * TONGUE_K - f.vy * TONGUE_C;
-        f.az = (at.z - f.z) * TONGUE_K - f.vz * TONGUE_C;
-        f.vx += f.ax * dt;
-        f.vy += f.ay * dt;
-        f.vz += f.az * dt;
-        double sp = Math.sqrt(f.vx * f.vx + f.vy * f.vy + f.vz * f.vz);
-        if (sp > TONGUE_SPEED) {
-            f.vx *= TONGUE_SPEED / sp;
-            f.vy *= TONGUE_SPEED / sp;
-            f.vz *= TONGUE_SPEED / sp;
+    // --- a bullfrog's tongue (the polish's step 3, 2026-11-20) -------------------------------------------------------
+
+    /**
+     * The fly a bullfrog fixes its eyes on: the one nearest its mouth within this reach (flying, or landed on the ground
+     * or the water), none another frog has its eyes on; or none.
+     */
+    @javax.annotation.Nullable
+    Fly pick(Object frog, Vec3 mouth, double reach) {
+        Fly best = null;
+        double bestD = reach * reach;
+        for (Fly f : flies) {
+            if (f.mode == Mode.ON_TONGUE || f.hunter != null && f.hunter != frog && !gone(f.hunter)) {
+                continue;
+            }
+            double d = mouth.distanceToSqr(f.drawX, f.drawY, f.drawZ);
+            if (d < bestD) {
+                best = f;
+                bestD = d;
+            }
         }
-        f.x += f.vx * dt;
-        f.y += f.vy * dt;
-        f.z += f.vz * dt;
+        if (best != null) {
+            best.hunter = frog;
+        }
+        return best;
+    }
+
+    private static boolean gone(Object hunter) {
+        return hunter instanceof net.minecraft.world.entity.Entity e && (e.isRemoved() || !e.isAlive());
+    }
+
+    /** Whether this fly is still one of the swarm's. */
+    boolean has(Fly f) {
+        return flies.contains(f);
+    }
+
+    /** The frog lets its eyes go of a fly (the flick is over, or it gave up). */
+    static void release(Fly f, Object frog) {
+        if (f.hunter == frog) {
+            f.hunter = null;
+        }
+    }
+
+    /** A fly caught on a tongue's pad: held at the pad (the frog draws it there; the cloud no longer does). */
+    void hold(Fly f, Vec3 at) {
+        if (f.mode == Mode.PERCHED || f.mode == Mode.LANDING) {
+            f.perch = 0;
+        }
+        f.mode = Mode.ON_TONGUE;
+        f.x = f.drawX = at.x;
+        f.y = f.drawY = at.y;
+        f.z = f.drawZ = at.z;
+        f.vx = f.vy = f.vz = f.ax = f.ay = f.az = 0;
+        f.heldAt = time;
+    }
+
+    /** A fly slips the tongue: it darts off sideways and up, away from where the pad is coming from. */
+    void dodge(Fly f, Vec3 from) {
+        boolean down = f.mode == Mode.PERCHED || f.mode == Mode.LANDING;
+        f.mode = Mode.FLY;
+        double dx = f.x - from.x, dz = f.z - from.z;
+        double flat = Math.max(1.0E-3, Math.sqrt(dx * dx + dz * dz));
+        double side = rng.nextBoolean() ? 1 : -1;       // sideways across the tongue's line
+        f.vx = (-dz / flat * side * 0.8 + dx / flat * 0.3) * DODGE_SPEED;
+        f.vy = DODGE_SPEED * 0.55;
+        f.vz = (dx / flat * side * 0.8 + dz / flat * 0.3) * DODGE_SPEED;
+        inCloud(f);
+        if (down) {
+            f.rub = 0;
+        }
+    }
+
+    /** Let go of a held fly: it zips off into the cloud again. */
+    private void letGo(Fly f) {
+        f.mode = Mode.FLY;
+        f.hunter = null;
+        f.vx = (rng.nextDouble() - 0.5) * 4;
+        f.vy = 1.5;
+        f.vz = (rng.nextDouble() - 0.5) * 4;
+        inCloud(f);
     }
 
     private static void spring(Fly f, double tx, double ty, double tz, double k, double c, double dt) {

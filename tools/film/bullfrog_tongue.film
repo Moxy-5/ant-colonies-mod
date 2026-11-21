@@ -1,0 +1,25 @@
+# The bullfrog's tongue aimed at one fly (the polish's step 3, 2026-11-20): a hungry frog with its own mind under a fly
+# cloud held low in front of it (in reach), filmed with the game frozen and stepped a tick at a time, two pictures a tick
+# (the tongue is out and back in 0.35 s), from the side and three quarters: the head tipping up to its fly, the tip
+# following the fly, the fly stuck on the pad or dodging, flick after flick.
+#   ./gradlew runFilm -PfilmScene=tools/film/bullfrog_tongue.film      pictures in run-film/screenshots/bullfrog_tongue/
+cmd time set 2000
+cmd weather clear
+cmd kill @e[type=!player]
+cmd fill 30 -60 8 44 -55 22 minecraft:air
+lens 50
+wait 40
+cmd summon antcolonies:bullfrog 36.5 -60.0 14.5 {PersistenceRequired:1b,Male:1b,HungryIn:0,Rotation:[-90f,0f]}
+cmd summon antcolonies:fly_cloud 37.6 -58.1 14.5 {NoAI:1b,PersistenceRequired:1b,Flies:10,Most:10,Refill:99999}
+wait 20
+camera 37.0 -61.0 11.6 0 5
+wait 2
+frames 2
+cmd tick freeze
+burst tongue_side 120 1
+cmd tick unfreeze
+camera 34.6 -60.6 12.6 -45 8
+wait 2
+cmd tick freeze
+burst tongue_three 120 1
+cmd tick unfreeze

@@ -1,0 +1,131 @@
+# The bullfrog's new moves frame by frame (the polish, 2026-11-20; the animation checks rule): the climb out of the
+# water onto a bank level with it (a block-high bank keeps it in: too heavy to climb), the hop that dives into the water, and the creep up on a snail then the lunge; each
+# filmed with the game frozen and stepped a tick a picture, from the side, ahead and three quarters (the scene played
+# again for each camera).
+#   ./gradlew runFilm -PfilmScene=tools/film/bullfrog_moves_frames.film   pictures in run-film/screenshots/bullfrog_moves_frames/
+cmd time set 2000
+cmd weather clear
+lens 50
+# climb out, side
+cmd kill @e[type=!player]
+cmd fill -12 -63 -7 12 -55 7 minecraft:air
+cmd fill -12 -64 -7 12 -61 7 minecraft:grass_block
+cmd fill -12 -63 -7 0 -61 7 minecraft:water
+wait 10
+walker antcolonies:bullfrog -2.5 -61 0.5 -90 Male:1b,HungryIn:99999
+wait 30
+camera 0.3 -61.7 -2.6 0 5
+wait 4
+go 3 -60 0 1.0
+frames 1
+cmd tick freeze
+burst climb_side 70 1
+cmd tick unfreeze
+# climb out, ahead
+cmd kill @e[type=!player]
+cmd fill -12 -63 -7 12 -55 7 minecraft:air
+cmd fill -12 -64 -7 12 -61 7 minecraft:grass_block
+cmd fill -12 -63 -7 0 -61 7 minecraft:water
+wait 10
+walker antcolonies:bullfrog -2.5 -61 0.5 -90 Male:1b,HungryIn:99999
+wait 30
+camera 2.6 -61.7 0.5 90 5
+wait 4
+go 3 -60 0 1.0
+frames 1
+cmd tick freeze
+burst climb_ahead 70 1
+cmd tick unfreeze
+# climb out, three
+cmd kill @e[type=!player]
+cmd fill -12 -63 -7 12 -55 7 minecraft:air
+cmd fill -12 -64 -7 12 -61 7 minecraft:grass_block
+cmd fill -12 -63 -7 0 -61 7 minecraft:water
+wait 10
+walker antcolonies:bullfrog -2.5 -61 0.5 -90 Male:1b,HungryIn:99999
+wait 30
+camera 2.6 -61.7 -1.6 45 8
+wait 4
+go 3 -60 0 1.0
+frames 1
+cmd tick freeze
+burst climb_three 70 1
+cmd tick unfreeze
+# the dive, side
+cmd kill @e[type=!player]
+cmd fill -12 -63 -7 12 -55 7 minecraft:air
+cmd fill -12 -64 -7 12 -61 7 minecraft:grass_block
+cmd fill 1 -63 -7 12 -61 7 minecraft:water
+wait 10
+walker antcolonies:bullfrog -2.5 -60 0.5 -90 Male:1b,HungryIn:99999
+wait 30
+camera 0.4 -61.3 -2.6 0 5
+wait 4
+go 5 -61 0 1.0
+cmd tick freeze
+burst dive_side 110 1
+cmd tick unfreeze
+# the dive, ahead
+cmd kill @e[type=!player]
+cmd fill -12 -63 -7 12 -55 7 minecraft:air
+cmd fill -12 -64 -7 12 -61 7 minecraft:grass_block
+cmd fill 1 -63 -7 12 -61 7 minecraft:water
+wait 10
+walker antcolonies:bullfrog -2.5 -60 0.5 -90 Male:1b,HungryIn:99999
+wait 30
+camera 2.8 -61.3 0.5 90 5
+wait 4
+go 5 -61 0 1.0
+cmd tick freeze
+burst dive_ahead 110 1
+cmd tick unfreeze
+# the dive, three
+cmd kill @e[type=!player]
+cmd fill -12 -63 -7 12 -55 7 minecraft:air
+cmd fill -12 -64 -7 12 -61 7 minecraft:grass_block
+cmd fill 1 -63 -7 12 -61 7 minecraft:water
+wait 10
+walker antcolonies:bullfrog -2.5 -60 0.5 -90 Male:1b,HungryIn:99999
+wait 30
+camera 2.8 -61.3 -1.6 45 8
+wait 4
+go 5 -61 0 1.0
+cmd tick freeze
+burst dive_three 110 1
+cmd tick unfreeze
+# the creep and lunge, side
+cmd kill @e[type=!player]
+cmd fill -12 -63 -7 12 -55 7 minecraft:air
+cmd fill -12 -64 -7 12 -61 7 minecraft:grass_block
+wait 10
+cmd summon antcolonies:bullfrog -1.5 -60 0.5 {PersistenceRequired:1b,Male:1b,HungryIn:0,Rotation:[-90f,0f]}
+cmd summon antcolonies:snail 1.7 -60 0.5 {NoAI:1b,PersistenceRequired:1b}
+camera 0.0 -61.2 -2.6 0 5
+wait 4
+cmd tick freeze
+burst creep_side 160 2
+cmd tick unfreeze
+# the creep and lunge, ahead
+cmd kill @e[type=!player]
+cmd fill -12 -63 -7 12 -55 7 minecraft:air
+cmd fill -12 -64 -7 12 -61 7 minecraft:grass_block
+wait 10
+cmd summon antcolonies:bullfrog -1.5 -60 0.5 {PersistenceRequired:1b,Male:1b,HungryIn:0,Rotation:[-90f,0f]}
+cmd summon antcolonies:snail 1.7 -60 0.5 {NoAI:1b,PersistenceRequired:1b}
+camera 3.4 -61.2 0.5 90 5
+wait 4
+cmd tick freeze
+burst creep_ahead 160 2
+cmd tick unfreeze
+# the creep and lunge, three
+cmd kill @e[type=!player]
+cmd fill -12 -63 -7 12 -55 7 minecraft:air
+cmd fill -12 -64 -7 12 -61 7 minecraft:grass_block
+wait 10
+cmd summon antcolonies:bullfrog -1.5 -60 0.5 {PersistenceRequired:1b,Male:1b,HungryIn:0,Rotation:[-90f,0f]}
+cmd summon antcolonies:snail 1.7 -60 0.5 {NoAI:1b,PersistenceRequired:1b}
+camera 3.4 -61.2 -1.6 45 8
+wait 4
+cmd tick freeze
+burst creep_three 160 2
+cmd tick unfreeze

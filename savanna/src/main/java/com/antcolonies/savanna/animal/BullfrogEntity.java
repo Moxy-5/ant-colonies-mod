@@ -75,18 +75,34 @@ import software.bernie.geckolib.util.GeckoLibUtil;
  */
 public class BullfrogEntity extends Animal implements GeoEntity {
     /** What it is doing to be seen (synced). */
-    public static final byte NONE = 0, HOP = 1, LEAP = 2, LUNGE = 3, TONGUE = 4, PUFF = 5, CALL = 6, DIG_IN = 7, DUG = 8, DIG_OUT = 9;
+    public static final byte NONE = 0, HOP = 1, LEAP = 2, LUNGE = 3, TONGUE = 4, PUFF = 5, CALL = 6, DIG_IN = 7, DUG = 8, DIG_OUT = 9,
+            AIM = 10, STALK = 11, HOP_DIVE = 12, CLIMB_OUT = 13;
     /** A female's length against a male's (the user's 0.65 against 0.8). */
     static final float FEMALE_SIZE = 0.65F / 0.8F;
     /** The model's mouth, against the frog's feet and middle (blocks at a male's size: the snout 0.4 ahead, 0.19 up). */
     static final double MOUTH_AHEAD = 0.4, MOUTH_UP = 0.19;
     /** How long a meal lasts (ticks; 4 to 8 minutes), and the rest after a few flies (1 to 2 minutes). */
     static final int FED_MIN = 4800, FED_MORE = 4800, FLIES_FILL = 3, FLY_REST_MIN = 1200, FLY_REST_MORE = 1200;
-    /** A hop: the kick's push up and forward (blocks a tick, forward at a male's size) and the clip's tick of the kick. */
-    static final double HOP_UP = 0.24, HOP_UP_STEP = 0.45, HOP_FORWARD = 0.13;
+    /**
+     * A hop: the kick's push up (blocks a tick; up a step a bigger one, its arc over a block's top from tick 4 to 7 and
+     * down onto it at about 7, the same flight as a plain hop's, so the clip fits both), how far it goes (blocks at a
+     * male's size: the user, 2026-11-20, "make him jump further": at most 1.1, about 1.4 of its length, my pick; at least
+     * 0.4, a short hop to a spot close by) and the clip's tick of the kick. The forward push is held through the whole
+     * flight (the polish: Minecraft wipes a mob's speed into a block's side, so a hop up from right against a step rose
+     * straight up and fell back for good, the user's find on the course's stairs).
+     */
+    static final double HOP_UP = 0.24, HOP_UP_STEP = 0.40, HOP_LONGEST = 1.1, HOP_SHORTEST = 0.4;
     static final int HOP_KICK = 2;
     /** The hop clip's flight (seconds, at speed 1: from 0.12 to 0.6 of its 0.8 s) and the real flight (ticks). */
     static final double HOP_CLIP_FLIGHT = 0.384, HOP_FLIGHT_TICKS = 7.0;
+    /**
+     * After landing it stays in its hop this many ticks, the clip's landing (from 0.6 to 0.8 of it, at the clip's
+     * speed: 3 ticks) folding it up; landing stops its slide (the polish's step 1: the course found each landing slid on
+     * in the walk clip for 8 ticks, its feet jumping at both clip changes).
+     */
+    static final int HOP_SETTLE = 3;
+    /** How much of its sideways speed a landing keeps (frogs land and stop). */
+    static final double LANDING_KEEPS = 0.0;     // (0.15 slid on 3 to 5 ticks in the walk clip: the second course run)
 
     private static final EntityDataAccessor<Byte> DATA_ACTION = SynchedEntityData.defineId(BullfrogEntity.class, EntityDataSerializers.BYTE);
     /** Counts every action started, so a clip that plays once restarts for the next (a second hop, a second flick). */
@@ -94,6 +110,12 @@ public class BullfrogEntity extends Animal implements GeoEntity {
     private static final EntityDataAccessor<Boolean> DATA_MALE = SynchedEntityData.defineId(BullfrogEntity.class, EntityDataSerializers.BOOLEAN);
     /** Where its tongue reaches to (world), while it flicks. */
     private static final EntityDataAccessor<Vector3f> DATA_TONGUE_AT = SynchedEntityData.defineId(BullfrogEntity.class, EntityDataSerializers.VECTOR3);
+    /**
+     * The fly cloud it is aiming at or flicking into (its entity id; -1 none), and whether this flick catches a fly (the
+     * server's call, one in four misses): each player's computer picks the real fly and shows the catch or the dodge.
+     */
+    private static final EntityDataAccessor<Integer> DATA_TONGUE_CLOUD = SynchedEntityData.defineId(BullfrogEntity.class, EntityDataSerializers.INT);
+    private static final EntityDataAccessor<Boolean> DATA_TONGUE_HIT = SynchedEntityData.defineId(BullfrogEntity.class, EntityDataSerializers.BOOLEAN);
 
     private final AnimatableInstanceCache cache = GeckoLibUtil.createInstanceCache(this);
     /** Ticks until it is hungry again, and flies eaten since its last rest. */
@@ -101,8 +123,13 @@ public class BullfrogEntity extends Animal implements GeoEntity {
     int fliesEaten;
     /** Ticks into the action now under way (server), and until its next hop may start. */
     int actionTicks;
-    private int hopCooldown;
+    private int hopCooldown, landedAt;
+    /** The climb out of the water: from where, onto where (blocks, world). */
+    @Nullable
+    private Vec3 climbFrom, climbTo;
     private boolean hopUp;
+    /** This hop's forward push each tick of its flight (blocks a tick). */
+    private double hopPush;
     /** Ticks until a male calls again (night and rain only). */
     int callIn;
     // client: the action last seen (to restart its clip) and when it began
@@ -119,7 +146,7 @@ public class BullfrogEntity extends Animal implements GeoEntity {
 
     public static AttributeSupplier.Builder createAttributes() {
         return Animal.createMobAttributes().add(Attributes.MAX_HEALTH, 10.0).add(Attributes.MOVEMENT_SPEED, 1.0)
-                .add(Attributes.ATTACK_DAMAGE, 2.0).add(Attributes.STEP_HEIGHT, 1.0);
+                .add(Attributes.ATTACK_DAMAGE, 2.0);     // Minecraft's own step (0.6): only a hop takes it up a block
     }
 
     @Override
@@ -139,6 +166,8 @@ public class BullfrogEntity extends Animal implements GeoEntity {
         builder.define(DATA_ACTION_ID, 0);
         builder.define(DATA_MALE, true);
         builder.define(DATA_TONGUE_AT, new Vector3f());
+        builder.define(DATA_TONGUE_CLOUD, -1);
+        builder.define(DATA_TONGUE_HIT, false);
     }
 
     // --- what it is ----------------------------------------------------------------------------------------------------
@@ -189,7 +218,7 @@ public class BullfrogEntity extends Animal implements GeoEntity {
     /** Busy with something its legs must not walk out of (a lunge, a flick, a call, digging; a hop in the air is the legs' own). */
     public boolean busy() {
         byte a = action();
-        return a != NONE && a != HOP && a != PUFF;
+        return a != NONE && a != HOP && a != HOP_DIVE && a != PUFF && a != STALK;
     }
 
     public boolean isDug() {
@@ -199,13 +228,107 @@ public class BullfrogEntity extends Animal implements GeoEntity {
 
     /** Whether a new hop may start: on the ground, not busy, rested from the last. */
     boolean mayHop() {
-        return onGround() && !busy() && action() != HOP && hopCooldown <= 0;
+        return onGround() && !busy() && action() != HOP && action() != HOP_DIVE && hopCooldown <= 0;
     }
 
-    /** A hop toward where it faces (its legs ask; up a block if the way climbs). */
-    void startHop(boolean up) {
+    /**
+     * A hop toward where it faces (its legs ask; up a block if the way climbs). One that will come down in the water is
+     * a dive (the polish's step 5: nose down, arms forward, into the water, not onto its hands).
+     */
+    void startHop(boolean up, double far) {
         hopUp = up;
-        act(HOP);
+        landedAt = 0;
+        double reach = Mth.clamp(far + 0.1, HOP_SHORTEST * getScale(), HOP_LONGEST * getScale());
+        hopPush = reach / HOP_FLIGHT_TICKS;
+        act(!up && landsInWater(reach) ? HOP_DIVE : HOP);
+    }
+
+    /**
+     * Out of the water onto a bank (the polish's step 5, a move of its own as the engine's monitor climbs are): over
+     * {@link #CLIMB_TICKS} the game carries it up (most of the rise in the first {@link #CLIMB_RISE} of the move) and
+     * then forward onto the bank (from {@link #CLIMB_ON} of it), in step with the climb_out clip: arms onto the bank,
+     * the pull, the kick, sitting.
+     */
+    static final int CLIMB_TICKS = 16;
+    static final double CLIMB_RISE = 0.6, CLIMB_ON = 0.4;
+    /**
+     * How high a bank it hauls itself out onto (blocks over its feet as it floats: a bank about level with the water;
+     * the user, 2026-11-20: African bullfrogs are too heavy to climb, so a bank a block over the water keeps it in, and
+     * it gets out where the bank is low), and how far onto it it ends (at a male's size).
+     */
+    static final double CLIMB_HIGHEST = 0.9, CLIMB_ONTO = 0.4;
+
+    /**
+     * Where a climb out onto the bank ahead (toward x, z) would end: the bank's top a little way onto it, if the bank is
+     * right in front of it, its top over the water and within {@link #CLIMB_HIGHEST}, with room for it there.
+     */
+    @Nullable
+    Vec3 bankAhead(double x, double z) {
+        double dx = x - getX(), dz = z - getZ();
+        double flat = Math.sqrt(dx * dx + dz * dz);
+        if (flat < 0.05) {
+            return null;
+        }
+        dx /= flat;
+        dz /= flat;
+        double edge = getBbWidth() * 0.5 + 0.35;      // a little ahead of its nose: before it bumps (and steps up)
+        BlockPos front = BlockPos.containing(getX() + dx * edge, getY(), getZ() + dz * edge);
+        for (int up = 0; up <= 2; up++) {
+            BlockPos at = front.above(up);
+            var shape = level().getBlockState(at).getCollisionShape(level(), at);
+            if (shape.isEmpty()) {
+                continue;
+            }
+            double top = at.getY() + shape.max(net.minecraft.core.Direction.Axis.Y);
+            BlockPos over = BlockPos.containing(getX() + dx * edge, top + 0.05, getZ() + dz * edge);
+            if (top - getY() < 0.2 || top - getY() > CLIMB_HIGHEST || !level().getBlockState(over).getCollisionShape(level(), over).isEmpty()
+                    || level().getFluidState(over).is(FluidTags.WATER) || !level().getBlockState(over.above()).getCollisionShape(level(), over.above()).isEmpty()) {
+                continue;
+            }
+            double onto = edge + CLIMB_ONTO * getScale();
+            return new Vec3(getX() + dx * onto, top, getZ() + dz * onto);
+        }
+        return null;
+    }
+
+    /** Starts the climb out onto that spot. */
+    void climbOut(Vec3 to) {
+        climbFrom = position();
+        climbTo = to;
+        float yaw = (float) (Mth.atan2(to.z - getZ(), to.x - getX()) * Mth.RAD_TO_DEG) - 90.0F;
+        setYRot(yaw);
+        yBodyRot = yaw;
+        yHeadRot = yaw;
+        setNoGravity(true);
+        act(CLIMB_OUT);
+    }
+
+    private void climbTick() {
+        if (climbFrom == null || climbTo == null) {
+            stopActing();
+            setNoGravity(false);
+            return;
+        }
+        double u = Math.min(1.0, actionTicks / (double) CLIMB_TICKS);
+        double rise = Mth.clamp(u / CLIMB_RISE, 0, 1), on = Mth.clamp((u - CLIMB_ON) / (1 - CLIMB_ON), 0, 1);
+        rise = rise * rise * (3 - 2 * rise);
+        on = on * on * (3 - 2 * on);
+        setPos(climbFrom.x + (climbTo.x - climbFrom.x) * on, climbFrom.y + (climbTo.y - climbFrom.y) * rise,
+                climbFrom.z + (climbTo.z - climbFrom.z) * on);
+        setDeltaMovement(Vec3.ZERO);
+        if (u >= 1.0) {
+            climbFrom = climbTo = null;
+            setNoGravity(false);
+            stopActing();
+            hopCooldown = 6;
+        }
+    }
+
+    /** Whether a hop this long from here comes down in the water: water where it lands, nothing solid on top of it. */
+    boolean landsInWater(double ahead) {
+        float yaw = getYRot() * Mth.DEG_TO_RAD;
+        BlockPos at = BlockPos.containing(getX() - Mth.sin(yaw) * ahead, getY() - 0.2, getZ() + Mth.cos(yaw) * ahead);
+        return level().getFluidState(at).is(FluidTags.WATER) && level().getBlockState(at).getCollisionShape(level(), at).isEmpty();
     }
 
     /** Where its tongue reaches to now (client: for the rope), while it flicks. */
@@ -216,6 +339,44 @@ public class BullfrogEntity extends Animal implements GeoEntity {
 
     void setTongueAt(Vec3 at) {
         entityData.set(DATA_TONGUE_AT, new Vector3f((float) at.x, (float) at.y, (float) at.z));
+    }
+
+    /** The fly cloud it aims at or flicks into, or none (its entity id on every computer). */
+    @Nullable
+    public FlyCloudEntity tongueCloud() {
+        int id = entityData.get(DATA_TONGUE_CLOUD);
+        return id >= 0 && level().getEntity(id) instanceof FlyCloudEntity cloud ? cloud : null;
+    }
+
+    void setTongueCloud(@Nullable FlyCloudEntity cloud) {
+        entityData.set(DATA_TONGUE_CLOUD, cloud == null ? -1 : cloud.getId());
+    }
+
+    /** Whether the flick under way catches its fly (the server's call). */
+    public boolean tongueHits() {
+        return entityData.get(DATA_TONGUE_HIT);
+    }
+
+    void setTongueHit(boolean hit) {
+        entityData.set(DATA_TONGUE_HIT, hit);
+    }
+
+    /**
+     * Client only (the renderer's, unknown here): the fly of the cloud's swarm its eyes are on and its tongue goes for,
+     * the action id it was picked for, where the tongue met it or where it dodged from, and the head's tilt toward it.
+     */
+    @Nullable
+    public Object clientFly;
+    public int clientFlyFor = -1;
+    @Nullable
+    public Vec3 clientContact;
+    public boolean clientCaught;
+    public float clientHeadPitch;
+    public long clientHeadTime;
+
+    /** The id of the action now under way (counts up with each one started; the players' computers see it too). */
+    public int actionId() {
+        return entityData.get(DATA_ACTION_ID);
     }
 
     /** Ticks since the action now under way began, as the players' computers see it (for the tongue's rope). */
@@ -269,7 +430,9 @@ public class BullfrogEntity extends Animal implements GeoEntity {
         }
         actionTicks++;
         byte a = action();
-        if (a == HOP) {
+        if (a == CLIMB_OUT) {
+            climbTick();
+        } else if (a == HOP || a == HOP_DIVE) {
             hopTick();
         } else if (a == LEAP && (actionTicks > 4 && (onGround() || isInWater()) || actionTicks > 60)) {
             stopActing();
@@ -297,12 +460,23 @@ public class BullfrogEntity extends Animal implements GeoEntity {
 
     /** The hop: the kick at its tick, then the flight; done on landing. */
     private void hopTick() {
-        if (actionTicks == HOP_KICK) {
+        if (actionTicks >= HOP_KICK && landedAt == 0) {
+            // the kick, then its forward push held through the flight (no air drag, nothing lost against a step's side)
             float yaw = getYRot() * Mth.DEG_TO_RAD;
-            double forward = HOP_FORWARD * getScale() * (hopUp ? 0.8 : 1.0);
-            setDeltaMovement(-Mth.sin(yaw) * forward, hopUp ? HOP_UP_STEP : HOP_UP, Mth.cos(yaw) * forward);
+            double up = actionTicks == HOP_KICK ? (hopUp ? HOP_UP_STEP : HOP_UP) : getDeltaMovement().y;
+            setDeltaMovement(-Mth.sin(yaw) * hopPush, up, Mth.cos(yaw) * hopPush);
             hasImpulse = true;
-        } else if (actionTicks > HOP_KICK + 2 && (onGround() || isInWater()) || actionTicks > 40) {
+        }
+        if (actionTicks == HOP_KICK) {
+            return;
+        } else if (landedAt == 0 && (actionTicks > HOP_KICK + 2 && (action() == HOP_DIVE ? isInWater() : onGround() || isInWater())
+                || actionTicks > 40)) {     // (a dive grazing the bank's edge on its way out is not a landing)
+            landedAt = actionTicks;
+            Vec3 v = getDeltaMovement();
+            setDeltaMovement(v.x * LANDING_KEEPS, v.y, v.z * LANDING_KEEPS);
+        }
+        if (landedAt > 0 && (actionTicks >= landedAt + HOP_SETTLE || isInWater())) {
+            landedAt = 0;
             stopActing();
             hopCooldown = 4 + random.nextInt(10);
         }
@@ -474,7 +648,10 @@ public class BullfrogEntity extends Animal implements GeoEntity {
     // --- animations --------------------------------------------------------------------------------------------------
     private static final RawAnimation IDLE = RawAnimation.begin().thenLoop("idle");
     private static final RawAnimation WALK = RawAnimation.begin().thenLoop("walk");
+    private static final RawAnimation STALK_CLIP = RawAnimation.begin().thenLoop("stalk");
     private static final RawAnimation HOP_CLIP = RawAnimation.begin().thenPlay("hop");
+    private static final RawAnimation CLIMB_OUT_CLIP = RawAnimation.begin().thenPlayAndHold("climb_out");
+    private static final RawAnimation HOP_DIVE_CLIP = RawAnimation.begin().thenPlayAndHold("hop_dive");
     private static final RawAnimation LEAP_CLIP = RawAnimation.begin().thenPlayAndHold("leap");
     private static final RawAnimation SWIM = RawAnimation.begin().thenLoop("swim");
     private static final RawAnimation FLOAT = RawAnimation.begin().thenLoop("float");
@@ -487,7 +664,12 @@ public class BullfrogEntity extends Animal implements GeoEntity {
     private static final RawAnimation DUG_CLIP = RawAnimation.begin().thenLoop("dug");
     private static final RawAnimation DIG_OUT_CLIP = RawAnimation.begin().thenPlay("dig_out");
     /** The walk clip's planted feet match this pace (blocks a tick at a male's size: 5.1 model pixels a second). */
-    static final double WALK_CLIP_PACE = 0.10 / 20.0;
+    public static final double WALK_CLIP_PACE = 0.10 / 20.0;
+    /**
+     * The creep (the polish's step 4): the stalk clip's planted feet slide back 6.7 model pixels a second, 0.0067 blocks
+     * a tick for a male (tools/bullfrog_models.py, STALK_*); its legs move it at exactly this, the clip at its own speed.
+     */
+    public static final double STALK_CLIP_PACE = 0.0067;
     /** The swim clip's kick is made for this pace (blocks a tick at a male's size; my pick). */
     static final double SWIM_CLIP_PACE = 0.05;
 
@@ -542,7 +724,9 @@ public class BullfrogEntity extends Animal implements GeoEntity {
         int id = entityData.get(DATA_ACTION_ID);
         if (id != animatedActionId) {
             animatedActionId = id;
-            player.forceAnimationReset();       // a new action: its clip from the start, even the same clip again
+            if (action() != AIM) {
+                player.forceAnimationReset();   // a new action: its clip from the start, even the same clip again
+            }
         }
         double size = Math.max(0.3, getScale());
         double dx = getX() - xo, dz = getZ() - zo, dy = getY() - yo;
@@ -552,6 +736,13 @@ public class BullfrogEntity extends Animal implements GeoEntity {
                 player.setAnimationSpeed(HOP_CLIP_FLIGHT * 20.0 / HOP_FLIGHT_TICKS);
                 return state.setAndContinue(HOP_CLIP);
             }
+            case CLIMB_OUT -> {
+                return state.setAndContinue(CLIMB_OUT_CLIP);
+            }
+            case HOP_DIVE -> {
+                player.setAnimationSpeed(HOP_CLIP_FLIGHT * 20.0 / HOP_FLIGHT_TICKS);
+                return state.setAndContinue(HOP_DIVE_CLIP);
+            }
             case LEAP -> {
                 return state.setAndContinue(LEAP_CLIP);
             }
@@ -560,6 +751,10 @@ public class BullfrogEntity extends Animal implements GeoEntity {
             }
             case TONGUE -> {
                 return state.setAndContinue(TONGUE_CLIP);
+            }
+            case STALK -> {
+                // its legs move it at the clip's own pace (BullfrogMoveControl), so the clip plays at its own speed
+                return state.setAndContinue(STALK_CLIP);
             }
             case PUFF -> {
                 return state.setAndContinue(PUFF_CLIP);

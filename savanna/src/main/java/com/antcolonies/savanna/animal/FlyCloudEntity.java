@@ -61,11 +61,6 @@ public class FlyCloudEntity extends Mob {
     static final double KEEP_NEAR = 64.0;
 
     private static final EntityDataAccessor<Integer> DATA_FLIES = SynchedEntityData.defineId(FlyCloudEntity.class, EntityDataSerializers.INT);
-    /** Where a bullfrog's tongue reaches into the cloud (world), while one does (the renderer steers a fly to it). */
-    private static final EntityDataAccessor<org.joml.Vector3f> DATA_TONGUE = SynchedEntityData.defineId(FlyCloudEntity.class, EntityDataSerializers.VECTOR3);
-    private static final EntityDataAccessor<Boolean> DATA_TONGUE_ON = SynchedEntityData.defineId(FlyCloudEntity.class, EntityDataSerializers.BOOLEAN);
-    /** Ticks a tongue may stay aimed at it before it is let go (a frog interrupted mid-flick). */
-    private int tongueLeft;
 
     /** The players' computers start the cloud's buzz through this (set by the client's setup; nothing on a server). */
     public static Consumer<FlyCloudEntity> startBuzz = cloud -> { };
@@ -101,8 +96,6 @@ public class FlyCloudEntity extends Mob {
     protected void defineSynchedData(SynchedEntityData.Builder builder) {
         super.defineSynchedData(builder);
         builder.define(DATA_FLIES, 8);
-        builder.define(DATA_TONGUE, new org.joml.Vector3f());
-        builder.define(DATA_TONGUE_ON, false);
     }
 
     /** How many flies it holds now. */
@@ -116,39 +109,16 @@ public class FlyCloudEntity extends Mob {
     }
 
     /**
-     * A bullfrog's tongue reaches into the cloud here (prey plan step 3): the players' computers steer the fly nearest it
-     * onto the tongue's sticky pad, and then wherever the tongue is aimed next (back into the frog's mouth).
+     * A fly caught by a bullfrog's tongue is swallowed: one fly fewer (it comes back in a minute or so). Which fly is
+     * each player's computer's own pick (the frog's renderer aims the tongue at a real fly of the swarm).
      */
-    public void aimTongue(Vec3 at) {
-        entityData.set(DATA_TONGUE, new org.joml.Vector3f((float) at.x, (float) at.y, (float) at.z));
-        entityData.set(DATA_TONGUE_ON, true);
-        tongueLeft = 20;
-    }
-
-    /** The tongue missed (or was pulled back empty): the fly on it zips off into the cloud again. */
-    public void clearTongue() {
-        entityData.set(DATA_TONGUE_ON, false);
-    }
-
-    /** The fly on the tongue is swallowed: one fly fewer (it comes back in a minute or so). */
     public void takeFly() {
-        clearTongue();
         if (flies() > 0) {
             setFlies(flies() - 1);
             if (refill <= 0) {
                 refill = REFILL_TICKS;
             }
         }
-    }
-
-    /** Where a tongue reaches into the cloud now, or none. */
-    @Nullable
-    public Vec3 tongue() {
-        if (!entityData.get(DATA_TONGUE_ON)) {
-            return null;
-        }
-        org.joml.Vector3f v = entityData.get(DATA_TONGUE);
-        return new Vec3(v.x(), v.y(), v.z());
     }
 
     /** How many it holds when full. */
@@ -207,9 +177,6 @@ public class FlyCloudEntity extends Mob {
         if (far > 1.0E-4) {
             Vec3 step = far > MOST_SPEED ? to.scale(MOST_SPEED / far) : to;
             setPos(getX() + step.x, getY() + step.y, getZ() + step.z);
-        }
-        if (tongueLeft > 0 && --tongueLeft == 0) {
-            clearTongue();
         }
         int now = flies();
         if (now < most && --refill <= 0) {

@@ -22,12 +22,12 @@ import bullfrog_models as bm  # noqa: E402
 WATER = ('swim', 'float')
 DIG = ('dig_in', 'dug', 'dig_out')
 # When each clip means the frog to be on the ground (parts of the clip; the hop and leap fly in between)
-ON_GROUND = {'leap': ((0.0, 0.7),)}          # the leap ends in the water
+ON_GROUND = {'leap': ((0.0, 0.7),), 'hop_dive': ((0.0, 0.6),), 'climb_out': ((0.9, 1.0),)}   # it ends on the bank          # the leap ends in the water
 # The hop and the leap are thrown by the game (docs/plans/prey-fish-and-frogs.md): it launches the frog as the kick
 # starts and lands it as the clip's flight ends (parts of the clip), on an arc under Minecraft's gravity (32 blocks a
 # second, squared). The checks and the strips raise the frog by that arc, as the game will, so the ground they judge
 # against is the real one. A male is drawn at 0.32: one model pixel is 0.02 blocks.
-FLIGHT = {'hop': (0.12, 0.6), 'leap': (0.12, 0.7)}
+FLIGHT = {'hop': (0.12, 0.6), 'hop_dive': (0.12, 0.6), 'leap': (0.12, 0.7)}
 PX_PER_BLOCK = 16 / 0.32
 
 

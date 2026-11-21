@@ -37,6 +37,13 @@ final class BullfrogGoals {
 
     /** How far its lunge reaches from its mouth, and its tongue (blocks at a male's size; the tongue the user's 2). */
     static final double LUNGE_REACH = 1.5, TONGUE_REACH = 2.0;
+    /**
+     * The creep (the polish's step 4; my picks): prey on land seen within this many blocks of its mouth (at a male's
+     * size) but past the lunge's reach gets a slow creep first; it gives up after this many ticks (the creep covers
+     * about 1.7 blocks in that time) or if the prey gets this much farther than where it started creeping.
+     */
+    static final double STALK_REACH = 3.0, STALK_LOSE = 1.5;
+    static final int STALK_TICKS = 400;
     /** How near a monitor or a grown crocodile sends it leaping for the water, and how far it looks for water. */
     static final double DANGER_NEAR = 5.0;
     static final int WATER_REACH = 6;
@@ -48,6 +55,11 @@ final class BullfrogGoals {
     static final float TONGUE_MISS = 0.25F;
     /** The tongue clip: the pad at the fly on this tick (0.15 s), back in the mouth on this one, the clip over on this. */
     static final int TONGUE_OUT = 3, TONGUE_BACK = 7, TONGUE_END = 14;
+    /**
+     * The aim before a flick (ticks: eyes on the fly, the head tipping up to it), the wait between one flick and the next
+     * while flies stay in reach (20 to 40 ticks: 1 to 2 s), and the most flicks in one go (my picks).
+     */
+    static final int AIM_TICKS = 8, FLICK_GAP_MIN = 12, FLICK_GAP_MORE = 20, MOST_FLICKS = 8;
     /** The lunge: the push on this tick, the jaws shut on this one, the clip (0.8 s) over on this. */
     static final int LUNGE_PUSH = 2, LUNGE_SNAP = 6, LUNGE_END = 16;
     /** Digging in and out (the clips' 3 s and 1.2 s). */
@@ -222,12 +234,16 @@ final class BullfrogGoals {
     /**
      * A hungry frog that is out (not dug in) lunges at something small passing within {@link #LUNGE_REACH} blocks of
      * its mouth: a barb in the water, a snail, a young crab. Mouth wide, a push forward, the jaws shut; caught, it is
-     * swallowed (the clip's hands push it in) and the frog is fed.
+     * swallowed (the clip's hands push it in) and the frog is fed. Prey on land seen a little farther off, within
+     * {@link #STALK_REACH}, gets a slow creep first (the polish's step 4: real frogs creep up on prey just out of reach,
+     * body low, eyes fixed), then the lunge; a frog in the water only waits (it floats, and lunges at what comes close).
      */
     static final class LungeGoal extends Goal {
         private final BullfrogEntity frog;
         @Nullable
         private LivingEntity prey;
+        private int stalked;
+        private double startFar;
 
         LungeGoal(BullfrogEntity frog) {
             this.frog = frog;
@@ -244,18 +260,27 @@ final class BullfrogGoals {
             return e instanceof SnailEntity && !e.hasCustomName() || e instanceof CrabEntity crab && crab.life().isYoung() && !crab.hasCustomName();
         }
 
+        private static Vec3 middle(LivingEntity e) {
+            return e.position().add(0, e.getBbHeight() * 0.5, 0);
+        }
+
+        /** Prey worth creeping up on: on land (not in the water: a barb or a snail on the river bed is only ambushed). */
+        private boolean stalkable(LivingEntity e) {
+            return !e.isInWater() && frog.onGround() && !frog.isInWater();
+        }
+
         @Override
         public boolean canUse() {
             if (!frog.isHungry() || frog.isDug() || frog.busy() || !now(frog, 4)) {
                 return false;
             }
             Vec3 mouth = frog.mouth();
-            double reach = LUNGE_REACH * frog.getScale();
+            double reach = LUNGE_REACH * frog.getScale(), far = STALK_REACH * frog.getScale();
             prey = null;
             double best = Double.MAX_VALUE;
-            for (LivingEntity e : frog.level().getEntitiesOfClass(LivingEntity.class, frog.getBoundingBox().inflate(reach + 0.5), LungeGoal::isPrey)) {
-                double d = e.position().add(0, e.getBbHeight() * 0.5, 0).distanceTo(mouth);
-                if (d < reach && d < best && clearFromMouth(frog, e.position().add(0, e.getBbHeight() * 0.5, 0))) {
+            for (LivingEntity e : frog.level().getEntitiesOfClass(LivingEntity.class, frog.getBoundingBox().inflate(far + 0.5), LungeGoal::isPrey)) {
+                double d = middle(e).distanceTo(mouth);
+                if ((d < reach || d < far && stalkable(e)) && d < best && clearFromMouth(frog, middle(e))) {
                     best = d;
                     prey = e;
                 }
@@ -266,13 +291,24 @@ final class BullfrogGoals {
         @Override
         public void start() {
             frog.getNavigation().stop();
+            stalked = 0;
+            startFar = middle(prey).distanceTo(frog.mouth());
+            if (startFar < LUNGE_REACH * frog.getScale()) {
+                lunge();
+            } else {
+                frog.act(BullfrogEntity.STALK);
+            }
+        }
+
+        private void lunge() {
             turnTo(frog, prey.position(), 360);
             frog.act(BullfrogEntity.LUNGE);
         }
 
         @Override
         public boolean canContinueToUse() {
-            return frog.action() == BullfrogEntity.LUNGE && frog.actionTicks < LUNGE_END;
+            byte a = frog.action();
+            return a == BullfrogEntity.STALK || a == BullfrogEntity.LUNGE && frog.actionTicks < LUNGE_END;
         }
 
         @Override
@@ -282,6 +318,10 @@ final class BullfrogGoals {
 
         @Override
         public void tick() {
+            if (frog.action() == BullfrogEntity.STALK) {
+                stalkTick();
+                return;
+            }
             int t = frog.actionTicks;
             if (prey == null) {
                 return;
@@ -294,7 +334,7 @@ final class BullfrogGoals {
                 frog.hasImpulse = true;
             } else if (t == LUNGE_SNAP) {
                 Vec3 mouth = frog.mouth();
-                double near = prey.position().add(0, prey.getBbHeight() * 0.5, 0).distanceTo(mouth);
+                double near = middle(prey).distanceTo(mouth);
                 if (prey.isAlive() && near < 0.6 * frog.getScale() + prey.getBbWidth() * 0.5 + 0.2) {
                     prey.discard();         // swallowed whole
                     frog.ateMeal();
@@ -304,9 +344,27 @@ final class BullfrogGoals {
             }
         }
 
+        /** The creep: toward the prey at the clip's pace (its legs'), the lunge once it is in reach; or it gives up. */
+        private void stalkTick() {
+            stalked++;
+            double d = prey == null ? Double.MAX_VALUE : middle(prey).distanceTo(frog.mouth());
+            if (prey == null || !prey.isAlive() || stalked > STALK_TICKS || frog.isInWater() || prey.isInWater()
+                    || d > startFar + STALK_LOSE * frog.getScale() || frog.horizontalCollision || !clearFromMouth(frog, middle(prey))) {
+                frog.stopActing();          // lost it: sits again
+                return;
+            }
+            frog.getLookControl().setLookAt(prey, 10, 10);
+            if (d < LUNGE_REACH * frog.getScale()) {
+                lunge();
+                return;
+            }
+            frog.getMoveControl().setWantedPosition(prey.getX(), prey.getY(), prey.getZ(), 1.0);
+        }
+
         @Override
         public void stop() {
-            if (frog.action() == BullfrogEntity.LUNGE) {
+            byte a = frog.action();
+            if (a == BullfrogEntity.LUNGE || a == BullfrogEntity.STALK) {
                 frog.stopActing();
             }
             prey = null;
@@ -316,19 +374,21 @@ final class BullfrogGoals {
     // --- 1: the tongue at flies ----------------------------------------------------------------------------------------
 
     /**
-     * A hungry frog under a fly cloud flicks its tongue (the user's 2 blocks, at a male's size) at the cloud's nearest
-     * flies when they sink within reach, in front of it and above it along a clear line: it turns to face them, the
-     * tongue shoots out (the renderer's rope), one fly in four gets away, a caught one rides the tongue back into its
-     * mouth. The flies' places are only on the players' computers, so the server decides: a fly "comes within reach" by
-     * chance every few seconds while the cloud's edge is within reach.
+     * A hungry frog under a fly cloud (the polish's step 3, 2026-11-20: the tongue aims at one fly). When the cloud sinks
+     * within reach (the user's 2 blocks, at a male's size), in front of it and above it along a clear line, it turns to
+     * face it and fixes its eyes on one fly (AIM: the head tips up to it), then flicks. The flies fly only on the players'
+     * computers, so the server decides when and whether a flick catches (one in four misses) and each computer picks the
+     * real fly: the tongue's tip follows that fly as it shoots out and the fly rides back on the pad, or dodges at the
+     * last moment. While flies stay in reach and it is hungry it flicks again {@link #FLICK_GAP_MIN} to
+     * {@link #FLICK_GAP_MIN} + {@link #FLICK_GAP_MORE} ticks later, until a few fill it.
      */
     static final class TongueGoal extends Goal {
         private final BullfrogEntity frog;
         @Nullable
         private FlyCloudEntity cloud;
         private Vec3 at = Vec3.ZERO;
-        private boolean flicked, caught;
-        private int turning;
+        private boolean caught;
+        private int ticks, aimed, flicks, wait;
 
         TongueGoal(BullfrogEntity frog) {
             this.frog = frog;
@@ -376,14 +436,22 @@ final class BullfrogGoals {
         @Override
         public void start() {
             frog.getNavigation().stop();
-            flicked = false;
-            caught = false;
-            turning = 0;
+            flicks = 0;
+            ticks = 0;
+            aim(0);
+        }
+
+        /** Eyes on a fly (the head tips up to it on the players' computers), the next flick after this many ticks at least. */
+        private void aim(int pause) {
+            aimed = 0;
+            wait = pause;
+            frog.setTongueCloud(cloud);
+            frog.act(BullfrogEntity.AIM);
         }
 
         @Override
         public boolean canContinueToUse() {
-            return cloud != null && (!flicked ? turning < 20 : frog.action() == BullfrogEntity.TONGUE && frog.actionTicks < TONGUE_END);
+            return cloud != null && ++ticks < 400;
         }
 
         @Override
@@ -396,46 +464,55 @@ final class BullfrogGoals {
             if (cloud == null) {
                 return;
             }
-            if (!flicked) {
-                // it turns to face the flies first (a frog cannot flick sideways), then shoots
-                turning++;
-                if (turnTo(frog, at, 30) < 12) {
+            if (frog.action() == BullfrogEntity.AIM) {
+                // it turns to face the flies (a frog cannot flick sideways), holds its eyes on one, then shoots
+                aimed++;
+                boolean facing = turnTo(frog, at, 30) < 12;
+                if (aimed > 20 + wait) {
+                    cloud = null;       // never came round to face them
+                    return;
+                }
+                if (facing && aimed >= AIM_TICKS + wait) {
                     at = inReach(frog, cloud);
-                    if (at == null || cloud.flies() <= 0) {
+                    if (at == null || !cloud.isAlive() || cloud.flies() <= 0) {
                         cloud = null;
                         return;
                     }
-                    flicked = true;
+                    caught = frog.getRandom().nextFloat() >= TONGUE_MISS;
                     frog.setTongueAt(at);
+                    frog.setTongueHit(caught);
                     frog.act(BullfrogEntity.TONGUE);
-                    cloud.aimTongue(at);
                     frog.playSound(SoundEvents.FROG_TONGUE, 1.0F, 0.8F);
+                    flicks++;
                 }
                 return;
             }
+            if (frog.action() != BullfrogEntity.TONGUE) {
+                cloud = null;           // something else took over
+                return;
+            }
             int t = frog.actionTicks;
-            if (t == TONGUE_OUT) {
-                caught = frog.getRandom().nextFloat() >= TONGUE_MISS && cloud.isAlive() && cloud.flies() > 0;
-                if (caught) {
-                    cloud.aimTongue(frog.mouth());      // the fly rides the tongue back into its mouth
-                } else {
-                    cloud.clearTongue();                // missed: the fly zips off
-                }
-            } else if (t == TONGUE_BACK && caught) {
+            if (t == TONGUE_BACK && caught && cloud.isAlive() && cloud.flies() > 0) {
                 cloud.takeFly();
                 frog.ateFly();
                 frog.playSound(SoundEvents.FROG_EAT, 0.8F, 1.1F);
+            } else if (t >= TONGUE_END) {
+                // flick after flick while it is hungry and the flies stay in reach
+                if (frog.isHungry() && flicks < MOST_FLICKS && cloud.isAlive() && cloud.flies() > 0 && (at = inReach(frog, cloud)) != null) {
+                    aim(FLICK_GAP_MIN + frog.getRandom().nextInt(FLICK_GAP_MORE));
+                } else {
+                    cloud = null;
+                }
             }
         }
 
         @Override
         public void stop() {
-            if (frog.action() == BullfrogEntity.TONGUE) {
+            byte a = frog.action();
+            if (a == BullfrogEntity.TONGUE || a == BullfrogEntity.AIM) {
                 frog.stopActing();
             }
-            if (cloud != null && flicked && !caught) {
-                cloud.clearTongue();
-            }
+            frog.setTongueCloud(null);
             cloud = null;
         }
     }
@@ -742,8 +819,8 @@ final class BullfrogGoals {
 
         @Override
         public boolean canUse() {
-            if (frog.busy() || frog.isDug() || frog.getRandom().nextInt(600) != 0) {
-                return false;
+            if (frog.busy() || frog.isDug() || !frog.getNavigation().isDone() || frog.getRandom().nextInt(600) != 0) {
+                return false;       // (never over a route under way: the polish's step 1 test caught it taking over one)
             }
             BlockPos water = nearestWater(frog, 6, null);
             Vec3 to;

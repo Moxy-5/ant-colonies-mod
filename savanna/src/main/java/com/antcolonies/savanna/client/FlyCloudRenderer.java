@@ -102,15 +102,15 @@ public class FlyCloudRenderer extends EntityRenderer<FlyCloudEntity> {
         }
         Vec3 middle = cloud.getPosition(partialTick);
         FlySwarm swarm = swarm(cloud);
-        swarm.update(cloud.level(), middle, (cloud.tickCount + partialTick) / 20.0, cloud.flies(), cloud.tongue());
+        swarm.update(cloud.level(), middle, (cloud.tickCount + partialTick) / 20.0, cloud.flies());
         Vec3 eye = entityRenderDispatcher.camera.getPosition();
         // bodies, then wings, each look in turn
         for (int pass = 0; pass < 4; pass++) {
             boolean wings = pass >= 2, lookB = pass % 2 == 1;
             VertexConsumer buffer = null;
             for (FlySwarm.Fly f : swarm.flies) {
-                if (f.lookB != lookB) {
-                    continue;
+                if (f.lookB != lookB || f.mode == FlySwarm.Mode.ON_TONGUE) {
+                    continue;           // a fly on a bullfrog's tongue is drawn by the frog, at the pad
                 }
                 double far = eye.distanceToSqr(f.drawX, f.drawY, f.drawZ);
                 if (far > DRAWN_WITHIN * DRAWN_WITHIN) {
@@ -136,6 +136,35 @@ public class FlyCloudRenderer extends EntityRenderer<FlyCloudEntity> {
             }
         }
         super.render(cloud, yaw, partialTick, poseStack, buffers, packedLight);
+    }
+
+    /**
+     * One fly drawn by someone else (a bullfrog draws the fly on its tongue's pad, at the pad's place this frame, so it
+     * never lags behind the tongue): its body and its wings, posed as in the cloud, the poseStack at {@code origin}.
+     */
+    static void drawOne(PoseStack poseStack, MultiBufferSource buffers, FlySwarm swarm, FlySwarm.Fly f, Vec3 origin, Vec3 eye, int light) {
+        BakedGeoModel model = model();
+        if (model == null) {
+            return;
+        }
+        double far = eye.distanceToSqr(f.drawX, f.drawY, f.drawZ);
+        if (far > DRAWN_WITHIN * DRAWN_WITHIN) {
+            return;
+        }
+        ResourceLocation texture = f.lookB ? HOUSE : BOTTLE;
+        for (int pass = 0; pass < 2; pass++) {
+            boolean wings = pass == 1;
+            VertexConsumer buffer = buffers.getBuffer(wings ? RenderType.entityTranslucent(texture) : RenderType.entityCutoutNoCull(texture));
+            poseStack.pushPose();
+            poseStack.translate(f.drawX - origin.x, f.drawY - origin.y, f.drawZ - origin.z);
+            poseStack.mulPose(Axis.YP.rotation((float) f.yaw));
+            poseStack.scale(SCALE, SCALE, SCALE);
+            poseFly(model, f, swarm);
+            for (GeoBone bone : model.topLevelBones()) {
+                drawBone(poseStack, bone, buffer, wings, far < LEGS_WITHIN * LEGS_WITHIN, wings ? WINGS_FLYING : SOLID, light);
+            }
+            poseStack.popPose();
+        }
     }
 
     /**

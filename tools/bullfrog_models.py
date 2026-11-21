@@ -666,10 +666,14 @@ BODY_PIVOT = (0.0, 6.0, 0.0)
 IDLE_LEN, WALK_LEN, HOP_LEN, LEAP_LEN, SWIM_LEN, FLOAT_LEN = 6.0, 1.4, 0.8, 1.1, 1.0, 3.0
 TONGUE_LEN, TONGUE_FLIP, TONGUE_STRETCH, TONGUE_GAPE, TONGUE_LEAN = 0.7, -3.5, 3.9, 38.0, 4.0
 CALL_LEN, PUFF_LEN, ATTACK_LEN, DEATH_LEN, DIG_LEN, DUG_LEN, DIG_OUT_LEN = 3.0, 2.0, 0.8, 1.0, 3.0, 6.0, 1.2
+STALK_LEN, STALK_SWEEP, STALK_DUTY, STALK_LIFT = 1.0, 5.0, 0.75, -0.4   # the creep: long time down, body low; planted feet
+# slide back 5.0 px in 0.75 s = 6.7 px/s, 0.0067 blocks a tick for a male (BullfrogEntity.STALK_CLIP_PACE; my picks)
 WALK_SWEEP, WALK_DUTY, WALK_LIFT = 5.0, 0.7, 1.4       # each foot's sweep under the body, the time down, the body raised
 KNEE_OUT, ELBOW_OUT, KNEE_EASE = 1.6, 1.0, 2.5                         # knees and elbows pushed out, fully once a foot is 2.5 px from its rest (my picks, measured)
 BLINK_UP, BLINK_HOLD, BLINK_DOWN = 0.08, 0.06, 0.14       # the lids up, held shut, down (s; my picks: quick, a
                                                         # touch slower opening, as the crocodile's)
+L_OUT = 1.0              # the climb's pulling hands a little out from the chest (the elbows clear of it)
+CLIMB_LEN = 0.8           # the climb out of the water (BullfrogEntity.CLIMB_TICKS: 16)
 BLINK_LEN = BLINK_UP + BLINK_HOLD + BLINK_DOWN + 0.02
 DUG_DEPTH = 10.0                                        # how deep it sits dug in: the back and the eyes out
 
@@ -913,6 +917,30 @@ def clips():
         return p
     make('walk', WALK_LEN, walk, 30)
 
+    # stalk (the polish's step 4, 2026-11-20): prey seen just out of reach gets a slow creep before the lunge, as real
+    # frogs do. The walk's gait made low and careful: the body pressed down and nose a touch down, short slow steps
+    # with the feet barely lifted, little rocking, the head steady and the throat still (no breathing pumps: all eyes).
+    def stalk(t):
+        p = {}
+        u0 = t / STALK_LEN
+        w = 2 * math.pi * u0
+        P.body(p, pitch=-1.5 + 0.3 * math.sin(2 * w), roll=1.0 * math.sin(w - 0.6), lift=STALK_LIFT + 0.12 * math.sin(2 * w + 0.5))
+        for (kind, side), ph in order.items():
+            u = (u0 - ph) % 1.0
+            W = P.rest_end(kind, side)
+            if u < STALK_DUTY:
+                W[2] += STALK_SWEEP * (u / STALK_DUTY - 0.5)
+                F = None
+            else:
+                b = (u - STALK_DUTY) / (1 - STALK_DUTY)
+                W[2] += STALK_SWEEP * (0.5 - smooth(b))
+                W[1] += 1.2 * math.sin(math.pi * b)
+                F = turn_x((5 if kind == 'leg' else -8) * math.sin(math.pi * b))
+            P.limb(p, kind, side, W, F)
+        _face(p, t, gape=-2.0)
+        return p
+    make('stalk', STALK_LEN, stalk, 30)
+
     def jump(t, length, air_from, air_to, land_to, dive):
         """The hop and the leap: crouch, kick, fly stretched, land (the hop on its hands, then folding up; the leap nose
         down into the water, arms forward, held). Times in parts of the clip. Each limb is either planted (on the
@@ -970,6 +998,11 @@ def clips():
 
     P = _Poser()
     make('hop', HOP_LEN, lambda t: jump(t, HOP_LEN, 0.3, 0.6, 0.8, False), 40, False)
+    # hop_dive (the polish's step 5, 2026-11-20): a hop whose landing is water dives instead of landing on its hands:
+    # the same kick and flight, then nose down, arms forward, legs trailing (the leap's dive at a hop's size); holds its
+    # last pose until the water takes it (the float or the swim blends in)
+    P = _Poser()
+    make('hop_dive', HOP_LEN, lambda t: jump(t, HOP_LEN, 0.3, 0.6, 0.8, True), 40, 'hold')
     P = _Poser()
     make('leap', LEAP_LEN, lambda t: jump(t, LEAP_LEN, 0.25, 0.7, 0.85, True), 40, 'hold')
 
@@ -993,6 +1026,37 @@ def clips():
         _face(p, t)
         return p
     make('swim', SWIM_LEN, swim, 30)
+
+    # climb_out (the polish's step 5, 2026-11-20): out of the water onto a bank up to a block above it, a move of its
+    # own (the game carries the frog up, then forward onto the bank, over the clip's 0.8 s: BullfrogEntity.CLIMB_*). The
+    # arms reach up and forward onto the bank, the body tips up, the arms pull as the body comes up over them, the hind
+    # legs drawn up from the swim kick it on, then it folds into sitting.
+    P = _Poser()
+
+    def climb_out(t):
+        u = t / CLIMB_LEN
+        p = {}
+        pitch = _ramp(u, ((0.0, 4.0), (0.25, 26.0), (0.55, 20.0), (0.8, 5.0), (1.0, 0.0)))
+        P.body(p, pitch=pitch, lift=_ramp(u, ((0.0, 0.0), (0.6, 1.0), (1.0, 0.0))))
+        reach = _ramp(u, ((0.0, 0.0), (0.22, 1.0), (0.35, 1.0), (0.62, 0.0)))    # hands up and forward onto the bank
+        pull = _ramp(u, ((0.25, 0.0), (0.6, 1.0), (0.9, 0.0)))                  # and back under the chest
+        kick = _ramp(u, ((0.36, 0.0), (0.68, 1.0), (0.76, 1.0), (0.97, 0.0)))
+        sit = _ramp(u, ((0.74, 0.0), (1.0, 1.0)))
+        for s, side in SIDES:
+            ar = P.rest_end('arm', side)
+            W = [ar[0] + L_OUT * pull * (1 if s > 0 else -1), ar[1] + 9.0 * reach - 1.0 * pull, ar[2] - 7.0 * reach + 2.5 * pull]
+            P.limb(p, 'arm', side, W, turn_x(-30 * reach), in_body=True)
+            L = P.limbs['leg', side]
+            folded = [s * 13.0, 6.5, 12.0]                       # the swim's drawn-up legs
+            straight = [s * 9.0, 4.0, L['S'][2] + 0.97 * (L['l1'] + L['l2']) - 1.0]
+            rest = P.rest_end('leg', side)
+            swum = [folded[i] + (straight[i] - folded[i]) * kick for i in range(3)]
+            W = [swum[i] + (rest[i] - swum[i]) * sit for i in range(3)]
+            F = turn_y(-s * (130 + 50 * kick) * (1 - sit)) if sit < 0.999 else None
+            P.limb(p, 'leg', side, W, F, in_body=sit < 0.999)
+        _face(p, t, gape=-4.0 * reach)
+        return p
+    make('climb_out', CLIMB_LEN, climb_out, 40, 'hold')
 
     # float: at the surface, the legs spread out, a slow bob
     P = _Poser()
@@ -1179,14 +1243,17 @@ def WORKSHOP_CLIPS():
 # as tools/frog_check.py), the made size against the game's (a male drawn at 0.32), the water clips and their surface
 # (blocks at made size: the back and the eyes out), and a line about each clip.
 WORKSHOP_CLIP_INFO = {
-    'flight': {'hop': [0.12, 0.6], 'leap': [0.12, 0.7]}, 'scale': 0.32, 'water': ['swim', 'float'], 'surface': 0.7,
+    'flight': {'hop': [0.12, 0.6], 'hop_dive': [0.12, 0.6], 'leap': [0.12, 0.7]}, 'scale': 0.32, 'water': ['swim', 'float'], 'surface': 0.7,
     'notes': {
         'idle': 'Sitting: the throat pumping, a slow shift of weight (its blinks are the blink clip, played over any pose).',
         'blink': 'The blink: the lower lids rise over the eyes and drop. The game plays it over every pose, every 4 to 10 s.',
         'walk': 'The heavy crawl, one leg at a time; the game slides it forward so planted feet stay put.',
+        'stalk': 'The creep toward prey seen just out of reach: body pressed low, slow short steps, throat still.',
         'hop': 'A short hop: crouch, kick, fly stretched, land on its hands, fold up. The game throws it on this arc.',
+        'hop_dive': 'A hop into the water: the same kick, then nose down, arms forward, legs trailing; the float takes over.',
         'leap': 'The long leap into the water from danger, nose down, arms forward; holds (the swim takes over).',
         'swim': 'The frog kick: both hind legs together, glide, draw up.',
+        'climb_out': 'Out of the water onto a bank: arms reach onto it, it tips up and pulls, the hind legs kick it on, it sits.',
         'float': 'Resting at the surface, legs spread, a slow bob.',
         'call': 'The deep whoop: it lifts, the throat swells big, holds with a tremble, sinks.',
         'puff': 'Its threat: blown up and risen on straight front legs, mouth a little open.',
