@@ -292,5 +292,12 @@
         "cmd time set 2000"
       ]
     }
+  },
+  "verify": {
+    "compare": {
+      "version": "v27",
+      "film": "tools/film/bullfrog_eyes.film",
+      "shots": "eye_side,eye_threequarter,eye_front,eye_side_right"
+    }
   }
 }

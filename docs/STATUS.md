@@ -5,6 +5,19 @@ Keep this short. The full story is in `docs/HISTORY.md`; every status bullet is 
 ## Finish line
 **M8 playable = the mod done for now** (the user, 2026-10-25): Matabele scouts find termites, raid columns go out, fight, and carry prey home. Everything after that is optional.
 
+## Now (2026-11-21): the Animal Maker Engine overnight, steps A to C and the full check
+Branch `claude/engine-every-animal` (not yet in `C:\Ant Mod`, which holds another session's uncommitted notes). One checker and one course for any animal, shared climbing moves in the framework, shared leg maths, game faces automatic, the monitor's S-curve, and `python tools/verify_animal.py <animal> [--quick]` (the one command that checks an animal all the way). Every built animal passed it. Open: BUGS 255 (a monitor can stand at a one-block step without climbing, found by a new test), BUGS 256 (young crocodiles' tails inside blocks at steps).
+
+**Your calls, to confirm (all made without you; say no to any):**
+- The monitor's back S-curve: shoulders and hips swing opposite ways, 7 degrees walking, 5 swimming; its whole-body sway cut from 6 and 5 to 2.
+- The monitor's game faces on: its yellow back and tail bars now drawn as in the approved design (they were shuffled box by box).
+- A monitor hurt mid-climb is set down at once and starts no new climb while hurt; a broken step or a block put in its way ends the climb.
+- Coming at a step within 30 degrees of square it climbs as it comes (its body easing round over 0.4 s); 30 to 135 degrees off it turns square on the spot first; more, it goes elsewhere.
+- No pause between climbs on a hill of steps 3 or more apart (1.2 s sooner over three steps); steps 1 or 2 apart keep the old step-up (a slope climb is your call).
+- The crocodile keeps its old step (its own climb left over: a step is taller than its body and it would rarely play on level river banks); its game faces stay off (the game draws a white teeth row its approved look lacks).
+- The fly's, fish's, crab's and snail's game faces stay off until each is filmed.
+- Tools (no effect on play): the checker's and verify tool's names, what they count as a failure, one game launch per animal.
+
 ## Works, confirmed in-game
 - **Termites (Macrotermes):** king and queen, workers, soldiers, the cathedral mound, fungus garden and mushrooms, foraging holes, underground galleries, eating dead wood from below, mud sheeting, the alarm.
 - **Giant savanna trees:** umbrella thorn, camel thorn, baobab; growing, dying, falling, fire, lightning, dead wood eaten by termites.

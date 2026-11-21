@@ -330,5 +330,12 @@
       "dash": 1.7,
       "bpt": 0.039
     }
+  },
+  "verify": {
+    "compare": {
+      "version": "v1",
+      "film": "tools/film/game_faces.film",
+      "shots": "monitor_side,monitor_threequarter,monitor_top,monitor_front,monitor_behind"
+    }
   }
 }

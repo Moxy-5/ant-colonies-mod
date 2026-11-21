@@ -1529,9 +1529,15 @@ public class RiverLifeTests {
         ServerLevel level = helper.getLevel();
         int floor = helper.absolutePos(new BlockPos(0, TOP + 1, 0)).getY();
         long[] brokenAt = {-1};
+        double[] seen = {0, -1, 0};     // ticks on a move, the highest it got on one (over the floor), its size
         helper.onEachTick(() -> {
             if (brokenAt[0] < 0) {
                 upTheStep(helper, monitor, MZ0 + 5);
+                seen[2] = monitor.ownSize();
+                if (monitor.climb() != null) {
+                    seen[0]++;
+                    seen[1] = Math.max(seen[1], monitor.getY() - floor);
+                }
                 if (monitor.climb() != null && monitor.getY() > floor + 0.5) {     // its box on top of the step
                     for (int x = STEP_X; x <= STEP_X + 4; x++) {
                         for (int z = MZ0; z <= MZ1; z++) {
@@ -1549,7 +1555,9 @@ public class RiverLifeTests {
                     + monitor.position());
         });
         helper.succeedWhen(() -> {
-            helper.assertTrue(brokenAt[0] >= 0, "the monitor never got its box on top of the step");
+            helper.assertTrue(brokenAt[0] >= 0, "the monitor never got its box on top of the step (on a move "
+                    + (int) seen[0] + " ticks, highest on one " + String.format("%.2f", seen[1]) + ", size "
+                    + String.format("%.3f", seen[2]) + ", now at " + monitor.position() + ")");
             helper.assertTrue(monitor.onGround() && Math.abs(monitor.getY() - floor) < 0.05,
                     "the monitor is not back on the ground under the broken step: y " + String.format("%.2f", monitor.getY() - floor)
                             + " over it, on ground " + monitor.onGround());

@@ -255,5 +255,15 @@
       "dash": 1.9,
       "bpt": 0.04624206495636382
     }
+  },
+  "verify": {
+    "models": [
+      "crocodile_teen"
+    ],
+    "compare": {
+      "version": "v1",
+      "film": "tools/film/game_faces.film",
+      "shots": "croc_side,croc_threequarter,croc_top,croc_front"
+    }
   }
 }

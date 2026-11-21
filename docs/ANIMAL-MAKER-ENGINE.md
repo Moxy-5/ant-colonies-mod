@@ -258,6 +258,18 @@ the monitor's leftovers in its own row.
 7. If it spawns by itself: the spawning check list (CLAUDE.md).
 8. The user tries it in-game.
 
+**The one command for steps 3, 4 and 6 (2026-11-21):** `python tools/verify_animal.py <animal> [more animals]
+[--quick]` runs, in order and stopping at the first hard failure (a check that could not run or made nothing): the
+offline clip checker with every clip change (`clip_check.py --switches`, on its young's models too), the box budget,
+its family's course (full, or the quick preset), its frozen frame films with the game's own checks and a contact sheet a
+burst (`references/anim_lab/<animal>/verify/`), and `game_compare.py` against its newest approved version; then one
+short summary (full log `run-film/verify/verify_<animal>.log`). The game part is one launch an animal, its course first (one long launch for all of them recorded the later animals with
+false pops and snaps, 2026-11-21).
+`--offline` for the first two only (seconds), `--no-films` to skip the frame films. What it needs beyond the rest of the
+body plan is the plan's optional `verify` section (young models, frame films, the approved version to compare). Run it
+`--quick` after a small change, full after a big one and before a merge into `master`. Not done: comparing key poses (a
+mid-walk frame, an open jaw) with the approved version, since the viewer draws a version only at rest.
+
 ### The steps (in this order; each builds the shared piece, the animal it is proved on is named)
 **A. One checker and one course for any animal. BUILT 2026-11-20** (overnight, branch `claude/engine-every-animal`;
 `tools/clip_check.py`, `tools/body_course.py` by family, `tools/body_plan.py`'s "checks" and "course" fields, body
@@ -480,6 +492,32 @@ about 5 or more blocks apart (the monitor's 4.5 blocks need 3), and the mod's ri
 stays for the crocodile (a 7 to 9 px foot pop, the neck/chest seam 4 to 7 px at steps and banks: the course). Worth
 building when the user wants the crocodile on hills or high banks; its water moves (into the water off a high bank, out
 onto a bank a block up, BUGS 243) would bring the most.
+
+**Prove it: every animal through `verify_animal.py`, full (2026-11-21, overnight 4 of 4).** Every animal passed all
+five checks (nothing could not run). "Before" is the course as steps A and C left it (their recordings, checked again
+the same night); "after" is the full course after steps A to C, each animal in its own launch (the monitor's from the
+first launch, where it was filmed first). Only the monitor's game files changed tonight; every other animal's change is
+run-to-run luck (its mind picks a slightly different path each run). Worst findings, model pixels:
+
+| Animal | Before (steps A and C) | After (A to C done) | Read |
+|---|---|---|---|
+| Monitor | tail joints snap 30-56 deg on the drops and banks (tail1-tail2 56 at the high bank) | the same kinds, 33-48 deg (high bank 48); a new hips-tail1 37 deg on the level bank (the S-curve's tail counter-turn, to watch) | about the same; S-curve and moves added nothing broken; game look matches v1 from five cameras |
+| Crocodile | tail pop 10.6 (turn), front feet pops 8.7-8.8 at banks | tail pop 11.9, front feet 8.7-8.8 | the same (old step; its own moves left over) |
+| Croc hatchling, teen | never run in full before | hatchling: tail 45-47 into the block at banks and steps, head 29 on stairs; teen: tail pop 76 in the turn, neck snaps 67 at a high bank, tail 16 into blocks | first baseline: the young on steps and banks look bad (the grown animal's old step rules at their small size); for the crocodile's moves |
+| Bullfrog | planted feet slide 6-8 times the body's speed, foot pop 30 (turn) | slide 5, foot pops 18-26 | the same kinds (BUGS 253); unchanged since its polish |
+| Tilapia | tail pop 2.3, seams 1.2 | tail pop 3.1, seams 1.2 | the same |
+| Catfish | chin barbel 3.9 into the bed, seams 1.3 | barbel 3.9-4.9, a tail pop 14 in the scare | the same, one scare pop |
+| Barb | tail-fin joint snaps 11-21 deg | 7 deg | the same or better |
+| Crab | planted feet slide 0.9-1.2 of its speed walking out | 1.1-1.2 | the same (BUGS 254: needs a sideways walk clip) |
+| River snail | 15-92 clip flickers a scene | 6-130 | the same (BUGS 250) |
+
+Offline (`clip_check.py --switches`): the monitor 50 clips, 44 with a flag (mostly grazes and its folded swimming legs,
+as step A found), 2 clip changes; the crocodile 16 of 25 (teen 12), none at changes; the bullfrog 6 of 18, 8 changes
+(BUGS 249); the fish, crab and snail none inside clips, the fish 2-4 changes each. Box budget: the monitor 665 of 400
+and the crab 248 of 150 over (warnings); the bullfrog and barb not in the budget table yet.
+**Lesson:** one launch of 99 scenes (80 minutes) recorded the later animals with false pops and snaps (the barb's tail
+fin 35 degrees, the tilapia's tail 24 px) that a short launch of the same scenes did not show (4 degrees, 3 px), so
+`verify_animal.py` launches once an animal, the course first.
 
 **D. Families as their first animal arrives** (the families table above). Each adds its course scenes, its checks in
 the one checker, and its own shared piece: the snake's wave, flight, the gallop, the coil, and the insect engine freed

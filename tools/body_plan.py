@@ -83,6 +83,12 @@ The files are <mod>/src/main/resources/assets/<mod name>/body_plans/<model>.json
                             same size's next move): GeckoLib's blend between them is checked
               wave          [clip, ...] swimming clips whose body chain should wave: each piece's sideways swing and
                             when it peaks (growing to the tail, running back along it; step C, 2026-11-20)
+  verify    (animals; 2026-11-21) what tools/verify_animal.py needs beyond the rest of the plan; every key optional:
+              models        more models its clips play on (the young: ["crocodile_teen"])
+              films         its frame films (paths from the project folder), in place of tools/film/<animal>_frames.film
+                            and tools/film/<animal>_*_frames.film
+              compare       {"version", "film", "shots"}: its newest approved workshop version and the film scene (a
+                            still animal, film:none) whose shots game_compare.py lays beside it
 
 Inside the tools everything works in role names: a model read from the game's geo file has its bones renamed to their
 roles as it is read (Plan.model_to_roles), clips read from the game's animation file the same (Plan.clip_to_roles),
