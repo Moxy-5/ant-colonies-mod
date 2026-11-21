@@ -1,6 +1,6 @@
 # Handoff Card: Hippopotamus
 
-- **Status:** v8 approved by the user (2026-11-21, "V8 looks good"); block moves (step up, step down, out of the water) made and checked offline 2026-11-21, waiting for the user's look | Workshop version: `v8`
+- **Status:** v8 approved by the user (2026-11-21, "V8 looks good"); block moves made 2026-11-21; **in the game** (`HippoEntity`, `HippoModel`, `HippoRenderer`, 2026-11-21, picked up by Claude) | Workshop version: `v8`
 - **Mod & ID:** `savanna` (`antcolonies:hippo`) | **Family:** `upright_four_legs`
 
 ## Asset Paths
@@ -56,7 +56,8 @@
 - [x] Offline `clip_check.py hippo --switches` checked: `0/24` clip transitions flagged, zero floor clipping and zero leg-into-pink-belly clipping across all 14 clips, all film strips visually inspected
 - [x] User approved `v8` (2026-11-21: "V8 looks good", seen in the versions viewer)
 - [x] Block moves checked offline (2026-11-21): `clip_check.py hippo 'step_*' 'out_*' --switches` (40 switches, 0 flagged; no joint turns over 90 deg, biggest 79), film strips `references/anim_lab/hippo/cc_hippo_<move>.png` judged; `verify_animal.py hippo --offline` passed. Small leftovers kept: foot and shin grazes of about 2 to 2.7 px at the lip at takeoff and landing, hind knees 0.6 to 1.3 px deeper than at rest at the hind landings, the cow's 2.4 px hover at 4.26 s on the way down
-- [ ] In-game `game_compare.py`, `body_course.py`, & 3-angle frame check (once `HippoEntity` exists)
+- [x] `HippoEntity` exists (2026-11-21): body plan has `controller`, `course` and `verify.films` (`tools/film/hippo_moves_frames.film`, the three moves from three sides); clip blend 5 ticks (`lead_ticks` 5 in the move file, all 40 clip changes clean at 5, one flagged at 4)
+- [ ] `game_compare.py` (needs a `verify.compare` entry: a game_faces-style film of the hippo)
 
 ## Notes for Java
 - Once `HippoEntity.java` exists, add `"controller": "savanna/src/main/java/..."` and `"course"` to `body_plans/hippo.json` so `clip_check.py` reads the exact Java blend constant and `body_course.py` can film it.

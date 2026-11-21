@@ -91,6 +91,11 @@ public final class BlockMoves {
         private final String[] clips;
         public final double aheadPx;
         public final boolean startsAfloat, endsAfloat, goesDown;
+        /**
+         * A land move that may start or end in shallow water, walked on the bed (the hippo's, 2026-11-21: down a bank
+         * into the shallows, out of them onto a bank): never cut for being in water. Optional in the file.
+         */
+        public final boolean wades;
         public final int endLevel, wetTick, ticks;
         private final float[][] rise, along;
 
@@ -101,6 +106,7 @@ public final class BlockMoves {
             startsAfloat = o.get("starts_afloat").getAsBoolean();
             endsAfloat = o.get("ends_afloat").getAsBoolean();
             goesDown = o.get("goes_down").getAsBoolean();
+            wades = o.has("wades") && o.get("wades").getAsBoolean();
             endLevel = o.has("end_level") ? o.get("end_level").getAsInt() : 0;
             wetTick = o.get("wet_tick").getAsInt();
             ticks = o.get("ticks").getAsInt();
@@ -363,7 +369,7 @@ public final class BlockMoves {
         double ticks = ticks(p, now);
         Move m = move(p.move());
         double back = m.aheadPx * pxToBlocks;
-        boolean water = m.endsAfloat || m.startsAfloat;
+        boolean water = m.endsAfloat || m.startsAfloat || m.wades;
         // the bank's or step's block it relies on: going down or in, the one it leaves; up or out, the one past the face
         double to = m.goesDown ? back - 0.5 : back + 0.5;
         double blockY = m.goesDown ? -0.5 : m.endLevel - 0.5;

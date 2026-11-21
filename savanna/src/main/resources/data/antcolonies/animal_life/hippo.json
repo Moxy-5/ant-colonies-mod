@@ -1,0 +1,14 @@
+{
+  "_note": "The hippopotamus's life (the animal life kit; 2026-11-21, my picks, fun first). Sizes are shares of a bull's (the 5-block model, its moves made for 0.92 and 1.0): bulls the big ones, cows smaller, the same look. Born grown for now; calves and breeding come later (the calf model is 0.45).",
+  "sexes": "two",
+  "male_size": [
+    0.97,
+    1.03
+  ],
+  "female_size": [
+    0.88,
+    0.95
+  ],
+  "max_size": 1.03,
+  "breeds": false
+}

@@ -305,6 +305,8 @@ public class CrocodileEntity extends PathfinderMob implements GeoEntity, HasLife
         goalSelector.addGoal(0, new CrocodileBreeding.HeldForMateGoal(this));
         goalSelector.addGoal(0, new CrocodileBreeding.WaitForMotherGoal(this));
         goalSelector.addGoal(0, new PlungeGoal(this));
+        // hippos charge crocodiles that come near them (2026-11-21, "River zones"): it keeps clear of any within 8 blocks
+        goalSelector.addGoal(0, new net.minecraft.world.entity.ai.goal.AvoidEntityGoal<>(this, HippoEntity.class, 8.0F, 1.0, 1.4));
         goalSelector.addGoal(1, new CrocodileBreeding.MotherGoal(this));
         goalSelector.addGoal(1, new SeekMateGoal<>(this, 1.0));      // over the sun and the wandering: a courtship is not left for a bask
         goalSelector.addGoal(1, new BaskGoal(this));

@@ -131,6 +131,10 @@ public class SavannaItems {
     public static final DeferredItem<DeferredSpawnEggItem> MONITOR_SPAWN_EGG =
             ITEMS.register("monitor_spawn_egg",
                     () -> new DeferredSpawnEggItem(SavannaEntities.MONITOR, 0x34332B, 0xD6B03A, new Item.Properties()));
+    // Grey-purple with a pink belly (the hippo's back and its dusty-pink underside), my pick.
+    public static final DeferredItem<DeferredSpawnEggItem> HIPPO_SPAWN_EGG =
+            ITEMS.register("hippo_spawn_egg",
+                    () -> new DeferredSpawnEggItem(SavannaEntities.HIPPO, 0x4E3E44, 0xC48A8E, new Item.Properties()));
     public static final DeferredItem<DeferredSpawnEggItem> CROCODILE_SPAWN_EGG =
             ITEMS.register("crocodile_spawn_egg",
                     () -> new DeferredSpawnEggItem(SavannaEntities.CROCODILE, 0x4A4E26, 0xC8B070, new Item.Properties()));

@@ -1,0 +1,101 @@
+# The hippo's three block moves frame by frame (2026-11-21, the hard rule: every animation checked in the game, frozen
+# and stepped, from three sides): up a block (the step's west face at x 10), down off it (its edge at x 10, going west),
+# and out of the shallows (water a block deep west of x 10, the bank a block up from the bed). Stepped 3 ticks a picture.
+#   ./gradlew runFilm -PfilmScene=tools/film/hippo_moves_frames.film   pictures in run-film/screenshots/hippo_moves_frames/
+cmd time set noon
+cmd weather clear
+cmd kill @e[type=!player]
+cmd fill -4 -61 -8 24 -55 8 minecraft:air
+cmd fill -4 -62 -8 24 -62 8 minecraft:dirt
+cmd fill 10 -61 -8 24 -60 8 minecraft:stone
+cmd fill -4 -61 -8 9 -61 8 minecraft:grass_block
+lens 40
+wait 40
+# --- up a block: side on, front on top, behind three quarters
+walker antcolonies:hippo 6.8 -60 0.5 -90 OwnSize:1.0f,Led:1b
+camera 10.5 -59.4 -12.5 0 4
+cmd tick unfreeze
+go 17 -59 0 0.8
+wait 14
+cmd tick freeze
+burst up_side 52 3
+cmd kill @e[type=antcolonies:hippo]
+wait 10
+walker antcolonies:hippo 6.8 -60 0.5 -90 OwnSize:1.0f,Led:1b
+camera 19.5 -57.4 -7.0 52 14
+cmd tick unfreeze
+go 17 -59 0 0.8
+wait 14
+cmd tick freeze
+burst up_front 52 3
+cmd kill @e[type=antcolonies:hippo]
+wait 10
+walker antcolonies:hippo 6.8 -60 0.5 -90 OwnSize:1.0f,Led:1b
+camera 1.5 -58.6 -7.5 -50 12
+cmd tick unfreeze
+go 17 -59 0 0.8
+wait 14
+cmd tick freeze
+burst up_back 52 3
+cmd kill @e[type=antcolonies:hippo]
+wait 10
+# --- down off the step, going west: side on, front (west, below), behind (on top)
+walker antcolonies:hippo 11.6 -59 0.5 90 OwnSize:1.0f,Led:1b
+camera 10.5 -59.4 -12.5 0 4
+cmd tick unfreeze
+go 2 -60 0 0.8
+wait 14
+cmd tick freeze
+burst down_side 52 3
+cmd kill @e[type=antcolonies:hippo]
+wait 10
+walker antcolonies:hippo 11.6 -59 0.5 90 OwnSize:1.0f,Led:1b
+camera 1.5 -58.6 -7.5 -50 12
+cmd tick unfreeze
+go 2 -60 0 0.8
+wait 14
+cmd tick freeze
+burst down_front 52 3
+cmd kill @e[type=antcolonies:hippo]
+wait 10
+walker antcolonies:hippo 11.6 -59 0.5 90 OwnSize:1.0f,Led:1b
+camera 19.5 -57.4 -7.0 52 14
+cmd tick unfreeze
+go 2 -60 0 0.8
+wait 14
+cmd tick freeze
+burst down_back 52 3
+cmd kill @e[type=antcolonies:hippo]
+wait 10
+# --- out of the shallows: water a block deep west of the bank (its bed the dirt at -62), the bank lowered to a block
+# over the bed (its top level with the water)
+cmd fill 10 -60 -8 24 -60 8 minecraft:air
+cmd fill 0 -61 -6 9 -61 6 minecraft:water
+wait 10
+walker antcolonies:hippo 6.8 -61 0.5 -90 OwnSize:1.0f,Led:1b
+camera 10.5 -59.4 -12.5 0 4
+cmd tick unfreeze
+go 17 -60 0 0.8
+wait 14
+cmd tick freeze
+burst out_side 60 3
+cmd kill @e[type=antcolonies:hippo]
+wait 10
+walker antcolonies:hippo 6.8 -61 0.5 -90 OwnSize:1.0f,Led:1b
+camera 19.5 -57.4 -7.0 52 14
+cmd tick unfreeze
+go 17 -60 0 0.8
+wait 14
+cmd tick freeze
+burst out_front 60 3
+cmd kill @e[type=antcolonies:hippo]
+wait 10
+walker antcolonies:hippo 6.8 -61 0.5 -90 OwnSize:1.0f,Led:1b
+camera 1.5 -58.6 -7.5 -50 12
+cmd tick unfreeze
+go 17 -60 0 0.8
+wait 14
+cmd tick freeze
+burst out_back 60 3
+cmd kill @e[type=antcolonies:hippo]
+quit

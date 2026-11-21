@@ -74,6 +74,7 @@
   "checks": {
     "about": "Offline checks for tools/clip_check.py (canonical adult scale 1.0: 1 px = 0.0625 blocks). Update controller once HippoEntity.java lands.",
     "px": 0.0625,
+    "controller": "savanna/src/main/java/com/antcolonies/savanna/animal/HippoEntity.java",
     "blend": 5,
     "water": [
       "float",
@@ -285,6 +286,20 @@
         "out_1000",
         "idle"
       ]
+    ]
+  },
+  "course": {
+    "hippo": {
+      "id": "antcolonies:hippo",
+      "data": "OwnSize:1.0f,Led:1b",
+      "walk": 0.8,
+      "dash": 1.7,
+      "bpt": 0.031
+    }
+  },
+  "verify": {
+    "films": [
+      "tools/film/hippo_moves_frames.film"
     ]
   }
 }

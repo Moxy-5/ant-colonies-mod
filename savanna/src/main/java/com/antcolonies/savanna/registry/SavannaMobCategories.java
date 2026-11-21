@@ -12,7 +12,19 @@ import net.minecraft.world.entity.MobCategory;
 public final class SavannaMobCategories {
     private SavannaMobCategories() {}
 
-    private static MobCategory riverFish, riverHunter, riverBed, riverBank, riverSchool, flyCloud, bullfrog;
+    private static MobCategory riverFish, riverHunter, riverBed, riverBank, riverSchool, flyCloud, bullfrog, hippoPod;
+
+    /**
+     * The hippos' group (2026-11-21, the spawning check list; {@code docs/DESIGN.md}, "River zones": "hippos one pod at a
+     * time round a player"): its own, cap 6 round a player, so one pod of 2 to 5 (each spawned at least
+     * {@code HippoEntity.SPAWN_APART} blocks from another pod), friendly, removed past 128 blocks.
+     */
+    public static MobCategory hippoPod() {
+        if (hippoPod == null) {
+            hippoPod = MobCategory.valueOf("ANTCOLONIES_HIPPO_POD");
+        }
+        return hippoPod;
+    }
 
     /**
      * The bullfrogs' group (prey plan step 3, 2026-11-20, the spawning check list): its own, cap 4 round a player

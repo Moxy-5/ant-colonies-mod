@@ -1723,6 +1723,223 @@ public class RiverLifeTests {
         helper.succeed();
     }
 
+    // --- the hippo (2026-11-21) ------------------------------------------------------------------------------------------
+
+    /** The hippo's ground: what lies at each x of the strip MX0..MX1 (stone walls round it hold any water in). */
+    private enum HippoGround { STEP, SHALLOWS, POOL }
+
+    /**
+     * Builds the hippo's ground over MX0..MX1, MZ0..MZ1: STEP a stone floor at TOP with a one-block step from STEP_X on;
+     * SHALLOWS the same with the water a block deep before the step (the step is a bank one block over the bed); POOL
+     * water two deep before STEP_X - 3, a shelf a block deep up to STEP_X, then a grass bank level with the water's top.
+     */
+    private static void hippoGround(GameTestHelper helper, HippoGround kind) {
+        for (int x = MX0 - 1; x <= MX1 + 1; x++) {
+            for (int z = MZ0 - 1; z <= MZ1 + 1; z++) {
+                boolean wall = x < MX0 || x > MX1 || z < MZ0 || z > MZ1;
+                for (int y = TOP - 3; y <= TOP + 7; y++) {
+                    BlockState state;
+                    if (wall) {
+                        state = (y <= TOP + 2 ? Blocks.STONE : Blocks.AIR).defaultBlockState();
+                    } else if (kind == HippoGround.POOL) {
+                        int bed = x < STEP_X - 3 ? TOP - 2 : TOP - 1;
+                        state = y <= bed ? Blocks.STONE.defaultBlockState()
+                                : x < STEP_X && y <= TOP ? Blocks.WATER.defaultBlockState()
+                                : x >= STEP_X && y == TOP ? Blocks.GRASS_BLOCK.defaultBlockState() : Blocks.AIR.defaultBlockState();
+                    } else {
+                        state = y <= TOP - 1 || y == TOP ? Blocks.STONE.defaultBlockState()
+                                : y == TOP + 1 && x >= STEP_X ? Blocks.STONE.defaultBlockState()
+                                : y == TOP + 1 && kind == HippoGround.SHALLOWS ? Blocks.WATER.defaultBlockState() : Blocks.AIR.defaultBlockState();
+                    }
+                    helper.setBlock(new BlockPos(x, y, z), state);
+                }
+            }
+        }
+    }
+
+    private static com.antcolonies.savanna.animal.HippoEntity hippoAt(GameTestHelper helper, double x, double y, float yaw) {
+        com.antcolonies.savanna.animal.HippoEntity hippo = helper.spawn(SavannaEntities.HIPPO.get(),
+                new net.minecraft.world.phys.Vec3(x, y, MZ0 + 5.5));
+        hippo.setPersistenceRequired();
+        hippo.led = true;
+        hippo.setYRot(yaw);
+        hippo.yBodyRot = yaw;
+        hippo.yHeadRot = yaw;
+        return hippo;
+    }
+
+    /**
+     * A hippo sent along its ground plays its block move ({@code up}, {@code down} or {@code out}) and ends on the far
+     * level, never inside a block on the way: its route is resent whenever it is done, as a player's walking would.
+     */
+    private static void hippoMoves(GameTestHelper helper, com.antcolonies.savanna.animal.HippoEntity hippo, int move, double goalX,
+            int endY, String what) {
+        ServerLevel level = helper.getLevel();
+        boolean[] saw = {false};
+        int[] other = {-1};
+        helper.onEachTick(() -> {
+            com.antcolonies.entity.body.BlockMoves.Play play = hippo.climb();
+            if (play != null) {
+                saw[0] |= play.move() == move;
+                if (play.move() != move) {
+                    other[0] = play.move();
+                }
+            }
+            helper.assertTrue(level.noCollision(hippo, hippo.getBoundingBox().deflate(0.01)), "the hippo is inside a block at "
+                    + hippo.position().subtract(net.minecraft.world.phys.Vec3.atLowerCornerOf(helper.absolutePos(BlockPos.ZERO))));
+            if (play == null && hippo.getNavigation().isDone()) {
+                BlockPos goal = helper.absolutePos(new BlockPos((int) goalX, endY, MZ0 + 5));
+                hippo.getNavigation().moveTo(goal.getX() + 0.5, goal.getY(), goal.getZ() + 0.5, 1.0);
+            }
+        });
+        int top = helper.absolutePos(new BlockPos(0, endY, 0)).getY();
+        helper.succeedWhen(() -> {
+            helper.assertTrue(saw[0], "the hippo never " + what + " on its move (other move " + other[0] + ", at "
+                    + hippo.position().subtract(net.minecraft.world.phys.Vec3.atLowerCornerOf(helper.absolutePos(BlockPos.ZERO))) + ")");
+            helper.assertTrue(hippo.climb() == null && hippo.onGround() && Math.abs(hippo.getY() - top) < 0.05,
+                    "the hippo is not on the far level yet: y " + String.format("%.2f", hippo.getY() - top));
+        });
+    }
+
+    /** A hippo walking up to a one-block step climbs it on its own move (forefeet up first, then the hind legs heave). */
+    @GameTest(template = "arena", timeoutTicks = 1200)
+    public static void aHippoClimbsAStepOnItsMove(GameTestHelper helper) {
+        hippoGround(helper, HippoGround.STEP);
+        var hippo = hippoAt(helper, MX0 + 3.5, TOP + 1, -90.0F);
+        hippoMoves(helper, hippo, com.antcolonies.savanna.animal.HippoEntity.UP, STEP_X + 6, TOP + 2, "climbed the step");
+    }
+
+    /** A hippo wading in water a block deep walks out onto the bank a block up on its out move. */
+    @GameTest(template = "arena", timeoutTicks = 1200)
+    public static void aHippoWalksOutOfTheShallowsOnItsMove(GameTestHelper helper) {
+        hippoGround(helper, HippoGround.SHALLOWS);
+        var hippo = hippoAt(helper, MX0 + 3.5, TOP + 1, -90.0F);
+        hippoMoves(helper, hippo, com.antcolonies.savanna.animal.HippoEntity.OUT, STEP_X + 6, TOP + 2, "walked out of the shallows");
+    }
+
+    /** A hippo on a bank walks down into the shallows (water a block deep) on its step-down move, wading. */
+    @GameTest(template = "arena", timeoutTicks = 1200)
+    public static void aHippoStepsDownIntoTheShallowsOnItsMove(GameTestHelper helper) {
+        hippoGround(helper, HippoGround.SHALLOWS);
+        var hippo = hippoAt(helper, STEP_X + 6.5, TOP + 2, 90.0F);
+        hippoMoves(helper, hippo, com.antcolonies.savanna.animal.HippoEntity.DOWN, MX0 + 2, TOP + 1, "stepped down into the shallows");
+    }
+
+    /**
+     * A survival player walking up to a hippo gets the warning yawn; staying near, they are charged and bitten (5 hearts).
+     */
+    @GameTest(template = "arena", timeoutTicks = 600)
+    public static void aHippoYawnsAtAPlayerThenChargesAndBites(GameTestHelper helper) {
+        hippoGround(helper, HippoGround.STEP);
+        var hippo = hippoAt(helper, MX0 + 3.5, TOP + 1, -90.0F);
+        net.minecraft.server.level.ServerPlayer player = MatabeleDefenceTests.survivalPlayer(helper);
+        BlockPos at = helper.absolutePos(new BlockPos(MX0 + 8, TOP + 1, MZ0 + 5));
+        player.moveTo(at.getX() + 0.5, at.getY(), at.getZ() + 0.5, 90.0F, 0.0F);
+        boolean[] yawned = {false};
+        float health = player.getHealth();
+        helper.onEachTick(() -> {
+            yawned[0] |= hippo.doing() == com.antcolonies.savanna.animal.HippoEntity.YAWN;
+            helper.assertTrue(hippo.doing() != com.antcolonies.savanna.animal.HippoEntity.BITE || yawned[0], "it bit before its warning yawn");
+        });
+        helper.succeedWhen(() -> {
+            helper.assertTrue(yawned[0], "the hippo never yawned at the player " + String.format("%.1f", player.distanceTo(hippo)) + " away");
+            helper.assertTrue(player.getHealth() <= health - 8.0F, "the hippo has not bitten the player: health " + player.getHealth()
+                    + ", doing " + hippo.doing() + ", charging " + hippo.charging() + ", " + String.format("%.1f", player.distanceTo(hippo)) + " away");
+        });
+    }
+
+    /**
+     * At night a hippo in its pool walks out onto the land and grazes ({@code graze}); by day it goes back into the water.
+     */
+    @GameTest(template = "arena", timeoutTicks = 2400)
+    public static void aHippoGrazesOnLandAtNightAndGoesBackByDay(GameTestHelper helper) {
+        hippoGround(helper, HippoGround.POOL);
+        var hippo = hippoAt(helper, MX0 + 2.5, TOP - 1, -90.0F);
+        hippo.led = false;
+        hippo.heldNight = true;
+        boolean[] grazed = {false};
+        helper.onEachTick(() -> {
+            if (!grazed[0] && hippo.doing() == com.antcolonies.savanna.animal.HippoEntity.GRAZE && !hippo.isInWater()) {
+                grazed[0] = true;
+                hippo.heldNight = false;
+            }
+        });
+        helper.succeedWhen(() -> {
+            helper.assertTrue(grazed[0], "the hippo never grazed on land at night: in water " + hippo.isInWater() + ", doing " + hippo.doing()
+                    + ", at " + hippo.position().subtract(net.minecraft.world.phys.Vec3.atLowerCornerOf(helper.absolutePos(BlockPos.ZERO)))
+                    + ", " + hippo.about() + ", origin " + helper.absolutePos(BlockPos.ZERO));
+            helper.assertTrue(hippo.isInWater(), "the hippo has not gone back into the water by day, at "
+                    + hippo.position().subtract(net.minecraft.world.phys.Vec3.atLowerCornerOf(helper.absolutePos(BlockPos.ZERO))));
+        });
+    }
+
+    /**
+     * Hippos spawn by themselves in pods (the spawning check list): the world's own checks over a river at sea level pass
+     * only in water at least two deep within {@code BANK_REACH} of a bank, never where it is shallower; a pod's members
+     * may spawn near each other but no hippo of another pod within {@code SPAWN_APART}; the kind is in its own group
+     * (hippo pods, cap 6), listed in the savanna's waters in pods of 2 to 5.
+     */
+    @GameTest(template = "arena", timeoutTicks = 200)
+    public static void hipposSpawnInPoolsByThemselves(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        int top = buildChannel(helper, false);
+        BlockPos corner = helper.absolutePos(new BlockPos(CX0, 0, CZ0));
+        var type = SavannaEntities.HIPPO.get();
+        int spots = 0;
+        StringBuilder wrong = new StringBuilder();
+        for (int i = 0; i < CHANNEL_DEPTHS.length; i++) {
+            for (int dz = 0; dz <= CZ1 - CZ0; dz++) {
+                for (int y = top - 8; y <= top + 1; y++) {
+                    BlockPos at = new BlockPos(corner.getX() + i, y, corner.getZ() + dz);
+                    if (worldWouldSpawn(level, type, at)) {
+                        spots++;
+                        if (CHANNEL_DEPTHS[i] < com.antcolonies.savanna.animal.HippoEntity.POOL_DEPTH) {
+                            wrong.append(" ").append(i).append(",").append(dz).append(" (").append(CHANNEL_DEPTHS[i]).append(" deep)");
+                        }
+                    }
+                }
+            }
+        }
+        SavannaMod.LOGGER.info("[pod spawns] spots the world would spawn a hippo at over the channel: {}", spots);
+        if (spots == 0) {
+            helper.fail("the world would spawn a hippo nowhere over the river");
+        }
+        if (!wrong.isEmpty()) {
+            helper.fail("hippos would spawn in water too shallow:" + wrong);
+        }
+        // a pod mate near, then a hippo of another pod far off
+        BlockPos first = new BlockPos(corner.getX() + 6, top - 2, corner.getZ() + 3);
+        net.minecraft.world.entity.Mob mob = type.create(level);
+        mob.moveTo(first.getX() + 0.5, first.getY(), first.getZ() + 0.5, 0, 0);
+        mob.finalizeSpawn(level, level.getCurrentDifficultyAt(first), MobSpawnType.NATURAL, null);
+        if (!level.getBlockState(mob.blockPosition().below()).isSolid()) {
+            helper.fail("a hippo spawned by the world is not set on the bed, at " + mob.blockPosition().subtract(corner));
+        }
+        level.addFreshEntity(mob);
+        if (!worldWouldSpawn(level, type, new BlockPos(corner.getX() + 8, top - 2, corner.getZ() + 4))) {
+            helper.fail("a pod mate would not spawn beside the first hippo");
+        }
+        mob.setPos(mob.getX() + 40, mob.getY(), mob.getZ());
+        if (worldWouldSpawn(level, type, new BlockPos(corner.getX() + 7, top - 2, corner.getZ() + 4))) {
+            helper.fail("a hippo would spawn 40 blocks from another pod's");
+        }
+        mob.discard();
+        buildChannel(helper, true);
+        if (type.getCategory() != com.antcolonies.savanna.registry.SavannaMobCategories.hippoPod()) {
+            helper.fail("the hippo is in the " + type.getCategory().getName() + " group, not the hippo pod group");
+        }
+        var biomes = level.registryAccess().registryOrThrow(net.minecraft.core.registries.Registries.BIOME);
+        var river = net.minecraft.resources.ResourceKey.create(net.minecraft.core.registries.Registries.BIOME,
+                net.minecraft.resources.ResourceLocation.fromNamespaceAndPath(SavannaMod.MODID, "savanna_river"));
+        for (var key : java.util.List.of(net.minecraft.world.level.biome.Biomes.SAVANNA, river)) {
+            var list = biomes.getOrThrow(key).getMobSettings().getMobs(com.antcolonies.savanna.registry.SavannaMobCategories.hippoPod()).unwrap();
+            if (list.stream().noneMatch(d -> d.type == type && d.minCount == 2 && d.maxCount == 5)) {
+                helper.fail("the hippo is not in " + key.location() + "'s hippo pod spawn list in pods of 2 to 5");
+            }
+        }
+        helper.succeed();
+    }
+
     // --- the river barb (2026-11-20) -----------------------------------------------------------------------------------
 
     /**

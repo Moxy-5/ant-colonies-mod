@@ -181,6 +181,17 @@ public class SavannaEntities {
                     .clientTrackingRange(8)
                     .build("monitor"));
 
+    // The hippopotamus (M9 savanna life, 2026-11-21): drawn 5 blocks long and 2 tall (a bull, the approved v8 model); its
+    // box covers the barrel of its body, about 1.9 wide and 1.8 tall at a bull's size (its own size through SCALE), so
+    // it is pushed and hit where it is drawn; its routes are two blocks wide, as the ravager's.
+    public static final DeferredHolder<EntityType<?>, EntityType<com.antcolonies.savanna.animal.HippoEntity>> HIPPO =
+            ENTITY_TYPES.register("hippo", () -> EntityType.Builder
+                    .of(com.antcolonies.savanna.animal.HippoEntity::new, SavannaMobCategories.hippoPod())
+                    .sized(1.9F, 1.8F)
+                    .eyeHeight(1.5F)
+                    .clientTrackingRange(10)
+                    .build("hippo"));
+
     // The river crab (M9 river life, the clean-up crew, 2026-11-15): drawn about 0.8 blocks across with its legs and 0.3
     // tall; its box a little narrower than the legs' spread (my pick); each crab's own size through its SCALE attribute.
     public static final DeferredHolder<EntityType<?>, EntityType<com.antcolonies.savanna.animal.CrabEntity>> CRAB =

@@ -1400,6 +1400,15 @@ def _move_clip(keys, sc, note, log=None):
             th = math.degrees(math.asin(max(-0.95, min(0.95, (yf - yh) / _TRUNK_LEN))))
             r[0], r[1] = th, yh - _Y_HIP + _HIND_SOCK * math.sin(math.radians(th))
         prev = (yh, yf)
+    # the move starts and ends at the standing height the walk and idle have (the root at 0, and a whole block up or
+    # down at the end): the legs' reach less the sag would leave it 1.3 px low, a dip as the move began and a pop as
+    # the game handed back to the walk (2026-11-21, found putting the hippo in the game). Eased in and out over
+    # the first and last ends' half second, where the feet stand still under the legs.
+    B = keys.get("block", 16.0)
+    ends = round(trunk[-1][1] / B) * B
+    d0, d1, T = -trunk[0][1], ends - trunk[-1][1], 0.6
+    for t, r in zip(times, trunk):
+        r[1] += d0 * (1.0 - ease(min(1.0, t / T))) + d1 * ease(max(0.0, min(1.0, (t - (length - T)) / T)))
     path = []
 
     def pose_at(t, record=True):
@@ -1569,7 +1578,7 @@ def _step_up_keys(B, water=False):
                    (5.95, 6.35, "there")),
     }, sc, k)
     return {
-        "length": 6.9 * k,
+        "length": 6.9 * k, "block": B,
         "dz": dz,
         "feet": feet,
         # the legs stay pillars (a hippo's thick shins bent more than this dig into the ground): it rides a little low
@@ -1608,7 +1617,7 @@ def _step_down_keys(B):
                    (5.45, 5.8, "there"), (6.25, 6.6, "there")),
     }, sc)
     return {
-        "length": 7.0,
+        "length": 7.0, "block": B,
         "dz": dz,
         "feet": feet,
         "sag": ((0.0, 0.5), (0.4, 1.5), (6.3, 1.5), (7.0, 0.5)),
@@ -1650,12 +1659,12 @@ def move_specs():
     """The hippo's moves for the shared move file (model_parts.block_moves; the game's BlockMoves)."""
     return [
         {"name": "up", "clip": lambda s: move_name("step_up", s), "ahead_px": STEP_FACE,
-         "starts_afloat": False, "ends_afloat": False, "goes_down": False, "end_level": 1},
+         "starts_afloat": False, "ends_afloat": False, "goes_down": False, "end_level": 1, "wades": True},
         {"name": "down", "clip": lambda s: move_name("step_down", s), "ahead_px": DOWN_EDGE,
-         "starts_afloat": False, "ends_afloat": False, "goes_down": True, "end_level": -1},
+         "starts_afloat": False, "ends_afloat": False, "goes_down": True, "end_level": -1, "wades": True},
         # out of the shallows: wading on the riverbed (not afloat), onto a bank a block up from the bed
         {"name": "out", "clip": lambda s: move_name("out", s), "ahead_px": STEP_FACE,
-         "starts_afloat": False, "ends_afloat": False, "goes_down": False, "end_level": 1},
+         "starts_afloat": False, "ends_afloat": False, "goes_down": False, "end_level": 1, "wades": True},
     ]
 
 
@@ -1715,7 +1724,7 @@ def export_game():
         "textures/entity/hippo.png": png_bytes,
         "animations/entity/hippo.animation.json": animations(all_clips),
     }, mod="savanna")
-    write_block_moves("hippo", block_moves(all_clips, MOVE_SIZES, move_block_px, move_specs()),
+    write_block_moves("hippo", block_moves(all_clips, MOVE_SIZES, move_block_px, move_specs(), lead=5),
                       "tools/hippo_models.py game")
 
 

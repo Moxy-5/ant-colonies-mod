@@ -101,6 +101,18 @@
         false,
         128
       ]
+    },
+    {
+      "enum": "net/minecraft/world/entity/MobCategory",
+      "name": "ANTCOLONIES_HIPPO_POD",
+      "constructor": "(Ljava/lang/String;IZZI)V",
+      "parameters": [
+        "antcolonies:hippo_pod",
+        6,
+        true,
+        false,
+        128
+      ]
     }
   ]
 }

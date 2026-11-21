@@ -1,0 +1,35 @@
+# The measuring course (into water from a bank level with it, walking) for the hippo: written by tools/body_course.py films, do not edit.
+lens 50
+cmd fill 1 -63 -7 12 -61 7 minecraft:water
+walker antcolonies:hippo -4.5 -60 0.5 -90 OwnSize:1.0f,Led:1b
+follow 0 3.5 -6 0 25
+cmd tick unfreeze
+record on 3
+go 8 -61 0 0.8
+wait 60
+shot p00
+wait 60
+shot p01
+wait 60
+shot p02
+wait 60
+shot p03
+wait 60
+shot p04
+wait 60
+shot p05
+wait 60
+shot p06
+wait 60
+shot p07
+wait 60
+shot p08
+wait 60
+shot p09
+wait 60
+shot p10
+wait 60
+shot p11
+wait 3
+shot p12
+record off

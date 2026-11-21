@@ -266,7 +266,7 @@ def move_path(made_clip):
     return [v[i:i + 3] for i in range(0, len(v) - 2, 3)], wet
 
 
-def block_moves(made, sizes, block_px, moves):
+def block_moves(made, sizes, block_px, moves, lead=None):
     """The game's move file for one animal (a dict): {sizes, moves: [...]}, from its made clips.
 
     sizes:    the animal sizes a clip is made for (any number: the monitor 5, most animals 1 to 3; the game plays the nearest)
@@ -274,8 +274,12 @@ def block_moves(made, sizes, block_px, moves):
     moves:    in order, each {'name', 'clip': size -> clip name, 'ahead_px' (how far ahead of the move's start the step's
               face, the edge or the bank's face is), 'starts_afloat', 'ends_afloat', 'goes_down' (its box stays on the
               top it leaves until its back has passed the edge), 'end_level' (ending on land: the ground it ends on,
-              blocks up from where it started, e.g. 1 up a step, -1 down one, 0 out onto a bank level with the water)}
+              blocks up from where it started, e.g. 1 up a step, -1 down one, 0 out onto a bank level with the water),
+              optional 'wades' (a land move that may start or end in shallow water: walked on the bed, never cut for
+              being in water; the hippo's)}
     The rise is a share of a block (below 0 going down), the forward travel model pixels, one row a tick for each size.
+    lead:     optional: the ticks the animal's clip player eases each clip change over (the game's BlockMoves.lead,
+              4 if not given; the hippo's 5, its clips checked clean at 5)
     """
     out = []
     for m in moves:
@@ -290,8 +294,11 @@ def block_moves(made, sizes, block_px, moves):
         out.append({'name': m['name'], 'clips': [m['clip'](s) for s in sizes], 'ahead_px': m['ahead_px'],
                     'starts_afloat': m['starts_afloat'], 'ends_afloat': m['ends_afloat'], 'goes_down': m['goes_down'],
                     'end_level': m.get('end_level', 0), 'wet_tick': round(wet * 20), 'ticks': len(rises[0]) - 1,
-                    'rise': rises, 'along': alongs})
-    return {'sizes': list(sizes), 'block_px': [round(block_px(s), 4) for s in sizes], 'moves': out}
+                    'rise': rises, 'along': alongs, **({'wades': True} if m.get('wades') else {})})
+    data = {'sizes': list(sizes), 'block_px': [round(block_px(s), 4) for s in sizes], 'moves': out}
+    if lead is not None:
+        data['lead_ticks'] = lead
+    return data
 
 
 def _row(r):
@@ -304,11 +311,14 @@ def write_block_moves(animal, data, maker, mod='savanna'):
     path = mod_paths.assets(mod) / 'block_moves' / f'{animal}.json'
     path.parent.mkdir(parents=True, exist_ok=True)
     lines = ['{', f'  "_made_by": {json.dumps(maker + ": never edit by hand")},',
-             f'  "sizes": {json.dumps(data["sizes"])},', f'  "block_px": {json.dumps(data["block_px"])},', '  "moves": [']
+             f'  "sizes": {json.dumps(data["sizes"])},', f'  "block_px": {json.dumps(data["block_px"])},']
+    if 'lead_ticks' in data:
+        lines.append(f'  "lead_ticks": {data["lead_ticks"]},')
+    lines.append('  "moves": [')
     for i, m in enumerate(data['moves']):
         head = ', '.join(f'{json.dumps(k)}: {json.dumps(m[k])}' for k in
                          ('name', 'clips', 'ahead_px', 'starts_afloat', 'ends_afloat', 'goes_down', 'end_level', 'wet_tick',
-                          'ticks'))
+                          'ticks') + (('wades',) if m.get('wades') else ()))
         lines.append('    {' + head + ',')
         for key in ('rise', 'along'):
             rows = ',\n'.join('        ' + _row(r) for r in m[key])
