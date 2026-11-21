@@ -81,6 +81,8 @@ The files are <mod>/src/main/resources/assets/<mod name>/body_plans/<model>.json
                             whose own "stride" note gives it)
               switches      [[from, to], ...] the clip changes the game makes (patterns; a sized move changes into the
                             same size's next move): GeckoLib's blend between them is checked
+              wave          [clip, ...] swimming clips whose body chain should wave: each piece's sideways swing and
+                            when it peaks (growing to the tail, running back along it; step C, 2026-11-20)
 
 Inside the tools everything works in role names: a model read from the game's geo file has its bones renamed to their
 roles as it is read (Plan.model_to_roles), clips read from the game's animation file the same (Plan.clip_to_roles),

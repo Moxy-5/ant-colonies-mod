@@ -103,6 +103,9 @@
         "idle",
         "court"
       ]
+    ],
+    "wave": [
+      "swim"
     ]
   },
   "course": {

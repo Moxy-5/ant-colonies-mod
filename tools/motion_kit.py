@@ -262,3 +262,21 @@ def cached(animal, name, key, build):
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps({'key': key, 'made': made}), encoding='utf-8')
     return made
+
+
+# --- a self-check: python tools/motion_kit.py (pieces keep their lengths, joints bend toward their poles) -------------------
+if __name__ == '__main__':
+    def near(a, b, eps=1e-6):
+        return abs(a - b) < eps
+    for lengths, kw in (([3.0, 4.0], {}), ([3.0, 4.0, 2.0], {'parallel': True}),
+                        ([3.0, 4.0, 1.0, 1.0], {'ends': [[0, -1, 0], [0, 0, -1]]})):
+        for target in ([0.0, -5.0, 0.0], [1.0, -6.0, -1.5], [0.0, -40.0, 0.0]):
+            joints, miss = limb([0.0, 0.0, 0.0], lengths, target, [0.0, 0.0, -1.0], **kw)
+            assert all(near(vlen(vsub(b, a)), L) for a, b, L in zip(joints, joints[1:], lengths)), (lengths, target)
+            assert joints[1][2] <= 1e-9, ('the first joint bends toward its pole', lengths, target)
+            assert miss > 0 or near(vlen(vsub(joints[-1], target)), 0.0), (lengths, target, miss)
+    pts = curve(lambda s: [2 * math.sin(s / 5), 0.0, s], 0.0, 40.0, 200)
+    js = follow_path(pts, [4.0] * 6)
+    assert all(near(vlen(vsub(b, a)), 4.0) for a, b in zip(js, js[1:]))
+    assert near(stride(0.0, 0.6)[0], 1.0) and near(stride(0.6, 0.6)[1], 0.0)
+    print('motion_kit: limbs of 2, 3 and 4 pieces, the path chain and the stride all check out')

@@ -86,6 +86,9 @@
         "swim",
         "flop"
       ]
+    ],
+    "wave": [
+      "swim"
     ]
   },
   "course": {

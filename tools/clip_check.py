@@ -570,6 +570,11 @@ def check_clip(animal, name, flagged):
         out(f'  {r["label"]}: reaches {r["past_z"] - best[0]:.1f} px past {r["past_label"]} at {best[2]:.2f}, '
             f'{best[1]:.1f} px over the ground there')
 
+    # the body's sideways wave (the plan's "wave": the swimming clips whose body chain should wave; step C, 2026-11-20)
+    if name in ck.get('wave', []):
+        for line in wave_lines(animal, pl):
+            out(line)
+
     # jumps, turns
     top = sorted(jumps.items(), key=lambda kv: -kv[1][0])[:6]
     out('  biggest jump of a part in 1/80 s (px at time; a walking foot moves about 1): '
@@ -586,6 +591,46 @@ def check_clip(animal, name, flagged):
                 if d > 90:
                     flagged.add(round(t, 2))
     return pl, planted, lines
+
+
+def wave_lines(animal, pl):
+    """The body chain's sideways wave over one loop of a swimming clip (the fish family's piece of the engine, step C,
+    2026-11-20): each piece's sideways swing (half its side to side travel, px) and when it peaks (its share of the beat
+    after the head's, from the loop's first harmonic). A swimming body's wave grows toward the tail and runs back along
+    it (each piece later than the one in front); flagged: a head swinging more than the middle of the body (a wag, not a
+    swim), or a piece peaking before the one in front of it by more than a tenth of a beat (the wave running forward)."""
+    chain = [b for b in animal.plan_data.get('chain', []) if b in animal.model.by]
+    if len(chain) < 3:
+        return ['  sideways wave: no body chain in the plan']
+    n = 80
+    xs = {b: [] for b in chain}
+    for k in range(n):
+        t = pl.length * k / n
+        for b in chain:
+            xs[b].append(pl.world(b, animal.model.by[b]['pivot'], t)[0])
+    amp, peak = {}, {}
+    for b in chain:
+        c = sum(x * math.cos(2 * math.pi * k / n) for k, x in enumerate(xs[b])) * 2 / n
+        s = sum(x * math.sin(2 * math.pi * k / n) for k, x in enumerate(xs[b])) * 2 / n
+        amp[b] = (max(xs[b]) - min(xs[b])) / 2
+        peak[b] = math.atan2(s, c) / (2 * math.pi)
+    lag, last, back = {}, 0.0, []
+    for i, b in enumerate(chain):
+        d = (peak[b] - peak[chain[0]]) % 1.0 if i else 0.0
+        if i and d < last - 0.1 and last - d < 0.5:
+            back.append(b)
+        lag[b], last = d, d
+    mid = chain[len(chain) // 2]
+    flags = []
+    if amp[chain[0]] > amp[mid] + 0.2:
+        flags.append(f'the head swings more than the middle ({amp[chain[0]]:.1f} against {amp[mid]:.1f} px) FLAGGED')
+    if back:
+        flags.append('the wave runs forward at ' + ', '.join(back) + ' FLAGGED')
+    out = ['  sideways wave (piece: swing px, peak after the head as a share of the beat): ' + ', '.join(
+        f'{b} {amp[b]:.1f}/{lag[b]:.2f}' for b in chain)]
+    out.append('    ' + ('; '.join(flags) if flags else
+                         f'grows to the tail ({amp[chain[0]]:.1f} to {amp[chain[-1]]:.1f} px) and runs back along it'))
+    return out
 
 
 def lab_descendants(model, bone):

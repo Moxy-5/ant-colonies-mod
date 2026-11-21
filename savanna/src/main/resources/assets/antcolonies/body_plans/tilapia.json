@@ -74,6 +74,9 @@
         "caught",
         "caught_fight"
       ]
+    ],
+    "wave": [
+      "swim"
     ]
   },
   "course": {
