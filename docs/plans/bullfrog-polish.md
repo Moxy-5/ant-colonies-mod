@@ -1,4 +1,4 @@
-# The bullfrog's polish (planned 2026-11-20 with the user; not built)
+# The bullfrog's polish (planned 2026-11-20 with the user; built the same day, every step: change log in `docs/HISTORY.md`)
 
 The user's asks after the bullfrog went into the game: does it hop up a block, how should it use its lunge, does it
 slip smoothly into the water; the tongue should really aim at one fly of the cloud; the blink did not show in the films.
@@ -69,3 +69,10 @@ Out of the water at a bank up to a block high: it heaves out (arms on the edge, 
 the bank; a new `climb_out` clip), instead of gliding up by the step-height rule.
 
 **Order:** 1, then 2's viewer look (waits on the user), 3, 4, 5. Tests: `river` after each step.
+
+## Progress
+Built 2026-11-20, all five steps, on `claude/bullfrog-polish`. Changes from the plan, at the user's word: hops go up
+to 1.1 blocks (was 0.55) and keep their push through the flight (a hop up from right against a step rose straight up
+and fell back for good); the haul-out is only onto banks about level with the water (African bullfrogs are too heavy to
+climb: at a bank a block high it swims to a low spot); the creep runs at 0.13 blocks a second (the clip's own pace).
+The user watched the course and the frame films: "everything looks good". Not yet tried by the user in a real world.
