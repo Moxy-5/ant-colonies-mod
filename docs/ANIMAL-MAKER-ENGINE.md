@@ -68,6 +68,13 @@ its checks are about things that look broken (gaps, sliding feet, pops), never a
   with the monitor's move file). One checker per animal (`climb_check.py`,
   `water_check.py` for the monitor, `croc_check.py`, `frog_check.py`) until step A (2026-11-20) made them one,
   `tools/clip_check.py`; step B makes the moves shared.
+- **Built in step C (2026-11-20/21):** `tools/motion_kit.py`, the authoring kit every maker shares: limbs of 2, 3 or 4
+  pieces solved directly with trigonometry and a pole per joint (`two_bone`, `limb`: a pantograph or given end ways for
+  3 and 4), feet on a plan of steps (`foot_at`), a step's timing (`stride`), a chain following a path (`follow_path`,
+  `headings`, `curve`), easing (`ease`, `pulse`, `ramp`, `spline`) and per-clip fingerprints (`cached`); ways of
+  building only, never an animal's numbers; `python tools/motion_kit.py` checks itself. The game faces rule runs
+  inside `model_parts.write_assets` for every game model (BUGS 245). `clip_check.py` checks a swimmer's body wave
+  (the plan's `checks.wave`).
 - **Planned, not built:** the tools review `docs/plans/animal-kit-tools-review.md` (2026-11-08) holds the animation
   half of this engine as ideas: K1 clips remade only when changed, K5 lab checks for every family, K6 the pose viewer
   for any model, G1 an animated body for any creature (not an ant), G2 an animal's clips listed in data, G4 the live
@@ -445,24 +452,41 @@ crocodile is untouched (step C gives it moves of its own on `BlockMoves`).
 - Then the rules the moves replaced are removed, not kept beside them (old stage D's clean-up): the step parts of
   `GroundBend` and `EdgeOver` for the monitor, then for the crocodile when it has moves of its own.
 
-**C. Every built animal through the path, one row each** (what the checker and course find is fixed or written into
-`docs/BUGS.md`):
-| Animal | Its to-dos |
-|---|---|
-| Nile monitor | its in-game test of the climb down and the water moves (built, not tried); hills (B: no rest between steps 3+ apart built; a slope climb for steps 1 or 2 apart, the user's call); the back's S-curve (old step 3: shoulders and hips turning opposite ways in the walk and swim, on planted feet) |
-| Crocodile (and its young) | moves of its own on the shared player (B), off the old step rules; the neck snap at the water (baseline 5); BUGS 243 (a hatchling sinks and sits); game faces (BUGS 245) |
-| Bullfrog | through the one checker and the hopper scenes; its polish plan (`docs/plans/bullfrog-polish.md`) goes on as planned |
-| Tilapia, catfish, barb | swimmer scenes; the body's sideways wave checked (the fish family's piece) |
-| Crab, river snail | walker scenes on the bed and banks (sideways walking for the crab, the foot's glide for the snail) |
-| Fly clouds | a swarm, not a body: its own films only |
-| Remains | still, nothing to move: the look check only |
+**C. Every built animal through the path, one row each. BUILT IN PART 2026-11-20/21** (overnight 3 of 4, branch
+`claude/engine-every-animal`). In two tiers (a second review's advice: full polish of every animal would take weeks):
+**C1, prove the engine** (build and fix) on a few, **C2, a quick audit** of the rest (the checker and the quick course,
+nits into `docs/BUGS.md`, fix only what is clearly broken). Plus two shared pieces: **`tools/motion_kit.py`** (the
+authoring side, above, so the first upright mammal or spider does not start its leg maths over; proved by the monitor's
+and crocodile's game files byte for byte the same after the move) and **the game faces rule made automatic**
+(`model_parts.write_assets` passes every geo file through `game_faces`, once; an older animal not yet proved in the game
+says `faces=False` with its reason).
+
+| Tier | Animal | Its to-dos | Done (2026-11-21) |
+|---|---|---|---|
+| C1 | Nile monitor | its in-game test of the climb down and the water moves (built, not tried); hills (B: no rest between steps 3+ apart built; a slope climb for steps 1 or 2 apart, the user's call); the back's S-curve (old step 3: shoulders and hips turning opposite ways in the walk and swim, on planted feet) | **S-curve done** (kit's path chain; 7 deg walking, 5 swimming, my picks; offline better than before; filmed from three sides; course as before); **game faces on, proved** (`tools/film/game_faces.film`); its in-game tests still the user's |
+| C1 | Crocodile (and its young) | moves of its own on the shared player (B), off the old step rules; the neck snap at the water (baseline 5); BUGS 243; game faces (BUGS 245) | **Left over, my call:** its moves not built (below); the neck at a high bank measured the same as step A (seam 6.8 px, the neck bent about 80 degrees down over the drop: for its water moves); BUGS 243 needs nothing new (its cause is written there); game faces kept off (a teeth row the approved look lacks, BUGS 245) |
+| C1 | Bullfrog | through the one checker and the hopper scenes; its polish plan (`docs/plans/bullfrog-polish.md`) goes on as planned | **Done:** the full hopper course runs (the hopper scenes proved); findings to its polish (BUGS 253); nothing changed |
+| C1 | Tilapia | swimmer scenes; the body's sideways wave checked (the fish family's piece) | **Done:** the full swimmer course; the wave check built into `clip_check.py` (`checks.wave`) and right on all three fish; nothing looked broken (a 2.3 px tail pop in a sharp turn, 1 px seams) |
+| C2 | Catfish, barb | swimmer scenes, quick | **Audited** (BUGS 254) |
+| C2 | Crab, river snail | walker scenes on the bed and banks (sideways walking for the crab, the foot's glide for the snail) | **Audited** (BUGS 254: the crab's feet skate walking out, its walk clip strokes across its way; the snail's flicker, BUGS 250) |
+| - | Fly clouds | a swarm, not a body: its own films only | nothing; game faces kept off (no still fly to film) |
+| - | Remains | still, nothing to move: the look check only | nothing; game faces kept off (not filmed) |
+
+*The crocodile's moves, left over (my call, for the user):* measured first. A block is 14.4 of its model pixels and its
+back stands about 13, its legs reach about 8: a step is taller than the crocodile, so a move of its own is a climb like
+the monitor's (the front reared onto the top, the belly hauled over the edge), not a small shove, and it needs the same
+design rounds on films the monitor's took. And it would rarely play: at 7.5 blocks long a move fits only where steps are
+about 5 or more blocks apart (the monitor's 4.5 blocks need 3), and the mod's river banks are level. So the old step
+stays for the crocodile (a 7 to 9 px foot pop, the neck/chest seam 4 to 7 px at steps and banks: the course). Worth
+building when the user wants the crocodile on hills or high banks; its water moves (into the water off a high bank, out
+onto a bank a block up, BUGS 243) would bring the most.
 
 **D. Families as their first animal arrives** (the families table above). Each adds its course scenes, its checks in
 the one checker, and its own shared piece: the snake's wave, flight, the gallop, the coil, and the insect engine freed
 from the ant class (G1) with the first six- or eight-legged animal that is not a colony insect. Ants and termites stay
 untouched (guard films: no changed pictures).
 
-**Done for the engine (for now):** A, B and C built; the user has tried the monitor, crocodile and bullfrog in-game.
+**Done for the engine (for now):** A, B and C built (C's crocodile moves left over, above); the user has tried the monitor, crocodile and bullfrog in-game.
 From then on every new animal is only the path above plus its family's piece.
 
 ### How phase 1 went (the monitor, 2026-11-19; the old steps, for the record)
