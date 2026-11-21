@@ -565,3 +565,4 @@ Every "Current status" bullet CLAUDE.md held up to 2026-11-19, word for word, ol
 - 2026-11-20: world eggs step 1 built: crocodile nests already in new land, a site every 250 to 350 blocks of river (measured 306 on 3 seeds), a guarding mother at half the nests; not seen in a real world yet.
 - 2026-11-21: the barb fry and the tadpole painted (fry v2, tadpole v3 and v4 with legs), in a worktree of their own so Neon's hippo work in `C:\Ant Mod` is untouched; waiting for the user's look, then the clips.
 - 2026-11-21: the barb fry made cuter (v3: round, shiny, bulging eyes; a tiny mouth); waiting for the user's look.
+- 2026-11-21: the fry's look confirmed by the user (v3); the tadpole made slimmer and cuter (v5, v6 with legs); waiting for the user's look at the tadpole, then the clips.

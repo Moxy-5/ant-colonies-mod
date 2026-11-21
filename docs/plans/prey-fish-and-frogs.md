@@ -355,6 +355,12 @@ user: a detailed webbed foot model comes later). Fun first, inspired by the real
   to the front, their edges dark so they show big from the front and above; a smaller chin with a tiny mouth; the
   texture at 4 pixels a model pixel so the round eye has room (64 by 64). Picture
   `references/workshop/barb_fry/cuter_v2_v3.png`.
+- 2026-11-21, **the fry's look approved** (the user: "that looks perfect", fry v3). **The tadpole slimmer and
+  cuter** (the user: "the tadpole looks too bulbous compared to the 2D render we can lower its size I want it to be
+  cute as well"): v5 (v6 with the day-3 legs), the body about a fifth less deep and wide (top 5.6, belly 1.4, half
+  width 2.2 at its widest, was 6.0, 1.0, 2.6), so it flows into the tail's root as on the sheet; the eyes round and
+  high on the sides with a gold ring and a white shine spot, as the fry's (texture 4 pixels a model pixel). Same
+  25 boxes (29 with legs). Picture `references/workshop/tadpole/slimmer_v3_v5.png`.
 
 ## My picks the user may change
 The barb's name and look, every size and number above (the bullfrog's size is the user's call), barbs with no hunger,

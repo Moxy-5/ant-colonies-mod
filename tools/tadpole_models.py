@@ -25,12 +25,15 @@ from model_parts import cube, curve, paint_faces, png   # noqa: E402
 LENGTH = 18.0
 # (x, top, belly, half width) along the body, eased between: the tail's root, the widest middle, the rounded snout.
 # Read off the outline (body rear y 2-6 half 1.5, body 1-6 half 2.5, snout 2-5 half 1.5), rounded.
-PROFILE = ((11.0, 5.4, 2.2, 1.6), (12.0, 5.9, 1.4, 2.2), (13.5, 6.0, 1.0, 2.6), (15.0, 6.0, 1.0, 2.6),
-           (16.5, 5.6, 1.4, 2.3), (17.5, 5.0, 2.0, 1.7), (18.0, 4.6, 2.4, 1.3))
+# 2026-11-21, v5: slimmer and lower (the user: "the tadpole looks too bulbous compared to the 2D render ... I want it to
+# be cute as well"): about a fifth less deep and wide, so it flows into the tail's root as on the sheet.
+PROFILE = ((11.0, 5.0, 2.2, 1.4), (12.0, 5.4, 1.6, 1.9), (13.5, 5.6, 1.4, 2.2), (15.0, 5.6, 1.4, 2.2),
+           (16.5, 5.3, 1.7, 1.9), (17.5, 4.8, 2.2, 1.5), (18.0, 4.5, 2.5, 1.1))
 CORE_WIDTH = 0.55        # the tall box's share of the width
 FLANK_DEPTH = 0.6        # the wide box's share of the depth
 BODY_FROM = 11.0
-EYE = (15.0, 16.0, 4.0, 5.0)        # the eye on the flank: from x, to x, from y, to y
+EYE = (15.0, 16.5, 3.25, 4.75)      # the eye high on the flank: from x, to x, from y, to y (round, ringed, a shine spot)
+TEXELS = 4               # texture pixels a model pixel (4, so the round eye has room)
 LEGS = 0.0               # 1: the day-3 hind legs shown
 
 
@@ -128,7 +131,8 @@ def plain_colour(c, face, x, y, z):
 
 # --- the paint (stage 4, 2026-11-21, from the sheet's colours) --------------------------------------------------------
 PAINT = {
-    'body': (50, 50, 40), 'fleck': (80, 78, 58), 'gold': (176, 150, 80), 'eye': (10, 10, 10), 'ring': (176, 150, 80),
+    'body': (50, 50, 40), 'fleck': (80, 78, 58), 'gold': (176, 150, 80), 'eye': (10, 10, 10), 'ring': (196, 168, 88),
+    'shine': (250, 250, 244),
     'belly': (104, 106, 96), 'belly_fleck': (128, 128, 116), 'gut': (66, 62, 50), 'beak': (28, 26, 22),
     'lip': (150, 140, 116), 'muscle': (64, 62, 50), 'mottle': (94, 90, 70), 'fin': (134, 142, 132),
     'fin_speck': (84, 90, 84), 'leg': (70, 70, 52), 'toe': (46, 46, 36),
@@ -154,7 +158,14 @@ def paint_colour(c, face, x, y, z):
             return PAINT['toe']                                           # the foot's dark toe tips
         return PAINT['fleck'] if n < 0.25 else PAINT['leg']
     if face in ('east', 'west') and EYE[0] <= ox < EYE[1] and EYE[2] <= y < EYE[3]:
-        return PAINT['eye'] if ox < EYE[0] + 0.5 else PAINT['ring']     # small eye, its gold ring behind
+        cx, cy = (EYE[0] + EYE[1]) / 2, (EYE[2] + EYE[3]) / 2
+        if cx + 0.25 <= ox < cx + 0.5 and cy + 0.25 <= y < cy + 0.5:
+            return PAINT['shine']                                         # the shine spot, up and to the front
+        r = ((ox - cx) ** 2 + (y - cy) ** 2) ** 0.5
+        if r < 0.56:
+            return PAINT['eye']
+        if r < 0.8:
+            return PAINT['ring']                                          # the gold ring round the pupil
     if face == 'down':
         if ox > LENGTH - 1.5 and abs(x) < 1.0:
             return PAINT['beak'] if abs(x) < 0.5 else PAINT['lip']       # the mouth underneath at the front
@@ -164,7 +175,7 @@ def paint_colour(c, face, x, y, z):
         return PAINT['belly_fleck'] if n < 0.2 else PAINT['belly']
     if y < 1.75:
         return PAINT['belly']
-    if face in ('east', 'west') and 14.0 <= ox < 16.0 and y < 2.75:
+    if face in ('east', 'west') and 13.5 <= ox < 15.5 and y < 2.5:
         return PAINT['gut']                                               # the gut's edge seen from the side
     if n < 0.05 and face != 'north' and (face == 'up' or y >= 3.0):
         return PAINT['gold']                                              # the gold flecks
@@ -183,7 +194,7 @@ WORKSHOP_PARTS = {'body': ['body'], 'tail root': ['tail_1'], 'tail middle': ['ta
 
 
 def workshop_look():
-    bones, rows, w, h = paint_faces(model(), 2, LOOKS[WORKSHOP_LOOK])
+    bones, rows, w, h = paint_faces(model(), TEXELS, LOOKS[WORKSHOP_LOOK])
     return bones, png(rows), w, h
 
 
