@@ -727,7 +727,9 @@ def write_game():
         files.update(game_files('crab_berried', life_looks.crab_model(SEXES['female'], 'broad', eggs=True, game=True)))
     for sex, big in SEXES.items():
         files[f'animations/entity/crab_{sex}.animation.json'] = animations(clips(big))
-    write_assets(files)
+    # faces=False: its old faces until its in-game film is compared with its approved version (BUGS 245; step C,
+    # 2026-11-20, proved the monitor, crocodile and fly first)
+    write_assets(files, faces=False)
 
 
 if __name__ == '__main__':

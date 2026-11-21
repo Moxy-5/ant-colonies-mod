@@ -493,7 +493,9 @@ def write_game():
     files = {'textures/entity/snail.png': png(rows)}
     files['geo/entity/snail.geo.json'] = geo('snail', game_bones, w, h, (1, 1, [0, 0.25, 0]))
     files['animations/entity/snail.animation.json'] = animations(clips())
-    write_assets(files)
+    # faces=False: its old faces until its in-game film is compared with its approved version (BUGS 245; step C,
+    # 2026-11-20, proved the monitor, crocodile and fly first)
+    write_assets(files, faces=False)
 
 if __name__ == '__main__':
     import sys

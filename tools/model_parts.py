@@ -190,7 +190,25 @@ def game_faces(bones):
                     turned[face] = ({'uv': [x, y + h], 'uv_size': [w, -h]} if face in ('up', 'down')
                                     else {'uv': [x + w, y], 'uv_size': [-w, h]})
             c['uv'] = turned
+        b[FACED] = True                     # turned already: write_assets leaves it (and takes the mark off)
     return out
+
+
+FACED = '_game_faces'
+
+
+def _game_geo(data):
+    """A game model file with every bone's faces placed as GeckoLib needs them (game_faces), once: bones a maker
+    already passed through game_faces by hand (the bullfrog's) are left as they are; the marks are taken off."""
+    data = copy.deepcopy(data)
+    for g in data.get('minecraft:geometry', []):
+        bones = g.get('bones', [])
+        if not all(b.get(FACED) for b in bones):
+            bones = game_faces(bones)
+        for b in bones:
+            b.pop(FACED, None)
+        g['bones'] = bones
+    return data
 
 
 def geo(name, bones, w, h, bounds):
@@ -206,11 +224,20 @@ def animations(clips):
     return {'format_version': '1.8.0', 'animations': clips}
 
 
-def write_assets(files, mod='savanna'):
-    """Writes {path inside the mod's assets: bytes or data for a JSON file} into the mod, saying each file."""
+def write_assets(files, mod='savanna', faces=True):
+    """Writes {path inside the mod's assets: bytes or data for a JSON file} into the mod, saying each file.
+
+    Every game model (a geo/ file) goes through game_faces here, so no animal can forget it (BUGS 245; the Animal Maker
+    Engine step C, 2026-11-20): the game then draws each box's paint as the viewer does. faces=False keeps an animal's
+    old faces until its in-game film matches its approved viewer version (tools/game_compare.py); say why beside it."""
     import mod_paths
     root = mod_paths.assets(mod)
     for rel, data in files.items():
+        if isinstance(data, dict) and 'minecraft:geometry' in data:
+            if faces:
+                data = _game_geo(data)
+            elif any(b.get(FACED) for g in data['minecraft:geometry'] for b in g.get('bones', [])):
+                raise ValueError(f'{rel}: faces=False, but its bones went through game_faces')
         path = root / rel
         path.parent.mkdir(parents=True, exist_ok=True)
         if isinstance(data, bytes):

@@ -422,7 +422,9 @@ def write_game():
     files['textures/entity/tilapia_brooding.png'] = png(rows)
     files['geo/entity/tilapia_brooding.geo.json'] = geo('tilapia_brooding', brood_bones, bw, bh, (2, 1.5, [0, 0.5, 0]))
     files['animations/entity/tilapia.animation.json'] = animations(clips())
-    write_assets(files)
+    # faces=False: its old faces until its in-game film is compared with its approved version (BUGS 245; step C,
+    # 2026-11-20, proved the monitor, crocodile and fly first)
+    write_assets(files, faces=False)
 
 
 if __name__ == '__main__':

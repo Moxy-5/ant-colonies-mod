@@ -546,7 +546,9 @@ def write_game():
     LOOKS.setdefault('Y', life_looks.cm.LOOKS['Y'])      # (run as a script, this module is not the one life_looks set it in)
     _, rows, _, _ = paint(model(), 'Y')
     files['textures/entity/catfish_young.png'] = png(rows)
-    write_assets(files)
+    # faces=False: its old faces until its in-game film is compared with its approved version (BUGS 245; step C,
+    # 2026-11-20, proved the monitor, crocodile and fly first)
+    write_assets(files, faces=False)
 
 
 if __name__ == '__main__':

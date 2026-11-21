@@ -1581,6 +1581,8 @@ public class MonitorEntity extends PathfinderMob implements GeoEntity, HasLife {
     }
 
     // --- animations ----------------------------------------------------------------------------------------------------
+    /** Clips named by the film camera ({@code film:<clip>}, a still one; step C, 2026-11-20). */
+    private static final java.util.Map<String, RawAnimation> FILM_CLIPS = new java.util.concurrent.ConcurrentHashMap<>();
     private static final RawAnimation IDLE = RawAnimation.begin().thenLoop("idle");
     private static final RawAnimation WALK = RawAnimation.begin().thenLoop("walk");
     private static final RawAnimation SWIM = RawAnimation.begin().thenLoop("swim");
@@ -1623,6 +1625,11 @@ public class MonitorEntity extends PathfinderMob implements GeoEntity, HasLife {
     private PlayState animate(AnimationState<MonitorEntity> state) {
         AnimationController<MonitorEntity> player = state.getController();
         player.setAnimationSpeed(1.0);
+        net.minecraft.network.chat.Component film = getCustomName();
+        if (film != null && film.getString().startsWith("film:")) {     // the film camera's still look (game_compare): a
+            return state.setAndContinue(FILM_CLIPS.computeIfAbsent(film.getString().substring(5),   // clip it lacks
+                    c -> RawAnimation.begin().thenLoop(c)));                                        // draws its rest pose
+        }
         if (isDeadOrDying()) {
             return state.setAndContinue(DEATH);
         }

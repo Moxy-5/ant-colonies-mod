@@ -1,0 +1,44 @@
+# The game faces rule in the game (the Animal Maker Engine step C, 2026-11-20; BUGS 245): a still monitor and a still
+# crocodile in their rest pose (named film:none, a clip they lack), filmed side on, three quarters from above, from
+# above and from the front, for tools/game_compare.py to lay beside the approved viewer versions from the same cameras.
+#   ./gradlew runFilm -PfilmScene=tools/film/game_faces.film      pictures in run-film/screenshots/game_faces/
+# Each faces +x (yaw -90), size 1. A camera's height is its feet (the eye 1.62 above).
+cmd time set noon
+cmd weather clear
+cmd kill @e[type=!player]
+cmd fill 26 -60 4 48 -50 46 minecraft:air
+lens 40
+wait 40
+cmd summon antcolonies:monitor 36.5 -60.0 14.5 {NoAI:1b,PersistenceRequired:1b,OwnSize:1.0f,Rotation:[-90f,0f],CustomName:'"film:none"'}
+wait 20
+camera 36.5 -60.9 8.3 0 8
+wait 6
+shot monitor_side
+camera 40.3 -58.4 10.7 45 32
+wait 6
+shot monitor_threequarter
+camera 36.5 -54.6 14.5 0 89
+wait 6
+shot monitor_top
+camera 43.4 -60.7 14.5 90 6
+wait 6
+shot monitor_front
+camera 30.6 -59.2 17.8 -120 22
+wait 6
+shot monitor_behind
+cmd tp @e[type=antcolonies:monitor] 36 -140 14
+wait 3
+cmd summon antcolonies:crocodile 36.5 -60.0 34.5 {NoAI:1b,PersistenceRequired:1b,OwnSize:1.0f,Rotation:[-90f,0f],CustomName:'"film:none"'}
+wait 20
+camera 36.5 -60.6 25.5 0 8
+wait 6
+shot croc_side
+camera 42.0 -57.4 29.0 45 32
+wait 6
+shot croc_threequarter
+camera 36.5 -52.0 34.5 0 89
+wait 6
+shot croc_top
+camera 45.5 -60.4 34.5 90 6
+wait 6
+shot croc_front

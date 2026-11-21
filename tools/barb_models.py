@@ -490,7 +490,9 @@ def write_game():
         files[f'textures/entity/{name}.png'] = png(rows)
     files['geo/entity/barb.geo.json'] = geo('barb', bones, w, h, (2, 1, [0, 0.4, 0]))
     files['animations/entity/barb.animation.json'] = animations(clips())
-    write_assets(files)
+    # faces=False: its old faces until its in-game film is compared with its approved version (BUGS 245; step C,
+    # 2026-11-20, proved the monitor, crocodile and fly first)
+    write_assets(files, faces=False)
 
 
 if __name__ == '__main__':

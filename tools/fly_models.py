@@ -273,7 +273,9 @@ def write_game():
         bones, data, w, h = look(which)
         files[f'textures/entity/{name}.png'] = data
     files['geo/entity/fly.geo.json'] = geo('fly', bones, w, h, (1, 1, [0, 0.3, 0]))
-    write_assets(files)
+    # faces=False: kept off (BUGS 245): a cloud's flies are posed by FlyCloudRenderer and never stand still for the
+    # in-game compare (tools/game_compare.py needs one still animal); turn on with a still-fly film of its own
+    write_assets(files, faces=False)
 
 
 if __name__ == '__main__':

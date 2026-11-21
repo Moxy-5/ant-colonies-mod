@@ -712,7 +712,10 @@ def write_game():
         if name != 'crocodile_hatchling':
             files[f'geo/entity/{name}.geo.json'] = geo(name, game_bones, w, h, (8, 2.5, [0, 0.75, 0]))
     files['animations/entity/crocodile.animation.json'] = animations({**clips(), **young_clips()})
-    write_assets(files)
+    # faces=False: kept off (BUGS 245, step C 2026-11-20): filmed with and without the rule (tools/film/game_faces.film),
+    # the game draws a white row of teeth along the lips that the approved look lacks either way, so the rule's match
+    # cannot be shown on it yet; its mottling is too fine to judge from those cameras
+    write_assets(files, faces=False)
 
 
 if __name__ == '__main__':

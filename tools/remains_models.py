@@ -466,7 +466,9 @@ def write_game():
                 for look, word in GAME_LOOKS.items():       # same model, painted as the young or the breeding male
                     files[f'textures/entity/{name}_{word}.png'] = png(fish_remains(kind, stage, look, torn)[1])
             files[f'geo/entity/{name}.geo.json'] = geo(name, lying(bones), w, h, (4, 1.5, [0, 0.5, 0]))
-    write_assets(files)
+    # faces=False: its old faces until its in-game film is compared with its approved version (BUGS 245; step C,
+    # 2026-11-20, proved the monitor, crocodile and fly first)
+    write_assets(files, faces=False)
 
 
 if __name__ == '__main__':
