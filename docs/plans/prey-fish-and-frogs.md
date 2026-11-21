@@ -349,6 +349,12 @@ user: a detailed webbed foot model comes later). Fun first, inspired by the real
   glass, belly and fins drawn see-through (gut, bladder, eyes, dots solid). Pictures
   `references/workshop/tadpole/paint_v3_v4.png`, `references/workshop/barb_fry/paint_v2.png`. Next: the user's
   look, then the clips (tadpole: wriggle down its three tail bones, graze; the fry reuses the barb's).
+- 2026-11-21, **the fry made cuter** (the user: "make the baby fish cuter maybe its with the eyes"). Fry v3: the
+  eyes are now two bulges standing half a pixel out of the head (14 boxes), a little lower and forward, each round on
+  its side (a big black pupil, a gold-silver ring, the corners the head's glass) with two white shine spots up and
+  to the front, their edges dark so they show big from the front and above; a smaller chin with a tiny mouth; the
+  texture at 4 pixels a model pixel so the round eye has room (64 by 64). Picture
+  `references/workshop/barb_fry/cuter_v2_v3.png`.
 
 ## My picks the user may change
 The barb's name and look, every size and number above (the bullfrog's size is the user's call), barbs with no hunger,

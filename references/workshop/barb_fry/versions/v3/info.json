@@ -1,0 +1,10 @@
+{
+ "note": "Cuter: round bulging eyes (a big pupil, a gold-silver ring, two shine spots), a little lower and forward, dark at their edges so they show big from the front and above; a smaller chin and a tiny mouth",
+ "date": "2026-11-21",
+ "boxes": 14,
+ "numbers": {
+  "HEAD_HALF": 1.25,
+  "BELLY_HALF": 1.25,
+  "REAR_HALF": 0.5
+ }
+}

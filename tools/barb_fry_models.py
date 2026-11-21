@@ -11,7 +11,7 @@ z = 6 - x here, and its y (the belly fold 0, the back fold's top 5) is kept as y
 
 The shape (box budget 12, as up to 30 fry can be near a breeding school): the grown barb's bone names (body, head,
 tail_stalk, tail_fin, back_fin, fin_left, fin_right), so its swim, turn and scatter clips move the fry too. The head
-is one box as wide as the eyes, the eyes painted on its sides (big and dark, as a real fry's); the body two boxes
+is one box, the eyes two thin bulges on its sides (big, round and shiny, as a real fry's); the body two boxes
 narrowing to the tail; the fins still folds: a low fold on the back and under the belly, a small fork for the tail.
 """
 import sys
@@ -24,7 +24,10 @@ LENGTH = 12.0
 HEAD_HALF = 1.25         # the head's half width (the eyes on its sides)
 BELLY_HALF = 1.25        # the body's half width round the gut
 REAR_HALF = 0.5          # the rear body's half width
-EYE = (8.0, 10.0, 2.0, 4.0)   # the eye on the head's side: from x, to x, from y, to y
+EYE = (8.5, 10.5, 1.75, 3.75)   # the eye on the head's side: from x, to x, from y, to y (2026-11-21: a touch lower and
+                                # forward, bulging, round with a ring and two shine spots: the user, "make the baby fish cuter")
+EYE_BULGE = 0.5          # how far each eye stands out of the head's side
+TEXELS = 4               # texture pixels a model pixel (4, so the round eye has room: 8 by 8)
 
 
 def z_of(x):
@@ -38,7 +41,10 @@ def box(x0, x1, half, y0, y1, part, across=0.0):
 
 def model():
     b = {n: [] for n in ('body', 'head', 'tail_stalk', 'tail_fin', 'back_fin', 'fin_left', 'fin_right')}
-    b['head'] += [box(8.0, 11.0, HEAD_HALF, 1.0, 4.0, 'head'), box(11.0, 12.0, 0.5, 2.0, 3.0, 'body')]
+    b['head'] += [box(8.0, 11.0, HEAD_HALF, 1.0, 4.0, 'head'), box(11.0, 12.0, 0.5, 1.75, 2.75, 'body')]
+    for s in (1, -1):                                                         # the bulging eyes
+        b['head'].append(box(EYE[0], EYE[1], EYE_BULGE / 2, EYE[2], EYE[3], 'eye',
+                             across=s * (HEAD_HALF + EYE_BULGE / 2)))
     b['body'] += [box(6.0, 8.0, BELLY_HALF, 1.0, 4.0, 'body'), box(3.0, 6.0, REAR_HALF, 1.25, 3.75, 'body'),
                   box(4.0, 6.0, 0.25, 0.0, 1.25, 'fin')]                       # the belly fold
     b['back_fin'].append(box(5.0, 7.0, 0.25, 3.75, 5.0, 'fin'))
@@ -93,19 +99,39 @@ def plain_colour(c, face, x, y, z):
 PAINT = {
     'glass': (196, 210, 212), 'back': (164, 178, 180), 'head_top': (150, 162, 164), 'spine': (180, 194, 196), 'belly': (222, 228, 226),
     'silver': (236, 240, 244), 'gut': (206, 170, 92), 'gut_dark': (176, 136, 64), 'eye': (16, 16, 18),
-    'glint': (200, 214, 222), 'dot': (78, 86, 84), 'spot': (98, 104, 110), 'fin': (160, 178, 182),
+    'shine': (252, 254, 255), 'ring': (214, 198, 150), 'mouth': (120, 128, 126), 'dot': (78, 86, 84), 'spot': (98, 104, 110), 'fin': (160, 178, 182),
     'fin_edge': (140, 160, 168),
 }
+
+
+def eye_colour(face, ox, y):
+    """The round eye on the bulge's outer face: a black pupil, a gold-silver ring, the corners the head's glass so it
+    reads round, and two shine spots up and to the front (a big one and a small one)."""
+    if face not in ('east', 'west'):
+        return PAINT['eye']                           # the eyeball's edge: dark, so the eyes show big from the front and above
+    cx, cy = (EYE[0] + EYE[1]) / 2, (EYE[2] + EYE[3]) / 2
+    if cx + 0.25 <= ox < cx + 0.75 and cy + 0.25 <= y < cy + 0.75:
+        return PAINT['shine']
+    if cx - 0.5 <= ox < cx - 0.25 and cy - 0.5 <= y < cy - 0.25:
+        return PAINT['shine']
+    r = ((ox - cx) ** 2 + (y - cy) ** 2) ** 0.5
+    if r < 0.85:
+        return PAINT['eye']
+    if r < 1.08:
+        return PAINT['ring']
+    return PAINT['glass']
 
 
 def paint_colour(c, face, x, y, z):
     part = c['_part']
     ox = LENGTH / 2 - z
+    if part == 'eye':
+        return eye_colour(face, ox, y)
     if part == 'fin':
         return PAINT['fin_edge'] if (c['_bone'] == 'tail_fin' and ox < 0.5) else PAINT['fin']
+    if face == 'north' and ox > LENGTH - 0.5 and abs(x) < 0.26 and y < 2.25:
+        return PAINT['mouth']                         # the tiny mouth
     if face in ('east', 'west'):
-        if part == 'head' and EYE[0] <= ox < EYE[1] and EYE[2] <= y < EYE[3]:
-            return PAINT['glint'] if (ox >= EYE[1] - 0.5 and y >= EYE[3] - 0.5) else PAINT['eye']   # one bright glint
         if 2.0 <= ox < 4.0 and 2.0 <= y < 3.0:
             return PAINT['spot']                      # the tail spot, just starting
         if 6.0 <= ox < 8.0 and y < 2.0:
@@ -114,10 +140,6 @@ def paint_colour(c, face, x, y, z):
             return PAINT['silver']                    # the swim bladder over the gut
         if 3.0 <= ox < 6.0 and 2.25 <= y < 2.75:
             return PAINT['spine']                     # the backbone showing through the clear rear body
-    if face == 'up' and part == 'head' and abs(x) > HEAD_HALF - 0.5 and EYE[0] <= ox < EYE[1]:
-        return PAINT['eye']                           # the big eyes bulge, so they show from above and the front too
-    if face == 'north' and part == 'head' and abs(x) > HEAD_HALF - 0.5 and EYE[2] <= y < EYE[3]:
-        return PAINT['eye']
     if face == 'up':
         if part == 'body' and int(ox) in (4, 6) and abs(x) < 0.5:
             return PAINT['dot']                       # the dark dots along the back
@@ -144,7 +166,7 @@ WORKSHOP_PARTS = {'head': ['head'], 'body': ['body'], 'tail': ['tail_stalk'], 'b
 
 
 def workshop_look():
-    bones, rows, w, h = paint_faces(model(), 2, LOOKS[WORKSHOP_LOOK])
+    bones, rows, w, h = paint_faces(model(), TEXELS, LOOKS[WORKSHOP_LOOK])
     return bones, png(rows), w, h
 
 
