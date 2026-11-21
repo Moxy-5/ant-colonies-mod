@@ -1,0 +1,13 @@
+{
+ "note": "v2 clean eyes, seamless barrel, warmer muzzle",
+ "date": "2026-11-21",
+ "boxes": 106,
+ "numbers": {
+  "HEIGHT": 32.0,
+  "BARREL_HW": 15.5,
+  "MUZZLE_LEN": 11.0,
+  "MUZZLE_HW": 10.0,
+  "LEG_H": 13.0,
+  "JAW_OPEN": 0.0
+ }
+}

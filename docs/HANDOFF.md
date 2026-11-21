@@ -8,8 +8,8 @@ Keep this short (~40 lines). Remove finished items once merged or picked up. Det
 - **Shared ground (`framework/.../entity/body/`):** Coordinate here before editing (e.g., Animal Maker Engine Step B `BlockMoves`). Always work on separate branches/worktrees.
 
 ## In progress right now
-- **Neon:** Setting up the Animal Maker Engine upgrades (`docs/ANIMAL-MAKER-ENGINE.md`, starting with Step A).
-- **Claude:** World eggs (step 1 built; step 2 next).
+- **Neon:** (free)
+- **Claude:** Hippo into the game (`HippoEntity`, branch `claude/engine-every-animal`; v8 and its block moves approved/made 2026-11-21, `docs/handoff/hippo.md`). World eggs step 2 after.
 
 ## Ready for Claude (from Neon)
 <!-- Format: - **<animal or tool>** (branch `<name>`): summary + `docs/handoff/<animal>.md` -->

@@ -1,0 +1,290 @@
+{
+  "model": "hippo",
+  "about": "The hippopotamus's body plan (the Animal Maker Engine, Upright Four Legs family): 5.0 blocks long x 2.0 blocks tall at scale 1.0 (16 px = 1 block). Read by tools/clip_check.py, tools/body_plan.py and the game.",
+  "family": "upright_four_legs",
+  "root": "root",
+  "forebody": "chest",
+  "head": {
+    "bone": "head",
+    "jaws": [
+      "jaw"
+    ]
+  },
+  "chain": [
+    "head",
+    "neck",
+    "chest",
+    "hips",
+    "tail_1",
+    "tail_2",
+    "tail_3"
+  ],
+  "legs": {
+    "l1": [
+      "leg_fl_1",
+      "leg_fl_2",
+      "leg_fl_foot"
+    ],
+    "r1": [
+      "leg_fr_1",
+      "leg_fr_2",
+      "leg_fr_foot"
+    ],
+    "l2": [
+      "leg_bl_1",
+      "leg_bl_2",
+      "leg_bl_foot"
+    ],
+    "r2": [
+      "leg_br_1",
+      "leg_br_2",
+      "leg_br_foot"
+    ]
+  },
+  "bones": {
+    "root": "root",
+    "hips": "hips",
+    "tail_1": "tail_1",
+    "tail_2": "tail_2",
+    "tail_3": "tail_3",
+    "chest": "chest",
+    "neck": "neck",
+    "head": "head",
+    "ear_left": "ear_left",
+    "ear_right": "ear_right",
+    "eye_left": "eye_left",
+    "eye_right": "eye_right",
+    "lid_left": "lid_left",
+    "lid_right": "lid_right",
+    "jaw": "jaw",
+    "tongue": "tongue",
+    "leg_fl_1": "leg_fl_1",
+    "leg_fl_2": "leg_fl_2",
+    "leg_fl_foot": "leg_fl_foot",
+    "leg_fr_1": "leg_fr_1",
+    "leg_fr_2": "leg_fr_2",
+    "leg_fr_foot": "leg_fr_foot",
+    "leg_bl_1": "leg_bl_1",
+    "leg_bl_2": "leg_bl_2",
+    "leg_bl_foot": "leg_bl_foot",
+    "leg_br_1": "leg_br_1",
+    "leg_br_2": "leg_br_2",
+    "leg_br_foot": "leg_br_foot"
+  },
+  "checks": {
+    "about": "Offline checks for tools/clip_check.py (canonical adult scale 1.0: 1 px = 0.0625 blocks). Update controller once HippoEntity.java lands.",
+    "px": 0.0625,
+    "blend": 5,
+    "water": [
+      "float",
+      "underwater_walk"
+    ],
+    "surface": 21.5,
+    "surface_marks": [
+      {
+        "label": "eyes",
+        "prefix": "eye",
+        "edge": "top"
+      },
+      {
+        "label": "ears",
+        "prefix": "ear",
+        "edge": "top"
+      },
+      {
+        "label": "back",
+        "prefix": "chest",
+        "edge": "top"
+      }
+    ],
+    "feet_parts": [
+      "foot"
+    ],
+    "feet_free": [
+      "walk",
+      "charge",
+      "float",
+      "underwater_walk",
+      "rest_down",
+      "rest",
+      "rest_up",
+      "death"
+    ],
+    "tuck_ok": [
+      "rest_down",
+      "rest",
+      "rest_up",
+      "death"
+    ],
+    "body_bones": [
+      "hips",
+      "chest"
+    ],
+    "walks": {
+      "walk": 6.944,
+      "charge": 22.321
+    },
+    "switches": [
+      [
+        "idle",
+        "walk"
+      ],
+      [
+        "walk",
+        "idle"
+      ],
+      [
+        "walk",
+        "charge"
+      ],
+      [
+        "charge",
+        "walk"
+      ],
+      [
+        "charge",
+        "bite"
+      ],
+      [
+        "bite",
+        "idle"
+      ],
+      [
+        "idle",
+        "yawn"
+      ],
+      [
+        "yawn",
+        "idle"
+      ],
+      [
+        "idle",
+        "bite"
+      ],
+      [
+        "idle",
+        "ear_flick"
+      ],
+      [
+        "ear_flick",
+        "idle"
+      ],
+      [
+        "idle",
+        "graze"
+      ],
+      [
+        "graze",
+        "idle"
+      ],
+      [
+        "idle",
+        "rest_down"
+      ],
+      [
+        "rest_down",
+        "rest"
+      ],
+      [
+        "rest",
+        "rest_up"
+      ],
+      [
+        "rest_up",
+        "idle"
+      ],
+      [
+        "idle",
+        "dung_flick"
+      ],
+      [
+        "dung_flick",
+        "idle"
+      ],
+      [
+        "float",
+        "underwater_walk"
+      ],
+      [
+        "underwater_walk",
+        "float"
+      ],
+      [
+        "float",
+        "ear_flick"
+      ],
+      [
+        "walk",
+        "float"
+      ],
+      [
+        "float",
+        "walk"
+      ],
+      [
+        "walk",
+        "step_up_920"
+      ],
+      [
+        "walk",
+        "step_up_1000"
+      ],
+      [
+        "step_up_920",
+        "idle"
+      ],
+      [
+        "step_up_1000",
+        "idle"
+      ],
+      [
+        "step_up_920",
+        "walk"
+      ],
+      [
+        "step_up_1000",
+        "walk"
+      ],
+      [
+        "walk",
+        "step_down_920"
+      ],
+      [
+        "walk",
+        "step_down_1000"
+      ],
+      [
+        "step_down_920",
+        "idle"
+      ],
+      [
+        "step_down_1000",
+        "idle"
+      ],
+      [
+        "step_down_920",
+        "walk"
+      ],
+      [
+        "step_down_1000",
+        "walk"
+      ],
+      [
+        "walk",
+        "out_920"
+      ],
+      [
+        "walk",
+        "out_1000"
+      ],
+      [
+        "out_920",
+        "idle"
+      ],
+      [
+        "out_1000",
+        "idle"
+      ]
+    ]
+  }
+}

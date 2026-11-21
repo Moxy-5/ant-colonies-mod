@@ -1,0 +1,40 @@
+{
+  "length_blocks": 5.0,
+  "_note": "Blended inspiration sheet (2026-11-21): Side, Front & Back from hippo_smooth.jpg; Top & Open Mouth from hippo_blocky.jpg. User target size: 5.0 blocks long x 2.0 blocks tall.",
+  "views": {
+    "side": {
+      "box": [
+        14,
+        14,
+        248,
+        141
+      ],
+      "head": "left"
+    },
+    "top": {
+      "box": [
+        14,
+        195,
+        248,
+        316
+      ],
+      "head": "left"
+    },
+    "front": {
+      "box": [
+        252,
+        14,
+        356,
+        140
+      ]
+    }
+  },
+  "marks": {
+    "snout": 24,
+    "head_back": 84,
+    "shoulders": 101,
+    "hips": 195,
+    "tail_base": 225
+  },
+  "background_tolerance": 30
+}

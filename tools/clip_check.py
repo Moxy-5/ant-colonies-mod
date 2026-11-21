@@ -422,7 +422,7 @@ def check_clip(animal, name, flagged):
         if body_bones and joints and k % 4 == 0 and not animal.matches(name, 'tuck_ok'):
             bodies = [cs[i:i + 8] for b, cs in now.items() if b in body_bones for i in range(0, len(cs), 8)]
             for key, j in joints.items():
-                d = body_depth(pl.world(j, animal.model.by[j]['pivot'], t), bodies) - rest_joint[key]
+                d = max(0.0, body_depth(pl.world(j, animal.model.by[j]['pivot'], t), bodies)) - max(0.0, rest_joint[key])
                 if d > deepest.get(j, (-99, 0))[0]:
                     deepest[j] = (d, t)
         if pl.kind == 'dig' and k % 8 == 0:

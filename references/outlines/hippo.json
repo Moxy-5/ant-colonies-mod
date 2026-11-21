@@ -1,0 +1,156 @@
+{
+ "animal": "hippo",
+ "length_px": 80,
+ "note": "Hippopotamus outline (2026-11-21): user target 5.0 blocks long (80 px) x 2.0 blocks tall (32 px at back dome), ~1.94 blocks wide (31 px barrel). Blended from hippo_smooth (silhouette, head, eyes, legs) and hippo_blocky (wide barrel top view, deep jaw, palette). Tiered barrel gives rounded front silhouette; pinched neck + broad flared muzzle reads cleanly from above. x from tail tip (0) to snout tip (80).",
+ "marks": [
+  {
+   "name": "eye",
+   "side": [65.5, 68.5, 23.5, 26],
+   "top": [65.5, 68.5, 5.5, 8.5],
+   "front": [5.5, 8.5, 23.5, 26],
+   "colour": "#111111"
+  },
+  {
+   "name": "eye (right)",
+   "top": [65.5, 68.5, -8.5, -5.5],
+   "front": [-8.5, -5.5, 23.5, 26],
+   "colour": "#111111"
+  },
+  {
+   "name": "nostril",
+   "side": [75.5, 78, 21.5, 23.5],
+   "top": [75.5, 78, 3.5, 6],
+   "front": [3.5, 6, 21.5, 23.5],
+   "colour": "#2e2225"
+  },
+  {
+   "name": "nostril (right)",
+   "top": [75.5, 78, -6, -3.5],
+   "front": [-6, -3.5, 21.5, 23.5],
+   "colour": "#2e2225"
+  },
+  {
+   "name": "waterline (submerged)",
+   "side": [0, 80, 21.5, 22],
+   "front": [-16, 16, 21.5, 22],
+   "colour": "#2b7de9"
+  }
+ ],
+ "parts": [
+  {
+   "name": "tail",
+   "side": [0, 2.5, 11, 21],
+   "half_width": 2.0
+  },
+  {
+   "name": "rump rear",
+   "side": [2.5, 7, 10, 26.5],
+   "half_width": 11.0
+  },
+  {
+   "name": "rump mid",
+   "side": [7, 15, 9, 28],
+   "half_width": 14.0
+  },
+  {
+   "name": "rump crown",
+   "side": [8, 16, 28, 30.5],
+   "half_width": 10.5
+  },
+  {
+   "name": "barrel core",
+   "side": [15, 43, 10, 27],
+   "half_width": 15.5
+  },
+  {
+   "name": "barrel upper",
+   "side": [15, 44, 27, 30],
+   "half_width": 13.0
+  },
+  {
+   "name": "barrel ridge",
+   "side": [17, 42, 30, 32],
+   "half_width": 9.5
+  },
+  {
+   "name": "belly band",
+   "side": [14, 45, 7, 10.5],
+   "half_width": 13.0
+  },
+  {
+   "name": "shoulders core",
+   "side": [43, 53, 9.5, 26.5],
+   "half_width": 14.0
+  },
+  {
+   "name": "shoulders upper",
+   "side": [43, 52, 26.5, 30],
+   "half_width": 11.5
+  },
+  {
+   "name": "shoulders ridge",
+   "side": [42, 50, 30, 31],
+   "half_width": 8.5
+  },
+  {
+   "name": "chest taper",
+   "side": [53, 57, 10, 28],
+   "half_width": 11.5
+  },
+  {
+   "name": "neck",
+   "side": [57, 63, 11.5, 27],
+   "half_width": 9.0
+  },
+  {
+   "name": "head",
+   "side": [62, 70, 12.5, 26],
+   "half_width": 9.5
+  },
+  {
+   "name": "brow",
+   "side": [64, 69, 24, 27.5],
+   "top": [64, 69, 4, 9.0],
+   "front": [4, 9.0, 24, 27.5],
+   "mirror": true
+  },
+  {
+   "name": "ear",
+   "side": [59.5, 62.5, 26.5, 31],
+   "top": [59.5, 62.5, 5.0, 8.5],
+   "front": [5.0, 8.5, 26.5, 31],
+   "mirror": true
+  },
+  {
+   "name": "muzzle",
+   "side": [69, 80, 14, 22],
+   "half_width": 10.0
+  },
+  {
+   "name": "nostril bump",
+   "side": [74, 78.5, 21.5, 24],
+   "top": [74, 78.5, 3, 7],
+   "front": [3, 7, 21.5, 24],
+   "mirror": true
+  },
+  {
+   "name": "lower jaw",
+   "side": [63, 78.5, 11, 14.5],
+   "half_width": 8.5
+  },
+  {
+   "name": "hind leg",
+   "side": [7, 16, 0, 13],
+   "top": [7, 16, 4.5, 12.5],
+   "front": [4.5, 12.5, 0, 13],
+   "mirror": true
+  },
+  {
+   "name": "front leg",
+   "side": [45, 54, 0, 13],
+   "top": [45, 54, 4.5, 12.5],
+   "front": [4.5, 12.5, 0, 13],
+   "mirror": true
+  }
+ ]
+}

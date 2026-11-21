@@ -1,0 +1,32 @@
+{
+  "length_blocks": 5.0,
+  "views": {
+    "side": {
+      "box": [
+        20,
+        20,
+        860,
+        380
+      ],
+      "head": "right"
+    },
+    "top": {
+      "box": [
+        20,
+        380,
+        860,
+        730
+      ],
+      "head": "right"
+    },
+    "front": {
+      "box": [
+        860,
+        20,
+        1210,
+        380
+      ]
+    }
+  },
+  "made_by": "python tools/workshop.py outline hippo (from references/outlines/hippo.json)"
+}
