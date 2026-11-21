@@ -21,6 +21,7 @@ Units are model pixels (16 a block), the head points to -Z, up is +Y, left is +X
 import random
 
 from model_parts import cube, mix, shade, png, clip, paint_faces, geo, animations, write_assets  # noqa: F401 (png for the viewer)
+from motion_kit import stride  # noqa: E402
 
 V = 2.0               # model pixels a voxel
 TEXELS = 0.5          # texture pixels a model pixel: one flat colour a voxel face
@@ -570,14 +571,7 @@ YOUNG_DUTY = 0.65                     # the share of a step a hatchling's foot s
 FORE, DOWN = 1, 1
 
 
-def _stride(ph, duty):
-    """One foot's step at phase ph (0 to 1): its swing (+1 forward, -1 back) and lift (0 to 1). Planted for the first
-    duty share, going back evenly (so it stays put on the ground while the body goes on), then lifted and swung forward."""
-    ph %= 1.0
-    if ph < duty:
-        return 1.0 - 2.0 * ph / duty, 0.0
-    u = (ph - duty) / (1.0 - duty)
-    return -1.0 + 2.0 * (0.5 - 0.5 * math.cos(math.pi * u)), math.sin(math.pi * u)
+_stride = stride                       # one foot's step timing (tools/motion_kit.py, 2026-11-20)
 
 
 def young_clips():

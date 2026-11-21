@@ -24,6 +24,9 @@ from model_parts import (png, shade, smooth, pitch, mat_mul, transpose, turn_x, 
                          cube, rounded, paint_faces, geo, animations, write_assets,
                          block_moves, write_block_moves)  # png for the viewer
 
+from motion_kit import (ease as _ease, pulse as _pulse, ramp as _ramp, spline as _spline,  # noqa: E402
+                        bend_way as _bend_way, foot_at as _foot_at, two_bone, cached, fingerprint)
+
 TEXELS = 1.0          # texture pixels a model pixel (plain colours for now)
 
 # --- the outline's numbers (references/outlines/monitor.json, the approved outline; python tools/workshop.py outline
@@ -469,38 +472,6 @@ BODY_PIVOT = (0.0, TAIL_AXIS, -13.0)
 WALK_LEN, SWIM_LEN = 1.2, 1.6          # one full stride, one full tail beat (seconds; the game will scale them by speed)
 
 
-def _ease(x):
-    return smooth(x)
-
-
-def _pulse(t, start, rise, hold, fall):
-    """0 before start, easing up to 1 over rise, held, easing back to 0 over fall."""
-    if t < start:
-        return 0.0
-    if t < start + rise:
-        return _ease((t - start) / rise)
-    if t < start + rise + hold:
-        return 1.0
-    return 1.0 - _ease((t - start - rise - hold) / fall)
-
-
-def _ramp(t, keys):
-    """A value easing from key to key ((time, value), ...); held before the first and after the last."""
-    if t <= keys[0][0]:
-        return keys[0][1]
-    for (t0, v0), (t1, v1) in zip(keys, keys[1:]):
-        if t <= t1:
-            return v0 + (v1 - v0) * _ease((t - t0) / (t1 - t0))
-    return keys[-1][1]
-
-
-def _bend_way(pole, dh):
-    """Which way a joint between two pieces bends (a unit direction square to dh, the line from the leg's root to its
-    end): pole, less its part along dh."""
-    k = sum(x * y for x, y in zip(pole, dh))
-    return unit([x - k * y for x, y in zip(pole, dh)])
-
-
 class _Poser:
     """Turns wanted bone turns (matrices) into clip values, and bends the legs to reach wanted foot places."""
 
@@ -545,23 +516,13 @@ class _Poser:
         else:
             Wb = vadd(mat_vec(transpose(body_m), vsub(vsub(wrist, body_d), BODY_PIVOT)), BODY_PIVOT)
             Fb = mat_mul(transpose(body_m), foot_m)
-        d = vsub(Wb, S)
-        D = vlen(d)
-        reach = 0.985 * (L['l1'] + L['l2'])
-        if D > reach:                                   # out of reach: as far as it goes (and remember by how much)
-            self.worst = max(self.worst, D - reach)
-            if self.log is not None:
-                self.log.append((self.now, L['kind'][0] + L['side'][0], D - reach))
-            d = [c * reach / D for c in d]
-            Wb, D = vadd(S, d), reach
-        D = max(D, abs(L['l1'] - L['l2']) * 1.02)
-        dh = [c / D for c in d]
-        a = (L['l1'] ** 2 - L['l2'] ** 2 + D * D) / (2 * D)
-        h = math.sqrt(max(0.0, L['l1'] ** 2 - a * a))
         if way is None:
             way = vsub(L['E'], S) if raised is None else [a - raised * b for a, b in zip(L['stand'], L['reach'])]
-        pole = _bend_way(way, dh)
-        E = [S[i] + a * dh[i] + h * pole[i] for i in range(3)]
+        E, Wb, miss = two_bone(S, L['l1'], L['l2'], Wb, way)
+        if miss > 0.0:                                  # out of reach: as far as it goes (and remember by how much)
+            self.worst = max(self.worst, miss)
+            if self.log is not None:
+                self.log.append((self.now, L['kind'][0] + L['side'][0], miss))
         r1, r2 = leg_frames(s, plan, S, E, Wb)
         name = f"{L['kind']}_%s_{L['side']}"
         p[name % 'upper'] = {'rotation': self.value(name % 'upper', r1)}
@@ -1175,65 +1136,6 @@ def water_move(kind, size, swim_table, swim_leg, flick, log=None):
     return made, P.worst, sc, path
 
 
-def _spline(t, keys, start=0.0, end=0.0):
-    """A value passing smoothly through its keys ((time, value), ...) with no overshoot (a monotone cubic); held
-    before the first and after the last (going on at the end slope after it, when one is given)."""
-    if t <= keys[0][0]:
-        return keys[0][1] + start * (t - keys[0][0])
-    if t >= keys[-1][0]:
-        return keys[-1][1] + end * (t - keys[-1][0])
-    n = len(keys)
-    d = [(keys[i + 1][1] - keys[i][1]) / (keys[i + 1][0] - keys[i][0]) for i in range(n - 1)]
-    m = [0.0] * n                                    # the first and last keys start and stop at rest (or at the slopes given)
-    m[0], m[-1] = start, end
-    for i in range(1, n - 1):
-        m[i] = 0.0 if d[i - 1] * d[i] <= 0 else 2.0 / (1.0 / d[i - 1] + 1.0 / d[i])
-    for i in range(n - 1):
-        (t0, v0), (t1, v1) = keys[i], keys[i + 1]
-        if t <= t1:
-            h = t1 - t0
-            u = (t - t0) / h
-            return (v0 * (2 * u ** 3 - 3 * u ** 2 + 1) + m[i] * h * (u ** 3 - 2 * u ** 2 + u)
-                    + v1 * (-2 * u ** 3 + 3 * u ** 2) + m[i + 1] * h * (u ** 3 - u ** 2))
-    return keys[-1][1]
-
-
-def _foot_at(t, plan, lift, reach=False):
-    """Where a foot's wrist or ankle is at time t on its plan (its first place, then its steps: lift time, land time,
-    place), how far it is lifted (0 to 1) and how far the foot is turned toes up (degrees, a place's fourth value). A
-    hind foot stepping up a face lifts first and reaches forward over it after; a forefoot reaching up (reach) goes
-    forward and up together in one arc, the rise a little ahead, so it stays in front of its shoulder (rising first on
-    the spot while the body went on, it ended up above and behind the shoulder, the elbow thrown up over the back)."""
-    at = list(plan[0][:3])
-    pitch = plan[0][3] if len(plan[0]) > 3 else 0.0
-    for t0, t1, to in plan[1:]:
-        goes = to[3] if len(to) > 3 else 0.0
-        if t <= t0:
-            return at, 0.0, pitch
-        if t < t1:
-            f = (t - t0) / (t1 - t0)
-            rise = to[1] - at[1]
-            if rise < -2.0:                          # going down an edge: out over it first, then down (never into it)
-                fy, fz = _ease(max(0.0, (f - 0.3) / 0.7)), _ease(min(1.0, f / 0.5))
-            elif rise <= 2.0:
-                fy = fz = _ease(f)
-            elif reach:
-                fy, fz = _ease(min(1.0, f / 0.65)), _ease(f)
-            else:
-                fy, fz = _ease(min(1.0, f / 0.6)), _ease(max(0.0, (f - 0.35) / 0.65))
-            arc = math.sin(math.pi * f)
-            # toes turning up onto a face follow the reach forward (never into the face); toes coming off a face
-            # flatten in the last of the rise, as the foot comes over the edge (not a hand waving above it)
-            # going down, the toes turn down onto a face as the foot starts down it, and flatten as it nears the ground
-            turn = ((_ease(max(0.0, (fy - 0.6) / 0.4)) if goes < pitch else fz) if rise > 2.0
-                    else (_ease(min(1.0, 1.5 * fy)) if goes < pitch else _ease(min(1.0, max(0.0, (fy - 0.2) / 0.6)))) if rise < -2.0
-                    else _ease(f))
-            return ([at[0] + (to[0] - at[0]) * _ease(f), at[1] + rise * fy + lift * arc, at[2] + (to[2] - at[2]) * fz],
-                    arc, pitch + (goes - pitch) * turn)
-        at, pitch = list(to[:3]), goes
-    return at, 0.0, pitch
-
-
 def _trunk(rear, bend, hy, hz):
     """The climb's trunk: the hips reared rear (degrees, nose up) with the hip joint at height hy and place hz, the front
     half bent bend more nose down over its three joints, each turned on its outer edge as the game turns it. Returns the
@@ -1624,15 +1526,18 @@ def clips():
                             '0.05': 'path body ' + ' '.join(f'{t:.4f} {dy:.3f} {dz:.3f}' for t, dy, dz in path)}
         return made, P.worst
 
+    # (each remade only when this maker, the kit or model_parts changed: motion_kit.cached, 2026-11-20)
     for down in (False, True):
         for size in CLIMB_SIZES:
             name = climb_name(size, down)
-            out[name], worst[name] = climb(size, down)
+            out[name], worst[name] = cached('monitor', name, fingerprint(name, files=[__file__]),
+                                            lambda: list(climb(size, down)))
     # Going into and out of the water (see _water_keys), one clip for each size.
     for kind in WATER_KINDS:
         for size in CLIMB_SIZES:
             name = water_name(kind, size)
-            out[name], worst[name] = water_move(kind, size, swim_table, swim_leg, flick)[:2]
+            out[name], worst[name] = cached('monitor', name, fingerprint(name, files=[__file__]),
+                                            lambda: list(water_move(kind, size, swim_table, swim_leg, flick)[:2]))
     return out, worst
 
 
