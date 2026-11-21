@@ -775,7 +775,7 @@ public class AnimalLifeTests {
         helper.assertTrue(com.antcolonies.savanna.block.CrocodileNestBlock.lay(level, nest, SavannaEntities.CROCODILE.get(), 6), "no nest laid");
         com.antcolonies.savanna.block.CrocodileNestBlock.cover(level, nest, false);
         var female = croc(helper, "female", new BlockPos(CROC_WATER_TO + 3, WATER_TOP + 1, 11));
-        female.guardNestForTests(nest);
+        female.guardNest(nest);
         var monitor = helper.spawn(SavannaEntities.MONITOR.get(), new BlockPos(CROC_WATER_TO + 5, WATER_TOP + 1, 8));
         float full = monitor.getHealth();
         boolean[] hissed = {false};

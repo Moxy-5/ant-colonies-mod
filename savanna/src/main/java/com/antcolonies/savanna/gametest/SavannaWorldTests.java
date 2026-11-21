@@ -1161,6 +1161,113 @@ public class SavannaWorldTests {
     /** The slope spacings the point reading is tried at. */
     static final int[] BEND_SPANS = {16, 32, 64};
 
+    /**
+     * World eggs step 1 (2026-11-20, {@code docs/plans/world-eggs.md}): crocodile nest sites
+     * ({@link com.antcolonies.savanna.worldgen.NestSites}) come about every 250 to 350 blocks of savanna river (the user's
+     * numbers), never two close together. On {@link #GROUND_SEEDS} the rivers' middle lines are walked as the bend survey
+     * walks them (from river spots beside savanna, both ways, {@link #BEND_STEP}-block steps while in savanna or its
+     * river); every site chunk within two chunks of the line (wide rivers' far banks) is met once; reported: blocks of river per site and the gaps
+     * between one site and the next along a walk. Fails when a site comes on average less than every 230 or more than
+     * every 400 blocks, or one gap in 10 is under 150.
+     */
+    @GameTest(template = "arena", timeoutTicks = 600, batch = "savanna_maps")
+    public static void crocodileNestSitesComeEvery250To350BlocksOfRiver(GameTestHelper helper) {
+        var registries = helper.getLevel().registryAccess();
+        double length = 0;
+        int sites = 0;
+        List<Integer> gaps = new ArrayList<>();
+        long start = System.nanoTime();
+        for (long seed : GROUND_SEEDS) {
+            Climate.Sampler sampler = BiomeMaps.sampler(registries, seed);
+            MultiNoiseBiomeSource source = BiomeMaps.bigSavannaSource(registries, seed);
+            var weird = sampler.weirdness();
+            byte[] map = BiomeMaps.map(source, sampler);
+            int side = BiomeMaps.SIDE;
+            List<Integer> starts = new ArrayList<>();
+            for (int c = 0; c < map.length; c++) {
+                int i = c / side, j = c % side;
+                if (map[c] == BiomeMaps.RIVER && i > 0 && j > 0 && i < side - 1 && j < side - 1 && BiomeMaps.riverBeside(map, c, BiomeMaps.SAVANNA)) {
+                    starts.add(c);
+                }
+            }
+            java.util.Collections.shuffle(starts, new java.util.Random(seed));
+            java.util.Set<Long> walked = new java.util.HashSet<>(), met = new java.util.HashSet<>();
+            int seedWalks = 0;
+            for (int c : starts) {
+                if (seedWalks >= BEND_WALKS) {
+                    break;
+                }
+                double[] p = {-BiomeMaps.HALF + (c / side) * BiomeMaps.STEP, -BiomeMaps.HALF + (c % side) * BiomeMaps.STEP};
+                if (!toMiddle(weird, p) || walked.contains(cellKey(p))) {
+                    continue;
+                }
+                seedWalks++;
+                java.util.Set<Long> mine = new java.util.HashSet<>();
+                for (int dir : new int[] {1, -1}) {
+                    double[] q = p.clone();
+                    double along = 0, lastSite = -1;
+                    for (int s = 0; s < BEND_WALK / BEND_STEP; s++) {
+                        int ci = (int) Math.floor((q[0] + BiomeMaps.HALF) / BiomeMaps.STEP + 0.5), cj = (int) Math.floor((q[1] + BiomeMaps.HALF) / BiomeMaps.STEP + 0.5);
+                        if (ci < 0 || cj < 0 || ci >= side || cj >= side) {
+                            break;
+                        }
+                        int cc = ci * side + cj;
+                        if (map[cc] != BiomeMaps.SAVANNA && !(map[cc] == BiomeMaps.RIVER && BiomeMaps.riverBeside(map, cc, BiomeMaps.SAVANNA))) {
+                            break;
+                        }
+                        long key = cellKey(q);
+                        if (walked.contains(key) && !mine.contains(key)) {
+                            break;      // another walk's river
+                        }
+                        mine.add(key);
+                        if (s > 0 || dir == 1) {
+                            length += BEND_STEP;
+                        }
+                        int cx = Math.floorDiv((int) Math.floor(q[0]), 16), cz = Math.floorDiv((int) Math.floor(q[1]), 16);
+                        for (int dx = -2; dx <= 2; dx++) {
+                            for (int dz = -2; dz <= 2; dz++) {
+                                long site = ((long) (cx + dx) << 32) ^ ((cz + dz) & 0xffffffffL);
+                                if (!met.contains(site) && com.antcolonies.savanna.worldgen.NestSites.site(source, sampler, seed, cx + dx, cz + dz)) {
+                                    met.add(site);
+                                    sites++;
+                                    if (lastSite >= 0) {
+                                        gaps.add((int) (along - lastSite));
+                                    }
+                                    lastSite = along;
+                                }
+                            }
+                        }
+                        along += BEND_STEP;
+                        var r = com.antcolonies.savanna.worldgen.RiverBends.read(weird, (int) Math.floor(q[0]), (int) Math.floor(q[1]));
+                        double tx = -r.gz() * dir, tz = r.gx() * dir, tl = Math.hypot(tx, tz);
+                        if (tl < 1e-12) {
+                            break;
+                        }
+                        q[0] += BEND_STEP * tx / tl;
+                        q[1] += BEND_STEP * tz / tl;
+                        if (!toMiddle(weird, q)) {
+                            break;
+                        }
+                    }
+                }
+                walked.addAll(mine);
+            }
+        }
+        java.util.Collections.sort(gaps);
+        double every = sites == 0 ? Double.MAX_VALUE : length / sites;
+        int shortGaps = (int) gaps.stream().filter(g -> g < 150).count();
+        SavannaMod.LOGGER.info("[nest sites] {} blocks of river walked, {} sites: one every {} blocks; gaps along a walk (n {}): 10% {}, 25% {}, middle {}, 75% {}, 90% {}; under 150: {} ({} s)",
+                (int) length, sites, String.format("%.0f", every), gaps.size(), pct(gaps, 10), pct(gaps, 25), pct(gaps, 50), pct(gaps, 75), pct(gaps, 90),
+                shortGaps, String.format("%.0f", (System.nanoTime() - start) / 1e9));
+        helper.assertTrue(every >= 230 && every <= 400, String.format("a crocodile nest site every %.0f blocks of river (250 to 350 wanted)", every));
+        helper.assertTrue(shortGaps * 10 <= gaps.size(), shortGaps + " of " + gaps.size() + " gaps between sites under 150 blocks");
+        helper.succeed();
+    }
+
+    private static int pct(List<Integer> sorted, int p) {
+        return sorted.isEmpty() ? -1 : sorted.get(Math.min(sorted.size() - 1, sorted.size() * p / 100));
+    }
+
     /** Moves the point onto the weirdness' zero line (a few Newton steps); false if it found none near. */
     private static boolean toMiddle(net.minecraft.world.level.levelgen.DensityFunction weird, double[] p) {
         for (int k = 0; k < 6; k++) {

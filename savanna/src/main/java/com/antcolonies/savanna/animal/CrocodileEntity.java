@@ -414,8 +414,8 @@ public class CrocodileEntity extends PathfinderMob implements GeoEntity, HasLife
                 && (state.getValue(com.antcolonies.savanna.block.CrocodileNestBlock.OPEN) || com.antcolonies.savanna.block.CrocodileNestBlock.hatching(state));
     }
 
-    /** For tests: she guards a nest here (one laid by the test). */
-    public void guardNestForTests(BlockPos nest) {
+    /** She guards a nest here (one laid by a test, or by new land's nesting beaches, {@code worldgen/CrocodileNestFeature}). */
+    public void guardNest(BlockPos nest) {
         nestAt = nest;
         gravid = false;
     }
@@ -1138,7 +1138,7 @@ public class CrocodileEntity extends PathfinderMob implements GeoEntity, HasLife
     private static java.util.Set<net.minecraft.world.level.block.Block> riverSand;
 
     /** River sand a crocodile lies on: dry or wet sand or a crocodile slide, of any tone. */
-    static boolean isRiverSand(net.minecraft.world.level.block.state.BlockState state) {
+    public static boolean isRiverSand(net.minecraft.world.level.block.state.BlockState state) {
         if (riverSand == null) {
             java.util.Set<net.minecraft.world.level.block.Block> set = new java.util.HashSet<>();
             for (var tone : java.util.List.of(com.antcolonies.savanna.registry.SavannaBlocks.RED_SAND,

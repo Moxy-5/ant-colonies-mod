@@ -1,0 +1,5 @@
+{
+  "_note": "World eggs step 1 (2026-11-20): once per chunk; the feature itself asks whether the chunk is a nest site (worldgen/NestSites).",
+  "feature": "antcolonies:crocodile_nests",
+  "placement": []
+}

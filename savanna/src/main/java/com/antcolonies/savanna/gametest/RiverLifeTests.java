@@ -2161,6 +2161,64 @@ public class RiverLifeTests {
         });
     }
 
+    /**
+     * World eggs step 1 (2026-11-20, {@code docs/plans/world-eggs.md}): on a nest site's chunk new land lays covered
+     * crocodile nests on the dry river sand 2 to 6 blocks back from the water, at least 6 apart, each a clutch of the
+     * crocodile's 6 to 10 eggs laid under 3 days ago (so none hatches at once); a mother by a nest is a grown female in the
+     * water close by, guarding that nest. Built over one whole chunk: a strip of water 2 deep and a golden sand bank level
+     * with its top.
+     */
+    @GameTest(template = "arena", timeoutTicks = 100)
+    public static void newLandLaysCrocodileNestsOnTheSandBank(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        BlockPos base = helper.absolutePos(new BlockPos(4, TOP, 4));
+        int x0 = (base.getX() + 15) & ~15, z0 = (base.getZ() + 15) & ~15, y = base.getY();
+        BlockState sand = SavannaBlocks.GOLDEN_SAND.dry().get().defaultBlockState();
+        for (int x = x0 - 3; x <= x0 + 18; x++) {
+            for (int z = z0 - 3; z <= z0 + 18; z++) {
+                boolean water = z < z0 + 4;
+                for (int dy = -3; dy <= 4; dy++) {
+                    BlockState state = dy <= -2 ? Blocks.STONE.defaultBlockState() : dy <= 0 ? (water ? Blocks.WATER.defaultBlockState() : dy == 0 ? sand
+                            : Blocks.STONE.defaultBlockState()) : Blocks.AIR.defaultBlockState();
+                    level.setBlock(new BlockPos(x, y + dy, z), state, 2);
+                }
+            }
+        }
+        long now = level.getGameTime();
+        int laid = com.antcolonies.savanna.worldgen.CrocodileNestFeature.lay(level, net.minecraft.util.RandomSource.create(20261120L), x0, z0, y, now);
+        java.util.List<BlockPos> nests = new java.util.ArrayList<>();
+        for (BlockPos p : BlockPos.betweenClosed(x0, y + 1, z0, x0 + 15, y + 1, z0 + 15)) {
+            if (level.getBlockState(p).getBlock() instanceof com.antcolonies.savanna.block.CrocodileNestBlock) {
+                nests.add(p.immutable());
+            }
+        }
+        var mothers = level.getEntitiesOfClass(com.antcolonies.savanna.animal.CrocodileEntity.class,
+                new net.minecraft.world.phys.AABB(x0 - 10, y - 4, z0 - 10, x0 + 26, y + 6, z0 + 26));
+        SavannaMod.LOGGER.info("[world nests] laid {}: {}; mothers {}", laid, nests, mothers.size());
+        helper.assertTrue(laid >= 1 && laid <= 4 && nests.size() == laid, "laid " + laid + " nests, found " + nests.size() + " (1 to 4 wanted)");
+        for (BlockPos n : nests) {
+            int toWater = n.getZ() - (z0 + 3);
+            helper.assertTrue(toWater >= 2 && toWater <= 6, "a nest " + toWater + " blocks from the water (2 to 6 wanted) at " + n);
+            helper.assertTrue(!level.getBlockState(n).getValue(com.antcolonies.savanna.block.CrocodileNestBlock.OPEN), "a nest laid open at " + n);
+            var clutch = (com.antcolonies.animal.EggClutchBlockEntity) level.getBlockEntity(n);
+            helper.assertTrue(clutch.count() >= 6 && clutch.count() <= 10, "a nest of " + clutch.count() + " eggs (6 to 10 wanted)");
+            long age = now - clutch.laid();
+            helper.assertTrue(age >= 0 && age <= 3 * 24000L && clutch.motherKind() == SavannaEntities.CROCODILE.get(),
+                    "a nest laid " + age + " ticks ago (3 days at most) by " + clutch.motherKind());
+            for (BlockPos m : nests) {
+                helper.assertTrue(m == n || m.distSqr(n) >= 36, "two nests " + Math.sqrt(m.distSqr(n)) + " blocks apart (6 at least)");
+            }
+        }
+        for (var mother : mothers) {
+            helper.assertTrue(!mother.life().isMale() && !mother.life().isYoung() && nests.contains(mother.nestAt())
+                    && level.getFluidState(mother.blockPosition()).is(net.minecraft.tags.FluidTags.WATER),      // (isInWater waits for her first tick)
+                    "a world-laid mother: male " + mother.life().isMale() + ", young " + mother.life().isYoung() + ", guards " + mother.nestAt()
+                    + ", at " + mother.blockPosition());
+            mother.discard();
+        }
+        helper.succeed();
+    }
+
     /** A Nile monitor coming at a bullfrog on the bank makes it leap into the water (Minecraft's long-jump aim). */
     @GameTest(template = "arena", timeoutTicks = 300)
     public static void aBullfrogLeapsIntoTheWaterFromAMonitor(GameTestHelper helper) {
