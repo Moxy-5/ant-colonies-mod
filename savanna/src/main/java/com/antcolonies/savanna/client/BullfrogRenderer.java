@@ -41,6 +41,7 @@ import software.bernie.geckolib.renderer.GeoEntityRenderer;
  */
 public class BullfrogRenderer extends GeoEntityRenderer<BullfrogEntity> {
     static final float SCALE = 0.8F / 2.5F;
+    private static final ResourceLocation FEMALE_TEXTURE = ResourceLocation.fromNamespaceAndPath(SavannaMod.MODID, "textures/entity/bullfrog_female.png");
     /** The rope's colours: the tongue's pink, its shaded side, the pad's deeper rose (RGB). */
     private static final int PINK = 0xE07C88, PINK_SHADE = 0xB65866, PAD = 0xC4475E;
     /**
@@ -59,6 +60,12 @@ public class BullfrogRenderer extends GeoEntityRenderer<BullfrogEntity> {
             public void setCustomAnimations(BullfrogEntity frog, long instanceId, AnimationState<BullfrogEntity> state) {
                 super.setCustomAnimations(frog, instanceId, state);
                 headOnFly(frog, getAnimationProcessor().getBone("head"));
+            }
+
+            /** A female in her own olive-brown look (2026-11-21, the user's approved v29); a male, a froglet as its sex. */
+            @Override
+            public ResourceLocation getTextureResource(BullfrogEntity frog) {
+                return frog.isMale() ? super.getTextureResource(frog) : FEMALE_TEXTURE;
             }
         });
         withScale(SCALE);

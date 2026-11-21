@@ -58,6 +58,7 @@ public class SavannaEvents {
         event.put(SavannaEntities.BARB.get(), com.antcolonies.savanna.animal.BarbEntity.createAttributes().build());
         event.put(SavannaEntities.FLY_CLOUD.get(), com.antcolonies.savanna.animal.FlyCloudEntity.createAttributes().build());
         event.put(SavannaEntities.BULLFROG.get(), com.antcolonies.savanna.animal.BullfrogEntity.createAttributes().build());
+        event.put(SavannaEntities.TADPOLE.get(), com.antcolonies.savanna.animal.TadpoleEntity.createAttributes().build());
     }
 
     /** Where the river animals may spawn (M9): the tilapia and the catfish in the savanna's rivers, pans and oxbows. */
@@ -276,6 +277,7 @@ public class SavannaEvents {
             event.accept(SavannaItems.BARB_SPAWN_EGG);
             event.accept(SavannaItems.FLY_CLOUD_SPAWN_EGG);
             event.accept(SavannaItems.BULLFROG_SPAWN_EGG);
+            event.accept(SavannaItems.TADPOLE_SPAWN_EGG);
         });
     }
 }

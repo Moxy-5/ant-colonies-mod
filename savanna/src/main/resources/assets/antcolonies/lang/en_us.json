@@ -194,5 +194,8 @@
   "entity.antcolonies.bullfrog": "African Bullfrog",
   "item.antcolonies.bullfrog_spawn_egg": "African Bullfrog Spawn Egg",
   "subtitles.antcolonies.bullfrog_call": "Bullfrog calls",
-  "subtitles.antcolonies.bullfrog_bark": "Bullfrog barks"
+  "subtitles.antcolonies.bullfrog_bark": "Bullfrog barks",
+  "entity.antcolonies.tadpole": "Bullfrog Tadpole",
+  "item.antcolonies.tadpole_spawn_egg": "Bullfrog Tadpole Spawn Egg",
+  "block.antcolonies.frog_eggs": "Bullfrog Eggs"
 }

@@ -154,6 +154,10 @@ public class SavannaItems {
     public static final DeferredItem<DeferredSpawnEggItem> BULLFROG_SPAWN_EGG =
             ITEMS.register("bullfrog_spawn_egg",
                     () -> new DeferredSpawnEggItem(SavannaEntities.BULLFROG, 0x4E5E2A, 0xE0BC4A, new Item.Properties()));
+    // Near black with olive-grey fins (the bullfrog's tadpole), my pick.
+    public static final DeferredItem<DeferredSpawnEggItem> TADPOLE_SPAWN_EGG =
+            ITEMS.register("tadpole_spawn_egg",
+                    () -> new DeferredSpawnEggItem(SavannaEntities.TADPOLE, 0x32322A, 0x868E84, new Item.Properties()));
     // Olive grey with a red throat (the breeding male's), my pick.
     public static final DeferredItem<DeferredSpawnEggItem> TILAPIA_SPAWN_EGG =
             ITEMS.register("tilapia_spawn_egg",

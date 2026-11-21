@@ -41,7 +41,7 @@ public class AnimalLifeTests {
     public static void everyRiverAnimalKeepsItsLifeThroughASaveAndLoad(GameTestHelper helper) {
         List<EntityType<? extends Mob>> kinds = List.of(SavannaEntities.TILAPIA.get(), SavannaEntities.CATFISH.get(),
                 SavannaEntities.CROCODILE.get(), SavannaEntities.CRAB.get(), SavannaEntities.SNAIL.get(),
-                SavannaEntities.MONITOR.get(), SavannaEntities.BARB.get());
+                SavannaEntities.MONITOR.get(), SavannaEntities.BARB.get(), SavannaEntities.BULLFROG.get(), SavannaEntities.TADPOLE.get());
         int x = 2;
         for (EntityType<? extends Mob> kind : kinds) {
             Mob mob = helper.spawn(kind, new BlockPos(x, 2, 4));
@@ -62,7 +62,7 @@ public class AnimalLifeTests {
             helper.assertTrue(numbers.twoSexes() == (life.sex() != Sex.NONE), name + "'s sex does not fit its kind: " + life.sex());
             boolean breeds = kind == SavannaEntities.TILAPIA.get() || kind == SavannaEntities.SNAIL.get()
                     || kind == SavannaEntities.CRAB.get() || kind == SavannaEntities.CATFISH.get() || kind == SavannaEntities.CROCODILE.get()
-                    || kind == SavannaEntities.BARB.get();
+                    || kind == SavannaEntities.BARB.get() || kind == SavannaEntities.BULLFROG.get();
             helper.assertTrue(numbers.breeds() == breeds, name + (breeds ? " does not breed (on since step 2 or 3)" : " breeds already (not before its own step)"));
 
             // Saved and loaded whole.
@@ -691,6 +691,170 @@ public class AnimalLifeTests {
                 || female.action() == com.antcolonies.savanna.animal.BarbEntity.SHIVER);
         helper.runAfterDelay(300, () -> {
             helper.assertTrue(!shivered[0] && female.eggsToScatter() == 0, "a pair spawned with " + limit + " barbs round");
+            helper.succeed();
+        });
+    }
+
+    /**
+     * The bullfrog's breeding (2026-11-21, {@code docs/plans/prey-fish-and-frogs.md} step 4): not in the dry; on a
+     * rainy night a grown male calls from the water; the female comes to him, he clasps her from behind on her back
+     * (amplexus) and she lays 8 to 12 eggs as a film on the water's top; he lets go and guards the spot. The eggs hatch
+     * into tadpoles in the water under the film, at 0.7 of a grown tadpole; on day 3 their hind legs are out; grown
+     * (day 4) a tadpole turns into a froglet, a teen bullfrog at 0.31 of grown.
+     */
+    @GameTest(template = "arena", timeoutTicks = 2400, batch = "breeding_frog")
+    public static void bullfrogsCallClaspAndLayAnEggFilmTheFatherGuards(GameTestHelper helper) {
+        breedingPond(helper);
+        clearLeftovers(helper, SavannaEntities.BULLFROG.get());
+        clearLeftovers(helper, SavannaEntities.TADPOLE.get());
+        com.antcolonies.savanna.animal.BullfrogEntity male = helper.spawn(SavannaEntities.BULLFROG.get(), new BlockPos(P0 + 5, BED + 1, P0 + 5));
+        male.setUp(true, 1.0F);
+        com.antcolonies.savanna.animal.BullfrogEntity female = helper.spawn(SavannaEntities.BULLFROG.get(), new BlockPos(P1 - 2, BED + 1, P1 - 2));
+        female.setUp(false, 1.0F);
+        com.antcolonies.gametest.TestClock.still(helper, 22.0);
+        AnimalLife.setRainForTests(false);
+        helper.assertTrue(!female.life().readyToBreed() && !male.life().readyToBreed(), "a bullfrog ready to breed in the dry");
+        AnimalLife.setRainForTests(true);
+        helper.assertTrue(female.life().readyToBreed() && male.life().readyToBreed(), "a grown bullfrog not ready on a rainy night");
+        long started = helper.getLevel().getGameTime();
+        boolean[] clasped = {false}, onHer = {false};
+        helper.runAtTickTime(2390, () -> {
+            AnimalLife.setRainForTests(null);
+            helper.fail("bullfrogs never laid: clasped " + clasped[0] + ", male calling " + male.callingForMate() + " in water " + male.isInWater()
+                    + " at " + helper.relativePos(male.blockPosition()) + ", female partner " + female.life().partner() + " at "
+                    + helper.relativePos(female.blockPosition()) + ", d " + male.distanceTo(female));
+        });
+        helper.onEachTick(() -> {
+            if (male.action() == com.antcolonies.savanna.animal.BullfrogEntity.CLASP) {
+                clasped[0] = true;
+                onHer[0] |= male.getY() > female.getY() + 0.1 && male.distanceTo(female) < 0.6;
+            }
+            BlockPos film = null;
+            for (BlockPos rel : BlockPos.betweenClosed(new BlockPos(P0, WATER_TOP + 1, P0), new BlockPos(P1, WATER_TOP + 1, P1))) {
+                if (helper.getBlockState(rel).is(SavannaBlocks.FROG_EGGS.get())) {
+                    film = helper.absolutePos(rel).immutable();
+                }
+            }
+            if (film == null) {
+                return;
+            }
+            try {
+                helper.assertTrue(clasped[0] && onHer[0], "eggs laid without the male clasped on her back (clasped " + clasped[0] + ")");
+                long took = helper.getLevel().getGameTime() - started;
+                helper.assertTrue(took >= female.life().numbers().courtshipTicks(), "they bred after only " + took + " ticks");
+                EggClutchBlockEntity clutch = (EggClutchBlockEntity) helper.getLevel().getBlockEntity(film);
+                helper.assertTrue(clutch.motherKind() == SavannaEntities.TADPOLE.get(), "a bullfrog clutch of " + clutch.motherKind());
+                helper.assertTrue(clutch.count() >= 8 && clutch.count() <= 12, clutch.count() + " eggs (8 to 12 wanted)");
+                helper.assertTrue(film.equals(male.guarding()), "the father guards " + male.guarding() + ", not the eggs at " + film);
+                helper.assertTrue(male.action() != com.antcolonies.savanna.animal.BullfrogEntity.CLASP && !male.isNoGravity(), "the male still holds on after laying");
+                com.antcolonies.ColonyFrameworkMod.LOGGER.info("[life] bullfrogs laid after {} ticks, {} eggs", took, clutch.count());
+                tadpoleChecks(helper, film);
+            } finally {
+                AnimalLife.setRainForTests(null);
+            }
+            helper.succeed();
+        });
+    }
+
+    private static void tadpoleChecks(GameTestHelper helper, BlockPos film) {
+        ServerLevel level = helper.getLevel();
+        int eggs = ((EggClutchBlockEntity) level.getBlockEntity(film)).count();
+        try {
+            age(level, film, AnimalLives.get(SavannaEntities.TADPOLE.get()).hatchTicks());
+            com.antcolonies.colony.Watchers.setPretend(List.of(net.minecraft.world.phys.Vec3.atCenterOf(film)));
+            tick(level, film);
+        } finally {
+            com.antcolonies.colony.Watchers.setPretend(List.of());
+        }
+        helper.assertTrue(level.getBlockState(film).isAir(), "the egg film is still there after hatching: " + level.getBlockState(film));
+        List<com.antcolonies.savanna.animal.TadpoleEntity> young = level.getEntitiesOfClass(com.antcolonies.savanna.animal.TadpoleEntity.class,
+                new net.minecraft.world.phys.AABB(film).inflate(1.5), t -> true);
+        helper.assertTrue(young.size() == eggs, young.size() + " tadpoles from " + eggs + " eggs");
+        com.antcolonies.savanna.animal.TadpoleEntity one = young.get(0);
+        // (just added, it has not ticked yet, so isInWater is not set: the block it is in)
+        helper.assertTrue(level.getFluidState(one.blockPosition()).is(net.minecraft.tags.FluidTags.WATER) && one.getY() < film.getY(),
+                "a tadpole hatched out of the water at " + one.position() + " (the film at " + film + ")");
+        double share = one.getAttributeBaseValue(Attributes.SCALE) / one.life().ownSize();
+        helper.assertTrue(Math.abs(share - 0.7) < 0.01 && !one.hasLegs(), "a new tadpole at " + share + " of grown (0.7 wanted), legs " + one.hasLegs());
+        // day 3: its hind legs out
+        one.life().setAge(3 * com.antcolonies.animal.LifeNumbers.DAY);
+        for (int i = 0; i < 20 && !one.hasLegs(); i++) {
+            one.tick();             // its legs are looked at once a second
+        }
+        helper.assertTrue(one.hasLegs(), "a 3-day tadpole without legs");
+        // grown (day 4): a froglet in its place, a teen bullfrog at 0.31 of grown
+        java.util.UUID was = one.getUUID();
+        one.life().setAge(one.life().numbers().grownAge());
+        one.turnIntoFroglet(level);
+        helper.assertTrue(level.getEntity(was) == null, "the tadpole is still there after turning");
+        List<com.antcolonies.savanna.animal.BullfrogEntity> froglets = level.getEntitiesOfClass(com.antcolonies.savanna.animal.BullfrogEntity.class,
+                new net.minecraft.world.phys.AABB(film).inflate(2.5), com.antcolonies.savanna.animal.BullfrogEntity::isFroglet);
+        helper.assertTrue(froglets.size() == 1, froglets.size() + " froglets from one tadpole");
+        double froglet = froglets.get(0).getAttributeBaseValue(Attributes.SCALE) / froglets.get(0).life().ownSize();
+        helper.assertTrue(Math.abs(froglet - 0.31) < 0.01, "a froglet at " + froglet + " of grown (0.31 wanted)");
+    }
+
+    /**
+     * Two ready males calling close together wrestle (lunges and shoves, in turn); after it the smaller gives way (no
+     * calling for mates for a minute) and the bigger does not.
+     */
+    @GameTest(template = "arena", timeoutTicks = 900, batch = "breeding_frog_wrestle")
+    public static void bullfrogMalesWrestleAndTheSmallerGivesWay(GameTestHelper helper) {
+        breedingPond(helper);
+        clearLeftovers(helper, SavannaEntities.BULLFROG.get());
+        com.antcolonies.savanna.animal.BullfrogEntity big = helper.spawn(SavannaEntities.BULLFROG.get(), new BlockPos(P0 + 5, BED + 1, P0 + 5));
+        big.setUp(true, 1.08F);
+        com.antcolonies.savanna.animal.BullfrogEntity small = helper.spawn(SavannaEntities.BULLFROG.get(), new BlockPos(P0 + 6, BED + 1, P0 + 6));
+        small.setUp(true, 0.92F);
+        com.antcolonies.gametest.TestClock.still(helper, 22.0);
+        AnimalLife.setRainForTests(true);
+        int[] lunges = {0};
+        byte[] last = {0, 0};
+        helper.runAtTickTime(890, () -> {
+            AnimalLife.setRainForTests(null);
+            helper.fail("no wrestle settled: lunges " + lunges[0] + ", small gives way " + small.givingWay() + ", big gives way " + big.givingWay()
+                    + ", d " + big.distanceTo(small));
+        });
+        helper.onEachTick(() -> {
+            byte a = big.action(), b = small.action();
+            if (a == com.antcolonies.savanna.animal.BullfrogEntity.LUNGE && last[0] != a || b == com.antcolonies.savanna.animal.BullfrogEntity.LUNGE && last[1] != b) {
+                lunges[0]++;
+            }
+            last[0] = a;
+            last[1] = b;
+            if (small.givingWay() || big.givingWay()) {
+                AnimalLife.setRainForTests(null);
+                helper.assertTrue(small.givingWay() && !big.givingWay(), "the bigger male gave way");
+                helper.assertTrue(lunges[0] >= 3, "they gave way after only " + lunges[0] + " lunges");
+                helper.succeed();
+            }
+        });
+    }
+
+    /** No bullfrog breeding while 12 bullfrogs (the life file's local limit) already live round the pond. */
+    @GameTest(template = "arena", timeoutTicks = 400, batch = "breeding_frog_full")
+    public static void noBullfrogBreedingWhileTheRiverIsFull(GameTestHelper helper) {
+        breedingPond(helper);
+        clearLeftovers(helper, SavannaEntities.BULLFROG.get());
+        com.antcolonies.savanna.animal.BullfrogEntity male = helper.spawn(SavannaEntities.BULLFROG.get(), new BlockPos(P0 + 5, BED + 1, P0 + 5));
+        male.setUp(true, 1.0F);
+        com.antcolonies.savanna.animal.BullfrogEntity female = helper.spawn(SavannaEntities.BULLFROG.get(), new BlockPos(P0 + 7, BED + 1, P0 + 5));
+        female.setUp(false, 1.0F);
+        int limit = male.life().numbers().localLimit();
+        for (int i = 2; i < limit; i++) {
+            helper.spawn(SavannaEntities.BULLFROG.get(), new BlockPos(P0 + 2 + i % 10, BED + 1, P0 + 9 + i / 10 * 2)).setUp(false, 1.0F);
+        }
+        com.antcolonies.gametest.TestClock.still(helper, 22.0);
+        AnimalLife.setRainForTests(true);
+        boolean[] clasped = {false};
+        helper.onEachTick(() -> clasped[0] |= male.action() == com.antcolonies.savanna.animal.BullfrogEntity.CLASP);
+        helper.runAfterDelay(300, () -> {
+            AnimalLife.setRainForTests(null);
+            boolean film = false;
+            for (BlockPos rel : BlockPos.betweenClosed(new BlockPos(P0, WATER_TOP + 1, P0), new BlockPos(P1, WATER_TOP + 1, P1))) {
+                film |= helper.getBlockState(rel).is(SavannaBlocks.FROG_EGGS.get());
+            }
+            helper.assertTrue(!clasped[0] && !film, "a pair bred with " + limit + " bullfrogs round (clasped " + clasped[0] + ", eggs " + film + ")");
             helper.succeed();
         });
     }

@@ -19,7 +19,7 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from model_parts import animations, clip, cube, geo, paint_faces, png, smooth, write_assets   # noqa: E402
+from model_parts import animations, clip, cube, game_faces, geo, paint_faces, png, smooth, write_assets   # noqa: E402
 
 LENGTH = 12.0
 HEAD_HALF = 1.25         # the head's half width (the eyes on its sides)
@@ -297,7 +297,7 @@ def write_game():
     """Writes the fry's model, texture and clips into the savanna mod (drawn by the barb's renderer while young)."""
     bones, rows, w, h = paint_faces(model(), TEXELS, LOOKS['painted'])
     write_assets({'textures/entity/barb_fry.png': png(rows),
-                  'geo/entity/barb_fry.geo.json': geo('barb_fry', bones, w, h, (1, 0.5, [0, 0.2, 0])),
+                  'geo/entity/barb_fry.geo.json': geo('barb_fry', game_faces(bones), w, h, (1, 0.5, [0, 0.2, 0])),
                   'animations/entity/barb_fry.animation.json': animations(clips())})
 
 

@@ -77,12 +77,23 @@ final class BullfrogGoals {
     /** How far a call is answered (blocks). */
     static final double ANSWER_REACH = 24.0;
 
+    /** Breeding (prey plan step 4, 2026-11-21; my picks): how near a rival male starts a wrestle (blocks), its shoves
+     * (one every this many ticks, this many in all), how long the beaten one gives way (1 minute), how far a ready male
+     * looks for water to call from (blocks), and how close a father keeps to his spot and sees things off from it. */
+    static final double RIVAL_NEAR = 3.0;
+    static final int SHOVE_EVERY = 30, SHOVES = 4, GIVE_WAY = 1200, BREED_WATER_REACH = 8;
+    static final double FATHER_STAYS = 3.0, FATHER_SEES_OFF = 2.5;
+
     static void register(BullfrogEntity frog, GoalSelector goals) {
         goals.addGoal(0, new EscapeGoal(frog));
         goals.addGoal(1, new LungeGoal(frog));
         goals.addGoal(1, new TongueGoal(frog));
         goals.addGoal(2, new ThreatGoal(frog));
+        goals.addGoal(2, new FatherGoal(frog));
         goals.addGoal(3, new DigGoal(frog));
+        goals.addGoal(3, new WrestleGoal(frog));
+        goals.addGoal(3, new com.antcolonies.animal.SeekMateGoal<>(frog, 1.0));
+        goals.addGoal(4, new ToBreedingWaterGoal(frog));
         goals.addGoal(4, new CallGoal(frog));
         goals.addGoal(5, new ToCloudGoal(frog));
         goals.addGoal(6, new WanderGoal(frog));
@@ -729,7 +740,8 @@ final class BullfrogGoals {
                 rest--;
             }
             boolean provoked = frog.getLastHurtByMob() == player && frog.tickCount - frog.getLastHurtByMobTimestamp() < 100;
-            if (rest <= 0 && (puffed > 30 && player.distanceTo(frog) < BITE_NEAR || provoked && player.distanceTo(frog) < 2.5)) {
+            int puffFirst = frog.guarding() != null ? 10 : 30;        // a father guarding his tadpoles bites sooner
+            if (rest <= 0 && (puffed > puffFirst && player.distanceTo(frog) < BITE_NEAR || provoked && player.distanceTo(frog) < 2.5)) {
                 frog.act(BullfrogEntity.LUNGE);
                 bit = false;
                 frog.playSound(SavannaSounds.BULLFROG_BARK.get(), 1.2F, frog.getVoicePitch());
@@ -841,7 +853,8 @@ final class BullfrogGoals {
 
         @Override
         public boolean canUse() {
-            return frog.isMale() && frog.callIn <= 0 && !frog.busy() && !frog.isDug() && callingTime(frog.level(), frog.blockPosition())
+            return frog.isMale() && frog.life().stage().grown() && frog.callIn <= 0 && !frog.busy() && !frog.isDug()
+                    && callingTime(frog.level(), frog.blockPosition())
                     && (frog.onGround() || frog.isInWater());
         }
 
@@ -850,6 +863,9 @@ final class BullfrogGoals {
             frog.getNavigation().stop();
             frog.act(BullfrogEntity.CALL);
             frog.playSound(SavannaSounds.BULLFROG_CALL.get(), 2.0F, frog.getVoicePitch());
+            if (frog.isInWater() && frog.life().readyToBreed()) {
+                frog.calledAt = frog.tickCount;      // calling for a mate from the water
+            }
             for (BullfrogEntity other : frog.level().getEntitiesOfClass(BullfrogEntity.class, frog.getBoundingBox().inflate(ANSWER_REACH, 8, ANSWER_REACH),
                     o -> o != frog && o.isMale())) {
                 other.callIn = Math.min(other.callIn, 40 + frog.getRandom().nextInt(60));        // an answer 2 to 5 s later
@@ -866,7 +882,270 @@ final class BullfrogGoals {
             if (frog.action() == BullfrogEntity.CALL) {
                 frog.stopActing();
             }
-            frog.callIn = CALL_REST_MIN + frog.getRandom().nextInt(CALL_REST_MORE);
+            // a male calling for a mate calls every 5 to 10 s, else every 10 to 30 s
+            frog.callIn = frog.life().readyToBreed() ? CALL_TICKS + 40 + frog.getRandom().nextInt(100)
+                    : CALL_REST_MIN + frog.getRandom().nextInt(CALL_REST_MORE);
+        }
+    }
+
+    // --- breeding (prey plan step 4, 2026-11-21) -----------------------------------------------------------------------
+
+    /** A ready grown male on land, not giving way and guarding nothing, goes into the nearest water to call from. */
+    static final class ToBreedingWaterGoal extends Goal {
+        private final BullfrogEntity frog;
+        private int ticks;
+
+        ToBreedingWaterGoal(BullfrogEntity frog) {
+            this.frog = frog;
+            setFlags(EnumSet.of(Flag.MOVE));
+        }
+
+        @Override
+        public boolean canUse() {
+            if (!frog.isMale() || !frog.life().stage().grown() || frog.isInWater() || frog.busy() || frog.isDug()
+                    || frog.tickCount < frog.givesWayUntil || frog.guarding() != null || !now(frog, 40)
+                    || !frog.life().readyToBreed()) {
+                return false;
+            }
+            BlockPos water = nearestWater(frog, BREED_WATER_REACH, null);
+            if (water == null) {
+                return false;
+            }
+            ticks = 0;
+            return frog.getNavigation().moveTo(water.getX() + 0.5, water.getY(), water.getZ() + 0.5, 1.0);
+        }
+
+        @Override
+        public boolean canContinueToUse() {
+            return ++ticks < 300 && !frog.isInWater() && !frog.getNavigation().isDone();
+        }
+
+        @Override
+        public void stop() {
+            frog.getNavigation().stop();
+        }
+    }
+
+    /**
+     * Two ready males in the water close together wrestle for the spot (real bullfrog males shove and bite): every
+     * {@link #SHOVE_EVERY} ticks one lunges at the other in turn, shoving him back; after {@link #SHOVES} the smaller
+     * gives way for a minute (no calling for mates) and swims off. The goal on one of the pair moves both.
+     */
+    static final class WrestleGoal extends Goal {
+        private final BullfrogEntity frog;
+        @Nullable
+        private BullfrogEntity rival;
+        private int ticks;
+
+        WrestleGoal(BullfrogEntity frog) {
+            this.frog = frog;
+            setFlags(EnumSet.of(Flag.MOVE, Flag.LOOK, Flag.JUMP));
+        }
+
+        static boolean mayWrestle(BullfrogEntity f) {
+            return f.isMale() && f.life().stage().grown() && f.isInWater() && f.wrestling == null && f.life().partner() == null
+                    && f.tickCount >= f.givesWayUntil && f.guarding() == null && f.life().readyToBreed() && !f.busy();
+        }
+
+        @Override
+        public boolean canUse() {
+            if (!now(frog, 20) || !mayWrestle(frog)) {
+                return false;
+            }
+            rival = null;
+            double best = RIVAL_NEAR * RIVAL_NEAR;
+            for (BullfrogEntity o : frog.level().getEntitiesOfClass(BullfrogEntity.class, frog.getBoundingBox().inflate(RIVAL_NEAR),
+                    o -> o != frog && mayWrestle(o))) {
+                double d = o.distanceToSqr(frog);
+                if (d < best) {
+                    best = d;
+                    rival = o;
+                }
+            }
+            return rival != null;
+        }
+
+        @Override
+        public void start() {
+            ticks = 0;
+            frog.wrestling = rival;
+            rival.wrestling = frog;
+            frog.getNavigation().stop();
+            rival.getNavigation().stop();
+        }
+
+        @Override
+        public boolean canContinueToUse() {
+            return rival != null && rival.isAlive() && ticks < SHOVE_EVERY * SHOVES + 10 && rival.wrestling == frog;
+        }
+
+        @Override
+        public boolean requiresUpdateEveryTick() {
+            return true;
+        }
+
+        @Override
+        public void tick() {
+            if (rival == null) {
+                return;
+            }
+            ticks++;
+            turnTo(frog, rival.position(), 20);
+            turnTo(rival, frog.position(), 20);
+            if (ticks % SHOVE_EVERY == 1) {
+                boolean mine = ticks / SHOVE_EVERY % 2 == 0;
+                BullfrogEntity a = mine ? frog : rival, b = mine ? rival : frog;
+                a.act(BullfrogEntity.LUNGE);
+                a.playSound(SavannaSounds.BULLFROG_BARK.get(), 1.0F, a.getVoicePitch());
+                Vec3 way = b.position().subtract(a.position());
+                double flat = Math.max(0.05, Math.sqrt(way.x * way.x + way.z * way.z));
+                a.setDeltaMovement(a.getDeltaMovement().add(way.x / flat * 0.15, 0.05, way.z / flat * 0.15));
+                b.setDeltaMovement(b.getDeltaMovement().add(way.x / flat * 0.25, 0.08, way.z / flat * 0.25));
+                a.hasImpulse = b.hasImpulse = true;
+            } else if (ticks % SHOVE_EVERY == 16) {
+                if (frog.action() == BullfrogEntity.LUNGE) {
+                    frog.stopActing();
+                }
+                if (rival.action() == BullfrogEntity.LUNGE) {
+                    rival.stopActing();
+                }
+            }
+        }
+
+        @Override
+        public void stop() {
+            if (rival != null) {
+                if (ticks >= SHOVE_EVERY * SHOVES) {
+                    BullfrogEntity loser = frog.life().ownSize() < rival.life().ownSize() ? frog : rival;
+                    loser.givesWayUntil = loser.tickCount + GIVE_WAY;
+                    Vec3 away = DefaultRandomPos.getPosAway(loser, 8, 3, (loser == frog ? rival : frog).position());
+                    if (away != null) {
+                        loser.getNavigation().moveTo(away.x, away.y, away.z, 1.2);
+                    }
+                }
+                if (rival.wrestling == frog) {
+                    rival.wrestling = null;
+                }
+                if (rival.action() == BullfrogEntity.LUNGE) {
+                    rival.stopActing();
+                }
+            }
+            frog.wrestling = null;
+            if (frog.action() == BullfrogEntity.LUNGE) {
+                frog.stopActing();
+            }
+            rival = null;
+        }
+    }
+
+    /** What a father sees off from his spot: catfish, crabs and other bullfrogs (players get his puffing and bite). */
+    static boolean intruder(BullfrogEntity father, LivingEntity e) {
+        return e.isAlive() && (e instanceof CatfishEntity || e instanceof CrabEntity
+                || e instanceof BullfrogEntity other && other != father && other.isMale());
+    }
+
+    /**
+     * The father (real bullfrog fathers guard their tadpoles, the frog's most famous habit): while he guards his spot he
+     * keeps within {@link #FATHER_STAYS} blocks of it and goes for anything {@link #intruder} that comes within
+     * {@link #FATHER_SEES_OFF} of it: a lunge with a bite and a shove.
+     */
+    static final class FatherGoal extends Goal {
+        private final BullfrogEntity frog;
+        @Nullable
+        private LivingEntity foe;
+        private int ticks;
+
+        FatherGoal(BullfrogEntity frog) {
+            this.frog = frog;
+            setFlags(EnumSet.of(Flag.MOVE, Flag.LOOK));
+        }
+
+        @Nullable
+        private LivingEntity foeNear(BlockPos spot) {
+            List<LivingEntity> near = frog.level().getEntitiesOfClass(LivingEntity.class,
+                    new net.minecraft.world.phys.AABB(spot).inflate(FATHER_SEES_OFF), e -> intruder(frog, e));
+            return near.isEmpty() ? null : near.get(0);
+        }
+
+        private boolean far(BlockPos spot) {
+            return frog.distanceToSqr(Vec3.atCenterOf(spot)) > FATHER_STAYS * FATHER_STAYS;
+        }
+
+        @Override
+        public boolean canUse() {
+            BlockPos spot = frog.guarding();
+            if (spot == null || frog.busy() || frog.isDug() || !now(frog, 10)) {
+                return false;
+            }
+            foe = foeNear(spot);
+            return foe != null || far(spot);
+        }
+
+        @Override
+        public void start() {
+            ticks = 0;
+        }
+
+        @Override
+        public boolean canContinueToUse() {
+            BlockPos spot = frog.guarding();
+            return spot != null && ++ticks < 200 && (foe != null && foe.isAlive() || far(spot));
+        }
+
+        @Override
+        public boolean requiresUpdateEveryTick() {
+            return true;
+        }
+
+        @Override
+        public void tick() {
+            BlockPos spot = frog.guarding();
+            if (spot == null) {
+                return;
+            }
+            if (foe != null && (!foe.isAlive() || Math.sqrt(foe.distanceToSqr(Vec3.atCenterOf(spot))) > FATHER_SEES_OFF + 2)) {
+                foe = null;                     // seen off
+            }
+            if (foe == null) {
+                if (frog.getNavigation().isDone() || ticks % 20 == 0) {
+                    frog.getNavigation().moveTo(spot.getX() + 0.5, spot.getY(), spot.getZ() + 0.5, 1.0);
+                }
+                return;
+            }
+            frog.getLookControl().setLookAt(foe, 30, 30);
+            if (frog.action() == BullfrogEntity.LUNGE) {
+                int t = frog.actionTicks;
+                if (t == LUNGE_PUSH) {
+                    Vec3 to = foe.position().subtract(frog.position());
+                    double flat = Math.max(0.05, Math.sqrt(to.x * to.x + to.z * to.z));
+                    frog.setDeltaMovement(frog.getDeltaMovement().add(to.x / flat * 0.3 * frog.getScale(), 0.12, to.z / flat * 0.3 * frog.getScale()));
+                    frog.hasImpulse = true;
+                } else if (t == LUNGE_SNAP && foe.distanceTo(frog) < 1.0 * frog.getScale() + 0.8) {
+                    foe.hurt(frog.damageSources().mobAttack(frog), BITE);
+                    Vec3 off = foe.position().subtract(frog.position()).normalize();
+                    foe.setDeltaMovement(foe.getDeltaMovement().add(off.x * 0.4, 0.1, off.z * 0.4));
+                    foe.hasImpulse = true;
+                } else if (t >= LUNGE_END) {
+                    frog.stopActing();
+                }
+                return;
+            }
+            if (foe.distanceTo(frog) < LUNGE_REACH * frog.getScale() + 0.5) {
+                turnTo(frog, foe.position(), 30);
+                frog.act(BullfrogEntity.LUNGE);
+                frog.playSound(SavannaSounds.BULLFROG_BARK.get(), 1.2F, frog.getVoicePitch());
+            } else if (frog.getNavigation().isDone() || ticks % 10 == 0) {
+                frog.getNavigation().moveTo(foe, 1.2);
+            }
+        }
+
+        @Override
+        public void stop() {
+            if (frog.action() == BullfrogEntity.LUNGE) {
+                frog.stopActing();
+            }
+            frog.getNavigation().stop();
+            foe = null;
         }
     }
 

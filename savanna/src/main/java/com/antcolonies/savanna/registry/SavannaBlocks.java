@@ -224,6 +224,14 @@ public class SavannaBlocks {
             BlockBehaviour.Properties.of().mapColor(MapColor.WATER).replaceable().noCollission().instabreak().noOcclusion()
                     .sound(SoundType.FROGSPAWN).randomTicks().pushReaction(PushReaction.DESTROY).noLootTable());
     /**
+     * The African bullfrog's eggs (prey plan step 4, 2026-11-21; block/FrogEggsBlock): a film of eggs on the water's
+     * top, Minecraft's frogspawn look; gone when they hatch into tadpoles. Drops nothing.
+     */
+    public static final DeferredBlock<com.antcolonies.savanna.block.FrogEggsBlock> FROG_EGGS = BLOCKS.registerBlock("frog_eggs",
+            com.antcolonies.savanna.block.FrogEggsBlock::new,
+            BlockBehaviour.Properties.of().mapColor(MapColor.WATER).replaceable().noCollission().instabreak().noOcclusion()
+                    .sound(SoundType.FROGSPAWN).randomTicks().pushReaction(PushReaction.DESTROY).noLootTable());
+    /**
      * The Nile crocodile's nest on a sand bank (M9, animal life cycle step 4, 2026-11-20; block/CrocodileNestBlock): a low
      * heap of churned sand over her eggs, dug open when they hatch. Drops nothing.
      */

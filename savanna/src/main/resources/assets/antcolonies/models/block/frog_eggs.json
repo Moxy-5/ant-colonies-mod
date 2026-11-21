@@ -1,0 +1,4 @@
+{
+  "parent": "minecraft:block/frogspawn",
+  "render_type": "minecraft:cutout"
+}

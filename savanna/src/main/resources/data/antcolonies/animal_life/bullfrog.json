@@ -1,0 +1,23 @@
+{
+  "_note": "The African bullfrog's life (the animal life kit; breeding on 2026-11-21, docs/plans/prey-fish-and-frogs.md step 4; every number my pick, fun first, inspired by the real frog). Sizes are shares of a male's usual 0.8 blocks: males 0.9 to 1.1 of it, females 0.65 blocks (the user's) 0.9 to 1.1, so 0.73 to 0.89. Its young are tadpoles, an animal of their own (animal_life/tadpole.json): a tadpole turns into a froglet here, a teen 0.25 blocks long (0.31 of a male) that is grown in 3 days. They breed in the rains while it rains, every 4 days: ready males go into the shallow water and call, wrestle a rival male that comes close (the smaller gives way), and a ready female comes to a calling male; he clasps her from behind 10 seconds (courtship ticks count every other game tick) and she lays a film of 8 to 12 eggs on the water there; the father guards the spot 5 days (the eggs' day and the tadpoles' 4). Breeds only while fewer than 12 bullfrogs live within 48 blocks and the bullfrog group (cap 4 round a player) has room.",
+  "sexes": "two",
+  "male_size": [0.9, 1.1],
+  "female_size": [0.73, 0.89],
+  "max_size": 1.15,
+  "young_size": 1.0,
+  "young_days": 0,
+  "teen_size": 0.31,
+  "teen_days": 3,
+  "breeds": true,
+  "breed_every_days": 4,
+  "clutch": [8, 12],
+  "hatch_days": 1,
+  "seasons": ["rains"],
+  "weather": "rain",
+  "time": "any",
+  "care": "guard",
+  "care_days": 5,
+  "mate_reach": 16,
+  "local_limit": 12,
+  "courtship_ticks": 100
+}

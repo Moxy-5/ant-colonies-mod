@@ -143,7 +143,7 @@ public class HuntTilapiaGoal extends Goal {
     static void scatter(net.minecraft.world.entity.Entity hunter, @Nullable net.minecraft.world.entity.Entity struckAt) {
         Vec3 at = hunter.position();
         List<AbstractSchoolingFish> school = hunter.level().getEntitiesOfClass(AbstractSchoolingFish.class, hunter.getBoundingBox().inflate(SCATTER_WITHIN),
-                f -> f instanceof TilapiaEntity || f instanceof BarbEntity);
+                f -> f instanceof TilapiaEntity || f instanceof BarbEntity || f instanceof TadpoleEntity);
         for (AbstractSchoolingFish other : school) {
             if (other == struckAt) {
                 continue;
@@ -191,9 +191,9 @@ public class HuntTilapiaGoal extends Goal {
         return best;
     }
 
-    /** A wild tilapia or barb in the water near it (never the player's own fish, from a bucket or named). */
+    /** A wild tilapia, barb or tadpole in the water near it (never the player's own fish, from a bucket or named). */
     private boolean huntable(AbstractSchoolingFish t) {
-        return (t instanceof TilapiaEntity || t instanceof BarbEntity) && t.isAlive() && t.isInWater() && !t.fromBucket() && !t.hasCustomName()
+        return (t instanceof TilapiaEntity || t instanceof BarbEntity || t instanceof TadpoleEntity) && t.isAlive() && t.isInWater() && !t.fromBucket() && !t.hasCustomName()
                 && t.distanceToSqr(fish) < (LOOK_ACROSS + 4) * (LOOK_ACROSS + 4);
     }
 }

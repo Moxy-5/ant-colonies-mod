@@ -1,0 +1,10 @@
+{
+  "_note": "The bullfrog's tadpole (the animal life kit, 2026-11-21, docs/plans/prey-fish-and-frogs.md step 4; my picks, fun first). Hatched from the bullfrog's egg film in a day (hatch_days is read for the eggs, which are the tadpoles' own kind), 0.15 blocks long when grown, hatching at 0.7 of that; the hind legs show from day 3; at day 4 it is 'grown' and turns into a froglet (a teen bullfrog) as soon as the bullfrogs have room there (their local limit and group cap), so frogs never crowd past the user's cap: one with no room stays a tadpole (real tadpoles can wait too). No sexes, never breeds. Up to 36 tadpoles within 48 blocks (three clutches) before more eggs hatch.",
+  "sexes": "both",
+  "size": [0.9, 1.1],
+  "young_size": 0.7,
+  "young_days": 4,
+  "breeds": false,
+  "hatch_days": 1,
+  "local_limit": 36
+}

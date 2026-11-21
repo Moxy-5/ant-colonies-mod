@@ -396,6 +396,29 @@ user: a detailed webbed foot model comes later). Fun first, inspired by the real
   the game (`tools/film/barb_young_frames.film`, `references/workshop/barb_fry/game_frames.png`): the fry at a third
   of a grown barb's length, nothing in blocks; first light is dim, so the colours are best judged in a real world.
 
+- 2026-11-21, **step 4 built: the bullfrog breeds, and tadpoles** (the user: "lets put in the bulfrogs breeding and
+  tadpoles"). Life files `animal_life/bullfrog.json` and `animal_life/tadpole.json` (all my picks: every 4 days in
+  the rains while it rains; females 0.73-0.89 of a male, the user's 0.65 blocks; clutch 8-12; hatch in a day; a
+  tadpole 0.7 at hatching, its hind legs out on day 3, a froglet on day 4, 0.31 of a male, grown 3 days later; local
+  limits 12 frogs and 36 tadpoles). In the rain ready males go into the nearest water and call every 5 to 10 s; two
+  calling close together wrestle (lunges and shoves in turn, 4 each; the smaller gives way for a minute and swims
+  off). A ready female comes to a calling male; he clasps her from behind (amplexus, a new `clasp` clip: flat along
+  her back, chin over her head, arms round her behind her head, squeezing; held there by the game) for 5 s; she lays
+  a film of eggs on the water's top (a new block, the look of frogspawn); he lets go and guards the spot 5 days,
+  lunging at catfish, crabs and other males that come within 2.5 blocks and biting a player sooner. The eggs hatch into
+  tadpoles in the water under the film (their own animal, the user's approved model and clips: school, graze the
+  algae, gulp air, scatter, flop; kept within 6 blocks). Grown in water, a tadpole turns into a froglet if the
+  frogs have room (their group's cap of 4 and their local limit), else it stays a tadpole until they do; tadpoles
+  have a spawning group of their own (cap 24) so they never fill the frogs' or barbs'. Catfish and young crocodiles
+  eat tadpoles (the father sees catfish off). Females now wear their own look (v29). Tests (`life`): the breeding
+  (not in the dry, the clasp on her back, 8-12 eggs, the father guarding, tadpoles in the water at 0.7, legs on day
+  3, a froglet at 0.31), the wrestle, no breeding when full; the bullfrog and tadpole in the save test. Filmed in the
+  game (`tools/film/bullfrog_breeding_frames.film`; `references/workshop/bullfrog/clasp_game_frames.png`,
+  `references/workshop/tadpole/game_frames.png`): the first film showed the male tipped snout up, sitting on her like
+  a frog on a rock; laid flatter with his hind legs folded along her it reads as a real clasp. Full run (step 4's):
+  274 of 280, all old flakes (BUGS 97, 179, 239, 244) or new ones that passed alone 3 of 3 (BUGS 259, 260; and 261,
+  262 from the `life,river` run). Not yet seen: the whole thing happening by itself in a real rainy world.
+
 ## My picks the user may change
 The barb's name and look, every size and number above (the bullfrog's size is the user's call), barbs with no hunger,
 grown crocodiles ignoring barbs, the bullfrog's bite of 1 heart, bullfrogs not eating colony insects.

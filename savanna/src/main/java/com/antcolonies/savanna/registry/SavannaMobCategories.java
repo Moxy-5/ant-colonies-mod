@@ -12,7 +12,19 @@ import net.minecraft.world.entity.MobCategory;
 public final class SavannaMobCategories {
     private SavannaMobCategories() {}
 
-    private static MobCategory riverFish, riverHunter, riverBed, riverBank, riverSchool, flyCloud, bullfrog;
+    private static MobCategory riverFish, riverHunter, riverBed, riverBank, riverSchool, flyCloud, bullfrog, tadpole;
+
+    /**
+     * The tadpoles' group (prey plan step 4, 2026-11-21): its own, so a school of tadpoles never fills the frogs' places
+     * (the user's 4) or the barbs'. Tadpoles never spawn by themselves (only from eggs): the group is the breeding's cap
+     * round a player, 24 (my pick: two clutches), friendly, removed past 128 blocks.
+     */
+    public static MobCategory tadpole() {
+        if (tadpole == null) {
+            tadpole = MobCategory.valueOf("ANTCOLONIES_TADPOLE");
+        }
+        return tadpole;
+    }
 
     /**
      * The bullfrogs' group (prey plan step 3, 2026-11-20, the spawning check list): its own, cap 4 round a player

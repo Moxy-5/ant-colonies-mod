@@ -64,12 +64,13 @@ public abstract class EggClutchBlock extends Block implements EntityBlock {
      * leaves ({@link #toShells}). A species may let its young out its own way (carried, in water).
      */
     protected void hatch(ServerLevel level, BlockPos pos, BlockState state, EggClutchBlockEntity clutch, EntityType<?> kind, RandomSource random) {
+        BlockPos at = youngAt(pos);
         for (int i = 0; i < clutch.count(); i++) {
             Entity young = kind.create(level);
             if (young == null) {
                 break;
             }
-            young.moveTo(pos.getX() + 0.3 + random.nextDouble() * 0.4, pos.getY(), pos.getZ() + 0.3 + random.nextDouble() * 0.4,
+            young.moveTo(at.getX() + 0.3 + random.nextDouble() * 0.4, at.getY(), at.getZ() + 0.3 + random.nextDouble() * 0.4,
                     random.nextFloat() * 360, 0);
             if (young instanceof Mob mob) {
                 mob.finalizeSpawn(level, level.getCurrentDifficultyAt(pos), MobSpawnType.BREEDING, null);
@@ -81,6 +82,11 @@ public abstract class EggClutchBlock extends Block implements EntityBlock {
             level.addFreshEntity(young);
         }
         toShells(level, pos, state);       // nothing left but the shells
+    }
+
+    /** The block the young come out in: the clutch's own (a clutch floating on the water lets them out under it). */
+    protected BlockPos youngAt(BlockPos pos) {
+        return pos;
     }
 
     /**

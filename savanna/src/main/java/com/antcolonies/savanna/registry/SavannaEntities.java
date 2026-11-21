@@ -149,6 +149,16 @@ public class SavannaEntities {
                     .clientTrackingRange(6)
                     .build("bullfrog"));
 
+    // The bullfrog's tadpole (prey plan step 4, 2026-11-21): drawn 0.15 blocks long (my pick), a small box, each one's
+    // size through its SCALE attribute (its life). Its own group, tadpoles; never spawned by the world.
+    public static final DeferredHolder<EntityType<?>, EntityType<com.antcolonies.savanna.animal.TadpoleEntity>> TADPOLE =
+            ENTITY_TYPES.register("tadpole", () -> EntityType.Builder
+                    .of(com.antcolonies.savanna.animal.TadpoleEntity::new, SavannaMobCategories.tadpole())
+                    .sized(0.18F, 0.12F)
+                    .eyeHeight(0.06F)
+                    .clientTrackingRange(4)
+                    .build("tadpole"));
+
     // The river catfish (M9 river life, the hunter, 2026-11-14): drawn 2 blocks long (the user's pick); its box shorter
     // than the drawn fish (my pick), so it can turn in narrow water; each fish's own size through its SCALE attribute.
     // Under 0.87 wide so even the biggest (1.15) stays under 1: Minecraft plans a swimmer's route in squares of its

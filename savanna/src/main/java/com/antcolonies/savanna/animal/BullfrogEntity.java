@@ -4,6 +4,9 @@ import javax.annotation.Nullable;
 
 import org.joml.Vector3f;
 
+import com.antcolonies.animal.AnimalLife;
+import com.antcolonies.animal.HasLife;
+import com.antcolonies.animal.LifeStage;
 import com.antcolonies.entity.body.SteadyController;
 import com.antcolonies.savanna.registry.SavannaSounds;
 
@@ -19,6 +22,7 @@ import net.minecraft.sounds.SoundEvents;
 import net.minecraft.tags.FluidTags;
 import net.minecraft.util.Mth;
 import net.minecraft.util.RandomSource;
+import net.minecraft.world.entity.Mob;
 import net.minecraft.world.DifficultyInstance;
 import net.minecraft.world.damagesource.DamageSource;
 import net.minecraft.world.entity.AgeableMob;
@@ -27,7 +31,6 @@ import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.MobSpawnType;
 import net.minecraft.world.entity.SpawnGroupData;
-import net.minecraft.world.entity.ai.attributes.AttributeInstance;
 import net.minecraft.world.entity.ai.attributes.AttributeSupplier;
 import net.minecraft.world.entity.ai.attributes.Attributes;
 import net.minecraft.world.entity.ai.navigation.AmphibiousPathNavigation;
@@ -71,12 +74,19 @@ import software.bernie.geckolib.util.GeckoLibUtil;
  * <li>Males call from dusk and in rain, a deep lowing whoop (the throat swelling), and others answer.</li>
  * <li>On land it hops ({@link BullfrogMoveControl}); in the water it swims and floats at the surface.</li>
  * </ul>
- * Breeding (calling and wrestling, the tadpole school guarded by the father) is the plan's step 4.
+ * Its life is the animal life kit's ({@code animal_life/bullfrog.json}): sex, own size, and a froglet stage (a teen,
+ * 0.25 blocks, grown in 3 days) for frogs that come out of the water as tadpoles turn ({@link TadpoleEntity}).
+ *
+ * <p>Breeding (prey plan step 4, 2026-11-21; {@link BullfrogGoals}): in the rains while it rains, ready males go into
+ * shallow water and call; a rival male close by is wrestled (shoves and lunges; the smaller gives way); a ready female
+ * comes to a calling male ({@code SeekMateGoal}), he clasps her from behind (amplexus, {@link #CLASP}) and she lays a
+ * film of eggs on the water there ({@code FrogEggsBlock}); the father stays and guards the spot while the eggs hatch and
+ * the tadpoles grow, biting what comes near.
  */
-public class BullfrogEntity extends Animal implements GeoEntity {
+public class BullfrogEntity extends Animal implements GeoEntity, HasLife {
     /** What it is doing to be seen (synced). */
     public static final byte NONE = 0, HOP = 1, LEAP = 2, LUNGE = 3, TONGUE = 4, PUFF = 5, CALL = 6, DIG_IN = 7, DUG = 8, DIG_OUT = 9,
-            AIM = 10, STALK = 11, HOP_DIVE = 12, CLIMB_OUT = 13;
+            AIM = 10, STALK = 11, HOP_DIVE = 12, CLIMB_OUT = 13, CLASP = 14;
     /** A female's length against a male's (the user's 0.65 against 0.8). */
     static final float FEMALE_SIZE = 0.65F / 0.8F;
     /** The model's mouth, against the frog's feet and middle (blocks at a male's size: the snout 0.4 ahead, 0.19 up). */
@@ -107,7 +117,7 @@ public class BullfrogEntity extends Animal implements GeoEntity {
     private static final EntityDataAccessor<Byte> DATA_ACTION = SynchedEntityData.defineId(BullfrogEntity.class, EntityDataSerializers.BYTE);
     /** Counts every action started, so a clip that plays once restarts for the next (a second hop, a second flick). */
     private static final EntityDataAccessor<Integer> DATA_ACTION_ID = SynchedEntityData.defineId(BullfrogEntity.class, EntityDataSerializers.INT);
-    private static final EntityDataAccessor<Boolean> DATA_MALE = SynchedEntityData.defineId(BullfrogEntity.class, EntityDataSerializers.BOOLEAN);
+    private static final EntityDataAccessor<Byte> DATA_LIFE = AnimalLife.dataFor(BullfrogEntity.class);
     /** Where its tongue reaches to (world), while it flicks. */
     private static final EntityDataAccessor<Vector3f> DATA_TONGUE_AT = SynchedEntityData.defineId(BullfrogEntity.class, EntityDataSerializers.VECTOR3);
     /**
@@ -132,12 +142,26 @@ public class BullfrogEntity extends Animal implements GeoEntity {
     private double hopPush;
     /** Ticks until a male calls again (night and rain only). */
     int callIn;
+    /** Its life: sex, stage, own size (the animal life kit). */
+    private final AnimalLife life;
+    /** The tick a ready male last called from the water (he takes a mate while calling there). */
+    int calledAt = -10000;
+    /** A beaten male gives way until this tick (no calling for mates, no wrestling). */
+    int givesWayUntil;
+    /** A father's spot (the eggs) and the game time he guards it until; null when he guards nothing. */
+    @Nullable
+    BlockPos guardSpot;
+    long guardUntil;
+    /** The rival male it is wrestling now, if any (both of the pair point at each other). */
+    @Nullable
+    BullfrogEntity wrestling;
     // client: the action last seen (to restart its clip) and when it began
     private int seenActionId = -1;
     private int clientActionStart;
 
     public BullfrogEntity(EntityType<? extends BullfrogEntity> type, Level level) {
         super(type, level);
+        life = new AnimalLife(this, DATA_LIFE);
         moveControl = new BullfrogMoveControl(this);
         setPathfindingMalus(PathType.WATER, 0.0F);
         hungryIn = 200 + level.random.nextInt(1200);
@@ -164,7 +188,7 @@ public class BullfrogEntity extends Animal implements GeoEntity {
         super.defineSynchedData(builder);
         builder.define(DATA_ACTION, NONE);
         builder.define(DATA_ACTION_ID, 0);
-        builder.define(DATA_MALE, true);
+        AnimalLife.define(builder, DATA_LIFE);
         builder.define(DATA_TONGUE_AT, new Vector3f());
         builder.define(DATA_TONGUE_CLOUD, -1);
         builder.define(DATA_TONGUE_HIT, false);
@@ -172,17 +196,116 @@ public class BullfrogEntity extends Animal implements GeoEntity {
 
     // --- what it is ----------------------------------------------------------------------------------------------------
 
-    public boolean isMale() {
-        return entityData.get(DATA_MALE);
+    @Override
+    public AnimalLife life() {
+        return life;
     }
 
-    /** Makes it a male or a female of its own length (0.9 to 1.1 of its sex's usual), drawn and boxed through SCALE. */
+    public boolean isMale() {
+        return life.isMale();
+    }
+
+    /** A froglet: the teen stage, just out of the water as a tadpole turned. */
+    public boolean isFroglet() {
+        return life.stage() == LifeStage.TEEN;
+    }
+
+    /**
+     * Makes it a grown male or female of its own length (0.9 to 1.1 of its sex's usual), drawn and boxed through SCALE
+     * (for tests and the film; the world's own are rolled by its life).
+     */
     public void setUp(boolean male, float own) {
-        entityData.set(DATA_MALE, male);
-        AttributeInstance scale = getAttribute(Attributes.SCALE);
-        if (scale != null) {
-            scale.setBaseValue((male ? 1.0F : FEMALE_SIZE) * own);
+        CompoundTag asked = new CompoundTag();
+        asked.putString("sex", male ? "male" : "female");
+        asked.putBoolean("young", false);
+        asked.putFloat("OwnSize", (male ? 1.0F : FEMALE_SIZE) * own);
+        life.load(asked);
+    }
+
+    // --- breeding (prey plan step 4) -------------------------------------------------------------------------------------
+
+    /** How long after his last call a male in the water still takes a mate (ticks: his calls come 5 to 10 s apart). */
+    static final int CALLING_FOR = 400;
+
+    /** Calling for a mate from the water now: a ready, grown male who called lately, not giving way, guarding nothing. */
+    public boolean callingForMate() {
+        if (action() == CLASP) {
+            return true;                // holding her: still hers until they part
         }
+        return isMale() && life.stage() == LifeStage.GROWN && life.readyToBreed() && isInWater()
+                && tickCount - calledAt < CALLING_FOR && tickCount >= givesWayUntil && guardSpot == null;
+    }
+
+    /** A female goes to a calling male; a male waits in the water, calling. */
+    @Override
+    public boolean seeksMate() {
+        return !isMale();
+    }
+
+    @Override
+    public boolean takesMate() {
+        return !isMale() || callingForMate();
+    }
+
+    /**
+     * Amplexus (each tick of the courtship, on her: she is the one who came): he lies on her back, his arms round her
+     * from behind, both still in the water; he is held there (no gravity, no legs) until they part.
+     */
+    @Override
+    public void courting(Mob mate, int ticks) {
+        getNavigation().stop();
+        setDeltaMovement(getDeltaMovement().scale(0.5));
+        if (mate instanceof BullfrogEntity him) {
+            him.getNavigation().stop();
+            float yaw = yBodyRot * Mth.DEG_TO_RAD;
+            double back = 0.12 * getScale();
+            him.setNoGravity(true);
+            him.setPos(getX() + Mth.sin(yaw) * back, getY() + getBbHeight() * 0.55, getZ() - Mth.cos(yaw) * back);
+            him.setDeltaMovement(Vec3.ZERO);
+            him.setYRot(getYRot());
+            him.yBodyRot = yBodyRot;
+            him.yHeadRot = yBodyRot;
+            if (him.action() != CLASP) {
+                him.act(CLASP);
+            }
+        }
+    }
+
+    /**
+     * Mated: she lays her eggs as a film on the water's top here ({@code FrogEggsBlock}); he lets go, and guards the
+     * spot for his life file's care days (the eggs' day and the tadpoles' days).
+     */
+    @Override
+    public void mated(Mob mate) {
+        if (!(level() instanceof ServerLevel server)) {
+            return;
+        }
+        if (isMale()) {
+            stopActing();
+            setNoGravity(false);
+            return;
+        }
+        BlockPos spot = com.antcolonies.savanna.block.FrogEggsBlock.spotNear(server, blockPosition());
+        int eggs = life.numbers().clutchMin() + random.nextInt(life.numbers().clutchMax() - life.numbers().clutchMin() + 1);
+        if (spot != null && com.antcolonies.savanna.block.FrogEggsBlock.lay(server, spot,
+                com.antcolonies.savanna.registry.SavannaEntities.TADPOLE.get(), eggs) && mate instanceof BullfrogEntity him) {
+            him.guardSpot = spot;
+            him.guardUntil = server.getGameTime() + life.numbers().careTicks();
+        }
+    }
+
+    /** Giving way to a bigger male after a wrestle (no calling for mates for a minute). */
+    public boolean givingWay() {
+        return tickCount < givesWayUntil;
+    }
+
+    /** The spot a father guards now (his eggs, then his tadpoles), or none. */
+    @Nullable
+    public BlockPos guarding() {
+        if (guardSpot != null && level().getGameTime() > guardUntil) {
+            guardSpot = null;
+        }
+        return guardSpot;
     }
 
     public boolean isHungry() {
@@ -419,6 +542,11 @@ public class BullfrogEntity extends Animal implements GeoEntity {
             return;
         }
         filmTick();
+        life.tick();
+        if (action() == CLASP && life.partner() == null) {
+            stopActing();               // the courtship ended (mated, or broken off): he lets go
+            setNoGravity(false);
+        }
         if (hungryIn > 0) {
             hungryIn--;
         }
@@ -520,8 +648,7 @@ public class BullfrogEntity extends Animal implements GeoEntity {
     @Nullable
     public SpawnGroupData finalizeSpawn(ServerLevelAccessor level, DifficultyInstance difficulty, MobSpawnType spawnType, @Nullable SpawnGroupData data) {
         SpawnGroupData out = super.finalizeSpawn(level, difficulty, spawnType, data);
-        RandomSource r = level.getRandom();
-        setUp(r.nextBoolean(), 0.9F + r.nextFloat() * 0.2F);
+        life.setUp(false, level.getRandom());
         if (spawnType == MobSpawnType.NATURAL || spawnType == MobSpawnType.CHUNK_GENERATION) {
             // drawn anywhere in its column: set down on the top (on the bank, or afloat on the water)
             int top = surface(level, getX(), getZ());
@@ -627,8 +754,12 @@ public class BullfrogEntity extends Animal implements GeoEntity {
     @Override
     public void addAdditionalSaveData(CompoundTag tag) {
         super.addAdditionalSaveData(tag);
-        tag.putBoolean("Male", isMale());
+        life.save(tag);
         tag.putInt("HungryIn", hungryIn);
+        if (guardSpot != null) {
+            tag.putLong("GuardSpot", guardSpot.asLong());
+            tag.putLong("GuardUntil", guardUntil);
+        }
         byte a = action();
         if (a == DUG || a == DIG_IN) {
             tag.putBoolean("Dug", true);
@@ -638,8 +769,14 @@ public class BullfrogEntity extends Animal implements GeoEntity {
     @Override
     public void readAdditionalSaveData(CompoundTag tag) {
         super.readAdditionalSaveData(tag);
-        entityData.set(DATA_MALE, !tag.contains("Male") || tag.getBoolean("Male"));
+        if (!tag.contains("Life") && !tag.contains("Male")) {
+            tag = tag.copy();
+            tag.putBoolean("Male", true);          // saved before sexes were kept: a male, as before
+        }
+        life.load(tag);
         hungryIn = tag.getInt("HungryIn");
+        guardSpot = tag.contains("GuardSpot") ? BlockPos.of(tag.getLong("GuardSpot")) : null;
+        guardUntil = tag.getLong("GuardUntil");
         if (tag.getBoolean("Dug")) {
             entityData.set(DATA_ACTION, DUG);
         }
@@ -663,6 +800,7 @@ public class BullfrogEntity extends Animal implements GeoEntity {
     private static final RawAnimation DIG_IN_CLIP = RawAnimation.begin().thenPlayAndHold("dig_in");
     private static final RawAnimation DUG_CLIP = RawAnimation.begin().thenLoop("dug");
     private static final RawAnimation DIG_OUT_CLIP = RawAnimation.begin().thenPlay("dig_out");
+    private static final RawAnimation CLASP_CLIP = RawAnimation.begin().thenLoop("clasp");
     /** The walk clip's planted feet match this pace (blocks a tick at a male's size: 5.1 model pixels a second). */
     public static final double WALK_CLIP_PACE = 0.10 / 20.0;
     /**
@@ -770,6 +908,9 @@ public class BullfrogEntity extends Animal implements GeoEntity {
             }
             case DIG_OUT -> {
                 return state.setAndContinue(DIG_OUT_CLIP);
+            }
+            case CLASP -> {
+                return state.setAndContinue(CLASP_CLIP);
             }
             default -> { }
         }

@@ -1,0 +1,82 @@
+# The bullfrog's breeding in the game, frame by frame (prey fish plan step 4, 2026-11-21; CLAUDE.md's hard rule): the
+# male clasped on the female's back (amplexus, film:clasp) where the game holds him (BullfrogEntity.courting: 0.12 of
+# her size behind her middle, his feet at 0.55 of her box's height; she a female of 0.81, he a male of 1.0), side on,
+# three quarters, the front and from above; then the tadpoles at their real size in a pool: a new one (no legs, 0.7 of
+# grown) swimming, a three-day one with its hind legs out, grazing; last a froglet (a teen bullfrog, 0.31) on land.
+#   ./gradlew runFilm -PfilmScene=tools/film/bullfrog_breeding_frames.film   pictures in run-film/screenshots/bullfrog_breeding_frames/
+cmd time set noon
+cmd weather clear
+cmd kill @e[type=!player]
+cmd fill 33 -60 11 40 -57 18 minecraft:air
+lens 40
+wait 40
+# the pair: she faces east; he is 0.097 behind her middle (west) and 0.178 up
+cmd summon antcolonies:bullfrog 36.5 -60.0 14.5 {NoAI:1b,PersistenceRequired:1b,sex:"female",OwnSize:0.81f,Rotation:[-90f,0f],CustomName:'"film:idle"'}
+cmd summon antcolonies:bullfrog 36.403 -59.822 14.5 {NoAI:1b,NoGravity:1b,PersistenceRequired:1b,sex:"male",OwnSize:1.0f,Rotation:[-90f,0f],CustomName:'"film:clasp"'}
+wait 10
+camera 36.45 -61.17 12.90 0 6
+wait 6
+cmd tick freeze
+burst clasp_side 10 4
+cmd tick unfreeze
+camera 37.70 -61.05 13.30 45 18
+wait 6
+cmd tick freeze
+burst clasp_three 6 6
+cmd tick unfreeze
+camera 38.10 -61.20 14.50 90 8
+wait 6
+cmd tick freeze
+burst clasp_front 6 6
+cmd tick unfreeze
+camera 36.45 -60.22 14.50 0 90
+wait 6
+cmd tick freeze
+burst clasp_above 4 8
+cmd tick unfreeze
+cmd tp @e[type=antcolonies:bullfrog] 36 -140 14
+wait 3
+# the pool for the tadpoles: x 30..44, 3 deep, flush with the grass
+cmd fill 30 -63 -8 44 -61 8 minecraft:water
+wait 10
+cmd summon antcolonies:tadpole 33.5 -62.2 0.5 {NoAI:1b,PersistenceRequired:1b,Rotation:[-90f,0f],young:1b,CustomName:'"film:swim"'}
+camera 33.50 -63.77 0.05 0 0
+wait 10
+cmd tick freeze
+burst tadpole_swim_side 10 2
+cmd tick unfreeze
+camera 33.80 -63.70 0.20 45 12
+wait 5
+cmd tick freeze
+burst tadpole_swim_three 6 3
+cmd tick unfreeze
+cmd tp @e[type=antcolonies:tadpole] 33 -140 0
+wait 3
+# three days old: its hind legs out (looked at once a second), a little bigger
+cmd summon antcolonies:tadpole 33.5 -62.2 0.5 {NoAI:1b,PersistenceRequired:1b,Rotation:[-90f,0f],Life:{Age:72000,OwnSize:1.0f},CustomName:'"film:graze"'}
+wait 30
+camera 33.50 -63.77 -0.10 0 0
+wait 5
+cmd tick freeze
+burst legs_graze_side 8 4
+cmd tick unfreeze
+camera 33.50 -63.25 0.50 0 90
+wait 5
+cmd tick freeze
+burst legs_above 3 6
+cmd tick unfreeze
+cmd tp @e[type=antcolonies:tadpole] 33 -140 0
+wait 3
+# a froglet on the grass
+cmd summon antcolonies:bullfrog 36.5 -60.0 14.5 {NoAI:1b,PersistenceRequired:1b,Rotation:[-90f,0f],Life:{Age:0,Grown:0b,Sex:"male",OwnSize:1.0f},CustomName:'"film:idle"'}
+wait 10
+camera 36.50 -61.50 14.10 0 10
+wait 5
+cmd tick freeze
+burst froglet_side 3 10
+cmd tick unfreeze
+camera 36.75 -61.45 14.25 45 15
+wait 5
+cmd tick freeze
+burst froglet_three 3 10
+cmd tick unfreeze

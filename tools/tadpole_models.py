@@ -321,7 +321,23 @@ def workshop_look():
     return bones, png(rows), w, h
 
 
+def write_game():
+    """Writes the tadpole's model (the day-3 leg buds in it as their own bones; the renderer hides them until the
+    tadpole is 3 days old), its texture and clips into the savanna mod. The faces go through game_faces, so the eye's
+    gold patch and black sheen land on the outside in the game as in the viewer."""
+    global LEGS
+    from model_parts import animations, game_faces, geo, write_assets
+    LEGS = 1.0
+    bones, rows, w, h = paint_faces(model(), TEXELS, LOOKS['painted'])
+    write_assets({'textures/entity/tadpole.png': png(rows),
+                  'geo/entity/tadpole.geo.json': geo('tadpole', game_faces(bones), w, h, (1, 0.5, [0, 0.2, 0])),
+                  'animations/entity/tadpole.animation.json': animations(clips())})
+
+
 if __name__ == '__main__':
+    if sys.argv[1:] == ['game']:
+        write_game()
+        sys.exit()
     bones = model()
     print(sum(len(b['cubes']) for b in bones), 'boxes,', len(bones), 'bones')
     LEGS = 1.0

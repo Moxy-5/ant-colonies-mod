@@ -688,6 +688,8 @@ from model_parts import (clip as _sample, smooth, turn_x, turn_y, turn_z, mat_ve
 
 BODY_PIVOT = (0.0, 6.0, 0.0)
 IDLE_LEN, WALK_LEN, HOP_LEN, LEAP_LEN, SWIM_LEN, FLOAT_LEN = 6.0, 1.4, 0.8, 1.1, 1.0, 3.0
+CLASP_LEN, CLASP_LIFT, CLASP_PITCH = 2.0, 0.5, -6.0     # the clasp's loop, his body raised (px) and tipped (deg, snout down: flat along her back)
+CLASP_GRIP = (9.5, -2.0, -9.5)     # where his wrists grip her (on his ground's axes: out to the side, height, forward; my picks)
 TONGUE_LEN, TONGUE_FLIP, TONGUE_STRETCH, TONGUE_GAPE, TONGUE_LEAN = 0.7, -3.5, 3.9, 38.0, 4.0
 CALL_LEN, PUFF_LEN, ATTACK_LEN, DEATH_LEN, DIG_LEN, DUG_LEN, DIG_OUT_LEN = 3.0, 2.0, 0.8, 1.0, 3.0, 6.0, 1.2
 STALK_LEN, STALK_SWEEP, STALK_DUTY, STALK_LIFT = 1.0, 5.0, 0.75, -0.4   # the creep: long time down, body low; planted feet
@@ -1097,6 +1099,27 @@ def clips():
         return p
     make('float', FLOAT_LEN, float_)
 
+    # clasp (amplexus, prey plan step 4): the male on the female's back as the game holds him there
+    # (BullfrogEntity.courting: 0.12 of her size behind her middle, his feet at 0.55 of her box's height). Lifted a
+    # little and tipped a little snout down, flat along her back, his chin over her head (the first in-game film: tipped
+    # snout up he sat on her like a frog on a rock); his arms reach down round her behind her head
+    # and grip her flanks (the hands pressed in, hidden against her), squeezing now and then; his hind legs folded along
+    # her hips; a slow bob as she floats (my picks)
+    P = _Poser()
+
+    def clasp(t):
+        w = 2 * math.pi * t / CLASP_LEN
+        squeeze = _pulse(t, 0.6, 0.15, 0.35, 0.3)
+        p = {}
+        P.body(p, pitch=CLASP_PITCH + 0.8 * math.sin(w), lift=CLASP_LIFT + 0.3 * math.sin(w), fwd=0.4)
+        for s, side in SIDES:
+            P.limb(p, 'arm', side, [s * (CLASP_GRIP[0] - 0.6 * squeeze), CLASP_GRIP[1], CLASP_GRIP[2]],
+                   turn_z(-s * 55), way=[s * 1.0, 0.6, 0.4])
+            P.limb(p, 'leg', side, [s * 12.5, CLASP_LIFT - 5.0, 8.0], turn_y(-s * 20))     # folded along her sides
+        _face(p, t, pump=_breath(t, 0.9))
+        return p
+    make('clasp', CLASP_LEN, clasp, 30)
+
     # call: the body lifts, the throat swells big, holds with a tremble, sinks
     P = _Poser()
 
@@ -1279,6 +1302,7 @@ WORKSHOP_CLIP_INFO = {
         'swim': 'The frog kick: both hind legs together, glide, draw up.',
         'climb_out': 'Out of the water onto a bank: arms reach onto it, it tips up and pulls, the hind legs kick it on, it sits.',
         'float': 'Resting at the surface, legs spread, a slow bob.',
+        'clasp': 'Amplexus: the male on her back, arms round her behind her head, squeezing now and then (the game holds him on her).',
         'call': 'The deep whoop: it lifts, the throat swells big, holds with a tremble, sinks.',
         'puff': 'Its threat: blown up and risen on straight front legs, mouth a little open.',
         'tongue': 'The flick for small prey close by: the tongue shoots out from the back of the mouth, slaps its pad down, snaps back.',
@@ -1295,7 +1319,11 @@ def write_game():
     byte; the model's faces go through model_parts.game_faces, so the game draws them as the viewer does (2026-11-20:
     without it the eyes' art was on the faces inside the head, the outer sides plain green, the front turned over)."""
     bones, rows, w, h = paint_faces(model(), 1, LOOKS[GAME_LOOK])
+    # the female's own olive-brown look (the user's approved v29) on the same model and texture layout
+    female_bones, female_rows, fw, fh = paint_faces(model(), 1, LOOKS['female'])
+    assert (fw, fh) == (w, h) and [b['name'] for b in female_bones] == [b['name'] for b in bones]
     write_assets({'textures/entity/bullfrog.png': png(rows),
+                  'textures/entity/bullfrog_female.png': png(female_rows),
                   'geo/entity/bullfrog.geo.json': geo('bullfrog', game_faces(bones), w, h, (3, 2, [0, 0.6, 0])),
                   'animations/entity/bullfrog.animation.json': animations(clips())})
 
