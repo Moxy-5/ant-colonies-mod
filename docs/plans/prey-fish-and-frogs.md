@@ -327,6 +327,18 @@ user: a detailed webbed foot model comes later). Fun first, inspired by the real
     the sheets and outlines.
   - Tools: `workshop.py snapshot --set NAME=value` (a slider number or `WORKSHOP_LOOK=<look>`, for keeping a sex as a
     version); the outline page draws small animals bigger; `barb_sheet.draw_map` takes its colours.
+- 2026-11-20, **the fry's and the tadpole's plain 3D shapes** (the user: "Build the 3D shapes"; the sheets OKed by
+  going on). `tools/barb_fry_models.py` (v1, 12 boxes, the grown barb's bone names so its clips move it: the head one
+  box with the eyes painted on its sides, the body two boxes narrowing, folds on the back and belly, a small forked
+  tail, tiny breast fins; against the sheet side 98 / 100, from above 88 / 87, front 79 / 97: a little narrower than
+  the sheet's 3-pixel front on purpose, so the head and body are one width from above). At its real 0.08 blocks it
+  is about one Minecraft texture pixel long, so it is kept a simple bar of glass. `tools/tadpole_models.py` (v1, 25
+  boxes; v2 with the day-3 hind legs, 29): the body one-pixel slices of two boxes each (a flat oval from the front and
+  above), the eye and the mouth underneath painted, the tail three bones (`tail_1` to `tail_3`) of muscle with thin
+  fins above and below, the hind legs small buds at the tail's root on their own bones (`LEGS` 0 leaves their boxes
+  out); side 96 / 97, from above 94 / 88, front 86 / 96. Plain colours, the sheets'. Pictures
+  `references/workshop/barb_fry/plain_v1.png`, `references/workshop/tadpole/plain_v1_v2.png`. Waiting for the
+  user's look; next the paint (my pick for the game: the fry drawn see-through).
 
 ## My picks the user may change
 The barb's name and look, every size and number above (the bullfrog's size is the user's call), barbs with no hunger,

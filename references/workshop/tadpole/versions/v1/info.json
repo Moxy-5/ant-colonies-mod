@@ -1,0 +1,10 @@
+{
+ "note": "plain 3D shape from the outline",
+ "date": "2026-11-20",
+ "boxes": 25,
+ "numbers": {
+  "CORE_WIDTH": 0.55,
+  "FLANK_DEPTH": 0.6,
+  "LEGS": 0.0
+ }
+}

@@ -1,0 +1,10 @@
+{
+ "note": "plain 3D shape from the outline",
+ "date": "2026-11-20",
+ "boxes": 12,
+ "numbers": {
+  "HEAD_HALF": 1.25,
+  "BELLY_HALF": 1.25,
+  "REAR_HALF": 0.5
+ }
+}
