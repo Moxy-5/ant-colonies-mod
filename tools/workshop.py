@@ -6,6 +6,8 @@ versions and shape sliders (docs/plans/model-workshop.md, built 2026-11-19).
     python tools/workshop.py outline <animal>   the outline over the picture's views with fill scores, and the outline
                                                 as a picture for the 3D viewer's Compare
     python tools/workshop.py snapshot <animal> --note "longer neck"   keep the model as it is now as the next version
+                                                (--set NAME=value for a slider number or WORKSHOP_LOOK=<look>, e.g.
+                                                a female: --set PLUMP=1 --set WORKSHOP_LOOK=female)
     python tools/workshop.py versions <animal>  the versions page (references/workshop/<animal>/versions.html): one
                                                 version or two side by side, one over the other, parts mixed, Compare
     python tools/workshop.py serve <animal>     the same page with live shape sliders, at http://localhost:8790/
@@ -437,7 +439,7 @@ def outline_page(animal):
     outline = load_outline(animal)
     boxes = view_boxes(outline)
     found = picture_views(animal)
-    S = 7                                                    # screen pixels a model pixel
+    S = max(7, round(420 / outline["length_px"]))           # screen pixels a model pixel (small animals bigger)
     sections, scores = [], {}
     for view in VIEWS:
         rects = boxes[view]
@@ -547,7 +549,10 @@ def maker(animal, numbers=None):
     name = f"{animal}_models"
     mod = importlib.reload(sys.modules[name]) if name in sys.modules else importlib.import_module(name)
     for key, value in (numbers or {}).items():
-        set_shape(mod, key, value)
+        if key == "WORKSHOP_LOOK":                       # a maker's named look (a sex, a season), not a slider
+            mod.WORKSHOP_LOOK = value
+        else:
+            set_shape(mod, key, value)
     return mod
 
 
@@ -703,12 +708,16 @@ def main():
     note = ""
     if "--note" in argv:                                   # snapshot <animal> --note "what changed"
         i = argv.index("--note"); note = argv[i + 1] if i + 1 < len(argv) else ""; del argv[i:i + 2]
+    numbers = {}
+    while "--set" in argv:                                 # snapshot <animal> --set PLUMP=1 --set WORKSHOP_LOOK=female
+        i = argv.index("--set"); k, _, v = argv[i + 1].partition("="); del argv[i:i + 2]
+        numbers[k] = v if k == "WORKSHOP_LOOK" else float(v)
     args = [a for a in argv if not a.startswith("--")]
     if len(args) != 2 or args[0] not in ("brief", "starter", "outline", "snapshot", "versions", "serve"):
         raise SystemExit(__doc__.split("\n\n")[1])
     cmd, animal = args
     if cmd == "snapshot":
-        snapshot(animal, note)
+        snapshot(animal, note, numbers or None)
         print("wrote", versions_page(animal).relative_to(ROOT))
     elif cmd == "versions":
         print("wrote", versions_page(animal).relative_to(ROOT))

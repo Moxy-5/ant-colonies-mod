@@ -1,0 +1,32 @@
+{
+  "length_blocks": 1.125,
+  "views": {
+    "side": {
+      "box": [
+        20,
+        20,
+        240,
+        130
+      ],
+      "head": "right"
+    },
+    "top": {
+      "box": [
+        20,
+        130,
+        240,
+        220
+      ],
+      "head": "right"
+    },
+    "front": {
+      "box": [
+        240,
+        20,
+        330,
+        130
+      ]
+    }
+  },
+  "made_by": "python tools/workshop.py outline tadpole (from references/outlines/tadpole.json)"
+}

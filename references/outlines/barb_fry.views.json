@@ -1,0 +1,32 @@
+{
+  "length_blocks": 0.75,
+  "views": {
+    "side": {
+      "box": [
+        20,
+        20,
+        180,
+        110
+      ],
+      "head": "right"
+    },
+    "top": {
+      "box": [
+        20,
+        110,
+        180,
+        180
+      ],
+      "head": "right"
+    },
+    "front": {
+      "box": [
+        180,
+        20,
+        250,
+        110
+      ]
+    }
+  },
+  "made_by": "python tools/workshop.py outline barb_fry (from references/outlines/barb_fry.json)"
+}

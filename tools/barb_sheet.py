@@ -116,7 +116,8 @@ def _front():
 SIDE, TOP, FRONT = _side(), _top(), _front()
 
 
-def draw_map(img, rows, x0, y0, cell=CELL, swap=None):
+def draw_map(img, rows, x0, y0, cell=CELL, swap=None, colours=None):
+    colours = colours or COLOURS
     d = ImageDraw.Draw(img)
     for j, row in enumerate(rows):
         for i, ch in enumerate(row):
@@ -124,7 +125,7 @@ def draw_map(img, rows, x0, y0, cell=CELL, swap=None):
                 continue
             if swap and ch in swap:
                 ch = swap[ch]
-            c = COLOURS[ch]
+            c = colours[ch]
             d.rectangle([x0 + i * cell, y0 + j * cell, x0 + (i + 1) * cell - 1, y0 + (j + 1) * cell - 1], fill=c)
     return (x0, y0, x0 + len(rows[0]) * cell, y0 + len(rows) * cell)
 

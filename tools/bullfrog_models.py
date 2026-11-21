@@ -617,7 +617,28 @@ def paint_colour(c, face_, x, y, z):
     return _noise(base, ix, iy, iz)
 
 
-LOOKS = {'painted': paint_colour, 'plain': plain_colour}
+# The female (2026-11-20, my pick, inspired by the real bullfrog: females are smaller (the game draws her 0.65 blocks to
+# his 0.8) and duller, olive-brown with a cream throat; the male's throat is yellow, brighter in the rains). Same model,
+# same marks (the noise and dashes fall in the same places), only these colours changed.
+FEMALE = {
+    'back': (84, 82, 44), 'head': (86, 86, 46), 'snout': (86, 86, 46), 'dash': (44, 38, 20), 'wart': (130, 124, 76),
+    'flank': (164, 150, 90), 'yellow': (200, 178, 108), 'orange': (204, 148, 86), 'belly': (234, 222, 176),
+    'lip': (182, 174, 112), 'throat': (228, 216, 172), 'blotch': (156, 146, 98), 'leg': (88, 86, 48),
+    'bar': (54, 50, 28), 'web': (128, 126, 80),
+}
+
+
+def female_colour(c, face_, x, y, z):
+    global PAINT
+    male = PAINT
+    PAINT = dict(male, **FEMALE)
+    try:
+        return paint_colour(c, face_, x, y, z)
+    finally:
+        PAINT = male
+
+
+LOOKS = {'painted': paint_colour, 'female': female_colour, 'plain': plain_colour}
 GAME_LOOK = 'painted'
 
 
@@ -629,8 +650,11 @@ WORKSHOP_PARTS = {'head': ['head'], 'eyes': ['eye_left', 'eye_right'], 'body': [
                   'hind legs': ['leg_left_1', 'leg_right_1']}
 
 
+WORKSHOP_LOOK = GAME_LOOK
+
+
 def workshop_look():
-    bones, rows, w, h = paint_faces(model(), 1, LOOKS[GAME_LOOK])
+    bones, rows, w, h = paint_faces(model(), 1, LOOKS[WORKSHOP_LOOK])
     return bones, png(rows), w, h
 
 

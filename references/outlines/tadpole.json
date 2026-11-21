@@ -1,0 +1,167 @@
+{
+ "animal": "tadpole",
+ "length_px": 18,
+ "note": "The bullfrog tadpole's outline, Claude's design (references/inspiration/tadpole.png, tools/young_sheets.py), 2026-11-20. Made 18 model pixels long, drawn in the game at 0.15 blocks. x from the tail tip (0) to the snout.",
+ "marks": [
+  {
+   "name": "eye",
+   "side": [
+    15,
+    16,
+    4,
+    5
+   ],
+   "top": [
+    15,
+    16,
+    1.5,
+    2.5
+   ],
+   "front": [
+    1.5,
+    2.5,
+    4,
+    5
+   ],
+   "colour": "#0a0a0a"
+  },
+  {
+   "name": "eye (right)",
+   "top": [
+    15,
+    16,
+    -2.5,
+    -1.5
+   ],
+   "front": [
+    -2.5,
+    -1.5,
+    4,
+    5
+   ],
+   "colour": "#0a0a0a"
+  },
+  {
+   "name": "mouth",
+   "front": [
+    -1.5,
+    1.5,
+    2,
+    3
+   ],
+   "colour": "#968c74"
+  },
+  {
+   "name": "gut",
+   "side": [
+    14,
+    16,
+    2,
+    3
+   ],
+   "colour": "#423e32"
+  }
+ ],
+ "parts": [
+  {
+   "name": "snout",
+   "side": [
+    17,
+    18,
+    2,
+    5
+   ],
+   "half_width": 1.5
+  },
+  {
+   "name": "body",
+   "side": [
+    12,
+    17,
+    1,
+    6
+   ],
+   "half_width": 2.5
+  },
+  {
+   "name": "body rear",
+   "side": [
+    11,
+    12,
+    2,
+    6
+   ],
+   "half_width": 1.5
+  },
+  {
+   "name": "tail root",
+   "side": [
+    8,
+    11,
+    2,
+    5
+   ],
+   "half_width": 1.5
+  },
+  {
+   "name": "tail",
+   "side": [
+    1,
+    8,
+    3,
+    4
+   ],
+   "half_width": 0.5
+  },
+  {
+   "name": "tail tip",
+   "side": [
+    0,
+    1,
+    3,
+    4
+   ],
+   "half_width": 0.25
+  },
+  {
+   "name": "upper fin",
+   "side": [
+    4,
+    11,
+    5,
+    7
+   ],
+   "half_width": 0.25
+  },
+  {
+   "name": "upper fin back",
+   "side": [
+    1,
+    6,
+    4,
+    6
+   ],
+   "half_width": 0.25
+  },
+  {
+   "name": "lower fin",
+   "side": [
+    3,
+    11,
+    1,
+    3
+   ],
+   "half_width": 0.25
+  },
+  {
+   "name": "lower fin edge",
+   "side": [
+    5,
+    10,
+    0,
+    1
+   ],
+   "half_width": 0.25
+  }
+ ]
+}

@@ -304,6 +304,29 @@ user: a detailed webbed foot model comes later). Fun first, inspired by the real
   catfish eating frogs (no frog in their food yet), barbs and young crocodiles eating landed flies, tadpoles (step 4).
   Changes in `docs/HISTORY.md`. Not tried in-game by the user yet.
 - 2026-11-20, the user: the in-game eyes are not their design. **Fixed:** GeckoLib drew each box's paint the other way round from the viewer (east and west swapped, every face's picture back to front), so the eyes' art sat on the faces inside the head and the front's was turned over. The frog's export now passes its faces through `model_parts.game_faces`; texture (v27 byte for byte), shape and clips unchanged. Filmed in the game (`tools/film/bullfrog_eyes.film`) and put beside the v27 viewer from the same cameras (`tools/game_compare.py`): the eyes match the approved C2 look pixel for pixel from the side, three quarters, front and the other side; the idle blink, the attack's swallow and the tongue move them right. Picture `references/workshop/bullfrog/eyes_game_vs_v27.png`. BUGS 245 (the other animals' smaller swaps left open).
+- 2026-11-20, **the young and the sexes, design started** (the user: "lets get started on designing the tadpole and the
+  baby silver barb and female and male models"). Read as both species' sexes, as both breed (my reading). All my picks,
+  fun first, inspired by real barbs and bullfrogs; nothing in the game yet:
+  - **Barb male and female** (`tools/barb_models.py`, `PLUMP` and `STYLES`): the approved v6 is the male (proved
+    unchanged); the female (v7) is fuller, her belly dropped 1.6 px and widened round the deepest part (real female
+    barbs are rounder with eggs), the belly fins moved down with it, her fins amber rather than orange; a male in
+    breeding colours for the rains (v8): deeper orange-red fins, scarlet tail tips, a coppery flush above the side
+    line, a few white bumps on the head (real breeding barbs grow them). Each 39 boxes. Picture
+    `references/workshop/barb/sexes_v6_v7_v8.png`.
+  - **Bullfrog female** (`FEMALE` in `tools/bullfrog_models.py`, v29): the same model and marks, olive-brown and duller,
+    a cream throat (the male's yellow); drawn 0.65 blocks to his 0.8 (the user's sizes). Picture
+    `references/workshop/bullfrog/sexes_v28_v29.png`. Her eye plates keep the approved eye art's green lid row.
+  - **Barb fry and tadpole**, new models through the workshop: design sheets drawn by Claude (`tools/young_sheets.py`
+    -> `references/inspiration/barb_fry.png`, `tadpole.png`), briefs (`*.brief.md`), outlines
+    (`references/outlines/barb_fry.json`, `tadpole.json`; side, top, front 100/100, 95/90, 91/100 and 97/99, 99/100,
+    96/100). The fry: 12 px, drawn 0.08 blocks, a glassy see-through body, big dark eyes, the silver swim bladder and
+    gold gut showing, the barb's bone names so its swim clips drive it, under 12 boxes; the fry look for its first day,
+    then the grown model drawn small (my pick). The tadpole: 18 px, drawn 0.15 blocks, near black, a flat oval body,
+    small eyes high on the sides, the mouth underneath, a grey belly with the gut showing, a tail 1.6 times the body
+    with speckled fins, hind legs as their own bones shown from day 3, under 30 boxes. Waiting for the user's look at
+    the sheets and outlines.
+  - Tools: `workshop.py snapshot --set NAME=value` (a slider number or `WORKSHOP_LOOK=<look>`, for keeping a sex as a
+    version); the outline page draws small animals bigger; `barb_sheet.draw_map` takes its colours.
 
 ## My picks the user may change
 The barb's name and look, every size and number above (the bullfrog's size is the user's call), barbs with no hunger,

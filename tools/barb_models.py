@@ -43,6 +43,11 @@ BODY_FROM, HEAD_FROM, TAIL_ROOT = 11.0, 23.0, 7.0    # the body bone from x 11, 
 EYE_AT, EYE_HEIGHT, EYE_SIZE = 26.0, 7.0, 1.0        # the eye's middle (outline x, y) and its half size
 MOUTH_Y, JAW_FROM, SNOUT = 5.0, 27.5, 2.0   # the mouth line's height, where the lower jaw hinges, the snout's length
 FORK = 2.0               # where the lobes' tip pieces begin (model pixels from the tail tip's line)
+# The female (2026-11-20, my pick from real small barbs: the female a little fuller, her belly rounded with eggs, the
+# male slimmer and brighter): PLUMP 0 is the approved fish (the male), 1 the female. The belly drops and widens round
+# the deepest part (PLUMP_AT, PLUMP_SPREAD), the belly fins and the fin under the tail move down with it.
+PLUMP = 0.0
+PLUMP_DROP, PLUMP_WIDEN, PLUMP_AT, PLUMP_SPREAD = 1.6, 0.6, 17.5, 4.5
 
 
 def z_of(x):
@@ -53,7 +58,14 @@ def at(x):
     """(top, belly, half width) of the body at outline x, eased between the profile's points."""
     xs = [p[0] for p in PROFILE]
     t_of = lambda v: (v - xs[0]) / (xs[-1] - xs[0])           # noqa: E731
-    return tuple(curve([(t_of(p[0]), p[k]) for p in PROFILE], t_of(x)) for k in (1, 2, 3))
+    top, belly, hw = (curve([(t_of(p[0]), p[k]) for p in PROFILE], t_of(x)) for k in (1, 2, 3))
+    b = PLUMP * math.exp(-((x - PLUMP_AT) / PLUMP_SPREAD) ** 2)
+    return top, belly - PLUMP_DROP * b, hw + PLUMP_WIDEN * b
+
+
+def fin_drop():
+    """How far the belly fins and the fin under the tail sit lower on a plump fish (they keep their own length)."""
+    return PLUMP * PLUMP_DROP * 0.8
 
 
 def box(x0, x1, half, y0, y1, part, across=0.0):
@@ -131,11 +143,11 @@ def fins(bones):
     top = at(19.5)[0]
     bones['back_fin'] += [box(18.0, 21.0, 0.25, top - 0.4, 11.0, 'fin'), box(19.0, 20.5, 0.25, 11.0, 12.0, 'fin')]
     # the belly fins, one each side under the deepest part
-    belly = at(19.0)[1]
+    belly, d = at(19.0)[1], fin_drop()
     for s in (1, -1):
-        bones['body'].append(box(18.0, 20.0, 0.25, 0.0, belly + 0.4, 'fin', across=s * 0.6))
+        bones['body'].append(box(18.0, 20.0, 0.25, 0.0 - d, belly + 0.4, 'fin', across=s * 0.6))
     # the fin under the tail
-    bones['body'].append(box(12.0, 14.0, 0.25, 0.0, at(13.0)[1] + 0.4, 'fin'))
+    bones['body'].append(box(12.0, 14.0, 0.25, 0.0 - d * 0.5, at(13.0)[1] + 0.4, 'fin'))
     # the breast fins: thin plates out from the lower flank behind the gills, trailing back
     for s, name in ((1, 'fin_left'), (-1, 'fin_right')):
         hw = at(22.0)[2]
@@ -222,10 +234,25 @@ def flank_band(y, flash=False):
     return 'belly'
 
 
-def paint(c, face, x, y, z, flash=False):
+# The sexes' colours (2026-11-20, my picks, inspired by real small barbs): the approved paint is the male's everyday
+# look. The female's fins are paler, amber rather than orange, the tail's tips a softer red. In the rains a breeding
+# male brightens: deeper orange-red fins, the tail's tips scarlet, a coppery gold flush above the side line, and the
+# few tiny white bumps real breeding barbs grow on the snout and head.
+STYLES = {
+    'male': {},
+    'female': {'orange': (224, 178, 100), 'red': (206, 104, 80)},
+    'breeding': {'orange': (238, 92, 34), 'red': (220, 28, 30), 'upper': (166, 140, 82), 'silver': (212, 206, 190)},
+}
+BUMPS = ((26.5, 0.5), (27.5, -0.5), (28.5, 0.25), (25.5, -1.0), (25.0, 1.0))   # the breeding bumps: (x, across)
+
+
+def paint(c, face, x, y, z, flash=False, style='male'):
     part, bone = c['_part'], c['_bone']
     ox = LENGTH / 2 - z
-    col = SHEET
+    col = dict(SHEET, **STYLES[style])
+    if style == 'breeding' and bone == 'head' and face == 'up' and any(
+            abs(ox - bx) < 0.5 and abs(x - bz) < 0.5 for bx, bz in BUMPS):
+        return (244, 244, 236)
     if part == 'eye' and face in ('east', 'west'):
         return col['pupil'] if abs(ox - EYE_AT) < 0.5 and abs(y - EYE_HEIGHT) < 0.5 else col['eye']
     if part == 'mouth':
@@ -253,13 +280,18 @@ def paint(c, face, x, y, z, flash=False):
         return col['orange'] if ox < 21.0 else col['fin']
     if bone == 'tail_fin':
         return col['red'] if ox < FORK and (y >= 9.25 or y < 1.75) else col['fin']
-    if bone == 'body' and y < 1.0 and ((17.5 < ox < 19.0) or (11.5 < ox < 13.0)):
+    d = fin_drop()
+    if bone == 'body' and ((17.5 < ox < 19.0 and y < 1.0 - d) or (11.5 < ox < 13.0 and y < 1.0 - d * 0.5)):
         return col['orange']                                      # the belly fins' and the fin under the tail's tips
     return col['fin']
 
 
 LOOKS = {'everyday': lambda c, f, x, y, z: paint(c, f, x, y, z),
          'flash': lambda c, f, x, y, z: paint(c, f, x, y, z, flash=True),
+         'female': lambda c, f, x, y, z: paint(c, f, x, y, z, style='female'),
+         'female_flash': lambda c, f, x, y, z: paint(c, f, x, y, z, flash=True, style='female'),
+         'breeding': lambda c, f, x, y, z: paint(c, f, x, y, z, style='breeding'),
+         'breeding_flash': lambda c, f, x, y, z: paint(c, f, x, y, z, flash=True, style='breeding'),
          'plain': plain_colour}
 WORKSHOP_LOOK = 'everyday'
 
@@ -271,6 +303,7 @@ WORKSHOP_SHAPE = [
     ('EYE_HEIGHT', 'Eye height (model pixels)', 5.5, 8.0, 0.25),
     ('EYE_SIZE', 'Eye half size (model pixels)', 0.5, 1.5, 0.25),
     ('FORK', 'Where the tail lobes tips begin (model pixels)', 1.0, 3.0, 0.25),
+    ('PLUMP', 'Plumpness (0 the male, 1 the female full of eggs)', 0.0, 1.5, 0.05),
 ]
 WORKSHOP_PARTS = {'head': ['head'], 'body': ['body'], 'tail': ['tail_stalk'], 'back fin': ['back_fin'],
                   'breast fins': ['fin_left', 'fin_right']}

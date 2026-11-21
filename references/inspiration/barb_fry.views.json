@@ -1,0 +1,37 @@
+{
+  "length_blocks": 0.75,
+  "_note": "Drawn by tools/young_sheets.py: one cell is one model pixel, so length_blocks is the made size (12 pixels).",
+  "views": {
+    "side": {
+      "box": [
+        40,
+        90,
+        416,
+        270
+      ],
+      "head": "left"
+    },
+    "top": {
+      "box": [
+        40,
+        340,
+        416,
+        464
+      ],
+      "head": "left"
+    },
+    "front": {
+      "box": [
+        496,
+        90,
+        676,
+        270
+      ]
+    }
+  },
+  "marks": {
+    "snout": 60,
+    "head_back": 172,
+    "tail_base": 340
+  }
+}

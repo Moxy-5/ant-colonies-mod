@@ -1,0 +1,167 @@
+{
+ "animal": "barb_fry",
+ "length_px": 12,
+ "note": "The barb fry's outline, Claude's design (references/inspiration/barb_fry.png, tools/young_sheets.py), 2026-11-20. Made 12 model pixels long, drawn in the game at 0.08 blocks. x from the tail tip (0) to the snout.",
+ "marks": [
+  {
+   "name": "eye",
+   "side": [
+    8,
+    10,
+    2,
+    4
+   ],
+   "top": [
+    8,
+    10,
+    0.5,
+    1.5
+   ],
+   "front": [
+    0.5,
+    1.5,
+    2,
+    4
+   ],
+   "colour": "#101012"
+  },
+  {
+   "name": "eye (right)",
+   "top": [
+    8,
+    10,
+    -1.5,
+    -0.5
+   ],
+   "front": [
+    -1.5,
+    -0.5,
+    2,
+    4
+   ],
+   "colour": "#101012"
+  },
+  {
+   "name": "gut",
+   "side": [
+    6,
+    8,
+    1,
+    2
+   ],
+   "colour": "#ceaa5c"
+  },
+  {
+   "name": "tail spot",
+   "side": [
+    2,
+    4,
+    2,
+    3
+   ],
+   "colour": "#62686e"
+  }
+ ],
+ "parts": [
+  {
+   "name": "tail tip upper",
+   "side": [
+    0,
+    1,
+    3,
+    5
+   ],
+   "half_width": 0.25
+  },
+  {
+   "name": "tail tip lower",
+   "side": [
+    0,
+    1,
+    0,
+    2
+   ],
+   "half_width": 0.25
+  },
+  {
+   "name": "tail base",
+   "side": [
+    1,
+    2,
+    1,
+    4
+   ],
+   "half_width": 0.25
+  },
+  {
+   "name": "tail stalk",
+   "side": [
+    2,
+    3,
+    2,
+    3
+   ],
+   "half_width": 0.5
+  },
+  {
+   "name": "body rear",
+   "side": [
+    3,
+    6,
+    1,
+    4
+   ],
+   "half_width": 0.5
+  },
+  {
+   "name": "body",
+   "side": [
+    6,
+    8,
+    1,
+    4
+   ],
+   "half_width": 1.5
+  },
+  {
+   "name": "head",
+   "side": [
+    8,
+    11,
+    1,
+    4
+   ],
+   "half_width": 1.5
+  },
+  {
+   "name": "snout",
+   "side": [
+    11,
+    12,
+    2,
+    3
+   ],
+   "half_width": 0.5
+  },
+  {
+   "name": "back fold",
+   "side": [
+    5,
+    7,
+    4,
+    5
+   ],
+   "half_width": 0.25
+  },
+  {
+   "name": "belly fold",
+   "side": [
+    4,
+    6,
+    0,
+    1
+   ],
+   "half_width": 0.25
+  }
+ ]
+}
