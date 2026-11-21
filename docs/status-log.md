@@ -566,3 +566,4 @@ Every "Current status" bullet CLAUDE.md held up to 2026-11-19, word for word, ol
 - 2026-11-21: the barb fry and the tadpole painted (fry v2, tadpole v3 and v4 with legs), in a worktree of their own so Neon's hippo work in `C:\Ant Mod` is untouched; waiting for the user's look, then the clips.
 - 2026-11-21: the barb fry made cuter (v3: round, shiny, bulging eyes; a tiny mouth); waiting for the user's look.
 - 2026-11-21: the fry's look confirmed by the user (v3); the tadpole made slimmer and cuter (v5, v6 with legs); waiting for the user's look at the tadpole, then the clips.
+- 2026-11-21: the tadpole's and the fry's clips made and checked offline (frozen frames, joint turns); the engine checker and in-game films wait for their game entities; waiting for the user's look.

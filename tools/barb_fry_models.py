@@ -14,11 +14,12 @@ tail_stalk, tail_fin, back_fin, fin_left, fin_right), so its swim, turn and scat
 is one box, the eyes two thin bulges on its sides (big, round and shiny, as a real fry's); the body two boxes
 narrowing to the tail; the fins still folds: a low fold on the back and under the belly, a small fork for the tail.
 """
+import math
 import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from model_parts import cube, paint_faces, png   # noqa: E402
+from model_parts import clip, cube, paint_faces, png, smooth   # noqa: E402
 
 LENGTH = 12.0
 HEAD_HALF = 1.25         # the head's half width (the eyes on its sides)
@@ -163,6 +164,117 @@ WORKSHOP_SHAPE = [
 ]
 WORKSHOP_PARTS = {'head': ['head'], 'body': ['body'], 'tail': ['tail_stalk'], 'back fin': ['back_fin'],
                   'breast fins': ['fin_left', 'fin_right']}
+
+
+# --- the clips (stage 5, 2026-11-21). Fun first, from real fish fry: they hover with their breast fins fanning all the
+# time (a fry's fins never rest), move in short darting bursts with a glide between, pick at specks in the water with a
+# quick lunge, and scatter in a flash. Their own clips (not the grown barb's: the barb's moves are measured to its own
+# body, its snout to the bed and its mouth to the surface). The game moves the fry; the clips only bend it. -----------
+IDLE_LEN, SWIM_LEN, DART_LEN, PECK_LEN, SCATTER_LEN, DEATH_LEN = 1.2, 0.2, 0.9, 0.8, 0.4, 1.0
+WAVE = (('body', None, 0.04, 0.9), ('head', 'body', 0.06, 0.0), ('tail_stalk', 'body', 0.30, 1.7),
+        ('tail_fin', 'tail_stalk', 0.55, 2.5))
+LIE = 2.5 - (HEAD_HALF + EYE_BULGE)   # how far it comes down lying on its side: its middle line to its eye's edge
+
+
+def _ease(x):
+    return smooth(x)
+
+
+def _wave(p, t, beat, amount, curl=0.0):
+    ab = {None: 0.0}
+    for name, parent, a, lag in WAVE:
+        ab[name] = amount * a * math.sin(beat * t - lag) + curl * a * 2.2
+        p.setdefault(name, {})['rotation'] = [0.0, round(math.degrees(ab[name] - ab[parent]), 3), 0.0]
+    return p
+
+
+def _fins(p, t, out=0.0, flutter=0.0, rate=8.0, back_fin=0.0):
+    """The breast fins held back (out 0) or spread fanning (out 1), fluttering; the back fold up (0) or flat (1)."""
+    for s, name in ((1, 'fin_left'), (-1, 'fin_right')):
+        f = flutter * math.sin(2 * math.pi * rate * t + (0.6 if s < 0 else 0.0))
+        p[name] = {'rotation': [0.0, round(s * (-28.0 + 30.0 * out + 14.0 * f), 3), round(s * 14.0 * f, 3)]}
+    p['back_fin'] = {'rotation': [round(-50.0 * back_fin, 3), 0.0, 0.0]}
+    return p
+
+
+def clips():
+    out = {}
+
+    def make(name, length, pose_at, steps_per_s=40, loop=True):
+        out[name] = clip(length, pose_at, max(8, round(length * steps_per_s)), loop)
+
+    # idle: hovering, the breast fins fanning fast, the tail barely moving, a tiny bob
+    def idle(t):
+        w = 2 * math.pi / IDLE_LEN
+        p = _wave({}, t, w * 2, 0.25)
+        p['body']['position'] = [0.0, round(0.15 * math.sin(w * t), 3), 0.0]
+        return _fins(p, t, out=0.8, flutter=1.0, rate=6 / IDLE_LEN)
+    make('idle', IDLE_LEN, idle)
+
+    # swim: the quick wave, fins tucked (the game plays it faster the faster it swims)
+    def swim(t):
+        return _fins(_wave({}, t, 2 * math.pi / SWIM_LEN, 1.0), t, out=0.0, flutter=0.3, rate=1 / SWIM_LEN)
+    make('swim', SWIM_LEN, swim)
+
+    # dart: three quick hard beats, then a glide with the fins spreading to brake (fry move in short bursts)
+    def dart(t):
+        burst = 3 * SWIM_LEN * 0.8
+        k = 1 - _ease((t - burst) / 0.25)
+        p = _wave({}, t, 2 * math.pi / (SWIM_LEN * 0.8), 1.2 * k)
+        return _fins(p, t, out=0.8 * (1 - k), flutter=0.6 * (1 - k), rate=6.0)
+    make('dart', DART_LEN, dart, loop=False)
+
+    # peck: a quick lunge at a speck in the water, the head snapping forward, then backing off fanning
+    def peck(t):
+        lunge = math.sin(math.pi * min(1.0, max(0.0, (t - 0.15) / 0.18)))
+        back = math.sin(math.pi * min(1.0, max(0.0, (t - 0.33) / 0.4)))
+        p = _wave({}, t, 2 * math.pi / (SWIM_LEN * 1.5), 0.6 * lunge + 0.2)
+        p['body']['position'] = [0.0, 0.0, round(-0.6 * lunge + 0.3 * back, 3)]
+        p['head']['rotation'][0] = round(-6.0 * lunge, 3)
+        return _fins(p, t, out=0.9 - 0.7 * lunge, flutter=1.0, rate=7.0)
+    make('peck', PECK_LEN, peck, loop=False)
+
+    # scatter: snaps into a C, whips the other way, fast beats, fins flat
+    def scatter(t):
+        bend_end, snap_end = 0.06, 0.13
+        if t < bend_end:
+            c = _ease(t / bend_end)
+        elif t < snap_end:
+            c = 1 - 2 * _ease((t - bend_end) / (snap_end - bend_end))
+        else:
+            c = -1 * (1 - _ease((t - snap_end) / (SCATTER_LEN - snap_end)))
+        settle = _ease((t - snap_end) / (SCATTER_LEN - snap_end))
+        p = _wave({}, t, 2 * math.pi / (SWIM_LEN * 0.7), settle, curl=1.2 * c)
+        p['body']['rotation'][2] = round(10.0 * c, 3)
+        return _fins(p, t, out=0.0, back_fin=1.0 - 0.8 * settle)
+    make('scatter', SCATTER_LEN, scatter, 60, loop=False)
+
+    # death: the wave dies away as it rolls onto its side and settles
+    def death(t):
+        f = _ease(t / (DEATH_LEN * 0.8))
+        down = _ease((t - DEATH_LEN * 0.25) / (DEATH_LEN * 0.6))
+        p = _wave({}, t, 2 * math.pi / 0.35, 0.9 * (1 - f), curl=-0.25 * f)
+        p['body']['rotation'][2] = round(90.0 * f, 3)
+        p['body']['position'] = [0.0, round(-LIE * down, 3), 0.0]
+        return _fins(p, t, out=-1.5 * f, back_fin=f)
+    make('death', DEATH_LEN, death, loop='hold')
+    return out
+
+
+def WORKSHOP_CLIPS():
+    return clips()
+
+
+WORKSHOP_CLIP_INFO = {
+    'scale': 0.08 / (LENGTH / 16), 'water': ['idle', 'swim', 'dart', 'peck', 'scatter'], 'surface': 1.0,
+    'notes': {
+        'idle': 'Hovering: the breast fins fanning fast, the tail barely moving, a tiny bob.',
+        'swim': 'The quick tail beat, fins tucked; the game plays it faster the faster it swims.',
+        'dart': 'A short burst: three hard beats, then a glide with the fins spreading to brake.',
+        'peck': 'A quick lunge at a speck in the water, then backing off fanning.',
+        'scatter': 'Startled: snaps into a C, whips the other way, darts off.',
+        'death': 'The wave dies away as it rolls onto its side.',
+    }}
 
 
 def workshop_look():

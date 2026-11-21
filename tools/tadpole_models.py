@@ -16,11 +16,12 @@ tip), so the wriggle can travel down it, each a piece of the muscle with its thi
 (day 3) are their own bones at the tail's root, small buds trailing back along it; LEGS 0 leaves their boxes out (the
 game keeps the bones and hides them until day 3).
 """
+import math
 import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from model_parts import cube, curve, paint_faces, png   # noqa: E402
+from model_parts import clip, cube, curve, paint_faces, png, smooth   # noqa: E402
 
 LENGTH = 18.0
 # (x, top, belly, half width) along the body, eased between: the tail's root, the widest middle, the rounded snout.
@@ -184,6 +185,135 @@ WORKSHOP_SHAPE = [
 ]
 WORKSHOP_PARTS = {'body': ['body'], 'tail root': ['tail_1'], 'tail middle': ['tail_2'], 'tail tip': ['tail_3'],
                   'hind legs': ['leg_left', 'leg_right']}
+
+
+# --- the clips (stage 5, 2026-11-21). Fun first, from real tadpoles: they wobble, the whole body rocking side to side
+# as the tail beats (a tadpole's swim is famously wobbly); they hang still with only the tail tip quivering; they graze
+# nose down, rasping algae off the bed with small quick bobs; bullfrog tadpoles rise to gulp air; a startled one bends
+# into a C and darts. The legs (day 3) trail along the tail and paddle a little. The game moves the tadpole; the clips
+# only bend it. -------------------------------------------------------------------------------------------------------
+IDLE_LEN, SWIM_LEN, GRAZE_LEN, GULP_LEN, SCATTER_LEN, FLOP_LEN, DEATH_LEN = 2.0, 0.3, 1.6, 1.2, 0.5, 0.5, 1.2
+# the wave: bone, its parent, how far it swings (radians, against the tadpole's line), how late (radians of the beat).
+# The body swings a lot for its size (the wobble); the tail's tip most of all.
+WAVE = (('body', None, 0.10, 0.0), ('tail_1', 'body', 0.30, 1.0), ('tail_2', 'tail_1', 0.55, 1.9),
+        ('tail_3', 'tail_2', 0.85, 2.8))
+SNOUT_DROP = 0.84        # how far the body comes down grazing nose down 25 degrees, so the mouth just meets the bed
+GULP_RISE = 5.5          # how far the body rises as it tips 35 degrees nose up, so the tail's lower fin stays over its
+                         # lowest point at rest (measured: the tail tip's fin drops about 5 pixels)
+LIE = 3.5 - 2.2          # how far it comes down lying on its side: its middle line (3.5 up) to its half width
+
+
+def _ease(x):
+    return smooth(x)
+
+
+def _wave(p, t, beat, amount, curl=0.0):
+    """The swim wave at t: each bone's swing, its parent's taken off (curl bends every bone one way as well)."""
+    ab = {None: 0.0}
+    for name, parent, a, lag in WAVE:
+        ab[name] = amount * a * math.sin(beat * t - lag) + curl * a * 2.0
+        p.setdefault(name, {})['rotation'] = [0.0, round(math.degrees(ab[name] - ab[parent]), 3), 0.0]
+    return p
+
+
+def _legs(p, t, paddle=0.0, rate=2.0):
+    """The hind legs (day 3): held back along the tail's root, trailing its swing, paddling a little (paddle 0 to 1)."""
+    trail = -0.6 * p['tail_1']['rotation'][1]
+    for s, name in ((1, 'leg_left'), (-1, 'leg_right')):
+        k = paddle * math.sin(2 * math.pi * rate * t + (math.pi if s < 0 else 0.0))
+        p[name] = {'rotation': [round(12.0 * k, 3), round(trail + s * 6.0 * k, 3), 0.0]}
+    return p
+
+
+def clips():
+    out = {}
+
+    def make(name, length, pose_at, steps_per_s=40, loop=True):
+        out[name] = clip(length, pose_at, max(8, round(length * steps_per_s)), loop)
+
+    # idle: hanging in the water, the body still, only the tail's back half quivering, a slow small bob
+    def idle(t):
+        w = 2 * math.pi / IDLE_LEN
+        p = _wave({}, t, 2 * math.pi / 0.5, 0.12)
+        p['body']['position'] = [0.0, round(0.2 * math.sin(w * t), 3), 0.0]
+        return _legs(p, t, paddle=0.15, rate=1 / IDLE_LEN)
+    make('idle', IDLE_LEN, idle)
+
+    # swim: the quick wobbly wave (the game plays it faster the faster it swims)
+    def swim(t):
+        return _legs(_wave({}, t, 2 * math.pi / SWIM_LEN, 1.0), t, paddle=0.3, rate=1 / SWIM_LEN)
+    make('swim', SWIM_LEN, swim)
+
+    # graze: nose down on the bed, rasping: small quick bobs of the mouth, the tail fanning slowly to hold it there
+    def graze(t):
+        rasp = math.sin(2 * math.pi * 6 / GRAZE_LEN * t)
+        p = _wave({}, t, 2 * math.pi / (GRAZE_LEN / 2), 0.35)
+        p['body']['rotation'][0] = round(25.0 + 2.5 * rasp, 3)
+        p['body']['position'] = [0.0, round(-SNOUT_DROP + 0.12 * (1 - rasp), 3), round(-0.1 * rasp, 3)]
+        return _legs(p, t, paddle=0.2, rate=2 / GRAZE_LEN)
+    make('graze', GRAZE_LEN, graze)
+
+    # gulp: at the surface, nose tips up, a quick gulp of air (a little jerk), then back down, the tail beating hard
+    # at the start to push it up (the game lifts it to the surface first)
+    def gulp(t):
+        up = _ease(t / (GULP_LEN * 0.3)) * (1 - _ease((t - GULP_LEN * 0.65) / (GULP_LEN * 0.35)))
+        g = math.sin(math.pi * min(1.0, max(0.0, (t - GULP_LEN * 0.38) / 0.14)))
+        p = _wave({}, t, 2 * math.pi / (SWIM_LEN * 1.4), 0.8 * (1 - 0.6 * up))
+        p['body']['rotation'][0] = round(-35.0 * up - 6.0 * g, 3)
+        p['body']['position'] = [0.0, round(GULP_RISE * up + 0.5 * g, 3), 0.0]   # rises as it tips, the tail clear
+        return _legs(p, t, paddle=0.3, rate=1 / SWIM_LEN)
+    make('gulp', GULP_LEN, gulp, loop=False)
+
+    # scatter: startled: the body snaps into a C, whips the other way, then fast beats
+    def scatter(t):
+        bend_end, snap_end = 0.07, 0.16
+        if t < bend_end:
+            c = _ease(t / bend_end)
+        elif t < snap_end:
+            c = 1 - 2 * _ease((t - bend_end) / (snap_end - bend_end))
+        else:
+            c = -1 * (1 - _ease((t - snap_end) / (SCATTER_LEN - snap_end)))
+        settle = _ease((t - snap_end) / (SCATTER_LEN - snap_end))
+        p = _wave({}, t, 2 * math.pi / (SWIM_LEN * 0.6), settle, curl=1.0 * c)
+        return _legs(p, t, paddle=0.0)
+    make('scatter', SCATTER_LEN, scatter, 60, loop=False)
+
+    # flop: stranded, on its side, wriggling and flipping its tail (the game hops it about)
+    def flop(t):
+        w = 2 * math.pi / FLOP_LEN
+        p = _wave({}, t, w, 1.5, curl=-0.5 * (0.5 + 0.5 * math.sin(w * t)))
+        p['body']['rotation'][2] = 90.0
+        p['body']['position'] = [0.0, round(-LIE + 0.8 * abs(math.sin(w * t)), 3), 0.0]
+        return _legs(p, t, paddle=0.8, rate=2 / FLOP_LEN)
+    make('flop', FLOP_LEN, flop)
+
+    # death: the wave dies away as it rolls over belly up and settles
+    def death(t):
+        f = _ease(t / (DEATH_LEN * 0.8))
+        p = _wave({}, t, 2 * math.pi / 0.4, 0.9 * (1 - f), curl=-0.2 * f)
+        p['body']['rotation'][2] = round(180.0 * f, 3)
+        return _legs(p, t, paddle=0.0)
+    make('death', DEATH_LEN, death, loop='hold')
+    return out
+
+
+def WORKSHOP_CLIPS():
+    return clips()
+
+
+# For the versions page's clip player: the made size against the game's (0.15 blocks of the made 18 pixels), the
+# water clips and a line about each.
+WORKSHOP_CLIP_INFO = {
+    'scale': 0.15 / (LENGTH / 16), 'water': ['idle', 'swim', 'graze', 'gulp', 'scatter'], 'surface': 1.0,
+    'notes': {
+        'idle': 'Hanging in the water: the body still, only the tail tip quivering, a slow small bob.',
+        'swim': 'The wobbly swim: the wave runs down the three tail pieces and rocks the whole body side to side.',
+        'graze': 'Nose down on the bed, rasping algae: small quick bobs of the mouth, the tail fanning slowly.',
+        'gulp': 'At the surface: nose up for a quick gulp of air, then back down.',
+        'scatter': 'Startled: snaps into a C, whips the other way, darts off.',
+        'flop': 'Stranded on land: on its side, wriggling.',
+        'death': 'The wave dies away as it rolls belly up.',
+    }}
 
 
 def workshop_look():

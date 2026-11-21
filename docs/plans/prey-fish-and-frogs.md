@@ -363,6 +363,20 @@ user: a detailed webbed foot model comes later). Fun first, inspired by the real
   25 boxes (29 with legs). Then the user: "the model actually looks better with the eyes in the 2D image", so v5 and v6 were
   rebuilt with the sheet's eyes (black, a gold patch just behind), keeping the slimmer body. Picture
   `references/workshop/tadpole/slimmer_v5.png`.
+- 2026-11-21, **the clips for the tadpole and the fry** (the user: "Start animations"; the slimmer tadpole with the
+  sheet's eyes OKed by going on). Tadpole (`tools/tadpole_models.py` `clips()`): idle (still, the tail tip
+  quivering), swim (the wave down the three tail bones, the whole body rocking: the wobble), graze (nose down 25
+  degrees, the mouth just on the bed, quick rasping bobs), gulp (nose up for air, the body rising so the tail stays
+  clear), scatter (a C-bend and dart), flop (stranded), death (rolls belly up); the day-3 legs trail the tail's
+  swing and paddle a little. Fry (`tools/barb_fry_models.py`, its own clips, my pick: the barb's are measured to its
+  own body): idle (hovering, the breast fins fanning fast), swim, dart (three hard beats, a glide braking with the
+  fins: fry move in bursts), peck (a lunge at a speck), scatter, death. Checked offline: the fastest joint turn per
+  clip from the keys (all under the engine's 90 degrees in 0.05 s; the fry's scatter snap 82 the most) and frozen
+  frames from two sides each in the workshop's clip player (`references/workshop/tadpole/clips_1.png`, `clips_2.png`,
+  `references/workshop/barb_fry/clips.png`); one fault found and fixed (the gulp's tail dipped under the bed: the
+  body now rises 5.5 px as it tips). **Not yet checked:** `tools/clip_check.py` and the in-game frame films (the
+  hard rule's second half): the checker is on `claude/engine-every-animal`, and both need the game's files and an
+  entity, which come with plan steps 2 and 4 (the fry and tadpole in the game).
 
 ## My picks the user may change
 The barb's name and look, every size and number above (the bullfrog's size is the user's call), barbs with no hunger,
