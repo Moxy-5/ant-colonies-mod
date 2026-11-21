@@ -21,15 +21,19 @@ The mod keeps termite mounds off the floodplain: no mound where the ground is 2 
 
 Every clutch placed with new land gets a random age within its hatching time, so they hatch spread out over the days after a player finds them, not all at once.
 
+Spacing is measured along the river (sand banks come about one every 80 to 120 blocks of river, `worldgen/SandBanks`). The user, 2026-11-20: my first picks were too many for rivers this big ("1 bank in 4" plus lone nests, and snail clutches every 24 blocks of shore); then, on hearing a nesting beach every 400 blocks: "that's perfect, I was thinking 250 to 350 blocks apart".
+
 | Kind | Where | How common | Comes with |
 |---|---|---|---|
-| Crocodile nest | dry sand on a sand bank, 2 to 6 blocks from the water | **bunched:** 1 sand bank in 4 is a nesting beach with 2 to 4 nests 3 to 6 blocks apart; 1 in 10 other banks has one nest alone | a guarding mother at half the nests (her nest, so she guards it and hisses at players); the other half are left for now (she is off in the water), so a player can find unguarded ones |
-| Monitor clutch | a living mound near the water, or a bank burrow (the question above) | rare: about 1 per 200 blocks of river bank | nothing (monitors leave their eggs); built with life-cycle step 5 |
-| Tilapia nest pits | sandy or silty shallows 1 to 2 deep | a nesting ground of 3 to 6 pits about 1 per 80 blocks of shallow river | a male in breeding colours on each pit (a pit with no male fades in 3 days anyway) |
-| Snail clutch | pearly eggs on a stone, pebble or bank at the waterline | common: about 1 per 24 blocks of shore, 1 or 2 together | nothing |
-| Catfish eggs | on algae in the shallows and pans | uncommon: 1 algae patch in 6 | nothing (tilapia and crabs eat most) |
-| Crab eggs | carried, not a block | 1 in 4 crab females the world spawns already carries her eggs | the female |
+| Crocodile nests | dry sand on a sand bank, 2 to 6 blocks from the water | **a nest site every 250 to 350 blocks of river (the user's):** 1 sand bank in 3; most sites a nesting beach of 2 to 4 nests 3 to 6 blocks apart, 1 site in 4 a lone nest | a guarding mother at half the nests (she hisses at players); the other half unguarded (she is off in the water), so a player can find some to look at |
+| Monitor clutch | a living mound near the water, or a bank burrow (the question above) | rare: about one per 500 blocks of river | nothing (monitors leave their eggs); built with life-cycle step 5 |
+| Tilapia nesting ground | sandy or silty shallows 1 to 2 deep | 2 to 4 pits together, about one ground per 300 blocks of river | a male in breeding colours on each pit (a pit with no male fades in 3 days anyway) |
+| Snail clutch | pearly eggs on a stone, pebble or bank at the waterline | the commonest, but about one per 60 to 80 blocks of river (either shore), 1 or 2 together | nothing |
+| Catfish eggs | on algae in the shallows and pans | about one patch per 200 blocks of river | nothing (tilapia and crabs eat most) |
+| Crab eggs | carried, not a block | 1 in 6 crab females the world spawns already carries her eggs | the female |
 | Bullfrog | tadpoles not built yet | later | |
+
+(All my picks but the crocodiles' spacing; each kind's number in one data file so the user can change it.)
 
 **Balance:** a guarding mother counts in the crocodile group's cap of 5 round a player, so near a nesting beach fewer other crocodiles spawn; hatching keeps the local limit (fewer than 6 crocodiles within 48 blocks; a nest lets out at least one), so a nesting beach of 4 nests adds a few young, not a swarm. Monitors raiding nests (step 5) and catfish eating the young keep them down.
 

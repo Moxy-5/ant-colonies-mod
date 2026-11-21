@@ -96,7 +96,7 @@
       "constructor": "(Ljava/lang/String;IZZI)V",
       "parameters": [
         "antcolonies:bullfrog",
-        12,
+        4,
         true,
         false,
         128

@@ -19,7 +19,7 @@ Every living thing in the mod, built or planned, plants and fungi included, in o
 | `antcolonies:river_bed` | 24 | within 96, gone past 128 | crab, snail |
 | `antcolonies:river_bank` | 2 | within 96, gone past 128 | Nile monitor (alone, 80 apart) |
 | `antcolonies:river_school` | 40 | within 96, gone past 128 | river barb (schools of 8 to 14) |
-| `antcolonies:bullfrog` | 12 | within 96, gone past 128 | African bullfrog (groups of 1 to 3; its tadpoles later) |
+| `antcolonies:bullfrog` | 4 | within 96, gone past 128 | African bullfrog (ones and twos; its tadpoles later; was cap 12 in groups of 1 to 3: the user found too many, 2026-11-20) |
 | `antcolonies:fly_cloud` | 18 | within 96, gone past 128 | fly cloud (one or two at a spot, 4 to 12 flies; was cap 6, one at a time, kept within 64: tripled 2026-11-20, the user asked for more flies) |
 
 (2026-11-20 with the barb, built: `river_fish` cap 60 -> 45 (the user's number) and tilapia groups 2 to 5, to make room for the barbs; `docs/plans/prey-fish-and-frogs.md`.)

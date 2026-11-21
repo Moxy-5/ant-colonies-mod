@@ -1818,7 +1818,7 @@ public class RiverLifeTests {
      * Bullfrogs spawn by themselves at the shallows' edges (the spawning check list): over a river's cross-section the
      * world would spawn one at every spot of a column within 2 blocks of water 1 to 3 deep (the water there or the free
      * block over the top), never over the deep middle; one spawned the world's way is set down afloat on the water, a
-     * male 0.8 blocks long or a female 0.65 (each 0.9 to 1.1 of that); its own group (cap 12) in the savanna's waters.
+     * male 0.8 blocks long or a female 0.65 (each 0.9 to 1.1 of that); its own group (cap 4) in the savanna's waters, in ones and twos.
      */
     @GameTest(template = "arena", timeoutTicks = 200)
     public static void bullfrogsSpawnAtTheShallowsByThemselves(GameTestHelper helper) {
@@ -1865,13 +1865,13 @@ public class RiverLifeTests {
             helper.fail("bullfrogs spawn at the wrong spots:" + wrong);
         }
         var group = com.antcolonies.savanna.registry.SavannaMobCategories.bullfrog();
-        helper.assertTrue(type.getCategory() == group && group.getMaxInstancesPerChunk() == 12,
-                "the bullfrog is in the " + type.getCategory().getName() + " group, cap " + type.getCategory().getMaxInstancesPerChunk() + " (its own, 12 wanted)");
+        helper.assertTrue(type.getCategory() == group && group.getMaxInstancesPerChunk() == 4,
+                "the bullfrog is in the " + type.getCategory().getName() + " group, cap " + type.getCategory().getMaxInstancesPerChunk() + " (its own, 4 wanted)");
         var biomes = level.registryAccess().registryOrThrow(net.minecraft.core.registries.Registries.BIOME);
         var listed = biomes.getOrThrow(net.minecraft.world.level.biome.Biomes.SAVANNA).getMobSettings().getMobs(group).unwrap().stream()
                 .filter(d -> d.type == type).findFirst();
-        helper.assertTrue(listed.isPresent() && listed.get().minCount == 1 && listed.get().maxCount == 3,
-                "bullfrogs in the savanna's list: " + listed.map(d -> d.minCount + " to " + d.maxCount).orElse("none") + " (1 to 3 wanted)");
+        helper.assertTrue(listed.isPresent() && listed.get().minCount == 1 && listed.get().maxCount == 2,
+                "bullfrogs in the savanna's list: " + listed.map(d -> d.minCount + " to " + d.maxCount).orElse("none") + " (1 to 2 wanted)");
         helper.succeed();
     }
 

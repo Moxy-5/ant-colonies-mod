@@ -15,8 +15,8 @@ public final class SavannaMobCategories {
     private static MobCategory riverFish, riverHunter, riverBed, riverBank, riverSchool, flyCloud, bullfrog;
 
     /**
-     * The bullfrogs' group (prey plan step 3, 2026-11-20, the spawning check list): its own, cap 12 round a player (the
-     * plan), friendly, removed past 128 blocks.
+     * The bullfrogs' group (prey plan step 3, 2026-11-20, the spawning check list): its own, cap 4 round a player
+     * (2026-11-20, the user found too many: was 12, the plan's), friendly, removed past 128 blocks.
      */
     public static MobCategory bullfrog() {
         if (bullfrog == null) {
