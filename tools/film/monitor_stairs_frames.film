@@ -1,0 +1,43 @@
+# The Nile monitor up a hill of one-block steps three blocks apart, frame by frame (the Animal Maker Engine step B,
+# 2026-11-20; docs/ANIMAL-MAKER-ENGINE.md): one climb running on into the next. The game frozen and stepped 3 ticks
+# between pictures from the end of the first climb through the second, side on, from the front up the hill, and from
+# behind. The steps' west faces at x 10, 13 and 16.
+#   ./gradlew runFilm -PfilmScene=tools/film/monitor_stairs_frames.film   pictures in run-film/screenshots/monitor_stairs_frames/
+cmd time set noon
+cmd weather clear
+cmd kill @e[type=!player]
+cmd fill 10 -60 -3 22 -60 3 minecraft:stone
+cmd fill 13 -59 -3 22 -59 3 minecraft:stone
+cmd fill 16 -58 -3 22 -58 3 minecraft:stone
+lens 50
+wait 40
+# side on (the camera's height is its feet: its eye is 1.62 higher)
+walker antcolonies:monitor 6.5 -60 0.5 -90 OwnSize:1.0f,HungryIn:99999,SunIn:99999
+camera 13.0 -59.0 -6.0 0 6
+cmd tick unfreeze
+go 20 -57 0 0.8
+wait 70
+cmd tick freeze
+burst side 70 3
+cmd kill @e[type=antcolonies:monitor]
+wait 10
+# from the front, up the hill
+walker antcolonies:monitor 6.5 -60 0.5 -90 OwnSize:1.0f,HungryIn:99999,SunIn:99999
+camera 21.5 -56.6 0.5 90 22
+cmd tick unfreeze
+go 20 -57 0 0.8
+wait 70
+cmd tick freeze
+burst front 70 3
+cmd kill @e[type=antcolonies:monitor]
+wait 10
+# from behind, three quarters
+walker antcolonies:monitor 6.5 -60 0.5 -90 OwnSize:1.0f,HungryIn:99999,SunIn:99999
+camera 7.5 -59.4 -4.0 -50 12
+cmd tick unfreeze
+go 20 -57 0 0.8
+wait 70
+cmd tick freeze
+burst back 70 3
+cmd kill @e[type=antcolonies:monitor]
+quit

@@ -2,10 +2,10 @@ package com.antcolonies.savanna.client;
 
 import com.antcolonies.client.BoneFrames;
 import com.antcolonies.client.DraggedTail;
+import com.antcolonies.entity.body.BlockMoves;
 import com.antcolonies.entity.body.GroundBend;
 import com.antcolonies.entity.body.TailDrag;
 import com.antcolonies.savanna.SavannaMod;
-import com.antcolonies.savanna.animal.MonitorClimb;
 import com.antcolonies.savanna.animal.MonitorEntity;
 
 import net.minecraft.client.Minecraft;
@@ -43,7 +43,7 @@ import org.joml.Vector3f;
  * between its two poses, the swim clip starting only once both pairs are folded ({@link MonitorEntity#swimClip}).
  * <p>
  * Going into and out of the water are moves of their own (the Animal Maker Engine step 4, 2026-11-19), made as the climbs
- * are ({@link com.antcolonies.savanna.animal.MonitorClimb}, played and placed like them): walking in off a level bank, a dash in, sliding in off a bank a
+ * are (played and placed like them by the shared {@link BlockMoves}): walking in off a level bank, a dash in, sliding in off a bank a
  * block up, diving in off one two blocks up, swimming out onto a level bank and climbing out onto one a block up. Going
  * in, each leg hangs loose as it loses the bottom and folds for swimming a while after (the user's ask); coming out the
  * legs unfold to hanging and then find the bank.
@@ -55,7 +55,7 @@ import org.joml.Vector3f;
  * into the water, and out of it after the hips. The other clips (bask, hiss, bite, eat, death) keep their own tail with
  * the body's lie as before, eased over.
  * <p>
- * Climbing a block (stage B, 2026-11-19, {@link MonitorEntity.Climb}) it is drawn on the climb's own path: its place
+ * Climbing a block (stage B, 2026-11-19, {@link BlockMoves.Play}) it is drawn on the climb's own path: its place
  * worked out from where the climb started and how far into the clip it is, not from its box (which steps up all at once
  * at the face), the body's lie on the ground eased away and the legs left to the clip; the tail hangs from the reared
  * hips and is dragged up after them. Where the drawing hands over between its box and the path it slides across
@@ -138,7 +138,9 @@ public class MonitorModel extends DefaultedEntityGeoModel<MonitorEntity> {
         }
         float yaw = Mth.rotLerp(pt, monitor.yBodyRotO, monitor.yBodyRot);
         double scale = MonitorEntity.MODEL_SCALE * monitor.getScale();
-        MonitorEntity.Climb climb = monitor.climb();
+        BlockMoves.Play climb = monitor.climb();
+        // turning square to an edge on the spot before a move (step B), it stands and steps round as when walking
+        boolean moving = monitor.moveClipOn();
         GroundBend bend = monitor.bend();
         bend.update(monitor.level(), x, y, z, yaw, scale, monitor.isInWater(), monitor.floatDepth(),
                 !monitor.isDeadOrDying() && climb == null, System.nanoTime());
@@ -168,10 +170,10 @@ public class MonitorModel extends DefaultedEntityGeoModel<MonitorEntity> {
             }
         }
         byte doing = monitor.doing();
-        if (!monitor.isDeadOrDying() && climb == null && (doing == MonitorEntity.CALM || doing == MonitorEntity.WATCH)) {
+        if (!monitor.isDeadOrDying() && !moving && (doing == MonitorEntity.CALM || doing == MonitorEntity.WATCH)) {
             legs(monitor, bend, scale, x, y, z, yaw);
-        } else if (climb != null) {          // a move's clip has the legs: as it ends, folded afloat or standing on land
-            double end = MonitorClimb.endsAfloat(climb.move()) ? 0.0 : 1.0;
+        } else if (moving) {                 // a move's clip has the legs: as it ends, folded afloat or standing on land
+            double end = MonitorEntity.MOVES.move(climb.move()).endsAfloat ? 0.0 : 1.0;
             monitor.legStand[0] = end;
             monitor.legStand[1] = end;
             monitor.legNanos = 0;
@@ -186,14 +188,13 @@ public class MonitorModel extends DefaultedEntityGeoModel<MonitorEntity> {
      * forward and up the clip has come by the moment it is drawn at), sliding over from one to the other when it starts
      * or ends ({@link #HAND_OVER}). Moves the whole model there by its root bone; says by how much (model blocks).
      */
-    private Vector3d place(MonitorEntity monitor, MonitorEntity.Climb climb, double scale, double x, double y, double z, float yaw) {
+    private Vector3d place(MonitorEntity monitor, BlockMoves.Play climb, double scale, double x, double y, double z, float yaw) {
         double wx = x, wy = y, wz = z;
         if (climb != null) {
-            double t = Math.max(0.0, monitor.climbClipTicks());
-            double along = MonitorClimb.along(climb.move(), climb.size(), t) * scale / 16.0;
-            wx = climb.x() + climb.dirX() * along;
-            wy = climb.y() + MonitorClimb.rise(climb.move(), climb.size(), t);
-            wz = climb.z() + climb.dirZ() * along;
+            Vec3 at = MonitorEntity.MOVES.drawnAt(climb, Math.max(0.0, monitor.climbClipTicks()), scale / 16.0);
+            wx = at.x;
+            wy = at.y;
+            wz = at.z;
         }
         long now = System.nanoTime();
         boolean climbing = climb != null;
@@ -238,7 +239,7 @@ public class MonitorModel extends DefaultedEntityGeoModel<MonitorEntity> {
      * clips' own swing and bob, so on flat ground the tail is exactly the clip's; climbing, the hips as the climb clip
      * rears the body, where the climb has moved it ({@code moved}, model blocks).
      */
-    private void tail(MonitorEntity monitor, GroundBend bend, MonitorEntity.Climb climb, Vector3d moved, double scale, double x,
+    private void tail(MonitorEntity monitor, GroundBend bend, BlockMoves.Play climb, Vector3d moved, double scale, double x,
             double y, double z, float yaw) {
         Function<String, GeoBone> bones = getAnimationProcessor()::getBone;
         GeoBone hips = bones.apply("hips");

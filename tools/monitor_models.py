@@ -21,7 +21,8 @@ from pathlib import Path
 
 from model_parts import (png, shade, smooth, pitch, mat_mul, transpose, turn_x, turn_y, rot, vsub, vadd,  # noqa: F401
                          vlen, unit, from_axes, mat_vec, euler, blend_turn, leg_frames, round_leg, bent_chain,
-                         cube, rounded, paint_faces, geo, animations, write_assets)  # png for the viewer
+                         cube, rounded, paint_faces, geo, animations, write_assets,
+                         block_moves, write_block_moves)  # png for the viewer
 
 TEXELS = 1.0          # texture pixels a model pixel (plain colours for now)
 
@@ -579,7 +580,7 @@ class _Poser:
 # bending over the edge onto the top; then its hips roll over the edge, the hind feet step up onto the top, it walks on
 # a step and stands (the tail is not the clip's: the game drags it up after the hips). In model pixels: the step is one
 # block high, so its height in pixels hangs on the monitor's size (a clip for each of CLIMB_SIZES, the game plays the
-# nearest). The root's travel is not in the clip but in its path ('path' note, and MonitorClimb.java made from it): the
+# nearest). The root's travel is not in the clip but in its path ('path' note, and the move file made from it): the
 # game moves the monitor along the path (its box on the server, its drawing on the client), so the end pose hands over
 # to the walk with nothing to slide back. Every number my pick (second version, 2026-11-19, after the frame by frame
 # films: the first looked straight up like a periscope, climbed as a stiff plank and folded the hind legs up under it).
@@ -1635,164 +1636,31 @@ def clips():
     return out, worst
 
 
-def climb_java(made):
-    """MonitorClimb.java: the moves' paths for the game (the server moves the box along them, the drawing the model):
-    the climbs up and down a block, and going into and out of the water."""
-    kinds = [('UP', lambda s: climb_name(s, False), CLIMB_FACE, False, False), ('DOWN', lambda s: climb_name(s, True), DOWN_EDGE, False, False)]
+# The monitor's moves in the order the game names them (MonitorEntity), for the shared move file (model_parts.block_moves).
+def move_specs():
+    specs = [{'name': 'up', 'clip': lambda s: climb_name(s, False), 'ahead_px': CLIMB_FACE,
+              'starts_afloat': False, 'ends_afloat': False, 'goes_down': False, 'end_level': 1},
+             {'name': 'down', 'clip': lambda s: climb_name(s, True), 'ahead_px': DOWN_EDGE,
+              'starts_afloat': False, 'ends_afloat': False, 'goes_down': True, 'end_level': -1}]
     for kind in WATER_KINDS:
-        kinds.append((kind.upper().replace('OUTUP', 'OUT_UP'), lambda s, k=kind: water_name(k, s),
-                      WATER_FACE_UP if kind == 'outup' else WATER_FACE if kind == 'out' else WATER_EDGE, kind not in ('out', 'outup'), kind in ('out', 'outup')))
-    rises, alongs, ticks, seconds, wets = [], [], [], [], []
-    for _, name_of, _, _, _ in kinds:
-        note = next((v for v in made[name_of(1.0)].get('timeline', {}).values() if v.startswith('wet ')), 'wet -1')
-        wets.append(round(float(note.split()[1]) * 20))
-        r_k, a_k = [], []
-        for size in CLIMB_SIZES:
-            name = name_of(size)
-            B = block_px(size)
-            note = next(v for v in made[name]['timeline'].values() if v.startswith('path '))
-            v = list(map(float, note.split()[2:]))
-            rows = [v[i:i + 3] for i in range(0, len(v) - 2, 3)]
-            r_k.append([dy / B for _, dy, _ in rows])         # how far up (down below 0), a share of a block
-            a_k.append([-dz for _, _, dz in rows])            # how far forward, model pixels
-        rises.append(r_k)
-        alongs.append(a_k)
-        ticks.append(len(r_k[0]) - 1)
-        seconds.append(made[name_of(CLIMB_SIZES[0])]['animation_length'])
-
-    def table(rows):
-        return ',\n'.join('            {' + ', '.join(f'{round(x, 4) + 0.0:.4f}F' for x in r) + '}' for r in rows)
-
-    def tables(per_kind):
-        return ',\n'.join('        {\n' + table(rows) + '}' for rows in per_kind)
-    names = ', '.join(f'{k} = {i}' for i, (k, _, _, _, _) in enumerate(kinds))
-    clips = ', '.join('"' + n(CLIMB_SIZES[0]).rsplit('_', 1)[0] + '_"' for _, n, _, _, _ in kinds)
-    return f"""package com.antcolonies.savanna.animal;
-
-/**
- * The Nile monitor's moves, each made once (for each of {{@link #SIZES}}) with its clip: the climbs up and down a block
- * (the Animal Maker Engine step 2, stages B and C) and going into and out of the water (step 4): the paths the clips
- * move it along. Made by {{@code python tools/monitor_models.py game}} with the clips: never edit by hand.
- */
-public final class MonitorClimb {{
-    private MonitorClimb() {{
-    }}
-
-    /** The moves: up and down a block; into the water off a level bank, off a bank one or two blocks over it, running; out onto a level bank, onto a bank a block up. */
-    public static final int {names};
-    /** Each move's clips' names, less the size. */
-    private static final String[] CLIP = {{{clips}}};
-    /** How far ahead of where a move starts the step's face, the edge or the bank's face is (model pixels). */
-    private static final double[] AHEAD_PX = {{{', '.join(f'{a:g}' for _, _, a, _, _ in kinds)}}};
-    /** Whether a move ends afloat (it glides on into the swim), and whether it starts afloat. */
-    private static final boolean[] ENDS_AFLOAT = {{{', '.join('true' if w else 'false' for _, _, _, w, _ in kinds)}}};
-    private static final boolean[] STARTS_AFLOAT = {{{', '.join('true' if w else 'false' for _, _, _, _, w in kinds)}}};
-    /** The sizes a clip is made for, and a block's height in model pixels at each. */
-    public static final double[] SIZES = {{{', '.join(f'{x:g}' for x in CLIMB_SIZES)}}};
-    public static final double[] BLOCK_PX = {{{', '.join(f'{block_px(x):.4f}' for x in CLIMB_SIZES)}}};
-    /** The tick going in the chest meets the water (a splash), coming out the hips leave it (the water runs off); -20 for none. */
-    private static final int[] WET = {{{', '.join(str(w) for w in wets)}}};
-    /** Each move's clip's length (ticks; {', '.join(f'{k} {s:g} s' for (k, _, _, _, _), s in zip(kinds, seconds))}). */
-    private static final int[] TICKS = {{{', '.join(str(t) for t in ticks)}}};
-    /** For each move and size, tick by tick: how far up the body has come (a share of a block, below 0 going down). */
-    private static final float[][][] RISE = {{
-{tables(rises)}}};
-    /** For each move and size, tick by tick: how far forward it has come (model pixels). */
-    private static final float[][][] ALONG = {{
-{tables(alongs)}}};
-
-    /** The clip made for the size nearest this one. */
-    public static int nearest(double size) {{
-        int best = 0;
-        for (int i = 1; i < SIZES.length; i++) {{
-            if (Math.abs(SIZES[i] - size) < Math.abs(SIZES[best] - size)) {{
-                best = i;
-            }}
-        }}
-        return best;
-    }}
-
-    public static String clip(int move, int size) {{
-        return CLIP[move] + Math.round(SIZES[size] * 1000);
-    }}
-
-    /** How far ahead of where the move starts the step's face, the edge or the bank's face is (model pixels). */
-    public static double ahead(int move) {{
-        return AHEAD_PX[move];
-    }}
-
-    /** The clip's length (ticks). */
-    public static int ticks(int move) {{
-        return TICKS[move];
-    }}
-
-    /** The tick going in the chest meets the water, or coming out the hips leave it (below 0 for a climb). */
-    public static int wetTick(int move) {{
-        return WET[move];
-    }}
-
-    public static boolean endsAfloat(int move) {{
-        return ENDS_AFLOAT[move];
-    }}
-
-    public static boolean startsAfloat(int move) {{
-        return STARTS_AFLOAT[move];
-    }}
-
-    /** Whether the move goes down (its box stays on the bank it leaves until its back has passed the edge). */
-    public static boolean goesDown(int move) {{
-        return move == DOWN || ENDS_AFLOAT[move];
-    }}
-
-    /** How far up at this many ticks into the clip (a share of a block, below 0 going down; held before and after). */
-    public static double rise(int move, int size, double ticks) {{
-        return at(RISE[move][size], ticks);
-    }}
-
-    /** How far forward at this many ticks into the clip (model pixels; held before, and after it goes on at its last speed). */
-    public static double along(int move, int size, double ticks) {{
-        float[] row = ALONG[move][size];
-        int last = row.length - 1;
-        if (ticks > last) {{
-            return row[last] + (row[last] - row[last - 1]) * (ticks - last);
-        }}
-        return at(row, ticks);
-    }}
-
-    /** How fast it goes at the end of the move (model pixels a tick). */
-    public static double endSpeed(int move, int size) {{
-        float[] row = ALONG[move][size];
-        return row[row.length - 1] - row[row.length - 2];
-    }}
-
-    private static double at(float[] row, double ticks) {{
-        int last = row.length - 1;
-        if (ticks <= 0) {{
-            return row[0];
-        }}
-        if (ticks >= last) {{
-            return row[last];
-        }}
-        int i = (int) ticks;
-        double f = ticks - i;
-        return row[i] + (row[i + 1] - row[i]) * f;
-    }}
-}}
-"""
+        out = kind in ('out', 'outup')
+        specs.append({'name': 'out_up' if kind == 'outup' else kind, 'clip': lambda s, k=kind: water_name(k, s),
+                      'ahead_px': WATER_FACE_UP if kind == 'outup' else WATER_FACE if kind == 'out' else WATER_EDGE,
+                      'starts_afloat': out, 'ends_afloat': not out, 'goes_down': not out,
+                      'end_level': 1 if kind == 'outup' else 0})
+    return specs
 
 
 def write_game():
-    """Writes the monitor's model, texture and clips into the savanna mod, and the climbs' paths into its code."""
+    """Writes the monitor's model, texture and clips into the savanna mod, and its moves' paths into its move file
+    (assets/antcolonies/block_moves/monitor.json, read by the game's BlockMoves)."""
     import mod_paths
     game_bones, rows, w, h = paint(model(), GAME_LOOK)
     made = clips()[0]
     write_assets({'textures/entity/monitor.png': png(rows),
                   'geo/entity/monitor.geo.json': geo('monitor', game_bones, w, h, (8, 2.5, [0, 0.75, 0])),
                   'animations/entity/monitor.animation.json': animations(made)})
-    java = mod_paths.mod_folder('savanna') / 'src/main/java/com/antcolonies/savanna/animal/MonitorClimb.java'
-    with open(java, 'w', encoding='utf-8', newline='\n') as f:
-        f.write(climb_java(made))
-    print('wrote', java.relative_to(mod_paths.PROJECT))
+    write_block_moves('monitor', block_moves(made, CLIMB_SIZES, block_px, move_specs()), 'tools/monitor_models.py game')
 
 
 if __name__ == '__main__':

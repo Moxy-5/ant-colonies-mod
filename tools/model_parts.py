@@ -221,6 +221,78 @@ def write_assets(files, mod='savanna'):
         print('wrote', path.relative_to(mod_paths.PROJECT))
 
 
+# --- moves of their own (the Animal Maker Engine step B, 2026-11-20) -------------------------------------------------
+# A move made once with its clip (a step up, a step down, into or out of the water): the clip poses the body, its
+# 'path' note says where the body's root goes tick by tick, and the game moves the animal along that path
+# (framework/.../entity/body/BlockMoves.java reads the file written here). Each animal's maker makes its own moves and
+# clips (rule 5: animals never move alike); this only turns their notes into the game's move file.
+#
+# A move's clip carries two timeline notes: 'path body t dy dz t dy dz ...' (one row a tick, model pixels: how far up,
+# and forward as -z) and, if it meets the water, 'wet t' (seconds: going in, the chest meets the water; coming out, the
+# hips leave it; below 0 for none).
+def move_path(made_clip):
+    """A move clip's path rows (t, dy, dz) and its wet time (seconds, -1 for none), from its notes."""
+    notes = made_clip.get('timeline', {}).values()
+    path = next(v for v in notes if v.startswith('path '))
+    v = list(map(float, path.split()[2:]))
+    wet = next((float(n.split()[1]) for n in notes if n.startswith('wet ')), -1.0)
+    return [v[i:i + 3] for i in range(0, len(v) - 2, 3)], wet
+
+
+def block_moves(made, sizes, block_px, moves):
+    """The game's move file for one animal (a dict): {sizes, moves: [...]}, from its made clips.
+
+    sizes:    the animal sizes a clip is made for (any number: the monitor 5, most animals 1 to 3; the game plays the nearest)
+    block_px: size -> a block's height in model pixels on an animal of that size
+    moves:    in order, each {'name', 'clip': size -> clip name, 'ahead_px' (how far ahead of the move's start the step's
+              face, the edge or the bank's face is), 'starts_afloat', 'ends_afloat', 'goes_down' (its box stays on the
+              top it leaves until its back has passed the edge), 'end_level' (ending on land: the ground it ends on,
+              blocks up from where it started, e.g. 1 up a step, -1 down one, 0 out onto a bank level with the water)}
+    The rise is a share of a block (below 0 going down), the forward travel model pixels, one row a tick for each size.
+    """
+    out = []
+    for m in moves:
+        rises, alongs = [], []
+        for size in sizes:
+            rows = move_path(made[m['clip'](size)])[0]
+            B = block_px(size)
+            rises.append([dy / B for _, dy, _ in rows])
+            alongs.append([-dz for _, _, dz in rows])
+        # the wet tick read from the clip at size 1 (or the middle size): the same moment at every size
+        wet = move_path(made[next((m['clip'](s) for s in sizes if s == 1.0), m['clip'](sizes[len(sizes) // 2]))])[1]
+        out.append({'name': m['name'], 'clips': [m['clip'](s) for s in sizes], 'ahead_px': m['ahead_px'],
+                    'starts_afloat': m['starts_afloat'], 'ends_afloat': m['ends_afloat'], 'goes_down': m['goes_down'],
+                    'end_level': m.get('end_level', 0), 'wet_tick': round(wet * 20), 'ticks': len(rises[0]) - 1,
+                    'rise': rises, 'along': alongs})
+    return {'sizes': list(sizes), 'block_px': [round(block_px(s), 4) for s in sizes], 'moves': out}
+
+
+def _row(r):
+    return '[' + ', '.join(f'{round(x, 4) + 0.0:.4f}' for x in r) + ']'
+
+
+def write_block_moves(animal, data, maker, mod='savanna'):
+    """Writes an animal's move file (assets/<mod id>/block_moves/<animal>.json), one tick row a line."""
+    import mod_paths
+    path = mod_paths.assets(mod) / 'block_moves' / f'{animal}.json'
+    path.parent.mkdir(parents=True, exist_ok=True)
+    lines = ['{', f'  "_made_by": {json.dumps(maker + ": never edit by hand")},',
+             f'  "sizes": {json.dumps(data["sizes"])},', f'  "block_px": {json.dumps(data["block_px"])},', '  "moves": [']
+    for i, m in enumerate(data['moves']):
+        head = ', '.join(f'{json.dumps(k)}: {json.dumps(m[k])}' for k in
+                         ('name', 'clips', 'ahead_px', 'starts_afloat', 'ends_afloat', 'goes_down', 'end_level', 'wet_tick',
+                          'ticks'))
+        lines.append('    {' + head + ',')
+        for key in ('rise', 'along'):
+            rows = ',\n'.join('        ' + _row(r) for r in m[key])
+            lines.append(f'      "{key}": [\n{rows}\n      ]' + (',' if key == 'rise' else ''))
+        lines.append('    }' + (',' if i < len(data['moves']) - 1 else ''))
+    lines += ['  ]', '}', '']
+    with open(path, 'w', encoding='utf-8', newline='\n') as f:
+        f.write('\n'.join(lines))
+    print('wrote', path.relative_to(mod_paths.PROJECT))
+
+
 # --- turns -----------------------------------------------------------------------------------------------------------
 def mat_mul(a, b):
     return [[sum(a[i][k] * b[k][j] for k in range(3)) for j in range(3)] for i in range(3)]

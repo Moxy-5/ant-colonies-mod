@@ -1448,6 +1448,145 @@ public class RiverLifeTests {
                 + ", doing " + monitor.doing() + ", snail at " + snail.blockPosition().subtract(helper.absolutePos(BlockPos.ZERO))));
     }
 
+    // --- moves of their own, cut short and at an angle (the Animal Maker Engine step B, 2026-11-20) --------------------
+    /** The monitor's climbing ground: stone at TOP, a one-block step from x = STEP_X on; a monitor sent up it from x = MX0 + 3. */
+    private static final int STEP_X = MX0 + 10;
+
+    private static com.antcolonies.savanna.animal.MonitorEntity monitorBeforeStep(GameTestHelper helper, double x0, int z, float yaw) {
+        for (int x = MX0; x <= MX1; x++) {
+            for (int zz = MZ0; zz <= MZ1; zz++) {
+                helper.setBlock(new BlockPos(x, TOP, zz), Blocks.STONE);
+                helper.setBlock(new BlockPos(x, TOP + 1, zz), x >= STEP_X ? Blocks.STONE : Blocks.AIR);
+                for (int y = TOP + 2; y <= TOP + 5; y++) {
+                    helper.setBlock(new BlockPos(x, y, zz), Blocks.AIR);
+                }
+            }
+        }
+        com.antcolonies.savanna.animal.MonitorEntity monitor = helper.spawn(SavannaEntities.MONITOR.get(),
+                new net.minecraft.world.phys.Vec3(x0, TOP + 1, z + 0.5));
+        monitor.setPersistenceRequired();
+        monitor.setYRot(yaw);
+        monitor.yBodyRot = yaw;
+        monitor.yHeadRot = yaw;
+        return monitor;
+    }
+
+    /** Sends it on up the step (again whenever its route is done or another goal took it, until it is on top). */
+    private static void upTheStep(GameTestHelper helper, com.antcolonies.savanna.animal.MonitorEntity monitor, int z) {
+        if (monitor.climb() == null && monitor.getNavigation().isDone() && monitor.hurtTime == 0) {
+            BlockPos goal = helper.absolutePos(new BlockPos(STEP_X + 6, TOP + 2, z));
+            monitor.getNavigation().moveTo(goal.getX() + 0.5, goal.getY(), goal.getZ() + 0.5, 1.0);
+        }
+    }
+
+    /**
+     * A move cut short from any tick ends cleanly: a monitor hurt half way up its climb is set down on the ground at
+     * once (not held in the air on the climb's path, not inside the step), its move over, and walks on afterwards.
+     */
+    @GameTest(template = "arena", timeoutTicks = 1200)
+    public static void aMonitorHurtMidClimbIsSetDownAndWalksOn(GameTestHelper helper) {
+        com.antcolonies.savanna.animal.MonitorEntity monitor = monitorBeforeStep(helper, MX0 + 3.5, MZ0 + 5, -90.0F);
+        ServerLevel level = helper.getLevel();
+        long[] hurtAt = {-1};
+        double[] landed = {Double.NaN, 0, 0};
+        helper.onEachTick(() -> {
+            if (hurtAt[0] < 0) {
+                upTheStep(helper, monitor, MZ0 + 5);
+                com.antcolonies.entity.body.BlockMoves.Play play = monitor.climb();
+                if (play != null && com.antcolonies.savanna.animal.MonitorEntity.MOVES.ticks(play, level.getGameTime()) > 40) {
+                    monitor.hurt(monitor.damageSources().generic(), 1.0F);
+                    hurtAt[0] = level.getGameTime();
+                    helper.assertTrue(monitor.climb() == null, "the hurt did not end the climb");
+                }
+                return;
+            }
+            long since = level.getGameTime() - hurtAt[0];
+            helper.assertTrue(monitor.climb() == null || since > 20, "a move started again at once after the hurt");
+            helper.assertTrue(level.noCollision(monitor, monitor.getBoundingBox().deflate(1.0E-3)), "the monitor is inside a block "
+                    + since + " ticks after the hurt, at " + monitor.position());
+            if (Double.isNaN(landed[0]) && monitor.onGround()) {
+                landed[0] = monitor.getX();
+                landed[2] = monitor.getZ();
+                landed[1] = since;
+            }
+            helper.assertTrue(!Double.isNaN(landed[0]) || since < 30, "30 ticks after the hurt the monitor is still not on the ground, at "
+                    + monitor.position());
+        });
+        helper.succeedWhen(() -> {
+            helper.assertTrue(!Double.isNaN(landed[0]), "not hurt and landed yet");
+            double walked = Math.hypot(monitor.getX() - landed[0], monitor.getZ() - landed[2]);
+            helper.assertTrue(walked > 1.0, "the monitor has not walked on since it was set down (" + String.format("%.2f", walked) + " blocks)");
+        });
+    }
+
+    /**
+     * The block a climbing monitor is on taken away under it mid-move (broken by a player, say): the move ends and the
+     * monitor falls to the ground below, never left floating on the climb's path.
+     */
+    @GameTest(template = "arena", timeoutTicks = 900)
+    public static void aMonitorWhoseStepIsBrokenMidClimbFallsBack(GameTestHelper helper) {
+        com.antcolonies.savanna.animal.MonitorEntity monitor = monitorBeforeStep(helper, MX0 + 3.5, MZ0 + 5, -90.0F);
+        ServerLevel level = helper.getLevel();
+        int floor = helper.absolutePos(new BlockPos(0, TOP + 1, 0)).getY();
+        long[] brokenAt = {-1};
+        helper.onEachTick(() -> {
+            if (brokenAt[0] < 0) {
+                upTheStep(helper, monitor, MZ0 + 5);
+                if (monitor.climb() != null && monitor.getY() > floor + 0.5) {     // its box on top of the step
+                    for (int x = STEP_X; x <= STEP_X + 4; x++) {
+                        for (int z = MZ0; z <= MZ1; z++) {
+                            helper.setBlock(new BlockPos(x, TOP + 1, z), Blocks.AIR);
+                        }
+                    }
+                    brokenAt[0] = level.getGameTime();
+                }
+                return;
+            }
+            long since = level.getGameTime() - brokenAt[0];
+            helper.assertTrue(since < 2 || monitor.climb() == null || monitor.getY() < floor + 0.5,
+                    "the monitor is still on its climb over the broken step (" + since + " ticks), at " + monitor.position());
+            helper.assertTrue(level.noCollision(monitor, monitor.getBoundingBox().deflate(1.0E-3)), "the monitor is inside a block at "
+                    + monitor.position());
+        });
+        helper.succeedWhen(() -> {
+            helper.assertTrue(brokenAt[0] >= 0, "the monitor never got its box on top of the step");
+            helper.assertTrue(monitor.onGround() && Math.abs(monitor.getY() - floor) < 0.05,
+                    "the monitor is not back on the ground under the broken step: y " + String.format("%.2f", monitor.getY() - floor)
+                            + " over it, on ground " + monitor.onGround());
+        });
+    }
+
+    /**
+     * Coming at a step far off square (60 degrees), the monitor turns square on the spot and climbs it with its move (it
+     * stepped up the old way before, 2026-11-20), and ends on top. (Its turn is only told, not required: Minecraft's own
+     * steering may turn it most of the way before it reaches the climb's start.)
+     */
+    @GameTest(template = "arena", timeoutTicks = 900)
+    public static void aMonitorAtAnAngleTurnsSquareAndClimbs(GameTestHelper helper) {
+        // already where the climb starts (its move's 50 px short of the face at size 1: 2.34 blocks), facing 60 degrees
+        // off the step's face, which lies straight ahead along x
+        com.antcolonies.savanna.animal.MonitorEntity monitor = monitorBeforeStep(helper, STEP_X - 2.3, MZ0 + 5, -30.0F);
+        ServerLevel level = helper.getLevel();
+        int[] turn = {-1};
+        helper.onEachTick(() -> {
+            com.antcolonies.entity.body.BlockMoves.Play play = monitor.climb();
+            if (play != null && turn[0] < 0) {
+                turn[0] = play.turn();
+            }
+            if (turn[0] < 0 && monitor.getNavigation().isDone()) {
+                // straight at the face along x from where it stands, so the route's last step up is square to it
+                BlockPos goal = helper.absolutePos(new BlockPos(STEP_X + 6, TOP + 2, MZ0 + 5));
+                monitor.getNavigation().moveTo(goal.getX() + 0.5, goal.getY(), goal.getZ() + 0.5, 1.0);
+            }
+        });
+        int top = helper.absolutePos(new BlockPos(0, TOP + 2, 0)).getY();
+        helper.succeedWhen(() -> {
+            helper.assertTrue(turn[0] >= 0, "the monitor never started its climb (at " + monitor.position() + ")");
+            helper.assertTrue(monitor.climb() == null && monitor.onGround() && Math.abs(monitor.getY() - top) < 0.05,
+                    "the monitor is not on top yet: y " + String.format("%.2f", monitor.getY() - top) + ", turned first " + turn[0] + " ticks");
+        });
+    }
+
     /**
      * A Nile monitor watches a survival player (2026-11-17, the user's ask): 11 blocks off it stops and faces them; when
      * they step back to 13.5 it trails them back toward 6; when they walk right up to its jaws it hisses, then lunges and

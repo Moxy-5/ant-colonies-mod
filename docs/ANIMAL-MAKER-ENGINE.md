@@ -64,7 +64,8 @@ its checks are about things that look broken (gaps, sliding feet, pops), never a
   (`tools/monitor_models.py`, `tools/crocodile_models.py`, ...).
 - **Built since (to 2026-11-20):** shared: the measuring course, `SteadyController` (clip speed), `TailDrag` and
   `DraggedTail` (the dragged tail), `game_compare.py`, body plans for the monitor, crocodile and bullfrog. The
-  monitor's own: `MonitorClimb` (its climbs and water moves). One checker per animal (`climb_check.py`,
+  monitor's own: `MonitorClimb` (its climbs and water moves; since step B, 2026-11-20, the shared `BlockMoves` player
+  with the monitor's move file). One checker per animal (`climb_check.py`,
   `water_check.py` for the monitor, `croc_check.py`, `frog_check.py`) until step A (2026-11-20) made them one,
   `tools/clip_check.py`; step B makes the moves shared.
 - **Planned, not built:** the tools review `docs/plans/animal-kit-tools-review.md` (2026-11-08) holds the animation
@@ -359,8 +360,81 @@ about half as much on the turn).
   click-to-pin notes on the viewer page so the user can point at a spot; gait builders (trot, gallop, the many-legged
   wave); freeing the insect animation tools from the ant class (G1) when a non-colony insect or spider comes.
 
-**B. Shared moves in the framework.**
-- `MonitorClimb` becomes a species-neutral move player in `framework/.../entity/body/` (`BlockMoves`, my pick): it
+**B. Shared moves in the framework. BUILT 2026-11-20** (overnight 2 of 4, branch `claude/engine-every-animal`; the
+plan as written stays below the record).
+
+*What was built:*
+- **`framework/.../entity/body/BlockMoves.java`**, the shared move player. It never names an animal: an animal hands
+  it its move file with `BlockMoves.of(<a class of its own mod>, <mod id>, <animal>)`, read straight from that mod's own
+  jar on both sides (the server moves the box, the client draws the model; not a data pack, which a multiplayer client
+  would not have), as the body plans are read. It plays a move once the animal has started it: the box along the path
+  (`step`), where it is drawn (`drawnAt`), the clip time (`ticks`), the turn onto the heading (`facing`), and ends it
+  cleanly (`cut`). Which move where and the room for it stay the animal's own (its body decides what it can climb).
+  `BlockMoves.Play` (was `MonitorEntity.Climb`) is one move being played, synced as a tag.
+- **The move file** (`assets/<mod>/block_moves/<animal>.json`; the monitor's `assets/antcolonies/block_moves/monitor.json`,
+  63 KB): its sizes, and for each move by name its clip a size, how far ahead the face or edge is, starts or ends
+  afloat, goes down, the ground it ends on (`end_level`), the wet tick, its length, and its path tick by tick a size (`rise`, a share of a block; `along`, model pixels). Optional
+  `lead_ticks`, `rest_ticks`, `turn_ticks` (the monitor's 4, 8, 8 as defaults). **Each animal's number of sizes is its
+  own** (the monitor keeps 5, 0.85 to 1.15; another animal may have 1 to 3; young of a very different size get their
+  own file or none, never an adult's scaled).
+- **The tools:** the general half of the monitor's move maker moved to `tools/model_parts.py` (`move_path`, which reads a
+  move clip's `path` and `wet` notes; `block_moves`, which turns an animal's made clips and its list of moves into the
+  file; `write_block_moves`). `tools/monitor_models.py` keeps only its own moves (`move_specs()`: names, clips, faces,
+  flags) and writes the file with `python tools/monitor_models.py game`. `MonitorClimb.java` (73 KB of generated
+  tables) and its Java writer (`climb_java`) are deleted.
+- **The monitor moved over unchanged:** its clip files byte for byte the same (so `clip_check.py`'s findings are the
+  same), the move file's every number the same as the old Java tables (checked row by row, all 8 moves x 5 sizes, and
+  the faces, wet ticks and lengths), the unit test `BlockMovesFileTest` reads it as the game does.
+- **`tools/film.sh watch` reloads a changed move file** without a relaunch (`FilmWatch` calls `BlockMoves.reloadAll()`
+  after copying it in; same JVM, so the server side sees it too).
+
+*Interrupted and angled moves (new; how the monitor started and ended moves was read first: a move started only
+calm and squarely within 40 degrees, and nothing but death, landing in water or the step going ended it early; a
+hurt did not):*
+- **A clean blend-out from any tick (`BlockMoves.cut`):** the box set down where it really is (pushed up out of any
+  block it ended in), left to the game's own walking, falling and floating; its drawing slides from the path back
+  onto it (`MonitorModel`'s 0.12 s hand-over) and its clip player eases back to the walk or swim by itself. A move is
+  cut when the animal dies, a land move finds itself in water, the step or bank goes from under it, a block is put
+  in its way (new: the box's next place checked against the blocks), or (the monitor, my pick) **it is hurt**; a move
+  is not started again while it is still hurt (Minecraft's own 0.5 s `hurtTime`), so its flight or bite back takes
+  over. Being pushed does nothing mid-move (the path holds its box, as before).
+- **Chunks unloading:** a move is synced data, never saved: a monitor saved mid-move comes back standing where its box
+  was (never inside a block: the box is kept out of them), and a player's screen joining mid-move draws it at the
+  right moment of the clip (the move's own start tick).
+- **Angled approaches (my picks):** within 30 degrees of square to the edge (`BlockMoves.SQUARE`) the move plays as it
+  comes, the body turning onto the heading over 0.4 s while the clip eases in (it snapped round in one tick before, up
+  to 40 degrees); 30 to 135 degrees off, it **turns square on the spot first** (6 degrees a tick, `TURN_RATE`; its
+  walk clip stepping round), then plays the move; more, no move (going elsewhere). Before, more than 40 degrees off it
+  stepped up the old way.
+- **Game tests (`river`):** `aMonitorHurtMidClimbIsSetDownAndWalksOn`, `aMonitorWhoseStepIsBrokenMidClimbFallsBack`,
+  `aMonitorAtAnAngleTurnsSquareAndClimbs`.
+
+*Hills (old stage D), measured first:* a full climb up needs its start 2.34 blocks short of the face and ends with its
+middle 0.1 past the edge, so a move fits only where steps are **3 or more blocks apart**; with 1 or 2 blocks between
+steps the next face is already under the monitor's 4.5-block body (its head would go into the next step), the room
+check refuses, and it steps up Minecraft's old way with the old bend. What was built: **no rest between the moves of a
+hill** (the 0.4 s stand after a climb is skipped when the route goes on up or down within 4 nodes; a single step keeps
+it, so the climb the user confirmed is unchanged). Course `stairs` (steps 3 apart): three climbs done at t 328 against
+352 for step A (1.2 s sooner), all other findings the same kinds and sizes. Films: `tools/film/monitor_stairs_frames.film`
+and `tools/film/monitor_turn_square_frames.film` (frozen, 3 and 2 ticks a picture, side, front, behind; judged every
+phase: the climb's end, stepping onto the top, the walk on without a stand, the next climb's look and rear; the turn
+on the spot, then the climb as before; no pops, nothing in the blocks, the tail draping over each edge).
+- **Tried and dropped (strike 1, written down):** starting the next move past its standing first ticks when it follows
+  another. The course showed the head pop 5.8 px and the neck snap 10 degrees at the chained start: GeckoLib eases
+  into a clip's first frame, not the tick it is started from. Not patched; removed (it saved only 0.2 s).
+- **Left, a user's call:** steps 1 or 2 blocks apart need a move of their own (a slope climb: the body along the stair's
+  slant, the legs walking each step), new clips made by the monitor's maker. Until then they keep the old step.
+
+*What was removed and what stays:* removed `MonitorClimb.java`, its Java writer, and the monitor's 40-degree start
+limit. **The step parts of `GroundBend` and the monitor's own step rules in `MonitorModel` (the whole-body lift, the
+trunk hinges and joint closing, foot planting) stay**, my call: they act only when no move plays, and that still
+happens often in real land (steps 1 or 2 blocks apart, a bank with no room for a move, a slope of flowing water);
+removing them now would make those plain plank pops. They go when the slope climb exists. `EdgeOver` is the insects'
+only (the monitor never used it): untouched, so no insect body class changed and no guard films were needed. The
+crocodile is untouched (step C gives it moves of its own on `BlockMoves`).
+
+
+
   plays any animal's moves (the path tables, how far ahead the edge must be, the splash tick, starting or ending
   afloat, the sizes), never naming one. The general half of the monitor's move maker (the path writer, the sizes, the
   Java table writer) moves into `tools/model_parts.py`; each animal's moves stay its own clips and paths (rule 5: the
@@ -375,7 +449,7 @@ about half as much on the turn).
 `docs/BUGS.md`):
 | Animal | Its to-dos |
 |---|---|
-| Nile monitor | its in-game test of the climb down and the water moves (built, not tried); hills (B); the back's S-curve (old step 3: shoulders and hips turning opposite ways in the walk and swim, on planted feet) |
+| Nile monitor | its in-game test of the climb down and the water moves (built, not tried); hills (B: no rest between steps 3+ apart built; a slope climb for steps 1 or 2 apart, the user's call); the back's S-curve (old step 3: shoulders and hips turning opposite ways in the walk and swim, on planted feet) |
 | Crocodile (and its young) | moves of its own on the shared player (B), off the old step rules; the neck snap at the water (baseline 5); BUGS 243 (a hatchling sinks and sits); game faces (BUGS 245) |
 | Bullfrog | through the one checker and the hopper scenes; its polish plan (`docs/plans/bullfrog-polish.md`) goes on as planned |
 | Tilapia, catfish, barb | swimmer scenes; the body's sideways wave checked (the fish family's piece) |

@@ -283,6 +283,10 @@ final class FilmWatch {
             String[] parts = name.split("/");
             if (parts.length > 2 && (parts[2].equals("animations") || parts[2].equals("geo"))) {
                 gecko = true;
+            } else if (parts.length > 2 && parts[2].equals("block_moves")) {
+                // an animal's move file (the Animal Maker Engine step B): read again from the copied file, both sides
+                com.antcolonies.entity.body.BlockMoves.reloadAll();
+                gecko = true;
             } else {
                 full = true;
             }
