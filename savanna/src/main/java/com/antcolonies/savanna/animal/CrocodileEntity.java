@@ -114,8 +114,14 @@ public class CrocodileEntity extends PathfinderMob implements GeoEntity, HasLife
     public static final int ROLL_TICKS = 40, ROLL_TURNS = 3, ROLL_PAUSE = 30;
     /** How high its spine is, the line it rolls round (blocks, at size 1: the body bone's pivot, 6 model pixels). */
     public static final double ROLL_AXIS = 6.0 * CrocodileEntity.MODEL_SCALE / 16.0;
-    /** How far ahead of its middle its jaws close (blocks, at size 1: the snout's tip, 20 model pixels). */
-    public static final double JAWS_AHEAD = 20.0 * CrocodileEntity.MODEL_SCALE / 16.0;
+    /**
+     * How far ahead of its position its jaws reach (blocks, at size 1: the snout's tip, 40 model pixels; the position is at
+     * the front of its hips, model z 0). Was 20 pixels from the first crocodile on, so it bit from the back of its head
+     * (BUGS 283, 2026-11-22).
+     */
+    public static final double JAWS_AHEAD = 40.0 * CrocodileEntity.MODEL_SCALE / 16.0;
+    /** Where it holds what it carries: between its teeth, the model's {@code carried} socket (30 model pixels ahead). */
+    public static final double HOLD_AHEAD = 30.0 * CrocodileEntity.MODEL_SCALE / 16.0;
     /** How long it stays fed after a big kill and after something small (ticks; my picks: a day, half a day). */
     static final int FED_BIG = 24000, FED_SMALL = 12000;
     /**
@@ -136,12 +142,12 @@ public class CrocodileEntity extends PathfinderMob implements GeoEntity, HasLife
     /** With a catfish and a tilapia both in reach, the chance it goes for the catfish, the bigger meal (the user, 2026-11-15). */
     static final float PREFERS_CATFISH = 0.6F;
     /**
-     * The sideways snap at a fish beside its head: the head and neck swing round from the shoulders (this far behind its
-     * middle) by this much, the snout's tip this far from the shoulders, and the jaws slam shut on this tick of the
+     * The sideways snap at a fish beside its head: the head and neck swing round from the shoulders (the neck's joint, this
+     * far ahead of its position; was 6 pixels behind it, BUGS 283) by this much, the snout's tip this far from the shoulders, and the jaws slam shut on this tick of the
      * snap's {@link #SNAP_TICKS} (the snap_left and snap_right clips: shut at 0.2 s). A fish more than this far off its
      * nose (degrees) is snapped at sideways; nearer the nose it lunges straight at it.
      */
-    static final double NECK_BACK = 6.0 * CrocodileEntity.MODEL_SCALE / 16.0, HEAD_REACH = 26.0 * CrocodileEntity.MODEL_SCALE / 16.0, SNAP_SWING = 54.0, SNAP_FROM_NOSE = 25.0;
+    static final double NECK_AHEAD = 14.0 * CrocodileEntity.MODEL_SCALE / 16.0, HEAD_REACH = 26.0 * CrocodileEntity.MODEL_SCALE / 16.0, SNAP_SWING = 54.0, SNAP_FROM_NOSE = 25.0;
     static final int SNAP_TICKS = 10, SNAP_CATCH = 4;
     /** How often the fish darts away just as the jaws come (my pick: about 1 strike in 3 misses), and how many misses before it gives up a while. */
     static final float FISH_DODGE = 0.35F;
@@ -644,7 +650,7 @@ public class CrocodileEntity extends PathfinderMob implements GeoEntity, HasLife
     }
 
     /**
-     * Something small is held crosswise in its jaws, the prey's middle at the snout's tip. A big animal is held by the
+     * Something small is held crosswise in its jaws, between its teeth ({@link #HOLD_AHEAD}). A big animal is held by the
      * head, facing the crocodile, as it was seized and as it is hauled in. Afloat the prey's middle is at the height of
      * the crocodile's spine (so the roll turns prey and crocodile round one line); on the bank it stands on the ground
      * under it, and slides down the edge into the water as it is pulled over.
@@ -653,7 +659,7 @@ public class CrocodileEntity extends PathfinderMob implements GeoEntity, HasLife
     protected void positionRider(Entity passenger, Entity.MoveFunction callback) {
         float yaw = yBodyRot * Mth.DEG_TO_RAD;
         boolean big = passenger instanceof LivingEntity l && !isSmall(l);
-        double ahead = JAWS_AHEAD * getScale() + passenger.getBbWidth() * (big ? 0.6 : 0.3);
+        double ahead = HOLD_AHEAD * getScale() + passenger.getBbWidth() * (big ? 0.6 : 0.3);
         double px = getX() - Mth.sin(yaw) * ahead, pz = getZ() + Mth.cos(yaw) * ahead;
         double want = Math.max(getY() + ROLL_AXIS * getScale() - passenger.getBbHeight() * 0.5, floorAt(px, pz));
         heldY = Double.isNaN(heldY) || Math.abs(want - heldY) > 3.0 ? want : heldY + Mth.clamp(want - heldY, -0.2, 0.2);
@@ -2088,11 +2094,11 @@ public class CrocodileEntity extends PathfinderMob implements GeoEntity, HasLife
             croc.setDeltaMovement(v.x, Math.min(v.y, Mth.clamp(dy * 0.08, -0.12, -0.03)), v.z);
         }
 
-        /** Where its head swings from: its shoulders, a little behind its middle, at the height of its spine. */
+        /** Where its head swings from: its shoulders (the neck's joint), ahead of its position, at the height of its spine. */
         private Vec3 shoulders() {
             float yaw = croc.yBodyRot * Mth.DEG_TO_RAD;
-            double back = NECK_BACK * croc.getScale();
-            return new Vec3(croc.getX() + Mth.sin(yaw) * back, croc.getY() + ROLL_AXIS * croc.getScale(), croc.getZ() - Mth.cos(yaw) * back);
+            double ahead = NECK_AHEAD * croc.getScale();
+            return new Vec3(croc.getX() - Mth.sin(yaw) * ahead, croc.getY() + ROLL_AXIS * croc.getScale(), croc.getZ() + Mth.cos(yaw) * ahead);
         }
 
         /**

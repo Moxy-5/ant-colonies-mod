@@ -1,0 +1,41 @@
+# The crocodile's bite from its snout (2026-11-22, BUGS 283: its jaw point was half its snout's reach, so it bit from
+# the back of its head): a hungry crocodile in a pool rushes a cow on the bank, grabs it, the tug of war, hauls it in.
+# Stepped 3 ticks a picture (hard rule: frozen and stepped, three sides): side on, ahead (from the bank behind the cow),
+# from above. Look for: the jaws closing on the cow's head, the cow held between the teeth, not inside the head.
+#   ./gradlew runFilm -PfilmScene=tools/film/crocodile_bite_frames.film   pictures in run-film/screenshots/crocodile_bite_frames/
+cmd time set noon
+cmd weather clear
+lens 50
+# --- side on (from the south)
+cmd kill @e[type=!player]
+cmd fill 14 -61 2 50 -50 32 minecraft:air
+cmd fill 14 -62 2 50 -62 32 minecraft:grass_block
+cmd fill 26 -63 8 44 -61 26 minecraft:water
+wait 30
+cmd summon antcolonies:crocodile 32.5 -61 17.0 {HungerIn:0,SunIn:100000,StrikeLuck:1b,Rotation:[90f,0f],OwnSize:1.0f}
+cmd summon minecraft:cow 22.6 -60 17.0 {NoAI:1b,Rotation:[90f,0f]}
+camera 27.0 -57.5 7.5 0 20
+wait 6
+cmd tick freeze
+burst side 80 3
+cmd tick unfreeze
+# --- ahead (from the bank behind the cow, looking east at the crocodile)
+cmd kill @e[type=!player]
+wait 10
+cmd summon antcolonies:crocodile 32.5 -61 17.0 {HungerIn:0,SunIn:100000,StrikeLuck:1b,Rotation:[90f,0f],OwnSize:1.0f}
+cmd summon minecraft:cow 22.6 -60 17.0 {NoAI:1b,Rotation:[90f,0f]}
+camera 17.5 -57.0 14.5 -110 22
+wait 6
+cmd tick freeze
+burst ahead 80 3
+cmd tick unfreeze
+# --- from above
+cmd kill @e[type=!player]
+wait 10
+cmd summon antcolonies:crocodile 32.5 -61 17.0 {HungerIn:0,SunIn:100000,StrikeLuck:1b,Rotation:[90f,0f],OwnSize:1.0f}
+cmd summon minecraft:cow 22.6 -60 17.0 {NoAI:1b,Rotation:[90f,0f]}
+camera 26.5 -50.0 10.0 0 60
+wait 6
+cmd tick freeze
+burst above 80 3
+cmd tick unfreeze
