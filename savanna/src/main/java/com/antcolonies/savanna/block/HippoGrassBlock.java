@@ -133,9 +133,14 @@ public class HippoGrassBlock extends BushBlock {
     protected void entityInside(BlockState state, net.minecraft.world.level.Level level, BlockPos pos, net.minecraft.world.entity.Entity entity) {
         if (level instanceof ServerLevel server && state.getValue(PlantPush.PUSH) != PlantPush.PUSHED
                 && PlantPush.pusher(entity) && PlantPush.moving(entity)) {
-            server.setBlock(pos, state.setValue(PlantPush.PUSH, PlantPush.PUSHED), Block.UPDATE_CLIENTS);
-            PlantPush.lookAgain(server, pos, this, PlantPush.CHECK);
+            push(server, pos, state);
         }
+    }
+
+    /** Marks the mat pushed and looks again in a while. */
+    public void push(ServerLevel level, BlockPos pos, BlockState state) {
+        level.setBlock(pos, state.setValue(PlantPush.PUSH, PlantPush.PUSHED), Block.UPDATE_CLIENTS);
+        PlantPush.lookAgain(level, pos, this, PlantPush.CHECK);
     }
 
     @Override

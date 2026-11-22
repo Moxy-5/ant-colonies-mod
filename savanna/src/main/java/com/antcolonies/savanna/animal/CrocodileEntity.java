@@ -71,7 +71,7 @@ import software.bernie.geckolib.util.GeckoLibUtil;
  * {@link Attributes#SCALE}. Its box is under a block wide at every size, so its routes use 1-block squares (the
  * catfish's lesson). It breathes under water (my pick: a crocodile holding its breath for an hour is not worth a rule).
  */
-public class CrocodileEntity extends PathfinderMob implements GeoEntity, HasLife {
+public class CrocodileEntity extends PathfinderMob implements com.antcolonies.savanna.block.LongBody, GeoEntity, HasLife {
     private static final EntityDataAccessor<Boolean> DATA_BASKING = SynchedEntityData.defineId(CrocodileEntity.class, EntityDataSerializers.BOOLEAN);
     /** What its jaws are doing in a hunt: {@link #JAWS_NONE}, gaping in the lunge, clamped on its prey, or tearing at a kill. */
     private static final EntityDataAccessor<Byte> DATA_JAWS = SynchedEntityData.defineId(CrocodileEntity.class, EntityDataSerializers.BYTE);
@@ -2574,5 +2574,17 @@ public class CrocodileEntity extends PathfinderMob implements GeoEntity, HasLife
     @Override
     public AnimatableInstanceCache getAnimatableInstanceCache() {
         return cache;
+    }
+
+    /** Its drawn body's reach ahead of its position, for pushing plants aside ({@link com.antcolonies.savanna.block.LongBody}). */
+    @Override
+    public double noseAhead() {
+        return JAWS_AHEAD * getScale();
+    }
+
+    /** Its drawn body's reach behind its position (the tail's tip or rump). */
+    @Override
+    public double tailBehind() {
+        return (7.5 - JAWS_AHEAD) * getScale();
     }
 }

@@ -95,7 +95,7 @@ import software.bernie.geckolib.util.GeckoLibUtil;
  * down over it, reaches its forefeet down the face to the lower ground, tips its chest down while its hind legs brake on
  * top, then its hips go over and its hind feet step down the face; the tail slides off the edge last.
  */
-public class MonitorEntity extends PathfinderMob implements GeoEntity, HasLife {
+public class MonitorEntity extends PathfinderMob implements com.antcolonies.savanna.block.LongBody, GeoEntity, HasLife {
     /** What it is doing, for the clips. */
     public static final byte CALM = 0, BASK = 1, HISS = 2, BITE = 3, EAT = 4, WATCH = 5, BITE_PLAYER = 6;
     private static final EntityDataAccessor<Byte> DATA_DOING = SynchedEntityData.defineId(MonitorEntity.class, EntityDataSerializers.BYTE);
@@ -1686,5 +1686,17 @@ public class MonitorEntity extends PathfinderMob implements GeoEntity, HasLife {
     @Override
     public AnimatableInstanceCache getAnimatableInstanceCache() {
         return cache;
+    }
+
+    /** Its drawn body's reach ahead of its position, for pushing plants aside ({@link com.antcolonies.savanna.block.LongBody}). */
+    @Override
+    public double noseAhead() {
+        return JAWS_AHEAD * getScale();
+    }
+
+    /** Its drawn body's reach behind its position (the tail's tip or rump). */
+    @Override
+    public double tailBehind() {
+        return (4.5 - JAWS_AHEAD) * getScale();
     }
 }

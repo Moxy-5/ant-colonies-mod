@@ -82,7 +82,7 @@ import software.bernie.geckolib.util.GeckoLibUtil;
  * </ul>
  * Not yet: calves and breeding, hippo paths and short "hippo lawns", resting on the banks by day.
  */
-public class HippoEntity extends PathfinderMob implements GeoEntity, HasLife {
+public class HippoEntity extends PathfinderMob implements com.antcolonies.savanna.block.LongBody, GeoEntity, HasLife {
     /** What it is doing, for the clips. */
     public static final byte CALM = 0, YAWN = 1, BITE = 2, GRAZE = 3, EAR_FLICK = 4, DUNG = 5, REST = 6;
     private static final EntityDataAccessor<Byte> DATA_DOING = SynchedEntityData.defineId(HippoEntity.class, EntityDataSerializers.BYTE);
@@ -1304,5 +1304,17 @@ public class HippoEntity extends PathfinderMob implements GeoEntity, HasLife {
     @Override
     public AnimatableInstanceCache getAnimatableInstanceCache() {
         return cache;
+    }
+
+    /** Its drawn body's reach ahead of its position, for pushing plants aside ({@link com.antcolonies.savanna.block.LongBody}). */
+    @Override
+    public double noseAhead() {
+        return 2.5 * getScale();
+    }
+
+    /** Its drawn body's reach behind its position (the tail's tip or rump). */
+    @Override
+    public double tailBehind() {
+        return 2.5 * getScale();
     }
 }

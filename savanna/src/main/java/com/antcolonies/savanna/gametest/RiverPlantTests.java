@@ -153,6 +153,35 @@ public class RiverPlantTests {
     }
 
     /**
+     * A hippo pushes plants with its whole body as drawn (5 blocks nose to rump), not only its square box (1.9 across):
+     * the blocks 2 ahead of its middle and 2 behind lie under it, 2 to the side do not; a husk's is just its box (the user,
+     * 2026-11-22: "the hippo is also missing the ones it should hit").
+     */
+    @GameTest(template = "arena", timeoutTicks = 20)
+    public static void aHippoPushesPlantsWithItsWholeBodyNotOnlyItsBox(GameTestHelper helper) {
+        for (int x = 2; x <= 20; x++) {
+            for (int z = 2; z <= 20; z++) {
+                helper.setBlock(new BlockPos(x, 1, z), Blocks.STONE);
+            }
+        }
+        net.minecraft.world.entity.Mob hippo = helper.spawnWithNoFreeWill(com.antcolonies.savanna.registry.SavannaEntities.HIPPO.get(), 10.5F, 2, 10.5F);
+        hippo.setYRot(-90);                                   // facing +x
+        hippo.setYBodyRot(-90);
+        com.antcolonies.savanna.block.PlantPush.Footprint f = com.antcolonies.savanna.block.PlantPush.footprint(hippo);
+        BlockPos mid = helper.absolutePos(new BlockPos(10, 2, 10));
+        double size = hippo.getScale();
+        helper.assertTrue(f.overlaps(mid.getX() + (int) Math.floor(2 * size), mid.getZ()), "the block at its nose should lie under it");
+        helper.assertTrue(f.overlaps(mid.getX() - (int) Math.floor(2 * size), mid.getZ()), "the block at its rump should lie under it");
+        helper.assertFalse(f.overlaps(mid.getX(), mid.getZ() + 2), "a block 2 to its side should not");
+        helper.assertFalse(f.overlaps(mid.getX() + (int) Math.ceil(2.5 * size) + 1, mid.getZ()), "a block past its nose should not");
+        net.minecraft.world.entity.Mob husk = helper.spawnWithNoFreeWill(net.minecraft.world.entity.EntityType.HUSK, 15.5F, 2, 15.5F);
+        com.antcolonies.savanna.block.PlantPush.Footprint h = com.antcolonies.savanna.block.PlantPush.footprint(husk);
+        BlockPos at = helper.absolutePos(new BlockPos(15, 2, 15));
+        helper.assertTrue(h.overlaps(at.getX(), at.getZ()) && !h.overlaps(at.getX() + 1, at.getZ()), "a husk should touch only its own block");
+        helper.succeed();
+    }
+
+    /**
      * Hippo grass: a clump on a silt bank sends mats out over the water (young only 1 block out); the mats take the
      * clump's stage ring by ring; dying back they go from the outside in, the clump staying, which then comes round to
      * young again.

@@ -128,22 +128,30 @@ public final class PlantPushClient {
         }
     }
 
-    /** Adds what {@code entity} does to the plants its box (a little widened) touches. */
+    /**
+     * Adds what {@code entity} does to the plants under its footprint ({@link PlantPush#footprint}: its box, or a long
+     * body's line nose to tail; the same blocks the server marks): each leans away from the nearest point of the body
+     * (and a little along its way), the more the nearer that point.
+     */
     private static void feel(ClientLevel level, Entity entity) {
-        AABB box = entity.getBoundingBox().deflate(1.0E-7);     // the blocks the server's push sees (Entity.checkInsideBlocks)
-        Vec3 move = entity.getDeltaMovement().multiply(1, 0, 1);
-        double mx = 0, mz = 0;
-        if (move.lengthSqr() > 1.0E-5) {
-            Vec3 m = move.normalize();
-            mx = m.x;
-            mz = m.z;
+        PlantPush.Footprint f = PlantPush.footprint(entity);
+        double mx = entity.getX() - entity.xo, mz = entity.getZ() - entity.zo, ml = Math.sqrt(mx * mx + mz * mz);
+        if (ml > 1.0E-3) {
+            mx /= ml;
+            mz /= ml;
+        } else {
+            mx = 0;
+            mz = 0;
         }
-        double half = entity.getBbWidth() / 2 + REACH;
+        double half = f.half() + REACH;
         BlockPos.MutableBlockPos at = new BlockPos.MutableBlockPos();
         java.util.Set<BlockPos> felt = new java.util.HashSet<>();
-        for (int x = Mth.floor(box.minX); x <= Mth.floor(box.maxX); x++) {
-            for (int z = Mth.floor(box.minZ); z <= Mth.floor(box.maxZ); z++) {
-                for (int y = Mth.floor(box.minY); y <= Mth.floor(box.maxY); y++) {
+        for (int x = f.minX(); x <= f.maxX(); x++) {
+            for (int z = f.minZ(); z <= f.maxZ(); z++) {
+                if (!f.overlaps(x, z)) {
+                    continue;
+                }
+                for (int y = Mth.floor(f.minY()); y <= Mth.floor(f.maxY() - 1.0E-7); y++) {
                     at.set(x, y, z);
                     BlockState state = level.getBlockState(at);
                     boolean reed = state.getBlock() instanceof ReedBlock;
@@ -155,7 +163,9 @@ public final class PlantPushClient {
                         continue;                              // one push a column from each pusher
                     }
                     Vec3 off = state.getOffset(level, at);
-                    double dx = x + 0.5 + off.x - entity.getX(), dz = z + 0.5 + off.z - entity.getZ();
+                    double px = x + 0.5 + off.x, pz = z + 0.5 + off.z;
+                    double[] near = f.nearest(px, pz);
+                    double dx = px - near[0], dz = pz - near[1];
                     double d = Math.sqrt(dx * dx + dz * dz);
                     double close = Mth.clamp(1 - d / half, 0, 1);
                     if (close <= 0) {
