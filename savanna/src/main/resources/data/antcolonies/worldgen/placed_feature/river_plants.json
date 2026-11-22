@@ -1,0 +1,5 @@
+{
+  "_note": "Reeds and hippo grass step 4 (2026-11-22): once per chunk, after the algae, the nests and the hippos' pools; the feature works over the chunk's columns (worldgen/RiverPlantsFeature).",
+  "feature": "antcolonies:river_plants",
+  "placement": []
+}

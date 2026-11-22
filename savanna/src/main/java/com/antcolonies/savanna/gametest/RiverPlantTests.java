@@ -281,4 +281,124 @@ public class RiverPlantTests {
         helper.assertTrue(HippoGrassClumpBlock.next(HippoGrassClumpBlock.DYING) == HippoGrassClumpBlock.YOUNG, "dying back should come round to young");
         helper.succeed();
     }
+
+    /**
+     * New land's river plants scene: a basin 3 deep (water top y 4), a silt bank flush with the water along z 2 to 4, a
+     * shallow shelf 2 deep along z 5 to 7, the rest 3 deep, and a sand bar (red river sand, bank and bed) over x 14 to 17.
+     * Returns the absolute water top.
+     */
+    private static int riverPlantsScene(GameTestHelper helper) {
+        basin(helper, 2, 2, 17, 17, 3);
+        for (int x = 2; x <= 17; x++) {
+            for (int z = 2; z <= 7; z++) {
+                BlockState ground = x >= 14 ? SavannaBlocks.RED_SAND.dry().get().defaultBlockState() : SavannaBlocks.SILT.get().defaultBlockState();
+                int top = z <= 4 ? 4 : 2;                          // the bank's top level with the water; the shelf's bed under 2 of water
+                for (int y = 2; y <= top; y++) {
+                    helper.setBlock(new BlockPos(x, y, z), ground);
+                }
+            }
+        }
+        return helper.absolutePos(new BlockPos(0, 4, 0)).getY();
+    }
+
+    private static com.antcolonies.savanna.worldgen.RiverPlantsFeature.Plan plantsPlan(GameTestHelper helper, long seed, boolean reeds) {
+        BlockPos a = helper.absolutePos(new BlockPos(2, 0, 2)), b = helper.absolutePos(new BlockPos(17, 0, 17));
+        int ax = Math.min(a.getX(), b.getX()), bx = Math.max(a.getX(), b.getX()), az = Math.min(a.getZ(), b.getZ()), bz = Math.max(a.getZ(), b.getZ());
+        var all = com.antcolonies.savanna.worldgen.RiverPlantsFeature.Patches.ALL;
+        var none = com.antcolonies.savanna.worldgen.RiverPlantsFeature.Patches.NONE;
+        return new com.antcolonies.savanna.worldgen.RiverPlantsFeature.Plan(seed,
+                p -> p.getX() >= ax && p.getX() <= bx && p.getZ() >= az && p.getZ() <= bz, reeds ? all : none, reeds ? none : all);
+    }
+
+    private static int layPlants(GameTestHelper helper, int top, com.antcolonies.savanna.worldgen.RiverPlantsFeature.Plan plan) {
+        BlockPos a = helper.absolutePos(new BlockPos(2, 0, 2)), b = helper.absolutePos(new BlockPos(17, 0, 17));
+        return com.antcolonies.savanna.worldgen.RiverPlantsFeature.lay(helper.getLevel(), Math.min(a.getX(), b.getX()), Math.min(a.getZ(), b.getZ()),
+                Math.abs(a.getX() - b.getX()) + 1, Math.abs(a.getZ() - b.getZ()) + 1, top, plan);
+    }
+
+    /**
+     * New land's reed beds (reeds and hippo grass step 4): where the patches say, full-height columns in water 1 or 2 deep
+     * and at the waterline, never in water 3 deep, back on the dry bank, or on or beside a sand bar.
+     */
+    @GameTest(template = "arena", timeoutTicks = 20)
+    public static void newLandReedBedsStandInTheShallowsAndNeverOnSand(GameTestHelper helper) {
+        int top = riverPlantsScene(helper);
+        int laid = layPlants(helper, top, plantsPlan(helper, 1, true));
+        ServerLevel level = helper.getLevel();
+        int shelf = 0, waterline = 0;
+        for (int x = 2; x <= 17; x++) {
+            for (int z = 2; z <= 17; z++) {
+                for (int y = 2; y <= 8; y++) {
+                    BlockState state = level.getBlockState(helper.absolutePos(new BlockPos(x, y, z)));
+                    if (!(state.getBlock() instanceof ReedBlock reed)) {
+                        continue;
+                    }
+                    helper.assertTrue(x <= 12, "a reed on or beside the sand bar at x " + x + " z " + z);
+                    helper.assertTrue(z >= 4 && z <= 7, "a reed back on the dry bank or in water 3 deep at z " + z);
+                    BlockPos abs = helper.absolutePos(new BlockPos(x, y, z));
+                    if (!level.getBlockState(abs.below()).is(reed)) {         // a column's foot
+                        int height = 0;
+                        while (level.getBlockState(abs.above(height)).is(reed)) {
+                            height++;
+                        }
+                        helper.assertTrue(height == ReedBlock.fullHeight(level, abs) && level.getBlockState(abs.above(height - 1)).getValue(ReedBlock.TOP),
+                                "a reed column at x " + x + " z " + z + " should stand full height with its plume on top (" + height + " tall)");
+                        if (z == 4) {
+                            waterline++;
+                        } else {
+                            shelf++;
+                        }
+                    }
+                }
+            }
+        }
+        helper.assertTrue(shelf == 11 * 3 && waterline == 11, "reeds should fill the shelf (33) and the waterline (11) away from the sand: " + shelf + ", " + waterline + " (laid " + laid + ")");
+        helper.succeed();
+    }
+
+    /**
+     * New land's hippo grass: clumps on the bank at the waterline, mats lying out over the water ring by ring (each mat
+     * r out beside one r - 1 out, or the clump), at most 3 out and no farther than the spot's own reach, at the patch's
+     * stage, never on or beside the sand bar.
+     */
+    @GameTest(template = "arena", timeoutTicks = 20)
+    public static void newLandHippoGrassGrowsOutFromTheBankAndNeverOnSand(GameTestHelper helper) {
+        int top = riverPlantsScene(helper);
+        BlockPos mid = helper.absolutePos(new BlockPos(8, 0, 4));
+        long seed = 0;
+        while (com.antcolonies.savanna.worldgen.RiverPlantsFeature.stageAt(seed, mid.getX(), mid.getZ()) != HippoGrassClumpBlock.GROWN
+                || com.antcolonies.savanna.worldgen.RiverPlantsFeature.stageAt(seed, mid.getX() + 8, mid.getZ() + 8) != HippoGrassClumpBlock.GROWN
+                || com.antcolonies.savanna.worldgen.RiverPlantsFeature.stageAt(seed, mid.getX() - 8, mid.getZ() - 8) != HippoGrassClumpBlock.GROWN) {
+            seed++;                                             // a seed whose patch here is grown, so its mats reach out
+        }
+        layPlants(helper, top, plantsPlan(helper, seed, false));
+        ServerLevel level = helper.getLevel();
+        int clumps = 0, mats = 0, farthest = 0;
+        for (int x = 2; x <= 17; x++) {
+            for (int z = 2; z <= 17; z++) {
+                for (int y = 2; y <= 8; y++) {
+                    BlockPos abs = helper.absolutePos(new BlockPos(x, y, z));
+                    BlockState state = level.getBlockState(abs);
+                    if (state.getBlock() instanceof HippoGrassClumpBlock) {
+                        helper.assertTrue(z == 4 && y == 5 && x <= 12, "a clump off the waterline or by the sand at x " + x + " y " + y + " z " + z);
+                        helper.assertTrue(state.getValue(HippoGrassClumpBlock.STAGE) == HippoGrassClumpBlock.GROWN, "the clump should be at its patch's stage");
+                        clumps++;
+                    } else if (state.getBlock() instanceof HippoGrassBlock) {
+                        int reach = state.getValue(HippoGrassBlock.REACH);
+                        helper.assertTrue(x <= 12 && y == 5 && reach == z - 4, "a mat at x " + x + " z " + z + " should lie " + (z - 4) + " out on the surface, not " + reach);
+                        helper.assertTrue(reach <= HippoGrassBlock.mostReachAt(abs), "a mat farther out than its spot allows");
+                        BlockState nearer = level.getBlockState(abs.north());
+                        helper.assertTrue(reach == 1 ? nearer.getBlock() instanceof HippoGrassClumpBlock
+                                : nearer.getBlock() instanceof HippoGrassBlock && nearer.getValue(HippoGrassBlock.REACH) == reach - 1,
+                                "a mat " + reach + " out should lie beside the ring nearer the bank");
+                        mats++;
+                        farthest = Math.max(farthest, reach);
+                    }
+                }
+            }
+        }
+        helper.assertTrue(clumps == 11 && mats >= 11 && farthest >= 2, "clumps all along the waterline away from the sand (11) and mats out from them: "
+                + clumps + " clumps, " + mats + " mats, farthest " + farthest);
+        helper.succeed();
+    }
 }

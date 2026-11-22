@@ -1,0 +1,18 @@
+{
+  "values": [
+    "#minecraft:sand",
+    "antcolonies:red_river_sand",
+    "antcolonies:wet_red_river_sand",
+    "antcolonies:rippled_red_river_sand",
+    "antcolonies:red_crocodile_slide",
+    "antcolonies:golden_river_sand",
+    "antcolonies:wet_golden_river_sand",
+    "antcolonies:rippled_golden_river_sand",
+    "antcolonies:golden_crocodile_slide",
+    "antcolonies:pale_river_sand",
+    "antcolonies:wet_pale_river_sand",
+    "antcolonies:rippled_pale_river_sand",
+    "antcolonies:pale_crocodile_slide",
+    "antcolonies:crocodile_nest"
+  ]
+}

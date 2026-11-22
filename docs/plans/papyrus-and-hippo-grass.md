@@ -85,7 +85,9 @@ higher and shaggier, short blades sticking up through it), and a rooted clump at
    (mat and clump, the four stages ticking), with drops and the creative tab.
 3. **Pushing through** (built 2026-11-22): the reeds' bend and the mats' dip, drawn smoothly by the client; filmed in
    the game (`tools/film/reeds_push_frames.film`). Only plants the pusher's box overlaps bend (as the server sees them).
-4. **In new land:** beds and fringes placed as above; a game test for where they go and that they never touch a sand
+4. **In new land** (built 2026-11-22, `worldgen/RiverPlantsFeature`; a patch noise over the land picks the beds, measured
+   offline for the spacing; oxbow-thick beds only within an oxbow site's 3 by 3 chunks, the floodplain's other water at the
+   river's spacing; never on or beside sand, slides or nests, tag `no_river_plants`; flight 0 stalls): beds and fringes placed as above; a game test for where they go and that they never touch a sand
    bar, slide, nest or pan; a game test for the hippo grass cycle; a flight for loading speed.
 5. **Hippos nibble hippo grass** (optional, the user's say).
 6. **Fish hide in the reeds** (optional, the user's say).

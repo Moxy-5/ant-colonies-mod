@@ -29,6 +29,9 @@ public class SavannaFeatures {
     /** River algae on the beds of the river, pans and oxbows (M9 river life; data/antcolonies/neoforge/biome_modifier/river_algae.json). */
     public static final DeferredHolder<Feature<?>, com.antcolonies.savanna.worldgen.RiverAlgaeFeature> RIVER_ALGAE =
             FEATURES.register("river_algae", () -> new com.antcolonies.savanna.worldgen.RiverAlgaeFeature(NoneFeatureConfiguration.CODEC));
+    /** Reed beds and hippo grass along the slow rivers and round the oxbows (reeds and hippo grass step 4, 2026-11-22). */
+    public static final DeferredHolder<Feature<?>, com.antcolonies.savanna.worldgen.RiverPlantsFeature> RIVER_PLANTS =
+            FEATURES.register("river_plants", () -> new com.antcolonies.savanna.worldgen.RiverPlantsFeature(NoneFeatureConfiguration.CODEC));
 
     /** A few old fish remains on the beds of the savanna's waters (switched on with the algae, .../biome_modifier/river_algae.json). */
     public static final DeferredHolder<Feature<?>, com.antcolonies.savanna.worldgen.RiverRemainsFeature> RIVER_REMAINS =
