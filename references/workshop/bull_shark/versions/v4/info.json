@@ -1,0 +1,14 @@
+{
+ "note": "Stage 3 v4: clean tucked lids, underside nostrils, tighter pectoral foils, fixed jaw gape",
+ "date": "2026-11-22",
+ "boxes": 264,
+ "numbers": {
+  "BODY_HW": 12.6,
+  "HUMP_H": 29.2,
+  "DORSAL_H": 38.2,
+  "PEC_SPAN": 24.5,
+  "PEC_DIP": 0.2,
+  "JAW_OPEN": 0.0,
+  "LID_CLOSE": 0.0
+ }
+}

@@ -19,10 +19,10 @@ import net.minecraft.world.level.levelgen.feature.configurations.NoneFeatureConf
 
 /**
  * Still water on the savanna floodplain (2026-11-07, {@code docs/plans/savanna-rivers.md}, step 4), placed on purpose on
- * flat floodplain ground, never near the river (it is its own water, a block up on the plain):
+ * flat floodplain ground, never near the river (it is its own water, a block up on the plain). Since 2026-11-22 only the
+ * pans (the oxbows are {@link OxbowFeature}, 16 to 32 across; the pans' own rework is step 4 of
+ * {@code docs/plans/oxbows-and-pans.md}):
  * <ul>
- * <li><b>oxbows</b> ({@code oxbow} true): a river bend cut off and left as a crescent lake when the river took a shorter
- * way; 3 to 5 wide, 1 deep, 2 down its middle, a little trampled mud at the ends;</li>
  * <li><b>pans</b>: shallow rough ovals 5 to 12 across that fill with rain and flood water, kept bare and muddy by
  * animals drinking and wallowing; 1 deep with a mud bed and a thin ring of mud round the water, and a wallow of savanna
  * mud at one end ({@link #panWallow}, 2026-11-21).</li>
@@ -34,25 +34,22 @@ import net.minecraft.world.level.levelgen.feature.configurations.NoneFeatureConf
 public class FloodplainPoolFeature extends Feature<NoneFeatureConfiguration> {
     /** No pool within this many blocks of the river's water. */
     static final int FROM_RIVER = 8;
-    private final boolean oxbow;
-
-    public FloodplainPoolFeature(Codec<NoneFeatureConfiguration> codec, boolean oxbow) {
+    public FloodplainPoolFeature(Codec<NoneFeatureConfiguration> codec) {
         super(codec);
-        this.oxbow = oxbow;
     }
 
     @Override
     public boolean place(FeaturePlaceContext<NoneFeatureConfiguration> context) {
         WorldGenLevel level = context.level();
-        return place(level, context.origin(), context.random(), oxbow, level.getSeaLevel() - 1);
+        return place(level, context.origin(), context.random(), level.getSeaLevel() - 1);
     }
 
     /**
-     * Puts a pool (an oxbow or a pan) round {@code o}, if it fits: level ground above water whose surface is at
+     * Puts a pan round {@code o}, if it fits: level ground above water whose surface is at
      * {@code sea} (the river's, sea level in the world), none of it within {@link #FROM_RIVER} blocks.
      */
-    public static boolean place(WorldGenLevel level, BlockPos o, RandomSource random, boolean oxbow, int sea) {
-        Map<Long, Integer> depth = oxbow ? oxbow(o.getX(), o.getZ(), random) : pan(o.getX(), o.getZ(), random);
+    public static boolean place(WorldGenLevel level, BlockPos o, RandomSource random, int sea) {
+        Map<Long, Integer> depth = pan(o.getX(), o.getZ(), random);
         // the rim: every cell beside the water
         Map<Long, Boolean> rim = new HashMap<>();
         int minX = Integer.MAX_VALUE, maxX = Integer.MIN_VALUE, minZ = Integer.MAX_VALUE, maxZ = Integer.MIN_VALUE;
@@ -109,9 +106,8 @@ public class FloodplainPoolFeature extends Feature<NoneFeatureConfiguration> {
         }
         for (long key : rim.keySet()) {
             int x = BlockPos.getX(key), z = BlockPos.getZ(key);
-            // pans: a thin, nearly whole ring of trampled mud; oxbows: mud only here and there, more at the ends
-            double chance = oxbow ? 0.3 : 0.8;
-            if (random.nextDouble() < chance) {
+            // a thin, nearly whole ring of trampled mud
+            if (random.nextDouble() < 0.8) {
                 clear(level, x, low, z);
                 level.setBlock(new BlockPos(x, low, z), mud, Block.UPDATE_CLIENTS);
             } else {
@@ -123,9 +119,7 @@ public class FloodplainPoolFeature extends Feature<NoneFeatureConfiguration> {
                 }
             }
         }
-        if (!oxbow) {
-            panWallow(level, random, depth, rim, low);
-        }
+        panWallow(level, random, depth, rim, low);
         return true;
     }
 
@@ -169,31 +163,6 @@ public class FloodplainPoolFeature extends Feature<NoneFeatureConfiguration> {
                         Block.UPDATE_CLIENTS);
             }
         }
-    }
-
-    /** A crescent: part of a ring, thinning to points at its ends, 2 deep down the middle of its middle part. */
-    private static Map<Long, Integer> oxbow(int cx, int cz, RandomSource random) {
-        Map<Long, Integer> cells = new HashMap<>();
-        double radius = 4 + random.nextDouble() * 4, width = 3 + random.nextDouble() * 2;
-        double span = Math.toRadians(180 + random.nextInt(80)), start = random.nextDouble() * 2 * Math.PI;
-        int reach = (int) Math.ceil(radius + width);
-        for (int dx = -reach; dx <= reach; dx++) {
-            for (int dz = -reach; dz <= reach; dz++) {
-                double r = Math.sqrt(dx * dx + dz * dz);
-                double a = Math.atan2(dz, dx) - start;
-                a = ((a % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI);
-                if (a > span) {
-                    continue;
-                }
-                double along = a / span; // 0 to 1 from end to end
-                double half = width / 2 * Math.sqrt(Math.sin(Math.PI * along));
-                double off = Math.abs(r - radius);
-                if (off < half) {
-                    cells.put(BlockPos.asLong(cx + dx, 0, cz + dz), off < half * 0.45 && along > 0.25 && along < 0.75 ? 2 : 1);
-                }
-            }
-        }
-        return cells;
     }
 
     /** A rough oval, its edge wavy. */

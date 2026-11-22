@@ -1,0 +1,32 @@
+{
+  "length_blocks": 5.4875,
+  "views": {
+    "side": {
+      "box": [
+        20,
+        20,
+        938,
+        440
+      ],
+      "head": "right"
+    },
+    "top": {
+      "box": [
+        20,
+        440,
+        938,
+        970
+      ],
+      "head": "right"
+    },
+    "front": {
+      "box": [
+        938,
+        20,
+        1468,
+        440
+      ]
+    }
+  },
+  "made_by": "python tools/workshop.py outline bull_shark (from references/outlines/bull_shark.json)"
+}

@@ -1,0 +1,13 @@
+{
+ "note": "Stage 2 plain 3D shape (5.5b base, 7-bone spine, full 7-fin set)",
+ "date": "2026-11-22",
+ "boxes": 80,
+ "numbers": {
+  "BODY_HW": 12.6,
+  "HUMP_H": 29.2,
+  "DORSAL_H": 38.2,
+  "PEC_SPAN": 24.5,
+  "PEC_DIP": 0.2,
+  "JAW_OPEN": 0.0
+ }
+}

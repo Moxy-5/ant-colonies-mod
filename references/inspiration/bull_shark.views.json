@@ -1,0 +1,25 @@
+{
+  "length_blocks": 5.5,
+  "_note": "Bull Shark (Carcharhinus leucas) ortho views extracted and scale-matched from user's inspiration sheet (bull_shark_sheet.png, 2026-11-22). User plans size variations from 5.0 to 7.0 blocks; base 1.0 model is 5.5 blocks (88 model px at 16 px/block), scaling 0.91x (5.0) to 1.27x (7.0).",
+  "views": {
+    "side": {
+      "box": [14, 14, 520, 246],
+      "head": "left"
+    },
+    "top": {
+      "box": [14, 250, 520, 537],
+      "head": "left"
+    },
+    "front": {
+      "box": [524, 14, 821, 246]
+    }
+  },
+  "marks": {
+    "snout": 24,
+    "head_back": 170,
+    "shoulders": 195,
+    "hips": 315,
+    "tail_base": 413
+  },
+  "background_tolerance": 22
+}

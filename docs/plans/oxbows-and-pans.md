@@ -97,6 +97,16 @@ and its loading speed, and touches the termite mound and tree surveys.
    the river biomes give the river its colour); to settle in step 4.
 3. **Oxbows in new land:** a structure (carved to the water's level, bed, banks, ages); today's oxbow feature removed;
    kept out of quiet savannas (`worldgen/BigSavanna` gate); trees and mounds kept off the water.
+   **The user, 2026-11-22: "make it 16-32 with them being random so there different sizes and add them".** Built the
+   same day as a feature, not a structure (16 to 32 across fits the 3 by 3 chunks a feature may write):
+   `worldgen/OxbowFeature` (the viewer's shapes and ages, sized to the user's 16 to 32, open side to the nearest river
+   water, neck 5 to 8, level floodplain 1 or 2 over the river, water at its lowest ground, banks cut to a block over the
+   water within 4, sides and bed made solid so no cave drains it, no mound within 15, no tree foot within 3) on sites
+   from `worldgen/OxbowSites` (floodplain chunks 14 to 22 blocks from the river, about 112 apart, 8 tries each);
+   `[world oxbows]` log lines say where each went and why a site stayed empty. Flights on 3 seeds: 11 laid of 32 sites,
+   16 to 26 across (the 27 to 32 ones need the widest floodplain, so rare), no stalls. The old small oxbow shape removed from `FloodplainPoolFeature` (it keeps the pans until step 4).
+   Tests: `SavannaWorldTests` batch `savanna_oxbows` (one per age, 16, 20, 24 and 32 across) and the river banks test.
+   Not yet: hippos in oxbows and the survey on real land (steps 5 and 6).
 4. **Pans in new land:** a structure; today's pan feature removed; same gate; mounds and trees kept off.
 5. **Life in them:** algae; which animals may live there (fish and crocodiles in oxbows; pans with algae and snails,
    no catfish or crocodiles, my pick); every spawning change through the spawning check list in `CLAUDE.md`.

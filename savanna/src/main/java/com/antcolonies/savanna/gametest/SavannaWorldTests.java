@@ -7,6 +7,7 @@ import com.antcolonies.savanna.SavannaMod;
 import com.antcolonies.savanna.registry.SavannaBlocks;
 import com.antcolonies.savanna.worldgen.MoundPlaces;
 import com.antcolonies.savanna.worldgen.FloodplainPoolFeature;
+import com.antcolonies.savanna.worldgen.OxbowFeature;
 import com.antcolonies.savanna.worldgen.FloodplainTreePiece;
 import com.antcolonies.savanna.worldgen.FloodplainTreeStructure;
 import com.antcolonies.savanna.worldgen.MinecraftZones;
@@ -1729,16 +1730,19 @@ public class SavannaWorldTests {
         helper.assertTrue(inner >= 2 * outer + 10, "the silt bars are not on the inside of the bends: " + report);
         helper.assertTrue(mud >= 5, "no trampled mud by the water: " + report);
         helper.assertTrue(bedSilt >= bed * 0.9, "the river bed is not silt: " + report);
-        // the pools: a pan and an oxbow up on the plain, well away from the river; none within 8 blocks of it
+        // the pools: a pan up on the plain, an oxbow beside the river facing it (OxbowFeature, 16 to 32 across); no pan
+        // within 8 blocks of the river
         RandomSource random = RandomSource.create(7);
         boolean pan = false, oxbow = false;
         for (int t = 0; t < 8 && !pan; t++) {
-            pan = FloodplainPoolFeature.place(level, helper.absolutePos(new BlockPos(14, plain, 14)), random, false, a.getY());
+            pan = FloodplainPoolFeature.place(level, helper.absolutePos(new BlockPos(14, plain, 14)), random, a.getY());
         }
-        for (int t = 0; t < 8 && !oxbow; t++) {
-            oxbow = FloodplainPoolFeature.place(level, helper.absolutePos(new BlockPos(46, plain, 16)), random, true, a.getY());
+        BlockPos o0 = helper.absolutePos(new BlockPos(28, 0, 1)), o1 = helper.absolutePos(new BlockPos(63, 0, 63));
+        int[] bounds = {Math.min(o0.getX(), o1.getX()), Math.min(o0.getZ(), o1.getZ()), Math.max(o0.getX(), o1.getX()), Math.max(o0.getZ(), o1.getZ())};
+        for (int t = 0; t < 16 && !oxbow; t++) {
+            oxbow = OxbowFeature.lay(level, random, bounds, a.getY(), OxbowFeature.ACROSS_MIN, OxbowFeature.Age.FRESH, null) != null;
         }
-        boolean beside = FloodplainPoolFeature.place(level, helper.absolutePos(new BlockPos(30, plain, 34)), random, false, a.getY());
+        boolean beside = FloodplainPoolFeature.place(level, helper.absolutePos(new BlockPos(30, plain, 34)), random, a.getY());
         helper.assertTrue(pan && oxbow, "a pan (" + pan + ") or an oxbow (" + oxbow + ") did not fit on the open plain");
         helper.assertFalse(beside, "a pool was put beside the river");
         int poolWater = poolWater(helper, plain);
@@ -1840,6 +1844,99 @@ public class SavannaWorldTests {
     }
 
     /** Still water blocks at the plain's top in the arena's northern part, where the test puts its pools. */
+    /** Oxbow lakes 16 to 32 across, one per age (the user, 2026-11-22; {@code worldgen/OxbowFeature}). */
+    @GameTest(template = "arena", timeoutTicks = 100, batch = "savanna_oxbows")
+    public static void freshOxbowIs32AcrossAndFourDeep(GameTestHelper helper) {
+        oxbowInArena(helper, 32, OxbowFeature.Age.FRESH, 4);
+    }
+
+    @GameTest(template = "arena", timeoutTicks = 100, batch = "savanna_oxbows")
+    public static void siltingOxbowIs24AcrossAndThreeDeep(GameTestHelper helper) {
+        oxbowInArena(helper, 24, OxbowFeature.Age.SILTING, 3);
+    }
+
+    @GameTest(template = "arena", timeoutTicks = 100, batch = "savanna_oxbows")
+    public static void oldOxbowIs16AcrossAndShallow(GameTestHelper helper) {
+        oxbowInArena(helper, 16, OxbowFeature.Age.OLD, 2);
+    }
+
+    @GameTest(template = "arena", timeoutTicks = 100, batch = "savanna_oxbows")
+    public static void oxbowScarHoldsNoWater(GameTestHelper helper) {
+        oxbowInArena(helper, 20, OxbowFeature.Age.SCAR, 0);
+    }
+
+    /**
+     * Lays an oxbow of this size and age on a plain a block over a straight river 7 wide (its near edge at z 51) and checks
+     * the user's size (its longest side within 2 of the size asked), the age's depth, its open side to the river (its
+     * water {@link OxbowFeature#NECK_MIN} to {@link OxbowFeature#NECK_MAX} and a few blocks off it, past the low strip),
+     * and that its water stays put.
+     */
+    private static void oxbowInArena(GameTestHelper helper, int across, OxbowFeature.Age age, int deepest) {
+        var level = helper.getLevel();
+        int plain = 6, water = plain - 1, edge = 51;
+        for (int x = 1; x < 64; x++) {
+            for (int z = 1; z < 64; z++) {
+                boolean river = z > edge && z <= edge + 7;
+                for (int y = 1; y <= plain; y++) {
+                    Block b = river && y >= water - 2 ? (y <= water ? Blocks.WATER : Blocks.AIR) : y == plain ? Blocks.GRASS_BLOCK : Blocks.DIRT;
+                    helper.setBlock(x, y, z, b);
+                }
+            }
+        }
+        BlockPos a = helper.absolutePos(new BlockPos(1, water, 1)), b = helper.absolutePos(new BlockPos(63, water, 63));
+        int[] bounds = {Math.min(a.getX(), b.getX()), Math.min(a.getZ(), b.getZ()), Math.max(a.getX(), b.getX()), Math.max(a.getZ(), b.getZ())};
+        RandomSource random = RandomSource.create(across * 31L + age.ordinal());
+        OxbowFeature.Laid laid = null;
+        for (int t = 0; t < 24 && laid == null; t++) {
+            laid = OxbowFeature.lay(level, random, bounds, a.getY(), across, age, null);
+        }
+        helper.assertTrue(laid != null, "a " + age + " oxbow " + across + " across did not fit beside the river");
+        OxbowFeature.Laid it = laid;
+        int minX = 99, maxX = -1, minZ = 99, maxZ = -1, nearest = 99, sources = 0;
+        for (int x = 1; x < 64; x++) {
+            for (int z = 1; z <= edge; z++) {
+                for (int y = 1; y <= plain; y++) {
+                    BlockState here = helper.getBlockState(new BlockPos(x, y, z));
+                    if (here.getFluidState().isSource()) {
+                        sources++;
+                        minX = Math.min(minX, x); maxX = Math.max(maxX, x); minZ = Math.min(minZ, z); maxZ = Math.max(maxZ, z);
+                    }
+                    // the oxbow's nearest part to the river: its water or its bank and dried ends (mud, silt)
+                    if (y == plain && (here.getFluidState().isSource() || here.is(SavannaBlocks.RIVER_MUD.get())
+                            || here.is(SavannaBlocks.WET_SILT.get()) || here.is(SavannaBlocks.SILT.get()))) {
+                        nearest = Math.min(nearest, edge + 1 - z);
+                    }
+                }
+            }
+        }
+        String report = String.format("%s oxbow asked %d across: laid %d across, %d deep, neck %d; water %d blocks over x %d..%d z %d..%d, its nearest part %d from the river",
+                age, across, it.across(), it.deepest(), it.neck(), sources, minX, maxX, minZ, maxZ, nearest);
+        SavannaMod.LOGGER.info("[oxbows] {}", report);
+        helper.assertTrue(Math.abs(it.across() - across) <= 2, "not the size asked: " + report);
+        helper.assertTrue(it.deepest() == deepest, "not the age's depth: " + report);
+        if (age == OxbowFeature.Age.SCAR) {
+            helper.assertTrue(sources == 0, "a scar holds water: " + report);
+        } else {
+            helper.assertTrue(sources >= across, "too little water: " + report);
+            helper.assertTrue(nearest >= OxbowFeature.NECK_MIN && nearest <= OxbowFeature.NECK_MAX + 4, "not beside the river: " + report);
+        }
+        int before = sources;
+        helper.runAfterDelay(60, () -> {
+            int still = 0, flowing = 0;
+            for (int x = 1; x < 64; x++) {
+                for (int z = 1; z <= edge; z++) {
+                    for (int y = 1; y <= plain + 1; y++) {
+                        var f = helper.getBlockState(new BlockPos(x, y, z)).getFluidState();
+                        still += f.isSource() ? 1 : 0;
+                        flowing += !f.isEmpty() && !f.isSource() ? 1 : 0;
+                    }
+                }
+            }
+            helper.assertTrue(flowing == 0 && still == before, "the oxbow spilled: " + flowing + " flowing, " + still + " of " + before + " still");
+            helper.succeed();
+        });
+    }
+
     private static int poolWater(GameTestHelper helper, int plain) {
         int n = 0;
         for (int x = 1; x < 64; x++) {

@@ -379,7 +379,7 @@ public class MudTests {
             }
         }
         BlockPos middle = helper.absolutePos(new BlockPos(20, 2, 20));
-        boolean made = com.antcolonies.savanna.worldgen.FloodplainPoolFeature.place(level, middle, RandomSource.create(9), false, middle.getY() - 1);
+        boolean made = com.antcolonies.savanna.worldgen.FloodplainPoolFeature.place(level, middle, RandomSource.create(9), middle.getY() - 1);
         helper.assertTrue(made, "a pan should be made on level floodplain");
         int mud = 0, wet = 0;
         for (int dx = -20; dx <= 20; dx++) {

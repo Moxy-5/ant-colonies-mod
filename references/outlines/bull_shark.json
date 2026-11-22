@@ -1,0 +1,239 @@
+{
+ "animal": "bull_shark",
+ "length_px": 88,
+ "note": "Stage 1 Bull Shark outline (2026-11-22): base 1.0 model = 5.5 blocks long (88 model px at 16 px/block), scaling 0.91x (5.0 blocks) to 1.27x (7.0 blocks). Stepped-oval heavy bull-shark trunk, blunt overhanging snout, underslung toothy jaw, 5 recessed gills, full 7-fin set (tall 1st dorsal, small 2nd dorsal, broad downturned swept pectorals, pelvics, anal, asymmetric heterocercal tail). x from upper tail tip (0) to snout tip (88), y from lowest pectoral tip (0) to 1st dorsal tip (38.4).",
+ "marks": [
+  {
+   "name": "eye",
+   "side": [79.0, 82.0, 18.5, 21.5],
+   "top": [79.0, 82.0, 7.2, 9.2],
+   "front": [7.2, 9.2, 18.5, 21.5],
+   "colour": "#0d1015"
+  },
+  {
+   "name": "eye (right)",
+   "top": [79.0, 82.0, -9.2, -7.2],
+   "front": [-9.2, -7.2, 18.5, 21.5],
+   "colour": "#0d1015"
+  },
+  {
+   "name": "mouth gape",
+   "side": [74.0, 82.5, 11.5, 14.5],
+   "front": [-6.5, 6.5, 11.5, 14.5],
+   "colour": "#b57a74"
+  },
+  {
+   "name": "gill slits (5)",
+   "side": [62.5, 71.0, 12.0, 22.0],
+   "colour": "#1d232c"
+  },
+  {
+   "name": "surface prowl waterline",
+   "side": [0.0, 88.0, 30.5, 31.2],
+   "front": [-25.0, 25.0, 30.5, 31.2],
+   "colour": "#2b7de9"
+  }
+ ],
+ "parts": [
+  {
+   "name": "snout tip",
+   "side": [84.0, 88.0, 16.5, 22.0],
+   "half_width": 5.0
+  },
+  {
+   "name": "snout upper",
+   "side": [78.0, 84.5, 13.5, 24.5],
+   "half_width": 8.2
+  },
+  {
+   "name": "snout crown",
+   "side": [77.0, 83.0, 23.5, 25.5],
+   "half_width": 5.5
+  },
+  {
+   "name": "jaw lower",
+   "side": [72.0, 81.5, 9.5, 14.5],
+   "half_width": 7.8
+  },
+  {
+   "name": "head core",
+   "side": [62.0, 78.5, 10.5, 24.5],
+   "half_width": 11.0
+  },
+  {
+   "name": "head belly",
+   "side": [62.0, 75.0, 8.0, 11.0],
+   "half_width": 8.5
+  },
+  {
+   "name": "head upper",
+   "side": [62.0, 77.0, 24.0, 27.0],
+   "half_width": 7.5
+  },
+  {
+   "name": "head crest",
+   "side": [62.0, 71.0, 26.5, 28.5],
+   "half_width": 4.2
+  },
+  {
+   "name": "chest core",
+   "side": [50.0, 62.5, 11.0, 23.5],
+   "half_width": 12.6
+  },
+  {
+   "name": "chest belly",
+   "side": [50.0, 62.5, 8.0, 11.5],
+   "half_width": 10.6
+  },
+  {
+   "name": "chest upper",
+   "side": [50.0, 62.5, 23.0, 27.0],
+   "half_width": 8.5
+  },
+  {
+   "name": "chest crest",
+   "side": [50.0, 62.5, 26.5, 29.2],
+   "half_width": 4.8
+  },
+  {
+   "name": "torso core",
+   "side": [38.0, 50.5, 11.0, 23.0],
+   "half_width": 10.8
+  },
+  {
+   "name": "torso belly",
+   "side": [38.0, 50.5, 8.8, 11.5],
+   "half_width": 8.2
+  },
+  {
+   "name": "torso upper",
+   "side": [38.0, 50.5, 22.5, 26.5],
+   "half_width": 7.2
+  },
+  {
+   "name": "torso crest",
+   "side": [40.0, 50.5, 26.0, 28.2],
+   "half_width": 4.2
+  },
+  {
+   "name": "rear core",
+   "side": [28.0, 38.5, 12.0, 22.5],
+   "half_width": 8.2
+  },
+  {
+   "name": "rear belly",
+   "side": [28.0, 38.5, 10.5, 12.5],
+   "half_width": 6.0
+  },
+  {
+   "name": "rear upper",
+   "side": [28.0, 38.5, 22.0, 24.5],
+   "half_width": 5.0
+  },
+  {
+   "name": "peduncle front",
+   "side": [21.5, 28.5, 13.8, 22.0],
+   "half_width": 5.4
+  },
+  {
+   "name": "peduncle rear",
+   "side": [16.0, 22.0, 15.0, 20.8],
+   "half_width": 3.4
+  },
+  {
+   "name": "dorsal 1 base",
+   "side": [42.0, 58.0, 27.5, 31.5],
+   "half_width": 1.3
+  },
+  {
+   "name": "dorsal 1 mid",
+   "side": [43.5, 54.5, 31.0, 35.0],
+   "half_width": 1.2
+  },
+  {
+   "name": "dorsal 1 tip",
+   "side": [44.0, 50.5, 34.5, 38.2],
+   "half_width": 1.0
+  },
+  {
+   "name": "dorsal 2",
+   "side": [22.5, 27.5, 21.5, 25.5],
+   "half_width": 0.9
+  },
+  {
+   "name": "anal fin",
+   "side": [23.0, 27.5, 12.0, 14.8],
+   "half_width": 0.8
+  },
+  {
+   "name": "pectoral root",
+   "side": [53.5, 61.0, 6.5, 12.8],
+   "top": [49.0, 59.5, 10.5, 15.5],
+   "front": [10.5, 15.5, 6.5, 12.8],
+   "mirror": true
+  },
+  {
+   "name": "pectoral mid 1",
+   "side": [51.0, 58.0, 4.0, 9.8],
+   "top": [46.5, 56.5, 14.5, 18.8],
+   "front": [14.5, 18.8, 4.0, 9.8],
+   "mirror": true
+  },
+  {
+   "name": "pectoral mid 2",
+   "side": [49.0, 55.0, 2.0, 7.0],
+   "top": [44.5, 53.5, 17.8, 21.8],
+   "front": [17.8, 21.8, 2.0, 7.0],
+   "mirror": true
+  },
+  {
+   "name": "pectoral tip",
+   "side": [47.2, 52.2, 0.2, 4.2],
+   "top": [43.5, 50.5, 20.8, 24.5],
+   "front": [20.8, 24.5, 0.2, 4.2],
+   "mirror": true
+  },
+  {
+   "name": "pelvic fin",
+   "side": [31.5, 36.5, 8.2, 11.8],
+   "top": [31.5, 37.0, 5.5, 10.0],
+   "front": [5.5, 10.0, 8.2, 11.8],
+   "mirror": true
+  },
+  {
+   "name": "tail root",
+   "side": [9.5, 17.2, 13.5, 19.5],
+   "half_width": 1.8
+  },
+  {
+   "name": "tail upper base",
+   "side": [6.5, 16.5, 19.0, 23.8],
+   "half_width": 1.3
+  },
+  {
+   "name": "tail upper mid",
+   "side": [4.2, 14.2, 23.2, 27.2],
+   "half_width": 1.1
+  },
+  {
+   "name": "tail upper sweep",
+   "side": [2.2, 10.8, 26.8, 30.4],
+   "half_width": 1.0
+  },
+  {
+   "name": "tail upper tip",
+   "side": [0.2, 6.5, 29.8, 32.8],
+   "half_width": 0.9
+  },
+  {
+   "name": "tail lower base",
+   "side": [9.0, 15.6, 9.2, 14.2],
+   "half_width": 1.2
+  },
+  {
+   "name": "tail lower tip",
+   "side": [7.8, 12.4, 5.4, 9.8],
+   "half_width": 1.0
+  }
+ ]
+}
