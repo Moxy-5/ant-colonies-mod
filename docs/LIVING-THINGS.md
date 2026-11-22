@@ -87,6 +87,7 @@ Every living thing in the mod, built or planned, plants and fungi included, in o
   - African dung beetle (rolls dung balls away and buries them; an animal-kit proof pick; ties to the big plant eaters' dung and dung spreading acacia seed): user's list 2026-11-18.
   - Tadpole shrimp (eggs wait in dry mud), butterflies sipping at wet mud (mud-puddling, drawn as particles), mud wasps collecting mud balls: IDEA (mud pits, 2026-11-17).
 - *5b. Reptiles and amphibians:*
+  - African leopard tortoise (*Stigmochelys pardalis*, large dry-savanna grazer `~1.48` blocks at `0.62×`, domed chocolate-and-gold mosaic carapace, curved 3D beak, straight-back Cryptodira retraction with armored forearm shield, sunny basking sploot, 12 clips): LOOKS (ready for Java, `docs/handoff/leopard_tortoise.md`, workshop `references/workshop/leopard_tortoise/versions.html`, 2026-11-22).
   - Black mamba (fast snake, hunted by the secretarybird): user's list 2026-11-16.
   - Giant African bullfrog: moved to the river animals (PLANNED 2026-11-20).
   - Pythons (floodplain).

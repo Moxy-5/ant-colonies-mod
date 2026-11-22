@@ -1,0 +1,14 @@
+{
+ "note": "Stage 3 v5: sleek hero-proportioned long torpedo body matching top hero render",
+ "date": "2026-11-22",
+ "boxes": 272,
+ "numbers": {
+  "BODY_HW": 9.8,
+  "HUMP_H": 26.2,
+  "DORSAL_H": 37.8,
+  "PEC_SPAN": 25.0,
+  "PEC_DIP": 0.2,
+  "JAW_OPEN": 0.0,
+  "LID_CLOSE": 0.0
+ }
+}

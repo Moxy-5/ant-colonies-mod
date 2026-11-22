@@ -1,0 +1,13 @@
+{
+ "note": "Stage 4b v12: dark-top pectoral/pelvic fairings + 3-stage smooth tapered wingtips",
+ "date": "2026-11-22",
+ "boxes": 244,
+ "numbers": {
+  "LEN_MULT": 1.16,
+  "THIN_MULT": 0.86,
+  "DORSAL_H": 37.8,
+  "PEC_LEN": 18.8,
+  "JAW_OPEN": 0.0,
+  "LID_CLOSE": 0.0
+ }
+}

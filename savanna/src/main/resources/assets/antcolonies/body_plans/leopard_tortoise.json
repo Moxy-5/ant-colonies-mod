@@ -1,0 +1,130 @@
+{
+  "model": "leopard_tortoise",
+  "about": "The African Leopard Tortoise's (Stigmochelys pardalis) body plan (Animal Maker Engine): 38.0 model px -> ~1.48 blocks outstretched at MODEL_SCALE=0.62 (snug high-domed hollow-arch carapace ~1.00L x 0.80W x 0.77H blocks). Read by tools/clip_check.py, tools/body_plan.py and the game.",
+  "family": "four_legged_long_body",
+  "root": "root",
+  "forebody": "shell",
+  "head": {
+    "bone": "head",
+    "jaws": [
+      "jaw"
+    ],
+    "sockets": {
+      "carry": "carry"
+    }
+  },
+  "chain": [
+    "head",
+    "neck_2",
+    "neck_1",
+    "shell",
+    "tail_1",
+    "tail_2"
+  ],
+  "legs": {
+    "l1": [
+      "leg_fl_1",
+      "leg_fl_2",
+      "leg_fl_3"
+    ],
+    "r1": [
+      "leg_fr_1",
+      "leg_fr_2",
+      "leg_fr_3"
+    ],
+    "l2": [
+      "leg_bl_1",
+      "leg_bl_2",
+      "leg_bl_3"
+    ],
+    "r2": [
+      "leg_br_1",
+      "leg_br_2",
+      "leg_br_3"
+    ]
+  },
+  "bones": {
+    "root": "root",
+    "shell": "shell",
+    "neck_1": "neck_1",
+    "neck_2": "neck_2",
+    "head": "head",
+    "jaw": "jaw",
+    "lid_left": "lid_left",
+    "lid_right": "lid_right",
+    "carry": "carry",
+    "tail_1": "tail_1",
+    "tail_2": "tail_2",
+    "leg_fl_1": "leg_fl_1",
+    "leg_fl_2": "leg_fl_2",
+    "leg_fl_3": "leg_fl_3",
+    "leg_fr_1": "leg_fr_1",
+    "leg_fr_2": "leg_fr_2",
+    "leg_fr_3": "leg_fr_3",
+    "leg_bl_1": "leg_bl_1",
+    "leg_bl_2": "leg_bl_2",
+    "leg_bl_3": "leg_bl_3",
+    "leg_br_1": "leg_br_1",
+    "leg_br_2": "leg_br_2",
+    "leg_br_3": "leg_br_3"
+  },
+  "checks": {
+    "about": "Offline checks for tools/clip_check.py (adult scale 0.62: 1 model px = 0.03875 blocks). Add controller once LeopardTortoiseEntity.java lands.",
+    "px": 0.03875,
+    "blend": 5,
+    "feet_parts": [
+      "_3"
+    ],
+    "feet_free": [
+      "walk",
+      "retract_in",
+      "retract_hold",
+      "retract_out",
+      "bask_down",
+      "bask",
+      "bask_up",
+      "death"
+    ],
+    "tuck_ok": [
+      "retract_in",
+      "retract_hold",
+      "retract_out",
+      "bask_down",
+      "bask",
+      "bask_up",
+      "death"
+    ],
+    "body_bones": [
+      "shell"
+    ],
+    "walks": {
+      "walk": 4.167
+    },
+    "switches": [
+      ["idle", "walk"],
+      ["walk", "idle"],
+      ["idle", "graze"],
+      ["graze", "idle"],
+      ["walk", "graze"],
+      ["graze", "walk"],
+      ["idle", "drink"],
+      ["drink", "idle"],
+      ["idle", "bite"],
+      ["bite", "idle"],
+      ["walk", "bite"],
+      ["idle", "retract_in"],
+      ["walk", "retract_in"],
+      ["retract_in", "retract_hold"],
+      ["retract_hold", "retract_out"],
+      ["retract_out", "idle"],
+      ["retract_out", "walk"],
+      ["idle", "bask_down"],
+      ["bask_down", "bask"],
+      ["bask", "bask_up"],
+      ["bask_up", "idle"],
+      ["idle", "death"],
+      ["walk", "death"],
+      ["retract_hold", "death"]
+    ]
+  }
+}

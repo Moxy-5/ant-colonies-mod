@@ -207,6 +207,8 @@ def _game_geo(data):
             bones = game_faces(bones)
         for b in bones:
             b.pop(FACED, None)
+            if b.get('parent') is None:
+                b.pop('parent', None)
         g['bones'] = bones
     return data
 

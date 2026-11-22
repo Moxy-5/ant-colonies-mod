@@ -1,0 +1,18 @@
+{
+ "note": "Stage 5: Approved African Leopard Tortoise model (curved 3D beak, unified golden-tan skin, 0.62x adult scale) + 12 zero-clip animations",
+ "date": "2026-11-22",
+ "boxes": 131,
+ "numbers": {
+  "SHELL_LEN": 25.8,
+  "SHELL_HW": 11.2,
+  "DOME_H": 18.4,
+  "BELLY_Y": 3.3,
+  "MARGIN_FLARE": 17.0,
+  "NECK_EXT": 0.0,
+  "NECK_PITCH": 9.0,
+  "HEAD_LEN": 7.6,
+  "HEAD_TILT": 0.0,
+  "LEG_SPLAY": 9.2,
+  "TAIL_LEN": 3.2
+ }
+}

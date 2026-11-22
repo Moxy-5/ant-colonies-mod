@@ -1,0 +1,18 @@
+{
+ "note": "v2: High-domed hollow-arch Leopard Tortoise shell (DOME_H=21.0, BELLY_Y=4.0) with wide front cavern archway \u2014 zero head or knee clipping in retract, walk, graze, and bask",
+ "date": "2026-11-22",
+ "boxes": 131,
+ "numbers": {
+  "SHELL_LEN": 25.8,
+  "SHELL_HW": 11.2,
+  "DOME_H": 21.0,
+  "BELLY_Y": 4.0,
+  "MARGIN_FLARE": 15.0,
+  "NECK_EXT": 0.0,
+  "NECK_PITCH": 7.0,
+  "HEAD_LEN": 7.6,
+  "HEAD_TILT": 0.0,
+  "LEG_SPLAY": 9.2,
+  "TAIL_LEN": 3.2
+ }
+}

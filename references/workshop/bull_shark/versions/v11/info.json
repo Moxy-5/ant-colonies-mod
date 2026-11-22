@@ -1,0 +1,13 @@
+{
+ "note": "Stage 4b v11: razor-smooth 3D-rotated pectoral & pelvic wings + Var 2 proportions",
+ "date": "2026-11-22",
+ "boxes": 242,
+ "numbers": {
+  "LEN_MULT": 1.16,
+  "THIN_MULT": 0.86,
+  "DORSAL_H": 37.8,
+  "PEC_LEN": 18.8,
+  "JAW_OPEN": 0.0,
+  "LID_CLOSE": 0.0
+ }
+}

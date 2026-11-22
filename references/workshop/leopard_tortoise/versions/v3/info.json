@@ -1,0 +1,18 @@
+{
+ "note": "v3: Tailored snug high-domed Leopard Tortoise shell (SHELL_HW=10.3, DOME_H=19.8, MARGIN_FLARE=4 deg, LEG_SPLAY=8.4) wrapping seamlessly around flanks, bridges, and retracted forearm shield with zero clipping",
+ "date": "2026-11-22",
+ "boxes": 131,
+ "numbers": {
+  "SHELL_LEN": 25.8,
+  "SHELL_HW": 10.3,
+  "DOME_H": 19.8,
+  "BELLY_Y": 3.6,
+  "MARGIN_FLARE": 4.0,
+  "NECK_EXT": 0.0,
+  "NECK_PITCH": 6.0,
+  "HEAD_LEN": 7.6,
+  "HEAD_TILT": 0.0,
+  "LEG_SPLAY": 8.4,
+  "TAIL_LEN": 3.2
+ }
+}

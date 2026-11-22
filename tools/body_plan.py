@@ -523,7 +523,7 @@ BOX_KIND = [('worker_ant', 'colony insect'), ('termite_', 'colony insect'), ('ma
             ('snail', 'small animal'), ('crab', 'small animal'), ('tilapia', 'small animal'),
             ('remains_tilapia', 'small animal'), ('catfish', 'medium animal'), ('remains_catfish', 'medium animal'),
             ('crocodile', 'large animal'), ('monitor', 'large animal'), ('hippo', 'large animal'),
-            ('otter', 'medium animal')]
+            ('otter', 'medium animal'), ('bull_shark', 'large animal')]
 
 
 def box_kind(model):
