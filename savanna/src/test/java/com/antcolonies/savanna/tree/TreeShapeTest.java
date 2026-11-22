@@ -6,6 +6,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import java.util.ArrayList;
 import java.util.List;
 
+import org.junit.jupiter.api.parallel.ResourceAccessMode;
+import org.junit.jupiter.api.parallel.ResourceLock;
 import org.junit.jupiter.api.Test;
 
 import it.unimi.dsi.fastutil.longs.Long2ObjectMap;
@@ -16,31 +18,51 @@ import net.minecraft.core.BlockPos;
  * The tree shape maker's checks (M7.5 step 2): nothing floats, one seed is one tree, a tree only adds wood as it grows
  * (real growth), an ancient tree keeps its trunk, and grown trees come out at the sizes picked with the user.
  */
+@ResourceLock(value = "TreeDraw", mode = ResourceAccessMode.READ_WRITE) // flips TreeDraw's trial switches: never beside a class that flips them (test speed step 1)
 class TreeShapeTest {
     static final String[] KINDS = {"umbrella_thorn", "camel_thorn", "baobab"};
     private static final double[] AGES = {0, 0.05, 0.1, 0.2, 0.3, 0.4, 0.44, 0.46, 0.5, 0.6, 0.7, 0.8, 0.9, 1, 1.1, 1.2, 1.25};
 
     @Test
     void nothingFloats() {
+        eachKindAndSeed(5, (name, kind, seed) -> {
+            for (double age : AGES) {
+                for (TreeStage stage : TreeShapes.stages(kind)) {
+                    TreeVoxels v = TreeShapes.build(kind, seed, age, stage);
+                    LongOpenHashSet standing = v.grounded();
+                    for (Long2ObjectMap.Entry<TreePart> e : v.entries()) {
+                        long k = e.getLongKey();
+                        assertTrue(standing.contains(k), () -> name + " seed " + seed + " age " + age + " " + stage.id + ": " + e.getValue().id
+                                + " floating at " + BlockPos.of(k).toShortString());
+                    }
+                }
+            }
+        });
+    }
+
+    /** One tree to check: its kind's name, the kind, and its seed. */
+    private interface TreeCheck {
+        void check(String name, TreeKind kind, long seed);
+    }
+
+    /**
+     * Runs the check for every kind (but those the limb look on trial skips) and seeds 1 to {@code seeds}, side by side on
+     * all the computer's threads (test speed step 1, 2026-11-22). Growing a tree touches nothing shared but the two
+     * trial switches of {@link TreeDraw}, which are only set between these calls, never during one.
+     */
+    private static void eachKindAndSeed(int seeds, TreeCheck check) {
+        java.util.List<Runnable> trees = new java.util.ArrayList<>();
         for (String name : KINDS) {
             if (skipForLook(name)) {
                 continue;
             }
             TreeKind kind = TreeKind.load(name);
-            for (long seed = 1; seed <= 5; seed++) {
-                for (double age : AGES) {
-                    for (TreeStage stage : TreeShapes.stages(kind)) {
-                        TreeVoxels v = TreeShapes.build(kind, seed, age, stage);
-                        LongOpenHashSet standing = v.grounded();
-                        for (Long2ObjectMap.Entry<TreePart> e : v.entries()) {
-                            long k = e.getLongKey();
-                            assertTrue(standing.contains(k), () -> name + " seed " + " age " + age + " " + stage.id + ": " + e.getValue().id
-                                    + " floating at " + BlockPos.of(k).toShortString());
-                        }
-                    }
-                }
+            for (long seed = 1; seed <= seeds; seed++) {
+                long s = seed;
+                trees.add(() -> check.check(name, kind, s));
             }
         }
+        trees.parallelStream().forEach(Runnable::run);
     }
 
     @Test
@@ -60,32 +82,26 @@ class TreeShapeTest {
     /** Real growth: every log block of a living tree is still wood a little later (except the side branches it drops). */
     @Test
     void aGrowingTreeOnlyAddsWood() {
-        for (String name : KINDS) {
-            if (skipForLook(name)) {
-                continue;
-            }
-            TreeKind kind = TreeKind.load(name);
-            for (long seed = 1; seed <= 6; seed++) {
-                TreeVoxels before = null;
-                for (int step = 2; step <= 20; step++) {
-                    double age = step * 0.05;
-                    TreeVoxels now = TreeShapes.build(kind, seed, age, TreeStage.LIVING);
-                    if (before != null) {
-                        for (Long2ObjectMap.Entry<TreePart> e : before.entries()) {
-                            long k = e.getLongKey();
-                            if (!e.getValue().isLivingLog() || before.isDropped(k)) {
-                                continue;
-                            }
-                            TreePart later = now.get(k);
-                            long s = seed;
-                            assertTrue(later != null && later.isLivingLog(), () -> name + " seed " + s + " age " + age + ": the log at "
-                                    + BlockPos.of(k).toShortString() + " became " + (later == null ? "air" : later.id));
+        eachKindAndSeed(6, (name, kind, seed) -> {
+            TreeVoxels before = null;
+            for (int step = 2; step <= 20; step++) {
+                double age = step * 0.05;
+                TreeVoxels now = TreeShapes.build(kind, seed, age, TreeStage.LIVING);
+                if (before != null) {
+                    for (Long2ObjectMap.Entry<TreePart> e : before.entries()) {
+                        long k = e.getLongKey();
+                        if (!e.getValue().isLivingLog() || before.isDropped(k)) {
+                            continue;
                         }
+                        TreePart later = now.get(k);
+                        long s = seed;
+                        assertTrue(later != null && later.isLivingLog(), () -> name + " seed " + s + " age " + age + ": the log at "
+                                + BlockPos.of(k).toShortString() + " became " + (later == null ? "air" : later.id));
                     }
-                    before = now;
                 }
+                before = now;
             }
-        }
+        });
     }
 
     /**

@@ -129,6 +129,8 @@ neoForge {
                 gameDirectory = project.file("${testShardsFolder}/${shard}")
                 systemProperty 'neoforge.enabledGameTestNamespaces', gameTestNamespaces
                 systemProperty 'antcolonies.shard', "${shard}/${testShards}"
+                // Each test's last minutes, so the servers share the tests out by length (test speed step 2)
+                systemProperty 'antcolonies.testTimes', project.file('tools/test-times.txt').absolutePath
             }
         }
 

@@ -3,10 +3,16 @@ package com.antcolonies.savanna.colony;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.FutureTask;
+import java.util.function.LongConsumer;
 
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
 import com.antcolonies.savanna.colony.MoundPlan.Part;
@@ -22,6 +28,10 @@ import net.minecraft.core.BlockPos;
  * jobs done in a random order, and with surprises on the way (some blocks of every stage cannot be worked on, and the
  * termites move on without them). A stuck block fails the test and is named. Also: every outside block can be mended
  * from inside, and tunnels, once there, stay.
+ *
+ * <p>Each check runs its colonies side by side on all the computer's threads (test speed step 1, 2026-11-22: one after
+ * another the class took about 2.5 minutes of every build). Growing a mound touches nothing shared, so the colonies cannot
+ * get in each other's way; a failure still names its seed.
  */
 class MoundGrowthTest {
     private static final MoundNumbers NUMBERS = new MoundNumbers(32, 2.0F, 0.5F, 3, 13);
@@ -36,11 +46,34 @@ class MoundGrowthTest {
     /** How many more colonies, picked at random (fixed), the sweep grows (side by side; about 1 in 80 was stuck before BUGS 82). */
     private static final int SWEEP = 200;
 
-    /** Each colony's stages, grown once for all the tests here (growing takes a moment). */
-    private static final Map<Long, List<Shape>> GROWN = new java.util.HashMap<>();
+    /**
+     * Each colony's stages, grown once for all the tests here (growing takes a moment). One task per colony, so two
+     * colonies grow side by side and a second test asking for a colony being grown waits for that one only.
+     */
+    private static final Map<Long, FutureTask<List<Shape>>> GROWN = new ConcurrentHashMap<>();
 
-    private static synchronized List<Shape> grown(long seed) {
-        return GROWN.computeIfAbsent(seed, s -> MoundPlan.growth(NUMBERS, s));
+    private static List<Shape> grown(long seed) {
+        FutureTask<List<Shape>> task = GROWN.computeIfAbsent(seed, s -> new FutureTask<>(() -> MoundPlan.growth(NUMBERS, s)));
+        task.run(); // grows it the first time; does nothing once grown or while another thread is growing it
+        try {
+            return task.get();
+        } catch (ExecutionException e) {
+            if (e.getCause() instanceof RuntimeException runtime) {
+                throw runtime;
+            }
+            if (e.getCause() instanceof Error error) {
+                throw error;
+            }
+            throw new IllegalStateException(e.getCause());
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new IllegalStateException(e);
+        }
+    }
+
+    /** Runs the check for every colony of {@link #SEEDS} side by side; the first failure stops the test and names its seed. */
+    private static void eachSeed(LongConsumer check) {
+        Arrays.stream(SEEDS).parallel().forEach(check);
     }
 
     private static List<Shape> allStages(long seed) {
@@ -49,13 +82,15 @@ class MoundGrowthTest {
 
     @Test
     void everyStageOfManyMoundsCanBeGrownFromInside() {
-        for (long seed : SEEDS) {
+        eachSeed(seed -> {
             List<String> problems = MoundGrowth.problems(NUMBERS.maxHeight(), h -> MoundPlan.shapeOf(h, NUMBERS, seed));
             assertTrue(problems.isEmpty(), "seed " + seed + ": " + problems);
-        }
+        });
     }
 
+    /** Slow (31 s on all threads, so it cannot get faster): left out of the everyday build, run by every full run ({@code -PslowTests}). */
     @Test
+    @Tag("slow")
     void manyMoreMoundsCanBeGrownFromInside() {
         Random random = new Random(82);
         long[] seeds = java.util.stream.LongStream.range(0, SWEEP).map(i -> random.nextLong()).toArray();
@@ -67,39 +102,39 @@ class MoundGrowthTest {
 
     @Test
     void stageAfterStageTheTunnelsAreEnough() {
-        for (long seed : SEEDS) {
+        eachSeed(seed -> {
             List<MoundGrowth.Stuck> stuck = MoundGrowth.check(allStages(seed), null);
             assertTrue(stuck.isEmpty(), "seed " + seed + ": stuck at " + stuck);
-        }
+        });
     }
 
     @Test
     void inAnyOrder() {
-        for (long seed : SEEDS) {
+        eachSeed(seed -> {
             List<MoundGrowth.Stuck> stuck = MoundGrowth.check(allStages(seed), new Random(seed));
             assertTrue(stuck.isEmpty(), "seed " + seed + ": stuck at " + stuck);
-        }
+        });
     }
 
     @Test
     void withSurprisesOnTheWay() {
-        for (long seed : SEEDS) {
+        eachSeed(seed -> {
             Random random = new Random(seed * 31 + 1);
             for (double share : new double[] {0.01, 0.05}) {
                 List<MoundGrowth.Stuck> stuck = MoundGrowth.checkWithSurprises(allStages(seed), random, share);
                 assertTrue(stuck.isEmpty(), "seed " + seed + ", " + share + " of every stage blocked: stuck at " + stuck);
             }
-        }
+        });
     }
 
     @Test
     void everyOutsideBlockCanBeMendedFromInside() {
-        for (long seed : SEEDS) {
+        eachSeed(seed -> {
             for (int h : new int[] {8, 20, 32}) {
                 List<BlockPos> missing = MoundGrowth.unreachableOutside(grown(seed).subList(1, h + 1));
                 assertTrue(missing.isEmpty(), "seed " + seed + ", stage " + h + ": no termite inside could mend " + missing);
             }
-        }
+        });
     }
 
     @Test

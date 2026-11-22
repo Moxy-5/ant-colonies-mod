@@ -71,8 +71,23 @@ tasks.withType(JavaCompile).configureEach {
     options.encoding = 'UTF-8' // Use the UTF-8 charset for Java compilation
 }
 
-tasks.named('test') {
-    useJUnitPlatform()
+// Test speed step 1 (docs/plans/test-speed.md, 2026-11-22): the test classes run side by side in one test program
+// (JUnit's own side-by-side mode; the tests of one class still one after another), and a test tagged @Tag("slow") (a long
+// random sweep that cannot get faster) is left out of the everyday build. -PslowTests runs only the slow ones;
+// tools/run_game_tests.sh does that in every full run. Not 4 programs side by side: they share build/minecraft-junit and
+// each rewrites config/fml.toml as it starts, so one read the other's half-written file and failed to start. A class
+// that flips a shared switch takes a lock (@ResourceLock("TreeDraw") in the tree tests) so no class reading it runs beside.
+tasks.named('test', Test) {
+    useJUnitPlatform {
+        if (project.hasProperty('slowTests')) {
+            includeTags 'slow'
+        } else {
+            excludeTags 'slow'
+        }
+    }
+    systemProperty 'junit.jupiter.execution.parallel.enabled', 'true'
+    systemProperty 'junit.jupiter.execution.parallel.mode.default', 'same_thread'
+    systemProperty 'junit.jupiter.execution.parallel.mode.classes.default', 'concurrent'
 }
 
 idea {

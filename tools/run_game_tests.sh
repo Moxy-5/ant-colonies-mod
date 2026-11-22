@@ -22,6 +22,11 @@
 # or bad luck). Tests on a server that crashed or was stopped by the hang watchdog never finished and are not rerun.
 # The summary also lists the 10 slowest tests (each test logs its own time, "[test-time]" lines).
 #
+# Test speed (docs/plans/test-speed.md, 2026-11-22): after every run the passed tests' times go into tools/test-times.txt
+# (tools/test_times.py: a full run renews them all, a part run only adds tests the file lacks), and the servers share the
+# tests out by length from it (TestFilter.keepShard). A full run also runs the slow unit tests the everyday build leaves
+# out (./gradlew :savanna:test -PslowTests, Gradle's output in run-test-shards/slow-tests.log).
+#
 # Each server ("shard") gets its own folder and world under run-test-shards/<n>/ and its share of the tests
 # (TestFilter.keepShard). One server runs everything on one thread, so n servers finish about n times sooner, as long
 # as the PC has the threads (20 here). At the end it lists every failed test with its message, and the log of each
@@ -48,6 +53,19 @@ watch_pid=$!
 gradle_exit=$?
 touch run-test-shards/.watch-stop
 wait $watch_pid 2>/dev/null
+
+# Each passed test's time into tools/test-times.txt (only this run's servers' logs: older folders may hold old ones).
+full_run=0
+if [ -z "${ANTCOLONIES_TESTS:-}" ] && [ -z "${ANTCOLONIES_MODS:-}" ]; then
+    full_run=1
+fi
+logs=""
+for i in $(seq 1 "$shards"); do
+    [ -f "run-test-shards/$i/logs/latest.log" ] && logs="$logs run-test-shards/$i/logs/latest.log"
+done
+if [ -n "$logs" ] && [ "${ANTCOLONIES_EVERY_SHARD:-0}" != "1" ]; then
+    python tools/test_times.py $([ $full_run -eq 1 ] && echo full || echo add) $logs
+fi
 
 echo
 failed=0
@@ -78,7 +96,7 @@ if [ -s run-test-shards/hangs.txt ]; then
 fi
 
 # The slowest tests (each logs "[test-time] <name> passed|failed <ms> ms" when it is done).
-times=$(cat run-test-shards/*/logs/latest.log 2>/dev/null | grep -o "\[test-time\] [^ ]* [a-z]* [0-9]* ms" | sort -t' ' -k4 -n -r | head -10)
+times=$(cat $logs 2>/dev/null | grep -o "\[test-time\] [^ ]* [a-z]* [0-9]* ms" | sort -t' ' -k4 -n -r | head -10)
 if [ -n "$times" ]; then
     echo
     echo "The slowest tests (seconds):"
@@ -134,6 +152,18 @@ if [ -n "$failures" ] && [ "${ANTCOLONIES_RERUN:-1}" != "0" ]; then
         echo "    $test: $verdict ($folder)"
         echo "$test: $verdict" >> run-test-reruns/verdicts.txt
     done
+fi
+
+# A full run also runs the slow unit tests (the everyday ./gradlew build leaves them out; test speed step 1).
+if [ -z "${ANTCOLONIES_TESTS:-}" ] && { [ -z "${ANTCOLONIES_MODS:-}" ] || [[ "$ANTCOLONIES_MODS" == *savanna* ]]; }; then
+    echo
+    if ./gradlew :savanna:test -PslowTests > run-test-shards/slow-tests.log 2>&1; then
+        echo "The slow unit tests: all passed"
+    else
+        echo "The slow unit tests: FAILED (see run-test-shards/slow-tests.log and savanna/build/reports/tests/test/index.html)"
+        failed=1
+        real=1
+    fi
 fi
 
 minutes=$(( ($(date +%s) - start) / 60 ))

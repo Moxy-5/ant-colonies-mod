@@ -30,13 +30,32 @@ about 90 past test runs (`run-test-shards/*/logs`, archived logs included), 177 
 
 ## Steps (next, before or at the start of the bigger plan)
 
-1. **Slow unit tests out of the everyday build.** Tag `MoundGrowthTest`, `TreeShapeTest`, `GalleryProofTest`,
-   `MoundPlanTest`, `TreeShapeExport` as slow (JUnit tag); `build` skips them; a `slowTest` task runs them, and the
-   full run and any change to mound, tree or gallery code run it. Never delete a check. Goal: an animal change builds
-   in about 1 min instead of 4. Check: time `./gradlew build` after a one-line savanna change, before and after.
-2. **Split tests by length.** The runs already log `[test-time] <name> ... ms`; keep a small file of each test's last
-   time (written by `run_game_tests.sh`), and `keepShard` deals the longest first to the least-loaded server (unknown
-   tests count as average). Goal: full run about 23 min instead of 40; `river,worldgen` about 9 min instead of 16.
-   Check: one full run before and after, compare the busiest and idlest server.
+**Rethought 2026-11-22 after a closer look at the logs (the user: "think about the fix for both").**
+
+**Steps 1 and 2 built 2026-11-22** (details and numbers in `docs/HISTORY.md`): the build after a savanna change 50 s (step 1 changed in building: one test program with the classes side by side, not 4 programs, which clashed on `config/fml.toml`); `river,worldgen` 11 min 20 s (step 2 changed in building: each server takes at most its even share of the default-batch tests, as side by side is not free). The full run's time is still to be seen.
+
+1. **Unit tests side by side, not skipped.** Each slow test is a loop over many seeds done one at a time
+   (`MoundGrowthTest.withSurprisesOnTheWay` 52 s, `everyStageOfManyMoundsCanBeGrownFromInside` 38 s,
+   `TreeShapeTest.everyLimbLookStandsAndGrows` 21 s, `GalleryProofTest.wholeWebs...` 10 s), while the PC has 20 threads.
+   Run each seed loop on all cores (as `manyMoreMoundsCanBeGrownFromInside` already does), swap the mound cache's
+   one big lock for a per-seed one, and let JUnit run the test classes side by side. Every check still runs in
+   every build, so there is no "remember to run the slow tests" rule. Only the 200-random-seed sweep
+   (`manyMoreMounds...`, 31 s and already on all cores, so it cannot get faster) gets a `slow` tag: the everyday
+   build skips it and `run_game_tests.sh` runs it by itself in every full run (the 20 fixed seeds still check
+   every stage in every build). Expected (a guess until timed): the test part about 15 s instead of 3.3 min, the
+   build about 45 s to 1 min instead of 4. Check: time `./gradlew build` after a one-line savanna change, before and after.
+2. **Split game tests by length, with the right sum.** Found in the 10:27 full run: a server runs its batches one
+   after another, and inside a batch the tests run side by side, so the default batch costs only its longest test
+   (server 4's 38 default tests took 13 min, its longest 12.7). The world-map tests (`savanna_maps`) block the server
+   while they build land, so they add up (server 5: `riverwidthismeasured` 10.8 + `oxbowandpanroomismeasured` 7.0
+   + 2.6 = its 20-minute batch; that pair on one server made the run 40 min). So a server's cost is: the sum of
+   its own-batch tests plus the longest of its default tests. `keepShard` deals the longest test first to the server
+   whose cost it raises least (ties: fewer tests). Times from a small committed file `tools/test-times.txt`
+   (one "name minutes" line per test), refreshed by `run_game_tests.sh` from the `[test-time]` lines of each run;
+   `merge=union` so branches never clash, the reader takes the last line for a name; an unknown test counts
+   as 1 minute. Simulated on the 10:27 run's own times: every server 18.6 to 19.8 min, so about 21 min with
+   start-up instead of 40 (floor: the longest test, 12.7 min). Check: one full run, compare with the simulation.
+   Note: server 1's "1.5 min busy" in that run was the raid crash (BUGS 281, also 198), not idle time; it lost
+   21 tests. Fixing it is its own work.
 3. **Later, if wanted:** use `film.sh watch` by default for film work (saves about 40 s a film); overnight full run and
    soak with a short morning report.

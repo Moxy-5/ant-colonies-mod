@@ -2,9 +2,12 @@ package com.antcolonies.savanna.tree;
 
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import org.junit.jupiter.api.parallel.ResourceAccessMode;
+import org.junit.jupiter.api.parallel.ResourceLock;
 import org.junit.jupiter.api.Test;
 
 /** Step 5c: a dead acacia falls toward its heavier side (the way most of its shed wood hangs). */
+@ResourceLock(value = "TreeDraw", mode = ResourceAccessMode.READ) // grows trees, which read TreeDraw's trial switches: never beside a class that flips them (test speed step 1)
 class TreeFallTest {
     @Test
     void fallsTowardItsHeavierSide() {

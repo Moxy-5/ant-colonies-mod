@@ -4,6 +4,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.Random;
 
+import org.junit.jupiter.api.parallel.ResourceAccessMode;
+import org.junit.jupiter.api.parallel.ResourceLock;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -11,6 +13,7 @@ import org.junit.jupiter.api.Test;
  * few days, grown in 20 to 40, ancient after 100+) and the deaths (about 9 in 10 seedlings never reach young, about
  * half the young never reach grown), over many trees with their own seeds and dice.
  */
+@ResourceLock(value = "TreeDraw", mode = ResourceAccessMode.READ) // grows trees, which read TreeDraw's trial switches: never beside a class that flips them (test speed step 1)
 class TreeLifeTest {
     @Test
     void speedsAreTheDecidedOnes() {

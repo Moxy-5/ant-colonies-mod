@@ -12,3 +12,4 @@ docs/BUGS.md merge=union
 CLAUDE.md merge=union
 docs/status-log.md merge=union
 docs/HANDOFF.md merge=union
+tools/test-times.txt merge=union

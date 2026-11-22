@@ -2,6 +2,8 @@ package com.antcolonies.savanna.tree;
 
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import org.junit.jupiter.api.parallel.ResourceAccessMode;
+import org.junit.jupiter.api.parallel.ResourceLock;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -9,6 +11,7 @@ import org.junit.jupiter.api.Test;
  * rotten wood, frass on its floor and a way in at the foot. Hollowing only takes wood away or turns it rotten (or to
  * frass); it never adds a block where the plain tree has none, and it leaves the crown alone.
  */
+@ResourceLock(value = "TreeDraw", mode = ResourceAccessMode.READ) // grows trees, which read TreeDraw's trial switches: never beside a class that flips them (test speed step 1)
 class TreeHollowTest {
     @Test
     void termitesHollowTheLowerTrunk() {

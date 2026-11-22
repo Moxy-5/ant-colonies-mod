@@ -8,6 +8,8 @@ import java.util.Base64;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
+import org.junit.jupiter.api.parallel.ResourceAccessMode;
+import org.junit.jupiter.api.parallel.ResourceLock;
 import org.junit.jupiter.api.Test;
 
 import com.google.gson.Gson;
@@ -21,6 +23,7 @@ import net.minecraft.core.BlockPos;
  * (python tools/model_viewer.py trees): a few seeds of every kind at the viewer's ages and stages. Each tree is its
  * blocks as 4 bytes (x, y, z, part), base64.
  */
+@ResourceLock(value = "TreeDraw", mode = ResourceAccessMode.READ_WRITE) // flips TreeDraw's trial switches: never beside a class that flips them (test speed step 1)
 class TreeShapeExport {
     static final String[][] KINDS = {{"umbrella", "umbrella_thorn"}, {"camel", "camel_thorn"}, {"baobab", "baobab"}};
     static final double[] AGES = {0.03, 0.15, 0.3, 0.45, 0.6, 0.8, 1, 1.25};

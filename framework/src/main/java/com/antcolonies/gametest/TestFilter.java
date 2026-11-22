@@ -130,8 +130,18 @@ public final class TestFilter {
     /**
      * Tests side by side (test health plan, 2026-10-16): {@code tools/run_game_tests.sh} starts several test servers at
      * once, each with the system property {@code antcolonies.shard} set to "i/n", and each keeps only its share of the
-     * tests. Tests with a batch of their own (the long whole-colony ones) are dealt out first, then the rest class by
-     * class, so the long ones and each class's tests spread over all the servers.
+     * tests. Every server deals the same way, so each test lands on exactly one.
+     *
+     * <p>Dealt by length (test speed step 2, docs/plans/test-speed.md, 2026-11-22): a server runs its batches one after
+     * another, and the tests of one batch side by side, so the default batch costs about its longest test, while the tests
+     * with a batch of their own add up (the world-map tests also add up inside their shared batch: they hold the server
+     * while they build land). So a server's cost is the sum of its own-batch tests plus its longest default-batch test,
+     * and the tests are dealt longest first, each to the server whose cost it raises least (a tie: the one with fewer
+     * tests). But side by side is not free (one server thread ticks them all), so no server takes more than its even
+     * share of the default-batch tests: the load the times were measured under (the first try without it put 63 of 80
+     * tests on one server, and three of them timed out or failed in the lag). Each test's minutes come from {@code tools/test-times.txt} (system property {@code antcolonies.testTimes},
+     * refreshed by the run script); a test not in it counts as {@link #UNKNOWN_MINUTES}. Before, they were dealt by batch
+     * and name, blind to length: the 2026-11-22 full run took 40 minutes while the six servers' loads ran 13 to 39.
      */
     @SuppressWarnings("unchecked")
     private static void keepShard(MinecraftServer server) {
@@ -150,32 +160,84 @@ public final class TestFilter {
             ColonyFrameworkMod.LOGGER.error("[test-filter] antcolonies.shard should look like 2/5, was {}: running every test", shard);
             return;
         }
-        Map<String, String> classOf = new java.util.HashMap<>();
-        for (List<Class<?>> category : CATEGORIES.values()) {
-            for (Class<?> testClass : category) {
-                for (java.lang.reflect.Method method : testClass.getDeclaredMethods()) {
-                    classOf.put(method.getName().toLowerCase(Locale.ROOT), testClass.getSimpleName());
-                }
-            }
-        }
+        Map<String, Double> minutes = testTimes(System.getProperty("antcolonies.testTimes"));
         try {
             Field field = GameTestServer.class.getDeclaredField("testFunctions");
             field.setAccessible(true);
             Collection<TestFunction> tests = (Collection<TestFunction>) field.get(server);
+            java.util.function.ToDoubleFunction<TestFunction> length = test -> minutes.getOrDefault(test.testName().toLowerCase(Locale.ROOT), UNKNOWN_MINUTES);
             List<TestFunction> order = new java.util.ArrayList<>(tests);
-            order.sort(java.util.Comparator.comparing((TestFunction test) -> test.batchName().equals("defaultBatch") ? 1 : 0)
-                    .thenComparing(test -> classOf.getOrDefault(test.testName(), ""))
-                    .thenComparing(TestFunction::testName));
+            order.sort(java.util.Comparator.comparingDouble(length).reversed().thenComparing(TestFunction::testName));
+            double[] ownBatches = new double[count]; // the sum of each server's own-batch tests
+            double[] longestDefault = new double[count]; // each server's longest default-batch test
+            int[] dealt = new int[count];
+            int[] dealtDefault = new int[count];
+            int fairShare = (int) Math.ceil(order.stream().filter(test -> test.batchName().equals("defaultBatch")).count() / (double) count);
             java.util.Set<String> kept = new java.util.HashSet<>();
-            for (int i = index - 1; i < order.size(); i += count) {
-                kept.add(order.get(i).testName());
+            for (TestFunction test : order) {
+                double time = length.applyAsDouble(test);
+                boolean inDefault = test.batchName().equals("defaultBatch");
+                int best = -1;
+                double bestCost = Double.MAX_VALUE;
+                for (int k = 0; k < count; k++) {
+                    if (inDefault && dealtDefault[k] >= fairShare) {
+                        continue;
+                    }
+                    double cost = inDefault ? ownBatches[k] + Math.max(longestDefault[k], time) : ownBatches[k] + time + longestDefault[k];
+                    if (cost < bestCost - 1e-9 || (Math.abs(cost - bestCost) <= 1e-9 && dealt[k] < dealt[best])) {
+                        best = k;
+                        bestCost = cost;
+                    }
+                }
+                if (inDefault) {
+                    longestDefault[best] = Math.max(longestDefault[best], time);
+                    dealtDefault[best]++;
+                } else {
+                    ownBatches[best] += time;
+                }
+                dealt[best]++;
+                if (best == index - 1) {
+                    kept.add(test.testName());
+                }
             }
             int before = tests.size();
             tests.removeIf(test -> !kept.contains(test.testName()));
-            ColonyFrameworkMod.LOGGER.warn("[test-filter] shard {}: running {} of {} game tests: {}", shard, tests.size(), before,
+            ColonyFrameworkMod.LOGGER.warn("[test-filter] shard {}: running {} of {} game tests (about {} min by tools/test-times.txt; {} of all the chosen tests had no time there): {}",
+                    shard, tests.size(), before, String.format(Locale.ROOT, "%.1f", ownBatches[index - 1] + longestDefault[index - 1]),
+                    order.stream().filter(test -> !minutes.containsKey(test.testName().toLowerCase(Locale.ROOT))).count(),
                     tests.stream().map(TestFunction::testName).sorted().toList());
         } catch (ReflectiveOperationException e) {
             ColonyFrameworkMod.LOGGER.error("[test-filter] could not split the game tests, running them all", e);
         }
+    }
+
+    /** The minutes a test not in {@code tools/test-times.txt} counts as (a new test; most tests take well under one). */
+    private static final double UNKNOWN_MINUTES = 1.0;
+
+    /**
+     * Each test's minutes from the times file: one "name minutes" line per test, {@code #} starts a comment; a name
+     * written twice (two branches' times kept by git's union merge) counts by its last line. No file: an empty map
+     * (every test then counts the same, and the deal is still even by count).
+     */
+    private static Map<String, Double> testTimes(String file) {
+        Map<String, Double> minutes = new java.util.HashMap<>();
+        if (file == null || file.isBlank()) {
+            return minutes;
+        }
+        try {
+            for (String line : java.nio.file.Files.readAllLines(java.nio.file.Path.of(file))) {
+                String[] words = line.strip().split("\\s+");
+                if (words.length == 2 && !words[0].startsWith("#")) {
+                    try {
+                        minutes.put(words[0].toLowerCase(Locale.ROOT), Double.parseDouble(words[1]));
+                    } catch (NumberFormatException e) {
+                        // (not a time: skipped)
+                    }
+                }
+            }
+        } catch (java.io.IOException e) {
+            ColonyFrameworkMod.LOGGER.warn("[test-filter] no test times in {}: dealing the tests by count", file);
+        }
+        return minutes;
     }
 }
