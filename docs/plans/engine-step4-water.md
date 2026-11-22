@@ -53,7 +53,9 @@ The user: the old walk-in was janky ("I made it before we have this whole system
   checks the bank is solid and open all that way back.
 - **The tail** (`TailDrag`, framework): a new ceiling at the tail's root: no joint rests higher than the root's own
   drawn height, so the tail no longer arches up from hips sunk below the bank (a test proves it). What is left is
-  BUGS 278 (a W in the tail at the lip as the hips go under), the shared tail drag's, not the clip's.
+  BUGS 278 (a W in the tail at the lip as the hips go under), the shared tail drag's, not the clip's; fixed the same day:
+  over a low lip the tail bridges from its root to the lip like a rope (`TailDrag.lip`, `BRIDGE`), off a high bank it
+  still hangs down the face.
 - Checks: `python tools/clip_check.py monitor 'water_in_*' --switches` (all five sizes: nothing inside the bank, no
   planted foot hanging, fastest joint turn 53 degrees, no clip change flagged); the course scene `bank_level`; the
   film `tools/film/monitor_water_in_frames.film` from the side, front and behind.

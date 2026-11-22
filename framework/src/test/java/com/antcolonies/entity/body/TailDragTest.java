@@ -238,6 +238,71 @@ class TailDragTest {
         }
     }
 
+    /**
+     * Walking off a level bank into the water (its top a little over the surface), the hips sinking to float: the tail runs
+     * from its root up over the lip like a rope, never dipping to the surface and climbing back out over the lip (a W from
+     * the side, the user's ask after the walk-in's film, BUGS 278, 2026-11-22).
+     */
+    @Test
+    void walkingOffALowBankTheTailRunsUpToTheLipWithNoDip() {
+        TailDrag t = new TailDrag(LENGTH, REST, LOWEST, 11.0);
+        TailDrag.Ground bank = new TailDrag.Ground() {
+            @Override
+            public double at(double x, double z) {
+                return z > 0 ? 0.0 : -2.0;          // the bank behind (+z), the bottom two blocks down ahead
+            }
+
+            @Override
+            public double afloat(double x, double z) {
+                return z > 0 ? Double.NaN : -0.15;   // floats a little under the bank's top
+            }
+        };
+        long now = 1;
+        for (int f = 0; f <= 120; f++, now += FRAME) {
+            double rz = 0.6 - 3.0 * f / 120.0;                                  // the root from over the bank out 2.4 blocks
+            double sink = Math.min(1.0, Math.max(0.0, (0.6 - rz) / 2.0));
+            double by = 11.0 * PB + (-0.17 - 11.0 * PB) * sink;                // down to floating
+            t.update(bank, 0, by, rz, 0, 1, 15.0 * Math.sin(Math.PI * sink), PB, true, now);
+            lies(t, bank, "frame " + f);
+            for (int i = 1; i < 12; i++) {
+                double front = Double.NEGATIVE_INFINITY, back = Double.NEGATIVE_INFINITY;
+                for (int j = 0; j < i; j++) {
+                    front = Math.max(front, t.y(j));
+                }
+                for (int j = i + 1; j <= 12; j++) {
+                    back = Math.max(back, t.y(j));
+                }
+                assertTrue(t.y(i) >= Math.min(front, back) - 0.5 * PB, "frame " + f + ": joint " + i + " at "
+                        + String.format("%.3f", t.y(i)) + " dips under the joints before (" + String.format("%.3f", front)
+                        + ") and after (" + String.format("%.3f", back) + ") it");
+            }
+        }
+    }
+
+    /** Off a bank two blocks over the water the tail is not laid as a rope to the top: it floats out and hangs down the face. */
+    @Test
+    void offAHighBankTheTailStillFloatsAndHangsDownTheFace() {
+        TailDrag t = new TailDrag(LENGTH, REST, LOWEST, 11.0);
+        TailDrag.Ground bank = new TailDrag.Ground() {
+            @Override
+            public double at(double x, double z) {
+                return z > 0 ? 2.0 : -1.0;
+            }
+
+            @Override
+            public double afloat(double x, double z) {
+                return z > 0 ? Double.NaN : -0.15;
+            }
+        };
+        long now = 1;
+        for (int f = 0; f <= 60; f++, now += FRAME) {
+            t.update(bank, 0, -0.17, -0.6 - 0.6 * f / 60.0, 0, 1, 0.0, PB, true, now);      // swimming out from the face
+        }
+        for (int i = 1; i <= 2; i++) {          // the joints by the root float (laid as a rope, they rose toward the top)
+            assertEquals(-0.15, t.y(i), 0.12, "joint " + i + " at z " + t.z(i));
+        }
+    }
+
     @Test
     void handedBackToTheClipItEasesOver() {
         TailDrag t = drag();

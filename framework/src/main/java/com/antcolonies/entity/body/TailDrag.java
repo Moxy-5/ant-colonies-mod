@@ -86,6 +86,11 @@ public final class TailDrag {
     static final double EASE = 0.15, STRAIGHTEN = 3.0, WEIGH = 0.25;
     /** How fast ground past the tail's own reach stops holding a joint up (blocks lower a block further: my pick). */
     static final double BEYOND = 3.0;
+    /**
+     * How high a lip over the water a dragged tail bridges as a rope, as a share of its whole length: in full up to this,
+     * fading out by twice it, over a higher bank it hangs down the face (my pick: about half a block for the monitor).
+     */
+    static final double BRIDGE = 0.2;
     /** Moved farther than this in a frame (blocks: a teleport, a knockback), or not drawn for half a second: laid out afresh. */
     static final double RESET = 2.0;
 
@@ -226,6 +231,7 @@ public final class TailDrag {
         for (int i = 0; i < n; i++) {
             behind += lengthPx[i] * perBlock;
         }
+        double total = behind;
         for (int i = 1; i <= n; i++) {
             double len = lengthPx[i - 1] * perBlock;
             behind -= len;
@@ -245,6 +251,20 @@ public final class TailDrag {
             // (no higher than a little over the hips, as it lies swimming at the surface: an animal swimming under, hiding after a scare, keeps its
             // tail down with it; floated to the surface, the tail zig-zagged up from the sunk hips and snapped, 2026-11-19)
             double rest = Double.isNaN(wet) ? Math.min(under, home) + restPx[i - 1] * perBlock : Math.min(wet, by + 0.25 * lengthPx[0] * perBlock);
+            // (and while the tail behind still lies on the bank it came off, no lower than the straight line from the joint
+            // in front to the lip, as a rope dragged over an edge: dropped to the surface, it climbed back out over a low
+            // bank's lip, a W from the side, 2026-11-22, BUGS 278). Only a low lip is bridged: over a high one the tail
+            // hangs down the face as before ({@link #BRIDGE}; laid as a rope up to a bank two blocks high, its end
+            // flipped over the top as it slid off).
+            if (!Double.isNaN(wet)) {
+                double d = lip(ground, x[i - 1], z[i - 1], ux, uz, len + behind);
+                if (!Double.isNaN(d)) {
+                    double top = ground.at(x[i - 1] + ux * d, z[i - 1] + uz * d) + lowestPx[i - 1] * perBlock;
+                    double line = y[i - 1] + (top - y[i - 1]) * Math.min(1.0, reach / d);
+                    double bridged = Mth.clamp(2.0 - (top - rest) / (BRIDGE * total), 0.0, 1.0);
+                    rest = Math.max(rest, rest + (line - rest) * bridged);
+                }
+            }
             // (over ground, no higher than the root now carries it: as far under the root as at rest. The hips sinking
             // over a bank's lip into the water, the base pieces stayed at their rest height over the bank and the tail
             // arched up from its own root, 2026-11-22. On flat ground and climbing the root is at or over its rest
@@ -320,6 +340,30 @@ public final class TailDrag {
             dz = z + uz * (d + 1.0E-6);
             // (ground past what the tail behind reaches counts less and less, smoothly: cut off, the tip snapped)
             floor = Math.max(floor, ground.at(dx, dz) + lowest - d * SLANT - Math.max(0.0, d - behind) * BEYOND);
+        }
+    }
+
+    /**
+     * How far back from (x, z) along (ux, uz) the water ends at dry ground (blocks, just past that block border), within
+     * {@code most}; NaN where (x, z) is itself dry or the water goes on past it.
+     */
+    private static double lip(Ground ground, double x, double z, double ux, double uz, double most) {
+        if (Double.isNaN(ground.afloat(x, z))) {
+            return Double.NaN;
+        }
+        double dx = x, dz = z, d = 0;
+        while (true) {
+            double toX = ux > 1.0E-9 ? (Math.floor(dx) + 1 - dx) / ux : ux < -1.0E-9 ? (Math.ceil(dx) - 1 - dx) / ux : Double.MAX_VALUE;
+            double toZ = uz > 1.0E-9 ? (Math.floor(dz) + 1 - dz) / uz : uz < -1.0E-9 ? (Math.ceil(dz) - 1 - dz) / uz : Double.MAX_VALUE;
+            d += Math.max(Math.min(toX, toZ), 1.0E-6) + 1.0E-6;
+            if (d > most) {
+                return Double.NaN;
+            }
+            dx = x + ux * d;
+            dz = z + uz * d;
+            if (Double.isNaN(ground.afloat(dx, dz))) {
+                return d;
+            }
         }
     }
 
