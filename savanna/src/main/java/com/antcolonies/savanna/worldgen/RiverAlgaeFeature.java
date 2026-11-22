@@ -39,7 +39,11 @@ public class RiverAlgaeFeature extends Feature<NoneFeatureConfiguration> {
         if (!BigSavanna.lives(level.getLevel(), level.getBiome(new net.minecraft.core.BlockPos(x0 + 8, level.getSeaLevel(), z0 + 8)), x0 + 8, z0 + 8)) {
             return false; // the gate: no river life in a savanna too small to live in
         }
-        return lay(level, x0, z0, 16, 16, level.getSeaLevel() - 1, at -> level.getBiome(at).is(RiverBankFeature.WATERS)) > 0;
+        // the river and the oxbows (a pan lays its own thin algae at its edge, PanFeature)
+        return lay(level, x0, z0, 16, 16, level.getSeaLevel() - 1, at -> {
+            var biome = level.getBiome(at);
+            return biome.is(RiverBankFeature.WATERS) && !MudSites.dryLand(biome);
+        }) > 0;
     }
 
     /**

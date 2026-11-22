@@ -1251,6 +1251,70 @@ public class RiverLifeTests {
     }
 
     /**
+     * Pans and oxbows (oxbows and pans step 5, 2026-11-22; the spawning check list): a pond 2 deep painted open savanna (a
+     * pan) up on the plain, 9 blocks over the river's level (higher than the river animals' old limit of 6), then painted
+     * floodplain (an oxbow) 2 over the river's level, as the oxbows lie. Every check Minecraft's spawner makes, counted over the pond and its bank: in the pan snails,
+     * bullfrogs and fly clouds and none of the river's fish, crocodiles, crabs or monitors; in the oxbow the river's
+     * animals too.
+     */
+    @GameTest(template = "arena", timeoutTicks = 40)
+    public static void pansKeepSnailsFrogsAndFliesOxbowsTheRiversAnimals(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        BlockPos corner = helper.absolutePos(new BlockPos(20, 0, 20));
+        int w = 14, d = 12;
+        // the pond with its surface at this height (its land's grass level with the water)
+        java.util.function.IntConsumer build = surface -> {
+            for (int i = 0; i < w; i++) {
+                for (int k = 0; k < d; k++) {
+                    boolean pond = i >= 2 && i < w - 2 && k >= 2 && k < d - 2;
+                    for (int y = level.getSeaLevel() - 6; y <= level.getSeaLevel() + 16; y++) {
+                        BlockState state = y > surface ? Blocks.AIR.defaultBlockState()
+                                : pond && y >= surface - 1 ? Blocks.WATER.defaultBlockState()
+                                : y == surface ? Blocks.GRASS_BLOCK.defaultBlockState() : Blocks.DIRT.defaultBlockState();
+                        level.setBlock(new BlockPos(corner.getX() + i, y, corner.getZ() + k), state, 2);
+                    }
+                }
+            }
+        };
+        var kinds = java.util.List.<net.minecraft.world.entity.EntityType<? extends net.minecraft.world.entity.Mob>>of(SavannaEntities.SNAIL.get(),
+                SavannaEntities.BULLFROG.get(), SavannaEntities.FLY_CLOUD.get(), SavannaEntities.TILAPIA.get(), SavannaEntities.BARB.get(),
+                SavannaEntities.CATFISH.get(), SavannaEntities.CROCODILE.get(), SavannaEntities.CRAB.get(), SavannaEntities.MONITOR.get());
+        java.util.function.BiFunction<String, Integer, int[]> count = (biome, surface) -> {
+            build.accept(surface);
+            BlockPos far = corner.offset(w, 0, d);
+            level.getServer().getCommands().performPrefixedCommand(level.getServer().createCommandSourceStack().withSuppressedOutput().withLevel(level),
+                    "fillbiome " + (corner.getX() - 4) + " " + (surface - 8) + " " + (corner.getZ() - 4) + " " + (far.getX() + 4) + " " + (surface + 8) + " "
+                            + (far.getZ() + 4) + " " + biome);
+            int[] spots = new int[kinds.size()];
+            for (int i = 0; i < w; i++) {
+                for (int k = 0; k < d; k++) {
+                    for (int y = surface - 2; y <= surface + 2; y++) {
+                        BlockPos at = new BlockPos(corner.getX() + i, y, corner.getZ() + k);
+                        for (int n = 0; n < kinds.size(); n++) {
+                            spots[n] += worldWouldSpawn(level, kinds.get(n), at) ? 1 : 0;
+                        }
+                    }
+                }
+            }
+            return spots;
+        };
+        int[] pan = count.apply("minecraft:savanna", level.getSeaLevel() - 1 + 9);                       // a pan up on the plain
+        int[] oxbow = count.apply(SavannaMod.MODID + ":savanna_floodplain", level.getSeaLevel() - 1 + 2);  // an oxbow 2 over the river
+        String report = "spots in the pan / the oxbow: " + java.util.stream.IntStream.range(0, kinds.size())
+                .mapToObj(n -> kinds.get(n).getDescriptionId().replace("entity.antcolonies.", "") + " " + pan[n] + "/" + oxbow[n])
+                .collect(java.util.stream.Collectors.joining(", "));
+        SavannaMod.LOGGER.info("[pans] {}", report);
+        for (int n = 0; n < 3; n++) {
+            helper.assertTrue(pan[n] > 0, "no " + kinds.get(n).getDescriptionId() + " in a pan up on the plain: " + report);
+        }
+        for (int n = 3; n < kinds.size(); n++) {
+            helper.assertTrue(pan[n] == 0, kinds.get(n).getDescriptionId() + " in a pan: " + report);
+        }
+        helper.assertTrue(oxbow[3] > 0 && oxbow[4] > 0 && oxbow[6] > 0, "the oxbow lost the river's fish or crocodiles: " + report);
+        helper.succeed();
+    }
+
+    /**
      * Whether the world itself would spawn this kind here (every check Minecraft's natural spawner makes at a spot but the
      * biome's list and the distance to a player): the placement, the kind's own rule (with the quiet-savanna gate), room
      * for its box, then the mob's own last checks.
@@ -1967,8 +2031,9 @@ public class RiverLifeTests {
     /**
      * River zones (2026-11-21, {@code worldgen/RiverZones}): the savanna river reads as coast, near, mid or far inland by
      * how far inland (the sand's bands), the floodplain's and savanna's other waters as still water, anywhere else as no
-     * zone (the whole cap, as the quiet gate); each kind keeps its share of its group's cap there: hippos none at the
-     * coast, far inland or (until the oxbows are reworked) the still waters; crocodiles a quarter of theirs far inland;
+     * zone (the whole cap, as the quiet gate); the still waters split into oxbows (the floodplain's) and pans (the open
+     * savanna's, 2026-11-22); each kind keeps its share of its group's cap there: hippos spawned none at the coast, far
+     * inland or the still waters (the oxbows' pods are placed with the land); the pans only snails, bullfrogs and flies; crocodiles a quarter of theirs far inland;
      * crabs most far inland; bullfrogs only the still waters, a little mid inland; kinds not listed everywhere.
      */
     @GameTest(template = "arena", timeoutTicks = 20)
@@ -1985,8 +2050,11 @@ public class RiverLifeTests {
                 helper.assertTrue(zone.ordinal() == (int) r[1], "the river " + r[0] + " inland reads " + zone);
             }
         }
-        helper.assertTrue(com.antcolonies.savanna.worldgen.RiverZones.zoneOf(floodplain, () -> 0) == com.antcolonies.savanna.worldgen.RiverZones.Zone.STILL,
-                "the floodplain's water is not still water");
+        helper.assertTrue(com.antcolonies.savanna.worldgen.RiverZones.zoneOf(floodplain, () -> 0) == com.antcolonies.savanna.worldgen.RiverZones.Zone.OXBOW,
+                "the floodplain's water is not an oxbow's");
+        var savanna = biomes.getHolderOrThrow(net.minecraft.world.level.biome.Biomes.SAVANNA);
+        helper.assertTrue(com.antcolonies.savanna.worldgen.RiverZones.zoneOf(savanna, () -> 0) == com.antcolonies.savanna.worldgen.RiverZones.Zone.PAN,
+                "the open savanna's water is not a pan's");
         helper.assertTrue(com.antcolonies.savanna.worldgen.RiverZones.zoneOf(plains, () -> 0) == com.antcolonies.savanna.worldgen.RiverZones.Zone.UNKNOWN,
                 "a plains spot has a river zone");
         var Z = com.antcolonies.savanna.worldgen.RiverZones.Zone.values();
@@ -2007,9 +2075,19 @@ public class RiverLifeTests {
         helper.assertTrue(com.antcolonies.savanna.worldgen.RiverZones.allows(croc, far, crocsFar - 1)
                 && !com.antcolonies.savanna.worldgen.RiverZones.allows(croc, far, crocsFar), "the far-inland crocodiles' limit is not " + crocsFar);
         helper.assertTrue(com.antcolonies.savanna.worldgen.RiverZones.allows(crab, far, 1000), "crabs held back far inland");
-        helper.assertTrue(com.antcolonies.savanna.worldgen.RiverZones.allows(frog, com.antcolonies.savanna.worldgen.RiverZones.Zone.STILL, 1000)
+        helper.assertTrue(com.antcolonies.savanna.worldgen.RiverZones.allows(frog, com.antcolonies.savanna.worldgen.RiverZones.Zone.OXBOW, 1000)
+                && com.antcolonies.savanna.worldgen.RiverZones.allows(frog, com.antcolonies.savanna.worldgen.RiverZones.Zone.PAN, 1000)
                 && !com.antcolonies.savanna.worldgen.RiverZones.allows(frog, com.antcolonies.savanna.worldgen.RiverZones.Zone.COAST, 0),
                 "bullfrogs are not the still waters' alone");
+        // the pans (2026-11-22): rain pools with snails, bullfrogs and flies, none of the river's fish, crocodiles, crabs or monitors
+        var pan = com.antcolonies.savanna.worldgen.RiverZones.Zone.PAN;
+        for (var kind : java.util.List.of(SavannaEntities.TILAPIA.get(), SavannaEntities.CATFISH.get(), SavannaEntities.BARB.get(), croc, crab,
+                SavannaEntities.MONITOR.get(), hippo)) {
+            helper.assertFalse(com.antcolonies.savanna.worldgen.RiverZones.allows(kind, pan, 0), kind.getDescriptionId() + " allowed in a pan");
+        }
+        for (var kind : java.util.List.of(SavannaEntities.SNAIL.get(), frog, flies)) {
+            helper.assertTrue(com.antcolonies.savanna.worldgen.RiverZones.allows(kind, pan, 1000), kind.getDescriptionId() + " held back in a pan");
+        }
         helper.succeed();
     }
 

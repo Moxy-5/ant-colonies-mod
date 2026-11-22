@@ -545,7 +545,7 @@ public class BullfrogEntity extends Animal implements GeoEntity {
      */
     public static boolean canSpawn(EntityType<BullfrogEntity> type, LevelAccessor level, MobSpawnType reason, BlockPos pos, RandomSource random) {
         int sea = level.getSeaLevel();
-        if (pos.getY() < sea - 13 || pos.getY() > sea + 7) {
+        if (pos.getY() < sea - 13 || pos.getY() > sea + com.antcolonies.savanna.worldgen.RiverZones.HIGHEST_POOL + 1) {
             return false;
         }
         int top = surface(level, pos.getX() + 0.5, pos.getZ() + 0.5);

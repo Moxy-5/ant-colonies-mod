@@ -28,8 +28,10 @@ import net.minecraft.world.phys.AABB;
  * River zones: who lives where along a savanna river (the user, 2026-11-18 and 2026-11-21, {@code docs/DESIGN.md}, "River
  * zones"). The one place that answers "which stretch of river is this": the {@link Zone#COAST coast}, {@link Zone#NEAR
  * near}, {@link Zone#MID mid} or {@link Zone#FAR far inland} river, read from Minecraft's "how far inland" number
- * (continentalness, the same number the rivers' widths and the sand's colours follow, {@link SandBanks}), or the
- * {@link Zone#STILL still waters} off the river (the floodplain's oxbows and pans, the savanna's ponds).
+ * (continentalness, the same number the rivers' widths and the sand's colours follow, {@link SandBanks}), or the still
+ * waters off it: the {@link Zone#OXBOW oxbows} (any water of the floodplain) and the {@link Zone#PAN pans} (any water of the
+ * open savanna; split from one "still waters" zone 2026-11-22, oxbows and pans step 5: real pans are rain pools with no
+ * river fish, the African bullfrog's, the snails' and the flies').
  *
  * <p>Each river animal has a share of its spawning group's cap in each zone ({@link #SHARES}, my picks, fun first, inspired
  * by real rivers): a share of 1 is the whole cap (no change), 0.25 a quarter of it counted within {@link #LOOK} blocks, 0
@@ -39,9 +41,12 @@ import net.minecraft.world.phys.AABB;
  * pocket under the land) is no river at all: nothing spawns in it.
  */
 public final class RiverZones {
+    /** The highest a still pool's water lies over sea level for its animals to spawn in (the pans up on the open plain; my pick). */
+    public static final int HIGHEST_POOL = 24;
+
     /** A stretch of the savanna's waters. */
     public enum Zone {
-        COAST, NEAR, MID, FAR, STILL, UNKNOWN
+        COAST, NEAR, MID, FAR, OXBOW, PAN, UNKNOWN
     }
 
     /** How far inland, from continentalness: the coast below the first, near inland below the second, mid below the third, far above (the sand's bands). */
@@ -52,20 +57,22 @@ public final class RiverZones {
     public static final ResourceKey<Biome> RIVER = ResourceKey.create(Registries.BIOME, ResourceLocation.fromNamespaceAndPath(SavannaMod.MODID, "savanna_river"));
 
     /**
-     * Each kind's share of its group's cap by zone: coast, near, mid, far inland, still waters (my picks, 2026-11-21).
+     * Each kind's share of its group's cap by zone: coast, near, mid, far inland, oxbows, pans (my picks, 2026-11-21; the
+     * oxbows keep the old still waters' shares, the pans new, 2026-11-22: none of the river's fish, crocodiles, crabs or
+     * monitors; snails and bullfrogs all of theirs).
      * Kinds not listed keep the whole cap everywhere (the fly clouds: flies hang over any water). The hippo is here for the
      * record only: it is placed with new land ({@link PodSites}), never spawned.
      */
     static final Map<String, float[]> SHARES = Map.of(
-            "hippo", new float[] {0, 1, 1, 0, 0},                 // slow deep pools of the near and mid rivers (deep oxbows when they are reworked)
-            "crocodile", new float[] {0.25F, 1, 1, 0.25F, 0.5F}, // most on the wide slow rivers' bars, few at the coast and up the narrow rivers
-            "catfish", new float[] {1, 1, 1, 0.25F, 1},           // deep and murky water and the pans; few in the clear narrow rivers
-            "tilapia", new float[] {0.5F, 1, 1, 0.5F, 1},         // quiet water; nurseries in the oxbows
-            "barb", new float[] {0.25F, 0.5F, 1, 1, 0.25F},       // clear running water, most far inland
-            "crab", new float[] {0.25F, 0.5F, 1, 1, 0.25F},       // stony beds, most far inland
-            "snail", new float[] {0.25F, 1, 1, 0.5F, 1},          // still and slow water, weed and algae
-            "bullfrog", new float[] {0, 0, 0.1F, 0, 1},           // the pans and pools of the floodplain; rare on the river
-            "monitor", new float[] {0.5F, 1, 1, 1, 0.5F});        // any bank, fewer at the coast and the still waters
+            "hippo", new float[] {0, 1, 1, 0, 0, 0},              // slow deep pools of the near and mid rivers (and deep oxbows: placed with the land, OxbowFeature)
+            "crocodile", new float[] {0.25F, 1, 1, 0.25F, 0.5F, 0}, // most on the wide slow rivers' bars, few at the coast and up the narrow rivers
+            "catfish", new float[] {1, 1, 1, 0.25F, 1, 0},        // deep and murky water and the oxbows; few in the clear narrow rivers
+            "tilapia", new float[] {0.5F, 1, 1, 0.5F, 1, 0},       // quiet water; nurseries in the oxbows
+            "barb", new float[] {0.25F, 0.5F, 1, 1, 0.25F, 0},     // clear running water, most far inland
+            "crab", new float[] {0.25F, 0.5F, 1, 1, 0.25F, 0},     // stony beds, most far inland
+            "snail", new float[] {0.25F, 1, 1, 0.5F, 1, 1},        // still and slow water, weed and algae
+            "bullfrog", new float[] {0, 0, 0.1F, 0, 1, 1},        // the pans and the floodplain's pools; rare on the river
+            "monitor", new float[] {0.5F, 1, 1, 1, 0.5F, 0});     // any bank of the river and oxbows, fewer at the coast and the oxbows
 
     private RiverZones() {
     }
@@ -89,7 +96,10 @@ public final class RiverZones {
         if (biome.is(RIVER)) {
             return river(band(continentalness.getAsDouble()));
         }
-        return biome.is(RiverBankFeature.WATERS) ? Zone.STILL : Zone.UNKNOWN;
+        if (biome.is(MudSites.FLOODPLAIN)) {
+            return Zone.OXBOW;
+        }
+        return biome.is(RiverBankFeature.WATERS) ? Zone.PAN : Zone.UNKNOWN;
     }
 
     /** The zone of a spot in a world (by its biome there; the river's band from the world's own continentalness). */

@@ -120,6 +120,10 @@ and its loading speed, and touches the termite mound and tree surveys.
    across: pans shrink to fit the chunks), no stalls. Next: the user's look in a new world (step 7), then step 5.
 5. **Life in them:** algae; which animals may live there (fish and crocodiles in oxbows; pans with algae and snails,
    no catfish or crocodiles, my pick); every spawning change through the spawning check list in `CLAUDE.md`.
+   **Built 2026-11-22:** river zones `OXBOW` (old still waters' shares) and `PAN` (snails, bullfrogs, fly clouds only);
+   those three spawn in pans up to 24 over sea level; thin edge algae laid by the pan; 1 in 3 deep oxbows on the
+   hippos' stretches get a pod. Details in `docs/HISTORY.md`. Next: papyrus and hippo grass (the user's idea, 2026-11-22).
 6. **Check:** a survey test on real land (counts, sizes, depth, nothing in rivers or on mounds), the loading speed
    (`tools/flight.sh`), `worldgen,mound,trees,river` on 6 servers.
-7. **The user's look** in a new world.
+7. **The user's look** in a new world. **Done 2026-11-22: "they look great"** (after trim, don't refuse; the game first
+   would not load because of the bull shark's model file, fixed).

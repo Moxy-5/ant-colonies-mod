@@ -52,7 +52,7 @@ public final class RiverBed {
     public static boolean maySpawnAt(LevelAccessor level, BlockPos pos) {
         BlockPos bed = bedUnder(level, pos);
         int sea = level.getSeaLevel();
-        return bed != null && bed.getY() >= sea - 13 && bed.getY() <= sea + 6;
+        return bed != null && bed.getY() >= sea - 13 && bed.getY() <= sea + com.antcolonies.savanna.worldgen.RiverZones.HIGHEST_POOL;
     }
 
     /** A bed dweller the world spawned (not an egg or a command) is set down on the bed under where it was drawn. */

@@ -76,7 +76,7 @@ public class OxbowFeature extends Feature<NoneFeatureConfiguration> {
     }
 
     /** What was laid. */
-    public record Laid(BlockPos middle, Age age, int across, int deepest, int water, int neck, int kept) {
+    public record Laid(BlockPos middle, Age age, int across, int deepest, int water, int neck, int kept, BlockPos deep) {
     }
 
     /** What a world's oxbow or pan keeps off, column by column: termite mounds and tree feet (nothing in a test arena). */
@@ -116,8 +116,10 @@ public class OxbowFeature extends Feature<NoneFeatureConfiguration> {
             WHY.remove();
             Laid laid = lay(level, random, bounds, sea, 0, null, keepout);
             if (laid != null) {
-                SavannaMod.LOGGER.info("[world oxbows] {} oxbow at {} {}: {} across, {} deep, {} water blocks, neck {}, {}% of its lake kept", laid.age(),
-                        laid.middle().getX(), laid.middle().getZ(), laid.across(), laid.deepest(), laid.water(), laid.neck(), laid.kept());
+                int hippos = pod(level, random, laid, bounds, source.randomState().sampler());
+                SavannaMod.LOGGER.info("[world oxbows] {} oxbow at {} {}: {} across, {} deep, {} water blocks, neck {}, {}% of its lake kept{}", laid.age(),
+                        laid.middle().getX(), laid.middle().getZ(), laid.across(), laid.deepest(), laid.water(), laid.neck(), laid.kept(),
+                        hippos > 0 ? ", a pod of " + hippos + (hippos == 1 ? " hippo" : " hippos") : "");
                 return true;
             }
             why.merge(String.valueOf(WHY.get()), 1, Integer::sum);
@@ -244,6 +246,7 @@ public class OxbowFeature extends Feature<NoneFeatureConfiguration> {
         BlockState dirt = Blocks.DIRT.defaultBlockState();
         Map<Long, Integer> depths = new HashMap<>();
         int deepest = 0, waterBlocks = 0;
+        BlockPos deep = null;
         for (long key : kept) {
             int x = BlockPos.getX(key), z = BlockPos.getZ(key);
             Spot s = lake.get(key);
@@ -255,6 +258,10 @@ public class OxbowFeature extends Feature<NoneFeatureConfiguration> {
                 }
                 level.setBlock(new BlockPos(x, low - depth, z), RiverBankFeature.hash(x, z) < 0.45 ? mud : silt, Block.UPDATE_CLIENTS);
                 depths.put(key, depth);
+                if (depth > deepest || deep == null || depth == deepest && s.u() + s.along() < lake.get(BlockPos.asLong(deep.getX(), 0, deep.getZ())).u()
+                        + lake.get(BlockPos.asLong(deep.getX(), 0, deep.getZ())).along()) {
+                    deep = new BlockPos(x, low, z); // the deepest, most in the middle
+                }
                 deepest = Math.max(deepest, depth);
                 waterBlocks += depth;
             } else if (theAge == Age.SCAR) {
@@ -301,7 +308,7 @@ public class OxbowFeature extends Feature<NoneFeatureConfiguration> {
             }
         }
         holdWater(level, depths, low);
-        return new Laid(BlockPos.containing(cx, low, cz), theAge, got, deepest, waterBlocks, neck, keptShare);
+        return new Laid(BlockPos.containing(cx, low, cz), theAge, got, deepest, waterBlocks, neck, keptShare, deep);
     }
 
     /**
@@ -402,6 +409,29 @@ public class OxbowFeature extends Feature<NoneFeatureConfiguration> {
                 }
             }
         }
+    }
+
+    /** The share of deep oxbows (fresh or silting) on the hippos' stretches of river that hold a pod (my pick). */
+    static final float POD_SHARE = 1 / 3F;
+
+    /**
+     * Hippos in a deep oxbow (oxbows and pans step 5, 2026-11-22): real pods love oxbow lakes, quiet deep water off the
+     * current. On the hippos' stretches of river (near and mid inland, {@link RiverZones}), {@link #POD_SHARE} of the fresh
+     * and silting oxbows get a pod in their deepest water, laid and kept for good as the river's pods are
+     * ({@link HippoPodFeature#lay}, 1 to 3). How many hippos were laid.
+     */
+    static int pod(WorldGenLevel level, RandomSource random, Laid laid, int[] bounds, net.minecraft.world.level.biome.Climate.Sampler sampler) {
+        if (laid.deep() == null || laid.age() != Age.FRESH && laid.age() != Age.SILTING) {
+            return 0;
+        }
+        RiverZones.Zone zone = RiverZones.river(RiverZones.band(RiverBends.at(sampler.continentalness(), laid.deep().getX(), laid.deep().getZ())));
+        if (RiverZones.SHARES.get("hippo")[zone.ordinal()] <= 0 || random.nextFloat() >= POD_SHARE) {
+            return 0;
+        }
+        // the 16 by 16 columns round its deepest water, inside the chunks the feature may read (a hippo's spot reads its 3 by 3)
+        int x0 = Math.max(bounds[0] + 1, Math.min(bounds[2] - 16, laid.deep().getX() - 8));
+        int z0 = Math.max(bounds[1] + 1, Math.min(bounds[3] - 16, laid.deep().getZ() - 8));
+        return HippoPodFeature.lay(level, random, x0, z0, laid.deep().getY());
     }
 
     /** Why the last try on this thread laid nothing (for the log). */

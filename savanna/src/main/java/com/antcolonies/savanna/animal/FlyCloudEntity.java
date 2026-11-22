@@ -205,13 +205,13 @@ public class FlyCloudEntity extends Mob {
 
     /**
      * Where a cloud may spawn by itself: over shallow water (1 to {@link #SHALLOW} deep), or over the land within
-     * {@link #BANK} blocks of it, in the river animals' band of heights (13 under sea level to 6 over). Minecraft's
+     * {@link #BANK} blocks of it, from 13 under sea level up to the highest pans ({@link com.antcolonies.savanna.worldgen.RiverZones#HIGHEST_POOL}). Minecraft's
      * spawner draws one height in the column: any spot in the water there or the free block just over the top passes
      * ({@link #finalizeSpawn} sets the cloud up to its height).
      */
     public static boolean canSpawn(EntityType<FlyCloudEntity> type, LevelAccessor level, MobSpawnType reason, BlockPos pos, RandomSource random) {
         int sea = level.getSeaLevel();
-        if (pos.getY() < sea - 13 || pos.getY() > sea + 7) {
+        if (pos.getY() < sea - 13 || pos.getY() > sea + com.antcolonies.savanna.worldgen.RiverZones.HIGHEST_POOL + 1) {
             return false;
         }
         int top = surface(level, pos.getX() + 0.5, pos.getZ() + 0.5);

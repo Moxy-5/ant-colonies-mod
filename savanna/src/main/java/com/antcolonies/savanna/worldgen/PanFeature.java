@@ -240,13 +240,24 @@ public class PanFeature extends Feature<NoneFeatureConfiguration> {
                 clear(level, x, g, z);
             }
         }
+        // thin algae at the edge only: the cloudy water keeps the light out (the model viewer's pans)
+        for (long key : kept) {
+            int x = BlockPos.getX(key), z = BlockPos.getZ(key);
+            if (cells.edge().contains(key) && RiverBankFeature.hash(x + 1, z) < 0.25) {
+                BlockPos cell = new BlockPos(x, low - depths.get(key) + 1, z);
+                BlockState algae = SavannaBlocks.ALGAE.get().whole(com.antcolonies.savanna.block.AlgaeBlock.THIN);
+                if (level.getBlockState(cell).is(Blocks.WATER) && algae.canSurvive(level, cell)) {
+                    level.setBlock(cell, algae, Block.UPDATE_CLIENTS);
+                }
+            }
+        }
         wallow(level, random, depths, shoreLaid, low, tone);
         OxbowFeature.holdWater(level, depths, low);
         return new Laid(new BlockPos(cx, low, cz), want, unit.size() > 1, deepest, cells.ring(), waterBlocks, keptShare);
     }
 
     /** A pan's columns: water (with its depth), shore, trampled ring and the grazed land past it (blocks past the ring). */
-    record Cells(Map<Long, Integer> water, Map<Long, Double> shore, Map<Long, Double> trampled, Map<Long, Double> past, int ring) {
+    record Cells(Map<Long, Integer> water, java.util.Set<Long> edge, Map<Long, Double> shore, Map<Long, Double> trampled, Map<Long, Double> past, int ring) {
         /** Whether its water, shore and ring lie inside the chunks a feature may touch, a tree's foot to spare. */
         boolean fits(int[] bounds) {
             for (Map<Long, ?> part : List.of(water, shore, trampled)) {
@@ -264,6 +275,7 @@ public class PanFeature extends Feature<NoneFeatureConfiguration> {
     private static Cells cells(List<Lobe> unit, double r, double ringDice, int cx, int cz) {
         int ring = (int) Math.round(2 + r / 8 + 2 * ringDice);
         Map<Long, Integer> water = new HashMap<>();
+        java.util.Set<Long> rimWater = new java.util.HashSet<>();
         Map<Long, Double> shore = new HashMap<>(), trampled = new HashMap<>(), past = new HashMap<>();
         int reach = (int) Math.ceil(r * 2.2 + ring + GRAZED + 2);
         for (int x = cx - reach; x <= cx + reach; x++) {
@@ -286,6 +298,9 @@ public class PanFeature extends Feature<NoneFeatureConfiguration> {
                 long key = BlockPos.asLong(x, 0, z);
                 if (d < 0) {
                     water.put(key, depth);
+                    if (d > -2) {
+                        rimWater.add(key);
+                    }
                 } else if (d < 1.5) {
                     shore.put(key, d);
                 } else if (d < ring + 1.5) {
@@ -295,7 +310,7 @@ public class PanFeature extends Feature<NoneFeatureConfiguration> {
                 }
             }
         }
-        return new Cells(water, shore, trampled, past, ring);
+        return new Cells(water, rimWater, shore, trampled, past, ring);
     }
 
     /** A bank column's ground if the pan may lay its shore or ring there, else {@link Integer#MIN_VALUE}. */
