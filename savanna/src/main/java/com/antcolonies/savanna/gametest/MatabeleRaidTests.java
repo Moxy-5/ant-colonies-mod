@@ -457,6 +457,87 @@ public class MatabeleRaidTests {
     }
 
     /**
+     * BUGS 281: a scout finds termites feeding right beside its nest (under a log at the dead mound's foot, about 9
+     * blocks from the chimney) a step from the entrance, so its scent line home is the entrance and one step: nothing of it lies past the column's line start.
+     * The raid sets out all the same (it crashed the server, asking that line for 2 points), marches from the line's
+     * start to the find, stings the termites and comes home.
+     */
+    @GameTest(template = "arena", timeoutTicks = 9000, skyAccess = true, batch = "matabele_raids")
+    public static void aScoutThatFindsTermitesRightBesideItsNestLeadsARaidThere(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        level.getServer().tickRateManager().setTickRate(2000.0F);
+        TestScenes.shapeGround(helper, 45, (x, z) -> 0);
+        MatabeleScenes.deadMound(helper, NEST, NEST);
+        Colony colony = MatabeleScenes.colony(helper, NEST + 6, NEST, 20);
+        // (the log 5 blocks from the entrance, on the side away from the mound's middle; the first termite at the log's x + 1;
+        // the entrance's arena cell found by looking, as the game's relativePos does not undo a turned arena)
+        BlockPos center = colony.getCenter();
+        int[] door = null;
+        for (int x = 0; x <= 45 && door == null; x++) {
+            for (int z = 0; z <= 45; z++) {
+                BlockPos abs = helper.absolutePos(new BlockPos(x, SURFACE, z));
+                if (abs.getX() == center.getX() && abs.getZ() == center.getZ()) {
+                    door = new int[] {x, z};
+                    break;
+                }
+            }
+        }
+        helper.assertTrue(door != null, "the nest's entrance is not in the arena");
+        // (the entrance is the dead mound's chimney on its hump: the log goes on the open ground at the hump's foot, the
+        // first spot 4 or more blocks out along x with the log's 4 blocks all on bare ground)
+        int logX = -1;
+        StringBuilder row = new StringBuilder();
+        for (int x = door[0] + 3; x <= door[0] + 16 && logX < 0; x++) {
+            boolean bare = true;
+            for (int i = 0; i < 4; i++) {
+                BlockPos on = helper.absolutePos(new BlockPos(x + i, SURFACE, door[1]));
+                bare &= helper.getLevel().getBlockState(on).getCollisionShape(helper.getLevel(), on).isEmpty()
+                        && helper.getLevel().getFluidState(on).isEmpty();
+            }
+            row.append(' ').append(helper.getLevel().getBlockState(helper.absolutePos(new BlockPos(x, SURFACE, door[1]))).getBlock().getName().getString());
+            logX = bare ? x : -1;
+        }
+        helper.assertTrue(logX >= 0, "no bare ground for the log within 16 blocks of the entrance, the row:" + row);
+        SavannaMod.LOGGER.info("[raid test] beside the nest: the log {} blocks from the entrance", logX - door[0]);
+        List<TermiteWorkerEntity> termites = MatabeleScenes.feedingUnderALog(helper, logX, door[1]);
+        Raids raids = colony.part(SavannaParts.RAIDS).orElse(null);
+        helper.assertTrue(raids != null, "a Matabele colony has no raids part");
+        RaidColumn[] column = {null};
+        helper.startSequence()
+                .thenIdle(40)
+                .thenExecute(() -> {
+                    BlockPos entrance = colony.getCenter();
+                    MatabeleEntity scout = colony.population().realMembers(level).stream()
+                            .filter(ant -> ant instanceof MatabeleEntity matabele && matabele.hasMajorBody() && !raids.isScouting(ant.getUUID()))
+                            .map(ant -> (MatabeleEntity) ant)
+                            .findFirst().orElse(null);
+                    helper.assertTrue(scout != null, "no real major to be the scout");
+                    BlockPos at = termites.get(0).blockPosition();
+                    // (the scout's line, nest end first: the entrance and the step out where it smelt the termites)
+                    BlockPos step = entrance.offset(Integer.signum(at.getX() - entrance.getX()), 0, Integer.signum(at.getZ() - entrance.getZ()));
+                    List<BlockPos> trail = List.of(entrance, level.getHeightmapPos(
+                            net.minecraft.world.level.levelgen.Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, step));
+                    SavannaMod.LOGGER.info("[raid test] beside the nest: entrance {}, termites {} ({} out), the scout's line {}",
+                            entrance.toShortString(), at.toShortString(), Math.round(flat(entrance, at) * 10) / 10.0, trail);
+                    RaidColumn raid = raids.raidForTests(level, at, 2, trail, scout.getUUID());
+                    helper.assertTrue(raid != null, "no raid set out to termites beside the nest; " + raids.describe(level));
+                    helper.assertTrue(raid.leader().equals(scout.getUUID()), "the raid is not led by the find's scout");
+                    helper.assertTrue(flat(raid.gatheringPlace(), at) < flat(entrance, at),
+                            "the column's way out does not lead toward the termites: it gathers at " + raid.gatheringPlace().toShortString()
+                                    + ", the find " + at.toShortString());
+                    column[0] = raid;
+                    SavannaMod.LOGGER.info("[raid test] beside the nest, set out: {}", raids.describe(level));
+                })
+                .thenWaitUntil(() -> helper.assertTrue(column[0] != null && column[0].stage().ordinal() >= RaidColumn.Stage.ATTACKING.ordinal(),
+                        "the column did not reach the termites beside the nest; " + raids.describe(level)))
+                .thenWaitUntil(() -> helper.assertTrue(termites.stream().anyMatch(termite -> !termite.isAlive() || termite.isParalysed()),
+                        "no termite worker stung beside the nest; " + raids.describe(level)))
+                .thenWaitUntil(() -> helper.assertTrue(raids.column() == null, "the raid is not home yet; " + raids.describe(level)))
+                .thenExecute(() -> helper.assertTrue(column[0].cameHome() >= 1, "nobody came home with the column: " + column[0].endedWhy()))
+                .thenSucceed();
+    }
+
+    /**
      * Step 3c, the empty raid: a raid to a find where no termite is any more (the log is there, the termites gone) bunches
      * up and attacks nothing, spreads round the spot a while looking, then comes home empty; the find counts one empty
      * check. A raider crippled on the march (3 legs gone) leaves the column and limps home along the trail by itself;

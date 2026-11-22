@@ -433,10 +433,17 @@ public final class RaidColumn implements com.antcolonies.fight.FightDiary {
         // entrance itself (a dead mound's open chimney: a place there is in the air over the hole, BUGS 87).
         // R4: the line is the scent trail on the ground (the scout's line, or a column's trail walked before).
         List<BlockPos> trail = new ArrayList<>(this.trail.points());
-        BlockPos start = lineStart(level, colony.getCenter(), trail.isEmpty() ? find.at() : trail.get(trail.size() - 1), trail);
+        // BUGS 281: with no point of the line 2 blocks out, the start is aimed at the find itself (the line's last point
+        // is then only where the scout stood when it smelt the termites, near the nest).
+        BlockPos start = lineStart(level, colony.getCenter(), find.at(), trail);
         double startOut = flat(start, colony.getCenter());
         trail.removeIf(p -> flat(p, colony.getCenter()) < Math.max(1.5, startOut + 0.5));
         trail.add(0, start);
+        if (trail.size() < 2) {
+            // BUGS 281: a scout that smelt termites right beside the nest comes home with a line of a point or two by
+            // the entrance, all removed above: the march is the start to the find (it crashed asking the line for 2).
+            trail.add(find.at());
+        }
         // The gathering place: the last point of the scent line at least stop_short from the find.
         int gather = 0;
         for (int i = 0; i < trail.size(); i++) {
