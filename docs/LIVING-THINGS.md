@@ -130,7 +130,7 @@ Every living thing in the mod, built or planned, plants and fungi included, in o
 - River algae (look C, strands bitten off): BUILT.
 - Blue and black grama grass (harvester seed food, plains and badlands): BUILT.
 - Dry savanna grass ("Dry Grass" block, termite food, bare patches regrowing): BUILT.
-- Reeds and papyrus (cover for fish, floodplain reedbeds): IDEA.
+- Papyrus (stands 3 to 5 tall in shallow still water: oxbows and slow river stretches) and hippo grass (a floating fringe along slow banks and oxbows; hippos nibble it): PLANNED (the user, 2026-11-22; `docs/plans/papyrus-and-hippo-grass.md`). Reeds: IDEA.
 - Elephant grass (very tall grass, 2 to 4 m, of the wetter savanna and floodplain; cover for animals): IDEA (user's list 2026-11-16).
 - Water lilies on lagoons and oxbows: IDEA (big floodplains).
 - Desert wildflower, refuse-pile gardens round ant nests: IDEA (custom plants list).
