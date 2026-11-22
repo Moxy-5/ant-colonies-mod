@@ -92,6 +92,8 @@ public final class TailDrag {
     private final int n;
     /** Each piece's length, each joint's height over flat ground at rest, and the least it lies over the ground (model pixels; the joint at a piece's far end). */
     private final double[] lengthPx, restPx, lowestPx;
+    /** The root's own height over flat ground at rest (model pixels); NaN: not known (no ceiling from the root). */
+    private final double rootPx;
     /** The joints in the world, the base first (blocks). */
     private final double[] x, y, z;
     /** Each joint's sideways bend from this frame's drag (degrees; a scratch row). */
@@ -106,6 +108,15 @@ public final class TailDrag {
      * @param lowestPx the least each piece's far end lies over the ground: its own thickness (model pixels)
      */
     public TailDrag(double[] lengthPx, double[] restPx, double[] lowestPx) {
+        this(lengthPx, restPx, lowestPx, Double.NaN);
+    }
+
+    /**
+     * @param rootPx the root's own height over flat ground at rest (model pixels): over ground, no joint aims higher
+     *               than the root now carries it ({@link #update}); NaN for none
+     */
+    public TailDrag(double[] lengthPx, double[] restPx, double[] lowestPx, double rootPx) {
+        this.rootPx = rootPx;
         n = lengthPx.length;
         if (restPx.length != n || lowestPx.length != n) {
             throw new IllegalArgumentException("a length, a rest height and a lowest height for each piece");
@@ -234,6 +245,13 @@ public final class TailDrag {
             // (no higher than a little over the hips, as it lies swimming at the surface: an animal swimming under, hiding after a scare, keeps its
             // tail down with it; floated to the surface, the tail zig-zagged up from the sunk hips and snapped, 2026-11-19)
             double rest = Double.isNaN(wet) ? Math.min(under, home) + restPx[i - 1] * perBlock : Math.min(wet, by + 0.25 * lengthPx[0] * perBlock);
+            // (over ground, no higher than the root now carries it: as far under the root as at rest. The hips sinking
+            // over a bank's lip into the water, the base pieces stayed at their rest height over the bank and the tail
+            // arched up from its own root, 2026-11-22. On flat ground and climbing the root is at or over its rest
+            // height, so this never holds a joint lower there.)
+            if (Double.isNaN(wet) && !Double.isNaN(rootPx)) {
+                rest = Math.min(rest, by - (rootPx - restPx[i - 1]) * perBlock);
+            }
             double height = Math.max(y[i] + (rest - y[i]) * k, floor);
             // (after a piece the ground raised, this one may fold back down over the top)
             // (and with the hips tipped nose down, holding its root up, the root may bend down twice as far)

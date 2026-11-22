@@ -628,16 +628,21 @@ public class MonitorEntity extends PathfinderMob implements GeoEntity, HasLife {
 
     /**
      * Going into the water off the bank at {@code face} (its top at {@code y}): the bank under both forefeet a whole
-     * block, and past the edge for two blocks, under both feet and the middle, still water at its height for the move
+     * block (walking in, all the way back to where the move starts), and past the edge for two blocks, under both feet and the middle, still water at its height for the move
      * (the water's block's top level with the bank, or one or two blocks lower) with open air over it up to over the bank.
      */
     private boolean roomToEnter(int move, int y, boolean alongX, double face, int sign, double across, double scale) {
         double out = CLIMB_FEET_OUT * scale / 16.0;
         int drop = move == DROP ? 1 : move == DROP2 ? 2 : 0;
+        // walking in, it walks on along the bank from its start, about two blocks back from the edge (2026-11-22):
+        // the bank level and whole for all of it; the other moves start at the edge
+        double back = move == IN ? MOVES.move(move).aheadPx * scale / 16.0 : 0.5;
         for (double side : new double[] {across - out, across, across + out}) {
-            BlockPos top = climbCell(alongX, face - 0.5 * sign, side, y - 1);
-            if (!level().getBlockState(top).isCollisionShapeFullBlock(level(), top) || !dryOpen(top.above())) {
-                return false;
+            for (double behind = 0.5; behind < back + 0.5; behind += 1.0) {
+                BlockPos top = climbCell(alongX, face - behind * sign, side, y - 1);
+                if (!level().getBlockState(top).isCollisionShapeFullBlock(level(), top) || !dryOpen(top.above())) {
+                    return false;
+                }
             }
             for (double ahead : new double[] {0.5, 1.5}) {
                 BlockPos water = climbCell(alongX, face + ahead * sign, side, y - 1 - drop);

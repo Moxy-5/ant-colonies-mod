@@ -687,7 +687,7 @@ def water_scene(kind, B):
     if kind in ('out', 'outup'):
         return {'kind': kind, 'edge': -(WATER_FACE_UP if kind == 'outup' else WATER_FACE), 'land_ahead': True, 'top': B if kind == 'outup' else 0.0,
                 'surface': s0, 'bottom': -B, 'float': s0 - WATER_FLOAT}
-    return {'kind': kind, 'edge': -WATER_EDGE, 'land_ahead': False, 'top': 0.0, 'surface': s0 - h * B, 'bottom': -(h + 1) * B,
+    return {'kind': kind, 'edge': -(IN_EDGE if kind == 'in' else WATER_EDGE), 'land_ahead': False, 'top': 0.0, 'surface': s0 - h * B, 'bottom': -(h + 1) * B,
             'float': s0 - h * B - WATER_FLOAT}
 
 
@@ -714,38 +714,7 @@ def _water_keys(kind, B, size):
     F, ze = sc['float'], sc['edge']
     glide = px_per_tick(GLIDE, size)
     if kind == 'in':
-        # Walking in off a level bank: it stops with its fore claws at the edge and dips its head to the water (a flick of
-        # the tongue on it), walks on: each forefoot steps to the lip, reaches out and down into the water, finds no
-        # bottom and sweeps back along the body, folding; the chest slides into the water while the hips still walk on
-        # the bank, the hind legs crouching so the belly slides over the lip; the hind feet push off the edge and fold,
-        # the hips settle, it floats level and glides on, the tail's swimming wave easing in. 4.4 s.
-        return {
-            # (the hips stay over the lip until the folded hind feet, trailing 12 px behind the hip joint, are past it)
-            'hips_z': ((0.9, -4.0), (1.6, -11.0), (2.3, -19.5), (3.0, -28.5), (3.6, -36.5), (4.1, -43.0), (4.5, -48.5),
-                       (5.0, -55.5), (6.3, -55.5 - 1.3 * glide)),
-            'hips_z_end': -glide,
-            'hips_y': ((0.9, 10.5), (1.8, 9.6), (2.5, 8.2), (3.0, 6.4), (3.6, 4.8), (4.1, 3.2), (4.5, 1.6), (4.85, F + 11.2),
-                       (5.0, F + 10.5)),
-            'rear': ((0.0, 0.0), (0.9, 0.0), (1.8, -3.0), (2.5, -9.0), (3.0, -14.0), (3.6, -12.0), (4.1, -9.0), (4.5, -5.0),
-                     (4.85, -1.0), (5.0, 0.0)),
-            'bend': ((0.9, 0.0), (1.6, 6.0), (2.2, 17.0), (2.7, 20.0), (3.1, 10.0), (3.6, 2.0), (4.1, -3.0), (4.6, 0.0)),
-            'neck': ((0.0, 18.0), (0.35, -8.0), (0.85, -8.0), (1.4, 10.0), (2.4, 6.0), (3.4, 12.0), (5.0, 18.0)),
-            'head': ((0.0, -2.0), (0.35, -36.0), (0.85, -34.0), (1.4, -10.0), (2.4, -6.0), (3.4, -2.0)),
-            'flicks': (0.4,),
-            ('arm', 'left'): ((10.8, 2.3, -25.0), (0.95, 1.3, (10.8, 2.3, -28.0)), (1.5, 1.9, (11.0, -3.0, -35.0))),
-            ('arm', 'right'): ((-10.8, 2.3, -25.0), (1.15, 1.5, (-10.8, 2.3, -28.5)), (1.75, 2.15, (-11.0, -3.5, -36.5))),
-            ('leg', 'left'): ((11.8, 2.6, -2.6), (1.2, 1.5, (11.8, 2.6, -11.5)), (1.9, 2.2, (11.8, 2.6, -20.5)),
-                              (2.6, 2.9, (11.8, 2.6, -28.0))),
-            ('leg', 'right'): ((-11.8, 2.6, -2.6), (1.0, 1.3, (-11.8, 2.6, -9.5)), (1.7, 2.0, (-11.8, 2.6, -18.5)),
-                               (2.4, 2.7, (-11.8, 2.6, -27.0))),
-            'hang': {('arm', 'left'): ((2.2, 0.0), (2.7, 1.0)), ('arm', 'right'): ((2.45, 0.0), (2.95, 1.0)),
-                     ('leg', 'left'): ((3.5, 0.0), (4.0, 1.0)), ('leg', 'right'): ((3.35, 0.0), (3.85, 1.0))},
-            'fold': {('arm', 'left'): ((4.5, 0.0), (5.4, 1.0)), ('arm', 'right'): ((4.7, 0.0), (5.6, 1.0)),
-                     ('leg', 'left'): ((5.1, 0.0), (6.2, 1.0)), ('leg', 'right'): ((5.0, 0.0), (6.1, 1.0))},
-            'swim': (5.0, 6.3, 'in'),
-            'knees': KNEES, 'elbows': ELBOWS,
-            'length': 6.3,
-        }
+        return _walk_in_keys(B, size)
     if kind == 'dash':
         # Running in (scared): no stop; it runs off the edge, plunging head first, the forelegs sweeping back at once,
         # the hind legs giving a last shove off the lip and folding, the body following its head under the surface and
@@ -915,6 +884,202 @@ def _water_keys(kind, B, size):
     }
 
 
+# --- walking into the water off a level bank (remade from scratch 2026-11-22, the user: "curve down into the water
+# without his back cutting, without him going into swimming form, and as he goes into the water he gradually goes into
+# swimming form once he's about fully in") -----------------------------------------------------------------------------
+# The old walk-in bent the back at its three trunk joints by keys of its own while the hips stayed up on the bank: the
+# back broke into a step at the waist, then the hips dropped in at the end. The new starting idea in one sentence: **the
+# trunk is laid along one smooth curve, its middle line on the bank, over the lip and level afloat, piece by piece, so the
+# bend runs back along the body as it walks over the edge (a snake over a ledge), never a kink at one joint.** It walks
+# on without stopping, each foot stepping as the walk steps until its next step would land past the lip; then that foot
+# lets go and hangs; the legs fold for swimming and the swim's wave eases in only once the hips are in. Every number my
+# pick. The tail is the game's (dragged, TailDrag): it slides off the lip after the hips.
+IN_EDGE = 50.0              # the bank's edge this far ahead of where it starts (px): level, a stride on the bank before the curve
+# The course in three parts (my picks): level on the bank; easing down over IN_LEAD so the belly is just over the lip
+# (the middle line IN_LIP over the bank, the belly 5 px under it) as the body crosses it; curving down over IN_DIVE to
+# afloat. Its steepest about 21 degrees. (Curving down from standing height at the lip, the hips stayed up in the air
+# after the hind legs let go, tipped nose down, and the dragged tail fell away behind them in a peak: the first film,
+# 2026-11-22. With the belly on the lip, the lip carries the hips as they slide over it.)
+IN_LEAD, IN_LIP, IN_DIVE = 22.0, 6.6, 36.0
+STROLL = 0.031              # its calm walk (blocks a tick, MonitorEntity's stroll): it walks in at this, glides off at GLIDE
+FOOT_ON = 4.5               # a foot's wrist or ankle lands at least this far back from the lip (its claws on the bank)
+RELEASE = 3.0               # the last foot on the bank lets go this much further behind its girdle than a walking step (px)
+# The walk's gait (the walk clip's own, shared with it): a lizard's trot, each foot planted this share of the stride,
+# landing and leaving at these places along the body (px) and lifted this high; when each foot steps (share of a stride)
+WALK_DUTY = 0.62
+WALK_REACH = {'arm': (-27.0, -18.5, 2.5), 'leg': (-7.0, 1.5, 3.0)}
+WALK_PHASES = {('arm', 'left'): 0.0, ('leg', 'right'): 0.05, ('arm', 'right'): 0.5, ('leg', 'left'): 0.55}
+
+
+def _hermite(u, a, b, ma, mb):
+    """The cubic from a to b over u = 0 to 1, leaving a at slope ma and reaching b at slope mb (per whole u)."""
+    return (a * (2 * u ** 3 - 3 * u ** 2 + 1) + ma * (u ** 3 - 2 * u ** 2 + u) + b * (-2 * u ** 3 + 3 * u ** 2)
+            + mb * (u ** 3 - u ** 2))
+
+
+def _in_course(B):
+    """The walk-in's course for the trunk's middle line (the bend pivot's height, BODY_PIVOT): level on the bank, curving
+    down over the lip and level again afloat. Returns at(s): the point (z, y) at s px along it (forward), s = 0 where the
+    pivot stands at the start."""
+    sc = water_scene('in', B)
+    top, low, ze = BODY_PIVOT[1], sc['float'] + BODY_PIVOT[1], sc['edge']
+    # (each part a cubic easing from one slope to the next: level, the lip's slope, level; the lip's slope the harmonic
+    # mean of the two parts' average slopes, so neither part overshoots)
+    s1, s2 = (top - IN_LIP) / IN_LEAD, (IN_LIP - low) / IN_DIVE
+    m = 2.0 * s1 * s2 / (s1 + s2)
+
+    def height(z):
+        d = ze + IN_LEAD - z                         # how far past the start of the lead (px, forward)
+        if d <= 0.0:
+            return top
+        if d < IN_LEAD:
+            return _hermite(d / IN_LEAD, top, IN_LIP, 0.0, -m * IN_LEAD)
+        d -= IN_LEAD
+        if d < IN_DIVE:
+            return _hermite(d / IN_DIVE, IN_LIP, low, -m * IN_DIVE, 0.0)
+        return low
+    zs, ys, ss = [], [], []
+    z = BODY_PIVOT[2] + 40.0
+    while z > ze - IN_DIVE - 260.0:
+        zs.append(z)
+        ys.append(height(z))
+        ss.append(0.0 if len(ss) == 0 else ss[-1] + math.hypot(z - zs[-2], ys[-1] - ys[-2]))
+        z -= 0.25
+    s0 = ss[min(range(len(zs)), key=lambda i: abs(zs[i] - BODY_PIVOT[2]))]
+    ss = [s - s0 for s in ss]
+
+    def at(s):
+        if s <= ss[0]:
+            return zs[0] - (ss[0] - s), ys[0]
+        lo, hi = 0, len(ss) - 1
+        if s >= ss[hi]:
+            return zs[hi] - (s - ss[hi]), ys[hi]
+        while hi - lo > 1:
+            mid = (lo + hi) // 2
+            lo, hi = (mid, hi) if ss[mid] <= s else (lo, mid)
+        f = (s - ss[lo]) / (ss[hi] - ss[lo])
+        return zs[lo] + (zs[hi] - zs[lo]) * f, ys[lo] + (ys[hi] - ys[lo]) * f
+    return at
+
+
+def _pitch(a, b):
+    """The pitch (degrees, nose up) of the line from a back to b ahead, both (z, y) with forward as -z."""
+    return math.degrees(math.atan2(b[1] - a[1], a[0] - b[0]))
+
+
+def _trunk_on(at, sp):
+    """The trunk laid along the course with its bend pivot sp px along it: each piece (hips, waist, ribs, chest) turned
+    to the chord between its ends on the course, each joint turned on its outer edge as the game turns it (as _trunk).
+    Returns (rear, the body's turn and move, each front piece's clip turn, the pieces' places as _trunk gives them)."""
+    ends = (BODY_Z[1], BODY_PIVOT[2], TRUNK_JOINTS[0], TRUNK_JOINTS[1], BODY_Z[0])    # back to front
+    pts = [at(sp + BODY_PIVOT[2] - z) for z in ends]
+    pitches = [_pitch(a, b) for a, b in zip(pts, pts[1:])]
+    # (the hips are one long piece: laid on its chord, the whole of the course's bend over its length fell on the waist,
+    # an 18 degree crease; tipped half way to the course's own slope at the pivot, the rest goes to the dragged tail)
+    # (tipped about its back end, which stays on the course: tipped about the pivot, the tail's root rose a pixel and a
+    # half over the bank, a little peak at the hips with the tail sloping down from it)
+    pitches[0] = 0.5 * pitches[0] + 0.5 * _pitch(at(sp - 1.5), at(sp + 1.5))
+    rear = pitches[0]
+    bm = euler([-rear, 0.0, 0.0])
+    a = math.radians(rear)
+    q = (pts[0][0] - (BODY_Z[1] - BODY_PIVOT[2]) * math.cos(a), pts[0][1] + (BODY_Z[1] - BODY_PIVOT[2]) * math.sin(a))
+    bd = [0.0, q[1] - BODY_PIVOT[1], q[0] - BODY_PIVOT[2]]
+    M, t = bm, vadd(vsub(BODY_PIVOT, mat_vec(bm, BODY_PIVOT)), bd)
+    turns, places = {}, [(M, t)]
+    for (name, z, _), before, now in zip(TRUNK_HINGES, pitches, pitches[1:]):
+        b = before - now                             # (nose down, as the clip turns it)
+        turns[name] = b
+        c = [0.0, BODY_TOP if b > 0 else BODY_BOTTOM, z]
+        R = euler([b, 0.0, 0.0])
+        t = vadd(mat_vec(M, vsub(c, mat_vec(R, c))), t)
+        M = mat_mul(M, R)
+        places.append((M, t))
+    return rear, bm, bd, turns, places, pitches[-1]
+
+
+def _walk_in_keys(B, size):
+    """The walk-in's course (keys as _water_keys gives them, its trunk as a function of time: see the section's top)."""
+    sc = water_scene('in', B)
+    ze = sc['edge']
+    at = _in_course(B)
+    v0, v1 = px_per_tick(STROLL, size), px_per_tick(GLIDE, size)      # (px a second)
+    # when it is about fully in: the hips' back end (the tail's root) four fifths of the way down the curve
+    s_in = (BODY_PIVOT[2] - ze) + 0.8 * IN_DIVE + (BODY_Z[1] - BODY_PIVOT[2])
+    t_f = s_in / v0
+    fold = 1.3                                       # the legs folding, and the swim easing in, over this long (s)
+    length = round((t_f + fold + 0.15) / 0.05) * 0.05
+
+    def travel(t):                                   # how far along the course the pivot has come (its speed eases
+        u = min(1.0, t / length)                     # from the stroll to the glide)
+        return v0 * t + (v1 - v0) * length * (u * u * u - 0.5 * u ** 4) if t <= length else travel(length) + v1 * (t - length)
+
+    def trunk(t):
+        return _trunk_on(at, travel(t))
+
+    def girdle(t, kind):
+        """The shoulder or hip joint's place along (z) at time t."""
+        rear, bm, bd, turns, places, _ = trunk(t)
+        S = LEG_PLANS[kind]['joints'][0]
+        if kind == 'arm':
+            M, tr = places[-1]
+            return vadd(mat_vec(M, list(S)), tr)[2]
+        return vadd(vadd(mat_vec(bm, vsub(list(S), BODY_PIVOT)), BODY_PIVOT), bd)[2]
+
+    # the feet: the walk's own steps (its places and rhythm, at the stroll), each foot stepping until its next step would
+    # land past the lip (its claws over the water): there it lifts and lets go, hanging
+    keys = {}
+    for kind in ('arm', 'leg'):
+        front, back, _ = WALK_REACH[kind]
+        S, _, W = LEG_PLANS[kind]['joints']
+        T = (back - front) / (v0 * WALK_DUTY)
+        for s, side in ((1, 'left'), (-1, 'right')):
+            plan = [((s * W[0], W[1], W[2]),)]
+            k, hang = 0, None
+            first = ((WALK_PHASES[(kind, side)] + WALK_DUTY) % 1.0) * T
+            while True:
+                lift = first + k * T
+                land = lift + (1.0 - WALK_DUTY) * T
+                # (no further than the lip: a last short step up to it; a foot already there, or with less than a
+                # small step left, lets go and hangs instead, its girdle by then over the lip or near it)
+                z = max(girdle(land, kind) + (front - S[2]), ze + FOOT_ON)
+                if z > plan[-1][-1][2] - 2.0 or land > t_f:
+                    hang = lift
+                    break
+                plan.append((lift, land, (s * W[0], W[1], z)))
+                k += 1
+            # the last foot on the bank lets go once its girdle has gone on past it as far as a walking step leaves it
+            # behind, and a little more (a push off the lip): not at the walk's next beat, which after a short last step
+            # held a hind foot stretched straight past its reach until its knee flipped; nor sooner, when a forefoot's
+            # toes went down past the lip's top corner with its shoulder still over the bank
+            hang = plan[-1][1] if len(plan) > 1 else 0.0
+            while plan[-1][-1][2] - girdle(hang, kind) < back - S[2] + RELEASE and hang < t_f:
+                hang += 0.05
+            keys[(kind, side)] = (plan[0][0],) + tuple(plan[1:])
+            keys.setdefault('hang', {})[(kind, side)] = ((hang, 0.0), (hang + 0.55, 1.0))
+            # folding for swimming once it is about fully in: the forelegs first, the left a touch ahead
+            f0 = t_f - (0.35 if kind == 'arm' else 0.0) + (0.0 if side == 'left' else 0.1)
+            keys.setdefault('fold', {})[(kind, side)] = ((f0, 0.0), (f0 + fold - 0.1, 1.0))
+
+    def neck(t):
+        """Where the neck points (degrees above level): its rest lift, dipping with the course ahead of the chest."""
+        sp = travel(t)
+        n = sp + BODY_PIVOT[2] - BODY_Z[0] + 0.5 * NECK_LEN
+        return 18.0 + 0.8 * _pitch(at(n - 2.0), at(n + 2.0)) * _ease(min(1.0, t / 0.5))
+
+    def head(t):
+        """The head's own angle (degrees above level): a little nose down at rest, looking down the course ahead."""
+        sp = travel(t)
+        h = sp + BODY_PIVOT[2] - BODY_Z[0] + NECK_LEN + 0.5 * HEAD_LEN
+        return -2.0 + 0.8 * _pitch(at(h - 3.0), at(h + 3.0)) * _ease(min(1.0, t / 0.5))
+
+    # letting go: a forefoot reaches on forward over the lip and down into the water, feeling for the bottom (hanging
+    # straight down it dangled down the bank's face like a stick); a hind foot trails back, kicking off the lip
+    # (in, up, back from standing (px), the toes' droop; my picks)
+    hang_at = {'arm': ((1.5, -0.5, -2.5), -40.0), 'leg': ((1.5, 1.5, 4.0), -55.0)}    # (6 px ahead was out of reach)
+    return {**keys, 'trunk': trunk, 'hang_at': hang_at, 'neck': neck, 'head': head, 'flicks': (0.3,),
+            'swim': (t_f - 0.35, length, 'in'), 'knees': KNEES, 'elbows': ELBOWS, 'length': length}
+
+
 TOES_OUT = {'arm': 80.0, 'leg': 95.0}    # half way through a fold the foot lies flat, toes this far round out to the side
 
 
@@ -936,10 +1101,10 @@ ELBOWS = 0.5    # my pick: and the elbows (reaching forward past the shoulder in
 HANG = {'arm': ((1.0, 1.5, 2.5), -55.0), 'leg': ((1.5, 2.5, 0.0), -65.0)}  # my picks: in, up, back (px); toes down
 
 
-def _hang_leg(L):
+def _hang_leg(L, at=None):
     """Where a leg hanging loose in the water has its wrist or ankle, and its foot's turn (on the body's axes): a little
-    in, up and back from standing, the toes drooping."""
-    (dx, dy, dz), toes = HANG[L['kind']]
+    in, up and back from standing, the toes drooping (or as a move's own 'hang_at' has it, by leg kind)."""
+    (dx, dy, dz), toes = (at or HANG)[L['kind']]
     w = L['W']
     return [w[0] - L['s'] * dx, w[1] + dy, w[2] + dz], mat_mul(L['foot'], turn_x(toes))
 
@@ -999,13 +1164,22 @@ def water_move(kind, size, swim_table, swim_leg, flick, log=None):
     def pose(t):
         P.now = t
         p = {}
-        rear, bend = _spline(t, keys['rear']), _spline(t, keys['bend'])
-        hy = _spline(t, keys['hips_y'])
-        hz = _spline(t, keys['hips_z'], keys.get('hips_z_start', 0.0), keys.get('hips_z_end', 0.0))
-        bm, bd, turns, places = _trunk(rear, bend, hy, hz)
-        lift = _water_clearance(places, sc)
-        if lift > 0.0:
-            bm, bd, turns, places = _trunk(rear, bend, hy + lift, hz)
+        if 'trunk' in keys:              # (the walk-in: the trunk laid along its course)
+            rear, bm, bd, turns, places, chest_up = keys['trunk'](t)
+            lift = _water_clearance(places, sc)
+            marks['lift'] = max(marks.get('lift', 0.0), lift)
+            if lift > 0.0:
+                bd = [bd[0], bd[1] + lift, bd[2]]
+                places = [(M, vadd(tr, [0.0, lift, 0.0])) for M, tr in places]
+        else:
+            rear, bend = _spline(t, keys['rear']), _spline(t, keys['bend'])
+            hy = _spline(t, keys['hips_y'])
+            hz = _spline(t, keys['hips_z'], keys.get('hips_z_start', 0.0), keys.get('hips_z_end', 0.0))
+            bm, bd, turns, places = _trunk(rear, bend, hy, hz)
+            lift = _water_clearance(places, sc)
+            if lift > 0.0:
+                bm, bd, turns, places = _trunk(rear, bend, hy + lift, hz)
+            chest_up = rear - bend
         p['body'] = {'rotation': [round(-rear, 3), 0.0, 0.0], 'position': [0.0, 0.0, 0.0]}
         for name, b in turns.items():
             p[name] = {'rotation': [round(b, 3), 0.0, 0.0]}
@@ -1058,18 +1232,32 @@ def water_move(kind, size, swim_table, swim_leg, flick, log=None):
                 if hangs:
                     # a leg that has lost the bottom hangs loose under the body, its toes drooping, and only folds
                     # for swimming a while after (folded at once the feet swung up over the back, the user's ask)
-                    hw, hf = _hang_leg(L)
+                    hw, hf = _hang_leg(L, keys.get('hang_at'))
                     # (off the lip forward and out first, then down: straight down to it the foot went through the
                     # bank's edge)
                     h, hz, hy = _ease(hang), _ease(min(1.0, hang / 0.6)), _ease(max(0.0, (hang - 0.25) / 0.75))
                     wb = [wb[0] + (hw[0] - wb[0]) * hz, wb[1] + (hw[1] - wb[1]) * hy, wb[2] + (hw[2] - wb[2]) * hz]
                     # (turned only once off the ground or the face: turned on it, the toes swung through it)
-                    fb = _slerp_turn(fb, hf, _ease(min(1.0, max(0.0, (hang - 0.4) / 0.6))))
+                    droop = _ease(min(1.0, max(0.0, (hang - 0.4) / 0.6)))
+                    w = vadd(vadd(mat_vec(fm, vsub(wb, BODY_PIVOT)), BODY_PIVOT), fd)
+                    if 'trunk' in keys:
+                        # (the walk-in: the toes droop only once the wrist is out past the bank's face; drooped over
+                        # the lip they went 2.3 px into its top corner, 2026-11-22)
+                        droop *= _ease(min(1.0, max(0.0, (sc['edge'] - w[2] - 1.0) / 5.0)))
+                        # (lifting off a little first, as it lets go: lifted 5 px a forefoot rose over its crouching
+                        # shoulder, claws in the air, 2026-11-22)
+                        h = max(droop, 0.4 * _ease(min(1.0, hang / 0.35)))
+                    fb = _slerp_turn(fb, hf, droop)
                     # never under the ground it is still over (a foot letting go lifts off first): the wrist kept its
                     # standing height over the bank's top or the bottom, more as the toes droop
-                    w = vadd(vadd(mat_vec(fm, vsub(wb, BODY_PIVOT)), BODY_PIVOT), fd)
                     # (its toes too, ahead of it, when it is up near a ledge's top: low against a face it keeps off it)
                     under, ahead = scene_floor(sc, w[2]), scene_floor(sc, w[2] - 6.0)
+                    if 'trunk' in keys:
+                        # (the walk-in: the foot kept off the bank's top until its heel too is well out past the lip,
+                        # the guard easing off over 10 px: a guard that let go at once dropped the foot in a frame,
+                        # and over 6 px a forefoot sweeping forward crossed it in two frames and its arm snapped over)
+                        k = _ease(min(1.0, max(0.0, (sc['edge'] - w[2] - 4.0) / 10.0)))
+                        under = sc['top'] + (sc['bottom'] - sc['top']) * k
                     least = (ahead if ahead > under and w[1] > ahead - 8.0 else under) + 2.3 + 5.0 * h
                     if w[1] < least:
                         w[1] = least
@@ -1096,8 +1284,8 @@ def water_move(kind, size, swim_table, swim_leg, flick, log=None):
                 P.leg(leg_p, L, fm, fd, wrist, foot_m, curl=18 * up * flat_ish, way=bend_way)
             p.update(leg_p)
             folded[side] = fold
-        chest_up = rear - bend
-        neck_up, head_up = _ramp(t, keys['neck']), _ramp(t, keys['head'])
+        neck_up = keys['neck'](t) if callable(keys['neck']) else _ramp(t, keys['neck'])
+        head_up = keys['head'](t) if callable(keys['head']) else _ramp(t, keys['head'])
         x = chest_up + 18.0 - neck_up
         for (bone, share), ex in zip((('neck1', 0.55), ('neck2', 0.45), ('head', 0.0)), (0.0, 0.0, neck_up - 20.0 - head_up)):
             p[bone] = {'rotation': [round(share * x + ex, 3), 0.0, 0.0]}
@@ -1238,9 +1426,7 @@ def clips():
     # side with the stride, bringing each shoulder forward as its foot reaches; the neck turns against the swing so the
     # head stays nearly steady, and a wave runs down the tail.
     P = _Poser()
-    phases = {('arm', 'left'): 0.0, ('leg', 'right'): 0.05, ('arm', 'right'): 0.5, ('leg', 'left'): 0.55}
-    reach = {'arm': (-27.0, -18.5, 2.5), 'leg': (-7.0, 1.5, 3.0)}      # where the foot lands, leaves, how high it lifts
-    duty = 0.62
+    phases, reach, duty = WALK_PHASES, WALK_REACH, WALK_DUTY     # (where each foot lands, leaves, how high it lifts)
 
     def walk(t):
         p = {}
@@ -1597,7 +1783,7 @@ def move_specs():
     for kind in WATER_KINDS:
         out = kind in ('out', 'outup')
         specs.append({'name': 'out_up' if kind == 'outup' else kind, 'clip': lambda s, k=kind: water_name(k, s),
-                      'ahead_px': WATER_FACE_UP if kind == 'outup' else WATER_FACE if kind == 'out' else WATER_EDGE,
+                      'ahead_px': WATER_FACE_UP if kind == 'outup' else WATER_FACE if kind == 'out' else IN_EDGE if kind == 'in' else WATER_EDGE,
                       'starts_afloat': out, 'ends_afloat': not out, 'goes_down': not out,
                       'end_level': 1 if kind == 'outup' else 0})
     return specs

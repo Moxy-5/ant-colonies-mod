@@ -22,7 +22,7 @@ bite and eyelids stay. Fun and good-looking first (it is an animal). Every numbe
 - Six moves (`WATER_KINDS`):
   | move | when | length | notes |
   |---|---|---|---|
-  | `in` | walking into water off a level bank | 6.3 s | looks down (a tongue flick), forefeet reach into the water and hang, the chest slides in, the hind feet push off the lip and hang, it floats and glides, the legs fold over 5.0-6.2 s |
+  | `in` | walking into water off a level bank | 6.5 s | **remade 2026-11-22** (see "The walk-in remade"): the body bends down one smooth course into the water, the legs walk on until each pair loses the lip, hang, then fold once it is about fully in |
   | `dash` | running in (speed over `DASH_SPEED`) | 1.9 s | no stop: forefeet reach out, the body drops in past the edge, legs hang, fold from 0.9 s |
   | `drop` | a bank a block over the water's block | 5.1 s | the climb down's course (confirmed) until the forefeet reach the water; they hang, the chest slides in, the hind feet come down the face and let go |
   | `drop2` | two blocks over | 4.6 s | **a dive** (my pick: hanging down a face twice its height looked wrong; monitors drop into water off banks and branches): looks down, forefeet on the lip, crouches, springs, falls head first, the forelegs tucking as it hits (they struck the bottom of a one-block pool hanging), levels out |
@@ -33,6 +33,30 @@ bite and eyelids stay. Fun and good-looking first (it is an animal). Every numbe
   the last against the swim; coming out, the reverse.
 - The tail is the game's (`TailDrag`): afloat each joint eases to just under the surface (`TAIL_FLOAT`), so it slides
   off the bank into the water and is dragged out after the hips.
+
+## The walk-in remade (2026-11-22, the user's ask)
+The user: the old walk-in was janky ("I made it before we have this whole system"), so it was deleted and made new:
+**curve down into the water without the back cutting, no snap into swimming form, ease into it once about fully in.**
+- **The starting idea:** the trunk (hips, waist, ribs, chest) is laid on one course, a level line that bends down over
+  the lip into the water (`_in_course`: level, then a smooth curve to the lip, then a smooth curve down to floating
+  height, joined with matching slopes), and the body slides along it at a stroll that eases up to the glide. Each joint
+  bends by the course's turn only, so the back is never cut (joint bends at most 7.8 degrees in every size).
+- **The belly rides the lip** (6.6 px over the water's block, steepest about 21 degrees): a course that kept the hips at
+  standing height until past the edge left the back of the body held up by nothing in the game (a "tent" in the first
+  film); a body sliding off a bank rests on the lip.
+- **The legs walk** on the module's walk numbers (`WALK_PHASES`, `WALK_REACH`, `WALK_DUTY`, the same as the walk clip):
+  each foot steps as long as it has ground (never past 4.5 px back from the lip), lets go when its shoulder or hip has
+  passed its last place by its reach plus 3 px, **hangs** (forefeet forward and down, hind feet back and down, `hang_at`),
+  and folds into the swim from about 0.35 s before the body is floating (forelegs first, each right side 0.1 s after).
+  The swim's tail sweep and the neck and head ease in with the body.
+- **The game:** the move file says it starts 50 px back from the face (`IN_EDGE`), and `MonitorEntity.roomToEnter` now
+  checks the bank is solid and open all that way back.
+- **The tail** (`TailDrag`, framework): a new ceiling at the tail's root: no joint rests higher than the root's own
+  drawn height, so the tail no longer arches up from hips sunk below the bank (a test proves it). What is left is
+  BUGS 278 (a W in the tail at the lip as the hips go under), the shared tail drag's, not the clip's.
+- Checks: `python tools/clip_check.py monitor 'water_in_*' --switches` (all five sizes: nothing inside the bank, no
+  planted foot hanging, fastest joint turn 53 degrees, no clip change flagged); the course scene `bank_level`; the
+  film `tools/film/monitor_water_in_frames.film` from the side, front and behind.
 
 ## Rules learned (each from a check that flagged it)
 1. **Hang, then fold** (the user): `'hang'` ramps per leg (stand to hang) and `'fold'` ramps (hang to swim); coming out

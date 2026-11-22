@@ -20,7 +20,7 @@ class BlockMovesFileTest {
         assertEquals(8, MOVES.count());
         assertEquals(5, MOVES.sizes().length);
         String[] names = {"up", "down", "in", "drop", "drop2", "dash", "out", "out_up"};
-        int[] ticks = {66, 69, 126, 102, 92, 38, 92, 90};
+        int[] ticks = {66, 69, 130, 102, 92, 38, 92, 90};   // (the walk-in remade 2026-11-22)
         for (int i = 0; i < names.length; i++) {
             assertEquals(i, MOVES.index(names[i]));
             assertEquals(ticks[i], MOVES.move(i).ticks);
@@ -30,7 +30,8 @@ class BlockMovesFileTest {
         assertEquals(2, MOVES.nearest(1.0));
         assertEquals(0, MOVES.nearest(0.5));
         assertEquals(50.0, MOVES.move(0).aheadPx);
-        assertEquals(57, MOVES.move(2).wetTick);
+        assertEquals(61, MOVES.move(2).wetTick);
+        assertEquals(50.0, MOVES.move(2).aheadPx);         // (walking in from about two blocks back)
         assertTrue(MOVES.move(2).endsAfloat && MOVES.move(2).goesDown && !MOVES.move(2).startsAfloat);
         assertTrue(MOVES.move(6).startsAfloat && !MOVES.move(6).goesDown);
     }

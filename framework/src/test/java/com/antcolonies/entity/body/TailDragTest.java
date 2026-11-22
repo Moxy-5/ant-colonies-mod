@@ -210,6 +210,34 @@ class TailDragTest {
         }
     }
 
+    /**
+     * The hips sunk under their rest height over the bank (sliding over the lip into the water, 2026-11-22): the tail never
+     * arches up from its root, every joint at or under it, and still out of the ground.
+     */
+    @Test
+    void hipsSunkOverTheGroundTheTailNeverArchesUpFromTheRoot() {
+        TailDrag t = new TailDrag(LENGTH, REST, LOWEST, 11.0);
+        TailDrag.Ground flat = (x, z) -> 0.0;
+        long now = 1;
+        for (int f = 0; f < 60; f++, now += FRAME) {
+            double sink = Math.min(1.0, f / 30.0);           // the root easing from its rest height down to 5 px
+            t.update(flat, 0, (11.0 - 6.0 * sink) * PB, -0.5 * PB * f, 0, 1, 15.0 * sink, PB, true, now);
+            lies(t, flat, "frame " + f);
+        }
+        for (int i = 1; i <= 12; i++) {
+            assertTrue(t.y(i) <= t.y(0) + 1.0E-6, "joint " + i + " at " + t.y(i) + " over the root at " + t.y(0));
+        }
+        // and on flat ground at its rest height the root changes nothing: it lies as the model has it
+        TailDrag rest = new TailDrag(LENGTH, REST, LOWEST, 11.0);
+        now = 1;
+        for (int f = 0; f < 60; f++, now += FRAME) {
+            rest.update(flat, 0, 11.0 * PB, -0.5 * PB * f, 0, 1, 0.0, PB, true, now);
+        }
+        for (int i = 1; i <= 12; i++) {
+            assertEquals(REST[i - 1] * PB, rest.y(i), 1.0E-3, "joint " + i);
+        }
+    }
+
     @Test
     void handedBackToTheClipItEasesOver() {
         TailDrag t = drag();

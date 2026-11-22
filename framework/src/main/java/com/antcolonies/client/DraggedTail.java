@@ -31,6 +31,8 @@ public final class DraggedTail {
     /** Each bone's rest turn (radians). */
     private float[] restX, restY, restZ;
     private double[] lengthPx, restPx;
+    /** The tail root's height over flat ground at rest (model pixels). */
+    private double rootPx;
 
     public DraggedTail(String... names) {
         this.names = names.clone();
@@ -41,7 +43,7 @@ public final class DraggedTail {
      * over the ground (model pixels: its own thickness). Null if the model lacks the bones.
      */
     public TailDrag newDrag(Function<String, GeoBone> bones, double[] lowestPx) {
-        return prepare(bones) ? new TailDrag(lengthPx, restPx, lowestPx) : null;
+        return prepare(bones) ? new TailDrag(lengthPx, restPx, lowestPx, rootPx) : null;
     }
 
     /**
@@ -113,6 +115,7 @@ public final class DraggedTail {
             pivot[i] = BoneFrames.pivot(b[i]);
         }
         Matrix4f m = BoneFrames.chain(b[0].getParent(), true);
+        rootPx = m.transformPosition(new Vector3f(pivot[0])).y * 16.0;
         for (int i = 0; i < n; i++) {
             // the last bone reaches as far past its pivot as the one before it does
             along[i] = i + 1 < n ? new Vector3f(pivot[i + 1]).sub(pivot[i]) : new Vector3f(along[i - 1]);
