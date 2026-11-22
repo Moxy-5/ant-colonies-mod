@@ -13,10 +13,15 @@ Assets are ready from Neon: otter v6 (`docs/handoff/otter.md`, 21 clips, 5 block
   move). A third copy for the otter would mean three places to fix every move bug. Step 1 pulls that glue into one
   framework helper (species-neutral, so the monitor and hippo can switch to it later; they are not touched now).
 - **The otter's moves are slow for an otter.** Its step up, step down, slide in, dive and climb out each take 2.0 to 2.3
-  seconds (fine for the hippo's 7 s and the monitor's 3.3 s; a real otter pops up a bank in about half a second). An otter
-  that stops 2 s at every block will look stiff, the opposite of special. I measure it in the game first (films), and if
-  it drags, speed the move clips up with `tools/otter_models.py` keeping their shape (a change to approved clips: shown
-  to the user before it stays).
+  seconds (fine for the hippo's 7 s and the monitor's 3.3 s; a real otter pops up a bank in about half a second). **The
+  user, 2026-11-22: "the coming out of water is really quick ... more so the going up blocks ... I want it to look cute
+  like he's scrambling up a block but quickly."** So, remade with `tools/otter_models.py` in step 1 (the user's change to
+  approved clips): **climbing out of the water quick** (about 0.8 s, my pick: a hop up, chest on the edge, hind feet kick
+  it over, straight into `shake_dry`); **step up a cute quick scramble** (about 0.8 s, my pick: front paws reach and
+  scrabble on the top edge, head up, back arching, hind feet paddling fast against the face, a little rump wiggle as it
+  pulls over, tail swinging for balance); step down quickened to match (about 0.6 s, a neat front-first hop). The calm
+  slide in and the leaping dive keep their lengths (a slow slide and a big leap read well). Checked offline and filmed
+  from three sides in the game before showing the user.
 - **A pet must keep up.** The otter's bound is 2 blocks a second; a player walks 4.3 and runs 5.6. A pet otter needs a
   faster gallop on land (the bound stretched and quickened, checked offline and filmed) and a fast swim (real otters are
   quick swimmers: about 4 to 5 blocks a second, faster than a swimming player).
@@ -38,7 +43,7 @@ Assets are ready from Neon: otter v6 (`docs/handoff/otter.md`, 21 clips, 5 block
    a spray of drops (its ticks 2 to 18), the mud coat (mud adapted, drawn with its mud mask). Hit chain along the body.
    Pups at 0.55 follow their mother (`AnimalLife`), stepping normally.
    Checks: `clip_check`, `body_course` (add `controller` and `course` to its body plan), 3-side frame films of every
-   move in the game, `game_compare` beside v6. Then the speed fix above if the films say so.
+   move in the game, `game_compare` beside v6. The quick climb-out and the scramble up (above) are made in this step.
 2. **Hunting, all of it.** Crabs: wades the shallows over gravel and stone doing `forage_feel` (the paws feel under
    stones, the real clawless otter's way), catches a crab with a `bite`, carries it crosswise in its jaws (`carry`
    socket) to the bank, lies down and `eat`s it (4 crunches, tail wag), leaving a crab shell remains. Fish: spots a barb
