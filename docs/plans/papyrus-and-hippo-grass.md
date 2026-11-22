@@ -25,8 +25,23 @@ its old name so older notes still point here. Looks in the viewer: `python tools
 or 2 deep (waterlogged, on the bed) or on wet river mud at the waterline; stalk blocks under a top block with the plume,
 drawn as three crossed planes (a thick bed), each clump nudged a little off its block's middle. No collision: animals,
 fish and players pass through. Does not spread for now.
-- **Plume looks:** A fresh (dusky purple-brown), B old (pale tan); the user picks one, or (my suggestion) plumes start
-  fresh and turn pale with time like the real ones.
+- **Plumes start fresh and turn pale** (the user, 2026-11-22: "go fresh turning pale"): a new plume is look A (dusky
+  purple-brown) and turns to look B (pale tan) with random ticks over a few game days, like the real ones by the dry
+  season; with seasons (M9.5) it follows the shared season source.
+- **They bend when pushed** (the user, 2026-11-22: "we're gonna need to add animations for them when a big animal or the
+  player goes through them"; how, my picks): a player or a big animal (box at least 0.6 wide: hippo, crocodile, monitor,
+  otter, player) moving through a reed column makes the whole column lean away from it, up to about 40 degrees, the top
+  leaning most, then spring back upright with a small overshoot, in about a second. Standing still pushes nothing new (a
+  hippo resting in reeds does not keep them flapping).
+  - *How in Minecraft:* block models can only tilt in 22.5 degree steps and every change redraws the chunk section, so a
+    smooth bend is drawn by the client itself: the server marks a pushed column (one block state, set on the push and
+    cleared when the spring-back ends, two changes a push); while it is marked, the block's plain model is hidden and the
+    client draws the leaning reed with a smooth spring, leaning away from wherever the pusher actually is. Only pushed
+    reeds are drawn this way, so a big reed bed costs nothing until something walks through it.
+  - *Checked as animations are* (the `CLAUDE.md` rule): offline, then filmed in the game frame by frame from three sides
+    (a player and a hippo walking through a bed).
+  - *Later, with fish hiding:* a small fish moving among the stems makes them shiver a little, the real tell of fish in a
+    reed bed.
 - **Where:** reed beds of about 10 to 60 clumps.
   - **Oxbows:** most of them, along the shallow edges; silting and old oxbows the most (their shallow muddy ends).
   - **Rivers:** only the slow near- and mid-inland stretches, about one bed per 100 blocks of bank, at the river mud
@@ -37,6 +52,7 @@ fish and players pass through. Does not spread for now.
 
 **Hippo grass** (`antcolonies:hippo_grass`): a grassy mat lying on the water's surface (like a lily pad, a little
 higher and shaggier, short blades sticking up through it), and a rooted clump at the bank's edge it grows out from.
+- **The user liked the green and flowering looks** (2026-11-22); blue-green dropped.
 - **Life stages:** young shoots (light green, sparse, 1 block out), grown (lush green, out to 3), flowering (pale spikes),
   dying back (straw brown, broken up; the mat pulls back to 1 block and then to the clump alone, whose foot shows new
   green). The blue-green look is dropped (the user liked green and flowering; blue-green is not a real stage).
@@ -48,6 +64,8 @@ higher and shaggier, short blades sticking up through it), and a rooted clump at
 - **Where:** a fringe 1 to 3 blocks wide out from the bank, in patches 5 to 20 blocks long, along slow river banks
   (near and mid inland) and round oxbows; about one patch per 60 blocks of bank. Never on sand bars, slides or nests,
   never in pans.
+- **Mats dip and part when pushed** (with the reeds' bend, same way): a swimmer or wader pushing through a mat presses it
+  under the surface and to the sides; it bobs back up over about a second.
 - **Hippos nibble it** (my pick, fun): a hippo in the water at night eats a mat now and then; it grows back with the
   cycle.
 
@@ -63,10 +81,12 @@ higher and shaggier, short blades sticking up through it), and a rooted clump at
 
 1. **Looks in the model viewer** (done 2026-11-22, first papyrus, then reeds and the hippo grass stages): reed beds and
    the hippo grass fringe on an oxbow and a river bank, beside a hippo and a player for scale; the user picks.
-2. **The blocks:** reeds (stacking, survive only in or at shallow water) and hippo grass (mat and clump, the four
-   stages ticking), with drops and the creative tab.
-3. **In new land:** beds and fringes placed as above; a game test for where they go and that they never touch a sand
+2. **The blocks:** reeds (stacking, survive only in or at shallow water, plumes fresh turning pale) and hippo grass
+   (mat and clump, the four stages ticking), with drops and the creative tab.
+3. **Pushing through:** the reeds' bend and the mats' dip, drawn smoothly by the client; checked offline and filmed in
+   the game.
+4. **In new land:** beds and fringes placed as above; a game test for where they go and that they never touch a sand
    bar, slide, nest or pan; a game test for the hippo grass cycle; a flight for loading speed.
-4. **Hippos nibble hippo grass** (optional, the user's say).
-5. **Fish hide in the reeds** (optional, the user's say).
-6. **The user's look** in a new world.
+5. **Hippos nibble hippo grass** (optional, the user's say).
+6. **Fish hide in the reeds** (optional, the user's say).
+7. **The user's look** in a new world.
