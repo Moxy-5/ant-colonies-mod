@@ -42,7 +42,8 @@ import javax.annotation.Nullable;
  * in soupy mud a creature sinks a quarter block if light (a crab, a bullfrog) up to half a block if heavy (a hippo),
  * by the size of its body; in sticky mud half that; drying and cracked mud is firm flat ground. The block is drawn as a
  * full cube, so the sunk feet are hidden in the mud (as in powder snow). Half a block is less than any creature's step,
- * so nothing is ever trapped.
+ * so nothing is ever trapped. Ants and termites (a few milligrams) do not sink: they walk on the surface, and their legs
+ * go round wet mud ({@link #insectCost}).
  *
  * <p><b>Drag</b> ({@link #DRAG}): anything not tagged {@code #antcolonies:mud_adapted} is slowed while its feet are in the
  * mud, the deeper it sinks the slower; the river animals are not. Mobs plan over it as ground (the ants' own legs keep off wet mud).
@@ -54,7 +55,7 @@ import javax.annotation.Nullable;
  * <p><b>Light</b>: it takes light in as glass does ({@link #getLightBlock}), so a creature sunk in it is not drawn
  * black (Minecraft lights a mob from the block at its eyes); it still hides its neighbours' faces as dirt does.
  */
-public class SavannaMudBlock extends Block {
+public class SavannaMudBlock extends Block implements com.antcolonies.nav.SoftGround {
     public static final EnumProperty<Wetness> WETNESS = EnumProperty.create("wetness", Wetness.class);
     public static final IntegerProperty DEPTH = IntegerProperty.create("depth", 1, 4);
     public static final EnumProperty<Tone> TONE = EnumProperty.create("tone", Tone.class);
@@ -84,6 +85,12 @@ public class SavannaMudBlock extends Block {
      */
     static final double DRAG_PER_PIXEL = 0.04;
 
+    /**
+     * What one foothold on wet (sticky or soupy) mud adds to an ant's or termite's route (my pick): about 12 blocks of
+     * walking, so a column goes round a wallow and crosses only when there is no other way (real ants keep off wet mud).
+     */
+    static final double WET_INSECT_COST = 12.0;
+
     /** The floor for each sink in pixels (0 to {@link #HEAVY_SINK}). */
     private static final VoxelShape[] FLOORS = new VoxelShape[HEAVY_SINK + 1];
     static {
@@ -110,9 +117,13 @@ public class SavannaMudBlock extends Block {
 
     /**
      * How many pixels this creature sinks in this mud: soupy from {@link #LIGHT_SINK} to {@link #HEAVY_SINK} by its weight,
-     * sticky half that, drying and cracked none. With no creature (the route planner, the light) a light one's.
+     * sticky half that, drying and cracked none; an ant or termite none. With no creature (the route planner, the light) a
+     * light one's.
      */
     public static int sinkPixels(BlockState state, @Nullable Entity entity) {
+        if (entity instanceof com.antcolonies.entity.AbstractAntEntity) {
+            return 0;      // an ant or termite weighs a few milligrams: it walks on the mud's surface
+        }
         int soupy = entity == null ? LIGHT_SINK : weightSink(entity);
         return switch (state.getValue(WETNESS)) {
             case CRACKED, DRYING -> 0;
@@ -126,6 +137,12 @@ public class SavannaMudBlock extends Block {
         double body = entity.getBbWidth() * entity.getBbWidth() * entity.getBbHeight();
         double heavy = Math.clamp((body - LIGHT_BODY) / (HEAVY_BODY - LIGHT_BODY), 0.0, 1.0);
         return LIGHT_SINK + (int) Math.round(heavy * (HEAVY_SINK - LIGHT_SINK));
+    }
+
+    /** Ants and termites go round wet mud ({@link #WET_INSECT_COST}); dry mud is plain ground to them. */
+    @Override
+    public double insectCost(BlockState state) {
+        return soft(state) ? WET_INSECT_COST : 0.0;
     }
 
     /** Whether this mud lets anything sink in (sticky or soupy). */

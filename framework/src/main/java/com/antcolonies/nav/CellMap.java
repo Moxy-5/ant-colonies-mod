@@ -46,6 +46,14 @@ public interface CellMap {
     }
 
     /**
+     * The extra cost of holding this foothold, from the ground it is on ({@link SoftGround}: wet mud); 0 for plain ground
+     * and for a channel.
+     */
+    default double footCost(Foothold at) {
+        return 0.0;
+    }
+
+    /**
      * Whether the channel in this cell is a doorway's tube (a chimney mouth): its opening on top is the mouth an
      * insect comes out of and goes in by, with the doorway's own motion ({@link Doorway}, {@link DoorwayMotion}).
      */

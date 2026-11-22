@@ -56,6 +56,7 @@ import net.minecraft.core.Direction;
  * the mouth's own column (3).
  * Turning over onto a ceiling costs a little extra, so a route never flips upside down for a tiny shortcut (like
  * curling from the tunnel ceiling up into the shaft instead of walking the last block).
+ * The ground can cost extra too ({@link CellMap#footCost}, {@link SoftGround}: wet mud, gone round unless there is no other way).
  * A mind can add its own costs to any step ({@link StepCosts}: later scent trails, avoiding enemies, raids). Nothing
  * here is specific to ants, so termites and later species use the same planner.
  */
@@ -293,7 +294,7 @@ public final class AntPathFinder {
                 if (extra == Double.POSITIVE_INFINITY) {
                     return; // ruled out by the mind
                 }
-                double cost = current.cost + moveCost + extra;
+                double cost = current.cost + moveCost + extra + map.footCost(to);
                 Double known = bestCost.get(to);
                 if (known == null || cost < known) {
                     bestCost.put(to, cost);

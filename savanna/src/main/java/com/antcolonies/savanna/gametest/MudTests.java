@@ -211,4 +211,58 @@ public class MudTests {
         SavannaMod.LOGGER.info("[mud] random ticks to crack: rim {}, deep middle {}", rimCracked, deepCracked);
         helper.succeed();
     }
+
+    /**
+     * The ants' legs and wet mud (step 2): a route goes round a band of wet mud through the gap at its end, but straight
+     * across the same band once it has dried; an ant set down in the middle of wet mud still finds its way out (a cost,
+     * never a wall); and an ant stands on soupy mud without sinking (a few milligrams).
+     */
+    @GameTest(template = "arena", timeoutTicks = 100)
+    public static void antsGoRoundWetMudButCrossItDry(GameTestHelper helper) {
+        ground(helper, 1, 1, 20, 12);
+        ServerLevel level = helper.getLevel();
+        // a band of wet mud 3 wide across the way, from z 2 to 10: the ground at z 1 and 11 to 12 goes round it
+        for (int x = 8; x <= 10; x++) {
+            for (int z = 2; z <= 10; z++) {
+                helper.setBlock(new BlockPos(x, 1, z), mud().with(Wetness.SOUPY, 2, Tone.OLIVE));
+            }
+        }
+        BlockPos start = helper.absolutePos(new BlockPos(3, 2, 6)), goal = helper.absolutePos(new BlockPos(15, 2, 6));
+        com.antcolonies.nav.Route wet = com.antcolonies.nav.AntPathFinder.find(new com.antcolonies.nav.LevelCellMap(level), start, goal, 20000);
+        helper.assertTrue(wet != null, "an ant should find a way round the wet mud");
+        helper.assertTrue(stepsOnMud(level, wet) == 0, "an ant's route should go round wet mud, it steps on it " + stepsOnMud(level, wet) + " times: " + wet);
+        // set down in the middle of the wet band, it still gets out
+        BlockPos inside = helper.absolutePos(new BlockPos(9, 2, 6));
+        com.antcolonies.nav.Route out = com.antcolonies.nav.AntPathFinder.find(new com.antcolonies.nav.LevelCellMap(level), inside, goal, 20000);
+        helper.assertTrue(out != null, "an ant in the middle of wet mud should still find a way out");
+        // the band dries: the route goes straight over it
+        for (int x = 8; x <= 10; x++) {
+            for (int z = 2; z <= 10; z++) {
+                helper.setBlock(new BlockPos(x, 1, z), mud().with(Wetness.CRACKED, 2, Tone.OLIVE));
+            }
+        }
+        com.antcolonies.nav.Route dry = com.antcolonies.nav.AntPathFinder.find(new com.antcolonies.nav.LevelCellMap(level), start, goal, 20000);
+        helper.assertTrue(dry != null && stepsOnMud(level, dry) >= 3, "an ant's route should cross dried mud straight, " + dry);
+        helper.assertTrue(dry.size() < wet.size(), "the dry way across should be shorter than the way round (" + dry.size() + " against " + wet.size() + ")");
+        // an ant on soupy mud stands on its surface
+        helper.setBlock(new BlockPos(9, 1, 6), mud().with(Wetness.SOUPY, 4, Tone.OLIVE));
+        Mob ant = still(helper, SavannaEntities.MATABELE_MAJOR.get(), new BlockPos(9, 1, 6));
+        helper.runAfterDelay(20, () -> {
+            double floor = helper.absolutePos(new BlockPos(0, 2, 0)).getY();
+            helper.assertTrue(Math.abs(ant.getY() - floor) < 0.02, "an ant should not sink in soupy mud, at " + (ant.getY() - floor));
+            helper.succeed();
+        });
+    }
+
+    /** How many of a route's footholds hold on to savanna mud. */
+    private static int stepsOnMud(ServerLevel level, com.antcolonies.nav.Route route) {
+        int on = 0;
+        for (com.antcolonies.nav.Route.Step step : route.steps()) {
+            com.antcolonies.nav.Foothold at = step.to();
+            if (!at.isChannel() && level.getBlockState(at.cell().relative(at.surface())).getBlock() instanceof SavannaMudBlock) {
+                on++;
+            }
+        }
+        return on;
+    }
 }

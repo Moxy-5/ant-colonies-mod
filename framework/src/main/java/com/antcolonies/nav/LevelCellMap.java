@@ -68,6 +68,20 @@ public final class LevelCellMap implements CellMap {
         return state.isFaceSturdy(level, pos, face) && !state.getCollisionShape(level, pos, context).isEmpty();
     }
 
+    /** The ground's own cost ({@link SoftGround}) of the block this foothold holds on to. */
+    @Override
+    public double footCost(Foothold at) {
+        if (at.isChannel()) {
+            return 0.0;
+        }
+        BlockPos solid = at.cell().relative(at.surface());
+        if (!LandReady.at(level, solid)) {
+            return 0.0;
+        }
+        BlockState state = level.getBlockState(solid);
+        return state.getBlock() instanceof SoftGround ground ? ground.insectCost(state) : 0.0;
+    }
+
     @Override
     public int channelSides(BlockPos cell) {
         if (!LandReady.at(level, cell)) {

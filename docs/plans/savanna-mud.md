@@ -127,8 +127,9 @@ look changes.
 
 ### 5.5 Ants and termites (realism rule)
 
-- **The ant legs treat wet mud (sticky, soupy) as water:** never planned through; an ant that lands in it walks straight
-  out. Dry mud (drying, cracked) is plain ground. Real: Matabele ants keep off wet ground and water; termites never cross
+- **The ant legs go round wet mud (sticky, soupy)** (BUILT 2026-11-21 as a cost, not a wall: each foothold on wet mud
+  costs a route about 12 blocks of walking, `nav/SoftGround`, so a column goes round and an ant set down in it, or with no
+  other way, still crosses; ants and termites do not sink in mud). Dry mud (drying, cracked) is plain ground. Real: Matabele ants keep off wet ground and water; termites never cross
   open wet mud, they forage under their own runways. A raid column meeting a wallow goes round it.
 - No wallow on a mound place, a Matabele nest or a crocodile nest site.
 - Rubbing posts on mounds (later): **no soldier alarm.** Real Macrotermes soldiers pour out when the wall is broken, and a
@@ -156,7 +157,8 @@ the stealth bonus are left out: not asked for; ideas for later.)
    it; Neon's tool should not overwrite it). Light fix: the block lets light through and hides only the faces it shares
    with other mud (as glass does), else a small animal sunk in it would be drawn black. Tests: sink depths, drag, adapted
    mobs unhurried, a player-sized mob walks out of the deep middle, a pit dries from the rim and comes back after rain.
-2. **The ant legs and wet mud** (read `docs/BUGS.md` first): tests in `legs` and `raids`.
+2. **The ant legs and wet mud** (BUILT 2026-11-21: `nav/SoftGround`, test `antsGoRoundWetMudButCrossItDry`; `legs` and
+   `raids` run).
 3. **Placing the wallows in new land** (the three places above, spaced from the seed like the other sites); `worldgen`
    tests (off mounds, flat ground, spaced, olive by the river, the land's tone off it); chunk-making time measured.
    Full test run here (3 steps).
