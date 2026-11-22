@@ -1,0 +1,407 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>River plants</title>
+<style>
+  :root { --bg: #f4f1ea; --fg: #2c2c2a; --muted: #6b6a64; --line: #d3d1c7; --pick: #2f6b3a; }
+  @media (prefers-color-scheme: dark) { :root { --bg: #1f1f1d; --fg: #ecebe4; --muted: #a9a79e; --line: #44443f; --pick: #8fd19e; } }
+  body { margin: 0; background: var(--bg); color: var(--fg); font: 14px/1.5 system-ui, sans-serif; }
+  #panel { padding: 10px 16px; display: grid; gap: 6px; }
+  .row { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+  .row b { width: 120px; font-weight: 500; }
+  button { background: transparent; color: var(--fg); border: 1px solid var(--line); border-radius: 6px; padding: 3px 9px; cursor: pointer; font: inherit; }
+  button.on { border-color: var(--pick); color: var(--pick); font-weight: 500; }
+  button:disabled { opacity: 0.35; cursor: default; }
+  #note, #sizes { color: var(--muted); font-size: 13px; }
+  canvas { display: block; width: 100%; height: calc(100vh - 250px); min-height: 380px; }
+</style>
+</head>
+<body>
+<div id="panel">
+  <div id="note">Reed beds and hippo grass for the savanna's rivers and oxbows (docs/plans/papyrus-and-hippo-grass.md): reeds 2 to 3 blocks over the water in thick beds, in water 1 or 2 deep or on mud at the waterline, for fish to hide in; hippo grass floating out 1 to 3 blocks from the bank, rooted in clumps at the edge, through its life: young shoots creeping out, grown, flowering, then dying back to the bank (straw brown, breaking up) and growing out again. Only on the slow mid and near-coast rivers (none on the fast far-inland ones) and round oxbows. For scale: the grey box is a hippo (4 long), the olive one a crocodile (7.5 long), the blue one a player (1.8 tall). Drag to turn, scroll to zoom, right-drag to slide.</div>
+  <div id="sizes"></div>
+</div>
+<canvas id="c"></canvas>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+<script>
+const D = {"blocks": {"grass_block_top": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAAAAAA6mKC9AAAA8UlEQVR42gUAWW+CMPj7yXuZ0ylHOWwpR6EFC0ERh8gh+ELGEl9mwh8zEC9iv2eaVxwodpoPHxKvlJmeGVp3E4uHXah8xXJIGMbndsRf+gwrm8ooU7hm+pK5jQI/5mgODzI8P/XmrhIfsnR9Q4ckxwkx1ySIQT3WITepZuHfIWokA4ZPbri7WnLEiJVaB00+9wMaj1NvcFsUKkjjz/fSXscR74KJIcgLWRtzIF6bxmREMrDGfSUt7kjubSdNofCUiGaR/U0jqpzrjQTUrriSoeUi2rwk7QOqy2s73WOhJgnuTu4G7ANxrmksgv9dZ4WkeAPz+JNw8txdwAAAAABJRU5ErkJggg==", "grass_block_side_overlay": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAAeElEQVQ4T+2NsQrAIAxE/WtHUdxUUARXZwcXfzDtXRFa6Cd4IPHlLokaY0jOWVprEmOUzajo4fXeyahrLbHW8g9PwXgPIqBugZ1zZATBtVbWnQ8hiOKWWwh672mAsWwv2tfmnOxprZ/rfyqlfAxjDDml9D9wdHREXc8PflIHcVV8AAAAAElFTkSuQmCC", "dirt": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQBAMAAADt3eJSAAAAFVBMVEW5hVyHh4eWbEpsbGx0WER5VTpZPSnqDkA3AAAAbklEQVR42hXLwQnDQAwEwOVA7uDyNgq6AtJD/mLD6m0Muv5LCJ7/YES6OhNsvjLGhpXJtA1vW+nMQJy31o+Ncu4uJUwzDSQE13I5giyGGuxqCQTTxnX4RPDkJ+5ChZskgPp6HemIqwp8+ojp8voDZ2EdYwBe7AYAAAAASUVORK5CYII=", "coarse_dirt": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAMAAAAoLQ9TAAAA51BMVEW5hVy4hFu2g1qvfVeufVaHh4eoeFOjdVGidVChdFCYbUuWbEqVa0qUakmTakiQaEeLZEVsbGyJY0OIYkOHYUKGYUJnZ2eCXkCAXD9jY2N+Wz5+Wj59Wj15Vzt5VTp4VDl3Uzl1VDl2UzhyUjh0UTdzUTdwUDdxTzZuTzdvTjVuTTRUVFRmSDBkSDJlRzBjRS9hRC5aRDReQy5fQi1eQi1cQSxZPSlYPChXPChWPClUOyhVOidSOyhTOSZSOSdPNyVONyVMNCNKMyJIMiJHMSFFMCBFLyBELh9CLh88KRs7KRs3JhkwIRbDSzqpAAAAy0lEQVR42g3I6yICUQCF0Z27NsothG9wiDAjZY5QIZcOev/n0fq5JK+DBi6ZknQr4WGbnUacJcuOUXplslYm8lQyfBRyQ8+OD9XjgMmNNt52ay/u4XF7k9oPyr5t/BvjeUZJO5eAm7NMyupz1yaoQHnYvkzuNzOwtXcyCrSYdI58BzEJf5H6EWCpohSUnGnhSf6sy2HQQE2wV4vugQ8nsUsUY9Pa18WIIqNTqYrwUdxjl3/zYxSCzLt6U2K+wlZKtsyVT8tFBoYQUvwHZHwhD+cESWEAAAAASUVORK5CYII=", "short_grass": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQBAMAAADt3eJSAAAAFVBMVEUAAAC4t7igoKCRkZGDgYN2d3ZsbGyS5OzOAAAAAXRSTlMAQObYZgAAAG5JREFUeNptyDESgyAQheHHSvpt7DcDpCaGHMABqRnwBI73P4Ng7Wv+bx6eJgSmAVJguau0cC/eND6AK61dHeS/emCeXJwJEKNe4rhAFirWS4UlU4IsE3xsbTcx4Jda3Fzy0PWs+W8TwnEeOX+2CxhUDj0662krAAAAAElFTkSuQmCC", "water_still": "data:image/png;base64,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", "grass_colormap": "data:image/png;base64,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", "silt": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAABcElEQVR42l2TT0sDQQzF55MJXgoKe+hhhYoiFVpwoYKCllJWaNUW63+roHiw4EVEEPEDRn6RN0QPw2aSl5e8ZDZ93XTsuS793B427Wq/sPfTlr2MWn989fZytj8v23axu+LfhAHwqNtwJ4CnQdPuJj0bV6s2qxpOuDjZ8Nj3vLLHg8Lxx73CEiwEAFIF8HxQuo/zcbaZbQqQKBy+RPXz0U5ui7valRQOMb6SCM4JaBfjddr2aiQLCAlApHCf1h2LkoknDSgOEgKS1K7IZEsOBVPUjJPhPQzXM4A49tu4zPNQ13xTZOPglL44E/xKpCB+J5BTerE1tOHWUh5exEm2D1FsUZ+0612w4v+dQpQl8DD0wggKSGXIsIlhgyXxfrb3uwUuqkQnJIlEb0QS8GljelRJBgC1FUmQyFakHZ869H9BwxPgur/mmtUNPt4ECXpQcVtJyXQBI9UARp+GBhZy2U6gKgBVFYCGpH1rQ/E3ZwY/mDFcSFsLNi4AAAAASUVORK5CYII=", "wet_silt": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAABaUlEQVR42l2T4UtCUQzF778UBILwQFCSCsNQDAPDNF5mKWovKYKiD0VQ9C8vfpNzWX24vN3t7Gxnuy99b7r2PG36uR81bHVe2MdN217Kgz++ycl+tr9WHVue1f2bMABendbcCeBp3LBqPrDrft0W/ZoTvs4OPfZT9exxVDh+NigswUIAIFUAV+Om+zifd0fZpgCJwuFLVF+WvdwWd7UrKRxifCURnBPQLsbbvOPVSBYQEoBI4X477VqUTDxpQHGQEJCkdkUmW3IomKJmnAxvO2lnAHHs97KV56Gu+abIxsEpfXEm+JVIQfxOIKf0Ymtol8d7eXgRJ9k+RLFFfdKud8GK/3cKUZbAw9ALIygglSHDJoYNlsSHxXC3BS6qRCckiURvRBLwaWN6VEkGALUVSZDIVqQdnzr0f0HDE2B90XLN6gYfb4IEPai4raRkuoCRagCjT0MDC7lsJ1AVgKoKQEPSvrWh+Jszg19SqBNGhb5oygAAAABJRU5ErkJggg==", "river_mud": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAA6ElEQVR42mWTOw4CMQxEfRIKGqABioUGhLagooCe+98jaCK9aDIU1q7/47FT92XXXuu5fZ5Le1z3XWS7HLfdjq6vYr7vW/+XX1KejFE2T5aNIsSMAkqWYPAkyemwGd29CE2KEeQQPEejZH1pgl05xPYCkgwCTfKDDqKBABSZjB3dx+gFcDoxmeyEMhb2MQIJuT6K0pnZialcmzPuydxAkvw3AgQxr48BQt/QdEh0cbKyK4iQcqefra9LOgeFn7EKOFTMDcgHXJpMJBLgN5/nDRo4cN4q9w8P/iLZiqOZCjjsfHWpOzqN8APUlJ/GvqRa6gAAAABJRU5ErkJggg=="}, "algae": ["data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAAiklEQVR42mNgwAO0vGRPoIs55eic8Kk1fu2QqXWCgVTNIKAXqHAivM4cv2awTbk6hBUNKLBJ0iDsQrtUTQxFroV6J0DYJV+XPC9aJ2qcsE5UJ6xZ01N2kAciUcAhUxurN5zzdE+E1piR50XHbO0TwZWmhDWDogprCs3RGUqBa5+BPcs6ZGmfgKVSAI6pKdZo8viYAAAAAElFTkSuQmCC", "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAABh0lEQVR42o1Ty07CUBDlP0AwumhpS5WHlgjFggVEHgohhJ2giCIImBh1IUhi1Cgu3brgb+Zf5ifs3MSECxS8u55758yZM6cOh82JnolQ+9JhFo+3Zcg8+jHRUcCu1pG8VcFf2UCl4OEe7V9KQAREzhXoDS/4jj3ssvochtwgiCcvOygdrdl3+TuxCy8oeTfIOTcIphP2agL7zj4FMD8MotnzrSZZdKiQVAhJ5xyBN+OC07EOkbpgT564UaD4uotiysU9IvM6P0lsfsexNtbtCWiUeJt3mrDSm4ZqcZ03koDKUGOAbM1fvA9B6V1DoyVzBNFzkRnNdTJaEph9lXWrjsIgpl0gppwQqG4irW2lWbMyp7dTGIVQzi5eJdWRIlti6p6+22LzzuJ6Q4TyR3i5QoqxlOG7U+HhwzaSP5SVJWPJUP4Mo26NMY1H6iLEmtK89IOuwsyjB8a1DBQikm9c/cNEs+9jjLQJHlehO0nhsrRR9O2TaCWuN0kjrZYrsqJNyioDDeiX/gVsdLGupG4QSAAAAABJRU5ErkJggg==", "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAACZElEQVR42l1T604TQRSe9zCi0paWXqDtdpeS0ntrS++lIAIirdZai6gYKiJVrKgo6g9NjIkk+kcTE1/kvMt5Cecb7Lo4SdPds3POfLcR+rqd9Q0HxzqTJP6uxB0Pha7ZuXwQ4tRdr1mfu+kioznB1aEuv2mc6LpJeEpjVDvUOdf3c3LTS6ktL5UGGnc+J7kyDHH8ttscgOfGmxm5z0OZB1On9WTPowbUXxqMjxV56tb3y9x4G1ZDfLULauPyQZhwwNK+YQ5Uq/ZC59JTjbU1u0IRabnIv3SJi/tBVZ9/HGCgsiLBSt/zEX4CG/xXxrk0CHJ2+xTWynCWAsvjXJXDgWpUH9GItl1Uk4hz/WkWixKqtmrjePfsCWjKP/LzyjBs1iMtpxK38lzS/Jbl9qcEi/org9sf4wzl/xcL2qwezpp1b3mMDOkYUDuz52iqfpFE5r6PgldtivPSwKC5Gy7Srzu4/ExTmqAJzfXdEC0ehxUdKyWhrdkUfzQsvDa4+yXFdfmPZ6CADpGmk9LyIBxgpamszO1Mc0CKiAbY1PoQkx77qLAX4Pldv6q7i+fNxmh7kvCOoaAojKaDgQInWKevH0UItKziIpVA2/ua5rwcHpLWi6pMG1BYo7xxPEcPf+ZVZGO3/tWRQFBEM/Z7oA/CgBQidRAnKhtmWhPcOJpRFJrvompAQiYWloNarGOxfOdXQU0EElgK4fCO5v7vorIMtiKNyEHGQrWxp5MAz82TDMNKWAgEuHVQv/AkqBzCfTmjvhwCzXCA2P6RV5tGl8ZUWw4CIqTRvHlyNd9HVcgWJMXeSYb/ALWPZXl955tNAAAAAElFTkSuQmCC", "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAACdUlEQVR42j2T6U5TURSF74towiy02OHe2zaiQIX2toWWUuo8UEBRKENBkcEBB5z/aKI/TDQ4/zA+yHmX/RKeb19qk6bpOXuvvdba6zgrX3IyfZCSYCsuQ3N9xrGf8fVBU7gXl8T5TgnuxmSo0We8K90y+dCVqq2dfp6S2ou0TDxIijPzOiPlR66U9hJSf5ORxtszpnrg65l7uUubAZ3Z8U31mS+uBdr+O6EgpT0LMPXEs2gpZUGDf71HKo89mXrqy6SdwO/IrQHD2cT9pNRepnXQzKsjBlDkcONnQQuCrZik53qlsB3XCTADvLSbsICu1iAl1eiRlu1xaF54NyJ5C0RRthk1/GYW+pRJrN4hq4d5GVuNGphyB32+yHTQVd73Qlq7vurNLkcMkzEYhqdmQx9Gbw+Y9W+BsijuJFSu0zaQQ8D6i8cMF3VrLvrH1gZD0GbExM91KP3W90BltX4E4jQ/jwsrwxSmYSTmJC506sqgfHr+hAEQT5BcscYzePN3URw1x6IyjY0osp1QtOeAAdL2InmxU4fBlvVv/rImMokNoKlgwzR8s19DlLzUpRTZCoyGF/vVl/ydmN1Ar7KBlUMC177m1cjRpYjqDYuTymbxQ1bOrkTDhLYGTdGuF8NheOP9iA2SpY5+tEGL4nZkvWvdMrocgkbLxw2ArJseZC1+zIrjWqrslOKKZYHTaFw9zKksmOU2Tpp2/skHLJCGZAejuMRRTIQy6KQRINzmP0Cp2TDmG9Y87smJ5iA4okXS0vO9/x+Sd7VbeIUA0UiDSrPn5X1XpTtLn8bUZabjQW3bM1t/Spoy3gOuMx1fAOY9MB15bOEfIrDQysizmEcAAAAASUVORK5CYII="], "reeds": {"stem": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAAwElEQVR42mNgwAK80oz+g+jS+b7/p+9MArMLZnj9ZyAWZHS5/U/vcfmPLka0AfnTPP/3b4gj3wCYc6duT/yfBzSMZAPQFWdPdP+P14DJWxL+YwtEZJA31fM/XudO25EEDzhsthHthYxel/8UGQAC5Qv9CRowa2/qf6IDEV1syrZE/IkLWyCCxEBRWjLX9z/J0Thnf9r/DGAAg5I2yekA5NyZu1P+k5wXsie5/8+fjtBEUiyAnIruV5IMwBWI2BQDADx/gK2koHo5AAAAAElFTkSuQmCC", "tops": {"A": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAABV0lEQVR42pVTWUsCURj1N7WpaFRgrqPjpKZliyk5a1qZC9SjRYktYupAVkT/ICKix/7Yae4Nze3K9D3dOfdwlo87Fgtj2mURmuBBdNGOHvZwqtBz2GGFxczI/OoQ8epgB7mID5EB0bE5V5IgRHJec9oouVncx4W6BYV3g7PNwb8wyxZoFDJolbJQwx4IhkAPG+QwK5CO9XwKl9o2JcSXndSZJKjKm5BCLuoesDISdCoS7o7TyBs9yff6kgO6gRHh0kYIguEcnda/UxHpZTERRGLF2SdW5SSOYgHDeUL/9mcaT99iH6wZC1SFv/5kumcqTuIcQvZ5tnvzPQWt6aUEqeYeI07C7j/2hrF82wep7oIZAZKcmUa6do1d+rMzFCt0OVRe+ekvcVIC/SuDXMtr7gmPCjTedqHc/mKHuh+mBYrPQRQeOeZipwpIN8M/0r8Eyi88c4mj8wOjjr+If88pKgAAAABJRU5ErkJggg==", "B": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAABaklEQVR42o1S60pCYRD0mXoGCxPDR+gGZSJlaGT0NyIkM1NPVh6thDLLEEnxkpeOWZlSGhhhQtrtT9IrTJ0vtLx8dubXMjvMzi4rElHwWooh5jfDZdWiztWq56S2G9UQCUHIa2wS5i+9OAsw2LVo6QZZzo3Ct5CvnaZpkuCpGEYudYDwsRHWJSVMC+N0g/JdEM8PUUR9JvAGde6vhqWt8FFJoZj14SZ9SASerTkyuXIfQSaxh4DHQKabFyc6G7yXEyjlA+CCDBG4N3TguVo1hVtuG45VddNR2/D2GCfNXNKBI3a+Icwk93ER2SST2/ZnQiNwcL9k4cqLU99aY38eny9pXMdZrOtV9OnmkyGozBIiUOj72oSdOEtwuJmbYvqhWBZDiAGfnJpGYRC3NaVjPYTT2GXQueTdP7FTAltkFJNWibAXbjUw+QehNP5wapsUgg1mnAPQsDLqYbsaKFZ68d9aVMzuyKlHbMUXkBv0P5okMwYAAAAASUVORK5CYII="}}, "grass": {"young": {"name": "Young shoots", "mat": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAA70lEQVR42mPInmrxP6nD+H96v9n/5C6T/1mTzf8zQMHJd5VwNjro3+ODXW7VybT/BXOswIbmzbTEqihjItCyTuP/ab2m/xl23SnAUNS+yQMuBnJRxgSz//mzrcB0aq8JpqELr4bhdCoMHH5eRlANQTBhvy/lhlAVTDnsj+qiqUf8iXbihgtZqGo3XcrGqXnCPojfc6ZZgKMPFCPZU8z/FwBphuQuYHz2mYITETbNmcA4B2lMB6oh6Kzc6UAbgAZmTjL/n9Jt8j8HmEqR5TdfziHOiyuOp+JU2LHZgzhDFlwOpXOcE5Oc8aTz0v/kegUAUT596xjBFhAAAAAASUVORK5CYII=", "clump": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAAZUlEQVR42mNgGAWjYHiCift9/7dv8gBjdLlpxwKwimOAbddz/3ds8URR3Ank77ydT5wBMLD2TAZYQ/9en/99u33AbJArJh30I86geRdD4N7p3Or5f8654P+zzwaT5or9j4rxagAAq7hJc+f5hqwAAAAASUVORK5CYII="}, "grown": {"name": "Grown", "mat": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAB5ElEQVR42mVTWS9DQRS+v6elPFItLS9otai1eMCbSlpLUboh/AJBEEW1toaIJdQeEiGxPHoQf+WYb665946eZHLPzFnmO998V/EmLNQwWUST5w7yzZVS7aiJFINFTh18H9qpkM6HduU9t8XrFopfV5MnVkwNU0UUyqpJ2+/dWjIuqh8zUeO0hecp4aNKLRjLO2kgVcb3q4/tlPvqJdeEmerCJnJFzDSSs/Nikb9020pK4K8A3ZCIL0YRScN7Nu6nnjvJiITH9lmsftxMjUkLD0QvnXT03cd9nGEBgYvliKLETQ33m9gIvnl2UfpN7YrZRZLwRxlkjAEfZANd82yJduHAuopeyXx0FzDK4f2Z4An8YBTpFbzxYgKcyGmVVpD97CloKKDDFvI+jgJ1WgKggWEB1Vi88eKnFjavm71EMGOlppkSGj6w0TrQgDiRKPiAoZmbCQzwUYyz8ePKQvFwsg7tWmBwq1wXzZlD8zdf/dwPZnUFRi+cckOoDN+JkyoOF+NgceUl9XlDjMC1pw65eOWhTeUApLIZxfnyXSuJxoiDOMhcK/REVQViBTbKKP3WVQAxmLXqDe/bVCGxS+og6zWm+f/PBHnHrqrlv9LAx0jOJsM3Egc7/umXdKEX2iUewod2+gXMPjbF9QtsMwAAAABJRU5ErkJggg==", "clump": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAAmUlEQVR42mNgGAXDAeQssvyfNc8CjGFiNbscUfgEQd4SKwxDsudb4DSkeLXNf5Cemp2OqPKl62zhBqEbCAKVWx3+F620QZWbfTgcRUP1DkeshuQuxvTqyqvxaC5Yb4ehGYRXXIqDs0FqlpyL+V+1zeE/yCsM2DQUrbZB4Rcst4ZrxuY1OIApJISJipmpu0PI04gM/Gp1CWoGANzGuDyiF916AAAAAElFTkSuQmCC"}, "flowering": {"name": "Flowering", "mat": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAB50lEQVR42mVTWS9DQRS+v6elPBattryg9lL7A95UUltR2tqCPyCNIHa1NRqxxBqERIjtSTyIv3LMd665t6Mnmdwzc5b5zjff1arGbFQxkkUjp27yTedSyYCFtDQLH7t537NdoJz37qh7tvhVHcWuiqgymk0Vo1n0+RKnu7NZ2nxrNZJxUdmghaonbJynIUEGoxce6lqx837xvoGSX+3kHbZSachC3rCV+pNOLkYczbG0wF8BuiERX4wim/btOthfeWxSkHBsT8QkTBxEzj2U+u5gv3rcRlhA4B2yGoVj18Xs14gRfDPioo1XvStml0nSHxCQMQZ8kA10tVM53BhnXcs6em3rvTWDUYb3Z6FUoV4gxsUokgNGXhXLJsAJH7uMgsRHW0ZDCR02d+FjFKgzEgANDEuo6cWrT81UJ+YtFy8R3Mqnmskc6tt30DLQgDiZKPmAoVm5EBjgoxhnQ4eFmeJhsg6cRqB7Pc8UzYnb8Neem9kPJkwFRs48akOoDN/hIxfDxThYrLxxc94eIeOlh0a1eOHOr3MAUsWM8nz+pp5kY8RBHGRuFFZGdAViBVbttPHakgExmMg3G976dSGJS0oh6yWh+f/PBHlHL4vUvzKNj/6kQ4WfThzs8KdT0YVZ6FR4CB046RfJwEU/c9zFVgAAAABJRU5ErkJggg==", "clump": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAArUlEQVR42mNgwAGunZn2n4ESQHUDqGIgRYZQbABVvIEV5Cyy/J81zwKMYWI1uxxR+ARB3hIrDEOy51vgNKR4tc1/kJ6anY6o8qXrbOEGoRsIApVbHf4XrbRBlZt9OBxFQ/UOR6yG5C7G9OrKq/FoLlhvh6EZhFdcioOzQWqWnIv5X7XN4T/IKwzYNBSttkHhFyy3hmvG5jU4gCkkhImKmam7Q8jTiAz8anUJagYAeujVK3ckJe8AAAAASUVORK5CYII="}, "dying": {"name": "Dying back", "mat": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAABKklEQVR42mNggIKiGMv/jRkO/wuiLP4zYAGLusNRxBf3RGBVBwaVSbb/yxNswArWTYvDUAiyDKfmbXOS4ZILu1BtBbkQmb9jWcF/hpUTo+GCm2clgtkgsb2rijFsWdYfhd3mrbOT4BKViTb/0W0CgYPrysBi2+ciXLikNxLTwGsHmjAES2KtUMTWTIn9D/GSI6pamBe2zUG46NLeBjC7OtkOLlaTYoeqERQlW5E0EfQzFMxsDobIn9xa/R89urD6D80LcFCbao/XJvTAw6qvPs0e6ldbDIWH15f/bwIGWGmc9f+GdEQMwWIGK0BObU2ZjvhduGICIjGtRwqLq1iiFD11YgVrp0IM2TQz4f/KiTGENWALJOTUuWF6PH5DYIkFBm4caiHKVlA+AgA1U6T/D1gh7QAAAABJRU5ErkJggg==", "clump": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAAeElEQVR42mNgGAWjYHiCZf1R/2c2B4MxyZoXdIaBNc6H0iQbtGF6PIpGGF4/Lf7/nLaQ/2unxkH4QHVbZif+v7in/j/Dsr6o/0t6I1E09OwLAGN0PsiQWS3B/2HenNcR+p8Bm40gXLHKAQXDXLllVuL/zTMT4V4DAEMYf0dkE7ErAAAAAElFTkSuQmCC"}}};
+const OPTIONS = {
+  show: { label: "Show", pick: 2, list: [["An oxbow by a river"], ["Every oxbow age along one river"], ["A river bank up close"]] },
+  reed: { label: "Reed plume", pick: 0, list: [["A: fresh (purple-brown)"], ["B: old (pale tan)"]] },
+  hg: { label: "Hippo grass", pick: 4, list: [["Young shoots"], ["Grown"], ["Flowering"], ["Dying back"], ["Mixed along the bank"]] },
+  plants: { label: "Plants", pick: 0, list: [["Both"], ["Reeds only"], ["Hippo grass only"], ["Neither (compare)"]] },
+  age: { label: "Oxbow age", pick: 0, list: [["Fresh (open water, 4 deep)"], ["Silting (3 deep, muddy ends)"], ["Old (1 to 2 deep, mud round it)"], ["Scar (dry green crescent)"]] },
+  band: { label: "River", pick: 1, list: [["Far inland (23 wide, fast)"], ["Mid inland (42 wide)"], ["Near the coast (66 wide)"]] },
+  view: { label: "View", pick: 1, list: [["From above"], ["Low on the bank"]] },
+};
+const USES = { age: [0], band: [0] };   // which rows matter for which "Show"
+const state = {}; for (const k in OPTIONS) state[k] = OPTIONS[k].pick;
+for (const [k, v] of new URLSearchParams(location.hash.slice(1))) if (k in state) state[k] = +v;   // e.g. #show=0&view=0&hg=4 (for pictures)
+/* Pan water (my pick): clay brown, cloudy from rain-washed clay and from animals wading, drinking and wallowing in it,
+   as real savanna pans are; thicker than the other waters, so the bed barely shows through. */
+const RIVER_WATER = 0x8C9E68, STILL_WATER = 0x5E8A52, PAN_WATER = 0xA88A5C, FLOOD_GRASS = 0x6F9B45, SCAR_GRASS = 0x5E9A3E;
+let SEED = 1;                                      // "Another one" rolls a new set of sizes and shapes
+function rnd(k) { return hash(SEED * 17.3 + k * 3.1, SEED * 5.7 - k * 11.9); }
+const SLOW = b => b.river > 30;   // only the slow mid and near-coast rivers get plants (the plan)
+const BANDS = [{ river: 23, depth: 7 }, { river: 42, depth: 8 }, { river: 66, depth: 9 }];
+
+function load(src) { return new Promise(r => { const i = new Image(); i.onload = () => r(i); i.src = src; }); }
+function canvasOf(img, w, h) { const c = document.createElement("canvas"); c.width = w || img.width; c.height = h || img.height; c.getContext("2d").drawImage(img, 0, 0); return c; }
+function tinted(img, hex, w, h) {
+  const c = canvasOf(img, w, h), g = c.getContext("2d"), d = g.getImageData(0, 0, c.width, c.height);
+  const r = (hex >> 16 & 255) / 255, gg = (hex >> 8 & 255) / 255, b = (hex & 255) / 255;
+  for (let i = 0; i < d.data.length; i += 4) { d.data[i] *= r; d.data[i + 1] *= gg; d.data[i + 2] *= b; }
+  g.putImageData(d, 0, 0); return c;
+}
+function tex(c) { const t = new THREE.CanvasTexture(c); t.magFilter = THREE.NearestFilter; t.minFilter = THREE.NearestFilter; return t; }
+function hash(x, z) { const s = Math.sin(x * 127.1 + z * 311.7) * 43758.5453; return s - Math.floor(s); }
+
+const IMG = {}; let ALGAE = [], SAVANNA = 0x9EA75A; const REED = { tops: {} }, HG = {};
+const STAGES = ["young", "grown", "flowering", "dying"];
+const renderer = new THREE.WebGLRenderer({ canvas: document.getElementById("c"), antialias: true });
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(55, 1, 0.1, 900);
+const controls = new THREE.OrbitControls(camera, renderer.domElement);
+
+/* A column: top = the y of its top block (water's block is y 0, its surface 0.875; the floodplain's grass is top 1,
+   one block over the water, top 2 farther out), kind = the top block, water = true when still or river water stands
+   on it, wk = "river" or "still", algae = 0..3 or null, tuft = short grass on it, pocks = hoof marks. */
+function cell(top, kind) { return { top, kind, water: false, wk: null, algae: null, tuft: false, pocks: false }; }
+
+/* Oxbow sizes from the river (half real size, my picks): the lake half the river's width, the loop twice the river's
+   width across, a neck of floodplain an eighth of the river's width (3 to 8) between its ends and the river. */
+/* Every oxbow its own (my picks): the loop 0.6 to 1.35 times that size, the lake 0.65 to 1.35 times as wide, the arms
+   reaching 100 to 170 degrees round (a half-moon to a near ring), the loop squashed or drawn out (0.75 to 1.3), turned a
+   little, its banks wavier or smoother, one arm wider than the other, the neck 3 to 8. k picks which oxbow of a scene. */
+function oxbowSize(river, k) {
+  const r = i => rnd(k * 10 + i);
+  const baseW = Math.max(8, Math.round(river / 2)), baseA = Math.max(30, 2 * river);
+  const across = Math.max(26, Math.round(baseA * (0.6 + 0.75 * r(1))));
+  const w = Math.min(Math.round(across * 0.3), Math.max(6, Math.round(baseW * (0.65 + 0.7 * r(2)))));
+  return { w, rc: (across - w) / 2, across, neck: 3 + Math.floor(r(3) * 6), half: (100 + 70 * r(4)) * Math.PI / 180,
+           stretch: 0.75 + 0.55 * r(5), tilt: (r(6) - 0.5) * 0.6, phase: r(7) * 6.28, wob: 0.05 + 0.12 * r(8), lop: (r(9) - 0.5) * 0.5 };
+}
+const TODAY_OXBOW = { w: 4, rc: 6, across: 16, neck: 8, half: 110 * Math.PI / 180, stretch: 1, tilt: 0, phase: 4, wob: 0.08, lop: 0, today: true };
+
+/* how far an oxbow and its bank ring reach from its centre, counted cell by cell (river toward -z) */
+function oxbowFit(o) {
+  const R = Math.ceil((o.rc + o.w) * Math.max(1, o.stretch) + 6);
+  let minX = 0, maxX = 0, minZ = 0, maxZ = 0;
+  for (let x = -R; x <= R; x++) for (let z = -R; z <= R; z++) {
+    const p = inOxbow(o, 0, 0, 1, x, z);
+    if (p && p.out < 1.5) { minX = Math.min(minX, x); maxX = Math.max(maxX, x); minZ = Math.min(minZ, z); maxZ = Math.max(maxZ, z); }
+  }
+  return { minX, maxX, minZ, maxZ };
+}
+
+/* where (x, z) lies in an oxbow centred at (cx, cz) whose open side faces the river (dir +1: river toward -z) */
+function inOxbow(o, cx, cz, dir, x, z) {
+  let dx = x + 0.5 - cx, dz = (z + 0.5 - cz) * dir;
+  const ct = Math.cos(o.tilt), st = Math.sin(o.tilt);
+  [dx, dz] = [(dx * ct - dz * st) / o.stretch, dx * st + dz * ct];
+  const a = Math.atan2(dx, dz), r = Math.hypot(dx, dz);     // a = 0 straight away from the river
+  const along = Math.abs(a) / o.half;
+  if (along > 1.15) return null;
+  let hw = o.w / 2 * (1 + o.wob * Math.sin(a * 5 + o.phase)) * (1 + o.lop * a / o.half);
+  if (along > 0.82) hw *= Math.sqrt(Math.max(0, 1 - ((along - 0.82) / 0.18) ** 2));   // rounded ends
+  const across = Math.abs(r - o.rc);
+  return { along: Math.min(along, 1), u: hw > 0.01 ? across / hw : 99, out: across - hw };
+}
+
+/* what an oxbow of an age does to a column: water and bed depth, mud flats, the scar's dip */
+function oxbowCell(c, p, age, today) {
+  if (p.u <= 1) {
+    let depth = 0;
+    if (today) depth = p.along < 0.5 ? 2 : 1;
+    else if (age === 0) depth = Math.max(1, Math.ceil(4 * (1 - p.u ** 3)));
+    else if (age === 1) depth = p.along < 0.8 ? Math.max(1, Math.round(3 * (1 - p.u * p.u) * (1 - 0.7 * p.along * p.along))) : 0;
+    else if (age === 2) depth = p.along < 0.45 && p.u < 0.75 ? (p.along < 0.25 && p.u < 0.4 ? 2 : 1) : 0;
+    if (depth > 0) {
+      Object.assign(c, { top: -depth, kind: hash(c.x, c.z) < 0.45 ? "mud" : "silt", water: true, wk: "still", tuft: false });
+      c.algae = depth <= 1 ? (hash(c.x + 3, c.z) < 0.35 ? 3 : 2) : depth === 2 ? (hash(c.x, c.z + 7) < 0.5 ? 2 : 1) : depth === 3 ? 1 : null;
+    } else if (age === 3) {
+      Object.assign(c, { top: 0, kind: hash(c.x, c.z) < 0.15 ? "mud" : "scar", tuft: hash(c.x + 1, c.z + 2) < 0.35 });
+    } else {
+      Object.assign(c, { top: 0, kind: hash(c.x, c.z) < 0.55 ? "mud" : "wetsilt", tuft: false });   // mud flats where it silted
+    }
+    return;
+  }
+  // the banks: a ring of mud just outside the water, the ground round the lake one block over the water
+  if (p.out < 1.5 && age !== 3) Object.assign(c, { top: age === 0 && !today ? 1 : 0, kind: hash(c.x + 2, c.z) < 0.6 ? "mud" : "wetsilt", tuft: false });
+  else if (p.out < 4 && c.top > 1) c.top = 1;
+}
+
+/* the river: running along x; columns z from zA to zA + river - 1 are water; floodplain both sides */
+function riverCell(c, zA, b) {
+  const e = Math.min(c.z - zA, zA + b.river - 1 - c.z);    // blocks from the nearer edge (inside the water)
+  if (e >= 0) {
+    const shallow = b.river * 0.2;
+    const top = e < shallow ? -1 - Math.floor(e / shallow * 2) : -b.depth + Math.round(Math.sin(c.x / 9) * 0.6);
+    Object.assign(c, { top, kind: e < 2 ? "wetsilt" : "silt", water: true, wk: "river" });
+    if (e < shallow) c.algae = hash(c.x, c.z) < 0.4 ? 2 : 1;
+    return;
+  }
+  const out = -e;                                        // blocks out from the water's edge
+  if (out <= 4) Object.assign(c, { top: 0, kind: out <= 2 ? "wetsilt" : "silt" });
+  else if (out <= 12) Object.assign(c, { top: 1, kind: "flood", tuft: hash(c.x, c.z) < 0.08 });
+  else Object.assign(c, { top: 2, kind: "flood", tuft: hash(c.x, c.z) < 0.1 });
+}
+
+const extras = [];   // the scale boxes: [x, y, z, length, height, width, colour, turn]
+
+/* the deepest middle of an oxbow, for the hippo and the low camera */
+function oxbowMiddle(o, cx, cz, dir) {
+  let best = null, score = 1e9;
+  for (let x = Math.floor(cx - o.rc * 2); x < cx + o.rc * 2; x++) for (let z = Math.floor(cz - o.rc * 2); z < cz + o.rc * 2; z++) {
+    const p = inOxbow(o, cx, cz, dir, x, z);
+    if (p && p.u < 0.5 && p.along + p.u < score) { score = p.along + p.u; best = [x + 0.5, z + 0.5]; }
+  }
+  return best || [cx, cz + o.rc * dir];
+}
+
+function oxbowScene() {
+  const b = BANDS[state.band], today = state.size === 1, o = today ? TODAY_OXBOW : oxbowSize(b.river, 0), f = oxbowFit(o);
+  const zA = 12, cx = 25 - f.minX, cz = zA + b.river + o.neck - f.minZ;
+  const W = Math.round(f.maxX - f.minX + 50), L = Math.round(cz + f.maxZ + 16), col = [];
+  for (let x = 0; x < W; x++) for (let z = 0; z < L; z++) {
+    const c = Object.assign(cell(1, "flood"), { x, z });
+    riverCell(c, zA, b);
+    if (!c.water) { const p = inOxbow(o, cx, cz, 1, x, z); if (p) oxbowCell(c, p, state.age, today); }
+    col.push(c);
+  }
+  const mid = oxbowMiddle(o, cx, cz, 1);
+  extras.length = 0;
+  if (!today && state.age < 2) extras.push([mid[0], -0.55, mid[1], 4, 1.6, 1.8, 0x8A7F86, 0.3]);    // a hippo, eyes out
+  extras.push([cx + f.minX - 8, 1, zA + b.river + 2.5, 7.5, 0.7, 1.2, 0x5A6236, 0]);               // a crocodile on the strip
+  extras.push([cx + 6, 2, zA + b.river + o.neck + 2, 0.6, 1.8, 0.6, 0x3A5FA8, 0]);                   // a player
+  const long = f.maxX - f.minX + 1, deep = f.maxZ - f.minZ + 1;
+  const word = today ? `today's oxbow: a ditch ${o.w} wide on a loop ${o.across} across, ${o.neck} blocks off the river, 2 deep`
+    : `this oxbow: the lake about ${o.w} wide on a loop ${long} along the river by ${deep} out from it, ${o.neck} blocks of floodplain between its ends and the river (a plain one for this river is a lake ${Math.max(8, Math.round(b.river / 2))} wide on a loop ${Math.max(30, 2 * b.river)} across; each one is 0.6 to 1.35 times that, in its own shape; where the floodplain is too narrow the game shrinks it to fit, never under a loop 26 across)`;
+  return { col, W, L, centre: [cx, 0, cz - deep * 0.15], span: Math.max(W, L), low: [[cx, 5.2, cz - o.rc * 0.4], [mid[0], 0, mid[1]]], words: `River ${b.river} wide, ${b.depth} deep in its channel; ${word}. "Another one" for a new one.` };
+}
+
+function allAgesScene() {
+  const b = BANDS[0], os = [0, 1, 2, 3].map(i => oxbowSize(b.river, i + 1)), fits = os.map(oxbowFit);
+  const xs = []; let x0 = 10;
+  fits.forEach(f => { xs.push(x0 - f.minX); x0 += f.maxX - f.minX + 16; });
+  const reach = Math.max(...os.map((o, i) => o.neck + fits[i].maxZ - fits[i].minZ)) + 12;
+  const W = Math.round(x0 - 6), zA = reach, L = reach * 2 + b.river, col = [];
+  const czs = os.map((o, i) => i % 2 === 0 ? zA + b.river + o.neck - fits[i].minZ : zA - 1 - o.neck + fits[i].minZ);
+  for (let x = 0; x < W; x++) for (let z = 0; z < L; z++) {
+    const c = Object.assign(cell(1, "flood"), { x, z });
+    riverCell(c, zA, b);
+    if (!c.water) {
+      let best = null, bi = 0;
+      os.forEach((o, i) => { const p = inOxbow(o, xs[i], czs[i], i % 2 === 0 ? 1 : -1, x, z); if (p && (!best || p.out < best.out)) { best = p; bi = i; } });
+      if (best) oxbowCell(c, best, bi, false);
+    }
+    col.push(c);
+  }
+  const mid = oxbowMiddle(os[0], xs[0], czs[0], 1);
+  extras.length = 0;
+  extras.push([mid[0], -0.55, mid[1], 4, 1.6, 1.8, 0x8A7F86, 0.3]);
+  extras.push([xs[1], 2, zA - os[1].neck - 2, 0.6, 1.8, 0.6, 0x3A5FA8, 0]);
+  const sizes = os.map((o, i) => `${o.w} wide on a loop ${fits[i].maxX - fits[i].minX + 1}`).join("; ");
+  return { col, W, L, centre: [W / 2, 0, L / 2], span: W * 0.8, low: [[mid[0], 5.2, czs[0] - os[0].rc * 0.4], [mid[0], 0, mid[1]]],
+    words: `A far-inland river (23 wide) with an oxbow of each age, left to right: fresh, silting, old, scar; they swap sides as the river's bends do, and each has its own size and shape. The lakes: ${sizes}. "Another one" for a new set.` };
+}
+
+/* A river bank up close: the mid-inland river's shallow edge along x, its bank and floodplain, a little muddy bay. */
+function closeScene() {
+  const b = BANDS[1], W = 40, L = 34, zA = 12 - b.river, col = [];
+  for (let x = 0; x < W; x++) for (let z = 0; z < L; z++) {
+    const c = Object.assign(cell(1, "flood"), { x, z });
+    riverCell(c, zA, b);
+    const bay = Math.hypot((x - 24) / 1.6, z - 12.5);                  // a quiet bay cut into the bank
+    if (!c.water && bay < 4.2) Object.assign(c, { top: -1, kind: hash(x, z) < 0.5 ? "mud" : "wetsilt", water: true, wk: "river", algae: hash(x + 1, z) < 0.4 ? 2 : 1 });
+    else if (!c.water && bay < 5.6) Object.assign(c, { top: 0, kind: "mud" });
+    col.push(c);
+  }
+  extras.length = 0;
+  extras.push([8, -0.55, 4, 4, 1.6, 1.8, 0x8A7F86, 0.2]);                   // a hippo, eyes out
+  extras.push([34, 0, 16.5, 0.6, 1.8, 0.6, 0x3A5FA8, 0]);                   // a player on the silt strip
+  return { col, W, L, centre: [W / 2, 0, L / 2], span: 44, low: [[33, 6.5, 30], [20, 1, 8]],
+    words: "The mid-inland river's shallow edge (1 to 2 deep), its silt strip and floodplain, with a quiet muddy bay: reeds where the water is 1 or 2 deep or on mud at the waterline, hippo grass floating out from the bank." };
+}
+
+/* where the plants go, by the plan's rules (patch shapes my picks): water and mud cells get reeds in patchy beds,
+   water near the bank a floating hippo grass fringe 1 to 3 wide in patches, rooted clumps on the bank beside it */
+function patch(x, z, k) {
+  return 0.5 + 0.22 * Math.sin(x / 4.3 + k * 1.7 + SEED) + 0.18 * Math.sin(z / 3.7 + k * 2.3 - SEED) + 0.1 * Math.sin((x + z) / 2.9 + k);
+}
+function placePlants(S) {
+  const { col, W, L } = S, at = (x, z) => (x < 0 || z < 0 || x >= W || z >= L) ? null : col[x * L + z];
+  const riverOk = S.slow, still = c => c.wk === "still" || (c.wk === "river" && riverOk);
+  const landNear = (c, r) => {                                   // blocks to the nearest dry column, up to r
+    let d = 99;
+    for (let dx = -r; dx <= r; dx++) for (let dz = -r; dz <= r; dz++) { const n = at(c.x + dx, c.z + dz); if (n && !n.water) d = Math.min(d, Math.hypot(dx, dz)); }
+    return d;
+  };
+  const byWater = c => [[1, 0], [-1, 0], [0, 1], [0, -1]].some(([dx, dz]) => { const n = at(c.x + dx, c.z + dz); return n && n.water && still(n); });
+  for (const c of col) {
+    c.reed = 0; c.mat = null; c.clump = null;
+    const wet = c.water && still(c);
+    if (wet && c.top >= -2 || !c.water && c.kind === "mud" && c.top === 0 && byWater(c)) {
+      const depth = c.water ? -c.top : 0;
+      if (patch(c.x, c.z, 1) > 0.62 && hash(c.x + 5, c.z + 1) < 0.9) c.reed = depth + 2 + Math.floor(hash(c.x, c.z + 2) * 2);   // 2 or 3 blocks over the water
+    }
+    if (wet && !c.reed) {
+      const stage = state.hg < 4 ? state.hg : Math.floor((((c.x + c.z) * 0.035 + patch(c.x, c.z, 5) * 0.5 + SEED * 0.37) % 1) * 4);   // the stages in turn along the bank
+      const d = landNear(c, 3), wide = stage === 0 || stage === 3 ? 1 : 1 + Math.floor(patch(c.x, c.z, 3) * 3);   // young creep out, dying shrink back
+      if (d <= wide && patch(c.x, c.z, 2) > 0.5) c.mat = STAGES[Math.max(0, stage)];
+    }
+  }
+  for (const c of col) if (!c.water && !c.reed) for (const [dx, dz] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+    const n = at(c.x + dx, c.z + dz);
+    if (n && n.mat && hash(c.x + 3, c.z) < 0.75) { c.clump = n.mat === "dying" ? "dying" : n.mat; break; }
+  }
+}
+
+function build() {
+  while (scene.children.length) scene.remove(scene.children[0]);
+  for (const k in USES) document.querySelectorAll(`[data-row=${k}] button`).forEach(b => b.disabled = !USES[k].includes(state.show));
+  const S = [oxbowScene, allAgesScene, closeScene][state.show]();
+  S.slow = state.show === 2 || SLOW(BANDS[state.show === 1 ? 0 : state.band]);
+  placePlants(S);
+  document.getElementById("sizes").textContent = S.words;
+  const { col, W, L } = S;
+  const at = (x, z) => (x < 0 || z < 0 || x >= W || z >= L) ? null : col[x * L + z];
+  const shade = [0.6, 0.6, 1, 0.5, 0.8, 0.8];
+  const boxMats = map => shade.map((s, i) => new THREE.MeshBasicMaterial({ map: map[i] || map[0], color: new THREE.Color(s, s, s) }));
+  const dirt = tex(canvasOf(IMG.dirt));
+  const sideOf = hex => { const c = canvasOf(IMG.dirt); c.getContext("2d").drawImage(tinted(IMG.grass_block_side_overlay, hex), 0, 0); return tex(c); };
+  const grassMats = hex => { const s = sideOf(hex); return boxMats([s, s, tex(tinted(IMG.grass_block_top, hex)), dirt, s, s]); };
+  const mats = { grass: grassMats(SAVANNA), flood: grassMats(FLOOD_GRASS), scar: grassMats(SCAR_GRASS), dirt: boxMats([dirt]),
+                 coarse: boxMats([tex(canvasOf(IMG.coarse_dirt))]), silt: boxMats([tex(canvasOf(IMG.silt))]),
+                 wetsilt: boxMats([tex(canvasOf(IMG.wet_silt))]), mud: boxMats([tex(canvasOf(IMG.river_mud))]) };
+  const cells = {}; for (const k in mats) cells[k] = [];
+  for (const c of col) {
+    let low = c.top;
+    for (const [dx, dz] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) { const n = at(c.x + dx, c.z + dz); low = Math.min(low, n ? n.top + 1 : -10); }
+    for (let y = Math.max(low, -10); y <= c.top; y++) cells[y < c.top ? "dirt" : c.kind].push([c.x, y, c.z]);
+  }
+  const box = new THREE.BoxGeometry(1, 1, 1), m4 = new THREE.Matrix4();
+  for (const k in cells) {
+    if (!cells[k].length) continue;
+    const mesh = new THREE.InstancedMesh(box, mats[k], cells[k].length);
+    cells[k].forEach(([x, y, z], i) => mesh.setMatrixAt(i, m4.makeTranslation(x + 0.5, y + 0.5, z + 0.5)));
+    scene.add(mesh);
+  }
+  const plane = new THREE.PlaneGeometry(1, 1); plane.rotateX(-Math.PI / 2);
+  for (let s = 0; s < 4; s++) {                     // algae on the shallow beds (look C, the game's)
+    const cs = col.filter(c => c.algae === s);
+    if (!cs.length) continue;
+    const mesh = new THREE.InstancedMesh(plane, new THREE.MeshBasicMaterial({ map: ALGAE[s], transparent: true, alphaTest: 0.05, depthWrite: false }), cs.length);
+    cs.forEach((c, i) => mesh.setMatrixAt(i, m4.makeRotationY(Math.floor(hash(c.x + 9, c.z + 4) * 4) * Math.PI / 2).setPosition(c.x + 0.5, c.top + 1.01, c.z + 0.5)));
+    scene.add(mesh);
+  }
+  const pk = col.filter(c => c.pocks);              // hoof marks pressed into the trampled ring
+  if (pk.length) {
+    const small = new THREE.PlaneGeometry(0.22, 0.28); small.rotateX(-Math.PI / 2);
+    const mesh = new THREE.InstancedMesh(small, new THREE.MeshBasicMaterial({ color: 0x3B2E22 }), pk.length * 2);
+    pk.forEach((c, i) => { for (let j = 0; j < 2; j++) mesh.setMatrixAt(i * 2 + j, m4.makeTranslation(c.x + 0.2 + 0.6 * hash(c.x + j, c.z), c.top + 1.005, c.z + 0.2 + 0.6 * hash(c.x, c.z + j))); });
+    scene.add(mesh);
+  }
+  const tf = col.filter(c => c.tuft);               // short grass
+  if (tf.length) {
+    const g1 = new THREE.PlaneGeometry(0.9, 0.9); g1.translate(0, 0.45, 0); const g2 = g1.clone(); g1.rotateY(Math.PI / 4); g2.rotateY(-Math.PI / 4);
+    for (const g of [g1, g2]) {
+      const mesh = new THREE.InstancedMesh(g, new THREE.MeshBasicMaterial({ map: tex(tinted(IMG.short_grass, FLOOD_GRASS)), transparent: true, alphaTest: 0.1, side: THREE.DoubleSide }), tf.length);
+      tf.forEach((c, i) => mesh.setMatrixAt(i, m4.makeTranslation(c.x + 0.5, c.top + 1, c.z + 0.5)));
+      scene.add(mesh);
+    }
+  }
+  for (const [wk, hex] of [["river", RIVER_WATER], ["still", STILL_WATER], ["pan", PAN_WATER]]) {
+    const ws = col.filter(c => c.wk === wk);
+    if (!ws.length) continue;
+    const mesh = new THREE.InstancedMesh(plane, new THREE.MeshBasicMaterial({ map: tex(tinted(IMG.water_still, hex, 16, 16)), transparent: true, opacity: wk === "pan" ? 0.96 : 0.9, depthWrite: false, side: THREE.DoubleSide }), ws.length);
+    ws.forEach((c, i) => mesh.setMatrixAt(i, m4.makeTranslation(c.x + 0.5, 0.875, c.z + 0.5)));
+    scene.add(mesh);
+  }
+  drawPlants(col);
+  for (const [x, y, z, l, h, w, hex, turn] of extras) {
+    const m = new THREE.Mesh(new THREE.BoxGeometry(l, h, w), new THREE.MeshBasicMaterial({ color: hex }));
+    m.position.set(x, y + h / 2, z); m.rotation.y = turn; scene.add(m);
+    const e = new THREE.LineSegments(new THREE.EdgesGeometry(m.geometry), new THREE.LineBasicMaterial({ color: 0x111111 }));
+    e.position.copy(m.position); e.rotation.copy(m.rotation); scene.add(e);
+  }
+  scene.background = new THREE.Color(0x78A7FF);
+  const [cx, , cz] = S.centre, sp = S.span;
+  if (state.view === 0) { camera.position.set(cx, sp * 0.42, cz + sp * 0.55); controls.target.set(cx, 0, cz); }
+  else { camera.position.set(...S.low[0]); controls.target.set(...S.low[1]); }
+  controls.update();
+}
+
+/* reeds: three crossed planes a block (a thick bed), stem blocks under a top block with the plume, each clump nudged a
+   little off its block's middle (a block can do that, as grass does); hippo grass: a mat lying just over the water with
+   short blades sticking up through it (none when dying back), crossed clumps on the bank */
+function drawPlants(col) {
+  const showReed = state.plants === 0 || state.plants === 1, showHg = state.plants === 0 || state.plants === 2;
+  const m4 = new THREE.Matrix4(), mat = t => new THREE.MeshBasicMaterial({ map: t, transparent: true, alphaTest: 0.1, side: THREE.DoubleSide });
+  const crossed = (w, h, n) => { const gs = []; for (let i = 0; i < n; i++) { const g = new THREE.PlaneGeometry(w, h); g.translate(0, h / 2, 0); g.rotateY(Math.PI / 4 + i * Math.PI / n); gs.push(g); } return gs; };
+  const add = (gs, t, spots) => { if (!spots.length) return; for (const g of gs) { const m = new THREE.InstancedMesh(g, mat(t), spots.length); spots.forEach((p, i) => m.setMatrixAt(i, m4.makeRotationY(p[3] || 0).setPosition(p[0], p[1], p[2]))); scene.add(m); } };
+  if (showReed) {
+    const stem = [], top = [];
+    for (const c of col.filter(c => c.reed)) {
+      const ox = c.x + 0.5 + (hash(c.x + 7, c.z) - 0.5) * 0.3, oz = c.z + 0.5 + (hash(c.x, c.z + 7) - 0.5) * 0.3, y0 = c.top + 1, turn = hash(c.x + 2, c.z + 9) * 6.28;
+      for (let k = 0; k < c.reed - 1; k++) stem.push([ox, y0 + k, oz, turn]);
+      top.push([ox, y0 + c.reed - 1, oz, turn]);
+    }
+    add(crossed(1, 1, 3), REED.stem, stem); add(crossed(1, 1, 3), REED.tops["AB"[state.reed]], top);
+  }
+  if (showHg) {
+    const flat = new THREE.PlaneGeometry(1.15, 1.15); flat.rotateX(-Math.PI / 2);
+    for (const st of STAGES) {
+      const G = HG[st], mats = col.filter(c => c.mat === st);
+      if (mats.length) {
+        const m = new THREE.InstancedMesh(flat, new THREE.MeshBasicMaterial({ map: G.mat, transparent: true, alphaTest: 0.1, depthWrite: false }), mats.length);
+        mats.forEach((c, i) => m.setMatrixAt(i, m4.makeRotationY(Math.floor(hash(c.x + 9, c.z + 4) * 4) * Math.PI / 2).setPosition(c.x + 0.5, 0.9, c.z + 0.5)));
+        scene.add(m);
+      }
+      if (st !== "dying") add(crossed(0.8, st === "young" ? 0.3 : 0.45, 2), G.clump, mats.filter(c => hash(c.x + 4, c.z + 4) < 0.55).map(c => [c.x + 0.5, 0.86, c.z + 0.5, hash(c.x, c.z) * 6.28]));
+      add(crossed(1, 1, 2), G.clump, col.filter(c => c.clump === st).map(c => [c.x + 0.5, c.top + 1, c.z + 0.5, hash(c.x, c.z + 1) * 3]));
+    }
+  }
+  const n = col.filter(c => c.reed).length, count = st => col.filter(c => c.mat === st).length;
+  document.getElementById("sizes").textContent += ` Here: ${n} reed clumps; hippo grass ${STAGES.map(st => `${HG[st].name.toLowerCase()} ${count(st)}`).join(", ")} blocks.`;
+}
+
+function buttons() {
+  const panel = document.getElementById("panel");
+  for (const key in OPTIONS) {
+    const row = document.createElement("div"); row.className = "row"; row.dataset.row = key;
+    row.innerHTML = `<b>${OPTIONS[key].label}</b>`;
+    OPTIONS[key].list.forEach((o, i) => {
+      const b = document.createElement("button"); b.textContent = o[0]; b.className = state[key] === i ? "on" : "";
+      b.onclick = () => { state[key] = i; [...row.querySelectorAll("button")].forEach((x, j) => x.className = j === i ? "on" : ""); build(); };
+      row.appendChild(b);
+    });
+    panel.appendChild(row);
+  }
+  const row = document.createElement("div"); row.className = "row";
+  row.innerHTML = `<b>Shapes and stands</b>`;
+  const b = document.createElement("button"), n = document.createElement("span");
+  b.textContent = "Another one"; n.textContent = `set ${SEED}`;
+  b.onclick = () => { SEED++; n.textContent = `set ${SEED}`; build(); };
+  row.appendChild(b); row.appendChild(n); panel.appendChild(row);
+}
+
+function resize() { const c = renderer.domElement; renderer.setSize(c.clientWidth, c.clientHeight, false); camera.aspect = c.clientWidth / c.clientHeight; camera.updateProjectionMatrix(); }
+window.addEventListener("resize", resize);
+
+(async () => {
+  for (const k in D.blocks) IMG[k] = await load(D.blocks[k]);
+  const cm = canvasOf(IMG.grass_colormap).getContext("2d"); const p = cm.getImageData(0, 255, 1, 1).data; SAVANNA = p[0] << 16 | p[1] << 8 | p[2];
+  for (const src of D.algae) ALGAE.push(tex(canvasOf(await load(src))));
+  REED.stem = tex(canvasOf(await load(D.reeds.stem)));
+  for (const k in D.reeds.tops) REED.tops[k] = tex(canvasOf(await load(D.reeds.tops[k])));
+  for (const k in D.grass) HG[k] = { name: D.grass[k].name, mat: tex(canvasOf(await load(D.grass[k].mat))), clump: tex(canvasOf(await load(D.grass[k].clump))) };
+  buttons(); build(); resize();
+  (function loop() { requestAnimationFrame(loop); controls.update(); renderer.render(scene, camera); })();
+})();
+</script>
+</body>
+</html>

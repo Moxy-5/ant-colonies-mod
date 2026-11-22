@@ -60,10 +60,10 @@ Oxbows and pans rework (docs/plans/oxbows-and-pans.md step 2, 2026-11-18; oxbow_
 a river at its four ages and three river widths, every age along one river, a pan at four sizes, today's tiny ponds to
 compare, with a hippo, a crocodile and a player for scale:
 python tools/model_viewer.py oxbows [out.html]   (default references/oxbow_viewer.html)
-Papyrus and hippo grass (docs/plans/papyrus-and-hippo-grass.md step 1, 2026-11-22, papyrus_art.py;
-papyrus_viewer.template.html): papyrus stands and the hippo grass fringe on an oxbow, along a river and up close, three
-looks of each, with a hippo, a crocodile and a player for scale:
-python tools/model_viewer.py papyrus [out.html]   (default references/papyrus_viewer.html)
+River plants (docs/plans/papyrus-and-hippo-grass.md step 1, 2026-11-22, river_plants_art.py;
+river_plants_viewer.template.html): reed beds and the hippo grass fringe (its life cycle: young, grown, flowering, dying
+back, or mixed along a bank) on an oxbow, along a river and up close, with a hippo, a crocodile and a player for scale:
+python tools/model_viewer.py riverplants [out.html]   (default references/river_plants_viewer.html)
 """
 import base64
 import json
@@ -526,12 +526,12 @@ def oxbow_page(out):
     print("wrote", out)
 
 
-def papyrus_page(out):
-    """Papyrus and hippo grass (docs/plans/papyrus-and-hippo-grass.md step 1): the oxbow viewer's scenes with papyrus
-    stands and hippo grass fringes placed by the plan's rules, three looks of each (papyrus_art.py)."""
+def river_plants_page(out):
+    """River plants (docs/plans/papyrus-and-hippo-grass.md step 1): the oxbow viewer's scenes with reed beds and hippo
+    grass fringes placed by the plan's rules, the reeds' two plumes and hippo grass's four life stages (river_plants_art.py)."""
     import zipfile
     import algae_art
-    import papyrus_art as pa
+    import river_plants_art as ra
     jar = Path.home() / ".gradle/caches/neoformruntime/artifacts/minecraft_1.21.1_client.jar"
     z = zipfile.ZipFile(jar)
     blocks = {n: uri(z.read(f"assets/minecraft/textures/block/{n}.png"))
@@ -540,12 +540,11 @@ def papyrus_page(out):
     for n in ("silt", "wet_silt", "river_mud"):
         blocks[n] = file_uri(n + ".png")
     algae = [uri(png(r)) for r in algae_art.all_looks()["C"]["mat"]]
-    looks = pa.all_looks()
-    papyrus = {"base": uri(png(looks["papyrus"]["base"])), "stem": uri(png(looks["papyrus"]["stem"])),
-               "heads": {k: uri(png(r)) for k, r in looks["papyrus"]["heads"].items()}}
-    grass = {k: {part: uri(png(r)) for part, r in v.items()} for k, v in looks["hippo_grass"].items()}
-    data = {"blocks": blocks, "algae": algae, "papyrus": papyrus, "grass": grass}
-    template = (Path(__file__).resolve().parent / "papyrus_viewer.template.html").read_text(encoding="utf-8")
+    looks = ra.all_looks()
+    reeds = {"stem": uri(png(looks["reeds"]["stem"])), "tops": {k: uri(png(r)) for k, r in looks["reeds"]["tops"].items()}}
+    grass = {k: {"name": v["name"], "mat": uri(png(v["mat"])), "clump": uri(png(v["clump"]))} for k, v in looks["hippo_grass"].items()}
+    data = {"blocks": blocks, "algae": algae, "reeds": reeds, "grass": grass}
+    template = (Path(__file__).resolve().parent / "river_plants_viewer.template.html").read_text(encoding="utf-8")
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(template.replace("/*DATA*/null", json.dumps(data)), encoding="utf-8")
     print("wrote", out)
@@ -836,8 +835,8 @@ def main():
     if len(sys.argv) > 1 and sys.argv[1] == "oxbows":
         oxbow_page(Path(sys.argv[2]) if len(sys.argv) > 2 else ROOT / "references/oxbow_viewer.html")
         return
-    if len(sys.argv) > 1 and sys.argv[1] == "papyrus":
-        papyrus_page(Path(sys.argv[2]) if len(sys.argv) > 2 else ROOT / "references/papyrus_viewer.html")
+    if len(sys.argv) > 1 and sys.argv[1] == "riverplants":
+        river_plants_page(Path(sys.argv[2]) if len(sys.argv) > 2 else ROOT / "references/river_plants_viewer.html")
         return
     if len(sys.argv) > 1 and sys.argv[1] == "sand":
         sand_page(Path(sys.argv[2]) if len(sys.argv) > 2 else ROOT / "references/sand_viewer.html")
