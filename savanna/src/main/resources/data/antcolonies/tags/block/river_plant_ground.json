@@ -1,0 +1,21 @@
+{
+  "values": [
+    "antcolonies:silt",
+    "antcolonies:wet_silt",
+    "antcolonies:river_mud",
+    "antcolonies:savanna_mud",
+    "#minecraft:sand",
+    "#minecraft:dirt",
+    "minecraft:clay",
+    "minecraft:gravel",
+    "antcolonies:red_river_sand",
+    "antcolonies:wet_red_river_sand",
+    "antcolonies:rippled_red_river_sand",
+    "antcolonies:golden_river_sand",
+    "antcolonies:wet_golden_river_sand",
+    "antcolonies:rippled_golden_river_sand",
+    "antcolonies:pale_river_sand",
+    "antcolonies:wet_pale_river_sand",
+    "antcolonies:rippled_pale_river_sand"
+  ]
+}

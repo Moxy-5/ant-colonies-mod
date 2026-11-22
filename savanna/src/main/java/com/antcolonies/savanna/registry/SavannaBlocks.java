@@ -171,6 +171,30 @@ public class SavannaBlocks {
                     .sound(SoundType.WET_GRASS).randomTicks().pushReaction(PushReaction.DESTROY));
 
     /**
+     * Reeds (2026-11-22, docs/plans/papyrus-and-hippo-grass.md step 2; block/ReedBlock): thick beds of grassy stalks 2 or 3
+     * blocks over shallow still and slow water, a column like sugar cane, plumes fresh turning pale. No collision; holds
+     * water where it stands in it; each clump nudged a little off its block's middle, as grass is.
+     */
+    public static final DeferredBlock<com.antcolonies.savanna.block.ReedBlock> REEDS = BLOCKS.registerBlock("reeds",
+            com.antcolonies.savanna.block.ReedBlock::new,
+            BlockBehaviour.Properties.of().mapColor(MapColor.PLANT).noCollission().instabreak().sound(SoundType.WET_GRASS)
+                    .randomTicks().offsetType(BlockBehaviour.OffsetType.XZ).pushReaction(PushReaction.DESTROY));
+
+    /**
+     * Hippo grass (2026-11-22, docs/plans/papyrus-and-hippo-grass.md step 2): the floating mat out over the water
+     * (block/HippoGrassBlock) and the rooted clump at the bank it grows from (block/HippoGrassClumpBlock), going through
+     * young, grown, flowering and dying back. No collision.
+     */
+    public static final DeferredBlock<com.antcolonies.savanna.block.HippoGrassBlock> HIPPO_GRASS = BLOCKS.registerBlock("hippo_grass",
+            com.antcolonies.savanna.block.HippoGrassBlock::new,
+            BlockBehaviour.Properties.of().mapColor(MapColor.PLANT).noCollission().instabreak().sound(SoundType.WET_GRASS)
+                    .randomTicks().noOcclusion().pushReaction(PushReaction.DESTROY));
+    public static final DeferredBlock<com.antcolonies.savanna.block.HippoGrassClumpBlock> HIPPO_GRASS_CLUMP = BLOCKS.registerBlock("hippo_grass_clump",
+            com.antcolonies.savanna.block.HippoGrassClumpBlock::new,
+            BlockBehaviour.Properties.of().mapColor(MapColor.PLANT).noCollission().instabreak().sound(SoundType.GRASS)
+                    .randomTicks().offsetType(BlockBehaviour.OffsetType.XZ).pushReaction(PushReaction.DESTROY));
+
+    /**
      * Scraps on the river bed (M9 river life, 2026-11-15): pale flecks of flesh and fish droppings left where a fish
      * was eaten, food for the crab, fading in about a day (block/ScrapsBlock). Holds water; drops nothing.
      */

@@ -56,6 +56,11 @@ public class SavannaItems {
     public static final DeferredItem<BlockItem> RIVER_MUD = ITEMS.registerSimpleBlockItem(SavannaBlocks.RIVER_MUD);
     public static final DeferredItem<BlockItem> SAVANNA_MUD = ITEMS.registerSimpleBlockItem(SavannaBlocks.SAVANNA_MUD);
     public static final DeferredItem<BlockItem> ALGAE = ITEMS.registerSimpleBlockItem(SavannaBlocks.ALGAE);
+    public static final DeferredItem<BlockItem> REEDS = ITEMS.registerSimpleBlockItem(SavannaBlocks.REEDS);
+    /** Placed on water like a lily pad. */
+    public static final DeferredItem<BlockItem> HIPPO_GRASS = ITEMS.<BlockItem>register("hippo_grass",
+            () -> new net.minecraft.world.item.PlaceOnWaterBlockItem(SavannaBlocks.HIPPO_GRASS.get(), new Item.Properties()));
+    public static final DeferredItem<BlockItem> HIPPO_GRASS_CLUMP = ITEMS.registerSimpleBlockItem(SavannaBlocks.HIPPO_GRASS_CLUMP);
     public static final DeferredItem<BlockItem> SCRAPS = ITEMS.registerSimpleBlockItem(SavannaBlocks.SCRAPS);
     public static final DeferredItem<BlockItem> CROC_DROPPINGS = ITEMS.registerSimpleBlockItem(SavannaBlocks.CROC_DROPPINGS);
     public static final DeferredItem<BlockItem> CRAB_SHELL = ITEMS.registerSimpleBlockItem(SavannaBlocks.CRAB_SHELL);

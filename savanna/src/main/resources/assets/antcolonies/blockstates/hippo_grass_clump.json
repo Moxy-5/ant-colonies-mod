@@ -1,0 +1,16 @@
+{
+  "variants": {
+    "stage=0": {
+      "model": "antcolonies:block/hippo_grass_clump_young"
+    },
+    "stage=1": {
+      "model": "antcolonies:block/hippo_grass_clump_grown"
+    },
+    "stage=2": {
+      "model": "antcolonies:block/hippo_grass_clump_flowering"
+    },
+    "stage=3": {
+      "model": "antcolonies:block/hippo_grass_clump_dying"
+    }
+  }
+}

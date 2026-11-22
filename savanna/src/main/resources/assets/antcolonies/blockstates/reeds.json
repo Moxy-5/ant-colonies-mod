@@ -1,0 +1,140 @@
+{
+  "variants": {
+    "pale=false,top=false,waterlogged=false": [
+      {
+        "model": "antcolonies:block/reeds_stem"
+      },
+      {
+        "model": "antcolonies:block/reeds_stem",
+        "y": 90
+      },
+      {
+        "model": "antcolonies:block/reeds_stem",
+        "y": 180
+      },
+      {
+        "model": "antcolonies:block/reeds_stem",
+        "y": 270
+      }
+    ],
+    "pale=false,top=false,waterlogged=true": [
+      {
+        "model": "antcolonies:block/reeds_stem"
+      },
+      {
+        "model": "antcolonies:block/reeds_stem",
+        "y": 90
+      },
+      {
+        "model": "antcolonies:block/reeds_stem",
+        "y": 180
+      },
+      {
+        "model": "antcolonies:block/reeds_stem",
+        "y": 270
+      }
+    ],
+    "pale=true,top=false,waterlogged=false": [
+      {
+        "model": "antcolonies:block/reeds_stem"
+      },
+      {
+        "model": "antcolonies:block/reeds_stem",
+        "y": 90
+      },
+      {
+        "model": "antcolonies:block/reeds_stem",
+        "y": 180
+      },
+      {
+        "model": "antcolonies:block/reeds_stem",
+        "y": 270
+      }
+    ],
+    "pale=true,top=false,waterlogged=true": [
+      {
+        "model": "antcolonies:block/reeds_stem"
+      },
+      {
+        "model": "antcolonies:block/reeds_stem",
+        "y": 90
+      },
+      {
+        "model": "antcolonies:block/reeds_stem",
+        "y": 180
+      },
+      {
+        "model": "antcolonies:block/reeds_stem",
+        "y": 270
+      }
+    ],
+    "pale=false,top=true,waterlogged=false": [
+      {
+        "model": "antcolonies:block/reeds_top_fresh"
+      },
+      {
+        "model": "antcolonies:block/reeds_top_fresh",
+        "y": 90
+      },
+      {
+        "model": "antcolonies:block/reeds_top_fresh",
+        "y": 180
+      },
+      {
+        "model": "antcolonies:block/reeds_top_fresh",
+        "y": 270
+      }
+    ],
+    "pale=false,top=true,waterlogged=true": [
+      {
+        "model": "antcolonies:block/reeds_top_fresh"
+      },
+      {
+        "model": "antcolonies:block/reeds_top_fresh",
+        "y": 90
+      },
+      {
+        "model": "antcolonies:block/reeds_top_fresh",
+        "y": 180
+      },
+      {
+        "model": "antcolonies:block/reeds_top_fresh",
+        "y": 270
+      }
+    ],
+    "pale=true,top=true,waterlogged=false": [
+      {
+        "model": "antcolonies:block/reeds_top_pale"
+      },
+      {
+        "model": "antcolonies:block/reeds_top_pale",
+        "y": 90
+      },
+      {
+        "model": "antcolonies:block/reeds_top_pale",
+        "y": 180
+      },
+      {
+        "model": "antcolonies:block/reeds_top_pale",
+        "y": 270
+      }
+    ],
+    "pale=true,top=true,waterlogged=true": [
+      {
+        "model": "antcolonies:block/reeds_top_pale"
+      },
+      {
+        "model": "antcolonies:block/reeds_top_pale",
+        "y": 90
+      },
+      {
+        "model": "antcolonies:block/reeds_top_pale",
+        "y": 180
+      },
+      {
+        "model": "antcolonies:block/reeds_top_pale",
+        "y": 270
+      }
+    ]
+  }
+}

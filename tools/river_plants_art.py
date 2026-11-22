@@ -181,6 +181,104 @@ def all_looks():
     }
 
 
-if __name__ == "__main__":
+ASSETS = "savanna/src/main/resources/assets/antcolonies"
+DATA = "savanna/src/main/resources/data/antcolonies"
+STAGE_NUMBER = {"young": 0, "grown": 1, "flowering": 2, "dying": 3}
+TUFT = {"young": 5, "grown": 7, "flowering": 7}          # the blades through a mat, pixels tall (none when dying back)
+
+
+def _plane(angle, tex, x0=0.8, x1=15.2, h=16, axis_x=False):
+    """One upright plane through the block's middle (crossed-plant style), both faces, unshaded."""
+    face = {"uv": [0, 0, 16, 16], "texture": tex}
+    el = {"from": [x0, 0, 8], "to": [x1, h, 8], "shade": False, "faces": {"north": face, "south": dict(face)}}
+    if axis_x:
+        el = {"from": [8, 0, x0], "to": [8, h, x1], "shade": False, "faces": {"east": face, "west": dict(face)}}
+    if angle:
+        el["rotation"] = {"origin": [8, 8, 8], "axis": "y", "angle": angle, "rescale": True}
+    return el
+
+
+def _model(textures, elements):
+    return {"parent": "block/block", "render_type": "minecraft:cutout", "ambientocclusion": False,
+            "textures": textures, "elements": elements}
+
+
+def _reed_model(tex):
+    """Four planes: the two diagonals and the two through the middle along x and z (a thick bed, as the viewer draws)."""
+    return _model({"particle": tex, "reed": tex},
+                  [_plane(45, "#reed"), _plane(-45, "#reed"), _plane(0, "#reed", 0, 16), _plane(0, "#reed", 0, 16, axis_x=True)])
+
+
+def _mat_model(stage, tuft):
+    """The mat lying on the water (a little over it, as a lily pad), short blades through it when `tuft`."""
+    mat, clump = f"antcolonies:block/hippo_grass_mat_{stage}", f"antcolonies:block/hippo_grass_clump_{stage}"
+    els = [{"from": [0, 0.25, 0], "to": [16, 0.5, 16], "shade": False, "faces": {
+        "up": {"uv": [0, 0, 16, 16], "texture": "#mat"}, "down": {"uv": [0, 0, 16, 16], "texture": "#mat"}}}]
+    textures = {"particle": mat, "mat": mat}
+    if tuft:
+        textures["blades"] = clump
+        els += [_plane(45, "#blades", 3, 13, TUFT[stage]), _plane(-45, "#blades", 3, 13, TUFT[stage])]
+    return _model(textures, els)
+
+
+def _write(path, obj):
+    import json
+    import os
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    with open(path, "w", encoding="utf-8") as f:
+        json.dump(obj, f, indent=2)
+        f.write("\n")
+
+
+def main():
+    """Writes the reeds' and hippo grass's textures, block models, block states, item models and loot tables into the
+    savanna mod (step 2 of docs/plans/papyrus-and-hippo-grass.md; the looks the user picked 2026-11-22)."""
+    import os
+    import river_blocks_art
+    tex = os.path.join(ASSETS, "textures/block")
     looks = all_looks()
-    print("reed tops:", list(looks["reeds"]["tops"]), "hippo grass stages:", list(looks["hippo_grass"]))
+    pngs = {"reeds_stem": looks["reeds"]["stem"], "reeds_top_fresh": looks["reeds"]["tops"]["A"],
+            "reeds_top_pale": looks["reeds"]["tops"]["B"]}
+    for stage, v in looks["hippo_grass"].items():
+        pngs[f"hippo_grass_mat_{stage}"] = v["mat"]
+        pngs[f"hippo_grass_clump_{stage}"] = v["clump"]
+    for name, rows in pngs.items():
+        river_blocks_art.write_png(os.path.join(tex, name + ".png"), S, S, [p for r in rows for p in r])
+    models = os.path.join(ASSETS, "models/block")
+    for name in ("reeds_stem", "reeds_top_fresh", "reeds_top_pale"):
+        _write(os.path.join(models, name + ".json"), _reed_model("antcolonies:block/" + name))
+    turns = lambda model: [dict({"model": model}, **({"y": y} if y else {})) for y in (0, 90, 180, 270)]
+    reeds = {}
+    for top in ("false", "true"):
+        for pale in ("false", "true"):
+            for wet in ("false", "true"):
+                model = "antcolonies:block/" + ("reeds_stem" if top == "false" else "reeds_top_pale" if pale == "true" else "reeds_top_fresh")
+                reeds[f"pale={pale},top={top},waterlogged={wet}"] = turns(model)
+    _write(os.path.join(ASSETS, "blockstates/reeds.json"), {"variants": reeds})
+    mats, clumps = {}, {}
+    for stage, n in STAGE_NUMBER.items():
+        _write(os.path.join(models, f"hippo_grass_mat_{stage}.json"), _mat_model(stage, False))
+        if stage in TUFT:
+            _write(os.path.join(models, f"hippo_grass_mat_{stage}_tuft.json"), _mat_model(stage, True))
+        _write(os.path.join(models, f"hippo_grass_clump_{stage}.json"), {"parent": "minecraft:block/cross",
+               "render_type": "minecraft:cutout", "textures": {"cross": f"antcolonies:block/hippo_grass_clump_{stage}"}})
+        choices = turns(f"antcolonies:block/hippo_grass_mat_{stage}")
+        if stage in TUFT:                                 # about half the mats with blades through them (the viewer's)
+            choices += turns(f"antcolonies:block/hippo_grass_mat_{stage}_tuft")
+        for reach in (1, 2, 3):
+            mats[f"reach={reach},stage={n}"] = choices
+        clumps[f"stage={n}"] = {"model": f"antcolonies:block/hippo_grass_clump_{stage}"}
+    _write(os.path.join(ASSETS, "blockstates/hippo_grass.json"), {"variants": mats})
+    _write(os.path.join(ASSETS, "blockstates/hippo_grass_clump.json"), {"variants": clumps})
+    items = {"reeds": "reeds_top_fresh", "hippo_grass": "hippo_grass_mat_grown", "hippo_grass_clump": "hippo_grass_clump_grown"}
+    for item, picture in items.items():
+        _write(os.path.join(ASSETS, f"models/item/{item}.json"),
+               {"parent": "minecraft:item/generated", "textures": {"layer0": "antcolonies:block/" + picture}})
+        _write(os.path.join(DATA, f"loot_table/blocks/{item}.json"), {"type": "minecraft:block", "pools": [{
+            "rolls": 1, "entries": [{"type": "minecraft:item", "name": "antcolonies:" + item}],
+            "conditions": [{"condition": "minecraft:survives_explosion"}]}]})
+    print("wrote the reeds' and hippo grass's textures, models, block states, item models and loot tables")
+
+
+if __name__ == "__main__":
+    main()

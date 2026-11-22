@@ -1,0 +1,6 @@
+{
+  "parent": "minecraft:item/generated",
+  "textures": {
+    "layer0": "antcolonies:block/hippo_grass_mat_grown"
+  }
+}
