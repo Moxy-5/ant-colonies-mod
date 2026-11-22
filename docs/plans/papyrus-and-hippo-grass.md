@@ -81,10 +81,10 @@ higher and shaggier, short blades sticking up through it), and a rooted clump at
 
 1. **Looks in the model viewer** (done 2026-11-22, first papyrus, then reeds and the hippo grass stages): reed beds and
    the hippo grass fringe on an oxbow and a river bank, beside a hippo and a player for scale; the user picks.
-2. **The blocks:** reeds (stacking, survive only in or at shallow water, plumes fresh turning pale) and hippo grass
+2. **The blocks** (built 2026-11-22): reeds (stacking, survive only in or at shallow water, plumes fresh turning pale) and hippo grass
    (mat and clump, the four stages ticking), with drops and the creative tab.
-3. **Pushing through:** the reeds' bend and the mats' dip, drawn smoothly by the client; checked offline and filmed in
-   the game.
+3. **Pushing through** (built 2026-11-22): the reeds' bend and the mats' dip, drawn smoothly by the client; filmed in
+   the game (`tools/film/reeds_push_frames.film`). Only plants the pusher's box overlaps bend (as the server sees them).
 4. **In new land:** beds and fringes placed as above; a game test for where they go and that they never touch a sand
    bar, slide, nest or pan; a game test for the hippo grass cycle; a flight for loading speed.
 5. **Hippos nibble hippo grass** (optional, the user's say).

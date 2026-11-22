@@ -1,0 +1,101 @@
+# Reeds and hippo grass pushed aside (2026-11-22, docs/plans/papyrus-and-hippo-grass.md step 3; the hard rule: every
+# animation checked in the game, frozen and stepped, from three sides): a hippo wades east along z 0.5 through a pool a
+# block deep (silt bed at -62, water at -61). Reed columns (3 tall, 2 over the water) stand in its way (z 0 and 1, x 4 to
+# 12, every other block), at its edge (z -1, every third) and out of its reach for comparison (z 3); floating hippo grass
+# from x 14 to 16 with clumps on the bank at x 17. Stepped 4 ticks a picture: side on, ahead along the way, from above.
+#   ./gradlew runFilm -PfilmScene=tools/film/reeds_push_frames.film   pictures in run-film/screenshots/reeds_push_frames/
+cmd time set noon
+cmd weather clear
+cmd kill @e[type=!player]
+cmd fill -6 -61 -8 24 -55 8 minecraft:air
+cmd fill -6 -63 -8 24 -63 8 minecraft:stone
+cmd fill -6 -62 -8 24 -62 8 antcolonies:silt
+cmd fill -6 -61 -8 24 -61 8 minecraft:grass_block
+cmd fill -4 -61 -5 16 -61 5 minecraft:water
+cmd setblock 4 -61 0 antcolonies:reeds[waterlogged=true,top=false]
+cmd setblock 4 -60 0 antcolonies:reeds[top=false]
+cmd setblock 4 -59 0 antcolonies:reeds[top=true,pale=false]
+cmd setblock 6 -61 0 antcolonies:reeds[waterlogged=true,top=false]
+cmd setblock 6 -60 0 antcolonies:reeds[top=false]
+cmd setblock 6 -59 0 antcolonies:reeds[top=true,pale=false]
+cmd setblock 8 -61 0 antcolonies:reeds[waterlogged=true,top=false]
+cmd setblock 8 -60 0 antcolonies:reeds[top=false]
+cmd setblock 8 -59 0 antcolonies:reeds[top=true,pale=false]
+cmd setblock 10 -61 0 antcolonies:reeds[waterlogged=true,top=false]
+cmd setblock 10 -60 0 antcolonies:reeds[top=false]
+cmd setblock 10 -59 0 antcolonies:reeds[top=true,pale=false]
+cmd setblock 12 -61 0 antcolonies:reeds[waterlogged=true,top=false]
+cmd setblock 12 -60 0 antcolonies:reeds[top=false]
+cmd setblock 12 -59 0 antcolonies:reeds[top=true,pale=false]
+cmd setblock 5 -61 1 antcolonies:reeds[waterlogged=true,top=false]
+cmd setblock 5 -60 1 antcolonies:reeds[top=false]
+cmd setblock 5 -59 1 antcolonies:reeds[top=true,pale=true]
+cmd setblock 7 -61 1 antcolonies:reeds[waterlogged=true,top=false]
+cmd setblock 7 -60 1 antcolonies:reeds[top=false]
+cmd setblock 7 -59 1 antcolonies:reeds[top=true,pale=true]
+cmd setblock 9 -61 1 antcolonies:reeds[waterlogged=true,top=false]
+cmd setblock 9 -60 1 antcolonies:reeds[top=false]
+cmd setblock 9 -59 1 antcolonies:reeds[top=true,pale=true]
+cmd setblock 11 -61 1 antcolonies:reeds[waterlogged=true,top=false]
+cmd setblock 11 -60 1 antcolonies:reeds[top=false]
+cmd setblock 11 -59 1 antcolonies:reeds[top=true,pale=true]
+cmd setblock 4 -61 -1 antcolonies:reeds[waterlogged=true,top=false]
+cmd setblock 4 -60 -1 antcolonies:reeds[top=false]
+cmd setblock 4 -59 -1 antcolonies:reeds[top=true,pale=false]
+cmd setblock 7 -61 -1 antcolonies:reeds[waterlogged=true,top=false]
+cmd setblock 7 -60 -1 antcolonies:reeds[top=false]
+cmd setblock 7 -59 -1 antcolonies:reeds[top=true,pale=false]
+cmd setblock 10 -61 -1 antcolonies:reeds[waterlogged=true,top=false]
+cmd setblock 10 -60 -1 antcolonies:reeds[top=false]
+cmd setblock 10 -59 -1 antcolonies:reeds[top=true,pale=false]
+cmd setblock 4 -61 3 antcolonies:reeds[waterlogged=true,top=false]
+cmd setblock 4 -60 3 antcolonies:reeds[top=false]
+cmd setblock 4 -59 3 antcolonies:reeds[top=true,pale=true]
+cmd setblock 6 -61 3 antcolonies:reeds[waterlogged=true,top=false]
+cmd setblock 6 -60 3 antcolonies:reeds[top=false]
+cmd setblock 6 -59 3 antcolonies:reeds[top=true,pale=true]
+cmd setblock 8 -61 3 antcolonies:reeds[waterlogged=true,top=false]
+cmd setblock 8 -60 3 antcolonies:reeds[top=false]
+cmd setblock 8 -59 3 antcolonies:reeds[top=true,pale=true]
+cmd setblock 10 -61 3 antcolonies:reeds[waterlogged=true,top=false]
+cmd setblock 10 -60 3 antcolonies:reeds[top=false]
+cmd setblock 10 -59 3 antcolonies:reeds[top=true,pale=true]
+cmd setblock 12 -61 3 antcolonies:reeds[waterlogged=true,top=false]
+cmd setblock 12 -60 3 antcolonies:reeds[top=false]
+cmd setblock 12 -59 3 antcolonies:reeds[top=true,pale=true]
+cmd fill 14 -60 -3 16 -60 3 antcolonies:hippo_grass[stage=1,reach=2]
+cmd fill 17 -60 -3 17 -60 3 antcolonies:hippo_grass_clump[stage=1]
+lens 50
+wait 40
+# --- side on (from the south)
+walker antcolonies:hippo -2.5 -61 0.5 -90 OwnSize:1.0f,Led:1b
+camera 8.5 -57.6 -11.5 0 10
+cmd tick unfreeze
+go 20 -60 0 0.8
+wait 30
+cmd tick freeze
+burst side 90 4
+cmd kill @e[type=antcolonies:hippo]
+cmd tick unfreeze
+wait 60
+# --- ahead, along its way (from the east bank, looking west)
+walker antcolonies:hippo -2.5 -61 0.5 -90 OwnSize:1.0f,Led:1b
+camera 19.5 -57.4 0.5 90 14
+cmd tick unfreeze
+go 20 -60 0 0.8
+wait 30
+cmd tick freeze
+burst ahead 90 4
+cmd kill @e[type=antcolonies:hippo]
+cmd tick unfreeze
+wait 60
+# --- from above (high in the south west)
+walker antcolonies:hippo -2.5 -61 0.5 -90 OwnSize:1.0f,Led:1b
+camera 2.5 -52.0 -8.5 -35 45
+cmd tick unfreeze
+go 20 -60 0 0.8
+wait 30
+cmd tick freeze
+burst above 90 4
+cmd kill @e[type=antcolonies:hippo]
+cmd tick unfreeze

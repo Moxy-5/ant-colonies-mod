@@ -1,6 +1,6 @@
 {
   "variants": {
-    "pale=false,top=false,waterlogged=false": [
+    "pale=false,push=0,top=false,waterlogged=false": [
       {
         "model": "antcolonies:block/reeds_stem"
       },
@@ -17,7 +17,13 @@
         "y": 270
       }
     ],
-    "pale=false,top=false,waterlogged=true": [
+    "pale=false,push=1,top=false,waterlogged=false": {
+      "model": "antcolonies:block/reeds_hidden"
+    },
+    "pale=false,push=2,top=false,waterlogged=false": {
+      "model": "antcolonies:block/reeds_hidden"
+    },
+    "pale=false,push=0,top=false,waterlogged=true": [
       {
         "model": "antcolonies:block/reeds_stem"
       },
@@ -34,7 +40,13 @@
         "y": 270
       }
     ],
-    "pale=true,top=false,waterlogged=false": [
+    "pale=false,push=1,top=false,waterlogged=true": {
+      "model": "antcolonies:block/reeds_hidden"
+    },
+    "pale=false,push=2,top=false,waterlogged=true": {
+      "model": "antcolonies:block/reeds_hidden"
+    },
+    "pale=true,push=0,top=false,waterlogged=false": [
       {
         "model": "antcolonies:block/reeds_stem"
       },
@@ -51,7 +63,13 @@
         "y": 270
       }
     ],
-    "pale=true,top=false,waterlogged=true": [
+    "pale=true,push=1,top=false,waterlogged=false": {
+      "model": "antcolonies:block/reeds_hidden"
+    },
+    "pale=true,push=2,top=false,waterlogged=false": {
+      "model": "antcolonies:block/reeds_hidden"
+    },
+    "pale=true,push=0,top=false,waterlogged=true": [
       {
         "model": "antcolonies:block/reeds_stem"
       },
@@ -68,7 +86,13 @@
         "y": 270
       }
     ],
-    "pale=false,top=true,waterlogged=false": [
+    "pale=true,push=1,top=false,waterlogged=true": {
+      "model": "antcolonies:block/reeds_hidden"
+    },
+    "pale=true,push=2,top=false,waterlogged=true": {
+      "model": "antcolonies:block/reeds_hidden"
+    },
+    "pale=false,push=0,top=true,waterlogged=false": [
       {
         "model": "antcolonies:block/reeds_top_fresh"
       },
@@ -85,7 +109,13 @@
         "y": 270
       }
     ],
-    "pale=false,top=true,waterlogged=true": [
+    "pale=false,push=1,top=true,waterlogged=false": {
+      "model": "antcolonies:block/reeds_hidden"
+    },
+    "pale=false,push=2,top=true,waterlogged=false": {
+      "model": "antcolonies:block/reeds_hidden"
+    },
+    "pale=false,push=0,top=true,waterlogged=true": [
       {
         "model": "antcolonies:block/reeds_top_fresh"
       },
@@ -102,7 +132,13 @@
         "y": 270
       }
     ],
-    "pale=true,top=true,waterlogged=false": [
+    "pale=false,push=1,top=true,waterlogged=true": {
+      "model": "antcolonies:block/reeds_hidden"
+    },
+    "pale=false,push=2,top=true,waterlogged=true": {
+      "model": "antcolonies:block/reeds_hidden"
+    },
+    "pale=true,push=0,top=true,waterlogged=false": [
       {
         "model": "antcolonies:block/reeds_top_pale"
       },
@@ -119,7 +155,13 @@
         "y": 270
       }
     ],
-    "pale=true,top=true,waterlogged=true": [
+    "pale=true,push=1,top=true,waterlogged=false": {
+      "model": "antcolonies:block/reeds_hidden"
+    },
+    "pale=true,push=2,top=true,waterlogged=false": {
+      "model": "antcolonies:block/reeds_hidden"
+    },
+    "pale=true,push=0,top=true,waterlogged=true": [
       {
         "model": "antcolonies:block/reeds_top_pale"
       },
@@ -135,6 +177,12 @@
         "model": "antcolonies:block/reeds_top_pale",
         "y": 270
       }
-    ]
+    ],
+    "pale=true,push=1,top=true,waterlogged=true": {
+      "model": "antcolonies:block/reeds_hidden"
+    },
+    "pale=true,push=2,top=true,waterlogged=true": {
+      "model": "antcolonies:block/reeds_hidden"
+    }
   }
 }

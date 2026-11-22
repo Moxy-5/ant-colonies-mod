@@ -1,6 +1,6 @@
 {
   "variants": {
-    "reach=1,stage=0": [
+    "push=0,reach=1,stage=0": [
       {
         "model": "antcolonies:block/hippo_grass_mat_young"
       },
@@ -32,7 +32,13 @@
         "y": 270
       }
     ],
-    "reach=2,stage=0": [
+    "push=1,reach=1,stage=0": {
+      "model": "antcolonies:block/hippo_grass_hidden"
+    },
+    "push=2,reach=1,stage=0": {
+      "model": "antcolonies:block/hippo_grass_hidden"
+    },
+    "push=0,reach=2,stage=0": [
       {
         "model": "antcolonies:block/hippo_grass_mat_young"
       },
@@ -64,7 +70,13 @@
         "y": 270
       }
     ],
-    "reach=3,stage=0": [
+    "push=1,reach=2,stage=0": {
+      "model": "antcolonies:block/hippo_grass_hidden"
+    },
+    "push=2,reach=2,stage=0": {
+      "model": "antcolonies:block/hippo_grass_hidden"
+    },
+    "push=0,reach=3,stage=0": [
       {
         "model": "antcolonies:block/hippo_grass_mat_young"
       },
@@ -96,7 +108,13 @@
         "y": 270
       }
     ],
-    "reach=1,stage=1": [
+    "push=1,reach=3,stage=0": {
+      "model": "antcolonies:block/hippo_grass_hidden"
+    },
+    "push=2,reach=3,stage=0": {
+      "model": "antcolonies:block/hippo_grass_hidden"
+    },
+    "push=0,reach=1,stage=1": [
       {
         "model": "antcolonies:block/hippo_grass_mat_grown"
       },
@@ -128,7 +146,13 @@
         "y": 270
       }
     ],
-    "reach=2,stage=1": [
+    "push=1,reach=1,stage=1": {
+      "model": "antcolonies:block/hippo_grass_hidden"
+    },
+    "push=2,reach=1,stage=1": {
+      "model": "antcolonies:block/hippo_grass_hidden"
+    },
+    "push=0,reach=2,stage=1": [
       {
         "model": "antcolonies:block/hippo_grass_mat_grown"
       },
@@ -160,7 +184,13 @@
         "y": 270
       }
     ],
-    "reach=3,stage=1": [
+    "push=1,reach=2,stage=1": {
+      "model": "antcolonies:block/hippo_grass_hidden"
+    },
+    "push=2,reach=2,stage=1": {
+      "model": "antcolonies:block/hippo_grass_hidden"
+    },
+    "push=0,reach=3,stage=1": [
       {
         "model": "antcolonies:block/hippo_grass_mat_grown"
       },
@@ -192,7 +222,13 @@
         "y": 270
       }
     ],
-    "reach=1,stage=2": [
+    "push=1,reach=3,stage=1": {
+      "model": "antcolonies:block/hippo_grass_hidden"
+    },
+    "push=2,reach=3,stage=1": {
+      "model": "antcolonies:block/hippo_grass_hidden"
+    },
+    "push=0,reach=1,stage=2": [
       {
         "model": "antcolonies:block/hippo_grass_mat_flowering"
       },
@@ -224,7 +260,13 @@
         "y": 270
       }
     ],
-    "reach=2,stage=2": [
+    "push=1,reach=1,stage=2": {
+      "model": "antcolonies:block/hippo_grass_hidden"
+    },
+    "push=2,reach=1,stage=2": {
+      "model": "antcolonies:block/hippo_grass_hidden"
+    },
+    "push=0,reach=2,stage=2": [
       {
         "model": "antcolonies:block/hippo_grass_mat_flowering"
       },
@@ -256,7 +298,13 @@
         "y": 270
       }
     ],
-    "reach=3,stage=2": [
+    "push=1,reach=2,stage=2": {
+      "model": "antcolonies:block/hippo_grass_hidden"
+    },
+    "push=2,reach=2,stage=2": {
+      "model": "antcolonies:block/hippo_grass_hidden"
+    },
+    "push=0,reach=3,stage=2": [
       {
         "model": "antcolonies:block/hippo_grass_mat_flowering"
       },
@@ -288,7 +336,13 @@
         "y": 270
       }
     ],
-    "reach=1,stage=3": [
+    "push=1,reach=3,stage=2": {
+      "model": "antcolonies:block/hippo_grass_hidden"
+    },
+    "push=2,reach=3,stage=2": {
+      "model": "antcolonies:block/hippo_grass_hidden"
+    },
+    "push=0,reach=1,stage=3": [
       {
         "model": "antcolonies:block/hippo_grass_mat_dying"
       },
@@ -305,7 +359,13 @@
         "y": 270
       }
     ],
-    "reach=2,stage=3": [
+    "push=1,reach=1,stage=3": {
+      "model": "antcolonies:block/hippo_grass_hidden"
+    },
+    "push=2,reach=1,stage=3": {
+      "model": "antcolonies:block/hippo_grass_hidden"
+    },
+    "push=0,reach=2,stage=3": [
       {
         "model": "antcolonies:block/hippo_grass_mat_dying"
       },
@@ -322,7 +382,13 @@
         "y": 270
       }
     ],
-    "reach=3,stage=3": [
+    "push=1,reach=2,stage=3": {
+      "model": "antcolonies:block/hippo_grass_hidden"
+    },
+    "push=2,reach=2,stage=3": {
+      "model": "antcolonies:block/hippo_grass_hidden"
+    },
+    "push=0,reach=3,stage=3": [
       {
         "model": "antcolonies:block/hippo_grass_mat_dying"
       },
@@ -338,6 +404,12 @@
         "model": "antcolonies:block/hippo_grass_mat_dying",
         "y": 270
       }
-    ]
+    ],
+    "push=1,reach=3,stage=3": {
+      "model": "antcolonies:block/hippo_grass_hidden"
+    },
+    "push=2,reach=3,stage=3": {
+      "model": "antcolonies:block/hippo_grass_hidden"
+    }
   }
 }

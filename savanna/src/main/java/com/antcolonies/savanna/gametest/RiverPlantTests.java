@@ -111,6 +111,48 @@ public class RiverPlantTests {
     }
 
     /**
+     * Pushing through reeds (step 3): a pushed column is marked pushed on every block (the client then draws it bent) and
+     * stays so while a big body stands in it; once it is gone the column settles for the spring back, then is still. A
+     * chicken is too small to push.
+     */
+    @GameTest(template = "arena", timeoutTicks = 120)
+    public static void aPushedReedColumnStaysPushedWhileTouchedThenSettles(GameTestHelper helper) {
+        basin(helper, 2, 2, 4, 4, 1);
+        ServerLevel level = helper.getLevel();
+        ReedBlock reeds = SavannaBlocks.REEDS.get();
+        BlockPos foot = helper.absolutePos(new BlockPos(3, 2, 3));
+        level.setBlock(foot, reeds.defaultBlockState().setValue(ReedBlock.WATERLOGGED, true), Block.UPDATE_ALL);
+        BlockPos top = foot;
+        while (reeds.grow(level, top)) {
+            top = top.above();
+        }
+        BlockPos last = top;
+        java.util.function.IntPredicate all = push -> {
+            for (BlockPos at = foot; at.getY() <= last.getY(); at = at.above()) {
+                if (level.getBlockState(at).getValue(com.antcolonies.savanna.block.PlantPush.PUSH) != push) {
+                    return false;
+                }
+            }
+            return true;
+        };
+        helper.assertFalse(com.antcolonies.savanna.block.PlantPush.pusher(helper.spawnWithNoFreeWill(net.minecraft.world.entity.EntityType.CHICKEN, 8.5F, 2, 8.5F)),
+                "a chicken should be too small to push reeds");
+        net.minecraft.world.entity.Mob husk = helper.spawnWithNoFreeWill(net.minecraft.world.entity.EntityType.HUSK, 3.5F, 2, 3.5F);
+        reeds.push(level, last);
+        helper.assertTrue(all.test(com.antcolonies.savanna.block.PlantPush.PUSHED), "the whole column should be marked pushed");
+        helper.runAtTickTime(14, () -> {
+            helper.assertTrue(all.test(com.antcolonies.savanna.block.PlantPush.PUSHED), "the column should stay pushed while the husk stands in it");
+            husk.discard();
+        });
+        helper.runAtTickTime(26, () -> helper.assertTrue(all.test(com.antcolonies.savanna.block.PlantPush.SETTLING),
+                "the column should settle once nothing touches it"));
+        helper.runAtTickTime(60, () -> {
+            helper.assertTrue(all.test(com.antcolonies.savanna.block.PlantPush.STILL), "the column should be still after settling");
+            helper.succeed();
+        });
+    }
+
+    /**
      * Hippo grass: a clump on a silt bank sends mats out over the water (young only 1 block out); the mats take the
      * clump's stage ring by ring; dying back they go from the outside in, the clump staying, which then comes round to
      * young again.

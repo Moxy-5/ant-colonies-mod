@@ -31,6 +31,8 @@ import net.minecraft.world.phys.shapes.VoxelShape;
  * together, ring by ring outward. Young mats reach 1 block out, grown and flowering ones out to 1 to 3 (a ragged edge,
  * fixed per spot; the plan's fringe 1 to 3 wide); dying back, the mats go from the outside in, leaving the clump. A mat
  * with nothing nearer the bank keeps its stage (a player's mat on a pond stays as placed) unless it is dying back.
+ *
+ * <p>A swimmer or wader pushing through presses it under and aside ({@link PlantPush}: marked, the client drawing the dip).
  */
 public class HippoGrassBlock extends BushBlock {
     public static final MapCodec<HippoGrassBlock> CODEC = simpleCodec(HippoGrassBlock::new);
@@ -44,7 +46,7 @@ public class HippoGrassBlock extends BushBlock {
 
     public HippoGrassBlock(Properties properties) {
         super(properties);
-        registerDefaultState(stateDefinition.any().setValue(STAGE, HippoGrassClumpBlock.GROWN).setValue(REACH, 1));
+        registerDefaultState(stateDefinition.any().setValue(STAGE, HippoGrassClumpBlock.GROWN).setValue(REACH, 1).setValue(PlantPush.PUSH, PlantPush.STILL));
     }
 
     @Override
@@ -54,7 +56,7 @@ public class HippoGrassBlock extends BushBlock {
 
     @Override
     protected void createBlockStateDefinition(StateDefinition.Builder<Block, BlockState> builder) {
-        builder.add(STAGE, REACH);
+        builder.add(STAGE, REACH, PlantPush.PUSH);
     }
 
     @Override
@@ -125,6 +127,25 @@ public class HippoGrassBlock extends BushBlock {
             }
         }
         return false;
+    }
+
+    @Override
+    protected void entityInside(BlockState state, net.minecraft.world.level.Level level, BlockPos pos, net.minecraft.world.entity.Entity entity) {
+        if (level instanceof ServerLevel server && state.getValue(PlantPush.PUSH) != PlantPush.PUSHED
+                && PlantPush.pusher(entity) && PlantPush.moving(entity)) {
+            server.setBlock(pos, state.setValue(PlantPush.PUSH, PlantPush.PUSHED), Block.UPDATE_CLIENTS);
+            PlantPush.lookAgain(server, pos, this, PlantPush.CHECK);
+        }
+    }
+
+    @Override
+    protected void tick(BlockState state, ServerLevel level, BlockPos pos, RandomSource random) {
+        if (state.getValue(PlantPush.PUSH) == PlantPush.STILL) {
+            return;
+        }
+        PlantPush.Next next = PlantPush.next(state.getValue(PlantPush.PUSH), PlantPush.touched(level, new net.minecraft.world.phys.AABB(pos)));
+        level.setBlock(pos, state.setValue(PlantPush.PUSH, next.push()), Block.UPDATE_CLIENTS);
+        PlantPush.lookAgain(level, pos, this, next.delay());
     }
 
     @Override

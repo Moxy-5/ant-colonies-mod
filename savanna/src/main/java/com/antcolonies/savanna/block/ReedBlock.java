@@ -40,6 +40,9 @@ import net.minecraft.world.phys.shapes.VoxelShape;
  * are drawn as stalks. A plume starts fresh (dusky purple-brown) and turns {@link #PALE} (silvery tan) over a few game
  * days, then a fresh one comes again (the user, 2026-11-22: "go fresh turning pale"; it follows the shared season source
  * once seasons come, M9.5). Broken, the blocks above fall with it, as with sugar cane.
+ *
+ * <p>A player or a big animal going through bends the column away ({@link PlantPush}: the whole column marked, the client
+ * drawing the bend).
  */
 public class ReedBlock extends Block implements SimpleWaterloggedBlock {
     public static final MapCodec<ReedBlock> CODEC = simpleCodec(ReedBlock::new);
@@ -62,7 +65,7 @@ public class ReedBlock extends Block implements SimpleWaterloggedBlock {
 
     public ReedBlock(Properties properties) {
         super(properties);
-        registerDefaultState(stateDefinition.any().setValue(TOP, true).setValue(PALE, false).setValue(WATERLOGGED, false));
+        registerDefaultState(stateDefinition.any().setValue(TOP, true).setValue(PALE, false).setValue(WATERLOGGED, false).setValue(PlantPush.PUSH, PlantPush.STILL));
     }
 
     @Override
@@ -72,7 +75,7 @@ public class ReedBlock extends Block implements SimpleWaterloggedBlock {
 
     @Override
     protected void createBlockStateDefinition(StateDefinition.Builder<Block, BlockState> builder) {
-        builder.add(TOP, PALE, WATERLOGGED);
+        builder.add(TOP, PALE, WATERLOGGED, PlantPush.PUSH);
     }
 
     @Override
@@ -115,6 +118,49 @@ public class ReedBlock extends Block implements SimpleWaterloggedBlock {
     protected void tick(BlockState state, ServerLevel level, BlockPos pos, RandomSource random) {
         if (!state.canSurvive(level, pos)) {
             level.destroyBlock(pos, true);
+            return;
+        }
+        if (state.getValue(PlantPush.PUSH) != PlantPush.STILL && bottom(level, pos).equals(pos)) {
+            PlantPush.Next next = PlantPush.next(state.getValue(PlantPush.PUSH), PlantPush.touched(level, column(level, pos)));
+            mark(level, pos, next.push());
+            PlantPush.lookAgain(level, pos, this, next.delay());
+        }
+    }
+
+    @Override
+    protected void entityInside(BlockState state, net.minecraft.world.level.Level level, BlockPos pos, net.minecraft.world.entity.Entity entity) {
+        if (level instanceof ServerLevel server && state.getValue(PlantPush.PUSH) != PlantPush.PUSHED
+                && PlantPush.pusher(entity) && PlantPush.moving(entity)) {
+            push(server, pos);
+        }
+    }
+
+    /** Marks the column {@code pos} is in as pushed and looks again in a while (its bottom's scheduled tick). */
+    public void push(ServerLevel level, BlockPos pos) {
+        BlockPos bottom = bottom(level, pos);
+        mark(level, bottom, PlantPush.PUSHED);
+        PlantPush.lookAgain(level, bottom, this, PlantPush.CHECK);
+    }
+
+    /** The space the whole column from {@code bottom} fills. */
+    private net.minecraft.world.phys.AABB column(BlockGetter level, BlockPos bottom) {
+        BlockPos top = bottom;
+        while (level.getBlockState(top.above()).is(this)) {
+            top = top.above();
+        }
+        return new net.minecraft.world.phys.AABB(bottom.getX(), bottom.getY(), bottom.getZ(), top.getX() + 1, top.getY() + 1, top.getZ() + 1);
+    }
+
+    /** Sets {@link PlantPush#PUSH} on every block of the column from {@code bottom} up. */
+    private void mark(ServerLevel level, BlockPos bottom, int push) {
+        for (BlockPos at = bottom; ; at = at.above()) {
+            BlockState s = level.getBlockState(at);
+            if (!s.is(this)) {
+                return;
+            }
+            if (s.getValue(PlantPush.PUSH) != push) {
+                level.setBlock(at, s.setValue(PlantPush.PUSH, push), Block.UPDATE_CLIENTS);
+            }
         }
     }
 
@@ -194,7 +240,7 @@ public class ReedBlock extends Block implements SimpleWaterloggedBlock {
         if (top.getY() - bottom.getY() + 1 >= fullHeight(level, bottom) || !level.isEmptyBlock(up)) {
             return false;
         }
-        level.setBlock(up, defaultBlockState(), Block.UPDATE_ALL);     // a new top with a fresh plume; the old top turns stalk
+        level.setBlock(up, defaultBlockState().setValue(PlantPush.PUSH, level.getBlockState(top).getValue(PlantPush.PUSH)), Block.UPDATE_ALL);     // a new top with a fresh plume; the old top turns stalk
         return true;
     }
 }

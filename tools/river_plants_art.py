@@ -204,9 +204,12 @@ def _model(textures, elements):
 
 
 def _reed_model(tex):
-    """Four planes: the two diagonals and the two through the middle along x and z (a thick bed, as the viewer draws)."""
-    return _model({"particle": tex, "reed": tex},
-                  [_plane(45, "#reed"), _plane(-45, "#reed"), _plane(0, "#reed", 0, 16), _plane(0, "#reed", 0, 16, axis_x=True)])
+    """Four planes: the two diagonals and the two through the middle along x and z (a thick bed, as the viewer draws).
+    On a top block only the diagonals carry the plume, the other two the bare stalks' blades (in the game four plumes a
+    block read as a brown lump, 2026-11-22)."""
+    side = "antcolonies:block/reeds_stem" if "top" in tex else tex
+    return _model({"particle": tex, "reed": tex, "side": side},
+                  [_plane(45, "#reed"), _plane(-45, "#reed"), _plane(0, "#side", 0, 16), _plane(0, "#side", 0, 16, axis_x=True)])
 
 
 def _mat_model(stage, tuft):
@@ -248,12 +251,17 @@ def main():
     for name in ("reeds_stem", "reeds_top_fresh", "reeds_top_pale"):
         _write(os.path.join(models, name + ".json"), _reed_model("antcolonies:block/" + name))
     turns = lambda model: [dict({"model": model}, **({"y": y} if y else {})) for y in (0, 90, 180, 270)]
+    # while pushed (push 1 or 2, step 3) the plain model is hidden and the client draws the bent plant
+    # (client/PlantPushClient); the hidden model keeps the plant's picture for breaking bits
+    _write(os.path.join(models, "reeds_hidden.json"), {"textures": {"particle": "antcolonies:block/reeds_stem"}, "elements": []})
+    _write(os.path.join(models, "hippo_grass_hidden.json"), {"textures": {"particle": "antcolonies:block/hippo_grass_mat_grown"}, "elements": []})
     reeds = {}
     for top in ("false", "true"):
         for pale in ("false", "true"):
             for wet in ("false", "true"):
                 model = "antcolonies:block/" + ("reeds_stem" if top == "false" else "reeds_top_pale" if pale == "true" else "reeds_top_fresh")
-                reeds[f"pale={pale},top={top},waterlogged={wet}"] = turns(model)
+                for push in (0, 1, 2):
+                    reeds[f"pale={pale},push={push},top={top},waterlogged={wet}"] = turns(model) if push == 0 else {"model": "antcolonies:block/reeds_hidden"}
     _write(os.path.join(ASSETS, "blockstates/reeds.json"), {"variants": reeds})
     mats, clumps = {}, {}
     for stage, n in STAGE_NUMBER.items():
@@ -266,7 +274,8 @@ def main():
         if stage in TUFT:                                 # about half the mats with blades through them (the viewer's)
             choices += turns(f"antcolonies:block/hippo_grass_mat_{stage}_tuft")
         for reach in (1, 2, 3):
-            mats[f"reach={reach},stage={n}"] = choices
+            for push in (0, 1, 2):
+                mats[f"push={push},reach={reach},stage={n}"] = choices if push == 0 else {"model": "antcolonies:block/hippo_grass_hidden"}
         clumps[f"stage={n}"] = {"model": f"antcolonies:block/hippo_grass_clump_{stage}"}
     _write(os.path.join(ASSETS, "blockstates/hippo_grass.json"), {"variants": mats})
     _write(os.path.join(ASSETS, "blockstates/hippo_grass_clump.json"), {"variants": clumps})
