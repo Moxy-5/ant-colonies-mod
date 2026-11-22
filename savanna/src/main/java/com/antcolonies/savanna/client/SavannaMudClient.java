@@ -41,6 +41,22 @@ public final class SavannaMudClient {
                 SavannaItems.SAVANNA_MUD.get());
     }
 
+    /** The coats' colours (mud step 4): Neon's soil tints, wet to dry ({@link SavannaMudBlock.Tone#colour}). */
+    @SubscribeEvent
+    public static void onClientSetup(net.neoforged.fml.event.lifecycle.FMLClientSetupEvent event) {
+        com.antcolonies.client.MudCoatLook.tint = (tone, dryness) -> SavannaMudBlock.Tone.values()[tone & 3].colour(dryness, 1.0F);
+    }
+
+    /** Mud on players (mud step 4): Neon's player masks over both skins. */
+    @SubscribeEvent
+    public static void onAddLayers(net.neoforged.neoforge.client.event.EntityRenderersEvent.AddLayers event) {
+        for (net.minecraft.client.resources.PlayerSkin.Model skin : event.getSkins()) {
+            if (event.getSkin(skin) instanceof net.minecraft.client.renderer.entity.player.PlayerRenderer renderer) {
+                renderer.addLayer(new MudPlayerLayer(renderer));
+            }
+        }
+    }
+
     @SubscribeEvent
     public static void onRegisterLayers(RegisterGuiLayersEvent event) {
         event.registerBelow(VanillaGuiLayers.CAMERA_OVERLAYS, ResourceLocation.fromNamespaceAndPath(SavannaMod.MODID, "under_mud"),

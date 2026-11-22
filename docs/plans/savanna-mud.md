@@ -164,7 +164,10 @@ the stealth bonus are left out: not asked for; ideas for later.)
    side; not yet seen in a generated world) (the three places above, spaced from the seed like the other sites); `worldgen`
    tests (off mounds, flat ground, spaced, olive by the river, the land's tone off it); chunk-making time measured.
    Full test run here (3 steps).
-4. **Mud on bodies** (framework coat, coat layer, player legs, wash-off, fly clouds keeping off); the river animals
+4. **Mud on bodies** (BUILT 2026-11-21: `coat/MudCoat`, `client/MudCoatLook`, `client/MudCoatLayer` on the hippo,
+   crocodile, monitor, bullfrog and crab, `MudPlayerLayer` on players; test `mudComesOnInMudDriesAndWashesOffInWater`,
+   film `tools/film/mud_coats.film`; the fly clouds keeping off left out: the clouds hang over the water and never
+   follow an animal, so there is nothing to keep off yet) (framework coat, coat layer, player legs, wash-off, fly clouds keeping off); the river animals
    checked walking in and out of every depth (`river`); clip checks for the sinking look.
 5. **Mud balls.**
 6. **In-game test by the user** (a new world).

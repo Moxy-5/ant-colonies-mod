@@ -61,6 +61,7 @@ public class BullfrogRenderer extends GeoEntityRenderer<BullfrogEntity> {
                 headOnFly(frog, getAnimationProcessor().getBone("head"));
             }
         });
+        addRenderLayer(new com.antcolonies.client.MudCoatLayer<>(this));      // mud on its body (savanna mud step 4)
         withScale(SCALE);
         shadowRadius = 0.32F;
     }

@@ -39,6 +39,8 @@ public class SavannaMod {
         BodyPlans.signUp(SavannaMod.class, "/assets/" + MODID + "/body_plans/");
         com.antcolonies.savanna.species.InsectSizes.signUp(); // real sizes, 2026-11-05
         SavannaBlocks.BLOCKS.register(modEventBus);
+        // savanna mud on bodies (mud step 4): bits of the soil's mud fly off as a coat loses a step
+        com.antcolonies.coat.MudCoat.onShed = com.antcolonies.savanna.block.SavannaMudBlock::shed;
         com.antcolonies.savanna.registry.SavannaBlockEntities.BLOCK_ENTITIES.register(modEventBus); // the doum's pieces (floodplain trees step 5)
         SavannaFeatures.FEATURES.register(modEventBus);
         SavannaFeatures.BIOME_MODIFIERS.register(modEventBus);

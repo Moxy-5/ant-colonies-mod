@@ -1,0 +1,48 @@
+# Mud on bodies, savanna mud step 4 (2026-11-21, docs/plans/savanna-mud.md): each animal summoned wearing a coat
+# (the colonyframework:mud_coat byte: coverage << 5 | dryness << 2 | tone; tones 0 olive, 1 red, 2 golden, 3 pale),
+# beside a clean hippo.
+#   ./gradlew runFilm -PfilmScene=tools/film/mud_coats.film      pictures in run-film/screenshots/mud_coats/
+cmd time set noon
+cmd weather clear
+cmd kill @e[type=!player]
+lens 50
+# a clean hippo, and one with wet olive mud to its belly (4, wet, olive = 128 = -128b)
+cmd summon antcolonies:hippo 10.5 -60 10.5 {NoAI:1b,Rotation:[90f,0f]}
+cmd summon antcolonies:hippo 10.5 -60 16.5 {NoAI:1b,Rotation:[90f,0f],"neoforge:attachments":{"colonyframework:mud_coat":-128b}}
+# a crocodile with red mud on its flanks, half dry (5, 3, red = 173 = -83b)
+cmd summon antcolonies:crocodile 20.5 -60 10.5 {NoAI:1b,Rotation:[90f,0f],"neoforge:attachments":{"colonyframework:mud_coat":-83b}}
+# a monitor caked all over in dry golden mud (7, 7, golden = 254 = -2b)
+cmd summon antcolonies:monitor 20.5 -60 16.5 {NoAI:1b,Rotation:[90f,0f],"neoforge:attachments":{"colonyframework:mud_coat":-2b}}
+# a crab all over in wet pale mud (7, 0, pale = 227 = -29b) and a bullfrog with drying red mud (3, 5, red = 117b)
+cmd summon antcolonies:crab 26.5 -60 10.5 {NoAI:1b,Rotation:[90f,0f],"neoforge:attachments":{"colonyframework:mud_coat":-29b}}
+cmd summon antcolonies:bullfrog 26.5 -60 16.5 {NoAI:1b,Rotation:[90f,0f],"neoforge:attachments":{"colonyframework:mud_coat":117b}}
+# clean twins to compare: each one 2 blocks east of its muddy twin
+cmd summon antcolonies:crocodile 20.5 -60 8.0 {NoAI:1b,Rotation:[90f,0f]}
+cmd summon antcolonies:monitor 20.5 -60 19.0 {NoAI:1b,Rotation:[90f,0f]}
+cmd summon antcolonies:crab 28.5 -60 10.5 {NoAI:1b,Rotation:[90f,0f]}
+cmd summon antcolonies:bullfrog 28.5 -60 16.5 {NoAI:1b,Rotation:[90f,0f]}
+wait 40
+camera 10.5 -59.0 5.0 0 15
+wait 10
+shot hippos_front
+camera 4.0 -58.8 13.5 -90 10
+wait 10
+shot hippos_side
+camera 20.5 -59.3 6.5 0 15
+wait 10
+shot croc_monitor
+camera 27.5 -59.4 8.0 0 30
+wait 10
+shot crabs
+camera 27.5 -59.4 14.0 0 30
+wait 10
+shot frogs
+camera 15.0 -59.0 18.0 -90 15
+wait 10
+shot monitors
+camera 15.0 -59.0 9.0 -90 15
+wait 10
+shot crocodiles
+camera 16.0 -57.5 13.5 -90 40
+wait 10
+shot all_above

@@ -12,6 +12,7 @@ import software.bernie.geckolib.renderer.GeoEntityRenderer;
 public class CrocodileRenderer extends GeoEntityRenderer<CrocodileEntity> {
     public CrocodileRenderer(EntityRendererProvider.Context context) {
         super(context, new CrocodileModel());
+        addRenderLayer(new com.antcolonies.client.MudCoatLayer<>(this));      // mud on its body (savanna mud step 4)
         withScale(CrocodileEntity.MODEL_SCALE);
         shadowRadius = 1.1F;
     }

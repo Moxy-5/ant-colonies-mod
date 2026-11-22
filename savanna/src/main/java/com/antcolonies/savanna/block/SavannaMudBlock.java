@@ -208,19 +208,58 @@ public class SavannaMudBlock extends Block implements com.antcolonies.nav.SoftGr
         return entity.getType().is(SavannaTags.MUD_ADAPTED);
     }
 
+    /** Every this many ticks a creature standing in soft mud gets a step muddier (step 4; my pick, half a second). */
+    static final int PICK_UP_TICKS = 10;
+
     /**
-     * Slows a creature whose feet are in this mud, once a tick: only the block under the middle of its feet acts (a
-     * player standing over four blocks is not slowed four times). Runs on both sides, so a player's own game slows them
-     * the same way the server does.
+     * A creature whose feet are in this mud, once a tick (only the block under the middle of its feet acts: a player
+     * standing over four blocks is not slowed four times): it gets muddy ({@link #muddy}) and, unless the mud is its home,
+     * slowed. The slowing runs on both sides, so a player's own game slows them the same way the server does.
      */
     @Override
     protected void entityInside(BlockState state, Level level, BlockPos pos, Entity entity) {
-        if (!soft(state) || adapted(entity) || !pos.equals(BlockPos.containing(entity.getX(), entity.getY() + 1.0E-3, entity.getZ()))) {
+        if (!soft(state) || !pos.equals(BlockPos.containing(entity.getX(), entity.getY() + 1.0E-3, entity.getZ()))) {
+            return;
+        }
+        if (!level.isClientSide && (entity.tickCount + entity.getId()) % PICK_UP_TICKS == 0) {
+            muddy(state, entity);
+        }
+        if (adapted(entity)) {
             return;
         }
         double drag = drag(sinkPixels(state, entity));
         Vec3 motion = entity.getDeltaMovement();
         entity.setDeltaMovement(motion.x * drag, motion.y, motion.z * drag);
+    }
+
+    /**
+     * A step more mud on a creature standing in this mud ({@link com.antcolonies.coat.MudCoat}), up to how far up its body
+     * the mud reaches: 1 + 7 x (how far it sinks / its height), so a player in soupy mud gets muddy legs (2), a hippo its
+     * legs and belly (3), a crocodile or a monitor its flanks (5), a crab nearly all over (7). Ants and termites (and
+     * anything not alive) stay clean.
+     */
+    static void muddy(BlockState state, Entity entity) {
+        if (!(entity instanceof net.minecraft.world.entity.LivingEntity) || entity instanceof com.antcolonies.entity.AbstractAntEntity) {
+            return;
+        }
+        double sunk = sinkPixels(state, entity) / 16.0;
+        int most = (int) Math.max(1, Math.min(7, Math.round(1 + 7 * sunk / Math.max(0.1, entity.getBbHeight()))));
+        com.antcolonies.coat.MudCoat.pickUp(entity, most, state.getValue(TONE).ordinal());
+    }
+
+    /**
+     * Bits of mud flying off a creature that loses a step of its coat (signed up as the coat's {@code onShed}): wet brown
+     * bits in the water, pale dry flakes on land, in the coat's soil colour.
+     */
+    public static void shed(Entity entity, int tone) {
+        if (!(entity.level() instanceof ServerLevel level)) {
+            return;
+        }
+        Wetness look = entity.isInWater() || entity.isInWaterOrRain() ? Wetness.SOUPY : Wetness.CRACKED;
+        BlockState bits = com.antcolonies.savanna.registry.SavannaBlocks.SAVANNA_MUD.get().with(look, 2, Tone.values()[tone & 3]);
+        float w = entity.getBbWidth(), h = entity.getBbHeight();
+        level.sendParticles(new net.minecraft.core.particles.BlockParticleOption(net.minecraft.core.particles.ParticleTypes.BLOCK, bits),
+                entity.getX(), entity.getY() + h * 0.4, entity.getZ(), 6, w * 0.3, h * 0.25, w * 0.3, 0.05);
     }
 
     @Override

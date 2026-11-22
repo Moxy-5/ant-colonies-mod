@@ -12,6 +12,7 @@ import software.bernie.geckolib.renderer.GeoEntityRenderer;
 public class MonitorRenderer extends GeoEntityRenderer<MonitorEntity> {
     public MonitorRenderer(EntityRendererProvider.Context context) {
         super(context, new MonitorModel());
+        addRenderLayer(new com.antcolonies.client.MudCoatLayer<>(this));      // mud on its body (savanna mud step 4)
         withScale(MonitorEntity.MODEL_SCALE);
         shadowRadius = 0.55F;
     }

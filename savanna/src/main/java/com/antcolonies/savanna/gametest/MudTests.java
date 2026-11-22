@@ -396,4 +396,59 @@ public class MudTests {
         helper.assertTrue(wet == mud, "the pan's water should keep its whole wallow wet (" + wet + " of " + mud + ")");
         helper.succeed();
     }
+
+    /**
+     * Mud on bodies (step 4): a pig standing in soupy mud gets muddy a step at a time up to its legs and belly (4), wet and
+     * in the mud's colour; a crab (a river animal) gets muddy too, an ant never. Out on dry ground the pig's mud dries a
+     * step; in water it washes off a step at a time, never all at once, till the pig is clean.
+     */
+    @GameTest(template = "arena", timeoutTicks = 1200)
+    public static void mudComesOnInMudDriesAndWashesOffInWater(GameTestHelper helper) {
+        ground(helper, 1, 1, 20, 10);
+        BlockState soupy = mud().with(Wetness.SOUPY, 3, Tone.RED);
+        for (int x = 2; x <= 7; x++) {
+            helper.setBlock(new BlockPos(x, 1, 4), soupy);
+        }
+        for (int x = 14; x <= 18; x++) {                                  // a pool two deep
+            for (int z = 3; z <= 7; z++) {
+                helper.setBlock(new BlockPos(x, 0, z), Blocks.WATER);
+                helper.setBlock(new BlockPos(x, 1, z), Blocks.WATER);
+            }
+        }
+        Mob pig = still(helper, EntityType.PIG, new BlockPos(3, 1, 4));
+        Mob crab = still(helper, SavannaEntities.CRAB.get(), new BlockPos(5, 1, 4));
+        Mob ant = still(helper, SavannaEntities.MATABELE_MAJOR.get(), new BlockPos(7, 1, 4));
+        int[] lowest = {Integer.MAX_VALUE}, last = {-1};
+        // watched every tick from the start (a watcher started inside a timed step makes Minecraft's test runner run that
+        // step twice): once the pig is in the pool, its mud may only come off a step at a time
+        helper.onEachTick(() -> {
+            if (last[0] < 0) {
+                return;
+            }
+            int now = com.antcolonies.coat.MudCoat.coverage(pig);
+            helper.assertTrue(now >= last[0] - 1, "mud washes off a step at a time, went " + last[0] + " to " + now);
+            last[0] = now;
+            lowest[0] = Math.min(lowest[0], now);
+        });
+        helper.runAfterDelay(80, () -> {
+            helper.assertTrue(com.antcolonies.coat.MudCoat.coverage(pig) == 4, "a pig in soupy mud should be muddy to its belly (4), is " + com.antcolonies.coat.MudCoat.coverage(pig));
+            helper.assertTrue(com.antcolonies.coat.MudCoat.dryness(pig) == 0 && com.antcolonies.coat.MudCoat.tone(pig) == Tone.RED.ordinal(),
+                    "fresh mud is wet and the mud's colour");
+            helper.assertTrue(com.antcolonies.coat.MudCoat.coverage(crab) > 0, "a crab gets muddy too");
+            helper.assertTrue(com.antcolonies.coat.MudCoat.coverage(ant) == 0, "an ant walks on the mud and stays clean");
+            BlockPos dry = helper.absolutePos(new BlockPos(10, 2, 8));
+            pig.teleportTo(dry.getX() + 0.5, dry.getY(), dry.getZ() + 0.5);
+        });
+        helper.runAfterDelay(80 + 420, () -> {
+            helper.assertTrue(com.antcolonies.coat.MudCoat.dryness(pig) >= 1, "on dry ground the mud dries, dryness " + com.antcolonies.coat.MudCoat.dryness(pig));
+            helper.assertTrue(com.antcolonies.coat.MudCoat.coverage(pig) == 4, "drying mud stays on till it is dry");
+            BlockPos pool = helper.absolutePos(new BlockPos(16, 1, 5));
+            pig.teleportTo(pool.getX() + 0.5, pool.getY(), pool.getZ() + 0.5);
+            last[0] = 4;
+        });
+        helper.runAfterDelay(80 + 420 + 300, () -> {
+            helper.assertTrue(lowest[0] == 0, "in water the pig should wash clean within 15 seconds, still " + com.antcolonies.coat.MudCoat.coverage(pig));
+            helper.succeed();
+        });
+    }
 }

@@ -13,6 +13,7 @@ import software.bernie.geckolib.renderer.GeoEntityRenderer;
 public class HippoRenderer extends GeoEntityRenderer<HippoEntity> {
     public HippoRenderer(EntityRendererProvider.Context context) {
         super(context, new HippoModel());
+        addRenderLayer(new com.antcolonies.client.MudCoatLayer<>(this));      // mud on its body (savanna mud step 4)
         withScale(HippoEntity.MODEL_SCALE);
         shadowRadius = 1.3F;
     }

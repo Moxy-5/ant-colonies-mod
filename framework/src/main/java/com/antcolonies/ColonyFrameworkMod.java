@@ -39,6 +39,11 @@ public class ColonyFrameworkMod {
         // M8 step 2e: how a colony defends its nest against a player, and the pain of a sting.
         com.antcolonies.fight.DefenceNumbers.signUp();
         com.antcolonies.registry.ModEffects.EFFECTS.register(modEventBus);
+        // Mud on a body (savanna mud step 4): the one-byte coat, its rules and the message that tells players about it.
+        com.antcolonies.coat.MudCoat.ATTACHMENTS.register(modEventBus);
+        modEventBus.addListener(com.antcolonies.coat.MudCoat::registerPayloads);
+        NeoForge.EVENT_BUS.addListener(com.antcolonies.coat.MudCoat::tick);
+        NeoForge.EVENT_BUS.addListener(com.antcolonies.coat.MudCoat::startTracking);
         // The raid test bench, B1: the rules every colony shares (docs/plans/raid-test-bench.md).
         com.antcolonies.watch.GeneralRules.signUp();
         // Only some game tests when ANTCOLONIES_TESTS is set (quick checks while working).
