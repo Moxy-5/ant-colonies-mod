@@ -116,6 +116,8 @@ and its loading speed, and touches the termite mound and tree surveys.
    edge goes round it, a pan shrinks to fit) instead of the whole thing being refused; uneven ground makes a step
    (water at the lowest, the high side a bank); kept only while most of it is left (my pick: about 60 percent), else
    nothing. Measure again with flights.
+   **Built 2026-11-22:** flights on 3 seeds: oxbows 26 laid of 30 sites (15 to 28 across), pans 16 of 17 (17 to 24
+   across: pans shrink to fit the chunks), no stalls. Next: the user's look in a new world (step 7), then step 5.
 5. **Life in them:** algae; which animals may live there (fish and crocodiles in oxbows; pans with algae and snails,
    no catfish or crocodiles, my pick); every spawning change through the spawning check list in `CLAUDE.md`.
 6. **Check:** a survey test on real land (counts, sizes, depth, nothing in rivers or on mounds), the loading speed

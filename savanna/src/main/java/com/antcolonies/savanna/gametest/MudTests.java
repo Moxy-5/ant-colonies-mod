@@ -382,7 +382,7 @@ public class MudTests {
         BlockPos c0 = helper.absolutePos(new BlockPos(0, 0, 0)), c1 = helper.absolutePos(new BlockPos(40, 0, 40));
         int[] bounds = {Math.min(c0.getX(), c1.getX()), Math.min(c0.getZ(), c1.getZ()), Math.max(c0.getX(), c1.getX()), Math.max(c0.getZ(), c1.getZ())};
         boolean made = com.antcolonies.savanna.worldgen.PanFeature.lay(level, RandomSource.create(9), middle.getX(), middle.getZ(), bounds,
-                middle.getY() - 4, middle.getY() + 6, com.antcolonies.savanna.worldgen.PanFeature.ACROSS_MIN, Tone.RED, null) != null;
+                middle.getY() - 4, middle.getY() + 6, com.antcolonies.savanna.worldgen.PanFeature.ACROSS_MIN, Tone.RED, com.antcolonies.savanna.worldgen.OxbowFeature.Keepout.NONE) != null;
         helper.assertTrue(made, "a pan should be made on level ground: " + com.antcolonies.savanna.worldgen.PanFeature.lastWhy());
         // the wallow (soupy mud) and the wet shore (sticky); the trampled ring's drying mud farther out is left to dry
         int soupy = 0, mud = 0, wet = 0;

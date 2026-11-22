@@ -35,10 +35,9 @@ import net.minecraft.world.level.levelgen.feature.configurations.NoneFeatureConf
  * drying wait for the seasons. Water colour: the savanna's still water for now (the clay-brown pan water needs a small pan
  * biome, not built).
  *
- * <p>On a pan site ({@link PanSites}) the chunk tries {@link #TRIES} spots round its middle. A pan goes only on soft open
- * ground (nothing but plants), never within {@link #FROM_WATER} blocks of sea-level water, no termite mound within
- * {@link OxbowFeature#MOUND_CLEAR} blocks of its ring, no tree's foot within {@link OxbowFeature#TREE_CLEAR}; never in a
- * quiet savanna. Numbers my picks unless marked.
+ * <p>On a pan site ({@link PanSites}) the chunk tries {@link #TRIES} spots round its middle. Trim, don't refuse (the user,
+ * 2026-11-22): a pan too big for its room shrinks; a column with something in the way is left out (see {@link #lay});
+ * never in a quiet savanna. Numbers my picks unless marked.
  */
 public class PanFeature extends Feature<NoneFeatureConfiguration> {
     /** Across at the widest bowl, picked at random between these. */
@@ -58,7 +57,7 @@ public class PanFeature extends Feature<NoneFeatureConfiguration> {
     }
 
     /** What was laid. */
-    public record Laid(BlockPos middle, int across, boolean twoBowls, int deepest, int ring, int water) {
+    public record Laid(BlockPos middle, int across, boolean twoBowls, int deepest, int ring, int water, int kept) {
     }
 
     public PanFeature(Codec<NoneFeatureConfiguration> codec) {
@@ -81,18 +80,17 @@ public class PanFeature extends Feature<NoneFeatureConfiguration> {
         RandomSource random = context.random();
         int[] bounds = {x0 - 16, z0 - 16, x0 + 31, z0 + 31};
         SavannaMudBlock.Tone tone = MudSites.landTone(sampler, x0 + 8, z0 + 8);
-        OxbowFeature.Guard guard = (minX, minZ, maxX, maxZ, cells) -> OxbowFeature.nearMound(level, minX, minZ, maxX, maxZ)
-                || OxbowFeature.nearTree(level, bounds, cells);
+        OxbowFeature.Keepout keepout = OxbowFeature.keepout(level, bounds);
         Map<String, Integer> why = new java.util.TreeMap<>();
         for (int t = 0; t < TRIES; t++) {
             WHY.remove();
             int px = x0 + 4 + random.nextInt(9), pz = z0 + 4 + random.nextInt(9);
             // the land's own ground there, from before any tree or plant (the lakes come first)
             int lookFrom = level.getHeight(net.minecraft.world.level.levelgen.Heightmap.Types.OCEAN_FLOOR_WG, px, pz) + UNEVEN + 4;
-            Laid laid = lay(level, random, px, pz, bounds, sea, lookFrom, 0, tone, guard);
+            Laid laid = lay(level, random, px, pz, bounds, sea, lookFrom, 0, tone, keepout);
             if (laid != null) {
-                SavannaMod.LOGGER.info("[world pans] pan at {} {}: {} across{}, {} deep, ring {}, {} water blocks", laid.middle().getX(),
-                        laid.middle().getZ(), laid.across(), laid.twoBowls() ? " (two bowls)" : "", laid.deepest(), laid.ring(), laid.water());
+                SavannaMod.LOGGER.info("[world pans] pan at {} {}: {} across{}, {} deep, ring {}, {} water blocks, {}% of its water kept", laid.middle().getX(),
+                        laid.middle().getZ(), laid.across(), laid.twoBowls() ? " (two bowls)" : "", laid.deepest(), laid.ring(), laid.water(), laid.kept());
                 return true;
             }
             why.merge(String.valueOf(WHY.get()), 1, Integer::sum);
@@ -115,25 +113,156 @@ public class PanFeature extends Feature<NoneFeatureConfiguration> {
     }
 
     /**
-     * Lays a pan round {@code cx, cz} if it fits, everything read and written inside {@code bounds} ({minX, minZ, maxX,
-     * maxZ}); {@code sea} the sea-level water's top; every column's ground read down from {@code lookFrom} (a few blocks over
-     * the middle's ground: never from a column's own top, which may be a tree's crown or a test's barrier roof). {@code across} 0 picks at random; {@code guard} null keeps clear of
-     * nothing more. Returns what was laid, or null (nothing changed).
+     * Lays a pan round {@code cx, cz}, everything read and written inside {@code bounds} ({minX, minZ, maxX, maxZ});
+     * {@code sea} the sea-level water's top; every column's ground read down from {@code lookFrom} (a few blocks over the
+     * middle's ground: never from a column's own top, which may be a tree's crown or a test's barrier roof). Trim, don't
+     * refuse (the user, 2026-11-22): too big for the chunks it may touch, it shrinks (never under {@link #ACROSS_MIN}); a
+     * column with something in the way (a tree, a log, a rock, a termite mound, water within {@link #FROM_WATER}) is left
+     * out and the water goes round it; ground more than {@link #UNEVEN} over the water's level stays as a bank. Laid while
+     * {@link OxbowFeature#KEEP_MOST} of its water is left, else null (nothing changed). {@code across} 0 picks at random.
      */
     public static Laid lay(WorldGenLevel level, RandomSource random, int cx, int cz, int[] bounds, int sea, int lookFrom, int across,
-            SavannaMudBlock.Tone tone, OxbowFeature.Guard guard) {
-        int want = across > 0 ? across : ACROSS_MIN + random.nextInt(ACROSS_MAX - ACROSS_MIN + 1);
-        double r = want / 2.0;
-        List<Lobe> lobes = new ArrayList<>();
-        lobes.add(new Lobe(0, 0, r, 1 + 0.45 * random.nextDouble(), random.nextDouble() * Math.PI, random.nextDouble() * 6.28,
+            SavannaMudBlock.Tone tone, OxbowFeature.Keepout keepout) {
+        int rolled = across > 0 ? across : ACROSS_MIN + random.nextInt(ACROSS_MAX - ACROSS_MIN + 1);
+        // the shape's dice, for a pan of radius 1 (scaled to its size below)
+        List<Lobe> unit = new ArrayList<>();
+        unit.add(new Lobe(0, 0, 1, 1 + 0.45 * random.nextDouble(), random.nextDouble() * Math.PI, random.nextDouble() * 6.28,
                 random.nextDouble() * 6.28, 0.04 + 0.08 * random.nextDouble()));
         if (random.nextDouble() < 0.4) {
-            double a = random.nextDouble() * 6.28, rr = r * (0.45 + 0.25 * random.nextDouble());
-            lobes.add(new Lobe(Math.cos(a) * r * 0.8, Math.sin(a) * r * 0.8, rr, 1 + 0.3 * random.nextDouble(), random.nextDouble() * Math.PI,
+            double a = random.nextDouble() * 6.28, rr = 0.45 + 0.25 * random.nextDouble();
+            unit.add(new Lobe(Math.cos(a) * 0.8, Math.sin(a) * 0.8, rr, 1 + 0.3 * random.nextDouble(), random.nextDouble() * Math.PI,
                     random.nextDouble() * 6.28, random.nextDouble() * 6.28, 0.06));
         }
-        int ring = (int) Math.round(2 + r / 8 + 2 * random.nextDouble());
-        // the columns: water (with its depth), shore, ring, and the land past it (out = blocks past the water's edge)
+        double ringDice = random.nextDouble();
+        // the biggest size up to the one rolled whose water, shore and ring fit the chunks it may touch (shrinking 2 at a time)
+        Cells cells = null;
+        int want = rolled;
+        for (; want >= ACROSS_MIN; want -= 2) {
+            cells = cells(unit, want / 2.0, ringDice, cx, cz);
+            if (cells.fits(bounds)) {
+                break;
+            }
+        }
+        if (want < ACROSS_MIN) {
+            return no("past the chunks it may touch");
+        }
+        // what is in the way: each water column open, soft, clear of water, mounds and trees
+        int size = Math.max(bounds[2] - bounds[0], bounds[3] - bounds[1]) + 1;
+        RiverBankFeature.Waters waters = new RiverBankFeature.Waters(level, bounds[0], bounds[1], size, sea);
+        Map<Long, Integer> ground = new HashMap<>();
+        java.util.Set<Long> open = new java.util.HashSet<>();
+        int low = Integer.MAX_VALUE;
+        for (long key : cells.water().keySet()) {
+            int x = BlockPos.getX(key), z = BlockPos.getZ(key);
+            if (!OxbowFeature.inside(bounds, x, z) || keepout.at(x, z) || waters.distance(x, z, FROM_WATER) <= FROM_WATER) {
+                continue;
+            }
+            int g = RiverBankFeature.ground(level, x, z, lookFrom);
+            if (!RiverBankFeature.soft(level.getBlockState(new BlockPos(x, g, z))) || !clearAbove(level, x, g, z)) {
+                continue;
+            }
+            ground.put(key, g);
+            open.add(key);
+            low = Math.min(low, g);
+        }
+        if (open.isEmpty()) {
+            return no("everything in the way");
+        }
+        if (low <= sea) {
+            return no("too low");
+        }
+        final int level0 = low;
+        open.removeIf(key -> ground.get(key) > level0 + UNEVEN); // higher ground stays as a bank
+        java.util.Set<Long> kept = OxbowFeature.biggestPatch(open);
+        int keptShare = (int) Math.round(100.0 * kept.size() / cells.water().size());
+        if (kept.size() < OxbowFeature.KEEP_MOST * cells.water().size()) {
+            return no("too much in the way");
+        }
+        // lay it
+        BlockState mud = SavannaBlocks.RIVER_MUD.get().defaultBlockState(), wetSilt = SavannaBlocks.WET_SILT.get().defaultBlockState();
+        BlockState waterState = Blocks.WATER.defaultBlockState(), dirt = Blocks.DIRT.defaultBlockState();
+        BlockState shoreMud = SavannaBlocks.SAVANNA_MUD.get().with(SavannaMudBlock.Wetness.STICKY, 1, tone);
+        BlockState dryMud = SavannaBlocks.SAVANNA_MUD.get().with(SavannaMudBlock.Wetness.DRYING, 1, tone);
+        Map<Long, Integer> depths = new HashMap<>();
+        int deepest = 0, waterBlocks = 0;
+        for (long key : kept) {
+            int x = BlockPos.getX(key), z = BlockPos.getZ(key), depth = cells.water().get(key);
+            clear(level, x, low, z);
+            for (int k = 0; k < depth; k++) {
+                level.setBlock(new BlockPos(x, low - k, z), waterState, Block.UPDATE_CLIENTS);
+            }
+            level.setBlock(new BlockPos(x, low - depth, z), RiverBankFeature.hash(x, z) < 0.5 ? mud : wetSilt, Block.UPDATE_CLIENTS);
+            depths.put(key, depth);
+            deepest = Math.max(deepest, depth);
+            waterBlocks += depth;
+        }
+        Map<Long, Double> shoreLaid = new HashMap<>();
+        for (Map.Entry<Long, Double> e : cells.shore().entrySet()) {
+            int x = BlockPos.getX(e.getKey()), z = BlockPos.getZ(e.getKey());
+            int g = open(level, bounds, keepout, x, z, lookFrom, low);
+            if (g == Integer.MIN_VALUE) {
+                continue; // a bank a step up, or something on it: left as it is
+            }
+            raiseTo(level, x, z, g, low, dirt);
+            level.setBlock(new BlockPos(x, low, z), shoreMud, Block.UPDATE_CLIENTS);
+            shoreLaid.put(e.getKey(), e.getValue());
+        }
+        for (Map.Entry<Long, Double> e : cells.trampled().entrySet()) {
+            int x = BlockPos.getX(e.getKey()), z = BlockPos.getZ(e.getKey());
+            int g = open(level, bounds, keepout, x, z, lookFrom, low);
+            if (g == Integer.MIN_VALUE) {
+                continue;
+            }
+            int top = e.getValue() < cells.ring() / 2.0 + 1.5 ? low : Math.max(low, Math.min(g, low + 1));
+            double k = RiverBankFeature.hash(x + 4, z);
+            BlockState kind = k < 0.4 ? Blocks.COARSE_DIRT.defaultBlockState() : k < 0.7 ? Blocks.DIRT.defaultBlockState() : dryMud;
+            raiseTo(level, x, z, g, top, dirt);
+            level.setBlock(new BlockPos(x, top, z), kind, Block.UPDATE_CLIENTS);
+        }
+        for (Map.Entry<Long, Double> e : cells.past().entrySet()) {
+            int x = BlockPos.getX(e.getKey()), z = BlockPos.getZ(e.getKey());
+            if (x < bounds[0] || x > bounds[2] || z < bounds[1] || z > bounds[3]) {
+                continue;
+            }
+            int g = RiverBankFeature.ground(level, x, z, lookFrom);
+            if (!clearAbove(level, x, g, z)) {
+                continue; // a tree, a log: left as it is
+            }
+            // the land past the ring slopes up a block a block, its grass grazed short
+            int most = low + 1 + (int) Math.floor(e.getValue());
+            if (g > most && g <= low + UNEVEN + 2 && RiverBankFeature.soft(level.getBlockState(new BlockPos(x, g, z)))) {
+                clear(level, x, most, z);
+                level.setBlock(new BlockPos(x, most, z), Blocks.GRASS_BLOCK.defaultBlockState(), Block.UPDATE_CLIENTS);
+                g = most;
+            }
+            BlockState plant = level.getBlockState(new BlockPos(x, g + 1, z));
+            if (!plant.isAir() && plant.getFluidState().isEmpty() && RiverBankFeature.hash(x, z + 5) >= 0.03) {
+                clear(level, x, g, z);
+            }
+        }
+        wallow(level, random, depths, shoreLaid, low, tone);
+        OxbowFeature.holdWater(level, depths, low);
+        return new Laid(new BlockPos(cx, low, cz), want, unit.size() > 1, deepest, cells.ring(), waterBlocks, keptShare);
+    }
+
+    /** A pan's columns: water (with its depth), shore, trampled ring and the grazed land past it (blocks past the ring). */
+    record Cells(Map<Long, Integer> water, Map<Long, Double> shore, Map<Long, Double> trampled, Map<Long, Double> past, int ring) {
+        /** Whether its water, shore and ring lie inside the chunks a feature may touch, a tree's foot to spare. */
+        boolean fits(int[] bounds) {
+            for (Map<Long, ?> part : List.of(water, shore, trampled)) {
+                for (long key : part.keySet()) {
+                    if (!OxbowFeature.inside(bounds, BlockPos.getX(key), BlockPos.getZ(key))) {
+                        return false;
+                    }
+                }
+            }
+            return true;
+        }
+    }
+
+    /** The columns of a pan of radius {@code r} from its radius-1 shape (the model viewer's {@code panAt}). */
+    private static Cells cells(List<Lobe> unit, double r, double ringDice, int cx, int cz) {
+        int ring = (int) Math.round(2 + r / 8 + 2 * ringDice);
         Map<Long, Integer> water = new HashMap<>();
         Map<Long, Double> shore = new HashMap<>(), trampled = new HashMap<>(), past = new HashMap<>();
         int reach = (int) Math.ceil(r * 2.2 + ring + GRAZED + 2);
@@ -141,15 +270,16 @@ public class PanFeature extends Feature<NoneFeatureConfiguration> {
             for (int z = cz - reach; z <= cz + reach; z++) {
                 double dx = x + 0.5 - cx, dz = z + 0.5 - cz, d = Double.MAX_VALUE;
                 int depth = 1;
-                for (Lobe l : lobes) {
-                    double ex = dx - l.x(), ez = dz - l.z(), c = Math.cos(l.ang()), s = Math.sin(l.ang()), k = Math.sqrt(l.sx());
+                for (Lobe l : unit) {
+                    double lr = l.r() * r;
+                    double ex = dx - l.x() * r, ez = dz - l.z() * r, c = Math.cos(l.ang()), s = Math.sin(l.ang()), k = Math.sqrt(l.sx());
                     double u = (ex * c + ez * s) / k, v = (-ex * s + ez * c) * k, a = Math.atan2(v, u), rr = Math.hypot(u, v);
-                    double edge = l.r() * (1 + l.wob() * Math.sin(3 * a + l.p1()) + l.wob() * 0.6 * Math.sin(5 * a + l.p2()));
+                    double edge = lr * (1 + l.wob() * Math.sin(3 * a + l.p1()) + l.wob() * 0.6 * Math.sin(5 * a + l.p2()));
                     d = Math.min(d, rr - edge);
                     if (rr < edge * 0.55) {
                         depth = Math.max(depth, 2);
                     }
-                    if (rr < edge * 0.25 && l.r() >= 14) {
+                    if (rr < edge * 0.25 && lr >= 14) {
                         depth = 3; // only the biggest pans are 3 deep in the very middle
                     }
                 }
@@ -165,123 +295,27 @@ public class PanFeature extends Feature<NoneFeatureConfiguration> {
                 }
             }
         }
-        // inside the chunks it may touch, a tree's foot's width to spare
-        int minX = Integer.MAX_VALUE, maxX = Integer.MIN_VALUE, minZ = Integer.MAX_VALUE, maxZ = Integer.MIN_VALUE;
-        List<Long> footprint = new ArrayList<>(water.keySet());
-        footprint.addAll(shore.keySet());
-        footprint.addAll(trampled.keySet());
-        for (long key : footprint) {
-            int x = BlockPos.getX(key), z = BlockPos.getZ(key);
-            minX = Math.min(minX, x); maxX = Math.max(maxX, x); minZ = Math.min(minZ, z); maxZ = Math.max(maxZ, z);
+        return new Cells(water, shore, trampled, past, ring);
+    }
+
+    /** A bank column's ground if the pan may lay its shore or ring there, else {@link Integer#MIN_VALUE}. */
+    private static int open(WorldGenLevel level, int[] bounds, OxbowFeature.Keepout keepout, int x, int z, int lookFrom, int low) {
+        if (!OxbowFeature.inside(bounds, x, z) || keepout.at(x, z)) {
+            return Integer.MIN_VALUE;
         }
-        int margin = OxbowFeature.TREE_CLEAR;
-        if (minX < bounds[0] + margin || maxX > bounds[2] - margin || minZ < bounds[1] + margin || maxZ > bounds[3] - margin) {
-            return no("past the chunks it may touch");
+        int g = RiverBankFeature.ground(level, x, z, lookFrom);
+        if (g > low + UNEVEN || !RiverBankFeature.soft(level.getBlockState(new BlockPos(x, g, z))) || !clearAbove(level, x, g, z)) {
+            return Integer.MIN_VALUE;
         }
-        // no river or lake near
-        int size = Math.max(bounds[2] - bounds[0], bounds[3] - bounds[1]) + 1;
-        RiverBankFeature.Waters waters = new RiverBankFeature.Waters(level, bounds[0], bounds[1], size, sea);
-        for (int x = minX - FROM_WATER; x <= maxX + FROM_WATER; x++) {
-            for (int z = minZ - FROM_WATER; z <= maxZ + FROM_WATER; z++) {
-                if (waters.isWater(x, z)) {
-                    return no("water near, at " + x + " " + z + " (the pan from " + minX + " " + minZ + " to " + maxX + " " + maxZ + ")");
-                }
-            }
+        return g;
+    }
+
+    /** The ground taken down to {@code top} or filled up to it with dirt (a dip beside the water would drain it). */
+    private static void raiseTo(WorldGenLevel level, int x, int z, int g, int top, BlockState dirt) {
+        clear(level, x, top, z);
+        for (int y = g + 1; y < top; y++) {
+            level.setBlock(new BlockPos(x, y, z), dirt, Block.UPDATE_CLIENTS);
         }
-        // soft open ground, uneven by no more than UNEVEN, above the sea
-        int low = Integer.MAX_VALUE, high = Integer.MIN_VALUE;
-        for (long key : footprint) {
-            int x = BlockPos.getX(key), z = BlockPos.getZ(key);
-            int g = RiverBankFeature.ground(level, x, z, lookFrom);
-            if (!RiverBankFeature.soft(level.getBlockState(new BlockPos(x, g, z)))) {
-                return no("not soft ground: " + net.minecraft.core.registries.BuiltInRegistries.BLOCK.getKey(level.getBlockState(new BlockPos(x, g, z)).getBlock()).getPath());
-            }
-            if (!clearAbove(level, x, g, z)) {
-                return no("something on the ground");
-            }
-            low = Math.min(low, g);
-            high = Math.max(high, g);
-            if (high - low > UNEVEN) {
-                return no("not level");
-            }
-        }
-        if (low <= sea) {
-            return no("too low");
-        }
-        if (guard != null && guard.refuses(minX, minZ, maxX, maxZ, footprint)) {
-            return no("a termite mound or tree");
-        }
-        // lay it
-        BlockState mud = SavannaBlocks.RIVER_MUD.get().defaultBlockState(), wetSilt = SavannaBlocks.WET_SILT.get().defaultBlockState();
-        BlockState waterState = Blocks.WATER.defaultBlockState();
-        BlockState shoreMud = SavannaBlocks.SAVANNA_MUD.get().with(SavannaMudBlock.Wetness.STICKY, 1, tone);
-        BlockState dryMud = SavannaBlocks.SAVANNA_MUD.get().with(SavannaMudBlock.Wetness.DRYING, 1, tone);
-        int deepest = 0, waterBlocks = 0;
-        for (Map.Entry<Long, Integer> e : water.entrySet()) {
-            int x = BlockPos.getX(e.getKey()), z = BlockPos.getZ(e.getKey()), depth = e.getValue();
-            clear(level, x, low, z);
-            for (int k = 0; k < depth; k++) {
-                level.setBlock(new BlockPos(x, low - k, z), waterState, Block.UPDATE_CLIENTS);
-            }
-            level.setBlock(new BlockPos(x, low - depth, z), RiverBankFeature.hash(x, z) < 0.5 ? mud : wetSilt, Block.UPDATE_CLIENTS);
-            deepest = Math.max(deepest, depth);
-            waterBlocks += depth;
-        }
-        for (long key : shore.keySet()) {
-            int x = BlockPos.getX(key), z = BlockPos.getZ(key);
-            clear(level, x, low, z);
-            level.setBlock(new BlockPos(x, low, z), shoreMud, Block.UPDATE_CLIENTS);
-        }
-        for (Map.Entry<Long, Double> e : trampled.entrySet()) {
-            int x = BlockPos.getX(e.getKey()), z = BlockPos.getZ(e.getKey());
-            int g = RiverBankFeature.ground(level, x, z, low + UNEVEN + 4);
-            int top = e.getValue() < ring / 2.0 + 1.5 ? low : Math.min(g, low + 1);
-            double k = RiverBankFeature.hash(x + 4, z);
-            BlockState kind = k < 0.4 ? Blocks.COARSE_DIRT.defaultBlockState() : k < 0.7 ? Blocks.DIRT.defaultBlockState() : dryMud;
-            clear(level, x, top, z);
-            level.setBlock(new BlockPos(x, top, z), kind, Block.UPDATE_CLIENTS);
-        }
-        for (Map.Entry<Long, Double> e : past.entrySet()) {
-            int x = BlockPos.getX(e.getKey()), z = BlockPos.getZ(e.getKey());
-            if (x < bounds[0] || x > bounds[2] || z < bounds[1] || z > bounds[3]) {
-                continue;
-            }
-            int g = RiverBankFeature.ground(level, x, z, low + UNEVEN + 4);
-            if (!clearAbove(level, x, g, z)) {
-                continue; // a tree, a log: left as it is
-            }
-            // the land past the ring slopes up a block a block, its grass grazed short
-            int most = low + 1 + (int) Math.floor(e.getValue());
-            if (g > most && RiverBankFeature.soft(level.getBlockState(new BlockPos(x, g, z)))) {
-                clear(level, x, most, z);
-                level.setBlock(new BlockPos(x, most, z), Blocks.GRASS_BLOCK.defaultBlockState(), Block.UPDATE_CLIENTS);
-                g = most;
-            }
-            BlockPos over = new BlockPos(x, g + 1, z);
-            BlockState plant = level.getBlockState(over);
-            if (!plant.isAir() && plant.getFluidState().isEmpty() && RiverBankFeature.hash(x, z + 5) >= 0.03) {
-                clear(level, x, g, z);
-            }
-        }
-        wallow(level, random, water, shore, low, tone);
-        // the water held: every side of it solid (a cave under the land would drain it)
-        BlockState dirt = Blocks.DIRT.defaultBlockState();
-        for (Map.Entry<Long, Integer> e : water.entrySet()) {
-            int x = BlockPos.getX(e.getKey()), z = BlockPos.getZ(e.getKey());
-            for (int k = 0; k < e.getValue(); k++) {
-                for (int[] side : new int[][] {{1, 0}, {-1, 0}, {0, 1}, {0, -1}}) {
-                    Integer theirs = water.get(BlockPos.asLong(x + side[0], 0, z + side[1]));
-                    if (theirs != null && theirs > k) {
-                        continue;
-                    }
-                    BlockPos at = new BlockPos(x + side[0], low - k, z + side[1]);
-                    if (!level.getBlockState(at).isSolid()) {
-                        level.setBlock(at, dirt, Block.UPDATE_CLIENTS);
-                    }
-                }
-            }
-        }
-        return new Laid(new BlockPos(cx, low, cz), want, lobes.size() > 1, deepest, ring, waterBlocks);
     }
 
     /**

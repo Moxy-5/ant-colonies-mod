@@ -1737,11 +1737,11 @@ public class SavannaWorldTests {
         BlockPos o0 = helper.absolutePos(new BlockPos(20, 0, 1)), o1 = helper.absolutePos(new BlockPos(63, 0, 63));
         int[] bounds = {Math.min(o0.getX(), o1.getX()), Math.min(o0.getZ(), o1.getZ()), Math.max(o0.getX(), o1.getX()), Math.max(o0.getZ(), o1.getZ())};
         for (int t = 0; t < 16 && !oxbow; t++) {
-            oxbow = OxbowFeature.lay(level, random, bounds, a.getY(), OxbowFeature.ACROSS_MIN, OxbowFeature.Age.FRESH, null) != null;
+            oxbow = OxbowFeature.lay(level, random, bounds, a.getY(), OxbowFeature.ACROSS_MIN, OxbowFeature.Age.FRESH, com.antcolonies.savanna.worldgen.OxbowFeature.Keepout.NONE) != null;
         }
         BlockPos q0 = helper.absolutePos(new BlockPos(1, 0, 1)), q1 = helper.absolutePos(new BlockPos(63, 0, 63)), byRiver = helper.absolutePos(new BlockPos(30, plain, 34));
         int[] all = {Math.min(q0.getX(), q1.getX()), Math.min(q0.getZ(), q1.getZ()), Math.max(q0.getX(), q1.getX()), Math.max(q0.getZ(), q1.getZ())};
-        boolean beside = PanFeature.lay(level, random, byRiver.getX(), byRiver.getZ(), all, a.getY(), byRiver.getY() + 6, PanFeature.ACROSS_MIN, com.antcolonies.savanna.block.SavannaMudBlock.Tone.RED, null) != null;
+        boolean beside = PanFeature.lay(level, random, byRiver.getX(), byRiver.getZ(), all, a.getY(), byRiver.getY() + 6, PanFeature.ACROSS_MIN, com.antcolonies.savanna.block.SavannaMudBlock.Tone.RED, com.antcolonies.savanna.worldgen.OxbowFeature.Keepout.NONE) != null;
         helper.assertTrue(oxbow, "an oxbow did not fit beside the river");
         helper.assertFalse(beside, "a pool was put beside the river");
         int poolWater = poolWater(helper, plain);
@@ -1887,7 +1887,7 @@ public class SavannaWorldTests {
         RandomSource random = RandomSource.create(across * 31L + age.ordinal());
         OxbowFeature.Laid laid = null;
         for (int t = 0; t < 24 && laid == null; t++) {
-            laid = OxbowFeature.lay(level, random, bounds, a.getY(), across, age, null);
+            laid = OxbowFeature.lay(level, random, bounds, a.getY(), across, age, com.antcolonies.savanna.worldgen.OxbowFeature.Keepout.NONE);
         }
         helper.assertTrue(laid != null, "a " + age + " oxbow " + across + " across did not fit beside the river");
         OxbowFeature.Laid it = laid;
@@ -1967,7 +1967,7 @@ public class SavannaWorldTests {
         RandomSource random = RandomSource.create(across * 17L + (slope ? 1 : 0));
         PanFeature.Laid laid = null;
         for (int t = 0; t < 16 && laid == null; t++) {
-            laid = PanFeature.lay(level, random, mid.getX(), mid.getZ(), bounds, a.getY(), a.getY() + 16, across, com.antcolonies.savanna.block.SavannaMudBlock.Tone.GOLDEN, null);
+            laid = PanFeature.lay(level, random, mid.getX(), mid.getZ(), bounds, a.getY(), a.getY() + 16, across, com.antcolonies.savanna.block.SavannaMudBlock.Tone.GOLDEN, com.antcolonies.savanna.worldgen.OxbowFeature.Keepout.NONE);
         }
         helper.assertTrue(laid != null, "a pan " + across + " across did not fit: " + PanFeature.lastWhy());
         PanFeature.Laid it = laid;
@@ -2006,6 +2006,83 @@ public class SavannaWorldTests {
                 }
             }
             helper.assertTrue(flowing == 0 && still == before, "the pan spilled: " + flowing + " flowing, " + still + " of " + before + " still");
+            helper.succeed();
+        });
+    }
+
+    /**
+     * Trim, don't refuse (the user, 2026-11-22, "it's okay if it's on a step or if it's misshapen"): on a plain with a
+     * tree trunk every 8 blocks and a hill 5 high at one end, an oxbow beside the river and a pan on the open land are both
+     * laid, the water going round the trunks (each left standing, dry at its foot) and stopping at the hill, most of each
+     * kept, and nothing spills.
+     */
+    @GameTest(template = "arena", timeoutTicks = 100, batch = "savanna_pans")
+    public static void oxbowsAndPansGoRoundWhatIsInTheirWay(GameTestHelper helper) {
+        var level = helper.getLevel();
+        int plain = 6, water = plain - 1, edge = 55;
+        for (int x = 1; x < 64; x++) {
+            for (int z = 1; z < 64; z++) {
+                boolean river = z > edge;
+                int top = x >= 58 ? plain + 5 : plain;                                   // a hill at the east end
+                for (int y = 1; y <= top + 4; y++) {
+                    Block b = river && y >= water - 2 ? (y <= water ? Blocks.WATER : Blocks.AIR) : y < top ? Blocks.DIRT : y == top ? Blocks.GRASS_BLOCK : Blocks.AIR;
+                    helper.setBlock(x, y, z, b);
+                }
+                if (!river && x % 8 == 4 && z % 8 == 4 && x < 58) {
+                    for (int y = top + 1; y <= top + 3; y++) {
+                        helper.setBlock(x, y, z, Blocks.OAK_LOG);                         // a tree trunk
+                    }
+                }
+            }
+        }
+        BlockPos a = helper.absolutePos(new BlockPos(1, water, 1)), b = helper.absolutePos(new BlockPos(63, water, 63));
+        int[] bounds = {Math.min(a.getX(), b.getX()), Math.min(a.getZ(), b.getZ()), Math.max(a.getX(), b.getX()), Math.max(a.getZ(), b.getZ())};
+        RandomSource random = RandomSource.create(5);
+        OxbowFeature.Laid oxbow = null;
+        for (int t = 0; t < 24 && oxbow == null; t++) {
+            oxbow = OxbowFeature.lay(level, random, bounds, a.getY(), 24, OxbowFeature.Age.FRESH, OxbowFeature.Keepout.NONE);
+        }
+        helper.assertTrue(oxbow != null, "no oxbow round the trunks");
+        // the pan on the land the oxbow left, away from the river
+        PanFeature.Laid pan = null;
+        for (int t = 0; t < 24 && pan == null; t++) {
+            BlockPos at = helper.absolutePos(new BlockPos(16 + random.nextInt(30), plain, 14 + random.nextInt(8)));
+            int[] panBounds = {Math.max(bounds[0], at.getX() - 24), Math.max(bounds[1], at.getZ() - 24), Math.min(bounds[2], at.getX() + 23),
+                    Math.min(bounds[3], at.getZ() + 23)};
+            pan = PanFeature.lay(level, random, at.getX(), at.getZ(), panBounds, a.getY(), at.getY() + 8, 20,
+                    com.antcolonies.savanna.block.SavannaMudBlock.Tone.RED, OxbowFeature.Keepout.NONE);
+        }
+        int trunks = 0, wetFeet = 0, sources = 0;
+        for (int x = 1; x < 64; x++) {
+            for (int z = 1; z <= edge; z++) {
+                if (x % 8 == 4 && z % 8 == 4 && x < 58) {
+                    trunks += helper.getBlockState(new BlockPos(x, plain + 2, z)).is(Blocks.OAK_LOG) ? 1 : 0;
+                    wetFeet += helper.getBlockState(new BlockPos(x, plain, z)).getFluidState().isEmpty() ? 0 : 1;
+                }
+                for (int y = 1; y <= plain + 6; y++) {
+                    sources += helper.getBlockState(new BlockPos(x, y, z)).getFluidState().isSource() ? 1 : 0;
+                }
+            }
+        }
+        String report = String.format("oxbow %s; pan %s; %d trunks standing, %d with water at their foot, %d water blocks", oxbow, pan, trunks, wetFeet, sources);
+        SavannaMod.LOGGER.info("[trim] {}", report);
+        helper.assertTrue(pan != null, "no pan round the trunks: " + PanFeature.lastWhy() + "; " + report);
+        helper.assertTrue(oxbow.kept() < 100 || pan.kept() < 100, "nothing was in the way (the test's trunks missed both): " + report);
+        helper.assertTrue(oxbow.kept() >= 60 && pan.kept() >= 60, "kept less than the most: " + report);
+        helper.assertTrue(trunks == 49 && wetFeet == 0, "a trunk was taken or stands in water: " + report);
+        int before = sources;
+        helper.runAfterDelay(60, () -> {
+            int still = 0, flowing = 0;
+            for (int x = 1; x < 64; x++) {
+                for (int z = 1; z <= edge; z++) {
+                    for (int y = 1; y <= plain + 6; y++) {
+                        var f = helper.getBlockState(new BlockPos(x, y, z)).getFluidState();
+                        still += f.isSource() ? 1 : 0;
+                        flowing += !f.isEmpty() && !f.isSource() ? 1 : 0;
+                    }
+                }
+            }
+            helper.assertTrue(flowing == 0 && still == before, "spilled: " + flowing + " flowing, " + still + " of " + before + " still");
             helper.succeed();
         });
     }
