@@ -1,0 +1,61 @@
+# Savanna mud, step 1 (2026-11-21, docs/plans/savanna-mud.md): every look in every tone, a wallow with animals sunk in it
+# (lit, not black): soupy mud sinks a light creature a quarter block, a heavy one half (the user's rule). Film mobs have no AI and so do not fall: each is set at the height it sinks to (the game tests prove
+# the sinking itself). The brown screen under the mud is not filmed: the film camera hides the screen's overlays.
+#   ./gradlew runFilm -PfilmScene=tools/film/savanna_mud.film      pictures in run-film/screenshots/savanna_mud/
+cmd time set noon
+cmd weather clear
+cmd kill @e[type=!player]
+lens 50
+# a wallow: sticky rim, soupy mud darker toward a 3 by 3 middle (the depth is the look only)
+cmd fill 8 -61 8 18 -61 18 antcolonies:savanna_mud[wetness=sticky,depth=1,tone=olive]
+cmd fill 9 -61 9 17 -61 17 antcolonies:savanna_mud[wetness=soupy,depth=2,tone=olive]
+cmd fill 10 -61 10 16 -61 16 antcolonies:savanna_mud[wetness=soupy,depth=3,tone=olive]
+cmd fill 12 -61 12 14 -61 14 antcolonies:savanna_mud[wetness=soupy,depth=4,tone=olive]
+cmd fill 7 -61 7 19 -61 7 antcolonies:savanna_mud[wetness=drying,depth=1,tone=olive]
+cmd fill 7 -61 19 19 -61 19 antcolonies:savanna_mud[wetness=cracked,depth=1,tone=olive]
+# every look (cracked, drying, sticky, soupy 2, 3, 4) in each tone: olive, red, golden, pale
+cmd setblock 10 -61 22 antcolonies:savanna_mud[wetness=cracked,tone=olive]
+cmd setblock 11 -61 22 antcolonies:savanna_mud[wetness=drying,tone=olive]
+cmd setblock 12 -61 22 antcolonies:savanna_mud[wetness=sticky,tone=olive]
+cmd setblock 13 -61 22 antcolonies:savanna_mud[wetness=soupy,depth=2,tone=olive]
+cmd setblock 14 -61 22 antcolonies:savanna_mud[wetness=soupy,depth=3,tone=olive]
+cmd setblock 15 -61 22 antcolonies:savanna_mud[wetness=soupy,depth=4,tone=olive]
+cmd setblock 10 -61 24 antcolonies:savanna_mud[wetness=cracked,tone=red]
+cmd setblock 11 -61 24 antcolonies:savanna_mud[wetness=drying,tone=red]
+cmd setblock 12 -61 24 antcolonies:savanna_mud[wetness=sticky,tone=red]
+cmd setblock 13 -61 24 antcolonies:savanna_mud[wetness=soupy,depth=2,tone=red]
+cmd setblock 14 -61 24 antcolonies:savanna_mud[wetness=soupy,depth=3,tone=red]
+cmd setblock 15 -61 24 antcolonies:savanna_mud[wetness=soupy,depth=4,tone=red]
+cmd setblock 10 -61 26 antcolonies:savanna_mud[wetness=cracked,tone=golden]
+cmd setblock 11 -61 26 antcolonies:savanna_mud[wetness=drying,tone=golden]
+cmd setblock 12 -61 26 antcolonies:savanna_mud[wetness=sticky,tone=golden]
+cmd setblock 13 -61 26 antcolonies:savanna_mud[wetness=soupy,depth=2,tone=golden]
+cmd setblock 14 -61 26 antcolonies:savanna_mud[wetness=soupy,depth=3,tone=golden]
+cmd setblock 15 -61 26 antcolonies:savanna_mud[wetness=soupy,depth=4,tone=golden]
+cmd setblock 10 -61 28 antcolonies:savanna_mud[wetness=cracked,tone=pale]
+cmd setblock 11 -61 28 antcolonies:savanna_mud[wetness=drying,tone=pale]
+cmd setblock 12 -61 28 antcolonies:savanna_mud[wetness=sticky,tone=pale]
+cmd setblock 13 -61 28 antcolonies:savanna_mud[wetness=soupy,depth=2,tone=pale]
+cmd setblock 14 -61 28 antcolonies:savanna_mud[wetness=soupy,depth=3,tone=pale]
+cmd setblock 15 -61 28 antcolonies:savanna_mud[wetness=soupy,depth=4,tone=pale]
+wait 20
+cmd summon antcolonies:hippo 13.0 -60.5 13.5 {NoAI:1b,Rotation:[90f,0f]}
+cmd summon antcolonies:crab 10.5 -60.25 13.5 {NoAI:1b,Rotation:[90f,0f]}
+cmd summon minecraft:pig 13.5 -60.4375 16.5 {NoAI:1b,Rotation:[0f,0f]}
+cmd summon antcolonies:crocodile 15.5 -60.375 10.5 {NoAI:1b,Rotation:[0f,0f]}
+wait 40
+camera 13.5 -55.0 1.5 0 38
+wait 10
+shot wallow_overview
+camera 4.0 -59.2 13.5 -90 12
+wait 10
+shot wallow_side
+camera 8.6 -59.9 13.5 -90 25
+wait 10
+shot crab_close
+camera 12.5 -56.5 18.0 0 70
+wait 10
+shot tones_above
+camera 12.5 -59.4 19.5 0 20
+wait 10
+shot tones_low

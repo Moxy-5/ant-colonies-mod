@@ -1,0 +1,147 @@
+{
+  "multipart": [
+    {
+      "when": {
+        "wetness": "cracked"
+      },
+      "apply": [
+        {
+          "model": "antcolonies:block/savanna_mud_cracked"
+        },
+        {
+          "model": "antcolonies:block/savanna_mud_cracked",
+          "y": 90
+        },
+        {
+          "model": "antcolonies:block/savanna_mud_cracked",
+          "y": 180
+        },
+        {
+          "model": "antcolonies:block/savanna_mud_cracked",
+          "y": 270
+        }
+      ]
+    },
+    {
+      "when": {
+        "wetness": "drying"
+      },
+      "apply": [
+        {
+          "model": "antcolonies:block/savanna_mud_drying"
+        },
+        {
+          "model": "antcolonies:block/savanna_mud_drying",
+          "y": 90
+        },
+        {
+          "model": "antcolonies:block/savanna_mud_drying",
+          "y": 180
+        },
+        {
+          "model": "antcolonies:block/savanna_mud_drying",
+          "y": 270
+        }
+      ]
+    },
+    {
+      "when": {
+        "OR": [
+          {
+            "wetness": "sticky"
+          },
+          {
+            "wetness": "soupy",
+            "depth": "1"
+          }
+        ]
+      },
+      "apply": [
+        {
+          "model": "antcolonies:block/savanna_mud_sticky"
+        },
+        {
+          "model": "antcolonies:block/savanna_mud_sticky",
+          "y": 90
+        },
+        {
+          "model": "antcolonies:block/savanna_mud_sticky",
+          "y": 180
+        },
+        {
+          "model": "antcolonies:block/savanna_mud_sticky",
+          "y": 270
+        }
+      ]
+    },
+    {
+      "when": {
+        "wetness": "soupy",
+        "depth": "2"
+      },
+      "apply": [
+        {
+          "model": "antcolonies:block/savanna_mud_soupy_shallow"
+        },
+        {
+          "model": "antcolonies:block/savanna_mud_soupy_shallow",
+          "y": 90
+        },
+        {
+          "model": "antcolonies:block/savanna_mud_soupy_shallow",
+          "y": 180
+        },
+        {
+          "model": "antcolonies:block/savanna_mud_soupy_shallow",
+          "y": 270
+        }
+      ]
+    },
+    {
+      "when": {
+        "wetness": "soupy",
+        "depth": "3"
+      },
+      "apply": [
+        {
+          "model": "antcolonies:block/savanna_mud_soupy_mid"
+        },
+        {
+          "model": "antcolonies:block/savanna_mud_soupy_mid",
+          "y": 90
+        },
+        {
+          "model": "antcolonies:block/savanna_mud_soupy_mid",
+          "y": 180
+        },
+        {
+          "model": "antcolonies:block/savanna_mud_soupy_mid",
+          "y": 270
+        }
+      ]
+    },
+    {
+      "when": {
+        "wetness": "soupy",
+        "depth": "4"
+      },
+      "apply": [
+        {
+          "model": "antcolonies:block/savanna_mud_soupy_deep"
+        },
+        {
+          "model": "antcolonies:block/savanna_mud_soupy_deep",
+          "y": 90
+        },
+        {
+          "model": "antcolonies:block/savanna_mud_soupy_deep",
+          "y": 180
+        },
+        {
+          "model": "antcolonies:block/savanna_mud_soupy_deep",
+          "y": 270
+        }
+      ]
+    }
+  ]
+}

@@ -54,6 +54,7 @@ public class SavannaItems {
     public static final DeferredItem<BlockItem> SILT = ITEMS.registerSimpleBlockItem(SavannaBlocks.SILT);
     public static final DeferredItem<BlockItem> WET_SILT = ITEMS.registerSimpleBlockItem(SavannaBlocks.WET_SILT);
     public static final DeferredItem<BlockItem> RIVER_MUD = ITEMS.registerSimpleBlockItem(SavannaBlocks.RIVER_MUD);
+    public static final DeferredItem<BlockItem> SAVANNA_MUD = ITEMS.registerSimpleBlockItem(SavannaBlocks.SAVANNA_MUD);
     public static final DeferredItem<BlockItem> ALGAE = ITEMS.registerSimpleBlockItem(SavannaBlocks.ALGAE);
     public static final DeferredItem<BlockItem> SCRAPS = ITEMS.registerSimpleBlockItem(SavannaBlocks.SCRAPS);
     public static final DeferredItem<BlockItem> CROC_DROPPINGS = ITEMS.registerSimpleBlockItem(SavannaBlocks.CROC_DROPPINGS);

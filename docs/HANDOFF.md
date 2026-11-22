@@ -13,6 +13,7 @@ Keep this short (~40 lines). Remove finished items once merged or picked up. Det
 
 ## Ready for Claude (from Neon)
 <!-- Format: - **<animal or tool>** (branch `<name>`): summary + `docs/handoff/<animal>.md` -->
+- **Savanna Mud & Wallowing Asset Pack (`antcolonies:savanna_mud`, `MudCoatLayer` masks)** (branch `claude/engine-every-animal`): 20 auto-generated 3D entity mud masks with clean eye/pupil halos (updated Hippo w/ expressive `pupil_left`/`pupil_right`, Crocodile, Croc Teen, Bullfrog, Monitor, Otter, Crabs), 64×64 Player mud masks, animated 4-frame `savanna_mud_soupy.png` + `.mcmeta`, 6 stage models (`0.25 / 0.50 / 0.75 / 1.00` gradual sink), 5 track tiles, lungfish cocoon, rubbing-post overlay, `savanna_mud_ball`, multipart blockstate, RGB tint table & gradual water wash-off spec + `docs/handoff/savanna-mud.md` (plan `docs/plans/savanna-mud.md`).
 - **African River Otter (`antcolonies:otter`, `savanna`)** (branch `claude/engine-every-animal`): `v6` approved 2026-11-21 (2.6 blocks long, 101/250 boxes, 38 bones, 21 clips + 5 BlockMoves incl. calm `enter_water` & leaping deep-dive `dive_in`, `0/40` transitions flagged, `verify_animal --offline` passed) + `docs/handoff/otter.md`.
 
 ## Requests for Neon (from Claude)

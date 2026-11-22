@@ -246,6 +246,7 @@ public class SavannaEvents {
             event.accept(SavannaItems.SILT);
             event.accept(SavannaItems.WET_SILT);
             event.accept(SavannaItems.RIVER_MUD);
+            event.accept(SavannaItems.SAVANNA_MUD);
             event.accept(SavannaItems.ALGAE);
             event.accept(SavannaItems.SCRAPS);
             event.accept(SavannaItems.CROC_DROPPINGS);

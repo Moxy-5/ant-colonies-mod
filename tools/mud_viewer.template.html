@@ -1,0 +1,1096 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Savanna Mud &amp; Wallowing Studio</title>
+  <script src="https://www.gstatic.com/antigravity/web/dev/tailwindcss.min.js"></script>
+  <style>
+    * { box-sizing: border-box; }
+    html, body { height: 100%; margin: 0; padding: 0; overflow: hidden; }
+    canvas { display: block; width: 100%; height: 100%; cursor: grab; touch-action: none; }
+    canvas:active { cursor: grabbing; }
+    input[type="range"] { cursor: pointer; }
+    .pill-btn {
+      transition: background-color 120ms ease, border-color 120ms ease, transform 80ms ease;
+    }
+    .pill-btn:active { transform: scale(0.97); }
+  </style>
+</head>
+<body class="bg-[var(--background)] text-[var(--foreground)] antialiased flex flex-col h-full select-none">
+
+  <!-- Top Bar -->
+  <header class="flex flex-wrap items-center justify-between gap-2 px-3 py-2 border-b border-[var(--border)] bg-[var(--card)] shrink-0">
+    <div class="flex items-center gap-2">
+      <span class="inline-block w-2.5 h-2.5 rounded-full bg-amber-600"></span>
+      <h1 class="text-sm font-semibold tracking-tight">Savanna Mud &amp; Wallowing Studio</h1>
+      <span class="text-xs px-1.5 py-0.5 rounded bg-[var(--secondary)] text-[var(--muted-foreground)]">Phase 0 Lab</span>
+    </div>
+    <div class="flex items-center gap-1 bg-[var(--background)] p-0.5 rounded-lg border border-[var(--border)]">
+      <button id="tab-animals" class="pill-btn px-2.5 py-1 text-xs font-medium rounded-md">Animal Mud Coat</button>
+      <button id="tab-wallow" class="pill-btn px-2.5 py-1 text-xs font-medium rounded-md">Wallow Depth &amp; Drying</button>
+      <button id="tab-assets" class="pill-btn px-2.5 py-1 text-xs font-medium rounded-md">Game Asset Pack</button>
+    </div>
+  </header>
+
+  <!-- Main Workspace -->
+  <div class="flex-1 flex flex-col lg:flex-row min-h-0 overflow-hidden">
+
+    <!-- 3D Viewport -->
+    <div class="relative flex-1 min-h-[280px] bg-[var(--content)] overflow-hidden">
+      <canvas id="glcanvas"></canvas>
+
+      <!-- Tab 3: Live Tinted Game Asset Pack Overlay -->
+      <div id="asset-stage" class="hidden absolute inset-0 overflow-y-auto p-4 bg-[var(--content)]">
+        <div class="max-w-4xl mx-auto space-y-4">
+          <div class="flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <h2 class="text-sm font-semibold">Exported Game Textures (Live Regional Tint Preview)</h2>
+              <p class="text-xs text-[var(--muted-foreground)]">Saved in <code class="text-[var(--code-foreground)]">savanna/src/main/resources/assets/antcolonies/</code> &mdash; single greyscale set tinted by <code class="text-[var(--code-foreground)]">BlockColor</code> across all 4 soil zones.</p>
+            </div>
+            <span class="text-xs px-2 py-1 rounded bg-[var(--card)] border border-[var(--border)] font-mono">20 entity masks + 14 block/item/player PNGs</span>
+          </div>
+          <div id="asset-grid" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3"></div>
+        </div>
+      </div>
+
+      <!-- Floating Camera Presets -->
+      <div class="absolute top-2.5 left-2.5 flex flex-wrap gap-1 pointer-events-auto">
+        <button data-cam="threeq" class="cam-btn pill-btn px-2 py-1 text-xs rounded border border-[var(--border)] bg-[var(--card)]/90 hover:bg-[var(--secondary)]">3/4 View</button>
+        <button data-cam="side" class="cam-btn pill-btn px-2 py-1 text-xs rounded border border-[var(--border)] bg-[var(--card)]/90 hover:bg-[var(--secondary)]">Side</button>
+        <button data-cam="front" class="cam-btn pill-btn px-2 py-1 text-xs rounded border border-[var(--border)] bg-[var(--card)]/90 hover:bg-[var(--secondary)]">Front</button>
+        <button data-cam="top" class="cam-btn pill-btn px-2 py-1 text-xs rounded border border-[var(--border)] bg-[var(--card)]/90 hover:bg-[var(--secondary)]">Top</button>
+        <button data-cam="low" class="cam-btn pill-btn px-2 py-1 text-xs rounded border border-[var(--border)] bg-[var(--card)]/90 hover:bg-[var(--secondary)]">Belly / Cutaway</button>
+      </div>
+
+      <!-- Floating Status Chip -->
+      <div id="hud-chip" class="absolute bottom-2.5 left-2.5 px-2.5 py-1.5 rounded-lg border border-[var(--border)] bg-[var(--card)]/90 text-xs flex flex-wrap items-center gap-3 pointer-events-none">
+        <span id="hud-label" class="font-medium">Hippo (v8)</span>
+        <span id="hud-packet" class="font-mono text-[var(--muted-foreground)]">byte: 0x00</span>
+      </div>
+
+      <div class="absolute bottom-2.5 right-2.5 px-2 py-1 rounded border border-[var(--border)] bg-[var(--card)]/80 text-xs text-[var(--muted-foreground)] pointer-events-none">
+        Drag: Orbit &middot; Right-Drag: Pan &middot; Scroll: Zoom
+      </div>
+    </div>
+
+    <!-- Controls Sidebar -->
+    <aside class="w-full lg:w-80 border-t lg:border-t-0 lg:border-l border-[var(--border)] bg-[var(--card)] overflow-y-auto p-3 space-y-3 shrink-0">
+
+      <!-- Soil Tone (Shared Across Both Tabs) -->
+      <section class="space-y-1.5">
+        <div class="flex items-center justify-between text-xs">
+          <span class="font-semibold text-[var(--foreground)]">Regional Soil Colour</span>
+          <span id="tone-readout" class="text-[var(--muted-foreground)]">Floodplain Olive</span>
+        </div>
+        <div class="grid grid-cols-2 gap-1.5" id="tone-grid">
+          <button data-tone="0" class="tone-btn pill-btn flex items-center gap-1.5 px-2 py-1.5 text-xs rounded-md border border-[var(--border)]">
+            <span class="w-3 h-3 rounded-full shrink-0" style="background:#4b3f2d"></span>Floodplain Olive
+          </button>
+          <button data-tone="1" class="tone-btn pill-btn flex items-center gap-1.5 px-2 py-1.5 text-xs rounded-md border border-[var(--border)]">
+            <span class="w-3 h-3 rounded-full shrink-0" style="background:#7a3622"></span>Kenya Red
+          </button>
+          <button data-tone="2" class="tone-btn pill-btn flex items-center gap-1.5 px-2 py-1.5 text-xs rounded-md border border-[var(--border)]">
+            <span class="w-3 h-3 rounded-full shrink-0" style="background:#7d5e31"></span>Mid Golden
+          </button>
+          <button data-tone="3" class="tone-btn pill-btn flex items-center gap-1.5 px-2 py-1.5 text-xs rounded-md border border-[var(--border)]">
+            <span class="w-3 h-3 rounded-full shrink-0" style="background:#797165"></span>Coastal Pale
+          </button>
+        </div>
+      </section>
+
+      <!-- TAB 1 CONTROLS: ANIMAL MUD COAT -->
+      <div id="panel-animals" class="space-y-3 pt-2 border-t border-[var(--border)]">
+        <section class="space-y-1.5">
+          <span class="text-xs font-semibold">Savanna Animal (Exact Game Model)</span>
+          <div class="grid grid-cols-2 gap-1.5" id="animal-grid">
+            <button data-animal="hippo" class="animal-btn pill-btn px-2 py-1.5 text-xs rounded-md border border-[var(--border)] text-left font-medium">Hippo</button>
+            <button data-animal="crocodile" class="animal-btn pill-btn px-2 py-1.5 text-xs rounded-md border border-[var(--border)] text-left font-medium">Nile Crocodile</button>
+            <button data-animal="bullfrog" class="animal-btn pill-btn px-2 py-1.5 text-xs rounded-md border border-[var(--border)] text-left font-medium">Bullfrog</button>
+            <button data-animal="monitor" class="animal-btn pill-btn px-2 py-1.5 text-xs rounded-md border border-[var(--border)] text-left font-medium">Nile Monitor</button>
+            <button data-animal="otter" class="animal-btn pill-btn px-2 py-1.5 text-xs rounded-md border border-[var(--border)] text-left font-medium col-span-2">African River Otter</button>
+          </div>
+        </section>
+
+        <section class="space-y-2 pt-2 border-t border-[var(--border)]">
+          <div>
+            <div class="flex justify-between text-xs mb-1">
+              <label for="sl-cov" class="font-medium">Mud Coverage</label>
+              <span id="cov-readout" class="font-mono text-[var(--muted-foreground)]">6 / 7 (Full Coat)</span>
+            </div>
+            <input id="sl-cov" type="range" min="0" max="7" step="1" value="6" class="w-full accent-[var(--primary)]" />
+            <div class="flex justify-between text-xs text-[var(--muted-foreground)] mt-0.5">
+              <span>Clean</span><span>Feet/Belly</span><span>Full Wallow</span>
+            </div>
+          </div>
+
+          <div>
+            <div class="flex justify-between text-xs mb-1">
+              <label for="sl-dry" class="font-medium">Wet &rarr; Sun-Baked Dry</label>
+              <span id="dry-readout" class="font-mono text-[var(--muted-foreground)]">1 / 7 (Wet Glossy)</span>
+            </div>
+            <input id="sl-dry" type="range" min="0" max="7" step="1" value="1" class="w-full accent-[var(--primary)]" />
+            <div class="flex justify-between text-xs text-[var(--muted-foreground)] mt-0.5">
+              <span>Dripping</span><span>Tacky</span><span>Cracked Dust</span>
+            </div>
+          </div>
+        </section>
+
+        <section class="space-y-1.5 pt-2 border-t border-[var(--border)]">
+          <span class="text-xs font-semibold">Live Behaviour Preview</span>
+          <div class="grid grid-cols-2 gap-1.5">
+            <button id="btn-wallow" class="pill-btn px-2 py-1.5 text-xs rounded-md border border-[var(--border)] bg-[var(--secondary)] hover:opacity-90 font-medium">Roll in Wallow</button>
+            <button id="btn-shake" class="pill-btn px-2 py-1.5 text-xs rounded-md border border-[var(--border)] bg-[var(--secondary)] hover:opacity-90 font-medium">Shake Dry Flakes</button>
+            <button id="btn-wash" class="pill-btn px-2 py-1.5 text-xs rounded-md border border-[var(--border)] bg-[var(--secondary)] hover:opacity-90 font-medium">Gradual River Wash</button>
+            <button id="btn-compare" class="pill-btn px-2 py-1.5 text-xs rounded-md border border-[var(--border)] bg-[var(--secondary)] hover:opacity-90 font-medium">Hold: Clean View</button>
+          </div>
+          <label class="flex items-center gap-2 text-xs text-[var(--muted-foreground)] pt-1 cursor-pointer">
+            <input id="chk-ground" type="checkbox" checked class="accent-[var(--primary)]" />
+            Show muddy ground &amp; auto-drip/flake particles
+          </label>
+          <label class="flex items-center gap-2 text-xs text-[var(--muted-foreground)] cursor-pointer">
+            <input id="chk-spin" type="checkbox" class="accent-[var(--primary)]" />
+            Slow turntable rotation
+          </label>
+        </section>
+
+        <section class="p-2.5 rounded-lg bg-[var(--background)] border border-[var(--border)] text-xs space-y-1">
+          <div class="font-semibold">Zero-Lag Engine Breakdown</div>
+          <p class="text-[var(--muted-foreground)] leading-relaxed">
+            Auto-generated by <code class="text-[var(--code-foreground)]">tools/mud_masks.py</code> directly from <code class="text-[var(--code-foreground)]">.geo.json</code> 3D coordinates. Eyes, pupils, mouth &amp; tongue stay clean automatically.
+          </p>
+          <p class="text-[var(--muted-foreground)] leading-relaxed">
+            In-game: <strong>1 packed byte</strong> synced per mob + 1 translucent layer tinted dynamically. 0 ms when clean or past 56 blocks.
+          </p>
+        </section>
+      </div>
+
+      <!-- TAB 2 CONTROLS: WALLOW DEPTH & DRYING DIORAMA -->
+      <div id="panel-wallow" class="hidden space-y-3 pt-2 border-t border-[var(--border)]">
+        <section class="space-y-2">
+          <div>
+            <div class="flex justify-between text-xs mb-1">
+              <label for="sl-wallow-wet" class="font-medium">Wallow Wetness (Radial Drying)</label>
+              <span id="wallow-wet-readout" class="font-mono text-[var(--muted-foreground)]">95% (After Rain)</span>
+            </div>
+            <input id="sl-wallow-wet" type="range" min="0" max="100" step="1" value="95" class="w-full accent-[var(--primary)]" />
+            <div class="flex justify-between text-xs text-[var(--muted-foreground)] mt-0.5">
+              <span>Dry Cracked</span><span>Shrinking</span><span>Full Soupy</span>
+            </div>
+          </div>
+
+          <div class="space-y-1.5 pt-1">
+            <label class="flex items-center gap-2 text-xs cursor-pointer">
+              <input id="chk-cutaway" type="checkbox" checked class="accent-[var(--primary)]" />
+              <span><strong>Depth Cutaway Slice</strong> (0.25 &rarr; 0.50 &rarr; 0.75 &rarr; 1.00)</span>
+            </label>
+            <label class="flex items-center gap-2 text-xs cursor-pointer">
+              <input id="chk-animals-diorama" type="checkbox" checked class="accent-[var(--primary)]" />
+              <span>Show scale Hippo (1.0 sink) &amp; Bullfrog (0.5 sink)</span>
+            </label>
+            <label class="flex items-center gap-2 text-xs cursor-pointer">
+              <input id="chk-rub-posts" type="checkbox" checked class="accent-[var(--primary)]" />
+              <span>Show Acacia &amp; Termite Mound rubbing posts</span>
+            </label>
+          </div>
+        </section>
+
+        <section class="p-2.5 rounded-lg bg-[var(--background)] border border-[var(--border)] text-xs space-y-1.5">
+          <div class="font-semibold">6 Mud Stages (Quarter-Block Gradual Sink)</div>
+          <ul class="space-y-1 text-[var(--muted-foreground)]">
+            <li class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-sm inline-block" style="background:#261f15"></span><strong>Deep Soupy:</strong> 1.00-block pocket (hippo chest-deep)</li>
+            <li class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-sm inline-block" style="background:#332a1d"></span><strong>Mid Soupy:</strong> 0.75-block slope (middle transition)</li>
+            <li class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-sm inline-block" style="background:#413525"></span><strong>Shallow Soupy:</strong> 0.50-block wading shelf (bullfrog/knees)</li>
+            <li class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-sm inline-block" style="background:#554734"></span><strong>Sticky Mud:</strong> 0.25-block early drop + tracks</li>
+            <li class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-sm inline-block" style="background:#73644c"></span><strong>Drying Rim:</strong> 0.00 firm matte clay, tracks fading</li>
+            <li class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-sm inline-block" style="background:#9d8e72"></span><strong>Cracked Pan:</strong> 0.00 baked plates (lungfish cocoons)</li>
+          </ul>
+        </section>
+      </div>
+
+      <!-- TAB 3 CONTROLS: EXPORTED GAME ASSET PACK -->
+      <div id="panel-assets" class="hidden space-y-3 pt-2 border-t border-[var(--border)]">
+        <section class="p-2.5 rounded-lg bg-[var(--background)] border border-[var(--border)] text-xs space-y-1.5">
+          <div class="font-semibold">Ready for Claude (Java Phase 1 &amp; 2)</div>
+          <ul class="space-y-1 text-[var(--muted-foreground)] list-disc pl-4">
+            <li><strong>20 Entity Masks</strong> exported to <code class="text-[var(--code-foreground)]">textures/entity/</code> (Hippo, Crocodile, Croc Teen, Bullfrog, Monitor, Otter, Crabs).</li>
+            <li><strong>Player Masks</strong> (<code class="text-[var(--code-foreground)]">player_mud_low/full.png</code>) on 64&times;64 UV layout.</li>
+            <li><strong>11 Block Textures + .mcmeta</strong> (4-frame animated soupy ripple, sticky + 5 track stamps, drying, cracked, lungfish cocoon, rubbing band).</li>
+            <li><strong>Blockstate &amp; Models</strong> using <code class="text-[var(--code-foreground)]">tintindex: 0</code> so one texture set covers all 4 soil zones.</li>
+            <li><strong>Handoff Card:</strong> <code class="text-[var(--code-foreground)]">docs/handoff/savanna-mud.md</code></li>
+          </ul>
+        </section>
+        <p class="text-xs text-[var(--muted-foreground)]">Click any <strong>Regional Soil Colour</strong> above to preview how <code class="text-[var(--code-foreground)]">BlockColor</code> tints every texture in-game.</p>
+      </div>
+
+    </aside>
+  </div>
+
+<script>
+const MUD_DATA = /*__MUD_DATA__*/null/*__END_MUD_DATA__*/;
+
+(() => {
+  if (!MUD_DATA) {
+    document.getElementById('hud-label').textContent = 'Run tools/mud_viewer.py to populate model data';
+    return;
+  }
+
+  function b64ToF32(b64) {
+    const bin = atob(b64);
+    const bytes = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+    return new Float32Array(bytes.buffer);
+  }
+
+  const TONES = [
+    { name: 'Floodplain Olive', wet: [54, 46, 33],   mid: [96, 84, 62],   dry: [154, 142, 118] },
+    { name: 'Kenya Red',        wet: [92, 40, 25],   mid: [142, 69, 43],  dry: [192, 118, 82]  },
+    { name: 'Mid Golden',       wet: [92, 70, 35],   mid: [142, 112, 62], dry: [188, 164, 114] },
+    { name: 'Coastal Pale',     wet: [84, 79, 70],   mid: [128, 121, 108],dry: [178, 172, 158] },
+  ];
+
+  const COV_LABELS = ['Clean', 'Ankle Dust', 'Feet & Belly', 'Lower Flanks', 'Mid Flanks', 'Heavy Splatter', 'Full Coat', 'Caked Wallow'];
+  const DRY_LABELS = ['Dripping Wet', 'Wet Glossy', 'Damp Soft', 'Tacky Matte', 'Setting', 'Dry Crust', 'Dusty Cracked', 'Flaking Dry'];
+
+  const state = {
+    tab: 'animals',
+    animal: 'hippo',
+    tone: 0,
+    cov: 6,
+    dry: 1,
+    holdClean: false,
+    showGround: true,
+    spin: false,
+    wallowWet: 95,
+    cutaway: true,
+    showDioramaAnimals: true,
+    showRubPosts: true,
+    shakeTime: 0,
+    washActive: false,
+    washStepTimer: 0,
+    splashTime: 0,
+  };
+
+  // Optional URL hash params for automated shots (#tab=wallow&tone=1&animal=hippo&cov=6&dry=1&cam=threeq)
+  let initCam = 'threeq';
+  if (location.hash.length > 1) {
+    location.hash.slice(1).split('&').forEach(kv => {
+      const [k, v] = kv.split('=').map(decodeURIComponent);
+      if (k === 'tab' && (v === 'animals' || v === 'wallow' || v === 'assets')) state.tab = v;
+      if (k === 'animal' && MUD_DATA.animals[v]) state.animal = v;
+      if (k === 'tone') state.tone = Math.max(0, Math.min(3, Number(v) || 0));
+      if (k === 'cov') state.cov = Math.max(0, Math.min(7, Number(v) || 0));
+      if (k === 'dry') state.dry = Math.max(0, Math.min(7, Number(v) || 0));
+      if (k === 'wet') state.wallowWet = Math.max(0, Math.min(100, Number(v) || 0));
+      if (k === 'cutaway') state.cutaway = v !== '0';
+      if (k === 'cam') initCam = v;
+    });
+  }
+
+  const canvas = document.getElementById('glcanvas');
+  const gl = canvas.getContext('webgl', { antialias: true, alpha: false, preserveDrawingBuffer: true });
+  if (!gl) {
+    document.getElementById('hud-label').textContent = 'WebGL unavailable';
+    return;
+  }
+
+  const VS = `
+    attribute vec3 aPos;
+    attribute vec3 aNorm;
+    attribute vec2 aUv;
+    uniform mat4 uProj;
+    uniform mat4 uView;
+    uniform mat4 uModel;
+    varying vec3 vNorm;
+    varying vec2 vUv;
+    varying vec3 vWorld;
+    void main() {
+      vec4 wp = uModel * vec4(aPos, 1.0);
+      vWorld = wp.xyz;
+      vNorm = normalize(mat3(uModel) * aNorm);
+      vUv = aUv;
+      gl_Position = uProj * uView * wp;
+    }
+  `;
+
+  const FS = `
+    precision mediump float;
+    uniform sampler2D uTex;
+    uniform vec4 uTint;
+    uniform vec3 uSunDir;
+    uniform vec3 uCamPos;
+    uniform float uGloss;
+    uniform float uAlphaTest;
+    uniform vec2 uUvOffset;
+    varying vec3 vNorm;
+    varying vec2 vUv;
+    varying vec3 vWorld;
+    void main() {
+      vec4 tex = texture2D(uTex, vUv + uUvOffset);
+      float a = tex.a * uTint.a;
+      if (a < uAlphaTest) discard;
+      vec3 n = normalize(vNorm);
+      float ndl = max(dot(n, normalize(uSunDir)), 0.0);
+      float hemi = 0.5 + 0.5 * n.y;
+      vec3 amb = mix(vec3(0.42, 0.37, 0.30), vec3(0.76, 0.78, 0.74), hemi);
+      vec3 light = amb * 0.68 + vec3(1.0, 0.96, 0.88) * ndl * 0.58;
+      vec3 col = tex.rgb * uTint.rgb * light;
+      if (uGloss > 0.01) {
+        vec3 vdir = normalize(uCamPos - vWorld);
+        vec3 hdir = normalize(normalize(uSunDir) + vdir);
+        float spec = pow(max(dot(n, hdir), 0.0), 22.0) * uGloss;
+        col += vec3(0.85, 0.88, 0.80) * spec;
+      }
+      gl_FragColor = vec4(col, a);
+    }
+  `;
+
+  function compile(type, src) {
+    const s = gl.createShader(type);
+    gl.shaderSource(s, src);
+    gl.compileShader(s);
+    if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(s));
+    return s;
+  }
+  const prog = gl.createProgram();
+  gl.attachShader(prog, compile(gl.VERTEX_SHADER, VS));
+  gl.attachShader(prog, compile(gl.FRAGMENT_SHADER, FS));
+  gl.linkProgram(prog);
+  gl.useProgram(prog);
+
+  const loc = {
+    aPos: gl.getAttribLocation(prog, 'aPos'),
+    aNorm: gl.getAttribLocation(prog, 'aNorm'),
+    aUv: gl.getAttribLocation(prog, 'aUv'),
+    uProj: gl.getUniformLocation(prog, 'uProj'),
+    uView: gl.getUniformLocation(prog, 'uView'),
+    uModel: gl.getUniformLocation(prog, 'uModel'),
+    uTex: gl.getUniformLocation(prog, 'uTex'),
+    uTint: gl.getUniformLocation(prog, 'uTint'),
+    uSunDir: gl.getUniformLocation(prog, 'uSunDir'),
+    uCamPos: gl.getUniformLocation(prog, 'uCamPos'),
+    uGloss: gl.getUniformLocation(prog, 'uGloss'),
+    uAlphaTest: gl.getUniformLocation(prog, 'uAlphaTest'),
+    uUvOffset: gl.getUniformLocation(prog, 'uUvOffset'),
+  };
+
+  function m4Identity() { const m = new Float32Array(16); m[0] = m[5] = m[10] = m[15] = 1; return m; }
+  function m4Mul(a, b) {
+    const o = new Float32Array(16);
+    for (let c = 0; c < 4; c++) {
+      for (let r = 0; r < 4; r++) {
+        o[c * 4 + r] = a[r] * b[c * 4] + a[4 + r] * b[c * 4 + 1] + a[8 + r] * b[c * 4 + 2] + a[12 + r] * b[c * 4 + 3];
+      }
+    }
+    return o;
+  }
+  function m4Translate(x, y, z) { const m = m4Identity(); m[12] = x; m[13] = y; m[14] = z; return m; }
+  function m4Scale(sx, sy, sz) { const m = m4Identity(); m[0] = sx; m[5] = sy; m[10] = sz; return m; }
+  function m4RotY(rad) { const m = m4Identity(), c = Math.cos(rad), s = Math.sin(rad); m[0] = c; m[2] = -s; m[8] = s; m[10] = c; return m; }
+  function m4Persp(fovy, aspect, near, far) {
+    const f = 1 / Math.tan(fovy / 2), nf = 1 / (near - far);
+    const m = new Float32Array(16);
+    m[0] = f / aspect; m[5] = f; m[10] = (far + near) * nf; m[11] = -1; m[14] = 2 * far * near * nf;
+    return m;
+  }
+  function m4LookAt(eye, target, up) {
+    let zx = eye[0] - target[0], zy = eye[1] - target[1], zz = eye[2] - target[2];
+    let len = Math.hypot(zx, zy, zz) || 1; zx /= len; zy /= len; zz /= len;
+    let xx = up[1] * zz - up[2] * zy, xy = up[2] * zx - up[0] * zz, xz = up[0] * zy - up[1] * zx;
+    len = Math.hypot(xx, xy, xz) || 1; xx /= len; xy /= len; xz /= len;
+    let yx = zy * xz - zz * xy, yy = zz * xx - zx * xz, yz = zx * xy - zy * xx;
+    const m = m4Identity();
+    m[0] = xx; m[4] = xy; m[8] = xz;
+    m[1] = yx; m[5] = yy; m[9] = yz;
+    m[2] = zx; m[6] = zy; m[10] = zz;
+    m[12] = -(xx * eye[0] + xy * eye[1] + xz * eye[2]);
+    m[13] = -(yx * eye[0] + yy * eye[1] + yz * eye[2]);
+    m[14] = -(zx * eye[0] + zy * eye[1] + zz * eye[2]);
+    return m;
+  }
+
+  function makeTextureFromSource(src, repeat = false) {
+    const tex = gl.createTexture();
+    gl.bindTexture(gl.TEXTURE_2D, tex);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+    const wrap = repeat ? gl.REPEAT : gl.CLAMP_TO_EDGE;
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, wrap);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, wrap);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, src);
+    return tex;
+  }
+
+  let pendingImgs = 0;
+  function loadBase64Tex(uri) {
+    const tex = gl.createTexture();
+    gl.bindTexture(gl.TEXTURE_2D, tex);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array([0, 0, 0, 0]));
+    pendingImgs++;
+    const img = new Image();
+    img.onload = () => {
+      gl.bindTexture(gl.TEXTURE_2D, tex);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, img);
+      pendingImgs--;
+      if (pendingImgs === 0) window.__MUD_READY__ = true;
+    };
+    img.src = uri;
+    return tex;
+  }
+
+  function hash2(x, y, s) {
+    let n = Math.imul(x, 374761393) + Math.imul(y, 668265263) + Math.imul(s, 1442695041);
+    n = (n ^ (n >>> 13)) * 1274126177;
+    return ((n ^ (n >>> 16)) >>> 0) / 4294967296;
+  }
+
+  function makePixelCanvas(fn, size = 16) {
+    const c = document.createElement('canvas');
+    c.width = c.height = size;
+    const ctx = c.getContext('2d');
+    const img = ctx.createImageData(size, size);
+    for (let y = 0; y < size; y++) {
+      for (let x = 0; x < size; x++) {
+        const [r, g, b, a = 255] = fn(x, y, size);
+        const i = (y * size + x) * 4;
+        img.data[i] = Math.max(0, Math.min(255, r));
+        img.data[i + 1] = Math.max(0, Math.min(255, g));
+        img.data[i + 2] = Math.max(0, Math.min(255, b));
+        img.data[i + 3] = Math.max(0, Math.min(255, a));
+      }
+    }
+    ctx.putImageData(img, 0, 0);
+    return c;
+  }
+
+  const BLOCK_TEX = {
+    white: makeTextureFromSource(makePixelCanvas(() => [255, 255, 255, 255], 4), true),
+    soupy: makeTextureFromSource(makePixelCanvas((x, y) => {
+      const wave = Math.sin((x + y * 0.7) * 0.85) * 14 + (hash2(x, y, 11) - 0.5) * 20;
+      const v = 212 + wave;
+      return [v, v, v, 255];
+    }), true),
+    sticky: makeTextureFromSource(makePixelCanvas((x, y) => {
+      const n = (hash2(x, y, 21) - 0.5) * 34;
+      const clump = Math.sin(x * 0.9) * Math.cos(y * 0.9) * 12;
+      const v = 218 + n + clump;
+      return [v, v, v, 255];
+    }), true),
+    tracks: makeTextureFromSource(makePixelCanvas((x, y) => {
+      let v = 218 + (hash2(x, y, 22) - 0.5) * 26;
+      const d1 = Math.hypot(x - 5.5, y - 5.5);
+      const d2 = Math.hypot(x - 11, y - 11.5);
+      if ((d1 < 2.6 && !(x === 5 && y < 6)) || (d2 < 3.0 && d2 > 0.8)) v -= 62;
+      if (d1 < 3.4 && d1 >= 2.5) v += 16;
+      return [v, v, v, 255];
+    }), true),
+    drying: makeTextureFromSource(makePixelCanvas((x, y) => {
+      const n = (hash2(x, y, 31) - 0.5) * 30;
+      const crack = ((x + y * 2) % 9 === 0 && hash2(x, y, 32) > 0.35) ? -28 : 0;
+      const v = 224 + n + crack;
+      return [v, v, v, 255];
+    }), true),
+    cracked: makeTextureFromSource(makePixelCanvas((x, y) => {
+      const pts = [[3,3],[11,2],[6,9],[13,11],[2,14],[10,15]];
+      let d1 = 99, d2 = 99;
+      for (const [px, py] of pts) {
+        const dx = Math.min(Math.abs(x - px), 16 - Math.abs(x - px));
+        const dy = Math.min(Math.abs(y - py), 16 - Math.abs(y - py));
+        const d = Math.hypot(dx, dy);
+        if (d < d1) { d2 = d1; d1 = d; } else if (d < d2) { d2 = d; }
+      }
+      const isCrack = (d2 - d1) < 1.15;
+      const v = isCrack ? 115 + (hash2(x, y, 41) - 0.5) * 18 : 232 + (hash2(x, y, 42) - 0.5) * 24;
+      return [v, v, v, 255];
+    }), true),
+    grass: makeTextureFromSource(makePixelCanvas((x, y) => {
+      const n = (hash2(x, y, 51) - 0.5) * 28;
+      return [122 + n, 144 + n, 72 + n * 0.7, 255];
+    }), true),
+    dirt: makeTextureFromSource(makePixelCanvas((x, y) => {
+      const n = (hash2(x, y, 61) - 0.5) * 26;
+      return [118 + n, 88 + n * 0.8, 60 + n * 0.6, 255];
+    }), true),
+    bark: makeTextureFromSource(makePixelCanvas((x, y) => {
+      const stripe = Math.sin(x * 1.45) * 14 + (hash2(x, y, 71) - 0.5) * 18;
+      return [102 + stripe, 92 + stripe * 0.9, 80 + stripe * 0.8, 255];
+    }), true),
+    mound: makeTextureFromSource(makePixelCanvas((x, y) => {
+      const n = (hash2(x, y, 81) - 0.5) * 28;
+      return [168 + n, 106 + n * 0.8, 62 + n * 0.6, 255];
+    }), true),
+    rubbedMask: makeTextureFromSource(makePixelCanvas((x, y) => {
+      const band = Math.exp(-Math.pow((y - 8) / 5.2, 2));
+      const n = hash2(x, y, 91);
+      const a = band * (0.72 + 0.28 * n) * 235;
+      const v = 205 + (n - 0.5) * 30;
+      return [v, v, v, a];
+    }), true),
+  };
+
+  function createMesh(posArr, normArr, uvArr) {
+    const posBuf = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, posBuf);
+    gl.bufferData(gl.ARRAY_BUFFER, posArr instanceof Float32Array ? posArr : new Float32Array(posArr), gl.STATIC_DRAW);
+
+    const normBuf = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, normBuf);
+    gl.bufferData(gl.ARRAY_BUFFER, normArr instanceof Float32Array ? normArr : new Float32Array(normArr), gl.STATIC_DRAW);
+
+    const uvBuf = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, uvBuf);
+    gl.bufferData(gl.ARRAY_BUFFER, uvArr instanceof Float32Array ? uvArr : new Float32Array(uvArr), gl.STATIC_DRAW);
+
+    return { posBuf, normBuf, uvBuf, count: posArr.length / 3 };
+  }
+
+  function pushQuad(P, N, U, v0, v1, v2, v3, n, u0, v0t, u1, v1t) {
+    const verts = [v0, v1, v2, v0, v2, v3];
+    const uvs = [[u0, v0t], [u1, v0t], [u1, v1t], [u0, v0t], [u1, v1t], [u0, v1t]];
+    for (let i = 0; i < 6; i++) {
+      P.push(verts[i][0], verts[i][1], verts[i][2]);
+      N.push(n[0], n[1], n[2]);
+      U.push(uvs[i][0], uvs[i][1]);
+    }
+  }
+
+  function makeUnitBoxMesh(uvScale = [1, 1]) {
+    const P = [], N = [], U = [];
+    const us = uvScale[0], vs = uvScale[1];
+    pushQuad(P, N, U, [-0.5, 0.5, -0.5], [0.5, 0.5, -0.5], [0.5, 0.5, 0.5], [-0.5, 0.5, 0.5], [0, 1, 0], 0, 0, us, vs);
+    pushQuad(P, N, U, [-0.5, -0.5, 0.5], [0.5, -0.5, 0.5], [0.5, -0.5, -0.5], [-0.5, -0.5, -0.5], [0, -1, 0], 0, 0, us, vs);
+    pushQuad(P, N, U, [-0.5, 0.5, 0.5], [0.5, 0.5, 0.5], [0.5, -0.5, 0.5], [-0.5, -0.5, 0.5], [0, 0, 1], 0, 0, us, vs);
+    pushQuad(P, N, U, [0.5, 0.5, -0.5], [-0.5, 0.5, -0.5], [-0.5, -0.5, -0.5], [0.5, -0.5, -0.5], [0, 0, -1], 0, 0, us, vs);
+    pushQuad(P, N, U, [0.5, 0.5, 0.5], [0.5, 0.5, -0.5], [0.5, -0.5, -0.5], [0.5, -0.5, 0.5], [1, 0, 0], 0, 0, us, vs);
+    pushQuad(P, N, U, [-0.5, 0.5, -0.5], [-0.5, 0.5, 0.5], [-0.5, -0.5, 0.5], [-0.5, -0.5, -0.5], [-1, 0, 0], 0, 0, us, vs);
+    return createMesh(P, N, U);
+  }
+  const UNIT_BOX = makeUnitBoxMesh([1, 1]);
+  const GROUND_BOX = makeUnitBoxMesh([8, 8]);
+
+  const ANIMALS = {};
+  for (const [k, v] of Object.entries(MUD_DATA.animals)) {
+    ANIMALS[k] = {
+      mesh: createMesh(b64ToF32(v.pos_b64), b64ToF32(v.norm_b64), b64ToF32(v.uv_b64)),
+      texBase: loadBase64Tex(v.tex_base),
+      texLow: loadBase64Tex(v.tex_low),
+      texFull: loadBase64Tex(v.tex_full),
+      radius: v.radius,
+      height: v.height,
+      label: v.label,
+    };
+  }
+
+  function drawMesh(mesh, modelMat, tex, tint = [1, 1, 1, 1], opts = {}) {
+    gl.bindBuffer(gl.ARRAY_BUFFER, mesh.posBuf);
+    gl.enableVertexAttribArray(loc.aPos);
+    gl.vertexAttribPointer(loc.aPos, 3, gl.FLOAT, false, 0, 0);
+
+    gl.bindBuffer(gl.ARRAY_BUFFER, mesh.normBuf);
+    gl.enableVertexAttribArray(loc.aNorm);
+    gl.vertexAttribPointer(loc.aNorm, 3, gl.FLOAT, false, 0, 0);
+
+    gl.bindBuffer(gl.ARRAY_BUFFER, mesh.uvBuf);
+    gl.enableVertexAttribArray(loc.aUv);
+    gl.vertexAttribPointer(loc.aUv, 2, gl.FLOAT, false, 0, 0);
+
+    gl.activeTexture(gl.TEXTURE0);
+    gl.bindTexture(gl.TEXTURE_2D, tex);
+    gl.uniform1i(loc.uTex, 0);
+    gl.uniformMatrix4fv(loc.uModel, false, modelMat);
+    gl.uniform4f(loc.uTint, tint[0], tint[1], tint[2], tint[3]);
+    gl.uniform1f(loc.uGloss, opts.gloss || 0.0);
+    gl.uniform1f(loc.uAlphaTest, opts.alphaTest !== undefined ? opts.alphaTest : 0.02);
+    gl.uniform2f(loc.uUvOffset, opts.uvx || 0, opts.uvy || 0);
+    gl.drawArrays(gl.TRIANGLES, 0, mesh.count);
+  }
+
+  function lerp3(a, b, t) {
+    return [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t];
+  }
+
+  function mudRgb(toneIdx, dry07) {
+    const p = TONES[toneIdx];
+    const t = dry07 / 7;
+    const rgb = t < 0.5 ? lerp3(p.wet, p.mid, t * 2) : lerp3(p.mid, p.dry, (t - 0.5) * 2);
+    return [rgb[0] / 255, rgb[1] / 255, rgb[2] / 255];
+  }
+
+  function drawAnimalWithMud(animalObj, modelMat, cov, dry, toneIdx) {
+    drawMesh(animalObj.mesh, modelMat, animalObj.texBase, [1, 1, 1, 1], { alphaTest: 0.45, gloss: 0.0 });
+    if (cov <= 0) return;
+
+    gl.enable(gl.POLYGON_OFFSET_FILL);
+    gl.polygonOffset(-1.2, -1.2);
+    gl.depthMask(false);
+
+    const rgb = mudRgb(toneIdx, dry);
+    const gloss = Math.max(0, 1 - dry / 3.2) * 0.52;
+    const dryFade = dry >= 6 ? 0.84 : 1.0;
+
+    if (cov <= 2) {
+      const a = (cov === 1 ? 0.58 : 0.94) * dryFade;
+      drawMesh(animalObj.mesh, modelMat, animalObj.texLow, [rgb[0], rgb[1], rgb[2], a], { gloss, alphaTest: 0.04 });
+    } else if (cov <= 4) {
+      drawMesh(animalObj.mesh, modelMat, animalObj.texLow, [rgb[0], rgb[1], rgb[2], 0.95 * dryFade], { gloss, alphaTest: 0.04 });
+      const aFull = (cov === 3 ? 0.42 : 0.72) * dryFade;
+      drawMesh(animalObj.mesh, modelMat, animalObj.texFull, [rgb[0], rgb[1], rgb[2], aFull], { gloss, alphaTest: 0.04 });
+    } else {
+      const aFull = (cov === 5 ? 0.86 : cov === 6 ? 0.96 : 1.0) * dryFade;
+      drawMesh(animalObj.mesh, modelMat, animalObj.texFull, [rgb[0], rgb[1], rgb[2], aFull], { gloss, alphaTest: 0.04 });
+    }
+
+    gl.depthMask(true);
+    gl.disable(gl.POLYGON_OFFSET_FILL);
+  }
+
+  const particles = [];
+  function spawnParticles(kind, count, origin, spread, toneIdx, dry) {
+    const rgb = kind === 'water' ? [0.55, 0.48, 0.36] : mudRgb(toneIdx, dry);
+    for (let i = 0; i < count; i++) {
+      particles.push({
+        x: origin[0] + (Math.random() - 0.5) * spread[0],
+        y: origin[1] + Math.random() * spread[1],
+        z: origin[2] + (Math.random() - 0.5) * spread[2],
+        vx: (Math.random() - 0.5) * (kind === 'drip' ? 0.01 : 0.09),
+        vy: kind === 'drip' ? -0.02 : (0.03 + Math.random() * 0.08),
+        vz: (Math.random() - 0.5) * (kind === 'drip' ? 0.01 : 0.09),
+        size: kind === 'drip' ? 0.055 : kind === 'flake' ? 0.07 : 0.085,
+        life: 0.7 + Math.random() * 0.8,
+        rgb,
+        grav: kind === 'flake' ? 0.0022 : 0.0055,
+      });
+    }
+  }
+
+  const WALLOW_RAD = 6;
+  const WALLOW_CELLS = [];
+  for (let gz = -WALLOW_RAD; gz <= WALLOW_RAD; gz++) {
+    for (let gx = -WALLOW_RAD; gx <= WALLOW_RAD; gx++) {
+      const dist = Math.hypot(gx * 0.88, gz * 1.04);
+      const pocket1 = Math.hypot((gx + 0.8) * 0.95, (gz + 0.3) * 1.05);
+      const pocket2 = Math.hypot((gx - 2.2) * 1.15, (gz - 1.3) * 1.15);
+      const wobble = Math.sin(gx * 1.2 + gz * 0.85) * 0.32;
+      const d = dist + wobble;
+      let maxStage = -1;
+      if (pocket1 < 1.65 || pocket2 < 0.95) maxStage = 5;      // Deep Soupy (1.00-block sink!)
+      else if (pocket1 < 2.65 || d < 2.45) maxStage = 4;       // Mid Soupy (0.75-block middle drop!)
+      else if (d < 3.55) maxStage = 3;                         // Shallow Soupy (0.50-block wading shelf!)
+      else if (d < 4.60) maxStage = 2;                         // Sticky Mud (0.25-block early drop + tracks!)
+      else if (d < 5.45) maxStage = 1;                         // Drying Rim (0.00 firm matte)
+      else if (d < 6.15) maxStage = 0;                         // Cracked Hard Pan (0.00)
+      const hasTrack = maxStage === 2 && ((gx * 7 + gz * 13) & 3) === 0;
+      WALLOW_CELLS.push({ gx, gz, d, maxStage, hasTrack });
+    }
+  }
+
+  const cam = { yaw: 0.72, pitch: 0.34, dist: 6.2, tx: 0, ty: 0.9, tz: 0 };
+  function setCameraPreset(preset) {
+    if (state.tab === 'wallow') {
+      cam.tx = 0; cam.ty = 0.2; cam.tz = 0;
+      if (preset === 'threeq') { cam.yaw = 0.56; cam.pitch = 0.48; cam.dist = 16.5; }
+      else if (preset === 'side') { cam.yaw = 0.0; cam.pitch = 0.14; cam.dist = 15.5; }
+      else if (preset === 'front') { cam.yaw = Math.PI / 2; cam.pitch = 0.16; cam.dist = 15.5; }
+      else if (preset === 'top') { cam.yaw = 0.0; cam.pitch = 1.48; cam.dist = 17.5; }
+      else if (preset === 'low') { cam.yaw = 0.20; cam.pitch = 0.11; cam.dist = 12.0; cam.ty = -0.25; }
+      return;
+    }
+    const a = ANIMALS[state.animal];
+    const baseDist = Math.max(3.2, a.radius * 3.05);
+    cam.tx = 0; cam.ty = a.height * 0.48; cam.tz = 0;
+    if (preset === 'threeq') { cam.yaw = 2.38; cam.pitch = 0.28; cam.dist = baseDist; }
+    else if (preset === 'side') { cam.yaw = Math.PI / 2; cam.pitch = 0.08; cam.dist = baseDist * 1.05; }
+    else if (preset === 'front') { cam.yaw = Math.PI; cam.pitch = 0.12; cam.dist = baseDist * 0.95; }
+    else if (preset === 'top') { cam.yaw = Math.PI / 2; cam.pitch = 1.46; cam.dist = baseDist * 1.1; }
+    else if (preset === 'low') { cam.yaw = 2.52; cam.pitch = -0.10; cam.dist = baseDist * 0.92; cam.ty = a.height * 0.30; }
+  }
+
+  let dragMode = null, lx = 0, ly = 0;
+  canvas.addEventListener('contextmenu', e => e.preventDefault());
+  canvas.addEventListener('pointerdown', e => {
+    canvas.setPointerCapture(e.pointerId);
+    dragMode = (e.button === 2 || e.shiftKey) ? 'pan' : 'orbit';
+    lx = e.clientX; ly = e.clientY;
+  });
+  canvas.addEventListener('pointermove', e => {
+    if (!dragMode) return;
+    const dx = e.clientX - lx, dy = e.clientY - ly;
+    lx = e.clientX; ly = e.clientY;
+    if (dragMode === 'orbit') {
+      cam.yaw -= dx * 0.008;
+      cam.pitch = Math.max(-0.45, Math.min(1.52, cam.pitch + dy * 0.008));
+    } else {
+      const s = cam.dist * 0.0018;
+      cam.tx -= Math.cos(cam.yaw) * dx * s;
+      cam.tz += Math.sin(cam.yaw) * dx * s;
+      cam.ty += dy * s;
+    }
+  });
+  canvas.addEventListener('pointerup', () => { dragMode = null; });
+  canvas.addEventListener('wheel', e => {
+    e.preventDefault();
+    cam.dist = Math.max(1.4, Math.min(28, cam.dist * (1 + e.deltaY * 0.001)));
+  }, { passive: false });
+
+  function isLightTheme() {
+    return document.documentElement.classList.contains('light');
+  }
+
+  function updateUI() {
+    const tA = document.getElementById('tab-animals');
+    const tW = document.getElementById('tab-wallow');
+    const tP = document.getElementById('tab-assets');
+    const activeCls = ['bg-[var(--primary)]', 'text-[var(--primary-foreground)]'];
+    const idleCls = ['text-[var(--muted-foreground)]', 'hover:text-[var(--foreground)]'];
+    [tA, tW, tP].forEach(b => b.classList.remove(...activeCls, ...idleCls));
+    (state.tab === 'animals' ? tA : state.tab === 'wallow' ? tW : tP).classList.add(...activeCls);
+    [tA, tW, tP].filter(b => b !== (state.tab === 'animals' ? tA : state.tab === 'wallow' ? tW : tP)).forEach(b => b.classList.add(...idleCls));
+
+    document.getElementById('panel-animals').classList.toggle('hidden', state.tab !== 'animals');
+    document.getElementById('panel-wallow').classList.toggle('hidden', state.tab !== 'wallow');
+    document.getElementById('panel-assets').classList.toggle('hidden', state.tab !== 'assets');
+    document.getElementById('asset-stage').classList.toggle('hidden', state.tab !== 'assets');
+
+    document.querySelectorAll('.tone-btn').forEach(b => {
+      const on = Number(b.dataset.tone) === state.tone;
+      b.classList.toggle('border-[var(--primary)]', on);
+      b.classList.toggle('bg-[var(--secondary)]', on);
+    });
+    document.getElementById('tone-readout').textContent = TONES[state.tone].name;
+
+    document.querySelectorAll('.animal-btn').forEach(b => {
+      const on = b.dataset.animal === state.animal;
+      b.classList.toggle('border-[var(--primary)]', on);
+      b.classList.toggle('bg-[var(--secondary)]', on);
+    });
+
+    document.getElementById('sl-cov').value = state.cov;
+    document.getElementById('sl-dry').value = state.dry;
+    document.getElementById('sl-wallow-wet').value = state.wallowWet;
+    document.getElementById('chk-cutaway').checked = state.cutaway;
+    document.getElementById('cov-readout').textContent = `${state.cov} / 7 (${COV_LABELS[state.cov]})`;
+    document.getElementById('dry-readout').textContent = `${state.dry} / 7 (${DRY_LABELS[state.dry]})`;
+
+    const w = state.wallowWet;
+    const wLabel = w > 75 ? 'After Rain (Deep + Shallow Soupy)' : w > 45 ? 'Shrinking Rim' : w > 18 ? 'Mostly Sticky/Drying' : 'Dry Season Cracked Pan';
+    document.getElementById('wallow-wet-readout').textContent = `${w}% (${wLabel})`;
+
+    const packed = ((state.cov & 7) << 5) | ((state.dry & 7) << 2) | (state.tone & 3);
+    const hex = '0x' + packed.toString(16).toUpperCase().padStart(2, '0');
+    if (state.tab === 'animals') {
+      document.getElementById('hud-label').textContent = ANIMALS[state.animal].label + (state.washActive ? ' — Rinsing in River...' : '');
+      document.getElementById('hud-packet').textContent =
+        `MudCoat byte: ${hex} (cov=${state.cov} dry=${state.dry} tone=${state.tone})`;
+    } else if (state.tab === 'wallow') {
+      document.getElementById('hud-label').textContent = state.cutaway ? 'Wallow Cutaway: 0.25 -> 0.50 -> 0.75 -> 1.00 Block Sink' : 'Full Savanna Wallow (13x13 Stepped Basin)';
+      document.getElementById('hud-packet').textContent = `Wallow Book: 1 record | 6 stages | 0 fluids | 0 skylight updates`;
+    }
+    if (state.tab === 'assets') renderAssetPack();
+  }
+
+  // --- Tab 3: Live Tinted Preview of Actual Exported 16x16 & 64x64 Game PNGs ---
+  const assetCards = [];
+  if (MUD_DATA.assets) {
+    const grid = document.getElementById('asset-grid');
+    MUD_DATA.assets.forEach(item => {
+      const card = document.createElement('div');
+      card.className = 'p-2.5 rounded-lg border border-[var(--border)] bg-[var(--card)] flex flex-col items-center gap-1.5';
+      const c = document.createElement('canvas');
+      c.width = item.w; c.height = item.h;
+      c.style.width = '96px'; c.style.height = '96px'; c.style.imageRendering = 'pixelated';
+      c.className = 'rounded border border-[var(--border)] bg-[var(--background)]';
+      const title = document.createElement('div');
+      title.className = 'text-xs font-medium text-center leading-tight';
+      title.textContent = item.label;
+      const sub = document.createElement('div');
+      sub.className = 'text-xs font-mono text-[var(--muted-foreground)] text-center truncate w-full';
+      sub.textContent = item.file;
+      card.append(c, title, sub);
+      grid.appendChild(card);
+      const img = new Image();
+      img.onload = () => { if (state.tab === 'assets') renderAssetPack(); };
+      img.src = item.uri;
+      assetCards.push({ item, canvas: c, img });
+    });
+  }
+
+  let soupyFrame = 0;
+  function renderAssetPack() {
+    const t = TONES[state.tone];
+    for (const { item, canvas: c, img } of assetCards) {
+      if (!img.complete || !img.naturalWidth) continue;
+      const ctx = c.getContext('2d');
+      ctx.clearRect(0, 0, c.width, c.height);
+      const sy = item.frames ? (soupyFrame % item.frames) * item.h : 0;
+      ctx.drawImage(img, 0, sy, item.w, item.h, 0, 0, c.width, c.height);
+      const id = ctx.getImageData(0, 0, c.width, c.height);
+      const d = id.data;
+      const rgb = item.tint === 'wet' ? t.wet : item.tint === 'dry' ? t.dry : t.mid;
+      for (let i = 0; i < d.length; i += 4) {
+        if (d[i + 3] === 0) continue;
+        d[i] = Math.min(255, (d[i] * rgb[0]) / 225);
+        d[i + 1] = Math.min(255, (d[i + 1] * rgb[1]) / 225);
+        d[i + 2] = Math.min(255, (d[i + 2] * rgb[2]) / 225);
+      }
+      ctx.putImageData(id, 0, 0);
+    }
+  }
+  setInterval(() => {
+    soupyFrame = (soupyFrame + 1) % 4;
+    if (state.tab === 'assets') renderAssetPack();
+  }, 400);
+
+  document.getElementById('tab-animals').onclick = () => { state.tab = 'animals'; setCameraPreset('threeq'); updateUI(); };
+  document.getElementById('tab-wallow').onclick = () => { state.tab = 'wallow'; setCameraPreset('threeq'); updateUI(); };
+  document.getElementById('tab-assets').onclick = () => { state.tab = 'assets'; updateUI(); };
+  document.querySelectorAll('.cam-btn').forEach(b => b.onclick = () => setCameraPreset(b.dataset.cam));
+  document.querySelectorAll('.tone-btn').forEach(b => b.onclick = () => { state.tone = Number(b.dataset.tone); updateUI(); });
+  document.querySelectorAll('.animal-btn').forEach(b => b.onclick = () => {
+    state.animal = b.dataset.animal;
+    state.washActive = false;
+    setCameraPreset('threeq');
+    updateUI();
+  });
+  document.getElementById('sl-cov').oninput = e => { state.washActive = false; state.cov = Number(e.target.value); updateUI(); };
+  document.getElementById('sl-dry').oninput = e => { state.dry = Number(e.target.value); updateUI(); };
+  document.getElementById('sl-wallow-wet').oninput = e => { state.wallowWet = Number(e.target.value); updateUI(); };
+  document.getElementById('chk-ground').onchange = e => { state.showGround = e.target.checked; };
+  document.getElementById('chk-spin').onchange = e => { state.spin = e.target.checked; };
+  document.getElementById('chk-cutaway').onchange = e => { state.cutaway = e.target.checked; updateUI(); };
+  document.getElementById('chk-animals-diorama').onchange = e => { state.showDioramaAnimals = e.target.checked; };
+  document.getElementById('chk-rub-posts').onchange = e => { state.showRubPosts = e.target.checked; };
+
+  document.getElementById('btn-wallow').onclick = () => {
+    state.washActive = false;
+    state.cov = 7; state.dry = 0; state.splashTime = 0.5;
+    const a = ANIMALS[state.animal];
+    spawnParticles('splash', 26, [0, a.height * 0.35, 0], [a.radius * 1.4, a.height * 0.4, a.radius * 1.4], state.tone, 0);
+    updateUI();
+  };
+  document.getElementById('btn-shake').onclick = () => {
+    state.washActive = false;
+    state.dry = Math.max(5, state.dry);
+    state.cov = Math.max(0, state.cov - 2);
+    state.shakeTime = 0.55;
+    const a = ANIMALS[state.animal];
+    spawnParticles('flake', 30, [0, a.height * 0.55, 0], [a.radius * 1.5, a.height * 0.5, a.radius * 1.5], state.tone, 6);
+    updateUI();
+  };
+  document.getElementById('btn-wash').onclick = () => {
+    if (state.cov === 0) state.cov = 7;
+    state.dry = Math.min(state.dry, 1);
+    state.washActive = true;
+    state.washStepTimer = 0.15;
+    updateUI();
+  };
+  const cmpBtn = document.getElementById('btn-compare');
+  cmpBtn.onpointerdown = () => { state.holdClean = true; };
+  window.addEventListener('pointerup', () => { state.holdClean = false; });
+  window.addEventListener('themechange', () => {});
+
+  setCameraPreset(initCam);
+  updateUI();
+
+  let lastT = performance.now();
+  let dripTimer = 0;
+
+  function render(now) {
+    const dt = Math.min(0.05, (now - lastT) / 1000);
+    lastT = now;
+    const tSec = now * 0.001;
+
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    const w = Math.max(1, Math.floor(canvas.clientWidth * dpr));
+    const h = Math.max(1, Math.floor(canvas.clientHeight * dpr));
+    if (canvas.width !== w || canvas.height !== h) { canvas.width = w; canvas.height = h; }
+    gl.viewport(0, 0, w, h);
+
+    if (isLightTheme()) gl.clearColor(0.82, 0.89, 0.93, 1.0);
+    else gl.clearColor(0.11, 0.13, 0.16, 1.0);
+
+    gl.enable(gl.DEPTH_TEST);
+    gl.enable(gl.BLEND);
+    gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+    gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+
+    if (state.spin && state.tab === 'animals' && !dragMode) cam.yaw += dt * 0.35;
+
+    const eye = [
+      cam.tx + cam.dist * Math.cos(cam.pitch) * Math.sin(cam.yaw),
+      cam.ty + cam.dist * Math.sin(cam.pitch),
+      cam.tz + cam.dist * Math.cos(cam.pitch) * Math.cos(cam.yaw),
+    ];
+    const proj = m4Persp(38 * Math.PI / 180, w / h, 0.05, 120);
+    const view = m4LookAt(eye, [cam.tx, cam.ty, cam.tz], [0, 1, 0]);
+
+    gl.uniformMatrix4fv(loc.uProj, false, proj);
+    gl.uniformMatrix4fv(loc.uView, false, view);
+    gl.uniform3f(loc.uSunDir, 0.55, 0.85, 0.42);
+    gl.uniform3f(loc.uCamPos, eye[0], eye[1], eye[2]);
+
+    if (state.tab === 'animals') {
+      const a = ANIMALS[state.animal];
+      if (state.showGround) {
+        const padW = Math.max(4.5, a.radius * 2.8);
+        const padMat = m4Mul(m4Translate(0, -0.18, 0), m4Scale(padW, 0.36, padW));
+        if (state.washActive) {
+          // Murky savanna river water pad while gradually washing off mud!
+          drawMesh(GROUND_BOX, padMat, BLOCK_TEX.soupy, [0.36, 0.43, 0.27, 0.92], { gloss: 0.55, uvx: (tSec * 0.1) % 1, uvy: (tSec * 0.06) % 1 });
+        } else {
+          const gRgb = mudRgb(state.tone, Math.min(5, state.dry));
+          drawMesh(GROUND_BOX, padMat, state.dry <= 2 ? BLOCK_TEX.sticky : BLOCK_TEX.cracked, [gRgb[0], gRgb[1], gRgb[2], 1], { gloss: state.dry <= 1 ? 0.25 : 0.0 });
+        }
+      }
+
+      // Gradual river wash-off: steps coverage down 1 notch every ~0.55s with swirling silt clouds!
+      if (state.washActive) {
+        state.washStepTimer -= dt;
+        if (state.washStepTimer <= 0) {
+          state.washStepTimer = 0.55;
+          if (state.cov > 0) {
+            state.cov--;
+            state.dry = 0;
+            spawnParticles('water', 12, [0, a.height * 0.25, 0], [a.radius * 1.3, a.height * 0.35, a.radius * 1.3], state.tone, 0);
+            updateUI();
+          } else {
+            state.washActive = false;
+            updateUI();
+          }
+        }
+      }
+
+      let shakeYaw = 0;
+      if (state.shakeTime > 0) {
+        state.shakeTime = Math.max(0, state.shakeTime - dt);
+        shakeYaw = Math.sin(state.shakeTime * 48) * 0.16 * (state.shakeTime / 0.55);
+      }
+      const animalMat = m4RotY(shakeYaw);
+      const effCov = state.holdClean ? 0 : state.cov;
+      drawAnimalWithMud(a, animalMat, effCov, state.dry, state.tone);
+
+      dripTimer += dt;
+      if (state.showGround && effCov >= 2 && dripTimer > 0.24) {
+        dripTimer = 0;
+        if (state.dry <= 1) {
+          spawnParticles('drip', 2, [0, a.height * 0.28, 0], [a.radius * 1.1, a.height * 0.25, a.radius * 1.1], state.tone, 0);
+        } else if (state.dry >= 6) {
+          spawnParticles('flake', 2, [0, a.height * 0.45, 0], [a.radius * 1.2, a.height * 0.3, a.radius * 1.2], state.tone, 7);
+        }
+      }
+    } else {
+      const wetFrac = state.wallowWet / 100;
+      const ripple = (tSec * 0.14) % 1.0;
+
+      for (const cell of WALLOW_CELLS) {
+        if (state.cutaway && cell.gz > 0) continue;
+        const { gx, gz, maxStage, hasTrack } = cell;
+
+        drawMesh(UNIT_BOX, m4Mul(m4Translate(gx, -1.5, gz), m4Scale(1, 1, 1)), BLOCK_TEX.dirt, [0.92, 0.88, 0.82, 1]);
+
+        if (maxStage < 0) {
+          drawMesh(UNIT_BOX, m4Mul(m4Translate(gx, -0.5, gz), m4Scale(1, 1, 1)), BLOCK_TEX.grass, [1, 1, 1, 1]);
+          continue;
+        }
+
+        const dryShift = (1 - wetFrac) * 4.8;
+        const stage = Math.max(0, Math.round(maxStage - dryShift));
+
+        if (stage === 5) {
+          // DEEP SOUPY (1.00-block sink!) — full 1.00 block soupy mud pocket
+          const rgb = mudRgb(state.tone, 0);
+          drawMesh(UNIT_BOX, m4Mul(m4Translate(gx, -0.53, gz), m4Scale(1, 0.94, 1)), BLOCK_TEX.soupy, [rgb[0] * 0.80, rgb[1] * 0.80, rgb[2] * 0.80, 0.97], { gloss: 0.68, uvx: ripple, uvy: ripple * 0.5 });
+        } else if (stage === 4) {
+          // MID SOUPY (0.75-block sink!) — 0.25 firm base + 0.75 soupy mud slope
+          const subRgb = mudRgb(state.tone, 2.2);
+          drawMesh(UNIT_BOX, m4Mul(m4Translate(gx, -0.875, gz), m4Scale(1, 0.25, 1)), BLOCK_TEX.dirt, [subRgb[0] * 1.05, subRgb[1] * 1.05, subRgb[2] * 1.05, 1]);
+          const topRgb = mudRgb(state.tone, 0.3);
+          drawMesh(UNIT_BOX, m4Mul(m4Translate(gx, -0.40, gz), m4Scale(1, 0.70, 1)), BLOCK_TEX.soupy, [topRgb[0] * 0.90, topRgb[1] * 0.90, topRgb[2] * 0.90, 0.96], { gloss: 0.60, uvx: ripple * 0.8, uvy: -ripple * 0.4 });
+        } else if (stage === 3) {
+          // SHALLOW SOUPY (0.50-block sink!) — 0.50 firm base + 0.50 soupy mud shelf
+          const subRgb = mudRgb(state.tone, 2.0);
+          drawMesh(UNIT_BOX, m4Mul(m4Translate(gx, -0.75, gz), m4Scale(1, 0.50, 1)), BLOCK_TEX.dirt, [subRgb[0] * 1.1, subRgb[1] * 1.1, subRgb[2] * 1.1, 1]);
+          const topRgb = mudRgb(state.tone, 0.7);
+          drawMesh(UNIT_BOX, m4Mul(m4Translate(gx, -0.275, gz), m4Scale(1, 0.45, 1)), BLOCK_TEX.soupy, [topRgb[0], topRgb[1], topRgb[2], 0.95], { gloss: 0.50, uvx: -ripple * 0.7, uvy: ripple * 0.4 });
+        } else if (stage === 2) {
+          // STICKY TRACK MUD (0.25-block early drop!) — 0.75 firm base + 0.25 soft sticky top
+          const subRgb = mudRgb(state.tone, 2.6);
+          drawMesh(UNIT_BOX, m4Mul(m4Translate(gx, -0.625, gz), m4Scale(1, 0.75, 1)), BLOCK_TEX.dirt, [subRgb[0] * 1.12, subRgb[1] * 1.12, subRgb[2] * 1.12, 1]);
+          const rgb = mudRgb(state.tone, 1.8);
+          drawMesh(UNIT_BOX, m4Mul(m4Translate(gx, -0.15, gz), m4Scale(1, 0.20, 1)), hasTrack ? BLOCK_TEX.tracks : BLOCK_TEX.sticky, [rgb[0], rgb[1], rgb[2], 1], { gloss: 0.28 });
+        } else if (stage === 1) {
+          // DRYING RIM (0.00 sink)
+          const rgb = mudRgb(state.tone, 4.2);
+          drawMesh(UNIT_BOX, m4Mul(m4Translate(gx, -0.52, gz), m4Scale(1, 0.96, 1)), BLOCK_TEX.drying, [rgb[0], rgb[1], rgb[2], 1], { gloss: 0.04 });
+        } else {
+          // CRACKED HARD PAN (0.00 sink)
+          const rgb = mudRgb(state.tone, 6.8);
+          drawMesh(UNIT_BOX, m4Mul(m4Translate(gx, -0.51, gz), m4Scale(1, 0.98, 1)), BLOCK_TEX.cracked, [rgb[0], rgb[1], rgb[2], 1], { gloss: 0.0 });
+        }
+      }
+
+      if (state.showDioramaAnimals) {
+        const hippoSink = wetFrac > 0.65 ? -0.88 : wetFrac > 0.40 ? -0.55 : wetFrac > 0.18 ? -0.22 : -0.02;
+        const hippoMat = m4Mul(m4Translate(-0.8, hippoSink, -0.7), m4Mul(m4RotY(2.35), m4Scale(0.76, 0.76, 0.76)));
+        drawAnimalWithMud(ANIMALS.hippo, hippoMat, wetFrac > 0.3 ? 6 : 4, wetFrac > 0.5 ? 0 : 5, state.tone);
+
+        const frogSink = wetFrac > 0.50 ? -0.38 : wetFrac > 0.20 ? -0.18 : -0.02;
+        const frogMat = m4Mul(m4Translate(2.6, frogSink, -1.8), m4Mul(m4RotY(2.6), m4Scale(0.45, 0.45, 0.45)));
+        drawAnimalWithMud(ANIMALS.bullfrog, frogMat, 5, wetFrac > 0.5 ? 1 : 6, state.tone);
+      }
+
+      if (state.showRubPosts) {
+        const rubRgb = mudRgb(state.tone, 4.5);
+        for (let y = 0; y < 3; y++) {
+          const tm = m4Mul(m4Translate(-5, y + 0.5, -4), m4Scale(0.92, 1.0, 0.92));
+          drawMesh(UNIT_BOX, tm, BLOCK_TEX.bark, [1, 1, 1, 1]);
+          if (y === 1) {
+            gl.enable(gl.POLYGON_OFFSET_FILL);
+            gl.polygonOffset(-1.5, -1.5);
+            drawMesh(UNIT_BOX, tm, BLOCK_TEX.rubbedMask, [rubRgb[0], rubRgb[1], rubRgb[2], 0.92], { gloss: 0.22 });
+            gl.disable(gl.POLYGON_OFFSET_FILL);
+          }
+        }
+        const moundBlocks = [[5, 0.5, -4, 1.15, 1.0, 1.15], [5, 1.5, -4, 0.82, 1.0, 0.82], [5, 2.35, -4, 0.45, 0.7, 0.45]];
+        moundBlocks.forEach(([x, y, z, sx, sy, sz], idx) => {
+          const mm = m4Mul(m4Translate(x, y, z), m4Scale(sx, sy, sz));
+          drawMesh(UNIT_BOX, mm, BLOCK_TEX.mound, [1, 1, 1, 1]);
+          if (idx === 0) {
+            gl.enable(gl.POLYGON_OFFSET_FILL);
+            gl.polygonOffset(-1.5, -1.5);
+            drawMesh(UNIT_BOX, mm, BLOCK_TEX.rubbedMask, [rubRgb[0], rubRgb[1], rubRgb[2], 0.90], { gloss: 0.18 });
+            gl.disable(gl.POLYGON_OFFSET_FILL);
+          }
+        });
+      }
+
+      for (let i = 0; i < 6; i++) {
+        const ang = tSec * 2.4 + i * 1.1;
+        const fx = -3.4 + Math.cos(ang) * 0.45;
+        const fy = 1.45 + Math.sin(ang * 1.7 + i) * 0.22;
+        const fz = -2.2 + Math.sin(ang * 1.2) * 0.45;
+        drawMesh(UNIT_BOX, m4Mul(m4Translate(fx, fy, fz), m4Scale(0.07, 0.07, 0.07)), BLOCK_TEX.white, [0.15, 0.18, 0.12, 1]);
+      }
+    }
+
+    for (let i = particles.length - 1; i >= 0; i--) {
+      const p = particles[i];
+      p.life -= dt;
+      if (p.life <= 0 || p.y < -0.1) { particles.splice(i, 1); continue; }
+      p.vy -= p.grav;
+      p.x += p.vx; p.y += p.vy; p.z += p.vz;
+      const s = p.size * Math.min(1, p.life * 2.5);
+      const pm = m4Mul(m4Translate(p.x, p.y, p.z), m4Scale(s, s, s));
+      drawMesh(UNIT_BOX, pm, BLOCK_TEX.white, [p.rgb[0], p.rgb[1], p.rgb[2], Math.min(1, p.life * 1.5)]);
+    }
+
+    requestAnimationFrame(render);
+  }
+  requestAnimationFrame(render);
+})();
+</script>
+</body>
+</html>

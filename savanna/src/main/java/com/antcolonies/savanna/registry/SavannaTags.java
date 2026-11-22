@@ -22,6 +22,13 @@ public class SavannaTags {
             ResourceLocation.fromNamespaceAndPath(SavannaMod.MODID, "fits_termite_tunnels"));
 
     /**
+     * Creatures that walk through savanna mud unslowed (savanna mud, 2026-11-21;
+     * data/antcolonies/tags/entity_type/mud_adapted.json): the river animals that live in it.
+     */
+    public static final TagKey<EntityType<?>> MUD_ADAPTED = TagKey.create(Registries.ENTITY_TYPE,
+            ResourceLocation.fromNamespaceAndPath(SavannaMod.MODID, "mud_adapted"));
+
+    /**
      * Lying wood a Matabele colony nests under (M8 step 1d; data/antcolonies/tags/block/matabele_nest_logs.json): the dead
      * trees' logs, and any log, so a player can lay one down.
      */

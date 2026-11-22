@@ -64,6 +64,8 @@ public final class SavannaTests {
         // big savannas in normal worlds (2026-11-06): biome maps measured against the agreed size and rarity
         // River life (M9): the algae on the bed, later the fish.
         TestFilter.addCategory("river", RiverLifeTests.class);
+        // Savanna mud (docs/plans/savanna-mud.md): sinking, drag, walking out, wetting and drying.
+        TestFilter.addCategory("mud", MudTests.class);
         // The animal life kit (M9, docs/plans/animal-life-cycle.md): sex, age, own size, saving, breeding later.
         TestFilter.addCategory("life", AnimalLifeTests.class);
         TestFilter.addCategory("worldgen", SavannaWorldTests.class, SavannaLoadingTests.class);

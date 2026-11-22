@@ -1,0 +1,8 @@
+{
+  "parent": "antcolonies:block/tinted_cube_bottom_top",
+  "textures": {
+    "top": "antcolonies:block/savanna_mud_cracked",
+    "side": "antcolonies:block/savanna_mud_cracked",
+    "bottom": "antcolonies:block/savanna_mud_cracked"
+  }
+}
