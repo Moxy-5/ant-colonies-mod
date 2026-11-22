@@ -1,0 +1,400 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Papyrus and hippo grass</title>
+<style>
+  :root { --bg: #f4f1ea; --fg: #2c2c2a; --muted: #6b6a64; --line: #d3d1c7; --pick: #2f6b3a; }
+  @media (prefers-color-scheme: dark) { :root { --bg: #1f1f1d; --fg: #ecebe4; --muted: #a9a79e; --line: #44443f; --pick: #8fd19e; } }
+  body { margin: 0; background: var(--bg); color: var(--fg); font: 14px/1.5 system-ui, sans-serif; }
+  #panel { padding: 10px 16px; display: grid; gap: 6px; }
+  .row { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+  .row b { width: 120px; font-weight: 500; }
+  button { background: transparent; color: var(--fg); border: 1px solid var(--line); border-radius: 6px; padding: 3px 9px; cursor: pointer; font: inherit; }
+  button.on { border-color: var(--pick); color: var(--pick); font-weight: 500; }
+  button:disabled { opacity: 0.35; cursor: default; }
+  #note, #sizes { color: var(--muted); font-size: 13px; }
+  canvas { display: block; width: 100%; height: calc(100vh - 250px); min-height: 380px; }
+</style>
+</head>
+<body>
+<div id="panel">
+  <div id="note">Papyrus and hippo grass for the savanna's rivers and oxbows (docs/plans/papyrus-and-hippo-grass.md), placed by the plan's rules: papyrus stands 3 to 5 blocks tall in water 1 deep or on mud at the waterline of still and slow water; hippo grass floating out 1 to 3 blocks from the bank, rooted in clumps at the edge. Only on the slow mid and near-coast rivers (none on the fast far-inland ones) and round oxbows. For scale: the grey box is a hippo (4 long), the olive one a crocodile (7.5 long), the blue one a player (1.8 tall). Drag to turn, scroll to zoom, right-drag to slide.</div>
+  <div id="sizes"></div>
+</div>
+<canvas id="c"></canvas>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+<script>
+const D = /*DATA*/null;
+const OPTIONS = {
+  show: { label: "Show", pick: 2, list: [["An oxbow by a river"], ["Every oxbow age along one river"], ["A river bank up close"]] },
+  pap: { label: "Papyrus head", pick: 0, list: [["A: green mop"], ["B: brown tips (flowering)"], ["C: drooping mop"]] },
+  hg: { label: "Hippo grass", pick: 0, list: [["A: lush green"], ["B: blue-green"], ["C: flowering"]] },
+  plants: { label: "Plants", pick: 0, list: [["Both"], ["Papyrus only"], ["Hippo grass only"], ["Neither (compare)"]] },
+  age: { label: "Oxbow age", pick: 0, list: [["Fresh (open water, 4 deep)"], ["Silting (3 deep, muddy ends)"], ["Old (1 to 2 deep, mud round it)"], ["Scar (dry green crescent)"]] },
+  band: { label: "River", pick: 1, list: [["Far inland (23 wide, fast)"], ["Mid inland (42 wide)"], ["Near the coast (66 wide)"]] },
+  view: { label: "View", pick: 1, list: [["From above"], ["Low on the bank"]] },
+};
+const USES = { age: [0], band: [0] };   // which rows matter for which "Show"
+const state = {}; for (const k in OPTIONS) state[k] = OPTIONS[k].pick;
+for (const [k, v] of new URLSearchParams(location.hash.slice(1))) if (k in state) state[k] = +v;   // e.g. #show=0&view=0 (for pictures)
+/* Pan water (my pick): clay brown, cloudy from rain-washed clay and from animals wading, drinking and wallowing in it,
+   as real savanna pans are; thicker than the other waters, so the bed barely shows through. */
+const RIVER_WATER = 0x8C9E68, STILL_WATER = 0x5E8A52, PAN_WATER = 0xA88A5C, FLOOD_GRASS = 0x6F9B45, SCAR_GRASS = 0x5E9A3E;
+let SEED = 1;                                      // "Another one" rolls a new set of sizes and shapes
+function rnd(k) { return hash(SEED * 17.3 + k * 3.1, SEED * 5.7 - k * 11.9); }
+const SLOW = b => b.river > 30;   // only the slow mid and near-coast rivers get plants (the plan)
+const BANDS = [{ river: 23, depth: 7 }, { river: 42, depth: 8 }, { river: 66, depth: 9 }];
+
+function load(src) { return new Promise(r => { const i = new Image(); i.onload = () => r(i); i.src = src; }); }
+function canvasOf(img, w, h) { const c = document.createElement("canvas"); c.width = w || img.width; c.height = h || img.height; c.getContext("2d").drawImage(img, 0, 0); return c; }
+function tinted(img, hex, w, h) {
+  const c = canvasOf(img, w, h), g = c.getContext("2d"), d = g.getImageData(0, 0, c.width, c.height);
+  const r = (hex >> 16 & 255) / 255, gg = (hex >> 8 & 255) / 255, b = (hex & 255) / 255;
+  for (let i = 0; i < d.data.length; i += 4) { d.data[i] *= r; d.data[i + 1] *= gg; d.data[i + 2] *= b; }
+  g.putImageData(d, 0, 0); return c;
+}
+function tex(c) { const t = new THREE.CanvasTexture(c); t.magFilter = THREE.NearestFilter; t.minFilter = THREE.NearestFilter; return t; }
+function hash(x, z) { const s = Math.sin(x * 127.1 + z * 311.7) * 43758.5453; return s - Math.floor(s); }
+
+const IMG = {}; let ALGAE = [], SAVANNA = 0x9EA75A; const PAP = { heads: {} }, HG = {};
+const renderer = new THREE.WebGLRenderer({ canvas: document.getElementById("c"), antialias: true });
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(55, 1, 0.1, 900);
+const controls = new THREE.OrbitControls(camera, renderer.domElement);
+
+/* A column: top = the y of its top block (water's block is y 0, its surface 0.875; the floodplain's grass is top 1,
+   one block over the water, top 2 farther out), kind = the top block, water = true when still or river water stands
+   on it, wk = "river" or "still", algae = 0..3 or null, tuft = short grass on it, pocks = hoof marks. */
+function cell(top, kind) { return { top, kind, water: false, wk: null, algae: null, tuft: false, pocks: false }; }
+
+/* Oxbow sizes from the river (half real size, my picks): the lake half the river's width, the loop twice the river's
+   width across, a neck of floodplain an eighth of the river's width (3 to 8) between its ends and the river. */
+/* Every oxbow its own (my picks): the loop 0.6 to 1.35 times that size, the lake 0.65 to 1.35 times as wide, the arms
+   reaching 100 to 170 degrees round (a half-moon to a near ring), the loop squashed or drawn out (0.75 to 1.3), turned a
+   little, its banks wavier or smoother, one arm wider than the other, the neck 3 to 8. k picks which oxbow of a scene. */
+function oxbowSize(river, k) {
+  const r = i => rnd(k * 10 + i);
+  const baseW = Math.max(8, Math.round(river / 2)), baseA = Math.max(30, 2 * river);
+  const across = Math.max(26, Math.round(baseA * (0.6 + 0.75 * r(1))));
+  const w = Math.min(Math.round(across * 0.3), Math.max(6, Math.round(baseW * (0.65 + 0.7 * r(2)))));
+  return { w, rc: (across - w) / 2, across, neck: 3 + Math.floor(r(3) * 6), half: (100 + 70 * r(4)) * Math.PI / 180,
+           stretch: 0.75 + 0.55 * r(5), tilt: (r(6) - 0.5) * 0.6, phase: r(7) * 6.28, wob: 0.05 + 0.12 * r(8), lop: (r(9) - 0.5) * 0.5 };
+}
+const TODAY_OXBOW = { w: 4, rc: 6, across: 16, neck: 8, half: 110 * Math.PI / 180, stretch: 1, tilt: 0, phase: 4, wob: 0.08, lop: 0, today: true };
+
+/* how far an oxbow and its bank ring reach from its centre, counted cell by cell (river toward -z) */
+function oxbowFit(o) {
+  const R = Math.ceil((o.rc + o.w) * Math.max(1, o.stretch) + 6);
+  let minX = 0, maxX = 0, minZ = 0, maxZ = 0;
+  for (let x = -R; x <= R; x++) for (let z = -R; z <= R; z++) {
+    const p = inOxbow(o, 0, 0, 1, x, z);
+    if (p && p.out < 1.5) { minX = Math.min(minX, x); maxX = Math.max(maxX, x); minZ = Math.min(minZ, z); maxZ = Math.max(maxZ, z); }
+  }
+  return { minX, maxX, minZ, maxZ };
+}
+
+/* where (x, z) lies in an oxbow centred at (cx, cz) whose open side faces the river (dir +1: river toward -z) */
+function inOxbow(o, cx, cz, dir, x, z) {
+  let dx = x + 0.5 - cx, dz = (z + 0.5 - cz) * dir;
+  const ct = Math.cos(o.tilt), st = Math.sin(o.tilt);
+  [dx, dz] = [(dx * ct - dz * st) / o.stretch, dx * st + dz * ct];
+  const a = Math.atan2(dx, dz), r = Math.hypot(dx, dz);     // a = 0 straight away from the river
+  const along = Math.abs(a) / o.half;
+  if (along > 1.15) return null;
+  let hw = o.w / 2 * (1 + o.wob * Math.sin(a * 5 + o.phase)) * (1 + o.lop * a / o.half);
+  if (along > 0.82) hw *= Math.sqrt(Math.max(0, 1 - ((along - 0.82) / 0.18) ** 2));   // rounded ends
+  const across = Math.abs(r - o.rc);
+  return { along: Math.min(along, 1), u: hw > 0.01 ? across / hw : 99, out: across - hw };
+}
+
+/* what an oxbow of an age does to a column: water and bed depth, mud flats, the scar's dip */
+function oxbowCell(c, p, age, today) {
+  if (p.u <= 1) {
+    let depth = 0;
+    if (today) depth = p.along < 0.5 ? 2 : 1;
+    else if (age === 0) depth = Math.max(1, Math.ceil(4 * (1 - p.u ** 3)));
+    else if (age === 1) depth = p.along < 0.8 ? Math.max(1, Math.round(3 * (1 - p.u * p.u) * (1 - 0.7 * p.along * p.along))) : 0;
+    else if (age === 2) depth = p.along < 0.45 && p.u < 0.75 ? (p.along < 0.25 && p.u < 0.4 ? 2 : 1) : 0;
+    if (depth > 0) {
+      Object.assign(c, { top: -depth, kind: hash(c.x, c.z) < 0.45 ? "mud" : "silt", water: true, wk: "still", tuft: false });
+      c.algae = depth <= 1 ? (hash(c.x + 3, c.z) < 0.35 ? 3 : 2) : depth === 2 ? (hash(c.x, c.z + 7) < 0.5 ? 2 : 1) : depth === 3 ? 1 : null;
+    } else if (age === 3) {
+      Object.assign(c, { top: 0, kind: hash(c.x, c.z) < 0.15 ? "mud" : "scar", tuft: hash(c.x + 1, c.z + 2) < 0.35 });
+    } else {
+      Object.assign(c, { top: 0, kind: hash(c.x, c.z) < 0.55 ? "mud" : "wetsilt", tuft: false });   // mud flats where it silted
+    }
+    return;
+  }
+  // the banks: a ring of mud just outside the water, the ground round the lake one block over the water
+  if (p.out < 1.5 && age !== 3) Object.assign(c, { top: age === 0 && !today ? 1 : 0, kind: hash(c.x + 2, c.z) < 0.6 ? "mud" : "wetsilt", tuft: false });
+  else if (p.out < 4 && c.top > 1) c.top = 1;
+}
+
+/* the river: running along x; columns z from zA to zA + river - 1 are water; floodplain both sides */
+function riverCell(c, zA, b) {
+  const e = Math.min(c.z - zA, zA + b.river - 1 - c.z);    // blocks from the nearer edge (inside the water)
+  if (e >= 0) {
+    const shallow = b.river * 0.2;
+    const top = e < shallow ? -1 - Math.floor(e / shallow * 2) : -b.depth + Math.round(Math.sin(c.x / 9) * 0.6);
+    Object.assign(c, { top, kind: e < 2 ? "wetsilt" : "silt", water: true, wk: "river" });
+    if (e < shallow) c.algae = hash(c.x, c.z) < 0.4 ? 2 : 1;
+    return;
+  }
+  const out = -e;                                        // blocks out from the water's edge
+  if (out <= 4) Object.assign(c, { top: 0, kind: out <= 2 ? "wetsilt" : "silt" });
+  else if (out <= 12) Object.assign(c, { top: 1, kind: "flood", tuft: hash(c.x, c.z) < 0.08 });
+  else Object.assign(c, { top: 2, kind: "flood", tuft: hash(c.x, c.z) < 0.1 });
+}
+
+const extras = [];   // the scale boxes: [x, y, z, length, height, width, colour, turn]
+
+/* the deepest middle of an oxbow, for the hippo and the low camera */
+function oxbowMiddle(o, cx, cz, dir) {
+  let best = null, score = 1e9;
+  for (let x = Math.floor(cx - o.rc * 2); x < cx + o.rc * 2; x++) for (let z = Math.floor(cz - o.rc * 2); z < cz + o.rc * 2; z++) {
+    const p = inOxbow(o, cx, cz, dir, x, z);
+    if (p && p.u < 0.5 && p.along + p.u < score) { score = p.along + p.u; best = [x + 0.5, z + 0.5]; }
+  }
+  return best || [cx, cz + o.rc * dir];
+}
+
+function oxbowScene() {
+  const b = BANDS[state.band], today = state.size === 1, o = today ? TODAY_OXBOW : oxbowSize(b.river, 0), f = oxbowFit(o);
+  const zA = 12, cx = 25 - f.minX, cz = zA + b.river + o.neck - f.minZ;
+  const W = Math.round(f.maxX - f.minX + 50), L = Math.round(cz + f.maxZ + 16), col = [];
+  for (let x = 0; x < W; x++) for (let z = 0; z < L; z++) {
+    const c = Object.assign(cell(1, "flood"), { x, z });
+    riverCell(c, zA, b);
+    if (!c.water) { const p = inOxbow(o, cx, cz, 1, x, z); if (p) oxbowCell(c, p, state.age, today); }
+    col.push(c);
+  }
+  const mid = oxbowMiddle(o, cx, cz, 1);
+  extras.length = 0;
+  if (!today && state.age < 2) extras.push([mid[0], -0.55, mid[1], 4, 1.6, 1.8, 0x8A7F86, 0.3]);    // a hippo, eyes out
+  extras.push([cx + f.minX - 8, 1, zA + b.river + 2.5, 7.5, 0.7, 1.2, 0x5A6236, 0]);               // a crocodile on the strip
+  extras.push([cx + 6, 2, zA + b.river + o.neck + 2, 0.6, 1.8, 0.6, 0x3A5FA8, 0]);                   // a player
+  const long = f.maxX - f.minX + 1, deep = f.maxZ - f.minZ + 1;
+  const word = today ? `today's oxbow: a ditch ${o.w} wide on a loop ${o.across} across, ${o.neck} blocks off the river, 2 deep`
+    : `this oxbow: the lake about ${o.w} wide on a loop ${long} along the river by ${deep} out from it, ${o.neck} blocks of floodplain between its ends and the river (a plain one for this river is a lake ${Math.max(8, Math.round(b.river / 2))} wide on a loop ${Math.max(30, 2 * b.river)} across; each one is 0.6 to 1.35 times that, in its own shape; where the floodplain is too narrow the game shrinks it to fit, never under a loop 26 across)`;
+  return { col, W, L, centre: [cx, 0, cz - deep * 0.15], span: Math.max(W, L), low: [[cx, 5.2, cz - o.rc * 0.4], [mid[0], 0, mid[1]]], words: `River ${b.river} wide, ${b.depth} deep in its channel; ${word}. "Another one" for a new one.` };
+}
+
+function allAgesScene() {
+  const b = BANDS[0], os = [0, 1, 2, 3].map(i => oxbowSize(b.river, i + 1)), fits = os.map(oxbowFit);
+  const xs = []; let x0 = 10;
+  fits.forEach(f => { xs.push(x0 - f.minX); x0 += f.maxX - f.minX + 16; });
+  const reach = Math.max(...os.map((o, i) => o.neck + fits[i].maxZ - fits[i].minZ)) + 12;
+  const W = Math.round(x0 - 6), zA = reach, L = reach * 2 + b.river, col = [];
+  const czs = os.map((o, i) => i % 2 === 0 ? zA + b.river + o.neck - fits[i].minZ : zA - 1 - o.neck + fits[i].minZ);
+  for (let x = 0; x < W; x++) for (let z = 0; z < L; z++) {
+    const c = Object.assign(cell(1, "flood"), { x, z });
+    riverCell(c, zA, b);
+    if (!c.water) {
+      let best = null, bi = 0;
+      os.forEach((o, i) => { const p = inOxbow(o, xs[i], czs[i], i % 2 === 0 ? 1 : -1, x, z); if (p && (!best || p.out < best.out)) { best = p; bi = i; } });
+      if (best) oxbowCell(c, best, bi, false);
+    }
+    col.push(c);
+  }
+  const mid = oxbowMiddle(os[0], xs[0], czs[0], 1);
+  extras.length = 0;
+  extras.push([mid[0], -0.55, mid[1], 4, 1.6, 1.8, 0x8A7F86, 0.3]);
+  extras.push([xs[1], 2, zA - os[1].neck - 2, 0.6, 1.8, 0.6, 0x3A5FA8, 0]);
+  const sizes = os.map((o, i) => `${o.w} wide on a loop ${fits[i].maxX - fits[i].minX + 1}`).join("; ");
+  return { col, W, L, centre: [W / 2, 0, L / 2], span: W * 0.8, low: [[mid[0], 5.2, czs[0] - os[0].rc * 0.4], [mid[0], 0, mid[1]]],
+    words: `A far-inland river (23 wide) with an oxbow of each age, left to right: fresh, silting, old, scar; they swap sides as the river's bends do, and each has its own size and shape. The lakes: ${sizes}. "Another one" for a new set.` };
+}
+
+/* A river bank up close: the mid-inland river's shallow edge along x, its bank and floodplain, a little muddy bay. */
+function closeScene() {
+  const b = BANDS[1], W = 40, L = 34, zA = 12 - b.river, col = [];
+  for (let x = 0; x < W; x++) for (let z = 0; z < L; z++) {
+    const c = Object.assign(cell(1, "flood"), { x, z });
+    riverCell(c, zA, b);
+    const bay = Math.hypot((x - 24) / 1.6, z - 12.5);                  // a quiet bay cut into the bank
+    if (!c.water && bay < 4.2) Object.assign(c, { top: -1, kind: hash(x, z) < 0.5 ? "mud" : "wetsilt", water: true, wk: "river", algae: hash(x + 1, z) < 0.4 ? 2 : 1 });
+    else if (!c.water && bay < 5.6) Object.assign(c, { top: 0, kind: "mud" });
+    col.push(c);
+  }
+  extras.length = 0;
+  extras.push([8, -0.55, 4, 4, 1.6, 1.8, 0x8A7F86, 0.2]);                   // a hippo, eyes out
+  extras.push([34, 0, 16.5, 0.6, 1.8, 0.6, 0x3A5FA8, 0]);                   // a player on the silt strip
+  return { col, W, L, centre: [W / 2, 0, L / 2], span: 44, low: [[33, 6.5, 30], [20, 1, 8]],
+    words: "The mid-inland river's shallow edge (1 to 2 deep), its silt strip and floodplain, with a quiet muddy bay: papyrus where the water is 1 deep or on mud at the waterline, hippo grass floating out from the bank." };
+}
+
+/* where the plants go, by the plan's rules (patch shapes my picks): water and mud cells get papyrus in patchy stands,
+   water near the bank a floating hippo grass fringe 1 to 3 wide in patches, rooted clumps on the bank beside it */
+function patch(x, z, k) {
+  return 0.5 + 0.22 * Math.sin(x / 4.3 + k * 1.7 + SEED) + 0.18 * Math.sin(z / 3.7 + k * 2.3 - SEED) + 0.1 * Math.sin((x + z) / 2.9 + k);
+}
+function placePlants(S) {
+  const { col, W, L } = S, at = (x, z) => (x < 0 || z < 0 || x >= W || z >= L) ? null : col[x * L + z];
+  const riverOk = S.slow, still = c => c.wk === "still" || (c.wk === "river" && riverOk);
+  const landNear = (c, r) => {                                   // blocks to the nearest dry column, up to r
+    let d = 99;
+    for (let dx = -r; dx <= r; dx++) for (let dz = -r; dz <= r; dz++) { const n = at(c.x + dx, c.z + dz); if (n && !n.water) d = Math.min(d, Math.hypot(dx, dz)); }
+    return d;
+  };
+  for (const c of col) {
+    c.pap = 0; c.mat = false; c.clump = false;
+    const wet = c.water && still(c);
+    if (wet && c.top === -1 || !c.water && c.kind === "mud" && c.top === 0 && [[1, 0], [-1, 0], [0, 1], [0, -1]].some(([dx, dz]) => { const n = at(c.x + dx, c.z + dz); return n && n.water && still(n); })) {
+      if (patch(c.x, c.z, 1) > 0.66 && hash(c.x + 5, c.z + 1) < 0.85) c.pap = 3 + Math.floor(hash(c.x, c.z + 2) * 3);
+    }
+    if (wet && !c.pap) {
+      const d = landNear(c, 3), wide = 1 + Math.floor(patch(c.x, c.z, 3) * 3);
+      if (d <= wide && patch(c.x, c.z, 2) > 0.5) c.mat = true;
+    }
+  }
+  for (const c of col) if (!c.water && !c.pap && [[1, 0], [-1, 0], [0, 1], [0, -1]].some(([dx, dz]) => { const n = at(c.x + dx, c.z + dz); return n && n.mat; })) c.clump = hash(c.x + 3, c.z) < 0.75;
+}
+
+function build() {
+  while (scene.children.length) scene.remove(scene.children[0]);
+  for (const k in USES) document.querySelectorAll(`[data-row=${k}] button`).forEach(b => b.disabled = !USES[k].includes(state.show));
+  const S = [oxbowScene, allAgesScene, closeScene][state.show]();
+  S.slow = state.show === 2 || SLOW(BANDS[state.show === 1 ? 0 : state.band]);
+  placePlants(S);
+  document.getElementById("sizes").textContent = S.words;
+  const { col, W, L } = S;
+  const at = (x, z) => (x < 0 || z < 0 || x >= W || z >= L) ? null : col[x * L + z];
+  const shade = [0.6, 0.6, 1, 0.5, 0.8, 0.8];
+  const boxMats = map => shade.map((s, i) => new THREE.MeshBasicMaterial({ map: map[i] || map[0], color: new THREE.Color(s, s, s) }));
+  const dirt = tex(canvasOf(IMG.dirt));
+  const sideOf = hex => { const c = canvasOf(IMG.dirt); c.getContext("2d").drawImage(tinted(IMG.grass_block_side_overlay, hex), 0, 0); return tex(c); };
+  const grassMats = hex => { const s = sideOf(hex); return boxMats([s, s, tex(tinted(IMG.grass_block_top, hex)), dirt, s, s]); };
+  const mats = { grass: grassMats(SAVANNA), flood: grassMats(FLOOD_GRASS), scar: grassMats(SCAR_GRASS), dirt: boxMats([dirt]),
+                 coarse: boxMats([tex(canvasOf(IMG.coarse_dirt))]), silt: boxMats([tex(canvasOf(IMG.silt))]),
+                 wetsilt: boxMats([tex(canvasOf(IMG.wet_silt))]), mud: boxMats([tex(canvasOf(IMG.river_mud))]) };
+  const cells = {}; for (const k in mats) cells[k] = [];
+  for (const c of col) {
+    let low = c.top;
+    for (const [dx, dz] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) { const n = at(c.x + dx, c.z + dz); low = Math.min(low, n ? n.top + 1 : -10); }
+    for (let y = Math.max(low, -10); y <= c.top; y++) cells[y < c.top ? "dirt" : c.kind].push([c.x, y, c.z]);
+  }
+  const box = new THREE.BoxGeometry(1, 1, 1), m4 = new THREE.Matrix4();
+  for (const k in cells) {
+    if (!cells[k].length) continue;
+    const mesh = new THREE.InstancedMesh(box, mats[k], cells[k].length);
+    cells[k].forEach(([x, y, z], i) => mesh.setMatrixAt(i, m4.makeTranslation(x + 0.5, y + 0.5, z + 0.5)));
+    scene.add(mesh);
+  }
+  const plane = new THREE.PlaneGeometry(1, 1); plane.rotateX(-Math.PI / 2);
+  for (let s = 0; s < 4; s++) {                     // algae on the shallow beds (look C, the game's)
+    const cs = col.filter(c => c.algae === s);
+    if (!cs.length) continue;
+    const mesh = new THREE.InstancedMesh(plane, new THREE.MeshBasicMaterial({ map: ALGAE[s], transparent: true, alphaTest: 0.05, depthWrite: false }), cs.length);
+    cs.forEach((c, i) => mesh.setMatrixAt(i, m4.makeRotationY(Math.floor(hash(c.x + 9, c.z + 4) * 4) * Math.PI / 2).setPosition(c.x + 0.5, c.top + 1.01, c.z + 0.5)));
+    scene.add(mesh);
+  }
+  const pk = col.filter(c => c.pocks);              // hoof marks pressed into the trampled ring
+  if (pk.length) {
+    const small = new THREE.PlaneGeometry(0.22, 0.28); small.rotateX(-Math.PI / 2);
+    const mesh = new THREE.InstancedMesh(small, new THREE.MeshBasicMaterial({ color: 0x3B2E22 }), pk.length * 2);
+    pk.forEach((c, i) => { for (let j = 0; j < 2; j++) mesh.setMatrixAt(i * 2 + j, m4.makeTranslation(c.x + 0.2 + 0.6 * hash(c.x + j, c.z), c.top + 1.005, c.z + 0.2 + 0.6 * hash(c.x, c.z + j))); });
+    scene.add(mesh);
+  }
+  const tf = col.filter(c => c.tuft);               // short grass
+  if (tf.length) {
+    const g1 = new THREE.PlaneGeometry(0.9, 0.9); g1.translate(0, 0.45, 0); const g2 = g1.clone(); g1.rotateY(Math.PI / 4); g2.rotateY(-Math.PI / 4);
+    for (const g of [g1, g2]) {
+      const mesh = new THREE.InstancedMesh(g, new THREE.MeshBasicMaterial({ map: tex(tinted(IMG.short_grass, FLOOD_GRASS)), transparent: true, alphaTest: 0.1, side: THREE.DoubleSide }), tf.length);
+      tf.forEach((c, i) => mesh.setMatrixAt(i, m4.makeTranslation(c.x + 0.5, c.top + 1, c.z + 0.5)));
+      scene.add(mesh);
+    }
+  }
+  for (const [wk, hex] of [["river", RIVER_WATER], ["still", STILL_WATER], ["pan", PAN_WATER]]) {
+    const ws = col.filter(c => c.wk === wk);
+    if (!ws.length) continue;
+    const mesh = new THREE.InstancedMesh(plane, new THREE.MeshBasicMaterial({ map: tex(tinted(IMG.water_still, hex, 16, 16)), transparent: true, opacity: wk === "pan" ? 0.96 : 0.9, depthWrite: false, side: THREE.DoubleSide }), ws.length);
+    ws.forEach((c, i) => mesh.setMatrixAt(i, m4.makeTranslation(c.x + 0.5, 0.875, c.z + 0.5)));
+    scene.add(mesh);
+  }
+  drawPlants(col);
+  for (const [x, y, z, l, h, w, hex, turn] of extras) {
+    const m = new THREE.Mesh(new THREE.BoxGeometry(l, h, w), new THREE.MeshBasicMaterial({ color: hex }));
+    m.position.set(x, y + h / 2, z); m.rotation.y = turn; scene.add(m);
+    const e = new THREE.LineSegments(new THREE.EdgesGeometry(m.geometry), new THREE.LineBasicMaterial({ color: 0x111111 }));
+    e.position.copy(m.position); e.rotation.copy(m.rotation); scene.add(e);
+  }
+  scene.background = new THREE.Color(0x78A7FF);
+  const [cx, , cz] = S.centre, sp = S.span;
+  if (state.view === 0) { camera.position.set(cx, sp * 0.42, cz + sp * 0.55); controls.target.set(cx, 0, cz); }
+  else { camera.position.set(...S.low[0]); controls.target.set(...S.low[1]); }
+  controls.update();
+}
+
+/* papyrus: crossed stem planes like sugar cane (base block, stem blocks), a 4-plane mop head 1.6 wide on top, each
+   column nudged a little off its block's middle (a block can do that, as grass does); hippo grass: a mat lying just over
+   the water with short blades sticking up through it, crossed clumps on the bank */
+function drawPlants(col) {
+  const showPap = state.plants === 0 || state.plants === 1, showHg = state.plants === 0 || state.plants === 2;
+  const m4 = new THREE.Matrix4(), mat = t => new THREE.MeshBasicMaterial({ map: t, transparent: true, alphaTest: 0.1, side: THREE.DoubleSide });
+  const crossed = (w, h, n) => { const gs = []; for (let i = 0; i < n; i++) { const g = new THREE.PlaneGeometry(w, h); g.translate(0, h / 2, 0); g.rotateY(Math.PI / 4 + i * Math.PI / n); gs.push(g); } return gs; };
+  const add = (gs, t, spots) => { if (!spots.length) return; for (const g of gs) { const m = new THREE.InstancedMesh(g, mat(t), spots.length); spots.forEach((p, i) => m.setMatrixAt(i, m4.makeRotationY(p[3] || 0).setPosition(p[0], p[1], p[2]))); scene.add(m); } };
+  if (showPap) {
+    const base = [], stem = [], head = [];
+    for (const c of col.filter(c => c.pap)) {
+      const ox = c.x + 0.5 + (hash(c.x + 7, c.z) - 0.5) * 0.35, oz = c.z + 0.5 + (hash(c.x, c.z + 7) - 0.5) * 0.35, y0 = c.top + 1;
+      base.push([ox, y0, oz]);
+      for (let k = 1; k < c.pap - 1; k++) stem.push([ox, y0 + k, oz]);
+      head.push([ox, y0 + c.pap - 1, oz, hash(c.x + 2, c.z + 9) * 6.28]);
+    }
+    add(crossed(1, 1, 2), PAP.base, base); add(crossed(1, 1, 2), PAP.stem, stem);
+    add(crossed(1.6, 1.6, 4), PAP.heads["ABC"[state.pap]], head);
+  }
+  if (showHg) {
+    const G = HG["ABC"[state.hg]], mats = col.filter(c => c.mat);
+    if (mats.length) {
+      const flat = new THREE.PlaneGeometry(1.15, 1.15); flat.rotateX(-Math.PI / 2);
+      const m = new THREE.InstancedMesh(flat, new THREE.MeshBasicMaterial({ map: G.mat, transparent: true, alphaTest: 0.1, depthWrite: false }), mats.length);
+      mats.forEach((c, i) => m.setMatrixAt(i, m4.makeRotationY(Math.floor(hash(c.x + 9, c.z + 4) * 4) * Math.PI / 2).setPosition(c.x + 0.5, 0.9, c.z + 0.5)));
+      scene.add(m);
+    }
+    add(crossed(0.8, 0.45, 2), G.clump, mats.filter(c => hash(c.x + 4, c.z + 4) < 0.55).map(c => [c.x + 0.5, 0.86, c.z + 0.5, hash(c.x, c.z) * 6.28]));
+    add(crossed(1, 1, 2), G.clump, col.filter(c => c.clump).map(c => [c.x + 0.5, c.top + 1, c.z + 0.5, hash(c.x, c.z + 1) * 3]));
+  }
+  const n = col.filter(c => c.pap).length, f = col.filter(c => c.mat).length;
+  document.getElementById("sizes").textContent += ` Here: ${n} papyrus stems, ${f} blocks of floating hippo grass.`;
+}
+
+function buttons() {
+  const panel = document.getElementById("panel");
+  for (const key in OPTIONS) {
+    const row = document.createElement("div"); row.className = "row"; row.dataset.row = key;
+    row.innerHTML = `<b>${OPTIONS[key].label}</b>`;
+    OPTIONS[key].list.forEach((o, i) => {
+      const b = document.createElement("button"); b.textContent = o[0]; b.className = state[key] === i ? "on" : "";
+      b.onclick = () => { state[key] = i; [...row.querySelectorAll("button")].forEach((x, j) => x.className = j === i ? "on" : ""); build(); };
+      row.appendChild(b);
+    });
+    panel.appendChild(row);
+  }
+  const row = document.createElement("div"); row.className = "row";
+  row.innerHTML = `<b>Shapes and stands</b>`;
+  const b = document.createElement("button"), n = document.createElement("span");
+  b.textContent = "Another one"; n.textContent = `set ${SEED}`;
+  b.onclick = () => { SEED++; n.textContent = `set ${SEED}`; build(); };
+  row.appendChild(b); row.appendChild(n); panel.appendChild(row);
+}
+
+function resize() { const c = renderer.domElement; renderer.setSize(c.clientWidth, c.clientHeight, false); camera.aspect = c.clientWidth / c.clientHeight; camera.updateProjectionMatrix(); }
+window.addEventListener("resize", resize);
+
+(async () => {
+  for (const k in D.blocks) IMG[k] = await load(D.blocks[k]);
+  const cm = canvasOf(IMG.grass_colormap).getContext("2d"); const p = cm.getImageData(0, 255, 1, 1).data; SAVANNA = p[0] << 16 | p[1] << 8 | p[2];
+  for (const src of D.algae) ALGAE.push(tex(canvasOf(await load(src))));
+  PAP.base = tex(canvasOf(await load(D.papyrus.base))); PAP.stem = tex(canvasOf(await load(D.papyrus.stem)));
+  for (const k in D.papyrus.heads) PAP.heads[k] = tex(canvasOf(await load(D.papyrus.heads[k])));
+  for (const k in D.grass) HG[k] = { mat: tex(canvasOf(await load(D.grass[k].mat))), clump: tex(canvasOf(await load(D.grass[k].clump))) };
+  buttons(); build(); resize();
+  (function loop() { requestAnimationFrame(loop); controls.update(); renderer.render(scene, camera); })();
+})();
+</script>
+</body>
+</html>
