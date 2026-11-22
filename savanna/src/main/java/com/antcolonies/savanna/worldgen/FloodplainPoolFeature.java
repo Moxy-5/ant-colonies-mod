@@ -3,6 +3,7 @@ package com.antcolonies.savanna.worldgen;
 import java.util.HashMap;
 import java.util.Map;
 
+import com.antcolonies.savanna.block.SavannaMudBlock;
 import com.antcolonies.savanna.registry.SavannaBlocks;
 import com.mojang.serialization.Codec;
 
@@ -23,7 +24,8 @@ import net.minecraft.world.level.levelgen.feature.configurations.NoneFeatureConf
  * <li><b>oxbows</b> ({@code oxbow} true): a river bend cut off and left as a crescent lake when the river took a shorter
  * way; 3 to 5 wide, 1 deep, 2 down its middle, a little trampled mud at the ends;</li>
  * <li><b>pans</b>: shallow rough ovals 5 to 12 across that fill with rain and flood water, kept bare and muddy by
- * animals drinking and wallowing; 1 deep with a mud bed and a thin ring of mud round the water.</li>
+ * animals drinking and wallowing; 1 deep with a mud bed and a thin ring of mud round the water, and a wallow of savanna
+ * mud at one end ({@link #panWallow}, 2026-11-21).</li>
  * </ul>
  * The water takes the floodplain's murky green ({@code antcolonies:savanna_floodplain}). Full all year for now; drying
  * and refilling with the seasons later, from the one shared season source. A pool skips any spot where something other
@@ -121,7 +123,52 @@ public class FloodplainPoolFeature extends Feature<NoneFeatureConfiguration> {
                 }
             }
         }
+        if (!oxbow) {
+            panWallow(level, random, depth, rim, low);
+        }
         return true;
+    }
+
+    /** How far round a pan's wallow reaches from the rim spot it is centred on (blocks; my pick: 4 to 6 across). */
+    static final double WALLOW_REACH = 2.6;
+
+    /**
+     * A wallow at one end of a pan (savanna mud, 2026-11-21, {@code docs/plans/savanna-mud.md}, section 5.1): olive savanna
+     * mud round a rim spot picked at random, on the rim and the ring outside it, soupy by the water and sticky at its
+     * edge. The pan's water keeps it wet. Ground of the outer ring a block high is cut to the rim's level; anything but a
+     * plant there leaves that cell out.
+     */
+    private static void panWallow(WorldGenLevel level, RandomSource random, Map<Long, Integer> depth, Map<Long, Boolean> rim, int low) {
+        if (rim.isEmpty()) {
+            return;
+        }
+        Long[] spots = rim.keySet().toArray(new Long[0]);
+        java.util.Arrays.sort(spots);
+        long spot = spots[random.nextInt(spots.length)];
+        int sx = BlockPos.getX(spot), sz = BlockPos.getZ(spot);
+        int reach = (int) Math.ceil(WALLOW_REACH);
+        for (int dx = -reach; dx <= reach; dx++) {
+            for (int dz = -reach; dz <= reach; dz++) {
+                double d = Math.sqrt(dx * dx + dz * dz);
+                int x = sx + dx, z = sz + dz;
+                long key = BlockPos.asLong(x, 0, z);
+                if (d > WALLOW_REACH || depth.containsKey(key)) {
+                    continue;
+                }
+                if (!rim.containsKey(key)) {
+                    // the ring outside the rim: soil at the rim's level or a block over it, nothing but plants above
+                    int g = RiverBankFeature.ground(level, x, z, low + 4);
+                    if (g < low || g > low + 1 || !RiverBankFeature.soft(level.getBlockState(new BlockPos(x, g, z))) || !clearAbove(level, x, g, z)) {
+                        continue;
+                    }
+                    clear(level, x, low, z);
+                }
+                int mudDepth = d < 1.0 ? 3 : d < 2.0 ? 2 : 1;
+                SavannaMudBlock.Wetness wetness = mudDepth == 1 ? SavannaMudBlock.Wetness.STICKY : SavannaMudBlock.Wetness.SOUPY;
+                level.setBlock(new BlockPos(x, low, z), SavannaBlocks.SAVANNA_MUD.get().with(wetness, mudDepth, SavannaMudBlock.Tone.OLIVE),
+                        Block.UPDATE_CLIENTS);
+            }
+        }
     }
 
     /** A crescent: part of a ring, thinning to points at its ends, 2 deep down the middle of its middle part. */

@@ -1,6 +1,9 @@
 {
   "type": "neoforge:add_features",
   "biomes": "#antcolonies:savanna_waters",
-  "features": "antcolonies:river_bank",
+  "features": [
+    "antcolonies:river_bank",
+    "antcolonies:river_mud"
+  ],
   "step": "local_modifications"
 }

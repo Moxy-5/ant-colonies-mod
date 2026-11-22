@@ -1,0 +1,5 @@
+{
+  "_note": "Savanna mud (2026-11-21): once per chunk, after the banks; the feature asks whether the chunk is a river mud site (worldgen/MudSites).",
+  "feature": "antcolonies:river_mud",
+  "placement": []
+}

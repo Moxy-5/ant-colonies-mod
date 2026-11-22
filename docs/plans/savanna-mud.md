@@ -159,7 +159,9 @@ the stealth bonus are left out: not asked for; ideas for later.)
    mobs unhurried, a player-sized mob walks out of the deep middle, a pit dries from the rim and comes back after rain.
 2. **The ant legs and wet mud** (BUILT 2026-11-21: `nav/SoftGround`, test `antsGoRoundWetMudButCrossItDry`; `legs` and
    `raids` run).
-3. **Placing the wallows in new land** (the three places above, spaced from the seed like the other sites); `worldgen`
+3. **Placing the wallows in new land** (BUILT 2026-11-21: `MudSites`, `RiverMudFeature`, `DryWallowFeature`, the pans'
+   wallow; spacing measured on the noise: river mud one every 116 blocks of river, dry wallows one to a square 143 on a
+   side; not yet seen in a generated world) (the three places above, spaced from the seed like the other sites); `worldgen`
    tests (off mounds, flat ground, spaced, olive by the river, the land's tone off it); chunk-making time measured.
    Full test run here (3 steps).
 4. **Mud on bodies** (framework coat, coat layer, player legs, wash-off, fly clouds keeping off); the river animals

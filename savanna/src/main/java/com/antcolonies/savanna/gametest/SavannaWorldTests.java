@@ -1204,6 +1204,55 @@ public class SavannaWorldTests {
         helper.succeed();
     }
 
+    /**
+     * River mud sites ({@link com.antcolonies.savanna.worldgen.MudSites#river}, savanna mud step 3, 2026-11-21) come about
+     * every 120 blocks of savanna river (my pick), its own sites and the hippo pods' together, walked as the pod sites
+     * are. Fails when a site comes on average less than every 80 or more than every 180 blocks of river.
+     */
+    @GameTest(template = "arena", timeoutTicks = 600, batch = "savanna_maps")
+    public static void riverMudSitesComeAbout120BlocksApartAlongTheRivers(GameTestHelper helper) {
+        List<Integer> gaps = new ArrayList<>();
+        double[] r = walkSites(helper, com.antcolonies.savanna.worldgen.MudSites::river, (source, sampler, x, z) -> true, gaps);
+        double length = r[0], every = r[1] == 0 ? Double.MAX_VALUE : length / r[1];
+        SavannaMod.LOGGER.info("[mud sites] {} blocks of savanna river walked, {} river mud sites: one every {} blocks; gaps (n {}): 10% {}, 25% {}, middle {}, 75% {}, 90% {} ({} s)",
+                (int) length, (int) r[1], String.format("%.0f", every), gaps.size(), pct(gaps, 10), pct(gaps, 25), pct(gaps, 50), pct(gaps, 75), pct(gaps, 90),
+                String.format("%.0f", r[2]));
+        helper.assertTrue(every >= 80 && every <= 180, String.format("a river mud site every %.0f blocks of river (about 120 wanted)", every));
+        helper.succeed();
+    }
+
+    /**
+     * Dry wallow sites ({@link com.antcolonies.savanna.worldgen.MudSites#dry}, savanna mud step 3) on open savanna land, by
+     * the noise on {@link #GROUND_SEEDS}: one site for every so much open savanna, read as the side of the square each site
+     * has to itself. Fails outside 110 to 220 blocks (about 150 wanted, my pick; the ground then leaves some sites empty).
+     */
+    @GameTest(template = "arena", timeoutTicks = 600, batch = "savanna_maps")
+    public static void dryWallowSitesComeAbout150BlocksApartOnOpenSavanna(GameTestHelper helper) {
+        var registries = helper.getLevel().registryAccess();
+        long land = 0, sites = 0;
+        int half = 1536;
+        for (long seed : GROUND_SEEDS) {
+            Climate.Sampler sampler = BiomeMaps.sampler(registries, seed);
+            MultiNoiseBiomeSource source = BiomeMaps.bigSavannaSource(registries, seed);
+            for (int cx = -half / 16; cx < half / 16; cx++) {
+                for (int cz = -half / 16; cz < half / 16; cz++) {
+                    if (com.antcolonies.savanna.worldgen.MudSites.dryLandAt(source, sampler, cx * 16 + 8, cz * 16 + 8)) {
+                        land++;
+                        if (com.antcolonies.savanna.worldgen.MudSites.dry(source, sampler, seed, cx, cz)) {
+                            sites++;
+                        }
+                    }
+                }
+            }
+        }
+        double side = sites == 0 ? Double.MAX_VALUE : Math.sqrt(land * 256.0 / sites);
+        SavannaMod.LOGGER.info("[mud sites] {} chunks of open savanna, {} dry wallow sites: one site to a square {} blocks on a side",
+                land, sites, String.format("%.0f", side));
+        helper.assertTrue(land > 1000, "the seeds should hold open savanna to measure, " + land + " chunks");
+        helper.assertTrue(side >= 110 && side <= 220, String.format("a dry wallow site to a square %.0f blocks on a side (about 150 wanted)", side));
+        helper.succeed();
+    }
+
     /** A kind of river site's test of a chunk, and the stretches of river its sites are counted along. */
     private interface SiteTest {
         boolean site(MultiNoiseBiomeSource source, Climate.Sampler sampler, long seed, int cx, int cz);

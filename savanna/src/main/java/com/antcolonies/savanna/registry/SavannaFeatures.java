@@ -42,6 +42,14 @@ public class SavannaFeatures {
     public static final DeferredHolder<Feature<?>, com.antcolonies.savanna.worldgen.HippoPodFeature> HIPPO_PODS =
             FEATURES.register("hippo_pods", () -> new com.antcolonies.savanna.worldgen.HippoPodFeature(NoneFeatureConfiguration.CODEC));
 
+    /** New land's river mud areas at the waterline of mud sites (savanna mud step 3; .../biome_modifier/river_banks.json, after the banks). */
+    public static final DeferredHolder<Feature<?>, com.antcolonies.savanna.worldgen.RiverMudFeature> RIVER_MUD =
+            FEATURES.register("river_mud", () -> new com.antcolonies.savanna.worldgen.RiverMudFeature(NoneFeatureConfiguration.CODEC));
+
+    /** New land's dry wallows on open savanna (savanna mud step 3; .../biome_modifier/dry_wallows.json). */
+    public static final DeferredHolder<Feature<?>, com.antcolonies.savanna.worldgen.DryWallowFeature> DRY_WALLOWS =
+            FEATURES.register("dry_wallows", () -> new com.antcolonies.savanna.worldgen.DryWallowFeature(NoneFeatureConfiguration.CODEC));
+
     /** Minecraft's own savanna trees where a savanna is too small to live in (the gate; .../biome_modifier/quiet_savanna_trees.json). */
     public static final DeferredHolder<Feature<?>, com.antcolonies.savanna.worldgen.QuietSavannaTreesFeature> QUIET_SAVANNA_TREES =
             FEATURES.register("quiet_savanna_trees", () -> new com.antcolonies.savanna.worldgen.QuietSavannaTreesFeature(NoneFeatureConfiguration.CODEC));

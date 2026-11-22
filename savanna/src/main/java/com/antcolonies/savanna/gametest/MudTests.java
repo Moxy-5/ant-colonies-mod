@@ -265,4 +265,135 @@ public class MudTests {
         }
         return on;
     }
+
+    /**
+     * New land's river mud (step 3): on a bank flush with the water, a strip of mud at the waterline, sticky round its
+     * edge and soupy inside, every block close enough to the water to stay wet; never on the sand bank beside it nor up on
+     * the floodplain a block higher.
+     */
+    @GameTest(template = "arena", timeoutTicks = 100)
+    public static void riverMudLiesAtTheWaterlineAndStaysWet(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        // the river x 2 to 6, the low bank x 7 to 12 flush with it (sand at z 1 to 4), the floodplain a block up from x 13
+        for (int x = 1; x <= 19; x++) {
+            for (int z = 0; z <= 17; z++) {
+                for (int y = 0; y <= 4; y++) {
+                    BlockState state = y == 0 ? Blocks.STONE.defaultBlockState()
+                            : y == 1 ? (x <= 6 ? Blocks.WATER : x <= 12 && z <= 4 ? Blocks.SAND : Blocks.GRASS_BLOCK).defaultBlockState()
+                            : y == 2 && x >= 13 ? Blocks.GRASS_BLOCK.defaultBlockState() : Blocks.AIR.defaultBlockState();
+                    if (y == 1 && x >= 13) {
+                        state = Blocks.DIRT.defaultBlockState();
+                    }
+                    helper.setBlock(new BlockPos(x, y, z), state);
+                }
+            }
+        }
+        BlockPos corner = helper.absolutePos(new BlockPos(2, 1, 1));
+        int top = corner.getY();
+        int laid = com.antcolonies.savanna.worldgen.RiverMudFeature.lay(level, RandomSource.create(5), corner.getX(), corner.getZ(), top);
+        int soupy = 0, sticky = 0;
+        for (int x = 1; x <= 19; x++) {
+            for (int z = 0; z <= 17; z++) {
+                for (int y = 1; y <= 2; y++) {
+                    BlockPos at = helper.absolutePos(new BlockPos(x, y, z));
+                    BlockState state = level.getBlockState(at);
+                    if (!(state.getBlock() instanceof SavannaMudBlock)) {
+                        continue;
+                    }
+                    helper.assertTrue(y == 1 && x >= 7 && x <= 12, "river mud only on the low bank, not at " + x + " " + y + " " + z);
+                    helper.assertTrue(z > 4, "river mud never on the sand bank, at " + x + " " + z);
+                    helper.assertTrue(state.getValue(SavannaMudBlock.TONE) == Tone.OLIVE, "river mud is olive silt");
+                    helper.assertTrue(SavannaMudBlock.wetted(level, at), "every block of river mud should be kept wet by the river, not at " + x + " " + z);
+                    soupy += state.getValue(SavannaMudBlock.WETNESS) == Wetness.SOUPY ? 1 : 0;
+                    sticky += state.getValue(SavannaMudBlock.WETNESS) == Wetness.STICKY ? 1 : 0;
+                }
+            }
+        }
+        SavannaMod.LOGGER.info("[mud] river mud laid {} blocks: {} soupy, {} sticky", laid, soupy, sticky);
+        helper.assertTrue(laid >= 15, "a river mud area should be laid, " + laid + " blocks");
+        helper.assertTrue(soupy > 0 && sticky > 0, "river mud should be soupy inside and sticky round its edge (" + soupy + " soupy, " + sticky + " sticky)");
+        helper.succeed();
+    }
+
+    /**
+     * New land's dry wallow (step 3): an oval of dry mud 4 to 7 across laid level with the grass in the land's colour,
+     * deepest in its middle and cracked round its edge; none where a log lies within 4 blocks or the ground is uneven.
+     */
+    @GameTest(template = "arena", timeoutTicks = 100)
+    public static void aDryWallowLiesFlatInOpenGrassOnly(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        for (int x = 0; x <= 60; x++) {
+            for (int z = 0; z <= 20; z++) {
+                for (int y = 0; y <= 6; y++) {
+                    helper.setBlock(new BlockPos(x, y, z), y == 0 ? Blocks.STONE : y == 1 ? Blocks.GRASS_BLOCK : Blocks.AIR);
+                }
+            }
+        }
+        helper.setBlock(new BlockPos(32, 2, 10), Blocks.OAK_LOG);                   // a log beside the second spot
+        for (int x = 44; x <= 60; x++) {                                             // the third spot's ground steps up 2
+            for (int z = 0; z <= 20; z++) {
+                if (x >= 52) {
+                    helper.setBlock(new BlockPos(x, 2, z), Blocks.DIRT);
+                    helper.setBlock(new BlockPos(x, 3, z), Blocks.GRASS_BLOCK);
+                }
+            }
+        }
+        int lookFrom = helper.absolutePos(new BlockPos(0, 6, 0)).getY();         // under the arena's barrier roof
+        BlockPos open = helper.absolutePos(new BlockPos(10, 1, 10)), byLog = helper.absolutePos(new BlockPos(26, 1, 10)),
+                step = helper.absolutePos(new BlockPos(51, 1, 10));
+        int laid = com.antcolonies.savanna.worldgen.DryWallowFeature.lay(level, RandomSource.create(3), open.getX(), open.getZ(), Tone.RED, lookFrom);
+        helper.assertTrue(laid >= 12 && laid <= 40, "a dry wallow 4 to 7 across should be laid in open grass, " + laid + " blocks");
+        BlockState middle = level.getBlockState(open);
+        helper.assertTrue(middle.getBlock() instanceof SavannaMudBlock && middle.getValue(SavannaMudBlock.DEPTH) >= 3,
+                "the wallow's middle should be its deepest mud, is " + middle);
+        int edge = 0;
+        for (int dx = -4; dx <= 4; dx++) {
+            for (int dz = -4; dz <= 4; dz++) {
+                BlockState state = level.getBlockState(open.offset(dx, 0, dz));
+                helper.assertTrue(!(level.getBlockState(open.offset(dx, 1, dz)).getBlock() instanceof SavannaMudBlock), "a dry wallow lies level with the grass");
+                if (state.getBlock() instanceof SavannaMudBlock) {
+                    helper.assertTrue(state.getValue(SavannaMudBlock.TONE) == Tone.RED, "a dry wallow takes the land's colour");
+                    helper.assertTrue(state.getValue(SavannaMudBlock.WETNESS) == Wetness.CRACKED || state.getValue(SavannaMudBlock.WETNESS) == Wetness.DRYING,
+                            "new land lays dry wallows dry");
+                    edge += state.getValue(SavannaMudBlock.DEPTH) == 1 ? 1 : 0;
+                }
+            }
+        }
+        helper.assertTrue(edge > 0, "a dry wallow's edge should be its shallowest mud");
+        helper.assertTrue(com.antcolonies.savanna.worldgen.DryWallowFeature.lay(level, RandomSource.create(3), byLog.getX(), byLog.getZ(), Tone.RED, lookFrom) == 0,
+                "no dry wallow with a log within 4 blocks");
+        helper.assertTrue(com.antcolonies.savanna.worldgen.DryWallowFeature.lay(level, RandomSource.create(3), step.getX(), step.getZ(), Tone.RED, lookFrom) == 0,
+                "no dry wallow on uneven ground");
+        helper.succeed();
+    }
+
+    /** A pan on the floodplain gets a wallow of soupy savanna mud at one end, kept wet by the pan's water. */
+    @GameTest(template = "arena", timeoutTicks = 100)
+    public static void aPanHasAWallowAtOneEnd(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        for (int x = 0; x <= 40; x++) {
+            for (int z = 0; z <= 40; z++) {
+                for (int y = 0; y <= 6; y++) {
+                    helper.setBlock(new BlockPos(x, y, z), y <= 1 ? Blocks.DIRT : y == 2 ? Blocks.GRASS_BLOCK : Blocks.AIR);
+                }
+            }
+        }
+        BlockPos middle = helper.absolutePos(new BlockPos(20, 2, 20));
+        boolean made = com.antcolonies.savanna.worldgen.FloodplainPoolFeature.place(level, middle, RandomSource.create(9), false, middle.getY() - 1);
+        helper.assertTrue(made, "a pan should be made on level floodplain");
+        int mud = 0, wet = 0;
+        for (int dx = -20; dx <= 20; dx++) {
+            for (int dz = -20; dz <= 20; dz++) {
+                BlockPos at = middle.offset(dx, 0, dz);
+                BlockState state = level.getBlockState(at);
+                if (state.getBlock() instanceof SavannaMudBlock) {
+                    mud++;
+                    wet += SavannaMudBlock.wetted(level, at) ? 1 : 0;
+                }
+            }
+        }
+        helper.assertTrue(mud >= 5, "a pan should have a wallow of savanna mud at one end, " + mud + " blocks");
+        helper.assertTrue(wet == mud, "the pan's water should keep its whole wallow wet (" + wet + " of " + mud + ")");
+        helper.succeed();
+    }
 }

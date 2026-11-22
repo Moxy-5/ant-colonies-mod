@@ -1,0 +1,5 @@
+{
+  "_note": "Savanna mud (2026-11-21): once per chunk; the feature asks whether the chunk is a dry wallow site (worldgen/MudSites) and whether its ground lets one lie.",
+  "feature": "antcolonies:dry_wallows",
+  "placement": []
+}

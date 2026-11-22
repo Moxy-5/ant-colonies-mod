@@ -159,7 +159,7 @@ public class SavannaBlocks {
     public static final DeferredBlock<com.antcolonies.savanna.block.SavannaMudBlock> SAVANNA_MUD = BLOCKS.registerBlock("savanna_mud",
             com.antcolonies.savanna.block.SavannaMudBlock::new,
             BlockBehaviour.Properties.of().mapColor(MapColor.TERRACOTTA_BROWN).strength(0.5F).sound(SoundType.MUD)
-                    .randomTicks().dynamicShape().isSuffocating((state, level, pos) -> false).isViewBlocking((state, level, pos) -> false));
+                    .randomTicks().dynamicShape().forceSolidOn().isSuffocating((state, level, pos) -> false).isViewBlocking((state, level, pos) -> false));
 
     /**
      * River algae (M9 river life, 2026-11-14): a thin green mat on river, pan and oxbow beds under water, food for the
