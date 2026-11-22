@@ -1,0 +1,37 @@
+# Body hit boxes (2026-11-22; the user: "my hits aren't really that accurate, is there no way to sculpt a hit box
+# cleverly"): hit boxes drawn (F3+B) on a crocodile, a hippo and a monitor standing on open ground, the crocodile turned
+# half way between two sides (the boxes cannot turn, so its tail's beads step along the diagonal), then a crocodile
+# walking a curve, filmed stepped, to show the beads follow its body. Side on, from the front, from above.
+#   ./gradlew runFilm -PfilmScene=tools/film/hit_chain_frames.film   pictures in run-film/screenshots/hit_chain_frames/
+cmd time set noon
+cmd weather clear
+cmd kill @e[type=!player]
+cmd fill -12 -61 -14 26 -50 14 minecraft:air
+cmd fill -12 -62 -14 26 -62 14 minecraft:grass_block
+lens 60
+hitboxes on
+cmd summon antcolonies:crocodile 0.5 -61 -6.5 {NoAI:1b,Rotation:[-90f,0f],OwnSize:1.0f}
+cmd summon antcolonies:hippo 2.5 -61 3.5 {NoAI:1b,Rotation:[-90f,0f],OwnSize:1.0f}
+cmd summon antcolonies:monitor 14.5 -61 -6.5 {NoAI:1b,Rotation:[-45f,0f],OwnSize:1.0f}
+cmd summon antcolonies:crocodile 16.5 -61 4.5 {NoAI:1b,Rotation:[-45f,0f],OwnSize:1.0f}
+wait 40
+camera 8.5 -58.5 -20.5 0 12
+shot side
+camera 30.5 -58.5 -1.0 90 12
+shot front
+camera 8.5 -44.0 -1.0 0 80
+shot above
+camera -6.5 -55.0 -18.5 -40 25
+shot corner
+cmd kill @e[type=!player]
+wait 10
+# --- a crocodile walking a curve, stepped
+walker antcolonies:crocodile -6.5 -61 -4.5 -90 OwnSize:1.0f,Led:1b
+camera 6.5 -46.0 -10.5 0 60
+cmd tick unfreeze
+go 10 -61 6 1.0
+wait 20
+cmd tick freeze
+burst walk 40 4
+cmd tick unfreeze
+hitboxes off

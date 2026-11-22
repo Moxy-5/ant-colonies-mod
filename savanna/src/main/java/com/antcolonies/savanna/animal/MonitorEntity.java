@@ -95,7 +95,7 @@ import software.bernie.geckolib.util.GeckoLibUtil;
  * down over it, reaches its forefeet down the face to the lower ground, tips its chest down while its hind legs brake on
  * top, then its hips go over and its hind feet step down the face; the tail slides off the edge last.
  */
-public class MonitorEntity extends PathfinderMob implements com.antcolonies.savanna.block.LongBody, GeoEntity, HasLife {
+public class MonitorEntity extends PathfinderMob implements GeoEntity, HasLife {
     /** What it is doing, for the clips. */
     public static final byte CALM = 0, BASK = 1, HISS = 2, BITE = 3, EAT = 4, WATCH = 5, BITE_PLAYER = 6;
     private static final EntityDataAccessor<Byte> DATA_DOING = SynchedEntityData.defineId(MonitorEntity.class, EntityDataSerializers.BYTE);
@@ -253,8 +253,25 @@ public class MonitorEntity extends PathfinderMob implements com.antcolonies.sava
     public double shiftX, shiftY, shiftZ, drawnX, drawnY, drawnZ;
     public long drawnNanos;
 
+    /**
+     * Its hit boxes along the drawn body ({@link com.antcolonies.animal.HitChain}, 2026-11-22; my picks measured on its
+     * model): its position is at the back of its hips, so the head's tip is 2.25 ahead and the tail's 2.25 behind
+     * (model pixels times MODEL_SCALE); the head, the neck, the chest, the waist and four beads down the tail: its
+     * walking box is only the hips of a body 4.5 blocks long, so a swing or an arrow at what you see lands.
+     */
+    private final com.antcolonies.animal.HitChain chain = new com.antcolonies.animal.HitChain(this,
+            new com.antcolonies.animal.HitChain.Link("head", 1.95, 0.1, 0.5F, 0.4F),
+            new com.antcolonies.animal.HitChain.Link("neck", 1.45, 0.1, 0.45F, 0.4F),
+            new com.antcolonies.animal.HitChain.Link("chest", 0.95, 0.05, 0.6F, 0.5F),
+            new com.antcolonies.animal.HitChain.Link("waist", 0.45, 0, 0.6F, 0.5F),
+            new com.antcolonies.animal.HitChain.Link("tail1", -0.6, 0, 0.45F, 0.35F),
+            new com.antcolonies.animal.HitChain.Link("tail2", -1.1, 0, 0.4F, 0.3F),
+            new com.antcolonies.animal.HitChain.Link("tail3", -1.55, 0, 0.35F, 0.28F),
+            new com.antcolonies.animal.HitChain.Link("tail4", -1.98, 0, 0.3F, 0.25F));
+
     public MonitorEntity(EntityType<? extends MonitorEntity> type, Level level) {
         super(type, level);
+        setId(ENTITY_COUNTER.getAndAdd(chain.size() + 1) + 1);   // its hit boxes take the ids right after its own
         life = new AnimalLife(this, DATA_LIFE);
         moveControl = new SmoothSwimmingMoveControl(this, 85, 10, 0.1F, 0.6F, false);
         lookControl = new SmoothSwimmingLookControl(this, 20);
@@ -776,6 +793,7 @@ public class MonitorEntity extends PathfinderMob implements com.antcolonies.sava
     @Override
     public void tick() {
         super.tick();
+        chain.place();
         // its walk, for the clips (both sides): the last tick it moved and how far a tick, eased (BUGS 234)
         double dx = getX() - xo, dz = getZ() - zo, moved = Math.sqrt(dx * dx + dz * dz);
         if (moved > 0.004) {
@@ -1688,15 +1706,21 @@ public class MonitorEntity extends PathfinderMob implements com.antcolonies.sava
         return cache;
     }
 
-    /** Its drawn body's reach ahead of its position, for pushing plants aside ({@link com.antcolonies.savanna.block.LongBody}). */
     @Override
-    public double noseAhead() {
-        return JAWS_AHEAD * getScale();
+    public void setId(int id) {
+        super.setId(id);
+        if (chain != null) {                              // null while Entity's own constructor runs
+            chain.setIds(id);
+        }
     }
 
-    /** Its drawn body's reach behind its position (the tail's tip or rump). */
     @Override
-    public double tailBehind() {
-        return (4.5 - JAWS_AHEAD) * getScale();
+    public boolean isMultipartEntity() {
+        return true;
+    }
+
+    @Override
+    public net.neoforged.neoforge.entity.PartEntity<?>[] getParts() {
+        return chain.parts();
     }
 }

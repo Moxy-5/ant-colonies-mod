@@ -50,8 +50,8 @@ public final class PlantPushClient {
     /** The most a reed column leans (radians; about 40 degrees, the plan's). */
     static final float MOST_LEAN = 0.7F;
     /**
-     * How far past the pusher's side a plant's middle may lie and still lean (blocks): half a block, so every plant whose
-     * block the pusher's box overlaps (the ones the server marks, {@link PlantPush}) leans, those at the box's edge least.
+     * How far past a box's side a plant's middle may lie and still lean (blocks): half a block, so every plant whose block
+     * a pusher's box overlaps (the ones the server marks, {@link PlantPush}) leans, those at the box's edge least.
      */
     static final float REACH = 0.5F;
     /** The spring's pull and damping per tick (my picks: back in about 20 ticks with a small overshoot). */
@@ -129,12 +129,11 @@ public final class PlantPushClient {
     }
 
     /**
-     * Adds what {@code entity} does to the plants under its footprint ({@link PlantPush#footprint}: its box, or a long
-     * body's line nose to tail; the same blocks the server marks): each leans away from the nearest point of the body
-     * (and a little along its way), the more the nearer that point.
+     * Adds what {@code entity} does to the plants under its boxes ({@link PlantPush#body}: its own and its body's hit
+     * boxes; the same blocks the server marks): each leans away from the middle of the nearest box (and a little along its
+     * way), the more the nearer that middle. A plant under two boxes takes the push of the nearer.
      */
     private static void feel(ClientLevel level, Entity entity) {
-        PlantPush.Footprint f = PlantPush.footprint(entity);
         double mx = entity.getX() - entity.xo, mz = entity.getZ() - entity.zo, ml = Math.sqrt(mx * mx + mz * mz);
         if (ml > 1.0E-3) {
             mx /= ml;
@@ -143,46 +142,39 @@ public final class PlantPushClient {
             mx = 0;
             mz = 0;
         }
-        double half = f.half() + REACH;
-        BlockPos.MutableBlockPos at = new BlockPos.MutableBlockPos();
-        java.util.Set<BlockPos> felt = new java.util.HashSet<>();
-        for (int x = f.minX(); x <= f.maxX(); x++) {
-            for (int z = f.minZ(); z <= f.maxZ(); z++) {
-                if (!f.overlaps(x, z)) {
-                    continue;
+        Map<BlockPos, double[]> pushes = new HashMap<>();       // foot -> {lean x, lean z, closeness, reed}
+        for (net.minecraft.world.phys.AABB box : PlantPush.body(entity)) {
+            Vec3 mid = box.getCenter();
+            double half = box.getXsize() / 2 + REACH, wantX = mx, wantZ = mz;
+            PlantPush.eachBlock(box, at -> {
+                BlockState state = level.getBlockState(at);
+                boolean reed = state.getBlock() instanceof ReedBlock;
+                if (!reed && !(state.getBlock() instanceof HippoGrassBlock)) {
+                    return;
                 }
-                for (int y = Mth.floor(f.minY()); y <= Mth.floor(f.maxY() - 1.0E-7); y++) {
-                    at.set(x, y, z);
-                    BlockState state = level.getBlockState(at);
-                    boolean reed = state.getBlock() instanceof ReedBlock;
-                    if (!reed && !(state.getBlock() instanceof HippoGrassBlock)) {
-                        continue;
-                    }
-                    BlockPos foot = reed ? ((ReedBlock) state.getBlock()).bottom(level, at) : at.immutable();
-                    if (!felt.add(foot)) {
-                        continue;                              // one push a column from each pusher
-                    }
-                    Vec3 off = state.getOffset(level, at);
-                    double px = x + 0.5 + off.x, pz = z + 0.5 + off.z;
-                    double[] near = f.nearest(px, pz);
-                    double dx = px - near[0], dz = pz - near[1];
-                    double d = Math.sqrt(dx * dx + dz * dz);
-                    double close = Mth.clamp(1 - d / half, 0, 1);
-                    if (close <= 0) {
-                        continue;
-                    }
-                    double ux = d > 1.0E-3 ? dx / d : 0, uz = d > 1.0E-3 ? dz / d : 0;
-                    double wx = ux + 0.6 * mx, wz = uz + 0.6 * mz, wl = Math.sqrt(wx * wx + wz * wz);
-                    if (wl < 1.0E-3) {
-                        continue;
-                    }
-                    Sway sway = SWAYS.computeIfAbsent(foot, k -> new Sway(reed));
-                    double amount = (reed ? MOST_LEAN : 1) * close;
-                    sway.wantX += (float) (wx / wl * amount);
-                    sway.wantZ += (float) (wz / wl * amount);
+                BlockPos foot = reed ? ((ReedBlock) state.getBlock()).bottom(level, at) : at.immutable();
+                Vec3 off = state.getOffset(level, at);
+                double dx = at.getX() + 0.5 + off.x - mid.x, dz = at.getZ() + 0.5 + off.z - mid.z;
+                double d = Math.sqrt(dx * dx + dz * dz);
+                double close = Mth.clamp(1 - d / half, 0, 1);
+                double[] had = pushes.get(foot);
+                if (close <= 0 || had != null && had[2] >= close) {
+                    return;
                 }
-            }
+                double ux = d > 1.0E-3 ? dx / d : 0, uz = d > 1.0E-3 ? dz / d : 0;
+                double wx = ux + 0.6 * wantX, wz = uz + 0.6 * wantZ, wl = Math.sqrt(wx * wx + wz * wz);
+                if (wl >= 1.0E-3) {
+                    pushes.put(foot, new double[] {wx / wl, wz / wl, close, reed ? 1 : 0});
+                }
+            });
         }
+        pushes.forEach((foot, p) -> {
+            boolean reed = p[3] > 0;
+            Sway sway = SWAYS.computeIfAbsent(foot, k -> new Sway(reed));
+            double amount = (reed ? MOST_LEAN : 1) * p[2];
+            sway.wantX += (float) (p[0] * amount);
+            sway.wantZ += (float) (p[1] * amount);
+        });
     }
 
     @SubscribeEvent

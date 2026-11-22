@@ -32,4 +32,18 @@ public class ModEntities {
                     .clientTrackingRange(6)
                     .updateInterval(10)
                     .build("lost_leg"));
+
+    /**
+     * A hit box along a long animal's body ({@link com.antcolonies.animal.BodyPart}, 2026-11-22): its own type, never
+     * spawned, saved or summoned, so a search for an animal's type (a crowd count, a command's {@code @e[type=...]}) finds
+     * the animal and never its body's boxes, which NeoForge would otherwise give the animal's type.
+     */
+    public static final DeferredHolder<EntityType<?>, EntityType<com.antcolonies.animal.BodyPart>> BODY_PART =
+            ENTITY_TYPES.register("body_part", () -> EntityType.Builder
+                    .<com.antcolonies.animal.BodyPart>createNothing(MobCategory.MISC)
+                    .noSave()
+                    .noSummon()
+                    .sized(0.5F, 0.5F)
+                    .clientTrackingRange(0)
+                    .build("body_part"));
 }

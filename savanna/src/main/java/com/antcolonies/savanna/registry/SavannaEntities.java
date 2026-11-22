@@ -113,8 +113,8 @@ public class SavannaEntities {
     public static final DeferredHolder<EntityType<?>, EntityType<com.antcolonies.savanna.animal.TilapiaEntity>> TILAPIA =
             ENTITY_TYPES.register("tilapia", () -> EntityType.Builder
                     .of(com.antcolonies.savanna.animal.TilapiaEntity::new, SavannaMobCategories.riverFish())
-                    .sized(0.6F, 0.4F)
-                    .eyeHeight(0.2F)
+                    .sized(0.5F, 0.3F)                  // a thin fish 0.6 long, 0.25 tall (was 0.6 x 0.4, taller and wider than drawn; 2026-11-22)
+                    .eyeHeight(0.15F)
                     .clientTrackingRange(4)
                     .build("tilapia"));
 

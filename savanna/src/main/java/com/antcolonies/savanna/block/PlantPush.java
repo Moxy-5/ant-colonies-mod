@@ -20,10 +20,10 @@ import net.minecraft.world.phys.AABB;
  *
  * <p>A pusher is a player or an animal at least {@link #BIG} wide (hippo, crocodile, monitor, otter, a player); a push
  * starts only when it moves (a hippo resting in reeds does not set them going), and lasts while it touches the plant.
- * What it touches is its {@link #footprint}: its box, or for an animal drawn much longer than its box ({@link LongBody}:
- * the hippo, crocodile and monitor) its body as drawn, nose to tail along the way it faces. A box pusher marks plants
- * through the blocks' {@code entityInside}; a long body marks what lies under its footprint every other tick while it
- * moves ({@link #onTick}).
+ * What it touches is its {@link #body}: its box and, for an animal with a hit chain (the hippo, crocodile, monitor and
+ * catfish, {@code com.antcolonies.animal.HitChain}), every box along its drawn body, the same boxes a player's hits meet.
+ * Its own box marks plants through the blocks' {@code entityInside}; the chain's boxes mark what they cover every other
+ * tick while it moves ({@link #onTick}).
  */
 @net.neoforged.fml.common.EventBusSubscriber(modid = com.antcolonies.savanna.SavannaMod.MODID)
 public final class PlantPush {
@@ -39,9 +39,15 @@ public final class PlantPush {
     private PlantPush() {
     }
 
-    /** Whether {@code entity} is big enough to push plants aside. */
+    /** The animal a box belongs to: itself, or the owner of one of its body's hit boxes. */
+    public static Entity owner(Entity entity) {
+        return entity instanceof net.neoforged.neoforge.entity.PartEntity<?> part ? part.getParent() : entity;
+    }
+
+    /** Whether {@code entity} (or the animal owning it, for a body's hit box) is big enough to push plants aside. */
     public static boolean pusher(Entity entity) {
-        return entity.getBbWidth() >= BIG && !entity.isSpectator() && entity.isAlive();
+        Entity owner = owner(entity);
+        return owner.getBbWidth() >= BIG && !owner.isSpectator() && owner.isAlive();
     }
 
     /** Whether {@code entity} moved sideways since its last tick (the start of a push). */
@@ -50,96 +56,53 @@ public final class PlantPush {
         return dx * dx + dz * dz > 1.0E-4 || entity.getDeltaMovement().horizontalDistanceSqr() > 1.0E-4;
     }
 
-    /** Whether a pusher's footprint touches the column of blocks {@code box}. */
+    /** Whether a pusher's box, or one of its body's hit boxes, touches {@code box} (a plant's column of blocks). */
     public static boolean touched(Level level, AABB box) {
-        for (Entity e : level.getEntitiesOfClass(Entity.class, box.inflate(LONGEST, 1, LONGEST), PlantPush::pusher)) {
-            Footprint f = footprint(e);
-            if (f.minY < box.maxY && f.maxY > box.minY && f.overlaps(net.minecraft.util.Mth.floor(box.minX), net.minecraft.util.Mth.floor(box.minZ))) {
-                return true;
+        return !level.getEntities((Entity) null, box, PlantPush::pusher).isEmpty();
+    }
+
+    /** The boxes {@code entity} pushes plants with: its own, then each of its body's hit boxes. */
+    public static java.util.List<AABB> body(Entity entity) {
+        java.util.List<AABB> boxes = new java.util.ArrayList<>();
+        boxes.add(entity.getBoundingBox());
+        if (entity.isMultipartEntity() && entity.getParts() != null) {
+            for (net.minecraft.world.entity.Entity part : entity.getParts()) {
+                boxes.add(part.getBoundingBox());
             }
         }
-        return false;
+        return boxes;
     }
 
-    /** The farthest a long body reaches from its position (blocks; a big crocodile's tail), for finding pushers near a plant. */
-    static final double LONGEST = 8;
-
-    /**
-     * Where a pusher touches the ground's plants: a line from {@code (ax, az)} to {@code (bx, bz)} (its tail to its nose; a
-     * box pusher's is a point, its middle) widened by {@code half} each side, from {@code minY} to {@code maxY}.
-     */
-    public record Footprint(double ax, double az, double bx, double bz, double half, double minY, double maxY, boolean box) {
-        /** The nearest point of the line to {@code (x, z)}. */
-        public double[] nearest(double x, double z) {
-            double dx = bx - ax, dz = bz - az, len2 = dx * dx + dz * dz;
-            double t = len2 < 1.0E-9 ? 0 : net.minecraft.util.Mth.clamp(((x - ax) * dx + (z - az) * dz) / len2, 0, 1);
-            return new double[] {ax + t * dx, az + t * dz};
-        }
-
-        /** Whether the block column {@code (x, z)} lies under it: inside the box for a box pusher, else within half of the line. */
-        public boolean overlaps(int x, int z) {
-            if (box) {
-                return x + 1 > ax - half && x < ax + half && z + 1 > az - half && z < az + half;
+    /** Calls {@code each} for every block position {@code box} overlaps. */
+    public static void eachBlock(AABB box, java.util.function.Consumer<BlockPos.MutableBlockPos> each) {
+        BlockPos.MutableBlockPos at = new BlockPos.MutableBlockPos();
+        int x1 = net.minecraft.util.Mth.floor(box.maxX - 1.0E-7), y1 = net.minecraft.util.Mth.floor(box.maxY - 1.0E-7), z1 = net.minecraft.util.Mth.floor(box.maxZ - 1.0E-7);
+        for (int x = net.minecraft.util.Mth.floor(box.minX); x <= x1; x++) {
+            for (int z = net.minecraft.util.Mth.floor(box.minZ); z <= z1; z++) {
+                for (int y = net.minecraft.util.Mth.floor(box.minY); y <= y1; y++) {
+                    each.accept(at.set(x, y, z));
+                }
             }
-            double[] p = nearest(x + 0.5, z + 0.5);
-            double ex = Math.max(Math.abs(p[0] - (x + 0.5)) - 0.5, 0), ez = Math.max(Math.abs(p[1] - (z + 0.5)) - 0.5, 0);
-            return ex * ex + ez * ez < half * half;
-        }
-
-        public int minX() {
-            return net.minecraft.util.Mth.floor(Math.min(ax, bx) - half);
-        }
-
-        public int maxX() {
-            return net.minecraft.util.Mth.floor(Math.max(ax, bx) + half);
-        }
-
-        public int minZ() {
-            return net.minecraft.util.Mth.floor(Math.min(az, bz) - half);
-        }
-
-        public int maxZ() {
-            return net.minecraft.util.Mth.floor(Math.max(az, bz) + half);
         }
     }
 
-    /** The pusher's footprint now (its body's turn for a long body). */
-    public static Footprint footprint(Entity e) {
-        AABB b = e.getBoundingBox();
-        double half = e.getBbWidth() / 2;
-        if (e instanceof LongBody body) {
-            float yaw = (e instanceof net.minecraft.world.entity.LivingEntity living ? living.yBodyRot : e.getYRot()) * net.minecraft.util.Mth.DEG_TO_RAD;
-            double fx = -net.minecraft.util.Mth.sin(yaw), fz = net.minecraft.util.Mth.cos(yaw);
-            return new Footprint(e.getX() - fx * body.tailBehind(), e.getZ() - fz * body.tailBehind(),
-                    e.getX() + fx * body.noseAhead(), e.getZ() + fz * body.noseAhead(), half, b.minY, b.maxY, false);
-        }
-        return new Footprint(e.getX(), e.getZ(), e.getX(), e.getZ(), half, b.minY, b.maxY, true);
-    }
-
-    /** A long body moving marks the plants under its footprint, every other tick (a box pusher's are marked by the blocks). */
+    /** A moving animal with a hit chain marks the plants under its body's boxes, every other tick (its own box's are marked by the blocks). */
     @net.neoforged.bus.api.SubscribeEvent
     public static void onTick(net.neoforged.neoforge.event.tick.EntityTickEvent.Post event) {
         Entity e = event.getEntity();
-        if (!(e instanceof LongBody) || !(e.level() instanceof ServerLevel level) || (e.tickCount & 1) != 0 || !pusher(e) || !moving(e)) {
+        if (!e.isMultipartEntity() || !(e.level() instanceof ServerLevel level) || (e.tickCount & 1) != 0 || !pusher(e) || !moving(e)) {
             return;
         }
-        Footprint f = footprint(e);
-        BlockPos.MutableBlockPos at = new BlockPos.MutableBlockPos();
-        for (int x = f.minX(); x <= f.maxX(); x++) {
-            for (int z = f.minZ(); z <= f.maxZ(); z++) {
-                if (!f.overlaps(x, z)) {
-                    continue;
+        java.util.List<AABB> boxes = body(e);
+        for (AABB box : boxes.subList(1, boxes.size())) {
+            eachBlock(box, at -> {
+                net.minecraft.world.level.block.state.BlockState state = level.getBlockState(at);
+                if (state.getBlock() instanceof ReedBlock reed && state.getValue(PUSH) != PUSHED) {
+                    reed.push(level, at.immutable());
+                } else if (state.getBlock() instanceof HippoGrassBlock mat && state.getValue(PUSH) != PUSHED) {
+                    mat.push(level, at.immutable(), state);
                 }
-                for (int y = net.minecraft.util.Mth.floor(f.minY); y <= net.minecraft.util.Mth.floor(f.maxY - 1.0E-7); y++) {
-                    at.set(x, y, z);
-                    net.minecraft.world.level.block.state.BlockState state = level.getBlockState(at);
-                    if (state.getBlock() instanceof ReedBlock reed && state.getValue(PUSH) != PUSHED) {
-                        reed.push(level, at.immutable());
-                    } else if (state.getBlock() instanceof HippoGrassBlock mat && state.getValue(PUSH) != PUSHED) {
-                        mat.push(level, at.immutable(), state);
-                    }
-                }
-            }
+            });
         }
     }
 

@@ -135,8 +135,19 @@ public class CatfishEntity extends AbstractFish implements GeoEntity, HasLife {
     /** The drawn body's pitch (degrees, nose up positive), eased toward its swimming direction (client only). */
     private float swimPitch, swimPitchO;
 
+    /**
+     * Its hit boxes along the drawn body ({@link com.antcolonies.animal.HitChain}, 2026-11-22; my picks measured on its
+     * model): the head (to 0.88 ahead), the back half and the tail fin (to 1.12 behind): its box is only the middle of
+     * a fish 2 blocks long, so a swing or an arrow at what you see lands.
+     */
+    private final com.antcolonies.animal.HitChain chain = new com.antcolonies.animal.HitChain(this,
+            new com.antcolonies.animal.HitChain.Link("head", 0.7, 0.05, 0.45F, 0.35F),
+            new com.antcolonies.animal.HitChain.Link("tail1", -0.6, 0.05, 0.4F, 0.35F),
+            new com.antcolonies.animal.HitChain.Link("tail2", -0.98, 0.05, 0.3F, 0.32F));
+
     public CatfishEntity(EntityType<? extends CatfishEntity> type, Level level) {
         super(type, level);
+        setId(ENTITY_COUNTER.getAndAdd(chain.size() + 1) + 1);   // its hit boxes take the ids right after its own
         life = new AnimalLife(this, DATA_LIFE);
         hungryIn = 600 + level.random.nextInt(2400);
         gulpIn = 600 + level.random.nextInt(AirGulpGoal.EVERY_MORE);
@@ -406,6 +417,7 @@ public class CatfishEntity extends AbstractFish implements GeoEntity, HasLife {
     @Override
     public void tick() {
         super.tick();
+        chain.place();
         if (level().isClientSide) {
             swimPitchO = swimPitch;
             double dx = getX() - xo, dy = getY() - yo, dz = getZ() - zo;
@@ -647,5 +659,23 @@ public class CatfishEntity extends AbstractFish implements GeoEntity, HasLife {
     @Override
     public AnimatableInstanceCache getAnimatableInstanceCache() {
         return cache;
+    }
+
+    @Override
+    public void setId(int id) {
+        super.setId(id);
+        if (chain != null) {                              // null while Entity's own constructor runs
+            chain.setIds(id);
+        }
+    }
+
+    @Override
+    public boolean isMultipartEntity() {
+        return true;
+    }
+
+    @Override
+    public net.neoforged.neoforge.entity.PartEntity<?>[] getParts() {
+        return chain.parts();
     }
 }

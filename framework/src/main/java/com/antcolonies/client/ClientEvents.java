@@ -29,6 +29,7 @@ public class ClientEvents {
     public static void onRegisterRenderers(EntityRenderersEvent.RegisterRenderers event) {
         event.registerEntityRenderer(ModEntities.ANT_EGG.get(), AntEggRenderer::new);
         event.registerEntityRenderer(ModEntities.LOST_LEG.get(), LostLegRenderer::new);
+        event.registerEntityRenderer(ModEntities.BODY_PART.get(), net.minecraft.client.renderer.entity.NoopRenderer::new);   // drawn by its animal
         for (SpeciesBodies bodies : SpeciesBodies.all()) {
             event.registerEntityRenderer(bodies.corpse().get(), context -> new AntCorpseRenderer(context, bodies.corpseLook(), bodies.drawSize()));
         }

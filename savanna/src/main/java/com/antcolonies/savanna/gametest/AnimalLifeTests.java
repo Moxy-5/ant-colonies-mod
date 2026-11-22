@@ -294,7 +294,7 @@ public class AnimalLifeTests {
         breedingPond(helper);
         TilapiaEntity male = grown(helper, SavannaEntities.TILAPIA.get(), "male", new BlockPos(5, BED + 1, 5));
         int limit = male.life().numbers().localLimit();
-        for (int i = 1; i < limit; i++) {
+        for (int i = 1; i < limit + 3; i++) {                // a few past the limit: a full river, not one fish drifting off the count's edge (2026-11-22, smaller tilapia boxes)
             grown(helper, SavannaEntities.TILAPIA.get(), "female", new BlockPos(P0 + i % 12, BED + 1 + i % 2, P0 + 1 + i / 12 * 3));
         }
         helper.onEachTick(() -> male.wantsNestNow = true);

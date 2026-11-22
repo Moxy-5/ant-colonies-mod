@@ -347,7 +347,7 @@ public final class Replay {
 
     /** Every creature in the area but players, and the report's colonies if an earlier run left them. */
     private void removeLeftovers(ServerLevel level, AABB area) {
-        level.getEntities((Entity) null, area.inflate(0, 64, 0), entity -> !(entity instanceof Player)).forEach(Entity::discard);
+        level.getEntities((Entity) null, area.inflate(0, 64, 0), entity -> !(entity instanceof Player) && !(entity instanceof net.neoforged.neoforge.entity.PartEntity<?>)).forEach(Entity::discard);
         ColonyManager manager = ColonyManager.get(level);
         Set<UUID> ids = new HashSet<>(colonyIds());
         List<Entity> theirs = new ArrayList<>();

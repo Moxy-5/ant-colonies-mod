@@ -284,6 +284,9 @@ public class SavannaMudBlock extends Block implements com.antcolonies.nav.SoftGr
      */
     static void liftOnto(Level level, BlockPos pos, BlockState now) {
         for (Entity entity : level.getEntities((Entity) null, new net.minecraft.world.phys.AABB(pos))) {
+            if (entity instanceof net.neoforged.neoforge.entity.PartEntity<?>) {
+                continue;                                   // a body's hit box moves with its animal
+            }
             double floor = pos.getY() + 1.0 - sinkPixels(now, entity) / 16.0;
             if (entity.getY() < floor && entity.getY() >= pos.getY()) {
                 entity.teleportRelative(0.0, floor - entity.getY(), 0.0);

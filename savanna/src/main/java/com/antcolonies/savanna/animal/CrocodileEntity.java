@@ -71,7 +71,7 @@ import software.bernie.geckolib.util.GeckoLibUtil;
  * {@link Attributes#SCALE}. Its box is under a block wide at every size, so its routes use 1-block squares (the
  * catfish's lesson). It breathes under water (my pick: a crocodile holding its breath for an hour is not worth a rule).
  */
-public class CrocodileEntity extends PathfinderMob implements com.antcolonies.savanna.block.LongBody, GeoEntity, HasLife {
+public class CrocodileEntity extends PathfinderMob implements GeoEntity, HasLife {
     private static final EntityDataAccessor<Boolean> DATA_BASKING = SynchedEntityData.defineId(CrocodileEntity.class, EntityDataSerializers.BOOLEAN);
     /** What its jaws are doing in a hunt: {@link #JAWS_NONE}, gaping in the lunge, clamped on its prey, or tearing at a kill. */
     private static final EntityDataAccessor<Byte> DATA_JAWS = SynchedEntityData.defineId(CrocodileEntity.class, EntityDataSerializers.BYTE);
@@ -277,8 +277,28 @@ public class CrocodileEntity extends PathfinderMob implements com.antcolonies.sa
     /** Ticks it still gapes at a rival male. */
     private int gapeFor;
 
+    /**
+     * Its hit boxes along the drawn body ({@link com.antcolonies.animal.HitChain}, 2026-11-22; my picks measured on its
+     * model): its position is at the front of its hips, so the snout's tip is 2.78 ahead and the tail's 4.72 behind
+     * (model pixels times MODEL_SCALE); the snout, the head, the chest, the hips and six beads down the tail, thinning
+     * toward its tip: its walking box is only the middle of a body 7.5 blocks long, so a swing or an arrow at what you
+     * see lands.
+     */
+    private final com.antcolonies.animal.HitChain chain = new com.antcolonies.animal.HitChain(this,
+            new com.antcolonies.animal.HitChain.Link("snout", 2.45, 0.05, 0.55F, 0.4F),
+            new com.antcolonies.animal.HitChain.Link("head", 1.75, 0.1, 0.75F, 0.5F),
+            new com.antcolonies.animal.HitChain.Link("chest", 0.75, 0, 0.85F, 0.6F),
+            new com.antcolonies.animal.HitChain.Link("hips", -0.75, 0, 0.85F, 0.6F),
+            new com.antcolonies.animal.HitChain.Link("tail1", -1.5, 0, 0.75F, 0.45F),
+            new com.antcolonies.animal.HitChain.Link("tail2", -2.2, 0, 0.65F, 0.4F),
+            new com.antcolonies.animal.HitChain.Link("tail3", -2.85, 0, 0.58F, 0.36F),
+            new com.antcolonies.animal.HitChain.Link("tail4", -3.42, 0, 0.5F, 0.32F),
+            new com.antcolonies.animal.HitChain.Link("tail5", -3.93, 0, 0.45F, 0.28F),
+            new com.antcolonies.animal.HitChain.Link("tail6", -4.4, 0, 0.4F, 0.25F));
+
     public CrocodileEntity(EntityType<? extends CrocodileEntity> type, Level level) {
         super(type, level);
+        setId(ENTITY_COUNTER.getAndAdd(chain.size() + 1) + 1);   // its hit boxes take the ids right after its own
         life = new AnimalLife(this, DATA_LIFE);
         moveControl = new SmoothSwimmingMoveControl(this, 85, 10, 0.1F, 0.55F, false);
         lookControl = new SmoothSwimmingLookControl(this, 20);
@@ -729,6 +749,7 @@ public class CrocodileEntity extends PathfinderMob implements com.antcolonies.sa
     @Override
     public void tick() {
         super.tick();
+        chain.place();
         if (!isVehicle()) {
             heldY = Double.NaN;
         }
@@ -2576,15 +2597,21 @@ public class CrocodileEntity extends PathfinderMob implements com.antcolonies.sa
         return cache;
     }
 
-    /** Its drawn body's reach ahead of its position, for pushing plants aside ({@link com.antcolonies.savanna.block.LongBody}). */
     @Override
-    public double noseAhead() {
-        return JAWS_AHEAD * getScale();
+    public void setId(int id) {
+        super.setId(id);
+        if (chain != null) {                              // null while Entity's own constructor runs
+            chain.setIds(id);
+        }
     }
 
-    /** Its drawn body's reach behind its position (the tail's tip or rump). */
     @Override
-    public double tailBehind() {
-        return (7.5 - JAWS_AHEAD) * getScale();
+    public boolean isMultipartEntity() {
+        return true;
+    }
+
+    @Override
+    public net.neoforged.neoforge.entity.PartEntity<?>[] getParts() {
+        return chain.parts();
     }
 }

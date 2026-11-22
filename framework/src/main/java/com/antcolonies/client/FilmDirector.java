@@ -436,6 +436,7 @@ public final class FilmDirector {
                 waitTicks = 3;
             }
             case "fov" -> lens = Double.parseDouble(w[1]);
+            case "hitboxes" -> mc.getEntityRenderDispatcher().setRenderHitBoxes(w[1].equals("on"));   // F3+B, e.g. for body hit boxes
             case "lens" -> lens = sceneFov = Integer.parseInt(w[1]);
             case "shot" -> {
                 followWalker(mc);

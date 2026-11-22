@@ -82,7 +82,7 @@ import software.bernie.geckolib.util.GeckoLibUtil;
  * </ul>
  * Not yet: calves and breeding, hippo paths and short "hippo lawns", resting on the banks by day.
  */
-public class HippoEntity extends PathfinderMob implements com.antcolonies.savanna.block.LongBody, GeoEntity, HasLife {
+public class HippoEntity extends PathfinderMob implements GeoEntity, HasLife {
     /** What it is doing, for the clips. */
     public static final byte CALM = 0, YAWN = 1, BITE = 2, GRAZE = 3, EAR_FLICK = 4, DUNG = 5, REST = 6;
     private static final EntityDataAccessor<Byte> DATA_DOING = SynchedEntityData.defineId(HippoEntity.class, EntityDataSerializers.BYTE);
@@ -191,8 +191,19 @@ public class HippoEntity extends PathfinderMob implements com.antcolonies.savann
     private final AnimalLife life;
     private final AnimatableInstanceCache cache = GeckoLibUtil.createInstanceCache(this);
 
+    /**
+     * Its hit boxes along the drawn body ({@link com.antcolonies.animal.HitChain}, 2026-11-22; my picks measured on its
+     * model): the head with its wide muzzle (1.35 to 2.5 ahead), the front of the body and the rump: its walking box
+     * is only the middle of a body 5 blocks long, so a swing or an arrow at what you see lands.
+     */
+    private final com.antcolonies.animal.HitChain chain = new com.antcolonies.animal.HitChain(this,
+            new com.antcolonies.animal.HitChain.Link("front", 1.3, 0.2, 1.6F, 1.5F),
+            new com.antcolonies.animal.HitChain.Link("head", 1.95, 0.7, 1.2F, 1.1F),
+            new com.antcolonies.animal.HitChain.Link("rump", -1.5, 0.15, 1.7F, 1.6F));
+
     public HippoEntity(EntityType<? extends HippoEntity> type, Level level) {
         super(type, level);
+        setId(ENTITY_COUNTER.getAndAdd(chain.size() + 1) + 1);   // its hit boxes take the ids right after its own
         life = new AnimalLife(this, DATA_LIFE);
         setPathfindingMalus(PathType.WATER, 0.0F);
         setPathfindingMalus(PathType.WATER_BORDER, 0.0F);
@@ -580,6 +591,7 @@ public class HippoEntity extends PathfinderMob implements com.antcolonies.savann
     @Override
     public void tick() {
         super.tick();
+        chain.place();
         double dx = getX() - xo, dz = getZ() - zo, moved = Math.sqrt(dx * dx + dz * dz);
         if (moved > 0.004) {
             movedTick = tickCount;
@@ -1306,15 +1318,21 @@ public class HippoEntity extends PathfinderMob implements com.antcolonies.savann
         return cache;
     }
 
-    /** Its drawn body's reach ahead of its position, for pushing plants aside ({@link com.antcolonies.savanna.block.LongBody}). */
     @Override
-    public double noseAhead() {
-        return 2.5 * getScale();
+    public void setId(int id) {
+        super.setId(id);
+        if (chain != null) {                              // null while Entity's own constructor runs
+            chain.setIds(id);
+        }
     }
 
-    /** Its drawn body's reach behind its position (the tail's tip or rump). */
     @Override
-    public double tailBehind() {
-        return 2.5 * getScale();
+    public boolean isMultipartEntity() {
+        return true;
+    }
+
+    @Override
+    public net.neoforged.neoforge.entity.PartEntity<?>[] getParts() {
+        return chain.parts();
     }
 }

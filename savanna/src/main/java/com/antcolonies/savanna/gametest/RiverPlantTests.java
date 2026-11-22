@@ -154,8 +154,8 @@ public class RiverPlantTests {
 
     /**
      * A hippo pushes plants with its whole body as drawn (5 blocks nose to rump), not only its square box (1.9 across):
-     * the blocks 2 ahead of its middle and 2 behind lie under it, 2 to the side do not; a husk's is just its box (the user,
-     * 2026-11-22: "the hippo is also missing the ones it should hit").
+     * the blocks 2 ahead of its middle and 2 behind lie under its body's hit boxes, 2 to the side and past its nose do not;
+     * a husk's is just its box (the user, 2026-11-22: "the hippo is also missing the ones it should hit").
      */
     @GameTest(template = "arena", timeoutTicks = 20)
     public static void aHippoPushesPlantsWithItsWholeBodyNotOnlyItsBox(GameTestHelper helper) {
@@ -164,21 +164,62 @@ public class RiverPlantTests {
                 helper.setBlock(new BlockPos(x, 1, z), Blocks.STONE);
             }
         }
+        ServerLevel level = helper.getLevel();
         net.minecraft.world.entity.Mob hippo = helper.spawnWithNoFreeWill(com.antcolonies.savanna.registry.SavannaEntities.HIPPO.get(), 10.5F, 2, 10.5F);
         hippo.setYRot(-90);                                   // facing +x
         hippo.setYBodyRot(-90);
-        com.antcolonies.savanna.block.PlantPush.Footprint f = com.antcolonies.savanna.block.PlantPush.footprint(hippo);
-        BlockPos mid = helper.absolutePos(new BlockPos(10, 2, 10));
-        double size = hippo.getScale();
-        helper.assertTrue(f.overlaps(mid.getX() + (int) Math.floor(2 * size), mid.getZ()), "the block at its nose should lie under it");
-        helper.assertTrue(f.overlaps(mid.getX() - (int) Math.floor(2 * size), mid.getZ()), "the block at its rump should lie under it");
-        helper.assertFalse(f.overlaps(mid.getX(), mid.getZ() + 2), "a block 2 to its side should not");
-        helper.assertFalse(f.overlaps(mid.getX() + (int) Math.ceil(2.5 * size) + 1, mid.getZ()), "a block past its nose should not");
         net.minecraft.world.entity.Mob husk = helper.spawnWithNoFreeWill(net.minecraft.world.entity.EntityType.HUSK, 15.5F, 2, 15.5F);
-        com.antcolonies.savanna.block.PlantPush.Footprint h = com.antcolonies.savanna.block.PlantPush.footprint(husk);
-        BlockPos at = helper.absolutePos(new BlockPos(15, 2, 15));
-        helper.assertTrue(h.overlaps(at.getX(), at.getZ()) && !h.overlaps(at.getX() + 1, at.getZ()), "a husk should touch only its own block");
-        helper.succeed();
+        helper.runAtTickTime(3, () -> {                       // its body's boxes are set on its tick
+            BlockPos mid = helper.absolutePos(new BlockPos(10, 2, 10));
+            double size = hippo.getScale();
+            java.util.function.Predicate<BlockPos> under = pos -> com.antcolonies.savanna.block.PlantPush.touched(level, new net.minecraft.world.phys.AABB(pos));
+            helper.assertTrue(under.test(mid.offset((int) Math.floor(2 * size), 0, 0)), "the block at its nose should lie under it");
+            helper.assertTrue(under.test(mid.offset(-(int) Math.floor(2 * size), 0, 0)), "the block at its rump should lie under it");
+            helper.assertFalse(under.test(mid.offset(0, 0, 2)), "a block 2 to its side should not");
+            helper.assertFalse(under.test(mid.offset((int) Math.ceil(2.6 * size) + 1, 0, 0)), "a block past its nose should not");
+            BlockPos at = helper.absolutePos(new BlockPos(15, 2, 15));
+            helper.assertTrue(under.test(at) && !under.test(at.east()), "a husk should touch only its own block");
+            helper.succeed();
+        });
+    }
+
+    /**
+     * A long animal's body hit boxes (2026-11-22, the user: "my hits aren't really that accurate, is there no way to sculpt
+     * a hit box cleverly"): its boxes take the ids right after its own and the level finds them by id (so a player's swing
+     * at one reaches the server), they lie along its body as it faces, and a hit on one (a crocodile's head, its tail's
+     * tip) hurts the animal.
+     */
+    @GameTest(template = "arena", timeoutTicks = 20)
+    public static void hitsOnALongAnimalsBodyLandOnIt(GameTestHelper helper) {
+        for (int x = 2; x <= 20; x++) {
+            for (int z = 2; z <= 20; z++) {
+                helper.setBlock(new BlockPos(x, 1, z), Blocks.STONE);
+            }
+        }
+        ServerLevel level = helper.getLevel();
+        net.minecraft.world.entity.Mob croc = helper.spawnWithNoFreeWill(com.antcolonies.savanna.registry.SavannaEntities.CROCODILE.get(), 10.5F, 2, 10.5F);
+        croc.setYRot(0);                                      // facing +z
+        croc.setYBodyRot(0);
+        helper.runAtTickTime(3, () -> {
+            net.neoforged.neoforge.entity.PartEntity<?>[] parts = croc.getParts();
+            helper.assertTrue(croc.isMultipartEntity() && parts != null && parts.length > 2, "a crocodile should have body hit boxes");
+            for (int i = 0; i < parts.length; i++) {
+                helper.assertTrue(parts[i].getId() == croc.getId() + i + 1, "its boxes should take the ids after its own");
+                helper.assertTrue(level.getEntityOrPart(parts[i].getId()) == parts[i], "the level should find box " + i + " by its id");
+            }
+            net.minecraft.world.entity.Entity head = parts[0], tip = parts[parts.length - 1];
+            double size = croc.getScale();
+            helper.assertTrue(head.getZ() - croc.getZ() > 2 * size, "its first box should lie on its snout, 2 to 2.8 ahead, was " + (head.getZ() - croc.getZ()));
+            helper.assertTrue(croc.getZ() - tip.getZ() > 4 * size, "its last tail box should lie near its tail's tip, 4.7 behind, was " + (croc.getZ() - tip.getZ()));
+            helper.assertTrue(Math.abs(tip.getX() - croc.getX()) < 0.01, "its tail should lie straight behind it");
+            helper.assertTrue(level.getEntities((net.minecraft.world.entity.Entity) null, tip.getBoundingBox()).contains(tip),
+                    "a swing or an arrow at the tail's tip should find the box there");
+            helper.assertTrue(level.getEntities(croc.getType(), croc.getBoundingBox().inflate(8), e -> true).size() == 1,
+                    "a search by the crocodile's type should find it once, never its body's boxes (they have their own type)");
+            float before = croc.getHealth();
+            helper.assertTrue(tip.hurt(level.damageSources().generic(), 3) && croc.getHealth() < before, "a hit on the tail's tip should hurt the crocodile");
+            helper.succeed();
+        });
     }
 
     /**
