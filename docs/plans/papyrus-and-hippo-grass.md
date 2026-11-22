@@ -69,6 +69,23 @@ higher and shaggier, short blades sticking up through it), and a rooted clump at
 - **Hippos nibble it** (my pick, fun): a hippo in the water at night eats a mat now and then; it grows back with the
   cycle.
 
+**Who eats the new plants** (the user, 2026-11-22, "yes, add them"; the animals are fun first, inspired by real life):
+- **Living plants, eaten lightly** (only these two, so a mat is never stripped bare):
+  - **Hippo:** hippo grass mats at night and now and then a young reed shoot (above, and step 5).
+  - **Tilapia:** nibbles the young and grown hippo grass from under a mat, a bite now and then, besides its algae (some
+    real tilapia eat soft water plants). The mat loses nothing it cannot grow back in its cycle (my pick: a nibble at
+    most sets a mat back one block, never kills the clump). Nothing eats the tough reed stalks.
+- **The clean-up crew, only what is already dying** (no harm to the plants, and the dying-back stage gets a use):
+  - **Snail:** gathers on dying-back mats and scrapes reed stems (algae film and rot), as on the algae now.
+  - **Crab:** picks at dying and dead hippo grass and fallen reed bits at the edge, beside its remains and scraps.
+  - **Tadpoles** (when the bullfrog's tadpoles come): graze the stems and dying mats like the snails.
+- **Do not eat them:** catfish, crocodile, monitor, bullfrog and barb (meat or algae eaters); termites and ants (see
+  below).
+- **Later eaters, with their own animals:** the six-barred distichodus (the river's big plant-eating fish, eating hippo
+  grass and young reed shoots; the user's idea, 2026-11-22), and on land the lechwe, sitatunga, buffalo and cane rats.
+- **Using the plants, not eating them** (ideas for later steps, the user's say): small fish and baby crocodiles hiding
+  in reed beds (step 6), catfish laying eggs among flooded hippo grass, the bullfrog sitting at a reed bed's edge.
+
 ## Fits with what is there (checked)
 
 - Blocks only, no entities: no lag. Random ticks on plant blocks cost about what crops do. Placed with new land after
@@ -89,6 +106,7 @@ higher and shaggier, short blades sticking up through it), and a rooted clump at
    offline for the spacing; oxbow-thick beds only within an oxbow site's 3 by 3 chunks, the floodplain's other water at the
    river's spacing; never on or beside sand, slides or nests, tag `no_river_plants`; flight 0 stalls): beds and fringes placed as above; a game test for where they go and that they never touch a sand
    bar, slide, nest or pan; a game test for the hippo grass cycle; a flight for loading speed.
-5. **Hippos nibble hippo grass** (optional, the user's say).
+5. **Hippos nibble hippo grass** (optional, the user's say), and with it the other eaters above: tilapia nibbling mats,
+   snails and crabs on the dying ones (tadpoles when they exist); a game test that the mats always grow back.
 6. **Fish hide in the reeds** (optional, the user's say).
 7. **The user's look** in a new world.
