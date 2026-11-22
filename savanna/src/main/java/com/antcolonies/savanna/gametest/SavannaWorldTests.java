@@ -6,7 +6,7 @@ import java.util.List;
 import com.antcolonies.savanna.SavannaMod;
 import com.antcolonies.savanna.registry.SavannaBlocks;
 import com.antcolonies.savanna.worldgen.MoundPlaces;
-import com.antcolonies.savanna.worldgen.FloodplainPoolFeature;
+import com.antcolonies.savanna.worldgen.PanFeature;
 import com.antcolonies.savanna.worldgen.OxbowFeature;
 import com.antcolonies.savanna.worldgen.FloodplainTreePiece;
 import com.antcolonies.savanna.worldgen.FloodplainTreeStructure;
@@ -1670,7 +1670,7 @@ public class SavannaWorldTests {
 
     /**
      * The banks and pools as the game's own decoration makes them ({@code worldgen/RiverBankFeature},
-     * {@code worldgen/FloodplainPoolFeature}), on a river built in the arena: a plain a block over the water, the river
+     * {@code worldgen/OxbowFeature}, {@code worldgen/PanFeature}), on a river built in the arena: a plain a block over the water, the river
      * winding through it. The land test above reads only the noise; this checks the user's picks: the low strip flush with
      * the water 4 blocks back, the plain behind it untouched, silt and mud far more on the inside of the bends than the
      * outside, the bed silt, a pan and an oxbow up on the plain holding their water, and no pool beside the river.
@@ -1730,20 +1730,19 @@ public class SavannaWorldTests {
         helper.assertTrue(inner >= 2 * outer + 10, "the silt bars are not on the inside of the bends: " + report);
         helper.assertTrue(mud >= 5, "no trampled mud by the water: " + report);
         helper.assertTrue(bedSilt >= bed * 0.9, "the river bed is not silt: " + report);
-        // the pools: a pan up on the plain, an oxbow beside the river facing it (OxbowFeature, 16 to 32 across); no pan
-        // within 8 blocks of the river
+        // the pools: an oxbow beside the river facing it (OxbowFeature, 16 to 32 across); no pan beside the river (pans on
+        // open ground have their own tests, panInArena)
         RandomSource random = RandomSource.create(7);
-        boolean pan = false, oxbow = false;
-        for (int t = 0; t < 8 && !pan; t++) {
-            pan = FloodplainPoolFeature.place(level, helper.absolutePos(new BlockPos(14, plain, 14)), random, a.getY());
-        }
-        BlockPos o0 = helper.absolutePos(new BlockPos(28, 0, 1)), o1 = helper.absolutePos(new BlockPos(63, 0, 63));
+        boolean oxbow = false;
+        BlockPos o0 = helper.absolutePos(new BlockPos(20, 0, 1)), o1 = helper.absolutePos(new BlockPos(63, 0, 63));
         int[] bounds = {Math.min(o0.getX(), o1.getX()), Math.min(o0.getZ(), o1.getZ()), Math.max(o0.getX(), o1.getX()), Math.max(o0.getZ(), o1.getZ())};
         for (int t = 0; t < 16 && !oxbow; t++) {
             oxbow = OxbowFeature.lay(level, random, bounds, a.getY(), OxbowFeature.ACROSS_MIN, OxbowFeature.Age.FRESH, null) != null;
         }
-        boolean beside = FloodplainPoolFeature.place(level, helper.absolutePos(new BlockPos(30, plain, 34)), random, a.getY());
-        helper.assertTrue(pan && oxbow, "a pan (" + pan + ") or an oxbow (" + oxbow + ") did not fit on the open plain");
+        BlockPos q0 = helper.absolutePos(new BlockPos(1, 0, 1)), q1 = helper.absolutePos(new BlockPos(63, 0, 63)), byRiver = helper.absolutePos(new BlockPos(30, plain, 34));
+        int[] all = {Math.min(q0.getX(), q1.getX()), Math.min(q0.getZ(), q1.getZ()), Math.max(q0.getX(), q1.getX()), Math.max(q0.getZ(), q1.getZ())};
+        boolean beside = PanFeature.lay(level, random, byRiver.getX(), byRiver.getZ(), all, a.getY(), byRiver.getY() + 6, PanFeature.ACROSS_MIN, com.antcolonies.savanna.block.SavannaMudBlock.Tone.RED, null) != null;
+        helper.assertTrue(oxbow, "an oxbow did not fit beside the river");
         helper.assertFalse(beside, "a pool was put beside the river");
         int poolWater = poolWater(helper, plain);
         helper.assertTrue(poolWater >= 15, "the pools hold only " + poolWater + " blocks of water");
@@ -1933,6 +1932,80 @@ public class SavannaWorldTests {
                 }
             }
             helper.assertTrue(flowing == 0 && still == before, "the oxbow spilled: " + flowing + " flowing, " + still + " of " + before + " still");
+            helper.succeed();
+        });
+    }
+
+    /** Pans on the open savanna, 16 to 32 across (oxbows and pans step 4, 2026-11-22; {@code worldgen/PanFeature}). */
+    @GameTest(template = "arena", timeoutTicks = 100, batch = "savanna_pans")
+    public static void aBigPanIs3DeepOnSlopingGroundAndHolds(GameTestHelper helper) {
+        panInArena(helper, 32, 3, true);
+    }
+
+    @GameTest(template = "arena", timeoutTicks = 100, batch = "savanna_pans")
+    public static void aSmallPanIs2DeepWithItsTrampledRing(GameTestHelper helper) {
+        panInArena(helper, 16, 2, false);
+    }
+
+    /**
+     * Lays a pan of this size on open ground (sloping up 3 blocks across the arena if {@code slope}, its grass with tall
+     * grass on it) and checks the depth, a size near the one asked (a second bowl may make it longer), the wet mud shore
+     * and wallow, the bare trampled ring, the grass grazed short past it, and that its water stays put.
+     */
+    private static void panInArena(GameTestHelper helper, int across, int deepest, boolean slope) {
+        var level = helper.getLevel();
+        for (int x = 1; x < 64; x++) {
+            int top = 6 + (slope ? x * 3 / 64 : 0);
+            for (int z = 1; z < 64; z++) {
+                for (int y = 1; y <= top + 2; y++) {
+                    helper.setBlock(x, y, z, y < top ? Blocks.DIRT : y == top ? Blocks.GRASS_BLOCK : y == top + 1 ? Blocks.SHORT_GRASS : Blocks.AIR);
+                }
+            }
+        }
+        BlockPos a = helper.absolutePos(new BlockPos(1, 0, 1)), b = helper.absolutePos(new BlockPos(63, 0, 63)), mid = helper.absolutePos(new BlockPos(32, 0, 32));
+        int[] bounds = {Math.min(a.getX(), b.getX()), Math.min(a.getZ(), b.getZ()), Math.max(a.getX(), b.getX()), Math.max(a.getZ(), b.getZ())};
+        RandomSource random = RandomSource.create(across * 17L + (slope ? 1 : 0));
+        PanFeature.Laid laid = null;
+        for (int t = 0; t < 16 && laid == null; t++) {
+            laid = PanFeature.lay(level, random, mid.getX(), mid.getZ(), bounds, a.getY(), a.getY() + 16, across, com.antcolonies.savanna.block.SavannaMudBlock.Tone.GOLDEN, null);
+        }
+        helper.assertTrue(laid != null, "a pan " + across + " across did not fit: " + PanFeature.lastWhy());
+        PanFeature.Laid it = laid;
+        int minX = 99, maxX = -1, minZ = 99, maxZ = -1, sources = 0, mud = 0, trampled = 0, tufts = 0;
+        for (int x = 1; x < 64; x++) {
+            for (int z = 1; z < 64; z++) {
+                for (int y = 1; y <= 12; y++) {
+                    BlockState here = helper.getBlockState(new BlockPos(x, y, z));
+                    if (here.getFluidState().isSource()) {
+                        sources++;
+                        minX = Math.min(minX, x); maxX = Math.max(maxX, x); minZ = Math.min(minZ, z); maxZ = Math.max(maxZ, z);
+                    }
+                    mud += here.getBlock() instanceof com.antcolonies.savanna.block.SavannaMudBlock ? 1 : 0;
+                    trampled += here.is(Blocks.COARSE_DIRT) ? 1 : 0;
+                    tufts += here.is(Blocks.SHORT_GRASS) ? 1 : 0;
+                }
+            }
+        }
+        int longest = Math.max(maxX - minX, maxZ - minZ) + 1;
+        String report = String.format("pan asked %d across: %d across%s, %d deep, ring %d; water %d blocks, %d long; %d mud, %d coarse dirt, %d tufts of grass left",
+                across, it.across(), it.twoBowls() ? " (two bowls)" : "", it.deepest(), it.ring(), sources, longest, mud, trampled, tufts);
+        SavannaMod.LOGGER.info("[pans] {}", report);
+        helper.assertTrue(it.deepest() == deepest, "not the depth for its size: " + report);
+        helper.assertTrue(longest >= across * 0.75 && longest <= across * 2.2, "not near the size asked: " + report);
+        helper.assertTrue(mud >= 10 && trampled >= 10, "no wet shore or trampled ring: " + report);
+        int before = sources;
+        helper.runAfterDelay(60, () -> {
+            int still = 0, flowing = 0;
+            for (int x = 1; x < 64; x++) {
+                for (int z = 1; z < 64; z++) {
+                    for (int y = 1; y <= 12; y++) {
+                        var f = helper.getBlockState(new BlockPos(x, y, z)).getFluidState();
+                        still += f.isSource() ? 1 : 0;
+                        flowing += !f.isEmpty() && !f.isSource() ? 1 : 0;
+                    }
+                }
+            }
+            helper.assertTrue(flowing == 0 && still == before, "the pan spilled: " + flowing + " flowing, " + still + " of " + before + " still");
             helper.succeed();
         });
     }

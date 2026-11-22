@@ -54,11 +54,12 @@ public class SavannaFeatures {
     public static final DeferredHolder<Feature<?>, com.antcolonies.savanna.worldgen.QuietSavannaTreesFeature> QUIET_SAVANNA_TREES =
             FEATURES.register("quiet_savanna_trees", () -> new com.antcolonies.savanna.worldgen.QuietSavannaTreesFeature(NoneFeatureConfiguration.CODEC));
 
-    /** Oxbow lakes and pans on the floodplain (data/antcolonies/neoforge/biome_modifier/floodplain_pools.json); oxbows 16 to 32 across since 2026-11-22. */
+    /** Oxbow lakes on the floodplain, 16 to 32 across (data/antcolonies/neoforge/biome_modifier/floodplain_pools.json; 2026-11-22). */
     public static final DeferredHolder<Feature<?>, com.antcolonies.savanna.worldgen.OxbowFeature> OXBOW =
             FEATURES.register("oxbow", () -> new com.antcolonies.savanna.worldgen.OxbowFeature(NoneFeatureConfiguration.CODEC));
-    public static final DeferredHolder<Feature<?>, com.antcolonies.savanna.worldgen.FloodplainPoolFeature> PAN =
-            FEATURES.register("pan", () -> new com.antcolonies.savanna.worldgen.FloodplainPoolFeature(NoneFeatureConfiguration.CODEC));
+    /** Pans on the open savanna, 16 to 32 across (data/antcolonies/neoforge/biome_modifier/savanna_pans.json; 2026-11-22). */
+    public static final DeferredHolder<Feature<?>, com.antcolonies.savanna.worldgen.PanFeature> PAN =
+            FEATURES.register("pan", () -> new com.antcolonies.savanna.worldgen.PanFeature(NoneFeatureConfiguration.CODEC));
 
     /** Our own kinds of biome modifier. */
     public static final DeferredRegister<com.mojang.serialization.MapCodec<? extends net.neoforged.neoforge.common.world.BiomeModifier>> BIOME_MODIFIERS =

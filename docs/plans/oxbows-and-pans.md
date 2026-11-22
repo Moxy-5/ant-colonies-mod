@@ -108,6 +108,14 @@ and its loading speed, and touches the termite mound and tree surveys.
    Tests: `SavannaWorldTests` batch `savanna_oxbows` (one per age, 16, 20, 24 and 32 across) and the river banks test.
    Not yet: hippos in oxbows and the survey on real land (steps 5 and 6).
 4. **Pans in new land:** a structure; today's pan feature removed; same gate; mounds and trees kept off.
+   **Built 2026-11-22 as a feature** (`worldgen/PanFeature`, `PanSites`; 16 to 32 across, my pick to fit the 3 by 3
+   chunks; details in `docs/HISTORY.md`). Flights: 2 laid of 17 sites, too few.
+   **Next, agreed with the user 2026-11-22 ("I don't need them to be the perfect size ... it's okay if it's on a step or
+   if it's misshapen, that's the beauty of natural generation"): trim, don't refuse,** for oxbows and pans: a part that
+   would go past the chunks, into the river's bend, a tree, a log or a rock is left out (an arm ends short, the pan's
+   edge goes round it, a pan shrinks to fit) instead of the whole thing being refused; uneven ground makes a step
+   (water at the lowest, the high side a bank); kept only while most of it is left (my pick: about 60 percent), else
+   nothing. Measure again with flights.
 5. **Life in them:** algae; which animals may live there (fish and crocodiles in oxbows; pans with algae and snails,
    no catfish or crocodiles, my pick); every spawning change through the spawning check list in `CLAUDE.md`.
 6. **Check:** a survey test on real land (counts, sizes, depth, nothing in rivers or on mounds), the loading speed

@@ -2,8 +2,7 @@
   "type": "neoforge:add_features",
   "biomes": "antcolonies:savanna_floodplain",
   "features": [
-    "antcolonies:oxbow",
-    "antcolonies:pan"
+    "antcolonies:oxbow"
   ],
   "step": "lakes"
 }

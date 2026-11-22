@@ -367,32 +367,37 @@ public class MudTests {
         helper.succeed();
     }
 
-    /** A pan on the floodplain gets a wallow of soupy savanna mud at one end, kept wet by the pan's water. */
+    /** A pan gets a wallow of soupy savanna mud at one end, kept wet by the pan's water (worldgen/PanFeature, 16 across). */
     @GameTest(template = "arena", timeoutTicks = 100)
     public static void aPanHasAWallowAtOneEnd(GameTestHelper helper) {
         ServerLevel level = helper.getLevel();
         for (int x = 0; x <= 40; x++) {
             for (int z = 0; z <= 40; z++) {
                 for (int y = 0; y <= 6; y++) {
-                    helper.setBlock(new BlockPos(x, y, z), y <= 1 ? Blocks.DIRT : y == 2 ? Blocks.GRASS_BLOCK : Blocks.AIR);
+                    helper.setBlock(new BlockPos(x, y, z), y <= 3 ? Blocks.DIRT : y == 4 ? Blocks.GRASS_BLOCK : Blocks.AIR);
                 }
             }
         }
-        BlockPos middle = helper.absolutePos(new BlockPos(20, 2, 20));
-        boolean made = com.antcolonies.savanna.worldgen.FloodplainPoolFeature.place(level, middle, RandomSource.create(9), middle.getY() - 1);
-        helper.assertTrue(made, "a pan should be made on level floodplain");
-        int mud = 0, wet = 0;
+        BlockPos middle = helper.absolutePos(new BlockPos(20, 4, 20));
+        BlockPos c0 = helper.absolutePos(new BlockPos(0, 0, 0)), c1 = helper.absolutePos(new BlockPos(40, 0, 40));
+        int[] bounds = {Math.min(c0.getX(), c1.getX()), Math.min(c0.getZ(), c1.getZ()), Math.max(c0.getX(), c1.getX()), Math.max(c0.getZ(), c1.getZ())};
+        boolean made = com.antcolonies.savanna.worldgen.PanFeature.lay(level, RandomSource.create(9), middle.getX(), middle.getZ(), bounds,
+                middle.getY() - 4, middle.getY() + 6, com.antcolonies.savanna.worldgen.PanFeature.ACROSS_MIN, Tone.RED, null) != null;
+        helper.assertTrue(made, "a pan should be made on level ground: " + com.antcolonies.savanna.worldgen.PanFeature.lastWhy());
+        // the wallow (soupy mud) and the wet shore (sticky); the trampled ring's drying mud farther out is left to dry
+        int soupy = 0, mud = 0, wet = 0;
         for (int dx = -20; dx <= 20; dx++) {
             for (int dz = -20; dz <= 20; dz++) {
                 BlockPos at = middle.offset(dx, 0, dz);
                 BlockState state = level.getBlockState(at);
-                if (state.getBlock() instanceof SavannaMudBlock) {
+                if (state.getBlock() instanceof SavannaMudBlock && state.getValue(SavannaMudBlock.WETNESS) == Wetness.SOUPY) {
+                    soupy++;
                     mud++;
                     wet += SavannaMudBlock.wetted(level, at) ? 1 : 0;
                 }
             }
         }
-        helper.assertTrue(mud >= 5, "a pan should have a wallow of savanna mud at one end, " + mud + " blocks");
+        helper.assertTrue(soupy >= 3, "a pan should have a wallow of soupy savanna mud at one end, " + soupy + " blocks");
         helper.assertTrue(wet == mud, "the pan's water should keep its whole wallow wet (" + wet + " of " + mud + ")");
         helper.succeed();
     }
