@@ -1151,8 +1151,10 @@ public class MonitorEntity extends PathfinderMob implements GeoEntity, HasLife {
             water = m.isInWater() ? null : m.waterAim(16);
             if (water != null) {
                 m.getNavigation().moveTo(water.getX() + 0.5, water.getY(), water.getZ() + 0.5, 1.7);
-            } else if (m.scare != null) {
-                Vec3 away = DefaultRandomPos.getPosAway(m, 12, 4, m.scare.position());
+            } else {
+                // away from what scared it; hurt by nothing it can see (a fall, a cactus), it still bolts somewhere
+                // (BUGS 296: it stood frozen the whole 15 s it was startled)
+                Vec3 away = m.scare != null ? DefaultRandomPos.getPosAway(m, 12, 4, m.scare.position()) : DefaultRandomPos.getPos(m, 12, 4);
                 if (away != null) {
                     m.getNavigation().moveTo(away.x, away.y, away.z, 1.7);
                 }

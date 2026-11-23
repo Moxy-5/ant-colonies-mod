@@ -388,7 +388,9 @@ public class RiverLifeTests {
      * hungry one hunts a wild tilapia in the pond's deep end, strikes with its mouth open and swallows it, and is fed;
      * a tilapia from a bucket (the player's own) is left alone; it is 2 blocks long at the usual size.
      */
-    @GameTest(template = "arena", timeoutTicks = 900)
+    // (2600 ticks: a chase that fails gives up at 600 and rests 1200 before the next; with 900 a first miss failed the
+    // test, BUGS 279/298)
+    @GameTest(template = "arena", timeoutTicks = 2600)
     public static void aHungryCatfishHuntsAndSwallowsATilapia(GameTestHelper helper) {
         ServerLevel level = helper.getLevel();
         buildPond(helper);
@@ -480,7 +482,14 @@ public class RiverLifeTests {
                     scraps++;
                 }
             }
-            helper.assertTrue(scraps >= 1, "no scraps on the bed after the meal (a fish eaten leaves flecks)");
+            int inPond = 0;
+            for (BlockPos at : BlockPos.betweenClosed(helper.absolutePos(new BlockPos(X0, SURFACE - 1, Z0)), helper.absolutePos(new BlockPos(X1, TOP, Z1)))) {
+                if (level.getBlockState(at).is(com.antcolonies.savanna.registry.SavannaBlocks.SCRAPS.get())) {
+                    inPond++;
+                }
+            }
+            helper.assertTrue(scraps >= 1, "no scraps on the bed after the meal (a fish eaten leaves flecks); " + inPond
+                    + " anywhere in the pond, the catfish at " + catfish.blockPosition().subtract(helper.absolutePos(BlockPos.ZERO)));
             helper.assertTrue(wild.isRemoved() && sawStrike[0] && !catfish.isHungry(),
                     "the wild tilapia " + (wild.isRemoved() ? "is gone" : "still swims") + (sawStrike[0] ? "" : ", no strike seen")
                             + (catfish.isHungry() ? ", the catfish still hungry" : ""));
@@ -1656,7 +1665,9 @@ public class RiverLifeTests {
                     + monitor.position());
         });
         helper.succeedWhen(() -> {
-            helper.assertTrue(!Double.isNaN(landed[0]), "not hurt and landed yet");
+            helper.assertTrue(!Double.isNaN(landed[0]), "not hurt and landed yet (hurt at " + hurtAt[0] + ", on a move "
+                    + (monitor.climb() != null) + ", at " + monitor.position().subtract(net.minecraft.world.phys.Vec3.atLowerCornerOf(
+                    helper.absolutePos(BlockPos.ZERO))) + ", doing " + monitor.doing() + ", on ground " + monitor.onGround() + ")");
             double walked = Math.hypot(monitor.getX() - landed[0], monitor.getZ() - landed[2]);
             helper.assertTrue(walked > 1.0, "the monitor has not walked on since it was set down (" + String.format("%.2f", walked) + " blocks)");
         });
@@ -2079,7 +2090,8 @@ public class RiverLifeTests {
      * themselves, rear up face to face with their noses nearly touching (their middles the measured gap apart) and finish
      * it; a hungry pair beside them never plays.
      */
-    @GameTest(template = "arena", timeoutTicks = 3600)
+    // (6000 ticks: a try every 200 needs both calm, not resting or skittering; one pair first played at t3141, BUGS 299)
+    @GameTest(template = "arena", timeoutTicks = 6000)
     public static void twoFedOttersPlayABoutAHungryPairDoesNot(GameTestHelper helper) {
         otterPool(helper, MX0 + 20);
         // each pair kept within 3 blocks of one spot, so they stay in playmate reach (6): kept 5 from their own starting
@@ -2248,8 +2260,9 @@ public class RiverLifeTests {
                 }
             }
         }
-        com.antcolonies.savanna.animal.OtterEntity a = playOtter(helper, 22.5, 26.5, true, 26, 26);
-        com.antcolonies.savanna.animal.OtterEntity b = playOtter(helper, 29.5, 27.5, true, 26, 26);
+        // 5 blocks apart, inside the 6 of playmate reach (BUGS 299: 7 apart they could stand all test out of reach)
+        com.antcolonies.savanna.animal.OtterEntity a = playOtter(helper, 23.5, 26.5, true, 26, 26);
+        com.antcolonies.savanna.animal.OtterEntity b = playOtter(helper, 28.5, 27.5, true, 26, 26);
         for (com.antcolonies.savanna.animal.OtterEntity o : new com.antcolonies.savanna.animal.OtterEntity[] {a, b}) {
             o.addTag("play.now");
             o.addTag("play.rest");
@@ -2257,7 +2270,15 @@ public class RiverLifeTests {
         double nose = com.antcolonies.savanna.animal.OtterEntity.NOSE_BITE + com.antcolonies.savanna.animal.OtterEntity.NOSE_STAND;
         double beside = com.antcolonies.savanna.animal.OtterEntity.REST_BESIDE;
         double[] poke = {-1}, rest = {-1, 0, 0};             // the poke's gap; resting: the gap, their headings apart, along
+        StringBuilder trace = new StringBuilder();           // each change of either's doing or bout stage, for the failure
+        String[] lastState = {""};
         helper.onEachTick(() -> {
+            String state = a.doing() + "/" + b.doing() + " " + a.boutStage();
+            if (!state.equals(lastState[0]) && trace.length() < 2500 && (poke[0] < 0 || !a.inBout())) {
+                trace.append(" t").append(helper.getTick()).append(' ').append(state).append(String.format(" %.2f yaw %d/%d", a.distanceTo(b),
+                        (int) a.getYRot(), (int) b.getYRot()));
+                lastState[0] = state;
+            }
             byte bite = com.antcolonies.savanna.animal.OtterEntity.BITE, lie = com.antcolonies.savanna.animal.OtterEntity.REST;
             if (poke[0] < 0 && a.inBout() && b.inBout() && (a.doing() == bite || b.doing() == bite)) {
                 poke[0] = a.position().subtract(b.position()).horizontalDistance();
@@ -2271,13 +2292,14 @@ public class RiverLifeTests {
             }
         });
         helper.succeedWhen(() -> {
-            helper.assertTrue(poke[0] >= 0, "they never poked noses");
-            helper.assertTrue(rest[0] >= 0, "they never lay down together after the bout");
+            helper.assertTrue(poke[0] >= 0, "they never poked noses:" + trace);
+            helper.assertTrue(rest[0] >= 0, "they never lay down together after the bout:" + trace);
             SavannaMod.LOGGER.info("[otter spacing] the poke {} apart (noses touch at {}); resting {} apart (flank to flank {}), "
                     + "{} degrees apart, {} along", String.format("%.2f", poke[0]), String.format("%.2f", nose),
                     String.format("%.2f", rest[0]), String.format("%.2f", beside), (int) rest[1], String.format("%.2f", rest[2]));
             helper.assertTrue(Math.abs(poke[0] - nose) < 0.3, "at the poke their middles stood " + poke[0] + " apart, not " + nose);
-            helper.assertTrue(rest[0] > beside - 0.15 && rest[0] < beside + 0.4, "resting their middles lay " + rest[0] + " apart, not about " + beside);
+            helper.assertTrue(rest[0] > beside - 0.15 && rest[0] < beside + 0.4, "resting their middles lay " + rest[0] + " apart, not about " + beside
+                    + ":" + trace);
             helper.assertTrue(rest[1] < 25.0, "resting they faced " + rest[1] + " degrees apart, not the same way");
             helper.assertTrue(rest[2] < 0.5, "resting one lay " + rest[2] + " ahead of the other, not flank to flank");
         });
@@ -3310,6 +3332,30 @@ public class RiverLifeTests {
             helper.assertTrue(barb.isRemoved() && !croc.isHungry(),
                     "the barb " + (barb.isRemoved() ? "is gone" : "still swims " + String.format("%.1f", barb.distanceTo(croc)) + " blocks off")
                             + (croc.isHungry() ? ", the hatchling still hungry" : ""));
+        });
+    }
+
+    /**
+     * The river tie-up (2026-11-23): a hungry teen crocodile takes a bullfrog in the water (frogs are a big share of young
+     * crocodiles' food; teens hunted fish only before). The frog is held still: the hunt is under test, not its escape.
+     */
+    @GameTest(template = "arena", timeoutTicks = 900)
+    public static void aTeenCrocodileTakesABullfrogInTheWater(GameTestHelper helper) {
+        buildPond(helper);
+        var croc = helper.spawn(SavannaEntities.CROCODILE.get(), new BlockPos(X1 - 2, TOP - 1, Z0 + 2));
+        croc.life().setUp(true, croc.getRandom());
+        croc.life().setAge(croc.life().numbers().youngTicks());
+        croc.load(croc.saveWithoutId(new net.minecraft.nbt.CompoundTag()));       // its size and pace as it loads
+        croc.setPersistenceRequired();
+        croc.makeHungry();
+        croc.strikeLuck = 1;
+        com.antcolonies.savanna.animal.BullfrogEntity frog = helper.spawn(SavannaEntities.BULLFROG.get(), new BlockPos(X1 - 2, TOP, Z1 - 2));
+        frog.setNoAi(true);
+        frog.setPersistenceRequired();
+        helper.succeedWhen(() -> {
+            helper.assertTrue(croc.life().stage() == com.antcolonies.animal.LifeStage.TEEN, "the crocodile is a " + croc.life().stage() + ", not a teen");
+            helper.assertTrue(!frog.isAlive() && !croc.isHungry(), "the frog " + (frog.isAlive() ? "still lives " + String.format("%.1f", frog.distanceTo(croc))
+                    + " blocks off, in water " + frog.isInWater() : "is gone") + (croc.isHungry() ? ", the teen still hungry" : ""));
         });
     }
 

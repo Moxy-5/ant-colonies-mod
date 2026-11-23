@@ -2407,8 +2407,10 @@ public class CrocodileEntity extends PathfinderMob implements GeoEntity, HasLife
         if (croc.life().isYoung()) {
             return false;           // a hatchling hunts barbs only
         }
-        if (!croc.life().stage().grown() && !isFish(e)) {
-            return false;           // a teen hunts fish only (animal life cycle step 4)
+        if (!croc.life().stage().grown()) {
+            // a teen hunts fish (animal life cycle step 4) and bullfrogs in the water (2026-11-23, the river tie-up: frogs
+            // are a big share of young crocodiles' food); a hatchling (above) is too small for a grown frog
+            return e.isInWater() && (isFish(e) || e instanceof BullfrogEntity frog && !frog.hasCustomName());
         }
         if (e instanceof CrocodileEntity young) {
             // a grown crocodile eats another's hatchlings in the water (real crocodiles do; their mother guards them)

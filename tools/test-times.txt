@@ -178,6 +178,7 @@ ayoungonegrowsupintothenumberswhennomorerealonesarewanted 0.45
 barbsspawnintheshallowsbythemselves 0.00
 bigsavannashavetheagreedsizeandrarity 1.72
 bonemealgrowslittletreesbutnotpastyoung 0.00
+breakingacrocodilenestscapshowstheeggsorletsthehatchlingsout 0.00
 breakinsarebreachesfeltonlynearthem 0.25
 bullfrogsspawnattheshallowsbythemselves 0.00
 bullsharksspawnindeepriverwaterbythemselves 0.01

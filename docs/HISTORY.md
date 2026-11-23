@@ -1136,6 +1136,24 @@ Moved here from CLAUDE.md on 2026-10-13 (it was loaded into every chat and took 
   the legs (coverage 3 on). Pictures: `tools/particle_textures.py` (four mist wisps, two square prints). Film:
   `tools/film/blood_mist_prints.film` (note: the film camera's particle setting is Minimal, which drops the mist, as it
   drops any particle not forced; set `particles:0` in `run-film/options.txt` to film it).
+- 2026-11-23, **the river tie-up begins** (the user: "I am now happy with the river, let's tie up the rest of the animal
+  behaviour I have missed before going land animals"; the list in `docs/plans/river-tie-up.md`). Step 1, what is broken
+  now: (1) **Otters lie down flank to flank and rear at the right gap** (BUGS 299): the keep-out-of-bodies push
+  (`OtterEntity.keepApart`) shoved the playmate stepping in to its rearing spot back (they reared 2.0 to 2.2 apart for
+  1.69) and the one walking to lie beside the other off its flank (it ran out of its 3 seconds 1.5 blocks short and lay
+  crosswise); now the push is off between two otters in a bout's face-to-face part (`Bout.faceToFace`: stepping in, the
+  poke, stepping to the gap, rearing, dropping) and between a settling otter and the one it lies beside (`restWith`).
+  Measured after: rearing 1.70 to 1.82, resting 0.99 to 1.13 apart facing the same way. The spacing test now starts the
+  pair 5 apart (7 was past the 6 of playmate reach), the bout test has 6000 ticks (one pair first played at t3141).
+  (2) **A monitor hurt by nothing it can see bolts** (BUGS 296): with no water near and no one to run from, its flight
+  had nowhere to go and it stood frozen the 15 s it was startled; now it runs 12 blocks any way (`FleeGoal.run`). (3)
+  **Every fish eaten leaves flecks, even at the surface** (BUGS 279, 298): `ScrapsBlock.leave` gave up when the mouth was
+  above the water (a catch at the top) or algae covered the bed under it and its four sides; now it starts from the
+  nearest water beside the spot (a mouth above the water, or inside the wall at a catch against it) and tries the corners too. The
+  catfish swallow test has 2600 ticks (a missed chase gives up at 600 and rests 1200). Step 2 begun: **teen crocodiles
+  eat bullfrogs** in the water as well as fish (`CrocodileEntity.isPrey`; hatchlings keep to barbs), test
+  `aTeenCrocodileTakesABullfrogInTheWater`. Catfish eating frogs tried twice and dropped (my pick, the two-strikes rule:
+  a floating frog sits above a fish's reach and hops out; `docs/plans/river-tie-up.md`).
 
 ## Handover notes for a code reviewer (written at the end of a very long session)
 - State: branch `master`, all committed, `./gradlew build` passes, `./gradlew runGameTestServer` passes 47 tests (about 8 minutes, in one world, tests run in parallel arena grids). Some tests are timing-sensitive under load (`antsOnBumpyGroundReachTheFoodStore` and `aStarvingWorkerSlowsDownAndDies` have each failed once and passed on a re-run): re-run before blaming a change.

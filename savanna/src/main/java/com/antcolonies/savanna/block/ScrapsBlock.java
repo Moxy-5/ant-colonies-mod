@@ -155,8 +155,8 @@ public class ScrapsBlock extends BushBlock implements LiquidBlockContainer {
      */
     @Nullable
     public static BlockPos leave(ServerLevel level, Vec3 at) {
-        BlockPos pos = BlockPos.containing(at);
-        if (!level.getFluidState(pos).is(FluidTags.WATER)) {
+        BlockPos pos = nearestWater(level, at);
+        if (pos == null) {
             return null;
         }
         level.sendParticles(new ItemParticleOption(ParticleTypes.ITEM, new ItemStack(Items.BONE_MEAL)), at.x, at.y, at.z,
@@ -175,7 +175,36 @@ public class ScrapsBlock extends BushBlock implements LiquidBlockContainer {
                 return pos.relative(side);
             }
         }
+        for (Direction side : Direction.Plane.HORIZONTAL.shuffledCopy(level.getRandom())) {   // (algae all round: the corners)
+            BlockPos corner = pos.relative(side).relative(side.getClockWise());
+            if (place(level, corner, fresh)) {
+                return corner;
+            }
+        }
         return null;
+    }
+
+    /**
+     * The water the flecks start sinking from: the block at the spot, or else the nearest water in the block under it or
+     * round either (BUGS 279/298: a catch at the top of the water has the mouth poking out, and one against a wall has it
+     * inside the stone, and both left nothing); null with no water that near.
+     */
+    @Nullable
+    private static BlockPos nearestWater(ServerLevel level, Vec3 at) {
+        BlockPos pos = BlockPos.containing(at);
+        if (level.getFluidState(pos).is(FluidTags.WATER)) {
+            return pos;
+        }
+        BlockPos best = null;
+        double bestD = Double.MAX_VALUE;
+        for (BlockPos p : BlockPos.betweenClosed(pos.offset(-1, -1, -1), pos.offset(1, 0, 1))) {
+            double d = Vec3.atCenterOf(p).distanceToSqr(at);
+            if (d < bestD && level.getFluidState(p).is(FluidTags.WATER)) {
+                best = p.immutable();
+                bestD = d;
+            }
+        }
+        return best;
     }
 
     private static boolean place(ServerLevel level, BlockPos pos, BlockState fresh) {

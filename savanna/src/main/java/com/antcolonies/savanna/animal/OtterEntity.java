@@ -246,6 +246,12 @@ public class OtterEntity extends PathfinderMob implements GeoEntity, HasLife {
     @Nullable
     Vec3 restBeside;
     float restYaw;
+    /**
+     * The playmate it lies down beside, from the bout's end until it is down: it does not keep out of that one's body
+     * on the way (BUGS 299: pushed off the lying one's flank, it ran out of time 1.5 blocks short and lay crosswise).
+     */
+    @Nullable
+    OtterEntity restWith;
     /** When it may porpoise next in a swimming chase (a game tick). */
     int porpoiseAt;
     /** Ticks under water this dive, and ticks before it may dive again. */
@@ -467,6 +473,11 @@ public class OtterEntity extends PathfinderMob implements GeoEntity, HasLife {
         return bout != null;
     }
 
+    /** Its bout's stage now, or "none" (for tests' traces). */
+    public String boutStage() {
+        return bout == null ? "none" : bout.stage.name();
+    }
+
     /** Full now (for tests and the film camera), as after a meal. */
     public void makeFed() {
         hungryIn = FULL_TICKS;
@@ -585,7 +596,8 @@ public class OtterEntity extends PathfinderMob implements GeoEntity, HasLife {
         double ax = 0.0, az = 0.0;
         for (OtterEntity o : level().getEntitiesOfClass(OtterEntity.class, getBoundingBox().inflate(3.0 * getScale()),
                 o -> o != this && o.isAlive() && !o.isPassenger() && !o.isVehicle())) {
-            if (bout != null && bout == o.bout && (touching(doing()) || touching(o.doing())) || Math.abs(o.getY() - getY()) > 1.0) {
+            if (bout != null && bout == o.bout && (bout.faceToFace() || touching(doing()) || touching(o.doing())) || o == restWith
+                    || Math.abs(o.getY() - getY()) > 1.0) {
                 continue;
             }
             double share = o.doing() == REST ? 1.0 : 0.5;          // a resting one does not give way: this one does all of it
@@ -1734,6 +1746,7 @@ public class OtterEntity extends PathfinderMob implements GeoEntity, HasLife {
                 otter.getMoveControl().setWantedPosition(settleTo.x, settleTo.y, settleTo.z, STROLL);
                 otter.straightFor = 60;
             } else {
+                otter.restWith = null;
                 otter.setDoing(REST);
             }
         }
@@ -1778,6 +1791,7 @@ public class OtterEntity extends PathfinderMob implements GeoEntity, HasLife {
 
         @Override
         public void stop() {
+            otter.restWith = null;
             if (otter.doing() == REST) {
                 otter.setDoing(REST_UP);
             }
@@ -1841,6 +1855,16 @@ public class OtterEntity extends PathfinderMob implements GeoEntity, HasLife {
 
         private OtterEntity other(OtterEntity o) {
             return o == lead ? mate : lead;
+        }
+
+        /**
+         * The face-to-face part, where the bout itself sets them their measured gaps (stepping in, the poke, stepping to the
+         * rearing gap, rearing, dropping): the keep-apart push is off between them (BUGS 299: it shoved the one stepping
+         * in back, so they reared 2.1 apart for 1.7).
+         */
+        boolean faceToFace() {
+            return stage == Stage.STEP_IN || stage == Stage.POKE || stage == Stage.SPACE || stage == Stage.UP
+                    || stage == Stage.REAR || stage == Stage.DOWN;
         }
 
         /** How far apart their middles stand rearing face to face: their noses nearly touch. */
@@ -2352,6 +2376,7 @@ public class OtterEntity extends PathfinderMob implements GeoEntity, HasLife {
                 // they rest together, flank to flank the same way round (as real otters do), not one inside the other
                 mate.restBeside = besideSpot(lead, mate);
                 mate.restYaw = lead.getYRot();
+                mate.restWith = lead;
                 if (mate.restBeside == null) {
                     mate.restNext = 0;
                 }
