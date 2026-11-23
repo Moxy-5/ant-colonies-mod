@@ -1054,6 +1054,29 @@ Moved here from CLAUDE.md on 2026-10-13 (it was loaded into every chat and took 
 - **The otter's noodle bound and war dance (2026-11-23, `docs/plans/otter-play-and-fish.md` 6f):** `bound` remade (0.40 s, made for 2.5 b/s, a hump of the whole back, steady head, whip tail; `_bound_pose` in `tools/otter_models.py`) and `play_bound` (bouncier, a real hop; played when the mood is playful); `BOUND_CLIP_SPEED` 2.5 b/s, clip speed floor 0.6 -> 0.7. `side_hop_left`/`side_hop_right`, the weasel war dance (`OtterEntity.SIDE_L`/`SIDE_R`, carried 0.7 blocks sideways on ticks 3 to 7, `startDance`/`dancing`): before the nose poke of a bout, and at one skitter stop in three when playful. Body plan: `walks` bound 40 px/s, new switches. The dance holds its heading (Minecraft turns a moving mob toward its motion; `hopYaw` on the server, the body set to the head's yaw on the client); a tag `dance.now` makes an otter dance every 2 s for films. Films `otter_bound_frames`, `otter_bound_live`, `otter_dance_frames`, `otter_dance_live` (speed checked live against fence posts: about 2.4 strides a second at 2.5 b/s, a block a stride). Found: BUGS 295 (stepped films double the clip clock).
 - **2026-11-23, breaking a crocodile nest's cap reveals the eggs or hatchlings (the user: "when the crocodile nests cap breaks or is broken by the player it doesnt just fully break it and actually reveals the baby alligators or eggs underneath").** `block/CrocodileNestBlock.onDestroyedByPlayer`: a covered nest goes to open (the pit with the eggs drawn, eggs kept, a sand scrape heard) and the block stays; eggs calling (`CHIRPS` over 0) hatch at once through `letOut` (no mother named, as when they dig themselves out; only as many as the local limit has room for); an open pit with quiet eggs breaks as before. `onBlockExploded` does the same for explosions (my pick). The mother's own goal already re-covers an open nest and guards it. Test: `AnimalLifeTests.breakingACrocodileNestsCapShowsTheEggsOrLetsTheHatchlingsOut` (life).
 
+- **Otter chase and tag in the game (2026-11-23, `docs/plans/otter-play-and-fish.md` 6e step 4 and 6g):** in `OtterEntity.Bout`,
+  after the first rearing round on land or in the shallows, half the time (always with the tag `play.tag`) they play tag
+  (`game`, stages `NIP`, `RUN`, `CATCH`, `POUNCE`): a nip, the runner hops round and zigzags off in leaps (`ZIG_L`/`ZIG_R`,
+  the new clips `zig_left`/`zig_right`, 0.4 s, made in `tools/otter_models.py` `_zig_pose`: one big flung play bound,
+  leaning and bent into a C toward its side, the tail a rudder) carried `ZIG_GO` 2.2 on and `ZIG_SIDE` 0.9 aside a leap
+  (about 6 b/s along its path, the user's number) along an S of bends 5 to 8 blocks apart within `RUN_ROOM` 10 of where
+  the game began (`pickWay`, `leap`, `carry`, on `footing`); the chaser waits `CHASE_WAIT` 16 ticks then runs straight at
+  it at 5.5 b/s rising to 6.0 over 4 s and 6.5 over 4 more (the user's ramp; `chasing`, `speedFor`: Minecraft squares a
+  land mob's speed setting, b/s = (attribute x setting)^2 / 0.454 x 20); after 2.5 s with the chaser close the runner
+  skid-stops, the chaser pounces (`POUNCE`, the `pounce_tag` clip, carried onto the spot `POUNCE_BEHIND` 1.31 behind the
+  runner's middle), the runner hops out from under turning round (`hopTick`), the tagger runs; 3 to 6 tags. The swimming
+  chase in deep water porpoises every 1.5 to 3 s (`PORPOISE`, splashes out and in, `porpoiseSplash`). Where they meet:
+  the poke stands their middles `NOSE_BITE` + `NOSE_STAND` (2.83 blocks, measured on the clips) apart (`stepIn`); resting
+  after a bout (a third of the time, always with `play.rest`) the mate lies flank to flank beside the lead, `REST_BESIDE`
+  0.9 (`besideSpot`, `RestGoal` settles first); and `keepApart`: otters' bodies (the middle and the head and rump beads of
+  the `HitChain`, as circles) ease apart where they overlap, both stepping out of the line of the one going, except when
+  touching on purpose in a bout or resting. Tests (`river`): `playingOttersChaseAndTagEachOtherOnTheBank` (first try: leaping
+  6.16 b/s, chaser best 6.36, 0 leaps to the wrong side, nip reach 1.30 to 1.42), `playingOttersPorpoiseInADeepPool`,
+  `playingOttersTouchNosesAndRestSideBySideWithoutOverlapping` (poke 2.78, resting 0.87 apart, 0 degrees),
+  `anOtterWalkingThroughAnotherGoesRoundItsBody` (deepest 0.21, was 0.55). Films `otter_zig_frames` (frozen, three sides),
+  `otter_tag_live` (live, a camera riding with the otter named film-walker). Fixed on the way: BUGS 297. The user, 2026-11-23:
+  "the play chase is absolutely perfect".
+
 ## Handover notes for a code reviewer (written at the end of a very long session)
 - State: branch `master`, all committed, `./gradlew build` passes, `./gradlew runGameTestServer` passes 47 tests (about 8 minutes, in one world, tests run in parallel arena grids). Some tests are timing-sensitive under load (`antsOnBumpyGroundReachTheFoodStore` and `aStarvingWorkerSlowsDownAndDies` have each failed once and passed on a re-run): re-run before blaming a change.
 - Confirmed in-game by the user so far: everything up to and including dead ants and the refuse chamber, rich bread, worker hunger, colony starvation, and the hill-jam fix. Older bullets in "Current status" that still say "waiting for the user to confirm" are probably stale (the user tested them and reported no problems), but this was never written down: do not rely on those flags.

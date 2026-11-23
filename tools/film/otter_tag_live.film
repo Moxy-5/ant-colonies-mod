@@ -1,0 +1,37 @@
+# Chase and tag in the game, filmed LIVE (2026-11-23, docs/plans/otter-play-and-fish.md 6e step 4 and 6g; live because
+# the stepped films run the clip clock double, BUGS 295). Two fed otters on grass, tagged play.now and play.tag (they
+# start a bout at once and pick tag after the first rearing round): the nose poke (noses just touching), one nips the
+# other, hops round and zigzags off in leaps at 6 blocks a second, the other chases straight at it from 5.5 rising to
+# 6.5, the runner skid-stops, the chaser pounces paws onto its rump, the runner hops out from under turning round, and
+# the tagger runs. One otter is named film-walker: the camera rides along with it, 7 up and 7 behind to the north,
+# looking south and down, a picture a tick. Then two in a pool 3 deep: the swimming chase, porpoising, from the side.
+#   ./gradlew runFilm -PfilmScene=tools/film/otter_tag_live.film   pictures in run-film/screenshots/otter_tag_live/
+cmd time set noon
+cmd weather clear
+cmd kill @e[type=!player]
+cmd fill 0 -61 -20 60 -50 60 minecraft:air
+cmd fill 0 -64 -20 60 -62 60 minecraft:dirt
+cmd fill 0 -61 -20 60 -61 60 minecraft:grass_block
+lens 50
+wait 40
+cmd tick unfreeze
+cmd summon antcolonies:otter 28.5 -60 20.5 {PersistenceRequired:1b,Rotation:[-90f,0f],OwnSize:1.0f,HungryIn:6000,Tags:["play.now","play.tag","play.rest"],CustomName:'"film-walker"'}
+cmd summon antcolonies:otter 33.5 -60 20.5 {PersistenceRequired:1b,Rotation:[90f,0f],OwnSize:1.0f,HungryIn:6000,Tags:["play.tag"]}
+follow 0 8 -8 0 42
+repeat 700
+shot land_{i}
+wait 1
+end
+follow off
+cmd kill @e[type=antcolonies:otter]
+cmd fill 8 -64 12 32 -62 24 minecraft:water
+cmd fill 8 -61 12 32 -61 24 minecraft:air
+wait 20
+cmd summon antcolonies:otter 17.5 -62.2 17.5 {PersistenceRequired:1b,Rotation:[-90f,0f],OwnSize:1.0f,HungryIn:6000,Tags:["play.now"]}
+cmd summon antcolonies:otter 20.5 -62.2 17.5 {PersistenceRequired:1b,Rotation:[90f,0f],OwnSize:1.0f,HungryIn:6000}
+camera 20.0 -59.6 8.0 0 14
+repeat 300
+shot pool_{i}
+wait 1
+end
+cmd kill @e[type=antcolonies:otter]

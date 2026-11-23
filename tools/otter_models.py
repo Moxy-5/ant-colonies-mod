@@ -1204,6 +1204,78 @@ def _bound_pose(t, k=0.0):
     return p
 
 
+# --- ZIG_LEFT and ZIG_RIGHT (0.40 s each: the zigzag leaps of the play chase; plan otter-play-and-fish.md 6g) ----------
+# The user, 2026-11-23: "the otter leaping while skedaddling side to side, like jump left then right while running".
+# Real weasels and otters at play run in a crazy zigzag, each bound flung off to one side and the next to the other. One
+# clip is one big flung bound of the play bound: brief footfalls (front, then hind landing right behind them with the
+# back humped), a hard push and a long flight (over half the stride). Through it the body leans into the side it goes,
+# bends into a C toward it (the hind end swinging out the other way), the head looks ahead and the tail swings out
+# behind like a rudder. The game carries it ZIG_GO on and to the side over the whole clip at an even pace (its heading
+# stays on the run's line), so the planted feet are made for that pace: ZIG_SPEED px a second. The two clips end where
+# they start (the front feet landing, nothing to the side), so left, right, left strings on with no seam. Numbers my
+# picks, judged on the strips.
+ZIG_LEN = 0.40
+ZIG_GO = (2.2, 0.9)            # blocks on and to the side a leap, at size 1 (6 blocks a second along its path)
+ZIG_SPEED = ZIG_GO[0] * 16.0 / ZIG_LEN
+ZIG_FEET = {   # foot: (lands at u, planted share, middle of its stance z px, reach past its landing px)
+    "leg_fl": (0.00, 0.14, -10.8, 2.2), "leg_fr": (0.05, 0.14, -10.8, 2.2),
+    "leg_bl": (0.28, 0.14, 5.0, 0.0), "leg_br": (0.31, 0.14, 5.0, 0.0),
+}
+ZIG_HUMP = 0.30                # the back humped as the hind feet land
+
+
+def _zig_pose(t, side):
+    """side +1: flung to its left (+x, as the side hop), -1: to its right."""
+    L = ZIG_LEN
+    u = (t % L) / L
+    w = 2.0 * math.pi * (u - ZIG_HUMP)
+    A, P = math.cos(w), math.sin(w)
+    lift = ZIG_FEET["leg_br"][0] + ZIG_FEET["leg_br"][1] - 0.06
+    f = (u - lift) / (0.97 - lift)
+    fl = math.sin(math.pi * f) ** 2 if 0.0 < f < 1.0 else 0.0      # the flight: from the push to the front feet down
+    s = math.sin(math.pi * u)                                       # the fling to the side, nothing at either end
+    bend = A if A > 0.0 else 0.3 * A
+    up = 1.3 * bend
+    hop = 7.0                                                       # a real leap: the body well up, feet off the grass
+    p = {
+        "body":  {"position": [0.0, -0.3 + 1.6 * up + hop * fl, 0.0],       # (a touch higher: the leaning chest off the grass)
+                  "rotation": [-6.5 * P, 0.0, side * 14.0 * s]},    # leaning into the side it goes
+        "hips":  {"rotation": [-20.0 * up, side * 17.0 * s, 0.0]},  # the C: the hind end swung out the other way
+        "rump":  {"rotation": [-8.0 * up, side * 7.0 * s, 0.0]},
+        "waist": {"rotation": [12.0 * bend, -side * 12.0 * s, 0.0]},
+        "ribs":  {"rotation": [10.0 * bend, -side * 8.0 * s, 0.0]},
+        "chest": {"rotation": [-2.0 * bend, 0.0, 0.0]},
+        "neck":  {"rotation": [0.0, side * 7.0 * s, 0.0]},
+        "head":  {"rotation": [0.0, 0.0, 0.0]},
+        "jaw":   {"rotation": [16.0 + 3.0 * fl, 0.0, 0.0]},
+        "tongue": {"rotation": [-4.0, 0.0, 0.0]},
+    }
+    if "y" not in _HEAD_REST:
+        _HEAD_REST["y"] = _fk_bone(_idle_pose(0.0), "head")[0][1]
+    _steady_head(p, _HEAD_REST["y"] - 0.8 + 0.35 * 1.6 * up + 0.75 * hop * fl, 2.0)
+    _add_rot(p, "head", [0.0, side * 4.0 * s, -side * 8.0 * s])     # looking ahead, level against the lean
+    _set_lids(p, 0.0)
+    _set_whiskers(p, 4.0, 4.0)
+    _set_ears(p, -3.0, 2.0)
+    # the tail: up off the hump, a wave a beat late, swung out behind away from the fling (the rudder)
+    _set_tail(p, lambda i: ((25.0 * up + 12.0) if i == 0 else 4.0) + (3.0 + 1.3 * i) * 1.3 * math.cos(w - 1.0 - 0.6 * i),
+              lambda i: -side * (6.0 + 4.0 * i) * math.sin(math.pi * min(1.0, max(0.0, (u - 0.05 * i) / (1.0 - 0.05 * i)))))
+    for pref, (land, duty, mid, reach) in ZIG_FEET.items():
+        front = pref in ("leg_fl", "leg_fr")
+        sw, lift_, us = _bound_step(u - land, duty)
+        stance = ZIG_SPEED * duty * L
+        tz = mid + (0.9 if front else 0.0) - 0.5 * stance * sw - reach * math.sin(math.pi * us) ** 2
+        yup = (2.6 if front else 3.4) * lift_ + (0.85 * hop * fl if lift_ > 0.0 else 0.0)
+        _solve_leg(p, pref, yup, tz, paw_world_pitch=(-16.0 if front else -26.0) * lift_, roll_z=_leg_roll(pref, -10.0))
+    return p
+
+
+def _clip_zig(side):
+    out = clip(ZIG_LEN, lambda t: _zig_pose(t, side), 24, loop=False)
+    out["timeline"] = {"0": f"stride {ZIG_SPEED:.3f}"}
+    return out
+
+
 def _clip_bound():
     out = clip(BOUND_LEN, lambda t: _bound_pose(t, 0.0), 32, loop=True)
     out["timeline"] = {"0": f"stride {BOUND_SPEED:.3f}"}
@@ -2495,6 +2567,8 @@ def clips():
         "sniff_walk":       _clip_sniff_walk(),
         "hop_turn":         _clip_hop_turn(),
         "pounce_tag":       _clip_pounce_tag(),
+        "zig_left":         _clip_zig(1.0),
+        "zig_right":        _clip_zig(-1.0),
         "porpoise":         _clip_porpoise(),
         "step_up_1000":     _clip_step_up(),
         "step_down_1000":   _clip_step_down(),

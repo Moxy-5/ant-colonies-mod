@@ -77,7 +77,8 @@ import software.bernie.geckolib.util.GeckoLibUtil;
 public class OtterEntity extends PathfinderMob implements GeoEntity, HasLife {
     /** What it is doing, for the clips. */
     public static final byte CALM = 0, SHAKE = 1, REST = 2, REST_UP = 3, FORAGE = 4, BITE = 5, EAT = 6, SKID = 7, HOP = 8,
-            PLAY_UP = 9, PLAY = 10, PLAY_DOWN = 11, GULP = 12, SIDE_L = 13, SIDE_R = 14;
+            PLAY_UP = 9, PLAY = 10, PLAY_DOWN = 11, GULP = 12, SIDE_L = 13, SIDE_R = 14, POUNCE = 15, PORPOISE = 16,
+            ZIG_L = 17, ZIG_R = 18;
     /**
      * A small fish swallowed at once ({@link HeldCatch#swallowed}; the gulp clip, on the head's own layer): it takes the
      * fish as its jaws snap shut, and the gulp is over at the end (ticks), and such a fish fills it for this part of a
@@ -93,6 +94,13 @@ public class OtterEntity extends PathfinderMob implements GeoEntity, HasLife {
     static final int PLAY_UP_TICKS = 12, PLAY_DOWN_TICKS = 12, PLAY_EVERY = 200, PLAY_AFTER = 600;
     public static final double REAR_REACH = 13.5 / 16.0;
     /**
+     * Where they meet without one body inside the other (measured on the clips, 2026-11-23, after the user saw them
+     * clip): the nose 24.3 px ahead of the middle at the bite's reach and 21.0 px standing (the nose poke stands their
+     * middles the two apart, so the noses just touch), and an otter 7.2 px to either side lying down (resting together
+     * their middles are two of those apart, flank to flank).
+     */
+    public static final double NOSE_BITE = 24.3 / 16.0, NOSE_STAND = 21.0 / 16.0, REST_BESIDE = 14.4 / 16.0;
+    /**
      * How it goes on land (the skitter, 2026-11-22; plan {@code docs/plans/otter-play-and-fish.md}, section 6b): the even
      * walk, or the quick choppy scurry and the slow nose-down sniff of its burst-and-stop wandering ({@link SkitterGoal}).
      */
@@ -107,6 +115,30 @@ public class OtterEntity extends PathfinderMob implements GeoEntity, HasLife {
      * (ticks {@link #HOP_UP} to {@link #HOP_DOWN}); a dance is 2 to 4 of them, left and right in turn. Numbers my picks.
      */
     static final double SIDE_GO = 0.7;
+    /**
+     * Chase and tag (2026-11-23; plan {@code docs/plans/otter-play-and-fish.md} 6e step 4): the pounce ({@link #POUNCE},
+     * the pounce_tag clip, 0.85 s) has its feet up on ticks {@link #POUNCE_UP} to {@link #POUNCE_DOWN} (the game carries it
+     * then), nips on tick 9 and lets go on {@link #POUNCE_LET_GO}; it lands {@link #POUNCE_BEHIND} blocks (at size 1,
+     * measured on the clip: 21 px) behind the runner's middle, its paws on the runner's rump, and springs from at most
+     * {@link #POUNCE_FROM} blocks off (a leap of about 1.3 blocks; the clip's reach 0.6 to 2). The porpoise
+     * ({@link #PORPOISE}, 1.0 s) is out of the water from tick {@link #PORPOISE_OUT} to {@link #PORPOISE_IN}, splashing at
+     * both. Numbers from the clips; the rest my picks.
+     */
+    static final int POUNCE_TICKS = 17, POUNCE_UP = 4, POUNCE_DOWN = 8, POUNCE_LET_GO = 13;
+    static final int PORPOISE_TICKS = 20, PORPOISE_OUT = 4, PORPOISE_IN = 15;
+    public static final double POUNCE_BEHIND = 21.0 / 16.0, POUNCE_FROM = 2.6;
+    /**
+     * The land chase, take two (2026-11-23, plan 6g; the user: "fast like a real chase ... leaping while skedaddling side
+     * to side"): the runner zigzags in leaps ({@link #ZIG_L}, {@link #ZIG_R}, the zig_left and zig_right clips, 0.4 s),
+     * each carried {@link #ZIG_GO} blocks on and {@link #ZIG_SIDE} aside (at size 1: about 6 blocks a second along its
+     * path, the user's speed), the aside part while its feet are up (from tick {@link #ZIG_UP}); along an S near where
+     * the game started (within {@link #RUN_ROOM} blocks), for {@link #RUN_MOST} ticks at most. The chaser waits
+     * {@link #CHASE_WAIT} ticks, then runs straight at it at {@link #CHASE_FROM} blocks a second, rising to
+     * {@link #CHASE_MID} over {@link #CHASE_RAMP} ticks and to {@link #CHASE_TOP} over as many again (the user's numbers).
+     */
+    static final int ZIG_TICKS = 8, ZIG_UP = 3, RUN_MOST = 240, CHASE_WAIT = 16, CHASE_RAMP = 80;
+    public static final double ZIG_GO = 2.2, ZIG_SIDE = 0.9, RUN_ROOM = 10.0;
+    public static final double CHASE_FROM = 5.5, CHASE_MID = 6.0, CHASE_TOP = 6.5;
     /**
      * The skitter's speeds (shares of its speed attribute; my picks, measured in {@code RiverLifeTests}: about 1.6 and
      * 0.6 blocks a second, the clips' own strides) and the clips' made speeds (blocks a tick at size 1).
@@ -189,6 +221,12 @@ public class OtterEntity extends PathfinderMob implements GeoEntity, HasLife {
     @Nullable
     Bout bout;
     int playTryAt, restNext;
+    /** Resting with a playmate after a bout: the spot beside it to lie down on, and the way to face; null otherwise. */
+    @Nullable
+    Vec3 restBeside;
+    float restYaw;
+    /** When it may porpoise next in a swimming chase (a game tick). */
+    int porpoiseAt;
     /** Ticks under water this dive, and ticks before it may dive again. */
     int diveFor, breatheFor;
     /** Ticks it has pressed against a bank in the water. */
@@ -368,7 +406,7 @@ public class OtterEntity extends PathfinderMob implements GeoEntity, HasLife {
     public String playState() {
         return "playful " + playful() + " (fed " + isFed() + ", doing " + doing() + ", scared " + scared() + ", cross " + isCross()
                 + ", held " + (held != null) + ", move " + (rider.play() != null) + ", soaked " + soakedFor + ", day " + dayTime()
-                + ", water " + isInWater() + ") next try in " + (playTryAt - tickCount) + ", mood " + mood();
+                + ", water " + isInWater() + ", bout " + (bout == null ? "none" : bout.stage + " rounds " + bout.rounds) + ") next try in " + (playTryAt - tickCount) + ", mood " + mood();
     }
 
     /** Hops this many more times in its war dance (left and right in turn), the next one to its left if true. */
@@ -487,10 +525,103 @@ public class OtterEntity extends PathfinderMob implements GeoEntity, HasLife {
         scaredUntil = tickCount + ticks;
         if (doing() == REST) {
             setDoing(REST_UP);
-        } else if (doing() == SKID || doing() == HOP) {
+        } else if (doing() == SKID || doing() == HOP || doing() == POUNCE || doing() == ZIG_L || doing() == ZIG_R) {
             setDoing(CALM);                                  // off at once
         }
         setGait(EVEN);
+    }
+
+    /**
+     * The speed setting (a share of its speed attribute, as routes take) that runs it this many blocks a second on
+     * level land. Minecraft squares it on land: a mob's walk input is its speed, and its push each tick is its speed
+     * times that input, kept up against ground drag (0.6 x 0.91 a tick), so it runs (attribute x setting)^2 / 0.454
+     * blocks a tick (worked out 2026-11-23 from LivingEntity.travel; the dash, 1.15, gives 5.2 b/s, measured 5.0 round
+     * bends).
+     */
+    static double speedFor(OtterEntity o, double blocksPerSecond) {
+        return Math.sqrt(blocksPerSecond / 20.0 * 0.454) / o.getAttributeValue(Attributes.MOVEMENT_SPEED);
+    }
+
+    /**
+     * Keeps otters out of each other's bodies (2026-11-23; the user: "they still consistently clip into each other ...
+     * it's just the hitboxes"). Minecraft keeps mobs apart by their walking boxes only, and an otter's is the middle 0.75
+     * of a body 2.6 long, so one walked its head through the other's flank. Here the body is its middle and the head and
+     * rump beads of its {@link HitChain} (the tail left free), each a circle its bead's width across; where two otters'
+     * circles overlap, each eases itself away by a share of the overlap a tick, the way Minecraft nudges mobs. Left out:
+     * touching on purpose in a bout (rearing, the poke, the pounce), and a resting otter is not pushed (the one coming
+     * close gives way). Resting flank to flank (middles 0.9 apart) and noses meeting at the poke do not overlap. My picks.
+     */
+    private void keepApart() {
+        if (isPassenger() || isVehicle() || rider.play() != null || doing() == REST) {
+            return;
+        }
+        Vec3 v = getDeltaMovement();
+        double ax = 0.0, az = 0.0;
+        for (OtterEntity o : level().getEntitiesOfClass(OtterEntity.class, getBoundingBox().inflate(3.0 * getScale()),
+                o -> o != this && o.isAlive() && !o.isPassenger() && !o.isVehicle())) {
+            if (bout != null && bout == o.bout && (touching(doing()) || touching(o.doing())) || Math.abs(o.getY() - getY()) > 1.0) {
+                continue;
+            }
+            double share = o.doing() == REST ? 1.0 : 0.5;          // a resting one does not give way: this one does all of it
+            double px = 0.0, pz = 0.0;
+            for (int i = -1; i < 2; i++) {
+                for (int j = -1; j < 2; j++) {
+                    Entity a = i < 0 ? this : chain.parts()[i], b = j < 0 ? o : o.chain.parts()[j];
+                    double dx = a.getX() - b.getX(), dz = a.getZ() - b.getZ(), d = Math.sqrt(dx * dx + dz * dz);
+                    double over = 0.5 * (a.getBbWidth() + b.getBbWidth()) - d;
+                    if (over > 0.0) {
+                        if (d < 1.0E-3) {
+                            dx = getX() - o.getX() + 0.01;
+                            dz = getZ() - o.getZ();
+                            d = Math.max(1.0E-3, Math.sqrt(dx * dx + dz * dz));
+                        }
+                        px += dx / d * over * share;
+                        pz += dz / d * over * share;
+                    }
+                }
+            }
+            double len = Math.sqrt(px * px + pz * pz);
+            if (len < 1.0E-4) {
+                continue;
+            }
+            // whichever of the two is going: both step out of its line, each to the side it is already on (a push along
+            // the line only stalls the one going and shoves the other ahead of it)
+            Vec3 go = v.horizontalDistanceSqr() >= o.getDeltaMovement().horizontalDistanceSqr() ? v : o.getDeltaMovement();
+            double speed = go.horizontalDistance();
+            if (speed > 0.02) {
+                double lx = -go.z / speed, lz = go.x / speed;
+                double at = lx * (getX() - o.getX()) + lz * (getZ() - o.getZ());
+                double side = (Math.abs(at) > 0.05 ? at > 0.0 : getId() < o.getId()) ? 1.5 : -1.5;   // (dead in line: opposite ways)
+                px += lx * len * side;
+                pz += lz * len * side;
+            }
+            ax += px;
+            az += pz;
+        }
+        double len = Math.sqrt(ax * ax + az * az);
+        if (len < 1.0E-4) {
+            return;
+        }
+        double push = Math.min(len * 0.6, 0.2);                    // a share of the overlap a tick, at most 4 b/s
+        setDeltaMovement(v.add(ax / len * push, 0.0, az / len * push));
+    }
+
+    /** How deep its body goes into another otter's (blocks: the deepest overlap of their middle, head and rump circles). */
+    public double bodyOverlap(OtterEntity o) {
+        double most = 0.0;
+        for (int i = -1; i < 2; i++) {
+            for (int j = -1; j < 2; j++) {
+                Entity a = i < 0 ? this : chain.parts()[i], b = j < 0 ? o : o.chain.parts()[j];
+                double d = Math.sqrt((a.getX() - b.getX()) * (a.getX() - b.getX()) + (a.getZ() - b.getZ()) * (a.getZ() - b.getZ()));
+                most = Math.max(most, 0.5 * (a.getBbWidth() + b.getBbWidth()) - d);
+            }
+        }
+        return most;
+    }
+
+    /** Touching on purpose in a bout: rearing face to face, the poke and the nip, the pounce. */
+    private static boolean touching(byte d) {
+        return d == PLAY_UP || d == PLAY || d == PLAY_DOWN || d == BITE || d == POUNCE;
     }
 
     /** Faces a place, body and head (a little at a time). */
@@ -556,8 +687,8 @@ public class OtterEntity extends PathfinderMob implements GeoEntity, HasLife {
         chain.place();
         rider.noteMoved();
         if (level().isClientSide) {
-            if (doing() == SIDE_L || doing() == SIDE_R) {
-                yBodyRot = getYRot();                        // the drawn body keeps its heading through a side hop too
+            if (doing() == SIDE_L || doing() == SIDE_R || doing() == ZIG_L || doing() == ZIG_R) {
+                yBodyRot = getYRot();                        // the drawn body keeps its heading through a side hop or a zigzag leap
             }
             attention.tick(this);
             rider.wetLooks(0.9, 2.2);
@@ -566,6 +697,7 @@ public class OtterEntity extends PathfinderMob implements GeoEntity, HasLife {
             return;
         }
         life.tick();
+        keepApart();
         if (tickCount % 5 == 0) {
             updateMood();
         }
@@ -589,7 +721,9 @@ public class OtterEntity extends PathfinderMob implements GeoEntity, HasLife {
         if (d == SHAKE && doingFor() >= SHAKE_TICKS || d == REST_UP && doingFor() >= REST_UP_TICKS
                 || d == BITE && doingFor() >= BITE_TICKS || d == SKID && doingFor() >= SKID_TICKS
                 || (d == HOP || d == SIDE_L || d == SIDE_R) && doingFor() >= HOP_TICKS || d == PLAY_DOWN && doingFor() >= PLAY_DOWN_TICKS
-                || d == GULP && doingFor() >= GULP_TICKS) {
+                || d == GULP && doingFor() >= GULP_TICKS || d == POUNCE && doingFor() >= POUNCE_TICKS
+                || d == PORPOISE && (doingFor() >= PORPOISE_TICKS || !isInWater())
+                || (d == ZIG_L || d == ZIG_R) && doingFor() >= ZIG_TICKS + 2) {
             setDoing(CALM);
         } else if ((d == PLAY_UP || d == PLAY) && bout == null) {
             setDoing(PLAY_DOWN);                             // a bout broken off: down at once
@@ -613,6 +747,9 @@ public class OtterEntity extends PathfinderMob implements GeoEntity, HasLife {
             float yaw = hopYaw * Mth.DEG_TO_RAD;             // carried to its left (+) or right while its feet are up
             double step = (d == SIDE_L ? 1.0 : -1.0) * SIDE_GO * getScale() / (HOP_DOWN - HOP_UP);
             move(MoverType.SELF, new Vec3(Mth.cos(yaw) * step, 0.0, Mth.sin(yaw) * step));
+        }
+        if (d == PORPOISE && (doingFor() == PORPOISE_OUT || doingFor() == PORPOISE_IN)) {
+            porpoiseSplash(doingFor() == PORPOISE_OUT ? 0.6 : 0.3);
         }
         if (restNext > 0) {
             restNext--;
@@ -643,6 +780,23 @@ public class OtterEntity extends PathfinderMob implements GeoEntity, HasLife {
         } else if (!isInWater() && diving()) {
             setDiving(false);
         }
+    }
+
+    /**
+     * A porpoise leap's splash, out of the water and back in, this far ahead of its middle (blocks at size 1: it leaves
+     * nose first ahead and comes down a little behind that, as it swims on under the arc; my picks).
+     */
+    private void porpoiseSplash(double ahead) {
+        if (!(level() instanceof net.minecraft.server.level.ServerLevel server)) {
+            return;
+        }
+        double size = getScale();
+        float yaw = getYRot() * Mth.DEG_TO_RAD;
+        double x = getX() - Mth.sin(yaw) * ahead * size, z = getZ() + Mth.cos(yaw) * ahead * size;
+        double y = getY() + getFluidHeight(FluidTags.WATER);
+        server.sendParticles(ParticleTypes.SPLASH, x, y + 0.05, z, 16, 0.25 * size, 0.05, 0.25 * size, 0.25);
+        server.sendParticles(ParticleTypes.BUBBLE, x, y - 0.2, z, 6, 0.2 * size, 0.1, 0.2 * size, 0.05);
+        playSound(SoundEvents.GENERIC_SPLASH, 0.3F, 1.5F + random.nextFloat() * 0.3F);
     }
 
     /**
@@ -1446,17 +1600,63 @@ public class OtterEntity extends PathfinderMob implements GeoEntity, HasLife {
             return p != null && !p.isCrouching() && !p.isSpectator() && !p.isCreative();
         }
 
+        /** Resting beside its playmate: the spot to walk to first, and ticks left to get there and turn its way (or 0). */
+        @Nullable
+        private Vec3 settleTo;
+        private int settle;
+
         @Override
         public void start() {
             otter.getNavigation().stop();
-            otter.setDoing(REST);
             left = shortOne ? 200 + otter.random.nextInt(200) : 400 + otter.random.nextInt(800);
             shortOne = false;
             otter.restNext = 0;
+            settleTo = otter.restBeside;
+            otter.restBeside = null;
+            settle = settleTo != null ? 60 : 0;
+            if (settleTo != null) {
+                otter.getMoveControl().setWantedPosition(settleTo.x, settleTo.y, settleTo.z, STROLL);
+                otter.straightFor = 60;
+            } else {
+                otter.setDoing(REST);
+            }
+        }
+
+        @Override
+        public boolean requiresUpdateEveryTick() {
+            return true;
+        }
+
+        @Override
+        public void tick() {
+            if (settle <= 0) {
+                return;
+            }
+            settle--;
+            Vec3 to = settleTo;
+            if (to == null || otter.position().subtract(to).horizontalDistanceSqr() < 0.02 || otter.horizontalCollision) {
+                otter.straightFor = 0;
+                otter.getMoveControl().setWantedPosition(otter.getX(), otter.getY(), otter.getZ(), 0.0);
+                otter.setZza(0.0F);
+                float yaw = otter.restYaw * Mth.DEG_TO_RAD;         // turns its playmate's way, then lies down
+                otter.face(otter.getX() - Mth.sin(yaw) * 4.0, otter.getZ() + Mth.cos(yaw) * 4.0, 25.0F);
+                if (Math.abs(Mth.wrapDegrees(otter.getYRot() - otter.restYaw)) < 8.0F || settle <= 0) {
+                    settle = 0;
+                    otter.setDoing(REST);
+                }
+            } else if (settle <= 0) {
+                otter.straightFor = 0;
+                otter.setDoing(REST);                              // (got as near as it could)
+            } else {
+                otter.face(to.x, to.z, 30.0F);
+            }
         }
 
         @Override
         public boolean canContinueToUse() {
+            if (settle > 0) {
+                return !otter.scared() && !otter.isInWater() && !playerNear();
+            }
             return otter.doing() == REST && --left > 0 && !otter.scared() && !otter.isInWater() && !playerNear();
         }
 
@@ -1481,14 +1681,36 @@ public class OtterEntity extends PathfinderMob implements GeoEntity, HasLife {
      * block they chase each other swimming and diving instead. It ends when the rounds are done or either is hurt, scared
      * or busy; then a third of the time they lie down for a short rest. A mother answering her pup when she is not in the
      * mood herself (or one time in three when she is) gives it one round only. Numbers my picks.
+     * <p>
+     * Chase and tag (2026-11-23, plan 6e step 4): after the first round, on land or in the shallows, half the time they
+     * play tag instead of more rearing (a tag {@code play.tag} on either always picks it, for films and tests): one nips
+     * the other and bounds off in loops (a quarter of a circle 3 to 5 blocks across at a time), the other gives it a short
+     * head start and chases it a little faster; after 2.5 seconds or more, with the chaser close, the runner skid-stops
+     * and lets itself be caught (as real playing otters do), the chaser pounces with its paws on the runner's rump and
+     * nips it; the runner hops out from under the paws, turning round to it, and the tagger bounds off: it is the runner
+     * now. 3 to 6 tags. In deep water the swimming chase porpoises now and then. Numbers my picks.
      */
     static final class Bout {
-        private enum Stage { INVITE, DANCE, POKE, SPACE, UP, REAR, DOWN, CHASE, SWIM }
+        private enum Stage { INVITE, DANCE, STEP_IN, POKE, SPACE, UP, REAR, DOWN, CHASE, SWIM, NIP, RUN, CATCH, POUNCE }
         final OtterEntity lead, mate;
         private int rounds, left, again;
         private Stage stage = Stage.INVITE;
         private OtterEntity runner;
         private double toX, toZ;
+        /** Tag: not picked yet (0), rearing rounds (1) or tag (2). */
+        private int game;
+        /**
+         * Tag's run: where the game started (it keeps near), the bend of the S it heads for, its heading (the run's line,
+         * degrees), the way the next bend turns (+1 or -1), ticks run, ticks chased (the chaser's speed ramp), whether
+         * this leap lands a block up, and how far to the side it goes (0 when the side is blocked: straight on).
+         */
+        private double homeX, homeZ, wayX, wayZ, leapSide;
+        private float runYaw;
+        private int turnWay, runFor, chaseFor;
+        private boolean leapUp;
+        /** Tag's pounce: whether the runner has hopped out from under, and its hop's whole turn (degrees). */
+        private boolean hopped;
+        private float hopTurn;
 
         Bout(OtterEntity lead, OtterEntity mate, int rounds) {
             this.lead = lead;
@@ -1531,14 +1753,14 @@ public class OtterEntity extends PathfinderMob implements GeoEntity, HasLife {
             switch (stage) {
                 case INVITE -> {
                     mate.face(lead.getX(), lead.getZ(), 15.0F);
-                    if (lead.distanceTo(mate) < gap() + 0.8) {
+                    if (lead.distanceTo(mate) < pokeGap() + 0.5) {
                         lead.getNavigation().stop();
                         if (lead.onGround() && !lead.isInWater()) {
                             lead.startDance();                     // the war dance first, hopping side to side: play?
                             stage = Stage.DANCE;
                             left = 60;
                         } else {
-                            poke();
+                            stepIn();
                         }
                     } else if (--again <= 0) {
                         again = 10;
@@ -1552,13 +1774,24 @@ public class OtterEntity extends PathfinderMob implements GeoEntity, HasLife {
                     mate.face(lead.getX(), lead.getZ(), 15.0F);  // (the dancer keeps its heading through its hops)
                     if (!lead.dancing() || left <= 0) {
                         lead.danceLeft = 0;
-                        if (lead.distanceTo(mate) < gap() + 1.6) {
-                            poke();
+                        if (lead.distanceTo(mate) < pokeGap() + 1.5) {
+                            stepIn();
                         } else {
                             stage = Stage.INVITE;                  // danced off a little: bound back in and poke
                             left = 60;
                             again = 0;
                         }
+                    }
+                }
+                case STEP_IN -> {
+                    mate.face(lead.getX(), lead.getZ(), 20.0F);
+                    double dx = toX - lead.getX(), dz = toZ - lead.getZ();
+                    if (dx * dx + dz * dz < 0.03 || left <= 0 || lead.horizontalCollision) {
+                        halt(lead);
+                        lead.straightFor = 0;
+                        poke();
+                    } else {
+                        lead.face(toX, toZ, 30.0F);
                     }
                 }
                 case POKE -> {
@@ -1604,21 +1837,68 @@ public class OtterEntity extends PathfinderMob implements GeoEntity, HasLife {
                     if (left <= 0) {
                         if (rounds <= 0) {
                             end(true);
+                        } else if (tagGame()) {
+                            nip();
                         } else {
                             chase();
                         }
                     }
                 }
+                case NIP -> {
+                    OtterEntity chaser = other(runner);
+                    runner.face(chaser.getX(), chaser.getZ(), 20.0F);
+                    chaser.face(runner.getX(), runner.getZ(), 20.0F);
+                    if (left <= 0) {
+                        run();
+                    }
+                }
+                case RUN -> {
+                    OtterEntity chaser = other(runner);
+                    runFor++;
+                    boolean going = true;
+                    byte d = runner.doing();
+                    if (d == HOP && runner.doingFor() < HOP_TICKS) {
+                        hopTick(runner, 0.0);                      // turning round to bolt
+                    } else if (d != ZIG_L && d != ZIG_R || runner.doingFor() >= ZIG_TICKS) {
+                        going = leap();                            // the next leap, to the other side
+                    }
+                    if (going) {
+                        going = carry();
+                    }
+                    chasing(chaser);
+                    if (!going || runFor >= 50 && chaser.distanceTo(runner) < POUNCE_FROM * chaser.getScale() + 1.0 || left <= 0) {
+                        letCatch();                                // close behind it, or nowhere to go: it lets itself be caught
+                    }
+                }
+                case CATCH -> {
+                    OtterEntity chaser = other(runner);
+                    runner.getNavigation().stop();
+                    if (chaser.distanceTo(runner) < POUNCE_FROM * chaser.getScale()) {
+                        pounce();
+                    } else {
+                        chasing(chaser);
+                    }
+                    if (left <= 0) {
+                        end(true);
+                    }
+                }
+                case POUNCE -> pouncing();
                 case CHASE, SWIM -> {
                     OtterEntity chaser = other(runner);
                     if (--again <= 0) {
                         again = 8;
                         chaser.getNavigation().moveTo(runner, chaser.distanceToSqr(runner) > 36.0 ? DASH : BOUND);
-                        if (chaser.isInWater()) {
+                        if (chaser.isInWater() && chaser.doing() != PORPOISE) {
                             chaser.setDiving(runner.diving());
                         }
                     }
-                    boolean caught = chaser.distanceTo(runner) < gap() + 1.0;
+                    if (stage == Stage.SWIM) {
+                        porpoise(runner);
+                        porpoise(chaser);
+                    }
+                    // caught only after the runner has had a start (they set off nose to nose: counted at once, a
+                    // swimming chase's rounds all ran out in its first ticks, BUGS 297)
+                    boolean caught = ++runFor > 30 && chaser.distanceTo(runner) < gap() + 1.0;
                     if (stage == Stage.SWIM && (caught || left <= 0)) {
                         rounds--;                                  // tagged: the other one runs now
                         runner.setDiving(false);
@@ -1634,6 +1914,256 @@ public class OtterEntity extends PathfinderMob implements GeoEntity, HasLife {
                     }
                 }
             }
+        }
+
+        /** Tag or more rearing, picked once, after the first round: tag only where both can stand. */
+        private boolean tagGame() {
+            if (game == 0) {
+                boolean forced = lead.getTags().contains("play.tag") || mate.getTags().contains("play.tag");
+                game = canRear(lead) && canRear(mate) && (forced || lead.random.nextBoolean()) ? 2 : 1;
+                if (game == 2) {
+                    rounds = 3 + lead.random.nextInt(4);           // tags
+                    homeX = 0.5 * (lead.getX() + mate.getX());     // the game keeps near here
+                    homeZ = 0.5 * (lead.getZ() + mate.getZ());
+                }
+            }
+            return game == 2;
+        }
+
+        /** Tag's start: one nips the other (a play bite), then bounds off. */
+        private void nip() {
+            runner = lead.random.nextBoolean() ? lead : mate;
+            runner.getNavigation().stop();
+            runner.setDoing(BITE);
+            stage = Stage.NIP;
+            left = BITE_TICKS;
+        }
+
+        /**
+         * The runner turns round with a hop and bolts, away from the chaser, which gives it a head start (it watches for
+         * {@link #CHASE_WAIT} ticks); then it zigzags off in leaps along an S near where the game started.
+         */
+        private void run() {
+            OtterEntity chaser = other(runner);
+            runYaw = (float) Math.toDegrees(Math.atan2(runner.getZ() - chaser.getZ(), runner.getX() - chaser.getX())) - 90.0F;
+            turnWay = runner.random.nextBoolean() ? 1 : -1;
+            pickWay();
+            halt(runner);
+            hopTurn = Mth.wrapDegrees(runYaw - runner.getYRot());
+            runner.setDoing(HOP);
+            runner.doingSince = runner.tickCount;
+            runFor = 0;
+            chaseFor = 0;
+            stage = Stage.RUN;
+            left = RUN_MOST;
+            again = CHASE_WAIT;
+        }
+
+        /**
+         * The next bend of the S: 5 to 8 blocks on, turned 50 to 100 degrees off its heading, to the other side from the
+         * last bend, within {@link #RUN_ROOM} blocks of where the game started and on footing; else back toward there.
+         */
+        private void pickWay() {
+            double s = runner.getScale();
+            for (int k = 0; k < 6; k++, turnWay = -turnWay) {
+                float yaw = (runYaw + turnWay * (50.0F + runner.random.nextFloat() * 50.0F)) * Mth.DEG_TO_RAD;
+                double d = (5.0 + runner.random.nextDouble() * 3.0) * s;
+                double x = runner.getX() - Mth.sin(yaw) * d, z = runner.getZ() + Mth.cos(yaw) * d;
+                if ((x - homeX) * (x - homeX) + (z - homeZ) * (z - homeZ) < RUN_ROOM * RUN_ROOM * s * s
+                        && footing(runner.level(), x, runner.getY(), z) != null) {
+                    wayX = x;
+                    wayZ = z;
+                    turnWay = -turnWay;
+                    return;
+                }
+            }
+            wayX = homeX;
+            wayZ = homeZ;
+        }
+
+        /**
+         * One zigzag leap: its heading turns toward the next bend of the S (30 degrees a leap at most), and it is flung to
+         * the other side from the last leap ({@link #ZIG_GO} on and {@link #ZIG_SIDE} aside); straight on if that side has
+         * no footing; false if straight on has none either.
+         */
+        private boolean leap() {
+            double s = runner.getScale();
+            if ((wayX - runner.getX()) * (wayX - runner.getX()) + (wayZ - runner.getZ()) * (wayZ - runner.getZ()) < 4.0 * s * s) {
+                pickWay();
+            }
+            float want = (float) Math.toDegrees(Math.atan2(wayZ - runner.getZ(), wayX - runner.getX())) - 90.0F;
+            runYaw = Mth.approachDegrees(runYaw, want, 30.0F);
+            boolean toLeft = runner.doing() != ZIG_L;
+            float yaw = runYaw * Mth.DEG_TO_RAD;
+            for (double side : new double[] {toLeft ? 1.0 : -1.0, 0.0}) {
+                double x = runner.getX() + (-Mth.sin(yaw) * ZIG_GO + Mth.cos(yaw) * side * ZIG_SIDE) * s;
+                double z = runner.getZ() + (Mth.cos(yaw) * ZIG_GO + Mth.sin(yaw) * side * ZIG_SIDE) * s;
+                Double y = footing(runner.level(), x, runner.getY(), z);
+                if (y != null) {
+                    leapSide = side;
+                    leapUp = y > runner.getY() + 0.5;
+                    runner.setDoing(toLeft ? ZIG_L : ZIG_R);
+                    runner.doingSince = runner.tickCount;
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        /**
+         * Carries the leap this tick: on at an even pace over the whole leap, aside while its feet are up (from
+         * {@link #ZIG_UP}), lifted early when it lands a block up; its heading held on the run's line. False if it hit
+         * something.
+         */
+        private boolean carry() {
+            byte d = runner.doing();
+            if (d != ZIG_L && d != ZIG_R) {
+                return true;
+            }
+            int t = runner.doingFor();
+            double s = runner.getScale();
+            float yaw = runYaw * Mth.DEG_TO_RAD;
+            double on = ZIG_GO * s / ZIG_TICKS;
+            double aside = t >= ZIG_UP ? leapSide * ZIG_SIDE * s / (ZIG_TICKS - ZIG_UP) : 0.0;
+            runner.move(MoverType.SELF, new Vec3(-Mth.sin(yaw) * on + Mth.cos(yaw) * aside, leapUp && t < 4 ? 0.3 : 0.0,
+                    Mth.cos(yaw) * on + Mth.sin(yaw) * aside));
+            runner.setYRot(runYaw);
+            runner.yBodyRot = runYaw;
+            runner.yHeadRot = runYaw;
+            return !runner.horizontalCollision;
+        }
+
+        /**
+         * The chaser runs straight at the runner (it cuts the corners of its zigzag) once its head start is over, speeding
+         * up: {@link #CHASE_FROM} blocks a second, rising to {@link #CHASE_MID} over {@link #CHASE_RAMP} ticks and to
+         * {@link #CHASE_TOP} over as many again (the user's numbers, 2026-11-23), times its size.
+         */
+        private void chasing(OtterEntity chaser) {
+            if (again > 0) {
+                again--;
+                return;
+            }
+            chaseFor++;
+            if (chaseFor % 4 == 1) {
+                double ramp = Math.min(chaseFor / (double) CHASE_RAMP, 2.0);
+                double bps = ramp < 1.0 ? Mth.lerp(ramp, CHASE_FROM, CHASE_MID) : Mth.lerp(ramp - 1.0, CHASE_MID, CHASE_TOP);
+                chaser.getNavigation().moveTo(runner, speedFor(chaser, bps * chaser.getScale()));
+            }
+        }
+
+        /** Stands it still where it is: no route, no wanted spot, no walking on. */
+        private static void halt(OtterEntity o) {
+            o.getNavigation().stop();
+            o.getMoveControl().setWantedPosition(o.getX(), o.getY(), o.getZ(), 0.0);
+            o.setZza(0.0F);
+        }
+
+        /** A hop turn's feet-up ticks: turned by {@link #hopTurn} in all, and carried this far forward (blocks at size 1). */
+        private void hopTick(OtterEntity o, double forward) {
+            int h = o.doingFor();
+            if (o.doing() != HOP || h < HOP_UP || h >= HOP_DOWN) {
+                return;
+            }
+            float yaw = o.getYRot();
+            double step = forward * o.getScale() / (HOP_DOWN - HOP_UP);
+            if (step > 0.0) {
+                o.move(MoverType.SELF, new Vec3(-Mth.sin(yaw * Mth.DEG_TO_RAD) * step, 0.0, Mth.cos(yaw * Mth.DEG_TO_RAD) * step));
+            }
+            yaw += hopTurn / (HOP_DOWN - HOP_UP);
+            o.setYRot(yaw);
+            o.yBodyRot = yaw;
+            o.yHeadRot = yaw;
+        }
+
+        /** The runner skid-stops: it lets itself be caught. */
+        private void letCatch() {
+            halt(runner);
+            runner.setDoing(SKID);
+            stage = Stage.CATCH;
+            left = 60;
+        }
+
+        /** Close behind it: the chaser springs. */
+        private void pounce() {
+            OtterEntity chaser = other(runner);
+            halt(chaser);
+            chaser.setDeltaMovement(0.0, chaser.getDeltaMovement().y, 0.0);
+            chaser.setDoing(POUNCE);
+            hopped = false;
+            stage = Stage.POUNCE;
+            left = POUNCE_TICKS + HOP_TICKS + 10;
+        }
+
+        /**
+         * The pounce: the chaser faces the runner as it gathers, is carried onto the spot behind it while its feet are up
+         * (its paws come down on the runner's rump), nips, and lets go; the runner then hops out from under, turning round
+         * to it; then the tagger is the runner.
+         */
+        private void pouncing() {
+            OtterEntity chaser = other(runner);
+            int t = chaser.doingFor();
+            if (chaser.doing() == POUNCE) {
+                chaser.face(runner.getX(), runner.getZ(), 25.0F);
+                if (t >= POUNCE_UP && t < POUNCE_DOWN) {
+                    double dx = chaser.getX() - runner.getX(), dz = chaser.getZ() - runner.getZ(), d = Math.sqrt(dx * dx + dz * dz);
+                    if (d > 1.0E-3) {
+                        double back = POUNCE_BEHIND * chaser.getScale(), share = 1.0 / (POUNCE_DOWN - t);
+                        double tx = runner.getX() + dx / d * back, tz = runner.getZ() + dz / d * back;
+                        chaser.move(MoverType.SELF, new Vec3((tx - chaser.getX()) * share, 0.0, (tz - chaser.getZ()) * share));
+                    }
+                }
+                if (t >= POUNCE_LET_GO && !hopped) {
+                    hopped = true;
+                    float toward = (float) Math.toDegrees(Math.atan2(chaser.getZ() - runner.getZ(), chaser.getX() - runner.getX())) - 90.0F;
+                    hopTurn = Mth.clamp(Mth.wrapDegrees(toward - runner.getYRot()), -150.0F, 150.0F);
+                    runner.setDoing(HOP);
+                }
+            }
+            if (hopped) {
+                hopTick(runner, 0.35);                             // out from under the paws, turning round to the tagger
+            }
+            if (hopped && chaser.doing() != POUNCE && runner.doing() != HOP || left <= 0) {
+                rounds--;                                          // tagged
+                if (rounds <= 0) {
+                    end(true);
+                } else {
+                    runner = chaser;                               // the tagger runs now
+                    run();
+                }
+            }
+        }
+
+        /** In a swimming chase, going in deep water at the surface, now and then a porpoise leap (every 1.5 to 3 s). */
+        private static void porpoise(OtterEntity o) {
+            if (o.doing() == CALM && o.swimming() && !o.diving() && !o.getNavigation().isDone() && o.tickCount >= o.porpoiseAt
+                    && waterDepth(o) >= 2) {
+                o.setDoing(PORPOISE);
+                o.porpoiseAt = o.tickCount + PORPOISE_TICKS + 30 + o.random.nextInt(31);
+            }
+        }
+
+        /**
+         * How far apart their middles stand for the nose poke so their noses just touch (no head inside a head): the
+         * poker's nose at the bite's reach, the other's standing (measured on the clips, 2026-11-23).
+         */
+        double pokeGap() {
+            return NOSE_BITE * lead.getScale() + NOSE_STAND * mate.getScale();
+        }
+
+        /** The poker steps in (or back) to the spot in front of the other's face where their noses will meet. */
+        private void stepIn() {
+            double dx = lead.getX() - mate.getX(), dz = lead.getZ() - mate.getZ(), d = Math.sqrt(dx * dx + dz * dz);
+            if (d < 1.0E-3) {
+                dx = 1.0;
+                d = 1.0;
+            }
+            toX = mate.getX() + dx / d * pokeGap();
+            toZ = mate.getZ() + dz / d * pokeGap();
+            lead.getNavigation().stop();
+            lead.getMoveControl().setWantedPosition(toX, lead.getY(), toZ, STROLL);
+            lead.straightFor = 30;
+            stage = Stage.STEP_IN;
+            left = 30;
         }
 
         /** The nose poke (a play bite): come and play. */
@@ -1675,6 +2205,7 @@ public class OtterEntity extends PathfinderMob implements GeoEntity, HasLife {
                 return;
             }
             stage = Stage.CHASE;
+            runFor = 0;
             left = 100;
             again = 6;                                             // the chaser gives it a head start
         }
@@ -1687,14 +2218,17 @@ public class OtterEntity extends PathfinderMob implements GeoEntity, HasLife {
                 return;
             }
             runner.setDiving(runner.random.nextInt(3) == 0);
+            lead.porpoiseAt = lead.tickCount + 20 + lead.random.nextInt(30);
+            mate.porpoiseAt = mate.tickCount + 20 + mate.random.nextInt(30);
             stage = Stage.SWIM;
+            runFor = 0;
             left = 120;
             again = 6;
         }
 
         /** Over: both drop down, and a third of the time, on land, they lie down for a short rest. */
         void end(boolean done) {
-            boolean rest = done && lead.random.nextInt(3) == 0;
+            boolean rest = done && (lead.random.nextInt(3) == 0 || lead.getTags().contains("play.rest"));
             for (OtterEntity o : new OtterEntity[] {lead, mate}) {
                 if (o.bout != this) {
                     continue;
@@ -1711,14 +2245,60 @@ public class OtterEntity extends PathfinderMob implements GeoEntity, HasLife {
                     o.restNext = 100;
                 }
             }
+            if (rest && mate.restNext > 0) {
+                // they rest together, flank to flank the same way round (as real otters do), not one inside the other
+                mate.restBeside = besideSpot(lead, mate);
+                mate.restYaw = lead.getYRot();
+                if (mate.restBeside == null) {
+                    mate.restNext = 0;
+                }
+            }
+        }
+
+        /** The spot beside the lead, flank to flank, on the side nearer the mate first, on footing; or null. */
+        @Nullable
+        private static Vec3 besideSpot(OtterEntity lead, OtterEntity mate) {
+            float yaw = lead.getYRot() * Mth.DEG_TO_RAD;
+            double lx = Mth.cos(yaw), lz = Mth.sin(yaw);       // the lead's left
+            double toward = (mate.getX() - lead.getX()) * lx + (mate.getZ() - lead.getZ()) * lz;
+            double apart = REST_BESIDE * 0.5 * (lead.getScale() + mate.getScale());
+            for (double side : toward >= 0 ? new double[] {1.0, -1.0} : new double[] {-1.0, 1.0}) {
+                double x = lead.getX() + lx * side * apart, z = lead.getZ() + lz * side * apart;
+                Double y = footing(lead.level(), x, lead.getY(), z);
+                if (y != null) {
+                    return new Vec3(x, y, z);
+                }
+            }
+            return null;
         }
     }
 
     /** Where it can rear up: on land, or in water a block deep or less (its feet on the bed, the water hiding them). */
     static boolean canRear(OtterEntity o) {
-        if (!o.isInWater()) {
-            return o.onGround();
+        return o.isInWater() ? waterDepth(o) <= 1 : o.onGround();
+    }
+
+    /**
+     * Where it can stand at this spot, a block up or down from y: its feet's height, or null (no room, no ground, or
+     * water over a block deep).
+     */
+    @Nullable
+    static Double footing(Level level, double x, double y, double z) {
+        for (int dy : new int[] {0, 1, -1}) {
+            BlockPos p = BlockPos.containing(x, y + 0.1 + dy, z);
+            BlockPos below = p.below();
+            if (level.getBlockState(p).getCollisionShape(level, p).isEmpty()
+                    && level.getBlockState(p.above()).getCollisionShape(level, p.above()).isEmpty()
+                    && level.getFluidState(p.above()).isEmpty()
+                    && level.getBlockState(below).isFaceSturdy(level, below, net.minecraft.core.Direction.UP)) {
+                return (double) p.getY();
+            }
         }
+        return null;
+    }
+
+    /** How deep the water it is in is (blocks, up to 3). */
+    static int waterDepth(OtterEntity o) {
         Level level = o.level();
         BlockPos.MutableBlockPos p = o.blockPosition().mutable();
         while (level.getFluidState(p.above()).is(FluidTags.WATER) && p.getY() < o.getY() + 4) {
@@ -1729,7 +2309,7 @@ public class OtterEntity extends PathfinderMob implements GeoEntity, HasLife {
             deep++;
             p.move(0, -1, 0);
         }
-        return deep <= 1;
+        return deep;
     }
 
     /**
@@ -2079,6 +2659,10 @@ public class OtterEntity extends PathfinderMob implements GeoEntity, HasLife {
     private static final RawAnimation PLAY_CLIP = RawAnimation.begin().thenLoop("play_rear");
     private static final RawAnimation PLAY_DOWN_CLIP = RawAnimation.begin().thenPlayAndHold("play_down");
     private static final RawAnimation GULP_CLIP = RawAnimation.begin().thenPlayAndHold("gulp");
+    private static final RawAnimation POUNCE_CLIP = RawAnimation.begin().thenPlayAndHold("pounce_tag");
+    private static final RawAnimation PORPOISE_CLIP = RawAnimation.begin().thenPlayAndHold("porpoise");
+    private static final RawAnimation ZIG_L_CLIP = RawAnimation.begin().thenPlayAndHold("zig_left");
+    private static final RawAnimation ZIG_R_CLIP = RawAnimation.begin().thenPlayAndHold("zig_right");
 
     @Override
     public void registerControllers(AnimatableManager.ControllerRegistrar controllers) {
@@ -2146,6 +2730,14 @@ public class OtterEntity extends PathfinderMob implements GeoEntity, HasLife {
                 return state.setAndContinue(PLAY_CLIP);
             case PLAY_DOWN:
                 return state.setAndContinue(PLAY_DOWN_CLIP);
+            case POUNCE:
+                return state.setAndContinue(POUNCE_CLIP);
+            case PORPOISE:
+                return state.setAndContinue(PORPOISE_CLIP);
+            case ZIG_L:
+                return state.setAndContinue(ZIG_L_CLIP);
+            case ZIG_R:
+                return state.setAndContinue(ZIG_R_CLIP);
             default:
                 break;
         }

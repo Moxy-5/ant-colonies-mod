@@ -378,3 +378,60 @@ checks", then "make sure they jump side to side like real otters and weasels"):*
   hop, mouth open, tail swishing; the game carries it 0.7 blocks (times its size) to that side on ticks 3 to 7
   (`OtterEntity.SIDE_L`, `SIDE_R`, `startDance`). A dance is 2 to 4 hops, left and right in turn: the otter starting a
   play bout dances before its nose poke, and a playful skittering otter dances at one stop in three.
+
+**Built (2026-11-23, first try at chase and tag in the game):** the game part above, in `OtterEntity.Bout` (stages NIP,
+RUN, CATCH, POUNCE; `POUNCE` and `PORPOISE` doings; porpoise splashes); tests `playingOttersChaseAndTagEachOtherOnTheBank`
+and `playingOttersPorpoiseInADeepPool` pass. Fixed on the way: BUGS 297 (the swimming chase counted a catch on its first
+tick). The user watched it live: **the water play is great**; on land the chase is too slow, they clip into each other
+touching noses and lying down to rest, and the runner should leap side to side as it runs. Replanned in 6g.
+
+### 6g. The land chase, take two (planned 2026-11-23, no code yet)
+
+The user, 2026-11-23: "I want them to be fast like a real chase on land ... the otters keep clipping into each other
+when touching nose, when sleeping, and I wanted the chase to be the otter leaping while skedaddling side to side, like
+jump left then right while running."
+
+**1. A real chase speed (my picks).** Today the runner bounds at about 2.5 blocks a second and the chaser at up to 5.
+A real otter at full tilt covers several body lengths a second; on our scale (an otter 2.6 blocks long) that is far too
+fast for Minecraft, so: the runner about 5 blocks a second, the chaser about 6 (it gains, but slowly). The noodle bound
+plays faster with the speed (made for 2.5 b/s, it may play up to 2.6 times: a stride in 0.15 s), so the feet keep the
+ground. The loops grow with the speed: an S-shaped run 8 to 14 blocks across instead of a circle 3 to 5, so a run lasts
+2 to 4 seconds and covers ground, always on footing (no water over a block deep, no drops over a block).
+
+**2. The zigzag: leaping left and right while it runs.** Real weasels and otters at play run in a crazy zigzag, each
+bound flung off to one side and the next to the other. The runner does it, the chaser runs straight at it (it cuts the
+corners, which is why it can catch up). Two new clips from the noodle bound's pose maker:
+- `zig_left` and `zig_right` (about 0.3 s each, my pick): one big bound flung to that side. The body twists into a C
+  toward the side it goes, leans into it, the hind feet kick out the other way, the tail swings out behind like a
+  rudder, and the head stays nearly level and looks ahead.
+- The game carries each leap about 1.4 blocks on and 0.6 to the side (the side from the clip's side), so its path is a
+  real zigzag on the grass, left, right, left, around the S of its run. The heading is the run's line, never the leap's,
+  so it does not spin about.
+- Checked like every clip: offline (`clip_check.py`, its blends with `play_bound`, `skid_stop` and `pounce_tag`), then
+  in the game frozen from three sides, then live.
+
+**3. No clipping into each other (one rule, set where they come together, not a push).**
+- **The nose poke:** the one poking comes in to a spot just in front of the other's face (on the line it faces), so
+  their noses meet: the spot's distance measured on the bite clip's nose (not guessed), never a body inside a body.
+- **Resting after a bout:** they lie side by side, parallel, flank to flank (real otters rest touching, often in a
+  heap), the spot measured from the rest clip's width so the bodies touch but do not pass through.
+- I will measure every moment they meet (the poke, the rearing, the pounce, the rest) in the test as "how far one body
+  goes into the other", not only how far apart their middles are.
+
+**4. Testing it the new way.** The game test measures what you would see: the runner's speed (about 5 b/s), its leaps
+going left and right in turn (its path's side swing), the chaser gaining, no body inside another at a poke or a rest,
+and the tags swapping. For films, a camera that follows a named otter from above and to the side (the film camera can
+follow only its own walkers today; one small change to the film tool), so a fast chase stays in the picture, filmed
+live, plus the zigzag clips frozen from three sides.
+
+**Order:** (a) the zigzag clips, made and checked offline, then a page for your look; (b) the faster S-shaped run with
+the zigzag and the straight chaser; (c) the spacing at the poke and the rest; (d) the follow camera, the test and the
+films; then your look in the game.
+
+**Built (2026-11-23, 6g, at the user's word "yes start building it"; the user's speeds: the runner 6 blocks a second, the
+chaser 5.5 rising to 6 over 4 s and to 6.5 over 4 s more):** the zigzag clips `zig_left`/`zig_right`, the zigzag run on an
+S and the straight chaser with the ramp, the poke spaced so the noses just touch, resting flank to flank, and a rule
+keeping otters out of each other's bodies (the user saw them clip: "I'm pretty sure it's just the hitboxes"; Minecraft kept
+them apart by the 0.75-block walking box only). Measured: the runner leaps at 6.2 b/s; the chaser cuts the zigzag's bends
+and usually catches up within 4 to 6 s, so it seldom reaches its top 6.5 (best 6.4). The user, 2026-11-23: "the play chase
+is absolutely perfect". Next: keep-away.

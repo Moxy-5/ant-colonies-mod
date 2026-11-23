@@ -1,0 +1,53 @@
+# The zigzag leaps of the play chase (2026-11-23, docs/plans/otter-play-and-fish.md 6g; the hard rule: frozen and
+# stepped from three sides). zig_left and zig_right played in place (film:zig_left, film:zig_right; NoAI, the game's
+# carry left out): an otter facing west at x 20.5, z 17, side on from the south (its left), front on, three quarters.
+# Stepped films run the clip clock double (BUGS 295): ten steps show the 0.4 s leap about twice.
+#   ./gradlew runFilm -PfilmScene=tools/film/otter_zig_frames.film   pictures in run-film/screenshots/otter_zig_frames/
+cmd time set noon
+cmd weather clear
+cmd kill @e[type=!player]
+cmd fill 0 -61 0 40 -50 34 minecraft:air
+cmd fill 0 -62 0 40 -61 34 minecraft:grass_block
+lens 40
+wait 40
+cmd tick unfreeze
+cmd summon antcolonies:otter 20.5 -60 17.0 {NoAI:1b,Rotation:[90f,0f],OwnSize:1.0f,CustomName:'"film:zig_left"'}
+camera 19.6 -60.6 13.0 0 6
+wait 30
+cmd tick freeze
+frames 2
+burst left_side 10 1
+frames 1
+cmd tick unfreeze
+camera 16.0 -60.4 17.0 -90 6
+wait 10
+cmd tick freeze
+frames 2
+burst left_front 10 1
+frames 1
+cmd tick unfreeze
+camera 17.2 -59.9 14.4 -50 14
+wait 10
+cmd tick freeze
+frames 2
+burst left_three 10 1
+frames 1
+cmd tick unfreeze
+cmd kill @e[type=antcolonies:otter]
+wait 20
+cmd summon antcolonies:otter 20.5 -60 17.0 {NoAI:1b,Rotation:[90f,0f],OwnSize:1.0f,CustomName:'"film:zig_right"'}
+camera 16.0 -60.4 17.0 -90 6
+wait 30
+cmd tick freeze
+frames 2
+burst right_front 10 1
+frames 1
+cmd tick unfreeze
+camera 19.6 -60.6 21.0 180 6
+wait 10
+cmd tick freeze
+frames 2
+burst right_side 10 1
+frames 1
+cmd tick unfreeze
+cmd kill @e[type=antcolonies:otter]

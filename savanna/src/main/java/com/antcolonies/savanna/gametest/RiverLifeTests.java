@@ -2125,6 +2125,248 @@ public class RiverLifeTests {
         });
     }
 
+    /**
+     * Chase and tag (2026-11-23, plan otter-play-and-fish.md 6e step 4 and 6g): two fed otters on an open field, made to
+     * pick tag (the tag play.tag). The runner zigzags in leaps, left and right in turn, each flung to the side its clip
+     * says, at about 6 blocks a second along its path; the chaser runs straight at it, speeding up from 5.5 to 6.5 blocks
+     * a second (the user's numbers); both get caught in turn (the roles swap at each tag); at the nip the pouncer stands
+     * about the clip's measured reach (1.31 blocks) behind the runner's middle.
+     */
+    @GameTest(template = "arena", timeoutTicks = 3600)
+    public static void playingOttersChaseAndTagEachOtherOnTheBank(GameTestHelper helper) {
+        for (int x = 2; x <= 50; x++) {                        // an open stone field, 49 blocks a side
+            for (int zz = 2; zz <= 50; zz++) {
+                helper.setBlock(new BlockPos(x, TOP, zz), Blocks.STONE);
+                for (int y = TOP + 1; y <= TOP + 4; y++) {
+                    helper.setBlock(new BlockPos(x, y, zz), Blocks.AIR);
+                }
+            }
+        }
+        com.antcolonies.savanna.animal.OtterEntity a = playOtter(helper, 24.5, 26.5, true, 26, 26);
+        com.antcolonies.savanna.animal.OtterEntity b = playOtter(helper, 27.5, 26.5, true, 26, 26);
+        for (com.antcolonies.savanna.animal.OtterEntity o : new com.antcolonies.savanna.animal.OtterEntity[] {a, b}) {
+            o.addTag("play.now");
+            o.addTag("play.tag");
+        }
+        byte zl = com.antcolonies.savanna.animal.OtterEntity.ZIG_L, zr = com.antcolonies.savanna.animal.OtterEntity.ZIG_R;
+        java.util.List<String> pounces = new java.util.ArrayList<>();
+        java.util.List<Double> reach = new java.util.ArrayList<>();
+        double[] zig = {0, 0}, chaseTop = {0};                 // blocks and ticks leaping; the chaser's best 10-tick pace
+        int[] leaps = {0}, alternated = {0}, wrongSide = {0};
+        int[] since = {-1, -1};
+        byte[] lastDoing = {0, 0};
+        net.minecraft.world.phys.Vec3[] last = {a.position(), b.position()}, leapFrom = {null, null};
+        float[] leapYaw = {0, 0};
+        java.util.List<java.util.ArrayDeque<net.minecraft.world.phys.Vec3>> trail = java.util.List.of(new java.util.ArrayDeque<>(), new java.util.ArrayDeque<>());
+        boolean[] ended = {false};
+        helper.onEachTick(() -> {
+            com.antcolonies.savanna.animal.OtterEntity[] both = {a, b};
+            for (int i = 0; i < 2; i++) {
+                com.antcolonies.savanna.animal.OtterEntity o = both[i], other = both[1 - i];
+                byte d = o.doing();
+                boolean pouncing = d == com.antcolonies.savanna.animal.OtterEntity.POUNCE;
+                since[i] = pouncing ? since[i] + 1 : -1;
+                if (since[i] == 0) {
+                    pounces.add((i == 0 ? "a" : "b") + "@t" + helper.getTick());
+                }
+                if (since[i] == 10) {                          // the nip: paws on the rump
+                    reach.add(o.position().subtract(other.position()).horizontalDistance());
+                }
+                if (d == zl || d == zr) {
+                    zig[0] += o.position().subtract(last[i]).horizontalDistance() / o.getScale();   // (speeds go with size)
+                    zig[1]++;
+                }
+                if (d != lastDoing[i] && (lastDoing[i] == zl || lastDoing[i] == zr) && leapFrom[i] != null) {
+                    // a leap done: how far it went to its left (+) or right, against its heading
+                    float yaw = leapYaw[i] * net.minecraft.util.Mth.DEG_TO_RAD;
+                    net.minecraft.world.phys.Vec3 m = o.position().subtract(leapFrom[i]);
+                    double aside = m.x * net.minecraft.util.Mth.cos(yaw) + m.z * net.minecraft.util.Mth.sin(yaw);
+                    if (aside * (lastDoing[i] == zl ? 1 : -1) < -0.2) {
+                        wrongSide[0]++;
+                    }
+                }
+                if (d != lastDoing[i] && (d == zl || d == zr)) {
+                    leaps[0]++;
+                    if (lastDoing[i] == (d == zl ? zr : zl)) {
+                        alternated[0]++;
+                    }
+                    leapFrom[i] = o.position();
+                    leapYaw[i] = o.getYRot();
+                }
+                java.util.ArrayDeque<net.minecraft.world.phys.Vec3> tr = trail.get(i);
+                tr.addLast(o.position());
+                if (tr.size() > 11) {
+                    tr.removeFirst();
+                }
+                byte od = other.doing();
+                if (tr.size() == 11 && o.inBout() && d == com.antcolonies.savanna.animal.OtterEntity.CALM && (od == zl || od == zr)) {
+                    chaseTop[0] = Math.max(chaseTop[0], tr.getLast().subtract(tr.getFirst()).horizontalDistance() * 2.0 / o.getScale());
+                }
+                lastDoing[i] = d;
+                last[i] = o.position();
+            }
+            if (!pounces.isEmpty() && !a.inBout() && !b.inBout()) {
+                ended[0] = true;
+            }
+        });
+        helper.succeedWhen(() -> {
+            helper.assertTrue(ended[0], "the game of tag never ended; pounces so far " + pounces);
+            double zigBps = zig[1] > 0 ? zig[0] / zig[1] * 20.0 : 0.0;
+            SavannaMod.LOGGER.info("[otter tag] pounces {}, pouncer behind the runner at the nip {} (the clip's 1.31); {} leaps, {} "
+                    + "after one to the other side, {} to the wrong side; leaping {} b/s; the chaser's best {} b/s", pounces,
+                    reach.stream().map(r -> String.format("%.2f", r)).toList(), leaps[0], alternated[0], wrongSide[0],
+                    String.format("%.2f", zigBps), String.format("%.2f", chaseTop[0]));
+            helper.assertTrue(pounces.stream().anyMatch(p -> p.startsWith("a")) && pounces.stream().anyMatch(p -> p.startsWith("b")),
+                    "they did not both pounce (the roles never swapped): " + pounces);
+            helper.assertTrue(pounces.size() >= 3, "only " + pounces.size() + " tags: " + pounces);
+            for (double r : reach) {
+                helper.assertTrue(Math.abs(r - com.antcolonies.savanna.animal.OtterEntity.POUNCE_BEHIND) < 0.4,
+                        "a pouncer stood " + r + " behind the runner at the nip, not about 1.31: " + reach);
+            }
+            helper.assertTrue(leaps[0] >= 10, "only " + leaps[0] + " zigzag leaps");
+            helper.assertTrue(alternated[0] >= leaps[0] * 0.6, "the leaps did not go left and right in turn: " + alternated[0] + " of " + leaps[0]);
+            helper.assertTrue(wrongSide[0] <= leaps[0] / 10, wrongSide[0] + " of " + leaps[0] + " leaps went to the other side from their clip");
+            helper.assertTrue(zigBps > 5.2 && zigBps < 6.6, "the runner leapt at " + zigBps + " blocks a second, not about 6");
+            // (the chaser cuts the zigzag's bends, so a run seldom lasts the 8 s its pace takes to reach 6.5: first try 5.9)
+            helper.assertTrue(chaseTop[0] > 5.4 && chaseTop[0] < 7.0, "the chaser's best pace was " + chaseTop[0] + " blocks a second, not 5.5 to 6.5");
+        });
+    }
+
+    /**
+     * No body inside another where they meet (2026-11-23; the user saw their heads pass through each other at the nose
+     * poke and lying down together): at the poke their middles stand the measured nose reach apart (the poker's nose at
+     * the bite's reach, the other's standing: 2.83 blocks), so the noses just touch; resting after the bout (the tag
+     * play.rest: always) they lie flank to flank the same way round, their middles about two half widths apart.
+     */
+    @GameTest(template = "arena", timeoutTicks = 4800)
+    public static void playingOttersTouchNosesAndRestSideBySideWithoutOverlapping(GameTestHelper helper) {
+        for (int x = 2; x <= 50; x++) {                        // an open stone field
+            for (int zz = 2; zz <= 50; zz++) {
+                helper.setBlock(new BlockPos(x, TOP, zz), Blocks.STONE);
+                for (int y = TOP + 1; y <= TOP + 4; y++) {
+                    helper.setBlock(new BlockPos(x, y, zz), Blocks.AIR);
+                }
+            }
+        }
+        com.antcolonies.savanna.animal.OtterEntity a = playOtter(helper, 22.5, 26.5, true, 26, 26);
+        com.antcolonies.savanna.animal.OtterEntity b = playOtter(helper, 29.5, 27.5, true, 26, 26);
+        for (com.antcolonies.savanna.animal.OtterEntity o : new com.antcolonies.savanna.animal.OtterEntity[] {a, b}) {
+            o.addTag("play.now");
+            o.addTag("play.rest");
+        }
+        double nose = com.antcolonies.savanna.animal.OtterEntity.NOSE_BITE + com.antcolonies.savanna.animal.OtterEntity.NOSE_STAND;
+        double beside = com.antcolonies.savanna.animal.OtterEntity.REST_BESIDE;
+        double[] poke = {-1}, rest = {-1, 0, 0};             // the poke's gap; resting: the gap, their headings apart, along
+        helper.onEachTick(() -> {
+            byte bite = com.antcolonies.savanna.animal.OtterEntity.BITE, lie = com.antcolonies.savanna.animal.OtterEntity.REST;
+            if (poke[0] < 0 && a.inBout() && b.inBout() && (a.doing() == bite || b.doing() == bite)) {
+                poke[0] = a.position().subtract(b.position()).horizontalDistance();
+            }
+            if (rest[0] < 0 && a.doing() == lie && b.doing() == lie) {
+                net.minecraft.world.phys.Vec3 m = b.position().subtract(a.position());
+                float yaw = a.getYRot() * net.minecraft.util.Mth.DEG_TO_RAD;
+                rest[0] = m.horizontalDistance();
+                rest[1] = Math.abs(net.minecraft.util.Mth.wrapDegrees(a.getYRot() - b.getYRot()));
+                rest[2] = Math.abs(-m.x * net.minecraft.util.Mth.sin(yaw) + m.z * net.minecraft.util.Mth.cos(yaw));
+            }
+        });
+        helper.succeedWhen(() -> {
+            helper.assertTrue(poke[0] >= 0, "they never poked noses");
+            helper.assertTrue(rest[0] >= 0, "they never lay down together after the bout");
+            SavannaMod.LOGGER.info("[otter spacing] the poke {} apart (noses touch at {}); resting {} apart (flank to flank {}), "
+                    + "{} degrees apart, {} along", String.format("%.2f", poke[0]), String.format("%.2f", nose),
+                    String.format("%.2f", rest[0]), String.format("%.2f", beside), (int) rest[1], String.format("%.2f", rest[2]));
+            helper.assertTrue(Math.abs(poke[0] - nose) < 0.3, "at the poke their middles stood " + poke[0] + " apart, not " + nose);
+            helper.assertTrue(rest[0] > beside - 0.15 && rest[0] < beside + 0.4, "resting their middles lay " + rest[0] + " apart, not about " + beside);
+            helper.assertTrue(rest[1] < 25.0, "resting they faced " + rest[1] + " degrees apart, not the same way");
+            helper.assertTrue(rest[2] < 0.5, "resting one lay " + rest[2] + " ahead of the other, not flank to flank");
+        });
+    }
+
+    /**
+     * Otters keep out of each other's bodies (2026-11-23; the user saw one walk its head through the other's flank:
+     * Minecraft kept them apart by their 0.75-block walking boxes only, on bodies 2.6 long). One otter stands; another is
+     * sent walking straight through the spot it stands on and on beyond: it gives way round the other's body, never more
+     * than a little way into it (without the rule it went 0.6 deep and through).
+     */
+    @GameTest(template = "arena", timeoutTicks = 600)
+    public static void anOtterWalkingThroughAnotherGoesRoundItsBody(GameTestHelper helper) {
+        for (int x = 2; x <= 40; x++) {
+            for (int zz = 2; zz <= 30; zz++) {
+                helper.setBlock(new BlockPos(x, TOP, zz), Blocks.STONE);
+                for (int y = TOP + 1; y <= TOP + 4; y++) {
+                    helper.setBlock(new BlockPos(x, y, zz), Blocks.AIR);
+                }
+            }
+        }
+        com.antcolonies.savanna.animal.OtterEntity stander = playOtter(helper, 20.5, 16.5, false, 20, 16);
+        com.antcolonies.savanna.animal.OtterEntity walker = playOtter(helper, 12.5, 16.5, false, 20, 16);
+        for (com.antcolonies.savanna.animal.OtterEntity o : new com.antcolonies.savanna.animal.OtterEntity[] {stander, walker}) {
+            o.goalSelector.removeAllGoals(g -> true);
+            o.setYRot(o == stander ? 0.0F : -90.0F);
+            o.yBodyRot = o.getYRot();
+        }
+        net.minecraft.core.BlockPos to = helper.absolutePos(new BlockPos(30, TOP + 1, 16));
+        double[] deepest = {0};
+        long[] passedAt = {-1};
+        helper.onEachTick(() -> {
+            if (helper.getTick() % 10 == 1) {
+                walker.getNavigation().moveTo(to.getX() + 0.5, to.getY(), to.getZ() + 0.5, 0.8);
+            }
+            if (helper.getTick() > 2) {                       // (the beads are set on the body from its first tick)
+                deepest[0] = Math.max(deepest[0], walker.bodyOverlap(stander));
+            }
+            if (passedAt[0] < 0 && walker.getX() > stander.getX() + 1.5) {
+                passedAt[0] = helper.getTick();
+            }
+        });
+        helper.succeedWhen(() -> {
+            helper.assertTrue(walker.position().distanceTo(net.minecraft.world.phys.Vec3.atBottomCenterOf(to)) < 1.5,
+                    "the walker never got past the stander (at " + walker.position() + ")");
+            SavannaMod.LOGGER.info("[otter apart] the deepest one body went into the other: {} blocks; past it at t{}", String.format("%.2f", deepest[0]), passedAt[0]);
+            helper.assertTrue(deepest[0] < 0.3, "the walking otter went " + deepest[0] + " blocks into the standing one's body");
+        });
+    }
+
+    /**
+     * The swimming chase porpoises (2026-11-23): two fed otters in a pool 3 deep play; going after each other at the
+     * surface, now and then one leaps out in a porpoise.
+     */
+    @GameTest(template = "arena", timeoutTicks = 2400)
+    public static void playingOttersPorpoiseInADeepPool(GameTestHelper helper) {
+        int poolX = MX0 + 4;
+        otterPool(helper, poolX);
+        com.antcolonies.savanna.animal.OtterEntity a = poolOtter(helper, poolX + 5.5, MZ0 + 3.5);
+        com.antcolonies.savanna.animal.OtterEntity b = poolOtter(helper, poolX + 8.5, MZ0 + 6.5);
+        java.util.Set<String> leapt = new java.util.TreeSet<>();
+        boolean[] played = {false};
+        helper.onEachTick(() -> {
+            played[0] |= a.inBout();
+            for (com.antcolonies.savanna.animal.OtterEntity o : new com.antcolonies.savanna.animal.OtterEntity[] {a, b}) {
+                if (o.doing() == com.antcolonies.savanna.animal.OtterEntity.PORPOISE) {
+                    leapt.add(o == a ? "a" : "b");
+                }
+            }
+        });
+        helper.succeedWhen(() -> {
+            helper.assertTrue(played[0], "they never started a bout in the pool: a " + a.playState());
+            helper.assertTrue(!leapt.isEmpty(), "no otter porpoised in the swimming chase");
+            SavannaMod.LOGGER.info("[otter porpoise] leapt: {}", leapt);
+        });
+    }
+
+    /** A grown fed otter afloat in the pool, ready to play at once, kept in the water. */
+    private static com.antcolonies.savanna.animal.OtterEntity poolOtter(GameTestHelper helper, double x, double z) {
+        com.antcolonies.savanna.animal.OtterEntity otter = helper.spawn(SavannaEntities.OTTER.get(),
+                new net.minecraft.world.phys.Vec3(x, TOP, z));
+        otter.setPersistenceRequired();
+        otter.life().setUp(false, otter.getRandom());
+        otter.makeFed();
+        otter.addTag("play.now");
+        otter.restrictTo(helper.absolutePos(new BlockPos((int) x, TOP, (int) z)), 4);
+        return otter;
+    }
+
     /** A grown otter on the bank, fed or hungry, kept within 3 blocks of a spot; no swims (so the bout stays on the bank). */
     private static com.antcolonies.savanna.animal.OtterEntity playOtter(GameTestHelper helper, double x, double z, boolean fed,
             int keepX, int keepZ) {

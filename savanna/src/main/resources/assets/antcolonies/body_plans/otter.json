@@ -141,7 +141,9 @@
       "porpoise",
       "play_bound",
       "side_hop_left",
-      "side_hop_right"
+      "side_hop_right",
+      "zig_left",
+      "zig_right"
     ],
     "tuck_ok": [
       "swim",
@@ -166,7 +168,9 @@
       "bound": 40.0,
       "scurry": 25.078,
       "sniff_walk": 9.491,
-      "play_bound": 40.0
+      "play_bound": 40.0,
+      "zig_left": 88.0,
+      "zig_right": 88.0
     },
     "switches": [
       [
@@ -508,6 +512,38 @@
       [
         "bound",
         "side_hop_right"
+      ],
+      [
+        "zig_left",
+        "zig_right"
+      ],
+      [
+        "zig_right",
+        "zig_left"
+      ],
+      [
+        "play_bound",
+        "zig_left"
+      ],
+      [
+        "play_bound",
+        "zig_right"
+      ],
+      [
+        "zig_left",
+        "skid_stop"
+      ],
+      [
+        "zig_right",
+        "skid_stop"
+      ],
+      [
+        "zig_left",
+        "play_bound"
+      ],
+      [
+        "zig_right",
+        "play_bound"
       ]
     ],
     "controller": "savanna/src/main/java/com/antcolonies/savanna/animal/OtterEntity.java",

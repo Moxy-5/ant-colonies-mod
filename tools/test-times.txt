@@ -92,6 +92,7 @@ anoldhumpofnewlandisgrassywithtreesandaburrow 0.03
 anotterafloatinapooldoesnotdrown 0.04
 anotterscramblesupastepandhopsbackdown 0.02
 anotterslidesintoapoolandclimbsoutandshakes 0.02
+anotterwalkingthroughanothergoesrounditsbody 0.01
 antcrawlsupsidedowntothemiddleoftheroomceilingandhangsthere 0.37
 anthillonastepkeepsitsroundshape 6.13
 antpatrolnumbersarelostoutofsightonwaysthroughdanger 1.06
@@ -251,6 +252,9 @@ oxbowandpanroomismeasured 7.01
 oxbowsandpansgoroundwhatisintheirway 0.01
 oxbowscarholdsnowater 0.01
 panskeepsnailsfrogsandfliesoxbowstheriversanimals 0.00
+playingotterschaseandtageachotheronthebank 0.02
+playingottersporpoiseinadeeppool 0.01
+playingotterstouchnosesandrestsidebysidewithoutoverlapping 0.05
 queenisfedandheregggoestothenursery 4.51
 queenwalksfromtheroomuptothesurfaceandbackdown 0.03
 reedsrootinshallowwaterandatthewaterline 0.00
