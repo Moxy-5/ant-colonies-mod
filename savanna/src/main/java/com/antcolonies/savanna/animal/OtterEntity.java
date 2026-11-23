@@ -588,9 +588,11 @@ public class OtterEntity extends PathfinderMob implements GeoEntity, HasLife {
         super.remove(reason);
     }
 
+    /** Its own dives decide its breath (up after 20 s at most, DIVE_MOST): Minecraft's air would drown it afloat, since
+     *  its eye point sits just under the surface at its float depth (BUGS 288). */
     @Override
-    public int getMaxAirSupply() {
-        return 1200;
+    public boolean canDrownInFluidType(net.neoforged.neoforge.fluids.FluidType type) {
+        return false;
     }
 
     @Override

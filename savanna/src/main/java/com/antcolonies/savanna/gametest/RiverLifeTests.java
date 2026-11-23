@@ -2124,6 +2124,34 @@ public class RiverLifeTests {
         });
     }
 
+    /**
+     * An otter afloat in a pool for 75 s (longer than Minecraft's air would have lasted it) is never hurt: afloat, its
+     * eye point sits just under the surface, so it drowned in the river (BUGS 288); its own dives decide its breath.
+     */
+    @GameTest(template = "arena", timeoutTicks = 1700)
+    public static void anOtterAfloatInAPoolDoesNotDrown(GameTestHelper helper) {
+        int poolX = MX0 + 10, z = MZ0 + 5;
+        otterPool(helper, poolX);
+        com.antcolonies.savanna.animal.OtterEntity otter = helper.spawn(SavannaEntities.OTTER.get(),
+                new net.minecraft.world.phys.Vec3(poolX + 5.5, TOP, z + 0.5));
+        otter.setPersistenceRequired();
+        otter.life().setUp(false, otter.getRandom());
+        otter.goalSelector.removeAllGoals(g -> true);       // it stays afloat where it is
+        int[] wet = {0};
+        helper.onEachTick(() -> {
+            if (otter.isInWater()) {
+                wet[0]++;
+            }
+            helper.assertTrue(otter.isAlive() && otter.getHealth() >= otter.getMaxHealth(), "the otter was hurt afloat after "
+                    + wet[0] + " ticks in the water (health " + otter.getHealth() + ", air " + otter.getAirSupply()
+                    + ", eye in water " + otter.isEyeInFluid(net.minecraft.tags.FluidTags.WATER) + ")");
+        });
+        helper.runAtTickTime(1500, () -> {
+            helper.assertTrue(wet[0] > 1400, "the otter was not in the water the whole time (" + wet[0] + " ticks)");
+            helper.succeed();
+        });
+    }
+
     // --- the hippo (2026-11-21) ------------------------------------------------------------------------------------------
 
     /** The hippo's ground: what lies at each x of the strip MX0..MX1 (stone walls round it hold any water in). */
