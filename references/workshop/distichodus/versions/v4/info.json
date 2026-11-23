@@ -1,0 +1,15 @@
+{
+ "note": "slightly bulkier (body 4.5 across), the head level across the eye so each eye is one flush box with a whole pupil",
+ "date": "2026-11-22",
+ "boxes": 67,
+ "numbers": {
+  "WIDEST": 2.25,
+  "CHEEK": 1.5,
+  "CORE_WIDTH": 0.55,
+  "FLANK_DEPTH": 0.62,
+  "HEAD_FLANK_DEPTH": 0.85,
+  "EYE_AT": 33.0,
+  "EYE_HEIGHT": 10.25,
+  "EYE_SIZE": 1.0
+ }
+}
