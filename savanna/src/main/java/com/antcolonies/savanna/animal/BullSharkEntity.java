@@ -94,7 +94,9 @@ public class BullSharkEntity extends WaterAnimal implements GeoEntity {
     static final double SURFACE_IN_BLOCK = 8.0 / 9.0;
 
     // --- clips (ticks; each starts once the player has blended into it, CLIP_LAG later) ------------------------------
-    static final int CLIP_LAG = 4;
+    /** GeckoLib's blend into a new clip: 6 ticks (2026-11-22; 4 before). The swim clips' travelling wave is wide enough
+     *  that idle, swim, burst and prowl changed half a beat apart threw the tail 3.7 to 4.3 px in a tick over 4. */
+    static final int CLIP_LAG = 6;
     /** The bite: 0.95 s, the jaws shut on tick 8 (the card). */
     static final int BITE_TICKS = 19 + CLIP_LAG, BITE_HIT = 8 + CLIP_LAG;
     /** Shaking a held catfish: two beats of the 1.2 s clip (my pick). */
