@@ -1,5 +1,6 @@
 package com.antcolonies.savanna.client;
 
+import com.antcolonies.client.FaceLayer;
 import com.antcolonies.savanna.SavannaMod;
 import com.antcolonies.savanna.animal.OtterEntity;
 
@@ -16,13 +17,18 @@ import org.joml.Vector3d;
 /**
  * The otter's model (2026-11-22): its clips as made ({@code tools/otter_models.py game}); on a block move drawn on the
  * move's own path ({@link com.antcolonies.entity.body.MoveRider#drawnShift}, as the monitor and the hippo); its neck and
- * head turned toward what caught its eye ({@link OtterEntity#attention}), shared between the two.
+ * head turned toward what caught its eye ({@link OtterEntity#attention}), shared between the two; its face showing its
+ * mood on top of every clip ({@link FaceLayer}, {@code assets/antcolonies/faces/otter.json}, 2026-11-22).
  */
 public class OtterModel extends DefaultedEntityGeoModel<OtterEntity> {
     /** Drawn on its path and looking about only within this many blocks of the camera (my pick). */
     private static final double NEAR = 48.0;
     /** How far forward of its middle its eyes are (model pixels), and how far its head turns at most (degrees; my picks). */
     private static final double EYES_AHEAD = 18.4, HEAD_TURN = 55.0;
+    /** Its moods' faces (written by {@code python tools/otter_models.py game}). */
+    private static final FaceLayer FACE = FaceLayer.of(OtterModel.class, SavannaMod.MODID, "otter");
+    /** How much of the mood's tail it shows moving: on land all, afloat a little (the swim's own wave pushes it). */
+    private static final double TAIL_LAND = 1.0, TAIL_SWIMMING = 0.3;
 
     public OtterModel() {
         super(ResourceLocation.fromNamespaceAndPath(SavannaMod.MODID, "otter"));
@@ -51,6 +57,13 @@ public class OtterModel extends DefaultedEntityGeoModel<OtterEntity> {
         if (looks && Math.abs(otter.attention.headAim) > 1.0E-3) {
             turnY(getAnimationProcessor().getBone("neck"), otter.attention.headAim * 0.45);
             turnY(getAnimationProcessor().getBone("head"), otter.attention.headAim * 0.55);
+        }
+        if (!otter.isDeadOrDying()) {
+            // standing, its mood's stance clip carries the tail; the bite and the eat clips carry the jaw
+            double tail = otter.standing() || doing != OtterEntity.CALM ? 0.0 : otter.swimming() ? TAIL_SWIMMING : TAIL_LAND;
+            boolean jawFree = doing != OtterEntity.BITE && doing != OtterEntity.EAT;
+            FACE.draw(otter, getAnimationProcessor()::getBone, new FaceLayer.Frame(OtterEntity.MOODS[otter.mood()],
+                    (otter.tickCount + pt) / 20.0, jawFree, tail));
         }
     }
 

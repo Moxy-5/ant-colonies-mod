@@ -82,6 +82,22 @@ public class OtterEntity extends PathfinderMob implements GeoEntity, HasLife {
     private static final EntityDataAccessor<CompoundTag> DATA_MOVE = SynchedEntityData.defineId(OtterEntity.class,
             EntityDataSerializers.COMPOUND_TAG);
     private static final EntityDataAccessor<Byte> DATA_LIFE = AnimalLife.dataFor(OtterEntity.class);
+    /**
+     * Its mood (2026-11-22, the faces; plan {@code docs/plans/otter-play-and-fish.md}, section 6a): one value, worked
+     * out in one place ({@link #workOutMood}), read by its face, its tail and its standing stance. In order of how
+     * urgent it is: a more urgent mood comes at once, a calmer one only after {@link #MOOD_HOLD} ticks.
+     */
+    public static final String[] MOODS = {"calm", "playful", "curious", "content", "wary", "cross", "scared"};
+    public static final byte CALM_MOOD = 0, PLAYFUL = 1, CURIOUS = 2, CONTENT = 3, WARY = 4, CROSS = 5, SCARED = 6;
+    private static final EntityDataAccessor<Byte> DATA_MOOD = SynchedEntityData.defineId(OtterEntity.class, EntityDataSerializers.BYTE);
+    /** A calmer mood waits this long (ticks: 3 s) after the last change, so the face does not flicker (my pick). */
+    static final int MOOD_HOLD = 60;
+    /** A player sprinting within this many blocks, or standing (not crouching) within the second, makes it wary (my picks). */
+    static final double SPRINT_WARY = 10.0, TOO_CLOSE = 3.5;
+    /** Another otter this near (blocks), fed and safe in the day, it is playful (my pick; play itself comes later). */
+    static final double PLAYMATE_NEAR = 6.0;
+    /** Hit within this long (ticks: 5 s) and not running, it is cross (my pick). */
+    static final int CROSS_FOR = 100;
 
     /** The model is made at a grown otter's size (2.6 blocks nose to tail tip; 16 px a block); drawn at this share. */
     public static final float MODEL_SCALE = 1.0F;
@@ -221,6 +237,7 @@ public class OtterEntity extends PathfinderMob implements GeoEntity, HasLife {
         MoveRider.define(builder, DATA_MOVE);
         builder.define(DATA_DOING, CALM);
         builder.define(DATA_DIVING, false);
+        builder.define(DATA_MOOD, CALM_MOOD);
     }
 
     public MoveRider rider() {
@@ -259,6 +276,66 @@ public class OtterEntity extends PathfinderMob implements GeoEntity, HasLife {
 
     public float ownSize() {
         return life.ownSize();
+    }
+
+    /** Its mood now (one of {@link #MOODS}). */
+    public byte mood() {
+        return entityData.get(DATA_MOOD);
+    }
+
+    /** The game tick its mood last changed. */
+    private int moodSince;
+
+    /**
+     * Its mood from what it is doing and what is near (the one place that judges it; every 5 ticks on the server).
+     * A custom name "mood:wary" (a name tag) or a tag "mood.wary" (the film camera's walker, named already) holds a
+     * mood for looking at it.
+     */
+    byte workOutMood() {
+        net.minecraft.network.chat.Component name = getCustomName();
+        for (byte i = 0; i < MOODS.length; i++) {
+            if (name != null && name.getString().equals("mood:" + MOODS[i]) || getTags().contains("mood." + MOODS[i])) {
+                return i;
+            }
+        }
+        if (scared()) {
+            return SCARED;
+        }
+        if (getLastHurtByMob() != null && tickCount - getLastHurtByMobTimestamp() < CROSS_FOR) {
+            return CROSS;
+        }
+        byte d = doing();
+        if (d == EAT || d == REST || d == REST_UP || d == SHAKE) {
+            return CONTENT;
+        }
+        Player p = level().getNearestPlayer(this, 14.0);
+        if (p != null && !p.isSpectator() && !p.isInvisible()) {
+            double dist = distanceTo(p);
+            if (p.isSprinting() && dist < SPRINT_WARY || !p.isCrouching() && dist < TOO_CLOSE) {
+                return WARY;
+            }
+            if (Attention.playerInReach(p, dist, 14.0, 5.0)) {
+                return CURIOUS;
+            }
+        }
+        if (isFed() && level().isDay() && !level().getEntitiesOfClass(OtterEntity.class,
+                getBoundingBox().inflate(PLAYMATE_NEAR), o -> o != this && o.isAlive()).isEmpty()) {
+            return PLAYFUL;
+        }
+        return CALM_MOOD;
+    }
+
+    private void updateMood() {
+        byte now = mood(), want = workOutMood();
+        if (want != now && (want > now || tickCount - moodSince >= MOOD_HOLD)) {
+            entityData.set(DATA_MOOD, want);
+            moodSince = tickCount;
+        }
+    }
+
+    /** Standing still on land doing nothing else (its mood's standing stance plays then; drawing too). */
+    public boolean standing() {
+        return !going() && !swimming() && doing() == CALM && rider.play() == null && !isDeadOrDying();
     }
 
     /** Whether it is scared of something now (fleeing). */
@@ -330,6 +407,9 @@ public class OtterEntity extends PathfinderMob implements GeoEntity, HasLife {
             return;
         }
         life.tick();
+        if (tickCount % 5 == 0) {
+            updateMood();
+        }
         if (breatheFor > 0) {
             breatheFor--;
         }
@@ -1203,6 +1283,7 @@ public class OtterEntity extends PathfinderMob implements GeoEntity, HasLife {
 
     private static final java.util.Map<String, RawAnimation> FILM_CLIPS = new java.util.concurrent.ConcurrentHashMap<>();
     private static final java.util.Map<String, RawAnimation> MOVE_CLIPS = new java.util.concurrent.ConcurrentHashMap<>();
+    private static final java.util.Map<String, RawAnimation> STANCES = new java.util.concurrent.ConcurrentHashMap<>();
     private static final RawAnimation IDLE = RawAnimation.begin().thenLoop("idle");
     private static final RawAnimation WALK = RawAnimation.begin().thenLoop("walk");
     private static final RawAnimation BOUND_CLIP = RawAnimation.begin().thenLoop("bound");
@@ -1278,6 +1359,10 @@ public class OtterEntity extends PathfinderMob implements GeoEntity, HasLife {
             }
             player.setAnimationSpeed(Mth.clamp(stride / (WALK_CLIP_SPEED * size), 0.5, 2.0));
             return state.setAndContinue(WALK);
+        }
+        byte m = mood();
+        if (m != CALM_MOOD && !isInWater()) {      // its mood's stance and tail (tools/otter_models.py stance_clips)
+            return state.setAndContinue(STANCES.computeIfAbsent(MOODS[m], n -> RawAnimation.begin().thenLoop("stand_" + n)));
         }
         return state.setAndContinue(IDLE);
     }

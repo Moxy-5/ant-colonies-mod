@@ -18,6 +18,7 @@ Outline x (0 = tail tip, 41.6 = snout tip) converts to model z via oz(ox) = tota
     python tools/workshop.py versions otter
     python tools/workshop.py serve otter
 """
+import json
 import math
 import sys
 from pathlib import Path
@@ -37,7 +38,7 @@ NECK_LEN = 4.6          # neck reach along its pitched axis (px)
 HEAD_PITCH = 2.0        # slight alert head tilt (+ = nose slightly up, deg)
 TAIL_LEN = 12.2         # smooth tapering tail length (px)
 WHISKER_LEN = 3.2       # total length of each curved 3D whisker (px)
-EAR_STYLE = "v6"        # the ears: "v6" (approved), "A", "B" or "C" (see build_bones; the user picks on the faces page)
+EAR_STYLE = "A"         # the ears: "A" picked by the user 2026-11-22 ("do A bigger for the ears"); "v6" (the old), "B", "C"
 
 WORKSHOP_SHAPE = [
     ("BODY_EXTRA",  "Extra body length (px)",  0.0, 16.0, 0.8),
@@ -2023,7 +2024,7 @@ FACES = {m: dict(_FACE_ZERO, **v) for m, v in {
     "content": {"ear_fwd": -8.0, "ear_out": 2.0, "lids": 0.55, "whiskers": -7.0, "nod": -3.0, "blink": 2.8,
                 "flick": 0.5, "quiver": 0.8,
                 "tail_lift": -5.0, "tail_curl": 1.5, "tail_swish": 2.5, "tail_speed": 1, "tail_still": 1.0,
-                "crouch": 0.6, "neck": -3.0,
+                "crouch": 0.4, "neck": -3.0,
                 "note": "Eyes half shut in a squint, ears soft and back, settled low, tail lying slack. Eating, resting, "
                         "dried off."},
     "wary":    {"ear_fwd": 6.0, "ear_out": 6.0, "eyes": 1.1, "whiskers": 11.0, "jaw": -1.0, "tongue": -0.4,
@@ -2057,7 +2058,8 @@ def _flick(t, rate, seed):
     return _blink_curve(t % IDLE_LEN, times, dur=0.22)
 
 
-TAIL_GROUND = 0.7
+TAIL_GROUND = [2.8, 2.3, 1.8, 1.3]   # a pressed-down tail's joints tail_2..tail_5 this high (px): thick near the base,
+                                     # thin at the tip, so it lies on the ground, not in it
 
 
 def _world_tail_pitch(p):
@@ -2071,8 +2073,9 @@ def _add_rot(p, bone, d):
     p.setdefault(bone, {})["rotation"] = [r[0] + d[0], r[1] + d[1], r[2] + d[2]]
 
 
-def face_pose(mood, t):
-    """The idle body at time t with this mood on it: face, tail and stance (the faces page; the game adds the same)."""
+def face_pose(mood, t, face=True):
+    """The idle body at time t with this mood on it: face, tail and stance (the faces page). face=False: the stance and
+    tail only, the idle's own face kept (the game's stand_<mood> clips; the game adds the face live on every clip)."""
     f = FACES[mood]
     p = _idle_pose(t)
     w = 2.0 * math.pi * t / IDLE_LEN
@@ -2109,12 +2112,14 @@ def face_pose(mood, t):
     # is TAIL_GROUND px over the ground)
     for i in range(1, 5):
         for _ in range(40):
-            if _fk_bone(p, f"tail_{i + 1}")[0][1] >= TAIL_GROUND:
+            if _fk_bone(p, f"tail_{i + 1}")[0][1] >= TAIL_GROUND[i - 1]:
                 break
             _add_rot(p, f"tail_{i}", [2.0, 0.0, 0.0])
-    if _fk_bone(p, "tail_5")[0][1] < TAIL_GROUND + 0.4:
+    if _fk_bone(p, "tail_5")[0][1] < TAIL_GROUND[-1] + 0.4:
         _add_rot(p, "tail_5", [-_world_tail_pitch(p) * 0.8, 0.0, 0.0])
 
+    if not face:
+        return p
     # --- the face ---
     n = max(1, round(IDLE_LEN / f["blink"]))
     blink = _blink_curve(t, [((k + 0.3) / n) * IDLE_LEN for k in range(n)], dur=0.16)
@@ -2139,6 +2144,29 @@ def face_clips():
 
 
 EAR_STYLES = {"v6": "Now (approved v6)", "A": "A: bigger", "B": "B: bigger, pale rim", "C": "C: round, set out"}
+
+
+def stance_clips():
+    """The game's standing-still clips, one per mood with a stance (calm stands in the idle): stance and tail."""
+    return {"stand_" + m: clip(IDLE_LEN, lambda t, m=m: face_pose(m, t, face=False), 72, loop=True)
+            for m in FACE_MOODS if m != "calm"}
+
+
+FACE_KEYS = ["ear_fwd", "ear_out", "ear_flat", "lids", "eyes", "whiskers", "jaw", "tongue", "tilt", "nod", "blink",
+             "flick", "scan", "quiver", "tail_lift", "tail_curl", "tail_swish", "tail_speed"]
+
+
+def face_file():
+    """assets/antcolonies/faces/otter.json: what the game's face layer (framework FaceLayer) adds on every clip."""
+    return {"_made_by": "tools/otter_models.py game (FACES; the faces page: python tools/otter_models.py faces)",
+            "cycle": IDLE_LEN, "lid_drop": -1.55, "ear_flick": 14.0, "whisker_roll": 0.4, "blink_time": 0.16,
+            "flick_time": 0.22,
+            "bones": {"ear_left": "ear_left", "ear_right": "ear_right", "lid_left": "lid_left", "lid_right": "lid_right",
+                      "eye_left": "eye_left", "eye_right": "eye_right", "whisker_left": "whisker_left",
+                      "whisker_right": "whisker_right", "jaw": "jaw", "tongue": "tongue", "head": "head",
+                      "tail": ["tail_1", "tail_2", "tail_3", "tail_4", "tail_5"]},
+            "moods": {m: {k: FACES[m][k] for k in FACE_KEYS} for m in FACE_MOODS},
+            "stances": {m: "stand_" + m for m in FACE_MOODS if m != "calm"}}
 
 
 def faces_page():
@@ -2187,10 +2215,12 @@ def export_game():
     """Exports geo, texture, animations (with automatic model_parts.game_faces!) and BlockMoves into savanna/."""
     bones, png_bytes, w, h = workshop_look()
     all_clips = clips()
+    stances = stance_clips()
     write_assets({
         "geo/entity/otter.geo.json": geo("otter", bones, w, h, (3.2, 1.6, [0, 0.6, 0])),
         "textures/entity/otter.png": png_bytes,
-        "animations/entity/otter.animation.json": animations(all_clips),
+        "animations/entity/otter.animation.json": animations({**all_clips, **stances}),
+        "faces/otter.json": face_file(),
     }, mod="savanna")
     write_block_moves("otter", block_moves(all_clips, MOVE_SIZES, lambda s: 16.0 / s, move_specs(), lead=4),
                       "tools/otter_models.py game")

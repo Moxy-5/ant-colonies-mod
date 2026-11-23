@@ -1,0 +1,143 @@
+# The otter's moods in the game (2026-11-22, the faces; the hard rule: checked in the game from three sides): each mood
+# held with a name ("mood:<name>"; the walker a tag "mood.<name>") on an otter standing still facing west (its head about x 19.2, z 17), its face,
+# tail and stance filmed from the front three quarters, the side, face on and the whole body; then a playful otter
+# walking (the tail raised and swishing on the walk), and the curious face stepped 3 ticks a picture (its blinks and twitches).
+#   ./gradlew runFilm -PfilmScene=tools/film/otter_moods.film      pictures in run-film/screenshots/otter_moods/
+cmd time set noon
+cmd weather clear
+cmd kill @e[type=!player]
+cmd fill 0 -61 0 40 -50 34 minecraft:air
+cmd fill 0 -61 0 40 -61 34 minecraft:grass_block
+lens 40
+wait 40
+cmd summon antcolonies:otter 20.5 -60 17.0 {NoAI:1b,Rotation:[90f,0f],OwnSize:1.0f,CustomName:'"mood:calm"'}
+wait 30
+camera 17.0 -60.8 15.0 -48 10
+wait 12
+shot calm_three
+camera 19.4 -60.85 14.2 0 6
+wait 12
+shot calm_side
+camera 16.4 -60.85 17.0 -90 6
+wait 12
+shot calm_front
+camera 20.6 -60.5 12.6 0 14
+wait 12
+shot calm_body
+cmd kill @e[type=antcolonies:otter]
+wait 40
+cmd summon antcolonies:otter 20.5 -60 17.0 {NoAI:1b,Rotation:[90f,0f],OwnSize:1.0f,CustomName:'"mood:curious"'}
+wait 30
+camera 17.0 -60.8 15.0 -48 10
+wait 12
+shot curious_three
+camera 19.4 -60.85 14.2 0 6
+wait 12
+shot curious_side
+camera 16.4 -60.85 17.0 -90 6
+wait 12
+shot curious_front
+camera 20.6 -60.5 12.6 0 14
+wait 12
+shot curious_body
+cmd kill @e[type=antcolonies:otter]
+wait 40
+cmd summon antcolonies:otter 20.5 -60 17.0 {NoAI:1b,Rotation:[90f,0f],OwnSize:1.0f,CustomName:'"mood:playful"'}
+wait 30
+camera 17.0 -60.8 15.0 -48 10
+wait 12
+shot playful_three
+camera 19.4 -60.85 14.2 0 6
+wait 12
+shot playful_side
+camera 16.4 -60.85 17.0 -90 6
+wait 12
+shot playful_front
+camera 20.6 -60.5 12.6 0 14
+wait 12
+shot playful_body
+cmd kill @e[type=antcolonies:otter]
+wait 40
+cmd summon antcolonies:otter 20.5 -60 17.0 {NoAI:1b,Rotation:[90f,0f],OwnSize:1.0f,CustomName:'"mood:content"'}
+wait 30
+camera 17.0 -60.8 15.0 -48 10
+wait 12
+shot content_three
+camera 19.4 -60.85 14.2 0 6
+wait 12
+shot content_side
+camera 16.4 -60.85 17.0 -90 6
+wait 12
+shot content_front
+camera 20.6 -60.5 12.6 0 14
+wait 12
+shot content_body
+cmd kill @e[type=antcolonies:otter]
+wait 40
+cmd summon antcolonies:otter 20.5 -60 17.0 {NoAI:1b,Rotation:[90f,0f],OwnSize:1.0f,CustomName:'"mood:wary"'}
+wait 30
+camera 17.0 -60.8 15.0 -48 10
+wait 12
+shot wary_three
+camera 19.4 -60.85 14.2 0 6
+wait 12
+shot wary_side
+camera 16.4 -60.85 17.0 -90 6
+wait 12
+shot wary_front
+camera 20.6 -60.5 12.6 0 14
+wait 12
+shot wary_body
+cmd kill @e[type=antcolonies:otter]
+wait 40
+cmd summon antcolonies:otter 20.5 -60 17.0 {NoAI:1b,Rotation:[90f,0f],OwnSize:1.0f,CustomName:'"mood:scared"'}
+wait 30
+camera 17.0 -60.8 15.0 -48 10
+wait 12
+shot scared_three
+camera 19.4 -60.85 14.2 0 6
+wait 12
+shot scared_side
+camera 16.4 -60.85 17.0 -90 6
+wait 12
+shot scared_front
+camera 20.6 -60.5 12.6 0 14
+wait 12
+shot scared_body
+cmd kill @e[type=antcolonies:otter]
+wait 40
+cmd summon antcolonies:otter 20.5 -60 17.0 {NoAI:1b,Rotation:[90f,0f],OwnSize:1.0f,CustomName:'"mood:cross"'}
+wait 30
+camera 17.0 -60.8 15.0 -48 10
+wait 12
+shot cross_three
+camera 19.4 -60.85 14.2 0 6
+wait 12
+shot cross_side
+camera 16.4 -60.85 17.0 -90 6
+wait 12
+shot cross_front
+camera 20.6 -60.5 12.6 0 14
+wait 12
+shot cross_body
+cmd kill @e[type=antcolonies:otter]
+wait 40
+# --- playful, walking east past the camera (the tail on the walk)
+walker antcolonies:otter 14.0 -60 17.5 -90 OwnSize:1.0f,Tags:["mood.playful"]
+camera 19.0 -60.5 12.5 0 12
+cmd tick unfreeze
+go 28 -60 17 0.55
+wait 30
+cmd tick freeze
+burst playful_walk 8 3
+cmd tick unfreeze
+cmd kill @e[type=antcolonies:otter]
+wait 40
+# --- the curious face's own life, stepped
+cmd summon antcolonies:otter 20.5 -60 17.0 {NoAI:1b,Rotation:[90f,0f],OwnSize:1.0f,CustomName:'"mood:curious"'}
+camera 17.0 -60.8 15.0 -48 10
+wait 30
+cmd tick freeze
+burst curious_life 12 3
+cmd tick unfreeze
+quit

@@ -1,6 +1,6 @@
 # Handoff Card: African River Otter (*Aonyx capensis*)
 
-- **Status:** In the game (step 1, 2026-11-22: `OtterEntity`, moves through the shared `MoveRider`). Was: Ready for Java (`v6` look + sculpted outer haunches & all 21 clips / 5 BlockMoves approved by user 2026-11-21) | Approved workshop version: `v6`
+- **Status:** In the game (step 1, 2026-11-22: `OtterEntity`, moves through the shared `MoveRider`; hunting; moods and faces 2026-11-22: `v7` with **ears A** (bigger, the user's pick on `references/workshop/otter/faces.html`), six `stand_<mood>` clips and `faces/otter.json` for the shared `FaceLayer`, all from `tools/otter_models.py game`). Was: Ready for Java (`v6` look + sculpted outer haunches & all 21 clips / 5 BlockMoves approved by user 2026-11-21) | Approved workshop version: `v6`
 - **Mod & ID:** `savanna` (`antcolonies:otter`) | **Family:** `upright_four_legs` (Upright Four Legs + Aquatic Extras)
 
 ## Asset Paths

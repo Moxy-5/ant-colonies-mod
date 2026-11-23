@@ -284,3 +284,7 @@ a pale inside (`EAR_STYLE` in `tools/otter_models.py`; the game keeps v6 until t
 (lift, curl, swish, held stiff; a tail pressed down lies along the ground) and a **stance** (crouch, lean, neck, hunched
 back, head turning, trembling, a lifted front paw for wary; legs re-solved so the feet stay planted). In the game the
 stance goes on the standing-still clip only; the face and tail go on every clip. A "Whole body" camera shows it.
+
+**Built (2026-11-22, round 3):** the user: "those are perfect and do A bigger for the ears". Ears A in the game model
+(v7); the mood, face, tail and stances in the game (`OtterEntity.workOutMood`, the shared `client/FaceLayer`,
+`stand_<mood>` clips); filmed in the game (`tools/film/otter_moods.film`). Next in 6e: the skitter walks (6b).
