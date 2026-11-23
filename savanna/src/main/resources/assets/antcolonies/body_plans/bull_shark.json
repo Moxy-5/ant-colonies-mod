@@ -91,10 +91,18 @@
    ["swim", "death"]
   ]
  },
+ "verify": {
+  "films": ["tools/film/bull_shark_frames.film"],
+  "compare": {
+   "version": "v13",
+   "film": "tools/film/bull_shark_frames.film",
+   "shots": "rest_side,rest_threequarter,rest_top,rest_front"
+  }
+ },
  "course": {
   "bull_shark": {
    "id": "antcolonies:bull_shark",
-   "data": "",
+   "data": "Length:5.5f",
    "walk": 1.0,
    "dash": 1.8,
    "bpt": 0.165

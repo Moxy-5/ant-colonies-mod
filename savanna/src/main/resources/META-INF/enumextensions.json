@@ -44,6 +44,18 @@
     },
     {
       "enum": "net/minecraft/world/entity/MobCategory",
+      "name": "ANTCOLONIES_BULL_SHARK",
+      "constructor": "(Ljava/lang/String;IZZI)V",
+      "parameters": [
+        "antcolonies:bull_shark",
+        2,
+        true,
+        false,
+        128
+      ]
+    },
+    {
+      "enum": "net/minecraft/world/entity/MobCategory",
       "name": "ANTCOLONIES_RIVER_BED",
       "constructor": "(Ljava/lang/String;IZZI)V",
       "parameters": [
