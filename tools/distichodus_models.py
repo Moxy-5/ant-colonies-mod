@@ -240,8 +240,87 @@ def plain_colour(c, face, x, y, z):
     return PLAIN[part]
 
 
-LOOKS = {'plain': plain_colour}
-WORKSHOP_LOOK = 'plain'
+# --- paint (the workshop's stage 4, 2026-11-22; the user: v4 "Shape is OK"; the detail stage skipped, as the barb's:
+# the shape already carries the jaw, every fin and the eye) -----------------------------------------------------------
+# The design sheet's colours (tools/distichodus_sheet.py COLOURS), placed by where each texture pixel lies on the fish:
+# the body by its share of the depth at that place (the bronze line along the back, the warm peach-gold upper flank,
+# the pale cream-gold lower flank, the cream belly), the six straight bands at the sheet's places along the body (a
+# slate core, a softer edge, running from the back down over the belly, across the back seen from above), the head
+# silver-pink with a darker top and a bright cheek and gill cover, the red-ringed eye; the fins red-orange, deep red
+# where they meet the body, orange at their tips.
+SHEET = {
+    'back': (166, 124, 106), 'upper': (218, 170, 142), 'lower': (238, 206, 182), 'belly': (242, 226, 216),
+    'band': (70, 64, 84), 'band_edge': (86, 78, 98), 'head': (178, 162, 168), 'head_top': (134, 114, 116),
+    'cheek': (208, 192, 196), 'pupil': (14, 12, 16), 'ring': (156, 58, 48), 'mouth': (84, 62, 62),
+    'fin': (222, 62, 22), 'tip': (246, 128, 40), 'base': (172, 52, 30), 'adipose': (226, 210, 214),
+    'inside': (84, 52, 52),
+}
+BANDS = [(LENGTH - (10.0 + 3.5 * i), 0.85 if i < 5 else 0.6) for i in range(6)]   # (outline x, half width): the sheet's
+
+
+def band_at(ox):
+    """'band', 'band_edge' or None: the six straight bands along the body."""
+    for c, h in BANDS:
+        if abs(ox - c) <= h * 0.5:
+            return 'band'
+        if abs(ox - c) <= h:
+            return 'band_edge'
+    return None
+
+
+def body_colour(face, ox, y):
+    top, belly, _ = at(min(LENGTH, max(TAIL_ROOT, ox)))
+    f = (y - belly) / max(0.5, top - belly)               # 0 at the belly, 1 at the back
+    if ox >= HEAD_FROM:                                    # the head
+        if face == 'up' or f > 0.78:
+            return SHEET['head_top']
+        if face != 'down' and ox < HEAD_FROM + 3.0 and 0.15 < f < 0.55:
+            return SHEET['cheek']                          # the bright gill cover
+        return SHEET['head']
+    if face == 'down':
+        return SHEET['belly']
+    band = band_at(ox)
+    if band:
+        return SHEET[band]
+    if face == 'up' or f > 0.92:
+        return SHEET['back']
+    return SHEET['upper'] if f > 0.58 else SHEET['lower'] if f > 0.2 else SHEET['belly']
+
+
+def fin_colour(bone, ox, y):
+    """Deep red at the base, red-orange, orange at the tips and free edges (the sheet's fins)."""
+    if bone == 'back_fin':
+        return SHEET['base'] if y < 16.0 else SHEET['tip'] if y >= 19.5 or ox < 17.0 else SHEET['fin']
+    if bone in ('fin_left', 'fin_right'):
+        return SHEET['base'] if ox > 27.0 else SHEET['tip'] if ox < 24.0 else SHEET['fin']
+    if bone == 'tail_fin':
+        return SHEET['base'] if ox > 7.5 else SHEET['tip'] if ox < 1.5 else SHEET['fin']
+    # the belly fins, the fin under the tail (on the body and the stalk)
+    if 16.0 <= ox <= 22.0:                                 # belly fins: deep red only in a thin strip at the body
+        return SHEET['base'] if y > 4.25 else SHEET['tip'] if y < 1.0 else SHEET['fin']
+    return SHEET['base'] if y > 5.5 else SHEET['tip'] if y < 3.5 else SHEET['fin']
+
+
+def paint(c, face, x, y, z):
+    part, bone = c['_part'], c['_bone']
+    ox = LENGTH / 2 - z
+    if part == 'eye' and face in ('east', 'west'):
+        return SHEET['pupil'] if abs(ox - EYE_AT) < 0.5 and abs(y - EYE_HEIGHT) < 0.5 else SHEET['ring']
+    if part == 'mouth':
+        return SHEET['inside']
+    if part == 'adipose':
+        return SHEET['adipose']
+    if part == 'fin':
+        return fin_colour(bone, ox, y)
+    if part in ('body', 'flank', 'eye'):
+        if ox > LENGTH - 1.0 and face not in ('up', 'down') and abs(y - MOUTH_Y) < 0.25:
+            return SHEET['mouth']                          # the mouth line round the snout's tip
+        return body_colour(face, ox, y)
+    return SHEET['fin']
+
+
+LOOKS = {'everyday': paint, 'plain': plain_colour}
+WORKSHOP_LOOK = 'everyday'
 
 WORKSHOP_SHAPE = [
     ('WIDEST', 'Half the width along the flat sides (model pixels)', 1.25, 3.0, 0.25),

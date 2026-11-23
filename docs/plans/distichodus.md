@@ -50,7 +50,13 @@ fish beside the silver barbs and grey tilapia.
    small pale fin sit on the body and the stalk). The top and belly run straight between the sheet's points, never
    eased; body slices 2 pixels, head slices 1 so the wedge face reads straight. Compare against the sheet: side 93 /
    93, top 85 / 93, front 74 / 79. Page `references/workshop/distichodus/versions.html`. v3 (the user on v1: "the top left of their eyes go past their body and stick out"): each eye one piece per head slice, a quarter pixel proud of its own slice and inside a fuller cheek (`HEAD_FLANK_DEPTH` 0.85), 2 pixels across; the pupil painted across the pieces' step; 69 boxes. v4 (the user on v3: "the pupil in the middle is now split, you can make the fish slightly bulkier so that doesn't happen"): the body 4.5 across (`WIDEST` 2.25), the head level across the eye (`CHEEK` 1.5) so each eye is one flush box with a whole pupil; 67 boxes; against the sheet side 93 / 93, top 94 / 92, front 83 / 76. Waiting for the user's OK.
-3. Shape detail. 4. Paint (the bands painted at 2 texture pixels a model pixel).
+3. Shape detail: skipped (my pick, as the barb's: the shape already carries the jaw, every fin and the eye). **The
+   user: v4 "Shape is OK" (2026-11-22).**
+4. Paint (made 2026-11-22, v5: `paint()` in `tools/distichodus_models.py`, the sheet's colours by where each texture
+   pixel lies: the bronze back line, peach-gold upper flank, cream-gold lower flank, cream belly; the six straight
+   bands, slate core and softer edge, down the sides and across the back; the head silver-pink, darker on top, the
+   bright gill cover; the red-ringed eye; the fins red-orange, deep red in a thin strip at the body, orange tips; the
+   small pale fin). Waiting for the user's look.
 5. Clips: `idle`, `swim`, `graze`, `bolt`, `leap`, `flop`, `death` (checked with `clip_check.py` and in-game films).
 6. Into the game: the entity, spawning (the check list, `RiverLifeTests.worldWouldSpawn`), grazing hippo grass and
    reeds, bolting and leaping, crocodiles and the bull shark taking it; game tests `river`.
