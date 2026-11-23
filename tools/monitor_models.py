@@ -1144,6 +1144,20 @@ def _slerp_turn(a, b, k):
             [2 * (x * z - y * w), 2 * (y * z + x * w), 1 - 2 * (x * x + y * y)]]
 
 
+# Going in, the drift (2026-11-22, the user: the legs changed to the swim's form at once, folded in the move's last second;
+# "ease into the water, legs up until fully in, 2 seconds of drifting where they still move, then gradually into the form
+# over 2 seconds"). From about fully in (the swim's own motion starting to ease in, keys['swim'][0]) the legs hang loose
+# for DRIFT seconds, still swinging slowly, then fold for swimming over SETTLE_IN, each along the fold's own path (a foot
+# moved on a route and the leg reached to it: turning each bone straight from hanging to folded, the feet nearly half a
+# turn apart, swung the hind feet up past the back, the game-side try of the same day). The body coasts on, slowing
+# (COAST, seconds: how quickly the glide dies away, my pick), so the clip's longer move goes about a block further.
+DRIFT, SETTLE_IN, COAST = 2.0, 2.0, 1.0
+# the loose swing of a drifting leg: one swing in SWAY_BEAT s, the diagonal pairs together, the wrist or ankle this far
+# fore and aft and up (px; above where it hangs, twice SWAY_Y at the top), eased in over SWAY_IN s and out as the leg folds (my picks, fun first)
+SWAY_BEAT, SWAY_IN, SWAY_Z, SWAY_Y = 2.2, 0.6, 1.8, 0.9
+SWAY_PHASE = {('arm', 'left'): 0.0, ('leg', 'right'): 0.0, ('arm', 'right'): 0.5, ('leg', 'left'): 0.5}
+
+
 def water_move(kind, size, swim_table, swim_leg, flick, log=None):
     """One water move's clip for a monitor of this size: (clip, worst reach miss, its scene, its path as (time, up, along)
     in px). log, a list, gets every reach miss as (time, leg, px)."""
@@ -1156,14 +1170,23 @@ def water_move(kind, size, swim_table, swim_leg, flick, log=None):
     length = keys['length']
     path, marks = [], {}
     t0s, t1s, way = keys['swim']
+    course = length                 # going in, the move's own course ends here and the body coasts on (the drift)
+    if way == 'in':
+        f0 = t0s + DRIFT
+        # (forelegs first, the left a touch ahead, as the move's own folds were; all within SETTLE_IN; timed evenly,
+        # the fold's own path easing it once: eased here too, the whole fold bunched into under a second, the first film)
+        keys = {**keys, 'fold': {('arm', 'left'): ((f0, 0.0), (f0 + SETTLE_IN - 0.2, 1.0)),
+                                 ('arm', 'right'): ((f0 + 0.05, 0.0), (f0 + SETTLE_IN - 0.15, 1.0)),
+                                 ('leg', 'left'): ((f0 + 0.15, 0.0), (f0 + SETTLE_IN - 0.05, 1.0)),
+                                 ('leg', 'right'): ((f0 + 0.2, 0.0), (f0 + SETTLE_IN, 1.0))}}
+        length = t1s = round((f0 + SETTLE_IN + 0.15) / 0.05) * 0.05
     beat = round(SWIM_LEN / 0.05)
     lifts = {'arm': 3.0, 'leg': 3.0}
     if way == 'out':        # (the turns go on from the swim's own values: started afresh they came out a turn apart)
         P.last.update({bone: list(chans['rotation']) for bone, chans in swim_table[0].items() if 'rotation' in chans})
 
-    def pose(t):
-        P.now = t
-        p = {}
+    def body_at(t):
+        """The trunk on the move's course at t: (rear, bm, bd, turns, places, chest_up)."""
         if 'trunk' in keys:              # (the walk-in: the trunk laid along its course)
             rear, bm, bd, turns, places, chest_up = keys['trunk'](t)
             lift = _water_clearance(places, sc)
@@ -1180,6 +1203,19 @@ def water_move(kind, size, swim_table, swim_leg, flick, log=None):
             if lift > 0.0:
                 bm, bd, turns, places = _trunk(rear, bend, hy + lift, hz)
             chest_up = rear - bend
+        return rear, bm, bd, turns, places, chest_up
+    # the speed it glides at as the course ends (px a second, forward), carried on into the coast
+    glide_end = (body_at(course - 0.05)[2][2] - body_at(course)[2][2]) / 0.05 if length > course else 0.0
+
+    def pose(t):
+        P.now = t
+        p = {}
+        tc = min(t, course)
+        rear, bm, bd, turns, places, chest_up = body_at(tc)
+        if t > course:                   # coasting on after the course, slowing (the drift)
+            d = glide_end * COAST * (1.0 - math.exp(-(t - course) / COAST))
+            bd = [bd[0], bd[1], bd[2] - d]
+            places = [(M, vadd(tr, [0.0, 0.0, -d])) for M, tr in places]
         p['body'] = {'rotation': [round(-rear, 3), 0.0, 0.0], 'position': [0.0, 0.0, 0.0]}
         for name, b in turns.items():
             p[name] = {'rotation': [round(b, 3), 0.0, 0.0]}
@@ -1200,8 +1236,12 @@ def water_move(kind, size, swim_table, swim_leg, flick, log=None):
         folded = {}
         for L in P.legs:
             side = (L['kind'], L['side'])
-            wrist, up, pitch_ = _foot_at(t, keys[side], lifts[L['kind']], reach=L['kind'] == 'arm' and keys.get('raised', False))
-            fold = _ramp(t, keys['fold'][side])
+            wrist, up, pitch_ = _foot_at(tc, keys[side], lifts[L['kind']], reach=L['kind'] == 'arm' and keys.get('raised', False))
+            if way == 'in':                  # (the drift's slow fold, timed evenly: see DRIFT)
+                (a0, _), (a1, _) = keys['fold'][side]
+                fold = min(1.0, max(0.0, (t - a0) / (a1 - a0)))
+            else:
+                fold = _ramp(t, keys['fold'][side])
             fm, fd = (cm, cd) if L['kind'] == 'arm' else (bm, bd)
             # (a foot turned flat against a face lifts its claws straight off it: curled or drooped as on the ground,
             # they went into the face)
@@ -1233,6 +1273,12 @@ def water_move(kind, size, swim_table, swim_leg, flick, log=None):
                     # a leg that has lost the bottom hangs loose under the body, its toes drooping, and only folds
                     # for swimming a while after (folded at once the feet swung up over the back, the user's ask)
                     hw, hf = _hang_leg(L, keys.get('hang_at'))
+                    if way == 'in' and t > t0s:  # drifting: the loose leg swings slowly, less as it folds
+                        a = _ease(min(1.0, (t - t0s) / SWAY_IN)) * (1.0 - _ease(fold))
+                        u = 2.0 * math.pi * ((t - t0s) / SWAY_BEAT - SWAY_PHASE[side])
+                        # (up and down only up from where it hangs: swinging down too, the biggest monitor's hind claws
+                        # went 1.3 px into the bottom of the shallowest water it floats in)
+                        hw = [hw[0], hw[1] + SWAY_Y * (1.0 + math.sin(u - 1.2)) * a, hw[2] + SWAY_Z * math.sin(u) * a]
                     # (off the lip forward and out first, then down: straight down to it the foot went through the
                     # bank's edge)
                     h, hz, hy = _ease(hang), _ease(min(1.0, hang / 0.6)), _ease(max(0.0, (hang - 0.25) / 0.75))
@@ -1284,8 +1330,8 @@ def water_move(kind, size, swim_table, swim_leg, flick, log=None):
                 P.leg(leg_p, L, fm, fd, wrist, foot_m, curl=18 * up * flat_ish, way=bend_way)
             p.update(leg_p)
             folded[side] = fold
-        neck_up = keys['neck'](t) if callable(keys['neck']) else _ramp(t, keys['neck'])
-        head_up = keys['head'](t) if callable(keys['head']) else _ramp(t, keys['head'])
+        neck_up = keys['neck'](tc) if callable(keys['neck']) else _ramp(tc, keys['neck'])
+        head_up = keys['head'](tc) if callable(keys['head']) else _ramp(tc, keys['head'])
         x = chest_up + 18.0 - neck_up
         for (bone, share), ex in zip((('neck1', 0.55), ('neck2', 0.45), ('head', 0.0)), (0.0, 0.0, neck_up - 20.0 - head_up)):
             p[bone] = {'rotation': [round(share * x + ex, 3), 0.0, 0.0]}

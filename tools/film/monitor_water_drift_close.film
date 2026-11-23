@@ -1,0 +1,33 @@
+# The Nile monitor's legs going into the water, close (2026-11-22): walking in off a level bank, then drifting and
+# easing into the swim (MonitorModel.drift), stopping at x 6. Side on from just under the surface, and side on from just
+# over it, stepped 3 ticks a picture for 15 s. The scene as monitor_water_in_frames.
+#   ./gradlew runFilm -PfilmScene=tools/film/monitor_water_drift_close.film   pictures in run-film/screenshots/monitor_water_drift_close/
+cmd time set noon
+cmd weather clear
+cmd kill @e[type=!player]
+cmd fill -12 -63 -7 16 -62 7 minecraft:dirt
+cmd fill -12 -61 -7 16 -61 7 minecraft:grass_block
+cmd fill -12 -60 -7 16 -56 7 minecraft:air
+cmd fill 1 -63 -7 16 -61 7 minecraft:water
+lens 60
+wait 40
+# under the surface, side on
+walker antcolonies:monitor -1.6 -60 0.5 -90 OwnSize:1.0f,HungryIn:99999,SunIn:99999
+camera 3.6 -62.75 -3.6 0 -4
+cmd tick unfreeze
+go 6 -61 0 0.8
+wait 10
+cmd tick freeze
+burst under 100 3
+cmd kill @e[type=antcolonies:monitor]
+wait 10
+# just over it, side on
+walker antcolonies:monitor -1.6 -60 0.5 -90 OwnSize:1.0f,HungryIn:99999,SunIn:99999
+camera 3.6 -61.2 -3.6 0 14
+cmd tick unfreeze
+go 6 -61 0 0.8
+wait 10
+cmd tick freeze
+burst over 100 3
+cmd kill @e[type=antcolonies:monitor]
+quit

@@ -20,7 +20,8 @@ class BlockMovesFileTest {
         assertEquals(8, MOVES.count());
         assertEquals(5, MOVES.sizes().length);
         String[] names = {"up", "down", "in", "drop", "drop2", "dash", "out", "out_up"};
-        int[] ticks = {66, 69, 130, 102, 92, 38, 92, 90};   // (the walk-in remade 2026-11-22)
+        // (the walk-in remade 2026-11-22; the same day every way in drifts and folds slowly at its end, 2 s + 2 s longer)
+        int[] ticks = {66, 69, 177, 161, 151, 103, 92, 90};
         for (int i = 0; i < names.length; i++) {
             assertEquals(i, MOVES.index(names[i]));
             assertEquals(ticks[i], MOVES.move(i).ticks);
