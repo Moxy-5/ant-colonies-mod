@@ -542,8 +542,10 @@ def river_plants_page(out):
     algae = [uri(png(r)) for r in algae_art.all_looks()["C"]["mat"]]
     looks = ra.all_looks()
     reeds = {"stem": uri(png(looks["reeds"]["stem"])), "tops": {k: uri(png(r)) for k, r in looks["reeds"]["tops"].items()}}
-    grass = {k: {"name": v["name"], "mat": uri(png(v["mat"])), "clump": uri(png(v["clump"]))} for k, v in looks["hippo_grass"].items()}
-    data = {"blocks": blocks, "algae": algae, "reeds": reeds, "grass": grass}
+    grass = {g: {k: {"name": v["name"], "mat": uri(png(v["mat"])), "clump": uri(png(v["clump"]))}
+                 for k, v in ra.all_looks(g)["hippo_grass"].items()} for g in ra.GREENS}
+    data = {"blocks": blocks, "algae": algae, "reeds": reeds, "grass": grass,
+            "greens": [[g, v["name"]] for g, v in ra.GREENS.items()]}
     template = (Path(__file__).resolve().parent / "river_plants_viewer.template.html").read_text(encoding="utf-8")
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(template.replace("/*DATA*/null", json.dumps(data)), encoding="utf-8")

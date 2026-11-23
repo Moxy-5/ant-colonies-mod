@@ -101,20 +101,44 @@ def reed_top(look):
 
 
 # --- hippo grass ---------------------------------------------------------------------------------------------------
-# a stage: (base, lit, dark) colours, stems across the tile, blade every n pixels, blade length, share of pixels lost
+# a stage: (base, lit, dark) colours, stems across the tile, blade every n pixels, blade length, share of pixels lost;
+# the green stages (young, grown, flowering) take their colours from the green picked below
 STAGES = {
-    "young": {"name": "Young shoots", "col": ((150, 198, 80), (186, 220, 112), (108, 150, 56)), "stems": 2, "every": 3, "reach": 2, "broken": 0.0},
-    "grown": {"name": "Grown", "col": ((118, 176, 62), (164, 206, 92), (80, 128, 46)), "stems": 4, "every": 2, "reach": 3, "broken": 0.0},
-    "flowering": {"name": "Flowering", "col": ((118, 176, 62), (164, 206, 92), (80, 128, 46)), "stems": 4, "every": 2, "reach": 3, "broken": 0.0},
+    "young": {"name": "Young shoots", "stems": 2, "every": 3, "reach": 2, "broken": 0.0},
+    "grown": {"name": "Grown", "stems": 4, "every": 2, "reach": 3, "broken": 0.0},
+    "flowering": {"name": "Flowering", "stems": 4, "every": 2, "reach": 3, "broken": 0.0},
     "dying": {"name": "Dying back", "col": ((170, 146, 92), (200, 180, 122), (124, 100, 62)), "stems": 3, "every": 2, "reach": 3, "broken": 0.35},
 }
+# Hippo grass greens (the user, 2026-11-22: "super bright green, I want them at papyrus color or a little darker").
+# grown: (base, lit, dark) for grown and flowering; young: the fresh shoots, a little lighter. "now" is the bright green
+# first put in the game; A to C are the three darker tries (A the old papyrus stems' and the reeds' green, B a shade
+# darker, C darker and a little cooler, as real Vossia's blades are a blue-tinged green).
+GREENS = {
+    "now": {"name": "Old (bright)", "grown": ((118, 176, 62), (164, 206, 92), (80, 128, 46)),
+            "young": ((150, 198, 80), (186, 220, 112), (108, 150, 56))},
+    "A": {"name": "A: papyrus green", "grown": ((96, 144, 60), (134, 178, 82), (64, 102, 42)),
+          "young": ((112, 162, 68), (150, 192, 94), (76, 116, 48))},
+    "B": {"name": "B: a shade darker (in the game)", "grown": ((84, 128, 52), (118, 160, 72), (56, 90, 38)),
+          "young": ((100, 146, 60), (136, 176, 84), (68, 104, 44))},
+    "C": {"name": "C: darker, blue-tinged", "grown": ((70, 114, 54), (100, 146, 74), (46, 78, 38)),
+          "young": ((86, 132, 64), (118, 164, 86), (58, 94, 46))},
+}
+GREEN = "B"                       # the green written into the mod (main; the user picked B 2026-11-22); the viewer shows them all
+
+
+def _colours(stage, green):
+    if stage == "dying":
+        return STAGES[stage]["col"]
+    return GREENS[green]["young" if stage == "young" else "grown"]
+
+
 FLOWER = (214, 204, 150)
 
 
-def hippo_grass_mat(stage):
+def hippo_grass_mat(stage, green=GREEN):
     """Stems lying across the water, blades off them both ways; gaps so the water shows."""
     st = STAGES[stage]
-    base, lit, dark = st["col"]
+    base, lit, dark = _colours(stage, green)
     rows = blank()
     rng = random.Random(30)
     gap = S // st["stems"]
@@ -139,14 +163,14 @@ def hippo_grass_mat(stage):
                 if rows[y][x][3] and rng.random() < st["broken"]:
                     rows[y][x] = CLEAR
                 elif rows[y][x][3] and rng.random() < 0.06:
-                    rows[y][x] = (110, 150, 60, 255)
+                    rows[y][x] = GREENS[green]["grown"][0] + (255,)
     return rows
 
 
-def hippo_grass_clump(stage):
+def hippo_grass_clump(stage, green=GREEN):
     """A rooted tuft: broad blades arching up and out from the bottom middle (short when young, flopped when dying)."""
     st = STAGES[stage]
-    base, lit, dark = st["col"]
+    base, lit, dark = _colours(stage, green)
     rows = blank()
     rng = random.Random(40)
     tall = {"young": 0.55, "grown": 1.0, "flowering": 1.0, "dying": 0.7}[stage]
@@ -169,15 +193,15 @@ def hippo_grass_clump(stage):
                 put(rows, x, y + d, FLOWER)
     if stage == "dying":                  # the roots' new green at the foot
         for x in range(6, 10):
-            put(rows, x, 15, (120, 170, 64))
-            put(rows, x + (1 if x > 7 else -1), 14, (140, 190, 80))
+            put(rows, x, 15, GREENS[green]["young"][0])
+            put(rows, x + (1 if x > 7 else -1), 14, GREENS[green]["young"][1])
     return rows
 
 
-def all_looks():
+def all_looks(green=GREEN):
     return {
         "reeds": {"stem": reed_stem(), "tops": {k: reed_top(k) for k in PLUME}},
-        "hippo_grass": {k: {"name": v["name"], "mat": hippo_grass_mat(k), "clump": hippo_grass_clump(k)} for k, v in STAGES.items()},
+        "hippo_grass": {k: {"name": v["name"], "mat": hippo_grass_mat(k, green), "clump": hippo_grass_clump(k, green)} for k, v in STAGES.items()},
     }
 
 
