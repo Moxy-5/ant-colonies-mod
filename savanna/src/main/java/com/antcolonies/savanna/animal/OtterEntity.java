@@ -77,7 +77,7 @@ import software.bernie.geckolib.util.GeckoLibUtil;
 public class OtterEntity extends PathfinderMob implements GeoEntity, HasLife {
     /** What it is doing, for the clips. */
     public static final byte CALM = 0, SHAKE = 1, REST = 2, REST_UP = 3, FORAGE = 4, BITE = 5, EAT = 6, SKID = 7, HOP = 8,
-            PLAY_UP = 9, PLAY = 10, PLAY_DOWN = 11, GULP = 12;
+            PLAY_UP = 9, PLAY = 10, PLAY_DOWN = 11, GULP = 12, SIDE_L = 13, SIDE_R = 14;
     /**
      * A small fish swallowed at once ({@link HeldCatch#swallowed}; the gulp clip, on the head's own layer): it takes the
      * fish as its jaws snap shut, and the gulp is over at the end (ticks), and such a fish fills it for this part of a
@@ -100,6 +100,13 @@ public class OtterEntity extends PathfinderMob implements GeoEntity, HasLife {
     private static final EntityDataAccessor<Byte> DATA_GAIT = SynchedEntityData.defineId(OtterEntity.class, EntityDataSerializers.BYTE);
     /** The skid stop's and the hop turn's lengths (ticks), and the hop's feet off the ground (its ticks 3 to 7: it turns then). */
     static final int SKID_TICKS = 8, HOP_TICKS = 10, HOP_UP = 3, HOP_DOWN = 7;
+    /**
+     * The war dance (2026-11-23; plan {@code docs/plans/otter-play-and-fish.md} 6f; the user: "make sure they jump side to
+     * side like real otters and weasels"): a hop to its left or right ({@link #SIDE_L}, {@link #SIDE_R}), humped, bent and
+     * open mouthed, the same length as the hop turn, carried this far sideways (blocks at size 1) while its feet are up
+     * (ticks {@link #HOP_UP} to {@link #HOP_DOWN}); a dance is 2 to 4 of them, left and right in turn. Numbers my picks.
+     */
+    static final double SIDE_GO = 0.7;
     /**
      * The skitter's speeds (shares of its speed attribute; my picks, measured in {@code RiverLifeTests}: about 1.6 and
      * 0.6 blocks a second, the clips' own strides) and the clips' made speeds (blocks a tick at size 1).
@@ -136,8 +143,8 @@ public class OtterEntity extends PathfinderMob implements GeoEntity, HasLife {
     public static final double AFLOAT = 11.3 / 16.0;
     /** Diving, it swims this far under the surface (blocks, at size 1; the bed stops it in shallower water). */
     static final double DIVE_DEPTH = 1.9;
-    /** The clips' made speeds (blocks a tick, at size 1): the walk 1.12 blocks a second, the bound 2, the swims (my measure of the clips' strokes). */
-    static final double WALK_CLIP_SPEED = 1.123 / 20.0, BOUND_CLIP_SPEED = 2.0 / 20.0, SWIM_CLIP_SPEED = 0.07, DIVE_CLIP_SPEED = 0.11;
+    /** The clips' made speeds (blocks a tick, at size 1): the walk 1.12 blocks a second, the bound (and the play bound) 2.5, the swims (my measure of the clips' strokes). */
+    static final double WALK_CLIP_SPEED = 1.123 / 20.0, BOUND_CLIP_SPEED = 2.5 / 20.0, SWIM_CLIP_SPEED = 0.07, DIVE_CLIP_SPEED = 0.11;
     /** Faster than this (blocks a tick, at size 1) it is drawn bounding, not walking. */
     static final double BOUND_DRAWN = 0.075;
     /** Its speeds (shares of its speed attribute: about 1.1, 2.4 and 5 blocks a second on land, faster in the water). */
@@ -364,6 +371,33 @@ public class OtterEntity extends PathfinderMob implements GeoEntity, HasLife {
                 + ", water " + isInWater() + ") next try in " + (playTryAt - tickCount) + ", mood " + mood();
     }
 
+    /** Hops this many more times in its war dance (left and right in turn), the next one to its left if true. */
+    int danceLeft;
+    boolean danceToLeft;
+    /** The heading it keeps through a side hop (Minecraft turns a moving mob's body to where it goes: filmed, it swung round). */
+    float hopYaw;
+
+    /** Starts a war dance of 2 to 4 side hops (from standing). */
+    void startDance() {
+        danceLeft = 2 + random.nextInt(3);
+        danceToLeft = random.nextBoolean();
+        nextHop();
+    }
+
+    /** Still in its war dance (a hop now, or more to come; the otter's own tick takes the next one). */
+    boolean dancing() {
+        byte d = doing();
+        return d == SIDE_L || d == SIDE_R || danceLeft > 0;
+    }
+
+    private void nextHop() {
+        getNavigation().stop();
+        hopYaw = getYRot();
+        setDoing(danceToLeft ? SIDE_L : SIDE_R);
+        danceToLeft = !danceToLeft;
+        danceLeft--;
+    }
+
     /** In a play bout now (for tests). */
     public boolean inBout() {
         return bout != null;
@@ -522,6 +556,9 @@ public class OtterEntity extends PathfinderMob implements GeoEntity, HasLife {
         chain.place();
         rider.noteMoved();
         if (level().isClientSide) {
+            if (doing() == SIDE_L || doing() == SIDE_R) {
+                yBodyRot = getYRot();                        // the drawn body keeps its heading through a side hop too
+            }
             attention.tick(this);
             rider.wetLooks(0.9, 2.2);
             shakeLooks();
@@ -551,11 +588,31 @@ public class OtterEntity extends PathfinderMob implements GeoEntity, HasLife {
         byte d = doing();
         if (d == SHAKE && doingFor() >= SHAKE_TICKS || d == REST_UP && doingFor() >= REST_UP_TICKS
                 || d == BITE && doingFor() >= BITE_TICKS || d == SKID && doingFor() >= SKID_TICKS
-                || d == HOP && doingFor() >= HOP_TICKS || d == PLAY_DOWN && doingFor() >= PLAY_DOWN_TICKS
+                || (d == HOP || d == SIDE_L || d == SIDE_R) && doingFor() >= HOP_TICKS || d == PLAY_DOWN && doingFor() >= PLAY_DOWN_TICKS
                 || d == GULP && doingFor() >= GULP_TICKS) {
             setDoing(CALM);
         } else if ((d == PLAY_UP || d == PLAY) && bout == null) {
             setDoing(PLAY_DOWN);                             // a bout broken off: down at once
+        }
+        if (danceLeft > 0 && doing() == CALM) {
+            if (onGround() && !isInWater() && !scared()) {
+                nextHop();                                   // the war dance's next hop, the other way
+            } else {
+                danceLeft = 0;
+            }
+        }
+        if (getTags().contains("dance.now") && doing() == CALM && danceLeft == 0 && tickCount % 40 == 0) {
+            startDance();                                    // (the film camera's tag: dance now and then)
+        }
+        if (doing() == SIDE_L || doing() == SIDE_R) {
+            setYRot(hopYaw);                                 // faces the same way all through the hop
+            yBodyRot = hopYaw;
+            yHeadRot = hopYaw;
+        }
+        if ((d == SIDE_L || d == SIDE_R) && doingFor() >= HOP_UP && doingFor() < HOP_DOWN) {
+            float yaw = hopYaw * Mth.DEG_TO_RAD;             // carried to its left (+) or right while its feet are up
+            double step = (d == SIDE_L ? 1.0 : -1.0) * SIDE_GO * getScale() / (HOP_DOWN - HOP_UP);
+            move(MoverType.SELF, new Vec3(Mth.cos(yaw) * step, 0.0, Mth.sin(yaw) * step));
         }
         if (restNext > 0) {
             restNext--;
@@ -1426,7 +1483,7 @@ public class OtterEntity extends PathfinderMob implements GeoEntity, HasLife {
      * mood herself (or one time in three when she is) gives it one round only. Numbers my picks.
      */
     static final class Bout {
-        private enum Stage { INVITE, POKE, SPACE, UP, REAR, DOWN, CHASE, SWIM }
+        private enum Stage { INVITE, DANCE, POKE, SPACE, UP, REAR, DOWN, CHASE, SWIM }
         final OtterEntity lead, mate;
         private int rounds, left, again;
         private Stage stage = Stage.INVITE;
@@ -1476,15 +1533,32 @@ public class OtterEntity extends PathfinderMob implements GeoEntity, HasLife {
                     mate.face(lead.getX(), lead.getZ(), 15.0F);
                     if (lead.distanceTo(mate) < gap() + 0.8) {
                         lead.getNavigation().stop();
-                        lead.setDoing(BITE);                       // the nose poke: come and play
-                        stage = Stage.POKE;
-                        left = BITE_TICKS;
+                        if (lead.onGround() && !lead.isInWater()) {
+                            lead.startDance();                     // the war dance first, hopping side to side: play?
+                            stage = Stage.DANCE;
+                            left = 60;
+                        } else {
+                            poke();
+                        }
                     } else if (--again <= 0) {
                         again = 10;
                         lead.getNavigation().moveTo(mate, BOUND);
                     }
                     if (left <= 0) {
                         end(false);
+                    }
+                }
+                case DANCE -> {
+                    mate.face(lead.getX(), lead.getZ(), 15.0F);  // (the dancer keeps its heading through its hops)
+                    if (!lead.dancing() || left <= 0) {
+                        lead.danceLeft = 0;
+                        if (lead.distanceTo(mate) < gap() + 1.6) {
+                            poke();
+                        } else {
+                            stage = Stage.INVITE;                  // danced off a little: bound back in and poke
+                            left = 60;
+                            again = 0;
+                        }
                     }
                 }
                 case POKE -> {
@@ -1560,6 +1634,14 @@ public class OtterEntity extends PathfinderMob implements GeoEntity, HasLife {
                     }
                 }
             }
+        }
+
+        /** The nose poke (a play bite): come and play. */
+        private void poke() {
+            lead.getNavigation().stop();
+            lead.setDoing(BITE);
+            stage = Stage.POKE;
+            left = BITE_TICKS;
         }
 
         /** The next round: rearing face to face where they can stand, a swimming chase where they cannot. */
@@ -1728,7 +1810,7 @@ public class OtterEntity extends PathfinderMob implements GeoEntity, HasLife {
      * numbers my picks. It keeps within the water it last swam in, as the stroll does.
      */
     static class SkitterGoal extends Goal {
-        private enum Phase { DASH, SKID, LOOK, SNIFF, HOP }
+        private enum Phase { DASH, SKID, LOOK, SNIFF, HOP, DANCE }
         private final OtterEntity otter;
         private Phase phase = Phase.DASH;
         private int left, bursts;
@@ -1769,15 +1851,16 @@ public class OtterEntity extends PathfinderMob implements GeoEntity, HasLife {
         @Override
         public boolean canContinueToUse() {
             byte d = otter.doing();
-            return bursts > 0 && free() && (d == CALM || d == SKID || d == HOP);
+            return bursts > 0 && free() && (d == CALM || d == SKID || d == HOP || d == SIDE_L || d == SIDE_R);
         }
 
         @Override
         public void stop() {
             halt();
-            if (otter.doing() == SKID || otter.doing() == HOP) {
+            if (otter.doing() == SKID || otter.doing() == HOP || otter.doing() == SIDE_L || otter.doing() == SIDE_R) {
                 otter.setDoing(CALM);
             }
+            otter.danceLeft = 0;
         }
 
         /** A dash 1 to 3 blocks, this many degrees off its heading; false if there is no way there. */
@@ -1877,7 +1960,11 @@ public class OtterEntity extends PathfinderMob implements GeoEntity, HasLife {
                 case LOOK, SNIFF -> {
                     if (phase == Phase.SNIFF ? arrived() : --left <= 0) {
                         halt();
-                        if (otter.random.nextInt(3) == 0) {
+                        if (otter.mood() == PLAYFUL && otter.random.nextInt(3) == 0) {
+                            otter.startDance();                  // playful: the war dance, hopping side to side
+                            phase = Phase.DANCE;
+                            bursts--;
+                        } else if (otter.random.nextInt(3) == 0) {
                             bursts--;                            // a small turn without the hop: the dash turns it
                             if (bursts > 0 && !dash((otter.random.nextFloat() - 0.5F) * 50.0F)) {
                                 hop();
@@ -1885,6 +1972,11 @@ public class OtterEntity extends PathfinderMob implements GeoEntity, HasLife {
                         } else {
                             hop();
                         }
+                    }
+                }
+                case DANCE -> {
+                    if (!otter.dancing() && bursts > 0 && !dash((otter.random.nextFloat() - 0.5F) * 90.0F)) {
+                        hop();
                     }
                 }
                 case HOP -> {
@@ -1967,6 +2059,7 @@ public class OtterEntity extends PathfinderMob implements GeoEntity, HasLife {
     private static final RawAnimation IDLE = RawAnimation.begin().thenLoop("idle");
     private static final RawAnimation WALK = RawAnimation.begin().thenLoop("walk");
     private static final RawAnimation BOUND_CLIP = RawAnimation.begin().thenLoop("bound");
+    private static final RawAnimation PLAY_BOUND_CLIP = RawAnimation.begin().thenLoop("play_bound");
     private static final RawAnimation SWIM = RawAnimation.begin().thenLoop("swim");
     private static final RawAnimation DIVE_SWIM = RawAnimation.begin().thenLoop("dive_swim");
     private static final RawAnimation SHAKE_CLIP = RawAnimation.begin().thenPlayAndHold("shake_dry");
@@ -1980,6 +2073,8 @@ public class OtterEntity extends PathfinderMob implements GeoEntity, HasLife {
     private static final RawAnimation SNIFF_CLIP = RawAnimation.begin().thenLoop("sniff_walk");
     private static final RawAnimation SKID_CLIP = RawAnimation.begin().thenPlayAndHold("skid_stop");
     private static final RawAnimation HOP_CLIP = RawAnimation.begin().thenPlayAndHold("hop_turn");
+    private static final RawAnimation SIDE_L_CLIP = RawAnimation.begin().thenPlayAndHold("side_hop_left");
+    private static final RawAnimation SIDE_R_CLIP = RawAnimation.begin().thenPlayAndHold("side_hop_right");
     private static final RawAnimation PLAY_UP_CLIP = RawAnimation.begin().thenPlayAndHold("play_up");
     private static final RawAnimation PLAY_CLIP = RawAnimation.begin().thenLoop("play_rear");
     private static final RawAnimation PLAY_DOWN_CLIP = RawAnimation.begin().thenPlayAndHold("play_down");
@@ -2041,6 +2136,10 @@ public class OtterEntity extends PathfinderMob implements GeoEntity, HasLife {
                 return state.setAndContinue(SKID_CLIP);
             case HOP:
                 return state.setAndContinue(HOP_CLIP);
+            case SIDE_L:
+                return state.setAndContinue(SIDE_L_CLIP);
+            case SIDE_R:
+                return state.setAndContinue(SIDE_R_CLIP);
             case PLAY_UP:
                 return state.setAndContinue(PLAY_UP_CLIP);
             case PLAY:
@@ -2070,8 +2169,11 @@ public class OtterEntity extends PathfinderMob implements GeoEntity, HasLife {
                 return state.setAndContinue(SNIFF_CLIP);
             }
             if (stride > BOUND_DRAWN * size) {
-                player.setAnimationSpeed(Mth.clamp(stride / (BOUND_CLIP_SPEED * size), 0.6, 2.6));
-                return state.setAndContinue(BOUND_CLIP);
+                // the noodle bound (plan otter-play-and-fish.md 6f): its clip follows the real speed so the feet hold the
+                // ground, but never slower than 0.7 (a stride in 0.57 s: slower, the hump reads as a crawl); playing, the
+                // bouncy one
+                player.setAnimationSpeed(Mth.clamp(stride / (BOUND_CLIP_SPEED * size), 0.7, 2.6));
+                return state.setAndContinue(mood() == PLAYFUL ? PLAY_BOUND_CLIP : BOUND_CLIP);   // (in a bout it is playful)
             }
             player.setAnimationSpeed(Mth.clamp(stride / (WALK_CLIP_SPEED * size), 0.5, 2.0));
             return state.setAndContinue(WALK);

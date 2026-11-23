@@ -1,0 +1,81 @@
+# The otter's noodle bound filmed LIVE (2026-11-23): the game not frozen, a picture every client tick while a real otter
+# runs east along fence posts (one every 2 blocks), the camera riding beside it. Checks the clip's speed against the
+# ground at the game's own pace (the frozen, stepped films draw the clip's clock two ticks a picture, the body one).
+#   ./gradlew runFilm -PfilmScene=tools/film/otter_bound_live.film   pictures in run-film/screenshots/otter_bound_live/
+cmd time set noon
+cmd weather clear
+cmd kill @e[type=!player]
+cmd fill 0 -61 0 90 -50 20 minecraft:air
+cmd fill 0 -62 0 90 -62 20 minecraft:dirt
+cmd fill 0 -61 0 90 -61 20 minecraft:grass_block
+cmd setblock 0 -60 12 minecraft:oak_fence
+cmd setblock 2 -60 12 minecraft:oak_fence
+cmd setblock 4 -60 12 minecraft:oak_fence
+cmd setblock 6 -60 12 minecraft:oak_fence
+cmd setblock 8 -60 12 minecraft:oak_fence
+cmd setblock 10 -60 12 minecraft:oak_fence
+cmd setblock 12 -60 12 minecraft:oak_fence
+cmd setblock 14 -60 12 minecraft:oak_fence
+cmd setblock 16 -60 12 minecraft:oak_fence
+cmd setblock 18 -60 12 minecraft:oak_fence
+cmd setblock 20 -60 12 minecraft:oak_fence
+cmd setblock 22 -60 12 minecraft:oak_fence
+cmd setblock 24 -60 12 minecraft:oak_fence
+cmd setblock 26 -60 12 minecraft:oak_fence
+cmd setblock 28 -60 12 minecraft:oak_fence
+cmd setblock 30 -60 12 minecraft:oak_fence
+cmd setblock 32 -60 12 minecraft:oak_fence
+cmd setblock 34 -60 12 minecraft:oak_fence
+cmd setblock 36 -60 12 minecraft:oak_fence
+cmd setblock 38 -60 12 minecraft:oak_fence
+cmd setblock 40 -60 12 minecraft:oak_fence
+cmd setblock 42 -60 12 minecraft:oak_fence
+cmd setblock 44 -60 12 minecraft:oak_fence
+cmd setblock 46 -60 12 minecraft:oak_fence
+cmd setblock 48 -60 12 minecraft:oak_fence
+cmd setblock 50 -60 12 minecraft:oak_fence
+cmd setblock 52 -60 12 minecraft:oak_fence
+cmd setblock 54 -60 12 minecraft:oak_fence
+cmd setblock 56 -60 12 minecraft:oak_fence
+cmd setblock 58 -60 12 minecraft:oak_fence
+cmd setblock 60 -60 12 minecraft:oak_fence
+cmd setblock 62 -60 12 minecraft:oak_fence
+cmd setblock 64 -60 12 minecraft:oak_fence
+cmd setblock 66 -60 12 minecraft:oak_fence
+cmd setblock 68 -60 12 minecraft:oak_fence
+cmd setblock 70 -60 12 minecraft:oak_fence
+cmd setblock 72 -60 12 minecraft:oak_fence
+cmd setblock 74 -60 12 minecraft:oak_fence
+cmd setblock 76 -60 12 minecraft:oak_fence
+cmd setblock 78 -60 12 minecraft:oak_fence
+cmd setblock 80 -60 12 minecraft:oak_fence
+cmd setblock 82 -60 12 minecraft:oak_fence
+cmd setblock 84 -60 12 minecraft:oak_fence
+cmd setblock 86 -60 12 minecraft:oak_fence
+cmd setblock 88 -60 12 minecraft:oak_fence
+cmd setblock 90 -60 12 minecraft:oak_fence
+lens 40
+wait 40
+walker antcolonies:otter 6.5 -60 6.5 -90 OwnSize:1.0f
+follow 0 0.5 -5.0 0 6
+cmd tick unfreeze
+go 60 -60 6 0.8
+wait 25
+repeat 30
+shot live_bound_{i}
+wait 1
+end
+follow off
+cmd kill @e[type=antcolonies:otter]
+wait 20
+walker antcolonies:otter 6.5 -60 6.5 -90 OwnSize:1.0f,Tags:["mood.playful"]
+follow 0 0.5 -5.0 0 6
+cmd tick unfreeze
+go 60 -60 6 0.8
+wait 25
+repeat 30
+shot live_play_{i}
+wait 1
+end
+follow off
+cmd kill @e[type=antcolonies:otter]

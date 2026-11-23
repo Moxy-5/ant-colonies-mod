@@ -1,0 +1,35 @@
+# The otter's war dance filmed LIVE (2026-11-23; the stepped films run the clip's clock double, BUGS 295, so the
+# sideways carry and the hop's air time only line up when filmed live): a lone otter tagged dance.now (it dances now and
+# then, no AI), from the front (it faces the camera: its left is on the picture's right) and from above; then two fed
+# otters 5.5 blocks apart left to play (play.now): the one that starts bounds in and dances before its nose poke.
+#   ./gradlew runFilm -PfilmScene=tools/film/otter_dance_live.film   pictures in run-film/screenshots/otter_dance_live/
+cmd time set noon
+cmd weather clear
+cmd kill @e[type=!player]
+cmd fill 0 -61 0 40 -50 34 minecraft:air
+cmd fill 0 -62 0 40 -61 34 minecraft:grass_block
+lens 40
+wait 40
+cmd tick unfreeze
+cmd summon antcolonies:otter 20.5 -60 17.0 {NoAI:1b,Rotation:[90f,0f],OwnSize:1.0f,Tags:["dance.now"]}
+camera 14.5 -59.6 17.0 -90 8
+wait 20
+repeat 60
+shot front_{i}
+wait 1
+end
+camera 20.5 -54.0 17.0 0 89
+repeat 60
+shot above_{i}
+wait 1
+end
+cmd kill @e[type=antcolonies:otter]
+wait 20
+cmd summon antcolonies:otter 17.25 -60 17.5 {PersistenceRequired:1b,Rotation:[-90f,0f],OwnSize:1.0f,HungryIn:6000,Tags:["play.now"]}
+cmd summon antcolonies:otter 22.75 -60 17.5 {PersistenceRequired:1b,Rotation:[90f,0f],OwnSize:1.0f,HungryIn:6000}
+camera 20.0 -59.2 11.0 0 10
+repeat 120
+shot bout_{i}
+wait 1
+end
+cmd kill @e[type=antcolonies:otter]

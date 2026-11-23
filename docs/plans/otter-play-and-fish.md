@@ -361,3 +361,20 @@ takes 0.8 s a stride, slow enough to read as a crawl.
   user before the game uses it.
 
 Order: build it before wiring the chase and tag, since the chase is mostly bounding.
+
+**Built (2026-11-23, 6f, at the user's word "Yes that sounds good ... analyze it sped up at its natural speed do all the
+checks", then "make sure they jump side to side like real otters and weasels"):**
+- `bound` remade as the noodle bound and `play_bound` added (`tools/otter_models.py` `_bound_pose`): 0.40 s a stride, made for
+  2.5 blocks a second (a block a stride), a half-bound (front feet 0.07 apart, hind nearly together), the hump at u 0.40 (the
+  middle of the back rising 1.6 px while hips tuck 20 degrees and the front bends 22 degrees; the chest kept level so it
+  clears the ground), a little sag when long, a short flight, the head steadied by solving the neck each frame, the tail's
+  wave running out a beat late. The play bound: a bigger hump behind, a 2.2 px hop with the feet carried up in it, the
+  play face. The game plays the play bound when the otter's mood is playful (in a bout it is), and the clip speed follows
+  the real speed but never under 0.7 (a stride in at most 0.57 s): bounding at about 2.4 blocks a second it takes 2.4
+  strides a second, dashing at about 5, 5. Offline: no part in the ground, no planted foot short of it, no joint flips,
+  the 19 clip changes clean. Filmed stepped (three sides, and running beside fence posts) and live (BUGS 295: the stepped
+  films run the clip clock double; live, the clip keeps pace with the ground, about one stride a block).
+- **The war dance**: `side_hop_left` and `side_hop_right` (0.5 s): humped high, the body bent into a C, leaning into the
+  hop, mouth open, tail swishing; the game carries it 0.7 blocks (times its size) to that side on ticks 3 to 7
+  (`OtterEntity.SIDE_L`, `SIDE_R`, `startDance`). A dance is 2 to 4 hops, left and right in turn: the otter starting a
+  play bout dances before its nose poke, and a playful skittering otter dances at one stop in three.

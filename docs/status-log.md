@@ -616,3 +616,4 @@ Every "Current status" bullet CLAUDE.md held up to 2026-11-19, word for word, ol
 - 2026-11-22, the otter's catch looks right in the game: no more 22 degree tilt across the jaws (GeckoLib's rider turn, Neon's find, BUGS 294); the fish rides with the live jaw (a gulped barb goes down with it); the film really eats and gulps.
 - 2026-11-22, the otter holds its catch deeper in its mouth: the fish's front edge flush with its nose, the jaw open wider round it (the user's ask).
 - 2026-11-23, the otter's chase-and-tag clips: the pounce tag (paws onto the other's rump, a nip) and the porpoise leap in water, checked offline and filmed in the game; waiting for the user's look before the game plays them.
+- 2026-11-23, the otter runs in a noodle bound (the whole back humping, 2.4 strides a second at its bound), bouncier when playful, and does the weasel war dance (side to side hops) before a play bout and when skittering playful.

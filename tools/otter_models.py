@@ -842,10 +842,8 @@ WALK_STEP = 4.6           # half-stride travel (px); full stance = 9.2 px over 0
 WALK_DUTY = 0.64
 WALK_SPEED = round((2.0 * WALK_STEP) / (WALK_LEN * WALK_DUTY), 3)
 
-BOUND_LEN = 0.60          # energetic vertical-flexing otter lope/bound!
-BOUND_STEP = 4.8          # full stance = 9.6 px over 0.50 duty -> 32.000 px/s (2.000 b/s sprint)
-BOUND_DUTY = 0.50
-BOUND_SPEED = round((2.0 * BOUND_STEP) / (BOUND_LEN * BOUND_DUTY), 3)
+BOUND_LEN = 0.40          # the noodle bound (2026-11-23): made for 2.5 b/s, a block a stride; the game plays it faster or
+BOUND_SPEED = 40.0        # slower with the real speed (2.4 b/s bounding: 2.4 strides a second, 5 b/s dashing: 5)
 
 WATER_SURFACE = 11.3      # floating waterline in `swim` (eyes, ears, crown & dark nose cleanly above surface!)
 MOVE_SIZES = (1.0,)       # adult 1.0 (pups at 0.55 use standard Minecraft step)
@@ -1106,47 +1104,114 @@ def _clip_walk():
     return out
 
 
-# --- 3. BOUND (0.60 s, loop — signature vertical-flexing otter lope/bound!) ------------------------------------------
-def _clip_bound():
+# --- 3. BOUND and PLAY_BOUND (0.40 s, loop: the noodle bound; docs/plans/otter-play-and-fish.md 6f, 2026-11-23) -------
+# The real weasel bound with the back as the spring: front feet down one after the other (a half-bound), the hind feet
+# swing up under the belly and land just behind them while the back humps up (the noodle up, A = +1 at u 0.40), then they
+# push, the back stretches long and the front reaches far ahead (the noodle long, A = -1), a short flight, front down.
+# The head rides steady over it (the neck takes the roll back), the tail whips a beat late. play_bound is the same gait
+# bouncier: a higher hump, a real hop in the flight, the play face, the tail up. Numbers my picks, judged on the strips.
+BOUND_FEET = {   # foot: (lands at u, planted share of the stride, middle of its stance z px, reach past its landing px)
+    "leg_fl": (0.00, 0.30, -10.8, 1.6), "leg_fr": (0.07, 0.30, -10.8, 1.6),
+    "leg_bl": (0.40, 0.27, 5.0, 0.0), "leg_br": (0.43, 0.27, 5.0, 0.0),
+}
+HUMP_AT = 0.40
+
+
+def _bound_step(ph, duty):
+    """A foot at phase ph of its own stride: swing (+1 landing .. -1 lifting, as stride()), lift 0..1, share of the
+    swing done (0..1; 0 while planted)."""
+    ph %= 1.0
+    if ph < duty:
+        return 1.0 - 2.0 * ph / duty, 0.0, 0.0
+    u = (ph - duty) / (1.0 - duty)
+    return -1.0 + 2.0 * (0.5 - 0.5 * math.cos(math.pi * u)), math.sin(math.pi * u), u
+
+
+def _flight(u, k):
+    """The hop's height share (0..1..0): a smooth rise from the last hind foot's push to the front feet coming down."""
+    lift = BOUND_FEET["leg_br"][0] + BOUND_FEET["leg_br"][1] - 0.08
+    f = (u - lift) / (0.95 - lift)               # down a moment before the front feet touch (a soft landing)
+    return math.sin(math.pi * f) ** 2 if 0.0 < f < 1.0 else 0.0
+
+
+_HEAD_REST = {}
+
+
+def _steady_head(p, y_goal, pitch_goal):
+    """Turns the neck so the head's pivot sits at y_goal (px) and the head itself so it points pitch_goal (deg, + up)."""
+    base = p["neck"]["rotation"][0]
+    lo, hi = base - 35.0, base + 35.0
+    for _ in range(18):                            # neck down (+) lowers the head: bisect for the height
+        mid = 0.5 * (lo + hi)
+        p["neck"]["rotation"][0] = mid
+        if _fk_bone(p, "head")[0][1] > y_goal:
+            lo = mid
+        else:
+            hi = mid
+    p["head"]["rotation"][0] = 0.0
+    now = _parent_pitch_deg(_fk_bone(p, "head")[1])
+    p["head"]["rotation"][0] = -(pitch_goal - now)    # nose up is a negative turn
+
+
+def _bound_pose(t, k=0.0):
+    """The bound at time t; k 0 the everyday noodle bound, 1 the bouncy play bound."""
     L = BOUND_LEN
-    # Asymmetric otter lope: hind pair pushes together (0.00 / 0.06), front pair reaches together (0.50 / 0.56)
-    phases = {"leg_bl": 0.00, "leg_br": 0.06, "leg_fl": 0.50, "leg_fr": 0.56}
+    u = (t % L) / L
+    w = 2.0 * math.pi * (u - HUMP_AT)
+    A = math.cos(w)                       # +1 humped (hind feet just landed), -1 long (flight)
+    P = math.sin(w)                       # the see-saw: + front rising after the push, - front low on its feet
+    fl = _flight(u, k)
+    big = 1.0 + 0.45 * k                  # the play bound's bigger roll, in the back half and the height
+    bend = A if A > 0.0 else 0.3 * A      # humped hard, but only a little sag when long (the front stays down to land)
+    hop = 0.8 + 1.4 * k                   # the flight's rise (px)
+    up = bend * big                       # the hump's share now (a little negative when long)
+    upf = bend * (1.0 + 0.1 * k)          # the front half's: the play hump grows behind, not into the ground in front
+    p = {
+        # the middle of the back rises over the hump while both ends drop round it; long and a little lower in flight
+        "body":  {"position": [0.0, -0.9 + 1.6 * up + hop * fl, 0.0],
+                  "rotation": [-4.5 * P * big, 0.0, 0.0]},
+        "hips":  {"rotation": [-20.0 * up, 0.0, 0.0]},
+        "rump":  {"rotation": [-8.0 * up, 0.0, 0.0]},
+        "waist": {"rotation": [12.0 * upf, 0.0, 0.0]},
+        "ribs":  {"rotation": [10.0 * upf, 0.0, 0.0]},
+        "chest": {"rotation": [-2.0 * upf, 0.0, 0.0]},   # the chest kept level over the front feet (off the ground)
+        "neck":  {"rotation": [0.0, 0.0, 0.0]},
+        "head":  {"rotation": [0.0, 0.0, 0.0]},
+        "jaw":   {"rotation": [2.0 + 14.0 * k + 3.0 * k * fl, 0.0, 0.0]},
+        "tongue": {"rotation": [-4.0 * k, 0.0, 0.0]},
+    }
+    if "y" not in _HEAD_REST:
+        _HEAD_REST["y"] = _fk_bone(_idle_pose(0.0), "head")[0][1]
+    # the head glides: a little lower than standing, bobbing a third as much as the back, pointing a touch down
+    _steady_head(p, _HEAD_REST["y"] - 0.8 + 0.35 * 1.6 * up + 0.75 * hop * fl, -4.0 + 6.0 * k)
+    _set_lids(p, 0.0)
+    _set_whiskers(p, -5.0 + 9.0 * k, -5.0 + 9.0 * k)
+    _set_ears(p, -12.0 + 9.0 * k, -2.0 + 4.0 * k)
+    # the tail: its base takes back most of the hips' tuck (no scraping), then a wave runs out to the tip a beat late
+    _set_tail(p, lambda i: ((25.0 * up + 5.0 + 7.0 * k) if i == 0 else 2.0 + 2.0 * k)
+              + (3.0 + 1.3 * i) * big * math.cos(w - 1.0 - 0.6 * i),
+              lambda i: (0.6 + 0.4 * i) * math.sin(w - 0.4 * i))
+    for pref, (land, duty, mid, reach) in BOUND_FEET.items():
+        front = pref in ("leg_fl", "leg_fr")
+        if k > 0.0:
+            duty -= 0.04 * k                  # the hop: a little less time on the ground
+        s, lift, us = _bound_step(u - land, duty)
+        stance = BOUND_SPEED * duty * L       # px a planted foot goes back
+        tz = mid + (0.9 * k if front else 0.0) - 0.5 * stance * s - reach * math.sin(math.pi * us) ** 2
+        up = (2.6 if front else 3.4) * lift + (0.85 * hop * fl if lift > 0.0 else 0.0)   # feet up in the hop with the body
+        pitch_ = (-16.0 if front else -26.0) * lift
+        _solve_leg(p, pref, up, tz, paw_world_pitch=pitch_, roll_z=_leg_roll(pref, -10.0))
+    return p
 
-    def at(t):
-        u = (t % L) / L
-        w = 2.0 * math.pi * u
-        # Low & coiled while hind/front stance pushes, slight springy lift at mid-bound
-        flex = math.sin(w)
-        bounce = -0.58 + 0.26 * math.sin(2.0 * w - 0.5)
-        body_p = 3.5 * math.cos(w)
 
-        p = {
-            "body":  {"position": [0.0, bounce, 0.0], "rotation": [body_p, 0.0, 0.0]},
-            "hips":  {"rotation": [5.5 * flex, 0.0, 0.0]},
-            "waist": {"rotation": [-7.5 * flex, 0.0, 0.0]},
-            "ribs":  {"rotation": [9.5 * flex, 0.0, 0.0]},
-            "chest": {"rotation": [-6.0 * flex, 0.0, 0.0]},
-            "neck":  {"rotation": [5.0 - 4.0 * math.cos(w), 0.0, 0.0]},
-            "head":  {"rotation": [-4.5 - body_p * 0.65, 0.0, 0.0]},
-            "jaw":   {"rotation": [4.0 + 3.0 * max(0.0, flex), 0.0, 0.0]},
-        }
-        _set_lids(p, 0.0)
-        _set_whiskers(p, 4.0 * flex, 4.0 * flex)
-        _set_ears(p, -8.0, 0.0)
-        # Athletic balancing whip down the 5-bone tail (lifted cleanly above y > 1.0!)
-        _set_tail(p, lambda i: (10.0 if i == 0 else 4.5) + (3.2 + 0.9 * i) * math.sin(w - 0.45 * i),
-                  lambda i: 1.8 * math.sin(w - 0.4 * i))
+def _clip_bound():
+    out = clip(BOUND_LEN, lambda t: _bound_pose(t, 0.0), 32, loop=True)
+    out["timeline"] = {"0": f"stride {BOUND_SPEED:.3f}"}
+    return out
 
-        for pref, ph in phases.items():
-            wr = _rig()["legs"][pref]["w_rest"]
-            s_norm, l_norm = stride((u + ph) % 1.0, BOUND_DUTY)
-            tz = wr[2] - s_norm * BOUND_STEP
-            s_out = 1.0 if pref in ("leg_fl", "leg_bl") else -1.0
-            rz = s_out * (-9.0 if pref in ("leg_fl", "leg_fr") else -7.5)
-            _solve_leg(p, pref, l_norm * 2.5, tz, paw_world_pitch=-14.0 * l_norm, roll_z=rz)
-        return p
 
-    out = clip(L, at, 30, loop=True)
+def _clip_play_bound():
+    out = clip(BOUND_LEN, lambda t: _bound_pose(t, 1.0), 32, loop=True)
     out["timeline"] = {"0": f"stride {BOUND_SPEED:.3f}"}
     return out
 
@@ -1887,6 +1952,64 @@ def _clip_porpoise():
     return out
 
 
+# --- SIDE HOPS: the war dance (2026-11-23; the user: "make sure they jump side to side like real otters and weasels") ---
+# The real weasel "war dance": excited hops sideways, the back humped up high and the body bent into a C, mouth open in
+# the play face, the tail swishing. Otters and ferrets do it inviting play. One hop a clip, to its left or its right;
+# the game carries it sideways while its feet are up (SIDE_AIR, as the hop turn turns it) and strings 2 to 4 together,
+# left and right in turn. Numbers my picks.
+SIDE_LEN = 0.50
+SIDE_AIR = (0.15, 0.35)       # feet up (s): ticks 3 to 7
+SIDE_GO = 0.7                 # how far the game carries it sideways (blocks, at size 1)
+
+
+def _side_hop_pose(t, side):
+    """side +1: hops to its left (+x), -1: to its right."""
+    L = SIDE_LEN
+    a0, a1 = SIDE_AIR
+    p = _idle_pose(0.0)
+    crouch = pulse(t, 0.0, 0.12, 0.0, 0.05)
+    air = math.sin(math.pi * max(0.0, min(1.0, (t - a0) / (a1 - a0))))
+    land = pulse(t, a1 - 0.01, 0.04, 0.0, L - a1 - 0.05)
+    arch = ramp(t, ((0.0, 0.0), (0.12, 1.0), (0.36, 1.0), (L, 0.0)))
+    arch = ease(arch) if arch < 1.0 else 1.0
+    pos = p["body"]["position"]
+    p["body"]["position"] = [pos[0], pos[1] + 1.3 * arch - 0.5 * crouch + 3.2 * air - 0.5 * land, pos[2]]
+    # the hump, stronger than the bound's, the chest kept level; the C bend to the side it goes; a lean into the hop
+    _add_rot(p, "body", [0.0, 0.0, side * 9.0 * air])     # leaning into the hop (filmed: the other way leaned out)
+    _add_rot(p, "hips", [-24.0 * arch, side * 9.0 * air, 0.0])
+    _add_rot(p, "rump", [-9.0 * arch, 0.0, 0.0])
+    _add_rot(p, "waist", [11.0 * arch, -side * 7.0 * air, 0.0])
+    _add_rot(p, "ribs", [8.0 * arch, -side * 5.0 * air, 0.0])
+    _add_rot(p, "chest", [-6.0 * arch, 0.0, 0.0])
+    # head up and on the partner ahead, mouth open in the play face
+    _add_rot(p, "neck", [-6.0 * arch, side * 8.0 * air, 0.0])
+    _add_rot(p, "head", [-8.0 * arch + 3.0 * land, side * 4.0 * air, side * 6.0 * air])
+    p["jaw"] = {"rotation": [6.0 + 14.0 * arch, 0.0, 0.0]}
+    p["tongue"] = {"rotation": [-4.0 * arch, 0.0, 0.0]}
+    _set_ears(p, 8.0 * arch, 4.0 * arch)
+    _set_whiskers(p, 10.0 * arch, 10.0 * arch)
+    _set_lids(p, 0.0)
+    # the tail up from the humped rump, swishing away from the hop
+    _set_tail(p, lambda i: (36.0 * arch if i == 0 else 5.0 * arch) - 1.0 * crouch,
+              lambda i: -side * (5.0 + 3.0 * i) * air)
+    # feet: planted, tucked up in the air (a hair late in front), planted again on landing
+    for pref in ("leg_fl", "leg_fr", "leg_bl", "leg_br"):
+        wr = _rig()["legs"][pref]["w_rest"]
+        front = pref in ("leg_fl", "leg_fr")
+        late = 0.02 if front else 0.0
+        up = math.sin(math.pi * max(0.0, min(1.0, (t - a0 - late) / (a1 - a0 - late))))
+        _solve_leg(p, pref, (2.2 if front else 3.0) * up, wr[2] + (0.3 if front else -0.6) * arch, paw_world_pitch=-14.0 * up,
+                   roll_z=_leg_roll(pref) * (1.0 - 0.4 * up))
+    return p
+
+
+def _clip_side_hop(side):
+    a0, a1 = SIDE_AIR
+    out = clip(SIDE_LEN, lambda t: _side_hop_pose(t, side), 20, loop=False)
+    out["timeline"] = {f"{a0:.2f}": "air", f"{a1:.2f}": "land"}
+    return out
+
+
 # --- 15-18. BLOCK MOVES (step_up_1000, step_down_1000, enter_water_1000, exit_water_1000) ----------------------------
 # Clean athletic 2.6-block otter moves with exact `path root` and `step`/`water` timeline notes for BlockMoves.java!
 def _otter_move_clip(length, steps, dy_keys, dz_keys, pitch_keys, flex_keys, fl_fn, fr_fn, bl_fn, br_fn,
@@ -2350,6 +2473,9 @@ def clips():
         "idle":             _clip_idle(),
         "walk":             _clip_walk(),
         "bound":            _clip_bound(),
+        "play_bound":       _clip_play_bound(),
+        "side_hop_left":    _clip_side_hop(1.0),
+        "side_hop_right":   _clip_side_hop(-1.0),
         "swim":             _clip_swim(),
         "dive_swim":        _clip_dive_swim(),
         "forage_feel":      _clip_forage_feel(),

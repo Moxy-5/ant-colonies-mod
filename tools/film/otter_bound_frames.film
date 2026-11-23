@@ -1,0 +1,144 @@
+# The otter's noodle bound in the game (2026-11-23, docs/plans/otter-play-and-fish.md 6f; the hard rule: frozen and
+# stepped from three sides, then running). First the two clips in place (film:bound, film:play_bound), facing west, four
+# pictures a tick. Then a real otter running east along a row of fence posts (one every 2 blocks, so the speed against
+# the ground shows), the camera riding beside it, one picture a tick: at its bound (go ... 0.8), its dash (1.15), and
+# held playful (the bouncy bound).
+#   ./gradlew runFilm -PfilmScene=tools/film/otter_bound_frames.film   pictures in run-film/screenshots/otter_bound_frames/
+cmd time set noon
+cmd weather clear
+cmd kill @e[type=!player]
+cmd fill 0 -61 0 90 -50 20 minecraft:air
+cmd fill 0 -62 0 90 -62 20 minecraft:dirt
+cmd fill 0 -61 0 90 -61 20 minecraft:grass_block
+cmd fill 0 -60 12 90 -60 12 minecraft:air
+lens 40
+wait 40
+# --- in place: side, front three quarters, front
+cmd tick unfreeze
+cmd summon antcolonies:otter 20.5 -60 6.0 {NoAI:1b,Rotation:[90f,0f],OwnSize:1.0f,CustomName:'"film:bound"'}
+camera 19.6 -60.6 2.0 0 6
+wait 30
+cmd tick freeze
+frames 4
+burst bound_side 10 1
+frames 1
+cmd tick unfreeze
+camera 17.0 -59.9 3.4 -55 14
+wait 10
+cmd tick freeze
+frames 4
+burst bound_three 10 1
+frames 1
+cmd tick unfreeze
+camera 16.0 -60.6 6.0 -90 6
+wait 10
+cmd tick freeze
+frames 4
+burst bound_front 10 1
+frames 1
+cmd tick unfreeze
+cmd kill @e[type=antcolonies:otter]
+wait 20
+cmd summon antcolonies:otter 20.5 -60 6.0 {NoAI:1b,Rotation:[90f,0f],OwnSize:1.0f,CustomName:'"film:play_bound"'}
+camera 19.6 -60.6 2.0 0 6
+wait 30
+cmd tick freeze
+frames 4
+burst play_side 10 1
+frames 1
+cmd tick unfreeze
+camera 17.0 -59.9 3.4 -55 14
+wait 10
+cmd tick freeze
+frames 4
+burst play_three 10 1
+frames 1
+cmd tick unfreeze
+camera 16.0 -60.6 6.0 -90 6
+wait 10
+cmd tick freeze
+frames 4
+burst play_front 10 1
+frames 1
+cmd tick unfreeze
+cmd kill @e[type=antcolonies:otter]
+wait 20
+# --- running along the posts: bound, dash, playful
+cmd setblock 0 -60 12 minecraft:oak_fence
+cmd setblock 2 -60 12 minecraft:oak_fence
+cmd setblock 4 -60 12 minecraft:oak_fence
+cmd setblock 6 -60 12 minecraft:oak_fence
+cmd setblock 8 -60 12 minecraft:oak_fence
+cmd setblock 10 -60 12 minecraft:oak_fence
+cmd setblock 12 -60 12 minecraft:oak_fence
+cmd setblock 14 -60 12 minecraft:oak_fence
+cmd setblock 16 -60 12 minecraft:oak_fence
+cmd setblock 18 -60 12 minecraft:oak_fence
+cmd setblock 20 -60 12 minecraft:oak_fence
+cmd setblock 22 -60 12 minecraft:oak_fence
+cmd setblock 24 -60 12 minecraft:oak_fence
+cmd setblock 26 -60 12 minecraft:oak_fence
+cmd setblock 28 -60 12 minecraft:oak_fence
+cmd setblock 30 -60 12 minecraft:oak_fence
+cmd setblock 32 -60 12 minecraft:oak_fence
+cmd setblock 34 -60 12 minecraft:oak_fence
+cmd setblock 36 -60 12 minecraft:oak_fence
+cmd setblock 38 -60 12 minecraft:oak_fence
+cmd setblock 40 -60 12 minecraft:oak_fence
+cmd setblock 42 -60 12 minecraft:oak_fence
+cmd setblock 44 -60 12 minecraft:oak_fence
+cmd setblock 46 -60 12 minecraft:oak_fence
+cmd setblock 48 -60 12 minecraft:oak_fence
+cmd setblock 50 -60 12 minecraft:oak_fence
+cmd setblock 52 -60 12 minecraft:oak_fence
+cmd setblock 54 -60 12 minecraft:oak_fence
+cmd setblock 56 -60 12 minecraft:oak_fence
+cmd setblock 58 -60 12 minecraft:oak_fence
+cmd setblock 60 -60 12 minecraft:oak_fence
+cmd setblock 62 -60 12 minecraft:oak_fence
+cmd setblock 64 -60 12 minecraft:oak_fence
+cmd setblock 66 -60 12 minecraft:oak_fence
+cmd setblock 68 -60 12 minecraft:oak_fence
+cmd setblock 70 -60 12 minecraft:oak_fence
+cmd setblock 72 -60 12 minecraft:oak_fence
+cmd setblock 74 -60 12 minecraft:oak_fence
+cmd setblock 76 -60 12 minecraft:oak_fence
+cmd setblock 78 -60 12 minecraft:oak_fence
+cmd setblock 80 -60 12 minecraft:oak_fence
+cmd setblock 82 -60 12 minecraft:oak_fence
+cmd setblock 84 -60 12 minecraft:oak_fence
+cmd setblock 86 -60 12 minecraft:oak_fence
+cmd setblock 88 -60 12 minecraft:oak_fence
+cmd setblock 90 -60 12 minecraft:oak_fence
+walker antcolonies:otter 6.5 -60 6.5 -90 OwnSize:1.0f
+follow 0 0.4 -6.5 0 4
+cmd tick unfreeze
+go 60 -60 6 0.8
+wait 30
+cmd tick freeze
+burst run_bound 40 1
+cmd tick unfreeze
+follow off
+cmd kill @e[type=antcolonies:otter]
+wait 20
+walker antcolonies:otter 6.5 -60 6.5 -90 OwnSize:1.0f
+follow 0 0.4 -6.5 0 4
+cmd tick unfreeze
+go 80 -60 6 1.15
+wait 20
+cmd tick freeze
+burst run_dash 40 1
+cmd tick unfreeze
+follow off
+cmd kill @e[type=antcolonies:otter]
+wait 20
+walker antcolonies:otter 6.5 -60 6.5 -90 OwnSize:1.0f,Tags:["mood.playful"]
+follow 0 0.4 -6.5 0 4
+cmd tick unfreeze
+go 60 -60 6 0.8
+wait 30
+cmd tick freeze
+burst run_play 40 1
+cmd tick unfreeze
+follow off
+cmd kill @e[type=antcolonies:otter]

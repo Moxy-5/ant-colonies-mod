@@ -138,7 +138,10 @@
       "skid_stop",
       "hop_turn",
       "pounce_tag",
-      "porpoise"
+      "porpoise",
+      "play_bound",
+      "side_hop_left",
+      "side_hop_right"
     ],
     "tuck_ok": [
       "swim",
@@ -160,9 +163,10 @@
     ],
     "walks": {
       "walk": 17.969,
-      "bound": 32.0,
+      "bound": 40.0,
       "scurry": 25.078,
-      "sniff_walk": 9.491
+      "sniff_walk": 9.491,
+      "play_bound": 40.0
     },
     "switches": [
       [
@@ -424,6 +428,86 @@
       [
         "porpoise",
         "swim"
+      ],
+      [
+        "bound",
+        "play_bound"
+      ],
+      [
+        "play_bound",
+        "bound"
+      ],
+      [
+        "scurry",
+        "play_bound"
+      ],
+      [
+        "play_bound",
+        "scurry"
+      ],
+      [
+        "play_bound",
+        "skid_stop"
+      ],
+      [
+        "bound",
+        "skid_stop"
+      ],
+      [
+        "play_bound",
+        "pounce_tag"
+      ],
+      [
+        "walk",
+        "play_bound"
+      ],
+      [
+        "play_bound",
+        "walk"
+      ],
+      [
+        "idle",
+        "bound"
+      ],
+      [
+        "bound",
+        "idle"
+      ],
+      [
+        "idle",
+        "side_hop_left"
+      ],
+      [
+        "side_hop_left",
+        "side_hop_right"
+      ],
+      [
+        "side_hop_right",
+        "side_hop_left"
+      ],
+      [
+        "side_hop_left",
+        "idle"
+      ],
+      [
+        "side_hop_right",
+        "idle"
+      ],
+      [
+        "skid_stop",
+        "side_hop_left"
+      ],
+      [
+        "side_hop_right",
+        "bite"
+      ],
+      [
+        "side_hop_left",
+        "scurry"
+      ],
+      [
+        "bound",
+        "side_hop_right"
       ]
     ],
     "controller": "savanna/src/main/java/com/antcolonies/savanna/animal/OtterEntity.java",

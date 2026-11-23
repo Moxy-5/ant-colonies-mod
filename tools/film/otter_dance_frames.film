@@ -1,0 +1,56 @@
+# The otter's war dance (2026-11-23; the user: "make sure they jump side to side like real otters and weasels"; the hard
+# rule: frozen and stepped from three sides). The two side hops in place (film:side_hop_left, film:side_hop_right), an
+# otter facing west at x 20.5, z 17: side on from the south (its left), front on, three quarters. Then two fed otters
+# left to play (tag play.now): the one that starts dances side to side before its nose poke; filmed from above so the
+# sideways carry shows against the grass (each hop should land to the side its body leans).
+#   ./gradlew runFilm -PfilmScene=tools/film/otter_dance_frames.film   pictures in run-film/screenshots/otter_dance_frames/
+cmd time set noon
+cmd weather clear
+cmd kill @e[type=!player]
+cmd fill 0 -61 0 40 -50 34 minecraft:air
+cmd fill 0 -62 0 40 -61 34 minecraft:grass_block
+lens 40
+wait 40
+cmd tick unfreeze
+cmd summon antcolonies:otter 20.5 -60 17.0 {NoAI:1b,Rotation:[90f,0f],OwnSize:1.0f,CustomName:'"film:side_hop_left"'}
+camera 19.6 -60.6 13.0 0 6
+wait 30
+cmd tick freeze
+frames 2
+burst left_side 10 1
+frames 1
+cmd tick unfreeze
+camera 16.0 -60.4 17.0 -90 6
+wait 10
+cmd tick freeze
+frames 2
+burst left_front 10 1
+frames 1
+cmd tick unfreeze
+camera 17.2 -59.9 14.4 -50 14
+wait 10
+cmd tick freeze
+frames 2
+burst left_three 10 1
+frames 1
+cmd tick unfreeze
+cmd kill @e[type=antcolonies:otter]
+wait 20
+cmd summon antcolonies:otter 20.5 -60 17.0 {NoAI:1b,Rotation:[90f,0f],OwnSize:1.0f,CustomName:'"film:side_hop_right"'}
+camera 16.0 -60.4 17.0 -90 6
+wait 30
+cmd tick freeze
+frames 2
+burst right_front 10 1
+frames 1
+cmd tick unfreeze
+cmd kill @e[type=antcolonies:otter]
+wait 20
+cmd summon antcolonies:otter 18.0 -60 17.5 {PersistenceRequired:1b,Rotation:[-90f,0f],OwnSize:1.0f,HungryIn:6000,Tags:["play.now"]}
+cmd summon antcolonies:otter 22.0 -60 17.5 {PersistenceRequired:1b,Rotation:[90f,0f],OwnSize:1.0f,HungryIn:6000}
+camera 20.0 -52.0 12.0 0 55
+wait 4
+cmd tick freeze
+burst bank 160 1
+cmd tick unfreeze
+cmd kill @e[type=antcolonies:otter]
