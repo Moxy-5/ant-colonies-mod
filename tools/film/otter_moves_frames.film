@@ -1,0 +1,110 @@
+# The otter's block moves frame by frame (2026-11-22, the hard rule: every animation checked in the game, frozen and
+# stepped, from three sides): the quick scramble up a block (the step's west face at x 10), the hop down off it (its
+# edge at x 10, going west), the calm slide into a pool off a level bank (the pool's west edge at x 20) and the quick
+# climb out onto it. Stepped 1 tick a picture (the moves are quick).
+#   ./gradlew runFilm -PfilmScene=tools/film/otter_moves_frames.film   pictures in run-film/screenshots/otter_moves_frames/
+cmd time set noon
+cmd weather clear
+cmd kill @e[type=!player]
+cmd fill -4 -61 -8 32 -55 8 minecraft:air
+cmd fill -4 -63 -8 32 -62 8 minecraft:dirt
+cmd fill 10 -61 -8 16 -60 8 minecraft:stone
+cmd fill -4 -61 -8 9 -61 8 minecraft:grass_block
+cmd fill 17 -61 -8 19 -61 8 minecraft:grass_block
+cmd fill 20 -63 -6 30 -61 6 minecraft:water
+lens 40
+wait 40
+# --- up a block: side on, front on top, behind three quarters
+walker antcolonies:otter 6.0 -60 0.5 -90 OwnSize:1.0f
+camera 9.5 -59.6 -5.5 0 6
+cmd tick unfreeze
+go 14 -59 0 0.8
+wait 8
+cmd tick freeze
+burst up_side 34 1
+cmd kill @e[type=antcolonies:otter]
+wait 10
+walker antcolonies:otter 6.0 -60 0.5 -90 OwnSize:1.0f
+camera 13.5 -58.4 -3.2 52 16
+cmd tick unfreeze
+go 14 -59 0 0.8
+wait 8
+cmd tick freeze
+burst up_front 34 1
+cmd kill @e[type=antcolonies:otter]
+wait 10
+walker antcolonies:otter 6.0 -60 0.5 -90 OwnSize:1.0f
+camera 5.0 -59.6 -3.0 -50 10
+cmd tick unfreeze
+go 14 -59 0 0.8
+wait 8
+cmd tick freeze
+burst up_back 34 1
+cmd kill @e[type=antcolonies:otter]
+wait 10
+# --- down a block (west): side on, front below, behind on top
+walker antcolonies:otter 13.0 -59 0.5 90 OwnSize:1.0f
+camera 10.5 -59.6 -5.5 0 6
+cmd tick unfreeze
+go 5 -60 0 0.8
+wait 6
+cmd tick freeze
+burst down_side 30 1
+cmd kill @e[type=antcolonies:otter]
+wait 10
+walker antcolonies:otter 13.0 -59 0.5 90 OwnSize:1.0f
+camera 6.5 -59.6 -3.0 -52 10
+cmd tick unfreeze
+go 5 -60 0 0.8
+wait 6
+cmd tick freeze
+burst down_front 30 1
+cmd kill @e[type=antcolonies:otter]
+wait 10
+walker antcolonies:otter 13.0 -59 0.5 90 OwnSize:1.0f
+camera 15.0 -58.0 -3.0 50 18
+cmd tick unfreeze
+go 5 -60 0 0.8
+wait 6
+cmd tick freeze
+burst down_back 30 1
+cmd kill @e[type=antcolonies:otter]
+wait 10
+# --- into the pool off a level bank (east): side on, three quarters from the water
+walker antcolonies:otter 16.5 -60 0.5 -90 OwnSize:1.0f
+camera 20.0 -59.4 -6.0 0 8
+cmd tick unfreeze
+go 26 -61 0 0.55
+wait 8
+cmd tick freeze
+burst in_side 50 1
+cmd kill @e[type=antcolonies:otter]
+wait 10
+walker antcolonies:otter 16.5 -60 0.5 -90 OwnSize:1.0f
+camera 24.0 -58.6 -3.5 55 14
+cmd tick unfreeze
+go 26 -61 0 0.55
+wait 8
+cmd tick freeze
+burst in_three 50 1
+cmd kill @e[type=antcolonies:otter]
+wait 10
+# --- out of the pool onto the level bank (west): side on, three quarters from the bank
+walker antcolonies:otter 23.5 -60.8 0.5 90 OwnSize:1.0f
+camera 20.0 -59.4 -6.0 0 8
+cmd tick unfreeze
+go 15 -60 0 0.8
+wait 6
+cmd tick freeze
+burst out_side 46 1
+cmd kill @e[type=antcolonies:otter]
+wait 10
+walker antcolonies:otter 23.5 -60.8 0.5 90 OwnSize:1.0f
+camera 16.5 -58.8 -3.0 -55 14
+cmd tick unfreeze
+go 15 -60 0 0.8
+wait 6
+cmd tick freeze
+burst out_three 46 1
+cmd kill @e[type=antcolonies:otter]
+quit

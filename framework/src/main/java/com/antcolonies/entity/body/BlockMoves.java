@@ -144,6 +144,21 @@ public final class BlockMoves {
         public boolean wet() {
             return wetTick >= 0;
         }
+
+        /** The lowest it goes on the move (a share of a block from its start, below 0 going down). */
+        public double lowest(int size) {
+            double low = 0.0;
+            for (float r : rise[size]) {
+                low = Math.min(low, r);
+            }
+            return low;
+        }
+
+        /** How far forward it has gone by the end of the move (model pixels). */
+        public double reach(int size) {
+            float[] row = along[size];
+            return row[row.length - 1];
+        }
     }
 
     private static Data read(Class<?> owner, String path) {

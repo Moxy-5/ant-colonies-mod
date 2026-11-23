@@ -903,7 +903,7 @@ def _parent_pitch_deg(wm):
     return math.degrees(math.atan2(-dz, -dy))
 
 
-def _solve_leg(pose, pref, target_y_sole, target_z, paw_world_pitch=0.0, pole_z=1.0, roll_z=0.0):
+def _solve_leg(pose, pref, target_y_sole, target_z, paw_world_pitch=0.0, pole_z=1.0, roll_z=0.0, pole=None):
     """Solves 2-bone IK in the sagittal (Y-Z) plane for one otter leg, pinning the paw sole cleanly to (target_y_sole, target_z).
 
     pole_z = +1.0 bends elbow/hock backward (+Z, natural mammalian anatomy!).
@@ -919,7 +919,7 @@ def _solve_leg(pose, pref, target_y_sole, target_z, paw_world_pitch=0.0, pole_z=
 
     # Target wrist position in world space (paw_h = 1.55 px above target sole)
     w_target = [s_now[0], target_y_sole + info["paw_h"], target_z]
-    e_now, w_now, _miss = two_bone(s_now, info["l1"], info["l2"], w_target, [0.0, 0.0, pole_z], reach=0.985)
+    e_now, w_now, _miss = two_bone(s_now, info["l1"], info["l2"], w_target, pole or [0.0, 0.0, pole_z], reach=0.985)
 
     v1 = vsub(e_now, s_now)
     v2 = vsub(w_now, e_now)
@@ -1466,7 +1466,7 @@ def _clip_death():
 # Clean athletic 2.6-block otter moves with exact `path root` and `step`/`water` timeline notes for BlockMoves.java!
 def _otter_move_clip(length, steps, dy_keys, dz_keys, pitch_keys, flex_keys, fl_fn, fr_fn, bl_fn, br_fn,
                      note, wet_t=-1.0, neck_fn=None, head_fn=None, tail_fn=None, ear_fn=None, whisker_fn=None,
-                     shake_end=False):
+                     shake_end=False, wiggle_fn=None, tail_yaw_fn=None):
     times = [length * k / steps for k in range(steps + 1)]
     path = []
 
@@ -1482,13 +1482,16 @@ def _otter_move_clip(length, steps, dy_keys, dz_keys, pitch_keys, flex_keys, fl_
             u_s = (t - (length - 0.45)) / 0.45
             sh = 16.0 * math.sin(math.pi * u_s) * math.sin(2.0 * math.pi * 5.0 * u_s)
 
+        # the rump's wiggle as it scrambles over (2026-11-22, the user's "cute ... scrambling up quickly"): the hips
+        # roll one way and the chest a little the other
+        wg = wiggle_fn(t) if wiggle_fn else 0.0
         # In BlockMoves clips, root stays at 0 (the game moves the entity along `path root`), so pose is relative!
         p = {
             "body":  {"position": [0.0, 0.0, 0.0], "rotation": [-bp, 0.0, sh * 0.35]},
-            "hips":  {"rotation": [flx * 0.5, 0.0, 0.0]},
+            "hips":  {"rotation": [flx * 0.5, wg * 0.35, wg]},
             "waist": {"rotation": [-flx * 0.8, 0.0, 0.0]},
             "ribs":  {"rotation": [flx * 1.1, 0.0, 0.0]},
-            "chest": {"rotation": [-flx * 0.8, 0.0, sh * 0.5]},
+            "chest": {"rotation": [-flx * 0.8, 0.0, sh * 0.5 - wg * 0.3]},
             "neck":  {"rotation": [nk_add + bp * 0.35, 0.0, sh * 0.6]},
             "head":  {"rotation": [hd_pitch, 0.0, sh]},
             "jaw":   {"rotation": [1.5, 0.0, 0.0]},
@@ -1499,7 +1502,7 @@ def _otter_move_clip(length, steps, dy_keys, dz_keys, pitch_keys, flex_keys, fl_
         ep, ey = ear_fn(t) if ear_fn else (-4.0, 0.0)
         _set_ears(p, ep, ey)
         if tail_fn:
-            _set_tail(p, lambda i: tail_fn(t, i))
+            _set_tail(p, lambda i: tail_fn(t, i), (lambda i: tail_yaw_fn(t, i)) if tail_yaw_fn else None)
         else:
             _set_tail(p, lambda i: 4.5 + bp * 0.25)
 
@@ -1508,8 +1511,10 @@ def _otter_move_clip(length, steps, dy_keys, dz_keys, pitch_keys, flex_keys, fl_
             is_f = pref in ("leg_fl", "leg_fr")
             s_out = 1.0 if pref in ("leg_fl", "leg_bl") else -1.0
             if spec[0] == "ik":
+                # an optional fifth item: the way the joint bends (a reach up and forward bends the elbow down and
+                # back; the plain backward pole is square to that reach and let the elbow flip over, 2026-11-22)
                 _solve_leg(p, pref, spec[1] - dy, spec[2] - dz, paw_world_pitch=spec[3],
-                           roll_z=s_out * (-8.5 if is_f else -6.5))
+                           roll_z=s_out * (-8.5 if is_f else -6.5), pole=spec[4] if len(spec) > 4 else None)
             elif spec[0] == "blend":
                 # Smoothly eases from live IK pose (k=0) into target swim/dive angles (k=1) — ZERO snap!
                 _, k, y_s, z_t, a1, a2, ap, rz_end = spec
@@ -1557,82 +1562,151 @@ def _otter_move_clip(length, steps, dy_keys, dz_keys, pitch_keys, flex_keys, fl_
 
 
 def _clip_step_up():
-    """Nimble 2.6-block otter climb up a 1-block (16 px) step at face z = -24.0 (hind paws planted until takeoff!)."""
-    L = 2.00
+    """A quick, cute scramble up a 1-block (16 px) step at face z = -24.0 (2026-11-22, the user: "I want it to look cute
+    like he's scrambling up a block but quickly"; was a 2 s climb): a hop to the face rearing up, the front paws hooking
+    the top edge, the hind feet patting fast against the face as the hips come up with a little rump wiggle and the
+    tail swinging for balance, then over and on. 0.85 s."""
+    L = 0.85
     B = 16.0
     face = -STEP_FACE       # -24.0
     dz_end = -36.0
-    # Pitch nose UP early so chest clears the 16 px step while hips stay low & hind paws remain firmly planted on y=0!
-    dy_keys = ((0.0, 0.0), (0.28, 1.0), (0.64, 5.2), (1.02, 11.4), (1.42, B), (L, B))
-    dz_keys = ((0.0, 0.0), (0.32, -2.5), (0.72, -10.5), (1.16, -23.0), (1.62, -34.0), (L, dz_end))
-    pitch_keys = ((0.0, 0.0), (0.24, 18.0), (0.62, 34.0), (1.02, 22.0), (1.44, 4.0), (1.76, 0.0), (L, 0.0))
-    flex_keys = ((0.0, 0.0), (0.40, 5.0), (0.98, -4.5), (1.48, 2.0), (L, 0.0))
+    dy_keys = ((0.0, 0.0), (0.08, 0.8), (0.18, 4.5), (0.30, 6.5), (0.42, 9.5), (0.56, 13.6), (0.68, B), (L, B))
+    dz_keys = ((0.0, 0.0), (0.10, -2.5), (0.24, -8.5), (0.40, -15.5), (0.56, -24.0), (0.68, -31.0), (L, dz_end))
+    pitch_keys = ((0.0, 0.0), (0.06, 12.0), (0.18, 34.0), (0.36, 33.0), (0.52, 17.0), (0.66, 2.0), (L, 0.0))
+    flex_keys = ((0.0, 0.0), (0.10, 6.0), (0.30, -6.0), (0.50, 8.0), (0.66, -2.0), (L, 0.0))
 
-    def _step_leg(pref, t_lift, t_land):
-        is_f = pref in ("leg_fl", "leg_fr")
+    def _front(pref, t_reach, t_hook, t_step, t_land):
         def fn(t, dy, dz):
             wr = _rig()["legs"][pref]["w_rest"]
-            z0 = wr[2]
-            z1 = dz_end + wr[2]
-            if t < t_lift:
+            z0, z1 = wr[2], dz_end + wr[2]
+            zh = face - 3.0                      # hooked on the top, just past the edge
+            B = 16.7                             # the paw resting on the top, not into it
+            if t < t_reach:
                 return ("ik", 0.0, z0, 0.0)
-            if t < t_land:
-                u = (t - t_lift) / (t_land - t_lift)
-                # Higher arc on front legs clears the 16 px step edge cleanly; smooth ease on hind keeps turns < 60 deg/tick!
-                y_u = ease(min(1.0, u * 1.15)) if is_f else ease(u)
-                y_arc = B * y_u + (1.8 if is_f else 1.2) * math.sin(math.pi * u)
-                z_cur = z0 * (1.0 - ease(u)) + z1 * ease(u)
-                return ("ik", y_arc, z_cur, -8.0 * math.sin(math.pi * u))
+            pole = [0.0, -1.0, 0.7]
+            if t < t_hook:                      # up and over the edge in a quick reach
+                u = (t - t_reach) / (t_hook - t_reach)
+                return ("ik", B * ease(u) + 1.2 * math.sin(math.pi * u), z0 * (1 - ease(u)) + zh * ease(u),
+                        -10.0 * math.sin(math.pi * u), pole)
+            if t < t_step:
+                return ("ik", B, zh, 0.0, pole)
+            if t < t_land:                      # a step on along the top as the body comes over
+                u = (t - t_step) / (t_land - t_step)
+                return ("ik", B + 1.6 * math.sin(math.pi * u), zh * (1 - ease(u)) + z1 * ease(u), -6.0 * math.sin(math.pi * u), pole)
+            return ("ik", B, z1, 0.0, pole)
+        return fn
+
+    def _hind(pref, phase):
+        """A hop to the face, three quick pats up it (the scrabble), then onto the top."""
+        def fn(t, dy, dz):
+            wr = _rig()["legs"][pref]["w_rest"]
+            z0, z1 = wr[2], dz_end + wr[2]
+            zg = -7.0                           # hopped forward on the ground, under the rearing body
+            zf = face + 2.4                     # against the face (the paw's toes just touching it)
+            t_hop, t_hop_end = 0.20 + phase, 0.32 + phase
+            t_pats = 0.38 + phase
+            pat = 0.075
+            t_top = t_pats + 3 * pat
+            t_end = t_top + 0.11
+            if t < t_hop:
+                return ("ik", 0.0, z0, 0.0)
+            if t < t_hop_end:
+                u = (t - t_hop) / (t_hop_end - t_hop)
+                return ("ik", 2.2 * math.sin(math.pi * u), z0 * (1 - ease(u)) + zg * ease(u), 10.0 * math.sin(math.pi * u))
+            if t < t_pats:
+                u = (t - t_hop_end) / (t_pats - t_hop_end)
+                return ("ik", 4.5 * ease(u), zg * (1 - ease(u)) + zf * ease(u), 14.0 * ease(u))
+            if t < t_top:                       # pat, pat, pat: each a little higher up the face
+                k = (t - t_pats) / pat
+                i = int(k)
+                u = k - i
+                y0, y1 = 4.5 + 4.0 * i, 4.5 + 4.0 * (i + 1)
+                return ("ik", y0 + (y1 - y0) * ease(u) + 1.5 * math.sin(math.pi * u), zf + 1.2 * math.sin(math.pi * u), 22.0)
+            if t < t_end:
+                u = (t - t_top) / (t_end - t_top)
+                return ("ik", 16.5 * (1 - ease(u)) + B * ease(u) + 1.2 * math.sin(math.pi * u),
+                        zf * (1 - ease(u)) + z1 * ease(u), 20.0 * (1 - ease(u)))
             return ("ik", B, z1, 0.0)
         return fn
 
     return _otter_move_clip(
-        L, 40, dy_keys, dz_keys, pitch_keys, flex_keys,
-        fl_fn=_step_leg("leg_fl", 0.20, 0.72),
-        fr_fn=_step_leg("leg_fr", 0.34, 0.86),
-        bl_fn=_step_leg("leg_bl", 0.74, 1.34),
-        br_fn=_step_leg("leg_br", 0.90, 1.50),
+        L, 17, dy_keys, dz_keys, pitch_keys, flex_keys,
+        fl_fn=_front("leg_fl", 0.05, 0.26, 0.40, 0.62),
+        fr_fn=_front("leg_fr", 0.09, 0.30, 0.45, 0.67),
+        bl_fn=_hind("leg_bl", 0.0),
+        br_fn=_hind("leg_br", 0.035),
         note={"0": f"step {face:g} {B:.3f}"},
-        tail_fn=lambda t, i: (32.0 if i == 0 else 18.0 if i == 1 else 8.0) * pulse(t, 0.00, 0.20, 0.85, 0.45),
+        neck_fn=lambda t: -10.0 * pulse(t, 0.04, 0.12, 0.30, 0.20),          # looks up at the top first
+        ear_fn=lambda t: (-4.0 - 8.0 * pulse(t, 0.10, 0.10, 0.40, 0.15), 0.0),
+        wiggle_fn=lambda t: 9.0 * math.sin(2.0 * math.pi * 6.5 * t) * pulse(t, 0.36, 0.06, 0.22, 0.10),
+        # the tail held up off the ground as the body rears (its base turned against the body's pitch), then swinging
+        tail_fn=lambda t, i: (spline(t, pitch_keys) * 1.05 + 8.0 if i == 0 else 6.0 if i == 1 else 3.0)
+        + (10.0 if i == 0 else 6.0 if i == 1 else 2.0) * pulse(t, 0.02, 0.12, 0.40, 0.24),
+        tail_yaw_fn=lambda t, i: (10.0 if i < 2 else 16.0) * math.sin(2.0 * math.pi * 6.5 * t - 0.6 * i)
+        * pulse(t, 0.34, 0.06, 0.24, 0.12),
     )
 
 
 def _clip_step_down():
-    """Smooth head-first otter drop down a 1-block (16 px) ledge at edge z = -12.0."""
-    L = 2.00
+    """A neat front-first hop down a 1-block (16 px) ledge at edge z = -12.0 (2026-11-22; was a 2 s drop): the hind feet
+    step up to the edge and the hips stay up on the top as the chest tips over, the front paws reach down and land as
+    the body drops, then the hind feet hop down after and the body levels out, the tail held up clear of the edge. 0.6 s."""
+    L = 0.60
     B = 16.0
     edge = -DOWN_EDGE       # -12.0
-    dz_end = -34.0
-    # Hold body level until front paws reach past edge, then descend smoothly in sync with hind legs!
-    dy_keys = ((0.0, 0.0), (0.45, 0.0), (0.90, -2.5), (1.30, -10.8), (1.66, -B), (L, -B))
-    dz_keys = ((0.0, 0.0), (0.35, -4.5), (0.80, -14.0), (1.25, -24.5), (1.65, -32.2), (L, dz_end))
-    pitch_keys = ((0.0, 0.0), (0.32, -8.0), (0.82, -20.0), (1.24, -14.0), (1.62, -2.0), (1.84, 0.0), (L, 0.0))
-    flex_keys = ((0.0, 0.0), (0.60, -4.0), (1.18, 4.0), (1.68, 0.0), (L, 0.0))
+    dz_end = -40.0
+    dy_keys = ((0.0, 0.0), (0.14, 0.0), (0.22, -2.0), (0.32, -10.0), (0.42, -15.0), (0.50, -16.0), (L, -B))
+    dz_keys = ((0.0, 0.0), (0.10, -6.0), (0.20, -13.0), (0.30, -21.0), (0.40, -29.0), (0.52, -36.5), (L, dz_end))
+    pitch_keys = ((0.0, 0.0), (0.10, -14.0), (0.20, -30.0), (0.30, -26.0), (0.40, -12.0), (0.50, -2.0), (L, 0.0))
+    flex_keys = ((0.0, 0.0), (0.18, -5.0), (0.34, 5.0), (0.50, 0.0), (L, 0.0))
 
-    def _down_leg(pref, t_lift, t_land):
+    def _front(pref, t_lift, t_land, t_step, t_end):
         def fn(t, dy, dz):
             wr = _rig()["legs"][pref]["w_rest"]
-            z0 = wr[2]
-            z1 = dz_end + wr[2]
+            z0, z1 = wr[2], dz_end + wr[2]
+            zl = edge - 14.0                    # down on the lower ground, past the edge
             if t < t_lift:
                 return ("ik", 0.0, z0, 0.0)
             if t < t_land:
                 u = (t - t_lift) / (t_land - t_lift)
-                y_cur = -B * ease(u) + 1.2 * math.sin(math.pi * u)
-                z_cur = z0 * (1.0 - ease(u)) + z1 * ease(u)
-                return ("ik", y_cur, z_cur, 8.0 * math.sin(math.pi * u))
+                return ("ik", -B * ease(u) + 1.5 * math.sin(math.pi * u), z0 * (1 - ease(u)) + zl * ease(u), 10.0 * math.sin(math.pi * u))
+            if t < t_step:
+                return ("ik", -B, zl, 0.0)
+            if t < t_end:
+                u = (t - t_step) / (t_end - t_step)
+                return ("ik", -B + 1.5 * math.sin(math.pi * u), zl * (1 - ease(u)) + z1 * ease(u), -6.0 * math.sin(math.pi * u))
             return ("ik", -B, z1, 0.0)
         return fn
 
+    def _hind(pref, t1, t2, t3, t4):
+        """A step up to the edge on the top, then the hop down."""
+        def fn(t, dy, dz):
+            wr = _rig()["legs"][pref]["w_rest"]
+            z0, z1 = wr[2], dz_end + wr[2]
+            ze = edge + 2.5                     # the toes at the edge
+            pole = [0.0, 0.5, 1.0]
+            if t < t1:
+                return ("ik", 0.0, z0, 0.0, pole)
+            if t < t2:
+                u = (t - t1) / (t2 - t1)
+                return ("ik", 2.0 * math.sin(math.pi * u), z0 * (1 - ease(u)) + ze * ease(u), 8.0 * math.sin(math.pi * u), pole)
+            if t < t3:
+                return ("ik", 0.0, ze, 0.0, pole)
+            if t < t4:
+                u = (t - t3) / (t4 - t3)
+                return ("ik", -B * ease(u) + 2.5 * math.sin(math.pi * u), ze * (1 - ease(u)) + z1 * ease(u), 8.0 * math.sin(math.pi * u), pole)
+            return ("ik", -B, z1, 0.0, pole)
+        return fn
+
     return _otter_move_clip(
-        L, 40, dy_keys, dz_keys, pitch_keys, flex_keys,
-        fl_fn=_down_leg("leg_fl", 0.28, 0.90),
-        fr_fn=_down_leg("leg_fr", 0.44, 1.06),
-        bl_fn=_down_leg("leg_bl", 0.86, 1.48),
-        br_fn=_down_leg("leg_br", 1.00, 1.62),
+        L, 12, dy_keys, dz_keys, pitch_keys, flex_keys,
+        fl_fn=_front("leg_fl", 0.06, 0.34, 0.40, 0.54),
+        fr_fn=_front("leg_fr", 0.09, 0.37, 0.43, 0.57),
+        bl_fn=_hind("leg_bl", 0.02, 0.15, 0.20, 0.50),
+        br_fn=_hind("leg_br", 0.05, 0.18, 0.23, 0.53),
         note={"0": f"step {edge:g} {-B:.3f}"},
-        # Lift tail high over the upper edge until rump clears cleanly!
-        tail_fn=lambda t, i: (32.0 if i == 0 else 20.0 if i == 1 else 10.0) * pulse(t, 0.50, 0.25, 0.80, 0.35),
+        tail_fn=lambda t, i: (-spline(t, pitch_keys) * 0.9 + 18.0 if i == 0 else 14.0 if i == 1 else 9.0)
+        * pulse(t, 0.04, 0.12, 0.40, 0.10),
     )
 
 
@@ -1733,53 +1807,98 @@ def _clip_dive_in():
     )
 
 
-def _clip_exit_water():
-    """Agile otter scramble out of water onto a bank 1 block above start, ending cleanly grounded!"""
-    L = 2.10
-    B = 16.0
+AFLOAT_DY = -2.0 - WATER_SURFACE   # afloat, its feet under the water's block top (the game's float depth, -13.3 px)
+
+
+def _out_clip(L, B, dy_keys, dz_keys, pitch_keys, flex_keys, front_times, hind_times, wet_t):
+    """Out of the water onto a bank B px over the water's block top, quickly (2026-11-22, the user: "the coming out of
+    water is really quick"): from afloat (feet 13.3 px under that top), the front paws reach onto the bank, the hind
+    feet kick in the water then come up onto the top, and on it goes."""
     face = -STEP_FACE
     dz_end = -36.0
-    dy_keys = ((0.0, 0.0), (0.30, 2.2), (0.72, 9.0), (1.18, 14.5), (1.55, B), (L, B))
-    dz_keys = ((0.0, 0.0), (0.35, -5.0), (0.80, -14.5), (1.25, -24.5), (1.68, -34.0), (L, dz_end))
-    pitch_keys = ((0.0, 4.0), (0.32, 24.0), (0.82, 22.0), (1.28, 6.0), (1.60, 0.0), (L, 0.0))
-    flex_keys = ((0.0, 0.0), (0.50, 5.0), (1.05, -5.0), (1.55, 2.0), (L, 0.0))
 
-    def _out_front(pref, t_reach, t_land):
+    def _front(pref, t_reach, t_hook, t_step, t_land):
         def fn(t, dy, dz):
             wr = _rig()["legs"][pref]["w_rest"]
             z1 = dz_end + wr[2]
-            if t < t_reach:
-                return ("ang", 14.0, -18.0, 12.0)
+            zh = face - 3.0
+            if t < t_reach:                     # still the swim's paddle, tucked
+                return ("ang", 22.0, -26.0, 16.0)
+            if t < t_hook:
+                k = ease((t - t_reach) / (t_hook - t_reach))
+                if k < 0.999:
+                    return ("blend", 1.0 - k, B, zh, 22.0, -26.0, 16.0, 0.0)
+                return ("ik", B, zh, 0.0)
+            if t < t_step:
+                return ("ik", B, zh, 0.0)
             if t < t_land:
-                u = (t - t_reach) / (t_land - t_reach)
-                return ("ik", 4.0 + (B - 4.0) * ease(min(1.0, u * 1.25)) + 1.6 * math.sin(math.pi * u),
-                        (face + 8.0) * (1.0 - ease(u)) + z1 * ease(u), -6.0 * math.sin(math.pi * u))
+                u = (t - t_step) / (t_land - t_step)
+                return ("ik", B + 1.6 * math.sin(math.pi * u), zh * (1 - ease(u)) + z1 * ease(u), -6.0 * math.sin(math.pi * u))
             return ("ik", B, z1, 0.0)
         return fn
 
-    def _out_hind(pref, t_reach, t_land):
+    def _hind(pref, t_up, t_land, side):
         def fn(t, dy, dz):
             wr = _rig()["legs"][pref]["w_rest"]
             z1 = dz_end + wr[2]
-            if t < t_reach:
-                return ("ang", 36.0, -20.0, 20.0)
+            if t < t_up:                        # kicking hard in the water
+                kick = math.sin(2.0 * math.pi * t / 0.22 + side)
+                return ("ang", 40.0 + 22.0 * kick, -22.0 - 10.0 * kick, 26.0 + 10.0 * kick)
             if t < t_land:
-                u = (t - t_reach) / (t_land - t_reach)
-                return ("ik", 3.0 + (B - 3.0) * ease(u) + 1.2 * math.sin(math.pi * u),
-                        (face + 12.0) * (1.0 - ease(u)) + z1 * ease(u), -6.0 * math.sin(math.pi * u))
+                u = (t - t_up) / (t_land - t_up)
+                k = ease(u)
+                if k < 0.999:
+                    return ("blend", 1.0 - k, B + 1.5 * math.sin(math.pi * u), face - 3.5 + (z1 - face + 3.5) * k,
+                            40.0, -22.0, 26.0, 0.0)
+                return ("ik", B, z1, 0.0)
             return ("ik", B, z1, 0.0)
         return fn
 
     return _otter_move_clip(
-        L, 42, dy_keys, dz_keys, pitch_keys, flex_keys,
-        fl_fn=_out_front("leg_fl", 0.20, 0.68),
-        fr_fn=_out_front("leg_fr", 0.36, 0.84),
-        bl_fn=_out_hind("leg_bl", 0.94, 1.44),
-        br_fn=_out_hind("leg_br", 1.12, 1.62),
-        note={"0": f"water out {face:g} {B:.3f} {WATER_SURFACE:.3f} -16.0"},
-        wet_t=1.18,
-        tail_fn=lambda t, i: (20.0 if i == 0 else 10.0 if i == 1 else 4.0) * pulse(t, 0.05, 0.25, 0.85, 0.45),
-        shake_end=False,
+        L, round(L * 20), dy_keys, dz_keys, pitch_keys, flex_keys,
+        fl_fn=_front("leg_fl", *front_times[0]),
+        fr_fn=_front("leg_fr", *front_times[1]),
+        bl_fn=_hind("leg_bl", hind_times[0][0], hind_times[0][1], 0.0),
+        br_fn=_hind("leg_br", hind_times[1][0], hind_times[1][1], math.pi),
+        note={"0": f"water out {face:g} {B:.3f} -1.778 -16.0"},
+        wet_t=wet_t,
+        neck_fn=lambda t: -8.0 * pulse(t, 0.02, 0.10, 0.25, 0.20),
+        wiggle_fn=lambda t: 7.0 * math.sin(2.0 * math.pi * 6.0 * t) * pulse(t, L * 0.45, 0.06, L * 0.18, 0.10),
+        tail_fn=lambda t, i: (spline(t, pitch_keys) * 0.7 + 6.0 if i == 0 else 8.0 if i == 1 else 3.0)
+        * pulse(t, 0.0, 0.10, L * 0.5, 0.20),
+        tail_yaw_fn=lambda t, i: 8.0 * math.sin(2.0 * math.pi * 6.0 * t - 0.6 * i) * pulse(t, L * 0.45, 0.06, L * 0.18, 0.10),
+    )
+
+
+def _clip_exit_water():
+    """Quick climb out onto a bank level with the water's block top (0.8 s; was 2.1 s onto a bank a block up)."""
+    L = 0.80
+    return _out_clip(
+        L, 0.0,
+        dy_keys=((0.0, AFLOAT_DY), (0.10, AFLOAT_DY + 1.0), (0.30, -7.5), (0.48, -2.6), (0.62, 0.0), (L, 0.0)),
+        dz_keys=((0.0, 0.0), (0.12, -4.0), (0.30, -11.0), (0.48, -22.0), (0.64, -32.0), (L, -36.0)),
+        pitch_keys=((0.0, 0.0), (0.10, 14.0), (0.28, 22.0), (0.46, 10.0), (0.62, 0.0), (L, 0.0)),
+        flex_keys=((0.0, 0.0), (0.20, 5.0), (0.42, -5.0), (0.60, 2.0), (L, 0.0)),
+        front_times=((0.04, 0.20, 0.44, 0.62), (0.08, 0.24, 0.48, 0.66)),
+        hind_times=((0.44, 0.62), (0.48, 0.66)),
+        wet_t=0.44,
+    )
+
+
+def _clip_exit_water_up():
+    """Quick haul out onto a bank a block (16 px) over the water's block top (1.1 s): a lunge up out of the water, the
+    front paws hooking the top, the hind feet kicking then coming up the face, a wiggle over."""
+    L = 1.10
+    B = 16.0
+    return _out_clip(
+        L, B,
+        dy_keys=((0.0, AFLOAT_DY), (0.10, AFLOAT_DY + 2.0), (0.26, -1.5), (0.44, 8.0), (0.62, 14.5), (0.80, B), (L, B)),
+        dz_keys=((0.0, 0.0), (0.14, -3.0), (0.30, -6.5), (0.50, -13.0), (0.68, -24.0), (0.86, -33.0), (L, -36.0)),
+        pitch_keys=((0.0, 0.0), (0.12, 28.0), (0.28, 40.0), (0.48, 30.0), (0.66, 12.0), (0.84, 0.0), (L, 0.0)),
+        flex_keys=((0.0, 0.0), (0.24, 6.0), (0.48, -6.0), (0.70, 6.0), (0.88, 0.0), (L, 0.0)),
+        front_times=((0.08, 0.30, 0.44, 0.66), (0.12, 0.34, 0.48, 0.70)),
+        hind_times=((0.62, 0.84), (0.66, 0.88)),
+        wet_t=0.62,
     )
 
 
@@ -1795,6 +1914,8 @@ def move_specs():
         {"name": "dive", "clip": lambda s: f"dive_in_{round(s * 1000)}",     "ahead_px": DOWN_EDGE,
          "starts_afloat": False, "ends_afloat": True,  "goes_down": True,  "end_level": -1},
         {"name": "out",  "clip": lambda s: f"exit_water_{round(s * 1000)}",  "ahead_px": STEP_FACE,
+         "starts_afloat": True,  "ends_afloat": False, "goes_down": False, "end_level": 0,  "wades": True},
+        {"name": "out_up", "clip": lambda s: f"exit_water_up_{round(s * 1000)}", "ahead_px": STEP_FACE,
          "starts_afloat": True,  "ends_afloat": False, "goes_down": False, "end_level": 1,  "wades": True},
     ]
 
@@ -1822,6 +1943,7 @@ def clips():
         "enter_water_1000": _clip_enter_water(),
         "dive_in_1000":     _clip_dive_in(),
         "exit_water_1000":  _clip_exit_water(),
+        "exit_water_up_1000": _clip_exit_water_up(),
     }
 
 

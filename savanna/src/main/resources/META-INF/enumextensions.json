@@ -113,6 +113,18 @@
         false,
         128
       ]
+    },
+    {
+      "enum": "net/minecraft/world/entity/MobCategory",
+      "name": "ANTCOLONIES_RIVER_OTTER",
+      "constructor": "(Ljava/lang/String;IZZI)V",
+      "parameters": [
+        "antcolonies:river_otter",
+        6,
+        true,
+        false,
+        128
+      ]
     }
   ]
 }

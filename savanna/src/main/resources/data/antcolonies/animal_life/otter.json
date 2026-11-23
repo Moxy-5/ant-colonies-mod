@@ -1,0 +1,19 @@
+{
+  "_note": "The African clawless otter's life (the animal life kit, 2026-11-22; all my picks, fun first). Sizes are shares of its usual size (2.6 blocks). Born grown or as pups for now: about one in four of the world's spawns is a pup (0.55 of grown, Neon's card), teen from 0.8 after 3 days, grown 3 days later; breeding comes later.",
+  "sexes": "two",
+  "male_size": [
+    0.95,
+    1.1
+  ],
+  "female_size": [
+    0.85,
+    1.0
+  ],
+  "max_size": 1.1,
+  "young_size": 0.55,
+  "young_days": 3,
+  "teen_size": 0.8,
+  "teen_days": 3,
+  "young_at_spawn": 0.25,
+  "breeds": false
+}

@@ -12,7 +12,7 @@ import net.minecraft.world.entity.MobCategory;
 public final class SavannaMobCategories {
     private SavannaMobCategories() {}
 
-    private static MobCategory riverFish, riverHunter, riverBed, riverBank, riverSchool, flyCloud, bullfrog, hippoPod;
+    private static MobCategory riverFish, riverHunter, riverBed, riverBank, riverSchool, flyCloud, bullfrog, hippoPod, riverOtter;
 
     /**
      * The hippos' group (2026-11-21): its own, with no spawn list since the same day (the user: pods placed with new land
@@ -24,6 +24,18 @@ public final class SavannaMobCategories {
             hippoPod = MobCategory.valueOf("ANTCOLONIES_HIPPO_POD");
         }
         return hippoPod;
+    }
+
+    /**
+     * The otters' group (2026-11-22, the spawning check list): its own, so neither the fish nor the bank's monitors fill
+     * its places, cap 6 round a player (a family or two; families of 2 to 4 spawn together), friendly, removed past
+     * 128 blocks (my picks).
+     */
+    public static MobCategory riverOtter() {
+        if (riverOtter == null) {
+            riverOtter = MobCategory.valueOf("ANTCOLONIES_RIVER_OTTER");
+        }
+        return riverOtter;
     }
 
     /**

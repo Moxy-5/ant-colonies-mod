@@ -83,6 +83,7 @@ anantcolonyawaydigsitsroomsandheapsitshilloutofsightonreturn 0.87
 anantcolonyawaylivesonthroughasaveandloadandcatchesuponreturn 0.91
 anearraidsnumberstaketermitesfromthecolonyandbringthemhome 0.56
 anoldhumpofnewlandisgrassywithtreesandaburrow 0.03
+anotterslidesintoapoolandclimbsoutandshakes 0.02
 antcrawlsupsidedowntothemiddleoftheroomceilingandhangsthere 0.37
 anthillonastepkeepsitsroundshape 6.13
 antpatrolnumbersarelostoutofsightonwaysthroughdanger 1.06
@@ -223,6 +224,7 @@ notilapianestwhiletheriverisfull 0.00
 nymphsgrowintosoldierswhenthecolonyneedsthem 0.40
 oldcoloniesyieldtoneighboursandyoungonespushon 0.36
 oldoxbowis16acrossandshallow 0.00
+ottersspawninthewaterbybanksbythemselves 0.01
 oxbowandpanroomismeasured 7.01
 oxbowsandpansgoroundwhatisintheirway 0.01
 oxbowscarholdsnowater 0.01

@@ -1,6 +1,6 @@
 # Handoff Card: African River Otter (*Aonyx capensis*)
 
-- **Status:** Ready for Java (`v6` look + sculpted outer haunches & all 21 clips / 5 BlockMoves approved by user 2026-11-21) | Approved workshop version: `v6`
+- **Status:** In the game (step 1, 2026-11-22: `OtterEntity`, moves through the shared `MoveRider`). Was: Ready for Java (`v6` look + sculpted outer haunches & all 21 clips / 5 BlockMoves approved by user 2026-11-21) | Approved workshop version: `v6`
 - **Mod & ID:** `savanna` (`antcolonies:otter`) | **Family:** `upright_four_legs` (Upright Four Legs + Aquatic Extras)
 
 ## Asset Paths
@@ -40,11 +40,12 @@
 | `rest_up` | `0.85` | `false` | Smooth transition `rest → rest_up → idle` |
 | `shake_dry` | `1.10` | `false` | Vigorous head-to-tail water shake wave (`0.08..0.90 s`, ticks `2..18` for water-droplet splash hook after exiting water!) |
 | `death` | `1.10` | `hold` | Clean collapse onto right flank with tucked underside legs, eyelids shut, zero floor clipping |
-| `step_up_1000` | `2.00` | `false` | Block move (`up`): nimble 1-block climb (`ahead_px = 24.0`, `end_level = 1`, `wades = true`) |
-| `step_down_1000` | `2.00` | `false` | Block move (`down`): smooth 1-block head-first drop (`ahead_px = 12.0`, `end_level = -1`, `wades = true`) |
+| `step_up_1000` | `0.85` | `false` | Block move (`up`): quick cute scramble (remade by Claude 2026-11-22 at the user's word: front paws hook the top, three hind-foot pats up the face, rump wiggle; `ahead_px = 24.0`, `end_level = 1`, `wades = true`) |
+| `step_down_1000` | `0.60` | `false` | Block move (`down`): quick front-first hop (remade 2026-11-22; `ahead_px = 12.0`, `end_level = -1`, `wades = true`) |
 | `enter_water_1000` | `2.30` | `false` | Block move (`in`): gradual, relaxed riverbank glide into surface swim (`ahead_px = 12.0`, `ends_afloat = true`, `wet_tick = 18`, max turn 11°/tick) |
 | `dive_in_1000` | `2.00` | `false` | Block move (`dive`): leaping arc off a bank plunging deep underwater (`-29 px` / `~1.8` blocks below surface) straight into `dive_swim` (`ahead_px = 12.0`, `ends_afloat = true`, `end_level = -1`, `wet_tick = 18` for splash burst!) |
-| `exit_water_1000` | `2.10` | `false` | Block move (`out`): agile scramble from water onto a 1-block bank (`ahead_px = 24.0`, `starts_afloat = true`, `wet_tick = 24`) |
+| `exit_water_1000` | `0.80` | `false` | Block move (`out`): quick climb out onto a bank level with the water's top (remade 2026-11-22, starts at the game's float depth -13.3 px) |
+| `exit_water_up_1000` | `1.10` | `false` | Block move (`out_up`): quick haul out onto a bank a block up (new 2026-11-22) |
 
 **Block moves** (`block_moves/otter.json`, played by framework `BlockMoves`): size `1.0` (`block_px = 16.0`, `lead_ticks = 4`). Pups (`0.55`) skip block moves and use standard stepping (`size >= 0.80` plays moves).
 

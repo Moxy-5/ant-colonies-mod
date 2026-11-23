@@ -89,7 +89,7 @@
     "leg_br_paw": "leg_br_paw"
   },
   "checks": {
-    "about": "Offline checks for tools/clip_check.py (adult scale 1.0: 1 px = 0.0625 blocks). Update controller once OtterEntity.java lands.",
+    "about": "Offline checks for tools/clip_check.py (adult scale 1.0: 1 px = 0.0625 blocks); the numbers are the game's (OtterEntity.AFLOAT, its 4-tick blend) and the otter maker's.",
     "px": 0.0625,
     "blend": 4,
     "water": [
@@ -154,46 +154,176 @@
       "bound": 32.0
     },
     "switches": [
-      ["idle", "walk"],
-      ["walk", "idle"],
-      ["walk", "bound"],
-      ["bound", "walk"],
-      ["bound", "bite"],
-      ["bite", "idle"],
-      ["idle", "bite"],
-      ["idle", "forage_feel"],
-      ["forage_feel", "idle"],
-      ["forage_feel", "bite"],
-      ["idle", "eat"],
-      ["eat", "idle"],
-      ["idle", "play_up"],
-      ["play_up", "play_rear"],
-      ["play_rear", "play_down"],
-      ["play_down", "idle"],
-      ["idle", "shake_dry"],
-      ["shake_dry", "idle"],
-      ["idle", "rest_down"],
-      ["rest_down", "rest"],
-      ["rest", "rest_up"],
-      ["rest_up", "idle"],
-      ["swim", "dive_swim"],
-      ["dive_swim", "swim"],
-      ["walk", "swim"],
-      ["swim", "walk"],
-      ["walk", "step_up_1000"],
-      ["step_up_1000", "idle"],
-      ["step_up_1000", "walk"],
-      ["walk", "step_down_1000"],
-      ["step_down_1000", "idle"],
-      ["step_down_1000", "walk"],
-      ["walk", "enter_water_1000"],
-      ["enter_water_1000", "swim"],
-      ["walk", "dive_in_1000"],
-      ["bound", "dive_in_1000"],
-      ["dive_in_1000", "dive_swim"],
-      ["swim", "exit_water_1000"],
-      ["exit_water_1000", "idle"],
-      ["exit_water_1000", "walk"]
-    ]
+      [
+        "idle",
+        "walk"
+      ],
+      [
+        "walk",
+        "idle"
+      ],
+      [
+        "walk",
+        "bound"
+      ],
+      [
+        "bound",
+        "walk"
+      ],
+      [
+        "bound",
+        "bite"
+      ],
+      [
+        "bite",
+        "idle"
+      ],
+      [
+        "idle",
+        "bite"
+      ],
+      [
+        "idle",
+        "forage_feel"
+      ],
+      [
+        "forage_feel",
+        "idle"
+      ],
+      [
+        "forage_feel",
+        "bite"
+      ],
+      [
+        "idle",
+        "eat"
+      ],
+      [
+        "eat",
+        "idle"
+      ],
+      [
+        "idle",
+        "play_up"
+      ],
+      [
+        "play_up",
+        "play_rear"
+      ],
+      [
+        "play_rear",
+        "play_down"
+      ],
+      [
+        "play_down",
+        "idle"
+      ],
+      [
+        "idle",
+        "shake_dry"
+      ],
+      [
+        "shake_dry",
+        "idle"
+      ],
+      [
+        "idle",
+        "rest_down"
+      ],
+      [
+        "rest_down",
+        "rest"
+      ],
+      [
+        "rest",
+        "rest_up"
+      ],
+      [
+        "rest_up",
+        "idle"
+      ],
+      [
+        "swim",
+        "dive_swim"
+      ],
+      [
+        "dive_swim",
+        "swim"
+      ],
+      [
+        "walk",
+        "swim"
+      ],
+      [
+        "swim",
+        "walk"
+      ],
+      [
+        "walk",
+        "step_up_1000"
+      ],
+      [
+        "step_up_1000",
+        "idle"
+      ],
+      [
+        "step_up_1000",
+        "walk"
+      ],
+      [
+        "walk",
+        "step_down_1000"
+      ],
+      [
+        "step_down_1000",
+        "idle"
+      ],
+      [
+        "step_down_1000",
+        "walk"
+      ],
+      [
+        "walk",
+        "enter_water_1000"
+      ],
+      [
+        "enter_water_1000",
+        "swim"
+      ],
+      [
+        "walk",
+        "dive_in_1000"
+      ],
+      [
+        "bound",
+        "dive_in_1000"
+      ],
+      [
+        "dive_in_1000",
+        "dive_swim"
+      ],
+      [
+        "swim",
+        "exit_water_1000"
+      ],
+      [
+        "exit_water_1000",
+        "idle"
+      ],
+      [
+        "exit_water_1000",
+        "walk"
+      ]
+    ],
+    "controller": "savanna/src/main/java/com/antcolonies/savanna/animal/OtterEntity.java"
+  },
+  "course": {
+    "otter": {
+      "id": "antcolonies:otter",
+      "data": "OwnSize:1.0f",
+      "walk": 0.55,
+      "dash": 1.15,
+      "bpt": 0.056
+    }
   }
 }

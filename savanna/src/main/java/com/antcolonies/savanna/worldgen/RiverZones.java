@@ -72,7 +72,8 @@ public final class RiverZones {
             "crab", new float[] {0.25F, 0.5F, 1, 1, 0.25F, 0},     // stony beds, most far inland
             "snail", new float[] {0.25F, 1, 1, 0.5F, 1, 1},        // still and slow water, weed and algae
             "bullfrog", new float[] {0, 0, 0.1F, 0, 1, 1},        // the pans and the floodplain's pools; rare on the river
-            "monitor", new float[] {0.5F, 1, 1, 1, 0.5F, 0});     // any bank of the river and oxbows, fewer at the coast and the oxbows
+            "monitor", new float[] {0.5F, 1, 1, 1, 0.5F, 0},      // any bank of the river and oxbows, fewer at the coast and the oxbows
+            "otter", new float[] {0, 0.5F, 1, 1, 1, 0});          // fresh running water and the oxbows; none at the salty coast or the fishless pans
 
     private RiverZones() {
     }

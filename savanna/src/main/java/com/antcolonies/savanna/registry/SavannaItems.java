@@ -137,6 +137,10 @@ public class SavannaItems {
     public static final DeferredItem<DeferredSpawnEggItem> MONITOR_SPAWN_EGG =
             ITEMS.register("monitor_spawn_egg",
                     () -> new DeferredSpawnEggItem(SavannaEntities.MONITOR, 0x34332B, 0xD6B03A, new Item.Properties()));
+    // Warm chocolate brown with a cream bib (the otter's coat and its pale throat), my pick.
+    public static final DeferredItem<DeferredSpawnEggItem> OTTER_SPAWN_EGG =
+            ITEMS.register("otter_spawn_egg",
+                    () -> new DeferredSpawnEggItem(SavannaEntities.OTTER, 0x5A4030, 0xE3D3B0, new Item.Properties()));
     // Grey-purple with a pink belly (the hippo's back and its dusty-pink underside), my pick.
     public static final DeferredItem<DeferredSpawnEggItem> HIPPO_SPAWN_EGG =
             ITEMS.register("hippo_spawn_egg",

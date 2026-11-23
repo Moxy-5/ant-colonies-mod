@@ -1787,6 +1787,265 @@ public class RiverLifeTests {
         helper.succeed();
     }
 
+    // --- the otter (2026-11-22) ------------------------------------------------------------------------------------------
+
+    /**
+     * Otters spawn by themselves (the spawning check list): the world's own checks over a river at sea level pass in the
+     * water within {@code BANK_REACH} blocks of a bank and nowhere farther out, a spawn is set down on the bank, and the
+     * kind is in its own group's list (cap 6, families of 2 to 4) in the savanna's waters.
+     */
+    @GameTest(template = "arena", timeoutTicks = 200)
+    public static void ottersSpawnInTheWaterByBanksByThemselves(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        int top = buildChannel(helper, false);
+        BlockPos corner = helper.absolutePos(new BlockPos(CX0, 0, CZ0));
+        int reach = com.antcolonies.savanna.animal.OtterEntity.BANK_REACH;
+        var otterType = SavannaEntities.OTTER.get();
+        int spots = 0, monitors = 0, crocs = 0;
+        StringBuilder wrong = new StringBuilder();
+        for (int i = 0; i < CHANNEL_DEPTHS.length; i++) {
+            for (int dz = 0; dz <= CZ1 - CZ0; dz++) {
+                int fromBank = Math.min(Math.min(i + 1, CHANNEL_DEPTHS.length - i), Math.min(dz + 1, CZ1 - CZ0 + 1 - dz));
+                for (int y = top - 8; y <= top + 1; y++) {
+                    BlockPos at = new BlockPos(corner.getX() + i, y, corner.getZ() + dz);
+                    if (worldWouldSpawn(level, otterType, at)) {
+                        spots++;
+                        if (fromBank > reach) {
+                            wrong.append(" ").append(i).append(",").append(dz).append(" (").append(fromBank).append(" from the bank)");
+                        }
+                    }
+                    monitors += worldWouldSpawn(level, SavannaEntities.MONITOR.get(), at) ? 1 : 0;
+                    crocs += worldWouldSpawn(level, SavannaEntities.CROCODILE.get(), at) ? 1 : 0;
+                }
+            }
+        }
+        SavannaMod.LOGGER.info("[otter spawns] spots the world would spawn at over the channel: otter {}, monitor {}, crocodile {}", spots, monitors, crocs);
+        if (spots == 0) {
+            helper.fail("the world would spawn an otter nowhere over the river");
+        }
+        if (!wrong.isEmpty()) {
+            helper.fail("otters would spawn too far from a bank:" + wrong);
+        }
+        BlockPos drawn = new BlockPos(corner.getX() + 1, top - 1, corner.getZ() + 3);
+        net.minecraft.world.entity.Mob mob = otterType.create(level);
+        mob.moveTo(drawn.getX() + 0.5, drawn.getY(), drawn.getZ() + 0.5, 0, 0);
+        if (!net.neoforged.neoforge.event.EventHooks.checkSpawnPosition(mob, level, MobSpawnType.NATURAL)) {
+            helper.fail("the world refuses an otter in the water by a bank");
+        }
+        mob.finalizeSpawn(level, level.getCurrentDifficultyAt(drawn), MobSpawnType.NATURAL, null);
+        BlockPos stood = mob.blockPosition();
+        if (stood.getY() != top + 1 || !level.getFluidState(stood.below()).isEmpty() || !level.getBlockState(stood.below()).isSolid()) {
+            helper.fail("an otter spawned by the world stands at " + stood.subtract(corner) + ", not on the bank (y " + (top + 1) + ")");
+        }
+        mob.discard();
+        buildChannel(helper, true);
+        if (otterType.getCategory() != com.antcolonies.savanna.registry.SavannaMobCategories.riverOtter()) {
+            helper.fail("the otter is in the " + otterType.getCategory().getName() + " group, not the river otter group");
+        }
+        var biomes = level.registryAccess().registryOrThrow(net.minecraft.core.registries.Registries.BIOME);
+        var river = net.minecraft.resources.ResourceKey.create(net.minecraft.core.registries.Registries.BIOME,
+                net.minecraft.resources.ResourceLocation.fromNamespaceAndPath(SavannaMod.MODID, "savanna_river"));
+        for (var key : java.util.List.of(net.minecraft.world.level.biome.Biomes.SAVANNA, river)) {
+            var list = biomes.getOrThrow(key).getMobSettings().getMobs(com.antcolonies.savanna.registry.SavannaMobCategories.riverOtter()).unwrap();
+            if (list.stream().noneMatch(d -> d.type == otterType && d.minCount == 2 && d.maxCount == 4)) {
+                helper.fail("the otter is not in " + key.location() + "'s river otter spawn list in families of 2 to 4");
+            }
+        }
+        helper.succeed();
+    }
+
+    /** A grown otter on the stone bank by the step (the monitor's climbing ground), facing the step. */
+    private static com.antcolonies.savanna.animal.OtterEntity otterBeforeStep(GameTestHelper helper, double x0, int z) {
+        for (int x = MX0; x <= MX1; x++) {
+            for (int zz = MZ0; zz <= MZ1; zz++) {
+                helper.setBlock(new BlockPos(x, TOP, zz), Blocks.STONE);
+                helper.setBlock(new BlockPos(x, TOP + 1, zz), x >= STEP_X ? Blocks.STONE : Blocks.AIR);
+                for (int y = TOP + 2; y <= TOP + 5; y++) {
+                    helper.setBlock(new BlockPos(x, y, zz), Blocks.AIR);
+                }
+            }
+        }
+        com.antcolonies.savanna.animal.OtterEntity otter = helper.spawn(SavannaEntities.OTTER.get(),
+                new net.minecraft.world.phys.Vec3(x0, TOP + 1, z + 0.5));
+        otter.setPersistenceRequired();
+        otter.life().setUp(false, otter.getRandom());
+        otter.goalSelector.removeAllGoals(g -> true);       // only the test's own routes
+        otter.setYRot(-90.0F);
+        otter.yBodyRot = -90.0F;
+        otter.yHeadRot = -90.0F;
+        return otter;
+    }
+
+    /**
+     * The otter's own moves on a step (2026-11-22, the user: a quick cute scramble up a block, a quick hop down): sent up
+     * a one-block step it scrambles up with its move (under a second) and stands on top; sent back down it hops down
+     * with its move and stands on the low ground.
+     */
+    @GameTest(template = "arena", timeoutTicks = 700)
+    public static void anOtterScramblesUpAStepAndHopsBackDown(GameTestHelper helper) {
+        int z = MZ0 + 5;
+        com.antcolonies.savanna.animal.OtterEntity otter = otterBeforeStep(helper, MX0 + 3.5, z);
+        int low = helper.absolutePos(new BlockPos(0, TOP + 1, 0)).getY();
+        java.util.Set<com.antcolonies.entity.body.MoveRider.Edge> played = java.util.EnumSet.noneOf(com.antcolonies.entity.body.MoveRider.Edge.class);
+        int[] upTicks = {0};
+        StringBuilder fell = new StringBuilder();
+        double[] lastY = {Double.NaN};
+        helper.onEachTick(() -> {
+            var play = otter.rider().play();
+            if (play == null && !Double.isNaN(lastY[0]) && otter.getY() < lastY[0] - 0.3 && fell.length() < 400) {
+                var path = otter.getNavigation().getPath();
+                fell.append(String.format(" [dropped at x %.2f y %.2f yaw %.0f doing %d onGround %s path %s]",
+                        otter.getX() - helper.absolutePos(BlockPos.ZERO).getX(), otter.getY() - low, otter.yBodyRot, otter.doing(),
+                        otter.onGround(), path == null ? "none" : path.getNextNodeIndex() + "/" + path.getNodeCount()));
+            }
+            lastY[0] = otter.getY();
+            var edge = otter.rider().edge(play);
+            if (edge != null) {
+                played.add(edge);
+                if (edge == com.antcolonies.entity.body.MoveRider.Edge.UP && otter.rider().clipOn()) {
+                    upTicks[0]++;               // its clip playing (not turning square first), with the stand after
+                }
+            }
+            if (play == null && otter.getNavigation().isDone()) {
+                boolean up = !played.contains(com.antcolonies.entity.body.MoveRider.Edge.UP);
+                BlockPos goal = helper.absolutePos(up ? new BlockPos(STEP_X + 6, TOP + 2, z) : new BlockPos(MX0 + 3, TOP + 1, z));
+                otter.getNavigation().moveTo(goal.getX() + 0.5, goal.getY(), goal.getZ() + 0.5, com.antcolonies.savanna.animal.OtterEntity.BOUND);
+            }
+        });
+        helper.succeedWhen(() -> {
+            helper.assertTrue(played.contains(com.antcolonies.entity.body.MoveRider.Edge.UP), "the otter never scrambled up the step with its move (at "
+                    + otter.position().subtract(net.minecraft.world.phys.Vec3.atLowerCornerOf(helper.absolutePos(BlockPos.ZERO))) + ")");
+            helper.assertTrue(played.contains(com.antcolonies.entity.body.MoveRider.Edge.DOWN), "the otter never hopped down the step with its move;"
+                    + fell + " step at x " + STEP_X);
+            helper.assertTrue(otter.rider().play() == null && otter.onGround() && Math.abs(otter.getY() - low) < 0.05,
+                    "the otter is not back on the low ground");
+            helper.assertTrue(upTicks[0] < 40, "its scramble up took " + upTicks[0] + " ticks (it should be quick)");
+        });
+    }
+
+    /**
+     * Into the water and out again (2026-11-22): from a stone bank level with a pool's water it slides in with its move
+     * (or now and then takes the leaping dive) and swims; sent back to the bank it climbs out quickly with its move and shakes itself dry.
+     */
+    @GameTest(template = "arena", timeoutTicks = 900)
+    public static void anOtterSlidesIntoAPoolAndClimbsOutAndShakes(GameTestHelper helper) {
+        int poolX = MX0 + 10, z = MZ0 + 5;
+        for (int x = MX0; x <= MX1; x++) {
+            for (int zz = MZ0; zz <= MZ1; zz++) {
+                boolean pool = x >= poolX && x < MX1 && zz > MZ0 && zz < MZ1;
+                for (int y = TOP - 3; y <= TOP; y++) {
+                    helper.setBlock(new BlockPos(x, y, zz), pool && y > TOP - 3 ? Blocks.WATER : Blocks.STONE);
+                }
+                for (int y = TOP + 1; y <= TOP + 5; y++) {
+                    helper.setBlock(new BlockPos(x, y, zz), Blocks.AIR);
+                }
+            }
+        }
+        com.antcolonies.savanna.animal.OtterEntity otter = helper.spawn(SavannaEntities.OTTER.get(),
+                new net.minecraft.world.phys.Vec3(MX0 + 4.5, TOP + 1, z + 0.5));
+        otter.setPersistenceRequired();
+        otter.life().setUp(false, otter.getRandom());
+        otter.goalSelector.removeAllGoals(g -> true);       // only the test's own routes (its swims and strolls took them over)
+        java.util.Set<com.antcolonies.entity.body.MoveRider.Edge> played = java.util.EnumSet.noneOf(com.antcolonies.entity.body.MoveRider.Edge.class);
+        boolean[] shook = {false};
+        int[] swum = {0};
+        helper.onEachTick(() -> {
+            var edge = otter.rider().edge(otter.rider().play());
+            if (edge != null) {
+                played.add(edge);
+            }
+            if (otter.isInWater()) {
+                swum[0]++;
+            }
+            shook[0] |= otter.doing() == com.antcolonies.savanna.animal.OtterEntity.SHAKE;
+            if (otter.rider().play() == null && otter.getNavigation().isDone() && otter.doing() == com.antcolonies.savanna.animal.OtterEntity.CALM) {
+                boolean wentIn = played.contains(com.antcolonies.entity.body.MoveRider.Edge.IN)
+                        || played.contains(com.antcolonies.entity.body.MoveRider.Edge.RUN_IN);
+                boolean in = !wentIn || swum[0] < 60;
+                BlockPos goal = helper.absolutePos(in ? new BlockPos(poolX + 6, TOP, z) : new BlockPos(MX0 + 3, TOP + 1, z));
+                otter.getNavigation().moveTo(goal.getX() + 0.5, goal.getY() + 0.2, goal.getZ() + 0.5, com.antcolonies.savanna.animal.OtterEntity.STROLL);
+            }
+        });
+        helper.succeedWhen(() -> {
+            // in calmly, or (one time in three, its swim about's fun) with the leaping dive
+            helper.assertTrue(played.contains(com.antcolonies.entity.body.MoveRider.Edge.IN) || played.contains(com.antcolonies.entity.body.MoveRider.Edge.RUN_IN),
+                    "the otter never went into the pool with its move (at "
+                    + otter.position().subtract(net.minecraft.world.phys.Vec3.atLowerCornerOf(helper.absolutePos(BlockPos.ZERO))) + ", in water " + otter.isInWater() + ")");
+            helper.assertTrue(played.contains(com.antcolonies.entity.body.MoveRider.Edge.OUT), "the otter never climbed out with its move (swum "
+                    + swum[0] + " ticks, at " + otter.position().subtract(net.minecraft.world.phys.Vec3.atLowerCornerOf(helper.absolutePos(BlockPos.ZERO))) + ")");
+            helper.assertTrue(shook[0], "the otter did not shake itself dry once out");
+        });
+    }
+
+    /** The otter's pool: stone ground at TOP, a pool 3 deep from x = poolX on, its water's top level with the bank. */
+    private static void otterPool(GameTestHelper helper, int poolX) {
+        for (int x = MX0; x <= MX1; x++) {
+            for (int zz = MZ0; zz <= MZ1; zz++) {
+                boolean pool = x >= poolX && x < MX1 && zz > MZ0 && zz < MZ1;
+                for (int y = TOP - 3; y <= TOP; y++) {
+                    helper.setBlock(new BlockPos(x, y, zz), pool && y > TOP - 3 ? Blocks.WATER : Blocks.STONE);
+                }
+                for (int y = TOP + 1; y <= TOP + 5; y++) {
+                    helper.setBlock(new BlockPos(x, y, zz), Blocks.AIR);
+                }
+            }
+        }
+    }
+
+    /**
+     * The otter's hunt (step 2, 2026-11-22): a hungry otter on the bank by a pool with a crab on the bed in the shallow
+     * corner and a barb in the deep: it catches one (feeling under the stones for the crab, or diving after the fish),
+     * carries it out in its jaws, eats it on the bank and is full; a full otter leaves the other alone.
+     */
+    @GameTest(template = "arena", timeoutTicks = 1600)
+    public static void aHungryOtterCatchesItsPreyAndEatsItOnTheBank(GameTestHelper helper) {
+        int poolX = MX0 + 10, z = MZ0 + 5;
+        otterPool(helper, poolX);
+        helper.setBlock(new BlockPos(poolX, TOP - 2, z), Blocks.STONE);       // a shallow shelf by the bank for the crab
+        helper.setBlock(new BlockPos(poolX, TOP - 1, z), Blocks.STONE);
+        com.antcolonies.savanna.animal.CrabEntity crab = helper.spawn(SavannaEntities.CRAB.get(), new BlockPos(poolX, TOP, z));
+        crab.setPersistenceRequired();
+        TilapiaEntity fish = helper.spawn(SavannaEntities.TILAPIA.get(), new BlockPos(poolX + 6, TOP - 1, z + 1));
+        fish.setPersistenceRequired();
+        com.antcolonies.savanna.animal.OtterEntity otter = helper.spawn(SavannaEntities.OTTER.get(),
+                new net.minecraft.world.phys.Vec3(MX0 + 6.5, TOP + 1, z + 0.5));
+        otter.setPersistenceRequired();
+        otter.life().setUp(false, otter.getRandom());
+        otter.makeHungry();
+        boolean[] carried = {false};
+        boolean[] ateOnLand = {false};
+        java.util.Set<Byte> doings = new java.util.TreeSet<>();
+        String[] last = {""};
+        helper.onEachTick(() -> {
+            doings.add(otter.doing());
+            carried[0] |= otter.held() != null;
+            var rel = otter.position().subtract(net.minecraft.world.phys.Vec3.atLowerCornerOf(helper.absolutePos(BlockPos.ZERO)));
+            var play = otter.rider().play();
+            String now = "doing " + otter.doing() + " held " + (otter.held() != null) + " water " + otter.isInWater()
+                    + " move " + (play == null ? "-" : otter.rider().edge(play)) + " nav " + otter.getNavigation().isDone();
+            if (!now.equals(last[0])) {
+                last[0] = now;
+                SavannaMod.LOGGER.info("[otter hunt] t{} {} at {} yaw {}", helper.getTick(), now,
+                        String.format("%.2f %.2f %.2f", rel.x, rel.y, rel.z), (int) otter.yBodyRot);
+            }
+            if (otter.doing() == com.antcolonies.savanna.animal.OtterEntity.EAT && !otter.isInWater()) {
+                ateOnLand[0] = true;
+            }
+        });
+        helper.succeedWhen(() -> {
+            boolean oneGone = !crab.isAlive() || !fish.isAlive();
+            helper.assertTrue(oneGone && otter.isFed(), "the otter has not caught and eaten anything: doings " + doings + " vehicle "
+                    + otter.getVehicle() + " on ground " + otter.onGround() + " under " + otter.level().getBlockState(otter.blockPosition().below())
+                    + " crab at " + crab.position().subtract(net.minecraft.world.phys.Vec3.atLowerCornerOf(helper.absolutePos(BlockPos.ZERO)))
+                    + " fish alive " + fish.isAlive() + ", doing " + otter.doing()
+                    + ", holding " + otter.held() + ", in water " + otter.isInWater() + ", at "
+                    + otter.position().subtract(net.minecraft.world.phys.Vec3.atLowerCornerOf(helper.absolutePos(BlockPos.ZERO))));
+            helper.assertTrue(carried[0] && ateOnLand[0], "it did not carry its catch out and eat it on the bank (carried "
+                    + carried[0] + ", ate on land " + ateOnLand[0] + ")");
+            helper.assertTrue(crab.isAlive() != fish.isAlive(), "a full otter caught both");
+        });
+    }
+
     // --- the hippo (2026-11-21) ------------------------------------------------------------------------------------------
 
     /** The hippo's ground: what lies at each x of the strip MX0..MX1 (stone walls round it hold any water in). */
