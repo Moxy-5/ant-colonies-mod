@@ -1152,10 +1152,17 @@ def _clip_bound():
 
 
 # --- 4. SWIM (1.20 s, loop — Swimming panel: crown/eyes/ears/nose above waterline, vertical tail wave!) --------------
-def _clip_swim():
-    L = 1.20
+SWIM_LEN = 1.20
 
-    def at(t):
+
+def _clip_swim():
+    return clip(SWIM_LEN, _swim_pose, 32, loop=True)
+
+
+def _swim_pose(t):
+    """The swim clip's pose at time t (the porpoise leaps out of it and back in)."""
+    L = SWIM_LEN
+    if True:
         u = (t % L) / L
         w = 2.0 * math.pi * u
         # Waterline sits at y = 11.3 px: lower neck ~-16 deg and counter-pitch head so face rides sleekly on top!
@@ -1188,8 +1195,6 @@ def _clip_swim():
             p[f"{pref}_2"] = {"rotation": [-24.0 - 14.0 * k, 0.0, 0.0]}
             p[f"{pref}_paw"] = {"rotation": [32.0 + 20.0 * k, 0.0, 0.0]}
         return p
-
-    return clip(L, at, 32, loop=True)
 
 
 # --- 5. DIVE_SWIM (0.90 s, loop — Diving panel: sleek underwater torpedo, forelegs tucked, dolphin undulation!) ------
@@ -1730,6 +1735,158 @@ def _clip_hop_turn():
     return out
 
 
+# --- CHASE AND TAG (docs/plans/otter-play-and-fish.md, 6d game 2; 2026-11-23) ---------------------------------------
+# pounce_tag: the chaser, close behind, gathers, springs, and lands its front paws on the runner's rump, nips it, and
+# drops back down. The game moves it forward while its feet are up (POUNCE_AIR, as the hop turn turns it) so the paws
+# come down on the other otter; it stands so its paws reach POUNCE_PAW (model px from its middle) behind the runner's
+# middle by POUNCE_RUMP. porpoise: in a water chase, a low leap out of the swim and back in, nose up, arched over the
+# top, nose first back in (real: otters porpoise when they swim fast). The arc is drawn (the body rises PORPOISE_RISE
+# px over the swim's level); the game keeps the otter swimming at the surface and throws a splash at the "air" and
+# "splash" notes. Numbers my picks.
+POUNCE_LEN = 0.85
+POUNCE_AIR = (0.20, 0.40)     # feet up (s): ticks 4 to 8, the game carries it forward then
+POUNCE_HOLD = (0.40, 0.64)    # paws on the other's back
+POUNCE_PAW = (11.0, -13.0)    # where its front soles rest (height, ahead), px: on a grown otter's rump (top 11.4 to 12);
+                              # as far ahead as the reared shoulder reaches (measured: about -13.4)
+POUNCE_RUMP = 8.0             # the runner's rump this far behind its middle (px)
+PORPOISE_LEN = 1.00
+PORPOISE_AIR = (0.22, 0.74)   # out of the water (s)
+PORPOISE_RISE = 11.5          # the body's rise at the top of the arc (px): the belly just clears the surface
+
+
+def _pounce_spine(p, gather, rise, air, nip):
+    """The pounce's body, head and tail (no legs) on the idle pose p."""
+    pos = p["body"]["position"]
+    p["body"]["position"] = [pos[0], pos[1] - 1.1 * gather + 0.6 * rise + 0.8 * air, pos[2] + 1.2 * rise]
+    # half reared: the spine tips nose up, most of it in the back half so the shoulders lift over the other
+    _add_rot(p, "body", [2.5 * gather - 9.0 * rise, 0.0, 0.0])
+    _add_rot(p, "waist", [1.5 * gather - 9.0 * rise, 0.0, 0.0])
+    _add_rot(p, "ribs", [-7.0 * rise, 0.0, 0.0])
+    _add_rot(p, "chest", [-3.0 * rise, 0.0, 0.0])
+    # the head: low and forward gathering, then down over the rump to nip
+    _add_rot(p, "neck", [6.0 * gather + 26.0 * rise + 18.0 * nip, 0.0, 0.0])
+    _add_rot(p, "head", [-5.0 * gather + 12.0 * rise + 10.0 * nip, 0.0, 0.0])
+
+
+_POUNCE_REACH = {}
+
+
+def _pounce_reach(pref):
+    """The front leg's reach from its shoulder (angle forward of straight down, length) at rest and on the rump."""
+    if pref not in _POUNCE_REACH:
+        info = _rig()["legs"][pref]
+        out = []
+        for rise, (wy, wz) in ((0.0, (info["paw_h"], info["w_rest"][2])), (1.0, (POUNCE_PAW[0] + info["paw_h"], POUNCE_PAW[1]))):
+            q = _idle_pose(0.0)
+            _pounce_spine(q, 0.0, rise, 0.0, 0.0)
+            sh = _fk_bone(q, f"{pref}_1")[0]
+            out.append((math.atan2(-(wz - sh[2]), -(wy - sh[1])), math.hypot(wy - sh[1], wz - sh[2])))
+        _POUNCE_REACH[pref] = out
+    return _POUNCE_REACH[pref]
+
+
+def _pounce_pose(t):
+    L = POUNCE_LEN
+    a0, a1 = POUNCE_AIR
+    h0, h1 = POUNCE_HOLD
+    p = _idle_pose(0.0)
+    gather = pulse(t, 0.0, 0.14, 0.02, 0.06)                                  # low, eyes on the rump, ready
+    rise = ease(ramp(t, ((0.0, 0.0), (0.16, 0.0), (h0, 1.0), (h1, 1.0), (L, 0.0))))
+    air = math.sin(math.pi * max(0.0, min(1.0, (t - a0) / (a1 - a0))))
+    nip = pulse(t, h0 + 0.02, 0.05, 0.03, 0.06)                               # the tag: a quick play nip at the rump
+    _pounce_spine(p, gather, rise, air, nip)
+    p["jaw"] = {"rotation": [6.0 * gather + 12.0 * rise + 14.0 * nip - 12.0 * nip * nip, 0.0, 0.0]}
+    _set_ears(p, 8.0 * gather + 6.0 * rise, 3.0 * rise)
+    _set_whiskers(p, 9.0 * gather + 8.0 * rise, 9.0 * gather + 8.0 * rise)
+    _set_lids(p, 0.0)
+    wag = math.sin(2.0 * math.pi * t * 5.0)
+    _set_tail(p, lambda i: (-2.0 * gather + (6.0 if i == 0 else 1.5) * rise) + (0.6 * i * wag * gather),
+              lambda i: (1.0 + 0.8 * i) * wag * gather)
+    # front paws: the leg swings up and forward from straight down onto the rump and back down the same arc, kept long
+    # (a leg folded tight on the way down flipped its elbow), the paw a little further out mid swing so it clears
+    for pref in ("leg_fl", "leg_fr"):
+        info = _rig()["legs"][pref]
+        (ar, lr), (ah, lh) = _pounce_reach(pref)
+        ang = ar + (ah - ar) * rise
+        ln = lr + (lh - lr) * rise + 0.6 * math.sin(math.pi * rise)
+        sh = _fk_bone(p, f"{pref}_1")[0]
+        wy, wz = sh[1] - ln * math.cos(ang), sh[2] - ln * math.sin(ang)
+        _solve_leg(p, pref, max(0.0, wy - info["paw_h"]), wz, paw_world_pitch=-18.0 * rise,
+                   roll_z=_leg_roll(pref) * (1.0 - 0.5 * rise))
+    # hind feet: a small push off the ground while it flies, planted under it again for the hold
+    for pref in ("leg_bl", "leg_br"):
+        wr = _rig()["legs"][pref]["w_rest"]
+        up = math.sin(math.pi * max(0.0, min(1.0, (t - a0 - 0.02) / (a1 - a0 - 0.02))))
+        _solve_leg(p, pref, 1.8 * up, wr[2] + 0.6 * up, paw_world_pitch=-12.0 * up, roll_z=_leg_roll(pref) * 0.6)
+    return p
+
+
+def _clip_pounce_tag():
+    a0, a1 = POUNCE_AIR
+    out = clip(POUNCE_LEN, _pounce_pose, 17, loop=False)
+    out["timeline"] = {f"{a0:.2f}": "air", f"{a1:.2f}": "land", f"{POUNCE_HOLD[0] + 0.05:.2f}": "nip"}
+    return out
+
+
+def _porpoise_body(t):
+    """The leap's own part of the pose (no legs), on its own; blended with the swim at its two ends."""
+    a0, a1 = PORPOISE_AIR
+    s = max(0.0, min(1.0, (t - a0) / (a1 - a0)))
+    out_ = 0.0 < s < 1.0
+    # the height: a short surge down and up into the leap, the arc, then nose first under and back up to the swim
+    if t < a0:
+        dy = -2.0 * math.sin(math.pi * t / a0)
+    elif out_:
+        dy = PORPOISE_RISE * math.sin(math.pi * s)
+    else:
+        dy = -3.5 * math.sin(math.pi * min(1.0, (t - a1) / (PORPOISE_LEN - a1)))
+    # the pitch follows the arc: nose up leaving, level over the top, nose down going in
+    if t < a0:
+        pitch = -26.0 * ease(t / a0)
+    elif out_:
+        pitch = -26.0 * math.cos(math.pi * s)
+    else:
+        pitch = 26.0 * (1.0 - ease(min(1.0, (t - a1) / (PORPOISE_LEN - a1))))
+    arch = math.sin(math.pi * s) if out_ else 0.0                       # bowed over the top like a dolphin
+    p = {
+        "body":  {"position": [0.0, -0.35 + dy, 0.0], "rotation": [pitch, 0.0, 0.0]},
+        "hips":  {"rotation": [-11.0 * arch, 0.0, 0.0]},
+        "waist": {"rotation": [-4.0 * arch, 0.0, 0.0]},
+        "ribs":  {"rotation": [4.0 * arch, 0.0, 0.0]},
+        "chest": {"rotation": [9.0 * arch, 0.0, 0.0]},
+        "neck":  {"rotation": [(-2.0 + 24.0 * s * s) if t >= a0 else 8.0 - 10.0 * ease(t / a0), 0.0, 0.0]},   # head up out, down in
+        "head":  {"rotation": [-8.0 + 4.0 * arch, 0.0, 0.0]},
+        "jaw":   {"rotation": [0.5, 0.0, 0.0]},
+    }
+    _set_lids(p, 0.0)
+    _set_whiskers(p, -8.0, -8.0)
+    _set_ears(p, -22.0, -12.0)
+    # the tail trails the arc, each piece a little late, so it whips out of the water last
+    _set_tail(p, lambda i: 4.0 - 9.0 * math.sin(math.pi * s - 0.35 * i) * (1.0 if out_ else 0.0) + 2.0 * arch, lambda i: 0.0)
+    # forelegs tucked back along the chest, hind legs streamed out behind
+    for pref, s_out in (("leg_fl", 1.0), ("leg_fr", -1.0)):
+        p[f"{pref}_1"] = {"rotation": [84.0, 0.0, s_out * -9.0]}
+        p[f"{pref}_2"] = {"rotation": [-34.0, 0.0, 0.0]}
+        p[f"{pref}_paw"] = {"rotation": [48.0, 0.0, 0.0]}
+    for pref, s_out in (("leg_bl", 1.0), ("leg_br", -1.0)):
+        p[f"{pref}_1"] = {"rotation": [80.0, 0.0, s_out * -10.0]}
+        p[f"{pref}_2"] = {"rotation": [-10.0, 0.0, 0.0]}
+        p[f"{pref}_paw"] = {"rotation": [54.0, 0.0, 0.0]}
+    return p
+
+
+def _clip_porpoise():
+    L = PORPOISE_LEN
+
+    def at(t):
+        k = ease(min(1.0, t / 0.14)) * (1.0 - ease(max(0.0, (t - (L - 0.16)) / 0.16)))
+        return _blend_poses(_swim_pose(t), _porpoise_body(t), k)
+
+    out = clip(L, at, 20, loop=False)
+    out["timeline"] = {f"{PORPOISE_AIR[0]:.2f}": "air", f"{PORPOISE_AIR[1]:.2f}": "splash"}
+    return out
+
+
 # --- 15-18. BLOCK MOVES (step_up_1000, step_down_1000, enter_water_1000, exit_water_1000) ----------------------------
 # Clean athletic 2.6-block otter moves with exact `path root` and `step`/`water` timeline notes for BlockMoves.java!
 def _otter_move_clip(length, steps, dy_keys, dz_keys, pitch_keys, flex_keys, fl_fn, fr_fn, bl_fn, br_fn,
@@ -2211,6 +2368,8 @@ def clips():
         "skid_stop":        _clip_skid_stop(),
         "sniff_walk":       _clip_sniff_walk(),
         "hop_turn":         _clip_hop_turn(),
+        "pounce_tag":       _clip_pounce_tag(),
+        "porpoise":         _clip_porpoise(),
         "step_up_1000":     _clip_step_up(),
         "step_down_1000":   _clip_step_down(),
         "enter_water_1000": _clip_enter_water(),

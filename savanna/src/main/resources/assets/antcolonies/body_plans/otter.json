@@ -95,7 +95,8 @@
     "blend": 4,
     "water": [
       "swim",
-      "dive_swim"
+      "dive_swim",
+      "porpoise"
     ],
     "surface": 11.3,
     "float_depth": 11.3,
@@ -135,7 +136,9 @@
       "scurry",
       "sniff_walk",
       "skid_stop",
-      "hop_turn"
+      "hop_turn",
+      "pounce_tag",
+      "porpoise"
     ],
     "tuck_ok": [
       "swim",
@@ -146,7 +149,8 @@
       "death",
       "enter_water_1000",
       "dive_in_1000",
-      "exit_water_1000"
+      "exit_water_1000",
+      "porpoise"
     ],
     "body_bones": [
       "hips",
@@ -392,6 +396,34 @@
       [
         "skid_stop",
         "sniff_walk"
+      ],
+      [
+        "scurry",
+        "pounce_tag"
+      ],
+      [
+        "bound",
+        "pounce_tag"
+      ],
+      [
+        "pounce_tag",
+        "idle"
+      ],
+      [
+        "pounce_tag",
+        "scurry"
+      ],
+      [
+        "pounce_tag",
+        "bound"
+      ],
+      [
+        "swim",
+        "porpoise"
+      ],
+      [
+        "porpoise",
+        "swim"
       ]
     ],
     "controller": "savanna/src/main/java/com/antcolonies/savanna/animal/OtterEntity.java",

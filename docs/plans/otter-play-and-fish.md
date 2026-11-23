@@ -303,3 +303,24 @@ sniffs in quick puffs (sniff walk, forage feel, the curious stance), at the user
 **Built (2026-11-22, play part 1, 6e step 3):** `OtterEntity.Bout` and `PlayGoal`: the nose poke, rearing face to face 1.69 blocks apart
 (measured on the clip, not the 1.2 guessed above), chases between rounds, swimming chases in deep water, splashes in the shallows, the
 short rest after. Play uses its own rule (fed, calm, safe, day), not the mood. Next in 6e: chase and tag, then keep-away (step 4).
+
+**Progress (2026-11-23, 6e step 4, the chase-and-tag clips):** `pounce_tag` (0.85 s: gathers low, springs, its front paws
+come down on the runner's rump and it nips it, drops back down; the game carries it forward while its feet are up, ticks
+4 to 8, as the hop turn turns it) and `porpoise` (1.0 s: a low leap out of the swim, nose up, bowed over the top with its
+belly just clear of the water, nose first back in; the arc is drawn, the otter keeps swimming at the surface; splashes at
+its "air" and "splash" notes) made in `tools/otter_models.py`, checked offline (`clip_check.py otter pounce_tag porpoise
+--switches`, nothing flagged; the pounce's front feet are "hanging" on purpose: they rest on the other otter) and filmed
+in the game (`tools/film/otter_tag_frames.film`). Measured on the clip: the reared shoulder reaches the paws 13 px ahead
+of the otter's middle at 11 px high (a grown otter's rump top is 11.4 to 12), so the chaser lands 21 px (1.31 blocks,
+times its size) behind the runner's middle. Not played by the game yet. The game part, next (my picks):
+- **A game kind on the bout.** A bout opens as now (nose poke, one round of rearing), then rolls which game: in deep water
+  always the chase; on land or in the shallows the rearing rounds or the chase, even odds. (Keep-away joins the roll when
+  it is built.)
+- **The chase on land:** the runner nips the other's tail (the play bite from behind) and scurries off in loops round
+  where they started (waypoints a quarter turn on round a circle 3 to 5 blocks across, bound when the chaser is close);
+  the chaser follows a little faster. Within reach (its pounce's leap of 0.6 to 2 blocks), the runner skid-stops (it lets
+  itself be caught, as real playing otters do) and the chaser pounces, carried onto the spot behind the runner's rump.
+  Tagged, the runner hops forward out from under the paws and turns; the tagger scurries off and is the runner now. 3 to 6
+  tags, 10 to 30 seconds.
+- **The chase in water:** both swim at the surface; going fast in water two blocks deep or more, each porpoises now and
+  then (every 1.5 to 3 s, my pick), splashes at each leap and landing; the tag is a nip when the chaser draws level.
