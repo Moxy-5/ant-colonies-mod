@@ -114,16 +114,16 @@ STAGES = {
 # first put in the game; A to C are the three darker tries (A the old papyrus stems' and the reeds' green, B a shade
 # darker, C darker and a little cooler, as real Vossia's blades are a blue-tinged green).
 GREENS = {
-    "now": {"name": "Now (bright)", "grown": ((118, 176, 62), (164, 206, 92), (80, 128, 46)),
+    "now": {"name": "Old (bright)", "grown": ((118, 176, 62), (164, 206, 92), (80, 128, 46)),
             "young": ((150, 198, 80), (186, 220, 112), (108, 150, 56))},
     "A": {"name": "A: papyrus green", "grown": ((96, 144, 60), (134, 178, 82), (64, 102, 42)),
           "young": ((112, 162, 68), (150, 192, 94), (76, 116, 48))},
-    "B": {"name": "B: a shade darker", "grown": ((84, 128, 52), (118, 160, 72), (56, 90, 38)),
+    "B": {"name": "B: a shade darker (in the game)", "grown": ((84, 128, 52), (118, 160, 72), (56, 90, 38)),
           "young": ((100, 146, 60), (136, 176, 84), (68, 104, 44))},
     "C": {"name": "C: darker, blue-tinged", "grown": ((70, 114, 54), (100, 146, 74), (46, 78, 38)),
           "young": ((86, 132, 64), (118, 164, 86), (58, 94, 46))},
 }
-GREEN = "now"                     # the green written into the mod (main); the viewer shows them all
+GREEN = "B"                       # the green written into the mod (main; the user picked B 2026-11-22); the viewer shows them all
 
 
 def _colours(stage, green):
