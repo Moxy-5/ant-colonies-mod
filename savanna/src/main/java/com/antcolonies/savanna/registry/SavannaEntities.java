@@ -171,6 +171,17 @@ public class SavannaEntities {
                     .clientTrackingRange(8)
                     .build("crocodile"));
 
+    // The bull shark (M9 river life, 2026-11-22): drawn 5.5 blocks long at size 1 (5.0 to 7.0 by its own size, through
+    // SCALE); its box the middle of its body, 1.2 wide and 1.5 tall (my picks, measured on the v14 model: the body 1.05
+    // wide, its back 1.48 over its feet), the rest of it covered by its hit chain. Water only.
+    public static final DeferredHolder<EntityType<?>, EntityType<com.antcolonies.savanna.animal.BullSharkEntity>> BULL_SHARK =
+            ENTITY_TYPES.register("bull_shark", () -> EntityType.Builder
+                    .of(com.antcolonies.savanna.animal.BullSharkEntity::new, SavannaMobCategories.bullShark())
+                    .sized(1.2F, 1.5F)
+                    .eyeHeight(1.0F)
+                    .clientTrackingRange(10)
+                    .build("bull_shark"));
+
     // The Nile monitor (M9 river life, 2026-11-17): drawn 4.5 blocks long nose to tail (the user, 2026-11-17; was 6),
     // most of it a thin tail; its box covers the body only, under a block wide, so its routes use 1-block squares.
     public static final DeferredHolder<EntityType<?>, EntityType<com.antcolonies.savanna.animal.MonitorEntity>> MONITOR =

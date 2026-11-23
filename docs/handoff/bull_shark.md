@@ -50,7 +50,7 @@
 - [x] `body_plan.py check` (`bull_shark: OK`) & box budget checked (`351 / 400` boxes, `large animal`, `0` slanted cubes)
 - [x] `model_parts.game_faces()` applied on export & verified `0` `null` values in `bull_shark.geo.json` (fixed the `"parent": null` root bug both in `tools/bull_shark_models.py` and globally in `tools/model_parts.py`)
 - [x] Offline `clip_check.py bull_shark --switches` & `verify_animal.py bull_shark --offline` passed (`12` clips, `0` flags, `0` parts inside a block, `0 / 23` transitions flagged, all 4 swim waves grow cleanly head-to-tail)
-- [ ] In-game `game_compare.py` & 3-angle frame check (once `BullSharkEntity` exists)
+- [x] In-game `game_compare.py` & 3-angle frame check (Claude, 2026-11-22, `verify_animal.py bull_shark` passed; deep clips filmed in open air; `beached_flop` lies too high, a request on the board)
 
 ## Notes for Java
 - **River zones & spawning (`docs/LIVING-THINGS.md` spawning checklist):** Coast and Near-Inland deep middle river channels ONLY (`worldgen/RiverZones`), alone and rare. Give the Bull Shark its own small spawning group (e.g., `antcolonies:bull_shark`, cap `1`–`2`, kept within 96 / gone past 128) so common river fish or crocodiles cannot starve its spawn cap; wrap placement in the `BigSavanna` quiet-savanna gate and prove natural spawning with a real sea-level `worldWouldSpawn` game test.

@@ -92,6 +92,20 @@ public final class SavannaMobCategories {
         return riverHunter;
     }
 
+    private static MobCategory bullShark;
+
+    /**
+     * The bull shark's group (2026-11-22, the spawning check list): its own, so no common river fish or crocodile fills
+     * its places. Cap 2 round a player (the river zones keep one at most in a near-inland stretch), each spawned alone
+     * and at least {@code BullSharkEntity.SPAWN_APART} blocks from another, removed past 128 blocks.
+     */
+    public static MobCategory bullShark() {
+        if (bullShark == null) {
+            bullShark = MobCategory.valueOf("ANTCOLONIES_BULL_SHARK");
+        }
+        return bullShark;
+    }
+
     /**
      * The bed dwellers' group (the crab and the snail, 2026-11-16, BUGS 224: in the river fish group the tilapia, kept
      * near a player, filled the 60 places and took about 9 spawns in 10, so crabs and snails were hardly ever seen). Cap

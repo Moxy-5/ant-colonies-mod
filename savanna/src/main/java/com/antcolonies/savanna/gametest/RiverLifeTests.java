@@ -1425,6 +1425,84 @@ public class RiverLifeTests {
         helper.succeed();
     }
 
+    /**
+     * Bull sharks spawn by themselves (2026-11-22, the spawning check list): over a river's cross-section at sea level the
+     * world's own checks pass only in water at least {@code SPAWN_DEPTH} (4) deep, at any height of its column, and never
+     * over the shallower edges; a spawn is set into the middle of the water, 5 to 7 blocks long; none comes within
+     * {@code SPAWN_APART} blocks of another; the kind is in its own group (cap 2), listed in the savanna's waters; and the
+     * river zones give it the coast's whole cap, half of it near inland, none anywhere else. (No other test of this batch
+     * has a shark: a shark of another test within 80 blocks would refuse the spawns.)
+     */
+    @GameTest(template = "arena", timeoutTicks = 200)
+    public static void bullSharksSpawnInDeepRiverWaterByThemselves(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        int top = buildChannel(helper, false);
+        BlockPos corner = helper.absolutePos(new BlockPos(CX0, 0, CZ0));
+        var sharkType = SavannaEntities.BULL_SHARK.get();
+        // 1. its spots over the channel by the column's depth (the crocodile's for comparison)
+        int[] byColumn = new int[CHANNEL_DEPTHS.length];
+        int spots = 0, crocs = 0;
+        for (int i = 0; i < CHANNEL_DEPTHS.length; i++) {
+            for (int dz = 0; dz <= CZ1 - CZ0; dz++) {
+                for (int y = top - 8; y <= top + 1; y++) {
+                    BlockPos at = new BlockPos(corner.getX() + i, y, corner.getZ() + dz);
+                    if (worldWouldSpawn(level, sharkType, at)) {
+                        byColumn[i]++;
+                        spots++;
+                    }
+                    crocs += worldWouldSpawn(level, SavannaEntities.CROCODILE.get(), at) ? 1 : 0;
+                }
+            }
+        }
+        SavannaMod.LOGGER.info("[shark spawns] spots the world would spawn at over the channel: bull shark {}, crocodile {}; by column {} (depths {})",
+                spots, crocs, java.util.Arrays.toString(byColumn), java.util.Arrays.toString(CHANNEL_DEPTHS));
+        StringBuilder wrong = new StringBuilder();
+        for (int i = 0; i < CHANNEL_DEPTHS.length; i++) {
+            if (CHANNEL_DEPTHS[i] < com.antcolonies.savanna.animal.BullSharkEntity.SPAWN_DEPTH && byColumn[i] > 0) {
+                wrong.append(" column ").append(i).append(" (").append(CHANNEL_DEPTHS[i]).append(" deep): ").append(byColumn[i]);
+            }
+        }
+        helper.assertTrue(spots > 0, "the world would spawn a bull shark nowhere over the river");
+        helper.assertTrue(wrong.isEmpty(), "bull sharks would spawn over shallow water:" + wrong);
+        // 2. the world's own spawn drawn at the top of the deepest column: set into the middle of the water
+        BlockPos drawn = new BlockPos(corner.getX() + 6, top, corner.getZ() + 4);
+        var shark = sharkType.create(level);
+        shark.moveTo(drawn.getX() + 0.5, drawn.getY(), drawn.getZ() + 0.5, 0, 0);
+        helper.assertTrue(net.neoforged.neoforge.event.EventHooks.checkSpawnPosition(shark, level, MobSpawnType.NATURAL),
+                "the world refuses a bull shark at the top of deep water");
+        shark.finalizeSpawn(level, level.getCurrentDifficultyAt(drawn), MobSpawnType.NATURAL, null);
+        int bed = top - CHANNEL_DEPTHS[6] + 1;
+        double back = shark.getY() + 1.5 * shark.getScale();
+        helper.assertTrue(shark.getY() >= bed && back <= top + 0.9 - 0.4, "a spawned bull shark lies at y " + String.format("%.2f", shark.getY())
+                + " (its back at " + String.format("%.2f", back) + "), not in the middle of water from " + bed + " to " + (top + 1));
+        helper.assertTrue(shark.length() >= 5.0F && shark.length() <= 7.0F, "a spawned bull shark is " + shark.length() + " blocks long");
+        // 3. none within SPAWN_APART of another
+        level.addFreshEntity(shark);
+        BlockPos other = new BlockPos(corner.getX() + 8, top - 2, corner.getZ() + 1);
+        helper.assertFalse(worldWouldSpawn(level, sharkType, other), "a bull shark would spawn " + (int) Math.sqrt(other.distSqr(drawn)) + " blocks from another");
+        shark.discard();
+        buildChannel(helper, true);
+        // 4. its own group (cap 2), listed in the savanna's waters
+        helper.assertTrue(sharkType.getCategory() == com.antcolonies.savanna.registry.SavannaMobCategories.bullShark()
+                && sharkType.getCategory().getMaxInstancesPerChunk() == 2, "the bull shark is in the " + sharkType.getCategory().getName() + " group");
+        var biomes = level.registryAccess().registryOrThrow(net.minecraft.core.registries.Registries.BIOME);
+        for (var key : java.util.List.of(net.minecraft.world.level.biome.Biomes.SAVANNA, com.antcolonies.savanna.worldgen.RiverZones.RIVER)) {
+            var listed = biomes.getOrThrow(key).getMobSettings().getMobs(com.antcolonies.savanna.registry.SavannaMobCategories.bullShark()).unwrap();
+            helper.assertTrue(listed.size() == 1 && listed.get(0).type == sharkType, "the bull shark group's list in " + key.location() + ": " + listed);
+        }
+        // 5. its river zones: the coast's whole cap, one near inland (half of 2), none anywhere else
+        helper.assertTrue(com.antcolonies.savanna.worldgen.RiverZones.allows(sharkType, com.antcolonies.savanna.worldgen.RiverZones.Zone.COAST, 1),
+                "no second bull shark at the coast");
+        helper.assertTrue(com.antcolonies.savanna.worldgen.RiverZones.allows(sharkType, com.antcolonies.savanna.worldgen.RiverZones.Zone.NEAR, 0)
+                && !com.antcolonies.savanna.worldgen.RiverZones.allows(sharkType, com.antcolonies.savanna.worldgen.RiverZones.Zone.NEAR, 1),
+                "near inland is not one bull shark at most");
+        for (var z : java.util.List.of(com.antcolonies.savanna.worldgen.RiverZones.Zone.MID, com.antcolonies.savanna.worldgen.RiverZones.Zone.FAR,
+                com.antcolonies.savanna.worldgen.RiverZones.Zone.OXBOW, com.antcolonies.savanna.worldgen.RiverZones.Zone.PAN)) {
+            helper.assertFalse(com.antcolonies.savanna.worldgen.RiverZones.allows(sharkType, z, 0), "a bull shark allowed " + z);
+        }
+        helper.succeed();
+    }
+
     // --- the Nile monitor (2026-11-17) ---------------------------------------------------------------------------------
     private static final int MX0 = 16, MX1 = 40, MZ0 = 34, MZ1 = 44;    // a stone bank to hunt on, clear of the pond and channel
 

@@ -1,0 +1,15 @@
+# The measuring course (swimming straight across a deep pool) for the bull_shark: written by tools/body_course.py films, do not edit.
+lens 50
+cmd fill -12 -63 -7 12 -61 7 minecraft:water
+walker antcolonies:bull_shark -8.5 -62 0.5 -90 Length:5.5f
+follow 0 3.5 -6 0 25
+cmd tick unfreeze
+record on 3
+go 8 -62 0 1.0
+wait 60
+shot p00
+wait 60
+shot p01
+wait 53
+shot p02
+record off

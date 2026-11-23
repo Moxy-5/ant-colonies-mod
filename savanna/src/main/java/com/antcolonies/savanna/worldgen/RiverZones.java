@@ -63,17 +63,18 @@ public final class RiverZones {
      * Kinds not listed keep the whole cap everywhere (the fly clouds: flies hang over any water). The hippo is here for the
      * record only: it is placed with new land ({@link PodSites}), never spawned.
      */
-    static final Map<String, float[]> SHARES = Map.of(
-            "hippo", new float[] {0, 1, 1, 0, 0, 0},              // slow deep pools of the near and mid rivers (and deep oxbows: placed with the land, OxbowFeature)
-            "crocodile", new float[] {0.25F, 1, 1, 0.25F, 0.5F, 0}, // most on the wide slow rivers' bars, few at the coast and up the narrow rivers
-            "catfish", new float[] {1, 1, 1, 0.25F, 1, 0},        // deep and murky water and the oxbows; few in the clear narrow rivers
-            "tilapia", new float[] {0.5F, 1, 1, 0.5F, 1, 0},       // quiet water; nurseries in the oxbows
-            "barb", new float[] {0.25F, 0.5F, 1, 1, 0.25F, 0},     // clear running water, most far inland
-            "crab", new float[] {0.25F, 0.5F, 1, 1, 0.25F, 0},     // stony beds, most far inland
-            "snail", new float[] {0.25F, 1, 1, 0.5F, 1, 1},        // still and slow water, weed and algae
-            "bullfrog", new float[] {0, 0, 0.1F, 0, 1, 1},        // the pans and the floodplain's pools; rare on the river
-            "monitor", new float[] {0.5F, 1, 1, 1, 0.5F, 0},      // any bank of the river and oxbows, fewer at the coast and the oxbows
-            "otter", new float[] {0, 0.5F, 1, 1, 1, 0});          // fresh running water and the oxbows; none at the salty coast or the fishless pans
+    static final Map<String, float[]> SHARES = Map.ofEntries(
+            Map.entry("hippo", new float[] {0, 1, 1, 0, 0, 0}),              // slow deep pools of the near and mid rivers (and deep oxbows: placed with the land, OxbowFeature)
+            Map.entry("crocodile", new float[] {0.25F, 1, 1, 0.25F, 0.5F, 0}), // most on the wide slow rivers' bars, few at the coast and up the narrow rivers
+            Map.entry("catfish", new float[] {1, 1, 1, 0.25F, 1, 0}),        // deep and murky water and the oxbows; few in the clear narrow rivers
+            Map.entry("tilapia", new float[] {0.5F, 1, 1, 0.5F, 1, 0}),       // quiet water; nurseries in the oxbows
+            Map.entry("barb", new float[] {0.25F, 0.5F, 1, 1, 0.25F, 0}),     // clear running water, most far inland
+            Map.entry("crab", new float[] {0.25F, 0.5F, 1, 1, 0.25F, 0}),     // stony beds, most far inland
+            Map.entry("snail", new float[] {0.25F, 1, 1, 0.5F, 1, 1}),        // still and slow water, weed and algae
+            Map.entry("bullfrog", new float[] {0, 0, 0.1F, 0, 1, 1}),        // the pans and the floodplain's pools; rare on the river
+            Map.entry("bull_shark", new float[] {1, 0.5F, 0, 0, 0, 0}),      // up from the sea into the coast and near-inland rivers only
+            Map.entry("monitor", new float[] {0.5F, 1, 1, 1, 0.5F, 0}),      // any bank of the river and oxbows, fewer at the coast and the oxbows
+            Map.entry("otter", new float[] {0, 0.5F, 1, 1, 1, 0}));          // fresh running water and the oxbows; none at the salty coast or the fishless pans
 
     private RiverZones() {
     }
