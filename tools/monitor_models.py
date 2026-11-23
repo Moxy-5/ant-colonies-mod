@@ -1201,11 +1201,7 @@ def water_move(kind, size, swim_table, swim_leg, flick, log=None):
         for L in P.legs:
             side = (L['kind'], L['side'])
             wrist, up, pitch_ = _foot_at(t, keys[side], lifts[L['kind']], reach=L['kind'] == 'arm' and keys.get('raised', False))
-            # going in the legs never fold in the clip (2026-11-22, the user: folded in its last second they changed to
-            # the swim's form at once): they end hanging loose, and the game has them drift two seconds once it is about
-            # fully in and then ease into the swim's over two more (MonitorModel.drift; 'settled' below). The moves' own
-            # 'fold' keys are kept for the way out, which unfolds from the swim.
-            fold = 0.0 if way == 'in' else _ramp(t, keys['fold'][side])
+            fold = _ramp(t, keys['fold'][side])
             fm, fd = (cm, cd) if L['kind'] == 'arm' else (bm, bd)
             # (a foot turned flat against a face lifts its claws straight off it: curled or drooped as on the ground,
             # they went into the face)
@@ -1325,8 +1321,6 @@ def water_move(kind, size, swim_table, swim_leg, flick, log=None):
     made['timeline'] = {'0': f'water {kind} {sc["edge"]:g} {sc["top"]:.3f} {sc["surface"]:.3f} {sc["bottom"]:.3f}',
                         '0.05': 'path body ' + ' '.join(f'{t:.4f} {dy:.3f} {dz:.3f}' for t, dy, dz in path),
                         '0.1': f'wet {marks.get("wet", -1.0):.2f}'}
-    if way == 'in':         # about fully in (when the swim's own motion starts easing in): the game's drift starts here
-        made['timeline']['0.15'] = f'settled {t0s:.2f}'
     return made, P.worst, sc, path
 
 

@@ -268,12 +268,6 @@ def move_path(made_clip):
     return [v[i:i + 3] for i in range(0, len(v) - 2, 3)], wet
 
 
-def move_settled(made_clip):
-    """A move clip's settled time (seconds, -1 for none): going into the water, when it is about fully in (its note)."""
-    notes = made_clip.get('timeline', {}).values()
-    return next((float(n.split()[1]) for n in notes if n.startswith('settled ')), -1.0)
-
-
 def block_moves(made, sizes, block_px, moves, lead=None):
     """The game's move file for one animal (a dict): {sizes, moves: [...]}, from its made clips.
 
@@ -298,14 +292,11 @@ def block_moves(made, sizes, block_px, moves, lead=None):
             rises.append([dy / B for _, dy, _ in rows])
             alongs.append([-dz for _, _, dz in rows])
         # the wet tick read from the clip at size 1 (or the middle size): the same moment at every size
-        middle = made[next((m['clip'](s) for s in sizes if s == 1.0), m['clip'](sizes[len(sizes) // 2]))]
-        wet = move_path(middle)[1]
-        settled = move_settled(middle)
+        wet = move_path(made[next((m['clip'](s) for s in sizes if s == 1.0), m['clip'](sizes[len(sizes) // 2]))])[1]
         out.append({'name': m['name'], 'clips': [m['clip'](s) for s in sizes], 'ahead_px': m['ahead_px'],
                     'starts_afloat': m['starts_afloat'], 'ends_afloat': m['ends_afloat'], 'goes_down': m['goes_down'],
                     'end_level': m.get('end_level', 0), 'wet_tick': round(wet * 20), 'ticks': len(rises[0]) - 1,
-                    'rise': rises, 'along': alongs, **({'wades': True} if m.get('wades') else {}),
-                    **({'settle_tick': round(settled * 20)} if settled >= 0 else {})})
+                    'rise': rises, 'along': alongs, **({'wades': True} if m.get('wades') else {})})
     data = {'sizes': list(sizes), 'block_px': [round(block_px(s), 4) for s in sizes], 'moves': out}
     if lead is not None:
         data['lead_ticks'] = lead
@@ -329,7 +320,7 @@ def write_block_moves(animal, data, maker, mod='savanna'):
     for i, m in enumerate(data['moves']):
         head = ', '.join(f'{json.dumps(k)}: {json.dumps(m[k])}' for k in
                          ('name', 'clips', 'ahead_px', 'starts_afloat', 'ends_afloat', 'goes_down', 'end_level', 'wet_tick',
-                          'ticks') + (('wades',) if m.get('wades') else ()) + (('settle_tick',) if 'settle_tick' in m else ()))
+                          'ticks') + (('wades',) if m.get('wades') else ()))
         lines.append('    {' + head + ',')
         for key in ('rise', 'along'):
             rows = ',\n'.join('        ' + _row(r) for r in m[key])
