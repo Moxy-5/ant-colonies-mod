@@ -398,7 +398,7 @@
     "carry": {
       "bone": "carry",
       "jaw": "jaw",
-      "grip_ahead": 4.3,
+      "grip_ahead": 2.8,
       "grip_reach": 0.55,
       "slant": 35.0,
       "jaw_fill": 0.9,

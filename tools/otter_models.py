@@ -515,12 +515,13 @@ def build_bones():
          "pivot": [0.0, round(jaw_wy + dy_h, 3), round(oz(jaw_wox + BODY_EXTRA) + dz_h, 3)], "cubes": jaw_cubes},
         {"name": "tongue", "parent": "jaw",
          "pivot": [0.0, round(10.4 + dy_h, 3), round(oz(31.2 + BODY_EXTRA) + dz_h, 3)], "cubes": tongue_cubes},
-        # the carry point (2026-11-22): where the lips meet at the jaw tips, level with the jaw's hinge (10.45 high,
-        # the upper lip's underside; 10.65 sat inside the muzzle: Neon's diagnosis), 4.3 px ahead of it (further back
-        # the catch was buried in the head: clip_check.py --hold); the game opens the jaw round a catch and turns the
-        # catch down about the hinge with it (HeldCatch.ride, OtterRenderer)
+        # the carry point (2026-11-22): where the lips meet, level with the jaw's hinge (10.45 high, the upper lip's
+        # underside; 10.65 sat inside the muzzle: Neon's diagnosis), 2.8 px ahead of it (the plan's checks.carry
+        # grip_ahead, keep the two the same): a fish held deep in the mouth, its front edge flush with the nose (the
+        # user: "have the fish fit deeper into their mouth"; was 4.3, at the jaw tips, half the fish out in front);
+        # the game opens the jaw round a catch and turns the catch down about the hinge with it (HeldCatch.ride)
         {"name": "carry",  "parent": "head",
-         "pivot": [0.0, round(jaw_wy + dy_h, 3), round(oz(34.5 + BODY_EXTRA) + dz_h, 3)], "cubes": []},
+         "pivot": [0.0, round(jaw_wy + dy_h, 3), round(oz(jaw_wox + 2.8 + BODY_EXTRA) + dz_h, 3)], "cubes": []},
         *_build_leg("fl",  1, "front", w_scale, BODY_EXTRA, dy_c, dz_c),
         *_build_leg("fr", -1, "front", w_scale, BODY_EXTRA, dy_c, dz_c),
         *_build_leg("bl",  1, "hind",  w_scale),
