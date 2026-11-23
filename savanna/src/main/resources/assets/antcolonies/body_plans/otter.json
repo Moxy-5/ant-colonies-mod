@@ -394,7 +394,23 @@
         "sniff_walk"
       ]
     ],
-    "controller": "savanna/src/main/java/com/antcolonies/savanna/animal/OtterEntity.java"
+    "controller": "savanna/src/main/java/com/antcolonies/savanna/animal/OtterEntity.java",
+    "carry": {
+      "bone": "carry",
+      "jaw": "jaw",
+      "grip_ahead": 4.3,
+      "grip_reach": 0.55,
+      "slant": 35.0,
+      "jaw_fill": 0.9,
+      "jaw_min": 10.0,
+      "jaw_max": 40.0,
+      "jaw_other": 18.0,
+      "swallow_under": 0.32,
+      "swallow_chance": 0.85,
+      "ground_clips": {
+        "eat": 20.25
+      }
+    }
   },
   "course": {
     "otter": {

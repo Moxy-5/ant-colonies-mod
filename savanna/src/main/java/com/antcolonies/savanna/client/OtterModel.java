@@ -52,7 +52,8 @@ public class OtterModel extends DefaultedEntityGeoModel<OtterEntity> {
         byte doing = otter.doing();
         // (rearing at a playmate it looks straight at it: its body faces it)
         boolean looks = !onMove && !otter.isDeadOrDying() && doing != OtterEntity.REST && doing != OtterEntity.SHAKE
-                && doing != OtterEntity.PLAY_UP && doing != OtterEntity.PLAY && doing != OtterEntity.PLAY_DOWN;
+                && doing != OtterEntity.PLAY_UP && doing != OtterEntity.PLAY && doing != OtterEntity.PLAY_DOWN
+                && doing != OtterEntity.GULP;
         double scale = OtterEntity.MODEL_SCALE * otter.getScale(), ahead = EYES_AHEAD * scale / 16.0;
         otter.attention.aim(pt, x - Mth.sin(yaw * Mth.DEG_TO_RAD) * ahead, z + Mth.cos(yaw * Mth.DEG_TO_RAD) * ahead, yaw,
                 looks ? HEAD_TURN : 0.0);
@@ -63,9 +64,17 @@ public class OtterModel extends DefaultedEntityGeoModel<OtterEntity> {
         if (!otter.isDeadOrDying()) {
             // standing, its mood's stance clip carries the tail; the bite and the eat clips carry the jaw
             double tail = otter.standing() || doing != OtterEntity.CALM ? 0.0 : otter.swimming() ? TAIL_SWIMMING : TAIL_LAND;
-            boolean jawFree = doing != OtterEntity.BITE && doing != OtterEntity.EAT;
+            boolean jawFree = doing != OtterEntity.BITE && doing != OtterEntity.EAT && doing != OtterEntity.GULP;
             FACE.draw(otter, getAnimationProcessor()::getBone, new FaceLayer.Frame(OtterEntity.MOODS[otter.mood()],
                     (otter.tickCount + pt) / 20.0, jawFree, tail));
+            GeoBone jaw = getAnimationProcessor().getBone("jaw");
+            if (jawFree && jaw != null && otter.isVehicle()) {
+                // a catch between its teeth: the jaw open round it, never shut past it (the clip files' jaw: 0 shut,
+                // more open; GeckoLib's turn the other way)
+                double open = com.antcolonies.savanna.animal.HeldCatch.jawOpen(otter.getFirstPassenger(),
+                        otter.getScale() * OtterEntity.MODEL_SCALE);
+                jaw.setRotX(Math.min(jaw.getRotX(), (float) -open));
+            }
         }
     }
 

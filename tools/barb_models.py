@@ -327,6 +327,8 @@ SIP_LEN = 1.4
 SCATTER_LEN = 0.4
 DEATH_LEN = 1.0
 FLOP_LEN = 0.5
+HELD_LEN, HELD_BEAT, HELD_BEND = 1.6, 0.3, 2.8   # held in an otter's jaws: a loop, a beat, degrees of bend per px (my picks)
+HELD_SAG = 1.4      # held on its side by its middle its ends sag: the thrash flaps about this bend (as the tilapia's)
 NIBBLE_LEN = 1.8         # three pecks at the algae
 JAW_OPEN = 40.0          # how far the lower jaw drops, wide open (degrees): big enough to read on a quarter-block fish
 LIE = 5.5 - 3.6          # how far the fish comes down lying on its side: its middle line (5.5 up) to its half width
@@ -445,6 +447,31 @@ def clips():
         p['body']['position'] = [0.0, round(-LIE + 1.2 * abs(math.sin(w * t)), 3), 0.0]
         return _fins(p, t, out=-1.7, back_fin=1.0)
     make('flop', FLOP_LEN, flop)
+
+    # held: in an otter's jaws (2026-11-22, the user: "the fish sideways and wiggling ... the same model it has in the
+    # water"): gripped crosswise at its middle, upright, head and tail bending together to one side then the other in
+    # bursts of thrashing, then a tired lull, gasping; fins spread with the fight (the game draws it at the carry bone)
+    def held(t, down=False):
+        def ease(x):
+            x = max(0.0, min(1.0, x))
+            return x * x * (3 - 2 * x)
+        env = ease(t / 0.12) * (1 - ease((t - 0.72) / 0.18))
+        ph = 2 * math.pi * t / HELD_BEAT
+        c = HELD_BEND * (env * math.sin(ph) + (1 - env) * 0.12 * math.sin(2 * math.pi * t / 0.12)) + HELD_SAG
+        if down:            # pinned on the ground as it is eaten: one weak twitch a loop and a quiver (as the tilapia's)
+            env = 0.3 if t < 0.3 else 0.0
+            c = HELD_SAG + HELD_BEND * (0.3 * (math.sin(2 * math.pi * t / 0.3) if t < 0.3 else 0.0)
+                                        + 0.05 * math.sin(2 * math.pi * t / 0.12))
+        p = {'body': {'rotation': [0.0, round(c * -2.0, 3), round(8 * env * math.sin(ph + 0.7), 3)]},
+             'head': {'rotation': [0.0, round(c * -9.5, 3), 0.0]},
+             'tail_stalk': {'rotation': [0.0, round(c * 8.0, 3), 0.0]},
+             'tail_fin': {'rotation': [0.0, round(c * 5.5, 3), 0.0]}}
+        gasp = max(0.0, math.sin(math.pi * (t - 1.0) / 0.2)) if 1.0 <= t <= 1.2 else \
+            max(0.0, math.sin(math.pi * (t - 1.32) / 0.2)) if 1.32 <= t <= 1.52 else 0.0
+        p['jaw'] = {'rotation': [round(JAW_OPEN * 0.6 * gasp, 3), 0.0, 0.0]}
+        return _fins(p, t, out=0.9 * env, flutter=1.0, rate=6.0)
+    make('held', HELD_LEN, held)
+    make('held_down', HELD_LEN, lambda t: held(t, True))
 
     # death: the wave dies away as it rolls onto its side and settles
     def death(t):

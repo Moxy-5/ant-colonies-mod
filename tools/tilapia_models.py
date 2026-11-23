@@ -318,6 +318,34 @@ def fight_phase(t):
     return ph
 
 
+# Held in an otter's jaws (2026-11-22): a struggle in bursts (my picks): three quick beats of thrashing, then a lull.
+HELD_LEN, HELD_BEAT, HELD_BEND = 1.6, 0.3, 3.2      # seconds a loop, seconds a beat, degrees of bend per model px along it
+# Held on its side by its middle its ends sag (2026-11-22): the thrash flaps about this bend (degrees per px; my pick;
+# the sign bends toward its left flank, which lies down in the otter's jaws)
+HELD_SAG = 1.6
+
+
+def down_bend(t, most):
+    """Pinned on the ground as it is eaten (2026-11-22): curled about its sag, one weak twitch a loop (the first 0.3 s)
+    and a quiver, never so much that its ends bend down past straight (clip_check.py --hold: into the ground); its side
+    fins pressed flat (the clip folds them: one under it poked into the ground)."""
+    twitch = math.sin(2 * math.pi * t / 0.3) if t < 0.3 else 0.0
+    env = 0.3 if t < 0.3 else 0.0
+    return HELD_SAG + most * (0.3 * twitch + 0.05 * math.sin(2 * math.pi * t / 0.12)), env, 2 * math.pi * t / HELD_BEAT
+
+
+def held_bend(t, most):
+    """The held fish's bend at t (degrees per px along it, + one side), how hard it fights (0..1) and the beat's phase:
+    thrashing for the first 0.9 s, then only a quiver; 0 at both ends so the loop joins."""
+    def ease(x):
+        x = max(0.0, min(1.0, x))
+        return x * x * (3 - 2 * x)
+    env = ease(t / 0.12) * (1 - ease((t - 0.72) / 0.18))
+    ph = 2 * math.pi * t / HELD_BEAT
+    quiver = 0.12 * math.sin(2 * math.pi * t / 0.12)
+    return most * (env * math.sin(ph) + (1 - env) * quiver), env, ph
+
+
 def clips():
     """swim (a full beat, 0.9 s; the game plays it faster or slower by the swimming speed), idle (hanging in the water,
     a slow gentle wave), graze (nose down to the bed, three pecks), flop (on land, on its side, curling), death (rolls
@@ -392,7 +420,24 @@ def clips():
         p['body'] = {'rotation': [0, 0, 90 * f], 'position': [0, -LIE * f, 0]}
         return p
 
-    return {'idle': clip(2.0, idle, 24), 'swim': clip(swim_len, lambda t: rot_only(wave_pose(t, 1.0, beat)), 18),
+    def held(t, bend=lambda t, most: (lambda c, e, ph: (c + HELD_SAG, e, ph))(*held_bend(t, most))):
+        """In an otter's jaws (2026-11-22, the user: "the fish sideways and wiggling ... the same model it has in the water"):
+        gripped crosswise at its middle, upright as it swims, its head and tail bending together to one side then the
+        other (a C, the middle still) in bursts of thrashing, three beats, then a tired lull with only a quiver; the
+        breast fins spread with the fight, the body twisting a little about its length. The game draws it at the
+        otter's carry bone."""
+        c, env, ph = bend(t, HELD_BEND)
+        p = rot_only(wave_pose(t, 0.4 + 0.6 * env, 2 * math.pi / HELD_BEAT))      # the fins' flutter
+        ab = {'body': c * -8.5, 'front': c * -2.5, 'mid': c * 2.0, 'rear': c * 5.7, 'peduncle': c * 8.5, 'tail': c * 12.6}
+        parent = {'front': 'body', 'mid': 'front', 'rear': 'mid', 'peduncle': 'rear', 'tail': 'peduncle'}
+        p['body'] = {'rotation': [0, ab['body'], 8 * env * math.sin(ph + 0.7)]}
+        p['head'] = {'rotation': [0, 0, 0]}
+        for name, par in parent.items():
+            p[name] = {'rotation': [0, ab[name] - ab[par], 0]}
+        return p
+
+    return {'held': clip(HELD_LEN, held, 64), 'held_down': clip(HELD_LEN, lambda t: folded(held(t, down_bend), 1), 64),
+            'idle': clip(2.0, idle, 24), 'swim': clip(swim_len, lambda t: rot_only(wave_pose(t, 1.0, beat)), 18),
             'graze': clip(1.8, graze, 36), 'flop': clip(0.6, flop, 12), 'caught': clip(0.5, caught, 20),
             'caught_fight': clip(FIGHT_LEN, caught_fight, 84, 'hold'), 'death': clip(1.2, death, 12, 'hold')}
 

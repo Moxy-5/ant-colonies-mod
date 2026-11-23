@@ -671,6 +671,8 @@ public class TilapiaEntity extends AbstractSchoolingFish implements GeoEntity, H
     private static final RawAnimation GRAZE = RawAnimation.begin().thenLoop("graze");
     private static final RawAnimation FLOP = RawAnimation.begin().thenLoop("flop");
     private static final RawAnimation CAUGHT = RawAnimation.begin().thenLoop("caught");
+    private static final RawAnimation HELD = RawAnimation.begin().thenLoop("held");
+    private static final RawAnimation HELD_DOWN = RawAnimation.begin().thenLoop("held_down");
     private static final RawAnimation CAUGHT_FIGHT = RawAnimation.begin().thenPlayAndHold("caught_fight");
     private static final RawAnimation DEATH =RawAnimation.begin().thenPlayAndHold("death");
     /** The swim clip's beat is made for this speed (blocks a tick, about 1.2 a second); it plays faster or slower by it. */
@@ -683,6 +685,14 @@ public class TilapiaEntity extends AbstractSchoolingFish implements GeoEntity, H
 
     private PlayState animate(AnimationState<TilapiaEntity> state) {
         AnimationController<TilapiaEntity> player = state.getController();
+        if (getVehicle() instanceof OtterEntity otter) {   // in an otter's jaws: on its side, thrashing in bursts;
+            // pinned on the ground as it eats it: curled, twitching
+            if (otter.doing() == OtterEntity.EAT) {
+                return state.setAndContinue(HELD_DOWN);
+            }
+            player.setAnimationSpeed(1.0);
+            return state.setAndContinue(HELD);
+        }
         if (caught && fighting) {
             player.setAnimationSpeed(1.0);
             return state.setAndContinue(CAUGHT_FIGHT);

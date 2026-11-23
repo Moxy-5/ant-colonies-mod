@@ -77,7 +77,14 @@ import software.bernie.geckolib.util.GeckoLibUtil;
 public class OtterEntity extends PathfinderMob implements GeoEntity, HasLife {
     /** What it is doing, for the clips. */
     public static final byte CALM = 0, SHAKE = 1, REST = 2, REST_UP = 3, FORAGE = 4, BITE = 5, EAT = 6, SKID = 7, HOP = 8,
-            PLAY_UP = 9, PLAY = 10, PLAY_DOWN = 11;
+            PLAY_UP = 9, PLAY = 10, PLAY_DOWN = 11, GULP = 12;
+    /**
+     * A small fish swallowed at once ({@link HeldCatch#swallowed}; the gulp clip, on the head's own layer): it takes the
+     * fish as its jaws snap shut, and the gulp is over at the end (ticks), and such a fish fills it for this part of a
+     * catch carried to the bank (my pick: a barb is a mouthful, so it hunts again sooner).
+     */
+    static final int GULP_TAKE = 6, GULP_TICKS = 16;
+    static final double SMALL_MEAL = 1.0 / 3.0;
     /**
      * Play ({@link Bout}): rearing up and dropping down take this long (ticks: the play_up and play_down clips), rearing
      * face to face their noses reach this far ahead of their middles (blocks at size 1: 13.5 px, measured on the
@@ -112,6 +119,8 @@ public class OtterEntity extends PathfinderMob implements GeoEntity, HasLife {
     public static final String[] MOODS = {"calm", "playful", "curious", "content", "wary", "cross", "scared"};
     public static final byte CALM_MOOD = 0, PLAYFUL = 1, CURIOUS = 2, CONTENT = 3, WARY = 4, CROSS = 5, SCARED = 6;
     private static final EntityDataAccessor<Byte> DATA_MOOD = SynchedEntityData.defineId(OtterEntity.class, EntityDataSerializers.BYTE);
+    /** The angle its catch was caught at (the fish's heading against its own, degrees, + to its right; {@link HeldCatch}). */
+    private static final EntityDataAccessor<Float> DATA_CAUGHT_AT = SynchedEntityData.defineId(OtterEntity.class, EntityDataSerializers.FLOAT);
     /** A calmer mood waits this long (ticks: 3 s) after the last change, so the face does not flicker (my pick). */
     static final int MOOD_HOLD = 60;
     /** A player sprinting within this many blocks, or standing (not crouching) within the second, makes it wary (my picks). */
@@ -148,7 +157,8 @@ public class OtterEntity extends PathfinderMob implements GeoEntity, HasLife {
      * {@link #HUNT_REACH} blocks; it feels under the stones for a crab this long before it bites (ticks), the bite's
      * snap lands on the clip's tick 6, and it eats on the bank this long (two rounds of the eat clip's crunches).
      */
-    static final int FULL_TICKS = 6000, FULL_MORE = 3000, FEEL_TICKS = 36, BITE_TICKS = 12, BITE_HIT = 6, EAT_TICKS = 64;
+    public static final int FULL_TICKS = 6000;
+    static final int FULL_MORE = 3000, FEEL_TICKS = 36, BITE_TICKS = 12, BITE_HIT = 6, EAT_TICKS = 64;
     static final double HUNT_REACH = 12.0;
     /** How far ahead of its middle its jaws close, and how high (blocks at size 1: the model's carry socket, 20.9 px ahead, 7.9 up). */
     static final double JAWS_AHEAD = 1.31, JAWS_UP = 0.49;
@@ -272,6 +282,7 @@ public class OtterEntity extends PathfinderMob implements GeoEntity, HasLife {
         builder.define(DATA_DIVING, false);
         builder.define(DATA_MOOD, CALM_MOOD);
         builder.define(DATA_GAIT, EVEN);
+        builder.define(DATA_CAUGHT_AT, 90.0F);
     }
 
     public MoveRider rider() {
@@ -494,6 +505,19 @@ public class OtterEntity extends PathfinderMob implements GeoEntity, HasLife {
 
     @Override
     public void tick() {
+        if (!level().isClientSide && isVehicle()) {
+            for (String tag : getTags()) {                  // the film camera's catch angle: "caught.<degrees>"
+                if (tag.startsWith("caught.")) {
+                    entityData.set(DATA_CAUGHT_AT, Float.parseFloat(tag.substring(7)));
+                }
+                // and what it does with it ("doing.eat", "doing.gulp"), so a film runs the real eating and gulping
+                // drawing, not only their clips (a "film:" name plays a clip but leaves it calm)
+                byte filmed = "doing.eat".equals(tag) ? EAT : "doing.gulp".equals(tag) ? GULP : CALM;
+                if (filmed != CALM && doing() != filmed) {
+                    setDoing(filmed);
+                }
+            }
+        }
         super.tick();
         chain.place();
         rider.noteMoved();
@@ -527,7 +551,8 @@ public class OtterEntity extends PathfinderMob implements GeoEntity, HasLife {
         byte d = doing();
         if (d == SHAKE && doingFor() >= SHAKE_TICKS || d == REST_UP && doingFor() >= REST_UP_TICKS
                 || d == BITE && doingFor() >= BITE_TICKS || d == SKID && doingFor() >= SKID_TICKS
-                || d == HOP && doingFor() >= HOP_TICKS || d == PLAY_DOWN && doingFor() >= PLAY_DOWN_TICKS) {
+                || d == HOP && doingFor() >= HOP_TICKS || d == PLAY_DOWN && doingFor() >= PLAY_DOWN_TICKS
+                || d == GULP && doingFor() >= GULP_TICKS) {
             setDoing(CALM);
         } else if ((d == PLAY_UP || d == PLAY) && bout == null) {
             setDoing(PLAY_DOWN);                             // a bout broken off: down at once
@@ -732,12 +757,23 @@ public class OtterEntity extends PathfinderMob implements GeoEntity, HasLife {
             return false;
         }
         held = prey;
+        entityData.set(DATA_CAUGHT_AT, Mth.wrapDegrees(prey.getYRot() - yBodyRot));
         if (prey instanceof net.minecraft.world.entity.Mob mob) {
             mob.setNoAi(true);
         }
         prey.setInvulnerable(true);
         playSound(SoundEvents.FOX_BITE, 0.6F, 1.4F);
         return true;
+    }
+
+    /** How long it stays full yet (ticks; for tests). */
+    public int fullFor() {
+        return hungryIn;
+    }
+
+    /** The angle its catch was caught at (degrees, + to its right; drawing). */
+    public float caughtAt() {
+        return entityData.get(DATA_CAUGHT_AT);
     }
 
     /** Lets go of its catch (scared off, or the hunt is over). */
@@ -755,16 +791,21 @@ public class OtterEntity extends PathfinderMob implements GeoEntity, HasLife {
         }
     }
 
-    /** Eats its catch: gone (no drops), and it is full. */
+    /** Eats its catch: gone (no drops), and it is full (a small fish swallowed at once: for a while). */
     void eatCatch() {
+        eatCatch(false);
+    }
+
+    void eatCatch(boolean small) {
         LivingEntity was = held;
         held = null;
         if (was != null) {
             was.stopRiding();
             was.discard();
         }
-        hungryIn = FULL_TICKS + random.nextInt(FULL_MORE);
-        heal(4.0F);
+        int full = FULL_TICKS + random.nextInt(FULL_MORE);
+        hungryIn = small ? (int) (full * SMALL_MEAL) : full;
+        heal(small ? 1.0F : 4.0F);
     }
 
     /** Nobody steers an otter: a catch in its jaws rides it but must not drive it. */
@@ -1204,7 +1245,9 @@ public class OtterEntity extends PathfinderMob implements GeoEntity, HasLife {
                 otter.face(prey.getX(), prey.getZ(), 30.0F);
                 if (otter.doingFor() == BITE_HIT) {
                     if (otter.atJaws(prey, reach(prey) + 0.3)) {        // a little slack: it moved while felt for
-                        otter.grab(prey);
+                        if (otter.grab(prey) && HeldCatch.swallowed(prey, otter.random)) {
+                            otter.setDoing(GULP);                        // a small fish: down in one
+                        }
                         otter.getNavigation().stop();
                     }
                 }
@@ -1252,8 +1295,14 @@ public class OtterEntity extends PathfinderMob implements GeoEntity, HasLife {
             return prey instanceof CrabEntity ? 0.7 : 0.4;
         }
 
-        /** With its catch: to the nearest bank, out, and eat it lying on the bank. */
+        /** With its catch: to the nearest bank, out, and eat it lying on the bank (a small one gulped down where it is). */
         private void carry() {
+            if (otter.doing() == GULP) {
+                if (otter.doingFor() >= GULP_TAKE) {
+                    otter.eatCatch(true);
+                }
+                return;
+            }
             if (otter.doing() == EAT) {
                 if (otter.doingFor() >= EAT_TICKS) {
                     otter.eatCatch();
@@ -1934,6 +1983,7 @@ public class OtterEntity extends PathfinderMob implements GeoEntity, HasLife {
     private static final RawAnimation PLAY_UP_CLIP = RawAnimation.begin().thenPlayAndHold("play_up");
     private static final RawAnimation PLAY_CLIP = RawAnimation.begin().thenLoop("play_rear");
     private static final RawAnimation PLAY_DOWN_CLIP = RawAnimation.begin().thenPlayAndHold("play_down");
+    private static final RawAnimation GULP_CLIP = RawAnimation.begin().thenPlayAndHold("gulp");
 
     @Override
     public void registerControllers(AnimatableManager.ControllerRegistrar controllers) {
@@ -1941,6 +1991,15 @@ public class OtterEntity extends PathfinderMob implements GeoEntity, HasLife {
         bodyClips.setCustomInstructionKeyframeHandler(note -> {
         });         // the moves' clips' notes (their path) are for the tools only
         controllers.add(bodyClips);
+        // the head's own layer (2026-11-22): the gulp, over whatever the body is doing (it keys only the neck, head,
+        // jaw and tongue; the later controller's keys win), nothing the rest of the time
+        controllers.add(new AnimationController<>(this, "head", 2, state -> {
+            if (doing() != GULP || isDeadOrDying()) {
+                state.getController().forceAnimationReset();
+                return PlayState.STOP;
+            }
+            return state.setAndContinue(GULP_CLIP);
+        }));
     }
 
     /** Whether it walks or swims (drawing only): it moved within the last few ticks. */

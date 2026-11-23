@@ -309,6 +309,8 @@ public class BarbEntity extends AbstractSchoolingFish implements GeoEntity {
     private static final RawAnimation SCATTER = RawAnimation.begin().thenPlay("scatter");
     private static final RawAnimation STRUGGLE = RawAnimation.begin().thenLoop("scatter");
     private static final RawAnimation FLOP = RawAnimation.begin().thenLoop("flop");
+    private static final RawAnimation HELD = RawAnimation.begin().thenLoop("held");
+    private static final RawAnimation HELD_DOWN = RawAnimation.begin().thenLoop("held_down");
     private static final RawAnimation DEATH = RawAnimation.begin().thenPlayAndHold("death");
     /** The swim clip's beat is made for this speed (blocks a tick, 1 a second); it plays faster or slower by it. */
     static final double SWIM_CLIP_SPEED = 0.05;
@@ -324,6 +326,13 @@ public class BarbEntity extends AbstractSchoolingFish implements GeoEntity {
         String film = filmClip();
         if (film != null) {
             return state.setAndContinue(FILM_CLIPS.computeIfAbsent(film, c -> RawAnimation.begin().thenLoop(c)));
+        }
+        if (getVehicle() instanceof OtterEntity otter) {   // in an otter's jaws: on its side, thrashing in bursts;
+            // pinned on the ground as it eats it: curled, twitching
+            if (otter.doing() == OtterEntity.EAT) {
+                return state.setAndContinue(HELD_DOWN);
+            }
+            return state.setAndContinue(HELD);
         }
         if (getVehicle() != null) {         // in a crocodile's jaws: thrashing
             return state.setAndContinue(STRUGGLE);

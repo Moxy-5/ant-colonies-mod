@@ -1,0 +1,108 @@
+# An otter's catch in its jaws (2026-11-22; the grip from the body plans, animal/HeldCatch, judged offline first with
+# python tools/clip_check.py otter walk --hold tilapia:held): an otter playing its walk with a tilapia riding it as a catch
+# does (drawn at its carry bone by client/OtterRenderer, lying on its side, its own held clip), caught side on, from
+# behind and head on (the tag "caught.<degrees>"), filmed stepped from the side, three quarters, the front and above;
+# then eating it (the tag "doing.eat": really eating, the fish on the ground; between takes dropped fish
+# items are cleared); then a live hunt: a hungry otter gulping down a barb in a pool.
+#   ./gradlew runFilm -PfilmScene=tools/film/otter_catch_held.film   pictures in run-film/screenshots/otter_catch_held/
+cmd time set noon
+cmd weather clear
+cmd kill @e[type=!player]
+cmd kill @e[type=item]
+cmd fill 0 -61 0 40 -50 34 minecraft:air
+cmd fill 0 -62 0 40 -61 34 minecraft:grass_block
+lens 30
+wait 40
+cmd summon antcolonies:otter 20.5 -60 17.0 {NoAI:1b,Invulnerable:1b,Rotation:[90f,0f],OwnSize:1.0f,CustomName:'"film:walk"',Tags:["caught.90"],Passengers:[{id:"antcolonies:tilapia",NoAI:1b,Invulnerable:1b}]}
+wait 30
+camera 19.8 -60.9 12.8 0 4
+cmd tick freeze
+burst c90_side 8 3
+cmd tick unfreeze
+camera 16.4 -60.7 14.0 -50 8
+cmd tick freeze
+burst c90_three 6 4
+cmd tick unfreeze
+camera 16.0 -60.8 17.0 -90 6
+cmd tick freeze
+burst c90_front 6 4
+cmd tick unfreeze
+camera 19.3 -59.2 17.0 0 90
+cmd tick freeze
+burst c90_above 4 6
+cmd tick unfreeze
+cmd kill @e[type=!player]
+cmd kill @e[type=item]
+wait 25
+cmd summon antcolonies:otter 20.5 -60 17.0 {NoAI:1b,Invulnerable:1b,Rotation:[90f,0f],OwnSize:1.0f,CustomName:'"film:walk"',Tags:["caught.25"],Passengers:[{id:"antcolonies:tilapia",NoAI:1b,Invulnerable:1b}]}
+wait 30
+camera 19.8 -60.9 12.8 0 4
+cmd tick freeze
+burst c25_side 8 3
+cmd tick unfreeze
+camera 16.4 -60.7 14.0 -50 8
+cmd tick freeze
+burst c25_three 6 4
+cmd tick unfreeze
+camera 16.0 -60.8 17.0 -90 6
+cmd tick freeze
+burst c25_front 6 4
+cmd tick unfreeze
+camera 19.3 -59.2 17.0 0 90
+cmd tick freeze
+burst c25_above 4 6
+cmd tick unfreeze
+cmd kill @e[type=!player]
+cmd kill @e[type=item]
+wait 25
+cmd summon antcolonies:otter 20.5 -60 17.0 {NoAI:1b,Invulnerable:1b,Rotation:[90f,0f],OwnSize:1.0f,CustomName:'"film:walk"',Tags:["caught.155"],Passengers:[{id:"antcolonies:tilapia",NoAI:1b,Invulnerable:1b}]}
+wait 30
+camera 19.8 -60.9 12.8 0 4
+cmd tick freeze
+burst c155_side 8 3
+cmd tick unfreeze
+camera 16.4 -60.7 14.0 -50 8
+cmd tick freeze
+burst c155_three 6 4
+cmd tick unfreeze
+camera 16.0 -60.8 17.0 -90 6
+cmd tick freeze
+burst c155_front 6 4
+cmd tick unfreeze
+camera 19.3 -59.2 17.0 0 90
+cmd tick freeze
+burst c155_above 4 6
+cmd tick unfreeze
+cmd kill @e[type=!player]
+cmd kill @e[type=item]
+wait 25
+cmd summon antcolonies:otter 20.5 -60 17.0 {NoAI:1b,Invulnerable:1b,Rotation:[90f,0f],OwnSize:1.0f,Tags:["caught.90","doing.eat"],Passengers:[{id:"antcolonies:tilapia",NoAI:1b,Invulnerable:1b}]}
+wait 30
+camera 17.0 -60.9 14.0 -50 8
+cmd tick freeze
+burst eat_three 8 4
+cmd tick unfreeze
+cmd kill @e[type=!player]
+cmd kill @e[type=item]
+wait 25
+# a barb in its jaws, gulped (the tag "doing.gulp": its real gulp, on the head's layer, the barb riding the jaw)
+cmd summon antcolonies:otter 20.5 -60 17.0 {NoAI:1b,Invulnerable:1b,Rotation:[90f,0f],OwnSize:1.0f,Tags:["caught.90","doing.gulp"],Passengers:[{id:"antcolonies:barb",NoAI:1b,Invulnerable:1b}]}
+wait 30
+camera 17.6 -60.8 14.4 -45 6
+cmd tick freeze
+burst gulp_barb 16 1
+cmd tick unfreeze
+cmd kill @e[type=!player]
+cmd kill @e[type=item]
+wait 25
+# the live hunt: a pool 3 deep, a hungry otter on its bank, a barb in it
+cmd fill 14 -64 12 30 -62 22 minecraft:water
+cmd fill 14 -61 12 30 -61 22 minecraft:water
+cmd summon antcolonies:barb 21.5 -62 17.5 {PersistenceRequired:1b}
+cmd summon antcolonies:otter 12.5 -60 17.5 {PersistenceRequired:1b,Rotation:[-90f,0f],OwnSize:1.0f,HungryIn:0}
+camera 17.0 -58.0 11.0 0 30
+wait 4
+cmd tick freeze
+burst hunt 90 2
+cmd tick unfreeze
+quit

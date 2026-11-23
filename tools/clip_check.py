@@ -18,6 +18,12 @@ the game draws it, then in the game frame by frame.
   --switches   also (or, with no clip named, only) checks the clip changes the plan lists, GeckoLib's blend between
                them played as the game plays it (the blend length read from the animal's Java code), and draws each
                blend as a strip (sw_<from>_<to>.png) with --times.
+  --hold <prey>:<clip>  (2026-11-22) the clips with a catch in the animal's jaws, as the game draws it (the animal's
+               plan's "carry", the prey's "held", the same numbers the game reads in savanna animal/HeldCatch): the
+               prey posed by its own clip, gripped at the carry bone, the jaw opened round it. --caught a,b,...: the
+               angles it was caught at (the prey's heading against the hunter's, + to its right; default 90,25,155:
+               side on, from behind, head on); a strip each (cc_<model>_<clip>_held_<prey>_<angle>.png) with --times.
+               It prints how much of the catch is buried in the hunter's body and any part of it in the ground.
 
 Reads only the game's own files: the geo model, the animation file (the moves' own paths and scenes are in their
 clips' notes: "path <root> t dy dz ...", "step <face z> <height>", "water <kind> <edge z> <bank top> <surface>
@@ -779,6 +785,110 @@ def pairs(animal, names):
 
 
 # --- film strips ----------------------------------------------------------------------------------------------------
+# --- a catch in the jaws (2026-11-22) --------------------------------------------------------------------------------
+class Held:
+    """A catch held in an animal's jaws, as savanna animal/HeldCatch and client/OtterRenderer draw it in the game: the
+    prey posed by its own clip, gripped where the angle it was caught at puts the grip, lying on its side across the
+    jaws, its middle at the jaw tips turned down about the hinge with the live jaw (HeldCatch.ride). The tools work in the geo file's frame, the
+    game in its mirror image across the body (x the other way): the grip is worked out in the game's frame between."""
+
+    def __init__(self, animal, spec):
+        prey_name, _, clip = spec.partition(':')
+        self.prey = Animal(prey_name)
+        self.clip = clip or 'held'
+        if self.clip not in self.prey.data:
+            raise SystemExit(f'{prey_name} has no clip {self.clip}')
+        self.played = Played(self.prey, self.clip)
+        self.down = Played(self.prey, 'held_down') if 'held_down' in self.prey.data else self.played
+        self.carry = animal.checks['carry']
+        self.held = self.prey.checks['held']
+        self.k = self.held['px'] / animal.px              # a prey pixel in the hunter's pixels (both grown, size 1)
+        c, h = self.carry, self.held
+        thick = h['thick'] * self.k
+        self.jaw = max(math.radians(c['jaw_min']), min(math.radians(c['jaw_max']), math.atan(c['jaw_fill'] * thick / c['grip_ahead'])))
+        self.gap = c['grip_ahead'] * math.sin(self.jaw)
+        self.name = prey_name
+
+    def grip(self, angle):
+        c, h = self.carry, self.held
+        a = (angle + 180.0) % 360.0 - 180.0
+        side = 1.0 if a >= 0 else -1.0
+        g = max(-1.0, min(1.0, (abs(a) / 180.0 - 0.5) * 2.0))
+        return h['centre_z'] - g * c['grip_reach'] * h['half'], side * (-90.0 + c['slant'] * g)
+
+    def pose(self, animal, pose):
+        """The hunter's pose with its jaw opened round the catch (the clip's own, if wider)."""
+        out = dict(pose)
+        bone = self.carry.get('jaw', 'jaw')
+        rot, pos, scl = out.get(bone, ((0.0, 0.0, 0.0), (0, 0, 0), (1, 1, 1)))
+        out[bone] = ((max(rot[0], math.degrees(self.jaw)), rot[1], rot[2]), pos, scl)
+        return out
+
+    def parts(self, animal, pose, t, angle, clip=None):
+        """The catch's boxes in the hunter's model frame, at clip time t (the prey's clip looping); in the plan's
+        "ground_clips" it lies flat on the ground that far ahead instead, under the jaws, as the game draws it eating."""
+        along, turn = self.grip(angle)
+        ground = self.carry.get('ground_clips', {}).get(clip)
+        th = math.radians(turn)
+        ct, st = math.cos(th), math.sin(th)
+        bone = self.carry['bone']
+        piv = animal.model.by[bone]['pivot']
+        # turned down about the jaw's hinge with the jaw as far as it rides (savanna HeldCatch.ride: halfway while the
+        # jaw grips it, lying on the lower jaw once the jaw opens wider than it is thick), as the game draws it: the
+        # jaw's live turn, none of its offset
+        jaw_bone = self.carry.get('jaw', 'jaw')
+        jaw_deg = pose.get(jaw_bone, ((0.0, 0.0, 0.0),))[0][0]
+        opened = math.radians(abs(jaw_deg))
+        on_lower = opened - math.atan(self.held['thick'] * self.k * 0.5 / self.carry['grip_ahead'])
+        ride = math.copysign(max(opened * 0.5, on_lower), jaw_deg)
+        rode = dict(pose)
+        rode[jaw_bone] = ((math.degrees(ride), 0.0, 0.0), (0.0, 0.0, 0.0), (1.0, 1.0, 1.0))
+        xf = animal.model.transforms(rode)
+        played = self.down if ground is not None else self.played
+        prey_pose = played.pose(t % played.length)
+        out = []
+        for bn, cs, col in self.prey.model.posed(prey_pose):
+            moved = []
+            for p in cs:
+                # into the game's frame, the gripped point to the teeth, in the hunter's pixels
+                x, y, z = -p[0] * self.k, (p[1] - self.held['middle']) * self.k, (p[2] - along) * self.k
+                # on its side: a quarter turn about its length (z); on the ground on its other flank, so its sag curls
+                # its ends up off the ground
+                x, y = (-y, x) if ground is None else (y, -x)
+                x, z = x * ct + z * st, -x * st + z * ct   # across the jaws (about up), as JOML's Axis.YP turns
+                if ground is not None:
+                    moved.append((-x, y + self.held['thick'] * self.k / 2, z - ground))
+                    continue
+                moved.append(animal.model.world(jaw_bone, (piv[0] - x, piv[1] + y, piv[2] + z), rode, xf))
+            out.append(('held_' + bn, moved, col))
+        return out
+
+
+def check_held(animal, pl, held, angles, times):
+    """How the catch sits through the clip: how much of it is buried in the hunter's own boxes, parts in the ground."""
+    lines = [f'  held {held.name}:{held.clip}: jaw open {math.degrees(held.jaw):.0f} deg, gap {held.gap:.2f} px']
+    body = [(bn, cs) for bn, cs, _ in animal.model.posed(held.pose(animal, pl.pose(0)))]
+    for angle in angles:
+        along, turn = held.grip(angle)
+        worst_in, worst_ground, buried = 0.0, 0.0, []
+        for k in range(0, int(pl.length * 20) + 1):
+            t = k / 20
+            pose = held.pose(animal, pl.pose(min(t, pl.length)))
+            body = [(bn, cs) for bn, cs, _ in animal.model.posed(pose)]
+            parts = held.parts(animal, pose, t, angle, pl.name)
+            pts = [q for _, cs, _ in parts for q in cs]
+            inside = sum(1 for q in pts if any(box_depth(q, cs) > 0.0 for _, cs in body))
+            buried.append(inside / len(pts))
+            worst_in = max(worst_in, max(max((box_depth(q, cs) for _, cs in body), default=0.0) for q in pts))
+            if pl.scene.kind != 'open_water':
+                worst_ground = max(worst_ground, max(pl.scene.solid(q[1], q[2]) for q in pts))
+        flag = '  << in the ground' if worst_ground > 0.6 else ''
+        lines.append(f'    caught at {angle:>4.0f}: grip {along:+.1f} px along it, turned {turn:+.0f} deg; corners in its body '
+                     f'{100 * sum(buried) / len(buried):.0f}% on average (most {100 * max(buried):.0f}%), deepest {worst_in:.1f} px; '
+                     f'deepest in the ground {worst_ground:.1f} px{flag}')
+    return lines
+
+
 def scene_boxes(sc, ext_z):
     lo, hi = ext_z
     out = []
@@ -800,8 +910,16 @@ def scene_boxes(sc, ext_z):
     return boxes
 
 
-def strip(animal, pl, planted, times, views, flagged, path, title):
-    pts = [p for t in times for _, cs, _ in pl.posed(t) for p in cs]
+def strip(animal, pl, planted, times, views, flagged, path, title, held=None, angle=90.0):
+    def posed_at(t):
+        if held is None:
+            return pl.posed(t)
+        pose = held.pose(animal, pl.pose(min(t, pl.length)))
+        return animal.model.posed(pose) + held.parts(animal, pose, t, angle, pl.name)
+
+    pts = [p for t in times for _, cs, _ in posed_at(t) for p in cs]
+    if held is not None:            # close on the head and the catch
+        pts = [p for t in times for bn, cs, _ in posed_at(t) if bn.startswith('held_') for p in cs]
     xs, ys, zs = [p[0] for p in pts], [p[1] for p in pts], [p[2] for p in pts]
     sc = pl.scene
     lo_y = min(min(ys), 0.0 if sc.kind != 'water' else sc.bank['bottom']) - 4
@@ -835,7 +953,7 @@ def strip(animal, pl, planted, times, views, flagged, path, title):
                 cv.rect(x0 + cw - 3, y0, 3, ch + lh, RED)
             cv.text(x0 + 8, y0 + 6, f'{view.title} {t:.2f} S', rgb=RED if bad else (40, 30, 25))
             fr = lab.Frame(cv, (x0 + 4, y0 + lh, cw - 8, ch - 4), view, bounds)
-            posed = pl.posed(t)
+            posed = posed_at(t)
             if ground:
                 fr.boxes(ground)
             fr.boxes([c for c in posed if c[0] not in set(animal.checks.get('skip_bones', []))])
@@ -920,6 +1038,7 @@ def main(argv):
         return 1
     animal_name, args = argv[0], argv[1:]
     times, views, model, out_dir, names, switches = None, ('side', 'three', 'front'), None, None, [], False
+    hold, angles = None, [90.0, 25.0, 155.0]
     i = 0
     while i < len(args):
         a = args[i]
@@ -938,6 +1057,12 @@ def main(argv):
         elif a == '--switches':
             switches = True
             i += 1
+        elif a == '--hold':
+            hold = args[i + 1]
+            i += 2
+        elif a == '--caught':
+            angles = [float(x) for x in args[i + 1].split(',')]
+            i += 2
         else:
             names.append(a)
             i += 1
@@ -952,10 +1077,21 @@ def main(argv):
     hid = hidden_at_rest(animal)
     if hid:
         print(hid)
+    held = Held(animal, hold) if hold else None
     for name in chosen:
         flagged = set()
         pl, planted, lines = check_clip(animal, name, flagged)
         print('\n'.join(lines))
+        if held:
+            print('\n'.join(check_held(animal, pl, held, angles, times)))
+            if times:
+                ts = [min(t, pl.length) for t in times]
+                for angle in angles:
+                    png = strip(animal, pl, planted, ts, views, flagged,
+                                os.path.join(out_dir, f'cc_{animal.model_name}_{name}_held_{held.name}_{angle:.0f}.png'),
+                                f'{animal.model_name} {name} holding {held.name} caught at {angle:.0f}', held, angle)
+                    print('  wrote', png)
+            continue
         if times:
             ts = [min(t, pl.length) for t in times]
             png = strip(animal, pl, planted, ts, views, flagged, os.path.join(out_dir, f'cc_{animal.model_name}_{name}.png'),

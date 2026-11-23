@@ -70,6 +70,7 @@ ahungrymatabelecolonysendsascoutwhofindstermitesandcomeshomewithascentline 0.14
 ahungrymonitorcrushesasnailandbitesremains 0.56
 ahungrymonitordivesforasnailonthebed 0.35
 ahungryottercatchesitspreyandeatsitonthebank 0.03
+ahungryottergulpsdownasmallfishatonce 0.02
 ahungrysharkprowlsatnightandswallowsatilapia 0.03
 ahungryworkereatsoneseedfromthefoodstore 9.13
 alarvathatisnotfedfortwodaysstarves 0.02

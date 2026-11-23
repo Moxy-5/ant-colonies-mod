@@ -39,11 +39,22 @@ public class TilapiaRenderer extends GeoEntityRenderer<TilapiaEntity> {
     @Override
     protected void applyRotations(TilapiaEntity fish, PoseStack poseStack, float ageInTicks, float rotationYaw,
             float partialTick, float nativeScale) {
+        if (fish.getVehicle() instanceof com.antcolonies.savanna.animal.OtterEntity) {
+            // held, the otter places and turns it (OtterRenderer): none of its own turn, nor GeckoLib's turn for a rider
+            // (which follows the vehicle and adds 22 degrees for a rider facing across it: the tilted fish, Neon 2026-11-22)
+            return;
+        }
         super.applyRotations(fish, poseStack, ageInTicks, rotationYaw, partialTick, nativeScale);
         float pitch = fish.swimPitch(partialTick);
         if (pitch != 0) {
             poseStack.mulPose(Axis.XP.rotationDegrees(pitch));
         }
+    }
+
+    /** In an otter's jaws it is drawn by the otter, at its teeth ({@link OtterRenderer#render}), not here. */
+    @Override
+    public boolean shouldRender(TilapiaEntity fish, net.minecraft.client.renderer.culling.Frustum camera, double x, double y, double z) {
+        return !(fish.getVehicle() instanceof com.antcolonies.savanna.animal.OtterEntity) && super.shouldRender(fish, camera, x, y, z);
     }
 
     @Override

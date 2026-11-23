@@ -77,7 +77,14 @@
     ],
     "wave": [
       "swim"
-    ]
+    ],
+    "held": {
+      "px": 0.021739,
+      "middle": 7.13,
+      "centre_z": 1.4,
+      "half": 14.2,
+      "thick": 3.79
+    }
   },
   "course": {
     "tilapia": {

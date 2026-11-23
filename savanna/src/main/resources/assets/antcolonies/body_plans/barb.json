@@ -89,7 +89,14 @@
     ],
     "wave": [
       "swim"
-    ]
+    ],
+    "held": {
+      "px": 0.008333,
+      "middle": 5.0,
+      "centre_z": 0.0,
+      "half": 15.0,
+      "thick": 7.0
+    }
   },
   "course": {
     "barb": {

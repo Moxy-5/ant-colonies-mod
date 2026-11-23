@@ -75,6 +75,18 @@ The files are <mod>/src/main/resources/assets/<mod name>/body_plans/<model>.json
               body_bones    the torso's bones: knees and elbows (each leg's middle bone) are judged against their boxes
               hide_in, hidden_at_rest  parts that must hide inside body_bones and hide_in at rest (a shut mouth)
               skip_bones    bones not judged (a carried prey)
+              held          (a prey animal, 2026-11-22) how it is drawn in a hunter's jaws: {"px" (blocks a model pixel
+                            on a grown one), "middle" (its body's middle height), "centre_z" and "half" (its body's
+                            middle along it and half its length), "thick" (flank to flank); model px}
+              carry         (a hunter that carries its catch in its jaws, 2026-11-22) {"bone" (where between its teeth),
+                            "jaw", "grip_ahead" (px ahead of the jaw's hinge), "grip_reach" (how far toward an end the
+                            grip can sit, a part of half the catch's length), "slant" (degrees the long end sweeps back),
+                            "jaw_fill" (the gap a part of the catch's thickness), "jaw_min", "jaw_max", "jaw_other"
+                            (degrees; a catch with no "held"), "swallow_under" (blocks long: shorter catches are mostly
+                            swallowed at once), "swallow_chance", "ground_clips" ({clip: px ahead of its middle}:
+                            clips in which the catch lies flat on the ground there, under its jaws, as it eats)};
+                            the game reads these same numbers
+                            (savanna animal/HeldCatch) and clip_check.py --hold draws the catch from them
               jaw           {"bone", "flag_below"}: the jaw's least opening (under it: teeth through the jaw)
               reach         [{"clip", "bone", "past_z", "past_label", "label"}]: how far a part reaches past a point
               walks         {clip: px a second}: a walk's planted feet should slide back at it; or "walk_clips" (clips

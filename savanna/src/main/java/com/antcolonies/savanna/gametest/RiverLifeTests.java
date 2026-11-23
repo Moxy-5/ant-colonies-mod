@@ -2269,6 +2269,52 @@ public class RiverLifeTests {
     }
 
     /**
+     * A small fish gulped down (2026-11-22, the user: "super small fish are going to mostly just be swallowed"): by the
+     * body plans' numbers (animal/HeldCatch) a barb is swallowed at once most times and a tilapia never; and a hungry
+     * otter by a pool with a barb in it catches it and eats it: when it gulps it down (most runs), it never takes it to
+     * the bank, and it is full for a shorter while than after a catch eaten on the bank.
+     */
+    @GameTest(template = "arena", timeoutTicks = 1600)
+    public static void aHungryOtterGulpsDownASmallFishAtOnce(GameTestHelper helper) {
+        int poolX = MX0 + 10, z = MZ0 + 5;
+        otterPool(helper, poolX);
+        BarbEntity barb = helper.spawn(SavannaEntities.BARB.get(), new BlockPos(poolX + 4, TOP - 1, z + 1));
+        barb.setPersistenceRequired();
+        TilapiaEntity sample = helper.spawn(SavannaEntities.TILAPIA.get(), new BlockPos(poolX + 12, TOP - 1, z + 6));
+        net.minecraft.util.RandomSource dice = net.minecraft.util.RandomSource.create(7L);
+        int barbs = 0, tilapia = 0;
+        for (int i = 0; i < 200; i++) {
+            barbs += com.antcolonies.savanna.animal.HeldCatch.swallowed(barb, dice) ? 1 : 0;
+            tilapia += com.antcolonies.savanna.animal.HeldCatch.swallowed(sample, dice) ? 1 : 0;
+        }
+        helper.assertTrue(barbs >= 150 && barbs < 200, "a barb was swallowed " + barbs + " times in 200 (most, not all)");
+        helper.assertTrue(tilapia == 0, "a tilapia was swallowed " + tilapia + " times");
+        sample.discard();
+        int swallowedBarbs = barbs;
+        com.antcolonies.savanna.animal.OtterEntity otter = helper.spawn(SavannaEntities.OTTER.get(),
+                new net.minecraft.world.phys.Vec3(MX0 + 6.5, TOP + 1, z + 0.5));
+        otter.setPersistenceRequired();
+        otter.life().setUp(false, otter.getRandom());
+        otter.makeHungry();
+        boolean[] gulped = {false}, ateOnLand = {false};
+        helper.onEachTick(() -> {
+            gulped[0] |= otter.doing() == com.antcolonies.savanna.animal.OtterEntity.GULP;
+            ateOnLand[0] |= otter.doing() == com.antcolonies.savanna.animal.OtterEntity.EAT;
+        });
+        helper.succeedWhen(() -> {
+            helper.assertTrue(!barb.isAlive() && otter.isFed(), "the otter has not caught and eaten the barb (doing "
+                    + otter.doing() + ", holding " + otter.held() + ")");
+            helper.assertTrue(gulped[0] != ateOnLand[0], "gulped " + gulped[0] + " and ate on the bank " + ateOnLand[0]);
+            if (gulped[0]) {
+                helper.assertTrue(otter.fullFor() < com.antcolonies.savanna.animal.OtterEntity.FULL_TICKS,
+                        "a gulped barb filled it for " + otter.fullFor() + " ticks, as long as a meal on the bank");
+            }
+            SavannaMod.LOGGER.info("[otter gulp] {} ({} of 200 barbs swallowed by the numbers)",
+                    gulped[0] ? "gulped it down" : "carried it to the bank", swallowedBarbs);
+        });
+    }
+
+    /**
      * An otter afloat in a pool for 75 s (longer than Minecraft's air would have lasted it) is never hurt: afloat, its
      * eye point sits just under the surface, so it drowned in the river (BUGS 288); its own dives decide its breath.
      */
