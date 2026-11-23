@@ -244,6 +244,7 @@ final class BullSharkGoals {
             misses = 0;
             caught = false;
             shark.setProwling(true);
+            shark.hunting = true;
         }
 
         @Override
@@ -479,6 +480,7 @@ final class BullSharkGoals {
 
         @Override
         public void stop() {
+            shark.hunting = false;
             shark.setProwling(false);
             if (shark.action() == BullSharkEntity.ACT_BITE || shark.action() == BullSharkEntity.ACT_BREACH || shark.action() == BullSharkEntity.ACT_THRASH) {
                 shark.endAction();
@@ -761,6 +763,9 @@ final class BullSharkGoals {
         @Override
         public void start() {
             shark.startAction(BullSharkEntity.ACT_THREAT);
+            if (croc != null) {
+                croc.answerShark(shark);
+            }
         }
 
         @Override

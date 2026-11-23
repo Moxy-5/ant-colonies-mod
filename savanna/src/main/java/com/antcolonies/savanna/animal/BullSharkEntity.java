@@ -138,6 +138,8 @@ public class BullSharkEntity extends WaterAnimal implements GeoEntity {
     int hungryIn;
     /** Waits after a hunt given up, a player met, a crocodile warned, a spy hop (ticks). */
     int huntWait, meetWait, crocWait, spyWait;
+    /** Whether a hunt is under way (server only): the fish do not part round it then, it stalks them unseen. */
+    boolean hunting;
     /** The player who hit it, and how long it still minds it (ticks). */
     @Nullable
     Player provokedBy;
@@ -960,6 +962,20 @@ public class BullSharkEntity extends WaterAnimal implements GeoEntity {
     @Nullable
     ServerLevel server() {
         return level() instanceof ServerLevel s ? s : null;
+    }
+
+    /**
+     * How near a cruising shark makes barbs and tilapia swim aside (blocks from its middle, about its own length from
+     * its nose; my pick, 2026-11-23). The school parts round it as round any big hunter it can see coming.
+     */
+    public static final float FISH_PART_FROM = 6.0F;
+
+    /**
+     * Whether the fish swim aside from this: a shark in the water that is not hunting. A hunting shark sinks and comes on
+     * slowly, unseen, and the school only bursts away at its strike ({@link HuntTilapiaGoal#scatter}).
+     */
+    public static boolean partsFish(LivingEntity e) {
+        return e instanceof BullSharkEntity s && s.isAlive() && s.isInWater() && !s.hunting;
     }
 
     /** Whether this is something it hunts: a wild river fish in the water (never one from a bucket or named). */

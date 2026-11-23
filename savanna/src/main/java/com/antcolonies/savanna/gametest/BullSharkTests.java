@@ -5,6 +5,7 @@ import static com.antcolonies.savanna.gametest.TermiteMoundTests.SURFACE;
 import com.antcolonies.gametest.TestClock;
 import com.antcolonies.savanna.SavannaMod;
 import com.antcolonies.savanna.animal.BullSharkEntity;
+import com.antcolonies.savanna.animal.CrocodileEntity;
 import com.antcolonies.savanna.animal.RemainsEntity;
 import com.antcolonies.savanna.registry.SavannaEntities;
 
@@ -309,6 +310,78 @@ public class BullSharkTests {
         croc.setNoAi(true);
         helper.succeedWhen(() -> helper.assertTrue(shark.action() == BullSharkEntity.ACT_THREAT,
                 "no warning at the crocodile " + String.format("%.1f", shark.distanceTo(croc)) + " off, in water " + croc.isInWater()));
+    }
+
+    /** A grown male crocodile (7 blocks or more) warned by a shorter shark faces it and gapes: it holds its ground. */
+    @GameTest(template = "arena", timeoutTicks = 400, batch = BATCH)
+    public static void aBigCrocodileGapesBackAtAShorterShark(GameTestHelper helper) {
+        TestClock.still(helper, 12.0);
+        pool(helper);
+        BullSharkEntity shark = shark(helper, 20.5, 30.5, -90.0F, false);
+        shark.makeCurious();
+        var croc = warnedCrocodile(helper, com.antcolonies.animal.Sex.MALE);
+        helper.succeedWhen(() -> {
+            helper.assertTrue(shark.action() == BullSharkEntity.ACT_THREAT, "no warning yet");
+            helper.assertTrue(croc.jaws() == CrocodileEntity.JAWS_GAPE && croc.startled <= 0, "the crocodile ("
+                    + String.format("%.1f", croc.bodyLength()) + " long) did not stand its ground against a " + shark.length()
+                    + "-block shark: jaws " + croc.jaws() + ", startled " + croc.startled);
+        });
+    }
+
+    /** A grown female crocodile (under 6.5 blocks) warned by a 7.5-block shark gives way: it sinks out of sight. */
+    @GameTest(template = "arena", timeoutTicks = 400, batch = BATCH)
+    public static void aSmallCrocodileGivesWayToALongerShark(GameTestHelper helper) {
+        TestClock.still(helper, 12.0);
+        pool(helper);
+        BullSharkEntity shark = shark(helper, 20.5, 30.5, -90.0F, false);
+        shark.setLength(7.5F);
+        shark.makeCurious();
+        var croc = warnedCrocodile(helper, com.antcolonies.animal.Sex.FEMALE);
+        helper.succeedWhen(() -> {
+            helper.assertTrue(shark.action() == BullSharkEntity.ACT_THREAT, "no warning yet");
+            helper.assertTrue(croc.startled > 0 && croc.jaws() != CrocodileEntity.JAWS_GAPE, "the crocodile ("
+                    + String.format("%.1f", croc.bodyLength()) + " long) did not give way to a " + shark.length() + "-block shark");
+        });
+    }
+
+    /** A grown crocodile of that sex, still, in the water a little way ahead of the shark. */
+    private static CrocodileEntity warnedCrocodile(GameTestHelper helper, com.antcolonies.animal.Sex sex) {
+        CrocodileEntity croc = helper.spawn(SavannaEntities.CROCODILE.get(), new Vec3(26.5, WT - 1, 30.5));
+        croc.life().setUp(false, sex, helper.getLevel().random);
+        croc.life().apply();
+        croc.hungerIn = 1_000_000;
+        croc.setNoAi(true);
+        return croc;
+    }
+
+    /**
+     * A fed shark cruising (not hunting) makes barbs and tilapia near it swim aside, all of them out past 5.5 blocks; a
+     * hunting shark is not parted from (it stalks them unseen; the hunt tests above still catch fish).
+     */
+    @GameTest(template = "arena", timeoutTicks = 400, batch = BATCH)
+    public static void fishPartRoundACruisingShark(GameTestHelper helper) {
+        TestClock.still(helper, 12.0);
+        pool(helper);
+        BullSharkEntity shark = shark(helper, 28.5, 30.5, -90.0F, false);
+        shark.setNoAi(true);                    // holds still in the middle: a big shape in the water, not hunting
+        double y = WT - DEEP + 1.2;            // the shark's own height (relative to the test area)
+        java.util.List<net.minecraft.world.entity.Mob> fish = new java.util.ArrayList<>();
+        double[][] at = {{31.5, 30.5}, {28.5, 33.5}, {25.5, 30.5}, {28.5, 27.5}, {31.0, 33.0}};
+        for (int i = 0; i < at.length; i++) {
+            var type = i < 3 ? SavannaEntities.BARB.get() : SavannaEntities.TILAPIA.get();
+            net.minecraft.world.entity.Mob f = helper.spawn(type, new Vec3(at[i][0], y, at[i][1]));
+            f.setPersistenceRequired();
+            fish.add(f);
+            helper.assertTrue(f.distanceTo(shark) < 4.5, "a fish set down " + String.format("%.1f", f.distanceTo(shark)) + " from the shark");
+        }
+        helper.succeedWhen(() -> {
+            helper.assertTrue(BullSharkEntity.partsFish(shark), "a fed shark in the water does not part the fish (in water "
+                    + shark.isInWater() + ")");
+            for (net.minecraft.world.entity.Mob f : fish) {
+                helper.assertTrue(f.distanceTo(shark) > 5.5, f.getType().toShortString() + " still "
+                        + String.format("%.1f", f.distanceTo(shark)) + " blocks from the shark");
+            }
+        });
     }
 
     /** A hippo near in the water: the shark swims away until it is well clear. */

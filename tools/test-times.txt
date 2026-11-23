@@ -1,5 +1,6 @@
 # Each game test's minutes in its last full run (tools/test_times.py writes it; TestFilter.keepShard reads it).
 abigcolonyinadeadmoundraidsfromthescoutsownfindtothepilewithnostagehanging 0.19
+abigcrocodilegapesbackatashortershark 0.01
 abigpanis3deeponslopinggroundandholds 0.01
 abigtermitecolonyshowsnomorethanthecap 3.69
 ablockoveragapisbuiltoutfromsetsoilbesideit 0.00
@@ -137,6 +138,7 @@ asharkneverfollowsintoshallowwater 0.04
 asharkshakesacatfishapartandleavesremains 0.02
 asharkspyhopsataplayeronthebank 0.03
 asharkwarnsoffacrocodile 0.01
+asmallcrocodilegiveswaytoalongershark 0.00
 asmallpanis2deepwithitstrampledring 0.00
 asnailgrazesalgaeandhidesfromacrab 0.88
 astandingdeadtreeissensedandgetsagallerytoitsfoot 10.73
@@ -190,6 +192,7 @@ everyriveranimalkeepsitslifethroughasaveandload 0.00
 figblocksplacejoinandhang 0.00
 figtreesstandastheviewerdrewthem 0.01
 firecharsbarkkillsyoungtreesandsomegrownones 0.37
+fishpartroundacruisingshark 0.01
 floodplainfruitripensfallsandrots 0.00
 floodplaintreesstandonthefloodplainandkeepapart 2.57
 floodplainwidthismeasured 3.02

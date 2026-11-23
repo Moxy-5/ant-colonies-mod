@@ -177,6 +177,8 @@ public class CrocodileEntity extends PathfinderMob implements GeoEntity, HasLife
      * body (jaws, head, roll, how deep it floats, the walk's stride) is worked out from this, so it is the one size knob.
      */
     public static final float MODEL_SCALE = 7.5F / 6.75F;
+    /** How long it gapes facing down a bull shark that warned it (ticks: about the shark's own warning; my pick). */
+    static final int SHARK_STANDOFF = 50;
     /**
      * The joints along its middle line the body bends at to lie on what is under it ({@link GroundBend}; model z,
      * pixels, from {@code tools/crocodile_models.py}): the anchor at the shoulders, where the neck and the chest hang
@@ -705,6 +707,33 @@ public class CrocodileEntity extends PathfinderMob implements GeoEntity, HasLife
 
     public float ownSize() {
         return life.ownSize();
+    }
+
+    /** Its length snout to tail tip (blocks): 7.5 at the usual size. */
+    public float bodyLength() {
+        return MODEL_SCALE * 6.75F * getScale();
+    }
+
+    /**
+     * A bull shark's hunched warning turned on it in the water (2026-11-23): the longer of the two wins the standoff. A
+     * crocodile at least as long as the shark (most males) turns to face it and gapes, hissing, holding its ground; a
+     * shorter one (most females) gives way, sinking out of sight and keeping clear a while (its startle).
+     */
+    public void answerShark(BullSharkEntity shark) {
+        if (bodyLength() >= shark.length()) {
+            if (held != null || hunting) {
+                return;                 // busy with prey: it pays the shark no mind
+            }
+            getNavigation().stop();
+            float face = (float) (Mth.atan2(shark.getZ() - getZ(), shark.getX() - getX()) * Mth.RAD_TO_DEG) - 90.0F;
+            setYRot(face);
+            yBodyRot = face;
+            yHeadRot = face;
+            gape(SHARK_STANDOFF);
+            level().playSound(null, getX(), getY(), getZ(), net.minecraft.sounds.SoundEvents.CAT_HISS, net.minecraft.sounds.SoundSource.HOSTILE, 1.2F, 0.45F);
+        } else {
+            startle();
+        }
     }
 
     /** Its body's bend over what is under it (for the model). */

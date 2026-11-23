@@ -132,6 +132,9 @@ public class TilapiaEntity extends AbstractSchoolingFish implements GeoEntity, H
     protected void registerGoals() {
         super.registerGoals();
         goalSelector.addGoal(1, new TilapiaFryGoal(this));
+        // a cruising bull shark: the group swims aside (the catfish and crocodile lie in ambush, so nothing to see coming)
+        goalSelector.addGoal(2, new net.minecraft.world.entity.ai.goal.AvoidEntityGoal<>(this, BullSharkEntity.class,
+                BullSharkEntity.FISH_PART_FROM, 1.2, 1.5, BullSharkEntity::partsFish));
         goalSelector.addGoal(2, new TilapiaNestGoal(this));
         goalSelector.addGoal(3, new GrazeAlgaeGoal(this));
         goalSelector.addGoal(4, new SeekMateGoal<>(this, 1.0));
@@ -399,7 +402,7 @@ public class TilapiaEntity extends AbstractSchoolingFish implements GeoEntity, H
 
     private boolean dangerNear() {
         return !level().getEntities(this, getBoundingBox().inflate(DANGER_NEAR), e -> e.isAlive()
-                && (e instanceof CatfishEntity || e instanceof CrocodileEntity || e instanceof MonitorEntity
+                && (e instanceof CatfishEntity || e instanceof CrocodileEntity || e instanceof MonitorEntity || e instanceof BullSharkEntity
                 || e instanceof Player p && !p.isSpectator())).isEmpty();
     }
 
