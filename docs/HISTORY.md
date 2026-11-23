@@ -1016,6 +1016,8 @@ Moved here from CLAUDE.md on 2026-10-13 (it was loaded into every chat and took 
 
 - **Otters no longer drown in the river (2026-11-22, BUGS 288):** `OtterEntity.canDrownInFluidType` false like every other river animal (its eye point sat just under the surface afloat, so Minecraft's air ran out about 16 s in); its own dives (20 s at most) decide its breath. Test `anOtterAfloatInAPoolDoesNotDrown` in `river`.
 
+- **Fewer otters (2026-11-22, the user: "they would destroy the ecosystem"):** the river otter group's cap 6 -> 2 round a player and spawns in ones and twos (often a mother and her pup) instead of families of 2 to 4 (real clawless otters live mostly alone; the monitor's numbers). No spacing rule like the monitor's 80 blocks: Minecraft spawns a pair one by one, so it would refuse every second otter. `ottersSpawnInTheWaterByBanksByThemselves` checks the cap and the group sizes.
+
 ## Handover notes for a code reviewer (written at the end of a very long session)
 - State: branch `master`, all committed, `./gradlew build` passes, `./gradlew runGameTestServer` passes 47 tests (about 8 minutes, in one world, tests run in parallel arena grids). Some tests are timing-sensitive under load (`antsOnBumpyGroundReachTheFoodStore` and `aStarvingWorkerSlowsDownAndDies` have each failed once and passed on a re-run): re-run before blaming a change.
 - Confirmed in-game by the user so far: everything up to and including dead ants and the refuse chamber, rich bread, worker hunger, colony starvation, and the hill-jam fix. Older bullets in "Current status" that still say "waiting for the user to confirm" are probably stale (the user tested them and reported no problems), but this was never written down: do not rely on those flags.

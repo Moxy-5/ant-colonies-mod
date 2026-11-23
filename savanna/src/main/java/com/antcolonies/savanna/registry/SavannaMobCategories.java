@@ -28,8 +28,9 @@ public final class SavannaMobCategories {
 
     /**
      * The otters' group (2026-11-22, the spawning check list): its own, so neither the fish nor the bank's monitors fill
-     * its places, cap 6 round a player (a family or two; families of 2 to 4 spawn together), friendly, removed past
-     * 128 blocks (my picks).
+     * its places, cap 2 round a player (one otter alone or a pair, often a mother and her pup: real clawless otters live
+     * mostly alone; was cap 6 in families of 2 to 4 until the user found too many, 2026-11-22, "they would destroy the
+     * ecosystem"), friendly, removed past 128 blocks (my picks).
      */
     public static MobCategory riverOtter() {
         if (riverOtter == null) {

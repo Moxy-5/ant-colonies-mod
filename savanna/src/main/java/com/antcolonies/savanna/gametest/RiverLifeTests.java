@@ -1870,7 +1870,7 @@ public class RiverLifeTests {
     /**
      * Otters spawn by themselves (the spawning check list): the world's own checks over a river at sea level pass in the
      * water within {@code BANK_REACH} blocks of a bank and nowhere farther out, a spawn is set down on the bank, and the
-     * kind is in its own group's list (cap 6, families of 2 to 4) in the savanna's waters.
+     * kind is in its own group's list (cap 2, ones and twos; was cap 6 in families of 2 to 4) in the savanna's waters.
      */
     @GameTest(template = "arena", timeoutTicks = 200)
     public static void ottersSpawnInTheWaterByBanksByThemselves(GameTestHelper helper) {
@@ -1920,13 +1920,16 @@ public class RiverLifeTests {
         if (otterType.getCategory() != com.antcolonies.savanna.registry.SavannaMobCategories.riverOtter()) {
             helper.fail("the otter is in the " + otterType.getCategory().getName() + " group, not the river otter group");
         }
+        if (otterType.getCategory().getMaxInstancesPerChunk() != 2) {
+            helper.fail("the river otter group's cap is " + otterType.getCategory().getMaxInstancesPerChunk() + ", not 2");
+        }
         var biomes = level.registryAccess().registryOrThrow(net.minecraft.core.registries.Registries.BIOME);
         var river = net.minecraft.resources.ResourceKey.create(net.minecraft.core.registries.Registries.BIOME,
                 net.minecraft.resources.ResourceLocation.fromNamespaceAndPath(SavannaMod.MODID, "savanna_river"));
         for (var key : java.util.List.of(net.minecraft.world.level.biome.Biomes.SAVANNA, river)) {
             var list = biomes.getOrThrow(key).getMobSettings().getMobs(com.antcolonies.savanna.registry.SavannaMobCategories.riverOtter()).unwrap();
-            if (list.stream().noneMatch(d -> d.type == otterType && d.minCount == 2 && d.maxCount == 4)) {
-                helper.fail("the otter is not in " + key.location() + "'s river otter spawn list in families of 2 to 4");
+            if (list.stream().noneMatch(d -> d.type == otterType && d.minCount == 1 && d.maxCount == 2)) {
+                helper.fail("the otter is not in " + key.location() + "'s river otter spawn list in ones and twos");
             }
         }
         helper.succeed();

@@ -132,7 +132,7 @@
       "constructor": "(Ljava/lang/String;IZZI)V",
       "parameters": [
         "antcolonies:river_otter",
-        6,
+        2,
         true,
         false,
         128

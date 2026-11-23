@@ -22,7 +22,7 @@ Every living thing in the mod, built or planned, plants and fungi included, in o
 | `antcolonies:river_school` | 40 | within 96, gone past 128 | river barb (schools of 8 to 14) |
 | `antcolonies:bullfrog` | 4 | within 96, gone past 128 | African bullfrog (ones and twos; its tadpoles later; was cap 12 in groups of 1 to 3: the user found too many, 2026-11-20) |
 | `antcolonies:hippo_pod` | 6 | kept for good | hippo: no spawn list since 2026-11-21 (BUGS 271): pods of 1 to 3 are laid with new land at pod sites about every 250 blocks of the near and mid-inland rivers (`worldgen/HippoPodFeature`, `PodSites`) and never removed; the group only keeps hippos counted apart |
-| `antcolonies:river_otter` | 6 | within 96, gone past 128 | African clawless otter (families of 2 to 4, a quarter of them pups; near, mid and far inland rivers and oxbows, none at the coast or in the pans) |
+| `antcolonies:river_otter` | 2 | within 96, gone past 128 | African clawless otter (ones and twos, often a mother and her pup, a quarter of them pups; was cap 6 in families of 2 to 4: the user found too many, 2026-11-22; near, mid and far inland rivers and oxbows, none at the coast or in the pans) |
 | `antcolonies:fly_cloud` | 18 | within 96, gone past 128 | fly cloud (one or two at a spot, 4 to 12 flies; was cap 6, one at a time, kept within 64: tripled 2026-11-20, the user asked for more flies) |
 
 (2026-11-21, river zones, built: every river animal's spawns also ask `worldgen/RiverZones`: none in water shut off from the sky, and each kind only up to its zone's share of its group's cap within 64 blocks, by coast, near, mid and far inland river and the still waters; the table of shares is in `RiverZones.SHARES` and `docs/DESIGN.md`, "River zones".)
