@@ -288,3 +288,10 @@ stance goes on the standing-still clip only; the face and tail go on every clip.
 **Built (2026-11-22, round 3):** the user: "those are perfect and do A bigger for the ears". Ears A in the game model
 (v7); the mood, face, tail and stances in the game (`OtterEntity.workOutMood`, the shared `client/FaceLayer`,
 `stand_<mood>` clips); filmed in the game (`tools/film/otter_moods.film`). Next in 6e: the skitter walks (6b).
+
+**Progress (2026-11-22, 6e step 2, the skitter clips):** `scurry` (quick choppy trot, 1.57 b/s), `skid_stop` (braced stop,
+rock, head up), `sniff_walk` (nose-down zigzag, 0.59 b/s) and `hop_turn` (a small hop; the game turns the body while the feet
+are up, ticks 3 to 7) made in `tools/otter_models.py`, checked offline (`clip_check.py otter --switches`, none flagged) and
+filmed in the game (`tools/film/otter_skitter_frames.film`). On the versions page's clip buttons. Not played by the game yet:
+next, after the user's look, the burst-and-stop wandering (6b's first bullet): curious, playful or excited, it scurries 1 to 3
+blocks, skid-stops, looks or sniffs 0.5 to 2 s, hop-turns 30 to 90 degrees, and goes again; calm and content keep the walk.

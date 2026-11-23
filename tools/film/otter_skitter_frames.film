@@ -1,0 +1,120 @@
+# The otter's skitter clips in the game (2026-11-22, docs/plans/otter-play-and-fish.md section 6b; the hard rule:
+# frozen and stepped from three sides): scurry, skid_stop, sniff_walk and hop_turn, each played in place by an otter
+# named film:<clip> standing facing west (its middle at x 20.5, z 17), one loop stepped a tick (the sniff 2) a picture.
+#   ./gradlew runFilm -PfilmScene=tools/film/otter_skitter_frames.film   pictures in run-film/screenshots/otter_skitter_frames/
+cmd time set noon
+cmd weather clear
+cmd kill @e[type=!player]
+cmd fill 0 -61 0 40 -50 34 minecraft:air
+cmd fill 0 -61 0 40 -61 34 minecraft:grass_block
+lens 40
+wait 40
+cmd tick unfreeze
+cmd summon antcolonies:otter 20.5 -60 17.0 {NoAI:1b,Rotation:[90f,0f],OwnSize:1.0f,CustomName:'"film:scurry"'}
+camera 19.4 -60.85 14.2 0 6
+wait 30
+cmd tick freeze
+burst scurry_side 9 1
+cmd tick unfreeze
+cmd kill @e[type=antcolonies:otter]
+wait 20
+cmd tick unfreeze
+cmd summon antcolonies:otter 20.5 -60 17.0 {NoAI:1b,Rotation:[90f,0f],OwnSize:1.0f,CustomName:'"film:scurry"'}
+camera 17.0 -60.8 15.0 -48 10
+wait 30
+cmd tick freeze
+burst scurry_three 9 1
+cmd tick unfreeze
+cmd kill @e[type=antcolonies:otter]
+wait 20
+cmd tick unfreeze
+cmd summon antcolonies:otter 20.5 -60 17.0 {NoAI:1b,Rotation:[90f,0f],OwnSize:1.0f,CustomName:'"film:scurry"'}
+camera 16.4 -60.85 17.0 -90 6
+wait 30
+cmd tick freeze
+burst scurry_front 9 1
+cmd tick unfreeze
+cmd kill @e[type=antcolonies:otter]
+wait 20
+cmd tick unfreeze
+cmd summon antcolonies:otter 20.5 -60 17.0 {NoAI:1b,Rotation:[90f,0f],OwnSize:1.0f,CustomName:'"film:skid_stop"'}
+camera 19.4 -60.85 14.2 0 6
+wait 30
+cmd tick freeze
+burst skid_stop_side 8 1
+cmd tick unfreeze
+cmd kill @e[type=antcolonies:otter]
+wait 20
+cmd tick unfreeze
+cmd summon antcolonies:otter 20.5 -60 17.0 {NoAI:1b,Rotation:[90f,0f],OwnSize:1.0f,CustomName:'"film:skid_stop"'}
+camera 17.0 -60.8 15.0 -48 10
+wait 30
+cmd tick freeze
+burst skid_stop_three 8 1
+cmd tick unfreeze
+cmd kill @e[type=antcolonies:otter]
+wait 20
+cmd tick unfreeze
+cmd summon antcolonies:otter 20.5 -60 17.0 {NoAI:1b,Rotation:[90f,0f],OwnSize:1.0f,CustomName:'"film:skid_stop"'}
+camera 16.4 -60.85 17.0 -90 6
+wait 30
+cmd tick freeze
+burst skid_stop_front 8 1
+cmd tick unfreeze
+cmd kill @e[type=antcolonies:otter]
+wait 20
+cmd tick unfreeze
+cmd summon antcolonies:otter 20.5 -60 17.0 {NoAI:1b,Rotation:[90f,0f],OwnSize:1.0f,CustomName:'"film:sniff_walk"'}
+camera 19.4 -60.85 14.2 0 6
+wait 30
+cmd tick freeze
+burst sniff_walk_side 12 2
+cmd tick unfreeze
+cmd kill @e[type=antcolonies:otter]
+wait 20
+cmd tick unfreeze
+cmd summon antcolonies:otter 20.5 -60 17.0 {NoAI:1b,Rotation:[90f,0f],OwnSize:1.0f,CustomName:'"film:sniff_walk"'}
+camera 17.0 -60.8 15.0 -48 10
+wait 30
+cmd tick freeze
+burst sniff_walk_three 12 2
+cmd tick unfreeze
+cmd kill @e[type=antcolonies:otter]
+wait 20
+cmd tick unfreeze
+cmd summon antcolonies:otter 20.5 -60 17.0 {NoAI:1b,Rotation:[90f,0f],OwnSize:1.0f,CustomName:'"film:sniff_walk"'}
+camera 16.4 -60.85 17.0 -90 6
+wait 30
+cmd tick freeze
+burst sniff_walk_front 12 2
+cmd tick unfreeze
+cmd kill @e[type=antcolonies:otter]
+wait 20
+cmd tick unfreeze
+cmd summon antcolonies:otter 20.5 -60 17.0 {NoAI:1b,Rotation:[90f,0f],OwnSize:1.0f,CustomName:'"film:hop_turn"'}
+camera 19.4 -60.85 14.2 0 6
+wait 30
+cmd tick freeze
+burst hop_turn_side 10 1
+cmd tick unfreeze
+cmd kill @e[type=antcolonies:otter]
+wait 20
+cmd tick unfreeze
+cmd summon antcolonies:otter 20.5 -60 17.0 {NoAI:1b,Rotation:[90f,0f],OwnSize:1.0f,CustomName:'"film:hop_turn"'}
+camera 17.0 -60.8 15.0 -48 10
+wait 30
+cmd tick freeze
+burst hop_turn_three 10 1
+cmd tick unfreeze
+cmd kill @e[type=antcolonies:otter]
+wait 20
+cmd tick unfreeze
+cmd summon antcolonies:otter 20.5 -60 17.0 {NoAI:1b,Rotation:[90f,0f],OwnSize:1.0f,CustomName:'"film:hop_turn"'}
+camera 16.4 -60.85 17.0 -90 6
+wait 30
+cmd tick freeze
+burst hop_turn_front 10 1
+cmd tick unfreeze
+cmd kill @e[type=antcolonies:otter]
+wait 20
+quit
