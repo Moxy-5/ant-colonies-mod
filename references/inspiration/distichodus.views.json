@@ -1,0 +1,37 @@
+{
+  "length_blocks": 2.3125,
+  "_note": "Drawn by tools/distichodus_sheet.py: two cells are one model pixel, so length_blocks is the made size (37 pixels); the game draws it at 0.8 blocks grown.",
+  "views": {
+    "side": {
+      "box": [
+        20,
+        60,
+        578,
+        408
+      ],
+      "head": "left"
+    },
+    "top": {
+      "box": [
+        20,
+        455,
+        578,
+        628
+      ],
+      "head": "left"
+    },
+    "front": {
+      "box": [
+        600,
+        60,
+        822,
+        408
+      ]
+    }
+  },
+  "marks": {
+    "snout": 40,
+    "head_back": 166,
+    "tail_base": 432
+  }
+}

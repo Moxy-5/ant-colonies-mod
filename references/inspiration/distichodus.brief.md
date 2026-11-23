@@ -1,0 +1,7 @@
+**Six-banded distichodus** (Claude's design from the user's photo, 2026-11-22; the user: "make the six banded distichodus", "you design it", with the photo `distichodus_photo_side.png`). The river's big plant-eating fish.
+
+- **Length:** made 37 model pixels long, snout to tail tip (the barb 30, the tilapia about 28), drawn in the game at 0.8 blocks grown (my pick: a bit longer than the tilapia's 0.6); each fish 0.85 to 1.15 of that.
+- **Cube size:** one model pixel; the texture 2 pixels a model pixel, so the six bands are painted, not built.
+- **Key features (from the photo):** a deep, flat-sided body drawn from straight lines (the photo's fish is turned and tilted): depth about 0.3 of the length, the snout on the middle line, the head a straight wedge, the back rising straight to the back fin; a small mouth at the snout tip; a big eye with a red ring; six dark slate bands, straight up and down and evenly spaced, on a peach-gold body (the first up the nape behind the gill cover, the last a narrow ring at the tail's base); a silver-pink head; a cream belly; a tall swept-back red back fin, a deep forked red tail, red-orange belly, anal and breast fins, a small pale fin on the back near the tail.
+- **Box budget:** under 70 boxes (a few near a player at once: its own group, cap 8); no far look needed.
+- **Bones:** body, head, tail (two pieces so the swim can bend it), back fin, breast fins, belly fins.

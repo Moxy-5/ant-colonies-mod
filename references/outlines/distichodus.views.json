@@ -1,0 +1,32 @@
+{
+  "length_blocks": 2.3125,
+  "views": {
+    "side": {
+      "box": [
+        20,
+        20,
+        430,
+        245
+      ],
+      "head": "right"
+    },
+    "top": {
+      "box": [
+        20,
+        245,
+        430,
+        355
+      ],
+      "head": "right"
+    },
+    "front": {
+      "box": [
+        430,
+        20,
+        540,
+        245
+      ]
+    }
+  },
+  "made_by": "python tools/workshop.py outline distichodus (from references/outlines/distichodus.json)"
+}

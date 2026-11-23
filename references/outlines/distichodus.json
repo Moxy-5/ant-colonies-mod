@@ -1,0 +1,393 @@
+{
+ "animal": "distichodus",
+ "length_px": 37,
+ "note": "The six-banded distichodus's outline, Claude's design from the user's photo (references/inspiration/distichodus.png), drawn from straight lines side on at the user's word, 2026-11-22. Made 37 model pixels long, drawn in the game at 0.8 blocks. x from the tail tip (0) to the snout. Written by tools/distichodus_sheet.py --outline from the sheet's grid.",
+ "marks": [
+  {
+   "name": "eye",
+   "side": [
+    32.0,
+    33.5,
+    9.5,
+    11.5
+   ],
+   "top": [
+    32.0,
+    33.5,
+    1.0,
+    1.5
+   ],
+   "front": [
+    1.0,
+    1.5,
+    9.5,
+    11.5
+   ],
+   "colour": "#9c3a30"
+  },
+  {
+   "name": "eye (right)",
+   "top": [
+    32.0,
+    33.5,
+    -1.5,
+    -1.0
+   ],
+   "front": [
+    -1.5,
+    -1.0,
+    9.5,
+    11.5
+   ],
+   "colour": "#9c3a30"
+  },
+  {
+   "name": "band 1",
+   "side": [
+    26.0,
+    28.0,
+    5.0,
+    14.0
+   ],
+   "colour": "#46405a"
+  },
+  {
+   "name": "band 2",
+   "side": [
+    22.5,
+    24.5,
+    4.5,
+    15.5
+   ],
+   "colour": "#46405a"
+  },
+  {
+   "name": "band 3",
+   "side": [
+    19.0,
+    21.0,
+    4.5,
+    15.0
+   ],
+   "colour": "#46405a"
+  },
+  {
+   "name": "band 4",
+   "side": [
+    15.5,
+    17.5,
+    4.5,
+    15.0
+   ],
+   "colour": "#46405a"
+  },
+  {
+   "name": "band 5",
+   "side": [
+    12.0,
+    14.0,
+    6.0,
+    13.0
+   ],
+   "colour": "#46405a"
+  },
+  {
+   "name": "band 6",
+   "side": [
+    9.0,
+    10.0,
+    7.5,
+    11.5
+   ],
+   "colour": "#46405a"
+  }
+ ],
+ "parts": [
+  {
+   "name": "snout",
+   "side": [
+    35,
+    37,
+    8.5,
+    10.5
+   ],
+   "half_width": 0.5
+  },
+  {
+   "name": "head front",
+   "side": [
+    33,
+    35,
+    7.5,
+    11.5
+   ],
+   "half_width": 1.0
+  },
+  {
+   "name": "head",
+   "side": [
+    31,
+    33,
+    6.5,
+    12.0
+   ],
+   "half_width": 1.5
+  },
+  {
+   "name": "head back",
+   "side": [
+    28,
+    31,
+    5.5,
+    13.0
+   ],
+   "half_width": 2.0
+  },
+  {
+   "name": "shoulders",
+   "side": [
+    25,
+    28,
+    5.5,
+    14.0
+   ],
+   "half_width": 2.0
+  },
+  {
+   "name": "body front",
+   "side": [
+    22,
+    25,
+    4.5,
+    15.0
+   ],
+   "half_width": 2.0
+  },
+  {
+   "name": "body",
+   "side": [
+    18,
+    22,
+    4.5,
+    15.0
+   ],
+   "half_width": 2.0
+  },
+  {
+   "name": "body rear",
+   "side": [
+    15,
+    18,
+    4.5,
+    15.0
+   ],
+   "half_width": 2.0
+  },
+  {
+   "name": "hips",
+   "side": [
+    13,
+    15,
+    6.0,
+    14.0
+   ],
+   "half_width": 2.0
+  },
+  {
+   "name": "tail root",
+   "side": [
+    11,
+    13,
+    6.5,
+    12.5
+   ],
+   "half_width": 1.0
+  },
+  {
+   "name": "tail base",
+   "side": [
+    9,
+    11,
+    7.0,
+    12.0
+   ],
+   "half_width": 1.0
+  },
+  {
+   "name": "tail upper 1",
+   "side": [
+    6,
+    9,
+    9.5,
+    12.0
+   ],
+   "half_width": 0.25
+  },
+  {
+   "name": "tail upper 2",
+   "side": [
+    3,
+    6,
+    10.0,
+    14.0
+   ],
+   "half_width": 0.25
+  },
+  {
+   "name": "tail upper 3",
+   "side": [
+    0,
+    3,
+    13.5,
+    15.5
+   ],
+   "half_width": 0.25
+  },
+  {
+   "name": "tail lower 1",
+   "side": [
+    6,
+    9,
+    7.0,
+    9.5
+   ],
+   "half_width": 0.25
+  },
+  {
+   "name": "tail lower 2",
+   "side": [
+    3,
+    6,
+    5.0,
+    9.0
+   ],
+   "half_width": 0.25
+  },
+  {
+   "name": "tail lower 3",
+   "side": [
+    0,
+    3,
+    3.5,
+    5.5
+   ],
+   "half_width": 0.25
+  },
+  {
+   "name": "back fin 1",
+   "side": [
+    16.7,
+    19.85,
+    16.0,
+    19.0
+   ],
+   "half_width": 0.25
+  },
+  {
+   "name": "back fin 2",
+   "side": [
+    19.85,
+    23,
+    15.0,
+    16.5
+   ],
+   "half_width": 0.25
+  },
+  {
+   "name": "adipose fin",
+   "side": [
+    10.7,
+    12.7,
+    12.5,
+    14.0
+   ],
+   "half_width": 0.25
+  },
+  {
+   "name": "anal fin 1",
+   "side": [
+    9.399999999999999,
+    12.049999999999999,
+    3.0,
+    5.5
+   ],
+   "half_width": 0.25
+  },
+  {
+   "name": "anal fin 2",
+   "side": [
+    12.049999999999999,
+    14.7,
+    5.0,
+    6.0
+   ],
+   "half_width": 0.25
+  },
+  {
+   "name": "belly fin 1",
+   "side": [
+    16.6,
+    19.15,
+    0.5,
+    3.5
+   ],
+   "top": [
+    16.6,
+    19.15,
+    0.5,
+    1.5
+   ],
+   "front": [
+    0.5,
+    1.5,
+    0.5,
+    3.5
+   ],
+   "mirror": true
+  },
+  {
+   "name": "belly fin 2",
+   "side": [
+    19.15,
+    21.7,
+    3.0,
+    4.5
+   ],
+   "top": [
+    19.15,
+    21.7,
+    0.5,
+    1.5
+   ],
+   "front": [
+    0.5,
+    1.5,
+    3.0,
+    4.5
+   ],
+   "mirror": true
+  },
+  {
+   "name": "breast fin",
+   "side": [
+    22.6,
+    27.8,
+    3.5,
+    5.5
+   ],
+   "top": [
+    22.6,
+    27.8,
+    2.0,
+    3.5
+   ],
+   "front": [
+    2.0,
+    3.5,
+    3.5,
+    5.5
+   ],
+   "mirror": true
+  }
+ ]
+}
