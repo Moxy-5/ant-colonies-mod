@@ -1,0 +1,29 @@
+# Otters playing (2026-11-22, docs/plans/otter-play-and-fish.md section 1): two fed otters (HungryIn) left to their own
+# goals, tagged "play.now" so the first bout starts at once (the film camera's tag), filmed stepped from the side: on a
+# grass bank (the nose poke, rearing face to face, the chases), then standing in water a block deep (the splashes).
+#   ./gradlew runFilm -PfilmScene=tools/film/otter_play.film   pictures in run-film/screenshots/otter_play/
+cmd time set noon
+cmd weather clear
+cmd kill @e[type=!player]
+cmd fill 0 -61 0 40 -50 34 minecraft:air
+cmd fill 0 -62 0 40 -61 34 minecraft:grass_block
+lens 50
+wait 40
+cmd summon antcolonies:otter 18.5 -60 17.5 {PersistenceRequired:1b,Rotation:[90f,0f],OwnSize:1.0f,HungryIn:6000,Tags:["play.now"]}
+cmd summon antcolonies:otter 21.5 -60 17.5 {PersistenceRequired:1b,Rotation:[-90f,0f],OwnSize:1.0f,HungryIn:6000,Tags:["play.now"]}
+camera 20.0 -59.0 10.5 0 12
+wait 6
+cmd tick freeze
+burst bank 150 1
+cmd tick unfreeze
+cmd kill @e[type=antcolonies:otter]
+cmd fill 12 -61 14 28 -61 22 minecraft:water
+wait 30
+cmd summon antcolonies:otter 18.5 -61 17.5 {PersistenceRequired:1b,Rotation:[90f,0f],OwnSize:1.0f,HungryIn:6000,Tags:["play.now"]}
+cmd summon antcolonies:otter 21.5 -61 17.5 {PersistenceRequired:1b,Rotation:[-90f,0f],OwnSize:1.0f,HungryIn:6000,Tags:["play.now"]}
+camera 20.0 -59.8 13.5 0 14
+wait 6
+cmd tick freeze
+burst shallows 150 1
+cmd tick unfreeze
+quit

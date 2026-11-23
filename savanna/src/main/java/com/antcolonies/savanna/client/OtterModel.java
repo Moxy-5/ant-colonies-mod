@@ -50,7 +50,9 @@ public class OtterModel extends DefaultedEntityGeoModel<OtterEntity> {
         Vector3d shift = otter.rider().drawnShift(x, y, z, yaw, otter.rider().clipTicks(otter.bodyClips));
         nudge(getAnimationProcessor().getBone("root"), shift);
         byte doing = otter.doing();
-        boolean looks = !onMove && !otter.isDeadOrDying() && doing != OtterEntity.REST && doing != OtterEntity.SHAKE;
+        // (rearing at a playmate it looks straight at it: its body faces it)
+        boolean looks = !onMove && !otter.isDeadOrDying() && doing != OtterEntity.REST && doing != OtterEntity.SHAKE
+                && doing != OtterEntity.PLAY_UP && doing != OtterEntity.PLAY && doing != OtterEntity.PLAY_DOWN;
         double scale = OtterEntity.MODEL_SCALE * otter.getScale(), ahead = EYES_AHEAD * scale / 16.0;
         otter.attention.aim(pt, x - Mth.sin(yaw * Mth.DEG_TO_RAD) * ahead, z + Mth.cos(yaw * Mth.DEG_TO_RAD) * ahead, yaw,
                 looks ? HEAD_TURN : 0.0);

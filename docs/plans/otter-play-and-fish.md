@@ -288,3 +288,18 @@ stance goes on the standing-still clip only; the face and tail go on every clip.
 **Built (2026-11-22, round 3):** the user: "those are perfect and do A bigger for the ears". Ears A in the game model
 (v7); the mood, face, tail and stances in the game (`OtterEntity.workOutMood`, the shared `client/FaceLayer`,
 `stand_<mood>` clips); filmed in the game (`tools/film/otter_moods.film`). Next in 6e: the skitter walks (6b).
+
+**Progress (2026-11-22, 6e step 2, the skitter clips):** `scurry` (quick choppy trot, 1.57 b/s), `skid_stop` (braced stop,
+rock, head up), `sniff_walk` (nose-down zigzag, 0.59 b/s) and `hop_turn` (a small hop; the game turns the body while the feet
+are up, ticks 3 to 7) made in `tools/otter_models.py`, checked offline (`clip_check.py otter --switches`, none flagged) and
+filmed in the game (`tools/film/otter_skitter_frames.film`). On the versions page's clip buttons. Not played by the game yet:
+next, after the user's look, the burst-and-stop wandering (6b's first bullet): curious, playful or excited, it scurries 1 to 3
+blocks, skid-stops, looks or sniffs 0.5 to 2 s, hop-turns 30 to 90 degrees, and goes again; calm and content keep the walk.
+
+**Built (2026-11-22, the skitter in the game):** `OtterEntity.SkitterGoal`, curious or playful on land: bursts of scurry, skid stop,
+look or nose-down sniff, hop turn (speeds measured against the clips: scurry 1.60 b/s, sniff 0.60). The nose has its own bone and
+sniffs in quick puffs (sniff walk, forage feel, the curious stance), at the user's word. Next in 6e: play part 1 (section 1).
+
+**Built (2026-11-22, play part 1, 6e step 3):** `OtterEntity.Bout` and `PlayGoal`: the nose poke, rearing face to face 1.69 blocks apart
+(measured on the clip, not the 1.2 guessed above), chases between rounds, swimming chases in deep water, splashes in the shallows, the
+short rest after. Play uses its own rule (fed, calm, safe, day), not the mood. Next in 6e: chase and tag, then keep-away (step 4).

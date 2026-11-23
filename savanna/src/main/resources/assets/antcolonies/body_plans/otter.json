@@ -64,6 +64,7 @@
     "neck": "neck",
     "head": "head",
     "snout_bridge": "snout_bridge",
+    "nose": "nose",
     "ear_left": "ear_left",
     "ear_right": "ear_right",
     "eye_left": "eye_left",
@@ -130,7 +131,11 @@
       "rest_down",
       "rest",
       "rest_up",
-      "death"
+      "death",
+      "scurry",
+      "sniff_walk",
+      "skid_stop",
+      "hop_turn"
     ],
     "tuck_ok": [
       "swim",
@@ -151,7 +156,9 @@
     ],
     "walks": {
       "walk": 17.969,
-      "bound": 32.0
+      "bound": 32.0,
+      "scurry": 25.078,
+      "sniff_walk": 9.491
     },
     "switches": [
       [
@@ -313,6 +320,78 @@
       [
         "exit_water_1000",
         "walk"
+      ],
+      [
+        "walk",
+        "scurry"
+      ],
+      [
+        "scurry",
+        "walk"
+      ],
+      [
+        "scurry",
+        "bound"
+      ],
+      [
+        "bound",
+        "scurry"
+      ],
+      [
+        "idle",
+        "scurry"
+      ],
+      [
+        "scurry",
+        "skid_stop"
+      ],
+      [
+        "skid_stop",
+        "idle"
+      ],
+      [
+        "skid_stop",
+        "hop_turn"
+      ],
+      [
+        "idle",
+        "hop_turn"
+      ],
+      [
+        "hop_turn",
+        "idle"
+      ],
+      [
+        "hop_turn",
+        "scurry"
+      ],
+      [
+        "idle",
+        "sniff_walk"
+      ],
+      [
+        "sniff_walk",
+        "idle"
+      ],
+      [
+        "walk",
+        "sniff_walk"
+      ],
+      [
+        "sniff_walk",
+        "walk"
+      ],
+      [
+        "sniff_walk",
+        "scurry"
+      ],
+      [
+        "sniff_walk",
+        "forage_feel"
+      ],
+      [
+        "skid_stop",
+        "sniff_walk"
       ]
     ],
     "controller": "savanna/src/main/java/com/antcolonies/savanna/animal/OtterEntity.java"

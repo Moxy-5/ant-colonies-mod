@@ -53,7 +53,7 @@ WORKSHOP_SHAPE = [
 ]
 
 WORKSHOP_PARTS = {
-    "head":       ["head", "snout_bridge", "ear_left", "ear_right", "eye_left", "eye_right",
+    "head":       ["head", "snout_bridge", "nose", "ear_left", "ear_right", "eye_left", "eye_right",
                    "lid_left", "lid_right", "whisker_left", "whisker_right"],
     "jaw":        ["jaw", "tongue"],
     "neck":       ["neck"],
@@ -374,8 +374,11 @@ def build_bones():
     for s in (1, -1):
         hbox(head_cubes, s * 2.15, s * 4.08, 10.55, 12.30, 32.4, 34.48, "muzzle_pad")
     # Prominent velvety charcoal-brown rectangular otter nose pad
+    # (its own bone since 2026-11-22, so it can twitch and puff as it sniffs; the same box in the same place)
     nose_info = {"_nz0": oz(35.32 + BODY_EXTRA) + dz_h, "_ny0": 11.45 + dy_h, "_ny1": 12.98 + dy_h}
-    hsym(head_cubes, 1.40, 11.45, 12.98, 34.25, 35.32, "nose", extra=nose_info)
+    nose_cubes = []
+    hsym(nose_cubes, 1.40, 11.45, 12.98, 34.25, 35.32, "nose", extra=nose_info)
+    nose_piv = [0.0, round(12.2 + dy_h, 3), round(oz(34.25 + BODY_EXTRA) + dz_h, 3)]   # the back of the pad, its middle
     # Recessed upper palate roof (hidden when shut)
     hsym(head_cubes, 2.4, 10.5, 11.1, 30.2, 33.8, "mouth")
 
@@ -487,6 +490,7 @@ def build_bones():
          "rotation": pitch(-NECK_PITCH + HEAD_PITCH), "cubes": head_cubes},
         {"name": "snout_bridge", "parent": "head", "pivot": sb_piv,
          "rotation": pitch(-16.0), "cubes": sb_cubes},
+        {"name": "nose", "parent": "head", "pivot": nose_piv, "cubes": nose_cubes},
         {"name": "ear_left",  "parent": "head",
          "pivot": [ear_x, round(ear_y + dy_h, 3), round(oz(28.4 + BODY_EXTRA) + dz_h, 3)], "cubes": ear_l_cubes,
          **({"rotation": [0.0, 0.0, ear_tip]} if ear_tip else {})},
@@ -1002,6 +1006,19 @@ def _blink_curve(t, times, dur=0.18):
     return v
 
 
+def _sniff_puffs(t, bouts, rate=6.0, dur=0.11):
+    """How far into a sniff the nose is (0..1) at time t: bouts of quick puffs, each bout (start, puffs), rate a second."""
+    return _blink_curve(t, [b + k / rate for b, n in bouts for k in range(n)], dur=dur)
+
+
+def _set_nose(pose, puff, twitch=0.0):
+    """A sniff: the nose pad lifts a little and pushes forward, tipped up, its nostrils flaring wider (puff 0..1); twitch
+    (-1..1) wrinkles it side to side. Real noses work this way: a quick in-breath draws the nose up and the nostrils out."""
+    pose["nose"] = {"position": [0.25 * twitch, 0.38 * puff, -0.26 * puff],
+                    "rotation": [-10.0 * puff, 5.0 * twitch, 0.0],
+                    "scale": [1.0 + 0.22 * puff, 1.0 + 0.08 * puff, 1.0]}
+
+
 # --- 1. IDLE (3.60 s, loop) ------------------------------------------------------------------------------------------
 IDLE_LEN = 3.60
 
@@ -1232,6 +1249,7 @@ def _clip_forage_feel():
         }
         _set_lids(p, _blink_curve(t, (0.88,)))
         _set_whiskers(p, 7.0 * math.sin(6.0 * w), 7.0 * math.sin(6.0 * w))
+        _set_nose(p, _sniff_puffs(t, ((0.70, 3), (1.50, 2)), dur=0.13), 0.4 * (feel_l - feel_r))
         _set_ears(p, 4.0, 5.0)
         _set_tail(p, lambda i: 5.5 + 1.5 * math.sin(w - 0.4 * i), lambda i: (3.0 + i) * math.sin(w - 0.5 * i))
 
@@ -1246,7 +1264,7 @@ def _clip_forage_feel():
             _solve_leg(p, pref, y_sole, z_tgt, paw_world_pitch=8.0 * f_amp + 10.0 * pat, roll_z=s_out * -10.5)
         return p
 
-    return clip(L, at, 36, loop=True)
+    return clip(L, at, 72, loop=True)
 
 
 # --- 7. BITE (0.60 s, once — crisp hunting lunge & snap; hit on tick 6 = 0.30 s!) ------------------------------------
@@ -1495,6 +1513,193 @@ def _clip_death():
         return p
 
     return clip(L, at, 24, loop="hold")
+
+
+# --- SKITTER WALKS (docs/plans/otter-play-and-fish.md, section 6b; 2026-11-22) ---------------------------------------
+# Real otters on land scurry in short bursts: a dash of a block or three, a sudden stop with the head up, a sniff, a
+# little hop round to a new heading, another dash. Four clips for that (numbers my picks); the game picks when.
+SCURRY_LEN = 0.44         # quick choppy trot: diagonal pairs, short fast strides, twice the walk's cadence
+SCURRY_STEP = 3.2         # half-stride (px): full stance 6.4 px over 0.255 s -> 25.1 px/s (1.57 b/s), walk 1.12, bound 2
+SCURRY_DUTY = 0.58
+SCURRY_SPEED = round((2.0 * SCURRY_STEP) / (SCURRY_LEN * SCURRY_DUTY), 3)
+SNIFF_LEN = 1.20          # slow nose-down zigzag
+SNIFF_STEP = 4.1          # full stance 8.2 px over 0.864 s -> 9.5 px/s (0.59 b/s)
+SNIFF_DUTY = 0.72
+SNIFF_SPEED = round((2.0 * SNIFF_STEP) / (SNIFF_LEN * SNIFF_DUTY), 3)
+SKID_LEN = 0.40           # the little braced stop at the end of a burst (8 ticks)
+HOP_LEN = 0.50            # a quick hop round to a new heading (10 ticks); the game turns its body while its feet are up
+HOP_AIR = (0.15, 0.35)    # feet off the ground (s): ticks 3 to 7
+
+
+def _leg_roll(pref, front=-8.5):
+    s_out = 1.0 if pref in ("leg_fl", "leg_bl") else -1.0
+    return s_out * (front if pref in ("leg_fl", "leg_fr") else -6.5)
+
+
+def _scurry_pose(u, k=1.0):
+    """The scurry's body (no legs) at phase u; k fades its bob and sway out (the skid stop starts from it)."""
+    w = 2.0 * math.pi * u
+    bob = -0.80 + k * 0.28 * math.cos(2.0 * w)
+    roll = k * 1.0 * math.sin(w)
+    p = {
+        "body":  {"position": [0.0, bob, 0.0], "rotation": [1.5 + k * 1.2 * math.sin(2.0 * w), 0.0, roll]},
+        "hips":  {"rotation": [-1.0 + k * 1.6 * math.sin(2.0 * w + 0.6), 0.0, -roll * 0.3]},
+        "waist": {"rotation": [0.5 - k * 1.6 * math.cos(2.0 * w), 0.0, 0.0]},
+        "ribs":  {"rotation": [0.5 + k * 1.6 * math.cos(2.0 * w), 0.0, 0.0]},
+        "chest": {"rotation": [-1.0 - k * 1.0 * math.sin(2.0 * w), 0.0, -roll * 0.4]},
+        "neck":  {"rotation": [11.0 + k * 1.5 * math.cos(2.0 * w), 0.0, -roll * 0.3]},
+        "head":  {"rotation": [-9.0 - k * 1.5 * math.cos(2.0 * w), 0.0, -roll * 0.3]},
+        "jaw":   {"rotation": [1.5, 0.0, 0.0]},
+    }
+    _set_lids(p, 0.0)
+    _set_whiskers(p, 6.0 + 2.0 * math.sin(2.0 * w), 6.0 + 2.0 * math.sin(2.0 * w))
+    _set_ears(p, -7.0, 0.0)
+    # tail held straight out behind for balance, only a small flick at its tip
+    _set_tail(p, lambda i: (6.0 if i == 0 else 1.2) + k * 0.6 * i * math.sin(2.0 * w - 0.6 * i),
+              lambda i: k * (0.8 + 0.6 * i) * math.sin(w - 0.5 * i))
+    return p
+
+
+def _clip_scurry():
+    L = SCURRY_LEN
+    phases = {"leg_bl": 0.00, "leg_fr": 0.03, "leg_br": 0.50, "leg_fl": 0.53}   # a trot, the front foot a hair late
+    centre = {"leg_bl": -1.0, "leg_br": -1.0, "leg_fl": 1.0, "leg_fr": 1.0}     # each foot's stride kept in its reach
+
+    def at(t):
+        u = (t % L) / L
+        p = _scurry_pose(u)
+        for pref, ph in phases.items():
+            wr = _rig()["legs"][pref]["w_rest"]
+            s_norm, l_norm = stride((u + ph) % 1.0, SCURRY_DUTY)
+            _solve_leg(p, pref, l_norm * 1.4, wr[2] + centre[pref] - s_norm * SCURRY_STEP, paw_world_pitch=-12.0 * l_norm,
+                       roll_z=_leg_roll(pref, -11.0))
+        return p
+
+    out = clip(L, at, 24, loop=True)
+    out["timeline"] = {"0": f"stride {SCURRY_SPEED:.3f}"}
+    return out
+
+
+def _blend_poses(a, b, k):
+    """Pose a eased toward pose b (k 0 = a, 1 = b), channel by channel."""
+    out = {}
+    for bone in set(a) | set(b):
+        for ch in ("rotation", "position"):
+            va, vb = a.get(bone, {}).get(ch), b.get(bone, {}).get(ch)
+            if va is None and vb is None:
+                continue
+            va, vb = va or [0.0, 0.0, 0.0], vb or [0.0, 0.0, 0.0]
+            out.setdefault(bone, {})[ch] = [va[i] + (vb[i] - va[i]) * k for i in range(3)]
+    return out
+
+
+def _clip_skid_stop():
+    L = SKID_LEN
+
+    def at(t):
+        p = _blend_poses(_scurry_pose(0.0, 0.0), _idle_pose(0.0), ease(min(1.0, t / L)))
+        k = 1.0 - ease(min(1.0, t / L))
+        # the rock: weight pitched onto the braced front paws, then back, then settling
+        rock = ramp(t, ((0.0, 0.0), (0.10, 1.0), (0.22, -0.55), (0.32, 0.15), (L, 0.0)))
+        _add_rot(p, "body", [4.5 * rock, 0.0, 0.0])
+        pos = p["body"]["position"]
+        p["body"]["position"] = [pos[0], pos[1] - 0.35 * max(0.0, rock), pos[2] - 1.0 * rock]
+        # the head comes up past level to look about
+        up = pulse(t, 0.12, 0.14, 0.06, 0.08)
+        _add_rot(p, "neck", [-7.0 * up, 0.0, 0.0])
+        _add_rot(p, "head", [-3.0 * up + 3.0 * rock, 0.0, 0.0])
+        _set_ears(p, -7.0 * k + 6.0 * up, 4.0 * up)
+        _set_whiskers(p, 6.0 * k + 6.0 * up, 6.0 * k + 6.0 * up)
+        tail = [p[f"tail_{i + 1}"]["rotation"] for i in range(5)]
+        _set_tail(p, lambda i: tail[i][0] + (2.5 * rock if i > 0 else 0.0), lambda i: tail[i][1])
+        # front paws braced ahead from the start, a small shuffle back under it at the end; the hind catch up a step
+        for pref in ("leg_fl", "leg_fr"):
+            wr = _rig()["legs"][pref]["w_rest"]
+            back = ease(max(0.0, min(1.0, (t - 0.26) / 0.12)))
+            _solve_leg(p, pref, math.sin(math.pi * back) * 0.9, wr[2] - 1.6 * (1.0 - back),
+                       paw_world_pitch=8.0 * (1.0 - back) * max(0.0, rock), roll_z=_leg_roll(pref))
+        for pref, t0 in (("leg_bl", 0.04), ("leg_br", 0.10)):
+            wr = _rig()["legs"][pref]["w_rest"]
+            f = ease(max(0.0, min(1.0, (t - t0) / 0.18)))
+            _solve_leg(p, pref, math.sin(math.pi * f) * 1.0, wr[2] + 2.0 * (1.0 - f), paw_world_pitch=0.0,
+                       roll_z=_leg_roll(pref))
+        return p
+
+    return clip(L, at, 16, loop=False)
+
+
+def _clip_sniff_walk():
+    L = SNIFF_LEN
+    phases = {"leg_bl": 0.00, "leg_fl": 0.25, "leg_br": 0.50, "leg_fr": 0.75}
+
+    def at(t):
+        u = (t % L) / L
+        w = 2.0 * math.pi * u
+        sweep = math.sin(w)                       # nose swept left and right once a loop (the zigzag)
+        sniff = _sniff_puffs(t, ((0.08, 4), (0.70, 3)))   # two bouts of quick sniffs a loop
+        bob = -0.75 + 0.14 * math.cos(2.0 * w)
+        p = {
+            "body":  {"position": [0.0, bob, 0.0], "rotation": [2.5, 0.0, 0.3 * sweep]},
+            "hips":  {"rotation": [-1.0, 0.0, 0.0]},
+            "waist": {"rotation": [-0.5 - 0.8 * math.cos(2.0 * w), 0.0, 0.0]},
+            "ribs":  {"rotation": [0.5 + 0.8 * math.cos(2.0 * w), 0.0, 0.0]},
+            "chest": {"rotation": [1.0, 0.0, 0.0]},
+            "neck":  {"rotation": [30.0 + 2.0 * math.cos(2.0 * w), 16.0 * sweep, 0.0]},
+            "head":  {"rotation": [14.0 + 2.2 * sniff, 12.0 * sweep, 4.0 * sweep]},
+            "jaw":   {"rotation": [0.6, 0.0, 0.0]},
+        }
+        _set_lids(p, 0.12 + _blink_curve(t, (0.55,)))
+        q = 4.0 * sniff
+        _set_whiskers(p, 13.0 + q, 13.0 + q)
+        _set_nose(p, sniff, 0.5 * math.sin(w * 3.0))
+        _set_ears(p, 8.0, 5.0 * sweep)
+        _set_tail(p, lambda i: 2.0 + 0.6 * math.sin(w - 0.4 * i),
+                  lambda i: -(1.5 + 0.9 * i) * math.sin(w - 0.5 * i))
+        for pref, ph in phases.items():
+            wr = _rig()["legs"][pref]["w_rest"]
+            s_norm, l_norm = stride((u + ph) % 1.0, SNIFF_DUTY)
+            _solve_leg(p, pref, l_norm * 1.4, wr[2] - s_norm * SNIFF_STEP, paw_world_pitch=-10.0 * l_norm,
+                       roll_z=_leg_roll(pref, -11.0))
+        return p
+
+    out = clip(L, at, 96, loop=True)
+    out["timeline"] = {"0": f"stride {SNIFF_SPEED:.3f}"}
+    return out
+
+
+def _clip_hop_turn():
+    L = HOP_LEN
+    a0, a1 = HOP_AIR
+
+    def at(t):
+        p = _idle_pose(0.0)
+        crouch = pulse(t, 0.0, 0.12, 0.0, 0.08)               # gathers itself
+        land = pulse(t, a1 - 0.02, 0.05, 0.0, L - a1 - 0.03)  # soaks up the landing
+        air = math.sin(math.pi * max(0.0, min(1.0, (t - a0) / (a1 - a0))))
+        dy = -0.7 * crouch + 2.6 * air - 0.6 * land     # the front legs stand nearly straight: a deep crouch folds them fast
+        pos = p["body"]["position"]
+        p["body"]["position"] = [pos[0], pos[1] + dy, pos[2]]
+        _add_rot(p, "body", [-2.5 * air + 1.5 * crouch, 0.0, 0.0])
+        _add_rot(p, "waist", [-3.0 * air + 2.0 * crouch, 0.0, 0.0])   # the back rounds up in the air
+        _add_rot(p, "chest", [2.0 * air, 0.0, 0.0])
+        _add_rot(p, "neck", [-4.0 * air + 3.0 * crouch, 0.0, 0.0])
+        _add_rot(p, "head", [3.0 * air + 2.0 * land, 0.0, 0.0])
+        _set_ears(p, 4.0 * air - 3.0 * land, 3.0 * air)
+        _set_whiskers(p, 8.0 * air, 8.0 * air)
+        _set_tail(p, lambda i: (7.0 * air if i == 0 else 2.5 * air) - 1.0 * crouch, lambda i: 0.0)
+        # feet: planted while it gathers, tucked up a little under it in the air (front a hair later), planted to land
+        for pref in ("leg_fl", "leg_fr", "leg_bl", "leg_br"):
+            wr = _rig()["legs"][pref]["w_rest"]
+            front = pref in ("leg_fl", "leg_fr")
+            late = 0.02 if front else 0.0
+            up = math.sin(math.pi * max(0.0, min(1.0, (t - a0 - late) / (a1 - a0 - late))))
+            _solve_leg(p, pref, 2.9 * up, wr[2] + (-0.4 if front else 0.4) * up, paw_world_pitch=-10.0 * up,
+                       roll_z=_leg_roll(pref) * 0.6)
+        return p
+
+    out = clip(L, at, 18, loop=False)
+    out["timeline"] = {f"{a0:.2f}": "air", f"{a1:.2f}": "land"}
+    return out
 
 
 # --- 15-18. BLOCK MOVES (step_up_1000, step_down_1000, enter_water_1000, exit_water_1000) ----------------------------
@@ -1973,6 +2178,10 @@ def clips():
         "rest_up":          _clip_rest_up(),
         "shake_dry":        _clip_shake_dry(),
         "death":            _clip_death(),
+        "scurry":           _clip_scurry(),
+        "skid_stop":        _clip_skid_stop(),
+        "sniff_walk":       _clip_sniff_walk(),
+        "hop_turn":         _clip_hop_turn(),
         "step_up_1000":     _clip_step_up(),
         "step_down_1000":   _clip_step_down(),
         "enter_water_1000": _clip_enter_water(),
@@ -2094,6 +2303,8 @@ def face_pose(mood, t, face=True):
     _add_rot(p, "head", [0.75 * f["neck"] - f["nod"], 0.6 * look, f["tilt"]])
     if mood == "playful":
         _add_rot(p, "head", [-2.0 * math.sin(w * 2.0), 0.0, 0.0])
+    if mood == "curious":                                    # sniffing the air in little bouts, the nose working
+        _set_nose(p, _sniff_puffs(t, ((0.4, 3), (1.9, 4), (3.0, 2))), 0.6 * math.sin(w * 2.0))
     for pref in ("leg_fl", "leg_fr", "leg_bl", "leg_br"):
         wr = _rig()["legs"][pref]["w_rest"]
         lift = f["paw"] if pref == "leg_fl" else 0.0
@@ -2199,6 +2410,10 @@ WORKSHOP_CLIP_INFO = {
         "dive_swim":   "Underwater torpedo dive: forelegs tucked flat back, dolphin-like vertical spine & tail wave.",
         "forage_feel": "African clawless otter signature: alternating nimble front paws feeling under stones for crabs.",
         "play_rear":   "Social play-wrestle in shallows: rearing upright on hind legs & tail tripod, paws batting, mouth open.",
+        "scurry":      f"Skitter: quick choppy trot, low and long, tail straight out ({SCURRY_SPEED / 16:.2f} b/s).",
+        "skid_stop":   "Skitter: the braced stop at the end of a burst, rocking forward and back, head coming up.",
+        "sniff_walk":  f"Skitter: slow nose-down zigzag, whiskers forward, sniffing ({SNIFF_SPEED / 16:.2f} b/s).",
+        "hop_turn":    "Skitter: a quick little hop; the game turns it to its new heading while its feet are up.",
         "rest":        "Cozy riverbank rock rest: belly flush on stone, eyelids shut, chin resting near tucked front paws.",
     },
 }

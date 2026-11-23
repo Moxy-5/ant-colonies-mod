@@ -4,7 +4,7 @@
 - **Mod & ID:** `savanna` (`antcolonies:bull_shark`) | **Family:** `fish`
 
 ## Asset Paths
-- **Geo:** `savanna/src/main/resources/assets/antcolonies/geo/entity/bull_shark.geo.json` (`351 / 400` boxes, `35` bones, `0` slanted cubes, `model_parts.game_faces()` applied, `0` nulls)
+- **Geo:** `savanna/src/main/resources/assets/antcolonies/geo/entity/bull_shark.geo.json` (`366 / 400` boxes since the joint sleeves, 2026-11-22; `35` bones, `0` slanted cubes, `model_parts.game_faces()` applied, `0` nulls)
 - **Textures:**
   - Standard (Look A, Clean River Bull Shark): `savanna/src/main/resources/assets/antcolonies/textures/entity/bull_shark.png` (`512×256`, nearest-neighbor voxel pixel art)
   - Veteran Giant (Look B, Scarred Old Bull): `savanna/src/main/resources/assets/antcolonies/textures/entity/bull_shark_scarred.png` (darker slate + battle scars; recommended for large `>= 6.0` block giants!)
@@ -17,7 +17,7 @@
 - **Model length:** `87.8` model px (`~5.50` blocks at `1.00×` scale; `1 model px = 0.0625` blocks)
 - **Adult size variations (user request):** Adults should vary naturally in size from **`5.0` blocks (`0.91×`) up to `7.0` blocks (`1.27×`)** (e.g., `5.0b / 5.5b / 6.0b / 6.5b / 7.0b`, weighted around `5.5–6.0b` with rare `6.5–7.0b` giants using `bull_shark_scarred.png`). Pups (if bred later): `~0.45–0.55×` (`2.5–3.0` blocks).
 - **Hitbox (width × height at `1.00×`):** `1.55 × 1.10` blocks (scales cleanly with entity size; `visible_bounds` `5.5 × 2.2`).
-- **Clip-matched speeds (`SteadyController`, 4-tick blend passes `0/23` flagged):**
+- **Clip-matched speeds (`SteadyController`, 6-tick blend since 2026-11-22 (`CLIP_LAG`), passes `0/23` flagged):**
   - `idle` (ram-ventilation slow patrol): `~1.2` b/s
   - `swim` (cruise): `~3.3` b/s (`bpt ~ 0.165`)
   - `burst` (ambush sprint / chase): `~6.0` b/s
@@ -27,7 +27,7 @@
 | Clip | Length (s) | Loop | Notes / Exact Event Ticks (20 tps) |
 |---|---|---|---|
 | `idle` | `2.60` | `true` | Slow ominous ram-ventilation patrol glide (sharks never freeze completely); passes `checks.wave` |
-| `swim` | `1.50` | `true` | Steady predatory river swim; scale speed with `SteadyController`; passes `checks.wave` |
+| `swim` | `1.50` | `true` | Steady predatory river swim: one travelling S-wave down the whole body (2026-11-22, was a stiff tail wag); scale speed with `SteadyController`; passes `checks.wave` |
 | `burst` | `0.85` | `true` | High-speed ambush chase sprint, pectoral wings swept back for low drag; passes `checks.wave` |
 | `surface_prowl` | `1.80` | `true` | High-riding surface stalk (`dorsal_1` above waterline at `24.5` px); passes `checks.wave` |
 | `bite` | `0.95` | `false` | Signature crushing bite: snout lifts, jaw opens `46°`, pale nictitating eye-shields flick shut right before **hit tick 8 (`0.40s`)** |
@@ -49,6 +49,7 @@
 ## Verification
 - [x] `body_plan.py check` (`bull_shark: OK`) & box budget checked (`351 / 400` boxes, `large animal`, `0` slanted cubes)
 - [x] `model_parts.game_faces()` applied on export & verified `0` `null` values in `bull_shark.geo.json` (fixed the `"parent": null` root bug both in `tools/bull_shark_models.py` and globally in `tools/model_parts.py`)
+- [x] 2026-11-22: the four swim clips remade as one travelling wave (`_shark_swim_pose`, `WAVE_LEN` 1.05, `WAVE_TAIL` 11 px), joint sleeves on the head, torso, rear and peduncle (no cuts at the bends), blend 6 ticks; checked offline and filmed (`tools/film/bull_shark_swim_frames.film`, side, three quarters, above)
 - [x] Offline `clip_check.py bull_shark --switches` & `verify_animal.py bull_shark --offline` passed (`12` clips, `0` flags, `0` parts inside a block, `0 / 23` transitions flagged, all 4 swim waves grow cleanly head-to-tail)
 - [x] In-game `game_compare.py` & 3-angle frame check (Claude, 2026-11-22, `verify_animal.py bull_shark` passed; deep clips filmed in open air; `beached_flop` lies too high, a request on the board)
 

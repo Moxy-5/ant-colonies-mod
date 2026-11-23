@@ -1,0 +1,107 @@
+# The bull shark's four swimming clips in the game, frame by frame (2026-11-22, the travelling wave and the joint
+# sleeves: "make it so the shark isnt so stiff when swimming, watch for cuts in the model"). Each clip on a still film
+# shark in the open air a block over the grass, side on, three quarters from the front and from straight above (the
+# wave and any cut at a bending joint show best from above).
+#   ./gradlew runFilm -PfilmScene=tools/film/bull_shark_swim_frames.film   pictures in run-film/screenshots/bull_shark_swim_frames/
+cmd time set noon
+cmd weather clear
+cmd kill @e[type=!player]
+cmd fill -2 -61 -6 16 -50 6 minecraft:air
+lens 50
+wait 40
+cmd summon antcolonies:bull_shark 46.0 -59.00 0.5 {NoAI:1b,Length:5.5f,Rotation:[-90f,0f],CustomName:'"film:idle"'}
+camera 46.00 -59.82 -12.50 0 2
+wait 10
+cmd tick freeze
+burst idle_side 12 5
+cmd tick unfreeze
+cmd tp @e[type=antcolonies:bull_shark] 7 -140 0
+wait 3
+cmd summon antcolonies:bull_shark 46.0 -59.00 0.5 {NoAI:1b,Length:5.5f,Rotation:[-90f,0f],CustomName:'"film:idle"'}
+camera 54.50 -56.12 -8.50 45 18
+wait 10
+cmd tick freeze
+burst idle_threequarter 12 5
+cmd tick unfreeze
+cmd tp @e[type=antcolonies:bull_shark] 7 -140 0
+wait 3
+cmd summon antcolonies:bull_shark 46.0 -59.00 0.5 {NoAI:1b,Length:5.5f,Rotation:[-90f,0f],CustomName:'"film:idle"'}
+camera 46.00 -47.50 0.50 0 90
+wait 10
+cmd tick freeze
+burst idle_above 12 5
+cmd tick unfreeze
+cmd tp @e[type=antcolonies:bull_shark] 7 -140 0
+wait 3
+cmd summon antcolonies:bull_shark 46.0 -59.00 0.5 {NoAI:1b,Length:5.5f,Rotation:[-90f,0f],CustomName:'"film:swim"'}
+camera 46.00 -59.82 -12.50 0 2
+wait 10
+cmd tick freeze
+burst swim_side 11 3
+cmd tick unfreeze
+cmd tp @e[type=antcolonies:bull_shark] 7 -140 0
+wait 3
+cmd summon antcolonies:bull_shark 46.0 -59.00 0.5 {NoAI:1b,Length:5.5f,Rotation:[-90f,0f],CustomName:'"film:swim"'}
+camera 54.50 -56.12 -8.50 45 18
+wait 10
+cmd tick freeze
+burst swim_threequarter 11 3
+cmd tick unfreeze
+cmd tp @e[type=antcolonies:bull_shark] 7 -140 0
+wait 3
+cmd summon antcolonies:bull_shark 46.0 -59.00 0.5 {NoAI:1b,Length:5.5f,Rotation:[-90f,0f],CustomName:'"film:swim"'}
+camera 46.00 -47.50 0.50 0 90
+wait 10
+cmd tick freeze
+burst swim_above 11 3
+cmd tick unfreeze
+cmd tp @e[type=antcolonies:bull_shark] 7 -140 0
+wait 3
+cmd summon antcolonies:bull_shark 46.0 -59.00 0.5 {NoAI:1b,Length:5.5f,Rotation:[-90f,0f],CustomName:'"film:burst"'}
+camera 46.00 -59.82 -12.50 0 2
+wait 10
+cmd tick freeze
+burst burst_side 10 2
+cmd tick unfreeze
+cmd tp @e[type=antcolonies:bull_shark] 7 -140 0
+wait 3
+cmd summon antcolonies:bull_shark 46.0 -59.00 0.5 {NoAI:1b,Length:5.5f,Rotation:[-90f,0f],CustomName:'"film:burst"'}
+camera 54.50 -56.12 -8.50 45 18
+wait 10
+cmd tick freeze
+burst burst_threequarter 10 2
+cmd tick unfreeze
+cmd tp @e[type=antcolonies:bull_shark] 7 -140 0
+wait 3
+cmd summon antcolonies:bull_shark 46.0 -59.00 0.5 {NoAI:1b,Length:5.5f,Rotation:[-90f,0f],CustomName:'"film:burst"'}
+camera 46.00 -47.50 0.50 0 90
+wait 10
+cmd tick freeze
+burst burst_above 10 2
+cmd tick unfreeze
+cmd tp @e[type=antcolonies:bull_shark] 7 -140 0
+wait 3
+cmd summon antcolonies:bull_shark 46.0 -59.00 0.5 {NoAI:1b,Length:5.5f,Rotation:[-90f,0f],CustomName:'"film:surface_prowl"'}
+camera 46.00 -59.82 -12.50 0 2
+wait 10
+cmd tick freeze
+burst surface_prowl_side 10 4
+cmd tick unfreeze
+cmd tp @e[type=antcolonies:bull_shark] 7 -140 0
+wait 3
+cmd summon antcolonies:bull_shark 46.0 -59.00 0.5 {NoAI:1b,Length:5.5f,Rotation:[-90f,0f],CustomName:'"film:surface_prowl"'}
+camera 54.50 -56.12 -8.50 45 18
+wait 10
+cmd tick freeze
+burst surface_prowl_threequarter 10 4
+cmd tick unfreeze
+cmd tp @e[type=antcolonies:bull_shark] 7 -140 0
+wait 3
+cmd summon antcolonies:bull_shark 46.0 -59.00 0.5 {NoAI:1b,Length:5.5f,Rotation:[-90f,0f],CustomName:'"film:surface_prowl"'}
+camera 46.00 -47.50 0.50 0 90
+wait 10
+cmd tick freeze
+burst surface_prowl_above 10 4
+cmd tick unfreeze
+cmd tp @e[type=antcolonies:bull_shark] 7 -140 0
+wait 3

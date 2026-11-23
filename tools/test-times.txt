@@ -28,6 +28,7 @@ acrocodileclimbsouttobaskandgoesbackin 0.47
 acrocodilemotherseesoffamonitorfromhernest 0.00
 acrocodilesnapsupfishandcallsotherstotheschool 0.49
 acrocodileswimstoasandbanktobask 0.56
+acuriousotterskittersinburstsacalmonestrolls 0.03
 adaytimeraidonafullcolonyismeasured 0.24
 adeadbaobabslumpsintoaheapandisgone 0.00
 adeadmoundofnewlandgetsamatabelecolony 2.22
@@ -321,9 +322,11 @@ tilapiabreedinanestpitandthemotherkeepsherfryinhermouth 0.03
 tilapiagrazegrowupandweartheirlooks 0.36
 treeblocksplaceandbranchesjoin 0.00
 tunnelblocksjoinupontheirown 0.00
+twofedottersplayaboutahungrypairdoesnot 0.03
 whatanantcarriesiskeptafterareload 0.32
 workerscarryseedsandclipgrassintothefoodstore 8.73
 workerscloseeveryholeinthenestwallsandmenddamage 11.08
 workersdigthewholenestandbuildthemound 7.18
 workersinthenumbersdieofoldageandaresaved 0.37
 workerssharethejobsandthenursestaysbythequeen 8.95
+zzotterskitterdebug 0.01

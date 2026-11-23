@@ -21,7 +21,7 @@
   - Waterline when floating in `swim`: **`y = 11.3` model px** (`0.706` blocks above feet; keeps flat crown, eyes, ears, and dark nose pad cleanly above the surface)
 - **Recommended `SteadyController` blend:** **`4` ticks (`0.20 s`)** — all `40/40` clip transitions checked clean at `blend = 4`
 
-## Clips (21 total: 16 behavior clips + 5 BlockMoves)
+## Clips (25 total: 20 behavior clips + 5 BlockMoves; plus the six `stand_<mood>` clips)
 | Clip | Length (s) | Loop | Notes / Exact Event Ticks (20 tps) |
 |---|---|---|---|
 | `idle` | `3.60` | `true` | Alert arched stance, subtle breathing, head look, double-blinks, whisker twitch & gentle tail sway |
@@ -40,6 +40,10 @@
 | `rest_up` | `0.85` | `false` | Smooth transition `rest → rest_up → idle` |
 | `shake_dry` | `1.10` | `false` | Vigorous head-to-tail water shake wave (`0.08..0.90 s`, ticks `2..18` for water-droplet splash hook after exiting water!) |
 | `death` | `1.10` | `hold` | Clean collapse onto right flank with tucked underside legs, eyelids shut, zero floor clipping |
+| `scurry` | `0.44` | `true` | Skitter (2026-11-22): quick choppy trot, low and long, tail straight out; `25.078 px/s` (**`1.567 b/s`**), scale like the walk |
+| `skid_stop` | `0.40` | `false` | Skitter: braced stop at the end of a burst, rock forward and back, head up; ends on the idle's first pose |
+| `sniff_walk` | `1.20` | `true` | Skitter: slow nose-down zigzag, whiskers forward, sniffing; `9.491 px/s` (**`0.593 b/s`**) |
+| `hop_turn` | `0.50` | `false` | Skitter: small hop; feet off the ground ticks 3 to 7 (timeline `air` 0.15, `land` 0.35): turn the body to its new heading then |
 | `step_up_1000` | `0.85` | `false` | Block move (`up`): quick cute scramble (remade by Claude 2026-11-22 at the user's word: front paws hook the top, three hind-foot pats up the face, rump wiggle; `ahead_px = 24.0`, `end_level = 1`, `wades = true`) |
 | `step_down_1000` | `0.60` | `false` | Block move (`down`): quick front-first hop (remade 2026-11-22; `ahead_px = 12.0`, `end_level = -1`, `wades = true`) |
 | `enter_water_1000` | `2.30` | `false` | Block move (`in`): gradual, relaxed riverbank glide into surface swim (`ahead_px = 12.0`, `ends_afloat = true`, `wet_tick = 18`, max turn 11°/tick) |
@@ -52,6 +56,7 @@
 ## Special Bones (for Java / Renderer)
 - **Head look:** `head` (optional slight share on `neck`)
 - **Mouth / jaw:** `jaw` (plus `tongue` child of `jaw`)
+- **Nose:** `nose` (child of `head`, the nose pad alone since 2026-11-22; sniffs: lifts, pushes forward, flares wider on each puff)
 - **Prey carry socket:** `carry` (empty child bone of `head` right at the front of the jaws — attach caught `crab`, `tilapia`, or `barb` crosswise!)
 - **Eyelids:** `lid_left`, `lid_right` (animated via position `y: 0 → -1.55` in clips; hidden cleanly inside brow at rest)
 - **Whiskers & Ears:** `whisker_left`, `whisker_right`, `ear_left`, `ear_right`

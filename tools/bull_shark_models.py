@@ -714,6 +714,18 @@ def build_bones(teeth_style=None):
         sym_box(tail_fin_c, hwt, tsy(y0), tsy(y1), tx0, lx0 + 0.8, "fin_tip" if dark_tip else "fin_dark")
     sym_box(tail_fin_c, 0.48, tsy(27.2), tsy(29.4), 1.4, 3.4, "fin_tip")
 
+    # =================================================================================================================
+    # JOINT SLEEVES (2026-11-22, "watch for cuts in the model"): each bending piece reaches a few px into the piece in
+    # front of it (the head back into the chest), hidden there at rest: one oval slice the size of its own end, inside
+    # its neighbour's tiers (the neighbour's belly line, its height range trimmed). When the swim wave bends a joint
+    # 10 to 22 degrees the outer side shows more of this sleeve instead of a gap (the old 0.3 to 1 px overlaps opened
+    # past about 9 degrees; the thrash's head joint already opened 2.6 px).
+    # =================================================================================================================
+    _oval_slice(head_c, 59.0, 61.5, sy(9.4), sy(25.8), 8.95 * ws, belly_y=sy(14.0), crest=True)    # into the chest
+    _oval_slice(torso_c, 50.0, 53.0, sy(9.6), sy(25.4), 8.9 * ws, belly_y=sy(14.0), crest=True)    # into the chest
+    _oval_slice(rear_c, 37.5, 40.5, sy(11.4), sy(22.6), 6.4 * ws, belly_y=sy(14.6), crest=True)    # into the torso
+    _oval_slice(ped_c, 27.5, 30.5, sy(13.8), sy(20.3), 4.0 * ws, belly_y=sy(15.8), crest=False)    # into the rear
+
     bones = [
         {"name": "root",               "pivot": [0, AXIS_Y, 0],                          "cubes": []},
         {"name": "body",               "parent": "root",           "pivot": [0, AXIS_Y, oz(56.0)],                   "cubes": []},
@@ -1033,49 +1045,86 @@ def _env_bell(u, t0, t1, t2, t3):
     return 1.0 - smooth((u - t2) / max(1e-5, t3 - t2))
 
 
-def _shark_swim_pose(ph, amp=1.0, body_pitch=0.0, body_y=0.0, pec_sweep=0.0, pec_drop=0.0, jaw_base=4.0, jaw_amp=2.0):
-    """Core carcharhinid traveling S-wave pose at phase `ph` (radians).
-    Designed so world sideways swing grows cleanly from steady head -> tail_fin with monotonic backward phase lag,
-    and phase-aligned (`ph0 = +2.10`) so `t = 0` crosses centerline near 0 deg for silky-smooth GeckoLib blends!
-    """
-    s = math.sin
-    p0 = ph + 1.65  # centers rear/peduncle/tail_base cleanly near 0 deg at t = 0 for zero-pop 4-tick GeckoLib blends!
-    body_yaw = 1.3 * amp * s(p0)
-    body_roll = -1.2 * amp * s(p0 - 0.55)
-    head_yaw = -1.8 * amp * s(p0 - 0.15)
-    torso_yaw = 3.2 * amp * s(p0 - 0.58)
-    rear_yaw = 5.4 * amp * s(p0 - 1.18)
-    ped_yaw = 7.4 * amp * s(p0 - 1.78)
-    tbase_yaw = 9.8 * amp * s(p0 - 2.38)
-    tfin_yaw = 8.0 * amp * s(p0 - 2.92)
+# The swimming wave (2026-11-22, "the shark isnt so stiff when swimming"): one travelling wave along the whole body,
+# every chain piece laid along it, in place of a small wobble per joint. The old pose bent only the back half a few
+# degrees and its peaks ran down the body in a sixth of a beat, so the shark wagged its tail like a plank on a stiff
+# front (head, chest and torso swung 0 to 0.1 px). Real carcharhinids swim carangiform: the head swings a little side
+# to side, the amplitude is least just behind the head and grows fastest over the back third, the wave about one body
+# long (Lighthill's envelope). Fun first for animals: the tail swings a touch wider than a real one (0.125 of the body).
+WAVE_LEN = 1.05            # wavelength in body lengths (my pick, real carangiform 0.9 to 1.1)
+WAVE_TAIL = 11.0           # tail tip swing (px either side) at amp 1.0 (my pick; was about 6.6 at the tail fin's joint)
+# the chain's joints along the outline (ox: 0 tail tip .. 88 snout), as build_bones places them
+_J_SNOUT, _J_HEAD, _J_BODY, _J_TORSO, _J_REAR, _J_PED, _J_TBASE, _J_TFIN, _J_TIP = (
+    88.0, 62.2, 56.0, 50.0, 37.5, 27.5, 16.2, 11.2, 0.0)
 
-    pec_pitch = 2.0 * amp * s(p0 - 0.4)
-    pec_roll = 2.2 * amp * s(p0 - 0.3)
-    tip_yaw = -2.8 * amp * s(p0 - 0.9)
-    tip_roll = 3.4 * amp * s(p0 - 0.9)
-    pel_roll = 2.6 * amp * s(p0 - 1.5)
+
+def _wave_envelope(ox):
+    """Side swing at a point as a share of the tail tip's: least just behind the head, a little at the snout."""
+    u = (88.0 - ox) / 88.0
+    return 0.10 - 0.40 * u + 1.30 * u * u
+
+
+def _wave_phase(ox, ph):
+    """The wave's phase at a point; set so the tail's middle crosses the centre line at ph = 0 (clean blends)."""
+    u = (88.0 - ox) / 88.0
+    return ph - 2.0 * math.pi * (u - 0.82) / WAVE_LEN
+
+
+def _shark_swim_pose(ph, amp=1.0, body_pitch=0.0, body_y=0.0, pec_sweep=0.0, pec_drop=0.0, jaw_base=4.0, jaw_amp=2.0):
+    """The carcharhinid travelling wave at phase `ph` (radians): every chain piece is the chord of the wave between its
+    two joints, so the joints lie on the wave and each piece turns by its chord's angle less its parent's."""
+    s = math.sin
+    A = WAVE_TAIL * amp
+
+    def side(ox):
+        return A * _wave_envelope(ox) * s(_wave_phase(ox, ph))
+
+    def chord(front, back):     # world yaw of a piece from its front joint to its back joint (+yaw swings the back +x)
+        return math.degrees(math.atan2(side(back) - side(front), front - back))
+
+    w_chest = chord(_J_HEAD, _J_TORSO)
+    w_head = math.degrees(math.atan2(side(_J_HEAD) - side(_J_SNOUT), _J_SNOUT - _J_HEAD))
+    w_torso = chord(_J_TORSO, _J_REAR)
+    w_rear = chord(_J_REAR, _J_PED)
+    w_ped = chord(_J_PED, _J_TBASE)
+    w_tbase = chord(_J_TBASE, _J_TFIN)
+    w_tfin = chord(_J_TFIN, _J_TIP)
+    # the body bone turns on the chest's pivot: set it on the chest's chord so the joints sit on the wave
+    f = (_J_HEAD - _J_BODY) / (_J_HEAD - _J_TORSO)
+    root_x = side(_J_HEAD) + (side(_J_TORSO) - side(_J_HEAD)) * f
+
+    def at(ox, lag=0.0):
+        return s(_wave_phase(ox, ph) - lag)
+
+    body_roll = -1.4 * amp * at(_J_TORSO, 0.5)           # the trunk leans a little into each stroke
+    pec_pitch = 2.0 * amp * at(57.6, 0.4)
+    pec_roll = 2.2 * amp * at(57.6, 0.3)
+    tip_yaw = -2.8 * amp * at(57.6, 0.9)
+    tip_roll = 3.4 * amp * at(57.6, 0.9)
+    pel_roll = 2.6 * amp * at(34.5, 0.5)
     jaw_deg = max(0.0, jaw_base + jaw_amp * s(ph))
 
     p = {
-        "root":               {"position": [0.0, round(body_y + 0.30 * amp * s(ph * 2.0), 3), 0.0]},
-        "body":               {"rotation": [body_pitch, body_yaw, body_roll]},
-        "head":               {"rotation": [0.0, head_yaw, 0.0]},
+        "root":               {"position": [round(root_x, 3), round(body_y + 0.30 * amp * s(ph * 2.0), 3), 0.0]},
+        "body":               {"rotation": [body_pitch, round(w_chest, 3), round(body_roll, 3)]},
+        "head":               {"rotation": [0.0, round(w_head - w_chest, 3), 0.0]},
         "jaw":                {"rotation": [jaw_deg, 0.0, 0.0]},
         "tongue":             {"rotation": [jaw_deg * 0.12, 0.0, 0.0]},
-        "dorsal_1":           {"rotation": [0.0, 0.0, -1.4 * amp * s(p0 - 0.7)]},
+        "dorsal_1":           {"rotation": [0.0, 0.0, -2.0 * amp * at(51.5, 0.6)]},
         "pectoral_left":      {"rotation": [pec_pitch, -pec_sweep,  pec_drop + pec_roll]},
         "pectoral_right":     {"rotation": [pec_pitch,  pec_sweep, -pec_drop - pec_roll]},
         "pectoral_tip_left":  {"rotation": [0.0,  tip_yaw,  tip_roll]},
         "pectoral_tip_right": {"rotation": [0.0, -tip_yaw, -tip_roll]},
-        "torso":              {"rotation": [0.0, torso_yaw, 0.0]},
-        "rear":               {"rotation": [0.0, rear_yaw, 0.0]},
+        "torso":              {"rotation": [0.0, round(w_torso - w_chest, 3), 0.0]},
+        "rear":               {"rotation": [0.0, round(w_rear - w_torso, 3), 0.0]},
         "pelvic_left":        {"rotation": [0.0, 0.0,  pel_roll]},
         "pelvic_right":       {"rotation": [0.0, 0.0, -pel_roll]},
-        "peduncle":           {"rotation": [0.0, ped_yaw, 0.0]},
-        "dorsal_2":           {"rotation": [0.0, 0.0, -2.0 * amp * s(p0 - 1.9)]},
-        "anal_fin":           {"rotation": [0.0, 0.0,  2.0 * amp * s(p0 - 1.9)]},
-        "tail_base":          {"rotation": [0.0, tbase_yaw, 0.0]},
-        "tail_fin":           {"rotation": [0.0, tfin_yaw, 0.0]},
+        "peduncle":           {"rotation": [0.0, round(w_ped - w_rear, 3), 0.0]},
+        "dorsal_2":           {"rotation": [0.0, 0.0, -3.0 * amp * at(25.0, 0.6)]},
+        "anal_fin":           {"rotation": [0.0, 0.0,  3.0 * amp * at(25.0, 0.6)]},
+        "tail_base":          {"rotation": [0.0, round(w_tbase - w_ped, 3), 0.0]},
+        # the tall upper lobe trails and twists a little as it sweeps (the heterocercal tail's flex)
+        "tail_fin":           {"rotation": [0.0, round(w_tfin - w_tbase, 3), round(3.0 * amp * at(6.0, 1.2), 3)]},
     }
     p.update(_lid_pose(0.0))
     return p
@@ -1421,7 +1470,7 @@ WORKSHOP_CLIP_INFO = {
     "surface": 24.5 / 16.0,
     "notes": {
         "idle":             "Slow ominous ram-ventilation patrol glide (heavy low-cadence tail sweep + subtle jaw breath).",
-        "swim":             "Steady predatory river swim (speed-matched carcharhinid S-wave, steady head, wingtip feathering).",
+        "swim":             "Steady predatory river swim (one travelling S-wave down the whole body, the head swaying a little, wingtip feathering).",
         "burst":            "Explosive ambush sprint (fast tail whip + pectoral wings swept back for low drag).",
         "surface_prowl":    "Jaws-style high-riding river stalk with tall 1st dorsal fin slicing above the waterline.",
         "bite":             "Crushing bull shark bite: snout lifts, jaw opens 46 deg, pale nictitating lids flick shut on hit tick 8 (0.40s).",
