@@ -600,3 +600,4 @@ Every "Current status" bullet CLAUDE.md held up to 2026-11-19, word for word, ol
 - 2026-11-22, bull shark sizes on `master` (the user's ask): six sizes 5.0 to 7.5 blocks in half-block steps, most 5.5 to 6.0, few 7.5 giants; 14 bull shark tests pass.
 - 2026-11-22, the six-banded distichodus started on `master` (the user's photo, Claude's design): design sheet drawn from straight lines side on (the photo's tilted fish only guides colours, fins and bands), brief and outline (`docs/plans/distichodus.md`); waiting for the user's OK on the outline before the 3D shape.
 - 2026-11-22, the distichodus's outline approved ("Outline is OK"); the plain 3D shape made (v1, 67 boxes, straight lines kept; side 93 / 93 against the sheet), waiting for the user's OK.
+- 2026-11-22, the distichodus's eyes no longer stick out past the head (v3: one eye piece per head slice on a fuller cheek); waiting for the user's OK on the 3D shape.

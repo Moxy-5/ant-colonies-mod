@@ -1,0 +1,14 @@
+{
+ "note": "eyes sit in the head: one piece per head slice, inside the fuller cheek (v1's stuck out at the top front)",
+ "date": "2026-11-22",
+ "boxes": 69,
+ "numbers": {
+  "WIDEST": 2.0,
+  "CORE_WIDTH": 0.55,
+  "FLANK_DEPTH": 0.62,
+  "HEAD_FLANK_DEPTH": 0.85,
+  "EYE_AT": 33.0,
+  "EYE_HEIGHT": 10.25,
+  "EYE_SIZE": 1.0
+ }
+}

@@ -39,9 +39,12 @@ TAIL_ROOT = 9.0                # the tail fin behind this
 WIDEST = 2.0                   # half the width along the flat sides (4 across a depth of about 11)
 CORE_WIDTH = 0.55              # the tall box's share of the width (the back and belly ridges)
 FLANK_DEPTH = 0.62             # the wide box's share of the depth (the flat flank)
+HEAD_FLANK_DEPTH = 0.85        # the head's: a full flat cheek, so the eye sits on it (the user, v1: the eyes' top
+                               # corners stuck out past the head)
 BODY_SLICE, HEAD_SLICE = 2.0, 1.0
 SNOUT = 1.5                    # the last stretch, split at the mouth line into the upper lip and the small jaw
-EYE_AT, EYE_HEIGHT, EYE_SIZE = 32.8, 10.5, 1.25   # the eye's middle (outline x, y) and its half size
+EYE_AT, EYE_HEIGHT, EYE_SIZE = 33.0, 10.25, 1.0   # the eye's middle (outline x, y) and its half size: two head
+                                                  # slices long, inside the cheek's height
 MOUTH_Y = 9.35                 # the mouth line, a hair under the middle line (the small mouth at the tip)
 
 
@@ -85,12 +88,20 @@ def box(x0, x1, half, y0, y1, part, across=0.0):
     return cube([across - half, y0, z0], [across + half, y1, z1], part)
 
 
+def flank_of(x0, x1):
+    """A slice's flank box: (half width, bottom, top); fuller on the head (the cheek)."""
+    top, belly, hw = at((x0 + x1) / 2)
+    mid, half_d = (top + belly) / 2, (top - belly) / 2
+    depth = HEAD_FLANK_DEPTH if x0 >= HEAD_FROM - 1e-6 else FLANK_DEPTH
+    return q(hw), q(mid - half_d * depth), q(mid + half_d * depth)
+
+
 def slice_boxes(x0, x1):
     """A slice: the tall narrow box the full depth, the wide one the middle of the depth (the flat flank)."""
     top, belly, hw = at((x0 + x1) / 2)
-    mid, half_d = (top + belly) / 2, (top - belly) / 2
+    flank, f0, f1 = flank_of(x0, x1)
     return [box(x0, x1, q(hw * CORE_WIDTH), q(belly), q(top), 'body'),
-            box(x0, x1, q(hw), q(mid - half_d * FLANK_DEPTH), q(mid + half_d * FLANK_DEPTH), 'flank')]
+            box(x0, x1, flank, f0, f1, 'flank')]
 
 
 def slice_edges():
@@ -124,15 +135,23 @@ def mouth(bones):
 
 
 def eyes(bones):
-    """Each eye a block from the narrow core out to a quarter pixel past the widest head slice it touches (so no
-    slice behind it, wider, buries half of it). Its outer face is the red ring with the black pupil."""
+    """Each eye one piece per head slice it covers, each from the narrow core out to a quarter pixel past that slice's
+    own cheek and no higher or lower than the cheek, so the eye follows the wedge of the face and nothing of it stands
+    out past the head (the user, v1: "the top left of their eyes go past their body and stick out": one box sized to
+    the widest slice stood proud of the narrower ones in front, and rose above the cheek). Its outer faces are the red
+    ring with the black pupil."""
     a, b = EYE_AT - EYE_SIZE, EYE_AT + EYE_SIZE
-    outer = max(q(half_width(x)) for x in (a, b, EYE_AT)) + 0.25
-    core = q(half_width(EYE_AT) * CORE_WIDTH)
-    for s in (1, -1):
-        lo, hi = sorted((s * core, s * outer))
-        bones['head'].append(box(a, b, (hi - lo) / 2, EYE_HEIGHT - EYE_SIZE, EYE_HEIGHT + EYE_SIZE, 'eye',
-                                 across=(hi + lo) / 2))
+    edges = slice_edges()
+    for x0, x1 in zip(edges, edges[1:]):
+        p0, p1 = max(a, x0), min(b, x1)
+        if p1 - p0 < 0.25:
+            continue
+        flank, f0, f1 = flank_of(x0, x1)
+        core = q(half_width((x0 + x1) / 2) * CORE_WIDTH)
+        y0, y1 = max(EYE_HEIGHT - EYE_SIZE, f0), min(EYE_HEIGHT + EYE_SIZE, f1)
+        for s in (1, -1):
+            lo, hi = sorted((s * core, s * (flank + 0.25)))
+            bones['head'].append(box(p0, p1, (hi - lo) / 2, y0, y1, 'eye', across=(hi + lo) / 2))
 
 
 def tail(bones):
@@ -206,8 +225,9 @@ PLAIN = {
 def plain_colour(c, face, x, y, z):
     part, bone = c['_part'], c['_bone']
     ox = LENGTH / 2 - z
-    if part == 'eye' and face in ('east', 'west'):
-        if abs(ox - EYE_AT) < 0.6 and abs(y - EYE_HEIGHT) < 0.6:
+    if part == 'eye' and face not in ('up', 'down'):     # the sides, and the little step between the eye's two
+                                                          # pieces, so the pupil reads as one
+        if abs(ox - EYE_AT) < 0.5 and abs(y - EYE_HEIGHT) < 0.5:
             return PLAIN['pupil']
         return PLAIN['eye']
     if part in ('body', 'flank', 'eye'):
@@ -226,9 +246,10 @@ WORKSHOP_SHAPE = [
     ('WIDEST', 'Half the width along the flat sides (model pixels)', 1.25, 3.0, 0.25),
     ('CORE_WIDTH', 'Back and belly ridge width (share of the full width)', 0.3, 0.9, 0.05),
     ('FLANK_DEPTH', 'Flat flank depth (share of the full depth)', 0.4, 0.9, 0.02),
+    ('HEAD_FLANK_DEPTH', 'Cheek depth on the head (share of the full depth)', 0.5, 1.0, 0.05),
     ('EYE_AT', 'Eye along the head (model pixels from the tail tip)', 31.0, 35.0, 0.25),
-    ('EYE_HEIGHT', 'Eye height (model pixels)', 9.0, 12.0, 0.25),
-    ('EYE_SIZE', 'Eye half size (model pixels)', 0.75, 1.75, 0.25),
+    ('EYE_HEIGHT', 'Eye height (model pixels)', 9.0, 11.5, 0.25),
+    ('EYE_SIZE', 'Eye half size (model pixels)', 0.5, 1.5, 0.25),
 ]
 WORKSHOP_PARTS = {'head': ['head', 'jaw'], 'body': ['body'], 'tail': ['tail_stalk', 'tail_fin'],
                   'back fin': ['back_fin'], 'breast fins': ['fin_left', 'fin_right']}

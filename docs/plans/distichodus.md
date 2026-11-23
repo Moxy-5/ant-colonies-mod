@@ -49,7 +49,7 @@ fish beside the silver barbs and grey tilapia.
    head, jaw, tail_stalk, tail_fin, back_fin, fin_left, fin_right; the belly fins, the fin under the tail and the
    small pale fin sit on the body and the stalk). The top and belly run straight between the sheet's points, never
    eased; body slices 2 pixels, head slices 1 so the wedge face reads straight. Compare against the sheet: side 93 /
-   93, top 85 / 93, front 74 / 79. Page `references/workshop/distichodus/versions.html`. Waiting for the user's OK.
+   93, top 85 / 93, front 74 / 79. Page `references/workshop/distichodus/versions.html`. v3 (the user on v1: "the top left of their eyes go past their body and stick out"): each eye one piece per head slice, a quarter pixel proud of its own slice and inside a fuller cheek (`HEAD_FLANK_DEPTH` 0.85), 2 pixels across; the pupil painted across the pieces' step; 69 boxes. Waiting for the user's OK.
 3. Shape detail. 4. Paint (the bands painted at 2 texture pixels a model pixel).
 5. Clips: `idle`, `swim`, `graze`, `bolt`, `leap`, `flop`, `death` (checked with `clip_check.py` and in-game films).
 6. Into the game: the entity, spawning (the check list, `RiverLifeTests.worldWouldSpawn`), grazing hippo grass and
