@@ -3593,6 +3593,164 @@ public class RiverLifeTests {
         });
     }
 
+    // --- the tadpole (the river tie-up, 2026-11-23) --------------------------------------------------------------------
+
+    /** A hungry bullfrog at the water's edge lunges at a tadpole in the water in front of it (real bullfrogs eat their own kind's). */
+    @GameTest(template = "arena", timeoutTicks = 300)
+    public static void aHungryBullfrogLungesAtATadpole(GameTestHelper helper) {
+        bankWithPool(helper);
+        BullfrogEntity frog = frogOnBank(helper, MX0 + 5, MZ0 + 5, -90);
+        frog.makeHungry();
+        com.antcolonies.savanna.animal.TadpoleEntity tadpole = helper.spawn(SavannaEntities.TADPOLE.get(), new BlockPos(MX0 + 6, TOP, MZ0 + 5));
+        tadpole.setNoAi(true);
+        tadpole.setPersistenceRequired();
+        helper.succeedWhen(() -> helper.assertTrue(tadpole.isRemoved() && !frog.isHungry(), "the tadpole " + (tadpole.isRemoved() ? "is gone"
+                : "still swims " + String.format("%.2f", tadpole.distanceTo(frog)) + " blocks off") + (frog.isHungry() ? ", the frog still hungry" : "")));
+    }
+
+    /**
+     * Tadpoles spawn by themselves in the shallows (the spawning check list): over a river's cross-section the world would
+     * spawn one at every water spot of a column 1 or 2 blocks deep and nowhere deeper; their own group (cap 16), listed in
+     * the savanna's waters in schools of 6 to 10.
+     */
+    @GameTest(template = "arena", timeoutTicks = 200)
+    public static void tadpolesSpawnInTheShallowsByThemselves(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        int top = buildChannel(helper, false);
+        BlockPos corner = helper.absolutePos(new BlockPos(CX0, 0, CZ0));
+        int[] spots = new int[CHANNEL_DEPTHS.length];
+        for (int i = 0; i < CHANNEL_DEPTHS.length; i++) {
+            for (int dz = 0; dz <= CZ1 - CZ0; dz++) {
+                for (int y = top - 8; y <= top + 1; y++) {
+                    spots[i] += worldWouldSpawn(level, SavannaEntities.TADPOLE.get(), new BlockPos(corner.getX() + i, y, corner.getZ() + dz)) ? 1 : 0;
+                }
+            }
+        }
+        buildChannel(helper, true);
+        SavannaMod.LOGGER.info("[tadpole spawns] spots over the channel by column {}", java.util.Arrays.toString(spots));
+        StringBuilder wrong = new StringBuilder();
+        for (int i = 0; i < CHANNEL_DEPTHS.length; i++) {
+            int want = CHANNEL_DEPTHS[i] <= 2 ? CHANNEL_DEPTHS[i] * (CZ1 - CZ0 + 1) : 0;
+            if (spots[i] != want) {
+                wrong.append(" depth ").append(CHANNEL_DEPTHS[i]).append(": ").append(spots[i]).append(", want ").append(want);
+            }
+        }
+        helper.assertTrue(wrong.isEmpty(), "tadpoles spawn at the wrong spots:" + wrong);
+        var group = com.antcolonies.savanna.registry.SavannaMobCategories.tadpole();
+        helper.assertTrue(SavannaEntities.TADPOLE.get().getCategory() == group, "the tadpole is in the " + SavannaEntities.TADPOLE.get().getCategory().getName() + " group");
+        helper.assertTrue(group.getMaxInstancesPerChunk() == 16, "the tadpole group's cap is " + group.getMaxInstancesPerChunk() + " (16 wanted)");
+        var biomes = level.registryAccess().registryOrThrow(net.minecraft.core.registries.Registries.BIOME);
+        var listed = biomes.getOrThrow(net.minecraft.world.level.biome.Biomes.SAVANNA).getMobSettings().getMobs(group).unwrap().stream()
+                .filter(d -> d.type == SavannaEntities.TADPOLE.get()).findFirst();
+        helper.assertTrue(listed.isPresent() && listed.get().minCount == 6 && listed.get().maxCount == 10,
+                "tadpoles in the savanna's list: " + listed.map(d -> d.minCount + " to " + d.maxCount).orElse("none") + " (6 to 10 wanted)");
+        helper.succeed();
+    }
+
+    /**
+     * A tadpole's life: its leg buds show from day 3; at the end of day 3 it becomes a froglet (a young bullfrog, about a
+     * third of a grown one's size) when there is room; beside 4 bullfrogs another does not make it (the frogs' cap).
+     */
+    @GameTest(template = "arena", timeoutTicks = 200)
+    public static void aTadpoleGrowsLegsThenBecomesAFrogletOnlyWithRoom(GameTestHelper helper) {
+        buildPond(helper);
+        com.antcolonies.savanna.animal.TadpoleEntity legs = helper.spawn(SavannaEntities.TADPOLE.get(), new BlockPos(X1 - 1, SURFACE + 2, Z0 + 1));
+        legs.setPersistenceRequired();
+        legs.setAge(com.antcolonies.savanna.animal.TadpoleEntity.LEGS_AT - 20);
+        com.antcolonies.savanna.animal.TadpoleEntity grows = helper.spawn(SavannaEntities.TADPOLE.get(), new BlockPos(X1 - 1, SURFACE + 2, Z1 - 1));
+        grows.setPersistenceRequired();
+        grows.setAge(com.antcolonies.savanna.animal.TadpoleEntity.FROGLET_AT - 20);
+        java.util.Set<java.util.UUID> before = new java.util.HashSet<>();
+        long[] grewAt = {-1};
+        helper.onEachTick(() -> {
+            if (helper.getTick() == 1) {
+                helper.getLevel().getEntitiesOfClass(BullfrogEntity.class, helper.getBounds().inflate(40)).forEach(f -> before.add(f.getUUID()));
+            }
+        });
+        helper.succeedWhen(() -> {
+            helper.assertTrue(legs.hasLegs(), "no legs at day 3 (age " + legs.age() + ")");
+            helper.assertTrue(grows.isRemoved(), "the day-3 tadpole is still a tadpole (age " + grows.age() + ")");
+            var froglets = helper.getLevel().getEntitiesOfClass(BullfrogEntity.class, helper.getBounds().inflate(40), f -> !before.contains(f.getUUID()));
+            helper.assertTrue(froglets.size() == 1, froglets.size() + " froglets came of it (1 wanted)");
+            BullfrogEntity froglet = froglets.get(0);
+            helper.assertTrue(froglet.isFroglet() && froglet.getScale() < 0.4F, "the froglet: froglet " + froglet.isFroglet() + ", size " + froglet.getScale());
+            if (grewAt[0] < 0) {
+                grewAt[0] = helper.getTick();
+            }
+        });
+    }
+
+    /** Beside 4 bullfrogs a day-3 tadpole does not become a fifth: it is gone and no froglet comes of it. */
+    @GameTest(template = "arena", timeoutTicks = 200)
+    public static void aTadpoleBesideFourFrogsDoesNotBecomeAFifth(GameTestHelper helper) {
+        buildPond(helper);
+        java.util.List<BullfrogEntity> frogs = new java.util.ArrayList<>();
+        for (int i = 0; i < 4; i++) {
+            BullfrogEntity frog = helper.spawn(SavannaEntities.BULLFROG.get(), new BlockPos(X0 + i, TOP + 1, Z0 - 1));
+            frog.setNoAi(true);
+            frog.setPersistenceRequired();
+            frogs.add(frog);
+        }
+        com.antcolonies.savanna.animal.TadpoleEntity late = helper.spawn(SavannaEntities.TADPOLE.get(), new BlockPos(X1 - 1, SURFACE + 2, Z1 - 1));
+        late.setPersistenceRequired();
+        late.setAge(com.antcolonies.savanna.animal.TadpoleEntity.FROGLET_AT - 20);
+        helper.succeedWhen(() -> {
+            helper.assertTrue(late.isRemoved(), "the day-3 tadpole is still a tadpole");
+            int count = helper.getLevel().getEntitiesOfClass(BullfrogEntity.class, helper.getBounds().inflate(40)).size();
+            helper.assertTrue(count == 4, count + " bullfrogs (4 wanted: no froglet beside the 4)");
+        });
+    }
+
+    /** Tadpoles over an algae mat graze it: one noses down onto it (the graze), now and then taking a bite. */
+    @GameTest(template = "arena", timeoutTicks = 1200)
+    public static void tadpolesGrazeTheAlgae(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        buildPond(helper);
+        BlockPos corner = helper.absolutePos(new BlockPos(X0, TOP, Z0));
+        RiverAlgaeFeature.lay(level, corner.getX(), corner.getZ(), X1 - X0 + 1, Z1 - Z0 + 1, corner.getY(), at -> true);
+        java.util.List<com.antcolonies.savanna.animal.TadpoleEntity> school = new java.util.ArrayList<>();
+        for (int i = 0; i < 6; i++) {
+            com.antcolonies.savanna.animal.TadpoleEntity t = helper.spawn(SavannaEntities.TADPOLE.get(), new BlockPos(X0 + 1 + i % 3, TOP, Z0 + 2 + i / 3));
+            t.setPersistenceRequired();
+            school.add(t);
+        }
+        boolean[] grazed = {false};
+        helper.onEachTick(() -> {
+            for (var t : school) {
+                grazed[0] |= t.action() == com.antcolonies.savanna.animal.TadpoleEntity.GRAZE;
+            }
+        });
+        helper.succeedWhen(() -> helper.assertTrue(grazed[0], "no tadpole grazed the algae"));
+    }
+
+    /** A hungry hatchling crocodile in the shallows snaps up a tadpole; a hungry catfish takes one (a snack, as a barb). */
+    // (2600 ticks: a catfish's missed chase gives up at 600 and rests 1200, as in its tilapia test)
+    @GameTest(template = "arena", timeoutTicks = 2600)
+    public static void aHatchlingCrocodileAndACatfishEatTadpoles(GameTestHelper helper) {
+        buildPond(helper);
+        var croc = helper.spawn(SavannaEntities.CROCODILE.get(), new BlockPos(3, TOP - 1, 5));
+        croc.life().setUp(true, croc.getRandom());
+        croc.life().setAge(0);
+        croc.load(croc.saveWithoutId(new net.minecraft.nbt.CompoundTag()));
+        croc.setPersistenceRequired();
+        croc.makeHungry();
+        croc.strikeLuck = 1;
+        com.antcolonies.savanna.animal.TadpoleEntity forCroc = helper.spawn(SavannaEntities.TADPOLE.get(), new BlockPos(5, TOP - 1, 5));
+        forCroc.setNoAi(true);
+        forCroc.setPersistenceRequired();
+        CatfishEntity catfish = helper.spawn(SavannaEntities.CATFISH.get(), new BlockPos(X1 - 1, SURFACE + 2, Z0 + 1));
+        catfish.setPersistenceRequired();
+        catfish.makeHungry();
+        com.antcolonies.savanna.animal.TadpoleEntity forCatfish = helper.spawn(SavannaEntities.TADPOLE.get(), new BlockPos(X1 - 2, SURFACE + 3, Z1 - 2));
+        forCatfish.setPersistenceRequired();
+        helper.succeedWhen(() -> {
+            helper.assertTrue(forCroc.isRemoved() && !croc.isHungry(), "the hatchling's tadpole " + (forCroc.isRemoved() ? "is gone" : "still swims")
+                    + (croc.isHungry() ? ", the hatchling still hungry" : ""));
+            helper.assertTrue(forCatfish.isRemoved() && !catfish.isHungry(), "the catfish's tadpole " + (forCatfish.isRemoved() ? "is gone" : "still swims")
+                    + (catfish.isHungry() ? ", the catfish still hungry" : ""));
+        });
+    }
+
     /**
      * The long tongue (the user's 2 blocks): a hungry bullfrog under a fly cloud hanging within reach flicks at it and
      * eats flies; another under a cloud hanging 3 blocks up (out of reach) never flicks.

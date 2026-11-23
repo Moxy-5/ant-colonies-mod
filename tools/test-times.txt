@@ -67,6 +67,7 @@ ahippowalksoutoftheshallowsonitsmove 0.47
 ahippowearsapathwalkingthesameway 0.03
 ahippoyawnsataplayerthenchargesandbites 0.34
 ahungrybullfroglungesatabarb 0.25
+ahungrybullfroglungesatatadpole 0.01
 ahungrycatfishhuntsandswallowsatilapia 0.02
 ahungrycrabpicksremainsbeforealgae 0.44
 ahungrycrocodilegrabsdrownsandrollsitsprey 0.70
@@ -158,6 +159,9 @@ astarvingworkerslowsdownanddies 0.40
 astrandedsharkflopsbackintothewater 0.02
 astrandedsharksuffocatesslowly 0.05
 aswollenqueencannolongerwalk 2.25
+atadpolebesidefourfrogsdoesnotbecomeafifth 0.01
+atadpolegrowslegsthenbecomesafrogletonlywithroom 0.02
+ateencrocodiletakesabullfroginthewater 0.03
 atermitecolonyawayagesitscombfeedsitsqueenandeatsasnumbers 0.58
 atermitecolonyawayforagesfromthenightsholesandgrowsitsgalleriesonreturn 4.87
 atermitecrawlsupinsideaspireandcomesoutofitsmouth 0.62
@@ -299,6 +303,8 @@ soldiersstandguardandanursefeedsahungrysoldier 0.85
 soldierswalkbeatsatafeedingplacebyday 0.06
 soldierswithinearshotcometoaraidsbreaktaketheirownplacesandbite 0.06
 stresssavannashapes 2.14
+tadpolesgrazethealgae 0.01
+tadpolesspawnintheshallowsbythemselves 0.00
 tenmatabelesatafeedingspottakeminutesandmanytermitesescape 0.23
 termitemudonadeadtreestays 0.00
 termitenumbersarelostoutofsightonlywhereahostilereallyis 1.06

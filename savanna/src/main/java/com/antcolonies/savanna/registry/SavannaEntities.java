@@ -128,6 +128,16 @@ public class SavannaEntities {
                     .clientTrackingRange(4)
                     .build("barb"));
 
+    // The bullfrog's tadpole (the river tie-up, 2026-11-23): drawn 0.15 blocks long (the plan's pick), a small box. Its
+    // own spawning group, so its schools never fill the bullfrogs' 4 places or the barbs'.
+    public static final DeferredHolder<EntityType<?>, EntityType<com.antcolonies.savanna.animal.TadpoleEntity>> TADPOLE =
+            ENTITY_TYPES.register("tadpole", () -> EntityType.Builder
+                    .of(com.antcolonies.savanna.animal.TadpoleEntity::new, SavannaMobCategories.tadpole())
+                    .sized(0.18F, 0.12F)
+                    .eyeHeight(0.06F)
+                    .clientTrackingRange(4)
+                    .build("tadpole"));
+
     // A cloud of flies (fly clouds step 2, 2026-11-20): one mob for the whole cloud, its flies drawn by its renderer; a
     // small box round its middle (my pick), not collided with, not hurt by fire. Its own spawning group, fly clouds.
     public static final DeferredHolder<EntityType<?>, EntityType<com.antcolonies.savanna.animal.FlyCloudEntity>> FLY_CLOUD =

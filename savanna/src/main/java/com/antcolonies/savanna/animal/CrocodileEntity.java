@@ -2404,8 +2404,12 @@ public class CrocodileEntity extends PathfinderMob implements GeoEntity, HasLife
             // the young's food (a hatchling's only prey); a grown crocodile ignores barbs
             return !croc.life().stage().grown() && barb.isInWater() && isFish(e);
         }
+        if (e instanceof TadpoleEntity tadpole) {
+            // the young's food too (2026-11-23, the river tie-up), as a barb
+            return !croc.life().stage().grown() && tadpole.isInWater() && !tadpole.hasCustomName();
+        }
         if (croc.life().isYoung()) {
-            return false;           // a hatchling hunts barbs only
+            return false;           // a hatchling hunts barbs and tadpoles only
         }
         if (!croc.life().stage().grown()) {
             // a teen hunts fish (animal life cycle step 4) and bullfrogs in the water (2026-11-23, the river tie-up: frogs
@@ -2471,9 +2475,9 @@ public class CrocodileEntity extends PathfinderMob implements GeoEntity, HasLife
         return e instanceof net.minecraft.world.entity.animal.AbstractFish || !(e instanceof Player) && e.getBbWidth() < 0.75F && e.getBbHeight() < 0.95F;
     }
 
-    /** A wild river fish it hunts: a tilapia, a catfish or a barb, not from a bucket and not named (the player's own fish). */
+    /** A wild river fish it hunts: a tilapia, a catfish, a barb or a tadpole (hunted the fish's way), not from a bucket and not named (the player's own fish). */
     static boolean isFish(LivingEntity e) {
-        return (e instanceof TilapiaEntity || e instanceof CatfishEntity || e instanceof BarbEntity) && !((net.minecraft.world.entity.animal.AbstractFish) e).fromBucket()
+        return (e instanceof TilapiaEntity || e instanceof CatfishEntity || e instanceof BarbEntity || e instanceof TadpoleEntity) && !((net.minecraft.world.entity.animal.AbstractFish) e).fromBucket()
                 && !e.hasCustomName();
     }
 

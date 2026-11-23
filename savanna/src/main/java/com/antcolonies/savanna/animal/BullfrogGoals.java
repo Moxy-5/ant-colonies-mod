@@ -272,6 +272,10 @@ final class BullfrogGoals {
             if (e instanceof BarbEntity barb) {
                 return barb.isInWater() && !barb.fromBucket() && !barb.hasCustomName();
             }
+            if (e instanceof TadpoleEntity tadpole) {
+                // a tadpole swimming past its mouth (2026-11-23: real bullfrogs eat their own kind's too), ambushed only
+                return tadpole.isInWater() && !tadpole.hasCustomName();
+            }
             return e instanceof SnailEntity && !e.hasCustomName() || e instanceof CrabEntity crab && crab.life().isYoung() && !crab.hasCustomName();
         }
 
@@ -286,7 +290,7 @@ final class BullfrogGoals {
 
         /** Prey worth going after from afar: slow things (a snail, a young crab), not the darting barbs. */
         private static boolean chased(LivingEntity e) {
-            return !(e instanceof BarbEntity);
+            return !(e instanceof BarbEntity || e instanceof TadpoleEntity);
         }
 
         /**
@@ -658,8 +662,8 @@ final class BullfrogGoals {
 
         @Override
         public boolean canUse() {
-            if (!now(frog, 5) || frog.action() == BullfrogEntity.LEAP) {
-                return false;
+            if (!now(frog, 5) || frog.action() == BullfrogEntity.LEAP || frog.isFroglet()) {
+                return false;       // (a froglet is too small to square up to anyone)
             }
             player = playerNear(frog, PUFF_NEAR);
             if (player == null && frog.getLastHurtByMob() instanceof Player hurter && frog.tickCount - frog.getLastHurtByMobTimestamp() < 100
@@ -841,7 +845,7 @@ final class BullfrogGoals {
 
         @Override
         public boolean canUse() {
-            return frog.isMale() && frog.callIn <= 0 && !frog.busy() && !frog.isDug() && callingTime(frog.level(), frog.blockPosition())
+            return frog.isMale() && !frog.isFroglet() && frog.callIn <= 0 && !frog.busy() && !frog.isDug() && callingTime(frog.level(), frog.blockPosition())
                     && (frog.onGround() || frog.isInWater());
         }
 

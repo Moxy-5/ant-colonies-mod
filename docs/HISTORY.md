@@ -1154,6 +1154,25 @@ Moved here from CLAUDE.md on 2026-10-13 (it was loaded into every chat and took 
   eat bullfrogs** in the water as well as fish (`CrocodileEntity.isPrey`; hatchlings keep to barbs), test
   `aTeenCrocodileTakesABullfrogInTheWater`. Catfish eating frogs tried twice and dropped (my pick, the two-strikes rule:
   a floating frog sits above a fish's reach and hops out; `docs/plans/river-tie-up.md`).
+- 2026-11-23, **the bullfrog's tadpoles in the game, part A** (the user: "lets start on the tadpoles spawning in the water
+  naturally being a food source as well and coming from frog breeding"; part B, the frogs breeding, next; plan
+  `docs/plans/river-tie-up.md`). Model: `tools/tadpole_models.py` gains its paint (near black, freckles, the gut showing
+  through a grey belly, gold-ringed eye, clear speckled fins) and six clips (idle, swim: the wave down the tail, graze:
+  nose down rasping, scatter: a C then a dart, flop, death: belly up), `python tools/tadpole_models.py game`; body plan
+  `body_plans/tadpole.json`; checked offline (`clip_check.py tadpole --switches`: the dart's tail tip first turned 95
+  degrees in 0.05 s and the flop sank 4.9 px into the ground; fixed) and filmed in the game from three sides
+  (`tools/film/tadpole_frames.film`). `animal/TadpoleEntity` (a schooling fish, 0.15 blocks, schools up to 12;
+  `client/TadpoleRenderer` hides the leg buds until day 3): its age (synced), leg buds from day 3, at the end of day 3 a
+  froglet if fewer than 4 bullfrogs live within 32 blocks (the user's cap of 4), else it quietly goes; grazes algae
+  (`TadpoleGrazeGoal`, one graze in 6 takes a bite); swims aside from hunters, darts at a strike. Its own spawning group
+  `antcolonies:tadpole` (cap 16, schools of 6 to 10, water 1 or 2 deep, the quiet-savanna gate; spawned schools of one
+  age, within an hour of each other). Eaten by grown bullfrogs (ambush lunge), hatchling and teen crocodiles (counted
+  with the fish, their shoot-through-the-water lunge) and catfish (a snack, as a barb). **The froglet** is a bullfrog
+  with its own grow-up clock (`BullfrogEntity.makeFroglet`, `isFroglet`), not Minecraft's baby (GeckoLib reads the baby
+  flag its own way, and the mouth and tongue read SCALE): it starts at 0.32 of its full size and grows smoothly over 3
+  days; it neither calls nor squares up to players. Tests (`river`): `tadpolesSpawnInTheShallowsByThemselves`,
+  `aTadpoleGrowsLegsThenBecomesAFrogletOnlyWithRoom`, `aTadpoleBesideFourFrogsDoesNotBecomeAFifth`,
+  `tadpolesGrazeTheAlgae`, `aHungryBullfrogLungesAtATadpole`, `aHatchlingCrocodileAndACatfishEatTadpoles`.
 
 ## Handover notes for a code reviewer (written at the end of a very long session)
 - State: branch `master`, all committed, `./gradlew build` passes, `./gradlew runGameTestServer` passes 47 tests (about 8 minutes, in one world, tests run in parallel arena grids). Some tests are timing-sensitive under load (`antsOnBumpyGroundReachTheFoodStore` and `aStarvingWorkerSlowsDownAndDies` have each failed once and passed on a re-run): re-run before blaming a change.

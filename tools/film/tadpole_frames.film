@@ -1,0 +1,164 @@
+# The bullfrog's tadpole in the game, frame by frame (the river tie-up, 2026-11-23; CLAUDE.md's hard rule): every clip
+# on a still tadpole named film:<clip>, side on, three quarters and (swim) from the front, the game frozen and stepped; a
+# day-3 tadpole with its leg buds; the flop on land; a free school; a froglet beside a grown bullfrog.
+#   ./gradlew runFilm -PfilmScene=tools/film/tadpole_frames.film   pictures in run-film/screenshots/tadpole_frames/
+cmd time set noon
+cmd weather clear
+cmd kill @e[type=!player]
+# the pool: x 30..44, 3 deep, flush with the grass
+cmd fill 30 -63 -8 44 -61 8 minecraft:water
+lens 30
+wait 40
+cmd summon antcolonies:tadpole 33.5 -62.2 0.5 {NoAI:1b,Rotation:[-90f,0f],CustomName:'"film:idle"'}
+camera 33.50 -63.77 -0.10 0 0
+wait 10
+cmd tick freeze
+burst idle_side 12 2
+cmd tick unfreeze
+cmd tp @e[type=antcolonies:tadpole] 33 -140 0
+wait 3
+cmd summon antcolonies:tadpole 33.5 -62.2 0.5 {NoAI:1b,Rotation:[-90f,0f],CustomName:'"film:idle"'}
+camera 33.13 -63.72 0.13 -45 10
+wait 10
+cmd tick freeze
+burst idle_threequarter 12 2
+cmd tick unfreeze
+cmd tp @e[type=antcolonies:tadpole] 33 -140 0
+wait 3
+cmd summon antcolonies:tadpole 33.5 -62.2 0.5 {NoAI:1b,Rotation:[-90f,0f],CustomName:'"film:swim"'}
+camera 33.50 -63.77 -0.10 0 0
+wait 10
+cmd tick freeze
+burst swim_side 6 1
+cmd tick unfreeze
+cmd tp @e[type=antcolonies:tadpole] 33 -140 0
+wait 3
+cmd summon antcolonies:tadpole 33.5 -62.2 0.5 {NoAI:1b,Rotation:[-90f,0f],CustomName:'"film:swim"'}
+camera 33.13 -63.72 0.13 -45 10
+wait 10
+cmd tick freeze
+burst swim_threequarter 6 1
+cmd tick unfreeze
+cmd tp @e[type=antcolonies:tadpole] 33 -140 0
+wait 3
+cmd summon antcolonies:tadpole 33.5 -62.2 0.5 {NoAI:1b,Rotation:[-90f,0f],CustomName:'"film:swim"'}
+camera 34.10 -63.77 0.50 90 0
+wait 10
+cmd tick freeze
+burst swim_front 6 1
+cmd tick unfreeze
+cmd tp @e[type=antcolonies:tadpole] 33 -140 0
+wait 3
+cmd summon antcolonies:tadpole 33.5 -62.2 0.5 {NoAI:1b,Rotation:[-90f,0f],CustomName:'"film:graze"'}
+camera 33.50 -63.77 -0.10 0 0
+wait 10
+cmd tick freeze
+burst graze_side 10 2
+cmd tick unfreeze
+cmd tp @e[type=antcolonies:tadpole] 33 -140 0
+wait 3
+cmd summon antcolonies:tadpole 33.5 -62.2 0.5 {NoAI:1b,Rotation:[-90f,0f],CustomName:'"film:graze"'}
+camera 33.13 -63.72 0.13 -45 10
+wait 10
+cmd tick freeze
+burst graze_threequarter 10 2
+cmd tick unfreeze
+cmd tp @e[type=antcolonies:tadpole] 33 -140 0
+wait 3
+cmd summon antcolonies:tadpole 33.5 -62.2 0.5 {NoAI:1b,Rotation:[-90f,0f],CustomName:'"film:scatter"'}
+camera 33.50 -63.77 -0.10 0 0
+wait 10
+cmd tick freeze
+burst scatter_side 6 1
+cmd tick unfreeze
+cmd tp @e[type=antcolonies:tadpole] 33 -140 0
+wait 3
+cmd summon antcolonies:tadpole 33.5 -62.2 0.5 {NoAI:1b,Rotation:[-90f,0f],CustomName:'"film:scatter"'}
+camera 33.13 -63.72 0.13 -45 10
+wait 10
+cmd tick freeze
+burst scatter_threequarter 6 1
+cmd tick unfreeze
+cmd tp @e[type=antcolonies:tadpole] 33 -140 0
+wait 3
+cmd summon antcolonies:tadpole 33.5 -62.2 0.5 {NoAI:1b,Rotation:[-90f,0f],CustomName:'"film:death"'}
+camera 33.50 -63.77 -0.10 0 0
+wait 10
+cmd tick freeze
+burst death_side 10 2
+cmd tick unfreeze
+cmd tp @e[type=antcolonies:tadpole] 33 -140 0
+wait 3
+cmd summon antcolonies:tadpole 33.5 -62.2 0.5 {NoAI:1b,Rotation:[-90f,0f],CustomName:'"film:death"'}
+camera 33.13 -63.72 0.13 -45 10
+wait 10
+cmd tick freeze
+burst death_threequarter 10 2
+cmd tick unfreeze
+cmd tp @e[type=antcolonies:tadpole] 33 -140 0
+wait 3
+cmd summon antcolonies:tadpole 33.5 -62.2 0.5 {NoAI:1b,Rotation:[-90f,0f],CustomName:'"film:swim"',Age:50000}
+camera 33.50 -63.77 -0.10 0 0
+wait 10
+cmd tick freeze
+burst swim_legs_side 6 1
+cmd tick unfreeze
+cmd tp @e[type=antcolonies:tadpole] 33 -140 0
+wait 3
+cmd summon antcolonies:tadpole 33.5 -62.2 0.5 {NoAI:1b,Rotation:[-90f,0f],CustomName:'"film:swim"',Age:50000}
+camera 33.13 -63.72 0.13 -45 10
+wait 10
+cmd tick freeze
+burst swim_legs_threequarter 6 1
+cmd tick unfreeze
+cmd tp @e[type=antcolonies:tadpole] 33 -140 0
+wait 3
+# the flop on the grass beside the pool
+cmd summon antcolonies:tadpole 46.5 -60 0.5 {NoAI:1b,Rotation:[-90f,0f],CustomName:'"film:flop"'}
+camera 46.50 -61.52 -0.10 0 0
+wait 10
+cmd tick freeze
+burst flop_side 8 1
+cmd tick unfreeze
+camera 46.13 -61.47 0.13 -45 10
+wait 4
+cmd tick freeze
+burst flop_threequarter 8 1
+cmd tick unfreeze
+cmd kill @e[type=antcolonies:tadpole]
+wait 3
+# a free school of eight swimming in the pool
+cmd summon antcolonies:tadpole 36.50 -62.3 0.50
+cmd summon antcolonies:tadpole 36.80 -62.3 0.50
+cmd summon antcolonies:tadpole 37.10 -62.3 0.50
+cmd summon antcolonies:tadpole 37.40 -62.3 0.50
+cmd summon antcolonies:tadpole 36.50 -62.3 0.80
+cmd summon antcolonies:tadpole 36.80 -62.3 0.80
+cmd summon antcolonies:tadpole 37.10 -62.3 0.80
+cmd summon antcolonies:tadpole 37.40 -62.3 0.80
+lens 50
+camera 37.0 -61.4 -1.6 0 35
+wait 30
+shot school_0
+wait 8
+shot school_1
+wait 8
+shot school_2
+wait 8
+shot school_3
+wait 8
+shot school_4
+wait 8
+shot school_5
+wait 8
+cmd kill @e[type=antcolonies:tadpole]
+# a froglet (a day into its 3) beside a grown male, on the grass
+cmd summon antcolonies:bullfrog 47.0 -60 3.0 {NoAI:1b,Rotation:[0f,0f],FullSize:1.0f,FrogletFor:48000,FrogletDays:72000}
+cmd summon antcolonies:bullfrog 48.2 -60 3.0 {NoAI:1b,Rotation:[0f,0f],FullSize:1.0f}
+camera 47.6 -60.3 5.2 180 15
+wait 20
+shot froglet_beside_male
+camera 46.0 -60.2 3.6 -110 15
+wait 5
+shot froglet_beside_male_side
+quit

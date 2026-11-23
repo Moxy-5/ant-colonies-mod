@@ -1,0 +1,71 @@
+{
+  "model": "tadpole",
+  "about": "The bullfrog tadpole's body plan (the river tie-up, 2026-11-23): a fish-like swimmer, its body chain (body to tail tip), its day-3 leg buds, what tools/clip_check.py needs (checks). Read by tools/clip_check.py and tools/body_plan.py; the game reads only its bones table.",
+  "family": "fish",
+  "root": "root",
+  "forebody": "body",
+  "head": {
+    "bone": "body",
+    "jaws": []
+  },
+  "chain": [
+    "body",
+    "tail_1",
+    "tail_2",
+    "tail_3"
+  ],
+  "legs": {},
+  "bones": {
+    "root": "root",
+    "body": "body",
+    "tail_1": "tail_1",
+    "tail_2": "tail_2",
+    "tail_3": "tail_3",
+    "leg_left": "leg_left",
+    "leg_right": "leg_right"
+  },
+  "checks": {
+    "px": 0.0625,
+    "controller": "savanna/src/main/java/com/antcolonies/savanna/animal/TadpoleEntity.java",
+    "water": [
+      "idle",
+      "swim",
+      "graze",
+      "scatter",
+      "death"
+    ],
+    "switches": [
+      [
+        "idle",
+        "swim"
+      ],
+      [
+        "swim",
+        "idle"
+      ],
+      [
+        "swim",
+        "scatter"
+      ],
+      [
+        "scatter",
+        "swim"
+      ],
+      [
+        "idle",
+        "graze"
+      ],
+      [
+        "graze",
+        "idle"
+      ],
+      [
+        "swim",
+        "flop"
+      ]
+    ],
+    "wave": [
+      "swim"
+    ]
+  }
+}

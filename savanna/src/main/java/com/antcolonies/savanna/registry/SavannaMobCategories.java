@@ -93,6 +93,20 @@ public final class SavannaMobCategories {
         return riverHunter;
     }
 
+    private static MobCategory tadpole;
+
+    /**
+     * The tadpoles' group (the river tie-up, 2026-11-23, the spawning check list): its own, so its schools (6 to 10)
+     * never fill the bullfrogs' 4 places or the barbs' 40. Cap 16 round a player (about two schools in the shallows;
+     * my pick), friendly, removed past 128 blocks.
+     */
+    public static MobCategory tadpole() {
+        if (tadpole == null) {
+            tadpole = MobCategory.valueOf("ANTCOLONIES_TADPOLE");
+        }
+        return tadpole;
+    }
+
     private static MobCategory bullShark;
 
     /**

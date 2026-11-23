@@ -20,7 +20,8 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from model_parts import cube, curve, paint_faces, png   # noqa: E402
+import math  # noqa: E402
+from model_parts import animations, clip, cube, curve, geo, paint_faces, png, smooth, write_assets   # noqa: E402
 
 LENGTH = 18.0
 # (x, top, belly, half width) along the body, eased between: the tail's root, the widest middle, the rounded snout.
@@ -126,8 +127,40 @@ def plain_colour(c, face, x, y, z):
     return PLAIN['body']
 
 
-LOOKS = {'plain': plain_colour}
-WORKSHOP_LOOK = 'plain'
+# --- the paint (the workshop's paint stage, 2026-11-23, the river tie-up; my picks from the sheet) ----------------------
+# Near black on top with a faint olive sheen and darker freckles; a grey belly with the coiled gut showing gold-brown
+# through it; the eye a black pupil in a thin gold ring; the fins clear grey-green, freckled black; the leg buds the
+# body's colour. At 0.15 blocks the game shows little more than a dark comma with a pale wisp of fin.
+def _speck(x, y, z, every=5):
+    """A steady freckle pattern: true at about one pixel in every (from the pixel's place, so it does not flicker)."""
+    h = (int(math.floor(x * 2)) * 73856093) ^ (int(math.floor(y * 2)) * 19349663) ^ (int(math.floor(z * 2)) * 83492791)
+    return h % every == 0
+
+
+def paint(c, face, x, y, z):
+    part = c['_part']
+    ox = LENGTH / 2 - z
+    if part == 'fin':
+        return (22, 24, 20) if _speck(x, y, z, 6) else (128, 138, 126)
+    if part == 'muscle':
+        return (34, 34, 28) if _speck(x, y, z, 4) else (58, 58, 46)
+    if part == 'leg':
+        return (54, 54, 40)
+    if face in ('east', 'west') and EYE[0] <= ox < EYE[1] and EYE[2] <= y < EYE[3]:
+        return (8, 8, 8) if ox < EYE[0] + 0.5 else (184, 156, 82)
+    if face == 'down':
+        if ox > LENGTH - 1.5 and abs(x) < 1.0:
+            return (24, 22, 18) if abs(x) < 0.5 else (156, 146, 120)        # the beak and its pale lips
+        if 12.0 <= ox <= 15.5 and abs(x) < 1.5:
+            return (132, 104, 60) if _speck(x, y, z, 3) else (112, 112, 100)   # the coiled gut through the belly
+        return (108, 110, 100)
+    if y < 1.75:
+        return (100, 102, 92)
+    return (20, 20, 16) if _speck(x, y, z, 5) else (44, 46, 34)
+
+
+LOOKS = {'plain': plain_colour, 'paint': paint}
+WORKSHOP_LOOK = 'paint'
 WORKSHOP_SHAPE = [
     ('CORE_WIDTH', 'Back and belly ridge width (share of the full width)', 0.3, 0.9, 0.05),
     ('FLANK_DEPTH', 'Round flank depth (share of the full depth)', 0.4, 0.9, 0.05),
@@ -142,7 +175,129 @@ def workshop_look():
     return bones, png(rows), w, h
 
 
+# --- the clips (the workshop's animation stage, 2026-11-23; fun first, inspired by real tadpoles) ----------------------
+# A tadpole swims all with its tail: a fast wave running down it, the tip swinging most, the body barely rocking; it
+# hangs in the water with the tail tip shivering; it grazes nose down on the algae, rasping, the tail fanning to hold
+# it there; frightened it snaps into a C and darts. Each clip adds a bone's turn to its rest, in the model file's
+# degrees: y the sideways swing, x the pitch.
+SWIM_LEN = 0.3          # one tail beat at its cruising speed (the game plays it faster or slower with the speed)
+IDLE_LEN = 1.2
+GRAZE_LEN = 1.0
+SCATTER_LEN = 0.3
+FLOP_LEN = 0.4
+FLOP_CURL, FLOP_LIFT = -0.6, 2.8
+DEATH_LEN = 1.0
+# the wave down the tail: bone, its parent, how far it swings (radians, against the line), how late (radians)
+WAVE = (('body', None, 0.05, 0.0), ('tail_1', 'body', 0.22, 0.9), ('tail_2', 'tail_1', 0.42, 1.8),
+        ('tail_3', 'tail_2', 0.62, 2.7))
+
+
+def _wave(p, t, beat, amount, curl=0.0):
+    ab = {None: 0.0}
+    for name, parent, a, lag in WAVE:
+        ab[name] = amount * a * math.sin(beat * t - lag) + curl * a * 2.0
+        p.setdefault(name, {})['rotation'] = [0.0, round(math.degrees(ab[name] - ab[parent]), 3), 0.0]
+    return p
+
+
+def _legs(p, kick=0.0):
+    """The day-3 leg buds trail back along the tail, kicking a little with the beat."""
+    for s, name in ((1, 'leg_left'), (-1, 'leg_right')):
+        p[name] = {'rotation': [round(6.0 * kick, 3), round(s * 8.0, 3), 0.0]}
+    return p
+
+
+def clips():
+    out = {}
+
+    def make(name, length, pose_at, loop=True):
+        out[name] = clip(length, pose_at, max(8, round(length * 40)), loop)
+
+    # idle: hanging still in the water, the tail tip shivering, the body bobbing a hair
+    def idle(t):
+        w = 2 * math.pi / IDLE_LEN
+        p = _wave({}, t, w * 3, 0.25)
+        p['body']['position'] = [0.0, round(0.2 * math.sin(w * t), 3), 0.0]
+        return _legs(p)
+    make('idle', IDLE_LEN, idle)
+
+    # swim: the fast wave down the tail
+    def swim(t):
+        w = 2 * math.pi / SWIM_LEN
+        return _legs(_wave({}, t, w, 1.0), math.sin(w * t))
+    make('swim', SWIM_LEN, swim)
+
+    # graze: nose down to the algae (pitched 35 degrees), the mouth rasping (quick small nods), the tail fanning
+    # slowly to hold it in place
+    def graze(t):
+        w = 2 * math.pi / GRAZE_LEN
+        p = _wave({}, t, w * 2, 0.45)
+        nod = 4.0 * max(0.0, math.sin(w * 4 * t))
+        p['body']['rotation'][0] = round(35.0 + nod, 3)
+        p['tail_1']['rotation'][0] = -20.0          # the tail lifts back toward level behind the dipped body
+        return _legs(p)
+    make('graze', GRAZE_LEN, graze)
+
+    # scatter: the fright: snaps into a C, then whips straight with fast beats
+    def scatter(t):
+        f = t / SCATTER_LEN
+        snap = smooth(f / 0.15) if f < 0.15 else 1.0 - smooth(min(1.0, (f - 0.15) / 0.3))
+        return _legs(_wave({}, t, 2 * math.pi / 0.15, 1.0 * (1.0 - snap) + 0.2, curl=snap * 0.9))
+    make('scatter', SCATTER_LEN, scatter, loop=False)
+
+    # flop: out of the water, on its side, curling and springing
+    # (lying on its side its sideways swing goes up and down, so the curl only lifts the tail off the ground: FLOP_CURL's
+    # sign is the one that bends it up; the middle line raised its half width, FLOP_LIFT, so the flank rests on it)
+    def flop(t):
+        w = 2 * math.pi / FLOP_LEN
+        p = _wave({}, t, w, 0.15, curl=FLOP_CURL * (0.55 + 0.45 * math.sin(w * t)))
+        p['root'] = {'rotation': [0.0, 0.0, 90.0], 'position': [0.0, FLOP_LIFT, 0.0]}
+        return _legs(p)
+    make('flop', FLOP_LEN, flop)
+
+    # death: the beat dies away, it rolls belly up and the tail sags
+    def death(t):
+        f = smooth(min(1.0, t / DEATH_LEN))
+        p = _wave({}, t, 2 * math.pi / 0.3, 1.0 - f)
+        p['root'] = {'rotation': [0.0, 0.0, round(180.0 * f, 3)], 'position': [0.0, round(7.0 * f, 3), 0.0]}
+        p['tail_2']['rotation'][0] = round(10.0 * f, 3)
+        return _legs(p)
+    make('death', DEATH_LEN, death, loop='hold')
+    return out
+
+
+def WORKSHOP_CLIPS():
+    return clips()
+
+
+WORKSHOP_CLIP_INFO = {
+    'scale': 0.15 / (LENGTH / 16), 'water': ['idle', 'swim', 'graze', 'scatter', 'death'], 'surface': 0.5,
+    'notes': {
+        'idle': 'Hanging in the water, the tail tip shivering.',
+        'swim': 'The fast wave down the tail; the game plays it faster the faster it swims.',
+        'graze': 'Nose down on the algae, rasping, the tail fanning to hold it there.',
+        'scatter': 'Frightened: it snaps into a C and whips away.',
+        'flop': 'Out of the water: on its side, curling and springing.',
+        'death': 'The beat dies away; it rolls belly up.',
+    }}
+
+
+def write_game():
+    """Writes the tadpole's model (the leg buds in: the game hides them until day 3), texture and clips into the
+    savanna mod."""
+    global LEGS
+    keep, LEGS = LEGS, 1.0
+    bones, rows, w, h = paint_faces(model(), 2, paint)
+    LEGS = keep
+    write_assets({'textures/entity/tadpole.png': png(rows),
+                  'geo/entity/tadpole.geo.json': geo('tadpole', bones, w, h, (1, 1, [0, 0.3, 0])),
+                  'animations/entity/tadpole.animation.json': animations(clips())})
+
+
 if __name__ == '__main__':
+    if sys.argv[1:] == ['game']:
+        write_game()
+        sys.exit()
     bones = model()
     print(sum(len(b['cubes']) for b in bones), 'boxes,', len(bones), 'bones')
     LEGS = 1.0

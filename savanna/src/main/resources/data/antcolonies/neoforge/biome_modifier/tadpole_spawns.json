@@ -1,0 +1,12 @@
+{
+  "type": "neoforge:add_spawns",
+  "biomes": "#antcolonies:savanna_waters",
+  "spawners": [
+    {
+      "type": "antcolonies:tadpole",
+      "weight": 10,
+      "minCount": 6,
+      "maxCount": 10
+    }
+  ]
+}

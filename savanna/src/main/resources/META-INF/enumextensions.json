@@ -137,6 +137,18 @@
         false,
         128
       ]
+    },
+    {
+      "enum": "net/minecraft/world/entity/MobCategory",
+      "name": "ANTCOLONIES_TADPOLE",
+      "constructor": "(Ljava/lang/String;IZZI)V",
+      "parameters": [
+        "antcolonies:tadpole",
+        16,
+        true,
+        false,
+        128
+      ]
     }
   ]
 }

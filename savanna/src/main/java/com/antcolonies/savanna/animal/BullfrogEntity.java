@@ -179,10 +179,8 @@ public class BullfrogEntity extends Animal implements GeoEntity {
     /** Makes it a male or a female of its own length (0.9 to 1.1 of its sex's usual), drawn and boxed through SCALE. */
     public void setUp(boolean male, float own) {
         entityData.set(DATA_MALE, male);
-        AttributeInstance scale = getAttribute(Attributes.SCALE);
-        if (scale != null) {
-            scale.setBaseValue((male ? 1.0F : FEMALE_SIZE) * own);
-        }
+        fullSize = (male ? 1.0F : FEMALE_SIZE) * own;
+        applySize();
     }
 
     public boolean isHungry() {
@@ -418,6 +416,9 @@ public class BullfrogEntity extends Animal implements GeoEntity {
             }
             return;
         }
+        if (frogletFor > 0 && (--frogletFor % 100 == 0)) {
+            applySize();        // growing (a step every 5 s, too small to see)
+        }
         filmTick();
         if (hungryIn > 0) {
             hungryIn--;
@@ -582,6 +583,39 @@ public class BullfrogEntity extends Animal implements GeoEntity {
         return distanceToClosestPlayer > KEEP_NEAR * KEEP_NEAR && !hasCustomName();
     }
 
+    // --- the froglet (the river tie-up, 2026-11-23) -------------------------------------------------------------------
+
+    /**
+     * A froglet, fresh out of the water from a tadpole ({@link TadpoleEntity#becomeFroglet}), starts at about 0.25 blocks
+     * (the plan's pick: 0.32 of a male's 0.8) and grows smoothly to its full size over its 3 froglet days. Its own clock,
+     * not Minecraft's baby: its size goes through SCALE, so its box, its drawing (GeckoLib reads the baby flag its own
+     * way), its mouth and its tongue's reach all shrink with it.
+     */
+    static final float FROGLET_SIZE = 0.32F;
+    /** Its size when grown (its sex's usual times its own), and ticks left as a froglet (0: grown). */
+    private float fullSize = 1.0F;
+    private int frogletFor, frogletDays = 1;
+
+    /** Makes it a froglet that grows up in this many ticks. */
+    public void makeFroglet(int ticks) {
+        frogletFor = Math.max(0, ticks);
+        frogletDays = Math.max(1, ticks);
+        applySize();
+    }
+
+    /** Whether it is still a froglet (too small to call or square up to anyone). */
+    public boolean isFroglet() {
+        return frogletFor > 0;
+    }
+
+    private void applySize() {
+        AttributeInstance scale = getAttribute(Attributes.SCALE);
+        if (scale != null) {
+            float grown = frogletFor > 0 ? 1.0F - (float) frogletFor / frogletDays : 1.0F;
+            scale.setBaseValue(fullSize * (FROGLET_SIZE + (1.0F - FROGLET_SIZE) * grown));
+        }
+    }
+
     // --- not a farm animal ---------------------------------------------------------------------------------------------
 
     @Override
@@ -628,6 +662,9 @@ public class BullfrogEntity extends Animal implements GeoEntity {
     public void addAdditionalSaveData(CompoundTag tag) {
         super.addAdditionalSaveData(tag);
         tag.putBoolean("Male", isMale());
+        tag.putFloat("FullSize", fullSize);
+        tag.putInt("FrogletFor", frogletFor);
+        tag.putInt("FrogletDays", frogletDays);
         tag.putInt("HungryIn", hungryIn);
         byte a = action();
         if (a == DUG || a == DIG_IN) {
@@ -639,6 +676,15 @@ public class BullfrogEntity extends Animal implements GeoEntity {
     public void readAdditionalSaveData(CompoundTag tag) {
         super.readAdditionalSaveData(tag);
         entityData.set(DATA_MALE, !tag.contains("Male") || tag.getBoolean("Male"));
+        if (tag.contains("FullSize")) {     // (frogs saved before froglets: their size as it was)
+            fullSize = tag.getFloat("FullSize");
+            frogletFor = tag.getInt("FrogletFor");
+            frogletDays = Math.max(1, tag.getInt("FrogletDays"));
+            applySize();
+        } else {
+            AttributeInstance scale = getAttribute(Attributes.SCALE);
+            fullSize = scale != null ? (float) scale.getBaseValue() : 1.0F;
+        }
         hungryIn = tag.getInt("HungryIn");
         if (tag.getBoolean("Dug")) {
             entityData.set(DATA_ACTION, DUG);

@@ -47,6 +47,23 @@ built, checked, committed and pushed; the user's in-game look as they play.
   way (a floating frog's body sits above the water, out of a fish's reach, and it hops out onto the bank, so the catfish
   loses it); doing it right needs a new ambush-from-below hunt for a meeting that seldom happens (frogs keep to pans and
   slow edges, catfish to water 3 deep). Frogs are eaten by grown and teen crocodiles, the monitor and otters.
+- 2026-11-23, the bullfrog's tadpoles, part A built (spawning by themselves, grazing, eaten, froglets); part B, the
+  frogs breeding (calling after rain, the pair, eggs in the shallows hatching into a school, the father guarding it),
+  next. `docs/HISTORY.md`.
+
+## Part B: bullfrogs breed (my picks, fun first, from the 2026-11-20 plan in `docs/plans/prey-fish-and-frogs.md`)
+1. **The bullfrog onto the life kit** (`HasLife`, a life file `animal_life/bullfrog.json`): its sexes and sizes move
+   from its own code to the kit (nothing changes in the game: the user's 0.8 and 0.65 kept), local limit 4 (the user's cap).
+2. **After rain, the pair:** males already call from dusk and in rain; a ready female within 16 blocks of a calling
+   male comes to him in shallow water (`SeekMateGoal`); he clasps her from behind (a new `clasp` clip on both: his front
+   legs round her waist, her carrying him a few seconds), the hard animation rule (offline, then filmed in the game).
+3. **The eggs:** she lays a floating film of eggs at the surface of the shallow water (a new clutch block on
+   `EggClutchBlock`, its own look: a pale mat of black dots), 8 to 12 eggs; they hatch in a day into a tadpole school
+   (room to breed: fewer than 4 bullfrogs near and the tadpole group under its cap of 16), one female every 4 days.
+4. **The father guards the school** (the kit's guard care): he stays by the eggs and then the school for its 3 days,
+   puffs and lunges at anything that comes near (a player, a monitor, a young crocodile), and does not eat his own;
+   other frogs still may.
+5. Tests in `life` and `river`; then the user's look in a new world (rain helps).
 
 ## Left for later (not in this tie-up)
 Goliath tiger fish (the user's "later maybe"), electric catfish, lungfish and killifish (ideas).
