@@ -143,7 +143,8 @@
       "side_hop_left",
       "side_hop_right",
       "zig_left",
-      "zig_right"
+      "zig_right",
+      "pounce_pin"
     ],
     "tuck_ok": [
       "swim",
@@ -544,6 +545,22 @@
       [
         "zig_right",
         "play_bound"
+      ],
+      [
+        "bound",
+        "pounce_pin"
+      ],
+      [
+        "idle",
+        "pounce_pin"
+      ],
+      [
+        "pounce_pin",
+        "idle"
+      ],
+      [
+        "pounce_pin",
+        "eat"
       ]
     ],
     "controller": "savanna/src/main/java/com/antcolonies/savanna/animal/OtterEntity.java",

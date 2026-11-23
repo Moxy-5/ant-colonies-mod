@@ -2510,6 +2510,158 @@ public class RiverLifeTests {
         });
     }
 
+    /** An open stone field for the otter's trigger tests (x 2 to 40, z 2 to 30, at TOP). */
+    private static void otterField(GameTestHelper helper) {
+        for (int x = 2; x <= 40; x++) {
+            for (int zz = 2; zz <= 30; zz++) {
+                helper.setBlock(new BlockPos(x, TOP, zz), Blocks.STONE);
+                for (int y = TOP + 1; y <= TOP + 4; y++) {
+                    helper.setBlock(new BlockPos(x, y, zz), Blocks.AIR);
+                }
+            }
+        }
+    }
+
+    /**
+     * What sets its clips off (2026-11-23, the gaps filled): a hungry otter pounces on a bullfrog on land and pins it
+     * (the pounce_pin clip), and eats it; a player walking up while it eats makes it stop and stand over its catch, cross
+     * (stand_cross); once they are gone it eats on; after the meal it stands content a while, going nowhere
+     * (stand_content).
+     */
+    @GameTest(template = "arena", timeoutTicks = 2400)
+    public static void anOtterPinsAFrogGuardsItsMealThenStandsContent(GameTestHelper helper) {
+        otterField(helper);
+        com.antcolonies.savanna.animal.OtterEntity otter = helper.spawn(SavannaEntities.OTTER.get(),
+                new net.minecraft.world.phys.Vec3(20.5, TOP + 1, 16.5));
+        otter.setPersistenceRequired();
+        otter.life().setUp(false, otter.getRandom());
+        otter.makeHungry();
+        BullfrogEntity frog = helper.spawn(SavannaEntities.BULLFROG.get(), new net.minecraft.world.phys.Vec3(26.5, TOP + 1, 16.5));
+        frog.setPersistenceRequired();
+        byte calm = com.antcolonies.savanna.animal.OtterEntity.CALM, eat = com.antcolonies.savanna.animal.OtterEntity.EAT;
+        long[] pinnedAt = {-1}, grabbedAt = {-1}, eatAt = {-1}, guardAt = {-1}, ateOnAt = {-1}, doneAt = {-1};
+        double[] stillFrom = {0, 0, 0}, contentMoved = {-1};
+        boolean[] contentSeen = {false};
+        net.minecraft.server.level.ServerPlayer[] player = {null};
+        helper.onEachTick(() -> {
+            long t = helper.getTick();
+            byte d = otter.doing();
+            if (pinnedAt[0] < 0 && d == com.antcolonies.savanna.animal.OtterEntity.PIN) {
+                pinnedAt[0] = t;
+            }
+            if (grabbedAt[0] < 0 && otter.held() != null) {
+                grabbedAt[0] = t;
+            }
+            if (eatAt[0] < 0 && d == eat && !otter.isInWater()) {
+                eatAt[0] = t;
+                player[0] = helper.makeMockServerPlayerInLevel();   // someone walks up to it eating
+                player[0].moveTo(otter.getX() + 2.0, otter.getY(), otter.getZ(), 0.0F, 0.0F);
+            }
+            if (player[0] != null && guardAt[0] < 0 && d == calm && otter.mood() == com.antcolonies.savanna.animal.OtterEntity.CROSS
+                    && otter.held() != null) {
+                guardAt[0] = t;
+            }
+            if (player[0] != null && (guardAt[0] >= 0 && t > guardAt[0] + 40 || t > eatAt[0] + 100)) {
+                helper.getLevel().getServer().getPlayerList().remove(player[0]);   // gone (a player left behind changes later tests' spawning)
+                player[0] = null;
+            }
+            if (guardAt[0] >= 0 && player[0] == null && ateOnAt[0] < 0 && d == eat) {
+                ateOnAt[0] = t;
+            }
+            if (ateOnAt[0] >= 0 && doneAt[0] < 0 && otter.held() == null && d == calm) {
+                doneAt[0] = t;
+                stillFrom[0] = otter.getX();
+                stillFrom[2] = otter.getZ();
+            }
+            if (doneAt[0] >= 0 && t == doneAt[0] + 50) {
+                contentMoved[0] = Math.hypot(otter.getX() - stillFrom[0], otter.getZ() - stillFrom[2]);
+            }
+            if (doneAt[0] >= 0 && t > doneAt[0] && t < doneAt[0] + 50 && otter.mood() == com.antcolonies.savanna.animal.OtterEntity.CONTENT) {
+                contentSeen[0] = true;
+            }
+        });
+        helper.succeedWhen(() -> {
+            helper.assertTrue(pinnedAt[0] >= 0, "the otter never pounced on the frog: " + otter.playState() + ", frog " + frog.isAlive());
+            helper.assertTrue(grabbedAt[0] >= 0 && grabbedAt[0] - pinnedAt[0] < 20, "the pounce did not catch the frog (pounced t"
+                    + pinnedAt[0] + ", caught t" + grabbedAt[0] + ")");
+            helper.assertTrue(eatAt[0] >= 0, "it never ate its frog on land");
+            helper.assertTrue(guardAt[0] >= 0, "a player walking up did not make it stand over its meal, cross");
+            helper.assertTrue(ateOnAt[0] >= 0, "it did not eat on once the player was gone");
+            helper.assertTrue(contentMoved[0] >= 0, "the meal never ended");
+            SavannaMod.LOGGER.info("[otter triggers] pounced t{}, caught t{}, ate t{}, guarded t{}, ate on t{}, done t{}, moved {} in the "
+                    + "next 2.5 s, content {}", pinnedAt[0], grabbedAt[0], eatAt[0], guardAt[0], ateOnAt[0], doneAt[0],
+                    String.format("%.2f", contentMoved[0]), contentSeen[0]);
+            helper.assertTrue(contentSeen[0], "after the meal it was not content");
+            helper.assertTrue(contentMoved[0] < 0.3, "after the meal it went " + contentMoved[0] + " blocks, not standing content");
+        });
+    }
+
+    /**
+     * The startle (2026-11-23): an otter on land seeing a crocodile for the first time freezes facing it for half a
+     * second (stand_scared) before it bolts.
+     */
+    @GameTest(template = "arena", timeoutTicks = 600)
+    public static void anOtterSeeingACrocodileFreezesThenBolts(GameTestHelper helper) {
+        otterField(helper);
+        com.antcolonies.savanna.animal.OtterEntity otter = playOtter(helper, 20.5, 16.5, true, 20, 16);
+        long[] scaredAt = {-1};
+        double[] from = {0, 0}, frozen = {-1}, ran = {-1};
+        helper.runAfterDelay(20, () -> {
+            com.antcolonies.savanna.animal.CrocodileEntity croc = helper.spawn(SavannaEntities.CROCODILE.get(),
+                    new net.minecraft.world.phys.Vec3(27.5, TOP + 1, 16.5));
+            croc.setPersistenceRequired();
+            croc.setNoAi(true);
+        });
+        helper.onEachTick(() -> {
+            long t = helper.getTick();
+            if (scaredAt[0] < 0 && otter.mood() == com.antcolonies.savanna.animal.OtterEntity.SCARED) {
+                scaredAt[0] = t;                                // (the mood is worked out every 5 ticks: up to 4 late)
+                from[0] = otter.getX();
+                from[1] = otter.getZ();
+            }
+            if (scaredAt[0] >= 0 && t == scaredAt[0] + 4) {
+                frozen[0] = Math.hypot(otter.getX() - from[0], otter.getZ() - from[1]);
+            }
+            if (scaredAt[0] >= 0 && t == scaredAt[0] + 60) {
+                ran[0] = Math.hypot(otter.getX() - from[0], otter.getZ() - from[1]);
+            }
+        });
+        helper.succeedWhen(() -> {
+            helper.assertTrue(ran[0] >= 0, "it never took fright: " + otter.playState());
+            SavannaMod.LOGGER.info("[otter startle] moved {} in its first 4 frightened ticks, {} in 3 s", String.format("%.2f", frozen[0]),
+                    String.format("%.2f", ran[0]));
+            helper.assertTrue(frozen[0] < 0.1, "it did not freeze when it first saw the crocodile (went " + frozen[0] + ")");
+            helper.assertTrue(ran[0] > 2.0, "it did not bolt after its startle (went " + ran[0] + " in 3 s)");
+        });
+    }
+
+    /**
+     * Porpoising is not only play (2026-11-23): a lone otter swimming about a deep pool at its travelling pace leaps out
+     * in a porpoise now and then.
+     */
+    @GameTest(template = "arena", timeoutTicks = 3000)
+    public static void aLoneOtterSwimmingFastPorpoises(GameTestHelper helper) {
+        int poolX = MX0 + 4;
+        otterPool(helper, poolX);
+        com.antcolonies.savanna.animal.OtterEntity otter = helper.spawn(SavannaEntities.OTTER.get(),
+                new net.minecraft.world.phys.Vec3(poolX + 8.5, TOP, MZ0 + 5.5));
+        otter.setPersistenceRequired();
+        otter.life().setUp(false, otter.getRandom());
+        otter.makeFed();
+        double[] fastest = {0};
+        boolean[] leapt = {false};
+        helper.onEachTick(() -> {
+            if (otter.isInWater() && !otter.diving()) {
+                fastest[0] = Math.max(fastest[0], otter.getDeltaMovement().horizontalDistance() / otter.getScale());
+            }
+            leapt[0] |= otter.doing() == com.antcolonies.savanna.animal.OtterEntity.PORPOISE;
+        });
+        helper.succeedWhen(() -> {
+            helper.assertTrue(leapt[0], "the otter never porpoised swimming about (fastest at the surface " + fastest[0] + " a tick)");
+            SavannaMod.LOGGER.info("[otter porpoise alone] leapt; fastest at the surface {} blocks a tick", String.format("%.3f", fastest[0]));
+        });
+    }
+
     /**
      * A small fish gulped down (2026-11-22, the user: "super small fish are going to mostly just be swallowed"): by the
      * body plans' numbers (animal/HeldCatch) a barb is swallowed at once most times and a tilapia never; and a hungry

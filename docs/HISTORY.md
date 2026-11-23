@@ -1077,6 +1077,25 @@ Moved here from CLAUDE.md on 2026-10-13 (it was loaded into every chat and took 
   `otter_tag_live` (live, a camera riding with the otter named film-walker). Fixed on the way: BUGS 297. The user, 2026-11-23:
   "the play chase is absolutely perfect".
 
+- **What sets off the otter's clips, the gaps filled (2026-11-23, the user: "how about we start figuring out what triggers
+  each animation", then "yes, build those"):** all 40 clips were mapped to their triggers; five gaps filled in
+  `OtterEntity` (numbers my picks): (1) `stand_content` was never seen (content only while eating, resting or shaking,
+  under their own clips): after a meal, a rest or a shake it is content for 3 to 6 s (`contentUntil`, set in `setDoing`)
+  and stands still (`ContentGoal`); (2) `stand_cross` hardly ever (being hit also scares it): a player not crouching
+  within `GUARD_NEAR` 3.5 of it eating makes it stop, stand over its catch facing them, cross, with a growl
+  (`guardUntil`, in the hunt's `carry`), eating on 1.5 s after they go; (3) a danger first seen on land: a startled
+  freeze `STARTLE_TICKS` 10 facing it (`startleLeft`, `FleeGoal`), then it bolts (hurt, at once); (4) porpoising is no
+  longer play only: any surface swimming faster than `PORPOISE_FAST` 0.040 blocks a tick (swimming about measured 0.045)
+  in water 2 deep, every 3 to 6 s (in a play chase 1.5 to 3); (5) a bullfrog on land is pounced on (`PIN`, the new clip
+  `pounce_pin` from the pounce's pose maker, low, `PIN_PAW` 5 px high and 15 ahead: front paws on the frog's back),
+  from at most `PIN_FROM` 2.4, carried to `PIN_BEHIND` 0.94 behind the frog, grabbed at the nip. Found on the way: the
+  hunt is stepped every other tick (Minecraft's default), so a check on one exact odd tick never runs; the pin's carry
+  and bite allow for it (the old bite works only because `BITE_HIT` 6 is even). Tests (`river`):
+  `anOtterPinsAFrogGuardsItsMealThenStandsContent`, `anOtterSeeingACrocodileFreezesThenBolts` (0.00 moved in its first
+  frightened ticks, 6.4 in 3 s), `aLoneOtterSwimmingFastPorpoises`. `pounce_pin` checked offline (`clip_check.py otter
+  pounce_pin --switches`, nothing flagged; its front feet rest on the frog on purpose); not filmed in the game yet (the
+  user was in another game: no game windows).
+
 ## Handover notes for a code reviewer (written at the end of a very long session)
 - State: branch `master`, all committed, `./gradlew build` passes, `./gradlew runGameTestServer` passes 47 tests (about 8 minutes, in one world, tests run in parallel arena grids). Some tests are timing-sensitive under load (`antsOnBumpyGroundReachTheFoodStore` and `aStarvingWorkerSlowsDownAndDies` have each failed once and passed on a re-run): re-run before blaming a change.
 - Confirmed in-game by the user so far: everything up to and including dead ants and the refuse chamber, rich bread, worker hunger, colony starvation, and the hill-jam fix. Older bullets in "Current status" that still say "waiting for the user to confirm" are probably stale (the user tested them and reported no problems), but this was never written down: do not rely on those flags.

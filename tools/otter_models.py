@@ -1886,43 +1886,48 @@ POUNCE_HOLD = (0.40, 0.64)    # paws on the other's back
 POUNCE_PAW = (11.0, -13.0)    # where its front soles rest (height, ahead), px: on a grown otter's rump (top 11.4 to 12);
                               # as far ahead as the reared shoulder reaches (measured: about -13.4)
 POUNCE_RUMP = 8.0             # the runner's rump this far behind its middle (px)
+PIN_PAW = (5.0, -15.0)        # pounce_pin (2026-11-23): its front soles on a bullfrog's back (0.4 blocks tall), further
+PIN_REAR = 0.35               # ahead and hardly reared: a low pounce that pins its prey to the ground (my picks)
 PORPOISE_LEN = 1.00
 PORPOISE_AIR = (0.22, 0.74)   # out of the water (s)
 PORPOISE_RISE = 11.5          # the body's rise at the top of the arc (px): the belly just clears the surface
 
 
-def _pounce_spine(p, gather, rise, air, nip):
-    """The pounce's body, head and tail (no legs) on the idle pose p."""
+def _pounce_spine(p, gather, rise, air, nip, rear=1.0):
+    """The pounce's body, head and tail (no legs) on the idle pose p; rear 1 the tag's half rear onto a rump, less for
+    a low pounce on small prey (the head then goes further down to bite)."""
     pos = p["body"]["position"]
-    p["body"]["position"] = [pos[0], pos[1] - 1.1 * gather + 0.6 * rise + 0.8 * air, pos[2] + 1.2 * rise]
+    p["body"]["position"] = [pos[0], pos[1] - 1.1 * gather + 0.6 * rise * rear + 0.8 * air, pos[2] + 1.2 * rise]
     # half reared: the spine tips nose up, most of it in the back half so the shoulders lift over the other
-    _add_rot(p, "body", [2.5 * gather - 9.0 * rise, 0.0, 0.0])
-    _add_rot(p, "waist", [1.5 * gather - 9.0 * rise, 0.0, 0.0])
-    _add_rot(p, "ribs", [-7.0 * rise, 0.0, 0.0])
-    _add_rot(p, "chest", [-3.0 * rise, 0.0, 0.0])
-    # the head: low and forward gathering, then down over the rump to nip
-    _add_rot(p, "neck", [6.0 * gather + 26.0 * rise + 18.0 * nip, 0.0, 0.0])
-    _add_rot(p, "head", [-5.0 * gather + 12.0 * rise + 10.0 * nip, 0.0, 0.0])
+    _add_rot(p, "body", [2.5 * gather - 9.0 * rise * rear, 0.0, 0.0])
+    _add_rot(p, "waist", [1.5 * gather - 9.0 * rise * rear, 0.0, 0.0])
+    _add_rot(p, "ribs", [-7.0 * rise * rear, 0.0, 0.0])
+    _add_rot(p, "chest", [-3.0 * rise * rear, 0.0, 0.0])
+    # the head: low and forward gathering, then down over the rump (or the prey on the ground) to nip
+    low = 1.0 - rear
+    _add_rot(p, "neck", [6.0 * gather + 26.0 * rise * rear + 18.0 * nip + 14.0 * low * rise, 0.0, 0.0])
+    _add_rot(p, "head", [-5.0 * gather + 12.0 * rise * rear + 10.0 * nip + 8.0 * low * rise, 0.0, 0.0])
 
 
 _POUNCE_REACH = {}
 
 
-def _pounce_reach(pref):
-    """The front leg's reach from its shoulder (angle forward of straight down, length) at rest and on the rump."""
-    if pref not in _POUNCE_REACH:
+def _pounce_reach(pref, paw=POUNCE_PAW, rear=1.0):
+    """The front leg's reach from its shoulder (angle forward of straight down, length) at rest and on the target."""
+    key = (pref, paw, rear)
+    if key not in _POUNCE_REACH:
         info = _rig()["legs"][pref]
         out = []
-        for rise, (wy, wz) in ((0.0, (info["paw_h"], info["w_rest"][2])), (1.0, (POUNCE_PAW[0] + info["paw_h"], POUNCE_PAW[1]))):
+        for rise, (wy, wz) in ((0.0, (info["paw_h"], info["w_rest"][2])), (1.0, (paw[0] + info["paw_h"], paw[1]))):
             q = _idle_pose(0.0)
-            _pounce_spine(q, 0.0, rise, 0.0, 0.0)
+            _pounce_spine(q, 0.0, rise, 0.0, 0.0, rear)
             sh = _fk_bone(q, f"{pref}_1")[0]
             out.append((math.atan2(-(wz - sh[2]), -(wy - sh[1])), math.hypot(wy - sh[1], wz - sh[2])))
-        _POUNCE_REACH[pref] = out
-    return _POUNCE_REACH[pref]
+        _POUNCE_REACH[key] = out
+    return _POUNCE_REACH[key]
 
 
-def _pounce_pose(t):
+def _pounce_pose(t, paw=POUNCE_PAW, rear=1.0):
     L = POUNCE_LEN
     a0, a1 = POUNCE_AIR
     h0, h1 = POUNCE_HOLD
@@ -1931,7 +1936,7 @@ def _pounce_pose(t):
     rise = ease(ramp(t, ((0.0, 0.0), (0.16, 0.0), (h0, 1.0), (h1, 1.0), (L, 0.0))))
     air = math.sin(math.pi * max(0.0, min(1.0, (t - a0) / (a1 - a0))))
     nip = pulse(t, h0 + 0.02, 0.05, 0.03, 0.06)                               # the tag: a quick play nip at the rump
-    _pounce_spine(p, gather, rise, air, nip)
+    _pounce_spine(p, gather, rise, air, nip, rear)
     p["jaw"] = {"rotation": [6.0 * gather + 12.0 * rise + 14.0 * nip - 12.0 * nip * nip, 0.0, 0.0]}
     _set_ears(p, 8.0 * gather + 6.0 * rise, 3.0 * rise)
     _set_whiskers(p, 9.0 * gather + 8.0 * rise, 9.0 * gather + 8.0 * rise)
@@ -1943,7 +1948,7 @@ def _pounce_pose(t):
     # (a leg folded tight on the way down flipped its elbow), the paw a little further out mid swing so it clears
     for pref in ("leg_fl", "leg_fr"):
         info = _rig()["legs"][pref]
-        (ar, lr), (ah, lh) = _pounce_reach(pref)
+        (ar, lr), (ah, lh) = _pounce_reach(pref, paw, rear)
         ang = ar + (ah - ar) * rise
         ln = lr + (lh - lr) * rise + 0.6 * math.sin(math.pi * rise)
         sh = _fk_bone(p, f"{pref}_1")[0]
@@ -1961,6 +1966,14 @@ def _pounce_pose(t):
 def _clip_pounce_tag():
     a0, a1 = POUNCE_AIR
     out = clip(POUNCE_LEN, _pounce_pose, 17, loop=False)
+    out["timeline"] = {f"{a0:.2f}": "air", f"{a1:.2f}": "land", f"{POUNCE_HOLD[0] + 0.05:.2f}": "nip"}
+    return out
+
+
+def _clip_pounce_pin():
+    """The hunt's pounce on a bullfrog (2026-11-23): the same leap, low, front paws pinning it to the ground, a bite."""
+    a0, a1 = POUNCE_AIR
+    out = clip(POUNCE_LEN, lambda t: _pounce_pose(t, PIN_PAW, PIN_REAR), 17, loop=False)
     out["timeline"] = {f"{a0:.2f}": "air", f"{a1:.2f}": "land", f"{POUNCE_HOLD[0] + 0.05:.2f}": "nip"}
     return out
 
@@ -2567,6 +2580,7 @@ def clips():
         "sniff_walk":       _clip_sniff_walk(),
         "hop_turn":         _clip_hop_turn(),
         "pounce_tag":       _clip_pounce_tag(),
+        "pounce_pin":       _clip_pounce_pin(),
         "zig_left":         _clip_zig(1.0),
         "zig_right":        _clip_zig(-1.0),
         "porpoise":         _clip_porpoise(),

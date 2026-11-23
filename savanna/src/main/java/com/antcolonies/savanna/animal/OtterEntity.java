@@ -78,7 +78,7 @@ public class OtterEntity extends PathfinderMob implements GeoEntity, HasLife {
     /** What it is doing, for the clips. */
     public static final byte CALM = 0, SHAKE = 1, REST = 2, REST_UP = 3, FORAGE = 4, BITE = 5, EAT = 6, SKID = 7, HOP = 8,
             PLAY_UP = 9, PLAY = 10, PLAY_DOWN = 11, GULP = 12, SIDE_L = 13, SIDE_R = 14, POUNCE = 15, PORPOISE = 16,
-            ZIG_L = 17, ZIG_R = 18;
+            ZIG_L = 17, ZIG_R = 18, PIN = 19;
     /**
      * A small fish swallowed at once ({@link HeldCatch#swallowed}; the gulp clip, on the head's own layer): it takes the
      * fish as its jaws snap shut, and the gulp is over at the end (ticks), and such a fish fills it for this part of a
@@ -126,6 +126,25 @@ public class OtterEntity extends PathfinderMob implements GeoEntity, HasLife {
      */
     static final int POUNCE_TICKS = 17, POUNCE_UP = 4, POUNCE_DOWN = 8, POUNCE_LET_GO = 13;
     static final int PORPOISE_TICKS = 20, PORPOISE_OUT = 4, PORPOISE_IN = 15;
+    /**
+     * What sets its clips off, the gaps filled (2026-11-23, the user: "yes, build those"; numbers my picks):
+     * <ul>
+     * <li>after a meal, a rest or a shake it stands content for {@link #CONTENT_MIN} to twice that (ticks), the
+     * stand_content stance (before, content only while eating or resting, under their own clips: never seen);</li>
+     * <li>a player (not crouching) within {@link #GUARD_NEAR} blocks of it eating: it stops, stands over its catch facing
+     * them, cross (stand_cross) with a growl, and eats on once they have been off {@link #GUARD_AFTER} ticks;</li>
+     * <li>a danger first seen on land: a startle, frozen {@link #STARTLE_TICKS} ticks facing it (stand_scared), then it
+     * bolts (hurt, it bolts at once);</li>
+     * <li>swimming at the surface faster than {@link #PORPOISE_FAST} blocks a tick (a bound's pace and over: travelling,
+     * fleeing, chasing; swimming about measured 0.045) in water two deep, it porpoises every 3 to 6 s (in a play chase
+     * every 1.5 to 3 s);</li>
+     * <li>a bullfrog on land is pounced on ({@link #PIN}, the pounce_pin clip, the pounce's timing): from at most
+     * {@link #PIN_FROM} blocks, carried while its feet are up to {@link #PIN_BEHIND} behind the frog's middle (its paws
+     * 15 px ahead of its own), the frog grabbed at the nip if its jaws are there.</li>
+     * </ul>
+     */
+    static final int CONTENT_MIN = 60, GUARD_AFTER = 30, STARTLE_TICKS = 10;
+    static final double GUARD_NEAR = 3.5, PORPOISE_FAST = 0.040, PIN_FROM = 2.4, PIN_BEHIND = 15.0 / 16.0;
     public static final double POUNCE_BEHIND = 21.0 / 16.0, POUNCE_FROM = 2.6;
     /**
      * The land chase, take two (2026-11-23, plan 6g; the user: "fast like a real chase ... leaping while skedaddling side
@@ -221,6 +240,8 @@ public class OtterEntity extends PathfinderMob implements GeoEntity, HasLife {
     @Nullable
     Bout bout;
     int playTryAt, restNext;
+    /** Content until this tick (after a meal, a rest, a shake); guarding its catch until this tick; startled ticks left. */
+    int contentUntil, guardUntil, startleLeft;
     /** Resting with a playmate after a bout: the spot beside it to lie down on, and the way to face; null otherwise. */
     @Nullable
     Vec3 restBeside;
@@ -303,6 +324,7 @@ public class OtterEntity extends PathfinderMob implements GeoEntity, HasLife {
         goalSelector.addGoal(1, new FollowFamilyGoal(this));
         goalSelector.addGoal(2, new HuntGoal(this));
         goalSelector.addGoal(2, new RestGoal(this));
+        goalSelector.addGoal(2, new ContentGoal(this));
         goalSelector.addGoal(3, new SwimAboutGoal(this));
         goalSelector.addGoal(4, new SkitterGoal(this));
         goalSelector.addGoal(4, new RandomStrollGoal(this, STROLL, 100, false) {
@@ -339,8 +361,12 @@ public class OtterEntity extends PathfinderMob implements GeoEntity, HasLife {
     }
 
     void setDoing(byte doing) {
-        if (doing != doing()) {
+        byte was = doing();
+        if (doing != was) {
             doingSince = tickCount;
+            if (doing == CALM && (was == EAT || was == REST_UP || was == SHAKE)) {
+                contentUntil = tickCount + CONTENT_MIN + random.nextInt(CONTENT_MIN + 1);   // a full, warm, dry otter
+            }
         }
         entityData.set(DATA_DOING, doing);
     }
@@ -475,14 +501,14 @@ public class OtterEntity extends PathfinderMob implements GeoEntity, HasLife {
         if (scared()) {
             return SCARED;
         }
-        if (isCross()) {
+        if (isCross() || tickCount < guardUntil) {
             return CROSS;
         }
         if (bout != null) {
             return PLAYFUL;                                  // the open-mouthed play face
         }
         byte d = doing();
-        if (d == EAT || d == REST || d == REST_UP || d == SHAKE) {
+        if (d == EAT || d == REST || d == REST_UP || d == SHAKE || tickCount < contentUntil) {
             return CONTENT;
         }
         Player p = level().getNearestPlayer(this, 14.0);
@@ -525,7 +551,7 @@ public class OtterEntity extends PathfinderMob implements GeoEntity, HasLife {
         scaredUntil = tickCount + ticks;
         if (doing() == REST) {
             setDoing(REST_UP);
-        } else if (doing() == SKID || doing() == HOP || doing() == POUNCE || doing() == ZIG_L || doing() == ZIG_R) {
+        } else if (doing() == SKID || doing() == HOP || doing() == POUNCE || doing() == ZIG_L || doing() == ZIG_R || doing() == PIN) {
             setDoing(CALM);                                  // off at once
         }
         setGait(EVEN);
@@ -723,7 +749,7 @@ public class OtterEntity extends PathfinderMob implements GeoEntity, HasLife {
                 || (d == HOP || d == SIDE_L || d == SIDE_R) && doingFor() >= HOP_TICKS || d == PLAY_DOWN && doingFor() >= PLAY_DOWN_TICKS
                 || d == GULP && doingFor() >= GULP_TICKS || d == POUNCE && doingFor() >= POUNCE_TICKS
                 || d == PORPOISE && (doingFor() >= PORPOISE_TICKS || !isInWater())
-                || (d == ZIG_L || d == ZIG_R) && doingFor() >= ZIG_TICKS + 2) {
+                || (d == ZIG_L || d == ZIG_R) && doingFor() >= ZIG_TICKS + 2 || d == PIN && doingFor() >= POUNCE_TICKS) {
             setDoing(CALM);
         } else if ((d == PLAY_UP || d == PLAY) && bout == null) {
             setDoing(PLAY_DOWN);                             // a bout broken off: down at once
@@ -747,6 +773,11 @@ public class OtterEntity extends PathfinderMob implements GeoEntity, HasLife {
             float yaw = hopYaw * Mth.DEG_TO_RAD;             // carried to its left (+) or right while its feet are up
             double step = (d == SIDE_L ? 1.0 : -1.0) * SIDE_GO * getScale() / (HOP_DOWN - HOP_UP);
             move(MoverType.SELF, new Vec3(Mth.cos(yaw) * step, 0.0, Mth.sin(yaw) * step));
+        }
+        if (doing() == CALM && swimming() && !diving() && rider.play() == null && tickCount >= porpoiseAt
+                && getDeltaMovement().horizontalDistance() > PORPOISE_FAST * getScale() && waterDepth(this) >= 2) {
+            setDoing(PORPOISE);                              // going fast at the surface: a leap out and in
+            porpoiseAt = tickCount + PORPOISE_TICKS + (bout != null ? 30 + random.nextInt(31) : 60 + random.nextInt(61));
         }
         if (d == PORPOISE && (doingFor() == PORPOISE_OUT || doingFor() == PORPOISE_IN)) {
             porpoiseSplash(doingFor() == PORPOISE_OUT ? 0.6 : 0.3);
@@ -1267,6 +1298,9 @@ public class OtterEntity extends PathfinderMob implements GeoEntity, HasLife {
                 LivingEntity danger = otter.dangerNear();
                 if (danger != null) {
                     otter.scare(danger, 160);
+                    if (otter.onGround() && !otter.isInWater() && otter.doing() == CALM) {
+                        otter.startleLeft = STARTLE_TICKS;      // first seen: a startled freeze before it bolts
+                    }
                 }
             }
             return otter.scared();
@@ -1275,7 +1309,9 @@ public class OtterEntity extends PathfinderMob implements GeoEntity, HasLife {
         @Override
         public void start() {
             left = 0;
-            route();
+            if (otter.startleLeft <= 0) {
+                route();
+            }
         }
 
         private void route() {
@@ -1299,6 +1335,16 @@ public class OtterEntity extends PathfinderMob implements GeoEntity, HasLife {
 
         @Override
         public void tick() {
+            if (otter.startleLeft > 0) {
+                otter.getNavigation().stop();               // frozen, staring at it
+                if (otter.scare != null) {
+                    otter.face(otter.scare.getX(), otter.scare.getZ(), 30.0F);
+                }
+                if (--otter.startleLeft == 0) {
+                    route();
+                }
+                return;
+            }
             if (otter.isInWater() && otter.scare != null && !otter.scare.isInWater()) {
                 otter.setDiving(true);                       // away under the water from a danger on land
             }
@@ -1310,6 +1356,7 @@ public class OtterEntity extends PathfinderMob implements GeoEntity, HasLife {
         @Override
         public void stop() {
             otter.getNavigation().stop();
+            otter.startleLeft = 0;
         }
     }
 
@@ -1452,6 +1499,23 @@ public class OtterEntity extends PathfinderMob implements GeoEntity, HasLife {
                 }
                 return;
             }
+            if (d == PIN) {
+                int t = otter.doingFor();
+                otter.face(prey.getX(), prey.getZ(), 25.0F);
+                // (the hunt is stepped every other tick, Minecraft's way: the carry's shares and the bite allow for it)
+                if (t >= POUNCE_UP && t < POUNCE_DOWN) {        // carried while its feet are up, paws onto the frog
+                    double dx = otter.getX() - prey.getX(), dz = otter.getZ() - prey.getZ(), dd = Math.sqrt(dx * dx + dz * dz);
+                    if (dd > 1.0E-3) {
+                        double back = PIN_BEHIND * otter.getScale(), share = Math.min(1.0, 2.0 / (POUNCE_DOWN - t));
+                        otter.move(MoverType.SELF, new Vec3((prey.getX() + dx / dd * back - otter.getX()) * share, 0.0,
+                                (prey.getZ() + dz / dd * back - otter.getZ()) * share));
+                    }
+                }
+                if ((t == POUNCE_DOWN + 1 || t == POUNCE_DOWN + 2) && otter.atJaws(prey, reach(prey) + 0.5)) {
+                    otter.grab(prey);                           // pinned, and bitten
+                }
+                return;
+            }
             if (d == BITE) {
                 otter.face(prey.getX(), prey.getZ(), 30.0F);
                 if (otter.doingFor() == BITE_HIT) {
@@ -1475,6 +1539,12 @@ public class OtterEntity extends PathfinderMob implements GeoEntity, HasLife {
             if (crab && otter.atJaws(prey, reach(prey))) {
                 otter.getNavigation().stop();
                 otter.setDoing(FORAGE);                     // its paws feel under the stones round the crab
+                return;
+            }
+            if (prey instanceof BullfrogEntity && !otter.isInWater() && otter.onGround()
+                    && otter.distanceTo(prey) < PIN_FROM * otter.getScale() && otter.distanceTo(prey) > PIN_BEHIND * otter.getScale()) {
+                otter.getNavigation().stop();
+                otter.setDoing(PIN);                        // a frog on land: pounced on and pinned
                 return;
             }
             if (!crab && otter.atJaws(prey, reach(prey))) {
@@ -1514,6 +1584,25 @@ public class OtterEntity extends PathfinderMob implements GeoEntity, HasLife {
                 }
                 return;
             }
+            if (!otter.isInWater() && otter.onGround() && (otter.doing() == EAT || otter.doing() == CALM)) {
+                Player p = otter.level().getNearestPlayer(otter, GUARD_NEAR);
+                if (p != null && !p.isSpectator() && !p.isCrouching()) {
+                    if (otter.tickCount >= otter.guardUntil) {
+                        otter.playSound(SoundEvents.FOX_AGGRO, 0.7F, 1.5F + otter.random.nextFloat() * 0.2F);   // a growl
+                    }
+                    otter.guardUntil = otter.tickCount + GUARD_AFTER;
+                    if (otter.doing() == EAT) {
+                        otter.setDoing(CALM);                   // up over its catch, facing them
+                    }
+                    otter.getNavigation().stop();
+                    otter.face(p.getX(), p.getZ(), 20.0F);
+                    otter.getLookControl().setLookAt(p);
+                    return;
+                }
+                if (otter.tickCount < otter.guardUntil) {
+                    return;                                     // still watching where they went
+                }
+            }
             if (otter.doing() == EAT) {
                 if (otter.doingFor() >= EAT_TICKS) {
                     otter.eatCatch();
@@ -1549,7 +1638,7 @@ public class OtterEntity extends PathfinderMob implements GeoEntity, HasLife {
         @Override
         public void stop() {
             byte d = otter.doing();
-            if (d == FORAGE || d == BITE || d == EAT) {
+            if (d == FORAGE || d == BITE || d == EAT || d == PIN) {
                 otter.setDoing(CALM);
             }
             if (otter.held != null) {
@@ -1558,6 +1647,32 @@ public class OtterEntity extends PathfinderMob implements GeoEntity, HasLife {
             otter.setDiving(false);
             otter.getNavigation().stop();
             prey = null;
+        }
+    }
+
+    /** Stands content a little while after a meal, a rest or a shake (its stand_content stance), going nowhere. */
+    static class ContentGoal extends Goal {
+        private final OtterEntity otter;
+
+        ContentGoal(OtterEntity otter) {
+            this.otter = otter;
+            setFlags(EnumSet.of(Flag.MOVE));
+        }
+
+        @Override
+        public boolean canUse() {
+            return otter.tickCount < otter.contentUntil && otter.doing() == CALM && otter.onGround() && !otter.isInWater()
+                    && !otter.scared() && otter.held == null && otter.bout == null && otter.rider.play() == null;
+        }
+
+        @Override
+        public void start() {
+            otter.getNavigation().stop();
+        }
+
+        @Override
+        public boolean canContinueToUse() {
+            return canUse();
         }
     }
 
@@ -1892,10 +2007,6 @@ public class OtterEntity extends PathfinderMob implements GeoEntity, HasLife {
                             chaser.setDiving(runner.diving());
                         }
                     }
-                    if (stage == Stage.SWIM) {
-                        porpoise(runner);
-                        porpoise(chaser);
-                    }
                     // caught only after the runner has had a start (they set off nose to nose: counted at once, a
                     // swimming chase's rounds all ran out in its first ticks, BUGS 297)
                     boolean caught = ++runFor > 30 && chaser.distanceTo(runner) < gap() + 1.0;
@@ -2130,15 +2241,6 @@ public class OtterEntity extends PathfinderMob implements GeoEntity, HasLife {
                     runner = chaser;                               // the tagger runs now
                     run();
                 }
-            }
-        }
-
-        /** In a swimming chase, going in deep water at the surface, now and then a porpoise leap (every 1.5 to 3 s). */
-        private static void porpoise(OtterEntity o) {
-            if (o.doing() == CALM && o.swimming() && !o.diving() && !o.getNavigation().isDone() && o.tickCount >= o.porpoiseAt
-                    && waterDepth(o) >= 2) {
-                o.setDoing(PORPOISE);
-                o.porpoiseAt = o.tickCount + PORPOISE_TICKS + 30 + o.random.nextInt(31);
             }
         }
 
@@ -2663,6 +2765,7 @@ public class OtterEntity extends PathfinderMob implements GeoEntity, HasLife {
     private static final RawAnimation PORPOISE_CLIP = RawAnimation.begin().thenPlayAndHold("porpoise");
     private static final RawAnimation ZIG_L_CLIP = RawAnimation.begin().thenPlayAndHold("zig_left");
     private static final RawAnimation ZIG_R_CLIP = RawAnimation.begin().thenPlayAndHold("zig_right");
+    private static final RawAnimation PIN_CLIP = RawAnimation.begin().thenPlayAndHold("pounce_pin");
 
     @Override
     public void registerControllers(AnimatableManager.ControllerRegistrar controllers) {
@@ -2738,6 +2841,8 @@ public class OtterEntity extends PathfinderMob implements GeoEntity, HasLife {
                 return state.setAndContinue(ZIG_L_CLIP);
             case ZIG_R:
                 return state.setAndContinue(ZIG_R_CLIP);
+            case PIN:
+                return state.setAndContinue(PIN_CLIP);
             default:
                 break;
         }
