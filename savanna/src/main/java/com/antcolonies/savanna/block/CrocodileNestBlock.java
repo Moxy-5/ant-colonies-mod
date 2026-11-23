@@ -25,7 +25,9 @@ import net.minecraft.util.RandomSource;
 import net.minecraft.util.StringRepresentable;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.MobSpawnType;
+import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.level.BlockGetter;
+import net.minecraft.world.level.Explosion;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.LevelAccessor;
 import net.minecraft.world.level.LevelReader;
@@ -36,6 +38,7 @@ import net.minecraft.world.level.block.state.StateDefinition;
 import net.minecraft.world.level.block.state.properties.BooleanProperty;
 import net.minecraft.world.level.block.state.properties.EnumProperty;
 import net.minecraft.world.level.block.state.properties.IntegerProperty;
+import net.minecraft.world.level.material.FluidState;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.shapes.CollisionContext;
 import net.minecraft.world.phys.shapes.Shapes;
@@ -207,6 +210,47 @@ public class CrocodileNestBlock extends EggClutchBlock {
         level.playSound(null, pos, SoundEvents.TURTLE_EGG_HATCH, SoundSource.BLOCKS, 0.8F, 0.8F);
         level.removeBlock(pos, false);
         return out;
+    }
+
+    /**
+     * A player breaking the nest (the user, 2026-11-23: "actually reveals the baby alligators or eggs underneath"): the
+     * first hit scrapes the sand cap off and leaves the pit with the eggs showing (her mother, if near, comes back to
+     * cover them, as after laying); eggs already calling hatch there and then, the hatchlings crawling out; only a hit on
+     * the open pit with quiet eggs in it breaks the eggs. True only when the block is gone.
+     */
+    @Override
+    public boolean onDestroyedByPlayer(BlockState state, Level level, BlockPos pos, Player player, boolean willHarvest, FluidState fluid) {
+        if (hatching(state)) {
+            if (level instanceof ServerLevel server) {
+                letOut(server, pos, null);
+            }
+            return false;       // the client hears the block go from the server
+        }
+        if (!state.getValue(OPEN)) {
+            uncover(level, pos, state);
+            return false;
+        }
+        return super.onDestroyedByPlayer(state, level, pos, player, willHarvest, fluid);
+    }
+
+    /** An explosion blows the sand cap off the same way (my pick, fun first): the eggs showing, or the hatchlings out. */
+    @Override
+    public void onBlockExploded(BlockState state, Level level, BlockPos pos, Explosion explosion) {
+        if (hatching(state) && level instanceof ServerLevel server) {
+            letOut(server, pos, null);
+        } else if (!state.getValue(OPEN)) {
+            uncover(level, pos, state);
+        } else {
+            super.onBlockExploded(state, level, pos, explosion);
+        }
+    }
+
+    /** The cap scraped off: the pit open, a scrape of sand heard. */
+    private static void uncover(Level level, BlockPos pos, BlockState state) {
+        level.setBlock(pos, state.setValue(OPEN, true), level.isClientSide ? Block.UPDATE_ALL_IMMEDIATE : Block.UPDATE_ALL);
+        if (!level.isClientSide) {
+            level.playSound(null, pos, SoundEvents.SAND_BREAK, SoundSource.BLOCKS, 0.8F, 0.9F);
+        }
     }
 
     /** The eggs calling, now and then while they hatch (real hatchlings yelp from inside the eggs; my pick of sound). */

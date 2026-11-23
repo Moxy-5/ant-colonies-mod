@@ -792,6 +792,41 @@ public class AnimalLifeTests {
     }
 
     /**
+     * A player breaking a crocodile nest (the user, 2026-11-23): the first hit scrapes the sand cap off and leaves the pit
+     * open with every egg still in it; a hit on a nest whose eggs are calling lets the hatchlings out; only a hit on the
+     * open pit with quiet eggs breaks it.
+     */
+    @GameTest(template = "arena", timeoutTicks = 40)
+    public static void breakingACrocodileNestsCapShowsTheEggsOrLetsTheHatchlingsOut(GameTestHelper helper) {
+        crocRiver(helper);
+        ServerLevel level = helper.getLevel();
+        var player = helper.makeMockPlayer(net.minecraft.world.level.GameType.SURVIVAL);
+        var noFluid = net.minecraft.world.level.material.Fluids.EMPTY.defaultFluidState();
+        BlockPos eggs = helper.absolutePos(new BlockPos(CROC_WATER_TO + 2, WATER_TOP + 1, 4));
+        helper.assertTrue(com.antcolonies.savanna.block.CrocodileNestBlock.lay(level, eggs, SavannaEntities.CROCODILE.get(), 6), "no nest laid");
+        com.antcolonies.savanna.block.CrocodileNestBlock.cover(level, eggs, false);
+        var covered = level.getBlockState(eggs);
+        helper.assertFalse(covered.onDestroyedByPlayer(level, eggs, player, false, noFluid), "the first hit took the nest away");
+        var opened = level.getBlockState(eggs);
+        helper.assertTrue(opened.is(SavannaBlocks.CROCODILE_NEST.get()) && opened.getValue(com.antcolonies.savanna.block.CrocodileNestBlock.OPEN),
+                "the cap is not off: " + opened);
+        helper.assertTrue(level.getBlockEntity(eggs) instanceof EggClutchBlockEntity clutch && clutch.count() == 6, "eggs lost with the cap");
+        helper.assertTrue(opened.onDestroyedByPlayer(level, eggs, player, false, noFluid) && level.getBlockState(eggs).isAir(),
+                "a hit on the open pit did not break it");
+
+        BlockPos calling = helper.absolutePos(new BlockPos(CROC_WATER_TO + 2, WATER_TOP + 1, 12));
+        helper.assertTrue(com.antcolonies.savanna.block.CrocodileNestBlock.lay(level, calling, SavannaEntities.CROCODILE.get(), 3), "no second nest laid");
+        com.antcolonies.savanna.block.CrocodileNestBlock.cover(level, calling, false);
+        level.setBlock(calling, level.getBlockState(calling).setValue(com.antcolonies.savanna.block.CrocodileNestBlock.CHIRPS, 1), 3);
+        level.getBlockState(calling).onDestroyedByPlayer(level, calling, player, false, noFluid);
+        var young = level.getEntitiesOfClass(com.antcolonies.savanna.animal.CrocodileEntity.class, new net.minecraft.world.phys.AABB(calling).inflate(2),
+                c -> c.life().isYoung());
+        helper.assertTrue(!young.isEmpty() && young.size() <= 3, "hatchlings out: " + young.size() + " (want 1 to 3)");
+        helper.assertTrue(!level.getBlockState(calling).is(SavannaBlocks.CROCODILE_NEST.get()), "the hatched nest is still there");
+        helper.succeed();
+    }
+
+    /**
      * A crocodile's growing (the life file's stages): a hatchling about half a block, slower than a grown one; a teen
      * from 6 days at a third of grown; grown at 14 days; and a crocodile saved before step 4 (its age 0, when they were
      * born grown) loads grown, not as a hatchling.
