@@ -1,0 +1,99 @@
+{
+  "model": "distichodus",
+  "about": "The six-banded distichodus's body plan (2026-11-22, docs/plans/distichodus.md): its family, body chain (head to tail), and what tools/clip_check.py needs (checks). Read by tools/body_course.py, tools/clip_check.py and tools/body_plan.py; the game reads only its bones table. No controller or course entry yet: those come with the entity (the plan's step 6).",
+  "family": "fish",
+  "root": "root",
+  "forebody": "body",
+  "head": {
+    "bone": "head",
+    "jaws": [
+      "jaw"
+    ]
+  },
+  "chain": [
+    "head",
+    "body",
+    "tail_stalk",
+    "tail_fin"
+  ],
+  "legs": {},
+  "bones": {
+    "root": "root",
+    "body": "body",
+    "head": "head",
+    "jaw": "jaw",
+    "tail_stalk": "tail_stalk",
+    "tail_fin": "tail_fin",
+    "back_fin": "back_fin",
+    "fin_left": "fin_left",
+    "fin_right": "fin_right"
+  },
+  "checks": {
+    "px": 0.0625,
+    "water": [
+      "idle",
+      "swim",
+      "graze",
+      "nibble",
+      "bolt",
+      "flare",
+      "death"
+    ],
+    "wave": [
+      "swim"
+    ],
+    "switches": [
+      [
+        "idle",
+        "swim"
+      ],
+      [
+        "swim",
+        "idle"
+      ],
+      [
+        "swim",
+        "bolt"
+      ],
+      [
+        "bolt",
+        "swim"
+      ],
+      [
+        "idle",
+        "graze"
+      ],
+      [
+        "graze",
+        "idle"
+      ],
+      [
+        "idle",
+        "nibble"
+      ],
+      [
+        "nibble",
+        "idle"
+      ],
+      [
+        "idle",
+        "flare"
+      ],
+      [
+        "flare",
+        "idle"
+      ],
+      [
+        "swim",
+        "leap"
+      ],
+      [
+        "leap",
+        "swim"
+      ]
+    ],
+    "on_ground": {
+      "leap": []
+    }
+  }
+}

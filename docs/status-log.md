@@ -603,3 +603,4 @@ Every "Current status" bullet CLAUDE.md held up to 2026-11-19, word for word, ol
 - 2026-11-22, the distichodus's eyes no longer stick out past the head (v3: one eye piece per head slice on a fuller cheek); waiting for the user's OK on the 3D shape.
 - 2026-11-22, the distichodus slightly bulkier with one flush eye a side and a whole pupil (v4, the user's fix for the split pupil); waiting for the user's OK on the 3D shape.
 - 2026-11-22, the distichodus's shape approved ("Shape is OK"); painted from the design sheet (v5: six straight bands, silver-pink head, red fins), waiting for the user's look.
+- 2026-11-22, the distichodus's paint approved ("Paint is OK"); its nine clips made and checked offline (graze under a mat, nibble at reed shoots, bolt, leap, flare at a rival, ...), game files written, no entity yet; waiting for the user's look.

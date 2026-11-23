@@ -56,7 +56,16 @@ fish beside the silver barbs and grey tilapia.
    pixel lies: the bronze back line, peach-gold upper flank, cream-gold lower flank, cream belly; the six straight
    bands, slate core and softer edge, down the sides and across the back; the head silver-pink, darker on top, the
    bright gill cover; the red-ringed eye; the fins red-orange, deep red in a thin strip at the body, orange tips; the
-   small pale fin). Waiting for the user's look.
-5. Clips: `idle`, `swim`, `graze`, `bolt`, `leap`, `flop`, `death` (checked with `clip_check.py` and in-game films).
+   small pale fin). **The user: "Paint is OK" (2026-11-22).**
+5. Clips (made 2026-11-22, `clips()` in `tools/distichodus_models.py`; game files by `python tools/distichodus_models.py
+   game`: `geo/entity/distichodus.geo.json`, `textures/entity/distichodus.png`, `animations/entity/
+   distichodus.animation.json`; body plan `body_plans/distichodus.json`, family fish): `idle`, `swim` (0.6 s beat, the
+   game scales it with speed), `graze` (nose up under a mat, two bites torn off with head shakes), `nibble` (nose down
+   to reed shoots, three nips), `bolt` (the C-start escape), `leap` (out of the water in an arc: the game throws it and
+   must not pitch the fish itself while it plays; marked airborne in the plan), `flare` (back fin stood up, breast
+   fins spread, an S and head jerks), `flop`, `death`. Offline check (`clip_check.py distichodus --switches`): nothing
+   inside the ground, 12 clip changes, none flagged (the leap ends straightening up, so the swim takes over gently).
+   The in-game frame films come with the entity (step 6): nothing draws the fish in the game before it. Waiting for the
+   user's look.
 6. Into the game: the entity, spawning (the check list, `RiverLifeTests.worldWouldSpawn`), grazing hippo grass and
    reeds, bolting and leaping, crocodiles and the bull shark taking it; game tests `river`.

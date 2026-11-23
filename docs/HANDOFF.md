@@ -9,7 +9,7 @@ Keep this short (~40 lines). Remove finished items once merged or picked up. Det
 
 ## In progress right now
 - **Neon:** *(ready for next animal)*
-- **Claude:** six-banded distichodus, model and game both (the user picked Claude to design it, 2026-11-22; `docs/plans/distichodus.md`): shape approved, paint v5 made (`tools/distichodus_models.py`), waiting for the user's look. Neon: not this one.
+- **Claude:** six-banded distichodus, model and game both (the user picked Claude to design it, 2026-11-22; `docs/plans/distichodus.md`): shape and paint approved, clips made (`tools/distichodus_models.py`, game files written), waiting for the user's look; then the entity. Neon: not this one.
 - **Claude:** Otter into the game (step 1 built 2026-11-22: `OtterEntity`, the shared `MoveRider`; its step up, step down and climb-outs remade quick in `tools/otter_models.py` at the user's word); bull shark in a linked session on its own branch. Before: hippo into the game (`HippoEntity`, branch `claude/engine-every-animal`; v8 and its block moves approved/made 2026-11-21, `docs/handoff/hippo.md`). Hippo calf and teen looks (2026-11-21, `tools/life_looks.py` `hippo_looks`, life viewer "Hippo" groups), waiting for the user's look before they go into the game. World eggs step 2 after.
 
 ## Ready for Claude (from Neon)

@@ -19,12 +19,13 @@ stepping out into a deep fork (so the swim can bend it); the back fin, the breas
 bones (to fold, flutter and nibble); the belly fins, the fin under the tail and the small pale fin near the tail sit
 on the body and the stalk. Box budget under 70.
 """
+import math
 import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from model_parts import cube, paint_faces, png   # noqa: E402
+from model_parts import cube, paint_faces, png, clip, smooth, geo, animations, write_assets   # noqa: E402
 
 # --- shape numbers (model pixels; along the outline's x, tail tip 0 to snout 37) -------------------------------------
 LENGTH = 37.0
@@ -341,6 +342,211 @@ def workshop_look():
     return bones, png(rows), w, h
 
 
+# --- the clips (the workshop's stage 5, 2026-11-22; the user: the paint "Paint is OK") -------------------------------
+# Fun first, inspired by real big river grazers (CLAUDE.md: animals are generalized): a steadier, slower beat than the
+# barb's (a deep fish twice its length), the wave carried back along the body with the tail fin the most and latest;
+# the breast fins held back cruising and sculling out hovering. Grazing: under a hippo grass mat it tips its nose up,
+# bites and tears with quick sideways shakes of the head; at young reed shoots on the bed it tips nose down, nips and
+# tugs. Each clip gives a bone's turn ADDED to its rest turn, in the model file's degrees: y the sideways swing, z the
+# roll about the length, x the pitch (minus: nose up).
+SWIM_LEN = 0.6           # one tail beat cruising (the game plays it faster or slower with the speed)
+IDLE_LEN = 2.0
+GRAZE_LEN = 2.4          # two bites at a mat overhead, each torn with head shakes
+NIBBLE_LEN = 1.8         # three nips at reed shoots
+BOLT_LEN = 0.45
+LEAP_LEN = 1.0
+FLARE_LEN = 1.4
+FLOP_LEN = 0.55
+DEATH_LEN = 1.2
+JAW_OPEN = 35.0          # how far the small lower jaw drops, wide open (degrees)
+LIE = MID_Y - WIDEST     # how far the fish comes down lying on its side: its middle line to its half width
+
+# the wave: bone, its parent, how far it swings (radians, against the fish's line), how late (radians of the beat)
+WAVE = (('body', None, 0.03, 0.9), ('head', 'body', 0.05, 0.0), ('tail_stalk', 'body', 0.2, 1.7),
+        ('tail_fin', 'tail_stalk', 0.4, 2.5))
+
+
+def _ease(x):
+    return smooth(x)
+
+
+def _wave(p, t, beat, amount, curl=0.0):
+    """The swim wave at t: each bone's swing, its parent's taken off (curl bends every bone one way as well, a fish
+    curving round in a leap or a flop)."""
+    ab = {None: 0.0}
+    for name, parent, a, lag in WAVE:
+        ab[name] = amount * a * math.sin(beat * t - lag) + curl * a * 2.2
+        p.setdefault(name, {})['rotation'] = [0.0, round(math.degrees(ab[name] - ab[parent]), 3), 0.0]
+    return p
+
+
+def _fins(p, t, out=0.0, flutter=0.0, rate=6.0, back_fin=0.0):
+    """The breast fins: held back along the flank (out 0) or spread out sculling (out 1), fluttering; the back fin
+    up as at rest (0), folded flat back (1) or raised taller (below 0, the flare)."""
+    for s, name in ((1, 'fin_left'), (-1, 'fin_right')):
+        f = flutter * math.sin(2 * math.pi * rate * t + (0.6 if s < 0 else 0.0))
+        p[name] = {'rotation': [0.0, round(s * (-26.0 + 30.0 * out + 10.0 * f), 3), round(s * (10.0 * f), 3)]}
+    p['back_fin'] = {'rotation': [round(-50.0 * back_fin, 3), 0.0, 0.0]}
+    return p
+
+
+def _jaw(p, open_):
+    p['jaw'] = {'rotation': [round(JAW_OPEN * open_, 3), 0.0, 0.0]}
+    return p
+
+
+def clips():
+    out = {}
+
+    def make(name, length, pose_at, steps_per_s=40, loop=True):
+        out[name] = clip(length, pose_at, max(8, round(length * steps_per_s)), loop)
+
+    # idle: hanging in the water, a slow small wave, the breast fins sculling to hold it still, a gentle bob
+    def idle(t):
+        w = 2 * math.pi / IDLE_LEN
+        p = _wave({}, t, w, 0.3)
+        p['body']['position'] = [0.0, round(0.3 * math.sin(w * t), 3), 0.0]
+        return _fins(p, t, out=0.7, flutter=1.0, rate=2 / IDLE_LEN * 2)
+    make('idle', IDLE_LEN, idle)
+
+    # swim: the steady wave, the breast fins tucked back with a small flick each beat
+    def swim(t):
+        w = 2 * math.pi / SWIM_LEN
+        return _fins(_wave({}, t, w, 1.0), t, out=0.0, flutter=0.25, rate=1 / SWIM_LEN, back_fin=0.1)
+    make('swim', SWIM_LEN, swim)
+
+    # graze: under a hippo grass mat (the game holds it just under the mat): nose tipped up, two bites, each a reach up
+    # with the mouth open, a snap shut on the stems, then quick sideways shakes of the head to tear the bite off
+    def graze(t):
+        up = _ease(t / 0.3) * (1 - _ease((t - (GRAZE_LEN - 0.3)) / 0.3))
+        k = 2 * t / GRAZE_LEN % 1.0                       # where in the bite
+        reach = math.sin(math.pi * min(1.0, k / 0.4))
+        open_ = _ease(k / 0.2) * (1 - _ease((k - 0.28) / 0.08))
+        shake = math.sin(2 * math.pi * 3 * max(0.0, k - 0.36) / 0.5) * (1 - _ease((k - 0.7) / 0.2)) if k > 0.36 else 0
+        p = _wave({}, t, 2 * math.pi / (GRAZE_LEN / 2), 0.4)
+        p['body']['rotation'][0] = round(-30.0 * up - 4.0 * reach, 3)
+        p['body']['position'] = [0.0, round(1.2 * up + 0.4 * reach, 3), 0.0]
+        p['head']['rotation'][0] = round(-6.0 * reach, 3)
+        p['head']['rotation'][1] = round(14.0 * shake, 3)
+        p['body']['rotation'][2] = round(4.0 * shake, 3)
+        _jaw(p, open_)
+        return _fins(p, t, out=0.9, flutter=1.0, rate=4.0)
+    make('graze', GRAZE_LEN, graze)
+
+    # nibble: nose down to young reed shoots on the bed, three nips: the mouth opens as the head reaches in, snaps
+    # shut on a shoot and tugs back with a twist
+    def nibble(t):
+        k = 3 * t / NIBBLE_LEN % 1.0
+        reach = math.sin(math.pi * min(1.0, k / 0.55))
+        open_ = _ease(k / 0.3) * (1 - _ease((k - 0.38) / 0.1))
+        tug = math.sin(math.pi * min(1.0, max(0.0, (k - 0.48) / 0.3)))
+        p = _wave({}, t, 2 * math.pi / (NIBBLE_LEN / 2), 0.4)
+        p['body']['rotation'][0] = round(28.0 + 4.0 * reach - 3.0 * tug, 3)
+        p['body']['position'] = [0.0, round(-0.4 * reach, 3), round(-0.8 * reach + 0.5 * tug, 3)]
+        p['head']['rotation'][0] = round(6.0 * reach - 5.0 * tug, 3)
+        p['head']['rotation'][1] = round(8.0 * tug, 3)
+        _jaw(p, open_)
+        return _fins(p, t, out=0.9, flutter=1.0, rate=3 / NIBBLE_LEN * 2)
+    make('nibble', NIBBLE_LEN, nibble)
+
+    # bolt: the fast start when scared: the body snaps into a C, the tail whips back the other way (the push), then
+    # fast beats; fins folded flat (the game sends it off toward the reeds as it plays)
+    def bolt(t):
+        bend_end, snap_end = 0.09, 0.2
+        if t < bend_end:
+            c = _ease(t / bend_end)
+        elif t < snap_end:
+            c = 1 - 2 * _ease((t - bend_end) / (snap_end - bend_end))
+        else:
+            c = -1 * (1 - _ease((t - snap_end) / (BOLT_LEN - snap_end)))
+        settle = _ease((t - snap_end) / (BOLT_LEN - snap_end))
+        p = _wave({}, t, 2 * math.pi / (SWIM_LEN * 0.5), settle, curl=1.1 * c)
+        p['body']['rotation'][2] = round(10.0 * c, 3)
+        return _fins(p, t, out=0.0, back_fin=1.0 - 0.8 * settle)
+    make('bolt', BOLT_LEN, bolt, 60, loop=False)
+
+    # leap: clear of the water when badly scared (the game throws it in an arc; it must not pitch the fish itself
+    # while this plays): hard tail beats driving it up nose first, a curve through the air, nose down into the water
+    def leap(t):
+        f = t / LEAP_LEN
+        drive = 1 - _ease((f - 0.15) / 0.2)                # hard beats leaving the water, then none
+        p = _wave({}, t, 2 * math.pi / (SWIM_LEN * 0.45), 1.5 * drive, curl=0.5 * math.sin(math.pi * f))
+        # nose up, level at the top, nose down, straightening as it goes back in (so the swim takes over gently)
+        pitch = -38.0 + 76.0 * _ease(f / 0.75) - 26.0 * _ease((f - 0.75) / 0.25)
+        p['body']['rotation'][0] = round(pitch, 3)
+        fold = _ease((f - 0.8) / 0.2)                       # the breast fins back along the flank as it enters
+        return _fins(p, t, out=0.6 * (1 - drive) * (1 - fold), flutter=0.3 * (1 - fold), rate=5.0, back_fin=0.3 * drive)
+    make('leap', LEAP_LEN, leap, 60, loop=False)
+
+    # flare: at a rival on its patch: the back fin raised tall, the breast fins spread, the body held in a small S,
+    # two quick sideways jerks of the head with the mouth a little open
+    def flare(t):
+        up = _ease(t / 0.25) * (1 - _ease((t - (FLARE_LEN - 0.3)) / 0.3))
+        jerk = math.sin(2 * math.pi * 2 * max(0.0, t - 0.35) / 0.6) if 0.35 < t < 0.95 else 0.0
+        p = _wave({}, t, 2 * math.pi / (FLARE_LEN / 2), 0.5 * up)
+        p['body']['rotation'][1] = round(p['body']['rotation'][1] + 8.0 * up, 3)
+        p['tail_stalk']['rotation'][1] = round(p['tail_stalk']['rotation'][1] - 14.0 * up, 3)
+        p['head']['rotation'][1] = round(p['head']['rotation'][1] - 6.0 * up + 12.0 * jerk, 3)
+        _jaw(p, 0.35 * up)
+        return _fins(p, t, out=1.3 * up, flutter=0.6, rate=5.0, back_fin=-0.45 * up)   # the fin stood up tall
+    make('flare', FLARE_LEN, flare, loop=False)
+
+    # flop: stranded out of the water, on its side, curling and springing (the game hops it about)
+    def flop(t):
+        w = 2 * math.pi / FLOP_LEN
+        p = _wave({}, t, w, 1.0, curl=-0.6 * (0.5 + 0.5 * math.sin(w * t)))
+        p['body']['rotation'][2] = 90.0
+        p['body']['position'] = [0.0, round(-LIE + 0.75 + 1.5 * abs(math.sin(w * t)), 3), 0.0]
+        return _fins(p, t, out=-1.7, back_fin=1.0)
+    make('flop', FLOP_LEN, flop)
+
+    # death: the wave dies away as it rolls onto its side and settles
+    def death(t):
+        f = _ease(t / (DEATH_LEN * 0.8))
+        down = _ease((t - DEATH_LEN * 0.25) / (DEATH_LEN * 0.6))
+        p = _wave({}, t, 2 * math.pi / 0.6, 0.9 * (1 - f), curl=-0.25 * f)
+        p['body']['rotation'][2] = round(90.0 * f, 3)
+        p['body']['position'] = [0.0, round(-LIE * down, 3), 0.0]
+        return _fins(p, t, out=-1.7 * f, back_fin=f)
+    make('death', DEATH_LEN, death, loop='hold')
+    return out
+
+
+def WORKSHOP_CLIPS():
+    return clips()
+
+
+# For the versions page's clip player: the made size against the game's (0.8 blocks of the made 2.3125), the water
+# clips and their surface (blocks at made size), and a line about each clip.
+WORKSHOP_CLIP_INFO = {
+    'scale': 0.8 / (LENGTH / 16), 'water': ['idle', 'swim', 'graze', 'nibble', 'bolt', 'flare'],
+    'surface': 1.6,
+    'notes': {
+        'idle': 'Hanging in the water: a slow small wave, the breast fins sculling to hold it still, a gentle bob.',
+        'swim': 'The steady tail beat, the wave running back along the body; the game plays it faster the faster it swims.',
+        'graze': 'Under a hippo grass mat: nose up, two bites, each torn off with quick shakes of the head.',
+        'nibble': 'Nose down to young reed shoots on the bed: three nips, each tugged back with a twist.',
+        'bolt': 'The escape when scared: snaps into a C, the tail whips it clear, fast beats, off to the reeds.',
+        'leap': 'Badly scared: hard beats drive it up out of the water nose first, a curve through the air, nose down back in.',
+        'flare': 'At a rival on its patch: back fin raised tall, breast fins spread, a small S and two jerks of the head.',
+        'flop': 'Stranded on land: on its side, curling and springing.',
+        'death': 'The wave dies away as it rolls onto its side.',
+    }}
+
+
+def write_game():
+    """Writes the distichodus's model, texture and clips into the savanna mod (no entity uses them yet: that is the
+    plan's step 6; the files let the clip checks read the model as the game will)."""
+    bones, rows, w, h = paint_faces(model(), 2, LOOKS['everyday'])
+    files = {'textures/entity/distichodus.png': png(rows),
+             'geo/entity/distichodus.geo.json': geo('distichodus', bones, w, h, (3, 2, [0, 0.6, 0])),
+             'animations/entity/distichodus.animation.json': animations(clips())}
+    write_assets(files)
+
+
 if __name__ == '__main__':
+    if sys.argv[1:] == ['game']:
+        write_game()
+        sys.exit()
     bones = model()
     print(sum(len(b['cubes']) for b in bones), 'boxes,', len(bones), 'bones')
