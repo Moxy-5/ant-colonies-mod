@@ -1,0 +1,13 @@
+{
+ "note": "the plain 3D shape from the approved outline, straight lines",
+ "date": "2026-11-22",
+ "boxes": 67,
+ "numbers": {
+  "WIDEST": 2.0,
+  "CORE_WIDTH": 0.55,
+  "FLANK_DEPTH": 0.62,
+  "EYE_AT": 32.8,
+  "EYE_HEIGHT": 10.5,
+  "EYE_SIZE": 1.25
+ }
+}

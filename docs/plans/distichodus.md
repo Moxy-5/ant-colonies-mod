@@ -44,9 +44,12 @@ fish beside the silver barbs and grey tilapia.
 1. **Design sheet, brief and outline** (made 2026-11-22; `references/inspiration/distichodus.png`, `.brief.md`,
    `references/outlines/distichodus.json` from `tools/distichodus_sheet.py --outline`, page
    `references/workshop/distichodus/outline.html`; fill scores side 90 / 92, top 86 / 90, front 79 / 66, the front's small fins left to the 3D step). Waiting
-   for the user's OK on the outline.
-2. 3D shape in plain colours (`tools/distichodus_models.py` from `model_parts.py`, the outline read by
-   `workshop.load_outline`); bones body, head, tail root, tail fin, back fin, breast fins, belly fins.
+   for the user's OK on the outline. **The user: "Outline is OK" (2026-11-22).**
+2. 3D shape in plain colours (made 2026-11-22, v1: `tools/distichodus_models.py`, 67 boxes, 9 bones: root, body,
+   head, jaw, tail_stalk, tail_fin, back_fin, fin_left, fin_right; the belly fins, the fin under the tail and the
+   small pale fin sit on the body and the stalk). The top and belly run straight between the sheet's points, never
+   eased; body slices 2 pixels, head slices 1 so the wedge face reads straight. Compare against the sheet: side 93 /
+   93, top 85 / 93, front 74 / 79. Page `references/workshop/distichodus/versions.html`. Waiting for the user's OK.
 3. Shape detail. 4. Paint (the bands painted at 2 texture pixels a model pixel).
 5. Clips: `idle`, `swim`, `graze`, `bolt`, `leap`, `flop`, `death` (checked with `clip_check.py` and in-game films).
 6. Into the game: the entity, spawning (the check list, `RiverLifeTests.worldWouldSpawn`), grazing hippo grass and
