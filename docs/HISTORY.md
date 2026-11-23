@@ -1119,6 +1119,24 @@ Moved here from CLAUDE.md on 2026-10-13 (it was loaded into every chat and took 
   `aHippoWearsAPathWalkingTheSameWay`, `aHippoGrazesItsLawnShort` (counts tall grass grazed to short or to the bare
   grass block, not worn to path), `aHippoEatsHippoGrassNearItsPool`.
 
+- **Red mist on kills under water, muddy footprints, mud on your own arm (2026-11-23, the user's ideas).** Fun first (animals
+  rule). (1) `animal/BloodMist.puff`: a cloud of the new `antcolonies:blood_mist` particle (`client/BloodMistParticle`: starts
+  0.1 to 0.16, billows to 0.45 to 0.75, dark red (the user's pick of shade), fades in 3 to 5 s, gone out of the water; my picks) round a catch in the
+  water, sized by the prey's box (10 + 28 x size wisps, 6 to 60, spread 0.12 + 0.3 x size; the user asked for more): the shark's bite (`BullSharkGoals.take`), the crocodile's
+  seize (`CrocodileEntity.grab`), the catfish's snap (`HuntTilapiaGoal.swallow`, a barb 0.6), the otter's grab, every bite or
+  tear of remains in the water (`RemainsEntity.puff`), and anything that bleeds killed in the water by a creature or a player
+  (`BloodMist.onDeath`, 1.3; a crocodile's death roll, a sword). Crabs, snails, undead (`Enemy`) and golems give none (my pick).
+  (2) `client/MudFootprints`: a player wearing a mud coat leaves a boot print (`antcolonies:mud_footprint`,
+  `client/MudFootprintParticle`: a flat square print of Steve's square boot, 0.25 x 0.25 (his sole is 4 by 4 pixels; the
+  user's ask, a boot-shaped print dropped), lying on the ground turned the way the foot faced, the coat's soil colour) each time a foot comes down, timed to the legs' own swing (half a swing of Minecraft's 0.6662 per
+  step), 0.125 to each side of the middle; dark when the mud is wet (0.85), paler as it dries (0.35 at dry 7); none on water,
+  on the mud itself, swimming, flying, riding or in spectator; 45 s each, the last 15 fading; made on each computer, nothing
+  on the server. (3) First person: Minecraft draws only the arm there, never the body's layers, so a muddy player saw no mud
+  on themself: `SavannaMudClient.onRenderArm` draws the arm as Minecraft does and the full mask over it once the mud is past
+  the legs (coverage 3 on). Pictures: `tools/particle_textures.py` (four mist wisps, two square prints). Film:
+  `tools/film/blood_mist_prints.film` (note: the film camera's particle setting is Minimal, which drops the mist, as it
+  drops any particle not forced; set `particles:0` in `run-film/options.txt` to film it).
+
 ## Handover notes for a code reviewer (written at the end of a very long session)
 - State: branch `master`, all committed, `./gradlew build` passes, `./gradlew runGameTestServer` passes 47 tests (about 8 minutes, in one world, tests run in parallel arena grids). Some tests are timing-sensitive under load (`antsOnBumpyGroundReachTheFoodStore` and `aStarvingWorkerSlowsDownAndDies` have each failed once and passed on a re-run): re-run before blaming a change.
 - Confirmed in-game by the user so far: everything up to and including dead ants and the refuse chamber, rich bread, worker hunger, colony starvation, and the hill-jam fix. Older bullets in "Current status" that still say "waiting for the user to confirm" are probably stale (the user tested them and reported no problems), but this was never written down: do not rely on those flags.

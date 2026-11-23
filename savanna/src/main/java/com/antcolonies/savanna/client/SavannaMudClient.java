@@ -57,6 +57,63 @@ public final class SavannaMudClient {
         }
     }
 
+    /** The savanna's particles' looks (2026-11-23): the red mist of a kill under water, the muddy footprints. */
+    @SubscribeEvent
+    public static void onParticles(net.neoforged.neoforge.client.event.RegisterParticleProvidersEvent event) {
+        event.registerSpriteSet(com.antcolonies.savanna.registry.SavannaParticles.BLOOD_MIST.get(), BloodMistParticle.Provider::new);
+        event.registerSpriteSet(com.antcolonies.savanna.registry.SavannaParticles.MUD_FOOTPRINT.get(), MudFootprintParticle.Provider::new);
+    }
+
+    /**
+     * Mud on your own arm in first person (2026-11-23): Minecraft draws only the arm there, never the body's layers, so a
+     * muddy player saw no mud on themself. Once the mud is up past the legs (the full mask, coverage 3 on), the arm is
+     * drawn as Minecraft draws it and the mask over it in the coat's colour.
+     */
+    @SubscribeEvent
+    public static void onRenderArm(net.neoforged.neoforge.client.event.RenderArmEvent event) {
+        net.minecraft.client.player.AbstractClientPlayer player = event.getPlayer();
+        float alpha = fullMaskAlpha(player);
+        if (alpha <= 0 || player.isInvisible()
+                || !(Minecraft.getInstance().getEntityRenderDispatcher().getRenderer(player)
+                        instanceof net.minecraft.client.renderer.entity.player.PlayerRenderer renderer)) {
+            return;
+        }
+        var pose = event.getPoseStack();
+        var buffers = event.getMultiBufferSource();
+        int light = event.getPackedLight();
+        boolean right = event.getArm() == net.minecraft.world.entity.HumanoidArm.RIGHT;
+        event.setCanceled(true);
+        // Minecraft's own arm first (this event is fired from inside it, so it is asked not to fire it again)
+        drawingArm = true;
+        try {
+            if (right) {
+                renderer.renderRightHand(pose, buffers, light, player);
+            } else {
+                renderer.renderLeftHand(pose, buffers, light, player);
+            }
+        } finally {
+            drawingArm = false;
+        }
+        var model = renderer.getModel();
+        var arm = right ? model.rightArm : model.leftArm;
+        arm.render(pose, buffers.getBuffer(net.minecraft.client.renderer.RenderType.entityTranslucent(
+                ResourceLocation.fromNamespaceAndPath(SavannaMod.MODID, "textures/entity/player_mud_full.png"))),
+                light, net.minecraft.client.renderer.texture.OverlayTexture.NO_OVERLAY,
+                com.antcolonies.client.MudCoatLook.argb(player, alpha));
+    }
+
+    /** Set while Minecraft's own arm is drawn from {@link #onRenderArm}, so the event it fires again is let through. */
+    private static boolean drawingArm;
+
+    /** How much of the full mask shows on this player now (0 when the arm is clean or the arm is being drawn plain). */
+    private static float fullMaskAlpha(net.minecraft.client.player.AbstractClientPlayer player) {
+        if (drawingArm || com.antcolonies.coat.MudCoat.coverage(player) == 0) {
+            return 0;
+        }
+        return com.antcolonies.client.MudCoatLook.alphas(com.antcolonies.coat.MudCoat.coverage(player),
+                com.antcolonies.coat.MudCoat.dryness(player))[1];
+    }
+
     @SubscribeEvent
     public static void onRegisterLayers(RegisterGuiLayersEvent event) {
         event.registerBelow(VanillaGuiLayers.CAMERA_OVERLAYS, ResourceLocation.fromNamespaceAndPath(SavannaMod.MODID, "under_mud"),

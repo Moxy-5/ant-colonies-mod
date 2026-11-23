@@ -1,0 +1,44 @@
+# The red mist of a kill under water and the muddy footprints' look (2026-11-23, the user's ideas): a tilapia in a tank of
+# water killed by a catfish (by command, so it is the death path; a real hunt's catch makes the same cloud), filmed from
+# inside the water as the cloud billows and thins; then a short trail of boot prints (made by command: all right feet
+# facing south, olive mud; in play they come in step from a muddy player's boots) seen from above.
+#   ./gradlew runFilm -PfilmScene=tools/film/blood_mist_prints.film      pictures in run-film/screenshots/blood_mist_prints/
+cmd time set noon
+cmd weather clear
+cmd kill @e[type=!player]
+cmd fill -5 -61 -5 5 -53 4 minecraft:barrier hollow
+cmd fill -4 -60 -4 4 -54 3 minecraft:water
+cmd fill -4 -61 -4 4 -61 3 minecraft:sand
+lens 50
+wait 40
+cmd summon antcolonies:tilapia 0.0 -57.5 1.0 {NoAI:1b,Rotation:[90f,0f]}
+cmd summon antcolonies:catfish 2.0 -57.5 1.0 {NoAI:1b,HungryIn:99999,Rotation:[90f,0f]}
+# (the camera's height is its feet: its eye is 1.62 higher)
+camera 0.0 -59.4 -3.2 0 0
+wait 20
+shot mist_before
+cmd damage @e[type=antcolonies:tilapia,limit=1] 100 minecraft:mob_attack by @e[type=antcolonies:catfish,limit=1]
+wait 2
+shot mist_00
+wait 8
+shot mist_10
+wait 10
+shot mist_20
+wait 20
+shot mist_40
+wait 20
+shot mist_60
+wait 30
+shot mist_90
+# a trail of prints on grass
+cmd particle antcolonies:mud_footprint 20.375 -59.988 10.0 0 0 0 0 1 force
+cmd particle antcolonies:mud_footprint 20.625 -59.988 10.6 0 0 0 0 1 force
+cmd particle antcolonies:mud_footprint 20.375 -59.988 11.2 0 0 0 0 1 force
+cmd particle antcolonies:mud_footprint 20.625 -59.988 11.8 0 0 0 0 1 force
+cmd particle antcolonies:mud_footprint 20.375 -59.988 12.4 0 0 0 0 1 force
+camera 20.5 -58.0 8.0 0 55
+wait 10
+shot prints_above
+camera 22.5 -59.0 10.0 60 30
+wait 5
+shot prints_low

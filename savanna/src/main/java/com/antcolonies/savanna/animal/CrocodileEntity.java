@@ -616,6 +616,7 @@ public class CrocodileEntity extends PathfinderMob implements GeoEntity, HasLife
         held = prey;
         heldHurt = 0.0F;
         setJaws(JAWS_HOLD);
+        BloodMist.puff(prey);       // seized in the water: a red cloud round the jaws (2026-11-23)
         return true;
     }
 

@@ -161,6 +161,7 @@ public class HuntTilapiaGoal extends Goal {
     }
 
     private void swallow(AbstractSchoolingFish target) {
+        BloodMist.puff(target, target instanceof BarbEntity ? 0.6F : 1.0F);     // a red cloud at the snap (2026-11-23)
         if (fish.level() instanceof ServerLevel level) {
             Vec3 m = fish.mouth();
             level.sendParticles(ParticleTypes.BUBBLE, m.x, m.y, m.z, target instanceof BarbEntity ? 5 : 12, 0.3, 0.2, 0.3, 0.05);

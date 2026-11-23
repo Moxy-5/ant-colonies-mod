@@ -1005,6 +1005,7 @@ public class OtterEntity extends PathfinderMob implements GeoEntity, HasLife {
         }
         prey.setInvulnerable(true);
         playSound(SoundEvents.FOX_BITE, 0.6F, 1.4F);
+        BloodMist.puff(prey);       // caught in the water: a red cloud (2026-11-23)
         return true;
     }
 

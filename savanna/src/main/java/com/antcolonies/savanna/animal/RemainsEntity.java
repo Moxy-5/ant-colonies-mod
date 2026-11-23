@@ -185,6 +185,7 @@ public class RemainsEntity extends Entity implements GeoEntity {
     }
 
     private void puff(int count) {
+        BloodMist.puff(this, count >= 14 ? 0.8F : 0.45F);     // in the water, a red cloud with the bits (2026-11-23)
         if (level() instanceof ServerLevel server) {
             ItemStack bits = new ItemStack(kind() == Kind.TILAPIA || kind() == Kind.TILAPIA_HALF ? SavannaItems.TILAPIA.get() : SavannaItems.CATFISH.get());
             server.sendParticles(new ItemParticleOption(ParticleTypes.ITEM, bits), getX(), getY() + 0.15, getZ(),

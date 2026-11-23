@@ -408,6 +408,7 @@ final class BullSharkGoals {
             caught = true;
             ServerLevel level = shark.server();
             Vec3 m = shark.jawPoint();
+            BloodMist.puff(prey);       // the bite clouds the water red (2026-11-23)
             if (prey instanceof CatfishEntity) {
                 shark.hold(prey.getScale());
                 prey.discard();
