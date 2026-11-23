@@ -141,10 +141,128 @@ gets a request card for these clips, or I make them in the same session with the
    takes one fish and makes it fed; a full otter only looks; two otters, one props. Film the prop from first person
    (the shot that matters) and from the side.
 4. **Alone play** (`pebble_play`, `belly_slide` on wet mud), if wanted.
-5. **The pet** (old plan step 4), built on the hand-feeding memory, once you have made the call below.
+5. **The pet**
+
+(The order changed with section 6: the face, the skitter walks and the three games come first; see 6e.) (old plan step 4), built on the hand-feeding memory, once you have made the call below.
 
 After step 3: the `river` and `life` test categories; a full run before merging into `master` (every-3-steps rule).
 No guard films: animal-only work touches no ant or termite.
+
+## 6. Making it feel alive: skitter walks, a face that shows feelings, three play games (added 2026-11-22)
+
+The user, 2026-11-22: "I want to add new walk animations like skittering around facial emotions and a new animation
+of 3 different ways for them to play with other otters ... I think its whats been missing to make it feel really
+alive." Hard to put into words, so here is my reading of it as three pieces. They share one idea: **the otter has a
+mood, and the mood shows everywhere at once**: in how it moves, in its face, and in what games it starts. Today it has
+states (calm, eating, resting, scared) but its face is the same in all of them and it moves at an even pace, which is
+why it reads as a machine.
+
+### 6a. One mood, read in one place (the base for everything below)
+
+A small mood on the otter, worked out each second from what it already knows (my picks): **calm**, **curious**
+(something new nearby, a player holding a fish), **playful** (fed and safe, part 1's rule), **excited** (in a game,
+about to be fed), **wary** (a player came fast, a splash nearby), **scared** (fleeing), **content** (eating, resting,
+just dried off), **cross** (hurt, or its pup hurt). It is synced to the client so the drawing can show it. The walk,
+the face and play all read this one value; none of them judges the mood on its own (fewer rules, one place).
+
+### 6b. Skittering: how it moves, not only which clip
+
+Real otters on land rarely walk at an even pace. They **scurry in short bursts**: a quick dash of a block or three, a
+sudden stop, head up or nose down to sniff, a turn, another dash. The burst-and-stop pattern is most of the "alive"
+look, so this is two parts:
+
+- **The pattern (code, in the otter's wandering):** when curious, playful or excited, it moves in bursts of 1 to 3
+  blocks with 0.5 to 2 second stops, often changing direction 30 to 90 degrees at a stop; at each stop a short look
+  (head up, `stand_look` now and then) or a sniff (nose down). Calm and content keep today's even walk. Scared keeps the
+  bound straight away.
+- **New clips:**
+  - `scurry`: quick choppy steps, body low and long, tail straight out behind, head forward (faster than the walk,
+    slower than the bound; the clip speed follows the real speed as the walk does).
+  - `skid_stop`: the little stop at the end of a burst, front paws braced, body rocking forward and back, head
+    coming up (about 0.3 s).
+  - `sniff_walk`: a slow nose-down zigzag, whiskers forward, for the curious wander and for hunting along a bank.
+  - `hop_turn`: a quick little hop to face a new way at a stop (instead of turning on the spot).
+
+### 6c. A face that shows feelings
+
+Otters cannot frown or smile like a cartoon, but they show a lot with the parts they do have, and the model already
+has all of them as moving parts: ears, eyes, eyelids, whiskers, jaw and tongue. My pick: **real otter signals pushed a
+little bigger so they read at Minecraft distance, no cartoon eyebrows.**
+
+| Mood | Ears | Eyes and lids | Whiskers | Mouth |
+|---|---|---|---|---|
+| calm | relaxed, a little out | open, slow blinks | relaxed, slightly back | closed |
+| curious | pricked forward, turning to sounds | wide | **bristled forward** (the real otter tell) | closed, nose twitching |
+| playful / excited | forward | wide, quick blinks | forward | **loose open "play face"**, tongue tip showing |
+| content | soft, back | **half shut, squinting** | relaxed back | closed or a slow chew |
+| wary | turning about | wide, few blinks | forward and stiff | closed tight |
+| scared | **flat back** | wide | flat back against the face | closed |
+| cross | flat back | narrowed | forward | **open, teeth showing**, a snarl |
+
+How it works in the game: a **face layer** in `OtterModel`, added on top of whatever clip is playing, the way the
+head already turns to look on top of every clip. So the face shows while walking, swimming, eating or playing, without a
+clip for every mood times every action. It eases between moods over about half a second and adds small life of its
+own: blinks at random times, ear flicks, a nose twitch when curious. Where a clip moves a face part itself (the jaw in
+`bite` and `eat`, the lids in `rest`), the clip wins on that part.
+
+This is the engine's planned "live layer for animals" (G4 in `docs/plans/animal-kit-tools-review.md`); built for the
+otter first, written so other animals can use it later (shared code, each animal its own face table).
+
+May need from the model (checked in the workshop's detail stage, the user's OK): a **nose** part that can twitch and
+wrinkle, and maybe **whisker pads** that puff out; today the whiskers move as one piece per side. The faces are shown
+in a viewer page first (each mood side by side, close up) for the user to pick from before any go into the game.
+
+### 6d. Three new ways to play together
+
+Kept: the rear-up and box (`play_up`, `play_rear`, `play_down`), now the usual opening of a game. Three new games, each
+a different kind of real otter play (my picks of which three):
+
+1. **Tumble wrestle** (shallows and banks). They grab each other and roll over: one ends on its back pawing up at the
+   other, who mock-bites its neck and shoulders. Then they roll and swap, two or three times, with splashes. The
+   wrestling everyone thinks of when they think of otters.
+2. **Chase and tag** (water or land). One nips the other's tail and runs. In water the chase goes in **porpoise
+   leaps**, arcing out of the water and back in; on land it is a scurry chase in loops. When the chaser catches up it
+   tags with a pounce, and they swap who chases.
+3. **Keep-away** (with a pebble or a crab shell). One picks up a pebble or an empty crab shell (the crab remains are
+   built) and runs off with it, turning to show it off. The other chases and tries to snatch it. The winner rolls onto
+   its back and fiddles the pebble between its front paws, until the other comes for it again.
+
+Which game they play: the place picks first (deep water: chase; shallows or bank: any; a shell or pebble nearby:
+keep-away more likely), then a random roll. A game runs 10 to 30 seconds and can lead into another.
+
+**New clips:**
+- `wrestle_top` and `wrestle_bottom`, a pair made together so the two bodies fit, plus `wrestle_roll`, a swap where
+  both turn over.
+- `porpoise`: a leap out of the water and back in.
+- `pounce_tag`.
+- `belly_up_fiddle`: lying on its back, the pebble between the paws.
+- `snatch`.
+
+**The hard part, honestly: two animals moving as one.** In the wrestle the two bodies hold each other. If each otter
+moved on its own, they would drift apart, sink into each other, or push each other away (Minecraft pushes touching
+mobs). So this needs a new shared piece, **paired moves**:
+- One otter leads. The other is set at a fixed place and facing beside it every tick, and plays its half of the clip
+  pair on the same clock (the leader's), so the bites and rolls line up exactly.
+- No pushing between the two while paired.
+- Either one being hurt, scared or pushed breaks the pair at once.
+- A player joining mid-wrestle sees both at the right point.
+
+It is species-neutral (in the framework). Later it could also serve a crocodile with prey in its jaws, a mother
+carrying a pup, or ants carrying hurt nestmates. The chase and keep-away need no pairing: each otter runs its own part,
+and only the tag and the snatch are a quick touch. So the wrestle is the hardest of the three and comes last.
+
+### 6e. The order (each a step with the user's OK in the viewer before it goes into the game)
+
+1. **The mood and the face layer** (6a, 6c): the faces in a viewer page, then in the game on every clip. The biggest
+   change for the least work, because it shows on everything the otter already does.
+2. **Skitter walks** (6b): the four clips through the workshop, then the burst-and-stop wandering.
+3. **Play part 1** (section 1 above), with the rear-up opening, so the games have a start and an end.
+4. **Chase and tag**, then **keep-away** (no pairing needed).
+5. **Paired moves and the tumble wrestle.**
+6. Then the fish begging (sections 2 to 4), which gets the face for free (curious, then excited, then content).
+
+Every new clip follows the hard rule: `clip_check.py otter --switches` offline, then filmed frozen and stepped in the
+game from three sides, before the user sees it. The faces need close-up films (a new short film scene, head only).
 
 ## Open call for the user
 
