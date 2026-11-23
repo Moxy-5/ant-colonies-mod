@@ -33,25 +33,27 @@
 <body>
 <header>
   <h1>Otter faces</h1>
-  <p>The otter's moods, shown with the face parts it already has: ears, eyelids, eyes, whiskers, jaw and tongue, plus a head tilt.
+  <p>The otter's moods: the face (ears, eyelids, eyes, whiskers, jaw, tongue, a head tilt), the tail, and how it holds its body. Three new ear designs to try on every mood.
      Pick a mood to see it on one otter (it eases from the last face over half a second, as it will in the game), or show all of them side by side.
      Drag to turn, scroll to zoom, right-drag to slide.</p>
 </header>
 <div id="wrap"><canvas id="c"></canvas><div id="labels"></div></div>
 <div class="controls"><span class="what">Mood</span><span id="moods" style="display:contents"></span></div>
 <div id="note"></div>
+<div class="controls"><span class="what">Ears</span><span id="ears" style="display:contents"></span></div>
 <div class="controls"><span class="what">Camera</span><span id="cams" style="display:contents"></span></div>
 <div class="controls"><span class="what">Show</span><span id="shows" style="display:contents"></span></div>
 <ul>
   <li><b>In the game</b> the face is added on top of whatever the otter is doing (walking, swimming, eating, playing), the way its head already turns to look at things. Here it sits on the idle clip.</li>
   <li><b>Excited</b> uses the playful face. Where a clip moves a face part itself (the jaw biting or chewing, the eyelids when asleep), the clip wins on that part.</li>
+  <li><b>The body stance</b> (crouching, leaning, the neck, the lifted paw) shows while the otter stands still; moving, its walk or bound carries the body, and the face and tail still show. Real otters hardly signal with the tail (it is a rudder and a prop to stand on), so the tail moods are kept small.</li>
   <li><b>Its own little life:</b> blinks at its own pace for each mood, ear flicks, ears turning about when wary, whiskers quivering when curious.</li>
 </ul>
 <pre id="viewer-state" hidden></pre>
 <!--VIEWER-->
 <script>
 const DATA = /*DATA*/null;
-const S = Viewer.settingsFromHash({mood: 'curious', all: 0, cam: 'three', life: 1, t: -1});
+const S = Viewer.settingsFromHash({mood: 'curious', all: 0, cam: 'three', life: 1, t: -1, ear: ''});
 const st = Viewer.stage({canvas: document.getElementById('c'), wrap: document.getElementById('wrap'),
                          labels: document.getElementById('labels'), sky: '#b9d6e4', fog: [40, 90]});
 const ground = new THREE.Mesh(new THREE.PlaneGeometry(60, 60), new THREE.MeshLambertMaterial({color: '#b49a6c'}));
@@ -61,14 +63,23 @@ const clips = Viewer.readClips(DATA.clips);
 const moods = DATA.moods.map(m => m.key);
 const SPACING = 1.15;
 
-// one otter for the close-up, and one per mood for "side by side"; heads toward -z (the camera's side)
-const solo = Viewer.buildModel(DATA.look, st.scene);
-const row = moods.map((m, i) => {
-  const o = Viewer.buildModel(DATA.look, st.scene);
-  o.position.x = -(i - (moods.length - 1) / 2) * SPACING;   // the camera looks from -z, so +x is on the left
-  st.tag(DATA.moods[i].label, o, () => 1.25);
-  return o;
+// one otter for the close-up, and one per mood for "side by side"; heads toward -z (the camera's side). The models
+// are rebuilt when the ears change; the labels hang on fixed markers.
+let ear = DATA.looks[S.ear] ? S.ear : DATA.ear;
+const anchors = moods.map((m, i) => {
+  const a = new THREE.Object3D();
+  a.position.x = -(i - (moods.length - 1) / 2) * SPACING;   // the camera looks from -z, so +x is on the left
+  st.scene.add(a);
+  st.tag(DATA.moods[i].label, a, () => 1.35);
+  return a;
 });
+let solo, row = [];
+function buildAll() {
+  [solo, ...row].forEach(o => o && st.scene.remove(o));
+  solo = Viewer.buildModel(DATA.looks[ear], st.scene);
+  row = anchors.map(a => { const o = Viewer.buildModel(DATA.looks[ear], st.scene); o.position.x = a.position.x; return o; });
+}
+buildAll();
 
 // the pose between two clips: rest, then each channel eased from the old face to the new one
 function poseBlend(model, a, b, f, t) {
@@ -105,6 +116,7 @@ const CAMS = {
   three: ['Three quarters', h => [[h.x - 1.5, h.y + 0.45, h.z - 2.1], [h.x, h.y - 0.05, h.z - 0.2]]],
   front: ['Face on', h => [[h.x, h.y + 0.25, h.z - 2.5], [h.x, h.y - 0.05, h.z - 0.2]]],
   side: ['Side', h => [[h.x - 2.4, h.y + 0.1, h.z - 0.2], [h.x, h.y - 0.05, h.z - 0.2]]],
+  body: ['Whole body', h => [[h.x + 4.6, 0.75, h.z + 0.9], [h.x, 0.45, h.z + 0.9]]],
   player: ['As a player sees it', h => [[h.x + 0.4, 1.62, h.z - 2.6], [h.x, h.y - 0.1, h.z]]],
 };
 let cam = CAMS[S.cam] ? S.cam : 'three';
@@ -123,6 +135,10 @@ const markMood = Viewer.buttons(document.getElementById('moods'), DATA.moods.map
 const markCam = Viewer.buttons(document.getElementById('cams'), Object.entries(CAMS).map(([k, [l]]) => [k, l]), k => {
   cam = k; markCam(k); if (all) { all = false; refresh(); } else placeCamera();
 });
+const markEar = Viewer.buttons(document.getElementById('ears'), DATA.ears, k => {
+  ear = k; markEar(k); buildAll(); refresh();
+});
+markEar(ear);
 const shows = document.getElementById('shows');
 const allBtn = document.createElement('button'); shows.appendChild(allBtn);
 allBtn.onclick = () => { all = !all; refresh(); };
@@ -135,6 +151,7 @@ function note() {
 function refresh() {
   solo.visible = !all;
   row.forEach(o => o.visible = all);
+  anchors.forEach(a => a.visible = all);
   allBtn.textContent = all ? 'One at a time' : 'All side by side';
   allBtn.classList.toggle('on', all);
   lifeBtn.textContent = life ? 'Blinks and twitches: on' : 'Blinks and twitches: still';

@@ -37,6 +37,7 @@ NECK_LEN = 4.6          # neck reach along its pitched axis (px)
 HEAD_PITCH = 2.0        # slight alert head tilt (+ = nose slightly up, deg)
 TAIL_LEN = 12.2         # smooth tapering tail length (px)
 WHISKER_LEN = 3.2       # total length of each curved 3D whisker (px)
+EAR_STYLE = "v6"        # the ears: "v6" (approved), "A", "B" or "C" (see build_bones; the user picks on the faces page)
 
 WORKSHOP_SHAPE = [
     ("BODY_EXTRA",  "Extra body length (px)",  0.0, 16.0, 0.8),
@@ -406,10 +407,30 @@ def build_bones():
         hbox(lc, lx0, lx1, ey1 + 0.05, ey1 + 1.55, eox0 - 0.05, eox1 + 0.08, "head_fur")
 
     # --- SMALL ROUNDED EARS WITH DARK HOLLOW CUPS (matches hero_detail.png!) -----------------------------------------
+    # EAR_STYLE (2026-11-22, the user: "make the ears a little bigger or redesign them ... 3 variations"): "v6" the
+    # approved ears (small, on the skull's side, they hardly show above it), "A" bigger and poking up over the crown,
+    # "B" as A with a pale rim round the dark hollow (reads against the dark head), "C" rounder, set out to the sides
+    # and tipped out, with a pale inside. Picked on the faces page (python tools/otter_models.py faces).
     ear_l_cubes, ear_r_cubes = [], []
     for s, ec in ((1, ear_l_cubes), (-1, ear_r_cubes)):
-        hbox(ec, s * 3.7, s * 4.88, 13.45, 15.18, 27.6, 29.15, "ear")
-        hbox(ec, s * 4.02, s * 4.66, 13.75, 14.82, 28.92, 29.22, "ear_hollow")
+        if EAR_STYLE == "v6":
+            hbox(ec, s * 3.7, s * 4.88, 13.45, 15.18, 27.6, 29.15, "ear")
+            hbox(ec, s * 4.02, s * 4.66, 13.75, 14.82, 28.92, 29.22, "ear_hollow")
+        elif EAR_STYLE in ("A", "B"):
+            hbox(ec, s * 3.45, s * 5.15, 13.5, 16.4, 27.3, 29.2, "ear")
+            hbox(ec, s * 3.75, s * 4.85, 16.4, 16.95, 27.5, 29.0, "ear")
+            if EAR_STYLE == "B":
+                hbox(ec, s * 3.6, s * 5.0, 13.85, 16.25, 29.15, 29.25, "ear_rim")
+                hbox(ec, s * 3.92, s * 4.68, 14.1, 15.85, 29.2, 29.32, "ear_hollow")
+            else:
+                hbox(ec, s * 3.85, s * 4.75, 14.0, 15.9, 29.15, 29.27, "ear_hollow")
+        else:   # "C"
+            hbox(ec, s * 3.9, s * 5.4, 14.0, 16.0, 27.5, 29.2, "ear")
+            hbox(ec, s * 4.05, s * 5.25, 16.0, 16.7, 27.65, 29.05, "ear")
+            hbox(ec, s * 4.3, s * 5.0, 16.7, 17.1, 27.85, 28.85, "ear")
+            hbox(ec, s * 4.2, s * 5.1, 14.4, 16.4, 29.15, 29.27, "ear_inner")
+    ear_x, ear_y = (4.6, 14.5) if EAR_STYLE == "C" else (4.0, 14.2)
+    ear_tip = 18.0 if EAR_STYLE == "C" else 0.0
 
     # --- LOWER JAW & TONGUE ------------------------------------------------------------------------------------------
     jaw_wox, jaw_wy = 30.2, 10.45
@@ -466,9 +487,11 @@ def build_bones():
         {"name": "snout_bridge", "parent": "head", "pivot": sb_piv,
          "rotation": pitch(-16.0), "cubes": sb_cubes},
         {"name": "ear_left",  "parent": "head",
-         "pivot": [4.0, round(14.2 + dy_h, 3), round(oz(28.4 + BODY_EXTRA) + dz_h, 3)], "cubes": ear_l_cubes},
+         "pivot": [ear_x, round(ear_y + dy_h, 3), round(oz(28.4 + BODY_EXTRA) + dz_h, 3)], "cubes": ear_l_cubes,
+         **({"rotation": [0.0, 0.0, ear_tip]} if ear_tip else {})},
         {"name": "ear_right", "parent": "head",
-         "pivot": [-4.0, round(14.2 + dy_h, 3), round(oz(28.4 + BODY_EXTRA) + dz_h, 3)], "cubes": ear_r_cubes},
+         "pivot": [-ear_x, round(ear_y + dy_h, 3), round(oz(28.4 + BODY_EXTRA) + dz_h, 3)], "cubes": ear_r_cubes,
+         **({"rotation": [0.0, 0.0, -ear_tip]} if ear_tip else {})},
         {"name": "eye_left",  "parent": "head",
          "pivot": [3.15, round(13.3 + dy_h, 3), round(oz(32.0 + BODY_EXTRA) + dz_h, 3)], "cubes": eye_l_cubes},
         {"name": "eye_right", "parent": "head",
@@ -636,6 +659,10 @@ def fur_colour(c, face, px, py, pz):
         return _face_shading(col, face)
     if part == "ear_hollow":
         return (36, 23, 17)
+    if part == "ear_rim":
+        return mix((232, 210, 178), (214, 190, 156), _voxel_noise(px, py, pz, cell=0.6, seed=29))
+    if part == "ear_inner":
+        return mix((196, 156, 138), (178, 138, 122), _voxel_noise(px, py, pz, cell=0.6, seed=31))
     if part == "mouth":
         return (152, 82, 86)
     if part == "tongue":
@@ -781,6 +808,8 @@ PLAIN_PALETTE = {
     "paw_toe":      (42, 27, 21),
     "ear":          (68, 44, 32),
     "ear_hollow":   (36, 23, 17),
+    "ear_rim":      (228, 206, 172),
+    "ear_inner":    (190, 150, 132),
     "nose":         (36, 24, 19),
     "whisker":      (244, 240, 234),
     "mouth":        (162, 92, 96),
@@ -1953,41 +1982,69 @@ def clips():
 
 
 # --- FACES: the otter's moods (docs/plans/otter-play-and-fish.md, section 6c; 2026-11-22) ---------------------------
-# Real otter signals pushed a little bigger so they read at Minecraft distance; no cartoon brows (my pick). Each mood is
-# a set of offsets the game's face layer will add on top of whatever clip plays (as the head look is added today), plus
-# the face's own little life (blinks, ear flicks, ear scanning, whisker quiver). Numbers are my picks, in degrees and
-# model px:
-#   ear_fwd   ears tipped forward (+) or laid back (-)     ear_out   ears turned out (+) or folded in flat (-)
-#   lids      eyelids down, 0 open .. 1 shut               eyes      eye size (1 = as made; wide-eyed a touch bigger)
-#   whiskers  whiskers swung forward (+) or swept back (-) jaw       mouth open (deg)
-#   tongue    tongue tip forward (+ px, out of the mouth) or drawn back (-)
-#   tilt      head tilted to one side (deg, the curious head tilt)          nod  head tipped up (+) or down (-)
-#   blink     seconds between blinks                       flick     ear flicks per 10 s
-#   scan      ears turning about to listen (deg)           quiver    whisker quiver (deg)
+# Real otter signals pushed a little bigger so they read at Minecraft distance; no cartoon brows (my pick). Two layers:
+# the FACE and TAIL (offsets the game adds on top of whatever clip plays, as the head look is added today) and the
+# BODY STANCE (crouch, lean, neck, back, a lifted paw: drawn with the legs re-solved so the feet stay planted, so in the
+# game it goes on the standing-still clip only; moving, the walk or the bound carries the body). The user, 2026-11-22:
+# "scared and wary need more body language ... include [the tail] to the emotions". Honest note: real otters hardly
+# signal with the tail (it is a rudder and a prop to stand on); the tail moods are fun first, kept small.
+# Numbers are my picks, in degrees and model px:
+#   face:  ear_fwd ears tipped forward (+) / laid back (-)   ear_out ears turned out (+) / in (-)
+#          ear_flat ears' tips folded out sideways            lids eyelids down, 0 open .. 1 shut
+#          eyes eye size (1 as made)                          whiskers swung forward (+) / swept back (-)
+#          jaw mouth open                                     tongue tip forward (+ px) / drawn back (-)
+#          tilt head tilt (the curious one)                   nod head tipped up (+) / down (-)
+#          blink seconds between blinks   flick ear flicks per 10 s   scan ears turning about   quiver whisker quiver
+#   tail:  tail_lift the tail raised at its base (+) / clamped down (-)   tail_curl each piece bent further (- under)
+#          tail_swish side to side (deg)   tail_speed swishes per 3.6 s   tail_still 0 idle sway .. 1 held stiff
+#   body:  crouch body lowered (px)   lean weight back (+ px) / forward (-)   neck neck raised (+ deg) / drawn in (-)
+#          hunch back arched up (deg)   look head turning side to side (deg)   shiver trembling (deg)
+#          paw front left paw lifted (px)   bounce a little bob (px)
 FACE_MOODS = ["calm", "curious", "playful", "content", "wary", "scared", "cross"]
-FACES = {
-    "calm":    {"ear_fwd": 0.0, "ear_out": 0.0, "lids": 0.0, "eyes": 1.0, "whiskers": 0.0, "jaw": 0.0, "tongue": 0.0,
-                "tilt": 0.0, "nod": 0.0, "blink": 3.2, "flick": 1.0, "scan": 0.0, "quiver": 1.5,
-                "note": "Relaxed: ears a little out, slow blinks, whiskers resting, mouth closed."},
-    "curious": {"ear_fwd": 14.0, "ear_out": 8.0, "lids": 0.0, "eyes": 1.08, "whiskers": 16.0, "jaw": 0.0, "tongue": 0.0,
-                "tilt": 13.0, "nod": 4.0, "blink": 4.5, "flick": 4.0, "scan": 0.0, "quiver": 5.0,
-                "note": "Ears pricked forward, whiskers bristled forward (the real otter tell), eyes wide, head tilted."},
-    "playful": {"ear_fwd": 9.0, "ear_out": 4.0, "lids": 0.0, "eyes": 1.06, "whiskers": 9.0, "jaw": 17.0, "tongue": 0.9,
-                "tilt": 6.0, "nod": 6.0, "blink": 1.6, "flick": 3.0, "scan": 0.0, "quiver": 3.0,
-                "note": "The loose open-mouthed play face, tongue tip showing, quick blinks. Also the excited face."},
-    "content": {"ear_fwd": -8.0, "ear_out": 2.0, "lids": 0.55, "eyes": 1.0, "whiskers": -7.0, "jaw": 0.0, "tongue": 0.0,
-                "tilt": 0.0, "nod": -3.0, "blink": 2.8, "flick": 0.5, "scan": 0.0, "quiver": 0.8,
-                "note": "Eyes half shut in a squint, ears soft and back, whiskers relaxed back. Eating, resting, dried off."},
-    "wary":    {"ear_fwd": 6.0, "ear_out": 6.0, "lids": 0.0, "eyes": 1.1, "whiskers": 11.0, "jaw": -1.0, "tongue": -0.4,
-                "tilt": 0.0, "nod": 7.0, "blink": 7.0, "flick": 0.0, "scan": 22.0, "quiver": 0.0,
-                "note": "Ears turning about to listen, eyes wide and hardly blinking, whiskers stiff forward, mouth tight."},
-    "scared":  {"ear_fwd": -32.0, "ear_out": -20.0, "lids": 0.0, "eyes": 1.14, "whiskers": -16.0, "jaw": 0.0,
-                "tongue": -0.4, "tilt": 0.0, "nod": -4.0, "blink": 6.0, "flick": 0.0, "scan": 0.0, "quiver": 0.0,
-                "note": "Ears laid flat back, whiskers swept back against the face, eyes wide."},
-    "cross":   {"ear_fwd": -26.0, "ear_out": -12.0, "lids": 0.38, "eyes": 1.0, "whiskers": 13.0, "jaw": 24.0,
-                "tongue": -0.6, "tilt": 0.0, "nod": -6.0, "blink": 8.0, "flick": 0.0, "scan": 0.0, "quiver": 2.0,
-                "note": "Ears flat back, eyes narrowed, whiskers forward, mouth open in a snarl, head low."},
-}
+_FACE_ZERO = {"ear_fwd": 0.0, "ear_out": 0.0, "ear_flat": 0.0, "lids": 0.0, "eyes": 1.0, "whiskers": 0.0, "jaw": 0.0,
+              "tongue": 0.0, "tilt": 0.0, "nod": 0.0, "blink": 3.2, "flick": 1.0, "scan": 0.0, "quiver": 1.5,
+              "tail_lift": 0.0, "tail_curl": 0.0, "tail_swish": 0.0, "tail_speed": 1, "tail_still": 0.0,
+              "crouch": 0.0, "lean": 0.0, "neck": 0.0, "hunch": 0.0, "look": 0.0, "shiver": 0.0, "paw": 0.0,
+              "bounce": 0.0}
+FACES = {m: dict(_FACE_ZERO, **v) for m, v in {
+    "calm":    {"note": "Relaxed: ears a little out, slow blinks, whiskers resting, mouth closed, tail lazy."},
+    "curious": {"ear_fwd": 14.0, "ear_out": 8.0, "eyes": 1.08, "whiskers": 16.0, "tilt": 13.0, "nod": 4.0,
+                "blink": 4.5, "flick": 4.0, "quiver": 5.0,
+                "tail_lift": 5.0, "tail_swish": 4.0, "tail_speed": 4, "tail_still": 0.6,
+                "lean": -0.7, "neck": 7.0,
+                "note": "Ears pricked, whiskers bristled forward (the real otter tell), eyes wide, head tilted; leaning in "
+                        "with the neck stretched, the tail lifted a little with its tip flicking."},
+    "playful": {"ear_fwd": 9.0, "ear_out": 4.0, "eyes": 1.06, "whiskers": 9.0, "jaw": 17.0, "tongue": 0.9,
+                "tilt": 6.0, "nod": 4.0, "blink": 1.6, "flick": 3.0, "quiver": 3.0,
+                "tail_lift": 9.0, "tail_swish": 11.0, "tail_speed": 3, "tail_still": 1.0,
+                "neck": 3.0, "bounce": 0.45,
+                "note": "The loose open-mouthed play face, tongue tip out, quick blinks; bouncing on its toes, tail up "
+                        "and swishing. Also the excited face."},
+    "content": {"ear_fwd": -8.0, "ear_out": 2.0, "lids": 0.55, "whiskers": -7.0, "nod": -3.0, "blink": 2.8,
+                "flick": 0.5, "quiver": 0.8,
+                "tail_lift": -5.0, "tail_curl": 1.5, "tail_swish": 2.5, "tail_speed": 1, "tail_still": 1.0,
+                "crouch": 0.6, "neck": -3.0,
+                "note": "Eyes half shut in a squint, ears soft and back, settled low, tail lying slack. Eating, resting, "
+                        "dried off."},
+    "wary":    {"ear_fwd": 6.0, "ear_out": 6.0, "eyes": 1.1, "whiskers": 11.0, "jaw": -1.0, "tongue": -0.4,
+                "nod": 2.0, "blink": 7.0, "flick": 0.0, "scan": 22.0, "quiver": 0.0,
+                "tail_lift": -3.0, "tail_curl": 0.5, "tail_still": 1.0,
+                "crouch": -0.3, "lean": 0.8, "neck": 24.0, "look": 20.0, "paw": 2.2,
+                "note": "Frozen and tall: weight back, neck stretched up, one front paw lifted, head and ears turning "
+                        "to find the danger, eyes wide and hardly blinking, tail held straight and stiff."},
+    "scared":  {"ear_fwd": -32.0, "ear_out": -12.0, "ear_flat": 22.0, "eyes": 1.14, "whiskers": -16.0,
+                "tongue": -0.4, "nod": 6.0, "blink": 6.0, "flick": 0.0, "quiver": 0.0,
+                "tail_lift": -22.0, "tail_curl": -2.0, "tail_still": 1.0,
+                "crouch": 2.4, "lean": 1.2, "neck": -16.0, "hunch": 7.0, "shiver": 1.3,
+                "note": "Crouched low and pulled back, back hunched, head drawn in, ears flat, whiskers swept back, "
+                        "eyes wide, trembling, tail clamped down to the ground."},
+    "cross":   {"ear_fwd": -26.0, "ear_out": -12.0, "ear_flat": 10.0, "lids": 0.38, "whiskers": 13.0, "jaw": 24.0,
+                "tongue": -0.6, "nod": -2.0, "blink": 8.0, "flick": 0.0, "quiver": 2.0,
+                "tail_lift": 6.0, "tail_swish": 5.0, "tail_speed": 6, "tail_still": 1.0,
+                "crouch": 0.9, "lean": -0.7, "neck": -9.0, "hunch": 5.0,
+                "note": "Ears flat, eyes narrowed, snarling; head low and pushed forward, back arched, weight on the "
+                        "front feet ready to lunge, tail stiff with its tip lashing."},
+}.items()}
 WHISKER_SIGN = 1.0      # which way "forward" turns the whisker bones (checked on the faces page)
 
 
@@ -2000,19 +2057,72 @@ def _flick(t, rate, seed):
     return _blink_curve(t % IDLE_LEN, times, dur=0.22)
 
 
+TAIL_GROUND = 0.7
+
+
+def _world_tail_pitch(p):
+    """How far the last tail piece points down (deg, + down) in the world, from tail_4 to tail_5's joints."""
+    a, b = _fk_bone(p, "tail_4")[0], _fk_bone(p, "tail_5")[0]
+    return math.degrees(math.atan2(a[1] - b[1], abs(b[2] - a[2]) + 1e-6))
+
+
+def _add_rot(p, bone, d):
+    r = p.get(bone, {}).get("rotation", [0.0, 0.0, 0.0])
+    p.setdefault(bone, {})["rotation"] = [r[0] + d[0], r[1] + d[1], r[2] + d[2]]
+
+
 def face_pose(mood, t):
-    """The idle body at time t with this mood's face on it (the faces page; the game adds the same offsets live)."""
+    """The idle body at time t with this mood on it: face, tail and stance (the faces page; the game adds the same)."""
     f = FACES[mood]
     p = _idle_pose(t)
     w = 2.0 * math.pi * t / IDLE_LEN
+
+    # --- the stance (pitch: a piece reaching to -z, head-wards, goes up with a negative x turn) ---
+    bob = f["bounce"] * abs(math.sin(2.0 * w))
+    shiver = f["shiver"] * math.sin(w * 40.0)
+    pos = p.get("body", {}).get("position", [0.0, 0.0, 0.0])
+    p.setdefault("body", {})["position"] = [pos[0], pos[1] - f["crouch"] + bob, pos[2] + f["lean"]]
+    _add_rot(p, "body", [0.0, 0.0, shiver])
+    _add_rot(p, "waist", [-f["hunch"], 0.0, 0.0])            # front of the waist up: the back humps
+    _add_rot(p, "chest", [f["hunch"], 0.0, 0.0])             # shoulders back down
+    _add_rot(p, "hips", [-0.5 * f["hunch"], 0.0, 0.0])       # rump tucked a little
+    look = f["look"] * math.sin(w)
+    _add_rot(p, "neck", [-f["neck"], 0.4 * look, 0.0])
+    _add_rot(p, "head", [0.75 * f["neck"] - f["nod"], 0.6 * look, f["tilt"]])
+    if mood == "playful":
+        _add_rot(p, "head", [-2.0 * math.sin(w * 2.0), 0.0, 0.0])
+    for pref in ("leg_fl", "leg_fr", "leg_bl", "leg_br"):
+        wr = _rig()["legs"][pref]["w_rest"]
+        lift = f["paw"] if pref == "leg_fl" else 0.0
+        _solve_leg(p, pref, lift, wr[2] - 0.5 * lift, 18.0 * lift / max(f["paw"], 0.01) if lift else 0.0)
+
+    # --- the tail: its idle sway faded out by tail_still, then lift, curl and swish ---
+    idle_tail = [p.get(f"tail_{i + 1}", {}).get("rotation", [0.0, 0.0, 0.0]) for i in range(5)]
+    sw = f["tail_swish"]
+    _set_tail(p,
+              lambda i: (1.0 - f["tail_still"]) * idle_tail[i][0] + (f["tail_lift"] if i == 0 else 0.0)
+              + (f["tail_curl"] if i > 0 else 0.0),
+              lambda i: (1.0 - f["tail_still"]) * idle_tail[i][1]
+              + sw * (0.4 + 0.3 * i) * math.sin(w * f["tail_speed"] - 0.6 * i))
+
+    # a tail pressed down lies along the ground instead of going into it (each piece turned up until the next joint
+    # is TAIL_GROUND px over the ground)
+    for i in range(1, 5):
+        for _ in range(40):
+            if _fk_bone(p, f"tail_{i + 1}")[0][1] >= TAIL_GROUND:
+                break
+            _add_rot(p, f"tail_{i}", [2.0, 0.0, 0.0])
+    if _fk_bone(p, "tail_5")[0][1] < TAIL_GROUND + 0.4:
+        _add_rot(p, "tail_5", [-_world_tail_pitch(p) * 0.8, 0.0, 0.0])
+
+    # --- the face ---
     n = max(1, round(IDLE_LEN / f["blink"]))
     blink = _blink_curve(t, [((k + 0.3) / n) * IDLE_LEN for k in range(n)], dur=0.16)
-    lids = max(f["lids"], blink)
-    _set_lids(p, lids)
+    _set_lids(p, max(f["lids"], blink))
     fl, fr = _flick(t, f["flick"], 0.0), _flick(t, f["flick"], 2.3)
     scan = f["scan"] * math.sin(w * 2.0)
-    p["ear_left"] = {"rotation": [f["ear_fwd"] + 14.0 * fl, f["ear_out"] + scan, 0.0]}
-    p["ear_right"] = {"rotation": [f["ear_fwd"] + 14.0 * fr, -(f["ear_out"] - scan), 0.0]}
+    p["ear_left"] = {"rotation": [f["ear_fwd"] + 14.0 * fl, f["ear_out"] + scan, f["ear_flat"]]}
+    p["ear_right"] = {"rotation": [f["ear_fwd"] + 14.0 * fr, -(f["ear_out"] - scan), -f["ear_flat"]]}
     q = f["quiver"] * math.sin(w * 9.0)
     wk = WHISKER_SIGN * (f["whiskers"] + q)
     _set_whiskers(p, wk, wk)
@@ -2021,9 +2131,6 @@ def face_pose(mood, t):
     p["tongue"] = {"position": [0.0, 0.0, -f["tongue"]]}
     for side in ("eye_left", "eye_right"):
         p[side] = {"scale": [f["eyes"]] * 3}
-    head = p.get("head", {}).get("rotation", [0.0, 0.0, 0.0])
-    bob = 2.0 * math.sin(w * 2.0) if mood == "playful" else 0.0
-    p["head"] = {"rotation": [head[0] + f["nod"] + bob, head[1], head[2] + f["tilt"]]}
     return p
 
 
@@ -2031,14 +2138,23 @@ def face_clips():
     return {"face_" + m: clip(IDLE_LEN, lambda t, m=m: face_pose(m, t), 72, loop=True) for m in FACE_MOODS}
 
 
+EAR_STYLES = {"v6": "Now (approved v6)", "A": "A: bigger", "B": "B: bigger, pale rim", "C": "C: round, set out"}
+
+
 def faces_page():
     """references/workshop/otter/faces.html: every mood's face side by side and one at a time, blending between them."""
     import base64
     from viewer_page import build
-    bones, png_bytes, w, h = workshop_look()
-    data = {"look": {"bones": bones, "texture": "data:image/png;base64," + base64.b64encode(png_bytes).decode(),
-                     "w": w, "h": h},
-            "clips": face_clips(), "idle": {"idle": _clip_idle()},
+    global EAR_STYLE
+    kept, looks = EAR_STYLE, {}
+    for style in EAR_STYLES:
+        EAR_STYLE = style
+        bones, png_bytes, w, h = workshop_look()
+        looks[style] = {"bones": bones, "w": w, "h": h,
+                        "texture": "data:image/png;base64," + base64.b64encode(png_bytes).decode()}
+    EAR_STYLE = kept
+    data = {"looks": looks, "ears": [[k, EAR_STYLES[k]] for k in EAR_STYLES], "ear": kept,
+            "clips": face_clips(),
             "moods": [{"key": m, "label": m.capitalize(), "note": FACES[m]["note"]} for m in FACE_MOODS]}
     return build("face_viewer.template.html", data, Path(__file__).resolve().parent.parent
                  / "references/workshop/otter/faces.html")

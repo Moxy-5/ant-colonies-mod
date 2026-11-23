@@ -276,3 +276,11 @@ game from three sides, before the user sees it. The faces need close-up films (a
 (calm, curious, playful, content, wary, scared, cross) with their own blinks and twitches, one at a time with the half-second
 blend, or side by side. The face numbers are `FACES` in `tools/otter_models.py`. Waiting for the user to pick before the
 game's face layer is built.
+
+**Progress (2026-11-22, round 2):** the user: "make the ears a little bigger or redesign them ... 3 variations", and
+"scared and wary need more body language ... include [the tail]". The faces page now has an **Ears** row: Now (v6), A
+bigger and poking up over the crown, B as A with a pale rim round the dark hollow, C rounder, set out and tipped out with
+a pale inside (`EAR_STYLE` in `tools/otter_models.py`; the game keeps v6 until the user picks). Every mood got a **tail**
+(lift, curl, swish, held stiff; a tail pressed down lies along the ground) and a **stance** (crouch, lean, neck, hunched
+back, head turning, trembling, a lifted front paw for wary; legs re-solved so the feet stay planted). In the game the
+stance goes on the standing-still clip only; the face and tail go on every clip. A "Whole body" camera shows it.
