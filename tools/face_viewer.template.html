@@ -1,0 +1,160 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Otter Faces</title>
+<style>
+  :root { --bg: #f1efe8; --panel: #fdfcf8; --ink: #2a2a22; --muted: #6a675a; --line: #d9d4c4; --accent: #8a5a2b; }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) { --bg: #1a1a16; --panel: #23231e; --ink: #ecebe2; --muted: #a5a291; --line: #3a3930; --accent: #e0a868; }
+  }
+  :root[data-theme="dark"] { --bg: #1a1a16; --panel: #23231e; --ink: #ecebe2; --muted: #a5a291; --line: #3a3930; --accent: #e0a868; }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font: 15px/1.45 system-ui, sans-serif; }
+  header { padding: 14px 16px 6px; }
+  h1 { margin: 0 0 4px; font-size: 20px; }
+  header p { margin: 0; color: var(--muted); max-width: 86ch; }
+  #wrap { position: relative; height: 62vh; min-height: 340px; margin: 10px 16px; border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
+  canvas { display: block; width: 100%; height: 100%; }
+  #labels { position: absolute; inset: 0; pointer-events: none; overflow: hidden; }
+  .tag { position: absolute; transform: translate(-50%, -100%); background: var(--panel); border: 1px solid var(--line); border-radius: 6px;
+         padding: 1px 6px; font-size: 12px; font-weight: 600; white-space: nowrap; }
+  .controls { display: flex; flex-wrap: wrap; gap: 8px 10px; padding: 0 16px 8px; align-items: center; }
+  .controls .what { color: var(--muted); font-size: 13px; min-width: 4.5em; }
+  button { font: inherit; padding: 6px 12px; border-radius: 8px; border: 1px solid var(--line); background: var(--panel); color: var(--ink); cursor: pointer; }
+  button.on { border-color: var(--accent); color: var(--accent); font-weight: 600; }
+  #note { margin: 4px 16px 8px; padding: 8px 12px; border-left: 3px solid var(--accent); background: var(--panel); max-width: 86ch; }
+  ul { margin: 8px 16px 24px; padding-left: 22px; max-width: 86ch; }
+  li { margin: 4px 0; }
+  li b { color: var(--accent); }
+</style>
+</head>
+<body>
+<header>
+  <h1>Otter faces</h1>
+  <p>The otter's moods, shown with the face parts it already has: ears, eyelids, eyes, whiskers, jaw and tongue, plus a head tilt.
+     Pick a mood to see it on one otter (it eases from the last face over half a second, as it will in the game), or show all of them side by side.
+     Drag to turn, scroll to zoom, right-drag to slide.</p>
+</header>
+<div id="wrap"><canvas id="c"></canvas><div id="labels"></div></div>
+<div class="controls"><span class="what">Mood</span><span id="moods" style="display:contents"></span></div>
+<div id="note"></div>
+<div class="controls"><span class="what">Camera</span><span id="cams" style="display:contents"></span></div>
+<div class="controls"><span class="what">Show</span><span id="shows" style="display:contents"></span></div>
+<ul>
+  <li><b>In the game</b> the face is added on top of whatever the otter is doing (walking, swimming, eating, playing), the way its head already turns to look at things. Here it sits on the idle clip.</li>
+  <li><b>Excited</b> uses the playful face. Where a clip moves a face part itself (the jaw biting or chewing, the eyelids when asleep), the clip wins on that part.</li>
+  <li><b>Its own little life:</b> blinks at its own pace for each mood, ear flicks, ears turning about when wary, whiskers quivering when curious.</li>
+</ul>
+<pre id="viewer-state" hidden></pre>
+<!--VIEWER-->
+<script>
+const DATA = /*DATA*/null;
+const S = Viewer.settingsFromHash({mood: 'curious', all: 0, cam: 'three', life: 1, t: -1});
+const st = Viewer.stage({canvas: document.getElementById('c'), wrap: document.getElementById('wrap'),
+                         labels: document.getElementById('labels'), sky: '#b9d6e4', fog: [40, 90]});
+const ground = new THREE.Mesh(new THREE.PlaneGeometry(60, 60), new THREE.MeshLambertMaterial({color: '#b49a6c'}));
+ground.rotation.x = -Math.PI / 2; ground.receiveShadow = true; st.prop(ground);
+
+const clips = Viewer.readClips(DATA.clips);
+const moods = DATA.moods.map(m => m.key);
+const SPACING = 1.15;
+
+// one otter for the close-up, and one per mood for "side by side"; heads toward -z (the camera's side)
+const solo = Viewer.buildModel(DATA.look, st.scene);
+const row = moods.map((m, i) => {
+  const o = Viewer.buildModel(DATA.look, st.scene);
+  o.position.x = -(i - (moods.length - 1) / 2) * SPACING;   // the camera looks from -z, so +x is on the left
+  st.tag(DATA.moods[i].label, o, () => 1.25);
+  return o;
+});
+
+// the pose between two clips: rest, then each channel eased from the old face to the new one
+function poseBlend(model, a, b, f, t) {
+  const groups = model.userData.groups;
+  Object.values(groups).forEach(g => { Viewer.setRot(g, g.userData.rest); g.position.copy(g.userData.base); g.scale.set(1, 1, 1); });
+  const names = new Set([...Object.keys(a.bones), ...Object.keys(b.bones)]);
+  names.forEach(bone => {
+    const g = groups[bone];
+    if (!g) return;
+    const ca = a.bones[bone] || {}, cb = b.bones[bone] || {};
+    const pick = (ch, zero) => {
+      const va = ca[ch] ? Viewer.sample(ca[ch], t) : zero, vb = cb[ch] ? Viewer.sample(cb[ch], t) : zero;
+      return va.map((x, j) => x + (vb[j] - x) * f);
+    };
+    const r = pick('rotation', [0, 0, 0]), rest = g.userData.rest;
+    Viewer.setRot(g, [rest[0] + r[0], rest[1] + r[1], rest[2] + r[2]]);
+    const p = pick('position', [0, 0, 0]);
+    g.position.set(g.userData.base.x - p[0], g.userData.base.y + p[1], g.userData.base.z + p[2]);
+    const sc = pick('scale', [1, 1, 1]);
+    g.scale.set(sc[0], sc[1], sc[2]);
+  });
+}
+
+let mood = moods.includes(S.mood) ? S.mood : 'curious', from = mood, blend = 1, all = !!S.all, life = !!S.life;
+let clock = S.t >= 0 ? S.t : 0.05;
+const ease = x => x * x * (3 - 2 * x);
+
+// the head's place, for the cameras
+function headAt(model) {
+  model.updateMatrixWorld(true);
+  return model.userData.groups.head.getWorldPosition(new THREE.Vector3());
+}
+const CAMS = {
+  three: ['Three quarters', h => [[h.x - 1.5, h.y + 0.45, h.z - 2.1], [h.x, h.y - 0.05, h.z - 0.2]]],
+  front: ['Face on', h => [[h.x, h.y + 0.25, h.z - 2.5], [h.x, h.y - 0.05, h.z - 0.2]]],
+  side: ['Side', h => [[h.x - 2.4, h.y + 0.1, h.z - 0.2], [h.x, h.y - 0.05, h.z - 0.2]]],
+  player: ['As a player sees it', h => [[h.x + 0.4, 1.62, h.z - 2.6], [h.x, h.y - 0.1, h.z]]],
+};
+let cam = CAMS[S.cam] ? S.cam : 'three';
+function placeCamera() {
+  if (all) {
+    const h = headAt(row[Math.floor(row.length / 2)]);
+    st.setView(null, [[h.x, h.y + 0.9, h.z - 6.3], [h.x, h.y - 0.2, h.z]]);
+  } else {
+    st.setView(null, CAMS[cam][1](headAt(solo)));
+  }
+}
+
+const markMood = Viewer.buttons(document.getElementById('moods'), DATA.moods.map(m => [m.key, m.label]), k => {
+  from = mood; mood = k; blend = from === k ? 1 : 0; markMood(k); note(); if (all) { all = false; refresh(); }
+});
+const markCam = Viewer.buttons(document.getElementById('cams'), Object.entries(CAMS).map(([k, [l]]) => [k, l]), k => {
+  cam = k; markCam(k); if (all) { all = false; refresh(); } else placeCamera();
+});
+const shows = document.getElementById('shows');
+const allBtn = document.createElement('button'); shows.appendChild(allBtn);
+allBtn.onclick = () => { all = !all; refresh(); };
+const lifeBtn = document.createElement('button'); shows.appendChild(lifeBtn);
+lifeBtn.onclick = () => { life = !life; refresh(); };
+function note() {
+  const m = DATA.moods.find(x => x.key === mood);
+  document.getElementById('note').innerHTML = '<b>' + m.label + ':</b> ' + m.note;
+}
+function refresh() {
+  solo.visible = !all;
+  row.forEach(o => o.visible = all);
+  allBtn.textContent = all ? 'One at a time' : 'All side by side';
+  allBtn.classList.toggle('on', all);
+  lifeBtn.textContent = life ? 'Blinks and twitches: on' : 'Blinks and twitches: still';
+  lifeBtn.classList.toggle('on', life);
+  placeCamera();
+}
+
+st.onFrame.push(dt => {
+  if (life) clock = (clock + dt) % clips['face_' + mood].length;
+  blend = Math.min(1, blend + dt / 0.5);
+  poseBlend(solo, clips['face_' + from], clips['face_' + mood], ease(blend), clock);
+  row.forEach((o, i) => poseBlend(o, clips['face_' + moods[i]], clips['face_' + moods[i]], 1, clock));
+});
+
+markMood(mood); markCam(cam); note();
+poseBlend(solo, clips['face_' + mood], clips['face_' + mood], 1, clock);
+row.forEach((o, i) => poseBlend(o, clips['face_' + moods[i]], clips['face_' + moods[i]], 1, clock));
+refresh();
+st.start();
+document.getElementById('viewer-state').textContent = JSON.stringify({mood, all});
+</script>
+</body>
+</html>

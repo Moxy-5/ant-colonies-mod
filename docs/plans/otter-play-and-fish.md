@@ -270,3 +270,9 @@ game from three sides, before the user sees it. The faces need close-up films (a
   follows you, swims beside you, and plays with you (the play rules above with you as its partner: it rears up at you
   and bats, chases you). Wild grown otters keep the 3-second wait every first time. Say if it should be fewer or more
   feeds, or pups only.
+
+**Progress (2026-11-22):** the faces page is built: `python tools/otter_models.py faces` writes
+`references/workshop/otter/faces.html` (template `tools/face_viewer.template.html`). It shows the seven moods
+(calm, curious, playful, content, wary, scared, cross) with their own blinks and twitches, one at a time with the half-second
+blend, or side by side. The face numbers are `FACES` in `tools/otter_models.py`. Waiting for the user to pick before the
+game's face layer is built.

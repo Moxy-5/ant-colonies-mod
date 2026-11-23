@@ -973,10 +973,13 @@ def _blink_curve(t, times, dur=0.18):
 
 
 # --- 1. IDLE (3.60 s, loop) ------------------------------------------------------------------------------------------
-def _clip_idle():
-    L = 3.60
+IDLE_LEN = 3.60
 
-    def at(t):
+
+def _idle_pose(t):
+    """The idle clip's pose at time t (the faces page draws the faces on it)."""
+    L = IDLE_LEN
+    if True:
         w = 2.0 * math.pi * t / L
         breath = math.sin(w)
         look_y = 9.0 * math.sin(w - 0.5) * pulse(t, 0.4, 0.5, 1.4, 0.7)
@@ -1003,7 +1006,9 @@ def _clip_idle():
             _solve_leg(p, pref, 0.0, wr[2], 0.0)
         return p
 
-    return clip(L, at, 36, loop=True)
+
+def _clip_idle():
+    return clip(IDLE_LEN, _idle_pose, 36, loop=True)
 
 
 # --- 2. WALK (0.80 s, loop — sleek 4-beat otter prowl with exact planted paws!) --------------------------------------
@@ -1947,6 +1952,98 @@ def clips():
     }
 
 
+# --- FACES: the otter's moods (docs/plans/otter-play-and-fish.md, section 6c; 2026-11-22) ---------------------------
+# Real otter signals pushed a little bigger so they read at Minecraft distance; no cartoon brows (my pick). Each mood is
+# a set of offsets the game's face layer will add on top of whatever clip plays (as the head look is added today), plus
+# the face's own little life (blinks, ear flicks, ear scanning, whisker quiver). Numbers are my picks, in degrees and
+# model px:
+#   ear_fwd   ears tipped forward (+) or laid back (-)     ear_out   ears turned out (+) or folded in flat (-)
+#   lids      eyelids down, 0 open .. 1 shut               eyes      eye size (1 = as made; wide-eyed a touch bigger)
+#   whiskers  whiskers swung forward (+) or swept back (-) jaw       mouth open (deg)
+#   tongue    tongue tip forward (+ px, out of the mouth) or drawn back (-)
+#   tilt      head tilted to one side (deg, the curious head tilt)          nod  head tipped up (+) or down (-)
+#   blink     seconds between blinks                       flick     ear flicks per 10 s
+#   scan      ears turning about to listen (deg)           quiver    whisker quiver (deg)
+FACE_MOODS = ["calm", "curious", "playful", "content", "wary", "scared", "cross"]
+FACES = {
+    "calm":    {"ear_fwd": 0.0, "ear_out": 0.0, "lids": 0.0, "eyes": 1.0, "whiskers": 0.0, "jaw": 0.0, "tongue": 0.0,
+                "tilt": 0.0, "nod": 0.0, "blink": 3.2, "flick": 1.0, "scan": 0.0, "quiver": 1.5,
+                "note": "Relaxed: ears a little out, slow blinks, whiskers resting, mouth closed."},
+    "curious": {"ear_fwd": 14.0, "ear_out": 8.0, "lids": 0.0, "eyes": 1.08, "whiskers": 16.0, "jaw": 0.0, "tongue": 0.0,
+                "tilt": 13.0, "nod": 4.0, "blink": 4.5, "flick": 4.0, "scan": 0.0, "quiver": 5.0,
+                "note": "Ears pricked forward, whiskers bristled forward (the real otter tell), eyes wide, head tilted."},
+    "playful": {"ear_fwd": 9.0, "ear_out": 4.0, "lids": 0.0, "eyes": 1.06, "whiskers": 9.0, "jaw": 17.0, "tongue": 0.9,
+                "tilt": 6.0, "nod": 6.0, "blink": 1.6, "flick": 3.0, "scan": 0.0, "quiver": 3.0,
+                "note": "The loose open-mouthed play face, tongue tip showing, quick blinks. Also the excited face."},
+    "content": {"ear_fwd": -8.0, "ear_out": 2.0, "lids": 0.55, "eyes": 1.0, "whiskers": -7.0, "jaw": 0.0, "tongue": 0.0,
+                "tilt": 0.0, "nod": -3.0, "blink": 2.8, "flick": 0.5, "scan": 0.0, "quiver": 0.8,
+                "note": "Eyes half shut in a squint, ears soft and back, whiskers relaxed back. Eating, resting, dried off."},
+    "wary":    {"ear_fwd": 6.0, "ear_out": 6.0, "lids": 0.0, "eyes": 1.1, "whiskers": 11.0, "jaw": -1.0, "tongue": -0.4,
+                "tilt": 0.0, "nod": 7.0, "blink": 7.0, "flick": 0.0, "scan": 22.0, "quiver": 0.0,
+                "note": "Ears turning about to listen, eyes wide and hardly blinking, whiskers stiff forward, mouth tight."},
+    "scared":  {"ear_fwd": -32.0, "ear_out": -20.0, "lids": 0.0, "eyes": 1.14, "whiskers": -16.0, "jaw": 0.0,
+                "tongue": -0.4, "tilt": 0.0, "nod": -4.0, "blink": 6.0, "flick": 0.0, "scan": 0.0, "quiver": 0.0,
+                "note": "Ears laid flat back, whiskers swept back against the face, eyes wide."},
+    "cross":   {"ear_fwd": -26.0, "ear_out": -12.0, "lids": 0.38, "eyes": 1.0, "whiskers": 13.0, "jaw": 24.0,
+                "tongue": -0.6, "tilt": 0.0, "nod": -6.0, "blink": 8.0, "flick": 0.0, "scan": 0.0, "quiver": 2.0,
+                "note": "Ears flat back, eyes narrowed, whiskers forward, mouth open in a snarl, head low."},
+}
+WHISKER_SIGN = 1.0      # which way "forward" turns the whisker bones (checked on the faces page)
+
+
+def _flick(t, rate, seed):
+    """A quick ear flick (0..1) about rate times in 10 s, at fixed made-up times so the clip loops."""
+    if rate <= 0:
+        return 0.0
+    n = max(1, round(rate * IDLE_LEN / 10.0))
+    times = [((k + 0.5) / n + 0.13 * math.sin(7.1 * k + seed)) * IDLE_LEN for k in range(n)]
+    return _blink_curve(t % IDLE_LEN, times, dur=0.22)
+
+
+def face_pose(mood, t):
+    """The idle body at time t with this mood's face on it (the faces page; the game adds the same offsets live)."""
+    f = FACES[mood]
+    p = _idle_pose(t)
+    w = 2.0 * math.pi * t / IDLE_LEN
+    n = max(1, round(IDLE_LEN / f["blink"]))
+    blink = _blink_curve(t, [((k + 0.3) / n) * IDLE_LEN for k in range(n)], dur=0.16)
+    lids = max(f["lids"], blink)
+    _set_lids(p, lids)
+    fl, fr = _flick(t, f["flick"], 0.0), _flick(t, f["flick"], 2.3)
+    scan = f["scan"] * math.sin(w * 2.0)
+    p["ear_left"] = {"rotation": [f["ear_fwd"] + 14.0 * fl, f["ear_out"] + scan, 0.0]}
+    p["ear_right"] = {"rotation": [f["ear_fwd"] + 14.0 * fr, -(f["ear_out"] - scan), 0.0]}
+    q = f["quiver"] * math.sin(w * 9.0)
+    wk = WHISKER_SIGN * (f["whiskers"] + q)
+    _set_whiskers(p, wk, wk)
+    jaw = p.get("jaw", {}).get("rotation", [0.0, 0.0, 0.0])
+    p["jaw"] = {"rotation": [max(0.0, jaw[0] + f["jaw"]), 0.0, 0.0]}
+    p["tongue"] = {"position": [0.0, 0.0, -f["tongue"]]}
+    for side in ("eye_left", "eye_right"):
+        p[side] = {"scale": [f["eyes"]] * 3}
+    head = p.get("head", {}).get("rotation", [0.0, 0.0, 0.0])
+    bob = 2.0 * math.sin(w * 2.0) if mood == "playful" else 0.0
+    p["head"] = {"rotation": [head[0] + f["nod"] + bob, head[1], head[2] + f["tilt"]]}
+    return p
+
+
+def face_clips():
+    return {"face_" + m: clip(IDLE_LEN, lambda t, m=m: face_pose(m, t), 72, loop=True) for m in FACE_MOODS}
+
+
+def faces_page():
+    """references/workshop/otter/faces.html: every mood's face side by side and one at a time, blending between them."""
+    import base64
+    from viewer_page import build
+    bones, png_bytes, w, h = workshop_look()
+    data = {"look": {"bones": bones, "texture": "data:image/png;base64," + base64.b64encode(png_bytes).decode(),
+                     "w": w, "h": h},
+            "clips": face_clips(), "idle": {"idle": _clip_idle()},
+            "moods": [{"key": m, "label": m.capitalize(), "note": FACES[m]["note"]} for m in FACE_MOODS]}
+    return build("face_viewer.template.html", data, Path(__file__).resolve().parent.parent
+                 / "references/workshop/otter/faces.html")
+
+
 WORKSHOP_CLIPS = clips
 WORKSHOP_CLIP_INFO = {
     "water": ["swim", "dive_swim"],
@@ -1986,6 +2083,8 @@ def export_game():
 if __name__ == "__main__":
     if "game" in sys.argv[1:]:
         export_game()
+    elif "faces" in sys.argv[1:]:
+        faces_page()
     else:
         bones = build_bones()
         all_clips = clips()
