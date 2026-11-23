@@ -359,6 +359,8 @@ FLARE_LEN = 1.4
 FLOP_LEN = 0.55
 DEATH_LEN = 1.2
 JAW_OPEN = 35.0          # how far the small lower jaw drops, wide open (degrees)
+FIN_LEAN, FIN_SHRINK, FIN_GROW = 20.0, 0.45, 0.8   # the back fin folded: leans back 20 degrees, 0.55 as tall;
+                                                 # raised (the flare, -0.45): 1.36 as tall
 LIE = MID_Y - WIDEST     # how far the fish comes down lying on its side: its middle line to its half width
 
 # the wave: bone, its parent, how far it swings (radians, against the fish's line), how late (radians of the beat)
@@ -386,7 +388,15 @@ def _fins(p, t, out=0.0, flutter=0.0, rate=6.0, back_fin=0.0):
     for s, name in ((1, 'fin_left'), (-1, 'fin_right')):
         f = flutter * math.sin(2 * math.pi * rate * t + (0.6 if s < 0 else 0.0))
         p[name] = {'rotation': [0.0, round(s * (-26.0 + 30.0 * out + 10.0 * f), 3), round(s * (10.0 * f), 3)]}
-    p['back_fin'] = {'rotation': [round(-50.0 * back_fin, 3), 0.0, 0.0]}
+    # The back fin's base always stays on the back (the user: "the fin on the top cuts off of him"): turned as one stiff
+    # plate on its front edge, tipping it up lifted its back end off the body (the flare) and folding it 50 degrees
+    # pushed its swept-back tip inside the body (bolt, leap, flop, death). Now, as a real fish's rays do, folding leans
+    # it back only a little while it grows shorter, lying along the back, and raising makes it taller, never tipped.
+    if back_fin >= 0:
+        lean, tall = -FIN_LEAN * back_fin, 1.0 - FIN_SHRINK * back_fin
+    else:
+        lean, tall = 0.0, 1.0 - FIN_GROW * back_fin
+    p['back_fin'] = {'rotation': [round(lean, 3), 0.0, 0.0], 'scale': [1.0, round(tall, 3), 1.0]}
     return p
 
 

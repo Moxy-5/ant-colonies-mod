@@ -604,3 +604,5 @@ Every "Current status" bullet CLAUDE.md held up to 2026-11-19, word for word, ol
 - 2026-11-22, the distichodus slightly bulkier with one flush eye a side and a whole pupil (v4, the user's fix for the split pupil); waiting for the user's OK on the 3D shape.
 - 2026-11-22, the distichodus's shape approved ("Shape is OK"); painted from the design sheet (v5: six straight bands, silver-pink head, red fins), waiting for the user's look.
 - 2026-11-22, the distichodus's paint approved ("Paint is OK"); its nine clips made and checked offline (graze under a mat, nibble at reed shoots, bolt, leap, flare at a rival, ...), game files written, no entity yet; waiting for the user's look.
+- 2026-11-22, the otter's moods in the game: seven moods worked out in one place, its face (ears, lids, eyes, whiskers, jaw, tongue, head tilt) and tail drawn live on every clip by the new shared FaceLayer, a standing stance clip for each mood, ears A (bigger) in the game model; filmed in the game.
+- 2026-11-22, the distichodus's back fin no longer comes off its back in the clips (folds and rises on a base that stays put); clips waiting for the user's look.

@@ -65,7 +65,9 @@ fish beside the silver barbs and grey tilapia.
    must not pitch the fish itself while it plays; marked airborne in the plan), `flare` (back fin stood up, breast
    fins spread, an S and head jerks), `flop`, `death`. Offline check (`clip_check.py distichodus --switches`): nothing
    inside the ground, 12 clip changes, none flagged (the leap ends straightening up, so the swim takes over gently).
-   The in-game frame films come with the entity (step 6): nothing draws the fish in the game before it. Waiting for the
-   user's look.
+   The back fin keeps its base on the back in every clip (the user: "the fin on the top cuts off of him"): folding leans
+   it back 20 degrees while it grows 0.55 as tall, the flare makes it 1.36 as tall, never tipped (`FIN_LEAN`,
+   `FIN_SHRINK`, `FIN_GROW`). The in-game frame films come with the entity (step 6): nothing draws the fish in the game
+   before it. Waiting for the user's look.
 6. Into the game: the entity, spawning (the check list, `RiverLifeTests.worldWouldSpawn`), grazing hippo grass and
    reeds, bolting and leaping, crocodiles and the bull shark taking it; game tests `river`.
