@@ -1,0 +1,20 @@
+{
+  "_note": "The African bullfrog's life (the river tie-up part B, 2026-11-23; all numbers my picks, fun first, inspired by the real frog). Sizes are shares of a male's usual size (0.8 blocks): males 0.9 to 1.1, females the user's 0.65 blocks, 0.9 to 1.1 of that (0.73 to 0.89). Young are froglets: a tadpole climbs out at 0.32 of its grown size and grows up in 3 days (the tadpole's own 3 days come before, TadpoleEntity). They breed in the rains, while it rains: males call, and a ready female within 16 blocks comes to a calling male; he climbs onto her back and clasps her (courtship ticks count every other game tick, so 160 is 16 seconds) while she carries him to the shallows, where she lays a floating mat of 8 to 12 eggs at the surface; they hatch in a day into a tadpole school, and the father guards the eggs and then his school for 3 days. A female breeds once every 4 days. Breeds only while fewer than 4 bullfrogs live within 48 blocks (the user's cap of 4) and the frog group is under its cap; a tadpole becomes a froglet by the same rule.",
+  "sexes": "two",
+  "male_size": [0.9, 1.1],
+  "female_size": [0.73, 0.89],
+  "max_size": 1.15,
+  "young_size": 0.32,
+  "young_days": 3,
+  "breeds": true,
+  "breed_every_days": 4,
+  "clutch": [8, 12],
+  "hatch_days": 1,
+  "seasons": ["rains"],
+  "weather": "rain",
+  "care": "guard",
+  "care_days": 3,
+  "mate_reach": 16,
+  "local_limit": 4,
+  "courtship_ticks": 160
+}

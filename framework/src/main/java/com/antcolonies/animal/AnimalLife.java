@@ -177,6 +177,12 @@ public final class AnimalLife {
         return ownSize;
     }
 
+    /** Sets its own size (tests, and kinds that move an older size of their own onto the kit), drawing it anew. */
+    public void setOwnSize(float size) {
+        ownSize = Mth.clamp(size, 0.5F, numbers().maxSize());
+        apply();
+    }
+
     /** Ticks since it hatched (kept at its grown age once grown). */
     public int age() {
         return age;

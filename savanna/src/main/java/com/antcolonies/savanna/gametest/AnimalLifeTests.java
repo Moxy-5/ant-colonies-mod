@@ -41,7 +41,7 @@ public class AnimalLifeTests {
     public static void everyRiverAnimalKeepsItsLifeThroughASaveAndLoad(GameTestHelper helper) {
         List<EntityType<? extends Mob>> kinds = List.of(SavannaEntities.TILAPIA.get(), SavannaEntities.CATFISH.get(),
                 SavannaEntities.CROCODILE.get(), SavannaEntities.CRAB.get(), SavannaEntities.SNAIL.get(),
-                SavannaEntities.MONITOR.get());
+                SavannaEntities.MONITOR.get(), SavannaEntities.BULLFROG.get());
         int x = 2;
         for (EntityType<? extends Mob> kind : kinds) {
             Mob mob = helper.spawn(kind, new BlockPos(x, 2, 4));
@@ -61,7 +61,8 @@ public class AnimalLifeTests {
                     name + " is not drawn at its own size when grown");
             helper.assertTrue(numbers.twoSexes() == (life.sex() != Sex.NONE), name + "'s sex does not fit its kind: " + life.sex());
             boolean breeds = kind == SavannaEntities.TILAPIA.get() || kind == SavannaEntities.SNAIL.get()
-                    || kind == SavannaEntities.CRAB.get() || kind == SavannaEntities.CATFISH.get() || kind == SavannaEntities.CROCODILE.get();
+                    || kind == SavannaEntities.CRAB.get() || kind == SavannaEntities.CATFISH.get() || kind == SavannaEntities.CROCODILE.get()
+                    || kind == SavannaEntities.BULLFROG.get();
             helper.assertTrue(numbers.breeds() == breeds, name + (breeds ? " does not breed (on since step 2 or 3)" : " breeds already (not before its own step)"));
 
             // Saved and loaded whole.
@@ -862,5 +863,129 @@ public class AnimalLifeTests {
         croc.life().load(old);
         helper.assertTrue(croc.life().stage() == com.antcolonies.animal.LifeStage.GROWN, "a crocodile saved before step 4 loaded as a " + croc.life().stage());
         helper.succeed();
+    }
+
+    // --- the bullfrog's breeding (the river tie-up part B, 2026-11-23) ---------------------------------------------------
+
+    /**
+     * The bullfrog's breeding: in the rain a ready female comes to a calling male; he climbs onto her back and clasps her
+     * while she carries him; she lays a floating mat of 8 to 12 eggs at the top of the shallow water, they part, and he
+     * stays to guard the eggs.
+     */
+    @GameTest(template = "arena", timeoutTicks = 2400, batch = "breeding_frog")
+    public static void bullfrogsClaspInTheRainAndSheLaysEggsHeGuards(GameTestHelper helper) {
+        breedingPond(helper);
+        clearLeftovers(helper, SavannaEntities.BULLFROG.get());
+        clearLeftovers(helper, SavannaEntities.TADPOLE.get());
+        com.antcolonies.savanna.animal.BullfrogEntity male = grown(helper, SavannaEntities.BULLFROG.get(), "male", new BlockPos(P0 + 2, WATER_TOP, P0 + 2));
+        com.antcolonies.savanna.animal.BullfrogEntity female = grown(helper, SavannaEntities.BULLFROG.get(), "female", new BlockPos(P1 - 2, WATER_TOP, P1 - 2));
+        male.setPersistenceRequired();
+        female.setPersistenceRequired();
+        helper.assertTrue(!male.seeksMate() && female.seeksMate(), "the male should wait, calling, and the female come to him");
+        AnimalLife.setRainForTests(false);
+        helper.assertTrue(!female.life().readyToBreed(), "a female ready to breed in the dry");
+        AnimalLife.setRainForTests(true);
+        boolean[] clasped = {false};
+        helper.onEachTick(() -> {
+            male.calledNow();       // he calls in the rain (CallGoal); here every tick, so the test needs no wait for it
+            clasped[0] |= male.getVehicle() == female && male.action() == com.antcolonies.savanna.animal.BullfrogEntity.CLASP;
+        });
+        helper.runAtTickTime(2390, () -> {
+            AnimalLife.setRainForTests(null);
+            helper.fail("the frogs never bred: clasped " + clasped[0] + ", her partner " + female.life().partner() + ", laid at " + female.lastClutch()
+                    + ", she at " + helper.relativePos(female.blockPosition()) + ", he at " + helper.relativePos(male.blockPosition()));
+        });
+        helper.succeedWhen(() -> {
+            BlockPos eggs = female.lastClutch();
+            helper.assertTrue(clasped[0], "he never clasped her");
+            helper.assertTrue(eggs != null, "no eggs laid yet");
+            helper.assertTrue(helper.getLevel().getBlockState(eggs).is(SavannaBlocks.FROG_EGGS.get()), "no eggs at " + helper.relativePos(eggs));
+            int count = ((EggClutchBlockEntity) helper.getLevel().getBlockEntity(eggs)).count();
+            helper.assertTrue(count >= 8 && count <= 12, count + " eggs (8 to 12 wanted)");
+            helper.assertTrue(!male.isPassenger() && !female.isVehicle(), "the pair never parted");
+            helper.assertTrue(male.guards(eggs), "he does not guard the eggs");
+            AnimalLife.setRainForTests(null);
+        });
+    }
+
+    /**
+     * The eggs hatch into one school (not before their day, and only when watched): each egg a tadpole just hatched,
+     * knowing its father; the father, hungry, guards the school and never eats one of his own.
+     */
+    @GameTest(template = "arena", timeoutTicks = 400, batch = "breeding_frog")
+    public static void frogEggsHatchIntoASchoolTheFatherGuardsAndNeverEats(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        breedingPond(helper);
+        clearLeftovers(helper, SavannaEntities.BULLFROG.get());
+        clearLeftovers(helper, SavannaEntities.TADPOLE.get());
+        com.antcolonies.savanna.animal.BullfrogEntity father = grown(helper, SavannaEntities.BULLFROG.get(), "male", new BlockPos(P0 + 4, WATER_TOP, P0 + 5));
+        father.setPersistenceRequired();
+        BlockPos eggs = helper.absolutePos(new BlockPos(P0 + 6, WATER_TOP, P0 + 5));
+        helper.assertTrue(com.antcolonies.savanna.block.FrogEggsBlock.lay(level, eggs, SavannaEntities.BULLFROG.get(), 10), "eggs could not be laid on the pond");
+        father.guard(eggs);
+        List<com.antcolonies.savanna.animal.TadpoleEntity> school = new java.util.ArrayList<>();
+        try {
+            com.antcolonies.colony.Watchers.setPretend(List.of(net.minecraft.world.phys.Vec3.atCenterOf(eggs)));
+            tick(level, eggs);
+            helper.assertTrue(level.getBlockState(eggs).is(SavannaBlocks.FROG_EGGS.get()), "the eggs hatched before their day");
+            age(level, eggs, AnimalLives.get(SavannaEntities.BULLFROG.get()).hatchTicks());
+            tick(level, eggs);
+        } finally {
+            com.antcolonies.colony.Watchers.setPretend(List.of());
+        }
+        helper.assertTrue(level.getBlockState(eggs).is(Blocks.WATER), "the hatched eggs are not plain water again: " + level.getBlockState(eggs));
+        school.addAll(level.getEntitiesOfClass(com.antcolonies.savanna.animal.TadpoleEntity.class, new net.minecraft.world.phys.AABB(eggs).inflate(2)));
+        helper.assertTrue(school.size() == 10, school.size() + " tadpoles from 10 eggs");
+        for (var t : school) {
+            t.setPersistenceRequired();
+            helper.assertTrue(t.age() < 5 && father.isFatherOf(t), "a tadpole aged " + t.age() + ", its father " + t.father() + " (" + father.getUUID() + " wanted)");
+        }
+        father.makeHungry();
+        boolean[] lunged = {false};
+        helper.onEachTick(() -> lunged[0] |= father.action() == com.antcolonies.savanna.animal.BullfrogEntity.LUNGE);
+        helper.runAfterDelay(300, () -> {
+            long alive = school.stream().filter(t -> t.isAlive() && !t.isRemoved()).count();
+            helper.assertTrue(alive == 10 && !lunged[0], "the father ate his own: " + alive + " of 10 left" + (lunged[0] ? ", he lunged" : ""));
+            helper.assertTrue(father.guardSpot() != null, "the father does not guard his school");
+            helper.succeed();
+        });
+    }
+
+    /** A father guarding his eggs goes for a monitor that comes near them, puffs up and bites it (he does not flee it). */
+    @GameTest(template = "arena", timeoutTicks = 600, batch = "breeding_frog")
+    public static void aGuardingFatherGoesForAMonitorNearHisEggs(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        breedingPond(helper);
+        clearLeftovers(helper, SavannaEntities.BULLFROG.get());
+        com.antcolonies.savanna.animal.BullfrogEntity father = grown(helper, SavannaEntities.BULLFROG.get(), "male", new BlockPos(P0 + 8, WATER_TOP, P0 + 8));
+        father.setPersistenceRequired();
+        BlockPos eggs = helper.absolutePos(new BlockPos(P0 + 3, WATER_TOP, P0 + 8));
+        com.antcolonies.savanna.block.FrogEggsBlock.lay(level, eggs, SavannaEntities.BULLFROG.get(), 10);
+        father.guard(eggs);
+        // the monitor wading on the shallow shelf at the edge, at the frog's level (one lying on the bed right under a
+        // floating frog is out of his bite: he floats over it; not a meeting the game makes)
+        var monitor = helper.spawn(SavannaEntities.MONITOR.get(), new BlockPos(P0, BED + 2, P0 + 8));
+        monitor.setNoAi(true);
+        monitor.setPersistenceRequired();
+        float full = monitor.getHealth();
+        boolean[] puffed = {false};
+        int[] lunges = {0};
+        double[] nearest = {99};
+        byte[] last = {0};
+        helper.onEachTick(() -> {
+            byte a = father.action();
+            puffed[0] |= a == com.antcolonies.savanna.animal.BullfrogEntity.PUFF;
+            if (a == com.antcolonies.savanna.animal.BullfrogEntity.LUNGE && last[0] != a) {
+                lunges[0]++;
+            }
+            last[0] = a;
+            nearest[0] = Math.min(nearest[0], father.distanceTo(monitor));
+        });
+        helper.succeedWhen(() -> {
+            helper.assertTrue(puffed[0], "the father never puffed up at the monitor (" + String.format("%.1f", father.distanceTo(monitor)) + " blocks off)");
+            helper.assertTrue(monitor.getHealth() < full, "the father never bit the monitor (" + lunges[0] + " lunges, nearest "
+                    + String.format("%.2f", nearest[0]) + ", the monitor " + String.format("%.2f", monitor.getBbWidth()) + " wide, the frog at "
+                    + helper.relativePos(father.blockPosition()) + ", the monitor at " + helper.relativePos(monitor.blockPosition()) + ")");
+        });
     }
 }

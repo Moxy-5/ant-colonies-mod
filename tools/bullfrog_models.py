@@ -690,6 +690,11 @@ BODY_PIVOT = (0.0, 6.0, 0.0)
 IDLE_LEN, WALK_LEN, HOP_LEN, LEAP_LEN, SWIM_LEN, FLOAT_LEN = 6.0, 1.4, 0.8, 1.1, 1.0, 3.0
 TONGUE_LEN, TONGUE_FLIP, TONGUE_STRETCH, TONGUE_GAPE, TONGUE_LEAN = 0.7, -3.5, 3.9, 38.0, 4.0
 CALL_LEN, PUFF_LEN, ATTACK_LEN, DEATH_LEN, DIG_LEN, DUG_LEN, DIG_OUT_LEN = 3.0, 2.0, 0.8, 1.0, 3.0, 6.0, 1.2
+# the clasp (the male on the female's back; model pixels at his size, the clip's ground her back's top): his body's pitch
+# and lift, his wrists (along the outline, below the ground, out to the side) and how far they turn in to grip, his heels
+CLASP_LEN, CLASP_PITCH, CLASP_LIFT = 2.4, -6.0, 0.0
+CLASP_HAND_AT, CLASP_GRIP, CLASP_HAND_OUT, CLASP_HAND_TURN = 27.0, 6.0, 8.5, 60.0
+CLASP_HEEL_AT, CLASP_HEEL_DOWN, CLASP_HEEL_OUT, CLASP_FOOT_TURN = 8.0, 2.5, 11.5, 25.0
 STALK_LEN, STALK_SWEEP, STALK_DUTY, STALK_LIFT = 1.0, 5.0, 0.75, -0.4   # the creep: long time down, body low; planted feet
 # slide back 5.0 px in 0.75 s = 6.7 px/s, 0.0067 blocks a tick for a male (BullfrogEntity.STALK_CLIP_PACE; my picks)
 WALK_SWEEP, WALK_DUTY, WALK_LIFT = 5.0, 0.7, 1.4       # each foot's sweep under the body, the time down, the body raised
@@ -1125,6 +1130,26 @@ def clips():
         return p
     make('puff', PUFF_LEN, puff)
 
+    # clasp (the river tie-up part B, 2026-11-23): the male on the female's back, the game setting him on her (her back's
+    # top under his feet, the clip's ground). He lies along her, snout a touch up, his arms down round her waist just
+    # behind her arms (the hands on her flanks, CLASP_GRIP below the clip's ground, turned in to grip), his hind legs
+    # folded down along her hips; a slow squeeze now and then, the throat pumping.
+    P = _Poser()
+
+    def clasp(t):
+        w = 2 * math.pi * t / CLASP_LEN
+        squeeze = _pulse(t / CLASP_LEN, 0.35, 0.12, 0.18, 0.2)
+        p = {}
+        P.body(p, pitch=CLASP_PITCH + 1.0 * squeeze, lift=CLASP_LIFT - 0.3 * squeeze, fwd=0.0, roll=0.6 * math.sin(w))
+        for s, side in SIDES:
+            W = world(CLASP_HAND_AT, -CLASP_GRIP, CLASP_HAND_OUT - 0.4 * squeeze, s)
+            P.limb(p, 'arm', side, W, turn_z(s * CLASP_HAND_TURN))
+            H = world(CLASP_HEEL_AT, -CLASP_HEEL_DOWN, CLASP_HEEL_OUT, s)
+            P.limb(p, 'leg', side, H, turn_z(s * CLASP_FOOT_TURN))
+        _face(p, t, pump=0.6 * _breath(t, 0.8))
+        return p
+    make('clasp', CLASP_LEN, clasp)
+
     # attack: the lunge, a huge gape, snapped shut, the hands pushing the food in, the eyes pulled down to swallow
     P = _Poser()
 
@@ -1287,6 +1312,7 @@ WORKSHOP_CLIP_INFO = {
         'dig_in': 'Shuffles backward into the mud, hind feet scraping in turn, until only the back and eyes show.',
         'dug': 'Dug in: only the throat and eyes move (the ground hides the rest in the game).',
         'dig_out': 'Pushes up out of the ground and shakes off.',
+        'clasp': "The male on the female's back (the game sets him there): arms round her waist, hind legs down her hips, a slow squeeze.",
     }}
 
 

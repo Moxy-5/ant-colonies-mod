@@ -52,7 +52,9 @@ afoundingtermitepairraisetheirfirstworkerswhileaway 1.78
 afreshdeadmoundofnewlandstillstands 0.04
 afullcolonyofnewlandisawholelivingcolony 0.08
 agrowntreediesofoldageandfalls 0.01
+aguardingfathergoesforamonitornearhiseggs 0.00
 ahalffedcolonysscoutspassoverlonetermitesandtakearicherspotfurtherout 0.11
+ahatchlingcrocodileandacatfisheattadpoles 0.04
 ahatchlingcrocodilesnapsupabarb 0.40
 ahatchlingswimsatthesurfaceandclimbsout 0.01
 ahealthygardensendsupmushroomswhentherainends 2.32
@@ -184,6 +186,7 @@ bigsavannashavetheagreedsizeandrarity 1.72
 bonemealgrowslittletreesbutnotpastyoung 0.00
 breakingacrocodilenestscapshowstheeggsorletsthehatchlingsout 0.00
 breakinsarebreachesfeltonlynearthem 0.25
+bullfrogsclaspintherainandshelayseggsheguards 0.01
 bullfrogsspawnattheshallowsbythemselves 0.00
 bullsharksspawnindeepriverwaterbythemselves 0.01
 catfishspawnonarainynightandscattereggsonthealgae 0.00
@@ -215,6 +218,7 @@ flycloudsspawnovertheshallowsbythemselves 0.00
 footstepsbringtheminorswithinearshottolookanddrum 0.67
 foragerswearlastingtrunktrailsthatfadeandgrowback 2.23
 freshoxbowis32acrossandfourdeep 0.01
+frogeggshatchintoaschoolthefatherguardsandnevereats 0.01
 gianttreesstandinnewland 0.01
 haynearaholegetsarunwayofmudandiseatenunderitbyday 2.42
 heartrotshowsbracketsthenhollowsthetrunk 0.01

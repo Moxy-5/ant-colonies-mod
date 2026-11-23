@@ -1,5 +1,8 @@
 package com.antcolonies.savanna.animal;
 
+import com.antcolonies.animal.AnimalLives;
+import com.antcolonies.animal.RoomToBreed;
+
 import javax.annotation.Nullable;
 
 import com.antcolonies.entity.body.SteadyController;
@@ -52,9 +55,12 @@ import software.bernie.geckolib.util.GeckoLibUtil;
  *
  * <p>Its life: hatched (or spawned) it is a plain tadpole; from day 3 ({@link #LEGS_AT}) its hind leg buds show; at the
  * end of day 3 ({@link #FROGLET_AT}) it becomes a froglet, a young {@link BullfrogEntity}, which is grown 3 days later,
- * but only while fewer than {@link #FROGS_NEAR} bullfrogs live within {@link #FROGS_WITHIN} blocks (the user found 4
- * frogs round a player enough, so a school of ten does not turn into ten frogs); the rest quietly do not make it, as
- * most real tadpoles do not.
+ * but only while the bullfrog has room to breed ({@link RoomToBreed}: fewer than its life file's 4 within 48 blocks; the
+ * user found 4 frogs round a player enough, so a school of ten does not turn into ten frogs); the rest quietly do not
+ * make it, as most real tadpoles do not.
+ *
+ * <p>Schools come from the world's own spawns and from bullfrog eggs ({@link com.antcolonies.savanna.block.FrogEggsBlock},
+ * part B): a hatched tadpole knows its father ({@link #father}), who guards the school and never eats it.
  *
  * <p>Eaten by: grown bullfrogs (their ambush lunge; real bullfrogs are cannibals), hatchling crocodiles, catfish (a
  * snack, as a barb). A strike near the school makes it dart off ({@link #startle}); a hunter near makes it swim aside.
@@ -67,11 +73,11 @@ public class TadpoleEntity extends AbstractSchoolingFish implements GeoEntity {
     private static final EntityDataAccessor<Integer> DATA_AGE = SynchedEntityData.defineId(TadpoleEntity.class, EntityDataSerializers.INT);
     /** The leg buds show from the start of day 3, and it climbs out a froglet at the end of it (ticks). */
     public static final int LEGS_AT = 2 * 24000, FROGLET_AT = 3 * 24000;
-    /** A froglet's days to grow up (ticks; the plan's 3 days). */
-    static final int FROGLET_DAYS = 3 * 24000;
-    /** A tadpole becomes a froglet only while fewer than this many bullfrogs live within so many blocks. */
-    static final int FROGS_NEAR = 4;
-    static final double FROGS_WITHIN = 32.0;
+    /**
+     * Eggs hatch only while fewer than this many tadpoles live within {@link RoomToBreed#REACH} blocks (the eggs' room to
+     * hatch, as the life kit's local limit; two or three schools) and the tadpole group is under its cap.
+     */
+    public static final int LOCAL_LIMIT = 24;
     /** The entity event that tells the players' computers it was startled (plays its dart). */
     private static final byte STARTLED_EVENT = 61;
     /** How hard a startled tadpole darts away (blocks a tick, added once), and its dart's length (ticks: 0.3 s). */
@@ -87,6 +93,9 @@ public class TadpoleEntity extends AbstractSchoolingFish implements GeoEntity {
     private final AnimatableInstanceCache cache = GeckoLibUtil.createInstanceCache(this);
     private float swimPitch, swimPitchO;
     private int scatterTicks;
+    /** The bullfrog that guarded the eggs it hatched from, if any. */
+    @Nullable
+    private java.util.UUID father;
 
     public TadpoleEntity(EntityType<? extends TadpoleEntity> type, Level level) {
         super(type, level);
@@ -125,6 +134,16 @@ public class TadpoleEntity extends AbstractSchoolingFish implements GeoEntity {
 
     public void setAge(int ticks) {
         entityData.set(DATA_AGE, Math.max(0, ticks));
+    }
+
+    /** The bullfrog that guarded the eggs it hatched from (null for the world's own spawns). */
+    @Nullable
+    public java.util.UUID father() {
+        return father;
+    }
+
+    public void setFather(@Nullable java.util.UUID frog) {
+        father = frog;
     }
 
     /** Whether its hind leg buds show (day 3 on). */
@@ -178,16 +197,17 @@ public class TadpoleEntity extends AbstractSchoolingFish implements GeoEntity {
 
     /**
      * The end of day 3: it climbs out a froglet where it is (a young bullfrog, a male or a female, grown in 3 days), if
-     * fewer than {@link #FROGS_NEAR} bullfrogs live near; else it quietly does not make it. Either way the tadpole goes.
+     * the bullfrog has room to breed here ({@link RoomToBreed}, its life file's local limit and the frog group's cap);
+     * else it quietly does not make it. Either way the tadpole goes.
      */
     void becomeFroglet(ServerLevel level) {
-        int frogs = level.getEntitiesOfClass(BullfrogEntity.class, getBoundingBox().inflate(FROGS_WITHIN), LivingEntity::isAlive).size();
-        if (frogs < FROGS_NEAR) {
-            BullfrogEntity froglet = SavannaEntities.BULLFROG.get().create(level);
+        EntityType<BullfrogEntity> frog = SavannaEntities.BULLFROG.get();
+        if (RoomToBreed.leftAt(level, blockPosition(), frog, AnimalLives.get(frog).localLimit()) > 0
+                && RoomToBreed.groupHasRoom(level, frog.getCategory(), new net.minecraft.world.level.ChunkPos(blockPosition()))) {
+            BullfrogEntity froglet = frog.create(level);
             if (froglet != null) {
                 froglet.moveTo(getX(), getY(), getZ(), getYRot(), 0.0F);
-                froglet.setUp(random.nextBoolean(), 0.9F + random.nextFloat() * 0.2F);
-                froglet.makeFroglet(FROGLET_DAYS);
+                froglet.makeFroglet();
                 if (isPersistenceRequired()) {
                     froglet.setPersistenceRequired();
                 }
@@ -224,12 +244,16 @@ public class TadpoleEntity extends AbstractSchoolingFish implements GeoEntity {
     public void addAdditionalSaveData(CompoundTag tag) {
         super.addAdditionalSaveData(tag);
         tag.putInt("Age", age());
+        if (father != null) {
+            tag.putUUID("Father", father);
+        }
     }
 
     @Override
     public void readAdditionalSaveData(CompoundTag tag) {
         super.readAdditionalSaveData(tag);
         setAge(tag.getInt("Age"));
+        father = tag.hasUUID("Father") ? tag.getUUID("Father") : null;
     }
 
     /** No tadpole bucket of ours: a water bucket does nothing to it. */

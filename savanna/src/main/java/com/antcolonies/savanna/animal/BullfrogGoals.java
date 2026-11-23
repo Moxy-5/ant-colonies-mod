@@ -56,7 +56,17 @@ final class BullfrogGoals {
     static final double DANGER_NEAR = 5.0;
     static final int WATER_REACH = 6;
     /** How near a player makes it puff up, and how near (after puffing a while) makes it lunge and bite (blocks). */
-    static final double PUFF_NEAR = 3.0, BITE_NEAR = 1.6;
+    static final double PUFF_NEAR = 3.0;
+    /**
+     * The bite's reach (blocks from its mouth's side of its box to the foe's edge: a male of size 1 reaches 1.8, a smaller
+     * frog less), and how far inside it the lunge starts (the lunge carries it little, least in the water: started at the
+     * old fixed 1.6 a female, reaching 1.5, always fell short, and a father's bites at a monitor half did).
+     */
+    static final double BITE_REACH = 1.0, BITE_REACH_MORE = 0.8, LUNGE_FROM = 0.3;
+
+    static double biteReach(BullfrogEntity frog) {
+        return BITE_REACH * frog.getScale() + BITE_REACH_MORE;
+    }
     /** The bite (hearts x 2: the plan's 1 heart). */
     static final float BITE = 2.0F;
     /** One flick in four misses (the plan). */
@@ -81,11 +91,14 @@ final class BullfrogGoals {
         goals.addGoal(0, new EscapeGoal(frog));
         goals.addGoal(1, new LungeGoal(frog));
         goals.addGoal(1, new TongueGoal(frog));
+        goals.addGoal(1, new com.antcolonies.animal.SeekMateGoal<>(frog, 1.0));     // a female to a calling male
         goals.addGoal(2, new ThreatGoal(frog));
-        goals.addGoal(3, new DigGoal(frog));
-        goals.addGoal(4, new CallGoal(frog));
-        goals.addGoal(5, new ToCloudGoal(frog));
-        goals.addGoal(6, new WanderGoal(frog));
+        // the father by his eggs and school (the life kit's guard; who comes near them is ThreatGoal's to see off)
+        goals.addGoal(3, new com.antcolonies.animal.GuardPlaceGoal(frog, frog::guardSpot, BullfrogEntity.GUARD_STAY, 0.0, e -> false, 1.0));
+        goals.addGoal(4, new DigGoal(frog));
+        goals.addGoal(5, new CallGoal(frog));
+        goals.addGoal(6, new ToCloudGoal(frog));
+        goals.addGoal(7, new WanderGoal(frog));
     }
 
     // --- shared looks -------------------------------------------------------------------------------------------------
@@ -107,7 +120,7 @@ final class BullfrogGoals {
     @Nullable
     static LivingEntity danger(BullfrogEntity frog, double within) {
         List<LivingEntity> near = frog.level().getEntitiesOfClass(LivingEntity.class, frog.getBoundingBox().inflate(within, 3.0, within),
-                e -> e.isAlive() && (e instanceof MonitorEntity || e instanceof CrocodileEntity c && c.life().stage().grown()));
+                e -> e.isAlive() && (e instanceof MonitorEntity && frog.guardSpot() == null || e instanceof CrocodileEntity c && c.life().stage().grown()));
         LivingEntity best = null;
         double bestD = Double.MAX_VALUE;
         for (LivingEntity e : near) {
@@ -181,8 +194,8 @@ final class BullfrogGoals {
 
         @Override
         public boolean canUse() {
-            if (!now(frog, 5) || frog.action() == BullfrogEntity.DIG_OUT || frog.action() == BullfrogEntity.LEAP) {
-                return false;
+            if (!now(frog, 5) || frog.action() == BullfrogEntity.DIG_OUT || frog.action() == BullfrogEntity.LEAP || frog.getVehicle() instanceof BullfrogEntity) {
+                return false;       // (a clasped male holds on: she does the leaping)
             }
             from = danger(frog, DANGER_NEAR);
             LivingEntity hurtBy = frog.getLastHurtByMob();
@@ -322,7 +335,8 @@ final class BullfrogGoals {
             double look = hunting ? HUNT_REACH : far;
             prey = null;
             double best = Double.MAX_VALUE;
-            for (LivingEntity e : frog.level().getEntitiesOfClass(LivingEntity.class, frog.getBoundingBox().inflate(look + 0.5), LungeGoal::isPrey)) {
+            for (LivingEntity e : frog.level().getEntitiesOfClass(LivingEntity.class, frog.getBoundingBox().inflate(look + 0.5),
+                    e -> isPrey(e) && !frog.isFatherOf(e))) {      // (never his own tadpoles)
                 double d = middle(e).distanceTo(mouth);
                 boolean wanted = d < reach && clearFromMouth(frog, middle(e)) || d < far && stalkable(e) && clearFromMouth(frog, middle(e))
                         || hunting && d < HUNT_REACH && chased(e) && sees(e);
@@ -641,17 +655,19 @@ final class BullfrogGoals {
         }
     }
 
-    // --- 2: the threat to a player -------------------------------------------------------------------------------------
+    // --- 2: the threat to a player, and the father's guard -------------------------------------------------------------
 
     /**
      * Bold, not shy (the plan): a player coming within {@link #PUFF_NEAR} blocks makes it face them and puff up; one who
-     * comes within {@link #BITE_NEAR} after it has puffed a second and a half, or who hurt it, gets a barking lunge and a
-     * bite ({@link #BITE}: 1 heart), then it puffs again.
+     * comes within its bite's reach ({@link #biteReach}) after it has puffed a second and a half, or who hurt it, gets a barking lunge and a
+     * bite ({@link #BITE}: 1 heart), then it puffs again. A father (the river tie-up part B) does the same to anything
+     * that comes within {@link BullfrogEntity#GUARD_SEE_OFF} blocks of his eggs or school ({@link BullfrogEntity#threatensYoung}:
+     * a player, a monitor, a young crocodile), going right up to it first.
      */
     static final class ThreatGoal extends Goal {
         private final BullfrogEntity frog;
         @Nullable
-        private Player player;
+        private LivingEntity foe;
         private int puffed, rest, ticks;
         private boolean bit;
 
@@ -662,15 +678,47 @@ final class BullfrogGoals {
 
         @Override
         public boolean canUse() {
-            if (!now(frog, 5) || frog.action() == BullfrogEntity.LEAP || frog.isFroglet()) {
-                return false;       // (a froglet is too small to square up to anyone)
+            if (!now(frog, 5) || frog.action() == BullfrogEntity.LEAP || frog.isFroglet() || frog.getVehicle() instanceof BullfrogEntity || frog.isVehicle()) {
+                return false;       // (a froglet is too small to square up to anyone; a clasping pair is busy)
             }
-            player = playerNear(frog, PUFF_NEAR);
-            if (player == null && frog.getLastHurtByMob() instanceof Player hurter && frog.tickCount - frog.getLastHurtByMobTimestamp() < 100
+            foe = playerNear(frog, PUFF_NEAR);
+            if (foe == null) {
+                foe = intruder(frog);
+            }
+            if (foe == null && frog.getLastHurtByMob() instanceof Player hurter && frog.tickCount - frog.getLastHurtByMobTimestamp() < 100
                     && !hurter.isCreative() && !hurter.isSpectator() && hurter.distanceTo(frog) < 6) {
-                player = hurter;
+                foe = hurter;
             }
-            return player != null && frog.hasLineOfSight(player);
+            return foe != null && frog.hasLineOfSight(foe);
+        }
+
+        /** The nearest thing come within reach of the eggs or school a father guards, if any. */
+        @Nullable
+        static LivingEntity intruder(BullfrogEntity frog) {
+            BlockPos spot = frog.guardSpot();
+            if (spot == null) {
+                return null;
+            }
+            LivingEntity best = null;
+            double bestD = Double.MAX_VALUE;
+            for (LivingEntity e : frog.level().getEntitiesOfClass(LivingEntity.class, new net.minecraft.world.phys.AABB(spot).inflate(BullfrogEntity.GUARD_SEE_OFF),
+                    e -> e != frog && BullfrogEntity.threatensYoung(e))) {
+                double d = e.distanceToSqr(frog);
+                if (d < bestD) {
+                    bestD = d;
+                    best = e;
+                }
+            }
+            return best;
+        }
+
+        /** Whether the foe is still the frog's business: near it, or (for a father) still near his young. */
+        private boolean stillNear(LivingEntity e) {
+            if (e.distanceTo(frog) < PUFF_NEAR + 2.0) {
+                return true;
+            }
+            BlockPos spot = frog.guardSpot();
+            return spot != null && e.distanceToSqr(Vec3.atCenterOf(spot)) < Mth.square(BullfrogEntity.GUARD_SEE_OFF + 2.0);
         }
 
         @Override
@@ -686,8 +734,8 @@ final class BullfrogGoals {
 
         @Override
         public boolean canContinueToUse() {
-            return player != null && player.isAlive() && !player.isCreative() && !player.isSpectator()
-                    && player.distanceTo(frog) < PUFF_NEAR + 2.0 && ++ticks < 600;
+            return foe != null && foe.isAlive() && !(foe instanceof Player p && (p.isCreative() || p.isSpectator()))
+                    && stillNear(foe) && ++ticks < 600;
         }
 
         @Override
@@ -697,26 +745,26 @@ final class BullfrogGoals {
 
         @Override
         public void tick() {
-            if (player == null) {
+            if (foe == null) {
                 return;
             }
             byte a = frog.action();
-            frog.getLookControl().setLookAt(player, 30, 30);
+            frog.getLookControl().setLookAt(foe, 30, 30);
             if (a == BullfrogEntity.DIG_OUT) {
                 return;             // the entity ends its digging out by itself
             }
             if (a == BullfrogEntity.LUNGE) {
                 int t = frog.actionTicks;
                 if (t == LUNGE_PUSH) {
-                    Vec3 to = player.position().subtract(frog.position());
+                    Vec3 to = foe.position().subtract(frog.position());
                     double flat = Math.max(0.05, Math.sqrt(to.x * to.x + to.z * to.z));
                     double push = 0.3 * frog.getScale();
                     frog.setDeltaMovement(frog.getDeltaMovement().add(to.x / flat * push, 0.15, to.z / flat * push));
                     frog.hasImpulse = true;
                 } else if (t == LUNGE_SNAP && !bit) {
                     bit = true;
-                    if (player.distanceTo(frog) < 1.0 * frog.getScale() + 0.8) {
-                        player.hurt(frog.damageSources().mobAttack(frog), BITE);
+                    if (foe.distanceTo(frog) - body(foe) < biteReach(frog)) {
+                        foe.hurt(frog.damageSources().mobAttack(frog), BITE);
                     }
                 } else if (t >= LUNGE_END) {
                     frog.act(BullfrogEntity.PUFF);
@@ -724,7 +772,23 @@ final class BullfrogGoals {
                 }
                 return;
             }
-            turnTo(frog, player.position(), 15);
+            double far = foe.distanceTo(frog) - body(foe);
+            double lungeFrom = biteReach(frog) - LUNGE_FROM;
+            if (far > lungeFrom && frog.guardSpot() != null) {
+                // a father goes right up to it (hopping or swimming: his legs' own moves), then puffs and bites
+                if (a == BullfrogEntity.PUFF) {
+                    frog.stopActing();
+                }
+                if (frog.getNavigation().isDone() || frog.tickCount % 10 == 0) {
+                    frog.getNavigation().moveTo(foe, 1.2);
+                }
+                return;
+            }
+            if (a == BullfrogEntity.HOP || a == BullfrogEntity.HOP_DIVE) {
+                return;             // a hop under way lands first
+            }
+            frog.getNavigation().stop();
+            turnTo(frog, foe.position(), 15);
             if (a != BullfrogEntity.PUFF) {
                 frog.act(BullfrogEntity.PUFF);
             }
@@ -732,12 +796,17 @@ final class BullfrogGoals {
             if (rest > 0) {
                 rest--;
             }
-            boolean provoked = frog.getLastHurtByMob() == player && frog.tickCount - frog.getLastHurtByMobTimestamp() < 100;
-            if (rest <= 0 && (puffed > 30 && player.distanceTo(frog) < BITE_NEAR || provoked && player.distanceTo(frog) < 2.5)) {
+            boolean provoked = frog.getLastHurtByMob() == foe && frog.tickCount - frog.getLastHurtByMobTimestamp() < 100;
+            if (rest <= 0 && (puffed > 30 && far < lungeFrom || provoked && far < 2.5)) {
                 frog.act(BullfrogEntity.LUNGE);
                 bit = false;
                 frog.playSound(SavannaSounds.BULLFROG_BARK.get(), 1.2F, frog.getVoicePitch());
             }
+        }
+
+        /** How much nearer a big foe's middle is than its edge (none for a player: the old reaches were made for them). */
+        private static double body(LivingEntity e) {
+            return e instanceof Player ? 0.0 : e.getBbWidth() * 0.5;
         }
 
         @Override
@@ -746,7 +815,8 @@ final class BullfrogGoals {
             if (a == BullfrogEntity.PUFF || a == BullfrogEntity.LUNGE) {
                 frog.stopActing();
             }
-            player = null;
+            frog.getNavigation().stop();
+            foe = null;
         }
     }
 
@@ -853,6 +923,7 @@ final class BullfrogGoals {
         public void start() {
             frog.getNavigation().stop();
             frog.act(BullfrogEntity.CALL);
+            frog.lastCall = frog.tickCount;     // a ready female within reach comes to him (its life kit's SeekMateGoal)
             frog.playSound(SavannaSounds.BULLFROG_CALL.get(), 2.0F, frog.getVoicePitch());
             for (BullfrogEntity other : frog.level().getEntitiesOfClass(BullfrogEntity.class, frog.getBoundingBox().inflate(ANSWER_REACH, 8, ANSWER_REACH),
                     o -> o != frog && o.isMale())) {

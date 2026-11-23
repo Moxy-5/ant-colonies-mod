@@ -67,6 +67,7 @@ public class SavannaItems {
     public static final DeferredItem<BlockItem> TILAPIA_NEST = ITEMS.registerSimpleBlockItem(SavannaBlocks.TILAPIA_NEST);
     public static final DeferredItem<BlockItem> SNAIL_EGGS = ITEMS.registerSimpleBlockItem(SavannaBlocks.SNAIL_EGGS);
     public static final DeferredItem<BlockItem> CATFISH_EGGS = ITEMS.registerSimpleBlockItem(SavannaBlocks.CATFISH_EGGS);
+    public static final DeferredItem<BlockItem> FROG_EGGS = ITEMS.registerSimpleBlockItem(SavannaBlocks.FROG_EGGS);
     public static final DeferredItem<BlockItem> CROCODILE_NEST = ITEMS.registerSimpleBlockItem(SavannaBlocks.CROCODILE_NEST);
     /** River sand in its three tones (dry, wet, rippled, crocodile slide each) and river pebbles (sand banks, 2026-11-16). */
     public static final java.util.List<DeferredItem<BlockItem>> RIVER_SAND = java.util.stream.Stream.of(

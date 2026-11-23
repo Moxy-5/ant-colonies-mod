@@ -4,7 +4,13 @@ import javax.annotation.Nullable;
 
 import org.joml.Vector3f;
 
+import java.util.UUID;
+
+import com.antcolonies.animal.AnimalLife;
+import com.antcolonies.animal.HasLife;
+import com.antcolonies.animal.Sex;
 import com.antcolonies.entity.body.SteadyController;
+import com.antcolonies.savanna.block.FrogEggsBlock;
 import com.antcolonies.savanna.registry.SavannaSounds;
 
 import net.minecraft.core.BlockPos;
@@ -23,8 +29,10 @@ import net.minecraft.world.DifficultyInstance;
 import net.minecraft.world.damagesource.DamageSource;
 import net.minecraft.world.entity.AgeableMob;
 import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.EntityDimensions;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.Mob;
 import net.minecraft.world.entity.MobSpawnType;
 import net.minecraft.world.entity.SpawnGroupData;
 import net.minecraft.world.entity.ai.attributes.AttributeInstance;
@@ -71,12 +79,18 @@ import software.bernie.geckolib.util.GeckoLibUtil;
  * <li>Males call from dusk and in rain, a deep lowing whoop (the throat swelling), and others answer.</li>
  * <li>On land it hops ({@link BullfrogMoveControl}); in the water it swims and floats at the surface.</li>
  * </ul>
- * Breeding (calling and wrestling, the tadpole school guarded by the father) is the plan's step 4.
+ * <p>Its life (the animal life kit, its life file {@code animal_life/bullfrog.json}; the river tie-up part B,
+ * 2026-11-23): a tadpole ({@link TadpoleEntity}) climbs out a froglet, its young stage, grown in 3 days. In the rains,
+ * while it rains, a ready female comes to a calling male ({@link com.antcolonies.animal.SeekMateGoal}); he climbs onto
+ * her back and clasps her round the waist (the clasp clip) while she carries him to the shallows, where she lays a
+ * floating mat of eggs at the surface ({@link FrogEggsBlock}). He stays by the eggs, and then by the tadpole school that
+ * hatches from them, for its first 3 days, puffing and lunging at anything that comes near ({@link #guardSpot}); he
+ * never eats his own tadpoles (other frogs still may).
  */
-public class BullfrogEntity extends Animal implements GeoEntity {
+public class BullfrogEntity extends Animal implements GeoEntity, HasLife {
     /** What it is doing to be seen (synced). */
     public static final byte NONE = 0, HOP = 1, LEAP = 2, LUNGE = 3, TONGUE = 4, PUFF = 5, CALL = 6, DIG_IN = 7, DUG = 8, DIG_OUT = 9,
-            AIM = 10, STALK = 11, HOP_DIVE = 12, CLIMB_OUT = 13;
+            AIM = 10, STALK = 11, HOP_DIVE = 12, CLIMB_OUT = 13, CLASP = 14;
     /** A female's length against a male's (the user's 0.65 against 0.8). */
     static final float FEMALE_SIZE = 0.65F / 0.8F;
     /** The model's mouth, against the frog's feet and middle (blocks at a male's size: the snout 0.4 ahead, 0.19 up). */
@@ -107,7 +121,9 @@ public class BullfrogEntity extends Animal implements GeoEntity {
     private static final EntityDataAccessor<Byte> DATA_ACTION = SynchedEntityData.defineId(BullfrogEntity.class, EntityDataSerializers.BYTE);
     /** Counts every action started, so a clip that plays once restarts for the next (a second hop, a second flick). */
     private static final EntityDataAccessor<Integer> DATA_ACTION_ID = SynchedEntityData.defineId(BullfrogEntity.class, EntityDataSerializers.INT);
-    private static final EntityDataAccessor<Boolean> DATA_MALE = SynchedEntityData.defineId(BullfrogEntity.class, EntityDataSerializers.BOOLEAN);
+    /** Its life: sex, stage (a froglet is its young stage), own size (the animal life kit). */
+    private static final EntityDataAccessor<Byte> DATA_LIFE = AnimalLife.dataFor(BullfrogEntity.class);
+    private final AnimalLife life;
     /** Where its tongue reaches to (world), while it flicks. */
     private static final EntityDataAccessor<Vector3f> DATA_TONGUE_AT = SynchedEntityData.defineId(BullfrogEntity.class, EntityDataSerializers.VECTOR3);
     /**
@@ -138,6 +154,7 @@ public class BullfrogEntity extends Animal implements GeoEntity {
 
     public BullfrogEntity(EntityType<? extends BullfrogEntity> type, Level level) {
         super(type, level);
+        life = new AnimalLife(this, DATA_LIFE);
         moveControl = new BullfrogMoveControl(this);
         setPathfindingMalus(PathType.WATER, 0.0F);
         hungryIn = 200 + level.random.nextInt(1200);
@@ -164,7 +181,7 @@ public class BullfrogEntity extends Animal implements GeoEntity {
         super.defineSynchedData(builder);
         builder.define(DATA_ACTION, NONE);
         builder.define(DATA_ACTION_ID, 0);
-        builder.define(DATA_MALE, true);
+        AnimalLife.define(builder, DATA_LIFE);
         builder.define(DATA_TONGUE_AT, new Vector3f());
         builder.define(DATA_TONGUE_CLOUD, -1);
         builder.define(DATA_TONGUE_HIT, false);
@@ -172,15 +189,22 @@ public class BullfrogEntity extends Animal implements GeoEntity {
 
     // --- what it is ----------------------------------------------------------------------------------------------------
 
-    public boolean isMale() {
-        return entityData.get(DATA_MALE);
+    @Override
+    public AnimalLife life() {
+        return life;
     }
 
-    /** Makes it a male or a female of its own length (0.9 to 1.1 of its sex's usual), drawn and boxed through SCALE. */
+    public boolean isMale() {
+        return life.isMale();
+    }
+
+    /**
+     * Makes it a grown male or female of its own length (a share of its sex's usual: 1 is 0.8 blocks for a male, 0.65
+     * for a female), drawn and boxed through SCALE. Tests and the film tool.
+     */
     public void setUp(boolean male, float own) {
-        entityData.set(DATA_MALE, male);
-        fullSize = (male ? 1.0F : FEMALE_SIZE) * own;
-        applySize();
+        life.setUp(false, male ? Sex.MALE : Sex.FEMALE, getRandom());
+        life.setOwnSize((male ? 1.0F : FEMALE_SIZE) * own);
     }
 
     public boolean isHungry() {
@@ -416,9 +440,8 @@ public class BullfrogEntity extends Animal implements GeoEntity {
             }
             return;
         }
-        if (frogletFor > 0 && (--frogletFor % 100 == 0)) {
-            applySize();        // growing (a step every 5 s, too small to see)
-        }
+        life.tick();
+        breedingTick();
         filmTick();
         if (hungryIn > 0) {
             hungryIn--;
@@ -521,8 +544,7 @@ public class BullfrogEntity extends Animal implements GeoEntity {
     @Nullable
     public SpawnGroupData finalizeSpawn(ServerLevelAccessor level, DifficultyInstance difficulty, MobSpawnType spawnType, @Nullable SpawnGroupData data) {
         SpawnGroupData out = super.finalizeSpawn(level, difficulty, spawnType, data);
-        RandomSource r = level.getRandom();
-        setUp(r.nextBoolean(), 0.9F + r.nextFloat() * 0.2F);
+        life.setUp(false, level.getRandom());
         if (spawnType == MobSpawnType.NATURAL || spawnType == MobSpawnType.CHUNK_GENERATION) {
             // drawn anywhere in its column: set down on the top (on the bank, or afloat on the water)
             int top = surface(level, getX(), getZ());
@@ -583,37 +605,244 @@ public class BullfrogEntity extends Animal implements GeoEntity {
         return distanceToClosestPlayer > KEEP_NEAR * KEEP_NEAR && !hasCustomName();
     }
 
-    // --- the froglet (the river tie-up, 2026-11-23) -------------------------------------------------------------------
+    // --- the froglet: its young stage (the river tie-up, 2026-11-23) -------------------------------------------------
 
     /**
-     * A froglet, fresh out of the water from a tadpole ({@link TadpoleEntity#becomeFroglet}), starts at about 0.25 blocks
-     * (the plan's pick: 0.32 of a male's 0.8) and grows smoothly to its full size over its 3 froglet days. Its own clock,
-     * not Minecraft's baby: its size goes through SCALE, so its box, its drawing (GeckoLib reads the baby flag its own
-     * way), its mouth and its tongue's reach all shrink with it.
+     * Whether it is still a froglet, its life's young stage: fresh out of the water from a tadpole
+     * ({@link TadpoleEntity#becomeFroglet}) at 0.32 of its grown size (about 0.25 blocks), grown in 3 days (its life
+     * file). Too small to call or square up to anyone. Its size goes through SCALE (the life kit), so its box, its
+     * drawing, its mouth and its tongue's reach all shrink with it.
      */
-    static final float FROGLET_SIZE = 0.32F;
-    /** Its size when grown (its sex's usual times its own), and ticks left as a froglet (0: grown). */
-    private float fullSize = 1.0F;
-    private int frogletFor, frogletDays = 1;
-
-    /** Makes it a froglet that grows up in this many ticks. */
-    public void makeFroglet(int ticks) {
-        frogletFor = Math.max(0, ticks);
-        frogletDays = Math.max(1, ticks);
-        applySize();
-    }
-
-    /** Whether it is still a froglet (too small to call or square up to anyone). */
     public boolean isFroglet() {
-        return frogletFor > 0;
+        return life.isYoung();
     }
 
-    private void applySize() {
-        AttributeInstance scale = getAttribute(Attributes.SCALE);
-        if (scale != null) {
-            float grown = frogletFor > 0 ? 1.0F - (float) frogletFor / frogletDays : 1.0F;
-            scale.setBaseValue(fullSize * (FROGLET_SIZE + (1.0F - FROGLET_SIZE) * grown));
+    /** Makes it a froglet just out of the water (its sex and own size rolled anew). */
+    public void makeFroglet() {
+        life.setUp(true, getRandom());
+        life.setAge(0);
+    }
+
+    // --- breeding (the river tie-up part B, 2026-11-23; every number my pick, fun first) -------------------------------
+
+    /** A male takes a mate only while he has called this recently (ticks: a female comes to his call). */
+    static final int CALLED_WITHIN = 1200;
+    /** How far round her a clasped female looks for the shallows to lay in (blocks across; up or down 3). */
+    static final int LAY_REACH = 10;
+    /**
+     * Where the clasped male sits on her back (her model pixels at her size, one a 50th of a block on a male of size 1):
+     * this high over her feet (under her back's top: his belly rests on her back, the two bodies just meeting) and this
+     * far back from her middle, so his chin lies on her back behind her eyes and her head shows in front of his (the
+     * first film had him over her head, a stack of two frogs), his hands round her waist (the clasp clip).
+     */
+    static final double CLASP_UP = 14.5, CLASP_BACK = 9.0, PIXEL = 0.32 / 16.0;
+    /**
+     * The father's guard: he keeps within {@link #GUARD_STAY} blocks of his eggs (or of his nearest tadpole), sees off
+     * anything that comes within {@link #GUARD_SEE_OFF} of them ({@link BullfrogGoals.ThreatGoal}), and follows his school
+     * up to {@link #GUARD_FOLLOW} blocks off.
+     */
+    static final double GUARD_STAY = 3.0, GUARD_SEE_OFF = 4.0, GUARD_FOLLOW = 16.0;
+
+    /** When it last called (its own ticks; a male only). */
+    int lastCall = -CALLED_WITHIN;
+    /** The shallows a clasped female is carrying her male to (not saved). */
+    @Nullable
+    private BlockPos layAt;
+    /** Where she laid her last eggs (her male reads it as they part). */
+    @Nullable
+    private BlockPos lastClutch;
+    /** The eggs a father guards (saved), and what he guards this second: the eggs, then his nearest tadpole. */
+    @Nullable
+    private BlockPos guardAt;
+    @Nullable
+    private BlockPos guardSpot;
+
+    /** A female goes to the male; a male waits, calling. */
+    @Override
+    public boolean seeksMate() {
+        return !isMale();
+    }
+
+    /** A male is picked only while he is calling (or already clasping her). */
+    @Override
+    public boolean takesMate() {
+        return isMale() && (isPassenger() || tickCount - lastCall < CALLED_WITHIN);
+    }
+
+    /**
+     * The pair's courtship (on her, the one that came): he climbs onto her back and clasps her (the clasp clip, set on
+     * her back by {@link #getPassengerAttachmentPoint}), and she carries him to the nearest shallows to lay in.
+     */
+    @Override
+    public void courting(Mob mate, int ticks) {
+        if (isMale() || !(mate instanceof BullfrogEntity male)) {
+            return;
         }
+        if (!male.isPassenger()) {
+            male.getNavigation().stop();
+            male.startRiding(this, true);
+            male.act(CLASP);
+        }
+        if (layAt == null && ticks % 20 == 0 || layAt != null && ticks % 40 == 0 && !FrogEggsBlock.canLayAt(level(), layAt)) {
+            layAt = findLayingSpot(LAY_REACH);
+        }
+        if (layAt != null && distanceToSqr(Vec3.atBottomCenterOf(layAt)) > 1.0 && (ticks % 10 == 0 || getNavigation().isDone())) {
+            getNavigation().moveTo(layAt.getX() + 0.5, layAt.getY(), layAt.getZ() + 0.5, 1.0);
+        }
+    }
+
+    /** She lays where she is in the shallows, still clasped, and they part; he stays to guard the eggs. */
+    @Override
+    public void mated(Mob mate) {
+        if (!isMale()) {
+            ejectPassengers();
+            BlockPos at = layAt != null && FrogEggsBlock.canLayAt(level(), layAt) && distanceToSqr(Vec3.atBottomCenterOf(layAt)) < 9.0
+                    ? layAt : findLayingSpot(3);
+            int eggs = life.numbers().clutchMin() + random.nextInt(life.numbers().clutchMax() - life.numbers().clutchMin() + 1);
+            lastClutch = at != null && level() instanceof ServerLevel server && FrogEggsBlock.lay(server, at, getType(), eggs) ? at : null;
+            layAt = null;
+            getNavigation().stop();
+            return;
+        }
+        stopRiding();
+        stopActing();
+        guardAt = mate instanceof BullfrogEntity female ? female.lastClutch : null;
+        guardSpot = guardAt;
+    }
+
+    /**
+     * The nearest water to lay in within this reach: the top of shallow water (a still water block with air over it and
+     * the bed at most 2 below), nearest first; null with none.
+     */
+    @Nullable
+    BlockPos findLayingSpot(int reach) {
+        BlockPos home = blockPosition();
+        BlockPos best = null;
+        double bestD = Double.MAX_VALUE;
+        for (BlockPos at : BlockPos.betweenClosed(home.offset(-reach, -3, -reach), home.offset(reach, 3, reach))) {
+            double d = at.distSqr(home);
+            if (d < bestD && FrogEggsBlock.canLayAt(level(), at)) {
+                bestD = d;
+                best = at.immutable();
+            }
+        }
+        return best;
+    }
+
+    /** Where a clasped male sits: on her back behind her head. */
+    @Override
+    protected Vec3 getPassengerAttachmentPoint(Entity rider, EntityDimensions dimensions, float partialTick) {
+        double px = PIXEL * getScale();
+        return new Vec3(0.0, CLASP_UP * px, -CLASP_BACK * px).yRot(-getYRot() * Mth.DEG_TO_RAD);
+    }
+
+    /** He faces as she does. */
+    @Override
+    protected void positionRider(Entity rider, Entity.MoveFunction move) {
+        super.positionRider(rider, move);
+        rider.setYRot(getYRot());
+        rider.setYHeadRot(getYHeadRot());
+        if (rider instanceof LivingEntity living) {
+            living.yBodyRot = yBodyRot;
+            living.yBodyRotO = yBodyRotO;
+        }
+    }
+
+    /** A clasped male only holds on: she goes where she likes. */
+    @Override
+    public boolean canControlVehicle() {
+        return false;
+    }
+
+    /**
+     * Each tick: a pair no longer courting part (a courtship broken off, or a world saved mid-clasp); each second the
+     * father's guard spot is found anew.
+     */
+    private void breedingTick() {
+        if (isVehicle() && life.partner() == null && !(getFirstPassenger() instanceof BullfrogEntity rider && rider.filmed())) {
+            ejectPassengers();
+        }
+        if (getVehicle() instanceof BullfrogEntity && !filmed() && life.partner() == null) {
+            stopRiding();       // (only a frog on a frog: a frog carried off in an otter's or a croc's jaws rides its hunter)
+        }
+        if (action() == CLASP && !isPassenger()) {
+            stopActing();
+        }
+        if (tickCount % 20 == 0) {
+            guardSpot = findGuardSpot();
+        }
+    }
+
+    /** A frog the film tool set up (named film...): a clasped pair it summons stays together. */
+    private boolean filmed() {
+        Component name = getCustomName();
+        return name != null && name.getString().startsWith("film");
+    }
+
+    /** What a father guards now: his eggs while they lie, then his nearest tadpole through its first days; else null. */
+    @Nullable
+    private BlockPos findGuardSpot() {
+        if (guardAt == null) {
+            return null;
+        }
+        if (level().getBlockState(guardAt).getBlock() instanceof FrogEggsBlock) {
+            return guardAt;
+        }
+        int care = life.numbers().careTicks();
+        TadpoleEntity nearest = null;
+        double best = Double.MAX_VALUE;
+        for (TadpoleEntity t : level().getEntitiesOfClass(TadpoleEntity.class, getBoundingBox().inflate(GUARD_FOLLOW),
+                t -> t.isAlive() && isFatherOf(t) && t.age() < care)) {
+            double d = t.distanceToSqr(this);
+            if (d < best) {
+                best = d;
+                nearest = t;
+            }
+        }
+        if (nearest == null) {
+            guardAt = null;         // the eggs gone, his school grown up, eaten or lost: his guard is over
+            return null;
+        }
+        return nearest.blockPosition();
+    }
+
+    /** What he guards this second (his eggs or his nearest tadpole), or null. */
+    @Nullable
+    public BlockPos guardSpot() {
+        return guardSpot;
+    }
+
+    /** Sets the eggs he guards (tests). */
+    public void guard(@Nullable BlockPos eggs) {
+        guardAt = eggs;
+        guardSpot = eggs;
+    }
+
+    /** Whether he guards the eggs here. */
+    public boolean guards(BlockPos eggs) {
+        return eggs.equals(guardAt);
+    }
+
+    /** Whether this tadpole hatched from eggs he guarded (he never eats it). */
+    public boolean isFatherOf(LivingEntity e) {
+        return e instanceof TadpoleEntity t && getUUID().equals(t.father());
+    }
+
+    /** Whether this comes to harm his eggs or school, when it comes near them: a player, a monitor, a young crocodile. */
+    static boolean threatensYoung(LivingEntity e) {
+        return e.isAlive() && (e instanceof Player p && !p.isCreative() && !p.isSpectator() || e instanceof MonitorEntity
+                || e instanceof CrocodileEntity c && !c.life().stage().grown());
+    }
+
+    /** For tests: as if it had just called. */
+    public void calledNow() {
+        lastCall = tickCount;
+    }
+
+    /** For tests: where she last laid. */
+    @Nullable
+    public BlockPos lastClutch() {
+        return lastClutch;
     }
 
     // --- not a farm animal ---------------------------------------------------------------------------------------------
@@ -661,10 +890,10 @@ public class BullfrogEntity extends Animal implements GeoEntity {
     @Override
     public void addAdditionalSaveData(CompoundTag tag) {
         super.addAdditionalSaveData(tag);
-        tag.putBoolean("Male", isMale());
-        tag.putFloat("FullSize", fullSize);
-        tag.putInt("FrogletFor", frogletFor);
-        tag.putInt("FrogletDays", frogletDays);
+        life.save(tag);
+        if (guardAt != null) {
+            tag.putLong("GuardAt", guardAt.asLong());
+        }
         tag.putInt("HungryIn", hungryIn);
         byte a = action();
         if (a == DUG || a == DIG_IN) {
@@ -675,16 +904,16 @@ public class BullfrogEntity extends Animal implements GeoEntity {
     @Override
     public void readAdditionalSaveData(CompoundTag tag) {
         super.readAdditionalSaveData(tag);
-        entityData.set(DATA_MALE, !tag.contains("Male") || tag.getBoolean("Male"));
-        if (tag.contains("FullSize")) {     // (frogs saved before froglets: their size as it was)
-            fullSize = tag.getFloat("FullSize");
-            frogletFor = tag.getInt("FrogletFor");
-            frogletDays = Math.max(1, tag.getInt("FrogletDays"));
-            applySize();
-        } else {
+        if (!tag.contains("Life") && tag.contains("Male")) {
+            // a frog saved before the life kit (2026-11-23): its size was its "FullSize" (or, before froglets, its SCALE),
+            // already its sex's share, which is what the kit calls its own size; a froglet then is grown now
             AttributeInstance scale = getAttribute(Attributes.SCALE);
-            fullSize = scale != null ? (float) scale.getBaseValue() : 1.0F;
+            tag.putFloat("OwnSize", tag.contains("FullSize") ? tag.getFloat("FullSize") : scale != null ? (float) scale.getBaseValue() : 1.0F);
+        } else if (!tag.contains("Life") && tag.contains("sex") && Sex.fromFile(tag.getString("sex")) != null) {
+            life.setUp(false, Sex.fromFile(tag.getString("sex")), getRandom());    // a summon's sex: its size in that sex's range
         }
+        life.load(tag);
+        guardAt = tag.contains("GuardAt") ? BlockPos.of(tag.getLong("GuardAt")) : null;
         hungryIn = tag.getInt("HungryIn");
         if (tag.getBoolean("Dug")) {
             entityData.set(DATA_ACTION, DUG);
@@ -709,6 +938,7 @@ public class BullfrogEntity extends Animal implements GeoEntity {
     private static final RawAnimation DIG_IN_CLIP = RawAnimation.begin().thenPlayAndHold("dig_in");
     private static final RawAnimation DUG_CLIP = RawAnimation.begin().thenLoop("dug");
     private static final RawAnimation DIG_OUT_CLIP = RawAnimation.begin().thenPlay("dig_out");
+    private static final RawAnimation CLASP_CLIP = RawAnimation.begin().thenLoop("clasp");
     /** The walk clip's planted feet match this pace (blocks a tick at a male's size: 5.1 model pixels a second). */
     public static final double WALK_CLIP_PACE = 0.10 / 20.0;
     /**
@@ -816,6 +1046,9 @@ public class BullfrogEntity extends Animal implements GeoEntity {
             }
             case DIG_OUT -> {
                 return state.setAndContinue(DIG_OUT_CLIP);
+            }
+            case CLASP -> {
+                return state.setAndContinue(CLASP_CLIP);
             }
             default -> { }
         }

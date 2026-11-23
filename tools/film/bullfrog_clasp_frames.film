@@ -1,0 +1,59 @@
+# The bullfrog pair clasped (the river tie-up part B, 2026-11-23; CLAUDE.md's hard rule): a female with a male on her
+# back playing the clasp clip, on land (she sits, film:idle) and afloat (film:float), from the side, three quarters
+# (front) and the front, the game frozen and stepped 4 ticks a picture. (A camera's height is its feet: the eye is 1.62
+# above.)
+#   ./gradlew runFilm -PfilmScene=tools/film/bullfrog_clasp_frames.film   pictures in run-film/screenshots/bullfrog_clasp_frames/
+cmd time set noon
+cmd weather clear
+cmd kill @e[type=!player]
+# the pool: x 30..44, z -8..8, 3 deep, flush with the grass (its top -60); the land pair sits at 36.5 -60 14.5
+cmd fill 30 -63 -8 44 -61 8 minecraft:water
+cmd fill 33 -60 11 40 -57 18 minecraft:air
+lens 40
+wait 40
+cmd summon antcolonies:bullfrog 36.5 -60.0 14.5 {NoAI:1b,PersistenceRequired:1b,Rotation:[-90f,0f],CustomName:'"film:idle"',sex:"female",Passengers:[{id:"antcolonies:bullfrog",NoAI:1b,PersistenceRequired:1b,CustomName:'"film:clasp"',sex:"male"}]}
+camera 36.50 -61.30 12.70 0 6
+wait 10
+cmd tick freeze
+burst clasp_side 12 4
+cmd tick unfreeze
+camera 37.75 -61.00 13.25 45 14
+wait 6
+cmd tick freeze
+burst clasp_threequarter 12 4
+cmd tick unfreeze
+camera 38.30 -61.30 14.50 90 6
+wait 6
+cmd tick freeze
+burst clasp_front 12 4
+cmd tick unfreeze
+camera 36.50 -60.40 15.40 180 50
+wait 6
+cmd tick freeze
+burst clasp_above 4 6
+cmd tick unfreeze
+cmd kill @e[type=antcolonies:bullfrog]
+wait 3
+# afloat in the pool (NoAI: set at the floating height, its back at the surface)
+cmd summon antcolonies:bullfrog 36.5 -60.27 0.5 {NoAI:1b,PersistenceRequired:1b,Rotation:[-90f,0f],CustomName:'"film:float"',sex:"female",Passengers:[{id:"antcolonies:bullfrog",NoAI:1b,PersistenceRequired:1b,CustomName:'"film:clasp"',sex:"male"}]}
+camera 36.50 -61.45 -1.40 0 12
+wait 10
+cmd tick freeze
+burst afloat_side 8 6
+cmd tick unfreeze
+camera 37.80 -61.10 -0.80 45 22
+wait 6
+cmd tick freeze
+burst afloat_threequarter 8 6
+cmd tick unfreeze
+cmd kill @e[type=antcolonies:bullfrog]
+wait 3
+# the eggs: a mat at the pool's top beside the bank
+cmd setblock 34 -61 6 antcolonies:frog_eggs
+cmd setblock 35 -61 6 antcolonies:frog_eggs
+camera 36.50 -60.60 8.60 160 30
+wait 10
+shot eggs_above
+camera 34.50 -61.80 9.50 180 6
+wait 4
+shot eggs_low

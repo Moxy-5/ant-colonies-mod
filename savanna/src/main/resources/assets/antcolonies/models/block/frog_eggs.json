@@ -1,0 +1,75 @@
+{
+  "parent": "block/block",
+  "ambientocclusion": false,
+  "render_type": "minecraft:translucent",
+  "textures": {
+    "particle": "minecraft:block/frogspawn",
+    "t": "minecraft:block/frogspawn"
+  },
+  "elements": [
+    {
+      "from": [
+        0,
+        14.4,
+        0
+      ],
+      "to": [
+        16,
+        14.4,
+        16
+      ],
+      "faces": {
+        "up": {
+          "uv": [
+            0,
+            0,
+            16,
+            16
+          ],
+          "texture": "#t"
+        },
+        "down": {
+          "uv": [
+            0,
+            16,
+            16,
+            0
+          ],
+          "texture": "#t"
+        }
+      }
+    },
+    {
+      "from": [
+        1,
+        13.9,
+        1
+      ],
+      "to": [
+        15,
+        13.9,
+        15
+      ],
+      "faces": {
+        "up": {
+          "uv": [
+            16,
+            0,
+            0,
+            16
+          ],
+          "texture": "#t"
+        },
+        "down": {
+          "uv": [
+            16,
+            16,
+            0,
+            0
+          ],
+          "texture": "#t"
+        }
+      }
+    }
+  ]
+}

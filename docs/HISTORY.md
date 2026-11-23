@@ -1173,6 +1173,41 @@ Moved here from CLAUDE.md on 2026-10-13 (it was loaded into every chat and took 
   days; it neither calls nor squares up to players. Tests (`river`): `tadpolesSpawnInTheShallowsByThemselves`,
   `aTadpoleGrowsLegsThenBecomesAFrogletOnlyWithRoom`, `aTadpoleBesideFourFrogsDoesNotBecomeAFifth`,
   `tadpolesGrazeTheAlgae`, `aHungryBullfrogLungesAtATadpole`, `aHatchlingCrocodileAndACatfishEatTadpoles`.
+- **2026-11-23, bullfrogs breed, part B of the tadpoles** (the user: "coming from frog breeding"; plan
+  `docs/plans/river-tie-up.md`; every number my pick, fun first). **The bullfrog is on the life kit** (`HasLife`, its
+  life file `animal_life/bullfrog.json`): its sex and own size moved there (males 0.9 to 1.1, females the user's 0.65
+  blocks as 0.73 to 0.89 of a male; nothing changes in the game), and the froglet is now simply its young stage (0.32 of
+  grown, 3 days), replacing part A's own grow-up clock (one rule fewer); a tadpole becomes a froglet only while
+  `RoomToBreed` allows (the life file's local limit 4 within 48 blocks and the frog group's cap; part A counted frogs
+  within 32 itself). A summoned frog given `sex` gets a size in that sex's range; frogs saved before the kit keep their
+  size. **The pair:** in the rains while it rains, a ready female within 16 blocks comes to a male who has called in the
+  last minute (`SeekMateGoal`; `seeksMate` only for females, `takesMate` only for a calling male); he climbs onto her
+  back and clasps her (a Minecraft ride: `getPassengerAttachmentPoint` sets him 14.5 of her model pixels up and 9 back,
+  so his chin lies on her back behind her eyes; he cannot steer her; the new `clasp` clip on him: lying along her, arms
+  down round her waist, hind legs down her hips, a slow squeeze) while she carries him to the nearest shallows within
+  10 blocks; after 16 seconds she lays 8 to 12 eggs there and they part. A pair broken off (she flees, the world is saved
+  mid-clasp) lets go. A female breeds once every 4 days. **The eggs** (`block/FrogEggsBlock`, `antcolonies:frog_eggs`,
+  on the kit's `EggClutchBlock`): a floating film at the top of water at most 2 deep, drawn with Minecraft's own
+  frogspawn picture as two thin layers at the surface (translucent); after a day, watched and with room for tadpoles
+  (fewer than `TadpoleEntity.LOCAL_LIMIT` 24 within 48 blocks and the tadpole group under its cap), each egg hatches
+  into a tadpole of one school, just hatched, its father the male guarding the eggs (`TadpoleEntity.father`, saved),
+  and the block is water again. **The father** stays within 3 blocks of his eggs, then of his nearest tadpole while it
+  is under 3 days old (the kit's `GuardPlaceGoal`); the threat display now has a second source (`ThreatGoal.intruder`):
+  a player, a monitor or a young crocodile within 4 blocks of his eggs or school, which he goes right up to, puffs at
+  and bites; while guarding he no longer flees a monitor (still a grown crocodile); he never eats his own tadpoles
+  (other frogs may). Clip checked offline (`clip_check.py bullfrog clasp --switches`: clean; the blends into and out of
+  it snap in 3 ticks at the moment the game puts him on her back or takes him off, judged fine in the film) and filmed
+  in the game from the side, three quarters, front and above, on land and afloat (`tools/film/bullfrog_clasp_frames.film`):
+  the first film had him stacked over her head, so he now sits further back and lower. Tests (`life`, batch
+  `breeding_frog`): `bullfrogsClaspInTheRainAndSheLaysEggsHeGuards`, `frogEggsHatchIntoASchoolTheFatherGuardsAndNeverEats`,
+  `aGuardingFatherGoesForAMonitorNearHisEggs`; the bullfrog added to `everyRiverAnimalKeepsItsLifeThroughASaveAndLoad`.
+  `AnimalLife.setOwnSize` added to the framework (neutral). Found on the way: **the lunge's start and its bite did not
+  match** (it lunged inside a fixed 1.6 blocks but bit within its size's reach, 1.8 for a male and only 1.5 for a
+  female, who so always fell short); now one reach (`BullfrogGoals.biteReach`) for both, the lunge starting 0.3 inside
+  it, and a father closes to that point before he puffs. The rule that parts a broken-off pair first also made a frog
+  caught by an otter hop out of its jaws (the otter's frog test caught it); it now parts only a frog riding a frog.
+  Known limit: a floating father cannot bite a foe lying on the bed right under him (he floats over it); the monitor
+  test has it wading at the edge, the meeting the game makes.
 
 ## Handover notes for a code reviewer (written at the end of a very long session)
 - State: branch `master`, all committed, `./gradlew build` passes, `./gradlew runGameTestServer` passes 47 tests (about 8 minutes, in one world, tests run in parallel arena grids). Some tests are timing-sensitive under load (`antsOnBumpyGroundReachTheFoodStore` and `aStarvingWorkerSlowsDownAndDies` have each failed once and passed on a re-run): re-run before blaming a change.

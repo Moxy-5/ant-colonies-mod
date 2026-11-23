@@ -257,6 +257,14 @@ public class SavannaBlocks {
             BlockBehaviour.Properties.of().mapColor(MapColor.WATER).replaceable().noCollission().instabreak().noOcclusion()
                     .sound(SoundType.FROGSPAWN).randomTicks().pushReaction(PushReaction.DESTROY).noLootTable());
     /**
+     * A bullfrog's eggs floating at the top of shallow water (the river tie-up part B, 2026-11-23; block/FrogEggsBlock):
+     * a film of black eggs in jelly, plain water again when they hatch into tadpoles. Drops nothing.
+     */
+    public static final DeferredBlock<com.antcolonies.savanna.block.FrogEggsBlock> FROG_EGGS = BLOCKS.registerBlock("frog_eggs",
+            com.antcolonies.savanna.block.FrogEggsBlock::new,
+            BlockBehaviour.Properties.of().mapColor(MapColor.WATER).replaceable().noCollission().instabreak().noOcclusion()
+                    .sound(SoundType.FROGSPAWN).randomTicks().pushReaction(PushReaction.DESTROY).noLootTable());
+    /**
      * The Nile crocodile's nest on a sand bank (M9, animal life cycle step 4, 2026-11-20; block/CrocodileNestBlock): a low
      * heap of churned sand over her eggs, dug open when they hatch. Drops nothing.
      */

@@ -110,7 +110,8 @@
           0.9,
           1.0
         ]
-      ]
+      ],
+      "clasp": []
     },
     "flight": {
       "hop": [
@@ -131,7 +132,8 @@
       "hop",
       "leap",
       "death",
-      "attack"
+      "attack",
+      "clasp"
     ],
     "tuck_ok": [
       "dig_in",
@@ -278,6 +280,22 @@
       [
         "dig_out",
         "idle"
+      ],
+      [
+        "idle",
+        "clasp"
+      ],
+      [
+        "clasp",
+        "idle"
+      ],
+      [
+        "float",
+        "clasp"
+      ],
+      [
+        "clasp",
+        "swim"
       ]
     ]
   },

@@ -26,7 +26,7 @@ built, checked, committed and pushed; the user's in-game look as they play.
   `docs/plans/otter-play-and-fish.md`: how taming starts).
 - **Hippo:** calves and breeding (the calf and teen looks are made), deep oxbows.
 - **Monitor:** life-cycle step 5 (wrestling males, eggs in a living termite mound, raiding crocodile nests, young).
-- **Bullfrog:** tadpoles and breeding (tadpole shape made). **Barb:** breeding (fry and female shapes made).
+- **Bullfrog:** tadpoles and breeding: BUILT 2026-11-23. **Barb:** breeding (fry and female shapes made).
 - **Crab:** the burrow with shells outside.
 - **Eggs already in new land** (`docs/plans/world-eggs.md` steps 2 and 3).
 - **Crocodile:** the old giant (1 or 2 to a river system); its own climb (BUGS 243, 256) and the monitor's stand at a
@@ -50,6 +50,9 @@ built, checked, committed and pushed; the user's in-game look as they play.
 - 2026-11-23, the bullfrog's tadpoles, part A built (spawning by themselves, grazing, eaten, froglets); part B, the
   frogs breeding (calling after rain, the pair, eggs in the shallows hatching into a school, the father guarding it),
   next. `docs/HISTORY.md`.
+- 2026-11-23, part B built: the bullfrog on the life kit (the froglet its young stage), females coming to calling males
+  in the rain, the clasp, floating egg mats hatching into a school that knows its father, the father guarding eggs and
+  school; the wrestling males of the old plan left out (not asked for). `docs/HISTORY.md`.
 
 ## Part B: bullfrogs breed (my picks, fun first, from the 2026-11-20 plan in `docs/plans/prey-fish-and-frogs.md`)
 1. **The bullfrog onto the life kit** (`HasLife`, a life file `animal_life/bullfrog.json`): its sexes and sizes move
