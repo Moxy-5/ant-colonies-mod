@@ -53,7 +53,7 @@ import software.bernie.geckolib.util.GeckoLibUtil;
  * the deep middle channel of the coast and near-inland rivers ({@code worldgen/RiverZones}), never into water under
  * {@link #MIN_DEPTH} blocks deep (the one place that judges it: {@link #shallowAhead}, read by its swimming), alone and
  * rare. Neon's approved model v14 ({@code docs/handoff/bull_shark.md}): 5.5 blocks long at size 1, each shark its own
- * length 5.0 to 7.0 blocks ({@link #rollLength}), the old scarred look from 6.0 up.
+ * length 5.0 to 7.5 blocks in half-block steps ({@link #rollLength}), the old scarred look from 6.0 up.
  *
  * <p>Its life ({@link BullSharkGoals}): by day it patrols slowly up and down the deep channel (sharks never stop
  * swimming); at dusk and by night a hungry shark hunts: the fin out cutting the surface ({@code surface_prowl}), a slow
@@ -71,8 +71,8 @@ public class BullSharkEntity extends WaterAnimal implements GeoEntity {
     // --- the model (tools/bull_shark_models.py, v14; model pixels over 16, blocks at size 1) -------------------------
     /** The model's length, snout to tail tip (88 pixels). */
     public static final float MODEL_LENGTH = 5.5F;
-    /** Its own lengths (blocks; the user's 5.0 to 7.0) and where the scarred old look starts (the card's 6.0). */
-    public static final float SHORTEST = 5.0F, LONGEST = 7.0F, SCARRED_FROM = 6.0F;
+    /** Its own lengths (blocks; the user's 5.0 to 7.5) and where the scarred old look starts (the card's 6.0). */
+    public static final float SHORTEST = 5.0F, LONGEST = 7.5F, SCARRED_FROM = 6.0F;
     /** The water's surface over its feet when it prowls with the fin out (the card: 24.5 pixels). */
     public static final double WATERLINE = 24.5 / 16.0;
     /** Its jaws (the prey bone: 33.5 pixels ahead of its middle, 12.15 over its feet) and its snout's tip (44 ahead). */
@@ -245,13 +245,20 @@ public class BullSharkEntity extends WaterAnimal implements GeoEntity {
     }
 
     // --- size ----------------------------------------------------------------------------------------------------------
-    /**
-     * A length for a new shark (blocks): most 5.5 to 6.0, a quarter shorter, a quarter longer, and one in ten a big old
-     * one of 6.5 to 7.0 (the card's spread; the shares my picks).
-     */
+    /** The sizes a shark comes in (the user, 2026-11-22: 5 to 7.5 blocks in half-block steps) and how often each comes up. */
+    static final float[] LENGTHS = {5.0F, 5.5F, 6.0F, 6.5F, 7.0F, 7.5F};
+    static final float[] LENGTH_SHARES = {0.15F, 0.25F, 0.25F, 0.18F, 0.11F, 0.06F};   // my picks: most mid-sized, few giants
+
+    /** A length for a new shark (blocks): one of {@link #LENGTHS}, by its share. */
     static float rollLength(RandomSource random) {
-        float r = random.nextFloat(), within = random.nextFloat() * 0.5F;
-        return r < 0.25F ? 5.0F + within : r < 0.65F ? 5.5F + within : r < 0.9F ? 6.0F + within : 6.5F + within;
+        float r = random.nextFloat();
+        for (int i = 0; i < LENGTHS.length - 1; i++) {
+            r -= LENGTH_SHARES[i];
+            if (r < 0) {
+                return LENGTHS[i];
+            }
+        }
+        return LENGTHS[LENGTHS.length - 1];
     }
 
     /** Its own length (blocks). */
@@ -259,9 +266,9 @@ public class BullSharkEntity extends WaterAnimal implements GeoEntity {
         return length;
     }
 
-    /** Sets its own length and draws and boxes it at that size. */
+    /** Sets its own length (the nearest half block from 5.0 to 7.5) and draws and boxes it at that size. */
     public void setLength(float blocks) {
-        length = Mth.clamp(blocks, SHORTEST - 0.5F, LONGEST + 0.5F);
+        length = Mth.clamp(Math.round(blocks * 2.0F) / 2.0F, SHORTEST, LONGEST);
         var scale = getAttribute(Attributes.SCALE);
         if (scale != null) {
             scale.setBaseValue(length / MODEL_LENGTH);

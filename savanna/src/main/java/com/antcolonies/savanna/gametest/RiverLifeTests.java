@@ -1475,7 +1475,8 @@ public class RiverLifeTests {
         double back = shark.getY() + 1.5 * shark.getScale();
         helper.assertTrue(shark.getY() >= bed && back <= top + 0.9 - 0.4, "a spawned bull shark lies at y " + String.format("%.2f", shark.getY())
                 + " (its back at " + String.format("%.2f", back) + "), not in the middle of water from " + bed + " to " + (top + 1));
-        helper.assertTrue(shark.length() >= 5.0F && shark.length() <= 7.0F, "a spawned bull shark is " + shark.length() + " blocks long");
+        helper.assertTrue(shark.length() >= 5.0F && shark.length() <= 7.5F && shark.length() * 2 == Math.round(shark.length() * 2),
+                "a spawned bull shark is " + shark.length() + " blocks long, not one of 5.0 to 7.5 in half blocks");
         // 3. none within SPAWN_APART of another
         level.addFreshEntity(shark);
         BlockPos other = new BlockPos(corner.getX() + 8, top - 2, corner.getZ() + 1);
