@@ -299,3 +299,7 @@ blocks, skid-stops, looks or sniffs 0.5 to 2 s, hop-turns 30 to 90 degrees, and 
 **Built (2026-11-22, the skitter in the game):** `OtterEntity.SkitterGoal`, curious or playful on land: bursts of scurry, skid stop,
 look or nose-down sniff, hop turn (speeds measured against the clips: scurry 1.60 b/s, sniff 0.60). The nose has its own bone and
 sniffs in quick puffs (sniff walk, forage feel, the curious stance), at the user's word. Next in 6e: play part 1 (section 1).
+
+**Built (2026-11-22, play part 1, 6e step 3):** `OtterEntity.Bout` and `PlayGoal`: the nose poke, rearing face to face 1.69 blocks apart
+(measured on the clip, not the 1.2 guessed above), chases between rounds, swimming chases in deep water, splashes in the shallows, the
+short rest after. Play uses its own rule (fed, calm, safe, day), not the mood. Next in 6e: chase and tag, then keep-away (step 4).

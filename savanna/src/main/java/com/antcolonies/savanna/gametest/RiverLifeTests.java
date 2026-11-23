@@ -2075,6 +2075,74 @@ public class RiverLifeTests {
     }
 
     /**
+     * Play part 1 (2026-11-22, plan otter-play-and-fish.md section 1): two fed otters on a bank start a bout by
+     * themselves, rear up face to face with their noses nearly touching (their middles the measured gap apart) and finish
+     * it; a hungry pair beside them never plays.
+     */
+    @GameTest(template = "arena", timeoutTicks = 3600)
+    public static void twoFedOttersPlayABoutAHungryPairDoesNot(GameTestHelper helper) {
+        otterPool(helper, MX0 + 20);
+        // each pair kept within 3 blocks of one spot, so they stay in playmate reach (6): kept 5 from their own starting
+        // spots they could wander 13 apart and once never met in 3 minutes beside other tests
+        com.antcolonies.savanna.animal.OtterEntity a = playOtter(helper, MX0 + 4.5, MZ0 + 4.5, true, MX0 + 6, MZ0 + 5);
+        com.antcolonies.savanna.animal.OtterEntity b = playOtter(helper, MX0 + 7.5, MZ0 + 6.5, true, MX0 + 6, MZ0 + 5);
+        com.antcolonies.savanna.animal.OtterEntity c = playOtter(helper, MX0 + 15.5, MZ0 + 4.5, false, MX0 + 16, MZ0 + 6);
+        com.antcolonies.savanna.animal.OtterEntity d = playOtter(helper, MX0 + 16.5, MZ0 + 7.5, false, MX0 + 16, MZ0 + 6);
+        double gap = com.antcolonies.savanna.animal.OtterEntity.REAR_REACH * 2.0;
+        double[] reared = {-1, 0};          // their gap and how far off facing each other, the first time both rear on land
+        long[] startedAt = {-1}, endedAt = {-1};
+        java.util.Set<String> hungry = new java.util.TreeSet<>();
+        helper.onEachTick(() -> {
+            if (startedAt[0] < 0 && a.inBout() && b.inBout()) {
+                startedAt[0] = helper.getTick();
+                SavannaMod.LOGGER.info("[otter play] a bout starts at t{}", helper.getTick());
+            }
+            if (startedAt[0] >= 0 && endedAt[0] < 0 && !a.inBout() && !b.inBout()) {
+                endedAt[0] = helper.getTick();
+                SavannaMod.LOGGER.info("[otter play] the bout ends at t{}", helper.getTick());
+            }
+            if (reared[0] < 0 && a.doing() == com.antcolonies.savanna.animal.OtterEntity.PLAY
+                    && b.doing() == com.antcolonies.savanna.animal.OtterEntity.PLAY && a.onGround() && b.onGround()) {
+                reared[0] = a.position().subtract(b.position()).horizontalDistance();
+                reared[1] = Math.abs(net.minecraft.util.Mth.wrapDegrees(a.getYRot() - b.getYRot() - 180.0F));
+                SavannaMod.LOGGER.info("[otter play] rearing {} apart (the gap {}), {} degrees off facing", String.format("%.2f", reared[0]),
+                        String.format("%.2f", gap), (int) reared[1]);
+            }
+            for (com.antcolonies.savanna.animal.OtterEntity o : new com.antcolonies.savanna.animal.OtterEntity[] {c, d}) {
+                if (o.inBout() || o.doing() == com.antcolonies.savanna.animal.OtterEntity.PLAY) {
+                    hungry.add("t" + helper.getTick());
+                }
+            }
+        });
+        helper.succeedWhen(() -> {
+            helper.assertTrue(hungry.isEmpty(), "a hungry otter played: " + hungry);
+            helper.assertTrue(startedAt[0] >= 0, "the fed otters never started a bout: " + String.format("%.1f", a.distanceTo(b))
+                    + " apart; a " + a.playState() + "; b " + b.playState());
+            helper.assertTrue(reared[0] >= 0, "they never reared up face to face on land");
+            helper.assertTrue(Math.abs(reared[0] - gap) < 0.4, "they reared " + reared[0] + " apart, not about " + gap);
+            helper.assertTrue(reared[1] < 35.0, "rearing they faced " + reared[1] + " degrees off each other");
+            helper.assertTrue(endedAt[0] >= 0, "the bout never ended");
+        });
+    }
+
+    /** A grown otter on the bank, fed or hungry, kept within 3 blocks of a spot; no swims (so the bout stays on the bank). */
+    private static com.antcolonies.savanna.animal.OtterEntity playOtter(GameTestHelper helper, double x, double z, boolean fed,
+            int keepX, int keepZ) {
+        com.antcolonies.savanna.animal.OtterEntity otter = helper.spawn(SavannaEntities.OTTER.get(),
+                new net.minecraft.world.phys.Vec3(x, TOP + 1, z));
+        otter.setPersistenceRequired();
+        otter.life().setUp(false, otter.getRandom());
+        if (fed) {
+            otter.makeFed();
+        } else {
+            otter.makeHungry();
+        }
+        otter.restrictTo(helper.absolutePos(new BlockPos(keepX, TOP + 1, keepZ)), 3);
+        otter.goalSelector.removeAllGoals(g -> g.getClass().getSimpleName().equals("SwimAboutGoal"));
+        return otter;
+    }
+
+    /**
      * The skitter (2026-11-22, plan otter-play-and-fish.md 6b): a curious otter on the bank goes in bursts: scurries, skid
      * stops, looks or sniffs, hops round to a new heading; its scurry runs at about the scurry clip's stride (1.57 blocks a
      * second) and its sniff at about the sniff clip's (0.59), so the feet do not slide. A calm one beside it only strolls.

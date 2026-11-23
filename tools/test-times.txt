@@ -319,6 +319,7 @@ tilapiabreedinanestpitandthemotherkeepsherfryinhermouth 0.03
 tilapiagrazegrowupandweartheirlooks 0.36
 treeblocksplaceandbranchesjoin 0.00
 tunnelblocksjoinupontheirown 0.00
+twofedottersplayaboutahungrypairdoesnot 0.03
 whatanantcarriesiskeptafterareload 0.32
 workerscarryseedsandclipgrassintothefoodstore 8.73
 workerscloseeveryholeinthenestwallsandmenddamage 11.08
