@@ -56,6 +56,7 @@
 ## Special Bones (for Java / Renderer)
 - **Head look:** `head` (optional slight share on `neck`)
 - **Mouth / jaw:** `jaw` (plus `tongue` child of `jaw`)
+- **Nose:** `nose` (child of `head`, the nose pad alone since 2026-11-22; sniffs: lifts, pushes forward, flares wider on each puff)
 - **Prey carry socket:** `carry` (empty child bone of `head` right at the front of the jaws — attach caught `crab`, `tilapia`, or `barb` crosswise!)
 - **Eyelids:** `lid_left`, `lid_right` (animated via position `y: 0 → -1.55` in clips; hidden cleanly inside brow at rest)
 - **Whiskers & Ears:** `whisker_left`, `whisker_right`, `ear_left`, `ear_right`

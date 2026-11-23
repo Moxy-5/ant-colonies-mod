@@ -53,7 +53,7 @@ WORKSHOP_SHAPE = [
 ]
 
 WORKSHOP_PARTS = {
-    "head":       ["head", "snout_bridge", "ear_left", "ear_right", "eye_left", "eye_right",
+    "head":       ["head", "snout_bridge", "nose", "ear_left", "ear_right", "eye_left", "eye_right",
                    "lid_left", "lid_right", "whisker_left", "whisker_right"],
     "jaw":        ["jaw", "tongue"],
     "neck":       ["neck"],
@@ -374,8 +374,11 @@ def build_bones():
     for s in (1, -1):
         hbox(head_cubes, s * 2.15, s * 4.08, 10.55, 12.30, 32.4, 34.48, "muzzle_pad")
     # Prominent velvety charcoal-brown rectangular otter nose pad
+    # (its own bone since 2026-11-22, so it can twitch and puff as it sniffs; the same box in the same place)
     nose_info = {"_nz0": oz(35.32 + BODY_EXTRA) + dz_h, "_ny0": 11.45 + dy_h, "_ny1": 12.98 + dy_h}
-    hsym(head_cubes, 1.40, 11.45, 12.98, 34.25, 35.32, "nose", extra=nose_info)
+    nose_cubes = []
+    hsym(nose_cubes, 1.40, 11.45, 12.98, 34.25, 35.32, "nose", extra=nose_info)
+    nose_piv = [0.0, round(12.2 + dy_h, 3), round(oz(34.25 + BODY_EXTRA) + dz_h, 3)]   # the back of the pad, its middle
     # Recessed upper palate roof (hidden when shut)
     hsym(head_cubes, 2.4, 10.5, 11.1, 30.2, 33.8, "mouth")
 
@@ -487,6 +490,7 @@ def build_bones():
          "rotation": pitch(-NECK_PITCH + HEAD_PITCH), "cubes": head_cubes},
         {"name": "snout_bridge", "parent": "head", "pivot": sb_piv,
          "rotation": pitch(-16.0), "cubes": sb_cubes},
+        {"name": "nose", "parent": "head", "pivot": nose_piv, "cubes": nose_cubes},
         {"name": "ear_left",  "parent": "head",
          "pivot": [ear_x, round(ear_y + dy_h, 3), round(oz(28.4 + BODY_EXTRA) + dz_h, 3)], "cubes": ear_l_cubes,
          **({"rotation": [0.0, 0.0, ear_tip]} if ear_tip else {})},
@@ -1002,6 +1006,19 @@ def _blink_curve(t, times, dur=0.18):
     return v
 
 
+def _sniff_puffs(t, bouts, rate=6.0, dur=0.11):
+    """How far into a sniff the nose is (0..1) at time t: bouts of quick puffs, each bout (start, puffs), rate a second."""
+    return _blink_curve(t, [b + k / rate for b, n in bouts for k in range(n)], dur=dur)
+
+
+def _set_nose(pose, puff, twitch=0.0):
+    """A sniff: the nose pad lifts a little and pushes forward, tipped up, its nostrils flaring wider (puff 0..1); twitch
+    (-1..1) wrinkles it side to side. Real noses work this way: a quick in-breath draws the nose up and the nostrils out."""
+    pose["nose"] = {"position": [0.25 * twitch, 0.38 * puff, -0.26 * puff],
+                    "rotation": [-10.0 * puff, 5.0 * twitch, 0.0],
+                    "scale": [1.0 + 0.22 * puff, 1.0 + 0.08 * puff, 1.0]}
+
+
 # --- 1. IDLE (3.60 s, loop) ------------------------------------------------------------------------------------------
 IDLE_LEN = 3.60
 
@@ -1232,6 +1249,7 @@ def _clip_forage_feel():
         }
         _set_lids(p, _blink_curve(t, (0.88,)))
         _set_whiskers(p, 7.0 * math.sin(6.0 * w), 7.0 * math.sin(6.0 * w))
+        _set_nose(p, _sniff_puffs(t, ((0.70, 3), (1.50, 2)), dur=0.13), 0.4 * (feel_l - feel_r))
         _set_ears(p, 4.0, 5.0)
         _set_tail(p, lambda i: 5.5 + 1.5 * math.sin(w - 0.4 * i), lambda i: (3.0 + i) * math.sin(w - 0.5 * i))
 
@@ -1246,7 +1264,7 @@ def _clip_forage_feel():
             _solve_leg(p, pref, y_sole, z_tgt, paw_world_pitch=8.0 * f_amp + 10.0 * pat, roll_z=s_out * -10.5)
         return p
 
-    return clip(L, at, 36, loop=True)
+    return clip(L, at, 72, loop=True)
 
 
 # --- 7. BITE (0.60 s, once — crisp hunting lunge & snap; hit on tick 6 = 0.30 s!) ------------------------------------
@@ -1618,7 +1636,7 @@ def _clip_sniff_walk():
         u = (t % L) / L
         w = 2.0 * math.pi * u
         sweep = math.sin(w)                       # nose swept left and right once a loop (the zigzag)
-        sniff = 0.5 + 0.5 * math.sin(w * 12.0)    # quick sniffs
+        sniff = _sniff_puffs(t, ((0.08, 4), (0.70, 3)))   # two bouts of quick sniffs a loop
         bob = -0.75 + 0.14 * math.cos(2.0 * w)
         p = {
             "body":  {"position": [0.0, bob, 0.0], "rotation": [2.5, 0.0, 0.3 * sweep]},
@@ -1631,8 +1649,9 @@ def _clip_sniff_walk():
             "jaw":   {"rotation": [0.6, 0.0, 0.0]},
         }
         _set_lids(p, 0.12 + _blink_curve(t, (0.55,)))
-        q = 3.5 * math.sin(w * 12.0)
+        q = 4.0 * sniff
         _set_whiskers(p, 13.0 + q, 13.0 + q)
+        _set_nose(p, sniff, 0.5 * math.sin(w * 3.0))
         _set_ears(p, 8.0, 5.0 * sweep)
         _set_tail(p, lambda i: 2.0 + 0.6 * math.sin(w - 0.4 * i),
                   lambda i: -(1.5 + 0.9 * i) * math.sin(w - 0.5 * i))
@@ -1643,7 +1662,7 @@ def _clip_sniff_walk():
                        roll_z=_leg_roll(pref, -11.0))
         return p
 
-    out = clip(L, at, 48, loop=True)
+    out = clip(L, at, 96, loop=True)
     out["timeline"] = {"0": f"stride {SNIFF_SPEED:.3f}"}
     return out
 
@@ -2284,6 +2303,8 @@ def face_pose(mood, t, face=True):
     _add_rot(p, "head", [0.75 * f["neck"] - f["nod"], 0.6 * look, f["tilt"]])
     if mood == "playful":
         _add_rot(p, "head", [-2.0 * math.sin(w * 2.0), 0.0, 0.0])
+    if mood == "curious":                                    # sniffing the air in little bouts, the nose working
+        _set_nose(p, _sniff_puffs(t, ((0.4, 3), (1.9, 4), (3.0, 2))), 0.6 * math.sin(w * 2.0))
     for pref in ("leg_fl", "leg_fr", "leg_bl", "leg_br"):
         wr = _rig()["legs"][pref]["w_rest"]
         lift = f["paw"] if pref == "leg_fl" else 0.0

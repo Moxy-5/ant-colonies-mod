@@ -2075,6 +2075,78 @@ public class RiverLifeTests {
     }
 
     /**
+     * The skitter (2026-11-22, plan otter-play-and-fish.md 6b): a curious otter on the bank goes in bursts: scurries, skid
+     * stops, looks or sniffs, hops round to a new heading; its scurry runs at about the scurry clip's stride (1.57 blocks a
+     * second) and its sniff at about the sniff clip's (0.59), so the feet do not slide. A calm one beside it only strolls.
+     */
+    @GameTest(template = "arena", timeoutTicks = 1200)
+    public static void aCuriousOtterSkittersInBurstsACalmOneStrolls(GameTestHelper helper) {
+        int poolX = MX0 + 16;
+        otterPool(helper, poolX);
+        com.antcolonies.savanna.animal.OtterEntity curious = skitterOtter(helper, MZ0 + 3.5, "mood.curious");
+        com.antcolonies.savanna.animal.OtterEntity calm = skitterOtter(helper, MZ0 + 8.5, "mood.calm");
+        java.util.Set<Byte> doings = new java.util.TreeSet<>(), gaits = new java.util.TreeSet<>(), calmGaits = new java.util.TreeSet<>();
+        double[] scurry = {0, 0}, sniff = {0, 0};      // blocks gone, ticks
+        float[] hopTurned = {0};
+        float[] lastYaw = {curious.getYRot()};
+        net.minecraft.world.phys.Vec3[] last = {curious.position()};
+        helper.onEachTick(() -> {
+            byte g = curious.gait();
+            doings.add(curious.doing());
+            gaits.add(g);
+            calmGaits.add(calm.gait());
+            if (calm.doing() != com.antcolonies.savanna.animal.OtterEntity.CALM) {
+                calmGaits.add((byte) (10 + calm.doing()));
+            }
+            double moved = curious.position().subtract(last[0]).horizontalDistance();
+            if (moved > 0.01 && curious.onGround()) {          // going, its route's start and end left in (a fair measure)
+                double[] into = g == com.antcolonies.savanna.animal.OtterEntity.SCURRY ? scurry
+                        : g == com.antcolonies.savanna.animal.OtterEntity.SNIFF ? sniff : null;
+                if (into != null) {
+                    into[0] += moved;
+                    into[1]++;
+                }
+            }
+            if (curious.doing() == com.antcolonies.savanna.animal.OtterEntity.HOP) {
+                hopTurned[0] += Math.abs(net.minecraft.util.Mth.wrapDegrees(curious.getYRot() - lastYaw[0]));
+            }
+            last[0] = curious.position();
+            lastYaw[0] = curious.getYRot();
+        });
+        helper.runAfterDelay(1100, () -> {
+            double scurryBps = scurry[1] > 0 ? scurry[0] / scurry[1] * 20.0 : 0.0, sniffBps = sniff[1] > 0 ? sniff[0] / sniff[1] * 20.0 : 0.0;
+            SavannaMod.LOGGER.info("[otter skitter] doings {} gaits {} scurry {} b/s over {} ticks, sniff {} b/s over {} ticks, "
+                    + "turned in hops {} deg; the calm one: {}", doings, gaits, String.format("%.2f", scurryBps), (int) scurry[1],
+                    String.format("%.2f", sniffBps), (int) sniff[1], (int) hopTurned[0], calmGaits);
+            helper.assertTrue(doings.contains(com.antcolonies.savanna.animal.OtterEntity.SKID)
+                    && doings.contains(com.antcolonies.savanna.animal.OtterEntity.HOP)
+                    && gaits.contains(com.antcolonies.savanna.animal.OtterEntity.SCURRY),
+                    "the curious otter did not skitter (doings " + doings + ", gaits " + gaits + ")");
+            helper.assertTrue(hopTurned[0] > 60.0F, "its hops turned it only " + hopTurned[0] + " degrees in all");
+            helper.assertTrue(scurryBps > 1.3 && scurryBps < 1.9, "it scurried at " + scurryBps + " blocks a second, the clip's stride is 1.57");
+            helper.assertTrue(sniff[1] == 0 || sniffBps > 0.4 && sniffBps < 0.8, "it sniffed along at " + sniffBps + " blocks a second, the clip's 0.59");
+            helper.assertTrue(calmGaits.equals(java.util.Set.of(com.antcolonies.savanna.animal.OtterEntity.EVEN)),
+                    "the calm otter skittered: " + calmGaits);
+            helper.succeed();
+        });
+    }
+
+    /** A grown otter on the bank, held in a mood by its tag, with only its land wandering left (no hunting, swims or rests). */
+    private static com.antcolonies.savanna.animal.OtterEntity skitterOtter(GameTestHelper helper, double z, String moodTag) {
+        com.antcolonies.savanna.animal.OtterEntity otter = helper.spawn(SavannaEntities.OTTER.get(),
+                new net.minecraft.world.phys.Vec3(MX0 + 7.5, TOP + 1, z));
+        otter.setPersistenceRequired();
+        otter.life().setUp(false, otter.getRandom());
+        otter.addTag(moodTag);
+        otter.restrictTo(BlockPos.containing(otter.position()), 6);
+        otter.goalSelector.removeAllGoals(g -> {
+            String n = g.getClass().getSimpleName();
+            return n.equals("SwimAboutGoal") || n.equals("HuntGoal") || n.equals("RestGoal");
+        });
+        return otter;
+    }
+
+    /**
      * The otter's hunt (step 2, 2026-11-22): a hungry otter on the bank by a pool with a crab on the bed in the shallow
      * corner and a barb in the deep: it catches one (feeling under the stones for the crab, or diving after the fish),
      * carries it out in its jaws, eats it on the bank and is full; a full otter leaves the other alone.

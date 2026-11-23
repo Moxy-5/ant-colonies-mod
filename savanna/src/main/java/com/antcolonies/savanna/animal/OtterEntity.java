@@ -76,7 +76,21 @@ import software.bernie.geckolib.util.GeckoLibUtil;
  */
 public class OtterEntity extends PathfinderMob implements GeoEntity, HasLife {
     /** What it is doing, for the clips. */
-    public static final byte CALM = 0, SHAKE = 1, REST = 2, REST_UP = 3, FORAGE = 4, BITE = 5, EAT = 6;
+    public static final byte CALM = 0, SHAKE = 1, REST = 2, REST_UP = 3, FORAGE = 4, BITE = 5, EAT = 6, SKID = 7, HOP = 8;
+    /**
+     * How it goes on land (the skitter, 2026-11-22; plan {@code docs/plans/otter-play-and-fish.md}, section 6b): the even
+     * walk, or the quick choppy scurry and the slow nose-down sniff of its burst-and-stop wandering ({@link SkitterGoal}).
+     */
+    public static final byte EVEN = 0, SCURRY = 1, SNIFF = 2;
+    private static final EntityDataAccessor<Byte> DATA_GAIT = SynchedEntityData.defineId(OtterEntity.class, EntityDataSerializers.BYTE);
+    /** The skid stop's and the hop turn's lengths (ticks), and the hop's feet off the ground (its ticks 3 to 7: it turns then). */
+    static final int SKID_TICKS = 8, HOP_TICKS = 10, HOP_UP = 3, HOP_DOWN = 7;
+    /**
+     * The skitter's speeds (shares of its speed attribute; my picks, measured in {@code RiverLifeTests}: about 1.6 and
+     * 0.6 blocks a second, the clips' own strides) and the clips' made speeds (blocks a tick at size 1).
+     */
+    public static final double SCURRY_GO = 0.66, SNIFF_GO = 0.40;
+    static final double SCURRY_CLIP_SPEED = 1.567 / 20.0, SNIFF_CLIP_SPEED = 0.593 / 20.0;
     private static final EntityDataAccessor<Byte> DATA_DOING = SynchedEntityData.defineId(OtterEntity.class, EntityDataSerializers.BYTE);
     private static final EntityDataAccessor<Boolean> DATA_DIVING = SynchedEntityData.defineId(OtterEntity.class, EntityDataSerializers.BOOLEAN);
     private static final EntityDataAccessor<CompoundTag> DATA_MOVE = SynchedEntityData.defineId(OtterEntity.class,
@@ -222,7 +236,13 @@ public class OtterEntity extends PathfinderMob implements GeoEntity, HasLife {
         goalSelector.addGoal(2, new HuntGoal(this));
         goalSelector.addGoal(2, new RestGoal(this));
         goalSelector.addGoal(3, new SwimAboutGoal(this));
-        goalSelector.addGoal(4, new RandomStrollGoal(this, STROLL, 100, false));
+        goalSelector.addGoal(4, new SkitterGoal(this));
+        goalSelector.addGoal(4, new RandomStrollGoal(this, STROLL, 100, false) {
+            @Override
+            public boolean canUse() {
+                return !skittery() && super.canUse();      // curious or playful, it skitters instead
+            }
+        });
     }
 
     @Override
@@ -238,6 +258,7 @@ public class OtterEntity extends PathfinderMob implements GeoEntity, HasLife {
         builder.define(DATA_DOING, CALM);
         builder.define(DATA_DIVING, false);
         builder.define(DATA_MOOD, CALM_MOOD);
+        builder.define(DATA_GAIT, EVEN);
     }
 
     public MoveRider rider() {
@@ -276,6 +297,21 @@ public class OtterEntity extends PathfinderMob implements GeoEntity, HasLife {
 
     public float ownSize() {
         return life.ownSize();
+    }
+
+    /** How it goes on land now ({@link #EVEN}, {@link #SCURRY} or {@link #SNIFF}). */
+    public byte gait() {
+        return entityData.get(DATA_GAIT);
+    }
+
+    void setGait(byte gait) {
+        entityData.set(DATA_GAIT, gait);
+    }
+
+    /** In the mood to skitter about (curious or playful: the burst-and-stop wandering instead of the even stroll). */
+    boolean skittery() {
+        byte m = mood();
+        return m == CURIOUS || m == PLAYFUL;
     }
 
     /** Its mood now (one of {@link #MOODS}). */
@@ -348,7 +384,10 @@ public class OtterEntity extends PathfinderMob implements GeoEntity, HasLife {
         scaredUntil = tickCount + ticks;
         if (doing() == REST) {
             setDoing(REST_UP);
+        } else if (doing() == SKID || doing() == HOP) {
+            setDoing(CALM);                                  // off at once
         }
+        setGait(EVEN);
     }
 
     /** Faces a place, body and head (a little at a time). */
@@ -428,7 +467,8 @@ public class OtterEntity extends PathfinderMob implements GeoEntity, HasLife {
         rider.hurry = scared() || leapForFun;
         byte d = doing();
         if (d == SHAKE && doingFor() >= SHAKE_TICKS || d == REST_UP && doingFor() >= REST_UP_TICKS
-                || d == BITE && doingFor() >= BITE_TICKS) {
+                || d == BITE && doingFor() >= BITE_TICKS || d == SKID && doingFor() >= SKID_TICKS
+                || d == HOP && doingFor() >= HOP_TICKS) {
             setDoing(CALM);
         }
         if (isInWater()) {
@@ -1222,6 +1262,188 @@ public class OtterEntity extends PathfinderMob implements GeoEntity, HasLife {
      * one time in three; now and then, after a while in the water, out onto a bank again. Going in from a bank it slides in
      * calmly, or one time in three takes the leaping dive for the fun of it.
      */
+    /**
+     * The skitter (2026-11-22; plan {@code docs/plans/otter-play-and-fish.md}, section 6b): curious or playful on land,
+     * a real otter does not stroll evenly but scurries in short bursts. A dash of 1 to 3 blocks, a skid stop with the head
+     * coming up, then a look about (standing, its mood's stance) or a short nose-down sniff, then a hop round to a new
+     * heading 30 to 90 degrees off (a smaller turn now and then without the hop), and the next dash; 3 to 6 bursts. All
+     * numbers my picks. It keeps within the water it last swam in, as the stroll does.
+     */
+    static class SkitterGoal extends Goal {
+        private enum Phase { DASH, SKID, LOOK, SNIFF, HOP }
+        private final OtterEntity otter;
+        private Phase phase = Phase.DASH;
+        private int left, bursts;
+        /** The hop's whole turn (degrees), shared out over its feet-off-the-ground ticks. */
+        private float turn;
+        /** Where its dash or sniff goes. */
+        private double toX, toZ;
+
+        SkitterGoal(OtterEntity otter) {
+            this.otter = otter;
+            setFlags(EnumSet.of(Flag.MOVE));
+        }
+
+        private boolean free() {
+            return !otter.isInWater() && otter.onGround() && !otter.scared() && otter.rider.play() == null
+                    && otter.held == null && !otter.isDeadOrDying();
+        }
+
+        @Override
+        public boolean canUse() {
+            return otter.skittery() && otter.doing() == CALM && free() && otter.random.nextInt(20) == 0;
+        }
+
+        /** Every tick (Minecraft steps a goal every other tick by default: its pauses ran twice as long, the hop half turned). */
+        @Override
+        public boolean requiresUpdateEveryTick() {
+            return true;
+        }
+
+        @Override
+        public void start() {
+            bursts = 3 + otter.random.nextInt(4);
+            if (!dash(otter.random.nextInt(3) == 0 ? (otter.random.nextFloat() - 0.5F) * 120.0F : 0.0F)) {
+                hop();
+            }
+        }
+
+        @Override
+        public boolean canContinueToUse() {
+            byte d = otter.doing();
+            return bursts > 0 && free() && (d == CALM || d == SKID || d == HOP);
+        }
+
+        @Override
+        public void stop() {
+            halt();
+            if (otter.doing() == SKID || otter.doing() == HOP) {
+                otter.setDoing(CALM);
+            }
+        }
+
+        /** A dash 1 to 3 blocks, this many degrees off its heading; false if there is no way there. */
+        private boolean dash(float off) {
+            for (int i = 0; i < 6; i++) {
+                float wander = i == 0 ? 0.0F : (otter.random.nextFloat() - 0.5F) * 40.0F * i;
+                float yaw = (otter.getYRot() + off + wander) * Mth.DEG_TO_RAD;
+                double d = 1.2 + otter.random.nextDouble() * 1.8;
+                double x = otter.getX() - Mth.sin(yaw) * d, z = otter.getZ() + Mth.cos(yaw) * d;
+                if (goStraight(x, z, SCURRY_GO, 40)) {
+                    otter.setGait(SCURRY);
+                    phase = Phase.DASH;
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        /**
+         * Goes straight at a spot this near, no route (a route of a block or two counts as done before it takes a step: the
+         * test, 2026-11-22), if the way is level dry ground in reach of its water; for at most this many ticks.
+         */
+        private boolean goStraight(double x, double z, double speed, int ticks) {
+            Level level = otter.level();
+            for (double f = 0.34; f <= 1.0; f += 0.33) {
+                BlockPos at = BlockPos.containing(Mth.lerp(f, otter.getX(), x), otter.getY(), Mth.lerp(f, otter.getZ(), z));
+                if (otter.hasRestriction() && !otter.isWithinRestriction(at) || !level.getFluidState(at).isEmpty()
+                        || !level.getFluidState(at.below()).isEmpty() || !level.getBlockState(at).getCollisionShape(level, at).isEmpty()
+                        || !level.getBlockState(at.below()).isFaceSturdy(level, at.below(), net.minecraft.core.Direction.UP)) {
+                    return false;
+                }
+            }
+            otter.getNavigation().stop();
+            otter.getMoveControl().setWantedPosition(x, otter.getY(), z, speed);
+            otter.straightFor = ticks;
+            left = ticks;
+            toX = x;
+            toZ = z;
+            return true;
+        }
+
+        /** Got there, or out of time, or against something. */
+        private boolean arrived() {
+            double dx = toX - otter.getX(), dz = toZ - otter.getZ();
+            return dx * dx + dz * dz < 0.09 || --left <= 0 || otter.horizontalCollision;
+        }
+
+        private void halt() {
+            otter.straightFor = 0;
+            otter.getNavigation().stop();
+            otter.getMoveControl().setWantedPosition(otter.getX(), otter.getY(), otter.getZ(), 0.0);
+            otter.setZza(0.0F);
+            otter.setGait(EVEN);
+        }
+
+        /** Turns to a new heading with a little hop. */
+        private void hop() {
+            turn = (otter.random.nextBoolean() ? 1 : -1) * (30.0F + otter.random.nextFloat() * 60.0F);
+            halt();
+            otter.setDoing(HOP);
+            phase = Phase.HOP;
+            bursts--;
+        }
+
+        /** A short slow sniff along, nose down, a block or so ahead; false if there is no way. */
+        private boolean sniff() {
+            float yaw = (otter.getYRot() + (otter.random.nextFloat() - 0.5F) * 60.0F) * Mth.DEG_TO_RAD;
+            double d = 1.0 + otter.random.nextDouble() * 1.0;
+            double x = otter.getX() - Mth.sin(yaw) * d, z = otter.getZ() + Mth.cos(yaw) * d;
+            if (!goStraight(x, z, SNIFF_GO, 60)) {
+                return false;
+            }
+            otter.setGait(SNIFF);
+            return true;
+        }
+
+        @Override
+        public void tick() {
+            switch (phase) {
+                case DASH -> {
+                    if (arrived()) {
+                        halt();
+                        otter.setDoing(SKID);                    // braced on its front paws, head coming up
+                        phase = Phase.SKID;
+                    }
+                }
+                case SKID -> {
+                    if (otter.doing() == CALM) {
+                        if (otter.random.nextFloat() < 0.45F && sniff()) {
+                            phase = Phase.SNIFF;
+                        } else {
+                            phase = Phase.LOOK;                  // stands and looks about: its mood's stance
+                            left = 10 + otter.random.nextInt(31);
+                        }
+                    }
+                }
+                case LOOK, SNIFF -> {
+                    if (phase == Phase.SNIFF ? arrived() : --left <= 0) {
+                        halt();
+                        if (otter.random.nextInt(3) == 0) {
+                            bursts--;                            // a small turn without the hop: the dash turns it
+                            if (bursts > 0 && !dash((otter.random.nextFloat() - 0.5F) * 50.0F)) {
+                                hop();
+                            }
+                        } else {
+                            hop();
+                        }
+                    }
+                }
+                case HOP -> {
+                    int t = otter.doingFor();
+                    if (otter.doing() == HOP && t >= HOP_UP && t < HOP_DOWN) {
+                        float yaw = otter.getYRot() + turn / (HOP_DOWN - HOP_UP);   // turned while its feet are up
+                        otter.setYRot(yaw);
+                        otter.yBodyRot = yaw;
+                        otter.yHeadRot = yaw;
+                    } else if (otter.doing() == CALM && bursts > 0 && !dash(0.0F)) {
+                        hop();
+                    }
+                }
+            }
+        }
+    }
+
     static class SwimAboutGoal extends Goal {
         private final OtterEntity otter;
         private boolean dive, out;
@@ -1296,6 +1518,10 @@ public class OtterEntity extends PathfinderMob implements GeoEntity, HasLife {
     private static final RawAnimation FORAGE_CLIP = RawAnimation.begin().thenLoop("forage_feel");
     private static final RawAnimation BITE_CLIP = RawAnimation.begin().thenPlayAndHold("bite");
     private static final RawAnimation EAT_CLIP = RawAnimation.begin().thenLoop("eat");
+    private static final RawAnimation SCURRY_CLIP = RawAnimation.begin().thenLoop("scurry");
+    private static final RawAnimation SNIFF_CLIP = RawAnimation.begin().thenLoop("sniff_walk");
+    private static final RawAnimation SKID_CLIP = RawAnimation.begin().thenPlayAndHold("skid_stop");
+    private static final RawAnimation HOP_CLIP = RawAnimation.begin().thenPlayAndHold("hop_turn");
 
     @Override
     public void registerControllers(AnimatableManager.ControllerRegistrar controllers) {
@@ -1340,6 +1566,10 @@ public class OtterEntity extends PathfinderMob implements GeoEntity, HasLife {
                 return state.setAndContinue(BITE_CLIP);
             case EAT:
                 return state.setAndContinue(EAT_CLIP);
+            case SKID:
+                return state.setAndContinue(SKID_CLIP);
+            case HOP:
+                return state.setAndContinue(HOP_CLIP);
             default:
                 break;
         }
@@ -1353,6 +1583,15 @@ public class OtterEntity extends PathfinderMob implements GeoEntity, HasLife {
             return state.setAndContinue(SWIM);
         }
         if (going()) {
+            byte gait = gait();
+            if (gait == SCURRY) {
+                player.setAnimationSpeed(Mth.clamp(stride / (SCURRY_CLIP_SPEED * size), 0.5, 2.0));
+                return state.setAndContinue(SCURRY_CLIP);
+            }
+            if (gait == SNIFF) {
+                player.setAnimationSpeed(Mth.clamp(stride / (SNIFF_CLIP_SPEED * size), 0.5, 2.0));
+                return state.setAndContinue(SNIFF_CLIP);
+            }
             if (stride > BOUND_DRAWN * size) {
                 player.setAnimationSpeed(Mth.clamp(stride / (BOUND_CLIP_SPEED * size), 0.6, 2.6));
                 return state.setAndContinue(BOUND_CLIP);

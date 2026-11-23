@@ -608,3 +608,4 @@ Every "Current status" bullet CLAUDE.md held up to 2026-11-19, word for word, ol
 - 2026-11-22, the distichodus's back fin no longer comes off its back in the clips (folds and rises on a base that stays put); clips waiting for the user's look.
 - 2026-11-22, the monitor eases into the water: legs hang until it is fully in, drift 2 s still swinging, then fold into the swim over 2 s (every way in; the user: "they look perfect"; BUGS 289).
 - 2026-11-22, the otter's skitter clips: scurry, skid_stop, sniff_walk and hop_turn made, checked offline and filmed in the game; on the versions page, not played by the game yet (next: the burst-and-stop wandering after the user's look).
+- 2026-11-22, the otter skitters in the game: curious or playful on land it scurries in bursts, skid-stops, looks or sniffs nose down, hop-turns; its nose has its own bone and sniffs in quick puffs (the user's ask).

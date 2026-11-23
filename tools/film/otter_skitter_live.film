@@ -1,0 +1,41 @@
+# The otter's skitter in the game (2026-11-22, docs/plans/otter-play-and-fish.md section 6b): a grown otter held curious
+# (its tag "mood.curious") left to its own goals on open grass, filmed from a fixed camera, the game stepped through
+# about 8 seconds: its bursts (scurry), skid stops, looks or sniffs and hop turns. Then its nose sniffing, close up from the
+# front: an otter playing sniff_walk in place, and one standing curious (its stance sniffs the air).
+#   ./gradlew runFilm -PfilmScene=tools/film/otter_skitter_live.film   pictures in run-film/screenshots/otter_skitter_live/
+cmd time set noon
+cmd weather clear
+cmd kill @e[type=!player]
+cmd fill 0 -61 0 40 -50 34 minecraft:air
+cmd fill 0 -61 0 40 -61 34 minecraft:grass_block
+lens 50
+wait 40
+cmd summon antcolonies:otter 20.5 -60 17.0 {PersistenceRequired:1b,Rotation:[90f,0f],OwnSize:1.0f,Tags:["mood.curious"]}
+camera 20.0 -57.0 12.0 0 32
+wait 60
+cmd tick freeze
+burst live 80 1
+cmd tick unfreeze
+camera 15.0 -58.6 17.0 -90 18
+wait 20
+cmd tick freeze
+burst side 60 1
+cmd tick unfreeze
+cmd kill @e[type=antcolonies:otter]
+wait 20
+cmd summon antcolonies:otter 20.5 -60 17.0 {NoAI:1b,Rotation:[90f,0f],OwnSize:1.0f,CustomName:'"film:sniff_walk"'}
+camera 17.2 -61.25 17.0 -90 0
+lens 30
+wait 30
+cmd tick freeze
+burst nose_sniff 24 1
+cmd tick unfreeze
+cmd kill @e[type=antcolonies:otter]
+wait 20
+cmd summon antcolonies:otter 20.5 -60 17.0 {NoAI:1b,Rotation:[90f,0f],OwnSize:1.0f,CustomName:'"mood:curious"'}
+camera 18.0 -60.6 17.0 -90 4
+wait 30
+cmd tick freeze
+burst nose_curious 36 1
+cmd tick unfreeze
+quit
