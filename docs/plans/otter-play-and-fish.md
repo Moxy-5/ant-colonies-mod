@@ -324,3 +324,40 @@ times its size) behind the runner's middle. Not played by the game yet. The game
   tags, 10 to 30 seconds.
 - **The chase in water:** both swim at the surface; going fast in water two blocks deep or more, each porpoises now and
   then (every 1.5 to 3 s, my pick), splashes at each leap and landing; the tag is a nip when the chaser draws level.
+
+### 6f. The noodle bound (planned 2026-11-23, no code yet)
+
+The user, 2026-11-23: "you know how otters jump when they skimper like a little noodle going up and down, we can make the
+animation happen fast enough where it looks natural". The real gait: otters, like all weasels, run in a **bound**. The
+back is the spring. The hind feet land right behind the front feet and the back humps up high (the noodle up), then the
+hind legs push, the front legs reach far ahead and the back stretches long and flat (the noodle long), a short flight,
+front feet down, again. The head stays nearly level while the back rolls under it, and the tail follows a beat late.
+
+**Why today's bound does not look like that (measured on the clip):** it is a flat lope. The back bends only 6 to 10
+degrees at each joint and the body bobs 0.26 px. And it is too slow: one stride takes 0.6 s at 2 blocks a second, and the
+game slows the clip with the otter's speed down to 0.75x, so a bound just fast enough to start (1.5 blocks a second)
+takes 0.8 s a stride, slow enough to read as a crawl.
+
+**The plan (my picks, fun first):**
+- **One new pose maker for the bound**, two clips from it: `bound` remade as the noodle bound (fleeing, hunting, chases),
+  and `play_bound`, the same gait bouncier (a higher hump, a real hop in the air, the play face, tail up) when the otter
+  is playful or excited. The game picks by the mood it already has.
+- **The four beats of a stride:** front feet down one after the other (a half-bound: the front pair a little apart in
+  time, the hind pair together); gather (hind feet land just behind the front prints, the back humps up about 30 degrees
+  over its length, hips tucked); push and reach (the back flattens and stretches, the chest and head go long); flight
+  (everything long, all feet up for a moment at speed).
+- **Fast enough to look natural:** about 2.5 strides a second at the bound's 2 blocks a second (0.40 s a stride, was 0.60),
+  so each stride covers 0.8 blocks. The hump does the work, not the reach: hind feet landing near the front feet make the
+  strides short anyway. The game's slow-down limit kept so a stride never takes longer than about 0.5 s; under 1.5 blocks a
+  second it walks or scurries, as now.
+- **The head stays steady:** the neck takes back most of the body's rise and pitch, so the head travels in a near-flat
+  line (real animals steady the head; it is also what makes the back's roll read as a noodle).
+- **The tail as a whip:** each tail piece follows the back's wave a little later, so the wave runs out to the tip.
+- **Fits the blocks:** the hump adds about 4 px (a quarter block) at the top of the back, still under a block; the drawn
+  body shortens and lengthens about a sixth, round the shoulders, so the head does not slide back and forth.
+- **Checks (the hard rule):** `clip_check.py otter bound play_bound --switches` (no foot sliding at the measured speed,
+  the blends with walk, scurry, skid stop, pounce tag and the leaping dive), then filmed in the game standing (three
+  sides) and running (a live film beside a block row, so the speed against the ground shows), and the phone page for the
+  user before the game uses it.
+
+Order: build it before wiring the chase and tag, since the chase is mostly bounding.
