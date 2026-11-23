@@ -173,9 +173,6 @@ public class MonitorEntity extends PathfinderMob implements GeoEntity, HasLife {
             "tail5", "tail6", "tail7", "tail8", "tail9", "tail10", "tail11", "tail12"};
     /** Where each leg pair's feet stand along the body (model z, pixels): the forelegs, then the hind legs. */
     public static final double[] LEG_PAIRS = {-25, -3};
-    /** How much each leg pair stands now (1) or is folded back along the body as it swims (0), eased; drawing only (MonitorModel). */
-    public final double[] legStand = {1, 1};
-    public long legNanos;
     /** How many ticks still it may stand before its walk stops (my pick: 0.15 s); the last tick it moved; how far a tick, eased. */
     static final int WALK_HOLD = 3;
     private int movedTick = -100;
@@ -198,12 +195,6 @@ public class MonitorEntity extends PathfinderMob implements GeoEntity, HasLife {
             TAIL_LOWEST[i] = 4.6 + (0.6 - 4.6) * (i + 1) / TAIL_LOWEST.length + 0.25;
         }
     }
-    /**
-     * Both leg pairs are folded this far (stand under this) before the swim clip plays (2026-11-18, the user's report: going
-     * into the water the hind legs swung up over the back for a moment). Until then the walk or idle clip plays and the
-     * model folds each pair itself as its feet lose the ground, so the clip never switches under a leg still on the bank.
-     */
-    public static final double FOLDED = 0.05;
     /**
      * The front half is three pieces (waist, ribs, chest: the first {@link #TRUNK_PIECES} of {@link #BENT_BONES}), each
      * bending at most {@link #TRUNK_BEND} degrees against the one behind (my picks, 2026-11-18, the user's reports: one
@@ -421,12 +412,19 @@ public class MonitorEntity extends PathfinderMob implements GeoEntity, HasLife {
         if (path == null || path.isDone()) {
             return false;
         }
-        int floor = Mth.floor(getY() + 1.0E-3);
+        int floor = Mth.floor(getY() + 0.4);
         int last = Math.min(path.getNodeCount() - 2, path.getNextNodeIndex() + 3);
         for (int i = Math.max(0, path.getNextNodeIndex() - 1); i <= last; i++) {
             Node a = path.getNode(i), b = path.getNode(i + 1);
             int dx = b.x - a.x, dz = b.z - a.z;
             if (Math.abs(dx) + Math.abs(dz) != 1) {
+                if (!afloat && Math.abs(dx) == 1 && Math.abs(dz) == 1 && a.y == floor && intoWater(b, floor) >= 0) {
+                    BlockMoves.Play diag = diagonalIntoWater(a, b, dx, dz, floor);
+                    if (diag != null) {
+                        entityData.set(DATA_CLIMB, diag.save());
+                        return true;
+                    }
+                }
                 continue;
             }
             int move = afloat ? outOf(a, b) : a.y == floor ? intoWater(b, floor) : -1;
@@ -450,6 +448,39 @@ public class MonitorEntity extends PathfinderMob implements GeoEntity, HasLife {
             return false;
         }
         return afloat && outPastRoute(path);
+    }
+
+    /** Resolves a diagonal bank-to-water path step onto a cardinal bank edge so the water-entry move plays. */
+    @Nullable
+    private BlockMoves.Play diagonalIntoWater(Node a, Node b, int dx, int dz, int floor) {
+        Node wx = new Node(a.x + dx, a.y, a.z), wz = new Node(a.x, a.y, a.z + dz);
+        int mx = intoWater(wx, floor);
+        if (mx >= 0) {
+            BlockMoves.Play c = climbAt(a, wx, dx, 0, mx);
+            if (c != null) {
+                return c;
+            }
+        }
+        int mz = intoWater(wz, floor);
+        if (mz >= 0) {
+            BlockMoves.Play c = climbAt(a, wz, 0, dz, mz);
+            if (c != null) {
+                return c;
+            }
+        }
+        int mb = intoWater(b, floor);
+        if (mb >= 0) {
+            if (solidGround(new BlockPos(wx.x, floor - 1, wx.z))) {
+                BlockMoves.Play c = climbAt(wx, b, 0, dz, mb);
+                if (c != null) {
+                    return c;
+                }
+            }
+            if (solidGround(new BlockPos(wz.x, floor - 1, wz.z))) {
+                return climbAt(wz, b, dx, 0, mb);
+            }
+        }
+        return null;
     }
 
     /**
@@ -492,8 +523,8 @@ public class MonitorEntity extends PathfinderMob implements GeoEntity, HasLife {
         for (int down = 1; down <= 3; down++) {
             BlockPos at = new BlockPos(b.x, floor - down, b.z);
             if (level().getFluidState(at).is(FluidTags.WATER)) {
-                if (!level().getFluidState(at.above()).isEmpty() || level().getFluidState(at).getAmount() < 8) {
-                    return -1;               // a slope of flowing water, or water over its block: not a bank's edge
+                if (!level().getFluidState(at.above()).isEmpty() || level().getFluidState(at).getAmount() < 6) {
+                    return -1;               // a shallow spill or water over its block: not a bank's edge
                 }
                 if (down == 1) {
                     // (its eased step from tick(): here, before this tick's move, getX() - xo was always 0 and a
@@ -531,10 +562,10 @@ public class MonitorEntity extends PathfinderMob implements GeoEntity, HasLife {
         return level().getFluidState(p).getAmount() < 8 ? Integer.MIN_VALUE : p.getY() + 1;
     }
 
-    /** Whether node b stands on a whole dry block with open air over it. */
+    /** Whether node b stands on sturdy dry ground with open air over it. */
     private boolean dryStand(Node b) {
         BlockPos at = new BlockPos(b.x, b.y, b.z);
-        return dryOpen(at) && level().getBlockState(at.below()).isCollisionShapeFullBlock(level(), at.below());
+        return dryOpen(at) && solidGround(at.below());
     }
 
     /**
@@ -549,8 +580,18 @@ public class MonitorEntity extends PathfinderMob implements GeoEntity, HasLife {
         int sign = dx + dz;
         double face = dx != 0 ? (dx > 0 ? a.x + 1 : a.x) : (dz > 0 ? a.z + 1 : a.z);
         double dist = (face - (dx != 0 ? getX() : getZ())) * sign;
+        boolean entering = MOVES.move(move).endsAfloat;
+        double minDist = entering ? back - 0.6 : back - 0.4;
+        double maxDist = entering ? back + 0.2 : back + 0.1;
+        if (move == IN && dist < minDist && dist >= 0.5) {
+            // started close to the water's edge (e.g., basking right by the bank): use the shorter level entry instead
+            move = DASH;
+            back = MOVES.move(move).aheadPx * scale / 16.0;
+            minDist = 0.5;
+            maxDist = back + 0.25;
+        }
         // not there yet, or come too close to fit the move (a route turning up the step right at it: the old step)
-        if (dist > back + 0.1 || dist < back - 0.4) {
+        if (dist > maxDist || dist < minDist) {
             return null;
         }
         float yaw = (float) Math.toDegrees(Math.atan2(dz, dx)) - 90.0F;
@@ -559,7 +600,7 @@ public class MonitorEntity extends PathfinderMob implements GeoEntity, HasLife {
             return null;
         }
         boolean afloat = MOVES.move(move).startsAfloat;
-        int level = afloat ? waterTop() : Mth.floor(getY() + 1.0E-3);
+        int level = afloat ? waterTop() : Mth.floor(getY() + 0.4);
         if (afloat) {
             // afloat at its resting depth (the float holds it there), not diving or still sinking in
             double want = level - 1.0 / 9.0 - AFLOAT * getScale();
@@ -568,12 +609,14 @@ public class MonitorEntity extends PathfinderMob implements GeoEntity, HasLife {
             }
         }
         // its feet on the top (or the lower ground, or the water): where it goes, else slid sideways to the middle of
-        // the column (half a block at most)
+        // the column
         double side = dx != 0 ? getZ() : getX(), middle = (dx != 0 ? b.z : b.x) + 0.5;
+        double maxSnap = entering ? 0.65 : 0.5;
         for (double across : new double[] {side, middle}) {
-            if (Math.abs(across - side) <= 0.5 && room(move, level, dx != 0, face, sign, across, scale)) {
+            if (Math.abs(across - side) <= maxSnap && room(move, level, dx != 0, face, sign, across, scale)) {
                 double along = face - back * sign;
-                return MOVES.start(this, move, dx != 0 ? along : across, afloat ? level : getY(), dx != 0 ? across : along, yaw, turn);
+                double startY = afloat || entering ? level : getY();
+                return MOVES.start(this, move, dx != 0 ? along : across, startY, dx != 0 ? across : along, yaw, turn);
             }
         }
         return null;
@@ -644,31 +687,38 @@ public class MonitorEntity extends PathfinderMob implements GeoEntity, HasLife {
     }
 
     /**
-     * Going into the water off the bank at {@code face} (its top at {@code y}): the bank under both forefeet a whole
-     * block (walking in, all the way back to where the move starts), and past the edge for two blocks, under both feet and the middle, still water at its height for the move
-     * (the water's block's top level with the bank, or one or two blocks lower) with open air over it up to over the bank.
+     * Going into the water off the bank at {@code face} (its top at {@code y}): sturdy bank ground (including river mud)
+     * at the lip with open space along the approach, water for two blocks ahead along the centerline (plants in or over
+     * the water count as open), and no solid walls right beside the body.
      */
     private boolean roomToEnter(int move, int y, boolean alongX, double face, int sign, double across, double scale) {
-        double out = CLIMB_FEET_OUT * scale / 16.0;
         int drop = move == DROP ? 1 : move == DROP2 ? 2 : 0;
-        // walking in, it walks on along the bank from its start, about two blocks back from the edge (2026-11-22):
-        // the bank level and whole for all of it; the other moves start at the edge
+        BlockPos lip = climbCell(alongX, face - 0.5 * sign, across, y - 1);
+        if (!solidGround(lip) || !dryOpen(lip.above())) {
+            return false;
+        }
         double back = move == IN ? MOVES.move(move).aheadPx * scale / 16.0 : 0.5;
-        for (double side : new double[] {across - out, across, across + out}) {
-            for (double behind = 0.5; behind < back + 0.5; behind += 1.0) {
-                BlockPos top = climbCell(alongX, face - behind * sign, side, y - 1);
-                if (!level().getBlockState(top).isCollisionShapeFullBlock(level(), top) || !dryOpen(top.above())) {
+        for (double behind = 1.5; behind < back + 0.5; behind += 1.0) {
+            if (!open(climbCell(alongX, face - behind * sign, across, y))) {
+                return false;
+            }
+        }
+        double half = 0.35 * getScale();
+        for (double ahead : new double[] {0.5, 1.5}) {
+            BlockPos water = climbCell(alongX, face + ahead * sign, across, y - 1 - drop);
+            if (!level().getFluidState(water).is(FluidTags.WATER) || level().getFluidState(water).getAmount() < 6
+                    || !open(water)) {
+                return false;
+            }
+            for (int up = 1; up <= drop + 1; up++) {
+                if (!dryOpen(water.above(up))) {
                     return false;
                 }
             }
-            for (double ahead : new double[] {0.5, 1.5}) {
-                BlockPos water = climbCell(alongX, face + ahead * sign, side, y - 1 - drop);
-                if (!level().getFluidState(water).is(FluidTags.WATER) || level().getFluidState(water).getAmount() < 8
-                        || !open(water)) {
-                    return false;
-                }
+            for (double side : new double[] {across - half, across + half}) {
+                BlockPos sideWater = climbCell(alongX, face + ahead * sign, side, y - 1 - drop);
                 for (int up = 1; up <= drop + 1; up++) {
-                    if (!dryOpen(water.above(up))) {
+                    if (!open(sideWater.above(up))) {
                         return false;
                     }
                 }
@@ -709,12 +759,19 @@ public class MonitorEntity extends PathfinderMob implements GeoEntity, HasLife {
         return open(pos) && level().getFluidState(pos).isEmpty();
     }
 
+    private boolean solidGround(BlockPos pos) {
+        return level().getBlockState(pos).isFaceSturdy(level(), pos, net.minecraft.core.Direction.UP);
+    }
+
     private static BlockPos climbCell(boolean alongX, double along, double across, int y) {
         return alongX ? new BlockPos(Mth.floor(along), y, Mth.floor(across)) : new BlockPos(Mth.floor(across), y, Mth.floor(along));
     }
 
     private boolean open(BlockPos pos) {
-        return level().getBlockState(pos).getCollisionShape(level(), pos).isEmpty();
+        net.minecraft.world.level.block.state.BlockState state = level().getBlockState(pos);
+        return state.getCollisionShape(level(), pos).isEmpty()
+                || state.is(net.minecraft.tags.BlockTags.REPLACEABLE)
+                || state.getBlock() instanceof net.minecraft.world.level.block.BushBlock;
     }
 
     /**
@@ -1629,11 +1686,10 @@ public class MonitorEntity extends PathfinderMob implements GeoEntity, HasLife {
     }
 
     /**
-     * Whether the swim clip plays (drawing only): afloat, with both leg pairs folded ({@link #FOLDED}). The model eases
-     * {@link #legStand} by each pair's own footing, and sets it straight from "afloat" when drawn too far to bend.
+     * Whether the swim clip plays (drawing only): afloat. Water entry and leg folding are handled by the water-entry moves.
      */
     public boolean swimClip() {
-        return isInWater() && !onGround() && legStand[0] < FOLDED && legStand[1] < FOLDED;
+        return isInWater() && !onGround();
     }
 
     /**

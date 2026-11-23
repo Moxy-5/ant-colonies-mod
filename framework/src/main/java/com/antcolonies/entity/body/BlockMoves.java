@@ -394,7 +394,7 @@ public final class BlockMoves {
             return Step.DONE;
         }
         if (mob.isDeadOrDying() || !water && mob.isInWater()
-                || !mob.level().getBlockState(step).isCollisionShapeFullBlock(mob.level(), step)) {
+                || !mob.level().getBlockState(step).isFaceSturdy(mob.level(), step, net.minecraft.core.Direction.UP)) {
             cut(mob);
             return Step.CUT;
         }

@@ -14,7 +14,6 @@ import net.minecraft.util.Mth;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.phys.Vec3;
 import software.bernie.geckolib.animation.AnimationState;
-import software.bernie.geckolib.animation.state.BoneSnapshot;
 import software.bernie.geckolib.cache.object.GeoBone;
 import software.bernie.geckolib.model.DefaultedEntityGeoModel;
 
@@ -22,7 +21,6 @@ import java.util.function.Function;
 
 import org.joml.Matrix4f;
 import org.joml.Vector3d;
-import org.joml.Quaternionf;
 import org.joml.Vector3f;
 
 /**
@@ -74,14 +72,6 @@ public class MonitorModel extends DefaultedEntityGeoModel<MonitorEntity> {
     private static final String[] TURNING = {"neck1", "neck2", "head"};
     private static final double[] SHARE = {0.4, 0.3, 0.3};
 
-    /** How quickly a leg pair folds or stands (seconds; my pick). */
-    private static final double LEG_EASE = 0.2;
-    /**
-     * How far under the body's own height a pair's feet still reach the ground, and how deep water they still wade in
-     * (blocks, at size 1; my picks). The reach is more than a block, so a pair stepping down off a block stands on (its
-     * legs fold back only over deep water, never over a drop on land, where folded forelegs stuck up like spikes).
-     */
-    private static final double REACH = 1.3, WADE = 0.4;
     /** How far a standing leg reaches down, or draws up, to keep its foot on the ground as the body bends (model pixels; my pick). */
     private static final double PLANT = 4.0;
     /** How far out from the middle line each pair's feet stand (model pixels; from the leg plans). */
@@ -90,18 +80,9 @@ public class MonitorModel extends DefaultedEntityGeoModel<MonitorEntity> {
     private static final double PIVOT_Y = 11.0, PIVOT_Z = -13.0;
     /** The body boxes' top and bottom (model pixels): the chest turns on the joint's outer edge, one or the other. */
     private static final double BODY_TOP = 16.0, BODY_BOTTOM = 5.0;
-    /**
-     * The swim clip's legs folded back along the body (degrees, the left side as the clip file has them: upper, lower,
-     * foot; the right side mirrors y and z), for a pair whose feet lose the ground while the rest still walks. From
-     * {@code tools/monitor_models.py} (swim B, the hind feet held out wide); kept in step with it by hand.
-     */
-    private static final double[][][] FOLD = {
-            {{-16.981, -61.241, 1.022}, {121.979, 45.687, 27.192}, {-107.544, -55.625, 158.836}},
-            {{56.749, -52.764, -1.292}, {0.0, 0.0, 19.231}, {-56.661, 24.419, -131.013}}};
-    private static final String[] PIECES = {"upper", "lower", "foot"};
-    /** The tail, base to tip, dragged ({@link TailDrag}). */
     /** How quickly the drawing slides from its box onto the climb's path, or back (seconds; my pick). */
     private static final double HAND_OVER = 0.12;
+    /** The tail, base to tip, dragged ({@link TailDrag}). */
     private static final DraggedTail TAIL = new DraggedTail("tail1", "tail2", "tail3", "tail4", "tail5", "tail6", "tail7",
             "tail8", "tail9", "tail10", "tail11", "tail12");
 
@@ -129,10 +110,6 @@ public class MonitorModel extends DefaultedEntityGeoModel<MonitorEntity> {
         if (camera.distanceToSqr(x, y, z) > NEAR * NEAR) {
             monitor.lookNanos = 0;
             monitor.headAim = 0;
-            monitor.legNanos = 0;
-            double afloat = monitor.isInWater() && !monitor.onGround() ? 0 : 1;
-            monitor.legStand[0] = afloat;
-            monitor.legStand[1] = afloat;
             monitor.drawnNanos = 0;
             return;
         }
@@ -170,13 +147,9 @@ public class MonitorModel extends DefaultedEntityGeoModel<MonitorEntity> {
             }
         }
         byte doing = monitor.doing();
-        if (!monitor.isDeadOrDying() && !moving && (doing == MonitorEntity.CALM || doing == MonitorEntity.WATCH)) {
-            legs(monitor, bend, scale, x, y, z, yaw);
-        } else if (moving) {                 // a move's clip has the legs: as it ends, folded afloat or standing on land
-            double end = MonitorEntity.MOVES.move(climb.move()).endsAfloat ? 0.0 : 1.0;
-            monitor.legStand[0] = end;
-            monitor.legStand[1] = end;
-            monitor.legNanos = 0;
+        if (!monitor.isDeadOrDying() && !moving && !monitor.isInWater()
+                && (doing == MonitorEntity.CALM || doing == MonitorEntity.WATCH)) {
+            plantLegs(monitor, bend, scale, x, y, z, yaw);
         }
         Vector3d moved = place(monitor, climb, scale, x, y, z, yaw);
         tail(monitor, bend, climb, moved, scale, x, y, z, yaw);
@@ -267,53 +240,15 @@ public class MonitorModel extends DefaultedEntityGeoModel<MonitorEntity> {
     }
 
     /**
-     * The legs pair by pair (2026-11-18): each pair stands where its own feet find a footing and folds back along the
-     * body where they do not, so walking into deep water the forelegs tuck in first while the hind legs still push, and
-     * swimming up to a bank the forelegs reach out onto it while the hind legs stay folded. Until both pairs are folded
-     * the walk or idle clip plays ({@link MonitorEntity#swimClip}) and this turns each pair from the clip's pose toward
-     * the swim clip's folded pose, along the shortest turn between them; once the swim clip plays, its legs are that
-     * folded pose already. A standing pair's feet are kept on the ground as the body bends over a step.
+     * Keeps standing feet on dry ground as the body bends over land steps/slopes. Water entry and leg folding are handled
+     * solely by the monitor's water-entry moves ({@link BlockMoves}).
      */
-    private void legs(MonitorEntity monitor, GroundBend bend, double scale, double x, double y, double z, float yaw) {
-        long now = System.nanoTime();
-        double dt = monitor.legNanos == 0 ? 1.0 : (now - monitor.legNanos) / 1.0E9;
-        monitor.legNanos = now;
-        double k = dt <= 0 ? 0 : dt > 0.5 ? 1.0 : 1.0 - Math.exp(-dt / LEG_EASE);
-        double perBlock = scale / 16.0;
-        boolean[] feet = new boolean[MonitorEntity.LEG_PAIRS.length];
-        for (int pair = 0; pair < feet.length; pair++) {
-            feet[pair] = bend.footing(monitor.level(), -MonitorEntity.LEG_PAIRS[pair] * perBlock, REACH * monitor.getScale(),
-                    WADE * monitor.getScale());
-        }
-        boolean swimming = monitor.swimClip();
-        for (int pair = 0; pair < feet.length; pair++) {
-            // a pair folds only for water (in it, or water under that pair): on land over a drop the legs stay standing
-            // (BUGS 235: after a step up, the hind pair found no ground under the still-lifted body for a moment and
-            // folded toward the swimming pose, a hind foot twisting round backwards). Into and out of the water the
-            // moves fold and unfold the legs (step 4, 2026-11-19); this is for a way in or out no move fits
-            boolean water = monitor.isInWater() || !feet[pair]
-                    && bend.overWater(monitor.level(), -MonitorEntity.LEG_PAIRS[pair] * perBlock, REACH * monitor.getScale());
-            double want = feet[pair] || !water ? 1.0 : 0.0;
-            monitor.legStand[pair] += (want - monitor.legStand[pair]) * k;
-            if (swimming) {                          // the swim clip sets every leg itself
-                continue;
-            }
-            double fold = 1.0 - monitor.legStand[pair];
+    private void plantLegs(MonitorEntity monitor, GroundBend bend, double scale, double x, double y, double z, float yaw) {
+        for (int pair = 0; pair < MonitorEntity.LEG_PAIRS.length; pair++) {
             String kind = pair == 0 ? "arm" : "leg";
             for (int s = 1; s >= -1; s -= 2) {
                 String side = s > 0 ? "_left" : "_right";
-                if (fold > 1.0E-3) {
-                    for (int p = 0; p < PIECES.length; p++) {
-                        GeoBone bone = getAnimationProcessor().getBone(kind + "_" + PIECES[p] + side);
-                        double[] f = FOLD[pair][p];
-                        // folded is the swim clip's turn on top of the leg's rest (a bone turns as -x, -y, z of a clip's;
-                        // the right side's clip mirrors y and z)
-                        turnToward(bone, -f[0], -s * f[1], s * f[2], fold);
-                    }
-                }
-                if (monitor.legStand[pair] > 1.0E-3) {
-                    plant(monitor, bend, pair, kind + "_upper" + side, s, monitor.legStand[pair], scale, x, y, z, yaw);
-                }
+                plant(monitor, bend, pair, kind + "_upper" + side, s, 1.0, scale, x, y, z, yaw);
             }
         }
     }
@@ -366,30 +301,6 @@ public class MonitorModel extends DefaultedEntityGeoModel<MonitorEntity> {
         upper.setPosY((float) (upper.getPosY() - reach));
         if (!marked) {
             upper.resetStateChanges();
-        }
-    }
-
-    /**
-     * Turns a bone from its clip's pose toward its rest pose plus this turn (degrees), by {@code amount} (0 to 1), along
-     * the shortest turn between the two (2026-11-18: easing each of the three angles on its own swung the folding legs
-     * through poses that are neither, a thigh up over the back), leaving the marks as they were. GeckoLib turns a bone
-     * about Z, then Y, then X, as JOML's ZYX order does.
-     */
-    private static void turnToward(GeoBone bone, double x, double y, double z, double amount) {
-        if (bone == null) {
-            return;
-        }
-        boolean marked = bone.hasRotationChanged() || bone.hasPositionChanged() || bone.hasScaleChanged();
-        BoneSnapshot rest = bone.getInitialSnapshot();
-        Quaternionf from = new Quaternionf().rotationZYX(bone.getRotZ(), bone.getRotY(), bone.getRotX());
-        Quaternionf to = new Quaternionf().rotationZYX(rest.getRotZ() + (float) Math.toRadians(z),
-                rest.getRotY() + (float) Math.toRadians(y), rest.getRotX() + (float) Math.toRadians(x));
-        Vector3f turn = from.slerp(to, (float) Mth.clamp(amount, 0.0, 1.0)).getEulerAnglesZYX(new Vector3f());
-        bone.setRotX(turn.x);
-        bone.setRotY(turn.y);
-        bone.setRotZ(turn.z);
-        if (!marked) {
-            bone.resetStateChanges();
         }
     }
 
