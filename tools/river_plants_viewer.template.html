@@ -29,14 +29,16 @@
 <script>
 const D = /*DATA*/null;
 const OPTIONS = {
-  show: { label: "Show", pick: 2, list: [["An oxbow by a river"], ["Every oxbow age along one river"], ["A river bank up close"]] },
+  show: { label: "Show", pick: 3, list: [["An oxbow by a river"], ["Every oxbow age along one river"], ["A river bank up close"], ["The greens side by side"]] },
   reed: { label: "Reed plume", pick: 0, list: [["A: fresh (purple-brown)"], ["B: old (pale tan)"]] },
-  hg: { label: "Hippo grass", pick: 4, list: [["Young shoots"], ["Grown"], ["Flowering"], ["Dying back"], ["Mixed along the bank"]] },
+  green: { label: "Hippo grass green", pick: 1, list: [] },   // filled from the data: now, A, B, C
+  hg: { label: "Hippo grass", pick: 1, list: [["Young shoots"], ["Grown"], ["Flowering"], ["Dying back"], ["Mixed along the bank"]] },
   plants: { label: "Plants", pick: 0, list: [["Both"], ["Reeds only"], ["Hippo grass only"], ["Neither (compare)"]] },
   age: { label: "Oxbow age", pick: 0, list: [["Fresh (open water, 4 deep)"], ["Silting (3 deep, muddy ends)"], ["Old (1 to 2 deep, mud round it)"], ["Scar (dry green crescent)"]] },
   band: { label: "River", pick: 1, list: [["Far inland (23 wide, fast)"], ["Mid inland (42 wide)"], ["Near the coast (66 wide)"]] },
-  view: { label: "View", pick: 1, list: [["From above"], ["Low on the bank"]] },
+  view: { label: "View", pick: 0, list: [["From above"], ["Low on the bank"]] },
 };
+OPTIONS.green.list = D.greens.map(g => [g[1]]);
 const USES = { age: [0], band: [0] };   // which rows matter for which "Show"
 const state = {}; for (const k in OPTIONS) state[k] = OPTIONS[k].pick;
 for (const [k, v] of new URLSearchParams(location.hash.slice(1))) if (k in state) state[k] = +v;   // e.g. #show=0&view=0&hg=4 (for pictures)
@@ -227,6 +229,31 @@ function closeScene() {
     words: "The mid-inland river's shallow edge (1 to 2 deep), its silt strip and floodplain, with a quiet muddy bay: reeds where the water is 1 or 2 deep or on mud at the waterline, hippo grass floating out from the bank." };
 }
 
+/* The greens side by side (2026-11-22): a straight bank with four stretches of hippo grass, left to right the greens in
+   the "Hippo grass green" row (now, A, B, C), a reed clump between them to compare against; the "Hippo grass" row picks
+   the stage ("Mixed" runs young, grown, flowering, dying back across each stretch). */
+function greensScene() {
+  const W = 39, L = 14, col = [], n = D.greens.length;
+  for (let x = 0; x < W; x++) for (let z = 0; z < L; z++) {
+    const c = Object.assign(cell(z < 10 ? 0 : 1, "flood"), { x, z });
+    if (z < 7) Object.assign(c, { top: -2 + (z > 4 ? 1 : 0), kind: "wetsilt", water: true, wk: "river", algae: hash(x, z) < 0.3 ? 1 : -1 });
+    c.reed = 0; c.mat = null; c.clump = null;
+    const sec = Math.floor(x / 10), k = x % 10;
+    if (k === 9 || x === 0) { if (z >= 4 && z <= 6 && c.water) c.reed = -c.top + 2 + (hash(x, z) < 0.5 ? 1 : 0); }
+    else if (sec < n) {
+      c.g = D.greens[sec][0];
+      const stage = state.hg < 4 ? state.hg : Math.min(3, Math.floor((k - 1) / 2));
+      if (c.water && z >= 4) c.mat = STAGES[stage];
+      if (z === 7 && hash(x + 3, z) < 0.8) c.clump = STAGES[stage];
+    }
+    col.push(c);
+  }
+  extras.length = 0;
+  extras.push([20, 0, 10.5, 0.6, 1.8, 0.6, 0x3A5FA8, 0]);                   // a player on the bank
+  return { col, W, L, fixed: true, centre: [W / 2, 0, 5.5], span: 36, low: [[19.5, 9, 25], [19.5, 0, 4.5]],
+    words: `The hippo grass greens side by side along one bank, left to right: ${D.greens.map(g => g[1]).join(", ")}; a reed clump between each stretch to compare with. "Hippo grass" picks the stage; "Mixed" runs young, grown, flowering, dying back across each stretch.` };
+}
+
 /* where the plants go, by the plan's rules (patch shapes my picks): water and mud cells get reeds in patchy beds,
    water near the bank a floating hippo grass fringe 1 to 3 wide in patches, rooted clumps on the bank beside it */
 function patch(x, z, k) {
@@ -263,9 +290,9 @@ function placePlants(S) {
 function build() {
   while (scene.children.length) scene.remove(scene.children[0]);
   for (const k in USES) document.querySelectorAll(`[data-row=${k}] button`).forEach(b => b.disabled = !USES[k].includes(state.show));
-  const S = [oxbowScene, allAgesScene, closeScene][state.show]();
+  const S = [oxbowScene, allAgesScene, closeScene, greensScene][state.show]();
   S.slow = state.show === 2 || SLOW(BANDS[state.show === 1 ? 0 : state.band]);
-  placePlants(S);
+  if (!S.fixed) placePlants(S);
   document.getElementById("sizes").textContent = S.words;
   const { col, W, L } = S;
   const at = (x, z) => (x < 0 || z < 0 || x >= W || z >= L) ? null : col[x * L + z];
@@ -354,19 +381,20 @@ function drawPlants(col) {
   }
   if (showHg) {
     const flat = new THREE.PlaneGeometry(1.15, 1.15); flat.rotateX(-Math.PI / 2);
-    for (const st of STAGES) {
-      const G = HG[st], mats = col.filter(c => c.mat === st);
+    const cur = D.greens[state.green][0];
+    for (const gk in HG) for (const st of STAGES) {
+      const G = HG[gk][st], mine = c => (c.g || cur) === gk, mats = col.filter(c => c.mat === st && mine(c));
       if (mats.length) {
         const m = new THREE.InstancedMesh(flat, new THREE.MeshBasicMaterial({ map: G.mat, transparent: true, alphaTest: 0.1, depthWrite: false }), mats.length);
         mats.forEach((c, i) => m.setMatrixAt(i, m4.makeRotationY(Math.floor(hash(c.x + 9, c.z + 4) * 4) * Math.PI / 2).setPosition(c.x + 0.5, 0.9, c.z + 0.5)));
         scene.add(m);
       }
       if (st !== "dying") add(crossed(0.8, st === "young" ? 0.3 : 0.45, 2), G.clump, mats.filter(c => hash(c.x + 4, c.z + 4) < 0.55).map(c => [c.x + 0.5, 0.86, c.z + 0.5, hash(c.x, c.z) * 6.28]));
-      add(crossed(1, 1, 2), G.clump, col.filter(c => c.clump === st).map(c => [c.x + 0.5, c.top + 1, c.z + 0.5, hash(c.x, c.z + 1) * 3]));
+      add(crossed(1, 1, 2), G.clump, col.filter(c => c.clump === st && mine(c)).map(c => [c.x + 0.5, c.top + 1, c.z + 0.5, hash(c.x, c.z + 1) * 3]));
     }
   }
   const n = col.filter(c => c.reed).length, count = st => col.filter(c => c.mat === st).length;
-  document.getElementById("sizes").textContent += ` Here: ${n} reed clumps; hippo grass ${STAGES.map(st => `${HG[st].name.toLowerCase()} ${count(st)}`).join(", ")} blocks.`;
+  document.getElementById("sizes").textContent += ` Here: ${n} reed clumps; hippo grass ${STAGES.map(st => `${HG.now[st].name.toLowerCase()} ${count(st)}`).join(", ")} blocks.`;
 }
 
 function buttons() {
@@ -398,7 +426,7 @@ window.addEventListener("resize", resize);
   for (const src of D.algae) ALGAE.push(tex(canvasOf(await load(src))));
   REED.stem = tex(canvasOf(await load(D.reeds.stem)));
   for (const k in D.reeds.tops) REED.tops[k] = tex(canvasOf(await load(D.reeds.tops[k])));
-  for (const k in D.grass) HG[k] = { name: D.grass[k].name, mat: tex(canvasOf(await load(D.grass[k].mat))), clump: tex(canvasOf(await load(D.grass[k].clump))) };
+  for (const g in D.grass) { HG[g] = {}; for (const k in D.grass[g]) HG[g][k] = { name: D.grass[g][k].name, mat: tex(canvasOf(await load(D.grass[g][k].mat))), clump: tex(canvasOf(await load(D.grass[g][k].clump))) }; }
   buttons(); build(); resize();
   (function loop() { requestAnimationFrame(loop); controls.update(); renderer.render(scene, camera); })();
 })();
