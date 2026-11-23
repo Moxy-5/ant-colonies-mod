@@ -55,6 +55,8 @@ Assets are ready from Neon: otter v6 (`docs/handoff/otter.md`, 21 clips, 5 block
    shark: into the water with the leaping dive and away underwater, or out onto land if the danger is in the water.
    Players: curious (stops, watches, comes to about 4 blocks, periscope look from the water), slips away if you run at it,
    nips (`bite`) only if hit or its pup is.
+   **Play and players replanned 2026-11-22:** `docs/plans/otter-play-and-fish.md` (what starts play, holding out a
+   fish, the otter propping up on the player).
 4. **The pet** (waiting on the user's call, below).
 
 ## The bull shark (steps 5 to 7)
