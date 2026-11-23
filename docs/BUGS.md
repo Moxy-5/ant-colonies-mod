@@ -476,3 +476,12 @@ scraps on the bed after the meal" / "0 remains by the catfish") failed alone 2 o
 ("0 barbs gone") 1 of 3; both passed alone straight after, and the run before that day's otter work passed them. Nothing
 in the otter changes touches the catfish; look at how the remains are counted (a fleck or half that drifts off, or a hunt
 that runs past the test's wait when the server is slow) before calling it a game bug.
+299. **Open: two otter play spacing tests fail most runs** (found 2026-11-23 by the `river` run for the hippo's bank rest
+and lawns, 4 servers). `playingOttersTouchNosesAndRestSideBySideWithoutOverlapping` failed alone 3 of 3, each time
+differently ("they never poked noses"; "resting their middles lay 1.58 apart, not about 0.9", 1.40 along: one lay well
+ahead of the other; the poke once 2.54 apart for 2.83), and `twoFedOttersPlayAboutAHungryPairDoesNot` failed 1 to 2 of 3
+("they reared 2.33 apart, not about 1.6875"). Not from the otter triggers work: the same two fail the same way on the
+commit before it (7235db84, the chase and tag, which recorded one pass of each). Not looked into yet: the spacing at
+the poke, the rear and the rest is set once and then each otter walks to its own spot, so a likely place is the two
+arriving at different times (one still walking when the other lies down or rears, or the new keep-out-of-bodies rule
+pushing one off its mark); the 4-box rule: likely box 1 (a real spacing bug the user saw) or 3.

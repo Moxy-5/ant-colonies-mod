@@ -57,10 +57,14 @@ ahatchlingcrocodilesnapsupabarb 0.40
 ahatchlingswimsatthesurfaceandclimbsout 0.01
 ahealthygardensendsupmushroomswhentherainends 2.32
 ahippoclimbsasteponitsmove 2.26
+ahippoeatshippograssnearitspool 0.01
+ahippograzesitslawnshort 0.02
 ahippograzesonlandatnightandgoesbackbyday 0.57
 ahippopushesplantswithitswholebodynotonlyitsbox 0.00
+ahipporestsonthebankinthecoolhoursthengoesbackin 0.02
 ahippostepsdownintotheshallowsonitsmove 0.34
 ahippowalksoutoftheshallowsonitsmove 0.47
+ahippowearsapathwalkingthesameway 0.03
 ahippoyawnsataplayerthenchargesandbites 0.34
 ahungrybullfroglungesatabarb 0.25
 ahungrycatfishhuntsandswallowsatilapia 0.02
@@ -75,6 +79,7 @@ ahungrysharkprowlsatnightandswallowsatilapia 0.03
 ahungryworkereatsoneseedfromthefoodstore 9.13
 alarvathatisnotfedfortwodaysstarves 0.02
 algaegrowsbydepthspreadsandisgrazed 0.00
+aloneotterswimmingfastporpoises 0.01
 alonequeenfoundshercolonyandraisesherfirstworkers 5.74
 amatabelecolonymovesintoadeadtermitemound 0.97
 amatabelecolonywithanemptypreypilestarves 0.35
@@ -90,7 +95,9 @@ anantcolonyawaylivesonthroughasaveandloadandcatchesuponreturn 0.91
 anearraidsnumberstaketermitesfromthecolonyandbringthemhome 0.56
 anoldhumpofnewlandisgrassywithtreesandaburrow 0.03
 anotterafloatinapooldoesnotdrown 0.04
+anotterpinsafrogguardsitsmealthenstandscontent 0.03
 anotterscramblesupastepandhopsbackdown 0.02
+anotterseeingacrocodilefreezesthenbolts 0.01
 anotterslidesintoapoolandclimbsoutandshakes 0.02
 anotterwalkingthroughanothergoesrounditsbody 0.01
 antcrawlsupsidedowntothemiddleoftheroomceilingandhangsthere 0.37
@@ -273,6 +280,7 @@ riverbanksgettheirstripsiltandmud 0.00
 riverbendsaremeasured 0.62
 rivermudliesatthewaterlineandstayswet 0.00
 rivermudsitescomeabout120blocksapartalongtherivers 0.84
+rivermudsitescomeabout60blocksapartalongtherivers 0.61
 riverwidthismeasured 10.78
 riverzonesshareeachkindsgroupbystretch 0.00
 royalpairdigstheirchamberandsealstheentrance 0.96

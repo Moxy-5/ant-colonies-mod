@@ -1207,18 +1207,19 @@ public class SavannaWorldTests {
 
     /**
      * River mud sites ({@link com.antcolonies.savanna.worldgen.MudSites#river}, savanna mud step 3, 2026-11-21) come about
-     * every 120 blocks of savanna river (my pick), its own sites and the hippo pods' together, walked as the pod sites
-     * are. Fails when a site comes on average less than every 80 or more than every 180 blocks of river.
+     * every 60 blocks of savanna river (the user, 2026-11-23, "more mud areas"; was about 120), its own sites and the
+     * hippo pods' together, walked as the pod sites are. Fails when a site comes on average less than every 40 or more
+     * than every 90 blocks of river.
      */
     @GameTest(template = "arena", timeoutTicks = 600, batch = "savanna_maps")
-    public static void riverMudSitesComeAbout120BlocksApartAlongTheRivers(GameTestHelper helper) {
+    public static void riverMudSitesComeAbout60BlocksApartAlongTheRivers(GameTestHelper helper) {
         List<Integer> gaps = new ArrayList<>();
         double[] r = walkSites(helper, com.antcolonies.savanna.worldgen.MudSites::river, (source, sampler, x, z) -> true, gaps);
         double length = r[0], every = r[1] == 0 ? Double.MAX_VALUE : length / r[1];
         SavannaMod.LOGGER.info("[mud sites] {} blocks of savanna river walked, {} river mud sites: one every {} blocks; gaps (n {}): 10% {}, 25% {}, middle {}, 75% {}, 90% {} ({} s)",
                 (int) length, (int) r[1], String.format("%.0f", every), gaps.size(), pct(gaps, 10), pct(gaps, 25), pct(gaps, 50), pct(gaps, 75), pct(gaps, 90),
                 String.format("%.0f", r[2]));
-        helper.assertTrue(every >= 80 && every <= 180, String.format("a river mud site every %.0f blocks of river (about 120 wanted)", every));
+        helper.assertTrue(every >= 40 && every <= 90, String.format("a river mud site every %.0f blocks of river (about 60 wanted)", every));
         helper.succeed();
     }
 

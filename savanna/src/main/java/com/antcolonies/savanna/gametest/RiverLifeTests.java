@@ -2886,6 +2886,128 @@ public class RiverLifeTests {
         });
     }
 
+    /** A hippo resting in the deep end of the POOL ground, its pool there, by day (night held off). */
+    private static com.antcolonies.savanna.animal.HippoEntity hippoInPool(GameTestHelper helper) {
+        var hippo = hippoAt(helper, MX0 + 2.5, TOP - 1, -90.0F);
+        hippo.led = false;
+        hippo.heldNight = false;
+        hippo.heldCool = false;
+        hippo.joinPod(helper.absolutePos(new BlockPos(MX0 + 2, TOP - 1, MZ0 + 5)));
+        return hippo;
+    }
+
+    /**
+     * In the cool hours a hippo in its pool hauls out onto the bank and lies down there ({@code rest}, out of the water,
+     * on the grass within 3 blocks of the water); when the cool hours end it gets up ({@code rest_up}) and goes back into
+     * the water (2026-11-23).
+     */
+    @GameTest(template = "arena", timeoutTicks = 2400)
+    public static void aHippoRestsOnTheBankInTheCoolHoursThenGoesBackIn(GameTestHelper helper) {
+        hippoGround(helper, HippoGround.POOL);
+        var hippo = hippoInPool(helper);
+        hippo.heldCool = true;
+        int[] rested = {0};
+        boolean[] rose = {false};
+        helper.onEachTick(() -> {
+            if (hippo.doing() == com.antcolonies.savanna.animal.HippoEntity.REST) {
+                helper.assertFalse(hippo.isInWater(), "the hippo lies down in the water");
+                BlockPos at = hippo.blockPosition().subtract(helper.absolutePos(BlockPos.ZERO));
+                helper.assertTrue(at.getX() >= STEP_X && at.getX() <= STEP_X + 3, "the hippo rests away from the water's edge at " + at);
+                if (++rested[0] == 200) {
+                    hippo.heldCool = false;           // the day heats up
+                }
+            }
+            rose[0] |= rested[0] > 0 && hippo.doing() == com.antcolonies.savanna.animal.HippoEntity.RISE;
+        });
+        helper.succeedWhen(() -> {
+            helper.assertTrue(rested[0] >= 200, "the hippo has not rested on the bank: doing " + hippo.doing() + ", in water "
+                    + hippo.isInWater() + ", " + hippo.about());
+            helper.assertTrue(rose[0], "the hippo never got up off the bank");
+            helper.assertTrue(hippo.isInWater(), "the hippo has not gone back into the water after its rest, at "
+                    + hippo.blockPosition().subtract(helper.absolutePos(BlockPos.ZERO)));
+        });
+    }
+
+    /** A hippo walking back and forth over grass wears a path under its feet: path blocks along its way, none off it. */
+    @GameTest(template = "arena", timeoutTicks = 1600)
+    public static void aHippoWearsAPathWalkingTheSameWay(GameTestHelper helper) {
+        hippoGround(helper, HippoGround.POOL);
+        var hippo = hippoAt(helper, STEP_X + 3.5, TOP + 1, -90.0F);
+        int[] trips = {0};
+        helper.onEachTick(() -> {
+            if (hippo.climb() == null && hippo.getNavigation().isDone()) {
+                trips[0]++;
+                BlockPos goal = helper.absolutePos(new BlockPos(trips[0] % 2 == 1 ? MX1 - 3 : STEP_X + 3, TOP + 1, MZ0 + 5));
+                hippo.getNavigation().moveTo(goal.getX() + 0.5, goal.getY(), goal.getZ() + 0.5, 1.0);
+            }
+        });
+        helper.succeedWhen(() -> {
+            int on = 0;
+            for (int x = STEP_X; x <= MX1; x++) {
+                for (int z = MZ0; z <= MZ1; z++) {
+                    if (helper.getBlockState(new BlockPos(x, TOP, z)).is(Blocks.DIRT_PATH)) {
+                        helper.assertTrue(Math.abs(z - (MZ0 + 5)) <= 2, "a path block off the hippo's way at " + x + "," + z);
+                        on++;
+                    }
+                }
+            }
+            helper.assertTrue(on >= 6 && trips[0] >= 6, on + " path blocks after " + trips[0] + " trips");
+        });
+    }
+
+    /**
+     * At night a hippo grazes its lawn short: with tall grass all over the bank it finds its lawns, leaves the water at its
+     * landing, and crops tall grass down to short grass (or to the ground), not pulling it up all at once (2026-11-23).
+     */
+    @GameTest(template = "arena", timeoutTicks = 2400)
+    public static void aHippoGrazesItsLawnShort(GameTestHelper helper) {
+        hippoGround(helper, HippoGround.POOL);
+        for (int x = STEP_X; x <= MX1; x++) {
+            for (int z = MZ0; z <= MZ1; z++) {
+                helper.setBlock(new BlockPos(x, TOP + 1, z), Blocks.TALL_GRASS.defaultBlockState()
+                        .setValue(net.minecraft.world.level.block.DoublePlantBlock.HALF, net.minecraft.world.level.block.state.properties.DoubleBlockHalf.LOWER));
+                helper.setBlock(new BlockPos(x, TOP + 2, z), Blocks.TALL_GRASS.defaultBlockState()
+                        .setValue(net.minecraft.world.level.block.DoublePlantBlock.HALF, net.minecraft.world.level.block.state.properties.DoubleBlockHalf.UPPER));
+            }
+        }
+        var hippo = hippoInPool(helper);
+        hippo.heldNight = true;
+        boolean[] landed = {false};
+        helper.onEachTick(() -> landed[0] |= !hippo.isInWater() && hippo.landing() != null);
+        helper.succeedWhen(() -> {
+            // grazed: its tall grass cropped to short grass or on down to the bare grass block (a lawn), not worn to path
+            int shortGrass = 0;
+            for (int x = STEP_X; x <= MX1; x++) {
+                for (int z = MZ0; z <= MZ1; z++) {
+                    BlockState plant = helper.getBlockState(new BlockPos(x, TOP + 1, z));
+                    if (helper.getBlockState(new BlockPos(x, TOP, z)).is(Blocks.GRASS_BLOCK) && (plant.is(Blocks.SHORT_GRASS) || plant.isAir())) {
+                        shortGrass++;
+                    }
+                }
+            }
+            helper.assertFalse(hippo.lawnsKnown().isEmpty(), "the hippo found no lawn: " + hippo.about());
+            helper.assertTrue(landed[0], "the hippo did not leave the water at a landing: " + hippo.about());
+            helper.assertTrue(shortGrass >= 2, "the hippo has grazed " + shortGrass + " tall grass short (doing " + hippo.doing()
+                    + ", lawns " + hippo.lawnsKnown() + ", " + hippo.about() + ")");
+        });
+    }
+
+    /** A hippo in its pool by day wades to a hippo grass mat near the bank and eats it, grazing in the water. */
+    @GameTest(template = "arena", timeoutTicks = 2400)
+    public static void aHippoEatsHippoGrassNearItsPool(GameTestHelper helper) {
+        hippoGround(helper, HippoGround.POOL);
+        BlockPos mat = new BlockPos(STEP_X - 1, TOP + 1, MZ0 + 5);
+        helper.setBlock(mat, com.antcolonies.savanna.registry.SavannaBlocks.HIPPO_GRASS.get().defaultBlockState());
+        var hippo = hippoInPool(helper);
+        boolean[] grazedInWater = {false};
+        helper.onEachTick(() -> grazedInWater[0] |= hippo.isInWater() && hippo.doing() == com.antcolonies.savanna.animal.HippoEntity.GRAZE);
+        helper.succeedWhen(() -> {
+            helper.assertTrue(grazedInWater[0], "the hippo never grazed in the water: " + hippo.about());
+            helper.assertTrue(helper.getBlockState(mat).isAir(), "the hippo grass mat is not eaten: " + helper.getBlockState(mat)
+                    + ", hippo at " + hippo.blockPosition().subtract(helper.absolutePos(BlockPos.ZERO)));
+        });
+    }
+
     /**
      * Hippo pods are laid with new land and kept for good (the user, 2026-11-21; BUGS 271): in a flat-bedded pool three
      * deep a pod of one to three is laid, the bull (male) first, his cows (female) within reach of him, all sharing his

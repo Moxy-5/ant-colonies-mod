@@ -42,6 +42,7 @@ import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.LevelAccessor;
 import net.minecraft.world.level.ServerLevelAccessor;
+import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.levelgen.Heightmap;
@@ -79,12 +80,20 @@ import software.bernie.geckolib.util.GeckoLibUtil;
  * <li>Climbing up or down a block and walking out of the shallows onto a bank are moves of its own (the Animal Maker
  * Engine, made once with their clips, played by the shared {@link BlockMoves} as the monitor's): it stops short of the
  * step, rises and sets its forefeet on top before its body touches it, then heaves its hind legs up.</li>
+ * <li>Its night's grazing keeps to the pod's two lawns ({@link #lawns}, from its pool, so pod mates share them): it
+ * leaves the water at the same landing every night (the bank spot nearest the lawn) and walks the same way to the lawn,
+ * wearing a path into the grass (grass to path under its feet, {@link #PATH_WEAR}); on the lawn it crops tall grass short
+ * and short grass to the ground, stepping on to the next plant as each bite runs out (2026-11-23).</li>
+ * <li>In the cool of the morning and late afternoon it hauls out onto the bank beside its pool and lies there, pod mates
+ * side by side ({@link BankRestGoal}); it gets up and back into the water as the day heats up, or when a player comes.</li>
+ * <li>Now and then, by day or before going out at night, it wades to a hippo grass mat near its pool and eats it, dunking
+ * its head ({@link NibbleGoal}); the mats grow back from their clump.</li>
  * </ul>
- * Not yet: calves and breeding, hippo paths and short "hippo lawns", resting on the banks by day.
+ * Not yet: calves and breeding.
  */
 public class HippoEntity extends PathfinderMob implements GeoEntity, HasLife {
     /** What it is doing, for the clips. */
-    public static final byte CALM = 0, YAWN = 1, BITE = 2, GRAZE = 3, EAR_FLICK = 4, DUNG = 5, REST = 6;
+    public static final byte CALM = 0, YAWN = 1, BITE = 2, GRAZE = 3, EAR_FLICK = 4, DUNG = 5, REST = 6, RISE = 7;
     private static final EntityDataAccessor<Byte> DATA_DOING = SynchedEntityData.defineId(HippoEntity.class, EntityDataSerializers.BYTE);
     /** Its move now ({@link BlockMoves.Play}), empty when not on one. */
     private static final EntityDataAccessor<CompoundTag> DATA_CLIMB = SynchedEntityData.defineId(HippoEntity.class,
@@ -107,7 +116,22 @@ public class HippoEntity extends PathfinderMob implements GeoEntity, HasLife {
     /** Its strolling and charging speeds (the move control's share of its speed: about 0.5 and 4 blocks a second). */
     static final double STROLL = 0.8, CHARGE_SPEED = 6.0;
     /** The clips' lengths and moments (ticks): the bite's crushing hit, the yawn, the ear flick, the dung flick, a graze loop. */
-    static final int BITE_TICKS = 15, BITE_HIT = 8, YAWN_TICKS = 52, EAR_TICKS = 22, DUNG_TICKS = 32, GRAZE_LOOP = 48;
+    static final int BITE_TICKS = 15, BITE_HIT = 8, YAWN_TICKS = 52, EAR_TICKS = 22, DUNG_TICKS = 32, GRAZE_LOOP = 48, RISE_TICKS = 18;
+    /**
+     * Its grazing lawns (2026-11-23, my picks): this many per pool, at least this far apart, grazed within this reach of
+     * their middle (and this much farther once the middle is cropped bare: the lawn grows at its edge).
+     */
+    static final int LAWNS = 2, LAWN_APART = 10, LAWN_REACH = 5, LAWN_GROW = 4;
+    /** Its landing (where it leaves and comes back to the water) lies this near its pool (blocks). */
+    static final int LANDING_REACH = 12;
+    /** The chance each block of grass a foot comes onto, walking on land off its lawns, wears to path (a path in about 3 nights). */
+    static final float PATH_WEAR = 1 / 4f;
+    /** It rests on a bank this near its pool (blocks), lying 1 to 2.5 minutes, then not again for 2 to 4 minutes. */
+    static final int BANK_REACH = 12, REST_SHORTEST = 1200, REST_LONGEST = 3000, REST_AGAIN = 2400;
+    /** The cool hours it rests on the bank (the day's ticks: 6:30 to 10:00 and 14:00 to 17:30). */
+    static final int MORNING_FROM = 500, MORNING_TO = 4000, AFTERNOON_FROM = 8000, AFTERNOON_TO = 11500;
+    /** Hippo grass mats this near its pool are eaten (blocks); after a meal it waits 2 to 5 minutes. */
+    static final int NIBBLE_REACH = 8, NIBBLE_AGAIN = 2400;
     /** How hard it bites (5 hearts) and how far its bite reaches past its snout (blocks). */
     static final float BITE_DAMAGE = 10.0F;
     static final double BITE_REACH = 0.9;
@@ -147,6 +171,19 @@ public class HippoEntity extends PathfinderMob implements GeoEntity, HasLife {
     int angryUntil;
     /** Ticks before it may charge again, or yawn a warning at the same player, or mind a crocodile again. */
     int chargeWait, warnWait, crocWait;
+    /** Ticks before it may rest on the bank again, or go to eat hippo grass again. */
+    int restWait, nibbleWait;
+    /** Its pod's grazing lawns (their middles, from its pool; saved), the one it grazes tonight, and where it left the water for it. */
+    final List<BlockPos> lawns = new java.util.ArrayList<>();
+    @Nullable
+    BlockPos lawn, landing;
+    /** How many lawns it gave up as out of its reach (rolled into the lawns' dice, so the next ones differ). */
+    int lawnsDropped;
+    /** The bank spot it is going to rest at, or rests at (null: none). */
+    @Nullable
+    BlockPos restAt;
+    /** The blocks under its two foot lines last tick (a path wears where a foot comes onto a new block). */
+    private final BlockPos[] lastFoot = new BlockPos[2];
     /** The game tick its doing started (for its clips' lengths and moments). */
     int doingSince;
     /** The last tick it moved, and how far a tick, eased (for the clips). */
@@ -219,9 +256,11 @@ public class HippoEntity extends PathfinderMob implements GeoEntity, HasLife {
     @Override
     protected void registerGoals() {
         goalSelector.addGoal(0, new TerritoryGoal(this));
-        goalSelector.addGoal(1, new HomeGoal(this));
-        goalSelector.addGoal(2, new GrazeGoal(this));
-        goalSelector.addGoal(3, new PoolGoal(this));
+        goalSelector.addGoal(1, new BankRestGoal(this));
+        goalSelector.addGoal(2, new HomeGoal(this));
+        goalSelector.addGoal(3, new NibbleGoal(this));
+        goalSelector.addGoal(4, new GrazeGoal(this));
+        goalSelector.addGoal(5, new PoolGoal(this));
     }
 
     @Override
@@ -611,15 +650,22 @@ public class HippoEntity extends PathfinderMob implements GeoEntity, HasLife {
         if (crocWait > 0) {
             crocWait--;
         }
+        if (restWait > 0) {
+            restWait--;
+        }
+        if (nibbleWait > 0) {
+            nibbleWait--;
+        }
         if (angryAt != null && (tickCount > angryUntil || !angryAt.isAlive())) {
             angryAt = null;
         }
         // a doing's clip played out: back to calm
         byte d = doing();
         if (d == YAWN && doingFor() >= YAWN_TICKS || d == EAR_FLICK && doingFor() >= EAR_TICKS || d == DUNG && doingFor() >= DUNG_TICKS
-                || d == BITE && doingFor() >= BITE_TICKS) {
+                || d == BITE && doingFor() >= BITE_TICKS || d == RISE && doingFor() >= RISE_TICKS) {
             setDoing(CALM);
         }
+        wearPath();
         // in the water: walking, it sinks to the bed and bounds along it; still, it rises to float with its eyes, ears
         // and back out where the water is deep enough, and stands on the bed where it is not
         if (isInWater() && climb() == null) {
@@ -660,6 +706,9 @@ public class HippoEntity extends PathfinderMob implements GeoEntity, HasLife {
         boolean hurt = super.hurt(source, amount);
         if (hurt && !level().isClientSide) {
             cutMove();
+            if (doing() == REST) {
+                setDoing(RISE);                         // up off the bank at once
+            }
             if (isAlive() && source.getEntity() instanceof LivingEntity by && by != this
                     && !(by instanceof Player p && !EntitySelector.NO_CREATIVE_OR_SPECTATOR.test(p))) {
                 angryAt = by;                           // whoever hurt it is charged at once
@@ -723,7 +772,23 @@ public class HippoEntity extends PathfinderMob implements GeoEntity, HasLife {
 
     /** Joins a pod resting in the pool at {@code pool} (new land's pods: the bull's spot). */
     public void joinPod(BlockPos pool) {
+        setPool(pool);
+    }
+
+    /** Its pool is here now: its lawns go with the old one (found again from the new pool). */
+    void setPool(BlockPos pool) {
         this.pool = pool.immutable();
+        lawns.clear();
+    }
+
+    /** Its lawns, and the landing it left the water at tonight (for tests). */
+    public List<BlockPos> lawnsKnown() {
+        return List.copyOf(lawns);
+    }
+
+    @Nullable
+    public BlockPos landing() {
+        return landing;
     }
 
     /** Its pool (for tests). */
@@ -768,6 +833,16 @@ public class HippoEntity extends PathfinderMob implements GeoEntity, HasLife {
         if (led) {
             tag.putBoolean("Led", true);
         }
+        if (!lawns.isEmpty()) {
+            net.minecraft.nbt.ListTag list = new net.minecraft.nbt.ListTag();
+            for (BlockPos l : lawns) {
+                list.add(NbtUtils.writeBlockPos(l));
+            }
+            tag.put("Lawns", list);
+        }
+        if (lawnsDropped > 0) {
+            tag.putInt("LawnsDropped", lawnsDropped);
+        }
     }
 
     @Override
@@ -776,6 +851,15 @@ public class HippoEntity extends PathfinderMob implements GeoEntity, HasLife {
         life.load(tag);
         pool = NbtUtils.readBlockPos(tag, "Pool").orElse(null);
         led = tag.getBoolean("Led");             // the film camera's walkers and game tests ("Led:1b")
+        lawns.clear();
+        lawnsDropped = tag.getInt("LawnsDropped");
+        if (tag.get("Lawns") instanceof net.minecraft.nbt.ListTag list) {
+            for (net.minecraft.nbt.Tag t : list) {
+                if (t instanceof net.minecraft.nbt.IntArrayTag a && a.size() == 3) {
+                    lawns.add(new BlockPos(a.get(0).getAsInt(), a.get(1).getAsInt(), a.get(2).getAsInt()));
+                }
+            }
+        }
         life.apply();
     }
 
@@ -820,34 +904,409 @@ public class HippoEntity extends PathfinderMob implements GeoEntity, HasLife {
     /** A grass spot to graze on land, between {@link #GRAZE_NEAR} and {@link #GRAZE_FAR} blocks from its pool; null if none found. */
     @Nullable
     BlockPos grassNear(BlockPos home) {
-        Level level = level();
+        return grassNear(home, random);
+    }
+
+    /** {@link #grassNear(BlockPos)} rolling its own dice (the lawns: from the pool, so pod mates find the same ones). */
+    @Nullable
+    BlockPos grassNear(BlockPos home, RandomSource dice) {
         for (int i = 0; i < 30; i++) {
-            double a = random.nextDouble() * Math.PI * 2, r = GRAZE_NEAR + random.nextDouble() * (GRAZE_FAR - GRAZE_NEAR);
-            int x = home.getX() + Mth.floor(Math.cos(a) * r), z = home.getZ() + Mth.floor(Math.sin(a) * r);
-            int y = level.getHeight(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, x, z);
-            BlockPos stand = new BlockPos(x, y, z);
-            if (Math.abs(y - home.getY()) > 8 || !level.getFluidState(stand).isEmpty() || !level.getFluidState(stand.below()).isEmpty()) {
-                continue;
-            }
-            BlockState ground = level.getBlockState(stand.below());
-            if (ground.is(Blocks.GRASS_BLOCK) || ground.is(BlockTags.DIRT)) {
+            double a = dice.nextDouble() * Math.PI * 2, r = GRAZE_NEAR + dice.nextDouble() * (GRAZE_FAR - GRAZE_NEAR);
+            BlockPos stand = grassStand(home.getX() + Mth.floor(Math.cos(a) * r), home.getZ() + Mth.floor(Math.sin(a) * r), home.getY(), 8);
+            if (stand != null) {
                 return stand;
             }
         }
         return null;
     }
 
-    /** Eats a grass plant at its jaws, if any (the plant is gone; the grass block under it stays). */
-    void cropGrass() {
+    /** Where it would stand on grass (or soil) in the column x, z within {@code dy} of {@code y}, dry, in loaded land; else null. */
+    @Nullable
+    private BlockPos grassStand(int x, int z, int y, int dy) {
+        Level level = level();
+        if (!level.hasChunkAt(new BlockPos(x, y, z))) {
+            return null;
+        }
+        BlockPos stand = new BlockPos(x, level.getHeight(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, x, z), z);
+        if (Math.abs(stand.getY() - y) > dy || !level.getFluidState(stand).isEmpty() || !level.getFluidState(stand.below()).isEmpty()) {
+            return null;
+        }
+        BlockState ground = level.getBlockState(stand.below());
+        return ground.is(Blocks.GRASS_BLOCK) || ground.is(BlockTags.DIRT) ? stand : null;
+    }
+
+    /**
+     * Its pod's lawns (2026-11-23): found once from its pool with dice rolled from the pool's place, so every hippo of a
+     * pod (sharing the bull's pool) finds the same {@link #LAWNS} places, at least {@link #LAWN_APART} apart, and walks
+     * the same paths to them; kept with it.
+     */
+    List<BlockPos> lawns() {
+        if (lawns.isEmpty() && pool != null) {
+            RandomSource dice = RandomSource.create(pool.asLong() ^ 0x4C41574E5EL ^ (long) lawnsDropped * 0x9E3779B97F4A7C15L);
+            for (int i = 0; i < 12 && lawns.size() < LAWNS; i++) {
+                BlockPos c = grassNear(pool, dice);
+                if (c != null && lawns.stream().allMatch(l -> horizontalSqr(l, c) >= LAWN_APART * LAWN_APART)) {
+                    lawns.add(c);
+                }
+            }
+        }
+        return lawns;
+    }
+
+    private static double horizontalSqr(BlockPos a, BlockPos b) {
+        double dx = a.getX() - b.getX(), dz = a.getZ() - b.getZ();
+        return dx * dx + dz * dz;
+    }
+
+    /** Whether it stands on one of its lawns (or the lawn's growing edge). */
+    boolean onLawn() {
+        BlockPos at = blockPosition();
+        int reach = LAWN_REACH + LAWN_GROW;
+        return lawns.stream().anyMatch(l -> horizontalSqr(l, at) <= reach * reach);
+    }
+
+    /**
+     * A spot to graze on a lawn: grass within {@link #LAWN_REACH} of its middle with a plant to eat within 2 blocks,
+     * else the same out to {@link #LAWN_GROW} farther (a lawn cropped bare grows at its edge), else any grass on it
+     * (grazing it keeps it short); null if none.
+     */
+    @Nullable
+    BlockPos grazeSpot(BlockPos lawn) {
+        BlockPos any = null;
+        for (int reach : new int[] {LAWN_REACH, LAWN_REACH + LAWN_GROW}) {
+            for (int i = 0; i < 12; i++) {
+                BlockPos stand = grassStand(lawn.getX() + random.nextInt(2 * reach + 1) - reach,
+                        lawn.getZ() + random.nextInt(2 * reach + 1) - reach, lawn.getY(), 3);
+                if (stand == null) {
+                    continue;
+                }
+                if (plantNear(stand, 2) != null) {
+                    return stand;
+                }
+                if (any == null && reach == LAWN_REACH) {
+                    any = stand;
+                }
+            }
+        }
+        return any;
+    }
+
+    /**
+     * Where it leaves the water for a lawn and comes back to it: the dry bank spot within {@link #LANDING_REACH} of its
+     * pool, beside the water and at most a block over it, nearest the lawn (the same every night, so its feet wear a
+     * path from there); null if none.
+     */
+    @Nullable
+    BlockPos landingFor(BlockPos lawn) {
+        int w = waterTop();
+        if (w == Integer.MIN_VALUE) {
+            return null;
+        }
+        BlockPos best = null;
+        double bestD = Double.MAX_VALUE;
+        for (int dx = -LANDING_REACH; dx <= LANDING_REACH; dx++) {
+            for (int dz = -LANDING_REACH; dz <= LANDING_REACH; dz++) {
+                BlockPos stand = bankStand(pool.getX() + dx, pool.getZ() + dz, w);
+                if (stand == null || !waterWithin(stand.getX(), stand.getZ(), w, 1)) {
+                    continue;
+                }
+                double d = horizontalSqr(stand, lawn);
+                if (d < bestD) {
+                    bestD = d;
+                    best = stand;
+                }
+            }
+        }
+        return best;
+    }
+
+    /** The top block of its pool's water (its y), or {@link Integer#MIN_VALUE} if it has no pool of water. */
+    int waterTop() {
+        if (pool == null || !level().getFluidState(pool).is(FluidTags.WATER)) {
+            return Integer.MIN_VALUE;
+        }
+        BlockPos.MutableBlockPos p = pool.mutable();
+        while (level().getFluidState(p.above()).is(FluidTags.WATER) && p.getY() < pool.getY() + 16) {
+            p.move(0, 1, 0);
+        }
+        return p.getY();
+    }
+
+    /** Where it would stand on dry bank in the column x, z: its ground's top level with the water's top {@code w} or a block over; else null. */
+    @Nullable
+    private BlockPos bankStand(int x, int z, int w) {
+        Level level = level();
+        BlockPos probe = new BlockPos(x, w, z);
+        if (!level.hasChunkAt(probe)) {
+            return null;
+        }
+        BlockPos stand = new BlockPos(x, level.getHeight(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, x, z), z);
+        if (stand.getY() < w + 1 || stand.getY() > w + 2 || !full(stand.below()) || !dryOpen(stand) || !dryOpen(stand.above())
+                || !level.getFluidState(stand.below()).isEmpty()) {
+            return null;
+        }
+        return stand;
+    }
+
+    /** Whether water's top lies at level {@code w} within {@code reach} columns of x, z. */
+    private boolean waterWithin(int x, int z, int w, int reach) {
+        for (int dx = -reach; dx <= reach; dx++) {
+            for (int dz = -reach; dz <= reach; dz++) {
+                if ((dx != 0 || dz != 0) && level().getFluidState(new BlockPos(x + dx, w, z + dz)).is(FluidTags.WATER)) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    /** Whether a hippo eats this plant: grass and ferns, and the savanna's grass tufts while still green (dry ones are the termites'). */
+    static boolean edible(BlockState s) {
+        if (s.is(Blocks.SHORT_GRASS) || s.is(Blocks.TALL_GRASS) || s.is(Blocks.FERN) || s.is(Blocks.LARGE_FERN)) {
+            return true;
+        }
+        return (s.getBlock() instanceof com.antcolonies.savanna.block.DryGrassBlock || s.getBlock() instanceof com.antcolonies.savanna.block.TallDryGrassBlock)
+                && s.getValue(com.antcolonies.savanna.block.DryGrassBlock.GROWTH) != com.antcolonies.savanna.block.DryGrassBlock.Growth.DRY;
+    }
+
+    /** An edible plant at its jaws (the block at the ground there, or the one over it), or null. */
+    @Nullable
+    BlockPos plantAtJaws() {
         Vec3 jaw = jawPoint();
         BlockPos at = BlockPos.containing(jaw.x, getY() + 0.2, jaw.z);
         for (BlockPos p : List.of(at, at.above())) {
-            BlockState s = level().getBlockState(p);
-            if (s.is(Blocks.SHORT_GRASS) || s.is(Blocks.TALL_GRASS) || s.is(Blocks.FERN) || s.is(Blocks.LARGE_FERN)) {
-                level().destroyBlock(p, false, this);
+            if (edible(level().getBlockState(p))) {
+                return p;
+            }
+        }
+        return null;
+    }
+
+    /** The nearest edible plant standing on the ground within {@code reach} columns of {@code stand} (its level or one off), or null. */
+    @Nullable
+    BlockPos plantNear(BlockPos stand, int reach) {
+        BlockPos best = null;
+        double bestD = Double.MAX_VALUE;
+        for (int dx = -reach; dx <= reach; dx++) {
+            for (int dz = -reach; dz <= reach; dz++) {
+                for (int dy = -1; dy <= 1; dy++) {
+                    BlockPos p = stand.offset(dx, dy, dz);
+                    double d = dx * dx + dz * dz;
+                    if (d < bestD && edible(level().getBlockState(p))) {
+                        bestD = d;
+                        best = p;
+                    }
+                }
+            }
+        }
+        return best;
+    }
+
+    /**
+     * Eats a grass plant at its jaws, if any: grazed short, not pulled up (2026-11-23, the lawns): tall grass and large
+     * ferns are cropped to short grass and ferns, a tall green savanna tuft to a short one, and a short plant to the
+     * ground (the grass block under it stays).
+     */
+    void cropGrass() {
+        BlockPos p = plantAtJaws();
+        if (p == null || !net.neoforged.neoforge.event.EventHooks.canEntityGrief(level(), this)) {
+            return;
+        }
+        Level level = level();
+        BlockState s = level.getBlockState(p);
+        if (s.hasProperty(net.minecraft.world.level.block.DoublePlantBlock.HALF)) {
+            BlockPos lower = s.getValue(net.minecraft.world.level.block.DoublePlantBlock.HALF)
+                    == net.minecraft.world.level.block.state.properties.DoubleBlockHalf.UPPER ? p.below() : p;
+            BlockState low = level.getBlockState(lower);
+            BlockState shorter = low.is(Blocks.TALL_GRASS) ? Blocks.SHORT_GRASS.defaultBlockState()
+                    : low.is(Blocks.LARGE_FERN) ? Blocks.FERN.defaultBlockState()
+                    : low.getBlock() instanceof com.antcolonies.savanna.block.TallDryGrassBlock
+                            ? com.antcolonies.savanna.registry.SavannaBlocks.DRY_GRASS.get().defaultBlockState()
+                                    .setValue(com.antcolonies.savanna.block.DryGrassBlock.GROWTH, low.getValue(com.antcolonies.savanna.block.DryGrassBlock.GROWTH))
+                            : null;
+            if (shorter != null) {
+                level.levelEvent(net.minecraft.world.level.block.LevelEvent.PARTICLES_DESTROY_BLOCK, lower.above(), Block.getId(low));
+                level.setBlock(lower.above(), Blocks.AIR.defaultBlockState(), Block.UPDATE_CLIENTS | Block.UPDATE_KNOWN_SHAPE);
+                level.setBlock(lower, shorter, Block.UPDATE_ALL);
                 return;
             }
         }
+        level.destroyBlock(p, false, this);
+    }
+
+    /**
+     * Its feet wear a path (2026-11-23): walking on land off its lawns, each block of grass (or soil) one of its two foot
+     * lines comes onto turns to path {@link #PATH_WEAR} of the time, the plant on it trampled. Its nights' trips from the
+     * same landing to the same lawns wear the same way into a path in a few nights.
+     */
+    private void wearPath() {
+        if (!onGround() || isInWater() || doing() != CALM || !walking() || climb() != null) {
+            lastFoot[0] = lastFoot[1] = null;
+            return;
+        }
+        float yaw = yBodyRot * Mth.DEG_TO_RAD;
+        double out = FEET_OUT * MODEL_SCALE * getScale() / 16.0;
+        for (int side = 0; side < 2; side++) {
+            double s = side == 0 ? out : -out;
+            BlockPos under = BlockPos.containing(getX() + Mth.cos(yaw) * s, getY() - 0.5, getZ() + Mth.sin(yaw) * s);
+            if (under.equals(lastFoot[side])) {
+                continue;
+            }
+            lastFoot[side] = under;
+            if (random.nextFloat() < PATH_WEAR && !onLawn()) {
+                wear(under);
+            }
+        }
+    }
+
+    /** Wears one block to path: grass or soil with open air (or a plant) over it. */
+    private void wear(BlockPos under) {
+        Level level = level();
+        BlockState ground = level.getBlockState(under);
+        if (!(ground.is(Blocks.GRASS_BLOCK) || ground.is(Blocks.DIRT) || ground.is(Blocks.COARSE_DIRT))
+                || !net.neoforged.neoforge.event.EventHooks.canEntityGrief(level, this)) {
+            return;
+        }
+        BlockPos over = under.above();
+        BlockState plant = level.getBlockState(over);
+        if (!plant.isAir()) {
+            if (!plant.canBeReplaced() || !plant.getFluidState().isEmpty()) {
+                return;
+            }
+            level.destroyBlock(over, false, this);     // trampled
+        }
+        level.setBlock(under, Blocks.DIRT_PATH.defaultBlockState(), Block.UPDATE_ALL);
+    }
+
+    /** The hippos round it (pod mates, and any other in reach), for the bank rest. */
+    private List<HippoEntity> othersNear(double reach) {
+        return level().getEntitiesOfClass(HippoEntity.class, getBoundingBox().inflate(reach, 8.0, reach), m -> m != this && m.isAlive());
+    }
+
+    /**
+     * A spot on the bank to rest at (2026-11-23): dry ground within {@link #BANK_REACH} of its pool, level with the
+     * water's top or a block over, within 3 blocks of the water, flat and open for 3 by 3 round it; beside a hippo
+     * already resting or going to (2 to 4 blocks off: they lie side by side, touching) if it can, else the nearest to the
+     * pool; never where another lies or is going. Null if none.
+     */
+    @Nullable
+    BlockPos restSpot() {
+        int w = waterTop();
+        if (w == Integer.MIN_VALUE) {
+            return null;
+        }
+        List<HippoEntity> others = othersNear(BANK_REACH + 8.0);
+        BlockPos best = null;
+        double bestScore = Double.MAX_VALUE;
+        for (int dx = -BANK_REACH; dx <= BANK_REACH; dx++) {
+            for (int dz = -BANK_REACH; dz <= BANK_REACH; dz++) {
+                if (dx * dx + dz * dz > BANK_REACH * BANK_REACH) {
+                    continue;
+                }
+                BlockPos stand = bankStand(pool.getX() + dx, pool.getZ() + dz, w);
+                if (stand == null || !waterWithin(stand.getX(), stand.getZ(), w, 3) || !flatRoom(stand)) {
+                    continue;
+                }
+                double score = dx * dx + dz * dz;
+                boolean taken = false;
+                for (HippoEntity o : others) {
+                    BlockPos lies = o.restAt != null ? o.restAt : o.doing() == REST ? o.blockPosition() : null;
+                    if (lies == null) {
+                        continue;
+                    }
+                    double d = horizontalSqr(lies, stand);
+                    if (d < 4.0) {
+                        taken = true;
+                    } else if (d <= 16.0) {
+                        score -= 1000;                  // beside a resting mate
+                    }
+                }
+                if (!taken && score < bestScore) {
+                    bestScore = score;
+                    best = stand;
+                }
+            }
+        }
+        return best;
+    }
+
+    /** Whether the 3 by 3 round a stand spot is flat dry ground with room over it for its body. */
+    private boolean flatRoom(BlockPos stand) {
+        for (int dx = -1; dx <= 1; dx++) {
+            for (int dz = -1; dz <= 1; dz++) {
+                BlockPos p = stand.offset(dx, 0, dz);
+                if (!full(p.below()) || !dryOpen(p) || !dryOpen(p.above())) {
+                    return false;
+                }
+            }
+        }
+        return true;
+    }
+
+    /** The cool hours of the day when it may rest on the bank: morning and late afternoon, no rain. */
+    boolean coolHours() {
+        if (heldCool != null) {
+            return heldCool;
+        }
+        if (night() || level().isRaining()) {
+            return false;
+        }
+        long t = level().getDayTime() % 24000L;
+        return t >= MORNING_FROM && t < MORNING_TO || t >= AFTERNOON_FROM && t < AFTERNOON_TO;
+    }
+
+    /** A hippo grass mat to eat within {@link #NIBBLE_REACH} of its pool, on its water's top (nearest it), or null. */
+    @Nullable
+    BlockPos grassMatNear() {
+        int w = waterTop();
+        if (w == Integer.MIN_VALUE) {
+            return null;
+        }
+        BlockPos best = null;
+        double bestD = Double.MAX_VALUE;
+        for (int dx = -NIBBLE_REACH; dx <= NIBBLE_REACH; dx++) {
+            for (int dz = -NIBBLE_REACH; dz <= NIBBLE_REACH; dz++) {
+                BlockPos p = new BlockPos(pool.getX() + dx, w + 1, pool.getZ() + dz);
+                if (!level().hasChunkAt(p) || !edibleMat(level().getBlockState(p))) {
+                    continue;
+                }
+                double d = distanceToSqr(Vec3.atCenterOf(p));
+                if (d < bestD) {
+                    bestD = d;
+                    best = p;
+                }
+            }
+        }
+        return best;
+    }
+
+    /** A hippo grass mat it eats: any but a dying one. */
+    static boolean edibleMat(BlockState s) {
+        return s.getBlock() instanceof com.antcolonies.savanna.block.HippoGrassBlock
+                && s.getValue(com.antcolonies.savanna.block.HippoGrassBlock.STAGE) != com.antcolonies.savanna.block.HippoGrassClumpBlock.DYING;
+    }
+
+    /** A hippo grass mat its jaws reach (within a block and a third of its snout, across), or null. */
+    @Nullable
+    BlockPos matAtJaws() {
+        Vec3 jaw = jawPoint();
+        int w = waterTop();
+        if (w == Integer.MIN_VALUE) {
+            return null;
+        }
+        BlockPos best = null;
+        double bestD = 1.35 * 1.35;
+        for (int dx = -1; dx <= 1; dx++) {
+            for (int dz = -1; dz <= 1; dz++) {
+                BlockPos p = BlockPos.containing(jaw.x + dx, w + 1, jaw.z + dz);
+                double ex = p.getX() + 0.5 - jaw.x, ez = p.getZ() + 0.5 - jaw.z, d = ex * ex + ez * ez;
+                if (d < bestD && edibleMat(level().getBlockState(p))) {
+                    bestD = d;
+                    best = p;
+                }
+            }
+        }
+        return best;
     }
 
     /**
@@ -858,6 +1317,9 @@ public class HippoEntity extends PathfinderMob implements GeoEntity, HasLife {
     /** For tests: night or day held whatever the clock (null: the clock). */
     @Nullable
     public Boolean heldNight;
+    /** For tests: the bank's cool hours held on or off whatever the clock (null: the clock). */
+    @Nullable
+    public Boolean heldCool;
 
     /** Where it was last sent and whether a route was found (for tests' messages). */
     @Nullable
@@ -909,8 +1371,8 @@ public class HippoEntity extends PathfinderMob implements GeoEntity, HasLife {
 
         @Override
         public boolean canUse() {
-            if (h.climb() != null || h.doing() == REST) {
-                return false;
+            if (h.climb() != null || h.doing() == REST || h.doing() == RISE) {
+                return false;                       // lying on the bank it gets up first (its bank rest sees the danger)
             }
             if (h.angryAt != null && h.angryAt.isAlive()) {
                 target = h.angryAt;
@@ -1046,12 +1508,16 @@ public class HippoEntity extends PathfinderMob implements GeoEntity, HasLife {
         }
     }
 
-    /** By day out of the water (dawn after the night's grazing): back to its pool, or the nearest water deep enough. */
+    /**
+     * By day out of the water (dawn after the night's grazing, or after a rest on the bank): back to its pool, or the
+     * nearest water deep enough; from its lawn by the landing it left the water at (its path home).
+     */
     static class HomeGoal extends Goal {
         private final HippoEntity h;
         @Nullable
         private BlockPos to;
         private int ticks;
+        private boolean viaLanding;
 
         HomeGoal(HippoEntity h) {
             this.h = h;
@@ -1072,32 +1538,247 @@ public class HippoEntity extends PathfinderMob implements GeoEntity, HasLife {
         public void start() {
             ticks = 0;
             h.setDoing(CALM);
-            h.sendTo(to, STROLL * 1.2);
+            viaLanding = h.landing != null && horizontalSqr(h.landing, h.blockPosition()) > 9.0
+                    && h.pool != null && horizontalSqr(h.landing, h.pool) <= 32 * 32;
+            h.sendTo(viaLanding ? h.landing : to, STROLL * 1.2);
         }
 
         @Override
         public boolean canContinueToUse() {
-            return !h.isInWater() && ticks < 1200 && (!h.getNavigation().isDone() || h.climb() != null);
+            return !h.isInWater() && ticks < 1200 && (!h.getNavigation().isDone() || h.climb() != null || viaLanding);
         }
 
         @Override
         public void tick() {
-            if (++ticks % 100 == 0 && h.getNavigation().isDone() && h.climb() == null) {
+            ticks++;
+            if (viaLanding && (horizontalSqr(h.landing, h.blockPosition()) <= 6.25 || ticks > 800)) {
+                viaLanding = false;                     // at its landing: down into the water
                 h.sendTo(to, STROLL * 1.2);
+            }
+            if (ticks % 100 == 0 && h.getNavigation().isDone() && h.climb() == null) {
+                h.sendTo(viaLanding ? h.landing : to, STROLL * 1.2);
+            }
+        }
+
+        @Override
+        public void stop() {
+            if (h.isInWater()) {
+                h.landing = null;
             }
         }
     }
 
     /**
-     * At night: out of the water to graze the land round its pool. It walks to a grass spot {@link #GRAZE_NEAR} to
-     * {@link #GRAZE_FAR} blocks off, crops there for 20 to 40 seconds (a grass plant at its jaws eaten each loop or two),
-     * now and then flicking its dung, then moves on to another; at dawn the home goal takes it back.
+     * In the cool of the morning and the late afternoon ({@link #coolHours}) a hippo in its pool now and then hauls out
+     * onto the bank ({@link #restSpot}) and lies down there ({@code rest_down}, {@code rest}) for 1 to 2.5 minutes, pod
+     * mates side by side; it gets up ({@code rest_up}) when its time is up, the cool hours end, a survival player comes
+     * within {@link #WARN_REACH}, or it is hurt, and its home goal takes it back into the water. Real hippos haul out to
+     * bask on sand bars and banks in the cooler hours; in the heat of the day they keep to the water (2026-11-23, my picks).
+     */
+    static class BankRestGoal extends Goal {
+        private final HippoEntity h;
+        private int ticks, left;
+        private boolean lying;
+        private float face;
+
+        BankRestGoal(HippoEntity h) {
+            this.h = h;
+            setFlags(EnumSet.of(Flag.MOVE, Flag.LOOK, Flag.JUMP));
+        }
+
+        @Override
+        public boolean canUse() {
+            if (h.led || h.restWait > 0 || !h.isInWater() || h.climb() != null || h.doing() != CALM || h.charging()
+                    || h.getRandom().nextInt(100) != 0 || !h.coolHours()) {
+                return false;
+            }
+            h.restAt = h.restSpot();
+            if (h.restAt == null) {
+                h.restWait = 600;                       // no bank here: look again in half a minute
+            }
+            return h.restAt != null;
+        }
+
+        @Override
+        public void start() {
+            ticks = 0;
+            lying = false;
+            h.sendTo(h.restAt, STROLL);
+        }
+
+        @Override
+        public boolean canContinueToUse() {
+            if (h.restAt == null || h.isDeadOrDying()) {
+                return false;
+            }
+            if (h.doing() == RISE) {
+                return true;                            // its getting up plays out
+            }
+            return lying ? h.doing() == REST : ticks < 1200 && h.coolHours() && h.angryAt == null;
+        }
+
+        @Override
+        public void tick() {
+            ticks++;
+            if (h.doing() == RISE) {
+                return;
+            }
+            if (!lying) {
+                if (h.climb() != null) {
+                    return;
+                }
+                if (!h.isInWater() && h.onGround() && horizontalSqr(h.restAt, h.blockPosition()) <= 1.5) {
+                    lying = true;
+                    h.getNavigation().stop();
+                    left = REST_SHORTEST + h.getRandom().nextInt(REST_LONGEST - REST_SHORTEST);
+                    face = h.getYRot();
+                    for (HippoEntity o : h.othersNear(5.0)) {
+                        if (o.doing() == REST) {
+                            face = o.getYRot();         // lies the way its neighbour lies
+                            break;
+                        }
+                    }
+                    h.setDoing(REST);
+                } else if (ticks % 60 == 0 && h.getNavigation().isDone()) {
+                    h.sendTo(h.restAt, STROLL);
+                }
+                return;
+            }
+            float yaw = Mth.approachDegrees(h.getYRot(), face, 3.0F);
+            h.setYRot(yaw);
+            h.yBodyRot = yaw;
+            h.yHeadRot = yaw;
+            Vec3 v = h.getDeltaMovement();
+            h.setDeltaMovement(0.0, v.y, 0.0);
+            if (--left <= 0 || !h.coolHours() || h.hurtTime > 0 || h.angryAt != null || h.tickCount % 10 == 0 && playerNear()) {
+                h.setDoing(RISE);
+            }
+        }
+
+        private boolean playerNear() {
+            return h.level().getNearestPlayer(h.getX(), h.getY(), h.getZ(), WARN_REACH * h.getScale(),
+                    e -> EntitySelector.NO_CREATIVE_OR_SPECTATOR.test(e) && EntitySelector.LIVING_ENTITY_STILL_ALIVE.test(e)) != null;
+        }
+
+        @Override
+        public void stop() {
+            if (h.doing() == REST) {
+                h.setDoing(RISE);
+            }
+            h.restAt = null;
+            h.restWait = REST_AGAIN + h.getRandom().nextInt(REST_AGAIN);
+        }
+
+        @Override
+        public boolean requiresUpdateEveryTick() {
+            return true;
+        }
+    }
+
+    /**
+     * Now and then, in the water by day or before going out at night, it wades to a hippo grass mat near its pool
+     * ({@link #grassMatNear}) and eats there: it stops as soon as a mat is at its snout and grazes, head dunked, two or
+     * three bites, each eating the mat its jaws reach (the patch grows back from its clump). Then it waits 2 to 5 minutes
+     * ({@code docs/plans/papyrus-and-hippo-grass.md} step 5; 2026-11-23, my picks).
+     */
+    static class NibbleGoal extends Goal {
+        private final HippoEntity h;
+        @Nullable
+        private BlockPos mat;
+        private int ticks, bites;
+
+        NibbleGoal(HippoEntity h) {
+            this.h = h;
+            setFlags(EnumSet.of(Flag.MOVE, Flag.LOOK));
+        }
+
+        @Override
+        public boolean canUse() {
+            if (h.led || h.nibbleWait > 0 || !h.isInWater() || h.climb() != null || h.doing() != CALM || h.charging()
+                    || h.getRandom().nextInt(100) != 0 || h.pool == null) {
+                return false;
+            }
+            mat = h.grassMatNear();
+            if (mat == null) {
+                h.nibbleWait = 600;                     // none near: look again in half a minute
+            }
+            return mat != null;
+        }
+
+        @Override
+        public void start() {
+            ticks = 0;
+            bites = 2 + h.getRandom().nextInt(2);
+            h.sendTo(mat.below(), STROLL);
+        }
+
+        @Override
+        public boolean canContinueToUse() {
+            return ticks < 900 && bites > 0 && h.isInWater() && h.angryAt == null;
+        }
+
+        @Override
+        public void tick() {
+            ticks++;
+            if (h.doing() == GRAZE) {
+                if (h.doingFor() > 0 && h.doingFor() % GRAZE_LOOP == GRAZE_LOOP / 2) {
+                    BlockPos at = h.matAtJaws();
+                    if (at != null && net.neoforged.neoforge.event.EventHooks.canEntityGrief(h.level(), h)) {
+                        h.level().destroyBlock(at, false, h);
+                    }
+                    bites--;
+                }
+                return;
+            }
+            if (h.doing() != CALM || h.climb() != null) {
+                return;
+            }
+            BlockPos at = h.matAtJaws();
+            if (at != null) {
+                h.getNavigation().stop();
+                h.face(at.getX() + 0.5, at.getZ() + 0.5, 30.0F);
+                h.setDoing(GRAZE);
+                return;
+            }
+            if (ticks % 40 == 0) {
+                BlockPos next = h.grassMatNear();
+                if (next == null) {
+                    bites = 0;                          // eaten or gone
+                } else if (!next.equals(mat) || h.getNavigation().isDone()) {
+                    mat = next;
+                    h.sendTo(mat.below(), STROLL);
+                }
+            }
+        }
+
+        @Override
+        public void stop() {
+            if (h.doing() == GRAZE) {
+                h.setDoing(CALM);
+            }
+            h.getNavigation().stop();
+            h.nibbleWait = NIBBLE_AGAIN + h.getRandom().nextInt(NIBBLE_AGAIN * 3 / 2);
+        }
+
+        @Override
+        public boolean requiresUpdateEveryTick() {
+            return true;
+        }
+    }
+
+    /**
+     * At night: out of the water to graze the land round its pool. It grazes one of its pod's lawns ({@link #lawns}; with
+     * none found, any grass spot {@link #GRAZE_NEAR} to {@link #GRAZE_FAR} blocks off): out of the water at the lawn's
+     * landing ({@link #landingFor}), along its path to a spot on the lawn ({@link #grazeSpot}), and grazes there for 20 to
+     * 40 seconds (a plant at its jaws cropped each loop or two), a few steps on to the next plant when none is left at its
+     * jaws, now and then flicking its dung; at dawn the home goal takes it back by the same landing.
      */
     static class GrazeGoal extends Goal {
         private final HippoEntity h;
         @Nullable
         private BlockPos spot;
         private int left, ticks;
+        private boolean viaLanding, grazed;
 
         GrazeGoal(HippoEntity h) {
             this.h = h;
@@ -1110,9 +1791,16 @@ public class HippoEntity extends PathfinderMob implements GeoEntity, HasLife {
                 return false;
             }
             if (h.pool == null && h.isInWater()) {
-                h.pool = h.blockPosition();
+                h.setPool(h.blockPosition());
             }
-            spot = h.grassNear(h.pool != null ? h.pool : h.blockPosition());
+            List<BlockPos> lawns = h.lawns();
+            if (!lawns.isEmpty()) {
+                h.lawn = lawns.get(h.getRandom().nextInt(lawns.size()));
+                spot = h.grazeSpot(h.lawn);
+            } else {
+                h.lawn = null;
+                spot = h.grassNear(h.pool != null ? h.pool : h.blockPosition());
+            }
             return spot != null;
         }
 
@@ -1121,7 +1809,16 @@ public class HippoEntity extends PathfinderMob implements GeoEntity, HasLife {
             left = 400 + h.getRandom().nextInt(400);
             ticks = 0;
             h.setDoing(CALM);
-            h.sendTo(spot, STROLL);
+            viaLanding = false;
+            grazed = false;
+            if (h.isInWater() && h.lawn != null) {
+                BlockPos l = h.landingFor(h.lawn);
+                if (l != null) {
+                    h.landing = l;
+                    viaLanding = true;
+                }
+            }
+            h.sendTo(viaLanding ? h.landing : spot, STROLL);
         }
 
         @Override
@@ -1132,7 +1829,21 @@ public class HippoEntity extends PathfinderMob implements GeoEntity, HasLife {
         @Override
         public void tick() {
             ticks++;
+            if (viaLanding) {
+                // out of the water at its landing first: the same way every night
+                if (h.climb() == null && !h.isInWater() && horizontalSqr(h.landing, h.blockPosition()) <= 6.25 || ticks > 800) {
+                    viaLanding = false;
+                    h.sendTo(spot, STROLL);
+                } else if (ticks % 100 == 0 && h.getNavigation().isDone() && h.climb() == null) {
+                    h.sendTo(h.landing, STROLL);
+                }
+                return;
+            }
             boolean there = h.getNavigation().isDone() && h.climb() == null && !h.isInWater();
+            if (!there && h.doing() == CALM && h.climb() == null && !h.isInWater() && h.onLawn() && h.plantAtJaws() != null) {
+                h.getNavigation().stop();               // on its lawn with a plant at its snout: graze here
+                there = true;
+            }
             if (!there) {
                 if (ticks % 100 == 0 && h.getNavigation().isDone() && h.climb() == null) {
                     h.sendTo(spot, STROLL);
@@ -1140,6 +1851,7 @@ public class HippoEntity extends PathfinderMob implements GeoEntity, HasLife {
                 return;
             }
             left--;
+            grazed = true;
             if (h.doing() == CALM) {
                 if (h.getRandom().nextInt(600) == 0) {
                     h.setDoing(DUNG);
@@ -1147,8 +1859,20 @@ public class HippoEntity extends PathfinderMob implements GeoEntity, HasLife {
                     h.setDoing(GRAZE);
                 }
             }
-            if (h.doing() == GRAZE && h.doingFor() > 0 && h.doingFor() % GRAZE_LOOP == GRAZE_LOOP / 2 && h.getRandom().nextBoolean()) {
-                h.cropGrass();
+            if (h.doing() == GRAZE && h.doingFor() > 0) {
+                int t = h.doingFor() % GRAZE_LOOP;
+                if (t == GRAZE_LOOP / 2 && h.getRandom().nextBoolean()) {
+                    h.cropGrass();
+                } else if (t == 0 && h.plantAtJaws() == null) {
+                    // nothing left at its snout: a few steps on to the nearest plant
+                    Vec3 jaw = h.jawPoint();
+                    BlockPos next = h.plantNear(BlockPos.containing(jaw.x, h.getY() + 0.2, jaw.z), 4);
+                    if (next != null) {
+                        spot = next;
+                        h.setDoing(CALM);
+                        h.sendTo(next, STROLL);
+                    }
+                }
             }
         }
 
@@ -1157,6 +1881,15 @@ public class HippoEntity extends PathfinderMob implements GeoEntity, HasLife {
             if (h.doing() == GRAZE) {
                 h.setDoing(CALM);
             }
+            if (!grazed && ticks >= 1600 && h.lawn != null && h.lawns.remove(h.lawn)) {
+                h.lawnsDropped++;                       // a lawn it cannot get to (across the river, walled off): another is found
+            }
+        }
+
+        /** Every tick: stepped every other tick (Minecraft's default) the loop's crop tick never came, so nothing was cropped. */
+        @Override
+        public boolean requiresUpdateEveryTick() {
+            return true;
         }
     }
 
@@ -1197,7 +1930,7 @@ public class HippoEntity extends PathfinderMob implements GeoEntity, HasLife {
             }
             if (h.doing() == CALM && --restFor <= 0) {
                 if (h.pool == null || h.poolGone()) {
-                    h.pool = h.blockPosition();         // its pool dried or filled in: here is its pool now
+                    h.setPool(h.blockPosition());       // its pool dried or filled in: here is its pool now
                 }
                 if (h.getRandom().nextInt(4) == 0) {
                     h.setDoing(YAWN);
@@ -1238,6 +1971,7 @@ public class HippoEntity extends PathfinderMob implements GeoEntity, HasLife {
     private static final RawAnimation DUNG_CLIP = RawAnimation.begin().thenPlayAndHold("dung_flick");
     private static final RawAnimation GRAZE_CLIP = RawAnimation.begin().thenLoop("graze");
     private static final RawAnimation REST_CLIP = RawAnimation.begin().thenPlay("rest_down").thenLoop("rest");
+    private static final RawAnimation RISE_CLIP = RawAnimation.begin().thenPlayAndHold("rest_up");
     private static final RawAnimation DEATH = RawAnimation.begin().thenPlayAndHold("death");
     /** Every move's clip, by its name ({@link #MOVES}; made as first played). */
     private static final java.util.Map<String, RawAnimation> MOVE_CLIPS = new java.util.concurrent.ConcurrentHashMap<>();
@@ -1291,6 +2025,8 @@ public class HippoEntity extends PathfinderMob implements GeoEntity, HasLife {
                 return state.setAndContinue(GRAZE_CLIP);
             case REST:
                 return state.setAndContinue(REST_CLIP);
+            case RISE:
+                return state.setAndContinue(RISE_CLIP);
             default:
                 break;
         }

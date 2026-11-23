@@ -1096,6 +1096,29 @@ Moved here from CLAUDE.md on 2026-10-13 (it was loaded into every chat and took 
   pounce_pin --switches`, nothing flagged; its front feet rest on the frog on purpose); not filmed in the game yet (the
   user was in another game: no game windows).
 
+- **Hippos rest on the banks, wear paths, graze lawns short and nibble hippo grass (2026-11-23; finished in a second
+  session after the first ran out of quota):** in `HippoEntity` (numbers my picks): (1) **bank rest** (`BankRestGoal`):
+  in the cool hours (6:30 to 10:00 and 14:00 to 17:30, no rain; `coolHours`) a hippo in its pool now and then hauls out
+  onto flat dry bank within `BANK_REACH` 12 of its pool and lies down (`rest_down`, `rest`) for 1 to 2.5 minutes, pod
+  mates side by side 2 to 4 blocks apart; it gets up (`RISE`, `rest_up`) when its time is up, the cool hours end, a
+  survival player comes within `WARN_REACH`, or it is hurt, then the home goal takes it back in; not again for 2 to 4
+  minutes. (2) **lawns** (`lawns()`): each pool gets `LAWNS` 2 lawns at least `LAWN_APART` 10 apart, found with dice
+  rolled from the pool's place so pod mates share them (saved with the hippo); at night it grazes one, cropping tall
+  grass to short grass and short grass to the bare grass block (`cropGrass`: grazed short, never pulled up), stepping
+  on to the next plant within 4 as each runs out; a lawn cropped bare grows at its edge (`LAWN_GROW` 4); a lawn it
+  cannot reach in 1600 ticks is dropped and another found (`lawnsDropped`). (3) **paths** (`wearPath`): it leaves and
+  comes back to the water at the same landing every night (`landingFor`, the bank spot nearest the lawn within
+  `LANDING_REACH` 12), and off its lawns each grass block a foot comes onto turns to dirt path `PATH_WEAR` 1 in 4 of the
+  time (a path in about 3 nights). (4) **hippo grass** (`NibbleGoal`, `docs/plans/papyrus-and-hippo-grass.md` step 5):
+  now and then in the water it wades to a hippo grass mat within `NIBBLE_REACH` 8 of its pool and eats two or three
+  bites, head dunked, then waits 2 to 5 minutes. Fixed on the way: the graze goal was stepped every other tick
+  (Minecraft's default), so its crop tick in the 48-tick graze loop never came and nothing was cropped; it now runs every
+  tick like the hippo's other goals (the same trap the otter's hunt met). Also (the user, "more mud areas along the
+  river"): river mud sites twice as often, about every 60 blocks of river (`MudSites.RIVER_APART` 110 -> 55;
+  `riverMudSitesComeAbout60BlocksApartAlongTheRivers`). Tests (`river`): `aHippoRestsOnTheBankInTheCoolHoursThenGoesBackIn`,
+  `aHippoWearsAPathWalkingTheSameWay`, `aHippoGrazesItsLawnShort` (counts tall grass grazed to short or to the bare
+  grass block, not worn to path), `aHippoEatsHippoGrassNearItsPool`.
+
 ## Handover notes for a code reviewer (written at the end of a very long session)
 - State: branch `master`, all committed, `./gradlew build` passes, `./gradlew runGameTestServer` passes 47 tests (about 8 minutes, in one world, tests run in parallel arena grids). Some tests are timing-sensitive under load (`antsOnBumpyGroundReachTheFoodStore` and `aStarvingWorkerSlowsDownAndDies` have each failed once and passed on a re-run): re-run before blaming a change.
 - Confirmed in-game by the user so far: everything up to and including dead ants and the refuse chamber, rich bread, worker hunger, colony starvation, and the hill-jam fix. Older bullets in "Current status" that still say "waiting for the user to confirm" are probably stale (the user tested them and reported no problems), but this was never written down: do not rely on those flags.

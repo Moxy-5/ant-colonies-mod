@@ -17,7 +17,7 @@ import net.minecraft.world.level.biome.Climate;
  * Where new land's savanna mud goes (the user, 2026-11-21, "river mud plus dry wallows"; {@code docs/plans/savanna-mud.md},
  * section 5.1), from the seed and the land's noise alone like the other sites ({@link RiverSites}):
  * <ul>
- * <li><b>river mud areas</b>: a site about every 120 blocks of any savanna river (and every hippo pod's pool,
+ * <li><b>river mud areas</b>: a site about every 60 blocks of any savanna river (and every hippo pod's pool,
  *     {@link PodSites}); the chunk lays its mud at the waterline ({@link RiverMudFeature});</li>
  * <li><b>dry wallows</b>: a site about every 150 blocks of open savanna land off the river and the floodplain; the chunk
  *     lays a hollow of dry mud if its ground lets it ({@link DryWallowFeature}).</li>
@@ -26,10 +26,11 @@ import net.minecraft.world.level.biome.Climate;
  */
 public final class MudSites {
     /**
-     * No two river mud sites nearer than this (blocks): with the pods' pools, about one every 120 blocks of river (85 gave
-     * one every 92 in the measure, {@code riverMudSitesComeAbout120BlocksApartAlongTheRivers}).
+     * No two river mud sites nearer than this (blocks): with the pods' pools, about one every 60 blocks of river (the
+     * user, 2026-11-23: "more mud areas along the river"; was 110, one every 116; measured by
+     * {@code riverMudSitesComeAbout60BlocksApartAlongTheRivers}).
      */
-    public static final int RIVER_APART = 110;
+    public static final int RIVER_APART = 55;
     /** No two dry wallow sites nearer than this (blocks): one to a square about 150 on a side (110 gave 106). */
     public static final int DRY_APART = 155;
     public static final ResourceKey<Biome> FLOODPLAIN = ResourceKey.create(Registries.BIOME,
