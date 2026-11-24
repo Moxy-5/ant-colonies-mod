@@ -13,7 +13,7 @@ cmd tick freeze
 fov 10
 follow 0 0.15 -6 0 0
 go 5 -59 0
-burst onto_ceiling 150 1
+burst onto_ceiling 190 1
 go 5 -63 0
 burst down_again 80 1
 log off

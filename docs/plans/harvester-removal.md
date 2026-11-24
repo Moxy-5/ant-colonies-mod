@@ -320,3 +320,13 @@ minor, or dropped where the scene filmed something only the harvester did (decid
 - **Not moved, with the reason:** the extra hole beside a shaft (the termite repair test already opens roofs and a side wall, and the leak finder treats every opening alike); the harvester unit tests (the shared rules they touch already have framework tests: `JobsByAgeTest`, `QueenAndHungerRulesTest`, `FoodWorthTest`).
 - **Run:** `legs,antnest,away,colony,body` on 6 servers: all green after the fixes above (one old flake, `neighbouringTermitesWallOffTheirGalleries`, passed alone 3 of 3).
 
+### Step 3 (2026-11-23): the guard films with a Matabele minor
+- **Re-filmed with a Matabele minor** (they were the harvester worker's): `a_walk`, `b_turn`, `c_climb`, `d_ledge`, `e_ceiling`, `n_down_turn`, and the crowd of 400 (`h_crowd`). The plain film scenes `climb`, `poses` and `work` use it too (the hot-weather poses and the dig clip, harvester-only, left them).
+- **None dropped:** every harvester scene guards a shared body rule, and no Matabele scene filmed these before (the Matabele had only `r_crowd_space` and `s_carry_down`).
+- **Unchanged:** the termite scenes (`f`, `i` to `m`, `o`, `q`), the empty scene, the two Matabele ones.
+- **The ceiling scene got more time** (its first burst 150 to 190 ticks): the minor had not reached its place on the roof when the next order came.
+- **Found on the new body: BUGS 308** (a small leg pop at the pace change, a jump and a 30-degree tip at the pillar's top, more of the longer body in the roof at the known ceiling snap). Not fixed here.
+- **Drawing time:** 400 Matabele minors 54.5 ms a frame (136 microseconds an ant).
+- **Not approved yet:** the new pictures become the standard only on the user's OK after a look at `run-film/guard_films.mp4` (then `python tools/guard_films.py approve`, the three faulty scenes with `--bug`).
+- **The tools' default insect:** the scenes are switched; the tools that only name `worker_ant` in examples and tables are left to Neon (a line on the board, `docs/HANDOFF.md`), the harvester-only tools go in step 4.
+
