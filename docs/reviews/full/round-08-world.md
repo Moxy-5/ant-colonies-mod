@@ -1,18 +1,45 @@
-# Round 8: the world (reading round, 2026-11-23) — UNFINISHED
+# Round 8: the world (reading round, 2026-11-23 and 24)
 
-**Status: carried on 2026-11-24 after the usage limit; R8-11 to R8-17 added, the data and the last blocks still being
-read, the second pass still owed for some.** Nothing below was measured in the game (reading round: no tests, no
-soak). Findings keep their numbers for good.
+**Status: finished.** Every file of the system was read (list below), in two sittings (the first was cut short by the
+usage limit). Nothing was measured in the game: this was a reading round, with no tests and no soak. Findings keep
+their numbers for good; none was dropped (R8-1 to R8-20).
 
-**The second pass is only partly done.** Each finding says how far it was checked: *proven* means the path was walked
-in the code named; *likely* means the code path is there but one link (named in the finding) was not read yet.
+**How far each finding was checked (the second pass):** *proven* means the path was walked in the code or data named;
+*likely* means the path is there but one link, named in the finding, could not be read here (mostly Minecraft's or
+TerraBlender's own code, quoted from memory); *to measure* means a lag finding whose cost is an estimate, with the
+scene to measure it.
 
-## Read so far (every line)
+## The four that matter most
 
-`FlatSavanna`, `BigSavanna`, `SavannaRegion`, `SavannaSpawn`, `GroundHeights`, `MinecraftZones`, `RiverZones`,
-`RiverSites`, `RiverBends`, `SandBanks`, `PlainSurface`, `MudSites`, `NestSites`, `OxbowSites`, `PanSites`, `PodSites`,
-`RainModifier`, `WaterColourModifier`, `RiverBankFeature`, `OxbowFeature`, `PanFeature`, `RiverMudFeature`,
-`DryWallowFeature`, `RiverPlantsFeature`; and the world, river, mud and spawning entries of `docs/BUGS.md`.
+1. **R8-11 (bug):** termite mounds of new land are lost when the game is left while land is still being made, and the
+   lost places can turn up as mounds in the next world opened in the same sitting.
+2. **R8-12 with R8-2 (lag):** the mod's 12 spawning groups are tried on every tick in every chunk of every world, also
+   far from any savanna; about three times Minecraft's own spawner work. To measure.
+3. **R8-18 (bug against a decision):** "no ravines or caves in the savanna" does not hold along the savanna's rivers:
+   the river biome was left out of the rule, and ravines and caves started there run on into the plain.
+4. **R8-14 (rules that fight):** the world maker lays mud in a picture (firm sticky edges, a drying ring round pans);
+   the mud's own wet-and-dry rule wipes that picture out within minutes of a player being near.
+
+## Read (every line unless said)
+
+- `worldgen/`: `FlatSavanna`, `BigSavanna`, `SavannaRegion`, `SavannaSpawn`, `GroundHeights`, `MinecraftZones`,
+  `RiverZones`, `RiverSites`, `RiverBends`, `SandBanks`, `PlainSurface`, `MudSites`, `NestSites`, `OxbowSites`,
+  `PanSites`, `PodSites`, `RainModifier`, `WaterColourModifier`, `RiverBankFeature`, `OxbowFeature`, `PanFeature`,
+  `RiverMudFeature`, `DryWallowFeature`, `RiverPlantsFeature`, `RiverAlgaeFeature`, `RiverRemainsFeature`,
+  `CrocodileNestFeature`, `HippoPodFeature`, `QuietSavannaTreesFeature`, `MoundPlaces`, `TermiteMoundStructure`,
+  `TermiteMoundPiece`. (The tree placing is round 7's.)
+- Top level: `SavannaEvents`, `SavannaMod`, `SavannaConfig`, `SavannaSpecies`.
+- `registry/`: `SavannaMobCategories`, `SavannaEntities`, `SavannaFeatures`, `SavannaStructures`, `SavannaTags`,
+  `SavannaBoats`, `SavannaBlockEntities`, `SavannaParticles`, `SavannaSounds`, `SavannaBlocks`; `SavannaItems` and
+  `TreeBlocks` are lists of sign-ups only and were skimmed (the tree blocks themselves are round 7's).
+- `block/`: `SavannaMudBlock`, `AlgaeBlock`, `ReedBlock`, `HippoGrassBlock`, `HippoGrassClumpBlock`,
+  `RiverPebblesBlock`, `RiverSand`, `PlantPush`. (`MudCrustBlock` and `MudCastBlock` are the termites' mud, round 5's.)
+- `colony/NewLandMounds` lines 60 to 300 only (the hand-over from world making; the rest is round 5's).
+- The data: every biome modifier, every placed feature, the mound's structure and structure set, the two water
+  biomes, the biome tags, `META-INF/enumextensions.json`, the groups table in `docs/LIVING-THINGS.md`; of the terrain
+  number files under `data/minecraft/worldgen/density_function/` which ones are replaced and what they point at, not
+  the sums inside (made by `tools/flat_savannas/`, guarded by the `worldgen` tests).
+- The world, river, mud and spawning entries of `docs/BUGS.md`.
 
 ## Findings
 
@@ -78,9 +105,12 @@ in the code named; *likely* means the code path is there but one link (named in 
   through, while the trunk stands.
 - **Where:** `worldgen/PanFeature.java:389-397` (used at 190, 234, 240, 330, 363), `worldgen/OxbowFeature.java:539-547`.
 - **Proof:** `RiverBankFeature.ground` stops at the first `isSolid` block from the top, and leaves count as solid.
+- **Second pass:** the keep-out round a tree is 3 blocks from its foot (`OxbowFeature.TREE_CLEAR`), far less than a
+  crown's reach; leaves do count as solid for `ground`. Still owed: whether any tree of round 7 carries leaves or a
+  branch as low as 4 to 7 blocks over the water's level (the young trees are the likely ones).
 - **Fix proposed:** `clear` removes only up to the ground height the caller already read (`g`) plus the plants on it.
 
-### R8-5 (C, likely): the river bank's look depends on which chunk was made first
+### R8-5 (C, proven in the code; how much it shows is likely): the river bank's look depends on which chunk was made first
 
 - **What is wrong:** `RiverBankFeature` says its result is the same in any order because it "depends only on the
   sea-level water round it". But a water column only counts with *air* over it (`Waters.isWater`), and a neighbour
@@ -89,6 +119,9 @@ in the code named; *likely* means the code path is there but one link (named in 
 - **What the player would see:** now and then a kink in the low strip, or the wet line of silt and mud missing, along
   a chunk's edge.
 - **Where:** `worldgen/RiverBankFeature.java:289-304`.
+- **Second pass:** the banks are made at step `local_modifications`, the reeds, mats and algae at
+  `vegetal_decoration`, so a neighbour made earlier always has its plants; a reed standing in water is a block holding
+  water at the water's level with a reed (not air) over it. The shift is one or two blocks of the strip's edge.
 - **Fix proposed:** count water with one of our water plants or a lily pad over it as water.
 
 ### R8-6 (C, proven): the spawn search reads one row of columns from the wrong chunk
@@ -124,12 +157,15 @@ in the code named; *likely* means the code path is there but one link (named in 
   (`BigSavanna.java:45`); `SavannaSpawn.pendingMessage` is cleared only by a log-in (`SavannaSpawn.java:62`). Fix:
   clear both on `ServerStoppedEvent`.
 
-### R8-10 (B, likely; data not read yet): the flat savannas replace two of Minecraft's own land numbers
+### R8-10 (B, proven in the data; known and written down in `docs/DESIGN.md`): the flat savannas replace eleven of Minecraft's own land files
 
-- `FlatSavanna`'s notes say the land is flattened by overriding `minecraft:overworld/erosion` and `ridges_folded` in
-  data. Any other world-shaping mod or data pack overriding the same two files wins or loses whole: either their land
-  or our flat savannas, by load order. **Proof still owed:** the data files under `data/minecraft/worldgen/` were not
-  read.
+- The mod's data replaces `minecraft:overworld/erosion`, `offset`, `ridges_folded`, `sloped_cheese`,
+  `caves/entrances` and `caves/noodle`, and `minecraft:overworld_large_biomes/erosion`, `factor`, `jaggedness`,
+  `offset` and `sloped_cheese` (each wraps a copy of Minecraft's own, kept as `antcolonies:.../raw_*`, and adds the
+  savanna's change inside the climate mask). Any other world-shaping mod or data pack replacing one of the same files
+  wins or loses whole, by load order: their land, or our flat savannas and filled caves. `docs/DESIGN.md` ("Flat
+  savannas") already names this as a known cost; kept here so the count of files is on record. The copies also freeze
+  Minecraft 1.21.1's own numbers: a Minecraft update that changes them needs `tools/flat_savannas/` run again.
 
 ### R8-11 (A, proven in the code): mounds of new land are lost when the game is left, and can turn up in the next world
 
@@ -195,7 +231,7 @@ in the code named; *likely* means the code path is there but one link (named in 
 - **Fix proposed:** the biome and big-savanna checks first (at the surface height of the middle column only), the 13
   columns after.
 
-### R8-14 (B, likely): the mud's own wetness rule undoes the pattern the world maker lays
+### R8-14 (B, proven in the code): the mud's own wetness rule undoes the pattern the world maker lays
 
 - **What is wrong:** the features lay mud in a picture: river mud with a sticky edge (`RiverMudFeature.java:96-100`),
   a pan with a sticky shore and a ring of drying mud round it (`PanFeature.java:184-185, 207, 218`). Every mud block
@@ -207,21 +243,26 @@ in the code named; *likely* means the code path is there but one link (named in 
   edge gone soupy, so walking the water's edge slows or sinks where the feature meant firm ground); land visited
   before looks different from new land.
 - **Where:** as above; `block/SavannaMudBlock.java` (`isRandomlyTicking` always true).
-- **Proof still owed:** the rule was read, the speed was not measured (random ticks, a 1 in 3 to 1 in 6 chance to dry);
-  whether the sticky edge is meant to last is a design question (`docs/DESIGN.md`, the mud section, not re-read).
+- **Proof:** river mud is laid only within 4 blocks of the water (`RiverMudFeature.java:91`, the same 4 as the
+  block's `WATER_REACH`), so every block of it counts as wetted, and a wetted block goes one step wetter on every
+  random tick with no dice (`SavannaMudBlock.java:298-302`): the sticky edge is soupy after its first random tick,
+  about a minute on average. Mud more than 4 from water dries a step with a chance of 1 in 6 (depth 1) a random tick,
+  so a pan's drying ring is cracked after some minutes. Rain wets all of it. Not measured in the game; whether the
+  sticky edge was meant to last is a design question.
 - **Fix proposed:** one place decides: either the feature lays what the block's rule would settle at (so nothing
   changes after), or the rule keeps a laid edge (a "settled" wetness by distance to water: soupy at 1, sticky at 2 to
   4, drying beyond).
 
-### R8-15 (C, likely): the colonies' insects count as Minecraft's farm animals
+### R8-15 (C, proven in the code; the count rule from memory): the colonies' insects count as Minecraft's farm animals
 
 - **What is wrong:** termites and Matabele ants are signed up in Minecraft's own `CREATURE` group
   (`registry/SavannaEntities`), and nothing takes them out of the count (`AbstractAntEntity.java:2938` only stops them
   vanishing with distance). That group's cap is 10 round a player; one colony's 50 real insects fill it many times.
 - **What the player would see:** near a colony no chicken, armadillo or (in a neighbouring biome) cow, pig or sheep ever
   spawns after the land was made; the animals made with the land are not touched.
-- **Proof still owed:** whether the colony marks its insects "persistent" when it spawns them (then they do not count);
-  not looked for in the framework (round 1's code).
+- **Second pass:** nothing in the framework or the savanna mod marks an insect persistent
+  (`setPersistenceRequired` is called only for a froglet and in tests) and none overrides its group, so they count.
+  That Minecraft leaves out only persistent mobs when it counts a group is quoted from memory.
 - **Fix proposed:** a group of the insects' own with no spawn list and marked persistent, or `MISC`.
 
 ### R8-16 (C, likely): algae can creep out of the savanna
@@ -236,28 +277,97 @@ in the code named; *likely* means the code path is there but one link (named in 
   ("The raid view forgets a player who leaves...") hangs over `onMount`, which is about the crocodile's jaws. `SavannaMod`'s
   class note still speaks of the desert mod. One misplaced note in `SavannaTags`. Fix with the next change there.
 
-## Found solid so far
+### R8-18 (A, proven in the data; Minecraft's carver rule from memory): ravines and caves still come into the savanna along its rivers
 
-- **Reaching into neighbouring chunks:** `RiverBankFeature`, `RiverMudFeature`, `RiverPlantsFeature` write only their
-  own chunk and read at most 13 blocks out; `OxbowFeature`, `PanFeature`, `DryWallowFeature` keep every read and write
-  inside the 3 by 3 chunks a feature may touch (bounds checked column by column). None reads the live world's chunks;
-  what they take from the server level is the noise and the generator only.
+- **What is wrong:** the user's decision of 2026-11-07 is "no dips, ravines or caves" in the savanna. The rule that
+  takes the ravine and cave carvers out (`no_savanna_ravines_or_caves.json`) names the biomes in `#minecraft:is_savanna`.
+  The savanna's river (`antcolonies:savanna_river`, added the same week) is not in that tag (it is in `#is_river` and
+  in our own `savanna_waters`), and its own file lists all three carvers. Minecraft picks a chunk's carvers by the
+  biome at that chunk's corner and lets a ravine or cave started there run on for up to about 100 blocks. So every
+  river chunk can start one, and it cuts on into the flat plain and the floodplain beside the river. (The noise caves
+  are filled by the climate mask, which does cover the river; this is about the carved ones only.)
+- **What the player would see:** now and then a ravine or a cave mouth in the flat savanna within about 100 blocks of
+  a river, or a deep water-filled trench across the river's bed; for the insects, a hole that paths and nests must go
+  round (BUGS 121 and 140 were scouts stuck at a ravine's lip).
+- **Where:** `data/antcolonies/neoforge/biome_modifier/no_savanna_ravines_or_caves.json` (written by
+  `tools/flat_savannas/flat_caves.py`, last lines); `data/antcolonies/worldgen/biome/savanna_river.json` (`carvers`).
+- **Proof still owed:** not looked for in a world. A cheap check for a game test: the river biome's carver list, as the
+  game sees it after the modifiers, must be empty.
+- **Fix proposed:** the rule names `#antcolonies:savanna_waters` (the tag every other river rule here already uses) and
+  the river's own file lists no carvers. A carver started in another biome within 100 blocks of a savanna's edge still
+  reaches in; that is Minecraft's own rule and stays.
+
+### R8-19 (B, likely): in a Large Biomes world the cave filling looks at the wrong map
+
+- **What is wrong:** cave mouths and the thin "noodle" caves are filled where the climate is the savanna's, by adding
+  the savanna mask to two of Minecraft's cave files. Minecraft has only one copy of those two files for normal and
+  Large Biomes worlds alike, and our replacement points at the normal world's mask
+  (`antcolonies:overworld/savanna_flatness`, built on the normal climate noises), while a Large Biomes world's
+  savannas lie where the large noises say (`overworld_large_biomes/savanna_flatness`). The land's flattening has its
+  own large-biome files; the cave filling has none.
+- **What the player would see:** in a Large Biomes world only: cave mouths and pits in the flat savanna, and patches
+  of other land with no cave mouths (where the normal map would have had a savanna).
+- **Where:** `data/minecraft/worldgen/density_function/overworld/caves/entrances.json`, `noodle.json`;
+  `tools/flat_savannas/flat_caves.py`.
+- **Proof still owed:** that Large Biomes worlds read the same two cave files is from memory of Minecraft's noise
+  settings, not re-read; not looked for in a world.
+- **Fix proposed:** a small density function of our own that answers with the mask of the world being made (the
+  `antcolonies:whole_savanna` type already knows which world it is in), used by the two cave files.
+
+### R8-20 (C): small things
+
+- **A reed planted in water 2 deep never grows (proven):** `ReedBlock.grow` needs air over the top block
+  (`block/ReedBlock.java`, `grow`), and in 2-deep water the block over a lone bottom block is water. The same after a
+  player breaks the under-water second block of a column. Fix: grow into a water source too, holding the water.
+- **No savanna villages for any mod (proven in the data):** `data/minecraft/tags/worldgen/biome/has_structure/village_savanna.json`
+  has `"replace": true` and no biomes, which also wipes what other mods add to that tag. If no savanna villages is
+  meant only for our savannas, this needs another way (a note for the day another biome mod is tested).
+- **Minecraft's own sand, clay and gravel discs on our banks (likely, a look question):** the floodplain and
+  Minecraft's savannas keep `disk_sand`, `disk_clay` and `disk_gravel`, laid after our banks and oxbows; they turn
+  grass and dirt within 2 to 6 blocks of a water column to plain yellow sand or gravel, so on the low strip and round
+  oxbows (the savanna's river biome itself has none). Not looked at in a world; if the user has not minded them,
+  nothing to do.
+
+## Found solid
+
+- **Reaching into neighbouring chunks:** `RiverBankFeature`, `RiverMudFeature`, `RiverPlantsFeature`,
+  `RiverAlgaeFeature`, `RiverRemainsFeature`, `CrocodileNestFeature` and `QuietSavannaTreesFeature` write only their
+  own chunk (or within 8 blocks of it) and read at most 13 blocks out; `OxbowFeature`, `PanFeature`,
+  `DryWallowFeature` keep every read and write inside the 3 by 3 chunks a feature may touch (bounds checked column by
+  column); `HippoPodFeature` stays inside the bounds `OxbowFeature.pod` hands it (its standing spot reads one column
+  past its feet, and the bounds are pulled in by one for that).
+- **World-making threads and the live world:** no feature reads a chunk of the live world. What they take from the
+  server level is the seed, the noise and the generator only (`MoundPlaces.Land.of`, `GroundHeights`). The one
+  hand-over to the server, `NewLandMounds.queue`, is safe between threads in itself (its fault is R8-11, what happens
+  to the list afterwards); the server puts a mound in only once `LandReady` says the land round it is loaded (the
+  BUGS 183 lesson holds).
+- **The order of our features in a chunk:** oxbows and pans at `lakes`, the banks and river mud at
+  `local_modifications`, the mound's place and the giant trees at `surface_structures`, algae, remains, nests, pods
+  and water plants (in that order) at `vegetal_decoration`, dry wallows last. The oxbows come before the banks on
+  purpose and do not fight them: an oxbow's water stands a block or two over the river's, the banks read only water at
+  the river's own level, and the oxbow keeps off the river's strip by its distance to the water, not by reading the
+  strip.
 - **`GroundHeights`:** capped (4,096 pages a kind), let go with its world, safe from several threads.
 - **`FlatSavanna.Shared`:** the BUGS 222 leak fix holds (one memory per thread, cleared per wiring).
 - **`BigSavanna.livesAt`:** answers per cell, capped, the same whoever asks first.
 - **`PlainSurface`:** switches TerraBlender's chooser off only when every recipe is the same as the world's own, and
   leaves everything alone on any surprise.
 - **`RiverBends`, `SandBanks`:** from the noise alone, a few dozen readings a chunk.
+- **`MoundPlaces`' memories:** `isPlace` is keyed by the seed and the numbers it depends on; the dead-mound memory is
+  thrown away when the seed or the mound numbers change (new numbers are read with every world), and capped.
+- **The spawning groups' caps:** the 12 rows of `enumextensions.json` match the groups table in
+  `docs/LIVING-THINGS.md` row by row; no rare kind shares a group with a common kept one. Every river animal's spawn
+  rule goes through the quiet-savanna gate (`SavannaEvents.inBigSavanna`), its own rule first, the costly count last.
+- **The spawn lists:** all on `#antcolonies:savanna_waters`; `no_vanilla_mobs` takes Minecraft's monsters, farm
+  animals, bats, squid and river fish out of the same biomes and leaves the chicken and armadillo in, as planned.
+- **The blocks' ticking:** mud's random tick reads at most 162 cells and only loaded land; reeds tick only at their
+  top block; `PlantPush` looks again only at pushed plants (every 10 ticks, one small search) and its entity hook
+  leaves at once for anything that is not a many-part animal; the fire hook in `SavannaEvents` leaves at once unless
+  the changed block is fire.
 
-## Not read yet (for the session that carries on)
+## Not read here (other rounds')
 
-- `worldgen/`: `RiverAlgaeFeature`, `RiverRemainsFeature`, `CrocodileNestFeature`, `HippoPodFeature` (check its reads
-  stay inside the bounds `OxbowFeature.pod` gives it), `QuietSavannaTreesFeature`, `MoundPlaces` (check that
-  `MoundPlaces.Land.of(ServerLevel, ...)`, called from world-making threads by `OxbowFeature.keepout`, never reads a
-  chunk of the live world), `TermiteMoundStructure`, `TermiteMoundPiece`. The tree placing is round 7's.
-- `registry/` (all 12 files; `SavannaMobCategories` and `SavannaEntities` first: the groups' caps, and the callers of
-  `RiverZones.room` for R8-2), `SavannaEvents`, `SavannaMod`, `SavannaConfig`, `SavannaSpecies`.
-- The mud and water-plant blocks: `SavannaMudBlock`, `MudCrustBlock`, `AlgaeBlock`, `ReedBlock`, `HippoGrassBlock`,
-  `HippoGrassClumpBlock`, `RiverPebblesBlock`, `RiverSand`, `PlantPush`.
-- The data: biome modifiers, placed features (and the order of our features inside a chunk), the spawn lists,
-  `META-INF/enumextensions.json`, `data/minecraft/worldgen/` (R8-10).
+- The tree placing and the tree blocks (round 7); the termites' mud blocks `MudCrustBlock`, `MudCastBlock` and the
+  rest of `colony/NewLandMounds` (round 5); the animals' own spawn rules inside each animal class (the animals'
+  round) — R8-2's measure needs them.
+- TerraBlender's and Minecraft's own code (R8-3, R8-12, R8-15, R8-18, R8-19 quote it from memory).
