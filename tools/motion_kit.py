@@ -139,6 +139,95 @@ def limb(root, lengths, target, pole, ends=None, parallel=False, reach=0.985):
     return out, miss
 
 
+def digitigrade_leg(root, lengths, target, pole=(0.0, 0.0, -1.0), hock_deg=22.0, side_yaw_deg=0.0, reach=0.985):
+    """A 3-segment digitigrade mammal/feline hind leg (thigh, shin, metatarsal/hock -> ankle) solved directly.
+    hock_deg controls how far the hock juts back (+Z) from vertical: 0 deg = straight sprint push-off, ~22 deg = alert
+    feline stance, 60..75 deg = deep crouched stalk or sit. Returns (joints [hip, knee, hock, ankle], miss)."""
+    l1, l2, l3 = lengths
+    hr = math.radians(hock_deg)
+    yr = math.radians(side_yaw_deg)
+    # Direction from hock down to ankle (down -Y, forward -Z, optional slight outward yaw)
+    meta_dir = unit([math.sin(hr) * math.sin(yr), -math.cos(hr), -math.sin(hr) * math.cos(yr)])
+    hock_target = vsub(target, [c * l3 for c in meta_dir])
+    knee, hock, miss = two_bone(root, l1, l2, hock_target, pole, reach)
+    ankle = vadd(hock, [c * l3 for c in meta_dir])
+    return [list(root), knee, hock, ankle], miss
+
+
+# --- quadruped gaits & secondary motion (Animal Maker Engine upgrade, 2026-11-23) ---------------------------------------
+def quadruped_gait(phase, phases, duty, stride_len, lift_h, bounce=0.0, suspend_h=0.0, spine_flex=0.0,
+                   cycle_s=1.0):
+    """Parameterized 4-legged gait evaluator (walk, stealth stalk, trot, rotary gallop / bound with airborne flight).
+    Every animal passes its own timings and amplitudes (Rule 5: shared methods, unique animals).
+
+    phases:     dict of phase offsets (0..1) for ('bl', 'fl', 'br', 'fr')
+    duty:       float or dict per foot (fraction of cycle planted; < 0.5 creates airborne suspension in a gallop)
+    stride_len: float or dict per foot (ground travel while planted, model px)
+    lift_h:     float or dict per foot (peak paw lift height during swing, model px)
+    Returns {'feet', 'body_y', 'body_pitch', 'spine_pitch', 'airborne', 'speed_px_s'}."""
+    feet = {}
+    planted_count = 0
+    for key in ('bl', 'fl', 'br', 'fr'):
+        ph = (phase + phases[key]) % 1.0
+        d = duty[key] if isinstance(duty, dict) else duty
+        sl = stride_len[key] if isinstance(stride_len, dict) else stride_len
+        lh = lift_h[key] if isinstance(lift_h, dict) else lift_h
+        sw, lf = stride(ph, d)
+        planted = ph < d
+        if planted:
+            planted_count += 1
+        feet[key] = {'swing': sw, 'dz': -sw * (sl * 0.5), 'lift': lf, 'dy': lf * lh, 'planted': planted}
+    front_sw = 0.5 * (feet['fl']['swing'] + feet['fr']['swing'])
+    hind_sw = 0.5 * (feet['bl']['swing'] + feet['br']['swing'])
+    air_frac = max(0.0, 1.0 - planted_count / 2.0)  # 0 when 2+ feet down, 0.5 at 1 foot, 1.0 full airborne flight
+    # Spine gathers (arches up) when hind feet swing forward under the belly and extends when front feet reach forward
+    spine_pitch = spine_flex * 0.5 * (hind_sw - front_sw)
+    body_pitch = -spine_flex * 0.35 * (front_sw + hind_sw) * 0.5
+    body_y = bounce * math.sin(2.0 * math.pi * (phase * 2.0)) + suspend_h * ease(air_frac)
+    avg_duty = sum(duty.values()) / len(duty) if isinstance(duty, dict) else duty
+    avg_stride = sum(stride_len.values()) / len(stride_len) if isinstance(stride_len, dict) else stride_len
+    return {
+        'feet': feet,
+        'body_y': body_y,
+        'body_pitch': body_pitch,
+        'spine_pitch': spine_pitch,
+        'airborne': planted_count == 0,
+        'speed_px_s': avg_stride / max(1e-6, avg_duty * cycle_s),
+    }
+
+
+def secondary_lag(samples, dt, lag_s, damping=0.82, loop=True):
+    """2nd-order damped spring lag over a sequence of scalars or vectors (for living mane, tail tuft, and ear inertia).
+    When loop=True, pre-settles for 2 cycles so the last frame blends seamlessly into the first with zero pop."""
+    if not samples or lag_s <= 1e-6:
+        return [list(s) if isinstance(s, (list, tuple)) else s for s in samples]
+    is_vec = isinstance(samples[0], (list, tuple))
+    vecs = [list(s) for s in samples] if is_vec else [[float(s)] for s in samples]
+    dim = len(vecs[0])
+    omega = 2.0 / max(lag_s, dt * 1.5)
+    zeta = max(0.35, min(1.5, damping))
+    y = list(vecs[0])
+    v = [0.0] * dim
+    n = len(vecs)
+    # Sub-step for unconditional numerical stability even at coarse sample rates
+    sub = max(1, int(math.ceil(dt * omega * 2.5)))
+    h = dt / sub
+    passes = 3 if loop else 1
+    out = []
+    for p in range(passes):
+        cur = []
+        for idx in range(n):
+            tgt = vecs[idx]
+            for _ in range(sub):
+                for j in range(dim):
+                    acc = omega * omega * (tgt[j] - y[j]) - 2.0 * zeta * omega * v[j]
+                    v[j] += acc * h
+                    y[j] += v[j] * h
+            cur.append(list(y))
+        out = cur
+    return out if is_vec else [c[0] for c in out]
+
+
 # --- feet over time ------------------------------------------------------------------------------------------------------
 def stride(ph, duty):
     """One foot's step at phase ph (0 to 1): its swing (+1 forward, -1 back) and lift (0 to 1). Planted for the first
@@ -279,4 +368,18 @@ if __name__ == '__main__':
     js = follow_path(pts, [4.0] * 6)
     assert all(near(vlen(vsub(b, a)), 4.0) for a, b in zip(js, js[1:]))
     assert near(stride(0.0, 0.6)[0], 1.0) and near(stride(0.6, 0.6)[1], 0.0)
-    print('motion_kit: limbs of 2, 3 and 4 pieces, the path chain and the stride all check out')
+    # Digitigrade 3-segment feline hind leg: exact lengths & knee bends forward (-Z), hock sits behind (+Z)
+    for hock_deg in (0.0, 24.0, 62.0):
+        dj, dmiss = digitigrade_leg([0.0, 14.0, 0.0], [6.5, 6.0, 4.0], [0.0, 0.5, -1.0], hock_deg=hock_deg)
+        assert all(near(vlen(vsub(b, a)), L) for a, b, L in zip(dj, dj[1:], [6.5, 6.0, 4.0]))
+        assert dmiss == 0.0 and dj[1][2] <= dj[2][2] + 1e-6
+    # Quadruped rotary gallop has real airborne suspension frames
+    gallop_phases = {'bl': 0.0, 'br': 0.12, 'fl': 0.45, 'fr': 0.58}
+    air_frames = [quadruped_gait(k / 40.0, gallop_phases, 0.28, 22.0, 5.0, suspend_h=3.0, spine_flex=14.0)['airborne']
+                  for k in range(40)]
+    assert any(air_frames) and not all(air_frames), 'gallop must mix planted and airborne suspension frames'
+    # Secondary lag smooths a wave and closes a loop cleanly
+    wave = [math.sin(2.0 * math.pi * k / 24.0) * 10.0 for k in range(24)]
+    lagged = secondary_lag(wave, 1 / 24.0, 0.12, loop=True)
+    assert len(lagged) == len(wave) and abs(lagged[0] - lagged[-1]) < 3.0
+    print('motion_kit: limbs, digitigrade_leg, quadruped_gait, secondary_lag, path chain and stride all check out')

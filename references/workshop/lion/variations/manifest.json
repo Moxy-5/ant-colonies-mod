@@ -1,0 +1,77 @@
+[
+  {
+    "variant": "photo_king",
+    "title": "Savanna Pride King (Photo Fusion)",
+    "subtitle": "Real-photo fiery ginger crown halo + chestnut/charcoal swept cape + jet-black lower chest apron",
+    "tag": "Photo-inspired \u00b7 fiery crown & black apron",
+    "boxes": 250,
+    "slanted": 116,
+    "bones": 37,
+    "length_blocks": 4.613,
+    "height_blocks": 2.03,
+    "width_blocks": 1.519,
+    "min_y": 0.0,
+    "max_y": 32.486,
+    "paw_min_y": {
+      "leg_bl_paw": 0.0,
+      "leg_br_paw": 0.0,
+      "leg_fl_paw": 0.0,
+      "leg_fr_paw": 0.0
+    },
+    "mouth_poke_px": -1.55,
+    "tex_size": [
+      512,
+      256
+    ]
+  },
+  {
+    "variant": "monarch",
+    "title": "Golden Savanna Monarch",
+    "subtitle": "Classic sunlit golden-amber crown + warm cinnamon-chestnut flowing cape + rich dark-chocolate chest",
+    "tag": "Warm gold \u00b7 balanced royal cape",
+    "boxes": 250,
+    "slanted": 116,
+    "bones": 37,
+    "length_blocks": 4.613,
+    "height_blocks": 2.03,
+    "width_blocks": 1.471,
+    "min_y": 0.0,
+    "max_y": 32.486,
+    "paw_min_y": {
+      "leg_bl_paw": 0.0,
+      "leg_br_paw": 0.0,
+      "leg_fl_paw": 0.0,
+      "leg_fr_paw": 0.0
+    },
+    "mouth_poke_px": -1.55,
+    "tex_size": [
+      512,
+      256
+    ]
+  },
+  {
+    "variant": "kalahari",
+    "title": "Kalahari Black-Maned Patriarch",
+    "subtitle": "Heavyweight apex boss (1.11x bulk): sweeping obsidian-espresso full mane, belly fringe & elbow tufts",
+    "tag": "Heavy patriarch \u00b7 dramatic black mane",
+    "boxes": 253,
+    "slanted": 116,
+    "bones": 37,
+    "length_blocks": 4.613,
+    "height_blocks": 2.03,
+    "width_blocks": 1.595,
+    "min_y": 0.0,
+    "max_y": 32.486,
+    "paw_min_y": {
+      "leg_bl_paw": 0.0,
+      "leg_br_paw": 0.0,
+      "leg_fl_paw": 0.0,
+      "leg_fr_paw": 0.0
+    },
+    "mouth_poke_px": -1.55,
+    "tex_size": [
+      512,
+      256
+    ]
+  }
+]
