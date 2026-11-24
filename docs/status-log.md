@@ -632,3 +632,4 @@ Every "Current status" bullet CLAUDE.md held up to 2026-11-19, word for word, ol
 - 2026-11-23: the food web's step 4 built: scared barbs and tilapia dash into reeds or under hippo grass mats and keep still; hunters see a still fish there only within 2 blocks; hatchling crocodiles rest in reeds by their crèche.
 - 2026-11-23: the food web's step 5 built: the six-banded distichodus in the river (grazes hippo grass mats, nibbles reeds, flares, bolts into cover, leaps when hit; eaten by crocodiles and the bull shark); the food web plan is done.
 - 2026-11-23: the food web's step 6 built: a hippo standing in its pool by day flicks its dung into the water, a brown cloud that barbs and tilapia crowd round and pick at (looks only).
+- 2026-11-23: the user said the Matabele raids are still broken and inconsistent (the march works, the raids do not); M8 is not really done. Plan for a from-scratch rewrite by a Fable session written: `docs/plans/raid-rewrite.md` (BUGS 306).

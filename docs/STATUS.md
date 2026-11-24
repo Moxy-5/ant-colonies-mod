@@ -5,6 +5,8 @@ Keep this short. The full story is in `docs/HISTORY.md`; every status bullet is 
 ## Finish line
 **M8 playable = the mod done for now** (the user, 2026-10-25): Matabele scouts find termites, raid columns go out, fight, and carry prey home. Everything after that is optional.
 
+**The raids do not work yet (the user, 2026-11-23):** the march works, but the raids themselves are broken and inconsistent. They get a from-scratch rewrite by a Fable session: `docs/plans/raid-rewrite.md` (BUGS 306).
+
 ## Now (2026-11-21): the Animal Maker Engine overnight, steps A to C and the full check
 Branch `claude/engine-every-animal` (not yet in `C:\Ant Mod`, which holds another session's uncommitted notes). One checker and one course for any animal, shared climbing moves in the framework, shared leg maths, game faces automatic, the monitor's S-curve, and `python tools/verify_animal.py <animal> [--quick]` (the one command that checks an animal all the way). Every built animal passed it. Open: BUGS 255 (a monitor can stand at a one-block step without climbing, found by a new test), BUGS 256 (young crocodiles' tails inside blocks at steps).
 
