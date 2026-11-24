@@ -32,6 +32,7 @@ import net.minecraft.world.level.ServerLevelAccessor;
 import net.minecraft.world.level.levelgen.Heightmap;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
+import org.joml.Vector3f;
 
 /**
  * A cloud of flies (fly clouds step 2, 2026-11-20, {@code docs/plans/fly-clouds.md}; animals are fun first): one mob
@@ -45,8 +46,8 @@ import net.minecraft.world.phys.Vec3;
  * 2026-11-20 when the user asked for more flies round the river). The cloud wanders slowly round the spot it came to
  * ({@link #DRIFT} blocks), its middle between about 1.7 and 3 blocks over the ground or water under it, mostly near 2,
  * rising and sinking every minute or two (the user's heights: in reach of a bullfrog's 2-block tongue when it sinks,
- * out of reach when it rises). Eaten flies come back one a minute ({@link #REFILL_TICKS}); the bullfrog's tongue, barbs
- * and young crocodiles eating them is the plan's step 3.
+ * out of reach when it rises). Eaten flies come back one a minute ({@link #REFILL_TICKS}); the bullfrog's tongue takes
+ * them from the swarm, and barbs, young crocodiles and bullfrogs take the ones that land ({@link #landedFly}).
  *
  * <p>Not a creature to fight: it cannot be hit, pushed, leashed or hurt (only {@code /kill} removes it), and it passes
  * through blocks.
@@ -62,6 +63,24 @@ public class FlyCloudEntity extends Mob {
     static final double KEEP_NEAR = 96.0;
 
     private static final EntityDataAccessor<Integer> DATA_FLIES = SynchedEntityData.defineId(FlyCloudEntity.class, EntityDataSerializers.INT);
+    private static final EntityDataAccessor<Byte> DATA_LAND = SynchedEntityData.defineId(FlyCloudEntity.class, EntityDataSerializers.BYTE);
+    private static final EntityDataAccessor<Vector3f> DATA_LAND_SPOT = SynchedEntityData.defineId(FlyCloudEntity.class, EntityDataSerializers.VECTOR3);
+
+    /**
+     * A landed fly (the river food web's step 1, 2026-11-23, {@code docs/plans/river-tie-up.md}; my picks): the flies'
+     * own landings are drawn only on the players' computers, so the server cannot see them. So now and then (every
+     * {@link #LAND_GAP_MIN} to {@link #LAND_GAP_MIN} + {@link #LAND_GAP_MORE} ticks, about 2 a minute) the cloud itself
+     * picks a spot under it on the water's surface or the ground and one of its flies lands there for
+     * {@link #LAND_TICKS} ticks; the players' computers steer one fly down to it. While it sits there one eater may
+     * claim it (a barb, a young crocodile, a bullfrog: {@link #claimLanded}); a claimed fly waits for its eater up to
+     * {@link #LAND_LONGEST} ticks. Then it is eaten ({@link #eatLanded}), dodges the bite and flies up
+     * ({@link #landedFlyOff}), or flies up by itself. One landed fly a cloud at a time. States: none, down, eaten, off
+     * (eaten and off are held {@link #LAND_SHOWN} ticks so the players' computers see them).
+     */
+    public static final byte LAND_NONE = 0, LAND_DOWN = 1, LAND_EATEN = 2, LAND_OFF = 3;
+    static final int LAND_GAP_MIN = 400, LAND_GAP_MORE = 400, LAND_TICKS = 80, LAND_LONGEST = 160, LAND_SHOWN = 10;
+    /** How far from the cloud's middle it lands at most (blocks across), and how far under it (the swarm's own numbers). */
+    static final double LAND_ACROSS = 1.4, LAND_BELOW = 4.0;
 
     /** The players' computers start the cloud's buzz through this (set by the client's setup; nothing on a server). */
     public static Consumer<FlyCloudEntity> startBuzz = cloud -> { };
@@ -77,6 +96,10 @@ public class FlyCloudEntity extends Mob {
     private int most = 8, refill;
     /** Its own phases for the wandering and the rise and fall (radians), so no two clouds move together. */
     private float phaseX, phaseZ, phaseLow, phaseHigh;
+    /** The landed fly: ticks to the next landing, ticks it has sat, ticks left to show eaten or off, and its eater. */
+    private int landGap = LAND_GAP_MIN, landedFor, landShown;
+    @Nullable
+    private Entity landClaim;
 
     public FlyCloudEntity(EntityType<? extends FlyCloudEntity> type, Level level) {
         super(type, level);
@@ -97,6 +120,8 @@ public class FlyCloudEntity extends Mob {
     protected void defineSynchedData(SynchedEntityData.Builder builder) {
         super.defineSynchedData(builder);
         builder.define(DATA_FLIES, 8);
+        builder.define(DATA_LAND, LAND_NONE);
+        builder.define(DATA_LAND_SPOT, new Vector3f());
     }
 
     /** How many flies it holds now. */
@@ -120,6 +145,151 @@ public class FlyCloudEntity extends Mob {
                 refill = REFILL_TICKS;
             }
         }
+    }
+
+    // --- a landed fly (the food web's step 1) ---------------------------------------------------------------------------
+
+    /** Its landed fly's state now: {@link #LAND_NONE}, {@link #LAND_DOWN}, {@link #LAND_EATEN} or {@link #LAND_OFF}. */
+    public byte landState() {
+        return entityData.get(DATA_LAND);
+    }
+
+    /** Where its last landed fly sat (the water's surface or the ground's top; read with {@link #landState}). */
+    public Vec3 landSpot() {
+        Vector3f v = entityData.get(DATA_LAND_SPOT);
+        return new Vec3(v.x, v.y, v.z);
+    }
+
+    /** Where a fly of it sits landed now, or none. */
+    @Nullable
+    public Vec3 landedFly() {
+        return landState() == LAND_DOWN ? landSpot() : null;
+    }
+
+    /** Whether its landed fly sits on the water (else on the ground). */
+    public boolean landedOnWater() {
+        return level().getFluidState(BlockPos.containing(landSpot())).is(FluidTags.WATER);
+    }
+
+    /** Whether this eater is the one going for its landed fly. */
+    public boolean claimedBy(Entity eater) {
+        return landState() == LAND_DOWN && landClaim == eater;
+    }
+
+    /** An eater goes for its landed fly: true if it is down and no other eater is after it (the fly then waits longer). */
+    public boolean claimLanded(Entity eater) {
+        if (landState() != LAND_DOWN || landClaim != null && landClaim != eater && claimHolds()) {
+            return false;
+        }
+        landClaim = eater;
+        return true;
+    }
+
+    /** An eater gives up on its landed fly (it sits on until its time is up). */
+    public void releaseLanded(Entity eater) {
+        if (landClaim == eater) {
+            landClaim = null;
+        }
+    }
+
+    /** Its eater catches the landed fly: one fly fewer, as a tongued one. */
+    public void eatLanded(Entity eater) {
+        if (claimedBy(eater)) {
+            takeFly();
+            endLanding(LAND_EATEN);
+        }
+    }
+
+    /** The landed fly dodges its eater's bite and flies back up into the cloud. */
+    public void landedFlyOff(Entity eater) {
+        if (claimedBy(eater)) {
+            endLanding(LAND_OFF);
+        }
+    }
+
+    /** For tests and films: a fly lands at this spot now. */
+    public void landAt(Vec3 spot) {
+        entityData.set(DATA_LAND_SPOT, new Vector3f((float) spot.x, (float) spot.y, (float) spot.z));
+        entityData.set(DATA_LAND, LAND_DOWN);
+        landedFor = 0;
+        landClaim = null;
+    }
+
+    /** For tests: no fly lands by itself while true (false lets them land again). */
+    public void holdLandings(boolean hold) {
+        landGap = hold ? Integer.MAX_VALUE / 2 : LAND_GAP_MIN;
+    }
+
+    private boolean claimHolds() {
+        return landClaim != null && landClaim.isAlive() && !landClaim.isRemoved();
+    }
+
+    private void endLanding(byte how) {
+        entityData.set(DATA_LAND, how);
+        landShown = LAND_SHOWN;
+        landClaim = null;
+        if (landGap < Integer.MAX_VALUE / 4) {
+            landGap = LAND_GAP_MIN + random.nextInt(LAND_GAP_MORE);
+        }
+    }
+
+    /** The landing's tick: a fly down sits its time (longer while an eater comes), eaten or off shows a moment, then the next landing. */
+    private void tickLanding() {
+        byte state = landState();
+        if (state == LAND_DOWN) {
+            if (!claimHolds()) {
+                landClaim = null;
+            }
+            if (++landedFor >= (landClaim != null ? LAND_LONGEST : LAND_TICKS) || flies() <= 0) {
+                endLanding(LAND_OFF);
+            }
+        } else if (state != LAND_NONE) {
+            if (--landShown <= 0) {
+                entityData.set(DATA_LAND, LAND_NONE);
+            }
+        } else if (flies() > 0 && --landGap <= 0) {
+            landGap = LAND_GAP_MIN + random.nextInt(LAND_GAP_MORE);
+            Vec3 spot = landingSpot();
+            if (spot != null) {
+                landAt(spot);
+            }
+        }
+    }
+
+    /** A spot under it a fly may land on: the top of the ground or the water's surface within reach under it, or none. */
+    @Nullable
+    private Vec3 landingSpot() {
+        double x = getX() + (random.nextDouble() * 2 - 1) * LAND_ACROSS;
+        double z = getZ() + (random.nextDouble() * 2 - 1) * LAND_ACROSS;
+        int top = level().getHeight(Heightmap.Types.MOTION_BLOCKING, Mth.floor(x), Mth.floor(z));
+        double y = top;
+        if (level().getFluidState(BlockPos.containing(x, top - 1, z)).is(FluidTags.WATER)) {
+            y = top - 0.11;       // on the water's surface (a water block's top is not the block's)
+        }
+        return getY() - y > LAND_BELOW || y > getY() ? null : new Vec3(x, y, z);
+    }
+
+    /**
+     * The nearest cloud whose landed fly sits within this reach of the eater (blocks, straight line to the fly) and no
+     * other eater is after; on the water only if asked. None if none.
+     */
+    @Nullable
+    public static FlyCloudEntity landedNear(Entity eater, double reach, boolean waterOnly) {
+        FlyCloudEntity best = null;
+        double bestD = reach * reach;
+        for (FlyCloudEntity c : eater.level().getEntitiesOfClass(FlyCloudEntity.class,
+                eater.getBoundingBox().inflate(reach + LAND_ACROSS, reach + LAND_BELOW, reach + LAND_ACROSS))) {
+            Vec3 at = c.landedFly();
+            if (at == null || c.landClaim != null && c.landClaim != eater && c.claimHolds() || waterOnly && !c.landedOnWater()) {
+                continue;
+            }
+            double d = eater.position().distanceToSqr(at);
+            if (d < bestD) {
+                best = c;
+                bestD = d;
+            }
+        }
+        return best;
     }
 
     /** How many it holds when full. */
@@ -163,6 +333,7 @@ public class FlyCloudEntity extends Mob {
         if (home == null) {
             home = position();
         }
+        tickLanding();          // also with NoAI: a still cloud's flies still land (films and tests)
         if (isNoAi()) {
             return;         // a cloud summoned with NoAI stays where it is put (as any NoAI mob does; films and tests)
         }

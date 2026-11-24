@@ -3799,7 +3799,93 @@ public class RiverLifeTests {
         cloud.moveTo(at.x, at.y, at.z, 0, 0);
         cloud.setPersistenceRequired();
         helper.getLevel().addFreshEntity(cloud);
+        cloud.holdLandings(true);       // no fly lands by itself (a test lands one where it wants it)
         return cloud;
+    }
+
+    // --- landed flies (the river food web's step 1, 2026-11-23) ---------------------------------------------------------
+
+    /** Keeps a fly landed at this spot (relative): a new one lands each time the last is eaten or flies off. */
+    private static void keepAFlyLanded(GameTestHelper helper, FlyCloudEntity cloud, net.minecraft.world.phys.Vec3 spot) {
+        net.minecraft.world.phys.Vec3 at = helper.absoluteVec(spot);
+        helper.onEachTick(() -> {
+            if (cloud.landState() == FlyCloudEntity.LAND_NONE && cloud.flies() > 0) {
+                cloud.landAt(at);
+            }
+        });
+    }
+
+    /** A barb sips a fly landed on the water near it (any time of day: no dawn or dusk set). */
+    @GameTest(template = "arena", timeoutTicks = 500)
+    public static void aBarbSipsALandedFlyOffTheWater(GameTestHelper helper) {
+        buildPond(helper);
+        BarbEntity barb = helper.spawn(SavannaEntities.BARB.get(), new BlockPos(5, TOP - 1, 5));
+        barb.setPersistenceRequired();
+        FlyCloudEntity cloud = cloudAt(helper, helper.absoluteVec(new net.minecraft.world.phys.Vec3(3.5, TOP + 3.0, 5.5)));
+        keepAFlyLanded(helper, cloud, new net.minecraft.world.phys.Vec3(3.5, TOP + 0.89, 5.5));
+        boolean[] sipped = {false};
+        helper.onEachTick(() -> sipped[0] |= barb.action() == BarbEntity.SIP);
+        helper.succeedWhen(() -> helper.assertTrue(sipped[0] && cloud.flies() < 4, "the barb " + (sipped[0] ? "sipped" : "never sipped")
+                + ", the cloud holds " + cloud.flies() + " of 4 flies"));
+    }
+
+    /** A hatchling crocodile, not hungry, snaps up a fly landed on the water near it. */
+    @GameTest(template = "arena", timeoutTicks = 500)
+    public static void aHatchlingCrocodileSnapsALandedFly(GameTestHelper helper) {
+        buildPond(helper);
+        var croc = helper.spawn(SavannaEntities.CROCODILE.get(), new BlockPos(3, TOP - 1, 5));
+        croc.life().setUp(true, croc.getRandom());
+        croc.life().setAge(0);
+        croc.load(croc.saveWithoutId(new net.minecraft.nbt.CompoundTag()));       // its size and pace as it loads
+        croc.setPersistenceRequired();
+        FlyCloudEntity cloud = cloudAt(helper, helper.absoluteVec(new net.minecraft.world.phys.Vec3(5.5, TOP + 3.0, 5.5)));
+        keepAFlyLanded(helper, cloud, new net.minecraft.world.phys.Vec3(5.5, TOP + 0.89, 5.5));
+        boolean[] snapped = {false};
+        helper.onEachTick(() -> snapped[0] |= croc.jaws() == com.antcolonies.savanna.animal.CrocodileEntity.JAWS_SNAP_LEFT
+                || croc.jaws() == com.antcolonies.savanna.animal.CrocodileEntity.JAWS_SNAP_RIGHT);
+        helper.succeedWhen(() -> {
+            helper.assertTrue(croc.life().isYoung(), "the crocodile is not a hatchling");
+            helper.assertTrue(snapped[0] && cloud.flies() < 4, "the hatchling " + (snapped[0] ? "snapped" : "never snapped")
+                    + " (" + String.format("%.1f", croc.position().distanceTo(helper.absoluteVec(new net.minecraft.world.phys.Vec3(5.5, TOP + 0.89, 5.5))))
+                    + " blocks from the fly), the cloud holds " + cloud.flies() + " of 4 flies");
+        });
+    }
+
+    /** A hungry bullfrog tongues a fly landed on the ground in front of it, though its cloud hangs out of reach. */
+    @GameTest(template = "arena", timeoutTicks = 400)
+    public static void aBullfrogTonguesALandedFly(GameTestHelper helper) {
+        bankWithPool(helper);
+        BullfrogEntity frog = frogOnBank(helper, MX0 + 2, MZ0 + 2, -90);
+        frog.makeHungry();
+        FlyCloudEntity cloud = cloudAt(helper, frog.position().add(0.8, 3.5, 0));
+        keepAFlyLanded(helper, cloud, new net.minecraft.world.phys.Vec3(MX0 + 2 + 0.5 + 1.2, TOP + 1.0, MZ0 + 2 + 0.5));
+        boolean[] flicked = {false};
+        helper.onEachTick(() -> flicked[0] |= frog.action() == BullfrogEntity.TONGUE);
+        helper.succeedWhen(() -> helper.assertTrue(flicked[0] && cloud.flies() < 4, "the frog " + (flicked[0] ? "flicked" : "never flicked")
+                + ", the cloud holds " + cloud.flies() + " of 4 flies"));
+    }
+
+    /** With no eater near, a cloud's flies land by themselves now and then and every one flies back up: none is lost. */
+    @GameTest(template = "arena", timeoutTicks = 1100)
+    public static void aCloudWithNobodyNearLosesNoLandedFlies(GameTestHelper helper) {
+        bankWithPool(helper);
+        FlyCloudEntity cloud = cloudAt(helper, helper.absoluteVec(new net.minecraft.world.phys.Vec3(MX0 + 8, TOP + 2.0, MZ0 + 5)));
+        cloud.holdLandings(false);
+        int[] landings = {0};
+        byte[] last = {FlyCloudEntity.LAND_NONE};
+        helper.onEachTick(() -> {
+            byte now = cloud.landState();
+            if (now == FlyCloudEntity.LAND_DOWN && last[0] != now) {
+                landings[0]++;
+            }
+            last[0] = now;
+        });
+        helper.runAtTickTime(1050, () -> {
+            helper.assertTrue(landings[0] >= 1, "no fly landed by itself in 50 s");
+            helper.assertTrue(cloud.flies() == 4, "the cloud holds " + cloud.flies() + " of 4 flies with nobody to eat them");
+            SavannaMod.LOGGER.info("[flies] {} landings in 50 s", landings[0]);
+            helper.succeed();
+        });
     }
 
     /** Bold, not shy: a player standing close makes a bullfrog puff up, then lunge and bite (1 heart). */

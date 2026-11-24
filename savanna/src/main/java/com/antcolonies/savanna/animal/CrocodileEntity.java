@@ -340,6 +340,7 @@ public class CrocodileEntity extends PathfinderMob implements GeoEntity, HasLife
         goalSelector.addGoal(1, new SeekMateGoal<>(this, 1.0));      // over the sun and the wandering: a courtship is not left for a bask
         goalSelector.addGoal(1, new BaskGoal(this));
         goalSelector.addGoal(1, new HuntGoal(this));
+        goalSelector.addGoal(0, new CrocFlySnapGoal(this));        // the young snap up landed flies (the river food web, 2026-11-23; over a bask and the crèche, never over a hunt)
         goalSelector.addGoal(2, new ToWaterGoal(this));
         goalSelector.addGoal(3, new HalfOutGoal(this));
         goalSelector.addGoal(3, new AshoreGoal(this));

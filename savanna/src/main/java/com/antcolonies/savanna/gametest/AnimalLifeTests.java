@@ -988,4 +988,63 @@ public class AnimalLifeTests {
                     + helper.relativePos(father.blockPosition()) + ", the monitor at " + helper.relativePos(monitor.blockPosition()) + ")");
         });
     }
+
+    // --- frog spawn eaten (the river food web's step 2, 2026-11-23) ------------------------------------------------------
+    // (a batch of their own: the father here counted against the breeding tests' room to breed, run beside them)
+
+    /** How many eggs a frog egg mat holds now (0 once it is gone). */
+    private static int frogEggs(GameTestHelper helper, BlockPos eggs) {
+        return helper.getLevel().getBlockState(eggs).is(SavannaBlocks.FROG_EGGS.get())
+                && helper.getLevel().getBlockEntity(eggs) instanceof EggClutchBlockEntity clutch ? clutch.count() : 0;
+    }
+
+    /** A frog egg mat no father guards is nibbled: one by a hungry tilapia, another by a hungry crab on the bed under it. */
+    @GameTest(template = "arena", timeoutTicks = 800, batch = "frog_spawn_eaten")
+    public static void tilapiaAndCrabsNibbleAnUnguardedFrogEggMat(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        breedingPond(helper);
+        clearLeftovers(helper, SavannaEntities.BULLFROG.get());
+        BlockPos forFish = helper.absolutePos(new BlockPos(P0 + 3, WATER_TOP, P0 + 3));
+        BlockPos forCrab = helper.absolutePos(new BlockPos(P1 - 2, WATER_TOP, P1 - 2));
+        helper.assertTrue(com.antcolonies.savanna.block.FrogEggsBlock.lay(level, forFish, SavannaEntities.BULLFROG.get(), 10)
+                && com.antcolonies.savanna.block.FrogEggsBlock.lay(level, forCrab, SavannaEntities.BULLFROG.get(), 10), "eggs could not be laid on the pond");
+        var tilapia = helper.spawn(SavannaEntities.TILAPIA.get(), new BlockPos(P0 + 3, BED + 1, P0 + 5));
+        tilapia.setPersistenceRequired();
+        tilapia.makeHungry();
+        var crab = helper.spawn(SavannaEntities.CRAB.get(), new BlockPos(P1 - 2, BED + 1, P1 - 4));
+        crab.setPersistenceRequired();
+        crab.makeHungry();
+        helper.succeedWhen(() -> {
+            helper.assertTrue(frogEggs(helper, forFish) < 10, "the tilapia never nibbled its egg mat (10 eggs left; it is "
+                    + String.format("%.1f", tilapia.position().distanceTo(net.minecraft.world.phys.Vec3.atCenterOf(forFish))) + " blocks off)");
+            helper.assertTrue(frogEggs(helper, forCrab) < 10, "the crab never nibbled its egg mat (10 eggs left; it is "
+                    + String.format("%.1f", crab.position().distanceTo(net.minecraft.world.phys.Vec3.atCenterOf(forCrab))) + " blocks off)");
+        });
+    }
+
+    /** A father guarding his eggs puffs up and lunges at a tilapia come within 2 blocks of them to eat them, and bites it. */
+    @GameTest(template = "arena", timeoutTicks = 600, batch = "frog_spawn_eaten")
+    public static void aGuardingFatherLungesAtATilapiaAtHisEggs(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        breedingPond(helper);
+        clearLeftovers(helper, SavannaEntities.BULLFROG.get());
+        com.antcolonies.savanna.animal.BullfrogEntity father = grown(helper, SavannaEntities.BULLFROG.get(), "male", new BlockPos(P0 + 9, WATER_TOP, P0 + 8));
+        father.setPersistenceRequired();
+        BlockPos eggs = helper.absolutePos(new BlockPos(P0 + 5, WATER_TOP, P0 + 8));
+        com.antcolonies.savanna.block.FrogEggsBlock.lay(level, eggs, SavannaEntities.BULLFROG.get(), 10);
+        father.guard(eggs);
+        // the tilapia held still at the eggs, at the floating frog's level (the meeting under test, not its escape)
+        var tilapia = helper.spawn(SavannaEntities.TILAPIA.get(), new BlockPos(P0 + 5, WATER_TOP, P0 + 7));
+        tilapia.setNoAi(true);
+        tilapia.setNoGravity(true);
+        tilapia.setPersistenceRequired();
+        float full = tilapia.getHealth();
+        boolean[] puffed = {false};
+        helper.onEachTick(() -> puffed[0] |= father.action() == com.antcolonies.savanna.animal.BullfrogEntity.PUFF);
+        helper.succeedWhen(() -> {
+            helper.assertTrue(puffed[0], "the father never puffed up at the tilapia (" + String.format("%.1f", father.distanceTo(tilapia)) + " blocks off)");
+            helper.assertTrue(!tilapia.isAlive() || tilapia.getHealth() < full, "the father never bit the tilapia ("
+                    + String.format("%.2f", father.distanceTo(tilapia)) + " blocks off)");
+        });
+    }
 }

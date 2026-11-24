@@ -519,6 +519,9 @@ final class BullfrogGoals {
      * real fly: the tongue's tip follows that fly as it shoots out and the fly rides back on the pad, or dodges at the
      * last moment. While flies stay in reach and it is hungry it flicks again {@link #FLICK_GAP_MIN} to
      * {@link #FLICK_GAP_MIN} + {@link #FLICK_GAP_MORE} ticks later, until a few fill it.
+     *
+     * <p>A fly landed in reach (the river food web's step 1, 2026-11-23: {@code FlyCloudEntity.landedFly}) is the easy
+     * one: on the ground or the water in front of it, lower than its mouth too; it claims it, turns, and flicks once.
      */
     static final class TongueGoal extends Goal {
         private final BullfrogEntity frog;
@@ -526,6 +529,10 @@ final class BullfrogGoals {
         private FlyCloudEntity cloud;
         private Vec3 at = Vec3.ZERO;
         private boolean caught;
+        /** Whether it is after the cloud's landed fly (else the swarm), and that cloud (let go of when it stops). */
+        private boolean landed;
+        @Nullable
+        private FlyCloudEntity claimed;
         private int ticks, aimed, flicks, wait;
 
         TongueGoal(BullfrogEntity frog) {
@@ -552,11 +559,39 @@ final class BullfrogGoals {
             return hit.getType() == HitResult.Type.MISS ? edge : null;
         }
 
+        /** A landed fly's spot if it lies within the tongue's reach of the mouth along a clear line, else none. */
+        @Nullable
+        static Vec3 landedInReach(BullfrogEntity frog, FlyCloudEntity cloud) {
+            Vec3 spot = cloud.landedFly();
+            if (spot == null) {
+                return null;
+            }
+            Vec3 mouth = frog.mouth();
+            Vec3 aim = spot.add(0, 0.05, 0);
+            if (aim.distanceTo(mouth) > TONGUE_REACH * frog.getScale()) {
+                return null;
+            }
+            HitResult hit = frog.level().clip(new ClipContext(mouth, aim, ClipContext.Block.COLLIDER, ClipContext.Fluid.NONE, frog));
+            return hit.getType() == HitResult.Type.MISS ? aim : null;
+        }
+
         @Override
         public boolean canUse() {
             if (!frog.isHungry() || frog.isDug() || frog.busy() || !now(frog, 10)) {
                 return false;
             }
+            FlyCloudEntity down = FlyCloudEntity.landedNear(frog, TONGUE_REACH * frog.getScale() + 1.0, false);
+            if (down != null) {
+                Vec3 spot = landedInReach(frog, down);
+                if (spot != null && down.claimLanded(frog)) {
+                    cloud = down;
+                    claimed = down;
+                    at = spot;
+                    landed = true;
+                    return true;
+                }
+            }
+            landed = false;
             for (FlyCloudEntity c : frog.level().getEntitiesOfClass(FlyCloudEntity.class, frog.getBoundingBox().inflate(4.0))) {
                 if (c.flies() <= 0) {
                     continue;
@@ -584,6 +619,7 @@ final class BullfrogGoals {
             aimed = 0;
             wait = pause;
             frog.setTongueCloud(cloud);
+            frog.setTongueAt(at);       // where its eyes are: its renderer picks the landed fly when it aims at its spot
             frog.act(BullfrogEntity.AIM);
         }
 
@@ -611,7 +647,7 @@ final class BullfrogGoals {
                     return;
                 }
                 if (facing && aimed >= AIM_TICKS + wait) {
-                    at = inReach(frog, cloud);
+                    at = landed ? cloud.claimedBy(frog) ? landedInReach(frog, cloud) : null : inReach(frog, cloud);
                     if (at == null || !cloud.isAlive() || cloud.flies() <= 0) {
                         cloud = null;
                         return;
@@ -630,13 +666,20 @@ final class BullfrogGoals {
                 return;
             }
             int t = frog.actionTicks;
-            if (t == TONGUE_BACK && caught && cloud.isAlive() && cloud.flies() > 0) {
-                cloud.takeFly();
+            if (landed && t == TONGUE_OUT && !caught) {
+                cloud.landedFlyOff(frog);       // the landed fly zips up just as the pad comes
+            }
+            if (t == TONGUE_BACK && caught && cloud.isAlive() && cloud.flies() > 0 && (!landed || cloud.claimedBy(frog))) {
+                if (landed) {
+                    cloud.eatLanded(frog);
+                } else {
+                    cloud.takeFly();
+                }
                 frog.ateFly();
                 frog.playSound(SoundEvents.FROG_EAT, 0.8F, 1.1F);
             } else if (t >= TONGUE_END) {
-                // flick after flick while it is hungry and the flies stay in reach
-                if (frog.isHungry() && flicks < MOST_FLICKS && cloud.isAlive() && cloud.flies() > 0 && (at = inReach(frog, cloud)) != null) {
+                // flick after flick while it is hungry and the flies stay in reach (a landed fly: one flick)
+                if (!landed && frog.isHungry() && flicks < MOST_FLICKS && cloud.isAlive() && cloud.flies() > 0 && (at = inReach(frog, cloud)) != null) {
                     aim(FLICK_GAP_MIN + frog.getRandom().nextInt(FLICK_GAP_MORE));
                 } else {
                     cloud = null;
@@ -651,7 +694,12 @@ final class BullfrogGoals {
                 frog.stopActing();
             }
             frog.setTongueCloud(null);
+            if (claimed != null) {
+                claimed.releaseLanded(frog);
+                claimed = null;
+            }
             cloud = null;
+            landed = false;
         }
     }
 
@@ -662,7 +710,8 @@ final class BullfrogGoals {
      * comes within its bite's reach ({@link #biteReach}) after it has puffed a second and a half, or who hurt it, gets a barking lunge and a
      * bite ({@link #BITE}: 1 heart), then it puffs again. A father (the river tie-up part B) does the same to anything
      * that comes within {@link BullfrogEntity#GUARD_SEE_OFF} blocks of his eggs or school ({@link BullfrogEntity#threatensYoung}:
-     * a player, a monitor, a young crocodile), going right up to it first.
+     * a player, a monitor, a young crocodile), going right up to it first, and to a tilapia or crab come within
+     * {@link BullfrogEntity#RAIDER_NEAR} of them to eat the eggs (the river food web's step 2, 2026-11-23).
      */
     static final class ThreatGoal extends Goal {
         private final BullfrogEntity frog;
@@ -701,8 +750,10 @@ final class BullfrogGoals {
             }
             LivingEntity best = null;
             double bestD = Double.MAX_VALUE;
+            Vec3 middle = Vec3.atCenterOf(spot);
             for (LivingEntity e : frog.level().getEntitiesOfClass(LivingEntity.class, new net.minecraft.world.phys.AABB(spot).inflate(BullfrogEntity.GUARD_SEE_OFF),
-                    e -> e != frog && BullfrogEntity.threatensYoung(e))) {
+                    e -> e != frog && (BullfrogEntity.threatensYoung(e)
+                            || BullfrogEntity.raidsEggs(e) && e.distanceToSqr(middle) < Mth.square(BullfrogEntity.RAIDER_NEAR)))) {
                 double d = e.distanceToSqr(frog);
                 if (d < bestD) {
                     bestD = d;
@@ -714,10 +765,14 @@ final class BullfrogGoals {
 
         /** Whether the foe is still the frog's business: near it, or (for a father) still near his young. */
         private boolean stillNear(LivingEntity e) {
+            BlockPos spot = frog.guardSpot();
+            if (BullfrogEntity.raidsEggs(e)) {
+                // an egg thief is left once it has backed off from the eggs (he does not hunt fish across the pool)
+                return spot != null && e.distanceToSqr(Vec3.atCenterOf(spot)) < Mth.square(BullfrogEntity.RAIDER_NEAR + 2.0);
+            }
             if (e.distanceTo(frog) < PUFF_NEAR + 2.0) {
                 return true;
             }
-            BlockPos spot = frog.guardSpot();
             return spot != null && e.distanceToSqr(Vec3.atCenterOf(spot)) < Mth.square(BullfrogEntity.GUARD_SEE_OFF + 2.0);
         }
 

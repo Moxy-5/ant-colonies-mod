@@ -102,7 +102,7 @@ public class FlyCloudRenderer extends EntityRenderer<FlyCloudEntity> {
         }
         Vec3 middle = cloud.getPosition(partialTick);
         FlySwarm swarm = swarm(cloud);
-        swarm.update(cloud.level(), middle, (cloud.tickCount + partialTick) / 20.0, cloud.flies());
+        swarm.update(cloud.level(), middle, (cloud.tickCount + partialTick) / 20.0, cloud.flies(), cloud.landState(), cloud.landSpot());
         Vec3 eye = entityRenderDispatcher.camera.getPosition();
         // bodies, then wings, each look in turn
         for (int pass = 0; pass < 4; pass++) {

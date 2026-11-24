@@ -149,7 +149,7 @@ public class BullfrogRenderer extends GeoEntityRenderer<BullfrogEntity> {
             frog.clientFly = null;
         }
         if (f == null && frog.clientContact == null) {
-            frog.clientFly = swarm.pick(frog, frog.mouth(), PICK_REACH * 2.0 * frog.getScale() + 0.3);
+            frog.clientFly = swarm.pick(frog, frog.mouth(), PICK_REACH * 2.0 * frog.getScale() + 0.3, frog.tongueAt());
         }
     }
 

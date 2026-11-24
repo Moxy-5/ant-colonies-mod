@@ -1,4 +1,5 @@
 # Each game test's minutes in its last full run (tools/test_times.py writes it; TestFilter.keepShard reads it).
+abarbsipsalandedflyoffthewater 0.03
 abigcolonyinadeadmoundraidsfromthescoutsownfindtothepilewithnostagehanging 0.19
 abigcrocodilegapesbackatashortershark 0.01
 abigpanis3deeponslopinggroundandholds 0.01
@@ -10,6 +11,7 @@ abullfrogdigsinatmiddayandcomesoutforaplayer 0.34
 abullfroghopswhereitissentandupastep 0.62
 abullfrogleapsintothewaterfromamonitor 0.31
 abullfrogpuffsupandbitesaplayerwhostaysclose 0.26
+abullfrogtonguesalandedfly 0.02
 abullfrogtonguesfliesonlyfromacloudinreach 2.28
 abullseesoffacrocodilewithabluffnotafight 0.36
 abullsharkpatrolsthedeepwaterandkeepsofftheshelf 0.07
@@ -17,6 +19,7 @@ acalmmatabeleneststandsstillmostofthetime 0.10
 acalmtermiteneststandsstillmostofthetime 0.33
 acatfishcomesuptogulpair 0.06
 acatfishtakesabarbandtheschoolbursts 0.33
+acloudwithnobodynearlosesnolandedflies 0.15
 acolonyawayeatsmillsbreadandraisesitsyoungasnumbers 0.55
 acolonyawayfoldsitsfrozeninsectsintothenumbersandputsthingsbackonreturn 0.46
 acolonyofnewlandbornfarfromplayersknowsitsqueenandgarden 0.36
@@ -53,8 +56,10 @@ afreshdeadmoundofnewlandstillstands 0.04
 afullcolonyofnewlandisawholelivingcolony 0.08
 agrowntreediesofoldageandfalls 0.01
 aguardingfathergoesforamonitornearhiseggs 0.00
+aguardingfatherlungesatatilapiaathiseggs 0.00
 ahalffedcolonysscoutspassoverlonetermitesandtakearicherspotfurtherout 0.11
 ahatchlingcrocodileandacatfisheattadpoles 0.04
+ahatchlingcrocodilesnapsalandedfly 0.01
 ahatchlingcrocodilesnapsupabarb 0.40
 ahatchlingswimsatthesurfaceandclimbsout 0.01
 ahealthygardensendsupmushroomswhentherainends 2.32
@@ -342,6 +347,7 @@ therulescatchahangingraidandsaveareport 0.05
 theschoolswimsonafterahunt 4.66
 thornytwigsprickbiganimalsbutnotinsects 0.37
 tilapiaandcrabseattheeggs 0.00
+tilapiaandcrabsnibbleanunguardedfrogeggmat 0.00
 tilapiabreedinanestpitandthemotherkeepsherfryinhermouth 0.03
 tilapiagrazegrowupandweartheirlooks 0.36
 treeblocksplaceandbranchesjoin 0.00

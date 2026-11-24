@@ -18,6 +18,10 @@ import net.minecraft.world.phys.Vec3;
  * it leans into its dashes and turns. Now and then one lands on the ground or the water near the cloud for 1.4 to 4.4
  * s, turns about and often rubs its front legs, then takes off (at most half the cloud down at once). Every number is
  * the preview's (my picks, tuned there), the cloud a little wider for the game's 4 to 12 flies.
+ *
+ * <p>Besides its own landings, the server's landed fly (the river food web's step 1, 2026-11-23): when the cloud says a
+ * fly is down at a spot ({@code FlyCloudEntity.landState}), the flying fly nearest it is steered down there and sits
+ * until the server says it was eaten (it is the one taken away) or flew off (it darts up).
  */
 final class FlySwarm {
     /** The cloud's half sizes round its middle (blocks; my picks). */
@@ -67,6 +71,10 @@ final class FlySwarm {
     private final float shareB;
     final List<Fly> flies = new ArrayList<>();
     private double lastTime = -1;
+    /** The fly sitting where the server says (its landed fly), and the server's landing state last seen. */
+    @javax.annotation.Nullable
+    private Fly serverFly;
+    private byte landSeen;
     /** Frames drawn (the wings swap angles every frame: the buzzing blur). */
     int frame;
     /** The time now (seconds), for the legs' rubbing. */
@@ -81,7 +89,10 @@ final class FlySwarm {
      * Brings the swarm to this frame: as many flies as the cloud holds, each moved on by the time gone since. A fly
      * fewer is first one a bullfrog's tongue holds (swallowed).
      */
-    void update(Level level, Vec3 middle, double now, int count) {
+    void update(Level level, Vec3 middle, double now, int count, byte land, Vec3 landSpot) {
+        if (serverFly != null && !flies.contains(serverFly)) {
+            serverFly = null;
+        }
         while (flies.size() > count) {
             Fly held = null;
             for (Fly f : flies) {
@@ -89,6 +100,10 @@ final class FlySwarm {
                     held = f;
                     break;
                 }
+            }
+            if (held == null && serverFly != null && land == com.antcolonies.savanna.animal.FlyCloudEntity.LAND_EATEN) {
+                held = serverFly;       // the landed fly a barb or a young crocodile took
+                serverFly = null;
             }
             if (held == null) {
                 break;
@@ -108,6 +123,7 @@ final class FlySwarm {
         while (flies.size() > count) {
             flies.remove(flies.size() - 1);
         }
+        serverLanding(land, landSpot);
         double dt = lastTime < 0 ? 0 : Mth.clamp(now - lastTime, 0, 0.25);
         lastTime = now;
         time = now;
@@ -126,6 +142,56 @@ final class FlySwarm {
         for (Fly f : flies) {
             pose(f, now);
         }
+    }
+
+    /**
+     * Follows the server's landed fly: a landing begins (the nearest flying fly no frog has its eyes on goes down to the
+     * spot), it sits on while down, and when the landing ends it darts up (off, or eaten while a frog's tongue holds
+     * another) or is already gone (eaten).
+     */
+    private void serverLanding(byte land, Vec3 spot) {
+        boolean down = land == com.antcolonies.savanna.animal.FlyCloudEntity.LAND_DOWN;
+        if (down && landSeen != land) {
+            Fly best = null;
+            double bestD = Double.MAX_VALUE;
+            for (Fly f : flies) {
+                if (f.mode == Mode.FLY && f.hunter == null) {
+                    double d = spot.distanceToSqr(f.x, f.y, f.z);
+                    if (d < bestD) {
+                        best = f;
+                        bestD = d;
+                    }
+                }
+            }
+            serverFly = best;
+            if (best != null) {
+                best.mode = Mode.LANDING;
+                best.tx = spot.x;
+                best.ty = spot.y;
+                best.tz = spot.z;
+            }
+        }
+        landSeen = land;
+        Fly f = serverFly;
+        if (f == null) {
+            return;
+        }
+        if (down) {
+            if (f.mode == Mode.PERCHED) {
+                f.perch = Math.max(f.perch, 0.5);      // it sits as long as the server says
+            }
+        } else {
+            serverFly = null;
+            if (f.mode == Mode.PERCHED || f.mode == Mode.LANDING) {
+                dodge(f, new Vec3(f.x, f.y - 1.0, f.z));       // up and off
+            }
+        }
+    }
+
+    /** The server's landed fly while it is going down or sitting, or none. */
+    @javax.annotation.Nullable
+    Fly landed() {
+        return serverFly != null && (serverFly.mode == Mode.LANDING || serverFly.mode == Mode.PERCHED) ? serverFly : null;
     }
 
     /** A new spot in the cloud to dash to (against the middle). */
@@ -237,7 +303,13 @@ final class FlySwarm {
      * or the water), none another frog has its eyes on; or none.
      */
     @javax.annotation.Nullable
-    Fly pick(Object frog, Vec3 mouth, double reach) {
+    Fly pick(Object frog, Vec3 mouth, double reach, @javax.annotation.Nullable Vec3 aim) {
+        Fly landed = landed();
+        if (aim != null && landed != null && (landed.hunter == null || landed.hunter == frog || gone(landed.hunter))
+                && aim.distanceToSqr(landed.tx, landed.ty, landed.tz) < 0.6 * 0.6) {
+            landed.hunter = frog;
+            return landed;      // the frog aims at the server's landed fly
+        }
         Fly best = null;
         double bestD = reach * reach;
         for (Fly f : flies) {

@@ -19,6 +19,10 @@ import net.minecraft.world.phys.Vec3;
  * A barb's little meals, for looks only (M9 river life, 2026-11-20; my picks; no hunger, nothing eaten, so barbs can
  * never strip a river): at dawn and dusk it now and then rises to sip at the surface (a gulp, a tiny ring of bubbles
  * on the water), and at other times it now and then noses down to pick at an algae mat a few seconds.
+ *
+ * <p>A fly landed on the water within {@link #FLY_REACH} blocks (the river food web's step 1, 2026-11-23:
+ * {@code FlyCloudEntity.landedFly}), at any time of day: it claims it, swims up under it and sips it off the surface,
+ * one sip in {@link #FLY_MISS} missing (the fly zips up). Still no hunger: the fly is gone from the cloud, nothing else.
  */
 public class BarbFeedGoal extends Goal {
     /** One check in this many starts a meal (checked every other tick: about every 10 s at dawn and dusk, every 20 s else). */
@@ -27,14 +31,23 @@ public class BarbFeedGoal extends Goal {
     static final int SURFACE_ABOVE = 3, LOOK_ACROSS = 4, LOOK_DOWN = 3;
     /** How long a sip and a nibble last (ticks: the sip clip once, the nibble clip two or three times). */
     static final int SIP_TICKS = 28, NIBBLE_MIN = 36, NIBBLE_MORE = 36;
+    /** Nearer its spot than this (blocks) it swims straight at it (was 1.5, too short for a path's own stopping short). */
+    static final double STRAIGHT = 3.0;
     /** How long it may swim to its spot before it gives up (ticks). */
     static final int GIVE_UP = 100;
+    /** How far it sees a fly landed on the water (blocks), how often it looks (one check in this many: every 10 ticks), and the share of sips that miss. */
+    static final double FLY_REACH = 6.0;
+    static final int FLY_LOOK = 5;
+    static final float FLY_MISS = 0.25F;
 
     private final BarbEntity fish;
     @Nullable
     private Vec3 spot;
     private byte kind;
-    private int ticks, eating, eatFor;
+    private int ticks, eating, eatFor, look;
+    /** The cloud whose landed fly it is after, or none (a plain sip or nibble). */
+    @Nullable
+    private FlyCloudEntity fly;
 
     public BarbFeedGoal(BarbEntity fish) {
         this.fish = fish;
@@ -51,6 +64,17 @@ public class BarbFeedGoal extends Goal {
     public boolean canUse() {
         if (!fish.isInWater() || fish.getVehicle() != null) {
             return false;
+        }
+        fly = null;
+        if (++look % FLY_LOOK == 0) {
+            FlyCloudEntity down = FlyCloudEntity.landedNear(fish, FLY_REACH, true);
+            if (down != null && down.claimLanded(fish)) {
+                Vec3 at = down.landedFly();
+                fly = down;
+                kind = BarbEntity.SIP;
+                spot = new Vec3(at.x, Math.floor(at.y) + 0.85 - fish.getBbHeight(), at.z);
+                return true;
+            }
         }
         if (dawnOrDusk(fish.level(), fish.blockPosition())) {
             if (fish.getRandom().nextInt(SIP_CHANCE) != 0) {
@@ -70,7 +94,7 @@ public class BarbFeedGoal extends Goal {
 
     @Override
     public boolean canContinueToUse() {
-        return spot != null && fish.isInWater() && ticks < GIVE_UP + eatFor;
+        return spot != null && fish.isInWater() && ticks < GIVE_UP + eatFor && (fly == null || eating > 10 || fly.claimedBy(fish));
     }
 
     @Override
@@ -86,6 +110,10 @@ public class BarbFeedGoal extends Goal {
         fish.setAction(BarbEntity.NONE);
         fish.getNavigation().stop();
         spot = null;
+        if (fly != null) {
+            fly.releaseLanded(fish);
+            fly = null;
+        }
     }
 
     @Override
@@ -104,6 +132,13 @@ public class BarbFeedGoal extends Goal {
             if (kind == BarbEntity.SIP && eating == 10 && fish.level() instanceof ServerLevel server) {
                 // the gulp: a tiny ring on the water
                 server.sendParticles(ParticleTypes.BUBBLE_POP, spot.x, Math.floor(spot.y) + 0.95, spot.z, 4, 0.12, 0.0, 0.12, 0.0);
+                if (fly != null) {
+                    if (fish.getRandom().nextFloat() < FLY_MISS) {
+                        fly.landedFlyOff(fish);
+                    } else {
+                        fly.eatLanded(fish);
+                    }
+                }
             }
             if (++eating > eatFor) {
                 spot = null;
@@ -122,8 +157,9 @@ public class BarbFeedGoal extends Goal {
             spot = null;
             return;
         }
-        if (far < 1.5) {
-            // the last stretch, nudged straight there (Minecraft's fish swim only along a path, which stops short)
+        if (far < STRAIGHT) {
+            // the last stretch, nudged straight there (Minecraft's fish swim only along a path, which stops short: a
+            // path to a spot 2 blocks off counts as swum at once, and the barb only drifted, the food web's step 1)
             fish.getNavigation().stop();
             double push = 0.02 / Math.max(far, 0.05);
             fish.setDeltaMovement(fish.getDeltaMovement().scale(0.8).add(dx * push, dy * push, dz * push));

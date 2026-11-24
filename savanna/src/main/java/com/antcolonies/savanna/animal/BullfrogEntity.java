@@ -642,6 +642,8 @@ public class BullfrogEntity extends Animal implements GeoEntity, HasLife {
      * up to {@link #GUARD_FOLLOW} blocks off.
      */
     static final double GUARD_STAY = 3.0, GUARD_SEE_OFF = 4.0, GUARD_FOLLOW = 16.0;
+    /** How near his eggs or school a small egg thief must come before a father goes for it (blocks; the food web's step 2, my pick). */
+    static final double RAIDER_NEAR = 2.0;
 
     /** When it last called (its own ticks; a male only). */
     int lastCall = -CALLED_WITHIN;
@@ -826,6 +828,14 @@ public class BullfrogEntity extends Animal implements GeoEntity, HasLife {
     /** Whether this tadpole hatched from eggs he guarded (he never eats it). */
     public boolean isFatherOf(LivingEntity e) {
         return e instanceof TadpoleEntity t && getUUID().equals(t.father());
+    }
+
+    /**
+     * Whether this is a small egg thief (the river food web's step 2, 2026-11-23): a tilapia or a crab, which nibble frog
+     * spawn; a father goes for one only when it comes within {@link #RAIDER_NEAR} blocks of his eggs or school.
+     */
+    static boolean raidsEggs(LivingEntity e) {
+        return e.isAlive() && (e instanceof TilapiaEntity || e instanceof CrabEntity);
     }
 
     /** Whether this comes to harm his eggs or school, when it comes near them: a player, a monitor, a young crocodile. */

@@ -96,7 +96,7 @@ public class BarbEntity extends AbstractSchoolingFish implements GeoEntity {
         goalSelector.addGoal(2, new AvoidEntityGoal<>(this, LivingEntity.class, PART_FROM, 1.4, 1.6, BarbEntity::isHunter));
         // a cruising bull shark, a big shape seen from afar: the school parts round it wider
         goalSelector.addGoal(2, new AvoidEntityGoal<>(this, BullSharkEntity.class, BullSharkEntity.FISH_PART_FROM, 1.4, 1.6, BullSharkEntity::partsFish));
-        goalSelector.addGoal(4, new BarbFeedGoal(this));
+        goalSelector.addGoal(3, new BarbFeedGoal(this));      // over Minecraft's fish swimming (4), which it could never take over at the same number
     }
 
     /**
