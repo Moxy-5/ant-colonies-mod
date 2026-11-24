@@ -281,6 +281,74 @@ Each step ends with `./gradlew build`, the `raids,soldiers,away` test categories
 the start crash is gone, near and away raids bring home the same catch for the same find (within dice), and the user
 moves on from watching raids in-game without a bug report.
 
+## Step 2 as built (2026-11-23): the tests, written first
+
+The user's OK on the raid in play: 2026-11-23 ("Yes, build to it"), the halt waiting for the column's tail and the raid
+turning home when its scout is lost on the way out included.
+
+**The file:** `gametest/MatabeleRaidChainTests.java`, ten scenes on one driver, in their own category `raidchain`
+(`ANTCOLONIES_TESTS=raidchain tools/run_game_tests.sh`) and out of full runs (`TestFilter.skipInFullRuns` in
+`SavannaTests`) until step 3. They name neither `RaidColumn` nor the new `Raid`: they read the colony's `[raid]` diary
+from its black box, the insects in the world, the prey pile and the watch rules, so they need no change when the old
+code goes. Step 3 moves them into `raids` and takes the skip away.
+
+**The diary the new raid must keep** (the contract; the top comment of the test file has it in full): one line on
+entering a stage (`[raid] halt: begins, N ant(s)`), one on leaving with the count and the reason (`[raid] halt: ends
+after S s, N ant(s): the tail is in`), a turn home as a reason starting `turns home:`, the last line `[raid] done: N
+home, C termite(s) on the pile, ...`, and `[raid] no raid to X: no termite there now` when the check at muster says
+no. Stage names: muster, march out, halt, attack, regroup, march home, done.
+
+**The rules every scene checks:** stages in order, each once, none skipped unless the raid turned home; none past its
+deadline (muster 20 s, halt 15 s, attack 2 minutes, regroup 30 s, a march a second a block plus half a minute; a hung
+stage fails at once with the story so far); a halt of 3 s or more; no raider fighting more than 16 blocks from the spot
+in the attack (the leash); nobody fighting 3 s after the attack; no stung termite left on the ground; nobody outside or
+holding a fight order at the end; no watch rule broken.
+
+| Scene | From | What it adds |
+|---|---|---|
+| Flat ground | the old flat and chain tests | prey on the pile |
+| Tall dead mound, low dead mound | the old mound tests | 120 ants up the chimney, every stage in time |
+| Lumpy ground | the user's raid of 2026-11-08, in small (steps and holes laid by hand) | |
+| Ridge and pond | the old ridge test | the scout's own line |
+| Empty spot at muster | the soak (15 raids to finds with no termite), BUGS 168, 202 | no raid at all, the find forgotten, the diary says why |
+| The termites leave on the way | the old empty-raid test | halt, a look of 10 s at most, home empty, the find forgotten |
+| Dusk at the spot | R7 (no old test) | turns home, takes what it stung |
+| The scout killed on the march out | the plan's list; the real rule from the papers | turns home, never attacks, the find kept |
+| Termites in the open that run | the soak (240 stung, 111 carried; a chase of 37 blocks) | all stung carried, the leash |
+
+**Run once on the old code (expected to fail, and they do, each for the reason it should):** nine fail with "no raid
+mustered yet" (the old raid ran in every scene and brought termites home, so the scenes are sound, but it keeps no
+stage diary), the empty-spot scene with a raid of 30 ants attacking a spot with no termite. **Not proven yet:** the
+checks behind the first one (deadlines, the leash, stung against carried) have never run against a raid that keeps the
+diary; step 3 will show whether any is too strict (the 4-box rule then).
+
+**Old checks ported** (as a rule in every scene, or a scene of its own): nobody left standing at the termites after
+the raid (BUGS 88, 103); no stage hangs (87, 111, the chain test's limits); nobody standing about outside at the end
+(93); the raid brings termites home and they reach the pile (189, 91's "majors bit nothing open" shows as no prey);
+an empty spot counts against the find (168, 174, 202; stricter now: no raid, or one short look); the attack does not
+run to its longest time for hidden termites (review 2, finding 3: now the deadline and "nobody fights after"); the
+raid sets out from a tall and a low mound with its recruits (101, 141, 166: now "muster in time and every stage after");
+no watch rule broken in the whole chain (the bench, B1).
+
+**Old checks that stay in `MatabeleRaidTests` for now and move in step 3** (they need hooks into the raid itself, which
+the new `Raid` and `RaidMarch` will give; none is deleted): the stream march's speed, width, crowding and personal
+space (BUGS 127, 169, 171, 178, 182); the user's own lumpy savanna put back from its report (193, 194, 195); the gap
+in the trail cast across and mended (R4, 197), the wide gap and the faded trail; a raider out of sight 10 s kept
+(finding 1); the hungry recruit stays (finding 3); a carrier killed on the way home drops its termites (finding 18); the
+hurt raider calls, is carried and licked (step 5); the limper and the badly wounded go home along the trail; raiders
+called to defend the nest while mustering rejoin (finding 4); the raid's size for its find; food first for minors
+(a fight rule); the bench's own test (a hanging raid caught and reported); and the six scout tests, untouched (the
+scouts stay).
+
+**Old checks dropped, and why:** "half the column bunched before the attack" (`gatheredAtAttack`) and "the empty raid
+must go through the spreading stage" test the old stages themselves; the halt rule and the short look replace them.
+"If the scout dies the nearest ant leads on" is not real (the papers) and is replaced by the turn-home scene. The
+ribbon checks were closed with the ribbon (BUGS 187).
+
+**For step 3, from writing the tests:** the one judge of "termites here now" must count the termites that are there
+as bodies when the land is loaded (what a player sees) and the termite colony's record otherwise; the old scenes'
+termites belong to no colony, and a judge that only asked a colony would call every one of them empty.
+
 ## Rules for the session doing this
 
 - Read `CLAUDE.md` first; ants and termites are strict realism.
