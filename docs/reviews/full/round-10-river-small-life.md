@@ -89,3 +89,73 @@ whose mob is gone, dead or farther than the mate reach, checked once a second.
 `registry/SavannaMobCategories.java:53-56` says "Cap 6 round a player"; `META-INF/enumextensions.json` gives
 `ANTCOLONIES_FLY_CLOUD` 18, and `FlyCloudEntity.java:44-46` says 18 (tripled 2026-11-20). Fix the comment (and check
 the groups table in `docs/LIVING-THINGS.md` says 18).
+
+---
+
+## Piece 2: the other fish, flies, remains, algae and the egg blocks
+
+### R10-4 (B, likely; to measure): catfish eggs are eaten long before they can hatch
+
+**What is wrong.** A catfish female scatters 6 to 10 eggs over algae mats, 2 to 4 a mat, and they need a full game day
+(20 minutes) to hatch. Every hungry tilapia goes for eggs before any algae (`GrazeAlgaeGoal.EGGS_FIRST = 20`, the
+"best of all"), looks 8 blocks round, takes 2 eggs a bite (`AlgaeBlock.EGGS_A_BITE`), and is hungry again every 2 to 4
+minutes. Catfish spawn in the same water as the tilapia (the same spawning group), where 15 or more tilapia are within
+reach of a mat. By these numbers a whole spawning is gone in a minute or two; the 20 minutes are never reached. Crabs
+eat them too. On top of this the hatching needs room (R10-1).
+
+**What the player would see.** Catfish courting on rainy nights, eggs on the algae, tilapia crowding them, and never a
+young catfish.
+
+**Where.** `savanna/.../animal/GrazeAlgaeGoal.java:139-149` (eggs worth 20 against a lush mat's 8), `:30` (hungry
+every 2400 to 4800 ticks); `block/AlgaeBlock.java:222-233, 254`; `animal_life/catfish.json` (`hatch_days: 1`,
+`clutch: [6, 10]`); `CatfishScatterEggsGoal.java:29` (2 to 4 a mat).
+
+**Proof.** Numbers only, not watched in play: mark **likely**. Scene to measure: the catfish breeding test's pond with
+a school of 15 hungry tilapia added; count eggs left after 2, 5 and 20 minutes.
+
+**Proposed fix (balance, my pick unless the user says otherwise).** Make eggs a find, not a magnet: worth no more than
+a lush mat (so a fish eats them only when they are the nearest good food), or let a tilapia notice eggs only within 3
+blocks. Keep the life file's hatch time.
+
+### R10-5 (B, proven path; its speed to measure): river algae spreads into any shallow water, with nothing to stop it
+
+**What is wrong.** A thick or lush mat seeds bare bed beside it on 1 random tick in 10 (`AlgaeBlock.spread`). The only
+conditions are still water on a sturdy floor. There is no check for the biome, for the savanna, or for how much algae is
+already there, and a grazed mat never goes away (growth 0 stays as a block). In water 1 to 4 deep a seeded mat grows
+thick and spreads on. So algae creeps out of the savanna's rivers along any connected shallow bed: lake shores, sea
+shores, another biome's river, a player's pond or water garden joined to a river.
+
+**What the player would see.** Over many hours near a base: green mats over every shallow bed, also outside the
+savanna, and growing back after being cleared unless every last bare speck is broken. No lag (a mat is a plain block).
+
+**Where.** `savanna/.../block/AlgaeBlock.java:187-189` (the chance), `:193-204` (the spread; only `isLoaded`, water
+source and `canSurvive`), `:134-137` (thick only in water up to 4 deep, so deep channels stop it).
+
+**Proof.** Walked: `randomTick` → `spread` → `setBlock(to, bare)`; `mayPlaceOn` (`:88-90`) takes any sturdy top but
+magma. About 17 random ticks a day × 1/10 × the share of sides that fit: a front of roughly a block every 2 or 3 game
+days where ticked (to measure in a long soak: count algae blocks in a fenced pool over 30 days).
+
+**Proposed fix (looks: the user's call).** Recommended: spread only inside the savanna's waters (the biome tag the
+world's own algae feature uses), and only while fewer than some number of mats lie in the 5 by 5 round the new spot, so
+beds stay patchy as new land lays them.
+
+### R10-6 (C, proven): small things that disagree or are test-only
+
+- `TilapiaFryGoal.java:17, 23, 42`: the note says a fry whose mother is gone is on its own after 10 seconds; the count
+  goes up once per goal check, and goals are checked every other tick, so it is 20 seconds.
+- `AnimalLife.java:225-231`: `rainForTests`, a test's own weather, is a static switch inside the play code that every
+  world in the same sitting shares. If a test run ever leaves it set, breeding weather is wrong in the next world.
+  Move it behind the test kit.
+- `TilapiaEntity.java:108` (`wantsNestNow`) and `:647` (`followedForTests`, which the real `leaveSchool` at `:368` also
+  uses): test hooks the game relies on; rename the second, it is not for tests only.
+- `BarbEntity.java:243-245` and `DistichodusEntity.java:239-242`: `getBucketItemStack` gives a water bucket though
+  `mobInteract` refuses every bucket; dead code that would hand out free buckets if the refusal were ever lifted.
+
+### R10-7 (C, to measure; belongs with round 8): thirteen spawning groups of our own, each tried in every chunk every tick
+
+Every group in `META-INF/enumextensions.json` is made non-persistent, so Minecraft tries it in every chunk near a
+player every tick while it is under its cap. Groups that can never fill where the player stands (river groups on the
+open plain, the hippo group, which has no spawn list at all) are tried for ever. Each try is small (a random spot,
+most are underground and end at once), but there are 13 groups × about 290 chunks a tick. Measure with the profiler on
+the open savanna away from water; if it shows, the hippo group at least can be made a group the spawner skips. Noted
+here because the small animals' groups are most of the thirteen.
