@@ -316,3 +316,127 @@ design pick, noted only.
   the dive is set last before each move and wins; walked through, no fight.
 
 ---
+
+## Part 4: the hippo (`HippoEntity`)
+
+(Parts are in the order they were finished; part 3 is the otter.) The file was read whole by a helper reader, with
+`worldgen/HippoPodFeature` and the kit classes it calls; I then walked each finding below through the code again
+myself. Line numbers are `HippoEntity.java`'s. **No A finding.**
+
+### R9-13 (B, proven): the warning yawn is remembered per hippo, not per visitor: the second one is bitten unwarned
+
+**What is wrong.** A hippo warns with a yawn, and for 10 seconds after a yawn it charges whoever is close without
+yawning again. That memory is one timer on the hippo; it does not remember who was warned.
+
+**What the player would see.** With a friend: one player gets the yawn, the other walks up within 10 seconds and is
+charged and bitten (5 hearts) with no warning. Alone: a bull that has just yawned at a crocodile charges the player
+with no yawn.
+
+**Where and proof.** `warnWait` (field 187; its comment says "at the same player"); `TerritoryGoal.start` 1520 sets
+it; `canUse` 1473-1486: the target `p` is whichever crocodile or nearest player is found now, and line 1482
+(`charge = ... && h.warnWait > 0`) asks only the timer. The test for the yawn (`RiverLifeTests`, about line 2877) has
+one target.
+
+**Fix proposed.** Keep who was warned (a UUID beside the timer); only that one is charged without a yawn.
+
+### R9-14 (C, proven): dung on land almost never happens
+
+The 1 in 600 roll for flicking dung while grazing sits inside `if (h.doing() == CALM)` (`GrazeGoal.tick` 1943-1949),
+and the other branch sets it to grazing at once, so the dice are rolled on about one tick a bout: about one flick in
+a hundred bouts. The comments (75, 1862) promise "now and then". **Fix:** roll at the end of each graze loop.
+
+### R9-15 (B, proven): a hippo shot from more than 16 blocks never answers
+
+**What is wrong.** A hit makes it angry and starts a charge, but the charge's own keep-going rule is the territory
+rule: the target must be within 16 blocks. From 17 blocks the charge starts and ends at the next check, and ending
+it wipes the anger and starts the 10-second charge rest.
+
+**What the player would see.** The river's most dangerous animal stands and takes arrows from 17 blocks until it is
+dead (80 health): it neither charges nor flees.
+
+**Where and proof.** `hurt` 798-803 (`angryAt`, `angryUntil = tickCount + 400`, `chargeWait = 0`);
+`TerritoryGoal.canUse` 1465-1469 starts the charge; `canContinueToUse` 1536
+(`target.distanceTo(h) < giveUp(target)`) ends it; `stop` 1583-1588 (`chargeWait = CHARGE_REST; angryAt = null`).
+
+**Fix proposed.** For a target it is angry at, give up by time and its follow range (32), and keep the anger until
+`angryUntil`; or let it make for deep water when it cannot reach what hurts it.
+
+### R9-16 (B/C, likely, to measure): two "nothing found" searches with no wait after them
+
+- **No way home by day** (`HomeGoal.canUse` 1617-1622, `canContinueToUse` 1636): when the route to the pool fails or
+  ends short (fenced in by a player, a pit), the goal ends at once and starts again on a 1 in 10 roll with no wait:
+  a 40-column pool search and a full route search for a 2-block-wide body about once a second, all day, for each
+  stuck hippo. The bank rest and the nibble already wait 600 ticks after "none" (1685, 1791); this one does not.
+- **No grass in reach at night** (`lawns()` 1029-1040, from `GrazeGoal.canUse` 1884): with no lawn found the list
+  stays empty, so the whole search (360 seeded column probes, the same ones with the same answer) runs again about
+  once a second all night. Small cost.
+
+**To measure.** A hippo penned on a bank by day; the profiler's `pathfind` and tick time. **Fix:** a wait after a
+failed go, and remember "no lawns here" a few minutes.
+
+### R9-17 (B, the read proven, the stall likely): the pool's water is read with no check that its land is loaded
+
+`waterTop()` (1111) and `poolGone()` (2042) read the saved pool block directly; every other far read in the file is
+guarded. At home it is always loaded. A hippo led away on a lead (Minecraft allows it) or drawn off charge after
+charge, then standing in other water, loads its pool's chunk on the spot at each rest's end, nibble look and bank
+look. The same hole as the crocodile's nest (R9-10). **Fix:** `level().isLoaded(pool)` first in both.
+
+### R9-18 (B/C, proven in the code): when the pool is gone each hippo takes its own, and "gone" is judged two ways
+
+- `PoolGoal.tick` 2020-2022: each hippo whose pool has no water left makes the spot it stands on its new pool, at
+  its own time, and `setPool` (865-868) clears its lawns. The pod stops sharing one pool and one pair of lawns (the
+  small form of BUGS 272's drift; it happens once, not for ever).
+- `poolGone` (2042) wants no water at the pool block **and** none over it; `waterTop` (1111) gives up when the pool
+  block alone has no water. One block landing on the bed at the bull's spot (a player's block, falling sand or
+  gravel) leaves the pool "not gone" while `waterTop` answers "none" for good: the landing, the bank rest and the
+  nibbling all stop without a word (1088, 1281, 1348, 1380).
+
+**Fix proposed.** One judge of the pool's water (the block or the one over it), and a new pool every pod mate finds
+the same way.
+
+### R9-19 (C, proven; looks and comments, the user's call where it shows)
+
+- **"The lawn it grazes tonight" is rolled again every 20 to 40 seconds** (`GrazeGoal.canUse` 1886): half the time
+  the hippo marches off to its other lawn, 10 to 48 blocks away, and back, all night, wearing a third path between
+  them. At dawn it goes home by the landing of the night's first lawn (1629), which may be the far one.
+- **A lawn dropped as out of reach is not replaced** (`lawns()` 1030 only searches when both are gone; the comment
+  at 1972 says another is found).
+- **Night is `level.isDay()`** (1433-1435; the comment says "the shared day clock"). Minecraft's `isDay` has the
+  weather in it: in a thunderstorm at noon it answers "not day" (the sky's darkness is 5, day needs under 4; worked
+  out from `Level.updateSkyBrightness`), so the whole pod walks out to graze and goes home when the storm ends. The
+  crocodile (`CrocodileEntity.java:742`) and the monitor read the same call. It also means these animals do not read
+  a test's clock, hence the hippo's own `heldNight` and `heldCool` switches.
+- **Timers in goals that are stepped every other tick run at half speed** (`HomeGoal`, `PoolGoal`): a rest is 20 s
+  to 2 min 20 s, not the comment's "half a minute to a minute and a half" (1985); dung in the pool comes about every
+  5 minutes a hippo, not "2 to 3" (137).
+- **Paths only ever grow** (`wearPath` 1228-1265): a quarter of the blocks a foot comes onto off the lawn turn to
+  path and never heal, charges too; a player's lawn by a pool is worn as well. All behind `mobGriefing`; bounded by
+  the pod's range. A looks matter.
+
+### R9-20 (C): small things in the hippo
+
+- **The bed-step hop never happens:** `travel` sets an upward speed of 0.35 against a step (640) and `tick`, later in
+  the same game tick, sets it back to falling while it walks (695). Its step height of 1.0 does the climbing. Two
+  places steering; the hop can go.
+- **Nothing calls `life.tick()`** (the crocodile and otter do): harmless while hippos are born grown, the first thing
+  calves will need (a summoned `young:true` hippo never grows).
+- **A name tag starting `film:`** makes any hippo play that clip for good (2092-2095), and the crocodile the same
+  (`CrocodileEntity.java:2604-2608`): the film camera's hook is reachable by a player with a name tag.
+- **Test switches live in the game class** (`led`, `heldNight`, `heldCool`, `dungNext`..., 1402-1430; `led` is saved).
+- **No loot table for the hippo**: it drops nothing. A question, not a fault.
+
+### What is solid in the hippo
+
+- **A pod is only "hippos whose saved pool is the same block"**: no pod object, no link to the bull by id. Nothing
+  breaks when the bull dies, unloads or reloads.
+- **Nothing heavy runs every tick:** every search is behind a dice roll or a timer (crocodile search: a 5.5-block
+  box about 3 times a second for a bull; the bank spot search at most every 30 s).
+- **The pool does not move while it has water**; one bite, then a minute's peace for crocodiles: BUGS 271, 272 and
+  273 all hold. A nest mother near a bull is not worn down: her keep-clear goal outranks her guard.
+- **Counts:** never spawned by the spawner, never removed, never breeds, in a spawning group of its own: hippos can
+  only go down in number. Dung is particles and one remembered spot, never an entity or block: it cannot pile up.
+- **Blocks:** one plant about every 5 seconds a grazing hippo, no drops, `mobGriefing` asked at all three places.
+- **Creative and spectator players** are left out at every door; boats are never attacked.
+- **Saved state** loses and doubles nothing; no entity is held by id.
+
+---
