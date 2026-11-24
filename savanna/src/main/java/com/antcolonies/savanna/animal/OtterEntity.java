@@ -1466,7 +1466,7 @@ public class OtterEntity extends PathfinderMob implements GeoEntity, HasLife {
             prey = null;
             double best = HUNT_REACH * HUNT_REACH;
             for (LivingEntity e : otter.level().getEntitiesOfClass(LivingEntity.class, otter.getBoundingBox().inflate(HUNT_REACH),
-                    e -> e.isAlive() && isPrey(e) && !e.isPassenger())) {
+                    e -> e.isAlive() && isPrey(e) && !e.isPassenger() && !RiverCover.hiddenFrom(otter, e))) {     // (a fish still in the reeds unseen)
                 double d = e.distanceToSqr(otter) * (e instanceof CrabEntity ? 0.6 : 1.0);     // crabs first: its favourite
                 if (d < best) {
                     best = d;
@@ -1491,7 +1491,8 @@ public class OtterEntity extends PathfinderMob implements GeoEntity, HasLife {
             if (otter.held != null) {
                 return true;                                // carrying it to the bank and eating it
             }
-            return prey != null && prey.isAlive() && !prey.isPassenger() && --left > 0 && otter.doing() != EAT;
+            return prey != null && prey.isAlive() && !prey.isPassenger() && --left > 0 && otter.doing() != EAT
+                    && !RiverCover.hiddenFrom(otter, prey);         // a fish hiding in the reeds: lost
         }
 
         @Override

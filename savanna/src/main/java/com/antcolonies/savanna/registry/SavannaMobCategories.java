@@ -12,7 +12,7 @@ import net.minecraft.world.entity.MobCategory;
 public final class SavannaMobCategories {
     private SavannaMobCategories() {}
 
-    private static MobCategory riverFish, riverHunter, riverBed, riverBank, riverSchool, flyCloud, bullfrog, hippoPod, riverOtter;
+    private static MobCategory riverFish, riverHunter, riverBed, riverBank, riverSchool, riverGrazer, flyCloud, bullfrog, hippoPod, riverOtter;
 
     /**
      * The hippos' group (2026-11-21): its own, with no spawn list since the same day (the user: pods placed with new land
@@ -70,6 +70,18 @@ public final class SavannaMobCategories {
             riverSchool = MobCategory.valueOf("ANTCOLONIES_RIVER_SCHOOL");
         }
         return riverSchool;
+    }
+
+    /**
+     * The big plant-eating fish's group (the distichodus, 2026-11-23, the spawning check list): a fish in groups of 2 to
+     * 4, kept near the player, never sharing a cap with the common tilapia or barbs. Cap 8 round a player (the plan's),
+     * friendly, removed past 128 blocks.
+     */
+    public static MobCategory riverGrazer() {
+        if (riverGrazer == null) {
+            riverGrazer = MobCategory.valueOf("ANTCOLONIES_RIVER_GRAZER");
+        }
+        return riverGrazer;
     }
 
     /** The river fish group (tilapia and catfish). */

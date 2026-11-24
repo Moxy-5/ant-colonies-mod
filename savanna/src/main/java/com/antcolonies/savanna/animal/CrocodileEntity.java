@@ -504,10 +504,45 @@ public class CrocodileEntity extends PathfinderMob implements GeoEntity, HasLife
         return crecheAt != null && level().getGameTime() < crecheUntil ? BlockPos.containing(crecheAt) : null;
     }
 
-    /** The crèche a young one keeps to while its mother cares for it (null: none). */
+    /** A young one's resting spot in the reeds by its crèche, the crèche it was found for, and when it looks again. */
+    @Nullable
+    private BlockPos crecheRest;
+    @Nullable
+    private Vec3 crecheRestFor;
+    private long crecheRestLook;
+    /** How often a young one looks again for reeds by its crèche (ticks: a reed bed broken or grown since). */
+    static final int CRECHE_REST_LOOK = 600;
+
+    /**
+     * The spot a young one keeps to while its mother cares for it (null: none): the crèche, or cover by it (the food
+     * web's step 4, 2026-11-23): with reeds or a hippo grass mat within her see-off reach of the crèche
+     * ({@link CrocodileBreeding#GUARD_SEE_OFF}, so they stay where she guards them) the young rest among the stalks.
+     * Nests are on sand banks, where no reeds grow, so this happens only where a bank and a reed bed meet.
+     */
     @Nullable
     private BlockPos crecheSpot() {
-        return life.isYoung() && crecheAt != null && level().getGameTime() < crecheUntil ? BlockPos.containing(crecheAt) : null;
+        if (!life.isYoung() || crecheAt == null || level().getGameTime() >= crecheUntil) {
+            return null;
+        }
+        BlockPos at = BlockPos.containing(crecheAt);
+        if (crecheRestFor != crecheAt || level().getGameTime() >= crecheRestLook) {
+            crecheRestFor = crecheAt;
+            crecheRestLook = level().getGameTime() + CRECHE_REST_LOOK;
+            crecheRest = RiverCover.nearest(level(), at, (int) CrocodileBreeding.GUARD_SEE_OFF);
+        }
+        return crecheRest != null ? crecheRest : at;
+    }
+
+    /** For tests: a young one keeps to a crèche here for this long (ticks), as if let out of its mother's mouth there. */
+    public void keepCreche(Vec3 at, int ticks) {
+        crecheAt = at;
+        crecheUntil = level().getGameTime() + ticks;
+    }
+
+    /** For tests: where a young one rests by its crèche (the crèche itself with no reeds near; null: no crèche). */
+    @Nullable
+    public BlockPos crecheRestSpot() {
+        return crecheSpot();
     }
 
     /**
@@ -1828,7 +1863,7 @@ public class CrocodileEntity extends PathfinderMob implements GeoEntity, HasLife
             Vec3 from = called ? croc.schoolAt : croc.position();
             double around = hatchling ? YOUNG_HUNT_REACH : called ? SCHOOL_REACH : HUNT_REACH;
             for (LivingEntity seen : croc.level().getEntitiesOfClass(LivingEntity.class, new net.minecraft.world.phys.AABB(from, from).inflate(around, 6.0, around),
-                    e -> isPrey(croc, e) && (!called || isFish(e)))) {
+                    e -> isPrey(croc, e) && (!called || isFish(e)) && !RiverCover.hiddenFrom(croc, e))) {      // (a fish still in the reeds unseen)
                 double d = seen.distanceToSqr(from);
                 if (d >= around * around) {
                     continue;
@@ -1840,7 +1875,7 @@ public class CrocodileEntity extends PathfinderMob implements GeoEntity, HasLife
                 if (seen instanceof CatfishEntity && d < bestCat) {
                     bestCat = d;
                     cat = seen;
-                } else if (seen instanceof TilapiaEntity && d < bestTilapia) {
+                } else if ((seen instanceof TilapiaEntity || seen instanceof DistichodusEntity) && d < bestTilapia) {
                     bestTilapia = d;
                     tilapia = seen;
                 }
@@ -1941,7 +1976,7 @@ public class CrocodileEntity extends PathfinderMob implements GeoEntity, HasLife
                         }
                         croc.release();
                         prey.discard();         // swallowed whole
-                        eat(prey instanceof TilapiaEntity ? FED_TILAPIA : FED_SMALL, 30);
+                        eat(prey instanceof TilapiaEntity || prey instanceof DistichodusEntity ? FED_TILAPIA : FED_SMALL, 30);
                     }
                 }
                 case EAT -> {
@@ -1957,8 +1992,8 @@ public class CrocodileEntity extends PathfinderMob implements GeoEntity, HasLife
         private void stalk() {
             left--;
             if (!prey.isAlive() || prey.isRemoved() || croc.distanceTo(prey) > reach + 4 || !atWater(croc.level(), prey, 5)
-                    || prey.isPassenger() || left <= 0 || fish && !prey.isInWater()) {
-                giveUp(200);
+                    || prey.isPassenger() || left <= 0 || fish && (!prey.isInWater() || RiverCover.hiddenFrom(croc, prey))) {
+                giveUp(200);       // (a fish hiding in the reeds: lost)
                 return;
             }
             if (fish) {
@@ -2476,9 +2511,13 @@ public class CrocodileEntity extends PathfinderMob implements GeoEntity, HasLife
         return e instanceof net.minecraft.world.entity.animal.AbstractFish || !(e instanceof Player) && e.getBbWidth() < 0.75F && e.getBbHeight() < 0.95F;
     }
 
-    /** A wild river fish it hunts: a tilapia, a catfish, a barb or a tadpole (hunted the fish's way), not from a bucket and not named (the player's own fish). */
+    /**
+     * A wild river fish it hunts: a tilapia, a catfish, a barb, a tadpole or a distichodus (hunted the fish's way), not
+     * from a bucket and not named (the player's own fish). The bull shark hunts by this too.
+     */
     static boolean isFish(LivingEntity e) {
-        return (e instanceof TilapiaEntity || e instanceof CatfishEntity || e instanceof BarbEntity || e instanceof TadpoleEntity) && !((net.minecraft.world.entity.animal.AbstractFish) e).fromBucket()
+        return (e instanceof TilapiaEntity || e instanceof CatfishEntity || e instanceof BarbEntity || e instanceof TadpoleEntity
+                || e instanceof DistichodusEntity) && !((net.minecraft.world.entity.animal.AbstractFish) e).fromBucket()
                 && !e.hasCustomName();
     }
 

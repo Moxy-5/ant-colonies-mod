@@ -71,3 +71,11 @@ fish beside the silver barbs and grey tilapia.
    before it. Waiting for the user's look.
 6. Into the game: the entity, spawning (the check list, `RiverLifeTests.worldWouldSpawn`), grazing hippo grass and
    reeds, bolting and leaping, crocodiles and the bull shark taking it; game tests `river`.
+   **Built 2026-11-23 (the river food web's step 5):** `animal/DistichodusEntity`, `DistichodusGrazeGoal`,
+   `client/DistichodusRenderer`; its own group `river_grazer` (cap 8), groups of 2 to 4 in water 2 to 4 deep, river zones
+   near, mid and oxbow. Grazes under living hippo grass mats (bites by the tilapia's outer-edge rule, one a fish every 2
+   minutes), nibbles reed feet and algae for looks (my pick: reed shoots are not eaten away), flares at a smaller one now
+   and then, bolts into cover (the food web's step 4), leaps when hit or (half the time) struck at close by from within 2
+   blocks of the surface; teen and grown crocodiles and the bull shark take it as a tilapia. The clip blend is 6 ticks
+   (3 snapped into the nose-down nibble in the offline check), 3 for the bolt and leap. Filmed in the game from three
+   sides (`tools/film/distichodus_frames.film`, sheets in `references/anim_lab/distichodus/game/`). Tests in `river`.

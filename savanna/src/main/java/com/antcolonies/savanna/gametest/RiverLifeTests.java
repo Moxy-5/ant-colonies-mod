@@ -4327,4 +4327,281 @@ public class RiverLifeTests {
             SavannaMod.LOGGER.info("[bullfrog] dug in at tick {}, out at {}", dugAt[0], outAt[0]);
         });
     }
+
+    // --- hiding in the reeds (the river food web's step 4, 2026-11-23) --------------------------------------------------
+
+    /**
+     * The bank with a pool 3 deep across it (x MX0+2 to MX1-2, z MZ0+1 to MZ1-1) whose west end is a reed bed in water
+     * 2 deep on silt (x MX0+2 to MX0+4, z MZ0+3 to MZ0+7; columns standing 2 over the water).
+     */
+    private static void poolWithReeds(GameTestHelper helper) {
+        for (int x = MX0; x <= MX1; x++) {
+            for (int z = MZ0; z <= MZ1; z++) {
+                boolean pool = x >= MX0 + 2 && x <= MX1 - 2 && z >= MZ0 + 1 && z <= MZ1 - 1;
+                boolean bed = pool && x <= MX0 + 4 && z >= MZ0 + 3 && z <= MZ0 + 7;
+                helper.setBlock(new BlockPos(x, TOP - 3, z), Blocks.STONE);
+                helper.setBlock(new BlockPos(x, TOP - 2, z), bed ? SavannaBlocks.SILT.get().defaultBlockState()
+                        : pool ? Blocks.WATER.defaultBlockState() : Blocks.STONE.defaultBlockState());
+                for (int y = TOP - 1; y <= TOP; y++) {
+                    helper.setBlock(new BlockPos(x, y, z), pool ? Blocks.WATER : Blocks.STONE);
+                }
+                for (int y = TOP + 1; y <= TOP + 5; y++) {
+                    helper.setBlock(new BlockPos(x, y, z), Blocks.AIR);
+                }
+            }
+        }
+        BlockState reed = SavannaBlocks.REEDS.get().defaultBlockState();
+        for (int x = MX0 + 2; x <= MX0 + 4; x++) {
+            for (int z = MZ0 + 3; z <= MZ0 + 7; z++) {
+                for (int y = TOP - 1; y <= TOP + 2; y++) {
+                    helper.setBlock(new BlockPos(x, y, z), reed.setValue(com.antcolonies.savanna.block.ReedBlock.WATERLOGGED, y <= TOP)
+                            .setValue(com.antcolonies.savanna.block.ReedBlock.TOP, y == TOP + 2));
+                }
+            }
+        }
+    }
+
+    private static boolean inCover(GameTestHelper helper, net.minecraft.world.entity.Entity e) {
+        return com.antcolonies.savanna.animal.RiverCover.isCover(helper.getLevel(), e.blockPosition());
+    }
+
+    private static boolean hidden(net.minecraft.world.entity.Entity fish) {
+        return ((com.antcolonies.savanna.animal.RiverCover.Hider) fish).hiding().hidden();
+    }
+
+    /**
+     * A barb and a tilapia scared 5 blocks from a reed bed dash into it and keep still there a few seconds, hidden, then
+     * come out again; a barb scared out of reach of any cover (14 blocks off) never hides (it flees as before).
+     */
+    @GameTest(template = "arena", timeoutTicks = 900)
+    public static void scaredFishHideInTheReedsThenComeOut(GameTestHelper helper) {
+        poolWithReeds(helper);
+        BarbEntity barb = helper.spawn(SavannaEntities.BARB.get(), new BlockPos(MX0 + 9, TOP - 1, MZ0 + 4));
+        TilapiaEntity tilapia = helper.spawn(SavannaEntities.TILAPIA.get(), new BlockPos(MX0 + 9, TOP - 1, MZ0 + 6));
+        BarbEntity far = helper.spawn(SavannaEntities.BARB.get(), new BlockPos(MX1 - 3, TOP - 1, MZ0 + 5));
+        tilapia.setUp(false, tilapia.getRandom());
+        net.minecraft.world.entity.animal.AbstractFish[] both = {barb, tilapia};
+        for (var f : new net.minecraft.world.entity.animal.AbstractFish[] {barb, tilapia, far}) {
+            f.setPersistenceRequired();
+        }
+        long now = helper.getLevel().getGameTime();
+        barb.hiding().scare(now);
+        tilapia.hiding().scare(now);
+        int[] hidFor = {0, 0};
+        boolean[] cameOut = {false, false};
+        boolean[] farHid = {false};
+        helper.onEachTick(() -> {
+            far.hiding().scare(helper.getLevel().getGameTime());       // kept scared: it would hide if it had anywhere to
+            farHid[0] |= far.hiding().hidden();
+            for (int i = 0; i < 2; i++) {
+                if (hidden(both[i])) {
+                    helper.assertTrue(inCover(helper, both[i]), "a fish counts as hidden out of the reeds, at " + helper.relativePos(both[i].blockPosition()));
+                    hidFor[i]++;
+                } else if (hidFor[i] >= 60) {
+                    cameOut[i] = true;
+                }
+            }
+        });
+        helper.succeedWhen(() -> {
+            helper.assertFalse(farHid[0], "a barb with no cover near hid");
+            helper.assertTrue(cameOut[0] && cameOut[1], "barb: hid " + hidFor[0] + " ticks" + (cameOut[0] ? ", came out" : "") + "; tilapia: hid "
+                    + hidFor[1] + " ticks" + (cameOut[1] ? ", came out" : "") + " (barb at " + helper.relativePos(barb.blockPosition())
+                    + ", tilapia at " + helper.relativePos(tilapia.blockPosition()) + ")");
+        });
+    }
+
+    /**
+     * A hungry catfish 4 blocks from a barb keeping still in the reeds does not see it and goes for a barb in open water
+     * 10 blocks off instead (it would take the nearest it saw): a hunter sees a still fish in cover only within 2 blocks.
+     */
+    @GameTest(template = "arena", timeoutTicks = 1200)
+    public static void aCatfishPassesOverABarbHiddenInTheReeds(GameTestHelper helper) {
+        poolWithReeds(helper);
+        BarbEntity hiding = helper.spawn(SavannaEntities.BARB.get(), new BlockPos(MX0 + 4, TOP - 1, MZ0 + 5));
+        hiding.setPersistenceRequired();
+        hiding.hiding().scare(helper.getLevel().getGameTime());
+        CatfishEntity[] catfish = {null};
+        BarbEntity[] open = {null};
+        helper.onEachTick(() -> {
+            hiding.hiding().scare(helper.getLevel().getGameTime());       // kept hiding all along
+            if (catfish[0] == null && hiding.hiding().hidden()) {
+                // in the reeds now: the hunter comes 4 blocks off it, the open-water barb 10 blocks beyond the hunter
+                catfish[0] = helper.spawn(SavannaEntities.CATFISH.get(), new BlockPos(MX0 + 8, TOP - 2, MZ0 + 5));
+                catfish[0].setPersistenceRequired();
+                open[0] = helper.spawn(SavannaEntities.BARB.get(), new BlockPos(MX0 + 18, TOP - 1, MZ0 + 5));
+                open[0].setPersistenceRequired();
+            }
+            if (catfish[0] != null && open[0].isAlive()) {
+                catfish[0].makeHungry();        // hungry until it has taken one
+            }
+        });
+        helper.succeedWhen(() -> {
+            helper.assertTrue(catfish[0] != null, "the barb never hid in the reeds (at " + helper.relativePos(hiding.blockPosition()) + ")");
+            helper.assertTrue(hiding.isAlive() && !hiding.isRemoved(), "the catfish took the barb hidden in the reeds");
+            helper.assertTrue(open[0].isRemoved(), "the catfish has not taken the barb in open water (it is "
+                    + String.format("%.1f", catfish[0].distanceTo(open[0])) + " blocks off it)");
+        });
+    }
+
+    /**
+     * Hatchling crocodiles rest among reeds by their crÃ¨che when a bed lies within their mother's see-off reach of it,
+     * and keep to the crÃ¨che itself where there are none.
+     */
+    @GameTest(template = "arena", timeoutTicks = 900)
+    public static void hatchlingsRestInTheReedsByTheirCreche(GameTestHelper helper) {
+        poolWithReeds(helper);
+        var croc = helper.spawn(SavannaEntities.CROCODILE.get(), new BlockPos(MX0 + 9, TOP - 1, MZ0 + 5));
+        var lone = helper.spawn(SavannaEntities.CROCODILE.get(), new BlockPos(MX1 - 4, TOP - 1, MZ0 + 5));
+        for (var c : new com.antcolonies.savanna.animal.CrocodileEntity[] {croc, lone}) {
+            c.life().setUp(true, c.getRandom());
+            c.life().setAge(0);
+            c.load(c.saveWithoutId(new net.minecraft.nbt.CompoundTag()));
+            c.setPersistenceRequired();
+        }
+        croc.keepCreche(net.minecraft.world.phys.Vec3.atCenterOf(helper.absolutePos(new BlockPos(MX0 + 8, TOP - 1, MZ0 + 5))), 20000);
+        BlockPos loneCreche = helper.absolutePos(new BlockPos(MX1 - 4, TOP - 1, MZ0 + 5));
+        lone.keepCreche(net.minecraft.world.phys.Vec3.atCenterOf(loneCreche), 20000);
+        helper.succeedWhen(() -> {
+            BlockPos rest = croc.crecheRestSpot();
+            helper.assertTrue(rest != null && com.antcolonies.savanna.animal.RiverCover.isCover(helper.getLevel(), rest),
+                    "the hatchling's resting spot " + (rest == null ? "is none" : helper.relativePos(rest) + " is not in the reeds"));
+            helper.assertTrue(loneCreche.equals(lone.crecheRestSpot()), "with no reeds near, the hatchling rests at " + lone.crecheRestSpot() + ", not its crÃ¨che");
+            double off = croc.position().distanceTo(net.minecraft.world.phys.Vec3.atBottomCenterOf(rest));
+            helper.assertTrue(off < 4.5, "the hatchling is " + String.format("%.1f", off) + " blocks from its spot in the reeds");
+        });
+    }
+
+    // --- the six-banded distichodus (the river food web's step 5, 2026-11-23) ------------------------------------------
+
+    /**
+     * The distichodus spawns by itself along the slower edges (the spawning check list): over a river's cross-section the
+     * world would spawn one at every water spot of a column 2 to 4 blocks deep and nowhere shallower or deeper; it is in
+     * its own group, the river grazers (cap 8), listed in the savanna's waters in groups of 2 to 4.
+     */
+    @GameTest(template = "arena", timeoutTicks = 200)
+    public static void distichodusSpawnAlongTheSlowerEdgesByThemselves(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        int top = buildChannel(helper, false);
+        BlockPos corner = helper.absolutePos(new BlockPos(CX0, 0, CZ0));
+        int[] spots = new int[CHANNEL_DEPTHS.length];
+        int barbs = 0, tilapia = 0;
+        for (int i = 0; i < CHANNEL_DEPTHS.length; i++) {
+            for (int dz = 0; dz <= CZ1 - CZ0; dz++) {
+                for (int y = top - 8; y <= top + 1; y++) {
+                    BlockPos at = new BlockPos(corner.getX() + i, y, corner.getZ() + dz);
+                    spots[i] += worldWouldSpawn(level, SavannaEntities.DISTICHODUS.get(), at) ? 1 : 0;
+                    barbs += worldWouldSpawn(level, SavannaEntities.BARB.get(), at) ? 1 : 0;
+                    tilapia += worldWouldSpawn(level, SavannaEntities.TILAPIA.get(), at) ? 1 : 0;
+                }
+            }
+        }
+        buildChannel(helper, true);
+        SavannaMod.LOGGER.info("[distichodus spawns] spots over the channel: distichodus {} (by column {}), barb {}, tilapia {}",
+                java.util.Arrays.stream(spots).sum(), java.util.Arrays.toString(spots), barbs, tilapia);
+        StringBuilder wrong = new StringBuilder();
+        for (int i = 0; i < CHANNEL_DEPTHS.length; i++) {
+            int want = CHANNEL_DEPTHS[i] >= 2 && CHANNEL_DEPTHS[i] <= 4 ? CHANNEL_DEPTHS[i] * (CZ1 - CZ0 + 1) : 0;
+            if (spots[i] != want) {
+                wrong.append(" depth ").append(CHANNEL_DEPTHS[i]).append(": ").append(spots[i]).append(", want ").append(want);
+            }
+        }
+        if (!wrong.isEmpty()) {
+            helper.fail("the distichodus spawns at the wrong spots:" + wrong);
+        }
+        var grazers = com.antcolonies.savanna.registry.SavannaMobCategories.riverGrazer();
+        helper.assertTrue(SavannaEntities.DISTICHODUS.get().getCategory() == grazers, "the distichodus is in the "
+                + SavannaEntities.DISTICHODUS.get().getCategory().getName() + " group");
+        helper.assertTrue(grazers.getMaxInstancesPerChunk() == 8, "the river grazer group's cap is " + grazers.getMaxInstancesPerChunk() + " (8 wanted)");
+        var biomes = level.registryAccess().registryOrThrow(net.minecraft.core.registries.Registries.BIOME);
+        var river = net.minecraft.resources.ResourceKey.create(net.minecraft.core.registries.Registries.BIOME,
+                net.minecraft.resources.ResourceLocation.fromNamespaceAndPath(SavannaMod.MODID, "savanna_river"));
+        for (var key : java.util.List.of(net.minecraft.world.level.biome.Biomes.SAVANNA, river)) {
+            var d = biomes.getOrThrow(key).getMobSettings().getMobs(grazers).unwrap().stream()
+                    .filter(s -> s.type == SavannaEntities.DISTICHODUS.get()).findFirst();
+            helper.assertTrue(d.isPresent() && d.get().minCount == 2 && d.get().maxCount == 4,
+                    "the distichodus in " + key.location() + "'s river grazer list: " + d.map(s -> s.minCount + " to " + s.maxCount).orElse("none") + " (2 to 4 wanted)");
+        }
+        // the river zones: none at the coast, far inland or in the pans; all of its share on the near and mid rivers and the oxbows
+        var z = com.antcolonies.savanna.worldgen.RiverZones.Zone.class;
+        float[] want = {0, 1, 1, 0, 1, 0};
+        for (var zone : z.getEnumConstants()) {
+            if (zone.ordinal() < want.length) {
+                float share = com.antcolonies.savanna.worldgen.RiverZones.share(SavannaEntities.DISTICHODUS.get(), zone);
+                helper.assertTrue(share == want[zone.ordinal()], "the distichodus's share in " + zone + " is " + share + " (" + want[zone.ordinal()] + " wanted)");
+            }
+        }
+        helper.succeed();
+    }
+
+    /**
+     * A distichodus beside a living hippo grass fringe grazes under it and bites the outermost mat away, never the mat
+     * at the bank nor the clump; and it bites at most once in 2 minutes (the mat now outermost is left).
+     */
+    @GameTest(template = "arena", timeoutTicks = 1200)
+    public static void aDistichodusBitesOnlyTheOuterEdgeOfHippoGrass(GameTestHelper helper) {
+        bankWithPool(helper);
+        BlockPos[] row = hippoGrassRow(helper, MZ0 + 5, com.antcolonies.savanna.block.HippoGrassClumpBlock.GROWN);
+        var fish = helper.spawn(SavannaEntities.DISTICHODUS.get(), new BlockPos(MX0 + 8, TOP, MZ0 + 4));
+        fish.setPersistenceRequired();
+        boolean[] grazed = {false};
+        int[] bitAt = {-1};
+        helper.onEachTick(() -> {
+            grazed[0] |= fish.action() == com.antcolonies.savanna.animal.DistichodusEntity.GRAZE;
+            if (bitAt[0] < 0 && !isMat(helper, row[3])) {
+                bitAt[0] = (int) helper.getTick();
+            }
+            helper.assertTrue(isMat(helper, row[1]), "the mat at the bank was eaten");
+            helper.assertTrue(helper.getLevel().getBlockState(row[0]).is(SavannaBlocks.HIPPO_GRASS_CLUMP.get()), "the clump is gone");
+            if (bitAt[0] >= 0) {
+                helper.assertTrue(isMat(helper, row[2]), "a second mat was bitten " + (helper.getTick() - bitAt[0]) + " ticks after the first (2 minutes wanted)");
+            }
+        });
+        helper.runAtTickTime(1150, () -> {
+            helper.assertTrue(grazed[0], "the distichodus never grazed (at " + helper.relativePos(fish.blockPosition()) + ")");
+            helper.assertTrue(bitAt[0] >= 0, "the distichodus grazed but never bit the outer mat away");
+            helper.succeed();
+        });
+    }
+
+    /** A distichodus hit just under the surface leaps clear of the water and comes down in it again, unhurt beyond the hit. */
+    @GameTest(template = "arena", timeoutTicks = 300)
+    public static void aDistichodusLeapsClearOfTheWaterWhenHit(GameTestHelper helper) {
+        poolWithReeds(helper);
+        var fish = helper.spawn(SavannaEntities.DISTICHODUS.get(), new BlockPos(MX0 + 12, TOP, MZ0 + 5));
+        fish.setPersistenceRequired();
+        double surface = helper.absolutePos(new BlockPos(0, TOP + 1, 0)).getY();
+        double[] highest = {-1000};
+        boolean[] leapt = {false};
+        helper.runAtTickTime(5, () -> fish.hurt(helper.getLevel().damageSources().generic(), 1.0F));
+        helper.onEachTick(() -> {
+            highest[0] = Math.max(highest[0], fish.getY());
+            leapt[0] |= fish.action() == com.antcolonies.savanna.animal.DistichodusEntity.LEAP;
+        });
+        helper.succeedWhen(() -> {
+            helper.assertTrue(leapt[0], "the distichodus never leapt (its top at " + String.format("%.2f", highest[0] - surface) + " over the water)");
+            helper.assertTrue(highest[0] > surface + 0.3, "the leap never cleared the water (highest " + String.format("%.2f", highest[0] - surface) + " over it)");
+            helper.assertTrue(fish.isAlive() && fish.isInWater(), "the distichodus did not come down in the water");
+        });
+    }
+
+    /** A hungry grown crocodile takes a distichodus from a group of three, as it takes a tilapia, and is fed. */
+    @GameTest(template = "arena", timeoutTicks = 1600)
+    public static void aCrocodileTakesADistichodus(GameTestHelper helper) {
+        buildPond(helper);
+        helper.setDayTime(18000);                            // night: no wish to bask
+        var croc = helper.spawn(SavannaEntities.CROCODILE.get(), new BlockPos(X0 + 2, SURFACE + 5, Z0 + 3));
+        croc.setPersistenceRequired();
+        croc.makeHungry();
+        croc.strikeLuck = 1;        // no fish darts away at the snap: the test is about the catch
+        java.util.List<com.antcolonies.savanna.animal.DistichodusEntity> group = new java.util.ArrayList<>();
+        for (int i = 0; i < 3; i++) {
+            var fish = helper.spawn(SavannaEntities.DISTICHODUS.get(), new BlockPos(X1 - 1 - (i % 2), SURFACE + 3 + (i % 2), Z0 + 2 + i));
+            fish.setPersistenceRequired();
+            group.add(fish);
+        }
+        helper.succeedWhen(() -> helper.assertTrue(group.stream().anyMatch(f -> f.isRemoved()) && croc.held() == null && !croc.isHungry(),
+                "no distichodus eaten yet (" + group.stream().filter(f -> !f.isRemoved()).count() + " left, the crocodile "
+                        + (croc.isHungry() ? "hungry" : "fed") + ", nearest " + String.format("%.1f", group.stream()
+                        .mapToDouble(f -> f.distanceTo(croc)).min().orElse(-1)) + " blocks off)"));
+    }
 }

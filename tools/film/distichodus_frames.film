@@ -1,0 +1,226 @@
+# The six-banded distichodus in the game, frame by frame (the river food web's step 5, 2026-11-23; CLAUDE.md's hard
+# rule): every clip on a still fish named film:<clip> (it plays only that clip), side on, three quarters and (the
+# swimming clips) from the front, the game frozen and stepped a tick or two a picture; then a free group in the pool.
+#   ./gradlew runFilm -PfilmScene=tools/film/distichodus_frames.film   pictures in run-film/screenshots/distichodus_frames/
+cmd time set noon
+cmd weather clear
+cmd kill @e[type=!player]
+# the pool: x 26..44, 3 deep, flush with the grass
+cmd fill 26 -63 -8 44 -61 8 minecraft:water
+lens 30
+wait 40
+cmd summon antcolonies:distichodus 33.5 -62.15 0.5 {NoAI:1b,Rotation:[-90f,0f],CustomName:'"film:idle"'}
+camera 33.50 -63.67 -1.80 0 0
+wait 10
+cmd tick freeze
+burst idle_side 20 2
+cmd tick unfreeze
+cmd tp @e[type=antcolonies:distichodus] 33 -140 0
+wait 3
+cmd summon antcolonies:distichodus 33.5 -62.15 0.5 {NoAI:1b,Rotation:[-90f,0f],CustomName:'"film:idle"'}
+camera 31.87 -63.27 -1.13 -45 10
+wait 10
+cmd tick freeze
+burst idle_threequarter 20 2
+cmd tick unfreeze
+cmd tp @e[type=antcolonies:distichodus] 33 -140 0
+wait 3
+cmd summon antcolonies:distichodus 33.5 -62.15 0.5 {NoAI:1b,Rotation:[-90f,0f],CustomName:'"film:swim"'}
+camera 33.50 -63.67 -1.80 0 0
+wait 10
+cmd tick freeze
+burst swim_side 12 1
+cmd tick unfreeze
+cmd tp @e[type=antcolonies:distichodus] 33 -140 0
+wait 3
+cmd summon antcolonies:distichodus 33.5 -62.15 0.5 {NoAI:1b,Rotation:[-90f,0f],CustomName:'"film:swim"'}
+camera 31.87 -63.27 -1.13 -45 10
+wait 10
+cmd tick freeze
+burst swim_threequarter 12 1
+cmd tick unfreeze
+cmd tp @e[type=antcolonies:distichodus] 33 -140 0
+wait 3
+cmd summon antcolonies:distichodus 33.5 -62.15 0.5 {NoAI:1b,Rotation:[-90f,0f],CustomName:'"film:swim"'}
+camera 35.80 -63.67 0.50 90 0
+wait 10
+cmd tick freeze
+burst swim_front 12 1
+cmd tick unfreeze
+cmd tp @e[type=antcolonies:distichodus] 33 -140 0
+wait 3
+cmd summon antcolonies:distichodus 33.5 -62.15 0.5 {NoAI:1b,Rotation:[-90f,0f],CustomName:'"film:graze"'}
+camera 33.50 -63.67 -1.80 0 0
+wait 10
+cmd tick freeze
+burst graze_side 24 2
+cmd tick unfreeze
+cmd tp @e[type=antcolonies:distichodus] 33 -140 0
+wait 3
+cmd summon antcolonies:distichodus 33.5 -62.15 0.5 {NoAI:1b,Rotation:[-90f,0f],CustomName:'"film:graze"'}
+camera 31.87 -63.27 -1.13 -45 10
+wait 10
+cmd tick freeze
+burst graze_threequarter 24 2
+cmd tick unfreeze
+cmd tp @e[type=antcolonies:distichodus] 33 -140 0
+wait 3
+cmd summon antcolonies:distichodus 33.5 -62.15 0.5 {NoAI:1b,Rotation:[-90f,0f],CustomName:'"film:nibble"'}
+camera 33.50 -63.67 -1.80 0 0
+wait 10
+cmd tick freeze
+burst nibble_side 18 2
+cmd tick unfreeze
+cmd tp @e[type=antcolonies:distichodus] 33 -140 0
+wait 3
+cmd summon antcolonies:distichodus 33.5 -62.15 0.5 {NoAI:1b,Rotation:[-90f,0f],CustomName:'"film:nibble"'}
+camera 31.87 -63.27 -1.13 -45 10
+wait 10
+cmd tick freeze
+burst nibble_threequarter 18 2
+cmd tick unfreeze
+cmd tp @e[type=antcolonies:distichodus] 33 -140 0
+wait 3
+cmd summon antcolonies:distichodus 33.5 -62.15 0.5 {NoAI:1b,Rotation:[-90f,0f],CustomName:'"film:bolt"'}
+camera 33.50 -63.67 -1.80 0 0
+wait 10
+cmd tick freeze
+burst bolt_side 9 1
+cmd tick unfreeze
+cmd tp @e[type=antcolonies:distichodus] 33 -140 0
+wait 3
+cmd summon antcolonies:distichodus 33.5 -62.15 0.5 {NoAI:1b,Rotation:[-90f,0f],CustomName:'"film:bolt"'}
+camera 31.87 -63.27 -1.13 -45 10
+wait 10
+cmd tick freeze
+burst bolt_threequarter 9 1
+cmd tick unfreeze
+cmd tp @e[type=antcolonies:distichodus] 33 -140 0
+wait 3
+cmd summon antcolonies:distichodus 33.5 -62.15 0.5 {NoAI:1b,Rotation:[-90f,0f],CustomName:'"film:bolt"'}
+camera 35.80 -63.67 0.50 90 0
+wait 10
+cmd tick freeze
+burst bolt_front 9 1
+cmd tick unfreeze
+cmd tp @e[type=antcolonies:distichodus] 33 -140 0
+wait 3
+cmd summon antcolonies:distichodus 33.5 -62.15 0.5 {NoAI:1b,Rotation:[-90f,0f],CustomName:'"film:leap"'}
+camera 33.50 -63.67 -1.80 0 0
+wait 10
+cmd tick freeze
+burst leap_side 20 1
+cmd tick unfreeze
+cmd tp @e[type=antcolonies:distichodus] 33 -140 0
+wait 3
+cmd summon antcolonies:distichodus 33.5 -62.15 0.5 {NoAI:1b,Rotation:[-90f,0f],CustomName:'"film:leap"'}
+camera 31.87 -63.27 -1.13 -45 10
+wait 10
+cmd tick freeze
+burst leap_threequarter 20 1
+cmd tick unfreeze
+cmd tp @e[type=antcolonies:distichodus] 33 -140 0
+wait 3
+cmd summon antcolonies:distichodus 33.5 -62.15 0.5 {NoAI:1b,Rotation:[-90f,0f],CustomName:'"film:leap"'}
+camera 35.80 -63.67 0.50 90 0
+wait 10
+cmd tick freeze
+burst leap_front 20 1
+cmd tick unfreeze
+cmd tp @e[type=antcolonies:distichodus] 33 -140 0
+wait 3
+cmd summon antcolonies:distichodus 33.5 -62.15 0.5 {NoAI:1b,Rotation:[-90f,0f],CustomName:'"film:flare"'}
+camera 33.50 -63.67 -1.80 0 0
+wait 10
+cmd tick freeze
+burst flare_side 14 2
+cmd tick unfreeze
+cmd tp @e[type=antcolonies:distichodus] 33 -140 0
+wait 3
+cmd summon antcolonies:distichodus 33.5 -62.15 0.5 {NoAI:1b,Rotation:[-90f,0f],CustomName:'"film:flare"'}
+camera 31.87 -63.27 -1.13 -45 10
+wait 10
+cmd tick freeze
+burst flare_threequarter 14 2
+cmd tick unfreeze
+cmd tp @e[type=antcolonies:distichodus] 33 -140 0
+wait 3
+cmd summon antcolonies:distichodus 33.5 -62.15 0.5 {NoAI:1b,Rotation:[-90f,0f],CustomName:'"film:flare"'}
+camera 35.80 -63.67 0.50 90 0
+wait 10
+cmd tick freeze
+burst flare_front 14 2
+cmd tick unfreeze
+cmd tp @e[type=antcolonies:distichodus] 33 -140 0
+wait 3
+# on the grass: stranded and dying
+cmd summon antcolonies:distichodus 22.5 -60.0 0.5 {NoAI:1b,Rotation:[-90f,0f],CustomName:'"film:flop"'}
+camera 22.50 -61.40 -1.80 0 6
+wait 10
+cmd tick freeze
+burst flop_side 11 1
+cmd tick unfreeze
+cmd tp @e[type=antcolonies:distichodus] 33 -140 0
+wait 3
+cmd summon antcolonies:distichodus 22.5 -60.0 0.5 {NoAI:1b,Rotation:[-90f,0f],CustomName:'"film:flop"'}
+camera 20.87 -61.00 -1.13 -45 16
+wait 10
+cmd tick freeze
+burst flop_threequarter 11 1
+cmd tick unfreeze
+cmd tp @e[type=antcolonies:distichodus] 33 -140 0
+wait 3
+cmd summon antcolonies:distichodus 22.5 -60.0 0.5 {NoAI:1b,Rotation:[-90f,0f],CustomName:'"film:death"'}
+camera 22.50 -61.40 -1.80 0 6
+wait 10
+cmd tick freeze
+burst death_side 12 2
+cmd tick unfreeze
+cmd tp @e[type=antcolonies:distichodus] 33 -140 0
+wait 3
+cmd summon antcolonies:distichodus 22.5 -60.0 0.5 {NoAI:1b,Rotation:[-90f,0f],CustomName:'"film:death"'}
+camera 20.87 -61.00 -1.13 -45 16
+wait 10
+cmd tick freeze
+burst death_threequarter 12 2
+cmd tick unfreeze
+cmd tp @e[type=antcolonies:distichodus] 33 -140 0
+wait 3
+# a free group of 3 swimming in the pool; the camera rides along with one (named film-walker, it lives as usual),
+# from under the water and from the bank above
+cmd summon antcolonies:distichodus 38.0 -62 -2.0 {CustomName:'"film-walker"'}
+cmd summon antcolonies:distichodus 38.8 -62 -1.2
+cmd summon antcolonies:distichodus 37.4 -62 -0.6
+wait 60
+lens 50
+follow 0 0.1 -4.0 0 0
+shot group_under_0
+wait 8
+shot group_under_1
+wait 8
+shot group_under_2
+wait 8
+shot group_under_3
+wait 8
+shot group_under_4
+wait 8
+shot group_under_5
+wait 8
+cmd tick freeze
+burst group_under_burst 16 1
+cmd tick unfreeze
+follow 0 3.2 -3.2 0 42
+shot group_above_0
+wait 8
+shot group_above_1
+wait 8
+shot group_above_2
+wait 8
+shot group_above_3
+wait 8
+shot group_above_4
+wait 8
+shot group_above_5
+wait 8
+follow off
+quit

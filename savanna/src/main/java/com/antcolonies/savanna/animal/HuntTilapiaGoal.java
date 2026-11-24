@@ -170,9 +170,17 @@ public class HuntTilapiaGoal extends Goal {
     static void scatter(net.minecraft.world.entity.Entity hunter, @Nullable net.minecraft.world.entity.Entity struckAt) {
         Vec3 at = hunter.position();
         List<AbstractSchoolingFish> school = hunter.level().getEntitiesOfClass(AbstractSchoolingFish.class, hunter.getBoundingBox().inflate(SCATTER_WITHIN),
-                f -> f instanceof TilapiaEntity || f instanceof BarbEntity || f instanceof TadpoleEntity);
+                f -> f instanceof TilapiaEntity || f instanceof BarbEntity || f instanceof TadpoleEntity || f instanceof DistichodusEntity);
         for (AbstractSchoolingFish other : school) {
             if (other == struckAt) {
+                continue;
+            }
+            RiverCover.scare(other);        // into the reeds, if any are near (the food web's step 4)
+            if (other instanceof DistichodusEntity big) {
+                // a hard scare: half the time it leaps clear of the water first (the food web's step 5)
+                if (big.getRandom().nextFloat() < DistichodusEntity.LEAP_ON_STRIKE) {
+                    big.leap(at);
+                }
                 continue;
             }
             if (other instanceof BarbEntity barb) {
@@ -223,9 +231,13 @@ public class HuntTilapiaGoal extends Goal {
         return best;
     }
 
-    /** A wild tilapia, barb or tadpole (a snack, as a barb: 2026-11-23) in the water near it (never the player's own fish, from a bucket or named). */
+    /**
+     * A wild tilapia, barb or tadpole (a snack, as a barb: 2026-11-23) in the water near it (never the player's own fish,
+     * from a bucket or named), not keeping still in the reeds out of its sight ({@link RiverCover#hiddenFrom}: a chase is
+     * lost when the fish hides).
+     */
     private boolean huntable(AbstractSchoolingFish t) {
         return (t instanceof TilapiaEntity || t instanceof BarbEntity || t instanceof TadpoleEntity) && t.isAlive() && t.isInWater() && !t.fromBucket() && !t.hasCustomName()
-                && t.distanceToSqr(fish) < (LOOK_ACROSS + 4) * (LOOK_ACROSS + 4);
+                && t.distanceToSqr(fish) < (LOOK_ACROSS + 4) * (LOOK_ACROSS + 4) && !RiverCover.hiddenFrom(fish, t);
     }
 }
