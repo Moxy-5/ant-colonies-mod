@@ -17,6 +17,9 @@ import net.minecraft.world.phys.Vec3;
  * and then it noses down onto the nearest mat with strands and rasps at it a few seconds; one graze in
  * {@link #BITE_ONE_IN} takes a bite off the mat ({@link AlgaeBlock#graze}), so a school of ten never strips it (the
  * tilapia are the mats' big eaters). No hunger: a tadpole with no algae near swims on and still grows.
+ *
+ * <p>Dying hippo grass too (the river food web's step 3, 2026-11-23): it rasps at a dying mat's outer edge from just
+ * under the surface ({@code HippoGrassBlock.dyingBite}); a bite takes the mat (it was going anyway).
  */
 public class TadpoleGrazeGoal extends Goal {
     /** One check in this many starts a graze (checked every other tick: about every 6 s). */
@@ -48,7 +51,8 @@ public class TadpoleGrazeGoal extends Goal {
             return false;
         }
         double r = 0.3;
-        spot = new Vec3(mat.getX() + 0.5 + (tadpole.getRandom().nextDouble() - 0.5) * r * 2, mat.getY() + 0.25,
+        boolean floating = tadpole.level().getBlockState(mat).getBlock() instanceof com.antcolonies.savanna.block.HippoGrassBlock;
+        spot = new Vec3(mat.getX() + 0.5 + (tadpole.getRandom().nextDouble() - 0.5) * r * 2, floating ? mat.getY() - 0.3 : mat.getY() + 0.25,
                 mat.getZ() + 0.5 + (tadpole.getRandom().nextDouble() - 0.5) * r * 2);
         return true;
     }
@@ -88,8 +92,8 @@ public class TadpoleGrazeGoal extends Goal {
         if (grazing > 0) {
             tadpole.setDeltaMovement(tadpole.getDeltaMovement().scale(0.5));
             if (++grazing > grazeFor) {
-                if (mat != null && tadpole.getRandom().nextInt(BITE_ONE_IN) == 0 && AlgaeBlock.bitesLeft(tadpole.level().getBlockState(mat)) > 0) {
-                    AlgaeBlock.graze(tadpole.level(), mat);
+                if (mat != null && tadpole.getRandom().nextInt(BITE_ONE_IN) == 0 && food(tadpole.level(), mat)) {
+                    EggMeals.bite(tadpole.level(), mat);    // a bite of algae, or a dying mat taken
                 }
                 spot = null;
             }
@@ -122,7 +126,13 @@ public class TadpoleGrazeGoal extends Goal {
         }
     }
 
-    /** The nearest algae mat with strands on it, or none. */
+    /** Whether there is food here: algae with strands, or a dying hippo grass mat's outer edge. */
+    private static boolean food(Level level, BlockPos at) {
+        net.minecraft.world.level.block.state.BlockState state = level.getBlockState(at);
+        return AlgaeBlock.bitesLeft(state) > 0 || com.antcolonies.savanna.block.HippoGrassBlock.dyingBite(level, at, state);
+    }
+
+    /** The nearest algae mat with strands on it (or dying hippo grass), or none. */
     @Nullable
     private BlockPos matNear() {
         Level level = tadpole.level();
@@ -130,7 +140,7 @@ public class TadpoleGrazeGoal extends Goal {
         BlockPos best = null;
         double bestDist = Double.MAX_VALUE;
         for (BlockPos at : BlockPos.betweenClosed(home.offset(-LOOK_ACROSS, -LOOK_DOWN, -LOOK_ACROSS), home.offset(LOOK_ACROSS, 1, LOOK_ACROSS))) {
-            if (AlgaeBlock.bitesLeft(level.getBlockState(at)) <= 0) {
+            if (!food(level, at)) {
                 continue;
             }
             double d = at.distSqr(home);

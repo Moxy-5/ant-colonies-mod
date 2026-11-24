@@ -14,6 +14,9 @@ import net.minecraft.world.entity.ai.goal.Goal;
  * clip plays for {@link #GRAZE_TICKS}, and partway through it takes one bite off the mat ({@link AlgaeBlock#graze}, the
  * same bite a tilapia takes). Then it is fed for 1.5 to 3 minutes. Nothing near, it looks again in 15 s, creeping on
  * meanwhile: a snail never starves. My picks.
+ *
+ * <p>Dying hippo grass too (the river food web's step 3, 2026-11-23): a dying mat's outer edge floating no more than a
+ * block over it, rasped from under ({@code HippoGrassBlock.dyingBite}); the bite takes the mat (it was going anyway).
  */
 public class SnailGrazeGoal extends Goal {
     static final int LOOK_ACROSS = 6, LOOK_UP_DOWN = 2;
@@ -47,7 +50,7 @@ public class SnailGrazeGoal extends Goal {
 
     @Override
     public boolean canContinueToUse() {
-        return !fed && algae != null && (grazing > 0 ? grazing < GRAZE_TICKS + 1 : AlgaeBlock.bitesLeft(snail.level().getBlockState(algae)) > 0)
+        return !fed && algae != null && (grazing > 0 ? grazing < GRAZE_TICKS + 1 : food(algae))
                 && ticks < GIVE_UP_TICKS;
     }
 
@@ -101,12 +104,18 @@ public class SnailGrazeGoal extends Goal {
         snail.setDoing(SnailEntity.GRAZE);
         grazing++;
         if (grazing == BITE_AT) {
-            AlgaeBlock.graze(snail.level(), algae);
+            EggMeals.bite(snail.level(), algae);        // a bite of algae, or a dying mat taken
         }
         if (grazing >= GRAZE_TICKS) {
             fed = true;
             snail.hungryIn = FED_MIN + snail.getRandom().nextInt(FED_MORE);
         }
+    }
+
+    /** Whether there is food here: algae with bites left, or a dying hippo grass mat's outer edge. */
+    private boolean food(BlockPos at) {
+        net.minecraft.world.level.block.state.BlockState state = snail.level().getBlockState(at);
+        return AlgaeBlock.bitesLeft(state) > 0 || com.antcolonies.savanna.block.HippoGrassBlock.dyingBite(snail.level(), at, state);
     }
 
     @Nullable
@@ -116,8 +125,8 @@ public class SnailGrazeGoal extends Goal {
         double bestD = Double.MAX_VALUE;
         for (BlockPos at : BlockPos.betweenClosed(home.offset(-LOOK_ACROSS, -LOOK_UP_DOWN, -LOOK_ACROSS),
                 home.offset(LOOK_ACROSS, LOOK_UP_DOWN, LOOK_ACROSS))) {
-            if (AlgaeBlock.bitesLeft(snail.level().getBlockState(at)) == 0) {
-                continue;
+            if (at.getY() > home.getY() + 1 || !food(at)) {
+                continue;       // (a mat higher than a block over it is out of its reach)
             }
             double d = at.distSqr(home);
             if (d < bestD) {

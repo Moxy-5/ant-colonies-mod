@@ -3803,6 +3803,111 @@ public class RiverLifeTests {
         return cloud;
     }
 
+    // --- hippo grass eaten (the river food web's step 3, 2026-11-23) ----------------------------------------------------
+
+    /**
+     * The bank with its pool (1 deep) and a row of hippo grass across it: a clump on silt at the bank and mats lying 1, 2
+     * and 3 out, all of this stage, at this z (relative). Returns the clump's place and the three mats' (absolute).
+     */
+    private static BlockPos[] hippoGrassRow(GameTestHelper helper, int z, int stage) {
+        helper.setBlock(new BlockPos(MX0 + 5, TOP, z), SavannaBlocks.SILT.get());
+        BlockPos clump = new BlockPos(MX0 + 5, TOP + 1, z);
+        helper.setBlock(clump, SavannaBlocks.HIPPO_GRASS_CLUMP.get().defaultBlockState()
+                .setValue(com.antcolonies.savanna.block.HippoGrassClumpBlock.STAGE, stage));
+        BlockPos[] row = {helper.absolutePos(clump), null, null, null};
+        for (int reach = 1; reach <= 3; reach++) {
+            BlockPos at = new BlockPos(MX0 + 5 + reach, TOP + 1, z);
+            helper.setBlock(at, SavannaBlocks.HIPPO_GRASS.get().defaultBlockState()
+                    .setValue(com.antcolonies.savanna.block.HippoGrassBlock.STAGE, stage).setValue(com.antcolonies.savanna.block.HippoGrassBlock.REACH, reach));
+            row[reach] = helper.absolutePos(at);
+        }
+        return row;
+    }
+
+    private static boolean isMat(GameTestHelper helper, BlockPos at) {
+        return helper.getLevel().getBlockState(at).getBlock() instanceof com.antcolonies.savanna.block.HippoGrassBlock;
+    }
+
+    /**
+     * A tilapia kept hungry by a living hippo grass fringe with no algae nibbles the outer edge from under it (the mat 3
+     * out goes), and never the mat at the bank nor the clump: a clump can never be stripped.
+     */
+    @GameTest(template = "arena", timeoutTicks = 900)
+    public static void aTilapiaNibblesOnlyTheOuterEdgeOfLivingHippoGrass(GameTestHelper helper) {
+        bankWithPool(helper);
+        BlockPos[] row = hippoGrassRow(helper, MZ0 + 5, com.antcolonies.savanna.block.HippoGrassClumpBlock.GROWN);
+        var tilapia = helper.spawn(SavannaEntities.TILAPIA.get(), new BlockPos(MX0 + 8, TOP, MZ0 + 4));
+        tilapia.setPersistenceRequired();
+        boolean[] ate = {false};
+        helper.onEachTick(() -> {
+            tilapia.makeHungry();       // hungry all along: it would nibble on and on if it were let
+            ate[0] |= !isMat(helper, row[3]);
+        });
+        helper.runAtTickTime(850, () -> {
+            helper.assertTrue(ate[0], "the tilapia never nibbled the outer mat (it is " + String.format("%.1f",
+                    tilapia.position().distanceTo(net.minecraft.world.phys.Vec3.atCenterOf(row[3]))) + " blocks off)");
+            helper.assertTrue(isMat(helper, row[1]), "the mat at the bank was eaten");
+            helper.assertTrue(helper.getLevel().getBlockState(row[0]).is(SavannaBlocks.HIPPO_GRASS_CLUMP.get()), "the clump is gone");
+            helper.succeed();
+        });
+    }
+
+    /** A hungry snail and a tadpole graze a dying hippo grass mat's outer edge from under it; living mats they leave. */
+    @GameTest(template = "arena", timeoutTicks = 900)
+    public static void aSnailAndATadpoleGrazeDyingHippoGrass(GameTestHelper helper) {
+        bankWithPool(helper);
+        int dying = com.antcolonies.savanna.block.HippoGrassClumpBlock.DYING;
+        BlockPos[] forSnail = hippoGrassRow(helper, MZ0 + 3, dying);
+        BlockPos[] forTadpole = hippoGrassRow(helper, MZ0 + 7, dying);
+        var snail = helper.spawn(SavannaEntities.SNAIL.get(), new BlockPos(MX0 + 8, TOP, MZ0 + 4));
+        snail.setPersistenceRequired();
+        var tadpole = helper.spawn(SavannaEntities.TADPOLE.get(), new BlockPos(MX0 + 8, TOP, MZ0 + 6));
+        tadpole.setPersistenceRequired();
+        boolean[] grazed = {false, false};
+        helper.onEachTick(() -> {
+            snail.makeHungry();
+            grazed[0] |= snail.doing() == com.antcolonies.savanna.animal.SnailEntity.GRAZE && under(snail, forSnail, forTadpole);
+            grazed[1] |= tadpole.action() == com.antcolonies.savanna.animal.TadpoleEntity.GRAZE && under(tadpole, forSnail, forTadpole);
+        });
+        helper.succeedWhen(() -> {
+            helper.assertTrue(grazed[0], "the snail never grazed under a dying mat (" + helper.relativePos(snail.blockPosition()) + ")");
+            helper.assertTrue(grazed[1], "the tadpole never grazed under a dying mat (" + helper.relativePos(tadpole.blockPosition()) + ")");
+        });
+    }
+
+    /** A hungry crab picks at a dying hippo grass mat's outer edge, floating a block over the bed; it is gone after. */
+    @GameTest(template = "arena", timeoutTicks = 900)
+    public static void aCrabPicksAtDyingHippoGrass(GameTestHelper helper) {
+        bankWithPool(helper);
+        BlockPos[] row = hippoGrassRow(helper, MZ0 + 5, com.antcolonies.savanna.block.HippoGrassClumpBlock.DYING);
+        var crab = helper.spawn(SavannaEntities.CRAB.get(), new BlockPos(MX0 + 9, TOP, MZ0 + 4));
+        crab.setPersistenceRequired();
+        boolean[] picked = {false};
+        helper.onEachTick(() -> {
+            crab.makeHungry();
+            picked[0] |= crab.doing() == com.antcolonies.savanna.animal.CrabEntity.PICK_ALGAE && under(crab, row, row);
+        });
+        helper.succeedWhen(() -> helper.assertTrue(picked[0] && !isMat(helper, row[3]), "the crab " + (picked[0] ? "picked" : "never picked")
+                + " at the outer dying mat, which is " + (isMat(helper, row[3]) ? "still there" : "gone") + " (the crab at "
+                + helper.relativePos(crab.blockPosition()) + ")"));
+    }
+
+    /**
+     * Whether the animal is within a block (across) of under a mat of either row (the outer edge moves in as mats are
+     * eaten or die back by themselves, so any of them may be the one it grazes).
+     */
+    private static boolean under(net.minecraft.world.entity.Entity e, BlockPos[] a, BlockPos[] b) {
+        for (BlockPos[] row : new BlockPos[][] {a, b}) {
+            for (int reach = 1; reach <= 3; reach++) {
+                double dx = e.getX() - (row[reach].getX() + 0.5), dz = e.getZ() - (row[reach].getZ() + 0.5);
+                if (dx * dx + dz * dz < 1.0) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
     // --- landed flies (the river food web's step 1, 2026-11-23) ---------------------------------------------------------
 
     /** Keeps a fly landed at this spot (relative): a new one lands each time the last is eaten or flies off. */

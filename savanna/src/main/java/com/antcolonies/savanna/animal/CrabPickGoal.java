@@ -239,7 +239,8 @@ public class CrabPickGoal extends Goal {
             return null;
         }
         BlockState state = crab.level().getBlockState(block);
-        if (!state.is(SavannaBlocks.SCRAPS.get()) && AlgaeBlock.bitesLeft(state) == 0 && !EggMeals.forCrab(state)) {
+        if (!state.is(SavannaBlocks.SCRAPS.get()) && AlgaeBlock.bitesLeft(state) == 0 && !EggMeals.forCrab(state)
+                && !com.antcolonies.savanna.block.HippoGrassBlock.dyingBite(crab.level(), block, state)) {
             return null;
         }
         return new Vec3(block.getX() + 0.5, block.getY(), block.getZ() + 0.5);
@@ -306,7 +307,9 @@ public class CrabPickGoal extends Goal {
                 home.offset(LOOK_ACROSS, LOOK_UP_DOWN, LOOK_ACROSS))) {
             BlockState state = crab.level().getBlockState(at);
             boolean isScraps = state.is(SavannaBlocks.SCRAPS.get());
-            if (!isScraps && (scraps || AlgaeBlock.bitesLeft(state) == 0)) {
+            // dying hippo grass, the food web's step 3: a dying mat's outer edge its claws reach (a block over it at most)
+            boolean dying = at.getY() <= home.getY() + 1 && com.antcolonies.savanna.block.HippoGrassBlock.dyingBite(crab.level(), at, state);
+            if (!isScraps && (scraps || AlgaeBlock.bitesLeft(state) == 0 && !dying)) {
                 continue;
             }
             double d = at.distSqr(home);
