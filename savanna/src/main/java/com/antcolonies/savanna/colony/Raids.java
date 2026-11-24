@@ -267,6 +267,12 @@ public class Raids {
         stepRaid(level);
     }
 
+    /** The raid that last came home, or null (tests: a raid out of sight is gone from {@link #column} once done). */
+    @Nullable
+    public Raid lastRaid() {
+        return last;
+    }
+
     /** The raid out now is this one: one that set out as numbers ({@link RaidsAway}), or one read back after a reload. */
     void putRaid(Raid raid) {
         column = raid;

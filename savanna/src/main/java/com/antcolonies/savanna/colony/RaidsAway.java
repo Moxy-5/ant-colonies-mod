@@ -239,8 +239,8 @@ public final class RaidsAway {
      */
     private void maySetOut(ServerLevel level, long now) {
         SavannaNumbers.ColumnNumbers column = raids.columnNumbers();
-        if (raids.numbers() == null || column == null || !raids.isRaidTime(level) || !raids.isHungry()
-                || !raids.dayHasRoom(level) || colony.population().inside(Caste.WORKER) <= 0) {
+        // (the one rule of when the colony's own raid may leave, the same near and away: Raids.whyNoOwnRaidNow)
+        if (raids.numbers() == null || column == null || raids.whyNoOwnRaidNow(level) != null || colony.population().inside(Caste.WORKER) <= 0) {
             return;
         }
         for (Raids.Find find : raids.finds()) {

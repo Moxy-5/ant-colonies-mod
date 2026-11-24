@@ -496,6 +496,64 @@ test, "no scout noticed the living mound yet" (BUGS 164's own words; alone 3 of 
 `matabeleMajorBitesTheMudOpenOverATermite` once beside the others (BUGS 77c; alone 3 of 3). Neither uses what part c
 changed.
 
+## Step 4 as built (2026-11-24): one raid, with or without bodies; a raid kept through a reload
+
+Built on `claude/raid-rewrite-step4-502b0d` (beside part c, which is merged in).
+
+**What changed in play.**
+- A colony nobody is near still raids, and it is now the very same raid (`colony/Raid`) stepped without bodies: the
+  same seven stages, the same judge of "termites there now" before the muster and at the halt, the same turn home at
+  dusk and in rain, the same `[raid]` diary lines (its muster line says "out of sight"). `RaidsAway` no longer has a
+  raid of its own: it keeps the away raid day, the scouts out of sight, and the showing.
+- A player coming near a raid out of sight: the same raid takes bodies at its stage's place (in the nest's rooms while
+  it musters or has only just left, on the trail on a march, bunched at the halting place at the spot) with its catch
+  in their jaws, and goes on. A raid shown in its attack regroups (its catch was made as the attack began).
+- A watched raid whose ants pass out of sight (the land unloads, or the player walks off) is no longer dropped: after
+  the away grace (a minute) each unseen raider goes over to the raid's numbers, with the termites it held, and the
+  raid goes on to `done`. "Lost from sight" (14 of 46 raids in step 1's soak) is gone as an ending.
+- A raid out is saved, in any stage, and goes on from that stage after a reload (stage, when it began, the find, the
+  members, the numbers, the catch, what was lost; the trail is the one still smelt, else laid again along the find's
+  line). Raid data of older saves is read without harm and that raid dropped (the old key `out` is ignored).
+- Raids out of sight no longer leave in rain and follow the one rule of when a raid leaves (`Raids.whyNoOwnRaidNow`,
+  part c). The old away-only rule "no raid leaves unless its attack would start before dusk" is dropped: dusk turns
+  such a raid home, as it does a watched one.
+
+**The time each stage takes without bodies (my picks, from the same numbers):** muster and halt
+`raids.column.bunch_least_ticks` (5 s); a march the way's length at `raids.away.pace` (the laden pace home with a
+catch); the attack the shorter of `raids.away.fight_ticks` and the column's deadline; the regroup `bunch_least_ticks`
+plus `carry.pick_ticks` a termite, never past its deadline. Every stage still ends at its own deadline.
+
+**The catch of raiders going as numbers is one rule** (`Raid.takeHidden`, with `RaidCatch`): about `per_raider` each
+by the dice. With nobody's body at the spot they also take the termites standing in the open there (if that land
+ticks), the termite colony's soldiers answer (some stung and carried home) and a few raiders die or come home hurt
+(the numbers `RaidsAway` had). **The judge** takes a termite colony's own word when that colony lives as numbers or is
+in its away grace (it lives, has workers, does not keep off the spot), and hunts "by the land" only where the raiders'
+colony is away and no termite colony is on record in its scouts' reach.
+
+**Measured.** `RaidsAway.java` 790 lines before, 554 after (no raid stage left in it). `Raid.java` 1,694 before, about
+2,230 after (the bodiless side, the showing and hiding, the saving). `Raids.java` 1,905 before step 4's edits, 1,877
+after them (before the merge with part c).
+
+**Tests** (`raids,away`, 3 servers): all 41 pass after the merge with part c (40 in the run of all, and `aRaidOutAsNumbersIsShownWithItsCatchAfterItsAttack` alone after its test was put right: it had never hidden the raid again). In the run before the merge the ridge chain scene failed once on the watch rule `raider-stuck` (a watched raid's leader still 30 s; alone it failed 1 of 3, and it passed in the later run): a chance failure of the march with bodies, not of step 4, written down as BUGS 313.
+
+New and changed checks: the far raid's diary is read by the chain tests' book (the same stage lines in order, each in
+its deadline, a halt to see) and brings a catch home; the raid shown after its attack is first written down and read
+back in its attack (it goes on, with its catch) and, hidden again on the way home, ends in `done`;
+`aWatchedRaidAndARaidOutOfSightBringHomeTheSameCatch` (six termites in the open, a raid of 75 watched, then out of
+sight: both bring termites home, within 3 of each other); the old "whole raid hidden: lost from sight" check now
+asks that the hidden raid goes on as numbers and comes home (behaviour changed on purpose).
+
+**Not built, or not sure.**
+- **Near and away agree only where termites stand in the open.** A watched raid's real ants take what they can sting:
+  termite bodies. Termites feeding under the mud by day are numbers, and only the raiders going as numbers (none in a
+  raid of 75 or fewer) take those; a raid out of sight takes about 0.1 a raider from them. So at a spot with nobody
+  in the open a watched raid may bring home less than the same raid unseen. Whether that shows in play is for step
+  6's soak (part b said the same); the fix would be on the termite side (who comes out at a break), not a second rule.
+- A raid read back after a reload with real members waits for them to load; those not seen within the grace go over
+  to the numbers (not tried with a real save file, only by writing down and reading back in a test).
+- A raid shown near the nest steps back to the muster; one nearly home is not shown at all (it just arrives).
+- The scouts out of sight are untouched (their bookkeeping moves in step 5).
+
 ## Rules for the session doing this
 
 - Read `CLAUDE.md` first; ants and termites are strict realism.

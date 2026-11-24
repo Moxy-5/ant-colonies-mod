@@ -336,21 +336,26 @@ public class MatabeleAwayTests {
                             + column.carried());
                     helper.assertTrue(held + column.hiddenCatch() >= caught[0], "the raid had caught " + caught[0] + " termite(s) when it was saved; read back and shown it has "
                             + (held + column.hiddenCatch()));
+                    // the watcher leaves again: the same raid goes on as numbers from where it stands
+                    colony.away().setWatcherForTests(nest.offset(0, 0, -600));
                     stage[0] = 4;
                     stageAt[0] = now;
                 }
                 case 4 -> {
-                    // they walk home; out of the watcher's reach they are numbers again, the same raid, and it ends in done
-                    // with the catch home
-                    if (raids.column() == null && !raids.away().isOut() && pile.broughtIn() > 0) {
-                        com.antcolonies.savanna.colony.Raid last = raids.lastRaid();
-                        helper.assertTrue(last != null && last.stage() == com.antcolonies.savanna.colony.Raid.Stage.DONE && last.find().at().equals(spot),
-                                "the raid shown and hidden again did not end in done: " + (last == null ? "no last raid" : last.endedWhy()));
-                        helper.assertTrue(last.wasOutOfSight(), "the shown raiders never went over to the numbers again: " + last.endedWhy());
-                        helper.assertTrue(pile.broughtIn() >= caught[0], "the raid had caught " + caught[0] + " termite(s) when it was saved, but "
-                                + pile.broughtIn() + " reached the pile");
-                        helper.succeed();
+                    // hidden again, the raiders are numbers once more, the same raid: it ends in done, everyone home, and
+                    // what they held in their jaws comes home with the numbers
+                    com.antcolonies.savanna.colony.Raid last = raids.lastRaid();
+                    if (last == null) {
+                        helper.assertTrue(now - stageAt[0] < 6000, "the raid shown and hidden again never came home; " + raids.describe(level));
+                        return;
                     }
+                    helper.assertTrue(last.stage() == com.antcolonies.savanna.colony.Raid.Stage.DONE && last.find().at().equals(spot) && last.turned() == null,
+                            "the raid shown and hidden again did not end in done: " + last.endedWhy());
+                    helper.assertTrue(last.wasOutOfSight(), "the shown raiders never went over to the numbers again: " + last.endedWhy());
+                    helper.assertTrue(last.cameHome() >= shown[0], "of " + shown[0] + " raiders shown and hidden again only " + last.cameHome() + " came home: " + last.endedWhy());
+                    helper.assertTrue(pile.broughtIn() >= caught[0] && caught[0] > 0, "the raid had caught " + caught[0] + " termite(s) when it was saved, but "
+                            + pile.broughtIn() + " reached the pile" + pile.describe(level));
+                    helper.succeed();
                 }
                 default -> {
                 }
