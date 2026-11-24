@@ -42,3 +42,5 @@
 - [ ] M10: Grama grass + Termitomyces mushrooms. (Grama grass BUILT 2026-10-16, moved up by the user; Termitomyces done in 5c.)
 - [ ] M11: Digging phase 2 (bite stages).
 - [ ] Later: alarm level + hazards, leafcutters, army ants, ant farm, field journal.
+
+- **2026-11-23, the red harvester ant taken out (the user):** the desert mod, grama grass and ant bread left the repository (tag `harvester-last`, `docs/archive/harvester.md`, `docs/plans/harvester-removal.md`). Read every line above that speaks of the harvester ant, M6.5's harvester backlog or the desert mod as history; a desert mod may come back later as a new species mod on the framework.
