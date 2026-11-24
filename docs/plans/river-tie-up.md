@@ -89,7 +89,8 @@ All picks are mine (animals: fun first, inspired by real life).
    animation rule for its clips in the game. Its own plan is read before starting.
 
 **Ideas I am adding (say no to any):**
-- **Fish round hippo dung** (real: hippo dung feeds African rivers, fish gather where hippos are): a hippo resting in
+- **Fish round hippo dung** (BUILT 2026-11-23 as step 6; only a hippo standing in its pool, not afloat, so the flick
+  clip plays as made) (real: hippo dung feeds African rivers, fish gather where hippos are): a hippo resting in
   its pool by day flicks dung now and then; barbs and tilapia within 8 blocks crowd the spot a few seconds and pick at
   it (looks only, like the barbs' sips). Cheap: the dung flick clip exists.
 - **Hatchlings as prey** (real: only a few hatchlings in a hundred grow up; catfish, monitors and herons take them):
@@ -140,6 +141,8 @@ All picks are mine (animals: fun first, inspired by real life).
   (within 5 blocks, the mother's see-off reach, not 8); `docs/HISTORY.md`.
 - 2026-11-23, the food web's step 5 built: the distichodus in the river (`docs/plans/distichodus.md`); the food web
   plan is done.
+- 2026-11-23, the food web's step 6 built (the first idea below, at the user's "start step 6"): fish crowd round a
+  hippo's dung in its pool (`docs/HISTORY.md`). "Hatchlings as prey" still waits for the monitor's nest raids.
 - 2026-11-23, part B built: the bullfrog on the life kit (the froglet its young stage), females coming to calling males
   in the rain, the clasp, floating egg mats hatching into a school that knows its father, the father guarding eggs and
   school; the wrestling males of the old plan left out (not asked for). `docs/HISTORY.md`.

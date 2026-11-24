@@ -3031,6 +3031,57 @@ public class RiverLifeTests {
     }
 
     /**
+     * The river food web's step 6 (2026-11-23): a hippo standing in its pool by day flicks its dung into the water now and
+     * then, a cloud behind its rump, and the barbs and tilapia near crowd round it and pick at it (the barb's nibble, the
+     * tilapia's graze, within reach of the cloud). The pool is made a block deep all over, so the hippo stands, never
+     * floats (only a standing hippo flicks its dung in the water).
+     */
+    @GameTest(template = "arena", timeoutTicks = 6000)
+    public static void fishCrowdRoundAHipposDungInItsPool(GameTestHelper helper) {
+        hippoGround(helper, HippoGround.POOL);
+        for (int x = MX0; x < STEP_X - 3; x++) {
+            for (int z = MZ0; z <= MZ1; z++) {
+                helper.setBlock(new BlockPos(x, TOP - 1, z), Blocks.STONE.defaultBlockState());
+            }
+        }
+        var hippo = hippoAt(helper, MX0 + 5.5, TOP, -90.0F);
+        hippo.led = false;
+        hippo.heldNight = false;
+        hippo.heldCool = false;
+        hippo.joinPod(helper.absolutePos(new BlockPos(MX0 + 5, TOP, MZ0 + 5)));
+        java.util.List<net.minecraft.world.entity.PathfinderMob> fish = new java.util.ArrayList<>();
+        for (int i = 0; i < 4; i++) {
+            BarbEntity barb = helper.spawn(SavannaEntities.BARB.get(), new BlockPos(MX0 + 1 + i, TOP, MZ0 + 1 + (i % 2) * 8));
+            barb.setPersistenceRequired();
+            fish.add(barb);
+        }
+        for (int i = 0; i < 2; i++) {
+            TilapiaEntity t = helper.spawn(SavannaEntities.TILAPIA.get(), new BlockPos(MX0 + 2 + i * 3, TOP, MZ1 - 1));
+            t.setUp(false, helper.getLevel().random);
+            t.setPersistenceRequired();
+            fish.add(t);
+        }
+        boolean[] flicked = {false};
+        java.util.Set<net.minecraft.world.entity.PathfinderMob> picked = new java.util.HashSet<>();
+        helper.onEachTick(() -> {
+            flicked[0] |= com.antcolonies.savanna.animal.HippoEntity.dungNear(hippo, 10.0) != null;
+            for (var f : fish) {
+                boolean pecking = f instanceof BarbEntity b ? b.action() == BarbEntity.NIBBLE : ((TilapiaEntity) f).isGrazing();
+                if (pecking && com.antcolonies.savanna.animal.HippoEntity.dungNear(f, 2.0) != null) {
+                    picked.add(f);
+                }
+            }
+        });
+        helper.succeedWhen(() -> {
+            helper.assertTrue(flicked[0], "the hippo has flicked no dung into its pool: doing " + hippo.doing() + ", afloat "
+                    + hippo.afloat() + ", " + hippo.about());
+            long barbs = picked.stream().filter(f -> f instanceof BarbEntity).count();
+            helper.assertTrue(barbs >= 2 && picked.size() > barbs, barbs + " barbs and " + (picked.size() - barbs)
+                    + " tilapia have picked at the hippo's dung");
+        });
+    }
+
+    /**
      * Hippo pods are laid with new land and kept for good (the user, 2026-11-21; BUGS 271): in a flat-bedded pool three
      * deep a pod of one to three is laid, the bull (male) first, his cows (female) within reach of him, all sharing his
      * pool, never despawning; every one rests with its whole body clear of the ground and is unhurt after a while there

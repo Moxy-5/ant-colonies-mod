@@ -137,6 +137,10 @@ public class TilapiaEntity extends AbstractSchoolingFish implements GeoEntity, H
                 BullSharkEntity.FISH_PART_FROM, 1.2, 1.5, BullSharkEntity::partsFish));
         goalSelector.addGoal(2, new TilapiaNestGoal(this));
         goalSelector.addGoal(3, new GrazeAlgaeGoal(this));
+        // a hippo's dung in the water: crowds round it and picks at it (the food web's step 6); not a fry with its
+        // mother, a male on his nest pit, a mother with eggs or fry, nor one with a fish in its mouth
+        goalSelector.addGoal(3, new DungPickGoal(this, this::setGrazing,
+                () -> !isYoung() && nest == null && eggs == 0 && !caring() && mouth.isEmpty()));
         goalSelector.addGoal(4, new SeekMateGoal<>(this, 1.0));
         // scared: into the reeds (the food web's step 4); a fry keeps to its mother, a male on his nest pit and a mother
         // with eggs or fry stand their ground

@@ -97,6 +97,8 @@ public class BarbEntity extends AbstractSchoolingFish implements GeoEntity, Rive
         // a cruising bull shark, a big shape seen from afar: the school parts round it wider
         goalSelector.addGoal(2, new AvoidEntityGoal<>(this, BullSharkEntity.class, BullSharkEntity.FISH_PART_FROM, 1.4, 1.6, BullSharkEntity::partsFish));
         goalSelector.addGoal(3, new BarbFeedGoal(this));      // over Minecraft's fish swimming (4), which it could never take over at the same number
+        // a hippo's dung in the water: the school crowds round it and picks at it (the food web's step 6)
+        goalSelector.addGoal(3, new DungPickGoal(this, picking -> setAction(picking ? NIBBLE : NONE), () -> true));
         goalSelector.addGoal(1, new HideInCoverGoal(this, () -> true));     // scared: into the reeds (the food web's step 4)
     }
 

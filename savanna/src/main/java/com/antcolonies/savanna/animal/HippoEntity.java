@@ -88,6 +88,9 @@ import software.bernie.geckolib.util.GeckoLibUtil;
  * side by side ({@link BankRestGoal}); it gets up and back into the water as the day heats up, or when a player comes.</li>
  * <li>Now and then, by day or before going out at night, it wades to a hippo grass mat near its pool and eats it, dunking
  * its head ({@link NibbleGoal}); the mats grow back from their clump.</li>
+ * <li>Standing in its pool by day it now and then flicks its dung into the water ({@link #dungInWater}): a brown cloud
+ * behind it that the barbs and tilapia near crowd round and pick at a while (the river food web's step 6, 2026-11-23;
+ * real: hippo dung feeds African rivers, and fish gather where hippos are).</li>
  * </ul>
  * Not yet: calves and breeding.
  */
@@ -128,6 +131,16 @@ public class HippoEntity extends PathfinderMob implements GeoEntity, HasLife {
     static final float PATH_WEAR = 1 / 4f;
     /** It rests on a bank this near its pool (blocks), lying 1 to 2.5 minutes, then not again for 2 to 4 minutes. */
     static final int BANK_REACH = 12, REST_SHORTEST = 1200, REST_LONGEST = 3000, REST_AGAIN = 2400;
+    /**
+     * Its dung in the water (the river food web's step 6, 2026-11-23, my picks): standing in its pool by day, one rest
+     * in this many ends in a dung flick; the tail spreads it from tick {@link #DUNG_SPREAD_FROM} to {@link #DUNG_SPREAD_TO}
+     * of the clip (the clip's propeller), this far behind its middle (blocks, at size 1: just past its rump); the cloud
+     * hangs in the water this long (ticks), and barbs and tilapia this near it come to pick at it ({@code DungPickGoal}).
+     */
+    static final int DUNG_IN_POOL = 2, DUNG_SPREAD_FROM = 4, DUNG_SPREAD_TO = 24, DUNG_CLOUD = 240;
+    static final double DUNG_BEHIND = 2.7, DUNG_FISH_REACH = 8.0;
+    /** The dung cloud's colour (a murky olive brown, my pick). */
+    static final org.joml.Vector3f DUNG_COLOUR = new org.joml.Vector3f(0.36F, 0.30F, 0.14F);
     /** The cool hours it rests on the bank (the day's ticks: 6:30 to 10:00 and 14:00 to 17:30). */
     static final int MORNING_FROM = 500, MORNING_TO = 4000, AFTERNOON_FROM = 8000, AFTERNOON_TO = 11500;
     /** Hippo grass mats this near its pool are eaten (blocks); after a meal it waits 2 to 5 minutes. */
@@ -192,6 +205,10 @@ public class HippoEntity extends PathfinderMob implements GeoEntity, HasLife {
     static final int WALK_HOLD = 3;
     /** It was afloat last tick (coming up from the bed it flicks its ears). */
     private boolean wasAfloat;
+    /** Its dung cloud in the water (the river food web's step 6), until when (game time); null: none. */
+    @Nullable
+    Vec3 dungAt;
+    long dungUntil;
     @Nullable
     private BlockMoves.Play climb;
     @Nullable
@@ -666,6 +683,7 @@ public class HippoEntity extends PathfinderMob implements GeoEntity, HasLife {
             setDoing(CALM);
         }
         wearPath();
+        dungInWater();
         // in the water: walking, it sinks to the bed and bounds along it; still, it rises to float with its eyes, ears
         // and back out where the water is deep enough, and stands on the bed where it is not
         if (isInWater() && climb() == null) {
@@ -686,6 +704,73 @@ public class HippoEntity extends PathfinderMob implements GeoEntity, HasLife {
         } else {
             wasAfloat = false;
         }
+    }
+
+    /**
+     * Its dung in the water (the river food web's step 6): while its dung flick's tail spins in the water it sprays a
+     * brown cloud behind it, with splashes where the tail breaks the surface; the cloud hangs there a while, murking the
+     * water, and draws the barbs and tilapia near to pick at it ({@link #dungNear}). Looks only: nothing grows from it.
+     */
+    private void dungInWater() {
+        if (!(level() instanceof ServerLevel server)) {
+            return;
+        }
+        long now = level().getGameTime();
+        int t = doingFor();
+        if (doing() == DUNG && isInWater() && t >= DUNG_SPREAD_FROM && t <= DUNG_SPREAD_TO) {
+            float yaw = yBodyRot * Mth.DEG_TO_RAD;
+            double back = DUNG_BEHIND * getScale();
+            double x = getX() + Mth.sin(yaw) * back, z = getZ() - Mth.cos(yaw) * back;
+            double s = surface();
+            double y = Double.isNaN(s) ? getY() + 0.8 * getScale() : Math.max(getY() + 0.3, s - 0.7);
+            if (!level().getFluidState(BlockPos.containing(x, y, z)).is(FluidTags.WATER)) {
+                return;                                 // its rump to the bank: the dung lands on the shore, no cloud
+            }
+            if (dungAt == null || t == DUNG_SPREAD_FROM) {
+                dungAt = new Vec3(x, y, z);
+            }
+            dungUntil = now + DUNG_CLOUD;
+            if (t % 2 == 0) {
+                double spread = 0.3 + 0.05 * (t - DUNG_SPREAD_FROM);       // the tail's spray widens as it spins
+                server.sendParticles(new net.minecraft.core.particles.DustParticleOptions(DUNG_COLOUR, 1.4F), x, y, z, 6,
+                        spread, 0.25, spread, 0.0);
+                if (!Double.isNaN(s)) {
+                    server.sendParticles(ParticleTypes.SPLASH, x, s + 0.05, z, 3, 0.4, 0.0, 0.4, 0.1);
+                }
+            }
+            if (t == DUNG_SPREAD_FROM) {
+                playSound(SoundEvents.GENERIC_SPLASH, 0.5F, 1.4F);
+            }
+            return;
+        }
+        if (dungAt == null) {
+            return;
+        }
+        if (now > dungUntil || !level().getFluidState(BlockPos.containing(dungAt)).is(FluidTags.WATER)) {
+            dungAt = null;
+        } else if (now % 10 == 0) {                         // the cloud lingers, murking the water
+            server.sendParticles(new net.minecraft.core.particles.DustParticleOptions(DUNG_COLOUR, 1.2F), dungAt.x, dungAt.y, dungAt.z, 3,
+                    1.0, 0.3, 1.0, 0.0);
+        }
+    }
+
+    /** The dung cloud in the water nearest a fish, within {@code reach} blocks of it, or none (the food web's step 6). */
+    @Nullable
+    public static Vec3 dungNear(Entity fish, double reach) {
+        Vec3 best = null;
+        double bestDist = reach * reach;
+        long now = fish.level().getGameTime();
+        for (HippoEntity h : fish.level().getEntitiesOfClass(HippoEntity.class, fish.getBoundingBox().inflate(reach + DUNG_BEHIND + 1))) {
+            if (h.dungAt == null || now > h.dungUntil) {
+                continue;
+            }
+            double d = h.dungAt.distanceToSqr(fish.position());
+            if (d <= bestDist) {
+                best = h.dungAt;
+                bestDist = d;
+            }
+        }
+        return best;
     }
 
     /** Drawing only: a splash where it goes into the water off a move, and as it surfaces. */
@@ -1932,7 +2017,9 @@ public class HippoEntity extends PathfinderMob implements GeoEntity, HasLife {
                 if (h.pool == null || h.poolGone()) {
                     h.setPool(h.blockPosition());       // its pool dried or filled in: here is its pool now
                 }
-                if (h.getRandom().nextInt(4) == 0) {
+                if (!h.afloat() && h.getRandom().nextInt(DUNG_IN_POOL) == 0) {
+                    h.setDoing(DUNG);                   // standing in its pool: the tail spins its dung into the water
+                } else if (h.getRandom().nextInt(4) == 0) {
                     h.setDoing(YAWN);
                     h.playSound(SoundEvents.RAVAGER_AMBIENT, 0.6F, 0.6F);
                 } else {
