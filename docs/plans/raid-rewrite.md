@@ -56,17 +56,112 @@ The user has much more compute for the project and named this as one of three bi
 - **The user's own list:** _to fill in when the user next watches a raid (one line each: what they did, what they
   expected, what happened)._
 
-### Why it keeps breaking (my reading of the code, to confirm in step 1)
+### Why it keeps breaking (measured in step 1, 2026-11-23)
 
-1. **Too many places judge the same thing.** Whether a find is worth a raid, whether termites are there, whether a stage
-   is over, and whether an ant is stuck are each decided in two to four places (the scout goal, `Raids`, `RaidColumn`,
-   `RaidsAway`, the raid goal and the fight goal stepping aside). When they disagree, ants freeze or pace.
-2. **Waiting on single ants.** Stages wait for the leader, for stragglers, for "everyone out" or "everyone gathered". One
-   ant stuck on a ledge holds up the whole raid. Patches then added timeouts, then exceptions to the timeouts.
-3. **Too many tuning numbers pulling against each other** (119), the same trap as the march's 15 speed rules on
-   2026-11-08.
-4. **The termites at the spot are checked at the wrong time.** The raid trusts what the scout saw, sometimes hours
-   earlier, instead of asking the termite colony where its workers are feeding now.
+**How it was measured.** `tools/soak.sh 6 4` on this branch (old code, real savanna, six seeds, 4 game days each, the
+pretend player poking at the raids), then every `[raid]` diary line sorted into one record per raid with two small
+scripts (kept with their output in the sessions' shared notes folder: `raid-rewrite-soak-by-stage.txt`,
+`raid-rewrite-soak-per-raid.txt`). The old raid tests were run too (`raids`, 6 servers, then every test on every server).
+
+**The soak in numbers.** 46 raids with real ants were started; 32 ran to their end, 14 were cut off (below). No server
+crashed and none hung; the start crash (BUGS 158, 198, 281, 303) did not show in 46 starts (it needs a find right beside
+the nest). Rules broken: 18 not-stuck, 11 raider-stuck, 1 home-by-night, 1 prey-ends.
+
+| | Watched raids (real ants), 32 finished | Raids out of sight (numbers), 212 home |
+|---|---|---|
+| Came home with no termite | **14 of 32** | **0 of 212** |
+| Termites carried, a raid | middle 1, mean 3.5 (only 6 raids brought 7 or more) | mean 5.5 |
+| Raid size | 9 to 69 ants, middle 27 | mean 39 |
+| How far | 27 to 90 blocks, middle 54 | mean 62 |
+
+So the same colony raiding the same land does well when nobody looks and badly when somebody does. This is the
+"inconsistent" the user sees, measured.
+
+**How long each stage lasted** (seconds of play at normal speed; a game hour is 50 s):
+
+| Stage (old name) | Shortest | Middle | Longest | What that looks like |
+|---|---|---|---|---|
+| Forming at the nest | 0 | 4 | 9 | The column is gone almost as the scout arrives |
+| March out | 12 | 33 | 77 | About 1.8 blocks a second; fine |
+| Gathering (the halt) | 0 | 2 | 15 | No visible halt: 2 s |
+| Attack | 28 | 30 | 120 | 30 s is "nobody found, give up"; 120 s is the cap, hit in 5 raids |
+| Collecting | 0 | 2 | 60 | |
+| Spreading out (empty spot) | 10 | 30 | 40 | In 9 raids |
+| Regrouping | 0 | 4 | 20 | |
+| Whole raid | 93 | about 170 | 298 | |
+
+**Every failed or odd raid, by the stage it went wrong in** (server and game clock of each in the per-raid file):
+
+| Stage | How many | What happened | Why (read in the diary and the code) |
+|---|---|---|---|
+| **The scout's find** (before the raid) | 15 of 32 raids went to a find "worth 15"; they brought 11 termites between them, 9 of the 15 none | 25 to 66 ants march 30 to 84 blocks and meet 0 to 4 termites, often only soldiers | `MatabeleScoutGoal` scores a find as 3 x (termites seen, or termites *assumed hidden* at a feeding place). "Worth 15" is a mud-cased branch with **no termite seen**. Finds worth 45 and more (termites really counted) brought 12 to 23 in 4 of 6 raids |
+| **Muster** | 11 of 30 raids set out 8 to 67 game hours after the scout last looked | Old remembered finds raided again with nobody checking | Nothing asks "are termites there now" when a watched raid starts. The away raids do ask the termite colony (`keepsOff`): they turned away from empty spots 281 times in this soak, which is why none came home empty |
+| **Muster / any stage** | 14 of 46 raids never ended | The server restarted or the land unloaded in mid-raid; the raiders were left "outside with nothing to do" and walked home one by one; twice 26 to 30 of them stood still over 3 minutes first (raider-stuck) | The column is not saved. A reload simply drops the raid |
+| **March out** | 1 raid of 38 lost 26 of its 28 ants | At one place 87 blocks along, each ant in turn made no headway for 15 s and was sent home "stuck", until the leader was the last one and the raid ended "lost from sight" | The march's place for an ant lay 2 blocks up beside the trail there; the per-ant "no headway, go home" rule then emptied the column one at a time. The march is good but not perfect (1 of 38) |
+| **Halt** | all | The halt lasts 2 s; nobody sees it | The rule ends it as soon as three quarters are "there", and the stream arrives nearly together |
+| **Attack** | 26 of 33 attacks ended at "no termite about the spot for 30 s" | The attack stops while ants are still stinging: 240 termites stung in all, 111 carried | **Two judges.** The stage asks `RaidColumn.termitesAbout` (workers only, in the open, within the collect reach of the find); the ants' own fight goal picks its foes by another rule (soldiers too, under cover, 9 to 15 blocks off). One says "over" while the other fights on |
+| **Attack** | about 10 raids | The whole column (up to 66 ants) meets 1 or 2 termites, often soldiers, and every ant goes for the same one | Each ant picks its own foe by nearness; no sharing out shows in the diary (not read in the fight code: that system stays) |
+| **Collect** | 4 raids stung 8, 13, 22 and 29 termites and carried **none**; 1 stung termite lay past its paralysis (prey-ends) | The stung termites are left on the ground | Collecting looks within 10 blocks of the find; the ants had chased the termites farther off, and went on stinging after collecting was over (my reading of the diary; the code's reach is `carry.collect_reach`) |
+| **Spread out, regroup** | 3 raids | Ants still sting, lose grips and die while "regrouping"; one ended 37 blocks off the trail | Fight orders are not all cancelled when the stage moves on, and nothing keeps a raider near the spot |
+| **March home** | 8 raids lost 1 to 18 ants "stuck, no headway" (33 ants in all); 6 raids "no headway home: the line breaks up" | The column home falls apart at its start; ants are sent home alone | They start the walk home from wherever the fight left them, far off the trail ("0.0 along, 37 off"), and the 15 s rule fires before they reach it. In one raid the 18 stuck were the carriers' half of a 36-ant column |
+| **Done** | 1 raid "nobody left in it at homing" | Ended with everyone already let go | The same |
+
+**The old tests do not see any of this.** All 15 raid tests passed (one run on 6 servers); run on every server at once (90 runs) 88 passed, the 2 failures both the known scout flake of BUGS 164 ("no scout noticed the living mound yet", passed alone 3 of 3). They build their own scenes
+with termites put at the spot, so the two big causes (finds with no termites, raids on old finds) cannot happen in them.
+Step 2's tests must be built from the soak's cases, not only from the old scenes.
+
+**What this says about the four guesses that stood here:**
+
+1. *Too many places judge the same thing:* **confirmed, and it is the main cause.** "Are termites here" is judged four
+   ways: the scout's score (counts assumed termites), the attack's own rule, the fight goal's choice of foe, and the away
+   raids' question to the termite colony. Only the last one is right, and only raids nobody watches use it.
+2. *Waiting on single ants:* **not what breaks raids today.** The old patches removed the waiting; what is left is the
+   opposite fault: a 15 s "no headway" rule that throws ants out of the column one by one (59 ants in 9 raids) and stages
+   so short (the halt 2 s, forming 4 s) that the raid has no shape to see.
+3. *Too many numbers:* the stage times above come from a dozen limits (30 s quiet, 120 s cap, 20 s regroup, 15 s
+   headway, 60 s out of sight, 10 s home headway) that fire in turn; **confirmed** in the sense that each odd raid above
+   ends on one of them.
+4. *Termites checked at the wrong time:* **confirmed** (11 of 30 raids on finds 8 to 67 game hours old; half the raids
+   on finds where no termite was ever seen).
+
+**New from the soak (not guessed before):**
+
+- A raid is lost at every reload (not saved). The new machine runs as numbers too, so it is saved like an away raid.
+- Stung termites are not the raid's own list: what one stage stings another cannot find. The raid must keep one list
+  of what it stung, and the pile by the break is where they go.
+- Nothing keeps a raider near the spot. A leash (the fight ends for an ant that leaves the spot's reach) is needed.
+- The scout's score must count termites that are there, not feeding places.
+
+## The real numbers, checked (step 1, 2026-11-23)
+
+What could be read in full: Frank et al. 2017 (*Science Advances* 3:e1602187) and the start of Frank, Hoenle and
+Linsenmair 2018 (*J. Exp. Biol.* 221:jeb174854; its results only through a machine summary). Wikipedia's *Megaponera*
+page was read for what it cites from Longhurst and Howse 1979, Hoelldobler et al. 1994 and Yusuf 2010. **Not readable
+(paywall or blocked):** Longhurst and Howse 1979 itself, Hoelldobler et al. 1994, Frank and Linsenmair 2017 (both
+papers: only search snippets), the Dja (Cameroon) study, Frank's thesis (too big to fetch). Numbers from those are
+marked "second hand".
+
+| Question | What the sources say | How sure |
+|---|---|---|
+| Recruiting at the nest | 60 to 300 s from the scout's return to the column leaving (Hoelldobler 1994, second hand) | fairly |
+| How far raids go | Middle about 10 m in Comoe (21 and 63 raids, Frank 2018, summary); "up to 50 m" (Frank 2017, read); mean 22 m in the Dja (snippet); columns up to 95 m (Longhurst and Howse 1979, abstract) | sure of the range, not of one typical figure |
+| Marching speed | 1.9 cm a second in grass, 3.4 on open ground; the walk out a middle 7 minutes, home 7.6; the same path both ways (Frank 2018, summary) | fairly |
+| The halt | 20 to 50 cm short of the termites the column stops and **bunches up in a circle round the scout until all the ants have arrived**, then rushes in in open order (Longhurst and Howse 1979, second hand) | fairly; how long it lasts is **not stated anywhere I could read** |
+| The attack | 5 to 30 minutes (2 to 65 in Kenya, 15 in the Dja, 5 to 15 in Comoe; Yusuf 2026, read earlier, in DESIGN); "rarely longer than 4 to 5 minutes" (Frank and Linsenmair 2017, snippet only) | the range is sure; the sources disagree on the typical length |
+| After the attack | The ants gather at the place where they halted, majors holding the termites, and the column forms again; they wait so that all gather before leaving (Frank 2017, read); after the column begins to form some ants go back to the hunting ground for another 1 to 2 minutes (Frank and Linsenmair 2017, snippet) | fairly; the length of the wait **not stated** |
+| Ants that fall behind | Hurt ants "were never observed to return alone" in the wild: they call and are carried; made to walk alone 32 percent died (spiders mostly), healthy ones 10 percent; 6 fatally hurt ants in 53 raids were left at the spot (Frank 2017, read). **Healthy stragglers: no source says.** My belief that they follow the trail home stays a belief | unsure for healthy ants |
+| The scout's part | The scout leads from the front; all ants lay trail on the way out; **without the scout the others cannot follow its trail** (Yusuf 2010, second hand) | fairly: so "the next ant in front leads" in this plan's design is **not real** on the way out |
+| One raid, one spot | A raid is a single event; ants do not go back on their own to the same site (Longhurst 1979, second hand) | fairly |
+| Raid size, day, hurt | 200 to 500 ants; 3 to 5 raids a day, 6:00 to 11:00 and 15:00 to 19:00; a middle 3 ants carried home hurt a raid, none in 1 raid in 9 (Frank 2017, read) | sure |
+
+**What the real numbers change in the design below (my recommendation, for the user's OK):**
+
+- **The halt waits for the column's tail, not for a quorum of three in four.** That is the real rule and it is what
+  makes a halt visible. The deadline still guards it (a stuck ant never holds the raid).
+- **If the scout is lost on the way out, the raid turns home** (the others cannot go on without her). On the way home
+  anyone leads: the whole column laid that trail.
+- **The game's raids are long by real standards** (middle 54 blocks against a real 10 to 22 m): that comes from how far
+  apart mounds and feeding places lie (the balancer rule), not from the raid code, and the rewrite does not change it.
 
 ## What stays (works, or belongs to other systems)
 
@@ -101,9 +196,27 @@ Frank et al. 2017 to 2018; Yusuf 2026), as the notes record it:
 8. **Raid size and day:** 20 to 500 ants (the game shows at most 50 to 100, the user's 2026-11-08 call), 2 to 4 raids a
    day in the morning and late afternoon, none at night or in heavy rain.
 
-**To check in step 1 (I am not sure of these, so they need the papers, not my memory):** how long the halt, the attack
-and the regroup last in real raids; how far raids go (my memory says most within about 50 m of the nest); what happens to
-ants that fall behind (my belief: they are left and find their own way home along the trail).
+**Checked in step 1:** see "The real numbers, checked" above (what was read, what is second hand, what stays unsure).
+
+### The raid in play (shown to the user 2026-11-23, waiting for their OK)
+
+One scale for every stage, so a raid keeps its real proportions: the real walk out takes a middle 7 minutes and the
+game's takes about 30 s, so **a real minute is about 4 seconds of play**. Lengths in play are my picks from that.
+
+| Stage | Real | In play | Ends when | Never longer than |
+|---|---|---|---|---|
+| The scout's look | looks the termites over without touching them | counts only termites that are there now | she has counted | her trip's time |
+| Muster at the nest | 1 to 5 minutes | 5 to 20 s: ants pour out and bunch at the entrance round the scout | the called ants are out | 20 s, then it leaves with who is there |
+| March out | middle 7 minutes, same path both ways | as now (the kept march), about 2 blocks a second | the front reaches the halting place | the march's own limit |
+| Halt | stops just short, bunches in a circle round the scout till the tail is in | 5 to 10 s, a real bunch 3 to 4 blocks short | the column's tail has arrived | 15 s |
+| Attack | 5 to 30 minutes, often 5 to 15 | 20 to 120 s: majors bite the mud open, minors go in and sting, the stung are dragged to a pile by the break | no termite stung or gone for near the break for 15 s | 2 minutes |
+| Regroup and load | gather where they halted, majors holding the termites; a few go back for 1 to 2 minutes | 10 to 20 s: back to the halting place, the pile picked up, the hurt picked up | the pile is empty or every jaw is full | 30 s |
+| March home | middle 7.6 minutes | the kept march, a little slower laden | the front is home | the march's own limit |
+
+Also in the picture: nobody at the spot when the scout checks again at the halt means a short look round (10 s) and home
+empty, and that find is forgotten; a raid goes only to a find where termites were counted, and the termite colony is
+asked once more at muster; the scout lost on the way out turns the raid home; a raider that leaves the spot's reach
+stops fighting and comes back; a raid lives through a reload.
 
 ## The new design (the rules to build to)
 
