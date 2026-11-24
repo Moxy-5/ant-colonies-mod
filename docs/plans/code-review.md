@@ -79,6 +79,18 @@ Rounds 5 and 9 are big enough to split in two sessions each if a session runs sh
    - **C**: tidy-ups (dead code, wrong comments, names).
 4. **No code changes in a reading round.** So reading rounds can run several at once with no clashes.
 
+## No finding is ever lost (the user, 2026-11-23)
+
+- **Saved as it is found.** A reading session writes its findings file piece by piece and commits and pushes it to
+  GitHub after each piece, so a session that stops half way (quota, a crash) loses nothing already written.
+- **Never deleted, only marked.** Every finding keeps its number for good (`R7-3` is round 7's third). A fix session
+  never removes or rewrites a finding; it adds a status line under it: **fixed** (the commit and the test), **open**
+  (why), or **not a fault after all** (what was checked). `SUMMARY.md` counts them per round.
+- **Fixes live on their own branches**, one commit per finding or small batch, each naming its finding's number, so any
+  fix can be looked at or taken back alone without touching the others or the findings.
+- **The fixes are Claude's call (the user: "this will be fully up to you").** The user is asked only when a fix would
+  change how the game looks or plays, or a real-biology number for the ants and termites.
+
 ## How the fixes run
 
 - A **fix session per round**, after its findings are written, on its own branch (`claude/review-fix-<round>`).
