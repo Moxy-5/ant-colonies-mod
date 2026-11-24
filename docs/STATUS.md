@@ -7,6 +7,8 @@ Keep this short. The full story is in `docs/HISTORY.md`; every status bullet is 
 
 **The raids do not work yet (the user, 2026-11-23):** the march works, but the raids themselves are broken and inconsistent. They get a from-scratch rewrite by a Fable session: `docs/plans/raid-rewrite.md` (BUGS 306).
 
+**The three big jobs (planned 2026-11-23, none started):** take the red harvester ant out of the mod, rewrite the raids, review all the code system by system. Order and plans: `docs/plans/big-three.md`.
+
 ## Now (2026-11-21): the Animal Maker Engine overnight, steps A to C and the full check
 Branch `claude/engine-every-animal` (not yet in `C:\Ant Mod`, which holds another session's uncommitted notes). One checker and one course for any animal, shared climbing moves in the framework, shared leg maths, game faces automatic, the monitor's S-curve, and `python tools/verify_animal.py <animal> [--quick]` (the one command that checks an animal all the way). Every built animal passed it. Open: BUGS 255 (a monitor can stand at a one-block step without climbing, found by a new test), BUGS 256 (young crocodiles' tails inside blocks at steps).
 

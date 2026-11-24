@@ -10,6 +10,23 @@ it from scratch. The notes had called M8 closed (2026-11-10); that was wrong for
 `docs/DESIGN.md` "Matabele ants and the first fights", then the raid entries in `docs/BUGS.md` (search "raid") before
 any code.
 
+## Update, 2026-11-23 (later the same day): one of the three big jobs
+
+The user has much more compute for the project and named this as one of three big jobs (order and shared rules:
+`docs/plans/big-three.md`). The design and the steps below stand. What changes:
+
+- **Order:** steps 1 and 2 (find the causes, write the tests) run beside the harvester removal
+  (`docs/plans/harvester-removal.md`); they touch none of its files. Step 3 starts from `master` after the removal has
+  merged (merge `master` into `claude/raid-rewrite` first), so the new code is never built on harvester leftovers.
+- **More compute, spent on proof, not on more code:** step 1's soak is 6 servers for 4 days, not 2, with one helper
+  per raid stage reading the `[raid]` diaries side by side, and the papers checked in the same step. Step 6's soak is
+  run twice (two seeds). The plan's aim of about 30 tuning numbers and one judge per question does not grow.
+- **A fresh review before merging:** when step 5 is done, the full code review's round 12 (`docs/plans/code-review.md`)
+  reads the new raid code in a session that did not write it. Its A findings are fixed before step 6's soak.
+- **The old raid code is not reviewed** by the full review: it is being deleted.
+- **Still wanted from the user, whenever they next watch a raid:** their own list below (what they did, what they
+  expected, what happened). Step 1 does not wait for it.
+
 ## What we have now (measured 2026-11-23)
 
 - **About 6,500 lines of raid code** in six files, plus about 2,400 lines of raid tests:
