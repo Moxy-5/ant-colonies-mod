@@ -559,7 +559,7 @@ public class MatabeleRaidTests {
                 .thenExecute(() -> {
                     Raid raid = column[0];
                     helper.assertTrue(raid.cameHome() >= 1, "nobody came home with the column: " + raid.endedWhy());
-                    helper.assertTrue(!raid.lostFromSight(), "the raid counted as lost from sight: " + raid.endedWhy());
+                    helper.assertTrue(raid.wentToNumbers() == 0, raid.wentToNumbers() + " raider(s) of a raid in sight went over to the numbers: " + raid.endedWhy());
                     helper.assertTrue(columnOrders[0] >= 1, "at the spot no raider held the raid's own fight order (the nest's defence ended them?)");
                     SavannaMod.LOGGER.info("[empty raid test] home at {}: {}", helper.getTick(), raids.describe(level));
                 })
@@ -1574,31 +1574,38 @@ public class MatabeleRaidTests {
                     lostOnes.forEach(column[0]::hideForTests);
                     hiddenSince[0] = level.getGameTime();
                 })
+                // The raid rewrite, step 4: a raid whose raiders are all out of sight is no longer dropped ("lost from
+                // sight", its ants left to walk home: 14 of 46 raids in the soak of step 1). Kept the grace first, as
+                // before; then every raider goes over to the raid's numbers, the same raid goes on from its stage out of
+                // sight and ends in done, and the spot is no empty check (finding 1's old rule, kept).
+                .thenWaitUntil(() -> helper.assertTrue(column[0].wentToNumbers() > 0, "no raider out of sight went over to the numbers; " + raids.describe(level)))
+                .thenExecute(() -> {
+                    Raid raid = column[0];
+                    helper.assertTrue(level.getGameTime() - hiddenSince[0] >= com.antcolonies.colony.AwayLife.GRACE_TICKS,
+                            "the raiders went over to the numbers " + (level.getGameTime() - hiddenSince[0]) + " ticks after going out of sight, before the grace");
+                    helper.assertTrue(raid.goesAsNumbers() && raids.column() == raid && raid.stage() != Raid.Stage.DONE,
+                            "the raid out of sight does not go on as numbers: " + raid.describe());
+                    for (java.util.UUID id : lostOnes) {
+                        helper.assertTrue(!(level.getEntity(id) instanceof MatabeleEntity ant) || !ant.isAlive(),
+                                "an ant of the raid gone over to the numbers still stands in the world: " + id);
+                    }
+                })
                 .thenWaitUntil(() -> helper.assertTrue(raids.column() == null, "the raid out of sight did not end; " + raids.describe(level)))
                 .thenExecute(() -> {
                     Raid raid = column[0];
-                    helper.assertTrue(raid.lostFromSight(), "the raid out of sight did not end lost from sight: " + raid.endedWhy());
-                    helper.assertTrue(level.getGameTime() - hiddenSince[0] >= com.antcolonies.colony.AwayLife.GRACE_TICKS,
-                            "the raid ended " + (level.getGameTime() - hiddenSince[0]) + " ticks after going out of sight, before the grace");
+                    helper.assertTrue(raid.stage() == Raid.Stage.DONE && raid.cameHome() > 0, "the raid as numbers did not come home: " + raid.endedWhy());
                     Raids.Find find = raid.find();
                     helper.assertTrue(raids.finds().contains(find) && find.misses() == 0,
-                            "a raid lost from sight counted as an empty check of the spot; " + raids.describe(level));
-                    for (java.util.UUID id : lostOnes) {
-                        helper.assertTrue(!(level.getEntity(id) instanceof MatabeleEntity ant) || !ant.isAlive() || raids.isGoingHome(id)
-                                        || flat(ant.blockPosition(), colony.getCenter()) <= 8.0,
-                                "an ant of the raid lost from sight is not going home: " + id);
+                            "a raid gone out of sight counted as an empty check of the spot; " + raids.describe(level));
+                    // (its raiders are numbers in the nest now; the next raids of this test need real ants again)
+                    List<BlockPos> cells = colony.nest().getAllRoomCells(level).stream()
+                            .filter(cell -> com.antcolonies.savanna.colony.RaidGround.canStand(level, cell)).toList();
+                    helper.assertTrue(!cells.isEmpty(), "the nest has no room cell to stand in");
+                    for (int i = 0; i < lostOnes.size(); i++) {
+                        colony.population().comeOutAt(level, com.antcolonies.colony.Caste.WORKER, cells.get(i % cells.size()));
                     }
                 })
-                .thenWaitUntil(() -> {
-                    for (java.util.UUID id : lostOnes) {
-                        if (level.getEntity(id) instanceof MatabeleEntity ant && ant.isAlive()) {
-                            helper.assertTrue(flat(ant.blockPosition(), colony.getCenter()) <= 9.0 || colony.nest().isInside(level, ant.blockPosition()),
-                                    "an ant of the raid lost from sight is not home, at " + ant.blockPosition().toShortString() + ", "
-                                            + Math.round(flat(ant.blockPosition(), colony.getCenter())) + " out, doing " + ant.runningGoals()
-                                            + " (going home: " + raids.whyGoingHome(id) + ")");
-                        }
-                    }
-                })
+                .thenIdle(40)
                 // Raid rework R7, dusk: a raid set out at 18:45, in the evening raid hours, keeps them; at 19:30 on the
                 // march it turns home where it is, attacks nothing, and the spot is no empty check (never reached).
                 .thenExecute(() -> {

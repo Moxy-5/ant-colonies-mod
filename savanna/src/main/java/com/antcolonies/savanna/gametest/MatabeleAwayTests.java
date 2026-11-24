@@ -52,8 +52,13 @@ public class MatabeleAwayTests {
         int[] termitesBefore = new int[1];
         int[] stage = {0};
         long[] stageAt = new long[1];
+        // The raid rewrite, step 4: a raid out of sight is the same raid without bodies, so its diary holds the same
+        // stage lines, in order, each inside its deadline (the book of the raid chain tests reads them).
+        com.antcolonies.watch.Watch.watchForTests(colony);
+        MatabeleRaidChainTests.Book book = new MatabeleRaidChainTests.Book(helper, level, colony, raids, spot, java.util.List.of());
         helper.onEachTick(() -> {
             long now = helper.getTick();
+            book.tick();
             switch (stage[0]) {
                 case 0 -> {
                     if (now < 10) {
@@ -66,6 +71,7 @@ public class MatabeleAwayTests {
                     termites[0].population().setOnForTests(true);
                     termites[0].population().addNewMembers(Caste.WORKER, level.getGameTime(), 3000);
                     termitesBefore[0] = termites[0].population().inside(Caste.WORKER);
+                    farToo(termites[0]);
                     raids.rememberForTests(spot, 12, level.getGameTime()); // (a scout found them before the player left)
                     helper.assertTrue(raids.isHungry(), "the Matabele colony is not hungry with an empty pile");
                     // far: the away rule on, nobody near, a short grace
@@ -109,9 +115,11 @@ public class MatabeleAwayTests {
                 }
                 case 2 -> {
                     AwayReport report = colony.away().report();
-                    if (report.get(AwayReport.What.RAIDS) < 1 || report.get(AwayReport.What.PREY_BROUGHT) <= 0) {
+                    if (report.get(AwayReport.What.RAIDS) < 1 || report.get(AwayReport.What.PREY_BROUGHT) <= 0 || !book.in("done")) {
                         return;
                     }
+                    book.judge(false);
+                    helper.assertTrue(book.sawLine("out of sight"), "the raid's diary never says it went out of sight: " + book.story());
                     helper.assertTrue(colony.away().isAway(level), "the colony came back during the test");
                     helper.assertTrue(report.get(AwayReport.What.RAIDERS) >= 10, "a raid of only " + report.get(AwayReport.What.RAIDERS) + " set out");
                     helper.assertTrue(pile.broughtIn() > 0 && pile.edible() > 0, "the catch did not reach the prey pile" + pile.describe(level));
@@ -236,6 +244,7 @@ public class MatabeleAwayTests {
         int[] stage = {0};
         long[] stageAt = new long[1];
         int[] shown = new int[1];
+        int[] caught = new int[1];
         helper.onEachTick(() -> {
             long now = helper.getTick();
             BlockPos nest = colony.getCenter();
@@ -253,6 +262,7 @@ public class MatabeleAwayTests {
                     helper.assertTrue(termites != null, "no termite colony founded by the queen");
                     termites.population().setOnForTests(true);
                     termites.population().addNewMembers(Caste.WORKER, level.getGameTime(), 200);
+                    farToo(termites);
                     raids.rememberForTests(spot, 12, level.getGameTime());
                     helper.assertTrue(raids.isHungry(), "the Matabele colony is not hungry with an empty pile");
                     colony.population().setOnForTests(true);
@@ -268,7 +278,7 @@ public class MatabeleAwayTests {
                         helper.assertTrue(now - stageAt[0] < 4000, "no raid set out as numbers from the far colony");
                         return;
                     }
-                    helper.assertTrue(raids.column() == null,
+                    helper.assertTrue(raids.column() != null && raids.column().goesAsNumbers() && raids.column().members().isEmpty(),
                             "the far colony's raid set out with real ants in the world");
                     if (!afterAttack) {
                         colony.away().setWatcherForTests(watcher);
@@ -278,6 +288,12 @@ public class MatabeleAwayTests {
                 }
                 case 2 -> {
                     if (raids.away().hasAttacked()) {
+                        // The raid rewrite, step 4: a raid is saved in any stage. Written down and read back here, in
+                        // its attack as numbers, it is made again at the colony's next tick and goes on from there
+                        // (shown, it stands regrouping with its catch, and it ends in done below).
+                        caught[0] = raids.column().hiddenCatch();
+                        raids.reloadForTests();
+                        helper.assertTrue(raids.column() == null && raids.away().isOut(), "the raid read from the save does not wait to be made");
                         colony.away().setWatcherForTests(watcher);
                         stage[0] = 3;
                         stageAt[0] = now;
@@ -287,7 +303,7 @@ public class MatabeleAwayTests {
                 }
                 case 3 -> {
                     com.antcolonies.savanna.colony.Raid column = raids.column();
-                    if (column == null) {
+                    if (column == null || column.goesAsNumbers()) {
                         helper.assertTrue(raids.away().isOut(), "the raid out as numbers came home without being shown to the watcher by its trail");
                         return;
                     }
@@ -318,12 +334,21 @@ public class MatabeleAwayTests {
                             || column.stage() == com.antcolonies.savanna.colony.Raid.Stage.MARCH_HOME, "shown after its attack, the column is " + column.stage());
                     helper.assertTrue(held > 0 && held == column.carried(), "the raiders shown after the attack hold " + held + " termite(s), the column counts "
                             + column.carried());
+                    helper.assertTrue(held + column.hiddenCatch() >= caught[0], "the raid had caught " + caught[0] + " termite(s) when it was saved; read back and shown it has "
+                            + (held + column.hiddenCatch()));
                     stage[0] = 4;
                     stageAt[0] = now;
                 }
                 case 4 -> {
-                    // they walk home; out of the watcher's reach they are numbers again and the catch comes home
+                    // they walk home; out of the watcher's reach they are numbers again, the same raid, and it ends in done
+                    // with the catch home
                     if (raids.column() == null && !raids.away().isOut() && pile.broughtIn() > 0) {
+                        com.antcolonies.savanna.colony.Raid last = raids.lastRaid();
+                        helper.assertTrue(last != null && last.stage() == com.antcolonies.savanna.colony.Raid.Stage.DONE && last.find().at().equals(spot),
+                                "the raid shown and hidden again did not end in done: " + (last == null ? "no last raid" : last.endedWhy()));
+                        helper.assertTrue(last.wasOutOfSight(), "the shown raiders never went over to the numbers again: " + last.endedWhy());
+                        helper.assertTrue(pile.broughtIn() >= caught[0], "the raid had caught " + caught[0] + " termite(s) when it was saved, but "
+                                + pile.broughtIn() + " reached the pile");
                         helper.succeed();
                     }
                 }
@@ -519,5 +544,13 @@ public class MatabeleAwayTests {
                     SavannaMod.LOGGER.info("[near catch test] home: {}; {}", column[0].describe(), pile.describe(level));
                 })
                 .thenSucceed();
+    }
+
+    /** The termite colony lives as numbers too (nobody near it either), so the raid's judge takes its own word for who feeds at the spot. */
+    private static void farToo(Colony termites) {
+        termites.away().setOnForTests(true);
+        termites.away().setFarForTests(true);
+        termites.away().setNearForTests(false);
+        termites.away().setGraceForTests(40L);
     }
 }

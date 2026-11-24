@@ -15,7 +15,10 @@ import java.util.UUID;
 import org.jetbrains.annotations.Nullable;
 
 import com.antcolonies.colony.AwayLife;
+import com.antcolonies.colony.AwayReport;
+import com.antcolonies.colony.Caste;
 import com.antcolonies.colony.Colony;
+import com.antcolonies.colony.ColonyManager;
 import com.antcolonies.entity.AbstractAntEntity;
 import com.antcolonies.entity.Wounds;
 import com.antcolonies.fight.FightDiary;
@@ -28,11 +31,16 @@ import com.antcolonies.savanna.species.SavannaNumbers;
 import com.antcolonies.watch.Watch;
 
 import net.minecraft.core.BlockPos;
+import net.minecraft.nbt.CompoundTag;
+import net.minecraft.nbt.ListTag;
+import net.minecraft.nbt.NbtUtils;
+import net.minecraft.nbt.Tag;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.sounds.SoundEvents;
 import net.minecraft.sounds.SoundSource;
 import net.minecraft.util.Mth;
+import net.minecraft.util.RandomSource;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
@@ -66,9 +74,16 @@ import net.minecraft.world.phys.Vec3;
  * ({@code [raid] halt: ends after S s, N ant(s): the tail is in}), a turn home as a reason starting
  * {@code turns home:}, and last {@code [raid] done: N home, C termite(s) on the pile, H hurt carried, L let go}.
  *
- * <p>Not saved yet: after a reload the raiders are ants outside and go home (step 4 of the rewrite puts raids near and
- * out of sight on this one machine, saved). Numbers: the species file's {@code raids.column}, {@code raids.carry} and
- * {@code raids.hours_and_sound}.
+ * <p><b>With or without bodies</b> (the rewrite's step 4). A raid nobody is near goes as numbers ({@link #goesAsNumbers}):
+ * the same stages in the same order, each one's time worked out from the way's length and that stage's own rule and
+ * deadline ({@link #stepAsNumbers}), the same judge at the halt, the catch by the one rule for raiders going as numbers
+ * ({@link #takeHidden}), the same diary lines. A raider out of sight past the colony's away grace goes on as one of
+ * the raid's numbers, and when none has a body left the whole raid does ({@link #goOnAsNumbers}); when a watcher comes
+ * near, bodies are put at the stage's place and the same raid goes on with them ({@link #takeBodies}). It is saved with
+ * the colony ({@link #save}, {@link #load}), so a reload in mid-raid goes on from its stage.
+ *
+ * <p>Numbers: the species file's {@code raids.column}, {@code raids.carry}, {@code raids.hours_and_sound}, and for the
+ * raid as numbers {@code raids.away} (its pace, the attack's length, what the fight costs).
  */
 public final class Raid implements FightDiary {
     /** The raid's stages, in order, with the words the diary uses for each. */
@@ -158,16 +173,27 @@ public final class Raid implements FightDiary {
     private final Raids.Find find;
     /** The scent trail the raid walks, and the march along it, out and home. */
     private final ScentTrails.Trail trail;
-    private final RaidMarch march;
-    private final Route out;
-    private final Route back;
+    private final SavannaNumbers.TrailNumbers trailNumbers;
+    /** (made again when bodies are put on the trail: a raid that set out in land not loaded knew no ground for its start) */
+    private RaidMarch march;
+    private Route out;
+    private Route back;
     /** The raiders in marching order, the front first, and the same as a set. */
     private final List<UUID> members = new ArrayList<>();
     private final Set<UUID> memberSet = new HashSet<>();
+    @Nullable
     private UUID leader;
     /** The whole raid's size, real ants and the numbers who go along. */
-    private final int size;
-    private final int numbersAlong;
+    private int size;
+    private int numbersAlong;
+    /**
+     * Whether nobody in the raid has a body now (its colony out of sight, or every raider out of sight past the grace):
+     * it goes on as numbers, and where its front is comes from the time: {@code numbersAt} blocks along the stage's
+     * way at {@code numbersSince}, walking on at the numbers' pace ({@link #frontAsNumbers}).
+     */
+    private boolean asNumbers;
+    private double numbersAt;
+    private long numbersSince;
     /** How far the spot is from the nest (blocks, flat): the marches' deadline is counted from it. */
     private final int blocksOut;
     /** What the judge counted at the spot before the muster. */
@@ -226,9 +252,15 @@ public final class Raid implements FightDiary {
     record LetGo(UUID ant, String why) {
     }
 
-    /** Since when each member has been out of sight (kept for the colony's away grace, then lost from sight). */
+    /** Since when each member has been out of sight (kept for the colony's away grace, then it goes on as a number). */
     private final Map<UUID, Long> unseenSince = new HashMap<>();
-    private boolean lostFromSight;
+    /**
+     * The termites in each raider's jaws as last seen (only those holding some): one that goes over to the numbers
+     * after leaving the world (its land unloaded, or its colony folded in) takes them along, they are not lost.
+     */
+    private final Map<UUID, Integer> jaws = new HashMap<>();
+    /** How many raiders with a body went over to the raid's numbers (out of sight past the grace, or the colony was). */
+    private int wentToNumbers;
     /** Since when each member is held by another fight order (drafted by the nest's defence). */
     private final Map<UUID, Long> draftedSince = new HashMap<>();
     /** Whether the raid reached its spot and brought nothing back from it. */
@@ -257,14 +289,18 @@ public final class Raid implements FightDiary {
      * What the judge found at a spot: termite workers seen there ({@code seen}), or none seen but the termite colony's
      * own record says it feeds there now, under cover ({@code underCover}).
      */
-    public record Termites(int seen, boolean underCover) {
+    public record Termites(int seen, boolean underCover, boolean byTheLand) {
+        public Termites(int seen, boolean underCover) {
+            this(seen, underCover, false);
+        }
+
         public boolean any() {
-            return seen > 0 || underCover;
+            return seen > 0 || underCover || byTheLand;
         }
 
         String words() {
             return seen > 0 ? seen + " termite(s) counted there" : underCover ? "0 termite(s) counted there, but their colony feeds there under cover"
-                    : "0 termite(s) counted there";
+                    : byTheLand ? "0 termite(s) counted there, no termite colony on record yet: it hunts by the land" : "0 termite(s) counted there";
         }
     }
 
@@ -282,23 +318,33 @@ public final class Raid implements FightDiary {
      * termite workers, not stung, within the raid's {@link #reach} of the spot (soldiers alone are no reason to raid,
      * and a termite hidden in its own nest past the feeding ways is not at the spot). With none seen it asks the
      * nearest termite colony's own record: a feeding place it feeds at by day within reach that it does not keep off
-     * ({@link FeedingSpots#byDayPlaces}; termites under the mud are often numbers, not bodies).
+     * ({@link FeedingSpots#byDayPlaces}; termites under the mud are often numbers, not bodies). A termite colony that
+     * lives as numbers itself (nobody near it, or its land not loaded) has no such places on record and no block of
+     * its land may be read: its own word is taken, that it lives, has workers and does not keep off the spot (the rule
+     * raids out of sight always asked, and the one the soak of step 1 found right). And where the raiders' own colony
+     * lives as numbers and no living termite colony is on record in its scouts' reach at all (the termites' land not
+     * made yet: their colony is put in when a player first comes near their mound), it hunts by the land
+     * ({@link RaidCatch#noTermitesOnRecord}).
      */
     public static Termites termitesThere(ServerLevel level, Colony raiders, BlockPos at) {
         double reach = raiders.profile().section(SavannaNumbers.COLUMN).map(Raid::reach).orElse(10.0);
-        if (level.isPositionEntityTicking(at)) {
-            int seen = level.getEntitiesOfClass(AbstractAntEntity.class, new AABB(at).inflate(reach, 6.0, reach),
-                    insect -> insect.isAlive() && !insect.isParalysed() && !insect.isDowned() && !(insect instanceof MatabeleEntity)
-                            && !(insect instanceof TermiteSoldierEntity) && !raiders.getId().equals(insect.getColonyId())
-                            && !insect.isSheltered() && flat(insect.blockPosition(), at) <= reach).size();
+        boolean loaded = level.isPositionEntityTicking(at);
+        if (loaded) {
+            int seen = inTheOpen(level, raiders, at, reach).size();
             if (seen > 0) {
                 return new Termites(seen, false);
             }
         }
         int termiteReach = raiders.profile().section(SavannaNumbers.AWAY_RAIDS).orElse(SavannaNumbers.AwayRaidNumbers.DEFAULT).termiteReach();
         Colony termites = RaidCatch.termitesAt(level, at, termiteReach);
-        if (termites == null || termites.keepsOff(level, at)) {
+        if (termites == null) {
+            return new Termites(0, false, raiders.away().isAway(level) && RaidCatch.noTermitesOnRecord(level, raiders));
+        }
+        if (termites.keepsOff(level, at)) {
             return new Termites(0, false);
+        }
+        if (!loaded || !termites.away().isHere(level)) { // (away, or in its grace: its parts stand still, its places are not kept)
+            return new Termites(0, true);
         }
         for (FeedingSpots.ByDay place : FeedingSpots.byDayPlaces(level, termites)) {
             if (flat(place.food(), at) <= reach) {
@@ -308,27 +354,53 @@ public final class Raid implements FightDiary {
         return new Termites(0, false);
     }
 
+    /** The living termite workers in the open within {@code reach} of a spot: what a player would see there. */
+    private static List<AbstractAntEntity> inTheOpen(ServerLevel level, Colony raiders, BlockPos at, double reach) {
+        return level.getEntitiesOfClass(AbstractAntEntity.class, new AABB(at).inflate(reach, 6.0, reach),
+                insect -> insect.isAlive() && !insect.isParalysed() && !insect.isDowned() && !(insect instanceof MatabeleEntity)
+                        && !(insect instanceof TermiteSoldierEntity) && !raiders.getId().equals(insect.getColonyId())
+                        && !insect.isSheltered() && flat(insect.blockPosition(), at) <= reach);
+    }
+
+    /**
+     * A raid to this find along this trail: {@code raiders} the real ants in marching order, the front first, and
+     * {@code numbersAlong} more going as numbers. With no real ant at all (a colony nobody is near) the whole raid goes
+     * as numbers.
+     */
     Raid(ServerLevel level, Colony colony, SavannaNumbers.ColumnNumbers numbers, @Nullable SavannaNumbers.CarryNumbers carry,
          SavannaNumbers.TrailNumbers trailNumbers, Raids.Find find, ScentTrails.Trail scent, List<MatabeleEntity> raiders,
          int numbersAlong, Termites counted, long now) {
+        this(raiders.stream().map(Entity::getUUID).toList(), level, colony, numbers, carry, trailNumbers, find, scent, numbersAlong, counted, now);
+    }
+
+    private Raid(List<UUID> raiders, ServerLevel level, Colony colony, SavannaNumbers.ColumnNumbers numbers, @Nullable SavannaNumbers.CarryNumbers carry,
+                 SavannaNumbers.TrailNumbers trailNumbers, Raids.Find find, ScentTrails.Trail scent, int numbersAlong, Termites counted, long now) {
         this.colony = colony;
         this.numbers = numbers;
         this.carry = carry != null ? carry : SavannaNumbers.CarryNumbers.DEFAULT;
+        this.trailNumbers = trailNumbers;
         this.find = find;
         this.trail = scent;
         this.counted = counted;
         this.startedAt = now;
         this.stageSince = now;
-        for (MatabeleEntity raider : raiders) {
-            members.add(raider.getUUID());
-            memberSet.add(raider.getUUID());
-            formIndex.put(raider.getUUID(), formIndex.size());
+        this.numbersSince = now;
+        for (UUID raider : raiders) {
+            members.add(raider);
+            memberSet.add(raider);
+            formIndex.put(raider, formIndex.size());
         }
-        this.leader = members.get(0);
+        this.asNumbers = members.isEmpty();
+        this.leader = asNumbers ? null : members.get(0);
         this.size = members.size() + numbersAlong;
         this.numbersAlong = numbersAlong;
         this.blocksOut = (int) Math.round(flat(find.at(), colony.getCenter()));
-        this.march = new RaidMarch(level, colony, numbers, trailNumbers, scent, find.at(), new RaidMarch.Host() {
+        makeMarch(level);
+    }
+
+    /** The march along the raid's trail, and its two ways (out to the halting place, and back). */
+    private void makeMarch(ServerLevel level) {
+        this.march = new RaidMarch(level, colony, numbers, trailNumbers, trail, find.at(), new RaidMarch.Host() {
             @Override
             public void say(String what) {
                 Raid.this.say(what);
@@ -355,6 +427,10 @@ public final class Raid implements FightDiary {
         this.back = march.back();
     }
 
+    private SavannaNumbers.AwayRaidNumbers awayNumbers() {
+        return colony.profile().section(SavannaNumbers.AWAY_RAIDS).orElse(SavannaNumbers.AwayRaidNumbers.DEFAULT);
+    }
+
     // ------------------------------------------------------------------------------------------------- the diary
 
     /** The fight diary: a raider fighting for this raid tells what it does; a termite gone for or stung keeps the attack going. */
@@ -379,8 +455,8 @@ public final class Raid implements FightDiary {
     /** The diary's first line: the muster begins (said by the colony's raids once the raid is made). */
     void sayStart(ServerLevel level) {
         lastLevel = level;
-        say("begins, " + members.size() + " ant(s) called to " + find.at().toShortString() + ", " + blocksOut + " blocks out, "
-                + counted.words() + "; led by " + RaidGround.shortId(leader) + " (a raid of " + size + ", " + numbersAlong
+        say("begins, " + count() + " ant(s) called to " + find.at().toShortString() + ", " + blocksOut + " blocks out, "
+                + counted.words() + (leader == null ? "; out of sight" : "; led by " + RaidGround.shortId(leader)) + " (a raid of " + size + ", " + numbersAlong
                 + " going as numbers; the march " + Math.round(out.length()) + " blocks along " + out.points.size()
                 + " points to the halting place " + out.end().toShortString() + ")");
     }
@@ -409,8 +485,35 @@ public final class Raid implements FightDiary {
         return trail;
     }
 
+    /** The ant in front (null while the raid goes as numbers). */
+    @Nullable
     public UUID leader() {
         return leader;
+    }
+
+    /** Whether nobody in the raid has a body now: it goes on as numbers, out of sight. */
+    public boolean goesAsNumbers() {
+        return asNumbers && stage != Stage.DONE;
+    }
+
+    /** Whether the raid has (or, done, ended with) nobody with a body: out of sight. */
+    public boolean wasOutOfSight() {
+        return asNumbers;
+    }
+
+    /** The raiders going as numbers now (they are out, not in the nest). */
+    public int numbersAlong() {
+        return stage == Stage.DONE ? 0 : numbersAlong;
+    }
+
+    /** How many raiders with a body went over to the raid's numbers on the way (out of sight past the grace). */
+    public int wentToNumbers() {
+        return wentToNumbers;
+    }
+
+    /** The raiders in the diary's counts: the real ants, or the numbers when nobody has a body. */
+    private int count() {
+        return asNumbers ? numbersAlong : members.size();
     }
 
     public List<UUID> members() {
@@ -521,11 +624,6 @@ public final class Raid implements FightDiary {
         List<LetGo> gone = List.copyOf(letGo);
         letGo.clear();
         return gone;
-    }
-
-    /** Whether the raid ended lost from sight (its leader out of sight past the grace): no check of the spot. */
-    public boolean lostFromSight() {
-        return lostFromSight;
     }
 
     /** Whether the raid reached its spot and brought nothing back from it. */
@@ -703,64 +801,398 @@ public final class Raid implements FightDiary {
         return march.isOut(level, ant);
     }
 
-    // --------------------------------------------------------------------------------------------- away and back
-
-    /**
-     * The brain while away ({@code RaidsAway}): the raid starts partway, a raid that set out as numbers shown where it is
-     * now. The raiders, just out of the numbers, are put on the trail, the first one in front and each the column's
-     * spacing behind the one ahead. Not attacked yet: on the way out, the front {@code share} of the way from the nest
-     * to the halting place. Attacked (the catch already in the raiders' jaws): regrouping at the halting place
-     * ({@code share} 1), or on the way home with {@code share} of the way out still to walk.
-     */
-    void startPartway(ServerLevel level, List<MatabeleEntity> ants, boolean attacked, double share, long now) {
-        share = Math.max(0.0, Math.min(1.0, share));
-        boolean home = attacked && share < 1.0;
-        Route route = home ? back : out;
-        double front = home ? (1.0 - share) * back.length() : share * out.length();
-        for (int k = 0; k < ants.size(); k++) {
-            double along = Math.max(0.0, front - k * numbers.spacing());
-            BlockPos cell = route.place(level, along, 0.0);
-            double[] way = route.direction(along);
-            float yaw = (float) (Mth.atan2(way[1], way[0]) * Mth.RAD_TO_DEG) - 90.0F;
-            MatabeleEntity ant = ants.get(k);
-            ant.moveTo(cell.getX() + 0.5, cell.getY(), cell.getZ() + 0.5, yaw, 0.0F);
-            ant.setYHeadRot(yaw);
-            ant.setYBodyRot(yaw);
-        }
-        lastLevel = level;
-        leftAt = now;
-        stage = !attacked ? Stage.MARCH_OUT : home ? Stage.MARCH_HOME : Stage.REGROUP;
-        stageSince = now;
-        march.startAt(front);
-        updatedAt = now - EVERY; // (its clocks start now)
-        if (attacked) {
-            attackedAt = now; // (the fight is over: it walks home with what it carries)
-        }
-        say("begins, " + ants.size() + " ant(s): the raid out as numbers is shown, put on the trail " + Math.round(front) + " of "
-                + Math.round(route.length()) + " blocks along the way " + (home ? "home" : "out"));
-    }
+    // ------------------------------------------------------------------------------------ with and without bodies
 
     /** How much of the way out from the nest to its spot the raid's front is now (0 at the nest, 1 at the spot). */
-    double shareOut() {
+    double shareOut(long now) {
+        double along = asNumbers ? frontAsNumbers(now) : march.frontAt();
         return switch (stage) {
             case MUSTER, DONE -> 0.0;
-            case MARCH_OUT -> Math.max(0.0, Math.min(1.0, march.frontAt() / Math.max(1.0, out.length())));
-            case MARCH_HOME -> Math.max(0.0, Math.min(1.0, 1.0 - march.frontAt() / Math.max(1.0, back.length())));
+            case MARCH_OUT -> Math.max(0.0, Math.min(1.0, along / Math.max(1.0, out.length())));
+            case MARCH_HOME -> Math.max(0.0, Math.min(1.0, 1.0 - along / Math.max(1.0, back.length())));
             default -> 1.0;
         };
     }
 
-    /** Termites this raider already holds in its jaws (caught while the raid was numbers). */
-    void noteCarried(int termites) {
-        if (termites > 0) {
-            carried += termites;
-            carriers++;
+    /** The way's length from the entrance to the halting place (blocks along the trail). */
+    double wayBlocks() {
+        return out.length();
+    }
+
+    /**
+     * Where the front of a raid going as numbers is on its trail now (the trail's own point, no ground looked for), and
+     * where its tail is: the column's length behind the front on a march, the same place in a bunch. A watcher near the
+     * front watches the colony, and bodies are put there only where nobody would see them appear ({@code RaidsAway}).
+     */
+    BlockPos frontPlace(long now) {
+        return out.point(shareOut(now) * out.length());
+    }
+
+    BlockPos tailPlace(long now) {
+        double length = size * numbers.spacing();
+        double front = shareOut(now) * out.length();
+        return out.point(Math.max(0.0, Math.min(out.length(), stage == Stage.MARCH_OUT ? front - length : stage == Stage.MARCH_HOME ? front + length : front)));
+    }
+
+    /**
+     * How far along the stage's way (out, or back) the front of a raid going as numbers is now: from where it was when
+     * its walk as numbers began, at the numbers' pace ({@code raids.away.pace}, a little under the real column's about
+     * 2 blocks a second: out of sight nothing is known of the ground), slower laden on the way home as the real column is.
+     */
+    private double frontAsNumbers(long now) {
+        if (stage != Stage.MARCH_OUT && stage != Stage.MARCH_HOME) {
+            return 0.0;
+        }
+        double pace = awayNumbers().pace() * (stage == Stage.MARCH_HOME && hiddenCatch > 0 ? carry.ladenPace() : 1.0);
+        return numbersAt + Math.max(0.1, pace) * Math.max(0, now - numbersSince) / 20.0;
+    }
+
+    /** The raid's walk as numbers goes on from here along the stage's way, from now. */
+    private void walkFrom(double along, long now) {
+        numbersAt = Math.max(0.0, along);
+        numbersSince = now;
+    }
+
+    /**
+     * The raid as numbers: the same stages in the same order, each ended by its own rule with nobody's body to wait
+     * for, and never past its deadline. A bunch (the muster, the halt) lasts as long as the rule's least, since every
+     * number is at its place at once; a march lasts the way's length at the numbers' pace; the halt asks the one judge
+     * as the front arrives, and an empty spot gets the same short look; the attack opens with the catch
+     * ({@link #takeHidden}) and lasts {@code raids.away.fight_ticks} (a minute: a watched attack lasts 20 s to the
+     * 2-minute deadline; my pick, never past the deadline); the regroup lasts the bunch's least and a pick-up for each
+     * termite taken, never past its deadline. Nothing here reads a block: the land may not be loaded.
+     */
+    private void stepAsNumbers(ServerLevel level, long now) {
+        long spent = now - stageSince;
+        switch (stage) {
+            case MUSTER -> {
+                if (spent >= Math.min(numbers.bunchLeastTicks(), numbers.musterTicks())) {
+                    leftAt = now;
+                    next(Stage.MARCH_OUT, now, "everyone is out (as numbers)");
+                    walkFrom(0.0, now);
+                }
+            }
+            case MARCH_OUT -> {
+                if (frontAsNumbers(now) >= out.length()) {
+                    trail.walked(now);
+                    next(Stage.HALT, now, "the front is at the halting place");
+                    atHalt = termitesThere(level, colony, find.at());
+                    say("the scout looks at the spot: " + atHalt.words());
+                } else if (spent >= marchLimit()) {
+                    turnHome(List.of(), now, "the march's time is up, " + marchLimit() / 20 + " s for " + blocksOut + " blocks");
+                }
+            }
+            case HALT -> {
+                if (atHalt == null) {
+                    atHalt = termitesThere(level, colony, find.at());
+                }
+                if (!atHalt.any()) {
+                    if (spent >= numbers.lookTicks()) {
+                        spotEmpty = true;
+                        foundNothing = true;
+                        turnHome(List.of(), now, "no termite at the spot now, after a look round of " + spent / 20 + " s");
+                    }
+                } else if (spent >= Math.min(numbers.bunchLeastTicks(), numbers.gatherTicks())) {
+                    next(Stage.ATTACK, now, "the tail is in");
+                    attackedAt = now;
+                    lastActionAt = now;
+                    takeHidden(level);
+                }
+            }
+            case ATTACK -> {
+                if (spent >= Math.min(awayNumbers().fightTicks(), numbers.fightTicks())) {
+                    next(Stage.REGROUP, now, "no termite stung or gone for any more; " + hiddenCatch + " taken");
+                }
+            }
+            case REGROUP -> {
+                if (spent >= Math.min(numbers.regroupTicks(), numbers.bunchLeastTicks() + (long) carry.pickTicks() * hiddenCatch)) {
+                    if (turned == null && hiddenCatch == 0 && carried == 0) {
+                        foundNothing = true; // (they were at the spot and bring nothing back)
+                    }
+                    next(Stage.MARCH_HOME, now, (turned != null ? "turns home: " + turned + "; " : "")
+                            + (hiddenCatch > 0 ? "everything stung is picked up" : "nothing to pick up") + " (" + hiddenCatch + " termite(s) with the numbers)");
+                    walkFrom(0.0, now);
+                }
+            }
+            case MARCH_HOME -> {
+                boolean home = frontAsNumbers(now) >= back.length();
+                if (home || spent >= marchLimit()) {
+                    trail.walked(now);
+                    cameHome += numbersAlong;
+                    end(now, home ? "all home" : "its time is up: the rest walk in out of sight");
+                }
+            }
+            default -> {
+            }
         }
     }
 
-    /** Termites caught as numbers that no real raider's jaws had room for come home with the raid. */
-    void addHidden(int termites) {
-        hiddenCatch += Math.max(0, termites);
+    /**
+     * One raider goes over to the raid's numbers (it is out of sight past the grace, or its whole colony is): it leaves
+     * the world if it is there (folded into the colony's numbers, {@code AwayLife}), and what it holds in its jaws goes
+     * on with the numbers.
+     */
+    private void toNumbers(ServerLevel level, UUID id) {
+        int held = jaws.getOrDefault(id, 0);
+        if (level.getEntity(id) instanceof MatabeleEntity ant) {
+            if (ant.fightOrderBy() == this) {
+                ant.endFightOrder(this);
+            }
+            held = MatabeleLoads.termitesHeldBy(ant);
+            if (!ant.isAlive() || !colony.away().foldInStray(level, ant)) {
+                drop(id); // (dead, downed or stung itself: no number)
+                return;
+            }
+        }
+        if (held > 0) {
+            carried = Math.max(0, carried - held);
+            carriers = Math.max(0, carriers - 1);
+            hiddenCatch += held;
+        }
+        drop(id);
+        numbersAlong++;
+        wentToNumbers++;
+    }
+
+    /**
+     * The whole raid goes on as numbers from where it is: its colony went out of sight ({@code Raids.tickAway}), or
+     * its last raider with a body did. The same stage, begun when it began; on a march the walk as numbers starts
+     * where the front was. The hurt waiting at the spot are let go (they are the colony's own numbers now, or limp
+     * home), and what lies stung on the ground is left.
+     */
+    void goOnAsNumbers(ServerLevel level) {
+        if (asNumbers || stage == Stage.DONE) {
+            return;
+        }
+        long now = level.getGameTime();
+        lastLevel = level;
+        double share = shareOut(now);
+        releaseHurt("the raid went out of sight");
+        for (UUID id : List.copyOf(members)) {
+            toNumbers(level, id);
+        }
+        if (numbersAlong <= 0) {
+            end(now, "nobody left in it");
+            return;
+        }
+        asNumbers = true;
+        leader = null;
+        orders.clear();
+        sentIn.clear();
+        returning.clear();
+        taking.clear();
+        stung.clear();
+        noWay.clear();
+        march.newWalk();
+        walkFrom(stage == Stage.MARCH_HOME ? (1.0 - share) * back.length() : share * out.length(), now);
+        updatedAt = now;
+        say("goes on as " + numbersAlong + " number(s), out of sight, " + Math.round(share * out.length()) + " of " + Math.round(out.length())
+                + " blocks out" + (hiddenCatch > 0 ? ", " + hiddenCatch + " termite(s) with them" : ""));
+    }
+
+    /**
+     * Bodies for a raid going as numbers (a watcher is near it, {@code RaidsAway.show}): these ants, just out of the
+     * colony's numbers, are the raid's real ants from now, the first one in front, and the same raid goes on with them
+     * from its stage. What the numbers caught is put in their jaws. Their places: {@code inNest} (the raid is
+     * mustering, or has only just left) they stand in the nest's rooms where they came out and the raid musters with
+     * them at the entrance as any raid does; on a march they stand on the trail, the front where the numbers' front
+     * was and each the column's spacing behind the one ahead; at the spot they stand bunched at the halting place. A
+     * raid shown in its attack regroups: its catch is made, the attack as numbers began with it.
+     */
+    void takeBodies(ServerLevel level, List<MatabeleEntity> ants, boolean inNest, long now) {
+        if (!asNumbers || ants.isEmpty() || stage == Stage.DONE) {
+            return;
+        }
+        lastLevel = level;
+        double share = shareOut(now);
+        makeMarch(level); // (the land is loaded now: the trail's start gets its ground)
+        for (MatabeleEntity ant : ants) {
+            members.add(ant.getUUID());
+            memberSet.add(ant.getUUID());
+        }
+        leader = members.get(0);
+        asNumbers = false;
+        numbersAlong = Math.max(0, size - ants.size());
+        int left = hiddenCatch;
+        for (MatabeleEntity ant : ants) {
+            int takes = Math.min(left, ant.termitesItCanCarry());
+            if (takes > 0) {
+                ant.setLoad(MatabeleLoads.termites(takes));
+                carried += takes;
+                carriers++;
+                left -= takes;
+            }
+        }
+        hiddenCatch = left;
+        updatedAt = now - EVERY; // (its clocks go on from now)
+        if (inNest) {
+            if (stage != Stage.MUSTER) {
+                next(Stage.MUSTER, now, "watched now, only just out of the nest: it musters at the entrance with bodies");
+            } else {
+                say(ants.size() + " ant(s): watched now, the raid as numbers musters with bodies");
+            }
+            stageSince = now;
+            leftAt = -1;
+            return;
+        }
+        if (stage == Stage.ATTACK) {
+            next(Stage.REGROUP, now, "watched now: the catch is made (" + carried + " termite(s)), it regroups with bodies");
+        }
+        boolean marching = stage == Stage.MARCH_OUT || stage == Stage.MARCH_HOME;
+        Route route = stage == Stage.MARCH_HOME ? back : out;
+        double front = stage == Stage.MARCH_OUT ? share * out.length() : stage == Stage.MARCH_HOME ? (1.0 - share) * back.length() : out.length();
+        BlockPos middle = haltMiddle();
+        for (int k = 0; k < ants.size(); k++) {
+            MatabeleEntity ant = ants.get(k);
+            double along = Math.max(0.0, front - k * numbers.spacing());
+            BlockPos cell = marching ? null : bunchPlace(level, middle, ant.getUUID(), null);
+            if (cell == null) {
+                cell = route.place(level, along, 0.0);
+            }
+            double[] way = route.direction(along);
+            float yaw = (float) (Mth.atan2(way[1], way[0]) * Mth.RAD_TO_DEG) - 90.0F;
+            ant.moveTo(cell.getX() + 0.5, cell.getY(), cell.getZ() + 0.5, yaw, 0.0F);
+            ant.setYHeadRot(yaw);
+            ant.setYBodyRot(yaw);
+        }
+        march.newWalk();
+        if (marching) {
+            march.startAt(front);
+        }
+        say(ants.size() + " ant(s): watched now, the raid as numbers has bodies, "
+                + (marching ? "on the trail " + Math.round(front) + " of " + Math.round(route.length()) + " blocks along the way "
+                        + (stage == Stage.MARCH_HOME ? "home" : "out") : "bunched at the halting place")
+                + (carried > 0 ? ", " + carried + " termite(s) in their jaws" : ""));
+    }
+
+    // ------------------------------------------------------------------------------------------------- saving
+
+    /** The raid written down with its colony: its stage and clocks, its find, who is in it, what it stung and carries. */
+    void save(CompoundTag tag) {
+        tag.putString("stage", stage.name());
+        tag.putLong("stageSince", stageSince);
+        tag.putLong("startedAt", startedAt);
+        tag.putLong("at", find.at().asLong());
+        tag.putInt("worth", find.worth());
+        tag.put("members", uuids(members));
+        tag.putInt("size", size);
+        tag.putInt("numbersAlong", numbersAlong);
+        // (where the front is: as numbers its place when the walk began and when; with bodies the march's own front)
+        tag.putDouble("front", asNumbers ? numbersAt : march.frontAt());
+        tag.putLong("frontSince", numbersSince);
+        tag.putLong("leftAt", leftAt);
+        tag.putLong("attackedAt", attackedAt);
+        tag.put("counted", termitesTag(counted));
+        if (atHalt != null) {
+            tag.put("atHalt", termitesTag(atHalt));
+        }
+        tag.putBoolean("spotEmpty", spotEmpty);
+        tag.putBoolean("foundNothing", foundNothing);
+        if (turned != null) {
+            tag.putString("turned", turned);
+        }
+        tag.putBoolean("turnedAtEdge", turnedAtEdge);
+        tag.putBoolean("keepsNoHours", keepsNoHours);
+        tag.put("stung", uuids(stung));
+        tag.put("hurtHere", uuids(hurtHere));
+        tag.putIntArray("counts", new int[] {cameHome, carried, carriers, letGoCount, rescued, hurtAtSpot, hiddenCatch, gatheredAtAttack});
+        if (hiddenFrom != null) {
+            tag.putUUID("hiddenFrom", hiddenFrom);
+        }
+    }
+
+    /** The spot a raid written down by {@link #save} was going to. */
+    static BlockPos savedSpot(CompoundTag tag) {
+        return BlockPos.of(tag.getLong("at"));
+    }
+
+    static int savedWorth(CompoundTag tag) {
+        return tag.getInt("worth");
+    }
+
+    private static ListTag uuids(java.util.Collection<UUID> ids) {
+        ListTag list = new ListTag();
+        ids.forEach(id -> list.add(NbtUtils.createUUID(id)));
+        return list;
+    }
+
+    private static CompoundTag termitesTag(Termites termites) {
+        CompoundTag tag = new CompoundTag();
+        tag.putInt("seen", termites.seen());
+        tag.putBoolean("underCover", termites.underCover());
+        tag.putBoolean("byTheLand", termites.byTheLand());
+        return tag;
+    }
+
+    private static Termites termitesOf(CompoundTag tag) {
+        return new Termites(tag.getInt("seen"), tag.getBoolean("underCover"), tag.getBoolean("byTheLand"));
+    }
+
+    /**
+     * A raid read back after a reload, in the stage it was saved in, its clocks as they were (the game's time does not
+     * run while the game is shut). Its real ants are in the world again if their land is loaded; one that is not counts
+     * as out of sight and goes over to the numbers after the grace, as always. The find and the trail are the colony's
+     * own ({@code find}, {@code scent}: found again by the saved spot). Null if what was written cannot be a raid.
+     */
+    @Nullable
+    static Raid load(ServerLevel level, Colony colony, SavannaNumbers.ColumnNumbers numbers, @Nullable SavannaNumbers.CarryNumbers carry,
+                     SavannaNumbers.TrailNumbers trailNumbers, Raids.Find find, ScentTrails.Trail scent, CompoundTag tag) {
+        Stage stage;
+        try {
+            stage = Stage.valueOf(tag.getString("stage"));
+        } catch (IllegalArgumentException e) {
+            return null;
+        }
+        List<UUID> members = new ArrayList<>();
+        for (Tag one : tag.getList("members", Tag.TAG_INT_ARRAY)) {
+            members.add(NbtUtils.loadUUID(one));
+        }
+        int numbersAlong = Math.max(0, tag.getInt("numbersAlong"));
+        if (stage == Stage.DONE || members.isEmpty() && numbersAlong <= 0) {
+            return null;
+        }
+        long now = level.getGameTime();
+        Raid raid = new Raid(members, level, colony, numbers, carry, trailNumbers, find, scent, numbersAlong, termitesOf(tag.getCompound("counted")),
+                tag.getLong("startedAt"));
+        raid.lastLevel = level;
+        raid.stage = stage;
+        raid.stageSince = tag.getLong("stageSince");
+        raid.size = Math.max(members.size() + numbersAlong, tag.getInt("size"));
+        raid.numbersAt = tag.getDouble("front");
+        raid.numbersSince = tag.getLong("frontSince");
+        if (!raid.asNumbers) {
+            raid.march.startAt(tag.getDouble("front"));
+        }
+        raid.leftAt = tag.getLong("leftAt");
+        raid.attackedAt = tag.getLong("attackedAt");
+        raid.lastActionAt = stage == Stage.ATTACK ? now : -1; // (the quiet clock starts again: who stung what last is not kept)
+        raid.atHalt = tag.contains("atHalt") ? termitesOf(tag.getCompound("atHalt")) : null;
+        raid.spotEmpty = tag.getBoolean("spotEmpty");
+        raid.foundNothing = tag.getBoolean("foundNothing");
+        raid.turned = tag.contains("turned") ? tag.getString("turned") : null;
+        raid.turnedAtEdge = tag.getBoolean("turnedAtEdge");
+        raid.keepsNoHours = tag.getBoolean("keepsNoHours");
+        for (Tag one : tag.getList("stung", Tag.TAG_INT_ARRAY)) {
+            raid.stung.add(NbtUtils.loadUUID(one));
+        }
+        for (Tag one : tag.getList("hurtHere", Tag.TAG_INT_ARRAY)) {
+            raid.hurtHere.add(NbtUtils.loadUUID(one));
+        }
+        int[] counts = tag.getIntArray("counts");
+        if (counts.length >= 8) {
+            raid.cameHome = counts[0];
+            raid.carried = counts[1];
+            raid.carriers = counts[2];
+            raid.letGoCount = counts[3];
+            raid.rescued = counts[4];
+            raid.hurtAtSpot = counts[5];
+            raid.hiddenCatch = counts[6];
+            raid.gatheredAtAttack = counts[7];
+        }
+        raid.hiddenFrom = tag.hasUUID("hiddenFrom") ? tag.getUUID("hiddenFrom") : null;
+        raid.say("read back after a reload: " + raid.count() + " ant(s)" + (raid.asNumbers ? " as numbers" : "") + ", "
+                + (now - raid.stageSince) / 20 + " s into this stage");
+        return raid;
     }
 
     // ------------------------------------------------------------------------------------------- turning home
@@ -801,6 +1233,15 @@ public final class Raid implements FightDiary {
             return;
         }
         turned = why;
+        double share = shareOut(now);
+        Stage was = stage;
+        turnHomeFrom(ants, now, why);
+        if (asNumbers && stage == Stage.MARCH_HOME && was != Stage.MARCH_HOME) {
+            walkFrom((1.0 - share) * back.length(), now); // (as numbers: the walk home starts where the front was)
+        }
+    }
+
+    private void turnHomeFrom(List<MatabeleEntity> ants, long now, String why) {
         switch (stage) {
             case MUSTER -> next(Stage.MARCH_HOME, now, "turns home: " + why);
             case MARCH_OUT, HALT -> {
@@ -844,6 +1285,7 @@ public final class Raid implements FightDiary {
         taking.remove(ant);
         unseenSince.remove(ant);
         draftedSince.remove(ant);
+        jaws.remove(ant);
     }
 
     /** It leaves the raid out in the field: dropped, and handed to the colony's raids to go home along the trail. */
@@ -859,6 +1301,7 @@ public final class Raid implements FightDiary {
             return;
         }
         stageSince += by;
+        numbersSince += by;
         if (attackedAt >= 0) {
             attackedAt += by;
         }
@@ -887,21 +1330,27 @@ public final class Raid implements FightDiary {
             say("the raid was not worked out for " + (now - previous) / 20 + " s (the colony's land not ticking): its clocks waited");
             holdClocks(now - previous - EVERY);
         }
-        List<MatabeleEntity> ants = rollCall(level, now);
-        tendHurt(level, now);
-        if (lostFromSight) {
-            for (UUID id : List.copyOf(members)) {
-                letGo(id, "the raid was lost from sight");
+        if (asNumbers) {
+            if (turnAsked != null) {
+                String why = turnAsked;
+                turnAsked = null;
+                turnHome(List.of(), now, why);
             }
-            end(now, "lost from sight: its leader out of sight over " + AwayLife.GRACE_TICKS / 20 + " s");
+            stepAsNumbers(level, now);
             return;
         }
+        int numbersBefore = wentToNumbers;
+        List<MatabeleEntity> ants = rollCall(level, now);
+        tendHurt(level, now);
         if (ants.isEmpty()) {
             if (!members.isEmpty()) {
                 holdClocks(EVERY); // (every member out of sight: the raid waits for them)
                 return;
             }
-            lostFromSight = lost.containsKey("lost from sight") && cameHome == 0;
+            if (wentToNumbers > numbersBefore) {
+                goOnAsNumbers(level); // (the last raider with a body is out of sight past the grace: the raid goes on as numbers)
+                return;
+            }
             end(now, "nobody left in it");
             return;
         }
@@ -934,7 +1383,8 @@ public final class Raid implements FightDiary {
 
     /**
      * Who is with the raid now. One out of sight (its land not loaded or not ticking) is kept for the colony's away
-     * grace, then lost from sight. One hurt at the spot leaves the raid, stands and calls for help. One drafted by
+     * grace, then goes on as one of the raid's numbers ({@link #toNumbers}; it was "lost from sight" and let go, and
+     * with its leader lost the whole raid was dropped: 14 of 46 raids in the soak of step 1). One hurt at the spot leaves the raid, stands and calls for help. One drafted by
      * another fight keeps its place a while. The dead, the crippled and the downed leave it.
      */
     private List<MatabeleEntity> rollCall(ServerLevel level, long now) {
@@ -948,12 +1398,8 @@ public final class Raid implements FightDiary {
                     return now;
                 });
                 if (now - since > AwayLife.GRACE_TICKS) {
-                    lost.merge("lost from sight", 1, Integer::sum);
-                    say(RaidGround.shortId(id) + " leaves the raid: lost from sight " + (now - since) / 20 + " s");
-                    if (id.equals(leader)) {
-                        lostFromSight = true;
-                    }
-                    letGo(id, "lost from sight"); // (seen again, it goes home along the trail)
+                    say(RaidGround.shortId(id) + " is out of sight " + (now - since) / 20 + " s: it goes on as one of the raid's numbers");
+                    toNumbers(level, id);
                 }
                 continue;
             }
@@ -973,6 +1419,12 @@ public final class Raid implements FightDiary {
             }
             if (entity instanceof MatabeleEntity ant && ant.isAlive() && !ant.fightsNoMore() && !ant.isDowned()) {
                 ants.add(ant);
+                int held = carried > 0 ? MatabeleLoads.termitesHeldBy(ant) : 0;
+                if (held > 0) {
+                    jaws.put(id, held);
+                } else {
+                    jaws.remove(id);
+                }
                 if (ant.getFightSpot() != null && ant.fightOrderBy() != this) {
                     long since = draftedSince.computeIfAbsent(id, key -> {
                         say(RaidGround.shortId(key) + " is called away to fight (it catches up after)");
@@ -1007,19 +1459,19 @@ public final class Raid implements FightDiary {
         if (to == Stage.MARCH_HOME) {
             releaseHurt("the raid left the spot without it");
         }
-        say("ends after " + (now - stageSince) / 20 + " s, " + members.size() + " ant(s): " + why);
+        say("ends after " + (now - stageSince) / 20 + " s, " + count() + " ant(s): " + why);
         march.newWalk();
         homeLed = false;
         stage = to;
         stageSince = now;
-        say("begins, " + members.size() + " ant(s)" + (carried > 0 ? ", " + carried + " termite(s) in their jaws" : ""));
+        say("begins, " + count() + " ant(s)" + (carried > 0 ? ", " + carried + " termite(s) in their jaws" : ""));
     }
 
     /** The raid is over: the diary's last line. */
     private void end(long now, String why) {
         releaseHurt("the raid ended");
         if (stage != Stage.DONE) {
-            say("ends after " + (now - stageSince) / 20 + " s, " + members.size() + " ant(s): " + why);
+            say("ends after " + (now - stageSince) / 20 + " s, " + count() + " ant(s): " + why);
         }
         stage = Stage.DONE;
         stageSince = now;
@@ -1043,7 +1495,7 @@ public final class Raid implements FightDiary {
 
     /** The front fell: the next in the stream leads on, else the first in the raid's order. */
     private UUID nextLeader() {
-        return march.lineOrder().stream().filter(memberSet::contains).findFirst().orElse(members.get(0));
+        return march.lineOrder().stream().filter(memberSet::contains).findFirst().orElse(members.isEmpty() ? null : members.get(0));
     }
 
     /**
@@ -1234,27 +1686,107 @@ public final class Raid implements FightDiary {
     }
 
     /**
-     * As the attack starts, the raiders going as numbers break into the galleries round the spot and take the termites
-     * feeding under the mud there ({@link RaidCatch}), if the termite colony still feeds there; brought home with the raid.
+     * Soldiers at a raid that goes as numbers (my picks, set to what the measuring scene of the alarm rework's step 5
+     * gave near a player: of a raid of 20 that broke in, 0 to 6 raiders dead, 1 to 14 hurt, 1 to 6 soldiers lost): the
+     * share of the termite colony's soldiers that comes to the break, and of those the share that each kill a raider,
+     * send one home hurt, are stung and carried home.
+     */
+    private static final double ANSWERING_SHARE = 0.6;
+    private static final double SOLDIER_KILLS = 0.12;
+    private static final double SOLDIER_HURTS = 0.3;
+    private static final double STUNG_SOLDIER_SHARE = 0.25;
+
+    /** How many of {@code of} by a chance {@code share} each (a coin per ant). */
+    private static int dice(RandomSource random, int of, double share) {
+        int hit = 0;
+        for (int i = 0; i < of; i++) {
+            if (random.nextDouble() < share) {
+                hit++;
+            }
+        }
+        return hit;
+    }
+
+    /**
+     * <b>The one rule for the catch of raiders going as numbers</b>, as the attack starts: the few who go along with a
+     * watched raid, and every raider of a raid out of sight. They break into the galleries round the spot and take the
+     * termites feeding under the mud there ({@link RaidCatch}: about {@code per_raider} each, never more than the
+     * termite colony can lose), if the termite colony still feeds there; where the raid hunts by the land (the judge's
+     * word at the halt, no termite colony on record yet) a small catch with no colony's count to take it from. Brought
+     * home with the raid. With nobody's body at the spot the numbers also stand for the fight itself: they take the
+     * termites walking in the open there, if any are bodies (nobody else will sting them), some of the termite colony's
+     * soldiers come to the break and are stung, and a few raiders die or come home hurt
+     * ({@code raids.away.lost_share}, {@code hurt_share}); with real raiders there, the real ants and soldiers fight
+     * that out.
      */
     private void takeHidden(ServerLevel level) {
         if (numbersAlong <= 0) {
             return;
         }
-        int reach = colony.profile().section(SavannaNumbers.AWAY_RAIDS).orElse(SavannaNumbers.AwayRaidNumbers.DEFAULT).termiteReach();
-        Colony termites = RaidCatch.termitesAt(level, find.at(), reach);
-        if (termites == null || termites.keepsOff(level, find.at())) {
-            say("the " + numbersAlong + " raiders going as numbers find no termites feeding under the mud here"
-                    + (termites == null ? " (no termite colony near)" : " (the termites keep off the spot)"));
-            return;
+        SavannaNumbers.AwayRaidNumbers away = awayNumbers();
+        RandomSource random = colony.random();
+        int wanted = RaidCatch.couldCarry(colony, numbersAlong, random);
+        int taken = 0;
+        if (asNumbers && level.isPositionEntityTicking(find.at())) {
+            for (AbstractAntEntity insect : inTheOpen(level, colony, find.at(), reach(numbers))) {
+                if (taken >= wanted) {
+                    break;
+                }
+                insect.carriedOff(level);
+                taken++;
+            }
         }
-        int wanted = RaidCatch.couldCarry(colony, numbersAlong, colony.random());
-        int most = RaidCatch.mostToTake(colony, termites);
-        hiddenCatch = Math.min(wanted, most);
-        hiddenFrom = termites.getId();
-        int countLost = RaidCatch.take(level, termites, hiddenCatch);
-        say("the " + numbersAlong + " raiders going as numbers take " + hiddenCatch + " termite(s) from under the mud (of " + wanted
-                + " they could carry, at most " + most + "); the termite colony's count lost " + countLost);
+        int inTheOpen = taken;
+        Colony termites = RaidCatch.termitesAt(level, find.at(), away.termiteReach());
+        boolean feeding = termites != null && !termites.keepsOff(level, find.at());
+        boolean byTheLand = termites == null && atHalt != null && atHalt.byTheLand();
+        int most = 0;
+        int countLost = 0;
+        int answering = 0;
+        if (feeding) {
+            most = RaidCatch.mostToTake(colony, termites);
+            int under = Math.max(0, Math.min(wanted - taken, most));
+            countLost = RaidCatch.take(level, termites, under);
+            taken += under;
+            hiddenFrom = termites.getId();
+            if (asNumbers) {
+                // the soldiers within earshot come to the break and hold the gallery from inside; about a quarter of
+                // them are stung and carried home with the workers (the alarm rework, step 5)
+                String minor = TermiteSoldierEntity.Rank.MINOR.caste();
+                String major = TermiteSoldierEntity.Rank.MAJOR.caste();
+                int soldiers = termites.getCount(minor) + termites.getCount(major);
+                answering = soldiers <= 0 ? 0 : Math.max(1, Math.min(12, (int) Math.round(soldiers * ANSWERING_SHARE)));
+                int stungSoldiers = dice(random, answering, STUNG_SOLDIER_SHARE);
+                if (stungSoldiers > 0) {
+                    termites.population().loseToHunters(level, termites.population().inside(minor) > 0 ? minor : major, stungSoldiers,
+                            AwayReport.What.TAKEN_BY_RAIDERS);
+                    taken += stungSoldiers;
+                }
+            }
+        } else if (byTheLand) {
+            taken += Math.max(0, Math.min(wanted - taken, Math.max(1, numbersAlong / 10)));
+        }
+        hiddenCatch += taken;
+        say("the " + numbersAlong + " raiders going as numbers take " + taken + " termite(s)" + (inTheOpen > 0 ? ", " + inTheOpen + " of them in the open" : "")
+                + (feeding ? " from under the mud (of " + wanted + " they could carry, at most " + most + "); the termite colony's count lost " + countLost
+                        + (asNumbers ? ", " + answering + " soldier(s) came to the break" : "")
+                        : byTheLand ? " by the land (no termite colony on record in reach yet)"
+                                : termites == null ? " (no termite colony near)" : " (the termites keep off the spot)"));
+        if (asNumbers) {
+            int dead = Math.min(numbersAlong - 1, dice(random, numbersAlong, away.lostShare()) + dice(random, answering, SOLDIER_KILLS));
+            int hurt = Math.min(numbersAlong - dead, dice(random, numbersAlong - dead, away.hurtShare()) + dice(random, answering, SOLDIER_HURTS));
+            dead = colony.population().loseInside(level, Caste.WORKER, Math.max(0, dead), AwayReport.What.RAIDERS_LOST);
+            colony.away().note(level, AwayReport.What.RAIDERS_HURT, hurt);
+            if (dead > 0) {
+                numbersAlong = Math.max(1, numbersAlong - dead);
+                size = Math.max(1, size - dead);
+                lost.merge("dead at the spot", dead, Integer::sum);
+            }
+            if (dead + hurt > 0) {
+                say("the fight cost " + dead + " raider(s) dead and " + hurt + " hurt");
+            }
+            ColonyManager.get(level).markChanged();
+        }
     }
 
     /** One raider sent in to fight round the find; the order is the raid's own, and only the raid ends it. */
@@ -1656,7 +2188,7 @@ public final class Raid implements FightDiary {
 
     /** The raid in words (the colony list). */
     public String describe() {
-        StringBuilder line = new StringBuilder("; a raid of ").append(size).append(" (").append(members.size()).append(" real out")
+        StringBuilder line = new StringBuilder("; a raid of ").append(size).append(asNumbers ? " out of sight (" : " (").append(members.size()).append(" real out")
                 .append(numbersAlong > 0 ? ", " + numbersAlong + " as numbers" : "").append("), ").append(stage.words())
                 .append(", to ").append(find.at().toShortString());
         if (hiddenCatch > 0) {

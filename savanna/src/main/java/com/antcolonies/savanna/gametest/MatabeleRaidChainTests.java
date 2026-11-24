@@ -174,6 +174,97 @@ public class MatabeleRaidChainTests {
         chain(helper, 65, (x, z) -> 0, false, 30, 40, 0, true, false, Twist.NONE);
     }
 
+    /**
+     * The raid rewrite, step 4 (the plan's "Done when"): a raid watched and a raid out of sight to the same find bring
+     * home the same catch, within the dice. Flat ground, six termite workers in the open, a colony of 100 (a raid of
+     * 75): first a raid with real ants, which stings and carries what stands there; then six termites again and the
+     * colony far from every watcher, the same raid machine without bodies, its catch by the one rule
+     * ({@code RaidCatch}: about 0.1 a raider by the dice, here of the termites standing there). Both bring termites
+     * home and the two catches differ by no more than 3 (my pick: the rule's dice for 75 raiders run from 5 to 9, of
+     * six termites to take).
+     */
+    @GameTest(template = "arena", timeoutTicks = 24000, skyAccess = true, batch = "matabele_raid_same_catch")
+    public static void aWatchedRaidAndARaidOutOfSightBringHomeTheSameCatch(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        level.getServer().tickRateManager().setTickRate(2000.0F);
+        TestClock.still(helper, 8.0); // (the morning raid hours)
+        TestScenes.shapeGround(helper, 45, (x, z) -> 0);
+        MatabeleScenes.deadMound(helper, NEST, NEST, 30);
+        List<TermiteWorkerEntity> termites = new ArrayList<>();
+        Runnable six = () -> {
+            for (int i = 0; i < 6; i++) {
+                termites.add(TestAnts.lone(helper, SavannaEntities.TERMITE_WORKER.get(), 37 + i % 3, SURFACE, NEST + 3 + 2 * (i / 3)));
+            }
+        };
+        six.run();
+        BlockPos at = termites.get(0).blockPosition();
+        Colony colony = MatabeleScenes.colony(helper, NEST + 6, NEST, 100);
+        Raids raids = colony.part(SavannaParts.RAIDS).orElseThrow();
+        com.antcolonies.savanna.colony.Raid[] near = new com.antcolonies.savanna.colony.Raid[1];
+        int[] stage = {0};
+        long[] stageAt = new long[1];
+        helper.onEachTick(() -> {
+            long now = helper.getTick();
+            switch (stage[0]) {
+                case 0 -> {
+                    if (now < 40) {
+                        return;
+                    }
+                    MatabeleEntity leader = TestIsolation.insectsOf(level, colony, MatabeleEntity.class).stream()
+                            .filter(ant -> ant.hasMajorBody() && !raids.isScouting(ant.getUUID())).findFirst().orElse(null);
+                    helper.assertTrue(leader != null, "no real major to be the scout");
+                    near[0] = raids.raidForTests(level, at, 18, trail(level, colony.getCenter(), at), leader.getUUID());
+                    helper.assertTrue(near[0] != null && !near[0].goesAsNumbers(), "no watched raid set out; " + raids.describe(level));
+                    stage[0] = 1;
+                    stageAt[0] = now;
+                }
+                case 1 -> {
+                    if (near[0].stage() != com.antcolonies.savanna.colony.Raid.Stage.DONE || raids.column() != null) {
+                        stageAt[0] = now;
+                        return;
+                    }
+                    if (now - stageAt[0] < 400) {
+                        return; // (a little while to go in)
+                    }
+                    helper.assertTrue(near[0].turned() == null, "the watched raid turned home: " + near[0].endedWhy());
+                    // the same find again, six termites there, the colony now far from every watcher
+                    termites.forEach(termite -> termite.discard());
+                    termites.clear();
+                    six.run();
+                    raids.forgetFindsForTests();
+                    raids.rememberForTests(at, 18, level.getGameTime());
+                    colony.population().setOnForTests(true);
+                    colony.away().setOnForTests(true);
+                    colony.away().setFarForTests(true);
+                    colony.away().setNearForTests(false);
+                    colony.away().setGraceForTests(40L);
+                    stage[0] = 2;
+                    stageAt[0] = now;
+                }
+                case 2 -> {
+                    com.antcolonies.savanna.colony.Raid last = raids.lastRaid();
+                    if (last == null || last == near[0] || raids.column() != null) {
+                        helper.assertTrue(now - stageAt[0] < 10000, "no raid out of sight went and came home after the watched one; " + raids.describe(level));
+                        return;
+                    }
+                    helper.assertTrue(last.wasOutOfSight() && last.members().isEmpty(), "the second raid was not out of sight: " + last.endedWhy());
+                    helper.assertTrue(last.stage() == com.antcolonies.savanna.colony.Raid.Stage.DONE && last.turned() == null && last.find().at().equals(at),
+                            "the raid out of sight did not go through to done at the same find: " + last.endedWhy());
+                    int watched = near[0].carried() + near[0].hiddenCatch();
+                    int unseen = last.carried() + last.hiddenCatch();
+                    SavannaMod.LOGGER.info("[same catch test] watched: a raid of {} brought {}; out of sight: a raid of {} brought {}",
+                            near[0].size(), watched, last.size(), unseen);
+                    helper.assertTrue(watched > 0 && unseen > 0, "a raid came home with nothing: watched " + watched + ", out of sight " + unseen);
+                    helper.assertTrue(Math.abs(watched - unseen) <= 3, "to the same find the watched raid (of " + near[0].size() + ") brought home "
+                            + watched + " termite(s), the raid out of sight (of " + last.size() + ") " + unseen);
+                    helper.succeed();
+                }
+                default -> {
+                }
+            }
+        });
+    }
+
     // ------------------------------------------------------------------ the one driver
 
     /**
@@ -370,8 +461,11 @@ public class MatabeleRaidChainTests {
 
     // ------------------------------------------------------------------ the book: the stage rules, read from outside
 
-    /** Reads one raid's stages from the colony's diary and watches the world beside it; {@link #judge} gives the verdict. */
-    private static final class Book {
+    /**
+     * Reads one raid's stages from the colony's diary and watches the world beside it; {@link #judge} gives the verdict.
+     * (Open to the other raid tests: a raid out of sight keeps the same diary, {@code MatabeleAwayTests}.)
+     */
+    static final class Book {
         private final GameTestHelper helper;
         private final ServerLevel level;
         private final Colony colony;

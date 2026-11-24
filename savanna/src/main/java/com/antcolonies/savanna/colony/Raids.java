@@ -158,7 +158,7 @@ public class Raids {
     private final Set<UUID> veterans = new LinkedHashSet<>();
     /** Since when a scout's place has stood open (game time, -1 none): a new ant takes it if no old scout comes soon. */
     private long openSince = -1;
-    /** The raid out now, or null (not saved: after a reload the raiders are just ants outside, and go home). */
+    /** The raid out now, with bodies or as numbers, or null (saved with the raids out of sight, {@link RaidsAway#save}). */
     @Nullable
     private Raid column;
     /** The last raid home (tests and the colony list), or null. */
@@ -229,8 +229,9 @@ public class Raids {
     }
 
     /**
-     * M8 step 3f: once a second while the colony is away. The finds fade as at home; a real raid column out when the
-     * colony went away goes on as numbers; then the raids out of sight ({@link RaidsAway}).
+     * M8 step 3f: once a second while the colony is away. The finds fade as at home; a raid out with bodies when the
+     * colony went away goes on as numbers, the same raid ({@link Raid#goOnAsNumbers}); the raid day and the scouts out
+     * of sight ({@link RaidsAway}); and the raid out is stepped as at home.
      */
     void tickAway(ServerLevel level) {
         SavannaNumbers.ScoutNumbers numbers = numbers();
@@ -243,17 +244,38 @@ public class Raids {
             waiting = null;
         }
         if (column != null) {
-            if (column.stage() != Raid.Stage.DONE) {
-                away.fromColumn(level, column);
-            }
-            last = column;
-            column = null;
+            column.goOnAsNumbers(level);
             raidCheckAt = -1;
         }
         scouts.clear(); // (the real scouts are numbers now: out of sight the colony's scouts search as numbers)
         sent.clear();
         sentAnyHour.clear();
         away.tick(level);
+        stepRaid(level);
+    }
+
+    /** The raid out now is this one: one that set out as numbers ({@link RaidsAway}), or one read back after a reload. */
+    void putRaid(Raid raid) {
+        column = raid;
+        whyNoRaid = null;
+    }
+
+    /** This find is forgotten: the judge found no termite there now. */
+    void forget(Find find) {
+        finds.remove(find);
+        forgetWaiting(find);
+    }
+
+    /** The scent trail to this find: the one still smelt, else a new one laid along the find's own line. */
+    ScentTrails.Trail trailFor(ServerLevel level, Find find, long now) {
+        ScentTrails.Trail trail = trails.liveTo(find.at, trailReach(), trailNumbers(), now);
+        return trail != null ? trail : trails.lay(level, colony.getCenter(), find.at, find.trail, now, false);
+    }
+
+    /** A find as a raid read back after a reload needs it: the remembered one at that spot, else one made for it. */
+    Find findFor(BlockPos at, int worth, long now) {
+        Find known = finds.stream().filter(find -> find.at.equals(at)).findFirst().orElse(null);
+        return known != null ? known : new Find(at.immutable(), worth, now, now, 0, RaidsAway.line(colony.getCenter(), at), null);
     }
 
     /**
@@ -285,68 +307,6 @@ public class Raids {
                 places.add(ant.blockPosition());
             }
         }
-    }
-
-    /**
-     * The brain while away, step 3: a raid out as numbers is shown as real ants ({@link RaidsAway#tickHere}). So many
-     * workers come out of the numbers and make a column to the raid's spot: {@code inNest}, in the nest's rooms, the raid
-     * forming as any raid does (it had only just left); else on the trail where the raid is now
-     * ({@link Raid#startPartway}), with {@code caught} termites in their jaws if it has attacked. False if it
-     * could not be (no room cell, nobody inside to come out): it goes on as numbers.
-     */
-    boolean showRaid(ServerLevel level, BlockPos at, BlockPos where, int raiders, boolean inNest, boolean attacked, double share, int caught) {
-        SavannaNumbers.ColumnNumbers numbers = columnNumbers();
-        if (numbers == null || column != null) {
-            return false;
-        }
-        long now = level.getGameTime();
-        int real = Math.min(Math.min(raiders, numbers.mostReal()), colony.population().inside(Caste.WORKER));
-        List<BlockPos> cells = !inNest ? List.of(where) : colony.nest().getAllRoomCells(level).stream()
-                .filter(cell -> RaidGround.canStand(level, cell)).toList();
-        if (real <= 0 || cells.isEmpty()) {
-            return false;
-        }
-        List<MatabeleEntity> ants = new ArrayList<>();
-        for (int i = 0; i < real; i++) {
-            if (colony.population().comeOutAt(level, Caste.WORKER, cells.get(colony.random().nextInt(cells.size()))) instanceof MatabeleEntity ant) {
-                ants.add(ant);
-            }
-        }
-        if (ants.isEmpty()) {
-            return false;
-        }
-        // (the marching order: a major leads as the scout would, the other majors at the back, the rear guard)
-        MatabeleEntity leader = ants.stream().filter(MatabeleEntity::hasMajorBody).findFirst().orElse(ants.get(0));
-        ants.sort(Comparator.comparingInt(ant -> ant == leader ? 0 : ant.hasMajorBody() ? 2 : 1));
-        Find known = findAt(at);
-        Find find = known != null ? known : new Find(at.immutable(), 0, now, now, 0, RaidsAway.line(colony.getCenter(), at), null);
-        ScentTrails.Trail trail = trails.liveTo(find.at, trailReach(), trailNumbers(), now);
-        if (trail == null) {
-            trail = trails.lay(level, colony.getCenter(), find.at, find.trail, now, false);
-        }
-        column = new Raid(level, colony, numbers, carryNumbers(), trailNumbers(), find, trail, ants, 0,
-                Raid.termitesThere(level, colony, find.at), now);
-        if (inNest) {
-            column.sayStart(level);
-        } else {
-            column.startPartway(level, ants, attacked, share, now);
-        }
-        int left = attacked ? caught : 0;
-        for (MatabeleEntity ant : ants) {
-            int takes = Math.min(left, ant.termitesItCanCarry());
-            if (takes > 0) {
-                ant.setLoad(com.antcolonies.savanna.entity.MatabeleLoads.termites(takes));
-                column.noteCarried(takes);
-                left -= takes;
-            }
-        }
-        column.addHidden(left);
-        whyNoRaid = null;
-        find.scout = leader.getUUID();
-        say(level, "a raid out of sight to " + at.toShortString() + " is watched now: " + ants.size() + " real raider(s) "
-                + (inNest ? "form in the nest" : "on the trail at " + where.toShortString()
-                        + (attacked ? ", on the way home with " + caught + " termite(s)" : ", on the way out")));
-        return true;
     }
 
     /**
@@ -386,16 +346,6 @@ public class Raids {
                 + cell.toShortString() + ", " + Math.round(RaidGround.flat(cell, colony.getCenter())) + " blocks out toward the "
                 + compass(heading) + ", and searches on from there");
         return true;
-    }
-
-    /** The brain while away, step 3: the points of the way to this spot, the nest end first (the scent trail if one is smelt, else the scout's line). */
-    List<BlockPos> wayTo(BlockPos at, long now) {
-        ScentTrails.Trail trail = trails.liveTo(at, trailReach(), trailNumbers(), now);
-        if (trail != null && trail.points().size() >= 2) {
-            return trail.points();
-        }
-        Find find = findAt(at);
-        return find != null && find.trail.size() >= 2 ? find.trail : RaidsAway.line(colony.getCenter(), at);
     }
 
     /** The diary for {@link RaidsAway}. */
@@ -510,40 +460,7 @@ public class Raids {
 
     private void tickTimed(ServerLevel level) {
         trails.tick(level, level.getGameTime(), trailNumbers(), column == null ? null : column.trail(), what -> say(level, what));
-        if (column != null) {
-            if (column.stage() != Raid.Stage.DONE && !column.keepsNoHours() && !column.turnedAtDusk()) {
-                if (isDusk(level)) {
-                    column.callDusk(); // (R7: raids end by dusk: it stops where it is, picks up what it stung and walks home)
-                } else if (colony.rainsNow(level)) {
-                    // M8 step 3e: rain turns a raid home the same way (it washes the scent trail out; real raids are not
-                    // seen in rain, Yusuf 2026; turning home mid-raid my pick)
-                    column.callRain();
-                }
-            }
-            try {
-                column.update(level); // (the raiders ask it every few ticks; this keeps it going with none of them loaded)
-            } catch (RuntimeException e) {
-                // B7 (nothing waits for ever): a column that cannot be worked out would hold its raiders for ever; it is
-                // given up and everyone walks home, and the error goes to the log for the bug list.
-                SavannaMod.LOGGER.error("[raid] colony {}: the raid column's update failed; the raid is given up",
-                        colony.getId(), e);
-                say(level, "the raid's update failed (" + e + "): the raid is given up, everyone walks home");
-                column.abandon(level, e.toString());
-            }
-            for (Raid.LetGo one : column.takeLetGo()) {
-                wayHome.send(one.ant(), column.back(), level.getGameTime(), one.why());
-                say(level, RaidGround.shortId(one.ant()) + " goes home along the trail by itself (" + one.why() + ")");
-            }
-            if (raidCheckAt >= 0 && level.getGameTime() >= raidCheckAt) {
-                raidCheckAt = -1;
-                checkRaiders(level, column);
-            }
-            if (column.stage() == Raid.Stage.DONE) {
-                raidHome(level, column);
-                last = column;
-                column = null;
-            }
-        }
+        stepRaid(level);
         checkSent(level);
         // (once a second: the colony's parts tick once a second; the raid code review, finding 8)
         SavannaNumbers.ScoutNumbers numbers = numbers();
@@ -583,6 +500,48 @@ public class Raids {
             sweep(level, now);
         }
         unseenSince.keySet().removeIf(id -> !scouts.contains(id) && !sent.contains(id) && !wayHome.isGoingHome(id));
+    }
+
+    /**
+     * The raid out is worked out once more (once a second, the colony here or away; the raiders ask it themselves every
+     * few ticks): dusk and rain turn it home, the raiders it let go are sent home along the trail, and a raid that is
+     * done is handed in ({@link #raidHome}).
+     */
+    private void stepRaid(ServerLevel level) {
+        if (column != null) {
+            if (column.stage() != Raid.Stage.DONE && !column.keepsNoHours() && !column.turnedAtDusk()) {
+                if (isDusk(level)) {
+                    column.callDusk(); // (R7: raids end by dusk: it stops where it is, picks up what it stung and walks home)
+                } else if (colony.rainsNow(level)) {
+                    // M8 step 3e: rain turns a raid home the same way (it washes the scent trail out; real raids are not
+                    // seen in rain, Yusuf 2026; turning home mid-raid my pick)
+                    column.callRain();
+                }
+            }
+            try {
+                column.update(level); // (the raiders ask it every few ticks; this keeps it going with none of them loaded)
+            } catch (RuntimeException e) {
+                // B7 (nothing waits for ever): a column that cannot be worked out would hold its raiders for ever; it is
+                // given up and everyone walks home, and the error goes to the log for the bug list.
+                SavannaMod.LOGGER.error("[raid] colony {}: the raid column's update failed; the raid is given up",
+                        colony.getId(), e);
+                say(level, "the raid's update failed (" + e + "): the raid is given up, everyone walks home");
+                column.abandon(level, e.toString());
+            }
+            for (Raid.LetGo one : column.takeLetGo()) {
+                wayHome.send(one.ant(), column.back(), level.getGameTime(), one.why());
+                say(level, RaidGround.shortId(one.ant()) + " goes home along the trail by itself (" + one.why() + ")");
+            }
+            if (raidCheckAt >= 0 && level.getGameTime() >= raidCheckAt) {
+                raidCheckAt = -1;
+                checkRaiders(level, column);
+            }
+            if (column.stage() == Raid.Stage.DONE) {
+                raidHome(level, column);
+                last = column;
+                column = null;
+            }
+        }
     }
 
     /**
@@ -705,12 +664,11 @@ public class Raids {
             // The raid rewrite: the column halted at the spot, looked round and nobody was there: forgotten at once.
             finds.remove(find);
             say(level, "the raid to " + find.at.toShortString() + " found no termite there: the find is forgotten");
-        } else if (raid.turned() != null || raid.lostTrail() || raid.lostFromSight()) {
-            // Turned home on the way (dusk, rain, the scout lost, a gap in the trail, land not loaded) or lost from
-            // sight: the spot was never looked over, so it is no empty check (a scout rechecks it later).
+        } else if (raid.turned() != null || raid.lostTrail()) {
+            // Turned home on the way (dusk, rain, the scout lost, a gap in the trail, land not loaded): the spot was
+            // never looked over, so it is no empty check (a scout rechecks it later).
             say(level, "the raid to " + find.at.toShortString() + " never looked the spot over ("
-                    + (raid.lostFromSight() ? "lost from sight" : raid.turned() != null ? raid.turned() : "the trail lost")
-                    + "): it still counts as a good spot");
+                    + (raid.turned() != null ? raid.turned() : "the trail lost") + "): it still counts as a good spot");
         } else if (raid.foundNothing()) {
             foundEmpty(level, find); // (they fought there and brought nothing back)
         }
@@ -727,9 +685,12 @@ public class Raids {
             return;
         }
         PreyPile pile = colony.part(SavannaParts.PREY_PILE).orElse(null);
-        if (pile != null) {
+        if (pile != null && colony.away().isHere(level)) {
             pile.bringIn(level, null, hidden);
+        } else if (pile != null) {
+            pile.bringInCounted(level.getGameTime(), hidden); // (out of sight: counted, no block touched; its layers are laid later)
         }
+        colony.away().note(level, com.antcolonies.colony.AwayReport.What.PREY_BROUGHT, hidden);
         Colony termites = raid.hiddenFrom() == null ? null : ColonyManager.get(level).getColony(raid.hiddenFrom());
         if (termites != null) {
             termites.danger().hurt(level, raid.find().at(), SavannaEntities.MATABELE_MAJOR.get().toShortString(), true);
@@ -1838,6 +1799,17 @@ public class Raids {
         }
         trails.load(tag);
         away.load(tag);
+    }
+
+    /**
+     * Tests: the raids written down and read back as a reload does it. The raid out is dropped from memory and made
+     * again from what was written, at the colony's next tick ({@link RaidsAway#restore}).
+     */
+    public void reloadForTests() {
+        CompoundTag tag = new CompoundTag();
+        save(tag);
+        column = null;
+        load(tag);
     }
 
     void fillForTests(ServerLevel level) {
