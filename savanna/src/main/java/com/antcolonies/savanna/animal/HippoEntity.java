@@ -88,7 +88,7 @@ import software.bernie.geckolib.util.GeckoLibUtil;
  * side by side ({@link BankRestGoal}); it gets up and back into the water as the day heats up, or when a player comes.</li>
  * <li>Now and then, by day or before going out at night, it wades to a hippo grass mat near its pool and eats it, dunking
  * its head ({@link NibbleGoal}); the mats grow back from their clump.</li>
- * <li>Standing in its pool by day it now and then flicks its dung into the water ({@link #dungInWater}): a brown cloud
+ * <li>In its pool by day, afloat or standing, it now and then flicks its dung into the water ({@link #dungInWater}): a brown cloud
  * behind it that the barbs and tilapia near crowd round and pick at a while (the river food web's step 6, 2026-11-23;
  * real: hippo dung feeds African rivers, and fish gather where hippos are).</li>
  * </ul>
@@ -132,12 +132,13 @@ public class HippoEntity extends PathfinderMob implements GeoEntity, HasLife {
     /** It rests on a bank this near its pool (blocks), lying 1 to 2.5 minutes, then not again for 2 to 4 minutes. */
     static final int BANK_REACH = 12, REST_SHORTEST = 1200, REST_LONGEST = 3000, REST_AGAIN = 2400;
     /**
-     * Its dung in the water (the river food web's step 6, 2026-11-23, my picks): standing in its pool by day, one rest
-     * in this many ends in a dung flick; the tail spreads it from tick {@link #DUNG_SPREAD_FROM} to {@link #DUNG_SPREAD_TO}
+     * Its dung in the water (the river food web's step 6, 2026-11-23, my picks): in its pool by day, afloat or standing
+     * (afloat since the user's "yes, add floating": the flick's tail spins at the waterline, eyes and ears kept out),
+     * one rest in this many ends in a dung flick (about one every 2 to 3 minutes); the tail spreads it from tick {@link #DUNG_SPREAD_FROM} to {@link #DUNG_SPREAD_TO}
      * of the clip (the clip's propeller), this far behind its middle (blocks, at size 1: just past its rump); the cloud
      * hangs in the water this long (ticks), and barbs and tilapia this near it come to pick at it ({@code DungPickGoal}).
      */
-    static final int DUNG_IN_POOL = 2, DUNG_SPREAD_FROM = 4, DUNG_SPREAD_TO = 24, DUNG_CLOUD = 240;
+    static final int DUNG_IN_POOL = 4, DUNG_SPREAD_FROM = 4, DUNG_SPREAD_TO = 24, DUNG_CLOUD = 240;
     static final double DUNG_BEHIND = 2.7, DUNG_FISH_REACH = 8.0;
     /** The dung cloud's colour (a murky olive brown, my pick). */
     static final org.joml.Vector3f DUNG_COLOUR = new org.joml.Vector3f(0.36F, 0.30F, 0.14F);
@@ -1405,6 +1406,8 @@ public class HippoEntity extends PathfinderMob implements GeoEntity, HasLife {
     /** For tests: the bank's cool hours held on or off whatever the clock (null: the clock). */
     @Nullable
     public Boolean heldCool;
+    /** For tests: its next rest in its pool ends in a dung flick, whatever the dice (cleared once it flicks). */
+    public boolean dungNext;
 
     /** Where it was last sent and whether a route was found (for tests' messages). */
     @Nullable
@@ -2017,8 +2020,9 @@ public class HippoEntity extends PathfinderMob implements GeoEntity, HasLife {
                 if (h.pool == null || h.poolGone()) {
                     h.setPool(h.blockPosition());       // its pool dried or filled in: here is its pool now
                 }
-                if (!h.afloat() && h.getRandom().nextInt(DUNG_IN_POOL) == 0) {
-                    h.setDoing(DUNG);                   // standing in its pool: the tail spins its dung into the water
+                if (h.dungNext || h.getRandom().nextInt(DUNG_IN_POOL) == 0) {
+                    h.dungNext = false;
+                    h.setDoing(DUNG);                   // afloat or standing: the tail spins its dung into the water
                 } else if (h.getRandom().nextInt(4) == 0) {
                     h.setDoing(YAWN);
                     h.playSound(SoundEvents.RAVAGER_AMBIENT, 0.6F, 0.6F);
