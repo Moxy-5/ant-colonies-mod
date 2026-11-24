@@ -628,3 +628,4 @@ Every "Current status" bullet CLAUDE.md held up to 2026-11-19, word for word, ol
 - 2026-11-23: the river food web planned (`docs/plans/river-tie-up.md`, "Finishing the food web": landed flies, frog spawn eaten, hippo grass grazers, hiding in reeds, the distichodus); step 1 built: fly clouds land a fly now and then, which barbs sip, young crocodiles snap and bullfrogs tongue.
 - 2026-11-23: the food web's step 2 built: tilapia and crabs nibble bullfrog egg mats; a guarding father lunges at them.
 - 2026-11-23: the food web's step 3 built: tilapia nibble hippo grass mats' outer edge (algae first, never the clump); snails, crabs and tadpoles graze the dying mats.
+- 2026-11-23: the catfish-catches-a-barb test fixed at its cause (the catfish no longer shoots out of the water after fish at the top, and a moment's loss no longer costs it a minute's rest); the longest test left out of full runs.

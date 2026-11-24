@@ -40,6 +40,8 @@ public class HuntTilapiaGoal extends Goal {
     static final double SWALLOW_WITHIN = 1.6;
     /** How long a chase may last before it gives up (ticks), and how long it then waits before hunting again. */
     static final int GIVE_UP_TICKS = 600, REST_AFTER_GIVING_UP = 1200;
+    /** How soon it looks again after losing its prey before the chase ran out (ticks; as with nothing near). */
+    static final int LOST_IT = 200;
     /** How long a meal lasts (ticks; 4 to 8 minutes), and a barb (2 to 4 minutes, my pick). */
     static final int FED_MIN = 4800, FED_MORE = 4800, FED_BARB_MIN = 2400, FED_BARB_MORE = 2400;
     /** How far the school round a strike scatters from (blocks), and how hard. */
@@ -84,7 +86,10 @@ public class HuntTilapiaGoal extends Goal {
     @Override
     public void stop() {
         if (prey != null && fish.hungryIn <= 0) {
-            fish.hungryIn = REST_AFTER_GIVING_UP;     // gave up or lost it: rest a minute
+            // a chase run out (30 s) is given up for a minute; prey lost sooner (it broke the surface a moment, or the
+            // catfish was knocked out of the water) is looked for again in 10 s, as with nothing near (2026-11-23: a
+            // barb at the surface for one tick cost the catfish a whole minute, BUGS 291/292/303)
+            fish.hungryIn = ticks >= GIVE_UP_TICKS ? REST_AFTER_GIVING_UP : LOST_IT;
         }
         prey = null;
         fish.getNavigation().stop();
@@ -119,15 +124,37 @@ public class HuntTilapiaGoal extends Goal {
             return;
         }
         if (ticks % 10 == 1 || fish.getNavigation().isDone()) {
-            fish.getNavigation().moveTo(target, near < DASH_FROM ? DASH_SPEED : STALK_SPEED);
+            Vec3 at = underTheSurface(target);
+            fish.getNavigation().moveTo(at.x, at.y, at.z, near < DASH_FROM ? DASH_SPEED : STALK_SPEED);
         }
+    }
+
+    /**
+     * Where it swims to after the prey: the prey's middle, but never higher than its own height under the water's top
+     * there (2026-11-23: dashing at a barb at the surface carried it out of the water, which ended the hunt; a catfish
+     * strikes up at fish at the top from just under it).
+     */
+    private Vec3 underTheSurface(AbstractSchoolingFish target) {
+        Vec3 at = target.position().add(0, target.getBbHeight() / 2, 0);
+        net.minecraft.core.BlockPos.MutableBlockPos p = net.minecraft.core.BlockPos.containing(at).mutable();
+        if (!fish.level().getFluidState(p).is(net.minecraft.tags.FluidTags.WATER)) {
+            p.move(0, -1, 0);       // the prey just over the top: the water under it
+        }
+        int up = 0;
+        while (up < 8 && fish.level().getFluidState(p.above()).is(net.minecraft.tags.FluidTags.WATER)) {
+            p.move(0, 1, 0);
+            up++;
+        }
+        double highest = p.getY() + 0.85 - fish.getBbHeight();      // the top water block's surface, less its own height
+        return at.y > highest ? new Vec3(at.x, highest, at.z) : at;
     }
 
     private void lunge(AbstractSchoolingFish target) {
         strikeTick = 0;
         fish.strike();
         fish.getNavigation().stop();
-        Vec3 push = target.position().subtract(fish.position()).normalize().scale(LUNGE_PUSH);
+        Vec3 aim = underTheSurface(target);
+        Vec3 push = aim.subtract(fish.position()).normalize().scale(LUNGE_PUSH);
         fish.setDeltaMovement(fish.getDeltaMovement().add(push));
         scatter();
     }
