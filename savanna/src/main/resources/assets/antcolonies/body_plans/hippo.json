@@ -285,6 +285,14 @@
       [
         "out_1000",
         "idle"
+      ],
+      [
+        "float",
+        "dung_flick"
+      ],
+      [
+        "dung_flick",
+        "float"
       ]
     ]
   },
@@ -299,7 +307,8 @@
   },
   "verify": {
     "films": [
-      "tools/film/hippo_moves_frames.film"
+      "tools/film/hippo_moves_frames.film",
+      "tools/film/hippo_dung_frames.film"
     ]
   }
 }
