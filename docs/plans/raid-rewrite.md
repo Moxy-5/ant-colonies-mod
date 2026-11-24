@@ -458,6 +458,44 @@ where they lie); a raid is still not saved through a reload (step 4); raids out 
 copy (step 4); whether termites that are only numbers under the mud give a watched raid too little to sting is for
 step 6's soak to measure.
 
+## Step 3 as built, part c (2026-11-24): the goal and the leave rule
+
+Built while step 4 ran in a linked session on its own branch (the user's ask), so part c kept to files step 4 does
+not need.
+
+- **One rule of when a raid may leave** (`Raids.whyNoRaidNow`). It was judged in two places that had drifted apart:
+  when a scout came home (`Raids.found`, four branches) and every second for a waiting find (three more). A find
+  brought home in the rain waited if it was outside the raid hours and was only remembered inside them; one brought
+  home while a raid was out was only remembered. Now every find a scout brings home waits (`waiting`), and one rule
+  is asked at once and then every second: one raid at a time, never in rain, in the raid hours, and for the colony's
+  own raid only while it is hungry and has not made its day's raids. The find waits while the reason passes by itself
+  (a raid out, rain, the hours, the day's count, land not loaded) and is only remembered once the colony is fed or no
+  raid could be made up. **What changes in play:** a find brought home while a raid is out, or in the rain, now gets
+  its raid when that passes (the judge at the muster still refuses a spot with no termites). `RaidsAway.maySetOut`
+  holds a third copy of the rule; step 4's session is given `Raids.whyNoOwnRaidNow` for it.
+- **The raid's start says every refusal** (`Raids.startRaid`): "nobody fit" was said by one caller only. A waiting
+  find says why it waits once, not every second.
+- **`MatabeleRaidGoal` does one job** (371 lines, was 510): it walks where its raid says. The walk home alone (the
+  hurt, the let go, a scout that gave up) is `MatabeleWayHomeGoal` (176 lines), with the harder search for a way that
+  only such an ant makes (BUGS 121, 140); the old goal had ten branches on "is it going home alone". Shared between
+  them: `Headway` (BUGS 141, walking without getting anywhere) and `RaidGround.hopCell` (where a hop lands).
+- **One rule of antenna cleaning**: a raider waiting at its place used a copy of the idle insects' rule; both now ask
+  `GroomGoal.pick` in the framework.
+- **The raid tells the goal its climbing pace** (`Raid.climbPace`); the goal no longer reads the raid's stage.
+- **Deleted, nothing called them:** `Raids.lastRaid`, `limpForTests`, `wasSent`, `hasWaitingFind`, `isLimping`.
+- **Sizes, honestly:** the two goals and their shared pieces are 588 lines where one goal was 510, and `Raids` is as
+  long as before (1,927): part c separated jobs and removed a doubled rule, it did not make the code shorter.
+- **Not done in part c, moved to step 5:** taking the scouts' bookkeeping (who is out, the old scouts, their ways and
+  reaches, the mound clue, the scout command; about 650 lines) out of `Raids` into a class of its own, which is what
+  leaves `Raids` with only the finds and the raid day. It is a move of code that changes nothing in play, it touches
+  the lines `RaidsAway` and the scout goal call, and step 4 is rewriting `RaidsAway` at the same time: two writers on
+  one set of lines. It goes with step 5, which opens the scout goal anyway (its old judging).
+
+**Tests (4 servers, the step 4 session testing beside it):** `raids,away`: all passed but the mound-as-a-clue scout
+test, "no scout noticed the living mound yet" (BUGS 164's own words; alone 3 of 3). `soldiers`: all passed but
+`matabeleMajorBitesTheMudOpenOverATermite` once beside the others (BUGS 77c; alone 3 of 3). Neither uses what part c
+changed.
+
 ## Rules for the session doing this
 
 - Read `CLAUDE.md` first; ants and termites are strict realism.

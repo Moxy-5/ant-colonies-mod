@@ -550,9 +550,9 @@ public class MatabeleRaidTests {
                     wounded[0].setHealth(wounded[0].getMaxHealth() * 0.3F);
                     helper.assertTrue(wounded[0].badlyWounded() && wounded[0].fightsNoMore(), "a raider at 30 percent health should fight no more");
                 })
-                .thenWaitUntil(() -> helper.assertTrue(raids.isLimping(limper[0].getUUID()),
+                .thenWaitUntil(() -> helper.assertTrue(raids.isGoingHome(limper[0].getUUID()),
                         "the crippled raider was not sent limping home; " + raids.describe(level)))
-                .thenWaitUntil(() -> helper.assertTrue(!wounded[0].isAlive() || raids.isLimping(wounded[0].getUUID())
+                .thenWaitUntil(() -> helper.assertTrue(!wounded[0].isAlive() || raids.isGoingHome(wounded[0].getUUID())
                         || !column[0].members().contains(wounded[0].getUUID()),
                         "the badly wounded raider was not sent home; " + raids.describe(level)))
                 .thenWaitUntil(() -> helper.assertTrue(raids.column() == null, "the raid is not home yet; " + raids.describe(level)))
@@ -563,9 +563,9 @@ public class MatabeleRaidTests {
                     helper.assertTrue(columnOrders[0] >= 1, "at the spot no raider held the raid's own fight order (the nest's defence ended them?)");
                     SavannaMod.LOGGER.info("[empty raid test] home at {}: {}", helper.getTick(), raids.describe(level));
                 })
-                .thenWaitUntil(() -> helper.assertTrue(!limper[0].isAlive() || !raids.isLimping(limper[0].getUUID()),
+                .thenWaitUntil(() -> helper.assertTrue(!limper[0].isAlive() || !raids.isGoingHome(limper[0].getUUID()),
                         "the limper is still on its way home, at " + limper[0].blockPosition().toShortString()))
-                .thenWaitUntil(() -> helper.assertTrue(!wounded[0].isAlive() || !raids.isLimping(wounded[0].getUUID()),
+                .thenWaitUntil(() -> helper.assertTrue(!wounded[0].isAlive() || !raids.isGoingHome(wounded[0].getUUID()),
                         "the wounded raider is still on its way home, at " + wounded[0].blockPosition().toShortString()))
                 .thenExecute(() -> {
                     if (limper[0].isAlive()) {

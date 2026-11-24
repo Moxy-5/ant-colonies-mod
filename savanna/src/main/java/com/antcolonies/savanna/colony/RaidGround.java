@@ -101,6 +101,42 @@ public final class RaidGround {
         return null;
     }
 
+    /** BUGS 121: the heights round the walker's own a hop's landing is looked for at, after the guess (each ±3 more by {@link #standAt}). */
+    private static final int[] OWN_HEIGHTS = {0, 6, -6};
+
+    /**
+     * Where a hop of {@code length} blocks from {@code from} toward {@code to}, turned by {@code turn} radians, lands: a
+     * cell to stand in, or null (none there, or the two at one place). BUGS 121: the height guessed from the way's two
+     * ends missed the ground on a hillside (a scout on a ravine's lip 10 blocks above its nest: every hop's guess lay
+     * inside the hill beside it or in the air over the ravine); the walker's own height, and a little over and under
+     * it, are tried too.
+     */
+    @Nullable
+    public static BlockPos hopCell(ServerLevel level, BlockPos from, BlockPos to, double length, double turn) {
+        double dx = to.getX() - from.getX();
+        double dz = to.getZ() - from.getZ();
+        double distance = Math.sqrt(dx * dx + dz * dz);
+        if (distance < 1.0E-3) {
+            return null;
+        }
+        double share = Math.min(1.0, length / distance);
+        double cos = Math.cos(turn);
+        double sin = Math.sin(turn);
+        double x = from.getX() + 0.5 + (dx * cos - dz * sin) * share;
+        double z = from.getZ() + 0.5 + (dx * sin + dz * cos) * share;
+        int y = Mth.floor(Mth.lerp(share, from.getY(), to.getY()));
+        BlockPos hop = standAt(level, x, z, y);
+        for (int dy : OWN_HEIGHTS) {
+            if (hop != null) {
+                break;
+            }
+            if (from.getY() + dy != y) {
+                hop = standAt(level, x, z, from.getY() + dy);
+            }
+        }
+        return hop;
+    }
+
     /** The raid diary's clock at the nest, "hh:mm" on the colony's own day (6:00 at day tick 0); "?" with no level yet. */
     public static String clock(Colony colony, @Nullable ServerLevel level) {
         if (level == null) {
