@@ -8,7 +8,7 @@ feature at a time, by many sessions; nobody has read all of it in one go. This i
 plays: the colonies, the insects, the trees, the world, the animals. **Not read:** the model and animation making
 (`tools/`, the Animal Maker Engine, the workshop, the viewers, the model, texture and clip files), the filming code
 (the film director, the guard films), and the tests and test kit as a subject of their own. Tests are still looked at
-from the game's side: each round asks whether what the player sees is guarded by a test (question 7).
+from the game's side: each round asks whether what the player sees is guarded by a test (4d below).
 
 **What it is for (the user's aims, `apex-aims`):** fewer bugs in play, no lag, and code that is quick to build the next
 feature on. Smaller code is never the goal by itself.
@@ -46,24 +46,74 @@ of Java.
 
 Rounds 5 and 9 are big enough to split in two sessions each if a session runs short.
 
-## What every round looks for (the same eight questions)
+## What every round looks for (the user's order, 2026-11-23: lag first, then behaviours that fight, then bugs)
 
-1. **Bugs a player can meet.** Wrong behaviour, crashes, things lost on save and reload, land unloading under an
-   insect, the 20-minute day, a second player, a dedicated server (client-only code reached from the server).
-2. **Lag.** Work done every tick that could be done less often, scans of the world, lists rebuilt in hot loops, too
-   many real mobs. Measured where it matters (the perf scenes; the target is about 0.02 ms per insect), not guessed.
-3. **Rules fighting each other.** Two places judging the same thing, tuning numbers pulling against each other, on/off
-   flags, a fix whose only job is to hide another fix (the raid march's lesson, 2026-11-08).
-4. **The mod's own building rules.** Mind, legs and body kept apart; the framework never naming a species; the season
-   from one place; colony dice from `Colony.random()`; a species reaching the brain only through its parts.
-5. **Real biology, for ants and termites only.** Numbers marked "my pick" that the papers can settle; behaviour that
-   drifted from `docs/DESIGN.md`. And **balance**: distances, rates and sizes checked against each other in play.
-   Animals are not checked for realism (fun first), only that their food chains cannot crash or lag.
-6. **Dead and misleading code.** Code nothing calls, leftovers of removed features, comments that no longer say what
-   the code does, notes (`DESIGN.md`, `HISTORY.md`) that disagree with the code.
-7. **Test gaps.** Behaviour the player sees with no test; tests that would still pass if the feature broke.
-8. **Parts grown past patching.** Named plainly for the user as a candidate for a rewrite, like the raids. The review
-   never rewrites one itself.
+### 1. Lag (high tick times)
+
+Minecraft has 50 ms for each tick. **Targets (my picks):** in a worst-case scene (a grown mound, a Matabele colony
+raiding it, a full river beside them) the mod's whole share stays under about 15 ms a tick; any single tick the mod
+pushes past 50 ms is an A finding; an insect costs about 0.02 ms (the old measured target).
+
+- **a. Work done every tick that need not be:** each goal's "may I start" check (Minecraft asks it for every mob,
+  again and again), colony parts, searches for blocks or mobs round each insect or animal, routes planned over and over.
+- **b. Work that grows with the square of the count:** each insect looking at every other one.
+- **c. Reading land that is not loaded.** It makes Minecraft load or build that land on the spot, the worst spikes there
+  are. Also far colonies doing real work when they should be numbers.
+- **d. Counts that can run away:** animals breeding, eggs, flies, remains, dropped items, insects that never fold back
+  into the numbers, anything that is never cleared away.
+- **e. Many blocks changed at once:** mound building, trees growing and falling, mud, grass; the light and neighbour
+  updates each change sets off; blocks that tick by themselves.
+- **f. Saving and memory:** big colony, trail, danger and tree records written too often; lists and records that only
+  ever grow.
+- **g. What is sent to players:** values sent every tick, particles, sounds.
+- **h. Drawing (frames, not ticks):** work done every frame in the renderers, box counts, many insects on screen.
+- **i. Making new land:** slow features, and features that reach into the neighbouring chunks (they can chain).
+- **j. Small things that add up:** throwaway objects made in busy loops (stutter), log lines written every tick, test
+  and debug watchers left running in normal play.
+
+**Measured, never guessed:** each round uses or builds a worst-case scene for its system and reports the cost part by
+part, with Minecraft's own tick readout and profiler and the mod's perf scenes. A finding of kind 1 names its number.
+
+### 2. Behaviours that fight each other
+
+- **a. Goals flip-flopping:** two goals taking an insect or animal in turn, or one that starts and stops every tick.
+- **b. Two things steering one body:** a goal, the navigator, Minecraft's own walking, a block move.
+- **c. Two places judging the same thing** (the raids' lesson), and the colony's orders against a goal's own idea.
+- **d. Near and away disagreeing:** the same colony or animal coming out differently watched and unwatched; insects
+  doubled or lost when they fold into the numbers and back.
+- **e. Tuning numbers pulling against each other,** on/off flags, a timeout that covers another timeout.
+- **f. Features meeting each other:** trees falling on mounds, rivers and mud through nests, animals among the insects,
+  spawning groups filling each other's room.
+- **g. Minecraft's own rules meeting ours:** fire, water, pistons, explosions, lightning, peaceful mode, sleeping
+  through the night and other jumps in time, `/tick rate`, the game rules (mob griefing, mob spawning), Minecraft's
+  own mobs and their spawning room.
+- **h. Other mods:** TerraBlender and biome mods such as Biomes O' Plenty; anything that would break beside them.
+
+### 3. Bugs
+
+- **a. Crashes:** an empty or one-item list (the raid start crash), a list changed while it is being walked, world
+  making touching the live world from another thread, drawing code reached on a dedicated server.
+- **b. Save and reload:** anything lost, doubled or started over; land unloading under an insect mid-task; a record
+  pointing at a mob that is gone.
+- **c. Leftovers between worlds:** things remembered from the last world when another is opened in the same sitting.
+- **d. More than one player:** code that assumes "the player", and what a second player sees.
+- **e. What the player meets:** drops, names, items that can be duplicated, test commands anyone on a server can use,
+  the player's own builds damaged by termites, trees or mounds.
+- **f. Data files:** a missing or wrong number in a species or animal file crashing the game, or quietly using a
+  default nobody chose.
+
+### 4. The rest
+
+- **a. The mod's own building rules:** mind, legs and body kept apart; the framework never naming a species; the
+  season from one place; colony dice from `Colony.random()`; a species reaching the brain only through its parts.
+- **b. Real biology, ants and termites only:** "my pick" numbers the papers can settle, drift from `docs/DESIGN.md`;
+  and balance, each distance, rate and size against the others it meets in play. Animals: only that their food chains
+  cannot crash or lag.
+- **c. Dead and misleading code:** code nothing calls, leftovers of removed features, comments and notes that disagree
+  with the code.
+- **d. Test gaps:** behaviour the player sees with no test; tests that would still pass if the feature broke.
+- **e. Parts grown past patching,** named plainly as candidates for a rewrite. The review never rewrites one itself.
+- **f. What is solid.** Each round also lists the parts it found sound, so no later session "fixes" what works.
 
 ## How a round runs
 
@@ -74,7 +124,8 @@ Rounds 5 and 9 are big enough to split in two sessions each if a session runs sh
    a walked path), **likely**, or dropped. No guess is written as a fact.
 3. **Write the findings** in `docs/reviews/full/<round>.md`, each with: what is wrong in plain words, what the player
    would see, where (file and line), the proof, and the fix proposed. Each is rated:
-   - **A**: the player can meet it (bug, crash, lag, lost on reload). Gets a number in `docs/BUGS.md`.
+   - **A**: the player can meet it (a lag spike, a crash, something lost on reload, behaviours visibly fighting).
+     Gets a number in `docs/BUGS.md`.
    - **B**: it will cost us when building on this (fighting rules, broken layering, a test gap on something risky).
    - **C**: tidy-ups (dead code, wrong comments, names).
 4. **No code changes in a reading round.** So reading rounds can run several at once with no clashes.
