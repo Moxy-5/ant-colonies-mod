@@ -233,3 +233,157 @@ multiplayer.
 (`FrogEggsBlock.java:119-124`), and the world's own tadpole schools (6 to 10 a school) fill that cap; a tadpole becomes
 a froglet only while the frog group is under its 4 (`TadpoleEntity.java:205-206`), which the world's own frogs fill.
 The frog's whole life cycle is the clearest case of R10-1.
+
+## Piece 4: crab and snail (and one finding that also covers the catfish)
+
+Files read: `CrabEntity`, `CrabPickGoal`, `CrabThreatGoal`, the crab's avoid goals, `CrabShellBlock`, `SnailEntity`,
+`SnailGrazeGoal`, `SnailHideGoal`, `SnailLayGoal`, `SnailEggsBlock`, `ScrapsBlock`, `GoExactly`, `crab.json`,
+`snail.json`, `catfish.json`, and their tests in `AnimalLifeTests` and `RiverLifeTests`.
+
+### R10-12 (A, proven): crabs, snails and catfish never grow up and breed only once in their lives
+
+**What is wrong.** Every animal with a life keeps two clocks in the life kit: its age (how grown it is) and its rest
+before the next breeding. Both clocks move only when the animal's own code calls the kit's `tick()` once a game tick.
+The tilapia, the bullfrog, the crocodile and the otter do. **The crab, the snail and the catfish never do.**
+
+**What the player would see.**
+- A baby crab stays a 0.15-size baby for ever, a baby snail a quarter-size baby for ever, a young catfish a
+  0.2-size youngster for ever. The young catfish also never starts to hunt and never leaves its 6-block hiding patch
+  (`CatfishEntity.java:474-479` frees it only once it is no longer young).
+- Each grown crab, snail or catfish breeds once. After that its rest clock is set (2 or more days, `AnimalLife.bred`,
+  `:244-245`) and never counts down, so it is never ready again.
+- The babies that never grow still count in the local limit (12 crabs, 10 snails, 6 catfish within 48 blocks) and in
+  their group's cap, so a stretch of river slowly fills with babies that can never breed, and the world's spawner is
+  kept from adding grown ones there (see R10-1). Bred animals are not kept for good, so they fade when the player
+  walks away; near a base the player stays at, they pile up to the limit and stop there. No runaway, but a dead end.
+
+**Where.** `AnimalLife.tick()` (`framework/.../animal/AnimalLife.java:116-130`) is called only at
+`TilapiaEntity.java:495`, `BullfrogEntity.java:443`, `CrocodileEntity.java:838` and `OtterEntity.java:737`. There is no
+call in `CrabEntity`, `SnailEntity` or `CatfishEntity`, and no shared place that ticks every animal's life (searched
+both mods for `life.tick()`, `life().tick()` and any entity tick event).
+
+**The proof.** The search above; `CatfishEntity.tick()` and the crab's and the snail's `tick()`/`aiStep()` read whole.
+No game test would have caught it: the tests check that babies are born at the right size
+(`AnimalLifeTests.java:372, 453`) and stop there; none waits for a baby to grow or for a parent to breed a second time.
+(The hippo and the monitor also never call it, but neither breeds nor has young yet: round 9's to note.)
+
+**Proposed fix.** One line in the server part of each of the three `tick()` methods (`life.tick()`; re-set the size
+when it returns true, as the tilapia does at `:495-497`). Better, and fewer rules: let the kit tick every `HasLife`
+animal from one place, so a new animal cannot forget it. Add one test per kind: a baby set to one tick before grown
+becomes grown, and a parent's rest runs out. **Mind what this switches on:** today breeding of these three kinds is
+mostly asleep, so R10-1 (spawner against breeding), R10-4 (catfish eggs eaten) and R10-16 below are hidden. Fix this
+one first, then judge those in play.
+
+### R10-13 (A, logic proven; how often to measure): a crab's meal does not count when the food ends at the first bite
+
+**What is wrong.** A crab picking at food bites at set moments. If the food is gone at the first bite (an algae mat
+one layer thin, a snail-egg clutch, scraps on their last piece), the meal is marked "not fed"
+(`CrabPickGoal.java:155-160`: `fed = picking > BITE_TICKS[0]`, false at the first bite), and a crab that was not fed
+is hungry again in 5 to 15 seconds (`:110-112`) instead of the minutes a fed crab waits.
+
+**What the player would see.** A crab on thin algae strips mat after mat with hardly a pause, or eats snail eggs and
+then a snail one after another: one crab can clear a patch of bed far faster than meant, the snails with it. Scene to
+measure: 3 crabs, 12 one-layer mats and 6 snails for a game day; count what is left.
+
+**Proposed fix.** A bite that ate something counts as fed, whatever number bite it was (`fed = true` when `bite()`
+succeeded once, or when the first bite removed the last of the food). One rule fewer, not one more.
+
+### R10-14 (B, proven): the crab's 20-second limit on threatening does nothing
+
+`CrabThreatGoal.java:52` stops the threat display after `MOST` (400 ticks, 20 s), but `canUse` (`:37-48`) starts it
+again at the next check whenever a survival player still stands within reach. The player sees a crab that holds its
+claws up at them for as long as they stand there, and never eats or moves on. Fun for a minute; wrong beside a base.
+Fix: after a full threat, the crab does not threaten the same player again for a while (it sidles off instead, which
+its avoid goal already does).
+
+### R10-15 (B, likely; to measure): asking for a new path every tick to a spot that cannot be reached
+
+`SeekMateGoal.java:85-94` (all breeding animals) and `SnailLayGoal.java:96-103` (through `GoExactly`) ask the path
+finder for a route again on every goal tick while the animal is not there yet. When the mate or the laying spot
+cannot be reached (a mate behind a ledge, a waterline spot with no way up), every try is a full failed search, the
+dearest kind, for the whole give-up time. Scene to measure: 10 snail pairs with a wall between each pair, 1 minute,
+time per tick against the same snails idle. Fix: ask again only every 10 to 20 ticks, or when the target has moved a
+block (vanilla's own follow goals do this), and give up early after two failed plans.
+
+### R10-16 (B, likely): snail eggs within a crab's reach never hatch
+
+A crab looks for eggs first, before algae or scraps (`CrabPickGoal.java:290-301`), within its whole search box and one
+block up or down. Snail clutches sit at the waterline for 2 days. Any clutch on a bed with a crab near is eaten well
+inside that time, and with R10-13 the crab is hungry again at once. Crabs and snails share most zones
+(`RiverZones.java:73-74`), so where both live the snails can only be replaced by the world's spawner, never by their
+own eggs. Not a crash of the chain (the spawner refills), but snail breeding is for show there. The user's call:
+leave it (fun first, the spawner covers it), or make eggs one food among the others (not first) and only when the
+crab stands within 2 or 3 blocks.
+
+### R10-17 (C/B, likely): the snail's crawl and rest clips flicker (BUGS 250's likely cause)
+
+`SnailEntity.java:296-302` picks crawl or rest from how far the snail moved since the last tick, with a cut-off of
+0.002 blocks. A snail's walk is so slow (speed 0.05, with stops and turns on the way) that its step falls under the
+cut-off between strides, so the clip can swap many times a second. Fix: decide from "does it have a path it is
+walking" (sent with the state it already syncs) rather than from the measured step, or keep crawl on for half a
+second after the last movement.
+
+### R10-18 (B/C, to measure): small searches that run more often than they need
+
+- The crab has three avoid goals, each looking round for its own animal on every check (every other tick). One look
+  for "anything I fear", shared, is cheaper and one rule.
+- `SnailHideGoal.scared()` (`:86-87`) asks the world for every entity in a box round the snail, then filters; asked
+  every other tick by every snail. Use the by-class search with the smaller box first, and check every 5 to 10 ticks
+  (a snail pulling in half a second late looks the same).
+- A mother crab asks `RoomToBreed.here` (a 48-block count of crabs) once a second for the whole 2 days before her
+  eggs are old enough to hatch (`CrabEntity.java:207-213`); the answer is only needed once the eggs are due.
+  Compute the room only when the clock says hatching time.
+Scene to measure all three: 24 crabs and snails (the group's cap) round one player, against an empty river.
+
+### R10-19 (C): crab and snail small things
+
+- A crab whose food cannot be reached gives up, then picks the same food again after its short wait: no memory of
+  "could not get there".
+- A female crab gets her eggs when the male's courtship ends even if she never took part (she was only marked).
+- Baby crabs riding their mother still run their own goals (they look for food while carried).
+- A snail being cracked by a crab when the chunk unloads is left whole but still marked as held: check on load.
+- The mob-griefing game rule is never asked by any animal that eats or changes blocks (kit-wide; say so in the
+  notes, or ask it once in one shared place).
+- A `snail_eggs` block from the creative menu never hatches (no clock set). Creative only.
+- Comments that disagree with the code: `CrabEntity.java:130-131, 204-205`; `SnailLayGoal`'s class comment;
+  `snail.json` says the snails touch heads 8 seconds, but 160 goal ticks is 16 seconds (goal ticks run every other
+  game tick; the catfish file says so rightly). A few unused imports.
+- A flaky test's "snails stuck: laying true" may be the test's snails fading mid-test (test animals are not kept and
+  the test has no player); unsure, to check when it next fails.
+- Good, to copy: the mother crab keeps trying to hatch for the kit's 10 days (`eggsTick` with `ClutchClock`); the
+  tilapia throws her eggs away on one failed check (R10-1).
+
+## Second pass: what stands
+
+| Rating | Findings |
+|---|---|
+| A | R10-1 (breeding against the spawner; size to measure), R10-8 (frog left floating), R10-9 (tadpole age sent every tick; cost to measure), R10-12 (crab, snail, catfish never grow), R10-13 (crab's uncounted meal; size to measure) |
+| B | R10-2, R10-4, R10-5, R10-10, R10-14, R10-15 (to measure), R10-16, R10-18 (to measure) |
+| C | R10-3, R10-6, R10-7 (to measure, round 8's), R10-11, R10-17, R10-19 |
+
+Nothing dropped; the ones marked "likely" (R10-4, R10-15, R10-16, R10-17) are read from the code and not seen
+happening. Order to fix: R10-12 first (it wakes breeding up), then R10-8 and R10-9, then measure R10-1, R10-4 and
+R10-16 in play with breeding really running, since those three are one question: should the world's spawner or the
+animals' own young fill the river. The A findings still need numbers in `docs/BUGS.md` (`python tools/bug_number.py`);
+left to the fix session, as this round writes only this file.
+
+## Parts found solid
+
+- **No count can run away.** Every birth is capped twice: the local limit and the group's cap before laying, and
+  again at hatching (`EggClutchBlock.hatch`, `CrabEntity.letOutBabies`, the tilapia's mouthful). Eggs become empty
+  shells after 10 days; remains rot (a day fresh, a day rotten); scraps, shells, clutches and nest pits all fade.
+- **No forced loading of land.** Every block search stays within 8 to 13 blocks of the animal or checks that the
+  place is loaded first.
+- **Looking for food is throttled.** Tilapia, catfish, crab and snail look every 200 to 300 ticks and wait longer
+  after finding nothing; the mate search runs every 40 ticks, spread over the animals so they do not all look in the
+  same tick.
+- **Fly clouds** cost next to nothing (no path, no search) and cannot be eaten out for good.
+- **Algae cannot be stripped for good:** a mat's last layer grows back, and grazers leave the bed block.
+- **Nobody starves to death;** hunger only changes what an animal does, so no food shortage can empty the river.
+- **Clocks run on the world's game time,** so sleeping and `/time set` do not break eggs or rests.
+- **Saving:** hunger, eggs carried, young in the mouth, the frog's guard spot and dug-in state all come back after a
+  reload; a mouth-brooding tilapia that dies lets its young out.
+- **Spectators** are handled the same way in every place I checked (not feared, not counted as near).
+- **The spawning check list is followed:** each kind has its group, the quiet-savanna gate, the zone shares, and a
+  test through the world's own checks.
+- **No leftovers between worlds,** except the test-only rain switch (R10-6); the life files reload with each world.
