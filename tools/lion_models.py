@@ -63,16 +63,34 @@ LOOKS = {
         "belly_fringe": True, "elbow_tufts": True, "elbow_len": 2.6, "head_breadth": 1.04,
     },
     "lioness": {
-        "title": "African Lioness (Pride Hunter)",
+        "title": "African Lioness (Serengeti Tawny Hunter)",
         "short": "Lioness",
         "kind": "lioness",
         "palette": "lioness_tawny",
     },
+    "lioness_kalahari": {
+        "title": "African Lioness (Kalahari Pale Sand)",
+        "short": "Kalahari Lioness",
+        "kind": "lioness",
+        "palette": "lioness_kalahari",
+    },
+    "lioness_elder": {
+        "title": "African Lioness (Prime Matriarch)",
+        "short": "Elder Lioness",
+        "kind": "lioness",
+        "palette": "lioness_elder",
+    },
     "cub": {
-        "title": "African Lion Cub (Spotted Young)",
-        "short": "Lion Cub",
+        "title": "African Lion Cub (Spotted Young, 2–5 mo)",
+        "short": "Spotted Cub",
         "kind": "cub",
         "palette": "cub_spotted",
+    },
+    "cub_subadult": {
+        "title": "African Lion Cub (Fading Juvenile, 6–12 mo)",
+        "short": "Juvenile Cub",
+        "kind": "cub",
+        "palette": "cub_subadult",
     },
 }
 
@@ -151,6 +169,135 @@ def aligned_seg(cubes, p0, p1, t0, t1, w, d, part, z_off=0.0, x_off=0.0, **extra
     ))
 
 
+# Locked V02 · Splaying Hunter feline crescent toe layout (middle toes jut forward ahead of outer toes!)
+SPLAY_TOES = (
+    (-0.74, 0.64, 0.42, 0.60, 0.96,  8.0),
+    (-0.26, 0.78, 0.46, 0.68, 1.02,  2.5),
+    ( 0.26, 0.78, 0.46, 0.68, 1.02, -2.5),
+    ( 0.74, 0.64, 0.42, 0.60, 0.96, -8.0),
+)
+
+
+def splaying_hunter_paw(tag, parent_bone, wr_piv, cx, ground_y, cz, width, length, height, lean_cub=False):
+    """Builds the locked V02 · Splaying Hunter articulated big-cat paw:
+      - Broad plush rounded metacarpal/metatarsal cushion + 3-lobe clover palm pad on `leg_{tag}_paw`
+      - 4 independent articulated toe bones `toe_{tag}_0..3` (furry rounded toe dome + teardrop toe bean)
+      - 4 independent curved 2-segment laterally-compressed bone-ivory sickle claws `claw_{tag}_0..3`
+        tucked 100% vertically inside each furry toe dome at bind pose (rx=0 -> 0.00 px poke-through!).
+    """
+    hw = width * 0.5
+    sc_p = width / 5.30
+    pad_h = max(0.28, 0.42 * sc_p)
+    paw_cubes = []
+
+    # 1. Plush wrist-to-metacarpal cushion & rounded flanks (lower edges cleared above pad_h so minY=0.00 strictly on pads!)
+    paw_cubes.append(cube([cx - hw * 0.78, ground_y + pad_h * 0.95, cz - length * 0.12],
+                          [cx + hw * 0.78, ground_y + height * 1.04, cz + length * 0.44], "paw_fur"))
+    paw_cubes.append(rot_cube(
+        [cx - hw * 0.90, ground_y + pad_h * 1.25, cz - length * 0.48],
+        [cx + hw * 0.90, ground_y + height * 0.92, cz + length * 0.18],
+        "paw_fur", rotation=[14.0, 0.0, 0.0], pivot=[cx, ground_y + height * 0.48, cz - length * 0.12],
+    ))
+    paw_cubes.append(rot_cube(
+        [cx - hw * 0.88, ground_y + pad_h * 1.35, cz - length * 0.56],
+        [cx + hw * 0.88, ground_y + height * 0.76, cz - length * 0.14],
+        "paw_fur", rotation=[20.0, 0.0, 0.0], pivot=[cx, ground_y + height * 0.45, cz - length * 0.32],
+    ))
+    for s in (-1, 1):
+        x0, x1 = sorted([cx + s * hw * 0.56, cx + s * hw * 0.96])
+        paw_cubes.append(rot_cube(
+            [x0, ground_y + pad_h * 1.35, cz - length * 0.40],
+            [x1, ground_y + height * 0.76, cz + length * 0.24],
+            "paw_fur", rotation=[6.0, s * -7.0, s * -8.0],
+        ))
+
+    # 2. Realistic 3-lobed clover metacarpal palm pad (flush on ground_y)
+    z_sh = 0.04 * length
+    paw_cubes.append(cube([cx - hw * 0.42, ground_y, cz - length * 0.28 + z_sh],
+                          [cx + hw * 0.42, ground_y + pad_h + 0.05, cz + length * 0.12 + z_sh], "paw_pad_clover"))
+    if not lean_cub:
+        paw_cubes.append(cube([cx - hw * 0.26, ground_y, cz + z_sh],
+                              [cx + hw * 0.26, ground_y + pad_h + 0.04, cz + length * 0.26 + z_sh], "paw_pad_clover"))
+    for s in (-1, 1):
+        x0, x1 = sorted([cx + s * hw * 0.14, cx + s * hw * 0.66])
+        paw_cubes.append(rot_cube(
+            [x0, ground_y, cz - length * 0.12 + z_sh],
+            [x1, ground_y + pad_h + 0.04, cz + length * 0.22 + z_sh],
+            "paw_pad_clover", rotation=[0.0, s * -11.0, 0.0],
+        ))
+
+    # 3. Four independent splaying toes + 2-segment curved bone-ivory sickle claws!
+    extra_bones = []
+    for i, (x_frac, z_reach, len_frac, h_scale, w_scale, fan_yaw) in enumerate(SPLAY_TOES):
+        tx = cx + x_frac * hw
+        t_len = length * len_frac
+        t_front = cz - length * z_reach
+        t_back = t_front + t_len
+        t_hw = (width / 4.0) * 0.47 * w_scale
+        t_h = height * h_scale
+        knuckle_piv = [tx, ground_y + t_h * 0.52, t_back - 0.35 * sc_p]
+
+        tcubes = []
+        if lean_cub:
+            tcubes.append(rot_cube(
+                [tx - t_hw, ground_y + pad_h * 1.25, t_front - 0.04 * sc_p],
+                [tx + t_hw, ground_y + t_h * 0.98, t_back],
+                "toe_fur", rotation=[12.0, fan_yaw, 0.0], pivot=knuckle_piv,
+            ))
+        else:
+            tcubes.append(rot_cube(
+                [tx - t_hw, ground_y + pad_h * 1.12, t_front + 0.10 * sc_p],
+                [tx + t_hw, ground_y + t_h * 0.90, t_back],
+                "toe_fur", rotation=[8.0, fan_yaw, 0.0], pivot=knuckle_piv,
+            ))
+            tcubes.append(rot_cube(
+                [tx - t_hw * 0.90, ground_y + pad_h * 1.48, t_front - 0.10 * sc_p],
+                [tx + t_hw * 0.90, ground_y + t_h * 1.02, t_front + t_len * 0.64],
+                "toe_fur", rotation=[22.0, fan_yaw, 0.0],
+                pivot=[tx, ground_y + t_h * 0.58, t_front + t_len * 0.30],
+            ))
+        bean_w = t_hw * 0.78
+        bean_h = pad_h * 1.12
+        tcubes.append(rot_cube(
+            [tx - bean_w, ground_y, t_front + 0.22 * sc_p],
+            [tx + bean_w, ground_y + bean_h, t_back - 0.26 * sc_p],
+            "paw_pad_bean", rotation=[0.0, fan_yaw, 0.0],
+            pivot=[tx, ground_y + bean_h * 0.5, (t_front + t_back) * 0.5],
+        ))
+
+        cpiv = [tx, ground_y + pad_h + (0.14 if lean_cub else 0.18) * sc_p, t_front + (1.28 if lean_cub else 0.92) * sc_p]
+        max_safe_len = max(0.38 * sc_p, (t_h - (pad_h + 0.18 * sc_p) - (0.48 if lean_cub else 0.34) * sc_p) * (0.70 if lean_cub else 0.84))
+        c_len = min(1.08 * sc_p * (1.04 if i in (1, 2) else 0.90), max_safe_len)
+        cw = 0.44 * sc_p
+        bw, bd = cw * 0.44, cw * 0.82
+        l1, l2 = c_len * 0.58, c_len * 0.62
+        base_p, curve_d = 4.0, 36.0
+        a1 = math.radians(base_p)
+        my = cpiv[1] + l1 * math.cos(a1) * 0.84
+        mz = cpiv[2] - l1 * math.sin(a1) * 0.84
+        ccubes = [
+            rot_cube(
+                [tx - bw, cpiv[1] - 0.08 * sc_p, cpiv[2] - bd * 0.92],
+                [tx + bw, cpiv[1] + l1, cpiv[2] + bd * 0.86],
+                "claw_ivory", rotation=[base_p, fan_yaw, 0.0], pivot=cpiv, _claw_t=0.20,
+            ),
+            rot_cube(
+                [tx - bw * 0.52, my - 0.05 * sc_p, mz - bd * 0.48],
+                [tx + bw * 0.52, my + l2, mz + bd * 0.32],
+                "claw_ivory", rotation=[base_p + curve_d, fan_yaw, 0.0], pivot=[tx, my, mz], _claw_t=0.92,
+            ),
+        ]
+        tname = f"toe_{tag}_{i}"
+        cname = f"claw_{tag}_{i}"
+        extra_bones.append({"name": tname, "parent": f"leg_{tag}_paw", "pivot": knuckle_piv, "cubes": tcubes})
+        extra_bones.append({"name": cname, "parent": tname, "pivot": cpiv, "cubes": ccubes})
+
+    return [
+        {"name": f"leg_{tag}_paw", "parent": parent_bone, "pivot": wr_piv, "cubes": paw_cubes},
+        *extra_bones,
+    ]
+
+
 def mane_lock(cubes, cx, yt, yb, oxf, oxb, w, part, layer, lock_id, ring_id=0,
               pitch_deg=0.0, yaw_deg=0.0, roll_deg=0.0, piv_y=None):
     if yt - yb < 0.5 or oxf - oxb < 0.35:
@@ -166,10 +313,10 @@ def mane_lock(cubes, cx, yt, yb, oxf, oxb, w, part, layer, lock_id, ring_id=0,
 # ====================================================================================================
 def build_stalker_king_head(hb):
     head_cubes, jaw_cubes, tongue_cubes, tongue_tip_cubes = [], [], [], []
-    ear_l, ear_r, lid_l, lid_r, pup_l, pup_r = [], [], [], [], [], []
+    ear_l, ear_r, brow_l, brow_r, lid_l, lid_r, ulid_l, ulid_r, pup_l, pup_r, nose_cubes = [], [], [], [], [], [], [], [], [], [], []
     cheek_clear = 3.82 * hb
     ear_piv_x, ear_piv_y, ear_piv_ox = 4.15 * hb, 27.9, 64.6
-    eye_piv_x, eye_piv_y, eye_piv_ox = 2.40 * hb, 25.8, 69.95
+    eye_piv_x, eye_piv_y, eye_piv_ox = 2.40 * hb, 25.84, 70.20
     jaw_piv = [0.0, 21.58, oz(66.3)]
 
     sym(head_cubes, 3.82 * hb, 21.8, 27.4, 62.7, 69.0, "head")
@@ -178,13 +325,17 @@ def build_stalker_king_head(hb):
     for s in (-1, 1):
         box(head_cubes, s * 2.12 * hb, s * 4.32 * hb, 23.9, 26.6, 64.2, 68.8, "head_cheek", rotation=[0, s * -14, s * -7])
         box(head_cubes, s * 1.62 * hb, s * 3.40 * hb, 21.4, 24.1, 64.9, 69.3, "head_cheek", rotation=[0, s * -16, 0])
-        box(head_cubes, s * 1.02 * hb, s * 3.96 * hb, 26.58, 27.60, 67.3, 70.35, "brow", rotation=[5, s * -14, s * -11])
+        box(brow_l if s > 0 else brow_r, s * 1.02 * hb, s * 3.96 * hb, 26.58, 27.60, 67.3, 70.35, "brow", rotation=[5, s * -14, s * -11])
         box(head_cubes, s * 1.32 * hb, s * 3.52 * hb, 25.06, 26.60, 68.25, 70.05, "eye_socket", rotation=[2, s * -14, s * -9])
         box(head_cubes, s * 1.44 * hb, s * 3.38 * hb, 25.20, 26.48, 69.04, 70.24, "eye_piercing", rotation=[2, s * -14, s * -9])
         exm = s * 2.40 * hb
-        box(pup_l if s > 0 else pup_r, exm - 0.30, exm + 0.30, 25.43, 26.25, 70.15, 70.33, "pupil", rotation=[2, s * -14, s * -9])
-        box(lid_l if s > 0 else lid_r, s * 1.40 * hb, s * 3.42 * hb, 26.50, 27.34, 69.00, 70.28, "lid", rotation=[2, s * -14, s * -9])
-        box(head_cubes, s * 1.40 * hb, s * 3.44 * hb, 24.40, 25.18, 68.45, 70.10, "under_eye", rotation=[4, s * -14, s * -6])
+        box(pup_l if s > 0 else pup_r, exm - 0.30, exm + 0.30, 25.43, 26.25, 70.10, 70.30, "pupil", rotation=[2, s * -14, s * -9])
+        # Flush dual eyelids (zero floating wiper plate!): upper lid tucks neatly behind brow (70.31 < brow 70.35) with dark lash rim,
+        # lower lid (under_eye) rises up 35% to meet it seamlessly in the middle of the eye!
+        lc = lid_l if s > 0 else lid_r
+        box(lc, s * 1.40 * hb, s * 3.42 * hb, 26.48, 27.26, 69.04, 70.31, "lid", rotation=[2, s * -14, s * -9])
+        box(lc, s * 1.40 * hb, s * 3.42 * hb, 26.40, 26.52, 69.06, 70.32, "eye_lash", rotation=[2, s * -14, s * -9])
+        box(ulid_l if s > 0 else ulid_r, s * 1.40 * hb, s * 3.44 * hb, 24.40, 25.20, 68.45, 70.31, "under_eye", rotation=[4, s * -14, s * -6])
         box(head_cubes, s * 1.24 * hb, s * 1.66 * hb, 23.92, 25.78, 69.4, 70.55, "tear_line", rotation=[16, s * -7, 0])
         ec = ear_l if s > 0 else ear_r
         ex, ey, er = s * 4.16 * hb, 27.9, [5, s * -8, s * -8]
@@ -196,9 +347,9 @@ def build_stalker_king_head(hb):
     for s in (-1, 1):
         box(head_cubes, s * 1.20 * hb, s * 2.74 * hb, 22.30, 25.40, 67.9, 73.50, "muzzle", rotation=[6, s * -14, 0])
     sym(head_cubes, 2.34 * hb, 22.10, 25.45, 67.9, 73.40, "muzzle")
-    sym(head_cubes, 1.74 * hb, 23.60, 24.32, 73.25, 74.30, "nose")
-    sym(head_cubes, 1.18 * hb, 23.16, 23.68, 73.30, 74.24, "nose")
-    sym(head_cubes, 0.62 * hb, 22.82, 23.24, 73.35, 74.20, "nose")
+    sym(nose_cubes, 1.74 * hb, 23.60, 24.32, 73.25, 74.30, "nose")
+    sym(nose_cubes, 1.18 * hb, 23.16, 23.68, 73.30, 74.24, "nose")
+    sym(nose_cubes, 0.62 * hb, 22.82, 23.24, 73.35, 74.20, "nose")
     sym(head_cubes, 0.22, 21.58, 22.88, 73.25, 74.06, "lip_cleft")
     for s in (-1, 1):
         box(head_cubes, s * 0.20 * hb, s * 2.72 * hb, 21.58, 23.48, 69.4, 74.00, "whisker_pad", rotation=[0, s * -13, 0])
@@ -215,8 +366,11 @@ def build_stalker_king_head(hb):
     )
     return {
         "head": head_cubes, "jaw": jaw_cubes, "tongue": tongue_cubes, "tongue_tip": tongue_tip_cubes,
+        "nose": nose_cubes,
         "ear_left": ear_l, "ear_right": ear_r,
+        "brow_left": brow_l, "brow_right": brow_r,
         "lid_left": lid_l, "lid_right": lid_r,
+        "ulid_left": ulid_l, "ulid_right": ulid_r,
         "pupil_left": pup_l, "pupil_right": pup_r,
         "jaw_pivot": jaw_piv,
         "tongue_tip_pivot": tongue_tip_piv,
@@ -341,7 +495,7 @@ def build_male_lion(look_key="photo_king"):
     for side, tag in ((1, "fl"), (-1, "fr")):
         sx, ex, wx = side * (6.2 * bulk), side * (5.8 * bulk), side * (5.3 * bulk)
         sh, el, wr = [sx, 20.2, oz(54.2)], [ex, 12.4, oz(51.8)], [wx, 3.0, oz(53.4)]
-        up, low, paw = [], [], []
+        up, low = [], []
         # Clean bone-aligned upper arm & forearm (zero colliding 0-deg shoulder squares during high swipes!)
         aligned_seg(up, sh, el, -0.16, 0.48, 4.6 * bulk, 5.6 * bulk, "coat", z_off=0.15)
         aligned_seg(up, sh, el, 0.20, 1.06, 4.2 * bulk, 4.8 * bulk, "leg_upper")
@@ -350,19 +504,18 @@ def build_male_lion(look_key="photo_king"):
             aligned_seg(up, sh, el, 0.72, t1_tuft, 2.8 * bulk, 3.0 * bulk, "mane_black", z_off=2.1 * bulk, _layer=0.95)
         aligned_seg(low, el, wr, -0.08, 0.56, 4.0 * bulk, 4.6 * bulk, "leg_lower")
         aligned_seg(low, el, wr, 0.44, 1.06, 3.4 * bulk, 3.8 * bulk, "leg_lower")
-        padded_paw(paw, wx, 0.0, oz(54.3), width=5.0 * bulk, length=5.8 * bulk, height=3.2,
-                   toes=4, claws=True, part="paw", claw_part="claw", pad_part="paw_pad", detailed=True)
         leg_bones.extend([
             {"name": f"leg_{tag}_1", "parent": "chest", "pivot": sh, "cubes": up},
             {"name": f"leg_{tag}_2", "parent": f"leg_{tag}_1", "pivot": el, "cubes": low},
-            {"name": f"leg_{tag}_paw", "parent": f"leg_{tag}_2", "pivot": wr, "cubes": paw},
+            *splaying_hunter_paw(tag, f"leg_{tag}_2", wr, wx, 0.0, oz(54.3),
+                                 width=5.10 * bulk, length=5.80 * bulk, height=3.20),
         ])
 
     # Locked Variation B ("Sleek Athletic Sprinter") bone-aligned hind leg muscle sculpt!
     for side, tag in ((1, "bl"), (-1, "br")):
         hx, kx, ax = side * (5.7 * bulk), side * (5.6 * bulk), side * (5.1 * bulk)
         hip, knee, hock, ankle = [hx, 20.0, oz(29.0)], [kx, 14.6, oz(32.6)], [ax, 8.2, oz(24.2)], [ax, 2.8, oz(26.6)]
-        thigh, shin, meta, paw = [], [], [], []
+        thigh, shin, meta = [], [], []
         aligned_seg(thigh, hip, knee, -0.14, 0.36, 3.9 * bulk, 5.5 * bulk, "coat", z_off=0.28)
         aligned_seg(thigh, hip, knee, 0.12, 0.78, 4.3 * bulk, 6.1 * bulk, "leg_upper", z_off=0.14)
         aligned_seg(thigh, hip, knee, 0.60, 1.10, 3.6 * bulk, 4.3 * bulk, "leg_upper", z_off=-0.18)
@@ -371,13 +524,12 @@ def build_male_lion(look_key="photo_king"):
         aligned_seg(shin, knee, hock, 0.88, 1.11, 2.85 * bulk, 3.15 * bulk, "leg_lower", z_off=0.15)
         aligned_seg(meta, hock, ankle, -0.08, 0.58, 2.75 * bulk, 2.95 * bulk, "leg_lower")
         aligned_seg(meta, hock, ankle, 0.42, 1.06, 2.60 * bulk, 2.75 * bulk, "leg_lower")
-        padded_paw(paw, ax, 0.0, oz(27.4), width=4.4 * bulk, length=5.2 * bulk, height=3.0,
-                   toes=4, claws=True, part="paw", claw_part="claw", pad_part="paw_pad", detailed=True)
         leg_bones.extend([
             {"name": f"leg_{tag}_1", "parent": "hips", "pivot": hip, "cubes": thigh},
             {"name": f"leg_{tag}_2", "parent": f"leg_{tag}_1", "pivot": knee, "cubes": shin},
             {"name": f"leg_{tag}_3", "parent": f"leg_{tag}_2", "pivot": hock, "cubes": meta},
-            {"name": f"leg_{tag}_paw", "parent": f"leg_{tag}_3", "pivot": ankle, "cubes": paw},
+            *splaying_hunter_paw(tag, f"leg_{tag}_3", ankle, ax, 0.0, oz(27.4),
+                                 width=4.45 * bulk, length=5.20 * bulk, height=3.00),
         ])
 
     tail_bones = []
@@ -412,10 +564,15 @@ def build_male_lion(look_key="photo_king"):
         {"name": "tongue", "parent": "jaw", "pivot": [0.0, 21.3, oz(67.2)], "cubes": hd["tongue"]},
         {"name": "tongue_tip", "parent": "tongue", "pivot": hd["tongue_tip_pivot"], "cubes": hd["tongue_tip"]},
         {"name": "carry", "parent": "head", "pivot": [0.0, 21.65, oz(70.5)], "cubes": []},
+        {"name": "nose", "parent": "head", "pivot": [0.0, 23.95, oz(73.30)], "cubes": hd["nose"]},
         {"name": "ear_left", "parent": "head", "pivot": [ex_p, ey_p, oz(eox_p)], "cubes": hd["ear_left"]},
         {"name": "ear_right", "parent": "head", "pivot": [-ex_p, ey_p, oz(eox_p)], "cubes": hd["ear_right"]},
-        {"name": "lid_left", "parent": "head", "pivot": [px_p, py_p + 0.5, oz(pox_p - 0.4)], "cubes": hd["lid_left"]},
-        {"name": "lid_right", "parent": "head", "pivot": [-px_p, py_p + 0.5, oz(pox_p - 0.4)], "cubes": hd["lid_right"]},
+        {"name": "brow_left", "parent": "head", "pivot": [px_p, py_p + 1.25, oz(pox_p - 1.4)], "cubes": hd["brow_left"]},
+        {"name": "brow_right", "parent": "head", "pivot": [-px_p, py_p + 1.25, oz(pox_p - 1.4)], "cubes": hd["brow_right"]},
+        {"name": "lid_left", "parent": "head", "pivot": [px_p, 27.26, oz(69.65)], "cubes": hd["lid_left"]},
+        {"name": "lid_right", "parent": "head", "pivot": [-px_p, 27.26, oz(69.65)], "cubes": hd["lid_right"]},
+        {"name": "ulid_left", "parent": "head", "pivot": [px_p, 24.40, oz(69.36)], "cubes": hd["ulid_left"]},
+        {"name": "ulid_right", "parent": "head", "pivot": [-px_p, 24.40, oz(69.36)], "cubes": hd["ulid_right"]},
         {"name": "pupil_left", "parent": "head", "pivot": [px_p, py_p, oz(pox_p)], "cubes": hd["pupil_left"]},
         {"name": "pupil_right", "parent": "head", "pivot": [-px_p, py_p, oz(pox_p)], "cubes": hd["pupil_right"]},
         {"name": "mane_crown", "parent": "head", "pivot": [0.0, 28.0, oz(63.4)], "cubes": mane_crown},
@@ -484,7 +641,7 @@ def build_lioness():
 
     # 3. Refined Stalker-King Feminine Head (lifted +0.5 px for proud graceful stance, shining hunter eyes!)
     head_cubes, jaw_cubes, tongue_cubes, tongue_tip_cubes = [], [], [], []
-    ear_l, ear_r, lid_l, lid_r, pup_l, pup_r = [], [], [], [], [], []
+    ear_l, ear_r, brow_l, brow_r, lid_l, lid_r, ulid_l, ulid_r, pup_l, pup_r, nose_cubes = [], [], [], [], [], [], [], [], [], [], []
     lsym(head_cubes, 3.30, 19.9, 24.8, 55.6, 61.0, "head")
     lsym(head_cubes, 2.85, 20.4, 24.4, 54.5, 56.6, "head", rotation=[-5, 0, 0])
     lsym(head_cubes, 2.95, 24.3, 25.45, 56.0, 61.3, "forehead", rotation=[-4.0, 0.0, 0.0])
@@ -495,14 +652,17 @@ def build_lioness():
         # Smooth graceful feminine cheekbones
         lbox(head_cubes, s * 1.80, s * 3.66, 21.7, 24.1, 56.8, 60.8, "head_cheek", rotation=[0, s * -13, s * -4])
         lbox(head_cubes, s * 1.38, s * 2.88, 19.5, 22.0, 57.4, 61.3, "head_cheek", rotation=[0, s * -15, 0])
-        # Calm, relaxed, noble savanna queen brow (level, gentle, no overhanging scowl) & open luminous golden eyes
-        lbox(head_cubes, s * 0.96, s * 3.36, 24.36, 25.06, 59.5, 61.92, "brow", rotation=[0, s * -11, 0])
+        # Calm, relaxed, noble savanna queen brow (promoted to brow_left/right for live expressions!) & open luminous golden eyes
+        lbox(brow_l if s > 0 else brow_r, s * 0.96, s * 3.36, 24.36, 25.06, 59.5, 62.38, "brow", rotation=[0, s * -11, 0])
         lbox(head_cubes, s * 1.24, s * 2.94, 22.86, 24.22, 60.45, 61.88, "eye_socket", rotation=[0, s * -11, 0])
         lbox(head_cubes, s * 1.18, s * 3.00, 22.88, 24.18, 61.22, 62.28, "eye_lioness", rotation=[0, s * -11, 0])
         exm = s * 2.08
-        lbox(pup_l if s > 0 else pup_r, exm - 0.28, exm + 0.28, 23.12, 23.92, 62.20, 62.36, "pupil", rotation=[0, s * -11, 0])
-        lbox(lid_l if s > 0 else lid_r, s * 1.16, s * 3.02, 24.22, 24.84, 61.18, 62.24, "lid", rotation=[0, s * -11, 0])
-        lbox(head_cubes, s * 1.18, s * 3.02, 22.18, 22.88, 60.58, 62.12, "under_eye", rotation=[2, s * -11, 0])
+        lbox(pup_l if s > 0 else pup_r, exm - 0.28, exm + 0.28, 23.12, 23.92, 62.14, 62.34, "pupil", rotation=[0, s * -11, 0])
+        # Flush dual eyelids meeting smoothly in the middle with crisp dark lash seam!
+        lc = lid_l if s > 0 else lid_r
+        lbox(lc, s * 1.16, s * 3.02, 24.18, 24.92, 61.18, 62.35, "lid", rotation=[0, s * -11, 0])
+        lbox(lc, s * 1.16, s * 3.02, 24.10, 24.22, 61.20, 62.36, "eye_lash", rotation=[0, s * -11, 0])
+        lbox(ulid_l if s > 0 else ulid_r, s * 1.18, s * 3.02, 22.18, 22.90, 60.58, 62.35, "under_eye", rotation=[2, s * -11, 0])
         lbox(head_cubes, s * 1.06, s * 1.38, 21.80, 23.38, 61.4, 62.40, "tear_line", rotation=[14, s * -6, 0])
         # ICONIC prominent rounded lioness ears in a calm, relaxed poise
         ec = ear_l if s > 0 else ear_r
@@ -516,9 +676,9 @@ def build_lioness():
     for s in (-1, 1):
         lbox(head_cubes, s * 1.02, s * 2.34, 20.30, 23.05, 60.0, 64.65, "muzzle", rotation=[6, s * -14, 0])
     lsym(head_cubes, 2.00, 20.15, 23.10, 60.0, 64.55, "muzzle")
-    lsym(head_cubes, 1.48, 21.45, 22.08, 64.45, 65.38, "nose")
-    lsym(head_cubes, 1.00, 21.06, 21.52, 64.50, 65.33, "nose")
-    lsym(head_cubes, 0.52, 20.76, 21.14, 64.55, 65.28, "nose")
+    lsym(nose_cubes, 1.48, 21.45, 22.08, 64.45, 65.38, "nose")
+    lsym(nose_cubes, 1.00, 21.06, 21.52, 64.50, 65.33, "nose")
+    lsym(nose_cubes, 0.52, 20.76, 21.14, 64.55, 65.28, "nose")
     lsym(head_cubes, 0.20, 19.68, 20.82, 64.45, 65.16, "lip_cleft")
     for s in (-1, 1):
         lbox(head_cubes, s * 0.18, s * 2.34, 19.68, 21.35, 61.0, 65.10, "whisker_pad", rotation=[0, s * -13, 0])
@@ -534,28 +694,27 @@ def build_lioness():
         tongue_tip_cubes=tongue_tip_cubes, detailed=True,
     )
 
-    # 4. Lithe fast hunter limbs (bone-aligned Sleek Athletic Sprinter sculpt) & compact 4-toed paws (zero elbow tufts!)
+    # 4. Lithe fast hunter limbs (bone-aligned Sleek Athletic Sprinter sculpt) & Splaying Hunter paws (zero elbow tufts!)
     leg_bones = []
     for side, tag in ((1, "fl"), (-1, "fr")):
         sx, ex, wx = side * 5.05, side * 4.75, side * 4.35
         sh, el, wr = [sx, 17.8, loz(47.8)], [ex, 10.8, loz(45.6)], [wx, 2.55, loz(47.2)]
-        up, low, paw = [], [], []
+        up, low = [], []
         aligned_seg(up, sh, el, -0.16, 0.48, 3.85, 4.70, "coat", z_off=0.12)
         aligned_seg(up, sh, el, 0.20, 1.06, 3.45, 3.95, "leg_upper")
         aligned_seg(low, el, wr, -0.08, 0.56, 3.25, 3.75, "leg_lower")
         aligned_seg(low, el, wr, 0.44, 1.06, 2.70, 3.05, "leg_lower")
-        padded_paw(paw, wx, 0.0, loz(47.9), width=4.05, length=4.85, height=2.75,
-                   toes=4, claws=True, part="paw", claw_part="claw", pad_part="paw_pad", detailed=True)
         leg_bones.extend([
             {"name": f"leg_{tag}_1", "parent": "chest", "pivot": sh, "cubes": up},
             {"name": f"leg_{tag}_2", "parent": f"leg_{tag}_1", "pivot": el, "cubes": low},
-            {"name": f"leg_{tag}_paw", "parent": f"leg_{tag}_2", "pivot": wr, "cubes": paw},
+            *splaying_hunter_paw(tag, f"leg_{tag}_2", wr, wx, 0.0, loz(47.9),
+                                 width=4.15, length=4.90, height=2.75),
         ])
 
     for side, tag in ((1, "bl"), (-1, "br")):
         hx, kx, ax = side * 4.75, side * 4.65, side * 4.20
         hip, knee, hock, ankle = [hx, 17.6, loz(25.6)], [kx, 12.8, loz(28.8)], [ax, 7.1, loz(21.4)], [ax, 2.4, loz(23.5)]
-        thigh, shin, meta, paw = [], [], [], []
+        thigh, shin, meta = [], [], []
         aligned_seg(thigh, hip, knee, -0.14, 0.36, 3.35, 4.75, "coat", z_off=0.24)
         aligned_seg(thigh, hip, knee, 0.12, 0.78, 3.70, 5.25, "leg_upper", z_off=0.12)
         aligned_seg(thigh, hip, knee, 0.60, 1.10, 3.10, 3.70, "leg_upper", z_off=-0.15)
@@ -564,13 +723,12 @@ def build_lioness():
         aligned_seg(shin, knee, hock, 0.88, 1.11, 2.45, 2.70, "leg_lower", z_off=0.12)
         aligned_seg(meta, hock, ankle, -0.08, 0.58, 2.35, 2.55, "leg_lower")
         aligned_seg(meta, hock, ankle, 0.42, 1.06, 2.25, 2.40, "leg_lower")
-        padded_paw(paw, ax, 0.0, loz(24.2), width=3.60, length=4.35, height=2.55,
-                   toes=4, claws=True, part="paw", claw_part="claw", pad_part="paw_pad", detailed=True)
         leg_bones.extend([
             {"name": f"leg_{tag}_1", "parent": "hips", "pivot": hip, "cubes": thigh},
             {"name": f"leg_{tag}_2", "parent": f"leg_{tag}_1", "pivot": knee, "cubes": shin},
             {"name": f"leg_{tag}_3", "parent": f"leg_{tag}_2", "pivot": hock, "cubes": meta},
-            {"name": f"leg_{tag}_paw", "parent": f"leg_{tag}_3", "pivot": ankle, "cubes": paw},
+            *splaying_hunter_paw(tag, f"leg_{tag}_3", ankle, ax, 0.0, loz(24.2),
+                                 width=3.65, length=4.40, height=2.55),
         ])
 
     # 5. Sleek S-curved hunter tail with refined smaller teardrop tuft
@@ -604,12 +762,17 @@ def build_lioness():
         {"name": "tongue", "parent": "jaw", "pivot": [0.0, 19.4, loz(59.4)], "cubes": tongue_cubes},
         {"name": "tongue_tip", "parent": "tongue", "pivot": tongue_tip_piv, "cubes": tongue_tip_cubes},
         {"name": "carry", "parent": "head", "pivot": [0.0, 19.72, loz(62.2)], "cubes": []},
+        {"name": "nose", "parent": "head", "pivot": [0.0, 21.75, loz(64.50)], "cubes": nose_cubes},
         {"name": "ear_left", "parent": "head", "pivot": [3.45, 24.9, loz(57.2)], "cubes": ear_l},
         {"name": "ear_right", "parent": "head", "pivot": [-3.45, 24.9, loz(57.2)], "cubes": ear_r},
-        {"name": "lid_left", "parent": "head", "pivot": [2.08, 23.95, loz(61.6)], "cubes": lid_l},
-        {"name": "lid_right", "parent": "head", "pivot": [-2.08, 23.95, loz(61.6)], "cubes": lid_r},
-        {"name": "pupil_left", "parent": "head", "pivot": [2.08, 23.45, loz(62.1)], "cubes": pup_l},
-        {"name": "pupil_right", "parent": "head", "pivot": [-2.08, 23.45, loz(62.1)], "cubes": pup_r},
+        {"name": "brow_left", "parent": "head", "pivot": [2.16, 24.71, loz(60.71)], "cubes": brow_l},
+        {"name": "brow_right", "parent": "head", "pivot": [-2.16, 24.71, loz(60.71)], "cubes": brow_r},
+        {"name": "lid_left", "parent": "head", "pivot": [2.09, 24.92, loz(61.74)], "cubes": lid_l},
+        {"name": "lid_right", "parent": "head", "pivot": [-2.09, 24.92, loz(61.74)], "cubes": lid_r},
+        {"name": "ulid_left", "parent": "head", "pivot": [2.10, 22.18, loz(61.44)], "cubes": ulid_l},
+        {"name": "ulid_right", "parent": "head", "pivot": [-2.10, 22.18, loz(61.44)], "cubes": ulid_r},
+        {"name": "pupil_left", "parent": "head", "pivot": [2.08, 23.52, loz(62.28)], "cubes": pup_l},
+        {"name": "pupil_right", "parent": "head", "pivot": [-2.08, 23.52, loz(62.28)], "cubes": pup_r},
         *tail_bones,
         *leg_bones,
     ]
@@ -659,7 +822,7 @@ def build_cub():
 
     # 3. Big adorable expressive cub head (huge warm luminous eyes, light delicate lashes, oversized fuzzy ears!)
     head_cubes, jaw_cubes, tongue_cubes, tongue_tip_cubes = [], [], [], []
-    ear_l, ear_r, lid_l, lid_r, pup_l, pup_r = [], [], [], [], [], []
+    ear_l, ear_r, brow_l, brow_r, lid_l, lid_r, ulid_l, ulid_r, pup_l, pup_r, nose_cubes = [], [], [], [], [], [], [], [], [], [], []
     csym(head_cubes, 3.30, 11.4, 16.0, 26.6, 31.3, "head")
     csym(head_cubes, 2.85, 11.8, 15.6, 25.6, 27.4, "head", rotation=[-6, 0, 0])
     csym(head_cubes, 2.95, 15.5, 16.65, 27.0, 31.5, "forehead", rotation=[-5.0, 0.0, 0.0])
@@ -670,14 +833,17 @@ def build_cub():
         # Soft plump cub cheeks
         cbox(head_cubes, s * 1.75, s * 3.55, 12.6, 15.2, 27.4, 31.2, "head_cheek", rotation=[0, s * -10, s * -4])
         cbox(head_cubes, s * 1.35, s * 3.00, 11.2, 13.0, 28.0, 31.5, "head_cheek", rotation=[0, s * -12, 0])
-        # Soft curious brow + HUGE warm bright cub eyes with delicate lash border (no heavy panda socket!)
-        cbox(head_cubes, s * 0.85, s * 3.25, 15.26, 15.92, 29.8, 31.95, "brow", rotation=[4, s * -10, s * -4])
+        # Soft curious brow (promoted to brow_left/right!) + HUGE warm bright cub eyes with delicate lash border
+        cbox(brow_l if s > 0 else brow_r, s * 0.85, s * 3.25, 15.26, 15.92, 29.8, 32.22, "brow", rotation=[4, s * -10, s * -4])
         cbox(head_cubes, s * 1.12, s * 2.96, 13.70, 15.24, 30.6, 31.95, "eye_socket", rotation=[2, s * -10, s * -3])
         cbox(head_cubes, s * 1.15, s * 2.93, 13.76, 15.16, 31.20, 32.12, "eye_cub", rotation=[2, s * -10, s * -3])
         exm = s * 2.04
-        cbox(pup_l if s > 0 else pup_r, exm - 0.34, exm + 0.34, 14.00, 14.88, 32.04, 32.20, "pupil", rotation=[2, s * -10, s * -3])
-        cbox(lid_l if s > 0 else lid_r, s * 1.12, s * 2.96, 15.16, 15.76, 31.16, 32.16, "lid", rotation=[2, s * -10, s * -3])
-        cbox(head_cubes, s * 1.12, s * 2.96, 13.12, 13.76, 30.70, 32.00, "under_eye", rotation=[4, s * -10, s * -3])
+        cbox(pup_l if s > 0 else pup_r, exm - 0.34, exm + 0.34, 14.00, 14.88, 32.00, 32.18, "pupil", rotation=[2, s * -10, s * -3])
+        # Flush dual eyelids meeting smoothly in the middle with crisp dark lash seam!
+        lc = lid_l if s > 0 else lid_r
+        cbox(lc, s * 1.12, s * 2.96, 15.16, 15.90, 31.16, 32.19, "lid", rotation=[2, s * -10, s * -3])
+        cbox(lc, s * 1.12, s * 2.96, 15.08, 15.20, 31.18, 32.20, "eye_lash", rotation=[2, s * -10, s * -3])
+        cbox(ulid_l if s > 0 else ulid_r, s * 1.12, s * 2.96, 13.12, 13.78, 30.70, 32.19, "under_eye", rotation=[4, s * -10, s * -3])
         cbox(head_cubes, s * 0.96, s * 1.24, 12.90, 14.20, 31.4, 32.18, "tear_line", rotation=[14, s * -6, 0])
         # BIG oversized fuzzy rounded cub ears (classic irresistible cub silhouette!)
         ec = ear_l if s > 0 else ear_r
@@ -691,10 +857,10 @@ def build_cub():
     for s in (-1, 1):
         cbox(head_cubes, s * 0.92, s * 2.22, 11.70, 13.95, 30.6, 33.85, "muzzle", rotation=[5, s * -12, 0])
     csym(head_cubes, 1.92, 11.55, 14.00, 30.6, 33.75, "muzzle")
-    # Cute compact cub nose
-    csym(head_cubes, 1.26, 12.78, 13.32, 33.55, 34.42, "nose")
-    csym(head_cubes, 0.84, 12.42, 12.84, 33.60, 34.36, "nose")
-    csym(head_cubes, 0.44, 12.16, 12.48, 33.65, 34.32, "nose")
+    # Cute compact cub nose (promoted to nose bone for sniffing twitches!)
+    csym(nose_cubes, 1.26, 12.78, 13.32, 33.55, 34.42, "nose")
+    csym(nose_cubes, 0.84, 12.42, 12.84, 33.60, 34.36, "nose")
+    csym(nose_cubes, 0.44, 12.16, 12.48, 33.65, 34.32, "nose")
     csym(head_cubes, 0.18, 11.35, 12.22, 33.55, 34.22, "lip_cleft")
     for s in (-1, 1):
         cbox(head_cubes, s * 0.16, s * 2.24, 11.38, 12.78, 31.1, 34.18, "whisker_pad", rotation=[0, s * -11, 0])
@@ -709,28 +875,27 @@ def build_cub():
         tongue_tip_cubes=tongue_tip_cubes, detailed=True,
     )
 
-    # 4. Chunky soft bone-aligned limbs & BIG "grow-into-them" bouncy cub paws!
+    # 4. Chunky soft bone-aligned limbs & BIG "grow-into-them" Splaying Hunter cub paws!
     leg_bones = []
     for side, tag in ((1, "fl"), (-1, "fr")):
         sx, ex, wx = side * 3.50, side * 3.40, side * 3.20
         sh, el, wr = [sx, 10.0, coz(23.6)], [ex, 5.9, coz(22.4)], [wx, 1.85, coz(23.6)]
-        up, low, paw = [], [], []
+        up, low = [], []
         aligned_seg(up, sh, el, -0.16, 0.48, 2.75, 3.25, "coat", z_off=0.08)
         aligned_seg(up, sh, el, 0.20, 1.06, 2.48, 2.85, "leg_upper")
         aligned_seg(low, el, wr, -0.08, 0.56, 2.45, 2.75, "leg_lower")
         aligned_seg(low, el, wr, 0.44, 1.06, 2.25, 2.50, "leg_lower")
-        padded_paw(paw, wx, 0.0, coz(24.2), width=3.45, length=3.95, height=2.15,
-                   toes=4, claws=True, part="paw", claw_part="claw", pad_part="paw_pad", detailed=True)
         leg_bones.extend([
             {"name": f"leg_{tag}_1", "parent": "chest", "pivot": sh, "cubes": up},
             {"name": f"leg_{tag}_2", "parent": f"leg_{tag}_1", "pivot": el, "cubes": low},
-            {"name": f"leg_{tag}_paw", "parent": f"leg_{tag}_2", "pivot": wr, "cubes": paw},
+            *splaying_hunter_paw(tag, f"leg_{tag}_2", wr, wx, 0.0, coz(24.2),
+                                 width=3.50, length=4.00, height=2.15, lean_cub=True),
         ])
 
     for side, tag in ((1, "bl"), (-1, "br")):
         hx, kx, ax = side * 3.40, side * 3.40, side * 3.10
         hip, knee, hock, ankle = [hx, 9.9, coz(13.2)], [kx, 7.1, coz(15.2)], [ax, 4.1, coz(11.1)], [ax, 1.75, coz(12.5)]
-        thigh, shin, meta, paw = [], [], [], []
+        thigh, shin, meta = [], [], []
         aligned_seg(thigh, hip, knee, -0.14, 0.36, 2.55, 3.55, "coat", z_off=0.16)
         aligned_seg(thigh, hip, knee, 0.12, 0.78, 2.80, 3.90, "leg_upper", z_off=0.08)
         aligned_seg(thigh, hip, knee, 0.60, 1.10, 2.40, 2.80, "leg_upper", z_off=-0.10)
@@ -739,13 +904,12 @@ def build_cub():
         aligned_seg(shin, knee, hock, 0.88, 1.11, 2.00, 2.20, "leg_lower", z_off=0.08)
         aligned_seg(meta, hock, ankle, -0.08, 0.58, 1.95, 2.15, "leg_lower")
         aligned_seg(meta, hock, ankle, 0.42, 1.06, 1.90, 2.05, "leg_lower")
-        padded_paw(paw, ax, 0.0, coz(13.1), width=3.15, length=3.65, height=2.05,
-                   toes=4, claws=True, part="paw", claw_part="claw", pad_part="paw_pad", detailed=True)
         leg_bones.extend([
             {"name": f"leg_{tag}_1", "parent": "hips", "pivot": hip, "cubes": thigh},
             {"name": f"leg_{tag}_2", "parent": f"leg_{tag}_1", "pivot": knee, "cubes": shin},
             {"name": f"leg_{tag}_3", "parent": f"leg_{tag}_2", "pivot": hock, "cubes": meta},
-            {"name": f"leg_{tag}_paw", "parent": f"leg_{tag}_3", "pivot": ankle, "cubes": paw},
+            *splaying_hunter_paw(tag, f"leg_{tag}_3", ankle, ax, 0.0, coz(13.1),
+                                 width=3.20, length=3.70, height=2.05, lean_cub=True),
         ])
 
     # 5. Perky playful curled cub tail with soft dark tip
@@ -777,12 +941,17 @@ def build_cub():
         {"name": "tongue", "parent": "jaw", "pivot": [0.0, 11.15, coz(29.8)], "cubes": tongue_cubes},
         {"name": "tongue_tip", "parent": "tongue", "pivot": tongue_tip_piv, "cubes": tongue_tip_cubes},
         {"name": "carry", "parent": "head", "pivot": [0.0, 11.42, coz(31.8)], "cubes": []},
+        {"name": "nose", "parent": "head", "pivot": [0.0, 13.05, coz(33.60)], "cubes": nose_cubes},
         {"name": "ear_left", "parent": "head", "pivot": [3.22, 15.8, coz(28.2)], "cubes": ear_l},
         {"name": "ear_right", "parent": "head", "pivot": [-3.22, 15.8, coz(28.2)], "cubes": ear_r},
-        {"name": "lid_left", "parent": "head", "pivot": [2.02, 14.9, coz(31.4)], "cubes": lid_l},
-        {"name": "lid_right", "parent": "head", "pivot": [-2.02, 14.9, coz(31.4)], "cubes": lid_r},
-        {"name": "pupil_left", "parent": "head", "pivot": [2.02, 14.35, coz(31.8)], "cubes": pup_l},
-        {"name": "pupil_right", "parent": "head", "pivot": [-2.02, 14.35, coz(31.8)], "cubes": pup_r},
+        {"name": "brow_left", "parent": "head", "pivot": [2.05, 15.59, coz(30.88)], "cubes": brow_l},
+        {"name": "brow_right", "parent": "head", "pivot": [-2.05, 15.59, coz(30.88)], "cubes": brow_r},
+        {"name": "lid_left", "parent": "head", "pivot": [2.04, 15.90, coz(31.66)], "cubes": lid_l},
+        {"name": "lid_right", "parent": "head", "pivot": [-2.04, 15.90, coz(31.66)], "cubes": lid_r},
+        {"name": "ulid_left", "parent": "head", "pivot": [2.04, 13.12, coz(31.42)], "cubes": ulid_l},
+        {"name": "ulid_right", "parent": "head", "pivot": [-2.04, 13.12, coz(31.42)], "cubes": ulid_r},
+        {"name": "pupil_left", "parent": "head", "pivot": [2.04, 14.44, coz(32.12)], "cubes": pup_l},
+        {"name": "pupil_right", "parent": "head", "pivot": [-2.04, 14.44, coz(32.12)], "cubes": pup_r},
         *tail_bones,
         *leg_bones,
     ]
@@ -827,15 +996,37 @@ PALETTES = {
         "belly": (238, 216, 174), "face_gold": (220, 180, 118), "cheek_tawny": (182, 144, 96),
         "under_eye": (242, 226, 192), "muzzle": (232, 206, 164), "chin": (250, 246, 236),
         "mane_fire": (214, 122, 38), "mane_mid": (128, 64, 28), "mane_black": (28, 24, 26),
-        "ear_back": (28, 22, 18), "nose": (36, 26, 26), "paw_pad": (42, 32, 28), "claw": (36, 28, 24), "tail_tuft": (34, 24, 18),
+        "ear_back": (28, 22, 18), "nose": (72, 46, 46), "paw_pad": (42, 32, 28), "claw": (36, 28, 24), "tail_tuft": (34, 24, 18),
+    },
+    "lioness_kalahari": {
+        "coat_top": (228, 200, 148), "coat_mid": (210, 180, 128), "coat_shade": (172, 144, 98),
+        "belly": (246, 232, 198), "face_gold": (232, 204, 152), "cheek_tawny": (196, 168, 122),
+        "under_eye": (248, 238, 212), "muzzle": (240, 222, 186), "chin": (252, 250, 242),
+        "mane_fire": (214, 122, 38), "mane_mid": (128, 64, 28), "mane_black": (28, 24, 26),
+        "ear_back": (26, 20, 18), "nose": (42, 32, 32), "paw_pad": (38, 30, 27), "claw": (34, 26, 22), "tail_tuft": (28, 20, 18),
+    },
+    "lioness_elder": {
+        "coat_top": (204, 152, 86), "coat_mid": (184, 134, 72), "coat_shade": (146, 102, 52),
+        "belly": (232, 204, 156), "face_gold": (208, 158, 92), "cheek_tawny": (168, 124, 72),
+        "under_eye": (238, 218, 178), "muzzle": (224, 194, 148), "chin": (248, 242, 230),
+        "mane_fire": (214, 122, 38), "mane_mid": (128, 64, 28), "mane_black": (28, 24, 26),
+        "ear_back": (24, 18, 16), "nose": (30, 22, 24), "paw_pad": (36, 28, 25), "claw": (30, 24, 20), "tail_tuft": (24, 18, 16),
     },
     "cub_spotted": {
-        "coat_top": (224, 188, 132), "coat_mid": (206, 168, 114), "coat_shade": (168, 132, 84),
-        "spot_dark": (118, 78, 42),
-        "belly": (244, 228, 192), "face_gold": (228, 190, 134), "cheek_tawny": (192, 154, 104),
-        "under_eye": (246, 232, 204), "muzzle": (238, 214, 178), "chin": (252, 248, 240),
+        "coat_top": (226, 192, 138), "coat_mid": (208, 172, 118), "coat_shade": (170, 134, 86),
+        "spot_dark": (112, 72, 38),
+        "belly": (246, 232, 198), "face_gold": (230, 194, 140), "cheek_tawny": (194, 158, 108),
+        "under_eye": (248, 236, 210), "muzzle": (240, 218, 184), "chin": (253, 249, 242),
         "mane_fire": (214, 122, 38), "mane_mid": (128, 64, 28), "mane_black": (28, 24, 26),
-        "ear_back": (44, 32, 24), "nose": (96, 62, 60), "paw_pad": (64, 48, 42), "claw": (48, 40, 34), "tail_tuft": (48, 34, 24),
+        "ear_back": (44, 32, 24), "nose": (144, 86, 86), "paw_pad": (78, 54, 48), "claw": (224, 214, 202), "tail_tuft": (48, 34, 24),
+    },
+    "cub_subadult": {
+        "coat_top": (218, 178, 118), "coat_mid": (198, 158, 102), "coat_shade": (160, 122, 74),
+        "spot_dark": (136, 98, 58),
+        "belly": (240, 220, 180), "face_gold": (222, 182, 122), "cheek_tawny": (184, 146, 98),
+        "under_eye": (244, 228, 196), "muzzle": (234, 208, 168), "chin": (251, 247, 238),
+        "mane_fire": (214, 122, 38), "mane_mid": (128, 64, 28), "mane_black": (28, 24, 26),
+        "ear_back": (34, 24, 19), "nose": (96, 62, 62), "paw_pad": (56, 42, 38), "claw": (204, 186, 162), "tail_tuft": (38, 26, 20),
     },
 }
 
@@ -896,11 +1087,13 @@ def make_painter(look_key="photo_king"):
             return (36, 26, 20) if part == "eye_lioness" else (24, 18, 14)
         if part == "pupil":
             return (14, 11, 10)
-        if part in ("eye_socket", "lip_cleft", "lip_dark"):
+        if part in ("eye_socket", "eye_lash", "lip_cleft", "lip_dark"):
             if part == "eye_socket" and kind == "cub":
                 return (48, 34, 24)
             if part == "eye_socket" and kind == "lioness":
                 return (38, 28, 22)
+            if part == "eye_lash":
+                return (34, 24, 20)
             return (28, 20, 18)
         if part == "tear_line":
             return shade(pal["cheek_tawny"], 0.50 if kind == "male" else (0.64 if kind == "lioness" else 0.66))
@@ -909,7 +1102,11 @@ def make_painter(look_key="photo_king"):
         if part == "nose":
             if face == "north" and nose_x_lo < abs(x) < nose_x_hi and nose_y_lo < y < nose_y_hi:
                 return (16, 11, 11)
-            return shade(pal["nose"], (1.18 if face == "up" else 0.95) * (0.96 + 0.04 * fg))
+            nb = pal["nose"]
+            # Real lion noses develop dark melanin freckles with age (young lioness & subadult juvenile)!
+            if look_key in ("lioness", "cub_subadult") and hash3(int(x * 5.0), int(y * 5.0), int(z * 5.0)) > 0.68:
+                nb = mix(nb, (28, 20, 20), 0.58)
+            return shade(nb, (1.18 if face == "up" else 0.95) * (0.96 + 0.04 * fg))
         if part == "whisker":
             return (248, 244, 236)
         if part == "tooth":
@@ -930,8 +1127,26 @@ def make_painter(look_key="photo_king"):
             groove = 0.85 if abs(x) < 0.24 else (0.95 if abs(x) < 0.42 else 1.04)
             pap = 0.95 + 0.08 * hash3(int(x * 7), int(y * 7), int(z * 7))
             return shade((226, 112, 122), groove * pap * (1.05 if face == "up" else 0.92))
-        if part == "paw_pad":
-            return shade(pal["paw_pad"], 0.95 + 0.06 * fg)
+        if part in ("paw_pad", "paw_pad_clover", "paw_pad_bean"):
+            pebble = 0.88 + 0.22 * hash3(int(x * 7.5), int(y * 7.5), int(z * 7.5))
+            rim_tgt = (118, 84, 78) if look_key == "cub" else ((88, 66, 60) if kind == "cub" else (72, 58, 52))
+            pad_rim = mix(pal["paw_pad"], rim_tgt, 0.55)
+            if face == "down":
+                return shade(mix(pal["paw_pad"], pad_rim, 0.14), pebble * 0.96)
+            return shade(mix(pal["paw_pad"], pad_rim, 0.36), pebble * 1.05)
+        if part == "claw_ivory":
+            t_seg = c.get("_claw_t", 0.5)
+            oy0, sy = c["origin"][1], max(0.01, c["size"][1])
+            u_local = max(0.0, min(1.0, (y - oy0) / sy))
+            u = max(0.0, min(1.0, t_seg * 0.65 + u_local * 0.45))
+            stria = 0.96 + 0.05 * math.sin(x * 16.0 + z * 11.0)
+            if kind == "cub":
+                # Soft translucent pearl-white milk claws for cubs!
+                col = mix((226, 210, 198), (254, 252, 248), u)
+            else:
+                col = mix((186, 162, 128), (248, 242, 226), u)
+            ao = 1.07 if face in ("north", "east", "west") else (0.86 if face == "down" else 1.0)
+            return shade(col, stria * ao)
         if part == "claw":
             return shade(pal["claw"], 0.95 + 0.06 * fg)
         if part == "ear_outer":
@@ -987,8 +1202,11 @@ def make_painter(look_key="photo_king"):
             return shade(pal["muzzle"], 0.95 + 0.05 * fg)
         if part == "belly":
             return shade(pal["belly"], (0.92 if face == "down" else 0.99) * (0.96 + 0.04 * fg))
-        if part == "paw":
-            return shade(mix(pal["coat_mid"], pal["belly"], 0.42 if y < paw_y else 0.18), 0.96 + 0.05 * fg)
+        if part in ("paw", "paw_fur", "toe_fur"):
+            base = mix(pal["coat_mid"], pal["belly"], 0.50 if part == "toe_fur" else (0.40 if y < paw_y else 0.18))
+            if face == "down":
+                base = shade(base, 0.88)
+            return shade(base, 0.96 + 0.05 * fg)
         if part in ("leg_upper", "leg_lower"):
             lg = fur_grain(x, y, z, scale=1.35, stretch=3.6, flow=(0.0, -1.0, 0.0))
             inn = 0.24 if ((x > 0 and face == "west") or (x < 0 and face == "east")) else 0.0
@@ -998,15 +1216,18 @@ def make_painter(look_key="photo_king"):
             if kind == "cub" and part == "leg_upper" and inn == 0.0:
                 sp = cub_rosette_weight(x * 1.15, y * 1.15, z * 1.15)
                 if sp > 0.15:
-                    base = mix(base, pal["spot_dark"], sp * 0.62)
+                    base = mix(base, pal["spot_dark"], sp * (0.36 if look_key == "cub_subadult" else 0.66))
             return shade(base, 0.96 + 0.06 * lg)
         h_norm = max(0.0, min(1.0, (y - body_y0) / body_yh))
         base = mix(pal["coat_shade"], pal["coat_top"], h_norm)
         if kind == "cub":
-            # Authentic soft fading lion cub rosettes across flanks, back & hips!
+            # Authentic cub rosettes: bold on young 2-5mo cub, fading into faint flank ghost spots on 6-12mo juvenile!
             sp = cub_rosette_weight(x, y, z)
-            if sp > 0.08:
-                base = mix(base, pal["spot_dark"], min(0.82, sp * 0.80))
+            if look_key == "cub_subadult":
+                if sp > 0.18 and y < 10.6:
+                    base = mix(base, pal["spot_dark"], min(0.42, sp * 0.40))
+            elif sp > 0.08:
+                base = mix(base, pal["spot_dark"], min(0.84, sp * 0.82))
         elif kind == "lioness" and y < 15.2 and face in ("east", "west"):
             # Ultra-subtle vestigial tawny flank dappling on real young adult lionesses
             sp = cub_rosette_weight(x * 0.6, y * 0.6, z * 0.6)
@@ -1071,11 +1292,14 @@ def export_pride():
 
 WORKSHOP_LOOK = "photo_king"
 WORKSHOP_PARTS = {
-    "head": ["head", "jaw", "tongue", "tongue_tip", "ear_left", "ear_right", "lid_left", "lid_right", "pupil_left", "pupil_right"],
+    "head": ["head", "jaw", "tongue", "tongue_tip", "nose", "ear_left", "ear_right", "brow_left", "brow_right", "lid_left", "lid_right", "ulid_left", "ulid_right", "pupil_left", "pupil_right"],
     "mane": ["mane_crown", "mane_cheeks", "mane_shoulders", "mane_chest"],
     "body": ["chest", "waist", "hips", "neck"],
-    "legs": ["leg_fl_1", "leg_fl_2", "leg_fl_paw", "leg_fr_1", "leg_fr_2", "leg_fr_paw",
-             "leg_bl_1", "leg_bl_2", "leg_bl_3", "leg_bl_paw", "leg_br_1", "leg_br_2", "leg_br_3", "leg_br_paw"],
+    "legs": [
+        "leg_fl_1", "leg_fl_2", "leg_fl_paw", "leg_fr_1", "leg_fr_2", "leg_fr_paw",
+        "leg_bl_1", "leg_bl_2", "leg_bl_3", "leg_bl_paw", "leg_br_1", "leg_br_2", "leg_br_3", "leg_br_paw",
+        *(f"{k}_{tag}_{i}" for tag in ("fl", "fr", "bl", "br") for i in range(4) for k in ("toe", "claw")),
+    ],
     "tail": ["tail_1", "tail_2", "tail_3", "tail_4", "tail_5"],
 }
 
@@ -1088,21 +1312,26 @@ def workshop_look(look=None):
     return bones, png(rows), tw, th
 
 
-def _build_body_plan(model_name, raw_bones, meta, kind="male", verify_models=None):
+def _build_body_plan(model_name, raw_bones, meta, kind="male", verify_models=None, clip_names=None):
     bnames = [b["name"] for b in raw_bones]
     is_cub = kind == "cub"
     is_lns = kind == "lioness"
+    have = set(clip_names) if clip_names is not None else None
     desc = ("African Lion (Panthera leo) male body plan: 4.66 x 2.03 blocks at scale 1.0 (16 px = 1 block)." if kind == "male"
             else ("African Lioness body plan: 4.09 x 1.75 blocks at scale 1.0." if is_lns
                   else "African Lion Cub body plan: 2.16 x 1.20 blocks at scale 1.0."))
-    switches = [
+    all_switches = [
         ["idle", "walk"], ["walk", "idle"],
         ["walk", "trot"], ["trot", "walk"],
         ["trot", "gallop"], ["gallop", "trot"],
         ["walk", "stalk"], ["stalk", "walk"],
+        ["stalk", "ambush_freeze"], ["ambush_freeze", "stalk"],
+        ["ambush_freeze", "stalk_leap_bite"], ["ambush_freeze", "idle"],
         ["stalk", "pounce"], ["pounce", "idle"],
+        ["stalk", "play_pounce"], ["play_pounce", "idle"],
         ["stalk", "stalk_leap_bite"], ["stalk_leap_bite", "idle"],
         ["idle", "roar"], ["roar", "idle"],
+        ["idle", "cub_call"], ["cub_call", "idle"],
         ["idle", "bite"], ["bite", "idle"],
         ["gallop", "bite"], ["gallop", "gallop_swat"], ["gallop_swat", "gallop"],
         ["idle", "swipe"], ["swipe", "idle"],
@@ -1113,6 +1342,17 @@ def _build_body_plan(model_name, raw_bones, meta, kind="male", verify_models=Non
         ["pounce", "takedown_pin"], ["takedown_pin", "idle"],
         ["idle", "bluff_charge"], ["bluff_charge", "idle"],
         ["idle", "pride_greet"], ["pride_greet", "idle"],
+        ["idle", "cub_groom"], ["cub_groom", "idle"],
+        ["idle", "play_wrestle"], ["play_wrestle", "idle"],
+        ["idle", "mama_nuzzle"], ["mama_nuzzle", "idle"],
+        ["idle", "mood_content"], ["mood_content", "idle"],
+        ["idle", "mood_alert"], ["mood_alert", "idle"],
+        ["idle", "mood_curious"], ["mood_curious", "idle"],
+        ["idle", "mood_angry"], ["mood_angry", "idle"],
+        ["idle", "mood_fearful"], ["mood_fearful", "idle"],
+        ["idle", "mood_submissive"], ["mood_submissive", "idle"],
+        ["idle", "mood_sleepy"], ["mood_sleepy", "idle"],
+        ["idle", "mood_flehmen"], ["mood_flehmen", "idle"],
         ["idle", "sit_down"], ["sit_down", "sit"], ["sit", "sit_up"], ["sit_up", "idle"],
         ["idle", "rest_down"], ["rest_down", "rest"], ["rest", "rest_up"], ["rest_up", "idle"],
         ["rest", "groom"], ["groom", "rest"],
@@ -1120,6 +1360,28 @@ def _build_body_plan(model_name, raw_bones, meta, kind="male", verify_models=Non
         ["idle", "drink"], ["drink", "idle"],
         ["idle", "death"],
     ]
+    switches = [s for s in all_switches if have is None or (s[0] in have and s[1] in have)]
+    all_feet_free = [
+        "walk", "stalk", "ambush_freeze", "trot", "gallop", "pounce", "play_pounce", "play_wrestle",
+        "swipe", "swipe_heavy", "swipe_quick", "swipe_combo", "jump_smack", "stalk_leap_bite",
+        "gallop_swat", "takedown_pin", "bluff_charge", "rest_stretch_up", "pride_greet",
+        "groom", "cub_groom", "cub_call", "mama_nuzzle",
+        "mood_content", "mood_alert", "mood_curious", "mood_angry", "mood_fearful",
+        "mood_submissive", "mood_sleepy", "mood_flehmen",
+        "sit_down", "sit", "sit_up", "rest_down", "rest", "rest_up", "death",
+        "step_up_1000", "step_down_1000",
+    ]
+    all_tuck_ok = [
+        "sit_down", "sit", "sit_up", "rest_down", "rest", "rest_up", "rest_stretch_up", "death",
+        "pounce", "play_pounce", "play_wrestle", "gallop", "stalk", "ambush_freeze",
+        "swipe", "swipe_heavy", "swipe_quick", "swipe_combo", "jump_smack", "stalk_leap_bite",
+        "gallop_swat", "takedown_pin", "bluff_charge", "pride_greet", "groom", "cub_groom",
+        "cub_call", "mama_nuzzle",
+        "mood_content", "mood_alert", "mood_curious", "mood_angry", "mood_fearful",
+        "mood_submissive", "mood_sleepy", "mood_flehmen",
+    ]
+    feet_free = [c for c in all_feet_free if have is None or c in have]
+    tuck_ok = [c for c in all_tuck_ok if have is None or c in have]
     plan = {
         "model": model_name,
         "about": desc,
@@ -1143,19 +1405,8 @@ def _build_body_plan(model_name, raw_bones, meta, kind="male", verify_models=Non
             "px": 0.0625,
             "blend": 4,
             "feet_parts": ["paw"],
-            "feet_free": [
-                "walk", "stalk", "trot", "gallop", "pounce", "swipe", "swipe_heavy", "swipe_quick",
-                "swipe_combo", "jump_smack", "stalk_leap_bite", "gallop_swat", "takedown_pin",
-                "bluff_charge", "rest_stretch_up", "pride_greet", "groom",
-                "sit_down", "sit", "sit_up", "rest_down", "rest", "rest_up", "death",
-                "step_up_1000", "step_down_1000",
-            ],
-            "tuck_ok": [
-                "sit_down", "sit", "sit_up", "rest_down", "rest", "rest_up", "rest_stretch_up", "death",
-                "pounce", "gallop", "stalk", "swipe", "swipe_heavy", "swipe_quick", "swipe_combo",
-                "jump_smack", "stalk_leap_bite", "gallop_swat", "takedown_pin", "bluff_charge",
-                "pride_greet", "groom",
-            ],
+            "feet_free": feet_free,
+            "tuck_ok": tuck_ok,
             "body_bones": ["chest", "waist", "hips"],
             "carry": {
                 "bone": "carry",
@@ -1206,25 +1457,40 @@ def export_game():
     assets_out["geo/entity/lion_kalahari.geo.json"] = geo_kal
     assets_out["textures/entity/lion_kalahari.png"] = png(r_kal)
     assets_out["animations/entity/lion.animation.json"] = animations(clips_male)
-    assets_out["body_plans/lion.json"] = _build_body_plan("lion", raw_male, meta_male, kind="male", verify_models=["lion_kalahari"])
+    assets_out["body_plans/lion.json"] = _build_body_plan(
+        "lion", raw_male, meta_male, kind="male", verify_models=["lion_kalahari"],
+        clip_names=list(clips_male.keys()),
+    )
 
-    # 2. Lioness
+    # 2. Lioness (default Serengeti tawny + shared-geo Kalahari Pale Sand & Prime Matriarch Elder textures!)
     raw_lns = build_member("lioness")
     b_lns, r_lns, tw_l, th_l = paint_faces(raw_lns, TEXELS, make_painter("lioness"), world_coords=True)
+    _, r_lns_k, tw_lk, th_lk = paint_faces(build_member("lioness_kalahari"), TEXELS, make_painter("lioness_kalahari"), world_coords=True)
+    _, r_lns_e, tw_le, th_le = paint_faces(build_member("lioness_elder"), TEXELS, make_painter("lioness_elder"), world_coords=True)
+    assert (tw_l, th_l) == (tw_lk, th_lk) == (tw_le, th_le), "lioness texture variants must match lioness.geo.json!"
     clips_lns, meta_lns = lion_anims.build_all_clips(raw_lns, kind="lioness")
     assets_out["geo/entity/lioness.geo.json"] = geo("lioness", b_lns, tw_l, th_l, (4.5, 2.5, [0, 1.0, 0]))
     assets_out["textures/entity/lioness.png"] = png(r_lns)
+    assets_out["textures/entity/lioness_kalahari.png"] = png(r_lns_k)
+    assets_out["textures/entity/lioness_elder.png"] = png(r_lns_e)
     assets_out["animations/entity/lioness.animation.json"] = animations(clips_lns)
-    assets_out["body_plans/lioness.json"] = _build_body_plan("lioness", raw_lns, meta_lns, kind="lioness")
+    assets_out["body_plans/lioness.json"] = _build_body_plan(
+        "lioness", raw_lns, meta_lns, kind="lioness", clip_names=list(clips_lns.keys()),
+    )
 
-    # 3. Lion Cub
+    # 3. Lion Cub (default 2-5mo spotted cub + shared-geo 6-12mo fading juvenile texture!)
     raw_cub = build_member("cub")
     b_cub, r_cub, tw_c, th_c = paint_faces(raw_cub, TEXELS, make_painter("cub"), world_coords=True)
+    _, r_cub_s, tw_cs, th_cs = paint_faces(build_member("cub_subadult"), TEXELS, make_painter("cub_subadult"), world_coords=True)
+    assert (tw_c, th_c) == (tw_cs, th_cs), "cub_subadult texture must match lion_cub.geo.json!"
     clips_cub, meta_cub = lion_anims.build_all_clips(raw_cub, kind="cub")
     assets_out["geo/entity/lion_cub.geo.json"] = geo("lion_cub", b_cub, tw_c, th_c, (3, 2, [0, 0.7, 0]))
     assets_out["textures/entity/lion_cub.png"] = png(r_cub)
+    assets_out["textures/entity/lion_cub_subadult.png"] = png(r_cub_s)
     assets_out["animations/entity/lion_cub.animation.json"] = animations(clips_cub)
-    assets_out["body_plans/lion_cub.json"] = _build_body_plan("lion_cub", raw_cub, meta_cub, kind="cub")
+    assets_out["body_plans/lion_cub.json"] = _build_body_plan(
+        "lion_cub", raw_cub, meta_cub, kind="cub", clip_names=list(clips_cub.keys()),
+    )
 
     write_assets(assets_out, mod="savanna", faces=True)
 
@@ -1246,7 +1512,7 @@ def export_game():
         )
         write_block_moves(stem, bm, "tools/lion_models.py", mod="savanna")
 
-    print(f"Exported full African Lion Pride game assets ({len(clips_male)} clips each for lion, lioness, lion_cub).")
+    print(f"Exported full African Lion Pride game assets (lion={len(clips_male)}, lioness={len(clips_lns)}, cub={len(clips_cub)} clips).")
 
 
 if __name__ == "__main__":

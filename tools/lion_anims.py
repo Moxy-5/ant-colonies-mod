@@ -241,15 +241,98 @@ class LionRig:
             pose[f"leg_{tag}_3"] = {"rotation": r3}
             pose[f"leg_{tag}_paw"] = {"rotation": rp}
 
-    def set_eyes(self, pose, blink=0.0, look_x=0.0, look_y=0.0, squint=0.0):
+    def set_eyes(self, pose, blink=0.0, look_x=0.0, look_y=0.0, squint=0.0,
+                 wide=0.0, brow_y=0.0, brow_tilt=0.0, lid_tilt=0.0, pupil_scale=1.0,
+                 brow_asym=0.0, nose_sniff=0.0, nose_flare=0.0):
+        """Full feline eye & nose expression rig:
+          - Flush DUAL eyelids (`lid_left/right` upper + `ulid_left/right` lower cheek) meeting seamlessly in the
+            middle of the eye at a crisp dark lash crease (zero floating window-wiper plate, zero rubber-band stretch!)
+          - Articulated brows (`brow_left/right` height + inward/outward angle)
+          - Real pupil gaze (`position`), dilation/constriction (`scale`), and clean socket-tuck behind closed lids
+          - Expressive sniffing/flaring nose (`nose` upward wrinkle + nostril flare)
+        """
         sc = self.sc
-        lid_drop = -1.25 * sc * max(blink, squint * 0.42)
-        pose["lid_left"] = {"position": [0.0, lid_drop, 0.0]}
-        pose["lid_right"] = {"position": [0.0, lid_drop, 0.0]}
-        px = _clamp(look_x, -0.35, 0.35) * sc
-        py = _clamp(look_y, -0.20, 0.20) * sc
-        pose["pupil_left"] = {"position": [px, py, 0.0]}
-        pose["pupil_right"] = {"position": [px, py, 0.0]}
+        b = _clamp(blink, 0.0, 1.0)
+        sq = _clamp(squint, 0.0, 1.0)
+        wd = _clamp(wide, 0.0, 1.0)
+        is_c = (self.kind == "cub")
+
+        # Upper lid drops 65% smoothly from behind the brow; lower lid (under_eye) rises 35% to meet it in the middle!
+        up_close = _clamp(max(b, sq * 0.56), 0.0, 1.0)
+        lo_close = _clamp(max(b, sq * 0.48), 0.0, 1.0)
+        up_y = (0.12 * wd * (1.0 - up_close)) - ((0.84 if is_c else 0.78) * up_close)
+        up_sy = 1.0 + (0.15 if is_c else 0.12) * up_close
+        lo_y = 0.10 * lo_close
+        lo_sy = 1.0 + (0.62 if is_c else 0.46) * lo_close
+        lt = lid_tilt * (1.0 - b)
+
+        pose["lid_left"] = {"position": [0.0, up_y, 0.0], "rotation": [0.0, 0.0, -lt], "scale": [1.0, up_sy, 1.0]}
+        pose["lid_right"] = {"position": [0.0, up_y, 0.0], "rotation": [0.0, 0.0, lt], "scale": [1.0, up_sy, 1.0]}
+        pose["ulid_left"] = {"position": [0.0, lo_y, 0.0], "rotation": [0.0, 0.0, 0.0], "scale": [1.0, lo_sy, 1.0]}
+        pose["ulid_right"] = {"position": [0.0, lo_y, 0.0], "rotation": [0.0, 0.0, 0.0], "scale": [1.0, lo_sy, 1.0]}
+
+        pose["brow_left"] = {
+            "position": [0.0, (brow_y + brow_asym) * sc, 0.0],
+            "rotation": [0.0, 0.0, -brow_tilt],
+        }
+        pose["brow_right"] = {
+            "position": [0.0, (brow_y - brow_asym) * sc, 0.0],
+            "rotation": [0.0, 0.0, brow_tilt],
+        }
+        px = _clamp(look_x, -0.32, 0.32) * sc
+        py = _clamp(look_y, -0.18, 0.18) * sc
+        # Slide each pupil ALONG its angled eye tangent plane (14 deg male, 11 deg lioness, 10 deg cub) so sideways gaze NEVER sinks behind the yellow iris!
+        eye_tan = math.tan(math.radians(14.0 if self.kind == "male" else (11.0 if self.kind == "lioness" else 10.0)))
+        tuck_z = 0.16 * sc * _clamp((b - 0.50) / 0.35, 0.0, 1.0)
+        psx = _clamp(pupil_scale, 0.70, 1.55)
+        psy = _clamp(1.0 + (psx - 1.0) * 0.55, 0.80, 1.32)
+        pose["pupil_left"] = {"position": [px, py, px * eye_tan + tuck_z], "scale": [psx, psy, 1.0]}
+        pose["pupil_right"] = {"position": [px, py, -px * eye_tan + tuck_z], "scale": [psx, psy, 1.0]}
+        ns = _clamp(nose_sniff, 0.0, 1.2)
+        nf = _clamp(nose_flare, 0.0, 1.2)
+        pose["nose"] = {
+            "position": [0.0, 0.14 * sc * ns, -0.06 * sc * ns],
+            "rotation": [-12.0 * ns, 0.0, 0.0],
+            "scale": [1.0 + 0.10 * nf, 1.0 - 0.07 * ns, 1.0 + 0.06 * nf],
+        }
+
+    def set_claws(self, pose, fl=0.0, fr=0.0, bl=0.0, br=0.0, hook=0.0):
+        """Articulate locked V02 · Splaying Hunter toes & retractable 2-seg curved bone-ivory claws.
+        At 0.0: compact toes & claws 100% hidden vertically inside the furry toe domes.
+        At 1.0: ±13° toe splay + -14° knuckle arch + curved ivory sickles pivoting out along real phalanx arc!
+        `hook=0.0` keeps tips safely clear of Y=0 when planted; `hook=1.0` adds deep predatory downward hook mid-air!
+        """
+        sc = self.sc
+        hk = _clamp(hook, 0.0, 1.0)
+        is_c = (self.kind == "cub")
+        for tag, ext in (("fl", fl), ("fr", fr), ("bl", bl), ("br", br)):
+            e = _clamp(ext, 0.0, 1.0)
+            p_sc = sc * (0.88 if tag[0] == "b" else 1.0)
+            e_sm = ease(e) if e > 0.0 else 0.0
+            splay_deg = 10.5 if is_c else 13.0
+            splay_dx = (0.20 if is_c else 0.28) * p_sc
+            knuckle_arch = -11.0 if is_c else -14.0
+            claw_rx = (60.0 + 12.0 * hk) if is_c else (64.0 + 14.0 * hk)
+            claw_dy = (-0.01 - 0.08 * hk) * p_sc if is_c else (-0.02 - 0.12 * hk) * p_sc
+            claw_dz = (-0.82 - 0.08 * hk) * p_sc if is_c else (-0.86 - 0.10 * hk) * p_sc
+            claw_sy = (1.76 + 0.12 * hk) if is_c else (1.98 + 0.12 * hk)
+            claw_sz = 1.12 if is_c else 1.20
+            for i in range(4):
+                frac = (i - 1.5) / 1.5
+                toe_ry = -frac * splay_deg * e_sm
+                toe_dx = frac * splay_dx * e_sm
+                toe_rx = knuckle_arch * e_sm * (1.0 if i in (1, 2) else 0.78)
+                toe_dy = 0.18 * p_sc * e_sm * (1.0 if i in (1, 2) else 0.65)
+                pose[f"toe_{tag}_{i}"] = {
+                    "rotation": [toe_rx, toe_ry, -frac * 3.5 * e_sm],
+                    "position": [toe_dx, toe_dy, -0.10 * p_sc * e_sm * (1.0 if i in (1, 2) else 0.5)],
+                }
+                c_rx = (claw_rx - toe_rx * 0.42) * e_sm
+                pose[f"claw_{tag}_{i}"] = {
+                    "rotation": [c_rx, 0.0, 0.0],
+                    "position": [0.0, claw_dy * e_sm, claw_dz * e_sm],
+                    "scale": [1.0, 1.0 + (claw_sy - 1.0) * e_sm, 1.0 + (claw_sz - 1.0) * e_sm],
+                }
 
     def apply_tail(self, pose, pitch_lift, yaw_arr, pitch_arr):
         """GeckoLib +Z tail: POSITIVE rx lifts tail UP off the ground (turn_x(-rx)*[0,0,1] = [0,+sin(rx),cos(rx)])."""
@@ -365,7 +448,8 @@ def build_all_clips(raw_bones, kind="male"):
                 "ear_left": {"rotation": [-2.0 + 9.0 * ear_t, -4.0 * scan - 12.0 * ear_t, 2.5 * breath]},
                 "ear_right": {"rotation": [-2.0, 4.0 * scan, -2.5 * breath]},
             }
-            rig.set_eyes(p, blink=min(1.0, blink), look_x=0.22 * scan)
+            sniff_i = pulse(t, 1.90, 0.10, 0.20, 0.14) * (0.5 - 0.5 * math.cos(2.0 * math.pi * (t - 1.90) * 4.2))
+            rig.set_eyes(p, blink=min(1.0, blink), look_x=0.22 * scan, nose_sniff=0.45 * sniff_i, nose_flare=0.35 * sniff_i)
             rig.solve_legs(p, rest_targets())
             return p, 2.0, 7.0 * math.sin(ph) + 18.0 * flick, 2.0 * breath, [2.5 * breath, -3.5 * scan, 1.2 * scan]
         return _bake_clip(rig, L, N, frame, loop=True, tail_lag=0.10, mane_lag=0.09)
@@ -431,6 +515,11 @@ def build_all_clips(raw_bones, kind="male"):
                     "hock": hk,
                 }
             rig.solve_legs(p, targs)
+            if name == "gallop":
+                # Smooth continuous sprint traction cleats (ramp out as paw lands & pushes off, retract cleanly into flight!)
+                def _gclaw(ftag):
+                    return 0.62 * _clamp(1.0 - g["feet"][ftag]["lift"] * 2.0, 0.0, 1.0)
+                rig.set_claws(p, fl=_gclaw("fl"), fr=_gclaw("fr"), bl=_gclaw("bl"), br=_gclaw("br"), hook=0.0)
             mane_drv = [-bp * 0.9 - (8.0 if name == "gallop" else 0.0) - g["body_y"] * 2.2, -sw_y * 1.4, -sw_r * 1.8]
             tail_p_drv = -sp * 0.45 - bp * 0.35
             tail_y_drv = tail_yaw_amp * math.sin(ph)
@@ -438,50 +527,90 @@ def build_all_clips(raw_bones, kind="male"):
 
         return _bake_clip(rig, L, N, frame, loop=True, tail_lag=0.075, mane_lag=0.065)
 
-    # 2. WALK — Regal patrol lateral-sequence stride
-    walk_L = 1.00 if is_cub else (1.25 if is_lns else 1.35)
+    # 2. WALK — Regal patrol lateral-sequence stride (perkier bouncy tail for Cub!)
+    walk_L = 0.94 if is_cub else (1.22 if is_lns else 1.35)
     clips["walk"] = make_gait(
         "walk", walk_L, 32,
         phases={"bl": 0.0, "fl": 0.25, "br": 0.50, "fr": 0.75},
-        duty=0.66, stride_len=17.5, lift_h=3.4, bounce=0.45, suspend_h=0.0, spine_flex=4.5,
-        body_drop=-0.25, chest_p=0.5, neck_p=1.5, head_p=-2.0, ear_pin=2.0,
-        sway_yaw=3.0, sway_roll=2.0, tail_lift=8.0, tail_yaw_amp=11.0, stance_x_pad=0.85,
+        duty=0.66, stride_len=17.5, lift_h=3.8 if is_cub else 3.4, bounce=0.72 if is_cub else 0.45,
+        suspend_h=0.0, spine_flex=5.2 if is_cub else 4.5,
+        body_drop=-0.25, chest_p=0.5, neck_p=1.5, head_p=-2.0, ear_pin=0.0 if is_cub else 2.0,
+        sway_yaw=3.4 if is_cub else 3.0, sway_roll=2.4 if is_cub else 2.0,
+        tail_lift=24.0 if is_cub else 8.0, tail_yaw_amp=16.0 if is_cub else 11.0, stance_x_pad=0.85,
     )
 
-    # 3. STALK — Razor-focused crouched savanna ambush slink (tail lifted slightly clear of grass!)
-    stalk_L = 1.25 if is_cub else (1.60 if is_lns else 1.70)
+    # 3. STALK — Razor-focused crouched ambush slink (extra-low silky hunter for Lioness; playful wide-eyed stalk for Cub!)
+    stalk_L = 1.20 if is_cub else (1.55 if is_lns else 1.70)
     clips["stalk"] = make_gait(
         "stalk", stalk_L, 36,
         phases={"bl": 0.0, "fl": 0.25, "br": 0.50, "fr": 0.75},
-        duty=0.72, stride_len=14.5, lift_h=2.2, bounce=0.18, suspend_h=0.0, spine_flex=3.0,
-        body_drop=-4.6, chest_p=7.5, neck_p=11.0, head_p=-17.5, ear_pin=26.0, squint=0.75,
-        hock_stance=44.0, sway_yaw=4.0, sway_roll=1.8, tail_lift=24.0, tail_yaw_amp=14.0,
+        duty=0.72, stride_len=14.5, lift_h=2.2, bounce=0.22 if is_cub else 0.18, suspend_h=0.0, spine_flex=3.0,
+        body_drop=-4.9 if is_lns else -4.6, chest_p=7.5, neck_p=11.0, head_p=-17.5,
+        ear_pin=8.0 if is_cub else 26.0, squint=0.15 if is_cub else 0.75,
+        hock_stance=44.0, sway_yaw=4.5 if is_cub else 4.0, sway_roll=1.8,
+        tail_lift=30.0 if is_cub else 24.0, tail_yaw_amp=18.0 if is_cub else 14.0,
         stance_x_pad=1.10,
     )
 
-    # 4. TROT — Brisk diagonal savanna patrol trot
-    trot_L = 0.65 if is_cub else (0.78 if is_lns else 0.85)
+    # 4. TROT — Brisk diagonal savanna patrol trot (bouncy high-tail cub trot!)
+    trot_L = 0.62 if is_cub else (0.76 if is_lns else 0.85)
     clips["trot"] = make_gait(
         "trot", trot_L, 24,
         phases={"fl": 0.0, "br": 0.02, "fr": 0.50, "bl": 0.52},
-        duty=0.54, stride_len=21.0, lift_h=4.6, bounce=0.85, suspend_h=0.4, spine_flex=6.0,
-        body_drop=-0.45, chest_p=1.5, neck_p=3.5, head_p=-4.5, ear_pin=6.0,
-        sway_yaw=2.2, sway_roll=2.6, tail_lift=14.0, tail_yaw_amp=7.0, stance_x_pad=0.65,
+        duty=0.54, stride_len=21.0, lift_h=4.9 if is_cub else 4.6, bounce=1.15 if is_cub else 0.85,
+        suspend_h=0.5 if is_cub else 0.4, spine_flex=6.5 if is_cub else 6.0,
+        body_drop=-0.45, chest_p=1.5, neck_p=3.5, head_p=-4.5, ear_pin=2.0 if is_cub else 6.0,
+        sway_yaw=2.2, sway_roll=2.6, tail_lift=32.0 if is_cub else 14.0, tail_yaw_amp=12.0 if is_cub else 7.0,
+        stance_x_pad=0.65,
     )
 
-    # 5. GALLOP — Explosive rotary big-cat gallop with airborne flight & streaming horizontal tail!
-    gal_L = 0.62 if is_cub else (0.62 if is_lns else 0.66)
+    # 5. GALLOP — Explosive rotary big-cat gallop with sprint traction cleats & streaming tail!
+    gal_L = 0.60 if is_cub else (0.60 if is_lns else 0.66)
     clips["gallop"] = make_gait(
         "gallop", gal_L, 28,
         phases={"bl": 0.0, "br": 0.14, "fl": 0.48, "fr": 0.64},
-        duty=0.38, stride_len=24.5, lift_h=5.6, bounce=1.0, suspend_h=3.2, spine_flex=13.5,
-        body_drop=-0.6, chest_p=2.0, neck_p=6.0, head_p=-7.0, ear_pin=28.0, squint=0.45,
-        hock_stance=20.0, sway_yaw=1.4, sway_roll=1.6, tail_lift=32.0, tail_yaw_amp=4.0,
-        stance_x_pad=0.55,
+        duty=0.38, stride_len=24.5, lift_h=5.6, bounce=1.1 if is_cub else 1.0, suspend_h=3.2, spine_flex=13.5,
+        body_drop=-0.6, chest_p=2.0, neck_p=6.0, head_p=-7.0, ear_pin=12.0 if is_cub else 28.0,
+        squint=0.15 if is_cub else 0.45,
+        hock_stance=20.0, sway_yaw=1.4, sway_roll=1.6, tail_lift=44.0 if is_cub else 32.0,
+        tail_yaw_amp=8.0 if is_cub else 4.0, stance_x_pad=0.55,
     )
 
-    # 6. ROAR (3.40s) — Slow, weighty 2-wave rolling diaphragm bellow (flanks -> chest -> megaphone neck/head, ZERO jitter!)
+    # 6. ROAR (Male 3.40s 2-wave patrol bellow; Lioness 2.50s sharper Pride Contact Call) / CUB_CALL (Cub 1.60s squeaky mew!)
     def make_roar():
+        if is_lns:
+            L, N = 2.50, 50
+            def frame(i, t):
+                gather = pulse(t, 0.04, 0.30, 0.06, 0.18)
+                w1_flank = pulse(t, 0.32, 0.28, 0.46, 0.38)
+                w1_chest = pulse(t, 0.40, 0.30, 0.50, 0.40)
+                w1_head = pulse(t, 0.48, 0.30, 0.54, 0.42)
+                w2_head = pulse(t, 1.56, 0.18, 0.18, 0.32)
+                bellow = _clamp(w1_head + 0.52 * w2_head, 0.0, 1.0)
+                jaw_deg = _clamp(44.0 * w1_head + 24.0 * w2_head, 0.0, 46.0)
+                dy = -0.25 * sc - 0.85 * sc * gather - 0.55 * sc * w1_chest
+                dz = 0.55 * sc * gather - 0.95 * sc * w1_chest
+                p = {
+                    "root": {"position": [0.0, 0.0, 0.0], "rotation": [0.0, 0.0, 0.0]},
+                    "body": {"position": [0.0, dy, dz], "rotation": [1.5 * gather - 1.6 * w1_chest, 0.0, 0.0]},
+                    "chest": {"rotation": [3.5 * gather - 5.5 * w1_chest, 0.0, 0.0]},
+                    "waist": {"rotation": [-2.2 * gather + 4.2 * w1_flank, 0.0, 0.0]},
+                    "hips": {"rotation": [1.2 * gather - 1.8 * w1_flank, 0.0, 0.0]},
+                    "neck": {"rotation": [5.0 * gather - 6.5 * w1_head + 2.0 * w2_head, 0.0, 0.0]},
+                    "head": {"rotation": [3.0 * gather - 8.5 * w1_head - 4.0 * w2_head, 0.0, 0.0]},
+                    "jaw": {"rotation": [jaw_deg, 0.0, 0.0]},
+                    "tongue": {"position": [0.0, 0.0, 0.0], "rotation": [5.0 * bellow, 0.0, 0.0]},
+                    "tongue_tip": {"rotation": [10.0 * bellow, 0.0, 0.0]},
+                    "ear_left": {"rotation": [-22.0 * bellow, -14.0 * bellow, 10.0 * bellow]},
+                    "ear_right": {"rotation": [-22.0 * bellow, 14.0 * bellow, -10.0 * bellow]},
+                }
+                rig.set_eyes(p, blink=pulse(t, 2.08, 0.07, 0.06, 0.10), squint=0.55 * bellow)
+                rig.solve_legs(p, rest_targets(x_pad=0.30))
+                rig.set_claws(p, fl=0.36 * bellow, fr=0.36 * bellow, hook=0.0)
+                tail_y = 14.0 * w1_flank * math.sin(math.pi * _clamp((t - 0.30) / 1.2, 0.0, 1.0))
+                return p, 16.0 * bellow, tail_y, 2.5 * w1_flank, [0.0, 0.0, 0.0]
+            return _bake_clip(rig, L, N, frame, loop=False, tail_lag=0.08, mane_lag=0.08)
+
         L, N = 3.40, 68
         def frame(i, t):
             # Phase 1: deep lung gather
@@ -523,12 +652,45 @@ def build_all_clips(raw_bones, kind="male"):
             }
             rig.set_eyes(p, blink=pulse(t, 2.92, 0.08, 0.08, 0.12), squint=0.72 * bellow)
             rig.solve_legs(p, rest_targets(x_pad=0.35))
+            # Powerful front-paw brace spread during the diaphragm bellow peak, relaxing back inside sheaths at rest!
+            rig.set_claws(p, fl=0.48 * bellow, fr=0.48 * bellow, hook=0.0)
             # Slow heavy authoritative tail sweep (zero jitter)
             tail_y = 18.0 * w1_flank * math.sin(math.pi * _clamp((t - 0.45) / 1.4, 0.0, 1.0)) - 14.0 * w2_flank
             mane_drv = [-11.0 * w1_chest - 6.5 * w2_chest + 4.0 * gather, 0.0, 0.0]
             return p, 14.0 * bellow, tail_y, 3.0 * w1_flank + 2.5 * w2_flank, mane_drv
         return _bake_clip(rig, L, N, frame, loop=False, tail_lag=0.09, mane_lag=0.085)
-    clips["roar"] = make_roar()
+
+    def make_cub_call():
+        """Adorable squeaky 'mrr-row!' cub contact call (replaces territorial male roar on Cub!)."""
+        L, N = 1.60, 36
+        def frame(i, t):
+            mew = pulse(t, 0.16, 0.24, 0.44, 0.34)
+            chirp = pulse(t, 0.96, 0.14, 0.14, 0.24)
+            call = _clamp(mew + 0.65 * chirp, 0.0, 1.0)
+            p = {
+                "root": {"position": [0.0, 0.0, 0.0], "rotation": [0.0, 0.0, 0.0]},
+                "body": {"position": [0.0, -0.15 * sc + 0.45 * sc * call, -0.35 * sc * call], "rotation": [-3.5 * call, 0.0, 0.0]},
+                "chest": {"rotation": [-5.0 * call, 0.0, 0.0]},
+                "waist": {"rotation": [2.5 * call, 0.0, 0.0]},
+                "hips": {"rotation": [2.0 * call, 0.0, 0.0]},
+                "neck": {"rotation": [-12.0 * call, 0.0, 0.0]},
+                "head": {"rotation": [-16.0 * mew - 10.0 * chirp, 0.0, 4.0 * mew]},
+                "jaw": {"rotation": [34.0 * mew + 22.0 * chirp, 0.0, 0.0]},
+                "tongue": {"position": [0.0, 0.0, 0.0], "rotation": [5.0 * call, 0.0, 0.0]},
+                "tongue_tip": {"rotation": [10.0 * call, 0.0, 0.0]},
+                "ear_left": {"rotation": [12.0 * call, 14.0 * call, 8.0 * call]},
+                "ear_right": {"rotation": [12.0 * call, -14.0 * call, -8.0 * call]},
+            }
+            rig.set_eyes(p, wide=0.85 * call, pupil_scale=1.22, brow_y=0.20 * call, look_y=0.10 * call)
+            rig.solve_legs(p, rest_targets(x_pad=0.25))
+            wag = 18.0 * call * math.sin(2.0 * math.pi * t * 2.5)
+            return p, 42.0 * call + 14.0, wag, 3.0 * call, [0.0, 0.0, 0.0]
+        return _bake_clip(rig, L, N, frame, loop=False, tail_lag=0.07, mane_lag=0.07)
+
+    if is_cub:
+        clips["cub_call"] = make_cub_call()
+    else:
+        clips["roar"] = make_roar()
 
     # 7. BITE (0.75s) — Spring coil -> explosive fang lunge -> CRUSH SNAP at tick 7-8 (0.38s)!
     def make_bite():
@@ -552,14 +714,18 @@ def build_all_clips(raw_bones, kind="male"):
                 "jaw": {"rotation": [gape, 0.0, 0.0]},
                 "tongue": {"position": [0.0, 0.0, 0.0], "rotation": [4.0 * gf, 0.0, 0.0]},
                 "tongue_tip": {"rotation": [10.0 * gf, 0.0, 0.0]},
-                "ear_left": {"rotation": [-34.0 * lunge, -18.0 * lunge, 14.0 * lunge]},
-                "ear_right": {"rotation": [-34.0 * lunge, 18.0 * lunge, -14.0 * lunge]},
+                "ear_left": {"rotation": ([10.0 * lunge, 10.0 * lunge, 6.0 * lunge] if is_cub else [-34.0 * lunge, -18.0 * lunge, 14.0 * lunge])},
+                "ear_right": {"rotation": ([10.0 * lunge, -10.0 * lunge, -6.0 * lunge] if is_cub else [-34.0 * lunge, 18.0 * lunge, -14.0 * lunge])},
             }
-            rig.set_eyes(p, blink=snap * 0.7, squint=0.8 * lunge)
+            if is_cub:
+                rig.set_eyes(p, blink=snap * 0.5, wide=0.72 * lunge, pupil_scale=1.24)
+            else:
+                rig.set_eyes(p, blink=snap * 0.7, squint=0.8 * lunge)
             targs = rest_targets(x_pad=0.65)
             for tag in ("fl", "fr"):
                 targs[tag]["pole"] = [rig.fore[tag]["side"] * 0.42, 0.0, 1.0]
             rig.solve_legs(p, targs)
+            rig.set_claws(p, fl=(0.24 if is_cub else 0.58) * lunge, fr=(0.24 if is_cub else 0.58) * lunge, hook=0.0)
             mane_drv = [-10.0 * lunge + 12.0 * snap, 0.0, 0.0]
             return p, 16.0 * lunge, 22.0 * lunge * math.sin(2.0 * math.pi * t * 3.5), 4.0 * snap, mane_drv
         return _bake_clip(rig, L, N, frame, loop=False, tail_lag=0.05, mane_lag=0.045)
@@ -584,13 +750,17 @@ def build_all_clips(raw_bones, kind="male"):
                 "hips": {"rotation": [-bR[0] * 0.25, -cR[1] * 0.25, 0.0]},
                 "neck": {"rotation": nR},
                 "head": {"rotation": hR},
-                "jaw": {"rotation": [jw, 0.0, 0.0]},
-                "tongue": {"position": [0.0, 0.0, 0.0], "rotation": [jw * 0.16, 0.0, 0.0]},
-                "tongue_tip": {"rotation": [jw * 0.30, 0.0, 0.0]},
-                "ear_left": {"rotation": [-30.0 * pin, -18.0 * pin, 14.0 * pin]},
-                "ear_right": {"rotation": [-30.0 * pin, 18.0 * pin, -14.0 * pin]},
+                "jaw": {"rotation": [jw * (0.35 if is_cub else 1.0), 0.0, 0.0]},
+                "tongue": {"position": [0.0, 0.0, 0.0], "rotation": [jw * (0.04 if is_cub else 0.16), 0.0, 0.0]},
+                "tongue_tip": {"rotation": [jw * (0.08 if is_cub else 0.30), 0.0, 0.0]},
+                "ear_left": {"rotation": ([10.0 * pin, 12.0 * pin, 6.0 * pin] if is_cub else [-30.0 * pin, -18.0 * pin, 14.0 * pin])},
+                "ear_right": {"rotation": ([10.0 * pin, -12.0 * pin, -6.0 * pin] if is_cub else [-30.0 * pin, 18.0 * pin, -14.0 * pin])},
             }
-            rig.set_eyes(p, squint=0.78 * pin)
+            if is_cub:
+                # Playful Cub Paw-Bat: curious wide dilated eyes, perky ears & soft 35% playful milk-claw flick!
+                rig.set_eyes(p, wide=0.82 * pin, pupil_scale=1.28, brow_y=0.18 * pin)
+            else:
+                rig.set_eyes(p, squint=0.78 * pin)
             targs = rest_targets(x_pad=0.35)
             # Striking right foreleg stays on pure Direct FK throughout with an anatomical elbow-tuck recovery (0.00 px clip!)
             fb = _kscal(t, ((0.0, 0.0), (0.04, 1.0), (L - 0.05, 1.0), (L, 0.0)))
@@ -600,6 +770,11 @@ def build_all_clips(raw_bones, kind="male"):
                 "fk_blend": fb,
             }
             rig.solve_legs(p, targs)
+            # Striking right paw stays sheathed during early lift, SNAPS OUT across the swipe arc (35% playful flick on Cub; 100% lethal on Adults!), retracts cleanly!
+            c_peak = 0.35 if is_cub else 1.0
+            fr_claw = c_peak * _kscal(t, ((0.0, 0.0), (0.14, 0.0), (0.24, 1.0), (0.64, 1.0), (0.76, 0.0), (L, 0.0)))
+            fl_brace = (0.0 if is_cub else keys.get("fl_brace", 0.0)) * pulse(t, 0.20, 0.14, 0.34, 0.18)
+            rig.set_claws(p, fl=fl_brace, fr=fr_claw, hook=1.0 if fr_claw > 0.25 else 0.0)
             mane_drv = [-9.0 * pin, cR[1] * 1.15, cR[2] * 1.10]
             return p, 16.0 * pin, -cR[1] * 1.35, 3.5 * pin, mane_drv
         return _bake_clip(rig, L, N, frame, loop=False, tail_lag=0.05, mane_lag=0.045)
@@ -621,12 +796,14 @@ def build_all_clips(raw_bones, kind="male"):
                 (0.50, [-78, -32, -12]), (0.66, [-58, -32, -10]), (0.82, [-26, -8, -2]), (1.00, [0, 0, 0])),
         "fr2": ((0.0, [0, 0, 0]), (0.24, [25, 65, 0]), (0.37, [8, 78, 0]),
                 (0.50, [28, 82, 0]), (0.66, [26, 48, 0]), (0.82, [-24, 10, 0]), (1.00, [0, 0, 0])),
-        "frP": ((0.0, [0, 0, 0]), (0.24, [70, 0, 0]), (0.37, [76, 0, 0]),
+        "frP": ((0.0, [0, 0, 0]), (0.09, [0, 0, 0]), (0.24, [70, 0, 0]), (0.37, [76, 0, 0]),
                 (0.50, [62, 0, 0]), (0.66, [28, 0, 0]), (0.82, [14, 0, 0]), (1.00, [0, 0, 0])),
     })
 
-    # 8b. SWIPE_HEAVY (1.05s) — Style 2 · High Overhead-Outward Club (heavy pride-fight takedown blow!)
-    clips["swipe_heavy"] = make_fk_swipe(1.05, 34, {
+    # 8b. SWIPE_HEAVY (1.05s) — Style 2 · High Overhead-Outward Club (Male pride-fight takedown blow!)
+    if kind == "male":
+        clips["swipe_heavy"] = make_fk_swipe(1.05, 34, {
+        "fl_brace": 0.38,
         "bodyT": ((0.0, [0, -0.2, 0]), (0.28, [1.0, -0.4, 1.0]), (0.41, [1.1, -0.4, 0.0]),
                   (0.54, [0.8, -0.9, -1.3]), (0.70, [0.4, -0.5, -0.6]), (0.88, [0.1, -0.2, -0.1]), (1.05, [0, -0.2, 0])),
         "bodyR": ((0.0, [0, 0, 0]), (0.28, [-4, 11, 3]), (0.41, [-3, 4, 1]),
@@ -663,7 +840,7 @@ def build_all_clips(raw_bones, kind="male"):
                 (0.45, [-74, -38, -14]), (0.60, [-56, -22, -6]), (0.76, [-26, -6, -2]), (0.90, [0, 0, 0])),
         "fr2": ((0.0, [0, 0, 0]), (0.22, [48, 72, 0]), (0.34, [12, 82, 0]),
                 (0.45, [42, 85, 0]), (0.60, [20, 42, 0]), (0.76, [-24, 8, 0]), (0.90, [0, 0, 0])),
-        "frP": ((0.0, [0, 0, 0]), (0.22, [68, 0, 0]), (0.34, [78, 0, 0]),
+        "frP": ((0.0, [0, 0, 0]), (0.09, [0, 0, 0]), (0.22, [68, 0, 0]), (0.34, [78, 0, 0]),
                 (0.45, [52, 0, 0]), (0.60, [22, 0, 0]), (0.76, [12, 0, 0]), (0.90, [0, 0, 0])),
     })
 
@@ -732,10 +909,15 @@ def build_all_clips(raw_bones, kind="male"):
             targs["fr"] = {"pos": fr_pos, "fk": (fr1, fr2, frP), "fk_blend": fb}
             targs["fl"] = {"pos": fl_pos, "fk": (fl1, fl2, flP), "fk_blend": fb}
             rig.solve_legs(p, targs)
+            # 1-2 Boxing Flurry: Right claws SNAP OUT on Hook 1 (0.20..0.58), Left claws SNAP OUT on Hook 2 (0.60..1.00), hind traction anchor!
+            fr_c = _kscal(t, ((0.0, 0.0), (0.16, 0.0), (0.24, 1.0), (0.54, 1.0), (0.66, 0.0), (L, 0.0)))
+            fl_c = _kscal(t, ((0.0, 0.0), (0.56, 0.0), (0.66, 1.0), (0.96, 1.0), (1.08, 0.0), (L, 0.0)))
+            rig.set_claws(p, fl=fl_c, fr=fr_c, bl=0.50 * rear, br=0.50 * rear, hook=1.0 if max(fl_c, fr_c) > 0.25 else 0.0)
             mane_drv = [-10.0 * rear + 10.0 * slam, cR[1] * 1.15, cR[2] * 1.15]
             return p, 54.0 * rear + 12.0 * slam, -cR[1] * 1.4, 4.0 * slam, mane_drv
         return _bake_clip(rig, L, N, frame, loop=False, tail_lag=0.055, mane_lag=0.05)
-    clips["swipe_combo"] = make_swipe_combo()
+    if kind == "male":
+        clips["swipe_combo"] = make_swipe_combo()
 
     # 8e. JUMP_SMACK (1.20s) — Bounding Mid-Air Hook Smack! (Crouch coil IK -> Leap & Mid-Air Torso-Whip Direct-FK Smack -> Land IK!)
     def make_jump_smack():
@@ -808,10 +990,15 @@ def build_all_clips(raw_bones, kind="male"):
                 targs[tag]["fk"] = b_fk
                 targs[tag]["fk_blend"] = fb_air
             rig.solve_legs(p, targs)
+            # Hind launch cleats on coil; right smacking paw explodes 100% splayed mid-air -> retracts cleanly on landing!
+            fr_c = _kscal(t, ((0.0, 0.0), (0.24, 0.0), (0.34, 1.0), (0.62, 1.0), (0.72, 0.0), (L, 0.0)))
+            fl_c = _kscal(t, ((0.0, 0.0), (0.28, 0.0), (0.38, 0.68), (0.60, 0.68), (0.70, 0.0), (L, 0.0)))
+            rig.set_claws(p, fl=fl_c, fr=fr_c, bl=0.65 * coil, br=0.65 * coil, hook=1.0 if arc > 0.2 else 0.0)
             mane_drv = [-14.0 * arc + 10.0 * land, cR[1] * 1.0, cR[2] * 1.0]
             return p, 34.0 * coil + 36.0 * arc + 14.0 * land, -cR[1] * 1.35, -5.0 * arc + 4.0 * land, mane_drv
         return _bake_clip(rig, L, N, frame, loop=False, tail_lag=0.05, mane_lag=0.045)
-    clips["jump_smack"] = make_jump_smack()
+    if not is_cub:
+        clips["jump_smack"] = make_jump_smack()
 
     # 8f. STALK_LEAP_BITE (1.45s) — Seamless 0-deg Chain from STALK -> Torpedo Leap -> Clamping Throat Bite -> Stand!
     def make_stalk_leap_bite():
@@ -889,13 +1076,18 @@ def build_all_clips(raw_bones, kind="male"):
                 targs[tag]["fk"] = b_fk
                 targs[tag]["fk_blend"] = fb_air
             rig.solve_legs(p, targs)
+            # Silent 0% during stalk -> hind cleats on launch -> BOTH front talons flare 100% mid-leap & clamp!
+            f_c = _kscal(t, ((0.0, 0.0), (0.30, 0.0), (0.42, 1.0), (0.72, 1.0), (0.98, 0.72), (1.16, 0.0), (L, 0.0)))
+            b_c = _kscal(t, ((0.0, 0.0), (0.16, 0.0), (0.26, 0.70), (0.38, 0.0), (L, 0.0)))
+            rig.set_claws(p, fl=f_c, fr=f_c, bl=b_c, br=b_c, hook=1.0 if arc > 0.25 else 0.0)
             twitch = 20.0 * coil * math.sin(2.0 * math.pi * t * 6.5)
             mane_drv = [-14.0 * arc + 11.0 * clamp_b, 0.0, 0.0]
             # Slight mane_chest lift while ultra-low in stalk coil so chest fringe clears ground cleanly!
             m_ch_t = [0.0, 1.4 * sc * (st_base * 0.5 + coil * 0.5), -0.6 * sc * coil]
             return p, 24.0 * st_base + 14.0 * coil + 36.0 * arc + 16.0 * clamp_b, twitch, -6.0 * arc + 5.0 * clamp_b, mane_drv, m_ch_t
         return _bake_clip(rig, L, N, frame, loop=False, tail_lag=0.05, mane_lag=0.045)
-    clips["stalk_leap_bite"] = make_stalk_leap_bite()
+    if not is_cub:
+        clips["stalk_leap_bite"] = make_stalk_leap_bite()
 
     # 8g. GALLOP_SWAT (0.95s) — Mid-Sprint Running Hindquarter Trip-Swat (forward bounding momentum + Direct-FK extended hook!)
     def make_gallop_swat():
@@ -953,10 +1145,15 @@ def build_all_clips(raw_bones, kind="male"):
             fr_pos = [targs["fr"]["pos"][0], targs["fr"]["pos"][1] + 6.0 * sc * fr_set, targs["fr"]["pos"][2] - 2.6 * sc * fr_set]
             targs["fr"] = {"pos": fr_pos, "fk": (fr1, fr2, frP), "fk_blend": fb}
             rig.solve_legs(p, targs)
+            # Right swatting paw explodes 100% out mid-trip-swat; grounded sprint paws flash 55% traction cleats!
+            fr_c = _kscal(t, ((0.0, 0.0), (0.08, 0.0), (0.24, 1.0), (0.56, 1.0), (0.72, 0.0), (L, 0.0)))
+            rig.set_claws(p, fl=0.55 * (1.0 - fl_air), fr=fr_c, bl=0.55 * (1.0 - surge), br=0.55 * (1.0 - surge),
+                          hook=1.0 if fr_c > 0.30 else 0.0)
             mane_drv = [-10.0 * surge, cR[1] * 1.1, cR[2] * 1.1]
             return p, 32.0 + 8.0 * surge, -cR[1] * 1.2, -4.0 * surge, mane_drv
         return _bake_clip(rig, L, N, frame, loop=False, tail_lag=0.05, mane_lag=0.045)
-    clips["gallop_swat"] = make_gallop_swat()
+    if not is_cub:
+        clips["gallop_swat"] = make_gallop_swat()
 
     # 8h. TAKEDOWN_PIN (1.30s) — Heavy Double-Paw Pin + Clamped Throat Shake!
     def make_takedown_pin():
@@ -993,11 +1190,14 @@ def build_all_clips(raw_bones, kind="male"):
             for tag in ("bl", "br"):
                 targs[tag]["hock"] = _clamp(rig.hind[tag]["rest_hock"] + 16.0 * pin_w, 12.0, 52.0)
             rig.solve_legs(p, targs)
+            # Front talons locked 95% splayed & anchored pinning prey; hind paws 55% traction anchor!
+            rig.set_claws(p, fl=0.95 * pin_w, fr=0.95 * pin_w, bl=0.55 * pin_w, br=0.55 * pin_w, hook=0.0)
             mane_drv = [-8.0 * pin_w + 8.0 * slam, -16.0 * shake, -10.0 * shake]
             m_ch_t = [0.0, 1.2 * sc * pin_w, -0.8 * sc * pin_w]
             return p, 24.0 * pin_w, -24.0 * shake, 4.0 * slam, mane_drv, m_ch_t
         return _bake_clip(rig, L, N, frame, loop=False, tail_lag=0.05, mane_lag=0.045)
-    clips["takedown_pin"] = make_takedown_pin()
+    if not is_cub:
+        clips["takedown_pin"] = make_takedown_pin()
 
     # 8i. BLUFF_CHARGE (1.35s) — Territorial Threat Snarl -> Stomping Forward Lunge -> Warning Paw Slap!
     def make_bluff_charge():
@@ -1048,16 +1248,21 @@ def build_all_clips(raw_bones, kind="male"):
                             (0.64, [-78, -34, -12]), (0.78, [-42, -14, -4]), (0.92, [-14, -2, 0]), (1.04, [10, 0, 0])))
             fr2 = _kvec(t, ((0.30, [-38, 0, 0]), (0.40, [-26, 22, 0]), (0.52, [42, 70, 0]),
                             (0.64, [30, 82, 0]), (0.78, [-28, 20, 0]), (0.92, [-26, 4, 0]), (1.04, [-18, 0, 0])))
-            frP = _kvec(t, ((0.30, [16, 0, 0]), (0.40, [24, 0, 0]), (0.52, [66, 0, 0]),
+            frP = _kvec(t, ((0.30, [0, 0, 0]), (0.40, [8, 0, 0]), (0.52, [66, 0, 0]),
                             (0.64, [52, 0, 0]), (0.78, [22, 0, 0]), (0.92, [16, 0, 0]), (1.04, [6, 0, 0])))
             targs["fr"] = {"pos": [targs["fr"]["pos"][0], targs["fr"]["pos"][1], targs["fr"]["pos"][2] - 2.6 * sc * lunge],
                            "fk": (fr1, fr2, frP), "fk_blend": fb}
             rig.solve_legs(p, targs)
+            # Right warning-slap claws flash 100% out mid-cuff; left stomping paw flares 75% threat grip!
+            fr_c = _kscal(t, ((0.0, 0.0), (0.36, 0.0), (0.46, 1.0), (0.78, 1.0), (0.90, 0.0), (L, 0.0)))
+            fl_c = _kscal(t, ((0.0, 0.0), (0.30, 0.0), (0.42, 0.78), (0.76, 0.70), (0.94, 0.0), (L, 0.0)))
+            rig.set_claws(p, fl=fl_c, fr=fr_c, hook=1.0 if fr_c > 0.35 else 0.0)
             lash = 24.0 * snarl * math.sin(2.0 * math.pi * t * 2.8)
             mane_drv = [-8.0 * lunge + 8.0 * stomp, cR[1] * 1.1, cR[2] * 1.0]
             return p, 22.0 * snarl, lash, 4.0 * stomp, mane_drv
         return _bake_clip(rig, L, N, frame, loop=False, tail_lag=0.055, mane_lag=0.05)
-    clips["bluff_charge"] = make_bluff_charge()
+    if not is_cub:
+        clips["bluff_charge"] = make_bluff_charge()
 
     # 8j. PRIDE_GREET (1.80s) — Affectionate Cheek/Mane Rub & High-Curling Greeting Tail!
     def make_pride_greet():
@@ -1140,6 +1345,10 @@ def build_all_clips(raw_bones, kind="male"):
                     "hock": _clamp(rig.hind[tag]["rest_hock"] + 24.0 * coil - 12.0 * arc + 12.0 * land, 10.0, 56.0),
                 }
             rig.solve_legs(p, targs)
+            # Silent 0% early coil -> hind launch cleats -> BOTH front paws flare 100% mid-air -> retract on landing!
+            f_c = _kscal(t, ((0.0, 0.0), (0.24, 0.0), (0.34, 1.0), (0.76, 1.0), (0.94, 0.0), (L, 0.0)))
+            b_c = _kscal(t, ((0.0, 0.0), (0.14, 0.0), (0.26, 0.68), (0.40, 0.0), (L, 0.0)))
+            rig.set_claws(p, fl=f_c, fr=f_c, bl=b_c, br=b_c, hook=1.0 if arc > 0.20 else 0.0)
             mane_drv = [-12.0 * arc + 8.0 * land, 0.0, 0.0]
             # Tail lifted cleanly clear of ground during deep coil AND streaming during leap!
             return p, 34.0 * coil + 32.0 * arc + 12.0 * land, 16.0 * coil * math.sin(2.0 * math.pi * t * 5.0), -6.0 * arc, mane_drv
@@ -1322,6 +1531,10 @@ def build_all_clips(raw_bones, kind="male"):
                     "pole": [s_sign * (0.22 + 0.63 * r_f), -0.18 * r_f, -1.0 + 0.50 * r_f],
                 }
             rig.solve_legs(p, targs)
+            # Iconic real-cat stretch: slowly splay both front paws & unsheathe claws at the peak of the deep bow & yawn,
+            # then smoothly retract them back inside the velvet sheaths as the lion arches up and stands!
+            stretch_c = _kscal(t, ((0.0, 0.0), (0.48, 0.0), (0.96, 0.88), (1.68, 0.88), (2.06, 0.0), (L, 0.0)))
+            rig.set_claws(p, fl=stretch_c, fr=stretch_c, hook=0.0)
             # Drape mane_chest cleanly clear of ground during rest & deep bow (0.00 px clip on Kalahari too!)
             mane_chest_t = [0.0, (2.4 * r_f + 4.6 * bow) * sc, (-1.6 * r_f - 1.5 * bow) * sc]
             # Tail curls luxuriously high over the back during both the bow (+104 deg) AND the convex cat-arch (+132 deg -> 0.00 px clip!)
@@ -1531,6 +1744,577 @@ def build_all_clips(raw_bones, kind="male"):
             return p, 34.0 * u, -24.0 * u2, 0.0, [-10.0 * u, -6.0 * u2, 12.0 * u2]
         return _bake_clip(rig, L, N, frame, loop="hold", tail_lag=0.08, mane_lag=0.08)
     clips["death"] = make_death()
+
+    # ================================================================================================
+    # 14b. REAL-CAT FACIAL EMOTIONS & BODY LANGUAGE SUITE (8 Full-Body Moods + 8 Layered Face Overlays)
+    # ================================================================================================
+    def _emotion_face_eval(mood, t, L):
+        """Return facial expression dict (eyes kwargs, ear_l, ear_r, jaw, tongue, tongue_tip) for any of the 8 feline moods."""
+        ph = 2.0 * math.pi * t / L
+        s1, c1 = math.sin(ph), math.cos(ph)
+        s2 = math.sin(2.0 * ph)
+        if mood == "content":
+            # Soft almond eyes, warm trusting 0.65s cat slow-blink, level relaxed brow, neutral ears
+            sb = pulse(t, 1.05, 0.24, 0.22, 0.26)
+            return {
+                "eyes": dict(blink=sb * 0.96, squint=0.40, look_x=0.10 * s1, brow_y=0.06, brow_tilt=-3.5, lid_tilt=-2.0, pupil_scale=1.02),
+                "ear_l": [-4.0, -7.0 - 2.0 * s1, -7.0],
+                "ear_r": [-4.0, 7.0 + 2.0 * s1, 7.0],
+                "jaw": 0.0, "tg_z": 0.0, "tg_rx": 0.0, "tip_rx": 0.0,
+            }
+        if mood == "alert":
+            # Wide bright eyes, lifted focused brows, sharp steady horizon tracking, twin forward radar ears + wind-check sniff
+            scan = math.sin(ph - 0.3)
+            snf = pulse(t, 0.88, 0.10, 0.38, 0.12) * (0.5 - 0.5 * math.cos(2.0 * math.pi * (t - 0.88) * 4.4))
+            return {
+                "eyes": dict(blink=pulse(t, 2.45, 0.06, 0.04, 0.08), wide=0.88, look_x=0.26 * scan, look_y=0.05,
+                             brow_y=0.26, brow_tilt=2.5, lid_tilt=0.0, pupil_scale=0.98,
+                             nose_sniff=0.72 * snf, nose_flare=0.60 * snf),
+                "ear_l": [10.0, 14.0 - 4.0 * scan, 8.0],
+                "ear_r": [10.0, -14.0 - 4.0 * scan, -8.0],
+                "jaw": 0.0, "tg_z": 0.0, "tg_rx": 0.0, "tip_rx": 0.0,
+            }
+        if mood == "curious":
+            # Wide bright dilated eyes (1.34x), inquisitive asymmetric brow lift, independent radar ears + cute double-sniff bursts!
+            look = math.sin(ph)
+            tw_l = pulse(t, 0.80, 0.10, 0.18, 0.14)
+            tw_r = pulse(t, 2.10, 0.10, 0.18, 0.14)
+            sn1 = pulse(t, 0.45, 0.10, 0.52, 0.12) * (0.5 - 0.5 * math.cos(2.0 * math.pi * (t - 0.45) * 4.6))
+            sn2 = pulse(t, 2.05, 0.10, 0.52, 0.12) * (0.5 - 0.5 * math.cos(2.0 * math.pi * (t - 2.05) * 4.6))
+            snf = max(sn1, sn2)
+            return {
+                "eyes": dict(blink=pulse(t, 2.75, 0.07, 0.04, 0.09), wide=0.92, look_x=0.28 * look, look_y=0.08 * c1,
+                             brow_y=0.30, brow_tilt=-4.0, lid_tilt=-2.0, pupil_scale=1.34, brow_asym=0.14 * math.sin(ph),
+                             nose_sniff=0.92 * snf, nose_flare=0.80 * snf),
+                "ear_l": [12.0 + 5.0 * tw_l, 18.0 - 12.0 * tw_l, 6.0],
+                "ear_r": [12.0 + 5.0 * tw_r, -18.0 + 12.0 * tw_r, -6.0],
+                "jaw": 2.5 * max(0.0, s1), "tg_z": 0.0, "tg_rx": 0.0, "tip_rx": 0.0,
+            }
+        if mood == "angry":
+            if is_cub:
+                # Kitten Spit-Hiss! Startled wide bright eyes, flat pinned ears, puffed spit-hiss & nose wrinkle!
+                spit = pulse(t, 0.55, 0.14, 0.45, 0.22) + pulse(t, 1.75, 0.14, 0.35, 0.20)
+                spit = _clamp(spit, 0.0, 1.0)
+                return {
+                    "eyes": dict(blink=pulse(t, 2.45, 0.06, 0.04, 0.06), wide=0.82, look_x=0.08 * s2, look_y=0.02,
+                                 brow_y=-0.12, brow_tilt=11.0, lid_tilt=7.0, pupil_scale=1.34,
+                                 nose_sniff=0.65 * spit, nose_flare=0.75 * spit),
+                    "ear_l": [-36.0, -26.0, 26.0],
+                    "ear_r": [-36.0, 26.0, -26.0],
+                    "jaw": 10.0 + 18.0 * spit, "tg_z": 0.0, "tg_rx": 6.0 * spit, "tip_rx": 10.0 * spit,
+                }
+            # Hard unblinking narrow glare, heavy inward-down predator brow (\ /), constricted sharp pupils (0.76x), airplane ears, snarling nose wrinkle!
+            snarl = 0.5 + 0.5 * math.sin(ph)
+            return {
+                "eyes": dict(blink=0.0, squint=0.72, look_x=0.04 * s2, look_y=-0.04,
+                             brow_y=-0.34, brow_tilt=15.0, lid_tilt=12.5, pupil_scale=0.76,
+                             nose_sniff=0.55 + 0.35 * snarl, nose_flare=0.65 + 0.35 * snarl),
+                "ear_l": [-28.0 - 4.0 * snarl, -26.0, 24.0],
+                "ear_r": [-28.0 - 4.0 * snarl, 26.0, -24.0],
+                "jaw": 14.0 + 7.5 * snarl, "tg_z": 0.0, "tg_rx": 3.0 * snarl, "tip_rx": 6.0 * snarl,
+            }
+        if mood == "fearful":
+            # Wide "saucer eyes", inner-up worried brow (/ \), massive dilated adrenaline pupils (1.52x), darting gaze, pinned flat ears, defensive hiss!
+            dart = math.sin(2.0 * ph) * 0.26
+            hiss = pulse(t, 0.65, 0.16, 0.55, 0.24)
+            return {
+                "eyes": dict(blink=pulse(t, 2.25, 0.05, 0.04, 0.06), wide=1.0, look_x=dart, look_y=0.04,
+                             brow_y=0.22, brow_tilt=-14.5, lid_tilt=-6.0, pupil_scale=1.52,
+                             nose_sniff=0.30 + 0.45 * hiss, nose_flare=0.55 + 0.45 * hiss),
+                "ear_l": [-38.0, -24.0, 26.0],
+                "ear_r": [-38.0, 24.0, -26.0],
+                "jaw": 10.0 + 18.0 * hiss, "tg_z": 0.0, "tg_rx": 5.0 * hiss, "tip_rx": 10.0 * hiss,
+            }
+        if mood == "submissive":
+            # Averting gaze sideways & down, soft squinted lids, inner-up appeasing brow, frequent nervous blinks, dropped sideways ears
+            nb = pulse(t, 0.70, 0.07, 0.05, 0.08) + pulse(t, 1.95, 0.07, 0.06, 0.09) + pulse(t, 2.85, 0.07, 0.04, 0.08)
+            return {
+                "eyes": dict(blink=min(1.0, nb), squint=0.52, look_x=0.28 + 0.05 * s1, look_y=-0.15,
+                             brow_y=0.14, brow_tilt=-13.5, lid_tilt=-8.5, pupil_scale=1.18),
+                "ear_l": [-14.0, -18.0, -22.0],
+                "ear_r": [-14.0, 18.0, 22.0],
+                "jaw": 0.0, "tg_z": 0.0, "tg_rx": 0.0, "tip_rx": 0.0,
+            }
+        if mood == "sleepy":
+            # Heavy drooping lids (84% closed), long sluggish 1.2s blink drift, soft low brow, drowsy drooping ears
+            drift = pulse(t, 1.20, 0.55, 0.65, 0.55)
+            return {
+                "eyes": dict(blink=drift * 0.98, squint=0.84, look_x=0.04 * s1, look_y=-0.14,
+                             brow_y=-0.18, brow_tilt=-4.0, lid_tilt=-3.0, pupil_scale=0.95),
+                "ear_l": [-10.0 - 4.0 * drift, -12.0, -16.0 - 4.0 * drift],
+                "ear_r": [-10.0 - 4.0 * drift, 12.0, 16.0 + 4.0 * drift],
+                "jaw": 0.0, "tg_z": 0.0, "tg_rx": 0.0, "tip_rx": 0.0,
+            }
+        # mood == "flehmen" — Iconic real-lion scent-sampling face! Active nose-wrinkle sniffing bursts into the savanna breeze!
+        taste = pulse(t, 1.40, 0.20, 0.35, 0.25)
+        sn_f1 = pulse(t, 0.30, 0.14, 0.78, 0.16) * (0.5 - 0.5 * math.cos(2.0 * math.pi * (t - 0.30) * 3.8))
+        sn_f2 = pulse(t, 2.05, 0.14, 0.72, 0.16) * (0.5 - 0.5 * math.cos(2.0 * math.pi * (t - 2.05) * 3.8))
+        sn_fl = 0.42 + 0.68 * max(sn_f1, sn_f2)
+        return {
+            "eyes": dict(blink=pulse(t, 2.55, 0.14, 0.14, 0.18) * 0.92, squint=0.56, look_x=0.06 * s1, look_y=0.12,
+                         brow_y=0.16, brow_tilt=-6.0, lid_tilt=-4.0, pupil_scale=1.08,
+                         nose_sniff=sn_fl, nose_flare=0.45 + 0.55 * max(sn_f1, sn_f2)),
+            "ear_l": [-6.0, -14.0, -10.0],
+            "ear_r": [-6.0, 14.0, 10.0],
+            "jaw": 14.0 + 5.0 * taste, "tg_z": -1.1 * sc * taste, "tg_rx": 10.0 * taste, "tip_rx": -14.0 * taste,
+        }
+
+    def make_face_overlay(mood, L, N):
+        """Face-only looping overlay clip (touches ONLY brow, lid, pupil, ear, jaw, tongue) for parallel GeckoLib controller!"""
+        def pose_at(t):
+            fe = _emotion_face_eval(mood, t, L)
+            p = {
+                "ear_left": {"rotation": fe["ear_l"]},
+                "ear_right": {"rotation": fe["ear_r"]},
+                "jaw": {"rotation": [fe["jaw"], 0.0, 0.0]},
+                "tongue": {"position": [0.0, 0.0, fe["tg_z"]], "rotation": [fe["tg_rx"], 0.0, 0.0]},
+                "tongue_tip": {"rotation": [fe["tip_rx"], 0.0, 0.0]},
+            }
+            rig.set_eyes(p, **fe["eyes"])
+            return p
+        made = clip(L, pose_at, N, loop=True)
+        _unwrap(made)
+        return made
+
+    def make_mood_body(mood, L, N):
+        """Full-body real-cat body-language & facial emotion loop (eyes + head carriage + spine posture + tail language!)."""
+        def frame(i, t):
+            ph = 2.0 * math.pi * t / L
+            br = math.sin(ph)
+            sw = math.sin(ph - 0.4)
+            fe = _emotion_face_eval(mood, t, L)
+
+            # Default standing neutral baseline
+            bx, by, bz = 0.0, -0.18 * sc + 0.22 * sc * br, 0.0
+            body_r = [0.3 * br, 0.0, 0.0]
+            chest_r = [-1.0 * br, 1.5 * sw, 0.0]
+            waist_r = [0.5 * br, -0.8 * sw, 0.0]
+            hips_r = [-0.4 * br, -0.5 * sw, 0.0]
+            neck_r = [-1.0 * br, 3.0 * sw, 0.0]
+            head_r = [1.0 * br, 4.0 * sw, 1.5 * sw]
+            x_pad = 0.20
+            hock_add = 0.0
+            paw_z_f, paw_z_b = 0.0, 0.0
+            tail_lift, tail_y, tail_p = 6.0, 7.0 * br, 1.5 * br
+            mane_drv = [2.0 * br, -2.5 * sw, 1.0 * sw]
+            mane_chest_t = None
+
+            if mood == "content":
+                by = -0.24 * sc + 0.28 * sc * br
+                neck_r = [1.5 - 1.2 * br, 3.5 * sw, 2.0 * sw]
+                head_r = [-1.0 + 1.0 * br, 4.5 * sw, 5.0 * math.sin(ph)]
+                tail_lift = 10.0 + 4.0 * br
+                tail_y = 12.0 * math.sin(ph)
+                mane_drv = [2.5 * br, -3.0 * sw, 2.0 * sw]
+            elif mood == "alert":
+                by = 0.25 * sc + 0.14 * sc * br
+                body_r = [-2.2, 0.0, 0.0]
+                chest_r = [-4.2 - 0.8 * br, 2.5 * sw, 0.0]
+                waist_r = [1.8, -1.5 * sw, 0.0]
+                hips_r = [1.0, -0.8 * sw, 0.0]
+                neck_r = [-10.5 - 0.6 * br, 6.5 * sw, 0.0]
+                head_r = [6.5 + 0.6 * br, 9.5 * sw, 0.0]
+                x_pad = 0.15
+                tail_lift = 18.0
+                tip_tw = pulse(t, 1.55, 0.12, 0.30, 0.18) * math.sin(2.0 * math.pi * (t - 1.55) * 3.0)
+                tail_y = 14.0 * tip_tw
+                mane_drv = [-3.0, -5.0 * sw, 0.0]
+            elif mood == "curious":
+                # Neck cranes forward + unmistakable curious cat head tilt (+15 deg -> -15 deg!)
+                tilt = math.sin(ph)
+                by = -0.75 * sc + 0.18 * sc * br
+                bz = -1.35 * sc - 0.30 * sc * math.cos(ph)
+                body_r = [2.6, 0.0, 0.0]
+                chest_r = [3.5, 2.5 * tilt, 1.5 * tilt]
+                waist_r = [-1.8, -1.8 * tilt, 0.0]
+                hips_r = [-1.2, -1.0 * tilt, 0.0]
+                neck_r = [8.5 - 1.0 * br, 5.5 * tilt, 4.0 * tilt]
+                head_r = [-8.0 + 1.5 * math.cos(ph), 7.5 * tilt, 15.0 * tilt]
+                x_pad = 0.40
+                paw_z_f = -0.6 * sc
+                tail_lift = 16.0 + 4.0 * math.cos(ph)
+                tail_y = 12.0 * math.sin(ph)
+                mane_drv = [3.5, -5.5 * tilt, -4.0 * tilt]
+            elif mood == "angry":
+                if is_cub:
+                    # Puffed-up Kitten Spit-Hiss: high convex Halloween-cat back arch, crouched wide stance & tall bristling tail!
+                    puff = 0.5 + 0.5 * math.sin(2.0 * ph)
+                    by = -0.35 * sc + 0.25 * sc * puff
+                    bz = 0.45 * sc
+                    body_r = [1.5, 0.0, 0.0]
+                    chest_r = [10.0 + 2.0 * puff, 2.0 * math.sin(ph), 0.0]
+                    waist_r = [-15.0 - 2.0 * puff, -2.0 * math.sin(ph), 0.0]
+                    hips_r = [-11.5, 0.0, 0.0]
+                    neck_r = [-6.0, 0.0, 0.0]
+                    head_r = [5.0, 0.0, 0.0]
+                    x_pad = 0.85
+                    hock_add = 10.0
+                    tail_lift = 96.0 + 8.0 * puff
+                    tail_y = 14.0 * math.sin(2.0 * ph)
+                    mane_drv = [0.0, 0.0, 0.0]
+                else:
+                    # Tall rigid dominant stance, lowered forward-thrust head guarding throat, heavy lashing tail!
+                    lash = math.sin(2.0 * ph)
+                    by = 0.15 * sc + 0.16 * sc * math.sin(2.0 * ph)
+                    bz = -1.45 * sc
+                    body_r = [2.6, 1.8 * lash, 0.0]
+                    chest_r = [5.2, 3.0 * lash, 0.0]
+                    waist_r = [-6.0, -3.5 * lash, 0.0]
+                    hips_r = [-4.5, -2.5 * lash, 0.0]
+                    neck_r = [14.0 - 1.5 * br, -2.5 * lash, 0.0]
+                    head_r = [-15.5 + 1.5 * br, -2.0 * lash, 0.0]
+                    x_pad = 1.15
+                    paw_z_f = -1.0 * sc
+                    tail_lift = 22.0 + 4.0 * abs(lash)
+                    tail_y = 30.0 * lash
+                    tail_p = 5.0 * abs(lash)
+                    mane_drv = [-6.0 + 2.0 * br, 4.5 * lash, 0.0]
+            elif mood == "fearful":
+                # Pulled tightly back & crouched low with defensive convex back-arch & guarded tucked tail!
+                trem = math.sin(4.0 * ph)
+                by = -2.55 * sc + 0.14 * sc * br
+                bz = 2.45 * sc
+                body_r = [-2.5, 0.0, 0.0]
+                chest_r = [8.5, 1.5 * trem, 0.0]
+                waist_r = [-11.5, -1.5 * trem, 0.0]
+                hips_r = [-9.5, 0.0, 0.0]
+                neck_r = [-6.5, 3.0 * math.sin(ph), 0.0]
+                head_r = [11.5, 4.5 * math.sin(ph), 2.5 * math.sin(ph)]
+                x_pad = 0.85
+                hock_add = 18.0
+                paw_z_b = 0.6 * sc
+                # Tail tucked low behind haunches while staying strictly above y=0 (tail_lift=68 offsets -21 deg hips curl!)
+                tail_lift = 68.0
+                tail_y = 6.0 * trem
+                mane_drv = [5.0, -2.0 * trem, 0.0]
+                mane_chest_t = [0.0, 0.8 * sc, 0.0]
+            elif mood == "submissive":
+                # Low compressed appeasing posture, head dipped low & turned politely away from dominant gaze!
+                by = -1.45 * sc + 0.14 * sc * br
+                bz = 0.60 * sc
+                body_r = [1.6, -1.8, 0.0]
+                chest_r = [2.4, -2.6, -1.0]
+                waist_r = [-1.6, 1.6, 0.0]
+                hips_r = [-1.2, 1.2, 0.0]
+                neck_r = [8.5 + 1.5 * br, -6.5 - 1.2 * br, 3.0]
+                head_r = [5.0 + 1.2 * br, -10.0 - 1.8 * br, 8.0]
+                x_pad = 0.42
+                hock_add = 10.0
+                tail_lift = 18.0
+                tail_y = -10.0 + 3.0 * br
+                mane_drv = [3.5, 5.0, 2.0]
+                mane_chest_t = [0.0, 0.4 * sc, -0.2 * sc]
+            elif mood == "sleepy":
+                # Heavy drooping head nods, relaxed low shoulders, deep sluggish breaths
+                nod = 0.5 - 0.5 * math.cos(ph)
+                by = -0.80 * sc + 0.30 * sc * br
+                body_r = [1.8 + 0.6 * nod, 0.0, 0.0]
+                chest_r = [2.8 + 1.0 * nod - 1.2 * br, 0.0, 0.0]
+                waist_r = [-1.2 + 0.6 * br, 0.0, 0.0]
+                hips_r = [-1.2, 0.0, 0.0]
+                neck_r = [9.5 + 5.5 * nod, 2.0 * sw, 1.5 * sw]
+                head_r = [6.5 + 7.5 * nod, 2.5 * sw, 3.0 * sw]
+                x_pad = 0.22
+                hock_add = 5.0
+                tail_lift = 12.0
+                tail_y = 4.0 * br
+                mane_drv = [4.0 + 2.5 * nod, 0.0, 0.0]
+            else:  # flehmen
+                # Iconic lion scent-sampling: neck stretched forward & UP, nose high in the breeze, dreamy swaying head!
+                sniff = math.sin(ph)
+                by = -0.12 * sc + 0.18 * sc * br
+                bz = -0.85 * sc
+                body_r = [-2.0, 0.0, 0.0]
+                chest_r = [-2.8 - 0.8 * br, 1.8 * sniff, 0.0]
+                waist_r = [1.2, -1.0 * sniff, 0.0]
+                hips_r = [0.8, -0.6 * sniff, 0.0]
+                neck_r = [-10.5 - 1.8 * br, 4.0 * sniff, 1.2 * sniff]
+                head_r = [-12.5 - 2.0 * math.cos(ph), 4.8 * sniff, 3.0 * sniff]
+                x_pad = 0.25
+                tail_lift = 18.0
+                tail_y = 8.0 * sniff
+                mane_drv = [-4.5, -3.0 * sniff, 0.0]
+
+            p = {
+                "root": {"position": [0.0, 0.0, 0.0], "rotation": [0.0, 0.0, 0.0]},
+                "body": {"position": [bx, by, bz], "rotation": body_r},
+                "chest": {"rotation": chest_r},
+                "waist": {"rotation": waist_r},
+                "hips": {"rotation": hips_r},
+                "neck": {"rotation": neck_r},
+                "head": {"rotation": head_r},
+                "jaw": {"rotation": [fe["jaw"], 0.0, 0.0]},
+                "tongue": {"position": [0.0, 0.0, fe["tg_z"]], "rotation": [fe["tg_rx"], 0.0, 0.0]},
+                "tongue_tip": {"rotation": [fe["tip_rx"], 0.0, 0.0]},
+                "ear_left": {"rotation": fe["ear_l"]},
+                "ear_right": {"rotation": fe["ear_r"]},
+            }
+            rig.set_eyes(p, **fe["eyes"])
+            targs = rest_targets(x_pad=x_pad)
+            for tag in ("fl", "fr"):
+                targs[tag]["pos"][2] += paw_z_f
+            for tag in ("bl", "br"):
+                targs[tag]["pos"][2] += paw_z_b
+                targs[tag]["hock"] = _clamp(rig.hind[tag]["rest_hock"] + hock_add, 12.0, 56.0)
+            rig.solve_legs(p, targs)
+            if mood == "angry":
+                c_ang = 0.72 + 0.10 * abs(math.sin(2.0 * ph))
+                rig.set_claws(p, fl=c_ang, fr=c_ang, hook=0.0)
+            elif mood == "fearful":
+                c_fr = 0.88 + 0.08 * abs(math.sin(4.0 * ph))
+                rig.set_claws(p, fl=c_fr, fr=c_fr, bl=0.45, br=0.45, hook=0.0)
+            if mane_chest_t is not None:
+                return p, tail_lift, tail_y, tail_p, mane_drv, mane_chest_t
+            return p, tail_lift, tail_y, tail_p, mane_drv
+
+        return _bake_clip(rig, L, N, frame, loop=True, tail_lag=0.08, mane_lag=0.075)
+
+    for _mood, _len, _steps in (
+        ("content", 3.80, 38),
+        ("alert", 3.00, 30),
+        ("curious", 3.40, 34),
+        ("angry", 2.80, 32),
+        ("fearful", 2.80, 32),
+        ("submissive", 3.40, 34),
+        ("sleepy", 4.20, 42),
+        ("flehmen", 3.60, 36),
+    ):
+        if is_cub and _mood == "flehmen":
+            continue
+        clips[f"mood_{_mood}"] = make_mood_body(_mood, _len, _steps)
+        clips[f"face_{_mood}"] = make_face_overlay(_mood, _len, _steps)
+
+    # ================================================================================================
+    # 14c. SIGNATURE LIONESS & CUB BEHAVIORS (Ambush Freeze, Maternal Cub Groom, Play-Pounce, Wrestle, Mama Nuzzle)
+    # ================================================================================================
+    if is_lns:
+        # L1. AMBUSH_FREEZE (2.40s loop) — Belly-flat tall-grass hunter freeze (chains smoothly w/ stalk -> stalk_leap_bite!)
+        def make_ambush_freeze():
+            L, N = 2.40, 36
+            def frame(i, t):
+                ph = 2.0 * math.pi * t / L
+                br = math.sin(ph)
+                # Subtle hypnotic tail-tip hunter twitch!
+                tw = math.sin(2.0 * ph) * 16.0
+                dy = -5.10 * sc + 0.10 * sc * br
+                p = {
+                    "root": {"position": [0.0, 0.0, 0.0], "rotation": [0.0, 0.0, 0.0]},
+                    "body": {"position": [0.0, dy, 0.0], "rotation": [1.8, 0.0, 0.0]},
+                    "chest": {"rotation": [8.0 - 0.5 * br, 0.0, 0.0]},
+                    "waist": {"rotation": [-3.0 + 0.4 * br, 0.0, 0.0]},
+                    "hips": {"rotation": [-3.2, 0.0, 0.0]},
+                    "neck": {"rotation": [12.0, 0.0, 0.0]},
+                    "head": {"rotation": [-19.5, 1.5 * math.sin(ph), 0.0]},
+                    "jaw": {"rotation": [0.0, 0.0, 0.0]},
+                    "tongue": {"position": [0.0, 0.0, 0.0], "rotation": [0.0, 0.0, 0.0]},
+                    "tongue_tip": {"rotation": [0.0, 0.0, 0.0]},
+                    "ear_left": {"rotation": [-12.0, 12.0, 6.0]},
+                    "ear_right": {"rotation": [-12.0, -12.0, -6.0]},
+                }
+                rig.set_eyes(p, wide=0.65, squint=0.35, pupil_scale=1.34, brow_y=-0.12, brow_tilt=6.0, look_x=0.06 * math.sin(ph))
+                targs = rest_targets(x_pad=1.25)
+                for tag in ("fl", "fr"):
+                    s_sign = rig.fore[tag]["side"]
+                    targs[tag]["pos"][2] -= 2.2 * sc
+                    targs[tag]["pole"] = [s_sign * 0.58, 0.18, 1.0]
+                for tag in ("bl", "br"):
+                    targs[tag]["hock"] = 48.0
+                rig.solve_legs(p, targs)
+                return p, 24.0, tw, 2.0 * br, [0.0, 0.0, 0.0]
+            return _bake_clip(rig, L, N, frame, loop=True, tail_lag=0.07, mane_lag=0.07)
+
+        # L2. CUB_GROOM (3.20s) — Affectionate maternal dip & 3 slow gentle upward tongue licks onto a cub in front!
+        def make_cub_groom():
+            L, N = 3.20, 64
+            def lick(t, t0, dur):
+                if t < t0 or t > t0 + dur:
+                    return 0.0, 0.0
+                u = (t - t0) / dur
+                if u < 0.25:
+                    e = ease(u / 0.25)
+                    return e, -e
+                if u < 0.72:
+                    return 1.0, -1.0 + 2.0 * ease((u - 0.25) / 0.47)
+                e = 1.0 - ease((u - 0.72) / 0.28)
+                return e, e
+
+            def frame(i, t):
+                dip = _kscal(t, ((0.0, 0.0), (0.48, 1.0), (2.68, 1.0), (L, 0.0)))
+                e1, s1 = lick(t, 0.56, 0.64)
+                e2, s2 = lick(t, 1.28, 0.66)
+                e3, s3 = lick(t, 2.02, 0.62)
+                ext = max(e1, e2, e3)
+                swp = s1 + s2 + s3
+                p = {
+                    "root": {"position": [0.0, 0.0, 0.0], "rotation": [0.0, 0.0, 0.0]},
+                    "body": {"position": [0.0, -0.20 * sc - 1.6 * sc * dip, -1.2 * sc * dip], "rotation": [5.5 * dip, 0.0, 0.0]},
+                    "chest": {"rotation": [5.0 * dip - 1.5 * swp, 0.0, 0.0]},
+                    "waist": {"rotation": [-3.0 * dip, 0.0, 0.0]},
+                    "hips": {"rotation": [-2.2 * dip, 0.0, 0.0]},
+                    "neck": {"rotation": [26.0 * dip - 6.5 * swp, 3.0 * dip, 0.0]},
+                    "head": {"rotation": [12.0 * dip - 9.0 * swp, 4.0 * dip, 5.0 * dip], },
+                    "jaw": {"rotation": [16.0 * ext, 0.0, 0.0]},
+                    "tongue": {"position": [0.0, -0.06 * sc * ext, -2.2 * sc * ext], "rotation": [14.0 * ext, 0.0, 0.0]},
+                    "tongue_tip": {"rotation": [(8.0 + 20.0 * max(0.0, swp)) * ext, 0.0, 0.0]},
+                    "ear_left": {"rotation": [-8.0 * dip, -10.0 * dip, -10.0 * dip]},
+                    "ear_right": {"rotation": [-8.0 * dip, 10.0 * dip, 10.0 * dip]},
+                }
+                rig.set_eyes(p, blink=pulse(t, 1.50, 0.14, 0.22, 0.16) * 0.90, squint=0.52 * dip, look_y=-0.12 * dip)
+                targs = rest_targets(x_pad=0.55 * dip)
+                rig.solve_legs(p, targs)
+                return p, 34.0 * dip, 12.0 * dip * math.sin(2.0 * math.pi * t / L), 2.0 * dip, [0.0, 0.0, 0.0]
+            return _bake_clip(rig, L, N, frame, loop=False, tail_lag=0.09, mane_lag=0.09)
+
+        clips["ambush_freeze"] = make_ambush_freeze()
+        clips["cub_groom"] = make_cub_groom()
+
+    if is_cub:
+        # C1. PLAY_POUNCE (1.65s) — Low play-crouch -> iconic rapid BUTT-WIGGLE -> high goofy spring-leap -> paw splat!
+        def make_play_pounce():
+            L, N = 1.65, 50
+            def frame(i, t):
+                crouch = _kscal(t, ((0.0, 0.0), (0.18, 1.0), (0.64, 1.0), (0.86, 0.0), (L, 0.0)))
+                wig_env = pulse(t, 0.20, 0.08, 0.34, 0.10)
+                wig = wig_env * math.sin(2.0 * math.pi * (t - 0.20) * 5.2)
+                u_air = _clamp((t - 0.68) / 0.50, 0.0, 1.0)
+                arc = math.sin(math.pi * u_air) if 0.68 <= t <= 1.18 else 0.0
+                splat = pulse(t, 1.16, 0.08, 0.10, 0.24)
+                dy = -0.18 * sc - 3.6 * sc * crouch + 8.4 * sc * arc - 2.2 * sc * splat
+                dz = 2.0 * sc * crouch - 4.0 * sc * arc - 2.4 * sc * splat
+                body_p = 10.0 * crouch - 18.0 * math.sin(math.pi * _clamp((t - 0.68) / 0.26, 0.0, 1.0)) + 13.0 * math.sin(math.pi * _clamp((t - 0.94) / 0.24, 0.0, 1.0)) + 4.0 * splat
+                p = {
+                    "root": {"position": [0.0, 0.0, 0.0], "rotation": [0.0, 0.0, 0.0]},
+                    "body": {"position": [0.45 * sc * wig, dy, dz], "rotation": [body_p, 4.0 * wig, 5.0 * wig]},
+                    "chest": {"rotation": [8.0 * crouch - 10.0 * arc + 5.0 * splat, -4.0 * wig, -3.0 * wig]},
+                    "waist": {"rotation": [-5.0 * crouch + 12.0 * arc, 16.0 * wig, 10.0 * wig]},
+                    "hips": {"rotation": [-6.0 * crouch + 10.0 * arc, 20.0 * wig, 12.0 * wig]},
+                    "neck": {"rotation": [11.0 * crouch - 5.0 * arc + 4.0 * splat, -5.0 * wig, 0.0]},
+                    "head": {"rotation": [-19.0 * crouch + 4.0 * arc - 6.0 * splat, -4.0 * wig, 0.0]},
+                    "jaw": {"rotation": [24.0 * arc + 10.0 * splat, 0.0, 0.0]},
+                    "tongue": {"position": [0.0, 0.0, 0.0], "rotation": [4.0 * arc, 0.0, 0.0]},
+                    "tongue_tip": {"rotation": [8.0 * arc, 0.0, 0.0]},
+                    "ear_left": {"rotation": [12.0 * crouch - 6.0 * arc, 14.0 * crouch, 8.0 * crouch]},
+                    "ear_right": {"rotation": [12.0 * crouch - 6.0 * arc, -14.0 * crouch, -8.0 * crouch]},
+                }
+                rig.set_eyes(p, wide=0.90 * max(crouch, arc), pupil_scale=1.36, brow_y=0.20 * crouch)
+                targs = rest_targets(x_pad=0.80 * max(crouch, splat))
+                for tag in ("fl", "fr"):
+                    w = rig.fore[tag]["wr"]
+                    s_sign = rig.fore[tag]["side"]
+                    targs[tag] = {
+                        "pos": [w[0] + s_sign * (0.9 * crouch + 1.8 * arc + 1.2 * splat) * sc,
+                                w[1] + 7.2 * sc * arc,
+                                w[2] - (1.8 * crouch + 6.8 * arc + 2.4 * splat) * sc],
+                        "toe": 26.0 * arc,
+                    }
+                for tag in ("bl", "br"):
+                    a = rig.hind[tag]["an"]
+                    s_sign = rig.hind[tag]["side"]
+                    targs[tag] = {
+                        "pos": [a[0] + s_sign * 0.9 * sc * crouch, a[1] + 5.8 * sc * arc, a[2] + 6.2 * sc * arc],
+                        "toe": 28.0 * arc,
+                        "hock": _clamp(rig.hind[tag]["rest_hock"] + 22.0 * crouch - 10.0 * arc + 10.0 * splat, 12.0, 56.0),
+                    }
+                rig.solve_legs(p, targs)
+                # Tiny playful milk claws flash 55% mid-leap & retract on splat!
+                f_c = 0.55 * _kscal(t, ((0.0, 0.0), (0.68, 0.0), (0.80, 1.0), (1.14, 1.0), (1.30, 0.0), (L, 0.0)))
+                rig.set_claws(p, fl=f_c, fr=f_c, hook=0.8 if arc > 0.2 else 0.0)
+                return p, 52.0 * crouch + 40.0 * arc + 24.0 * splat, 32.0 * wig, -4.0 * arc, [0.0, 0.0, 0.0]
+            return _bake_clip(rig, L, N, frame, loop=False, tail_lag=0.055, mane_lag=0.055)
+
+        # C2. PLAY_WRESTLE (2.20s) — Playful side-shoulder flop & alternating front paw-bats in the air (0.00 px clip!)
+        def make_play_wrestle():
+            L, N = 2.20, 56
+            def frame(i, t):
+                # Lift front paws cleanly UP before rolling onto shoulder & unroll before planting (0.00 px clip!)
+                lift_f = _kscal(t, ((0.0, 0.0), (0.18, 1.0), (1.92, 1.0), (L, 0.0)))
+                flop = _kscal(t, ((0.0, 0.0), (0.14, 0.0), (0.46, 1.0), (1.64, 1.0), (1.98, 0.0), (L, 0.0)))
+                bat_l = flop * math.sin(2.0 * math.pi * (t - 0.44) * 2.4)
+                bat_r = flop * math.sin(2.0 * math.pi * (t - 0.44) * 2.4 + math.pi)
+                p = {
+                    "root": {"position": [0.0, 0.0, 0.0], "rotation": [0.0, 0.0, 0.0]},
+                    "body": {"position": [0.7 * sc * flop, -0.18 * sc - 1.8 * sc * flop, 0.0],
+                             "rotation": [-12.0 * flop, 6.0 * flop, 34.0 * flop]},
+                    "chest": {"rotation": [-6.0 * flop, 8.0 * flop + 6.0 * bat_l, 10.0 * flop]},
+                    "waist": {"rotation": [-4.0 * flop, -8.0 * flop, -12.0 * flop]},
+                    "hips": {"rotation": [-6.0 * flop, -6.0 * flop, -14.0 * flop]},
+                    "neck": {"rotation": [10.0 * flop, -14.0 * flop, -18.0 * flop]},
+                    "head": {"rotation": [8.0 * flop, -10.0 * flop + 6.0 * bat_l, -20.0 * flop]},
+                    "jaw": {"rotation": [22.0 * flop + 6.0 * abs(bat_l), 0.0, 0.0]},
+                    "tongue": {"position": [0.0, 0.0, 0.0], "rotation": [5.0 * flop, 0.0, 0.0]},
+                    "tongue_tip": {"rotation": [10.0 * flop, 0.0, 0.0]},
+                    "ear_left": {"rotation": [-12.0 * flop, -10.0 * flop, -14.0 * flop]},
+                    "ear_right": {"rotation": [-8.0 * flop, 10.0 * flop, 12.0 * flop]},
+                }
+                rig.set_eyes(p, wide=0.88 * flop, pupil_scale=1.35, brow_y=0.16 * flop, look_x=-0.16 * flop)
+                targs = rest_targets(x_pad=0.75 * flop)
+                for tag in ("bl", "br"):
+                    s_sign = rig.hind[tag]["side"]
+                    targs[tag]["hock"] = _clamp(rig.hind[tag]["rest_hock"] + 22.0 * flop, 12.0, 56.0)
+                    targs[tag]["pole"] = [s_sign * 0.60, 0.25, -0.85]
+                fb = _kscal(t, ((0.0, 0.0), (0.06, 1.0), (2.06, 1.0), (L, 0.0)))
+                fl1 = [-68.0 * lift_f + 16.0 * bat_l, -18.0 * flop, -14.0 * flop]
+                fl2 = [34.0 * lift_f + 22.0 * bat_l, -24.0 * flop, 0.0]
+                flP = [26.0 * flop + 12.0 * bat_l, 0.0, 0.0]
+                fr1 = [-72.0 * lift_f + 16.0 * bat_r, 22.0 * flop, 16.0 * flop]
+                fr2 = [32.0 * lift_f + 22.0 * bat_r, 26.0 * flop, 0.0]
+                frP = [26.0 * flop + 12.0 * bat_r, 0.0, 0.0]
+                targs["fl"] = {"pos": [targs["fl"]["pos"][0], targs["fl"]["pos"][1] + 2.8 * sc * lift_f, targs["fl"]["pos"][2]],
+                               "fk": (fl1, fl2, flP), "fk_blend": fb}
+                targs["fr"] = {"pos": [targs["fr"]["pos"][0], targs["fr"]["pos"][1] + 2.8 * sc * lift_f, targs["fr"]["pos"][2]],
+                               "fk": (fr1, fr2, frP), "fk_blend": fb}
+                rig.solve_legs(p, targs)
+                rig.set_claws(p, fl=0.42 * flop * max(0.0, bat_l), fr=0.42 * flop * max(0.0, bat_r), hook=0.5)
+                return p, 64.0 * flop, 24.0 * bat_l, 4.0 * flop, [0.0, 0.0, 0.0]
+            return _bake_clip(rig, L, N, frame, loop=False, tail_lag=0.07, mane_lag=0.07)
+
+        # C3. MAMA_NUZZLE (1.85s) — Happy high tail + nose stretched UP high with closed trusting eyes for affectionate chin-bumps!
+        def make_mama_nuzzle():
+            L, N = 1.85, 42
+            def frame(i, t):
+                nuz = _kscal(t, ((0.0, 0.0), (0.34, 1.0), (1.42, 1.0), (L, 0.0)))
+                bump = nuz * math.sin(2.0 * math.pi * _clamp((t - 0.30) / 1.15, 0.0, 1.0))
+                p = {
+                    "root": {"position": [0.0, 0.0, 0.0], "rotation": [0.0, 0.0, 0.0]},
+                    "body": {"position": [0.5 * sc * bump, -0.15 * sc + 0.55 * sc * nuz, -1.2 * sc * nuz],
+                             "rotation": [-5.5 * nuz, 4.0 * bump, 3.0 * bump]},
+                    "chest": {"rotation": [-6.5 * nuz, 5.0 * bump, 4.0 * bump]},
+                    "waist": {"rotation": [3.5 * nuz, -3.0 * bump, -2.0 * bump]},
+                    "hips": {"rotation": [2.5 * nuz, -2.0 * bump, 0.0]},
+                    "neck": {"rotation": [-22.0 * nuz, 10.0 * bump, -8.0 * bump]},
+                    "head": {"rotation": [-14.0 * nuz - 5.0 * abs(bump), 14.0 * bump, -14.0 * bump]},
+                    "jaw": {"rotation": [0.0, 0.0, 0.0]},
+                    "tongue": {"position": [0.0, 0.0, 0.0], "rotation": [0.0, 0.0, 0.0]},
+                    "tongue_tip": {"rotation": [0.0, 0.0, 0.0]},
+                    "ear_left": {"rotation": [-6.0 * nuz, -10.0 * nuz, -12.0 * nuz]},
+                    "ear_right": {"rotation": [-6.0 * nuz, 10.0 * nuz, 12.0 * nuz]},
+                }
+                rig.set_eyes(p, blink=0.88 * nuz, squint=0.55 * nuz, look_y=0.14 * nuz)
+                targs = rest_targets(x_pad=0.25 * nuz)
+                step = pulse(t, 0.22, 0.16, 0.06, 0.14)
+                targs["fl"]["pos"][1] += 1.6 * sc * step
+                targs["fl"]["pos"][2] -= 1.4 * sc * nuz
+                rig.solve_legs(p, targs)
+                return p, 68.0 * nuz, 18.0 * bump, 4.0 * nuz, [0.0, 0.0, 0.0]
+            return _bake_clip(rig, L, N, frame, loop=False, tail_lag=0.075, mane_lag=0.075)
+
+        clips["play_pounce"] = make_play_pounce()
+        clips["play_wrestle"] = make_play_wrestle()
+        clips["mama_nuzzle"] = make_mama_nuzzle()
+
+    # 14b. CLAWS_OUT OVERLAY (2.00s loop) — Claws-only parallel GeckoLib controller layer (touches ONLY toe_* & claw_*!)
+    def make_claws_out_overlay():
+        L, N = 2.00, 20
+        def frame(t):
+            pulse_c = 0.94 + 0.06 * math.sin(2.0 * math.pi * t / L)
+            p = {}
+            rig.set_claws(p, fl=pulse_c, fr=pulse_c, bl=0.65 * pulse_c, br=0.65 * pulse_c, hook=0.35)
+            return p
+        made = clip(L, frame, N, loop=True)
+        _unwrap(made)
+        return made
+
+    clips["claws_out"] = make_claws_out_overlay()
 
     # 15 & 16. BLOCKMOVES: step_up_1000 & step_down_1000
     # NOTE: BlockMoves (and clip_check.py) ADD "path root t dy dz" onto the root at playback, so root.position

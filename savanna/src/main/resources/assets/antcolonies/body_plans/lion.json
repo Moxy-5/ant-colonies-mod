@@ -61,10 +61,15 @@
   "tongue": "tongue",
   "tongue_tip": "tongue_tip",
   "carry": "carry",
+  "nose": "nose",
   "ear_left": "ear_left",
   "ear_right": "ear_right",
+  "brow_left": "brow_left",
+  "brow_right": "brow_right",
   "lid_left": "lid_left",
   "lid_right": "lid_right",
+  "ulid_left": "ulid_left",
+  "ulid_right": "ulid_right",
   "pupil_left": "pupil_left",
   "pupil_right": "pupil_right",
   "mane_crown": "mane_crown",
@@ -79,17 +84,49 @@
   "leg_fl_1": "leg_fl_1",
   "leg_fl_2": "leg_fl_2",
   "leg_fl_paw": "leg_fl_paw",
+  "toe_fl_0": "toe_fl_0",
+  "claw_fl_0": "claw_fl_0",
+  "toe_fl_1": "toe_fl_1",
+  "claw_fl_1": "claw_fl_1",
+  "toe_fl_2": "toe_fl_2",
+  "claw_fl_2": "claw_fl_2",
+  "toe_fl_3": "toe_fl_3",
+  "claw_fl_3": "claw_fl_3",
   "leg_fr_1": "leg_fr_1",
   "leg_fr_2": "leg_fr_2",
   "leg_fr_paw": "leg_fr_paw",
+  "toe_fr_0": "toe_fr_0",
+  "claw_fr_0": "claw_fr_0",
+  "toe_fr_1": "toe_fr_1",
+  "claw_fr_1": "claw_fr_1",
+  "toe_fr_2": "toe_fr_2",
+  "claw_fr_2": "claw_fr_2",
+  "toe_fr_3": "toe_fr_3",
+  "claw_fr_3": "claw_fr_3",
   "leg_bl_1": "leg_bl_1",
   "leg_bl_2": "leg_bl_2",
   "leg_bl_3": "leg_bl_3",
   "leg_bl_paw": "leg_bl_paw",
+  "toe_bl_0": "toe_bl_0",
+  "claw_bl_0": "claw_bl_0",
+  "toe_bl_1": "toe_bl_1",
+  "claw_bl_1": "claw_bl_1",
+  "toe_bl_2": "toe_bl_2",
+  "claw_bl_2": "claw_bl_2",
+  "toe_bl_3": "toe_bl_3",
+  "claw_bl_3": "claw_bl_3",
   "leg_br_1": "leg_br_1",
   "leg_br_2": "leg_br_2",
   "leg_br_3": "leg_br_3",
-  "leg_br_paw": "leg_br_paw"
+  "leg_br_paw": "leg_br_paw",
+  "toe_br_0": "toe_br_0",
+  "claw_br_0": "claw_br_0",
+  "toe_br_1": "toe_br_1",
+  "claw_br_1": "claw_br_1",
+  "toe_br_2": "toe_br_2",
+  "claw_br_2": "claw_br_2",
+  "toe_br_3": "toe_br_3",
+  "claw_br_3": "claw_br_3"
  },
  "checks": {
   "px": 0.0625,
@@ -115,6 +152,14 @@
    "rest_stretch_up",
    "pride_greet",
    "groom",
+   "mood_content",
+   "mood_alert",
+   "mood_curious",
+   "mood_angry",
+   "mood_fearful",
+   "mood_submissive",
+   "mood_sleepy",
+   "mood_flehmen",
    "sit_down",
    "sit",
    "sit_up",
@@ -147,7 +192,15 @@
    "takedown_pin",
    "bluff_charge",
    "pride_greet",
-   "groom"
+   "groom",
+   "mood_content",
+   "mood_alert",
+   "mood_curious",
+   "mood_angry",
+   "mood_fearful",
+   "mood_submissive",
+   "mood_sleepy",
+   "mood_flehmen"
   ],
   "body_bones": [
    "chest",
@@ -316,6 +369,70 @@
    ],
    [
     "pride_greet",
+    "idle"
+   ],
+   [
+    "idle",
+    "mood_content"
+   ],
+   [
+    "mood_content",
+    "idle"
+   ],
+   [
+    "idle",
+    "mood_alert"
+   ],
+   [
+    "mood_alert",
+    "idle"
+   ],
+   [
+    "idle",
+    "mood_curious"
+   ],
+   [
+    "mood_curious",
+    "idle"
+   ],
+   [
+    "idle",
+    "mood_angry"
+   ],
+   [
+    "mood_angry",
+    "idle"
+   ],
+   [
+    "idle",
+    "mood_fearful"
+   ],
+   [
+    "mood_fearful",
+    "idle"
+   ],
+   [
+    "idle",
+    "mood_submissive"
+   ],
+   [
+    "mood_submissive",
+    "idle"
+   ],
+   [
+    "idle",
+    "mood_sleepy"
+   ],
+   [
+    "mood_sleepy",
+    "idle"
+   ],
+   [
+    "idle",
+    "mood_flehmen"
+   ],
+   [
+    "mood_flehmen",
     "idle"
    ],
    [

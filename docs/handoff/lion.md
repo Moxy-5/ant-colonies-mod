@@ -1,6 +1,6 @@
 # African Lion Pride (`antcolonies:lion`, `savanna`) — Model & Animation Handoff (Neon -> Claude)
 
-**Status:** Updated 2026-11-24 (`lion` v3 snapshot saved: locked **Variation B · Sleek Athletic Sprinter** bone-aligned hind-leg muscles + clean bone-aligned upper foreleg shoulders across the entire Pride, plus **Hybrid Planted-IK / Airborne-Direct-FK** combat & combo suite expanding from 20 -> **30 clips per Pride member**: all 3 Direct-FK swipes `swipe`/`swipe_heavy`/`swipe_quick` + `swipe_combo`, `jump_smack`, `stalk_leap_bite`, `gallop_swat`, `takedown_pin`, `bluff_charge`, `rest_stretch_up`, and `pride_greet`). All 18 game files exported with `game_faces=True`, all 3 body plans registered in `body_plans/index.json` (`body_plan.py check`: `lion: OK`, `lioness: OK`, `lion_cub: OK`; all under `BOX_BUDGET`), and **`clip_check.py` verified 0 flags / 0.00 px ground-or-step clipping across all 120 clips and 200 transitions** (`lion`, `lion_kalahari`, `lioness`, `lion_cub`).
+**Status:** Updated 2026-11-24 (`v5` — Facial Emotions w/ flush dual eyelids `lid_*`/`ulid_*`, tangent-plane `pupil_*` tracking & dilation, animated sniffing `nose`; **V02 · Splaying Hunter Retractable Claws** [`toe_*_0..3` + `claw_*_0..3` + 3-lobe clover beans + `claws_out` parallel overlay] wired with authentic big-cat claw timing; plus **Lioness & Cub shared-geo coat/age textures** and **6 new signature behaviors**: `ambush_freeze`, `cub_groom`, `cub_call`, `play_pounce`, `play_wrestle`, `mama_nuzzle`). All 21 game files exported with `game_faces=True`, all 3 body plans OK, and **`clip_check.py` verified 0 flags / 0.00 px ground clipping across all clips and switches** (`lion`: 47 clips, `lioness`: 47 clips, `lion_cub`: 41 clips).
 
 ---
 
@@ -9,11 +9,14 @@
 ### Models & Textures (`scale = 1.0`, `16 px = 1 block`)
 | Pride Member / Variant | Geo (`geo/entity/`) | Texture (`textures/entity/`) | Size (`L × H × W` blocks) | Boxes / Budget | Bones | Notes |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
-| **Male · Savanna Pride King** *(default)* | `lion.geo.json` | `lion.png` | `4.66 × 2.03 × 1.55` | `264 / 400` | `40` | Locked **Stalker King** head, **Sleek Athletic Sprinter** bone-aligned legs, fiery ginger crown, chestnut-charcoal cape, jet-black chest apron, detailed 3D mouth/fangs/2-bone tongue. |
-| **Male · Golden Savanna Monarch** | `lion.geo.json` *(100% shared!)* | `lion_monarch.png` | `4.66 × 2.03 × 1.55` | `264 / 400` | `40` | Pure texture swap on `lion.geo.json` (classic warm golden Pride Rock palette). |
-| **Male · Kalahari Black-Maned Patriarch** | `lion_kalahari.geo.json` | `lion_kalahari.png` | `4.66 × 2.03 × 1.63` | `267 / 400` | `40` | Heavier `1.11×` build, deeper obsidian mane, rooted lower belly fringe & bone-aligned elbow tufts. Shares `lion.animation.json`! |
-| **African Lioness** *(adult female)* | `lioness.geo.json` | `lioness.png` | `4.09 × 1.75 × 0.88` | `222 / 400` | `36` | Bespoke sleek hunter with bone-aligned Sleek Sprinter legs, smooth curving neck, creamy brisket, relaxed calm face, detailed mouth & prominent black-backed ears. |
-| **African Lion Cub** *(young)* | `lion_cub.geo.json` | `lion_cub.png` | `2.16 × 1.20 × 0.63` | `206 / 250` | `36` | Authentic cub proportions: big expressive head, bright amber eyes, rosy button nose, bone-aligned limbs, chunky paws, detailed mouth & fading cub rosettes. |
+| **Male · Savanna Pride King** *(default)* | `lion.geo.json` | `lion.png` | `4.66 × 2.03 × 1.55` | `322 / 400` | `77` | Locked **Stalker King** head, **Sleek Athletic Sprinter** legs, **V02 Splaying Hunter** retractable-claw paws (`toe_*_0..3` + `claw_*_0..3`), `brow_*` + flush dual `lid_*`/`ulid_*` + tangent `pupil_*` + sniffing `nose`, detailed 3D mouth & 2-bone tongue. |
+| **Male · Golden Savanna Monarch** | `lion.geo.json` *(100% shared!)* | `lion_monarch.png` | `4.66 × 2.03 × 1.55` | `322 / 400` | `77` | Pure texture swap on `lion.geo.json` (classic warm golden Pride Rock palette). |
+| **Male · Kalahari Black-Maned Patriarch** | `lion_kalahari.geo.json` | `lion_kalahari.png` | `4.66 × 2.03 × 1.63` | `325 / 400` | `77` | Heavier `1.11×` build, deeper obsidian mane, belly fringe & elbow tufts. Shares `lion.animation.json`! |
+| **Lioness · Serengeti Tawny** *(default)* | `lioness.geo.json` | `lioness.png` | `4.09 × 1.75 × 0.88` | `280 / 400` | `73` | Bespoke sleek hunter w/ V02 Splaying Hunter paws, full facial emotion/nose rig, creamy brisket, freckled slate nose. |
+| **Lioness · Kalahari Pale Sand** | `lioness.geo.json` *(100% shared!)* | `lioness_kalahari.png` | `4.09 × 1.75 × 0.88` | `280 / 400` | `73` | Pure texture swap: sun-bleached desert buff/sand coat w/ darker nose & ear rims. |
+| **Lioness · Prime Matriarch (Elder)** | `lioness.geo.json` *(100% shared!)* | `lioness_elder.png` | `4.09 × 1.75 × 0.88` | `280 / 400` | `73` | Pure texture swap: deeper ochre-russet coat & aged dark-slate nose. |
+| **Lion Cub · Spotted Young (2–5 mo)** *(default)* | `lion_cub.geo.json` | `lion_cub.png` | `2.16 × 1.20 × 0.64` | `244 / 250` | `73` | Bold chocolate rosettes, warm rosy-pink button nose, softer rosy-umber toe beans, delicate age-scaled translucent pearl-white milk claws. |
+| **Lion Cub · Juvenile (6–12 mo)** | `lion_cub.geo.json` *(100% shared!)* | `lion_cub_subadult.png` | `2.16 × 1.20 × 0.64` | `244 / 250` | `73` | Pure texture swap (scale up gently in Java `0.78× -> 1.15×`): fading ghost flank rosettes, richer golden coat, freckled pink-to-slate nose. |
 
 ### Animations, Body Plans & BlockMoves
 - **Animations (`animations/entity/`):**
@@ -34,13 +37,19 @@
 - **Bone Sockets & Interactive Bones:**
   - `root` (`[0,0,0]`): `BlockMoves` root anchor.
   - `carry` (parent `head`): `HeldCatch` prey-carrying socket right between the canines (`checks.carry` configured in all 3 body plans: `grip_ahead = 3.9 / 3.7 / 2.6`, `jaw_min = 14°`, `jaw_max = 48°`).
-  - `head`, `neck`, `jaw`, `tongue`, `tongue_tip`, `ear_left`, `ear_right`, `lid_left`, `lid_right`, `pupil_left`, `pupil_right`: full facial expression rig (sliding pupils + dropping eyelids + sealed 3D big-cat mouth with ridged palate, dark crimson throat, pigmented gumlines, 2-tier recurved canines, 6-tooth incisors, cheek carnassials & big 2-bone pink tongue).
+  - `head`, `neck`, `jaw`, `tongue`, `tongue_tip`, `nose`, `ear_left`, `ear_right`, `brow_left`, `brow_right`, `lid_left`, `lid_right`, `ulid_left`, `ulid_right`, `pupil_left`, `pupil_right`: full feline facial expression rig (angled brows, flush dual upper+lower eyelids meeting at a dark lash crease, sliding+scaling pupil dilation/constriction, sniffing/flaring nose, sealed 3D big-cat mouth & 2-bone pink tongue).
+  - **Parallel Face Controller (for Claude):** Run a second GeckoLib `AnimationController` ("face") playing any `face_*` clip (`face_content`, `face_alert`, `face_curious`, `face_angry`, `face_fearful`, `face_submissive`, `face_sleepy`, plus `face_flehmen` on adults) — these clips key **only** facial bones so they layer cleanly on top of `walk`, `stalk`, `trot`, `gallop`, `sit`, or `rest`!
+  - **Parallel Claws Controller (`claws_out`):** Standalone looping overlay touching **only** `toe_*_0..3` & `claw_*_0..3` bones so gameplay can also independently flare claws over any gait. All combat, leap, sprint-traction, stretch-bow, and angry/fearful clips already include built-in realistic claw retraction & extension!
   - `mane_crown`, `mane_cheeks`, `mane_shoulders`, `mane_chest` (males only): 4-bone secondary-inertia mane rig.
   - `tail_1..tail_5`: 5-bone S-curved tufted tail chain.
 
 ---
 
-## 3. Full Clip Catalogue (30 Clips per Pride Member)
+## 3. Full Clip Catalogue (`lion`: 47 | `lioness`: 47 | `lion_cub`: 41)
+
+*Roster notes:*
+- **Lioness (`47` clips):** Drops male-only `swipe_heavy` & `swipe_combo`; adds **`ambush_freeze`** & **`cub_groom`**; tunes `roar` (`2.50 s` sharper Pride Contact Call) & lower silky `stalk`.
+- **Cub (`41` clips):** Drops adult-only `roar`, `swipe_heavy`, `swipe_combo`, `jump_smack`, `stalk_leap_bite`, `gallop_swat`, `takedown_pin`, `bluff_charge`, `mood_flehmen`, `face_flehmen`; adds **`cub_call`**, **`play_pounce`**, **`play_wrestle`**, **`mama_nuzzle`**; tunes `mood_angry`/`face_angry` into puffed-up **Kitten Spit-Hiss**, `swipe`/`swipe_quick` into **Playful Paw-Bat** (`35%` milk-claw flick), `bite` into **Play-Nip**, and bouncier high-tail gaits!
 
 | Clip | Loop | Length (`Male / Lioness / Cub`) | Speed (`blocks/s`, Male / Lioness / Cub) | Gameplay Notes & Event Ticks |
 | :--- | :--- | :--- | :--- | :--- |
@@ -74,16 +83,28 @@
 | `death` | `hold` | `1.20 s` | — | Weighted collapse with IK paws splaying cleanly on `y = 0`, eyes closing & jaw relaxing (0 ground clip). |
 | `step_up_1000` | `hold` | `1.50 / 1.50 / 0.90 s` | BlockMove `step_up` | 1-block (`16 px`) ledge climb (`ahead_px = 32.0 / 28.1 / 20.2`). Adults step paw-by-paw; Cub performs a bouncy spring-hop! |
 | `step_down_1000` | `hold` | `1.50 / 1.50 / 0.90 s` | BlockMove `step_down` | 1-block (`16 px`) ledge descent (`ahead_px = 21.1 / 19.2 / 9.9`). Adults stride down with lifted tail; Cub hops playfully! |
+| `mood_content` / `face_content` | `true` | `3.80 s` | — | **Content / Affectionate:** soft almond lids, warm `0.65 s` trusting cat slow-blinks, level brow, neutral ears, relaxed gentle tail. |
+| `mood_alert` / `face_alert` | `true` | `3.00 s` | — | **Alert / Watchful:** wide bright lids, lifted brows, tall proud head carriage, twin forward radar ears, steady tail w/ tip twitch. |
+| `mood_curious` / `face_curious` | `true` | `3.40 s` | — | **Curious / Investigating:** dilated `1.34×` pupils, asymmetric lifted brow, forward-craned neck + `±15°` playful cat head-tilt, independently pivoting radar ears. |
+| `mood_angry` / `face_angry` | `true` | `2.80 s` | — | **Angry / Dominant Threat:** unblinking narrow glare, heavy `\ /` inward-down brows, constricted `0.76×` sharp pupils, lowered forward-thrust head, airplane ears, fang snarl, rigid lashing tail. |
+| `mood_fearful` / `face_fearful` | `true` | `2.80 s` | — | **Fearful / Defensive:** wide saucer eyes, `/ \` inner-up worried brows, `1.52×` dilated adrenaline pupils, darting gaze, pinned flat ears, defensive hiss, backward crouch w/ convex arched back & tucked tail. |
+| `mood_submissive` / `face_submissive` | `true` | `3.40 s` | — | **Submissive / Appeasing:** averted sideways/down gaze, nervous blinks, inner-up brows, head dipped low & turned politely away, dropped ears, compact low stance. |
+| `mood_sleepy` / `face_sleepy` | `true` | `4.20 s` | — | **Sleepy / Drowsy:** heavy `84%` drooping lids, slow `1.2 s` blink drift, drowsy chin nods, drooping ears, deep relaxed breaths. |
+| `mood_flehmen` / `face_flehmen` *(adults)* | `true` | `3.60 s` | — | **Flehmen / Scent-Sampling:** iconic real-lion scent face — neck & nose lifted high into the savanna breeze, dreamy half-closed eyes, active sniffing bursts, mouth slightly ajar (`14–19°`) with subtle tongue taste-flick. |
+| `claws_out` *(overlay)* | `true` | `2.00 s` | — | **Parallel Claws-Only Overlay:** touches only `toe_*_0..3` & `claw_*_0..3` to flare claws over any gait/posture. |
+| `ambush_freeze` *(Lioness)* | `true` | `2.40 s` | — | **Belly-Flat Grass Freeze:** ultra-low hunter freeze w/ forward radar ears, `1.34×` locked pupils & hypnotic tail-tip twitch (chains into `stalk_leap_bite`). |
+| `cub_groom` *(Lioness)* | `false` | `3.20 s` | — | **Maternal Cub Groom:** gentle crouch-dip w/ warm soft eyes & 3 slow upward affectionate tongue licks onto a cub in front. |
+| `cub_call` *(Cub)* | `false` | `1.60 s` | — | **Cub Contact Call:** replaces adult `roar` — chin tilted up, perky ears, bright eyes & squeaky `34°` *"mrr-row!"* call. |
+| `play_pounce` *(Cub)* | `false` | `1.65 s` | — | **Butt-Wiggle Play Pounce:** low play-crouch -> rapid hip/tail butt-wiggle (`0.20–0.64 s`) -> high spring-leap w/ `55%` pearl milk claws -> playful paw splat. |
+| `play_wrestle` *(Cub)* | `false` | `2.20 s` | — | **Play Wrestle Side-Roll:** lifts paws up, flops onto shoulder & bats both front paws alternately in the air w/ bright curious eyes (`0.00 px` clip). |
+| `mama_nuzzle` *(Cub)* | `false` | `1.85 s` | — | **Mama Nuzzle:** happy high greeting tail + stretches nose up high w/ trusting closed eyes for affectionate under-chin cheek-bumps. |
 
 ---
 
 ## 4. Maker & Verification Commands
-- **Maker:** `tools/lion_models.py` (models, palettes & exporter) + `tools/lion_anims.py` (hybrid Planted-IK / Airborne-Direct-FK animation & BlockMoves engine).
+- **Maker:** `tools/lion_models.py` (models, 8 Pride palettes & exporter) + `tools/lion_anims.py` (hybrid Planted-IK / Airborne-Direct-FK + V02 Splaying Hunter claws + facial emotion & BlockMoves engine).
 - **Regenerate all game files:** `python tools/lion_models.py game`
 - **Offline checks (all passed 2026-11-24):**
   - `python tools/body_plan.py check` (`lion: OK`, `lioness: OK`, `lion_cub: OK`)
-  - `python tools/body_plan.py boxes` (all 4 Pride models comfortably under budget: `264`, `267`, `222`, `206`)
-  - `python tools/clip_check.py lion --switches` (`0/50` flagged, `30/30` clips `0` flags / `0.00 px` ground clip)
-  - `python tools/clip_check.py lion --model lion_kalahari --switches` (`0/50` flagged, `30/30` clips `0` flags / `0.00 px` ground clip)
-  - `python tools/clip_check.py lioness --switches` (`0/50` flagged, `30/30` clips `0` flags / `0.00 px` ground clip)
-  - `python tools/clip_check.py lion_cub --switches` (`0/50` flagged, `30/30` clips `0` flags / `0.00 px` ground clip)
+  - `python tools/lion_models.py` (all 8 Pride looks `minY = 0.00`, comfortably under box budgets: Male `322/400`, Kalahari `325/400`, Lioness `280/400`, Cub `244/250`)
+  - `python tools/clip_check.py lion --switches`, `lioness --switches`, `lion_cub --switches` (**`0` changes flagged** across all switches, **`0` flags / `0.00 px` ground clip** across all clips!)
