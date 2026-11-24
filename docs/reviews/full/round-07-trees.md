@@ -16,7 +16,11 @@ theirs kept here was checked against the code again by the main reader.
 2. Placing (`TreePlacer`, the structures and pieces, `GroundHeights`, the features): done.
 3. The shape makers (`AcaciaShape`, `UmbrellaShape`, `BaobabShape`, `FigShape`, `DoumShape`, `PalmPieces`,
    `TreeShapes`, `TreeDraw`, `TreeVoxels`, `TreeKind`): done.
-4. The tree blocks: **not written yet** (added in the next save).
+4. The tree blocks (the 31 block classes, `registry/TreeBlocks`, their loot tables, tags and block states, the doum
+   palm's model code `client/DoumModel`): done. Their findings are R7-27 to R7-36, in part 5.
+
+**Every file of the system is read; the round is complete.** A finding rated A gets its `docs/BUGS.md` number
+(`python tools/bug_number.py`) when a fix session takes it up; none was added in this reading round.
 
 **How to read a finding.** Rating: **A** the player can meet it, **B** it will cost us when building on this,
 **C** a tidy-up. Proof: **proven** (the path was walked through the code line by line), **likely** (the code says
@@ -54,6 +58,16 @@ test yet.
 | R7-24 | B | proven | The tree kind files are read from inside the mod, not from data packs, and `umbrella_thorn.json` holds numbers nothing reads |
 | R7-25 | C | proven | Trial and leftover code, and comments that no longer match |
 | R7-26 | B | proven | Test gaps on the risky findings above |
+| R7-27 | A | proven | Every fig branch, however thin it is drawn, is a full solid cube to walk on, bump into and click |
+| R7-28 | A | proven | Shears on a fruit bunch give endless figs and doum nuts: a bunch put back by hand is ripe again |
+| R7-29 | A | proven code, likely in play | Animals walk straight into thorny twigs: Minecraft's path planner is never told they hurt |
+| R7-30 | B | proven code, likely in play | The river animals' "where is the ground" stops on top of a tree's crown, so they never use the ground under one; the fix already exists in the framework |
+| R7-31 | B | proven | A tree cut at the trunk leaves its whole crown hanging for good; a burnt fig or palm leaves pieces in the air |
+| R7-32 | B | proven | Fruit only moves on while a player is near; a bare tree far from the base stays bare for most of its cycle |
+| R7-33 | A | likely | A doum palm's crown is drawn by one block and reaches 6 blocks out of it: fronds can blink out at the screen's edge |
+| R7-34 | C | proven / likely | Small block slips (tool tag, a fire number, charred branches lose their taper, pods popping as items, eaten wood given back whole) |
+| R7-35 | C | unsure | Palm seedlings and rosettes need dirt under them; new land does not look at the ground (for round 8) |
+| R7-36 | C | proven | Tree blocks: unused code, comments that no longer match, tests missing |
 
 ---
 
@@ -587,6 +601,199 @@ play, step 8) should first split it into "live the days", "work out what should 
 
 ---
 
+## 5. The tree blocks (piece 4)
+
+**Lag: nothing to fix.** Checked one by one: only five blocks get random ticks (bracket fungus while it grows, the
+two fig bunches, the doum bunch, fallen fruit) and each tick is a dice roll and at most a few block changes; no tree
+block asks for a tick of its own; no block looks for entities or searches round itself; the leaves do not decay and
+never tick (a test guards it); the palm's block entity does not tick and has no per-frame drawing; no block gives
+light. Two small frame and memory notes are under R7-33 and R7-34.
+
+### R7-27 (A, proven). Every fig branch is a full cube
+
+**What is wrong.** A fig branch has six thicknesses, drawn 14 down to 4 pixels wide. Its solid shape is worked out
+with whole numbers: `(16 - width) / 2 / 16`, where `width` is a whole number, so the sum is 6 / 16 at most, which is
+0 in whole numbers. Every thickness gets the same shape: the whole block. (The acacia branches do the same sum with
+decimal numbers and are right.)
+
+**What the player sees.** A fig twig drawn 4 pixels thin stops the player and arrows a block away from the wood, has
+a full-block outline, holds torches and snow, lets mobs stand and spawn on it, and dims the light under it. For the
+ants and termites it matters more: their path finder sees a fig's whole crown of twigs as solid cubes.
+
+**Where.** `block/FigBranchBlock.java:39` (the sum), `61-63` (`width` returns `int`); compare
+`block/TaperingBranchBlock.java:37, 59` (`double`).
+
+**Proof.** `width(level) = 14 - 2 * level`, level 0 to 5, so `16 - width` is 2 to 12; `/ 2` gives 1 to 6; `/ 16` in
+whole numbers gives 0. `lo = 0`, `hi = 1`. The test `figBlocksPlaceJoinAndHang` checks `width`, never the shape.
+
+**Proposed fix.** `/ 2.0 / 16`, and one line in that test: a thinnest branch's shape is 4 pixels wide. Then look at
+a fig once in the game: the player and the insects will now pass between its twigs.
+
+### R7-28 (A, proven). Shears on a fruit bunch: endless fruit
+
+**What is wrong.** Two rules meet. A fruit bunch's starting state is "ripe", and placing one by hand only sets its
+place in the cycle, so a hand-placed bunch is always ripe. And shears (or silk touch) give the bunch itself back at
+any stage, bare too.
+
+**What the player does.** Picks a ripe bunch by hand (2 to 4 figs; the bunch goes bare), cuts the bare bunch with
+shears, puts it back: ripe again. The same for figs on the bark and for doum nuts.
+
+**Where.** `block/FigBunchBlock.java:34, 49-51`; `block/TrunkFigsBlock.java:47, 88`;
+`block/DoumPieceBlock.java:50, 72-74`; loot tables `fig_bunch.json`, `trunk_figs.json`, `doum_nut_bunch.json`.
+
+**Proposed fix.** A bunch placed by hand starts bare (bone meal still brings it on for builders).
+
+### R7-29 (A, proven in the code, likely in play). Animals do not know thorny twigs hurt
+
+**What is wrong.** A thorny twig slows and pricks any living thing but an insect, like a sweet berry bush; young
+acacias are covered in them. Minecraft's path planner only keeps mobs out of berry bushes and cactus because it knows
+those blocks by name; any other hurting block has to say so itself (`getBlockPathType`), and the twig does not. It
+has no solid shape either, so the planner sees open air.
+
+**What the player sees.** Cows, horses, pets and the mod's own land animals walk straight into young acacias, get
+pricked, panic and run through more twigs; some die of it over time. The same animals walk round berry bushes.
+
+**Where.** `block/ThornyTwigBlock.java:28-63` (no `getBlockPathType`); no use of `DAMAGE_OTHER` anywhere in the
+three mods. The one test pushes a pig through by force.
+
+**Proposed fix.** One override in `ThornyTwigBlock` that answers "hurts" (`PathType.DAMAGE_OTHER`). The ants and
+termites use their own path finder and are not touched (and are not pricked).
+
+### R7-30 (B, proven in the code, likely in play). The river animals' ground finder stops on top of a crown
+
+**What is wrong.** Minecraft's height map "without leaves" only leaves out Minecraft's own leaf blocks (by class,
+not by the leaves tag). Our tree leaves are their own class (on purpose: no decay), so under a giant crown that map
+answers "the crown's top". This was met before (BUGS 116) and the framework has the answer, `GroundTop`, which steps
+down through anything in the leaves tag. But these still ask the raw map: the hippo (2 places), monitor, otter,
+bullfrog, fly cloud (2), crocodile, `worldgen/SavannaSpawn.java:258`, `worldgen/RiverZones.java:133`, and the
+Matabele test command.
+
+**What the player sees.** Each of them then finds the answer is far from the animal or from the water and gives the
+spot up, so nothing breaks, but every column under a crown counts as "no place": hippos never graze there, monitors
+and otters never pick a spot there, flies never hang there. The figs and palms stand on the floodplain right beside
+the river, so this is a fair share of the bank.
+
+**Where.** `block/TreeLeavesBlock.java:15` (`extends Block`); `framework/.../colony/GroundTop.java` (the answer);
+`animal/HippoEntity.java:1016, 1129`, `MonitorEntity.java:1066`, `OtterEntity.java:1212`, `BullfrogEntity.java:558`,
+`FlyCloudEntity.java:319, 404`, `CrocodileEntity.java:1461`.
+
+**Proposed fix.** Use `GroundTop` in those places (for the animal rounds to take up; listed here because the cause
+is the tree leaves).
+
+### R7-31 (B, proven; the user's call). A cut tree's crown hangs for good
+
+**What is wrong.** Tree leaves never decay and no tree block checks what holds it up. When a player cuts a giant
+tree's trunk through at the foot, the tree book only ends the record (`Forest.java:535-537`); the trunk above the cut
+and the whole crown (5,000 to 13,000 blocks) stay in the air for good. Figs and doum palms are not in the book at
+all and burn like Minecraft's wood: a fire or an axe leaves fig leaf pads, limbs, a palm's crown, bunches and leaf
+stubs hanging.
+
+**What the player sees.** A floating giant crown over a stump, for good; after a fire on the floodplain, patches of
+fig leaves and a palm head in mid-air.
+
+**Where.** `tree/Forest.java:535-537`, `1084` (`cutThrough`); no `canSurvive` on `TreeLeavesBlock`, `FigLeavesBlock`,
+`TreeBranchBlock`, `FigBranchBlock`, `DoumPieceBlock`, `DoumLeafBaseBlock`.
+
+**Proposed fix (the user's call, it changes play).** My recommendation, the real thing: a tree cut through at the
+foot falls, the way a dead one already does (the fall, the log and the smashing are all built), instead of its record
+just ending. For the palm until its life in play: its crown, bunches and leaf bases drop when the stem behind them
+goes.
+
+### R7-32 (B, proven; a balance call). Fruit stands still when nobody is near
+
+**What is wrong.** Fruit moves on by random ticks, which only happen within about 128 blocks of a player. A bare
+bunch buds only if a tick reaches it inside its tree's budding window: 1 day in every 10 for a fig, 3 in 30 for a
+doum. Ripening is by dice on ticks too. So a tree away from the player is frozen, and a bare one the player comes
+back to stays bare until its next window (up to 9 days for a fig, 27 for a palm). New land starts 7 trees in 8 with
+fruit; once that has fallen, trees away from the base are bare nearly always.
+
+**What the player sees.** Fruit only on the trees they live beside; little for the animals that are to eat it along
+the rest of the river.
+
+**Where.** `block/HangingFruit.java:144-147` (`cropStarts`), `158-163` (the bare bunch's tick).
+
+**Proposed fix.** On a bare bunch's tick, work its stage out from the calendar (where in its cycle the tree is
+now), the same idea as the colonies' away timetable, instead of only starting inside the window.
+
+### R7-33 (A, likely; to be seen in the game). A palm's crown can blink out at the screen's edge
+
+**What is wrong.** A doum palm's whole crown (about 1,500 boxes, 9,000 faces) is drawn as the model of **one**
+block and reaches up to 6 blocks out of it. Minecraft decides what to draw by 16-block cubes of the world: when the
+cube holding that one block is off the screen, everything it draws goes, also the fronds still on the screen.
+
+**What the player sees.** Close to a palm, looking a little away from the crown's middle (flying in spectator, or
+standing under it looking out): the fronds in front of them vanish and come back as the view turns. From a distance
+it does not show.
+
+**Where.** `client/DoumModel.java:81-104`; `block/DoumPieceBlock.java:30-32` ("reaching up to 6 blocks out of it").
+Read from how Minecraft hides parts of the world, not seen in the game: **likely**.
+
+**Memory and frames (C, to measure).** `DoumModel` keeps the 24 crowns last drawn (about 2 MB each by the helper's
+sum, so about 45 MB at the worst); with more than 24 different crowns in view each redraw works one out again. A
+grown bunch works the whole crown out to keep only its own boxes. Scene to measure: a grove of 30 palms, frames and
+the time of `look.bits`.
+
+**Proposed fix.** Only if the user sees it: share a crown's faces out over the blocks they really lie in.
+
+### R7-34 (C). Small block slips
+
+- **Tool tag (likely).** `charred_wood_spores`, `charred_wood_wound`, `dead_wood`, `fallen_branch` and
+  `bracket_fungus` are in no tool list, so an axe breaks them at bare-hand speed beside wood that goes fast. (The
+  other marked woods are in `logs_that_burn`, which Minecraft's axe list takes in.)
+  `data/minecraft/tags/block/mineable/axe.json`.
+- **A fire number (proven).** `registry/TreeBlocks.java:404`: marked bleached wood is to "burn like the plain log
+  they mark", but the check compares with the bleached **log** while the pair is made from bleached **wood**, so it
+  is never true and the two blocks get 5 where plain bleached wood has 10.
+- **Charred branches lose their taper (proven).** `TreeBlocks.java:145`: `charred_branch` has one thickness; the
+  acacias' and dead trees' branches have ten. A tree that burns swaps thick limbs and thin twigs alike for one size.
+- **Pods pop as items (likely).** A camel thorn hangs a pod under about 1 leaf in 20 with air below it. A pod
+  whose leaf goes turns to air by its own rule and drops as an item, and the tree book changes blocks with full
+  updates (`Block.UPDATE_ALL`): a crown that sheds its dead leaves or shifts as it grows scatters pod items (some
+  tens at most). Bracket fungus, bark figs and frass drop the same way when their support goes.
+  `block/HangingPodsBlock.java:39-46`; `tree/AcaciaShape.java:514-524`.
+- **Eaten wood comes back whole (proven).** Breaking a half-eaten log or branch gives the block (or a stick) back
+  uneaten; placed again it is fresh food for the termites.
+- **`doum_crown` is in Minecraft's leaves tag.** Trees may grow through anything in that tag; one block replaced is
+  the whole crown gone. Rare.
+- **Block state counts.** About 9,000 states for five blocks (fig branch 4,608), against about 26,000 in all of
+  Minecraft: memory and loading time only.
+- **Leaves draw every inside face**, on Fast graphics too. To measure under a fig only if frames there are ever a
+  worry.
+
+### R7-35 (C, unsure; for round 8, the world's shaping). Do palm seedlings stand on their ground?
+
+Doum seedlings, rosettes and tree seedlings are Minecraft "bush" blocks: they only stay on dirt-like ground. New
+land puts them down without looking at the block under them, and the floodplain tree's foot is checked for biome,
+height and water, not for the ground block. Silt, river sand and river mud are not in the dirt list. If a palm can
+stand where the top block is one of those, its rosette and seedlings pop as items at the first block change beside
+them. I could not settle what the floodplain's top block is from the tree files. `block/DoumPlantBlock.java:20`,
+`block/TreeSeedlingBlock.java:16`, `worldgen/FloodplainTreePiece.java:126-134`,
+`worldgen/FloodplainTreeStructure.java:323-349`.
+
+### R7-36 (C, proven). Tree blocks: unused code, old comments, missing tests
+
+- **Unused:** `FallenFruitBlock.fruit()`; `HangingFruit.Fruit.unripe()` and its field; `FigBark.isDead()`. One rule
+  three times: "how far is this eaten" in `DeadTreeWoodBlock`, `DeadWoodBlock` and `FallenBranchBlock`.
+- **Comments that disagree:** `TreeBlocks.java:66-67` ("Nothing places them in the world yet"), `70` and `280`
+  (name `ModItems`, `ModBlocks`; they are `SavannaItems`, `SavannaBlocks`); `DeadWoodBlock.java:19` ("the last piece
+  leaves nothing"; a mud cast is left); `SavannaBlockEntities.java:16` (leaves out the fronds);
+  `TreeSeedlingBlock.java:13-14` (true for the three dry kinds only); `PlantPush.java:21`.
+- **No test for:** a branch's solid shape (how R7-27 got through); building acacia branches out by hand; mobs and
+  thorny twigs; a sheared bunch put back; palm seedlings on their ground; what is left of a cut or burnt fig or palm.
+
+---
+
+## What was looked at and dropped
+
+Checked against the code and found not to be a problem: a crash in `cutThrough` on wood without the "eaten"
+property (only reached for eaten wood, which has it); the fitted-shapes store being entered twice at once; two
+threads working one shape out (rare, the same answer, harmless); a fire's `hit.get(0)` on an empty list (the caller
+guards it); fire climbing a living trunk (a fire in the air beside wood that cannot burn dies on its first tick);
+an everlasting fire on the dry kinds (the same reason); bracket fungus spreading without end (one new knob at most,
+once, 1 in 3); fallen fruit piling up (a block, 3 to a column, gone in days).
+
+---
+
 ## What I found solid (do not "fix" these)
 
 - **Same seed, same tree, at every age and stage.** All shape dice come from `TreeRandom` seeded from the tree's own
@@ -615,3 +822,12 @@ play, step 8) should first split it into "live the days", "work out what should 
   a tree with nothing moving.
 - **No shape can leave the world or grow without end**: the tallest is about 36 blocks over its foot, the widest an
   ancient umbrella thorn at about 56.
+- **The tree blocks' ticking**: nothing ticks that need not; leaves never decay or tick; branches join one arm per
+  update with no chain of updates; thin pieces break under a piston, wash away in water.
+- **Fruit** (`HangingFruit`): one rule for the three fruit blocks, times in game days whatever the random tick speed,
+  fruit falls as a block and never as items, heaps capped at 3, the season asked in one place as the rule wants.
+- **The palm's block entity and model** (`DoumBlockEntity`, `DoumLook`, `DoumModel`): save, load and sending to the
+  player complete; nothing per tick or per frame; the store is safe under threads.
+- **Bracket fungus**: growth and spread bounded; it keeps the log's own properties when it dusts it with spores.
+- **Every tree block has a loot table and an item**; the shapes of bracket fungus, bark figs and leaf bases are right
+  on all four sides.
