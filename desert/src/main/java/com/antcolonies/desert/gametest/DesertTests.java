@@ -26,8 +26,6 @@ public final class DesertTests {
 
     /** Signs up the desert's tests (once, from {@code DesertMod}). */
     public static void signUp() {
-        // The legs: walking, climbing, ceilings, reloads of climbing ants.
-        TestFilter.addCategory("legs", NavigationTests.class);
         // The harvester ant's nest: digging, the hill, seeds, bread, eggs and larvae, hunger, the dead.
         TestFilter.addCategory("antnest", NestTests.class);
         // The colony: the virtual population, the lasting trails (brain part 4), neighbours.
@@ -36,8 +34,6 @@ public final class DesertTests {
         TestFilter.addCategory("away", HarvesterAwayTests.class);
         // Hills and uneven ground: the queen's level spot, the hill on a step.
         TestFilter.addCategory("hills", HarvesterHillTests.class);
-        // The body (the animation engine): naps, cleaning, noticing the player.
-        TestFilter.addCategory("body", HarvesterBodyTests.class);
 
         AwayKit.addPartsCheck(DesertTests::partsAreTheDeserts);
         // A trunk trail can reach 96 blocks and the arenas are about 45 apart: each colony's trails stop at its own

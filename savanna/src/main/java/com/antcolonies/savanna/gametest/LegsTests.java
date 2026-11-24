@@ -1,45 +1,64 @@
-package com.antcolonies.desert.gametest;
+package com.antcolonies.savanna.gametest;
 
+import com.antcolonies.gametest.TestAnts;
 import com.antcolonies.gametest.TestWatch;
+import com.antcolonies.savanna.SavannaMod;
+import com.antcolonies.savanna.registry.SavannaEntities;
 import java.util.List;
 
-import com.antcolonies.desert.DesertMod;
 import com.antcolonies.colony.Colony;
-import com.antcolonies.desert.colony.Hill;
 import com.antcolonies.colony.NestPlan;
 import com.antcolonies.entity.AbstractAntEntity;
-import com.antcolonies.desert.entity.QueenAntEntity;
-import com.antcolonies.desert.entity.WorkerAntEntity;
 import com.antcolonies.nav.Foothold;
 import com.antcolonies.nav.Route;
 import com.antcolonies.nav.StepKind;
-import com.antcolonies.desert.registry.DesertBlocks;
-import com.antcolonies.desert.registry.DesertEntities;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.gametest.framework.GameTest;
 import net.minecraft.gametest.framework.GameTestHelper;
+import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.phys.Vec3;
 import net.neoforged.neoforge.gametest.GameTestHolder;
 import net.neoforged.neoforge.gametest.PrefixGameTestTemplate;
 
 /**
- * Watches one ant at a time walk through a ready-made nest: a 3-deep shaft in the middle of the
- * test area, then four levels joined by a spiral staircase, each a tunnel going east and a room at the end.
+ * The legs, walked by savanna insects (the harvester removal, 2026-11-23: these were the harvester worker's
+ * {@code NavigationTests}; the rules are the shared navigator's and path finder's, so they moved here whole). A Matabele
+ * minor walks every scene; where a rule depends on the body's size (pits, edges, walls, ceilings) a termite worker, a
+ * third as long, walks it too; the queen's walk is the Matabele queen's, the biggest and slowest body.
+ *
+ * <p>The ground is a ready-made nest: a 3-deep shaft in the middle of the test area, then four levels joined by a
+ * spiral staircase, each a tunnel going east and a room at the end. Over its hole some scenes pile a stepped heap of
+ * soil (the shape of the harvester's hill, kept as ground to climb: three blocks high next to the hole, falling to
+ * one at its rim).
  */
-@GameTestHolder(DesertMod.MODID)
+@GameTestHolder(SavannaMod.MODID)
 @PrefixGameTestTemplate(false)
-public class NavigationTests {
+public class LegsTests {
     private static final int SURFACE = 12;
     private static final int MIDDLE = 12;
+    /** The stepped heap over the nest's hole reaches this far from it. */
+    private static final int HEAP_RADIUS = 3;
+
+    /** How high the heap is this far from the hole (0: no heap there; the hole itself stays open). */
+    private static int heapHeightAt(int dx, int dz) {
+        int distanceSquared = dx * dx + dz * dz;
+        if (distanceSquared == 0) {
+            return 0;
+        }
+        if (distanceSquared <= 2) {
+            return 3;
+        }
+        return distanceSquared <= 5 ? 2 : distanceSquared <= 10 ? 1 : 0;
+    }
 
     /** The queen (bigger and slower than a worker) walks from the seed store up the shaft to the surface and back down. */
     @GameTest(template = "arena", timeoutTicks = 5000, skyAccess = true)
     public static void queenWalksFromTheRoomUpToTheSurfaceAndBackDown(GameTestHelper helper) {
         buildNest(helper);
-        QueenAntEntity ant = helper.spawnWithNoFreeWill(DesertEntities.QUEEN_ANT.get(), MIDDLE + 8, SURFACE - 3, MIDDLE + 2);
+        AbstractAntEntity ant = helper.spawnWithNoFreeWill(SavannaEntities.MATABELE_QUEEN.get(), MIDDLE + 8, SURFACE - 3, MIDDLE + 2);
         BlockPos up = helper.absolutePos(new BlockPos(MIDDLE + 3, SURFACE, MIDDLE + 2));
         BlockPos down = helper.absolutePos(new BlockPos(MIDDLE + 8, SURFACE - 3, MIDDLE - 2));
         boolean[] wentUp = {false};
@@ -64,8 +83,12 @@ public class NavigationTests {
      */
     @GameTest(template = "arena", timeoutTicks = 600, skyAccess = true)
     public static void antToldToGoToItsOwnCellSurvivesBeingMovedAway(GameTestHelper helper) {
+        antToldToGoToItsOwnCellSurvivesBeingMovedAway(helper, SavannaEntities.MATABELE_MINOR.get());
+    }
+
+    private static void antToldToGoToItsOwnCellSurvivesBeingMovedAway(GameTestHelper helper, EntityType<? extends AbstractAntEntity> body) {
         buildNest(helper);
-        WorkerAntEntity ant = DesertTests.loneAnt(helper, MIDDLE + 5, SURFACE, MIDDLE + 5);
+        AbstractAntEntity ant = TestAnts.lone(helper, body, MIDDLE + 5, SURFACE, MIDDLE + 5);
         BlockPos goal = helper.absolutePos(new BlockPos(MIDDLE + 5, SURFACE, MIDDLE + 5));
         helper.runAfterDelay(10, () -> {
             ant.getNavigator().moveTo(ant.blockPosition(), 1.0);
@@ -86,7 +109,7 @@ public class NavigationTests {
         }
         Route square = new Route(steps, 9.0);
         BlockPos farCorner = helper.absolutePos(new BlockPos(x0 + 3, SURFACE, z0 + 3));
-        WorkerAntEntity follower = DesertTests.loneAnt(helper, x0, SURFACE, z0);
+        AbstractAntEntity follower = TestAnts.lone(helper, body, x0, SURFACE, z0);
         boolean[] movedOff = {false};
         boolean[] atFarCorner = {false};
         helper.runAfterDelay(10, () -> helper.assertTrue(follower.getNavigator().follow(square, 1.0), "no way onto the route " + square));
@@ -119,11 +142,21 @@ public class NavigationTests {
      */
     @GameTest(template = "arena", timeoutTicks = 600, skyAccess = true)
     public static void antsClimbOutOfAOneBlockPit(GameTestHelper helper) {
+        antsClimbOutOfAOneBlockPit(helper, SavannaEntities.MATABELE_MINOR.get());
+    }
+
+    /** The same with a termite worker (a body a third as long: the edges, walls and ceilings must hold for both). */
+    @GameTest(template = "arena", timeoutTicks = 600, skyAccess = true)
+    public static void antsClimbOutOfAOneBlockPitAsATermiteWorker(GameTestHelper helper) {
+        antsClimbOutOfAOneBlockPit(helper, SavannaEntities.TERMITE_WORKER.get());
+    }
+
+    private static void antsClimbOutOfAOneBlockPit(GameTestHelper helper, EntityType<? extends AbstractAntEntity> body) {
         buildNest(helper);
         helper.setBlock(MIDDLE + 6, SURFACE - 1, MIDDLE + 9, Blocks.AIR);
         helper.setBlock(MIDDLE - 6, SURFACE - 1, MIDDLE + 9, Blocks.AIR);
-        WorkerAntEntity inPit = DesertTests.loneAnt(helper, MIDDLE + 6.5F, (float) (SURFACE - 1), MIDDLE + 9.5F);
-        WorkerAntEntity abovePit = DesertTests.loneAnt(helper, MIDDLE - 5.5F, (float) SURFACE, MIDDLE + 9.5F);
+        AbstractAntEntity inPit = TestAnts.lone(helper, body, MIDDLE + 6.5F, (float) (SURFACE - 1), MIDDLE + 9.5F);
+        AbstractAntEntity abovePit = TestAnts.lone(helper, body, MIDDLE - 5.5F, (float) SURFACE, MIDDLE + 9.5F);
         BlockPos goal = helper.absolutePos(new BlockPos(MIDDLE + 3, SURFACE, MIDDLE + 9));
         BlockPos otherGoal = helper.absolutePos(new BlockPos(MIDDLE - 3, SURFACE, MIDDLE + 9));
         helper.runAfterDelay(1, () -> abovePit.getNavigator().moveTo(otherGoal, 1.0));
@@ -146,7 +179,11 @@ public class NavigationTests {
      */
     @GameTest(template = "arena", timeoutTicks = 4000, skyAccess = true)
     public static void antsFromAllAroundTheHillReachTheFoodStore(GameTestHelper helper) {
-        scan(helper, 2L, true, false, false);
+        antsFromAllAroundTheHillReachTheFoodStore(helper, SavannaEntities.MATABELE_MINOR.get());
+    }
+
+    private static void antsFromAllAroundTheHillReachTheFoodStore(GameTestHelper helper, EntityType<? extends AbstractAntEntity> body) {
+        scan(helper, body, 2L, true, false, false);
     }
 
     /**
@@ -155,7 +192,11 @@ public class NavigationTests {
      */
     @GameTest(template = "arena", timeoutTicks = 4000, skyAccess = true)
     public static void antsOnBumpyGroundOverAHalfBuiltHillReachTheFoodStore(GameTestHelper helper) {
-        scan(helper, 3L, true, true, true);
+        antsOnBumpyGroundOverAHalfBuiltHillReachTheFoodStore(helper, SavannaEntities.MATABELE_MINOR.get());
+    }
+
+    private static void antsOnBumpyGroundOverAHalfBuiltHillReachTheFoodStore(GameTestHelper helper, EntityType<? extends AbstractAntEntity> body) {
+        scan(helper, body, 3L, true, true, true);
     }
 
     /** The cell an ant stands in on top of the highest solid block in this column. */
@@ -168,14 +209,14 @@ public class NavigationTests {
         return 1;
     }
 
-    private static void scan(GameTestHelper helper, long seed, boolean anywhereInCell, boolean bumpy, boolean gappyHill) {
+    private static void scan(GameTestHelper helper, EntityType<? extends AbstractAntEntity> body, long seed, boolean anywhereInCell, boolean bumpy, boolean gappyHill) {
         helper.getLevel().getServer().tickRateManager().setTickRate(2000.0F);
         buildNest(helper);
         java.util.Random random = new java.util.Random(seed);
         if (bumpy) {
             for (int dx = -11; dx <= 11; dx++) {
                 for (int dz = -11; dz <= 11; dz++) {
-                    if (Math.abs(dx) <= Hill.MOUND_RADIUS + 1 && Math.abs(dz) <= Hill.MOUND_RADIUS + 1) {
+                    if (Math.abs(dx) <= HEAP_RADIUS + 1 && Math.abs(dz) <= HEAP_RADIUS + 1) {
                         continue; // the hill keeps flat ground around it
                     }
                     double roll = random.nextDouble();
@@ -189,17 +230,24 @@ public class NavigationTests {
         }
         buildHill(helper);
         if (gappyHill) {
-            for (int dx = -Hill.MOUND_RADIUS; dx <= Hill.MOUND_RADIUS; dx++) {
-                for (int dz = -Hill.MOUND_RADIUS; dz <= Hill.MOUND_RADIUS; dz++) {
-                    int height = Hill.moundHeightAt(dx, dz);
+            for (int dx = -HEAP_RADIUS; dx <= HEAP_RADIUS; dx++) {
+                for (int dz = -HEAP_RADIUS; dz <= HEAP_RADIUS; dz++) {
+                    int height = heapHeightAt(dx, dz);
                     if (height > 1 && random.nextDouble() < 0.35) {
                         helper.setBlock(MIDDLE + dx, SURFACE + height - 1, MIDDLE + dz, Blocks.AIR);
                     }
                 }
             }
         }
-        BlockPos goal = chambers(helper).get(0).center();
-        List<WorkerAntEntity> ants = new java.util.ArrayList<>();
+        NestPlan.Chamber store = chambers(helper).get(0);
+        BlockPos goal = store.center();
+        // An insect with a real size keeps a gap to the others (no stacking), so 440 of them cannot all end in the one goal
+        // cell: once it is full the navigator ends a walk on the nearest free spot round it (the crowd spills into the
+        // room). Arrived is: the walk done, standing in the store room or the end of its tunnel.
+        java.util.Set<BlockPos> storeRoom = new java.util.HashSet<>(store.cells());
+        storeRoom.addAll(store.room());
+        storeRoom.add(store.tunnelEnd());
+        List<AbstractAntEntity> ants = new java.util.ArrayList<>();
         List<String> starts = new java.util.ArrayList<>();
         for (int dx = -10; dx <= 10; dx++) {
             for (int dz = -10; dz <= 10; dz++) {
@@ -209,13 +257,13 @@ public class NavigationTests {
                 int y = standingY(helper, MIDDLE + dx, MIDDLE + dz);
                 float fx = MIDDLE + dx + (anywhereInCell ? 0.2F + 0.6F * random.nextFloat() : 0.5F);
                 float fz = MIDDLE + dz + (anywhereInCell ? 0.2F + 0.6F * random.nextFloat() : 0.5F);
-                ants.add(DesertTests.loneAnt(helper, fx, (float) y, fz));
+                ants.add(TestAnts.lone(helper, body, fx, (float) y, fz));
                 starts.add(dx + "," + dz + " y" + y);
             }
         }
         long[] arrived = new long[ants.size()];
         helper.runAfterDelay(10, () -> {
-            for (WorkerAntEntity ant : ants) {
+            for (AbstractAntEntity ant : ants) {
                 ant.getNavigator().moveTo(goal, 1.0);
             }
         });
@@ -224,8 +272,8 @@ public class NavigationTests {
                 return;
             }
             for (int i = 0; i < ants.size(); i++) {
-                WorkerAntEntity ant = ants.get(i);
-                if (arrived[i] == 0 && ant.getNavigator().isDone() && ant.blockPosition().equals(goal)) {
+                AbstractAntEntity ant = ants.get(i);
+                if (arrived[i] == 0 && ant.getNavigator().isDone() && !ant.getNavigator().hasFailed() && storeRoom.contains(ant.blockPosition())) {
                     arrived[i] = helper.getTick();
                 }
             }
@@ -236,18 +284,18 @@ public class NavigationTests {
             for (int i = 0; i < ants.size(); i++) {
                 if (arrived[i] == 0 || arrived[i] > 700) {
                     late++;
-                    DesertMod.LOGGER.info("[scan {}] ant from {} {} (arrived at tick {}, now at {}, route failed {})", seed, starts.get(i),
+                    SavannaMod.LOGGER.info("[scan {}] ant from {} {} (arrived at tick {}, now at {}, route failed {})", seed, starts.get(i),
                             arrived[i] == 0 ? "NEVER ARRIVED" : "was slow", arrived[i],
                             ants.get(i).position().subtract(Vec3.atLowerCornerOf(helper.absolutePos(BlockPos.ZERO))),
                             ants.get(i).getNavigator().hasFailed());
                     var navigator = ants.get(i).getNavigator();
-                    DesertMod.LOGGER.info("[scan {}]   cell {} next waypoint {} climbing {} route {}", seed,
+                    SavannaMod.LOGGER.info("[scan {}]   cell {} next waypoint {} climbing {} route {}", seed,
                             ants.get(i).blockPosition().subtract(helper.absolutePos(BlockPos.ZERO)).toShortString(), navigator.getNextWaypoint(),
                             navigator.isClimbing(), navigator.getRoute() == null ? "none" : relative(helper, navigator.getRoute()));
                 }
                 slowest = Math.max(slowest, arrived[i]);
             }
-            DesertMod.LOGGER.info("[scan {}] {} ants, {} late or lost, slowest arrival at tick {}", seed, ants.size(), late, slowest);
+            SavannaMod.LOGGER.info("[scan {}] {} ants, {} late or lost, slowest arrival at tick {}", seed, ants.size(), late, slowest);
             helper.assertTrue(late == 0, late + " of " + ants.size() + " ants were late or never arrived");
             helper.succeed();
         });
@@ -255,10 +303,10 @@ public class NavigationTests {
 
     /** The complete ant hill around the entrance (the hole at MIDDLE, MIDDLE stays open). */
     private static void buildHill(GameTestHelper helper) {
-        for (int dx = -Hill.MOUND_RADIUS; dx <= Hill.MOUND_RADIUS; dx++) {
-            for (int dz = -Hill.MOUND_RADIUS; dz <= Hill.MOUND_RADIUS; dz++) {
-                for (int h = 0; h < Hill.moundHeightAt(dx, dz); h++) {
-                    helper.setBlock(MIDDLE + dx, SURFACE + h, MIDDLE + dz, DesertBlocks.BURROWED_DIRT.get());
+        for (int dx = -HEAP_RADIUS; dx <= HEAP_RADIUS; dx++) {
+            for (int dz = -HEAP_RADIUS; dz <= HEAP_RADIUS; dz++) {
+                for (int h = 0; h < heapHeightAt(dx, dz); h++) {
+                    helper.setBlock(MIDDLE + dx, SURFACE + h, MIDDLE + dz, Blocks.DIRT);
                 }
             }
         }
@@ -291,8 +339,12 @@ public class NavigationTests {
 
     @GameTest(template = "arena", timeoutTicks = 1500, skyAccess = true)
     public static void antWalksFromTheSurfaceDownToTheDeepestRoom(GameTestHelper helper) {
+        antWalksFromTheSurfaceDownToTheDeepestRoom(helper, SavannaEntities.MATABELE_MINOR.get());
+    }
+
+    private static void antWalksFromTheSurfaceDownToTheDeepestRoom(GameTestHelper helper, EntityType<? extends AbstractAntEntity> body) {
         buildNest(helper);
-        WorkerAntEntity ant = DesertTests.loneAnt(helper, MIDDLE - 3, SURFACE, MIDDLE + 3);
+        AbstractAntEntity ant = TestAnts.lone(helper, body, MIDDLE - 3, SURFACE, MIDDLE + 3);
         BlockPos goal = chambers(helper).get(3).center();
         helper.runAfterDelay(10, () -> ant.getNavigator().moveTo(goal, 1.0));
         watch(helper, ant);
@@ -303,9 +355,13 @@ public class NavigationTests {
 
     @GameTest(template = "arena", timeoutTicks = 1500, skyAccess = true)
     public static void antWalksFromTheQueensRoomDownToTheRefuseChamberAndBack(GameTestHelper helper) {
+        antWalksFromTheQueensRoomDownToTheRefuseChamberAndBack(helper, SavannaEntities.MATABELE_MINOR.get());
+    }
+
+    private static void antWalksFromTheQueensRoomDownToTheRefuseChamberAndBack(GameTestHelper helper, EntityType<? extends AbstractAntEntity> body) {
         buildNest(helper);
         BlockPos start = chambers(helper).get(2).center().subtract(helper.absolutePos(BlockPos.ZERO));
-        WorkerAntEntity ant = DesertTests.loneAnt(helper, start.getX(), start.getY(), start.getZ());
+        AbstractAntEntity ant = TestAnts.lone(helper, body, start.getX(), start.getY(), start.getZ());
         BlockPos deep = chambers(helper).get(3).center();
         BlockPos back = chambers(helper).get(2).center();
         boolean[] wentDown = {false};
@@ -323,9 +379,13 @@ public class NavigationTests {
 
     @GameTest(template = "arena", timeoutTicks = 1500, skyAccess = true)
     public static void antWalksFromTheDeepestRoomUpToTheSurface(GameTestHelper helper) {
+        antWalksFromTheDeepestRoomUpToTheSurface(helper, SavannaEntities.MATABELE_MINOR.get());
+    }
+
+    private static void antWalksFromTheDeepestRoomUpToTheSurface(GameTestHelper helper, EntityType<? extends AbstractAntEntity> body) {
         buildNest(helper);
         BlockPos start = chambers(helper).get(3).center().subtract(helper.absolutePos(BlockPos.ZERO));
-        WorkerAntEntity ant = DesertTests.loneAnt(helper, start.getX(), start.getY(), start.getZ());
+        AbstractAntEntity ant = TestAnts.lone(helper, body, start.getX(), start.getY(), start.getZ());
         BlockPos goal = helper.absolutePos(new BlockPos(MIDDLE + 3, SURFACE, MIDDLE + 2));
         helper.runAfterDelay(10, () -> ant.getNavigator().moveTo(goal, 1.0));
         watch(helper, ant);
@@ -341,16 +401,20 @@ public class NavigationTests {
      */
     @GameTest(template = "arena", timeoutTicks = 2000, skyAccess = true)
     public static void antsClimbFromEveryRoomThroughTheFinishedHill(GameTestHelper helper) {
+        antsClimbFromEveryRoomThroughTheFinishedHill(helper, SavannaEntities.MATABELE_MINOR.get());
+    }
+
+    private static void antsClimbFromEveryRoomThroughTheFinishedHill(GameTestHelper helper, EntityType<? extends AbstractAntEntity> body) {
         buildNest(helper);
         buildHill(helper);
         int[][] goals = {{5, 0}, {-5, 0}, {0, 5}, {0, -5}};
-        List<WorkerAntEntity> ants = new java.util.ArrayList<>();
+        List<AbstractAntEntity> ants = new java.util.ArrayList<>();
         List<BlockPos> targets = new java.util.ArrayList<>();
         List<String> rooms = new java.util.ArrayList<>();
         for (int level = 0; level < NestPlan.MAX_LEVELS; level++) {
             BlockPos start = chambers(helper).get(level).center().subtract(helper.absolutePos(BlockPos.ZERO));
             for (int[] goal : goals) {
-                ants.add(DesertTests.loneAnt(helper, start.getX(), start.getY(), start.getZ()));
+                ants.add(TestAnts.lone(helper, body, start.getX(), start.getY(), start.getZ()));
                 targets.add(helper.absolutePos(new BlockPos(MIDDLE + goal[0], SURFACE, MIDDLE + goal[1])));
                 rooms.add("room " + level);
             }
@@ -358,18 +422,22 @@ public class NavigationTests {
         helper.runAfterDelay(10, () -> {
             for (int i = 0; i < ants.size(); i++) {
                 boolean found = ants.get(i).getNavigator().moveTo(targets.get(i), 1.0);
-                DesertMod.LOGGER.info("[nav-test] #{} route found: {} -> {}", ants.get(i).getId(), found,
+                SavannaMod.LOGGER.info("[nav-test] #{} route found: {} -> {}", ants.get(i).getId(), found,
                         ants.get(i).getNavigator().getRoute() == null ? "none" : relative(helper, ants.get(i).getNavigator().getRoute()));
             }
         });
-        for (WorkerAntEntity ant : ants) {
+        for (AbstractAntEntity ant : ants) {
             TestWatch.watch(helper, ant, ant == ants.get(0));
             trackSteadiness(helper, ant);
         }
         helper.succeedWhen(() -> {
             for (int i = 0; i < ants.size(); i++) {
+                // Four ants share each place, and an insect with a real size keeps a gap: one that finds the cell full ends
+                // its walk on the nearest free spot beside it (the same height, at most one cell off).
+                BlockPos at = ants.get(i).blockPosition();
+                BlockPos to = targets.get(i);
                 helper.assertTrue(ants.get(i).getNavigator().isDone() && !ants.get(i).getNavigator().hasFailed()
-                        && ants.get(i).blockPosition().equals(targets.get(i)) && helper.getTick() > 20,
+                        && at.getY() == to.getY() && Math.abs(at.getX() - to.getX()) <= 1 && Math.abs(at.getZ() - to.getZ()) <= 1 && helper.getTick() > 20,
                         "ant " + i + " (from " + rooms.get(i) + ") has not climbed out yet");
             }
         });
@@ -382,11 +450,21 @@ public class NavigationTests {
      */
     @GameTest(template = "arena", timeoutTicks = 1500, skyAccess = true)
     public static void antsStayOnTheShaftWallWhenTheirWalkEndsOrIsStopped(GameTestHelper helper) {
+        antsStayOnTheShaftWallWhenTheirWalkEndsOrIsStopped(helper, SavannaEntities.MATABELE_MINOR.get());
+    }
+
+    /** The same with a termite worker (a body a third as long: the edges, walls and ceilings must hold for both). */
+    @GameTest(template = "arena", timeoutTicks = 1500, skyAccess = true)
+    public static void antsStayOnTheShaftWallWhenTheirWalkEndsOrIsStoppedAsATermiteWorker(GameTestHelper helper) {
+        antsStayOnTheShaftWallWhenTheirWalkEndsOrIsStopped(helper, SavannaEntities.TERMITE_WORKER.get());
+    }
+
+    private static void antsStayOnTheShaftWallWhenTheirWalkEndsOrIsStopped(GameTestHelper helper, EntityType<? extends AbstractAntEntity> body) {
         buildNest(helper);
         buildHill(helper);
         BlockPos start = chambers(helper).get(1).center().subtract(helper.absolutePos(BlockPos.ZERO));
-        WorkerAntEntity ant = DesertTests.loneAnt(helper, start.getX(), start.getY(), start.getZ());
-        WorkerAntEntity stopped = DesertTests.loneAnt(helper, start.getX(), start.getY(), start.getZ());
+        AbstractAntEntity ant = TestAnts.lone(helper, body, start.getX(), start.getY(), start.getZ());
+        AbstractAntEntity stopped = TestAnts.lone(helper, body, start.getX(), start.getY(), start.getZ());
         BlockPos goal = helper.absolutePos(new BlockPos(MIDDLE, SURFACE - 1, MIDDLE));
         BlockPos out = helper.absolutePos(new BlockPos(MIDDLE - 5, SURFACE, MIDDLE - 2));
         long[] arrived = {-1};
@@ -428,16 +506,20 @@ public class NavigationTests {
      */
     @GameTest(template = "arena", timeoutTicks = 1500, skyAccess = true)
     public static void antsHangingInTheShaftCrawlRoundToTheOtherWall(GameTestHelper helper) {
+        antsHangingInTheShaftCrawlRoundToTheOtherWall(helper, SavannaEntities.MATABELE_MINOR.get());
+    }
+
+    private static void antsHangingInTheShaftCrawlRoundToTheOtherWall(GameTestHelper helper, EntityType<? extends AbstractAntEntity> body) {
         buildNest(helper);
         BlockPos start = chambers(helper).get(1).center().subtract(helper.absolutePos(BlockPos.ZERO));
         int[] depths = {1, 2};
-        WorkerAntEntity[] ants = new WorkerAntEntity[depths.length];
+        AbstractAntEntity[] ants = new AbstractAntEntity[depths.length];
         BlockPos[] hangs = new BlockPos[depths.length];
         BlockPos[] goals = new BlockPos[depths.length];
         Direction[] clung = new Direction[depths.length];
         long[] arrived = {-1, -1};
         for (int k = 0; k < depths.length; k++) {
-            ants[k] = DesertTests.loneAnt(helper, start.getX(), start.getY(), start.getZ());
+            ants[k] = TestAnts.lone(helper, body, start.getX(), start.getY(), start.getZ());
             hangs[k] = helper.absolutePos(new BlockPos(MIDDLE, SURFACE - depths[k], MIDDLE));
             int which = k;
             // The second waits a little, so the two are not on the same stretch of wall at once.
@@ -446,7 +528,7 @@ public class NavigationTests {
         }
         helper.onEachTick(() -> {
             for (int k = 0; k < depths.length; k++) {
-                WorkerAntEntity ant = ants[k];
+                AbstractAntEntity ant = ants[k];
                 if (arrived[k] < 0 && helper.getTick() > 12 + 100 * k && ant.getNavigator().isDone() && ant.blockPosition().equals(hangs[k])) {
                     arrived[k] = helper.getTick();
                 }
@@ -458,7 +540,7 @@ public class NavigationTests {
                     Direction out = clung[k].getOpposite();
                     goals[k] = helper.absolutePos(new BlockPos(MIDDLE + out.getStepX() * 4, SURFACE, MIDDLE + out.getStepZ() * 4));
                     boolean found = ant.getNavigator().moveTo(goals[k], 1.0);
-                    DesertMod.LOGGER.info("[nav-test] #{} hangs on the {} wall, sent out to the {}: route found {} -> {}", ant.getId(),
+                    SavannaMod.LOGGER.info("[nav-test] #{} hangs on the {} wall, sent out to the {}: route found {} -> {}", ant.getId(),
                             clung[k], out, found, ant.getNavigator().getRoute() == null ? "none" : relative(helper, ant.getNavigator().getRoute()));
                 }
             }
@@ -479,20 +561,30 @@ public class NavigationTests {
      */
     @GameTest(template = "arena", timeoutTicks = 600, skyAccess = true)
     public static void antsGoRoundTheOutsideEdgeOfABlock(GameTestHelper helper) {
+        antsGoRoundTheOutsideEdgeOfABlock(helper, SavannaEntities.MATABELE_MINOR.get());
+    }
+
+    /** The same with a termite worker (a body a third as long: the edges, walls and ceilings must hold for both). */
+    @GameTest(template = "arena", timeoutTicks = 600, skyAccess = true)
+    public static void antsGoRoundTheOutsideEdgeOfABlockAsATermiteWorker(GameTestHelper helper) {
+        antsGoRoundTheOutsideEdgeOfABlock(helper, SavannaEntities.TERMITE_WORKER.get());
+    }
+
+    private static void antsGoRoundTheOutsideEdgeOfABlock(GameTestHelper helper, EntityType<? extends AbstractAntEntity> body) {
         buildNest(helper);
-        List<WorkerAntEntity> ants = new java.util.ArrayList<>();
+        List<AbstractAntEntity> ants = new java.util.ArrayList<>();
         List<BlockPos> ends = new java.util.ArrayList<>();
         int i = 0;
         for (Direction wall : Direction.Plane.HORIZONTAL) {
             for (Direction side : new Direction[] {wall.getClockWise(), wall.getCounterClockWise()}) {
                 BlockPos block = new BlockPos(3 + (i % 4) * 5, SURFACE, 3 + (i / 4) * 16);
-                helper.setBlock(block, DesertBlocks.BURROWED_DIRT.get());
+                helper.setBlock(block, Blocks.DIRT);
                 BlockPos start = block.relative(wall.getOpposite());
                 BlockPos end = start.relative(side).relative(wall);
                 Route route = new Route(List.of(
                         new Route.Step(new Foothold(helper.absolutePos(start), wall), StepKind.START),
                         new Route.Step(new Foothold(helper.absolutePos(end), side.getOpposite()), StepKind.ROUND_EDGE)), 1.2);
-                WorkerAntEntity ant = DesertTests.loneAnt(helper, start.getX(), start.getY(), start.getZ());
+                AbstractAntEntity ant = TestAnts.lone(helper, body, start.getX(), start.getY(), start.getZ());
                 helper.runAfterDelay(10, () -> helper.assertTrue(ant.getNavigator().follow(route, 1.0), "no way onto the route " + route));
                 TestWatch.watch(helper, ant, false);
                 ants.add(ant);
@@ -503,7 +595,7 @@ public class NavigationTests {
         helper.succeedWhen(() -> {
             helper.assertTrue(helper.getTick() > 20, "not started yet");
             for (int k = 0; k < ants.size(); k++) {
-                WorkerAntEntity ant = ants.get(k);
+                AbstractAntEntity ant = ants.get(k);
                 helper.assertTrue(ant.getNavigator().getReplans() == 0, "ant " + k + " had to plan again (it was blocked)");
                 helper.assertTrue(ant.getNavigator().isDone() && !ant.getNavigator().hasFailed() && ant.blockPosition().equals(ends.get(k)),
                         "ant " + k + " has not gone round the edge yet");
@@ -517,10 +609,20 @@ public class NavigationTests {
      */
     @GameTest(template = "arena", timeoutTicks = 1200, skyAccess = true)
     public static void antCrawlsUpsideDownToTheMiddleOfTheRoomCeilingAndHangsThere(GameTestHelper helper) {
+        antCrawlsUpsideDownToTheMiddleOfTheRoomCeilingAndHangsThere(helper, SavannaEntities.MATABELE_MINOR.get());
+    }
+
+    /** The same with a termite worker (a body a third as long: the edges, walls and ceilings must hold for both). */
+    @GameTest(template = "arena", timeoutTicks = 1200, skyAccess = true)
+    public static void antCrawlsUpsideDownToTheMiddleOfTheRoomCeilingAndHangsThereAsATermiteWorker(GameTestHelper helper) {
+        antCrawlsUpsideDownToTheMiddleOfTheRoomCeilingAndHangsThere(helper, SavannaEntities.TERMITE_WORKER.get());
+    }
+
+    private static void antCrawlsUpsideDownToTheMiddleOfTheRoomCeilingAndHangsThere(GameTestHelper helper, EntityType<? extends AbstractAntEntity> body) {
         buildNest(helper);
         NestPlan.Chamber store = chambers(helper).get(0);
         BlockPos corner = store.room().get(store.room().size() - 1).subtract(helper.absolutePos(BlockPos.ZERO));
-        WorkerAntEntity ant = DesertTests.loneAnt(helper, corner.getX(), corner.getY(), corner.getZ());
+        AbstractAntEntity ant = TestAnts.lone(helper, body, corner.getX(), corner.getY(), corner.getZ());
         Foothold goal = Foothold.ceiling(store.center());
         long[] arrived = {-1};
         helper.runAfterDelay(10, () -> helper.assertTrue(ant.getNavigator().moveTo(goal, 1.0), "no route to the ceiling"));
@@ -546,17 +648,27 @@ public class NavigationTests {
      */
     @GameTest(template = "arena", timeoutTicks = 900, skyAccess = true)
     public static void antsGoUnderAnOverhangAndOutTheOtherSide(GameTestHelper helper) {
+        antsGoUnderAnOverhangAndOutTheOtherSide(helper, SavannaEntities.MATABELE_MINOR.get());
+    }
+
+    /** The same with a termite worker (a body a third as long: the edges, walls and ceilings must hold for both). */
+    @GameTest(template = "arena", timeoutTicks = 900, skyAccess = true)
+    public static void antsGoUnderAnOverhangAndOutTheOtherSideAsATermiteWorker(GameTestHelper helper) {
+        antsGoUnderAnOverhangAndOutTheOtherSide(helper, SavannaEntities.TERMITE_WORKER.get());
+    }
+
+    private static void antsGoUnderAnOverhangAndOutTheOtherSide(GameTestHelper helper, EntityType<? extends AbstractAntEntity> body) {
         buildNest(helper);
-        List<WorkerAntEntity> ants = new java.util.ArrayList<>();
+        List<AbstractAntEntity> ants = new java.util.ArrayList<>();
         List<BlockPos> ends = new java.util.ArrayList<>();
         BlockPos[] pillars = {new BlockPos(4, SURFACE, 4), new BlockPos(4, SURFACE, 20), new BlockPos(20, SURFACE, 4), new BlockPos(20, SURFACE, 20)};
         int i = 0;
         for (Direction out : Direction.Plane.HORIZONTAL) {
             BlockPos pillar = pillars[i++];
             BlockPos overhang = pillar.above().relative(out);
-            helper.setBlock(pillar, DesertBlocks.BURROWED_DIRT.get());
-            helper.setBlock(pillar.above(), DesertBlocks.BURROWED_DIRT.get());
-            helper.setBlock(overhang, DesertBlocks.BURROWED_DIRT.get());
+            helper.setBlock(pillar, Blocks.DIRT);
+            helper.setBlock(pillar.above(), Blocks.DIRT);
+            helper.setBlock(overhang, Blocks.DIRT);
             Direction side = out.getClockWise();
             BlockPos start = overhang.relative(out);
             BlockPos end = overhang.relative(side);
@@ -565,7 +677,7 @@ public class NavigationTests {
                     new Route.Step(Foothold.ceiling(helper.absolutePos(overhang.below())), StepKind.UNDER_EDGE),
                     new Route.Step(new Foothold(helper.absolutePos(end), side.getOpposite()), StepKind.OUT_FROM_UNDER)), 4.0);
             BlockPos ground = start.below();
-            WorkerAntEntity ant = DesertTests.loneAnt(helper, ground.getX(), ground.getY(), ground.getZ());
+            AbstractAntEntity ant = TestAnts.lone(helper, body, ground.getX(), ground.getY(), ground.getZ());
             helper.runAfterDelay(10, () -> helper.assertTrue(ant.getNavigator().follow(route, 1.0), "no way onto the route " + route));
             TestWatch.watch(helper, ant, false);
             ants.add(ant);
@@ -574,7 +686,7 @@ public class NavigationTests {
         helper.succeedWhen(() -> {
             helper.assertTrue(helper.getTick() > 20, "not started yet");
             for (int k = 0; k < ants.size(); k++) {
-                WorkerAntEntity ant = ants.get(k);
+                AbstractAntEntity ant = ants.get(k);
                 helper.assertTrue(ant.getNavigator().getReplans() == 0, "ant " + k + " had to plan again (it was blocked)");
                 helper.assertTrue(ant.getNavigator().isDone() && !ant.getNavigator().hasFailed() && ant.blockPosition().equals(ends.get(k)),
                         "ant " + k + " has not come out from under the overhang yet");
@@ -588,14 +700,18 @@ public class NavigationTests {
      */
     @GameTest(template = "arena", timeoutTicks = 1500, skyAccess = true)
     public static void antsOnTheShaftWallAndTheCeilingAreStillThereAfterAReload(GameTestHelper helper) {
+        antsOnTheShaftWallAndTheCeilingAreStillThereAfterAReload(helper, SavannaEntities.MATABELE_MINOR.get());
+    }
+
+    private static void antsOnTheShaftWallAndTheCeilingAreStillThereAfterAReload(GameTestHelper helper, EntityType<? extends AbstractAntEntity> body) {
         buildNest(helper);
         BlockPos start = chambers(helper).get(1).center().subtract(helper.absolutePos(BlockPos.ZERO));
-        WorkerAntEntity onWall = DesertTests.loneAnt(helper, start.getX(), start.getY(), start.getZ());
+        AbstractAntEntity onWall = TestAnts.lone(helper, body, start.getX(), start.getY(), start.getZ());
         BlockPos wall = helper.absolutePos(new BlockPos(MIDDLE, SURFACE - 1, MIDDLE));
         helper.runAfterDelay(10, () -> onWall.getNavigator().moveTo(wall, 1.0));
         NestPlan.Chamber store = chambers(helper).get(0);
         BlockPos corner = store.room().get(0).subtract(helper.absolutePos(BlockPos.ZERO));
-        WorkerAntEntity onCeiling = DesertTests.loneAnt(helper, corner.getX(), corner.getY(), corner.getZ());
+        AbstractAntEntity onCeiling = TestAnts.lone(helper, body, corner.getX(), corner.getY(), corner.getZ());
         Foothold ceiling = Foothold.ceiling(store.center());
         helper.runAfterDelay(10, () -> onCeiling.getNavigator().moveTo(ceiling, 1.0));
         java.util.function.Supplier<String> wallCheck = reloadOnceUp(helper, onWall,
@@ -615,9 +731,9 @@ public class NavigationTests {
      * that save in its place (what happens when its chunk is saved and loaded again). The copy must not drop. The check
      * it gives back says what is still wrong, or null once the copy has stayed up long enough.
      */
-    private static java.util.function.Supplier<String> reloadOnceUp(GameTestHelper helper, WorkerAntEntity ant, java.util.function.BooleanSupplier isUp) {
+    private static java.util.function.Supplier<String> reloadOnceUp(GameTestHelper helper, AbstractAntEntity ant, java.util.function.BooleanSupplier isUp) {
         long[] upSince = {-1};
-        WorkerAntEntity[] copy = {null};
+        AbstractAntEntity[] copy = {null};
         double[] savedY = {0.0};
         long[] loadedAt = {0};
         TestWatch.watch(helper, ant, false);
@@ -633,7 +749,7 @@ public class NavigationTests {
                 tag.remove("UUID");
                 savedY[0] = ant.getY();
                 ant.discard();
-                WorkerAntEntity loaded = DesertEntities.WORKER_ANT.get().create(helper.getLevel());
+                AbstractAntEntity loaded = (AbstractAntEntity) ant.getType().create(helper.getLevel());
                 loaded.load(tag);
                 // Like the ant it replaces: no mind of its own (no job or stroll may move it) and no colony.
                 loaded.removeFreeWill();
@@ -647,7 +763,7 @@ public class NavigationTests {
             if (copy[0] == null) {
                 return "the ant has not got up there yet";
             }
-            WorkerAntEntity loaded = copy[0];
+            AbstractAntEntity loaded = copy[0];
             if (loaded.getY() < savedY[0] - 0.05) {
                 return "the ant dropped after the reload (from " + savedY[0] + " to " + loaded.getY() + ")";
             }

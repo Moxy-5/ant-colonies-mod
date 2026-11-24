@@ -46,7 +46,6 @@ public class DesertMod {
         // In-game tests: only loaded when the game is started in game-test mode.
         modEventBus.addListener((RegisterGameTestsEvent event) -> {
             event.register(com.antcolonies.desert.gametest.NestTests.class);
-            event.register(com.antcolonies.desert.gametest.NavigationTests.class);
         });
     }
 }

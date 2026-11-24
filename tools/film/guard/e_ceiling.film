@@ -7,7 +7,7 @@ cmd fill 2 -60 -2 2 -59 2 stone
 cmd fill 8 -60 -2 8 -59 2 stone
 cmd fill 2 -58 -2 8 -58 2 stone
 lens 30
-walker worker_ant 6.5 -63 0.5 -90
+walker matabele_minor 6.5 -63 0.5 -90
 log ceiling
 cmd tick freeze
 fov 10

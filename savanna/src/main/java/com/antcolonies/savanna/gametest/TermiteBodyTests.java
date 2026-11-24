@@ -23,7 +23,7 @@ import net.neoforged.neoforge.gametest.PrefixGameTestTemplate;
 /**
  * The body (the animation engine, 2026-10-16): what the server decides about how a termite holds itself. The termites'
  * scenes (the split, step S4: they were the termite's part of the shared body scenes, now in
- * {@link HarvesterBodyTests}, every check kept).
+ * {@link MatabeleBodyTests}, every check kept).
  */
 @GameTestHolder(SavannaMod.MODID)
 @PrefixGameTestTemplate(false)

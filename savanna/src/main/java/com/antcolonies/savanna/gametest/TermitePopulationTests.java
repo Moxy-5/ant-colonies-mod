@@ -29,7 +29,8 @@ import net.neoforged.neoforge.gametest.PrefixGameTestTemplate;
 /**
  * The brain, part 1 ({@link Population}): most of the colony is numbers inside the nest, a few are real mobs. Game tests
  * have no players, so each test says where pretend players' eyes are ({@link Population#setViewersForTests}).
- * The termites' scenes (the split, step S4; the red harvester ant's are in {@link HarvesterPopulationTests}).
+ * The termites' scenes; the crew, coming out unseen, old age and growing up into the numbers were the red harvester
+ * ant's tests until it left the mod (2026-11-23) and run on a termite colony since: the rules are the shared brain's.
  */
 @GameTestHolder(SavannaMod.MODID)
 @PrefixGameTestTemplate(false)
@@ -76,6 +77,189 @@ public class TermitePopulationTests {
             int inside = colony.population().inside(Caste.WORKER);
             helper.assertTrue(colony.getCount(Caste.WORKER) == inside + workers, "the headcount " + colony.getCount(Caste.WORKER)
                     + " is not the " + inside + " inside and the " + workers + " real workers");
+            helper.succeed();
+        });
+    }
+
+    // --- the shared brain's rules, on a termite colony (the harvester's tests until 2026-11-23) -----------------------
+
+    /** A termite colony with its nest dug at once, no hunger, the brain on and nobody watching, at a still midday (the foragers stay in). */
+    private static void dugNest(GameTestHelper helper, java.util.function.Consumer<Colony> then) {
+        TermiteScenes.colony(helper, List.of(), colony -> {
+            helper.assertTrue(colony != null, "no termite colony");
+            digNestAtOnce(helper.getLevel(), colony);
+            TestClock.still(helper, 12.0);
+            colony.setHungerOn(false);
+            colony.population().setOnForTests(true);
+            colony.population().setViewersForTests(List.of());
+            then.accept(colony);
+        });
+    }
+
+    /**
+     * With a small crew (10, set for the test) and nobody near, 10 real workers come out of the 40 in the numbers, two a
+     * second, and the headcount stays 40. A player near (eyes 20 blocks off, above ground): all 40 come out (fewer than
+     * the cap of 50). The player gone: they go back in down to the crew again. Then the species' own crew (the whole cap,
+     * the user's decision: a loaded colony works as before the brain): all 40 come out with nobody near. Nothing is lost.
+     */
+    @GameTest(template = "arena", timeoutTicks = 3000, skyAccess = true)
+    public static void aCrewWorksWhileNobodyIsNearAndMoreComeOutWhenAPlayerIs(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        Colony[] found = {null};
+        long[] start = {-1};
+        dugNest(helper, colony -> {
+            colony.population().setCrewForTests(10);
+            colony.population().addNewMembers(Caste.WORKER, level.getGameTime(), 40);
+            found[0] = colony;
+            start[0] = helper.getTick();
+        });
+        boolean[] done = new boolean[4];
+        helper.onEachTick(() -> {
+            Colony colony = found[0];
+            if (colony == null) {
+                return;
+            }
+            long since = helper.getTick() - start[0];
+            int real = (int) real(helper, colony).stream().filter(mob -> mob instanceof TermiteWorkerEntity).count();
+            if (!done[0] && since >= 250) {
+                done[0] = true;
+                SavannaMod.LOGGER.info("[population-test] nobody near: {}", colony.population().describe(level));
+                helper.assertTrue(real == 10, "with nobody near the crew should be out: " + real + " real, " + colony.population().describe(level));
+                helper.assertTrue(colony.getCount(Caste.WORKER) == 40 && colony.population().inside(Caste.WORKER) == 30,
+                        "40 workers, 30 inside expected: " + colony.getCount(Caste.WORKER) + ", " + colony.population().inside(Caste.WORKER));
+                colony.population().setViewersForTests(List.of(Vec3.atCenterOf(helper.absolutePos(new BlockPos(MIDDLE + 20, SURFACE + 2, MIDDLE)))));
+            } else if (!done[1] && since >= 990) {
+                done[1] = true;
+                SavannaMod.LOGGER.info("[population-test] a player near: {}", colony.population().describe(level));
+                helper.assertTrue(real == 40 && colony.population().inside(Caste.WORKER) == 0,
+                        "with a player near all 40 should be out: " + real + " real, " + colony.population().describe(level));
+                colony.population().setViewersForTests(List.of());
+            } else if (!done[2] && since >= 2290) {
+                done[2] = true;
+                SavannaMod.LOGGER.info("[population-test] the player gone: {}", colony.population().describe(level));
+                helper.assertTrue(real == 10, "the player gone, back to the crew expected: " + real + " real, " + colony.population().describe(level));
+                helper.assertTrue(colony.getCount(Caste.WORKER) == 40 && colony.population().inside(Caste.WORKER) + real == 40,
+                        "nobody should be lost: " + colony.getCount(Caste.WORKER) + " counted, " + colony.population().inside(Caste.WORKER)
+                                + " inside, " + real + " real");
+                colony.population().setCrewForTests(null);
+            } else if (!done[3] && since >= 2790) {
+                done[3] = true;
+                SavannaMod.LOGGER.info("[population-test] the species' crew, nobody near: {}", colony.population().describe(level));
+                helper.assertTrue(real == 40 && colony.population().inside(Caste.WORKER) == 0 && colony.getCount(Caste.WORKER) == 40,
+                        "with the species' crew all 40 should be out with nobody near: " + real + " real, " + colony.population().describe(level));
+                helper.succeed();
+            }
+        });
+    }
+
+    /**
+     * Insects come out only where no player can see: a player's eyes in the middle of the nest's first room and one up
+     * on the surface. Every new real worker must appear out of both players' sight.
+     */
+    @GameTest(template = "arena", timeoutTicks = 900, skyAccess = true)
+    public static void insectsComeOutOnlyWhereNoPlayerCanSee(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        java.util.Set<java.util.UUID> seen = new java.util.HashSet<>();
+        List<Vec3> eyes = new java.util.ArrayList<>();
+        int[] cameOut = {0};
+        Colony[] found = {null};
+        long[] start = {-1};
+        dugNest(helper, colony -> {
+            com.antcolonies.colony.NestPlan.Chamber first = colony.nest().getPlannedChambers(level).get(0);
+            eyes.add(Vec3.atCenterOf(first.center()));
+            eyes.add(Vec3.atCenterOf(helper.absolutePos(new BlockPos(MIDDLE + 3, SURFACE + 1, MIDDLE + 3))));
+            colony.population().setViewersForTests(eyes);
+            colony.population().addNewMembers(Caste.WORKER, level.getGameTime(), 20);
+            found[0] = colony;
+            start[0] = helper.getTick();
+        });
+        helper.onEachTick(() -> {
+            Colony colony = found[0];
+            if (colony == null) {
+                return;
+            }
+            for (AbstractAntEntity mob : real(helper, colony)) {
+                if (mob instanceof TermiteWorkerEntity && seen.add(mob.getUUID())) {
+                    cameOut[0]++;
+                    helper.assertTrue(com.antcolonies.colony.Population.outOfSight(level, mob.position().add(0, 0.2, 0), eyes),
+                            "a worker came out where a player can see it, at " + mob.blockPosition().toShortString());
+                }
+            }
+            if (helper.getTick() - start[0] >= 700) {
+                SavannaMod.LOGGER.info("[population-test] {} came out unseen", cameOut[0]);
+                helper.assertTrue(cameOut[0] >= 10, "only " + cameOut[0] + " came out");
+                helper.succeed();
+            }
+        });
+    }
+
+    /**
+     * Workers in the numbers grow old and die like real ones: 20 grew up longer ago than any worker lives, 10 not long
+     * ago. Within a few seconds the 20 are dead (the headcount drops to 10), the 10 live on. And the numbers with their
+     * ages are saved with the colony.
+     */
+    @GameTest(template = "arena", timeoutTicks = 500, skyAccess = true)
+    public static void workersInTheNumbersDieOfOldAgeAndAreSaved(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        Colony[] found = {null};
+        long[] start = {-1};
+        dugNest(helper, colony -> {
+            colony.population().setOnForTests(false); // only the numbers, no swapping
+            long lifespan = colony.profile().worker().lifespanTicks();
+            helper.assertTrue(lifespan > 0, "termite workers should die of old age");
+            colony.population().addNewMembers(Caste.WORKER, level.getGameTime() - Math.round(lifespan * 1.2), 20);
+            colony.population().addNewMembers(Caste.WORKER, level.getGameTime() - 2400, 10);
+            Colony copy = Colony.load(colony.save());
+            helper.assertTrue(copy.population().inside(Caste.WORKER) == 30 && copy.getCount(Caste.WORKER) == 30,
+                    "after a reload the numbers are " + copy.population().inside(Caste.WORKER));
+            found[0] = colony;
+            start[0] = helper.getTick();
+        });
+        helper.onEachTick(() -> {
+            Colony colony = found[0];
+            if (colony != null && helper.getTick() - start[0] >= 110) {
+                helper.assertTrue(colony.getCount(Caste.WORKER) == 10 && colony.population().inside(Caste.WORKER) == 10,
+                        "the 20 old workers should have died: " + colony.getCount(Caste.WORKER) + " counted, "
+                                + colony.population().inside(Caste.WORKER) + " inside");
+                helper.succeed();
+            }
+        });
+    }
+
+    /**
+     * A nymph that has eaten its fill grows into a worker in the numbers when the colony has all the real workers it
+     * wants (a crew of 10, set for the test, nobody near) and nobody can see it; with the brain off it comes out as a
+     * real worker as before.
+     */
+    @GameTest(template = "arena", timeoutTicks = 700, skyAccess = true)
+    public static void aYoungOneGrowsUpIntoTheNumbersWhenNoMoreRealOnesAreWanted(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        Colony[] found = {null};
+        long[] start = {-1};
+        dugNest(helper, colony -> {
+            colony.population().setCrewForTests(10);
+            colony.population().addNewMembers(Caste.WORKER, level.getGameTime(), 12);
+            found[0] = colony;
+            start[0] = helper.getTick();
+        });
+        helper.onEachTick(() -> {
+            Colony colony = found[0];
+            if (colony == null || helper.getTick() - start[0] < 290) {
+                return;
+            }
+            java.util.function.IntSupplier realWorkers = () -> (int) real(helper, colony).stream().filter(mob -> mob instanceof TermiteWorkerEntity).count();
+            helper.assertTrue(realWorkers.getAsInt() == 10, "the crew is not out: " + colony.population().describe(level));
+            BlockPos spot = java.util.Objects.requireNonNull(colony.brood().pickEggSpot(level, level.getRandom()), "no room for a nymph");
+            com.antcolonies.entity.AntLarvaEntity larva = colony.brood().spawnLarva(level, spot.getX() + 0.5, spot.getY(), spot.getZ() + 0.5);
+            int before = realWorkers.getAsInt();
+            helper.assertTrue(colony.brood().hatchLarva(level, larva), "the nymph did not grow up");
+            helper.assertTrue(colony.getCount(Caste.WORKER) == 13 && colony.population().inside(Caste.WORKER) == 3
+                    && realWorkers.getAsInt() == before, "the new worker should be one of the numbers: " + colony.population().describe(level));
+            colony.population().setOnForTests(false);
+            com.antcolonies.entity.AntLarvaEntity second = colony.brood().spawnLarva(level, spot.getX() + 0.5, spot.getY(), spot.getZ() + 0.5);
+            helper.assertTrue(colony.brood().hatchLarva(level, second), "the second nymph did not grow up");
+            helper.assertTrue(realWorkers.getAsInt() == before + 1 && colony.getCount(Caste.WORKER) == 14,
+                    "with the brain off it should come out real: " + realWorkers.getAsInt() + " real");
             helper.succeed();
         });
     }
