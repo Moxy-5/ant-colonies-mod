@@ -132,9 +132,9 @@ public class MatabeleScoutGoal extends Goal {
     @Nullable
     private BlockPos find;
     private int worth;
-    /** R5: on its look at a find, the most termites it counted there at once, and the termites hidden in by-day places there. */
+    /** R5: on its look at a find, the most termites it counted there at once, and the most by-day feeding places it smelt there. */
     private int termitesSeen;
-    private int hiddenSeen;
+    private int placesSeen;
     /** R5: ticks of its look spent near enough to count. */
     private int lookTicks;
     /** R5: places it passed over this trip as too poor (not smelt again this trip). */
@@ -664,7 +664,7 @@ public class MatabeleScoutGoal extends Goal {
         find = nearest.immutable();
         worth = 0;
         termitesSeen = 0;
-        hiddenSeen = 0;
+        placesSeen = 0;
         lookTicks = 0;
         return true;
     }
@@ -749,34 +749,31 @@ public class MatabeleScoutGoal extends Goal {
             int counted = (int) termitesNear(level, new AABB(here).inflate(smell)).stream()
                     .filter(termite -> termite.blockPosition().closerThan(here, smell + 0.5)).count();
             termitesSeen = Math.max(termitesSeen, counted);
-            int hidden = 0;
+            int places = 0;
             // (the user's report, 2026-11-08: a scout locked onto a termite by a mud-covered branch or tree, found the
             // feeding place's cells just past its smell from that termite, scored it worth 3 and passed the whole patch
             // over, never to smell it again this trip; so the look counts every feeding place in the patch it would skip,
             // the same twice-smell reach as wasPassed)
             for (FeedingSpots.ByDay place : byDay) {
                 if (nearestSmelt(level, place, here, smell * 2) != null) {
-                    hidden += choose.byDayTermites();
+                    places++;
                 }
             }
-            hiddenSeen = Math.max(hiddenSeen, hidden);
+            placesSeen = Math.max(placesSeen, places);
         }
         if (lookTicks < numbers.inspectTicks() && stageTicks < numbers.inspectTicks() * 4) {
             return;
         }
-        worth = 3 * Math.max(termitesSeen, hiddenSeen);
-        double need = raids.need(find);
-        if (worth > 0 && worth >= need) {
-            raids.takes(level, find, worth, ant.getUUID());
-            raids.foundBy(level, ant, find); // (its own memory: it keeps to this way, its trips shrink back to the find)
+        // It reports what it saw; the colony decides whether that is worth a raid (the one judge, Raids.worthARaid).
+        worth = raids.worthOf(termitesSeen, placesSeen);
+        Raids.Find rechecking = trip.find() != null && !recheckDone && trip.find().at().closerThan(find, numbers.smell() * 2.0) ? trip.find() : null;
+        if (raids.looked(level, ant, find, worth, rechecking)) {
             clueDone(level, true);
             ant.getNavigator().stop();
             goHome("a find");
             return;
         }
         // too poor for a raid this far out now: passed over (a recheck of a remembered spot counts as an empty check)
-        Raids.Find rechecking = trip.find() != null && !recheckDone && trip.find().at().closerThan(find, numbers.smell() * 2.0) ? trip.find() : null;
-        raids.passedOver(level, find, worth, rechecking, ant.getUUID());
         passed.add(find);
         find = null;
         worth = 0;

@@ -244,7 +244,7 @@ public final class RaidsAway {
             return;
         }
         for (Raids.Find find : raids.finds()) {
-            if (find.worth() < raids.need(find.at())) {
+            if (!raids.worthARaid(find.at(), find.worth())) {
                 continue; // (too poor for the colony now)
             }
             Raid.Termites counted = Raid.termitesThere(level, colony, find.at());
@@ -301,10 +301,8 @@ public final class RaidsAway {
                 || !raids.isHungry() || colony.population().inside(Caste.WORKER) <= 0) {
             return List.of();
         }
-        for (Raids.Find find : raids.finds()) {
-            if (find.worth() >= raids.need(find.at())) {
-                return List.of(); // (it knows a find worth a raid: no scout is out)
-            }
+        if (raids.knowsAFindWorthARaid()) {
+            return List.of(); // (no scout is out)
         }
         int reach = raids.range();
         long trip = Math.max(200L, Math.round(2.0 * reach / Math.max(0.1, numbers().pace()) * 20.0));
@@ -363,10 +361,8 @@ public final class RaidsAway {
             return;
         }
         SavannaNumbers.AwayRaidNumbers numbers = numbers();
-        for (Raids.Find find : raids.finds()) {
-            if (find.worth() >= raids.need(find.at())) {
-                return; // (it knows a find worth a raid: the raid hours will take it)
-            }
+        if (raids.knowsAFindWorthARaid()) {
+            return; // (the raid hours will take it)
         }
         int reach = raids.range();
         List<BlockPos> places = new ArrayList<>();
@@ -437,7 +433,7 @@ public final class RaidsAway {
             BlockPos food = places.remove(pick);
             weights.remove(pick);
             int worth = numbers.scoutWorthLeast() + random.nextInt(Math.max(1, numbers.scoutWorthMost() - numbers.scoutWorthLeast() + 1));
-            if (worth < raids.need(food)) {
+            if (!raids.worthARaid(food, worth)) {
                 raids.diary(level, "out of sight: a scout passes over termites at " + food.toShortString() + " (worth " + worth
                         + ", " + Math.round(RaidGround.flat(colony.getCenter(), food)) + " blocks out: too poor)");
                 continue;

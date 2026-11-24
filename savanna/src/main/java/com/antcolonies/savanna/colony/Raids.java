@@ -769,6 +769,29 @@ public class Raids {
         return choosing().need(RaidGround.flat(at, colony.getCenter()), fedShare());
     }
 
+    /**
+     * What a scout's look at a place is worth: 3 a termite, of the termites it counted feeding there or, if that is
+     * more, of the termites out of sight in the feeding places it smelt there ({@code by_day_termites} a place).
+     */
+    public int worthOf(int termitesSeen, int feedingPlaces) {
+        return 3 * Math.max(termitesSeen, feedingPlaces * choosing().byDayTermites());
+    }
+
+    /**
+     * <b>The one judge of "worth a raid"</b> (the raid rewrite, step 5): a find of this worth here is worth a raid now
+     * if it reaches what the colony needs ({@link #need}: more the farther out, less the hungrier). Asked by a scout
+     * reporting its look ({@link #looked}), by the scouts out of sight, and before a raid leaves out of sight
+     * ({@link RaidsAway}); nobody else compares a worth with a need.
+     */
+    public boolean worthARaid(BlockPos at, int worth) {
+        return worth > 0 && worth >= need(at);
+    }
+
+    /** Whether the colony remembers a find worth a raid now. */
+    boolean knowsAFindWorthARaid() {
+        return finds.stream().anyMatch(find -> worthARaid(find.at, find.worth));
+    }
+
     /** The scouts' search numbers (the defaults if the species file has none). */
     public SavannaNumbers.SearchNumbers search() {
         return colony.profile().section(SavannaNumbers.SEARCH).orElse(SavannaNumbers.SearchNumbers.DEFAULT);
@@ -1219,26 +1242,26 @@ public class Raids {
     }
 
     /**
-     * R5: a scout found termites but too few for a raid this far out with the colony this hungry, and passes the place
-     * over (it searches on). At a remembered spot being rechecked, it counts as an empty check.
+     * R5: a scout has looked a place over and reports what it is worth ({@link Raids#worthOf}); the colony decides
+     * ({@link Raids#worthARaid}). Worth a raid: true, the scout runs home with it and keeps to that way
+     * ({@link #foundBy}). Too poor for a raid this far out with the colony this hungry: false, it passes the place over
+     * and searches on; at a remembered spot being rechecked that counts as an empty check.
      */
-    public void passedOver(ServerLevel level, BlockPos at, int worth, @Nullable Find rechecking, UUID scout) {
+    public boolean looked(ServerLevel level, MatabeleEntity ant, BlockPos at, int worth, @Nullable Find rechecking) {
         int away = (int) Math.round(RaidGround.flat(at, colony.getCenter()));
-        say(level, "scout " + RaidGround.shortId(scout) + " passes over termites at " + at.toShortString() + ", " + away
-                + " blocks out: worth " + worth + ", a raid that far needs " + String.format(Locale.ROOT, "%.1f", need(at))
-                + " with the colony " + Math.round(fedShare() * 100) + " percent fed");
+        boolean taken = worthARaid(at, worth);
+        say(level, "scout " + RaidGround.shortId(ant.getUUID()) + (taken ? " takes the termites at " : " passes over termites at ")
+                + at.toShortString() + ", " + away + " blocks out: worth " + worth + ", a raid that far needs "
+                + String.format(Locale.ROOT, "%.1f", need(at)) + " with the colony " + Math.round(fedShare() * 100) + " percent fed");
+        if (taken) {
+            foundBy(level, ant, at); // (its own memory: it keeps to this way, its trips shrink back to the find)
+            return true;
+        }
         passedOverCount++;
         if (rechecking != null && finds.contains(rechecking)) {
             foundEmpty(level, rechecking);
         }
-    }
-
-    /** R5, the diary: a scout found termites worth a raid this far out with the colony this hungry, and runs home. */
-    public void takes(ServerLevel level, BlockPos at, int worth, UUID scout) {
-        int away = (int) Math.round(RaidGround.flat(at, colony.getCenter()));
-        say(level, "scout " + RaidGround.shortId(scout) + " takes the termites at " + at.toShortString() + ", " + away
-                + " blocks out: worth " + worth + ", a raid that far needs " + String.format(Locale.ROOT, "%.1f", need(at))
-                + " with the colony " + Math.round(fedShare() * 100) + " percent fed");
+        return false;
     }
 
     /** R6: the numbers of the mound as a clue. */
