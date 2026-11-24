@@ -133,6 +133,8 @@ All picks are mine (animals: fun first, inspired by real life).
   bullfrogs (`docs/HISTORY.md`).
 - 2026-11-23, the food web's step 2 built: frog spawn eaten by tilapia and crabs, the father lunging at them
   (`docs/HISTORY.md`).
+- 2026-11-23, the food web's step 3 built: tilapia nibble mats' outer edge (algae first, so no day-long wait was
+  needed), snails, crabs and tadpoles graze dying mats (no reed stems: a snail cannot climb one); `docs/HISTORY.md`.
 - 2026-11-23, part B built: the bullfrog on the life kit (the froglet its young stage), females coming to calling males
   in the rain, the clasp, floating egg mats hatching into a school that knows its father, the father guarding eggs and
   school; the wrestling males of the old plan left out (not asked for). `docs/HISTORY.md`.

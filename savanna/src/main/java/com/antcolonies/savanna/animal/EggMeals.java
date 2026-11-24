@@ -59,6 +59,9 @@ public final class EggMeals {
      */
     public static boolean bite(Level level, BlockPos pos) {
         BlockState state = level.getBlockState(pos);
+        if (state.getBlock() instanceof com.antcolonies.savanna.block.HippoGrassBlock) {
+            return level instanceof ServerLevel server && com.antcolonies.savanna.block.HippoGrassBlock.bitten(server, pos);   // the food web's step 3
+        }
         if (isSnailEggs(state)) {
             if (!(level instanceof ServerLevel server)) {
                 return false;

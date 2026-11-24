@@ -33,6 +33,12 @@ import net.minecraft.world.phys.shapes.VoxelShape;
  * with nothing nearer the bank keeps its stage (a player's mat on a pond stays as placed) unless it is dying back.
  *
  * <p>A swimmer or wader pushing through presses it under and aside ({@link PlantPush}: marked, the client drawing the dip).
+ *
+ * <p>Eaten (the river food web's step 3, 2026-11-23, {@code docs/plans/river-tie-up.md}; my picks): living mats lightly,
+ * only by tilapia and only a patch's outermost mat lying 2 or 3 out ({@link #livingBite}), never the ring at the bank, so
+ * a clump can never be stripped and the cycle sends the mat out again; dying mats by the clean-up crew (snails, crabs,
+ * tadpoles), again the outermost first ({@link #dyingBite}), the order they die in anyway. A bite takes the mat away
+ * ({@link #bitten}). Hippos keep their own nibble.
  */
 public class HippoGrassBlock extends BushBlock {
     public static final MapCodec<HippoGrassBlock> CODEC = simpleCodec(HippoGrassBlock::new);
@@ -84,6 +90,29 @@ public class HippoGrassBlock extends BushBlock {
             }
         }
         return defaultBlockState().setValue(REACH, reach);
+    }
+
+    /** Whether a tilapia may nibble the mat here: a living mat, the patch's outermost, lying 2 or 3 out. */
+    public static boolean livingBite(BlockGetter level, BlockPos pos, BlockState state) {
+        return state.getBlock() instanceof HippoGrassBlock && state.getValue(STAGE) != HippoGrassClumpBlock.DYING
+                && state.getValue(REACH) >= 2 && !fartherOut(level, pos, state.getValue(REACH));
+    }
+
+    /** Whether the clean-up crew may graze the mat here: a dying mat with nothing farther out (the next to go anyway). */
+    public static boolean dyingBite(BlockGetter level, BlockPos pos, BlockState state) {
+        return state.getBlock() instanceof HippoGrassBlock && state.getValue(STAGE) == HippoGrassClumpBlock.DYING
+                && !fartherOut(level, pos, state.getValue(REACH));
+    }
+
+    /** A bite takes the mat here away, with a puff of its bits. Whether there was a mat. */
+    public static boolean bitten(ServerLevel level, BlockPos pos) {
+        BlockState state = level.getBlockState(pos);
+        if (!(state.getBlock() instanceof HippoGrassBlock)) {
+            return false;
+        }
+        level.levelEvent(net.minecraft.world.level.block.LevelEvent.PARTICLES_DESTROY_BLOCK, pos, Block.getId(state));
+        level.removeBlock(pos, false);
+        return true;
     }
 
     /** The farthest out a mat may lie at {@code pos} while its patch is grown or flowering: 1 to 3, fixed per spot (a ragged edge). */

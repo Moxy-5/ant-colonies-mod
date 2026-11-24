@@ -15,6 +15,9 @@ import net.minecraft.world.level.block.state.BlockState;
  * 2026-11-14): a few pecks, then {@link AlgaeBlock#graze} bites 2 strands off it (or, with none left, tears the mat off down to the bare bed; it grows back), and it swims on. Hungry again
  * after 2 to 4 minutes (my picks). Eggs near come first (animal life cycle step 3, {@link EggMeals}). With nothing to eat near it simply swims on: a fish never starves, so the river's
  * food chain can never crash (the balance rule).
+ *
+ * <p>Hippo grass (the river food web's step 3, 2026-11-23): with no algae worth more near, it nibbles a mat's outer edge
+ * from under it ({@code HippoGrassBlock.livingBite}: worth the least of all, so algae always comes first).
  */
 public class GrazeAlgaeGoal extends Goal {
     /** How far it looks for algae (blocks across and up or down; my picks). */
@@ -82,7 +85,7 @@ public class GrazeAlgaeGoal extends Goal {
             return;   // done (a bite or given up) this tick; the goal ends at its next check
         }
         ticks++;
-        double x = mat.getX() + 0.5, y = mat.getY() + 0.15, z = mat.getZ() + 0.5;
+        double x = mat.getX() + 0.5, y = spotY(mat), z = mat.getZ() + 0.5;
         fish.getLookControl().setLookAt(x, mat.getY(), z);
         double dx = fish.getX() - x, dz = fish.getZ() - z, dy = fish.getY() - y;
         boolean there = dx * dx + dz * dz < 0.36 && Math.abs(dy) < 0.6;
@@ -120,7 +123,13 @@ public class GrazeAlgaeGoal extends Goal {
     }
 
     private void swimTo() {
-        fish.getNavigation().moveTo(mat.getX() + 0.5, mat.getY() + 0.15, mat.getZ() + 0.5, 1.0);
+        fish.getNavigation().moveTo(mat.getX() + 0.5, spotY(mat), mat.getZ() + 0.5, 1.0);
+    }
+
+    /** The height it grazes at: just over an algae mat on the bed, or just under a hippo grass mat on the surface. */
+    private double spotY(BlockPos pos) {
+        return fish.level().getBlockState(pos).getBlock() instanceof com.antcolonies.savanna.block.HippoGrassBlock
+                ? pos.getY() - 0.45 : pos.getY() + 0.15;
     }
 
     /**
@@ -129,8 +138,12 @@ public class GrazeAlgaeGoal extends Goal {
      */
     private int growth(BlockPos pos) {
         BlockState state = fish.level().getBlockState(pos);
-        return AlgaeBlock.bitesLeft(state) + (EggMeals.forFish(state) ? EGGS_FIRST : 0);
+        int g = AlgaeBlock.bitesLeft(state) + (EggMeals.forFish(state) ? EGGS_FIRST : 0);
+        return g == 0 && com.antcolonies.savanna.block.HippoGrassBlock.livingBite(fish.level(), pos, state) ? HIPPO_GRASS : g;
     }
+
+    /** What the outer edge of a hippo grass mat is worth: the least of all, so any algae comes first. */
+    static final int HIPPO_GRASS = 1;
 
     /** What eggs add to a spot's worth, so a grazer goes for the nearest eggs before any algae. */
     static final int EGGS_FIRST = 20;
