@@ -544,3 +544,238 @@ only.
 - **`BloodMist`** has no state at all; **the catfish's give-up** rests 10 to 60 seconds and cannot pick again at once.
 
 ---
+
+## Part 3: the otter (`OtterEntity`, `HeldCatch`)
+
+Read: `OtterEntity.java` (2,939 lines) and `HeldCatch.java` (148), every line, and as far as a finding needed
+`client/OtterRenderer`, `client/OtterModel`, the otter's spawning group in `META-INF/enumextensions.json`, its row in
+`docs/LIVING-THINGS.md`, the body plan files. The otter never attacks anything but its prey, so Peaceful mode and
+ranged attacks (R9-6, R9-24) do not come up here. Four A findings: all four are "something ended in a way nobody
+planned and a state was left behind".
+
+### R9-27 (A, proven): a catch in the jaws is saved with the otter, but the otter forgets it: after a reload it is stuck at the snout for good
+
+**What is wrong.** A catch is a real rider on the otter, made helpless while it is held: its own will is turned off and
+it cannot be hurt. Minecraft saves a rider inside the animal it rides, with those two switches as they are, and seats
+it again on load. The otter's own note of what it holds (`held`) is not saved, and nothing looks for a rider after a
+load. So the otter no longer knows it holds anything: it never eats it and can never let it go.
+
+**What the player would see.** Quit the world (or walk away so the land unloads) while an otter carries or eats a
+catch. Back again: the otter has a frozen fish, crab or frog fixed at its snout for good. When it is hungry it hunts
+again and takes a second catch on top of the first. When that otter later dies or is removed, the old catch drops off
+still frozen and impossible to kill: a statue of a fish left in the river (and a target the crocodile, catfish and
+shark can pick but never hurt).
+
+**Where and proof.** `OtterEntity.java:957-969` saves only the life and `HungryIn`. `grab` 1009-1022:
+`prey.startRiding(this, true)`, `mob.setNoAi(true)`, `prey.setInvulnerable(true)`. The only check in the tick, 748,
+needs `held != null`; no other server line reads the rider. `remove` 1092-1098 lets go, but Minecraft does not call it
+when land unloads: `PersistentEntitySectionManager.processChunkUnload` (line 225) writes the animals first and then
+calls `setRemoved` directly (234-235), and `Entity.saveWithoutId` writes the riders (`"Passengers"`, 1811) and
+`EntityType.loadEntityRecursive` seats them again with force (1138-1144). All checked in the patched sources. A catch
+is held for 10 to 20 seconds of every 5 to 7.5 minutes (longer under R9-28), so a few saves in a hundred near an
+otter; each one leaves damage that stays in the world.
+
+**Fix proposed.** On its first tick after a load, an otter with a rider that is prey and no `held` takes it as `held`
+again (or lets it go properly: off, will on, can be hurt). A game test: grab, save, load, tick. The bullfrog already
+handles "a world saved mid-clasp" (`BullfrogEntity` 760): the same idea.
+
+### R9-28 (A, proven in the code; how often is for play to show): carrying a catch has no time limit: with no bank in reach the otter floats on the spot with it for ever
+
+**What is wrong.** While the otter holds a catch its hunt can never end by itself: the give-up clock is skipped. In
+the water it looks for a bank to haul out on within 12 blocks (16 lines out over the water), then for any dry spot
+within 10. Over open water both find nothing; no route is set; the hunt holds the otter's legs so nothing else may
+move it; and the same two searches run again every time the goal is asked (10 times a second). The same loop runs
+when a bank is found but cannot be reached.
+
+**What the player would see.** An otter hanging in mid-river with a fish in its mouth, never eating, until something
+hurts it or a crocodile or hippo comes within 9 blocks. The fish stays frozen and cannot be killed all that time.
+
+**Where and proof.** `HuntGoal.canContinueToUse` 1491-1493: `if (otter.held != null) return true;` comes before the
+give-up count on 1494. The carry, 1633-1641: `bank = nearestBank(otter, 12.0); if (bank == null) bank = landSpot(otter,
+10.0, null); if (bank != null) moveTo(...)`. `landSpot` 1204-1219 cannot answer over water (its ground must have no
+water under it, `roomyGround` 1268). **Does it fit the game:** `docs/DESIGN.md` gives the inland rivers about 53 to 66
+blocks of water across, so mid-river is up to 33 blocks from either bank; a hunt starts within 12 blocks of the prey
+and the chase carries the otter on. Otters spawn within 6 blocks of a bank, so most catches are near one: this is
+the wide-river case, not the everyday one.
+
+**Fix proposed.** One carry limit (about 30 seconds, then it eats afloat on its back, which real otters do, or lets
+the catch go); the bank search at most once a second, reaching wider after a miss; and with no bank found, swim toward
+the nearest column that is not water.
+
+### R9-29 (A, proven): only the otter that started a game of play can end it: if that one is killed or vanishes mid-game the other stands in the game for good
+
+**What is wrong.** A game of play (a bout) is one shared object held by both otters, and it has good limits: every
+stage has a clock, and "is it still on" checks both otters. But only the starter's goal runs those checks. The invited
+otter's goal just asks "do I still have a bout". If the starter stops thinking without its goal being closed properly,
+nobody ever ends the bout: killed in one blow (a dying animal runs no goals), removed by Minecraft for being far from
+the player (R9-30 makes that common), or its land unloaded while the mate's is not.
+
+**What the player would see.** The other otter frozen where it was: reared up batting at nothing, or standing or
+floating still with its play face on. Its play goal outranks hunting, resting, swimming and strolling, so it never
+does any of them again. Only a hit, or a crocodile or hippo within 9 blocks, frees it.
+
+**Where and proof.** `PlayGoal.canContinueToUse` 2494-2496: `return otter.bout != null;`. `PlayGoal.tick` 2499-2504:
+`if (b != null && b.lead == otter) b.tick();`. `Bout.on()` 1877-1886 is called only from `Bout.tick` 1889. `remove`
+1092-1098 does not end a bout; `hurt` 907 scares the family only `if (isAlive())`, so a killing blow scares nobody.
+The other way round is handled: the invited otter dead or gone is seen by `on()` (1880). A reload is fine too (the
+bout is not saved, both come back calm).
+
+**Fix proposed.** Either otter's play goal ends a bout that is no longer `on()`, and `remove()` and `die()` end the
+bout the otter is in. One "end it, whatever happened" door.
+
+### R9-30 (A, proven): the otter is the only river animal Minecraft may remove 32 blocks from the player: they vanish one at a time
+
+**What is wrong.** Every other river animal has the rule "kept while a player is within 96 blocks" (`removeWhenFarAway`
+in the crocodile, hippo, monitor, shark, crab, snail, bullfrog, the fish, the fly cloud). The otter has none, so it
+gets Minecraft's own rule for mobs: once no player has been within 32 blocks for 30 seconds it is removed at random,
+about 40 seconds later on average. `docs/LIVING-THINGS.md` (the groups table) says the otters are kept "within 96,
+gone past 128"; the code has only the 128.
+
+**What the player would see.** Watching otters from across a wide river, or from a hide 35 blocks off, they pop out of
+existence: a mother before her pup, or one playmate before the other (which sets off R9-29). New ones spawn (their
+group has its own cap of 2), so the river is not emptied, but a pup needs three days to grow up and will almost never
+live that long.
+
+**Where and proof.** No `removeWhenFarAway`, `requiresCustomPersistence` or `checkDespawn` anywhere in
+`OtterEntity.java`; it extends `PathfinderMob`, whose default answers yes. `Mob.checkDespawn` 744-747 (patched
+sources): `noActionTime > 600 && random.nextInt(800) == 0 && d0 > 32 * 32 && removeWhenFarAway(d0)`. The otter's
+`getNoActionTime` returning 0 (951-954) does not stop it: that line reads the field, not the method (the project's
+own comments in `TilapiaEntity` 593 say so). The group: `enumextensions.json` 143-151 (cap 2, 128).
+
+**Fix proposed.** The same three lines as the others: gone only past 96 blocks. And the check the spawning check list
+asks for (a test that `removeWhenFarAway` at 64 blocks says no). Balance: the cap of 2 means keeping them cannot pile
+them up.
+
+### R9-31 (B, the read proven; to measure): while an otter on screen holds a crab or a frog, the game reads and parses a file from the mod's jar twice every frame
+
+**What is wrong.** How a held fish lies in the jaws comes from measures in its body plan file, looked up once and
+remembered. A crab and a bullfrog have no such measures, and "none" is not remembered (the store used keeps nothing
+for an empty answer). So for those two the whole file (4 to 6 KB) is opened from the jar and parsed again on every
+call, and the drawing code calls it twice a frame for every otter on screen with such a catch, under one shared lock.
+Crabs are the otter's favourite prey.
+
+**What the player would see.** Maybe a dip in frames whenever an otter in view carries or eats a crab or a frog; for
+good under R9-27 or R9-28. Not measured. **The scene to measure it:** one otter with a crab in its jaws in view,
+the client's frame time with and without (the F3 frame graph, or a film scene with a crab catch).
+
+**Where and proof.** `HeldCatch.java:79-89`: `FISH.computeIfAbsent(name, n -> { ...; return h == null ? null : ...})`,
+and a `HashMap` stores nothing when the function gives null. `checks` 52-63 opens and parses the file. Callers:
+`OtterRenderer.java:77` and `OtterModel.java:74`, each frame. Only `barb.json` and `tilapia.json` have "held"
+(checked by search).
+
+**Fix proposed.** Remember "none" too (store an empty answer). One line.
+
+### R9-32 (B, proven that nothing stops it; how often not known): a hunt that gives up takes the same prey again half a second later
+
+**What is wrong.** When a hunt gives up (its clock runs out) the goal just stops: no wait, no memory of the prey it
+could not get. The next look round (about every 10 ticks) takes the nearest prey again, the same one. A hungry grown
+otter does not rest or play, so one prey it cannot reach (a crab in a gap, a fish under a ledge) holds it in one
+endless hunt, with a new route every 16 ticks.
+
+**Where and proof.** `HuntGoal.canUse` 1459-1477 (nearest prey, nothing remembered), 1494 (`--left > 0`), `stop`
+1653-1664 (sets no wait). A fish hidden in cover is the one exception (left out of the search, 1469). The catfish's
+hunt already does this right (rests 10 to 60 seconds after a give-up, R9-26's solid list).
+
+**Fix proposed.** After a give-up, a wait of some seconds and "not that one" for a minute. Use the same small rule for
+the shark's R9-22 and R9-23: one shared "gave up on this, wait" helper in the kit instead of each hunter's own.
+
+### R9-33 (B, likely, to measure): a cornered otter plans its escape again every time it is asked
+
+**What is wrong.** Fleeing picks a spot and a route, to be picked again after 60 counts "or when the route is done".
+When no spot is found, or the route fails at once, the route is "done" straight away, so the whole search (up to 24
+water spots and 24 land spots, each some block reads, and a route plan) runs 10 times a second for the 8 to 10
+seconds of the fright, for every frightened otter of the family at once.
+
+**Where and proof.** `FleeGoal.tick` 1364-1366: `if (--left <= 0 || otter.getNavigation().isDone()) route();`,
+`route` 1330-1342. Small numbers (cap 2), so a cost and not a spike. **The scene to measure it:** an otter in a
+walled one-block pool with a crocodile beside it, the server's tick time.
+
+**Fix proposed.** After a `route()` that set no route, wait 10 ticks. (The same "no wait after nothing found" shape
+as R9-16 and R9-23.)
+
+### R9-34 (B, proven): harm with no attacker does not make an otter run, and it wipes the fright of the otters near it
+
+**What is wrong.** "Scared" needs a thing to be scared of. Fire, lava, a cactus, a berry bush, falling, being stuck in
+a wall have no attacker, so a burning otter is not scared and does not flee: it drops its catch and stands there.
+Worse, every hit also tells the otters within 12 blocks "be scared of that attacker", and with no attacker that
+replaces what they were scared of with nothing: an otter that was fleeing a crocodile stops fleeing. And a killing
+blow scares nobody at all, because the family is only told while the hit otter is still alive.
+
+**Where and proof.** `hurt` 902-915: `scare(source.getEntity(), 200)` and for the family `mate.scare(source.getEntity(),
+160)`, both inside `if (isAlive())`. `scared()` 556-558: `scare != null && tickCount < scaredUntil`. `scare()`
+560-562 overwrites.
+
+**Fix proposed.** "Scared" runs on its clock alone, the scarer may be empty (`FleeGoal.route` 1331-1333 already copes
+with none: it just goes somewhere), a fright with no scarer never replaces one that has one, and the family is told
+before the alive check.
+
+### R9-35 (B, a design note): what the otter is doing lives in five places, and every A finding above is a state left behind when one of them ended unplanned
+
+**What is wrong.** `OtterEntity` is one file with the animal, nine goals and the 580-line play bout. "What am I doing"
+is kept in five places that meet only through "am I calm" checks: the `doing` number (20 values, started in goals and
+in the bout, ended by one long chain in the tick, 759-764), the bout's 14 stages, the skitter's 6 phases, the dance
+counter, and the block move it may be riding. Clocks run at three speeds (every tick, every goal tick, every goal
+check), and besides routes the code moves the body by hand in five places (787, 1524, 2165, 2207, 2249), one of them
+moving the *other* otter. No two of them were found pulling against each other today, and the tests cover the happy
+paths. But R9-27, R9-28, R9-29 and the stale rest spot in R9-36 all have the same cause, and it is the part most
+likely to break when the otter gets more (breeding, the pet, biting back).
+
+**Fix proposed (for the fix session to weigh, not a patch).** Before adding to the otter: the bout and the held catch
+each become their own small class with one "end, whatever happened" door, called from the goal's stop, from `remove`
+and from `die`. That one change fixes R9-27 and R9-29 at the root.
+
+### R9-36 (C): small things in the otter
+
+- **A rest-together spot never used is kept (proven).** A bout that ends in a rest gives the invited otter a spot
+  beside the other (2376-2383). The rest is refused while a player stands within 5 blocks (1713, 1727-1730), which is
+  just when the player is watching. The 100-tick offer runs out (797-799) but the spot is only cleared when a rest
+  starts (1743-1750): at its next ordinary rest, maybe minutes later, the otter first walks 3 seconds in a straight
+  line toward where its playmate once lay. Fix: clear the spot when the offer runs out.
+- **Otters and hippos share pools, and a hippo within 9 blocks is a danger (212, 1282; likely, for the balance soak).**
+  An otter beside a pod is frightened again within half a second of each 8-second fright ending, with a new startled
+  freeze each time on land, and cannot hunt, play or rest meanwhile. Does an otter in a hippo pool ever do anything
+  else? Watch one in the soak; if not, drop the hippo from the dangers unless it yawns or charges.
+- **Clocks counted in goal checks last twice what their comments say:** the hunt's give-up "20 s" is 40 s (223-224,
+  1494), the startle 10 is 20 ticks (146, 1356), a rest "20 to 60 s" is 40 to 120 s (1695, 1790), the swim about 300
+  is 600 (2736), the flee's 60 is 120. The skitter met this and was fixed (2546); these were not. Not harmful, but
+  every number is twice what a reader and the balance think. (The hippo has the same, R9-19.)
+- **A pup looks for a grown otter within 20 blocks every time it is asked, with no gate** (`FollowFamilyGoal.canUse`
+  1389-1403); the hunt has a 1-in-5 gate, this has none. A cheap search, a pup or two: add the same gate.
+- **Every otter searches for otters within 3 blocks every tick** (`keepApart` 591-645). Small box, cap 2: a note.
+- **Film-camera hooks live in the game code:** the tags `caught.<n>`, `doing.eat`, `doing.gulp` (711-723), `dance.now`
+  (776), `play.tag`, `play.rest`, `play.now` (2059, 2359, 2467), the names `mood:<mood>` and `film:<clip>` (506-510,
+  2822-2825), and 14 strings built every 5 ticks per otter to match them (505-511). A player's name tag "film:swim"
+  works on any otter (the same on the crocodile, hippo and shark: R9-20, R9-26). A tag `caught.x` on an otter with a
+  rider crashes the server (`Float.parseFloat`, 714; only an operator can add tags).
+- **`getNoActionTime` returning 0 (951-954) does nothing here:** the stroll is built not to read it (336) and
+  despawning reads the field (R9-30).
+- **A missing number in `otter.json`'s carry measures** is a crash at the first fish bitten, not at start-up
+  (`HeldCatch.carry` 66-75). The file is complete today. Fix: read it at start-up.
+- **Dead code and old comments:** `soakedFor()` (2936-2938) is used nowhere; the attack damage attribute (318) is
+  unused; the class comment still says "Not yet: hunting ... play-wrestling" (75) and "families of two to four" (66);
+  a comment block at 1802-1806 describes a goal 900 lines further down.
+- **Questions for the user, small:** a name-tagged fish or frog is eaten like any other (989-991; foxes do the same);
+  an otter in a boat can still be picked as a playmate and is then moved by the bout (418, 428; not walked in full);
+  a bout begun in the shallows ends at the first step onto dry land, because the wet otter shakes (808, 1881).
+
+### What is solid in the otter
+
+- **Breath:** it cannot drown afloat and cannot stay under for ever: up after its longest dive, then 80 ticks in
+  which diving is refused (389-391, 817-819), whatever goal asked for the dive.
+- **The hunt's look-round gate** (1460-1464): cheap checks first, then 1 in 5, then the search. Its comment on why
+  not "every 10th tick" is right.
+- **Bite and pounce timing** land on the right tick although goals step every other tick (1519, 1528, 1535).
+- **The play bout's own safety:** every stage has a clock, rounds only count down, the invited otter dead, hurt,
+  scared or busy ends it for both, a fright ends it through the goal's stop, the swimming chase's 30-tick start
+  (BUGS 297), the keep-apart push switched off while they touch on purpose (BUGS 299).
+- **The catch while the otter stays loaded:** hurt, dead, hunt broken off, eaten, knocked off, two otters after one
+  prey: never lost, never doubled, no drops.
+- **A block move is never fought by a goal** (every goal asks `rider.play()` first).
+- **No reads into land that is not loaded:** every block read is within 14 blocks. Nothing is spawned, no list
+  grows, nothing is logged, no synced value changes every tick, no shared state tied to one world.
+- **The food chain:** one catch per otter per 5 to 7.5 minutes, at most 2 otters round a player: it cannot fish a
+  river out, and an otter never starves (hunger only decides what it does).
+- **Test gaps (for the fix session):** no test saves and loads with a catch held, makes a catch far from a bank,
+  removes a bout's starter mid-bout, checks the keep-near rule, or hurts an otter with fire.
+
+---
