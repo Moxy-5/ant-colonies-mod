@@ -3,6 +3,7 @@
   "key.categories.colonyframework": "Ant Colonies",
   "entity.colonyframework.ant_egg": "Ant Egg",
   "entity.colonyframework.body_part": "Body Part",
+  "block.colonyframework.deep_soil": "Deep Soil",
   "block.colonyframework.dirt_ramp": "Dirt Ramp",
   "block.colonyframework.coarse_dirt_ramp": "Coarse Dirt Ramp",
   "block.colonyframework.rooted_dirt_ramp": "Rooted Dirt Ramp",

@@ -649,6 +649,7 @@ Goal: a mature colony can hold 1,000+ ants or termites without lag.
 - Several ants on one block share progress. About one block every few seconds per worker, slower for harder blocks.
 - Each bite makes a soil pellet the ant carries out in its mandibles. Pellets dropped at the entrance build the mound.
 - Diggable blocks come from a block tag: `dirt`, `grass_block`, `coarse_dirt`, `rooted_dirt`, `clay`, `mud`, `sand`, `red_sand`.
+- **Deep Soil** (confirmed in-game by the user, 2026-10-15; shared ground since the harvester left, 2026-11-23, BUGS 309): world generation turns the 5 to 7 blocks of stone right under every dirt surface into Deep Soil (`colonyframework:deep_soil`, in the diggable tag; the thickness is one number per biome and world seed), so the ground is soft 8 to 11 blocks down. The termites' rooms, galleries and foraging tunnels run through it. It is the framework's block, not a species': every digging species needs it.
 - Never dig stone, wood, or containers. (Player-placed dirt can't easily be told apart from natural dirt; that's fine for version 1.)
 - Never dig a block if the block above it can fall (sand, red sand, gravel), except for the entrance shaft.
 - Keep digging logic separate from digging visuals so phase 2 only changes the visuals.

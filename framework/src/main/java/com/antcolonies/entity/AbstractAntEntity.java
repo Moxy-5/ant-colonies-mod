@@ -250,7 +250,6 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
     /** The game time this worker grew up (came out of its egg or nymph stage); its age decides its usual job. Saved. */
     private long grownUpAt = AGE_NOT_SET;
 
-    private boolean seedForBread;
     /** How many seconds in a row the ant has had nothing to do. Server side only, not saved. */
     private int idleSeconds;
     /** Whether the navigator set the motion last tick (so the leftover ladder push can be cleared when it lets go). */
@@ -491,15 +490,6 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
         } else {
             letGoOf(FrameworkLoads.CORPSE);
         }
-    }
-
-    /** The seed in the mandibles is for the mill (it becomes bread), not for the food store. Server side only, saved. */
-    public boolean isSeedForBread() {
-        return seedForBread;
-    }
-
-    public void setSeedForBread(boolean forBread) {
-        this.seedForBread = forBread;
     }
 
     /**
@@ -747,14 +737,6 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
             Colony theirs = other.getColony();
             if (theirs != null && theirs.getSpecies().equals(colony.getSpecies()) && colony.neighbours().canMeet(theirs)) {
                 colony.news().tell(level, ColonyNews.NEIGHBOUR_MET, new ColonyNews.NeighbourMet(blockPosition(), theirs.getId(), other.getUUID()));
-            }
-        }
-        for (Colony theirs : ColonyManager.get(level).getColonies()) {
-            if (theirs != colony && theirs.getSpecies().equals(colony.getSpecies()) && colony.neighbours().canMeet(theirs)
-                    && theirs.questions().ask(level, ColonyQuestions.ON_TRAIL, blockPosition())) {
-                UUID trail = new UUID(theirs.getId().getMostSignificantBits() ^ getUUID().getMostSignificantBits(),
-                        theirs.getId().getLeastSignificantBits() ^ getUUID().getLeastSignificantBits());
-                colony.news().tell(level, ColonyNews.NEIGHBOUR_MET, new ColonyNews.NeighbourMet(blockPosition(), theirs.getId(), trail)); // (stepped onto their trail)
             }
         }
     }
@@ -2124,13 +2106,6 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
         return restlessness;
     }
 
-    /** Tests only: gives it this personality. */
-    public void setTraitsForTests(float boldness, float curiosity, float restlessness) {
-        this.boldness = boldness;
-        this.curiosity = curiosity;
-        this.restlessness = restlessness;
-    }
-
     /**
      * Server, once a second: whether the ground under it is hot (its profile's {@code body_language.hot}: outside on a
      * floor under the open sky, no rain, in a hot biome, in the hottest hours of the day).
@@ -2310,15 +2285,6 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
                 checkHeat(serverLevel);
                 lookForHostiles(serverLevel);
                 lookForNeighbours(serverLevel);
-            }
-        }
-        // A look round every few ticks: a forager home with a seed touches the ants waiting inside by the entrance as it
-        // walks in (Gordon's rule, the harvester's door), one home from a rich patch lays its scent line, then calls (its
-        // recruits).
-        if (tickCount % 5 == getId() % 5 && getColonyId() != null && level() instanceof ServerLevel serverLevel) {
-            Colony colony = getColony();
-            if (colony != null) {
-                colony.news().tell(serverLevel, ColonyNews.MEMBER_ROUND, new ColonyNews.MemberRound(this));
             }
         }
         if (navigator.isAttached()) {
@@ -2864,7 +2830,6 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
         if (!load.isEmpty()) {
             load.kind().write(tag, load, registryAccess());
         }
-        tag.putBoolean("SeedForBread", seedForBread);
         if (stingsTaken > 0) {
             tag.putInt("StingsTaken", stingsTaken);
         }
@@ -2907,7 +2872,6 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
         }
         grownUpAt = tag.contains("GrownUpAt") ? tag.getLong("GrownUpAt") : AGE_NOT_SET;
         entityData.set(DATA_LOAD, LoadKind.readFrom(tag, registryAccess()));
-        seedForBread = tag.getBoolean("SeedForBread");
         stingsTaken = tag.getInt("StingsTaken");
         paralysedAt = tag.contains("ParalysedAt") ? tag.getLong("ParalysedAt") : NOT_PARALYSED;
         venomAt = tag.contains("VenomAt") ? tag.getLong("VenomAt") : paralysedAt != NOT_PARALYSED ? paralysedAt : NO_VENOM;

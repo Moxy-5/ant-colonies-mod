@@ -17,7 +17,7 @@ import net.minecraft.world.entity.ai.goal.Goal;
  * An ant holding a seed (or any piece of its species' food, such as a termite's forage or a stick it picked up) carries
  * it to the food store and adds it to a heap on the floor there (a seed pile, a forage pile: the species profile's pile).
  */
-public class StoreSeedGoal extends Goal {
+public class StoreFoodGoal extends Goal {
     /** How close (sideways, in blocks) the ant must get before it puts the seed down. */
     private static final double REACH = 0.9;
     /** If the ant can't get there in a minute it drops the seed where it stands. */
@@ -31,14 +31,8 @@ public class StoreSeedGoal extends Goal {
     @Nullable
     private BlockPos spot;
     private int ticks;
-    /**
-     * Where the forager joins the trunk trail it came out by, on its way home (harvester ants; see
-     * {@code TrunkTrails}); null once it is on it, or with no trail that way.
-     */
-    @Nullable
-    private BlockPos via;
 
-    public StoreSeedGoal(AbstractAntEntity ant) {
+    public StoreFoodGoal(AbstractAntEntity ant) {
         this.ant = ant;
         this.errand = new Errand<>(ant);
         setFlags(EnumSet.of(Flag.MOVE, Flag.LOOK));
@@ -47,7 +41,7 @@ public class StoreSeedGoal extends Goal {
     @Override
     public boolean canUse() {
         // A seed on its way to the mill is not stored (unless the trip is called off: then MillBreadGoal lets go of it).
-        if (!ant.isCarryingSeed() || ant.isSeedForBread() || ant.getColonyId() == null || !(ant.level() instanceof ServerLevel level)) {
+        if (!ant.isCarryingSeed() || ant.getColonyId() == null || !(ant.level() instanceof ServerLevel level)) {
             return false;
         }
         colony = ColonyManager.get(level).getColony(ant.getColonyId());
@@ -69,19 +63,13 @@ public class StoreSeedGoal extends Goal {
     public void start() {
         ticks = 0;
         errand.begin();
-        ColonyHooks.Trails trails = colony == null ? null : colony.lastingTrails();
-        via = ant.level() instanceof ServerLevel level && trails != null ? trails.wayHome(level, ant.blockPosition()) : null;
-        if (!errand.setOff(via, 1.0)) {
-            via = null;
-            walkToSpot();
-        }
+        walkToSpot();
     }
 
     @Override
     public void stop() {
         errand.stop();
         spot = null;
-        via = null;
         colony = null;
     }
 
@@ -92,18 +80,6 @@ public class StoreSeedGoal extends Goal {
         }
         if (++ticks >= GIVE_UP_TICKS) {
             dropSeed();
-            return;
-        }
-        if (via != null) {
-            // Back to the trunk trail first, then home along it.
-            BlockPos at = ant.blockPosition();
-            if (Math.abs(at.getX() - via.getX()) <= 1 && Math.abs(at.getZ() - via.getZ()) <= 1 && Math.abs(at.getY() - via.getY()) <= 2) {
-                via = null;
-                walkToSpot();
-            } else if (!errand.walkOn(via, 1.0)) {
-                via = null;
-                walkToSpot();
-            }
             return;
         }
         if (errand.within(spot, REACH)) {

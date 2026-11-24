@@ -317,7 +317,6 @@ public class NestLife {
         boolean changed = false;
         QueenCare queen = colony.queenCare();
         List<ColonyHooks.NurseJob> feeds = colony.hooks().all(ColonyHooks.NURSE_FEEDS);
-        List<ColonyHooks.NurseJob> makes = colony.hooks().all(ColonyHooks.NURSE_MAKES);
         while (nurseWork >= 1) {
             if (queen.wantsFoodAway(level, queenHome) && nurseFoodLeft(level) > 0) {
                 queen.feedQueen(level, takePiece(true));
@@ -329,8 +328,6 @@ public class NestLife {
                 takePiece(false);
                 colony.brood().feedInside(larva);
                 colony.away().note(level, AwayReport.What.YOUNG_FED, 1);
-            } else if (anyJob(level, makes)) {
-                // (more nurse food made: the harvester's bread)
             } else {
                 break;
             }

@@ -275,10 +275,7 @@ public class ColonyCommands {
                         : " | nest levels open " + Math.min(colony.nest().levelsUnlocked(level), colony.profile().nest().maxLevels()) + " of " + colony.profile().nest().maxLevels())
                 + " | members " + colony.getMemberCount() + colony.population().describe(level) + colony.away().describe(level) + colony.field().describe()
                 + " | " + colony.describeJobs(level)
-                + (colony.profile().food().makesBread()
-                        ? " | food " + colony.food().getFood() + " (rich " + colony.food().getRichSeeds() + ", eaten " + colony.food().getSeedsEaten() + ")"
-                                + lines(colony, ColonyHooks.LIST_STORE, level)
-                        : colony.hooks().first(ColonyHooks.LIST_FOOD) != null ? lines(colony, ColonyHooks.LIST_FOOD, level)
+                + (colony.hooks().first(ColonyHooks.LIST_FOOD) != null ? lines(colony, ColonyHooks.LIST_FOOD, level)
                         : " | food " + colony.food().getFood() + " pieces in the store")
                 + (colony.profile().laying().isPresent()
                         ? " | queen holds " + colony.queenCare().getQueenBread() + "/" + colony.profile().queen().meal() + " nodules" + nextEgg(colony, level)
@@ -325,8 +322,7 @@ public class ColonyCommands {
                     + SpeciesProfile.DayClock.clock(colony.timeOfDay(level)) + "; out " + SpeciesProfile.DayClock.clock(c.outFrom())
                     + " to " + SpeciesProfile.DayClock.clock(c.inBy()) + (rest > 0 ? ", resting " + SpeciesProfile.DayClock.clock(c.restStart(heat))
                     + " to " + SpeciesProfile.DayClock.clock(c.restStart(heat) + rest) : ", no midday rest")
-                    + String.format(" (biome heat %.1f)", heat) + (c.notInRain() ? ", never in rain" : "") + ")"
-                    + lines(colony, ColonyHooks.LIST_DAY, level);
+                    + String.format(" (biome heat %.1f)", heat) + (c.notInRain() ? ", never in rain" : "") + ")";
         }
         if (!colony.keepsASchedule() && holes == 0) {
             return "";

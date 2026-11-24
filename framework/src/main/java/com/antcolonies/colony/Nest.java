@@ -532,44 +532,6 @@ public class Nest {
     }
 
     /**
-     * Where the night soil may lie (see {@link NightSoil}): the floor of the top level's tunnel, and the founding chamber
-     * (its tunnel and room) once the queen has moved down out of it, every cell dug out, empty or already loose soil, on a
-     * solid floor and without brood. Nearest the shaft first. Nothing of the traffic's way is blocked: nothing collides with it.
-     * {@code pile} is the night soil's heap block (a cell it lies on already counts).
-     */
-    public List<BlockPos> nightSoilCells(Level level, net.minecraft.world.level.block.Block pile) {
-        NestLayout layout = getLayout(level);
-        if (layout == null) {
-            return List.of();
-        }
-        List<BlockPos> cells = new ArrayList<>();
-        if (!layout.chambers().isEmpty()) {
-            NestPlan.Chamber top = layout.chambers().get(0);
-            cells.addAll(top.wayIn());
-        }
-        NestPlan.Chamber founding = layout.founding();
-        if (founding != null && !founding.equals(getHomeChamber(level))) {
-            cells.addAll(founding.cells());
-        }
-        Set<BlockPos> brood = colony.brood().getBroodCells(level);
-        Set<BlockPos> planned = nestCells(level);
-        cells.removeIf(pos -> {
-            if (!LandReady.at(level, pos)) {
-                return true;
-            }
-            BlockState state = level.getBlockState(pos);
-            if (state.is(pile)) {
-                return false; // a pile already there is carried away wherever it lies
-            }
-            // Never on brood, and never on a block of the plan still to be dug (a stair going down: the diggers stand
-            // on top of it to bite it, the dig test's stall of 2026-10-16).
-            return !state.isAir() || brood.contains(pos) || planned.contains(pos.below())
-                    || !level.getBlockState(pos.below()).isFaceSturdy(level, pos.below(), Direction.UP);
-        });
-        return cells;
-    }
-
-    /**
      * The block right above the top of the shaft, at ground level: the hole a founding pair closes from inside (see
      * the species profile's {@code seal_while_founding}). It is not part of the plan, so nobody digs it open again.
      */

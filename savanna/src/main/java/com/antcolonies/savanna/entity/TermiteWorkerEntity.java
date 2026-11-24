@@ -17,7 +17,7 @@ import com.antcolonies.entity.goal.ClipGrassGoal;
 import com.antcolonies.entity.goal.FeedLarvaGoal;
 import com.antcolonies.entity.goal.FeedQueenGoal;
 import com.antcolonies.entity.goal.FleeGoal;
-import com.antcolonies.entity.goal.GatherSeedGoal;
+import com.antcolonies.entity.goal.GatherFoodGoal;
 import com.antcolonies.entity.goal.GoInsideGoal;
 import com.antcolonies.entity.goal.NoticeGoal;
 import com.antcolonies.savanna.entity.goal.PlugHoleGoal;
@@ -25,7 +25,7 @@ import com.antcolonies.entity.goal.ScoutGoal;
 import com.antcolonies.entity.goal.SealGoal;
 import com.antcolonies.savanna.entity.goal.ShapeMoundGoal;
 import com.antcolonies.entity.goal.StandByQueenGoal;
-import com.antcolonies.entity.goal.StoreSeedGoal;
+import com.antcolonies.entity.goal.StoreFoodGoal;
 import com.antcolonies.entity.goal.DigGoal;
 import com.antcolonies.entity.goal.EatGoal;
 import com.antcolonies.savanna.SavannaSpecies;
@@ -98,7 +98,7 @@ public class TermiteWorkerEntity extends AbstractAntEntity implements ColonyBorn
         // A hungry worker eats before anything else: a nodule (young) or old comb (older) in the fungus garden.
         this.goalSelector.addGoal(1, new EatGoal(this, hunger()));
         // What a termite holds goes where it belongs first: forage to the food store, soil to the mound.
-        this.goalSelector.addGoal(1, new StoreSeedGoal(this));
+        this.goalSelector.addGoal(1, new StoreFoodGoal(this));
         this.goalSelector.addGoal(1, new BuildMoundGoal(this));
         this.goalSelector.addGoal(2, new ShapeMoundGoal(this));
         // Nurses carry the queen's eggs into the fungus gardens and feed nodules to the queen and the nymphs.
@@ -110,7 +110,7 @@ public class TermiteWorkerEntity extends AbstractAntEntity implements ColonyBorn
         this.goalSelector.addGoal(2, new SealGoal(this));
         // Builders dig, foragers fetch food off the ground and cut it off plants.
         this.goalSelector.addGoal(3, new DigGoal(this, () -> true, () -> mayDo(ColonyRole.BUILDER)));
-        this.goalSelector.addGoal(3, new GatherSeedGoal(this));
+        this.goalSelector.addGoal(3, new GatherFoodGoal(this));
         this.goalSelector.addGoal(3, new CarryCorpseGoal(this));
         this.goalSelector.addGoal(4, new ClipGrassGoal(this));
         this.goalSelector.addGoal(4, new ScoutGoal(this));

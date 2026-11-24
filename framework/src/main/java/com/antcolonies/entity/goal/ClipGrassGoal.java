@@ -29,7 +29,7 @@ import net.minecraft.world.phys.shapes.VoxelShape;
  * Walks to a food plant near the nest, nibbles at it for a couple of seconds and cuts one piece off it: a seed off a
  * tuft of short grass for the harvester ant, a piece of forage off a dead bush, dry grass, dying leaves or a hay bale
  * for termites (the species profile's food {@code plants}). A plant gives the profile's number of pieces and then
- * breaks; {@link StoreSeedGoal} then carries the piece down to the food store. Only looks for plants when there is
+ * breaks; {@link StoreFoodGoal} then carries the piece down to the food store. Only looks for plants when there is
  * somewhere for the food to go: part of the food store is dug out, or the queen wants seeds. The ant works from the
  * plant's own cell (grass can be walked into) or from any spot right next to it (a hay bale is solid). Only at
  * foraging time (see {@code Colony.isForagingTime}); when it ends the forager leaves the plant.
@@ -58,12 +58,6 @@ public class ClipGrassGoal extends Goal {
     private static final int CLOSE_IN_LIMIT = 60;
     /** Eating from inside the nest (out of foraging time): from a foothold inside only. */
     private boolean fromInside;
-    /**
-     * Where the forager leaves the colony's trunk trail for its plant (harvester ants: it walks out along the trail
-     * first, then fans out; see {@code TrunkTrails}); null once it is there, or with no trail that way.
-     */
-    @Nullable
-    private BlockPos via;
 
     public ClipGrassGoal(AbstractAntEntity ant) {
         this.ant = ant;
@@ -89,22 +83,11 @@ public class ClipGrassGoal extends Goal {
         if (fromInside && !colony.keepsASchedule()) {
             return false;
         }
-        if (!fromInside && colony.mustWait(level, ant)) {
-            return false; // waits by the entrance for the homecomers' touches (Gordon's rule, see colony.Door)
-        }
         grass = colony.food().findGrass(level, ant.blockPosition(), errand.leftAlone(), ant.getUUID(), fromInside);
-        if (grass == null || colony.passesBy(level, ant.getUUID(), grass)) {
-            return false; // (a recruit on its way to its patch passes poorer food by)
+        if (grass == null) {
+            return false;
         }
         colony.food().claimGrass(level, grass, ant.getUUID());
-        if (!fromInside) {
-            colony.news().tell(level, ColonyNews.SET_OUT, new ColonyNews.SetOut(ant));
-        }
-        ColonyHooks.Trails trails = colony.lastingTrails();
-        via = fromInside || trails == null ? null : trails.setOut(level, grass);
-        if (via != null && flat(ant.blockPosition()) >= flat(via) - 1.0) {
-            via = null; // already out past the trail's end for this plant (it was out in the field): straight there
-        }
         return true;
     }
 
@@ -147,7 +130,6 @@ public class ClipGrassGoal extends Goal {
             colony.food().releaseGrass(ant.getUUID());
         }
         grass = null;
-        via = null;
         colony = null;
     }
 
@@ -157,18 +139,6 @@ public class ClipGrassGoal extends Goal {
             return;
         }
         ticks++;
-        if (via != null) {
-            // Out along the trunk trail first.
-            BlockPos at = ant.blockPosition();
-            if (Math.abs(at.getX() - via.getX()) <= 1 && Math.abs(at.getZ() - via.getZ()) <= 1 && Math.abs(at.getY() - via.getY()) <= 2) {
-                via = null;
-                errand.stop();
-            } else if (!errand.walkOn(via, 1.0)) {
-                via = null; // no way onto the trail from here: straight to the plant
-            } else {
-                return;
-            }
-        }
         ant.getLookControl().setLookAt(grass.getX() + 0.5, grass.getY() + 0.3, grass.getZ() + 0.5);
         // (BUGS 145: a small body a hair under the cell beside the plant, its feet at 64.9 down in an open mud cast's
         // top, counted as a cell too low; its walk to the cell above, a tenth of a block up, slipped back and began again
@@ -231,11 +201,10 @@ public class ClipGrassGoal extends Goal {
         }
         if (clipping >= CLIP_TICKS) {
             if (!colony.claimPlaceForAPiece(level, ant.getUUID())) {
-                ticks = GIVE_UP_TICKS; // nowhere to take a piece now (the store full, the mill busy): the plant is left
+                ticks = GIVE_UP_TICKS; // nowhere to take a piece now (the store full): the plant is left
                 return;
             }
             ant.setCarriedSeed(colony.food().cutPiece());
-            ant.setSeedForBread(colony.pieceGoesToMill(ant.getUUID())); // to the mill if the store has no room
             colony.food().clippedGrass(level, grass, ant.getUUID());
             ColonyManager.get(level).markChanged();
             grass = null; // so stop() does not free the tuft again

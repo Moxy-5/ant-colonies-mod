@@ -160,25 +160,12 @@ public final class AwayKit {
         // hand, in the order they were called; a kind nobody hears is not sent at all.
         Map<com.antcolonies.colony.ColonyNews.Kind<?>, List<String>> order = Map.ofEntries(
                 Map.entry(com.antcolonies.colony.ColonyNews.MEMBER_HURT, List.of("alarm", "patrol", "danger_map", "forager_spots")),
-                Map.entry(com.antcolonies.colony.ColonyNews.MEMBER_DIED, List.of("patrol", "forager_spots", "recruits")),
-                Map.entry(com.antcolonies.colony.ColonyNews.FOOD_FOUND, List.of("forager_spots", "recruits")),
                 Map.entry(com.antcolonies.colony.ColonyNews.NEIGHBOUR_MET, List.of("neighbours")),
                 // Step 8a: the rest of the shared code's tellings, each heard by the one part it used to name.
-                Map.entry(com.antcolonies.colony.ColonyNews.INTO_NUMBERS, List.of("forager_spots")),
-                Map.entry(com.antcolonies.colony.ColonyNews.OUT_OF_NUMBERS, List.of("forager_spots")),
-                Map.entry(com.antcolonies.colony.ColonyNews.FORAGER_NUMBERS, List.of("forager_spots")),
-                Map.entry(com.antcolonies.colony.ColonyNews.PIECE_TAKEN, List.of("bakery")),
-                Map.entry(com.antcolonies.colony.ColonyNews.PIECE_EATEN, List.of("bakery")),
                 Map.entry(com.antcolonies.colony.ColonyNews.HEAP_GONE, List.of("fungus_garden")),
-                Map.entry(com.antcolonies.colony.ColonyNews.NUMBERS_TRIP, List.of("trunk_trails")),
-                Map.entry(com.antcolonies.colony.ColonyNews.NUMBERS_FORAGED, List.of("door")),
                 Map.entry(com.antcolonies.colony.ColonyNews.BLOCK_DUG, List.of("mound")),
                 Map.entry(com.antcolonies.colony.ColonyNews.PLANT_EATEN, List.of("bare_patches")), // the split, step S3: was held by the food store
                 // step 9a: the shared goals' tellings
-                Map.entry(com.antcolonies.colony.ColonyNews.SET_OUT, List.of("door")),
-                Map.entry(com.antcolonies.colony.ColonyNews.SEARCH_STARTED, List.of("forager_spots")),
-                Map.entry(com.antcolonies.colony.ColonyNews.SEARCH_OVER, List.of("recruits", "forager_spots", "door")),
-                Map.entry(com.antcolonies.colony.ColonyNews.MEMBER_ROUND, List.of("door", "recruits")),
                 Map.entry(com.antcolonies.colony.ColonyNews.PLAYER_STAMPED, List.of("alarm")),
                 Map.entry(com.antcolonies.colony.ColonyNews.BLOCK_BROKEN, List.of("alarm")),
                 Map.entry(com.antcolonies.colony.ColonyNews.BROKEN_OPEN, List.of("raid_defence"))); // M8 step 2f
@@ -192,7 +179,6 @@ public final class AwayKit {
         // to be asked by name, in the order they were asked; a kind nobody answers is "no" at once.
         Map<com.antcolonies.colony.ColonyQuestions.Kind<?>, List<String>> asked = Map.ofEntries(
                 Map.entry(com.antcolonies.colony.ColonyQuestions.KEEP_OFF, List.of("neighbours", "closed_holes", "danger_map", "trunk_trails", "alarm")),
-                Map.entry(com.antcolonies.colony.ColonyQuestions.NOT_CLEARED, List.of("patrol")),
                 Map.entry(com.antcolonies.colony.ColonyQuestions.HOLE_KEPT_SHUT, List.of("closed_holes")),
                 Map.entry(com.antcolonies.colony.ColonyQuestions.ANY_HOLE_KEPT_SHUT, List.of("closed_holes")),
                 Map.entry(com.antcolonies.colony.ColonyQuestions.NO_GALLERY_THROUGH, List.of("closed_holes")),
@@ -201,14 +187,9 @@ public final class AwayKit {
                 Map.entry(com.antcolonies.colony.ColonyQuestions.BUILDING_OVER_NEST, List.of("mound")),
                 Map.entry(com.antcolonies.colony.ColonyQuestions.CLEAR_JOB, List.of("mound")),
                 Map.entry(com.antcolonies.colony.ColonyQuestions.STRUCTURE_TUNNEL, List.of("mound")),
-                Map.entry(com.antcolonies.colony.ColonyQuestions.MORE_FOOD_WANTED, List.of("bakery")),
-                Map.entry(com.antcolonies.colony.ColonyQuestions.KEEPS_TRAILS, List.of("trunk_trails")),
                 Map.entry(com.antcolonies.colony.ColonyQuestions.NOTHING_TO_EAT_IN_STORE, List.of("fungus_garden")),
                 // step 9a: the shared goals' asks
-                Map.entry(com.antcolonies.colony.ColonyQuestions.MUST_WAIT, List.of("door")),
-                Map.entry(com.antcolonies.colony.ColonyQuestions.PASSES_BY, List.of("recruits")),
-                Map.entry(com.antcolonies.colony.ColonyQuestions.ALARMED, List.of("alarm")),
-                Map.entry(com.antcolonies.colony.ColonyQuestions.ON_TRAIL, List.of("trunk_trails")));
+                Map.entry(com.antcolonies.colony.ColonyQuestions.ALARMED, List.of("alarm")));
         for (Map.Entry<com.antcolonies.colony.ColonyQuestions.Kind<?>, List<String>> kind : asked.entrySet()) {
             List<String> answering = kind.getValue().stream().filter(has::contains).toList();
             helper.assertTrue(colony.questions().answerersOf(kind.getKey()).equals(answering) && colony.questions().answers(kind.getKey()) == !answering.isEmpty(),
@@ -219,8 +200,6 @@ public final class AwayKit {
         // to name, in the order it used them.
         Map<com.antcolonies.colony.ColonyHooks.Kind<?>, List<String>> plugged = Map.ofEntries(
                 Map.entry(com.antcolonies.colony.ColonyHooks.REACH, List.of("trunk_trails")),
-                Map.entry(com.antcolonies.colony.ColonyHooks.TRAILS, List.of("trunk_trails")),
-                Map.entry(com.antcolonies.colony.ColonyHooks.DOOR_RULE, List.of("door")),
                 Map.entry(com.antcolonies.colony.ColonyHooks.CO_FOUNDERS, List.of("king_care")),
                 Map.entry(com.antcolonies.colony.ColonyHooks.NURSE_FOOD, List.of("fungus_garden", "bakery")),
                 Map.entry(com.antcolonies.colony.ColonyHooks.CASTES, List.of("soldiers")),
@@ -229,15 +208,10 @@ public final class AwayKit {
                 Map.entry(com.antcolonies.colony.ColonyHooks.GARDEN, List.of("fungus_garden")),
                 Map.entry(com.antcolonies.colony.ColonyHooks.CRUST, List.of("mound")), // step 9c
                 Map.entry(com.antcolonies.colony.ColonyHooks.AWAY_BUILDER, List.of("hill", "mound")),
-                Map.entry(com.antcolonies.colony.ColonyHooks.NUMBERS_SEARCH, List.of("forager_spots")),
                 Map.entry(com.antcolonies.colony.ColonyHooks.AWAY_BESIDE_QUEEN, List.of("king_care")),
                 Map.entry(com.antcolonies.colony.ColonyHooks.AWAY_AFTER_NURSES, List.of("fungus_garden")),
                 Map.entry(com.antcolonies.colony.ColonyHooks.NURSE_FEEDS, List.of("king_care")),
-                Map.entry(com.antcolonies.colony.ColonyHooks.NURSE_MAKES, List.of("bakery")),
                 // step 9a: the shared goals' sockets
-                Map.entry(com.antcolonies.colony.ColonyHooks.LONE_SEARCH, List.of("forager_spots")),
-                Map.entry(com.antcolonies.colony.ColonyHooks.CALLED_OUT, List.of("recruits")),
-                Map.entry(com.antcolonies.colony.ColonyHooks.MILL, List.of("bakery")),
                 Map.entry(com.antcolonies.colony.ColonyHooks.DUG_SOIL, List.of("mound", "hill")),
                 // step 9b: the parts' words in the colony list, slot by slot, in the order the list wrote them
                 Map.entry(com.antcolonies.colony.ColonyHooks.LIST_STORE, List.of("bakery")),
@@ -246,7 +220,6 @@ public final class AwayKit {
                 Map.entry(com.antcolonies.colony.ColonyHooks.LIST_SEARCH, List.of("forager_spots", "recruits", "trunk_trails")),
                 Map.entry(com.antcolonies.colony.ColonyHooks.LIST_DANGER, List.of("closed_holes")),
                 Map.entry(com.antcolonies.colony.ColonyHooks.LIST_BUILDING, List.of("mound")),
-                Map.entry(com.antcolonies.colony.ColonyHooks.LIST_DAY, List.of("patrol", "door", "hill")),
                 Map.entry(com.antcolonies.colony.ColonyHooks.LIST_HOLES, List.of("galleries", "hidden_trips", "bare_patches")),
                 // split S2: the galleries a part of their own
                 Map.entry(com.antcolonies.colony.ColonyHooks.UNDERGROUND, List.of("galleries")),

@@ -318,10 +318,12 @@ replay_bug121_scout_home 0.69
 replay_bug122_termite_on_mound 0.99
 replay_bug135_termites_over_tunnel_mouths 0.54
 replay_bug140_scout_by_ravine 2.05
+replay_bug145_termite_in_feeding_cast 1.81
 replay_bug148_egg_carrier_on_mound_top 2.27
 replay_bug156_nurse_in_cast 3.32
 replay_soak2_termite_under_cast_hole 2.56
 replay_soak4_raider_on_hump 2.71
+replay_soak4_termite_in_cast_going_home 3.69
 replay_soak_termite_under_mud_cast 2.37
 richbreadstartsaburstofeggs 10.36
 riverbanksgettheirstripsiltandmud 0.01

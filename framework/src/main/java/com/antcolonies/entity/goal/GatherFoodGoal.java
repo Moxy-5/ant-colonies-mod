@@ -19,12 +19,12 @@ import net.minecraft.world.entity.item.ItemEntity;
 import net.minecraft.world.item.ItemStack;
 
 /**
- * Walks to a seed lying on the ground near the nest (any item of the species profile's food {@code items}: seeds for
- * the harvester ant, sticks, saplings and wheat for termites) and takes one in its mandibles. {@link StoreSeedGoal}
+ * Walks to a seed lying on the ground near the nest (any item of the species profile's food {@code items}: sticks,
+ * saplings and wheat for termites) and takes one in its mandibles. {@link StoreFoodGoal}
  * then carries it down to the food store. Only looks for seeds when there is somewhere for them to go: part of the food store is dug out, or the queen wants them.
  * Only at foraging time (see {@code Colony.isForagingTime}); a forager on its way out when it ends turns back.
  */
-public class GatherSeedGoal extends Goal {
+public class GatherFoodGoal extends Goal {
     /** How close (sideways, in blocks) the ant must get to take the seed. */
     private static final double REACH = 0.9;
     /** If the ant can't get there in 30 seconds it leaves the seed to the others. */
@@ -39,7 +39,7 @@ public class GatherSeedGoal extends Goal {
     private ItemEntity seed;
     private int ticks;
 
-    public GatherSeedGoal(AbstractAntEntity ant) {
+    public GatherFoodGoal(AbstractAntEntity ant) {
         this.ant = ant;
         this.errand = new Errand<>(ant);
         setFlags(EnumSet.of(Flag.MOVE, Flag.LOOK));
@@ -56,15 +56,11 @@ public class GatherSeedGoal extends Goal {
         if (colony == null || !colony.isForagingTime(level) || colony.isAlarmed(level, ant.blockPosition())) {
             return false; // foragers only go out at foraging time (termites: at night and in the rain), not where the alarm is felt
         }
-        if (colony.mustWait(level, ant)) {
-            return false; // waits by the entrance for the homecomers' touches (Gordon's rule, see colony.Door)
-        }
         seed = colony.food().findSeed(level, ant.blockPosition(), errand.leftAlone());
-        if (seed == null || colony.passesBy(level, ant.getUUID(), seed.blockPosition())) {
-            return false; // (a recruit on its way to its patch passes poorer food by)
+        if (seed == null) {
+            return false;
         }
         colony.food().claimSeed(level, seed, ant.getUUID());
-        colony.news().tell(level, ColonyNews.SET_OUT, new ColonyNews.SetOut(ant));
         return true;
     }
 
@@ -107,7 +103,7 @@ public class GatherSeedGoal extends Goal {
     /** Takes one seed out of the pile on the ground. */
     private void take(ServerLevel level) {
         if (!colony.claimPlaceForAPiece(level, ant.getUUID())) {
-            ticks = GIVE_UP_TICKS; // nowhere to take it now (the store full, the mill busy): it stays where it lies
+            ticks = GIVE_UP_TICKS; // nowhere to take it now (the store full): it stays where it lies
             return;
         }
         ItemStack stack = seed.getItem();
@@ -118,9 +114,7 @@ public class GatherSeedGoal extends Goal {
             seed.setItem(stack);
         }
         ant.setCarriedSeed(one);
-        colony.news().tell(level, ColonyNews.FOOD_FOUND, new ColonyNews.FoodFound(ant.getUUID(), seed.blockPosition())); // (its spot now; a rich patch: a scent line home)
 
-        ant.setSeedForBread(colony.pieceGoesToMill(ant.getUUID())); // to the mill if the store has no room
         level.playSound(null, ant.blockPosition(), SoundEvents.ITEM_PICKUP, SoundSource.NEUTRAL, 0.15F, 1.6F);
     }
 }

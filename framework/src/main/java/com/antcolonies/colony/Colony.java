@@ -267,35 +267,9 @@ public class Colony {
         return questions.ask(level, ColonyQuestions.ALARMED, pos);
     }
 
-    /** Whether this forager must wait in the nest before it sets out (the harvester's door, {@link ColonyQuestions#MUST_WAIT}). */
-    public boolean mustWait(Level level, AbstractAntEntity forager) {
-        return questions.ask(level, ColonyQuestions.MUST_WAIT, forager);
-    }
-
-    /** Whether this forager passes the food by on its way to a patch it was called to ({@link ColonyQuestions#PASSES_BY}). */
-    public boolean passesBy(Level level, UUID forager, BlockPos food) {
-        return questions.ask(level, ColonyQuestions.PASSES_BY, new ColonyQuestions.FoodFor(forager, food));
-    }
-
-    /**
-     * Whether there is a place for this forager's piece, which it claims: at the mill if the colony has one (it takes
-     * the piece if the store has no room, {@link ColonyHooks#MILL}), otherwise in the store.
-     */
+    /** Whether there is a place in the store for this forager's piece, which it claims. */
     public boolean claimPlaceForAPiece(ServerLevel level, UUID forager) {
-        ColonyHooks.Mill mill = hooks.first(ColonyHooks.MILL);
-        return mill != null ? mill.hasPlace(level, forager) : food().claimStorePlace(level, forager);
-    }
-
-    /** Whether this forager's piece goes to the mill (the store had no room for it). */
-    public boolean pieceGoesToMill(UUID forager) {
-        ColonyHooks.Mill mill = hooks.first(ColonyHooks.MILL);
-        return mill != null && mill.milling(forager);
-    }
-
-    /** The colony's lasting trails (the harvester's trunk trails, {@link ColonyHooks#TRAILS}), or null. */
-    @Nullable
-    public ColonyHooks.Trails lastingTrails() {
-        return hooks.first(ColonyHooks.TRAILS);
+        return food().claimStorePlace(level, forager);
     }
 
     /**
@@ -391,12 +365,9 @@ public class Colony {
         setAge(level, days);
     }
 
-    /**
-     * Whether a forager may go for food at {@code pos} now: no part says it is not cleared yet today (the harvester's
-     * patrol: a patroller came back from that way) and none keeps the foragers off it ({@link #keepsOff}).
-     */
+    /** Whether a forager may go for food at {@code pos} now: no part keeps the foragers off it ({@link #keepsOff}). */
     public boolean mayForageAt(Level level, BlockPos pos) {
-        return !questions.ask(level, ColonyQuestions.NOT_CLEARED, pos) && !keepsOff(level, pos);
+        return !keepsOff(level, pos);
     }
 
 
@@ -553,11 +524,6 @@ public class Colony {
     /** Whether it rains on the nest now (as the colony sees it: a game test may pretend, see {@link #setRainForTests}). */
     public boolean rainsNow(net.minecraft.world.level.Level level) {
         return rainForTests != null ? rainForTests : rainsOnNest(level);
-    }
-
-    /** Tests only: pretend the biome at the nest is this hot, for the midday rest's length (null for the real biome). */
-    public void setHeatForTests(@Nullable Float heat) {
-        this.heat = heat;
     }
 
     /**
@@ -755,11 +721,11 @@ public class Colony {
     }
 
     /**
-     * How far (blocks, sideways from the nest's middle) the colony's searchers may get at most: the foraging range plus
-     * the stretch of a search drifting outward when nothing is found nearer (brain step 4c, {@code food.search}).
+     * How far (blocks, sideways from the nest's middle) the colony's searchers may get at most: the foraging range
+     * (until 2026-11-23 the harvester's drifting searches reached a stretch past it).
      */
     public int searchReach() {
-        return foragingRadius() + profile().food().search().map(SpeciesProfile.SearchNumbers::stretch).orElse(0);
+        return foragingRadius();
     }
 
     /** The nest area reaches at least this far sideways (blocks; it was the food radius, 24, before a young harvester colony's reach became 12). */
@@ -802,21 +768,6 @@ public class Colony {
             workOutRoles(level, now);
         }
         return roles.getOrDefault(ant.getUUID(), ColonyRole.BUILDER);
-    }
-
-    /** How many of the colony's real workers are builders now (the numbers inside the nest not counted). */
-    public int buildersNow(ServerLevel level) {
-        long now = level.getGameTime();
-        if (now - rolesWorkedOutAt >= 20 || now < rolesWorkedOutAt) {
-            workOutRoles(level, now);
-        }
-        int builders = 0;
-        for (ColonyRole role : roles.values()) {
-            if (role == ColonyRole.BUILDER) {
-                builders++;
-            }
-        }
-        return builders;
     }
 
     /** The role of the worker with this id (for tests and the colony list); a builder if it is not loaded. */

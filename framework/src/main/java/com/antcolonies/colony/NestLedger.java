@@ -272,13 +272,6 @@ public class NestLedger {
             for (int i = 0; i < seeds + richSeeds; i++) {
                 colony.food().countIn(i < richSeeds);
             }
-            for (int i = 0; colony.profile().food().makesBread() && i < bread + richBread; i++) {
-                boolean rich = i < richBread;
-                NurseFood food = colony.nurseFood();
-                if (food != null) {
-                    food.countedIn(rich);
-                }
-            }
         }
     }
 }

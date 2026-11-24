@@ -31,6 +31,8 @@ public class ColonyFrameworkMod {
         ModEntities.ENTITY_TYPES.register(modEventBus);
         // The soil ramps, the floors of sloping burrows (docs/plans/soil-ramp.md).
         SoilRamps.BLOCKS.register(modEventBus);
+        // Deep Soil, the soft ground under the dirt that every digging species needs (shared since the harvester left).
+        com.antcolonies.block.DeepSoil.signUp(modEventBus);
         // The one synced slot for what an insect carries, and the framework's rows of the load list (Apex part 3, T3).
         ModDataSerializers.SERIALIZERS.register(modEventBus);
         FrameworkLoads.signUp();

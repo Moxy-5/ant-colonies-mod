@@ -1,0 +1,8 @@
+{
+  "parent": "minecraft:block/cube_bottom_top",
+  "textures": {
+    "top": "colonyframework:block/deep_soil_top",
+    "bottom": "colonyframework:block/deep_soil_top",
+    "side": "colonyframework:block/deep_soil_side"
+  }
+}

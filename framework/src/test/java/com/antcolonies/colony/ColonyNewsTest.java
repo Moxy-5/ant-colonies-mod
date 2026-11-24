@@ -22,12 +22,12 @@ class ColonyNewsTest {
     void listenersHearTheirOwnKindInPlaceOrder() {
         ColonyNews news = new ColonyNews();
         List<String> heard = new ArrayList<>();
-        news.listen(ColonyNews.FOOD_FOUND, 20, "second", (level, found) -> heard.add("second " + found.where().getX()));
-        news.listen(ColonyNews.FOOD_FOUND, 10, "first", (level, found) -> heard.add("first " + found.where().getX()));
-        news.listen(ColonyNews.MEMBER_DIED, 10, "deaths", (level, died) -> heard.add("died"));
-        news.tell(null, ColonyNews.FOOD_FOUND, new ColonyNews.FoodFound(UUID.randomUUID(), new BlockPos(7, 60, 0)));
+        news.listen(ColonyNews.BLOCK_DUG, 20, "second", (level, dug) -> heard.add("second " + dug.where().getX()));
+        news.listen(ColonyNews.BLOCK_DUG, 10, "first", (level, dug) -> heard.add("first " + dug.where().getX()));
+        news.listen(ColonyNews.HEAP_GONE, 10, "heaps", (level, gone) -> heard.add("gone"));
+        news.tell(null, ColonyNews.BLOCK_DUG, new ColonyNews.BlockDug(new BlockPos(7, 60, 0)));
         assertEquals(List.of("first 7", "second 7"), heard);
-        assertEquals(List.of("first", "second"), news.listenersOf(ColonyNews.FOOD_FOUND));
+        assertEquals(List.of("first", "second"), news.listenersOf(ColonyNews.BLOCK_DUG));
     }
 
     @Test
@@ -46,7 +46,7 @@ class ColonyNewsTest {
     @Test
     void twoListenersAtOnePlaceAreRefused() {
         ColonyNews news = new ColonyNews();
-        news.listen(ColonyNews.MEMBER_DIED, 10, "patrol", (level, died) -> { });
-        assertThrows(IllegalStateException.class, () -> news.listen(ColonyNews.MEMBER_DIED, 10, "recruits", (level, died) -> { }));
+        news.listen(ColonyNews.HEAP_GONE, 10, "garden", (level, gone) -> { });
+        assertThrows(IllegalStateException.class, () -> news.listen(ColonyNews.HEAP_GONE, 10, "mound", (level, gone) -> { }));
     }
 }

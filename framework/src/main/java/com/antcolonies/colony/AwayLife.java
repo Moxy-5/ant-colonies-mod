@@ -421,7 +421,6 @@ public class AwayLife {
             case ADULT -> {
                 colony.population().foldIn(level, what.caste(), what.grownUpAt(), what.lastMeal());
                 colony.foodMap().wentHome(id);
-                colony.news().tell(level, ColonyNews.INTO_NUMBERS, new ColonyNews.IntoNumbers(id));
 
                 switch (what.load()) {
                     case SEED, RICH_SEED -> {

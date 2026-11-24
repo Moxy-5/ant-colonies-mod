@@ -114,10 +114,6 @@ public class FoodStore {
         seedsDropped++;
     }
 
-    public int getSeedsDroppedForTests() {
-        return seedsDropped;
-    }
-
     /** Whether the store has ever held a piece of food (for a termite colony: its first comb). */
     public boolean hasHadFood() {
         return hadFood || food > 0;
@@ -165,12 +161,9 @@ public class FoodStore {
         return colony.profile().food();
     }
 
-    /**
-     * Whether it is worth fetching a seed from outside: the food store has room for it, or bread still has to be milled
-     * (the ant then brings the seed straight to the mill, so nothing is put down without a store).
-     */
+    /** Whether it is worth fetching a piece of food from outside: the food store has room for it. */
     public boolean wantsSeeds(ServerLevel level) {
-        return hasStoreRoom(level) || colony.questions().ask(level, ColonyQuestions.MORE_FOOD_WANTED, null);
+        return hasStoreRoom(level);
     }
 
     /** Whether the food store has a place left that no seed on its way in is holding. */
@@ -222,9 +215,7 @@ public class FoodStore {
     /**
      * The seed (the species' food item) on the ground nearest to {@code near} that the ants should fetch, or null: only once the food store
      * has room (or the queen wants seeds), only on the surface (not what is already stored below), within the profile's food radius of the entrance,
-     * and not one another ant is on its way to. {@code avoid}: item entity ids this ant could not reach. A species that
-     * searches alone ({@link FoodMap#searchesAlone}) only takes a seed the ant has come across: within the find radius
-     * of {@code near} (real foragers bump into seeds; nobody tells them where one lies).
+     * and not one another ant is on its way to. {@code avoid}: item entity ids this ant could not reach. 
      */
     @Nullable
     public ItemEntity findSeed(Level level, BlockPos near, Set<Integer> avoid) {
@@ -237,7 +228,6 @@ public class FoodStore {
         AABB area = new AABB(center).inflate(radius, 0, radius).expandTowards(0, 8, 0);
         ItemEntity best = null;
         double bestDistance = Double.MAX_VALUE;
-        double feel = colony.foodMap().searchesAlone() ? food().findRadius() : Double.MAX_VALUE;
         for (ItemEntity item : level.getEntitiesOfClass(ItemEntity.class, area)) {
             if (!item.isAlive() || !item.getItem().is(items) || item.getY() < center.getY() - 0.5
                     || claimedSeeds.contains(item.getId()) || avoid.contains(item.getId())
@@ -245,9 +235,6 @@ public class FoodStore {
                 continue;
             }
             double distance = item.distanceToSqr(near.getX() + 0.5, near.getY() + 0.5, near.getZ() + 0.5);
-            if (distance > feel * feel) {
-                continue; // (searching alone: not come across yet)
-            }
             if (distance < bestDistance) {
 
                 best = item;
@@ -305,9 +292,7 @@ public class FoodStore {
                 continue;
             }
             double trip = tripLength(pos, exits.isEmpty() ? List.of(center) : exits);
-            ColonyHooks.Trails trails = colony.hooks().first(ColonyHooks.TRAILS);
-            double byTrail = trails == null ? -1.0 : trails.walkTo(pos); // (a cleared trail walks quicker: worth the walk)
-            double worth = worth(plant.pieces() - getPiecesCut(pos), byTrail >= 0 ? Math.min(trip, byTrail) : trip, pos.distSqr(near));
+            double worth = worth(plant.pieces() - getPiecesCut(pos), trip, pos.distSqr(near));
             if (worth > bestWorth) {
                 best = pos;
                 bestWorth = worth;
@@ -361,10 +346,10 @@ public class FoodStore {
             grassScanTime = now + GRASS_SCAN_TICKS;
             grassTufts.clear();
             int radius = colony.searchReach(); // (out to where a searcher's drift may take it)
-            int inner = Math.min(radius, food().radius() + food().search().map(SpeciesProfile.SearchNumbers::stretch).orElse(0));
+            int inner = Math.min(radius, food().radius());
             ColonyHooks.Underground web = colony.underground();
             boolean galleries = web != null && web.range() > 0;
-            if (!colony.questions().ask(level, ColonyQuestions.KEEPS_TRAILS, null) && !galleries) {
+            if (!galleries) {
                 inner = radius;
             }
             for (int x = center.getX() - inner; x <= center.getX() + inner; x++) {
@@ -376,7 +361,7 @@ public class FoodStore {
             // past it (out of the inner square) was then never scanned, so no piece was dug to it (docs/BUGS.md 51).
             if (inner < radius || galleries) {
                 Set<Long> done = new HashSet<>();
-                int side = BAND + food().search().map(SpeciesProfile.SearchNumbers::wander).orElse(0);
+                int side = BAND;
                 if (galleries) {
                     // Termites underground step 4: past the nest's own ground only along the galleries (round the holes,
                     // the tips and the food the colony knows), and round the workers out (below).
@@ -388,11 +373,6 @@ public class FoodStore {
                             }
                         }
                     }
-                }
-                int trailSide = side;
-                ColonyHooks.Trails trails = colony.hooks().first(ColonyHooks.TRAILS);
-                for (int[] column : trails == null ? List.<int[]>of() : trails.columnsNear(trailSide, radius)) {
-                    scanOuter(level, center.getX() + column[0], center.getZ() + column[1], inner, done);
                 }
                 AABB out = new AABB(center).inflate(radius + 2, 16, radius + 2);
                 for (com.antcolonies.entity.AbstractAntEntity ant : level.getEntitiesOfClass(com.antcolonies.entity.AbstractAntEntity.class, out,
@@ -608,9 +588,6 @@ public class FoodStore {
         BlockPos pos = grass.immutable();
         plantClaims.remove(ant);
         colony.trails().visited(level, pos, ant);
-        if (level instanceof ServerLevel server) {
-            colony.news().tell(server, ColonyNews.FOOD_FOUND, new ColonyNews.FoodFound(ant, pos)); // (its spot now; a rich patch: a scent line home)
-        }
         BlockState before = level.getBlockState(pos);
         SpeciesProfile.PlantFood plant = food().plantFor(before);
         if (plant != null && before.getBlock() instanceof EatenInStages eaten) {
@@ -1030,19 +1007,6 @@ public class FoodStore {
         return true;
     }
 
-    /** A heap of seeds in the food store to take one seed from, or null if there is none. */
-    @Nullable
-    public BlockPos findSeedPile(Level level, RandomSource random) {
-        List<BlockPos> piles = new ArrayList<>();
-        SeedPileBlock pile = food().pileBlock();
-        for (BlockPos pos : colony.nest().getFoodStoreCells(level)) {
-            if (level.getBlockState(pos).is(pile)) {
-                piles.add(pos);
-            }
-        }
-        return piles.isEmpty() ? null : piles.get(random.nextInt(piles.size()));
-    }
-
     /**
      * A worker takes one seed off the heap at {@code pile}: the heap gets a layer lower and the colony counts one food
      * less. Returns the seed (a pumpkin seed if it is a rich one, else the species' piece: a wheat seed), or an empty stack if the heap is
@@ -1059,9 +1023,6 @@ public class FoodStore {
         food = Math.max(0, food - 1);
         if (rich) {
             richSeeds--;
-        }
-        if (level instanceof ServerLevel server) {
-            colony.news().tell(server, ColonyNews.PIECE_TAKEN, new ColonyNews.PieceTaken(ant, rich)); // (a rich one: its miller makes rich bread)
         }
         return rich ? new ItemStack(Items.PUMPKIN_SEEDS) : cutPiece();
     }
@@ -1087,9 +1048,6 @@ public class FoodStore {
             return ItemStack.EMPTY;
         }
         ItemStack seed = takeSeedAt(level, pile, ant, false);
-        if (level instanceof ServerLevel server) {
-            colony.news().tell(server, ColonyNews.PIECE_EATEN, new ColonyNews.PieceEaten(ant)); // eaten, not milled
-        }
         if (!seed.isEmpty()) {
             seedsEaten++;
         }
