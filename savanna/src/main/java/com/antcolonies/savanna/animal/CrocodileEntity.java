@@ -1875,7 +1875,7 @@ public class CrocodileEntity extends PathfinderMob implements GeoEntity, HasLife
                 if (seen instanceof CatfishEntity && d < bestCat) {
                     bestCat = d;
                     cat = seen;
-                } else if (seen instanceof TilapiaEntity && d < bestTilapia) {
+                } else if ((seen instanceof TilapiaEntity || seen instanceof DistichodusEntity) && d < bestTilapia) {
                     bestTilapia = d;
                     tilapia = seen;
                 }
@@ -1976,7 +1976,7 @@ public class CrocodileEntity extends PathfinderMob implements GeoEntity, HasLife
                         }
                         croc.release();
                         prey.discard();         // swallowed whole
-                        eat(prey instanceof TilapiaEntity ? FED_TILAPIA : FED_SMALL, 30);
+                        eat(prey instanceof TilapiaEntity || prey instanceof DistichodusEntity ? FED_TILAPIA : FED_SMALL, 30);
                     }
                 }
                 case EAT -> {
@@ -2511,9 +2511,13 @@ public class CrocodileEntity extends PathfinderMob implements GeoEntity, HasLife
         return e instanceof net.minecraft.world.entity.animal.AbstractFish || !(e instanceof Player) && e.getBbWidth() < 0.75F && e.getBbHeight() < 0.95F;
     }
 
-    /** A wild river fish it hunts: a tilapia, a catfish, a barb or a tadpole (hunted the fish's way), not from a bucket and not named (the player's own fish). */
+    /**
+     * A wild river fish it hunts: a tilapia, a catfish, a barb, a tadpole or a distichodus (hunted the fish's way), not
+     * from a bucket and not named (the player's own fish). The bull shark hunts by this too.
+     */
     static boolean isFish(LivingEntity e) {
-        return (e instanceof TilapiaEntity || e instanceof CatfishEntity || e instanceof BarbEntity || e instanceof TadpoleEntity) && !((net.minecraft.world.entity.animal.AbstractFish) e).fromBucket()
+        return (e instanceof TilapiaEntity || e instanceof CatfishEntity || e instanceof BarbEntity || e instanceof TadpoleEntity
+                || e instanceof DistichodusEntity) && !((net.minecraft.world.entity.animal.AbstractFish) e).fromBucket()
                 && !e.hasCustomName();
     }
 

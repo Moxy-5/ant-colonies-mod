@@ -31,6 +31,10 @@ public final class RiverCover {
     /** A fish that hides in cover: its hiding state, read by the hunters. */
     public interface Hider {
         Hiding hiding();
+
+        /** Called as it sets off for cover (a fish with a bolt clip plays it). */
+        default void startedDash() {
+        }
     }
 
     /** One fish's hiding: scared until when (game time), and whether it is keeping still in cover now. */

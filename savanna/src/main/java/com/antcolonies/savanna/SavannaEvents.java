@@ -59,6 +59,7 @@ public class SavannaEvents {
         event.put(SavannaEntities.CRAB.get(), com.antcolonies.savanna.animal.CrabEntity.createAttributes().build());
         event.put(SavannaEntities.SNAIL.get(), com.antcolonies.savanna.animal.SnailEntity.createAttributes().build());
         event.put(SavannaEntities.BARB.get(), com.antcolonies.savanna.animal.BarbEntity.createAttributes().build());
+        event.put(SavannaEntities.DISTICHODUS.get(), com.antcolonies.savanna.animal.DistichodusEntity.createAttributes().build());
         event.put(SavannaEntities.TADPOLE.get(), com.antcolonies.savanna.animal.TadpoleEntity.createAttributes().build());
         event.put(SavannaEntities.FLY_CLOUD.get(), com.antcolonies.savanna.animal.FlyCloudEntity.createAttributes().build());
         event.put(SavannaEntities.BULLFROG.get(), com.antcolonies.savanna.animal.BullfrogEntity.createAttributes().build());
@@ -93,6 +94,9 @@ public class SavannaEvents {
                 net.neoforged.neoforge.event.entity.RegisterSpawnPlacementsEvent.Operation.REPLACE);
         event.register(SavannaEntities.BARB.get(), net.minecraft.world.entity.SpawnPlacementTypes.IN_WATER,
                 net.minecraft.world.level.levelgen.Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, inBigSavanna(com.antcolonies.savanna.animal.BarbEntity::canSpawn),
+                net.neoforged.neoforge.event.entity.RegisterSpawnPlacementsEvent.Operation.REPLACE);
+        event.register(SavannaEntities.DISTICHODUS.get(), net.minecraft.world.entity.SpawnPlacementTypes.IN_WATER,
+                net.minecraft.world.level.levelgen.Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, inBigSavanna(com.antcolonies.savanna.animal.DistichodusEntity::canSpawn),
                 net.neoforged.neoforge.event.entity.RegisterSpawnPlacementsEvent.Operation.REPLACE);
         event.register(SavannaEntities.TADPOLE.get(), net.minecraft.world.entity.SpawnPlacementTypes.IN_WATER,
                 net.minecraft.world.level.levelgen.Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, inBigSavanna(com.antcolonies.savanna.animal.TadpoleEntity::canSpawn),
@@ -310,6 +314,7 @@ public class SavannaEvents {
             event.accept(SavannaItems.CRAB_SPAWN_EGG);
             event.accept(SavannaItems.SNAIL_SPAWN_EGG);
             event.accept(SavannaItems.BARB_SPAWN_EGG);
+            event.accept(SavannaItems.DISTICHODUS_SPAWN_EGG);
             event.accept(SavannaItems.TADPOLE_SPAWN_EGG);
             event.accept(SavannaItems.FLY_CLOUD_SPAWN_EGG);
             event.accept(SavannaItems.BULLFROG_SPAWN_EGG);

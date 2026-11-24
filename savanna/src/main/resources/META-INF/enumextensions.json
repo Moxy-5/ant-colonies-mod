@@ -92,6 +92,18 @@
     },
     {
       "enum": "net/minecraft/world/entity/MobCategory",
+      "name": "ANTCOLONIES_RIVER_GRAZER",
+      "constructor": "(Ljava/lang/String;IZZI)V",
+      "parameters": [
+        "antcolonies:river_grazer",
+        8,
+        true,
+        false,
+        128
+      ]
+    },
+    {
+      "enum": "net/minecraft/world/entity/MobCategory",
       "name": "ANTCOLONIES_FLY_CLOUD",
       "constructor": "(Ljava/lang/String;IZZI)V",
       "parameters": [

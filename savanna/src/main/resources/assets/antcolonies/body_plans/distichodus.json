@@ -1,6 +1,6 @@
 {
   "model": "distichodus",
-  "about": "The six-banded distichodus's body plan (2026-11-22, docs/plans/distichodus.md): its family, body chain (head to tail), and what tools/clip_check.py needs (checks). Read by tools/body_course.py, tools/clip_check.py and tools/body_plan.py; the game reads only its bones table. No controller or course entry yet: those come with the entity (the plan's step 6).",
+  "about": "The six-banded distichodus's body plan (2026-11-22, docs/plans/distichodus.md): its family, body chain (head to tail), and what tools/clip_check.py needs (checks). Read by tools/body_course.py, tools/clip_check.py and tools/body_plan.py; the game reads only its bones table. The controller since the entity (the river food web's step 5, 2026-11-23).",
   "family": "fish",
   "root": "root",
   "forebody": "body",
@@ -30,6 +30,7 @@
   },
   "checks": {
     "px": 0.0625,
+    "controller": "savanna/src/main/java/com/antcolonies/savanna/animal/DistichodusEntity.java",
     "water": [
       "idle",
       "swim",

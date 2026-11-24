@@ -169,6 +169,10 @@ public class SavannaItems {
     public static final DeferredItem<DeferredSpawnEggItem> BARB_SPAWN_EGG =
             ITEMS.register("barb_spawn_egg",
                     () -> new DeferredSpawnEggItem(SavannaEntities.BARB, 0xC8CCC4, 0xD8602A, new Item.Properties()));
+    // Peach-gold with slate bands (the distichodus's flank and bands), my pick.
+    public static final DeferredItem<DeferredSpawnEggItem> DISTICHODUS_SPAWN_EGG =
+            ITEMS.register("distichodus_spawn_egg",
+                    () -> new DeferredSpawnEggItem(SavannaEntities.DISTICHODUS, 0xE2A86A, 0x3C4450, new Item.Properties()));
     // Metallic green with grey (the bottle fly and the house fly), my pick.
     public static final DeferredItem<DeferredSpawnEggItem> FLY_CLOUD_SPAWN_EGG =
             ITEMS.register("fly_cloud_spawn_egg",

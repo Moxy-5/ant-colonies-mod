@@ -143,12 +143,19 @@ public class HuntTilapiaGoal extends Goal {
     static void scatter(net.minecraft.world.entity.Entity hunter, @Nullable net.minecraft.world.entity.Entity struckAt) {
         Vec3 at = hunter.position();
         List<AbstractSchoolingFish> school = hunter.level().getEntitiesOfClass(AbstractSchoolingFish.class, hunter.getBoundingBox().inflate(SCATTER_WITHIN),
-                f -> f instanceof TilapiaEntity || f instanceof BarbEntity || f instanceof TadpoleEntity);
+                f -> f instanceof TilapiaEntity || f instanceof BarbEntity || f instanceof TadpoleEntity || f instanceof DistichodusEntity);
         for (AbstractSchoolingFish other : school) {
             if (other == struckAt) {
                 continue;
             }
             RiverCover.scare(other);        // into the reeds, if any are near (the food web's step 4)
+            if (other instanceof DistichodusEntity big) {
+                // a hard scare: half the time it leaps clear of the water first (the food web's step 5)
+                if (big.getRandom().nextFloat() < DistichodusEntity.LEAP_ON_STRIKE) {
+                    big.leap(at);
+                }
+                continue;
+            }
             if (other instanceof BarbEntity barb) {
                 barb.startle(at);
                 continue;

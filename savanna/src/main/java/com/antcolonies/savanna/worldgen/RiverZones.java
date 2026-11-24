@@ -69,6 +69,7 @@ public final class RiverZones {
             Map.entry("catfish", new float[] {1, 1, 1, 0.25F, 1, 0}),        // deep and murky water and the oxbows; few in the clear narrow rivers
             Map.entry("tilapia", new float[] {0.5F, 1, 1, 0.5F, 1, 0}),       // quiet water; nurseries in the oxbows
             Map.entry("barb", new float[] {0.25F, 0.5F, 1, 1, 0.25F, 0}),     // clear running water, most far inland
+            Map.entry("distichodus", new float[] {0, 1, 1, 0, 1, 0}),        // the slower edges of the near and mid rivers and the oxbows (2026-11-23)
             Map.entry("crab", new float[] {0.25F, 0.5F, 1, 1, 0.25F, 0}),     // stony beds, most far inland
             Map.entry("snail", new float[] {0.25F, 1, 1, 0.5F, 1, 1}),        // still and slow water, weed and algae
             Map.entry("bullfrog", new float[] {0, 0, 0.1F, 0, 1, 1}),        // the pans and the floodplain's pools; rare on the river

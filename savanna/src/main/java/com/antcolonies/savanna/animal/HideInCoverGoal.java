@@ -79,6 +79,7 @@ public class HideInCoverGoal extends Goal {
         dash = 0;
         still = 0;
         hiding.scaredUntil = 0;
+        ((RiverCover.Hider) fish).startedDash();
         go(DASH_SPEED);
     }
 

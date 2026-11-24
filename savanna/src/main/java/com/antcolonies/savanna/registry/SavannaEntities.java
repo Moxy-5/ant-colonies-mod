@@ -128,6 +128,17 @@ public class SavannaEntities {
                     .clientTrackingRange(4)
                     .build("barb"));
 
+    // The six-banded distichodus (M9 river life, the river's big plant eater; the river food web's step 5, 2026-11-23):
+    // drawn 0.8 blocks long grown, a deep flat-sided fish (my pick: the box 0.6 across, 0.35 tall), each fish's own size
+    // through its SCALE attribute. Its own spawning group, the river grazers.
+    public static final DeferredHolder<EntityType<?>, EntityType<com.antcolonies.savanna.animal.DistichodusEntity>> DISTICHODUS =
+            ENTITY_TYPES.register("distichodus", () -> EntityType.Builder
+                    .of(com.antcolonies.savanna.animal.DistichodusEntity::new, SavannaMobCategories.riverGrazer())
+                    .sized(0.6F, 0.35F)
+                    .eyeHeight(0.18F)
+                    .clientTrackingRange(4)
+                    .build("distichodus"));
+
     // The bullfrog's tadpole (the river tie-up, 2026-11-23): drawn 0.15 blocks long (the plan's pick), a small box. Its
     // own spawning group, so its schools never fill the bullfrogs' 4 places or the barbs'.
     public static final DeferredHolder<EntityType<?>, EntityType<com.antcolonies.savanna.animal.TadpoleEntity>> TADPOLE =
