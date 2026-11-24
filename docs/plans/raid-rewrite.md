@@ -349,6 +349,25 @@ ribbon checks were closed with the ribbon (BUGS 187).
 as bodies when the land is loaded (what a player sees) and the termite colony's record otherwise; the old scenes'
 termites belong to no colony, and a judge that only asked a colony would call every one of them empty.
 
+## Step 3 as built, part a (2026-11-24): the march lifted out
+
+Step 3 is built in parts, one session at a time (the way of working from 2026-11-24, `docs/plans/big-three.md`):
+**a** the march in its own class, **b** the new `Raid` stage machine on it, **c** the raid goal made thin and `Raids`
+cut down to finds and the raid day.
+
+- **Built on the harvester removal:** `claude/harvester-removal-49898c` (finished and proven, waiting to merge into
+  `master` behind Neon's lion work) was merged into this branch first, so the new code is never built on harvester
+  leftovers. This branch now carries the removal.
+- **`colony/RaidMarch.java` (about 700 lines), moved out of `RaidColumn` with no change in behaviour:** the way out
+  and the way home along the scent trail, the stream behind the front, the raiders coming up out of the nest, the gaps
+  in a broken trail and the casting about. It decides nothing about the raid: its owner tells it at every step who
+  leads, when the walk began and where the places are written, and it speaks through four questions (`RaidMarch.Host`:
+  a diary line, a raider in words, "this one stays home", "is a former scout along"). `RaidColumn` is 1,840 lines
+  (was 2,326) and calls it for both walks; the new `Raid` will call it the same way.
+- **Left for part b:** `RaidColumn.Order` (the place a raider is told) still lives in the old column and moves when
+  the column is deleted; the per-ant "no headway, go home" rule and the walk home's break-up stay in the old column
+  on purpose: step 1 measured both as causes, so they are not carried into the march.
+
 ## Rules for the session doing this
 
 - Read `CLAUDE.md` first; ants and termites are strict realism.
