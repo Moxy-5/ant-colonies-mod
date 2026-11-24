@@ -5,6 +5,12 @@
 their goal classes and helpers. No code was changed, no test or soak was run (other sessions had the test servers), so
 **no lag number here is measured**: every lag finding says which scene would measure it and is marked "to measure".
 
+**Where things are in this file** (the parts stand in the order they were finished): part 1 the shared kit (R9-1 to
+R9-4), part 2 the crocodile (R9-5 to R9-12), part 4 the hippo (R9-13 to R9-20), part 6 the bull shark (R9-21 to
+R9-26), part 3 the otter (R9-27 to R9-36), part 5 the Nile monitor (R9-37 to R9-44), and last "The whole round":
+what repeats across the animals, the count by rating, the notes for round 10 and the questions that are the user's
+call. 44 findings: 9 A, 24 B, 11 C.
+
 **How to read a finding:** each has a number that is kept for good (`R9-3`), what is wrong in plain words, what the
 player would see, where, the proof, the fix proposed, and a rating: **A** the player can meet it, **B** it will cost us
 when building on this, **C** a tidy-up. **Proven** means the path was walked through the code line by line; **likely**
@@ -779,3 +785,272 @@ and from `die`. That one change fixes R9-27 and R9-29 at the root.
   removes a bout's starter mid-bout, checks the keep-near rule, or hurts an otter with fire.
 
 ---
+
+## Part 5: the Nile monitor (`MonitorEntity`)
+
+Read: `MonitorEntity.java` (1,728 lines), every line, and to follow its calls `framework: entity/body/BlockMoves.java`
+(all), the start of `MoveRider.java`, its move file `assets/antcolonies/block_moves/monitor.json`, its life file, its
+spawning group, the three mid-climb tests in `RiverLifeTests` (1603-1750), BUGS 230, 255, 290, 292, 296.
+
+**A note on the task's wording:** it speaks of the monitor raiding crocodile nests and eating eggs. There is no such
+code yet (the class comment, line 87, says "Not yet"). What exists is the other side: a crocodile mother treats a
+monitor near her nest as an intruder (`CrocodileBreeding.intruder` 223), and the monitor keeps 8 blocks from any
+crocodile (297). So nothing can go wrong with eggs here today.
+
+Lag: nothing notable (a cap of 2, nothing synced every tick, every block read within 16 blocks). The two A findings
+are both about its staged moves (the climb, the walk into the water).
+
+### R9-37 (A where it is met, proven): a staged move that is stopped on its very first tick freezes the monitor in place, and starts again every tick
+
+**What is wrong.** Two things that meet.
+
+1. When the monitor starts a move (a climb up or down a block, into or out of the water), its `travel` plays the
+   move's first tick and then always ends the tick, even when that first tick answered "cut" (the move cannot be
+   done). Nothing has moved, nothing remembers that the move was just cut here, so on the next tick the same move is
+   started again and cut again. All ordinary walking, falling and swimming is skipped on each of those ticks.
+2. The check "is there room for this move" and the move itself do not ask about the same blocks. The room check asks
+   for a whole block under the monitor's two feet, which stand so wide that for 7 monitors in 8 they are in the
+   columns left and right of the one it walks along. The move then needs a whole block on the middle line. So a step
+   or bank whose middle block is not a whole block, with whole blocks left and right, passes the room check and is cut
+   by the move, every tick.
+
+**What the player would see.** A monitor stopped dead about 2.3 blocks short of a step or a bank (afloat: hanging
+still in the water). On a stroll, for up to 5 seconds (Minecraft gives up a route that does not move). On a hunt, for
+the whole 20 seconds of the chase, because the hunt asks for a new route every 10 ticks, which starts that 5-second
+clock again; then it rests a minute and may pick the same prey and freeze again. **Where a player meets such a
+block:** anything with a top to walk on that is not a whole block: a path block or farmland (savanna villages on a
+river), a top slab or upside-down stairs or a chest in a build, and in the wild a block of the mod's own mud still
+sticky or soupy between dried ones (`SavannaMudBlock.getCollisionShape` 159-162 lowers its floor; mud dries block by
+block). How often a monitor's route crosses one in a real savanna is not measured.
+
+**Where and proof.** `MonitorEntity.travel` 769-777: `if (c != null ? climbOn(c) : startMove()) { if (c == null)
+climbOn(climb()); return; }`: the second `climbOn`'s answer is thrown away. `startMove` 412-450 keeps no memory of a
+cut (only `hurtTime`). `BlockMoves.start` 355-357 only records where the move begins; `BlockMoves.step` 389-399 cuts
+when the block on the middle line is not `isCollisionShapeFullBlock`, before it moves anything. `roomToClimb`
+600-616: whole blocks asked only at `across - out` and `across + out` (`CLIMB_FEET_OUT` 12 px, 0.56 blocks at size
+1); the middle line is only asked for open air above. The same in `roomToClimbDown` (626) and `roomToLeave`
+(686-693); going into the water also checks the middle (657). The shared rider written later for the otter already
+has half the fix (`MoveRider.travel` 229-231 uses the first tick's answer) but looks to share the feet-only room
+check (`MoveRider.roomUp` 529; the hippo has its own third copy, R9-42).
+
+**Fix proposed.** In one place, not three: move the monitor (and the hippo) onto the shared `MoveRider`; there, a
+first tick that is cut falls through to ordinary travel, the room check asks the same middle block the move relies
+on, and after any cut no new move starts until the animal has moved on. A test: a step with a top slab on the middle
+line, and a climb must either play or the monitor must go up the old way, never stand.
+
+### R9-38 (A, proven in the data; how it looks not filmed): the walk into the water is cut short for 7 monitors in 8
+
+**What is wrong.** Since the walk-in was remade (2026-11-22, BUGS 289) its clip is longer for bigger monitors: 178,
+187, 196, 205 and 214 ticks for the five sizes. But the move file gives one length for the move, 177, the smallest
+size's, and the game ends the move there. So every monitor but the smallest is handed to the swim 9 to 36 ticks
+early (0.45 to 1.8 seconds), a little short of the path's end, and glides on at the path's last (slow) speed while
+it was still moving up to five times faster.
+
+**What the player would see.** A bigger monitor walking into the river loses the last half second to two seconds of
+its walk-in; that tail is where BUGS 289's fix lets the legs drift and fold into the swim, so most likely the "legs
+snap into the swim pose" look is back for most monitors, with a small jolt in speed. Not filmed (no game runs in a
+reading round): **the film to judge it is the walk-in at size 1.15 beside size 0.85**.
+
+**Where and proof.** `block_moves/monitor.json`, move `in`: `ticks` 177, the `rise` and `along` rows 178, 187, 196,
+205, 214 long (read with a script; every other move has rows of one length). `BlockMoves.Move` 112 reads one `ticks`;
+`BlockMoves.step` 417: `if (ticks >= m.ticks && m.endsAfloat)` ends it and glides at `endSpeed` (138-141: the row's
+last step). The file is written by `tools/model_parts.py` 298 (`'ticks': len(rises[0]) - 1`, the first size's
+length). `BlockMoves.read` checks only that each move has a row per size.
+
+**Fix proposed.** The move's length is the length of the row for the size played (no `ticks` number to disagree with
+the rows), and reading the file refuses rows and `ticks` that disagree. The tool side is Neon's (`docs/HANDOFF.md`):
+leave a request there.
+
+### R9-39 (B, likely): the mid-climb tests fail now and then because the monitor's own idle goals take it off the test's route (BUGS 255, 290, 292)
+
+**What was looked for.** A climb that can neither finish nor fall back, a switch left on, the animal left inside a
+block. On the tests' ground (flat stone, one stone step) none was found: the only state of a move is the synced
+play, and every way out clears it; the box is on the lower level until its front reaches the face and then on top,
+never inside the step.
+
+**What can make the tests fail as written.** They put a route straight onto the monitor's legs while its mind is
+left running, so no goal "holds" the legs and any idle goal may take them: (1) the stroll (`RandomStrollGoal`, 303)
+swaps the route for a random one, 1 look in 50, better than even odds over the walk to the climb's start, and the
+test only sends its route again once the legs are idle; (2) basking: the wish for sun starts at a random 0 to 60
+seconds (279-280), and a basking monitor refuses every move (413) for one to three minutes; (3) hunger, when another
+test's crab or snail is within 12 blocks. All three give the "on a move 0 ticks" message of BUGS 290. BUGS 255's
+other message ("on a move 93 ticks, highest 0.00") is **not explained** by today's code; BUGS 292 notes that
+uncommitted `BlockMoves` changes were in the folder for some of those runs.
+
+**Fix proposed.** Box 4 of the 4-box rule, in the tests: a test that steers the monitor itself first stills its mind
+(wish for sun and hunger far off, no stroll), or steers it through a goal that holds the legs. And a new test for
+R9-37, the real stuck state the tests do not cover.
+
+### R9-40 (B, proven): after a reload, and from its spawn until its first swim, nothing keeps a monitor near its water
+
+**What is wrong.** "Never strays far from the water it was last in" is a home spot set once a second while it is in
+the water. Minecraft does not save a mob's home spot and the monitor does not save it either; and a monitor spawned
+by the world is set straight onto the bank with none. Until it next swims, its strolls (10 blocks, any way) and its
+trailing of a player are free.
+
+**What the player would see.** Now and then a monitor well inland, away from any river, with no prey and no water to
+flee to (it never starves, so it just lives there until the player is 128 blocks off).
+
+**Where and proof.** The only `restrictTo` is at 822-824, inside `isInWater()`. Saved: the life, `HungryIn`, `SunIn`
+(1007-1013). `finalizeSpawn` 976-987 moves it to the bank and sets no home. `Mob.java` (patched sources): the home
+spot is two plain fields (132-133) that the save does not write. The snail keeps near its water the same way
+(`SnailEntity` 162-164; round 10's file).
+
+**Fix proposed.** Save the home spot and set it at spawn (the water it was spawned in).
+
+### R9-41 (B, proven): the monitor never counts its life clock (nor does the hippo); the kit leaves that to each animal to remember
+
+**What is wrong.** The kit's life (`AnimalLife`) grows an animal up and counts the wait between breedings only when
+the animal calls `life.tick()` every tick. Of the nine animals with a life, four call it (crocodile, otter, bullfrog,
+tilapia) and five do not: monitor, hippo, catfish, crab, snail. For the three that breed this is round 10's A
+finding R10-12 (their young never grow up, and each breeds once in its life). For the monitor and the hippo it does
+no harm today (neither breeds, both are born grown), with one hole: a monitor summoned young stays a baby for good.
+But the monitor already has the seek-a-mate goal registered (302): the day its life file says it breeds, it would
+breed once and never again.
+
+**Where and proof.** A search of both mods for `life.tick()` and `life().tick()` finds `CrocodileEntity` 838,
+`OtterEntity` 737, `BullfrogEntity` 443, `TilapiaEntity` 495 and nothing else; `MonitorEntity.tick` 793-832 has no
+call (the hippo: R9-20).
+
+**Fix proposed.** Fix it once, at the root, so no animal can forget again: the kit counts the clock itself for
+everything that has a life (one shared tick handler for `HasLife` animals in the framework), instead of one line
+added to five files. The fix session for R10-12 should do this, not the five lines.
+
+### R9-42 (B): the code that starts a staged move exists three times
+
+**What is wrong.** Finding the step or bank on the route, checking the room and starting the move is about 315 lines
+in `MonitorEntity` (404-718), again in `HippoEntity` (`startMove`, line 413 on), and once more, written properly for
+any animal, in the framework's `MoveRider` (made for the otter, 2026-11-22; its own header says the monitor and the
+hippo "keep their own until they are moved over"). R9-37's fix is half done in one copy and missing in the others;
+every fix to the moves has to be made up to three times.
+
+**Fix proposed.** Move the monitor, then the hippo, onto `MoveRider` (about 400 lines less in each), with R9-37
+fixed there. Guard with the monitor's course and its frame films, since the moves are approved looks.
+
+### R9-43 (C, proven or likely as said): three small behaviours that do not end the way they should
+
+- **Startled into the water, it can stroll straight back out and flee again (likely).** The flee goal ends the
+  moment it is in water (1123-1125, 1165-1167). For the rest of the 15 seconds nothing holds its legs, so the stroll
+  may pick a spot on the bank; out of the water, still startled, it runs back in. Once or twice in the 15 seconds.
+  Fix: the flee goal keeps holding the legs while it is startled, in the water too (one rule, no new clock).
+- **Fleeing to water it cannot reach (proven that the route is never checked).** It picks the nearest water two deep
+  within 16 blocks and goes (1149-1162) without asking whether a route was found. Water behind a fence or a wall:
+  it runs to the nearest point, stops, and picks the same water again each second. With no water in reach at all,
+  the search reads up to 9,801 spots (`waterAim` 1087-1103), once a second while its legs are idle: small for two
+  monitors, not measured. Fix: if the route does not reach the water, take the "run away" branch that is already
+  there (BUGS 296).
+- **A bite that misses still plays two seconds of eating; a meal cut short is not counted (proven).** When the jaws
+  shut on nothing (`snap` 1421-1424 returns early) the code still goes on to the eating clip (1380-1383): it chews
+  air. The other way round: it swallows a crab, is startled during the two seconds of chewing, and the "I am full"
+  clock was never set (only 1370 sets it, at the end of the chewing), so it hunts again at once. Fix: eat only if the
+  snap took something; set the full clock when the prey is swallowed.
+
+### R9-44 (C): small things in the monitor
+
+- **Two players near:** the hiss goal's "who is near" (1224-1237) answers with the first near player in the world's
+  list, not the one being hissed at. With two survival players close, the hiss at the second in the list ends within
+  half a second, every time (1288-1290), and it never bites or runs from that player. Proven.
+- **Day and night are read straight from the world** in the bask goal (`level().isDay()`, `isRaining()`; 1564-1589),
+  not from the shared day clock the kit uses. A thunderstorm at noon counts as night; and a test's own clock cannot
+  move its bask. The crocodile and hippo do the same (R9-19). One rule for the fix session: animals ask the shared
+  clock, as the season rule already says.
+- **The spawn rule searches for other monitors 80 blocks each way** on every spawn try that got past the cheap checks
+  (1051). While one monitor lives near the player and the cap is 2, such tries go on for good and each is refused by
+  this search. An entity search only, loads nothing; small. A note.
+- **In a boat or on a lead:** a new move is refused for a passenger (413), but a move already playing goes on setting
+  its place each tick against the boat until it ends (at most 9 seconds). A question, as R9-10.
+- **Name tags:** a named bullfrog is spared (1335), a named crab or snail is eaten. A monitor named `film:<anything>`
+  plays that clip for good (1653-1657; the film camera's hook is open to players, as on every animal here).
+- **Hunting in the water it leaves by Minecraft's old hop,** not its move out: the float rule stands aside during a
+  hunt (827), so it is seldom at floating depth and the move refuses (564-568). A look; the user's call.
+- **On soft mud no move ever starts:** it stands sunk, so its floor is a block below its route's (424), and mud is
+  never "a whole block". At every pan's muddy shore it steps and hops the old way. A look; the user's call.
+- **Summoned with data but no hunger or sun numbers,** both load as 0 (1019-1020): hungry and wanting the sun at once.
+- **Spawned under a low tree** it can be set inside the leaves (`bankNear` 1066 uses the height map that ignores
+  leaves) and falls out.
+- **Each snail it crushes leaves a shell block** (1433), with no mob-griefing check; whether the shells have an end
+  is for `CrabShellBlock`'s reader (round 10). Prey is removed, not killed: no drops, no death event (as R9-26).
+- **Dead and stale bits:** `isStartled()` 360 and `wantSun()` 1034 have no caller; an unused import (43); an unused
+  parameter (879-885); `refresh()` 1003 wraps one call; a doubled `setAnimationSpeed` (1652, 1666);
+  `getNoActionTime()` 960 answers what the stroll was already told (303); `waterTop()` is worked out up to three
+  times in one `startMove`; the class comment (81-87) leaves out the bullfrog; the hiss goal keeps a logged-off
+  player's object until its next hiss (1215).
+
+### What is solid in the monitor
+
+- **Every way out of a move ends clean** once the move is running: hurt (902-904), death, the step or bank gone, a
+  block put in the way; `BlockMoves.cut` lifts the box out of any block and hands it back to the game. Nothing but
+  the synced play holds state, so a save, an unload, a pause and a change of dimension mid-move are all harmless.
+- **A move is not started again at once after a hurt** (413), and a test checks it.
+- **The hunt's way out (BUGS 230):** a hunt that caught nothing rests a minute, judged in `stop` so every ending
+  passes through it; the 20 seconds count only the chase.
+- **The flight with no water at all (BUGS 296)** always finds somewhere to go.
+- **No stale "doing":** every goal resets its own state in `stop`, and a fright resets the bask, hiss and watch.
+- **Hit boxes:** the hunt's search asks for its four prey kinds by class, so it can never pick up a body part.
+- **No reads into land that is not loaded** (the farthest is 16 blocks); no statics tied to a world or an animal.
+- **Spawning follows the check list:** its own group (cap 2), any height in the water then set on the bank, 80 apart,
+  kept within 96 and gone past 128, the savanna gate. 80 apart, 2 in the group, 96 to 128: these fit each other.
+- **Peaceful:** it stays; its bite does nothing to a player, it still hisses, lunges and runs (no hold, unlike R9-6).
+- **The food chain:** at most two monitors, one meal each 5 to 10 minutes, prey that comes back by itself; it never
+  starves. It cannot crash or run away.
+- **Test gaps (for the fix session):** no test starts a move that is cut at once (R9-37) or has a part-block on the
+  middle line; none plays the walk-in at a size other than the smallest for its whole clip (R9-38); none reloads a
+  monitor and checks its home (R9-40); none misses a bite or has two players at a hiss.
+
+---
+
+## The whole round: what repeats, the count, and what is for others
+
+**The second pass.** Every finding above was checked a second time against the code by the lines it names, by the
+round's main reader, whether a helper or the main reader found it first. Two candidates were dropped in that pass
+(a crocodile "standing still wanting the sun" and "small prey 3 to 4 blocks from water is never lunged at"), and one
+worry was answered (a nest mother beside a hippo bull is not worn down): each turned out to be handled. Where a claim rests on how Minecraft itself
+works it was read in the patched 1.21.1 sources, not taken from memory. Nothing was run, so every lag finding is
+"to measure" and names its scene.
+
+**The count:** 44 findings. **A (the player can meet it): 9** (R9-1, 5, 6, 27, 28, 29, 30, 37, 38). **B: 24**
+(R9-2, 7, 8, 9, 10, 13, 15, 16, 17, 18, 21, 22, 23, 24, 25, 31, 32, 33, 34, 35, 39, 40, 41, 42). **C: 11**
+(R9-3, 4, 11, 12, 14, 19, 20, 26, 36, 43, 44). Lag findings waiting for a measure: R9-2, 8, 9, 16, 23, 25, 31, 33.
+
+**What repeats across the hunters** (one fix each, in the kit, would be better than one per animal):
+
+1. **State left behind when something ends unplanned.** The courting mark (R9-1), the otter's catch after a reload
+   (R9-27), the otter's bout when its starter is gone (R9-29), the monitor's home (R9-40), the crocodile's hatch site
+   (R9-12). The rule for the fix sessions: anything two animals share, or anything held, has one "end, whatever
+   happened" door, called from the goal's stop, from `remove` and from `die`, and is either saved or rebuilt on load.
+   The crocodile already does this right for the prey in its jaws (let go on load, `CrocodileEntity` 858-860).
+2. **No wait after "nothing found" or "cannot get there".** The crocodile's routes and nest search (R9-8, R9-9), the
+   hippo's home and lawns (R9-16), the shark's target pick (R9-23) and its three-nearest rule (R9-22), the catfish's
+   route (R9-25), the otter's hunt, bank search and flee (R9-28, R9-32, R9-33), the monitor's flee (R9-43). One small
+   kit helper ("gave up on this: wait, and not this one for a minute") would serve all of them.
+3. **What an animal must remember to do for the kit.** Count its life clock (R9-41, R10-12: five of nine forget),
+   keep-near-the-player (R9-30: the otter forgot). The kit should do these itself.
+4. **Hit from where it cannot answer.** The crocodile afloat (R9-11), the hippo beyond 16 blocks (R9-15), the shark
+   from the bank or a boat (R9-24) are all killed for free with a bow. One call for the user: should the big three
+   answer (charge, dive away, leave)?
+5. **Peaceful mode** is not thought of by any animal: the crocodile's hold is the one that hurts play (R9-6); the
+   shark's bump and the monitor's lunge are harmless. One call for the user.
+6. **Home reads with no "is it loaded" check** when an animal is carried far by a lead or a boat (R9-10, R9-17).
+7. **Day and night read from the world, not the shared clock** (crocodile, hippo, monitor: R9-19, R9-44); **clocks
+   counted in goal checks run at half speed** against their comments (hippo, otter: R9-19, R9-36).
+8. **The film camera's hooks are in the game code** on every animal (a name tag `film:<clip>` works for any player;
+   R9-20, R9-26, R9-36, R9-44). One shared, test-only switch would take them out of play.
+9. **Staged moves live three times** (R9-42), and the otter is one 2,939-line file with five places that say what it
+   is doing (R9-35): the two parts most likely to break when built on.
+
+**For round 10's reader and its fix sessions** (their files, noted here and not read in full): R9-1 is the same
+finding as R10-2 (rated A here, because a courted crocodile female never hunts again; the fix is the same). R9-41 is
+the kit side of R10-12. R9-25 is in the catfish's `HuntTilapiaGoal`. Prey is removed with `discard()` by the otter,
+monitor and shark (no drops, no death event). Under R9-27 a frozen prey that cannot be hurt can be left in the river:
+their hunters should give up on a target they cannot hurt. `CrabShellBlock.leave` has no mob-griefing check (R9-44).
+`CrocodileNestBlock`, `RemainsEntity`, `ScrapsBlock` and `DungPickGoal` were only read where a hunter calls them.
+
+**Questions that are the user's call** (each is one sentence in its finding): Peaceful mode and the crocodile's hold
+(R9-6); should the crocodile hunt tamed, named or leashed animals (R9-5); should the big hunters answer a bow (R9-11,
+R9-15, R9-24); may crocodiles and hippos be led or boated at all (R9-10, R9-17); a hippo beside an otter (R9-36).
+
+**The parts found solid, in one line each** (the lists under each part say why): the kit's `RoomToBreed`, `Carried`
+and the egg clock; the crocodile's paced searches, its hunt that cannot be cut off with prey in the jaws, and what it
+holds over a reload; the hippo's pod with no pod object, its pool that stays put and its counts; the shark's "one
+gate before every goal" and its counts; the otter's breath, bite timing and bout limits; the monitor's clean ways
+out of a running move and its hunt's rest. None of these should be "tidied" by a fix session.
