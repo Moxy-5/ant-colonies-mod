@@ -8,8 +8,7 @@ plugins {
     id 'org.gradle.toolchains.foojay-resolver-convention' version '1.0.0'
 }
 
-// The mods of this repository (the split, docs/plans/mod-split.md): the colony framework, the savanna mod and (since
-// step S7) the desert mod. The root project only runs the game with all of them.
+// The mods of this repository (the split, docs/plans/mod-split.md): the colony framework and the savanna mod (the
+// desert mod, the red harvester ant's, was taken out 2026-11-23). The root project only runs the game with both.
 include 'framework'
 include 'savanna'
-include 'desert'

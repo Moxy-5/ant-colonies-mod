@@ -18,15 +18,12 @@ Run from the project folder:  python tools/model_viewer.py [out.html]
 Second scene, the fungus comb as it ages (2026-10-15, comb_age_art.py; its own page template, comb_viewer.template.html):
 python tools/model_viewer.py comb [out.html]   (default references/comb_viewer.html)
 
-Third scene, the grama grasses for the harvester ants (2026-10-16, grama_art.py; its own template, grama_viewer.template.html):
-python tools/model_viewer.py grama [out.html]   (default references/grama_viewer.html)
-
 Fourth scene, the giant savanna trees (M7.5 step 0, 2026-10-18, tree_art.py for the textures; its own template,
 tree_viewer.template.html, which also holds the tree shape maker: every kind, age and dead stage from one seed):
 python tools/model_viewer.py trees [out.html]   (default references/tree_viewer.html)
 
 Fifth scene, the Matabele ant's heads and size (M8 step 1, 2026-10-23, matabele_models.py; its own template,
-matabele_viewer.template.html): each head as a major and a minor, beside the harvester worker, the termite worker and
+matabele_viewer.template.html): each head as a major and a minor, beside the termite worker and
 major soldier and a player's height, all at their game sizes; sliders for the Matabele sizes:
 python tools/model_viewer.py matabele [out.html]   (default references/matabele_viewer.html)
 
@@ -193,20 +190,6 @@ def comb_page(out):
     print("wrote", out)
 
 
-def grama_page(out):
-    """The grama looks: for each kind (blue, black), look (A, B) and stage, two versions; and the ground round them."""
-    import grama_art as grama
-    data = {"grass": uri(png(grama.grass_top())), "redSand": uri(png(grama.red_sand())),
-            "shortGrass": uri(png(grama.short_grass())), "deadBush": uri(png(grama.dead_bush()))}
-    for kind in grama.KINDS:
-        data[kind] = {look: {stage: [uri(grama.png(grama.texture(kind, look, stage, v))) for v in range(grama.VARIANTS)]
-                             for stage in grama.STAGES} for look in grama.LOOKS}
-    template = (Path(__file__).resolve().parent / "grama_viewer.template.html").read_text(encoding="utf-8")
-    out.parent.mkdir(parents=True, exist_ok=True)
-    out.write_text(template.replace("/*DATA*/null", json.dumps(data)), encoding="utf-8")
-    print("wrote", out)
-
-
 def trees_page(out):
     """The tree looks: every block texture (two looks where there is a choice); the viewer's shapes are made in the page,
     the game's own shapes (step 2) come from build/tree_shapes.json, written by ./gradlew test."""
@@ -252,8 +235,7 @@ def matabele_page(out):
                 bones, rows, w, h = mm.paint(mm.model(minor=minor, head=key, taper=taper), "A")
                 entry[caste] = {"bones": bones, "texture": uri(mm.png(rows)), "w": w, "h": h}
             data["looks"][key + leg_key] = entry
-    for mod, model, scale, label in (("desert", "worker_ant", 0.65, "Harvester worker"),
-                                     ("savanna", "termite_worker", 0.75, "Termite worker"),
+    for mod, model, scale, label in (("savanna", "termite_worker", 0.75, "Termite worker"),
                                      ("savanna", "termite_major_soldier", 0.75, "Termite major soldier")):
         assets = mod_paths.assets(mod)
         geo = json.loads((assets / f"geo/entity/{model}.geo.json").read_text(encoding="utf-8"))
@@ -284,8 +266,7 @@ def queen_page(out):
         bones, rows_q, wq, hq = mm.paint(mm.queen_bones(key), "A")
         entry["minor"] = {"bones": bones, "texture": uri(mm.png(rows_q)), "w": wq, "h": hq}
         data["looks"][key] = entry
-    for mod, model, scale, label in (("desert", "worker_ant", 0.65, "Harvester worker"),
-                                     ("savanna", "termite_worker", 0.75, "Termite worker"),
+    for mod, model, scale, label in (("savanna", "termite_worker", 0.75, "Termite worker"),
                                      ("savanna", "termite_major_soldier", 0.75, "Termite major soldier")):
         assets = mod_paths.assets(mod)
         geo = json.loads((assets / f"geo/entity/{model}.geo.json").read_text(encoding="utf-8"))
@@ -905,9 +886,6 @@ def main():
         return
     if len(sys.argv) > 1 and sys.argv[1] == "trees":
         trees_page(Path(sys.argv[2]) if len(sys.argv) > 2 else ROOT / "references/tree_viewer.html")
-        return
-    if len(sys.argv) > 1 and sys.argv[1] == "grama":
-        grama_page(Path(sys.argv[2]) if len(sys.argv) > 2 else ROOT / "references/grama_viewer.html")
         return
     if len(sys.argv) > 1 and sys.argv[1] == "comb":
         comb_page(Path(sys.argv[2]) if len(sys.argv) > 2 else ROOT / "references/comb_viewer.html")

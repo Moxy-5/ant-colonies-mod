@@ -280,8 +280,4 @@ public class NoticeGoal extends Goal {
         player = null;
     }
 
-    /** Tests only: whether it is walking closer to the player, backing off, or neither. */
-    public String stepForTests() {
-        return step.name().toLowerCase(java.util.Locale.ROOT);
-    }
 }

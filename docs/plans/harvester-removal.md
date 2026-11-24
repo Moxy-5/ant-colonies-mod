@@ -98,3 +98,258 @@ without a bug report from it.
 - **The framework was proven "many species" by having two species mods.** With one left, the compiler still refuses
   framework code that names savanna code, so the rule holds, but nothing tests a second mod until the jungle mod.
 - **Test runs get shorter:** 66 fewer tests, less the ones moved.
+
+---
+
+# Step 1: the lists (written 2026-11-23, before any deleting)
+
+The last commit with the harvester is tagged **`harvester-last`** (commit `fae5a490`, pushed to GitHub).
+
+**A count put right:** the desert mod has **58** game tests, not 66 (the 66 counted each test class's own header line
+too): legs 15, nest 24, away 8, population 4, body 2, hill 2, trails 2, neighbours 1. And 9 unit test files.
+
+Words used below. **Moved:** the check now runs on a savanna insect (step 2 writes it). **Covered:** a savanna test
+already checks the same shared rule; step 2 reads that test and adds whatever check is missing before the harvester one
+goes. **Gone:** the test checks something only the harvester did.
+
+## (a) The tests
+
+### `NavigationTests` (15, `legs`): all moved
+
+All 15 test the shared legs (`AntNavigator`, `AntPathFinder`), nothing of the harvester's. They move whole into a new
+savanna class `LegsTests` (category `legs`), walked by a **Matabele minor**; where the rule depends on body size the
+same scene is also walked by a **termite worker** (0.15 long against the Matabele's bigger body), and the queen's walk
+by a **Matabele queen** (the biggest, slowest body). The ready-made nest stays (four levels and a spiral stair from the
+shared nest plan, as terrain to walk). The harvester's hill becomes a plain stepped heap of soil of the same shape,
+built by the test (the legs only need its steps), and its soil block becomes vanilla dirt.
+
+| Test | Goes to |
+|---|---|
+| `queenWalksFromTheRoomUpToTheSurfaceAndBackDown` | moved: Matabele queen |
+| `antToldToGoToItsOwnCellSurvivesBeingMovedAway` | moved: Matabele minor |
+| `antsClimbOutOfAOneBlockPit` | moved: Matabele minor and termite worker |
+| `antsFromAllAroundTheHillReachTheFoodStore` | moved: Matabele minors round the stepped heap |
+| `antsOnBumpyGroundOverAHalfBuiltHillReachTheFoodStore` | moved: the same, bumpy ground and a gappy heap |
+| `antWalksFromTheSurfaceDownToTheDeepestRoom` | moved: Matabele minor |
+| `antWalksFromTheQueensRoomDownToTheRefuseChamberAndBack` | moved: Matabele minor (third level to fourth and back) |
+| `antWalksFromTheDeepestRoomUpToTheSurface` | moved: Matabele minor |
+| `antsClimbFromEveryRoomThroughTheFinishedHill` | moved: Matabele minors, steadiness check kept |
+| `antsStayOnTheShaftWallWhenTheirWalkEndsOrIsStopped` | moved: Matabele minor and termite worker |
+| `antsHangingInTheShaftCrawlRoundToTheOtherWall` | moved: Matabele minor |
+| `antsGoRoundTheOutsideEdgeOfABlock` | moved: Matabele minor and termite worker |
+| `antCrawlsUpsideDownToTheMiddleOfTheRoomCeilingAndHangsThere` | moved: Matabele minor and termite worker |
+| `antsGoUnderAnOverhangAndOutTheOtherSide` | moved: Matabele minor and termite worker |
+| `antsOnTheShaftWallAndTheCeilingAreStillThereAfterAReload` | moved: Matabele minor |
+
+### `NestTests` (24, `antnest`)
+
+The category `antnest` goes with the class; what moves lands in `colony`, `mound` or `termitefood`.
+
+| Test | Goes to |
+|---|---|
+| `workersDigTheWholeNestAndBuildTheMound` | gone (four levels, the hill, the diggers' day clock). The shared rule in it, "a colony digs every block of its plan and nothing else", is covered by `TermiteTests.royalPairDigsTheirChamberAndSealsTheEntrance`. |
+| `theNestGrowsDeeperOnlyAsTheColonyGrows` | gone (levels unlocked by workers and food: no savanna nest has a second level). |
+| `workersCloseEveryHoleInTheNestWallsAndMendDamage` | covered by `TermiteRepairTests.termitesSealOpeningsInTheirNestWithMoundSoil`; a kind of hole the termite test lacks (a crack up to the open air, a pit under a room) is added there. |
+| `manyAntsWithPelletsAndOneGapDoNotJam` | gone (pellets carried onto the hill; the carry goal is the harvester's own). |
+| `nestSitsOneBlockHigherWhenTheStoneIsTooClose` | gone (fitting several levels into thin soil). |
+| `theNestHasFewerLevelsWhenTheSoilIsThin` | gone (the same). |
+| `aLoneQueenFoundsHerColonyAndRaisesHerFirstWorkers` | gone (the founding chamber). Founding itself (sealed in, eggs, fed from her own fat, first workers open the entrance) is covered by `TermiteTests` (`aQueenWithoutAKingSealsTheEntranceHerself`, `theFoundingBatchGrowsIntoWorkersWhoOpenTheEntrance`). |
+| `workersCarrySeedsAndClipGrassIntoTheFoodStore` | covered by `TermiteFoodTests.termitesGatherDeadPlantsIntoTheirFungusGardenAndRaiseTheQueensEggsOnIt` (the same gather, clip and store goals). |
+| `queenIsFedAndHerEggGoesToTheNursery` | covered by the same termite test (queen fed, egg carried to the young's room); the bread is gone. |
+| `richBreadStartsABurstOfEggs` | gone (rich bread and the burst of eggs). |
+| `eggsBecomeLarvaeAndNursesFeedThemIntoWorkers` | covered by `TermiteTests.theFoundingBatchGrowsIntoWorkersWhoOpenTheEntrance` and the termite food test. |
+| `larvaeWaitWhenTheColonyHasEnoughWorkers` | **moved** to termites (`TermitePopulationTests`): fed nymphs wait when the colony is one short of its most workers. |
+| `aHungryWorkerEatsOneSeedFromTheFoodStore` | covered by `TermitePopulationTests.termiteWorkersEatNodulesWhenYoungAndOldCombWhenOlder` and `MatabeleFoodTests`. |
+| `aStarvingWorkerSlowsDownAndDies` | **moved** as a check into `MatabeleFoodTests.aMatabeleColonyWithAnEmptyPreyPileStarves` (half speed first, then death and a body). |
+| `aLarvaThatIsNotFedForTwoDaysStarves` | **moved** to termites (a nymph unfed for its starve time dies, a fed one lives). |
+| `aQueenThatIsNotFedForFiveDaysStarvesAndHerColonyDwindles` | **moved** to termites (`TermiteTests`): the queen starves in loaded land, the colony lives on queenless until its last worker dies of old age, then ends and the mound stays. |
+| `theNestPlanIsTheSameAfterAReload` | **moved** to termites: with comb lying in the rooms the reloaded colony plans the same royal chamber and gardens. |
+| `whatAnAntCarriesIsKeptAfterAReload` | **moved** to a termite worker: soil, forage, a nodule, an egg and a dead nestmate survive a save and load, and the egg is still carried to its room. |
+| `workersCarryTheDeadToTheRefuseChamber` | gone (the refuse chamber is the harvester's fourth level). The savanna's own ways with the dead are tested in `TermiteRaidDefenceTests.theDeadAreCarriedOutAndTheParalysedCarriedIn` and `MatabeleFoodTests`. |
+| `deadAntsNobodyCanCarryAwayCrumbleToDust` | **moved**: a Matabele body nobody deals with crumbles after the profile's `corpse_decay_ticks`. |
+| `queenLivesInTheFoundingChamberUntilHerOwnRoomIsDug` | gone (the founding chamber). |
+| `eggsGoToTheQueensRoomWhenThereIsNoNursery` | covered: every savanna nest has no nursery level, so every termite founding test is this case. |
+| `workersShareTheJobsAndTheNurseStaysByTheQueen` | covered by `TermiteJobsByAgeTests.termiteWorkersTakeTheJobOfTheirAge`; the "nurse waits by the queen" check is added there if missing. |
+| `seedsLyingByAFullStoreAreLeftThereAndFetchedOnceThereIsRoom` (BUGS 44) | **moved** to termites (`TermiteFoodTests`): food lying by the mound while the gardens are full is left there, never picked up and dropped again, and fetched once there is room. The "bread wanted" half is gone with the bread. |
+
+### `HarvesterAwayTests` (8, `away`)
+
+| Test | Goes to |
+|---|---|
+| `aColonyAwayFoldsItsFrozenInsectsIntoTheNumbersAndPutsThingsBackOnReturn` | covered by `TermiteAwayTests.aFarTermiteColonyLivesAsNumbersAndComesOutWhenAPlayerIsNear`; the checks it lacks (a carried piece put back, a half-fed young one keeping what it ate, old numbers dying while away) are **moved** into it. |
+| `aColonyAwayEatsMillsBreadAndRaisesItsYoungAsNumbers` | covered by `TermiteAwayTests.aTermiteColonyAwayAgesItsCombFeedsItsQueenAndEatsAsNumbers`; the bread is gone. |
+| `anAntColonyAwayDigsItsRoomsAndHeapsItsHillOutOfSightOnReturn` | covered by `TermiteAwayTests.aTermiteColonyAwayForagesFromTheNightsHolesAndGrowsItsGalleriesOnReturn` (building on return, out of sight); the hill is gone. |
+| `antNumbersForageOnlyOutOfSightAndFromWhatTheyRemember` | covered by `TermiteAwayTests.termiteNumbersForageKnownDryGrassOnlyAtNightOrInTheRain`; the "only out of every player's sight" check is **moved** into it if missing. |
+| `antPatrolNumbersAreLostOutOfSightOnWaysThroughDanger` | gone (the patrol). Harm out of sight is covered by `TermiteAwayTests.termiteNumbersAreLostOutOfSightOnlyWhereAHostileReallyIs`. |
+| `anAntColonyAwayLivesOnThroughASaveAndLoadAndCatchesUpOnReturn` | **moved**: a save and load in the middle of the termites' time away (`TermiteAwayTests`), the colony catching up on return. |
+| `aStarvingAntColonyAwayLosesItsYoungAndItsQueen` | covered by `TermiteAwayTests.aStarvingTermitePairAwayDieWhenTheirLandLoads`; young starving as numbers is **moved** into it if missing. |
+| `aFoundingAntQueenRaisesHerFirstWorkersWhileAway` | covered by `TermiteAwayTests.aFoundingTermitePairRaiseTheirFirstWorkersWhileAway` (the same shared check in `AwayKit`). |
+
+### The small classes (11)
+
+| Test | Goes to |
+|---|---|
+| `HarvesterPopulationTests.aCrewWorksWhileNobodyIsNearAndMoreComeOutWhenAPlayerIs` | **moved** to `TermitePopulationTests` (a crew while nobody is near, more when a player is, back in when the player goes). |
+| `...insectsComeOutOnlyWhereNoPlayerCanSee` | **moved** to `TermitePopulationTests`. |
+| `...workersInTheNumbersDieOfOldAgeAndAreSaved` | **moved** to `TermitePopulationTests`. |
+| `...aYoungOneGrowsUpIntoTheNumbersWhenNoMoreRealOnesAreWanted` | **moved** to `TermitePopulationTests`. |
+| `HarvesterBodyTests.idleWorkersNapAndWakeWhenHurt` | **moved** to a Matabele minor (new `MatabeleBodyTests`, category `body`): naps, wakes when hurt, never naps with a load, cleans its antennae. |
+| `HarvesterBodyTests.insectsNoticeMovingPlayersByTheirPersonality` | **moved** to a Matabele minor (it notices by sight, as the harvester did): the bold come near, the shy back off. |
+| `HarvesterHillTests.antQueenOnAHillsideWalksToLevelGroundAndFoundsThere` | gone (the harvester queen's search for a level site). |
+| `HarvesterHillTests.antHillOnAStepKeepsItsRoundShape` | gone (the hill). |
+| `HarvesterNeighbourTests.oldColoniesYieldToNeighboursAndYoungOnesPushOn` | gone (yielding by turning the foraging away; trunk trails). The shared half (meetings counted, old colonies yield, young push on) is covered by `TermiteNeighbourTests.neighbouringTermitesWallOffTheirGalleries`. |
+| `HarvesterTrailTests.foragersWearLastingTrunkTrailsThatFadeAndGrowBack` | gone (trunk trails). |
+| `HarvesterTrailTests.aFarMeadowPastTheTrailsTipIsFoundRecruitedToAndPullsTheTrailOut` | gone (trunk trails, recruits, grama grass). |
+
+**In all:** 15 legs tests moved whole, 14 more moved (whole or as a check), 13 covered already (each read in step 2),
+16 gone with what only the harvester did.
+
+### The unit tests (`desert/src/test/`, 9 files)
+
+| File | Goes to |
+|---|---|
+| `GramaLifeTest` | gone (grama grass). |
+| `MoundShapeTest` | gone (the hill's shape). |
+| `DoorRuleTest`, `SiteFidelityTest` | gone (the door, the forager spots). |
+| `HarvesterModelFilesTest`, `WorkerAnimationsTest`, `HarvesterBodyPlansTest` | gone (the harvester's model, clips and body plan). The savanna has the same checks for its own models (`ModelFilesTest`, `TermiteAnimationsTest`, `BodyPlansTest`). |
+| `HarvesterProfileTest` | gone, but for two shared rules **moved** into the savanna's `SpeciesProfileTest` if it lacks them: "foragers go out when their profile says" and "nurses are counted from the headcount". |
+| `HarvesterRulesTest` | the shared rules (a worker nurses, then builds, then forages; hungry, then slow, then starved before old age) **moved** into `SpeciesProfileTest` on the termite file; the queen's burst for rich bread is gone. |
+
+## (b) What the harvester leaves in the framework
+
+Found by asking, for every socket, profile field and class: does the savanna mod, or the framework for a savanna
+species, still use it once `desert\` is gone? **Delete** means step 5 takes it out; each delete is proved by the build
+and the test categories, and what really happened is written at the end of this file.
+
+### Sockets
+
+| Socket | Who used it | Mark |
+|---|---|---|
+| `ColonyHooks.TRAILS` | the trunk trails | delete |
+| `ColonyHooks.DOOR_RULE` | the door | delete |
+| `ColonyHooks.NUMBERS_SEARCH` | the forager spots (numbers searching alone) | delete |
+| `ColonyHooks.LONE_SEARCH`, with `SearchPlan` and `GroundPicker` | the forager spots (a real lone search) | delete, with the lone-search half of `ScoutGoal` |
+| `ColonyHooks.CALLED_OUT` | the recruits | delete |
+| `ColonyHooks.MILL` | the bakery | delete |
+| `ColonyHooks.NURSE_MAKES` | the bakery (bread milled while away) | delete |
+| `ColonyHooks.LIST_DAY` | the patrol, the door, the night soil | delete |
+| `ColonyHooks.REACH`, `NURSE_FOOD`, `AWAY_BUILDER`, `DUG_SOIL`, `LIST_STORE`, `LIST_SEARCH` | the harvester and the savanna | keep (their comments lose the harvester) |
+| `ColonyNews.FOOD_FOUND`, `INTO_NUMBERS`, `OUT_OF_NUMBERS`, `PIECE_TAKEN`, `PIECE_EATEN`, `NUMBERS_TRIP`, `NUMBERS_FORAGED`, `FORAGER_NUMBERS`, `SET_OUT`, `SEARCH_STARTED`, `SEARCH_OVER`, `MEMBER_ROUND` | heard only by harvester parts | delete (news nobody hears) |
+| `ColonyNews.MEMBER_DIED` | heard only by harvester parts | delete unless a shared part hears it (checked in step 5; the danger memory has its own way in) |
+| `ColonyQuestions.NOT_CLEARED`, `MORE_FOOD_WANTED`, `KEEPS_TRAILS`, `MUST_WAIT`, `PASSES_BY`, `ON_TRAIL` | answered only by harvester parts | delete |
+| every other socket | the savanna | keep |
+
+### Species profile fields (`SpeciesProfile`)
+
+| Field | Mark |
+|---|---|
+| `food.mill_ticks`, `food.bread_stock` (`makesBread`) | delete |
+| `food.day_clock` (the day forager's round, the midday rest by heat) and `body_language.hot` | delete: termites and Matabele go by `forage_at` and the raid hours |
+| `food.search` with `recruit` (searching alone, site fidelity, recruiting) | delete, after checking the two places the Matabele scout code names it |
+| `worker.rest_near_entrance` | delete (the Matabele use `rest_in_rooms`) |
+| `nest.founding_chamber`, `founding.site_search_radius`, `founding.max_unevenness` | delete |
+| `nest.level_unlocks` | delete if the levels go (below) |
+| `queen.rich_meal`, `burst_eggs`, `burst_interval_ticks` (the burst of eggs for rich food) | delete if no savanna queen can start a burst (termite queens lay by their size, `laying`); checked in step 5, because the termite file fills these fields today |
+| `colony.lost.patrollers` | delete |
+| `colony.danger.keep_away`, `colony.neighbours.turn_degrees` (foragers kept off danger; foraging turned away from a neighbour) | delete if only the harvester's foraging read them; checked in step 5 |
+| `nest.plug_block` | keep (the termites plug with mound soil) |
+| `nest.room_sizes`, `nest.max_levels` | see "the levels" below |
+| everything else | keep (the termite or Matabele file fills it, or the shared code runs on its default) |
+
+### Classes, tags and defaults
+
+| What | Mark |
+|---|---|
+| `colony/NestSite` (the queen's level-site scoring) | delete |
+| The harvester's built-in numbers and names in the framework (`SpeciesProfiles.signUpBuiltIn`, the film camera's `worker_ant` short name, comments saying "the harvester's ...") | delete or reword |
+| `AwayReport` lines `BREAD_MADE`, `HILL`, `PATROLS`, `PATROLLERS_LOST`, `NO_FORAGING_DAYS` | delete |
+| Methods only harvester code or harvester tests called (`Neighbours.turnsFrom`, `Nest.nightSoilCells`, `FoodStore.findSeedPile`, `FieldLife.sendSearching`, `QueenCare.isOnSecondBatch`, test setters such as `Colony.setHeatForTests`, ...) | delete, found again after step 4 by a script that lists every framework name nothing uses |
+| Item tags `colonyframework:seeds`, `rich_seeds`, and the desert's `nurse_food`, `rich_nurse_food`, block tag `old_plugs` | delete those no savanna file or code reads (checked in step 5) |
+| `block/SeedPileBlock`, `block/PlugBlock` | keep: the termites' comb heap and plug are built on them. `SeedPileBlock` keeps its name (renaming a block class buys nothing). |
+| `GatherSeedGoal`, `StoreSeedGoal` | keep, renamed `GatherFoodGoal` and `StoreFoodGoal` (they carry the termites' grass and wood) |
+
+### The levels (my pick: try the cut, keep if it will not come out cleanly)
+
+The shared nest plan can stack up to four levels joined by a spiral stair (seed store, nursery, queen, refuse chamber),
+fit fewer into thin soil, and open them as the colony grows. The termites' nest is its one-level case and the Matabele
+dig nothing, so after the harvester **nothing in the game digs a second level**. Step 5 tries to cut the plan down to
+the one level (the stair, the unlocking, the thin-soil fitting, the seed store, nursery and refuse chamber as levels).
+If that cannot be done without changing how the termite nest is planned or dug (rule 2), the levels stay, the report
+says so, and the question goes to the code review (job 3) by name. The legs tests' walk-through nest is then built by
+the test itself.
+
+## (c) Tools and films that take the harvester worker
+
+**Guard films** (`tools/film/guard/`):
+
+| Scene | What happens |
+|---|---|
+| `a_walk` (three speeds), `b_turn`, `d_ledge`, `e_ceiling` | filmed again with a Matabele minor (no Matabele or termite scene guards these) |
+| `c_climb` | filmed again with a Matabele minor: `k_climb_minor`, `l_climb_major` and `m_climb_king` are all termite bodies, so no Matabele climb is guarded yet |
+| `n_down_turn` | filmed again with a Matabele minor (`o_down_turn_major` is a termite major) |
+| `h_crowd` (400 harvester workers) | filmed again with 400 Matabele minors |
+| `f`, `g`, `i` to `m`, `o`, `q`, `r`, `s` | no harvester in them: untouched |
+
+The user looks once at the new `run-film/guard_films.mp4` before the new pictures become the approved ones.
+
+**Other film scenes:** `tools/film/climb.film`, `poses.film`, `work.film` name the harvester: switched to a Matabele
+minor, or dropped where the scene filmed something only the harvester did (decided scene by scene in step 3).
+
+**Tools** (Neon's lane; a file with uncommitted changes in `C:\Ant Mod` is not edited, the line goes on
+`docs/HANDOFF.md` instead; today that is `tools/body_plan.py`):
+
+| Tool | What it takes instead |
+|---|---|
+| `anim_lab.py`, `wall_check.py`, `ant_pose_viewer.py`, `ant_motion.py`, `groom_motion.py` | default insect `matabele_minor`; harvester-only clip makers in them go |
+| `ant_models.py` (the harvester worker's parts), `grama_art.py`, `grama_viewer.template.html`, `young_textures.py` (if only the harvester's young) | go |
+| `matabele_anims.py`, `matabele_models.py`, `matabele_climb.py`, `matabele_viewer.template.html` | they only mention the worker ant as where a part or clip was copied from: comments reworded, nothing else |
+| `mod_paths.py`, `run_game_tests.sh`, `film.sh` | the desert mod's lines go (step 4) |
+| `model_viewer.py`, `tree_viewer.template.html`, `nest_sites_viewer.template.html`, `perf_scenes.py`, `bbmodel_import.py` | the harvester's entries go; the nest sites viewer goes whole (it showed the queen's site scoring) |
+| `body_plan.py` | **not edited now** (Neon has uncommitted changes in it): a line on the board asks for its two `worker_ant` mentions to go |
+| `references/` pages built for the harvester (`grama_viewer.html`, `nest_sites_viewer.html`, `ant_pose_viewer.html`, `references/ants`) | go with their makers, or are rebuilt for the Matabele |
+
+## What was really done
+
+### Step 2 (2026-11-23): the shared tests moved onto savanna insects
+- **The legs** (`NavigationTests`, 14 scenes): now `savanna/.../gametest/LegsTests`, walked by a Matabele minor; five scenes whose rule depends on the body's size (the one-block pit, staying on the shaft wall, round a block's outside edge, the ceiling, under an overhang) are walked by a termite worker too; the queen's walk is the Matabele queen's. The harvester's hill is kept as plain ground to climb (a stepped heap of dirt of the same shape).
+- **Two legs tests changed their "arrived" rule, on purpose (box 2 of the 4-box rule, not loosened):** the harvester worker stacked, so 440 ants could all end in one cell; a Matabele keeps a gap (the real-sizes rule), and the navigator ends a walk at a full cell on the nearest free spot beside it. So in the two "from all around" scans a walker has arrived when its walk is done in the store room, and in the climb-out test when it stands on its place or one cell beside it. No leg bug was found by the move.
+- **The numbers** (`HarvesterPopulationTests`' 4 shared tests): now in `TermitePopulationTests` with a termite colony (the crew and the watching player, coming out only where nobody sees, old age in the numbers, a young one growing up into the numbers).
+- **The body** (`HarvesterBodyTests`): naps, waking when hurt and the personality drawn, kept and saved moved to `MatabeleBodyTests`. **Correction to list (a):** "insects notice moving players by their personality" is gone, not moved: noticing by sight was the harvester's alone (a Matabele has no notice numbers, a termite notices by tremor).
+- **The nest's life** (the shared part of `NestTests`): new `TermiteNestLifeTests` (nymphs wait at the worker cap, an unfed nymph starves, an unfed queen starves and her colony dwindles, the nest plan the same after a reload, what a worker carries kept after a reload, a body nobody carries crumbles, a nurse with nothing to do waits by the queen); the half-speed check of a hungry worker went into the Matabele starving test, the share-out check into `TermiteJobsByAgeTests`. **Correction to list (a):** "seeds lying by a full store" (BUGS 44) is gone: the bug lived in the harvester's bread rule.
+- **Away:** the fold-in test is now a termite colony's (`aTermiteColonyAwayFolds...`; termites eat their dead, so the 4 bodies owed are settled with none lying); new `termiteNumbersForageOnlyOutOfSight`; young starving as numbers added to the starving royal pair's scene. Saving and loading while away was already the termite comb test's.
+- **Not moved, with the reason:** the extra hole beside a shaft (the termite repair test already opens roofs and a side wall, and the leak finder treats every opening alike); the harvester unit tests (the shared rules they touch already have framework tests: `JobsByAgeTest`, `QueenAndHungerRulesTest`, `FoodWorthTest`).
+- **Run:** `legs,antnest,away,colony,body` on 6 servers: all green after the fixes above (one old flake, `neighbouringTermitesWallOffTheirGalleries`, passed alone 3 of 3).
+
+### Step 3 (2026-11-23): the guard films with a Matabele minor
+- **Re-filmed with a Matabele minor** (they were the harvester worker's): `a_walk`, `b_turn`, `c_climb`, `d_ledge`, `e_ceiling`, `n_down_turn`, and the crowd of 400 (`h_crowd`). The plain film scenes `climb`, `poses` and `work` use it too (the hot-weather poses and the dig clip, harvester-only, left them).
+- **None dropped:** every harvester scene guards a shared body rule, and no Matabele scene filmed these before (the Matabele had only `r_crowd_space` and `s_carry_down`).
+- **Unchanged:** the termite scenes (`f`, `i` to `m`, `o`, `q`), the empty scene, the two Matabele ones.
+- **The ceiling scene got more time** (its first burst 150 to 190 ticks): the minor had not reached its place on the roof when the next order came.
+- **Found on the new body: BUGS 308** (a small leg pop at the pace change, a jump and a 30-degree tip at the pillar's top, more of the longer body in the roof at the known ceiling snap). Not fixed here.
+- **Drawing time:** 400 Matabele minors 54.5 ms a frame (136 microseconds an ant).
+- **Not approved yet:** the new pictures become the standard only on the user's OK after a look at `run-film/guard_films.mp4` (then `python tools/guard_films.py approve`, the three faulty scenes with `--bug`).
+- **The tools' default insect:** the scenes are switched; the tools that only name `worker_ant` in examples and tables are left to Neon (a line on the board, `docs/HANDOFF.md`), the harvester-only tools go in step 4.
+
+
+### Step 4 (2026-11-23): the desert mod deleted
+- **Gone:** the `desert\` folder (the harvester worker and queen, grama grass, ant bread, the hill, the patrol, the door, the trunk trails, its 66 game tests and 9 unit test files), its lines in the build files (`settings.gradle`, `build.gradle`, `gradle.properties`, `gradle/mod-common.gradle`), the `antnest` test category, the harvester-only tools and pages (`ant_models.py`, `ant_pose_viewer.py`, `grama_art.py`, `wall_check.py`, the Blockbench file, two viewer pages). Two mods are left, the framework and the savanna.
+- **The full run after it** (357 tests, 6 servers, 51 minutes): none of the moved tests failed. Two replays failed alone 3 of 3 and passed on the code before the removal (a spare copy of the tag `harvester-last`, run side by side): **BUGS 309, a real fault of the removal itself**, see step 5. The other first-pass failures were the known river and replay flakes (BUGS 227, 270, 280, 301 and the chicken alarm's 20/22/207); they passed alone 2 or 3 times of 3 here and all passed on the old code's run.
+
+### Step 5 (2026-11-23): the framework's leftovers
+- **Deep Soil came back, as shared ground (BUGS 309; the one thing the plan missed).** The desert mod laid Deep Soil under all dirt everywhere, and the termites' whole underground ran through it. It is now the framework's block (`colonyframework:deep_soil`) with the same look and the same 5 to 7 layers, so new worlds are as before; the saved replay and test places were pointed at the new name. My pick: the framework and not the savanna mod, because every digging species needs it and two species mods must not each lay their own.
+- **Deleted (nothing ran them):** the sockets `TRAILS`, `DOOR_RULE`, `MILL`, `NUMBERS_SEARCH`, `LONE_SEARCH` (with `SearchPlan`, `GroundPicker`), `CALLED_OUT`, `NURSE_MAKES`, `LIST_DAY`; thirteen kinds of colony news nobody heard (`MEMBER_DIED` too: the danger memory hears `MEMBER_HURT`); the questions `NOT_CLEARED`, `MORE_FOOD_WANTED`, `KEEPS_TRAILS`, `MUST_WAIT`, `PASSES_BY`, `ON_TRAIL`; the lone search and the recruits' half of `ScoutGoal` (the termites' scouting and telling stays); the door wait, the pass-by and the trunk-trail detour in the carrying goals; `colony/NestSite`; the report lines `BREAD_MADE`, `HILL`, `PATROLS`, `PATROLLERS_LOST`, `NO_FORAGING_DAYS`; the profile keys `food.search` with `recruit`, `food.mill_ticks`, `food.bread_stock`, `founding.site_search_radius`, `founding.max_unevenness`, `colony.lost.patrollers`; and about thirty methods only harvester code or tests called. About 1,300 lines.
+- **Renamed:** `GatherSeedGoal` and `StoreSeedGoal` are `GatherFoodGoal` and `StoreFoodGoal` (saved names untouched).
+- **Kept, with the reason (each goes to the code review, job 3, by name):**
+  - **The nest's levels** (`NestPlan.MAX_LEVELS`, the stair, `nest.level_unlocks`, `room_sizes`, `founding_chamber`): the termite nest is planned and dug as the one-level case of this code, so cutting it means rewriting how the termite nest is planned (rule 2). The legs tests still walk the four-level plan.
+  - **The queen's rich meal and burst of eggs** (`queen.rich_meal`, `burst_eggs`, `burst_interval_ticks`): both savanna species files fill them and `QueenCare` runs them for the Matabele queen; taking them out could change her laying.
+  - **`colony.danger.keep_away` and `colony.neighbours.turn_degrees`:** read by shared code the termites run (the termite file sets `turn_degrees` 30).
+  - **The day clock and hot ground** (`food.day_clock`, `body_language.hot`, the `walk_hot` and `idle_hot` clips' code): no savanna species sets them, but they sit in the body code (which clip plays, the turn in place) and the shared clock formatter; cutting them is a body change that needs guard films. Dead today, harmless.
+  - **`worker.rest_near_entrance`, the bread counters in the nest ledger and the queen's meal, the item tags `seeds` and `rich_seeds`, the block tag `old_plugs`:** small, tangled into shared code paths the termites use (the store, the queen's meal); not worth the risk in this job.
+  - **Dead members that are not the harvester's** (found by the same script): left for the review.
+- **Run:** see the end of this file.
+- **Step 5's run** (`legs,colony,away,termitefood,mound,replays,worldgen`, 153 tests, 6 servers, 26 minutes): the two replays that failed after step 4 pass again, and so do all the others. Two first-pass failures: `holesTakeTurnsNearFoodFirstAndMoreInTheRain` (passed alone 3 of 3) and `aStandingDeadTreeIsSensedAndGetsAGalleryToItsFoot` (BUGS 310: a chance failure that the code before step 5 shows just as often, 2 of 10 runs against 1 of 10).
+
+### Step 7 (2026-11-24): proving it
+- **The full run** (357 tests, 6 servers, 38 minutes): 349 passed first time; the 8 others are river animals and two known termite chance failures (BUGS 311, 207, 310), none in a moved test or in code the removal touched. All 14 replays passed.
+- **The guard films, all 18 scenes** (`run-film/guard_films.mp4`): every termite scene (`f`, `i` to `m`, `o`) and the Matabele major's head scene (`q`) match their approved pictures exactly, 0 pictures changed: the removal moved no insect's body. The seven re-filmed scenes differ, as they must (a new insect; BUGS 308). Two Matabele scenes not re-filmed, `r_crowd_space` and `s_carry_down`, differ from their approved pictures too, but they differ just the same on the code before the removal (filmed on the tag `harvester-last`: 40 of 40 and 83 of 140 pictures): chance in those scenes, not the removal. Drawing time: 400 minors 48.0 ms a frame (119 microseconds an ant). **Nothing approved: the user's look comes first.**
+- **The soak** (`tools/soak.sh 6 2`, six new worlds, two game days each, 2026-11-24): all six ran to the end, no crash, no error in any log, nothing hung; 6 to 10 ms a tick in the middle. 18 rules broken in all, every one a Matabele ant standing stuck or off its face on a raid (the raids' known state, BUGS 306, the raid rewrite's job); **no termite broke a rule**, in new land where the ground under the dirt is the framework's Deep Soil.

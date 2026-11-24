@@ -1,21 +1,20 @@
 """
 Where each mod's files are (the split, step S8, 2026-10-23; docs/plans/mod-split.md). Since the split the repository
-holds three mods, each a folder of its own with its own name inside its files:
+holds the mods, each a folder of its own with its own name inside its files:
 
   framework/   the colony framework   colonyframework   (only the shared egg has files of its own)
   savanna/     the savanna mod        antcolonies       (termites, mounds, gardens, trees)
-  desert/      the desert mod         desertcolonies    (the red harvester ant, its seeds, grama, bread)
 
 Every tool asks here instead of naming a folder, so a model, texture or block is found in whichever mod holds it, and
-a new species mod is one line in MODS. Tools that write files for one mod (ant_models.py writes the harvester ant,
-termite_models.py the termites, ...) ask for that mod's folder by its folder name; tools that read any model (the anim
+a new species mod is one line in MODS. Tools that write files for one mod (termite_models.py writes the termites,
+matabele_models.py the Matabele ants, ...) ask for that mod's folder by its folder name; tools that read any model (the anim
 lab, the body plans, the Blockbench import) ask which mod holds it (model_assets).
 
   import mod_paths
   mod_paths.assets('savanna')            savanna/src/main/resources/assets/antcolonies
-  mod_paths.data('desert')               desert/src/main/resources/data/desertcolonies
-  mod_paths.namespace('desert')          'desertcolonies' (the name written inside the files: desertcolonies:block/...)
-  mod_paths.model_mod('worker_ant')      'desert' (the mod whose files hold that model)
+  mod_paths.data('savanna')              savanna/src/main/resources/data/antcolonies
+  mod_paths.namespace('savanna')         'antcolonies' (the name written inside the files: antcolonies:block/...)
+  mod_paths.model_mod('termite_worker')  'savanna' (the mod whose files hold that model)
   mod_paths.model_assets('termite_king') the assets folder of the mod holding that model
   mod_paths.find('textures/block/x.png') the first mod's copy of a file, or None
   mod_paths.models()                     every model (geo file) with its mod, species mods first
@@ -35,14 +34,13 @@ from pathlib import Path
 PROJECT = Path(__file__).resolve().parent.parent
 
 # folder -> the mod's name (its mod id, the namespace inside its files). Species mods after the framework; the game
-# reads them all at once (the root's build.gradle lists the same three).
+# reads them all at once (the root's build.gradle lists the same ones).
 MODS = {
     'framework': 'colonyframework',
     'savanna': 'antcolonies',
-    'desert': 'desertcolonies',
 }
 # Where a model is looked for first: the species mods (the framework holds no models today).
-SEARCH = ('savanna', 'desert', 'framework')
+SEARCH = ('savanna', 'framework')
 
 
 def mod_folder(mod):
@@ -86,7 +84,7 @@ def _holds(mod, model, base=None):
 
 
 def model_mod(model):
-    """The folder of the mod holding a model (by its geo, body plan, clips or texture), e.g. 'desert' for worker_ant."""
+    """The folder of the mod holding a model (by its geo, body plan, clips or texture), e.g. 'savanna' for termite_worker."""
     for mod in SEARCH:
         if _holds(mod, model):
             return mod

@@ -128,7 +128,11 @@ public class MatabeleFoodTests {
                 .thenSucceed();
     }
 
-    /** An empty pile: the hungry workers find nothing to eat and starve, and the colony counts them gone. */
+    /**
+     * An empty pile: the hungry workers find nothing to eat, slow down to half speed once they have gone the profile's
+     * {@code slow_after_ticks} without a meal (the shared worker hunger; the red harvester ant's check until 2026-11-23),
+     * then starve, and the colony counts them gone.
+     */
     @GameTest(template = "arena", timeoutTicks = 3000, skyAccess = true)
     public static void aMatabeleColonyWithAnEmptyPreyPileStarves(GameTestHelper helper) {
         ServerLevel level = helper.getLevel();
@@ -136,16 +140,27 @@ public class MatabeleFoodTests {
         PreyPile pile = colony.part(SavannaParts.PREY_PILE).orElse(null);
         helper.assertTrue(pile != null, "a Matabele colony has no prey pile");
         List<MatabeleEntity> ants = new ArrayList<>();
+        java.util.Map<MatabeleEntity, Double> normalSpeed = new java.util.HashMap<>();
         helper.startSequence()
                 .thenWaitUntil(() -> helper.assertTrue(colony.nest().getFinishedRoomCenter(level) != null, "the queen's room is not open yet"))
                 .thenExecute(() -> {
                     helper.assertTrue(pile.edible() == 0, "a new colony's pile is not empty");
                     // Every worker a few seconds short of starving.
-                    long starve = colony.profile().worker().starveAfterTicks();
                     ants.addAll(TestIsolation.insectsOf(level, colony, MatabeleEntity.class));
                     helper.assertTrue(ants.size() == 10, ants.size() + " real workers, not 10");
                     for (MatabeleEntity ant : ants) {
-                        ant.setLastMeal(level.getGameTime() - starve + 200);
+                        normalSpeed.put(ant, ant.getAttributeValue(net.minecraft.world.entity.ai.attributes.Attributes.MOVEMENT_SPEED));
+                        ant.setLastMeal(level.getGameTime() - colony.profile().worker().slowAfterTicks() - 5);
+                    }
+                })
+                .thenIdle(60)
+                .thenExecute(() -> {
+                    // Past slow_after_ticks without a meal: every worker at half its speed. Then a few seconds short of starving.
+                    for (MatabeleEntity ant : ants) {
+                        double speed = ant.getAttributeValue(net.minecraft.world.entity.ai.attributes.Attributes.MOVEMENT_SPEED);
+                        helper.assertTrue(Math.abs(speed - normalSpeed.get(ant) * 0.5) < 0.001,
+                                "a starving worker's speed is " + speed + ", expected half of " + normalSpeed.get(ant));
+                        ant.setLastMeal(level.getGameTime() - colony.profile().worker().starveAfterTicks() + 200);
                     }
                 })
                 .thenWaitUntil(() -> {

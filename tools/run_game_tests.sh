@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Runs the game tests on several test servers side by side (test health plan, docs/plans/test-health.md). Since the
-# split every server loads all three mods (framework, savanna, desert) and runs both species mods' tests, from the
+# split every server loads every mod (the framework and the savanna mod) and runs the species mod's tests, from the
 # root folder as before.
 #
 #   tools/run_game_tests.sh          every game test, split over 6 servers
@@ -8,7 +8,7 @@
 #   ANTCOLONIES_TESTS=antnest,away tools/run_game_tests.sh
 #                                    only those categories or tests (see gametest/TestFilter), still split
 #   ANTCOLONIES_MODS=savanna tools/run_game_tests.sh
-#                                    the framework with one species mod only (savanna or desert; both if not set),
+#                                    the framework with one species mod only (today savanna is the only one),
 #                                    so only that mod's tests run (the split, step S9: each mod on its own)
 #   ANTCOLONIES_TESTS=sometest ANTCOLONIES_EVERY_SHARD=1 tools/run_game_tests.sh
 #                                    every server runs every chosen test (a flaky test n times at once)

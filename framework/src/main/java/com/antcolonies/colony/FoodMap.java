@@ -64,17 +64,6 @@ public class FoodMap {
         return food().findRadius() > 0;
     }
 
-    /** Whether what a worker finds stays its own, never told to the colony (it searches alone, brain step 4c). */
-    public boolean searchesAlone() {
-        return findsByLooking() && food().search().map(SpeciesProfile.SearchNumbers::alone).orElse(false);
-    }
-
-    /** Whether this worker has found food of its own that it has not told of (or, searching alone, never will). */
-    public boolean hasFound(UUID worker) {
-        Set<BlockPos> own = found.get(worker);
-        return own != null && !own.isEmpty();
-    }
-
     /** Whether this worker may go for the plant: the colony knows it, or the worker found it itself. */
     public boolean knows(BlockPos plant, @Nullable UUID worker) {
         if (testArea != null && !testArea.contains(plant.getCenter())) {
@@ -139,28 +128,18 @@ public class FoodMap {
             seen.add(id);
             BlockPos at = ant.blockPosition();
             if (colony.nest().isInside(level, at)) {
-                if (!searchesAlone()) {
-                    // Inside it feels the food it touches (the wood over a feeding gallery, round a mud cast) and tells of
-                    // it at once: real termites follow the wood from inside, block after block up a dead trunk (the user's
-                    // ask, 2026-10-19: before, they ate the first blocks and stopped, knowing of no more by day).
-                    // (in reach: the 26 cells round it, where it can nibble from where it stands)
-                    for (BlockPos touched : BlockPos.betweenClosed(at.offset(-1, -1, -1), at.offset(1, 1, 1))) {
-                        if (!known.contains(touched) && (testArea == null || testArea.contains(touched.getCenter()))
-                                && colony.food().isFoodPlant(level.getBlockState(touched))) {
-                            known.add(touched.immutable());
-                        }
+                // Inside it feels the food it touches (the wood over a feeding gallery, round a mud cast) and tells of
+                // it at once: real termites follow the wood from inside, block after block up a dead trunk (the user's
+                // ask, 2026-10-19: before, they ate the first blocks and stopped, knowing of no more by day).
+                // (in reach: the 26 cells round it, where it can nibble from where it stands)
+                for (BlockPos touched : BlockPos.betweenClosed(at.offset(-1, -1, -1), at.offset(1, 1, 1))) {
+                    if (!known.contains(touched) && (testArea == null || testArea.contains(touched.getCenter()))
+                            && colony.food().isFoodPlant(level.getBlockState(touched))) {
+                        known.add(touched.immutable());
                     }
-                }
-                if (searchesAlone()) {
-                    // Searching alone it tells nobody, but remembers where it found food: it goes back out for it.
-                    Set<BlockPos> own = found.get(id);
-                    if (own != null) {
-                        own.removeIf(plant -> !colony.food().isFoodPlant(level.getBlockState(plant)));
-                    }
-                    continue;
                 }
                 Set<BlockPos> news = found.remove(id);
-                if (news != null && !searchesAlone()) {
+                if (news != null) {
                     news.removeIf(plant -> !colony.food().isFoodPlant(level.getBlockState(plant)));
                     if (!news.isEmpty()) {
                         known.addAll(news);
@@ -181,8 +160,7 @@ public class FoodMap {
     /** A worker went into the colony's numbers (it is home, see {@link Population}): it tells the colony of what it found. */
     void wentHome(UUID worker) {
         Set<BlockPos> news = found.remove(worker);
-        if (news != null && !searchesAlone()) {
-
+        if (news != null) {
             known.addAll(news);
         }
     }
@@ -209,8 +187,8 @@ public class FoodMap {
 
     /** For the colony list: " | knows 12 food plants (3 found, not yet told)", or empty for a species that knows them all. */
     public String describe() {
-        if (!findsByLooking() || searchesAlone()) {
-            return ""; // (searching alone: see ForagerSpots' line)
+        if (!findsByLooking()) {
+            return "";
         }
         int untold = 0;
 

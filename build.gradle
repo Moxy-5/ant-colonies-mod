@@ -1,6 +1,6 @@
 // The root of the repository only runs the game (the split, step S6, docs/plans/mod-split.md): each mod is a folder
-// of its own (framework\ the colony framework "colonyframework", savanna\ the savanna mod "antcolonies", desert\ the
-// desert mod "desertcolonies" since step S7), built and tested together. The commands and run folders are the same as
+// of its own (framework\ the colony framework "colonyframework", savanna\ the savanna mod "antcolonies"; the desert mod
+// "desertcolonies" was taken out 2026-11-23), built and tested together. The commands and run folders are the same as
 // before the split: ./gradlew build, runClient, runGameTestServer, runGameTestShard1..n (tools/run_game_tests.sh),
 // runFilm; the worlds stay in run\, run-test\, run-test-shards\ and run-film\.
 plugins {
@@ -20,15 +20,13 @@ tasks.named('wrapper', Wrapper).configure {
 
 evaluationDependsOn(':framework')
 evaluationDependsOn(':savanna')
-evaluationDependsOn(':desert')
 
-// Which species mods the game is started with (the split, step S9: each mod on its own). Both by default;
-// -PspeciesMods=savanna starts the framework with the savanna mod only, -PspeciesMods=desert with the desert mod only
+// Which species mods the game is started with (the split, step S9: each mod on its own). Today the savanna mod is
+// the only one (-PspeciesMods=savanna, the default); a new species mod adds its name here
 // (tools/run_game_tests.sh passes ANTCOLONIES_MODS on). The mods left out are not on the game's classpath at all.
-def speciesMods = (project.findProperty('speciesMods') ?: 'savanna,desert').toString().split(',')*.trim().findAll { it }
-speciesMods.each { if (!(it in ['savanna', 'desert'])) throw new GradleException("speciesMods: unknown mod '${it}' (savanna, desert)") }
+def speciesMods = (project.findProperty('speciesMods') ?: 'savanna').toString().split(',')*.trim().findAll { it }
+speciesMods.each { if (!(it in ['savanna'])) throw new GradleException("speciesMods: unknown mod '${it}' (savanna)") }
 def withSavanna = 'savanna' in speciesMods
-def withDesert = 'desert' in speciesMods
 
 version = mod_version
 group = mod_group_id
@@ -83,7 +81,7 @@ neoForge {
     }
 
     // Every species mod's game tests (each mod's tests sit under its own name since the split, step S7).
-    def gameTestNamespaces = ((withSavanna ? [project.mod_id] : []) + (withDesert ? [project.desert_mod_id] : [])).join(',')
+    def gameTestNamespaces = (withSavanna ? [project.mod_id] : []).join(',')
 
     // Default run configurations.
     // These can be tweaked, removed, or duplicated as needed.
@@ -199,7 +197,7 @@ neoForge {
             if (project.hasProperty('filmWatch')) {
                 systemProperty 'antcolonies.film.watch', 'true'
                 // every mod's files are watched (each mod's own folder; tools/mod_paths.py knows the same list)
-                def modFolders = ['framework', 'savanna', 'desert']
+                def modFolders = ['framework', 'savanna']
                 systemProperty 'antcolonies.film.src', modFolders.collect { project.file("${it}/src/main/resources").absolutePath }.join(File.pathSeparator)
                 systemProperty 'antcolonies.film.out', modFolders.collect { project.file("${it}/build/resources/main").absolutePath }.join(File.pathSeparator)
                 systemProperty 'antcolonies.film.project', project.projectDir.absolutePath
@@ -270,11 +268,6 @@ neoForge {
                 sourceSet(project(':savanna').sourceSets.main)
             }
         }
-        if (withDesert) {
-            "${desert_mod_id}" {
-                sourceSet(project(':desert').sourceSets.main)
-            }
-        }
     }
 }
 
@@ -283,9 +276,6 @@ dependencies {
     implementation project(':framework')
     if (withSavanna) {
         implementation project(':savanna')
-    }
-    if (withDesert) {
-        implementation project(':desert')
     }
 }
 

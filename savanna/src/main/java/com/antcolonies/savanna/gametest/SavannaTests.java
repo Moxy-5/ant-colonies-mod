@@ -34,7 +34,7 @@ public final class SavannaTests {
     /** Signs up the savanna's tests (once, from {@code SavannaMod}). */
     public static void signUp() {
         // The legs: climbing, crawling through termite tunnels, reloads of climbing insects, the Matabele up a pillar.
-        TestFilter.addCategory("legs", TermiteClimbingTests.class, TermiteTunnelTests.class, MatabeleTests.class);
+        TestFilter.addCategory("legs", TermiteClimbingTests.class, TermiteTunnelTests.class, MatabeleTests.class, LegsTests.class);
         // The termite mound: its blocks, the cathedral, doorways and chimney mouths, mending the nest.
         TestFilter.addCategory("mound", TermiteMoundTests.class, TermiteCathedralTests.class, TermiteRepairTests.class, TermiteNewLandTests.class);
         // Termite food: foraging and its holes, the garden, new holes, dead wood, runways, bare patches, mushrooms.
@@ -64,13 +64,13 @@ public final class SavannaTests {
         // The colony: founding, jobs by age, the virtual population, neighbours.
         TestFilter.addCategory("colony", TermiteTests.class, TermiteJobsByAgeTests.class, TermitePopulationTests.class,
                 TermiteNeighbourTests.class, MatabeleColonyTests.class, MatabeleNestTests.class, MatabeleFoodTests.class,
-                MatabeleNewLandTests.class, IdleTests.class);
+                MatabeleNewLandTests.class, IdleTests.class, TermiteNestLifeTests.class);
         // Colonies that live while the player is away: the termites' life while away; the Matabele raids out of sight (M8 step 3f).
         TestFilter.addCategory("away", TermiteAwayTests.class, MatabeleAwayTests.class);
         // Hills and uneven ground: the side tunnels, the mound on a slope.
         TestFilter.addCategory("hills", TermiteHillTests.class);
         // The body (the animation engine): what the server decides about how a termite holds itself.
-        TestFilter.addCategory("body", TermiteBodyTests.class);
+        TestFilter.addCategory("body", TermiteBodyTests.class, MatabeleBodyTests.class);
         // The giant savanna trees (M7.5): their blocks, shapes, growth and fall.
         TestFilter.addCategory("trees", TreeTests.class, TreeGrowthTests.class);
         // The raid test bench's replays (round 2, B3): saved reports put back and run again (ReplayTests, one test each).

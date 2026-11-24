@@ -66,7 +66,7 @@ import net.neoforged.neoforge.event.tick.ServerTickEvent;
  *
  * <p>A shot list is a text file, one step a line ({@code #} starts a comment):
  * <pre>
- * cmd summon desertcolonies:worker_ant 0.5 -60 0.5 {NoAI:1b,Rotation:[90f,0f],CustomName:'"film:walk"'}
+ * cmd summon antcolonies:matabele_minor 0.5 -60 0.5 {NoAI:1b,Rotation:[90f,0f],CustomName:'"film:walk"'}
  * camera 1.4 -59.7 0.5 90 15      the camera's x y z, turn and tilt (the player, a spectator, is put there: y is its
  *                                 feet, the eye 1.62 above)
  * lens 30                         the scene's lens (narrow for small insects); "fov" changes it for a moment only
@@ -525,7 +525,7 @@ public final class FilmDirector {
     }
 
     /**
-     * An insect's full name from a shot list's short one ({@code worker_ant} is {@code desertcolonies:worker_ant},
+     * An insect's full name from a shot list's short one ({@code matabele_minor} is {@code antcolonies:matabele_minor},
      * {@code termite_king} is {@code antcolonies:termite_king}): each species mod signs its insects up under its own
      * name since the split (step S7), so the camera looks the name up; a full name is used as it is.
      */

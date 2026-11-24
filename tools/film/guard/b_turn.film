@@ -4,7 +4,7 @@
 cmd time set noon
 cmd weather clear
 lens 30
-walker worker_ant 0.5 -60 0.5 -90
+walker matabele_minor 0.5 -60 0.5 -90
 log turn
 cmd tick freeze
 follow 0 1.9 0 0 90

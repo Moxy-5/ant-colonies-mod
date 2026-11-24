@@ -11,7 +11,7 @@ cmd weather clear
 cmd fill 3 -60 -4 3 -59 4 air
 cmd fill 3 -60 0 3 -59 0 stone
 lens 30
-walker worker_ant 1.5 -60 0.5 -90
+walker matabele_minor 1.5 -60 0.5 -90
 camera 1.0 -59.0 -3.5 -20 25
 shot climb_scene
 log climb

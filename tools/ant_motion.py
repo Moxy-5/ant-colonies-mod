@@ -677,7 +677,7 @@ def self_test():
     assert max(abs(x - y) for x, y in zip(a, b)) < 1e-9, (a, b)
     back = to_file(file_turn(rot))
     assert max(abs(x - y) for x, y in zip(back, rot)) < 1e-9, back
-    model = lab.Model('worker_ant')
+    model = lab.Model('matabele_minor')
     rig = Rig(model)
     for key, leg in rig.legs.items():
         q, err = leg.reach(rig.stance(key), {}, (0.0, 0.0, 0.0, 0.0))

@@ -62,12 +62,6 @@ public record SpeciesProfile(ColonyNumbers colony, WorkerNumbers worker, QueenNu
         this(colony, worker, queen, brood, food, refuse, nest, founding, Optional.empty(), laying, Optional.empty(), List.of());
     }
 
-    /** The same numbers with this parts list. */
-    public SpeciesProfile withParts(List<String> parts) {
-        return new SpeciesProfile(colony, worker, queen, brood, food, refuse, nest, founding, gardenRooms, laying, bodyLanguage,
-                List.copyOf(parts), sections);
-    }
-
     /** A species mod's own section of the file (Apex part 3, T1), or empty if the file has none. */
     @SuppressWarnings("unchecked")
     public <T> Optional<T> section(SpeciesSection<T> section) {
@@ -181,17 +175,16 @@ public record SpeciesProfile(ColonyNumbers colony, WorkerNumbers worker, QueenNu
      * Harm out of sight (brain step 4g, step 4; the user's decisions of 2026-10-18): a number's trip that still goes near
      * remembered danger can be lost. Its chance is {@code perPoint} for each point of danger there, at most {@code most}; in
      * loaded land a remembered place counts only while a hostile is really there (nobody dies of a mere memory), in
-     * unloaded land the memory decides. Who can be lost: patrol numbers checking a way through danger ({@code patrollers})
-     * and forager numbers at food near danger ({@code foragers}: termites, whose foragers are not kept away from where a
+     * unloaded land the memory decides. Who can be lost:
+     * forager numbers at food near danger ({@code foragers}: termites, whose foragers are not kept away from where a
      * hostile was only seen). A lost member only counts in the danger memory (as a death) if its nestmates find the body:
      * certain within {@code foundWithin} blocks of the nest's middle, {@code foundDropPerBlock} less likely each block
      * farther out (the user's idea). My picks, to confirm: 10% a point, at most 50%; found for sure within 6, 3% less a block.
      */
-    public record LostNumbers(double perPoint, double most, boolean patrollers, boolean foragers, double foundWithin, double foundDropPerBlock) {
+    public record LostNumbers(double perPoint, double most, boolean foragers, double foundWithin, double foundDropPerBlock) {
         public static final Codec<LostNumbers> CODEC = RecordCodecBuilder.create(i -> i.group(
                 Codec.DOUBLE.optionalFieldOf("per_point", 0.1).forGetter(LostNumbers::perPoint),
                 Codec.DOUBLE.optionalFieldOf("most", 0.5).forGetter(LostNumbers::most),
-                Codec.BOOL.optionalFieldOf("patrollers", false).forGetter(LostNumbers::patrollers),
                 Codec.BOOL.optionalFieldOf("foragers", false).forGetter(LostNumbers::foragers),
                 Codec.DOUBLE.optionalFieldOf("found_within", 6.0).forGetter(LostNumbers::foundWithin),
                 Codec.DOUBLE.optionalFieldOf("found_drop_per_block", 0.03).forGetter(LostNumbers::foundDropPerBlock)
@@ -418,36 +411,28 @@ public record SpeciesProfile(ColonyNumbers colony, WorkerNumbers worker, QueenNu
      * the item tag of the food they pick up off the ground (seeds, sticks), one item at a time. {@code plants}: plants
      * they cut pieces off where they grow (a tuft of grass, a dead bush, a hay bale), see {@link PlantFood}; every
      * piece is a {@code piece} item. The colony keeps its food in the food store as heaps of the {@code pile} block
-     * (a {@link SeedPileBlock}), one layer per piece. Bread, for species that mill it: {@code millTicks} to mill one
-     * seed into bread, and {@code breadStock} pieces the nurses keep ready for the queen; a species without bread leaves
-     * both out. {@code forageAt}: when the foragers go out, any of "day", "night" and "rain" (optional, all three:
+     * (a {@link SeedPileBlock}), one layer per piece. {@code forageAt}: when the foragers go out, any of "day", "night" and "rain" (optional, all three:
      * always); outside those times the workers stay inside (see {@code Colony.isForagingTime}). {@code findRadius}
      * (optional, 0: the colony knows every plant in its area at once): a plant is only gone for once a worker has
      * been within this many blocks of it and brought the news home, and foragers with nothing good to go for scout
      * the area (see {@code FoodMap}). {@code trails} (optional, the defaults of {@link Trails}): how the colony's
      * foraging trails get stronger with use and fade unused. {@code dayClock} (optional): the foragers' daily round.
-     * {@code search} (optional): each forager searches alone and remembers its own spot (see {@link SearchNumbers}).
      * A species' own food numbers are read by its own mod (Apex part 3, T1, {@link SpeciesSection}): the savanna's
-     * grass growing back ({@code regrowth}), the desert's door and patrol ({@code door}, {@code patrol}).
+     * grass growing back ({@code regrowth}).
      */
-    public record FoodNumbers(int radius, String items, List<PlantFood> plants, String piece, String pile, int millTicks, int breadStock,
-            List<String> forageAt, int findRadius, Trails trails, Optional<DayClock> dayClock, Optional<SearchNumbers> search) {
+    public record FoodNumbers(int radius, String items, List<PlantFood> plants, String piece, String pile,
+            List<String> forageAt, int findRadius, Trails trails, Optional<DayClock> dayClock) {
         /** Foraging at any time: day, night and in the rain. */
         public static final List<String> ALWAYS = List.of("day", "night", "rain");
 
-        public FoodNumbers(int radius, String items, List<PlantFood> plants, String piece, String pile, int millTicks, int breadStock,
-                List<String> forageAt, int findRadius, Trails trails, Optional<DayClock> dayClock) {
-            this(radius, items, plants, piece, pile, millTicks, breadStock, forageAt, findRadius, trails, dayClock, Optional.empty());
-        }
-
-        public FoodNumbers(int radius, String items, List<PlantFood> plants, String piece, String pile, int millTicks, int breadStock,
+        public FoodNumbers(int radius, String items, List<PlantFood> plants, String piece, String pile,
                 List<String> forageAt, int findRadius, Trails trails) {
-            this(radius, items, plants, piece, pile, millTicks, breadStock, forageAt, findRadius, trails, Optional.empty());
+            this(radius, items, plants, piece, pile, forageAt, findRadius, trails, Optional.empty());
         }
 
-        public FoodNumbers(int radius, String items, List<PlantFood> plants, String piece, String pile, int millTicks, int breadStock,
+        public FoodNumbers(int radius, String items, List<PlantFood> plants, String piece, String pile,
                 List<String> forageAt, int findRadius) {
-            this(radius, items, plants, piece, pile, millTicks, breadStock, forageAt, findRadius, Trails.DEFAULT);
+            this(radius, items, plants, piece, pile, forageAt, findRadius, Trails.DEFAULT);
         }
 
         public static final Codec<FoodNumbers> CODEC = RecordCodecBuilder.create(i -> i.group(
@@ -456,13 +441,10 @@ public record SpeciesProfile(ColonyNumbers colony, WorkerNumbers worker, QueenNu
                 PlantFood.CODEC.listOf().fieldOf("plants").forGetter(FoodNumbers::plants),
                 Codec.STRING.fieldOf("piece").forGetter(FoodNumbers::piece),
                 Codec.STRING.fieldOf("pile").forGetter(FoodNumbers::pile),
-                Codec.INT.optionalFieldOf("mill_ticks", 0).forGetter(FoodNumbers::millTicks),
-                Codec.INT.optionalFieldOf("bread_stock", 0).forGetter(FoodNumbers::breadStock),
                 Codec.STRING.listOf().optionalFieldOf("forage_at", ALWAYS).forGetter(FoodNumbers::forageAt),
                 Codec.INT.optionalFieldOf("find_radius", 0).forGetter(FoodNumbers::findRadius),
                 Trails.CODEC.optionalFieldOf("trails", Trails.DEFAULT).forGetter(FoodNumbers::trails),
-                DayClock.CODEC.optionalFieldOf("day_clock").forGetter(FoodNumbers::dayClock),
-                SearchNumbers.CODEC.optionalFieldOf("search").forGetter(FoodNumbers::search)
+                DayClock.CODEC.optionalFieldOf("day_clock").forGetter(FoodNumbers::dayClock)
         ).apply(i, FoodNumbers::new));
 
         /**
@@ -471,11 +453,6 @@ public record SpeciesProfile(ColonyNumbers colony, WorkerNumbers worker, QueenNu
          */
         public boolean foragesNow(boolean day, boolean raining) {
             return raining && forageAt.contains("rain") || forageAt.contains(day ? "day" : "night");
-        }
-
-        /** Whether the nurses mill the food into bread (the harvester ant's seeds). */
-        public boolean makesBread() {
-            return breadStock > 0;
         }
 
         /** The food items picked up off the ground (the seeds tag if the name is broken). */
@@ -605,87 +582,6 @@ public record SpeciesProfile(ColonyNumbers colony, WorkerNumbers worker, QueenNu
         public static String clock(long dayTime) {
             long minutes = (Math.floorMod(dayTime, 24000L) * 60 / 1000 + 6 * 60) % (24 * 60);
             return (minutes / 60) + ":" + String.format("%02d", minutes % 60);
-        }
-    }
-
-    /**
-     * Searching alone with site fidelity (brain step 4c; real red harvester ants, <i>Pogonomyrmex barbatus</i>: no
-     * forager tells the others of a seed; each walks out along a trunk trail, searches alone in a meandering walk and
-     * goes back to where it last found food). {@code alone}: what a worker finds (within {@code food.find_radius}) is its
-     * own, never told to the colony. A searcher looks within {@code wander} blocks of its search centre; a trip to its
-     * own spot that finds nothing in {@code spotTicks} counts as empty, and {@code emptyToDrop} empties drop the spot.
-     * It searches until it finds food (or the foraging time ends), giving up after {@code giveUpTicks}. Every
-     * {@code driftTicks} without a find its search centre moves {@code driftBlocks} farther out, never more than
-     * {@code stretch} blocks past the colony's foraging range (the range stretches from the ants' own failures).
-     */
-    public record SearchNumbers(boolean alone, int wander, int spotTicks, int emptyToDrop, int giveUpTicks, int driftTicks, int driftBlocks,
-            int stretch, Optional<RecruitNumbers> recruit) {
-        public SearchNumbers(boolean alone, int wander, int spotTicks, int emptyToDrop, int giveUpTicks, int driftTicks, int driftBlocks,
-                int stretch) {
-            this(alone, wander, spotTicks, emptyToDrop, giveUpTicks, driftTicks, driftBlocks, stretch, Optional.empty());
-        }
-
-        public static final Codec<SearchNumbers> CODEC = RecordCodecBuilder.create(i -> i.group(
-                Codec.BOOL.optionalFieldOf("alone", true).forGetter(SearchNumbers::alone),
-                Codec.INT.optionalFieldOf("wander", 4).forGetter(SearchNumbers::wander),
-                Codec.INT.optionalFieldOf("spot_ticks", 1200).forGetter(SearchNumbers::spotTicks),
-                Codec.INT.optionalFieldOf("empty_to_drop", 2).forGetter(SearchNumbers::emptyToDrop),
-                Codec.INT.optionalFieldOf("give_up_ticks", 6000).forGetter(SearchNumbers::giveUpTicks),
-                Codec.INT.optionalFieldOf("drift_ticks", 1200).forGetter(SearchNumbers::driftTicks),
-                Codec.INT.optionalFieldOf("drift_blocks", 3).forGetter(SearchNumbers::driftBlocks),
-                Codec.INT.optionalFieldOf("stretch", 8).forGetter(SearchNumbers::stretch),
-                RecruitNumbers.CODEC.optionalFieldOf("recruit").forGetter(SearchNumbers::recruit)
-        ).apply(i, SearchNumbers::new));
-
-        /**
-         * How far out (blocks from the nest's middle) a search centre that started {@code from} blocks out has drifted
-         * after {@code searched} ticks without a find: {@code driftBlocks} more every {@code driftTicks}, never past
-         * {@code range} plus the stretch (and never in from where it started).
-         */
-        public double drifted(double from, long searched, int range) {
-            double out = from + driftBlocks * Math.max(0, searched / Math.max(1, driftTicks));
-            return Math.max(from, Math.min(out, range + stretch));
-        }
-    }
-
-    /**
-     * Recruiting to rich patches (long trails step 2; the user's decisions of 2026-10-17; real <i>Pogonomyrmex barbatus</i>
-     * and <i>P. rugosus</i>: a forager that finds a dense patch of seed drags its sting tip on the way home, laying a
-     * poison-gland scent line, and in the nest it runs about touching nestmates, which follow the line out). A find is a
-     * rich patch when the food within {@code patchRadius} blocks of it (the pieces left on the {@code plants} named here,
-     * all food plants if none are named, plus the seeds lying there) is at least {@link #needed} for its distance home:
-     * {@code richPieces} at {@code atBlocks} blocks or nearer, growing with the distance to the power
-     * {@code distancePower} (value against distance: a long trip only for a big prize). The finder calls out one
-     * nestmate for every {@code piecesPerRecruit} pieces in the patch, at least 1 and at most {@code mostRecruits}
-     * (a richer find, a stronger recruitment). The scent line halves in strength every {@code halfLifeTicks} unless a
-     * returning recruit lays it again. Numbers are my picks, to confirm.
-     */
-    public record RecruitNumbers(int patchRadius, int richPieces, int atBlocks, double distancePower, int piecesPerRecruit, int mostRecruits,
-            int halfLifeTicks, List<String> plants) {
-        public static final Codec<RecruitNumbers> CODEC = RecordCodecBuilder.create(i -> i.group(
-                Codec.INT.optionalFieldOf("patch_radius", 4).forGetter(RecruitNumbers::patchRadius),
-                Codec.INT.optionalFieldOf("rich_pieces", 24).forGetter(RecruitNumbers::richPieces),
-                Codec.INT.optionalFieldOf("at_blocks", 20).forGetter(RecruitNumbers::atBlocks),
-                Codec.DOUBLE.optionalFieldOf("distance_power", 0.62).forGetter(RecruitNumbers::distancePower),
-                Codec.INT.optionalFieldOf("pieces_per_recruit", 16).forGetter(RecruitNumbers::piecesPerRecruit),
-                Codec.INT.optionalFieldOf("most_recruits", 8).forGetter(RecruitNumbers::mostRecruits),
-                Codec.INT.optionalFieldOf("half_life_ticks", 3600).forGetter(RecruitNumbers::halfLifeTicks),
-                Codec.STRING.listOf().optionalFieldOf("plants", List.of()).forGetter(RecruitNumbers::plants)
-        ).apply(i, RecruitNumbers::new));
-
-        /** The food a patch this far (blocks) from the nest's middle needs to be worth recruiting to (24 at 20, about 48 at 60, 64 at 96). */
-        public double needed(double distance) {
-            return richPieces * Math.pow(Math.max(1.0, distance / Math.max(1, atBlocks)), distancePower);
-        }
-
-        /** How many nestmates a find with this much food in its patch calls out (1 per {@code piecesPerRecruit}, 1 to {@code mostRecruits}). */
-        public int recruitsFor(int food) {
-            return Math.max(1, Math.min(mostRecruits, food / Math.max(1, piecesPerRecruit)));
-        }
-
-        /** Whether this food plant (its {@code block} as the profile names it) counts toward a rich patch. */
-        public boolean counts(PlantFood plant) {
-            return plants.isEmpty() || plants.contains(plant.block());
         }
     }
 
@@ -1002,23 +898,17 @@ public record SpeciesProfile(ColonyNumbers colony, WorkerNumbers worker, QueenNu
      * A founding batch: after the founders have sealed themselves in, the queen lays {@code eggs} eggs, one every
      * {@code eggIntervalTicks}, and the founders (the queen, and the king if the species has one) feed the young on
      * their own body fat (one piece every {@code feedIntervalTicks}), so the first workers need no food from outside.
-     * {@code siteSearchRadius}: a founding queen landed on uneven ground first walks up to this many blocks to the most
-     * level spot near her (real harvester ant queens look for flat open ground); 0, she founds where she lands (the
-     * termites' royal pair, whose mound fills in round the slope). {@code maxUnevenness}: how many blocks higher or
-     * lower than her spot the ground round it may be for it to count as level (both optional, default 0 and 1).
      */
-    public record Founding(int eggs, int eggIntervalTicks, int feedIntervalTicks, int siteSearchRadius, int maxUnevenness, int secondBatchEggs) {
+    public record Founding(int eggs, int eggIntervalTicks, int feedIntervalTicks, int secondBatchEggs) {
         public static final Codec<Founding> CODEC = RecordCodecBuilder.create(i -> i.group(
                 Codec.INT.fieldOf("eggs").forGetter(Founding::eggs),
                 Codec.INT.fieldOf("egg_interval_ticks").forGetter(Founding::eggIntervalTicks),
                 Codec.INT.fieldOf("feed_interval_ticks").forGetter(Founding::feedIntervalTicks),
-                Codec.INT.optionalFieldOf("site_search_radius", 0).forGetter(Founding::siteSearchRadius),
-                Codec.INT.optionalFieldOf("max_unevenness", 1).forGetter(Founding::maxUnevenness),
                 Codec.INT.optionalFieldOf("second_batch_eggs", 0).forGetter(Founding::secondBatchEggs)
         ).apply(i, Founding::new));
 
         public Founding(int eggs, int eggIntervalTicks, int feedIntervalTicks) {
-            this(eggs, eggIntervalTicks, feedIntervalTicks, 0, 1, 0);
+            this(eggs, eggIntervalTicks, feedIntervalTicks, 0);
         }
     }
 

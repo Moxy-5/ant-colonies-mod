@@ -91,11 +91,6 @@ public final class TestIsolation {
     private TestIsolation() {
     }
 
-    /** A species' own fence round each colony founded in a test's arena (its tests' sign-up), given that arena's box. */
-    public static synchronized void addFence(BiConsumer<Colony, AABB> fence) {
-        FENCES.add(fence);
-    }
-
     /**
      * Whether two spots lie in the arenas of two different running tests (always false outside the test server): a check
      * that keeps things apart in the world, such as new land's mounds, never counts another test's colony (BUGS 152).

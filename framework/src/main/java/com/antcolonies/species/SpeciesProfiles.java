@@ -17,7 +17,7 @@ import net.minecraft.util.profiling.ProfilerFiller;
 
 /**
  * Loads every species profile from {@code data/<namespace>/species/*.json} when the world starts and on {@code /reload}.
- * {@code data/desertcolonies/species/red_harvester_ant.json} becomes the species {@code desertcolonies:red_harvester_ant}.
+ * {@code data/antcolonies/species/macrotermes.json} becomes the species {@code antcolonies:macrotermes}.
  * Server side only (the client never needs the numbers).
  */
 public class SpeciesProfiles extends SimpleJsonResourceReloadListener {
@@ -50,16 +50,6 @@ public class SpeciesProfiles extends SimpleJsonResourceReloadListener {
             warned.clear();
         }
         ColonyFrameworkMod.LOGGER.info("Loaded {} species profiles: {}", loaded.size(), loaded.keySet());
-    }
-
-    /**
-     * A species mod's numbers built into its code (signed up at start), used when its file is missing or broken. The
-     * framework holds none of its own (the split's clean-up, 2026-10-23: it held the red harvester ant's).
-     */
-    public static void signUpBuiltIn(ResourceLocation species, SpeciesProfile numbers) {
-        synchronized (builtIn) {
-            builtIn.put(species, numbers);
-        }
     }
 
     /**

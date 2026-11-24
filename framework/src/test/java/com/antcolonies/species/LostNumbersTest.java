@@ -6,7 +6,7 @@ import org.junit.jupiter.api.Test;
 
 /** Brain step 4g, step 4: how likely nestmates find the body of a member lost out of sight (the user's idea). */
 class LostNumbersTest {
-    private final SpeciesProfile.LostNumbers lost = new SpeciesProfile.LostNumbers(0.1, 0.5, true, true, 6.0, 0.03);
+    private final SpeciesProfile.LostNumbers lost = new SpeciesProfile.LostNumbers(0.1, 0.5, true, 6.0, 0.03);
 
     @Test
     void aBodyNearTheNestIsAlwaysFound() {

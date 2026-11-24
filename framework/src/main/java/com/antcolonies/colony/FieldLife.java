@@ -160,9 +160,7 @@ public class FieldLife {
                 continue;
             }
             BlockPos at = pos.immutable();
-            // (searching alone the brain remembers every plant as its picture of the land: what is there, not what the
-            // colony knows; its numbers still only go for plants they find by searching, see forageAlone)
-            if (!colony.foodMap().knows(pos, null) && !colony.foodMap().searchesAlone()) {
+            if (!colony.foodMap().knows(pos, null)) {
                 if (picture) {
                     seen.add(at);
                     unknown.put(at, new Plant(numbers.plants().indexOf(plant), (float) walk(at, exits), false));
@@ -182,7 +180,7 @@ public class FieldLife {
 
     /** Whether the brain keeps a picture of the plants round the galleries that the colony does not know yet (termites underground, step 4). */
     private boolean keepsAPicture() {
-        return colony.foodMap().findsByLooking() && !colony.foodMap().searchesAlone() && colony.underground() != null;
+        return colony.foodMap().findsByLooking() && colony.underground() != null;
     }
 
     /**
@@ -349,14 +347,7 @@ public class FieldLife {
         returnedNow = 0;
         placedNow = 0;
         boolean changed = forageWith(level, foragers);
-        colony.news().tell(level, ColonyNews.NUMBERS_FORAGED, new ColonyNews.NumbersForaged(foragers, returnedNow, placedNow)); // (the door, Gordon's rule)
         return changed;
-    }
-
-    /** How many of the {@code foragers} may be out now: all of them, unless a part's rule holds some in (the harvester's door, Gordon's rule). */
-    public double foragersFree(ServerLevel level, int foragers) {
-        ColonyHooks.DoorRule door = colony.hooks().first(ColonyHooks.DOOR_RULE);
-        return door == null ? foragers : door.free(level, foragers);
     }
 
     /** Pieces the numbers brought home this second, and how many of them were at work on a plant (for the door). */
@@ -365,33 +356,21 @@ public class FieldLife {
 
     private boolean forageWith(ServerLevel level, int foragers) {
         out = 0;
-        boolean alone = colony.foodMap().searchesAlone();
-        if (alone) {
-            colony.news().tell(level, ColonyNews.FORAGER_NUMBERS, new ColonyNews.ForagerNumbers(foragers)); // (fewer forager numbers than spots held: some died or came out as real ones)
-        }
         ColonyHooks.Underground web0 = colony.underground();
         if (foragers <= 0 || known.isEmpty() && !(awayNow && web0 != null)) { // (away with nothing remembered: by the land, below)
             progress.clear();
             return false;
         }
         boolean outside = colony.isForagingTime(level);
-        if (!outside && (alone || !colony.keepsASchedule())) {
+        if (!outside && !colony.keepsASchedule()) {
             progress.clear();
-            return false; // (searching alone: nothing to eat from inside)
+            return false;
         }
         roomNow = colony.food().roomKnown();
         if (roomNow <= 0) {
             return false;
         }
         changedNow = false;
-        if (alone) {
-            // A species that searches alone (brain step 4c): its own way, plugged in by its part (the harvester's forager spots).
-            ColonyHooks.NumbersSearch search = colony.hooks().first(ColonyHooks.NUMBERS_SEARCH);
-            if (search != null) {
-                search.forage(level, this, foragers);
-            }
-            return changedNow;
-        }
         FoodStore food = colony.food();
         List<SpeciesProfile.PlantFood> kinds = colony.profile().food().plants();
         List<Map.Entry<BlockPos, Plant>> plants = new ArrayList<>();
@@ -414,7 +393,7 @@ public class FieldLife {
         }
         plants.sort(Comparator.comparingDouble((Map.Entry<BlockPos, Plant> entry) -> -worth.get(entry.getKey())));
         List<Vec3> eyes = colony.population().viewersInSight(level);
-        double free = foragersFree(level, foragers);
+        double free = foragers;
         int worked = 0;
         List<BlockPos> usedUp = new ArrayList<>();
         for (Map.Entry<BlockPos, Plant> entry : plants) {
@@ -483,12 +462,6 @@ public class FieldLife {
         return roomNow;
     }
 
-    /** {@code foragers} more of the numbers out this second, placed at work (for the door and the colony list): out searching, they come home with food, not empty. */
-    public void sendSearching(int foragers) {
-        placedNow += foragers;
-        out += foragers;
-    }
-
     /**
      * Up to {@code free} forager numbers work this plant this second (no more than may cut at it at once, less the real
      * foragers there; a plant a player can see is left to the real ones). Pieces they bring home are counted into the
@@ -536,7 +509,6 @@ public class FieldLife {
             food.countIn(false);
             colony.ledger().addStore(1);
             returnedNow++;
-            colony.news().tell(level, ColonyNews.NUMBERS_TRIP, new ColonyNews.NumbersTrip(pos)); // their trip out and back wears a trail too
             owed.put(pos, now);
             colony.away().note(level, AwayReport.What.FORAGED, 1);
             changedNow = true;

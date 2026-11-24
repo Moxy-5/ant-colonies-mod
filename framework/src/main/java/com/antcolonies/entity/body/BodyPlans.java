@@ -49,10 +49,6 @@ public final class BodyPlans {
             return spine.isEmpty() ? List.of() : spine.get(0).joints();
         }
 
-        /** The share of the first piece's bend each of its joints takes. */
-        public float[] waistShare() {
-            return spine.isEmpty() ? new float[0] : spine.get(0).shares();
-        }
     }
 
     /**
