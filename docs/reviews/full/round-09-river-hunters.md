@@ -440,3 +440,107 @@ the same way.
 - **Saved state** loses and doubles nothing; no entity is held by id.
 
 ---
+
+## Part 6: the bull shark (`BullSharkEntity`, `BullSharkGoals`, `BloodMist`) and the catfish's hunt (`HuntTilapiaGoal`)
+
+All four files were read whole by a helper reader; I walked each finding below through the code again. Line numbers
+are `BullSharkGoals.java`'s unless another file is named. **Three things the code is not, though the notes say so:**
+the shark does not react to blood (`BloodMist` is only a puff of particles, nothing reads it); `HuntTilapiaGoal` is
+the catfish's hunt alone (the shark and the crocodile use only its `scatter`); and the shark hunts fish only, its one
+other bite is a swimming player. So R9-5 (the player's animals) does not touch the shark.
+
+### R9-21 (B, proven; A if it has been seen in play): a shark's hunt hangs still for up to 45 seconds
+
+**What is wrong.** The shark picks only prey over deep water with a clear deep line to it, but once the hunt runs
+nothing asks that again. A fish that swims onto the shallow shelf is not "lost"; the shark's swimming stops at the
+shelf by its own rule (it never enters shallow water); and the hunt only ends when its 900-tick clock runs out.
+
+**What the player would see.** A shark lying dead still at the edge of the deep water, fin out, pointing at a fish in
+the shallows, for up to 45 seconds; then 10 seconds of patrol and maybe the same with the next fish. The shark's own
+rule (its class comment) is that it never stops swimming.
+
+**Where and proof.** `lost()` 274-277 asks only: dead, gone, out of the water, over 28 blocks, hidden in cover.
+`BullSharkEntity.java:835-837`: `if (shark.shallowAhead()) speed = 0`. `prowl` 280-301 and `close` 304-320 otherwise
+only count `left` down from 900 (243). Fish wander freely during a hunt (a hunting shark does not part them).
+
+**Fix proposed.** "Cannot reach" becomes part of `lost()`: the prey's column too shallow, or the swimming blocked for
+about 3 seconds, ends the hunt with the short wait. One rule in one place.
+
+### R9-22 (B, proven): only the three nearest fish are tried, so a school on the shelf hides every fish behind it
+
+`HuntGoal.canUse` 226-236 sorts all prey within 20 blocks by distance and checks only the nearest three for depth and
+a deep line. A school sits together: if the three nearest are in the shallows the shark hunts nothing, though fish it
+could take swim farther off; the same three are tried again every second. **The player would see** a hungry shark
+patrolling past fish all night. **Fix:** put the cheap depth test into the search's filter, then try the nearest
+three of those.
+
+### R9-23 (B, the search proven, the stuck shark likely; to measure): a shark with nowhere to go asks for a new target every tick and lies still
+
+**What is wrong.** `PatrolGoal.tick` 169-176: with no target it calls `deepPoint` twice (a hippo search 40 blocks
+wide and 16 tries, each a water-column scan and a deep-line scan), and if both fail the same again next tick, with no
+wait; with no target it is not told to swim at all. `KeepClearGoal.tick` 846 has the same shape. It happens to a
+shark in a deep hole too small for a run (the spawn rule looks at one column only, `BullSharkEntity.java:693`; an egg
+in a pond does the same) or hemmed in by hippos (`deepPoint` refuses every point within 20 blocks of one, 98-104, and
+the two share the near-inland river).
+
+**What the player would see.** A shark lying still in a hole for good. The cost is small by count (a few hundred
+block reads and two searches a tick for each stuck shark, two sharks at most); not measured.
+
+**To measure.** `BullSharkTests` with a shark in a 5 by 5 deep hole: tick time and whether it moves.
+**Fix proposed.** A wait (say 40 ticks) after a failed pick; a spawn rule that asks for two or three deep columns in
+a row.
+
+### R9-24 (B, proven; the user's call): a shark hit from the bank or from a boat does nothing
+
+`BullSharkEntity.hurt` 671-679 only remembers who hit it; the one reader (`MeetGoal.canUse` 531) needs that player to
+be swimming in deep water. A player with a bow on the bank or in a boat kills a 50-health shark while it patrols
+past: no flight, no dive, no change of pace. With R9-11 (the crocodile afloat) and R9-15 (the hippo past 16 blocks)
+this is one pattern: **all three big hunters can be killed from a distance with no answer.** Whether that matters is
+the user's call (fun first). **Fix if wanted:** hit by something it cannot reach, it swims away deep and fast a while
+(the call its swim-off already uses).
+
+### R9-25 (B, the call proven, the cost likely; the catfish's file, for round 10's fix session): the catfish plans a new route every tick once its route has run out short of its prey
+
+`HuntTilapiaGoal.java:126-129`: `if (ticks % 10 == 1 || fish.getNavigation().isDone())` then `moveTo`. While the
+route is finished and the prey is still more than 1.3 blocks from its mouth, a new route is planned every tick for up
+to the chase's 600 ticks. Cheap when the prey is right beside it; a full failed search every tick when the prey
+cannot be reached. The link not checked: how often a catfish sees prey it cannot reach (its pick needs a line of
+sight). This may be part of the old catfish hunting flakes (BUGS 217, 236, 279). **Fix:** plan on the 10-tick beat
+only.
+
+### R9-26 (C): small things in the shark
+
+- **A miss with the prey gone skips the wait** (`miss` 474: `lost() ? DONE : CLOSE`) and the next start resets the
+  three-miss count (244), so "three misses and it gives up half a minute" can be walked round. Rare.
+- **The catfish in its jaws is lost with nothing left** when the 54-tick thrash is cut short by a reload, by leaving
+  the water or by the shark's death: the fish was removed at the bite (413-417) and the remains and the meal come
+  only at the thrash's end (450-465). One catfish, a 2.7 second window.
+- **The spawn rule's 80-block shark search runs before the cheap zone test** (`BullSharkEntity.java:696-697`,
+  `SavannaEvents.java:120-123`); the group's cap is almost never reached, so the spawner keeps asking. Small.
+- **A name tag starting `film:`** takes over the animation (`BullSharkEntity.java:878-881`), as for the crocodile and
+  hippo (R9-20).
+- **Comments against code:** the spy hop "every 5 s" is every 10 (48; goals are asked every other tick); the class
+  comment says it keeps to the coast and near-inland rivers, but only its spawning is zoned, its patrol has no home;
+  `BloodMist` says "undead and golems give none" and leaves out every hostile mob; the entity list says 5 to 7
+  blocks, the code's longest is 7.5.
+- **Test hooks and a diary live in the game class** (`strikeLuck`, `breachNext`, `spyNext`, `mind`).
+- **Prey is removed, not killed** (415, 423; `HuntTilapiaGoal.java:215`; the crocodile's swallow too): no death
+  event, no drops, and whatever a fish's own death would do (a mouth-brooding tilapia letting out her fry, a
+  courting pair's mark: R9-1) does not run. For round 10 to weigh.
+- **No loot table:** the shark drops nothing but experience. A question, not a fault.
+
+### What is solid in the shark
+
+- **No reads into land that is not loaded:** the farthest read is about 28 blocks from the shark. Keep any new reach
+  under 32.
+- **Mind and legs are cleanly apart:** goals only say "swim there"; one rule for shallow water, asked in one place.
+- **`free()` is the one gate** every goal passes before it starts, so no goal breaks in on another's bite, bump,
+  breach or spy hop; no pair of goals flips tick by tick.
+- **Counts:** its own spawning group with a cap of 2, 80 blocks apart, removed past 96 to 128 blocks; one meal per 16
+  to 24 minutes, at night only: it cannot pile up and cannot fish a river out.
+- **Players:** creative and spectator players are never met or bitten; more than one player is handled; a player who
+  leaves the deep water is let go in every phase. In Peaceful the bite does no harm (the bump still shoves: R9-6).
+- **Nothing is synced or logged every tick; no action or phase is saved, so a reload leaves no stuck state.**
+- **`BloodMist`** has no state at all; **the catfish's give-up** rests 10 to 60 seconds and cannot pick again at once.
+
+---
