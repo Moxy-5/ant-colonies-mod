@@ -129,3 +129,190 @@ their search can never find anything, yet it still runs 10 times a second for ev
 - **`AnimalLives`:** a broken life file is logged and the default used, never a crash; reloaded with each world.
 
 ---
+
+## Part 2: the crocodile (`CrocodileEntity`, `CrocodileBreeding`, `CrocFlySnapGoal`, `RiverCover`)
+
+All four files were read whole. Line numbers are `CrocodileEntity.java`'s unless another file is named.
+
+### R9-5 (A, proven): the crocodile hunts the player's own animals: tamed horses, donkeys, llamas, name-tagged and leashed stock
+
+**What is wrong.** The hunt is meant to leave pets alone ("no tame pets"), but the rule only knows wolves, cats and
+parrots (Minecraft's `TamableAnimal`). A tamed horse, donkey, mule, llama or camel is a different kind of class and
+counts as wild. So do farm animals with a name tag or on a lead (fish with a name are spared, other animals are not).
+Small ones (a named chicken or rabbit, a calf) are "swallowed whole": deleted with no drops.
+
+**What the player would see.** Park a tamed, saddled horse within 4 blocks of the river and get off: a hungry
+crocodile comes out, hauls it into the water and death-rolls it. A pen of named cows by the water is emptied over
+time (one big kill feeds a crocodile for a day).
+
+**Where.** `isPrey`, lines 2435-2469 (the pet test is line 2465); `isSmall` 2510-2512; the swallow, 1973-1980.
+
+**The proof.** Line 2465: `!(e instanceof Animal) || e instanceof TamableAnimal pet && pet.isTame()` is the only pet
+test. In Minecraft 1.21.1 `AbstractHorse extends Animal implements ... OwnableEntity` (read in the patched sources): it
+is not a `TamableAnimal`, so a tamed horse passes. Line 2436 spares only an animal being ridden or riding. Nothing
+asks `hasCustomName()` or `isLeashed()` except for fish (2521) and frogs and tadpoles (2445, 2453).
+
+**Fix proposed.** One "the player's own" test used for every prey: owned (`OwnableEntity` with an owner), named,
+leashed, or saddled. Test: a tamed horse and a named cow at the water's edge beside a hungry crocodile are left alone.
+(The bull shark shares `isFish` and has its own prey rule: see part 6.)
+
+### R9-6 (A, proven; the user's call): in Peaceful the crocodile still seizes the player and holds them through twelve rolls
+
+**What is wrong.** No river animal asks the world's difficulty. In Peaceful, Minecraft turns a mob's bite into no
+damage at all, but the crocodile's grab is not damage: it seats the player in its jaws, the game is told the player
+cannot step off, and it rolls twelve times before letting go.
+
+**What the player would see.** Playing in Peaceful, a player at the water's edge is grabbed, dragged out and rolled
+for about 42 seconds, taking no damage, unable to get off except by hitting the crocodile for 4 hearts; half a minute
+later it may do it again. A nest mother's bite knocks the player back with no damage.
+
+**Where.** `isPrey` 2459-2462 (only creative and spectator are spared); `HuntGoal.grab` 2279-2295; `roll` 2333-2345
+(12 rolls of 70 ticks); `SavannaEvents.onMount` (`SavannaEvents.java:197-203`, no stepping off).
+
+**The proof.** `Player.hurt` (patched sources, line 903-919) scales a mob's attack by difficulty and answers "not
+hurt" when the result is 0. `grab()` does not look at that answer: line 2286 only asks whether the prey is still
+alive, then seats it (2291). The dismount is cancelled for as long as the crocodile holds it. Rolls deal 0, the player
+never dies, so only the 12-roll limit (2341) ends it: 12 x (40 + 30) ticks = 42 s.
+
+**Fix proposed, for the user to pick.** My recommendation: in Peaceful the crocodile does not hunt players and a
+mother only hisses (animals and fish are hunted as always). The same question goes for the hippo's and the bull
+shark's bites (parts 4 and 6).
+
+### R9-7 (B, likely): a crocodile whose basking spot lies beside a hippo swims to it and turns away, again and again
+
+**What is wrong.** Two rules judge the same water's edge and do not know of each other. The crocodile picks where to
+bask (a remembered sand bank, a row of basking crocodiles, the nearest bank, the half-out edge) without looking for
+hippos; and it keeps 7 blocks clear of any hippo. The sand spot is remembered and "kept going back to", so with a
+hippo resting within 7 blocks of it the crocodile sets off for the sand, is turned away 12 blocks, waits about 10
+seconds, and sets off for the same spot again, for as long as the hippo lies there and the sun is up.
+
+**What the player would see.** By a pod's pool, a crocodile shuttling toward the sand bank and away from it every 15
+to 20 seconds all day instead of basking or settling somewhere else. If it does get to lie down first, each time it
+is moved on it has a 1 in 4 chance of leaving droppings.
+
+**Where.** `AshoreGoal.canUse` 1773-1792; `findSandBank` 1209-1247 (line 1213 keeps the old spot); `taken` 1179-1201
+(crocodiles only); `KeepClearGoal` 1417-1503 (`NEAR` 7, `AWAY` 12, `CLEAR` 10; priority -1 at line 338);
+`BaskGoal.stop` 1339-1353.
+
+**The proof.** Walked: `AshoreGoal` (priority 3) runs only in the water with the sun wanted; it paths to `sandAt`.
+`KeepClearGoal` (priority -1, the same MOVE flag) starts when a hippo is within 7 blocks times its size and ends past
+10; it stops `AshoreGoal` without touching `sunIn` or `sandAt`. Back in the water `AshoreGoal.canUse` is true again
+after its wait of 100 asks (200 ticks) and `findSandBank` line 1213 answers the same spot, since `taken` knows no
+hippos. The link not checked in play: how often a pod rests within 7 blocks of river sand (the hippo's bank rest and
+pool are by the same banks, so it should be common).
+
+**Fix proposed.** One shared "may I lie here" test for all four spot pickers that also refuses a spot within the
+keep-clear reach of a hippo (and forgets `sandAt` when a hippo turned it away). No new timer.
+
+### R9-8 (B, to measure): every crocodile route may search four times as far as a zombie's, and failing routes are asked again and again
+
+**What is wrong.** To reach far sand banks the crocodile's "follow range" was set to 64 blocks. Minecraft uses that
+one number as the size of every route search the animal makes: up to 1,024 squares looked at for each search (a
+zombie: 560), over a copy of the land 72 blocks round it. A search to somewhere reachable ends early; one to
+somewhere it cannot get to runs to the limit. Several goals ask again every few ticks:
+
+- the charge up the bank asks a new route to the prey every 5 ticks for up to 4 seconds (2030-2031);
+- the stalk asks every 10 ticks for up to 30 seconds (2014-2016, 2152-2153), and a stalk that timed out picks the
+  same prey again after 10 seconds (`giveUp(200)`, 1996): the lesson of BUGS 230 (the monitor) is not applied here;
+- the walk to a nest spot asks every 20 ticks for up to a minute (`CrocodileBreeding.java:512-516`).
+
+BUGS 243 (open) says no crocodile can climb a bank a full block over the water, so "prey or a nest spot it cannot
+reach" is a known, real case: a cow on a two-block bank is charged at with 16 full-length searches in 4 seconds.
+
+**What the player would see.** Short stutters when a crocodile goes for something up a bank it cannot climb. Not
+measured.
+
+**Where.** `createAttributes` 317-321 (`FOLLOW_RANGE` 64); Minecraft's `PathNavigation` (patched sources line 59:
+`FOLLOW_RANGE * 16` squares) and `PathFinder` line 67.
+
+**To measure.** A scene with a hungry crocodile in a pool and a cow on a bank two blocks over the water; the
+profiler's `pathfind` section and the tick time during the charge.
+
+**Fix proposed.** Keep the follow range at a normal 24 to 32 and reach far sand in two or three legs; let a hunt
+remember the prey it failed to reach for a minute (as the monitor and catfish do); ask the charge's route every 10
+ticks.
+
+### R9-9 (B, to measure): two wide searches of the land done in a single tick
+
+**What is wrong.**
+- **The nest spot** (`CrocodileBreeding.nestSite`, lines 544-583): every column within 40 blocks (about 5,000), up
+  to 5 heights each, and for each open bank cell a check for water within 3 blocks that reads up to 98 blocks when
+  there is none. With no river sand in reach it never stops early (the cut-off at line 556 needs both a sand and a
+  bank spot found). My sum: 100,000 to 250,000 block reads in one tick, maybe 5 to 15 ms. It runs once when a female
+  starts to nest, again after each spot that failed, and **every 30 seconds for as long as she finds no spot at
+  all** (`waitSite = 600`, line 344); her eggs never time out, so that can go on for good.
+- **The sand bank** (`findSandBank`, 1209-1247): every other column within 64 blocks (about 3,300), 4 heights each,
+  at most once a minute for each crocodile that wants the sun and has no company: about 13,000 block reads, maybe
+  1 to 2 ms.
+
+Both guard far land with `level.isLoaded`, which is right, but it also says yes for a chunk still being made while
+a player travels, and the read then waits for it.
+
+**What the player would see.** A hitch now and then near rivers, worst where a ripe female has nowhere to nest.
+
+**To measure.** A game test or perf scene that calls each search on a wide river with no sand, timed.
+
+**Fix proposed.** Search outward in rings and stop at the first ring with an answer; check "water within 3" only for
+cells that already passed the cheap tests and whose column is near water; spread a wide search over several ticks.
+After a few failed tries let the eggs be lost (she goes back to her life).
+
+### R9-10 (B, the read proven, the stall likely): a mother taken from her nest reads the nest's land wherever it is
+
+**What is wrong.** A mother asks her nest's block once a second (`MotherGoal.pick`, `CrocodileBreeding.java:273`) and
+when she thinks of basking (`motherWork`, 444) with no check that the nest's land is loaded. At home she is always
+near it. But Minecraft lets a player put a lead on a crocodile (it is not a monster) and scoop one into a boat (its
+box is under a boat's width). Led or boated more than about 32 blocks from her nest, each read loads the nest's
+chunk on the spot, once a second, and her guard goal plans a full-length route home every second
+(`GuardPlaceGoal.java:62-63`). The hippo's pool has the same hole (R9-17).
+
+**What the player would see.** Lag while a mother crocodile is led or boated away from her nest. A rare thing to do.
+
+**Fix proposed.** Ask `level.isLoaded(nestAt)` first and treat a nest out of loaded land as "no work now"; give up
+guarding from beyond some distance. Bigger question for the user, noted in the report: whether crocodiles and hippos
+should take a lead at all.
+
+### R9-11 (C, proven): a crocodile hit while afloat does not react, and a nest mother shot from afar stands still
+
+- `hurt`, line 935: only a crocodile on land or basking is startled by a hit. The comment on `startle` (942-945) says
+  a startled one in the water "sinks out of sight a few seconds", but a hit in the water never startles it: a
+  crocodile floating at rest can be killed with a sword and never dives, flees or bites.
+- `hurt`, 916-919, with `ChaseOffGoal.seen` (`CrocodileBreeding.java:626-634`): a mother hit at her nest takes her
+  attacker as target and returns before the startle, but she only goes for a target within 9 blocks of the nest. Shot
+  from 10 blocks she neither flees nor answers. (The hippo has the same gap at 16 blocks, R9-15.)
+
+**Fix proposed.** A hit in the water startles it too (it sinks, the comment's own rule); for the mother it is a
+design pick, noted only.
+
+### R9-12 (C, proven): small things in the crocodile
+
+- **Not saved:** `hatchSite` and `waitForMother` (save 1044-1069). Reload in the middle of a hatching and the young no
+  longer wait in the nest: they run for the water alone; the mother still picks up those within 8 blocks of her.
+- **A startled crocodile on land with no water within 12 blocks** searches all 5,600 cells round it every time its
+  plunge is asked, for the 5 seconds the fright lasts, and does nothing (`PlungeGoal.canUse` 1547-1553, `waterAim`).
+- **`openWater`** (2477-2507) checks up to 121 cells round every water cell within 12 blocks, in no order, once for
+  each big grab: a one-off cost, maybe a few ms. To measure with R9-9.
+- **A player who logs out while held** counts as eaten: the crocodile is fed for a day (`roll` 2310-2316).
+- **The fly-snap goal sits at priority 0, above the hunt (1)**, though its comment (343) says "never over a hunt". It
+  works only because its own `canUse` refuses while hunting (`CrocFlySnapGoal.java:46`): the priority and the comment
+  disagree.
+- **Droppings on every ended bask, also one cut short by a fright** (`BaskGoal.stop` 1342). They crumble by
+  themselves (`CrocDroppingsBlock` ages on random ticks), so they cannot pile up.
+- **The class comment (62-73) is from the first step** ("for now it harms nothing", "about 5 blocks long").
+
+### What is solid in the crocodile
+
+- **The goals' searches are paced:** the hunt looks once a second, keep-clear twice a second, basking company and
+  the half-out edge every 10 seconds, the mother's work once a second; `canUse` asks its cheap questions first.
+- **The hunt cannot be cut off with prey in the jaws** (`isInterruptable`, 1917): no half-eaten states; whatever ends
+  it runs `stop`, which lets go.
+- **What is held is never lost or doubled on a reload:** prey is a rider, saved with it, and let go on load
+  (858-860); carried young are saved with the mother and let out if she dies (BUGS 264 holds).
+- **Crèche and care times use the game time** and are saved; the old fixes (BUGS 218, 267, 273, 283) are all in place.
+- **Counts:** crocodiles count in their spawning group whatever they are doing, so mothers kept near cannot fill the
+  world; hatchings are capped by the room left. One fish feeds a crocodile 5 minutes, a big kill a day: it cannot
+  fish a river out.
+- **No leftovers between worlds:** the only static state is the list of sand blocks and clip names.
+- **Two things steering:** the float rule in `tick` (870-875) and the hunt's dive both set the up-and-down speed, but
+  the dive is set last before each move and wins; walked through, no fight.
+
+---
