@@ -2,7 +2,8 @@
 
 1. **Take the red harvester ant out of the mod.** Plan: `docs/plans/harvester-removal.md`.
 2. **Rewrite the Matabele raids from scratch.** Plan: `docs/plans/raid-rewrite.md`.
-3. **Review the whole mod's code, system by system.** Plan: `docs/plans/code-review.md`.
+3. **Review the whole mod's code, system by system.** Only the code that plays in the mod (the user, 2026-11-23): not
+   the model and animation making, the tools, the filming code or the tests. Plan: `docs/plans/code-review.md`.
 
 ## The order, and why (my recommendation)
 
@@ -10,7 +11,7 @@
 |---|---|---|
 | **First** | The harvester removal, alone on the framework. Beside it: the raid rewrite's steps 1 and 2 (find the causes, write the tests) and the review's reading rounds for trees, world and animals. | The removal is the shortest job and takes 13,100 lines and 66 tests away, so both other jobs then work on less. The things beside it touch none of its files. |
 | **Second** | The raid rewrite's steps 3 to 6. The review reads the framework, the termites and the Matabele (not the raids), and its fix sessions follow. | The framework is clean of harvester leftovers by now. The review skips the old raid code: reviewing code about to be deleted is wasted. |
-| **Last** | The review reads the new raid code before it merges, then the tests, then the tools. The closing full run, soak and speed numbers. | A fresh pair of eyes on the rewrite; the tests are read last because every fix before changes them. |
+| **Last** | The review reads the new raid code before it merges. The closing full run, soak and speed numbers. | A fresh pair of eyes on the rewrite. |
 
 ## Rules across all three
 

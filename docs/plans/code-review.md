@@ -4,6 +4,12 @@
 feature at a time, by many sessions; nobody has read all of it in one go. This is job 3 of the three big jobs
 (`docs/plans/big-three.md`).
 
+**What is read (the user, 2026-11-23): only the code that plays in the mod.** That is the Java that runs while someone
+plays: the colonies, the insects, the trees, the world, the animals. **Not read:** the model and animation making
+(`tools/`, the Animal Maker Engine, the workshop, the viewers, the model, texture and clip files), the filming code
+(the film director, the guard films), and the tests and test kit as a subject of their own. Tests are still looked at
+from the game's side: each round asks whether what the player sees is guarded by a test (question 7).
+
 **What it is for (the user's aims, `apex-aims`):** fewer bugs in play, no lag, and code that is quick to build the next
 feature on. Smaller code is never the goal by itself.
 
@@ -14,9 +20,9 @@ feature on. Smaller code is never the goal by itself.
 | Colony Framework (`framework\`) | 229 | 52,400 |
 | Savanna mod (`savanna\`) | 362 | 112,200 (27,400 of them game tests) |
 | Desert mod (`desert\`) | 53 | 13,100 (gone before the review reads the framework) |
-| Tools (`tools\`, Python) | 154 | 47,100 |
 
-422 game tests, 46 unit test classes. The biggest single files: `RiverLifeTests` 4,657, `AbstractAntEntity` 3,409,
+About 130,000 lines play in the mod once the harvester is gone and the game tests and test bench are set aside. The biggest files:
+`AbstractAntEntity` 3,409,
 `OtterEntity` 2,939, `CrocodileEntity` 2,699, `AntNavigator` 2,579, `RaidColumn` 2,326 (being rewritten).
 
 ## The rounds (one system each)
@@ -29,16 +35,14 @@ of Java.
 | 1 | The colony brain: parts, food, brood, away life, neighbours, species files, the season source | `framework: colony/, species/, season/` | 17,200 |
 | 2 | Legs: the navigator, the path finder, the crowd, doorways | `framework: nav/` and the walking half of `AbstractAntEntity` | 6,000 |
 | 3 | The insect body: `AbstractAntEntity`, the shared goals, fights | `framework: entity/, entity/goal/, fight/` | 11,500 |
-| 4 | Bodies and drawing: body plans, block moves, renderers, the film director | `framework: entity/body/, client/, coat/`; `savanna: client/` | 12,400 |
+| 4 | How bodies move and are drawn in play: the game's body code and the renderers, only for what a player can meet (a wrong pose, a part in a block, lag from drawing); not the engine's design, the clips or the filming code | `framework: entity/body/, client/, coat/`; `savanna: client/` | about 11,000 |
 | 5 | Termites: mound, galleries, fungus, feeding, alarm, soldiers, new-land mounds | `savanna: colony/` (not raids), `block/`, termite entities and goals | about 24,000 |
 | 6 | Matabele, all but the raids: nests, prey pile, rescue, wound care, defence | `savanna: colony/`, `entity/`, `entity/goal/` | about 5,000 |
 | 7 | Giant trees | `savanna: tree/` | 7,600 |
 | 8 | World: big savannas, rivers, sand banks, mud, spawning groups | `savanna: worldgen/, registry/` | 9,400 |
 | 9 | River hunters: crocodile, otter, hippo, monitor, bull shark | `savanna: animal/`; `framework: animal/` | about 13,000 |
 | 10 | River small life and the life cycle: fish, frogs, crab, snail, flies, eggs, breeding, remains | `savanna: animal/` | about 11,000 |
-| 11 | The tests themselves and the test kit: flakes, slow tests, doubled scenes, checks that cannot fail | game tests, `framework: gametest/, watch/, debug/, command/` | about 33,000 |
-| 12 | **The new raid code**, read last, after the rewrite (job 2) is done | `savanna: colony/Raid*`, the raid goals | new |
-| 13 | Tools, findings only (Neon's lane): the test and soak scripts, the engine's checkers | `tools/` | 47,100 |
+| 11 | **The new raid code**, read last, after the rewrite (job 2) is done | `savanna: colony/Raid*`, the raid goals | new |
 
 Rounds 5 and 9 are big enough to split in two sessions each if a session runs short.
 
@@ -98,9 +102,7 @@ Rounds 5 and 9 are big enough to split in two sessions each if a session runs sh
 2. **After the harvester removal merges:** the framework rounds, 1 to 4, then 5 and 6. (Reading them earlier would
    mean reading harvester leftovers that are about to go.)
 3. **Fix sessions** follow each round's findings, framework first.
-4. **Round 11 (tests)** after the fixes of rounds 1 to 6, since they add and change tests.
-5. **Round 12 (the new raid code)** when the rewrite's step 5 is done, before it merges: a fresh pair of eyes on it.
-6. **Round 13 (tools)** last, findings handed to Neon through `docs/HANDOFF.md`.
+4. **Round 11 (the new raid code)** when the rewrite's step 5 is done, before it merges: a fresh pair of eyes on it.
 
 ## What the user gets
 
@@ -118,6 +120,9 @@ baseline numbers are no worse, and `SUMMARY.md` says in one page where the code 
 
 - Findings first, fixes after, never both in one session: a reader that may also fix stops reading at the first bug.
 - The harvester and the old raid code are not reviewed at all (both are going).
-- Tools are reviewed last and only as findings, since they are Neon's lane and do not ship in the mod.
+- Round 4 keeps the game's own body and drawing code, because a fault there shows in play; it is read only for what
+  the player can meet. Say the word and round 4 goes too.
+- The `/antcolonies` command and the test bench (`framework: command/, watch/, debug/, gametest/`) are not read:
+  they are for testing, not for play.
 - 20 worktrees and 129 branches have piled up on this PC; tidying the merged ones is offered at the end, done only at
   the user's word.
