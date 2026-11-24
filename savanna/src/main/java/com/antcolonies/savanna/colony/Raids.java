@@ -164,11 +164,24 @@ public class Raids {
     /** The last raid home (tests and the colony list), or null. */
     @Nullable
     private Raid last;
-    /** A find a scout brought home between the raid hours: the raid sets out to it when they come, the colony hungry. */
+    /**
+     * The find a scout last brought home, until it gets its raid or is only remembered: every second the one rule of
+     * when a raid may leave is asked for it ({@link #whyNoRaidNow}).
+     */
     @Nullable
     private Find waiting;
-    /** R7: the waiting find was brought home by the scout command's scout (it waits for the raid hours, hungry or not). */
-    private boolean waitingCommanded;
+    /** Whose raid the waiting find's would be. */
+    private By waitingBy = By.COLONY;
+    /** The diary: why the waiting find last could not get its raid (said once, not every second), or null. */
+    @Nullable
+    private String waitingWhy;
+
+    /**
+     * Whose raid it is: the colony's own (in the raid hours, hungry, the day's raids not all made), the scout command's
+     * scout's (R7: it keeps the raid hours, whatever the hunger or the day's count), or the command's "anytime" scout's
+     * (whatever the hour too).
+     */
+    private enum By { COLONY, COMMAND, COMMAND_ANY_HOUR }
     /** R7: ants the scout command sent with "anytime": their find raids at once, whatever the hour (not saved). */
     private final Set<UUID> sentAnyHour = new HashSet<>();
     /**
@@ -240,7 +253,7 @@ public class Raids {
         long now = level.getGameTime();
         finds.removeIf(find -> now - find.checkedAt > numbers.spotFadeTicks());
         if (waiting != null && !finds.contains(waiting)) {
-            waiting = null;
+            waitNoMore();
         }
         if (column != null) {
             if (column.stage() != Raid.Stage.DONE) {
@@ -419,9 +432,14 @@ public class Raids {
     /** A raid set out to this find: it no longer waits for the raid hours. */
     void forgetWaiting(Find find) {
         if (waiting == find) {
-            waiting = null;
-            waitingCommanded = false;
+            waitNoMore();
         }
+    }
+
+    private void waitNoMore() {
+        waiting = null;
+        waitingBy = By.COLONY;
+        waitingWhy = null;
     }
 
     /** A raid walked the scent trail to this spot: it is fresh again (if one is still smelt). */
@@ -560,21 +578,7 @@ public class Raids {
         veteranMissingSince.keySet().retainAll(veterans);
         headings.keySet().retainAll(veterans);
         reaches.keySet().retainAll(veterans);
-        if (waiting != null && !finds.contains(waiting)) {
-            waiting = null; // (forgotten meanwhile)
-        }
-        if (waiting != null && column == null && isRaidTime(level)) {
-            if (!isHungry() && !waitingCommanded) {
-                waiting = null; // (fed by now: the spot stays remembered for the next hungry spell)
-            } else if (!waitingCommanded && !dayHasRoom(level)) {
-                // (M8 step 3e: the day's raids are made; the find waits for tomorrow's raid hours)
-            } else if (startRaid(level, waiting, !waitingCommanded, null) != null) {
-                say(level, "the raid hours: the waiting find at " + column.find().at().toShortString() + " gets its raid"
-                        + (waitingCommanded ? " (brought home by the scout command's scout)" : ""));
-                waiting = null;
-                waitingCommanded = false;
-            }
-        }
+        raidTheWaitingFind(level, null);
         SavannaNumbers.CarryNumbers carry = carryNumbers();
         int limpTicks = carry == null ? SavannaNumbers.CarryNumbers.DEFAULT.limpTicks() : carry.limpTicks();
         wayHome.forgetIf(id -> now - wayHome.since(id) > limpTicks || goneFor(level, id, now));
@@ -737,12 +741,6 @@ public class Raids {
         say(level, "the raiders going as numbers bring " + hidden + " termite(s) home" + (pile == null ? "" : pile.describe(level)));
     }
 
-    /** The last raid home, or null (tests and the colony list). */
-    @Nullable
-    public Raid lastRaid() {
-        return last;
-    }
-
     /** The raid test bench (the raid-lists rule): how many finds are remembered, and how many ants go home by themselves. */
     public int findsCount() {
         return finds.size();
@@ -760,11 +758,6 @@ public class Raids {
     /** Whether this ant goes home along a trail by itself (step 3c's limpers and every ant let go out in the field). */
     public boolean isGoingHome(UUID ant) {
         return wayHome.isGoingHome(ant);
-    }
-
-    /** Step 3c's name for {@link #isGoingHome}. */
-    public boolean isLimping(UUID ant) {
-        return isGoingHome(ant);
     }
 
     /** Why this ant was sent home by itself (the diary and the tests), or null. */
@@ -790,11 +783,6 @@ public class Raids {
         wayHome.leaveTrail(ant.getUUID());
         say(level, RaidGround.shortId(ant.getUUID()) + " leaves its trail home (no way along it) and makes straight for the entrance");
         return true;
-    }
-
-    /** Tests: this ant limps home along this column's trail. */
-    public void limpForTests(MatabeleEntity ant, Raid raid, long now) {
-        wayHome.send(ant.getUUID(), raid.back(), now, "hurt (test)");
     }
 
     /** A carrier (or any ant) far out with no way to where it was going goes home along a trail by itself. */
@@ -915,7 +903,7 @@ public class Raids {
     /** Tests: every remembered find forgotten (a scene that wants the colony's scouts out, not a raid). */
     public void forgetFindsForTests() {
         finds.clear();
-        waiting = null;
+        waitNoMore();
     }
 
     /** M8 step 3e: raids set out today, near or away. */
@@ -935,7 +923,7 @@ public class Raids {
         return numbers != null && numbers.isRaidHour(colony.timeOfDay(level)) && !colony.rainsNow(level);
     }
 
-    /** The find a scout brought home outside the raid hours, waiting for them; null if none. */
+    /** The find waiting for its raid (the last a scout brought home); null if none. */
     @Nullable
     public Find waiting() {
         return waiting;
@@ -1091,11 +1079,6 @@ public class Raids {
         }
         scouts.remove(id);
         sent.remove(id);
-    }
-
-    /** Whether the scout command sent this ant out (it keeps no hours). */
-    public boolean wasSent(UUID ant) {
-        return sent.contains(ant);
     }
 
     /** Whether this ant is out scouting now. */
@@ -1425,49 +1408,95 @@ public class Raids {
         if (trails.liveTo(at, trailReach(), trailNumbers(), now) == null) {
             trails.lay(level, colony.getCenter(), at, trail, now, false);
         }
-        // Step 3b: home with a find, the scout recruits a raid there: in the raid hours, dry, the colony hungry (or the
-        // scout command's scout, whatever the hour), and no raid out already. Found between the raid hours (scouts search
-        // all day), the find waits for them (tick), the colony hungry then.
-        boolean commanded = scout != null && sent.contains(scout);
+        // Step 3b: home with a find, the scout recruits a raid there as soon as one may leave (the one rule, asked now
+        // and then every second while the find waits).
+        waiting = known != null ? known : finds.get(finds.size() - 1);
         // R7: the scout command keeps the raid hours (a find it brings home after 19:00 waits for the morning, hungry or
         // not) unless sent with "anytime" (its find raids at once, whatever the hour)
-        boolean anyHour = scout != null && sentAnyHour.contains(scout);
-        Find made = known != null ? known : finds.get(finds.size() - 1);
-        boolean dayFull = !commanded && !anyHour && !dayHasRoom(level); // (M8 step 3e: commands do not count the day)
-        if (column == null && !colony.rainsNow(level) && (anyHour || isRaidTime(level) && (commanded || isHungry() && !dayFull))) {
-            say(level, "a scout (" + (scout == null ? "?" : RaidGround.shortId(scout)) + ") is home from " + at.toShortString()
-                    + ", worth " + worth + (anyHour ? ", sent by the command at any hour" : commanded ? ", sent by the command" : "") + ": a raid sets out");
-            Raid started = startRaid(level, made, !commanded && !anyHour, scout);
-            if (started == null) {
-                if (unloadedFind) {
-                    say(level, "no raid: " + whyNoRaid + "; the find waits");
-                    waiting = made;
-                    waitingCommanded = commanded;
-                } else if (finds.contains(made)) {
-                    say(level, "nobody fit to raid: the find is only remembered");
-                }
-            } else {
-                if (anyHour && !isRaidTime(level)) {
+        waitingBy = scout != null && sentAnyHour.contains(scout) ? By.COMMAND_ANY_HOUR
+                : scout != null && sent.contains(scout) ? By.COMMAND : By.COLONY;
+        waitingWhy = null;
+        say(level, "a scout (" + (scout == null ? "?" : RaidGround.shortId(scout)) + ") is home from " + at.toShortString() + ", worth " + worth
+                + (waitingBy == By.COMMAND_ANY_HOUR ? ", sent by the command at any hour" : waitingBy == By.COMMAND ? ", sent by the command" : ""));
+        raidTheWaitingFind(level, scout);
+    }
+
+    /** Not hungry: the one reason that ends a find's wait (the spot stays remembered for the next hungry spell). */
+    private static final String FED = "the colony is not hungry";
+
+    /**
+     * The one rule of when a raid may leave now, null if it may, else why not (the raid rewrite, part c: a scout coming
+     * home and a waiting find were judged in two places, by rules that had drifted apart: a find brought home in the
+     * rain waited outside the raid hours and was only remembered inside them). One raid at a time, never in the rain
+     * (it washes the scent trail out; real raids are not seen in rain, Yusuf 2026), in the raid hours; the colony's own
+     * raid only while it is hungry and has not made its day's raids (M8 step 3e; commands do not count the day, BUGS 172).
+     */
+    @Nullable
+    private String whyNoRaidNow(ServerLevel level, By by) {
+        if (column != null) {
+            return "one is out already";
+        }
+        if (colony.rainsNow(level)) {
+            return "it rains";
+        }
+        if (by != By.COMMAND_ANY_HOUR && !isRaidTime(level)) {
+            return "outside the raid hours (" + RaidGround.clock(colony, level) + ")";
+        }
+        if (by != By.COLONY) {
+            return null;
+        }
+        if (!isHungry()) {
+            return FED;
+        }
+        return dayHasRoom(level) ? null
+                : "the colony has made its " + raidsToday(level) + " raid(s) today (it wants " + raidsWanted() + " this hungry)";
+    }
+
+    /** {@link #whyNoRaidNow} for the colony's own raid, asked for the raids out of sight too ({@link RaidsAway}). */
+    @Nullable
+    String whyNoOwnRaidNow(ServerLevel level) {
+        return whyNoRaidNow(level, By.COLONY);
+    }
+
+    /**
+     * The waiting find gets its raid if one may leave now ({@link #whyNoRaidNow}); it waits on while the reason passes
+     * by itself (a raid out, rain, the hours, the day's count, its land not loaded) and is only remembered once the
+     * colony is fed or no raid could be made up (nobody fit, no termite there now, nobody who knows the way: a later
+     * scout finds it again). {@code homeFrom}: the scout just home with it, or null.
+     */
+    private void raidTheWaitingFind(ServerLevel level, @Nullable UUID homeFrom) {
+        if (waiting == null) {
+            return;
+        }
+        Find find = waiting;
+        if (!finds.contains(find)) {
+            waitNoMore(); // (forgotten meanwhile)
+            return;
+        }
+        String why = whyNoRaidNow(level, waitingBy);
+        if (why == null) {
+            By by = waitingBy;
+            Raid started = startRaid(level, find, by == By.COLONY, homeFrom);
+            if (started != null) {
+                if (by == By.COMMAND_ANY_HOUR && !isRaidTime(level)) {
                     started.keepNoHours();
                 }
-                if (waiting == made) {
-                    waiting = null;
-                    waitingCommanded = false;
-                }
+                waitNoMore();
+                return;
             }
-        } else if (column == null && (commanded || isHungry()) && !isRaidTime(level)) {
-            say(level, "a scout is home from " + at.toShortString() + ", worth " + worth + ", outside the raid hours ("
-                    + RaidGround.clock(colony, level) + "): it waits for them" + (commanded ? " (sent by the command, which keeps the hours)" : ""));
-            waiting = made;
-            waitingCommanded = commanded;
-        } else if (column == null && isHungry() && dayFull && !colony.rainsNow(level)) {
-            say(level, "a scout is home from " + at.toShortString() + ", worth " + worth + ": the colony has made its "
-                    + raidsToday(level) + " raid(s) today (it wants " + raidsWanted() + " this hungry); the find waits for tomorrow");
-            waiting = made;
-            waitingCommanded = false;
-        } else {
-            say(level, "a scout is home from " + at.toShortString() + ", worth " + worth + ", no raid: " + (column != null ? "one is out already"
-                    : colony.rainsNow(level) ? "it rains" : "the colony is not hungry"));
+            if (!unloadedFind) {
+                waitNoMore(); // (the raid's start said why: the find is only remembered, or forgotten)
+                return;
+            }
+            why = whyNoRaid; // (its land not loaded, a raid still out of sight: it waits)
+        } else if (why == FED) {
+            say(level, "no raid to " + find.at.toShortString() + ": " + why + "; the find is only remembered");
+            waitNoMore();
+            return;
+        }
+        if (!why.equals(waitingWhy)) {
+            waitingWhy = why;
+            say(level, "the find at " + find.at.toShortString() + " waits for its raid: " + why);
         }
     }
 
@@ -1552,8 +1581,7 @@ public class Raids {
             // R7: no raid sets out to a spot in land not loaded (no ant can walk there till drawn-only ants, M8 step 4)
             unloadedFind = true;
             whyNoRaid = "the spot at " + find.at.toShortString() + " is in land not loaded";
-            say(level, "no raid to " + find.at.toShortString() + ": " + whyNoRaid);
-            return null;
+            return null; // (a waiting find says so once, a command answers with it)
         }
         // The raid rewrite: the one judge of "termites there now" is asked before anyone is called. Nobody there (the
         // termites fed and went, or keep off the spot): no raid, and the find is forgotten.
@@ -1562,9 +1590,7 @@ public class Raids {
             whyNoRaid = "no termite there now (the find is forgotten)";
             say(level, "no raid to " + find.at.toShortString() + ": " + whyNoRaid);
             finds.remove(find);
-            if (waiting == find) {
-                waiting = null;
-            }
+            forgetWaiting(find);
             return null;
         }
         int size = raidSize(find);
@@ -1581,6 +1607,7 @@ public class Raids {
         MatabeleEntity leader = scoutHere != null ? scoutHere : fit.stream().filter(MatabeleEntity::hasMajorBody).findFirst().orElse(null);
         if (leader == null) {
             whyNoRaid = "nobody fit to raid (real workers only; not hurt, clamped or fighting)";
+            say(level, "no raid to " + find.at.toShortString() + ": " + whyNoRaid);
             return null;
         }
         // R4: the raid follows the scent trail to the find if it is still smelt (whoever leads); with the trail gone only
@@ -1648,11 +1675,6 @@ public class Raids {
         SavannaNumbers.ScoutNumbers numbers = numbers();
         return numbers != null && colony.profile().section(SavannaNumbers.HOURS_SOUND).orElse(SavannaNumbers.HoursSoundNumbers.DEFAULT)
                 .isDusk(colony.timeOfDay(level), numbers);
-    }
-
-    /** R7, tests: whether a find waits for the raid hours. */
-    public boolean hasWaitingFind() {
-        return waiting != null;
     }
 
     /**

@@ -41,6 +41,7 @@ import com.antcolonies.savanna.entity.goal.BringPreyGoal;
 import com.antcolonies.savanna.entity.goal.CarryRemainsGoal;
 import com.antcolonies.savanna.entity.goal.MatabeleBiteOutGoal;
 import com.antcolonies.savanna.entity.goal.MatabeleRaidGoal;
+import com.antcolonies.savanna.entity.goal.MatabeleWayHomeGoal;
 import com.antcolonies.savanna.entity.goal.MatabeleScoutGoal;
 import com.antcolonies.savanna.registry.SavannaBlocks;
 import com.antcolonies.savanna.registry.SavannaEntities;
@@ -210,7 +211,8 @@ public class MatabeleEntity extends AbstractAntEntity implements ColonyBorn {
         // that carry something are never called to a raid or a scout's trip, and eating stands aside while it is out)
         scoutGoal = new MatabeleScoutGoal(this);
         this.goalSelector.addGoal(1, scoutGoal); // M8 3a: a major out scouting for termites
-        this.goalSelector.addGoal(1, new MatabeleRaidGoal(this)); // M8 3b: walking in a raid column (3c: fetching the stung, going home)
+        this.goalSelector.addGoal(1, new MatabeleRaidGoal(this)); // M8 3b: walking in a raid (3c: fetching the stung)
+        this.goalSelector.addGoal(1, new MatabeleWayHomeGoal(this)); // 3c: going home from the field by itself
         this.goalSelector.addGoal(2, new BringPreyGoal(this)); // M8 3c: the termites carried home onto the prey pile
         this.goalSelector.addGoal(3, new DigGoal(this, () -> true));
         this.goalSelector.addGoal(4, new GoInsideGoal(this));

@@ -116,7 +116,7 @@ public final class Raid implements FightDiary {
      * nest's shaft and down the hump at about a walk, so the column does not pile up on the nest's top (measured in the
      * march test: a major climbs 1.1 blocks a second at the column's pace and walks 2.0 to 2.3). For the look.
      */
-    public static final double MARCH_CLIMB = 2.0;
+    static final double MARCH_CLIMB = 2.0;
     /** A raider picks up a termite this near it (blocks). */
     public static final double PICK_REACH = 1.6;
     /** A raider carries a hurt nestmate only if at least this share of its width (my pick: minors carry minors). */
@@ -1109,6 +1109,14 @@ public final class Raid implements FightDiary {
         }
         BlockPos place = standAt(level, middle.getX() + 0.5 + Math.cos(angle) * radius, middle.getZ() + 0.5 + Math.sin(angle) * radius, middle.getY());
         return place != null && ahead != null && Math.abs(place.getY() - middle.getY()) > 1 ? null : place;
+    }
+
+    /**
+     * How fast a raider climbs now, against its own pace: about a walk on the way out (up the nest's shaft and down
+     * the hump, {@link #MARCH_CLIMB}), else as it will.
+     */
+    public double climbPace() {
+        return stage == Stage.MUSTER || stage == Stage.MARCH_OUT ? MARCH_CLIMB : 1.0;
     }
 
     /** One walk's step ({@link RaidMarch#step}): true at the route's end. */
