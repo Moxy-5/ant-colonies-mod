@@ -270,7 +270,6 @@ public final class Raid implements FightDiary {
     private String turnAsked;
     @Nullable
     private String turned;
-    private boolean turnedAtEdge;
     /** Sent outside the raid hours by a command: it keeps no hours (no turn at dusk or in rain). */
     private boolean keepsNoHours;
     /** The way home: whether the ant nearest home has been made the front for this walk. */
@@ -600,13 +599,9 @@ public final class Raid implements FightDiary {
         return cameHome;
     }
 
-    /** How many stung termites the raiders picked up, and how many raiders carried some. */
+    /** How many stung termites the raiders picked up. */
     public int carried() {
         return carried;
-    }
-
-    public int carriers() {
-        return carriers;
     }
 
     /** The termites the raid stung that still lie on the ground (its own list). */
@@ -650,11 +645,6 @@ public final class Raid implements FightDiary {
     /** Whether dusk or rain turned this raid home. */
     public boolean turnedAtDusk() {
         return !turnedBy().isEmpty();
-    }
-
-    /** Whether it turned home at the edge of land not loaded. */
-    public boolean turnedAtEdge() {
-        return turnedAtEdge;
     }
 
     /** Whether this member is out of sight now. */
@@ -1091,7 +1081,6 @@ public final class Raid implements FightDiary {
         if (turned != null) {
             tag.putString("turned", turned);
         }
-        tag.putBoolean("turnedAtEdge", turnedAtEdge);
         tag.putBoolean("keepsNoHours", keepsNoHours);
         tag.put("stung", uuids(stung));
         tag.put("hurtHere", uuids(hurtHere));
@@ -1170,7 +1159,6 @@ public final class Raid implements FightDiary {
         raid.spotEmpty = tag.getBoolean("spotEmpty");
         raid.foundNothing = tag.getBoolean("foundNothing");
         raid.turned = tag.contains("turned") ? tag.getString("turned") : null;
-        raid.turnedAtEdge = tag.getBoolean("turnedAtEdge");
         raid.keepsNoHours = tag.getBoolean("keepsNoHours");
         for (Tag one : tag.getList("stung", Tag.TAG_INT_ARRAY)) {
             raid.stung.add(NbtUtils.loadUUID(one));
@@ -1583,7 +1571,6 @@ public final class Raid implements FightDiary {
      */
     private void marchOut(ServerLevel level, List<MatabeleEntity> ants, long now) {
         if (edgeAhead(level, ants)) {
-            turnedAtEdge = true;
             turnHome(ants, now, "the land ahead is not loaded");
         } else if (march(level, ants, out, now)) {
             trail.walked(now); // (every raider laid scent on the way out)

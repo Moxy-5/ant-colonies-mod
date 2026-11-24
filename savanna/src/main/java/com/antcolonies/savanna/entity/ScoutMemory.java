@@ -18,8 +18,6 @@ public final class ScoutMemory {
     private int reach;
     /** Trips in a row it searched and came home empty. */
     private int emptyTrips;
-    /** How far from the nest its last find was (blocks), -1 none. */
-    private int lastFind = -1;
 
     public boolean hasHeading() {
         return !Double.isNaN(heading);
@@ -50,14 +48,6 @@ public final class ScoutMemory {
         this.emptyTrips = emptyTrips;
     }
 
-    public int lastFind() {
-        return lastFind;
-    }
-
-    public void setLastFind(int lastFind) {
-        this.lastFind = lastFind;
-    }
-
     /** An angle brought into 0 to a full turn. */
     public static double wrap(double angle) {
         double full = Math.PI * 2;
@@ -75,7 +65,6 @@ public final class ScoutMemory {
         }
         mine.putInt("reach", reach);
         mine.putInt("emptyTrips", emptyTrips);
-        mine.putInt("lastFind", lastFind);
         tag.put(TAG, mine);
     }
 
@@ -87,6 +76,5 @@ public final class ScoutMemory {
         heading = mine.contains("heading") ? wrap(mine.getDouble("heading")) : Double.NaN;
         reach = mine.getInt("reach");
         emptyTrips = mine.getInt("emptyTrips");
-        lastFind = mine.contains("lastFind") ? mine.getInt("lastFind") : -1;
     }
 }

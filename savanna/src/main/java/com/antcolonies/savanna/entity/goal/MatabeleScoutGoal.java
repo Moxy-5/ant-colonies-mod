@@ -1010,12 +1010,6 @@ public class MatabeleScoutGoal extends Goal {
         }
     }
 
-    /** Whether it has a find to tell of (tests). */
-    @Nullable
-    public BlockPos findForTests() {
-        return find;
-    }
-
     /** Its own search steps this trip, in order (tests: the path winds). */
     public List<BlockPos> searchStepsForTests() {
         return List.copyOf(steps);

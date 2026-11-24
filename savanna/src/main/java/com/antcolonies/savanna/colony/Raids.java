@@ -379,12 +379,6 @@ public class Raids {
         return finds.stream().filter(find -> find.at.closerThan(at, within)).findFirst().orElse(null);
     }
 
-    /** A remembered find was raided and termites were there: it counts as checked now. */
-    void checked(Find find, long now) {
-        find.checkedAt = now;
-        find.misses = 0;
-    }
-
     /** A raid set out to this find: it no longer waits for the raid hours. */
     void forgetWaiting(Find find) {
         if (waiting == find) {
@@ -396,14 +390,6 @@ public class Raids {
         waiting = null;
         waitingBy = By.COLONY;
         waitingWhy = null;
-    }
-
-    /** A raid walked the scent trail to this spot: it is fresh again (if one is still smelt). */
-    void walkTrail(BlockPos at, long now) {
-        ScentTrails.Trail trail = trails.liveTo(at, trailReach(), trailNumbers(), now);
-        if (trail != null) {
-            trail.walked(now);
-        }
     }
 
     /**
@@ -984,12 +970,10 @@ public class Raids {
                 && ant.getFightSpot() == null && !ant.hasFullMandibles();
     }
 
-    /** It sets out (counted as a scout until {@link #back}), and is one of the colony's scouts from now on. */
-    public void setOut(MatabeleEntity ant) {
-        setOut(ant, null);
-    }
-
-    /** It sets out on this trip; a recheck's spot is marked as on its way (no second scout to it meanwhile; finding 12). */
+    /**
+     * It sets out on this trip (counted as a scout until {@link #back}), and is one of the colony's scouts from now on;
+     * a recheck's spot is marked as on its way (no second scout to it meanwhile; finding 12).
+     */
     public void setOut(MatabeleEntity ant, @Nullable Trip trip) {
         if (trip != null && trip.find() != null) {
             trip.find().checking = ant.getUUID();
@@ -1221,7 +1205,6 @@ public class Raids {
         ant.scoutMemory().setReach(to);
         ant.scoutMemory().setHeading(angleOf(at));
         ant.scoutMemory().setEmptyTrips(0);
-        ant.scoutMemory().setLastFind(away);
         headings.put(ant.getUUID(), ant.scoutMemory().heading());
         reaches.put(ant.getUUID(), to);
         say(level, "scout " + RaidGround.shortId(ant.getUUID()) + " found termites " + away + " blocks out toward the " + compass(angleOf(at))

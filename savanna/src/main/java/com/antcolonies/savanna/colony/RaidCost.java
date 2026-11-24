@@ -46,11 +46,6 @@ public final class RaidCost {
         worstNanos = 0;
     }
 
-    /** The total so far, in milliseconds. */
-    public static double totalMillis() {
-        return nanos / 1_000_000.0;
-    }
-
     /** The count in words: the total, per column update, and the worst single call. */
     public static String report() {
         return String.format(java.util.Locale.ROOT, "%.2f ms in %d calls, %d column updates (%.3f ms an update), worst call %.3f ms",
