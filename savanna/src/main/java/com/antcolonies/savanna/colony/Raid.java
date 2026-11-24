@@ -419,7 +419,7 @@ public final class Raid implements FightDiary {
             @Override
             public boolean formerScoutIn() {
                 Raids raids = colony.part(SavannaParts.RAIDS).orElse(null);
-                return raids != null && members.stream().anyMatch(raids::isVeteran);
+                return raids != null && members.stream().anyMatch(raids.scouts()::isVeteran);
             }
         });
         this.out = march.out();

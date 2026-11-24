@@ -7,7 +7,7 @@ import net.minecraft.nbt.CompoundTag;
  * keeps no map of searched land): its favourite direction out of the nest, which it goes back to trip after trip (route
  * and site fidelity in ponerine ants, Fresneau 1985), how far out it searches now (its reach), how many trips in a row it
  * came home empty, and how far out its last find was. Saved on the ant. The rules that change it are in
- * {@code colony.Raids} ({@code cameHomeEmpty}, {@code foundBy}); the walk that uses it is {@code MatabeleScoutGoal}.
+ * {@code colony.Scouts} ({@code cameHomeEmpty}, {@code foundBy}); the walk that uses it is {@code MatabeleScoutGoal}.
  */
 public final class ScoutMemory {
     private static final String TAG = "matabeleScout";

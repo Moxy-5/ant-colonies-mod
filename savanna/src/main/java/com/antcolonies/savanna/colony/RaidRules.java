@@ -186,7 +186,7 @@ public final class RaidRules {
             boolean away = !ant.blockPosition().closerThan(colony.getCenter(), HOME) && !colony.nest().isInside(level, ant.blockPosition());
             boolean excused = ant.getFightSpot() != null || ant.isParalysed()
                     || raid != null && raid.keepsNoHours() && raid.has(id)
-                    || raids.wasSentAnyHour(id) // (BUGS 123: a scout sent "anytime", by the command or the soak, keeps no hours)
+                    || raids.scouts().wasSentAnyHour(id) // (BUGS 123: a scout sent "anytime", by the command or the soak, keeps no hours)
                     || raids.isGoingHome(id) && look.stillFor(ant) < RAIDER_STILL
                     // BUGS 142: a scout whose search ended at 19:30 runs home straight on its own goal, not along a trail;
                     // still walking (not standing), it is on its way home like the others (one standing is raider-stuck's)
@@ -301,7 +301,7 @@ public final class RaidRules {
                 }
                 return words.toString();
             }
-            if (raids.isScouting(id)) {
+            if (raids.scouts().isScouting(id)) {
                 return "scouting";
             }
             if (raids.isGoingHome(id)) {

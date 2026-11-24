@@ -60,7 +60,7 @@ public final class RaidCatch {
      * of 2026-11-11, 3 far colonies of 8).
      */
     static boolean noTermitesOnRecord(ServerLevel level, Colony matabele) {
-        int range = matabele.part(SavannaParts.RAIDS).map(Raids::range).orElse(96);
+        int range = matabele.part(SavannaParts.RAIDS).map(raids -> raids.scouts().range()).orElse(96);
         for (Colony termites : Raids.termiteColonies(level, matabele.getCenter(), range)) {
             if (termites.getCount(Caste.WORKER) > 0) {
                 return false;
