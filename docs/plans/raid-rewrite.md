@@ -554,6 +554,101 @@ asks that the hidden raid goes on as numbers and comes home (behaviour changed o
 - A raid shown near the nest steps back to the muster; one nearly home is not shown at all (it just arrives).
 - The scouts out of sight are untouched (their bookkeeping moves in step 5).
 
+## Step 5 as built (2026-11-24): the old code and numbers, one judge of worth, the scouts on their own
+
+Built on `claude/raid-rewrite-step5-e14ef4` (from step 4's branch), in five commits. **Nothing changes in play** but one thing: the
+start crash is gone (below). The rest is deleting and tidying.
+
+**1. What nothing used, deleted.** The old column itself went in step 3 and the away raid's own machine in step 4, so
+little dead code was left; every method, field and constant of the raid files was checked for a caller (code or test).
+Gone: `Raid.carriers` and `Raid.turnedAtEdge` (with its saved key), `Raids.checked`, `Raids.walkTrail`, the one-ant
+`Raids.setOut`, `ScentTrails.Trail.unsureCount` and `laidAt`, `ScoutMemory.lastFind` (saved on every scout, never
+read), `RaidCost.totalMillis`, `MatabeleScoutGoal.findForTests`. Kept on purpose: the test hooks tests still use, the
+BUGS 89 diary checks, `RaidCost` (the test log reads its report).
+
+**The `raids` numbers: 103 before, 96 now.** Seven had no reader left and are deleted from
+`megaponera_analis.json` and `SavannaNumbers`:
+
+| section | before | now | deleted |
+|---|---|---|---|
+| scouting | 13 | 13 | |
+| choosing | 6 | 6 | |
+| search (with its close search) | 19 | 19 | |
+| mound_clue | 6 | 6 | |
+| away | 11 | 10 | `player_near` |
+| catch | 3 | 3 | |
+| hours_and_sound | 9 | 9 | |
+| column | 16 | 15 | `home_ticks` |
+| carry | 14 | 9 | `collect_reach`, `collect_ticks`, `spread_ticks`, `spread_reach`, `spread_see` |
+| trails | 6 | 6 | |
+
+**Honest about the aim.** This plan hoped for about 30 numbers. Every one of the 96 left has a reader, so none of them
+is "unused": 38 belong to how a scout searches (scouting, search, the mound clue), which the rewrite kept as it was
+(it works and the user confirmed the search in play), and the raid's own stages hold 24 (column and carry). Getting
+lower means changing behaviour (folding the close search's numbers, dropping the mound clue's), which is a design
+call for the user, not a deleting step.
+
+**2. One judge of "worth a raid".** How the three judged before:
+
+| who | how it judged | where |
+|---|---|---|
+| a real scout looking a place over | worth = 3 x the larger of the termites it saw and 5 a feeding place; taken if worth is over 0 and at least `need(at)` | `MatabeleScoutGoal.inspect` |
+| the scouts out of sight | worth = 3 x (2 to 6 workers at the place by dice); taken if at least `need(at)`; "no scout goes out while a find worth a raid is known" compared the same in two more places | `RaidsAway.scout`, `scoutsNow` |
+| a raid leaving out of sight | the remembered worth against `need(at)` again | `RaidsAway.maySetOut` |
+
+They **agreed**: the same `need` (the colony's reach, how far out, how hungry: nearer and hungrier takes poorer finds,
+Frank and Linsenmair 2017) everywhere, only written five times. Now one rule, `Raids.worthARaid(at, worth)`, asked by
+all three; the scout only reports what it saw (`Raids.worthOf`, `Scouts.looked`). Two things found and **left as they
+are**, for the user to know:
+- A watched colony raids only the find a scout has just brought home, judged once at the scout's look. A colony out of
+  sight judges every remembered find again when a raid may leave, and may raid a remembered find with no scout's visit
+  that day. Real colonies do go back to known spots, so this is not wrong, only different near and away.
+- Worth still counts a by-day feeding place with no termite seen as 5 termites (step 1's "worth 15" finds). It no
+  longer sends raids to empty spots, because the one judge of "termites there now" stands before every muster.
+
+**3. The scouts' bookkeeping out of `Raids`.** `colony/Scouts.java` (owned by `Raids`, reached through
+`raids.scouts()`): who is out, the scout command's sends, the ants that keep the job and their upkeep, each scout's way
+and reach, a trip (`plan`, `setOut`, `back`, `cameHomeEmpty`, `foundBy`, `looked`), the mound clue's state and counts,
+the scouts' diary lines, their part of the colony list's line and of what is saved (the same keys, `raidScouts` and
+`raidSettled`). A move: the same code under a new name. `Raids` now holds the finds, the raid day, when a raid may
+leave, the raid out, the trails and the ants walking home.
+
+**The start crash fixed (BUGS 158, 198, 281, 303; this plan's "done when").** Step 3 moved the old cut into
+`RaidMarch` with the crash still in it: a find so near the nest that every point of the scout's line lay within the
+first step out left the line with its start alone, and the cut asked for two points. The line now gets the find as its
+second point. New test `aRaidToAFindRightBesideTheNestSetsOutWithoutACrash` (find 2 blocks from the entrance): it
+failed 3 of 3 with `toIndex = 2` before the fix. This is the one change of step 5 that is not deleting or moving; it
+was done here because the crash stops a colony's whole tick and three bug entries could not be closed without it.
+
+**4. The bug list.** A dated line added at each entry (nothing rewritten): closed as impossible now: 88, 103, 111,
+158, 166 (as written), 168 (the pacing), 198, 281, the crash of 303, and 169, 178, 182 (gone with the ribbon); fix
+living on in new code: 87, 89, 101, 141; half closed: 202; still open with what would prove them: 93, 212, 171, 197,
+and the umbrella 306 (until step 6 and the user's own watch).
+
+**Lines of each raid file, before and after step 5.**
+
+| file | before | after |
+|---|---|---|
+| `colony/Raid` | 2234 | 2221 |
+| `colony/Raids` | 1905 | 1228 |
+| `colony/Scouts` (new) | 0 | 781 |
+| `colony/RaidsAway` | 554 | 550 |
+| `colony/RaidMarch` | 699 | 705 |
+| `colony/ScentTrails` | 484 | 475 |
+| `colony/RaidCost` | 59 | 54 |
+| `entity/goal/MatabeleScoutGoal` | 1032 | 1024 |
+| `species/SavannaNumbers` | 912 | 903 |
+| unchanged: `RaidCatch` 100, `RaidDefence` 446, `RaidGround` 148, `RaidRules` 320, `RaidSoak` 262, `WayHome` 195, `Route` 246, `MatabeleBiteOutGoal` 304, `MatabeleRaidGoal` 371, `MatabeleWayHomeGoal` 176, `MatabeleCommands` 580, `RaidView` 155 | 3303 | 3303 |
+| all | 11182 | 11244 |
+
+The total grew by 62 lines: `Scouts` needs its own header and the few small doors between it and `Raids`. The gain is
+in where things are, not in size: `Raids` lost a third.
+
+**Tests.** `raids,away,soldiers` on 3 servers after each piece. after part 1: 61 of 62 passed (the mound-ring scout test failed beside others, passed alone 3 of 3: BUGS 153/164). After part 2: 58 of 62 (the ten-Matabele skirmish, BUGS 97/106, and the ridge chain scene, BUGS 313, each failed alone 1 of 3; the mound-ring scout test and a chicken alarm test, BUGS 207, passed alone 3 of 3). After part 3 and the crash fix: 59 of 63 (the chicken alarm tests, BUGS 207 and 22, one failing alone 1 of 3; the tall-mound chain scene on the watch rule `not-stuck`, the BUGS 313 kind, passed alone 3 of 3; and one new: `aRaidWhoseScoutIsKilledOnTheMarchOutTurnsHomeAndNobodyIsLeftOut`, a second raid standing 25 s in its muster, passed alone 3 of 3, written down as BUGS 315 and not chased). All chance failures; none failed 3 of 3.
+
+**Left for step 6:** the soaks and the full run; BUGS 93/212 and 171 want about 20 runs alone each; whether a watched
+raid should also take termites under the mud (BUGS 202's open half).
+
 ## Rules for the session doing this
 
 - Read `CLAUDE.md` first; ants and termites are strict realism.
