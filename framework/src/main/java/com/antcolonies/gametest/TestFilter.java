@@ -53,15 +53,33 @@ public final class TestFilter {
     }
 
     /**
+     * Tests left out of full runs (the user, 2026-11-23: "the test that is taking the longest, make a rule to remove it from
+     * future full sweep tests unless the change directly affected it"): each species signs up its own by name; they still
+     * run when their category or their exact name is given ({@code ANTCOLONIES_TESTS}), the run for a change that touches them.
+     */
+    static final java.util.Set<String> NOT_IN_FULL_RUNS = new java.util.HashSet<>();
+
+    /** Leaves these tests (method names) out of full runs; they run only when their category or name is asked for. */
+    public static synchronized void skipInFullRuns(String... testNames) {
+        for (String name : testNames) {
+            NOT_IN_FULL_RUNS.add(name.toLowerCase(Locale.ROOT));
+        }
+    }
+
+    /**
      * The stress tests (performance, such as {@code TermiteStressTests}) are long and only measure: they run only when named, never in
-     * a full run.
+     * a full run; nor do the tests signed up by {@link #skipInFullRuns}.
      */
     @SuppressWarnings("unchecked")
     private static void skipStressTests(MinecraftServer server) {
         try {
             Field field = GameTestServer.class.getDeclaredField("testFunctions");
             field.setAccessible(true);
-            ((Collection<TestFunction>) field.get(server)).removeIf(test -> test.testName().startsWith("stress"));
+            ((Collection<TestFunction>) field.get(server)).removeIf(test -> test.testName().startsWith("stress")
+                    || NOT_IN_FULL_RUNS.contains(test.testName().toLowerCase(Locale.ROOT)));
+            if (!NOT_IN_FULL_RUNS.isEmpty()) {
+                ColonyFrameworkMod.LOGGER.warn("[test-filter] left out of this full run (run their category to check them): {}", NOT_IN_FULL_RUNS);
+            }
         } catch (ReflectiveOperationException e) {
             ColonyFrameworkMod.LOGGER.error("[test-filter] could not leave out the stress tests", e);
         }

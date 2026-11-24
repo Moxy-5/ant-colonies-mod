@@ -40,6 +40,9 @@ public final class SavannaTests {
         // Termite food: foraging and its holes, the garden, new holes, dead wood, runways, bare patches, mushrooms.
         TestFilter.addCategory("termitefood", TermiteFoodTests.class, TermiteForagingTests.class, TermiteNewHoleTests.class,
                 TermiteRunwayTests.class, TermiteBarePatchTests.class, TermitomycesTests.class);
+        // The longest test (about 13 minutes, 2026-11-23, the user's rule): out of full runs, checked by its category's
+        // run (termitefood) when a change touches termite foraging or its holes.
+        TestFilter.skipInFullRuns("termitesOpenTheirForagingHolesAtNightAndPlugThemByDay");
         // Soldiers and the alarm; the fights (M8 step 2).
         TestFilter.addCategory("soldiers", TermiteSoldierTests.class, TermiteAlarmTests.class, MatabeleFightTests.class, TermiteRaidDefenceTests.class,
                 MatabeleDefenceTests.class);

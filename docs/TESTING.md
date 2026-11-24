@@ -29,3 +29,12 @@
 - **Never call `helper.onEachTick` inside a `runAfterDelay` (2026-11-21, mud coat test):** Minecraft's test runner then runs that timed step again and the test goes wrong every time. Register the watcher at the test's start and let it wait on a flag set later.
 - Use a creative test world, `/summon`, and F3 for coordinates.
 - `/tick rate 100` speeds up time for testing growth; `/tick rate 20` sets it back to normal.
+
+## Tests left out of full runs (the user, 2026-11-23)
+The user: "the test that is taking the longest, make a rule to remove it from future full sweep tests unless the change
+directly affected it". A species signs a test up with `TestFilter.skipInFullRuns("<method name>")` (savanna: in
+`SavannaTests.signUp`); a run with no `ANTCOLONIES_TESTS` leaves it out (as the stress tests) and says so in the log
+(`[test-filter] left out of this full run`). It still runs when its category or its exact name is asked for, so a
+change that touches it runs its category as usual. Signed up now: `termitesOpenTheirForagingHolesAtNightAndPlugThemByDay`
+(category `termitefood`, about 12.7 minutes in its last full run, the longest). The next longest, `riverWidthIsMeasured`
+(`worldgen`, about 11.9 minutes), stays in for now.
