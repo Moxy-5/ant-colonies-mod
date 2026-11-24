@@ -413,15 +413,15 @@ public class MatabeleAwayTests {
                     java.util.List<BlockPos> places = raids.away().scoutPlaces(level);
                     if (places.isEmpty()) {
                         helper.assertTrue(now - stageAt[0] < 6000, "the far, hungry colony's scouts out as numbers never had a place (raid out as numbers "
-                                + raids.away().isOut() + ", finds " + raids.finds().size() + ", hungry " + raids.isHungry() + ", scouting time " + raids.isScoutingTime(level)
-                                + ", reach " + raids.range() + ")");
+                                + raids.away().isOut() + ", finds " + raids.finds().size() + ", hungry " + raids.isHungry() + ", scouting time " + raids.scouts().isScoutingTime(level)
+                                + ", reach " + raids.scouts().range() + ")");
                         return;
                     }
-                    helper.assertTrue(raids.scoutsOut().isEmpty(), "a colony away has real scouts out");
+                    helper.assertTrue(raids.scouts().scoutsOut().isEmpty(), "a colony away has real scouts out");
                     BlockPos place = places.get(0);
                     double far = Math.sqrt((place.getX() - nest.getX()) * (double) (place.getX() - nest.getX())
                             + (place.getZ() - nest.getZ()) * (double) (place.getZ() - nest.getZ()));
-                    helper.assertTrue(far >= 15 && far <= raids.range() + 1, "a scout out as numbers is " + Math.round(far) + " blocks from its nest");
+                    helper.assertTrue(far >= 15 && far <= raids.scouts().range() + 1, "a scout out as numbers is " + Math.round(far) + " blocks from its nest");
                     placeAt[0] = place;
                     watcherAt[0] = BlockPos.containing(place.getX() + (place.getX() - nest.getX()) / far * 56, place.getY(),
                             place.getZ() + (place.getZ() - nest.getZ()) / far * 56);
@@ -430,11 +430,11 @@ public class MatabeleAwayTests {
                     stageAt[0] = now;
                 }
                 case 2 -> {
-                    if (raids.scoutsOut().isEmpty()) {
+                    if (raids.scouts().scoutsOut().isEmpty()) {
                         helper.assertTrue(now - stageAt[0] < 200, "no real scout was shown to the watcher 56 blocks past the number scout's place");
                         return;
                     }
-                    scout[0] = raids.scoutsOut().iterator().next();
+                    scout[0] = raids.scouts().scoutsOut().iterator().next();
                     helper.assertTrue(level.getEntity(scout[0]) instanceof com.antcolonies.savanna.entity.MatabeleEntity, "the shown scout is not in the world");
                     com.antcolonies.savanna.entity.MatabeleEntity ant = (com.antcolonies.savanna.entity.MatabeleEntity) level.getEntity(scout[0]);
                     helper.assertTrue(ant.hasMajorBody(), "the shown scout is a minor");
@@ -456,12 +456,12 @@ public class MatabeleAwayTests {
                         helper.fail("the shown scout left the world while watched");
                         return;
                     }
-                    if (raids.isScouting(scout[0]) && !ant.blockPosition().closerThan(firstAt[0], 5)) {
+                    if (raids.scouts().isScouting(scout[0]) && !ant.blockPosition().closerThan(firstAt[0], 5)) {
                         helper.succeed();
                         return;
                     }
                     helper.assertTrue(now - stageAt[0] < 1200, "the shown scout never walked on searching (it stands at " + ant.blockPosition().toShortString()
-                            + ", scouting " + raids.isScouting(scout[0]) + ")");
+                            + ", scouting " + raids.scouts().isScouting(scout[0]) + ")");
                 }
                 default -> {
                 }

@@ -165,7 +165,7 @@ final class RaidMarch {
     /**
      * The two ways along the colony's scent trail to a find at {@code spot}: out from the first cell to stand in beside
      * the entrance to the gathering place, the trail's last point at least {@code stop_short} from the spot, and home,
-     * the same line the other way. Always at least one point (the start itself).
+     * the same line the other way. Always at least two points (the start and, for a find right beside the nest, the find).
      */
     RaidMarch(ServerLevel level, Colony colony, SavannaNumbers.ColumnNumbers numbers, SavannaNumbers.TrailNumbers trailNumbers,
               ScentTrails.Trail scent, BlockPos spot, Host host) {
@@ -185,6 +185,12 @@ final class RaidMarch {
         double startOut = flat(start, colony.getCenter());
         points.removeIf(p -> flat(p, colony.getCenter()) < Math.max(1.5, startOut + 0.5));
         points.add(0, start);
+        if (points.size() < 2) {
+            // A find right beside the nest: every point of the scout's short line lay within the first step out, so only
+            // the start is left. A line always has two points: the start and the find (BUGS 158, 198, 281, 303: the cut
+            // below asked a one-point line for two and stopped the colony's tick).
+            points.add(spot);
+        }
         // The gathering place: the last point of the scent line at least stop_short from the find.
         int gather = 0;
         for (int i = 0; i < points.size(); i++) {

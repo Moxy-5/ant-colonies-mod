@@ -110,7 +110,7 @@ public final class RaidView {
                     }
                 }
             }
-            for (UUID id : raids.scoutsOut()) {
+            for (UUID id : raids.scouts().scoutsOut()) {
                 if (level.getEntity(id) instanceof MatabeleEntity ant) {
                     over(level, player, ant, new Vector3f(0.1F, 1.0F, 1.0F), 1.3F);
                 }

@@ -97,9 +97,9 @@ public class MatabeleNewLandTests {
                 helper.assertTrue(pile.edible() <= MatabeleColonies.dayOfFood(workers), pile.edible() + " layers of prey, more than a day's");
                 // R8's balance pass: an old colony of the land, its scouts knowing their whole foraging range from the start
                 Raids raids = colony.part(SavannaParts.RAIDS).orElseThrow();
-                helper.assertTrue(raids.isSettled(), "a new-land colony is not settled");
-                helper.assertTrue(raids.range() == raids.numbers().settledRange(),
-                        "a new-land colony's scouts start at " + raids.range() + " blocks, not the settled range " + raids.numbers().settledRange());
+                helper.assertTrue(raids.scouts().isSettled(), "a new-land colony is not settled");
+                helper.assertTrue(raids.scouts().range() == raids.numbers().settledRange(),
+                        "a new-land colony's scouts start at " + raids.scouts().range() + " blocks, not the settled range " + raids.numbers().settledRange());
             }
             // The numbers come out as real ants, up to the cap; the rest stay numbers.
             List<MatabeleEntity> real = TestIsolation.insectsOf(level, colony, MatabeleEntity.class);
@@ -137,8 +137,8 @@ public class MatabeleNewLandTests {
                         colony.population().inside(Caste.WORKER) + " numbers inside, not " + (sizes[i] - cap));
                 // R8's balance pass: the command's colony is new to the place, its scouts starting at the first range
                 Raids raids = colony.part(SavannaParts.RAIDS).orElseThrow();
-                helper.assertTrue(!raids.isSettled() && raids.range() == raids.numbers().firstRange(),
-                        "the command's colony starts its scouts at " + raids.range() + " blocks, not the first range");
+                helper.assertTrue(!raids.scouts().isSettled() && raids.scouts().range() == raids.numbers().firstRange(),
+                        "the command's colony starts its scouts at " + raids.scouts().range() + " blocks, not the first range");
             }
             helper.succeed();
         });

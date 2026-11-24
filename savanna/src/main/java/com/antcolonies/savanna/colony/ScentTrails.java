@@ -104,11 +104,6 @@ public final class ScentTrails {
             return shape;
         }
 
-        /** How many of its points wait for their land to load (tests). */
-        public int unsureCount() {
-            return unsure.cardinality();
-        }
-
         public boolean isBroken(int point) {
             return broken.get(point);
         }
@@ -116,10 +111,6 @@ public final class ScentTrails {
         /** How many of its points are broken now. */
         public int brokenCount() {
             return broken.cardinality();
-        }
-
-        public long laidAt() {
-            return laidAt;
         }
 
         public boolean byColumn() {

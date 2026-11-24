@@ -80,7 +80,7 @@ public final class RaidSoak implements Soak.Part {
                 if (raids == null || raids.column() != null) {
                     continue;
                 }
-                MatabeleEntity scout = raids.sendNow(level, true);
+                MatabeleEntity scout = raids.scouts().sendNow(level, true);
                 if (scout != null) {
                     return "a scout sent out at once (any hour) from " + name(colony);
                 }

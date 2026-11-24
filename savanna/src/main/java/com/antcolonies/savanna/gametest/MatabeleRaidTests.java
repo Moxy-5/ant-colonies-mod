@@ -18,6 +18,7 @@ import com.antcolonies.savanna.colony.NewLandMounds;
 import com.antcolonies.savanna.colony.PreyPile;
 import com.antcolonies.savanna.colony.Raid;
 import com.antcolonies.savanna.colony.Raids;
+import com.antcolonies.savanna.colony.Scouts;
 import com.antcolonies.savanna.colony.SavannaParts;
 import com.antcolonies.savanna.command.MatabeleCommands;
 import com.antcolonies.savanna.entity.MatabeleEntity;
@@ -90,7 +91,7 @@ public class MatabeleRaidTests {
         boolean[] pushed = {false};
         java.util.Set<java.util.UUID> scouted = new java.util.HashSet<>();
         helper.onEachTick(() -> {
-            colony.population().realMembers(level).stream().filter(ant -> raids.isScouting(ant.getUUID()))
+            colony.population().realMembers(level).stream().filter(ant -> raids.scouts().isScouting(ant.getUUID()))
                     .forEach(ant -> scouted.add(ant.getUUID()));
             if (outAt[0] < 0 && !scouted.isEmpty()) {
                 outAt[0] = helper.getTick();
@@ -110,10 +111,10 @@ public class MatabeleRaidTests {
                         helper.assertTrue(scout != null && scout.scoutRunningForTests(), "the scout's goal is not running yet");
                         helper.assertTrue(scout.pushScoutAsideForTests(), "the scout's goal could not be pushed aside");
                         pushed[0] = true;
-                        helper.assertTrue(raids.isScouting(scout.getUUID()), "a scout pushed aside for a moment gave its trip up");
+                        helper.assertTrue(raids.scouts().isScouting(scout.getUUID()), "a scout pushed aside for a moment gave its trip up");
                     }
                     MatabeleEntity scout = scoutNamed(level, colony, scouted.iterator().next());
-                    helper.assertTrue(scout != null && raids.isScouting(scout.getUUID()), "a scout pushed aside gave its trip up");
+                    helper.assertTrue(scout != null && raids.scouts().isScouting(scout.getUUID()), "a scout pushed aside gave its trip up");
                     helper.assertTrue(scout.scoutRunningForTests(), "the pushed-aside scout has not taken its trip up again yet");
                 })
                 .thenWaitUntil(() -> helper.assertTrue(!raids.finds().isEmpty(), "no find yet; " + raids.describe(level)))
@@ -131,7 +132,7 @@ public class MatabeleRaidTests {
                     for (int i = 1; i < line.size(); i++) {
                         helper.assertTrue(line.get(i).closerThan(line.get(i - 1), 5), "a gap in the scent line at point " + i);
                     }
-                    helper.assertTrue(find.scout() != null && scouted.contains(find.scout()) && raids.isVeteran(find.scout()),
+                    helper.assertTrue(find.scout() != null && scouted.contains(find.scout()) && raids.scouts().isVeteran(find.scout()),
                             "the find does not name its scout as one of the colony's scouts");
                     helper.assertTrue(raids.column() == null, "a raid left at 13:00, between the raid hours; " + raids.describe(level));
                     helper.assertTrue(raids.waiting() == find, "the 13:00 find is not waiting for the raid hours; " + raids.describe(level));
@@ -155,8 +156,8 @@ public class MatabeleRaidTests {
                 .thenExecute(() -> {
                     // (scouts search like real ants: after its find 10 blocks out the scout's reach is back to the first range)
                     MatabeleEntity scout = scoutNamed(level, colony, raids.finds().get(0).scout());
-                    helper.assertTrue(scout != null && scout.scoutMemory().reach(32) == 32 && raids.range() == 32,
-                            "the scout's reach is " + (scout == null ? "?" : scout.scoutMemory().reach(32)) + ", the colony's " + raids.range()
+                    helper.assertTrue(scout != null && scout.scoutMemory().reach(32) == 32 && raids.scouts().range() == 32,
+                            "the scout's reach is " + (scout == null ? "?" : scout.scoutMemory().reach(32)) + ", the colony's " + raids.scouts().range()
                                     + ", though termites were found 10 blocks out");
                 })
                 .thenExecute(() -> helper.assertTrue(scouted.size() == 1,
@@ -186,7 +187,7 @@ public class MatabeleRaidTests {
         helper.assertTrue(colony.getCenter().getY() - ground > 12, "the dead mound is only " + (colony.getCenter().getY() - ground)
                 + " blocks over the land: not the tall mound of the report");
         double[] farthest = {0.0};
-        helper.onEachTick(() -> colony.population().realMembers(level).stream().filter(ant -> raids.isScouting(ant.getUUID()))
+        helper.onEachTick(() -> colony.population().realMembers(level).stream().filter(ant -> raids.scouts().isScouting(ant.getUUID()))
                 .forEach(ant -> farthest[0] = Math.max(farthest[0], Math.hypot(ant.getX() - colony.getCenter().getX() - 0.5,
                         ant.getZ() - colony.getCenter().getZ() - 0.5))));
         helper.succeedWhen(() -> helper.assertTrue(farthest[0] >= 24, "the scouts got only " + Math.round(farthest[0])
@@ -322,7 +323,7 @@ public class MatabeleRaidTests {
                 .thenExecute(() -> {
                     BlockPos entrance = colony.getCenter();
                     MatabeleEntity scout = colony.population().realMembers(level).stream()
-                            .filter(ant -> ant instanceof MatabeleEntity matabele && matabele.hasMajorBody() && !raids.isScouting(ant.getUUID()))
+                            .filter(ant -> ant instanceof MatabeleEntity matabele && matabele.hasMajorBody() && !raids.scouts().isScouting(ant.getUUID()))
                             .map(ant -> (MatabeleEntity) ant)
                             .findFirst().orElse(null);
                     helper.assertTrue(scout != null, "no real major to be the scout");
@@ -502,7 +503,7 @@ public class MatabeleRaidTests {
                 .thenExecute(() -> {
                     BlockPos entrance = colony.getCenter();
                     MatabeleEntity scout = colony.population().realMembers(level).stream()
-                            .filter(ant -> ant instanceof MatabeleEntity matabele && matabele.hasMajorBody() && !raids.isScouting(ant.getUUID()))
+                            .filter(ant -> ant instanceof MatabeleEntity matabele && matabele.hasMajorBody() && !raids.scouts().isScouting(ant.getUUID()))
                             .map(ant -> (MatabeleEntity) ant)
                             .findFirst().orElse(null);
                     helper.assertTrue(scout != null, "no real major to be the scout");
@@ -658,7 +659,7 @@ public class MatabeleRaidTests {
         });
         helper.startSequence()
                 .thenIdle(40)
-                .thenExecute(() -> helper.assertTrue(raids.sendNow(level) != null, "the scout command found no fit major"))
+                .thenExecute(() -> helper.assertTrue(raids.scouts().sendNow(level) != null, "the scout command found no fit major"))
                 .thenWaitUntil(() -> helper.assertTrue(column[0] != null, "no raid yet; " + raids.describe(level)))
                 .thenExecute(() -> {
                     com.antcolonies.savanna.colony.RaidCost.reset(); // (the raid review, finding 9: the raid's own cost, out and home)
@@ -700,7 +701,7 @@ public class MatabeleRaidTests {
                 .thenExecute(() -> {
                     for (MatabeleEntity ant : raiders) {
                         if (ant.isAlive() && !ant.isCrippled() && !ant.isDowned() && ant.getFightSpot() == null && !raids.isRaider(ant.getUUID())
-                                && !raids.isScouting(ant.getUUID())) {
+                                && !raids.scouts().isScouting(ant.getUUID())) {
                             helper.assertTrue(flat(ant.blockPosition(), colony.getCenter()) <= 8.0 || colony.nest().isInside(level, ant.blockPosition()),
                                     "a raider stands about outside at " + ant.blockPosition().toShortString() + ", "
                                             + Math.round(flat(ant.blockPosition(), colony.getCenter())) + " from the nest, doing " + ant.runningGoals());
@@ -753,7 +754,7 @@ public class MatabeleRaidTests {
 
         Raid[] column = {null};
         helper.startSequence()
-                .thenExecute(() -> helper.assertTrue(raids.sendNow(level) != null, "the scout command found no fit major"))
+                .thenExecute(() -> helper.assertTrue(raids.scouts().sendNow(level) != null, "the scout command found no fit major"))
                 .thenWaitUntil(() -> {
                     column[0] = raids.column();
                     helper.assertTrue(column[0] != null && column[0].stage() != Raid.Stage.MUSTER,
@@ -1168,7 +1169,7 @@ public class MatabeleRaidTests {
                 .thenExecute(() -> {
                     BlockPos entrance = colony.getCenter();
                     MatabeleEntity scout = colony.population().realMembers(level).stream()
-                            .filter(ant -> ant instanceof MatabeleEntity matabele && matabele.hasMajorBody() && !raids.isScouting(ant.getUUID())
+                            .filter(ant -> ant instanceof MatabeleEntity matabele && matabele.hasMajorBody() && !raids.scouts().isScouting(ant.getUUID())
                                     && !colony.nest().isInside(level, ant.blockPosition()))
                             .map(ant -> (MatabeleEntity) ant)
                             .findFirst().orElse(null);
@@ -1382,7 +1383,7 @@ public class MatabeleRaidTests {
         });
         helper.startSequence()
                 .thenIdle(40)
-                .thenExecute(() -> helper.assertTrue(raids.sendNow(level) != null, "the scout command found no fit major"))
+                .thenExecute(() -> helper.assertTrue(raids.scouts().sendNow(level) != null, "the scout command found no fit major"))
                 .thenWaitUntil(() -> helper.assertTrue(column[0] != null, "no raid yet; " + raids.describe(level)))
                 .thenExecute(() -> {
                     Raid raid = column[0];
@@ -1513,7 +1514,7 @@ public class MatabeleRaidTests {
                     MatabeleScenes.termitesAt(helper, at);
                     Raid raid = raids.raidForTests(level, at, 2, trail, null);
                     helper.assertTrue(raid != null, "no raid set out; " + raids.describe(level));
-                    helper.assertTrue(!raids.isVeteran(raid.leader()), "the raid's leader is a former scout");
+                    helper.assertTrue(!raids.scouts().isVeteran(raid.leader()), "the raid's leader is a former scout");
                     // R7: set out by hand at 21:00, outside the raid hours, it keeps no hours (dusk does not turn it)
                     helper.assertTrue(raids.isDusk(level) && raid.keepsNoHours(), "a raid set out by hand at night does not keep no hours");
                     // A wall on the trail from 10 to 18 blocks out: a gap of about 10 blocks, past casting reach.
@@ -1726,7 +1727,7 @@ public class MatabeleRaidTests {
                 .thenIdle(20)
                 .thenExecute(() -> {
                     SavannaNumbers.ScoutNumbers numbers = raids.numbers();
-                    SavannaNumbers.SearchNumbers search = raids.search();
+                    SavannaNumbers.SearchNumbers search = raids.scouts().search();
                     int first = numbers.firstRange();
                     int step = numbers.rangeStep();
                     int most = numbers.mostRange();
@@ -1735,55 +1736,55 @@ public class MatabeleRaidTests {
                             .map(ant -> (MatabeleEntity) ant).limit(3).toList();
                     helper.assertTrue(majors.size() == 3, "fewer than 3 real majors in the colony: " + majors.size());
                     MatabeleEntity a = majors.get(0);
-                    helper.assertTrue(raids.range() == first, "the colony's reach starts at " + raids.range());
+                    helper.assertTrue(raids.scouts().range() == first, "the colony's reach starts at " + raids.scouts().range());
 
                     // each new scout its own way, spread from the others'; each keeps it
                     List<Double> ways = new ArrayList<>();
                     for (MatabeleEntity major : majors) {
-                        Raids.Trip trip = raids.plan(level, major);
+                        Scouts.Trip trip = raids.scouts().plan(level, major);
                         helper.assertTrue(trip != null && trip.find() == null && trip.reach() == first, "a new scout's first trip is " + trip);
                         helper.assertTrue(trip.out() >= Math.floor(first * search.outNear()) - 1 && trip.out() <= Math.ceil(first * search.outFar()) + 1,
                                 "a trip walks out " + trip.out() + " blocks of a reach of " + first);
-                        helper.assertTrue(major.scoutMemory().hasHeading() && Math.abs(Raids.turnBetween(trip.heading(), major.scoutMemory().heading())) < 1e-6,
+                        helper.assertTrue(major.scoutMemory().hasHeading() && Math.abs(Scouts.turnBetween(trip.heading(), major.scoutMemory().heading())) < 1e-6,
                                 "the trip does not go the scout's own way");
                         ways.add(trip.heading());
                     }
                     for (int i = 0; i < ways.size(); i++) {
                         for (int j = i + 1; j < ways.size(); j++) {
-                            double gap = Math.toDegrees(Math.abs(Raids.turnBetween(ways.get(i), ways.get(j))));
+                            double gap = Math.toDegrees(Math.abs(Scouts.turnBetween(ways.get(i), ways.get(j))));
                             helper.assertTrue(gap >= 40, "two new scouts' ways are only " + Math.round(gap) + " degrees apart: " + ways);
                         }
                     }
                     double aWay = a.scoutMemory().heading();
-                    Raids.Trip trip = raids.plan(level, a);
-                    helper.assertTrue(trip != null && Math.abs(Raids.turnBetween(trip.heading(), aWay)) < 1e-6, "the scout's next trip changed its way");
+                    Scouts.Trip trip = raids.scouts().plan(level, a);
+                    helper.assertTrue(trip != null && Math.abs(Scouts.turnBetween(trip.heading(), aWay)) < 1e-6, "the scout's next trip changed its way");
 
                     // the search range bug, in its new form: setting out is not searching
-                    raids.setOut(a, trip);
-                    raids.back(a);
-                    helper.assertTrue(a.scoutMemory().reach(first) == first && raids.range() == first,
+                    raids.scouts().setOut(a, trip);
+                    raids.scouts().back(a);
+                    helper.assertTrue(a.scoutMemory().reach(first) == first && raids.scouts().range() == first,
                             "a scout's reach grew from only setting out: " + a.scoutMemory().reach(first));
                     int least = (int) Math.ceil(numbers.tripTicks() * search.searchedShare());
-                    helper.assertTrue(!raids.cameHomeEmpty(level, a, trip, least - 20, "the test"),
+                    helper.assertTrue(!raids.scouts().cameHomeEmpty(level, a, trip, least - 20, "the test"),
                             "a trip cut short counted as searched empty");
-                    helper.assertTrue(a.scoutMemory().reach(first) == first && Math.abs(Raids.turnBetween(a.scoutMemory().heading(), aWay)) < 1e-6,
+                    helper.assertTrue(a.scoutMemory().reach(first) == first && Math.abs(Scouts.turnBetween(a.scoutMemory().heading(), aWay)) < 1e-6,
                             "a trip cut short changed the scout's reach or way");
 
                     // trips really searched empty: farther each time, the way drifting a little
-                    helper.assertTrue(raids.cameHomeEmpty(level, a, trip, least, "the test"), "a trip searched long enough did not count");
-                    helper.assertTrue(a.scoutMemory().reach(first) == first + step && raids.range() == first + step,
-                            "after a trip searched empty the scout's reach is " + a.scoutMemory().reach(first) + ", the colony's " + raids.range());
-                    double drift = Math.toDegrees(Math.abs(Raids.turnBetween(aWay, a.scoutMemory().heading())));
+                    helper.assertTrue(raids.scouts().cameHomeEmpty(level, a, trip, least, "the test"), "a trip searched long enough did not count");
+                    helper.assertTrue(a.scoutMemory().reach(first) == first + step && raids.scouts().range() == first + step,
+                            "after a trip searched empty the scout's reach is " + a.scoutMemory().reach(first) + ", the colony's " + raids.scouts().range());
+                    double drift = Math.toDegrees(Math.abs(Scouts.turnBetween(aWay, a.scoutMemory().heading())));
                     helper.assertTrue(drift < 90, "the scout's way swung " + Math.round(drift) + " degrees after one empty trip (it drifts)");
                     for (int i = 0; i < 40 && a.scoutMemory().reach(first) < most; i++) {
-                        raids.cameHomeEmpty(level, a, raids.plan(level, a), numbers.tripTicks(), "the test");
+                        raids.scouts().cameHomeEmpty(level, a, raids.scouts().plan(level, a), numbers.tripTicks(), "the test");
                     }
-                    helper.assertTrue(a.scoutMemory().reach(first) == most && raids.range() == most,
+                    helper.assertTrue(a.scoutMemory().reach(first) == most && raids.scouts().range() == most,
                             "the reach did not grow to the most, " + most + ": " + a.scoutMemory().reach(first));
-                    Raids.Trip far = raids.plan(level, a);
+                    Scouts.Trip far = raids.scouts().plan(level, a);
                     helper.assertTrue(far != null && far.reach() == most && far.out() <= Math.ceil(most * search.outFar()) + 1,
                             "a trip at the most reach is " + far);
-                    raids.cameHomeEmpty(level, a, far, numbers.tripTicks(), "the test");
+                    raids.scouts().cameHomeEmpty(level, a, far, numbers.tripTicks(), "the test");
                     helper.assertTrue(a.scoutMemory().reach(first) == most, "the reach grew past the most: " + a.scoutMemory().reach(first));
                     helper.assertTrue(a.scoutMemory().emptyTrips() >= (most - first) / step + 1, "empty trips counted " + a.scoutMemory().emptyTrips());
 
@@ -1803,14 +1804,14 @@ public class MatabeleRaidTests {
                             + fedEdge + " at its whole reach, " + most + " blocks: scouts would pass feeding places over");
 
                     // a find 20 blocks out to the east: its way turns to the find, its reach shrinks back
-                    raids.foundBy(level, a, center.offset(20, 0, 0));
+                    raids.scouts().foundBy(level, a, center.offset(20, 0, 0));
                     helper.assertTrue(a.scoutMemory().reach(first) == Math.max(first, 20 + search.findMargin()) && a.scoutMemory().emptyTrips() == 0,
                             "after a find 20 out the scout's reach is " + a.scoutMemory().reach(first));
-                    helper.assertTrue(Math.abs(Raids.turnBetween(a.scoutMemory().heading(), 0.0)) < 0.05,
+                    helper.assertTrue(Math.abs(Scouts.turnBetween(a.scoutMemory().heading(), 0.0)) < 0.05,
                             "after a find to the east the scout's way is " + Math.round(Math.toDegrees(a.scoutMemory().heading())) + " degrees");
-                    helper.assertTrue(raids.range() == first, "after the find the colony's reach is " + raids.range());
-                    Raids.Trip after = raids.plan(level, a);
-                    helper.assertTrue(after != null && after.reach() == first && Math.abs(Raids.turnBetween(after.heading(), 0.0)) < 0.05,
+                    helper.assertTrue(raids.scouts().range() == first, "after the find the colony's reach is " + raids.scouts().range());
+                    Scouts.Trip after = raids.scouts().plan(level, a);
+                    helper.assertTrue(after != null && after.reach() == first && Math.abs(Scouts.turnBetween(after.heading(), 0.0)) < 0.05,
                             "the trip after the find is " + after);
                 })
                 .thenSucceed();
@@ -1845,14 +1846,14 @@ public class MatabeleRaidTests {
             }
         });
         helper.startSequence()
-                .thenWaitUntil(() -> helper.assertTrue(raids.headingsForTests().size() >= 3,
-                        "not 3 scouts out yet: " + raids.headingsForTests().size() + "; " + raids.describe(level)))
+                .thenWaitUntil(() -> helper.assertTrue(raids.scouts().headingsForTests().size() >= 3,
+                        "not 3 scouts out yet: " + raids.scouts().headingsForTests().size() + "; " + raids.describe(level)))
                 .thenExecute(() -> {
-                    List<Double> ways = new ArrayList<>(raids.headingsForTests().values());
+                    List<Double> ways = new ArrayList<>(raids.scouts().headingsForTests().values());
                     double smallest = 360;
                     for (int i = 0; i < ways.size(); i++) {
                         for (int j = i + 1; j < ways.size(); j++) {
-                            smallest = Math.min(smallest, Math.toDegrees(Math.abs(Raids.turnBetween(ways.get(i), ways.get(j)))));
+                            smallest = Math.min(smallest, Math.toDegrees(Math.abs(Scouts.turnBetween(ways.get(i), ways.get(j)))));
                         }
                     }
                     helper.assertTrue(smallest >= 30, "two scouts of one colony set out only " + Math.round(smallest) + " degrees apart");
@@ -1868,7 +1869,7 @@ public class MatabeleRaidTests {
                         if (i >= 2) {
                             double before = Math.atan2(steps.get(i - 1).getZ() - steps.get(i - 2).getZ(), steps.get(i - 1).getX() - steps.get(i - 2).getX());
                             double now = Math.atan2(steps.get(i).getZ() - steps.get(i - 1).getZ(), steps.get(i).getX() - steps.get(i - 1).getX());
-                            if (Math.abs(Raids.turnBetween(before, now)) > Math.toRadians(15)) {
+                            if (Math.abs(Scouts.turnBetween(before, now)) > Math.toRadians(15)) {
                                 turns++;
                             }
                         }
@@ -1931,15 +1932,15 @@ public class MatabeleRaidTests {
                 .thenExecute(() -> helper.assertTrue(pile.stock(level, 1) == 1, "the pile did not take a layer")) // (a layer feeds 20 of the 40)
                 .thenExecute(() -> helper.assertTrue(raids.fedShare() >= 0.4 && raids.isHungry(),
                         "the colony is " + Math.round(raids.fedShare() * 100) + " percent fed, not about half"))
-                .thenWaitUntil(() -> helper.assertTrue(!raids.finds().isEmpty(), "no find yet (" + raids.passedOverCount() + " passed over); "
+                .thenWaitUntil(() -> helper.assertTrue(!raids.finds().isEmpty(), "no find yet (" + raids.scouts().passedOverCount() + " passed over); "
                         + raids.describe(level)))
                 .thenExecute(() -> {
                     Raids.Find find = raids.finds().get(0);
                     helper.assertTrue(group.stream().anyMatch(termite -> termite.blockPosition().closerThan(find.at(), 6)),
                             "the find at " + find.at().toShortString() + " is not at the group of four");
                     helper.assertTrue(find.worth() >= 9, "the group of four scored worth only " + find.worth());
-                    helper.assertTrue(raids.passedOverCount() >= 1, "the scouts passed no lone termite over on their way out to the group");
-                    SavannaMod.LOGGER.info("[choosy scout test] found at {}, {} passed over: {}", helper.getTick(), raids.passedOverCount(),
+                    helper.assertTrue(raids.scouts().passedOverCount() >= 1, "the scouts passed no lone termite over on their way out to the group");
+                    SavannaMod.LOGGER.info("[choosy scout test] found at {}, {} passed over: {}", helper.getTick(), raids.scouts().passedOverCount(),
                             raids.describe(level));
                 })
                 .thenSucceed();
@@ -2022,16 +2023,16 @@ public class MatabeleRaidTests {
             }
         });
         helper.startSequence()
-                .thenWaitUntil(() -> helper.assertTrue(raids.moundsNoticed() >= 1, "no scout noticed the living mound yet; " + raids.describe(level)))
+                .thenWaitUntil(() -> helper.assertTrue(raids.scouts().moundsNoticed() >= 1, "no scout noticed the living mound yet; " + raids.describe(level)))
                 .thenWaitUntil(() -> helper.assertTrue(!raids.finds().isEmpty(), "no find yet; " + raids.describe(level)))
                 .thenExecute(() -> {
                     Raids.Find find = raids.finds().get(0);
                     helper.assertTrue(group.stream().anyMatch(termite -> termite.blockPosition().closerThan(find.at(), 6)),
                             "the find at " + find.at().toShortString() + " is not at the four termites at the east tunnel's end; " + raids.describe(level));
                     helper.assertTrue(find.worth() >= 9, "the four termites scored worth only " + find.worth());
-                    helper.assertTrue(raids.tunnelsFollowed() >= 1 && raids.clueFinds() >= 1,
-                            "the find was not made by following a tunnel from the mound (" + raids.tunnelsFollowed() + " followed, "
-                                    + raids.clueFinds() + " clue finds); " + raids.describe(level));
+                    helper.assertTrue(raids.scouts().tunnelsFollowed() >= 1 && raids.scouts().clueFinds() >= 1,
+                            "the find was not made by following a tunnel from the mound (" + raids.scouts().tunnelsFollowed() + " followed, "
+                                    + raids.scouts().clueFinds() + " clue finds); " + raids.describe(level));
                     // (scouts search like real ants: the find 40 out sets the finder's reach to 48, so the colony's reach is no
                     // sign of how it was found any more; the clue counts above are)
                     List<BlockPos> line = find.trail();

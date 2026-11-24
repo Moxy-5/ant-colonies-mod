@@ -244,7 +244,7 @@ public final class RaidsAway {
             return;
         }
         for (Raids.Find find : raids.finds()) {
-            if (find.worth() < raids.need(find.at())) {
+            if (!raids.worthARaid(find.at(), find.worth())) {
                 continue; // (too poor for the colony now)
             }
             Raid.Termites counted = Raid.termitesThere(level, colony, find.at());
@@ -297,20 +297,18 @@ public final class RaidsAway {
     List<ScoutAt> scoutsNow(ServerLevel level) {
         SavannaNumbers.ScoutNumbers scouting = raids.numbers();
         long now = level.getGameTime();
-        if (!scoutsAsNumbers || isOut() || scouting == null || now < noScoutShownBefore || !raids.isScoutingTime(level)
+        if (!scoutsAsNumbers || isOut() || scouting == null || now < noScoutShownBefore || !raids.scouts().isScoutingTime(level)
                 || !raids.isHungry() || colony.population().inside(Caste.WORKER) <= 0) {
             return List.of();
         }
-        for (Raids.Find find : raids.finds()) {
-            if (find.worth() >= raids.need(find.at())) {
-                return List.of(); // (it knows a find worth a raid: no scout is out)
-            }
+        if (raids.knowsAFindWorthARaid()) {
+            return List.of(); // (no scout is out)
         }
-        int reach = raids.range();
+        int reach = raids.scouts().range();
         long trip = Math.max(200L, Math.round(2.0 * reach / Math.max(0.1, numbers().pace()) * 20.0));
         BlockPos nest = colony.getCenter();
         List<ScoutAt> places = new ArrayList<>();
-        int wanted = raids.scoutsWanted();
+        int wanted = raids.scouts().scoutsWanted();
         for (int i = 0; i < wanted; i++) {
             long seed = net.minecraft.util.Mth.murmurHash3Mixer((int) colony.getId().getLeastSignificantBits() + i * 0x9E3779B9);
             double heading = (seed & 0xFFFF) / 65536.0 * Math.PI * 2;
@@ -347,7 +345,7 @@ public final class RaidsAway {
             if (!colony.away().watcherNear(level, one.at(), com.antcolonies.colony.AwayLife.NEAR)) {
                 continue;
             }
-            if (!raids.showScout(level, one.at(), one.heading())) {
+            if (!raids.scouts().showScout(level, one.at(), one.heading())) {
                 noScoutShownBefore = level.getGameTime() + 2400; // (no major to show: not asked again for two minutes)
                 return;
             }
@@ -359,16 +357,14 @@ public final class RaidsAway {
 
     private void scout(ServerLevel level) {
         SavannaNumbers.ScoutNumbers scouting = raids.numbers();
-        if (scouting == null || !raids.isScoutingTime(level) || !raids.isHungry() || colony.population().inside(Caste.WORKER) <= 0) {
+        if (scouting == null || !raids.scouts().isScoutingTime(level) || !raids.isHungry() || colony.population().inside(Caste.WORKER) <= 0) {
             return;
         }
         SavannaNumbers.AwayRaidNumbers numbers = numbers();
-        for (Raids.Find find : raids.finds()) {
-            if (find.worth() >= raids.need(find.at())) {
-                return; // (it knows a find worth a raid: the raid hours will take it)
-            }
+        if (raids.knowsAFindWorthARaid()) {
+            return; // (the raid hours will take it)
         }
-        int reach = raids.range();
+        int reach = raids.scouts().range();
         List<BlockPos> places = new ArrayList<>();
         List<Double> weights = new ArrayList<>();
         for (Colony termites : Raids.termiteColonies(level, colony.getCenter(), reach + numbers.termiteReach())) {
@@ -429,7 +425,7 @@ public final class RaidsAway {
         if (places.isEmpty()) {
             return;
         }
-        for (int scout = 0; scout < raids.scoutsWanted() && !places.isEmpty(); scout++) {
+        for (int scout = 0; scout < raids.scouts().scoutsWanted() && !places.isEmpty(); scout++) {
             if (random.nextDouble() >= numbers.scoutFindChance()) {
                 continue;
             }
@@ -437,7 +433,7 @@ public final class RaidsAway {
             BlockPos food = places.remove(pick);
             weights.remove(pick);
             int worth = numbers.scoutWorthLeast() + random.nextInt(Math.max(1, numbers.scoutWorthMost() - numbers.scoutWorthLeast() + 1));
-            if (worth < raids.need(food)) {
+            if (!raids.worthARaid(food, worth)) {
                 raids.diary(level, "out of sight: a scout passes over termites at " + food.toShortString() + " (worth " + worth
                         + ", " + Math.round(RaidGround.flat(colony.getCenter(), food)) + " blocks out: too poor)");
                 continue;

@@ -289,14 +289,14 @@ public class MatabeleCommands {
             source.sendFailure(Component.literal("No Matabele colony within 64 blocks (/antcolonies matabele <workers> makes one)."));
             return 0;
         }
-        MatabeleEntity scout = raids.sendNow(level, anyHour);
+        MatabeleEntity scout = raids.scouts().sendNow(level, anyHour);
         if (scout == null) {
             source.sendFailure(Component.literal("No major there fit to scout (real ones only; not hurt, fighting or hungry)."));
             return 0;
         }
         source.sendSuccess(() -> Component.literal("A scout (a major at " + scout.blockPosition().toShortString()
                 + ") sets out from the Matabele nest at " + colony.getCenter().toShortString() + ", searching up to "
-                + raids.range() + " blocks out; /antcolonies list shows what the scouts found"
+                + raids.scouts().range() + " blocks out; /antcolonies list shows what the scouts found"
                 + (anyHour ? ". Its find raids at once, whatever the hour." : ". Its find raids in the raid hours (6 to 11, 16 to 19), else waits for them.")), false);
         return 1;
     }

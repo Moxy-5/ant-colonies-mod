@@ -211,7 +211,7 @@ public class MatabeleRaidChainTests {
                         return;
                     }
                     MatabeleEntity leader = TestIsolation.insectsOf(level, colony, MatabeleEntity.class).stream()
-                            .filter(ant -> ant.hasMajorBody() && !raids.isScouting(ant.getUUID())).findFirst().orElse(null);
+                            .filter(ant -> ant.hasMajorBody() && !raids.scouts().isScouting(ant.getUUID())).findFirst().orElse(null);
                     helper.assertTrue(leader != null, "no real major to be the scout");
                     near[0] = raids.raidForTests(level, at, 18, trail(level, colony.getCenter(), at), leader.getUUID());
                     helper.assertTrue(near[0] != null && !near[0].goesAsNumbers(), "no watched raid set out; " + raids.describe(level));
@@ -364,7 +364,7 @@ public class MatabeleRaidChainTests {
                     termites.forEach(termite -> termite.discard()); // (the termites have left the log)
                 }
                 MatabeleEntity leader = TestIsolation.insectsOf(level, colony, MatabeleEntity.class).stream()
-                        .filter(ant -> ant.hasMajorBody() && !raids.isScouting(ant.getUUID())).findFirst().orElse(null);
+                        .filter(ant -> ant.hasMajorBody() && !raids.scouts().isScouting(ant.getUUID())).findFirst().orElse(null);
                 helper.assertTrue(leader != null, "no real major to be the scout");
                 scout[0] = leader.getUUID();
                 raids.raidForTests(level, at, 3 * termites.size(), trail(level, colony.getCenter(), at), leader.getUUID());
@@ -372,7 +372,7 @@ public class MatabeleRaidChainTests {
         } else {
             sequence = sequence.thenExecute(() -> {
                 scoutsHeadToward(helper, colony, at);
-                helper.assertTrue(raids.sendNow(level) != null, "the scout command found no fit major");
+                helper.assertTrue(raids.scouts().sendNow(level) != null, "the scout command found no fit major");
             });
         }
         if (twist == Twist.EMPTY_AT_MUSTER) {
@@ -611,7 +611,7 @@ public class MatabeleRaidChainTests {
 
         void nobodyOutside(String when) {
             for (MatabeleEntity ant : TestIsolation.insectsOf(level, colony, MatabeleEntity.class)) {
-                if (ant.isAlive() && !ant.isCrippled() && !ant.isDowned() && !raids.isScouting(ant.getUUID())) {
+                if (ant.isAlive() && !ant.isCrippled() && !ant.isDowned() && !raids.scouts().isScouting(ant.getUUID())) {
                     helper.assertTrue(flat(ant.blockPosition(), colony.getCenter()) <= 8.0 || colony.nest().isInside(level, ant.blockPosition()),
                             when + " a raider stands about outside at " + ant.blockPosition().toShortString() + ", "
                                     + Math.round(flat(ant.blockPosition(), colony.getCenter())) + " from the nest, doing " + ant.runningGoals());
@@ -651,5 +651,37 @@ public class MatabeleRaidChainTests {
             List<Watch.Breach> broken = Watch.breaches(colony);
             helper.assertTrue(broken.isEmpty(), broken.size() + " watch rule(s) broken in the raid: " + broken);
         }
+    }
+
+    /**
+     * The raid rewrite, step 5 (BUGS 158, 198, 281, 303): a find right beside the nest. Every point of the scout's short
+     * line lies within the first step out of the entrance, so the march's line had only its start left and making the
+     * raid threw an error that stopped the colony's whole tick. The line now always has two points (the start and the
+     * find), the raid sets out and comes to its end like any other.
+     */
+    @GameTest(template = "arena", timeoutTicks = 6000, skyAccess = true, batch = "matabele_raid_beside_nest")
+    public static void aRaidToAFindRightBesideTheNestSetsOutWithoutACrash(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        level.getServer().tickRateManager().setTickRate(2000.0F);
+        TestClock.still(helper, 8.0); // (the morning raid hours)
+        TestScenes.shapeGround(helper, 45, (x, z) -> 0);
+        MatabeleScenes.deadMound(helper, NEST, NEST, 30);
+        Colony colony = MatabeleScenes.colony(helper, NEST + 6, NEST, 40);
+        Raids raids = colony.part(SavannaParts.RAIDS).orElseThrow();
+        BlockPos at = colony.getCenter().offset(2, 0, 0);
+        MatabeleScenes.termitesAt(helper, at);
+        com.antcolonies.savanna.colony.Raid[] raid = new com.antcolonies.savanna.colony.Raid[1];
+        helper.onEachTick(() -> {
+            if (helper.getTick() < 40 || raid[0] != null) {
+                return;
+            }
+            MatabeleEntity leader = TestIsolation.insectsOf(level, colony, MatabeleEntity.class).stream()
+                    .filter(MatabeleEntity::hasMajorBody).findFirst().orElse(null);
+            helper.assertTrue(leader != null, "no real major to lead the raid");
+            raid[0] = raids.raidForTests(level, at, 18, List.of(colony.getCenter(), at), leader.getUUID());
+            helper.assertTrue(raid[0] != null, "no raid set out to the find beside the nest; " + raids.describe(level));
+        });
+        helper.succeedWhen(() -> helper.assertTrue(raid[0] != null && raid[0].stage() == com.antcolonies.savanna.colony.Raid.Stage.DONE,
+                "the raid to the find beside the nest has not come to its end; " + raids.describe(level)));
     }
 }

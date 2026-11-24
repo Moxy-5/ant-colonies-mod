@@ -892,7 +892,7 @@ public class MatabeleEntity extends AbstractAntEntity implements ColonyBorn {
     private boolean onRaidErrand() {
         Colony colony = getColony();
         return colony != null && colony.part(SavannaParts.RAIDS)
-                .map(raids -> raids.isScouting(getUUID()) || raids.isRaider(getUUID()) || raids.isGoingHome(getUUID())).orElse(false);
+                .map(raids -> raids.scouts().isScouting(getUUID()) || raids.isRaider(getUUID()) || raids.isGoingHome(getUUID())).orElse(false);
     }
 
     /** Whether it is busy with a nest chore now (feeding the queen or the young, carrying eggs, waste or prey, care). */
