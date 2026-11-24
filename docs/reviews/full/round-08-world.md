@@ -1,8 +1,8 @@
 # Round 8: the world (reading round, 2026-11-23) — UNFINISHED
 
-**Status: cut short by the usage limit after the first pass over about half of `worldgen/`.** Nothing below was
-measured in the game (reading round: no tests, no soak). Findings keep their numbers for good; a later session carries
-on from "Not read yet" at the bottom and adds R8-11 onward.
+**Status: carried on 2026-11-24 after the usage limit; R8-11 to R8-17 added, the data and the last blocks still being
+read, the second pass still owed for some.** Nothing below was measured in the game (reading round: no tests, no
+soak). Findings keep their numbers for good.
 
 **The second pass is only partly done.** Each finding says how far it was checked: *proven* means the path was walked
 in the code named; *likely* means the code path is there but one link (named in the finding) was not read yet.
@@ -44,8 +44,11 @@ in the code named; *likely* means the code path is there but one link (named in 
 - **What the player would see:** higher tick times standing by a river whose kinds have part shares (coast and far
   inland rivers, oxbows), worse with many animals and insects about.
 - **Where:** `worldgen/RiverZones.java:146-156`.
-- **Proof still owed:** the callers (`SavannaEvents`, the spawn rules in `registry/SavannaEntities`) were not read yet,
-  so how often `room` runs per tick is not known; and each group's spawn interval (`SavannaMobCategories`).
+- **Proof (second session):** the caller is `SavannaEvents.inBigSavanna` (`SavannaEvents.java:118-124`), wrapped round
+  every river animal's spawn rule: for a natural spawn it asks the animal's own rule first, then
+  `BigSavanna.lives`, then `RiverZones.room`. So the search runs only for a try that already found a fitting spot for
+  that kind, not for every try. Every one of the 12 groups is tried on every tick (R8-12). How many tries get as far as
+  `room` each tick is still not measured.
 - **Scene to measure:** a player standing still on a far-inland river bank and at an oxbow in a new world, Minecraft's
   profiler on the spawner (`/debug start`, 60 s), reading the share of `RiverZones.room`.
 - **Fix proposed:** count per kind and 64-block cell once every second or so and reuse it; or check the cheap things
@@ -127,6 +130,111 @@ in the code named; *likely* means the code path is there but one link (named in 
   data. Any other world-shaping mod or data pack overriding the same two files wins or loses whole: either their land
   or our flat savannas, by load order. **Proof still owed:** the data files under `data/minecraft/worldgen/` were not
   read.
+
+### R8-11 (A, proven in the code): mounds of new land are lost when the game is left, and can turn up in the next world
+
+- **What is wrong:** world making hands each termite mound's place to the server through a list that lives outside the
+  world (`NewLandMounds.QUEUE`, a `static` list). The server moves the list into the saved book only on every 10th
+  tick, and only while the world ticks. The list is never saved and never emptied when a world closes. So every place
+  handed over after the last look is gone from that world for good (its chunk is saved as made, so world making never
+  offers the place again), and it is still in the list when the next world opens in the same sitting: the next world's
+  first look takes every place of the same dimension into *its* book and saves it there.
+- **What the player would see:** (1) fly over new savanna, press Esc and "Save and Quit" (the world stops ticking the
+  moment the menu opens, while land already asked for goes on being made): the mounds of the last strip of land are
+  missing for good, a hole in the mound field, dead mounds and their Matabele colonies with them. (2) Open another
+  world without closing the game: a termite mound (living colony or dead mound, with its dead tree) is put in at the
+  old world's coordinates as soon as that land loads, on any diggable dry ground, in any biome (a mound in a forest or
+  a village), since the server's check looks only at water, soil and other colonies near.
+- **Where:** `colony/NewLandMounds.java:93` (the list), `:128-131` (`queue`, called from
+  `worldgen/TermiteMoundPiece.java:65-67`), `:137-148` (taken in only when `gameTime % 10 == 0`), `:240-253` (what the
+  server checks before it puts a mound in); `SavannaEvents.java:211-213` (the only thing done when the server stops is
+  `RaidView.clear()`).
+- **Proof:** walked: nothing reads or clears `QUEUE` but `tick` and the soak's `stillWaiting`; `Queued` holds the
+  dimension's name, the same in every world. Not measured: how many places are in the list at a usual quit.
+- **Fix proposed:** on `ServerStoppingEvent` (before the worlds are saved) take the list into each level's book, and on
+  `ServerStoppedEvent` empty what is left; better still, hand over with the level itself (not its name) so a place can
+  never reach another world.
+
+### R8-12 (A if the measure confirms it; to measure): twelve spawning groups are tried on every tick in every chunk, everywhere
+
+- **What is wrong:** the mod adds 12 spawning groups (`META-INF/enumextensions.json`), every one marked "not
+  persistent". Minecraft tries each such group for every chunk round every player on every tick for as long as the
+  group is under its cap (the persistent ones, like its own farm animals, only every 400 ticks). Our groups have spawn
+  lists only in the savanna's waters, so everywhere else (forests, oceans, caves, the Nether, the End) they are under
+  their cap for ever and tried for ever, each try doing a random spot, a block read, up to three nearest-player
+  searches and up to three spawn-list lookups before it finds the list empty. Minecraft itself has 6 groups tried
+  every tick; with ours there are 18, so about three times the spawner's work in every world with this mod, also far
+  from any savanna. `hippo_pod` has no spawn list in any biome at all (hippos come only with new land) and is tried all
+  the same.
+- **What the player would see:** a steady extra tick cost everywhere, growing with the players online and the view
+  distance; worst in a savanna by a river, where the rules of R8-2 run on top.
+- **Where:** `META-INF/enumextensions.json` (12 rows, the fourth value `false`); `registry/SavannaMobCategories.java`;
+  the spawn lists `data/antcolonies/neoforge/biome_modifier/*_spawns.json` (all on `#antcolonies:savanna_waters`).
+- **Proof:** the 12 rows and the spawn lists were read; Minecraft's spawner (`NaturalSpawner.spawnForChunk`,
+  `spawnCategoryForPosition`) is quoted from memory, not re-read here. Not measured.
+- **Scene to measure:** a new world, a player standing still (a) in a forest far from any savanna and (b) on a savanna
+  river bank; `/debug start` for 60 s, reading the `mobSpawner` share of the tick; then the same with the mod's
+  groups taken out of the test build (or the unmodded game) for the difference.
+- **Fix proposed:** fewer groups tried every tick. Mark the rare, kept kinds' groups persistent (river_bank, bull_shark,
+  river_otter, river_hunter, hippo_pod, bullfrog, river_grazer: tried every 20 seconds, which is plenty for animals
+  that are kept), and take `hippo_pod` out of the spawner altogether if nothing is ever meant to spawn in it. This
+  changes how fast those kinds appear, so it needs a look at the groups table in `docs/LIVING-THINGS.md` first.
+
+### R8-13 (C, to measure): a mound place reads 13 columns of ground before it asks which biome it is in
+
+- **What is wrong:** the mound structure is offered in every chunk of the overworld (`spacing` 1). For every chunk
+  that is a candidate place, `MoundPlaces.holds` works out the ground's height at 13 columns from the land's noise and
+  only afterwards asks whether the place is in a savanna at all (one cheap reading). In oceans, forests and mountains
+  the 13 columns are wasted.
+- **What the player would see:** nothing by eye; a little slower new land everywhere (world-making threads).
+- **Where:** `worldgen/MoundPlaces.java:222-265` (`warm` at 237, the biome check at 256-265);
+  `data/antcolonies/worldgen/structure_set/termite_mounds.json` (`spacing` 1);
+  `worldgen/TermiteMoundStructure.java:331-346`.
+- **Scene to measure:** the flight run over land with no savanna, the structure-start time summed with and without the
+  biome check moved first.
+- **Fix proposed:** the biome and big-savanna checks first (at the surface height of the middle column only), the 13
+  columns after.
+
+### R8-14 (B, likely): the mud's own wetness rule undoes the pattern the world maker lays
+
+- **What is wrong:** the features lay mud in a picture: river mud with a sticky edge (`RiverMudFeature.java:96-100`),
+  a pan with a sticky shore and a ring of drying mud round it (`PanFeature.java:184-185, 207, 218`). Every mud block
+  then runs its own rule on random ticks (`SavannaMudBlock.nextWetness`, `:298-307`): water within 4 blocks makes it
+  one step wetter each time until it is soupy; with no water near it dries. So within some minutes of a player being
+  near, every laid block within 4 of the water is soupy whatever the feature chose, and the rest dries: two places
+  decide the same thing, and the block always wins.
+- **What the player would see:** fresh banks and pans look one way when first met and another after a while (the firm
+  edge gone soupy, so walking the water's edge slows or sinks where the feature meant firm ground); land visited
+  before looks different from new land.
+- **Where:** as above; `block/SavannaMudBlock.java` (`isRandomlyTicking` always true).
+- **Proof still owed:** the rule was read, the speed was not measured (random ticks, a 1 in 3 to 1 in 6 chance to dry);
+  whether the sticky edge is meant to last is a design question (`docs/DESIGN.md`, the mud section, not re-read).
+- **Fix proposed:** one place decides: either the feature lays what the block's rule would settle at (so nothing
+  changes after), or the rule keeps a laid edge (a "settled" wetness by distance to water: soupy at 1, sticky at 2 to
+  4, drying beyond).
+
+### R8-15 (C, likely): the colonies' insects count as Minecraft's farm animals
+
+- **What is wrong:** termites and Matabele ants are signed up in Minecraft's own `CREATURE` group
+  (`registry/SavannaEntities`), and nothing takes them out of the count (`AbstractAntEntity.java:2938` only stops them
+  vanishing with distance). That group's cap is 10 round a player; one colony's 50 real insects fill it many times.
+- **What the player would see:** near a colony no chicken, armadillo or (in a neighbouring biome) cow, pig or sheep ever
+  spawns after the land was made; the animals made with the land are not touched.
+- **Proof still owed:** whether the colony marks its insects "persistent" when it spawns them (then they do not count);
+  not looked for in the framework (round 1's code).
+- **Fix proposed:** a group of the insects' own with no spawn list and marked persistent, or `MISC`.
+
+### R8-16 (C, likely): algae can creep out of the savanna
+
+- `AlgaeBlock.spread` (`block/AlgaeBlock.java:146-157`) seeds a new mat on any neighbouring bed under still water, with
+  no look at the biome. Where a savanna river runs into another biome's river or the sea, mats creep on along the
+  shallows, slowly (1 try in 10 random ticks of a thick mat). Fix: spread only inside `#antcolonies:savanna_waters`.
+
+### R8-17 (C, proven): notes that no longer match the code
+
+- `SavannaMobCategories.flyCloud`'s note says a cap of 6; the data says 18. A doc comment in `SavannaEvents.java:204`
+  ("The raid view forgets a player who leaves...") hangs over `onMount`, which is about the crocodile's jaws. `SavannaMod`'s
+  class note still speaks of the desert mod. One misplaced note in `SavannaTags`. Fix with the next change there.
 
 ## Found solid so far
 
