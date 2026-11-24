@@ -135,6 +135,9 @@ All picks are mine (animals: fun first, inspired by real life).
   (`docs/HISTORY.md`).
 - 2026-11-23, the food web's step 3 built: tilapia nibble mats' outer edge (algae first, so no day-long wait was
   needed), snails, crabs and tadpoles graze dying mats (no reed stems: a snail cannot climb one); `docs/HISTORY.md`.
+- 2026-11-23, the food web's step 4 built: scared barbs and tilapia hide in reeds and under hippo grass mats, one
+  shared "can I see it" rule for every fish hunter (`RiverCover`), hatchling crocodiles rest in reeds by their crèche
+  (within 5 blocks, the mother's see-off reach, not 8); `docs/HISTORY.md`.
 - 2026-11-23, part B built: the bullfrog on the life kit (the froglet its young stage), females coming to calling males
   in the rain, the clasp, floating egg mats hatching into a school that knows its father, the father guarding eggs and
   school; the wrestling males of the old plan left out (not asked for). `docs/HISTORY.md`.

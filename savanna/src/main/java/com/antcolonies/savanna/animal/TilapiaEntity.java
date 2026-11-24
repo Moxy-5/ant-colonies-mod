@@ -76,7 +76,7 @@ import software.bernie.geckolib.util.GeckoLibUtil;
  *
  * <p>It never starves (my pick: the food chain must never crash): a hungry fish with no algae near just swims on.
  */
-public class TilapiaEntity extends AbstractSchoolingFish implements GeoEntity, HasLife {
+public class TilapiaEntity extends AbstractSchoolingFish implements GeoEntity, HasLife, RiverCover.Hider {
     public static final int YOUNG = 0, EVERYDAY = 1, BREEDING = 2;
     /** How near a danger makes a mother take her fry into her mouth (blocks). */
     static final double DANGER_NEAR = 6;
@@ -138,6 +138,20 @@ public class TilapiaEntity extends AbstractSchoolingFish implements GeoEntity, H
         goalSelector.addGoal(2, new TilapiaNestGoal(this));
         goalSelector.addGoal(3, new GrazeAlgaeGoal(this));
         goalSelector.addGoal(4, new SeekMateGoal<>(this, 1.0));
+        // scared: into the reeds (the food web's step 4); a fry keeps to its mother, a male on his nest pit and a mother
+        // with eggs or fry stand their ground
+        goalSelector.addGoal(1, new HideInCoverGoal(this, () -> !isYoung() && nest == null && eggs == 0 && !caring() && mouth.isEmpty()));
+    }
+
+    /** Its hiding in cover (made on first use: Minecraft sets up the goals before this class's own fields are filled in). */
+    private RiverCover.Hiding hiding;
+
+    @Override
+    public RiverCover.Hiding hiding() {
+        if (hiding == null) {
+            hiding = new RiverCover.Hiding();
+        }
+        return hiding;
     }
 
     @Override

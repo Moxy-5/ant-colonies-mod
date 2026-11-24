@@ -224,7 +224,7 @@ final class BullSharkGoals {
             // the nearest prey over deep enough water that it can swim straight to (the line looked along for the
             // nearest few only: a school can be thirty fish)
             var seen = new java.util.ArrayList<>(shark.level().getEntitiesOfClass(LivingEntity.class,
-                    shark.getBoundingBox().inflate(HUNT_REACH, 8.0, HUNT_REACH), e -> BullSharkEntity.isPrey(e) && e.distanceToSqr(shark) < HUNT_REACH * HUNT_REACH));
+                    shark.getBoundingBox().inflate(HUNT_REACH, 8.0, HUNT_REACH), e -> BullSharkEntity.isPrey(e) && e.distanceToSqr(shark) < HUNT_REACH * HUNT_REACH && !RiverCover.hiddenFrom(shark, e)));
             seen.sort(java.util.Comparator.comparingDouble(e -> e.distanceToSqr(shark)));
             for (int i = 0; i < Math.min(3, seen.size()) && prey == null; i++) {
                 LivingEntity e = seen.get(i);
@@ -272,7 +272,8 @@ final class BullSharkGoals {
         }
 
         private boolean lost() {
-            return prey == null || !prey.isAlive() || prey.isRemoved() || !prey.isInWater() || prey.distanceToSqr(shark) > (HUNT_REACH + 8) * (HUNT_REACH + 8);
+            return prey == null || !prey.isAlive() || prey.isRemoved() || !prey.isInWater() || prey.distanceToSqr(shark) > (HUNT_REACH + 8) * (HUNT_REACH + 8)
+                    || RiverCover.hiddenFrom(shark, prey);        // a fish keeping still in the reeds (the food web's step 4)
         }
 
         /** The fin out at the surface, at its prowl pace toward the prey; near it, a breach or the slow approach under water. */
