@@ -4327,4 +4327,147 @@ public class RiverLifeTests {
             SavannaMod.LOGGER.info("[bullfrog] dug in at tick {}, out at {}", dugAt[0], outAt[0]);
         });
     }
+
+    // --- hiding in the reeds (the river food web's step 4, 2026-11-23) --------------------------------------------------
+
+    /**
+     * The bank with a pool 3 deep across it (x MX0+2 to MX1-2, z MZ0+1 to MZ1-1) whose west end is a reed bed in water
+     * 2 deep on silt (x MX0+2 to MX0+4, z MZ0+3 to MZ0+7; columns standing 2 over the water).
+     */
+    private static void poolWithReeds(GameTestHelper helper) {
+        for (int x = MX0; x <= MX1; x++) {
+            for (int z = MZ0; z <= MZ1; z++) {
+                boolean pool = x >= MX0 + 2 && x <= MX1 - 2 && z >= MZ0 + 1 && z <= MZ1 - 1;
+                boolean bed = pool && x <= MX0 + 4 && z >= MZ0 + 3 && z <= MZ0 + 7;
+                helper.setBlock(new BlockPos(x, TOP - 3, z), Blocks.STONE);
+                helper.setBlock(new BlockPos(x, TOP - 2, z), bed ? SavannaBlocks.SILT.get().defaultBlockState()
+                        : pool ? Blocks.WATER.defaultBlockState() : Blocks.STONE.defaultBlockState());
+                for (int y = TOP - 1; y <= TOP; y++) {
+                    helper.setBlock(new BlockPos(x, y, z), pool ? Blocks.WATER : Blocks.STONE);
+                }
+                for (int y = TOP + 1; y <= TOP + 5; y++) {
+                    helper.setBlock(new BlockPos(x, y, z), Blocks.AIR);
+                }
+            }
+        }
+        BlockState reed = SavannaBlocks.REEDS.get().defaultBlockState();
+        for (int x = MX0 + 2; x <= MX0 + 4; x++) {
+            for (int z = MZ0 + 3; z <= MZ0 + 7; z++) {
+                for (int y = TOP - 1; y <= TOP + 2; y++) {
+                    helper.setBlock(new BlockPos(x, y, z), reed.setValue(com.antcolonies.savanna.block.ReedBlock.WATERLOGGED, y <= TOP)
+                            .setValue(com.antcolonies.savanna.block.ReedBlock.TOP, y == TOP + 2));
+                }
+            }
+        }
+    }
+
+    private static boolean inCover(GameTestHelper helper, net.minecraft.world.entity.Entity e) {
+        return com.antcolonies.savanna.animal.RiverCover.isCover(helper.getLevel(), e.blockPosition());
+    }
+
+    private static boolean hidden(net.minecraft.world.entity.Entity fish) {
+        return ((com.antcolonies.savanna.animal.RiverCover.Hider) fish).hiding().hidden();
+    }
+
+    /**
+     * A barb and a tilapia scared 5 blocks from a reed bed dash into it and keep still there a few seconds, hidden, then
+     * come out again; a barb scared out of reach of any cover (14 blocks off) never hides (it flees as before).
+     */
+    @GameTest(template = "arena", timeoutTicks = 900)
+    public static void scaredFishHideInTheReedsThenComeOut(GameTestHelper helper) {
+        poolWithReeds(helper);
+        BarbEntity barb = helper.spawn(SavannaEntities.BARB.get(), new BlockPos(MX0 + 9, TOP - 1, MZ0 + 4));
+        TilapiaEntity tilapia = helper.spawn(SavannaEntities.TILAPIA.get(), new BlockPos(MX0 + 9, TOP - 1, MZ0 + 6));
+        BarbEntity far = helper.spawn(SavannaEntities.BARB.get(), new BlockPos(MX1 - 3, TOP - 1, MZ0 + 5));
+        tilapia.setUp(false, tilapia.getRandom());
+        net.minecraft.world.entity.animal.AbstractFish[] both = {barb, tilapia};
+        for (var f : new net.minecraft.world.entity.animal.AbstractFish[] {barb, tilapia, far}) {
+            f.setPersistenceRequired();
+        }
+        long now = helper.getLevel().getGameTime();
+        barb.hiding().scare(now);
+        tilapia.hiding().scare(now);
+        int[] hidFor = {0, 0};
+        boolean[] cameOut = {false, false};
+        boolean[] farHid = {false};
+        helper.onEachTick(() -> {
+            far.hiding().scare(helper.getLevel().getGameTime());       // kept scared: it would hide if it had anywhere to
+            farHid[0] |= far.hiding().hidden();
+            for (int i = 0; i < 2; i++) {
+                if (hidden(both[i])) {
+                    helper.assertTrue(inCover(helper, both[i]), "a fish counts as hidden out of the reeds, at " + helper.relativePos(both[i].blockPosition()));
+                    hidFor[i]++;
+                } else if (hidFor[i] >= 60) {
+                    cameOut[i] = true;
+                }
+            }
+        });
+        helper.succeedWhen(() -> {
+            helper.assertFalse(farHid[0], "a barb with no cover near hid");
+            helper.assertTrue(cameOut[0] && cameOut[1], "barb: hid " + hidFor[0] + " ticks" + (cameOut[0] ? ", came out" : "") + "; tilapia: hid "
+                    + hidFor[1] + " ticks" + (cameOut[1] ? ", came out" : "") + " (barb at " + helper.relativePos(barb.blockPosition())
+                    + ", tilapia at " + helper.relativePos(tilapia.blockPosition()) + ")");
+        });
+    }
+
+    /**
+     * A hungry catfish 4 blocks from a barb keeping still in the reeds does not see it and goes for a barb in open water
+     * 10 blocks off instead (it would take the nearest it saw): a hunter sees a still fish in cover only within 2 blocks.
+     */
+    @GameTest(template = "arena", timeoutTicks = 1200)
+    public static void aCatfishPassesOverABarbHiddenInTheReeds(GameTestHelper helper) {
+        poolWithReeds(helper);
+        BarbEntity hiding = helper.spawn(SavannaEntities.BARB.get(), new BlockPos(MX0 + 4, TOP - 1, MZ0 + 5));
+        hiding.setPersistenceRequired();
+        hiding.hiding().scare(helper.getLevel().getGameTime());
+        CatfishEntity[] catfish = {null};
+        BarbEntity[] open = {null};
+        helper.onEachTick(() -> {
+            hiding.hiding().scare(helper.getLevel().getGameTime());       // kept hiding all along
+            if (catfish[0] == null && hiding.hiding().hidden()) {
+                // in the reeds now: the hunter comes 4 blocks off it, the open-water barb 10 blocks beyond the hunter
+                catfish[0] = helper.spawn(SavannaEntities.CATFISH.get(), new BlockPos(MX0 + 8, TOP - 2, MZ0 + 5));
+                catfish[0].setPersistenceRequired();
+                open[0] = helper.spawn(SavannaEntities.BARB.get(), new BlockPos(MX0 + 18, TOP - 1, MZ0 + 5));
+                open[0].setPersistenceRequired();
+            }
+            if (catfish[0] != null && open[0].isAlive()) {
+                catfish[0].makeHungry();        // hungry until it has taken one
+            }
+        });
+        helper.succeedWhen(() -> {
+            helper.assertTrue(catfish[0] != null, "the barb never hid in the reeds (at " + helper.relativePos(hiding.blockPosition()) + ")");
+            helper.assertTrue(hiding.isAlive() && !hiding.isRemoved(), "the catfish took the barb hidden in the reeds");
+            helper.assertTrue(open[0].isRemoved(), "the catfish has not taken the barb in open water (it is "
+                    + String.format("%.1f", catfish[0].distanceTo(open[0])) + " blocks off it)");
+        });
+    }
+
+    /**
+     * Hatchling crocodiles rest among reeds by their crÃ¨che when a bed lies within their mother's see-off reach of it,
+     * and keep to the crÃ¨che itself where there are none.
+     */
+    @GameTest(template = "arena", timeoutTicks = 900)
+    public static void hatchlingsRestInTheReedsByTheirCreche(GameTestHelper helper) {
+        poolWithReeds(helper);
+        var croc = helper.spawn(SavannaEntities.CROCODILE.get(), new BlockPos(MX0 + 9, TOP - 1, MZ0 + 5));
+        var lone = helper.spawn(SavannaEntities.CROCODILE.get(), new BlockPos(MX1 - 4, TOP - 1, MZ0 + 5));
+        for (var c : new com.antcolonies.savanna.animal.CrocodileEntity[] {croc, lone}) {
+            c.life().setUp(true, c.getRandom());
+            c.life().setAge(0);
+            c.load(c.saveWithoutId(new net.minecraft.nbt.CompoundTag()));
+            c.setPersistenceRequired();
+        }
+        croc.keepCreche(net.minecraft.world.phys.Vec3.atCenterOf(helper.absolutePos(new BlockPos(MX0 + 8, TOP - 1, MZ0 + 5))), 20000);
+        BlockPos loneCreche = helper.absolutePos(new BlockPos(MX1 - 4, TOP - 1, MZ0 + 5));
+        lone.keepCreche(net.minecraft.world.phys.Vec3.atCenterOf(loneCreche), 20000);
+        helper.succeedWhen(() -> {
+            BlockPos rest = croc.crecheRestSpot();
+            helper.assertTrue(rest != null && com.antcolonies.savanna.animal.RiverCover.isCover(helper.getLevel(), rest),
+                    "the hatchling's resting spot " + (rest == null ? "is none" : helper.relativePos(rest) + " is not in the reeds"));
+            helper.assertTrue(loneCreche.equals(lone.crecheRestSpot()), "with no reeds near, the hatchling rests at " + lone.crecheRestSpot() + ", not its crÃ¨che");
+            double off = croc.position().distanceTo(net.minecraft.world.phys.Vec3.atBottomCenterOf(rest));
+            helper.assertTrue(off < 4.5, "the hatchling is " + String.format("%.1f", off) + " blocks from its spot in the reeds");
+        });
+    }
 }

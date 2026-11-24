@@ -336,7 +336,7 @@ final class BullfrogGoals {
             prey = null;
             double best = Double.MAX_VALUE;
             for (LivingEntity e : frog.level().getEntitiesOfClass(LivingEntity.class, frog.getBoundingBox().inflate(look + 0.5),
-                    e -> isPrey(e) && !frog.isFatherOf(e))) {      // (never his own tadpoles)
+                    e -> isPrey(e) && !frog.isFatherOf(e) && !RiverCover.hiddenFrom(frog, e))) {      // (never his own tadpoles; a barb still in the reeds unseen)
                 double d = middle(e).distanceTo(mouth);
                 boolean wanted = d < reach && clearFromMouth(frog, middle(e)) || d < far && stalkable(e) && clearFromMouth(frog, middle(e))
                         || hunting && d < HUNT_REACH && chased(e) && sees(e);

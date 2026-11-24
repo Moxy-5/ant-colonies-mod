@@ -148,6 +148,7 @@ public class HuntTilapiaGoal extends Goal {
             if (other == struckAt) {
                 continue;
             }
+            RiverCover.scare(other);        // into the reeds, if any are near (the food web's step 4)
             if (other instanceof BarbEntity barb) {
                 barb.startle(at);
                 continue;
@@ -196,9 +197,13 @@ public class HuntTilapiaGoal extends Goal {
         return best;
     }
 
-    /** A wild tilapia, barb or tadpole (a snack, as a barb: 2026-11-23) in the water near it (never the player's own fish, from a bucket or named). */
+    /**
+     * A wild tilapia, barb or tadpole (a snack, as a barb: 2026-11-23) in the water near it (never the player's own fish,
+     * from a bucket or named), not keeping still in the reeds out of its sight ({@link RiverCover#hiddenFrom}: a chase is
+     * lost when the fish hides).
+     */
     private boolean huntable(AbstractSchoolingFish t) {
         return (t instanceof TilapiaEntity || t instanceof BarbEntity || t instanceof TadpoleEntity) && t.isAlive() && t.isInWater() && !t.fromBucket() && !t.hasCustomName()
-                && t.distanceToSqr(fish) < (LOOK_ACROSS + 4) * (LOOK_ACROSS + 4);
+                && t.distanceToSqr(fish) < (LOOK_ACROSS + 4) * (LOOK_ACROSS + 4) && !RiverCover.hiddenFrom(fish, t);
     }
 }

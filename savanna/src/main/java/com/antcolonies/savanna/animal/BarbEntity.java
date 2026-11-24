@@ -56,7 +56,7 @@ import software.bernie.geckolib.util.GeckoLibUtil;
  * the surface, and now and then they pick at an algae mat, for looks only ({@link BarbFeedGoal}). Each fish has its own
  * length (0.85 to 1.15 of the usual, my pick) through {@link Attributes#SCALE}. Breeding is the plan's next step.
  */
-public class BarbEntity extends AbstractSchoolingFish implements GeoEntity {
+public class BarbEntity extends AbstractSchoolingFish implements GeoEntity, RiverCover.Hider {
     /** What it is doing to be seen (synced): nothing, sipping at the surface, or nibbling algae. */
     public static final byte NONE = 0, SIP = 1, NIBBLE = 2;
     private static final EntityDataAccessor<Byte> DATA_ACTION = SynchedEntityData.defineId(BarbEntity.class, EntityDataSerializers.BYTE);
@@ -97,6 +97,18 @@ public class BarbEntity extends AbstractSchoolingFish implements GeoEntity {
         // a cruising bull shark, a big shape seen from afar: the school parts round it wider
         goalSelector.addGoal(2, new AvoidEntityGoal<>(this, BullSharkEntity.class, BullSharkEntity.FISH_PART_FROM, 1.4, 1.6, BullSharkEntity::partsFish));
         goalSelector.addGoal(3, new BarbFeedGoal(this));      // over Minecraft's fish swimming (4), which it could never take over at the same number
+        goalSelector.addGoal(1, new HideInCoverGoal(this, () -> true));     // scared: into the reeds (the food web's step 4)
+    }
+
+    /** Its hiding in cover (made on first use: Minecraft sets up the goals before this class's own fields are filled in). */
+    private RiverCover.Hiding hiding;
+
+    @Override
+    public RiverCover.Hiding hiding() {
+        if (hiding == null) {
+            hiding = new RiverCover.Hiding();
+        }
+        return hiding;
     }
 
     /**
