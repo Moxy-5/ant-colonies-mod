@@ -159,3 +159,77 @@ open plain, the hippo group, which has no spawn list at all) are tried for ever.
 most are underground and end at once), but there are 13 groups × about 290 chunks a tick. Measure with the profiler on
 the open savanna away from water; if it shows, the hippo group at least can be made a group the spawner skips. Noted
 here because the small animals' groups are most of the thirteen.
+
+---
+
+## Piece 3: the bullfrog and the tadpole (read by a helper, each finding checked again against the code)
+
+### R10-8 (A, proven): a bullfrog climbing out of the water can be left hanging with no gravity, for good
+
+**What is wrong.** The climb-out switches the frog's gravity off (`BullfrogEntity.climbOut`, line 324) and only the
+climb's own tick switches it back on (`climbTick`, lines 331 and 343), which runs only while the frog's action is
+"climb out" (line 457). The threat goal does not wait for a climb to end: `ThreatGoal.canUse`
+(`BullfrogGoals.java:729-742`) refuses only a leap, a froglet and a clasping pair, and its tick sets the action to
+"puff" over whatever it was (`:846-848`). `act` (`BullfrogEntity.java:226-230`) and `stopActing` never touch gravity.
+So a frog that starts puffing in the 16 ticks of a climb keeps no gravity for ever; Minecraft saves the no-gravity
+mark with the mob, so it survives a reload too. On land its legs wait for the ground (`BullfrogMoveControl:77-78`), so
+it never hops again. Two more doors to the same hole: a female's courtship seats a male who is mid-climb
+(`BullfrogEntity.java:685-686`), and a save or unload inside the 16 ticks (the action is not saved, the mark is).
+The escape leap's "no air drag" mark (`BullfrogGoals.java:225`, cleared only at `BullfrogEntity.java:461-463`) has the
+same weakness, smaller.
+
+**What the player would see.** In survival, standing within 3 blocks of a frog hauling itself onto the bank: a frog
+frozen part way up, floating, puffed, that never moves again. (Not in creative or spectator: the frog ignores those.)
+
+**Proof.** The lines above, walked; `grep setNoGravity` over the frog's files finds only lines 324, 331, 343.
+
+**Proposed fix.** Do not use the saved no-gravity mark for a 16-tick move: clear no-gravity and no-drag in `act()` /
+`stopActing()` for any action but the one that needs them, and on load; and make `ThreatGoal.canUse` refuse a climb.
+Test first: a frog mid-climb with a survival player 2 blocks off must stand on the bank with gravity 2 seconds later.
+
+### R10-9 (A, proven that it is sent; the cost to measure): every tadpole tells every player its age every tick
+
+**What is wrong.** A tadpole's age is synced data and is counted up by one every tick
+(`TadpoleEntity.java:179-181` → `setAge`, `:135-137`). The players' computers need one fact from it (leg buds from day
+2). Synced data that changes every tick marks the mob as changed every tick, so the server sends a data packet for it
+every tick and, in Minecraft's tracker, its position goes out every tick too instead of every third.
+
+**What the player would see.** Nothing directly: more network and server work the more tadpoles and players there are
+(16 to about 26 tadpoles in a pool: some 300 to 500 extra packets a second for each player near). It matters most in
+multiplayer.
+
+**To measure:** 24 tadpoles in a pool, one player 10 blocks off: packets a second (F3's network chart, or the debug
+"tx" count) with and without the change.
+
+**Proposed fix.** Keep the age a plain server field (it is already saved) and sync one "has legs" flag, set once.
+
+### R10-10 (B, proven): the two frog steps before breeding can end with nothing, and a hungry frog searches wide 5 times a second
+
+- **Courtship ends on a timer, not at the water** (`SeekMateGoal.java:100-110`, `BullfrogEntity.java:698-708`): after
+  16 seconds both are marked as bred, then she lays only if she is within 3 blocks of her laying spot. A pair that had
+  to go round a bank part on land with no eggs, and she waits 4 days. How often: not known (to watch in play). Fix:
+  count the courtship as done only once she is at the spot, with the kit's own give-up time.
+- **The hungry frog's search has no rest** (`BullfrogGoals.java:328-349`): about every 4 ticks it lists every living
+  thing in a box 21 blocks each way and casts sight lines, and a frog that finds nothing stays hungry, so it goes on
+  for ever. Harmless at the cap of 4 frogs; a cost if the cap is ever raised. Fix: after an empty search wait a second
+  or two, and make the box 3 high.
+- **The father's guard goal searches for intruders it is told never to find** (`BullfrogGoals.java:97`,
+  `framework/.../GuardPlaceGoal.java:41-49`): made with a see-off distance of 0 and a test that is always false, it
+  still runs its search each check. Skip the search when the distance is 0. (C)
+
+### R10-11 (C, proven): frog and tadpole small things
+
+- `TadpoleEntity.java:275` says a tadpole hatched from eggs is kept for good; nothing in `FrogEggsBlock.hatch`
+  (`:126-148`) marks it kept, so a father's school fades past 96 blocks like a wild one. Despawning is the safer choice
+  for counts: correct the comment and drop the dead copy of the mark at `:211-213`.
+- `BullfrogEntity.java:669-672, 709`: "takes a mate" is true for a male riding anything, so a male held in an otter's
+  jaws may be courted and pulled free by `stopRiding`. Unsure it can last long enough; use "riding a bullfrog".
+- A `frog_eggs` block placed from the creative menu has no mother, never hatches, and puts a water source where it is
+  placed (`FrogEggsBlock.java:98-100`). Creative only.
+- In peaceful mode the frog still puffs and lunges at a survival player, and the bite does nothing.
+- The film hooks (`filmTick`, `filmed()`) read the frog's name every tick in normal play (`BullfrogEntity.java:475-483`).
+
+**Frog eggs and R10-1:** a frog's eggs hatch only while the tadpole group is under its cap of 16
+(`FrogEggsBlock.java:119-124`), and the world's own tadpole schools (6 to 10 a school) fill that cap; a tadpole becomes
+a froglet only while the frog group is under its 4 (`TadpoleEntity.java:205-206`), which the world's own frogs fill.
+The frog's whole life cycle is the clearest case of R10-1.
