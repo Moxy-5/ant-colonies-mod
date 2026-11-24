@@ -9,7 +9,7 @@ import org.jetbrains.annotations.Nullable;
 
 import com.antcolonies.colony.Colony;
 import com.antcolonies.entity.AbstractAntEntity;
-import com.antcolonies.savanna.colony.RaidColumn;
+import com.antcolonies.savanna.colony.Raid;
 import com.antcolonies.savanna.colony.RaidGround;
 import com.antcolonies.savanna.colony.Raids;
 import com.antcolonies.savanna.colony.SavannaParts;
@@ -26,7 +26,7 @@ import net.minecraft.world.entity.ai.goal.Goal;
 import net.minecraft.world.phys.Vec3;
 
 /**
- * M8 step 3b, a raider walking in its colony's raid column ({@link RaidColumn}). The column (the colony's brain) says
+ * M8 step 3b, a raider walking in its colony's raid column ({@link Raid}). The column (the colony's brain) says
  * where this ant should be now: round the entrance while the raid forms, its place in the line on the march, bunched
  * up short of the termites, home again after the fight. This goal only walks there through the ant's navigator, hop by
  * hop for a far place, and faces where the column is heading. The fight itself is {@code FightGoal}'s: the column gives
@@ -51,7 +51,7 @@ public class MatabeleRaidGoal extends Goal {
 
     private final MatabeleEntity ant;
     @Nullable
-    private RaidColumn column;
+    private Raid column;
     @Nullable
     private BlockPos walkingTo;
     private int waitUntil;
@@ -99,10 +99,10 @@ public class MatabeleRaidGoal extends Goal {
     }
 
     @Nullable
-    private RaidColumn myColumn() {
+    private Raid myColumn() {
         Raids raids = raids();
-        RaidColumn found = raids == null ? null : raids.column();
-        return found != null && found.has(ant.getUUID()) && found.stage() != RaidColumn.Stage.DONE ? found : null;
+        Raid found = raids == null ? null : raids.column();
+        return found != null && found.has(ant.getUUID()) && found.stage() != Raid.Stage.DONE ? found : null;
     }
 
     /** Step 3c: whether it limps home from a raid by itself (hurt, out of the column). */
@@ -158,14 +158,14 @@ public class MatabeleRaidGoal extends Goal {
         if (!(ant.level() instanceof ServerLevel level)) {
             return;
         }
-        RaidColumn.Order order;
+        Raid.Order order;
         if (limping) {
             Raids raids = raids();
             BlockPos to = raids == null ? null : raids.wayHomeOrder(level, ant);
             if (to == null) {
                 return; // (home: it is let go, and goes in as any ant)
             }
-            order = new RaidColumn.Order(to, 1.0, null);
+            order = new Raid.Order(to, 1.0, null);
         } else {
             order = column == null ? null : column.orderFor(level, ant);
         }
@@ -195,8 +195,8 @@ public class MatabeleRaidGoal extends Goal {
             return;
         }
         ant.getNavigator().setClimbPace(column != null && !limping
-                && (column.stage() == RaidColumn.Stage.FORMING || column.stage() == RaidColumn.Stage.MARCHING)
-                ? RaidColumn.MARCH_CLIMB : 1.0); // (the way out: up the nest's shaft and down the hump at about a walk)
+                && (column.stage() == Raid.Stage.MUSTER || column.stage() == Raid.Stage.MARCH_OUT)
+                ? Raid.MARCH_CLIMB : 1.0); // (the way out: up the nest's shaft and down the hump at about a walk)
         if (order.onTheMove() && order.to() != null) {
             march(level, order);
             return;
@@ -273,7 +273,7 @@ public class MatabeleRaidGoal extends Goal {
      * {@link #MARCH_MOVED} or its walk is over, and in between only its pace changes (hurrying to its place in the stream,
      * or walking on slower to let the column come up to it).
      */
-    private void march(ServerLevel level, RaidColumn.Order order) {
+    private void march(ServerLevel level, Raid.Order order) {
         endCleaning();
         millLook = null;
         BlockPos to = order.to();
@@ -297,16 +297,16 @@ public class MatabeleRaidGoal extends Goal {
      * Step 3c, at its stung termite to pick it up. Real sizes, step 2: its jaws on it (as in a fight, a little more
      * downward into a broken tunnel; it used to take one up to 1.6 blocks off, three major lengths); beside it, its
      * walk over, it steps the last little bit straight at it first; getting no nearer (a step of comb, a hole's edge), it
-     * takes it from where it stands, within {@link RaidColumn#PICK_REACH} as before real sizes.
+     * takes it from where it stands, within {@link Raid#PICK_REACH} as before real sizes.
      */
     private int atPrey(LivingEntity prey) {
         if (ant.reachesInFight(prey)) {
             return AT_PREY;
         }
-        if (prey.distanceTo(ant) > RaidColumn.PICK_REACH) {
+        if (prey.distanceTo(ant) > Raid.PICK_REACH) {
             return NOT_AT_PREY;
         }
-        AbstractAntEntity.CloseIn step = ant.closeIn(prey.position(), RaidColumn.PICK_REACH);
+        AbstractAntEntity.CloseIn step = ant.closeIn(prey.position(), Raid.PICK_REACH);
         if (step == AbstractAntEntity.CloseIn.STEPPING) {
             return STEPPING_TO_PREY;
         }

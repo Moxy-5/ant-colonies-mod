@@ -176,7 +176,7 @@
     "hours_and_sound": {
       "_note": "Raid rework R7, hours and sound (colony.Raids, colony.RaidColumn). Raids end by dusk (the user's answer, 2026-11-04): no raid leaves after 19:00 (the evening raid hours in scouting.hours end there: time to reach a spot and come home), a raid still out at dusk (19:30) stops where it is, picks up what it stung and walks home, and until the morning's first raid hour (6:00) it stays dusk, so a find made after 19:00 waits for the morning. Rare night raids in the hot season (Yusuf 2026) wait for the shared season source (Serene Seasons, M9). A raid a command sends outside the raid hours (/antcolonies raid, /antcolonies scout anytime) keeps no hours. The attack: once no termite has been about the spot (within carry.collect_reach) for quiet_ticks, the attack is over (real raids: the attack at the feeding site lasts about 10 to 20 minutes, the termites stung, fled or sealed in; Yusuf 2026; column.fight_ticks is the most it may last). The squeak (Hoelldobler et al. 1994: the columns' stridulation is no message between the ants but a warning to big animals): the raider nearest a player within squeak_hear blocks squeaks, squeak_quiet loud every squeak_every_far ticks at that distance, up to squeak_loud every squeak_every_near ticks at squeak_loud_at blocks, before anyone stings. A column marching into land not ticking within edge_look blocks ahead of its front turns home at that edge (until drawn-only ants, M8 step 4). Every number my pick, to confirm.",
       "dusk": 19.5,
-      "quiet_ticks": 600,
+      "quiet_ticks": 300,
       "squeak_hear": 12.0,
       "squeak_loud_at": 2.0,
       "squeak_quiet": 0.25,
@@ -200,8 +200,13 @@
       "gather_ticks": 300,
       "_fight_ticks_note": "Raid rework R7: the attack's longest, 2 minutes (was 5; the raid diary's attacks ran about 4 minutes, a raid out from 8:00 to 14:00 in game hours). Most attacks now end sooner, quiet_ticks after the last termite about (raids.hours_and_sound). My pick, to confirm.",
       "fight_ticks": 2400,
-      "regroup_ticks": 400,
-      "home_ticks": 3600
+      "_stages_note": "The raid rewrite (2026-11-24, colony.Raid): one deadline a stage. The muster at the nest lasts at most muster_ticks (real: 1 to 5 minutes from the scout's return to the column leaving, Hoelldobler et al. 1994; 20 s here), a bunch (the muster, the halt) lasts at least bunch_least_ticks so one can see it; at the halt the column waits for its tail at most gather_ticks; with no termite at the spot the front few look round look_ticks, then the raid turns home and the find is forgotten; the attack ends quiet_ticks (raids.hours_and_sound) after the last termite stung or gone for, at most fight_ticks; a raider fighting farther than leash blocks from the spot stops and comes back, and the raid counts and goes for termites only inside the square within that circle (leash over root 2, about 10 blocks each way), so nobody is sent after one the leash would call it back from; the regroup, picking up what was stung, at most regroup_ticks (30 s, was 20). A march may last a second a block and 30 s more (in code). My picks, sized so a raid on a spot 96 blocks out is home inside its day.",
+      "regroup_ticks": 600,
+      "home_ticks": 3600,
+      "muster_ticks": 400,
+      "bunch_least_ticks": 100,
+      "look_ticks": 200,
+      "leash": 14.0
     },
     "carry": {
       "_note": "M8 step 3c, home with the prey (colony.RaidColumn, BringPreyGoal). Real Megaponera (Longhurst and Howse 1979, Yusuf 2026): after the fight the raiders gather the stung termites, a major holding a bundle of up to about 12 under its jaws, a minor 1 to 3, and walk home as a column; the prey is eaten in the nest. A worker holds least_major (the shortest drawn as a major) to most_major (the longest major), least_minor to most_minor for a minor, by its length. The raiders pick up the paralysed termites within collect_reach blocks of the find, workers before soldiers, at most collect_ticks, each pick-up pick_ticks. A raid that found nothing spreads round the spot up to spread_reach blocks for spread_ticks, a raider seeing a termite within spread_see blocks going for it, then gathers what it stung; still nothing: home, and the find counts an empty check. Laden, the column walks home at laden_pace of its pace. At home each carrier lays its termites on the prey pile, termites_per_layer to a layer (one that finds no way to the pile in bring_ticks has them laid there out of sight). A raider that leaves the column hurt (crippled, or a soldier clamped on a leg) follows the raid's trail home alone, at most limp_ticks. Every number my pick, to confirm, but the loads (real).",

@@ -80,4 +80,25 @@ public final class MatabeleScenes {
         }
         return termites;
     }
+
+    /**
+     * The raid rewrite (2026-11-24): something for a raid to set out to. No raid goes to a spot with no termite any more
+     * (the one judge, {@code Raid.termitesThere}), so a test of the march or of a turn home puts two termite workers of
+     * no colony, standing still, at its trail's end (a place in the world, not the test's own).
+     */
+    static List<TermiteWorkerEntity> termitesAt(GameTestHelper helper, BlockPos absolute) {
+        List<TermiteWorkerEntity> put = new ArrayList<>();
+        for (int i = 0; i < 2; i++) {
+            TermiteWorkerEntity termite = SavannaEntities.TERMITE_WORKER.get().create(helper.getLevel());
+            // (on the ground there: a find is often the food block itself, and one put inside it would smother)
+            BlockPos cell = com.antcolonies.savanna.colony.RaidGround.standAt(helper.getLevel(), absolute.getX() + 0.5 + i, absolute.getZ() + 0.5, absolute.getY());
+            BlockPos on = cell != null ? cell : absolute.offset(i, 0, 0);
+            termite.moveTo(on.getX() + 0.5, on.getY(), on.getZ() + 0.5, 0.0F, 0.0F);
+            termite.setNoAi(true);
+            termite.keepOutOfColonies();
+            helper.getLevel().addFreshEntity(termite);
+            put.add(termite);
+        }
+        return put;
+    }
 }

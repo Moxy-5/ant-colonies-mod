@@ -23,7 +23,7 @@ import net.minecraft.util.RandomSource;
 /**
  * M8 step 3f, out of sight ({@code docs/plans/m8-matabele.md}): the Matabele raid while their colony is away (its land
  * not loaded, or loaded but with no player within the far rule's reach, {@code AwayLife}), as numbers, by the same rules
- * as the real column ({@link Raids}, {@link RaidColumn}). Real Megaponera raid 1 to 4 times a day, in the morning and
+ * as the real column ({@link Raids}, {@link Raid}). Real Megaponera raid 1 to 4 times a day, in the morning and
  * evening raid hours, a hungry colony more (Yusuf 2026; Frank and Linsenmair 2017), so a colony nobody watches must too:
  * without it a far colony starved on an empty prey pile.
  *
@@ -346,11 +346,11 @@ public final class RaidsAway {
 
     /**
      * A real raid column was out when the colony went away: it goes on as numbers from where it is
-     * ({@link RaidColumn#shareOut}; step 3 of the brain while away, it was "about half the march" before, and a column
+     * ({@link Raid#shareOut}; step 3 of the brain while away, it was "about half the march" before, and a column
      * on its way home started the whole walk home again). Not yet at its spot: it attacks after the rest of the march;
      * already attacked: it walks the rest of the way home with what it picked up (from the spot, it regroups first).
      */
-    void fromColumn(ServerLevel level, RaidColumn column) {
+    void fromColumn(ServerLevel level, Raid column) {
         long now = level.getGameTime();
         Raids.Find find = column.find();
         double distance = RaidGround.flat(colony.getCenter(), find.at());
@@ -364,7 +364,7 @@ public final class RaidsAway {
             out = new Out(find.at().immutable(), Math.max(1, column.size()), attackAt,
                     attackAt + numbers.fightTicks() + homeTicks(distance, columnNumbers, carry), termites == null ? null : termites.getId());
         } else {
-            long home = column.stage() == RaidColumn.Stage.HOMING ? homeTicks(distance * share, columnNumbers, carry) - (columnNumbers == null ? 400 : columnNumbers.regroupTicks())
+            long home = column.stage() == Raid.Stage.MARCH_HOME ? homeTicks(distance * share, columnNumbers, carry) - (columnNumbers == null ? 400 : columnNumbers.regroupTicks())
                     : homeTicks(distance, columnNumbers, carry);
             out = new Out(find.at().immutable(), Math.max(1, column.size()), now, now + Math.max(0, home), null);
             out.attacked = true;

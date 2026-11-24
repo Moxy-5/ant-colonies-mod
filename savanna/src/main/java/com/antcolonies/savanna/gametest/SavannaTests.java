@@ -46,21 +46,9 @@ public final class SavannaTests {
         // Soldiers and the alarm; the fights (M8 step 2).
         TestFilter.addCategory("soldiers", TermiteSoldierTests.class, TermiteAlarmTests.class, MatabeleFightTests.class, TermiteRaidDefenceTests.class,
                 MatabeleDefenceTests.class);
-        // The Matabele raids (M8 step 3): the scouts, then the columns.
-        TestFilter.addCategory("raids", MatabeleRaidTests.class);
-        // The raid rewrite, step 2 (docs/plans/raid-rewrite.md): the new raid's whole-chain tests, written before the new
-        // raid. They fail on the old raid code, so until step 3 they have their own category and stay out of full runs.
-        TestFilter.addCategory("raidchain", MatabeleRaidChainTests.class);
-        TestFilter.skipInFullRuns("aRaidOnFlatGroundRunsEveryStageInItsTimeAndBringsItsPreyToThePile",
-                "aRaidFromATallDeadMoundRunsEveryStageInItsTimeAndBringsItsPreyToThePile",
-                "aRaidFromALowDeadMoundRunsEveryStageInItsTimeAndBringsItsPreyToThePile",
-                "aRaidOverLumpyGroundRunsEveryStageInItsTimeAndBringsItsPreyToThePile",
-                "aRaidOverARidgeAndRoundAPondRunsEveryStageInItsTimeAndBringsItsPreyToThePile",
-                "noRaidSetsOutToASpotWhereNoTermiteIsNowAndTheFindIsForgotten",
-                "aRaidWhoseTermitesLeftOnTheWayLooksRoundBrieflyAndComesHomeEmpty",
-                "aRaidCaughtByDuskAtTheSpotTurnsHomeWithWhatItStung",
-                "aRaidWhoseScoutIsKilledOnTheMarchOutTurnsHomeAndNobodyIsLeftOut",
-                "everyTermiteStungInTheOpenIsCarriedHomeAndNobodyFightsPastTheSpot");
+        // The Matabele raids (M8 step 3): the scouts, then the raids; and the raid rewrite's whole-chain tests (step 2 of
+        // docs/plans/raid-rewrite.md, written before the new raid; in this category and in full runs since step 3 built it).
+        TestFilter.addCategory("raids", MatabeleRaidTests.class, MatabeleRaidChainTests.class);
         // The colony: founding, jobs by age, the virtual population, neighbours.
         TestFilter.addCategory("colony", TermiteTests.class, TermiteJobsByAgeTests.class, TermitePopulationTests.class,
                 TermiteNeighbourTests.class, MatabeleColonyTests.class, MatabeleNestTests.class, MatabeleFoodTests.class,

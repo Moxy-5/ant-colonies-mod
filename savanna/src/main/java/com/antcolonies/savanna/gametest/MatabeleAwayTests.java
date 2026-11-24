@@ -286,7 +286,7 @@ public class MatabeleAwayTests {
                     }
                 }
                 case 3 -> {
-                    com.antcolonies.savanna.colony.RaidColumn column = raids.column();
+                    com.antcolonies.savanna.colony.Raid column = raids.column();
                     if (column == null) {
                         helper.assertTrue(raids.away().isOut(), "the raid out as numbers came home without being shown to the watcher by its trail");
                         return;
@@ -308,14 +308,14 @@ public class MatabeleAwayTests {
                     SavannaMod.LOGGER.info("[shown raid test] shown at {}: {} raiders, stage {}, {} termite(s) held, carried {}",
                             now, shown[0], column.stage(), held, column.carried());
                     if (!afterAttack) {
-                        helper.assertTrue(column.stage() == com.antcolonies.savanna.colony.RaidColumn.Stage.MARCHING, "shown on its way out, the column is "
+                        helper.assertTrue(column.stage() == com.antcolonies.savanna.colony.Raid.Stage.MARCH_OUT, "shown on its way out, the column is "
                                 + column.stage() + ", not marching");
                         helper.assertTrue(held == 0, "raiders on their way out hold termites");
                         helper.succeed();
                         return;
                     }
-                    helper.assertTrue(column.stage() == com.antcolonies.savanna.colony.RaidColumn.Stage.REGROUPING
-                            || column.stage() == com.antcolonies.savanna.colony.RaidColumn.Stage.HOMING, "shown after its attack, the column is " + column.stage());
+                    helper.assertTrue(column.stage() == com.antcolonies.savanna.colony.Raid.Stage.REGROUP
+                            || column.stage() == com.antcolonies.savanna.colony.Raid.Stage.MARCH_HOME, "shown after its attack, the column is " + column.stage());
                     helper.assertTrue(held > 0 && held == column.carried(), "the raiders shown after the attack hold " + held + " termite(s), the column counts "
                             + column.carried());
                     stage[0] = 4;
@@ -460,7 +460,7 @@ public class MatabeleAwayTests {
         BlockPos spot = helper.absolutePos(new BlockPos(44, SURFACE, 44));
         Colony[] termites = new Colony[1];
         int[] termitesBefore = new int[1];
-        com.antcolonies.savanna.colony.RaidColumn[] column = new com.antcolonies.savanna.colony.RaidColumn[1];
+        com.antcolonies.savanna.colony.Raid[] column = new com.antcolonies.savanna.colony.Raid[1];
         helper.startSequence()
                 .thenIdle(10)
                 .thenExecute(() -> {
@@ -482,11 +482,14 @@ public class MatabeleAwayTests {
                                 new BlockPos(x, entrance.getY(), z)));
                     }
                     helper.assertTrue(raids.isHungry(), "the Matabele colony is not hungry with an empty pile");
+                    // (the raid rewrite: no raid sets out to a spot with no termite; the queen's new colony has no feeding
+                    // place of its own yet, so two workers of no colony stand at the spot for the judge to see)
+                    MatabeleScenes.termitesAt(helper, spot);
                     column[0] = raids.raidForTests(level, spot, 12, trail, null);
                     helper.assertTrue(column[0] != null, "no raid set out; " + raids.describe(level));
                     SavannaMod.LOGGER.info("[near catch test] set out: {}", column[0].describe());
                 })
-                .thenWaitUntil(() -> helper.assertTrue(column[0].stage().ordinal() >= com.antcolonies.savanna.colony.RaidColumn.Stage.ATTACKING.ordinal(),
+                .thenWaitUntil(() -> helper.assertTrue(column[0].stage().ordinal() >= com.antcolonies.savanna.colony.Raid.Stage.ATTACK.ordinal(),
                         "the column did not reach the spot; " + column[0].describe()))
                 .thenExecute(() -> {
                     int hidden = column[0].hiddenCatch();

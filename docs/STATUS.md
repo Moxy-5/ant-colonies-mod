@@ -5,7 +5,7 @@ Keep this short. The full story is in `docs/HISTORY.md`; every status bullet is 
 ## Finish line
 **M8 playable = the mod done for now** (the user, 2026-10-25): Matabele scouts find termites, raid columns go out, fight, and carry prey home. Everything after that is optional.
 
-**The raids do not work yet (the user, 2026-11-23):** the march works, but the raids themselves are broken and inconsistent. They get a from-scratch rewrite by a Fable session: `docs/plans/raid-rewrite.md` (BUGS 306).
+**The raids are being rewritten (BUGS 306; plan `docs/plans/raid-rewrite.md`).** The user, 2026-11-23: the march works, the raids themselves were broken and inconsistent. On branch `claude/raid-rewrite-edbbde` the new raid is built (2026-11-24): muster by the nest, march out, halt short of the termites, attack, regroup with the prey, march home, each stage with one rule that ends it and one time limit, and no raid sets out to a spot with no termites. Still to come there: raids out of sight on the same rules, a raid kept through leaving the game, the old code deleted, the long runs. `master` still has the old raids until that branch is merged.
 
 **The three big jobs (planned 2026-11-23):** the red harvester ant is taken out (2026-11-23, on its branch, waiting for your word to merge); next rewrite the raids, then review all the code system by system. Order and plans: `docs/plans/big-three.md`.
 

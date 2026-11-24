@@ -16,7 +16,7 @@ import net.minecraft.world.item.ItemStack;
  * The Matabele ants' own loads (Project Apex T3: a new load is a row in its species mod). M8 step 1e: termite leftovers
  * on their way out to the heap by the entrance ({@code CarryRemainsGoal}); a carrier that dies holding them leaves the
  * job to the numbers, its layer laid on the heap out of sight. M8 step 3c: a bundle of paralysed termites on its way
- * home from a raid ({@code colony.RaidColumn}, {@code BringPreyGoal}), held as that many prey items; a carrier that dies
+ * home from a raid ({@code colony.Raid}, {@code BringPreyGoal}), held as that many prey items; a carrier that dies
  * holding them drops them: they lie stung where it fell (the raid code review, finding 18; before, they vanished). Drawn in
  * {@code client.SavannaClientEvents}.
  */

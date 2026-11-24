@@ -50,7 +50,7 @@ import net.minecraft.world.level.Level;
  * {@code MatabeleScoutGoal}.
  *
  * <p>Step 3b, the column: a scout home with a find recruits a raid there ({@link #found}), sized by the find and capped
- * by the colony's size and hunger, and the colony keeps the {@link RaidColumn} while it is out (one at a time).
+ * by the colony's size and hunger, and the colony keeps the {@link Raid} while it is out (one at a time).
  * Numbers: the species file's {@code raids.scouting} ({@link SavannaNumbers.ScoutNumbers}) and {@code raids.column}
  * ({@link SavannaNumbers.ColumnNumbers}).
  *
@@ -160,10 +160,10 @@ public class Raids {
     private long openSince = -1;
     /** The raid out now, or null (not saved: after a reload the raiders are just ants outside, and go home). */
     @Nullable
-    private RaidColumn column;
+    private Raid column;
     /** The last raid home (tests and the colony list), or null. */
     @Nullable
-    private RaidColumn last;
+    private Raid last;
     /** A find a scout brought home between the raid hours: the raid sets out to it when they come, the colony hungry. */
     @Nullable
     private Find waiting;
@@ -243,7 +243,7 @@ public class Raids {
             waiting = null;
         }
         if (column != null) {
-            if (column.stage() != RaidColumn.Stage.DONE) {
+            if (column.stage() != Raid.Stage.DONE) {
                 away.fromColumn(level, column);
             }
             last = column;
@@ -268,10 +268,10 @@ public class Raids {
         if (numbersRaid != null) {
             places.add(numbersRaid);
         }
-        if ((column == null || column.stage() == RaidColumn.Stage.DONE) && scouts.isEmpty() && wayHome.size() == 0) {
+        if ((column == null || column.stage() == Raid.Stage.DONE) && scouts.isEmpty() && wayHome.size() == 0) {
             return places;
         }
-        if (column != null && column.stage() != RaidColumn.Stage.DONE) {
+        if (column != null && column.stage() != Raid.Stage.DONE) {
             addPlaces(level, column.members(), places);
         }
         addPlaces(level, scouts, places);
@@ -291,7 +291,7 @@ public class Raids {
      * The brain while away, step 3: a raid out as numbers is shown as real ants ({@link RaidsAway#tickHere}). So many
      * workers come out of the numbers and make a column to the raid's spot: {@code inNest}, in the nest's rooms, the raid
      * forming as any raid does (it had only just left); else on the trail where the raid is now
-     * ({@link RaidColumn#startPartway}), with {@code caught} termites in their jaws if it has attacked. False if it
+     * ({@link Raid#startPartway}), with {@code caught} termites in their jaws if it has attacked. False if it
      * could not be (no room cell, nobody inside to come out): it goes on as numbers.
      */
     boolean showRaid(ServerLevel level, BlockPos at, BlockPos where, int raiders, boolean inNest, boolean attacked, double share, int caught) {
@@ -324,8 +324,11 @@ public class Raids {
         if (trail == null) {
             trail = trails.lay(level, colony.getCenter(), find.at, find.trail, now, false);
         }
-        column = new RaidColumn(level, colony, numbers, carryNumbers(), trailNumbers(), find, trail, ants, 0, now);
-        if (!inNest) {
+        column = new Raid(level, colony, numbers, carryNumbers(), trailNumbers(), find, trail, ants, 0,
+                Raid.termitesThere(level, colony, find.at), now);
+        if (inNest) {
+            column.sayStart(level);
+        } else {
             column.startPartway(level, ants, attacked, share, now);
         }
         int left = attacked ? caught : 0;
@@ -508,7 +511,7 @@ public class Raids {
     private void tickTimed(ServerLevel level) {
         trails.tick(level, level.getGameTime(), trailNumbers(), column == null ? null : column.trail(), what -> say(level, what));
         if (column != null) {
-            if (column.stage() != RaidColumn.Stage.DONE && !column.keepsNoHours() && !column.turnedAtDusk()) {
+            if (column.stage() != Raid.Stage.DONE && !column.keepsNoHours() && !column.turnedAtDusk()) {
                 if (isDusk(level)) {
                     column.callDusk(); // (R7: raids end by dusk: it stops where it is, picks up what it stung and walks home)
                 } else if (colony.rainsNow(level)) {
@@ -527,7 +530,7 @@ public class Raids {
                 say(level, "the raid's update failed (" + e + "): the raid is given up, everyone walks home");
                 column.abandon(level, e.toString());
             }
-            for (RaidColumn.LetGo one : column.takeLetGo()) {
+            for (Raid.LetGo one : column.takeLetGo()) {
                 wayHome.send(one.ant(), column.back(), level.getGameTime(), one.why());
                 say(level, RaidGround.shortId(one.ant()) + " goes home along the trail by itself (" + one.why() + ")");
             }
@@ -535,7 +538,7 @@ public class Raids {
                 raidCheckAt = -1;
                 checkRaiders(level, column);
             }
-            if (column.stage() == RaidColumn.Stage.DONE) {
+            if (column.stage() == Raid.Stage.DONE) {
                 raidHome(level, column);
                 last = column;
                 column = null;
@@ -650,7 +653,7 @@ public class Raids {
     }
 
     /** BUGS 89: the raiders a moment after the raid was called: one not walking with it says why (the goals it runs). */
-    private void checkRaiders(ServerLevel level, RaidColumn raid) {
+    private void checkRaiders(ServerLevel level, Raid raid) {
         for (UUID id : raid.members()) {
             if (level.getEntity(id) instanceof MatabeleEntity ant && ant.getFightSpot() == null
                     && !ant.runsGoal(MatabeleRaidGoal.class)) {
@@ -689,7 +692,7 @@ public class Raids {
      * again); one that came back empty counts as an empty check of the spot, forgotten after {@code spot_misses} such
      * (the next scouts, sent out at once while the colony is hungry, look elsewhere first).
      */
-    private void raidHome(ServerLevel level, RaidColumn raid) {
+    private void raidHome(ServerLevel level, Raid raid) {
         Raids.Find find = raid.find();
         bringHiddenHome(level, raid);
         if (!finds.contains(find)) {
@@ -698,13 +701,18 @@ public class Raids {
         if (raid.carried() > 0 || raid.hiddenCatch() > 0) {
             find.checkedAt = level.getGameTime();
             find.misses = 0;
-        } else if (raid.lostTrail() || raid.lostFromSight()) {
-            // R4: turned home at a gap in the trail, or (the raid code review, finding 1) lost from sight: the spot was
-            // never looked over, so it is no empty check (a scout rechecks it later and lays a new line).
-            say(level, "the raid to " + find.at.toShortString() + " never looked the spot over (" + (raid.lostFromSight() ? "lost from sight" : "the trail lost")
+        } else if (raid.spotEmpty()) {
+            // The raid rewrite: the column halted at the spot, looked round and nobody was there: forgotten at once.
+            finds.remove(find);
+            say(level, "the raid to " + find.at.toShortString() + " found no termite there: the find is forgotten");
+        } else if (raid.turned() != null || raid.lostTrail() || raid.lostFromSight()) {
+            // Turned home on the way (dusk, rain, the scout lost, a gap in the trail, land not loaded) or lost from
+            // sight: the spot was never looked over, so it is no empty check (a scout rechecks it later).
+            say(level, "the raid to " + find.at.toShortString() + " never looked the spot over ("
+                    + (raid.lostFromSight() ? "lost from sight" : raid.turned() != null ? raid.turned() : "the trail lost")
                     + "): it still counts as a good spot");
         } else if (raid.foundNothing()) {
-            foundEmpty(level, find); // (they were there and found nothing)
+            foundEmpty(level, find); // (they fought there and brought nothing back)
         }
     }
 
@@ -713,7 +721,7 @@ public class Raids {
      * of sight: they are numbers), and the termite colony remembers the attack (its danger map: it keeps off the spot a
      * few days and plugs the holes there, brain step 4g), as the real raiders' stings already tell it.
      */
-    private void bringHiddenHome(ServerLevel level, RaidColumn raid) {
+    private void bringHiddenHome(ServerLevel level, Raid raid) {
         int hidden = raid.hiddenCatch();
         if (hidden <= 0) {
             return;
@@ -731,7 +739,7 @@ public class Raids {
 
     /** The last raid home, or null (tests and the colony list). */
     @Nullable
-    public RaidColumn lastRaid() {
+    public Raid lastRaid() {
         return last;
     }
 
@@ -785,7 +793,7 @@ public class Raids {
     }
 
     /** Tests: this ant limps home along this column's trail. */
-    public void limpForTests(MatabeleEntity ant, RaidColumn raid, long now) {
+    public void limpForTests(MatabeleEntity ant, Raid raid, long now) {
         wayHome.send(ant.getUUID(), raid.back(), now, "hurt (test)");
     }
 
@@ -1429,13 +1437,13 @@ public class Raids {
         if (column == null && !colony.rainsNow(level) && (anyHour || isRaidTime(level) && (commanded || isHungry() && !dayFull))) {
             say(level, "a scout (" + (scout == null ? "?" : RaidGround.shortId(scout)) + ") is home from " + at.toShortString()
                     + ", worth " + worth + (anyHour ? ", sent by the command at any hour" : commanded ? ", sent by the command" : "") + ": a raid sets out");
-            RaidColumn started = startRaid(level, made, !commanded && !anyHour, scout);
+            Raid started = startRaid(level, made, !commanded && !anyHour, scout);
             if (started == null) {
                 if (unloadedFind) {
                     say(level, "no raid: " + whyNoRaid + "; the find waits");
                     waiting = made;
                     waitingCommanded = commanded;
-                } else {
+                } else if (finds.contains(made)) {
                     say(level, "nobody fit to raid: the find is only remembered");
                 }
             } else {
@@ -1471,13 +1479,13 @@ public class Raids {
 
     /** The raid out now, or null. */
     @Nullable
-    public RaidColumn column() {
+    public Raid column() {
         return column;
     }
 
     /** Whether this ant walks in the raid out now. */
     public boolean isRaider(UUID ant) {
-        return column != null && column.has(ant) && column.stage() != RaidColumn.Stage.DONE;
+        return column != null && column.has(ant) && column.stage() != Raid.Stage.DONE;
     }
 
     /**
@@ -1528,7 +1536,7 @@ public class Raids {
      * at it and another leads (BUGS 193).
      */
     @Nullable
-    private RaidColumn startRaid(ServerLevel level, Find find, boolean ownRaid, @Nullable UUID homeFrom) {
+    private Raid startRaid(ServerLevel level, Find find, boolean ownRaid, @Nullable UUID homeFrom) {
         SavannaNumbers.ColumnNumbers numbers = columnNumbers();
         unloadedFind = false;
         if (numbers == null) {
@@ -1545,6 +1553,18 @@ public class Raids {
             unloadedFind = true;
             whyNoRaid = "the spot at " + find.at.toShortString() + " is in land not loaded";
             say(level, "no raid to " + find.at.toShortString() + ": " + whyNoRaid);
+            return null;
+        }
+        // The raid rewrite: the one judge of "termites there now" is asked before anyone is called. Nobody there (the
+        // termites fed and went, or keep off the spot): no raid, and the find is forgotten.
+        Raid.Termites counted = Raid.termitesThere(level, colony, find.at);
+        if (!counted.any()) {
+            whyNoRaid = "no termite there now (the find is forgotten)";
+            say(level, "no raid to " + find.at.toShortString() + ": " + whyNoRaid);
+            finds.remove(find);
+            if (waiting == find) {
+                waiting = null;
+            }
             return null;
         }
         int size = raidSize(find);
@@ -1584,7 +1604,7 @@ public class Raids {
         // then the rest, the majors at the back as the rear guard.
         List<MatabeleEntity> going = new ArrayList<>(fit.subList(0, real));
         going.sort(Comparator.comparingInt(ant -> ant == leader ? 0 : veterans.contains(ant.getUUID()) ? 1 : ant.hasMajorBody() ? 3 : 2));
-        column = new RaidColumn(level, colony, numbers, carryNumbers(), trailNumbers(), find, trail, going, along, now);
+        column = new Raid(level, colony, numbers, carryNumbers(), trailNumbers(), find, trail, going, along, counted, now);
         if (ownRaid) {
             away.countRaid(level); // (M8 step 3e: one of the day's raids; BUGS 172: commands do not count)
         }
@@ -1606,7 +1626,7 @@ public class Raids {
 
     /** The raid command: a raid sets out now to the best known find, whatever the hour or hunger; null if none could. */
     @Nullable
-    public RaidColumn raidNow(ServerLevel level) {
+    public Raid raidNow(ServerLevel level) {
         if (column != null || finds.isEmpty()) {
             return null;
         }
@@ -1615,7 +1635,7 @@ public class Raids {
 
     /** R7: a raid a command (or a test) sets out outside the raid hours keeps no hours: dusk does not turn it home. */
     @Nullable
-    private RaidColumn keepNoHoursOutsideThem(ServerLevel level, @Nullable RaidColumn raid) {
+    private Raid keepNoHoursOutsideThem(ServerLevel level, @Nullable Raid raid) {
         if (raid != null && !isRaidTime(level)) {
             raid.keepNoHours();
             say(level, "set out by a command outside the raid hours (" + RaidGround.clock(colony, level) + "): it keeps no hours");
@@ -1640,7 +1660,7 @@ public class Raids {
      * colony's own raid, so it counts among the day's raids (M8 step 3e).
      */
     @Nullable
-    public RaidColumn raidForTests(ServerLevel level, BlockPos at, int worth, List<BlockPos> trail, @Nullable UUID scout) {
+    public Raid raidForTests(ServerLevel level, BlockPos at, int worth, List<BlockPos> trail, @Nullable UUID scout) {
         Find find = new Find(at.immutable(), worth, level.getGameTime(), level.getGameTime(), 0, List.copyOf(trail), scout);
         finds.add(find);
         trails.lay(level, colony.getCenter(), at, trail, level.getGameTime(), false); // (R4: the scout's line, laid as it ran home)
@@ -1649,7 +1669,7 @@ public class Raids {
 
     /** Tests (BUGS 172): a raid to this remembered find set out as the raid command sets one out, not counted. */
     @Nullable
-    public RaidColumn raidByCommandForTests(ServerLevel level, Find find) {
+    public Raid raidByCommandForTests(ServerLevel level, Find find) {
         return column != null ? null : keepNoHoursOutsideThem(level, startRaid(level, find, false, null));
     }
 

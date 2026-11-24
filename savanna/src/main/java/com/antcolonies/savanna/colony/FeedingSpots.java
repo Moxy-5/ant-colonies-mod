@@ -76,7 +76,7 @@ public final class FeedingSpots {
      * Matabele scouts to smell; no mud count (cheap enough for every scout's trip). A place the colony keeps off
      * ({@link Colony#keepsOff}: it was attacked there, brain step 4g) is left out: the termites have sealed it off and
      * feed elsewhere, so there is nobody there to smell (BUGS 168: scouts scored abandoned spots worth a raid and sent
-     * columns to pace about an empty spot). The same question the number raiders ask ({@link RaidColumn}, {@link RaidsAway}).
+     * columns to pace about an empty spot). The same question the number raiders ask ({@link Raid}, {@link RaidsAway}).
      */
     public static List<ByDay> byDayPlaces(ServerLevel level, Colony colony) {
         List<ByDay> places = new ArrayList<>();

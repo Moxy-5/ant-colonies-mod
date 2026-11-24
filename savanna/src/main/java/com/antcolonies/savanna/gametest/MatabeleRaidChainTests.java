@@ -42,7 +42,7 @@ import net.neoforged.neoforge.gametest.PrefixGameTestTemplate;
  * The raid rewrite's tests, written before the new raid ({@code docs/plans/raid-rewrite.md}, step 2): one whole-chain
  * test a scene, each checking the new stage rules and nothing of how the raid is built. They read only what stays
  * through the rewrite: the colony's {@code [raid]} diary in its black box ({@link Watch#boxOf}), the insects in the
- * world, the prey pile and the watch rules. No test here names the old {@code RaidColumn} or the new {@code Raid}.
+ * world, the prey pile and the watch rules. No test here names the old {@code Raid} or the new {@code Raid}.
  *
  * <p><b>The diary a raid must keep</b> (the contract these tests read; one line on entering a stage, one on leaving):
  * <pre>
@@ -63,9 +63,8 @@ import net.neoforged.neoforge.gametest.PrefixGameTestTemplate;
  * off the ground, and what was taken lies on the prey pile; at the end nobody stands about outside and no watch rule
  * broke.
  *
- * <p>These tests fail on the old raid code (it keeps no such diary and breaks the rules the soak of 2026-11-23
- * measured), so they are kept out of full runs ({@code TestFilter.skipInFullRuns} in {@code SavannaTests}) and in their
- * own category, {@code raidchain}, until step 3 builds the new raid.
+ * <p>Written before the new raid (they failed on the old raid code, which kept no such diary and broke the rules the
+ * soak of 2026-11-23 measured); in the {@code raids} category and in full runs since step 3 built {@code colony.Raid}.
  */
 @GameTestHolder(SavannaMod.MODID)
 @PrefixGameTestTemplate(false)
@@ -298,9 +297,17 @@ public class MatabeleRaidChainTests {
                     .thenSucceed();
             return;
         }
+        long[] doneAt = {0};
         sequence.thenWaitUntil(() -> helper.assertTrue(book.sawAny(), "no raid mustered yet; " + raids.describe(level)))
                 .thenWaitUntil(() -> helper.assertTrue(book.began("done") >= 0, "the raid is not done yet: " + book.story() + "; " + raids.describe(level)))
-                .thenIdle(400) // (a little while to go in and lay the prey down)
+                .thenExecute(() -> doneAt[0] = level.getGameTime())
+                .thenIdle(400) // (a little while to go in)
+                // (laying the prey down takes longer from a tall mound: 70 ants up 11 blocks of wall and down the chimney in
+                // single file; a minute at most, well inside the 2 minutes after which a carrier with no way to the pile
+                // has its termites laid there out of sight, so a pass means they were carried in)
+                .thenWaitUntil(() -> helper.assertTrue(twist != Twist.NONE && twist != Twist.DUSK_AT_THE_SPOT
+                                || pile.broughtIn() - pileBefore >= 1 || level.getGameTime() - doneAt[0] >= 1200,
+                        "the carriers have not laid their prey down yet; " + raids.describe(level)))
                 .thenExecute(() -> {
                     SavannaMod.LOGGER.info("[raid chain] {}: {}", twist, book.story());
                     book.judge(twist != Twist.NONE);

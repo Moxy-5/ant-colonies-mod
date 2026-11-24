@@ -10,8 +10,8 @@ import net.minecraft.util.Mth;
 
 /**
  * A line of points (block middles) with the distance walked along it to each (blocks, flat): a raid column's way out
- * and home along its scent trail ({@link RaidColumn}), and an ant's walk home along a trail by itself ({@link WayHome}).
- * Taken out of {@code RaidColumn} in the raid tidy-up (2026-11-07; R9's "{@code Route} in its own file"), nothing
+ * and home along its scent trail ({@link Raid}), and an ant's walk home along a trail by itself ({@link WayHome}).
+ * Taken out of {@code Raid} in the raid tidy-up (2026-11-07; R9's "{@code Route} in its own file"), nothing
  * changed in it: ready to move into the framework with the trail store (R10).
  */
 final class Route {

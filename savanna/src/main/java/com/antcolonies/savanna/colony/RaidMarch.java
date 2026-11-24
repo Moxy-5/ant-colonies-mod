@@ -23,7 +23,7 @@ import net.minecraft.server.level.ServerLevel;
 import net.minecraft.util.Mth;
 
 /**
- * The raid's march, out and home (the raid rewrite, step 3: lifted out of {@link RaidColumn} with its behaviour
+ * The raid's march, out and home (the raid rewrite, step 3: lifted out of {@link Raid} with its behaviour
  * unchanged; the user, 2026-11-23: "the march works"). It owns the way out and the way home along the colony's scent
  * trail and everything a walk along them needs: the stream behind the front ({@link #step}), the raiders coming up
  * out of the nest, the gaps in a broken trail and the casting about at them. It decides nothing about the raid: who
@@ -51,7 +51,7 @@ final class RaidMarch {
      * front walks this much faster than the column's own pace, and never stops. (A slower front till the column had
      * closed up behind it, 0.9, was tried on 2026-11-08 and taken out the same day: the crowd always leaves a few raiders
      * two to four rows back, so "closed up" never came off a low mound and came on the top of a tall one, before anyone
-     * had climbed down; what had stretched the column was the slow climb, {@link #MARCH_CLIMB}.)
+     * had climbed down; what had stretched the column was the slow climb, {@link Raid#MARCH_CLIMB}.)
      */
     static final double FRONT_PACE = 1.05;
     /**
@@ -117,7 +117,7 @@ final class RaidMarch {
     /** Told at every step by the owner: the ant in front, when this walk began, and where the places are written. */
     private UUID leader;
     private long stageSince;
-    private Map<UUID, RaidColumn.Order> orders = new HashMap<>();
+    private Map<UUID, Raid.Order> orders = new HashMap<>();
     /** Kept for one update only: each raider's place along each route (asked many times an update). */
     private final Map<MatabeleEntity, Double> alongOutNow = new IdentityHashMap<>();
     private final Map<MatabeleEntity, Double> alongBackNow = new IdentityHashMap<>();
@@ -140,7 +140,7 @@ final class RaidMarch {
      * along the trail (the one farthest along first); a fallen front's place goes to the next in it.
      */
     private final List<UUID> lineOrder = new ArrayList<>();
-    /** Tests: the route {@link #hillEnd} was worked out for, and where its first climbs and drops end (along). */
+    /** The route {@link #hillEnd} was worked out for, and where its first climbs and drops end (along). */
     @Nullable
     private Route hillRoute;
     private double hillEndAt;
@@ -311,7 +311,7 @@ final class RaidMarch {
      * faster than the column ({@link #FRONT_PACE}), so it stays in front. On the way out the scout comes out of the nest
      * first: it calls at the foot of the nest's shaft, and till it is out the raiders already outside wait for it by the
      * entrance and the ones in the nest climb up behind it ({@link #comeOut}); down a hump every marcher climbs at about its
-     * walking pace ({@link #MARCH_CLIMB}). Every other raider walks the trail itself, the line the scout walked (known to be
+     * walking pace ({@link Raid#MARCH_CLIMB}). Every other raider walks the trail itself, the line the scout walked (known to be
      * walkable), its place {@code spacing} behind the one ahead of it in the line, the line sorted every update by how far
      * each has walked along the trail, so each follows the ant really ahead of it. Side by side is left to the legs: each
      * insect's own lane and personal space spread the stream where there is room and thin it to single file where there is
@@ -320,7 +320,7 @@ final class RaidMarch {
      * close up behind it. At the route's end true (the next stage).
      */
     boolean step(ServerLevel level, List<MatabeleEntity> ants, Route route, UUID leader, long stageSince,
-                 Map<UUID, RaidColumn.Order> orders, long now) {
+                 Map<UUID, Raid.Order> orders, long now) {
         this.leader = leader;
         this.stageSince = stageSince;
         this.orders = orders;
@@ -353,12 +353,12 @@ final class RaidMarch {
         boolean frontOut = route != out || isOut(level, front);
         BlockPos ahead = route.point(Math.min(route.length(), frontAt + 4.0));
         if (casting) {
-            orders.put(front.getUUID(), new RaidColumn.Order(castSpot(level, route, 0, now), 1.0, route.point(castGap.far())));
+            orders.put(front.getUUID(), new Raid.Order(castSpot(level, route, 0, now), 1.0, route.point(castGap.far())));
         } else {
             if (frontAt >= head - LEAD_STEP / 2) {
                 head = Math.min(route.length(), frontAt + LEAD_STEP);
             }
-            orders.put(front.getUUID(), RaidColumn.Order.marching(route.place(level, head, 0.0), FRONT_PACE, ahead));
+            orders.put(front.getUUID(), Raid.Order.marching(route.place(level, head, 0.0), FRONT_PACE, ahead));
         }
         BlockPos lineStart = frontOut ? null : route.place(level, 0.0, 0.0);
         for (int k = 0; k < line.size(); k++) {
@@ -366,7 +366,7 @@ final class RaidMarch {
             // (the scout still in the nest: a raider already outside waits for it at the trail's start by the entrance,
             // facing the trail; walking on ahead of it, it could stand out along the trail ahead of the scout)
             orders.put(ant.getUUID(), frontOut ? follow(level, route, ant, k, at.get(ant.getUUID()), frontW, frontPlace, spacing, casting, now)
-                    : new RaidColumn.Order(lineStart, 1.0, ahead));
+                    : new Raid.Order(lineStart, 1.0, ahead));
         }
         comeOut(level, route, front, notOut, ahead, now);
         sayMarch(route, front, line, notOut, now);
@@ -394,11 +394,11 @@ final class RaidMarch {
      * past it drops back behind it at {@link #PASSED_PACE}. Behind a broken trail it closes up to its place and stands
      * there (never walking back); one of the casters casts about.
      */
-    private RaidColumn.Order follow(ServerLevel level, Route route, MatabeleEntity ant, int k, double own, double frontW, double frontPlace,
+    private Raid.Order follow(ServerLevel level, Route route, MatabeleEntity ant, int k, double own, double frontW, double frontPlace,
                          double spacing, boolean casting, long now) {
         UUID id = ant.getUUID();
         if (casting && casters.contains(id)) {
-            return new RaidColumn.Order(castSpot(level, route, 1 + k, now), 1.0, route.point(castGap.far()));
+            return new Raid.Order(castSpot(level, route, 1 + k, now), 1.0, route.point(castGap.far()));
         }
         double place = frontPlace - (k + 1) * spacing;
         double placeAlong = Math.max(0.0, route.alongAtWalked(Math.max(0.0, place)));
@@ -407,14 +407,14 @@ final class RaidMarch {
         double pace = Mth.clamp(FRONT_PACE + PACE_PER_BLOCK * (place - own), LEAST_MARCH_PACE, CATCH_UP_PACE);
         if (casting) {
             double target = Math.min(place, own + WALK_AHEAD);
-            return target < own + 0.3 ? new RaidColumn.Order(null, 1.0, look) : new RaidColumn.Order(placeAhead(level, route, target, own), pace, look);
+            return target < own + 0.3 ? new Raid.Order(null, 1.0, look) : new Raid.Order(placeAhead(level, route, target, own), pace, look);
         }
         if (own > frontW - spacing * 0.5) {
             pace = PASSED_PACE; // (level with the front or past it: it drops back behind it, still walking)
         }
         double target = Math.min(frontW - spacing * 0.5, Math.max(place + CARROT, own + 1.0));
         target = Mth.clamp(Math.max(own + 0.5, Math.min(target, own + WALK_AHEAD)), 0.0, route.walkedLength());
-        return RaidColumn.Order.marching(placeAhead(level, route, target, own), pace, look);
+        return Raid.Order.marching(placeAhead(level, route, target, own), pace, look);
     }
 
     /**
@@ -433,7 +433,7 @@ final class RaidMarch {
                 host.staysHome(ant.getUUID());
                 continue;
             }
-            orders.put(ant.getUUID(), new RaidColumn.Order(lineStart, frontOut ? CATCH_UP_PACE : 1.0, ahead));
+            orders.put(ant.getUUID(), new Raid.Order(lineStart, frontOut ? CATCH_UP_PACE : 1.0, ahead));
         }
     }
 

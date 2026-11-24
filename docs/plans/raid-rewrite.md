@@ -368,6 +368,96 @@ cut down to finds and the raid day.
   the column is deleted; the per-ant "no headway, go home" rule and the walk home's break-up stay in the old column
   on purpose: step 1 measured both as causes, so they are not carried into the march.
 
+## Step 3 as built, part b (2026-11-24): the new raid
+
+`colony/Raid.java` replaces `RaidColumn` (deleted). One raid is one stage machine: **muster, march out, halt, attack,
+regroup, march home, done** (the old column had nine stages; "collecting" and "spreading" are gone). Each stage has
+one rule that ends it and one deadline, and at the deadline it goes on with whoever is there; nobody waits on one ant.
+
+| Stage | What the ants do | Ends when | Deadline |
+|---|---|---|---|
+| Muster | the scout stands at the trail's start by the entrance and the called ants come out and bunch behind her, as many as there is level ground for; the others wait in the nest | every ant with a place is at it (never before 5 s, so the bunch is seen) | 20 s (`muster_ticks`): the rest run after the column |
+| March out | the kept march (`RaidMarch`) | the front is at the halting place | a second a block and 30 s; time spent casting at a gap in the trail not counted |
+| Halt | a ring round the scout, 4 blocks short of the spot; the judge is asked as the front arrives | the tail is in (never before 5 s) | 15 s (`gather_ticks`): one more than 10 blocks behind is left and walks home |
+| Attack | everyone gets the raid's own fight order; majors bite the mud open, minors sting | no termite stung or gone for in 15 s (`quiet_ticks`, was 30) | 2 minutes (`fight_ticks`) |
+| Regroup | hurt nestmates fetched first, then each ant with room takes the nearest stung termite on the raid's own list, majors first; the rest bunch at the halting place | nothing left to fetch and the ants are back | 30 s (`regroup_ticks`, was 20) |
+| March home | the kept march back, the ant nearest home leading, slower laden; the last 12 blocks each streams in by itself | everyone is home | the march's limit: whoever is still out is let go and walks the trail alone |
+
+- **One judge of "termites here now": `Raid.termitesThere`.** Where the land is loaded it counts what a player would
+  see: living termite workers, not stung, not hidden in their own nest, within the raid's reach of the spot (soldiers
+  alone are no reason to raid). With none seen it asks the nearest termite colony's own record: a feeding place it feeds
+  at by day within reach that it does not keep off (`FeedingSpots.byDayPlaces`). Asked twice and by nobody else: by
+  `Raids.startRaid` before anyone is called (none: no raid, `[raid] no raid to X: no termite there now (the find is
+  forgotten)`), and at the halt (none: the front three walk on and look round 10 s, `look_ticks`, then the raid turns
+  home and the find is forgotten outright).
+- **One judge of "the attack is over", and it is the raid.** The shared fight tells the raid what each raider does
+  (`FightDiary`); a termite gone for, grabbed or stung, a breach picked or bitten open is work at the spot, "no foe",
+  "searched", "no way" and "chased without a blow" are not. Fifteen seconds with no work and nothing newly stung ends
+  the attack, and then **every fight order of the raid is ended at once**. What was stung goes onto the raid's own
+  list as it happens, so the regroup carries exactly what the attack stung, wherever it lies (step 1 measured 240 stung
+  against 111 carried, two rules judging two reaches).
+- **The leash** (`leash`, 14 blocks): a raider fighting farther than that from the spot stops and comes back, and is
+  sent in again within 7 blocks of it. The raid counts and goes for termites only inside the square that fits in that
+  circle (leash over root 2, about 10 blocks each way), so nobody is sent after a termite the leash would call it back
+  from (found before any test saw it: with the fight's old reach of 12 a termite in the square's corner, 17 blocks
+  out, would have had raiders pacing out and back till the deadline).
+- **Turn home, one edge from any stage** (`Raid.turnHome`): dusk, rain, the scout lost on the way out (real: nobody
+  else knows the way; the find is kept), the trail lost at a wide gap, land not loaded ahead, the march's time up,
+  nobody at the spot. Mustering, marching out or halted it walks home from where it is; in the attack every fight ends
+  and it regroups first, taking what it stung.
+- **What a raid's end means for its find** (`Raids.raidHome`): prey brought home, the find is fresh; nobody at the
+  spot at the halt, forgotten at once; turned home or lost from sight, no check at all; fought there and brought
+  nothing, one empty check as before.
+- **Not carried over from the old column, on purpose** (step 1 measured each as a cause): the per-ant "no headway, go
+  home" rule and the walk home's "stalled" rule (the stage's deadline lets the stragglers go instead); "spreading out"
+  round an empty spot (the short look replaces it); the scout running down into the nest to call (she waits at the
+  entrance, the table the user approved); "the next ant leads on" when the scout dies on the way out.
+- **New numbers** in the species file's `raids.column`: `muster_ticks` 400, `bunch_least_ticks` 100, `look_ticks` 200,
+  `leash` 14; changed: `regroup_ticks` 400 to 600, `raids.hours_and_sound.quiet_ticks` 600 to 300 (the table's 15 s).
+  No longer read by the raid and deleted in step 5 with the old code: `home_ticks`, `raids.carry.collect_ticks`,
+  `spread_ticks`, `spread_reach`, `spread_see`, `collect_reach`.
+- **Sizes, honestly:** `Raid` is about 1,670 lines against the old column's 1,840 (both beside the 700 of
+  `RaidMarch`), so this part made the raid simpler in its rules, not much shorter: a third of `Raid` is what tests,
+  tools and the away code ask of it. The lines come out in part c (the goal, `Raids`), step 4 (`RaidsAway`'s own copy
+  of a raid) and step 5 (old numbers, hooks nobody calls).
+- **One bunch shape for the muster and the halt** (`Raid.bunchPlace`): the scout in the middle, the others on a spiral
+  outward at 2 to 3 ants to a block of ground, so a raid of 10 reaches 2 blocks out from her and one of 75 about 4 (the
+  old ring was 2.5 blocks whatever the raid's size). At the muster only the half behind the scout, so nobody starts the
+  march in front of her, and only ground level with the entrance.
+- **The muster was rethought after two tries failed** (the two-strikes rule). Both assumed there is ground outside the
+  nest for the whole raid to stand on. That is true of a real nest (it opens on flat ground) and of the mod's nests in
+  the ground, not of a nest in a dead mound, which opens at its chimney's top with room for a few. Try 1 sent everyone
+  by way of the one cell at the entrance: on a mound 8 to 9 ants stood in one cell (the march tests' crowd check).
+  Try 2 mustered at the mound's foot: the bunch walked there outside the march and its rules (past a gap in the trail,
+  ahead of the scout), and on a short trail it stood nearly at the termites, so the march lasted no time (four tests
+  failed, rightly). **The rule now: the bunch is only as big as the level ground by the entrance; an ant with no place
+  waits in the nest and pours out behind the column as it leaves,** which is what the old raid did since BUGS 101 and
+  the user saw working (2026-11-06). In a ground nest the whole raid bunches behind the scout, as planned.
+- **The demo raid command** (`/antcolonies raid demo`) puts six termite workers at its trail's end now (no raid sets
+  out to an empty spot), so it shows a whole raid.
+
+**Tests.** The ten chain scenes are in the `raids` category and in full runs now (`raidchain` is gone). On the first
+run nine passed; the tall mound's failed once beside the others and passed alone 3 of 3: its 70 carriers need more
+than the 20 s the test gave them to climb 11 blocks and go down the chimney in single file, so the check now waits up
+to a minute for the first termite on the pile (box 3; well inside the 2 minutes after which a carrier with no way has
+its load laid out of sight). Old tests changed (box 2, behaviour changed on purpose): the tests that sent a raid to a
+bare spot put two termite workers there (`MatabeleScenes.termitesAt`); the empty-raid test keeps its termites and is
+now `aLimperFollowsTheTrailHomeAndRaidersCalledToDefendRejoinTheRaid` (its empty raid is two chain scenes); the march
+test checks the muster's deadline where it checked the scout's run down into the nest; the alarm rework's measuring
+scene keeps the old "prey about" rule as its own helper, so its numbers stay comparable.
+
+**The last run (`raids,away`, 6 servers, 2026-11-24, the muster as it is now):** every raid test and all ten chain
+scenes passed, both march tests among them (the crowd check and "the scout ahead of everyone"). One test failed:
+the mound-as-a-clue scout test, alone 1 of 3 (its old chance failure, BUGS 153 and 164; an update line there).
+`soldiers` ran twice earlier in part b, before the muster changed, with only its known chance failures (BUGS 97/106,
+207, 211); the muster touches nothing those tests use. The lumpy-savanna replay had no termites at its spot and got
+two (box 2).
+
+**Not built in part b, said plainly:** the stung termites are not dragged to a pile by the break (they are picked up
+where they lie); a raid is still not saved through a reload (step 4); raids out of sight still run on `RaidsAway`'s own
+copy (step 4); whether termites that are only numbers under the mud give a watched raid too little to sting is for
+step 6's soak to measure.
+
 ## Rules for the session doing this
 
 - Read `CLAUDE.md` first; ants and termites are strict realism.

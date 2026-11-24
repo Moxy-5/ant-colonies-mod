@@ -34,7 +34,7 @@ import com.antcolonies.entity.goal.WoundCareGoal;
 import com.antcolonies.fight.Fights;
 import com.antcolonies.savanna.SavannaSpecies;
 import com.antcolonies.savanna.block.MoundSoil;
-import com.antcolonies.savanna.colony.RaidColumn;
+import com.antcolonies.savanna.colony.Raid;
 import com.antcolonies.savanna.colony.Raids;
 import com.antcolonies.savanna.colony.SavannaParts;
 import com.antcolonies.savanna.entity.goal.BringPreyGoal;
@@ -964,11 +964,11 @@ public class MatabeleEntity extends AbstractAntEntity implements ColonyBorn {
         return colony.nest().getFinishedRoomCenter(level());
     }
 
-    /** M8 step 5: not while it is in a raid column (the column fetches its own hurt, {@code RaidColumn}). */
+    /** M8 step 5: not while it is in a raid column (the column fetches its own hurt, {@code Raid}). */
     @Override
     public boolean answersHelpCalls() {
         Colony colony = getColony();
-        RaidColumn column = colony == null ? null
+        Raid column = colony == null ? null
                 : colony.part(SavannaParts.RAIDS).map(Raids::column).orElse(null);
         return column == null || !column.has(getUUID());
     }

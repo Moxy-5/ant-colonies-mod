@@ -589,7 +589,7 @@ public class TermiteRaidDefenceTests {
                 // not keep it going), or after its longest time; what is counted is what had happened by then.
                 if (leftAt[0] < 0) {
                     boolean breaking = ants.stream().anyMatch(ant -> ant.isAlive() && ant.breaksIn() && ant.getFightSpot() != null);
-                    if (com.antcolonies.savanna.colony.RaidColumn.preyAbout(level, null, breakAt, 10.0, breaking)) {
+                    if (preyAbout(level, breakAt, 10.0, breaking)) {
                         preyAt[0] = since;
                     }
                     for (MatabeleEntity ant : ants) {
@@ -720,6 +720,21 @@ public class TermiteRaidDefenceTests {
     }
 
     /** A grown-up-at time that makes a worker a builder now (past nursing, not yet a forager). */
+    /**
+     * The measuring scene's own "is prey still about the spot" (it was the old raid column's rule, kept here when the
+     * raid rewrite gave the raid one judge of its own, so the alarm rework's measured numbers stay comparable): a living
+     * termite worker, not stung, not sheltered, within reach, in the open or not shut in ({@code breaking}: a major still
+     * breaks a way in, so the shut in count too). Soldiers alone never count.
+     */
+    private static boolean preyAbout(ServerLevel level, BlockPos at, double reach, boolean breaking) {
+        return !level.getEntitiesOfClass(com.antcolonies.entity.AbstractAntEntity.class, new net.minecraft.world.phys.AABB(at).inflate(reach, 6.0, reach),
+                insect -> insect.isAlive() && !insect.isParalysed() && !insect.isDowned() && !(insect instanceof MatabeleEntity)
+                        && Math.hypot(insect.getX() - at.getX() - 0.5, insect.getZ() - at.getZ() - 0.5) <= reach + 0.5
+                        && !insect.isSheltered() && !(insect instanceof TermiteSoldierEntity)
+                        && (breaking || com.antcolonies.fight.Fights.isInTheOpen(level, insect.blockPosition())
+                                || !com.antcolonies.fight.Fights.isShutIn(level, insect.blockPosition()))).isEmpty();
+    }
+
     private static long builderAge(ServerLevel level, Colony colony) {
         int nurse = colony.profile().worker().nurseUntilTicks();
         int builder = colony.profile().worker().builderUntilTicks();

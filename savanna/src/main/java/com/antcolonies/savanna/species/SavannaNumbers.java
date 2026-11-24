@@ -588,7 +588,7 @@ public final class SavannaNumbers {
     }
 
     /**
-     * Raid rework R7, hours and sound ({@code colony.Raids}, {@code colony.RaidColumn}). Raids end by dusk (the user's
+     * Raid rework R7, hours and sound ({@code colony.Raids}, {@code colony.Raid}). Raids end by dusk (the user's
      * answer, 2026-11-04): none leaves after the evening raid hours end (19:00 in {@code raids.scouting.hours}), and a raid
      * still out at {@code dusk} (19:30) stops where it is, picks up what it stung and walks home; until the morning's first
      * raid hour it stays dusk (a find made meanwhile waits for the morning). Rare night raids in the hot season wait for
@@ -692,7 +692,7 @@ public final class SavannaNumbers {
     }
 
     /**
-     * M8 step 3b, the raid column ({@code colony.RaidColumn}; real Megaponera: the scout home from a find recruits a raid
+     * M8 step 3b, the raid column ({@code colony.Raid}; real Megaponera: the scout home from a find recruits a raid
      * in proportion to the termites it found, Frank et al. 2018, and leads it out along its scent line). The raid's size
      * (M8 step 3d): the share of the colony's workers it can spare, from {@code leastShare} for a fed colony to
      * {@code mostShare} for a starving one (30 to 75 percent, Yusuf 2026), all of it for a find worth {@code richWorth} or
@@ -706,7 +706,8 @@ public final class SavannaNumbers {
      */
     public record ColumnNumbers(double richWorth, int leastRaid, double leastShare, double mostShare, int mostReal, int formTicks,
                                 double spacing, int stopShort,
-                                int gatherTicks, int fightTicks, int regroupTicks, int homeTicks) {
+                                int gatherTicks, int fightTicks, int regroupTicks, int homeTicks,
+                                int musterTicks, int bunchLeastTicks, int lookTicks, double leash) {
         public static final Codec<ColumnNumbers> CODEC = RecordCodecBuilder.create(i -> i.group(
                 Codec.DOUBLE.optionalFieldOf("rich_worth", 6.0).forGetter(ColumnNumbers::richWorth),
                 Codec.INT.optionalFieldOf("least_raid", 10).forGetter(ColumnNumbers::leastRaid),
@@ -719,11 +720,15 @@ public final class SavannaNumbers {
                 Codec.INT.optionalFieldOf("gather_ticks", 300).forGetter(ColumnNumbers::gatherTicks),
                 Codec.INT.optionalFieldOf("fight_ticks", 2400).forGetter(ColumnNumbers::fightTicks),
                 Codec.INT.optionalFieldOf("regroup_ticks", 400).forGetter(ColumnNumbers::regroupTicks),
-                Codec.INT.optionalFieldOf("home_ticks", 3600).forGetter(ColumnNumbers::homeTicks)
+                Codec.INT.optionalFieldOf("home_ticks", 3600).forGetter(ColumnNumbers::homeTicks),
+                Codec.INT.optionalFieldOf("muster_ticks", 400).forGetter(ColumnNumbers::musterTicks),
+                Codec.INT.optionalFieldOf("bunch_least_ticks", 100).forGetter(ColumnNumbers::bunchLeastTicks),
+                Codec.INT.optionalFieldOf("look_ticks", 200).forGetter(ColumnNumbers::lookTicks),
+                Codec.DOUBLE.optionalFieldOf("leash", 14.0).forGetter(ColumnNumbers::leash)
         ).apply(i, ColumnNumbers::new));
     }
     /**
-     * M8 step 3c, home with the prey ({@code colony.RaidColumn}, {@code entity.goal.BringPreyGoal}; real Megaponera: after
+     * M8 step 3c, home with the prey ({@code colony.Raid}, {@code entity.goal.BringPreyGoal}; real Megaponera: after
      * the fight the raiders gather the stung termites, a major carrying a bundle of up to about 12 in its jaws, a minor 1 to
      * 3, Yusuf 2026, and walk home as a column). How many a worker can hold grows with its length: a major from
      * {@code leastMajor} (the shortest drawn with the major's model) to {@code mostMajor} (the longest), a minor from
@@ -740,7 +745,7 @@ public final class SavannaNumbers {
     public record CarryNumbers(int leastMajor, int mostMajor, int leastMinor, int mostMinor, double collectReach, int collectTicks,
                                int pickTicks, int spreadTicks, double spreadReach, double spreadSee, double ladenPace,
                                int termitesPerLayer, int bringTicks, int limpTicks) {
-        /** The carry numbers when a species file has none (the same as Megaponera's; were {@code RaidColumn.DEFAULT_CARRY}). */
+        /** The carry numbers when a species file has none (the same as Megaponera's; were {@code Raid.DEFAULT_CARRY}). */
         public static final CarryNumbers DEFAULT = new CarryNumbers(4, 10, 1, 3, 10.0, 1200, 10, 600, 8.0, 5.0, 0.85, 10, 2400, 6000);
         public static final Codec<CarryNumbers> CODEC = RecordCodecBuilder.create(i -> i.group(
                 Codec.INT.optionalFieldOf("least_major", 4).forGetter(CarryNumbers::leastMajor),

@@ -8,7 +8,7 @@ import org.joml.Vector3f;
 
 import com.antcolonies.colony.Colony;
 import com.antcolonies.colony.ColonyManager;
-import com.antcolonies.savanna.colony.RaidColumn;
+import com.antcolonies.savanna.colony.Raid;
 import com.antcolonies.savanna.colony.Raids;
 import com.antcolonies.savanna.colony.SavannaParts;
 import com.antcolonies.savanna.colony.ScentTrails;
@@ -26,7 +26,7 @@ import net.minecraft.world.entity.Entity;
  * every {@link #EVERY} ticks, particles over the Matabele colonies' scent trails and raiders near them, only that
  * player seeing them. Trail points: green when fresh, darkening to brown as the scent fades, grey once no longer smelt,
  * red where broken; the spot a trail leads to a yellow column. Over each raider's head its state: white marching (the
- * front bigger), grey forming, yellow gathering or regrouping, red fighting, pink collecting or spreading, blue carrying
+ * front bigger), grey mustering, yellow halted, red fighting, pink regrouping and loading, blue carrying
  * termites, orange casting about at a gap, light green homing; cyan a scout out searching, purple a hurt raider
  * limping home.
  */
@@ -102,7 +102,7 @@ public final class RaidView {
                     }
                 }
             }
-            RaidColumn column = raids.column();
+            Raid column = raids.column();
             if (column != null) {
                 for (UUID id : column.members()) {
                     if (level.getEntity(id) instanceof MatabeleEntity ant) {
@@ -123,7 +123,7 @@ public final class RaidView {
         }
     }
 
-    private static Vector3f stateColour(RaidColumn column, MatabeleEntity ant) {
+    private static Vector3f stateColour(Raid column, MatabeleEntity ant) {
         if (column.isCasting(ant.getUUID())) {
             return new Vector3f(1.0F, 0.55F, 0.0F);
         }
@@ -134,11 +134,11 @@ public final class RaidView {
             return new Vector3f(0.2F, 0.4F, 1.0F);
         }
         return switch (column.stage()) {
-            case FORMING -> new Vector3f(0.6F, 0.6F, 0.6F);
-            case GATHERING, REGROUPING -> new Vector3f(1.0F, 0.9F, 0.1F);
-            case ATTACKING -> new Vector3f(1.0F, 0.3F, 0.3F);
-            case COLLECTING, SPREADING -> new Vector3f(1.0F, 0.5F, 0.8F);
-            case HOMING -> new Vector3f(0.5F, 1.0F, 0.5F);
+            case MUSTER -> new Vector3f(0.6F, 0.6F, 0.6F);
+            case HALT -> new Vector3f(1.0F, 0.9F, 0.1F);
+            case ATTACK -> new Vector3f(1.0F, 0.3F, 0.3F);
+            case REGROUP -> new Vector3f(1.0F, 0.5F, 0.8F);
+            case MARCH_HOME -> new Vector3f(0.5F, 1.0F, 0.5F);
             default -> new Vector3f(1.0F, 1.0F, 1.0F);
         };
     }

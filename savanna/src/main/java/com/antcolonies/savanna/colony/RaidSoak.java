@@ -34,7 +34,7 @@ public final class RaidSoak implements Soak.Part {
     /** A living termite colony within this many blocks of a Matabele nest makes it worth watching (the new-land rule). */
     static final double TERMITES_NEAR = 70;
 
-    private final Map<RaidColumn, RaidColumn.Stage> open = new IdentityHashMap<>();
+    private final Map<Raid, Raid.Stage> open = new IdentityHashMap<>();
     private CompoundTag counts = new CompoundTag();
 
     @Override
@@ -108,7 +108,7 @@ public final class RaidSoak implements Soak.Part {
         });
         pokes.put("kill-raider", (level, watched, random) -> {
             for (Colony colony : shuffled(ants(watched), random)) {
-                RaidColumn column = colony.part(SavannaParts.RAIDS).map(Raids::column).orElse(null);
+                Raid column = colony.part(SavannaParts.RAIDS).map(Raids::column).orElse(null);
                 if (column == null || column.members().isEmpty()) {
                     continue;
                 }
@@ -131,7 +131,7 @@ public final class RaidSoak implements Soak.Part {
             if (raids == null) {
                 continue;
             }
-            RaidColumn column = raids.column();
+            Raid column = raids.column();
             ScentTrails.Trail trail = column != null ? column.trail() : null;
             if (trail == null) {
                 List<ScentTrails.Trail> all = raids.trails().all();
@@ -173,8 +173,8 @@ public final class RaidSoak implements Soak.Part {
     @Override
     public boolean busy(ServerLevel level, List<Colony> watched) {
         for (Colony colony : ants(watched)) {
-            RaidColumn column = colony.part(SavannaParts.RAIDS).map(Raids::column).orElse(null);
-            if (column != null && column.stage() != RaidColumn.Stage.DONE && column.stage() != RaidColumn.Stage.FORMING) {
+            Raid column = colony.part(SavannaParts.RAIDS).map(Raids::column).orElse(null);
+            if (column != null && column.stage() != Raid.Stage.DONE && column.stage() != Raid.Stage.MUSTER) {
                 return true;
             }
         }
@@ -183,14 +183,14 @@ public final class RaidSoak implements Soak.Part {
 
     @Override
     public void tick(ServerLevel level, List<Colony> watched) {
-        List<RaidColumn> now = new ArrayList<>();
+        List<Raid> now = new ArrayList<>();
         for (Colony colony : ants(watched)) {
-            RaidColumn column = colony.part(SavannaParts.RAIDS).map(Raids::column).orElse(null);
+            Raid column = colony.part(SavannaParts.RAIDS).map(Raids::column).orElse(null);
             if (column == null) {
                 continue;
             }
             now.add(column);
-            RaidColumn.Stage before = open.get(column);
+            Raid.Stage before = open.get(column);
             if (before == null) {
                 add("raids", 1);
                 open.put(column, column.stage());
@@ -217,7 +217,7 @@ public final class RaidSoak implements Soak.Part {
         List<String> rows = new ArrayList<>();
         rows.add("Raids started: " + counts.getInt("raids") + (open.isEmpty() ? "" : " (" + open.size() + " out now)"));
         StringBuilder reached = new StringBuilder("Raids ended, by the farthest stage reached:");
-        for (RaidColumn.Stage stage : RaidColumn.Stage.values()) {
+        for (Raid.Stage stage : Raid.Stage.values()) {
             int n = counts.getInt("reached " + stage.name());
             if (n > 0) {
                 reached.append(' ').append(stage.name()).append(' ').append(n).append(',');
