@@ -102,7 +102,7 @@ class SpeciesProfileTest {
         SavannaNumbers.AlarmNumbers alarm = profile.section(SavannaNumbers.ALARM).orElseThrow();
         assertTrue(alarm.felt() < alarm.foe() && alarm.foe() <= alarm.breach(), "footsteps are felt less far than a foe or a breach");
         assertEquals(600, alarm.lastsTicks(com.antcolonies.savanna.colony.Alarm.Kind.FELT));
-        assertEquals(1.3, alarm.drumSpeed(), 1.0E-9);
+        assertEquals(43.3, alarm.drumSpeed(), 1.0E-9);
     }
 
     /**
