@@ -210,8 +210,7 @@ public class TadpoleEntity extends AbstractSchoolingFish implements GeoEntity {
      */
     void becomeFroglet(ServerLevel level) {
         EntityType<BullfrogEntity> frog = SavannaEntities.BULLFROG.get();
-        if (RoomToBreed.leftAt(level, blockPosition(), frog, AnimalLives.get(frog).localLimit()) > 0
-                && RoomToBreed.groupHasRoom(level, frog.getCategory(), new net.minecraft.world.level.ChunkPos(blockPosition()))) {
+        if (RoomToBreed.leftAt(level, blockPosition(), frog, AnimalLives.get(frog).localLimit()) > 0) {
             BullfrogEntity froglet = frog.create(level);
             if (froglet != null) {
                 froglet.moveTo(getX(), getY(), getZ(), getYRot(), 0.0F);

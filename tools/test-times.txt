@@ -222,6 +222,7 @@ atermitequeenthatisnotfedstarvesandhercolonydwindles 0.50
 atermitewalksthroughachimneyblockintoaclosedroom 0.20
 atermitomycesgrowsopenswiltsandisgone 0.00
 atilapiahatchesasafryandtheworldsyoungareasbefore 0.00
+atilapiamotherwithnoroomkeepshereggsuntilthereis 0.03
 atilapianibblesonlytheouteredgeoflivinghippograss 2.06
 atreeawaycatchesupatonce 0.00
 atreegrowsastepadayaroundaplayersblock 0.00
@@ -410,6 +411,7 @@ thenestplanisthesameafterareload 0.02
 thenightendsfortermitesbeforedawn 0.00
 therulescatchahangingraidandsaveareport 0.04
 theschoolswimsonafterahunt 4.48
+thespawnerleaveshalfofabreedingkindscounttobreeding 0.00
 thetermitenestplanisthesameafterareload 0.20
 thornytwigsprickbiganimalsbutnotinsects 0.12
 tilapiaandcrabseattheeggs 0.00

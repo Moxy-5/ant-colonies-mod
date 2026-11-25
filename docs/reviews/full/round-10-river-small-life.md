@@ -63,7 +63,7 @@ not two. Recommended: let breeding be the main way a river refills. Breeding and
 eggs and asks again (or lets out what fits) instead of losing the brood on one unlucky tick. And add a game test with a
 real counting player (a fake player in survival near the scene) so the playing path is tested, not only the spectator's.
 
-**Status: open, the user's call** (2026-11-24). It changes how the river plays (who refills it: the spawner or breeding), so it is put to the user as a game question with the recommendation above. Since R10-12's fix the crab, snail and catfish breed again, so this now decides more than it did.
+**Status: fixed** (2026-11-24, BUGS 337; the user: "Yes, breeding refills"). Breeding and hatching ask only the kind's local limit (`RoomToBreed`; the group-cap question and its reflection deleted, so a playing player and a spectator now get the same answer and the tests run the playing path); the world's spawner fills a kind that breeds only to half its count in a zone (`RiverZones.SPAWNER_SHARE`, `mostBySpawner`); a tilapia mother with no room keeps her eggs and asks again each second, up to the clutch clock's 10 days. Tests `aTilapiaMotherWithNoRoomKeepsHerEggsUntilThereIs`, `theSpawnerLeavesHalfOfABreedingKindsCountToBreeding`. Not measured in play: how full a river settles (the balance soak).
 
 ### R10-2 (B, proven by walked path): a mate that dies or unloads in the middle of courtship leaves its partner "taken" for good
 

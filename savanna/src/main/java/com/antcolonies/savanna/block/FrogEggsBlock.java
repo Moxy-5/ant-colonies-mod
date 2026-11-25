@@ -119,8 +119,7 @@ public class FrogEggsBlock extends EggClutchBlock implements LiquidBlockContaine
     @Override
     protected boolean roomFor(ServerLevel level, BlockPos pos, EntityType<?> kind) {
         EntityType<TadpoleEntity> tadpole = SavannaEntities.TADPOLE.get();
-        return RoomToBreed.leftAt(level, pos, tadpole, TadpoleEntity.LOCAL_LIMIT) > 0
-                && RoomToBreed.groupHasRoom(level, tadpole.getCategory(), new ChunkPos(pos));
+        return RoomToBreed.leftAt(level, pos, tadpole, TadpoleEntity.LOCAL_LIMIT) > 0;
     }
 
     /** Each egg the room allows becomes a tadpole of one school, just hatched, knowing its guarding father. */

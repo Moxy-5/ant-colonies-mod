@@ -1047,4 +1047,66 @@ public class AnimalLifeTests {
                     + String.format("%.2f", father.distanceTo(tilapia)) + " blocks off)");
         });
     }
+
+    /**
+     * Breeding refills the water (the user, 2026-11-24; review R10-1). A tilapia mother whose eggs are due while the
+     * river is full of her kind keeps them in her mouth and asks again (until then one look with no room threw the
+     * whole brood away); when room opens she lets her fry out.
+     */
+    @GameTest(template = "arena", timeoutTicks = 600, batch = "breeding_full_eggs")
+    public static void aTilapiaMotherWithNoRoomKeepsHerEggsUntilThereIs(GameTestHelper helper) {
+        breedingPond(helper);
+        clearLeftovers(helper, SavannaEntities.TILAPIA.get());
+        TilapiaEntity mother = grown(helper, SavannaEntities.TILAPIA.get(), "female", new BlockPos(5, BED + 1, 5));
+        TilapiaEntity male = grown(helper, SavannaEntities.TILAPIA.get(), "male", new BlockPos(6, BED + 1, 5));
+        int limit = mother.life().numbers().localLimit();
+        List<TilapiaEntity> crowd = new java.util.ArrayList<>();
+        for (int i = 2; i < limit + 3; i++) {
+            crowd.add(grown(helper, SavannaEntities.TILAPIA.get(), "female", new BlockPos(P0 + i % 12, BED + 1 + i % 2, P0 + 1 + i / 12 * 3)));
+        }
+        mother.mated(male);
+        int eggs = mother.eggsInMouth();
+        helper.assertTrue(eggs > 0, "she took no eggs into her mouth");
+        mother.ageEggs(mother.life().numbers().hatchTicks() + 1);
+        helper.runAfterDelay(100, () -> {
+            helper.assertTrue(mother.eggsInMouth() == eggs, "with no room for her kind she has " + mother.eggsInMouth() + " of her " + eggs + " eggs left");
+            helper.assertTrue(fryOf(helper, mother).isEmpty(), "fry let out into a full river");
+            crowd.forEach(net.minecraft.world.entity.Entity::discard);
+        });
+        helper.runAfterDelay(160, () -> {
+            helper.assertTrue(mother.eggsInMouth() == 0, "room opened and she still holds her eggs");
+            helper.assertTrue(fryOf(helper, mother).size() == eggs, fryOf(helper, mother).size() + " fry from " + eggs + " eggs with room for all");
+            helper.succeed();
+        });
+    }
+
+    /**
+     * The world's own spawner fills a kind that breeds only to half its count in a zone, so breeding has the other half
+     * to fill (review R10-1: both asked for the same room, and the spawner, trying every tick, always won); a kind that
+     * does not breed is spawned to its whole count, and no kind is spawned where it does not live.
+     */
+    @GameTest(template = "arena", timeoutTicks = 20, batch = "breeding_full_eggs")
+    public static void theSpawnerLeavesHalfOfABreedingKindsCountToBreeding(GameTestHelper helper) {
+        var zones = com.antcolonies.savanna.worldgen.RiverZones.Zone.values();
+        for (EntityType<?> kind : List.of(SavannaEntities.TILAPIA.get(), SavannaEntities.CATFISH.get(), SavannaEntities.CRAB.get(),
+                SavannaEntities.SNAIL.get(), SavannaEntities.BULLFROG.get(), SavannaEntities.CROCODILE.get())) {
+            int cap = kind.getCategory().getMaxInstancesPerChunk(), limit = AnimalLives.get(kind).localLimit();
+            for (var zone : zones) {
+                int whole = com.antcolonies.savanna.worldgen.RiverZones.allows(kind, zone, 0) ? 1 : 0;
+                int bySpawner = com.antcolonies.savanna.worldgen.RiverZones.mostBySpawner(kind, zone);
+                if (whole == 0) {
+                    helper.assertTrue(bySpawner == 0, kind.getDescriptionId() + " spawned " + zone + ", where it does not live");
+                    continue;
+                }
+                helper.assertTrue(bySpawner >= 1 && bySpawner <= Math.max(1, (cap + 1) / 2),
+                        kind.getDescriptionId() + " " + zone + ": the spawner fills " + bySpawner + " of a cap of " + cap);
+            }
+            helper.assertTrue(limit > 1, kind.getDescriptionId() + " has no room to breed in (local limit " + limit + ")");
+        }
+        for (EntityType<?> kind : List.of(SavannaEntities.OTTER.get(), SavannaEntities.MONITOR.get())) {
+            helper.assertTrue(com.antcolonies.savanna.worldgen.RiverZones.mostBySpawner(kind, com.antcolonies.savanna.worldgen.RiverZones.Zone.MID)
+                    == Integer.MAX_VALUE, kind.getDescriptionId() + " does not breed and is held back all the same");
+        }
+        helper.succeed();
+    }
 }

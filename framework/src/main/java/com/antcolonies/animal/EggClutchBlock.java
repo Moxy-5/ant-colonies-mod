@@ -53,10 +53,9 @@ public abstract class EggClutchBlock extends Block implements EntityBlock {
         }
     }
 
-    /** Whether its kind has room here: fewer than its local limit near, its spawning group under its cap. */
+    /** Whether its kind has room here: fewer than its local limit near. */
     protected boolean roomFor(ServerLevel level, BlockPos pos, EntityType<?> kind) {
-        return RoomToBreed.leftAt(level, pos, kind, AnimalLives.get(kind).localLimit()) > 0
-                && RoomToBreed.groupHasRoom(level, kind.getCategory(), new ChunkPos(pos));
+        return RoomToBreed.leftAt(level, pos, kind, AnimalLives.get(kind).localLimit()) > 0;
     }
 
     /**

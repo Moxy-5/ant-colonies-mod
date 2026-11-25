@@ -397,13 +397,24 @@ public class TilapiaEntity extends AbstractSchoolingFish implements GeoEntity, H
      */
     private void motherTick() {
         long now = level().getGameTime();
-        if (eggs > 0 && now - eggsSince >= life.numbers().hatchTicks()) {
-            if (RoomToBreed.here(this, life.numbers().localLimit()) && level() instanceof ServerLevel server) {
-                letOutFry(Math.min(eggs, RoomToBreed.left(server, this, life.numbers().localLimit())));   // the rest fail (code review 2026-11-21)
-                caringUntil = now + life.numbers().careTicks();
+        if (eggs > 0 && now % 20 == 0 && level() instanceof ServerLevel server) {
+            // With no room for her kind she keeps her eggs and asks again each second (review R10-1: one look, and with
+            // no room that tick the whole brood was thrown away); after the clutch clock's 10 days they are lost.
+            int room = RoomToBreed.left(server, this, life.numbers().localLimit());
+            switch (com.antcolonies.animal.ClutchClock.decide(now, eggsSince, life.numbers().hatchTicks(), true, room > 0)) {
+                case HATCH -> {
+                    letOutFry(Math.min(eggs, room));    // the rest fail (code review 2026-11-21)
+                    caringUntil = now + life.numbers().careTicks();
+                    eggs = 0;
+                    refresh();
+                }
+                case SHELLS -> {
+                    eggs = 0;
+                    refresh();
+                }
+                case WAIT -> {
+                }
             }
-            eggs = 0;
-            refresh();
         }
         if (!caring()) {
             if (!mouth.isEmpty()) {
