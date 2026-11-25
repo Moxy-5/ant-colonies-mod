@@ -552,6 +552,12 @@ public class CrocodileEntity extends PathfinderMob implements GeoEntity, HasLife
      * pace goes as the setting squared: the setting is the root of the pace (2026-11-20: set to the pace itself, a
      * hatchling crawled at a tenth of a grown one's pace and was drawn standing while it slid along).
      */
+    /** Growing up (its life's clock is counted by the kit, {@code AnimalLife.tickEvery}). */
+    @Override
+    public void grew() {
+        sizeChanged();
+    }
+
     private void sizeChanged() {
         AttributeInstance speed = getAttribute(Attributes.MOVEMENT_SPEED);
         if (speed != null) {
@@ -834,9 +840,6 @@ public class CrocodileEntity extends PathfinderMob implements GeoEntity, HasLife
             }
             lookAround();
             return;
-        }
-        if (life.tick()) {
-            sizeChanged();          // growing up
         }
         breedingTick();
         if (hungerIn > 0) {

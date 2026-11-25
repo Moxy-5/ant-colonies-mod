@@ -934,6 +934,8 @@ call (the hippo: R9-20).
 everything that has a life (one shared tick handler for `HasLife` animals in the framework), instead of one line
 added to five files. The fix session for R10-12 should do this, not the five lines.
 
+**Status: fixed** (2026-11-24, with R10-12, BUGS 335): the kit counts every animal's life clock from one place.
+
 ### R9-42 (B): the code that starts a staged move exists three times
 
 **What is wrong.** Finding the step or bank on the route, checking the room and starting the move is about 315 lines

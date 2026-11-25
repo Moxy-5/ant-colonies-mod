@@ -744,7 +744,6 @@ public class OtterEntity extends PathfinderMob implements GeoEntity, HasLife {
             playLooks();
             return;
         }
-        life.tick();
         keepApart();
         if (tickCount % 5 == 0) {
             updateMood();

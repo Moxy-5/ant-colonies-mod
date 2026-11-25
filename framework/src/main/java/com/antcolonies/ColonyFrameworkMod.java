@@ -45,6 +45,8 @@ public class ColonyFrameworkMod {
         com.antcolonies.coat.MudCoat.ATTACHMENTS.register(modEventBus);
         modEventBus.addListener(com.antcolonies.coat.MudCoat::registerPayloads);
         NeoForge.EVENT_BUS.addListener(com.antcolonies.coat.MudCoat::tick);
+        // Every animal's life clock (growing up, the wait before breeding again), counted in one place.
+        NeoForge.EVENT_BUS.addListener(com.antcolonies.animal.AnimalLife::tickEvery);
         NeoForge.EVENT_BUS.addListener(com.antcolonies.coat.MudCoat::startTracking);
         // The raid test bench, B1: the rules every colony shares (docs/plans/raid-test-bench.md).
         com.antcolonies.watch.GeneralRules.signUp();

@@ -12,6 +12,7 @@ abullfrogclimbsoutofthewaterontothebank 0.59
 abullfrogdigsinatmiddayandcomesoutforaplayer 0.45
 abullfroghopswhereitissentandupastep 1.76
 abullfrogleapsintothewaterfromamonitor 0.20
+abullfrogleftwithoutgravitygetsitback 0.03
 abullfrogpuffsupandbitesaplayerwhostaysclose 0.19
 abullfrogtonguesalandedfly 0.08
 abullfrogtonguesfliesonlyfromacloudinreach 0.56
@@ -31,6 +32,7 @@ acourtedanimalwhosesuitordiesorvanishesisfreeagain 0.00
 acowletsacrocodilebe 0.48
 acrabcracksasnailandleavesitsshell 0.58
 acrabpicksatdyinghippograss 0.48
+acrabwhosefirstbitetakesthelastofthefoodisfed 0.12
 acrewworkswhilenobodyisnearandmorecomeoutwhenaplayeris 5.70
 acrocodileafloatclimbsoveranunderwaterledge 0.25
 acrocodileclimbsouttobaskandgoesbackin 0.62
@@ -255,6 +257,7 @@ drywallowsitescomeabout150blocksapartonopensavanna 0.16
 eachscoutkeepsitsownwayanditsreachgrowsonlyaftertripsitreallysearchedthenshrinkstoitsfind 0.03
 eggsbecomelarvaeandnursesfeedthemintoworkers 4.33
 eggsgotothequeensroomwhenthereisnonursery 9.59
+everyanimalwithalifegrowsupandrestsafterbreeding 0.02
 everyriveranimalkeepsitslifethroughasaveandload 0.00
 everytermitestungintheopeniscarriedhomeandnobodyfightspastthespot 0.45
 figblocksplacejoinandhang 0.00

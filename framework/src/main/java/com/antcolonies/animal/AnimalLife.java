@@ -109,6 +109,17 @@ public final class AnimalLife {
     }
 
     /**
+     * Every animal with a life has its clocks counted here, once a server tick, after its own tick (review R10-12: each
+     * animal used to call {@link #tick} itself, and the crab, the snail, the catfish, the hippo and the monitor never
+     * did: their young never grew up and a grown one bred only once in its life).
+     */
+    public static void tickEvery(net.neoforged.neoforge.event.tick.EntityTickEvent.Post event) {
+        if (event.getEntity() instanceof HasLife animal && !event.getEntity().level().isClientSide && animal.life().tick()) {
+            animal.grew();
+        }
+    }
+
+    /**
      * Its life for one server tick: growing (drawn anew every few seconds and the moment it is grown) and the wait
      * before it may breed again. True when its size or stage was drawn anew this tick (the animal may want to change
      * its look too).
@@ -238,6 +249,11 @@ public final class AnimalLife {
         LifeNumbers numbers = numbers();
         return numbers.breeds() && readyIn <= 0 && stageNow().grown()
                 && numbers.seasons().contains(Seasons.now(mob.level(), mob.blockPosition()));
+    }
+
+    /** Ticks left of its wait before it may breed again (for tests). */
+    public int restLeft() {
+        return readyIn;
     }
 
     /** It has bred: the wait before it is ready again starts. */

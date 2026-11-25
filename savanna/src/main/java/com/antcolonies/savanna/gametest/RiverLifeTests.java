@@ -4793,4 +4793,95 @@ public class RiverLifeTests {
         helper.assertTrue(in.ticks(0) == 177 && in.ticks(4) == 213, "walk-in lengths " + in.ticks(0) + " and " + in.ticks(4) + ", not the clips' 177 and 213");
         helper.succeed();
     }
+
+    // --- review round 10's grade A fixes (2026-11-24) ------------------------------------------------------------------
+
+    /**
+     * Review R10-12: every animal with a life has its clocks counted (by the kit, in one place): a young crab, snail and
+     * catfish grow up, and a parent's wait before breeding again runs down. (These three never counted: their young
+     * stayed young for good and a grown one bred once in its life.) The hippo and the monitor are counted too.
+     */
+    @GameTest(template = "arena", timeoutTicks = 100)
+    public static void everyAnimalWithALifeGrowsUpAndRestsAfterBreeding(GameTestHelper helper) {
+        reviewFloor(helper, 4, 4, 20, 8);
+        java.util.List<net.minecraft.world.entity.Mob> young = new java.util.ArrayList<>(), parents = new java.util.ArrayList<>();
+        int x = 5;
+        for (var type : java.util.List.of(SavannaEntities.CRAB.get(), SavannaEntities.SNAIL.get(), SavannaEntities.CATFISH.get(),
+                SavannaEntities.TILAPIA.get(), SavannaEntities.HIPPO.get(), SavannaEntities.MONITOR.get())) {
+            net.minecraft.world.entity.Mob baby = helper.spawnWithNoFreeWill(type, new BlockPos(x, TOP + 1, 5));
+            net.minecraft.world.entity.Mob parent = helper.spawnWithNoFreeWill(type, new BlockPos(x, TOP + 1, 7));
+            var life = ((com.antcolonies.animal.HasLife) baby).life();
+            if (life.numbers().grownAge() > 10) {
+                life.setAge(life.numbers().grownAge() - 5);
+                young.add(baby);
+            } else {
+                baby.discard();
+            }
+            ((com.antcolonies.animal.HasLife) parent).life().bred();
+            parents.add(parent);
+            x += 3;
+        }
+        int[] rest = parents.stream().mapToInt(p -> ((com.antcolonies.animal.HasLife) p).life().restLeft()).toArray();
+        helper.runAfterDelay(20, () -> {
+            for (var baby : young) {
+                var life = ((com.antcolonies.animal.HasLife) baby).life();
+                helper.assertTrue(life.age() == life.numbers().grownAge(), "a young " + baby.getType().toShortString() + " did not grow up (age "
+                        + life.age() + " of " + life.numbers().grownAge() + ")");
+            }
+            for (int i = 0; i < parents.size(); i++) {
+                int left = ((com.antcolonies.animal.HasLife) parents.get(i)).life().restLeft();
+                helper.assertTrue(rest[i] == 0 || left < rest[i] && left >= rest[i] - 25, "a " + parents.get(i).getType().toShortString()
+                        + "'s wait before breeding again went from " + rest[i] + " to " + left + " in 20 ticks (once a tick wanted)");
+            }
+            young.forEach(net.minecraft.world.entity.Entity::discard);
+            parents.forEach(net.minecraft.world.entity.Entity::discard);
+            helper.succeed();
+        });
+    }
+
+    /**
+     * Review R10-8: a bullfrog left with "no gravity" and no climb to end it (a puff, a clasp or a save in the middle of
+     * its climb out of the water) gets its gravity back at once.
+     */
+    @GameTest(template = "arena", timeoutTicks = 60)
+    public static void aBullfrogLeftWithoutGravityGetsItBack(GameTestHelper helper) {
+        reviewFloor(helper, 24, 4, 28, 8);
+        var frog = helper.spawnWithNoFreeWill(SavannaEntities.BULLFROG.get(), new BlockPos(26, TOP + 3, 6));
+        frog.setNoGravity(true);                // as a load leaves it: the mark saved, the climb forgotten
+        frog.setDiscardFriction(true);
+        helper.runAfterDelay(30, () -> {
+            helper.assertTrue(!frog.isNoGravity() && !frog.shouldDiscardFriction(), "the frog still has no gravity (" + frog.isNoGravity()
+                    + ") or no air drag (" + frog.shouldDiscardFriction() + ")");
+            helper.assertTrue(frog.onGround(), "the frog still hangs in the air");
+            frog.discard();
+            helper.succeed();
+        });
+    }
+
+    /**
+     * Review R10-13: a crab whose first bite takes the last of the food has eaten: it stays fed for minutes, not seconds
+     * (it used to be hungry again within 15 seconds and strip mat after mat).
+     */
+    @GameTest(template = "arena", timeoutTicks = 2400)
+    public static void aCrabWhoseFirstBiteTakesTheLastOfTheFoodIsFed(GameTestHelper helper) {
+        buildPond(helper);
+        BlockPos scraps = new BlockPos(X0 + 3, TOP - 1, Z0 + 2);
+        helper.setBlock(scraps, SavannaBlocks.SCRAPS.get().defaultBlockState()
+                .setValue(com.antcolonies.savanna.block.ScrapsBlock.AMOUNT, com.antcolonies.savanna.block.ScrapsBlock.NEARLY_GONE));
+        com.antcolonies.savanna.animal.CrabEntity crab = helper.spawn(SavannaEntities.CRAB.get(), new BlockPos(X0 + 1, TOP - 1, Z0 + 3));
+        crab.setPersistenceRequired();
+        crab.makeHungry();
+        long[] goneAt = {-1};
+        helper.onEachTick(() -> {
+            if (goneAt[0] < 0 && !helper.getBlockState(scraps).is(SavannaBlocks.SCRAPS.get())) {
+                goneAt[0] = helper.getTick();
+            }
+        });
+        helper.succeedWhen(() -> {
+            helper.assertTrue(goneAt[0] >= 0, "the crab has not eaten the last scraps yet: at "
+                    + crab.blockPosition().subtract(helper.absolutePos(BlockPos.ZERO)));
+            helper.assertTrue(helper.getTick() >= goneAt[0] + 400, "waiting 20 seconds after its meal");
+            helper.assertTrue(crab.isFed(), "the crab is hungry again 20 seconds after eating the last of the scraps");
+        });
+    }
 }

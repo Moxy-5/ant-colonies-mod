@@ -238,6 +238,12 @@ public class TilapiaEntity extends AbstractSchoolingFish implements GeoEntity, H
     }
 
     /** Its look and size from its age, its nest and its mouth. */
+    /** Growing up: its look with its stage (its life's clock is counted by the kit, {@code AnimalLife.tickEvery}). */
+    @Override
+    public void grew() {
+        refresh();
+    }
+
     private void refresh() {
         if (level().isClientSide) {
             return;
@@ -491,9 +497,6 @@ public class TilapiaEntity extends AbstractSchoolingFish implements GeoEntity, H
             float want = isInWater() && flat + Math.abs(dy) > 0.01 ? (float) Mth.clamp(Math.toDegrees(Math.atan2(dy, flat)), -35, 35) : 0;
             swimPitch += (want - swimPitch) * 0.15F;
             return;
-        }
-        if (life.tick()) {
-            refresh();
         }
         if (hungryIn > 0) {
             hungryIn--;

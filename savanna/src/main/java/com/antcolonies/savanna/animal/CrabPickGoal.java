@@ -66,6 +66,8 @@ public class CrabPickGoal extends Goal {
     private Vec3 shellAt;
     private int ticks, picking;
     private boolean fed, shellLeft;
+    /** It got at least one bite of this meal down (review R10-13). */
+    private boolean ate;
 
     public CrabPickGoal(CrabEntity crab) {
         this.crab = crab;
@@ -92,7 +94,7 @@ public class CrabPickGoal extends Goal {
     @Override
     public void start() {
         ticks = picking = 0;
-        fed = shellLeft = false;
+        fed = shellLeft = ate = false;
         shellAt = null;
     }
 
@@ -108,7 +110,9 @@ public class CrabPickGoal extends Goal {
         crab.setDoing(CrabEntity.CALM);
         crab.getNavigation().stop();
         if (!fed) {
-            crab.hungryIn = 100 + crab.getRandom().nextInt(200);
+            // a meal that ended early because the food ran out counts all the same, whichever bite took the last of it
+            // (review R10-13: food gone at the first bite left the crab hungry again in seconds, stripping mat after mat)
+            crab.hungryIn = ate ? FED_MIN + crab.getRandom().nextInt(FED_MORE) : 100 + crab.getRandom().nextInt(200);
         }
         remains = null;
         block = null;
@@ -153,11 +157,14 @@ public class CrabPickGoal extends Goal {
         crab.setDoing(remains != null || isScraps() || isSnailEggs() ? CrabEntity.PICK_MEAT : CrabEntity.PICK_ALGAE);
         picking++;
         for (int at : BITE_TICKS) {
-            if (picking == at && !bite()) {
-                fed = picking > BITE_TICKS[0];
-                remains = null;
-                block = null;
-                return;
+            if (picking == at) {
+                if (bite()) {
+                    ate = true;
+                } else {
+                    remains = null;
+                    block = null;
+                    return;
+                }
             }
         }
         if (picking >= PICK_TICKS) {

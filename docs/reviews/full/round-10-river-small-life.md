@@ -63,6 +63,8 @@ not two. Recommended: let breeding be the main way a river refills. Breeding and
 eggs and asks again (or lets out what fits) instead of losing the brood on one unlucky tick. And add a game test with a
 real counting player (a fake player in survival near the scene) so the playing path is tested, not only the spectator's.
 
+**Status: open, the user's call** (2026-11-24). It changes how the river plays (who refills it: the spawner or breeding), so it is put to the user as a game question with the recommendation above. Since R10-12's fix the crab, snail and catfish breed again, so this now decides more than it did.
+
 ### R10-2 (B, proven by walked path): a mate that dies or unloads in the middle of courtship leaves its partner "taken" for good
 
 **What is wrong.** When courtship starts, both animals are marked as each other's partner
@@ -189,6 +191,8 @@ frozen part way up, floating, puffed, that never moves again. (Not in creative o
 `stopActing()` for any action but the one that needs them, and on load; and make `ThreatGoal.canUse` refuse a climb.
 Test first: a frog mid-climb with a survival player 2 blocks off must stand on the bank with gravity 2 seconds later.
 
+**Status: fixed** (2026-11-24, BUGS 333; test `aBullfrogLeftWithoutGravityGetsItBack`), with one rule in the frog's own tick in place of the proposed three: "no gravity" is taken off whenever its action is not the climb out, "no air drag" whenever it is not the leap. That covers the puff, the clasp and a save in mid-climb alike, and mends a frog already left hanging in an old world. `ThreatGoal.canUse` was left alone (a puff may still cut a climb short: the frog then drops into the water).
+
 ### R10-9 (A, proven that it is sent; the cost to measure): every tadpole tells every player its age every tick
 
 **What is wrong.** A tadpole's age is synced data and is counted up by one every tick
@@ -204,6 +208,8 @@ multiplayer.
 "tx" count) with and without the change.
 
 **Proposed fix.** Keep the age a plain server field (it is already saved) and sync one "has legs" flag, set once.
+
+**Status: fixed** (2026-11-24, BUGS 334; the old test `tadpolesGrowLegBudsThenBecomeFroglets`' checks still hold): the age is the server's own count (saved as before), one "has legs" flag is synced and changes once. The packets saved were not counted.
 
 ### R10-10 (B, proven): the two frog steps before breeding can end with nothing, and a hungry frog searches wide 5 times a second
 
@@ -276,6 +282,8 @@ becomes grown, and a parent's rest runs out. **Mind what this switches on:** tod
 mostly asleep, so R10-1 (spawner against breeding), R10-4 (catfish eggs eaten) and R10-16 below are hidden. Fix this
 one first, then judge those in play.
 
+**Status: fixed** (2026-11-24, BUGS 335; test `everyAnimalWithALifeGrowsUpAndRestsAfterBreeding`), the "better" way: the kit counts every animal's life clock from one place (`AnimalLife.tickEvery`, after each animal's own tick), with a `HasLife.grew()` hook for an animal that changes its look when it grows (tilapia, crocodile); the four animals' own calls are gone. The hippo and the monitor are counted too (round 9's R9-41). **Mind:** crabs, snails and catfish now breed again and again and their young grow up; R10-1, R10-4 and R10-16 are no longer hidden and want a look in play.
+
 ### R10-13 (A, logic proven; how often to measure): a crab's meal does not count when the food ends at the first bite
 
 **What is wrong.** A crab picking at food bites at set moments. If the food is gone at the first bite (an algae mat
@@ -289,6 +297,8 @@ measure: 3 crabs, 12 one-layer mats and 6 snails for a game day; count what is l
 
 **Proposed fix.** A bite that ate something counts as fed, whatever number bite it was (`fed = true` when `bite()`
 succeeded once, or when the first bite removed the last of the food). One rule fewer, not one more.
+
+**Status: fixed** (2026-11-24, BUGS 336; test `aCrabWhoseFirstBiteTakesTheLastOfTheFoodIsFed`): a meal with at least one bite down counts as fed when it ends.
 
 ### R10-14 (B, proven): the crab's 20-second limit on threatening does nothing
 
