@@ -1,0 +1,14 @@
+{
+ "note": "v5 seamless boss bevel and clean 14-segment mitered horns",
+ "date": "2026-11-24",
+ "boxes": 147,
+ "numbers": {
+  "HEIGHT": 36.2,
+  "BARREL_HW": 9.7,
+  "HUMP_BOOST": 0.0,
+  "HORN_SPAN": 16.7,
+  "HORN_DIP": 0.0,
+  "MUZZLE_LEN": 5.6,
+  "LEG_H": 13.4
+ }
+}

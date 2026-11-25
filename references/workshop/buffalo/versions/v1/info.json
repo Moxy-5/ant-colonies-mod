@@ -1,0 +1,14 @@
+{
+ "note": "v1 plain 3D shape",
+ "date": "2026-11-24",
+ "boxes": 130,
+ "numbers": {
+  "HEIGHT": 36.2,
+  "BARREL_HW": 10.4,
+  "HUMP_BOOST": 0.0,
+  "HORN_SPAN": 17.6,
+  "HORN_DIP": 0.0,
+  "MUZZLE_LEN": 5.8,
+  "LEG_H": 13.4
+ }
+}
