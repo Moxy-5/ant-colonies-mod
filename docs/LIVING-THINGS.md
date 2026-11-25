@@ -117,7 +117,8 @@ Every living thing in the mod, built or planned, plants and fungi included, in o
   - Cape buffalo: BUILT 2026-11-25 (step 1, `docs/plans/buffalo.md`: herds laid with pans, graze, drink, lie down, the temper; Neon's model v12, the user: "perfect"). Step 2 (block moves, wallowing, calves, river herds) PLANNED.
   - Antelope, wildebeest; floodplain grazers lechwe, puku, waterbuck, sitatunga, bushbuck; monkeys; dung spreading acacia seed.
 - *5f. Big hunters and scavengers:*
-  - African lion (prides), cheetah (sprints), spotted hyena (clans, scavenge and hunt), African wild dog (packs): user's list 2026-11-16.
+  - African lion (prides): PLANNED 2026-11-25 (`docs/plans/lion.md`: step 1 the pride laid with pans, its day, the temper; step 2 the hunt after buffalo calves; step 3 cubs growing; Neon's models and clips ready, `docs/handoff/lion.md`).
+  - Cheetah (sprints), spotted hyena (clans, scavenge and hunt), African wild dog (packs): user's list 2026-11-16.
   - Honey badger (digs, raids bee hives, fights snakes): user's list 2026-11-16.
   - Leopard (gallery forest).
 - *5g. Small mammals:*
