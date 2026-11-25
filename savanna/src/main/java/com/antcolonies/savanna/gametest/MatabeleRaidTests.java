@@ -1763,6 +1763,65 @@ public class MatabeleRaidTests {
     }
 
     /**
+     * BUGS 360 (BUGS 351's cause): a raid follows the line its scout laid on its latest walk home, never an older trail to
+     * the same spot still smelt (there the termites had cased a fallen branch in mud since, and every raid stood at it).
+     * A scout's first find lays its line; a column walks it (a column's trail, lasting longer); a scout home later from
+     * the same spot by another way lays its new line, the old one is dropped, and the next raid there follows the new.
+     */
+    @GameTest(template = "arena", timeoutTicks = 1200, skyAccess = true, batch = "matabele_raids")
+    public static void aRaidFollowsItsScoutsNewestLineNotAnOlderTrailToTheSameSpot(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        TestClock clock = TestClock.still(helper, 21.0); // (night: the colony sets out no raid by itself to the finds)
+        TestScenes.shapeGround(helper, 45, (x, z) -> 0);
+        MatabeleScenes.deadMound(helper, NEST, NEST);
+        Colony colony = MatabeleScenes.colony(helper, NEST + 6, NEST, 20);
+        Raids raids = colony.part(SavannaParts.RAIDS).orElse(null);
+        helper.assertTrue(raids != null, "a Matabele colony has no raids part");
+        BlockPos at = helper.absolutePos(new BlockPos(46, SURFACE, NEST + 4));
+        BlockPos bend = helper.absolutePos(new BlockPos(36, SURFACE, NEST + 14)); // (the newer way bows 10 blocks aside)
+        helper.startSequence()
+                .thenIdle(40)
+                .thenExecute(() -> {
+                    BlockPos entrance = colony.getCenter();
+                    List<BlockPos> straight = groundLine(level, List.of(entrance, at));
+                    List<BlockPos> bowed = groundLine(level, List.of(entrance, bend, at));
+                    raids.found(level, at, 2, straight, null);
+                    Raids.Find find = raids.finds().stream().filter(one -> one.at().equals(at)).findFirst().orElse(null);
+                    helper.assertTrue(find != null, "the scout's find was not remembered; " + raids.describe(level));
+                    helper.assertTrue(raids.column() == null, "a raid set out at night by itself");
+                    helper.assertTrue(raids.trails().all().size() == 1, "the scout's line was not laid as one trail; " + raids.describe(level));
+                    com.antcolonies.savanna.colony.ScentTrails.Trail old = raids.trails().all().get(0);
+                    old.walked(level.getGameTime()); // (a column walked it: a column's trail, fresher and longer lasting)
+                    raids.found(level, at, 2, bowed, null);
+                    helper.assertTrue(!raids.trails().all().contains(old), "the find's old trail was kept beside its scout's new line");
+                    MatabeleScenes.termitesAt(helper, at); // (no raid sets out to a spot with no termites)
+                    Raid raid = raids.raidByCommandForTests(level, find);
+                    helper.assertTrue(raid != null, "no raid set out; " + raids.whyNoRaid());
+                    helper.assertTrue(raid.trail() != old, "the raid follows the older trail, not its scout's newest line");
+                    double nearBend = raid.trail().points().stream().mapToDouble(p -> flat(p, bend)).min().orElse(99);
+                    helper.assertTrue(nearBend <= 1.5, "the raid's trail does not run the scout's new way (nearest point "
+                            + Math.round(nearBend) + " from its bend)");
+                })
+                .thenSucceed();
+    }
+
+    /** A scent line on the ground through these places, a point every 2 blocks (flat), the first place first. */
+    private static List<BlockPos> groundLine(ServerLevel level, List<BlockPos> through) {
+        List<BlockPos> line = new ArrayList<>();
+        for (int leg = 0; leg + 1 < through.size(); leg++) {
+            BlockPos from = through.get(leg), to = through.get(leg + 1);
+            int steps = (int) Math.ceil(Math.hypot(to.getX() - from.getX(), to.getZ() - from.getZ()) / 2.0);
+            for (int i = leg == 0 ? 0 : 1; i <= steps; i++) {
+                double t = i / (double) steps;
+                line.add(level.getHeightmapPos(net.minecraft.world.level.levelgen.Heightmap.Types.MOTION_BLOCKING_NO_LEAVES,
+                        new BlockPos(from.getX() + (int) Math.round((to.getX() - from.getX()) * t), from.getY(),
+                                from.getZ() + (int) Math.round((to.getZ() - from.getZ()) * t))));
+            }
+        }
+        return line;
+    }
+
+    /**
      * Raid scouts search like real ants (2026-11-04, in place of R5's rings and slices), the scouts' memory asked of the
      * colony directly (no ant walks; at 3:00 no scout sets out by itself). Three new scouts get their own ways out,
      * spread round the nest (40 degrees or more apart), and each keeps its way trip after trip; a trip walks out a share

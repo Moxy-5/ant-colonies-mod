@@ -75,6 +75,11 @@ public class Raids {
         @Nullable
         private UUID scout;
         /**
+         * BUGS 360: the id of the scent trail laid from {@link #trail} (0 none): a raid to the find follows this trail, the
+         * line its scout laid on its latest walk home, never an older trail to the same spot.
+         */
+        private int trailId;
+        /**
          * The raid code review, finding 12: the scout on its way to recheck it now (not saved), and when it was picked
          * for a trip. {@code checkedAt} is set only when a recheck really happens (found again, or found empty).
          */
@@ -246,8 +251,38 @@ public class Raids {
 
     /** The scent trail to this find: the one still smelt, else a new one laid along the find's own line. */
     ScentTrails.Trail trailFor(ServerLevel level, Find find, long now) {
-        ScentTrails.Trail trail = trails.liveTo(find.at, trailReach(), trailNumbers(), now);
-        return trail != null ? trail : trails.lay(level, colony.getCenter(), find.at, find.trail, now, false);
+        ScentTrails.Trail trail = trailOf(find, now);
+        return trail != null ? trail : layTrail(level, find, now);
+    }
+
+    /**
+     * BUGS 360: the trail for a raid read back from the save: the one it was walking (by its saved id) if it is still
+     * kept, even if its scout has laid a newer line since; else the find's own ({@link #trailFor}).
+     */
+    ScentTrails.Trail trailForSaved(ServerLevel level, Find find, int savedId, long now) {
+        ScentTrails.Trail walking = trails.byId(savedId);
+        return walking != null ? walking : trailFor(level, find, now);
+    }
+
+    /** BUGS 360: the find's own trail (laid from its scout's newest line) if it is still smelt; null if not. */
+    @Nullable
+    private ScentTrails.Trail trailOf(Find find, long now) {
+        ScentTrails.Trail trail = trails.byId(find.trailId);
+        return trail != null && trail.alive(trailNumbers(), now) ? trail : null;
+    }
+
+    /**
+     * BUGS 360: the find's scent line laid as a trail in the world, the find's trail from now on; the line it replaces is
+     * dropped (unless a raid walks it now: it fades by itself after).
+     */
+    private ScentTrails.Trail layTrail(ServerLevel level, Find find, long now) {
+        ScentTrails.Trail old = trails.byId(find.trailId);
+        if (old != null && (column == null || column.trail() != old)) {
+            trails.drop(old); // (first: at the most trails kept, laying would drop the oldest, maybe another find's)
+        }
+        ScentTrails.Trail trail = trails.lay(level, colony.getCenter(), find.at, find.trail, now, false);
+        find.trailId = trail.id();
+        return trail;
     }
 
     /** A find as a raid read back after a reload needs it: the remembered one at that spot, else one made for it. */
@@ -318,9 +353,10 @@ public class Raids {
      */
     void remember(ServerLevel level, BlockPos at, int worth, List<BlockPos> line) {
         long now = level.getGameTime();
-        finds.add(new Find(at.immutable(), worth, now, now, 0, List.copyOf(line), null));
-        if (LandReady.at(level, colony.getCenter()) && LandReady.at(level, at) && trails.liveTo(at, trailReach(), trailNumbers(), now) == null) {
-            trails.lay(level, colony.getCenter(), at, line, now, false);
+        Find find = new Find(at.immutable(), worth, now, now, 0, List.copyOf(line), null);
+        finds.add(find);
+        if (LandReady.at(level, colony.getCenter()) && LandReady.at(level, at)) {
+            layTrail(level, find, now);
         }
     }
 
@@ -756,14 +792,14 @@ public class Raids {
         } else {
             finds.add(new Find(at.immutable(), worth, now, now, 0, List.copyOf(trail), scout));
         }
-        // R4: the scout's line home is a scent trail in the world now, unless a trail still smelt leads there already (the
-        // raid follows that one: a column's trail is stronger than one scout's line).
-        if (trails.liveTo(at, trailReach(), trailNumbers(), now) == null) {
-            trails.lay(level, colony.getCenter(), at, trail, now, false);
-        }
+        Find find = known != null ? known : finds.get(finds.size() - 1);
+        // R4, made newer by BUGS 360: the scout's line home is a scent trail in the world now, and the find's trail: the
+        // next raid there follows the line its scout laid on this walk home (as real Megaponera do, the scout leading the
+        // column along its fresh trail, Longhurst and Howse 1979), not an older trail the ground may have shut since.
+        layTrail(level, find, now);
         // Step 3b: home with a find, the scout recruits a raid there as soon as one may leave (the one rule, asked now
         // and then every second while the find waits).
-        waiting = known != null ? known : finds.get(finds.size() - 1);
+        waiting = find;
         // R7: the scout command keeps the raid hours (a find it brings home after 19:00 waits for the morning, hungry or
         // not) unless sent with "anytime" (its find raids at once, whatever the hour)
         waitingBy = scout != null && scouts.wasSentAnyHour(scout) ? By.COMMAND_ANY_HOUR
@@ -963,17 +999,17 @@ public class Raids {
             say(level, "no raid to " + find.at.toShortString() + ": " + whyNoRaid);
             return null;
         }
-        // R4: the raid follows the scent trail to the find if it is still smelt (whoever leads); with the trail gone only
-        // the scout knows the way, and it lays a new one as it leads; with the scout gone too, nobody knows the way.
+        // R4: the raid follows the find's scent trail if it is still smelt (whoever leads); with the trail gone only the
+        // scout knows the way, and it lays a new one as it leads; with the scout gone too, nobody knows the way.
         long now = level.getGameTime();
-        ScentTrails.Trail trail = trails.liveTo(find.at, trailReach(), trailNumbers(), now);
+        ScentTrails.Trail trail = trailOf(find, now);
         if (trail == null) {
             if (scoutHere == null) {
                 whyNoRaid = "the scent trail to " + find.at.toShortString() + " has faded and its scout is not here to lead: nobody knows the way";
                 say(level, "no raid to " + find.at.toShortString() + ": " + whyNoRaid);
                 return null;
             }
-            trail = trails.lay(level, colony.getCenter(), find.at, find.trail, now, false);
+            trail = layTrail(level, find, now);
             say(level, "the trail to " + find.at.toShortString() + " has faded: its scout leads from memory, laying a new one");
         }
         fit.remove(leader);
@@ -1038,7 +1074,7 @@ public class Raids {
     public Raid raidForTests(ServerLevel level, BlockPos at, int worth, List<BlockPos> trail, @Nullable UUID scout) {
         Find find = new Find(at.immutable(), worth, level.getGameTime(), level.getGameTime(), 0, List.copyOf(trail), scout);
         finds.add(find);
-        trails.lay(level, colony.getCenter(), at, trail, level.getGameTime(), false); // (R4: the scout's line, laid as it ran home)
+        layTrail(level, find, level.getGameTime()); // (R4: the scout's line, laid as it ran home)
         return keepNoHoursOutsideThem(level, startRaid(level, find, true, scout));
     }
 
@@ -1125,6 +1161,7 @@ public class Raids {
             if (find.scout != null) {
                 one.putUUID("scout", find.scout);
             }
+            one.putInt("trailId", find.trailId);
             list.add(one);
         }
         tag.put("raidFinds", list);
@@ -1150,8 +1187,10 @@ public class Raids {
             for (long point : one.getLongArray("trail")) {
                 trail.add(BlockPos.of(point));
             }
-            finds.add(new Find(at, one.getInt("worth"), one.getLong("foundAt"), one.getLong("checkedAt"), one.getInt("misses"), trail,
-                    one.hasUUID("scout") ? one.getUUID("scout") : null));
+            Find find = new Find(at, one.getInt("worth"), one.getLong("foundAt"), one.getLong("checkedAt"), one.getInt("misses"), trail,
+                    one.hasUUID("scout") ? one.getUUID("scout") : null);
+            find.trailId = one.getInt("trailId"); // (0 in saves from before BUGS 360: the find's line is laid anew when a raid needs it)
+            finds.add(find);
         }
         scouts.load(tag);
         waiting = null;

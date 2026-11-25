@@ -1079,6 +1079,7 @@ public final class Raid implements FightDiary {
         tag.putLong("startedAt", startedAt);
         tag.putLong("at", find.at().asLong());
         tag.putInt("worth", find.worth());
+        tag.putInt("trail", trail.id()); // (BUGS 360: read back on the trail it walks, not a newer line laid since)
         tag.put("members", uuids(members));
         tag.putInt("size", size);
         tag.putInt("numbersAlong", numbersAlong);
@@ -1112,6 +1113,11 @@ public final class Raid implements FightDiary {
 
     static int savedWorth(CompoundTag tag) {
         return tag.getInt("worth");
+    }
+
+    /** The id of the scent trail a raid written down by {@link #save} walked (0 in saves from before BUGS 360). */
+    static int savedTrail(CompoundTag tag) {
+        return tag.getInt("trail");
     }
 
     private static ListTag uuids(java.util.Collection<UUID> ids) {

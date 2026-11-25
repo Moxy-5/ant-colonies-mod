@@ -529,7 +529,8 @@ public final class RaidsAway {
         try {
             long now = level.getGameTime();
             Raids.Find find = raids.findFor(Raid.savedSpot(tag), Raid.savedWorth(tag), now);
-            Raid raid = Raid.load(level, colony, column, raids.carryNumbers(), raids.trailNumbers(), find, raids.trailFor(level, find, now), tag);
+            Raid raid = Raid.load(level, colony, column, raids.carryNumbers(), raids.trailNumbers(), find,
+                    raids.trailForSaved(level, find, Raid.savedTrail(tag), now), tag);
             if (raid != null) {
                 raids.putRaid(raid);
             }
