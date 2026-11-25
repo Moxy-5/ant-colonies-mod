@@ -1,19 +1,14 @@
 package com.antcolonies.savanna.animal;
 
 import java.util.EnumSet;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.UUID;
 
 import javax.annotation.Nullable;
 
 import com.antcolonies.animal.Attention;
 import com.antcolonies.colony.Colony;
-import com.antcolonies.colony.GroundTop;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
-import net.minecraft.tags.FluidTags;
 import net.minecraft.util.Mth;
 import net.minecraft.util.RandomSource;
 import net.minecraft.world.entity.LivingEntity;
@@ -46,7 +41,7 @@ public final class BuffaloGoals {
     /** Its goals, by weight. */
     static void register(BuffaloEntity buffalo, GoalSelector goals) {
         goals.addGoal(0, new FloatGoal(buffalo));
-        goals.addGoal(0, new SwimOutGoal(buffalo));
+        goals.addGoal(0, new SwimOutGoal(buffalo, BuffaloEntity.TRAVEL));
         goals.addGoal(1, new TemperGoal(buffalo));
         goals.addGoal(2, new DayGoal(buffalo));
     }
@@ -69,8 +64,6 @@ public final class BuffaloGoals {
     static final double SPOT_NEAR = 8.0, SPOT_SPREAD = 14.0;
     /** Mixed into a grazing place's dice with the bout's number (any big odd number). */
     private static final long SPOT_DICE = 0x9E3779B97F4A7C15L;
-    /** Mates' spots round a place are spread by the golden angle (about 137.5 degrees) in their herd's order. */
-    static final double GOLDEN_ANGLE = Math.PI * (3.0 - Math.sqrt(5.0));
 
     /** The part of the day at this day time. */
     static Act actAt(long dayTime) {
@@ -98,25 +91,20 @@ public final class BuffaloGoals {
      * distance past the pan's ring, so every mate finds the same place whatever land is loaded, without reading the world.
      */
     public static Vec3 grazeCentre(BlockPos home, int across, long bout) {
-        RandomSource dice = RandomSource.create(home.asLong() ^ bout * SPOT_DICE);
-        double angle = dice.nextDouble() * Math.PI * 2.0;
-        double far = across / 2.0 + SPOT_NEAR + dice.nextDouble() * SPOT_SPREAD;
-        return new Vec3(home.getX() + 0.5 + Math.cos(angle) * far, home.getY(), home.getZ() + 0.5 + Math.sin(angle) * far);
+        return HomeGroup.dicePoint(home, bout, SPOT_DICE, across / 2.0 + SPOT_NEAR, SPOT_SPREAD);
     }
 
     /** A mate's own spot round a place: its order in the herd turned by the golden angle, this far out (blocks). */
     static Vec3 offset(int rank, double radius) {
-        double a = rank * GOLDEN_ANGLE;
-        return new Vec3(Math.cos(a) * radius, 0.0, Math.sin(a) * radius);
+        return HomeGroup.offset(rank, radius);
     }
 
     private static double flat(Vec3 a, double x, double z) {
-        double dx = a.x - x, dz = a.z - z;
-        return Math.sqrt(dx * dx + dz * dz);
+        return HomeGroup.flat(a, x, z);
     }
 
     private static double flat(Vec3 a, BlockPos b) {
-        return flat(a, b.getX() + 0.5, b.getZ() + 0.5);
+        return HomeGroup.flat(a, b);
     }
 
     // --- its day -----------------------------------------------------------------------------------------------------------
@@ -131,16 +119,6 @@ public final class BuffaloGoals {
     static final int GROUND_DY = 8;
     /** Mates set off for a new place one after another, this far apart in their herd's order (ticks). */
     static final int DEPART_GAP = 40;
-    /** A trip longer than this goes in legs this long, each its own route (blocks; well inside a route's search). */
-    static final double LEG = 20.0;
-    /**
-     * Where a leg may end, tried in order until one is on dry ground: {degrees turned off the way to its stand, part of a
-     * leg}; the first is straight on (the way round a pan lying across its way).
-     */
-    private static final double[][] LEG_TRIES = {{0, 1}, {30, 1}, {-30, 1}, {60, 1}, {-60, 1}, {0, 0.5}, {30, 0.5}, {-30, 0.5},
-            {60, 0.5}, {-60, 0.5}};
-    /** A route that brought it less than this much nearer has failed (blocks). */
-    static final double HEADWAY = 2.0;
     /** More than this far behind its herd (blocks) it trots to catch up. */
     static final double TROT_BEHIND = 8.0;
     /** After a place it could not reach it waits this long before trying again (ticks; review R9-16); land not loaded, this long. */
@@ -157,13 +135,8 @@ public final class BuffaloGoals {
     static final int DRINKS_FEWEST = 1, DRINKS_MOST = 2;
     /** Lying long, it gets up now and then, every this many ticks (60 to 120 s). */
     static final int UP_SHORTEST = 1200, UP_LONGEST = 2400;
-    /** The shore stand is looked for this far round its spot on the pan's edge (blocks). */
-    static final int SHORE_SEARCH = 6;
     /** At its stand: this near its middle, or this near with its route done (blocks). */
     static final double ARRIVE = 1.0, ARRIVE_DONE = 2.0;
-    /** This near its stand it walks straight to it, no route (blocks); bumping into something this many ticks running, it cannot reach it. */
-    static final double STRAIGHT = 4.0;
-    static final int BUMP_LIMIT = 40;
 
     /**
      * Its whole day, one goal read from the shared clock. Its place for each part of the day: grazing, a place from dice
@@ -199,11 +172,9 @@ public final class BuffaloGoals {
         /** Whether it grazes on where it is until its turn to set off. */
         private boolean grazeOn;
         /** Its turn to set off, and until when it waits (its own ticks). */
-        private int departAt, waitUntil, bumped;
-        /** Its route now (a leg, or its stand), and how far it was from its stand when that route began. */
-        @Nullable
-        private BlockPos routeTo;
-        private double routeFrom;
+        private int departAt, waitUntil;
+        /** Its way to its stand (the shared {@link Trip}: legs, routes, the last few blocks straight). */
+        private final Trip trip = new Trip();
         /** What its way to its stand is: a trip, a grazing step (it stops as soon as a plant is at its jaws), a few steps aside. */
         private int going;
         private static final int TRIP = 0, GRAZE_STEP = 1, ASIDE = 2;
@@ -240,7 +211,7 @@ public final class BuffaloGoals {
         @Override
         public void start() {
             there = false;
-            routeTo = null;
+            trip.drop();
             going = TRIP;
             stepFrom = null;
         }
@@ -248,7 +219,7 @@ public final class BuffaloGoals {
         @Override
         public void stop() {
             b.getNavigation().stop();
-            routeTo = null;
+            trip.drop();
         }
 
         @Override
@@ -293,7 +264,7 @@ public final class BuffaloGoals {
             stand = null;
             drinkFacing = null;
             there = false;
-            routeTo = null;
+            trip.drop();
             going = TRIP;
             waitUntil = 0;
             departAt = now + b.rank() * DEPART_GAP;
@@ -322,7 +293,6 @@ public final class BuffaloGoals {
                     return;
                 }
             }
-            PathNavigation nav = b.getNavigation();
             double dist = flat(b.position(), stand);
             if (d == BuffaloEntity.REST || d == BuffaloEntity.REST_DOWN) {
                 if (dist <= ARRIVE_DONE) {
@@ -335,10 +305,6 @@ public final class BuffaloGoals {
             if (d != BuffaloEntity.CALM) {
                 return;
             }
-            if (dist <= ARRIVE || dist <= ARRIVE_DONE && nav.isDone() && (routeTo == null || routeTo.equals(stand))) {
-                arrive();
-                return;
-            }
             if (going == GRAZE_STEP && stepFrom != null && flat(b.position(), stepFrom.x, stepFrom.z) >= STEP_LEAST) {
                 BlockPos p = b.plantAtJaws();
                 if (p != null && (grazedAt == null || p.getX() != grazedAt.getX() || p.getZ() != grazedAt.getZ())) {
@@ -346,75 +312,16 @@ public final class BuffaloGoals {
                     return;
                 }
             }
-            if (dist <= STRAIGHT) {
-                // the last few blocks on its own grass: straight there, no route (Minecraft's route-follower calls a short
-                // route done while a 2-wide body is still about 2 blocks off: measured 2026-11-25, 2.1 to 2.6 off)
-                if (routeTo != null) {
-                    nav.stop();
-                    routeTo = null;
-                }
-                b.getMoveControl().setWantedPosition(stand.getX() + 0.5, stand.getY(), stand.getZ() + 0.5, pace());
-                bumped = b.horizontalCollision ? bumped + 1 : 0;
-                if (bumped > BUMP_LIMIT) {
-                    bumped = 0;
-                    cannotReach(now);                               // something in the way of the last few blocks
-                }
-                return;
+            if (trip.stand() != stand) {
+                trip.to(stand);
             }
-            if (routeTo == null || nav.isDone()) {
-                if (routeTo != null && dist > routeFrom - HEADWAY) {
-                    cannotReach(now);
-                    return;
-                }
-                BlockPos to = dist > LEG ? legPoint(dist) : stand;
-                if (to == null) {
-                    waitUntil = now + UNLOADED_WAIT;
-                    return;
-                }
-                routeTo = to;
-                routeFrom = dist;
-                if (!nav.moveTo(to.getX() + 0.5, to.getY(), to.getZ() + 0.5, pace())) {
-                    cannotReach(now);
-                }
-                return;
-            }
-            if (now % 20 == 0) {
-                nav.setSpeedModifier(pace());
-            }
-        }
-
-        /**
-         * Its next leg: {@link #LEG} toward its stand, on dry ground there; null if that land is not loaded. A point in water
-         * (its pan lies across the way; {@link GroundTop} counts water as ground) is turned round it: {@link #LEG_TRIES} in
-         * order, each still bringing it well nearer its stand; with none dry, the straight one (it wades).
-         */
-        @Nullable
-        private BlockPos legPoint(double dist) {
-            Level level = b.level();
-            double ux = (stand.getX() + 0.5 - b.getX()) / dist, uz = (stand.getZ() + 0.5 - b.getZ()) / dist;
-            BlockPos straight = null;
-            for (double[] t : LEG_TRIES) {
-                double a = Math.toRadians(t[0]), far = LEG * t[1], cos = Math.cos(a), sin = Math.sin(a);
-                double x = b.getX() + (ux * cos - uz * sin) * far, z = b.getZ() + (ux * sin + uz * cos) * far;
-                BlockPos column = BlockPos.containing(x, b.getY(), z);
-                if (!level.hasChunkAt(column)) {
-                    if (straight == null) {
-                        return null;                            // the way straight on is not loaded: it waits
-                    }
-                    continue;
-                }
-                BlockPos cell = GroundTop.cell(level, column);
-                if (straight == null) {
-                    straight = cell;
-                }
-                if (flat(Vec3.atBottomCenterOf(cell), stand) > dist - HEADWAY - ARRIVE_DONE) {
-                    continue;                                   // too little nearer: its route would count as failed
-                }
-                if (level.getFluidState(cell).isEmpty() && level.getFluidState(cell.below()).isEmpty()) {
-                    return cell;
+            switch (trip.step(b, pace(), ARRIVE, ARRIVE_DONE)) {
+                case ARRIVED -> arrive();
+                case CANNOT_REACH -> cannotReach(now);
+                case UNLOADED -> waitUntil = now + UNLOADED_WAIT;
+                default -> {
                 }
             }
-            return straight;
         }
 
         /** Its pace: a grazing step or a few steps at the walk clip's own speed, a trip at its travelling walk, a trot when far behind. */
@@ -441,7 +348,7 @@ public final class BuffaloGoals {
 
         /** A place it cannot reach: it waits {@link #UNREACHABLE_WAIT} by its nearest mate, then tries again. */
         private void cannotReach(int now) {
-            routeTo = null;
+            trip.drop();
             if (going != TRIP) {
                 stand = b.blockPosition();                  // a step that cannot be made: it grazes (or lies) where it is
                 b.standAt = stand;
@@ -460,7 +367,7 @@ public final class BuffaloGoals {
         private void arrive() {
             b.getNavigation().stop();
             there = true;
-            routeTo = null;
+            trip.drop();
             if (going == GRAZE_STEP && flat(b.position(), stand) > ARRIVE) {
                 stand = b.blockPosition();                  // stopped early with a plant at its jaws
                 b.standAt = stand;
@@ -585,59 +492,16 @@ public final class BuffaloGoals {
             return null;
         }
 
-        /**
-         * Its own stand on its pan's shore: the dry bank stand ({@link Grazing#bankStand}) nearest its spot round the pan's
-         * edge (its order in the herd turned by the golden angle), with water one or two blocks straight ahead along a block
-         * axis (facing the pan's middle the most of those); null if there is none (no pan, a dry one). Sets the way it faces
-         * to drink.
-         */
+        /** Its own stand on its pan's shore (the shared {@link Shore}), setting its spot and the way it faces to drink; null if none. */
         @Nullable
         private BlockPos shoreStand(int rank) {
-            if (b.homeAcross() <= 0) {
+            Shore shore = Shore.find(b.level(), b.home(), b.homeAcross(), rank, this::crowded);
+            if (shore == null) {
                 return null;
             }
-            BlockPos home = b.home();
-            int w = home.getY();                            // its pan's water's top
-            Vec3 dir = offset(rank, 1.0);
-            double out = b.homeAcross() / 2.0 + 1.0;
-            spot = new Vec3(home.getX() + 0.5 + dir.x * out, w, home.getZ() + 0.5 + dir.z * out);
-            BlockPos best = null;
-            double bestD = Double.MAX_VALUE;
-            for (int dx = -SHORE_SEARCH; dx <= SHORE_SEARCH; dx++) {
-                for (int dz = -SHORE_SEARCH; dz <= SHORE_SEARCH; dz++) {
-                    int x = Mth.floor(spot.x) + dx, z = Mth.floor(spot.z) + dz;
-                    double ex = x + 0.5 - spot.x, ez = z + 0.5 - spot.z, d = ex * ex + ez * ez;
-                    if (d >= bestD) {
-                        continue;
-                    }
-                    BlockPos s = Grazing.bankStand(b.level(), x, z, w);
-                    if (s == null || crowded(x + 0.5, z + 0.5)) {
-                        continue;
-                    }
-                    Direction facing = null;
-                    double most = -Double.MAX_VALUE;
-                    for (Direction f : Direction.Plane.HORIZONTAL) {
-                        if (water(x + f.getStepX(), z + f.getStepZ(), w) || water(x + 2 * f.getStepX(), z + 2 * f.getStepZ(), w)) {
-                            double toMiddle = f.getStepX() * (home.getX() - x) + f.getStepZ() * (home.getZ() - z);
-                            if (toMiddle > most) {
-                                most = toMiddle;
-                                facing = f;
-                            }
-                        }
-                    }
-                    if (facing != null) {
-                        best = s;
-                        bestD = d;
-                        drinkFacing = facing;
-                    }
-                }
-            }
-            return best;
-        }
-
-        private boolean water(int x, int z, int w) {
-            BlockPos p = new BlockPos(x, w, z);
-            return b.level().isLoaded(p) && b.level().getFluidState(p).is(FluidTags.WATER);
+            spot = shore.spot();
+            drinkFacing = shore.facing();
+            return shore.stand();
         }
 
         // --- at its stand ------------------------------------------------------------------------------------------------
@@ -776,7 +640,7 @@ public final class BuffaloGoals {
             stand = best;
             b.standAt = best;
             there = false;
-            routeTo = null;
+            trip.drop();
             going = GRAZE_STEP;
             stepFrom = b.position();
             return true;
@@ -791,7 +655,7 @@ public final class BuffaloGoals {
             stand = to;
             b.standAt = to;
             there = false;
-            routeTo = null;
+            trip.drop();
             going = ASIDE;
             return true;
         }
@@ -900,10 +764,8 @@ public final class BuffaloGoals {
         /** What the moment called for when it was last free (taken up by {@link #start}). */
         @Nullable
         private Call pending;
-        /** The players it warned and when (game time), and how far each player it watched was when its watch ended. */
-        private final Map<UUID, Long> warned = new HashMap<>();
-        private final Map<UUID, Double> watched = new HashMap<>();
-        private int forgotAt;
+        /** The players it warned and watched (the shared {@link WarnMemory}). */
+        private final WarnMemory memory = new WarnMemory(WARN_MEMORY);
 
         /** What the moment calls for: a stage, at whom, whether for a hurt, and (bunching) where. */
         private record Call(Temper stage, LivingEntity target, boolean revenge, @Nullable Vec3 bunchAt) {
@@ -919,10 +781,7 @@ public final class BuffaloGoals {
             if (!b.isAlive()) {
                 return false;
             }
-            if (b.tickCount - forgotAt >= 100 || b.tickCount < forgotAt) {
-                forgotAt = b.tickCount;                     // (asked every other tick, so never by "tickCount % 100")
-                forget();
-            }
+            memory.tidy(b, this::notices);
             pending = call();
             return pending != null;
         }
@@ -1004,7 +863,7 @@ public final class BuffaloGoals {
             }
             byte doing = b.doing();
             boolean lying = doing == BuffaloEntity.REST || doing == BuffaloEntity.REST_DOWN || doing == BuffaloEntity.REST_UP;
-            Double was = watched.get(p.getUUID());
+            Double was = memory.watchedAt(p);
             if (!lying && (was == null || d <= was - NEARER || p.isSprinting())) {
                 return new Call(Temper.WATCH, p, false, null);
             }
@@ -1017,18 +876,7 @@ public final class BuffaloGoals {
         }
 
         private boolean warnedLately(Player p) {
-            Long at = warned.get(p.getUUID());
-            return at != null && b.level().getGameTime() - at <= WARN_MEMORY;
-        }
-
-        /** Old warnings, and watched players no longer noticed, are forgotten. */
-        private void forget() {
-            long now = b.level().getGameTime();
-            warned.values().removeIf(at -> now - at > WARN_MEMORY);
-            watched.keySet().removeIf(id -> {
-                Player p = b.level().getPlayerByUUID(id);
-                return p == null || !notices(p);
-            });
+            return memory.warnedLately(b, p);
         }
 
         /** How strongly a stage holds: a stronger call cuts in (a hurt over all; a calm is cut only by a hurt). */
@@ -1094,8 +942,8 @@ public final class BuffaloGoals {
         /** WATCH: it stands and faces the player; ends when they are no longer noticed or at {@link #WATCH_TICKS}. */
         private void watch() {
             if (!(target instanceof Player p) || !valid(p) || !notices(p) || ticks > WATCH_TICKS) {
-                if (target != null) {
-                    watched.put(target.getUUID(), (double) b.distanceTo(target));
+                if (target instanceof Player p) {
+                    memory.watched(p, b.distanceTo(p));
                 }
                 end();
                 return;
@@ -1125,7 +973,9 @@ public final class BuffaloGoals {
                 b.setDoing(BuffaloEntity.PAW_GROUND);
                 return;
             }
-            warned.put(target.getUUID(), b.level().getGameTime());     // warned: remembered for this player
+            if (target instanceof Player p) {
+                memory.warn(b, p);                          // warned: remembered for this player
+            }
             Call next = call();
             if (next != null) {
                 enter(next);
@@ -1253,8 +1103,8 @@ public final class BuffaloGoals {
         /** CALM: it stands its ground facing them ({@code mood_angry}, a pawing) for {@link #CALM_TICKS}, then back to its day. */
         private void calm() {
             if (ticks > CALM_TICKS) {
-                if (target instanceof Player && valid(target)) {
-                    watched.put(target.getUUID(), (double) b.distanceTo(target));    // not stared at again unless nearer
+                if (target instanceof Player p && valid(p)) {
+                    memory.watched(p, b.distanceTo(p));     // not stared at again unless nearer
                 }
                 end();
                 return;
@@ -1304,90 +1154,6 @@ public final class BuffaloGoals {
             if (b.doing() == BuffaloEntity.CALM) {
                 b.setDoing(BuffaloEntity.MOOD_ANGRY);
             }
-        }
-    }
-
-    // --- out of deep water --------------------------------------------------------------------------------------------------
-
-    /**
-     * In water too deep to stand in, it swims straight for the nearest dry ground and heaves itself out (as a real
-     * buffalo does; it has no swim route: Minecraft's route search finds none from deep water for a 2-wide body, and
-     * floating low its feet are more than a step under a flush bank, so against the bank it pushes itself up).
-     */
-    static final class SwimOutGoal extends Goal {
-        /** How far round it looks for dry ground (blocks), and how often anew (ticks). */
-        static final int SHORE_REACH = 12, LOOK_EVERY = 20;
-        /** How hard it heaves itself up against the bank (blocks a tick, upward). */
-        static final double HEAVE = 0.3;
-        private final BuffaloEntity b;
-        @Nullable
-        private Vec3 shore;
-        private int lookedAt = -LOOK_EVERY;
-
-        SwimOutGoal(BuffaloEntity b) {
-            this.b = b;
-            setFlags(EnumSet.of(Flag.MOVE));
-        }
-
-        @Override
-        public boolean canUse() {
-            return b.isAlive() && b.isInWater() && !b.onGround() && b.getFluidHeight(FluidTags.WATER) > 0.5 * b.getScale();
-        }
-
-        @Override
-        public boolean requiresUpdateEveryTick() {
-            return true;
-        }
-
-        @Override
-        public void start() {
-            b.getNavigation().stop();
-            shore = null;
-            lookedAt = b.tickCount - LOOK_EVERY;
-        }
-
-        @Override
-        public void tick() {
-            if (b.tickCount - lookedAt >= LOOK_EVERY) {
-                lookedAt = b.tickCount;
-                shore = nearestShore();
-            }
-            if (shore == null) {
-                return;                                         // nothing dry in reach: it floats (the float goal keeps it up)
-            }
-            b.getMoveControl().setWantedPosition(shore.x, shore.y, shore.z, BuffaloEntity.TRAVEL);
-            if (b.horizontalCollision) {
-                Vec3 v = b.getDeltaMovement();
-                b.setDeltaMovement(v.x, Math.max(v.y, HEAVE), v.z); // against the bank: up, then its step takes it out
-            }
-        }
-
-        /** The nearest dry ground with room over it within {@link #SHORE_REACH}, its standing point; null if none. */
-        @Nullable
-        private Vec3 nearestShore() {
-            Level level = b.level();
-            BlockPos at = b.blockPosition();
-            Vec3 best = null;
-            double bestD = Double.MAX_VALUE;
-            for (int dx = -SHORE_REACH; dx <= SHORE_REACH; dx++) {
-                for (int dz = -SHORE_REACH; dz <= SHORE_REACH; dz++) {
-                    BlockPos column = at.offset(dx, 0, dz);
-                    if (!level.isLoaded(column)) {
-                        continue;
-                    }
-                    BlockPos cell = GroundTop.cell(level, column);
-                    if (!level.getFluidState(cell).isEmpty() || !level.getFluidState(cell.below()).isEmpty()
-                            || cell.getY() > at.getY() + 3) {
-                        continue;                               // water, or a cliff it could never climb
-                    }
-                    double d = dx * dx + dz * dz;
-                    if (d < bestD) {
-                        bestD = d;
-                        best = Vec3.atBottomCenterOf(cell);
-                    }
-                }
-            }
-            return best;
         }
     }
 }

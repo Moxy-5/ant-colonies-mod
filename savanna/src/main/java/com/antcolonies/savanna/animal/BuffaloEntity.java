@@ -25,13 +25,11 @@ import net.minecraft.world.damagesource.DamageSource;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.LivingEntity;
-import net.minecraft.world.entity.Mob;
 import net.minecraft.world.entity.MobSpawnType;
 import net.minecraft.world.entity.PathfinderMob;
 import net.minecraft.world.entity.SpawnGroupData;
 import net.minecraft.world.entity.ai.attributes.AttributeSupplier;
 import net.minecraft.world.entity.ai.attributes.Attributes;
-import net.minecraft.world.entity.ai.control.MoveControl;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.ServerLevelAccessor;
@@ -148,9 +146,8 @@ public class BuffaloEntity extends PathfinderMob implements GeoEntity, HasLife {
     static final int WALK_HOLD = 3;
     /** Drawing only: the doing whose clip was last started. */
     private int shownDoingId = -1;
-    /** Drawing only (BuffaloModel): the ground under its front and hind feet as drawn (world heights, eased), and when last drawn. */
-    public double drawnFrontY, drawnHindY;
-    public long drawnNanos;
+    /** Drawing only (BuffaloModel): the ground under its front and hind feet as drawn. */
+    public final DrawnGround drawn = new DrawnGround();
     /**
      * Led by a game test or the film camera: its own day goals are off, so only where it is sent and its temper move it
      * ("Led:1b").
@@ -160,11 +157,7 @@ public class BuffaloEntity extends PathfinderMob implements GeoEntity, HasLife {
      * Whoever hurt it last (never another buffalo), until when it is angry at them (its own tick), and where it stood when
      * hurt: it charges them ({@link BuffaloGoals}), and its mates see it (the bull joins, the cows bunch round that spot).
      */
-    @Nullable
-    private LivingEntity angryAt;
-    private int angryUntil;
-    @Nullable
-    private Vec3 hurtAt;
+    private final Anger anger = new Anger();
     /** Its temper now and at whom (the temper goal's; read by tests). */
     BuffaloGoals.Temper temper = BuffaloGoals.Temper.NONE;
     @Nullable
@@ -214,7 +207,7 @@ public class BuffaloEntity extends PathfinderMob implements GeoEntity, HasLife {
         super(type, level);
         setId(ENTITY_COUNTER.getAndAdd(chain.size() + 1) + 1);   // its hit beads take the ids right after its own
         life = new AnimalLife(this, DATA_LIFE);
-        moveControl = new HeavyTurn(this);
+        moveControl = new HeavyTurn(this, MAX_TURN);
         getNavigation().setCanFloat(true);
     }
 
@@ -316,14 +309,7 @@ public class BuffaloEntity extends PathfinderMob implements GeoEntity, HasLife {
     public List<BuffaloEntity> mates() {
         if (tickCount - matesAt >= MATES_EVERY || tickCount < matesAt) {
             matesAt = tickCount;
-            if (home == null) {
-                mates = List.of();
-            } else {
-                List<BuffaloEntity> found = new java.util.ArrayList<>(level().getEntitiesOfClass(BuffaloEntity.class,
-                        getBoundingBox().inflate(MATES_REACH, 16.0, MATES_REACH), b -> b != this && b.isAlive() && home.equals(b.home)));
-                found.sort(java.util.Comparator.comparingDouble(this::distanceToSqr));
-                mates = List.copyOf(found);
-            }
+            mates = HomeGroup.find(this, BuffaloEntity.class, home, BuffaloEntity::home, MATES_REACH);
         }
         return mates;
     }
@@ -333,16 +319,7 @@ public class BuffaloEntity extends PathfinderMob implements GeoEntity, HasLife {
      * {@link #HOME_FROM_MATE} that has one, joining its herd; with none near, its home is where it stands, with no water.
      */
     private void takeHome() {
-        BuffaloEntity nearest = null;
-        double best = HOME_FROM_MATE * HOME_FROM_MATE;
-        for (BuffaloEntity b : level().getEntitiesOfClass(BuffaloEntity.class, getBoundingBox().inflate(HOME_FROM_MATE),
-                o -> o != this && o.home != null)) {
-            double d = distanceToSqr(b);
-            if (d <= best) {
-                best = d;
-                nearest = b;
-            }
-        }
+        BuffaloEntity nearest = HomeGroup.nearestWithHome(this, BuffaloEntity.class, HOME_FROM_MATE, BuffaloEntity::home);
         if (nearest != null) {
             setHome(nearest.home, nearest.homeAcross);
         } else {
@@ -355,28 +332,12 @@ public class BuffaloEntity extends PathfinderMob implements GeoEntity, HasLife {
      * set off one after another in this order, and each takes its own spot round the herd's place by it.
      */
     int rank() {
-        int r = 0;
-        for (BuffaloEntity m : mates()) {
-            if (m.getUUID().compareTo(getUUID()) < 0) {
-                r++;
-            }
-        }
-        return r;
+        return HomeGroup.rank(this, mates(), HomeGroup::byId);
     }
 
     /** Whether it is its herd's nearest member to something, each working it out from its own mate list (ties by id). */
     boolean nearestOfHerdTo(Entity e) {
-        double mine = distanceToSqr(e);
-        for (BuffaloEntity m : mates()) {
-            if (!m.isAlive()) {
-                continue;
-            }
-            double theirs = m.distanceToSqr(e);
-            if (theirs < mine - 1.0E-6 || Math.abs(theirs - mine) <= 1.0E-6 && m.getUUID().compareTo(getUUID()) < 0) {
-                return false;
-            }
-        }
-        return true;
+        return HomeGroup.nearestTo(this, mates(), e);
     }
 
     // --- its temper ------------------------------------------------------------------------------------------------------
@@ -387,24 +348,18 @@ public class BuffaloEntity extends PathfinderMob implements GeoEntity, HasLife {
      */
     @Nullable
     public LivingEntity angryAt() {
-        // a creative or spectator player is never a foe, as for Minecraft's own mobs (the user tests in creative and
-        // explores in spectator: a punched cow must not chase an attacker it can never hurt)
-        if (angryAt != null && (tickCount > angryUntil || !angryAt.isAlive() || angryAt.isRemoved() || angryAt.level() != level()
-                || angryAt instanceof Player p && (p.isCreative() || p.isSpectator()))) {
-            angryAt = null;
-        }
-        return angryAt;
+        return anger.at(this);
     }
 
     /** Where it stood when last hurt (its cows bunch round this spot). */
     @Nullable
     Vec3 hurtAt() {
-        return hurtAt;
+        return anger.where();
     }
 
     /** It gives up its anger (its foe got past its follow range). */
     void calmDown() {
-        angryAt = null;
+        anger.calm();
     }
 
     /** Its temper now (for tests): watching, warning, charging, calming down, bunching, or none. */
@@ -422,11 +377,8 @@ public class BuffaloEntity extends PathfinderMob implements GeoEntity, HasLife {
     @Override
     public boolean hurt(DamageSource source, float amount) {
         boolean hurt = super.hurt(source, amount);
-        if (hurt && !level().isClientSide && isAlive() && source.getEntity() instanceof LivingEntity by && by != this
-                && !(by instanceof BuffaloEntity) && !(by instanceof Player p && (p.isCreative() || p.isSpectator()))) {
-            angryAt = by;
-            angryUntil = tickCount + BuffaloGoals.REVENGE_TICKS;
-            hurtAt = position();
+        if (hurt) {
+            anger.hurt(this, source, by -> by instanceof BuffaloEntity, BuffaloGoals.REVENGE_TICKS);
         }
         return hurt;
     }
@@ -685,26 +637,6 @@ public class BuffaloEntity extends PathfinderMob implements GeoEntity, HasLife {
     @Override
     protected void playStepSound(BlockPos pos, BlockState state) {
         playSound(SoundEvents.RAVAGER_STEP, 0.35F, 1.1F);
-    }
-
-    /**
-     * Minecraft's move control with its turn held to {@link #MAX_TURN} degrees a tick (its own allows 90): a long heavy
-     * body swings round over a few ticks instead of its head jumping 3 blocks in one.
-     */
-    static final class HeavyTurn extends MoveControl {
-        HeavyTurn(Mob mob) {
-            super(mob);
-        }
-
-        @Override
-        public void tick() {
-            float before = mob.getYRot();
-            super.tick();
-            float turned = Mth.wrapDegrees(mob.getYRot() - before);
-            if (Math.abs(turned) > MAX_TURN) {
-                mob.setYRot(before + Math.copySign(MAX_TURN, turned));
-            }
-        }
     }
 
     // --- clips -----------------------------------------------------------------------------------------------------------

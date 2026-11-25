@@ -1,12 +1,10 @@
 package com.antcolonies.savanna.client;
 
-import com.antcolonies.entity.body.GroundBend;
 import com.antcolonies.savanna.SavannaMod;
 import com.antcolonies.savanna.animal.BuffaloEntity;
 
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.util.Mth;
-import net.minecraft.world.level.Level;
 import software.bernie.geckolib.animation.AnimationState;
 import software.bernie.geckolib.cache.object.GeoBone;
 import software.bernie.geckolib.model.DefaultedEntityGeoModel;
@@ -18,29 +16,22 @@ import software.bernie.geckolib.model.DefaultedEntityGeoModel;
  * <li>Drawn {@link BuffaloEntity#DRAW_AHEAD_PX} toward its head: the model's origin is at its front legs, so the middle
  * between its front and hind feet comes onto its box's middle (its box then covers its feet, not its front legs and belly).</li>
  * <li>Its trunk tilts to the ground under its front and hind feet (two ground heights, each eased over about 0.2 s,
- * {@link #EASE}): stepping up a block on Minecraft's own step its chest goes up first and its hips follow, instead of its
- * hind legs hanging in the air. The ground under each pair of feet is read as the shared {@link GroundBend#support} reads
- * it (a standing body tilts whole; GroundBend's chain of joints is for a body lying on what is under it).</li>
+ * {@link StandTilt}): stepping up a block on Minecraft's own step its chest goes up first and its hips follow, instead of its
+ * hind legs hanging in the air (the shared {@link StandTilt}).</li>
  * <li>Its eyes and head on what caught its eye ({@link BuffaloEntity#attention}, as the hippo's): each pupil sits at the
  * inner side of its eye looking ahead and slides out across the white to look to its own side; the head turns a little
  * toward it, slowly. Pupils are never moved by the clips.</li>
  * </ul>
  */
 public class BuffaloModel extends DefaultedEntityGeoModel<BuffaloEntity> {
-    /** Its front and hind feet, from the drawn middle (model px: the geo's 3.2 ahead and 23.4 behind, moved forward by the draw), and how far out to the sides. */
-    private static final double FRONT_FEET = 3.2 + BuffaloEntity.DRAW_AHEAD_PX, HIND_FEET = 23.4 - BuffaloEntity.DRAW_AHEAD_PX, FEET_OUT = 5.75;
     /**
-     * The ground is read under the inner half of each hoof (this much nearer the middle, model px): inside its box's span,
-     * where nothing can be higher than the ground its box stands on, so only an edge its box hangs over tilts it (a wall or
-     * a ledge in front of it never does).
+     * Its trunk's tilt on uneven ground ({@link StandTilt}): its front and hind feet from the drawn middle (model px: the
+     * geo's 3.2 ahead and 23.4 behind, moved forward by the draw), 5.75 out to the sides; drawn
+     * {@link BuffaloEntity#DRAW_AHEAD_PX} toward its head; at most 35 degrees (my pick: a 1-block step under a bull's
+     * 1.66-block stance asks 37).
      */
-    private static final double READ_IN = 3.0;
-    /** The ground under a pair of feet is taken at most this far under its box (blocks): past a drop it leans as down a step, then falls. */
-    private static final double MOST_DOWN = 1.0;
-    /** The trunk tilts at most this much (degrees; my pick: a 1-block step under a bull's 1.66-block stance asks 37). */
-    private static final double MAX_TILT = 35.0;
-    /** How quickly the ground under its feet is eased toward (seconds; settled in about 0.2 s). */
-    private static final double EASE = 0.07;
+    private static final StandTilt TILT = new StandTilt(3.2 + BuffaloEntity.DRAW_AHEAD_PX, 23.4 - BuffaloEntity.DRAW_AHEAD_PX, 5.75,
+            BuffaloEntity.DRAW_AHEAD_PX, 35.0);
     /**
      * How far forward of its middle its eyes are (model px, drawn), how far a pupil slides out across the white at most
      * (px; the white is 0.88 wide, the pupil 1.46), the eye's plane turned this far back toward its side (degrees, the
@@ -60,67 +51,8 @@ public class BuffaloModel extends DefaultedEntityGeoModel<BuffaloEntity> {
         double z = Mth.lerp(pt, buffalo.zo, buffalo.getZ());
         float yaw = Mth.rotLerp(pt, buffalo.yBodyRotO, buffalo.yBodyRot);
         double scale = BuffaloEntity.MODEL_SCALE * buffalo.getScale();
-        place(buffalo, scale, x, y, z, yaw);
+        TILT.place(buffalo, buffalo.drawn, getAnimationProcessor().getBone("root"), scale, x, y, z, yaw);
         eyes(buffalo, scale, pt, x, z, yaw);
-    }
-
-    /**
-     * Where its body is drawn: {@link BuffaloEntity#DRAW_AHEAD_PX} toward its head, its trunk tilted about the middle
-     * between its feet to the ground under its front and hind feet, and raised or lowered so both pairs stand on it.
-     */
-    private void place(BuffaloEntity buffalo, double scale, double x, double y, double z, float yaw) {
-        double fx = -Mth.sin(yaw * Mth.DEG_TO_RAD), fz = Mth.cos(yaw * Mth.DEG_TO_RAD);
-        double perPx = scale / 16.0;
-        Level level = buffalo.level();
-        boolean swims = buffalo.isInWater();
-        double frontWant = y, hindWant = y;
-        if (buffalo.isAlive()) {
-            frontWant = Mth.clamp(groundUnder(level, x, z, fx, fz, (FRONT_FEET - READ_IN) * perPx, FEET_OUT * perPx, y, swims), y - MOST_DOWN, y);
-            hindWant = Mth.clamp(groundUnder(level, x, z, fx, fz, -(HIND_FEET - READ_IN) * perPx, FEET_OUT * perPx, y, swims), y - MOST_DOWN, y);
-        }
-        // eased in world heights, so its box stepping up a block (all at once) never jolts the drawing
-        long now = System.nanoTime();
-        double dt = buffalo.drawnNanos == 0 ? 1.0 : (now - buffalo.drawnNanos) / 1.0E9;
-        buffalo.drawnNanos = now;
-        if (dt > 0.5 || Math.abs(buffalo.drawnFrontY - frontWant) > 3.0 || Math.abs(buffalo.drawnHindY - hindWant) > 3.0) {
-            buffalo.drawnFrontY = frontWant;
-            buffalo.drawnHindY = hindWant;
-        } else if (dt > 0) {
-            double k = 1.0 - Math.exp(-dt / EASE);
-            buffalo.drawnFrontY += (frontWant - buffalo.drawnFrontY) * k;
-            buffalo.drawnHindY += (hindWant - buffalo.drawnHindY) * k;
-        }
-        double front = buffalo.drawnFrontY - y, hind = buffalo.drawnHindY - y;
-        double stance = (FRONT_FEET + HIND_FEET) * perPx;
-        double maxSin = Math.sin(Math.toRadians(MAX_TILT));
-        double tilt = Math.asin(Mth.clamp((front - hind) / stance, -maxSin, maxSin));        // its head end up is positive
-        double liftPx = (front + hind) * 0.5 / perPx;
-        // the turn about the feet's middle (model px M, DRAW_AHEAD behind the origin at the ground) and the draw forward:
-        // a point p goes to R(p - M) + lift, so the root moves by lift - R M (GeckoLib turns a bone's +x about X head up)
-        double m = BuffaloEntity.DRAW_AHEAD_PX;
-        GeoBone root = getAnimationProcessor().getBone("root");
-        if (root == null) {
-            return;
-        }
-        boolean marked = root.hasRotationChanged() || root.hasPositionChanged() || root.hasScaleChanged();
-        root.setRotX((float) (root.getRotX() + tilt));
-        root.setPosY((float) (root.getPosY() + m * Math.sin(tilt) + liftPx));
-        root.setPosZ((float) (root.getPosZ() - m * Math.cos(tilt)));
-        if (!marked) {
-            root.resetStateChanges();
-        }
-    }
-
-    /**
-     * The ground under a pair of feet this far {@code along} its body from its middle (blocks, + forward), each foot
-     * {@code out} to its side: the higher of the two, as {@link GroundBend#support} reads a column (in the water, never
-     * under its own height: it swims level).
-     */
-    private static double groundUnder(Level level, double x, double z, double fx, double fz, double along, double out, double y, boolean swims) {
-        double cx = x + fx * along, cz = z + fz * along;
-        double left = GroundBend.support(level, cx - fz * out, cz + fx * out, y, swims, 0.0);
-        double right = GroundBend.support(level, cx + fz * out, cz - fx * out, y, swims, 0.0);
-        return Math.max(left, right);
     }
 
     /**
