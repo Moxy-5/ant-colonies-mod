@@ -2,6 +2,12 @@
 
 Read `CLAUDE.md`, `docs/HANDOFF.md`, `docs/ANIMAL-MAKER-ENGINE.md`, and `docs/plans/model-workshop.md` before starting any animal model, texture, or animation work.
 
+## Where you work in git (the user, 2026-11-25: "I don't want commits to keep being pushed back")
+- **Your own folder and branch:** work only in `C:\Ant Mod\neon-studio`, on the branch `neon/studio`. Best: open that folder as your workspace. If you were opened on `C:\Ant Mod`, do every read, write and command inside `C:\Ant Mod\neon-studio` (run the tools from there: `cd "C:\Ant Mod\neon-studio"` first). Never edit, commit or switch branches in `C:\Ant Mod` itself: Claude's sessions switch its branch, and work left there lands on the wrong branch or is lost. If the folder is missing: `git -C "C:\Ant Mod" worktree add neon-studio neon/studio`.
+- **Commit after every stage the user approves** (brief, outline, plain shape, detail, paint, each set of clips), and push: `git add <your files>`, `git commit -m "<animal>: <stage>"`, `git push origin neon/studio`. Never end a session with work not committed.
+- **At the start of each session** pick up the newest tools and game: `git merge master`. If it says there is a conflict, run `git merge --abort` and leave a note for Claude under "Requests for Neon" in `docs/HANDOFF.md` instead.
+- **Handoff:** list the animal under "Ready for Claude" in `docs/HANDOFF.md` with branch `neon/studio` (commit that too). Claude merges `neon/studio` from there; never merge into `master` or a `claude/...` branch yourself.
+
 ## Lane
 - **Neon (Model & Animation Studio):** owns `tools/`, `references/`, and model assets (`geo/`, `textures/`, `animations/`, `body_plans/`, `block_moves/`).
 - **Claude (Gameplay & Worldgen):** owns Java gameplay/worldgen, `data/` JSONs, and game tests. Coordinate via `docs/HANDOFF.md` and `docs/handoff/<animal>.md`.
