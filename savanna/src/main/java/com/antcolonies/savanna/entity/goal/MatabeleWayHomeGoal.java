@@ -26,8 +26,6 @@ import net.minecraft.world.entity.ai.goal.Goal;
 public class MatabeleWayHomeGoal extends Goal {
     /** The longest hop (blocks) it walks in one go. */
     private static final int HOP = 14;
-    /** It walks again once its place moved this far from where it was walking (blocks). */
-    private static final double MOVED = 1.5;
     /** It counts as at its place this near it (blocks), and this near it up or down. */
     private static final double AT = 1.2;
     private static final double UP_DOWN = 1.5;
@@ -42,8 +40,6 @@ public class MatabeleWayHomeGoal extends Goal {
     private static final double[] SIDE_TURNS = {0.0, Math.PI / 4, -Math.PI / 4, Math.PI / 2, -Math.PI / 2};
 
     private final MatabeleEntity ant;
-    @Nullable
-    private BlockPos walkingTo;
     private int waitUntil;
     /** The tries in a row that found no way. */
     private int fails;
@@ -83,7 +79,6 @@ public class MatabeleWayHomeGoal extends Goal {
 
     @Override
     public void start() {
-        walkingTo = null;
         waitUntil = 0;
         fails = 0;
         headway.reset();
@@ -92,7 +87,6 @@ public class MatabeleWayHomeGoal extends Goal {
     @Override
     public void stop() {
         ant.getNavigator().stop();
-        walkingTo = null;
     }
 
     @Override
@@ -107,23 +101,19 @@ public class MatabeleWayHomeGoal extends Goal {
         }
         if (headway.lost(ant)) {
             ant.getNavigator().stop();
-            walkingTo = to;
             waitUntil = ant.tickCount + RETRY;
             fails++;
             return;
         }
-        // (at its place counts in height too, BUGS 87; one standing where it last walked to stays while its place shifts
-        // less than MOVED)
-        boolean atPlace = flat(ant.blockPosition(), to) <= AT && Math.abs(ant.getY() - to.getY()) <= UP_DOWN;
-        boolean moved = walkingTo == null || flat(walkingTo, to) >= MOVED || Math.abs(walkingTo.getY() - to.getY()) > UP_DOWN;
-        boolean settled = walkingTo != null && flat(ant.blockPosition(), walkingTo) <= AT
-                && Math.abs(ant.getY() - walkingTo.getY()) <= UP_DOWN;
-        boolean idleAndOff = ant.getNavigator().isDone() && !atPlace && !settled;
-        if (!moved && !idleAndOff || ant.tickCount < waitUntil) {
+        // BUGS 354: a walk under way is walked to its end, and only then is the next place taken. Its place is asked
+        // afresh every tick (a little ahead of it on the trail), and where the answer jumps (beside a bend of the trail,
+        // at the trail's end) an ant shifting a twentieth of a block was told two places in turn; each new walk began
+        // its step over an edge again, and it stood on the lip for good.
+        if (!ant.getNavigator().isDone() || ant.tickCount < waitUntil) {
             return;
         }
-        if (atPlace && ant.getNavigator().isDone()) {
-            walkingTo = to;
+        // (at its place counts in height too, BUGS 87)
+        if (flat(ant.blockPosition(), to) <= AT && Math.abs(ant.getY() - to.getY()) <= UP_DOWN) {
             return;
         }
         boolean walked = walkToward(level, to);
@@ -148,18 +138,15 @@ public class MatabeleWayHomeGoal extends Goal {
         BlockPos from = ant.blockPosition();
         double distance = flat(from, to);
         if (distance <= HOP ? ant.getNavigator().moveTo(to, 1.0) : hop(level, from, to, HOP, 0.0)) {
-            walkingTo = to;
             return true;
         }
         for (double turn : SIDE_TURNS) {
             if (hop(level, from, to, turn == 0.0 ? HOP / 2.0 : HOP * 0.7, turn)) {
-                walkingTo = to;
                 return true;
             }
         }
         double nearer = Math.max(2.0, Math.min(HOP / 2.0, distance - AT));
         if (ant.getNavigator().moveTo(hold -> hold.isFloor() && flat(hold.cell(), to) <= distance - nearer, to, 1.0)) {
-            walkingTo = to;
             return true;
         }
         return false;

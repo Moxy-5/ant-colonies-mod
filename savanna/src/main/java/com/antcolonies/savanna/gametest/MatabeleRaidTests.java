@@ -48,6 +48,66 @@ import net.neoforged.neoforge.gametest.PrefixGameTestTemplate;
 @GameTestHolder(SavannaMod.MODID)
 @PrefixGameTestTemplate(false)
 public class MatabeleRaidTests {
+    /**
+     * BUGS 354: an ant going home walks each walk to its end before it takes the next place. Its place is asked afresh
+     * every tick (a little ahead of it along the trail); taking each new answer at once, a walk was dropped and begun
+     * again every block or two, and where the answer jumped (beside a bend, at the trail's end) an ant on the lip of a
+     * step began the step again for good. Here: one sent home along a trail with a bend drops no walk under way.
+     */
+    @GameTest(template = "arena", timeoutTicks = 3000, skyAccess = true, batch = "matabele_way_home")
+    public static void anAntGoingHomeWalksEachWalkToItsEnd(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        int middle = TestScenes.MIDDLE;
+        TestScenes.deepGround(helper);
+        TestClock.still(helper, 13.0); // (between the raid hours: no scout's find starts a raid)
+        MatabeleScenes.deadMound(helper, middle, middle);
+        Colony colony = MatabeleScenes.colony(helper, middle + 9, middle, 30);
+        Raids raids = colony.part(SavannaParts.RAIDS).orElseThrow();
+        List<BlockPos> line = new ArrayList<>();
+        for (int i = 8; i <= 34; i++) { // (the nest end first: east along the row, then slanting off south)
+            line.add(helper.absolutePos(new BlockPos(middle + i, SURFACE + 1, middle + Math.max(0, i - 20))));
+        }
+        MatabeleEntity[] out = new MatabeleEntity[1];
+        BlockPos[] walking = new BlockPos[1];
+        int[] walks = {0}, dropped = {0};
+        helper.onEachTick(() -> {
+            if (helper.getTick() < 5) {
+                return;
+            }
+            if (out[0] == null) {
+                out[0] = com.antcolonies.gametest.TestIsolation.insectsOf(level, colony, MatabeleEntity.class).stream()
+                        .filter(mob -> mob.nestCaste() != null && mob.isAlive() && !raids.scouts().isScouting(mob.getUUID()))
+                        .findFirst().orElse(null);
+                helper.assertTrue(out[0] != null, "the colony has no real worker that is no scout");
+                BlockPos end = line.get(line.size() - 1);
+                raids.trails().lay(level, colony.getCenter(), end, line, level.getGameTime(), false);
+                out[0].teleportTo(end.getX() + 0.5, end.getY(), end.getZ() + 0.5);
+                raids.sendHome(level, out[0], "test");
+                helper.assertTrue(raids.isGoingHome(out[0].getUUID()), "the ant out in the field was not sent home");
+                return;
+            }
+            if (!raids.isGoingHome(out[0].getUUID())) {
+                return;
+            }
+            BlockPos goal = out[0].getNavigator().isDone() ? null : out[0].getNavigator().getGoal();
+            if (goal != null && !goal.equals(walking[0])) {
+                walks[0]++;
+                // (a walk that ended and the next begun in one tick is no drop: a dropped one's end was still far off)
+                if (walking[0] != null && Math.sqrt(out[0].blockPosition().distSqr(walking[0])) > 3.0) {
+                    dropped[0]++;
+                }
+            }
+            walking[0] = goal;
+        });
+        helper.succeedWhen(() -> {
+            helper.assertTrue(out[0] != null && out[0].isAlive() && !raids.isGoingHome(out[0].getUUID()),
+                    "the ant sent home along the trail is not home yet (" + walks[0] + " walks, " + dropped[0] + " dropped; at "
+                            + (out[0] == null ? "?" : out[0].blockPosition().toShortString()) + ", the nest " + colony.getCenter().toShortString() + ")");
+            helper.assertTrue(walks[0] >= 3, "it was to come home along the trail in several walks, not " + walks[0]);
+            helper.assertTrue(dropped[0] == 0, dropped[0] + " of its " + walks[0] + " walks home were dropped under way for a new one");
+        });
+    }
+
     /** The nest's middle in this scene (away from the arena's edges, so every slice round it has ground). */
     private static final int NEST = 20;
 
