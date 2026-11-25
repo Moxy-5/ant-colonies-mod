@@ -65,7 +65,11 @@ def picture_views(animal):
         v = spec["views"].get(name)
         if v and v.get("box"):
             views[name] = viewer_page.cut_view(img, v["box"], v.get("head"), spec.get("background_tolerance", 40))
-    return views, spec, views["side"].width / spec["length_blocks"]
+    if "height_blocks" in spec and "length_blocks" not in spec:
+        ppb = views["side"].height / spec["height_blocks"]
+    else:
+        ppb = views["side"].width / spec["length_blocks"]
+    return views, spec, ppb
 
 
 def mask_of(img):
@@ -145,7 +149,8 @@ def measure(animal):
     if not found:
         raise SystemExit(f"no picture: save references/inspiration/{animal}.png and write {animal}.views.json beside it")
     views, spec, ppb = found
-    m = {"animal": animal, "length_blocks": spec["length_blocks"], "picture_px_per_block": round(ppb, 2), "views": {}}
+    length_blocks = spec.get("length_blocks", round(views["side"].width / ppb, 3))
+    m = {"animal": animal, "length_blocks": length_blocks, "picture_px_per_block": round(ppb, 2), "views": {}}
     for name, img in views.items():
         m["views"][name] = {"width_blocks": round(img.width / ppb, 3), "height_blocks": round(img.height / ppb, 3)}
     side = mask_of(views["side"])
@@ -156,9 +161,9 @@ def measure(animal):
     if "top" in views:
         m["width_profile"] = width_profile(mask_of(views["top"]), ppb)
         m["widest_blocks"] = max(p["width"] for p in m["width_profile"])
-    m["length_to_height"] = round(spec["length_blocks"] / m["height_blocks"], 2)
+    m["length_to_height"] = round(length_blocks / m["height_blocks"], 2)
     if m.get("widest_blocks"):
-        m["length_to_width"] = round(spec["length_blocks"] / m["widest_blocks"], 2)
+        m["length_to_width"] = round(length_blocks / m["widest_blocks"], 2)
     marks = spec.get("marks")
     if marks:
         # marks are x in the whole picture; turn them into shares of the length from the tail tip

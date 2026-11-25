@@ -915,6 +915,222 @@ def feline_mouth(upper_cubes, jaw_cubes, tongue_cubes, cx=0.0, y_palate=0.0, z_h
     return [cx, y_palate - 0.16, z_mid]
 
 
+# --- bird plumage & raptor anatomy (Animal Maker Engine Fliers upgrade, 2026-11-25) ----------------------------------
+def feather_grain(x, y, z, scale=2.0, flow=(0.0, 0.0, 1.0), bar_freq=0.0, shaft_pos=None):
+    """Directional feather barbule & optional raptor barring offset in [-1.0, +1.0].
+    Deterministic in 3D coordinates: creates subtle V-angled barbules along `flow`, optional transverse dark/light
+    barring (`bar_freq` cycles per model pixel along flow), and an optional central rachis shaft accent."""
+    fx, fy, fz = unit(flow)
+    along = x * fx + y * fy + z * fz
+    up = (0.0, 1.0, 0.0) if abs(fy) < 0.9 else (1.0, 0.0, 0.0)
+    u = unit(cross(up, (fx, fy, fz)))
+    v = cross((fx, fy, fz), u)
+    pu = x * u[0] + y * u[1] + z * u[2]
+    pv = x * v[0] + y * v[1] + z * v[2]
+    # V-chevron slant mimics barbs angling backward off the central rachis shaft
+    across = abs(pu - (shaft_pos if shaft_pos is not None else 0.0))
+    chevron = along - across * 0.65
+    ia = int(math.floor(chevron * scale * 0.75))
+    iu = int(math.floor(pu * scale * 1.4))
+    iv = int(math.floor(pv * scale))
+    barb = hash3(iu, iv, ia) * 0.70 + hash3(iu, iv, ia + 1) * 0.30
+    fine = hash3(int(math.floor(x * scale * 2.2)), int(math.floor(y * scale * 2.2)), int(math.floor(z * scale * 2.2)))
+    val = (barb * 0.76 + fine * 0.24) * 2.0 - 1.0
+    if bar_freq > 1e-6:
+        bar = math.sin(along * bar_freq * 2.0 * math.pi)
+        val = max(-1.0, min(1.0, val * 0.55 + bar * 0.55))
+    if shaft_pos is not None and across < 0.28 / max(0.5, scale * 0.5):
+        val = min(1.0, val + 0.32)
+    return val
+
+
+def feather_fan(cubes, origin, count, length, width, thickness=0.35, spread_deg=55.0, sweep_deg=0.0,
+                camber_deg=6.0, pitch_deg=0.0, axis='tail', side=1, taper=0.22, slot_gap=0.0,
+                stagger=0.03, part='feather', tip_part=None, layer=0.0):
+    """Builds an overlapping fan of sculpted bird feathers with anti-Z-fighting stagger and per-feather metadata.
+
+    axis='tail'   fans across X pointing backward (+Z): tail fans, rump coverts.
+    axis='wing'   fans outward along side*X and backward (+Z): slotted eagle primaries, secondaries, wing coverts.
+    axis='crest'  fans upward/backward (+Y/+Z) from crown: Martial Eagle occipital crest, Secretarybird quills.
+
+    Every feather cube carries `_feather_idx`, `_feather_n`, `_feather_frac` (0..1), `_feather_layer`, `_feather_side`
+    so the painter can render shafts, raptor barring, scalloped edges, and dark subterminal tips cleanly."""
+    created = []
+    ox, oy, oz = origin
+    n = max(1, int(count))
+    for i in range(n):
+        frac = 0.5 if n == 1 else i / (n - 1)           # 0..1 across the fan
+        sym_f = (frac - 0.5) * 2.0                      # -1..+1 centred
+        edge_taper = 1.0 - taper * (sym_f * sym_f if axis == 'tail' else abs(frac - 0.35) / 0.65)
+        fl = max(0.6, length * max(0.45, edge_taper))
+        fw = max(0.35, width * (1.0 - 0.14 * abs(sym_f)))
+        ft = max(0.18, thickness)
+        eps = ((i % 3) - 1) * stagger + i * (stagger * 0.35)
+        meta = {'_feather_idx': i, '_feather_n': n, '_feather_frac': round(frac, 3),
+                '_feather_layer': round(layer, 3), '_feather_side': side}
+        fpart = tip_part if (tip_part and axis == 'wing' and frac > 0.65) else part
+
+        if axis == 'tail':
+            yaw = sym_f * (spread_deg * 0.5)
+            pit = pitch_deg + camber_deg * (1.0 - sym_f * sym_f)
+            roll = sym_f * camber_deg * 0.35
+            px = ox + sym_f * (slot_gap * max(1, n - 1) * 0.5)
+            py = oy + eps
+            pz = oz
+            lo = [px - fw * 0.5, py - ft * 0.5, pz]
+            hi = [px + fw * 0.5, py + ft * 0.5, pz + fl]
+            c = rot_cube(lo, hi, fpart, rotation=[-pit, yaw, roll], pivot=[px, py, pz], **meta)
+        elif axis == 'crest':
+            yaw = sym_f * (spread_deg * 0.5)
+            pit = pitch_deg + (1.0 - abs(sym_f)) * camber_deg
+            px = ox + sym_f * (width * 0.45 * max(1, n - 1) * 0.35)
+            py = oy + eps
+            pz = oz + abs(sym_f) * 0.25
+            lo = [px - fw * 0.5, py - ft * 0.5, pz]
+            hi = [px + fw * 0.5, py + ft * 0.5, pz + fl]
+            c = rot_cube(lo, hi, fpart, rotation=[pit, yaw, 0.0], pivot=[px, py, pz], **meta)
+        else:  # axis == 'wing': feather extends along +Z (trailing) and fans outward toward side*X
+            yaw = side * (sweep_deg + frac * spread_deg)
+            pit = pitch_deg - camber_deg * (0.4 + 0.6 * frac)
+            roll = side * (camber_deg * 0.45 * frac)
+            px = ox + side * (i * (fw * 0.55 + slot_gap))
+            py = oy + eps
+            pz = oz + (1.0 - frac) * 0.25
+            lo = [px - fw * 0.5, py - ft * 0.5, pz]
+            hi = [px + fw * 0.5, py + ft * 0.5, pz + fl]
+            c = rot_cube(lo, hi, fpart, rotation=[-pit, yaw, roll], pivot=[px, py, pz], **meta)
+        cubes.append(c)
+        created.append(c)
+    return created
+
+
+def raptor_beak(upper_cubes, jaw_cubes, tongue_cubes, cx=0.0, y_base=0.0, z_base=0.0, length=4.5, width=2.4,
+                height=2.6, hook_drop=1.5, cere_frac=0.30, cere_part='cere', beak_part='beak',
+                tip_part='beak_tip', inner_part='mouth_inner', tongue_part='tongue', nostril_part='nostril'):
+    """Builds a sculpted 3D curved hooked raptor beak (cere + nostrils + arched culmen + sharp hook tip +
+    nested lower mandible + hidden-at-rest tongue) pointing toward -Z.
+    At jaw=0 deg, the lower mandible and tongue seal cleanly inside the upper beak (passes hidden_at_rest).
+    Returns (jaw_pivot, tongue_pivot)."""
+    hw = width * 0.5
+    cere_l = length * cere_frac
+    mid_l = length * (1.0 - cere_frac) * 0.64
+    tip_l = length * (1.0 - cere_frac) * 0.36
+    z_cere = z_base - cere_l
+    z_mid = z_cere - mid_l
+    z_tip = z_mid - tip_l
+
+    # 1. Fleshy cere (base of upper beak) + recessed side nostril slits
+    upper_cubes.append(cube([cx - hw, y_base, z_cere - 0.15],
+                            [cx + hw, y_base + height * 0.96, z_base + 0.35], cere_part))
+    for s in (-1, 1):
+        nx0 = cx + s * hw * 0.88
+        nx1 = cx + s * (hw + 0.08)
+        upper_cubes.append(cube([min(nx0, nx1), y_base + height * 0.44, z_cere + cere_l * 0.22],
+                                [max(nx0, nx1), y_base + height * 0.72, z_base - cere_l * 0.18], nostril_part))
+
+    # 2. Arched upper culmen ridge + dark recessed palate roof
+    upper_cubes.append(rot_cube([cx - hw * 0.82, y_base + height * 0.08, z_mid - 0.15],
+                                [cx + hw * 0.82, y_base + height * 0.92, z_cere + 0.25], beak_part,
+                                rotation=[10.0, 0.0, 0.0], pivot=[cx, y_base + height * 0.55, z_cere]))
+    upper_cubes.append(cube([cx - hw * 0.66, y_base + height * 0.06, z_mid + 0.25],
+                            [cx + hw * 0.66, y_base + height * 0.30, z_base - 0.10], inner_part))
+
+    # 3. Sharp downward-hooking raptor tip (2 tapered angled tiers)
+    if hook_drop > 0.05:
+        upper_cubes.append(rot_cube([cx - hw * 0.52, y_base - hook_drop * 0.42, z_tip - 0.05],
+                                    [cx + hw * 0.52, y_base + height * 0.52, z_mid + 0.32], tip_part,
+                                    rotation=[32.0, 0.0, 0.0], pivot=[cx, y_base + height * 0.32, z_mid]))
+        upper_cubes.append(rot_cube([cx - hw * 0.26, y_base - hook_drop, z_tip - 0.28],
+                                    [cx + hw * 0.26, y_base - hook_drop * 0.12, z_tip + tip_l * 0.58], tip_part,
+                                    rotation=[54.0, 0.0, 0.0], pivot=[cx, y_base - hook_drop * 0.22, z_tip + tip_l * 0.28]))
+    else:
+        upper_cubes.append(cube([cx - hw * 0.44, y_base + height * 0.14, z_tip],
+                                [cx + hw * 0.44, y_base + height * 0.66, z_mid + 0.25], tip_part))
+
+    # 4. Nested lower mandible (slightly narrower so it tucks cleanly inside the upper rim)
+    jaw_piv = [cx, y_base + height * 0.06, z_base - 0.15]
+    jaw_cubes.append(cube([cx - hw * 0.72, y_base - height * 0.28, z_mid + 0.25],
+                          [cx + hw * 0.72, y_base + height * 0.12, z_base + 0.15], beak_part))
+    jaw_cubes.append(cube([cx - hw * 0.50, y_base - height * 0.22, z_tip + tip_l * 0.45],
+                          [cx + hw * 0.50, y_base + height * 0.08, z_mid + 0.45], beak_part))
+    jaw_cubes.append(cube([cx - hw * 0.54, y_base - height * 0.12, z_mid + 0.45],
+                          [cx + hw * 0.54, y_base + height * 0.08, z_base - 0.15], inner_part))
+
+    # 5. Slender raptor tongue (hidden completely inside closed beak)
+    tongue_piv = [cx, y_base - height * 0.02, z_base - 0.35]
+    tongue_cubes.append(cube([cx - hw * 0.34, y_base - height * 0.10, z_mid + 0.65],
+                             [cx + hw * 0.34, y_base + height * 0.08, z_base - 0.35], tongue_part))
+    return jaw_piv, tongue_piv
+
+
+def bird_talon_foot(s, side, parent, ankle, foot_y=0.0, toe_lens=(3.2, 4.2, 3.0, 2.8),
+                    toe_fans=(-28.0, 0.0, 28.0), toe_r=0.44, claw_len=1.8, claw_drop=48.0,
+                    part='foot', claw_part='talon', prefix='leg'):
+    """Builds an anisodactyl gripping bird foot (3 forward toes + opposing rear hallux, each with its own
+    articulated curved scimitar talon bone) mounted at `ankle` = (ax, ay, az), resting flat at `foot_y`.
+    s = 1 left (+X), -1 right (-X). Returns a list of bones ready to append to the skeleton."""
+    ax, ay, az = ankle
+    out = []
+    foot_name = f'{prefix}_foot_{side}'
+    # Central scaly tarsometatarsus pad / knuckle hub
+    pad_w = max(1.1, toe_r * 3.1)
+    pad_h = max(0.85, ay - foot_y)
+    foot_cubes = [
+        cube([ax - pad_w * 0.5, foot_y, az - pad_w * 0.55],
+             [ax + pad_w * 0.5, foot_y + min(pad_h, toe_r * 2.3), az + pad_w * 0.55], part),
+    ]
+    out.append({'name': foot_name, 'parent': parent, 'pivot': [ax, ay, az], 'cubes': foot_cubes})
+
+    def _curved_talon(tx, ty, tz, direction_z, r_base, clen):
+        # 2-segment tapered scimitar talon pointing toward direction_z (-1 forward, +1 rear hallux)
+        z_mid = tz + direction_z * clen * 0.52
+        z_end = tz + direction_z * clen
+        lo1 = [tx - r_base * 0.55, ty - r_base * 0.55, min(tz, z_mid)]
+        hi1 = [tx + r_base * 0.55, ty + r_base * 0.55, max(tz, z_mid)]
+        lo2 = [tx - r_base * 0.34, ty - r_base * 0.45 - clen * 0.25, min(z_mid, z_end)]
+        hi2 = [tx + r_base * 0.34, ty + r_base * 0.22, max(z_mid, z_end)]
+        p2 = [tx, ty, z_mid]
+        return [
+            cube(lo1, hi1, claw_part),
+            rot_cube(lo2, hi2, claw_part, rotation=[direction_z * -26.0, 0.0, 0.0], pivot=p2),
+        ]
+
+    # 3 forward toes (inner, middle, outer)
+    ty = foot_y + toe_r
+    for idx in range(3):
+        tl = toe_lens[idx]
+        fan = toe_fans[idx]
+        off_x = s * (idx - 1) * (toe_r * 1.45)
+        tx = ax + off_x
+        tz = az - pad_w * 0.42
+        toe_cubes = [
+            cube([tx - toe_r, foot_y, tz - tl * 0.56], [tx + toe_r, foot_y + toe_r * 1.95, tz + 0.35], part),
+            cube([tx - toe_r * 0.82, foot_y, tz - tl], [tx + toe_r * 0.82, foot_y + toe_r * 1.65, tz - tl * 0.48], part),
+        ]
+        tname = f'{prefix}_toe{idx + 1}_{side}'
+        out.append({'name': tname, 'parent': foot_name, 'pivot': [tx, ty, tz],
+                    'rotation': [0.0, round(-s * fan, 3), 0.0], 'cubes': toe_cubes})
+        cz = tz - tl + 0.12
+        cname = f'{prefix}_talon{idx + 1}_{side}'
+        out.append({'name': cname, 'parent': tname, 'pivot': [tx, ty, cz],
+                    'rotation': [round(claw_drop * 0.35, 3), 0.0, 0.0],
+                    'cubes': _curved_talon(tx, ty, cz, -1.0, toe_r * 0.85, claw_len)})
+
+    # Opposing rear hallux (the raptor's power-locking rear talon!)
+    hl = toe_lens[3] if len(toe_lens) > 3 else toe_lens[0] * 0.85
+    hz = az + pad_w * 0.42
+    h_cubes = [
+        cube([ax - toe_r * 0.92, foot_y, hz - 0.30], [ax + toe_r * 0.92, foot_y + toe_r * 1.85, hz + hl], part),
+    ]
+    hname = f'{prefix}_hallux_{side}'
+    out.append({'name': hname, 'parent': foot_name, 'pivot': [ax, ty, hz], 'cubes': h_cubes})
+    hcz = hz + hl - 0.12
+    out.append({'name': f'{prefix}_hallux_talon_{side}', 'parent': hname, 'pivot': [ax, ty, hcz],
+                'rotation': [round(-claw_drop * 0.35, 3), 0.0, 0.0],
+                'cubes': _curved_talon(ax, ty, hcz, 1.0, toe_r * 0.95, claw_len * 1.15)})
+    return out
+
+
 # --- self-check: python tools/model_parts.py ---------------------------------------------------------------------------
 if __name__ == '__main__':
     # 1. Rotated cube world_point & face_point consistency
@@ -936,4 +1152,17 @@ if __name__ == '__main__':
     assert -1.0 <= g <= 1.0
     st_col = stamp_2d(['.A', 'B.'], {'A': (255, 200, 0), 'B': (20, 15, 10)}, 0.75, 0.25)
     assert st_col == (255, 200, 0)
-    print('model_parts: rot_cube, world_point, mane_layer, padded_paw, feline_mouth, fur_grain, stamp_2d all check out')
+    # 5. Bird plumage & raptor anatomy (feather_grain, feather_fan, raptor_beak, bird_talon_foot)
+    fg = feather_grain(0.5, 10.0, 3.2, bar_freq=0.35, shaft_pos=0.5)
+    assert -1.0 <= fg <= 1.0
+    for ax in ('tail', 'wing', 'crest'):
+        fc = []
+        feather_fan(fc, (0.0, 12.0, 4.0), count=6, length=8.0, width=1.8, axis=ax, side=1)
+        assert len(fc) == 6 and all('_feather_idx' in c for c in fc)
+    bu, bj, bt = [], [], []
+    jp, tp = raptor_beak(bu, bj, bt, y_base=18.0, z_base=-8.0)
+    assert len(bu) >= 6 and len(bj) == 3 and len(bt) == 1 and jp[2] > tp[2]
+    tbones = bird_talon_foot(1, 'left', 'leg_lower_left', (3.0, 1.5, 0.0))
+    assert len(tbones) == 9 and tbones[0]['name'] == 'leg_foot_left'
+    print('model_parts: rot_cube, world_point, mane_layer, padded_paw, feline_mouth, fur_grain, stamp_2d, '
+          'feather_grain, feather_fan, raptor_beak, bird_talon_foot all check out')
