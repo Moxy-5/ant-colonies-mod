@@ -261,22 +261,6 @@ public final class Errand<K> {
     }
 
     /**
-     * Sets off to a spot (in a chamber, say) at once: to {@code spot}, or, with no way there, to another from
-     * {@code another} (which gives null when there is none left), until one has a way. After {@link #MOST_SPOTS} spots
-     * with no way in this errand it gives up. The spot it set off to, or null (none left, or it gave up).
-     */
-    @Nullable
-    public BlockPos setOffTo(@Nullable BlockPos spot, Supplier<BlockPos> another, double speed) {
-        while (spot != null && !setOff(spot, speed)) {
-            if (++spotsWithNoWay >= MOST_SPOTS) {
-                return null;
-            }
-            spot = another.get();
-        }
-        return spot;
-    }
-
-    /**
      * Sets off at once to a spot to put a load down (a free cell of a chamber): to {@code spot} if there is one and a way
      * there, otherwise to the nearest of {@code spots} there is a way to, with one route search for them all (a real ant
      * puts its load down in the first free place it comes to; trying spots one after another cost a search each, and a

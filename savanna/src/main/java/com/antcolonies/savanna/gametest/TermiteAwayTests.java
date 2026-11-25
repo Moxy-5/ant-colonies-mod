@@ -50,7 +50,7 @@ import net.neoforged.neoforge.gametest.PrefixGameTestTemplate;
  * {@code Meals}, {@code NestLedger}). Their own category, {@code away} (the user's rule, 2026-10-15): run it after
  * every new feature or change to how colonies live, as well as the category the change touches. The shared helpers are
  * in {@link AwayKit} and {@link TestScenes}.
- * The termites' scenes (the split, step S4; the red harvester ant's are in {@link HarvesterAwayTests}).
+ * The termites' scenes (the red harvester ant's left with it, 2026-11-23; its shared checks moved here).
  */
 @GameTestHolder(SavannaMod.MODID)
 @PrefixGameTestTemplate(false)
@@ -960,12 +960,22 @@ public class TermiteAwayTests {
             unloaded.put(royals[0], freezeAndUnload(colony, level, theQueen));
             unloaded.put(royals[1], freezeAndUnload(colony, level, theKing));
             colony.away().setAwayForTests(true);
+            // The young too (the red harvester ant's check until 2026-11-23, the shared brood's rule): 3 nymphs as numbers,
+            // 2 of them almost their whole starve time without food.
+            long starve = colony.profile().brood().larvaStarveTicks();
+            colony.brood().addInsideForTests(Brood.Young.larva(0, starve - 100, null));
+            colony.brood().addInsideForTests(Brood.Young.larva(0, starve - 100, null));
+            colony.brood().addInsideForTests(Brood.Young.larva(0, 0, null));
         });
         helper.runAfterDelay(500, () -> {
             Colony colony = byId(helper, id[0]);
             AwayReport report = colony.away().report();
             SavannaMod.LOGGER.info("[away-test] king fix, starving pair: {}{}", colony.population().describe(level), colony.away().describe(level));
             helper.assertTrue(colony.away().isAway(level), "the colony should be away");
+            helper.assertTrue(report.get(AwayReport.What.YOUNG_STARVED) == 2 && report.get(AwayReport.What.YOUNG_FED) == 0,
+                    "the 2 long-hungry nymphs should starve, nobody fed: " + report.describe());
+            List<Brood.Young> young = colony.brood().youngInsideForTests();
+            helper.assertTrue(young.size() == 1 && !young.get(0).isEgg(), "the third nymph should live on: " + young);
             helper.assertTrue(report.describe().contains("the queen starved") && report.didKingStarve() && report.describe().contains("the king starved"),
                     "the queen and the king should starve while away: " + report.describe());
             helper.assertTrue(report.get(AwayReport.What.QUEEN_FED) == 0 && report.get(AwayReport.What.KING_FED) == 0,
@@ -1070,6 +1080,197 @@ public class TermiteAwayTests {
                 default -> {
                 }
             }
+        });
+    }
+
+    /**
+     * Step 2a (the red harvester ant's test until 2026-11-23; the rule is the shared {@code AwayLife}'s). A termite nest
+     * goes out of range with 3 real workers (one carrying a piece of forage), an egg and 2 nymphs (one fed 3 pieces), and
+     * 4 old workers in the numbers about to die; the queen just fed. After the grace minute (shortened for the test) the
+     * colony is away: the 3 workers are numbers (headcount still 3), the young are numbers, the old ones have died (4
+     * bodies owed), the piece is owed. Back in range, the frozen insects load again and leave the world on their first
+     * tick; the queen is alive; the egg and the nymphs are real again (the fed one still fed 3), the 4 bodies are
+     * settled (termites eat their dead: none lies about) and the piece is in the store. Then two stragglers frozen at the edge while the colony is here: one back
+     * after a moment carries on, one back after more than the grace has walked home (it is one of the numbers).
+     */
+    @GameTest(template = "arena", timeoutTicks = 900, skyAccess = true)
+    public static void aTermiteColonyAwayFoldsItsFrozenInsectsIntoTheNumbersAndPutsThingsBackOnReturn(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        List<UUID> workers = new ArrayList<>();
+        List<UUID> stragglers = new ArrayList<>();
+        Map<UUID, CompoundTag> unloaded = new HashMap<>();
+        UUID[] queen = new UUID[1];
+        int[] foodBefore = new int[1];
+        TermiteScenes.colony(helper, List.of(), colony -> {
+            helper.assertTrue(colony != null, "no termite colony");
+            TermiteScenes.digNestAtOnce(level, colony);
+            TestClock.still(helper, 12.0); // midday: nobody goes out foraging
+            colony.population().setOnForTests(false); // no swapping: the numbers stay where the test puts them
+            colony.population().setViewersForTests(List.of());
+            colony.setHungerOn(true);
+            for (int i = 0; i < 3; i++) {
+                workers.add(helper.spawn(SavannaEntities.TERMITE_WORKER.get(), MIDDLE + 2 + i, SURFACE, MIDDLE + 2).getUUID());
+            }
+            BlockPos eggSpot = colony.brood().pickEggSpot(level, level.getRandom());
+            helper.assertTrue(eggSpot != null && colony.brood().placeEgg(level, eggSpot), "no room for the egg");
+            for (int i = 0; i < 2; i++) {
+                BlockPos spot = colony.brood().pickEggSpot(level, level.getRandom());
+                helper.assertTrue(spot != null, "no room for a nymph");
+                com.antcolonies.entity.AntLarvaEntity nymph = colony.brood().spawnLarva(level, spot.getX() + 0.5, spot.getY(), spot.getZ() + 0.5);
+                if (i == 0) {
+                    nymph.setFed(3);
+                }
+            }
+        });
+        helper.runAfterDelay(40, () -> {
+            Colony colony = TermiteMoundTests.colony(helper);
+            helper.assertTrue(colony.getCount(Caste.WORKER) == 3, "3 workers expected, " + colony.getCount(Caste.WORKER));
+            AbstractAntEntity theQueen = colony.getQueen(level);
+            queen[0] = theQueen.getUUID();
+            colony.away().setOnForTests(true);
+            colony.away().setGraceForTests(100L);
+            colony.queenCare().setQueenLastFed(level.getGameTime());
+            ((AbstractAntEntity) level.getEntity(workers.get(0))).setCarriedSeed(new net.minecraft.world.item.ItemStack(com.antcolonies.savanna.registry.SavannaItems.FORAGE.get()));
+            foodBefore[0] = colony.food().getFood();
+            // Out of range: every insect of the colony is frozen and unloaded (the queen too: she is no number).
+            List<Entity> all = new ArrayList<>();
+            for (UUID id : workers) {
+                all.add(level.getEntity(id));
+            }
+            all.addAll(colony.brood().getEggs(level));
+            all.addAll(colony.brood().getLarvae(level));
+            all.add(theQueen);
+            for (Entity entity : all) {
+                unloaded.put(entity.getUUID(), freezeAndUnload(colony, level, entity));
+            }
+            colony.away().setAwayForTests(true);
+            long lifespan = colony.profile().worker().lifespanTicks();
+            colony.population().addNewMembers(Caste.WORKER, level.getGameTime() - lifespan * 12 / 10, 4);
+        });
+        helper.runAfterDelay(200, () -> {
+            Colony colony = java.util.Objects.requireNonNull(TestIsolation.colonyOfQueen(level, queen[0]), "no colony of the queen");
+            SavannaMod.LOGGER.info("[away-test] away: {}{}", colony.population().describe(level), colony.away().describe(level));
+            helper.assertTrue(colony.away().isAway(level), "the colony should be away");
+            for (UUID id : unloaded.keySet()) {
+                helper.assertTrue(id.equals(queen[0]) != colony.away().isFoldedIn(id), "every frozen insect but the queen should be folded in: " + id);
+            }
+            helper.assertTrue(colony.getCount(Caste.WORKER) == 3 && colony.population().inside(Caste.WORKER) == 3,
+                    "the 3 frozen workers should be numbers and the 4 old ones dead: " + colony.getCount(Caste.WORKER) + " counted, "
+                            + colony.population().inside(Caste.WORKER) + " inside");
+            helper.assertTrue(colony.brood().insideCount() == 3, "the egg and 2 nymphs should be numbers: " + colony.brood().insideCount());
+            helper.assertTrue(colony.away().getBodiesOwed() == 4 && colony.away().getFoodOwed() == 1,
+                    "4 bodies and 1 piece owed expected: " + colony.away().describe(level));
+            // Back in range: the chunks load again, with everything that was frozen in them.
+            colony.away().setAwayForTests(false);
+            unloaded.values().forEach(tag -> loadAgain(level, tag));
+        });
+        helper.runAfterDelay(240, () -> {
+            Colony colony = TermiteMoundTests.colony(helper);
+            helper.assertTrue(colony != null, "the queen should be back and alive");
+            colony.queenCare().setQueenLastFed(level.getGameTime()); // (fed: the rest of the test is not about her)
+            for (UUID id : unloaded.keySet()) {
+                if (!id.equals(queen[0])) {
+                    helper.assertTrue(level.getEntity(id) == null, "a folded insect should leave the world when it loads: " + level.getEntity(id));
+                }
+            }
+            SavannaMod.LOGGER.info("[away-test] back: {}{}", colony.population().describe(level), colony.away().describe(level));
+            helper.assertTrue(colony.brood().countEggs(level) == 1 && colony.brood().countLarvae(level) == 2 && colony.brood().insideCount() == 0,
+                    "the egg and the 2 nymphs should be real again: " + colony.brood().countEggs(level) + " eggs, " + colony.brood().countLarvae(level)
+                            + " nymphs, " + colony.brood().insideCount() + " inside");
+            helper.assertTrue(colony.brood().getLarvae(level).stream().anyMatch(nymph -> nymph.getFed() == 3), "the fed nymph should still be fed 3");
+            int bodies = TestIsolation.insectsOf(helper, com.antcolonies.entity.AntCorpseEntity.class,
+                    corpse -> corpse.isAlive() && colony.getId().equals(corpse.getColonyId())).size();
+            // Termites eat their dead (the species file's refuse rule): the 4 bodies owed are settled with none left lying.
+            helper.assertTrue(bodies == 0 && colony.away().getBodiesOwed() == 0, "the 4 bodies owed should be eaten, none lying: " + bodies
+                    + " lying, " + colony.away().getBodiesOwed() + " still owed");
+            helper.assertTrue(colony.food().getFood() == foodBefore[0] + 1 && colony.away().getFoodOwed() == 0,
+                    "the carried piece should be in the store: " + colony.food().getFood() + " food, was " + foodBefore[0]);
+            helper.assertTrue(colony.getCount(Caste.WORKER) == 3 && colony.population().inside(Caste.WORKER) == 3,
+                    "still 3 workers, all numbers: " + colony.getCount(Caste.WORKER) + ", " + colony.population().inside(Caste.WORKER));
+            // Two stragglers at the edge of the loaded land while the colony is here.
+            for (int i = 0; i < 2; i++) {
+                stragglers.add(helper.spawn(SavannaEntities.TERMITE_WORKER.get(), MIDDLE + 6 + i, SURFACE, MIDDLE - 4).getUUID());
+            }
+        });
+        helper.runAfterDelay(260, () -> {
+            Colony colony = TermiteMoundTests.colony(helper);
+            helper.assertTrue(colony.getCount(Caste.WORKER) == 5, "5 workers expected: " + colony.getCount(Caste.WORKER));
+            for (UUID id : stragglers) {
+                unloaded.put(id, freezeAndUnload(colony, level, level.getEntity(id)));
+            }
+        });
+        helper.runAfterDelay(280, () -> loadAgain(level, unloaded.get(stragglers.get(0)))); // back after a moment
+        helper.runAfterDelay(400, () -> loadAgain(level, unloaded.get(stragglers.get(1)))); // back after more than the grace
+        helper.runAfterDelay(440, () -> {
+            Colony colony = TermiteMoundTests.colony(helper);
+            Entity first = level.getEntity(stragglers.get(0));
+            helper.assertTrue(first != null && first.isAlive() && !colony.away().isFrozen(stragglers.get(0)),
+                    "the straggler back after a moment should carry on");
+            helper.assertTrue(level.getEntity(stragglers.get(1)) == null, "the straggler back after the grace should have walked home");
+            helper.assertTrue(colony.getCount(Caste.WORKER) == 5 && colony.population().inside(Caste.WORKER) == 4,
+                    "5 workers, 4 of them numbers expected: " + colony.getCount(Caste.WORKER) + ", " + colony.population().inside(Caste.WORKER));
+            helper.succeed();
+        });
+    }
+
+    /**
+     * Step 2c's other half (the red harvester ant's test until 2026-11-23; the rule is the shared {@code FieldLife}'s: the
+     * numbers forage always, but only out of every player's sight). 60 old termite workers in the numbers, no real
+     * workers, night, and two dry tufts the colony knows, 6 blocks east and west of the mound, each with 2 of its 4 pieces
+     * cut. A pretend player stands 5 blocks east of the east tuft, looking at it; a stone wall hides the
+     * west one. The numbers eat the west tuft up (2 pieces in, the tuft gone and forgotten); the east
+     * one is left as it was, still remembered, for the real foragers. The player gone, it is eaten too.
+     */
+    @GameTest(template = "arena", timeoutTicks = 2600, skyAccess = true)
+    public static void termiteNumbersForageOnlyOutOfSight(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        TestScenes.deepGround(helper);
+        helper.spawn(SavannaEntities.TERMITE_QUEEN.get(), MIDDLE, SURFACE, MIDDLE);
+        BlockPos seen = helper.absolutePos(new BlockPos(MIDDLE + 6, SURFACE, MIDDLE));
+        BlockPos hidden = helper.absolutePos(new BlockPos(MIDDLE - 6, SURFACE, MIDDLE));
+        int[] foodBefore = new int[1];
+        TestClock.still(helper, 23.0); // night: the termites' foraging time
+        helper.onEachTick(() -> noRealWorkers(helper));
+        helper.runAfterDelay(10, () -> {
+            Colony colony = TermiteMoundTests.colony(helper);
+            helper.assertTrue(colony != null, "no termite colony");
+            colony.population().setOnForTests(false); // no swapping: the numbers stay numbers
+            TermiteScenes.digNestAtOnce(level, colony);
+            colony.population().addNewMembers(Caste.WORKER, level.getGameTime() - 250000, 60);
+            com.antcolonies.savanna.colony.Galleries.of(colony).setSwitchForTests(false);
+            for (BlockPos tuft : List.of(seen, hidden)) {
+                level.setBlock(tuft.below(), Blocks.GRASS_BLOCK.defaultBlockState(), 3);
+                level.setBlock(tuft, com.antcolonies.savanna.registry.SavannaBlocks.DRY_GRASS.get().defaultBlockState(), 3);
+                colony.food().setPiecesCutForTests(tuft, 2);
+                colony.foodMap().knowForTests(tuft);
+            }
+            // The pretend player stands 5 blocks east of the east tuft; a wall of stone hides the west one.
+            for (int dz = -3; dz <= 3; dz++) {
+                for (int dy = 0; dy < 4; dy++) {
+                    level.setBlock(helper.absolutePos(new BlockPos(MIDDLE - 4, SURFACE + dy, MIDDLE + dz)), Blocks.STONE.defaultBlockState(), 3);
+                }
+            }
+            colony.population().setViewersForTests(List.of(Vec3.atCenterOf(helper.absolutePos(new BlockPos(MIDDLE + 11, SURFACE + 2, MIDDLE)))));
+            colony.food().rescanPlantsSoon();
+            foodBefore[0] = colony.food().getFood();
+            colony.field().setOnForTests(true);
+        });
+        helper.runAfterDelay(1200, () -> {
+            Colony colony = TermiteMoundTests.colony(helper);
+            SavannaMod.LOGGER.info("[away-test] out of sight: food {}{}", colony.food().getFood(), colony.field().describe());
+            helper.assertTrue(level.getBlockState(hidden).isAir() && !colony.foodMap().isKnown(hidden),
+                    "the tuft out of sight should be eaten up, gone and forgotten: cut " + colony.food().getPiecesCut(hidden));
+            helper.assertTrue(level.getBlockState(seen).is(com.antcolonies.savanna.registry.SavannaBlocks.DRY_GRASS.get())
+                    && colony.food().getPiecesCut(seen) == 2, "the tuft in the player's sight should be left alone: cut " + colony.food().getPiecesCut(seen));
+            helper.assertTrue(colony.field().remembers(seen), "the brain should still remember the tuft in sight");
+            helper.assertTrue(colony.food().getFood() == foodBefore[0] + 2, "2 pieces should have come in: " + colony.food().getFood() + ", was " + foodBefore[0]);
+            colony.population().setViewersForTests(List.of()); // the player gone
+        });
+        helper.runAfterDelay(2400, () -> {
+            Colony colony = TermiteMoundTests.colony(helper);
+            helper.assertTrue(level.getBlockState(seen).isAir(), "with nobody looking the other tuft should be eaten too: cut " + colony.food().getPiecesCut(seen));
+            helper.assertTrue(colony.food().getFood() == foodBefore[0] + 4, "4 pieces in all expected: " + colony.food().getFood() + ", was " + foodBefore[0]);
+            helper.succeed();
         });
     }
 }

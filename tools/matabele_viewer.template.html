@@ -201,7 +201,7 @@ tag('1 block', cubeBlock);
 
 // --- sizes and layout -----------------------------------------------------------------------------------------------
 // The major starts at twice the termite major soldier's length (the user, 2026-10-23).
-const termiteMajor = refs[2].userData.length * refs[2].scale.x;
+const termiteMajor = refs[1].userData.length * refs[1].scale.x;
 const settings = {major: 1.0, minor: 0.68, cam: 'overview'};   // the game's sizes since 2026-10-24: a major about 1 block, a minor 0.68 of it (it stays as it was)
 location.hash.slice(1).split('&').filter(Boolean).forEach(kv => {
   const [k, v] = kv.split('=').map(decodeURIComponent);
@@ -228,10 +228,8 @@ function layout() {
   const right = looks[looks.length - 1].minor.position.x + minorLen + gap + 0.8;
   cubeBlock.position.set(right, 0.5, -1.2);
   player.position.set(right + 1.6, 0, -1.2);
-  const harvester = refs[0].userData.length * refs[0].scale.x;
   document.getElementById('majorOut').textContent = majorLen.toFixed(2) + ' blocks long (' +
-    (majorLen / termiteMajor).toFixed(1) + ' times a termite major soldier, ' + (majorLen / harvester).toFixed(1) +
-    ' times a harvester worker)';
+    (majorLen / termiteMajor).toFixed(1) + ' times a termite major soldier)';
   document.getElementById('minorOut').textContent = Math.round(settings.minor * 100) + '% of the major: ' +
     minorLen.toFixed(2) + ' blocks long';
   if (DATA.sameScale) document.getElementById('minorLabel').style.display = 'none';

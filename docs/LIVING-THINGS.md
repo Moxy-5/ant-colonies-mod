@@ -36,7 +36,7 @@ Every living thing in the mod, built or planned, plants and fungi included, in o
 **1. Colony insects (strict realism; each a species profile on the framework)**
 - Macrotermes (mound termite): workers, minor and major soldiers, king, queen BUILT; alates (winged) PLANNED (M9.5). Savanna mod.
 - Matabele ant (Megaponera analis): majors, minors, ergatoid queen BUILT; colony splitting PLANNED (M9.5); moving house PLANNED (M8 step 6). Savanna mod.
-- Red harvester ant (Pogonomyrmex): workers, queen BUILT; rework PLANNED with the desert mod. Desert mod.
+- Red harvester ant (Pogonomyrmex): DROPPED (taken out 2026-11-23 with its desert mod; kept at the git tag `harvester-last`, design in `docs/archive/harvester.md`; maybe its own desert mod later).
 - Leafcutter ants (Atta, Acromyrmex): IDEA (jungle mod).
 - Army ants (Nomamyrmex, raiding leafcutters; savanna driver ants named only as a reason Matabele move): IDEA (jungle).
 - Honeypot ants (Myrmecocystus, neighbours of the harvester): IDEA (desert).
@@ -134,7 +134,7 @@ Every living thing in the mod, built or planned, plants and fungi included, in o
 
 **8. Small plants, grasses and water plants**
 - River algae (look C, strands bitten off): BUILT.
-- Blue and black grama grass (harvester seed food, plains and badlands): BUILT.
+- Blue and black grama grass (harvester seed food, plains and badlands): DROPPED with the harvester ant (2026-11-23; `docs/archive/harvester.md`).
 - Dry savanna grass ("Dry Grass" block, termite food, bare patches regrowing): BUILT.
 - Papyrus (stands 3 to 5 tall in shallow still water: oxbows and slow river stretches) and hippo grass (a floating fringe along slow banks and oxbows; hippos nibble it): PLANNED (the user, 2026-11-22; `docs/plans/papyrus-and-hippo-grass.md`). Reeds: IDEA.
 - Elephant grass (very tall grass, 2 to 4 m, of the wetter savanna and floodplain; cover for animals): IDEA (user's list 2026-11-16).

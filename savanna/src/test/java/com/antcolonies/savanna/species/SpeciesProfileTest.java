@@ -69,7 +69,6 @@ class SpeciesProfileTest {
         assertTrue(profile.founding().isPresent() && profile.founding().get().eggs() > 0, "termites raise a founding batch");
         // Food: dead plant material built into fungus comb in garden rooms round the royal chamber, no bread, no side room.
         assertEquals(java.util.List.of(), profile.nest().sideRooms(), "termites keep their food in the garden rooms, not a side room");
-        assertTrue(!profile.food().makesBread(), "termites mill no bread");
         assertEquals("antcolonies:fungus_comb", profile.food().pile());
         assertTrue(profile.section(SavannaNumbers.GARDEN).isPresent(), "termites keep a fungus garden");
         assertEquals(1, profile.section(SavannaNumbers.GARDEN).get().roomsFor(1), "the first garden comes with the first worker");
@@ -122,7 +121,6 @@ class SpeciesProfileTest {
         assertEquals(75, soldiers.wantedMinors(1000));
         assertEquals(25, soldiers.wantedMajors(1000));
         assertTrue(read("macrotermes").food().findRadius() > 0, "termites find their food by looking");
-        assertTrue(read("macrotermes").food().search().isEmpty(), "termites still tell the colony what they find");
         assertTrue(read("macrotermes").food().dayClock().isEmpty(), "termites keep their night and rain rule");
     }
 

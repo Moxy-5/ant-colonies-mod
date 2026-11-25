@@ -16,7 +16,6 @@ ROOT = Path(__file__).resolve().parent.parent
 
 # texture name -> (pale colour it is blended toward, how far: 0 = unchanged, 1 = all pale colour)
 YOUNG = {
-    "worker_ant": ((236, 208, 150), 0.55),
     "termite_worker": ((252, 248, 238), 0.5),
     # Matabele callows: freshly grown ponerines are a reddish brown, darkening to black over days (my pick, to confirm).
     "matabele_major": ((140, 88, 58), 0.45),

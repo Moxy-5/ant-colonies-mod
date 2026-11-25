@@ -68,14 +68,6 @@ public final class ColonyNews {
     public record MemberHurt(AbstractAntEntity member, BlockPos where, LivingEntity by, boolean killed) {
     }
 
-    /** A member died (of anything): it is gone from the colony. Today only worker ants tell it (as before: nothing else listened for the others). */
-    public record MemberDied(UUID member) {
-    }
-
-    /** A forager found food at {@code where}: it cut a piece off a plant there or picked up a seed. */
-    public record FoodFound(UUID finder, BlockPos where) {
-    }
-
     /**
      * A member met another colony of its species at {@code where}: {@code who} is what was met there (one of their insects,
      * their trail, their gallery), so the same meeting is not counted again and again.
@@ -84,42 +76,12 @@ public final class ColonyNews {
     }
 
     public static final Kind<MemberHurt> MEMBER_HURT = Kind.of("member_hurt");
-    public static final Kind<MemberDied> MEMBER_DIED = Kind.of("member_died");
-    public static final Kind<FoodFound> FOOD_FOUND = Kind.of("food_found");
     public static final Kind<NeighbourMet> NEIGHBOUR_MET = Kind.of("neighbour_met");
 
     // Step 8a: the rest of the shared code's tellings to a species part, each now told to whoever hears it.
 
-    /** A real member went into the numbers (it is counted inside the nest now, no longer in the world). */
-    public record IntoNumbers(UUID member) {
-    }
-
-    /** A member came out of the numbers as a real forager. */
-    public record OutOfNumbers(UUID member) {
-    }
-
-    /** A piece was taken off the store for milling: {@code rich}, a rich seed (its miller makes rich bread). */
-    public record PieceTaken(UUID ant, boolean rich) {
-    }
-
-    /** A worker ate the piece it took off the store (so it mills nothing). */
-    public record PieceEaten(UUID ant) {
-    }
-
     /** A heap of the store was eaten away to nothing; {@code nodules}: the fungus nodules it still carried, lost with it. */
     public record HeapGone(BlockPos where, int nodules) {
-    }
-
-    /** The forager numbers brought a piece home from the plant at {@code plant} (their trip out and back). */
-    public record NumbersTrip(BlockPos plant) {
-    }
-
-    /** The forager numbers' second: {@code foragers} of them, {@code returned} pieces home, {@code placed} at work on a plant or searching. */
-    public record NumbersForaged(int foragers, int returned, double placed) {
-    }
-
-    /** How many forager numbers there are this second (before they go out; a species that searches alone trims its spots to them). */
-    public record ForagerNumbers(int foragers) {
     }
 
     /** A block of the nest was dug out (by a real digger or by the builder numbers on return). */
@@ -133,38 +95,11 @@ public final class ColonyNews {
     public record PlantEaten(BlockPos where, net.minecraft.world.level.block.state.BlockState eaten, long eatenAt) {
     }
 
-    public static final Kind<IntoNumbers> INTO_NUMBERS = Kind.of("into_numbers");
-    public static final Kind<OutOfNumbers> OUT_OF_NUMBERS = Kind.of("out_of_numbers");
-    public static final Kind<PieceTaken> PIECE_TAKEN = Kind.of("piece_taken");
-    public static final Kind<PieceEaten> PIECE_EATEN = Kind.of("piece_eaten");
     public static final Kind<HeapGone> HEAP_GONE = Kind.of("heap_gone");
-    public static final Kind<NumbersTrip> NUMBERS_TRIP = Kind.of("numbers_trip");
-    public static final Kind<NumbersForaged> NUMBERS_FORAGED = Kind.of("numbers_foraged");
-    public static final Kind<ForagerNumbers> FORAGER_NUMBERS = Kind.of("forager_numbers");
     public static final Kind<BlockDug> BLOCK_DUG = Kind.of("block_dug");
     public static final Kind<PlantEaten> PLANT_EATEN = Kind.of("plant_eaten");
 
     // Step 9a: the shared goals', the ant body's and the event file's tellings to a species part.
-
-    /** A real forager sets out for food it found and claimed. */
-    public record SetOut(AbstractAntEntity ant) {
-    }
-
-    /** A real forager sets out to search (searching alone). */
-    public record SearchStarted(UUID ant) {
-    }
-
-    /**
-     * A real forager's search is over (it found food, or not): {@code empty}, it got to its search and came home with
-     * nothing, the search having gone out at {@code angle} (radians from the nest's middle); {@code gaveUp}, it searched
-     * as long as it may.
-     */
-    public record SearchOver(AbstractAntEntity ant, boolean empty, double angle, boolean gaveUp) {
-    }
-
-    /** A member's look round, every few ticks (a forager walking in with food touches the ants waiting by the entrance). */
-    public record MemberRound(AbstractAntEntity member) {
-    }
 
     /** A player jumped (the ground shook) somewhere on the colony's ground. */
     public record PlayerStamped(Player player) {
@@ -204,10 +139,6 @@ public final class ColonyNews {
 
     public static final Kind<BrokenOpen> BROKEN_OPEN = Kind.of("broken_open");
 
-    public static final Kind<SetOut> SET_OUT = Kind.of("set_out");
-    public static final Kind<SearchStarted> SEARCH_STARTED = Kind.of("search_started");
-    public static final Kind<SearchOver> SEARCH_OVER = Kind.of("search_over");
-    public static final Kind<MemberRound> MEMBER_ROUND = Kind.of("member_round");
     public static final Kind<PlayerStamped> PLAYER_STAMPED = Kind.of("player_stamped");
     public static final Kind<BlockBroken> BLOCK_BROKEN = Kind.of("block_broken");
 

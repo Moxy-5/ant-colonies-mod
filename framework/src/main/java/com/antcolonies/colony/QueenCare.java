@@ -96,11 +96,6 @@ public class QueenCare {
         queenLastFed = time;
     }
 
-    /** Tests only: she carries an egg that comes out at this game time. */
-    public void setEggDueForTests(long time) {
-        eggDue = time;
-    }
-
     /** True when the queen sits in her finished room (the workers feed her there, and her egg comes out there). */
     public boolean isQueenHome(ServerLevel level) {
         BlockPos room = colony.nest().getFinishedRoomCenter(level);
@@ -271,11 +266,6 @@ public class QueenCare {
                 && (eggsLaid >= batchEggs(founding) && (secondBatch || founding.secondBatchEggs() <= 0) || eggsLaid > founding.eggs() && !secondBatch);
     }
 
-    /** Whether she is laying her second batch (for tests and the colony list). */
-    public boolean isOnSecondBatch() {
-        return secondBatch;
-    }
-
     /**
      * A queen who lays a steady stream of eggs (the profile's {@code laying}; called by her once a second): while she is
      * in her room, has the food for an egg in her and the nursery is not full of young, an egg comes every interval
@@ -319,12 +309,6 @@ public class QueenCare {
     /** The game time of the next egg of the steady stream ({@link Colony#NOT_SET} if she cannot lay now). */
     public long getNextStreamEgg() {
         return nextStreamEgg;
-    }
-
-    /** The egg comes out of the queen at this spot; she starts over with an empty stomach. */
-    public void layEgg(ServerLevel level, double x, double y, double z) {
-        eggCameOut(level);
-        colony.brood().spawnEgg(level, x, y, z);
     }
 
     private void eggCameOut(ServerLevel level) {

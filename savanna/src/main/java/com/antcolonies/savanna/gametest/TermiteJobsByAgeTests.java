@@ -56,6 +56,17 @@ public class TermiteJobsByAgeTests {
                 helper.assertTrue(role == expected[i], "worker " + i + " (" + ages[i] + " ticks old) is a " + role + ", expected " + expected[i]
                         + "; " + colony.describeJobs(level));
             }
+            // The share-out rule (the red harvester ant's check until 2026-11-23): the jobs handed out are the rule's for
+            // these workers' ages, with the nurses the headcount wants.
+            int[] roles = new int[ColonyRole.values().length];
+            int[] natural = new int[ColonyRole.values().length];
+            for (TermiteWorkerEntity worker : workers) {
+                roles[colony.roleOf(level, worker).ordinal()]++;
+                natural[colony.profile().worker().roleForAge(level.getGameTime() - worker.getGrownUpAt()).ordinal()]++;
+            }
+            int[] shared = Colony.shareOut(workers.size(), colony.profile().colony().nurses(workers.size()), natural);
+            helper.assertTrue(java.util.Arrays.equals(roles, shared), "roles (nurse, builder, forager): " + java.util.Arrays.toString(roles)
+                    + ", the share-out rule gives " + java.util.Arrays.toString(shared));
             helper.assertTrue(workers.get(0).getYouth() > 0.9F, "the newest worker is not pale: " + workers.get(0).getYouth());
             helper.assertTrue(workers.get(2).getYouth() == 0.0F, "a middle-aged worker is still pale: " + workers.get(2).getYouth());
             CompoundTag saved = new CompoundTag();

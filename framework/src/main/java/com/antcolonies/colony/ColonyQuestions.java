@@ -68,8 +68,6 @@ public final class ColonyQuestions {
      * numbers.
      */
     public static final Kind<BlockPos> KEEP_OFF = Kind.of("keep_off");
-    /** Step 6: whether this place is not cleared for foraging yet today (no patroller back from that way). */
-    public static final Kind<BlockPos> NOT_CLEARED = Kind.of("not_cleared");
     /** Step 7: whether this foraging hole is kept shut (never opened, plugged at once, no turn, no food fetched through it). */
     public static final Kind<BlockPos> HOLE_KEPT_SHUT = Kind.of("hole_kept_shut");
     /** Step 7: whether any foraging hole is kept shut now (a quick check before asking of each); asked about nothing (null). */
@@ -87,23 +85,11 @@ public final class ColonyQuestions {
     public static final Kind<BlockPos> CLEAR_JOB = Kind.of("clear_job");
     /** Step 8a: whether this cell is one of the tunnels built inside the structure over the nest (it needs no walls of its own). */
     public static final Kind<BlockPos> STRUCTURE_TUNNEL = Kind.of("structure_tunnel");
-    /** Step 8a: whether more food is wanted in even with the store full (seeds to mill into bread); asked about nothing (null). */
-    public static final Kind<Void> MORE_FOOD_WANTED = Kind.of("more_food_wanted");
-    /** Step 8a: whether the colony keeps lasting trails (trunk trails); asked about nothing (null). */
-    public static final Kind<Void> KEEPS_TRAILS = Kind.of("keeps_trails");
     /** Step 8a: whether the store is known to hold nothing the workers eat (fungus comb with no old layer as far as the brain knows); asked about nothing (null). */
     public static final Kind<Void> NOTHING_TO_EAT_IN_STORE = Kind.of("nothing_to_eat_in_store");
 
     // Step 9a: the shared goals' and the ant body's yes/no asks of a species part.
 
-    /** Food a forager might go for, and the forager. */
-    public record FoodFor(UUID ant, BlockPos food) {
-    }
-
-    /** Step 9a: whether this forager must wait in the nest before it sets out (the harvester's door: not touched enough yet). */
-    public static final Kind<AbstractAntEntity> MUST_WAIT = Kind.of("must_wait");
-    /** Step 9a: whether this forager passes the food by (it was called out to a richer patch and is on its way there). */
-    public static final Kind<FoodFor> PASSES_BY = Kind.of("passes_by");
     /**
      * Whether the colony feels trouble at this place now (a foe there, a wall broken): the members there do not groom,
      * nap or stop to look at a player, and those outside go in and stay in ({@code AbstractAntEntity.mayGoOut}). Local
@@ -111,8 +97,6 @@ public final class ColonyQuestions {
      * "keeps everyone in", that stopped all foraging for one enemy at one hole.
      */
     public static final Kind<BlockPos> ALARMED = Kind.of("alarmed");
-    /** Step 9a: whether this place is on one of the colony's lasting trails (a neighbour stepping onto it meets the colony). */
-    public static final Kind<BlockPos> ON_TRAIL = Kind.of("on_trail");
 
     /** A member of the colony, and something it might attack. */
     public record Provoked(AbstractAntEntity ant, net.minecraft.world.entity.Entity foe) {

@@ -75,33 +75,6 @@ public final class ColonyHooks {
         List<BlockPos> places(ServerLevel level);
     }
 
-    /** Lasting trails the colony walks: how long the walk to a plant is by trail, and which columns along them to scan for plants. */
-    public interface Trails {
-        /** The walk (blocks) to {@code pos} along a trail, or a negative number if no trail leads near it. */
-        double walkTo(BlockPos pos);
-
-        /** The columns (x and z from the nest's middle) within {@code side} of the trails, out to {@code radius}. */
-        List<int[]> columnsNear(int side, int radius);
-
-        /** Step 9a: a real forager sets out for the food at {@code plant}: where it leaves the trail (its trip counted), or null. */
-        @Nullable
-        BlockPos setOut(ServerLevel level, BlockPos plant);
-
-        /** Step 9a: a real searcher sets out to search round {@code toward}: where it leaves the trail (not counted yet), or null. */
-        @Nullable
-        BlockPos wayOut(ServerLevel level, BlockPos toward);
-
-        /** Step 9a: a forager home with food from {@code from}: where it joins a trail home, or null. */
-        @Nullable
-        BlockPos wayHome(ServerLevel level, BlockPos from);
-    }
-
-    /** How many of the forager numbers may be out now (of {@code foragers}; Gordon's door rule for the harvester ant). */
-    @FunctionalInterface
-    public interface DoorRule {
-        double free(ServerLevel level, int foragers);
-    }
-
     /** The founders beside the queen (the king, in a royal pair). */
     public interface CoFounders {
         /** How many dig beside her (alive as far as the brain knows). */
@@ -254,63 +227,10 @@ public final class ColonyHooks {
         }
     }
 
-    /** Step 8c: a species' own way for its forager numbers to forage, when it searches alone (the harvester ant: brain step 4c). */
-    @FunctionalInterface
-    public interface NumbersSearch {
-        /** This second's foraging of {@code foragers} numbers, through {@code field}'s plants and trip rules. */
-        void forage(ServerLevel level, FieldLife field, int foragers);
-    }
-
     /** Step 8c: a species' own share of the nest's life while the colony is away, once a second. True if anything changed. */
     @FunctionalInterface
     public interface AwayWork {
         boolean work(ServerLevel level);
-    }
-
-    /**
-     * Step 9a: a real forager's search when it searches alone (the harvester ant: brain step 4c, {@code ScoutGoal}): the
-     * numbers it searches by, where this trip's search goes, and a search round its own spot found empty.
-     */
-    public interface LoneSearch {
-        /** The numbers of a lone search ({@code food.search}). */
-        SpeciesProfile.SearchNumbers settings();
-
-        /** Where this trip's search goes, or null (no open ground was hit); {@code ground} finds open ground. */
-        @Nullable
-        SearchPlan plan(ServerLevel level, AbstractAntEntity ant, GroundPicker ground);
-
-        /** Nothing at its own spot this time. */
-        void emptyAtSpot(UUID ant);
-    }
-
-    /** An open cell on the ground {@code distance} blocks out from the nest's middle at {@code angle}, give or take {@code jitter}, or null. */
-    @FunctionalInterface
-    public interface GroundPicker {
-        @Nullable
-        BlockPos cell(double angle, double distance, int jitter);
-    }
-
-    /**
-     * A lone search planned: its centre, its direction (radians from the nest's middle), how far out it starts, how far
-     * its way reaches (its drift goes at most the stretch past it), and whether it is round the forager's own spot.
-     */
-    public record SearchPlan(BlockPos spot, double angle, double from, int reachOfWay, boolean atOwnSpot) {
-    }
-
-    /** Step 9a: the scent line a forager called out to a rich patch follows (nest end first), or null. */
-    @FunctionalInterface
-    public interface CalledOut {
-        @Nullable
-        List<BlockPos> lineFor(Level level, UUID ant);
-    }
-
-    /** Step 9a: a place for a forager's load besides the store (the harvester's mill). */
-    public interface Mill {
-        /** Whether there is a place for this forager's piece, at the mill or in the store (it claims it). */
-        boolean hasPlace(ServerLevel level, UUID ant);
-
-        /** Whether this forager's piece goes to the mill. */
-        boolean milling(UUID ant);
     }
 
     /** Step 9a: where the soil a real digger bites loose goes (the harvester's hill, the termite mound). */
@@ -433,10 +353,6 @@ public final class ColonyHooks {
 
     /** Step 8b: how far out the colony forages, past its food radius (the harvester's trunk trails: their longest tip). */
     public static final Kind<Reach> REACH = Kind.of("reach");
-    /** Step 8b: the colony's lasting trails (the harvester's trunk trails). */
-    public static final Kind<Trails> TRAILS = Kind.of("trails");
-    /** Step 8b: how many forager numbers may be out (the harvester's door). */
-    public static final Kind<DoorRule> DOOR_RULE = Kind.of("door_rule");
     /** Step 8b: the founders beside the queen (the termite king). */
     public static final Kind<CoFounders> CO_FOUNDERS = Kind.of("co_founders");
     /** Step 8b: the nurses' food, bread or fungus nodules (the first plugged in is the colony's, {@link Colony#nurseFood}). */
@@ -455,8 +371,6 @@ public final class ColonyHooks {
     public static final Kind<com.antcolonies.block.FacedWall> CRUST = Kind.of("crust");
     /** Step 8c: the species' share of the building on return (the harvester's hill, the termite mound). */
     public static final Kind<AwayBuilder> AWAY_BUILDER = Kind.of("away_builder");
-    /** Step 8c: the forager numbers searching alone (the harvester's forager spots). */
-    public static final Kind<NumbersSearch> NUMBERS_SEARCH = Kind.of("numbers_search");
     /** Step 8c: while away, beside the queen's own life (the termite king's hunger clock). */
     public static final Kind<AwayWork> AWAY_BESIDE_QUEEN = Kind.of("away_beside_queen");
     /**
@@ -470,14 +384,6 @@ public final class ColonyHooks {
     public static final Kind<AwayWork> AWAY_AFTER_NURSES = Kind.of("away_after_nurses");
     /** Step 8c: the nurses feeding another member while away, after the queen and before the young (the termite king). */
     public static final Kind<NurseJob> NURSE_FEEDS = Kind.of("nurse_feeds");
-    /** Step 8c: the nurses making more food while away, once nobody is hungry (the harvester's bread milled). */
-    public static final Kind<NurseJob> NURSE_MAKES = Kind.of("nurse_makes");
-    /** Step 9a: a real forager's lone search (the harvester's forager spots). */
-    public static final Kind<LoneSearch> LONE_SEARCH = Kind.of("lone_search");
-    /** Step 9a: the scent line a called-out forager follows (the harvester's recruits). */
-    public static final Kind<CalledOut> CALLED_OUT = Kind.of("called_out");
-    /** Step 9a: a place for a load besides the store (the harvester's bakery). */
-    public static final Kind<Mill> MILL = Kind.of("mill");
     /** Step 9a: where a real digger's soil goes (the harvester's hill, the termite mound). */
     public static final Kind<DugSoil> DUG_SOIL = Kind.of("dug_soil");
     /** Step 9b, the colony list's slots: after the seed store (the bread). */
@@ -492,8 +398,6 @@ public final class ColonyHooks {
     public static final Kind<ListLine> LIST_DANGER = Kind.of("list_danger");
     /** After the dead ants (the mound). */
     public static final Kind<ListLine> LIST_BUILDING = Kind.of("list_building");
-    /** After the day clock (the patrol, the door, the night soil). */
-    public static final Kind<ListLine> LIST_DAY = Kind.of("list_day");
     /** After the holes, the new holes and the runways (the galleries, the hidden trips). */
     public static final Kind<ListLine> LIST_HOLES = Kind.of("list_holes");
     /** The split, step S2: the web of galleries under the ground (the termites'). */

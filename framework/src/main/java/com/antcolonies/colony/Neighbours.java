@@ -208,21 +208,6 @@ public class Neighbours {
         return false;
     }
 
-    /** Whether the colony lays no new trail and sends no search this way ({@code angle}: radians, 0 east, PI/2 south). */
-    public boolean turnsFrom(Level level, double angle) {
-        SpeciesProfile.NeighbourNumbers numbers = numbers();
-        if (numbers == null || meetings.isEmpty()) {
-            return false;
-        }
-        double turn = Math.toRadians(numbers.turnDegrees());
-        for (Meeting meeting : yielding(level)) {
-            if (difference(angleOf(meeting.pos), angle) <= turn) {
-                return true;
-            }
-        }
-        return false;
-    }
-
     /** Whether any place is remembered at all. */
     public boolean isEmpty() {
         return meetings.isEmpty();

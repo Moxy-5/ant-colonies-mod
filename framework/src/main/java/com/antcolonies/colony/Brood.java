@@ -88,12 +88,6 @@ public class Brood {
         return getEggs(level).size();
     }
 
-    /** The eggs lying in the nursery. */
-    public List<AntEggEntity> getNurseryEggs(Level level) {
-        Set<BlockPos> cells = new HashSet<>(colony.nest().getNurseryCells(level));
-        return getEggs(level).stream().filter(egg -> cells.contains(egg.blockPosition())).toList();
-    }
-
     /** The eggs that no worker has put in its place yet (not in the nursery or a garden, and not set down by a worker). */
     public List<AntEggEntity> getLooseEggs(Level level) {
         Set<BlockPos> cells = new HashSet<>(colony.nest().getNurseryCells(level));
@@ -328,20 +322,6 @@ public class Brood {
             cells.add(larva.blockPosition());
         }
         return cells;
-    }
-
-    /** How many more pieces of bread all the larvae together (the real ones and the numbers) still have to eat. */
-    public int larvaHunger(Level level) {
-        int hunger = 0;
-        for (AntLarvaEntity larva : getLarvae(level)) {
-            hunger += Math.max(0, larva.getMeal() - larva.getFed());
-        }
-        for (Young young : inside) {
-            if (!young.isEgg()) {
-                hunger += Math.max(0, mealFor(young.growsInto()) - young.fed());
-            }
-        }
-        return hunger;
     }
 
     /**

@@ -4,7 +4,7 @@ cmd time set noon
 cmd weather clear
 cmd fill -4 -60 -3 0 -59 3 stone
 lens 30
-walker worker_ant -2.5 -58 0.5 -90
+walker matabele_minor -2.5 -58 0.5 -90
 log ledge
 cmd tick freeze
 fov 10

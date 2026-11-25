@@ -4,7 +4,7 @@
 #
 #   tools/film.sh watch [scenes]   start a film session that stays open (in the background), film the scenes, wait for
 #                                  the pictures. From then on it films them again by itself whenever an animation or
-#                                  model file in any mod (<mod>/src/main/resources/assets: framework, savanna, desert,
+#                                  model file in any mod (<mod>/src/main/resources/assets: framework, savanna,
 #                                  the list in tools/mod_paths.py and build.gradle) or a shot list changes.
 #   tools/film.sh shoot [scenes]   film again now (with new scenes if named, kept for later shoots) and wait for the
 #                                  pictures; starts the session first if none is open. After running the motion library,
