@@ -212,6 +212,19 @@ public class SavannaEvents {
         com.antcolonies.savanna.command.RaidView.clear();
     }
 
+    /** A world closes (after its last save): the mounds of new land still on their way go into its book (review R8-11). */
+    @SubscribeEvent
+    public static void onLevelUnload(net.neoforged.neoforge.event.level.LevelEvent.Unload event) {
+        if (event.getLevel() instanceof ServerLevel level) {
+            com.antcolonies.savanna.colony.NewLandMounds.closing(level);
+        }
+    }
+
+    @SubscribeEvent
+    public static void onServerStopped(net.neoforged.neoforge.event.server.ServerStoppedEvent event) {
+        com.antcolonies.savanna.colony.NewLandMounds.forgetAll();
+    }
+
     /** Bone meal on a giant savanna tree's seedling or young tree grows it a day's step (M7.5 step 4, {@code Forest}). */
     @SubscribeEvent
     public static void onUseOnBlock(net.neoforged.neoforge.event.entity.player.PlayerInteractEvent.RightClickBlock event) {

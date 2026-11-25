@@ -74,7 +74,7 @@ public final class SavannaTests {
         // The animal life kit (M9, docs/plans/animal-life-cycle.md): sex, age, own size, saving, breeding later.
         TestFilter.addCategory("life", AnimalLifeTests.class);
         TestFilter.addCategory("worldgen", SavannaWorldTests.class, SavannaLoadingTests.class);
-        TestFilter.addCategory("stress", TermiteStressTests.class);
+        TestFilter.addCategory("stress", TermiteStressTests.class, SpawnerCostTests.class);
 
         AwayKit.addPartsCheck(SavannaTests::partsAreTheSavannas);
     }

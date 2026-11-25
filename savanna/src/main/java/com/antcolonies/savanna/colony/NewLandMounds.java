@@ -42,6 +42,7 @@ import net.minecraft.core.HolderLookup;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
 import net.minecraft.nbt.Tag;
+import javax.annotation.Nullable;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.tags.BlockTags;
@@ -89,10 +90,14 @@ public class NewLandMounds extends SavedData {
     /** No mound goes in this near (blocks) another colony or dead mound (a player's own colony, say). */
     public static final int KEEP_APART = 40;
 
-    /** Places handed over by world generation (any thread), taken into the book on the next look. */
+    /**
+     * Places handed over by world generation (any thread), taken into the book on the next look and when their world
+     * closes ({@link #closing}). Each is kept with its own world, never its dimension's name, which every world shares:
+     * a place can never reach another world opened in the same sitting (review R8-11).
+     */
     private static final ConcurrentLinkedQueue<Queued> QUEUE = new ConcurrentLinkedQueue<>();
 
-    private record Queued(ResourceKey<Level> dimension, Site site) {
+    private record Queued(ServerLevel level, Site site) {
     }
 
     /**
@@ -127,7 +132,49 @@ public class NewLandMounds extends SavedData {
     /** World generation made a mound's chunk (any thread): its place goes into the book on the next look. */
     public static void queue(ServerLevel level, BlockPos middle, Pick pick) {
         UUID colony = new UUID(pick.seed() * 0x9E3779B97F4A7C15L ^ middle.asLong(), middle.asLong() * 0xC2B2AE3D27D4EB4FL ^ pick.seed());
-        QUEUE.add(new Queued(level.dimension(), new Site(middle.immutable(), pick, colony)));
+        QUEUE.add(new Queued(level, new Site(middle.immutable(), pick, colony)));
+    }
+
+    /** The places handed over for this world go into its book. Returns the book if any did, else null. */
+    @Nullable
+    private static NewLandMounds takeIn(ServerLevel level) {
+        NewLandMounds book = null;
+        for (Queued q : QUEUE) {
+            if (q.level() == level && QUEUE.remove(q)) {
+                book = book == null ? get(level) : book;
+                book.waiting.add(q.site());
+                book.setDirty();
+            }
+        }
+        return book;
+    }
+
+    /**
+     * A world is closing, after its last save (review R8-11): the places world generation handed over since the last
+     * look (the world stops ticking when the pause menu opens, while land already asked for goes on being made) go into
+     * the book and the book is written once more, so no mound of the last strip of new land is lost.
+     */
+    public static void closing(ServerLevel level) {
+        if (takeIn(level) != null) {
+            level.getDataStorage().save();
+        }
+        QUEUE.removeIf(q -> q.level() == level);
+    }
+
+    /** The server has stopped: nothing handed over is kept for the next world. */
+    public static void forgetAll() {
+        QUEUE.clear();
+    }
+
+    /** The game tests: whether a place waits in this world's book. */
+    public boolean waitsForTests(BlockPos middle) {
+        return waiting.stream().anyMatch(s -> s.middle().equals(middle));
+    }
+
+    /** The game tests: a waiting place taken out of the book again. */
+    public void dropForTests(BlockPos middle) {
+        waiting.removeIf(s -> s.middle().equals(middle));
+        setDirty();
     }
 
     /**
@@ -138,14 +185,7 @@ public class NewLandMounds extends SavedData {
         if (level.getGameTime() % LOOK_TICKS != 0) {
             return;
         }
-        NewLandMounds book = null;
-        for (Queued q : QUEUE) {
-            if (q.dimension().equals(level.dimension()) && QUEUE.remove(q)) {
-                book = book == null ? get(level) : book;
-                book.waiting.add(q.site());
-                book.setDirty();
-            }
-        }
+        NewLandMounds book = takeIn(level);
         book = book == null ? get(level) : book;
         MoundNumbers numbers = SpeciesProfiles.get(SavannaSpecies.MACROTERMES).section(SavannaNumbers.MOUND).orElse(null);
         int growing = 0;
@@ -191,7 +231,7 @@ public class NewLandMounds extends SavedData {
     public static int stillWaiting(ServerLevel level, BlockPos site, int radius) {
         int count = 0;
         for (Queued q : QUEUE) {
-            if (q.dimension().equals(level.dimension()) && near(q.site().middle(), site, radius)) {
+            if (q.level() == level && near(q.site().middle(), site, radius)) {
                 count++;
             }
         }

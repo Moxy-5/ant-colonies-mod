@@ -46,6 +46,31 @@ public class SavannaWorldTests {
     static final long[] SEEDS = {-3635740773639857461L, 1L, 20261106L, 424242L};
 
     /**
+     * "No ravines or caves in the savanna" (the user, 2026-11-07) holds for its waters too (review R8-18: the savanna's
+     * river was left out of the rule, and a ravine or cave started in a river chunk runs on into the plain): as the game
+     * sees them, after every biome modifier, no savanna biome and neither of its water biomes starts a carver.
+     */
+    @GameTest(template = "arena", timeoutTicks = 40)
+    public static void noRavinesOrCavesStartInTheSavannaOrItsWaters(GameTestHelper helper) {
+        var biomes = helper.getLevel().registryAccess().registryOrThrow(Registries.BIOME);
+        List<String> carved = new ArrayList<>();
+        List<String> seen = new ArrayList<>();
+        for (var biome : biomes.getTagOrEmpty(RiverBankFeature.WATERS)) {
+            String name = biome.unwrapKey().map(k -> k.location().toString()).orElse("?");
+            seen.add(name);
+            for (var step : net.minecraft.world.level.levelgen.GenerationStep.Carving.values()) {
+                for (var carver : biome.value().getGenerationSettings().getCarvers(step)) {
+                    carved.add(name + ": " + carver.unwrapKey().map(k -> k.location().getPath()).orElse("?"));
+                }
+            }
+        }
+        helper.assertTrue(seen.contains("antcolonies:savanna_river") && seen.contains("antcolonies:savanna_floodplain")
+                && seen.contains("minecraft:savanna"), "the savanna and its waters are not all in the tag: " + seen);
+        helper.assertTrue(carved.isEmpty(), "ravines or caves can still start in " + carved);
+        helper.succeed();
+    }
+
+    /**
      * The target, agreed by the user 2026-11-06: a typical savanna about 2,000 blocks across, the biggest about 4,000,
      * about as easy to find as a desert (a big one every 2,000 to 3,000 blocks flown). The band the maps must land in
      * (my pick, a little wider than the target, as each seed differs): typical 1,300 to 3,000 across, the biggest at

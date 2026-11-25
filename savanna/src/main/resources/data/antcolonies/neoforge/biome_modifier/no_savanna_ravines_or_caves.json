@@ -1,6 +1,6 @@
 {
   "type": "neoforge:remove_carvers",
-  "biomes": "#minecraft:is_savanna",
+  "biomes": "#antcolonies:savanna_waters",
   "carvers": [
     "minecraft:canyon",
     "minecraft:cave",

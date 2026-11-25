@@ -81,6 +81,8 @@ scene to measure it.
 - **Fix proposed:** count per kind and 64-block cell once every second or so and reuse it; or check the cheap things
   (share 0, open sky) first and the count last (already so), and limit the search to the water's heights.
 
+**Status: not a fault a player can meet** (2026-11-24, measured: `SpawnerCostTests.whatTheSpawnerCostsForOurGroups`). One count of a kind among 150 mobs within 64 blocks takes 5.7 microseconds (3.5 with the heights cut to 16 up and down), and it runs only for a try that already found a fitting spot for a part-share kind. Even 50 such tries in a tick are 0.3 ms. Left as it is; grade C.
+
 ### R8-3 (B, likely): biome mods that are data packs lose all their biomes
 
 - **What is wrong:** `MinecraftZones.replace` empties TerraBlender's zone 0 (Minecraft's own) and gives its weight to
@@ -191,6 +193,8 @@ scene to measure it.
   `ServerStoppedEvent` empty what is left; better still, hand over with the level itself (not its name) so a place can
   never reach another world.
 
+**Status: fixed** (2026-11-24, BUGS 321; test `aMoundHandedOverAsTheWorldClosesIsNotLost`). A place is kept with its own world (not its dimension's name); when a world closes, after its last save (`LevelEvent.Unload`), the places still on their way go into its book and the book is written once more; when the server has stopped the list is emptied. Checked in Minecraft's source: on stop it finishes the land being made, saves, then closes each world, so nothing is handed over after that. **Open:** a crash (no clean stop) can still lose the places handed over in the last half second.
+
 ### R8-12 (A if the measure confirms it; to measure): twelve spawning groups are tried on every tick in every chunk, everywhere
 
 - **What is wrong:** the mod adds 12 spawning groups (`META-INF/enumextensions.json`), every one marked "not
@@ -215,6 +219,8 @@ scene to measure it.
   river_otter, river_hunter, hippo_pod, bullfrog, river_grazer: tried every 20 seconds, which is plenty for animals
   that are kept), and take `hippo_pod` out of the spawner altogether if nothing is ever meant to spawn in it. This
   changes how fast those kinds appear, so it needs a look at the groups table in `docs/LIVING-THINGS.md` first.
+
+**Status: measured, grade B now, open** (2026-11-24, `SpawnerCostTests.whatTheSpawnerCostsForOurGroups`, run by name, in the `stress` category). One try of a group with no spawn list costs 27 ns in solid ground (most tries: the spot's height is drawn from the world's floor up) and 803 ns in air or water. For 12 groups over the 256 chunks round one player that is about **0.15 ms a tick on land and 0.56 ms by open water** (2.5 ms if every try were in the open, which no real land is). Under 4 percent of the 15 ms target for four players, and no single slow tick: not grade A. **Done:** `hippo_pod`, which has no spawn list anywhere, is now tried only once every 20 seconds (a twelfth of the cost gone, no change in play). **Not done, on purpose:** making the other kept kinds' groups slow too would change how fast crocodiles, otters and the rest appear by a river, a game call for a gain of about 0.1 ms.
 
 ### R8-13 (C, to measure): a mound place reads 13 columns of ground before it asks which biome it is in
 
@@ -296,6 +302,8 @@ scene to measure it.
 - **Fix proposed:** the rule names `#antcolonies:savanna_waters` (the tag every other river rule here already uses) and
   the river's own file lists no carvers. A carver started in another biome within 100 blocks of a savanna's edge still
   reaches in; that is Minecraft's own rule and stays.
+
+**Status: fixed** (2026-11-24, BUGS 322; test `noRavinesOrCavesStartInTheSavannaOrItsWaters`). The savanna's river lists no carvers of its own, and the rule that takes them out of the savanna names `#antcolonies:savanna_waters` (the savanna, its floodplain and its river), in the data file and in the script that writes it (`tools/flat_savannas/flat_caves.py`). Only new land changes; a ravine already cut stays. A carver started in another biome within about 100 blocks still reaches in (Minecraft's own rule).
 
 ### R8-19 (B, likely): in a Large Biomes world the cave filling looks at the wrong map
 
