@@ -77,14 +77,17 @@ public class LionEntity extends PathfinderMob implements GeoEntity, HasLife {
     public static final byte CALM = 0, SIT_DOWN = 1, SIT = 2, SIT_UP = 3, REST_DOWN = 4, REST = 5, REST_UP = 6, STRETCH_UP = 7, GROOM = 8,
             DRINK = 9, ROAR = 10, GREET = 11, NUZZLE = 12, CUB_GROOM = 13, PLAY_POUNCE = 14, PLAY_WRESTLE = 15, MOOD_ALERT = 16,
             MOOD_ANGRY = 17, MOOD_FLEHMEN = 18, MOOD_CURIOUS = 19, BLUFF = 20, SWIPE = 21, SWIPE_QUICK = 22, SWIPE_HEAVY = 23,
-            SWIPE_COMBO = 24, BITE = 25, POUNCE = 26, GALLOP_SWAT = 27;
+            SWIPE_COMBO = 24, BITE = 25, POUNCE = 26, GALLOP_SWAT = 27,
+            // the hunt (lion step 2): creeping crouched, frozen flat, the leap from the stalk, the bounding smack, the pin
+            STALK = 28, FREEZE = 29, LEAP_BITE = 30, JUMP_SMACK = 31, PIN = 32;
     /** Each doing's clip, by its number (a cub's roar is its {@code cub_call}). */
     private static final String[] DOING_CLIPS = {"idle", "sit_down", "sit", "sit_up", "rest_down", "rest", "rest_up", "rest_stretch_up",
             "groom", "drink", "roar", "pride_greet", "mama_nuzzle", "cub_groom", "play_pounce", "play_wrestle", "mood_alert", "mood_angry",
-            "mood_flehmen", "mood_curious", "bluff_charge", "swipe", "swipe_quick", "swipe_heavy", "swipe_combo", "bite", "pounce", "gallop_swat"};
+            "mood_flehmen", "mood_curious", "bluff_charge", "swipe", "swipe_quick", "swipe_heavy", "swipe_combo", "bite", "pounce", "gallop_swat",
+            "stalk", "ambush_freeze", "stalk_leap_bite", "jump_smack", "takedown_pin"};
     /** Each one-shot doing's clip length (ticks, from the clip files); 0 for the loops. The roar's is the male's (see {@link #oneShotTicks}). */
     private static final int[] DOING_TICKS = {0, 15, 0, 15, 19, 0, 19, 76, 88, 60, 68, 36, 37, 64, 33, 44, 0, 0, 0, 0, 27, 20, 18, 21, 29,
-            15, 25, 19};
+            15, 25, 19, 0, 0, 29, 24, 26};
     /** The lioness's roar (her sharper contact call) and the cub's call (ticks). */
     static final int LIONESS_ROAR_TICKS = 50, CUB_CALL_TICKS = 32;
     /** The moods, by number: the face clips {@code face_<mood>}. */
@@ -131,12 +134,12 @@ public class LionEntity extends PathfinderMob implements GeoEntity, HasLife {
 
     /** The model's measures for one form. */
     public record Measures(double drawAheadPx, double feetPx, double feetOutPx, double eyesAheadPx, double headFront, double walkClip,
-                           double trotClip, double gallopClip) {
+                           double trotClip, double gallopClip, double stalkClip) {
         static Measures of(Form form) {
             return switch (form) {
-                case MALE -> new Measures(-3.2, 13.4, 5.5, 30.2, 2.15, 1.228 / 20.0, 2.860 / 20.0, 6.105 / 20.0);
-                case LIONESS -> new Measures(-2.85, 11.85, 4.3, 26.9, 1.9, 1.201 / 20.0, 2.828 / 20.0, 5.938 / 20.0);
-                case CUB -> new Measures(-0.85, 5.55, 3.15, 14.1, 1.02, 0.909 / 20.0, 2.022 / 20.0, 3.464 / 20.0);
+                case MALE -> new Measures(-3.2, 13.4, 5.5, 30.2, 2.15, 1.228 / 20.0, 2.860 / 20.0, 6.105 / 20.0, 0.74 / 20.0);
+                case LIONESS -> new Measures(-2.85, 11.85, 4.3, 26.9, 1.9, 1.201 / 20.0, 2.828 / 20.0, 5.938 / 20.0, 0.70 / 20.0);
+                case CUB -> new Measures(-0.85, 5.55, 3.15, 14.1, 1.02, 0.909 / 20.0, 2.022 / 20.0, 3.464 / 20.0, 0.53 / 20.0);
             };
         }
     }
@@ -329,7 +332,8 @@ public class LionEntity extends PathfinderMob implements GeoEntity, HasLife {
             case NUZZLE, PLAY_POUNCE, PLAY_WRESTLE, MOOD_CURIOUS -> form == Form.CUB;
             case CUB_GROOM -> form == Form.LIONESS;
             case SWIPE_HEAVY, SWIPE_COMBO -> form == Form.MALE;
-            case MOOD_FLEHMEN, BLUFF, GALLOP_SWAT -> form != Form.CUB;
+            case MOOD_FLEHMEN, BLUFF, GALLOP_SWAT, LEAP_BITE, JUMP_SMACK, PIN -> form != Form.CUB;
+            case FREEZE -> form == Form.LIONESS;
             default -> true;
         };
     }
@@ -495,9 +499,72 @@ public class LionEntity extends PathfinderMob implements GeoEntity, HasLife {
     public boolean hurt(DamageSource source, float amount) {
         boolean hurt = super.hurt(source, amount);
         if (hurt) {
-            anger.hurt(this, source, by -> by instanceof LionEntity l && den != null && den.equals(l.den), LionGoals.REVENGE_TICKS);
+            // never angry at its own pride, nor ever at a buffalo (no revenge on prey: a lion backs off from a charging
+            // buffalo, LionHunt; a revenge fight there was a pride-against-herd brawl)
+            anger.hurt(this, source, by -> by instanceof BuffaloEntity || by instanceof LionEntity l && den != null && den.equals(l.den),
+                    LionGoals.REVENGE_TICKS);
+            if (source.getEntity() instanceof BuffaloEntity b) {
+                hunt.hitBy(this, b);
+            }
         }
         return hurt;
+    }
+
+    /** Its hunt's state (lion step 2; kept on the lion, so a short interruption resumes it). */
+    final LionHunt.State hunt = new LionHunt.State();
+
+    /** Whether it is creeping crouched (and moving): a buffalo with its head up sees it within 12. */
+    public boolean stalking() {
+        return doing() == STALK && tickCount - movedTick <= WALK_HOLD;
+    }
+
+    /** Whether it lies frozen flat ({@code ambush_freeze}): never seen. */
+    public boolean frozen() {
+        return doing() == FREEZE;
+    }
+
+    /** Whether it runs at a gallop now. */
+    public boolean galloping() {
+        return tickCount - movedTick <= WALK_HOLD && stride / Math.max(0.3, getScale()) > measures.trotClip() * 1.45;
+    }
+
+    /** Whether it is on a hunt now (spread, stalking or in the fight): it stares at no player. */
+    public boolean hunting() {
+        return hunt.hunting();
+    }
+
+    /** Where it is in a hunt now (tests). */
+    public LionHunt.Stage huntStage() {
+        return hunt.stage;
+    }
+
+    /** Whether it knows a feast's carcass (kept through a save; tests). */
+    public boolean feastKnown() {
+        return hunt.feastId != null;
+    }
+
+    /** Whether it has come to a hunting try yet (the leader's window: a try is taken whatever comes of it; tests). */
+    public boolean huntTried() {
+        return hunt.tryKey != Long.MIN_VALUE;
+    }
+
+    /** Whether it has eaten its fill at a kill (tests). */
+    public boolean fedFull() {
+        return hunt.full;
+    }
+
+    /** Whether it clings to prey now. */
+    public boolean holding() {
+        return hunt.holding();
+    }
+
+    /** Ticks it has lived since its last meal (hungry from {@link LionHunt#HUNGRY}). */
+    public int sinceMeal() {
+        return hunt.sinceMeal;
+    }
+
+    public void setSinceMeal(int ticks) {
+        hunt.sinceMeal = ticks;
     }
 
     /** Its head bead's box: a hit lands only where this touches. */
@@ -623,6 +690,7 @@ public class LionEntity extends PathfinderMob implements GeoEntity, HasLife {
         if (den == null) {
             takeDen();
         }
+        hunt.sinceMeal = Math.min(hunt.sinceMeal + 1, LionHunt.HUNGRY * 4);
         if (tickCount % FREE_EVERY == 1 && !level().noBlockCollision(this, getBoundingBox().deflate(0.05))) {
             free();
         }
@@ -687,8 +755,8 @@ public class LionEntity extends PathfinderMob implements GeoEntity, HasLife {
     /** Lions never shove each other (a pride lies touching, in a row; a shove slid them off their beds). */
     @Override
     protected void doPush(Entity other) {
-        if (!(other instanceof LionEntity)) {
-            super.doPush(other);
+        if (!(other instanceof LionEntity) && !(other instanceof BuffaloEntity && holding())) {
+            super.doPush(other);                        // nor does a lion clinging to prey shove it about
         }
     }
 
@@ -737,6 +805,7 @@ public class LionEntity extends PathfinderMob implements GeoEntity, HasLife {
         life.setUp(false, level.getRandom());
         life.apply();
         rollCoat(level.getRandom());
+        hunt.sinceMeal = LionHunt.HUNGRY;           // one from an egg or a summon is hungry (a hunt can be set up at once); the world's prides roll theirs
         return out;
     }
 
@@ -756,6 +825,7 @@ public class LionEntity extends PathfinderMob implements GeoEntity, HasLife {
         tag.putByte("Coat", coat());
         tag.putLong("Drank", drankEvening);
         tag.putLong("Roared", roaredChorus);
+        hunt.save(tag);
         byte d = doing();
         if (d == REST || d == SIT) {
             tag.putByte("Lying", d);                    // a lying pride comes back lying, not standing up in front of you
@@ -778,6 +848,7 @@ public class LionEntity extends PathfinderMob implements GeoEntity, HasLife {
         drankEvening = tag.contains("Drank") ? tag.getLong("Drank") : Long.MIN_VALUE;
         roaredChorus = tag.contains("Roared") ? tag.getLong("Roared") : Long.MIN_VALUE;
         led = tag.getBoolean("Led");
+        hunt.load(tag);
         byte lying = tag.getByte("Lying");
         if (lying == REST || lying == SIT) {
             setDoing(lying);
@@ -791,7 +862,8 @@ public class LionEntity extends PathfinderMob implements GeoEntity, HasLife {
         return form + " den " + den + ", doing " + DOING_CLIPS[Mth.clamp(doing(), 0, DOING_CLIPS.length - 1)] + " for " + doingFor()
                 + ", act " + act + ", temper " + temper + (temperOn == null ? "" : " on " + temperOn.getName().getString())
                 + ", mood " + MOODS[Mth.clamp(mood(), 0, MOODS.length - 1)] + ", route " + (p == null ? "none" : p.getNextNodeIndex() + "/"
-                + p.getNodeCount() + " to " + p.getTarget() + (p.canReach() ? "" : " (can't reach)")) + ", on ground " + onGround();
+                + p.getNodeCount() + " to " + p.getTarget() + (p.canReach() ? "" : " (can't reach)")) + ", on ground " + onGround()
+                + ", hunt " + hunt.stage + (hunt.holding ? " holding" : "") + ", since meal " + hunt.sinceMeal + (hunt.full ? " full" : "");
     }
 
     // --- sounds (vanilla ones, re-pitched) ----------------------------------------------------------------------------------
@@ -913,6 +985,12 @@ public class LionEntity extends PathfinderMob implements GeoEntity, HasLife {
             if (d != CALM) {
                 player.forceAnimationReset();
             }
+        }
+        if (d == STALK) {
+            // creeping: the stalk at its pace; still between steps, held where it is (crouched, not frozen flat)
+            double s = stride / Math.max(0.3, getScale());
+            player.setAnimationSpeed(tickCount - movedTick > WALK_HOLD ? 0.0 : Mth.clamp(s / measures.stalkClip(), 0.4, 2.0));
+            return state.setAndContinue(DOING_ANIMS[d]);
         }
         if (d > CALM && d < DOING_ANIMS.length) {
             if (!oneShot(d)) {

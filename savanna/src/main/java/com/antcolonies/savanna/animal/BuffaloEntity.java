@@ -1,6 +1,7 @@
 package com.antcolonies.savanna.animal;
 
 import java.util.List;
+import java.util.UUID;
 
 import javax.annotation.Nullable;
 
@@ -8,7 +9,9 @@ import com.antcolonies.animal.AnimalLife;
 import com.antcolonies.animal.Attention;
 import com.antcolonies.animal.HasLife;
 import com.antcolonies.animal.HitChain;
+import com.antcolonies.animal.RoomToBreed;
 import com.antcolonies.entity.body.SteadyController;
+import com.antcolonies.savanna.registry.SavannaEntities;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.nbt.CompoundTag;
@@ -31,6 +34,7 @@ import net.minecraft.world.entity.SpawnGroupData;
 import net.minecraft.world.entity.ai.attributes.AttributeSupplier;
 import net.minecraft.world.entity.ai.attributes.Attributes;
 import net.minecraft.world.entity.player.Player;
+import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.ServerLevelAccessor;
 import net.minecraft.world.level.block.state.BlockState;
@@ -189,13 +193,143 @@ public class BuffaloEntity extends PathfinderMob implements GeoEntity, HasLife {
         if (seen instanceof CrocodileEntity) {
             return distance < 14.0 ? 0.4 : 0;
         }
-        if (seen instanceof LionEntity) {
-            return distance < 24.0 ? 0.3 : 0;            // a lion is watched from far (the lions, 2026-11-25)
+        if (seen instanceof LionEntity lion) {
+            // a lion is watched from far (the lions, 2026-11-25); a frozen one never, a creeping one only near (drawn: the
+            // head-down part of a graze is the server's, so the gaze leaves that out)
+            return lion.frozen() ? 0 : lion.stalking() ? (distance < LION_STALK_SEEN ? 0.3 : 0) : distance < LION_GALLOP_SEEN ? 0.3 : 0;
         }
         return moving && distance < 10.0 ? 1.0 : 0;
     }
 
     private final AnimalLife life;
+
+    // --- lions (lion step 2, docs/plans/lion-hunt.md, part C) -----------------------------------------------------------
+    /** A walking or creeping lion is seen this near, a galloping one this near (blocks). */
+    public static final double LION_SEEN = 12.0, LION_STALK_SEEN = 12.0, LION_GALLOP_SEEN = 24.0;
+    /** A graze's head is down from this clip tick to this one (the neck past 20 degrees in Neon's clip). */
+    static final int GRAZE_HEAD_DOWN = 9, GRAZE_HEAD_UP = 69;
+    /** The lions holding it now (their ids and the game time each last held it): its pace drops by half for each. */
+    private final java.util.Map<Integer, Long> holders = new java.util.HashMap<>();
+
+    /** Whether its head is up: not lying, not in the head-down part of a graze or a drink. */
+    public boolean headUp() {
+        byte d = doing();
+        if (d == REST || d == REST_DOWN || d == REST_UP || d == DRINK) {
+            return false;
+        }
+        return d != GRAZE || clipTick() < GRAZE_HEAD_DOWN || clipTick() > GRAZE_HEAD_UP;
+    }
+
+    /**
+     * Whether its head is down and stays down a while yet (lying, or in the head-down part of a graze or a drink with at
+     * least {@link #HEAD_UP_WARNING} ticks to go): a creeping lion moves only then, freezing a moment before a head comes
+     * up (real lions time their steps to the grazing; it also keeps the lion from being caught moving by the order the
+     * game ticks them in).
+     */
+    public boolean headDownAWhile() {
+        byte d = doing();
+        if (d == REST || d == REST_DOWN || d == REST_UP) {
+            return true;
+        }
+        int t = clipTick();
+        if (d == GRAZE) {
+            return t >= GRAZE_HEAD_DOWN && t <= GRAZE_HEAD_UP - HEAD_UP_WARNING;
+        }
+        return d == DRINK && t >= 5 && t <= DRINK_HEAD_UP - HEAD_UP_WARNING;
+    }
+
+    static final int HEAD_UP_WARNING = 9, DRINK_HEAD_UP = 60;
+
+    /**
+     * Whether it sees this lion (the one rule for its gaze, its watch and its flight): a frozen lion never; lying, it sees
+     * none; a galloping lion within {@link #LION_GALLOP_SEEN}; a creeping one within {@link #LION_STALK_SEEN} with its
+     * head up; a walking one within {@link #LION_SEEN}.
+     */
+    public boolean seesLion(LionEntity lion) {
+        if (!lion.isAlive() || lion.frozen()) {
+            return false;
+        }
+        byte d = doing();
+        if (d == REST || d == REST_DOWN || d == REST_UP) {
+            return false;
+        }
+        double dist = distanceTo(lion);
+        if (lion.galloping()) {
+            return dist <= LION_GALLOP_SEEN;
+        }
+        if (lion.stalking()) {
+            return dist <= LION_STALK_SEEN && headUp();
+        }
+        return lion.walking() && dist <= LION_SEEN;
+    }
+
+    /** A lion clinging to it never shoves it, nor it the lion (they would slide apart). */
+    @Override
+    protected void doPush(Entity other) {
+        if (!(other instanceof LionEntity lion && lion.holding())) {
+            super.doPush(other);
+        }
+    }
+
+    /** A lion clings to it this tick (each holder calls it every tick it holds). */
+    public void heldBy(Entity lion) {
+        holders.put(lion.getId(), level().getGameTime());
+    }
+
+    /** How many lions hold it now. */
+    public int holders() {
+        if (holders.isEmpty()) {
+            return 0;
+        }
+        long now = level().getGameTime();
+        holders.values().removeIf(t -> now - t > 1);
+        return holders.size();
+    }
+
+    /** Held by lions, its pace drops by half for each (two stop it); counted fresh each tick, so it frees itself. */
+    @Override
+    public void setSpeed(float speed) {
+        super.setSpeed(speed * (float) Math.max(0.0, 1.0 - 0.5 * holders()));
+    }
+
+    /** Its health follows its size (a bull's 60 at size 1): a calf is not as tough as a bull. Kept as a share when it grows. */
+    public void fitHealth() {
+        var max = getAttribute(Attributes.MAX_HEALTH);
+        if (max == null) {
+            return;
+        }
+        double want = Math.max(4.0, Math.round(FULL_HEALTH * getScale()));
+        if (Math.abs(max.getBaseValue() - want) < 0.5) {
+            return;
+        }
+        float share = getHealth() / getMaxHealth();
+        max.setBaseValue(want);
+        setHealth((float) (want * share));
+    }
+
+    static final double FULL_HEALTH = 60.0;
+
+    @Override
+    public void grew() {
+        fitHealth();
+    }
+
+    // --- calves (lion step 2, docs/plans/lion-hunt.md, part A) ---------------------------------------------------------
+    /** How often a cow looks to breed (ticks), how near her herd's bull must be (blocks), and how long she carries (ticks: 2 game days). */
+    static final int BREED_LOOK = 200;
+    static final double BULL_NEAR = 16.0;
+    public static final int GESTATION = 48000;
+    /** A calf is born this far to its mother's left (blocks, at her size). */
+    public static final double CALF_SIDE = 1.8;
+    /** Ticks until her calf is born (-1: not carrying). */
+    private int carrying = -1;
+    /** A calf's mother (her id), and the mother found in the world (looked for anew at most once a second). */
+    @Nullable
+    private UUID motherId;
+    @Nullable
+    private BuffaloEntity mother;
+    private int motherAt = -100;
+
     private final AnimatableInstanceCache cache = GeckoLibUtil.createInstanceCache(this);
 
     /**
@@ -249,7 +383,7 @@ public class BuffaloEntity extends PathfinderMob implements GeoEntity, HasLife {
      * Starts a doing and its clip. The doing it is on already goes on as it is (a loop is never restarted by being asked
      * again), unless it is a one-shot that has played out, which plays again from its start.
      */
-    void setDoing(byte doing) {
+    public void setDoing(byte doing) {
         byte now = doing();
         if (doing == now && !(oneShot(now) && doingFor() >= DOING_TICKS[now] + BLEND)) {
             return;
@@ -336,12 +470,26 @@ public class BuffaloEntity extends PathfinderMob implements GeoEntity, HasLife {
      * set off one after another in this order, and each takes its own spot round the herd's place by it.
      */
     int rank() {
-        return HomeGroup.rank(this, mates(), HomeGroup::byId);
+        return HomeGroup.rank(this, grownMates(), HomeGroup::byId);
     }
 
-    /** Whether it is its herd's nearest member to something, each working it out from its own mate list (ties by id). */
+    /**
+     * Whether it is its herd's nearest grown member to something, each working it out from its own mate list (ties by id;
+     * a calf nearer never answers for the herd: it never warns or charges).
+     */
     boolean nearestOfHerdTo(Entity e) {
-        return HomeGroup.nearestTo(this, mates(), e);
+        return HomeGroup.nearestTo(this, grownMates(), e);
+    }
+
+    /** Its grown mates (calves have no rank and never answer for the herd). */
+    private List<BuffaloEntity> grownMates() {
+        List<BuffaloEntity> all = mates();
+        for (BuffaloEntity m : all) {
+            if (!m.grownUp()) {
+                return all.stream().filter(BuffaloEntity::grownUp).toList();
+            }
+        }
+        return all;
     }
 
     // --- its temper ------------------------------------------------------------------------------------------------------
@@ -470,6 +618,7 @@ public class BuffaloEntity extends PathfinderMob implements GeoEntity, HasLife {
         if (home == null) {
             takeHome();
         }
+        breed();
         // stuck inside blocks (a tree grown through it, a mound, a player's building): out to the nearest open spot, once
         // every few seconds at most (Minecraft's own push-out only frees small overlaps)
         if (tickCount % FREE_EVERY == 1 && !level().noBlockCollision(this, getBoundingBox().deflate(0.05))) {
@@ -480,6 +629,121 @@ public class BuffaloEntity extends PathfinderMob implements GeoEntity, HasLife {
         if (oneShot(d) && doingFor() >= doingTicks(d)) {
             setDoing(d == REST_DOWN ? REST : CALM);
         }
+    }
+
+    /** Whether it is grown (a calf and a teen are not: they keep at their mothers' sides and never fight). */
+    public boolean grownUp() {
+        return life.stage().grown();
+    }
+
+    /** Whether she carries a calf now. */
+    public boolean carrying() {
+        return carrying >= 0;
+    }
+
+    /** Ticks until her calf is born (-1: none); tests set it. */
+    public int carryingLeft() {
+        return carrying;
+    }
+
+    public void setCarrying(int ticks) {
+        carrying = ticks;
+    }
+
+    /**
+     * A cow's breeding (no courting walk: a herd grazes together): every {@link #BREED_LOOK} ticks a grown cow ready to
+     * breed (her life kit's wait, room for her kind round her) with a grown bull of her herd within {@link #BULL_NEAR}
+     * has bred, and carries her calf {@link #GESTATION}; then it is born at her side.
+     */
+    private void breed() {
+        if (!(level() instanceof ServerLevel level) || life.isMale() || !grownUp()) {
+            return;
+        }
+        if (carrying > 0) {
+            carrying--;
+            return;
+        }
+        if (carrying == 0) {
+            carrying = -1;
+            giveBirth(level);
+            return;
+        }
+        if ((tickCount + getId()) % BREED_LOOK != 0 || !life.readyToBreed() || !roomToBreed(level)) {
+            return;
+        }
+        for (BuffaloEntity m : mates()) {
+            if (m.life.isMale() && m.grownUp() && distanceTo(m) <= BULL_NEAR) {
+                life.bred();
+                carrying = GESTATION;
+                return;
+            }
+        }
+    }
+
+    /** Room for a calf: the buffalo within {@link RoomToBreed#REACH}, and the calves carried there, under the local limit. */
+    private boolean roomToBreed(ServerLevel level) {
+        List<BuffaloEntity> near = level.getEntitiesOfClass(BuffaloEntity.class, getBoundingBox().inflate(RoomToBreed.REACH), BuffaloEntity::isAlive);
+        int count = near.size();
+        for (BuffaloEntity b : near) {
+            if (b.carrying()) {
+                count++;
+            }
+        }
+        return count < life.numbers().localLimit();
+    }
+
+    /** Her calf is born at her left side, young (its age 0), of her herd, knowing her. */
+    @Nullable
+    public BuffaloEntity giveBirth(ServerLevel level) {
+        BuffaloEntity calf = SavannaEntities.BUFFALO.get().create(level);
+        if (calf == null) {
+            return null;
+        }
+        float yaw = getYRot() * Mth.DEG_TO_RAD;
+        double side = CALF_SIDE * getScale();
+        double x = getX() + Mth.cos(yaw) * side, z = getZ() + Mth.sin(yaw) * side;
+        calf.moveTo(x, getY(), z, getYRot(), 0.0F);
+        calf.setYBodyRot(getYRot());
+        calf.setYHeadRot(getYRot());
+        calf.life.setUp(true, level.getRandom());
+        calf.life.setAge(0);
+        calf.life.apply();
+        calf.fitHealth();
+        calf.setHealth(calf.getMaxHealth());
+        if (home != null) {
+            calf.setHome(home, homeAcross);
+        }
+        calf.motherId = getUUID();
+        calf.mother = this;
+        calf.motherAt = calf.tickCount;
+        level.addFreshEntity(calf);
+        return calf;
+    }
+
+    /** A calf's mother if she is alive and near (null for a grown one, or a calf whose mother died or is gone). */
+    @Nullable
+    public BuffaloEntity mother() {
+        if (motherId == null || grownUp()) {
+            mother = null;
+            return null;
+        }
+        if (tickCount - motherAt >= MATES_EVERY || tickCount < motherAt) {
+            motherAt = tickCount;
+            mother = level() instanceof ServerLevel level && level.getEntity(motherId) instanceof BuffaloEntity b ? b : null;
+        }
+        return mother != null && mother.isAlive() && distanceTo(mother) <= MATES_REACH ? mother : null;
+    }
+
+    /** Whether this buffalo is that calf's mother. */
+    public boolean motherOf(BuffaloEntity calf) {
+        return getUUID().equals(calf.motherId) && !calf.grownUp();
+    }
+
+    /** Makes it this calf's mother (laying a herd, tests). */
+    public void adopt(BuffaloEntity calf) {
+        calf.motherId = getUUID();
+        calf.mother = this;
+        calf.motherAt = calf.tickCount;
     }
 
     /** How often it checks it is not stuck inside blocks (ticks), and how far it looks for room (blocks). */
@@ -525,9 +789,27 @@ public class BuffaloEntity extends PathfinderMob implements GeoEntity, HasLife {
     protected void tickDeath() {
         deathTime++;
         if (deathTime >= DEATH_TICKS && !level().isClientSide() && !isRemoved()) {
-            level().broadcastEntityEvent(this, (byte) 60);
+            if (level() instanceof ServerLevel level && getFluidHeight(net.minecraft.tags.FluidTags.WATER) < getBbHeight() * 0.5) {
+                // its body stays: a carcass for the lions (and later the scavengers), in its death pose (lion step 2)
+                RemainsEntity carcass = RemainsEntity.leave(level, RemainsEntity.Kind.BUFFALO, position(), yBodyRot, getScale());
+                if (carcass != null) {
+                    carcass.setKilledBy(killedByDen);
+                }
+            } else {
+                level().broadcastEntityEvent(this, (byte) 60);
+            }
             remove(Entity.RemovalReason.KILLED);
         }
+    }
+
+    /** The den of the pride whose lion killed it (its carcass is theirs), or null: set at its death from its killer. */
+    @Nullable
+    private BlockPos killedByDen;
+
+    @Override
+    public void die(net.minecraft.world.damagesource.DamageSource source) {
+        killedByDen = source.getEntity() instanceof LionEntity lion ? lion.den() : null;
+        super.die(source);
     }
 
     /** Kept for good, as Minecraft's villagers: the herd a player left is there when they come back. */
@@ -570,6 +852,8 @@ public class BuffaloEntity extends PathfinderMob implements GeoEntity, HasLife {
         }
         life.setUp(false, level.getRandom());
         life.apply();
+        fitHealth();
+        setHealth(getMaxHealth());
         return out;
     }
 
@@ -584,6 +868,12 @@ public class BuffaloEntity extends PathfinderMob implements GeoEntity, HasLife {
         if (led) {
             tag.putBoolean("Led", true);
         }
+        if (carrying >= 0) {
+            tag.putInt("Carrying", carrying);
+        }
+        if (motherId != null) {
+            tag.putUUID("Mother", motherId);
+        }
     }
 
     @Override
@@ -593,6 +883,8 @@ public class BuffaloEntity extends PathfinderMob implements GeoEntity, HasLife {
         home = NbtUtils.readBlockPos(tag, "Home").orElse(null);
         homeAcross = tag.getInt("HomeAcross");
         led = tag.getBoolean("Led");             // the film camera's walkers and game tests ("Led:1b")
+        carrying = tag.contains("Carrying") ? tag.getInt("Carrying") : -1;
+        motherId = tag.hasUUID("Mother") ? tag.getUUID("Mother") : null;
         life.apply();
     }
 
@@ -602,7 +894,9 @@ public class BuffaloEntity extends PathfinderMob implements GeoEntity, HasLife {
         return "home " + home + " (across " + homeAcross + "), doing " + DOING_CLIPS[Mth.clamp(doing(), 0, DOING_CLIPS.length - 1)]
                 + " for " + doingFor() + ", temper " + temper + (temperOn == null ? "" : " on " + temperOn.getName().getString())
                 + ", stand " + standAt + ", route " + (p == null ? "none" : p.getNextNodeIndex() + "/" + p.getNodeCount() + " to "
-                + p.getTarget() + (p.canReach() ? "" : " (can't reach)")) + ", on ground " + onGround() + ", in water " + isInWater();
+                + p.getTarget() + (p.canReach() ? "" : " (can't reach)")) + ", on ground " + onGround() + ", in water " + isInWater()
+                + ", " + life.stage() + (carrying >= 0 ? " carrying " + carrying : "") + ", health " + getHealth() + "/" + getMaxHealth()
+                + (holders() > 0 ? ", held by " + holders() : "");
     }
 
     // --- sounds (vanilla ones, re-pitched: the cow's grunts deep, the ravager's hooves) ------------------------------------

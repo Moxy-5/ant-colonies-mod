@@ -1,5 +1,5 @@
 {
-  "_note": "The Cape buffalo's life (the animal life kit; 2026-11-25, docs/plans/buffalo.md, my picks, fun first). Sizes are shares of a bull's (the 3.8-block v12 model): bulls the big ones, cows smaller, the same look. Born grown for now; calves (live birth) and breeding come later.",
+  "_note": "The Cape buffalo's life (the animal life kit; 2026-11-25, docs/plans/buffalo.md, my picks, fun first). Sizes are shares of a bull's (the 3.8-block v12 model): bulls the big ones, cows smaller, the same look. Calves from lion step 2 (docs/plans/lion-hunt.md, part A): live birth in BuffaloEntity (a cow with her herd's bull carries 2 days, one calf), a calf 0.4 of a bull growing to grown in 6 days; breeding only while fewer than 7 buffalo live within 48 blocks, so lions cannot empty a herd and herds cannot boom. Calves until Neon's calf model are the grown look made small.",
   "sexes": "two",
   "male_size": [
     0.97,
@@ -10,5 +10,11 @@
     0.93
   ],
   "max_size": 1.03,
-  "breeds": false
+  "young_size": 0.4,
+  "young_days": 3,
+  "teen_size": 0.7,
+  "teen_days": 3,
+  "breeds": true,
+  "breed_every_days": 4,
+  "local_limit": 7
 }

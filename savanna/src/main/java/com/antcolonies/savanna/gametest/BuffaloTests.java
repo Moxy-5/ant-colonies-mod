@@ -169,9 +169,19 @@ public class BuffaloTests {
         int[] bounds = {origin.getX(), origin.getZ(), origin.getX() + 64, origin.getZ() + 64};
         BuffaloHerds.Herd herd = BuffaloHerds.lay(level, RandomSource.create(7), laid, bounds, OxbowFeature.Keepout.NONE);
         List<BuffaloEntity> found = TestIsolation.insectsOf(helper, BuffaloEntity.class);
-        helper.assertTrue(herd.buffalo() >= 3 && herd.buffalo() <= 5 && found.size() == herd.buffalo(),
-                "a herd of " + herd.buffalo() + " laid (" + found.size() + " found, " + herd.spots() + " spots), not 3 to 5");
-        helper.assertTrue(found.stream().filter(b -> b.life().isMale()).count() == 1, "a herd is one bull and his cows");
+        List<BuffaloEntity> grown = found.stream().filter(BuffaloEntity::grownUp).toList();
+        helper.assertTrue(herd.buffalo() >= 3 && herd.buffalo() <= 5 && grown.size() == herd.buffalo(),
+                "a herd of " + herd.buffalo() + " laid (" + grown.size() + " grown found, " + herd.spots() + " spots), not 3 to 5");
+        helper.assertTrue(grown.stream().filter(b -> b.life().isMale()).count() == 1, "a herd is one bull and his cows");
+        // lion step 2: a herd of 4 or 5 may have one calf, laid young beside its mother, on a laying spot like the rest
+        helper.assertTrue(found.size() - grown.size() <= (herd.buffalo() >= BuffaloHerds.CALF_HERD ? 1 : 0), "too many calves laid: "
+                + (found.size() - grown.size()) + " with a herd of " + herd.buffalo());
+        for (BuffaloEntity calf : found) {
+            if (!calf.grownUp()) {
+                helper.assertTrue(calf.mother() != null && calf.distanceTo(calf.mother()) <= 2.5 + BuffaloEntity.CALF_SIDE,
+                        "a laid calf is not by its mother: " + calf.about());
+            }
+        }
         for (BuffaloEntity b : found) {
             b.led = true;                                   // they stand where they were laid
             helper.assertTrue(middle.equals(b.home()) && b.homeAcross() == across, "a herd member's home " + b.home() + " (across "

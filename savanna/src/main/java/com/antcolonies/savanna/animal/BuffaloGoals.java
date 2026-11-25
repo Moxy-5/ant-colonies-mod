@@ -11,6 +11,7 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.util.Mth;
 import net.minecraft.util.RandomSource;
+import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.ai.attributes.Attributes;
 import net.minecraft.world.entity.ai.goal.FloatGoal;
@@ -44,6 +45,7 @@ public final class BuffaloGoals {
         goals.addGoal(0, new SwimOutGoal(buffalo, BuffaloEntity.TRAVEL));
         goals.addGoal(1, new TemperGoal(buffalo));
         goals.addGoal(2, new DayGoal(buffalo));
+        goals.addGoal(2, new CalfGoal(buffalo));
     }
 
     // --- its day's clock ---------------------------------------------------------------------------------------------------
@@ -195,7 +197,7 @@ public final class BuffaloGoals {
 
         @Override
         public boolean canUse() {
-            return !b.led && b.home() != null && b.isAlive();
+            return !b.led && b.home() != null && b.isAlive() && b.grownUp();
         }
 
         @Override
@@ -469,7 +471,7 @@ public final class BuffaloGoals {
          */
         private boolean roomy(double x, double z) {
             for (BuffaloEntity m : b.mates()) {
-                if (m.isAlive() && flat(m.position(), x, z) < SPACE) {
+                if (m.isAlive() && m.grownUp() && flat(m.position(), x, z) < SPACE) {   // a calf at her side never stops her grazing
                     return false;
                 }
             }
@@ -681,8 +683,154 @@ public final class BuffaloGoals {
     // --- its temper --------------------------------------------------------------------------------------------------------
 
     /** Its temper's stages (as the raid's: one rule and one deadline each). */
+    // --- a calf ---------------------------------------------------------------------------------------------------------------
+
+    /** A calf keeps this far to its mother's side (blocks, at her size), and is there within this much (blocks). */
+    static final double CALF_BESIDE = 1.8, CALF_THERE = 0.7;
+    /** Farther than this from its spot it takes a route, not a straight line (blocks). */
+    static final double CALF_ROUTE = 10.0;
+    /** One in this many quiet seconds at her side while she grazes, it grazes too. */
+    static final int CALF_GRAZE_ONE_IN = 4;
+
+    /**
+     * A calf's (or a teen's) day and fear in one (lion step 2, {@code docs/plans/lion-hunt.md}, part A): it keeps at its
+     * mother's left side (her herd's nearest cow if she is dead or gone), at her pace, and lies down when she lies, gets up
+     * when she gets up, grazes now and then when she grazes. Danger to the herd (her temper on someone, a mate's charge or
+     * bunching, or her running from a lion) sends it to her far side from the danger, her body between them. It never
+     * warns or fights; grown, the herd's day takes it.
+     */
+    static final class CalfGoal extends Goal {
+        private final BuffaloEntity b;
+        private int repath;
+
+        CalfGoal(BuffaloEntity b) {
+            this.b = b;
+            setFlags(EnumSet.of(Flag.MOVE, Flag.LOOK));
+        }
+
+        @Override
+        public boolean canUse() {
+            return !b.led && b.isAlive() && !b.grownUp();
+        }
+
+        @Override
+        public boolean canContinueToUse() {
+            return canUse();
+        }
+
+        @Override
+        public boolean requiresUpdateEveryTick() {
+            return true;
+        }
+
+        @Override
+        public void stop() {
+            b.getNavigation().stop();
+        }
+
+        /** Its mother, else the nearest grown cow of its herd; null if none. */
+        @Nullable
+        private BuffaloEntity guardian() {
+            BuffaloEntity mom = b.mother();
+            if (mom != null) {
+                return mom;
+            }
+            for (BuffaloEntity m : b.mates()) {                 // nearest first
+                if (m.grownUp() && !m.life().isMale()) {
+                    return m;
+                }
+            }
+            return null;
+        }
+
+        /** What its guardian guards against now, or null. */
+        @Nullable
+        private static Entity danger(BuffaloEntity mom) {
+            if (mom.temperOn() != null && mom.temper() != Temper.NONE && mom.temper() != Temper.CALM) {
+                return mom.temperOn();
+            }
+            LivingEntity foe = mom.angryAt();
+            if (foe != null) {
+                return foe;
+            }
+            for (BuffaloEntity m : mom.mates()) {
+                if (m.temperOn() != null && (m.temper() == Temper.CHARGE || m.temper() == Temper.BUNCH)) {
+                    return m.temperOn();
+                }
+            }
+            return null;
+        }
+
+        @Override
+        public void tick() {
+            byte d = b.doing();
+            if (b.holders() > 0) {
+                b.getNavigation().stop();                       // held by a lion: knocked down, it stays down
+                if (d != BuffaloEntity.REST && d != BuffaloEntity.REST_DOWN) {
+                    b.setDoing(BuffaloEntity.REST_DOWN);
+                }
+                return;
+            }
+            BuffaloEntity mom = guardian();
+            if (mom == null) {
+                return;                                         // alone: it stands (a calf alone is a later step)
+            }
+            Entity danger = danger(mom);
+            float yaw = mom.getYRot() * Mth.DEG_TO_RAD;
+            Vec3 side = new Vec3(Mth.cos(yaw), 0, Mth.sin(yaw));     // her left
+            if (danger != null) {
+                Vec3 away = mom.position().subtract(danger.position());
+                if (side.x * away.x + side.z * away.z < 0) {
+                    side = side.scale(-1);                          // her far side from the danger
+                }
+            }
+            double off = CALF_BESIDE * mom.getScale();
+            Vec3 spot = mom.position().add(side.scale(off));
+            double dist = flat(b.position(), spot.x, spot.z);
+            boolean momDown = mom.doing() == BuffaloEntity.REST || mom.doing() == BuffaloEntity.REST_DOWN;
+            if (dist > CALF_THERE && !(momDown && dist < CALF_THERE * 2 && b.doing() == BuffaloEntity.REST)) {
+                if (d == BuffaloEntity.REST || d == BuffaloEntity.REST_DOWN) {
+                    b.setDoing(BuffaloEntity.REST_UP);
+                    return;
+                }
+                if (d != BuffaloEntity.CALM && d != BuffaloEntity.GRAZE) {
+                    return;                                     // a clip plays out first
+                }
+                if (d == BuffaloEntity.GRAZE) {
+                    b.setDoing(BuffaloEntity.CALM);
+                }
+                double pace = mom.stride() > BuffaloEntity.CHARGE_FROM ? BuffaloEntity.CHARGE
+                        : dist > 3.0 || mom.stride() > BuffaloEntity.TROT_FROM ? BuffaloEntity.TROT : BuffaloEntity.TRAVEL;
+                if (dist > CALF_ROUTE) {
+                    if (--repath <= 0) {
+                        repath = 20;
+                        b.getNavigation().moveTo(spot.x, spot.y, spot.z, pace);
+                    }
+                } else {
+                    b.getNavigation().stop();
+                    b.getMoveControl().setWantedPosition(spot.x, mom.getY(), spot.z, pace);
+                }
+                return;
+            }
+            b.getNavigation().stop();
+            if (d == BuffaloEntity.CALM) {
+                if (!b.faceYaw(mom.getYRot(), 6.0F)) {
+                    return;
+                }
+                if (momDown && danger == null) {
+                    b.setDoing(BuffaloEntity.REST_DOWN);
+                } else if (mom.doing() == BuffaloEntity.GRAZE && danger == null && b.tickCount % 20 == 0
+                        && b.getRandom().nextInt(CALF_GRAZE_ONE_IN) == 0) {
+                    b.setDoing(BuffaloEntity.GRAZE);
+                }
+            } else if (d == BuffaloEntity.REST && (!momDown || danger != null)) {
+                b.setDoing(BuffaloEntity.REST_UP);
+            }
+        }
+    }
+
     public enum Temper {
-        NONE, WATCH, WARN, CHARGE, CALM, BUNCH
+        NONE, WATCH, WARN, CHARGE, CALM, BUNCH, FLEE
     }
 
     /** A player (not in creative, not a spectator) is noticed this near, crouching this near (blocks); watched up to this long (ticks). */
@@ -690,6 +838,9 @@ public final class BuffaloGoals {
     static final int WATCH_TICKS = 200;
     /** A lion walking past this near is watched (blocks). */
     static final double LION_WATCH = 12.0;
+    /** A held buffalo pulls away from the nearest lion this near (blocks); a buffalo flees a hunter at most this long (ticks). */
+    static final double LION_HELD_REACH = 8.0;
+    static final int FLEE_TICKS = 100;
     /** A player it watched is watched again only after coming this much nearer (blocks), or sprinting. */
     static final double NEARER = 3.0;
     /** The herd's nearest member warns a player this near (blocks); a warning is remembered this long for that player (ticks), and may take this long. */
@@ -763,6 +914,9 @@ public final class BuffaloGoals {
         /** Bunching: its spot round where its mate was hurt. */
         @Nullable
         private Vec3 bunchAt;
+        /** Held, the way it pulls (fixed when first held). */
+        @Nullable
+        private Vec3 heldAway;
         /** What the moment called for when it was last free (taken up by {@link #start}). */
         @Nullable
         private Call pending;
@@ -830,6 +984,15 @@ public final class BuffaloGoals {
          */
         @Nullable
         private Call call() {
+            if (!b.grownUp()) {
+                return null;                                // a calf never warns or fights: it keeps by its mother (CalfGoal)
+            }
+            if (b.holders() > 0) {
+                LionEntity holder = nearestLion(LION_HELD_REACH, lion -> true);
+                if (holder != null) {
+                    return new Call(Temper.FLEE, holder, true, null);   // held: it pulls away, never charges its holders (no spinning)
+                }
+            }
             LivingEntity foe = b.angryAt();
             if (foe != null && b.distanceTo(foe) > followRange()) {
                 b.calmDown();                               // past its follow range: it gives up
@@ -843,13 +1006,17 @@ public final class BuffaloGoals {
                 if (mateFoe == null || m.hurtAt() == null) {
                     continue;
                 }
-                if (b.life().isMale()) {
+                if (b.life().isMale() || b.motherOf(m)) {
                     if (b.distanceTo(mateFoe) <= followRange()) {
-                        return new Call(Temper.CHARGE, mateFoe, true, null);
+                        return new Call(Temper.CHARGE, mateFoe, true, null);    // the bull, and a hurt calf's mother
                     }
                 } else {
                     return new Call(Temper.BUNCH, mateFoe, true, m.hurtAt().add(offset(b.rank(), BUNCH_RADIUS)));
                 }
+            }
+            LionEntity hunter = nearestLion(BuffaloEntity.LION_GALLOP_SEEN, lion -> (lion.stalking() || lion.galloping()) && b.seesLion(lion));
+            if (hunter != null) {
+                return new Call(Temper.FLEE, hunter, false, null);     // a hunting lion seen: the herd runs (lion step 2)
             }
             Player p = b.level().getNearestPlayer(b.getX(), b.getY(), b.getZ(), WATCH_REACH, e -> e instanceof Player q && notices(q));
             if (p == null) {
@@ -882,13 +1049,23 @@ public final class BuffaloGoals {
             if (doing == BuffaloEntity.REST || doing == BuffaloEntity.REST_DOWN || doing == BuffaloEntity.REST_UP) {
                 return null;
             }
-            for (LionEntity lion : b.level().getEntitiesOfClass(LionEntity.class, b.getBoundingBox().inflate(LION_WATCH),
-                    lion -> lion.isAlive() && lion.walking())) {
-                if (b.distanceTo(lion) <= LION_WATCH) {
-                    return new Call(Temper.WATCH, lion, false, null);
+            LionEntity lion = nearestLion(LION_WATCH, l -> l.walking() && b.seesLion(l));
+            return lion != null ? new Call(Temper.WATCH, lion, false, null) : null;
+        }
+
+        /** The nearest living lion within reach that passes the test, or null. */
+        @Nullable
+        private LionEntity nearestLion(double reach, java.util.function.Predicate<LionEntity> test) {
+            LionEntity best = null;
+            double bestD = reach;
+            for (LionEntity lion : b.level().getEntitiesOfClass(LionEntity.class, b.getBoundingBox().inflate(reach, 4.0, reach), LionEntity::isAlive)) {
+                double d = b.distanceTo(lion);
+                if (d <= bestD && test.test(lion)) {
+                    best = lion;
+                    bestD = d;
                 }
             }
-            return null;
+            return best;
         }
 
         /** Whether it notices a player: alive, not in creative, not a spectator, within reach ({@link Attention#playerInReach}). */
@@ -903,6 +1080,7 @@ public final class BuffaloGoals {
         /** How strongly a stage holds: a stronger call cuts in (a hurt over all; a calm is cut only by a hurt). */
         private static int weight(Temper s, boolean revenge) {
             return switch (s) {
+                case FLEE -> revenge ? 6 : 2;              // held, pulling away, over all; seeing a hunter, under a hurt mate's call
                 case CHARGE -> revenge ? 5 : 3;
                 case BUNCH -> 4;
                 case CALM -> 3;
@@ -955,9 +1133,56 @@ public final class BuffaloGoals {
                 case CHARGE -> charge();
                 case CALM -> calm();
                 case BUNCH -> bunch();
+                case FLEE -> flee();
                 default -> {
                 }
             }
+        }
+
+        /**
+         * FLEE (lion step 2): straight away from the hunting lion at its charge pace, for at most {@link #FLEE_TICKS}, or
+         * while it sees one hunting; held, it pulls away for as long as it is held (slowed by its holders,
+         * {@link BuffaloEntity#setSpeed}). Calves run at their mothers' sides.
+         */
+        private void flee() {
+            boolean held = b.holders() > 0;
+            if (!held) {
+                heldAway = null;
+            }
+            if (!held && (target == null || !target.isAlive() || ticks > FLEE_TICKS)) {
+                end();
+                return;
+            }
+            if (!held && ticks % 10 == 0) {
+                LionEntity hunter = nearestLion(BuffaloEntity.LION_GALLOP_SEEN, lion -> (lion.stalking() || lion.galloping()) && b.seesLion(lion));
+                if (hunter == null) {
+                    end();
+                    return;
+                }
+                target = hunter;
+                b.temperOn = hunter;
+            }
+            if (target == null) {
+                return;
+            }
+            byte d = b.doing();
+            if (d == BuffaloEntity.MOOD_ALERT || d == BuffaloEntity.MOOD_ANGRY || d == BuffaloEntity.GRAZE) {
+                b.setDoing(BuffaloEntity.CALM);
+            }
+            Vec3 away = b.position().subtract(target.position());
+            double len = Math.sqrt(away.x * away.x + away.z * away.z);
+            if (held && heldAway != null) {
+                away = heldAway;                            // held: on the way it first pulled (away from a lion on its flank
+                len = 1.0;                                  // it would turn after it and circle for good)
+            } else if (len < 1.0E-3) {
+                return;
+            } else {
+                away = new Vec3(away.x / len, 0, away.z / len);
+                len = 1.0;
+                heldAway = held ? away : null;
+            }
+            b.getNavigation().stop();
+            b.getMoveControl().setWantedPosition(b.getX() + away.x * 6.0, b.getY(), b.getZ() + away.z * 6.0, BuffaloEntity.CHARGE);
         }
 
         /** WATCH: it stands and faces the player (or a passing lion); ends when they are no longer noticed or at {@link #WATCH_TICKS}. */

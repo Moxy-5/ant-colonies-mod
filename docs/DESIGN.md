@@ -461,6 +461,18 @@ Plan and every pick: `docs/plans/buffalo.md`. In short: herds of 3 to 5 laid wit
 ### The African lion, prides by the pans (the user, 2026-11-25; built, step 1)
 Plan and every pick: `docs/plans/lion.md` (checked by four critics); Neon's models, coats and clips: `docs/handoff/lion.md`. In short: one pan in three also gets a pride (one male, one pride in four two brothers; 2 to 4 lionesses, the first the elder; 2 to 4 cubs in two prides of three), laid with the pan and kept for good (vanilla MISC); its den is the shade of a living tree 46 to 64 blocks from the pan, else an open spot 52 away. Its day as real lions: lying in one row at the den 7:00 to 16:00 (cubs play), waking 16:00 to 17:30 (stretch, groom, greet with head rubs), down to the pan to drink, a night patrol of 3 or 4 stops back to the den; the roar chorus at 18:30, midnight and 5:30. Its temper: a stare at 24, a growl at 10, a bluff charge at 6 stopping short, a strike for stepping in or for running from it (a gallop of about 7.5 blocks a second, one strike or 3 seconds); only two fight, the rest ring round, cubs hide. Buffalo stop and face a lion walking past. Fun first. Step 2: the hunt (buffalo calves); step 3: cubs growing.
 
+### The lions' hunt and buffalo calves (the user, 2026-11-25; built, lion step 2)
+Plan and every pick: `docs/plans/lion-hunt.md` (two critics before, four agents after). In short: buffalo cows with
+their herd's bull carry two days and give birth to one calf (while fewer than 7 buffalo are within 48 blocks); the calf
+keeps at its mother's left side, to her far side in danger, and grows in 6 days; a herd of 4 or 5 is laid with a calf one
+time in two. A hungry pride (its leader 2 days since her last meal) tries twice a day, at dusk once all have drunk and at
+dawn from 5:30: its lionesses spread round the nearest herd within 96 of the den, stalk crouched, freeze while a grown
+buffalo near has its head up, leap from 2.5 blocks or rush when seen (a sprint of at most 6 s), grip and bite; a calf or
+teen first, a grown buffalo only from a herd of 5 grown or more. Buffalo run from a stalking or galloping lion they see,
+a held one pulls away (slowed), a hurt calf's mother and the bull charge; lions never take revenge on buffalo, they back
+off. A dead buffalo leaves a carcass (38 meat bites times its size); the pride feeds by its order (the male first, a cub
+last), full lions lie by the kill until 16:00 the next day. Fun first (animals are not strict realism).
+
 ### Mud pits and wallows (the user, 2026-11-17, from videos of pangolins and many other animals playing in mud; ideas for savanna life, M9, nothing planned in detail or built)
 - **Where they come from (the user's call):** mud pits spawn naturally in new land near water (river banks, the floodplain, pans and oxbows), and some are made after rain (a dip fills and turns to mud, then dries away). Animals do not dig or deepen them (the user removed that idea).
 - **Real things worth copying (from memory, not source-checked; animals are fun first):**

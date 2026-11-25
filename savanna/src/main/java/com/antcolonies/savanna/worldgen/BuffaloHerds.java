@@ -71,7 +71,10 @@ public final class BuffaloHerds {
     private BuffaloHerds() {
     }
 
-    /** What was laid: how many buffalo, how many spots there were, and where they stand (a pride laid after keeps clear of them). */
+    /**
+     * What was laid: how many grown buffalo (a calf laid with them is not counted), how many spots there were, and where they
+     * all stand, the calf too (a pride laid after keeps clear of them).
+     */
     public record Herd(int buffalo, int spots, List<BlockPos> at) {
     }
 
@@ -139,6 +142,7 @@ public final class BuffaloHerds {
         }
         float heading = random.nextFloat() * 360.0F;
         int laid = 0;
+        BuffaloEntity firstCow = null;
         for (int i = 0; i < herd.size(); i++) {
             BuffaloEntity b = SavannaEntities.BUFFALO.get().create(level.getLevel());
             if (b == null) {
@@ -152,12 +156,51 @@ public final class BuffaloHerds {
             b.finalizeSpawn(level, level.getCurrentDifficultyAt(p), MobSpawnType.CHUNK_GENERATION, null);
             b.life().setUp(false, i == 0 ? Sex.MALE : Sex.FEMALE, random);
             b.life().apply();
+            b.fitHealth();
+            b.setHealth(b.getMaxHealth());
             b.setHome(pan.middle(), pan.across());
             level.addFreshEntity(b);
             laid++;
+            if (i == 1) {
+                firstCow = b;
+            }
+        }
+        // a herd of 4 or 5: one in two has a calf at its first cow's left side (lion step 2: new land shows calves at once)
+        if (firstCow != null && herd.size() >= CALF_HERD && random.nextBoolean()) {
+            float yaw = firstCow.getYRot() * net.minecraft.util.Mth.DEG_TO_RAD;
+            double side = BuffaloEntity.CALF_SIDE * firstCow.getScale();
+            double wx = firstCow.getX() + net.minecraft.util.Mth.cos(yaw) * side, wz = firstCow.getZ() + net.minecraft.util.Mth.sin(yaw) * side;
+            BlockPos at = null;                                 // the free laying spot nearest her left side (the same checks as the herd's)
+            double best = CALF_SPOT_REACH * CALF_SPOT_REACH;
+            for (Spot s : spots) {
+                double dx = s.at().getX() + 0.5 - wx, dz = s.at().getZ() + 0.5 - wz, d = dx * dx + dz * dz;
+                if (d <= best && !herd.contains(s.at())) {
+                    best = d;
+                    at = s.at();
+                }
+            }
+            BuffaloEntity calf = at == null ? null : SavannaEntities.BUFFALO.get().create(level.getLevel());
+            if (calf != null) {
+                herd.add(at);                                   // kept clear of lions laid after
+                calf.moveTo(at.getX() + 0.5, at.getY(), at.getZ() + 0.5, firstCow.getYRot(), 0.0F);
+                calf.setYBodyRot(firstCow.getYRot());
+                calf.setYHeadRot(firstCow.getYRot());
+                calf.finalizeSpawn(level, level.getCurrentDifficultyAt(firstCow.blockPosition()), MobSpawnType.CHUNK_GENERATION, null);
+                calf.life().setUp(true, null, random);
+                calf.life().apply();
+                calf.fitHealth();
+                calf.setHealth(calf.getMaxHealth());
+                calf.setHome(pan.middle(), pan.across());
+                firstCow.adopt(calf);
+                level.addFreshEntity(calf);
+            }
         }
         return new Herd(laid, spots.size() + 1, List.copyOf(herd));
     }
+
+    /** Herds of this many or more are laid with a calf one time in two, on a laying spot this near its mother's left side. */
+    public static final int CALF_HERD = 4;
+    static final double CALF_SPOT_REACH = 2.5;
 
     /** A spot a buffalo may be laid on, and how far it is from the pan's water (blocks). */
     private record Spot(BlockPos at, double water) {

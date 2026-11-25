@@ -114,10 +114,10 @@ Every living thing in the mod, built or planned, plants and fungi included, in o
   - Black rhinoceros (browser of bushes): user's list 2026-11-16.
   - Plains zebra (grazer, crocodile prey at crossings): user's list 2026-11-16.
   - Warthog (the king of mud wallowing: kneels and slides on its face; rubs on termite mounds after): IDEA (mud pits, 2026-11-17).
-  - Cape buffalo: BUILT 2026-11-25 (step 1, `docs/plans/buffalo.md`: herds laid with pans, graze, drink, lie down, the temper; Neon's model v12, the user: "perfect"). Step 2 (block moves, wallowing, calves, river herds) PLANNED.
+  - Cape buffalo: BUILT 2026-11-25 (step 1, `docs/plans/buffalo.md`: herds laid with pans, graze, drink, lie down, the temper; Neon's model v12, the user: "perfect"). Calves BUILT 2026-11-25 with lion step 2 (`docs/plans/lion-hunt.md`: born to a cow with her bull, one at a time up to 7 buffalo near, at her side, grown in 6 days; the grown look made small until Neon's calf model). Step 2 (block moves, wallowing, river herds) PLANNED.
   - Antelope, wildebeest; floodplain grazers lechwe, puku, waterbuck, sitatunga, bushbuck; monkeys; dung spreading acacia seed.
 - *5f. Big hunters and scavengers:*
-  - African lion (prides): BUILT 2026-11-25 (step 1, `docs/plans/lion.md`: the pride laid with one pan in three, its den in a tree's shade, its day and roar chorus, the temper; Neon's models, coats and clips, `docs/handoff/lion.md`). Step 2 (the hunt after buffalo calves) and step 3 (cubs growing) PLANNED.
+  - African lion (prides): BUILT 2026-11-25 (step 1, `docs/plans/lion.md`: the pride laid with one pan in three, its den in a tree's shade, its day and roar chorus, the temper; Neon's models, coats and clips, `docs/handoff/lion.md`). Step 2, the hunt, BUILT 2026-11-25 (`docs/plans/lion-hunt.md`: dusk and dawn tries, spread, stalk and freeze, the rush and the grip, the carcass and the feast). Step 3 (cubs growing) PLANNED.
   - Cheetah (sprints), spotted hyena (clans, scavenge and hunt), African wild dog (packs): user's list 2026-11-16.
   - Honey badger (digs, raids bee hives, fights snakes): user's list 2026-11-16.
   - Leopard (gallery forest).

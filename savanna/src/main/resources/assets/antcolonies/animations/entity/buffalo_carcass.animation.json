@@ -1,0 +1,253 @@
+{
+ "format_version": "1.8.0",
+ "animations": {
+  "carcass": {
+   "loop": true,
+   "animation_length": 0.05,
+   "bones": {
+    "root": {
+     "rotation": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "position": [
+      0.0,
+      0.0,
+      0.0
+     ]
+    },
+    "hips": {
+     "rotation": [
+      0.45,
+      0.0,
+      -78.0
+     ],
+     "position": [
+      0.0,
+      -7.0,
+      0.0
+     ]
+    },
+    "chest": {
+     "rotation": [
+      0.8,
+      -4.0,
+      4.0
+     ]
+    },
+    "neck": {
+     "rotation": [
+      5.0,
+      -6.0,
+      20.0
+     ],
+     "position": [
+      0.0,
+      0.0,
+      0.0
+     ]
+    },
+    "head": {
+     "rotation": [
+      0.0,
+      -5.0,
+      18.0
+     ]
+    },
+    "lid_left": {
+     "position": [
+      0.0,
+      -1.1,
+      0.0
+     ]
+    },
+    "lid_right": {
+     "position": [
+      0.0,
+      -1.1,
+      0.0
+     ]
+    },
+    "ulid_left": {
+     "position": [
+      0.0,
+      0.48,
+      0.0
+     ]
+    },
+    "ulid_right": {
+     "position": [
+      0.0,
+      0.48,
+      0.0
+     ]
+    },
+    "brow_left": {
+     "rotation": [
+      0.0,
+      0.0,
+      -0.0
+     ],
+     "position": [
+      0.0,
+      -0.0,
+      0.0
+     ]
+    },
+    "brow_right": {
+     "rotation": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "position": [
+      0.0,
+      -0.0,
+      0.0
+     ]
+    },
+    "jaw": {
+     "rotation": [
+      12.0,
+      0.0,
+      0.0
+     ]
+    },
+    "tongue": {
+     "rotation": [
+      4.0,
+      0.0,
+      0.0
+     ]
+    },
+    "tongue_tip": {
+     "rotation": [
+      0.0,
+      0.0,
+      0.0
+     ]
+    },
+    "ear_left": {
+     "rotation": [
+      -8.0,
+      -14.0,
+      16.0
+     ]
+    },
+    "ear_right": {
+     "rotation": [
+      -6.0,
+      10.0,
+      -12.0
+     ]
+    },
+    "leg_fl_1": {
+     "rotation": [
+      12.968,
+      0.0,
+      6.888
+     ]
+    },
+    "leg_fl_2": {
+     "rotation": [
+      74.962,
+      0.0,
+      0.0
+     ]
+    },
+    "leg_fl_foot": {
+     "rotation": [
+      -75.389,
+      9.107,
+      -0.31
+     ]
+    },
+    "leg_fr_1": {
+     "rotation": [
+      -7.032,
+      0.0,
+      -24.888
+     ]
+    },
+    "leg_fr_2": {
+     "rotation": [
+      98.962,
+      0.0,
+      0.0
+     ]
+    },
+    "leg_fr_foot": {
+     "rotation": [
+      -85.389,
+      -9.107,
+      0.31
+     ]
+    },
+    "leg_bl_1": {
+     "rotation": [
+      44.507,
+      0.0,
+      0.71
+     ]
+    },
+    "leg_bl_2": {
+     "rotation": [
+      -123.973,
+      0.0,
+      0.0
+     ]
+    },
+    "leg_bl_foot": {
+     "rotation": [
+      91.938,
+      -17.093,
+      2.645
+     ]
+    },
+    "leg_br_1": {
+     "rotation": [
+      26.507,
+      0.0,
+      -16.71
+     ]
+    },
+    "leg_br_2": {
+     "rotation": [
+      -107.973,
+      0.0,
+      0.0
+     ]
+    },
+    "leg_br_foot": {
+     "rotation": [
+      87.938,
+      17.093,
+      -2.645
+     ]
+    },
+    "tail_1": {
+     "rotation": [
+      23.0,
+      0.0,
+      16.0
+     ]
+    },
+    "tail_2": {
+     "rotation": [
+      3.449,
+      0.0,
+      9.2
+     ]
+    },
+    "tail_3": {
+     "rotation": [
+      2.747,
+      0.0,
+      10.4
+     ]
+    }
+   }
+  }
+ }
+}

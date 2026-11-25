@@ -264,6 +264,7 @@ public class CrabPickGoal extends Goal {
             case CATFISH_TORN -> 0.12;
             case TILAPIA -> 0.25;
             case TILAPIA_HALF -> 0.04;
+            case BUFFALO -> 1.5;                    // a buffalo's carcass (lion step 2): crabs pick at it too
         } * r.size();
         double yaw = Math.toRadians(r.getYRot());
         double ax = -Math.sin(yaw), az = Math.cos(yaw);

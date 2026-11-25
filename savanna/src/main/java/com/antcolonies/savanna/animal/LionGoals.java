@@ -42,7 +42,8 @@ public final class LionGoals {
         goals.addGoal(0, new FloatGoal(lion));
         goals.addGoal(0, new SwimOutGoal(lion, LionEntity.WALK));
         goals.addGoal(1, new TemperGoal(lion));
-        goals.addGoal(2, new DayGoal(lion));
+        goals.addGoal(2, new LionHunt.HuntGoal(lion));
+        goals.addGoal(3, new DayGoal(lion));
     }
 
     // --- its day's clock ---------------------------------------------------------------------------------------------------
@@ -1317,7 +1318,7 @@ public final class LionGoals {
                         return new Call(Temper.HIDE, p, false, null);
                     }
                 }
-                return !resting && watchAgain(p, d) ? new Call(Temper.WATCH, p, false, null) : null;
+                return !resting && watchAgain(p, d) && !l.hunting() ? new Call(Temper.WATCH, p, false, null) : null;
             }
             List<LionEntity> adults = new ArrayList<>();
             for (LionEntity m : l.mates()) {
@@ -1340,7 +1341,7 @@ public final class LionGoals {
                     return new Call(Temper.WARN, p, false, null);
                 }
             }
-            return !resting && watchAgain(p, d) ? new Call(Temper.WATCH, p, false, null) : null;
+            return !resting && watchAgain(p, d) && !l.hunting() ? new Call(Temper.WATCH, p, false, null) : null;
         }
 
         /** Watched again only when never watched, or come {@link #NEARER} blocks nearer than when its last watch ended. */

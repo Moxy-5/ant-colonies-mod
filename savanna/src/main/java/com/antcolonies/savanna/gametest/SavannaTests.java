@@ -76,6 +76,7 @@ public final class SavannaTests {
         // Savanna land animals (M9; docs/plans/buffalo.md): the Cape buffalo's herds, day, temper and paces.
         TestFilter.addCategory("land", BuffaloTests.class);
         TestFilter.addCategory("land", LionTests.class);
+        TestFilter.addCategory("land", LionHuntTests.class);
         TestFilter.addCategory("worldgen", SavannaWorldTests.class, SavannaLoadingTests.class);
         TestFilter.addCategory("stress", TermiteStressTests.class, SpawnerCostTests.class);
 

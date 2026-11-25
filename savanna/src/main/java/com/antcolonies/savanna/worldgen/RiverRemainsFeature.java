@@ -26,6 +26,9 @@ import net.minecraft.world.level.levelgen.feature.configurations.NoneFeatureConf
  * own pace. Runs after the algae, in the same step, only on its own chunk's columns.
  */
 public class RiverRemainsFeature extends Feature<NoneFeatureConfiguration> {
+    private static final RemainsEntity.Kind[] FISH = {RemainsEntity.Kind.CATFISH, RemainsEntity.Kind.CATFISH_TORN,
+            RemainsEntity.Kind.TILAPIA, RemainsEntity.Kind.TILAPIA_HALF};
+
     /** The share of river chunks with remains, and of those with a second (my picks). */
     static final float CHANCE = 0.2F, SECOND = 0.25F;
     /** Remains lie only in water this deep or less (blocks; deeper beds are out of sight anyway). */
@@ -86,7 +89,7 @@ public class RiverRemainsFeature extends Feature<NoneFeatureConfiguration> {
             if (remains == null) {
                 continue;
             }
-            RemainsEntity.Kind kind = RemainsEntity.Kind.values()[random.nextInt(RemainsEntity.Kind.values().length)];
+            RemainsEntity.Kind kind = FISH[random.nextInt(FISH.length)];     // fish only (a buffalo's carcass is the lions')
             boolean catfish = kind == RemainsEntity.Kind.CATFISH || kind == RemainsEntity.Kind.CATFISH_TORN;
             float size = catfish ? 0.85F + 0.3F * random.nextFloat() : 0.7F + 0.3F * random.nextFloat();
             // a tilapia's colours as the living ones come: about 1 in 4 young, 1 in 4 of the grown a breeding male (my picks)

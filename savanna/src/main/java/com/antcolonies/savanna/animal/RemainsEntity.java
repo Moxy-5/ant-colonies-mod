@@ -3,6 +3,13 @@ package com.antcolonies.savanna.animal;
 import com.antcolonies.savanna.registry.SavannaEntities;
 import com.antcolonies.savanna.registry.SavannaItems;
 
+import javax.annotation.Nullable;
+
+import net.minecraft.core.BlockPos;
+import software.bernie.geckolib.animation.AnimationController;
+import software.bernie.geckolib.animation.PlayState;
+import software.bernie.geckolib.animation.RawAnimation;
+
 import net.minecraft.core.particles.ItemParticleOption;
 import net.minecraft.core.particles.ParticleTypes;
 import net.minecraft.nbt.CompoundTag;
@@ -44,7 +51,9 @@ import software.bernie.geckolib.util.GeckoLibUtil;
 public class RemainsEntity extends Entity implements GeoEntity {
     /** The kinds (the front half of a tilapia a catfish bit off, 2026-11-15), their game names (models {@code remains_<name>_<stage>}, {@code tools/remains_models.py game}) and bites (my picks). */
     public enum Kind {
-        CATFISH("catfish", 12), CATFISH_TORN("catfish_torn", 9), TILAPIA("tilapia", 6), TILAPIA_HALF("tilapia_half", 3);
+        CATFISH("catfish", 12), CATFISH_TORN("catfish_torn", 9), TILAPIA("tilapia", 6), TILAPIA_HALF("tilapia_half", 3),
+        /** A Cape buffalo's carcass (lion step 2, 2026-11-25): 38 bites at size 1, times its size; drawn in its death pose. */
+        BUFFALO("buffalo", 38);
 
         public final String name;
         public final int bites;
@@ -96,8 +105,8 @@ public class RemainsEntity extends Entity implements GeoEntity {
             return null;
         }
         remains.entityData.set(DATA_KIND, kind.ordinal());
-        remains.entityData.set(DATA_BITES, kind.bites);
         remains.entityData.set(DATA_SIZE, size);
+        remains.entityData.set(DATA_BITES, remains.fullBites());
         remains.entityData.set(DATA_LOOK, look);
         remains.moveTo(at.x, at.y, at.z, yaw, 0.0F);
         remains.setYHeadRot(yaw);
@@ -137,8 +146,28 @@ public class RemainsEntity extends Entity implements GeoEntity {
 
     /** The look's stage: 1 fresh, 2 fed on, 3 picked over, 4 bones. */
     public int stage() {
-        return stageOf(kind(), bitesLeft());
+        int full = fullBites(), left = bitesLeft();
+        return left <= 0 ? 4 : 1 + Math.min(2, (full - left) * 3 / full);
     }
+
+    /** Its bites when fresh: its kind's, a carcass's times its size (a cow about 34, a calf about 15). */
+    public int fullBites() {
+        Kind k = kind();
+        return k == Kind.BUFFALO ? Math.max(1, Math.round(k.bites * size())) : k.bites;
+    }
+
+    /** The den of the pride whose lion killed it (a carcass theirs to feed on), or null. */
+    @Nullable
+    public BlockPos killedBy() {
+        return killedBy;
+    }
+
+    public void setKilledBy(@Nullable BlockPos den) {
+        killedBy = den;
+    }
+
+    @Nullable
+    private BlockPos killedBy;
 
     /** The look's stage for remains of this kind with this many bites left. */
     public static int stageOf(Kind kind, int left) {
@@ -169,7 +198,7 @@ public class RemainsEntity extends Entity implements GeoEntity {
 
     /** Sets how many bites are left (for tests and the command). */
     public void setBitesLeft(int left) {
-        entityData.set(DATA_BITES, Math.max(0, Math.min(kind().bites, left)));
+        entityData.set(DATA_BITES, Math.max(0, Math.min(fullBites(), left)));
     }
 
     /** An eater takes a bite: true if there was meat to take. A puff of meat bits flies off, more when the look changes. */
@@ -187,7 +216,8 @@ public class RemainsEntity extends Entity implements GeoEntity {
     private void puff(int count) {
         BloodMist.puff(this, count >= 14 ? 0.8F : 0.45F);     // in the water, a red cloud with the bits (2026-11-23)
         if (level() instanceof ServerLevel server) {
-            ItemStack bits = new ItemStack(kind() == Kind.TILAPIA || kind() == Kind.TILAPIA_HALF ? SavannaItems.TILAPIA.get() : SavannaItems.CATFISH.get());
+            ItemStack bits = new ItemStack(kind() == Kind.BUFFALO ? Items.BEEF
+                    : kind() == Kind.TILAPIA || kind() == Kind.TILAPIA_HALF ? SavannaItems.TILAPIA.get() : SavannaItems.CATFISH.get());
             server.sendParticles(new ItemParticleOption(ParticleTypes.ITEM, bits), getX(), getY() + 0.15, getZ(),
                     count, 0.25 * size(), 0.08, 0.25 * size(), 0.04);
         }
@@ -209,7 +239,7 @@ public class RemainsEntity extends Entity implements GeoEntity {
             return;
         }
         if (bitesLeft() > 0) {
-            if (++rot >= ROTS_TICKS / kind().bites) {
+            if (++rot >= ROTS_TICKS / fullBites()) {
                 rot = 0;
                 entityData.set(DATA_BITES, bitesLeft() - 1);
             }
@@ -258,8 +288,9 @@ public class RemainsEntity extends Entity implements GeoEntity {
     @Override
     protected void readAdditionalSaveData(CompoundTag tag) {
         entityData.set(DATA_KIND, Kind.byName(tag.getString("kind")).ordinal());
-        setBitesLeft(tag.contains("bites") ? tag.getInt("bites") : kind().bites);     // a summon with no bites: fresh
         entityData.set(DATA_SIZE, tag.contains("size") ? tag.getFloat("size") : 1.0F);
+        setBitesLeft(tag.contains("bites") ? tag.getInt("bites") : fullBites());     // a summon with no bites: fresh
+        killedBy = net.minecraft.nbt.NbtUtils.readBlockPos(tag, "killed_by").orElse(null);
         entityData.set(DATA_LOOK, tag.contains("look") ? net.minecraft.util.Mth.clamp(tag.getInt("look"), TilapiaEntity.YOUNG, TilapiaEntity.BREEDING) : TilapiaEntity.EVERYDAY);
         entityData.set(DATA_OTHER_SIDE, tag.getBoolean("other_side"));
         rot = tag.getInt("rot");
@@ -275,24 +306,32 @@ public class RemainsEntity extends Entity implements GeoEntity {
         tag.putBoolean("other_side", onOtherSide());
         tag.putInt("rot", rot);
         tag.putInt("bones", bones);
+        if (killedBy != null) {
+            tag.put("killed_by", net.minecraft.nbt.NbtUtils.writeBlockPos(killedBy));
+        }
     }
 
     /** Drawn about 2 blocks long on a small box: culled by the drawn fish, not the box. */
     @Override
     public AABB getBoundingBoxForCulling() {
-        return getBoundingBox().inflate(1.6 * size(), 0.3, 1.6 * size());
+        double reach = kind() == Kind.BUFFALO ? 2.4 : 1.6;       // a carcass is drawn 3.8 blocks long
+        return getBoundingBox().inflate(reach * size(), kind() == Kind.BUFFALO ? 1.0 : 0.3, reach * size());
     }
 
     @Override
     public boolean shouldRenderAtSqrDistance(double distanceSqr) {
-        double reach = 64.0 * getViewScale();
+        double reach = (kind() == Kind.BUFFALO ? 96.0 : 64.0) * getViewScale();   // a carcass as far as it is sent (6 chunks)
         return distanceSqr < reach * reach;
     }
 
     @Override
     public void registerControllers(AnimatableManager.ControllerRegistrar controllers) {
-        // still: nothing moves on remains
+        // still: nothing moves on remains; a carcass holds its one-frame death pose
+        controllers.add(new AnimationController<>(this, "pose", 0,
+                state -> kind() == Kind.BUFFALO ? state.setAndContinue(CARCASS) : PlayState.STOP));
     }
+
+    private static final RawAnimation CARCASS = RawAnimation.begin().thenLoop("carcass");
 
     @Override
     public AnimatableInstanceCache getAnimatableInstanceCache() {

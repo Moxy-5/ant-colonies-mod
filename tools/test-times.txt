@@ -35,8 +35,10 @@ acolonyawayeatsmillsbreadandraisesitsyoungasnumbers 0.55
 acolonyawayfoldsitsfrozeninsectsintothenumbersandputsthingsbackonreturn 0.46
 acolonyofnewlandbornfarfromplayersknowsitsqueenandgarden 0.33
 acourtedanimalwhosesuitordiesorvanishesisfreeagain 0.00
+acowamongsevenbuffalonevercarries 0.15
 acowletsacrocodilebe 0.32
 acowshotfrom20blockschargesthebulljoinsandthecowsbunch 0.03
+acowwithherbullcarriesandhercalfkeepsatherside 0.16
 acrabcracksasnailandleavesitsshell 1.18
 acrabpicksatdyinghippograss 0.31
 acrabwhosefirstbitetakesthelastofthefoodisfed 0.36
@@ -51,6 +53,7 @@ acrocodiletakesadistichodus 0.27
 acuriousotterskittersinburstsacalmonestrolls 0.72
 adaytimeraidonafullcolonyismeasured 0.27
 adeadbaobabslumpsintoaheapandisgone 0.00
+adeadbuffaloleavesacarcasseatenbitebybite 0.03
 adeadmoundofnewlandgetsamatabelecolony 0.60
 adeadmoundwearsdowntoagrassyhump 0.17
 adeadtermitenobodycarriesawaycrumblestodust 8.21
@@ -70,6 +73,7 @@ afallingtreecrusheswhatisunderit 0.38
 afarmatabelecolonyraidsoutofsightintheraidhours 0.68
 afarmeadowpastthetrailstipisfoundrecruitedtoandpullsthetrailout 1.99
 afartermitecolonylivesasnumbersandcomesoutwhenaplayerisnear 0.33
+afedprideandasmallherdofgrownmeannohunt 0.15
 afeedingplaceinlandnotloadedisneverread 0.03
 aflycloudhangsoverthewater 1.41
 afoundingantqueenraisesherfirstworkerswhileaway 9.18
@@ -77,6 +81,7 @@ afoundingtermitepairraisetheirfirstworkerswhileaway 8.84
 afreshdeadmoundofnewlandstillstands 0.03
 afterabedtheprideroarsthedawnchorusonce 0.08
 afullcolonyofnewlandisawholelivingcolony 0.07
+agallopinglionsendstheherdrunningandahurtcalfbringsitsmother 0.00
 agrowntreediesofoldageandfalls 0.01
 aguardingfathergoesforamonitornearhiseggs 0.00
 aguardingfatherlungesatatilapiaathiseggs 0.01
@@ -86,6 +91,7 @@ ahatchlingcrocodilesnapsalandedfly 0.28
 ahatchlingcrocodilesnapsupabarb 0.29
 ahatchlingswimsatthesurfaceandclimbsout 0.01
 ahealthygardensendsupmushroomswhentherainends 0.64
+aheldcowpullsawayneveratherholderandherbullcomes 0.01
 aherdislaidwithitspanandkeptforgood 0.03
 aherdstaresatastandingplayerthengrazesagain 0.08
 ahippoclimbsasteponitsmove 0.63
@@ -113,6 +119,7 @@ ahungryworkereatsoneseedfromthefoodstore 9.13
 alarvathatisnotfedfortwodaysstarves 0.02
 algaegrowsbydepthspreadsandisgrazed 0.00
 alimperfollowsthetrailhomeandraiderscalledtodefendrejointheraid 0.11
+alionesshurtbyabuffalobacksoffneveratit 0.02
 alionessshotfightsthemalejoinstherestringandthecubhides 0.01
 aliongallopsataboutsevenandahalfblocksasecond 0.03
 alionindeepwaterswimsout 0.04
@@ -223,6 +230,7 @@ asmallcrocodilegiveswaytoalongershark 0.00
 asmallpanis2deepwithitstrampledring 0.00
 asnailandatadpolegrazedyinghippograss 1.37
 asnailgrazesalgaeandhidesfromacrab 0.18
+astalkinglionessfreezeswhileaheadisupandcreepswhileitisdown 0.01
 astandingdeadtreeissensedandgetsagallerytoitsfoot 5.01
 astarvingantcolonyawaylosesitsyounganditsqueen 0.58
 astarvingtermitepairawaydiewhentheirlandloads 2.03
@@ -234,6 +242,7 @@ asummonedlionjoinsaprideanditscoatsurvivesasave 0.01
 aswollenqueencannolongerwalk 0.34
 atadpolebesidefourfrogsdoesnotbecomeafifth 0.09
 atadpolegrowslegsthenbecomesafrogletonlywithroom 0.09
+atduskahungrypridetakesacalfandfeeds 0.02
 atduskthepridewakesgreetsdrinksandroars 0.08
 ateencrocodiletakesabullfroginthewater 0.08
 atermitecolonyawayagesitscombfeedsitsqueenandeatsasnumbers 0.67

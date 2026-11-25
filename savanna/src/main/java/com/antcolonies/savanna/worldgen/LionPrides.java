@@ -169,6 +169,7 @@ public final class LionPrides {
             who.add(SavannaEntities.LION_CUB.get());
         }
         int laid = 0;
+        int sinceMeal = random.nextInt(com.antcolonies.savanna.animal.LionHunt.HUNGRY);
         for (int i = 0; i < who.size(); i++) {
             LionEntity l = who.get(i).create(level.getLevel());
             if (l == null) {
@@ -181,6 +182,7 @@ public final class LionPrides {
             l.setYHeadRot(yaw);
             l.finalizeSpawn(level, level.getCurrentDifficultyAt(p), MobSpawnType.CHUNK_GENERATION, null);
             l.rollCoat(random);                         // the pride's own dice, not the world's
+            l.setSinceMeal(sinceMeal);                  // the whole pride ate together, 0 to 2 days ago
             l.life().setUp(false, l.form() == LionEntity.Form.MALE ? Sex.MALE : l.form() == LionEntity.Form.LIONESS ? Sex.FEMALE : null, random);
             l.life().apply();
             l.setDen(den, denYaw, middle, pan.across());
