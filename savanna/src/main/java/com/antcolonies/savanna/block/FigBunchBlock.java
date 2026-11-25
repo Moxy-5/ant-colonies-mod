@@ -44,10 +44,13 @@ public class FigBunchBlock extends HangingPodsBlock implements BonemealableBlock
         builder.add(HangingFruit.STAGE, HangingFruit.PHASE);
     }
 
-    /** A bunch hung by hand fruits on its own place's timetable (a tree's own bunches are given their tree's). */
+    /**
+     * A bunch hung by hand fruits on its own place's timetable (a tree's own bunches are given their tree's) and starts
+     * bare: shears give the bunch back at any stage, so a ripe start was endless fruit (review R7-28).
+     */
     @Override
     public BlockState getStateForPlacement(BlockPlaceContext context) {
-        return defaultBlockState().setValue(HangingFruit.PHASE, HangingFruit.phaseOf(context.getClickedPos().asLong()));
+        return defaultBlockState().setValue(HangingFruit.STAGE, HangingFruit.BARE).setValue(HangingFruit.PHASE, HangingFruit.phaseOf(context.getClickedPos().asLong()));
     }
 
     @Override

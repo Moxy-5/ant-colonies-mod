@@ -29,6 +29,7 @@ public class FigLeavesBlock extends TreeLeavesBlock {
 
     @Override
     protected void createBlockStateDefinition(StateDefinition.Builder<Block, BlockState> builder) {
+        super.createBlockStateDefinition(builder);      // the shared leaves' own state (scorched; a fig's leaves never are)
         builder.add(TONE);
     }
 }

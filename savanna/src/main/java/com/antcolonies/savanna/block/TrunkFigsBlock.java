@@ -83,14 +83,14 @@ public class TrunkFigsBlock extends HorizontalDirectionalBlock implements Boneme
         return direction == state.getValue(FACING).getOpposite() && !canSurvive(state, level, pos) ? Blocks.AIR.defaultBlockState() : state;
     }
 
-    /** A player sets them on the side of a fig trunk they click. */
+    /** A player sets them on the side of a fig trunk they click; they start bare (review R7-28: shears and a ripe start were endless figs). */
     @Override
     public BlockState getStateForPlacement(BlockPlaceContext context) {
         Direction face = context.getClickedFace();
         if (face.getAxis().isVertical()) {
             return null;
         }
-        BlockState state = defaultBlockState().setValue(FACING, face)
+        BlockState state = defaultBlockState().setValue(FACING, face).setValue(HangingFruit.STAGE, HangingFruit.BARE)
                 .setValue(HangingFruit.PHASE, HangingFruit.phaseOf(context.getClickedPos().asLong()));
         return canSurvive(state, context.getLevel(), context.getClickedPos()) ? state : null;
     }

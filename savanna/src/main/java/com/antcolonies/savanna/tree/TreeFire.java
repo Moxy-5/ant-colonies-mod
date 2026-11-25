@@ -40,7 +40,11 @@ public final class TreeFire {
                 continue;
             }
             if (to != null) {
-                level.setBlock(p, to.withPropertiesOf(there), Block.UPDATE_CLIENTS);
+                BlockState changed = to.withPropertiesOf(there);
+                if (changed.hasProperty(com.antcolonies.savanna.block.TreeLeavesBlock.SCORCHED)) {
+                    changed = changed.setValue(com.antcolonies.savanna.block.TreeLeavesBlock.SCORCHED, true);   // it will not burn away, and greens again (review R7-10)
+                }
+                level.setBlock(p, changed, Block.UPDATE_CLIENTS);
             }
             hit.add(p.immutable());
         }

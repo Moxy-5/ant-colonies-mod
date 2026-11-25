@@ -107,6 +107,8 @@ shake): 3 to 5 ms per tree per day by itself.
 (stop asking once it reaches 3). Cheaper still: count only the columns' top blocks (the ground's surface) instead of a
 13-high box.
 
+**Status: fixed** (2026-11-24, BUGS 339). The branches under the crown are counted once per catch-up, at the first day that drops one, and the number is kept as branches fall (`Forest.update`, `BranchShedding.drop`). The once-a-day count in normal play (the B part) is as it was. Test `missedDaysCountBranchesOnceNewLandTreesAreKeptAndMoundsStopAFall`. The time saved was not measured.
+
 ### R7-2 (B, likely, to measure). The once-a-second walk looks at every tree in the world, and always starts from the same end
 
 **What is wrong.** Three things in one loop:
@@ -291,6 +293,8 @@ set on top of a living crown, 60 seconds, count the green leaves.
 burn (a "scorched" leaf that fire cannot eat, or dead leaves' burn odds 0 while the tree lives), and a living tree
 puts its green leaves back over the next days. Dead trees' brown leaves may keep burning.
 
+**Status: fixed** (2026-11-24, BUGS 340; the user: "Scorch, then regreen"). A leaf scorched by fire is marked (`TreeLeavesBlock.SCORCHED`): it cannot burn away and greens again by itself on a random tick, 1 in 36 (about two game days with a player near; my pick), never beside a fire. A dead tree's own withered leaves burn as before. Checks added to `fireCharsBarkKillsYoungTreesAndSomeGrownOnes`. Not shown: a whole crown in a real fire in play.
+
 ### R7-11 (A, proven). A falling tree breaks through a termite mound
 
 **What is wrong.** A falling tree smashes every block in its way that is softer than stone (hardness under 1.5) and
@@ -319,6 +323,8 @@ on the ground. What the colony then does with the hole is round 5's question (te
 **Proposed fix (the user's call).** Real Macrotermes mound walls are as hard as brick; a real tree comes to rest on
 the mound. My recommendation: mound and nest blocks stop the log like stone (one block tag, "a falling tree does not
 break this"), and the log lies over them the way it already lies over a hill.
+
+**Status: fixed** (2026-11-24, BUGS 341; the user: "Log rests on it"). A new block tag `antcolonies:stops_falling_trees` (the mound's blocks, comb, piles, remains): `TreeFall.smashes` leaves them, and the log rests over them as over a hill (they were already ground to `TreePlacer.rest`). Test `missedDaysCountBranchesOnceNewLandTreesAreKeptAndMoundsStopAFall` (the rule itself; no tree was dropped on a mound in a test).
 
 ### R7-12 (B, likely, to measure). Lightning takes big trees faster than old age
 
@@ -423,6 +429,8 @@ them back into the book.
 sturdy fix: when a chunk loads, look at its giant tree pieces (their records are in the chunk) and write any tree the
 book does not know and whose foot still stands; that also heals worlds already hit.
 
+**Status: half fixed** (2026-11-24, BUGS 342). The waiting list is taken into the book as a world closes (and the book written once more) and emptied when the server stops; each second every waiting tree of the world is taken, not only those at the head of the list. Open: a crash still loses the trees made since the last autosave, and worlds already hit are not healed (the sturdy fix, reading a loaded chunk's tree pieces, is not built). Test `missedDaysCountBranchesOnceNewLandTreesAreKeptAndMoundsStopAFall`.
+
 ### R7-16 (A, proven). A rot-killed log on a slope leaves wood hanging
 
 **What is wrong.** A fallen log is laid on the land it falls on: each slice is moved up or down to sit on its own
@@ -446,6 +454,8 @@ every block of a column; `crumbleColumn` never looks above the raw top + 1.
 **Proposed fix.** `crumble` rests the shape on the land the same way before it takes the columns (the land under a
 lying log does not change the answer much; or scan each column from the top of the box down).
 
+**Status: fixed** (2026-11-24, BUGS 343). `Forest.crumble` takes each column's top from the log as laid on its land (`TreePlacer.rest`), worked out only on the second a column is due. Test `aRottenLogLyingUpASlopeCrumblesAwayWhole`.
+
 ### R7-17 (A, proven). A dead sapling leaves a stick sunk in the ground
 
 **What is wrong.** A young tree's trunk line starts one block under the ground (y = -1). While the trunk is thinner
@@ -463,6 +473,8 @@ the fallen branch the dead tree leaves beside it). They add up over the days.
 
 **Proposed fix.** `remove` puts soil back where the block under the ground is a thin branch (or the shape never puts
 thin wood under y = 0).
+
+**Status: fixed** (2026-11-24, BUGS 344). `TreePlacer.remove` closes the soil over a thin stem under the ground (the soil beside it, else grass on top). Check added to `fireCharsBarkKillsYoungTreesAndSomeGrownOnes`.
 
 ### R7-18 (B, proven). One bad record empties the tree book
 
@@ -629,6 +641,8 @@ whole numbers gives 0. `lo = 0`, `hi = 1`. The test `figBlocksPlaceJoinAndHang` 
 **Proposed fix.** `/ 2.0 / 16`, and one line in that test: a thinnest branch's shape is 4 pixels wide. Then look at
 a fig once in the game: the player and the insects will now pass between its twigs.
 
+**Status: fixed** (2026-11-24, BUGS 345). `/ 2.0 / 16`. Test `figTwigsAreThinHandHungFruitStartsBareAndThornsAreKnownToHurt`. To look at once in the game: the player and the insects now pass between a fig's twigs.
+
 ### R7-28 (A, proven). Shears on a fruit bunch: endless fruit
 
 **What is wrong.** Two rules meet. A fruit bunch's starting state is "ripe", and placing one by hand only sets its
@@ -642,6 +656,8 @@ shears, puts it back: ripe again. The same for figs on the bark and for doum nut
 `block/DoumPieceBlock.java:50, 72-74`; loot tables `fig_bunch.json`, `trunk_figs.json`, `doum_nut_bunch.json`.
 
 **Proposed fix.** A bunch placed by hand starts bare (bone meal still brings it on for builders).
+
+**Status: fixed** (2026-11-24, BUGS 346). A fig bunch, figs on the bark and a doum nut bunch placed by hand start bare. Same test.
 
 ### R7-29 (A, proven in the code, likely in play). Animals do not know thorny twigs hurt
 
@@ -658,6 +674,8 @@ three mods. The one test pushes a pig through by force.
 
 **Proposed fix.** One override in `ThornyTwigBlock` that answers "hurts" (`PathType.DAMAGE_OTHER`). The ants and
 termites use their own path finder and are not touched (and are not pricked).
+
+**Status: fixed** (2026-11-24, BUGS 347). `ThornyTwigBlock.getBlockPathType` answers `DAMAGE_OTHER`. Same test (the answer only; no animal was watched walking round an acacia).
 
 ### R7-30 (B, proven in the code, likely in play). The river animals' ground finder stops on top of a crown
 
@@ -734,6 +752,8 @@ grown bunch works the whole crown out to keep only its own boxes. Scene to measu
 the time of `look.bits`.
 
 **Proposed fix.** Only if the user sees it: share a crown's faces out over the blocks they really lie in.
+
+**Status: open, waits to be seen** (2026-11-24). Read from how Minecraft hides parts of the world, never seen in the game; the fix is large (sharing a crown's faces out over its blocks) and is built only if the user sees fronds blink out.
 
 ### R7-34 (C). Small block slips
 

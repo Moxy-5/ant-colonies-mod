@@ -106,6 +106,44 @@ public class Forest extends SavedData {
     private record Queued(ResourceKey<Level> dimension, Tree tree) {
     }
 
+    /** Takes this world's trees of new land from the waiting list into its book. True if there were any. */
+    private static boolean takeIn(ServerLevel level, Forest forest) {
+        boolean any = false;
+        for (java.util.Iterator<Queued> it = QUEUE.iterator(); it.hasNext(); ) {
+            Queued q = it.next();
+            if (q.dimension() != level.dimension()) {
+                continue;
+            }
+            it.remove();
+            q.tree().lastDay = today(level);
+            HeartRot.newLand(q.tree(), today(level));
+            forest.add(q.tree());
+            any = true;
+        }
+        return any;
+    }
+
+    /**
+     * A world closes (after its last save): the trees of new land made since the last look go into its book and the book
+     * is written once more (review R7-15: a tree whose land was made in the last second before the player quit was never
+     * in the book, and stood frozen for good).
+     */
+    public static void closing(ServerLevel level) {
+        if (takeIn(level, get(level))) {
+            level.getDataStorage().save();
+        }
+    }
+
+    /** The server has stopped: no tree of this world is kept for the next one opened. */
+    public static void forgetAll() {
+        QUEUE.clear();
+    }
+
+    /** The game tests: how many trees of new land wait to be taken into a book. */
+    public static int waitingForTests() {
+        return QUEUE.size();
+    }
+
     /** One tree in the book. {@code placedAge} -1: nothing of it is in the world yet (a seedling not come up yet). */
     public static final class Tree {
         public final String kind;
@@ -393,12 +431,7 @@ public class Forest extends SavedData {
         if (level.getGameTime() % 20 != 7) {
             return;
         }
-        for (Queued q; (q = QUEUE.peek()) != null && q.dimension() == level.dimension(); ) {
-            QUEUE.poll();
-            q.tree().lastDay = today(level);
-            HeartRot.newLand(q.tree(), today(level));
-            forest.add(q.tree());
-        }
+        takeIn(level, forest);
         boolean timed = Perf.begin(Perf.Part.TREES);
         try {
             forest.second(level, today(level));
@@ -545,6 +578,7 @@ public class Forest extends SavedData {
             t.died = today - TreeLife.daysDeadIn(t.treeKind(), t.seed, t.stage, roll);
         }
         long fromDay = t.lastDay;
+        int lying = -1;     // the branches under its crown: counted once, at the first day that drops one (review R7-1)
         while (t.lastDay < today) {
             t.lastDay++;
             if (t.dead()) {
@@ -571,10 +605,15 @@ public class Forest extends SavedData {
             // Step 6b: a grown tree drops a dead branch under its crown now and then (more when old).
             Random shedDice = TreeLife.dice(t.seed, t.lastDay * 31 + 17);
             double shedChance = BranchShedding.chance(t.age) * (HeartRot.hollow(t) ? 2 : 1); // a hollow tree sheds more
-            if (now != null && shedDice.nextDouble() < shedChance
-                    && BranchShedding.shed(level, t.foot, now, shedDice, t.lastDay == today)) {
-                shed++;
-                HeartRot.wound(t, t.lastDay, HeartRot.SHED_CHANCE, shedDice);
+            if (now != null && now.size() > 0 && shedDice.nextDouble() < shedChance) {
+                if (lying < 0) {
+                    lying = BranchShedding.lyingUnder(level, t.foot, now);
+                }
+                if (lying < BranchShedding.MAX_UNDER_TREE && BranchShedding.drop(level, t.foot, now, shedDice, t.lastDay == today)) {
+                    lying++;
+                    shed++;
+                    HeartRot.wound(t, t.lastDay, HeartRot.SHED_CHANCE, shedDice);
+                }
             }
         }
         int stageSteps = 0;
@@ -700,7 +739,20 @@ public class Forest extends SavedData {
         List<int[]> columns = HeartRot.crumbleOrder(lying);
         int due = (int) Math.min(columns.size(), Math.ceil(f * columns.size()));
         if (t.crumbled < due) {
-            pulpHeaps += HeartRot.crumbleColumn(level, t.foot, columns.get(t.crumbled), TreeLife.dice(t.seed, -71 - t.crumbled));
+            // The column's top as the log really lies: laid on its land, each slice moved up or down to its own ground
+            // (review R7-16: the flat-ground top left a log's upper wood hanging where it fell uphill).
+            int[] column = columns.get(t.crumbled);
+            TreePlacer.Placed laid = TreePlacer.rest(lying, t.foot, TreePlacer.ground(level, t.foot));
+            int top = Integer.MIN_VALUE;
+            for (int i = 0; i < laid.size(); i++) {
+                if (laid.xs()[i] == column[0] && laid.zs()[i] == column[1]) {
+                    top = Math.max(top, laid.ys()[i]);
+                }
+            }
+            if (top != Integer.MIN_VALUE) {
+                column = new int[] {column[0], column[1], Math.max(top, column[2])};
+            }
+            pulpHeaps += HeartRot.crumbleColumn(level, t.foot, column, TreeLife.dice(t.seed, -71 - t.crumbled));
             t.crumbled++;
             setDirty();
         }

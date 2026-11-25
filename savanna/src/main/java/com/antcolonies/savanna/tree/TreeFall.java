@@ -332,10 +332,12 @@ public final class TreeFall {
 
     /**
      * What a falling giant smashes on its way (my pick for "crush all"): leaves, plants and anything soft (easier to
-     * break than stone); the ground (dirt, sand, gravel, what a shovel digs), stone, wood and fluids stop it.
+     * break than stone); the ground (dirt, sand, gravel, what a shovel digs), stone, wood and fluids stop it, and so does a
+     * termite mound (the user, 2026-11-24; review R7-11: real Macrotermes walls are hard as brick, the log comes to rest
+     * on the mound as on a hill; the mound's blocks are softer than stone only so that a player can dig them).
      */
-    static boolean smashes(ServerLevel level, BlockPos pos, BlockState state) {
-        if (!state.getFluidState().isEmpty()) {
+    public static boolean smashes(ServerLevel level, BlockPos pos, BlockState state) {
+        if (!state.getFluidState().isEmpty() || state.is(com.antcolonies.savanna.registry.SavannaTags.STOPS_FALLING_TREES)) {
             return false;
         }
         if (state.is(BlockTags.LEAVES) || state.canBeReplaced()) {

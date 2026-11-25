@@ -997,4 +997,51 @@ public class TreeTests {
         }
         helper.succeed();
     }
+
+    /**
+     * Review round 7's tree blocks. A fig twig is as thin as it is drawn (R7-27: in whole numbers every thickness came
+     * out a full cube, stopping players, arrows and the insects' path finder a block from the wood). A fruit bunch hung
+     * by hand starts bare (R7-28: shears give a bare bunch back, and a ripe start was endless fruit). A thorny twig tells
+     * Minecraft's path planner that it hurts, as a berry bush does (R7-29: animals walked straight into young acacias).
+     */
+    @GameTest(template = "arena", timeoutTicks = 40)
+    public static void figTwigsAreThinHandHungFruitStartsBareAndThornsAreKnownToHurt(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        int y = SURFACE + 4;
+        BlockPos twig = new BlockPos(30, y, 30);
+        helper.setBlock(twig, TreeBlocks.FIG_BRANCH.get());       // alone in the air: the thinnest, no arms
+        var shape = helper.getBlockState(twig).getCollisionShape(level, helper.absolutePos(twig));
+        double wide = shape.bounds().getXsize() * 16, tall = shape.bounds().getYsize() * 16;
+        helper.assertTrue(Math.abs(wide - 4) < 0.01 && Math.abs(tall - 4) < 0.01, "the thinnest fig twig is " + wide + " by " + tall + " pixels solid (4 wanted)");
+        var thick = TreeBlocks.FIG_BRANCH.get().defaultBlockState().setValue(com.antcolonies.savanna.block.FigBranchBlock.STEP, 0)
+                .getCollisionShape(level, helper.absolutePos(twig)).bounds();
+        helper.assertTrue(Math.abs(thick.getXsize() * 16 - 14) < 0.01, "the thickest fig branch is " + thick.getXsize() * 16 + " pixels solid (14 wanted)");
+
+        net.minecraft.world.entity.player.Player player = helper.makeMockPlayer(net.minecraft.world.level.GameType.CREATIVE);
+        BlockPos leaf = new BlockPos(34, y, 30), wood = new BlockPos(38, y, 30);
+        helper.setBlock(leaf, TreeBlocks.FIG_LEAVES.get());
+        helper.setBlock(wood, TreeBlocks.DOUM_WOOD.get());
+        helper.setBlock(new BlockPos(42, y, 30), TreeBlocks.FIG_LOG.get());
+        net.minecraft.world.item.ItemStack figs = new net.minecraft.world.item.ItemStack(TreeBlocks.FIG_BUNCH.get(), 4);
+        net.minecraft.world.item.ItemStack nuts = new net.minecraft.world.item.ItemStack(TreeBlocks.DOUM_NUT_BUNCH.get(), 4);
+        net.minecraft.world.item.ItemStack bark = new net.minecraft.world.item.ItemStack(TreeBlocks.TRUNK_FIGS.get(), 4);
+        player.setItemInHand(net.minecraft.world.InteractionHand.MAIN_HAND, figs);
+        helper.placeAt(player, figs, leaf, Direction.DOWN);
+        player.setItemInHand(net.minecraft.world.InteractionHand.MAIN_HAND, nuts);
+        helper.placeAt(player, nuts, wood, Direction.DOWN);
+        player.setItemInHand(net.minecraft.world.InteractionHand.MAIN_HAND, bark);
+        helper.placeAt(player, bark, new BlockPos(42, y, 30), Direction.NORTH);
+        BlockPos[] hung = {leaf.below(), wood.below(), new BlockPos(42, y, 29)};
+        net.minecraft.world.level.block.Block[] wanted = {TreeBlocks.FIG_BUNCH.get(), TreeBlocks.DOUM_NUT_BUNCH.get(), TreeBlocks.TRUNK_FIGS.get()};
+        for (int i = 0; i < hung.length; i++) {
+            BlockState state = helper.getBlockState(hung[i]);
+            helper.assertTrue(state.is(wanted[i]), "no " + wanted[i].getDescriptionId() + " hung by hand at " + hung[i] + ": " + state);
+            helper.assertTrue(state.getValue(HangingFruit.STAGE) == HangingFruit.BARE, "a " + wanted[i].getDescriptionId() + " hung by hand is not bare: " + state);
+        }
+
+        BlockState thorns = TreeBlocks.THORNY_TWIG.get().defaultBlockState();
+        helper.assertTrue(thorns.getBlockPathType(level, helper.absolutePos(twig), null) == net.minecraft.world.level.pathfinder.PathType.DAMAGE_OTHER,
+                "a thorny twig does not tell the path planner that it hurts");
+        helper.succeed();
+    }
 }

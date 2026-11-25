@@ -1,0 +1,16 @@
+{
+  "replace": false,
+  "values": [
+    "antcolonies:termite_mound",
+    "antcolonies:termite_hole",
+    "antcolonies:termite_spire",
+    "antcolonies:termite_mouth",
+    "antcolonies:termite_ramp",
+    "antcolonies:termite_tunnel",
+    "antcolonies:fungus_comb",
+    "antcolonies:dead_comb",
+    "antcolonies:forage_pile",
+    "antcolonies:prey_pile",
+    "antcolonies:termite_remains"
+  ]
+}

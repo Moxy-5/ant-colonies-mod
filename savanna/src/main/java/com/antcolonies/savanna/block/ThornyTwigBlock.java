@@ -46,6 +46,17 @@ public class ThornyTwigBlock extends Block {
         return SHAPE;
     }
 
+    /**
+     * Minecraft's path planner keeps mobs out of berry bushes and cactus because it knows them by name; any other block
+     * that hurts must say so itself, or animals walk straight into young acacias (review R7-29). The insects plan with
+     * their own path finder and are not pricked.
+     */
+    @Override
+    public net.minecraft.world.level.pathfinder.PathType getBlockPathType(BlockState state, BlockGetter level, BlockPos pos,
+            @javax.annotation.Nullable net.minecraft.world.entity.Mob mob) {
+        return net.minecraft.world.level.pathfinder.PathType.DAMAGE_OTHER;
+    }
+
     /** Whether the spines slow and prick this: anything alive but the insects. */
     public static boolean pricks(Entity entity) {
         return entity instanceof LivingEntity && !(entity instanceof AbstractAntEntity);

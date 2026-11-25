@@ -45,6 +45,9 @@ public class SavannaTags {
     public static final TagKey<Block> TILAPIA_NEST_GROUND = TagKey.create(Registries.BLOCK,
             ResourceLocation.fromNamespaceAndPath(SavannaMod.MODID, "tilapia_nest_ground"));
 
+    /** What a falling giant tree does not break although it is softer than stone: a termite mound and what lies in it (review R7-11). */
+    public static final TagKey<Block> STOPS_FALLING_TREES = TagKey.create(Registries.BLOCK,
+            ResourceLocation.fromNamespaceAndPath(SavannaMod.MODID, "stops_falling_trees"));
     public static final TagKey<Block> MATABELE_BREAKS_OPEN = TagKey.create(Registries.BLOCK,
             ResourceLocation.fromNamespaceAndPath(SavannaMod.MODID, "matabele_breaks_open"));
 }
