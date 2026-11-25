@@ -24,6 +24,7 @@ acatchsavedinanottersjawsisletgoafteraload 0.13
 acatfishcomesuptogulpair 0.03
 acatfishpassesoverabarbhiddeninthereeds 0.38
 acatfishtakesabarbandtheschoolbursts 0.16
+aclampedanthomeiscaredforintheroomsbyonenestmate 0.06
 acloudwithnobodynearlosesnolandedflies 0.56
 acolonyawayeatsmillsbreadandraisesitsyoungasnumbers 0.55
 acolonyawayfoldsitsfrozeninsectsintothenumbersandputsthingsbackonreturn 0.46
@@ -353,6 +354,8 @@ replay_bug140_scout_by_ravine 1.52
 replay_bug145_termite_in_feeding_cast 1.24
 replay_bug148_egg_carrier_on_mound_top 2.65
 replay_bug156_nurse_in_cast 2.49
+replay_bug350_clamped_left_outside 1.41
+replay_bug350_stuck_on_nest_mound 1.80
 replay_soak2_termite_under_cast_hole 2.35
 replay_soak4_raider_on_hump 1.92
 replay_soak4_termite_in_cast_going_home 2.91

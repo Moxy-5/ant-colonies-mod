@@ -1088,6 +1088,19 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
     private long tendedUntil;
     @Nullable
     private UUID tendedBy;
+    /** BUGS 349: the kinds of care a nestmate gives it, each with its own carer, so the two go on side by side. */
+    public enum CareJob { CLAMP, WOUND }
+
+    /**
+     * BUGS 349: for each kind of care ({@link CareJob}), the nestmate that has picked it (on its way or at work) and until
+     * when (game time; renewed while it walks and works). One carer of a kind at a time: the carer used to be written
+     * down only once it stood at the patient's side, so every free nestmate within reach set off for the same patient at
+     * once (35 in the soak).
+     */
+    private final UUID[] careBy = new UUID[CareJob.values().length];
+    private final long[] careUntil = new long[CareJob.values().length];
+    /** BUGS 349: a claim to care for it lasts this long (ticks) unless renewed: a carer that stopped without a word frees it soon. */
+    public static final int CARE_CLAIM_TICKS = 40;
 
     public Wounds wounds() {
         return wounds;
@@ -1159,6 +1172,41 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
 
     private boolean isTended() {
         return tender() != null;
+    }
+
+    /** A nestmate picks it for this kind of care, until this game time: false (and nothing changes) if another has it now. */
+    public boolean claimCare(CareJob job, UUID nestmate, long until) {
+        UUID taker = careTaker(job);
+        if (taker != null && !taker.equals(nestmate)) {
+            return false;
+        }
+        careBy[job.ordinal()] = nestmate;
+        careUntil[job.ordinal()] = until;
+        return true;
+    }
+
+    /** The nestmate that has picked it for this kind of care now, or null. */
+    @Nullable
+    public UUID careTaker(CareJob job) {
+        UUID taker = careBy[job.ordinal()];
+        return taker != null && careUntil[job.ordinal()] > level().getGameTime() ? taker : null;
+    }
+
+    /** That nestmate is done with this kind of care, or gives up: another may come at once. */
+    public void releaseCare(CareJob job, UUID nestmate) {
+        if (nestmate.equals(careBy[job.ordinal()])) {
+            careBy[job.ordinal()] = null;
+        }
+    }
+
+    /**
+     * BUGS 349: whether it has come to rest where a nestmate may work on it (take a clamp off, lick a wound): its legs
+     * have stopped and it stands in one of its nest's rooms. Never on its way in: every insect coming home walks down
+     * the shaft and along the tunnel, and one held still there stood in the way with a route it could not walk (the
+     * watch's not-stuck alarm) for the whole of the care.
+     */
+    public boolean restsForCare(Level level, Colony colony) {
+        return !isPassenger() && getNavigator().isDone() && colony.nest().getAllRoomCells(level).contains(blockPosition());
     }
 
     /** The hurt nestmate it carries home, or null. */

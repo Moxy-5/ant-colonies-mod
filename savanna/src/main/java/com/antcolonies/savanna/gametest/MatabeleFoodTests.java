@@ -172,6 +172,76 @@ public class MatabeleFoodTests {
     }
 
     /** A colony of 10, all real, settled in a month-old dead mound in the arena's middle. */
+    /**
+     * BUGS 349: a worker come home with a termite's head on a leg is cared for in the rooms, by one nestmate at a time.
+     * It was held still on its way in (the shaft's foot and the tunnel, where every ant coming home walks), frozen with a
+     * route it could not walk (the watch's not-stuck alarm), and every free nestmate within reach set off for it at once
+     * (35 in the soak). Here it is set down at the nest's entrance, over the dead mound's shaft, as it comes home: it is
+     * never held still outside the rooms or while walking, no more than one nestmate goes to it, and the head comes off.
+     */
+    @GameTest(template = "arena", timeoutTicks = 6000, skyAccess = true)
+    public static void aClampedAntHomeIsCaredForInTheRoomsByOneNestmate(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        com.antcolonies.gametest.TestClock.still(helper, 13.0); // (between the raid hours: everyone stays in)
+        Colony colony = settled(helper);
+        MatabeleEntity[] hurt = new MatabeleEntity[1];
+        int[] mostCarers = {0};
+        long[] held = {0, 0}; // (ticks held still for care, the tick it was set down)
+        String[] heldWrong = {null};
+        helper.onEachTick(() -> {
+            if (hurt[0] == null || !hurt[0].isAlive() || !hurt[0].clamp().isOn()) {
+                return;
+            }
+            long carers = TestIsolation.insectsOf(level, colony, MatabeleEntity.class).stream()
+                    .filter(ant -> ant.runsGoal(com.antcolonies.entity.goal.ClampCareGoal.class)).count();
+            mostCarers[0] = Math.max(mostCarers[0], (int) carers);
+            if (hurt[0].clamp().isHeldStill()) {
+                held[0]++;
+            }
+            if (heldWrong[0] == null && hurt[0].clamp().isHeldStill()) {
+                BlockPos at = hurt[0].blockPosition();
+                if (!hurt[0].getNavigator().isDone()) {
+                    heldWrong[0] = "held still with a route at " + helper.relativePos(at);
+                } else if (!colony.nest().getAllRoomCells(level).contains(at)) {
+                    heldWrong[0] = "held still outside the rooms at " + helper.relativePos(at);
+                }
+            }
+        });
+        helper.startSequence()
+                .thenWaitUntil(() -> helper.assertTrue(colony.nest().getFinishedRoomCenter(level) != null, "the queen's room is not open yet"))
+                .thenExecute(() -> {
+                    BlockPos door = colony.getCenter(); // (the entrance, over the shaft down to the rooms)
+                    helper.assertFalse(colony.nest().getAllRoomCells(level).contains(door), "the entrance is a room cell");
+                    MatabeleEntity ant = TestIsolation.insectsOf(level, colony, MatabeleEntity.class).stream()
+                            .filter(MatabeleEntity::canLoseLegs).findFirst().orElse(null);
+                    helper.assertTrue(ant != null, "no Matabele worker to put a clamped head on");
+                    ant.moveTo(door.getX() + 0.5, door.getY(), door.getZ() + 0.5, ant.getYRot(), 0.0F);
+                    com.antcolonies.entity.AbstractAntEntity holder = SavannaEntities.TERMITE_MAJOR_SOLDIER.get().create(level);
+                    holder.moveTo(ant.getX(), ant.getY(), ant.getZ(), 0.0F, 0.0F);
+                    level.addFreshEntity(holder);
+                    helper.assertTrue(ant.clamp().clampOn(holder), "the soldier could not clamp on");
+                    holder.kill();
+                    ant.clamp().becomeHead();
+                    helper.assertFalse(ant.mayGoOut(), "the worker may go out at 13:00: it would not go in to the rooms");
+                    hurt[0] = ant;
+                    held[1] = level.getGameTime();
+                    helper.assertTrue(ant.clamp().isOn(), "no head on the worker's leg");
+                })
+                .thenWaitUntil(() -> helper.assertTrue(!hurt[0].isAlive() || !hurt[0].clamp().isOn(),
+                        "nobody has taken the termite head off the worker at " + helper.relativePos(hurt[0].blockPosition())
+                                + " (goals " + hurt[0].runningGoals() + "; carers at once at most " + mostCarers[0] + ")"))
+                .thenExecute(() -> {
+                    helper.assertTrue(hurt[0].isAlive() && held[0] > 0, "the head did not come off by a nestmate's care: alive "
+                            + hurt[0].isAlive() + ", held still " + held[0] + " ticks, " + (level.getGameTime() - held[1]) + " ticks after it was set down");
+                    SavannaMod.LOGGER.info("[care] the head came off {} ticks after the worker was set down at the entrance; held still"
+                            + " {} ticks; at most {} nestmate(s) set off for it at once; now at {}", level.getGameTime() - held[1], held[0],
+                            mostCarers[0], helper.relativePos(hurt[0].blockPosition()));
+                    helper.assertTrue(heldWrong[0] == null, "the worker was " + heldWrong[0]);
+                    helper.assertTrue(mostCarers[0] == 1, mostCarers[0] + " nestmates set off to take the head off at once");
+                })
+                .thenSucceed();
+    }
+
     private static Colony settled(GameTestHelper helper) {
         ServerLevel level = helper.getLevel();
         TestScenes.deepGround(helper);
