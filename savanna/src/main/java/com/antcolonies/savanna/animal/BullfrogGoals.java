@@ -197,6 +197,9 @@ final class BullfrogGoals {
             if (!now(frog, 5) || frog.action() == BullfrogEntity.DIG_OUT || frog.action() == BullfrogEntity.LEAP || frog.getVehicle() instanceof BullfrogEntity) {
                 return false;       // (a clasped male holds on: she does the leaping)
             }
+            if (!frog.isInWater() && !frog.onGround()) {
+                return false;       // in the air over land: it picks leap or run once it lands (a fresh frog's first tick, BUGS 248)
+            }
             from = danger(frog, DANGER_NEAR);
             LivingEntity hurtBy = frog.getLastHurtByMob();
             if (from == null && hurtBy != null && frog.tickCount - frog.getLastHurtByMobTimestamp() < 100
