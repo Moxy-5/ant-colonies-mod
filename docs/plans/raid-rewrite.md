@@ -21,7 +21,7 @@ The user has much more compute for the project and named this as one of three bi
 - **More compute, spent on proof, not on more code:** step 1's soak is 6 servers for 4 days, not 2, with one helper
   per raid stage reading the `[raid]` diaries side by side, and the papers checked in the same step. Step 6's soak is
   run twice (two seeds). The plan's aim of about 30 tuning numbers and one judge per question does not grow.
-- **A fresh review before merging:** when step 5 is done, the full code review's round 12 (`docs/plans/code-review.md`)
+- **A fresh review before merging:** when step 5 is done, the full code review's round 11 (`docs/plans/code-review.md`)
   reads the new raid code in a session that did not write it. Its A findings are fixed before step 6's soak.
 - **The old raid code is not reviewed** by the full review: it is being deleted.
 - **Still wanted from the user, whenever they next watch a raid:** their own list below (what they did, what they

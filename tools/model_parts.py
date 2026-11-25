@@ -59,27 +59,50 @@ def cube(lo, hi, part):
     return {'origin': [round(v, 3) for v in lo], 'size': [round(b - a, 3) for a, b in zip(lo, hi)], '_part': part}
 
 
+def rot_cube(lo, hi, part, rotation=None, pivot=None, **extra):
+    """A box with optional cube-local Bedrock/GeckoLib rotation (deg) around pivot (defaults to box centre)."""
+    c = cube(lo, hi, part)
+    if rotation is not None and any(abs(r) > 1e-6 for r in rotation):
+        c['rotation'] = [round(v, 3) for v in rotation]
+        c['pivot'] = [round(v, 3) for v in (pivot if pivot is not None else [(a + b) * 0.5 for a, b in zip(lo, hi)])]
+    if extra:
+        c.update(extra)
+    return c
+
+
 def faces(c):
     """Each face of a box and its size (across, down)."""
     sx, sy, sz = c['size']
     return {'north': (sx, sy), 'south': (sx, sy), 'east': (sz, sy), 'west': (sz, sy), 'up': (sx, sz), 'down': (sx, sz)}
 
 
-def face_point(c, face, u, v):
+def world_point(c, x, y, z):
+    """Transforms a cube-local point (x, y, z) through the cube's pivot + rotation (GeckoLib Z, Y, X order)."""
+    rot_deg = c.get('rotation')
+    if rot_deg and any(abs(r) > 1e-6 for r in rot_deg):
+        piv = c.get('pivot', [0.0, 0.0, 0.0])
+        tr = mat_vec(euler(rot_deg), [x - piv[0], y - piv[1], z - piv[2]])
+        return piv[0] + tr[0], piv[1] + tr[1], piv[2] + tr[2]
+    return x, y, z
+
+
+def face_point(c, face, u, v, world=False):
     """Where texture pixel (u, v) (0 to 1 across the face, v down from the top) lies on the box, in the box's own
-    model space (the viewer's and the game's face layout)."""
+    model space (or transformed through cube-local pivot + rotation when world=True)."""
     (ox, oy, oz), (sx, sy, sz) = c['origin'], c['size']
     if face == 'east':
-        return ox + sx, oy + sy * (1 - v), oz + sz * (1 - u)
-    if face == 'west':
-        return ox, oy + sy * (1 - v), oz + sz * u
-    if face == 'up':
-        return ox + sx * u, oy + sy, oz + sz * v
-    if face == 'down':
-        return ox + sx * u, oy, oz + sz * (1 - v)
-    if face == 'south':
-        return ox + sx * u, oy + sy * (1 - v), oz + sz
-    return ox + sx * (1 - u), oy + sy * (1 - v), oz
+        pt = (ox + sx, oy + sy * (1 - v), oz + sz * (1 - u))
+    elif face == 'west':
+        pt = (ox, oy + sy * (1 - v), oz + sz * u)
+    elif face == 'up':
+        pt = (ox + sx * u, oy + sy, oz + sz * v)
+    elif face == 'down':
+        pt = (ox + sx * u, oy, oz + sz * (1 - v))
+    elif face == 'south':
+        pt = (ox + sx * u, oy + sy * (1 - v), oz + sz)
+    else:
+        pt = (ox + sx * (1 - u), oy + sy * (1 - v), oz)
+    return world_point(c, *pt) if world else pt
 
 
 def png(rows):
@@ -120,11 +143,12 @@ def _byte(v):
     return max(0, min(255, int(v)))
 
 
-def paint_faces(bones, texels, colour, to_byte=_byte):
+def paint_faces(bones, texels, colour, to_byte=_byte, world_coords=False):
     """Lays every face of every box out on one texture (texels texture pixels a model pixel; the tallest faces first,
     in shelves, on the narrowest square-ish texture they fit) and colours each pixel with colour(box, face, x, y, z),
-    (x, y, z) being where the pixel lies on the model. Returns (bones with every face's place on the texture, rows of
-    (r, g, b, a), width, height); the bones are a copy, without the '_' keys."""
+    (x, y, z) being where the pixel lies on the model (pass world_coords=True to transform rotated cubes into model
+    space automatically). colour() may return (r, g, b) or (r, g, b, a). Returns (bones with every face's place on
+    the texture, rows of (r, g, b, a), width, height); the bones are a copy, without the '_' keys."""
     bones = copy.deepcopy(bones)
     patches = []
     for b in bones:
@@ -152,8 +176,12 @@ def paint_faces(bones, texels, colour, to_byte=_byte):
         c['uv'][face] = {'uv': [x0, y0], 'uv_size': [w, h]}
         for j in range(h):
             for i in range(w):
-                px, py, pz = face_point(c, face, (i + 0.5) / w, (j + 0.5) / h)
-                rows[y0 + j][x0 + i] = tuple(to_byte(v) for v in colour(c, face, px, py, pz)) + (255,)
+                px, py, pz = face_point(c, face, (i + 0.5) / w, (j + 0.5) / h, world=world_coords)
+                col = colour(c, face, px, py, pz)
+                if len(col) == 4:
+                    rows[y0 + j][x0 + i] = tuple(to_byte(v) for v in col)
+                else:
+                    rows[y0 + j][x0 + i] = tuple(to_byte(v) for v in col) + (255,)
     for b in bones:
         for c in b.get('cubes', []):
             for k in [k for k in c if k.startswith('_')]:
@@ -616,3 +644,296 @@ def round_leg(kind, plan, s, side, parent, claw_shape, claw_drop, part='leg'):
         out.append({'name': name(f'claw{i + 1}'), 'parent': name(f'toe{i + 1}'), 'pivot': [tx, cy, cz],
                     'rotation': rot(turn_x(-claw_drop)), 'cubes': claw})
     return out
+
+
+# --- pixel-art & fur texture helpers (Animal Maker Engine upgrade, 2026-11-23) -----------------------------------------
+def hash3(ix, iy, iz):
+    """Deterministic integer hash -> [0.0, 1.0) for crisp nearest-neighbor pixel-art grain and spots."""
+    h = (ix * 374761393 + iy * 668265263 + iz * 2147483647) & 0xFFFFFFFF
+    h = ((h ^ (h >> 13)) * 1274126177) & 0xFFFFFFFF
+    return ((h ^ (h >> 16)) & 0xFFFF) / 65536.0
+
+
+def fur_grain(x, y, z, scale=1.5, stretch=3.0, flow=(0.0, 0.0, 1.0)):
+    """Directional fur-strand shade offset in [-1.0, +1.0]: stretched along flow so painted boxes read as sleek fur
+    or mane locks instead of random static noise. Deterministic in 3D model coordinates."""
+    fx, fy, fz = unit(flow)
+    along = x * fx + y * fy + z * fz
+    # Project onto two axes orthogonal to flow
+    up = (0.0, 1.0, 0.0) if abs(fy) < 0.9 else (1.0, 0.0, 0.0)
+    u = unit(cross(up, (fx, fy, fz)))
+    v = cross((fx, fy, fz), u)
+    pu = x * u[0] + y * u[1] + z * u[2]
+    pv = x * v[0] + y * v[1] + z * v[2]
+    ia = int(math.floor(along * scale / max(stretch, 0.25)))
+    iu = int(math.floor(pu * scale))
+    iv = int(math.floor(pv * scale))
+    strand = hash3(iu, iv, ia) * 0.72 + hash3(iu, iv, ia + 1) * 0.28
+    fine = hash3(int(math.floor(x * scale * 2.0)), int(math.floor(y * scale * 2.0)), int(math.floor(z * scale * 2.0)))
+    return (strand * 0.78 + fine * 0.22) * 2.0 - 1.0
+
+
+def stamp_2d(grid, palette, u, v, default=None):
+    """Crisp 2D pixel-art stamp lookup (u, v in [0, 1], v down from top): grid is a list of equal-length strings,
+    palette maps each character to an (r, g, b) or (r, g, b, a) colour; '.' or unmapped chars return default."""
+    if not grid or u < 0.0 or u >= 1.0 or v < 0.0 or v >= 1.0:
+        return default
+    row = grid[min(len(grid) - 1, int(v * len(grid)))]
+    ch = row[min(len(row) - 1, int(u * len(row)))]
+    return palette.get(ch, default)
+
+
+# --- sculpted organic parts: layered mane/fur, padded feline paws, roaring mouth ---------------------------------------
+def mane_layer(cubes, rings, part='mane', style='swept', flare_deg=18.0, drape_deg=8.0, jitter=0.14, seed=0):
+    """Builds layered fur/mane lock clusters around contoured rings (crown, cheek ruff, chest fall, shoulder cape).
+
+    Each ring in `rings` is a dict:
+        cx, cy, cz  ring centre in model pixels (default cx=0)
+        rx, ry      ellipse radii across X (width) and Y (height)
+        n           number of locks around the arc
+        a0, a1      arc start & end degrees (0 = top +Y, +90 = left +X, 180 = bottom -Y, -90 = right -X; default -180..180)
+        w, d, l     lock width (tangential), thickness (radial), length (back toward +Z)
+        layer       optional 0.0..1.0 depth tag (0 inner/crown -> 1 outer/chest) for painter colour cascades
+        flare       optional override of flare_deg for this ring
+        drape       optional override of drape_deg for this ring
+        part        optional paint part override
+        closed      True for full 360 rings (avoids duplicating lock at a0==a1+360; default auto-detected)
+
+    style='swept'   uses exact right-handed 3D frames so locks flow backward (+Z) and flare cleanly with mirror symmetry.
+    style='stepped' places pure 90-degree Minecraft cubes with tiny depth staggers to prevent Z-fighting.
+    Returns the list of created lock cubes (each tagged with _layer, _ring, _lock, _angle for rich shading)."""
+    created = []
+    for ri, ring in enumerate(rings):
+        cx = ring.get('cx', 0.0)
+        cy = ring['cy']
+        cz = ring['cz']
+        rx = ring['rx']
+        ry = ring['ry']
+        n = max(1, int(ring['n']))
+        a0 = ring.get('a0', -180.0)
+        a1 = ring.get('a1', 180.0)
+        w = ring['w']
+        d = ring['d']
+        l = ring['l']
+        layer = ring.get('layer', ri / max(1, len(rings) - 1))
+        rpart = ring.get('part', part)
+        r_flare = ring.get('flare', flare_deg)
+        r_drape = ring.get('drape', drape_deg)
+        closed = ring.get('closed', abs((a1 - a0) - 360.0) < 1e-3)
+        for k in range(n):
+            frac = (k / n) if closed else (0.5 if n == 1 else k / (n - 1))
+            ang_deg = a0 + (a1 - a0) * frac
+            ang = math.radians(ang_deg)
+            nx, ny = math.sin(ang), math.cos(ang)
+            tx, ty = math.cos(ang), -math.sin(ang)
+            # Symmetric jitter across the left/right midline so locks look organic yet balanced
+            sym_key = int(round(abs(ang_deg) * 10))
+            j = (hash3(sym_key, ri + seed * 17, 7) - 0.5) * 2.0 * jitter
+            eps = ((k % 3) - 1) * 0.025  # anti-Z-fighting stagger
+            px = cx + (rx + eps + j * 0.6) * nx
+            py = cy + (ry + eps + j * 0.6) * ny
+            pz = cz + j * 0.5
+            lw = max(0.4, w * (1.0 + j * 0.25))
+            ld = max(0.4, d * (1.0 + j * 0.2))
+            ll = max(0.6, l * (1.0 + j * 0.35))
+            meta = {'_layer': round(layer, 3), '_ring': ri, '_lock': k, '_angle': round(ang_deg, 1)}
+            if style == 'stepped':
+                hx = 0.5 * (abs(tx) * lw + abs(nx) * ld)
+                hy = 0.5 * (abs(ty) * lw + abs(ny) * ld)
+                # Step chest/lower locks slightly forward-down and crown locks cleanly back
+                c = cube([px - hx, py - hy, pz - ll * 0.22], [px + hx, py + hy, pz + ll * 0.78], rpart)
+                c.update(meta)
+            else:
+                fl = math.radians(r_flare)
+                # Gentle downward drape stronger on sides/lower chest than on the very top crown
+                dr = math.radians(r_drape) * (0.25 + 0.75 * max(0.0, 1.0 - max(0.0, ny)))
+                lz = unit([nx * math.sin(fl), ny * math.sin(fl) - math.sin(dr), math.cos(fl)])
+                dot_n = nx * lz[0] + ny * lz[1]
+                ly_raw = [nx - dot_n * lz[0], ny - dot_n * lz[1], -dot_n * lz[2]]
+                ly = unit(ly_raw) if vlen(ly_raw) > 1e-6 else [0.0, 1.0, 0.0]
+                lx = unit(cross(ly, lz))
+                R = from_axes(lx, ly, lz)
+                lo = [px - lw * 0.5, py - ld * 0.5, pz - ll * 0.2]
+                hi = [px + lw * 0.5, py + ld * 0.5, pz + ll * 0.8]
+                c = rot_cube(lo, hi, rpart, rotation=rot(R), pivot=[px, py, pz], **meta)
+            cubes.append(c)
+            created.append(c)
+    return created
+
+
+def padded_paw(cubes, cx, ground_y, cz, width, length, height, toes=4, claws=True,
+               part='paw', claw_part='claw', pad_part='paw_pad', detailed=True):
+    """Builds a chunky sculpted feline/mammal paw centred at (cx, ground_y, cz) pointing toward -Z:
+    wrist/heel block, arched metacarpal bridge, distinct curved toe knuckles (inner toes slightly forward),
+    optional semi-retracted dark claw tips, and underside paw pads (heel pad + toe pads)."""
+    created = []
+    hw = width * 0.5
+    pad_h = 0.35 if detailed else 0.0
+    # 1. Rear heel / wrist cushion
+    c_heel = cube([cx - hw * 0.80, ground_y + pad_h, cz - length * 0.10],
+                  [cx + hw * 0.80, ground_y + height, cz + length * 0.42], part)
+    created.append(c_heel)
+    # 2. Arched metacarpal bridge
+    c_arch = cube([cx - hw * 0.92, ground_y + pad_h, cz - length * 0.44],
+                  [cx + hw * 0.92, ground_y + height * 0.84, cz + length * 0.06], part)
+    created.append(c_arch)
+    # 3. Underside central metacarpal pad (flush on ground_y)
+    if detailed:
+        created.append(cube([cx - hw * 0.64, ground_y, cz - length * 0.24],
+                            [cx + hw * 0.64, ground_y + pad_h + 0.05, cz + length * 0.26], pad_part))
+    # 4. Sculpted toe knuckles + toe pads + optional dark claws
+    toe_w = (width * 0.94) / max(1, toes)
+    for i in range(toes):
+        frac = 0.0 if toes == 1 else (i / (toes - 1) - 0.5) * 2.0  # -1..+1 across paw
+        inner = 1.0 - abs(frac)                                     # 1 for centre toes, 0 for outer toes
+        tx = cx + frac * (hw - toe_w * 0.48)
+        t_front = cz - length * (0.62 + 0.14 * inner)
+        t_back = cz - length * 0.24
+        t_h = height * (0.56 + 0.10 * inner)
+        tw_half = toe_w * 0.45
+        created.append(cube([tx - tw_half, ground_y + pad_h * 0.85, t_front],
+                            [tx + tw_half, ground_y + t_h, t_back], part))
+        if detailed:
+            created.append(cube([tx - tw_half * 0.72, ground_y, t_front + 0.25],
+                                [tx + tw_half * 0.72, ground_y + pad_h, t_back - 0.15], pad_part))
+        if claws:
+            cw = max(0.28, tw_half * 0.42)
+            created.append(cube([tx - cw, ground_y + 0.18, t_front - length * 0.12],
+                                [tx + cw, ground_y + t_h * 0.52, t_front + 0.22], claw_part))
+    cubes.extend(created)
+    return created
+
+
+def feline_mouth(upper_cubes, jaw_cubes, tongue_cubes, cx=0.0, y_palate=0.0, z_hinge=0.0, z_tip=-5.0,
+                 width=4.0, fang_len=1.3, upper_part='mouth_inner', jaw_part='mouth_inner',
+                 tooth_part='tooth', tongue_part='tongue', tongue_tip_cubes=None, detailed=False):
+    """Builds a roaring 3D feline mouth cavity (recessed upper palate, lower jaw floor, gleaming canine fangs
+    + incisors + optional cheek carnassials & dark gumlines, and a fleshy 2-bone articulated tongue)
+    proportioned to hide cleanly inside a closed muzzle."""
+    hw = width * 0.5
+    length = abs(z_hinge - z_tip)
+    if not detailed:
+        # Backwards-compatible lean feline mouth
+        upper_cubes.append(cube([cx - hw * 0.88, y_palate, z_tip + 0.35],
+                                [cx + hw * 0.88, y_palate + 0.7, z_hinge - 0.15], upper_part))
+        fx = hw * 0.64
+        fw = max(0.32, width * 0.11)
+        fz = z_tip + max(0.45, length * 0.14)
+        for s in (-1, 1):
+            upper_cubes.append(cube([cx + s * fx - fw, y_palate - fang_len, fz - fw * 0.9],
+                                    [cx + s * fx + fw, y_palate + 0.15, fz + fw * 0.9], tooth_part))
+        upper_cubes.append(cube([cx - fx + fw, y_palate - fang_len * 0.42, fz - fw * 0.7],
+                                [cx + fx - fw, y_palate + 0.1, fz + fw * 0.6], tooth_part))
+        jaw_cubes.append(cube([cx - hw * 0.80, y_palate - 0.85, z_tip + 0.55],
+                              [cx + hw * 0.80, y_palate - 0.25, z_hinge - 0.15], jaw_part))
+        lfx = hw * 0.50
+        lfz = fz + max(0.35, fw * 1.1)
+        for s in (-1, 1):
+            jaw_cubes.append(cube([cx + s * lfx - fw * 0.85, y_palate - 0.35, lfz - fw * 0.8],
+                                  [cx + s * lfx + fw * 0.85, y_palate + fang_len * 0.72, lfz + fw * 0.8], tooth_part))
+        jaw_cubes.append(cube([cx - lfx + fw * 0.85, y_palate - 0.35, lfz - fw * 0.6],
+                              [cx + lfx - fw * 0.85, y_palate + fang_len * 0.28, lfz + fw * 0.55], tooth_part))
+        tw = hw * 0.56
+        z_mid = (z_hinge + z_tip) * 0.5
+        tongue_cubes.append(cube([cx - tw, y_palate - 0.45, z_mid],
+                                 [cx + tw, y_palate + 0.12, z_hinge - 0.35], tongue_part))
+        tongue_cubes.append(cube([cx - tw * 0.82, y_palate - 0.42, z_tip + 0.95],
+                                 [cx + tw * 0.82, y_palate + 0.05, z_mid + 0.2], tongue_part))
+        return [cx, y_palate - 0.12, z_mid]
+
+    # --- DETAILED SCULPTED BIG-CAT MOUTH (palate, dark throat, gum rims, 2-tier curved fangs, carnassials, big 2-bone tongue) ---
+    # 1. Ridged upper palate + deep dark throat backdrop + dark pigmented upper gum rims
+    upper_cubes.append(cube([cx - hw * 0.90, y_palate - 0.04, z_tip + 0.30],
+                            [cx + hw * 0.90, y_palate + 0.65, z_hinge - 0.10], 'mouth_palate'))
+    upper_cubes.append(cube([cx - hw * 0.76, y_palate - 1.15, z_hinge - 0.85],
+                            [cx + hw * 0.76, y_palate + 0.52, z_hinge - 0.08], 'mouth_throat'))
+    for s in (-1, 1):
+        upper_cubes.append(cube([cx + s * hw * 0.68, y_palate - 0.26, z_tip + 0.42],
+                                [cx + s * hw * 0.92, y_palate + 0.14, z_hinge - 0.35], 'mouth_gum'))
+    upper_cubes.append(cube([cx - hw * 0.74, y_palate - 0.22, z_tip + 0.28],
+                            [cx + hw * 0.74, y_palate + 0.14, z_tip + 0.76], 'mouth_gum'))
+
+    # 2. Sculpted 2-tier recurved upper canines + 6-tooth incisor row + cheek carnassial teeth
+    fx = hw * 0.66
+    fw = max(0.30, width * 0.105)
+    fz = z_tip + max(0.55, length * 0.14)
+    for s in (-1, 1):
+        # Thick ivory canine base + tapered sharp recurved tip
+        upper_cubes.append(rot_cube([cx + s * fx - fw, y_palate - fang_len * 0.68, fz - fw * 0.95],
+                                    [cx + s * fx + fw, y_palate + 0.10, fz + fw * 0.95], tooth_part,
+                                    rotation=[7.0, 0.0, s * -4.0]))
+        upper_cubes.append(rot_cube([cx + s * fx - fw * 0.62, y_palate - fang_len * 1.12, fz - fw * 0.58 + 0.08],
+                                    [cx + s * fx + fw * 0.62, y_palate - fang_len * 0.50, fz + fw * 0.58 + 0.08], tooth_part,
+                                    rotation=[12.0, 0.0, s * -3.0]))
+        # Back cheek carnassials (visible along the open jaw side profile in roars!)
+        for k_m, z_off in enumerate((length * 0.38, length * 0.62)):
+            mz = z_tip + z_off
+            mh = fang_len * (0.44 if k_m == 0 else 0.36)
+            upper_cubes.append(cube([cx + s * (hw * 0.76) - fw * 0.52, y_palate - mh, mz - fw * 0.85],
+                                    [cx + s * (hw * 0.76) + fw * 0.52, y_palate + 0.05, mz + fw * 0.85], tooth_part))
+    upper_cubes.append(cube([cx - fx + fw * 0.95, y_palate - fang_len * 0.40, fz - fw * 0.65],
+                            [cx + fx - fw * 0.95, y_palate + 0.06, fz + fw * 0.50], 'incisor'))
+
+    # 3. Lower jaw dark inner floor + dark pigmented lower gum rims
+    jaw_cubes.append(cube([cx - hw * 0.82, y_palate - 0.86, z_tip + 0.52],
+                          [cx + hw * 0.82, y_palate - 0.30, z_hinge - 0.12], jaw_part))
+    for s in (-1, 1):
+        jaw_cubes.append(cube([cx + s * hw * 0.62, y_palate - 0.45, z_tip + 0.58],
+                              [cx + s * hw * 0.84, y_palate - 0.12, z_hinge - 0.35], 'mouth_gum'))
+    # Sculpted 2-tier lower canines + lower incisors + cheek premolars
+    lfx = hw * 0.50
+    lfz = fz + max(0.40, fw * 1.2)
+    for s in (-1, 1):
+        jaw_cubes.append(rot_cube([cx + s * lfx - fw * 0.86, y_palate - 0.36, lfz - fw * 0.82],
+                                  [cx + s * lfx + fw * 0.86, y_palate + fang_len * 0.42, lfz + fw * 0.82], tooth_part,
+                                  rotation=[-8.0, 0.0, s * 4.0]))
+        jaw_cubes.append(rot_cube([cx + s * lfx - fw * 0.52, y_palate + fang_len * 0.28, lfz - fw * 0.48 + 0.08],
+                                  [cx + s * lfx + fw * 0.52, y_palate + fang_len * 0.80, lfz + fw * 0.48 + 0.08], tooth_part,
+                                  rotation=[-12.0, 0.0, s * 3.0]))
+        mz = z_tip + length * 0.50
+        jaw_cubes.append(cube([cx + s * (hw * 0.68) - fw * 0.46, y_palate - 0.34, mz - fw * 0.78],
+                              [cx + s * (hw * 0.68) + fw * 0.46, y_palate + fang_len * 0.16, mz + fw * 0.78], tooth_part))
+    jaw_cubes.append(cube([cx - lfx + fw * 0.84, y_palate - 0.36, lfz - fw * 0.58],
+                          [cx + lfx - fw * 0.84, y_palate + fang_len * 0.26, lfz + fw * 0.46], 'incisor'))
+
+    # 4. BIG fleshy 2-bone pink tongue (wide thick muscular base + broad curling front tip!)
+    tw = hw * 0.72
+    z_mid = z_hinge - length * 0.46
+    # Base tongue (rounded thick 2-layer cross-section)
+    tongue_cubes.append(cube([cx - tw, y_palate - 0.54, z_mid - 0.18],
+                             [cx + tw, y_palate + 0.06, z_hinge - 0.26], tongue_part))
+    tongue_cubes.append(cube([cx - tw * 0.82, y_palate - 0.20, z_mid - 0.12],
+                             [cx + tw * 0.82, y_palate + 0.26, z_hinge - 0.34], tongue_part))
+    # Front articulating tongue_tip (broad fleshy licking/lapping blade!)
+    tip_tgt = tongue_tip_cubes if tongue_tip_cubes is not None else tongue_cubes
+    tip_z0 = z_tip + max(0.75, length * 0.18)
+    tip_mid = (z_mid + tip_z0) * 0.5
+    tip_tgt.append(cube([cx - tw * 0.88, y_palate - 0.48, tip_mid - 0.15],
+                        [cx + tw * 0.88, y_palate + 0.14, z_mid + 0.24], tongue_part))
+    tip_tgt.append(cube([cx - tw * 0.68, y_palate - 0.42, tip_z0],
+                        [cx + tw * 0.68, y_palate + 0.08, tip_mid + 0.18], tongue_part))
+    return [cx, y_palate - 0.16, z_mid]
+
+
+# --- self-check: python tools/model_parts.py ---------------------------------------------------------------------------
+if __name__ == '__main__':
+    # 1. Rotated cube world_point & face_point consistency
+    rc = rot_cube([-1, -1, -1], [1, 1, 1], 'test', rotation=[0, 90, 0], pivot=[0, 0, 0])
+    wx, wy, wz = face_point(rc, 'east', 0.5, 0.5, world=True)
+    assert abs(wx) < 1e-6 and abs(wy) < 1e-6 and abs(wz + 1.0) < 1e-6, (wx, wy, wz)
+    # 2. Layered mane builder (swept & stepped)
+    for st in ('swept', 'stepped'):
+        mc = []
+        mane_layer(mc, [{'cy': 14.0, 'cz': -10.0, 'rx': 6.0, 'ry': 7.0, 'n': 12, 'w': 2.5, 'd': 2.0, 'l': 4.0}], style=st)
+        assert len(mc) == 12 and all('_layer' in c for c in mc)
+    # 3. Padded paw & feline mouth
+    pc, uc, jc, tc = [], [], [], []
+    padded_paw(pc, 0.0, 0.0, 0.0, 4.4, 5.2, 2.8, toes=4, claws=True)
+    feline_mouth(uc, jc, tc, y_palate=16.0, z_hinge=-14.0, z_tip=-20.0, width=4.6)
+    assert len(pc) == 15 and len(uc) == 4 and len(jc) == 4 and len(tc) == 2
+    # 4. Fur grain & 2D stamp
+    g = fur_grain(1.2, 5.4, -8.3)
+    assert -1.0 <= g <= 1.0
+    st_col = stamp_2d(['.A', 'B.'], {'A': (255, 200, 0), 'B': (20, 15, 10)}, 0.75, 0.25)
+    assert st_col == (255, 200, 0)
+    print('model_parts: rot_cube, world_point, mane_layer, padded_paw, feline_mouth, fur_grain, stamp_2d all check out')

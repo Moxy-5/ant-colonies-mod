@@ -76,9 +76,20 @@ const Viewer = (() => {
         mesh.userData = {mat, tint, bone: b.name};
         mesh.castShadow = true; mesh.receiveShadow = true;
         mesh.layers.enable(1);
-        mesh.position.set(c.origin[0] + c.size[0] / 2 - b.pivot[0], c.origin[1] + c.size[1] / 2 - b.pivot[1],
-                          c.origin[2] + c.size[2] / 2 - b.pivot[2]);
-        g.add(mesh); meshes.push(mesh);
+        if (c.rotation && c.rotation.some(v => Math.abs(v) > 1e-6)) {
+          const cg = new THREE.Group();
+          const cp = c.pivot || [0, 0, 0];
+          cg.position.set(cp[0] - b.pivot[0], cp[1] - b.pivot[1], cp[2] - b.pivot[2]);
+          setRot(cg, c.rotation);
+          mesh.position.set(c.origin[0] + c.size[0] / 2 - cp[0], c.origin[1] + c.size[1] / 2 - cp[1],
+                            c.origin[2] + c.size[2] / 2 - cp[2]);
+          cg.add(mesh); g.add(cg);
+        } else {
+          mesh.position.set(c.origin[0] + c.size[0] / 2 - b.pivot[0], c.origin[1] + c.size[1] / 2 - b.pivot[1],
+                            c.origin[2] + c.size[2] / 2 - b.pivot[2]);
+          g.add(mesh);
+        }
+        meshes.push(mesh);
       });
     });
     look.bones.forEach(b => (b.parent ? groups[b.parent] : root).add(groups[b.name]));

@@ -1,0 +1,448 @@
+{
+ "model": "lion_cub",
+ "about": "African Lion Cub body plan: 2.16 x 1.20 blocks at scale 1.0.",
+ "family": "upright_four_legs",
+ "root": "root",
+ "forebody": "chest",
+ "head": {
+  "bone": "head",
+  "jaws": [
+   "jaw"
+  ],
+  "sockets": {
+   "carry": "carry"
+  }
+ },
+ "chain": [
+  "head",
+  "neck",
+  "chest",
+  "waist",
+  "hips",
+  "tail_1",
+  "tail_2",
+  "tail_3",
+  "tail_4",
+  "tail_5"
+ ],
+ "legs": {
+  "l1": [
+   "leg_fl_1",
+   "leg_fl_2",
+   "leg_fl_paw"
+  ],
+  "r1": [
+   "leg_fr_1",
+   "leg_fr_2",
+   "leg_fr_paw"
+  ],
+  "l2": [
+   "leg_bl_1",
+   "leg_bl_2",
+   "leg_bl_3",
+   "leg_bl_paw"
+  ],
+  "r2": [
+   "leg_br_1",
+   "leg_br_2",
+   "leg_br_3",
+   "leg_br_paw"
+  ]
+ },
+ "bones": {
+  "root": "root",
+  "body": "body",
+  "chest": "chest",
+  "waist": "waist",
+  "hips": "hips",
+  "neck": "neck",
+  "head": "head",
+  "jaw": "jaw",
+  "tongue": "tongue",
+  "tongue_tip": "tongue_tip",
+  "carry": "carry",
+  "nose": "nose",
+  "ear_left": "ear_left",
+  "ear_right": "ear_right",
+  "brow_left": "brow_left",
+  "brow_right": "brow_right",
+  "lid_left": "lid_left",
+  "lid_right": "lid_right",
+  "ulid_left": "ulid_left",
+  "ulid_right": "ulid_right",
+  "pupil_left": "pupil_left",
+  "pupil_right": "pupil_right",
+  "tail_1": "tail_1",
+  "tail_2": "tail_2",
+  "tail_3": "tail_3",
+  "tail_4": "tail_4",
+  "tail_5": "tail_5",
+  "leg_fl_1": "leg_fl_1",
+  "leg_fl_2": "leg_fl_2",
+  "leg_fl_paw": "leg_fl_paw",
+  "toe_fl_0": "toe_fl_0",
+  "claw_fl_0": "claw_fl_0",
+  "toe_fl_1": "toe_fl_1",
+  "claw_fl_1": "claw_fl_1",
+  "toe_fl_2": "toe_fl_2",
+  "claw_fl_2": "claw_fl_2",
+  "toe_fl_3": "toe_fl_3",
+  "claw_fl_3": "claw_fl_3",
+  "leg_fr_1": "leg_fr_1",
+  "leg_fr_2": "leg_fr_2",
+  "leg_fr_paw": "leg_fr_paw",
+  "toe_fr_0": "toe_fr_0",
+  "claw_fr_0": "claw_fr_0",
+  "toe_fr_1": "toe_fr_1",
+  "claw_fr_1": "claw_fr_1",
+  "toe_fr_2": "toe_fr_2",
+  "claw_fr_2": "claw_fr_2",
+  "toe_fr_3": "toe_fr_3",
+  "claw_fr_3": "claw_fr_3",
+  "leg_bl_1": "leg_bl_1",
+  "leg_bl_2": "leg_bl_2",
+  "leg_bl_3": "leg_bl_3",
+  "leg_bl_paw": "leg_bl_paw",
+  "toe_bl_0": "toe_bl_0",
+  "claw_bl_0": "claw_bl_0",
+  "toe_bl_1": "toe_bl_1",
+  "claw_bl_1": "claw_bl_1",
+  "toe_bl_2": "toe_bl_2",
+  "claw_bl_2": "claw_bl_2",
+  "toe_bl_3": "toe_bl_3",
+  "claw_bl_3": "claw_bl_3",
+  "leg_br_1": "leg_br_1",
+  "leg_br_2": "leg_br_2",
+  "leg_br_3": "leg_br_3",
+  "leg_br_paw": "leg_br_paw",
+  "toe_br_0": "toe_br_0",
+  "claw_br_0": "claw_br_0",
+  "toe_br_1": "toe_br_1",
+  "claw_br_1": "claw_br_1",
+  "toe_br_2": "toe_br_2",
+  "claw_br_2": "claw_br_2",
+  "toe_br_3": "toe_br_3",
+  "claw_br_3": "claw_br_3"
+ },
+ "checks": {
+  "px": 0.0625,
+  "blend": 4,
+  "feet_parts": [
+   "paw"
+  ],
+  "feet_free": [
+   "walk",
+   "stalk",
+   "trot",
+   "gallop",
+   "pounce",
+   "play_pounce",
+   "play_wrestle",
+   "swipe",
+   "swipe_quick",
+   "rest_stretch_up",
+   "pride_greet",
+   "groom",
+   "cub_call",
+   "mama_nuzzle",
+   "mood_content",
+   "mood_alert",
+   "mood_curious",
+   "mood_angry",
+   "mood_fearful",
+   "mood_submissive",
+   "mood_sleepy",
+   "sit_down",
+   "sit",
+   "sit_up",
+   "rest_down",
+   "rest",
+   "rest_up",
+   "death",
+   "step_up_1000",
+   "step_down_1000"
+  ],
+  "tuck_ok": [
+   "sit_down",
+   "sit",
+   "sit_up",
+   "rest_down",
+   "rest",
+   "rest_up",
+   "rest_stretch_up",
+   "death",
+   "pounce",
+   "play_pounce",
+   "play_wrestle",
+   "gallop",
+   "stalk",
+   "swipe",
+   "swipe_quick",
+   "pride_greet",
+   "groom",
+   "cub_call",
+   "mama_nuzzle",
+   "mood_content",
+   "mood_alert",
+   "mood_curious",
+   "mood_angry",
+   "mood_fearful",
+   "mood_submissive",
+   "mood_sleepy"
+  ],
+  "body_bones": [
+   "chest",
+   "waist",
+   "hips"
+  ],
+  "carry": {
+   "bone": "carry",
+   "jaw": "jaw",
+   "grip_ahead": 2.6,
+   "grip_reach": 0.55,
+   "slant": 18.0,
+   "jaw_fill": 0.72,
+   "jaw_min": 14.0,
+   "jaw_max": 48.0,
+   "jaw_other": 22.0,
+   "swallow_under": 0.55,
+   "swallow_chance": 0.0
+  },
+  "jaw": {
+   "bone": "jaw",
+   "flag_below": -3.0
+  },
+  "walks": {
+   "walk": 14.549,
+   "stalk": 8.656,
+   "trot": 32.352,
+   "gallop": 55.425
+  },
+  "switches": [
+   [
+    "idle",
+    "walk"
+   ],
+   [
+    "walk",
+    "idle"
+   ],
+   [
+    "walk",
+    "trot"
+   ],
+   [
+    "trot",
+    "walk"
+   ],
+   [
+    "trot",
+    "gallop"
+   ],
+   [
+    "gallop",
+    "trot"
+   ],
+   [
+    "walk",
+    "stalk"
+   ],
+   [
+    "stalk",
+    "walk"
+   ],
+   [
+    "stalk",
+    "pounce"
+   ],
+   [
+    "pounce",
+    "idle"
+   ],
+   [
+    "stalk",
+    "play_pounce"
+   ],
+   [
+    "play_pounce",
+    "idle"
+   ],
+   [
+    "idle",
+    "cub_call"
+   ],
+   [
+    "cub_call",
+    "idle"
+   ],
+   [
+    "idle",
+    "bite"
+   ],
+   [
+    "bite",
+    "idle"
+   ],
+   [
+    "gallop",
+    "bite"
+   ],
+   [
+    "idle",
+    "swipe"
+   ],
+   [
+    "swipe",
+    "idle"
+   ],
+   [
+    "idle",
+    "swipe_quick"
+   ],
+   [
+    "swipe_quick",
+    "idle"
+   ],
+   [
+    "idle",
+    "pride_greet"
+   ],
+   [
+    "pride_greet",
+    "idle"
+   ],
+   [
+    "idle",
+    "play_wrestle"
+   ],
+   [
+    "play_wrestle",
+    "idle"
+   ],
+   [
+    "idle",
+    "mama_nuzzle"
+   ],
+   [
+    "mama_nuzzle",
+    "idle"
+   ],
+   [
+    "idle",
+    "mood_content"
+   ],
+   [
+    "mood_content",
+    "idle"
+   ],
+   [
+    "idle",
+    "mood_alert"
+   ],
+   [
+    "mood_alert",
+    "idle"
+   ],
+   [
+    "idle",
+    "mood_curious"
+   ],
+   [
+    "mood_curious",
+    "idle"
+   ],
+   [
+    "idle",
+    "mood_angry"
+   ],
+   [
+    "mood_angry",
+    "idle"
+   ],
+   [
+    "idle",
+    "mood_fearful"
+   ],
+   [
+    "mood_fearful",
+    "idle"
+   ],
+   [
+    "idle",
+    "mood_submissive"
+   ],
+   [
+    "mood_submissive",
+    "idle"
+   ],
+   [
+    "idle",
+    "mood_sleepy"
+   ],
+   [
+    "mood_sleepy",
+    "idle"
+   ],
+   [
+    "idle",
+    "sit_down"
+   ],
+   [
+    "sit_down",
+    "sit"
+   ],
+   [
+    "sit",
+    "sit_up"
+   ],
+   [
+    "sit_up",
+    "idle"
+   ],
+   [
+    "idle",
+    "rest_down"
+   ],
+   [
+    "rest_down",
+    "rest"
+   ],
+   [
+    "rest",
+    "rest_up"
+   ],
+   [
+    "rest_up",
+    "idle"
+   ],
+   [
+    "rest",
+    "groom"
+   ],
+   [
+    "groom",
+    "rest"
+   ],
+   [
+    "rest",
+    "rest_stretch_up"
+   ],
+   [
+    "rest_stretch_up",
+    "idle"
+   ],
+   [
+    "idle",
+    "drink"
+   ],
+   [
+    "drink",
+    "idle"
+   ],
+   [
+    "idle",
+    "death"
+   ]
+  ]
+ }
+}

@@ -272,8 +272,9 @@ def problems(plan, bones):
     for key, chain in plan.legs.items():
         if not re.match(r'[lr]\d+$', key):
             out.append(f'leg key "{key}" should be l or r and a pair number (l1 is the front left leg)')
-        if len(chain) != 3:
-            out.append(f'leg {key} has {len(chain)} bones; the motion library bends hip, knee and foot (3)')
+        allowed = (3, 4) if 'family' in plan.data else (3,)
+        if len(chain) not in allowed:
+            out.append(f'leg {key} has {len(chain)} bones; expected {" or ".join(map(str, allowed))}')
     for key in plan.legs:
         other = ('r' if key[0] == 'l' else 'l') + key[1:]
         if other not in plan.legs:
@@ -535,7 +536,8 @@ BOX_KIND = [('worker_ant', 'colony insect'), ('termite_', 'colony insect'), ('ma
             ('snail', 'small animal'), ('crab', 'small animal'), ('tilapia', 'small animal'),
             ('remains_tilapia', 'small animal'), ('catfish', 'medium animal'), ('remains_catfish', 'medium animal'),
             ('crocodile', 'large animal'), ('monitor', 'large animal'), ('hippo', 'large animal'),
-            ('otter', 'medium animal'), ('bull_shark', 'large animal')]
+            ('otter', 'medium animal'), ('bull_shark', 'large animal'),
+            ('lion', 'large animal'), ('lioness', 'large animal'), ('lion_cub', 'medium animal')]
 
 
 def box_kind(model):

@@ -1,0 +1,6 @@
+{
+ "note": "v4: Facial Emotions & Body Language (brow_left/right, lid tilt, pupil dilation scale, 8 full-body moods + 8 layered face overlays; 46 clips, 0 flags)",
+ "date": "2026-11-24",
+ "boxes": 264,
+ "numbers": {}
+}
