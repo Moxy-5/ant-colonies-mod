@@ -1,0 +1,340 @@
+# The Cape buffalo in the game, frame by frame (2026-11-25, CLAUDE.md's hard rule: every clip filmed in the real game,
+# frozen and stepped, from three sides; docs/plans/buffalo.md step 1): each clip on a still bull named film:<clip> (it
+# plays only that clip, looped) on flat grass, side on, three quarters from the front and above, and from the front, each
+# burst covering the whole clip; then a walking bull up a 1-block step and down it (no block moves in step 1: Minecraft's
+# own step with the trunk tilting to the ground under its front and hind feet, client/BuffaloModel), stepped 3 ticks a
+# picture from three sides. The bull faces east (+x); the model is drawn 10 px toward its head.
+#   ./gradlew runFilm -PfilmScene=tools/film/buffalo_frames.film   pictures in run-film/screenshots/buffalo_frames/
+cmd time set noon
+cmd weather clear
+cmd kill @e[type=!player]
+cmd fill 36 -61 -12 60 -50 12 minecraft:air
+cmd fill 36 -62 -12 60 -62 12 minecraft:grass_block
+lens 50
+wait 40
+cmd summon antcolonies:buffalo 46.5 -61 0.5 {NoAI:1b,OwnSize:1.0f,Rotation:[-90f,0f],CustomName:'"film:walk"'}
+camera 46.50 -59.00 -9.00 0 4
+wait 10
+cmd tick freeze
+burst walk_side 12 2
+cmd tick unfreeze
+cmd kill @e[type=antcolonies:buffalo]
+wait 3
+cmd summon antcolonies:buffalo 46.5 -61 0.5 {NoAI:1b,OwnSize:1.0f,Rotation:[-90f,0f],CustomName:'"film:walk"'}
+camera 53.50 -56.50 -6.00 45 16
+wait 10
+cmd tick freeze
+burst walk_threequarter 12 2
+cmd tick unfreeze
+cmd kill @e[type=antcolonies:buffalo]
+wait 3
+cmd summon antcolonies:buffalo 46.5 -61 0.5 {NoAI:1b,OwnSize:1.0f,Rotation:[-90f,0f],CustomName:'"film:walk"'}
+camera 55.00 -59.00 0.50 90 4
+wait 10
+cmd tick freeze
+burst walk_front 12 2
+cmd tick unfreeze
+cmd kill @e[type=antcolonies:buffalo]
+wait 3
+cmd summon antcolonies:buffalo 46.5 -61 0.5 {NoAI:1b,OwnSize:1.0f,Rotation:[-90f,0f],CustomName:'"film:trot"'}
+camera 46.50 -59.00 -9.00 0 4
+wait 10
+cmd tick freeze
+burst trot_side 8 2
+cmd tick unfreeze
+cmd kill @e[type=antcolonies:buffalo]
+wait 3
+cmd summon antcolonies:buffalo 46.5 -61 0.5 {NoAI:1b,OwnSize:1.0f,Rotation:[-90f,0f],CustomName:'"film:trot"'}
+camera 53.50 -56.50 -6.00 45 16
+wait 10
+cmd tick freeze
+burst trot_threequarter 8 2
+cmd tick unfreeze
+cmd kill @e[type=antcolonies:buffalo]
+wait 3
+cmd summon antcolonies:buffalo 46.5 -61 0.5 {NoAI:1b,OwnSize:1.0f,Rotation:[-90f,0f],CustomName:'"film:trot"'}
+camera 55.00 -59.00 0.50 90 4
+wait 10
+cmd tick freeze
+burst trot_front 8 2
+cmd tick unfreeze
+cmd kill @e[type=antcolonies:buffalo]
+wait 3
+cmd summon antcolonies:buffalo 46.5 -61 0.5 {NoAI:1b,OwnSize:1.0f,Rotation:[-90f,0f],CustomName:'"film:charge"'}
+camera 46.50 -59.00 -9.00 0 4
+wait 10
+cmd tick freeze
+burst charge_side 6 2
+cmd tick unfreeze
+cmd kill @e[type=antcolonies:buffalo]
+wait 3
+cmd summon antcolonies:buffalo 46.5 -61 0.5 {NoAI:1b,OwnSize:1.0f,Rotation:[-90f,0f],CustomName:'"film:charge"'}
+camera 53.50 -56.50 -6.00 45 16
+wait 10
+cmd tick freeze
+burst charge_threequarter 6 2
+cmd tick unfreeze
+cmd kill @e[type=antcolonies:buffalo]
+wait 3
+cmd summon antcolonies:buffalo 46.5 -61 0.5 {NoAI:1b,OwnSize:1.0f,Rotation:[-90f,0f],CustomName:'"film:charge"'}
+camera 55.00 -59.00 0.50 90 4
+wait 10
+cmd tick freeze
+burst charge_front 6 2
+cmd tick unfreeze
+cmd kill @e[type=antcolonies:buffalo]
+wait 3
+cmd summon antcolonies:buffalo 46.5 -61 0.5 {NoAI:1b,OwnSize:1.0f,Rotation:[-90f,0f],CustomName:'"film:graze"'}
+camera 46.50 -59.00 -9.00 0 4
+wait 10
+cmd tick freeze
+burst graze_side 20 4
+cmd tick unfreeze
+cmd kill @e[type=antcolonies:buffalo]
+wait 3
+cmd summon antcolonies:buffalo 46.5 -61 0.5 {NoAI:1b,OwnSize:1.0f,Rotation:[-90f,0f],CustomName:'"film:graze"'}
+camera 53.50 -56.50 -6.00 45 16
+wait 10
+cmd tick freeze
+burst graze_threequarter 20 4
+cmd tick unfreeze
+cmd kill @e[type=antcolonies:buffalo]
+wait 3
+cmd summon antcolonies:buffalo 46.5 -61 0.5 {NoAI:1b,OwnSize:1.0f,Rotation:[-90f,0f],CustomName:'"film:graze"'}
+camera 55.00 -59.00 0.50 90 4
+wait 10
+cmd tick freeze
+burst graze_front 20 4
+cmd tick unfreeze
+cmd kill @e[type=antcolonies:buffalo]
+wait 3
+cmd summon antcolonies:buffalo 46.5 -61 0.5 {NoAI:1b,OwnSize:1.0f,Rotation:[-90f,0f],CustomName:'"film:drink"'}
+camera 46.50 -59.00 -9.00 0 4
+wait 10
+cmd tick freeze
+burst drink_side 18 4
+cmd tick unfreeze
+cmd kill @e[type=antcolonies:buffalo]
+wait 3
+cmd summon antcolonies:buffalo 46.5 -61 0.5 {NoAI:1b,OwnSize:1.0f,Rotation:[-90f,0f],CustomName:'"film:drink"'}
+camera 53.50 -56.50 -6.00 45 16
+wait 10
+cmd tick freeze
+burst drink_threequarter 18 4
+cmd tick unfreeze
+cmd kill @e[type=antcolonies:buffalo]
+wait 3
+cmd summon antcolonies:buffalo 46.5 -61 0.5 {NoAI:1b,OwnSize:1.0f,Rotation:[-90f,0f],CustomName:'"film:drink"'}
+camera 55.00 -59.00 0.50 90 4
+wait 10
+cmd tick freeze
+burst drink_front 18 4
+cmd tick unfreeze
+cmd kill @e[type=antcolonies:buffalo]
+wait 3
+cmd summon antcolonies:buffalo 46.5 -61 0.5 {NoAI:1b,OwnSize:1.0f,Rotation:[-90f,0f],CustomName:'"film:rest_down"'}
+camera 46.50 -59.00 -9.00 0 4
+wait 10
+cmd tick freeze
+burst rest_down_side 16 3
+cmd tick unfreeze
+cmd kill @e[type=antcolonies:buffalo]
+wait 3
+cmd summon antcolonies:buffalo 46.5 -61 0.5 {NoAI:1b,OwnSize:1.0f,Rotation:[-90f,0f],CustomName:'"film:rest_down"'}
+camera 53.50 -56.50 -6.00 45 16
+wait 10
+cmd tick freeze
+burst rest_down_threequarter 16 3
+cmd tick unfreeze
+cmd kill @e[type=antcolonies:buffalo]
+wait 3
+cmd summon antcolonies:buffalo 46.5 -61 0.5 {NoAI:1b,OwnSize:1.0f,Rotation:[-90f,0f],CustomName:'"film:rest_down"'}
+camera 55.00 -59.00 0.50 90 4
+wait 10
+cmd tick freeze
+burst rest_down_front 16 3
+cmd tick unfreeze
+cmd kill @e[type=antcolonies:buffalo]
+wait 3
+cmd summon antcolonies:buffalo 46.5 -61 0.5 {NoAI:1b,OwnSize:1.0f,Rotation:[-90f,0f],CustomName:'"film:rest_up"'}
+camera 46.50 -59.00 -9.00 0 4
+wait 10
+cmd tick freeze
+burst rest_up_side 16 3
+cmd tick unfreeze
+cmd kill @e[type=antcolonies:buffalo]
+wait 3
+cmd summon antcolonies:buffalo 46.5 -61 0.5 {NoAI:1b,OwnSize:1.0f,Rotation:[-90f,0f],CustomName:'"film:rest_up"'}
+camera 53.50 -56.50 -6.00 45 16
+wait 10
+cmd tick freeze
+burst rest_up_threequarter 16 3
+cmd tick unfreeze
+cmd kill @e[type=antcolonies:buffalo]
+wait 3
+cmd summon antcolonies:buffalo 46.5 -61 0.5 {NoAI:1b,OwnSize:1.0f,Rotation:[-90f,0f],CustomName:'"film:rest_up"'}
+camera 55.00 -59.00 0.50 90 4
+wait 10
+cmd tick freeze
+burst rest_up_front 16 3
+cmd tick unfreeze
+cmd kill @e[type=antcolonies:buffalo]
+wait 3
+cmd summon antcolonies:buffalo 46.5 -61 0.5 {NoAI:1b,OwnSize:1.0f,Rotation:[-90f,0f],CustomName:'"film:headbutt"'}
+camera 46.50 -59.00 -9.00 0 4
+wait 10
+cmd tick freeze
+burst headbutt_side 13 2
+cmd tick unfreeze
+cmd kill @e[type=antcolonies:buffalo]
+wait 3
+cmd summon antcolonies:buffalo 46.5 -61 0.5 {NoAI:1b,OwnSize:1.0f,Rotation:[-90f,0f],CustomName:'"film:headbutt"'}
+camera 53.50 -56.50 -6.00 45 16
+wait 10
+cmd tick freeze
+burst headbutt_threequarter 13 2
+cmd tick unfreeze
+cmd kill @e[type=antcolonies:buffalo]
+wait 3
+cmd summon antcolonies:buffalo 46.5 -61 0.5 {NoAI:1b,OwnSize:1.0f,Rotation:[-90f,0f],CustomName:'"film:headbutt"'}
+camera 55.00 -59.00 0.50 90 4
+wait 10
+cmd tick freeze
+burst headbutt_front 13 2
+cmd tick unfreeze
+cmd kill @e[type=antcolonies:buffalo]
+wait 3
+cmd summon antcolonies:buffalo 46.5 -61 0.5 {NoAI:1b,OwnSize:1.0f,Rotation:[-90f,0f],CustomName:'"film:charge_headbutt"'}
+camera 46.50 -59.00 -9.00 0 4
+wait 10
+cmd tick freeze
+burst charge_headbutt_side 12 3
+cmd tick unfreeze
+cmd kill @e[type=antcolonies:buffalo]
+wait 3
+cmd summon antcolonies:buffalo 46.5 -61 0.5 {NoAI:1b,OwnSize:1.0f,Rotation:[-90f,0f],CustomName:'"film:charge_headbutt"'}
+camera 53.50 -56.50 -6.00 45 16
+wait 10
+cmd tick freeze
+burst charge_headbutt_threequarter 12 3
+cmd tick unfreeze
+cmd kill @e[type=antcolonies:buffalo]
+wait 3
+cmd summon antcolonies:buffalo 46.5 -61 0.5 {NoAI:1b,OwnSize:1.0f,Rotation:[-90f,0f],CustomName:'"film:charge_headbutt"'}
+camera 55.00 -59.00 0.50 90 4
+wait 10
+cmd tick freeze
+burst charge_headbutt_front 12 3
+cmd tick unfreeze
+cmd kill @e[type=antcolonies:buffalo]
+wait 3
+cmd summon antcolonies:buffalo 46.5 -61 0.5 {NoAI:1b,OwnSize:1.0f,Rotation:[-90f,0f],CustomName:'"film:gore"'}
+camera 46.50 -59.00 -9.00 0 4
+wait 10
+cmd tick freeze
+burst gore_side 11 2
+cmd tick unfreeze
+cmd kill @e[type=antcolonies:buffalo]
+wait 3
+cmd summon antcolonies:buffalo 46.5 -61 0.5 {NoAI:1b,OwnSize:1.0f,Rotation:[-90f,0f],CustomName:'"film:gore"'}
+camera 53.50 -56.50 -6.00 45 16
+wait 10
+cmd tick freeze
+burst gore_threequarter 11 2
+cmd tick unfreeze
+cmd kill @e[type=antcolonies:buffalo]
+wait 3
+cmd summon antcolonies:buffalo 46.5 -61 0.5 {NoAI:1b,OwnSize:1.0f,Rotation:[-90f,0f],CustomName:'"film:gore"'}
+camera 55.00 -59.00 0.50 90 4
+wait 10
+cmd tick freeze
+burst gore_front 11 2
+cmd tick unfreeze
+cmd kill @e[type=antcolonies:buffalo]
+wait 3
+cmd summon antcolonies:buffalo 46.5 -61 0.5 {NoAI:1b,OwnSize:1.0f,Rotation:[-90f,0f],CustomName:'"film:death"'}
+camera 46.50 -59.00 -9.00 0 4
+wait 10
+cmd tick freeze
+burst death_side 14 2
+cmd tick unfreeze
+cmd kill @e[type=antcolonies:buffalo]
+wait 3
+cmd summon antcolonies:buffalo 46.5 -61 0.5 {NoAI:1b,OwnSize:1.0f,Rotation:[-90f,0f],CustomName:'"film:death"'}
+camera 53.50 -56.50 -6.00 45 16
+wait 10
+cmd tick freeze
+burst death_threequarter 14 2
+cmd tick unfreeze
+cmd kill @e[type=antcolonies:buffalo]
+wait 3
+cmd summon antcolonies:buffalo 46.5 -61 0.5 {NoAI:1b,OwnSize:1.0f,Rotation:[-90f,0f],CustomName:'"film:death"'}
+camera 55.00 -59.00 0.50 90 4
+wait 10
+cmd tick freeze
+burst death_front 14 2
+cmd tick unfreeze
+cmd kill @e[type=antcolonies:buffalo]
+wait 3
+# --- up a 1-block step (its west face at x 10) at the travel pace, and down off it going west: side on, front, behind
+cmd fill -4 -61 -8 24 -55 8 minecraft:air
+cmd fill -4 -62 -8 24 -62 8 minecraft:dirt
+cmd fill 10 -61 -8 24 -61 8 minecraft:grass_block
+cmd fill -4 -62 -8 9 -62 8 minecraft:grass_block
+lens 40
+wait 20
+walker antcolonies:buffalo 5.5 -61 0.5 -90 OwnSize:1.0f,Led:1b
+camera 10.5 -59.6 -11.5 0 4
+cmd tick unfreeze
+go 17 -60 0 1.0
+wait 20
+cmd tick freeze
+burst up_side 40 3
+cmd kill @e[type=antcolonies:buffalo]
+wait 10
+walker antcolonies:buffalo 5.5 -61 0.5 -90 OwnSize:1.0f,Led:1b
+camera 18.5 -57.6 -6.5 52 14
+cmd tick unfreeze
+go 17 -60 0 1.0
+wait 20
+cmd tick freeze
+burst up_front 40 3
+cmd kill @e[type=antcolonies:buffalo]
+wait 10
+walker antcolonies:buffalo 5.5 -61 0.5 -90 OwnSize:1.0f,Led:1b
+camera 2.5 -59.0 -6.5 -50 12
+cmd tick unfreeze
+go 17 -60 0 1.0
+wait 20
+cmd tick freeze
+burst up_back 40 3
+cmd kill @e[type=antcolonies:buffalo]
+wait 10
+walker antcolonies:buffalo 14.5 -60 0.5 90 OwnSize:1.0f,Led:1b
+camera 10.5 -59.6 -11.5 0 4
+cmd tick unfreeze
+go 2 -61 0 1.0
+wait 20
+cmd tick freeze
+burst down_side 40 3
+cmd kill @e[type=antcolonies:buffalo]
+wait 10
+walker antcolonies:buffalo 14.5 -60 0.5 90 OwnSize:1.0f,Led:1b
+camera 2.5 -59.0 -6.5 -50 12
+cmd tick unfreeze
+go 2 -61 0 1.0
+wait 20
+cmd tick freeze
+burst down_front 40 3
+cmd kill @e[type=antcolonies:buffalo]
+wait 10
+walker antcolonies:buffalo 14.5 -60 0.5 90 OwnSize:1.0f,Led:1b
+camera 18.5 -57.6 -6.5 52 14
+cmd tick unfreeze
+go 2 -61 0 1.0
+wait 20
+cmd tick freeze
+burst down_back 40 3
+cmd kill @e[type=antcolonies:buffalo]
+wait 10
+quit

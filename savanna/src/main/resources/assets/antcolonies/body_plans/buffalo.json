@@ -55,6 +55,7 @@
  "checks": {
   "about": "Offline checks for tools/clip_check.py (canonical adult scale 1.0: 1 px = 0.0625 blocks). Update controller once BuffaloEntity.java lands.",
   "px": 0.0625,
+  "controller": "savanna/src/main/java/com/antcolonies/savanna/animal/BuffaloEntity.java",
   "blend": 5,
   "feet_parts": ["foot"],
   "feet_free": ["walk", "trot", "charge", "charge_headbutt", "paw_ground", "gore", "rest_down", "rest", "rest_up", "death", "step_up_1000", "step_down_1000"],
@@ -107,7 +108,33 @@
    ["rest_down", "rest"],
    ["rest", "rest_up"],
    ["rest_up", "idle"],
-   ["idle", "death"]
+   ["idle", "death"],
+   ["graze", "walk"],
+   ["graze", "mood_alert"],
+   ["graze", "mood_angry"],
+   ["walk", "mood_angry"],
+   ["mood_alert", "snort"],
+   ["snort", "paw_ground"],
+   ["paw_ground", "charge_headbutt"],
+   ["charge_headbutt", "mood_angry"],
+   ["mood_angry", "headbutt"],
+   ["mood_angry", "gore"],
+   ["headbutt", "mood_angry"],
+   ["gore", "mood_angry"],
+   ["mood_angry", "paw_ground"],
+   ["drink", "rest_down"]
   ]
+ },
+ "course": {
+  "buffalo": {
+   "id": "antcolonies:buffalo",
+   "data": "OwnSize:1.0f,Led:1b",
+   "walk": 1.0,
+   "dash": 2.3,
+   "bpt": 0.047
+  }
+ },
+ "verify": {
+  "films": ["tools/film/buffalo_frames.film"]
  }
 }

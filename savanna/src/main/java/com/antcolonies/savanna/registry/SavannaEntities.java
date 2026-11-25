@@ -224,6 +224,18 @@ public class SavannaEntities {
                     .clientTrackingRange(10)
                     .build("hippo"));
 
+    // The Cape buffalo (M9 savanna land animals, 2026-11-25, docs/plans/buffalo.md): drawn 3.8 blocks long and 2.3 tall at
+    // the hump (a bull, Neon's v12 model); its box covers the middle of its body, 1.6 wide and 1.9 tall at a bull's size
+    // (its own size through SCALE), so every size walks 2 by 2 routes 2 high; its head and rump hit beads along the rest.
+    // Never spawned by the world's spawner (MISC is never tried or counted): new land lays its herds beside pans.
+    public static final DeferredHolder<EntityType<?>, EntityType<com.antcolonies.savanna.animal.BuffaloEntity>> BUFFALO =
+            ENTITY_TYPES.register("buffalo", () -> EntityType.Builder
+                    .of(com.antcolonies.savanna.animal.BuffaloEntity::new, MobCategory.MISC)
+                    .sized(1.6F, 1.9F)
+                    .eyeHeight(1.6F)
+                    .clientTrackingRange(10)
+                    .build("buffalo"));
+
     // The African clawless otter (M9 savanna life, 2026-11-22): drawn 2.6 blocks long nose to tail tip, 1 tall at the
     // crown (the approved v6 model); its box covers the body's middle, sleek enough for one-block gaps (Neon's card),
     // its head, rump and tail hit boxes along the rest (HitChain); each otter's own size through SCALE.

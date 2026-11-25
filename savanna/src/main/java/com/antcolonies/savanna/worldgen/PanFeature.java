@@ -91,6 +91,9 @@ public class PanFeature extends Feature<NoneFeatureConfiguration> {
             if (laid != null) {
                 SavannaMod.LOGGER.info("[world pans] pan at {} {}: {} across{}, {} deep, ring {}, {} water blocks, {}% of its water kept", laid.middle().getX(),
                         laid.middle().getZ(), laid.across(), laid.twoBowls() ? " (two bowls)" : "", laid.deepest(), laid.ring(), laid.water(), laid.kept());
+                // its herd of Cape buffalo, grazing past its ring (as an oxbow's hippo pod)
+                BuffaloHerds.Herd herd = BuffaloHerds.lay(level, random, laid, bounds, keepout);
+                SavannaMod.LOGGER.info("[world herds] pan at {} {}: {}", laid.middle().getX(), laid.middle().getZ(), BuffaloHerds.words(herd));
                 return true;
             }
             why.merge(String.valueOf(WHY.get()), 1, Integer::sum);

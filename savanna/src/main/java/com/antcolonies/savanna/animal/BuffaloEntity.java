@@ -1,0 +1,629 @@
+package com.antcolonies.savanna.animal;
+
+import java.util.List;
+
+import javax.annotation.Nullable;
+
+import com.antcolonies.animal.AnimalLife;
+import com.antcolonies.animal.Attention;
+import com.antcolonies.animal.HasLife;
+import com.antcolonies.animal.HitChain;
+import com.antcolonies.entity.body.SteadyController;
+
+import net.minecraft.core.BlockPos;
+import net.minecraft.nbt.CompoundTag;
+import net.minecraft.nbt.NbtUtils;
+import net.minecraft.network.chat.Component;
+import net.minecraft.network.syncher.EntityDataAccessor;
+import net.minecraft.network.syncher.EntityDataSerializers;
+import net.minecraft.network.syncher.SynchedEntityData;
+import net.minecraft.sounds.SoundEvent;
+import net.minecraft.sounds.SoundEvents;
+import net.minecraft.util.Mth;
+import net.minecraft.world.DifficultyInstance;
+import net.minecraft.world.damagesource.DamageSource;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.entity.Mob;
+import net.minecraft.world.entity.MobSpawnType;
+import net.minecraft.world.entity.PathfinderMob;
+import net.minecraft.world.entity.SpawnGroupData;
+import net.minecraft.world.entity.ai.attributes.AttributeSupplier;
+import net.minecraft.world.entity.ai.attributes.Attributes;
+import net.minecraft.world.entity.ai.control.MoveControl;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.level.ServerLevelAccessor;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.pathfinder.Path;
+import net.minecraft.world.phys.AABB;
+import net.minecraft.world.phys.Vec3;
+import software.bernie.geckolib.animatable.GeoEntity;
+import software.bernie.geckolib.animatable.instance.AnimatableInstanceCache;
+import software.bernie.geckolib.animation.AnimatableManager;
+import software.bernie.geckolib.animation.AnimationController;
+import software.bernie.geckolib.animation.AnimationState;
+import software.bernie.geckolib.animation.PlayState;
+import software.bernie.geckolib.animation.RawAnimation;
+import software.bernie.geckolib.util.GeckoLibUtil;
+
+/**
+ * The Cape buffalo, the first savanna land animal (into the game 2026-11-25, {@code docs/plans/buffalo.md}; Neon's model,
+ * paint and 23 clips, workshop v12, approved by the user: "perfect"). An animal: fun first, inspired by real buffalo, every
+ * number my pick unless said.
+ * <ul>
+ * <li>Herds of 3 to 5 (a bull and cows) are laid with new land beside a pan and kept for good ({@code worldgen/BuffaloHerds});
+ * never spawned by the world's spawner. A herd's home is its pan's middle and how far across the pan is, saved by every
+ * member; the home is the herd's only name (a mate is a buffalo with the same home, {@link #mates}) and it never moves.
+ * One from a spawn egg or a summon takes the home of the nearest buffalo within {@link #HOME_FROM_MATE} that has one, else
+ * its home is where it stands.</li>
+ * <li>Its body (this step): a box 1.6 wide and 1.9 tall at size 1, so every size gets 2 by 2 routes 2 high, two hit
+ * beads ({@link HitChain}) for its head and rump, drawn whenever any of it is in view, out to {@link #DRAW_DISTANCE}. It
+ * steps up a block on Minecraft's own step (no block moves in this step: the shared one was sized for the otter), its
+ * trunk tilting to the ground under its front and hind feet as it goes ({@code client/BuffaloModel}); it turns at most
+ * {@link #MAX_TURN} degrees a tick (a 3.8-block body swung 90 degrees in a tick); in deep water it floats low, back and
+ * head out, and swims; it can drown.</li>
+ * <li>What it does has a clip of its own ({@link #doing}, synced): grazing, drinking, lying down and getting up, its
+ * little things (an ear flutter, a shake, a snort, a bull's bellow, pawing the ground) and its moods and hits. Its day and
+ * its temper are the goals' ({@link BuffaloGoals}, step 2 of the plan).</li>
+ * </ul>
+ * Not yet: its day and temper (step 2), wallowing, calves, block moves.
+ */
+public class BuffaloEntity extends PathfinderMob implements GeoEntity, HasLife {
+    /** What it is doing, for the clips (synced). One-shot clips end by themselves once played ({@link #tick}); the loops (rest, the moods) last until a goal ends them. */
+    public static final byte CALM = 0, GRAZE = 1, DRINK = 2, REST_DOWN = 3, REST = 4, REST_UP = 5, EAR_FLUTTER = 6, SHAKE_OFF = 7,
+            SNORT = 8, BELLOW = 9, PAW_GROUND = 10, MOOD_ALERT = 11, MOOD_ANGRY = 12, HEADBUTT = 13, GORE = 14, CHARGE_HEADBUTT = 15;
+    /** Each doing's clip, by its number. */
+    private static final String[] DOING_CLIPS = {"idle", "graze", "drink", "rest_down", "rest", "rest_up", "ear_flutter", "shake_off",
+            "snort", "bellow", "paw_ground", "mood_alert", "mood_angry", "headbutt", "gore", "charge_headbutt"};
+    /** Each one-shot doing's clip length (ticks, read from the clip file); 0 for the loops. */
+    private static final int[] DOING_TICKS = {0, 80, 72, 48, 0, 48, 30, 30, 28, 36, 36, 0, 0, 25, 22, 36};
+
+    private static final EntityDataAccessor<Byte> DATA_DOING = SynchedEntityData.defineId(BuffaloEntity.class, EntityDataSerializers.BYTE);
+    /** Counted up at every doing started, so the same clip started again plays from its start (as the bull shark's actions). */
+    private static final EntityDataAccessor<Integer> DATA_DOING_ID = SynchedEntityData.defineId(BuffaloEntity.class, EntityDataSerializers.INT);
+    private static final EntityDataAccessor<Byte> DATA_LIFE = AnimalLife.dataFor(BuffaloEntity.class);
+
+    /** The model is made at a bull's size (3.83 blocks long, 2.28 tall at the hump; 16 px a block); drawn at this share. */
+    public static final float MODEL_SCALE = 1.0F;
+    /**
+     * The model's origin sits at its front legs (front hooves 0.2 blocks ahead of it, hind hooves 1.46 behind): it is drawn
+     * this far toward its head (model px) so the middle between its feet sits on its box's middle ({@code client/BuffaloModel}).
+     * Every place on its body measured from the model is this much farther ahead of its middle.
+     */
+    public static final double DRAW_AHEAD_PX = 10.0;
+    /** Its jaws at the chewing part of a graze: 17 px ahead of the model's origin (the clip), so this far ahead of its middle (blocks, at size 1). */
+    static final double JAWS_AHEAD = (17.0 + DRAW_AHEAD_PX) / 16.0;
+    /**
+     * The clips' blend (ticks): GeckoLib eases from one clip into the next this long, then plays the new one from its
+     * start, so a moment of a clip comes this many ticks after its doing started ({@link #clipTick}). Read by
+     * {@code tools/clip_check.py} from the controller below.
+     */
+    public static final int BLEND = 5;
+    /** The death clip (1.4 s) is played to its end before the body goes. */
+    static final int DEATH_TICKS = 28 + BLEND;
+    /** The walk, trot and charge clips are made for these speeds (blocks a tick at size 1: 0.61, 1.39 and 2.45 blocks a second, its body plan's "walks"). */
+    static final double WALK_CLIP = 0.6076 / 20.0, TROT_CLIP = 1.389 / 20.0, CHARGE_CLIP = 2.447 / 20.0;
+    /** Faster than these (blocks a tick at size 1: 1.25 and 2.6 blocks a second, between the paces below) it is drawn trotting, then galloping. */
+    static final double TROT_FROM = 1.25 / 20.0, CHARGE_FROM = 2.6 / 20.0;
+    /**
+     * Its paces (the move control's share of its speed). Minecraft's walking push goes with the square of the speed
+     * (the hippo's walk measured 0.031 blocks a tick at 0.8): stepping between plants at the walk clip's own 0.6 blocks a
+     * second, travelling about 0.95, trotting to catch up about 1.6, charging about 5 (faster than a walking player, 4.3,
+     * slower than a sprint, 5.6). To be measured in a game test (BUGS 246), never trusted as worked out.
+     */
+    public static final double GRAZE_STEP = 0.8, TRAVEL = 1.0, TROT = 1.3, CHARGE = 2.3;
+    /** It turns at most this much a tick (degrees; Minecraft's own is 90). */
+    static final float MAX_TURN = 20.0F;
+    /** In water deeper than this over its feet (blocks, at size 1) it swims up: it floats low, its back and head out. */
+    static final double FLOAT_DEPTH = 1.3;
+    /** A spawn egg's or a summon's buffalo takes the home of the nearest buffalo this near that has one (blocks). */
+    static final double HOME_FROM_MATE = 16.0;
+    /** Mates are looked for this far round it (blocks), anew once a second. */
+    static final double MATES_REACH = 64.0;
+    /** Drawn this far off (blocks): herds are few and big, seen across the plain. */
+    static final double DRAW_DISTANCE = 128.0;
+    /** Its grunt (the cow's, deep). */
+    static final float VOICE_PITCH = 0.55F;
+
+    /** Where its herd lives (its pan's middle), and how far across the pan is (0: no water, a home on open grass); null until it has one. */
+    @Nullable
+    BlockPos home;
+    int homeAcross;
+    /** The game tick its doing started (for its clips' lengths and moments). */
+    int doingSince;
+    /** Its mates (buffalo with the same home), looked for anew once a second, and when. */
+    private List<BuffaloEntity> mates = List.of();
+    private int matesAt = Integer.MIN_VALUE;
+    /** The last tick it moved, and how far a tick, eased (for the clips). */
+    private int movedTick = -100;
+    private double stride;
+    static final int WALK_HOLD = 3;
+    /** Drawing only: the doing whose clip was last started. */
+    private int shownDoingId = -1;
+    /** Drawing only (BuffaloModel): the ground under its front and hind feet as drawn (world heights, eased), and when last drawn. */
+    public double drawnFrontY, drawnHindY;
+    public long drawnNanos;
+    /**
+     * Led by a game test or the film camera: its own day goals are off, so only where it is sent (and its temper, in step 2)
+     * moves it ("Led:1b").
+     */
+    public boolean led;
+
+    /**
+     * Where its eyes go (drawn only, {@code client/BuffaloModel}): a player within 16 blocks (6 crouching; spectators too),
+     * a crocodile within 14 even lying still, or any other animal stirring within 10; never another buffalo. My picks.
+     */
+    public final Attention attention = new Attention(16.0, BuffaloEntity::catchesEye);
+
+    private static double catchesEye(Entity seen, double distance, boolean moving) {
+        if (seen instanceof BuffaloEntity) {
+            return 0;
+        }
+        if (seen instanceof Player player) {
+            return Attention.playerInReach(player, distance, 16.0, 6.0) ? 0.5 : 0;
+        }
+        if (seen instanceof CrocodileEntity) {
+            return distance < 14.0 ? 0.4 : 0;
+        }
+        return moving && distance < 10.0 ? 1.0 : 0;
+    }
+
+    private final AnimalLife life;
+    private final AnimatableInstanceCache cache = GeckoLibUtil.createInstanceCache(this);
+
+    /**
+     * Its hit beads along the drawn body ({@link HitChain}; measured on the model's geo, then moved {@link #DRAW_AHEAD_PX}
+     * forward with the drawing): the head, horns and neck from just ahead of its box to the muzzle (0.85 to 2.55 ahead),
+     * and the rump past the back of its box. Its box covers the middle of a body 3.8 blocks long.
+     */
+    private final HitChain chain = new HitChain(this,
+            new HitChain.Link("head", 1.7, 0.2, 1.7F, 2.05F),
+            new HitChain.Link("rump", -0.85, 0.1, 1.0F, 2.05F));
+
+    public BuffaloEntity(EntityType<? extends BuffaloEntity> type, Level level) {
+        super(type, level);
+        setId(ENTITY_COUNTER.getAndAdd(chain.size() + 1) + 1);   // its hit beads take the ids right after its own
+        life = new AnimalLife(this, DATA_LIFE);
+        moveControl = new HeavyTurn(this);
+        getNavigation().setCanFloat(true);
+    }
+
+    public static AttributeSupplier.Builder createAttributes() {
+        return PathfinderMob.createMobAttributes().add(Attributes.MAX_HEALTH, 60.0).add(Attributes.MOVEMENT_SPEED, 0.2)
+                .add(Attributes.ATTACK_DAMAGE, 8.0).add(Attributes.STEP_HEIGHT, 1.0).add(Attributes.FOLLOW_RANGE, 32.0)
+                .add(Attributes.KNOCKBACK_RESISTANCE, 0.8).add(Attributes.ARMOR, 4.0);
+    }
+
+    @Override
+    protected void registerGoals() {
+        BuffaloGoals.register(this, goalSelector);
+    }
+
+    @Override
+    public AnimalLife life() {
+        return life;
+    }
+
+    @Override
+    protected void defineSynchedData(SynchedEntityData.Builder builder) {
+        super.defineSynchedData(builder);
+        AnimalLife.define(builder, DATA_LIFE);
+        builder.define(DATA_DOING, CALM);
+        builder.define(DATA_DOING_ID, 0);
+    }
+
+    // --- what it does ----------------------------------------------------------------------------------------------------
+
+    public byte doing() {
+        return entityData.get(DATA_DOING);
+    }
+
+    /**
+     * Starts a doing and its clip. The doing it is on already goes on as it is (a loop is never restarted by being asked
+     * again), unless it is a one-shot that has played out, which plays again from its start.
+     */
+    void setDoing(byte doing) {
+        byte now = doing();
+        if (doing == now && !(oneShot(now) && doingFor() >= DOING_TICKS[now] + BLEND)) {
+            return;
+        }
+        doingSince = tickCount;
+        entityData.set(DATA_DOING, doing);
+        entityData.set(DATA_DOING_ID, entityData.get(DATA_DOING_ID) + 1);
+        if (doing == SNORT) {
+            playSound(SoundEvents.HORSE_BREATHE, 1.2F, 0.6F);
+        } else if (doing == BELLOW) {
+            playSound(SoundEvents.COW_AMBIENT, 2.0F, 0.45F);
+        }
+    }
+
+    /** Ticks since its doing started (its own tick count). */
+    int doingFor() {
+        return tickCount - doingSince;
+    }
+
+    /** How far into its doing's clip it is (ticks of the clip; below 0 while the clip is still being eased into, {@link #BLEND}). */
+    int clipTick() {
+        return doingFor() - BLEND;
+    }
+
+    /** A doing whose clip plays once (all but calm, the rest and the moods). */
+    static boolean oneShot(byte doing) {
+        return doing > CALM && doing < DOING_TICKS.length && DOING_TICKS[doing] > 0;
+    }
+
+    /** How long a one-shot doing lasts (ticks, its blend in included); 0 for calm and the loops. */
+    static int doingTicks(byte doing) {
+        return oneShot(doing) ? DOING_TICKS[doing] + BLEND : 0;
+    }
+
+    public float ownSize() {
+        return life.ownSize();
+    }
+
+    /** Its herd's home (its pan's middle), or null until it has one (its first tick gives it one). */
+    @Nullable
+    public BlockPos home() {
+        return home;
+    }
+
+    /** How far across its home's pan is (blocks; 0: a home with no water). */
+    public int homeAcross() {
+        return homeAcross;
+    }
+
+    /** Its herd's home, set when it is laid with its pan; it never moves after. */
+    public void setHome(BlockPos home, int across) {
+        this.home = home.immutable();
+        this.homeAcross = across;
+        matesAt = Integer.MIN_VALUE;
+    }
+
+    /**
+     * Its mates: the living buffalo within {@link #MATES_REACH} with the same home, nearest first; looked for anew at most
+     * once a second (every goal of every member asks).
+     */
+    public List<BuffaloEntity> mates() {
+        if (tickCount - matesAt >= 20 || tickCount < matesAt) {
+            matesAt = tickCount;
+            if (home == null) {
+                mates = List.of();
+            } else {
+                List<BuffaloEntity> found = new java.util.ArrayList<>(level().getEntitiesOfClass(BuffaloEntity.class,
+                        getBoundingBox().inflate(MATES_REACH, 16.0, MATES_REACH), b -> b != this && b.isAlive() && home.equals(b.home)));
+                found.sort(java.util.Comparator.comparingDouble(this::distanceToSqr));
+                mates = List.copyOf(found);
+            }
+        }
+        return mates;
+    }
+
+    /**
+     * A buffalo with no home (from a spawn egg or a summon) takes the home of the nearest buffalo within
+     * {@link #HOME_FROM_MATE} that has one, joining its herd; with none near, its home is where it stands, with no water.
+     */
+    private void takeHome() {
+        BuffaloEntity nearest = null;
+        double best = HOME_FROM_MATE * HOME_FROM_MATE;
+        for (BuffaloEntity b : level().getEntitiesOfClass(BuffaloEntity.class, getBoundingBox().inflate(HOME_FROM_MATE),
+                o -> o != this && o.home != null)) {
+            double d = distanceToSqr(b);
+            if (d <= best) {
+                best = d;
+                nearest = b;
+            }
+        }
+        if (nearest != null) {
+            setHome(nearest.home, nearest.homeAcross);
+        } else {
+            setHome(blockPosition(), 0);
+        }
+    }
+
+    /** Where its jaws are at the chewing part of a graze: ahead of its middle, a little over its feet. */
+    Vec3 jawPoint() {
+        float yaw = yBodyRot * Mth.DEG_TO_RAD;
+        double ahead = JAWS_AHEAD * getScale();
+        return new Vec3(getX() - Mth.sin(yaw) * ahead, getY() + 0.2, getZ() + Mth.cos(yaw) * ahead);
+    }
+
+    /** An edible plant at its jaws ({@link Grazing#plantAt}), or null. */
+    @Nullable
+    BlockPos plantAtJaws() {
+        Vec3 jaw = jawPoint();
+        return Grazing.plantAt(level(), jaw.x, getY(), jaw.z);
+    }
+
+    /** Crops the plant at its jaws: a tall one to a short one, a short one left (a herd never bares the ground). Whether it ate. */
+    boolean cropAtJaws() {
+        return Grazing.crop(this, plantAtJaws(), false);
+    }
+
+    /** Faces a place, turning at most {@code step} degrees (never more than {@link #MAX_TURN}). */
+    void face(double x, double z, float step) {
+        double dx = x - getX(), dz = z - getZ();
+        if (dx * dx + dz * dz < 0.02) {
+            return;
+        }
+        float yaw = Mth.approachDegrees(getYRot(), (float) Math.toDegrees(Math.atan2(dz, dx)) - 90.0F, Math.min(step, MAX_TURN));
+        setYRot(yaw);
+        yBodyRot = yaw;
+        yHeadRot = yaw;
+    }
+
+    /** Its hit landing (the ravager's). */
+    void playHitSound() {
+        playSound(SoundEvents.RAVAGER_ATTACK, 1.0F, 0.9F);
+    }
+
+    // --- its body ----------------------------------------------------------------------------------------------------------
+
+    @Override
+    public void tick() {
+        super.tick();
+        chain.place();
+        double dx = getX() - xo, dz = getZ() - zo, moved = Math.sqrt(dx * dx + dz * dz);
+        if (moved > 0.004) {
+            movedTick = tickCount;
+            stride += (moved - stride) * 0.5;
+        }
+        if (level().isClientSide) {
+            attention.tick(this);
+            return;
+        }
+        if (home == null) {
+            takeHome();
+        }
+        // a one-shot clip played out: lying down goes on into lying, the rest back to calm
+        byte d = doing();
+        if (oneShot(d) && doingFor() >= doingTicks(d)) {
+            setDoing(d == REST_DOWN ? REST : CALM);
+        }
+    }
+
+    /** It swims up only where the water is deeper than {@link #FLOAT_DEPTH} over its feet, so it floats low. */
+    @Override
+    public double getFluidJumpThreshold() {
+        return FLOAT_DEPTH * getScale();
+    }
+
+    /** The death clip (1.4 s) is played to its end before the body goes ({@link #DEATH_TICKS}). */
+    @Override
+    protected void tickDeath() {
+        deathTime++;
+        if (deathTime >= DEATH_TICKS && !level().isClientSide() && !isRemoved()) {
+            level().broadcastEntityEvent(this, (byte) 60);
+            remove(Entity.RemovalReason.KILLED);
+        }
+    }
+
+    /** Kept for good, as Minecraft's villagers: the herd a player left is there when they come back. */
+    @Override
+    public boolean removeWhenFarAway(double distanceToClosestPlayer) {
+        return false;
+    }
+
+    /**
+     * Drawn whenever any of its body is in view: its box with its hit beads, and a little more for the horns' sweep (its
+     * box is only the middle of its body, so its head and rump blinked away at the screen's edge with the box alone, BUGS
+     * 271).
+     */
+    @Override
+    public AABB getBoundingBoxForCulling() {
+        AABB box = getBoundingBox();
+        if (firstTick) {
+            return box.inflate(2.6 * getScale(), 0.4 * getScale(), 2.6 * getScale());     // its beads not yet placed
+        }
+        for (net.neoforged.neoforge.entity.PartEntity<?> part : chain.parts()) {
+            box = box.minmax(part.getBoundingBox());
+        }
+        return box.inflate(0.4 * getScale(), 0.3 * getScale(), 0.4 * getScale());
+    }
+
+    @Override
+    public boolean shouldRenderAtSqrDistance(double distanceSqr) {
+        double reach = DRAW_DISTANCE * getViewScale();
+        return distanceSqr < reach * reach;
+    }
+
+    @Override
+    public SpawnGroupData finalizeSpawn(ServerLevelAccessor level, DifficultyInstance difficulty, MobSpawnType spawnType, @Nullable SpawnGroupData data) {
+        SpawnGroupData out = super.finalizeSpawn(level, difficulty, spawnType, data);
+        life.setUp(false, level.getRandom());
+        life.apply();
+        return out;
+    }
+
+    @Override
+    public void addAdditionalSaveData(CompoundTag tag) {
+        super.addAdditionalSaveData(tag);
+        life.save(tag);
+        if (home != null) {
+            tag.put("Home", NbtUtils.writeBlockPos(home));
+            tag.putInt("HomeAcross", homeAcross);
+        }
+        if (led) {
+            tag.putBoolean("Led", true);
+        }
+    }
+
+    @Override
+    public void readAdditionalSaveData(CompoundTag tag) {
+        super.readAdditionalSaveData(tag);
+        life.load(tag);
+        home = NbtUtils.readBlockPos(tag, "Home").orElse(null);
+        homeAcross = tag.getInt("HomeAcross");
+        led = tag.getBoolean("Led");             // the film camera's walkers and game tests ("Led:1b")
+        life.apply();
+    }
+
+    /** What it is about, for tests' messages. */
+    public String about() {
+        Path p = getNavigation().getPath();
+        return "home " + home + " (across " + homeAcross + "), doing " + DOING_CLIPS[Mth.clamp(doing(), 0, DOING_CLIPS.length - 1)]
+                + " for " + doingFor() + ", route " + (p == null ? "none" : p.getNextNodeIndex() + "/" + p.getNodeCount() + " to "
+                + p.getTarget() + (p.canReach() ? "" : " (can't reach)")) + ", on ground " + onGround() + ", in water " + isInWater();
+    }
+
+    // --- sounds (vanilla ones, re-pitched: the cow's grunts deep, the ravager's hooves) ------------------------------------
+
+    @Override
+    protected SoundEvent getAmbientSound() {
+        return SoundEvents.COW_AMBIENT;
+    }
+
+    @Override
+    protected SoundEvent getHurtSound(DamageSource source) {
+        return SoundEvents.COW_HURT;
+    }
+
+    @Override
+    protected SoundEvent getDeathSound() {
+        return SoundEvents.COW_DEATH;
+    }
+
+    @Override
+    public float getVoicePitch() {
+        return VOICE_PITCH + (random.nextFloat() - 0.5F) * 0.1F;
+    }
+
+    @Override
+    protected float getSoundVolume() {
+        return 1.3F;
+    }
+
+    /** A grunt now and then (about every 20 s, not the cow's 4). */
+    @Override
+    public int getAmbientSoundInterval() {
+        return 400;
+    }
+
+    @Override
+    protected void playStepSound(BlockPos pos, BlockState state) {
+        playSound(SoundEvents.RAVAGER_STEP, 0.35F, 1.1F);
+    }
+
+    /**
+     * Minecraft's move control with its turn held to {@link #MAX_TURN} degrees a tick (its own allows 90): a long heavy
+     * body swings round over a few ticks instead of its head jumping 3 blocks in one.
+     */
+    static final class HeavyTurn extends MoveControl {
+        HeavyTurn(Mob mob) {
+            super(mob);
+        }
+
+        @Override
+        public void tick() {
+            float before = mob.getYRot();
+            super.tick();
+            float turned = Mth.wrapDegrees(mob.getYRot() - before);
+            if (Math.abs(turned) > MAX_TURN) {
+                mob.setYRot(before + Math.copySign(MAX_TURN, turned));
+            }
+        }
+    }
+
+    // --- clips -----------------------------------------------------------------------------------------------------------
+
+    /** Clips named by the film camera ({@code film:<clip>}, a still one). */
+    private static final java.util.Map<String, RawAnimation> FILM_CLIPS = new java.util.concurrent.ConcurrentHashMap<>();
+    private static final RawAnimation IDLE = RawAnimation.begin().thenLoop("idle");
+    private static final RawAnimation WALK = RawAnimation.begin().thenLoop("walk");
+    private static final RawAnimation TROT_ANIM = RawAnimation.begin().thenLoop("trot");
+    private static final RawAnimation CHARGE_ANIM = RawAnimation.begin().thenLoop("charge");
+    private static final RawAnimation DEATH = RawAnimation.begin().thenPlayAndHold("death");
+    /** Each doing's clip: the one-shots played once and held, the loops looped. */
+    private static final RawAnimation[] DOING_ANIMS = new RawAnimation[DOING_CLIPS.length];
+
+    static {
+        for (byte d = 1; d < DOING_CLIPS.length; d++) {
+            DOING_ANIMS[d] = oneShot(d) ? RawAnimation.begin().thenPlayAndHold(DOING_CLIPS[d]) : RawAnimation.begin().thenLoop(DOING_CLIPS[d]);
+        }
+    }
+
+    @Override
+    public void registerControllers(AnimatableManager.ControllerRegistrar controllers) {
+        controllers.add(new SteadyController<>(this, "body", BLEND, this::animate));
+    }
+
+    /** Whether it walks (drawing only): it moved within the last {@link #WALK_HOLD} ticks. */
+    public boolean walking() {
+        return tickCount - movedTick <= WALK_HOLD;
+    }
+
+    /**
+     * How fast its looping clips play (idle, lying, the moods): 0.92 to 1.08 of their speed, fixed for each buffalo from its
+     * id, so a herd does not breathe and flick its ears in step.
+     */
+    public double loopRate() {
+        long bits = getUUID().getLeastSignificantBits() ^ getUUID().getMostSignificantBits();
+        return 0.92 + 0.16 * (Math.floorMod(bits, 1000L) / 999.0);
+    }
+
+    private PlayState animate(AnimationState<BuffaloEntity> state) {
+        AnimationController<BuffaloEntity> player = state.getController();
+        player.setAnimationSpeed(1.0);
+        Component film = getCustomName();
+        if (film != null && film.getString().startsWith("film:")) {
+            return state.setAndContinue(FILM_CLIPS.computeIfAbsent(film.getString().substring(5), c -> RawAnimation.begin().thenLoop(c)));
+        }
+        if (isDeadOrDying()) {
+            return state.setAndContinue(DEATH);
+        }
+        byte d = doing();
+        int id = entityData.get(DATA_DOING_ID);
+        if (id != shownDoingId) {
+            shownDoingId = id;
+            if (d != CALM) {
+                player.forceAnimationReset();   // a new doing: its clip from the start, even the same clip again
+            }
+        }
+        if (d > CALM && d < DOING_ANIMS.length) {
+            if (!oneShot(d)) {
+                player.setAnimationSpeed(loopRate());
+            }
+            return state.setAndContinue(DOING_ANIMS[d]);
+        }
+        if (walking()) {
+            // its gait by how fast it goes, each clip's pace following its stride so its hooves never slide (in the water
+            // too: the walk, at its swimming pace)
+            double s = stride / Math.max(0.3, getScale());
+            if (s > CHARGE_FROM) {
+                player.setAnimationSpeed(Mth.clamp(s / CHARGE_CLIP, 0.7, 2.5));
+                return state.setAndContinue(CHARGE_ANIM);
+            }
+            if (s > TROT_FROM) {
+                player.setAnimationSpeed(Mth.clamp(s / TROT_CLIP, 0.7, 1.8));
+                return state.setAndContinue(TROT_ANIM);
+            }
+            player.setAnimationSpeed(Mth.clamp(s / WALK_CLIP, 0.4, 2.0));
+            return state.setAndContinue(WALK);
+        }
+        player.setAnimationSpeed(loopRate());
+        return state.setAndContinue(IDLE);
+    }
+
+    @Override
+    public AnimatableInstanceCache getAnimatableInstanceCache() {
+        return cache;
+    }
+
+    @Override
+    public void setId(int id) {
+        super.setId(id);
+        if (chain != null) {                              // null while Entity's own constructor runs
+            chain.setIds(id);
+        }
+    }
+
+    @Override
+    public boolean isMultipartEntity() {
+        return true;
+    }
+
+    @Override
+    public net.neoforged.neoforge.entity.PartEntity<?>[] getParts() {
+        return chain.parts();
+    }
+}

@@ -1,0 +1,14 @@
+{
+  "_note": "The Cape buffalo's life (the animal life kit; 2026-11-25, docs/plans/buffalo.md, my picks, fun first). Sizes are shares of a bull's (the 3.8-block v12 model): bulls the big ones, cows smaller, the same look. Born grown for now; calves (live birth) and breeding come later.",
+  "sexes": "two",
+  "male_size": [
+    0.97,
+    1.03
+  ],
+  "female_size": [
+    0.86,
+    0.93
+  ],
+  "max_size": 1.03,
+  "breeds": false
+}

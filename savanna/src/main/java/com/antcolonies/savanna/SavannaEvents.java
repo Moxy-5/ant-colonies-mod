@@ -53,6 +53,7 @@ public class SavannaEvents {
         event.put(SavannaEntities.BULL_SHARK.get(), com.antcolonies.savanna.animal.BullSharkEntity.createAttributes().build());
         event.put(SavannaEntities.MONITOR.get(), com.antcolonies.savanna.animal.MonitorEntity.createAttributes().build());
         event.put(SavannaEntities.HIPPO.get(), com.antcolonies.savanna.animal.HippoEntity.createAttributes().build());
+        event.put(SavannaEntities.BUFFALO.get(), com.antcolonies.savanna.animal.BuffaloEntity.createAttributes().build());
         event.put(SavannaEntities.OTTER.get(), com.antcolonies.savanna.animal.OtterEntity.createAttributes().build());
         event.put(SavannaEntities.CRAB.get(), com.antcolonies.savanna.animal.CrabEntity.createAttributes().build());
         event.put(SavannaEntities.SNAIL.get(), com.antcolonies.savanna.animal.SnailEntity.createAttributes().build());
@@ -323,6 +324,7 @@ public class SavannaEvents {
             event.accept(SavannaItems.BULL_SHARK_SPAWN_EGG);
             event.accept(SavannaItems.MONITOR_SPAWN_EGG);
             event.accept(SavannaItems.HIPPO_SPAWN_EGG);
+            event.accept(SavannaItems.BUFFALO_SPAWN_EGG);
             event.accept(SavannaItems.OTTER_SPAWN_EGG);
             event.accept(SavannaItems.CRAB_SPAWN_EGG);
             event.accept(SavannaItems.SNAIL_SPAWN_EGG);

@@ -21,7 +21,6 @@ import net.minecraft.network.syncher.EntityDataSerializers;
 import net.minecraft.network.syncher.SynchedEntityData;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.sounds.SoundEvents;
-import net.minecraft.tags.BlockTags;
 import net.minecraft.tags.FluidTags;
 import net.minecraft.util.Mth;
 import net.minecraft.util.RandomSource;
@@ -1006,19 +1005,10 @@ public class HippoEntity extends PathfinderMob implements GeoEntity, HasLife {
         return null;
     }
 
-    /** Where it would stand on grass (or soil) in the column x, z within {@code dy} of {@code y}, dry, in loaded land; else null. */
+    /** Where it would stand on grass (or soil) in the column x, z within {@code dy} of {@code y} ({@link Grazing#grassStand}). */
     @Nullable
     private BlockPos grassStand(int x, int z, int y, int dy) {
-        Level level = level();
-        if (!level.hasChunkAt(new BlockPos(x, y, z))) {
-            return null;
-        }
-        BlockPos stand = new BlockPos(x, level.getHeight(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, x, z), z);
-        if (Math.abs(stand.getY() - y) > dy || !level.getFluidState(stand).isEmpty() || !level.getFluidState(stand.below()).isEmpty()) {
-            return null;
-        }
-        BlockState ground = level.getBlockState(stand.below());
-        return ground.is(Blocks.GRASS_BLOCK) || ground.is(BlockTags.DIRT) ? stand : null;
+        return Grazing.grassStand(level(), x, z, y, dy);
     }
 
     /**
@@ -1106,32 +1096,15 @@ public class HippoEntity extends PathfinderMob implements GeoEntity, HasLife {
         return best;
     }
 
-    /** The top block of its pool's water (its y), or {@link Integer#MIN_VALUE} if it has no pool of water. */
+    /** The top block of its pool's water (its y), or {@link Integer#MIN_VALUE} if it has no pool of water or its land is not loaded ({@link Grazing#waterTop}). */
     int waterTop() {
-        if (pool == null || !level().getFluidState(pool).is(FluidTags.WATER)) {
-            return Integer.MIN_VALUE;
-        }
-        BlockPos.MutableBlockPos p = pool.mutable();
-        while (level().getFluidState(p.above()).is(FluidTags.WATER) && p.getY() < pool.getY() + 16) {
-            p.move(0, 1, 0);
-        }
-        return p.getY();
+        return Grazing.waterTop(level(), pool);
     }
 
-    /** Where it would stand on dry bank in the column x, z: its ground's top level with the water's top {@code w} or a block over; else null. */
+    /** Where it would stand on dry bank in the column x, z: level with the water's top {@code w} or a block over ({@link Grazing#bankStand}). */
     @Nullable
     private BlockPos bankStand(int x, int z, int w) {
-        Level level = level();
-        BlockPos probe = new BlockPos(x, w, z);
-        if (!level.hasChunkAt(probe)) {
-            return null;
-        }
-        BlockPos stand = new BlockPos(x, level.getHeight(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, x, z), z);
-        if (stand.getY() < w + 1 || stand.getY() > w + 2 || !full(stand.below()) || !dryOpen(stand) || !dryOpen(stand.above())
-                || !level.getFluidState(stand.below()).isEmpty()) {
-            return null;
-        }
-        return stand;
+        return Grazing.bankStand(level(), x, z, w);
     }
 
     /** Whether water's top lies at level {@code w} within {@code reach} columns of x, z. */
@@ -1146,78 +1119,26 @@ public class HippoEntity extends PathfinderMob implements GeoEntity, HasLife {
         return false;
     }
 
-    /** Whether a hippo eats this plant: grass and ferns, and the savanna's grass tufts while still green (dry ones are the termites'). */
-    static boolean edible(BlockState s) {
-        if (s.is(Blocks.SHORT_GRASS) || s.is(Blocks.TALL_GRASS) || s.is(Blocks.FERN) || s.is(Blocks.LARGE_FERN)) {
-            return true;
-        }
-        return (s.getBlock() instanceof com.antcolonies.savanna.block.DryGrassBlock || s.getBlock() instanceof com.antcolonies.savanna.block.TallDryGrassBlock)
-                && s.getValue(com.antcolonies.savanna.block.DryGrassBlock.GROWTH) != com.antcolonies.savanna.block.DryGrassBlock.Growth.DRY;
-    }
-
-    /** An edible plant at its jaws (the block at the ground there, or the one over it), or null. */
+    /** An edible plant at its jaws (the block at the ground there, or the one over it; {@link Grazing#plantAt}), or null. */
     @Nullable
     BlockPos plantAtJaws() {
         Vec3 jaw = jawPoint();
-        BlockPos at = BlockPos.containing(jaw.x, getY() + 0.2, jaw.z);
-        for (BlockPos p : List.of(at, at.above())) {
-            if (edible(level().getBlockState(p))) {
-                return p;
-            }
-        }
-        return null;
+        return Grazing.plantAt(level(), jaw.x, getY(), jaw.z);
     }
 
-    /** The nearest edible plant standing on the ground within {@code reach} columns of {@code stand} (its level or one off), or null. */
+    /** The nearest edible plant standing on the ground within {@code reach} columns of {@code stand} ({@link Grazing#plantNear}), or null. */
     @Nullable
     BlockPos plantNear(BlockPos stand, int reach) {
-        BlockPos best = null;
-        double bestD = Double.MAX_VALUE;
-        for (int dx = -reach; dx <= reach; dx++) {
-            for (int dz = -reach; dz <= reach; dz++) {
-                for (int dy = -1; dy <= 1; dy++) {
-                    BlockPos p = stand.offset(dx, dy, dz);
-                    double d = dx * dx + dz * dz;
-                    if (d < bestD && edible(level().getBlockState(p))) {
-                        bestD = d;
-                        best = p;
-                    }
-                }
-            }
-        }
-        return best;
+        return Grazing.plantNear(level(), stand, reach);
     }
 
     /**
      * Eats a grass plant at its jaws, if any: grazed short, not pulled up (2026-11-23, the lawns): tall grass and large
      * ferns are cropped to short grass and ferns, a tall green savanna tuft to a short one, and a short plant to the
-     * ground (the grass block under it stays).
+     * ground (the grass block under it stays; {@link Grazing#crop}).
      */
     void cropGrass() {
-        BlockPos p = plantAtJaws();
-        if (p == null || !net.neoforged.neoforge.event.EventHooks.canEntityGrief(level(), this)) {
-            return;
-        }
-        Level level = level();
-        BlockState s = level.getBlockState(p);
-        if (s.hasProperty(net.minecraft.world.level.block.DoublePlantBlock.HALF)) {
-            BlockPos lower = s.getValue(net.minecraft.world.level.block.DoublePlantBlock.HALF)
-                    == net.minecraft.world.level.block.state.properties.DoubleBlockHalf.UPPER ? p.below() : p;
-            BlockState low = level.getBlockState(lower);
-            BlockState shorter = low.is(Blocks.TALL_GRASS) ? Blocks.SHORT_GRASS.defaultBlockState()
-                    : low.is(Blocks.LARGE_FERN) ? Blocks.FERN.defaultBlockState()
-                    : low.getBlock() instanceof com.antcolonies.savanna.block.TallDryGrassBlock
-                            ? com.antcolonies.savanna.registry.SavannaBlocks.DRY_GRASS.get().defaultBlockState()
-                                    .setValue(com.antcolonies.savanna.block.DryGrassBlock.GROWTH, low.getValue(com.antcolonies.savanna.block.DryGrassBlock.GROWTH))
-                            : null;
-            if (shorter != null) {
-                level.levelEvent(net.minecraft.world.level.block.LevelEvent.PARTICLES_DESTROY_BLOCK, lower.above(), Block.getId(low));
-                level.setBlock(lower.above(), Blocks.AIR.defaultBlockState(), Block.UPDATE_CLIENTS | Block.UPDATE_KNOWN_SHAPE);
-                level.setBlock(lower, shorter, Block.UPDATE_ALL);
-                return;
-            }
-        }
-        level.destroyBlock(p, false, this);
+        Grazing.crop(this, plantAtJaws(), true);
     }
 
     /**
