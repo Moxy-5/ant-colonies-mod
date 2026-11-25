@@ -688,6 +688,8 @@ public final class BuffaloGoals {
     /** A player (not in creative, not a spectator) is noticed this near, crouching this near (blocks); watched up to this long (ticks). */
     static final double WATCH_REACH = 12.0, WATCH_CROUCHED = 6.0;
     static final int WATCH_TICKS = 200;
+    /** A lion walking past this near is watched (blocks). */
+    static final double LION_WATCH = 12.0;
     /** A player it watched is watched again only after coming this much nearer (blocks), or sprinting. */
     static final double NEARER = 3.0;
     /** The herd's nearest member warns a player this near (blocks); a warning is remembered this long for that player (ticks), and may take this long. */
@@ -851,7 +853,7 @@ public final class BuffaloGoals {
             }
             Player p = b.level().getNearestPlayer(b.getX(), b.getY(), b.getZ(), WATCH_REACH, e -> e instanceof Player q && notices(q));
             if (p == null) {
-                return null;
+                return lionPassing();
             }
             double d = b.distanceTo(p);
             boolean nearest = b.nearestOfHerdTo(p);
@@ -866,6 +868,25 @@ public final class BuffaloGoals {
             Double was = memory.watchedAt(p);
             if (!lying && (was == null || d <= was - NEARER || p.isSprinting())) {
                 return new Call(Temper.WATCH, p, false, null);
+            }
+            return lionPassing();                           // a player already watched: a lion walking past still catches its eye
+        }
+
+        /**
+         * A lion walking past within {@link #LION_WATCH} (the lions, 2026-11-25; the hunt and the mobbing come with their
+         * step 2): a buffalo standing stops and faces it ({@code mood_alert}), never warns or charges. Null: none.
+         */
+        @Nullable
+        private Call lionPassing() {
+            byte doing = b.doing();
+            if (doing == BuffaloEntity.REST || doing == BuffaloEntity.REST_DOWN || doing == BuffaloEntity.REST_UP) {
+                return null;
+            }
+            for (LionEntity lion : b.level().getEntitiesOfClass(LionEntity.class, b.getBoundingBox().inflate(LION_WATCH),
+                    lion -> lion.isAlive() && lion.walking())) {
+                if (b.distanceTo(lion) <= LION_WATCH) {
+                    return new Call(Temper.WATCH, lion, false, null);
+                }
             }
             return null;
         }
@@ -939,8 +960,19 @@ public final class BuffaloGoals {
             }
         }
 
-        /** WATCH: it stands and faces the player; ends when they are no longer noticed or at {@link #WATCH_TICKS}. */
+        /** WATCH: it stands and faces the player (or a passing lion); ends when they are no longer noticed or at {@link #WATCH_TICKS}. */
         private void watch() {
+            if (target instanceof LionEntity lion) {
+                if (!lion.isAlive() || b.distanceTo(lion) > LION_WATCH + 2.0 || ticks > WATCH_TICKS) {
+                    end();
+                    return;
+                }
+                if (b.doing() != BuffaloEntity.MOOD_ALERT) {
+                    b.setDoing(BuffaloEntity.MOOD_ALERT);
+                }
+                b.face(lion.getX(), lion.getZ(), WATCH_TURN);
+                return;
+            }
             if (!(target instanceof Player p) || !valid(p) || !notices(p) || ticks > WATCH_TICKS) {
                 if (target instanceof Player p) {
                     memory.watched(p, b.distanceTo(p));

@@ -1,0 +1,9 @@
+{
+  "_note": "The lioness's life (the animal life kit; 2026-11-25, docs/plans/lion.md, my picks). Sizes are shares of Neon's lioness model (4.09 blocks long). No breeding yet (step 3).",
+  "sexes": "two",
+  "male_share": 0.0,
+  "male_size": [0.95, 1.0],
+  "female_size": [0.95, 1.0],
+  "max_size": 1.0,
+  "breeds": false
+}

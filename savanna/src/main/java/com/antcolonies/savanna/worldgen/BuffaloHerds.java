@@ -71,8 +71,8 @@ public final class BuffaloHerds {
     private BuffaloHerds() {
     }
 
-    /** What was laid: how many buffalo, and how many spots there were. */
-    public record Herd(int buffalo, int spots) {
+    /** What was laid: how many buffalo, how many spots there were, and where they stand (a pride laid after keeps clear of them). */
+    public record Herd(int buffalo, int spots, List<BlockPos> at) {
     }
 
     /**
@@ -92,7 +92,7 @@ public final class BuffaloHerds {
             }
         }
         if (water.isEmpty()) {
-            return new Herd(0, 0);
+            return new Herd(0, 0, List.of());
         }
         double nearest = pan.ring() + 1.5 + PAST_RING, farthest = pan.ring() + 1.5 + PanFeature.GRAZED + BEYOND_GRAZED;
         List<BoundingBox> trees = treeReach(level, bounds);
@@ -110,7 +110,7 @@ public final class BuffaloHerds {
             }
         }
         if (spots.size() < FEWEST) {
-            return new Herd(0, spots.size());
+            return new Herd(0, spots.size(), List.of());
         }
         // shuffled, then the nearest the water first (ties at random): the bull on one of the nearest
         for (int i = spots.size() - 1; i > 0; i--) {
@@ -135,7 +135,7 @@ public final class BuffaloHerds {
             }
         }
         if (herd.size() < FEWEST) {
-            return new Herd(0, spots.size() + 1);
+            return new Herd(0, spots.size() + 1, List.of());
         }
         float heading = random.nextFloat() * 360.0F;
         int laid = 0;
@@ -156,7 +156,7 @@ public final class BuffaloHerds {
             level.addFreshEntity(b);
             laid++;
         }
-        return new Herd(laid, spots.size() + 1);
+        return new Herd(laid, spots.size() + 1, List.copyOf(herd));
     }
 
     /** A spot a buffalo may be laid on, and how far it is from the pan's water (blocks). */

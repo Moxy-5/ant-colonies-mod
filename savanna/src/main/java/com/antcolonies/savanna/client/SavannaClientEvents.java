@@ -158,6 +158,9 @@ public class SavannaClientEvents {
         event.registerEntityRenderer(SavannaEntities.MONITOR.get(), MonitorRenderer::new);
         event.registerEntityRenderer(SavannaEntities.HIPPO.get(), HippoRenderer::new);
         event.registerEntityRenderer(SavannaEntities.BUFFALO.get(), BuffaloRenderer::new);
+        event.registerEntityRenderer(SavannaEntities.LION.get(), LionRenderer::new);
+        event.registerEntityRenderer(SavannaEntities.LIONESS.get(), LionRenderer::new);
+        event.registerEntityRenderer(SavannaEntities.LION_CUB.get(), LionRenderer::new);
         event.registerEntityRenderer(SavannaEntities.OTTER.get(), OtterRenderer::new);
         event.registerEntityRenderer(SavannaEntities.CRAB.get(), CrabRenderer::new);
         event.registerEntityRenderer(SavannaEntities.SNAIL.get(), SnailRenderer::new);

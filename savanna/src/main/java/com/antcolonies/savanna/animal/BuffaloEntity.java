@@ -174,7 +174,8 @@ public class BuffaloEntity extends PathfinderMob implements GeoEntity, HasLife {
 
     /**
      * Where its eyes go (drawn only, {@code client/BuffaloModel}): a player within 16 blocks (6 crouching; spectators too),
-     * a crocodile within 14 even lying still, or any other animal stirring within 10; never another buffalo. My picks.
+     * a lion within 24 and a crocodile within 14 even lying still, or any other animal stirring within 10; never another
+     * buffalo. My picks.
      */
     public final Attention attention = new Attention(16.0, BuffaloEntity::catchesEye);
 
@@ -187,6 +188,9 @@ public class BuffaloEntity extends PathfinderMob implements GeoEntity, HasLife {
         }
         if (seen instanceof CrocodileEntity) {
             return distance < 14.0 ? 0.4 : 0;
+        }
+        if (seen instanceof LionEntity) {
+            return distance < 24.0 ? 0.3 : 0;            // a lion is watched from far (the lions, 2026-11-25)
         }
         return moving && distance < 10.0 ? 1.0 : 0;
     }

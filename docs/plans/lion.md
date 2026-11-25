@@ -158,7 +158,7 @@ list of what they changed is at the end.
   strikes with `swipe`, `swipe_quick`, `bite`, a male also `swipe_heavy` and `swipe_combo`, from a gallop `gallop_swat`
   or `pounce` (struck from about 4 blocks, carried forward over the leap); the hit lands at the clip's hit tick if the
   head bead touches. After each strike it backs off half a block and stands `mood_angry` for 1 to 1.5 s. Ends: a player
-  who only came near, or ran, gets 1 strike (2 from a lioness with cubs) or 3 s of galloping, whichever is first; a lion
+  who only came near, or ran, gets 1 strike (2 from a lioness with cubs) or 4 s of galloping (3 s at first: a lion gains only about 1.7 blocks a second on a sprinting player, measured 2026-11-25), whichever is first; a lion
   that was hurt fights for 8 s (the buffalo's `REVENGE_TICKS`) and gives up only then or past the follow range of 32
   (review R9-15), so an archer at 20 is answered. A plain sprint started within about 8 blocks is caught once; from 12 it
   gets away; a sprint-jumper gets away.

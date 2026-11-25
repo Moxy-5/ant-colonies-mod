@@ -1,0 +1,9 @@
+{
+  "_note": "The lion cub's life (the animal life kit; 2026-11-25, docs/plans/lion.md, my picks). Sizes are shares of Neon's cub model (2.16 blocks long, a 2 to 5 month cub), all the spotted coat in step 1; growing up (the juvenile coat as the kit's teen stage, then a lioness or a young male) comes in step 3.",
+  "sexes": "two",
+  "male_share": 0.5,
+  "male_size": [0.85, 1.0],
+  "female_size": [0.85, 1.0],
+  "max_size": 1.0,
+  "breeds": false
+}

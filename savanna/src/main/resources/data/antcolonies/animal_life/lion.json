@@ -1,0 +1,9 @@
+{
+  "_note": "The male lion's life (the animal life kit; 2026-11-25, docs/plans/lion.md, my picks, fun first). Sizes are shares of Neon's male model (4.66 blocks long). The lion, the lioness and the cub are three entity types sharing one class, so each has its own file; born grown (cubs are laid as cubs), no growing or breeding yet (step 3).",
+  "sexes": "two",
+  "male_share": 1.0,
+  "male_size": [0.97, 1.03],
+  "female_size": [0.97, 1.03],
+  "max_size": 1.03,
+  "breeds": false
+}

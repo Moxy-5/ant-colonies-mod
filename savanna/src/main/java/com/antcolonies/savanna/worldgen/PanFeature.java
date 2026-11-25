@@ -94,6 +94,9 @@ public class PanFeature extends Feature<NoneFeatureConfiguration> {
                 // its herd of Cape buffalo, grazing past its ring (as an oxbow's hippo pod)
                 BuffaloHerds.Herd herd = BuffaloHerds.lay(level, random, laid, bounds, keepout);
                 SavannaMod.LOGGER.info("[world herds] pan at {} {}: {}", laid.middle().getX(), laid.middle().getZ(), BuffaloHerds.words(herd));
+                // one pan in three: a lion pride, its den in a tree's shade farther out (docs/plans/lion.md)
+                LionPrides.Pride pride = LionPrides.lay(level, random, laid, bounds, keepout, herd.at());
+                SavannaMod.LOGGER.info("[world prides] pan at {} {}: {}", laid.middle().getX(), laid.middle().getZ(), LionPrides.words(pride));
                 return true;
             }
             why.merge(String.valueOf(WHY.get()), 1, Integer::sum);

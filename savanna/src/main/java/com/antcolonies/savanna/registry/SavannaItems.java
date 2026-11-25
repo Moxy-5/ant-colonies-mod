@@ -150,6 +150,16 @@ public class SavannaItems {
     public static final DeferredItem<DeferredSpawnEggItem> BUFFALO_SPAWN_EGG =
             ITEMS.register("buffalo_spawn_egg",
                     () -> new DeferredSpawnEggItem(SavannaEntities.BUFFALO, 0x2B2623, 0x5A4A3A, new Item.Properties()));
+    // Tawny with a dark mane (the male), tawny with cream (the lioness), cream with brown spots (the cub); my picks.
+    public static final DeferredItem<DeferredSpawnEggItem> LION_SPAWN_EGG =
+            ITEMS.register("lion_spawn_egg",
+                    () -> new DeferredSpawnEggItem(SavannaEntities.LION, 0xC08A44, 0x4A2E1A, new Item.Properties()));
+    public static final DeferredItem<DeferredSpawnEggItem> LIONESS_SPAWN_EGG =
+            ITEMS.register("lioness_spawn_egg",
+                    () -> new DeferredSpawnEggItem(SavannaEntities.LIONESS, 0xC49A5E, 0xEAD7B0, new Item.Properties()));
+    public static final DeferredItem<DeferredSpawnEggItem> LION_CUB_SPAWN_EGG =
+            ITEMS.register("lion_cub_spawn_egg",
+                    () -> new DeferredSpawnEggItem(SavannaEntities.LION_CUB, 0xD8BC88, 0x7A5634, new Item.Properties()));
     public static final DeferredItem<DeferredSpawnEggItem> CROCODILE_SPAWN_EGG =
             ITEMS.register("crocodile_spawn_egg",
                     () -> new DeferredSpawnEggItem(SavannaEntities.CROCODILE, 0x4A4E26, 0xC8B070, new Item.Properties()));

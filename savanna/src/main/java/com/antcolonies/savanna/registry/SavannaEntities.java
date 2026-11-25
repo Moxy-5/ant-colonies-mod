@@ -236,6 +236,32 @@ public class SavannaEntities {
                     .clientTrackingRange(10)
                     .build("buffalo"));
 
+    // The African lion (M9 savanna land animals, 2026-11-25, docs/plans/lion.md): one class, three entity types, each its
+    // own box (Neon's card): the male 1.45 wide and 1.85 tall (drawn 4.66 long), the lioness 1.2 by 1.55 (4.09 long), the
+    // cub 0.78 by 0.95 (2.16 long); head and rump hit beads along the rest. Never spawned by the world's spawner (MISC):
+    // new land lays its prides beside some pans (worldgen/LionPrides).
+    public static final DeferredHolder<EntityType<?>, EntityType<com.antcolonies.savanna.animal.LionEntity>> LION =
+            ENTITY_TYPES.register("lion", () -> EntityType.Builder
+                    .of(com.antcolonies.savanna.animal.LionEntity::new, MobCategory.MISC)
+                    .sized(1.45F, 1.85F)
+                    .eyeHeight(1.62F)
+                    .clientTrackingRange(10)
+                    .build("lion"));
+    public static final DeferredHolder<EntityType<?>, EntityType<com.antcolonies.savanna.animal.LionEntity>> LIONESS =
+            ENTITY_TYPES.register("lioness", () -> EntityType.Builder
+                    .of(com.antcolonies.savanna.animal.LionEntity::new, MobCategory.MISC)
+                    .sized(1.2F, 1.55F)
+                    .eyeHeight(1.4F)
+                    .clientTrackingRange(10)
+                    .build("lioness"));
+    public static final DeferredHolder<EntityType<?>, EntityType<com.antcolonies.savanna.animal.LionEntity>> LION_CUB =
+            ENTITY_TYPES.register("lion_cub", () -> EntityType.Builder
+                    .of(com.antcolonies.savanna.animal.LionEntity::new, MobCategory.MISC)
+                    .sized(0.78F, 0.95F)
+                    .eyeHeight(0.85F)
+                    .clientTrackingRange(10)
+                    .build("lion_cub"));
+
     // The African clawless otter (M9 savanna life, 2026-11-22): drawn 2.6 blocks long nose to tail tip, 1 tall at the
     // crown (the approved v6 model); its box covers the body's middle, sleek enough for one-block gaps (Neon's card),
     // its head, rump and tail hit boxes along the rest (HitChain); each otter's own size through SCALE.
