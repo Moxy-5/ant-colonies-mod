@@ -1,0 +1,29 @@
+{
+  "animal": "buffalo",
+  "length_px": 61,
+  "note": "Measured African Buffalo (Syncerus caffer) outline (3.80 x 2.26 blocks = 61 x 36.2 px). Verified against Side and Front reference views.",
+  "parts": [
+    {"name": "tail", "side": [0.5, 3.0, 12.0, 29.5], "half_width": 1.3},
+    {"name": "rump", "side": [2.5, 8.0, 16.5, 32.2], "half_width": 8.0},
+    {"name": "hips", "side": [7.5, 16.5, 14.0, 33.6], "half_width": 9.4},
+    {"name": "barrel", "side": [16.0, 29.5, 13.4, 34.0], "half_width": 10.2},
+    {"name": "shoulder hump", "side": [29.0, 40.5, 11.5, 36.2], "half_width": 10.6},
+    {"name": "brisket", "side": [39.5, 43.5, 13.8, 34.6], "half_width": 9.4},
+    {"name": "neck", "side": [43.0, 49.0, 16.8, 33.2], "half_width": 8.2},
+    {"name": "skull", "side": [47.5, 55.8, 17.8, 31.8], "half_width": 5.8},
+    {"name": "muzzle", "side": [55.2, 60.8, 18.2, 26.0], "half_width": 4.3},
+    {"name": "horn boss", "side": [47.5, 55.5, 29.5, 34.5], "half_width": 8.0},
+    {"name": "horn sweep", "side": [45.2, 51.5, 26.2, 30.8], "top": [45.2, 51.5, 7.5, 17.8], "front": [7.5, 17.8, 26.2, 31.2], "mirror": true},
+    {"name": "horn hook", "side": [44.2, 48.8, 30.2, 36.2], "top": [44.2, 48.8, 13.0, 18.2], "front": [13.0, 18.2, 30.2, 36.2], "mirror": true},
+    {"name": "ear", "side": [47.2, 51.2, 22.0, 26.8], "top": [47.2, 51.2, 5.5, 12.2], "front": [5.5, 12.2, 22.0, 26.8], "mirror": true},
+    {"name": "front upper leg", "side": [31.5, 39.2, 10.0, 22.5], "top": [31.5, 39.2, 2.8, 8.2], "front": [2.8, 8.2, 10.0, 22.5], "mirror": true},
+    {"name": "front lower leg", "side": [32.8, 37.8, 3.2, 10.5], "top": [32.8, 37.8, 3.1, 7.7], "front": [3.1, 7.7, 3.2, 10.5], "mirror": true},
+    {"name": "front hoof", "side": [32.5, 38.4, 0.0, 3.4], "top": [32.5, 38.4, 3.0, 8.0], "front": [3.0, 8.0, 0.0, 3.4], "mirror": true},
+    {"name": "hind thigh", "side": [5.8, 14.5, 10.8, 24.5], "top": [5.8, 14.5, 3.0, 8.4], "front": [3.0, 8.4, 10.8, 24.5], "mirror": true},
+    {"name": "hind cannon", "side": [5.5, 10.5, 3.2, 11.2], "top": [5.5, 10.5, 3.1, 7.7], "front": [3.1, 7.7, 3.2, 11.2], "mirror": true},
+    {"name": "hind hoof", "side": [5.3, 11.2, 0.0, 3.4], "top": [5.3, 11.2, 3.0, 8.0], "front": [3.0, 8.0, 0.0, 3.4], "mirror": true}
+  ],
+  "marks": [
+    {"name": "eye", "side": [53.2, 55.4, 25.0, 27.2], "front": [3.6, 5.6, 25.0, 27.2]}
+  ]
+}

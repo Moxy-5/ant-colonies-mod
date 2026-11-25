@@ -1,0 +1,21 @@
+{
+  "length_blocks": 3.8,
+  "_note": "African Buffalo (Syncerus caffer) inspiration sheet (2026-11-24). Side view aspect W/H = 1.697 -> 3.80 blocks long x 2.24 blocks tall (60.8 x 35.8 model px at 16 px/block), matching our Savanna ecosystem scale (Male Lion 3.24b body x 2.00b tall; Hippo 4.84b body x 2.00b tall; Steve 1.80b tall).",
+  "views": {
+    "side": {
+      "box": [712, 224, 904, 348],
+      "head": "left"
+    },
+    "front": {
+      "box": [718, 65, 868, 198]
+    }
+  },
+  "marks": {
+    "snout": 717,
+    "head_back": 763,
+    "shoulders": 791,
+    "hips": 872,
+    "tail_base": 896
+  },
+  "background_tolerance": 10
+}

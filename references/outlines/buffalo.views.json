@@ -1,0 +1,32 @@
+{
+  "length_blocks": 3.76875,
+  "views": {
+    "side": {
+      "box": [
+        20,
+        20,
+        663,
+        422
+      ],
+      "head": "right"
+    },
+    "top": {
+      "box": [
+        20,
+        422,
+        663,
+        826
+      ],
+      "head": "right"
+    },
+    "front": {
+      "box": [
+        663,
+        20,
+        1067,
+        422
+      ]
+    }
+  },
+  "made_by": "python tools/workshop.py outline buffalo (from references/outlines/buffalo.json)"
+}
