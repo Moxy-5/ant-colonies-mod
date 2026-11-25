@@ -114,7 +114,7 @@ public class TadpoleEntity extends AbstractSchoolingFish implements GeoEntity {
     protected void registerGoals() {
         super.registerGoals();
         goalSelector.addGoal(2, new AvoidEntityGoal<>(this, LivingEntity.class, PART_FROM, 1.3, 1.5, BarbEntity::isHunter));
-        goalSelector.addGoal(4, new TadpoleGrazeGoal(this));
+        goalSelector.addGoal(3, new TadpoleGrazeGoal(this));     // over Minecraft's random swim (4), else a swim held off the graze roll (BUGS 302)
     }
 
     @Override

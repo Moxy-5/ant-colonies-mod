@@ -7,14 +7,12 @@ import com.antcolonies.savanna.entity.TermiteKingEntity;
 import com.antcolonies.savanna.entity.TermiteQueenEntity;
 import com.antcolonies.savanna.entity.TermiteSoldierEntity;
 import com.antcolonies.savanna.entity.TermiteWorkerEntity;
-import com.antcolonies.savanna.entity.goal.HuntTermitesGoal;
 import com.antcolonies.savanna.registry.SavannaEntities;
 import com.antcolonies.savanna.registry.SavannaItems;
 
 import net.minecraft.core.component.DataComponents;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerLevel;
-import net.minecraft.world.entity.animal.Chicken;
 import net.minecraft.world.item.CreativeModeTabs;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.component.BlockItemStateProperties;
@@ -27,7 +25,7 @@ import net.neoforged.neoforge.event.level.BlockEvent;
 
 /**
  * The savanna's game events (the split, step S4, out of the shared {@link ModEvents}): the termites' strength and
- * health, chickens hunting termites, and the giant trees' fire, lightning, falls, days and bone meal.
+ * health, and the giant trees' fire, lightning, falls, days and bone meal.
  */
 @EventBusSubscriber(modid = SavannaMod.MODID)
 public class SavannaEvents {
@@ -135,7 +133,10 @@ public class SavannaEvents {
         }
     }
 
-    /** Chickens hunt termite workers out on the surface (step 6c; see {@link HuntTermitesGoal}). */
+    /**
+     * A falling tree left mid-fall, and lightning drawn to a big tree. (Chickens hunting termite workers, step 6c, were
+     * taken out of the game by the user, 2026-11-25.)
+     */
     @SubscribeEvent
     public static void onJoinLevel(EntityJoinLevelEvent event) {
         if (event.loadedFromDisk() && event.getEntity().getTags().contains(com.antcolonies.savanna.tree.TreeFall.TAG)) {
@@ -150,9 +151,6 @@ public class SavannaEvents {
             if (to != null) {
                 bolt.moveTo(net.minecraft.world.phys.Vec3.atBottomCenterOf(to));
             }
-        }
-        if (!event.getLevel().isClientSide() && event.getEntity() instanceof Chicken chicken) {
-            chicken.goalSelector.addGoal(3, new HuntTermitesGoal(chicken));
         }
     }
 

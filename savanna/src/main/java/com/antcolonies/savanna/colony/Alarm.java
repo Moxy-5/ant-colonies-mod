@@ -36,7 +36,7 @@ import net.minecraft.world.phys.Vec3;
  * (2026-11-12, {@code docs/plans/termite-alarm-rework.md}): the alarm is local. It keeps a short list of
  * <b>troubles</b>: a place, what kind it is, and a strength that fades on its own. Real Macrotermes soldiers that feel
  * trouble drum their heads on the ground; soldiers near drum back and walk toward it, so the alarm runs along the
- * gallery at about 1.3 m a second and fades with distance, the workers there run deeper, and the rest of the colony
+ * gallery at about 1.3 m a second (43.3 blocks a second at the mod's scale) and fades with distance, the workers there run deeper, and the rest of the colony
  * carries on (Hager and Kirchner 2013).
  * <ul>
  * <li><b>Kinds</b> ({@link Kind}): something <i>felt</i> (a player sprinting or jumping on the mound), a <i>foe</i> (a
@@ -394,7 +394,7 @@ public class Alarm {
 
     /**
      * An enemy of the colony, by the shared fight rules ({@link Fights#isFoe}, M8 step 2a): an animal of the species
-     * file's {@code fight.foe_types} (chickens eat termites), an insect of a species it lists (the Matabele), or an ant
+     * file's {@code fight.foe_types} (none for the termites today), an insect of a species it lists (the Matabele), or an ant
      * or termite of another colony.
      */
     public boolean isEnemy(Entity entity) {
@@ -470,7 +470,7 @@ public class Alarm {
     /** Whether the trouble's drumming has got {@code distance} blocks out by now, and is still felt that far. */
     private boolean reached(Trouble trouble, double distance, long now) {
         SavannaNumbers.AlarmNumbers numbers = numbers();
-        double speed = numbers == null ? 1.3 : numbers.drumSpeed();
+        double speed = numbers == null ? 43.3 : numbers.drumSpeed();
         return distance <= strength(trouble, now) && (now - trouble.startedAt) * speed / 20.0 >= distance;
     }
 

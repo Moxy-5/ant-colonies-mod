@@ -271,7 +271,7 @@ public final class SavannaNumbers {
      * {@code breach} round a broken wall; that reach shrinks by {@code fadePerSecond} blocks a second from the last
      * thing that fed the trouble (so footsteps are over in 30 s, a foe or a breach 80 s after the last of it); the
      * drumming runs out from it at {@code drumSpeed} blocks a second (real: about 1.3 m a second, Hager and Kirchner
-     * 2013); something new within {@code mergeWithin} blocks of a trouble feeds that one. My picks but the speed.
+     * 2013, so 43.3 blocks a second at the mod's scale of 1 block = 30 mm; the user, 2026-11-25); something new within {@code mergeWithin} blocks of a trouble feeds that one. My picks but the speed.
      */
     public record AlarmNumbers(double felt, double foe, double breach, double fadePerSecond, double drumSpeed, double mergeWithin) {
         public static final Codec<AlarmNumbers> CODEC = RecordCodecBuilder.create(i -> i.group(
@@ -279,7 +279,7 @@ public final class SavannaNumbers {
                 Codec.DOUBLE.optionalFieldOf("foe", 16.0).forGetter(AlarmNumbers::foe),
                 Codec.DOUBLE.optionalFieldOf("breach", 16.0).forGetter(AlarmNumbers::breach),
                 Codec.DOUBLE.optionalFieldOf("fade_per_second", 0.2).forGetter(AlarmNumbers::fadePerSecond),
-                Codec.DOUBLE.optionalFieldOf("drum_speed", 1.3).forGetter(AlarmNumbers::drumSpeed),
+                Codec.DOUBLE.optionalFieldOf("drum_speed", 43.3).forGetter(AlarmNumbers::drumSpeed),
                 Codec.DOUBLE.optionalFieldOf("merge_within", 8.0).forGetter(AlarmNumbers::mergeWithin)
         ).apply(i, AlarmNumbers::new));
 

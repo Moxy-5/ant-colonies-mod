@@ -1030,6 +1030,13 @@ public class MonitorEntity extends PathfinderMob implements GeoEntity, HasLife {
         return hungryIn > 0;
     }
 
+    /** Fed and sunned for a long while (for tests whose monitor must only walk where it is sent: a bask or a hunt
+     *  starting at its random times took the climb tests' monitor off its route, BUGS 255, 277). */
+    public void calmForTests() {
+        hungryIn = 100_000;
+        sunIn = 100_000;
+    }
+
     /** Wants the sun now (for tests and the film camera). */
     public void wantSun() {
         sunIn = 0;

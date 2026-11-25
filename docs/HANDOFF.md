@@ -6,9 +6,10 @@ Keep this short (~40 lines). Remove finished items once merged or picked up. Det
 - **Neon (Model & Animation Studio):** `tools/`, `references/`, and model assets (`geo/`, `textures/`, `animations/`, `body_plans/`, `block_moves/`). Always present models/paint/clips via a live user-facing HTML artifact in the sidebar (`<animal>_model_viewer.html`, see `GEMINI.md`).
 - **Claude (Gameplay & Worldgen):** Java gameplay & worldgen (`*/src/main/java/`), `data/` JSONs (`animal_life/`, spawns, biomes), and game tests.
 - **Shared ground (`framework/.../entity/body/`):** Coordinate here before editing (e.g., Animal Maker Engine Step B `BlockMoves`). Always work on separate branches/worktrees.
+- **Where each works (2026-11-25):** Neon only in its own folder `C:\Ant Mod\neon-studio` on branch `neon/studio`, committing every approved stage (rules in `GEMINI.md`); Claude sessions in their own worktrees, and `C:\Ant Mod` holds the branch the user plays. Claude takes an animal by merging `neon/studio`.
 
 ## In progress right now
-- **Neon:** *(ready for next animal)*
+- **Neon:** Cape buffalo (`antcolonies:buffalo`), in the workshop on `neon/studio` (moved there from `C:\Ant Mod` uncommitted, 2026-11-25: brief, outline, model up to v10, paint, clips in progress).
 - **Claude:** six-banded distichodus, model and game both (the user picked Claude to design it, 2026-11-22; `docs/plans/distichodus.md`): shape and paint approved, clips made (`tools/distichodus_models.py`, game files written); the entity built 2026-11-23 (the river food web's step 5). Neon: not this one.
 - **Claude:** Otter into the game (step 1 built 2026-11-22: `OtterEntity`, the shared `MoveRider`; its step up, step down and climb-outs remade quick in `tools/otter_models.py` at the user's word); bull shark in a linked session on its own branch. Before: hippo into the game (`HippoEntity`, branch `claude/engine-every-animal`; v8 and its block moves approved/made 2026-11-21, `docs/handoff/hippo.md`). Hippo calf and teen looks (2026-11-21, `tools/life_looks.py` `hippo_looks`, life viewer "Hippo" groups), waiting for the user's look before they go into the game. World eggs step 2 after.
 

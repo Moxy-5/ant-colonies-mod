@@ -255,7 +255,7 @@ public class CrocodileEntity extends PathfinderMob implements GeoEntity, HasLife
     int schoolFor;
     /** The spot beside a basking crocodile it is going to lie at, and the way it will face there (null: none). */
     @Nullable
-    Vec3 joinAt;
+    public Vec3 joinAt;
     float joinFace;
     /** The spot on a river sand bank it goes to bask at (null: none known), and ticks before it may look for sand again. */
     @Nullable
@@ -744,8 +744,9 @@ public class CrocodileEntity extends PathfinderMob implements GeoEntity, HasLife
     }
 
     /** Whether it is a time to lie in the sun: day, dry, and it has been in the water long enough. */
-    boolean sunTime() {
-        return sunIn <= 0 && level().isDay() && !level().isRaining();
+    public boolean sunTime() {
+        return sunIn <= 0 && com.antcolonies.colony.Colony.isSunUp(level(), com.antcolonies.colony.Colony.dayTimeAt(level(), blockPosition()))
+                && !level().isRaining();
     }
 
     public float ownSize() {
@@ -809,13 +810,15 @@ public class CrocodileEntity extends PathfinderMob implements GeoEntity, HasLife
     public void travel(Vec3 travelVector) {
         if (isControlledByLocalInstance() && isInWater()) {
             moveRelative(getSpeed(), travelVector);
-            double before = getY();
             move(MoverType.SELF, getDeltaMovement());
             Vec3 v = getDeltaMovement().scale(0.9);
             // against a bank or a ledge under the water with room above it: up and over, as every swimming mob of
             // Minecraft's climbs out. Room means no block in the way, water allowed: Minecraft's own isFree also refuses
-            // water, so a crocodile afloat against a shelf a block under the surface never rose onto it (BUGS 273)
-            if (horizontalCollision && level().noCollision(this, getBoundingBox().move(v.x, v.y + 0.6 - getY() + before, v.z))) {
+            // water, so a crocodile afloat against a shelf a block under the surface never rose onto it (BUGS 273).
+            // Room to rise onto the top of the block its feet are in (at least 0.6): a big male floats with his feet
+            // about 0.6 to 0.7 under a bank's top, and a flat 0.6 left him drifting along it (BUGS 303)
+            double rise = Math.max(0.6, Math.floor(getY()) + 1.01 - getY());
+            if (horizontalCollision && level().noCollision(this, getBoundingBox().move(v.x, rise, v.z))) {
                 v = new Vec3(v.x, 0.3, v.z);
             }
             setDeltaMovement(v);
@@ -1779,7 +1782,12 @@ public class CrocodileEntity extends PathfinderMob implements GeoEntity, HasLife
             }
             wait = 100;
             if (croc.findBaskingCompany()) {
-                return croc.getNavigation().moveTo(croc.joinAt.x, croc.joinAt.y, croc.joinAt.z, 1.0);
+                // only company it can get to: not a basker in another pond over dry land (BUGS 305)
+                var path = croc.getNavigation().createPath(BlockPos.containing(croc.joinAt), 0);
+                if (path != null && path.canReach()) {
+                    return croc.getNavigation().moveTo(path, 1.0);
+                }
+                croc.joinAt = null;
             }
             if (croc.findSandBank()) {
                 var path = croc.getNavigation().createPath(croc.sandAt, 0);

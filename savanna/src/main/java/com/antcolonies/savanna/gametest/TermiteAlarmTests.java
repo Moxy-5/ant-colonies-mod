@@ -30,16 +30,13 @@ import net.minecraft.core.Direction;
 import net.minecraft.gametest.framework.GameTest;
 import net.minecraft.gametest.framework.GameTestHelper;
 import net.minecraft.server.level.ServerLevel;
-import net.minecraft.world.entity.EntityType;
-import net.minecraft.world.entity.animal.Chicken;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.phys.AABB;
 import net.neoforged.neoforge.gametest.GameTestHolder;
 import net.neoforged.neoforge.gametest.PrefixGameTestTemplate;
 
 /**
- * The alarm (M7 step 6c; local since the rework's step 3, 2026-11-12): chickens hunt termite workers, soldiers bite
- * them, the foragers there hurry home, footsteps bring the minors within earshot to look and drum, a break-in spreads
+ * The alarm (M7 step 6c; local since the rework's step 3, 2026-11-12): a foe at the foragers sends them hurrying home, footsteps bring the minors within earshot to look and drum, a break-in spreads
  * the drumming through the nest and sends the soldiers to the breach while the workers seal it; break-ins again and
  * again are still only breaches (no level 4, nothing kept after a reload, the rest of the colony carries on).
  */
@@ -47,111 +44,13 @@ import net.neoforged.neoforge.gametest.PrefixGameTestTemplate;
 @PrefixGameTestTemplate(false)
 public class TermiteAlarmTests {
     /**
-     * A chicken comes for the foragers at night. A colony with its nest dug out and both foraging holes open, five old
-     * workers (foragers) cutting at a hay bale 11 blocks out, three minors out on guard. A chicken is put down at the
-     * hay: a foe is felt there (the workers there go in; the rework, step 3: no longer the whole colony), the minors feel it, go at the chicken
-     * and bite it until it is dead, and the workers all go in.
-     */
-    @GameTest(template = "arena", timeoutTicks = 8000, skyAccess = true)
-    public static void minorsBiteAChickenThatHuntsTheForagersWhoHurryHome(GameTestHelper helper) {
-        ServerLevel level = helper.getLevel();
-        level.getServer().tickRateManager().setTickRate(2000.0F);
-        List<TermiteSoldierEntity> minors = new ArrayList<>();
-        BlockPos[] hay = new BlockPos[1];
-        Chicken[] chicken = new Chicken[1];
-        long[] at = {-1, -1, -1}; // when the chicken came, when the alarm went up, when every worker where it is felt was in
-        Set<UUID> biters = new HashSet<>();
-        Set<UUID> heard = new HashSet<>();
-        TermiteScenes.colony(helper, TermiteScenes.spots(5, i -> new BlockPos(MIDDLE - 2 + i, SURFACE, MIDDLE - 2)), colony -> {
-            helper.assertTrue(colony != null && !colony.isFounding(), "no termite colony with workers");
-            TestClock.still(helper, 12.0); // midday: everybody stays in
-            long old = level.getGameTime() - colony.profile().worker().builderUntilTicks() - 1000;
-            for (TermiteWorkerEntity worker : TestIsolation.insectsOf(helper, TermiteWorkerEntity.class)) {
-                worker.setGrownUpAt(old);
-            }
-            TermiteScenes.digNestAtOnce(level, colony);
-            level.setBlock(colony.nest().getEntrance(), Blocks.STONE.defaultBlockState(), 3);
-            List<NestPlan.ForagingTunnel> tunnels = colony.nest().getForagingTunnels(level);
-            for (NestPlan.ForagingTunnel tunnel : tunnels) {
-                level.setBlock(tunnel.hole(), Blocks.AIR.defaultBlockState(), 3);
-            }
-            hay[0] = tunnels.get(0).hole().above().relative(TermiteSoldierTests.intoArena(tunnels.get(0).side().getClockWise()), 11);
-            colony.foodMap().knowForTests(hay[0]); // (finding it is tested in TermiteFoodTests)
-            level.setBlock(hay[0], Blocks.HAY_BLOCK.defaultBlockState(), 3);
-            List<BlockPos> room = colony.nest().getHomeChamber(level).room();
-            for (int i = 0; i < 3; i++) {
-                minors.add(TermiteSoldierTests.put(level, SavannaEntities.TERMITE_MINOR_SOLDIER.get(), room.get(i)));
-            }
-        });
-        helper.runAfterDelay(40, () -> TestClock.still(helper, 0.0)); // midnight: the foragers go out
-        helper.onEachTick(() -> {
-            Colony colony = TermiteMoundTests.colony(helper);
-            if (colony == null || hay[0] == null || helper.getTick() < 40) {
-                return;
-            }
-            long tick = helper.getTick();
-            if (chicken[0] == null) {
-                // The chicken comes once a forager is at the hay and a minor is out on guard.
-                boolean foragerAtTheHay = !level.getEntitiesOfClass(TermiteWorkerEntity.class, new AABB(hay[0]).inflate(2),
-                        worker -> colony.getId().equals(worker.getColonyId())).isEmpty();
-                boolean minorOut = minors.stream().anyMatch(minor -> !colony.nest().isInside(level, minor.blockPosition()));
-                if (foragerAtTheHay && minorOut) {
-                    BlockPos spot = hay[0].relative(Direction.UP);
-                    chicken[0] = EntityType.CHICKEN.create(level);
-                    chicken[0].moveTo(spot.getX() + 0.5, spot.getY(), spot.getZ() + 0.5, 0.0F, 0.0F);
-                    level.addFreshEntity(chicken[0]);
-                    at[0] = tick;
-                    SavannaMod.LOGGER.info("[alarm-test] tick {}: a chicken at the hay; {}", tick, colony.part(SavannaParts.ALARM).orElseThrow().describe(level));
-                }
-                return;
-            }
-            if (at[1] < 0 && colony.part(SavannaParts.ALARM).orElseThrow().anyKeptIn(level)) {
-                at[1] = tick;
-                SavannaMod.LOGGER.info("[alarm-test] tick {}: alarm up {} ticks after the chicken came; {}", tick, tick - at[0],
-                        colony.part(SavannaParts.ALARM).orElseThrow().describe(level));
-            }
-            // (the rework, step 3: an alarm no longer ends the foraging time for the whole colony, so that check is gone;
-            // the workers at the hay going in is checked at the end)
-            for (TermiteSoldierEntity minor : minors) {
-                if (minor.isBiting()) {
-                    biters.add(minor.getUUID());
-                }
-                if (colony.part(SavannaParts.ALARM).orElseThrow().hasHeard(minor.getUUID())) {
-                    heard.add(minor.getUUID());
-                }
-            }
-            // The rework, step 3: the workers where the foe is felt go in (not the whole colony any more).
-            if (at[1] >= 0 && at[2] < 0 && colony.part(SavannaParts.ALARM).orElseThrow().anyKeptIn(level)
-                    && TestIsolation.insectsOf(helper, 8, TermiteWorkerEntity.class, worker -> colony.getId().equals(worker.getColonyId())
-                            && !colony.nest().isInside(level, worker.blockPosition()) && colony.isAlarmed(level, worker.blockPosition())).isEmpty()) {
-                at[2] = tick;
-            }
-            if (tick % 500 == 0) {
-                SavannaMod.LOGGER.info("[alarm-test] tick {}: chicken {} health {}, minors {}; {}", tick, chicken[0].blockPosition().toShortString(),
-                        chicken[0].getHealth(), minors.stream().map(m -> m.blockPosition().toShortString() + (m.isDrumming() ? " drumming" : "")).toList(),
-                        colony.part(SavannaParts.ALARM).orElseThrow().describe(level));
-            }
-        });
-        helper.succeedWhen(() -> {
-            Colony colony = TermiteMoundTests.colony(helper);
-            helper.assertTrue(colony != null && chicken[0] != null, "no chicken yet");
-            helper.assertTrue(at[1] >= 0, "the alarm did not go up");
-            // At least one: the first minor may kill the chicken (two bites) before the drumming reaches the others 15 blocks
-            // off, and they go in behind the workers (a full run, 2026-10-14: only 1 of 3 had felt it, the chicken dead).
-            helper.assertFalse(heard.isEmpty(), "no minor felt the alarm");
-            helper.assertFalse(biters.isEmpty(), "no minor has bitten the chicken");
-            helper.assertFalse(chicken[0].isAlive(), "the chicken is still alive (" + chicken[0].getHealth() + " health)");
-            helper.assertTrue(at[2] >= 0, "a worker stayed outside where the foe was felt");
-            SavannaMod.LOGGER.info("[alarm-test] tick {}: the chicken is dead, bitten by {} minors, the workers are in", helper.getTick(), biters.size());
-        });
-    }
-
-    /**
      * The rework, step 3 (2026-11-12): the alarm no longer keeps the whole colony in, and plugs no hole itself, so the
-     * scene now checks what is left of it: once the chicken has come, every worker outside where the foe is felt goes in
+     * scene now checks what is left of it: once the foe has come, every worker outside where the foe is felt goes in
      * while it is still felt (they crowded the open shaft over the hole before), and the hole is open to them all the while. The old
      * check (the middle hole plugged within 20 seconds of everybody being in) went with the rule it checked; holes being
-     * plugged once the foraging time is over is checked in the foraging tests. The scene as it was written:
+     * plugged once the foraging time is over is checked in the foraging tests. Chickens no longer hunt termites (the user,
+     * 2026-11-25), so the foe is now a lone Matabele major standing at the bush (no mind of its own: it only has to be
+     * there, an enemy at the foragers, as the chicken was). The scene as it was written:
      *
      * <p>The user's bug (2026-10-13): a young colony at night whose only way out is the open hole in the middle of the mound;
      * eight foragers out at a dead bush, minors out on guard. A chicken comes: the alarm goes to 2 and the colony stays in, so
@@ -162,13 +61,13 @@ public class TermiteAlarmTests {
      * tunnel block back over it first (it failed 1 run in 3 that way, 2026-10-14), and then it is closed to the sky.
      */
     @GameTest(template = "arena", timeoutTicks = 6000, skyAccess = true)
-    public static void theMiddleHoleIsPluggedSoonAfterAChickenAlarm(GameTestHelper helper) {
+    public static void foragersHurryInThroughAYoungMoundsOpenShaftAtAFoe(GameTestHelper helper) {
         ServerLevel level = helper.getLevel();
         level.getServer().tickRateManager().setTickRate(2000.0F);
         List<TermiteSoldierEntity> minors = new ArrayList<>();
         BlockPos[] bush = new BlockPos[1];
-        Chicken[] chicken = new Chicken[1];
-        long[] at = {-1, -1, -1}; // the chicken came, the fight was over (chicken dead or the minors back in), everybody was in
+        com.antcolonies.savanna.entity.MatabeleEntity[] foe = new com.antcolonies.savanna.entity.MatabeleEntity[1];
+        long[] at = {-1, -1, -1}; // the foe came, the fight was over (foe dead or the minors back in), everybody was in
         TermiteScenes.colony(helper, TermiteScenes.spots(10, i -> new BlockPos(MIDDLE - 2 + i % 4, SURFACE, MIDDLE - 2 + i / 4)), colony -> {
             helper.assertTrue(colony != null && !colony.isFounding(), "no termite colony with workers");
             long old = level.getGameTime() - colony.profile().worker().builderUntilTicks() - 1000;
@@ -207,20 +106,22 @@ public class TermiteAlarmTests {
             }
             long tick = helper.getTick();
             BlockPos hole = colony.nest().getEntrance();
-            if (chicken[0] == null) {
+            if (foe[0] == null) {
                 boolean workerOut = !level.getEntitiesOfClass(TermiteWorkerEntity.class, new AABB(bush[0]).inflate(3),
                         worker -> colony.getId().equals(worker.getColonyId())).isEmpty();
                 if (workerOut && minors.stream().anyMatch(minor -> !colony.nest().isInside(level, minor.blockPosition()))) {
-                    chicken[0] = EntityType.CHICKEN.create(level);
-                    chicken[0].moveTo(bush[0].getX() + 0.5, bush[0].getY(), bush[0].getZ() + 1.5, 0.0F, 0.0F);
-                    level.addFreshEntity(chicken[0]);
+                    foe[0] = SavannaEntities.MATABELE_MAJOR.get().create(level);
+                    foe[0].moveTo(bush[0].getX() + 0.5, bush[0].getY(), bush[0].getZ() + 1.5, 0.0F, 0.0F);
+                    foe[0].keepOutOfColonies();
+                    foe[0].setNoAi(true);
+                    level.addFreshEntity(foe[0]);
                     at[0] = tick;
                 }
                 return;
             }
-            // Over when the chicken is dead, or when the minors have gone in behind the workers and left it outside
+            // Over when the foe is dead, or when the minors have gone in behind the workers and left it outside
             // (real soldiers guard the foragers, then go in last and the hole is sealed).
-            if (at[1] < 0 && (!chicken[0].isAlive() || !colony.part(SavannaParts.SOLDIERS).orElseThrow().minorsOut(level))) {
+            if (at[1] < 0 && (!foe[0].isAlive() || !colony.part(SavannaParts.SOLDIERS).orElseThrow().minorsOut(level))) {
                 at[1] = tick;
             }
             if (at[2] < 0 && !colony.part(SavannaParts.ALARM).orElseThrow().isCalm(level)
@@ -248,8 +149,8 @@ public class TermiteAlarmTests {
                             .append(" ").append(ant.goalSelector.getAvailableGoals().stream().filter(g -> g.isRunning())
                                     .map(g -> g.getGoal().getClass().getSimpleName()).toList());
                 }
-                SavannaMod.LOGGER.info("[middle-hole] tick {}: chicken {}, alarm {}, foraging {}, hole {} ({}), wants plugging {}, anyone outside {}, minors out {}{}",
-                        tick, chicken[0].isAlive() ? "alive" : "dead", colony.part(SavannaParts.ALARM).orElseThrow().describe(level), colony.isForagingTime(level),
+                SavannaMod.LOGGER.info("[middle-hole] tick {}: foe {}, alarm {}, foraging {}, hole {} ({}), wants plugging {}, anyone outside {}, minors out {}{}",
+                        tick, foe[0].isAlive() ? "alive" : "dead", colony.part(SavannaParts.ALARM).orElseThrow().describe(level), colony.isForagingTime(level),
                         ForagingHoles.isOpen(level, hole) ? "open" : "shut", level.getBlockState(hole).getBlock().getName().getString(),
                         colony.foragingHoles().wantsPlugging(level), colony.foragingHoles().isAnyoneOutside(level),
                         colony.part(SavannaParts.SOLDIERS).orElseThrow().minorsOut(level), near);
@@ -257,10 +158,10 @@ public class TermiteAlarmTests {
         });
         helper.succeedWhen(() -> {
             Colony colony = TermiteMoundTests.colony(helper);
-            helper.assertTrue(chicken[0] != null, "no chicken yet: no forager reached the bush while a minor was outside");
-            helper.assertTrue(at[2] >= 0, "the workers outside did not all go in while the foe was felt (the chicken came at tick " + at[0] + "):"
+            helper.assertTrue(foe[0] != null, "no foe yet: no forager reached the bush while a minor was outside");
+            helper.assertTrue(at[2] >= 0, "the workers outside did not all go in while the foe was felt (the foe came at tick " + at[0] + "):"
                     + colony.part(SavannaParts.ALARM).orElseThrow().describe(level));
-            helper.assertTrue(at[2] - at[0] <= 1200, "the workers took " + (at[2] - at[0]) + " ticks to get in after the chicken came");
+            helper.assertTrue(at[2] - at[0] <= 1200, "the workers took " + (at[2] - at[0]) + " ticks to get in after the foe came");
             helper.assertTrue(at[2] - at[0] <= 600, "the workers where the foe was felt took " + (at[2] - at[0]) + " ticks to get in, more than 30 seconds");
         });
     }
