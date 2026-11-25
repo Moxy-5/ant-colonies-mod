@@ -507,12 +507,11 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
 
     /**
      * A dead worker or soldier leaves its body where it died (once the death animation is over, so also after
-     * {@code /kill}), for its nestmates to deal with. Not when a chicken killed it: the chicken has eaten it.
+     * {@code /kill}), for its nestmates to deal with.
      */
     @Override
     public void remove(net.minecraft.world.entity.Entity.RemovalReason reason) {
-        if (reason == net.minecraft.world.entity.Entity.RemovalReason.KILLED && leavesBody() && !(getLastHurtByMob() instanceof net.minecraft.world.entity.animal.Chicken)
-                && level() instanceof ServerLevel serverLevel) {
+        if (reason == net.minecraft.world.entity.Entity.RemovalReason.KILLED && leavesBody() && level() instanceof ServerLevel serverLevel) {
             Colony colony = getColonyId() == null ? null : ColonyManager.get(serverLevel).getColony(getColonyId());
             if (colony != null) {
                 colony.refuse().spawnCorpse(serverLevel, getX(), getY(), getZ());
@@ -679,7 +678,7 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
     }
 
     /**
-     * Hurt by something that is not of its own colony (a chicken pecking, a player, an ant of another colony): the
+     * Hurt by something that is not of its own colony (a player, an ant of another colony): the
      * colony's alarm goes up (level 2 at the attacker; only species that raise one, see {@code colony.Alarm}).
      */
     @Override
@@ -703,7 +702,7 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
 
     /**
      * Once a second: a member out on the surface (under the open sky, outside the nest) that sees a hostile mob close by
-     * (a monster, or any mob hunting insects, such as a chicken after termites) tells the danger memory (brain step 4g).
+     * (a monster, or any mob hunting insects) tells the danger memory (brain step 4g).
      */
     private void lookForHostiles(ServerLevel level) {
         Colony colony = getColonyId() == null ? null : getColony();

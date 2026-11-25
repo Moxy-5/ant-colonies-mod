@@ -18,7 +18,7 @@ import net.minecraft.resources.ResourceLocation;
  * <li>{@code bodies}: each body's health and damage (a body is what {@code AbstractAntEntity.fightBody()} names: a
  * termite's worker, minor and major soldier, king and queen; a Matabele's major, minor and queen), and how many stings
  * of a hunter it takes to fall paralysed ({@code stings_to_fall}, for a species others hunt).</li>
- * <li>{@code foe_types}: animals it takes for enemies (the chickens that peck termites).</li>
+ * <li>{@code foe_types}: animals it takes for enemies (none today: the chickens that pecked termites were taken out, 2026-11-25).</li>
  * <li>{@code foe_species}: species whose insects it fights wherever they come from, with or without a colony.</li>
  * <li>{@code prey}: species it hunts: its stings paralyse their insects instead of hurting them (the Matabele and
  * Macrotermes).</li>

@@ -394,7 +394,7 @@ public class Alarm {
 
     /**
      * An enemy of the colony, by the shared fight rules ({@link Fights#isFoe}, M8 step 2a): an animal of the species
-     * file's {@code fight.foe_types} (chickens eat termites), an insect of a species it lists (the Matabele), or an ant
+     * file's {@code fight.foe_types} (none for the termites today), an insect of a species it lists (the Matabele), or an ant
      * or termite of another colony.
      */
     public boolean isEnemy(Entity entity) {

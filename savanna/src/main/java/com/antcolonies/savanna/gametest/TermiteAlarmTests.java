@@ -30,16 +30,13 @@ import net.minecraft.core.Direction;
 import net.minecraft.gametest.framework.GameTest;
 import net.minecraft.gametest.framework.GameTestHelper;
 import net.minecraft.server.level.ServerLevel;
-import net.minecraft.world.entity.EntityType;
-import net.minecraft.world.entity.animal.Chicken;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.phys.AABB;
 import net.neoforged.neoforge.gametest.GameTestHolder;
 import net.neoforged.neoforge.gametest.PrefixGameTestTemplate;
 
 /**
- * The alarm (M7 step 6c; local since the rework's step 3, 2026-11-12): chickens hunt termite workers, soldiers bite
- * them, the foragers there hurry home, footsteps bring the minors within earshot to look and drum, a break-in spreads
+ * The alarm (M7 step 6c; local since the rework's step 3, 2026-11-12): a foe at the foragers sends them hurrying home, footsteps bring the minors within earshot to look and drum, a break-in spreads
  * the drumming through the nest and sends the soldiers to the breach while the workers seal it; break-ins again and
  * again are still only breaches (no level 4, nothing kept after a reload, the rest of the colony carries on).
  */
@@ -48,10 +45,12 @@ import net.neoforged.neoforge.gametest.PrefixGameTestTemplate;
 public class TermiteAlarmTests {
     /**
      * The rework, step 3 (2026-11-12): the alarm no longer keeps the whole colony in, and plugs no hole itself, so the
-     * scene now checks what is left of it: once the chicken has come, every worker outside where the foe is felt goes in
+     * scene now checks what is left of it: once the foe has come, every worker outside where the foe is felt goes in
      * while it is still felt (they crowded the open shaft over the hole before), and the hole is open to them all the while. The old
      * check (the middle hole plugged within 20 seconds of everybody being in) went with the rule it checked; holes being
-     * plugged once the foraging time is over is checked in the foraging tests. The scene as it was written:
+     * plugged once the foraging time is over is checked in the foraging tests. Chickens no longer hunt termites (the user,
+     * 2026-11-25), so the foe is now a lone Matabele major standing at the bush (no mind of its own: it only has to be
+     * there, an enemy at the foragers, as the chicken was). The scene as it was written:
      *
      * <p>The user's bug (2026-10-13): a young colony at night whose only way out is the open hole in the middle of the mound;
      * eight foragers out at a dead bush, minors out on guard. A chicken comes: the alarm goes to 2 and the colony stays in, so
@@ -62,13 +61,13 @@ public class TermiteAlarmTests {
      * tunnel block back over it first (it failed 1 run in 3 that way, 2026-10-14), and then it is closed to the sky.
      */
     @GameTest(template = "arena", timeoutTicks = 6000, skyAccess = true)
-    public static void theMiddleHoleIsPluggedSoonAfterAChickenAlarm(GameTestHelper helper) {
+    public static void foragersHurryInThroughAYoungMoundsOpenShaftAtAFoe(GameTestHelper helper) {
         ServerLevel level = helper.getLevel();
         level.getServer().tickRateManager().setTickRate(2000.0F);
         List<TermiteSoldierEntity> minors = new ArrayList<>();
         BlockPos[] bush = new BlockPos[1];
-        Chicken[] chicken = new Chicken[1];
-        long[] at = {-1, -1, -1}; // the chicken came, the fight was over (chicken dead or the minors back in), everybody was in
+        com.antcolonies.savanna.entity.MatabeleEntity[] foe = new com.antcolonies.savanna.entity.MatabeleEntity[1];
+        long[] at = {-1, -1, -1}; // the foe came, the fight was over (foe dead or the minors back in), everybody was in
         TermiteScenes.colony(helper, TermiteScenes.spots(10, i -> new BlockPos(MIDDLE - 2 + i % 4, SURFACE, MIDDLE - 2 + i / 4)), colony -> {
             helper.assertTrue(colony != null && !colony.isFounding(), "no termite colony with workers");
             long old = level.getGameTime() - colony.profile().worker().builderUntilTicks() - 1000;
@@ -107,20 +106,22 @@ public class TermiteAlarmTests {
             }
             long tick = helper.getTick();
             BlockPos hole = colony.nest().getEntrance();
-            if (chicken[0] == null) {
+            if (foe[0] == null) {
                 boolean workerOut = !level.getEntitiesOfClass(TermiteWorkerEntity.class, new AABB(bush[0]).inflate(3),
                         worker -> colony.getId().equals(worker.getColonyId())).isEmpty();
                 if (workerOut && minors.stream().anyMatch(minor -> !colony.nest().isInside(level, minor.blockPosition()))) {
-                    chicken[0] = EntityType.CHICKEN.create(level);
-                    chicken[0].moveTo(bush[0].getX() + 0.5, bush[0].getY(), bush[0].getZ() + 1.5, 0.0F, 0.0F);
-                    level.addFreshEntity(chicken[0]);
+                    foe[0] = SavannaEntities.MATABELE_MAJOR.get().create(level);
+                    foe[0].moveTo(bush[0].getX() + 0.5, bush[0].getY(), bush[0].getZ() + 1.5, 0.0F, 0.0F);
+                    foe[0].keepOutOfColonies();
+                    foe[0].setNoAi(true);
+                    level.addFreshEntity(foe[0]);
                     at[0] = tick;
                 }
                 return;
             }
-            // Over when the chicken is dead, or when the minors have gone in behind the workers and left it outside
+            // Over when the foe is dead, or when the minors have gone in behind the workers and left it outside
             // (real soldiers guard the foragers, then go in last and the hole is sealed).
-            if (at[1] < 0 && (!chicken[0].isAlive() || !colony.part(SavannaParts.SOLDIERS).orElseThrow().minorsOut(level))) {
+            if (at[1] < 0 && (!foe[0].isAlive() || !colony.part(SavannaParts.SOLDIERS).orElseThrow().minorsOut(level))) {
                 at[1] = tick;
             }
             if (at[2] < 0 && !colony.part(SavannaParts.ALARM).orElseThrow().isCalm(level)
@@ -148,8 +149,8 @@ public class TermiteAlarmTests {
                             .append(" ").append(ant.goalSelector.getAvailableGoals().stream().filter(g -> g.isRunning())
                                     .map(g -> g.getGoal().getClass().getSimpleName()).toList());
                 }
-                SavannaMod.LOGGER.info("[middle-hole] tick {}: chicken {}, alarm {}, foraging {}, hole {} ({}), wants plugging {}, anyone outside {}, minors out {}{}",
-                        tick, chicken[0].isAlive() ? "alive" : "dead", colony.part(SavannaParts.ALARM).orElseThrow().describe(level), colony.isForagingTime(level),
+                SavannaMod.LOGGER.info("[middle-hole] tick {}: foe {}, alarm {}, foraging {}, hole {} ({}), wants plugging {}, anyone outside {}, minors out {}{}",
+                        tick, foe[0].isAlive() ? "alive" : "dead", colony.part(SavannaParts.ALARM).orElseThrow().describe(level), colony.isForagingTime(level),
                         ForagingHoles.isOpen(level, hole) ? "open" : "shut", level.getBlockState(hole).getBlock().getName().getString(),
                         colony.foragingHoles().wantsPlugging(level), colony.foragingHoles().isAnyoneOutside(level),
                         colony.part(SavannaParts.SOLDIERS).orElseThrow().minorsOut(level), near);
@@ -157,10 +158,10 @@ public class TermiteAlarmTests {
         });
         helper.succeedWhen(() -> {
             Colony colony = TermiteMoundTests.colony(helper);
-            helper.assertTrue(chicken[0] != null, "no chicken yet: no forager reached the bush while a minor was outside");
-            helper.assertTrue(at[2] >= 0, "the workers outside did not all go in while the foe was felt (the chicken came at tick " + at[0] + "):"
+            helper.assertTrue(foe[0] != null, "no foe yet: no forager reached the bush while a minor was outside");
+            helper.assertTrue(at[2] >= 0, "the workers outside did not all go in while the foe was felt (the foe came at tick " + at[0] + "):"
                     + colony.part(SavannaParts.ALARM).orElseThrow().describe(level));
-            helper.assertTrue(at[2] - at[0] <= 1200, "the workers took " + (at[2] - at[0]) + " ticks to get in after the chicken came");
+            helper.assertTrue(at[2] - at[0] <= 1200, "the workers took " + (at[2] - at[0]) + " ticks to get in after the foe came");
             helper.assertTrue(at[2] - at[0] <= 600, "the workers where the foe was felt took " + (at[2] - at[0]) + " ticks to get in, more than 30 seconds");
         });
     }
