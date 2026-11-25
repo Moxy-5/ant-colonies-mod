@@ -193,7 +193,8 @@ public class Raids {
 
     /**
      * M8 step 3f: once a second while the colony is away. The finds fade as at home; a raid out with bodies when the
-     * colony went away goes on as numbers, the same raid ({@link Raid#goOnAsNumbers}); the raid day and the scouts out
+     * colony went away goes on as numbers, the same raid ({@link Raid#goOnAsNumbers}), unless a watcher is near it
+     * ({@link #watchedOut}); the raid day and the scouts out
      * of sight ({@link RaidsAway}); and the raid out is stepped as at home.
      */
     void tickAway(ServerLevel level) {
@@ -206,13 +207,23 @@ public class Raids {
         if (waiting != null && !finds.contains(waiting)) {
             waitNoMore();
         }
-        if (column != null) {
+        if (column != null && !column.goesAsNumbers() && !watchedOut(level, column, now)) {
             column.goOnAsNumbers(level);
             raidCheckAt = -1;
         }
         scouts.nobodyOut(); // (the real scouts are numbers now: out of sight the colony's scouts search as numbers)
         away.tick(level);
         stepRaid(level);
+    }
+
+    /**
+     * BUGS 319: whether a watcher is near this raid's real ants (its front or its tail, within the colony's own "near").
+     * Such a raid keeps its bodies though its colony is away (its nest's land went out of range behind it): nobody is
+     * folded into numbers in front of a player. Once nobody is near, it goes on as numbers at the next look.
+     */
+    private boolean watchedOut(ServerLevel level, Raid raid, long now) {
+        AwayLife watch = colony.away();
+        return watch.watcherNear(level, raid.frontPlace(now), AwayLife.NEAR) || watch.watcherNear(level, raid.tailPlace(now), AwayLife.NEAR);
     }
 
     /** The raid that last came home, or null (tests: a raid out of sight is gone from {@link #column} once done). */

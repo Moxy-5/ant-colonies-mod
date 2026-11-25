@@ -684,4 +684,259 @@ public class MatabeleRaidChainTests {
         helper.succeedWhen(() -> helper.assertTrue(raid[0] != null && raid[0].stage() == com.antcolonies.savanna.colony.Raid.Stage.DONE,
                 "the raid to the find beside the nest has not come to its end; " + raids.describe(level)));
     }
+
+    // ------------------------------------------------------------------ review round 11, the grade A findings
+
+    /**
+     * R11-1 (BUGS 316): a termite colony's feeding place in land that is not loaded is never read. A Matabele scout
+     * setting out asks every termite colony within about 133 blocks for its by-day feeding places, and that question
+     * read the gallery's blocks wherever they lay: a chunk read from disk or made new on the spot, a freeze of up to
+     * seconds. Here a living colony has a feeding tunnel 4,000 blocks off; after the scout's question that land is still
+     * not loaded.
+     */
+    @GameTest(template = "arena", timeoutTicks = 400, skyAccess = true, batch = "matabele_unloaded_gallery")
+    public static void aFeedingPlaceInLandNotLoadedIsNeverRead(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        TestScenes.shapeGround(helper, 45, (x, z) -> 0);
+        Colony termites = TermiteScenes.livingMound(helper, NEST, NEST, 6, 7L);
+        helper.assertTrue(termites != null, "the living mound could not go in");
+        BlockPos far = helper.absolutePos(new BlockPos(NEST, SURFACE, NEST)).offset(4000, 0, 4000);
+        helper.assertTrue(!com.antcolonies.colony.LandReady.at(level, far), "the land 4,000 blocks off is loaded before the test began");
+        // (the test's own check: a block read in land not loaded does load it, and this test can see that)
+        BlockPos other = far.offset(1000, 0, 0);
+        level.getBlockState(other);
+        helper.assertTrue(com.antcolonies.colony.LandReady.at(level, other), "a block read 5,000 blocks off left its land not loaded: this test cannot see a read");
+        List<BlockPos> tunnel = List.of(far.below(2).west(2), far.below(2).west());
+        List<BlockPos> gallery = List.of(far.below(), far.below().east());
+        termites.nest().foodWays().addNewTunnelForTests(new com.antcolonies.colony.FoodWays.NewTunnel(
+                new com.antcolonies.colony.NestPlan.ForagingTunnel(tunnel, far.west(), net.minecraft.core.Direction.EAST), far, gallery));
+        // (asked at once, as a scout asks a termite colony that is not being lived through: one out of range keeps its
+        // record of its ways to food, and that is when a gallery of its lies in land not loaded)
+        com.antcolonies.savanna.colony.FeedingSpots.byDayPlaces(level, termites);
+        helper.assertTrue(!com.antcolonies.colony.LandReady.at(level, far),
+                "asking for the by-day feeding places loaded the land a far one lies in (the scout's question at every trip's start)");
+        com.antcolonies.savanna.colony.FeedingSpots.of(level, termites);
+        termites.food().isFeedableFromInside(level, far);
+        termites.nest().isInside(level, gallery.get(0));
+        helper.assertTrue(!com.antcolonies.colony.LandReady.at(level, far),
+                "asking whether a far feeding place can be eaten from inside loaded its land");
+        helper.succeed();
+    }
+
+    /**
+     * R11-2 (BUGS 317): a scout with no way on asks its legs for a route only now and then, never every tick (BUGS 76's
+     * rule, which the raid goal and the way-home goal keep). A scout on its trip is shut in a glass box: every route it
+     * asks for fails. In any 10 ticks it asks for at most 19 routes (one try of up to 8 dodges, and one more set off by
+     * something new it smelt or noticed, with 3 hops; my pick of the bound); before, it asked for 40 and more.
+     */
+    @GameTest(template = "arena", timeoutTicks = 3000, skyAccess = true, batch = "matabele_scout_no_way")
+    public static void aScoutWithNoWayOnAsksForARouteOnlyNowAndThen(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        level.getServer().tickRateManager().setTickRate(2000.0F);
+        TestClock.still(helper, 8.0);
+        TestScenes.shapeGround(helper, 45, (x, z) -> 0);
+        MatabeleScenes.deadMound(helper, NEST, NEST, 30);
+        Colony colony = MatabeleScenes.colony(helper, NEST + 6, NEST, 40);
+        Raids raids = colony.part(SavannaParts.RAIDS).orElseThrow();
+        MatabeleEntity[] scout = new MatabeleEntity[1];
+        long[] boxedAt = {-1};
+        int[] asksWhenBoxed = {0};
+        java.util.ArrayDeque<Integer> lastTen = new java.util.ArrayDeque<>();
+        int[] most = {0};
+        helper.onEachTick(() -> {
+            long now = helper.getTick();
+            if (now < 40) {
+                return;
+            }
+            if (scout[0] == null) {
+                scout[0] = raids.scouts().sendNow(level);
+                helper.assertTrue(scout[0] != null, "the scout command found no fit major");
+                return;
+            }
+            MatabeleEntity ant = scout[0];
+            if (boxedAt[0] < 0) {
+                if (!raids.scouts().isScouting(ant.getUUID()) || ant.scoutGoalForTests().routeAsksForTests() == 0) {
+                    return; // (not off on its trip yet)
+                }
+                // a glass box on the plain, one cell of air inside: no way out of it
+                for (int dx = -1; dx <= 1; dx++) {
+                    for (int dz = -1; dz <= 1; dz++) {
+                        for (int dy = -1; dy <= 1; dy++) {
+                            helper.setBlock(38 + dx, SURFACE + dy, 8 + dz, dx == 0 && dz == 0 && dy == 0 ? Blocks.AIR : Blocks.GLASS);
+                        }
+                    }
+                }
+                BlockPos cell = helper.absolutePos(new BlockPos(38, SURFACE, 8));
+                ant.getNavigator().stop();
+                ant.teleportTo(cell.getX() + 0.5, cell.getY(), cell.getZ() + 0.5);
+                boxedAt[0] = now;
+                asksWhenBoxed[0] = ant.scoutGoalForTests().routeAsksForTests();
+                lastTen.clear();
+                return;
+            }
+            int asks = ant.scoutGoalForTests().routeAsksForTests();
+            lastTen.addLast(asks);
+            if (lastTen.size() > 10) {
+                int inTen = asks - lastTen.removeFirst();
+                most[0] = Math.max(most[0], inTen);
+                helper.assertTrue(inTen <= 19, "a scout with no way on asked its legs for " + inTen + " routes in 10 ticks ("
+                        + (now - boxedAt[0]) + " ticks after it was shut in): a route search every tick");
+            }
+            if (now - boxedAt[0] >= 200 || !raids.scouts().isScouting(ant.getUUID()) && now - boxedAt[0] >= 20) {
+                helper.assertTrue(asks - asksWhenBoxed[0] >= 2, "the scout shut in the box never asked for a route (the test proves nothing): "
+                        + (asks - asksWhenBoxed[0]) + " ask(s); " + raids.describe(level));
+                SavannaMod.LOGGER.info("[scout no way test] {} route(s) asked for in {} ticks shut in, at most {} in any 10 ticks",
+                        asks - asksWhenBoxed[0], now - boxedAt[0], most[0]);
+                helper.succeed();
+            }
+        });
+    }
+
+    /**
+     * R11-4 (BUGS 319): a raid a watcher is near keeps its bodies when its nest's own land goes out of range. The
+     * colony counts as away then, and the raid was folded into numbers a minute later whoever was looking: every ant
+     * vanished in front of the player. Here the colony goes away in mid-march with a watcher at the spot: 10 s later the
+     * raid still has its real ants. With the watcher gone, the same raid goes on as numbers as before.
+     */
+    @GameTest(template = "arena", timeoutTicks = 12000, skyAccess = true, batch = "matabele_raid_watched_far")
+    public static void aRaidAWatcherIsNearKeepsItsBodiesWhenItsNestGoesOutOfRange(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        level.getServer().tickRateManager().setTickRate(2000.0F);
+        TestClock.still(helper, 8.0);
+        TestScenes.shapeGround(helper, 45, (x, z) -> 0);
+        MatabeleScenes.deadMound(helper, NEST, NEST, 30);
+        List<TermiteWorkerEntity> termites = new ArrayList<>();
+        for (int i = 0; i < 3; i++) {
+            termites.addAll(MatabeleScenes.feedingUnderALog(helper, 36, NEST + 3 + 2 * i));
+        }
+        BlockPos at = termites.get(0).blockPosition();
+        Colony colony = MatabeleScenes.colony(helper, NEST + 6, NEST, 40);
+        Raids raids = colony.part(SavannaParts.RAIDS).orElseThrow();
+        com.antcolonies.savanna.colony.Raid[] raid = new com.antcolonies.savanna.colony.Raid[1];
+        int[] step = {0};
+        long[] stepAt = new long[1];
+        helper.onEachTick(() -> {
+            long now = helper.getTick();
+            switch (step[0]) {
+                case 0 -> {
+                    if (now < 40) {
+                        return;
+                    }
+                    MatabeleEntity leader = TestIsolation.insectsOf(level, colony, MatabeleEntity.class).stream()
+                            .filter(ant -> ant.hasMajorBody() && !raids.scouts().isScouting(ant.getUUID())).findFirst().orElse(null);
+                    helper.assertTrue(leader != null, "no real major to be the scout");
+                    raid[0] = raids.raidForTests(level, at, 18, trail(level, colony.getCenter(), at), leader.getUUID());
+                    helper.assertTrue(raid[0] != null && !raid[0].goesAsNumbers(), "no watched raid set out; " + raids.describe(level));
+                    step[0] = 1;
+                    stepAt[0] = now;
+                }
+                case 1 -> {
+                    helper.assertTrue(now - stepAt[0] < 4000, "the raid never marched out; " + raids.describe(level));
+                    if (raid[0].stage() != com.antcolonies.savanna.colony.Raid.Stage.MARCH_OUT) {
+                        return;
+                    }
+                    // the nest's land out of range (as when its chunk unloads), a watcher by the raid
+                    colony.away().setOnForTests(true);
+                    colony.away().setAwayForTests(true);
+                    colony.away().setGraceForTests(40L);
+                    colony.away().setWatcherForTests(at);
+                    step[0] = 2;
+                    stepAt[0] = now;
+                }
+                case 2 -> {
+                    helper.assertTrue(!raid[0].goesAsNumbers(), "the raid a watcher stands by was folded into numbers " + (now - stepAt[0])
+                            + " ticks after its nest went out of range; " + raids.describe(level));
+                    if (now - stepAt[0] < 200 && raid[0].stage() != com.antcolonies.savanna.colony.Raid.Stage.DONE) {
+                        return;
+                    }
+                    helper.assertTrue(raid[0].stage() == com.antcolonies.savanna.colony.Raid.Stage.DONE
+                                    || !TestIsolation.insectsOf(level, colony, MatabeleEntity.class).isEmpty(),
+                            "the watched raid has no real ant left; " + raids.describe(level));
+                    if (raid[0].stage() == com.antcolonies.savanna.colony.Raid.Stage.DONE) {
+                        helper.succeed(); // (home already: nothing left to fold)
+                        return;
+                    }
+                    colony.away().setWatcherForTests(null); // (nobody looks any more)
+                    step[0] = 3;
+                    stepAt[0] = now;
+                }
+                case 3 -> {
+                    if (raid[0].goesAsNumbers() || raid[0].stage() == com.antcolonies.savanna.colony.Raid.Stage.DONE) {
+                        helper.succeed();
+                        return;
+                    }
+                    helper.assertTrue(now - stepAt[0] < 200, "with nobody watching, the raid of a colony out of range still has bodies after 10 s; "
+                            + raids.describe(level));
+                }
+                default -> {
+                }
+            }
+        });
+    }
+
+    /**
+     * R11-5 (BUGS 320): a raid out as numbers takes no termite standing in front of somebody who can see the spot. A
+     * player arriving right beside an unseen raid (a teleport, a login) meets a raid that stays numbers (ants would be
+     * seen popping in), and its hidden catch carried off the real termites in the open: termites vanishing with no ant
+     * in sight. With a watcher at the spot as the raid halts there, every termite in the open is still standing when
+     * the raid is home; its catch comes from under the mud only.
+     */
+    @GameTest(template = "arena", timeoutTicks = 12000, skyAccess = true, batch = "matabele_raid_unseen_catch")
+    public static void aRaidOutOfSightTakesNoTermiteStandingInFrontOfAWatcher(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        level.getServer().tickRateManager().setTickRate(2000.0F);
+        TestClock.still(helper, 8.0);
+        TestScenes.shapeGround(helper, 45, (x, z) -> 0);
+        MatabeleScenes.deadMound(helper, NEST, NEST, 30);
+        List<TermiteWorkerEntity> termites = new ArrayList<>();
+        for (int i = 0; i < 6; i++) {
+            termites.add(TestAnts.lone(helper, SavannaEntities.TERMITE_WORKER.get(), 37 + i % 3, SURFACE, NEST + 3 + 2 * (i / 3)));
+        }
+        BlockPos at = termites.get(0).blockPosition();
+        Colony colony = MatabeleScenes.colony(helper, NEST + 6, NEST, 100);
+        Raids raids = colony.part(SavannaParts.RAIDS).orElseThrow();
+        boolean[] watched = {false};
+        long[] began = {-1};
+        long[] standingThen = {-1};
+        java.util.function.LongSupplier standingNow = () -> termites.stream()
+                .filter(termite -> termite.isAlive() && !termite.isRemoved() && !termite.isParalysed()).count();
+        helper.onEachTick(() -> {
+            long now = helper.getTick();
+            if (now < 40) {
+                return;
+            }
+            if (began[0] < 0) {
+                raids.forgetFindsForTests();
+                raids.rememberForTests(at, 18, level.getGameTime());
+                colony.population().setOnForTests(true);
+                colony.away().setOnForTests(true);
+                colony.away().setFarForTests(true);
+                colony.away().setNearForTests(false);
+                colony.away().setGraceForTests(40L);
+                began[0] = now;
+                return;
+            }
+            com.antcolonies.savanna.colony.Raid out = raids.column();
+            if (out != null && !watched[0] && (out.stage() == com.antcolonies.savanna.colony.Raid.Stage.HALT
+                    || out.stage() == com.antcolonies.savanna.colony.Raid.Stage.MARCH_OUT && out.blocksOutForTests() >= 12)) {
+                helper.assertTrue(out.goesAsNumbers(), "the raid of a colony far from every watcher has bodies; " + raids.describe(level));
+                colony.away().setWatcherForTests(at); // (somebody is suddenly there, inside the 50 blocks: it stays numbers)
+                watched[0] = true;
+                standingThen[0] = standingNow.getAsLong();
+                helper.assertTrue(standingThen[0] >= 3, "only " + standingThen[0] + " termite(s) stand in the open as the raid comes (the scene wants some)");
+            }
+            com.antcolonies.savanna.colony.Raid last = raids.lastRaid();
+            if (last == null || out != null) {
+                helper.assertTrue(now - began[0] < 10000, "no raid out of sight went and came home; " + raids.describe(level));
+                return;
+            }
+            helper.assertTrue(watched[0], "the raid was never seen at its halt (the test proves nothing): " + last.endedWhy());
+            helper.assertTrue(last.wasOutOfSight() && last.stage() == com.antcolonies.savanna.colony.Raid.Stage.DONE,
+                    "the raid was not out of sight to its end: " + last.endedWhy());
+            long standing = standingNow.getAsLong();
+            helper.assertTrue(standing == standingThen[0], "a raid nobody could see took " + (standingThen[0] - standing) + " of the "
+                    + standingThen[0] + " termites standing in the open in front of a watcher; " + raids.describe(level));
+            helper.succeed();
+        });
+    }
 }

@@ -59,10 +59,15 @@ public final class FeedingSpots {
 
     /** Whether termites can eat at this gallery by day, from inside: its food, or wood over one of its cells. */
     private static boolean galleryByDay(ServerLevel level, Colony colony, BlockPos food, List<BlockPos> gallery) {
+        if (!LandReady.round(level, food, 1)) {
+            // (BUGS 316: land not loaded is never read, here or below: a read there loads or makes the chunk on the spot.
+            // Nobody can be seen feeding there, so it is no by-day place now)
+            return false;
+        }
         boolean byDay = colony.food().isFeedableFromInside(level, food);
         for (int i = 0; i < gallery.size() && !byDay; i++) {
             BlockPos over = gallery.get(i).above();
-            byDay = !level.getBlockState(over).isAir() && colony.food().isFeedableFromInside(level, over);
+            byDay = LandReady.round(level, over, 1) && !level.getBlockState(over).isAir() && colony.food().isFeedableFromInside(level, over);
         }
         return byDay;
     }

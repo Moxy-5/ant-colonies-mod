@@ -157,7 +157,7 @@ public final class RaidsAway {
      * Just past how far insects are drawn (48 blocks, real sizes step 1): the raiders are put on the trail only where
      * no watcher is within this of them, so nobody sees them appear.
      */
-    private static final int SHOW_PAST = 50;
+    static final int SHOW_PAST = 50;
     /** A raid this near its nest (blocks along its way) is not put on the trail: not attacked yet, it forms in the nest; nearly home, it walks in unseen. */
     private static final double BY_THE_NEST = 8.0;
 

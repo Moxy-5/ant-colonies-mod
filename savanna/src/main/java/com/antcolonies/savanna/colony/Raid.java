@@ -436,12 +436,22 @@ public final class Raid implements FightDiary {
     @Override
     public void fightNote(AbstractAntEntity ant, String what) {
         say(RaidGround.shortId(ant.getUUID()) + (ant instanceof MatabeleEntity m && m.hasMajorBody() ? " (major)" : " (minor)") + " " + what);
-        // (what the shared fight tells when it finds nothing to do is no work at the spot; everything else is: going for
-        // a termite, a grab, a sting, a major picking a breach or biting it open)
-        boolean idle = what.startsWith("no foe") || what.startsWith("searched") || what.startsWith("no way") || what.startsWith("chased");
-        if (!idle && lastLevel != null && stage == Stage.ATTACK) {
+        if (worksAtTheSpot(what) && lastLevel != null && stage == Stage.ATTACK) {
             lastActionAt = lastLevel.getGameTime();
         }
+    }
+
+    /** Whether this line of the fight diary is work at the spot: it keeps the attack's quiet clock from running out. */
+    static boolean worksAtTheSpot(String what) {
+        // (BUGS 318: only what changes something, a termite in the ant's jaws or a breach. "Goes for" is no work: an ant
+        // goes for a termite it has no way to again every 10 s, which kept every attack awake to its last minute; nor is
+        // a grab at one already stung or held, nor jaws closing on nothing)
+        if (what.startsWith("grabs at ")) {
+            return what.endsWith("twists away");
+        }
+        return what.startsWith("grips ") || what.startsWith("stings ") || what.startsWith("strikes and misses ")
+                || what.startsWith("its jaws slide off ") || what.startsWith("loses its grip ") || what.startsWith("bites ")
+                || what.startsWith("picks a breach ");
     }
 
     /** One line in the raid's diary, with the stage now first. */
@@ -814,6 +824,11 @@ public final class Raid implements FightDiary {
      * where its tail is: the column's length behind the front on a march, the same place in a bunch. A watcher near the
      * front watches the colony, and bodies are put there only where nobody would see them appear ({@code RaidsAway}).
      */
+    /** How far out along its way the raid's front is now (blocks; tests). */
+    public double blocksOutForTests() {
+        return lastLevel == null ? 0.0 : shareOut(lastLevel.getGameTime()) * out.length();
+    }
+
     BlockPos frontPlace(long now) {
         return out.point(shareOut(now) * out.length());
     }
@@ -1722,7 +1737,9 @@ public final class Raid implements FightDiary {
         RandomSource random = colony.random();
         int wanted = RaidCatch.couldCarry(colony, numbersAlong, random);
         int taken = 0;
-        if (asNumbers && level.isPositionEntityTicking(find.at())) {
+        // (BUGS 320: never the termites standing in front of somebody who can see the spot: with no ant in sight they
+        // would simply vanish. The catch then comes from under the mud only)
+        if (asNumbers && level.isPositionEntityTicking(find.at()) && !colony.away().seerNear(level, find.at(), RaidsAway.SHOW_PAST)) {
             for (AbstractAntEntity insect : inTheOpen(level, colony, find.at(), reach(numbers))) {
                 if (taken >= wanted) {
                     break;

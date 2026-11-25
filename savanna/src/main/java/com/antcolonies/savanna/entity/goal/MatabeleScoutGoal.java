@@ -57,6 +57,8 @@ public class MatabeleScoutGoal extends Goal {
     private static final int SMELL_EVERY = 10;
     /** A point it found no way to after this many tries is skipped; after this many skips in all, it goes home. */
     private static final int TRIES_PER_POINT = 3;
+    /** With no way found, it stands this long (ticks) before it tries again (half a second, my pick; BUGS 317). */
+    private static final int RETRY = 10;
     private static final int MOST_SKIPS = 12;
     /** Its scent line has a point every this many blocks. */
     private static final double LINE_EVERY = 2.0;
@@ -114,6 +116,13 @@ public class MatabeleScoutGoal extends Goal {
     private double outDistance;
     /** Its own steps in a row it found no way for. */
     private int blocked;
+    /**
+     * BUGS 317: after a try that found no way anywhere, it asks its legs again only from this tick of its own on (BUGS
+     * 76's rule: a route is never searched every tick).
+     */
+    private int walkAgainAt;
+    /** Routes asked of its legs since it was made (tests). */
+    private int routeAsks;
     /** Ticks it spent searching this trip (its memory learns only from a trip it really searched). */
     private int searchTicks;
     /** Area-restricted search: until when (game time) it searches closely, and the smell it leans toward. */
@@ -393,7 +402,7 @@ public class MatabeleScoutGoal extends Goal {
                 return;
             }
         }
-        if (!ant.getNavigator().isDone()) {
+        if (!ant.getNavigator().isDone() || ant.tickCount < walkAgainAt) {
             return;
         }
         BlockPos point = next < points.size() ? points.get(next).at() : null;
@@ -401,6 +410,9 @@ public class MatabeleScoutGoal extends Goal {
             arrived(level);
         }
         walkOn(level);
+        if (stage == Stage.OUT && ant.getNavigator().isDone()) {
+            walkAgainAt = ant.tickCount + RETRY; // (no way found this time: a little later)
+        }
     }
 
     /** At a point in front of its walk: at a remembered spot it smelt nothing at, it searches round that spot instead. */
@@ -454,11 +466,9 @@ public class MatabeleScoutGoal extends Goal {
                 }
                 if (++skips > MOST_SKIPS) {
                     goHome("no way on");
-                    return;
                 }
-            } else {
-                return; // another try next time
             }
+            return; // (another try, or the next point, next time: never a row of route searches in one tick)
         }
         ownStep(level);
     }
@@ -527,7 +537,7 @@ public class MatabeleScoutGoal extends Goal {
                 continue; // (never past its reach: a step out there turns back in)
             }
             BlockPos cell = openGround(level, Mth.floor(x), Mth.floor(z));
-            if (cell != null && !cell.equals(at) && ant.getNavigator().moveTo(cell, pace)) {
+            if (cell != null && !cell.equals(at) && go(cell, pace)) {
                 walkHeading = a;
                 return true;
             }
@@ -601,7 +611,7 @@ public class MatabeleScoutGoal extends Goal {
             int dx = jitter == 0 ? 0 : ant.getRandom().nextInt(jitter * 2 + 1) - jitter;
             int dz = jitter == 0 ? 0 : ant.getRandom().nextInt(jitter * 2 + 1) - jitter;
             BlockPos cell = openGround(level, x + dx, z + dz);
-            if (cell != null && ant.getNavigator().moveTo(cell, pace)) {
+            if (cell != null && go(cell, pace)) {
                 return true;
             }
         }
@@ -732,13 +742,13 @@ public class MatabeleScoutGoal extends Goal {
         SavannaNumbers.ChooseNumbers choose = raids.choosing();
         double from = flat(ant.blockPosition(), find);
         boolean near = from <= choose.inspectFrom() + 1.0;
-        if (!near && ant.getNavigator().isDone()) {
+        if (!near && ant.getNavigator().isDone() && ant.tickCount >= walkAgainAt) {
             double share = Math.max(0.0, (from - choose.inspectFrom()) / Math.max(0.01, from));
             BlockPos at = ant.blockPosition();
             BlockPos cell = openGround(level, at.getX() + Mth.floor((find.getX() - at.getX()) * share),
                     at.getZ() + Mth.floor((find.getZ() - at.getZ()) * share));
-            if (cell != null) {
-                ant.getNavigator().moveTo(cell, 1.0);
+            if (cell == null || !go(cell, 1.0)) {
+                walkAgainAt = ant.tickCount + RETRY;
             }
         }
         if (near) {
@@ -993,19 +1003,31 @@ public class MatabeleScoutGoal extends Goal {
             stage = Stage.DONE;
             return;
         }
-        if (!ant.getNavigator().isDone()) {
+        if (!ant.getNavigator().isDone() || ant.tickCount < walkAgainAt) {
             return;
         }
         double pace = find != null ? FIND_PACE : 1.0;
         entrance = WayHome.nearEntrance(level, ant, entrance, NEAR_ENTRANCE, 0.0); // (BUGS 143: not the chimney's open mouth)
-        if (flat(at, entrance) <= HOP && ant.getNavigator().moveTo(entrance, pace) || hopToward(level, entrance, pace)
-                || tries >= TRIES_PER_POINT && ant.getNavigator().moveTo(entrance, pace)) { // (no hop: the whole way at once)
+        if (flat(at, entrance) <= HOP && go(entrance, pace) || hopToward(level, entrance, pace)
+                || tries >= TRIES_PER_POINT && go(entrance, pace)) { // (no hop: the whole way at once)
             tries = 0;
             return;
         }
+        walkAgainAt = ant.tickCount + RETRY;
         if (++tries > TRIES_PER_POINT * 4) {
             stage = Stage.DONE; // no way home from here (going in takes over)
         }
+    }
+
+    /** Asks its legs for a route to this cell; true if it is off. Every ask is counted ({@link #routeAsksForTests}). */
+    private boolean go(BlockPos cell, double pace) {
+        routeAsks++;
+        return ant.getNavigator().moveTo(cell, pace);
+    }
+
+    /** How many routes it has asked its legs for since it was made (tests: never one a tick with no way). */
+    public int routeAsksForTests() {
+        return routeAsks;
     }
 
     /** Its own search steps this trip, in order (tests: the path winds). */

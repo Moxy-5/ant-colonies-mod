@@ -43,6 +43,8 @@ for routes every tick; the **attack's end rule** is kept awake by a termite nobo
 
 ### R11-1 (A, proven; checked again): a scout setting out reads blocks in land that is not loaded
 
+**Status: fixed** (2026-11-24, BUGS 316; test `aFeedingPlaceInLandNotLoadedIsNeverRead`). The three reads ask `LandReady` first. Not done: `lookRound` still asks before its distance filter (harmless now).
+
 **What is wrong.** At the start of every trip the scout asks every termite colony within about 133 blocks of its nest
 (reach 96 + smell 5 + 32) for its by-day feeding places. That question reads blocks at the termites' galleries with no
 "is this land loaded" check, and the scout's own distance filter comes after the read.
@@ -67,6 +69,8 @@ a termite colony's places past the distance filter before asking for them.
 
 ### R11-2 (A, the repeat proven, its size to measure; checked again): the scout searches for a route every tick when it has no way
 
+**Status: fixed** (2026-11-24, BUGS 317; test `aScoutWithNoWayOnAsksForARouteOnlyNowAndThen`): a half-second retry clock, about a fifth of the route searches. **Open:** no rest between a scout's failed trips; a failed search's cost in milliseconds not measured.
+
 **What is wrong.** `AntNavigator.moveTo` plans a route at once on the main thread (`AntNavigator.begin` 403-421 ends in
 `plan()`); a failed plan can run to 6,000 steps of the path finder. The scout goal calls it again on every tick the
 navigator is done, with no wait after a failure. This breaks the project's own rule from BUGS 76 ("never searched
@@ -89,6 +93,8 @@ have no rest between trips), so the same trip can fail in a loop, each round wit
 
 ### R11-3 (A, the mechanism proven, how often in play not measured; checked again): the attack's "quiet" rule is kept awake by a termite nobody can reach
 
+**Status: fixed** (2026-11-24, BUGS 318; test `RaidRulesTest.onlyWhatChangesSomethingAtTheSpotKeepsTheAttackAwake`).
+
 **What is wrong.** The attack should end 15 s (`quiet_ticks` 300) after the last real work. But a raider's "goes for X"
 counts as work, and the shared fight puts an unreachable termite aside for only 10 s (`FightGoal.UNREACHABLE_TICKS`
 200) and then goes for it again. 200 is less than 300, so the quiet clock never runs out and only the 2-minute deadline
@@ -105,6 +111,8 @@ stung termite. "Goes for" does not count. This removes a rule, it adds no number
 
 ### R11-4 (A if met, likely; checked again): a raid the player is watching is folded into numbers when the nest's chunk unloads
 
+**Status: fixed** (2026-11-24, BUGS 319; test `aRaidAWatcherIsNearKeepsItsBodiesWhenItsNestGoesOutOfRange`): fixed in `Raids.tickAway` (a watched raid is not sent to numbers), not in `goOnAsNumbers`.
+
 **What is wrong.** "Is this colony watched" (`AwayLife.isHere` 153-163) answers no outright when the nest's own chunk is
 not loaded, before it asks whether a watcher is near the raiders. A minute later `Raids.tickAway` 209-212 calls
 `goOnAsNumbers`, which folds every raider in and discards its body (`Raid` 925-963).
@@ -118,6 +126,8 @@ distances.
 **Fix proposed.** In `goOnAsNumbers`, fold only the raiders no watcher is near; let the others go and walk home.
 
 ### R11-5 (A if met, likely; checked again): a raid as numbers takes real termites beside the player, with no ant in sight
+
+**Status: fixed** (2026-11-24, BUGS 320; test `aRaidOutOfSightTakesNoTermiteStandingInFrontOfAWatcher`), by my pick with the user's yes: the termites in the open are left alone.
 
 **What is wrong.** A raid as numbers is given bodies only when a watcher is within 64 blocks of its front and nobody
 who can see is within 50 (`RaidsAway.show` 183-195), asked once a second. A player who arrives inside the 50 blocks
