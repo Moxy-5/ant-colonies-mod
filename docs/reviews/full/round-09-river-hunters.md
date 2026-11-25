@@ -63,6 +63,8 @@ partner is not a live, loaded animal that still names this one as its partner (`
 cheap look-up). One place, no new timer. Test: a male crocodile killed mid-courtship; the female hunts and can be
 courted again.
 
+**Status: fixed** (2026-11-24, BUGS 323; test `aCourtedAnimalWhoseSuitorDiesOrVanishesIsFreeAgain`), as proposed: `AnimalLife.partner()` drops a mark whose mate is dead, gone from the loaded land or not naming this animal back. One place, for every animal with a life (it is R10-2 too).
+
 ### R9-2 (B, likely, to measure): every search for entities in the world walks every body hit box of every animal
 
 **What is wrong.** Since 2026-11-22 six animals carry a chain of hit boxes along the body (`HitChain`: crocodile 10,
@@ -162,6 +164,8 @@ asks `hasCustomName()` or `isLeashed()` except for fish (2521) and frogs and tad
 leashed, or saddled. Test: a tamed horse and a named cow at the water's edge beside a hungry crocodile are left alone.
 (The bull shark shares `isFish` and has its own prey rule: see part 6.)
 
+**Status: fixed** (2026-11-24, BUGS 324; test `theCrocodileLeavesThePlayersOwnAnimalsAlone`): `CrocodileEntity.playersOwn` (owned, named, on a lead or saddled) in the place of the wolves-cats-parrots test. **Open:** no scene test of a hungry crocodile beside a tamed horse at the water (the rule itself is tested).
+
 ### R9-6 (A, proven; the user's call): in Peaceful the crocodile still seizes the player and holds them through twelve rolls
 
 **What is wrong.** No river animal asks the world's difficulty. In Peaceful, Minecraft turns a mob's bite into no
@@ -183,6 +187,8 @@ never dies, so only the 12-roll limit (2341) ends it: 12 x (40 + 30) ticks = 42 
 **Fix proposed, for the user to pick.** My recommendation: in Peaceful the crocodile does not hunt players and a
 mother only hisses (animals and fish are hunted as always). The same question goes for the hippo's and the bull
 shark's bites (parts 4 and 6).
+
+**Status: fixed** (2026-11-24, BUGS 325; my pick, told to the user in the fix plan): in Peaceful the crocodile does not hunt players (`isPrey`) and a nest mother only hisses at one (`ChaseOffGoal`). **Open:** no test (a test cannot change the shared test server's difficulty without touching the tests beside it); the hippo's and the bull shark's bites in Peaceful do no damage and hold nobody, left as they are.
 
 ### R9-7 (B, likely): a crocodile whose basking spot lies beside a hippo swims to it and turns away, again and again
 
@@ -585,6 +591,8 @@ otter; each one leaves damage that stays in the world.
 again (or lets it go properly: off, will on, can be hurt). A game test: grab, save, load, tick. The bullfrog already
 handles "a world saved mid-clasp" (`BullfrogEntity` 760): the same idea.
 
+**Status: fixed** (2026-11-24, BUGS 326; test `aCatchSavedInAnOttersJawsIsLetGoAfterALoad`): an otter with a rider it does not know of lets it go properly (off, its will back, able to be hurt). A statue already left in an old world is not mended (it rides nothing any more).
+
 ### R9-28 (A, proven in the code; how often is for play to show): carrying a catch has no time limit: with no bank in reach the otter floats on the spot with it for ever
 
 **What is wrong.** While the otter holds a catch its hunt can never end by itself: the give-up clock is skipped. In
@@ -608,6 +616,8 @@ the wide-river case, not the everyday one.
 the catch go); the bank search at most once a second, reaching wider after a miss; and with no bank found, swim toward
 the nearest column that is not water.
 
+**Status: fixed** (2026-11-24, BUGS 327; no test): one carry limit, 30 seconds in the water (`CARRY_MOST`, my pick), then the catch is eaten afloat; the two bank searches at most once a second. Not done: the wider search after a miss and swimming toward the nearest land (the limit ends the case). **Open:** no test (it needs a pool wider than the test arena's); no clip of eating afloat, the catch is just eaten.
+
 ### R9-29 (A, proven): only the otter that started a game of play can end it: if that one is killed or vanishes mid-game the other stands in the game for good
 
 **What is wrong.** A game of play (a bout) is one shared object held by both otters, and it has good limits: every
@@ -628,6 +638,8 @@ bout is not saved, both come back calm).
 
 **Fix proposed.** Either otter's play goal ends a bout that is no longer `on()`, and `remove()` and `die()` end the
 bout the otter is in. One "end it, whatever happened" door.
+
+**Status: fixed** (2026-11-24, BUGS 328; test `anOtterWhosePlaymateVanishesMidGameIsFreeAgain`): either otter's play goal ends a game that is no longer on (`PlayGoal.canContinueToUse` asks `Bout.on()`). `remove()` and `die()` were left alone: the one door is enough.
 
 ### R9-30 (A, proven): the otter is the only river animal Minecraft may remove 32 blocks from the player: they vanish one at a time
 
@@ -651,6 +663,8 @@ own comments in `TilapiaEntity` 593 say so). The group: `enumextensions.json` 14
 **Fix proposed.** The same three lines as the others: gone only past 96 blocks. And the check the spawning check list
 asks for (a test that `removeWhenFarAway` at 64 blocks says no). Balance: the cap of 2 means keeping them cannot pile
 them up.
+
+**Status: fixed** (2026-11-24, BUGS 329; test `anOtterIsKeptWithin96BlocksOfAPlayer`).
 
 ### R9-31 (B, the read proven; to measure): while an otter on screen holds a crab or a frog, the game reads and parses a file from the mod's jar twice every frame
 
@@ -838,6 +852,8 @@ first tick that is cut falls through to ordinary travel, the room check asks the
 on, and after any cut no new move starts until the animal has moved on. A test: a step with a top slab on the middle
 line, and a climb must either play or the monitor must go up the old way, never stand.
 
+**Status: half fixed, open** (2026-11-24, BUGS 330). **Done:** the room checks for a climb up, a climb down and a climb out ask for a whole block under both feet and on the middle line, the block the move itself relies on (as the walk into the water already did), so the case found (a path block, slab or soft mud on the middle line) no longer starts a move that is cut. **Tried and taken back:** letting a move cut on its first tick fall through to ordinary walking. It broke `aMonitorAtAnAngleTurnsSquareAndClimbs` about one run in six (0 of 12 before, 12 of 12 after taking it back): first-tick cuts happen in ordinary play and the try-again-in-place is what lets the angled climb start. So the freeze for any other cause of a first-tick cut is still there; the real cure is the proposed move onto the shared `MoveRider` (R9-42), which is a rewrite, not a patch. No test of the slab case yet.
+
 ### R9-38 (A, proven in the data; how it looks not filmed): the walk into the water is cut short for 7 monitors in 8
 
 **What is wrong.** Since the walk-in was remade (2026-11-22, BUGS 289) its clip is longer for bigger monitors: 178,
@@ -860,6 +876,8 @@ length). `BlockMoves.read` checks only that each move has a row per size.
 **Fix proposed.** The move's length is the length of the row for the size played (no `ticks` number to disagree with
 the rows), and reading the file refuses rows and `ticks` that disagree. The tool side is Neon's (`docs/HANDOFF.md`):
 leave a request there.
+
+**Status: fixed in the game** (2026-11-24, BUGS 331; unit test `BlockMovesFileTest`, game test `aBiggerMonitorsWalkIntoTheWaterIsNotCutShort`): a move's length is its own size's row (`BlockMoves.Move.ticks(size)`); the file's one `ticks` is no longer read by the game; rows of one size that differ in length are refused. Filmed in the game at size 1.15 from the side (frozen, every 2 ticks): it glides on smoothly through the end, legs folded, no jolt. **Open:** one side only, not the three the rule asks; the tool still writes the one `ticks` (a request left on `docs/HANDOFF.md`).
 
 ### R9-39 (B, likely): the mid-climb tests fail now and then because the monitor's own idle goals take it off the test's route (BUGS 255, 290, 292)
 

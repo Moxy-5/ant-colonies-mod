@@ -246,9 +246,20 @@ public final class AnimalLife {
         partner = null;
     }
 
-    /** The mate it is courting now, if any. */
+    /**
+     * The mate it is courting now, if any. The mark proves itself (review R9-1, R10-2): a mate that has died, has left
+     * the loaded land or no longer names this animal is no mate, and the mark is dropped here. (A suitor's own goal
+     * takes the mark off when it stops, but a dead or unloaded suitor's goal never stops, and the one it courted stayed
+     * "taken" until the world was loaded anew.)
+     */
     @Nullable
     public UUID partner() {
+        if (partner != null && mob.level() instanceof net.minecraft.server.level.ServerLevel level) {
+            net.minecraft.world.entity.Entity mate = level.getEntity(partner);
+            if (mate == null || !mate.isAlive() || !(mate instanceof HasLife other) || !mob.getUUID().equals(other.life().partner)) {
+                partner = null;
+            }
+        }
         return partner;
     }
 

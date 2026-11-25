@@ -668,8 +668,9 @@ public final class CrocodileBreeding {
                 float face = (float) (Mth.atan2(target.getZ() - croc.getZ(), target.getX() - croc.getX()) * Mth.RAD_TO_DEG) - 90.0F;
                 croc.setYRot(Mth.approachDegrees(croc.getYRot(), face, 12.0F));
                 croc.yBodyRot = croc.getYRot();
-                if (t == HISS_TICKS && target.distanceToSqr(Vec3.atCenterOf(croc.guardPlace())) > GUARD_SEE_OFF * GUARD_SEE_OFF) {
-                    bit = true;                 // it backed off: enough
+                if (t == HISS_TICKS && (target.distanceToSqr(Vec3.atCenterOf(croc.guardPlace())) > GUARD_SEE_OFF * GUARD_SEE_OFF
+                        || target instanceof Player && CrocodileEntity.peaceful(croc.level()))) {
+                    bit = true;                 // it backed off: enough (and in Peaceful a player is only hissed at)
                 }
                 return;
             }

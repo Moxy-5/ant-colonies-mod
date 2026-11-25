@@ -2457,15 +2457,34 @@ public class CrocodileEntity extends PathfinderMob implements GeoEntity, HasLife
             return young.life().isYoung() && !croc.getUUID().equals(young.motherId) && young.isInWater();
         }
         if (e instanceof Player player) {
-            if (player.isCreative() || player.isSpectator()) {
+            if (player.isCreative() || player.isSpectator() || peaceful(croc.level())) {
                 return false;
             }
         } else if (isFish(e)) {
             return e.isInWater();       // a fish, in the water (never one the player brought in a bucket or named)
-        } else if (!(e instanceof Animal) || e instanceof TamableAnimal pet && pet.isTame()) {
+        } else if (!(e instanceof Animal) || playersOwn(e)) {
             return false;
         }
         return atWater(croc.level(), e, 4);
+    }
+
+    /**
+     * The player's own animal (review R9-5), which no river hunter takes: tamed or otherwise owned (a wolf, a cat, and a
+     * tamed horse, donkey, mule, llama or camel, which Minecraft keeps as a different kind of "tame"), named with a name
+     * tag, on a lead, or saddled.
+     */
+    public static boolean playersOwn(LivingEntity e) {
+        return e.hasCustomName() || e instanceof net.minecraft.world.entity.OwnableEntity owned && owned.getOwnerUUID() != null
+                || e instanceof net.minecraft.world.entity.Mob mob && mob.isLeashed()
+                || e instanceof net.minecraft.world.entity.Saddleable ridden && ridden.isSaddled();
+    }
+
+    /**
+     * Peaceful (review R9-6; my pick): the crocodile does not hunt players and a nest mother only hisses. Its grab is no
+     * damage, so Minecraft's own Peaceful rule did not stop it: a player was held through twelve rolls unhurt.
+     */
+    static boolean peaceful(net.minecraft.world.level.Level level) {
+        return level.getDifficulty() == net.minecraft.world.Difficulty.PEACEFUL;
     }
 
     /**

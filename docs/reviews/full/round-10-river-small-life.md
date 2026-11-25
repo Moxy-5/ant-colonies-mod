@@ -84,6 +84,8 @@ goals are stopped only by the goal selector's tick, which a dead or removed mob 
 **Proposed fix.** Clear a partner mark by itself: in `AnimalLife.tick` (or where `partner()` is read), drop a partner
 whose mob is gone, dead or farther than the mate reach, checked once a second.
 
+**Status: fixed** (2026-11-24, BUGS 323, with R9-1: the same fault; test `aCourtedAnimalWhoseSuitorDiesOrVanishesIsFreeAgain`).
+
 ### R10-3 (C, proven): the fly clouds' cap is written as 6 in one place and is 18
 
 `registry/SavannaMobCategories.java:53-56` says "Cap 6 round a player"; `META-INF/enumextensions.json` gives

@@ -4654,4 +4654,143 @@ public class RiverLifeTests {
                         + (croc.isHungry() ? "hungry" : "fed") + ", nearest " + String.format("%.1f", group.stream()
                         .mapToDouble(f -> f.distanceTo(croc)).min().orElse(-1)) + " blocks off)"));
     }
+
+    // --- review round 9's grade A fixes (2026-11-24) -------------------------------------------------------------------
+
+    /** A small stone floor for the review tests' animals to stand on. */
+    private static void reviewFloor(GameTestHelper helper, int x0, int z0, int x1, int z1) {
+        for (int x = x0; x <= x1; x++) {
+            for (int zz = z0; zz <= z1; zz++) {
+                helper.setBlock(new BlockPos(x, TOP, zz), Blocks.STONE);
+                for (int y = TOP + 1; y <= TOP + 4; y++) {
+                    helper.setBlock(new BlockPos(x, y, zz), Blocks.AIR);
+                }
+            }
+        }
+    }
+
+    /**
+     * Review R9-1 and R10-2: an animal marked as courted is free again as soon as its suitor is dead or gone (the mark
+     * was only ever taken off by the suitor's own goal, which never runs again for a dead or unloaded animal).
+     */
+    @GameTest(template = "arena", timeoutTicks = 40)
+    public static void aCourtedAnimalWhoseSuitorDiesOrVanishesIsFreeAgain(GameTestHelper helper) {
+        reviewFloor(helper, 4, 4, 12, 8);
+        for (boolean killed : new boolean[] {true, false}) {
+            var suitor = helper.spawnWithNoFreeWill(SavannaEntities.CROCODILE.get(), new BlockPos(5, TOP + 1, 6));
+            var courted = helper.spawnWithNoFreeWill(SavannaEntities.CROCODILE.get(), new BlockPos(10, TOP + 1, 6));
+            suitor.life().setPartner(courted.getUUID());
+            courted.life().setPartner(suitor.getUUID());
+            helper.assertTrue(suitor.getUUID().equals(courted.life().partner()), "a living pair's mark does not hold");
+            if (killed) {
+                suitor.kill();
+            } else {
+                suitor.discard();
+            }
+            helper.assertTrue(courted.life().partner() == null, "still taken after its suitor " + (killed ? "died" : "vanished"));
+            // and a mark its mate does not answer is no mark
+            var third = helper.spawnWithNoFreeWill(SavannaEntities.CROCODILE.get(), new BlockPos(7, TOP + 1, 6));
+            courted.life().setPartner(third.getUUID());
+            helper.assertTrue(courted.life().partner() == null, "taken by one that is not courting it");
+            courted.discard();
+            third.discard();
+            suitor.discard();
+        }
+        helper.succeed();
+    }
+
+    /** Review R9-30: an otter is kept while a player is within 96 blocks, as every other river animal (the spawning check list). */
+    @GameTest(template = "arena", timeoutTicks = 40)
+    public static void anOtterIsKeptWithin96BlocksOfAPlayer(GameTestHelper helper) {
+        reviewFloor(helper, 4, 12, 8, 16);
+        var otter = helper.spawnWithNoFreeWill(SavannaEntities.OTTER.get(), new BlockPos(6, TOP + 1, 14));
+        helper.assertFalse(otter.removeWhenFarAway(64.0 * 64.0), "an otter may be removed 64 blocks from the player");
+        helper.assertTrue(otter.removeWhenFarAway(100.0 * 100.0), "an otter is never removed, however far");
+        otter.discard();
+        helper.succeed();
+    }
+
+    /** Review R9-5: the crocodile leaves the player's own animals alone (tamed, named, on a lead or saddled), and still hunts wild ones. */
+    @GameTest(template = "arena", timeoutTicks = 40)
+    public static void theCrocodileLeavesThePlayersOwnAnimalsAlone(GameTestHelper helper) {
+        reviewFloor(helper, 4, 20, 12, 24);
+        var horse = helper.spawnWithNoFreeWill(net.minecraft.world.entity.EntityType.HORSE, new BlockPos(5, TOP + 1, 22));
+        var cow = helper.spawnWithNoFreeWill(net.minecraft.world.entity.EntityType.COW, new BlockPos(8, TOP + 1, 22));
+        var pig = helper.spawnWithNoFreeWill(net.minecraft.world.entity.EntityType.PIG, new BlockPos(11, TOP + 1, 22));
+        helper.assertFalse(com.antcolonies.savanna.animal.CrocodileEntity.playersOwn(horse), "a wild horse counts as the player's");
+        helper.assertFalse(com.antcolonies.savanna.animal.CrocodileEntity.playersOwn(cow), "a wild cow counts as the player's");
+        horse.setTamed(true);
+        horse.setOwnerUUID(java.util.UUID.randomUUID());
+        cow.setCustomName(net.minecraft.network.chat.Component.literal("Daisy"));
+        pig.equipSaddle(new net.minecraft.world.item.ItemStack(net.minecraft.world.item.Items.SADDLE), null);
+        helper.assertTrue(com.antcolonies.savanna.animal.CrocodileEntity.playersOwn(horse), "a tamed horse is fair prey");
+        helper.assertTrue(com.antcolonies.savanna.animal.CrocodileEntity.playersOwn(cow), "a named cow is fair prey");
+        helper.assertTrue(com.antcolonies.savanna.animal.CrocodileEntity.playersOwn(pig), "a saddled pig is fair prey");
+        horse.discard();
+        cow.discard();
+        pig.discard();
+        helper.succeed();
+    }
+
+    /**
+     * Review R9-27: a catch saved in an otter's jaws (Minecraft saves a rider with its mount, helpless as it was held)
+     * is let go properly after the load: off the otter, its will back, able to be hurt.
+     */
+    @GameTest(template = "arena", timeoutTicks = 100)
+    public static void aCatchSavedInAnOttersJawsIsLetGoAfterALoad(GameTestHelper helper) {
+        reviewFloor(helper, 14, 4, 18, 8);
+        var otter = helper.spawnWithNoFreeWill(SavannaEntities.OTTER.get(), new BlockPos(16, TOP + 1, 6));
+        var fish = helper.spawn(SavannaEntities.TILAPIA.get(), new BlockPos(16, TOP + 1, 6));
+        // as a load leaves them: seated, its will off, not to be hurt, and the otter knowing nothing of it
+        fish.startRiding(otter, true);
+        fish.setNoAi(true);
+        fish.setInvulnerable(true);
+        helper.succeedWhen(() -> {
+            helper.assertTrue(fish.getVehicle() == null, "the catch is still at the otter's snout");
+            helper.assertTrue(!fish.isNoAi() && !fish.isInvulnerable(), "the catch was let go still frozen (no will " + fish.isNoAi()
+                    + ", cannot be hurt " + fish.isInvulnerable() + ")");
+            fish.discard();
+            otter.discard();
+        });
+    }
+
+    /**
+     * Review R9-29: when the otter that started a game of play vanishes mid-game, the other one is out of the game at
+     * once (only the starter's goal used to end a game, so the other stood in it for good).
+     */
+    @GameTest(template = "arena", timeoutTicks = 2400)
+    public static void anOtterWhosePlaymateVanishesMidGameIsFreeAgain(GameTestHelper helper) {
+        reviewFloor(helper, 20, 4, 34, 14);
+        com.antcolonies.savanna.animal.OtterEntity a = playOtter(helper, 25.5, 8.5, true, 27, 9);
+        com.antcolonies.savanna.animal.OtterEntity b = playOtter(helper, 28.5, 9.5, true, 27, 9);
+        a.addTag("play.now");
+        b.addTag("play.now");
+        long[] goneAt = {-1};
+        helper.onEachTick(() -> {
+            if (goneAt[0] < 0 && a.inBout() && b.inBout()) {
+                (a.leadsBout() ? a : b).discard();
+                goneAt[0] = helper.getTick();
+            }
+        });
+        helper.succeedWhen(() -> {
+            helper.assertTrue(goneAt[0] >= 0, "no game of play started");
+            com.antcolonies.savanna.animal.OtterEntity left = a.isRemoved() ? b : a;
+            helper.assertTrue(helper.getTick() > goneAt[0] + 5, "a few ticks for its goal to look");
+            helper.assertTrue(!left.inBout(), "the otter left behind is still in the game");
+            left.discard();
+        });
+    }
+
+    /**
+     * Review R9-38: a bigger monitor's walk into the water lasts as long as its own (longer) clip, not the smallest
+     * size's length.
+     */
+    @GameTest(template = "arena", timeoutTicks = 40)
+    public static void aBiggerMonitorsWalkIntoTheWaterIsNotCutShort(GameTestHelper helper) {
+        var in = com.antcolonies.savanna.animal.MonitorEntity.MOVES.move(com.antcolonies.savanna.animal.MonitorEntity.IN);
+        helper.assertTrue(in.ticks(4) > in.ticks(0), "the biggest monitor's walk-in is no longer than the smallest's ("
+                + in.ticks(4) + " against " + in.ticks(0) + " ticks)");
+        helper.assertTrue(in.ticks(0) == 177 && in.ticks(4) == 213, "walk-in lengths " + in.ticks(0) + " and " + in.ticks(4) + ", not the clips' 177 and 213");
+        helper.succeed();
+    }
 }
