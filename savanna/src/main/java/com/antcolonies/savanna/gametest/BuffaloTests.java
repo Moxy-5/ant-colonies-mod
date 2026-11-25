@@ -406,7 +406,8 @@ public class BuffaloTests {
                 remove(helper, player[0]);
             }
             helper.fail("no stare and graze again: stared " + java.util.Arrays.toString(stared) + ", again " + java.util.Arrays.toString(again)
-                    + ", player placed at tick " + placed[0] + "; " + herd.get(0).about());
+                    + ", grazed " + java.util.Arrays.toString(grazing) + ", player placed at tick " + placed[0] + "; " + herd.get(0).about()
+                    + " | " + herd.get(1).about() + " at " + at(helper, herd.get(1)) + " | " + herd.get(2).about() + " at " + at(helper, herd.get(2)));
         });
     }
 

@@ -46,6 +46,7 @@ public final class BuffaloGoals {
     /** Its goals, by weight. */
     static void register(BuffaloEntity buffalo, GoalSelector goals) {
         goals.addGoal(0, new FloatGoal(buffalo));
+        goals.addGoal(0, new SwimOutGoal(buffalo));
         goals.addGoal(1, new TemperGoal(buffalo));
         goals.addGoal(2, new DayGoal(buffalo));
     }
@@ -160,6 +161,9 @@ public final class BuffaloGoals {
     static final int SHORE_SEARCH = 6;
     /** At its stand: this near its middle, or this near with its route done (blocks). */
     static final double ARRIVE = 1.0, ARRIVE_DONE = 2.0;
+    /** This near its stand it walks straight to it, no route (blocks); bumping into something this many ticks running, it cannot reach it. */
+    static final double STRAIGHT = 4.0;
+    static final int BUMP_LIMIT = 40;
 
     /**
      * Its whole day, one goal read from the shared clock. Its place for each part of the day: grazing, a place from dice
@@ -195,7 +199,7 @@ public final class BuffaloGoals {
         /** Whether it grazes on where it is until its turn to set off. */
         private boolean grazeOn;
         /** Its turn to set off, and until when it waits (its own ticks). */
-        private int departAt, waitUntil;
+        private int departAt, waitUntil, bumped;
         /** Its route now (a leg, or its stand), and how far it was from its stand when that route began. */
         @Nullable
         private BlockPos routeTo;
@@ -341,6 +345,21 @@ public final class BuffaloGoals {
                     arrive();                                       // a new plant at its jaws on the way: it grazes here
                     return;
                 }
+            }
+            if (dist <= STRAIGHT) {
+                // the last few blocks on its own grass: straight there, no route (Minecraft's route-follower calls a short
+                // route done while a 2-wide body is still about 2 blocks off: measured 2026-11-25, 2.1 to 2.6 off)
+                if (routeTo != null) {
+                    nav.stop();
+                    routeTo = null;
+                }
+                b.getMoveControl().setWantedPosition(stand.getX() + 0.5, stand.getY(), stand.getZ() + 0.5, pace());
+                bumped = b.horizontalCollision ? bumped + 1 : 0;
+                if (bumped > BUMP_LIMIT) {
+                    bumped = 0;
+                    cannotReach(now);                               // something in the way of the last few blocks
+                }
+                return;
             }
             if (routeTo == null || nav.isDone()) {
                 if (routeTo != null && dist > routeFrom - HEADWAY) {
@@ -1285,6 +1304,90 @@ public final class BuffaloGoals {
             if (b.doing() == BuffaloEntity.CALM) {
                 b.setDoing(BuffaloEntity.MOOD_ANGRY);
             }
+        }
+    }
+
+    // --- out of deep water --------------------------------------------------------------------------------------------------
+
+    /**
+     * In water too deep to stand in, it swims straight for the nearest dry ground and heaves itself out (as a real
+     * buffalo does; it has no swim route: Minecraft's route search finds none from deep water for a 2-wide body, and
+     * floating low its feet are more than a step under a flush bank, so against the bank it pushes itself up).
+     */
+    static final class SwimOutGoal extends Goal {
+        /** How far round it looks for dry ground (blocks), and how often anew (ticks). */
+        static final int SHORE_REACH = 12, LOOK_EVERY = 20;
+        /** How hard it heaves itself up against the bank (blocks a tick, upward). */
+        static final double HEAVE = 0.3;
+        private final BuffaloEntity b;
+        @Nullable
+        private Vec3 shore;
+        private int lookedAt = -LOOK_EVERY;
+
+        SwimOutGoal(BuffaloEntity b) {
+            this.b = b;
+            setFlags(EnumSet.of(Flag.MOVE));
+        }
+
+        @Override
+        public boolean canUse() {
+            return b.isAlive() && b.isInWater() && !b.onGround() && b.getFluidHeight(FluidTags.WATER) > 0.5 * b.getScale();
+        }
+
+        @Override
+        public boolean requiresUpdateEveryTick() {
+            return true;
+        }
+
+        @Override
+        public void start() {
+            b.getNavigation().stop();
+            shore = null;
+            lookedAt = b.tickCount - LOOK_EVERY;
+        }
+
+        @Override
+        public void tick() {
+            if (b.tickCount - lookedAt >= LOOK_EVERY) {
+                lookedAt = b.tickCount;
+                shore = nearestShore();
+            }
+            if (shore == null) {
+                return;                                         // nothing dry in reach: it floats (the float goal keeps it up)
+            }
+            b.getMoveControl().setWantedPosition(shore.x, shore.y, shore.z, BuffaloEntity.TRAVEL);
+            if (b.horizontalCollision) {
+                Vec3 v = b.getDeltaMovement();
+                b.setDeltaMovement(v.x, Math.max(v.y, HEAVE), v.z); // against the bank: up, then its step takes it out
+            }
+        }
+
+        /** The nearest dry ground with room over it within {@link #SHORE_REACH}, its standing point; null if none. */
+        @Nullable
+        private Vec3 nearestShore() {
+            Level level = b.level();
+            BlockPos at = b.blockPosition();
+            Vec3 best = null;
+            double bestD = Double.MAX_VALUE;
+            for (int dx = -SHORE_REACH; dx <= SHORE_REACH; dx++) {
+                for (int dz = -SHORE_REACH; dz <= SHORE_REACH; dz++) {
+                    BlockPos column = at.offset(dx, 0, dz);
+                    if (!level.isLoaded(column)) {
+                        continue;
+                    }
+                    BlockPos cell = GroundTop.cell(level, column);
+                    if (!level.getFluidState(cell).isEmpty() || !level.getFluidState(cell.below()).isEmpty()
+                            || cell.getY() > at.getY() + 3) {
+                        continue;                               // water, or a cliff it could never climb
+                    }
+                    double d = dx * dx + dz * dz;
+                    if (d < bestD) {
+                        bestD = d;
+                        best = Vec3.atBottomCenterOf(cell);
+                    }
+                }
+            }
+            return best;
         }
     }
 }
