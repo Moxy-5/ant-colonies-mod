@@ -4835,15 +4835,16 @@ public class RiverLifeTests {
     /**
      * Review R10-12: every animal with a life has its clocks counted (by the kit, in one place): a young crab, snail and
      * catfish grow up, and a parent's wait before breeding again runs down. (These three never counted: their young
-     * stayed young for good and a grown one bred once in its life.) The hippo and the monitor are counted too.
+     * stayed young for good and a grown one bred once in its life.) The hippo and the monitor are counted too, and the Cape
+     * buffalo (born grown and not breeding yet: only its wait is counted, by the kit, never by itself).
      */
     @GameTest(template = "arena", timeoutTicks = 100)
     public static void everyAnimalWithALifeGrowsUpAndRestsAfterBreeding(GameTestHelper helper) {
-        reviewFloor(helper, 4, 4, 20, 8);
+        reviewFloor(helper, 4, 4, 24, 8);
         java.util.List<net.minecraft.world.entity.Mob> young = new java.util.ArrayList<>(), parents = new java.util.ArrayList<>();
         int x = 5;
         for (var type : java.util.List.of(SavannaEntities.CRAB.get(), SavannaEntities.SNAIL.get(), SavannaEntities.CATFISH.get(),
-                SavannaEntities.TILAPIA.get(), SavannaEntities.HIPPO.get(), SavannaEntities.MONITOR.get())) {
+                SavannaEntities.TILAPIA.get(), SavannaEntities.HIPPO.get(), SavannaEntities.MONITOR.get(), SavannaEntities.BUFFALO.get())) {
             net.minecraft.world.entity.Mob baby = helper.spawnWithNoFreeWill(type, new BlockPos(x, TOP + 1, 5));
             net.minecraft.world.entity.Mob parent = helper.spawnWithNoFreeWill(type, new BlockPos(x, TOP + 1, 7));
             var life = ((com.antcolonies.animal.HasLife) baby).life();

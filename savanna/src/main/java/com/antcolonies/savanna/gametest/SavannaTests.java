@@ -73,6 +73,8 @@ public final class SavannaTests {
         TestFilter.addCategory("mud", MudTests.class);
         // The animal life kit (M9, docs/plans/animal-life-cycle.md): sex, age, own size, saving, breeding later.
         TestFilter.addCategory("life", AnimalLifeTests.class);
+        // Savanna land animals (M9; docs/plans/buffalo.md): the Cape buffalo's herds, day, temper and paces.
+        TestFilter.addCategory("land", BuffaloTests.class);
         TestFilter.addCategory("worldgen", SavannaWorldTests.class, SavannaLoadingTests.class);
         TestFilter.addCategory("stress", TermiteStressTests.class, SpawnerCostTests.class);
 

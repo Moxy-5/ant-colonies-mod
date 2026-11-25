@@ -24,6 +24,7 @@ import net.minecraft.world.DifficultyInstance;
 import net.minecraft.world.damagesource.DamageSource;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.Mob;
 import net.minecraft.world.entity.MobSpawnType;
 import net.minecraft.world.entity.PathfinderMob;
@@ -65,9 +66,11 @@ import software.bernie.geckolib.util.GeckoLibUtil;
  * head out, and swims; it can drown.</li>
  * <li>What it does has a clip of its own ({@link #doing}, synced): grazing, drinking, lying down and getting up, its
  * little things (an ear flutter, a shake, a snort, a bull's bellow, pawing the ground) and its moods and hits. Its day and
- * its temper are the goals' ({@link BuffaloGoals}, step 2 of the plan).</li>
+ * its temper are the goals' ({@link BuffaloGoals}): grazing in the cool hours, drinking at its pan and lying down at
+ * midday, lying down at night; watching, warning and charging a player who comes too near, and charging whoever hurt
+ * it ({@link #angryAt}), its herd's bull joining and the cows bunching.</li>
  * </ul>
- * Not yet: its day and temper (step 2), wallowing, calves, block moves.
+ * Not yet: wallowing, calves, block moves.
  */
 public class BuffaloEntity extends PathfinderMob implements GeoEntity, HasLife {
     /** What it is doing, for the clips (synced). One-shot clips end by themselves once played ({@link #tick}); the loops (rest, the moods) last until a goal ends them. */
@@ -110,7 +113,9 @@ public class BuffaloEntity extends PathfinderMob implements GeoEntity, HasLife {
      * Its paces (the move control's share of its speed). Minecraft's walking push goes with the square of the speed
      * (the hippo's walk measured 0.031 blocks a tick at 0.8): stepping between plants at the walk clip's own 0.6 blocks a
      * second, travelling about 0.95, trotting to catch up about 1.6, charging about 5 (faster than a walking player, 4.3,
-     * slower than a sprint, 5.6). To be measured in a game test (BUGS 246), never trusted as worked out.
+     * slower than a sprint, 5.6). Measured in game tests, never trusted as worked out (BUGS 246):
+     * {@code BuffaloTests.aChargeRunsAtAboutFiveBlocksASecondAndItsHitLands} (CHARGE, 4.5 to 5.5 blocks a second) and
+     * {@code BuffaloTests.aBuffaloTravelsAtAboutOneBlockASecond} (TRAVEL); each logs the pace it measured.
      */
     public static final double GRAZE_STEP = 0.8, TRAVEL = 1.0, TROT = 1.3, CHARGE = 2.3;
     /** It turns at most this much a tick (degrees; Minecraft's own is 90). */
@@ -145,10 +150,32 @@ public class BuffaloEntity extends PathfinderMob implements GeoEntity, HasLife {
     public double drawnFrontY, drawnHindY;
     public long drawnNanos;
     /**
-     * Led by a game test or the film camera: its own day goals are off, so only where it is sent (and its temper, in step 2)
-     * moves it ("Led:1b").
+     * Led by a game test or the film camera: its own day goals are off, so only where it is sent and its temper move it
+     * ("Led:1b").
      */
     public boolean led;
+    /**
+     * Whoever hurt it last (never another buffalo), until when it is angry at them (its own tick), and where it stood when
+     * hurt: it charges them ({@link BuffaloGoals}), and its mates see it (the bull joins, the cows bunch round that spot).
+     */
+    @Nullable
+    private LivingEntity angryAt;
+    private int angryUntil;
+    @Nullable
+    private Vec3 hurtAt;
+    /** Its temper now and at whom (the temper goal's; read by tests). */
+    BuffaloGoals.Temper temper = BuffaloGoals.Temper.NONE;
+    @Nullable
+    LivingEntity temperOn;
+    /**
+     * Where it means to stand for the part of the day it is on (its day goal's), and which part ({@link BuffaloGoals}'s
+     * key: the bout and the act): mates on the same part keep {@link BuffaloGoals#SPACE} apart by it.
+     */
+    @Nullable
+    BlockPos standAt;
+    long standKey = Long.MIN_VALUE;
+    /** How far in front of its middle its head bead reaches (blocks, at size 1): the bead's middle and half its width. */
+    static final double HEAD_FRONT = 1.7 + 0.85;
 
     /**
      * Where its eyes go (drawn only, {@code client/BuffaloModel}): a player within 16 blocks (6 crouching; spectators too),
@@ -321,6 +348,107 @@ public class BuffaloEntity extends PathfinderMob implements GeoEntity, HasLife {
         }
     }
 
+    /**
+     * Its place in its herd's order (0 first): how many of its mates have a smaller id (its UUID, kept through saves). Mates
+     * set off one after another in this order, and each takes its own spot round the herd's place by it.
+     */
+    int rank() {
+        int r = 0;
+        for (BuffaloEntity m : mates()) {
+            if (m.getUUID().compareTo(getUUID()) < 0) {
+                r++;
+            }
+        }
+        return r;
+    }
+
+    /** Whether it is its herd's nearest member to something, each working it out from its own mate list (ties by id). */
+    boolean nearestOfHerdTo(Entity e) {
+        double mine = distanceToSqr(e);
+        for (BuffaloEntity m : mates()) {
+            if (!m.isAlive()) {
+                continue;
+            }
+            double theirs = m.distanceToSqr(e);
+            if (theirs < mine - 1.0E-6 || Math.abs(theirs - mine) <= 1.0E-6 && m.getUUID().compareTo(getUUID()) < 0) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    // --- its temper ------------------------------------------------------------------------------------------------------
+
+    /**
+     * Whoever hurt it, while it is still angry at them ({@link BuffaloGoals#REVENGE_TICKS} from the last hurt), or null.
+     * Its mates read this: never told, they see it.
+     */
+    @Nullable
+    public LivingEntity angryAt() {
+        if (angryAt != null && (tickCount > angryUntil || !angryAt.isAlive() || angryAt.isRemoved() || angryAt.level() != level())) {
+            angryAt = null;
+        }
+        return angryAt;
+    }
+
+    /** Where it stood when last hurt (its cows bunch round this spot). */
+    @Nullable
+    Vec3 hurtAt() {
+        return hurtAt;
+    }
+
+    /** It gives up its anger (its foe got past its follow range). */
+    void calmDown() {
+        angryAt = null;
+    }
+
+    /** Its temper now (for tests): watching, warning, charging, calming down, bunching, or none. */
+    public BuffaloGoals.Temper temper() {
+        return temper;
+    }
+
+    /** Whom its temper is on now (for tests), or null. */
+    @Nullable
+    public LivingEntity temperOn() {
+        return temperOn;
+    }
+
+    /** Hurt by anything but another buffalo, it is angry at whoever did it ({@link #angryAt}). */
+    @Override
+    public boolean hurt(DamageSource source, float amount) {
+        boolean hurt = super.hurt(source, amount);
+        if (hurt && !level().isClientSide && isAlive() && source.getEntity() instanceof LivingEntity by && by != this
+                && !(by instanceof BuffaloEntity) && !by.isSpectator()) {
+            angryAt = by;
+            angryUntil = tickCount + BuffaloGoals.REVENGE_TICKS;
+            hurtAt = position();
+        }
+        return hurt;
+    }
+
+    /** Its head bead's box (its head, horns and neck): a hit lands only where this touches. */
+    AABB headBox() {
+        return chain.parts()[0].getBoundingBox();
+    }
+
+    /** How far it moves a tick now (blocks, eased): its pace. */
+    double stride() {
+        return stride;
+    }
+
+    /**
+     * A hit lands on its target: its attack's harm and a toss ({@link BuffaloGoals#TOSS} along the way it faces, with
+     * Minecraft's own little lift). Only ever on the target its temper is on.
+     */
+    void hitLands(LivingEntity target) {
+        if (target.hurt(damageSources().mobAttack(this), (float) getAttributeValue(Attributes.ATTACK_DAMAGE))) {
+            float yaw = yBodyRot * Mth.DEG_TO_RAD;
+            target.knockback(BuffaloGoals.TOSS, Mth.sin(yaw), -Mth.cos(yaw));
+            target.hurtMarked = true;               // a player's client is told it was tossed
+            playHitSound();
+        }
+    }
+
     /** Where its jaws are at the chewing part of a graze: ahead of its middle, a little over its feet. */
     Vec3 jawPoint() {
         float yaw = yBodyRot * Mth.DEG_TO_RAD;
@@ -346,10 +474,16 @@ public class BuffaloEntity extends PathfinderMob implements GeoEntity, HasLife {
         if (dx * dx + dz * dz < 0.02) {
             return;
         }
-        float yaw = Mth.approachDegrees(getYRot(), (float) Math.toDegrees(Math.atan2(dz, dx)) - 90.0F, Math.min(step, MAX_TURN));
+        faceYaw((float) Math.toDegrees(Math.atan2(dz, dx)) - 90.0F, step);
+    }
+
+    /** Turns toward a way (degrees, Minecraft's), at most {@code step} degrees; whether it faces that way now. */
+    boolean faceYaw(float want, float step) {
+        float yaw = Mth.approachDegrees(getYRot(), want, Math.min(step, MAX_TURN));
         setYRot(yaw);
         yBodyRot = yaw;
         yHeadRot = yaw;
+        return Math.abs(Mth.wrapDegrees(want - yaw)) < 3.0F;
     }
 
     /** Its hit landing (the ravager's). */
@@ -462,7 +596,8 @@ public class BuffaloEntity extends PathfinderMob implements GeoEntity, HasLife {
     public String about() {
         Path p = getNavigation().getPath();
         return "home " + home + " (across " + homeAcross + "), doing " + DOING_CLIPS[Mth.clamp(doing(), 0, DOING_CLIPS.length - 1)]
-                + " for " + doingFor() + ", route " + (p == null ? "none" : p.getNextNodeIndex() + "/" + p.getNodeCount() + " to "
+                + " for " + doingFor() + ", temper " + temper + (temperOn == null ? "" : " on " + temperOn.getName().getString())
+                + ", stand " + standAt + ", route " + (p == null ? "none" : p.getNextNodeIndex() + "/" + p.getNodeCount() + " to "
                 + p.getTarget() + (p.canReach() ? "" : " (can't reach)")) + ", on ground " + onGround() + ", in water " + isInWater();
     }
 
