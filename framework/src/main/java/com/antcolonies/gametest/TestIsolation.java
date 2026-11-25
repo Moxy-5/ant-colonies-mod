@@ -87,6 +87,12 @@ public final class TestIsolation {
     /** GameTestHelper's private field holding its test, found once. */
     private static Field helperTest;
     private static final java.util.Set<GameTestInfo> TIMED = new java.util.HashSet<>();
+    /**
+     * Each stand-in player and the tests running when it came in: one of them made it. A stand-in player left in the
+     * world (a test failing before its own clean-up) makes Minecraft despawn far-off young that are not kept and fills
+     * spawning caps for the tests after it (BUGS 227, 268, 311), so it goes once all of those tests are done.
+     */
+    private static final Map<UUID, List<GameTestInfo>> PLAYERS = new HashMap<>();
 
     private TestIsolation() {
     }
@@ -196,6 +202,21 @@ public final class TestIsolation {
         }
     }
 
+    /** A stand-in player goes once every test running when it came in is done (the test server has no real players). */
+    private static void letStandInPlayersGo(ServerLevel level) {
+        List<net.minecraft.server.level.ServerPlayer> players = List.copyOf(level.getServer().getPlayerList().getPlayers());
+        PLAYERS.keySet().retainAll(players.stream().map(Entity::getUUID).toList());
+        for (net.minecraft.server.level.ServerPlayer player : players) {
+            List<GameTestInfo> tests = PLAYERS.computeIfAbsent(player.getUUID(),
+                    id -> running.stream().filter(test -> !test.isDone()).toList());
+            if (tests.stream().allMatch(GameTestInfo::isDone)) {
+                PLAYERS.remove(player.getUUID());
+                level.getServer().getPlayerList().remove(player);
+                ColonyFrameworkMod.LOGGER.info("[test-isolation] a stand-in player left behind was taken out: {}", player.getName().getString());
+            }
+        }
+    }
+
     private static void readArenas() {
         if (running == null) {
             return;
@@ -242,6 +263,7 @@ public final class TestIsolation {
             }
         }
         GROUND_HELD.keySet().stream().filter(GameTestInfo::isDone).toList().forEach(test -> letGroundGo(level, test));
+        letStandInPlayersGo(level);
         logTimes();
         ARENAS.keySet().removeIf(test -> test.isDone() && !OWNERS.containsValue(test));
         TIMED.retainAll(ARENAS.keySet());
