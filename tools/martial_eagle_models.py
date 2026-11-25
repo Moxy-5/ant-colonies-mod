@@ -1,0 +1,672 @@
+"""Martial Eagle (Polemaetus bellicosus) model maker — Stage 2 Plain 3D Shape Remake (v4, 2026-11-25).
+
+First savanna bird & first true Flier (antcolonies:martial_eagle, flier family).
+Working model grid at MODEL_SCALE = 0.50 in-game (32 model px = 1 real block):
+  - Perched standing height: ~1.25 blocks (40.0 px)
+  - Perched shoulder width:  ~0.62 blocks (19.8 px)
+  - Soaring wingspan:        ~3.25 blocks (104.0 px wingtip-to-wingtip)
+  - Soaring body length:     ~1.55 blocks (49.6 px beak-to-tail)
+
+Dual-Wing Architecture (Approved 2026-11-25):
+  - Dedicated sculpted folded wing capes (wing_fold_left/right + wing_fold_tip_left/right)
+    for 10/10 sleek teardrop perched & ground silhouettes (still animatable for mantling,
+    breathing lifts, threat shrugs, preening, and rouse shakes!).
+  - Dedicated sculpted spread soaring wings (wing_upper -> wing_fore -> wing_hand -> wing_tips + alula)
+    for 10/10 continuous, gap-free soaring airfoil & naturally staggered slotted primary tips.
+  - Both wing sets live in the single game .geo.json (well within the 400-box budget) and cross-scale
+    cleanly [1,1,1] <-> [0,0,0] via GeckoLib animation scale channels on takeoff/landing.
+  - Smooth rounded() sculpted raptor fuselage, rounded feathered eagle trousers, proud S-curve neck,
+    fierce flat-crowned eagle skull with prominent swept occipital crest, heavy hooked raptor_beak(),
+    blazing golden eyes + dual flush eyelids + overhanging brow ridges, 7-feather tail fan,
+    and 3+1 gripping bird_talon_foot() resting flush at y = 0.00.
+
+    python tools/martial_eagle_models.py
+    python tools/workshop.py snapshot martial_eagle --note "..."
+"""
+import math
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from model_parts import (  # noqa: E402
+    cube, rot_cube, rounded, mix, shade, paint_faces, png, geo, write_assets,
+    feather_fan, raptor_beak, bird_talon_foot,
+    euler, mat_mul, mat_vec, vadd, vsub,
+)
+
+# --- Workshop sliders (main shape numbers for tools/workshop.py serve martial_eagle) ----------------------------------
+MODEL_SCALE = 0.50        # 32 model px = 1 real in-game block (px = 0.03125 blocks)
+BODY_PITCH = 48.0         # Perched upright torso tilt (deg; 0 = horizontal soaring flight)
+CHEST_HW = 6.5            # Torso ribcage half-width (px)
+WING_SPAN_SCALE = 1.00    # Multiplier on soaring wing span (1.00 -> ~106 px = 3.31 blocks)
+CREST_RAISE = 0.38        # 0.0 = sleek streamlined dive, 1.0 = fully raised alert occipital crest
+TAIL_SPREAD = 0.15        # 0.0 = narrow perched wedge, 1.0 = wide braking rudder fan
+BEAK_LEN = 5.4            # Prominent hooked raptor beak length (px)
+TALON_SCALE = 1.00        # Scale on curved gripping talons
+JAW_OPEN = 0.0            # Preview-only beak opening (deg)
+
+WORKSHOP_SHAPE = [
+    ("BODY_PITCH",      "Perched torso pitch (deg)",    38.0, 54.0, 1.0),
+    ("CHEST_HW",        "Torso half-width (px)",         4.8,  7.0, 0.2),
+    ("WING_SPAN_SCALE", "Soaring wingspan scale",       0.85, 1.15, 0.02),
+    ("CREST_RAISE",     "Occipital crest raise",        0.00, 1.00, 0.05),
+    ("TAIL_SPREAD",     "Tail fan spread",              0.00, 1.00, 0.05),
+    ("BEAK_LEN",        "Hooked beak length (px)",       4.2,  6.4, 0.2),
+    ("TALON_SCALE",     "Talon length scale",           0.80, 1.25, 0.05),
+    ("JAW_OPEN",        "Preview beak open (deg)",       0.0, 38.0, 2.0),
+]
+
+WORKSHOP_PARTS = {
+    "head":         ["head", "brow_left", "brow_right", "crest_c", "crest_left", "crest_right",
+                     "eye_left", "eye_right", "lid_left", "lid_right", "ulid_left", "ulid_right",
+                     "pupil_left", "pupil_right", "jaw", "tongue"],
+    "neck":         ["neck_1", "neck_2"],
+    "body":         ["body"],
+    "folded wings": ["wing_fold_left", "wing_fold_tip_left", "wing_fold_right", "wing_fold_tip_right"],
+    "spread wings": ["wing_upper_left", "wing_fore_left", "wing_hand_left", "wing_tips_left", "alula_left",
+                     "wing_upper_right", "wing_fore_right", "wing_hand_right", "wing_tips_right", "alula_right"],
+    "tail":         ["tail_base", "tail_c", "tail_left", "tail_right"],
+    "legs":         ["leg_upper_left", "leg_lower_left", "leg_tarsus_left", "leg_foot_left",
+                     "leg_upper_right", "leg_lower_right", "leg_tarsus_right", "leg_foot_right"],
+}
+
+WORKSHOP_LOOK = "plain"   # Stage 2 Plain 3D Shape ("plain", "clay")
+TEXELS = 2.0
+
+
+def _lerp(a, b, t):
+    return a + (b - a) * t
+
+
+def _rounded_x(cubes, x0, x1, cy, cz, ry, rz, part):
+    """Smooth 8-sided rounded cross-section extruding along X (used for aerodynamic leading-edge wing spars)."""
+    cubes.append(cube([x0, cy - ry * 0.55, cz - rz], [x1, cy + ry * 0.55, cz + rz], part))
+    cubes.append(cube([x0, cy - ry, cz - rz * 0.55], [x1, cy + ry, cz + rz * 0.55], part))
+
+
+def _rounded_y(cubes, cx, y0, y1, rx, rz, cz, part):
+    """Smooth 8-sided rounded vertical column (used for muscular feathered eagle thighs & knee cuffs!)."""
+    if min(rx, rz) < 0.85:
+        cubes.append(cube([cx - rx, y0, cz - rz], [cx + rx, y1, cz + rz], part))
+        return
+    cubes.append(cube([cx - rx,        y0, cz - rz * 0.55], [cx + rx,        y1, cz + rz * 0.55], part))
+    cubes.append(cube([cx - rx * 0.55, y0, cz - rz],        [cx + rx * 0.55, y1, cz + rz],        part))
+    cubes.append(cube([cx - rx * 0.84, y0, cz - rz * 0.84], [cx + rx * 0.84, y1, cz + rz * 0.84], part))
+
+
+def _build_folded_wing(s, side, by, bz, hw):
+    """Dedicated sculpted teardrop folded wing cape for perched & ground poses (10/10 sleek raptor silhouette!).
+    Authored cleanly in body-local space (+X left, +Y dorsal back, -Z chest/front, +Z tail/back) so when body
+    pitches up 46 deg at rest, the wing hugs the flanks smoothly and sweeps diagonally down-back along the rump."""
+    # Shoulder joint on upper side of chest/back
+    p_wf = [s * (hw * 0.84), by + 1.4, bz - 5.2]
+    cubes = []
+
+    def add_panel(x_in, x_out, y0, y1, z0, z1, part, rot_deg=None, piv=None):
+        lo = [min(s * x_in, s * x_out), y0, z0]
+        hi = [max(s * x_in, s * x_out), y1, z1]
+        if rot_deg:
+            p = piv if piv is not None else [(lo[0] + hi[0]) * 0.5, (lo[1] + hi[1]) * 0.5, (lo[2] + hi[2]) * 0.5]
+            cubes.append(rot_cube(lo, hi, part, rotation=rot_deg, pivot=p))
+        else:
+            cubes.append(cube(lo, hi, part))
+
+    # 1. Rounded muscular carpal shoulder bend (the proud forward-outer shoulder curve seen in front & 3/4 views!)
+    add_panel(hw * 0.60, hw * 1.32, by - 3.0, by + 5.6, bz - 8.8, bz - 2.0, 'wing_covert',
+              rot_deg=[5.0, s * -6.0, s * -7.0])
+    # Upper shoulder cap rounding cleanly into the dark dorsal mantle (fills upper back silhouette!)
+    add_panel(0.45, hw * 1.12, by + 3.2, by + 6.9, bz - 8.0, bz - 0.2, 'wing_covert',
+              rot_deg=[4.0, s * -3.0, s * -16.0])
+    # Front-lower carpal edge rounding smoothly toward the white chest (tapered, NOT a flat box wall!)
+    add_panel(hw * 0.70, hw * 1.24, by - 4.8, by - 1.4, bz - 7.4, bz - 1.0, 'wing_covert',
+              rot_deg=[8.0, s * -7.0, s * 10.0])
+
+    # 2. Upper & median covert armor shell (broadest curved mid-flank contour, tapering inward toward rump!)
+    add_panel(hw * 0.56, hw * 1.38, by - 3.4, by + 5.9, bz - 3.6, bz + 4.2, 'wing_covert',
+              rot_deg=[-3.0, s * 6.0, s * -6.0])
+    # Scapular / dorsal cape shingle bridging neatly onto the back spine (stays strictly on side s >= 0.4!)
+    add_panel(0.45, hw * 0.98, by + 3.4, by + 7.2, bz - 2.0, bz + 5.8, 'wing_covert',
+              rot_deg=[-5.0, s * 7.0, s * -18.0])
+
+    # 3. Terraced greater coverts shingle band (gives that crisp layered eagle wing plumage step!)
+    add_panel(hw * 0.52, hw * 1.30, by - 4.0, by + 4.8, bz + 2.0, bz + 9.0, 'wing_covert_hi',
+              rot_deg=[-6.0, s * 10.0, s * -5.0])
+    # Lower flank belly-hugging feather edge (smoothly sweeps down and back along the white thigh top!)
+    add_panel(hw * 0.62, hw * 1.18, by - 5.4, by - 1.8, bz - 1.8, bz + 6.6, 'wing_covert_hi',
+              rot_deg=[-4.0, s * 8.0, s * 12.0])
+
+    # 4. Sculpted broad folded secondaries & tertials curving smoothly over the lower back & hips
+    add_panel(0.55, hw * 1.12, by - 1.4, by + 5.2, bz + 6.0, bz + 14.2, 'wing_flight',
+              rot_deg=[-8.0, s * 13.0, s * -10.0])
+    add_panel(hw * 0.48, hw * 1.12, by - 4.0, by + 1.8, bz + 5.4, bz + 13.4, 'wing_flight',
+              rot_deg=[-7.0, s * 12.0, s * 5.0])
+
+    fold_bone = {
+        'name': f'wing_fold_{side}', 'parent': 'body', 'pivot': p_wf,
+        'rotation': [0.0, 0.0, 0.0], 'cubes': cubes,
+    }
+
+    # 5. Articulated folded primary wingtip spear (sweeps cleanly along rump & upper tail, converging toward midline!)
+    p_wt = [s * (hw * 0.66), by - 0.2, bz + 12.2]
+    tip_cubes = []
+
+    def add_tip(x_in, x_out, y0, y1, z0, z1, part, rot_deg=None):
+        lo = [min(s * x_in, s * x_out), y0, z0]
+        hi = [max(s * x_in, s * x_out), y1, z1]
+        p = [(lo[0] + hi[0]) * 0.5, (lo[1] + hi[1]) * 0.5, (lo[2] + hi[2]) * 0.5]
+        tip_cubes.append(rot_cube(lo, hi, part, rotation=rot_deg, pivot=p) if rot_deg else cube(lo, hi, part))
+
+    # Stacked dark primary outer web tapering cleanly to a sharp eagle spear tip above the tail!
+    add_tip(hw * 0.34, hw * 0.90, by - 2.6, by + 3.0, bz + 11.4, bz + 19.2, 'wing_primary',
+            rot_deg=[-6.0, s * 12.0, s * -5.0])
+    add_tip(hw * 0.16, hw * 0.68, by - 1.8, by + 2.2, bz + 17.2, bz + 23.8, 'wing_primary',
+            rot_deg=[-4.0, s * 10.0, s * -4.0])
+    # Longest pointed primary tip (P8/P9) resting sleekly over the upper tail coverts!
+    add_tip(0.25, hw * 0.46, by - 1.2, by + 1.3, bz + 22.0, bz + 27.0, 'wing_tip',
+            rot_deg=[-3.0, s * 8.0, s * -2.0])
+
+    tip_bone = {
+        'name': f'wing_fold_tip_{side}', 'parent': f'wing_fold_{side}', 'pivot': p_wt,
+        'rotation': [0.0, 0.0, 0.0], 'cubes': tip_cubes,
+    }
+    return [fold_bone, tip_bone]
+
+
+def _build_spread_wing(s, side, by, bz, ws):
+    """Dedicated sculpted soaring airfoil wing (10/10 continuous eagle silhouette, 3.25 blocks wingspan!).
+    Every joint angle is computed directly from exact joint vectors:
+      - Smooth forward-arched leading edge (shoulder -> elbow -> wrist -> smoothly curved hand, ZERO bowtie kink!)
+      - Continuous overlapping covert + secondary airfoil sheet (ZERO Venetian-blind gaps!)
+      - Seamlessly fanned inner primaries bridging wrist to outer tips (ZERO triangle hole!)
+      - 7 gracefully curved, staggered slotted eagle primary tips (broad overlapping bases -> notched aero tips!)."""
+    wy = by + 2.1
+
+    # Exact smooth avian wing spar waypoints (body-local space, +X left, -Z forward, +Z trailing):
+    p_sh = [s * 4.8, wy, bz - 4.2]
+    p_el = [s * (4.8 + 11.4 * ws), wy + 0.2, bz - 5.4]   # sweeps forward +6.0 deg
+    p_wr = [s * (4.8 + 24.4 * ws), wy + 0.4, bz - 6.6]   # forward-most wrist bend (+5.3 deg)
+    p_ha = [s * (4.8 + 33.4 * ws), wy + 0.2, bz - 5.0]   # smoothly sweeps back -10.1 deg (NO kink!)
+    p_al = [s * (4.8 + 24.8 * ws), wy + 0.85, bz - 7.1]
+
+    # Exact yaw for a +s*X spar bar from a to b (turn_y(d) maps (1,0,0)->(cos d, 0, -sin d))
+    def bar_yaw(a, b):
+        dx = abs(b[0] - a[0])
+        dz = b[2] - a[2]
+        return s * math.degrees(math.atan2(-dz, dx))
+
+    yaw_up = bar_yaw(p_sh, p_el)   # ~ s * +6.0 deg (sweeps forward)
+    yaw_fo = bar_yaw(p_el, p_wr)   # ~ s * +5.3 deg (continues smooth forward arch)
+    yaw_ha = bar_yaw(p_wr, p_ha)   # ~ s * -10.1 deg (smoothly curves back!)
+
+    # --- 1. wing_upper (humerus spar + smooth overlapping covert sheet + 4 wide overlapping tertials) ---
+    up_cubes = []
+    ux0, ux1 = sorted((p_sh[0] - s * 1.2, p_el[0] + s * 1.0))
+    # Thick cambered leading-edge spar (rounded airfoil nose!)
+    up_cubes.append(rot_cube([ux0, wy - 1.25, p_sh[2] - 2.1], [ux1, wy + 1.25, p_sh[2] + 2.3], 'wing_covert',
+                             rotation=[0.0, yaw_up, 0.0], pivot=p_sh))
+    up_cubes.append(rot_cube([ux0, wy - 0.65, p_sh[2] - 2.55], [ux1, wy + 0.65, p_sh[2] - 1.4], 'wing_covert',
+                             rotation=[0.0, yaw_up, 0.0], pivot=p_sh))
+    # Overlapping upper & greater covert sheets (solid airfoil cambered dome)
+    up_cubes.append(rot_cube([ux0, wy - 0.35, p_sh[2] + 1.4], [ux1, wy + 1.00, p_sh[2] + 6.6], 'wing_covert',
+                             rotation=[3.5, yaw_up, 0.0], pivot=p_sh))
+    up_cubes.append(rot_cube([ux0, wy - 0.52, p_sh[2] + 5.2], [ux1, wy + 0.52, p_sh[2] + 10.0], 'wing_covert_hi',
+                             rotation=[5.0, yaw_up, 0.0], pivot=p_sh))
+    # 4 wide overlapping tertials / inner flight feathers (width 4.1 on 2.85 spacing = 100% GAP-FREE continuous curve!)
+    for ti in range(4):
+        frac = ti / 3.0
+        fx = _lerp(p_sh[0] + s * 1.4, p_el[0] - s * 0.6, frac)
+        fz = _lerp(p_sh[2], p_el[2], frac) + 6.8
+        tlen = 13.0 + math.sin(frac * math.pi * 0.85) * 2.2
+        tw = 4.15
+        eps = ((ti % 2) - 0.5) * 0.06
+        up_cubes.append(rot_cube([fx - tw * 0.5, wy - 0.62 + eps, fz],
+                                 [fx + tw * 0.5, wy + 0.08 + eps, fz + tlen], 'wing_flight',
+                                 rotation=[5.5, s * (-4.0 + frac * 6.0), 0.0], pivot=[fx, wy, fz]))
+
+    b_up = {'name': f'wing_upper_{side}', 'parent': 'body', 'pivot': p_sh,
+            'rotation': [0.0, 0.0, s * -5.0], 'cubes': up_cubes}
+
+    # --- 2. wing_fore (ulna leading arch + terraced coverts + 7 GAP-FREE overlapping broad secondaries!) ---
+    fo_cubes = []
+    fx0, fx1 = sorted((p_el[0] - s * 0.9, p_wr[0] + s * 1.1))
+    # Cambered leading edge spar + rounded nose
+    fo_cubes.append(rot_cube([fx0, wy - 1.10, p_el[2] - 1.95], [fx1, wy + 1.15, p_el[2] + 2.2], 'wing_covert',
+                             rotation=[0.0, yaw_fo, 0.0], pivot=p_el))
+    fo_cubes.append(rot_cube([fx0, wy - 0.58, p_el[2] - 2.40], [fx1, wy + 0.58, p_el[2] - 1.3], 'wing_covert',
+                             rotation=[0.0, yaw_fo, 0.0], pivot=p_el))
+    # Median & greater covert sheets (clean overlapping plumage terraces!)
+    fo_cubes.append(rot_cube([fx0, wy - 0.25, p_el[2] + 1.3], [fx1, wy + 0.92, p_el[2] + 6.4], 'wing_covert',
+                             rotation=[3.5, yaw_fo, 0.0], pivot=p_el))
+    fo_cubes.append(rot_cube([fx0, wy - 0.45, p_el[2] + 5.0], [fx1, wy + 0.50, p_el[2] + 9.8], 'wing_covert_hi',
+                             rotation=[5.0, yaw_fo, 0.0], pivot=p_el))
+    # 7 broad overlapping secondaries (width 3.55 px on 1.95 px spacing -> smooth scalloped continuous trailing edge!)
+    for si in range(7):
+        frac = si / 6.0
+        sx = _lerp(p_el[0] + s * 0.8, p_wr[0] - s * 0.2, frac)
+        sz = _lerp(p_el[2], p_wr[2], frac) + 6.4
+        # Full convex eagle chord bulge (longest in the middle of the wing!)
+        slen = 15.2 + math.sin(frac * math.pi) * 2.2 - frac * 1.0
+        sw = 3.55
+        eps = ((si % 3) - 1) * 0.05 + si * 0.012
+        # Gentle progressive outward fan (2 deg -> 16 deg) seamlessly leading into inner primaries!
+        fo_cubes.append(rot_cube([sx - sw * 0.5, wy - 0.58 + eps, sz],
+                                 [sx + sw * 0.5, wy + 0.08 + eps, sz + slen], 'wing_flight',
+                                 rotation=[5.5, s * (2.0 + frac * 14.0), 0.0], pivot=[sx, wy, sz]))
+
+    b_fo = {'name': f'wing_fore_{side}', 'parent': f'wing_upper_{side}', 'pivot': p_el,
+            'rotation': [0.0, 0.0, s * -2.0], 'cubes': fo_cubes}
+
+    # --- 3. wing_hand (smooth curved carpometacarpus + primary coverts + 4 SEAMLESS inner primaries P1..P4!) ---
+    ha_cubes = []
+    hx0, hx1 = sorted((p_wr[0] - s * 0.9, p_ha[0] + s * 1.4))
+    # Leading edge hand spar (exact yaw_ha = -10.1 deg -> smooth seamless curve off the wrist, ZERO kink!)
+    ha_cubes.append(rot_cube([hx0, wy - 0.88, p_wr[2] - 1.65], [hx1, wy + 0.92, p_wr[2] + 2.2], 'wing_covert',
+                             rotation=[0.0, yaw_ha, 0.0], pivot=p_wr))
+    ha_cubes.append(rot_cube([hx0, wy - 0.45, p_wr[2] - 2.05], [hx1, wy + 0.48, p_wr[2] - 1.0], 'wing_covert',
+                             rotation=[0.0, yaw_ha, 0.0], pivot=p_wr))
+    # Primary coverts shingle seamlessly blending from greater coverts out toward P10
+    ha_cubes.append(rot_cube([hx0, wy - 0.25, p_wr[2] + 1.4], [hx1, wy + 0.62, p_wr[2] + 7.2], 'wing_covert_hi',
+                             rotation=[4.0, yaw_ha, 0.0], pivot=p_wr))
+    # 3 broad overlapping inner primaries (P1..P3) fanning cleanly from 18 -> 34 deg from +Z:
+    # ZERO triangle gap behind the wrist and ZERO overlap bump against the outer slotted tips!
+    for pi in range(3):
+        frac = pi / 2.0
+        px = _lerp(p_wr[0] + s * 0.4, p_ha[0] - s * 2.2, frac)
+        pz = _lerp(p_wr[2] + 4.4, p_ha[2] + 3.0, frac)
+        plen = 15.6 - frac * 0.9
+        pw = 3.55 - frac * 0.25
+        eps = ((pi % 3) - 1) * 0.05 + pi * 0.015
+        pyaw = s * (18.0 + frac * 16.0)   # 18, 26, 34 deg from +Z!
+        ha_cubes.append(rot_cube([px - pw * 0.5, wy - 0.52 + eps, pz],
+                                 [px + pw * 0.5, wy + 0.08 + eps, pz + plen], 'wing_primary',
+                                 rotation=[4.8, pyaw, 0.0], pivot=[px, wy, pz]))
+
+    b_ha = {'name': f'wing_hand_{side}', 'parent': f'wing_fore_{side}', 'pivot': p_wr,
+            'rotation': [0.0, 0.0, s * 2.0], 'cubes': ha_cubes}
+
+    # --- 3b. Alula (bastard wing thumb-tuft at wrist leading edge — sleek in glide, flares on landing!) ---
+    ax0, ax1 = sorted((p_al[0] - s * 0.5, p_al[0] + s * 6.2 * ws))
+    al_cubes = [rot_cube([ax0, p_al[1] - 0.30, p_al[2] - 0.75], [ax1, p_al[1] + 0.34, p_al[2] + 1.05], 'wing_primary',
+                         rotation=[0.0, yaw_ha + s * 5.0, s * -4.0], pivot=p_al)]
+    b_al = {'name': f'alula_{side}', 'parent': f'wing_hand_{side}', 'pivot': p_al,
+            'rotation': [0.0, 0.0, 0.0], 'cubes': al_cubes}
+
+    # --- 4. wing_tips — 7 Majestic Swept, Broad-Based, Long-Slotted Eagle Primary Feathers (P10..P4 -> +/-53.5 px!) ---
+    # Longer graceful slotted outer eagle fingers (P8/P7 longest, P10 shorter leading edge, crisp air-slots between tips!)
+    ti_cubes = []
+    # (yaw_from_X_deg, total_len, z_offset_from_p_ha, base_w, tip_w, aero_up_roll_deg)
+    finger_specs = [
+        ( -4.0, 14.8 * ws, -1.6, 2.30, 1.05, -9.5),  # P10 shorter leading slotted primary
+        ( -9.5, 17.8 * ws, -0.7, 2.45, 1.12, -8.5),  # P9
+        (-15.5, 19.6 * ws,  0.2, 2.55, 1.15, -7.5),  # P8 longest majestic eagle wingtip (~ +/-53.5 px = 3.34 blocks!)
+        (-22.0, 19.2 * ws,  1.0, 2.55, 1.15, -6.5),  # P7
+        (-28.5, 18.0 * ws,  1.8, 2.55, 1.15, -5.5),  # P6
+        (-35.5, 16.4 * ws,  2.5, 2.50, 1.18, -4.5),  # P5
+        (-43.0, 14.6 * ws,  3.1, 2.55, 1.25, -3.5),  # P4 seamlessly bridging into inner primary P3 (+34 deg from +Z)!
+    ]
+    for fi, (ang_x, flen, dz, w_base, w_tip, up_roll) in enumerate(finger_specs):
+        fyaw = s * ang_x
+        froll = s * up_roll
+        eps = ((fi % 3) - 1) * 0.045 + fi * 0.015
+        fz = p_ha[2] + dz
+        fx_base = p_ha[0] - s * 3.2   # deep seamless overlap into wing_hand!
+        mid_l = flen * 0.48
+        fx_mid = fx_base + s * mid_l
+        fx_end = fx_base + s * flen
+        fpiv = [fx_base, wy + eps, fz]
+
+        x_a0, x_a1 = sorted((fx_base, fx_mid + s * 0.35))
+        x_b0, x_b1 = sorted((fx_mid - s * 0.25, fx_end))
+        ti_cubes.append(rot_cube([x_a0, wy - 0.36 + eps, fz - w_base * 0.5],
+                                 [x_a1, wy + 0.14 + eps, fz + w_base * 0.5], 'wing_primary',
+                                 rotation=[0.0, round(fyaw, 3), round(froll * 0.55, 3)], pivot=fpiv))
+        ti_cubes.append(rot_cube([x_b0, wy - 0.26 + eps, fz - w_tip * 0.5],
+                                 [x_b1, wy + 0.12 + eps, fz + w_tip * 0.5], 'wing_tip',
+                                 rotation=[0.0, round(fyaw, 3), round(froll, 3)], pivot=fpiv))
+
+    b_ti = {'name': f'wing_tips_{side}', 'parent': f'wing_hand_{side}', 'pivot': p_ha,
+            'rotation': [0.0, 0.0, s * -5.0], 'cubes': ti_cubes}
+
+    return [b_up, b_fo, b_ha, b_al, b_ti]
+
+
+def build_bones(mode='perched', pitch_override=None, crest_override=None, tail_override=None, jaw_override=None):
+    """Builds the complete Martial Eagle skeleton & Stage 2 sculpted 3D geometry.
+    mode:
+      - 'perched': upright 46 deg perched pose, folded sculpted wing capes active (for Workshop Compare!)
+      - 'soaring': horizontal 0 deg soaring pose, legs tucked cleanly BACKWARD, spread wings active
+      - 'game':    full unified GeckoLib rig containing BOTH wing sets (cross-scaled by animation clips!)"""
+    is_soar = (mode == 'soaring')
+    include_folded = (mode in ('perched', 'game'))
+    include_spread = (mode in ('soaring', 'game'))
+
+    wf = 0.0 if is_soar else 1.0
+    bp = (BODY_PITCH * wf) if pitch_override is None else pitch_override
+    cr = CREST_RAISE if crest_override is None else crest_override
+    ts = TAIL_SPREAD if tail_override is None else tail_override
+    jo = JAW_OPEN if jaw_override is None else jaw_override
+    ws = WING_SPAN_SCALE
+    hw = CHEST_HW
+
+    bones = []
+    bones.append({'name': 'root', 'pivot': [0.0, 0.0, 0.0], 'cubes': []})
+
+    # --- 1. SMOOTH SCULPTED ROUNDED RAPTOR FUSELAGE (no boxy flat steps!) ---
+    by = 22.0
+    bz = -0.8
+    body_cubes = []
+
+    # Upper dark Martial Eagle bib / collar (tapered rounded oval flowing cleanly from neck)
+    rounded(body_cubes, 0.0, by - 0.2, hw * 0.74, 4.3, bz - 11.6, bz - 7.4, 'hood')
+    rounded(body_cubes, 0.0, by - 0.4, hw * 0.92, 5.2, bz - 8.4,  bz - 3.4, 'hood')
+    # Deep rounded muscular breast (proud snow-white lower chest keel curving smoothly into thighs!)
+    rounded(body_cubes, 0.0, by - 2.6, hw * 0.90, 5.1, bz - 7.2,  bz + 2.8, 'chest_white')
+    rounded(body_cubes, 0.0, by - 4.4, hw * 0.74, 3.6, bz - 5.2,  bz + 3.8, 'chest_white')
+    # Broad muscular dorsal back / mantle dome
+    rounded(body_cubes, 0.0, by + 1.4, hw * 0.96, 5.1, bz - 4.4,  bz + 3.6, 'mantle')
+    # Smoothly tapered waist & lower back
+    rounded(body_cubes, 0.0, by + 0.6, hw * 0.84, 4.4, bz + 2.4,  bz + 8.4, 'mantle')
+    rounded(body_cubes, 0.0, by - 2.2, hw * 0.72, 3.4, bz + 2.2,  bz + 8.2, 'chest_white')
+    # Sleek tapered rump & undertail coverts
+    rounded(body_cubes, 0.0, by - 0.1, hw * 0.64, 3.3, bz + 7.4,  bz + 12.2, 'mantle')
+    rounded(body_cubes, 0.0, by - 1.7, hw * 0.52, 2.2, bz + 7.6,  bz + 12.6, 'chest_white')
+    rounded(body_cubes, 0.0, by - 0.3, hw * 0.48, 2.2, bz + 11.2, bz + 14.4, 'mantle')
+
+    bones.append({
+        'name': 'body', 'parent': 'root', 'pivot': [0.0, by, bz],
+        'rotation': [round(-bp, 3), 0.0, 0.0], 'cubes': body_cubes,
+    })
+
+    # --- 2. PROUD ROUNDED S-CURVE NECK & FIERCE SCULPTED MARTIAL EAGLE HEAD ---
+    n1_p = [0.0, by + 1.5, bz - 9.8]
+    n1_cubes = []
+    rounded(n1_cubes, 0.0, n1_p[1] - 0.1, 3.55, 3.45, n1_p[2] - 4.0, n1_p[2] + 2.2, 'hood')
+    bones.append({'name': 'neck_1', 'parent': 'body', 'pivot': n1_p,
+                  'rotation': [round(bp * 0.04, 3), 0.0, 0.0], 'cubes': n1_cubes})
+
+    n2_p = [0.0, n1_p[1] + 0.7, n1_p[2] - 3.3]
+    n2_cubes = []
+    rounded(n2_cubes, 0.0, n2_p[1] + 0.0, 3.05, 3.00, n2_p[2] - 3.8, n2_p[2] + 1.8, 'hood')
+    bones.append({'name': 'neck_2', 'parent': 'neck_1', 'pivot': n2_p,
+                  'rotation': [round(bp * 0.24, 3), 0.0, 0.0], 'cubes': n2_cubes})
+
+    # Fierce eagle skull: slightly longer, prouder flat-sloped raptor crown, bold brow shelf, strong chin/cheek
+    hp = [0.0, n2_p[1] + 0.8, n2_p[2] - 3.1]
+    head_cubes = [
+        # Main sculpted cranium (rounded slightly narrower at brow, fuller at cheeks)
+        cube([-2.95, hp[1] - 2.35, hp[2] - 5.5], [2.95, hp[1] + 2.55, hp[2] + 1.6], 'hood'),
+        # Sleek flat-domed eagle crown & sloped forehead bridging cleanly into the pale cere
+        cube([-2.45, hp[1] + 1.95, hp[2] - 5.2], [2.45, hp[1] + 3.45, hp[2] + 1.2], 'hood'),
+        rot_cube([-1.95, hp[1] + 1.45, hp[2] - 6.5], [1.95, hp[1] + 3.00, hp[2] - 3.6], 'hood',
+                 rotation=[15.0, 0.0, 0.0], pivot=[0.0, hp[1] + 2.45, hp[2] - 4.4]),
+        # Rear occipital crown wedge (gives the iconic regal Martial Eagle warrior-helmet rear profile!)
+        rot_cube([-2.15, hp[1] + 1.35, hp[2] - 0.4], [2.15, hp[1] + 3.25, hp[2] + 2.9], 'hood',
+                 rotation=[-14.0, 0.0, 0.0], pivot=[0.0, hp[1] + 2.4, hp[2] + 0.6]),
+        # Dark feathered cheek & solid dark Martial Eagle throat (wrapping cleanly into neck)
+        cube([-2.60, hp[1] - 3.05, hp[2] - 4.2], [2.60, hp[1] - 1.45, hp[2] + 1.2], 'hood'),
+    ]
+
+    # Heavy, deeply hooked apex-predator beak + sealed lower mandible + hidden tongue
+    jaw_cubes, tongue_cubes = [], []
+    jaw_piv, tongue_piv = raptor_beak(
+        head_cubes, jaw_cubes, tongue_cubes,
+        cx=0.0, y_base=hp[1] - 1.15, z_base=hp[2] - 5.15,
+        length=BEAK_LEN, width=2.55, height=2.95, hook_drop=1.95, cere_frac=0.28,
+        cere_part='cere', beak_part='beak', tip_part='beak_tip',
+        inner_part='mouth_inner', tongue_part='tongue', nostril_part='nostril',
+    )
+
+    bones.append({'name': 'head', 'parent': 'neck_2', 'pivot': hp,
+                  'rotation': [round(bp * 0.72, 3), 0.0, 0.0], 'cubes': head_cubes})
+    bones.append({'name': 'jaw', 'parent': 'head', 'pivot': jaw_piv,
+                  'rotation': [round(jo, 3), 0.0, 0.0], 'cubes': jaw_cubes})
+    bones.append({'name': 'tongue', 'parent': 'jaw', 'pivot': tongue_piv, 'cubes': tongue_cubes})
+
+    # Iconic bold swept-back Martial Eagle occipital crest (immediately readable from side & 3/4!)
+    crest_pitch = -8.0 - cr * 28.0
+    crest_c_cubes = []
+    feather_fan(crest_c_cubes, (0.0, hp[1] + 2.85, hp[2] + 0.4), count=3, length=4.9, width=1.25,
+                thickness=0.44, spread_deg=24.0, camber_deg=7.0, pitch_deg=14.0, axis='crest',
+                stagger=0.05, part='crest')
+    bones.append({'name': 'crest_c', 'parent': 'head', 'pivot': [0.0, hp[1] + 2.85, hp[2] + 0.4],
+                  'rotation': [round(crest_pitch, 3), 0.0, 0.0], 'cubes': crest_c_cubes})
+    for s, side in ((1, 'left'), (-1, 'right')):
+        cc = []
+        feather_fan(cc, (s * 1.45, hp[1] + 2.45, hp[2] + 0.6), count=2, length=4.3, width=1.05,
+                    thickness=0.38, spread_deg=18.0, camber_deg=6.0, pitch_deg=10.0, axis='crest',
+                    side=s, stagger=0.05, part='crest')
+        bones.append({'name': f'crest_{side}', 'parent': 'head', 'pivot': [s * 1.45, hp[1] + 2.45, hp[2] + 0.6],
+                      'rotation': [round(crest_pitch * 0.85, 3), round(s * 14.0, 3), round(s * -8.0, 3)], 'cubes': cc})
+
+    # Fierce overhanging eagle supraorbital brows + blazing golden eyes + dual flush eyelids + sliding pupils
+    for s, side in ((1, 'left'), (-1, 'right')):
+        ex = s * 2.94
+        ey = hp[1] + 0.80
+        ez = hp[2] - 3.65
+        bx0, bx1 = sorted((s * 2.25, s * 3.50))
+        bones.append({'name': f'brow_{side}', 'parent': 'head', 'pivot': [s * 2.95, ey + 1.15, ez],
+                      'rotation': [12.0, round(s * -10.0, 3), round(s * -16.0, 3)],
+                      'cubes': [cube([bx0, ey + 0.70, ez - 1.55], [bx1, ey + 1.55, ez + 1.45], 'hood')]})
+        ex0, ex1 = sorted((ex - s * 0.36, ex + s * 0.16))
+        bones.append({'name': f'eye_{side}', 'parent': 'head', 'pivot': [ex, ey, ez],
+                      'cubes': [cube([ex0, ey - 0.80, ez - 0.90], [ex1, ey + 0.80, ez + 0.90], 'eye')]})
+        px0, px1 = sorted((ex + s * 0.12, ex + s * 0.21))
+        bones.append({'name': f'pupil_{side}', 'parent': f'eye_{side}', 'pivot': [ex + s * 0.16, ey, ez],
+                      'cubes': [cube([px0, ey - 0.39, ez - 0.44], [px1, ey + 0.39, ez + 0.44], 'pupil')]})
+        lx0, lx1 = sorted((ex - s * 0.22, ex + s * 0.24))
+        bones.append({'name': f'ulid_{side}', 'parent': 'head', 'pivot': [ex, ey + 0.84, ez],
+                      'cubes': [cube([lx0, ey + 0.56, ez - 0.96], [lx1, ey + 0.92, ez + 0.96], 'eyelid')]})
+        bones.append({'name': f'lid_{side}', 'parent': 'head', 'pivot': [ex, ey - 0.84, ez],
+                      'cubes': [cube([lx0, ey - 0.92, ez - 0.96], [lx1, ey - 0.58, ez + 0.96], 'eyelid')]})
+
+    # --- 3. DUAL SCULPTED WING ARCHITECTURE ---
+    # 3A. Dedicated sculpted teardrop folded wing capes (active when perched / on ground)
+    if include_folded:
+        for s, side in ((1, 'left'), (-1, 'right')):
+            bones.extend(_build_folded_wing(s, side, by, bz, hw))
+
+    # 3B. Dedicated sculpted soaring airfoil wings (active in flight / flapping / soaring)
+    if include_spread:
+        for s, side in ((1, 'left'), (-1, 'right')):
+            bones.extend(_build_spread_wing(s, side, by, bz, ws))
+
+    # --- 4. ARTICULATED 7-FEATHER TAIL FAN (overlapping, gap-free wedge -> wide rudder fan!) ---
+    tp = [0.0, by - 0.5, bz + 12.2]
+    tb_cubes = []
+    rounded(tb_cubes, 0.0, tp[1], 3.4, 1.55, tp[2] - 1.2, tp[2] + 3.6, 'mantle')
+    bones.append({'name': 'tail_base', 'parent': 'body', 'pivot': tp,
+                  'rotation': [round(3.5 * wf, 3), 0.0, 0.0], 'cubes': tb_cubes})
+
+    tc_cubes = []
+    feather_fan(tc_cubes, (0.0, tp[1], tp[2] + 0.8), count=3, length=15.4, width=2.75, thickness=0.62,
+                spread_deg=11.0 + ts * 14.0, camber_deg=3.0, pitch_deg=-2.0, axis='tail', taper=0.05,
+                stagger=0.04, part='tail')
+    bones.append({'name': 'tail_c', 'parent': 'tail_base', 'pivot': [0.0, tp[1], tp[2] + 0.8], 'cubes': tc_cubes})
+
+    for s, side in ((1, 'left'), (-1, 'right')):
+        side_cubes = []
+        feather_fan(side_cubes, (s * 1.45, tp[1] - 0.10, tp[2] + 0.6), count=2, length=14.3, width=2.65, thickness=0.58,
+                    spread_deg=9.0, camber_deg=2.5, pitch_deg=-2.0, axis='tail', taper=0.07,
+                    stagger=0.04, part='tail')
+        bones.append({'name': f'tail_{side}', 'parent': 'tail_base', 'pivot': [s * 1.45, tp[1] - 0.10, tp[2] + 0.6],
+                      'rotation': [0.0, round(s * (6.5 + ts * 20.0), 3), round(s * (-2.0 - ts * 4.0), 3)],
+                      'cubes': side_cubes})
+
+    # --- 5. ROUNDED MUSCULAR FEATHERED RAPTOR LEGS & 3+1 GRIPPING TALONS ---
+    # Exact GeckoLib flight tuck sign: POSITIVE X rotation (+80 deg) swings downward-hanging legs cleanly BACKWARD (+Z)
+    # flush under the white belly & tail coverts! (Verified: turn_x(-80)*(0,-1,0) = (0, -cos80, +sin80) = +Z!)
+    tuck = 1.0 - wf
+    for s, side in ((1, 'left'), (-1, 'right')):
+        hip = [s * 3.80, 17.6, -1.2]
+        knee = [s * 3.80, 9.4, -0.6]
+        ankle = [s * 3.75, 2.3, -2.9]
+
+        # Smooth rounded snow-white feathered eagle trousers (NO blocky square bricks!)
+        u_cubes = []
+        _rounded_y(u_cubes, hip[0], hip[1] - 5.2, hip[1] + 2.4, 2.70, 3.65, hip[2] - 0.2, 'thigh_white')
+        _rounded_y(u_cubes, hip[0], hip[1] - 8.8, hip[1] - 4.2, 2.15, 2.80, hip[2] + 0.1, 'thigh_white')
+        bones.append({'name': f'leg_upper_{side}', 'parent': 'root', 'pivot': hip,
+                      'rotation': [round(tuck * 78.0, 3), 0.0, round(s * -3.5 * wf, 3)], 'cubes': u_cubes})
+
+        # Rounded feathered lower knee cuff tapering cleanly into the scaly yellow tarsus
+        l_cubes = []
+        _rounded_y(l_cubes, knee[0], knee[1] - 2.3, knee[1] + 1.4, 1.75, 2.00, knee[2], 'thigh_white')
+        bones.append({'name': f'leg_lower_{side}', 'parent': f'leg_upper_{side}', 'pivot': knee,
+                      'rotation': [round(-tuck * 10.0, 3), 0.0, 0.0], 'cubes': l_cubes})
+
+        # Sturdy scaly pale yellow-ochre tarsometatarsus sloping smoothly forward from knee down to foot
+        t_piv = [knee[0], knee[1] - 0.9, knee[2]]
+        t_cubes = [
+            rot_cube([t_piv[0] - 1.12, t_piv[1] - 6.5, t_piv[2] - 1.15],
+                     [t_piv[0] + 1.12, t_piv[1] + 0.6, t_piv[2] + 1.15], 'tarsus',
+                     rotation=[-19.5, 0.0, 0.0], pivot=t_piv),
+        ]
+        bones.append({'name': f'leg_tarsus_{side}', 'parent': f'leg_lower_{side}', 'pivot': t_piv,
+                      'rotation': [round(tuck * 22.0, 3), 0.0, 0.0], 'cubes': t_cubes})
+
+        # 3+1 Anisodactyl gripping talons resting cleanly at y = +0.04 px (zero ground clip!)
+        foot_bones = bird_talon_foot(
+            s, side, f'leg_tarsus_{side}', ankle=ankle, foot_y=0.78,
+            toe_lens=(3.6, 4.7, 3.5, 3.1), toe_fans=(-28.0, 0.0, 28.0),
+            toe_r=0.52, claw_len=2.1 * TALON_SCALE, claw_drop=3.5,
+            part='tarsus', claw_part='talon', prefix='leg',
+        )
+        # In soaring flight, clench toes backward cleanly into aerodynamic tucked fists!
+        if tuck > 0.01:
+            for fb in foot_bones:
+                if '_toe' in fb['name']:
+                    r = list(fb.get('rotation', [0.0, 0.0, 0.0]))
+                    r[0] = round(r[0] + tuck * 52.0, 3)
+                    fb['rotation'] = r
+                elif '_hallux_' in fb['name'] and 'talon' not in fb['name']:
+                    r = list(fb.get('rotation', [0.0, 0.0, 0.0]))
+                    r[0] = round(r[0] - tuck * 48.0, 3)
+                    fb['rotation'] = r
+        bones.extend(foot_bones)
+
+    return bones
+
+
+# --- Stage 2 Clean Plain & Clay Palettes (for pure 3D shape judging before Stage 4 Paint!) ---------------------------
+PLAIN_PALETTE = {
+    'hood':           (58, 44, 38),     # Deep Martial Eagle chocolate hood/bib
+    'mantle':         (74, 58, 49),     # Rich dark umber back & rump
+    'crest':          (48, 36, 31),     # Dark occipital crest
+    'wing_covert':    (64, 49, 41),     # Upperwing lesser/median coverts
+    'wing_covert_hi': (88, 70, 58),     # Greater covert shingle tier (shows feather layers cleanly!)
+    'wing_flight':    (110, 96, 84),    # Broad secondaries & tertials
+    'wing_primary':   (52, 43, 39),     # Outer primaries & alula
+    'wing_tip':       (34, 28, 26),     # Slotted dark finger tips
+    'tail':           (72, 62, 56),     # Graduated 7-feather tail fan
+    'chest_white':    (228, 221, 210),  # Snow-white belly & breast
+    'thigh_white':    (222, 215, 204),  # Feathered eagle trousers
+    'cere':           (148, 146, 138),  # Pale slate-grey cere
+    'beak':           (60, 62, 68),     # Dark slate hooked beak
+    'beak_tip':       (32, 33, 38),     # Sharp charcoal hook tip
+    'nostril':        (26, 24, 24),
+    'mouth_inner':    (128, 66, 68),
+    'tongue':         (176, 98, 102),
+    'eye':            (242, 188, 24),   # Blazing golden-amber eagle eye
+    'pupil':          (16, 14, 16),
+    'eyelid':         (52, 40, 35),
+    'tarsus':         (210, 194, 136),  # Pale yellow-grey scaly legs & toes
+    'talon':          (30, 28, 32),     # Curved black scimitar talons
+}
+
+CLAY_PALETTE = {
+    k: ((238, 188, 32) if k == 'eye' else (24, 24, 28) if k == 'pupil' else (188, 182, 172))
+    for k in PLAIN_PALETTE
+}
+
+
+def make_look(look_name=None, **build_kwargs):
+    """Builds painted bones + PNG bytes + texture dims for workshop / viewer / game."""
+    lk = look_name or WORKSHOP_LOOK
+    pal = CLAY_PALETTE if lk == 'clay' else PLAIN_PALETTE
+    bones = build_bones(**build_kwargs)
+
+    def colour(c, face, x, y, z):
+        base = pal.get(c.get('_part', 'mantle'), (150, 140, 130))
+        k = {'up': 1.07, 'down': 0.84, 'north': 1.02, 'south': 0.92, 'east': 0.97, 'west': 0.95}.get(face, 1.0)
+        if face == 'down' and c.get('_part') in ('wing_flight', 'wing_primary', 'tail'):
+            base = mix(base, (226, 216, 198), 0.55)
+            k = 0.96
+        return shade(base, k)
+
+    painted, rows, w, h = paint_faces(bones, TEXELS, colour, world_coords=False)
+    return painted, png(rows), w, h
+
+
+def workshop_look():
+    """Hook read by tools/workshop.py snapshot & serve (perched silhouette for Compare!)."""
+    return make_look(WORKSHOP_LOOK, mode='perched')
+
+
+def inspect_poses():
+    """Mathematically verifies box count, bone count, ground clearance, and perched vs soaring bounding boxes."""
+    for label, mode in (
+        ('PERCHED (folded wings)', 'perched'),
+        ('SOARING (spread wings)', 'soaring'),
+        ('FULL GAME RIG (both wing sets)', 'game'),
+    ):
+        bones = build_bones(mode=mode)
+        by = {b['name']: b for b in bones}
+        world_xform = {}
+
+        def get_xf(name):
+            if name in world_xform:
+                return world_xform[name]
+            b = by[name]
+            p = b.get('parent')
+            piv = b['pivot']
+            R_loc = euler(b.get('rotation', [0.0, 0.0, 0.0]))
+            if p is None:
+                world_xform[name] = (R_loc, piv)
+            else:
+                Rp, pp = get_xf(p)
+                parent_piv = by[p]['pivot']
+                rel = vsub(piv, parent_piv)
+                pos = vadd(pp, mat_vec(Rp, rel))
+                world_xform[name] = (mat_mul(Rp, R_loc), pos)
+            return world_xform[name]
+
+        def bone_pts(b):
+            Rb, pb = get_xf(b['name'])
+            bpiv = b['pivot']
+            pts = []
+            for c in b.get('cubes', []):
+                o, sz = c['origin'], c['size']
+                crot = c.get('rotation')
+                cpiv = c.get('pivot', [0, 0, 0])
+                Rc = euler(crot) if crot else None
+                for dx in (0, sz[0]):
+                    for dy in (0, sz[1]):
+                        for dz in (0, sz[2]):
+                            q = [o[0] + dx, o[1] + dy, o[2] + dz]
+                            if Rc is not None:
+                                q = vadd(cpiv, mat_vec(Rc, vsub(q, cpiv)))
+                            pts.append(vadd(pb, mat_vec(Rb, vsub(q, bpiv))))
+            return pts
+
+        all_pts = [pt for b in bones for pt in bone_pts(b)]
+        xs = [p[0] for p in all_pts]
+        ys = [p[1] for p in all_pts]
+        zs = [p[2] for p in all_pts]
+        ncubes = sum(len(b.get('cubes', [])) for b in bones)
+        print(f'=== {label}: {len(bones)} bones, {ncubes}/400 boxes ===')
+        print(f'  Bounds px: X=[{min(xs):.1f}, {max(xs):.1f}] (W={max(xs)-min(xs):.1f}), '
+              f'Y=[{min(ys):.2f}, {max(ys):.1f}] (H={max(ys)-min(ys):.1f}), '
+              f'Z=[{min(zs):.1f}, {max(zs):.1f}] (L={max(zs)-min(zs):.1f})')
+        print(f'  In-game @0.5x: W={(max(xs)-min(xs))/32:.2f}b, H={(max(ys)-min(ys))/32:.2f}b, L={(max(zs)-min(zs))/32:.2f}b')
+        for bname in ('head', 'wing_fold_left', 'wing_fold_tip_left', 'wing_upper_left', 'wing_fore_left',
+                      'wing_hand_left', 'wing_tips_left', 'tail_c', 'leg_tarsus_left', 'leg_talon2_left'):
+            if bname in by:
+                pts = bone_pts(by[bname])
+                if pts:
+                    print(f'    {bname:18s}: X=[{min(p[0] for p in pts):+5.1f},{max(p[0] for p in pts):+5.1f}] '
+                          f'Y=[{min(p[1] for p in pts):+5.1f},{max(p[1] for p in pts):+5.1f}] '
+                          f'Z=[{min(p[2] for p in pts):+5.1f},{max(p[2] for p in pts):+5.1f}]')
+
+
+if __name__ == '__main__':
+    inspect_poses()

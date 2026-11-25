@@ -1,0 +1,16 @@
+{
+ "note": "v3 Stage 2 Plain 3D Shape - steeped primary cape and fuller tail",
+ "date": "2026-11-25",
+ "boxes": 170,
+ "numbers": {
+  "BODY_PITCH": 46.0,
+  "CHEST_HW": 6.1,
+  "WING_SPAN_SCALE": 1.0,
+  "WING_FOLD": 1.0,
+  "CREST_RAISE": 0.3,
+  "TAIL_SPREAD": 0.15,
+  "BEAK_LEN": 4.9,
+  "TALON_SCALE": 1.0,
+  "JAW_OPEN": 0.0
+ }
+}
