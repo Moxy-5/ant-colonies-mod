@@ -1,20 +1,31 @@
 package com.antcolonies.savanna.worldgen;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 import com.antcolonies.animal.Sex;
 import com.antcolonies.savanna.animal.BuffaloEntity;
 import com.antcolonies.savanna.registry.SavannaEntities;
 
+import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
+import it.unimi.dsi.fastutil.longs.LongSet;
 import net.minecraft.core.BlockPos;
 import net.minecraft.tags.FluidTags;
 import net.minecraft.util.Mth;
 import net.minecraft.util.RandomSource;
 import net.minecraft.world.entity.MobSpawnType;
+import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.WorldGenLevel;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.chunk.ChunkAccess;
+import net.minecraft.world.level.chunk.status.ChunkStatus;
+import net.minecraft.world.level.levelgen.structure.BoundingBox;
+import net.minecraft.world.level.levelgen.structure.Structure;
+import net.minecraft.world.level.levelgen.structure.StructurePiece;
+import net.minecraft.world.level.levelgen.structure.StructureStart;
 
 /**
  * New land's Cape buffalo herds (2026-11-25, {@code docs/plans/buffalo.md}): every pan laid ({@link PanFeature}) gets a herd
@@ -25,8 +36,9 @@ import net.minecraft.world.level.block.state.BlockState;
  *
  * <p>Each member's spot: dry grass past the pan's ring (no pan water within the ring's width and {@link #PAST_RING} more,
  * and not farther than the grazed land round it and {@link #BEYOND_GRAZED} more), its whole body clear (3 by 3 columns, 3
- * high, no water: BUGS 271), off the termite mounds and tree feet the pan keeps off, inside the chunks the pan's feature
- * may write at least {@link #EDGE} from their edge. The bull on one of the spots nearest the water, the cows
+ * high, no water: BUGS 271), off the termite mounds and tree feet the pan keeps off, at least {@link #TREE_MARGIN} from
+ * everything a savanna tree will put down ({@link #treeReach}), inside the chunks the pan's feature may write at least
+ * {@link #EDGE} from their edge. The bull on one of the spots nearest the water, the cows
  * {@link #NEAREST} to {@link #FARTHEST} from him and {@link #NEAREST} from each other, all facing about one way. Too few
  * spots for {@link #FEWEST}: no herd. All numbers my picks.
  */
@@ -43,6 +55,18 @@ public final class BuffaloHerds {
     static final int BULL_FROM = 8;
     /** Each member faces the herd's way give or take this much (degrees). */
     static final float FACING_SPREAD = 40.0F;
+    /**
+     * No spot within this many blocks (side on) of the ground a tree will cover: a buffalo is drawn 3.8 long, so its head
+     * or rump reaches 1.9 from its middle whichever way it faces. My pick.
+     */
+    static final int TREE_MARGIN = 2;
+    /**
+     * How far (chunks) from the pan's chunk a tree's start is read. New land holds every start this near while the pan is
+     * laid (Minecraft's features may read structure starts up to 8 chunks off; asking farther crashes), and a savanna
+     * tree reaches a few chunks from its start at most (its foot up to 24 blocks from its chunk's middle, then its crown or
+     * fallen log).
+     */
+    static final int START_LOOK = 8;
 
     private BuffaloHerds() {
     }
@@ -71,11 +95,12 @@ public final class BuffaloHerds {
             return new Herd(0, 0);
         }
         double nearest = pan.ring() + 1.5 + PAST_RING, farthest = pan.ring() + 1.5 + PanFeature.GRAZED + BEYOND_GRAZED;
+        List<BoundingBox> trees = treeReach(level, bounds);
         List<Spot> spots = new ArrayList<>();
         for (int x = bounds[0] + EDGE; x <= bounds[2] - EDGE; x++) {
             for (int z = bounds[1] + EDGE; z <= bounds[3] - EDGE; z++) {
                 double d = Math.sqrt(nearestWater(water, x, z));
-                if (d < nearest || d > farthest) {
+                if (d < nearest || d > farthest || nearTree(trees, x, z)) {
                     continue;
                 }
                 BlockPos stand = standSpot(level, x, z, low, keepout);
@@ -148,6 +173,55 @@ public final class BuffaloHerds {
             }
         }
         return best;
+    }
+
+    /**
+     * The ground every savanna tree will cover in these chunks, as boxes: the giant and young trees and the floodplain
+     * trees are structures put in after the lakes (so after the pan and its herd), and they put their blocks down with no
+     * look at who stands there, so a buffalo laid where a trunk, a low limb, a fallen giant's log or its litter will go ends
+     * up inside wood. Each tree's piece is planned before any feature, and its box already takes in all it will put down
+     * (trunk, crown, a fallen log the way it fell, the dead wood round it), so that box is the rule; nothing is guessed.
+     * Read from the starts of every tree whose box reaches these chunks (the chunks' own list of structures reaching
+     * them), not only those started here: a tree started next door may lie across them.
+     */
+    static List<BoundingBox> treeReach(WorldGenLevel level, int[] bounds) {
+        List<BoundingBox> boxes = new ArrayList<>();
+        int midX = ((bounds[0] + bounds[2]) / 2) >> 4, midZ = ((bounds[1] + bounds[3]) / 2) >> 4;
+        Map<Structure, LongSet> seen = new HashMap<>();
+        for (int cx = bounds[0] >> 4; cx <= bounds[2] >> 4; cx++) {
+            for (int cz = bounds[1] >> 4; cz <= bounds[3] >> 4; cz++) {
+                ChunkAccess chunk = level.getChunk(cx, cz, ChunkStatus.STRUCTURE_REFERENCES);
+                for (Map.Entry<Structure, LongSet> refs : chunk.getAllReferences().entrySet()) {
+                    for (long at : refs.getValue()) {
+                        ChunkPos from = new ChunkPos(at);
+                        if (Math.max(Math.abs(from.x - midX), Math.abs(from.z - midZ)) > START_LOOK
+                                || !seen.computeIfAbsent(refs.getKey(), k -> new LongOpenHashSet()).add(at)) {
+                            continue;
+                        }
+                        StructureStart start = level.getChunk(from.x, from.z, ChunkStatus.STRUCTURE_STARTS).getStartForStructure(refs.getKey());
+                        if (start == null || !start.isValid()) {
+                            continue;
+                        }
+                        for (StructurePiece piece : start.getPieces()) {
+                            if (piece instanceof GiantTreePiece || piece instanceof FloodplainTreePiece) {
+                                boxes.add(piece.getBoundingBox());
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        return boxes;
+    }
+
+    /** Whether x, z is within {@link #TREE_MARGIN} (side on) of the ground a tree will cover. */
+    static boolean nearTree(List<BoundingBox> trees, int x, int z) {
+        for (BoundingBox b : trees) {
+            if (x >= b.minX() - TREE_MARGIN && x <= b.maxX() + TREE_MARGIN && z >= b.minZ() - TREE_MARGIN && z <= b.maxZ() + TREE_MARGIN) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private static double horizontal(BlockPos a, BlockPos b) {

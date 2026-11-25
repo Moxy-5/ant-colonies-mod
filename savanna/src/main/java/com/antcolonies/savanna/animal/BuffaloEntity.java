@@ -110,14 +110,14 @@ public class BuffaloEntity extends PathfinderMob implements GeoEntity, HasLife {
     /** Faster than these (blocks a tick at size 1: 1.25 and 2.6 blocks a second, between the paces below) it is drawn trotting, then galloping. */
     static final double TROT_FROM = 1.25 / 20.0, CHARGE_FROM = 2.6 / 20.0;
     /**
-     * Its paces (the move control's share of its speed). Minecraft's walking push goes with the square of the speed
-     * (the hippo's walk measured 0.031 blocks a tick at 0.8): stepping between plants at the walk clip's own 0.6 blocks a
-     * second, travelling about 0.95, trotting to catch up about 1.6, charging about 5 (faster than a walking player, 4.3,
-     * slower than a sprint, 5.6). Measured in game tests, never trusted as worked out (BUGS 246):
+     * Its paces (the move control's share of its speed). Minecraft's walking push goes with the square of the speed:
+     * measured 2026-11-25, 1.73 x pace squared blocks a second (2.3 ran 9.23, 1.0 ran 1.73). So: stepping between plants
+     * at the walk clip's own 0.6 blocks a second, travelling about 1.0, trotting to catch up about 1.6, charging about 5
+     * (faster than a walking player, 4.3, slower than a sprint, 5.6). Measured in game tests, never trusted as worked out (BUGS 246):
      * {@code BuffaloTests.aChargeRunsAtAboutFiveBlocksASecondAndItsHitLands} (CHARGE, 4.5 to 5.5 blocks a second) and
      * {@code BuffaloTests.aBuffaloTravelsAtAboutOneBlockASecond} (TRAVEL); each logs the pace it measured.
      */
-    public static final double GRAZE_STEP = 0.8, TRAVEL = 1.0, TROT = 1.3, CHARGE = 2.3;
+    public static final double GRAZE_STEP = 0.59, TRAVEL = 0.76, TROT = 0.96, CHARGE = 1.70;
     /** It turns at most this much a tick (degrees; Minecraft's own is 90). */
     static final float MAX_TURN = 20.0F;
     /** In water deeper than this over its feet (blocks, at size 1) it swims up: it floats low, its back and head out. */
@@ -139,7 +139,9 @@ public class BuffaloEntity extends PathfinderMob implements GeoEntity, HasLife {
     int doingSince;
     /** Its mates (buffalo with the same home), looked for anew once a second, and when. */
     private List<BuffaloEntity> mates = List.of();
-    private int matesAt = Integer.MIN_VALUE;
+    private int matesAt = -MATES_EVERY;
+    /** Mates are looked for anew this often (ticks). */
+    static final int MATES_EVERY = 20;
     /** The last tick it moved, and how far a tick, eased (for the clips). */
     private int movedTick = -100;
     private double stride;
@@ -304,7 +306,7 @@ public class BuffaloEntity extends PathfinderMob implements GeoEntity, HasLife {
     public void setHome(BlockPos home, int across) {
         this.home = home.immutable();
         this.homeAcross = across;
-        matesAt = Integer.MIN_VALUE;
+        matesAt = tickCount - MATES_EVERY; // look anew at the next ask
     }
 
     /**
@@ -312,7 +314,7 @@ public class BuffaloEntity extends PathfinderMob implements GeoEntity, HasLife {
      * once a second (every goal of every member asks).
      */
     public List<BuffaloEntity> mates() {
-        if (tickCount - matesAt >= 20 || tickCount < matesAt) {
+        if (tickCount - matesAt >= MATES_EVERY || tickCount < matesAt) {
             matesAt = tickCount;
             if (home == null) {
                 mates = List.of();
@@ -385,7 +387,10 @@ public class BuffaloEntity extends PathfinderMob implements GeoEntity, HasLife {
      */
     @Nullable
     public LivingEntity angryAt() {
-        if (angryAt != null && (tickCount > angryUntil || !angryAt.isAlive() || angryAt.isRemoved() || angryAt.level() != level())) {
+        // a creative or spectator player is never a foe, as for Minecraft's own mobs (the user tests in creative and
+        // explores in spectator: a punched cow must not chase an attacker it can never hurt)
+        if (angryAt != null && (tickCount > angryUntil || !angryAt.isAlive() || angryAt.isRemoved() || angryAt.level() != level()
+                || angryAt instanceof Player p && (p.isCreative() || p.isSpectator()))) {
             angryAt = null;
         }
         return angryAt;
@@ -418,7 +423,7 @@ public class BuffaloEntity extends PathfinderMob implements GeoEntity, HasLife {
     public boolean hurt(DamageSource source, float amount) {
         boolean hurt = super.hurt(source, amount);
         if (hurt && !level().isClientSide && isAlive() && source.getEntity() instanceof LivingEntity by && by != this
-                && !(by instanceof BuffaloEntity) && !by.isSpectator()) {
+                && !(by instanceof BuffaloEntity) && !(by instanceof Player p && (p.isCreative() || p.isSpectator()))) {
             angryAt = by;
             angryUntil = tickCount + BuffaloGoals.REVENGE_TICKS;
             hurtAt = position();
@@ -509,10 +514,47 @@ public class BuffaloEntity extends PathfinderMob implements GeoEntity, HasLife {
         if (home == null) {
             takeHome();
         }
+        // stuck inside blocks (a tree grown through it, a mound, a player's building): out to the nearest open spot, once
+        // every few seconds at most (Minecraft's own push-out only frees small overlaps)
+        if (tickCount % FREE_EVERY == 1 && !level().noBlockCollision(this, getBoundingBox().deflate(0.05))) {
+            free();
+        }
         // a one-shot clip played out: lying down goes on into lying, the rest back to calm
         byte d = doing();
         if (oneShot(d) && doingFor() >= doingTicks(d)) {
             setDoing(d == REST_DOWN ? REST : CALM);
+        }
+    }
+
+    /** How often it checks it is not stuck inside blocks (ticks), and how far it looks for room (blocks). */
+    static final int FREE_EVERY = 60, FREE_REACH = 6;
+
+    /** Moves it to the nearest spot within {@link #FREE_REACH} where its whole box is clear of blocks and liquid. */
+    private void free() {
+        AABB box = getBoundingBox();
+        BlockPos at = blockPosition();
+        for (int r = 1; r <= FREE_REACH; r++) {
+            for (int dx = -r; dx <= r; dx++) {
+                for (int dz = -r; dz <= r; dz++) {
+                    if (Math.max(Math.abs(dx), Math.abs(dz)) != r) {
+                        continue; // the ring at r only
+                    }
+                    for (int dy = -1; dy <= 2; dy++) {
+                        BlockPos p = at.offset(dx, dy, dz);
+                        if (!level().isLoaded(p)) {
+                            continue;
+                        }
+                        double x = p.getX() + 0.5, y = p.getY(), z = p.getZ() + 0.5;
+                        AABB moved = box.move(x - getX(), y - getY(), z - getZ());
+                        if (level().noBlockCollision(this, moved) && !level().containsAnyLiquid(moved)
+                                && !level().getBlockState(p.below()).getCollisionShape(level(), p.below()).isEmpty()) {
+                            moveTo(x, y, z, getYRot(), getXRot());
+                            getNavigation().stop();
+                            return;
+                        }
+                    }
+                }
+            }
         }
     }
 
@@ -564,6 +606,12 @@ public class BuffaloEntity extends PathfinderMob implements GeoEntity, HasLife {
     @Override
     public SpawnGroupData finalizeSpawn(ServerLevelAccessor level, DifficultyInstance difficulty, MobSpawnType spawnType, @Nullable SpawnGroupData data) {
         SpawnGroupData out = super.finalizeSpawn(level, difficulty, spawnType, data);
+        // Minecraft adds a random bonus to the follow range here; the buffalo's 32 is a rule (a revenge charge gives up
+        // past it, the bull joins within it), so it is set back, the same for every buffalo
+        var follow = getAttribute(Attributes.FOLLOW_RANGE);
+        if (follow != null) {
+            follow.removeModifiers();
+        }
         life.setUp(false, level.getRandom());
         life.apply();
         return out;

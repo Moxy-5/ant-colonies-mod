@@ -24,6 +24,9 @@ import net.minecraft.world.entity.ai.goal.GoalSelector;
 import net.minecraft.world.entity.ai.navigation.PathNavigation;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.level.Level;
+import net.minecraft.world.level.block.DoublePlantBlock;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.pathfinder.Path;
 import net.minecraft.world.phys.Vec3;
 
 /**
@@ -129,6 +132,12 @@ public final class BuffaloGoals {
     static final int DEPART_GAP = 40;
     /** A trip longer than this goes in legs this long, each its own route (blocks; well inside a route's search). */
     static final double LEG = 20.0;
+    /**
+     * Where a leg may end, tried in order until one is on dry ground: {degrees turned off the way to its stand, part of a
+     * leg}; the first is straight on (the way round a pan lying across its way).
+     */
+    private static final double[][] LEG_TRIES = {{0, 1}, {30, 1}, {-30, 1}, {60, 1}, {-60, 1}, {0, 0.5}, {30, 0.5}, {-30, 0.5},
+            {60, 0.5}, {-60, 0.5}};
     /** A route that brought it less than this much nearer has failed (blocks). */
     static final double HEADWAY = 2.0;
     /** More than this far behind its herd (blocks) it trots to catch up. */
@@ -196,6 +205,9 @@ public final class BuffaloGoals {
         private static final int TRIP = 0, GRAZE_STEP = 1, ASIDE = 2;
         @Nullable
         private Vec3 stepFrom;
+        /** The block its jaws were over at its last graze (a step never stops early there again). */
+        @Nullable
+        private BlockPos grazedAt;
         /** At its stand: graze clips left before a step, drinks left, when it next gets up from lying. */
         private int grazesLeft, drinksLeft, upAt;
         /** Whether the last thing on its stand was a graze (a little thing may follow), and whether it has just got up. */
@@ -216,14 +228,17 @@ public final class BuffaloGoals {
             return canUse();
         }
 
-        /** Started again (after its temper): back to its stand, whatever it was doing there. */
+        /**
+         * Started again (after its temper): back to its stand, whatever it was doing there, as a trip (a grazing step or a
+         * few steps aside cut by a charge must not end where the charge left it: a step's early stop at a plant, or a step
+         * it cannot make, would pin its stand there, away from its herd).
+         */
         @Override
         public void start() {
             there = false;
             routeTo = null;
-            if (going == ASIDE) {
-                going = TRIP;
-            }
+            going = TRIP;
+            stepFrom = null;
         }
 
         @Override
@@ -241,6 +256,7 @@ public final class BuffaloGoals {
         public void tick() {
             int now = b.tickCount;
             if (b.doing() == BuffaloEntity.GRAZE && b.clipTick() == GRAZE_BITE) {
+                grazedAt = BlockPos.containing(b.jawPoint());
                 b.cropAtJaws();                         // the chewing part of a graze
             }
             long time = Colony.dayTimeAt(b.level(), b.home());
@@ -319,10 +335,12 @@ public final class BuffaloGoals {
                 arrive();
                 return;
             }
-            if (going == GRAZE_STEP && stepFrom != null && flat(b.position(), stepFrom.x, stepFrom.z) >= STEP_LEAST
-                    && b.plantAtJaws() != null) {
-                arrive();                                           // a plant at its jaws on the way: it grazes here
-                return;
+            if (going == GRAZE_STEP && stepFrom != null && flat(b.position(), stepFrom.x, stepFrom.z) >= STEP_LEAST) {
+                BlockPos p = b.plantAtJaws();
+                if (p != null && (grazedAt == null || p.getX() != grazedAt.getX() || p.getZ() != grazedAt.getZ())) {
+                    arrive();                                       // a new plant at its jaws on the way: it grazes here
+                    return;
+                }
             }
             if (routeTo == null || nav.isDone()) {
                 if (routeTo != null && dist > routeFrom - HEADWAY) {
@@ -346,16 +364,38 @@ public final class BuffaloGoals {
             }
         }
 
-        /** Its next leg: {@link #LEG} toward its stand, on the ground there; null if that land is not loaded. */
+        /**
+         * Its next leg: {@link #LEG} toward its stand, on dry ground there; null if that land is not loaded. A point in water
+         * (its pan lies across the way; {@link GroundTop} counts water as ground) is turned round it: {@link #LEG_TRIES} in
+         * order, each still bringing it well nearer its stand; with none dry, the straight one (it wades).
+         */
         @Nullable
         private BlockPos legPoint(double dist) {
-            double f = LEG / dist;
-            BlockPos column = BlockPos.containing(b.getX() + (stand.getX() + 0.5 - b.getX()) * f, b.getY(),
-                    b.getZ() + (stand.getZ() + 0.5 - b.getZ()) * f);
-            if (!b.level().hasChunkAt(column)) {
-                return null;
+            Level level = b.level();
+            double ux = (stand.getX() + 0.5 - b.getX()) / dist, uz = (stand.getZ() + 0.5 - b.getZ()) / dist;
+            BlockPos straight = null;
+            for (double[] t : LEG_TRIES) {
+                double a = Math.toRadians(t[0]), far = LEG * t[1], cos = Math.cos(a), sin = Math.sin(a);
+                double x = b.getX() + (ux * cos - uz * sin) * far, z = b.getZ() + (ux * sin + uz * cos) * far;
+                BlockPos column = BlockPos.containing(x, b.getY(), z);
+                if (!level.hasChunkAt(column)) {
+                    if (straight == null) {
+                        return null;                            // the way straight on is not loaded: it waits
+                    }
+                    continue;
+                }
+                BlockPos cell = GroundTop.cell(level, column);
+                if (straight == null) {
+                    straight = cell;
+                }
+                if (flat(Vec3.atBottomCenterOf(cell), stand) > dist - HEADWAY - ARRIVE_DONE) {
+                    continue;                                   // too little nearer: its route would count as failed
+                }
+                if (level.getFluidState(cell).isEmpty() && level.getFluidState(cell.below()).isEmpty()) {
+                    return cell;
+                }
             }
-            return GroundTop.cell(b.level(), column);
+            return straight;
         }
 
         /** Its pace: a grazing step or a few steps at the walk clip's own speed, a trip at its travelling walk, a trot when far behind. */
@@ -444,6 +484,10 @@ public final class BuffaloGoals {
             if (s == null) {
                 s = byMate();
             }
+            if (s == null) {
+                // no mate has its stand for this part of the day yet (it goes first): anywhere round the place's middle
+                s = standNear(centre.x, centre.z, GRAZE_RADIUS + STAND_REACH, home.getY(), GROUND_DY);
+            }
             setStand(s != null ? s : b.blockPosition());
             return true;
         }
@@ -506,16 +550,20 @@ public final class BuffaloGoals {
             return true;
         }
 
-        /** A stand by its nearest mate (beside it, {@link #SPACE} off), or null. */
+        /**
+         * A stand by its nearest mate with a stand for this same part of the day (beside it, {@link #SPACE} off), or null.
+         * Never by a mate's old place: a mate that has not set off yet (it goes later by its order) is about to leave it.
+         */
         @Nullable
         private BlockPos byMate() {
-            java.util.List<BuffaloEntity> mates = b.mates();
-            if (mates.isEmpty()) {
-                return null;
+            long key = key();
+            for (BuffaloEntity m : b.mates()) {             // nearest first
+                if (m.standKey == key && m.standAt != null) {
+                    BlockPos at = m.standAt;
+                    return standNear(at.getX() + 0.5, at.getZ() + 0.5, SPACE + 3.0, at.getY(), 2);
+                }
             }
-            BuffaloEntity m = mates.get(0);                 // nearest first
-            BlockPos at = m.standKey == key() && m.standAt != null ? m.standAt : m.blockPosition();
-            return standNear(at.getX() + 0.5, at.getZ() + 0.5, SPACE + 3.0, at.getY(), 2);
+            return null;
         }
 
         /**
@@ -614,11 +662,9 @@ public final class BuffaloGoals {
             if (d != BuffaloEntity.CALM) {
                 return;                                         // a graze or a little thing plays out, never cut
             }
-            if (!roomy(b.getX(), b.getZ())) {
-                // a mate's middle within SPACE (it stopped short of its stand, or a mate did): a step off before grazing
-                if (!stepToNextPlant()) {
-                    waitUntil = b.tickCount + 20;
-                }
+            if (!roomy(b.getX(), b.getZ()) && stepToNextPlant()) {
+                // a mate's middle within SPACE (it stopped short of its stand, or a mate did): a step off before grazing;
+                // with nowhere to step it grazes here (two mates must never stand waiting on each other for room)
                 return;
             }
             if (grazesLeft > 0) {
@@ -649,9 +695,12 @@ public final class BuffaloGoals {
         }
 
         /**
-         * A grazing step: to the nearest green plant {@link #STEP_LEAST} to {@link #STEP_MOST} from its jaws, standing so
-         * its jaws reach it, near its spot and clear of its mates' stands; with none, a step to grass ground near it. False
-         * if there is nowhere to step.
+         * A grazing step: to the nearest green plant {@link #STEP_LEAST} to {@link #STEP_MOST} from its jaws (a tall one,
+         * that can still be cropped, before a short one), standing so its jaws reach it (its jaws {@code JAWS_AHEAD} ahead
+         * of its middle along the way to the plant), near its spot and clear of its mates' stands; with none, a step to
+         * grass ground near it. The stand is always a real step off (at least {@link #STEP_LEAST} past {@link #ARRIVE}
+         * from its middle), never under its own body, where it would "arrive" at once and graze the same block for good.
+         * False if there is nowhere to step.
          */
         private boolean stepToNextPlant() {
             Level level = b.level();
@@ -659,16 +708,26 @@ public final class BuffaloGoals {
             double jawsAhead = BuffaloEntity.JAWS_AHEAD * b.getScale();
             BlockPos best = null;
             double bestD = Double.MAX_VALUE;
+            boolean bestTall = false;
             int r = Mth.ceil(STEP_MOST);
             for (int dx = -r; dx <= r; dx++) {
                 for (int dz = -r; dz <= r; dz++) {
+                    // (the block at its jaws, the one it just grazed, is always under STEP_LEAST from them)
                     int x = Mth.floor(jaw.x) + dx, z = Mth.floor(jaw.z) + dz;
                     double fromJaw = flat(jaw, x + 0.5, z + 0.5);
-                    if (fromJaw < STEP_LEAST || fromJaw > STEP_MOST || fromJaw >= bestD) {
+                    if (fromJaw < STEP_LEAST || fromJaw > STEP_MOST) {
                         continue;
                     }
                     BlockPos plant = Grazing.grassStand(level, x, z, b.getBlockY(), 2);
-                    if (plant == null || !Grazing.edible(level.getBlockState(plant))) {
+                    if (plant == null) {
+                        continue;
+                    }
+                    BlockState state = level.getBlockState(plant);
+                    if (!Grazing.edible(state)) {
+                        continue;
+                    }
+                    boolean tall = state.hasProperty(DoublePlantBlock.HALF);
+                    if (bestTall && !tall || tall == bestTall && fromJaw >= bestD) {
                         continue;
                     }
                     // where it stands to have the plant at its jaws: that far short of it, coming from where it is
@@ -680,12 +739,17 @@ public final class BuffaloGoals {
                     if (spot != null && flat(spot, sx, sz) > STAND_REACH + 1.0 || crowded(sx, sz) || !roomy(sx, sz)) {
                         continue;
                     }
-                    best = BlockPos.containing(sx, plant.getY(), sz);
+                    BlockPos s = Grazing.grassStand(level, Mth.floor(sx), Mth.floor(sz), plant.getY(), 1);
+                    if (s == null || flat(b.position(), s) < STEP_LEAST + ARRIVE) {
+                        continue;                                   // no ground to stand on there, or no real step
+                    }
+                    best = s;
                     bestD = fromJaw;
+                    bestTall = tall;
                 }
             }
             if (best == null) {
-                best = groundNear(STEP_LEAST, STEP_MOST);
+                best = groundNear(STEP_LEAST + ARRIVE, STEP_MOST);
             }
             if (best == null) {
                 return false;
@@ -699,9 +763,9 @@ public final class BuffaloGoals {
             return true;
         }
 
-        /** Lying long, up for a few steps: grass ground 1 or 2 blocks off, near its spot; false if none. */
+        /** Lying long, up for a few steps: grass ground 1 or 2 blocks of walk off (past {@link #ARRIVE}), near its spot; false if none. */
         private boolean stepAside() {
-            BlockPos to = groundNear(1.0, 2.0);
+            BlockPos to = groundNear(ARRIVE + 1.0, ARRIVE + 2.0);
             if (to == null) {
                 return false;
             }
@@ -713,7 +777,7 @@ public final class BuffaloGoals {
             return true;
         }
 
-        /** Dry grass ground this far from it (at random), near its spot and clear of its mates' stands; or null. */
+        /** Dry grass ground this far from it (at random; its block's middle at least {@code least}), near its spot and clear of its mates' stands; or null. */
         @Nullable
         private BlockPos groundNear(double least, double most) {
             for (int i = 0; i < 8; i++) {
@@ -723,7 +787,7 @@ public final class BuffaloGoals {
                     continue;
                 }
                 BlockPos s = Grazing.grassStand(b.level(), Mth.floor(x), Mth.floor(z), b.getBlockY(), 1);
-                if (s != null) {
+                if (s != null && flat(b.position(), s) >= least) {
                     return s;
                 }
             }
@@ -777,6 +841,8 @@ public final class BuffaloGoals {
     static final int BUNCH_TICKS = 400;
     /** How fast it turns to face what it watches and what it butts (degrees a tick). */
     static final float WATCH_TURN = 6.0F, BUTT_TURN = 12.0F;
+    /** A chase's route is renewed this often (ticks); after one that does not reach its target, only after this long. */
+    static final int CHASE_REPATH = 4, CHASE_RETRY = 15;
 
     /**
      * Its temper, one goal of stages (as the raid rewrite's: each stage one rule that ends it and one deadline); what the
@@ -1087,7 +1153,11 @@ public final class BuffaloGoals {
                         tryHit();
                     }
                 }
-                b.face(target.getX(), target.getZ(), BuffaloEntity.MAX_TURN);
+                if (nav.isDone()) {
+                    // turned by one hand a tick: on a route its move control turns it (HeavyTurn, MAX_TURN); facing as
+                    // well would turn it twice in the tick
+                    b.face(target.getX(), target.getZ(), BuffaloEntity.MAX_TURN);
+                }
                 return;
             }
             if (d == BuffaloEntity.HEADBUTT || d == BuffaloEntity.GORE) {
@@ -1113,15 +1183,20 @@ public final class BuffaloGoals {
             chase(BuffaloEntity.CHARGE);
         }
 
-        /** Runs at its target, its route renewed every few ticks (its target moves), at this pace. */
+        /**
+         * Runs at its target, its route renewed every {@link #CHASE_REPATH} ticks (its target moves), at this pace; a route
+         * that does not reach the target is looked for again only after {@link #CHASE_RETRY} (as Minecraft's own melee
+         * goal backs off), so a target it cannot reach never costs a route search a tick.
+         */
         private void chase(double pace) {
             PathNavigation nav = b.getNavigation();
-            if (--repath <= 0 || nav.isDone()) {
-                repath = 4;
-                nav.moveTo(target, pace);
-            } else {
+            if (--repath > 0) {
                 nav.setSpeedModifier(pace);
+                return;
             }
+            boolean found = nav.moveTo(target, pace);
+            Path path = nav.getPath();
+            repath = found && path != null && path.canReach() ? CHASE_REPATH : CHASE_RETRY;
         }
 
         /** Whether its head bead is within this much of its target. */
@@ -1192,10 +1267,12 @@ public final class BuffaloGoals {
             double gap = flat(b.position(), bunchAt.x, bunchAt.z);
             // in place: at its spot, or as near as its route got (its spot may be under its mate's body)
             boolean inPlace = gap <= BUNCH_THERE || part > 0 && nav.isDone() && gap < BUNCH_CLOSE;
+            if (ticks == 1 || !inPlace && b.doing() != BuffaloEntity.CALM) {
+                // whatever it was doing (a watch's mood_alert, a graze, a drink): off at its gait, its hooves never
+                // sliding under another clip; mood_angry only once in place
+                b.setDoing(BuffaloEntity.CALM);
+            }
             if (!inPlace) {
-                if (b.doing() == BuffaloEntity.MOOD_ANGRY) {
-                    b.setDoing(BuffaloEntity.CALM);
-                }
                 if (--repath <= 0) {
                     repath = 20;
                     part = 1;

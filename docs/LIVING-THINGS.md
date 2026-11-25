@@ -24,6 +24,7 @@ Every living thing in the mod, built or planned, plants and fungi included, in o
 | `antcolonies:bullfrog` | 4 | within 96, gone past 128 | African bullfrog (ones and twos; its tadpoles later; was cap 12 in groups of 1 to 3: the user found too many, 2026-11-20) |
 | `antcolonies:tadpole` | 16 | within 96, gone past 128 | bullfrog tadpole (schools of 6 to 10 in water 1 or 2 deep; its own group so its schools never fill the bullfrogs' 4 or the barbs' 40; 2026-11-23) |
 | `antcolonies:hippo_pod` | 6 | kept for good | hippo: no spawn list since 2026-11-21 (BUGS 271): pods of 1 to 3 are laid with new land at pod sites about every 250 blocks of the near and mid-inland rivers (`worldgen/HippoPodFeature`, `PodSites`) and never removed; the group only keeps hippos counted apart; since 2026-11-24 the spawner tries it only once every 20 seconds (it has nothing to spawn: review R8-12) |
+| `minecraft:misc` (vanilla) | none | kept for good | Cape buffalo (2026-11-25, my pick from the plan's fewer-rules check): never spawned by the world and never counted (the spawner never tries MISC, unlike a group with no spawn list, review R8-12); herds of 3 to 5 are laid with each new pan (`worldgen/BuffaloHerds`, called by `PanFeature`, about one pan to 192 x 192 blocks) and never removed; a spawn egg's buffalo joins the nearest herd within 16. |
 | `antcolonies:river_otter` | 2 | within 96, gone past 128 | African clawless otter (ones and twos, often a mother and her pup, a quarter of them pups; was cap 6 in families of 2 to 4: the user found too many, 2026-11-22; near, mid and far inland rivers and oxbows, none at the coast or in the pans) |
 | `antcolonies:fly_cloud` | 18 | within 96, gone past 128 | fly cloud (one or two at a spot, 4 to 12 flies; was cap 6, one at a time, kept within 64: tripled 2026-11-20, the user asked for more flies) |
 
@@ -113,7 +114,8 @@ Every living thing in the mod, built or planned, plants and fungi included, in o
   - Black rhinoceros (browser of bushes): user's list 2026-11-16.
   - Plains zebra (grazer, crocodile prey at crossings): user's list 2026-11-16.
   - Warthog (the king of mud wallowing: kneels and slides on its face; rubs on termite mounds after): IDEA (mud pits, 2026-11-17).
-  - Antelope, wildebeest, buffalo; floodplain grazers lechwe, puku, waterbuck, sitatunga, bushbuck; monkeys; dung spreading acacia seed.
+  - Cape buffalo: BUILT 2026-11-25 (step 1, `docs/plans/buffalo.md`: herds laid with pans, graze, drink, lie down, the temper; Neon's model v12, the user: "perfect"). Step 2 (block moves, wallowing, calves, river herds) PLANNED.
+  - Antelope, wildebeest; floodplain grazers lechwe, puku, waterbuck, sitatunga, bushbuck; monkeys; dung spreading acacia seed.
 - *5f. Big hunters and scavengers:*
   - African lion (prides), cheetah (sprints), spotted hyena (clans, scavenge and hunt), African wild dog (packs): user's list 2026-11-16.
   - Honey badger (digs, raids bee hives, fights snakes): user's list 2026-11-16.

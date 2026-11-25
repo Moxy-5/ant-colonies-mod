@@ -8,6 +8,7 @@ abigpanis3deeponslopinggroundandholds 0.00
 abigtermitecolonyshowsnomorethanthecap 3.89
 ablockoveragapisbuiltoutfromsetsoilbesideit 0.00
 abreakinspreadsthedrummingandsendsthesoldierstothebreach 0.71
+abuffalosdeathclipplaysoutbeforeitsbodygoes 0.03
 abullfrogclimbsoutofthewaterontothebank 0.62
 abullfrogdigsinatmiddayandcomesoutforaplayer 0.55
 abullfroghopswhereitissentandupastep 0.39
@@ -38,6 +39,7 @@ acrewworkswhilenobodyisnearandmorecomeoutwhenaplayeris 1.03
 acrocodileafloatclimbsoveranunderwaterledge 0.66
 acrocodileclimbsouttobaskandgoesbackin 1.72
 acrocodilemotherseesoffamonitorfromhernest 0.00
+acrocodilenevertakesagrownbuffalo 0.03
 acrocodilesnapsupfishandcallsotherstotheschool 0.67
 acrocodileswimstoasandbanktobask 1.69
 acrocodiletakesadistichodus 0.27
@@ -78,6 +80,8 @@ ahatchlingcrocodilesnapsalandedfly 0.28
 ahatchlingcrocodilesnapsupabarb 0.29
 ahatchlingswimsatthesurfaceandclimbsout 0.01
 ahealthygardensendsupmushroomswhentherainends 0.64
+aherdislaidwithitspanandkeptforgood 0.03
+aherdstaresatastandingplayerthengrazesagain 0.08
 ahippoclimbsasteponitsmove 0.63
 ahippoeatshippograssnearitspool 0.36
 ahippograzesitslawnshort 2.52
@@ -210,6 +214,7 @@ astarvingtermitepairawaydiewhentheirlandloads 2.03
 astarvingworkerslowsdownanddies 0.40
 astrandedsharkflopsbackintothewater 0.00
 astrandedsharksuffocatesslowly 0.01
+asummonedbuffalonexttoaherdtakesitshome 0.02
 aswollenqueencannolongerwalk 0.34
 atadpolebesidefourfrogsdoesnotbecomeafifth 0.09
 atadpolegrowslegsthenbecomesafrogletonlywithroom 0.09

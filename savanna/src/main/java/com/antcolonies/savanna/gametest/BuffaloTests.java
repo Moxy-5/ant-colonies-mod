@@ -28,6 +28,7 @@ import net.minecraft.util.Mth;
 import net.minecraft.util.RandomSource;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.MobCategory;
+import net.minecraft.world.entity.ai.attributes.Attributes;
 import net.minecraft.world.entity.projectile.Arrow;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.DoublePlantBlock;
@@ -43,6 +44,10 @@ import net.neoforged.neoforge.gametest.PrefixGameTestTemplate;
  * the answer to a hurt), its paces measured (the charge and the travelling walk), floating, dying, a summoned one joining
  * a herd, and crocodiles leaving it be. Each test lays its own flat grass field (stone at relative y 0, grass at y 1; a
  * buffalo stands at y 2) and finds its buffalo by holding them, or (the herd laid by the land) through the kit.
+ * <p>Every test has sky access: without it the arena's barrier roof (relative y 16) is the top of every column for the
+ * height map, so the buffalo's ground reader ({@code GroundTop}) found the roof and no stand anywhere (the first run's
+ * buffalo stood on their spawn blocks). Every test keeps its own still clock ({@link TestClock}), and every herd's
+ * members are given one home, set before their first tick.
  */
 @GameTestHolder(SavannaMod.MODID)
 @PrefixGameTestTemplate(false)
@@ -151,9 +156,10 @@ public class BuffaloTests {
      * pod): 3 to 5, one bull, all sharing the pan's middle as their home, each on dry grass with its whole body clear,
      * kept for good; the buffalo is in no biome's spawn list; after 10 s there they are unhurt and inside no block.
      */
-    @GameTest(template = "arena", timeoutTicks = 300)
+    @GameTest(template = "arena", timeoutTicks = 300, skyAccess = true)
     public static void aHerdIsLaidWithItsPanAndKeptForGood(GameTestHelper helper) {
         ServerLevel level = helper.getLevel();
+        TestClock.still(helper, 7.0);
         field(helper, 0, 0, 64, 64);
         int across = 9;
         int water = pan(helper, 32, 32, across);
@@ -199,7 +205,7 @@ public class BuffaloTests {
      * no two grazing buffalo ever have their middles under {@link BuffaloGoals#SPACE} apart; tall grass is cropped to short
      * grass, never to bare ground; dry tufts are left alone (the termites' food).
      */
-    @GameTest(template = "arena", timeoutTicks = 2400)
+    @GameTest(template = "arena", timeoutTicks = 2400, skyAccess = true)
     public static void matesGrazeApartAndCropTallGrassShort(GameTestHelper helper) {
         ServerLevel level = helper.getLevel();
         TestClock clock = TestClock.still(helper, 7.0);
@@ -262,7 +268,7 @@ public class BuffaloTests {
     /**
      * At midday the herd walks to its pan, each to its own shore stand, drinks facing the water, and lies down by it.
      */
-    @GameTest(template = "arena", timeoutTicks = 2000)
+    @GameTest(template = "arena", timeoutTicks = 2000, skyAccess = true)
     public static void atMiddayTheHerdDrinksAtItsPanAndLiesDownByIt(GameTestHelper helper) {
         ServerLevel level = helper.getLevel();
         TestClock.still(helper, 12.0);
@@ -310,7 +316,7 @@ public class BuffaloTests {
      * At night (23:00, the evening's bout) the herd lies down round where the evening's grazing was
      * ({@link BuffaloGoals#grazeCentre}), not by the water.
      */
-    @GameTest(template = "arena", timeoutTicks = 2400)
+    @GameTest(template = "arena", timeoutTicks = 2400, skyAccess = true)
     public static void atNightTheHerdLiesDownWhereItGrazed(GameTestHelper helper) {
         TestClock clock = TestClock.still(helper, 23.0);
         field(helper, 0, 0, 64, 64);
@@ -335,7 +341,7 @@ public class BuffaloTests {
      * A survival player standing 10 blocks off a grazing herd: the buffalo near enough stare (mood_alert), then each is
      * grazing again within about 15 s of its stare; none charges.
      */
-    @GameTest(template = "arena", timeoutTicks = 2400)
+    @GameTest(template = "arena", timeoutTicks = 2400, skyAccess = true)
     public static void aHerdStaresAtAStandingPlayerThenGrazesAgain(GameTestHelper helper) {
         TestClock clock = TestClock.still(helper, 7.0);
         field(helper, 0, 0, 64, 64);
@@ -406,53 +412,73 @@ public class BuffaloTests {
 
     /**
      * A player walking up to a herd (standing still at 4 blocks): the herd's nearest member warns them (a snort, pawing),
-     * then charges and its hit lands; no other buffalo charges. Then a second player walking up the same way gets their
-     * own warning before any charge (review R9-13: a warning is remembered per player, not per animal).
+     * then charges and its hit lands. A second cow stands 6.4 blocks from where the player stops (inside the warning's
+     * reach of 7) but always farther than the nearest member: she may stare, never warns or charges (the nearest-member
+     * rule). Then, once the charger's calm is over, a second player walks up to 5.5 blocks of where it stands now (inside
+     * the warning's reach, outside the charge's 5): they get their own warning before any charge (review R9-13: a warning
+     * is remembered per player, not per animal), and stepping in to 4 blocks after it, they are charged.
      */
-    @GameTest(template = "arena", timeoutTicks = 1600)
+    @GameTest(template = "arena", timeoutTicks = 1600, skyAccess = true)
     public static void aWalkingPlayerIsWarnedThenChargedAndASecondGetsTheirOwnWarning(GameTestHelper helper) {
+        TestClock.still(helper, 7.0);
         field(helper, 0, 20, 64, 44);
         BlockPos home = helper.absolutePos(new BlockPos(6, GROUND, 32));
         BuffaloEntity near = buffalo(helper, 20.5, 32.5, -90.0F, false, home, 0);
-        List<BuffaloEntity> herd = List.of(near, buffalo(helper, 12.5, 26.5, -90.0F, true, home, 0),
+        // 6.4 from the first player's stop (24.5, 32.5), and from every point of the walk farther than `near` is
+        BuffaloEntity second = buffalo(helper, 19.5, 36.5, -90.0F, false, home, 0);
+        List<BuffaloEntity> herd = List.of(near, second, buffalo(helper, 12.5, 26.5, -90.0F, true, home, 0),
                 buffalo(helper, 8.5, 37.5, -90.0F, false, home, 0));
         herd.forEach(b -> b.led = true);                    // its day off: only its temper moves it
+        sameHome(helper, herd);
         ServerPlayer[] walker = {player(helper, 40.5, 32.5), null};
-        double[] x = {40.5};
+        // the walk: from x[0] toward x[1] along z[0] (relative), 0.2 a tick (about 4 blocks a second)
+        double[] x = {40.5, 24.5}, z = {32.5};
         float[] health = {walker[0].getHealth()};
-        int[] who = {0};
-        boolean[] warned = new boolean[2], hit = new boolean[2];
-        long[] nextFrom = {-1};
+        // 0 the first player; 1 waiting for the charger's calm to end; 2 the second player walking to 5.5 off; 3 stepping in to 4
+        int[] stage = {0};
+        boolean[] warned = new boolean[2], hit = new boolean[2], calmed = {false};
+        double[] nearAt = new double[2];
         helper.onEachTick(() -> {
-            long now = helper.getTick();
-            ServerPlayer p = walker[who[0]];
-            if (p == null) {
-                if (nextFrom[0] >= 0 && now >= nextFrom[0]) {
-                    walker[1] = player(helper, 40.5, 32.5);
-                    x[0] = 40.5;
+            for (BuffaloEntity b : herd) {
+                helper.assertTrue(b == near || b.temper() != BuffaloGoals.Temper.WARN && b.temper() != BuffaloGoals.Temper.CHARGE,
+                        "a buffalo that is not the herd's nearest warned or charged: " + b.about() + " at " + at(helper, b));
+            }
+            if (stage[0] == 1) {
+                calmed[0] |= near.temper() == BuffaloGoals.Temper.CALM;
+                if (calmed[0] && near.temper() == BuffaloGoals.Temper.NONE) {
+                    // its calm is over: the second player walks up to 5.5 blocks of where it stands now
+                    Vec3 n = rel(helper, near.position());
+                    nearAt[0] = n.x;
+                    nearAt[1] = n.z;
+                    x[0] = n.x + 16.0;
+                    x[1] = n.x + 5.5;
+                    z[0] = n.z;
+                    walker[1] = player(helper, x[0], z[0]);
                     health[0] = walker[1].getHealth();
+                    stage[0] = 2;
                 }
                 return;
             }
-            x[0] = Math.max(24.5, x[0] - 0.2);              // walking up at about 4 blocks a second, then standing 4 off
-            hold(helper, p, x[0], 32.5);
-            for (BuffaloEntity b : herd) {
-                if (b.temper() == BuffaloGoals.Temper.CHARGE) {
-                    helper.assertTrue(b == near, "a buffalo that is not the herd's nearest charged: " + b.about());
-                }
-            }
+            int who = stage[0] == 0 ? 0 : 1;
+            ServerPlayer p = walker[who];
+            x[0] = Math.max(x[1], x[0] - 0.2);
+            hold(helper, p, x[0], z[0]);
             if (near.temperOn() == p) {
-                warned[who[0]] |= near.temper() == BuffaloGoals.Temper.WARN;
+                warned[who] |= near.temper() == BuffaloGoals.Temper.WARN;
                 if (near.temper() == BuffaloGoals.Temper.CHARGE) {
-                    helper.assertTrue(warned[who[0]], "player " + (who[0] + 1) + " was charged without a warning");
+                    helper.assertTrue(warned[who], "player " + (who + 1) + " was charged without a warning, "
+                            + String.format("%.1f", near.distanceTo(p)) + " off: " + near.about());
                 }
             }
-            if (p.getHealth() < health[0] && !hit[who[0]]) {
-                hit[who[0]] = true;
+            if (stage[0] == 2 && warned[1] && near.temper() != BuffaloGoals.Temper.WARN) {
+                stage[0] = 3;                               // warned, and the warning played out: one step in, to 4 off
+                x[1] = nearAt[0] + 4.0;
+            }
+            if (p.getHealth() < health[0] && !hit[who]) {
+                hit[who] = true;
                 remove(helper, p);
-                if (who[0] == 0) {
-                    who[0] = 1;
-                    nextFrom[0] = now + 20;
+                if (who == 0) {
+                    stage[0] = 1;
                 } else {
                     helper.succeed();
                 }
@@ -464,24 +490,40 @@ public class BuffaloTests {
                     remove(helper, p);
                 }
             }
-            helper.fail("player " + (who[0] + 1) + ": warned " + warned[who[0]] + ", hit " + hit[who[0]] + "; " + near.about());
+            int who = stage[0] == 0 ? 0 : 1;
+            helper.fail("stage " + stage[0] + ", player " + (who + 1) + ": warned " + warned[who] + ", hit " + hit[who] + ", calm seen "
+                    + calmed[0] + "; " + near.about() + " at " + at(helper, near));
         });
+    }
+
+    /** Every member of a herd shares one home (set before the first tick: buffalo with none would each take their own). */
+    private static void sameHome(GameTestHelper helper, List<BuffaloEntity> herd) {
+        for (BuffaloEntity b : herd) {
+            helper.assertTrue(b.home() != null && b.home().equals(herd.get(0).home()) && b.homeAcross() == herd.get(0).homeAcross(),
+                    "a herd member's home " + b.home() + " (across " + b.homeAcross() + ") is not its herd's " + herd.get(0).home());
+        }
     }
 
     /**
      * A cow shot by a player 20 blocks off charges the archer; the herd's bull joins her charge; the other cows never
-     * charge but bunch round where she was hurt and face the archer ({@code mood_angry}).
+     * charge but bunch round where she was hurt and face the archer ({@code mood_angry}), all while her anger lasts (one
+     * shot: {@link BuffaloGoals#REVENGE_TICKS}). The archer has 1000 health, so the cow's and the bull's butts never kill
+     * it (a player's 20 went in three hits, and a dead archer ends the anger before the cows have bunched).
      */
-    @GameTest(template = "arena", timeoutTicks = 800)
+    @GameTest(template = "arena", timeoutTicks = 800, skyAccess = true)
     public static void aCowShotFrom20BlocksChargesTheBullJoinsAndTheCowsBunch(GameTestHelper helper) {
         ServerLevel level = helper.getLevel();
+        TestClock.still(helper, 7.0);
         field(helper, 0, 16, 64, 48);
         BlockPos home = helper.absolutePos(new BlockPos(6, GROUND, 32));
         BuffaloEntity shot = buffalo(helper, 20.5, 32.5, -90.0F, false, home, 0);
         BuffaloEntity bull = buffalo(helper, 20.5, 25.5, -90.0F, true, home, 0);
         List<BuffaloEntity> cows = List.of(buffalo(helper, 13.5, 29.5, -90.0F, false, home, 0), buffalo(helper, 13.5, 36.5, -90.0F, false, home, 0));
         List.of(shot, bull, cows.get(0), cows.get(1)).forEach(b -> b.led = true);
+        sameHome(helper, List.of(shot, bull, cows.get(0), cows.get(1)));
         ServerPlayer archer = player(helper, 40.5, 32.5);
+        archer.getAttribute(Attributes.MAX_HEALTH).setBaseValue(1000.0);
+        archer.setHealth(1000.0F);
         Vec3 hurtAt = shot.position();
         boolean[] shotCharged = {false}, bullJoined = {false};
         boolean[][] cowSeen = new boolean[2][2];          // [cow][bunched, bunched and facing]
@@ -509,6 +551,14 @@ public class BuffaloTests {
             if (shotCharged[0] && bullJoined[0] && cowSeen[0][1] && cowSeen[1][1]) {
                 remove(helper, archer);
                 helper.succeed();
+                return;
+            }
+            if (helper.getTick() > 5 && shot.angryAt() == null) {
+                remove(helper, archer);                     // her anger is over: what was not seen by now never will be
+                helper.fail("the shot cow's anger ended at tick " + helper.getTick() + " (archer alive " + archer.isAlive()
+                        + ", health " + archer.getHealth() + "): she charged " + shotCharged[0] + ", the bull joined " + bullJoined[0]
+                        + ", cows bunched " + cowSeen[0][0] + "/" + cowSeen[1][0] + " and faced " + cowSeen[0][1] + "/" + cowSeen[1][1]
+                        + "; a cow: " + cows.get(0).about() + " at " + at(helper, cows.get(0)) + "; the bull: " + bull.about());
             }
         });
         helper.runAtTickTime(790, () -> {
@@ -526,8 +576,9 @@ public class BuffaloTests {
      * over 12 blocks of a gallop at a player 28 blocks off who hurt it; its run-up butt's hit lands on the player standing
      * still. The pace is logged ({@code [buffalo] charge pace}) for tuning {@code BuffaloEntity.CHARGE}.
      */
-    @GameTest(template = "arena", timeoutTicks = 600)
+    @GameTest(template = "arena", timeoutTicks = 600, skyAccess = true)
     public static void aChargeRunsAtAboutFiveBlocksASecondAndItsHitLands(GameTestHelper helper) {
+        TestClock.still(helper, 7.0);
         field(helper, 0, 26, 64, 38);
         BlockPos home = helper.absolutePos(new BlockPos(2, GROUND, 32));
         BuffaloEntity b = buffalo(helper, 4.5, 32.5, -90.0F, true, home, 0);
@@ -570,8 +621,9 @@ public class BuffaloTests {
      * Its travelling walk (a trip to a new place) runs at about 1 block a second (0.8 to 1.25), measured over 16 blocks.
      * The pace is logged ({@code [buffalo] travel pace}) for tuning {@code BuffaloEntity.TRAVEL}.
      */
-    @GameTest(template = "arena", timeoutTicks = 900)
+    @GameTest(template = "arena", timeoutTicks = 900, skyAccess = true)
     public static void aBuffaloTravelsAtAboutOneBlockASecond(GameTestHelper helper) {
+        TestClock.still(helper, 7.0);
         field(helper, 0, 26, 64, 38);
         BlockPos home = helper.absolutePos(new BlockPos(2, GROUND, 32));
         BuffaloEntity b = buffalo(helper, 4.5, 32.5, -90.0F, false, home, 0);
@@ -606,7 +658,7 @@ public class BuffaloTests {
      * A buffalo knocked into water 3 deep floats low (off the bed, its back out) and swims out onto the grass on its own day,
      * unhurt.
      */
-    @GameTest(template = "arena", timeoutTicks = 1600)
+    @GameTest(template = "arena", timeoutTicks = 1600, skyAccess = true)
     public static void aBuffaloInDeepWaterFloatsAndSwimsOut(GameTestHelper helper) {
         ServerLevel level = helper.getLevel();
         TestClock clock = TestClock.still(helper, 7.0);
@@ -657,8 +709,9 @@ public class BuffaloTests {
     }
 
     /** Its death clip (1.4 s) plays out before its body goes: still there a second after it died, gone by two. */
-    @GameTest(template = "arena", timeoutTicks = 100)
+    @GameTest(template = "arena", timeoutTicks = 100, skyAccess = true)
     public static void aBuffalosDeathClipPlaysOutBeforeItsBodyGoes(GameTestHelper helper) {
+        TestClock.still(helper, 7.0);
         field(helper, 0, 0, 12, 12);
         BuffaloEntity b = buffalo(helper, 6.5, 6.5, 0.0F, false, helper.absolutePos(new BlockPos(6, GROUND, 6)), 0);
         b.led = true;
@@ -674,8 +727,9 @@ public class BuffaloTests {
      * A buffalo from a spawn egg or a summon joins the herd of the nearest buffalo within 16 blocks (takes its home and
      * across); with none near, its home is where it stands (across 0).
      */
-    @GameTest(template = "arena", timeoutTicks = 40)
+    @GameTest(template = "arena", timeoutTicks = 40, skyAccess = true)
     public static void aSummonedBuffaloNextToAHerdTakesItsHome(GameTestHelper helper) {
+        TestClock.still(helper, 7.0);
         field(helper, 0, 0, 64, 20);
         BlockPos home = helper.absolutePos(new BlockPos(2, GROUND, 10));
         BuffaloEntity member = buffalo(helper, 6.5, 10.5, 0.0F, true, home, 9);
@@ -696,7 +750,7 @@ public class BuffaloTests {
      * Crocodiles never take a grown buffalo: a hungry grown crocodile in a pool takes a cow at its edge, never the buffalo
      * standing nearer it at the edge, which stays unhurt.
      */
-    @GameTest(template = "arena", timeoutTicks = 2400)
+    @GameTest(template = "arena", timeoutTicks = 2400, skyAccess = true)
     public static void aCrocodileNeverTakesAGrownBuffalo(GameTestHelper helper) {
         ServerLevel level = helper.getLevel();
         TestClock.still(helper, 0.0);                      // midnight: no wish to bask
