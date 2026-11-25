@@ -1,0 +1,87 @@
+Report 2026-11-24_20-24-14-raider-stuck
+raider-stuck broken: 2 raider(s) stuck: 8cf8f9ff going home (left outside with nothing to do there), still 60 s; 1e3b8e7c going home (left outside with nothing to do there), still 60 s
+Where: 2060, 71, 2148 in minecraft:overworld
+When: game tick 13156, day 1, 19:09
+Rules on: ON
+
+Colonies within 112 blocks (nearest first):
+- 335648f1 | antcolonies:macrotermes | center 2051, 72, 2140 | queen 03bbaefd | members 208 | real 50 (wants 50), in the nest 157 (workers young 13, middle 16, old 128; soldiers 0 minor, 0 major) | while away (1.7 hours): 5 comb layers ripened, 316 blocks dug, 19 gallery pieces grown, 15 gallery pieces grown toward food, 96 blocks of gallery grown | foragers out as numbers 0 (remembers 1229 plants) | ages 3 young, 2 middle, 26 old, jobs 4 nurses, 9 builders, 18 foragers | gardens 6 dug (planned 6), comb 216 layers on 54 blocks, nodules 2, mushrooms after rain: 8 | queen holds 2/6 nodules, next egg in 0:12 | queen unfed 0 of 100 min | eggs 3 | larvae 5 | soldiers 3 minor (wants 15), 4 major (wants 5), nymphs growing into soldiers 3, posts held 2 (0 beside ways out, 0 on trails) | trouble: foe at 2063, 72, 2147 (felt 16 blocks, 19 soldiers); foe at 2051, 69, 2147 (felt 16 blocks, 0 soldiers) | knows 1236 food plants (5 found, not yet told) | danger: 3 places (strongest 11.5 at 2058, 70, 2147: matabele_major) | 28 holes closed for danger | dead ants 5 (refuse chamber 0) | mound stage 14 (earned 14) of 32, 239/239 blocks finished, earned 255.1 blocks | foraging now (out at: night, rain), holes open 0 of 38 | new holes 22 (0 spent, 1 being dug), reach 41 | runways 3 (0 finished) | galleries: 29 pieces (22 out to food), 17 tips, 149 of 200 blocks, reach 35, 38 holes, 7 in turn | hidden trips: 11 underway (219 made, 206 out at the far end, 2 broken into, 0 folded in), 4 eaten tufts growing back (1 on bare ground by the holes)
+- 1a9f8fc5 | antcolonies:megaponera_analis | center 2108, 80, 2106 | nest in a dead termite mound, rooms open 6 of 6 | queen 47fb2e50 | members 38 | real 38 (wants 75), in the nest 0 (workers young 0, middle 0, old 0) | while away (2.8 hours): 5 pieces fed to the queen | ages 1 young, 0 middle, 11 old, jobs 3 nurses, 3 builders, 6 foragers | food 0 pieces in the store | queen fed 5/6, rich 0/5 | queen unfed 5 of 100 min | eggs 0 | larvae 0, raids: 1 scout(s) out, its scouts reach out to 78 blocks, 1 good spot(s) (2054, 72, 2151, 70 out, worth 15, line of 47); 9 raider(s) going home by themselves; 1 scent trail(s) (1 broken); a raid of 30 (23 real out), march home, to 2054, 72, 2151, carrying 9 termite(s), 7 s in this stage | dead ants 0 (refuse chamber 0) | staying in (out at: )
+- c5f0408f | antcolonies:macrotermes | center 2040, 72, 2058 | queen b7713baa | members 179 | real 0 (wants 0), in the nest 178 (workers young 9, middle 17, old 136; soldiers 12 minor, 4 major) | away 9598 ticks | owed to the nest: +83 food, 70 comb ripened, 60 gone old, 10 young, 5445.2 builder-hours of building | while away so far: 10 eggs laid, 10 eggs hatched, 24 pieces fed to the queen, 35 pieces fed to the young, 86 pieces of food brought in, 59 nodules grown, 70 comb layers ripened, 1 comb layers gone old | foragers out as numbers 0 (remembers 1034 plants) | ages 0 young, 0 middle, 0 old, jobs 0 nurses, 0 builders, 0 foragers | gardens 6 dug (planned 6), comb 133 layers on 54 blocks, nodules 0, mushrooms after rain: 8 | queen holds 4/6 nodules, not laying | queen unfed 0 of 100 min | eggs 0 | larvae 0 | soldiers 12 minor (wants 12), 4 major (wants 4), nymphs growing into soldiers 0, posts held 0 (0 beside ways out, 0 on trails) | calm | knows 1034 food plants | dead ants 0 (refuse chamber 0) | mound stage 13 (earned 13) of 32, 204/204 blocks finished, earned 221.0 blocks | foraging now (out at: night, rain), holes open 0 of 2 | new holes 0 (0 spent, 0 being dug), reach 24 | runways 0 (0 finished) | galleries: 0 pieces (0 out to food), 0 tips, 0 of 162 blocks, reach 0, 2 holes, 0 in turn (last time) | hidden trips: 0 underway (0 made, 0 out at the far end, 0 broken into, 0 folded in), 0 eaten tufts growing back (0 on bare ground by the holes)
+- 447d4478 | antcolonies:macrotermes | center 1964, 72, 2179 | queen 0e6ce842 | members 212 | real 0 (wants 0), in the nest 211 (workers young 12, middle 20, old 162; soldiers 12 minor, 5 major) | away 6788 ticks | owed to the nest: +86 food, 52 comb ripened, 40 gone old, 10 young, 5362.4 builder-hours of building | while away so far: 10 eggs laid, 10 eggs hatched, 24 pieces fed to the queen, 16 pieces fed to the young, 87 pieces of food brought in, 40 nodules grown, 52 comb layers ripened, 6 taken by raiders | foragers out as numbers 0 (remembers 587 plants) | ages 0 young, 0 middle, 0 old, jobs 0 nurses, 0 builders, 0 foragers | gardens 6 dug (planned 6), comb 130 layers on 54 blocks, nodules 0, mushrooms after rain: 8 | queen holds 4/6 nodules, not laying | queen unfed 0 of 100 min | eggs 0 | larvae 0 | soldiers 12 minor (wants 15), 5 major (wants 5), nymphs growing into soldiers 3, posts held 0 (0 beside ways out, 0 on trails) | calm | knows 587 food plants | dead ants 0 (refuse chamber 0) | mound stage 15 (earned 15) of 32, 261/261 blocks finished, earned 275.4 blocks | foraging now (out at: night, rain), holes open 0 of 2 | new holes 0 (0 spent, 0 being dug), reach 24 | runways 0 (0 finished) | galleries: 0 pieces (0 out to food), 0 tips, 0 of 194 blocks, reach 0, 2 holes, 0 in turn (last time) | hidden trips: 0 underway (0 made, 0 out at the far end, 0 broken into, 0 folded in), 0 eaten tufts growing back (0 on bare ground by the holes)
+
+Rules broken lately by these colonies:
+- none
+
+Insects within 24 blocks (nearest first):
+- matabele_major 30b45d13 at 2060, 71, 2148 (2060.1, 71.8, 2148.2) hp 7.0/10 standing, still 44 s, goals [MatabeleWayHomeGoal] | going home: left outside with nothing to do there [colony 1a9f8fc5]
+- matabele_major 1e3b8e7c at 2060, 71, 2148 (2060.1, 71.8, 2148.2) hp 9.0/10 standing, still 60 s, goals [MatabeleWayHomeGoal] | going home: left outside with nothing to do there [colony 1a9f8fc5]
+- matabele_minor 8cf8f9ff at 2060, 71, 2148 (2060.1, 71.9, 2148.1) hp 3.0/5 standing, still 60 s, goals [MatabeleWayHomeGoal] | going home: left outside with nothing to do there [colony 1a9f8fc5]
+- matabele_major 95b54d0b at 2060, 71, 2147 (2060.4, 71.0, 2147.9) hp 10.0/10 walking to 2062, 72, 2147, goals [MatabeleRaidGoal] | march_home, place 2 off [colony 1a9f8fc5]
+- matabele_major 4a2b5efc at 2060, 71, 2146 (2060.3, 71.0, 2146.9) hp 10.0/10 walking to 2063, 72, 2147, goals [MatabeleRaidGoal] | march_home, place 3 off [colony 1a9f8fc5]
+- matabele_major 7b82274c at 2060, 71, 2146 (2060.3, 71.0, 2146.8) hp 10.0/10 walking to 2063, 72, 2147, goals [MatabeleRaidGoal] | march_home, place 3 off [colony 1a9f8fc5]
+- matabele_minor 3029b426 at 2062, 72, 2148 (2062.3, 72.0, 2148.5) hp 5.0/5 walking to 2062, 72, 2147, goals [MatabeleRaidGoal] | march_home, place 1 off [colony 1a9f8fc5]
+- matabele_major 75cf8d08 at 2062, 72, 2148 (2062.5, 72.0, 2148.8) hp 9.0/10 walking to 2066, 71, 2145, goals [MatabeleWayHomeGoal] | going home: left outside with nothing to do there [colony 1a9f8fc5]
+- matabele_minor a7858565 at 2062, 72, 2149 (2062.4, 72.0, 2149.1) hp 5.0/5 walking to 2062, 72, 2148, goals [MatabeleRaidGoal] | march_home, place 1 off [colony 1a9f8fc5]
+- matabele_major f6534b7c at 2062, 72, 2147 (2062.4, 72.0, 2147.8) hp 10.0/10 standing, still 4 s, goals [MatabeleRaidGoal] | march_home, place 0 off [colony 1a9f8fc5]
+- matabele_major dbc0638e at 2062, 72, 2148 (2062.5, 72.0, 2148.1) hp 10.0/10 walking to 2062, 72, 2147, goals [MatabeleRaidGoal] | march_home, place 1 off [colony 1a9f8fc5]
+- matabele_major 490e05da at 2062, 72, 2148 (2062.6, 72.0, 2148.6) hp 10.0/10 walking to 2062, 72, 2147, goals [MatabeleRaidGoal] | march_home, place 1 off [colony 1a9f8fc5]
+- matabele_major 4e96b2c4 at 2059, 70, 2146 (2059.9, 70.0, 2146.9) hp 10.0/10 walking to 2054, 72, 2151, goals [MatabeleScoutGoal] | march_home, place 5 off [colony 1a9f8fc5]
+- matabele_minor bb5f3f5d at 2062, 72, 2150 (2062.3, 72.0, 2150.1) hp 4.0/5 walking to 2062, 72, 2149, goals [MatabeleRaidGoal] | march_home, place 1 off [colony 1a9f8fc5]
+- matabele_major 7ec2acdb at 2062, 72, 2149 (2062.7, 72.0, 2149.4) hp 10.0/10 walking to 2062, 72, 2148, goals [MatabeleRaidGoal] | march_home, place 1 off [colony 1a9f8fc5]
+- matabele_major 43b48880 at 2062, 72, 2147 (2062.8, 72.0, 2147.7) hp 10.0/10 walking to 2063, 72, 2147, still 2 s, goals [MatabeleRaidGoal] | march_home, place 1 off [colony 1a9f8fc5]
+- matabele_major 000adaa7 at 2059, 73, 2150 (2059.1, 73.0, 2150.3) hp 10.0/10 walking to 2066, 71, 2145, goals [MatabeleRaidGoal] | march_home (leads), place 9 off [colony 1a9f8fc5]
+- matabele_major 4ab23f3b at 2062, 72, 2147 (2062.9, 72.0, 2147.3) hp 10.0/10 walking to 2063, 72, 2147, goals [MatabeleRaidGoal] | march_home, place 1 off [colony 1a9f8fc5]
+- matabele_major b02345bf at 2061, 72, 2151 (2061.0, 72.0, 2151.2) hp 9.0/10 standing, still 2 s, goals [MatabeleRaidGoal] | march_home, place 0 off [colony 1a9f8fc5]
+- matabele_major 9ad88370 at 2059, 72, 2151 (2059.9, 72.0, 2151.3) hp 9.0/10 walking to 2060, 72, 2151, goals [MatabeleRaidGoal] | march_home, place 1 off [colony 1a9f8fc5]
+- termite_major_soldier e46eb530 at 2058, 71, 2146 (2058.5, 71.0, 2146.5) hp 12.0/12 standing, still 21 s, goals [DefendGoal] [colony 335648f1]
+- matabele_major 37ad4609 at 2062, 72, 2150 (2062.3, 72.0, 2150.7) hp 10.0/10 standing, still 2 s, goals [MatabeleRaidGoal] | march_home, place 0 off [colony 1a9f8fc5]
+- matabele_major 2586536b at 2061, 72, 2151 (2061.3, 72.0, 2151.2) hp 10.0/10 standing, still 4 s, goals [MatabeleRaidGoal] | march_home, place 0 off [colony 1a9f8fc5]
+- matabele_minor 0c55c643 at 2060, 72, 2151 (2060.3, 72.0, 2151.4) hp 5.0/5 standing, still 2 s, goals [MatabeleRaidGoal] | march_home, place 0 off [colony 1a9f8fc5]
+- matabele_major f80292c7 at 2063, 72, 2147 (2063.3, 72.0, 2147.7) hp 10.0/10 standing, goals [MatabeleRaidGoal] | march_home, place 0 off [colony 1a9f8fc5]
+- termite_worker b9a75d86 at 2058, 69, 2149 (2058.4, 69.9, 2149.9) hp 3.0/3 walking to 2050, 69, 2145, goals [CarryEggGoal] [colony 335648f1]
+- termite_worker 74780618 at 2058, 69, 2149 (2058.2, 70.0, 2149.9) hp 3.0/3 walking to 2060, 70, 2172, goals [DigGoal] [colony 335648f1]
+- matabele_major 80767e28 at 2061, 72, 2151 (2061.2, 72.0, 2151.5) hp 10.0/10 standing, still 4 s, goals [MatabeleRaidGoal] | march_home, place 0 off [colony 1a9f8fc5]
+- termite_major_soldier 84c70b41 at 2062, 70, 2146 (2062.2, 70.0, 2146.2) hp 12.0/12 standing, still 10 s, goals [DefendGoal] [colony 335648f1]
+- matabele_major aba037a5 at 2063, 72, 2146 (2063.3, 72.0, 2146.7) hp 9.0/10 walking to 2063, 72, 2146, goals [MatabeleRaidGoal] | march_home, place 0 off [colony 1a9f8fc5]
+- termite_major_soldier a45ea79b at 2062, 70, 2146 (2062.5, 70.0, 2146.2) hp 12.0/12 standing, still 12 s, goals [DefendGoal] [colony 335648f1]
+- matabele_major 937cdb3b at 2061, 72, 2151 (2061.1, 72.0, 2151.8) hp 10.0/10 walking to 2061, 72, 2150, goals [MatabeleRaidGoal] | march_home, place 1 off [colony 1a9f8fc5]
+- termite_worker bbadba2e at 2057, 69, 2149 (2057.2, 69.3, 2149.4) hp 3.0/3 walking to 2060, 70, 2172, goals [DigGoal] [colony 335648f1]
+- termite_worker 4390d13f at 2057, 69, 2149 (2057.1, 69.4, 2149.4) hp 3.0/3 walking to 2060, 70, 2172, goals [DigGoal] [colony 335648f1]
+- termite_worker ef686a8a at 2057, 69, 2149 (2057.3, 69.0, 2149.5) hp 3.0/3 walking to 2060, 70, 2172, goals [DigGoal] [colony 335648f1]
+- termite_worker 27ba58dc at 2057, 69, 2150 (2057.6, 69.0, 2150.5) hp 3.0/3 walking to 2060, 70, 2172, goals [DigGoal] [colony 335648f1]
+- termite_worker 106bb522 at 2057, 70, 2150 (2057.2, 70.0, 2150.9) hp 3.0/3 walking to 2051, 69, 2154, goals [FeedQueenGoal] [colony 335648f1]
+- termite_worker 6235aa3d at 2056, 69, 2148 (2056.3, 69.5, 2148.7) hp 3.0/3 walking to 2046, 69, 2144, goals [FeedQueenGoal] [colony 335648f1]
+- termite_worker 44fa9c32 at 2056, 69, 2148 (2056.3, 69.5, 2148.7) hp 3.0/3 walking to 2060, 70, 2172, goals [DigGoal] [colony 335648f1]
+- termite_worker 9a32f321 at 2055, 69, 2148 (2055.6, 69.5, 2148.2) hp 3.0/3 walking to 2060, 70, 2172, goals [DigGoal] [colony 335648f1]
+- termite_major_soldier 11802d38 at 2055, 71, 2150 (2055.5, 71.0, 2150.5) hp 12.0/12 standing, still 19 s, goals [DefendGoal] [colony 335648f1]
+- termite_worker 7f5b2365 at 2055, 69, 2147 (2055.5, 69.0, 2147.2) hp 3.0/3 walking to 2051, 69, 2147, goals [SealGoal] [colony 335648f1]
+- termite_worker ce399fc8 at 2054, 69, 2146 (2054.6, 69.5, 2146.3) hp 3.0/3 walking to 2051, 69, 2147, goals [SealGoal] [colony 335648f1]
+- termite_worker ce5a5b24 at 2053, 71, 2151 (2053.6, 71.0, 2151.8) hp 3.0/3 standing, goals [] [colony 335648f1]
+- termite_worker 4252fdd2 at 2053, 69, 2145 (2053.1, 69.0, 2145.3) hp 3.0/3 standing, still 4 s, goals [] [colony 335648f1]
+- matabele_minor 0f102bd4 at 2051, 69, 2147 (2051.9, 70.0, 2147.9) hp 3.0/5 walking to 2062, 72, 2149, goals [MatabeleWayHomeGoal] | going home: left outside with nothing to do there [colony 1a9f8fc5]
+- termite_worker 11051acd at 2052, 69, 2145 (2052.5, 69.0, 2145.5) hp 3.0/3 standing, goals [RandomLookAroundGoal] [colony 335648f1]
+- termite_worker 998cf40c at 2051, 69, 2148 (2051.7, 69.5, 2148.5) hp 3.0/3 standing, still 3 s, goals [] [colony 335648f1]
+- termite_worker 546448da at 2051, 71, 2149 (2051.1, 71.0, 2149.9) hp 3.0/3 walking to 2051, 69, 2148, goals [FeedLarvaGoal] [colony 335648f1]
+- termite_worker 3bc920b8 at 2051, 73, 2149 (2051.2, 73.0, 2149.9) hp 3.0/3 walking to 2051, 71, 2140, goals [FleeGoal] [colony 335648f1]
+- termite_queen 03bbaefd at 2051, 69, 2145 (2051.5, 69.0, 2145.5) hp 20.0/20 standing, still 291 s, goals [] [colony 335648f1]
+- termite_minor_soldier f7d81633 at 2050, 71, 2149 (2050.5, 71.0, 2149.5) hp 6.0/6 standing, still 46 s, goals [DefendGoal] [colony 335648f1]
+- termite_minor_soldier 3fbdb50a at 2054, 70, 2140 (2054.6, 70.0, 2140.5) hp 6.0/6 walking to 2062, 70, 2147, goals [DefendGoal] [colony 335648f1]
+- termite_king 7b01f53a at 2050, 69, 2145 (2050.5, 69.0, 2145.5) hp 10.0/10 standing, still 291 s, goals [] [colony 335648f1]
+- termite_worker d7ed344d at 2050, 69, 2145 (2050.3, 69.0, 2145.6) hp 3.0/3 standing, still 14 s, goals [CarryEggGoal] [colony 335648f1]
+- termite_worker cd5859d5 at 2049, 69, 2145 (2049.5, 69.0, 2145.5) hp 3.0/3 standing, goals [] [colony 335648f1]
+- termite_worker 09b8ebaa at 2048, 69, 2146 (2048.4, 69.5, 2146.1) hp 3.0/3 walking to 2051, 69, 2154, goals [FeedQueenGoal] [colony 335648f1]
+- termite_worker 8417b1f7 at 2048, 69, 2144 (2048.1, 69.5, 2144.7) hp 3.0/3 walking to 2046, 69, 2145, goals [FeedLarvaGoal] [colony 335648f1]
+- termite_worker fa65ba58 at 2047, 69, 2144 (2047.5, 69.5, 2144.4) hp 3.0/3 standing, goals [FeedLarvaGoal] [colony 335648f1]
+- termite_worker 0c6d4775 at 2046, 69, 2145 (2047.0, 69.5, 2145.5) hp 3.0/3 walking to 2046, 69, 2145, goals [FeedLarvaGoal] [colony 335648f1]
+- termite_minor_soldier 207ecff3 at 2049, 71, 2134 (2049.3, 71.0, 2134.1) hp 6.0/6 walking to 2049, 71, 2135, goals [WalkBeatGoal] [colony 335648f1]
+- termite_worker b566fd96 at 2059, 71, 2170 (2059.5, 71.0, 2170.5) hp 3.0/3 standing, still 6 s, goals [] [colony 335648f1]
+- termite_worker db238abd at 2060, 70, 2171 (2060.3, 70.0, 2171.8) hp 3.0/3 walking to 2060, 70, 2172, goals [DigGoal] [colony 335648f1]
+- termite_worker acb4d130 at 2059, 70, 2171 (2059.6, 70.1, 2171.9) hp 3.0/3 walking to 2060, 70, 2172, still 2 s, goals [DigGoal] [colony 335648f1]
+- termite_worker 68284365 at 2060, 70, 2172 (2060.5, 70.0, 2172.1) hp 3.0/3 standing, goals [DigGoal] [colony 335648f1]
+- termite_worker 1cc40438 at 2059, 71, 2172 (2059.5, 71.0, 2172.1) hp 3.0/3 standing, still 6 s, goals [] [colony 335648f1]
+- termite_worker 0822e85e at 2060, 70, 2172 (2060.5, 70.0, 2172.2) hp 3.0/3 standing, goals [DigGoal] [colony 335648f1]
+- termite_worker dcd5aaa3 at 2059, 71, 2172 (2059.2, 71.0, 2172.6) hp 3.0/3 walking to 2060, 70, 2172, goals [DigGoal] [colony 335648f1]
+- termite_worker b37e0e59 at 2059, 71, 2172 (2059.2, 71.5, 2172.9) hp 3.0/3 standing, goals [RandomLookAroundGoal] [colony 335648f1]
+
+The place: 2031, 47, 2079 (corner), size 96 x 48 x 96, in place.nbt.
