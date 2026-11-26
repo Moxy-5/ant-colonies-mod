@@ -12,6 +12,7 @@ import org.jetbrains.annotations.Nullable;
 
 import com.antcolonies.colony.Colony;
 import com.antcolonies.fight.Fights;
+import com.antcolonies.nav.Foothold;
 import com.antcolonies.savanna.SavannaMod;
 import com.antcolonies.savanna.colony.RaidGround;
 import com.antcolonies.savanna.entity.MatabeleEntity;
@@ -136,7 +137,11 @@ public class MatabeleBiteOutGoal extends Goal {
             return;
         }
         if (ant.getNavigator().isDone()) {
-            if (ant.blockPosition().equals(standAt) || !ant.getNavigator().moveTo(standAt, 1.0)) {
+            // BUGS 361: in its stand's cell but not on its floor (hanging from the pocket's ceiling, where its last chase
+            // left it) it walks down onto the floor first; it gave up on every block from there and stood walled in for good.
+            boolean thereOnTheFloor = ant.blockPosition().equals(standAt) && ant.getNavigator().getSurface() == Direction.DOWN
+                    && !ant.getNavigator().isClimbing() && ant.onGround();
+            if (thereOnTheFloor || !ant.getNavigator().moveTo(Foothold.floor(standAt), 1.0)) {
                 SavannaMod.LOGGER.debug("[raid] Matabele {} finds no stand to bite {} from (at {}, stand {}, floor {})",
                         RaidGround.shortId(ant.getUUID()), block.toShortString(), ant.blockPosition().toShortString(), standAt.toShortString(), ant.standsToFight());
                 noWay.put(block, now + NO_WAY_TICKS); // there and still not in reach on a floor, or no way: another block

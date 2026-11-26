@@ -709,6 +709,49 @@ public class MatabeleFightTests {
         });
     }
 
+    /**
+     * BUGS 361 (the BUGS 351 replay, 2026-11-25 and 26): a major that chased a termite into its gallery hung from the
+     * ceiling of a one-cell pocket when the termites plugged both ends. Its bite-out picked a block to bite from its own
+     * cell, took "in the cell" for "at its stand" though it was not on the floor, gave every block up, let go for 30 s and
+     * stood walled in for good. Now it steps down onto the pocket's floor and bites its way out: a block of soil each side,
+     * out well before the old code's first second try (30 s).
+     */
+    @GameTest(template = "arena", timeoutTicks = 1200, skyAccess = true)
+    public static void aMatabeleHangingFromThePocketsCeilingStepsDownAndBitesItsWayOut(GameTestHelper helper) {
+        floor(helper);
+        // A bank of soil 3 wide and 3 high; the pocket in its middle at the bottom, two blocks of soil over it.
+        for (int x = 3; x <= 5; x++) {
+            for (int z = 3; z <= 5; z++) {
+                for (int y = 1; y <= 3; y++) {
+                    helper.setBlock(x, y, z, Blocks.DIRT);
+                }
+            }
+        }
+        BlockPos pocket = new BlockPos(4, 1, 4);
+        helper.setBlock(pocket, Blocks.AIR);
+        ServerLevel level = helper.getLevel();
+        MatabeleEntity major = TestAnts.loneWithAMind(helper, SavannaEntities.MATABELE_MAJOR.get(), 4, 1, 4);
+        BlockPos cell = helper.absolutePos(pocket);
+        major.getNavigator().restoreHold(com.antcolonies.nav.Foothold.ceiling(cell), 0.0F);
+        major.setPos(cell.getX() + 0.5, cell.getY() + 1.0 - major.getBbHeight(), cell.getZ() + 0.5);
+        helper.assertTrue(com.antcolonies.fight.Fights.isShutIn(level, cell), "the pocket is not shut in");
+        long[] outAt = {-1};
+        helper.onEachTick(() -> {
+            if (outAt[0] < 0 && major.isAlive() && !com.antcolonies.fight.Fights.isShutIn(level, major.blockPosition())) {
+                outAt[0] = helper.getTick();
+                SavannaMod.LOGGER.info("[bite out test] the major hanging from the ceiling got out after {} s", outAt[0] / 20);
+            }
+        });
+        helper.runAfterDelay(3, () -> helper.assertTrue(major.getNavigator().getSurface() == Direction.UP,
+                "the major does not hang from the pocket's ceiling at the start (surface " + major.getNavigator().getSurface() + ")"));
+        helper.runAfterDelay(500, () -> {
+            helper.assertTrue(outAt[0] >= 0, "the major is still shut in after 25 s at " + helper.relativePos(major.blockPosition()).toShortString()
+                    + " (" + String.format(java.util.Locale.ROOT, "%.2f", major.getY() - cell.getY()) + " over the pocket's floor, holding its "
+                    + major.getNavigator().getSurface() + ")");
+            helper.succeed();
+        });
+    }
+
     /** Termite mound soil dried hard (age 2, a pickaxe for a player): too hard for a Matabele's jaws. */
     private static net.minecraft.world.level.block.state.BlockState hardSoil() {
         return SavannaBlocks.TERMITE_MOUND.get().defaultBlockState()

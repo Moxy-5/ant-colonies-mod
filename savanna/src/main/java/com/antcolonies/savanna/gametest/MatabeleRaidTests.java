@@ -869,6 +869,61 @@ public class MatabeleRaidTests {
     }
 
     /**
+     * BUGS 362 (the BUGS 351 replay, 2026-11-25): the raids' "can stand here" ({@code RaidGround.canStand}, which picks
+     * every place a raider is sent to: the halt, the regroup, the march home, a hop) was "anything solid under the cell",
+     * and took the top of a termite's upright plate of mud crust for ground; the legs never stand there, so raiders sent
+     * there stood with no route. Now it asks the legs ({@code AntPathFinder.floorCell}): the cell over an upright plate is
+     * no place to stand, and the cells over a plate lying on the ground, a slab and plain ground are, and a raider walks to
+     * each of them (the legs end a walk asked over a low block on that block, where the body really rests).
+     */
+    @GameTest(template = "arena", timeoutTicks = 1200, skyAccess = true)
+    public static void raidersAreSentOnlyWhereTheirLegsCanStand(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        TestScenes.shapeGround(helper, 20, (x, z) -> 0);
+        int z = 6;
+        com.antcolonies.savanna.block.MudCrustBlock crust = SavannaBlocks.MUD_CRUST.get();
+        BlockState upright = crust.withFace(crust.withFace(crust.defaultBlockState(), Direction.NORTH), Direction.WEST);
+        BlockState lying = crust.withFace(crust.defaultBlockState(), Direction.DOWN);
+        helper.setBlock(new BlockPos(4, SURFACE, z), upright);
+        helper.setBlock(new BlockPos(7, SURFACE, z), lying);
+        helper.setBlock(new BlockPos(10, SURFACE, z), Blocks.OAK_SLAB);
+        BlockPos overUpright = helper.absolutePos(new BlockPos(4, SURFACE + 1, z));
+        List<BlockPos> places = List.of(helper.absolutePos(new BlockPos(7, SURFACE + 1, z)), helper.absolutePos(new BlockPos(10, SURFACE + 1, z)),
+                helper.absolutePos(new BlockPos(13, SURFACE, z)));
+        helper.assertTrue(!com.antcolonies.savanna.colony.RaidGround.canStand(level, overUpright),
+                "the top of an upright plate of mud crust counts as a place to stand");
+        BlockPos picked = com.antcolonies.savanna.colony.RaidGround.standAt(level, overUpright.getX() + 0.5, overUpright.getZ() + 0.5, overUpright.getY());
+        helper.assertTrue(!overUpright.equals(picked), "a place was picked on top of an upright plate of mud crust");
+        for (BlockPos place : places) {
+            helper.assertTrue(com.antcolonies.savanna.colony.RaidGround.canStand(level, place),
+                    "no place to stand at " + helper.relativePos(place).toShortString() + " over " + level.getBlockState(place.below()));
+        }
+        MatabeleEntity raider = TestAnts.lone(helper, SavannaEntities.MATABELE_MINOR.get(), 15, SURFACE, z);
+        int[] next = {0};
+        boolean[] walking = {false};
+        helper.onEachTick(() -> {
+            if (next[0] >= places.size() || helper.getTick() < 10) {
+                return;
+            }
+            BlockPos place = places.get(next[0]);
+            if (!walking[0]) {
+                helper.assertTrue(raider.getNavigator().moveTo(place, 1.0), "a raider found no way to its place at "
+                        + helper.relativePos(place).toShortString() + " over " + level.getBlockState(place.below()));
+                walking[0] = true;
+                return;
+            }
+            // (at its place by the raid goal's own rule: within 1.2 blocks flat and 1.5 up or down)
+            if (raider.getNavigator().isDone() && Math.hypot(raider.getX() - place.getX() - 0.5, raider.getZ() - place.getZ() - 0.5) <= 1.2
+                    && Math.abs(raider.getY() - place.getY()) <= 1.5) {
+                next[0]++;
+                walking[0] = false;
+            }
+        });
+        helper.succeedWhen(() -> helper.assertTrue(next[0] >= places.size(), "the raider got to " + next[0] + " of " + places.size()
+                + " places; it is at " + helper.relativePos(raider.blockPosition()).toShortString()));
+    }
+
+    /**
      * The same from a dead mound worn down to a low hump (about a month dead, as most dead mounds in the world are): the
      * user (2026-11-07), "there are different types of dead mounds in the game, adapt the formations to the different
      * mounds as well": the same checks, none loosened for either mound.
@@ -1249,21 +1304,29 @@ public class MatabeleRaidTests {
                             ant.moveTo(cell.getX() + 0.2 + 0.6 * ((k * 7) % 10) / 10.0, cell.getY(), cell.getZ() + 0.2 + 0.6 * ((k * 3) % 10) / 10.0);
                         }
                     }
-                    // (the trail out the way farthest from the dead mound's dead tree, so the stream is measured on open ground)
-                    BlockPos tree = NewLandMounds.get(level).lastDeadTreeForTests();
+                    // (the trail out the way farthest from the dead mound's dead tree, so the stream is measured on open ground).
+                    // BUGS 363: the tree is found by its own wood on the ground of this test's arena. It was the world's "last
+                    // dead tree", which beside other tests was another test's (474 blocks off), so the trail could run into
+                    // this one's fallen log and the stream went round it, a different check failing each time.
+                    List<BlockPos> wood = new ArrayList<>();
+                    for (BlockPos p : BlockPos.betweenClosed(helper.absolutePos(new BlockPos(0, SURFACE, 0)), helper.absolutePos(new BlockPos(64, SURFACE + 2, 64)))) {
+                        if (level.getBlockState(p).is(TreeBlocks.TREE_WOOD)) {
+                            wood.add(p.immutable());
+                        }
+                    }
                     BlockPos at = null;
                     double clearest = -1.0;
                     for (BlockPos to : List.of(new BlockPos(NEST + 40, SURFACE, NEST), new BlockPos(NEST, SURFACE, NEST + 40),
                             new BlockPos(NEST + 28, SURFACE, NEST + 28))) {
                         BlockPos end = helper.absolutePos(to);
-                        double clear = tree == null ? 99.0 : offSegment(tree, entrance, end);
+                        double clear = wood.stream().mapToDouble(block -> offSegment(block, entrance, end)).min().orElse(99.0);
                         if (clear > clearest) {
                             clearest = clear;
                             at = end;
                         }
                     }
-                    SavannaMod.LOGGER.info("[march test] the dead tree at {}, the trail to {}, {} blocks clear of the tree's foot",
-                            tree == null ? "-" : tree.toShortString(), at.toShortString(), Math.round(clearest));
+                    SavannaMod.LOGGER.info("[march test] the dead tree: {} blocks of wood on the ground, the trail to {}, {} blocks clear of them",
+                            wood.size(), at.toShortString(), Math.round(clearest));
                     List<BlockPos> trail = new ArrayList<>();
                     int steps = (int) Math.ceil(Math.hypot(at.getX() - entrance.getX(), at.getZ() - entrance.getZ()) / 2.0);
                     for (int i = 0; i <= steps; i++) {

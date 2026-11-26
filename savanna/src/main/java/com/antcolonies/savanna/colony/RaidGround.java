@@ -8,6 +8,8 @@ import org.jetbrains.annotations.Nullable;
 
 import com.antcolonies.colony.Colony;
 import com.antcolonies.colony.GroundTop;
+import com.antcolonies.nav.AntPathFinder;
+import com.antcolonies.nav.LevelCellMap;
 import com.antcolonies.savanna.registry.TreeBlocks;
 
 import net.minecraft.core.BlockPos;
@@ -76,12 +78,13 @@ public final class RaidGround {
 
     /**
      * Whether an ant can stand in this cell (and scent laid there holds): the cell free and dry, the ground under it
-     * there and dry. The cell must be loaded.
+     * dry, and a walk can end standing there by the legs' own rule ({@link AntPathFinder#floorCell}: a floor under it, or
+     * a ramp or slab it stands on). BUGS 362: this used to be "anything solid under it", which took the top of a thin
+     * upright plate of termite mud for ground the legs never stand on, and raiders were sent there and stood with no route.
      */
     public static boolean canStand(ServerLevel level, BlockPos cell) {
-        BlockPos below = cell.below();
-        return level.getBlockState(cell).getCollisionShape(level, cell).isEmpty() && level.getFluidState(cell).isEmpty()
-                && level.getFluidState(below).isEmpty() && !level.getBlockState(below).getCollisionShape(level, below).isEmpty();
+        LevelCellMap map = new LevelCellMap(level);
+        return map.isOpen(cell) && level.getFluidState(cell.below()).isEmpty() && AntPathFinder.floorCell(map, cell) != null;
     }
 
     /** A cell an ant can stand in at this column of the world near height {@code y} ({@link #canStand}); null if none or not loaded. */
