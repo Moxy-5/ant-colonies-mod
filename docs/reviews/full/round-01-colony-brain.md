@@ -17,7 +17,49 @@ the finding, was not checked), **to measure** (a lag finding with no number yet)
 `docs/BUGS.md` number when a fix session takes it up. Findings keep their numbers for good (numbered in the order the
 slices came in, not by grade); a fix session adds a status line under a finding and never rewrites it.
 
-**Status: being written piece by piece.** Slices in so far: young, danger and species; food and field.
+**Count:** 50 findings: 15 A, 20 B, 15 C. All six readers are in; the round is read.
+
+## The short of it
+
+The brain's skeleton is sound: the parts and their sign-up, the tick slots, the claims, the season and species-name
+rules, the headcount when insects die, grow old or starve, nothing left over between worlds, and no away path that
+loads land by itself. What is wrong sits in four places:
+
+1. **The edges of loaded land.** A family of block reads guards the cell but not its neighbour, or reads first and
+   asks after (R1-7, R1-8, R1-18, R1-47): freezes near big mounds, in reach at the user's view distance of 10.
+2. **The change between bodies and numbers.** An insect folded twice (R1-43, with the drift it leaves visible in the
+   user's own saves), a body left behind (R1-45), loads lost (R1-28), insects in limbo (R1-29), a Matabele queen who
+   lays only as a number (R1-1).
+3. **Near and away living at different speeds, and the clock.** A slept night costs the termites their foraging
+   (R1-35), builders that are numbers work only away (R1-36), all numbers eat and starve in the same second (R1-37).
+4. **The save.** One typo in a species file empties the world's colonies (R1-42); the colony file is rebuilt whole at
+   every autosave and grows with the land explored (R1-44); colonies are never ended while away (R1-27).
+
+Plus plain lag in the nest: every builder scanning the whole nest for leaks (R1-16), `nestCells` built anew on every
+call (R1-21), a second's worth of block changes in one tick on return (R1-17).
+
+## The ones that matter most
+
+1. **R1-42:** a typo in a species file, and the world opens with every colony emptied, and saves it so.
+2. **R1-1:** a Matabele queen never lays while a player is near (since M8).
+3. **R1-35:** sleeping every night starves grass-fed termite colonies across the world. **The user's call.**
+4. **R1-43:** insects, food and young counted twice at the edge of loaded land; seen in the user's saves.
+5. **R1-16 and R1-21:** the leak scan and `nestCells`, lag that grows with the mound.
+6. **R1-8, R1-18, R1-47:** reads that load land on the spot.
+7. **R1-19:** a foraging hole left under the soil on a hillside.
+8. **R1-45:** extra Matabele minors each time a far scout is shown.
+
+## For the user to decide
+
+- **R1-35 (sleeping):** recommended: a skipped night is foraged as numbers (the termites foraged, the player slept).
+- **R1-36 (builders near):** recommended: builder numbers work near a player too, out of sight, so a watched mound
+  grows at its full pace. It makes watched mounds grow about four times faster than today.
+
+## What this round did not do
+
+Nothing was measured in the game: every lag finding is "what runs, how often, over how many things" (the plan asks for
+numbers; a fix session measures before and after). No test was run. The species side was read only where the brain
+calls it. `docs/BUGS.md` was searched by class name, not read whole.
 
 ---
 
@@ -566,3 +608,160 @@ readers; the line-by-line slices above cover those).
 - Old-age deaths are spread; the queen's stream uses one clock near and away, guarded so both never lay.
 - The season rule and the species-name rule hold across `colony/`, `species/` and `season/` (names only in comments).
 - `crew` equal to `real_cap` makes `watch_radius` do nothing; the species file says that is the user's pick.
+
+---
+
+## Thread: save, reload and lifetimes (a Fable reader, across all the parts)
+
+Followed a colony's data through its life. Minecraft's own behaviour was read in the NeoForge sources jar, not from
+memory. Save sizes were measured by reading the user's worlds in `run/saves` (read only). Not looked at: the species
+side's parts' save and load (galleries, raids, scouts, hidden trips), client-only classes on a dedicated server,
+whether new-land mound code reaches the brain from a world-making thread.
+
+### R1-42 (A, proven; checked again): one typo in a species file empties every colony of the world (R1-2 and R1-30 joined)
+
+- **What is wrong:** the chain, each link read:
+  1. A species file with a mistake is dropped (`SpeciesProfiles:43`) and there are no built-in numbers (R1-2).
+  2. `ColonyManager.load` (232 to 240) calls `Colony.load` for each colony with no try (R1-30). `Colony.load` makes the
+     colony, and the constructor's line 126 asks `profile().parts()`, which is `SpeciesProfiles.get`: it throws.
+  3. Minecraft's `DimensionDataStorage.readSavedData` catches every exception, logs "Error loading saved data" and
+     gives nothing; a new, empty manager is made.
+  4. Every loaded termite queen then founds a new empty colony (savanna `TermiteQueenEntity:149-155`), which marks the
+     store changed: the next autosave or pause writes the empty list over the old file.
+- **Other throws on the same path:** `Brood.fromSaved` (an unknown caste word), `AwayLife.load` (`Kind.valueOf`,
+  `Load.valueOf`), `FoodStore.load` (`Long.parseLong`), a missing `id` or `queen`.
+- **What the player sees:** after a typo in `macrotermes.json` (the file the user is told to tweak), or a species mod
+  taken out, the world opens with every mound an empty shell: queens alone, no workers, no food, no fungus, and it is
+  saved that way. One line in the log.
+- **This raises R1-30 from "likely, no throw found" to proven:** the throw is R1-2.
+- **Fix proposed:** both halves. `ColonyManager.load` catches for each colony, logs it and keeps the colony's raw
+  record to write back unchanged; `SpeciesProfiles` keeps the last good profile when a file fails at `/reload` and
+  stops the loading with the file's name at first load.
+
+### R1-43 (A, proven in code; checked again; the link to the drift in the saves, likely): an insect already folded into the numbers is folded a second time
+
+- **What is wrong:** `AwayLife.freeze` (251 to 260) writes `frozen.put(entity.getUUID(), what)` with a new record,
+  `folded` false, never looking at a record already there.
+  1. An insect's chunk leaves range: a record, not folded. The colony is away past the grace: `tickAway` folds it
+     (numbers inside +1) and marks the record folded. Right so far.
+  2. The player passes: the chunk is loaded again but in the outer ring, where entities do not tick. The insect is in
+     the world but never ticks, so `cameBack` (called from its own tick, 468 to 485) cannot remove the record and the
+     body. `foldLoaded` would, but only every 400 ticks and only with the nest's middle loaded.
+  3. The chunk leaves range again: Minecraft posts the leave event (`UNLOADED_TO_CHUNK`), `ModEvents.onLeaveLevel`
+     calls `freeze`, and the folded record is replaced by an unfolded one.
+  4. The next second `tickAway` folds it again: inside +1 a second time, and what it carried counted again (seed,
+     nurse food, egg, body). Eggs and larvae double the same way. The headcount is not raised.
+- **Evidence in the user's saves:** numbers inside above the headcount in 4 colonies of 3 worlds (worker 72 counted,
+  73 inside; minor soldier 5 and 6; Matabele worker 76 and 77; termite minor soldier 15 and 16; worker 200 and 210).
+  Not replayed in the game; this is the only path found in code that gives it for termites (R1-45 gives it for
+  Matabele).
+- **What the player sees:** colonies slowly gaining insects, food and young they never raised when the player, above
+  all flying in spectator, skirts the edge of their loaded land.
+- **Fix proposed:** `freeze` keeps a record that is already folded.
+
+### R1-44 (A, what runs proven, sizes measured; milliseconds to measure): every autosave and every pause rebuilds and copies every colony's whole record
+
+- **What is wrong:** R1-31's `markChanged()` every away second keeps the store always dirty. Minecraft's
+  `SavedData.save` builds the whole record and copies it on the server thread before the write goes to a worker.
+- **Measured:** the world "New World (227)", 76 colonies (75 away): 2,928,376 bytes uncompressed; a colony 21 KB at
+  the median, 190 KB the largest. By key: `field` 1,429,762 (`FieldLife` writes each plant as its own record: 24,627
+  plants and 7,133 unknown), `insideNest` 520,963, `knownFood` 323,696, `galleries` 260,983. The current world: 22
+  colonies, 1.1 MB. It grows with every mound new land places.
+- **What the player sees:** a hitch at every autosave and every Esc pause, growing with the land explored.
+- **Fix proposed:** mark changed from the away tick only when a part's saved numbers changed; `FieldLife`'s plants as
+  packed arrays (one of positions, one of kinds and trips).
+
+### R1-45 (A, proven; checked again): a minor that comes out when a number scout is shown goes back into the numbers, but its body stays
+
+- **Where:** savanna `Scouts.java:125-134`; `AwayLife.java:323-327` (`foldInNow`); `Population.java:637-638`.
+- **What is wrong:** `Population.comeOut` takes one from the numbers and adds the body to the world. `Scouts.showScout`
+  wants a major; for a body that is no major it calls `colony.away().foldInNow(level, mob)` and tries again, up to 8
+  times. `foldInNow` only adds the number; unlike `foldInStray` (343) it never discards the body, and nothing else
+  does here. Its other two callers are right (a hidden trip's traveller has left the world; `carriedOff` discards).
+- **What the player sees:** extra minors standing where a scout appears, each also alive as a number: a Matabele
+  colony growing by itself each time a far scout is watched.
+- **Fix proposed:** `foldInNow` discards a body still in the world (or this caller uses `foldInStray`).
+- **The caller is raid-rewrite code** (round 11's ground); it belongs with the raid fixes.
+
+### R1-46 (B, proven by its reader): a colony whose queen cannot be found is skipped for ever while near
+
+- **Where:** `ColonyManager.java:100-103`; `Colony.java:661-679`; `ModEvents.java:130-137`.
+- **What is wrong:** `if (!colony.isQueenless() && colony.getQueen(level) == null) { ... continue; }`. A queen gone
+  without `die()` (discarded, lost with a chunk, through a portal, R1-49) leaves a colony never ticked near and never
+  ended; away it lives on as numbers (the away half is R1-27).
+- **What the player sees:** a mound standing frozen: nothing happens, and it never dies out.
+- **Fix proposed:** a queen missing for some time with her chamber loaded takes the queen-died path.
+
+### R1-47 (B, likely): more reads one step past the guarded cell, and on a list up to 5 seconds old
+
+- **Where (beyond R1-18's places):** `FieldLife.java:158` and `FoodStore.java:287` (`plantFor(level.getBlockState(pos))`
+  on `FoodStore.plants()`, rescanned every 100 ticks); `Nest.java:1130`; `FoodMap.tick` (the 27 cells round each
+  ant); `Nest.isEntranceCovered` into `GroundTop.isRoofed`; `GroundReader.mayOpenHole` (85 to 88, reads `hole.above()`
+  before `mayDig`'s guard).
+- **Unchecked link:** how often a colony's cells lie on the outer ring of loaded land while it is here.
+- **How far out, corrected:** this reader measured the reach further than the note in the core slice: a colony is
+  here with a player up to 80 blocks from its middle, and runway holes lie up to about 82 blocks out, so a hole can
+  be 162 blocks from the player: outside the loaded land at a view distance of 10 chunks (the user's) and plainly so
+  at 8 or less. So R1-8 can bite in the user's own game.
+- **Fix proposed:** one guarded read helper (the block's state, or nothing when the land is not ready), used for
+  neighbours and remembered positions; with R1-18's shared helper this closes the whole family.
+
+### R1-48 (B, likely; to measure): the "no route to this food" memory is not saved
+
+- **Where:** `ForagingHoles.java:73`, `87` (`noRouteUntil`, `noRunwayUntil`, 6,000 ticks); the part is signed up as
+  not saved.
+- **What the player sees:** stutter in the first seconds after opening a world beside grown mounds: every colony
+  plans again each tunnel and runway route it had given up on.
+- **Fix proposed:** save the two maps (small, and they run out by themselves).
+
+### R1-49 (C, likely; not tried): an insect or queen that changes dimension is never taken off its colony
+
+- **Where:** `ModEvents.java:45`; savanna `TermiteWorkerEntity.java:197-207`, `TermiteQueenEntity.java:149-155`. No
+  `canUsePortal` override was found.
+- **What the player sees:** only with a portal by a nest: a headcount one too high for ever, or a second colony in
+  the Nether.
+- **Fix proposed:** colony insects do not use portals.
+
+### R1-50 (C, proven by its reader): small things that reset or never clear
+
+- `Nest.digProgress` is not saved: half-dug blocks start over after a reload. `Colony.skippedLogged` is static and
+  never cleared (it only stops a log line repeating). The dice: R1-33.
+
+### Saved or not, part by part
+
+| Part | Saved | Not saved, and does it matter |
+|---|---|---|
+| `Colony` itself | id, species, queen, middle, castes, `queenDiedAt`, `bornAt` | roles, `grownUp`, heat, the dice (R1-33): worked out again |
+| `Population`, `Meals` | yes, keys and defaults match | |
+| `Brood` | yes | throws on an unknown caste word (R1-42) |
+| `QueenCare` | yes | |
+| `FoodStore` | `knownFood`, `grassClips` | the plant list is scanned again; `Long.parseLong` can throw |
+| `FoodMap`, `FoodWays` | yes | |
+| `FieldLife` | yes | by far the biggest (R1-44) |
+| `Nest` | yes; the only load that survives a bad enum word | `digProgress` (R1-50) |
+| `NestLife`, `NestLedger`, `BuildLife`, `WorkerFood` | yes | |
+| `DangerMap`, `Neighbours` | yes | fade by the clock, pruned |
+| `ForagingTrails` | yes | |
+| `AwayLife`, `AwayReport` | `since`, the frozen records | `Kind` and `Load` words can throw; frozen records for chunks never seen again stay (210 to 429 a world measured; bounded by the real-mob cap a colony) |
+| `ForagingHoles` | no, on purpose | loses the no-route memory (R1-48), claims, `closedSince` |
+| `NestWalls`, `Refuse`, `Strays`, `NestDefence` | no, on purpose | built again from the world |
+
+### Seen by two readers (this thread and a slice)
+
+- **R1-8 and R1-24** (the read before the guard): found again, with the reach above.
+- **R1-27** (a colony never ended away) and **R1-31** (marked changed every second; R1-44 adds the measured sizes).
+
+### Solid on this thread (do not "fix")
+
+- **Leftovers between worlds: clean.** No per-world state in statics of `colony/`, `species/`, `season/` (test hooks,
+  registries, name caches only); the species profiles are filled again by the reload listener; one `ColonyManager` a
+  dimension; `ModEvents.onServerStopped` clears the watchers and labels.
+- **Threads:** `LandReady` answers from another thread without waiting; `ColonyParts.register` and `all` are
+  synchronized; no brain code was found reached from world making inside these folders.
+- `Colony.skipUnused` (a part the species no longer lists is skipped and logged once); `ColonyPart.check` (every part
+  says saved, or why not).
+- Headcount paths checked, count and inside changing together: `growOld`, `starved`, `loseInside`, `loseToHunters`,
+  `goIn`, `addNewMembers`, `carriedOff`, each caste's `die()`.
+- Closing the world freezes no insect (Minecraft unloads with no leave event).
+- `foldLoaded` and `foldInStray` remove the frozen record before folding: no double there.
+- `getEntitiesOfClass` and `getAllEntities` never load land.
