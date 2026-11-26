@@ -18,8 +18,10 @@ played by the game):
 A prey's "spots" (model px, the geo file's own frame: x to its left, y up, z toward its tail; forward is -z):
   skin    the bones whose boxes make its skin for the rays (its trunk, neck and head: not its legs or tail)
   clips   the clips it can play while held; each is posed every tick (20 a second)
-  pairs   the holds the game makes on it, for clip_check.py --pair (not in the table): holder, hold clip, both sizes,
-          the prey's clips then ({clip: "once" or "loop"})
+  pairs   the holds the game makes on it: holder, hold clip, both sizes, the prey's clips then ({clip: "once" or
+          "loop"}) and the spots it holds there ("spots"; all when left out). The game picks a holder's clip by them
+          (step 3): of the holder's pairs naming the prey's clip (none: its idle) and the spot, the one whose size is
+          nearest the prey's. clip_check.py --pair checks each.
   at      {name: {"bone", "from", "out"}}: the spot moves with "bone"; it lies where a ray from "from" (a point inside
           the body) going "out" (degrees from straight ahead, + to its left, flat) last leaves the skin's boxes at rest.
           The holder faces in along "out" (it stands outside the body that way).
@@ -31,7 +33,9 @@ A holder's "holds":
 The table (all model px, at size 1, the model's own frame; the game adds where it draws the model and its size):
   spots   names in order (the game syncs a spot by its index), each with "out" and its rest place
   clips   {clip: [one row a tick: x, y, z of each spot in order]}
-  holds   {clip: {"hit", "jaw": the jaw at the hit}}
+  holds   {clip: {"hit", "jaw": the jaw at the hit, "ticks": the clip's length, "loop"}} (a loop bites at its hit
+          every time round)
+  pairs   [{"holder", "hold", "size", "clips": [prey clips], "spots": [spot names]}] (the plan's, for the game)
   trunk   the holder's shoulders and hips (z) and half its width: the line two holders keep a width apart
 """
 import hashlib
@@ -45,7 +49,7 @@ sys.path.insert(0, HERE)
 import body_plan  # noqa: E402
 import clip_check as cc  # noqa: E402
 
-FORMAT = 1                  # changes when the table's layout or the way it is worked out changes
+FORMAT = 2                  # changes when the table's layout or the way it is worked out changes
 RAY_STEP, RAY_REACH = 0.05, 64.0
 
 
@@ -71,7 +75,8 @@ def fingerprint(animal, data):
     """What a table is made from: this tool's format, the plan's sections, the model and its clips."""
     a = cc.Animal(animal)
     h = hashlib.sha1()
-    spots = {k: v for k, v in data.get('spots', {}).items() if k not in ('about', 'pairs')}   # what the table is made from
+    spots = {k: v for k, v in data.get('spots', {}).items() if k != 'about'}   # what the table is made from
+    spots['pairs'] = game_pairs(spots.get('pairs', []), spots.get('at', {}))
     h.update(json.dumps([FORMAT, spots, data.get('holds'), data.get('legs'), data.get('bones')], sort_keys=True).encode())
     for path in (cc.lab.model_file(a.model_name, 'geo', 'entity', f'{a.model_name}.geo.json'),
                  cc.lab.model_file(a.anim_stem, 'animations', 'entity', f'{a.anim_stem}.animation.json')):
@@ -155,8 +160,15 @@ def hold_table(animal, holds):
         pl = cc.Played(animal, clip)
         if hit > round(pl.length * 20):
             raise SystemExit(f'{animal.name}: {clip} bites at tick {hit}, past its end')
-        out[clip] = {'hit': hit, 'jaw': [round(v, 2) for v in pl.world(jaw, pivot, hit / 20)]}
+        out[clip] = {'hit': hit, 'jaw': [round(v, 2) for v in pl.world(jaw, pivot, hit / 20)],
+                     'ticks': round(pl.length * 20), 'loop': animal.data[clip].get('loop') is True}
     return out
+
+
+def game_pairs(pairs, at):
+    """The pairs as the game reads them: who holds with which clip, at which prey size, on which clips and spots."""
+    return [{'holder': p['holder'], 'hold': p['hold'], 'size': p['size'], 'clips': list(p['clips']),
+             'spots': p.get('spots', list(at))} for p in pairs]
 
 
 # --- writing and checking ---------------------------------------------------------------------------------------------
@@ -168,6 +180,7 @@ def build(animal):
              'fingerprint': fingerprint(animal, data)}
     if 'spots' in data:
         table['spots'] = spot_table(a, data['spots'])
+        table['spots']['pairs'] = game_pairs(data['spots'].get('pairs', []), data['spots']['at'])
     if 'holds' in data:
         table['holds'] = hold_table(a, data['holds'])
         table['trunk'] = trunk(a)

@@ -106,7 +106,9 @@ The files are <mod>/src/main/resources/assets/<mod name>/body_plans/<model>.json
                             (clip_check.py --pair, tools/spots.py report); never a copy of the number
   spots     (a prey; the Motion Studio phase 3, 2026-11-26) where a hunter grips it, read by tools/spots.py (its top
             comment explains "skin", "clips" and "at"; the table it writes, assets/<mod>/spots/<animal>.json, is what
-            the game reads) and "pairs": the holds the game makes on it, for clip_check.py --pair
+            the game reads) and "pairs": the holds the game makes on it (which holder clip goes with which of its
+            clips and spots, at which size: the game picks a holder's clip by them; "together": the two clips start
+            on one tick and play on one clock), checked by clip_check.py --pair
   holds     (a holder) the clips it grips with and the tick each bites, and its "jaw" bone (tools/spots.py)
 
 Inside the tools everything works in role names: a model read from the game's geo file has its bones renamed to their

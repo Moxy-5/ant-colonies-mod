@@ -251,7 +251,9 @@ the monitor's leftovers in its own row.
 2. A body plan (`assets/.../body_plans/<animal>.json`) naming its family, legs, feet, body chain, jaw, wings or fins:
    everything the checks read. No checker learns an animal by its name.
 3. Its clips, checked by the one offline checker (step A) as the game draws them. An animal that holds another (or is held): its pairs too,
-   both posed as the game places them (`clip_check.py <holder> --pair <prey>`, the Motion Studio phase 3).
+   both posed as the game places them (`clip_check.py <holder> --pair <prey>`, the Motion Studio phase 3). A holder's
+   clips are made against the prey's spot table (its jaw solved to the spot each frame, `lion_anims.make_holds`), and
+   the pairs in the prey's plan say which plays when, in the game too.
 4. Its family's course scenes (step A), run and read before the user sees it.
 5. If it walks on land: its own moves for a step up, a step down, into and out of the water (step B), or a reason it
    needs none (a frog's hop already clears a block).

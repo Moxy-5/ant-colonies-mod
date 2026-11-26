@@ -402,6 +402,173 @@ def _bake_clip(rig, length, steps, frame_fn, loop=True, tail_lag=0.09, mane_lag=
 
 
 # ====================================================================================================
+# HOLDS MADE AGAINST THE PREY (the Motion Studio phase 3, step 3)
+# ====================================================================================================
+def _sample(made, t):
+    """A baked clip's pose at time t (its keyframes, straight lines between them, as GeckoLib plays them)."""
+    pose = {}
+    for bone, chans in made["bones"].items():
+        for ch, keys in chans.items():
+            ts = sorted(keys, key=float)
+            if t <= float(ts[0]):
+                v = keys[ts[0]]
+            elif t >= float(ts[-1]):
+                v = keys[ts[-1]]
+            else:
+                for a, b in zip(ts, ts[1:]):
+                    if float(a) <= t <= float(b):
+                        u = (t - float(a)) / max(1e-9, float(b) - float(a))
+                        v = [x + (y - x) * u for x, y in zip(keys[a], keys[b])]
+                        break
+            pose.setdefault(bone, {})[ch] = list(v)
+    return pose
+
+
+def _jaw(rig, pose):
+    """Her jaw (the carry socket, on her head) in her model's frame."""
+    mats, origs = rig.fk_world(pose, ("root", "body", "chest", "neck", "head", "carry"))
+    return rig.world_pt(mats, origs, "carry", rig.piv["carry"])
+
+
+def _prey_heights(holder, hold_clip):
+    """For the buffalo pair this hold is made for: the sizes, the prey's clips and the height of the spots it holds at
+    every tick of each (the mean of those spots, in the holder's model px) and their spread (px)."""
+    import json as _json
+    import os as _os
+    from mod_paths import model_assets  # noqa: E402  (where each model's files live)
+    base = model_assets("buffalo")
+    plan = _json.load(open(_os.path.join(base, "body_plans", "buffalo.json"), encoding="utf-8"))
+    pair = next(p for p in plan["spots"]["pairs"] if p["holder"] == holder and p["hold"] == hold_clip)
+    table = _json.load(open(_os.path.join(base, "spots", "buffalo.json"), encoding="utf-8"))["spots"]
+    names = table["names"]
+    held = [names.index(n) for n in pair.get("spots", names)]
+    scale = pair["size"] / pair["holder_size"]
+    out = {}
+    for clip in pair["clips"]:
+        rows = table["clips"][clip]
+        hs = [[row[3 * i + 1] * scale for i in held] for row in rows]
+        out[clip] = ([sum(h) / len(h) for h in hs], max(max(h) - min(h) for h in hs))
+    return pair, out
+
+
+def make_holds(rig, bite, rest_targets):
+    """throat_hold, hold_sink and hold_down for the lioness (see the comment where they are called)."""
+    import clip_check as cc                             # the blends and her bite's tick, read where the game reads them
+    sc = rig.sc
+    hits = cc.Animal("lioness").plan_data["holds"]["clips"]           # each hold's bite tick (her body plan's holds)
+    bite_hit = hits["bite"]
+    reach = _jaw(rig, _sample(bite, bite_hit / 20.0))
+    Z = reach[2]                                        # her jaw's reach ahead at the bite: every hold keeps it
+    stand_y = reach[1]
+
+    def solve(base, y, guess):
+        """Her neck's pitch and her body's shift ahead so her jaw is at height y and reach Z (Newton, two unknowns)."""
+        npitch, dz = guess
+        for _ in range(12):
+            def at(n, d):
+                q = base(n, d)
+                j = _jaw(rig, q)
+                return j[1] - y, j[2] - Z
+            f0 = at(npitch, dz)
+            if abs(f0[0]) < 0.005 and abs(f0[1]) < 0.005:
+                break
+            h = 0.05
+            fa, fb = at(npitch + h, dz), at(npitch, dz + h)
+            j11, j21 = (fa[0] - f0[0]) / h, (fa[1] - f0[1]) / h
+            j12, j22 = (fb[0] - f0[0]) / h, (fb[1] - f0[1]) / h
+            det = j11 * j22 - j12 * j21
+            if abs(det) < 1e-9:
+                break
+            npitch -= (j22 * f0[0] - j12 * f0[1]) / det
+            dz -= (-j21 * f0[0] + j11 * f0[1]) / det
+            npitch, dz = _clamp(npitch, -60.0, 70.0), _clamp(dz, -9.0 * sc, 9.0 * sc)
+        return npitch, dz
+
+    def hold_frame(t, y, low, shake, clamp_w, guess):
+        """One frame of a hold: low 0 (standing, reaching) to 1 (crouched over prey on the ground); shake the tug of her
+        head side to side (-1..1: under a pixel at her jaw, so her jaw stays on the hide); her jaw solved to height y
+        at her bite's reach."""
+        dy = -0.30 * sc - 2.6 * sc * low
+
+        def base(npitch, dz):
+            return {
+                "root": {"position": [0.0, 0.0, 0.0], "rotation": [0.0, 0.0, 0.0]},
+                "body": {"position": [0.0, dy, dz], "rotation": [5.0 * low, 0.6 * shake, 1.2 * shake]},
+                "chest": {"rotation": [3.0 + 4.0 * low, 0.8 * shake, 1.5 * shake]},
+                "waist": {"rotation": [-2.0 - 3.0 * low, -1.2 * shake, -1.0 * shake]},
+                "hips": {"rotation": [-1.5 - 3.0 * low, -1.0 * shake, 0.0]},
+                "neck": {"rotation": [npitch, 1.0 * shake, 3.0 * shake]},
+                "head": {"rotation": [0.45 * npitch - 6.0, -2.0 * shake, 7.0 * shake]},
+            }
+        npitch, dz = solve(base, y, guess)
+        p = base(npitch, dz)
+        gape = 7.0 - 3.0 * clamp_w
+        p.update({
+            "jaw": {"rotation": [gape, 0.0, 0.0]},
+            "tongue": {"position": [0.0, 0.0, 0.0], "rotation": [1.0, 0.0, 0.0]},
+            "tongue_tip": {"rotation": [2.0, 0.0, 0.0]},
+            "ear_left": {"rotation": [-32.0, -18.0, 14.0]},
+            "ear_right": {"rotation": [-32.0, 18.0, -14.0]},
+        })
+        rig.set_eyes(p, squint=0.85, blink=0.0)
+        targs = rest_targets(x_pad=1.2)                 # her paws stay put through every hold: only her body goes down
+        for tag in ("fl", "fr"):
+            targs[tag]["pos"][2] -= 0.8 * sc
+            targs[tag]["pole"] = [rig.fore[tag]["side"] * 0.5, 0.1, 1.0]
+        for tag in ("bl", "br"):
+            targs[tag]["hock"] = _clamp(rig.hind[tag]["rest_hock"] + 10.0 + 10.0 * low, 12.0, 52.0)
+        rig.solve_legs(p, targs)
+        rig.set_claws(p, fl=0.85, fr=0.85, bl=0.5, br=0.5, hook=0.0)
+        mane_drv = [-6.0 * low, -12.0 * shake, -8.0 * shake]
+        return p, (npitch, dz), 20.0 + 6.0 * low, -18.0 * shake, mane_drv
+
+    def lowness(y, y_down):
+        return _clamp((stand_y - y) / max(1e-6, stand_y - y_down), 0.0, 1.0)
+
+    made = {}
+    report = []
+    # the cow down first: its height sets how low "low" is
+    pair_d, h_down = _prey_heights("lioness", "hold_down")
+    y_down = sum(h_down["held_down"][0]) / len(h_down["held_down"][0])
+
+    def bake(name, L, N, track, loop):
+        state = {"guess": (0.0, 0.0)}
+        t_hit = hits[name] / 20.0                       # her jaw centred at her bite: the game places her by it there
+
+        def frame(i, t):
+            y = track(t)
+            shake = math.sin(2.0 * math.pi * 3.0 * (t - t_hit) / L) if loop else math.sin(2.0 * math.pi * 1.5 * (t - t_hit))
+            clamp_w = 0.5 + 0.5 * math.sin(2.0 * math.pi * t / (L if loop else 1.0))
+            p, state["guess"], tl, ty, md = hold_frame(t, y, lowness(y, y_down), shake, clamp_w, state["guess"])
+            return p, tl, ty, 3.0, md
+        return _bake_clip(rig, L, N, frame, loop=loop, tail_lag=0.06, mane_lag=0.05)
+
+    # throat_hold: a standing cow's throat (1.9 s loop, one bite a time round)
+    pair_t, h_throat = _prey_heights("lioness", "throat_hold")
+    ys, spread = h_throat["idle"]
+    y_throat = sum(ys) / len(ys)
+    made["throat_hold"] = bake("throat_hold", 1.9, 38, lambda t: y_throat, True)
+    report.append(f"throat_hold: jaw {y_throat:.2f} px high (her bite's {stand_y:.2f}), spots spread {spread:.2f}")
+    # hold_down: a cow down (1.9 s loop)
+    made["hold_down"] = bake("hold_down", 1.9, 38, lambda t: y_down, True)
+    report.append(f"hold_down: jaw {y_down:.2f} px high, spots spread {h_down['held_down'][1]:.2f}")
+    # hold_sink: on the cow's held_sink clock (her tick k is its tick k - 1), one tick longer so both end together
+    pair_s, h_sink = _prey_heights("lioness", "hold_sink")
+    track_s, spread_s = h_sink["held_sink"]
+    lead = cc.Animal("buffalo").blend_ticks()[0] - cc.Animal("lioness").blend_ticks()[0]   # the cow's blend less hers
+    n = len(track_s) - 1 + lead
+
+    def sink_y(t):
+        k = int(round(t * 20)) - lead
+        return track_s[max(0, min(len(track_s) - 1, k))]
+    made["hold_sink"] = bake("hold_sink", n / 20.0, n, sink_y, False)
+    report.append(f"hold_sink: jaw {track_s[0]:.2f} down to {track_s[-1]:.2f} px over {n} ticks, spots spread {spread_s:.2f}")
+    for line in report:
+        print("  lioness " + line)
+    return made
+
+
+# ====================================================================================================
 # ALL 20 BESPOKE LION PRIDE CLIPS (18 CORE/CHARACTER + 2 BLOCKMOVES)
 # ====================================================================================================
 def build_all_clips(raw_bones, kind="male"):
@@ -1198,6 +1365,16 @@ def build_all_clips(raw_bones, kind="male"):
         return _bake_clip(rig, L, N, frame, loop=False, tail_lag=0.05, mane_lag=0.045)
     if not is_cub:
         clips["takedown_pin"] = make_takedown_pin()
+
+    # 8h-bis. HOLDS MADE AGAINST THE BUFFALO (the Motion Studio phase 3, step 3; docs/plans/motion-studio-phase3.md).
+    # A holder stands where her jaw at her bite meets the buffalo's spot (the game places her so). Holding a cow's throat,
+    # going down with a cow brought down and holding it down, her jaw must be at the spot's height there, at the same
+    # reach ahead as in her bite: then her place is the same for every hold and she never slides while the cow sinks.
+    # The heights come from the buffalo's spot table (tools/spots.py, from its own clips) at the pair's sizes (its plan's
+    # spots.pairs); her neck and body are solved each tick so her jaw is there. hold_sink plays with the cow's held_sink
+    # on one clock (both start on the same tick; her clip starts one tick before the cow's, the blends being 4 and 5).
+    if is_lns:
+        clips.update(make_holds(rig, clips["bite"], rest_targets))
 
     # 8i. BLUFF_CHARGE (1.35s) — Territorial Threat Snarl -> Stomping Forward Lunge -> Warning Paw Slap!
     def make_bluff_charge():

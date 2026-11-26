@@ -34,9 +34,12 @@ the game draws it, then in the game frame by frame.
 
   --pair <prey> [--spots a,b]  (2026-11-26, the Motion Studio phase 3, step 2) the animal holding a prey as the game
                places it (savanna LionHunt.ride, framework Spots): for every pair the prey's plan lists with it
-               ("spots.pairs": the hold clip, both sizes, the prey's clips then, once or loop), both posed together
+               ("spots.pairs": the hold clip, both sizes, the prey's clips then, once or loop, the spots it holds there,
+               "together" when both clips start on one tick: step 3), both posed together
                tick by tick from the spot tables (tools/spots.py) and each model drawn where the game draws it (the
-               plans' "drawn_ahead", read from the Java). Name hold clips to check only those. It prints, per prey clip
+               plans' "drawn_ahead", read from the Java); a hold clip that loops goes round, one played "together"
+               runs on the prey clip's clock (the blends' difference counted), the rest bite again and again. Name hold
+               clips to check only those. It prints, per prey clip
                and spot (in sixteenths of a block): the jaw against the hide at each bite (+ in the air), its head and
                the prey in each other (the bite itself), its body and the prey in each other, and every holder against
                every other at a bite (heads, bodies); flagged: a bite more than 1 in the air or 3 buried, bodies more
@@ -1063,17 +1066,30 @@ class Pair:
         self.h_play = Played(holder, spec['hold'])
         self.h_ticks = round(self.h_play.length * 20)
         self.h_blend = holder.blend_ticks()[0]
+        self.p_blend = self.prey.blend_ticks()[0]
+        # how its clip runs against the prey's: on one clock with the prey's one-shot ("together": both start on the
+        # same tick, so its tick is the prey's plus the blends' difference), looped, or bitten again and again
+        self.mode = 'together' if spec.get('together') else ('loop' if self.hold.get('loop') else 'repeat')
+        self.spots = spec.get('spots')
         self.da_h, self.da_p = holder.drawn_ahead(), self.prey.drawn_ahead()
         self.head = lab_descendants(holder.model, holder.plan_data.get('head', {}).get('bone', 'head'))
         self.jaw_bone = holder.plan_data.get('holds', {}).get('jaw', 'carry')
         self._played = {}
 
     def holder_tick(self, k):
-        """The holder's clip tick k ticks into the hold: each bite starts at the last one's end, after its blend (the
-        blend shown as the clip's first frame)."""
+        """The holder's clip tick k ticks into the hold (k: the prey's clip tick for a clip played together): a bite
+        starts at the last one's end, after its blend (the blend shown as the clip's first frame); a loop goes round."""
+        if self.mode == 'together':
+            return max(0, min(self.h_ticks, k + self.p_blend - self.h_blend))
+        if self.mode == 'loop':
+            return max(0, k - self.h_blend) % self.h_ticks
         return max(0, k % (self.h_ticks + self.h_blend) - self.h_blend)
 
     def bites(self, k):
+        if self.mode == 'together':
+            return k + self.p_blend - self.h_blend == self.hold['hit']
+        if self.mode == 'loop':
+            return k >= self.h_blend and (k - self.h_blend) % self.h_ticks == self.hold['hit']
         return k % (self.h_ticks + self.h_blend) == self.h_blend + self.hold['hit']
 
     def prey_place(self, clip, kind, k):
@@ -1120,10 +1136,11 @@ def check_pair(holder, prey_name, spec, spots_wanted, step=2):
     prey's in the holder (deepest; its head apart from the rest: a bite's muzzle goes into the hide), and every holder
     against every other at once (the spots crowding)."""
     pair = Pair(holder, prey_name, spec)
-    names = [s for s in pair.table['names'] if not spots_wanted or s in spots_wanted]
+    names = [s for s in pair.table['names'] if (not spots_wanted or s in spots_wanted) and (not pair.spots or s in pair.spots)]
     lines = [f'== {holder.name} {spec["hold"]} (size {pair.hs}) holding {prey_name} (size {pair.ps})'
              + (f': {spec["about"]}' if spec.get('about') else '') + f'; it bites at clip tick {pair.hold["hit"]} of '
-             f'{pair.h_ticks}, after a {pair.h_blend}-tick blend (px: a sixteenth of a block; drawn ahead {pair.da_h} and '
+             f'{pair.h_ticks} ({ {"together": "on the prey clip's clock", "loop": "a loop", "repeat": "again and again"}[pair.mode]}), '
+             f'after a {pair.h_blend}-tick blend (px: a sixteenth of a block; drawn ahead {pair.da_h} and '
              f'{pair.da_p} model px)']
     flags = 0
     for clip, kind in spec['clips'].items():
@@ -1172,7 +1189,7 @@ def check_pair(holder, prey_name, spec, spots_wanted, step=2):
                          f'{prey_name} in each other {max(r["head"], r["prey_head"]):.1f} px (a bite); its body and the {prey_name} '
                          f'{max(r["body"], r["prey"]):.1f}' + (f'  << {", ".join(bad)}' if bad else ''))
         # every holder at once, at a bite: the spots crowding each other
-        k = pair.h_blend + pair.hold['hit']
+        k = next((j for j in range(0, n + 1) if pair.bites(j)), pair.h_blend + pair.hold['hit'])
         row = pair.prey_place(clip, kind, k)
         placed = {s: pair.holder_posed(pair.holder_frame(s, row), k)[0] for s in names}
         boxes = {s: Boxes(p) for s, p in placed.items()}

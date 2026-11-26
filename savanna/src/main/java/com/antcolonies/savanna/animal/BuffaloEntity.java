@@ -80,12 +80,14 @@ import software.bernie.geckolib.util.GeckoLibUtil;
 public class BuffaloEntity extends PathfinderMob implements GeoEntity, HasLife, com.antcolonies.debug.FilmFacts {
     /** What it is doing, for the clips (synced). One-shot clips end by themselves once played ({@link #tick}); the loops (rest, the moods) last until a goal ends them. */
     public static final byte CALM = 0, GRAZE = 1, DRINK = 2, REST_DOWN = 3, REST = 4, REST_UP = 5, EAR_FLUTTER = 6, SHAKE_OFF = 7,
-            SNORT = 8, BELLOW = 9, PAW_GROUND = 10, MOOD_ALERT = 11, MOOD_ANGRY = 12, HEADBUTT = 13, GORE = 14, CHARGE_HEADBUTT = 15;
+            SNORT = 8, BELLOW = 9, PAW_GROUND = 10, MOOD_ALERT = 11, MOOD_ANGRY = 12, HEADBUTT = 13, GORE = 14, CHARGE_HEADBUTT = 15,
+            // held by lions (the Motion Studio phase 3, step 3): brought down by two or more, struggling on the ground
+            HELD_SINK = 16, HELD_DOWN = 17;
     /** Each doing's clip, by its number. */
     private static final String[] DOING_CLIPS = {"idle", "graze", "drink", "rest_down", "rest", "rest_up", "ear_flutter", "shake_off",
-            "snort", "bellow", "paw_ground", "mood_alert", "mood_angry", "headbutt", "gore", "charge_headbutt"};
+            "snort", "bellow", "paw_ground", "mood_alert", "mood_angry", "headbutt", "gore", "charge_headbutt", "held_sink", "held_down"};
     /** Each one-shot doing's clip length (ticks, read from the clip file); 0 for the loops. */
-    private static final int[] DOING_TICKS = {0, 80, 72, 48, 0, 48, 30, 30, 28, 36, 36, 0, 0, 25, 22, 36};
+    private static final int[] DOING_TICKS = {0, 80, 72, 48, 0, 48, 30, 30, 28, 36, 36, 0, 0, 25, 22, 36, 40, 0};
 
     private static final EntityDataAccessor<Byte> DATA_DOING = SynchedEntityData.defineId(BuffaloEntity.class, EntityDataSerializers.BYTE);
     /** Counted up at every doing started, so the same clip started again plays from its start (as the bull shark's actions). */
@@ -318,17 +320,50 @@ public class BuffaloEntity extends PathfinderMob implements GeoEntity, HasLife, 
         int tick;
         boolean loop;
         if (isDeadOrDying()) {
-            clip = "death";
+            clip = clipName();
             tick = deathTime - BLEND;
             loop = false;
         } else {
             byte d = doing();
-            clip = d > CALM && d < DOING_CLIPS.length ? DOING_CLIPS[d] : "idle";
+            clip = clipName();
             tick = clipTick();
             loop = !oneShot(d);
         }
         return com.antcolonies.entity.body.Spots.world(SPOTS.at(spot, clip, tick, loop), position(), yBodyRot,
                 MODEL_SCALE * getScale(), DRAW_AHEAD_PX);
+    }
+
+    /**
+     * The clip it plays now: its doing's (calm: its idle, walking too), its death's when dying (lying already: dying where
+     * it lies, death_down, not standing up first into death). Its holders pick their hold by it ({@link com.antcolonies.entity.body.Spots#holdClip}).
+     */
+    public String clipName() {
+        byte d = doing();
+        if (isDeadOrDying()) {
+            return down(d) ? "death_down" : "death";
+        }
+        return d > CALM && d < DOING_CLIPS.length ? DOING_CLIPS[d] : "idle";
+    }
+
+    /** Whether this doing has it down on the ground (lying, lying down or getting up, held down, going down). */
+    static boolean down(byte d) {
+        return d == REST || d == REST_DOWN || d == REST_UP || d == HELD_SINK || d == HELD_DOWN;
+    }
+
+    /** Its size as its spots are drawn (its model's share times its scale): the size its holders' pairs are chosen by. */
+    public double spotSize() {
+        return MODEL_SCALE * getScale();
+    }
+
+    /** The lions holding it that have finished their strike (it goes down under two of them). */
+    int steadyHolders() {
+        int n = 0;
+        for (Entity p : getPassengers()) {
+            if (p instanceof LionEntity lion && !lion.striking()) {
+                n++;
+            }
+        }
+        return n;
     }
 
     /** A doing started: its clip's tick counted on the players' screens too (the spots its holders are placed on). */
@@ -486,7 +521,7 @@ public class BuffaloEntity extends PathfinderMob implements GeoEntity, HasLife, 
     }
 
     /** How far into its doing's clip it is (ticks of the clip; below 0 while the clip is still being eased into, {@link #BLEND}). */
-    int clipTick() {
+    public int clipTick() {
         return doingFor() - BLEND;
     }
 
@@ -706,10 +741,24 @@ public class BuffaloEntity extends PathfinderMob implements GeoEntity, HasLife, 
         if (tickCount % FREE_EVERY == 1 && !level().noBlockCollision(this, getBoundingBox().deflate(0.05))) {
             free();
         }
-        // a one-shot clip played out: lying down goes on into lying, the rest back to calm
+        // held by lions (the Motion Studio phase 3, step 3): a grown buffalo held by two that have struck goes down under
+        // them (real lionesses bring a buffalo down by their weight); fewer than two, it gets up again (its bull driving one
+        // off frees it). A calf is knocked down at the strike (LionHunt).
         byte d = doing();
+        if (!isDeadOrDying() && grownUp()) {
+            int held = steadyHolders();
+            if (held >= 2 && d != HELD_SINK && d != HELD_DOWN) {
+                getNavigation().stop();
+                setDoing(HELD_SINK);
+            } else if (held < 2 && (d == HELD_SINK || d == HELD_DOWN)) {
+                setDoing(REST_UP);
+            }
+            d = doing();
+        }
+        // a one-shot clip played out: lying down goes on into lying, going down under lions into struggling there, the
+        // rest back to calm
         if (oneShot(d) && doingFor() >= doingTicks(d)) {
-            setDoing(d == REST_DOWN ? REST : CALM);
+            setDoing(d == REST_DOWN ? REST : d == HELD_SINK ? HELD_DOWN : CALM);
         }
     }
 
@@ -1040,6 +1089,7 @@ public class BuffaloEntity extends PathfinderMob implements GeoEntity, HasLife, 
     private static final java.util.Map<String, RawAnimation> FILM_CLIPS = new java.util.concurrent.ConcurrentHashMap<>();
     private static final RawAnimation IDLE = RawAnimation.begin().thenLoop("idle");
     private static final RawAnimation DEATH = RawAnimation.begin().thenPlayAndHold("death");
+    private static final RawAnimation DEATH_DOWN = RawAnimation.begin().thenPlayAndHold("death_down");
     /** Each doing's clip: the one-shots played once and held, the loops looped. */
     private static final RawAnimation[] DOING_ANIMS = new RawAnimation[DOING_CLIPS.length];
 
@@ -1076,7 +1126,7 @@ public class BuffaloEntity extends PathfinderMob implements GeoEntity, HasLife, 
             return state.setAndContinue(FILM_CLIPS.computeIfAbsent(film.getString().substring(5), c -> RawAnimation.begin().thenLoop(c)));
         }
         if (isDeadOrDying()) {
-            return state.setAndContinue(DEATH);
+            return state.setAndContinue(down(doing()) ? DEATH_DOWN : DEATH);   // lying already: it dies where it lies
         }
         byte d = doing();
         int id = entityData.get(DATA_DOING_ID);

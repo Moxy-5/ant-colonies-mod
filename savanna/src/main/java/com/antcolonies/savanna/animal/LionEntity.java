@@ -89,15 +89,17 @@ public class LionEntity extends PathfinderMob implements GeoEntity, HasLife, com
             MOOD_ANGRY = 17, MOOD_FLEHMEN = 18, MOOD_CURIOUS = 19, BLUFF = 20, SWIPE = 21, SWIPE_QUICK = 22, SWIPE_HEAVY = 23,
             SWIPE_COMBO = 24, BITE = 25, POUNCE = 26, GALLOP_SWAT = 27,
             // the hunt (lion step 2): creeping crouched, frozen flat, the leap from the stalk, the bounding smack, the pin
-            STALK = 28, FREEZE = 29, LEAP_BITE = 30, JUMP_SMACK = 31, PIN = 32;
+            STALK = 28, FREEZE = 29, LEAP_BITE = 30, JUMP_SMACK = 31, PIN = 32,
+            // holds made against the buffalo (the Motion Studio phase 3, step 3): its throat, going down with it, holding it down
+            THROAT_HOLD = 33, HOLD_SINK = 34, HOLD_DOWN = 35;
     /** Each doing's clip, by its number (a cub's roar is its {@code cub_call}). */
     private static final String[] DOING_CLIPS = {"idle", "sit_down", "sit", "sit_up", "rest_down", "rest", "rest_up", "rest_stretch_up",
             "groom", "drink", "roar", "pride_greet", "mama_nuzzle", "cub_groom", "play_pounce", "play_wrestle", "mood_alert", "mood_angry",
             "mood_flehmen", "mood_curious", "bluff_charge", "swipe", "swipe_quick", "swipe_heavy", "swipe_combo", "bite", "pounce", "gallop_swat",
-            "stalk", "ambush_freeze", "stalk_leap_bite", "jump_smack", "takedown_pin"};
+            "stalk", "ambush_freeze", "stalk_leap_bite", "jump_smack", "takedown_pin", "throat_hold", "hold_sink", "hold_down"};
     /** Each one-shot doing's clip length (ticks, from the clip files); 0 for the loops. The roar's is the male's (see {@link #oneShotTicks}). */
     private static final int[] DOING_TICKS = {0, 15, 0, 15, 19, 0, 19, 76, 88, 60, 68, 36, 37, 64, 33, 44, 0, 0, 0, 0, 27, 20, 18, 21, 29,
-            15, 25, 19, 0, 0, 29, 24, 26};
+            15, 25, 19, 0, 0, 29, 24, 26, 0, 41, 0};
     /** The lioness's roar (her sharper contact call) and the cub's call (ticks). */
     static final int LIONESS_ROAR_TICKS = 50, CUB_CALL_TICKS = 32;
     /** The moods, by number: the face clips {@code face_<mood>}. */
@@ -334,7 +336,7 @@ public class LionEntity extends PathfinderMob implements GeoEntity, HasLife, com
     }
 
     /** How far into its doing's clip it is (below 0 while the clip is still being eased into). */
-    int clipTick() {
+    public int clipTick() {
         return doingFor() - BLEND;
     }
 
@@ -355,6 +357,22 @@ public class LionEntity extends PathfinderMob implements GeoEntity, HasLife, com
         return oneShot(doing) ? oneShotTicks(doing) + BLEND : 0;
     }
 
+    /** The doing whose clip this is (-1: none). */
+    static byte doingOf(String clip) {
+        for (byte d = 0; d < DOING_CLIPS.length; d++) {
+            if (DOING_CLIPS[d].equals(clip)) {
+                return d;
+            }
+        }
+        return -1;
+    }
+
+    /** Whether it is in its strike (the leap or the bounding smack) and its clip has not played out yet. */
+    public boolean striking() {
+        byte d = doing();
+        return (d == LEAP_BITE || d == JUMP_SMACK) && doingFor() < doingTicks(d);
+    }
+
     /** Whether its form has this doing's clip. */
     boolean has(byte doing) {
         return switch (doing) {
@@ -362,7 +380,7 @@ public class LionEntity extends PathfinderMob implements GeoEntity, HasLife, com
             case CUB_GROOM -> form == Form.LIONESS;
             case SWIPE_HEAVY, SWIPE_COMBO -> form == Form.MALE;
             case MOOD_FLEHMEN, BLUFF, GALLOP_SWAT, LEAP_BITE, JUMP_SMACK, PIN -> form != Form.CUB;
-            case FREEZE -> form == Form.LIONESS;
+            case FREEZE, THROAT_HOLD, HOLD_SINK, HOLD_DOWN -> form == Form.LIONESS;
             default -> true;
         };
     }
@@ -728,8 +746,8 @@ public class LionEntity extends PathfinderMob implements GeoEntity, HasLife, com
         super.tick();
         if (!isPassenger()) {
             settle = null;
-        } else if (!level().isClientSide && getVehicle() instanceof BuffaloEntity && !hunt.holding()) {
-            stopRiding();                               // its hold is over (let go, shaken, hit, the hunt ended, a reload): it stands there
+        } else if (!level().isClientSide && getVehicle() instanceof BuffaloEntity prey && (!hunt.holding() || !prey.isAlive())) {
+            stopRiding();                               // its hold is over (let go, shaken, hit, its prey dying, the hunt ended, a reload): it stands there
         }
         if (!level().isClientSide && !isPassenger() && holdSpot() >= 0) {
             setHoldSpot(-1);
