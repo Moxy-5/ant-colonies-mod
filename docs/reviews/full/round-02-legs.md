@@ -392,6 +392,8 @@ doorways and mouths, channels, where it stands now, hugging a column). Every lin
 
 ### R2-21 (B, proven for slabs and carpets, likely for paths and farmland): common part-blocks are neither ground nor passable
 
+**Status (2026-11-26, `claude/review-fix-2`): fixed, BUGS 412, the user's call ("Yes, plain ground"): a flat part-block is a flat slope to the planner (`LevelCellMap.lowTop`). Stairs are left out.**
+
 - **Where:** `LevelCellMap.isSolidFace` 60 to 69 (`isFaceSturdy`), `isOpen` 39 to 56; `Foothold.isValid` 74;
   `AntPathFinder.landing` 345 to 360.
 - **What is wrong:** the cell over a bottom slab, a carpet, a stair, a dirt path or farmland has no floor (the top
@@ -638,7 +640,7 @@ each pays its own search (a plugged hole is found again by every forager that wa
 
 ### R2-38 (A, the legs' side proven and checked again; two facts about Minecraft from memory; not run): an insect on a path block, on farmland or in a pond with a low bank can never plan a route again
 
-**Status (2026-11-26, `claude/review-fix-2`): small half fixed, BUGS 401: a start one step up beside it, corners too, and the shuffle no longer moves an insect onto ground the planner refuses (test `anInsectOnAPathBlockWalksOffIt`). Open: an insect in the middle of a path three wide or more, or in a pond more than a block from its bank, still has no start; the cure is R2-21, the user's call.**
+**Status (2026-11-26, `claude/review-fix-2`): small half fixed, BUGS 401: a start one step up beside it, corners too, and the shuffle no longer moves an insect onto ground the planner refuses (test `anInsectOnAPathBlockWalksOffIt`). The path half fixed after, BUGS 412 (R2-21). Open: an insect in a pond more than a block from its bank still has no start (BUGS 411).**
 
 - **Where:** `AntNavigator.plan` 583 to 661, `currentFoothold` 2099 to 2148, `floorBeside` 2179; `AntPathFinder.
   landing` 345 to 360; `Foothold.isValid` 70 to 75; `LevelCellMap.isOpen` 39 to 56, `isSolidFace` 60 to 69. How it

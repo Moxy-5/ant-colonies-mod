@@ -920,6 +920,44 @@ public class LegsTests {
                 && ant.blockPosition().equals(goal), "the ant has not walked off the path block to its goal"));
     }
 
+    /**
+     * Review round 2 (R2-21, the user's call 2026-11-26: plain ground): an insect in the middle of a path three wide
+     * plans a walk, and its way goes straight over farmland, a slab set into the ground, a carpet and a slab lying on
+     * the ground. Before, each of these was a gap no route crossed.
+     */
+    @GameTest(template = "arena", timeoutTicks = 600, skyAccess = true)
+    public static void pathsFarmlandSlabsAndCarpetsArePlainGround(GameTestHelper helper) {
+        buildNest(helper);
+        int z = MIDDLE + 8;
+        net.minecraft.world.level.block.Block slab = Blocks.OAK_SLAB;
+        for (int dz = -4; dz <= 4; dz++) {
+            for (int x = 4; x <= 6; x++) {
+                helper.setBlock(new BlockPos(x, SURFACE - 1, z + dz), Blocks.DIRT_PATH);
+            }
+            helper.setBlock(new BlockPos(8, SURFACE - 1, z + dz), Blocks.FARMLAND);
+            helper.setBlock(new BlockPos(9, SURFACE - 1, z + dz), slab);
+            helper.setBlock(new BlockPos(11, SURFACE, z + dz), Blocks.WHITE_CARPET);
+            helper.setBlock(new BlockPos(12, SURFACE, z + dz), slab);
+        }
+        AbstractAntEntity ant = TestAnts.lone(helper, SavannaEntities.MATABELE_MINOR.get(), 5, SURFACE, z);
+        BlockPos goal = helper.absolutePos(new BlockPos(15, SURFACE, z));
+        BlockPos lowSlab = helper.absolutePos(new BlockPos(9, SURFACE - 1, z));
+        BlockPos topSlab = helper.absolutePos(new BlockPos(12, SURFACE, z));
+        boolean[] stoodOn = new boolean[2];
+        helper.onEachTick(() -> {
+            BlockPos at = ant.blockPosition();
+            stoodOn[0] |= at.getX() == lowSlab.getX() && at.getY() == lowSlab.getY() && ant.onGround();
+            stoodOn[1] |= at.getX() == topSlab.getX() && at.getY() == topSlab.getY() && ant.onGround();
+        });
+        helper.runAfterDelay(20, () -> helper.assertTrue(ant.getNavigator().moveTo(goal, 1.0), "no way from the middle of a path three wide"));
+        helper.succeedWhen(() -> {
+            helper.assertTrue(helper.getTick() > 20 && ant.getNavigator().isDone() && !ant.getNavigator().hasFailed()
+                    && ant.blockPosition().equals(goal), "the ant has not reached its goal past the part-blocks, it is at " + ant.position());
+            helper.assertTrue(stoodOn[0], "the ant never stood on the slab set into the ground");
+            helper.assertTrue(stoodOn[1], "the ant never stood on the slab lying on the ground");
+        });
+    }
+
     private static void watch(GameTestHelper helper, AbstractAntEntity ant) {
         TestWatch.watch(helper, ant, true);
     }

@@ -11,12 +11,14 @@ import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.phys.shapes.CollisionContext;
+import net.minecraft.world.phys.shapes.VoxelShape;
 
 /**
  * The real game world, seen as cells for the route planner. Seen through the eyes of one insect if it is given: a block
  * that lets it through (a termite chimney block for termites) is an open cell for it, a doorway, and nothing to stand
  * or cling on, because it would fall into it (except the sides of a column that can be climbed, {@link ClimbShape}).
- * A slope ({@link Slope}) is a floor in its own cell. A block with a channel ({@link Channel}) is never an open cell: an
+ * A slope ({@link Slope}) is a floor in its own cell, and so is a flat part-block the body rests on (a path, farmland,
+ * a bottom slab, a carpet: {@link #lowTop}). A block with a channel ({@link Channel}) is never an open cell: an
  * insect that fits crawls through its channel. Species-neutral: what lets whom through is up to the block.
  */
 public final class LevelCellMap implements CellMap {
@@ -102,6 +104,33 @@ public final class LevelCellMap implements CellMap {
             return -1;
         }
         BlockState state = level.getBlockState(cell);
-        return state.getBlock() instanceof Slope slope ? slope.surfaceHeight(state, u, w) : -1;
+        return state.getBlock() instanceof Slope slope ? slope.surfaceHeight(state, u, w) : lowTop(cell, state);
+    }
+
+    /**
+     * A part-block with a flat top the body really rests on (a dirt path, farmland, a bottom slab, a carpet, snow
+     * layers): the height of that top in pixels, so the planner treats it as a flat slope, a floor in the block's own
+     * cell (the user, 2026-11-26: these are plain ground). -1 for everything else: air, a full block or one whose top
+     * is a sturdy face (a floor for the cell above already), a block not as wide as its cell (a fence, a pot), one in
+     * water, a campfire, and the blocks with a walking rule of their own (a channel, a column that is climbed).
+     */
+    private int lowTop(BlockPos cell, BlockState state) {
+        if (state.isAir() || state.isCollisionShapeFullBlock(level, cell) || !state.getFluidState().isEmpty()
+                || state.getBlock() instanceof Channel || state.getBlock() instanceof ClimbShape
+                || state.is(BlockTags.CAMPFIRES)) {
+            return -1;
+        }
+        VoxelShape shape = state.getCollisionShape(level, cell, context);
+        if (shape.isEmpty() || state.isFaceSturdy(level, cell, Direction.UP)) {
+            return -1;
+        }
+        double top = shape.max(Direction.Axis.Y);
+        if (top >= 1.0 || shape.min(Direction.Axis.Y) > 0.0
+                || shape.min(Direction.Axis.X) > 0.0 || shape.max(Direction.Axis.X) < 1.0
+                || shape.min(Direction.Axis.Z) > 0.0 || shape.max(Direction.Axis.Z) < 1.0
+                || shape.toAabbs().size() != 1) {
+            return -1;
+        }
+        return Math.max(1, (int) Math.round(top * Slope.PIXELS));
     }
 }
