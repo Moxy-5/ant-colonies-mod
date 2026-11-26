@@ -149,6 +149,34 @@ class BodyPlansTest {
         assertTrue(GaitShift.carries(buffalo.of("charge"), cow));
     }
 
+    /**
+     * Each lion's paces in its own gaits (BUGS 386, 2026-11-25): the mind's walk, trot and gallop paces move each form at a
+     * speed its matching clip carries, a tenth off either way still the same gait, so a wobble of its speed never flips its
+     * gait. The cub at the adults' speed failed it (its trot pace on its gallop's start, its walk near its trot's).
+     */
+    @Test
+    void eachLionsPacesLandInsideItsOwnGaits() {
+        Object[][] forms = {{"lion", com.antcolonies.savanna.animal.LionEntity.SPEED},
+                {"lioness", com.antcolonies.savanna.animal.LionEntity.SPEED},
+                {"lion_cub", com.antcolonies.savanna.animal.LionEntity.CUB_SPEED}};
+        Object[][] paces = {{com.antcolonies.savanna.animal.LionEntity.WALK, "walk"},
+                {com.antcolonies.savanna.animal.LionEntity.TROT, "trot"},
+                {com.antcolonies.savanna.animal.LionEntity.GALLOP, "gallop"}};
+        for (Object[] form : forms) {
+            Gaits g = BodyPlans.gaitsOf((String) form[0]);
+            for (Object[] pace : paces) {
+                // blocks a tick at size 1: Minecraft's push goes with the square (1.73 x pace squared blocks a second at speed 0.2; BUGS 246)
+                double push = (double) pace[0] * (double) form[1] / 0.2;
+                double v = 1.73 * push * push / 20.0;
+                String clip = (String) pace[1], at = form[0] + "'s " + clip + " pace (" + v + " blocks a tick)";
+                assertEquals(clip, g.pick(v).clip(), at);
+                assertEquals(clip, g.pick(v * 1.1).clip(), at + " a tenth faster");
+                assertEquals(clip, g.pick(v * 0.9).clip(), at + " a tenth slower");
+                assertTrue(GaitShift.carries(g.of(clip), v), at + ": the clip's feet stay right");
+            }
+        }
+    }
+
     private static List<String> geoBones(String model) throws Exception {
         try (InputStream in = BodyPlansTest.class.getResourceAsStream("/assets/antcolonies/geo/entity/" + model + ".geo.json")) {
             assertNotNull(in, "no " + model + ".geo.json");

@@ -118,6 +118,13 @@ public class LionEntity extends PathfinderMob implements GeoEntity, HasLife, com
     static final int DEATH_TICKS = 24 + BLEND;
     /** Its paces (the move control's share of its speed; Minecraft's push goes about with its square, 1.73 x pace squared blocks a second): a shift of a few steps, a walk about 1.2, a trot about 2.8, a gallop about 7.5. Measured in game tests (BUGS 246). */
     public static final double STEP = 0.6, WALK = 0.83, TROT = 1.27, GALLOP = 2.08;
+    /**
+     * Its speed (Minecraft's movement speed): the paces above are an adult's; a cub's shorter legs go at its own clips' paces,
+     * its trot clip made for 2.02 blocks a second against an adult's 2.8 (so 0.2 x the root of 2.02 / 2.8, the push going
+     * with the square; BUGS 386: at an adult's paces a cub's walk sat on its trot's start and its trot on its gallop's, and
+     * its gait flipped on every wobble of its speed).
+     */
+    public static final double SPEED = 0.2, CUB_SPEED = 0.17;
     /** It turns at most this much a tick while moving, and this much standing (degrees). */
     static final float MAX_TURN = 20.0F, STAND_TURN = 10.0F;
     /** In water deeper than this over its feet (blocks, at size 1) it swims up. */
@@ -245,21 +252,21 @@ public class LionEntity extends PathfinderMob implements GeoEntity, HasLife, com
 
     /** A male: 50 health, armour 3, a hit of 9 (at Normal); my picks. */
     public static AttributeSupplier.Builder maleAttributes() {
-        return base(50.0, 3.0, 9.0, 0.6);
+        return base(50.0, 3.0, 9.0, 0.6, SPEED);
     }
 
     /** A lioness: 40 health, armour 2, a hit of 7. */
     public static AttributeSupplier.Builder lionessAttributes() {
-        return base(40.0, 2.0, 7.0, 0.6);
+        return base(40.0, 2.0, 7.0, 0.6, SPEED);
     }
 
     /** A cub: 10 health, no armour; it never hits a player. */
     public static AttributeSupplier.Builder cubAttributes() {
-        return base(10.0, 0.0, 1.0, 0.0);
+        return base(10.0, 0.0, 1.0, 0.0, CUB_SPEED);
     }
 
-    private static AttributeSupplier.Builder base(double health, double armour, double hit, double knockback) {
-        return PathfinderMob.createMobAttributes().add(Attributes.MAX_HEALTH, health).add(Attributes.MOVEMENT_SPEED, 0.2)
+    private static AttributeSupplier.Builder base(double health, double armour, double hit, double knockback, double speed) {
+        return PathfinderMob.createMobAttributes().add(Attributes.MAX_HEALTH, health).add(Attributes.MOVEMENT_SPEED, speed)
                 .add(Attributes.ATTACK_DAMAGE, hit).add(Attributes.STEP_HEIGHT, 1.0).add(Attributes.FOLLOW_RANGE, 32.0)
                 .add(Attributes.KNOCKBACK_RESISTANCE, knockback).add(Attributes.ARMOR, armour);
     }
@@ -692,9 +699,10 @@ public class LionEntity extends PathfinderMob implements GeoEntity, HasLife, com
         super.tick();
         chain.place();
         double dx = getX() - xo, dz = getZ() - zo, moved = Math.sqrt(dx * dx + dz * dz);
-        if (moved > 0.004) {
+        Gaits.Gait fastest = gaits.order().get(gaits.order().size() - 1);
+        if (moved > 0.004 && Gaits.perSize(moved, getScale()) <= fastest.madeFor() * fastest.max()) {
             movedTick = tickCount;
-            stride += (moved - stride) * 0.5;
+            stride += (moved - stride) * 0.5;           // (a move faster than its fastest legs go is a jump of place, BUGS 386)
         }
         if (Math.abs(Mth.wrapDegrees(yBodyRot - yBodyRotO)) > 1.0F) {
             turnedTick = tickCount;                     // a turn in place shows a slow walk (its feet never skate); both sides
