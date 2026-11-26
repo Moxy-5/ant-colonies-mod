@@ -30,8 +30,8 @@ import net.neoforged.neoforge.client.event.RenderFrameEvent;
  *
  * <p>Two more columns since 2026-11-09 (the drawn-only insects' first measure): the middle drawing time by time (the
  * number to use for a crowd: the plain middle read 0.2 ms with 75 Matabele, the scene's empty first moments), and the
- * average whole frame, from one frame's start to the next one's (the camera turns the screen lock and the frame limit
- * off, so nothing waits for the screen).
+ * average whole frame, from one frame's start to the next one's (since 2026-11-25 the camera keeps 60 frames a second,
+ * so this column holds the wait; the drawing columns before it do not).
  */
 @EventBusSubscriber(modid = ColonyFrameworkMod.MODID, value = Dist.CLIENT)
 public final class FilmFrameMeter {

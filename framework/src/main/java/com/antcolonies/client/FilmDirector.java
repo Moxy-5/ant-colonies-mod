@@ -325,10 +325,11 @@ public final class FilmDirector {
             mc.options.hideGui = true;
             mc.options.bobView().set(false);
             mc.options.pauseOnLostFocus = false;
-            // no screen lock and no frame limit, or the frame-time meter measures the wait for the screen (2026-11-09:
-            // an empty scene read 16 ms a frame, the screen's 60 a second, and a crowd of 50 read less than it)
+            // 60 frames a second, no screen lock (the user, 2026-11-25: unlimited, the camera drew 1,000 to 1,600 frames a
+            // second and lagged the whole PC for hours). The pictures go by game ticks, and the frame-time meter times each
+            // frame's drawing alone (FilmFrameMeter), so neither changes; only its whole-frame column now holds the wait
             mc.options.enableVsync().set(false);
-            mc.options.framerateLimit().set(260);
+            mc.options.framerateLimit().set(60);
             send(mc, "gamemode spectator");
             send(mc, "time set noon");
             waitTicks = 60;                     // let the land load and settle
