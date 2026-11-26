@@ -182,8 +182,15 @@ public class HippoEntity extends PathfinderMob implements GeoEntity, HasLife {
     @Nullable
     LivingEntity angryAt;
     int angryUntil;
-    /** Ticks before it may charge again, or yawn a warning at the same player, or mind a crocodile again. */
-    int chargeWait, warnWait, crocWait;
+    /** Ticks before it may charge again, or mind a crocodile again. */
+    int chargeWait, crocWait;
+    /**
+     * Whom it has warned with a yawn, and until when (its tick) that one is charged without another yawn (review R9-13:
+     * one timer for everybody, so a second visitor was bitten with no warning). Not saved.
+     */
+    final java.util.Map<java.util.UUID, Integer> warned = new java.util.HashMap<>();
+    /** Its tick before which it does not try for home again (no way found), and does not search for lawns again (none found). Review R9-16. */
+    int homeNotBefore, lawnsNotBefore;
     /** Ticks before it may rest on the bank again, or go to eat hippo grass again. */
     int restWait, nibbleWait;
     /** Its pod's grazing lawns (their middles, from its pool; saved), the one it grazes tonight, and where it left the water for it. */
@@ -661,9 +668,6 @@ public class HippoEntity extends PathfinderMob implements GeoEntity, HasLife {
         if (chargeWait > 0) {
             chargeWait--;
         }
-        if (warnWait > 0) {
-            warnWait--;
-        }
         if (crocWait > 0) {
             crocWait--;
         }
@@ -864,6 +868,7 @@ public class HippoEntity extends PathfinderMob implements GeoEntity, HasLife {
     void setPool(BlockPos pool) {
         this.pool = pool.immutable();
         lawns.clear();
+        lawnsNotBefore = 0;
     }
 
     /** Its lawns, and the landing it left the water at tonight (for tests). */
@@ -1017,13 +1022,16 @@ public class HippoEntity extends PathfinderMob implements GeoEntity, HasLife {
      * the same paths to them; kept with it.
      */
     List<BlockPos> lawns() {
-        if (lawns.isEmpty() && pool != null) {
+        if (lawns.isEmpty() && pool != null && tickCount >= lawnsNotBefore) {
             RandomSource dice = RandomSource.create(pool.asLong() ^ 0x4C41574E5EL ^ (long) lawnsDropped * 0x9E3779B97F4A7C15L);
             for (int i = 0; i < 12 && lawns.size() < LAWNS; i++) {
                 BlockPos c = grassNear(pool, dice);
                 if (c != null && lawns.stream().allMatch(l -> horizontalSqr(l, c) >= LAWN_APART * LAWN_APART)) {
                     lawns.add(c);
                 }
+            }
+            if (lawns.isEmpty()) {
+                lawnsNotBefore = tickCount + 2400; // none in reach: the same search gives the same answer, so not again for 2 minutes
             }
         }
         return lawns;
@@ -1400,11 +1408,9 @@ public class HippoEntity extends PathfinderMob implements GeoEntity, HasLife {
                 return false;
             }
             target = p;
-            charge = p.distanceTo(h) < chargeReach(p) && h.warnWait > 0;
-            if (!charge && h.warnWait > 0) {
-                return false;
-            }
-            return true;
+            boolean warned = h.warned.getOrDefault(p.getUUID(), 0) > h.tickCount;
+            charge = warned && p.distanceTo(h) < chargeReach(p);
+            return charge || !warned; // warned and keeping off: left alone; never warned: the yawn first
         }
 
         @Nullable
@@ -1438,7 +1444,10 @@ public class HippoEntity extends PathfinderMob implements GeoEntity, HasLife {
             if (!charge) {
                 h.setDoing(YAWN);                   // the warning: the great yawn, facing them
                 h.playSound(SoundEvents.RAVAGER_ROAR, 0.7F, 1.4F);
-                h.warnWait = WARN_AGAIN;
+                h.warned.values().removeIf(until -> until <= h.tickCount);
+                if (target != null) {
+                    h.warned.put(target.getUUID(), h.tickCount + WARN_AGAIN);
+                }
             }
         }
 
@@ -1535,7 +1544,7 @@ public class HippoEntity extends PathfinderMob implements GeoEntity, HasLife {
 
         @Override
         public boolean canUse() {
-            if (h.led || h.night() || h.isInWater() || h.climb() != null || h.getRandom().nextInt(10) != 0) {
+            if (h.led || h.night() || h.isInWater() || h.climb() != null || h.tickCount < h.homeNotBefore || h.getRandom().nextInt(10) != 0) {
                 return false;
             }
             BlockPos from = h.pool != null ? h.pool : h.blockPosition();
@@ -1573,6 +1582,8 @@ public class HippoEntity extends PathfinderMob implements GeoEntity, HasLife {
         public void stop() {
             if (h.isInWater()) {
                 h.landing = null;
+            } else if (h.getNavigation().isDone() && h.climb() == null) {
+                h.homeNotBefore = h.tickCount + 200; // its way home failed or ended short (fenced in, a pit): not again for 10 seconds
             }
         }
     }
@@ -1960,7 +1971,8 @@ public class HippoEntity extends PathfinderMob implements GeoEntity, HasLife {
 
     /** Whether its pool is gone: no water left at it. */
     boolean poolGone() {
-        return pool != null && !level().getFluidState(pool).is(FluidTags.WATER) && !level().getFluidState(pool.above()).is(FluidTags.WATER);
+        // (land not loaded is not "gone": a hippo led far off never loads its pool, review R9-17; the same judge as waterTop, R9-18)
+        return pool != null && level().isLoaded(pool) && waterTop() == Integer.MIN_VALUE;
     }
 
     /** How deep the water is where it stands (blocks). */

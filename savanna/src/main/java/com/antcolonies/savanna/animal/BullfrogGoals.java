@@ -272,7 +272,7 @@ final class BullfrogGoals {
         private final BullfrogEntity frog;
         @Nullable
         private LivingEntity prey;
-        private int stalked, hunted, restUntil, noRoute;
+        private int stalked, hunted, restUntil, noRoute, lookAgain;
         private double startFar;
         private boolean chasing;
 
@@ -329,7 +329,7 @@ final class BullfrogGoals {
 
         @Override
         public boolean canUse() {
-            if (!frog.isHungry() || frog.isDug() || frog.busy() || !now(frog, 4)) {
+            if (!frog.isHungry() || frog.isDug() || frog.busy() || frog.tickCount < lookAgain || !now(frog, 4)) {
                 return false;
             }
             Vec3 mouth = frog.mouth();
@@ -338,7 +338,7 @@ final class BullfrogGoals {
             double look = hunting ? HUNT_REACH : far;
             prey = null;
             double best = Double.MAX_VALUE;
-            for (LivingEntity e : frog.level().getEntitiesOfClass(LivingEntity.class, frog.getBoundingBox().inflate(look + 0.5),
+            for (LivingEntity e : frog.level().getEntitiesOfClass(LivingEntity.class, frog.getBoundingBox().inflate(look + 0.5, 3.0, look + 0.5),
                     e -> isPrey(e) && !frog.isFatherOf(e) && !RiverCover.hiddenFrom(frog, e))) {      // (never his own tadpoles; a barb still in the reeds unseen)
                 double d = middle(e).distanceTo(mouth);
                 boolean wanted = d < reach && clearFromMouth(frog, middle(e)) || d < far && stalkable(e) && clearFromMouth(frog, middle(e))
@@ -347,6 +347,9 @@ final class BullfrogGoals {
                     best = d;
                     prey = e;
                 }
+            }
+            if (prey == null) {
+                lookAgain = frog.tickCount + 20; // nothing to eat in sight: the next wide look in a second (review R10-10: 5 a second, for good)
             }
             return prey != null;
         }

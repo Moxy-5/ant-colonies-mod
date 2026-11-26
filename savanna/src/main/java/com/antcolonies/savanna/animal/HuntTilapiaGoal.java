@@ -50,7 +50,7 @@ public class HuntTilapiaGoal extends Goal {
     private final CatfishEntity fish;
     @Nullable
     private AbstractSchoolingFish prey;
-    private int ticks, strikeTick = -1;
+    private int ticks, planned, strikeTick = -1;
 
     public HuntTilapiaGoal(CatfishEntity fish) {
         this.fish = fish;
@@ -80,6 +80,7 @@ public class HuntTilapiaGoal extends Goal {
     @Override
     public void start() {
         ticks = 0;
+        planned = 0;
         strikeTick = -1;
     }
 
@@ -123,7 +124,10 @@ public class HuntTilapiaGoal extends Goal {
             lunge(target);
             return;
         }
-        if (ticks % 10 == 1 || fish.getNavigation().isDone()) {
+        // A new route on the 10-tick beat, or when the route has run out, but then not on every tick (review R9-25: with
+        // prey it cannot reach, the route "runs out" at once and a full failed search was made every tick of the chase).
+        if (ticks % 10 == 1 || fish.getNavigation().isDone() && ticks - planned >= 4) {
+            planned = ticks;
             Vec3 at = underTheSurface(target);
             fish.getNavigation().moveTo(at.x, at.y, at.z, near < DASH_FROM ? DASH_SPEED : STALK_SPEED);
         }

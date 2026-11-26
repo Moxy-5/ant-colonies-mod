@@ -121,6 +121,8 @@ a school of 15 hungry tilapia added; count eggs left after 2, 5 and 20 minutes.
 a lush mat (so a fish eats them only when they are the nearest good food), or let a tilapia notice eggs only within 3
 blocks. Keep the life file's hatch time.
 
+**Your call (2026-11-26):** Catfish eggs and tilapia. Today every hungry tilapia goes for catfish eggs before any other food from 8 blocks off and takes 2 a bite, so by the numbers (not watched in play) a whole spawning is eaten in a minute or two and no catfish ever hatches from eggs (the world's spawner still refills them). Make eggs a find, not a magnet: a tilapia eats them only when they are the nearest good food? My pick: yes.
+
 ### R10-5 (B, proven path; its speed to measure): river algae spreads into any shallow water, with nothing to stop it
 
 **What is wrong.** A thick or lush mat seeds bare bed beside it on 1 random tick in 10 (`AlgaeBlock.spread`). The only
@@ -227,6 +229,8 @@ multiplayer.
   `framework/.../GuardPlaceGoal.java:41-49`): made with a see-off distance of 0 and a test that is always false, it
   still runs its search each check. Skip the search when the distance is 0. (C)
 
+**Status (2026-11-26, `claude/review-fix-b5-bc1153`): half fixed: a hungry frog that saw nothing to eat looks again a second later, in a box 3 high (`BullfrogGoals`, `lookAgain`), and a guard told to see nobody off searches for nobody (`GuardPlaceGoal`). Open: a courtship that ends on its timer away from the laying spot (how often is not known; to watch in play first).**
+
 ### R10-11 (C, proven): frog and tadpole small things
 
 - `TadpoleEntity.java:275` says a tadpole hatched from eggs is kept for good; nothing in `FrogEggsBlock.hatch`
@@ -310,6 +314,8 @@ claws up at them for as long as they stand there, and never eats or moves on. Fu
 Fix: after a full threat, the crab does not threaten the same player again for a while (it sidles off instead, which
 its avoid goal already does).
 
+**Status (2026-11-26, `claude/review-fix-b5-bc1153`): fixed: after a full 20-second display a crab does not threaten a player who only stands near for a minute (`CrabThreatGoal.notBefore`, my pick); a hit is still answered at once.**
+
 ### R10-15 (B, likely; to measure): asking for a new path every tick to a spot that cannot be reached
 
 `SeekMateGoal.java:85-94` (all breeding animals) and `SnailLayGoal.java:96-103` (through `GoExactly`) ask the path
@@ -318,6 +324,8 @@ cannot be reached (a mate behind a ledge, a waterline spot with no way up), ever
 dearest kind, for the whole give-up time. Scene to measure: 10 snail pairs with a wall between each pair, 1 minute,
 time per tick against the same snails idle. Fix: ask again only every 10 to 20 ticks, or when the target has moved a
 block (vanilla's own follow goals do this), and give up early after two failed plans.
+
+**Status (2026-11-26, `claude/review-fix-b5-bc1153`): fixed: `SeekMateGoal` and `SnailLayGoal` ask for a new route on their own beat, or when the route has run out, but then at most twice a second, not on every tick. Not measured. Giving up early after two failed plans is not built (the kit's give-up time still ends it).**
 
 ### R10-16 (B, likely): snail eggs within a crab's reach never hatch
 
@@ -350,6 +358,8 @@ second after the last movement.
   eggs are old enough to hatch (`CrabEntity.java:207-213`); the answer is only needed once the eggs are due.
   Compute the room only when the clock says hatching time.
 Scene to measure all three: 24 crabs and snails (the group's cap) round one player, against an empty river.
+
+**Status (2026-11-26, `claude/review-fix-b5-bc1153`): half fixed: a snail looks round for what it fears 4 times a second, not every other tick, and a mother crab counts the crabs round her only once her eggs are due. Open: the crab's three avoid goals as one look (small, not measured).**
 
 ### R10-19 (C): crab and snail small things
 

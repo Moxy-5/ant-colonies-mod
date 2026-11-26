@@ -126,13 +126,21 @@ public final class Grazing {
 
     /**
      * The top block of the water at {@code pool} (its y), or {@link Integer#MIN_VALUE} if there is no pool, its land is
-     * not loaded (an animal led far from home never loads it, review R9-17) or it holds no water.
+     * not loaded (an animal led far from home never loads it, review R9-17) or it holds no water (at its block or the one over it).
      */
     public static int waterTop(Level level, @Nullable BlockPos pool) {
-        if (pool == null || !level.isLoaded(pool) || !level.getFluidState(pool).is(FluidTags.WATER)) {
+        if (pool == null || !level.isLoaded(pool)) {
             return Integer.MIN_VALUE;
         }
         BlockPos.MutableBlockPos p = pool.mutable();
+        if (!level.getFluidState(p).is(FluidTags.WATER)) {
+            // A block landed on the bed at the pool's spot (sand, gravel, a player's block): the water over it is still
+            // the pool (review R9-18: "gone" asked the block over it too, this did not, and the two disagreed for good).
+            p.move(0, 1, 0);
+            if (!level.getFluidState(p).is(FluidTags.WATER)) {
+                return Integer.MIN_VALUE;
+            }
+        }
         while (level.getFluidState(p.above()).is(FluidTags.WATER) && p.getY() < pool.getY() + 16) {
             p.move(0, 1, 0);
         }

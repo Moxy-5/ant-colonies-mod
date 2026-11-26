@@ -83,6 +83,20 @@ public class SnailHideGoal extends Goal {
         if (snail.hurtTime > 0 || (hit != null && snail.tickCount - snail.getLastHurtByMobTimestamp() < 20)) {
             return true;
         }
+        // The look round for what it fears, 4 times a second (review R10-18: every other tick by every snail; a snail
+        // pulling in a quarter second late looks the same).
+        if (snail.tickCount - looked < 5) {
+            return fearNear;
+        }
+        looked = snail.tickCount;
+        fearNear = fearNear();
+        return fearNear;
+    }
+
+    private int looked = -5;
+    private boolean fearNear;
+
+    private boolean fearNear() {
         List<Entity> near = snail.level().getEntities(snail, snail.getBoundingBox().inflate(CROCODILE),
                 e -> e instanceof Player || e instanceof CrabEntity || e instanceof CrocodileEntity || e instanceof MonitorEntity);
         for (Entity e : near) {

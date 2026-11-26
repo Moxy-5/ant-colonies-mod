@@ -7,12 +7,12 @@ review files under `docs/reviews/full/`; search there for a finding's number (`R
 a `**Status ...**` line under the finding there and runs the tool. Bugs that did not come from the code
 review stay in `docs/BUGS.md`.
 
-**234 findings: 122 left (13 of them wait for your call), 112 done.**
+**234 findings: 107 left (14 of them wait for your call), 127 done.**
 
 | Grade | Found | Not started | Open | Half fixed | Fixed | Not a bug after all |
 |---|---|---|---|---|---|---|
 | A: a player can meet it | 50 | 0 | 1 | 0 | 48 | 1 |
-| B: it will cost us when building on this | 107 | 36 | 10 | 6 | 53 | 2 |
+| B: it will cost us when building on this | 107 | 10 | 16 | 11 | 68 | 2 |
 | C: a tidy-up | 77 | 67 | 0 | 2 | 7 | 1 |
 
 | Round | System | Found | Left | Done |
@@ -25,11 +25,11 @@ review stay in `docs/BUGS.md`.
 | 6 | the Matabele ants (not raids) | not read yet | | |
 | 7 | the giant trees | 36 | 20 | 16 |
 | 8 | the world | 20 | 15 | 5 |
-| 9 | the river hunters | 44 | 34 | 10 |
-| 10 | the river's small life | 19 | 13 | 6 |
+| 9 | the river hunters | 44 | 21 | 23 |
+| 10 | the river's small life | 19 | 11 | 8 |
 | 11 | the new raid code | 22 | 6 | 16 |
 
-## Waiting for your call (13)
+## Waiting for your call (14)
 
 These change how the game looks or plays, or a balance number, so nothing is built until you say. Each has
 what happens today and my pick. Answer whenever you like: tell Claude the number and what you want.
@@ -52,6 +52,8 @@ what happens today and my pick. Answer whenever you like: tell Claude the number
   - *Your call:* The big river hunters and arrows. Today a shark shot from the bank or a boat does nothing about it, and the crocodile afloat and the hippo past 16 blocks are the same: all three can be killed from a distance with no answer. Should one hit by something it cannot reach swim off deep and fast for a while? My pick: yes, for the shark and the crocodile; the hippo charges or goes under.
 - **R9-44** (grade C, the river hunters) small things in the monitor
   - *Your call:* The monitor in water and on mud. Two looks: hunting in the water it leaves by Minecraft's plain hop, not its own climbing-out move, and on soft mud it steps and hops the plain way because its moves never start there. Worth the work to give both its own moves? My pick: not now (small, and only a look); say if you have seen it and it bothers you.
+- **R10-4** (grade B, the river's small life) catfish eggs are eaten long before they can hatch
+  - *Your call:* Catfish eggs and tilapia. Today every hungry tilapia goes for catfish eggs before any other food from 8 blocks off and takes 2 a bite, so by the numbers (not watched in play) a whole spawning is eaten in a minute or two and no catfish ever hatches from eggs (the world's spawner still refills them). Make eggs a find, not a magnet: a tilapia eats them only when they are the nearest good food? My pick: yes.
 - **R10-5** (grade B, the river's small life) river algae spreads into any shallow water, with nothing to stop it
   - *Your call:* River algae spreading. Today a thick mat seeds any shallow still water beside it, with nothing to stop it: over many hours it creeps out of the savanna's rivers along lake and sea shores and into a player's pond joined to a river, and grows back unless every bare speck is broken. Keep it to the savanna's waters, and patchy (no new mat where enough lie round it)? My pick: yes.
 - **R10-16** (grade B, the river's small life) snail eggs within a crab's reach never hatch
@@ -73,7 +75,7 @@ is left; no word means nobody has started it. The findings that wait for your ca
 - **R7-33** A palm's crown can blink out at the screen's edge
   - *Open:* waits to be seen (2026-11-24). Read from how Minecraft hides parts of the world, never seen in the game; the fix is large (sharing a crown's faces out over its blocks) and is built only if the user sees fronds blink out.
 
-### B: it will cost us when building on this (42 left)
+### B: it will cost us when building on this (26 left)
 
 **Round 1, the colony brain** (`docs/reviews/full/round-01-colony-brain.md`)
 
@@ -120,35 +122,30 @@ is left; no word means nobody has started it. The findings that wait for your ca
 **Round 9, the river hunters** (`docs/reviews/full/round-09-river-hunters.md`)
 
 - **R9-2** every search for entities in the world walks every body hit box of every animal
-- **R9-7** a crocodile whose basking spot lies beside a hippo swims to it and turns away, again and again
+  - *Open:* to measure. The cost of the body hit boxes is a sum from counts (0.3 to 0.6 ms a tick for a full river), never measured, and fewer beads changes where each animal can be hit, which is how it plays. To do first: the full-river ...
 - **R9-8** every crocodile route may search four times as far as a zombie's, and failing routes are asked again and again
+  - *Open:* to measure. A follow range of 24 to 32 with far sand reached in legs is a change to how crocodiles find their banks, and the cost of the long searches was never measured. To do first: the scene named (a hungry crocodile, a cow on ...
 - **R9-9** two wide searches of the land done in a single tick
-- **R9-10** a mother taken from her nest reads the nest's land wherever it is
-- **R9-13** the warning yawn is remembered per hippo, not per visitor: the second one is bitten unwarned
+  - *Open:* to measure. Both searches read loaded land only; their cost (5 to 15 ms once, by sum) was never timed, and the fix (rings, a search spread over ticks, eggs lost after some failed tries) adds rules and one change in play (a female ...
 - **R9-15** a hippo shot from more than 16 blocks never answers
-- **R9-16** two "nothing found" searches with no wait after them
-- **R9-17** the pool's water is read with no check that its land is loaded
+  - *Open:* waits for the call on R9-24 (what the big river hunters do when hit by something they cannot reach; the hippo is part of that question).
 - **R9-18** when the pool is gone each hippo takes its own, and "gone" is judged two ways
-- **R9-21** a shark's hunt hangs still for up to 45 seconds
-- **R9-22** only the three nearest fish are tried, so a school on the shelf hides every fish behind it
+  - *Half fixed:* one judge of the pool's water: `poolGone` is now "`waterTop` finds none", and `waterTop` takes the water over the pool's block when a block has landed on the bed there, so the landing, the bank rest and the nibbling go on. Open: ...
 - **R9-23** a shark with nowhere to go asks for a new target every tick and lies still
-- **R9-25** the catfish plans a new route every tick once its route has run out short of its prey
-- **R9-31** while an otter on screen holds a crab or a frog, the game reads and parses a file from the mod's jar twice every frame
-- **R9-32** a hunt that gives up takes the same prey again half a second later
-- **R9-33** a cornered otter plans its escape again every time it is asked
-- **R9-34** harm with no attacker does not make an otter run, and it wipes the fright of the otters near it
+  - *Half fixed:* after a pick that found nowhere to go the patrol waits 2 seconds before it searches again, and the keep-clear goal asks every 2 seconds. Open: a shark in a hole too small for a run still lies still (it needs a spawn rule that ...
 - **R9-35** what the otter is doing lives in five places, and every A finding above is a state left behind when one of them ended unplanned
+  - *Open:* left on purpose, a design note. The bout and the held catch as their own classes with one "end, whatever happened" door is the first step of the next thing added to the otter (breeding, the pet); done now it would move approved ...
 - **R9-39** the mid-climb tests fail now and then because the monitor's own idle goals take it off the test's route (BUGS 255, 290, 292)
-- **R9-40** after a reload, and from its spawn until its first swim, nothing keeps a monitor near its water
+  - *Half fixed:* the mid-climb tests already still the monitor's mind (`calmForTests`, the stroll and the mate search taken out, BUGS 255's fix in `RiverLifeTests`). Open: BUGS 255's other message ("on a move 93 ticks, highest 0.00") is still not ...
 - **R9-42** the code that starts a staged move exists three times
+  - *Open:* left on purpose for the Motion Studio. Moving the monitor and the hippo onto `MoveRider` touches approved moves, so it needs the monitor's course and its frame films; it belongs with the next change to their staged moves.
 
 **Round 10, the river's small life** (`docs/reviews/full/round-10-river-small-life.md`)
 
-- **R10-4** catfish eggs are eaten long before they can hatch
 - **R10-10** the two frog steps before breeding can end with nothing, and a hungry frog searches wide 5 times a second
-- **R10-14** the crab's 20-second limit on threatening does nothing
-- **R10-15** asking for a new path every tick to a spot that cannot be reached
+  - *Half fixed:* a hungry frog that saw nothing to eat looks again a second later, in a box 3 high (`BullfrogGoals`, `lookAgain`), and a guard told to see nobody off searches for nobody (`GuardPlaceGoal`). Open: a courtship that ends on its timer ...
 - **R10-18** small searches that run more often than they need
+  - *Half fixed:* a snail looks round for what it fears 4 times a second, not every other tick, and a mother crab counts the crabs round her only once her eggs are due. Open: the crab's three avoid goals as one look (small, not measured).
 
 ### C: a tidy-up (66 left)
 
@@ -342,12 +339,25 @@ Fixed, or found to be no bug after all. The number after a finding is its entry 
 - **R9-1** (A) a courting animal whose suitor dies or leaves the loaded land is "taken" for good (BUGS 323)
 - **R9-5** (A) the crocodile hunts the player's own animals: tamed horses, donkeys, llamas, name-tagged and leashed stock (BUGS 324)
 - **R9-6** (A) in Peaceful the crocodile still seizes the player and holds them through twelve rolls (BUGS 325)
+- **R9-7** (B) a crocodile whose basking spot lies beside a hippo swims to it and turns away, again and again
+- **R9-10** (B) a mother taken from her nest reads the nest's land wherever it is
+- **R9-13** (B) the warning yawn is remembered per hippo, not per visitor: the second one is bitten unwarned
+- **R9-16** (B) two "nothing found" searches with no wait after them
+- **R9-17** (B) the pool's water is read with no check that its land is loaded
+- **R9-21** (B) a shark's hunt hangs still for up to 45 seconds
+- **R9-22** (B) only the three nearest fish are tried, so a school on the shelf hides every fish behind it
+- **R9-25** (B) the catfish plans a new route every tick once its route has run out short of its prey
 - **R9-27** (A) a catch in the jaws is saved with the otter, but the otter forgets it: after a reload it is stuck at the snout for good (BUGS 326)
 - **R9-28** (A) carrying a catch has no time limit: with no bank in reach the otter floats on the spot with it for ever (BUGS 327)
 - **R9-29** (A) only the otter that started a game of play can end it: if that one is killed or vanishes mid-game the other stands in the game for good (BUGS 328)
 - **R9-30** (A) the otter is the only river animal Minecraft may remove 32 blocks from the player: they vanish one at a time (BUGS 329)
+- **R9-31** (B) while an otter on screen holds a crab or a frog, the game reads and parses a file from the mod's jar twice every frame
+- **R9-32** (B) a hunt that gives up takes the same prey again half a second later
+- **R9-33** (B) a cornered otter plans its escape again every time it is asked
+- **R9-34** (B) harm with no attacker does not make an otter run, and it wipes the fright of the otters near it
 - **R9-37** (A) a staged move that is stopped on its very first tick freezes the monitor in place, and starts again every tick (BUGS 330)
 - **R9-38** (A) the walk into the water is cut short for 7 monitors in 8 (BUGS 331)
+- **R9-40** (B) after a reload, and from its spawn until its first swim, nothing keeps a monitor near its water
 - **R9-41** (B) the monitor never counts its life clock (nor does the hippo); the kit leaves that to each animal to remember (BUGS 335)
 
 **Round 10, the river's small life**
@@ -358,6 +368,8 @@ Fixed, or found to be no bug after all. The number after a finding is its entry 
 - **R10-9** (A) every tadpole tells every player its age every tick (BUGS 334)
 - **R10-12** (A) crabs, snails and catfish never grow up and breed only once in their lives (BUGS 335)
 - **R10-13** (A) a crab's meal does not count when the food ends at the first bite (BUGS 336)
+- **R10-14** (B) the crab's 20-second limit on threatening does nothing
+- **R10-15** (B) asking for a new path every tick to a spot that cannot be reached
 
 **Round 11, the new raid code**
 

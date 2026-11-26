@@ -135,7 +135,7 @@ final class BullSharkGoals {
         private final BullSharkEntity shark;
         @Nullable
         private Vec3 target;
-        private int t;
+        private int t, wait;
         private Vec3 lastPos = Vec3.ZERO;
 
         PatrolGoal(BullSharkEntity shark) {
@@ -166,11 +166,16 @@ final class BullSharkGoals {
             if (t % 60 == 0) {
                 lastPos = shark.position();
             }
-            if (target == null || stuck || shark.swimBlocked() || flat(shark.position(), target) < 2.0 || t > 600) {
+            if (wait > 0) {
+                wait--; // nowhere to go was found: the same two searches are not made again every tick (review R9-23)
+            } else if (target == null || stuck || shark.swimBlocked() || flat(shark.position(), target) < 2.0 || t > 600) {
                 boolean turnAround = stuck || shark.swimBlocked();
                 target = deepPoint(shark, shark.getYRot() + (turnAround ? 180 : 0), 10, 24, turnAround, null);
                 if (target == null) {
                     target = deepPoint(shark, shark.getYRot(), 4, 10, true, null);
+                }
+                if (target == null) {
+                    wait = 40;
                 }
                 t = 1;
             }
@@ -207,7 +212,7 @@ final class BullSharkGoals {
         @Nullable
         private LivingEntity prey;
         private Phase phase = Phase.DONE;
-        private int t, left, misses, look;
+        private int t, left, misses, look, blocked;
         private boolean caught;
 
         HuntGoal(BullSharkEntity shark) {
@@ -224,12 +229,13 @@ final class BullSharkGoals {
             // the nearest prey over deep enough water that it can swim straight to (the line looked along for the
             // nearest few only: a school can be thirty fish)
             var seen = new java.util.ArrayList<>(shark.level().getEntitiesOfClass(LivingEntity.class,
-                    shark.getBoundingBox().inflate(HUNT_REACH, 8.0, HUNT_REACH), e -> BullSharkEntity.isPrey(e) && e.distanceToSqr(shark) < HUNT_REACH * HUNT_REACH && !RiverCover.hiddenFrom(shark, e)));
+                    shark.getBoundingBox().inflate(HUNT_REACH, 8.0, HUNT_REACH), e -> BullSharkEntity.isPrey(e) && e.distanceToSqr(shark) < HUNT_REACH * HUNT_REACH && !RiverCover.hiddenFrom(shark, e)
+                            // (over deep enough water: asked here, so a school on the shelf does not hide the fish behind it, review R9-22)
+                            && BullSharkEntity.depthAt(shark.level(), e.getX(), e.getY() + 0.2, e.getZ()) >= BullSharkEntity.MIN_DEPTH));
             seen.sort(java.util.Comparator.comparingDouble(e -> e.distanceToSqr(shark)));
             for (int i = 0; i < Math.min(3, seen.size()) && prey == null; i++) {
                 LivingEntity e = seen.get(i);
-                if (BullSharkEntity.depthAt(shark.level(), e.getX(), e.getY() + 0.2, e.getZ()) >= BullSharkEntity.MIN_DEPTH
-                        && shark.deepLine(new Vec3(e.getX(), Math.min(shark.getY(), e.getY()), e.getZ()), false)) {
+                if (shark.deepLine(new Vec3(e.getX(), Math.min(shark.getY(), e.getY()), e.getZ()), false)) {
                     prey = e;
                 }
             }
@@ -242,6 +248,7 @@ final class BullSharkGoals {
             t = 0;
             left = 900;
             misses = 0;
+            blocked = 0;
             caught = false;
             shark.setProwling(true);
             shark.hunting = true;
@@ -260,6 +267,7 @@ final class BullSharkGoals {
         @Override
         public void tick() {
             t++;
+            blocked = shark.swimBlocked() ? blocked + 1 : 0;
             switch (phase) {
                 case PROWL -> prowl();
                 case CLOSE -> close();
@@ -273,7 +281,11 @@ final class BullSharkGoals {
 
         private boolean lost() {
             return prey == null || !prey.isAlive() || prey.isRemoved() || !prey.isInWater() || prey.distanceToSqr(shark) > (HUNT_REACH + 8) * (HUNT_REACH + 8)
-                    || RiverCover.hiddenFrom(shark, prey);        // a fish keeping still in the reeds (the food web's step 4)
+                    || RiverCover.hiddenFrom(shark, prey)         // a fish keeping still in the reeds (the food web's step 4)
+                    // it cannot be reached: it swam onto the shallow shelf, or the shark has stood at the shelf's edge 3
+                    // seconds (review R9-21: the hunt hung still, pointing at it, until its 45 seconds ran out)
+                    || !caught && (phase == Phase.PROWL || phase == Phase.CLOSE || phase == Phase.BURST) && (blocked > 60 || phase != Phase.BURST
+                            && BullSharkEntity.depthAt(shark.level(), prey.getX(), prey.getY() + 0.2, prey.getZ()) < BullSharkEntity.MIN_DEPTH);
         }
 
         /** The fin out at the surface, at its prowl pace toward the prey; near it, a breach or the slow approach under water. */
@@ -843,6 +855,9 @@ final class BullSharkGoals {
         @Override
         public void tick() {
             t++;
+            if (away == null && t % 40 != 0) {
+                return; // no way clear was found: asked again every 2 seconds, not every tick (review R9-23)
+            }
             if (away == null || flat(shark.position(), away) < 2.0 || shark.swimBlocked()) {
                 pickAway();
             }

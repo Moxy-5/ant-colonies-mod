@@ -27,6 +27,12 @@ public class CrabThreatGoal extends Goal {
     @Nullable
     private LivingEntity foe;
     private int ticks, pinchIn;
+    /**
+     * Its tick before which it does not threaten a player who only stands near (review R10-14: its 20-second limit did
+     * nothing, the display started again at the next look, for as long as the player stood there). After a full
+     * display it has made its point for a minute (my pick) and goes about its life; a hit is still answered at once.
+     */
+    private int notBefore;
 
     public CrabThreatGoal(CrabEntity crab) {
         this.crab = crab;
@@ -41,7 +47,7 @@ public class CrabThreatGoal extends Goal {
             return true;
         }
         Player player = crab.level().getNearestPlayer(crab, TOO_NEAR);
-        if (player != null && !player.isCreative() && !player.isSpectator()) {
+        if (player != null && !player.isCreative() && !player.isSpectator() && crab.tickCount >= notBefore) {
             foe = player;
             return true;
         }
@@ -62,6 +68,9 @@ public class CrabThreatGoal extends Goal {
 
     @Override
     public void stop() {
+        if (ticks >= MOST) {
+            notBefore = crab.tickCount + 1200;
+        }
         crab.setDoing(CrabEntity.CALM);
         foe = null;
     }

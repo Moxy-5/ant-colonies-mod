@@ -70,6 +70,9 @@ public class GuardPlaceGoal extends Goal {
 
     @Nullable
     private LivingEntity intruderNear(BlockPos at) {
+        if (seeOff <= 0) {
+            return null; // a guard that sees nobody off (the bullfrog father) searches for nobody (review R10-10)
+        }
         List<LivingEntity> near = animal.level().getEntitiesOfClass(LivingEntity.class, new AABB(at).inflate(seeOff),
                 e -> e != animal && e.isAlive() && intruder.test(e));
         return near.isEmpty() ? null : near.get(0);

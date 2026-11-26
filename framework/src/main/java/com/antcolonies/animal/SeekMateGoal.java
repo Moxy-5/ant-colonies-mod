@@ -29,7 +29,7 @@ public class SeekMateGoal<T extends Mob & HasLife> extends Goal {
     @Nullable
     private Mob mate;
     private int courted;
-    private int walked;
+    private int walked, planned;
 
     public SeekMateGoal(T animal, double speed) {
         this.animal = animal;
@@ -84,7 +84,10 @@ public class SeekMateGoal<T extends Mob & HasLife> extends Goal {
         double touch = (animal.getBbWidth() + mate.getBbWidth()) * 0.5 + 0.5;
         if (animal.distanceTo(mate) > touch) {
             walked++;
-            if (animal.getNavigation().isDone() || walked % 20 == 0) {
+            // A new route every second, or when the route has run out, but then at most twice a second (review R10-15:
+            // with a mate it cannot reach, the route "runs out" at once and a full failed search was made every tick).
+            if (walked % 20 == 0 || animal.getNavigation().isDone() && (walked == 1 || walked - planned >= 10)) {
+                planned = walked;
                 GoExactly.to(animal, mate.getX(), mate.getY(), mate.getZ(), speed);
             }
             if (animal.getNavigation().isDone()) {

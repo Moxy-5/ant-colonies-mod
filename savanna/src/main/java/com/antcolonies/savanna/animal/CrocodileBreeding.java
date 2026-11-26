@@ -269,7 +269,7 @@ public final class CrocodileBreeding {
             if (!croc.carried.isEmpty()) {
                 return Job.DELIVER;
             }
-            if (croc.nestAt != null) {
+            if (croc.nestAt != null && level.isLoaded(croc.nestAt)) {
                 var state = level.getBlockState(croc.nestAt);
                 if (!(state.getBlock() instanceof CrocodileNestBlock)) {
                     croc.nestAt = null;         // gone (dug up, broken): nothing to guard

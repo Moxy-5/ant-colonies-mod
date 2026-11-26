@@ -209,7 +209,8 @@ public class CrabEntity extends PathfinderMob implements GeoEntity, HasLife {
             return;
         }
         long hatch = life.numbers().hatchTicks();
-        boolean room = RoomToBreed.here(this, life.numbers().localLimit());
+        // (the count of crabs round her only once the eggs are due: it was asked every second of their 2 days, review R10-18)
+        boolean room = level().getGameTime() - eggsSince >= hatch && RoomToBreed.here(this, life.numbers().localLimit());
         switch (ClutchClock.decide(level().getGameTime(), eggsSince, hatch, true, room)) {
             case HATCH -> letOutBabies();
             case SHELLS -> {

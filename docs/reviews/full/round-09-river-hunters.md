@@ -93,6 +93,8 @@ the chains on, against the same scene with `isMultipartEntity()` answering false
 **Fix proposed (only if the number is worth it).** Fewer beads where they buy little (the crocodile's six tail beads
 could be three; the catfish, a common fish, may not need a chain at all). Not a rewrite: the chain itself is sound.
 
+**Status (2026-11-26, `claude/review-fix-b5-bc1153`): open: to measure. The cost of the body hit boxes is a sum from counts (0.3 to 0.6 ms a tick for a full river), never measured, and fewer beads changes where each animal can be hit, which is how it plays. To do first: the full-river scene with Minecraft's profiler, chains on against off.**
+
 ### R9-3 (C, proven): the guard goal searches for intruders when it has none to look for, and twice a turn when it runs
 
 **What is wrong.** `GuardPlaceGoal.canUse` searches for living things round the guarded place every time it is asked,
@@ -216,6 +218,8 @@ pool are by the same banks, so it should be common).
 **Fix proposed.** One shared "may I lie here" test for all four spot pickers that also refuses a spot within the
 keep-clear reach of a hippo (and forgets `sandAt` when a hippo turned it away). No new timer.
 
+**Status (2026-11-26, `claude/review-fix-b5-bc1153`): fixed: every picker of a basking spot asks one test, `CrocodileEntity.byHippo` (a hippo within the keep-clear reach of the spot plus a block): the remembered sand spot, a new sand spot, the row of basking crocodiles and the nearest bank. A sand spot with a hippo by it is forgotten and another is looked for (at most once a minute, as before). No new timer. Not watched in the game.**
+
 ### R9-8 (B, to measure): every crocodile route may search four times as far as a zombie's, and failing routes are asked again and again
 
 **What is wrong.** To reach far sand banks the crocodile's "follow range" was set to 64 blocks. Minecraft uses that
@@ -244,6 +248,8 @@ profiler's `pathfind` section and the tick time during the charge.
 remember the prey it failed to reach for a minute (as the monitor and catfish do); ask the charge's route every 10
 ticks.
 
+**Status (2026-11-26, `claude/review-fix-b5-bc1153`): open: to measure. A follow range of 24 to 32 with far sand reached in legs is a change to how crocodiles find their banks, and the cost of the long searches was never measured. To do first: the scene named (a hungry crocodile, a cow on a bank two blocks up) with the profiler's pathfind section.**
+
 ### R9-9 (B, to measure): two wide searches of the land done in a single tick
 
 **What is wrong.**
@@ -268,6 +274,8 @@ a player travels, and the read then waits for it.
 cells that already passed the cheap tests and whose column is near water; spread a wide search over several ticks.
 After a few failed tries let the eggs be lost (she goes back to her life).
 
+**Status (2026-11-26, `claude/review-fix-b5-bc1153`): open: to measure. Both searches read loaded land only; their cost (5 to 15 ms once, by sum) was never timed, and the fix (rings, a search spread over ticks, eggs lost after some failed tries) adds rules and one change in play (a female who gives her eggs up). To do first: time each search on a wide river with no sand.**
+
 ### R9-10 (B, the read proven, the stall likely): a mother taken from her nest reads the nest's land wherever it is
 
 **What is wrong.** A mother asks her nest's block once a second (`MotherGoal.pick`, `CrocodileBreeding.java:273`) and
@@ -282,6 +290,8 @@ chunk on the spot, once a second, and her guard goal plans a full-length route h
 **Fix proposed.** Ask `level.isLoaded(nestAt)` first and treat a nest out of loaded land as "no work now"; give up
 guarding from beyond some distance. Bigger question for the user, noted in the report: whether crocodiles and hippos
 should take a lead at all.
+
+**Status (2026-11-26, `claude/review-fix-b5-bc1153`): fixed: a mother asks her nest's block only when its land is loaded (`MotherGoal.pick`, `motherWork`), and `guardPlace` answers "nothing" for a nest out of loaded land, so led or boated far off she neither loads its chunk nor plans a way home. Whether crocodiles and hippos should take a lead at all is left as it is.**
 
 ### R9-11 (C, proven): a crocodile hit while afloat does not react, and a nest mother shot from afar stands still
 
@@ -351,6 +361,8 @@ one target.
 
 **Fix proposed.** Keep who was warned (a UUID beside the timer); only that one is charged without a yawn.
 
+**Status (2026-11-26, `claude/review-fix-b5-bc1153`): fixed: the hippo remembers whom it warned (`HippoEntity.warned`, each visitor's own 10 seconds), so only the one who was yawned at and stayed is charged without a yawn; a second player, or the player after a crocodile, gets the yawn first.**
+
 ### R9-14 (C, proven): dung on land almost never happens
 
 The 1 in 600 roll for flicking dung while grazing sits inside `if (h.doing() == CALM)` (`GrazeGoal.tick` 1943-1949),
@@ -373,6 +385,8 @@ dead (80 health): it neither charges nor flees.
 **Fix proposed.** For a target it is angry at, give up by time and its follow range (32), and keep the anger until
 `angryUntil`; or let it make for deep water when it cannot reach what hurts it.
 
+**Status (2026-11-26, `claude/review-fix-b5-bc1153`): open: waits for the call on R9-24 (what the big river hunters do when hit by something they cannot reach; the hippo is part of that question).**
+
 ### R9-16 (B/C, likely, to measure): two "nothing found" searches with no wait after them
 
 - **No way home by day** (`HomeGoal.canUse` 1617-1622, `canContinueToUse` 1636): when the route to the pool fails or
@@ -386,12 +400,16 @@ dead (80 health): it neither charges nor flees.
 **To measure.** A hippo penned on a bank by day; the profiler's `pathfind` and tick time. **Fix:** a wait after a
 failed go, and remember "no lawns here" a few minutes.
 
+**Status (2026-11-26, `claude/review-fix-b5-bc1153`): fixed: a hippo whose way home failed or ended short waits 10 seconds before it tries again (`homeNotBefore`, my pick), and "no lawns in reach" is remembered for 2 minutes (`lawnsNotBefore`; a new pool asks afresh). Not measured.**
+
 ### R9-17 (B, the read proven, the stall likely): the pool's water is read with no check that its land is loaded
 
 `waterTop()` (1111) and `poolGone()` (2042) read the saved pool block directly; every other far read in the file is
 guarded. At home it is always loaded. A hippo led away on a lead (Minecraft allows it) or drawn off charge after
 charge, then standing in other water, loads its pool's chunk on the spot at each rest's end, nibble look and bank
 look. The same hole as the crocodile's nest (R9-10). **Fix:** `level().isLoaded(pool)` first in both.
+
+**Status (2026-11-26, `claude/review-fix-b5-bc1153`): fixed: `poolGone` asks whether the pool's land is loaded first (land away is not "gone"); `waterTop` already did (`Grazing.waterTop`, since the buffalo).**
 
 ### R9-18 (B/C, proven in the code): when the pool is gone each hippo takes its own, and "gone" is judged two ways
 
@@ -405,6 +423,8 @@ look. The same hole as the crocodile's nest (R9-10). **Fix:** `level().isLoaded(
 
 **Fix proposed.** One judge of the pool's water (the block or the one over it), and a new pool every pod mate finds
 the same way.
+
+**Status (2026-11-26, `claude/review-fix-b5-bc1153`): half fixed: one judge of the pool's water: `poolGone` is now "`waterTop` finds none", and `waterTop` takes the water over the pool's block when a block has landed on the bed there, so the landing, the bank rest and the nibbling go on. Open: when the pool really is gone each hippo still takes the spot it stands on, at its own time (it happens once; a shared new pool needs the pod to agree, for the hippo's own step).**
 
 ### R9-19 (C, proven; looks and comments, the user's call where it shows)
 
@@ -480,6 +500,8 @@ only count `left` down from 900 (243). Fish wander freely during a hunt (a hunti
 **Fix proposed.** "Cannot reach" becomes part of `lost()`: the prey's column too shallow, or the swimming blocked for
 about 3 seconds, ends the hunt with the short wait. One rule in one place.
 
+**Status (2026-11-26, `claude/review-fix-b5-bc1153`): fixed: "cannot reach" is part of the hunt's `lost()`: the prey's water too shallow (while it prowls or closes in), or the shark held at the shelf's edge for 3 seconds, ends the hunt with the short wait. Not watched in the game; `BullSharkTests` pass.**
+
 ### R9-22 (B, proven): only the three nearest fish are tried, so a school on the shelf hides every fish behind it
 
 `HuntGoal.canUse` 226-236 sorts all prey within 20 blocks by distance and checks only the nearest three for depth and
@@ -487,6 +509,8 @@ a deep line. A school sits together: if the three nearest are in the shallows th
 could take swim farther off; the same three are tried again every second. **The player would see** a hungry shark
 patrolling past fish all night. **Fix:** put the cheap depth test into the search's filter, then try the nearest
 three of those.
+
+**Status (2026-11-26, `claude/review-fix-b5-bc1153`): fixed: the depth test is in the search's own filter, so the three nearest fish over deep water are tried for a clear line, not the three nearest of all.**
 
 ### R9-23 (B, the search proven, the stuck shark likely; to measure): a shark with nowhere to go asks for a new target every tick and lies still
 
@@ -503,6 +527,8 @@ block reads and two searches a tick for each stuck shark, two sharks at most); n
 **To measure.** `BullSharkTests` with a shark in a 5 by 5 deep hole: tick time and whether it moves.
 **Fix proposed.** A wait (say 40 ticks) after a failed pick; a spawn rule that asks for two or three deep columns in
 a row.
+
+**Status (2026-11-26, `claude/review-fix-b5-bc1153`): half fixed: after a pick that found nowhere to go the patrol waits 2 seconds before it searches again, and the keep-clear goal asks every 2 seconds. Open: a shark in a hole too small for a run still lies still (it needs a spawn rule that asks for two or three deep columns in a row, a spawning change with its own check list).**
 
 ### R9-24 (B, proven; the user's call): a shark hit from the bank or from a boat does nothing
 
@@ -523,6 +549,8 @@ to the chase's 600 ticks. Cheap when the prey is right beside it; a full failed 
 cannot be reached. The link not checked: how often a catfish sees prey it cannot reach (its pick needs a line of
 sight). This may be part of the old catfish hunting flakes (BUGS 217, 236, 279). **Fix:** plan on the 10-tick beat
 only.
+
+**Status (2026-11-26, `claude/review-fix-b5-bc1153`): fixed: the catfish plans on its 10-tick beat, or when its route has run out, but then at most every 4 ticks (`HuntTilapiaGoal.planned`), not on every tick. Kept shorter than the beat on purpose, so a chase does not stop and start at each route's end. Whether this was part of the old catfish hunting flakes is not known.**
 
 ### R9-26 (C): small things in the shark
 
@@ -689,6 +717,8 @@ and a `HashMap` stores nothing when the function gives null. `checks` 52-63 open
 
 **Fix proposed.** Remember "none" too (store an empty answer). One line.
 
+**Status (2026-11-26, `claude/review-fix-b5-bc1153`): fixed: "no measures" is remembered too (`HeldCatch.fish`), so a crab's or a frog's file is read once, not twice a frame.**
+
 ### R9-32 (B, proven that nothing stops it; how often not known): a hunt that gives up takes the same prey again half a second later
 
 **What is wrong.** When a hunt gives up (its clock runs out) the goal just stops: no wait, no memory of the prey it
@@ -703,6 +733,8 @@ hunt already does this right (rests 10 to 60 seconds after a give-up, R9-26's so
 **Fix proposed.** After a give-up, a wait of some seconds and "not that one" for a minute. Use the same small rule for
 the shark's R9-22 and R9-23: one shared "gave up on this, wait" helper in the kit instead of each hunter's own.
 
+**Status (2026-11-26, `claude/review-fix-b5-bc1153`): fixed: an otter whose hunt's clock ran out does not take that prey again for a minute and does not hunt for 5 seconds (`HuntGoal.gaveUpOn`, my picks). Kept in the otter's own goal; a shared "gave up on this" helper in the kit waits until a third hunter needs it.**
+
 ### R9-33 (B, likely, to measure): a cornered otter plans its escape again every time it is asked
 
 **What is wrong.** Fleeing picks a spot and a route, to be picked again after 60 counts "or when the route is done".
@@ -716,6 +748,8 @@ walled one-block pool with a crocodile beside it, the server's tick time.
 
 **Fix proposed.** After a `route()` that set no route, wait 10 ticks. (The same "no wait after nothing found" shape
 as R9-16 and R9-23.)
+
+**Status (2026-11-26, `claude/review-fix-b5-bc1153`): fixed: a flight that found no spot or no way asks again in half a second, not on every look (`FleeGoal.routed`).**
 
 ### R9-34 (B, proven): harm with no attacker does not make an otter run, and it wipes the fright of the otters near it
 
@@ -733,6 +767,8 @@ blow scares nobody at all, because the family is only told while the hit otter i
 with none: it just goes somewhere), a fright with no scarer never replaces one that has one, and the family is told
 before the alive check.
 
+**Status (2026-11-26, `claude/review-fix-b5-bc1153`): fixed: "scared" runs on its clock alone, so harm with no attacker (fire, a cactus, a fall) makes an otter run; a fright with no scarer never replaces one that has one; the family is told at a killing blow too; when what scared it dies it is calm again.**
+
 ### R9-35 (B, a design note): what the otter is doing lives in five places, and every A finding above is a state left behind when one of them ended unplanned
 
 **What is wrong.** `OtterEntity` is one file with the animal, nine goals and the 580-line play bout. "What am I doing"
@@ -747,6 +783,8 @@ likely to break when the otter gets more (breeding, the pet, biting back).
 **Fix proposed (for the fix session to weigh, not a patch).** Before adding to the otter: the bout and the held catch
 each become their own small class with one "end, whatever happened" door, called from the goal's stop, from `remove`
 and from `die`. That one change fixes R9-27 and R9-29 at the root.
+
+**Status (2026-11-26, `claude/review-fix-b5-bc1153`): open: left on purpose, a design note. The bout and the held catch as their own classes with one "end, whatever happened" door is the first step of the next thing added to the otter (breeding, the pet); done now it would move approved looks for no change in play.**
 
 ### R9-36 (C): small things in the otter
 
@@ -905,6 +943,8 @@ uncommitted `BlockMoves` changes were in the folder for some of those runs.
 (wish for sun and hunger far off, no stroll), or steers it through a goal that holds the legs. And a new test for
 R9-37, the real stuck state the tests do not cover.
 
+**Status (2026-11-26, `claude/review-fix-b5-bc1153`): half fixed: the mid-climb tests already still the monitor's mind (`calmForTests`, the stroll and the mate search taken out, BUGS 255's fix in `RiverLifeTests`). Open: BUGS 255's other message ("on a move 93 ticks, highest 0.00") is still not explained.**
+
 ### R9-40 (B, proven): after a reload, and from its spawn until its first swim, nothing keeps a monitor near its water
 
 **What is wrong.** "Never strays far from the water it was last in" is a home spot set once a second while it is in
@@ -921,6 +961,8 @@ spot is two plain fields (132-133) that the save does not write. The snail keeps
 (`SnailEntity` 162-164; round 10's file).
 
 **Fix proposed.** Save the home spot and set it at spawn (the water it was spawned in).
+
+**Status (2026-11-26, `claude/review-fix-b5-bc1153`): fixed: a monitor's home spot is saved with it and set at its spawn by the world (the water it was spawned in), so nothing lets it stroll inland after a reload or before its first swim.**
 
 ### R9-41 (B, proven): the monitor never counts its life clock (nor does the hippo); the kit leaves that to each animal to remember
 
@@ -952,6 +994,8 @@ every fix to the moves has to be made up to three times.
 
 **Fix proposed.** Move the monitor, then the hippo, onto `MoveRider` (about 400 lines less in each), with R9-37
 fixed there. Guard with the monitor's course and its frame films, since the moves are approved looks.
+
+**Status (2026-11-26, `claude/review-fix-b5-bc1153`): open: left on purpose for the Motion Studio. Moving the monitor and the hippo onto `MoveRider` touches approved moves, so it needs the monitor's course and its frame films; it belongs with the next change to their staged moves.**
 
 ### R9-43 (C, proven or likely as said): three small behaviours that do not end the way they should
 

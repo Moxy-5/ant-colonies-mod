@@ -438,8 +438,8 @@ public class CrocodileEntity extends PathfinderMob implements GeoEntity, HasLife
         if (gravid || !carried.isEmpty() || hatchSite != null) {
             return true;
         }
-        if (nestAt == null) {
-            return false;
+        if (nestAt == null || !level().isLoaded(nestAt)) {
+            return false; // (a mother led or boated far from her nest never loads its land, review R9-10)
         }
         var state = level().getBlockState(nestAt);
         return state.getBlock() instanceof com.antcolonies.savanna.block.CrocodileNestBlock
@@ -499,7 +499,7 @@ public class CrocodileEntity extends PathfinderMob implements GeoEntity, HasLife
             return null;
         }
         if (nestAt != null) {
-            return nestAt;
+            return level().isLoaded(nestAt) ? nestAt : null; // taken far from it she guards nothing and plans no way home (review R9-10)
         }
         return crecheAt != null && level().getGameTime() < crecheUntil ? BlockPos.containing(crecheAt) : null;
     }
@@ -1182,6 +1182,26 @@ public class CrocodileEntity extends PathfinderMob implements GeoEntity, HasLife
     }
 
     /** Whether a crocodile lies at (x, z), or is heading there to lie, within about a block and a third. */
+    /**
+     * Whether a hippo is so near a spot that a crocodile lying there would be moved on at once ({@link KeepClearGoal}):
+     * asked by every picker of a basking spot (review R9-7: the pickers did not know of hippos, so a crocodile set off
+     * for its sand bank beside a resting pod, was turned away, and set off again, all day).
+     */
+    static boolean byHippo(java.util.List<HippoEntity> hippos, double x, double z) {
+        for (HippoEntity h : hippos) {
+            double dx = h.getX() - x, dz = h.getZ() - z, keep = KeepClearGoal.NEAR * h.getScale() + 1.0;
+            if (h.isAlive() && dx * dx + dz * dz < keep * keep) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /** The hippos near enough to matter for a basking spot within {@code reach} of it. */
+    java.util.List<HippoEntity> hipposWithin(double reach) {
+        return level().getEntitiesOfClass(HippoEntity.class, getBoundingBox().inflate(reach + 12.0, 12.0, reach + 12.0));
+    }
+
     private static boolean taken(java.util.List<CrocodileEntity> crocs, double x, double z) {
         for (CrocodileEntity c : crocs) {
             double dx = c.getX() - x, dz = c.getZ() - z;
@@ -1216,7 +1236,9 @@ public class CrocodileEntity extends PathfinderMob implements GeoEntity, HasLife
         Level level = level();
         java.util.List<CrocodileEntity> all = level.getEntitiesOfClass(CrocodileEntity.class,
                 getBoundingBox().inflate(SAND_REACH + 4.0, 12.0, SAND_REACH + 4.0), c -> c != this);
-        if (sandAt != null && level.isLoaded(sandAt) && sandBank(level, sandAt) && !taken(all, sandAt.getX() + 0.5, sandAt.getZ() + 0.5)) {
+        java.util.List<HippoEntity> hippos = hipposWithin(SAND_REACH);
+        if (sandAt != null && level.isLoaded(sandAt) && sandBank(level, sandAt) && !taken(all, sandAt.getX() + 0.5, sandAt.getZ() + 0.5)
+                && !byHippo(hippos, sandAt.getX() + 0.5, sandAt.getZ() + 0.5)) {
             return true;
         }
         sandAt = null;
@@ -1241,7 +1263,7 @@ public class CrocodileEntity extends PathfinderMob implements GeoEntity, HasLife
                     if (!level.isLoaded(p)) {
                         break;
                     }
-                    if (sandBank(level, p) && !taken(all, p.getX() + 0.5, p.getZ() + 0.5)) {
+                    if (sandBank(level, p) && !taken(all, p.getX() + 0.5, p.getZ() + 0.5) && !byHippo(hippos, p.getX() + 0.5, p.getZ() + 0.5)) {
                         best = d;
                         sandAt = p.immutable();
                         break;
@@ -1781,9 +1803,10 @@ public class CrocodileEntity extends PathfinderMob implements GeoEntity, HasLife
                 return false;
             }
             wait = 100;
+            java.util.List<HippoEntity> hippos = croc.hipposWithin(24.0);
             if (croc.findBaskingCompany()) {
                 // only company it can get to: not a basker in another pond over dry land (BUGS 305)
-                var path = croc.getNavigation().createPath(BlockPos.containing(croc.joinAt), 0);
+                var path = byHippo(hippos, croc.joinAt.x, croc.joinAt.z) ? null : croc.getNavigation().createPath(BlockPos.containing(croc.joinAt), 0);
                 if (path != null && path.canReach()) {
                     return croc.getNavigation().moveTo(path, 1.0);
                 }
@@ -1798,7 +1821,8 @@ public class CrocodileEntity extends PathfinderMob implements GeoEntity, HasLife
             }
             Level level = croc.level();
             Optional<BlockPos> bank = BlockPos.findClosestMatch(croc.blockPosition(), 12, 3, p -> isBank(level, p)
-                    && !level.getFluidState(p.below()).is(FluidTags.WATER) && waterBeside(level, p, 3) && !waterBeside(level, p, 1));
+                    && !level.getFluidState(p.below()).is(FluidTags.WATER) && waterBeside(level, p, 3) && !waterBeside(level, p, 1)
+                    && !byHippo(hippos, p.getX() + 0.5, p.getZ() + 0.5));
             return bank.isPresent() && croc.getNavigation().moveTo(bank.get().getX() + 0.5, bank.get().getY(), bank.get().getZ() + 0.5, 1.0);
         }
 

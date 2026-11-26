@@ -81,11 +81,14 @@ public final class HeldCatch {
             return null;
         }
         String name = BuiltInRegistries.ENTITY_TYPE.getKey(e.getType()).getPath();
-        return FISH.computeIfAbsent(name, n -> {
-            JsonObject h = checks(n).getAsJsonObject("held");
-            return h == null ? null : new Fish(h.get("px").getAsDouble(), h.get("middle").getAsDouble(),
-                    h.get("centre_z").getAsDouble(), h.get("half").getAsDouble(), h.get("thick").getAsDouble());
-        });
+        if (!FISH.containsKey(name)) {
+            // "None" is remembered too (review R9-31: for a crab or a frog the file was read and parsed again on every
+            // call, twice a frame for every otter in view holding one).
+            JsonObject h = checks(name).getAsJsonObject("held");
+            FISH.put(name, h == null ? null : new Fish(h.get("px").getAsDouble(), h.get("middle").getAsDouble(),
+                    h.get("centre_z").getAsDouble(), h.get("half").getAsDouble(), h.get("thick").getAsDouble()));
+        }
+        return FISH.get(name);
     }
 
     private static double size(Entity e) {

@@ -990,6 +990,7 @@ public class MonitorEntity extends PathfinderMob implements GeoEntity, HasLife {
     public SpawnGroupData finalizeSpawn(ServerLevelAccessor level, DifficultyInstance difficulty, MobSpawnType spawnType, @Nullable SpawnGroupData data) {
         SpawnGroupData out = super.finalizeSpawn(level, difficulty, spawnType, data);
         if (spawnType == MobSpawnType.NATURAL || spawnType == MobSpawnType.CHUNK_GENERATION) {
+            restrictTo(blockPosition(), NEAR_WATER);       // the water it was spawned in is its home from the start (review R9-40)
             BlockPos bank = bankNear(level, blockPosition(), BANK_REACH);      // spawned in the water by a bank: onto the bank
             if (bank != null) {
                 moveTo(bank.getX() + 0.5, bank.getY(), bank.getZ() + 0.5, random.nextFloat() * 360.0F, 0.0F);
@@ -1024,6 +1025,9 @@ public class MonitorEntity extends PathfinderMob implements GeoEntity, HasLife {
         life.save(tag);
         tag.putInt("HungryIn", hungryIn);
         tag.putInt("SunIn", sunIn);
+        if (hasRestriction()) {
+            tag.putLong("Home", getRestrictCenter().asLong()); // Minecraft does not save a mob's home spot (review R9-40)
+        }
     }
 
     @Override
@@ -1032,6 +1036,9 @@ public class MonitorEntity extends PathfinderMob implements GeoEntity, HasLife {
         life.load(tag);
         hungryIn = tag.getInt("HungryIn");
         sunIn = tag.getInt("SunIn");
+        if (tag.contains("Home")) {
+            restrictTo(BlockPos.of(tag.getLong("Home")), NEAR_WATER);
+        }
         refresh();
     }
 

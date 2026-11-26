@@ -564,12 +564,15 @@ public class OtterEntity extends PathfinderMob implements GeoEntity, HasLife {
 
     /** Whether it is scared of something now (fleeing). */
     public boolean scared() {
-        return scare != null && tickCount < scaredUntil;
+        return tickCount < scaredUntil; // by its clock alone: what scared it may be nothing it can name (fire, a fall; review R9-34)
     }
 
+    /** A fright, from {@code by} or from nothing it can name (null: it just runs); one with no scarer never replaces one that has one. */
     void scare(@Nullable Entity by, int ticks) {
-        scare = by;
-        scaredUntil = tickCount + ticks;
+        if (by != null || !scared()) {
+            scare = by;
+        }
+        scaredUntil = Math.max(scaredUntil, tickCount + ticks);
         if (doing() == REST) {
             setDoing(REST_UP);
         } else if (doing() == SKID || doing() == HOP || doing() == POUNCE || doing() == ZIG_L || doing() == ZIG_R || doing() == PIN) {
@@ -770,7 +773,10 @@ public class OtterEntity extends PathfinderMob implements GeoEntity, HasLife {
                 }
             }
         }
-        if (scare != null && (tickCount >= scaredUntil || !scare.isAlive())) {
+        if (scare != null && !scare.isAlive()) {
+            scare = null;
+            scaredUntil = tickCount; // what scared it is dead: calm again
+        } else if (tickCount >= scaredUntil) {
             scare = null;
         }
         if (isInWater()) {
@@ -928,10 +934,10 @@ public class OtterEntity extends PathfinderMob implements GeoEntity, HasLife {
             release();                                   // a fright and its catch is dropped
             if (isAlive()) {
                 scare(source.getEntity(), 200);
-                // its family hears it and runs too
-                for (OtterEntity mate : level().getEntitiesOfClass(OtterEntity.class, getBoundingBox().inflate(12.0), o -> o != this)) {
-                    mate.scare(source.getEntity(), 160);
-                }
+            }
+            // its family hears it and runs too (a killing blow as well, review R9-34)
+            for (OtterEntity mate : level().getEntitiesOfClass(OtterEntity.class, getBoundingBox().inflate(12.0), o -> o != this && o.isAlive())) {
+                mate.scare(source.getEntity(), 160);
             }
         }
         return hurt;
@@ -1330,6 +1336,7 @@ public class OtterEntity extends PathfinderMob implements GeoEntity, HasLife {
     static class FleeGoal extends Goal {
         private final OtterEntity otter;
         private int left;
+        private boolean routed;
 
         FleeGoal(OtterEntity otter) {
             this.otter = otter;
@@ -1366,10 +1373,9 @@ public class OtterEntity extends PathfinderMob implements GeoEntity, HasLife {
             if (to == null) {
                 to = dangerInWater ? waterSpot(otter, 14.0, away) : landSpot(otter, 12.0, away);
             }
-            if (to != null) {
-                otter.getNavigation().moveTo(to.x, to.y, to.z, DASH);
-            }
-            left = 60;
+            routed = to != null && otter.getNavigation().moveTo(to.x, to.y, to.z, DASH);
+            // (cornered, no spot or no way: asked again in half a second, not on every look; review R9-33)
+            left = routed ? 60 : 10;
         }
 
         @Override
@@ -1392,7 +1398,7 @@ public class OtterEntity extends PathfinderMob implements GeoEntity, HasLife {
             if (otter.isInWater() && otter.scare != null && !otter.scare.isInWater()) {
                 otter.setDiving(true);                       // away under the water from a danger on land
             }
-            if (--left <= 0 || otter.getNavigation().isDone()) {
+            if (--left <= 0 || routed && otter.getNavigation().isDone()) {
                 route();
             }
         }
@@ -1478,6 +1484,13 @@ public class OtterEntity extends PathfinderMob implements GeoEntity, HasLife {
         @Nullable
         private LivingEntity prey;
         private int left, again;
+        /**
+         * The prey it gave up on (its hunt's clock ran out), not taken again before {@code notThatBefore}, and the tick
+         * before which it does not hunt at all (review R9-32: it took the same prey again half a second later, for good).
+         */
+        @Nullable
+        private LivingEntity gaveUpOn;
+        private int notThatBefore, restBefore;
         /** The tick it took its catch, and the tick it may next look for a bank. */
         private int carriedFrom, lookAgain;
         @Nullable
@@ -1491,15 +1504,18 @@ public class OtterEntity extends PathfinderMob implements GeoEntity, HasLife {
         @Override
         public boolean canUse() {
             if (otter.isFed() || otter.life.isYoung() || otter.doing() != CALM || otter.scared() || otter.held != null
-                    || otter.rider.play() != null || otter.random.nextInt(5) != 0) {
+                    || otter.rider.play() != null || otter.tickCount < restBefore || otter.random.nextInt(5) != 0) {
                 // (a look round about every 10 ticks: Minecraft checks goals every other tick, odd or even by the
                 // creature's id, so "tickCount % 10" never came round for half the otters)
                 return false;
             }
             prey = null;
+            if (otter.tickCount >= notThatBefore) {
+                gaveUpOn = null;
+            }
             double best = HUNT_REACH * HUNT_REACH;
             for (LivingEntity e : otter.level().getEntitiesOfClass(LivingEntity.class, otter.getBoundingBox().inflate(HUNT_REACH),
-                    e -> e.isAlive() && isPrey(e) && !e.isPassenger() && !RiverCover.hiddenFrom(otter, e))) {     // (a fish still in the reeds unseen)
+                    e -> e.isAlive() && e != gaveUpOn && isPrey(e) && !e.isPassenger() && !RiverCover.hiddenFrom(otter, e))) {     // (a fish still in the reeds unseen)
                 double d = e.distanceToSqr(otter) * (e instanceof CrabEntity ? 0.6 : 1.0);     // crabs first: its favourite
                 if (d < best) {
                     best = d;
@@ -1694,6 +1710,11 @@ public class OtterEntity extends PathfinderMob implements GeoEntity, HasLife {
 
         @Override
         public void stop() {
+            if (left <= 0 && otter.held == null && prey != null && prey.isAlive()) {
+                gaveUpOn = prey;                            // its clock ran out on prey it could not get: not that one for a minute,
+                notThatBefore = otter.tickCount + 1200;     // and a breather of 5 seconds (my picks)
+                restBefore = otter.tickCount + 100;
+            }
             byte d = otter.doing();
             if (d == FORAGE || d == BITE || d == EAT || d == PIN) {
                 otter.setDoing(CALM);

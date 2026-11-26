@@ -45,7 +45,7 @@ public class SnailLayGoal extends Goal {
     private final SnailEntity snail;
     @Nullable
     private Spot spot;
-    private int crept, laid;
+    private int crept, planned, laid;
 
     public SnailLayGoal(SnailEntity snail) {
         this.snail = snail;
@@ -96,7 +96,9 @@ public class SnailLayGoal extends Goal {
         if (!within(snail, at) && crept < GIVE_UP) {
             crept++;
             snail.setDoing(SnailEntity.CALM);
-            if (snail.getNavigation().isDone() || crept % 40 == 0) {
+            // (when its route has run out, a new one at most twice a second: a spot with no way up was a full failed search every tick, review R10-15)
+            if (crept % 40 == 0 || snail.getNavigation().isDone() && (crept == 1 || crept - planned >= 10)) {
+                planned = crept;
                 BlockPos to = standAt(snail.level(), spot.pos());
                 GoExactly.to(snail, to.getX() + 0.5, to.getY(), to.getZ() + 0.5, 1.0);
             }
