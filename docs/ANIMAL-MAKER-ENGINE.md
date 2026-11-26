@@ -237,6 +237,10 @@ the monitor's leftovers in its own row.
   animal along the move's own path. Bending a body to the ground every frame failed twice (the two strikes,
   2026-11-19: the feet jumped up at the last moment); the move made once was confirmed in-game ("it look perfect
   now"). `docs/plans/engine-step2-climb.md`, `docs/plans/engine-step4-water.md`.
+  **Strikes too (the Motion Studio phase 3, step 4, 2026-11-26):** a leap, lunge or pounce carries its own travel the
+  same way, aimed at a spot on its prey: made with the motion kit's `travel`, `path_note` and `on_path`, its share a
+  tick in the spot table (`tools/spots.py`, the plan's `strikes`), played by the framework's `entity/body/Strikes`
+  (`docs/plans/motion-studio-phase3.md`, step 4).
 - **M2. The body hangs from where it really is.** The tail a chain dragged after the hips, draping over edges and lying
   on the water (`framework/.../entity/body/TailDrag`, `client/DraggedTail`); legs hanging as they lose the bottom and
   folding a while after.

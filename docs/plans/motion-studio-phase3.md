@@ -245,4 +245,12 @@ the clip leapt on the spot).
   for 0.2 s (every clip change while moving does); her paw at the smack's hit is not checked against the hide offline
   (`--pair` checks holds only); a strike's jaw at its hit is not in the table. The film (`tools/film/lion_hunt.film`,
   asked first) is the judge.
+- **Shared for every animal (2026-11-26, the user: "Yes, share them"):** the ways of building a strike went into the
+  engine's shared pieces, the lion keeping only its own numbers: the motion kit (`tools/motion_kit.py`) has `travel`
+  (the speed eased in and out), `path_note` (the clip's note) and `on_path` (a foot target kept planted while the body
+  goes), with how to make a strike in its comment; the framework has `entity/body/Strikes` (`inReach`, the one rule when
+  to strike, and `Ride`, the striker placed along the strike's share from where it set off to its place, on every
+  side alike); `tools/spots.py` and `Spots.Strike` already were. The lion's clips proved the same keyframes after the
+  move; `land` 44 of 44. A new hunter needs: its strike clips made with the kit, `strikes` in its plan, and its own code
+  choosing the strike and the spot.
 - **Next:** the hunt film, then step 5 (feeding on the carcass).

@@ -13,6 +13,9 @@ Nile monitor's maker (_Poser.leg's reach, _bend_way, _foot_at, _spline, _ease, _
 - a chain following a path (follow_path, headings): each piece placed along the path the head took, eased as places,
   not angles (the monitor's S-curve today; later the snake, tails, the trunk, the millipede);
 - easing helpers (ease, pulse, ramp, spline);
+- strikes and lunges that carry themselves (the Motion Studio phase 3, step 4, 2026-11-26; first the lioness): the
+  travel's speed eased in and out (travel), written as the clip's "path root" note the game reads through the animal's
+  spot table (path_note), and a foot target kept planted on the ground while the body goes along the path (on_path);
 - per-clip fingerprints (cached): a clip is rebuilt only when what it is made from changed (the tools review's K1).
 
 Units are whatever the maker uses (model pixels in every maker so far); points are [x, y, z] lists.
@@ -26,6 +29,43 @@ from model_parts import smooth, vsub, vadd, vlen, unit
 
 ROOT = Path(__file__).resolve().parent.parent
 CACHE = ROOT / 'run-film' / 'clip_cache'
+
+
+# --- strikes that carry themselves (the Motion Studio phase 3, step 4) ------------------------------------------------
+# A strike (a leap, a lunge, a pounce) is made once with its own travel (the engine's method M1, as the block moves):
+# the clip poses the body with its root kept at 0; its travel goes into a "path root" note; tools/spots.py writes the
+# travel's share a tick into the animal's spot table (its plan's "strikes": the clip and its hit tick), and the game
+# places the animal that share of the way from where it set off to its place on its prey (framework Strikes). How to
+# make one: compute dz = -travel(t, ...) each frame, add on_path(...) to each foot's target z, set the root to dz while
+# the legs are solved, set it back to 0, and put path_note(L, path) in the clip's timeline.
+def travel(t, v, start, up, down_from, end):
+    """How far the body has gone forward at time t (the maker's units, usually px): still until start, its speed easing
+    up to v (units a second) by up, held, easing down to 0 from down_from to end (each ease a smoothstep of the speed,
+    so the travel has no jolt). start == up: it sets off at v (a leap out of a run)."""
+    a, b = up - start, end - down_from
+    if t <= start:
+        return 0.0
+    if t <= up:
+        u = (t - start) / a
+        return v * a * (u ** 3 - u ** 4 / 2.0)
+    if t <= down_from:
+        return v * a / 2.0 + v * (t - up)
+    u = min(1.0, (t - down_from) / b)
+    return v * a / 2.0 + v * (down_from - up) + v * b * (u - u ** 3 + u ** 4 / 2.0)
+
+
+def path_note(length, path):
+    """A clip's travel as its note ("path root t dy dz ...", one row a game tick, forward as -z), path(t) being how far
+    it has gone forward at time t; the lab and clip_check.py add it back to the root."""
+    n = round(length * 20)
+    return "path root " + " ".join(f"{k / 20:.4f} 0.000 {-path(k / 20):.3f}" for k in range(n + 1))
+
+
+def on_path(free, landed, dz, dz_end):
+    """What to add to a foot target's z (forward as -z) on a clip with travel, so a planted foot stays where it is in the
+    world: 0 where it stood before the travel, dz_end where it lands, the body's own dz while the foot is free (free:
+    its leg's air or FK weight, 0 to 1; landed: whether it is past the middle of the flight)."""
+    return (1.0 - free) * (dz_end if landed else 0.0) + free * dz
 
 
 # --- easing ------------------------------------------------------------------------------------------------------------

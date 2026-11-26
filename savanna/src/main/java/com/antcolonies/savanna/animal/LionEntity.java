@@ -187,9 +187,9 @@ public class LionEntity extends PathfinderMob implements GeoEntity, HasLife, com
     LionEntity focus;
     /** The game tick its doing started (on the players' screens too, for where it is placed holding prey). */
     int doingSince;
-    /** Settling onto its spot on its prey, on each side (the strike's end); null when it holds nothing. */
+    /** On its way onto its spot on its prey, on each side (from its strike's start, or a grip); null when it holds nothing. */
     @Nullable
-    LionHunt.Settle settle;
+    com.antcolonies.entity.body.Strikes.Ride settle;
     private List<LionEntity> mates = List.of();
     private int matesAt = -MATES_EVERY;
     private int movedTick = -100;

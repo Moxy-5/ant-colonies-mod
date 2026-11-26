@@ -297,25 +297,6 @@ public final class LionHunt {
 
     // --- the hold: placed on the prey's body (the Motion Studio, phase 3) ---------------------------------------------
 
-    /**
-     * Onto its spot: where it set off (the world: a strike's start, or where it gripped) and its heading then; on a strike,
-     * the share of the strike's travel already gone when it was first placed (a screen that learns of the strike a tick
-     * late carries on from where it draws it; below 0: no strike, it settles over its blend), and the ticks it has settled.
-     */
-    static final class Settle {
-        final double x, z;
-        final float yaw;
-        final double from;
-        int k;
-
-        Settle(double x, double z, float yaw, double from) {
-            this.x = x;
-            this.z = z;
-            this.yaw = yaw;
-            this.from = from;
-        }
-    }
-
     /** Where a holder stands (its feet, flat: the height is the ground's) and its heading. */
     record Place(Vec3 at, float yaw) {
     }
@@ -415,23 +396,14 @@ public final class LionHunt {
             return false;
         }
         var strike = l.strike();
-        double share = strike == null ? 1.0 : strike.share(l.doingFor());
         if (l.settle == null) {
-            // where it stands is where the strike had it a tick ago (its start, on the server's first tick on it)
-            l.settle = new Settle(l.getX(), l.getZ(), l.yBodyRot, strike == null ? -1.0 : strike.share(l.doingFor() - 1));
+            l.settle = com.antcolonies.entity.body.Strikes.Ride.from(l, l.yBodyRot, strike, l.doingFor());
         }
-        Settle s = l.settle;
-        double f;
-        if (s.from >= 0.0) {
-            f = s.from >= 1.0 ? 1.0 : Mth.clamp((share - s.from) / (1.0 - s.from), 0.0, 1.0);
-        } else {
-            f = s.k >= LionEntity.BLEND ? 1.0 : (double) ++s.k / LionEntity.BLEND;
-            f = f * f * (3.0 - 2.0 * f);
-        }
-        double x = Mth.lerp(f, s.x, p.at().x), z = Mth.lerp(f, s.z, p.at().z);
-        double ground = groundAt(l.level(), x, z, prey.getY());
-        move.accept(l, x, Double.isNaN(ground) ? l.getY() : ground, z);
-        float yaw = s.yaw + Mth.wrapDegrees(p.yaw() - s.yaw) * (float) f;
+        double f = l.settle.along(strike, l.doingFor(), LionEntity.BLEND);
+        Vec3 at = l.settle.at(f, p.at());
+        double ground = groundAt(l.level(), at.x, at.z, prey.getY());
+        move.accept(l, at.x, Double.isNaN(ground) ? l.getY() : ground, at.z);
+        float yaw = l.settle.yaw(f, p.yaw());
         l.setYRot(yaw);
         l.yBodyRot = yaw;
         l.yHeadRot = yaw;
@@ -453,9 +425,8 @@ public final class LionHunt {
         if (p == null) {
             return -1;
         }
-        int lands = strike.landed();
-        double x = p.at().x + (prey.getX() - prey.xo) * lands, z = p.at().z + (prey.getZ() - prey.zo) * lands;
-        return HomeGroup.flat(l.position(), x, z) <= strike.reach() * l.getScale() / 16.0 ? spot : -1;
+        Vec3 moved = new Vec3(prey.getX() - prey.xo, 0.0, prey.getZ() - prey.zo);
+        return com.antcolonies.entity.body.Strikes.inReach(l.position(), p.at(), moved, strike, l.getScale()) ? spot : -1;
     }
 
     /**
