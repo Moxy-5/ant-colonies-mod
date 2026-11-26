@@ -367,6 +367,10 @@ drawn to at most once a storm; bolts that did not come from the weather are left
 
 **Your call (2026-11-26):** Lightning near big trees. Today every bolt that lands within 24 blocks of a big tree is pulled onto it, so by my sum (not measured) one thunderstorm kills about 1 big tree in 8, and a Channeling trident thrown near big trees strikes the tree, not the mob. Change it so only the weather's own bolts are pulled, and a tree is struck at most once a storm? My pick: yes.
 
+**Call made (2026-11-26):** yes, my pick.
+
+**Status (2026-11-26, `claude/review-fix-b6`): fixed: only the weather's own bolts are pulled onto a tree (a bolt with a thrower, a Channeling trident's, strikes its mob: `SavannaEvents.onJoinLevel`), and a tree draws one strike a thunderstorm (`Forest.struckThisStorm`, forgotten when the thunder ends). A bolt made by a command with no thrower is still pulled (the test makes its bolts so). The test `lightningIsDrawnToABigTreeAndScarsIt` checks the second strike. Not measured: how many big trees a storm now kills (the review's own sum was not measured either).**
+
 ### R7-13 (B, likely, to measure). Seedlings after rain fill the savanna in
 
 **What is wrong.** The rates do not balance against new land's own spacing:
@@ -397,6 +401,10 @@ which trees die. And let old sound logs weather away in the end.
 
 **Your call (2026-11-26):** Seedlings after rain. By my sums (not measured) about 9 new grown trees come up in each 64-block square over 100 days where new land put 1, so round a long-lived base the open savanna slowly closes into woodland with fallen logs everywhere. Cap the seedlings so each square keeps about as many trees as new land gives it, and let old logs weather away in the end? My pick: yes; it keeps the savanna open, as the design says.
 
+**Call made (2026-11-26):** yes, my pick.
+
+**Status (2026-11-26, `claude/review-fix-b6`): fixed: a 64-block square of land takes seedlings only while its living trees weigh under 6, a grown tree counting 3 and a seedling or young one 1 (`Forest.SQUARE_ROOM`, `GROWN_ROOM`, my picks: new land's own 1 big and 3 young fill a square). A sound fallen log weathers away 90 to 150 days after it was due down, crumbling to pulp as a rotten one does (`HeartRot.WEATHER_DAYS`, `WEATHER_SPREAD`, my picks); a log of new land counts as just fallen. Test: `seedlingsComeUpAfterRainScattered` (a full square takes none, one free place takes one). Not measured: the 200-day count of trees and logs.**
+
 ### R7-14 (B, proven). Termites hollow baobabs, which nobody decided
 
 **What is wrong.** Heart rot leaves baobabs out on purpose (`HeartRot.canRot`: "baobabs hollow on their own"). The
@@ -415,6 +423,10 @@ about 7 wide and 7 high with a door at the foot, and in an ancient baobab it mee
 baobabs, whose wood is wet fibre; not checked against a paper), one line beside the age check.
 
 **Your call (2026-11-26):** Termites and baobabs. Today termites hollow a baobab near their mound like any tree: a cave about 7 wide in the trunk, and the tree dies at half its age. Nobody decided that. Leave baobabs out? My pick: yes, leave them out (as far as I know Macrotermes do not hollow living baobabs; not checked against a paper).
+
+**Call made (2026-11-26):** yes, leave baobabs out.
+
+**Status (2026-11-26, `claude/review-fix-b6`): fixed: termites never come into a baobab (`Forest.bring`, one check beside the age). A baobab an older world already marked keeps its hollow.**
 
 ---
 
@@ -751,6 +763,10 @@ goes.
 
 **Your call (2026-11-26):** A cut giant tree. Today a giant tree cut through at the foot keeps its trunk and whole crown hanging in the air for good, and a burnt fig or palm leaves pieces in the air. Should a tree cut through fall, the way a dead one already does (the fall, the log and the smashing are built)? My pick: yes.
 
+**Call made (2026-11-26):** yes, a tree cut through falls.
+
+**Status (2026-11-26, `claude/review-fix-b6`): fixed: a grown tree cut through at the foot dies (cause `cut`) and falls the way a storm-broken one does (`Forest.bring` to `fellNow`), found within a second of the block being broken (`Forest.brokenAt` from the break event; fire, blasts and termites are found at dawn as before); a little tree's leftovers go with it; a baobab dies and slumps into its heap. Tests: `aGrownTreeCutThroughAtTheFootFalls`, and the young tree's in `aTreeGrowsAStepADayAroundAPlayersBlock`. Left: the fall puts the stump back as dead wood (as every fall does), and figs and doum palms (not in the tree book) still leave pieces in the air when burnt or cut.**
+
 ### R7-32 (B, proven; a balance call). Fruit stands still when nobody is near
 
 **What is wrong.** Fruit moves on by random ticks, which only happen within about 128 blocks of a player. A bare
@@ -768,6 +784,10 @@ the rest of the river.
 now), the same idea as the colonies' away timetable, instead of only starting inside the window.
 
 **Your call (2026-11-26):** Fruit on trees away from you. Today figs and doum nuts only bud and ripen within about 128 blocks of a player, so trees along the rest of the river are bare nearly always once their first fruit has fallen, and a bare tree you come back to stays bare for up to 9 days (fig) or 27 days (palm). Change it so a bare bunch works out from the calendar where in its fruiting cycle the tree is, as the colonies do when you are away? That means more fruit along the whole river (more food for the animals that will eat it). My pick: yes.
+
+**Call made (2026-11-26):** yes, my pick.
+
+**Status (2026-11-26, `claude/review-fix-b6`): fixed: a bare bunch that has not borne its tree's crop yet takes the stage the calendar gives (green, turning or ripe by the stages' average times, `HangingFruit.cropStage`), so a tree nobody was near shows its fruit when a player comes back. A new block state `crop` remembers which crop a bunch last bore, so one picked or fallen waits for the next crop, and a bunch hung by hand starts as borne (no ripe fruit for nothing, R7-28). The budding window (`budDays`, `cropStarts`) is gone. Unit test `HangingFruitTest`.**
 
 ### R7-33 (A, likely; to be seen in the game). A palm's crown can blink out at the screen's edge
 

@@ -940,8 +940,31 @@ public class CrocodileEntity extends PathfinderMob implements GeoEntity, HasLife
         }
         if (hurt && (!isInWater() || isBasking())) {
             startle();
+        } else if (hurt && held == null && source.getEntity() instanceof LivingEntity by && by != this && by != getTarget()
+                && (!by.isInWater() || by.distanceToSqr(this) > 64.0)) {
+            // Afloat, hit by something it cannot get at (a bow on the bank, a boat; the user's call 2026-11-26, review
+            // R9-24, and R9-11's first half): it sinks out of sight and makes off under water, away from the hit.
+            startle();
+            swimOffFrom(by.position());
         }
         return hurt;
+    }
+
+    /** Under water away from a place: the farthest of a few points of water 10 to 16 blocks off (none: it only sinks). */
+    private void swimOffFrom(Vec3 danger) {
+        Vec3 best = null;
+        double far = distanceToSqr(danger);
+        for (int i = 0; i < 10; i++) {
+            double a = random.nextDouble() * Math.PI * 2, d = 10 + random.nextDouble() * 6;
+            BlockPos at = BlockPos.containing(getX() + Math.cos(a) * d, getY(), getZ() + Math.sin(a) * d);
+            if (level().isLoaded(at) && level().getFluidState(at).is(FluidTags.WATER) && Vec3.atCenterOf(at).distanceToSqr(danger) > far) {
+                far = Vec3.atCenterOf(at).distanceToSqr(danger);
+                best = Vec3.atCenterOf(at);
+            }
+        }
+        if (best != null) {
+            getNavigation().moveTo(best.x, best.y, best.z, 1.4);
+        }
     }
 
     /**

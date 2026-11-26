@@ -48,9 +48,13 @@ import javax.annotation.Nullable;
  * <p><b>Drag</b> ({@link #DRAG}): anything not tagged {@code #antcolonies:mud_adapted} is slowed while its feet are in the
  * mud, the deeper it sinks the slower; the river animals are not. Mobs plan over it as ground (the ants' own legs keep off wet mud).
  *
- * <p><b>Wetting and drying</b> ({@link #randomTick}, as Minecraft's farmland): water within {@link #WATER_REACH} blocks or
- * rain on it makes it one step wetter; otherwise, by chance, one step drier, the shallower the faster, so a wallow cracks
- * from its rim inward and the river mud areas (every block within reach of the river) never dry.
+ * <p><b>Wetting and drying</b> ({@link #randomTick}, as Minecraft's farmland): rain on it makes it one step wetter; water
+ * within {@link #WATER_REACH} blocks keeps it as wet as its place asks ({@link #kept}: soupy inside a wallow or a mud
+ * area, its rim sticky close to the water and drying farther out); wetter than that, or with no water near, it dries a
+ * step by chance, the shallower the faster, so a wallow cracks from its rim inward and the river mud areas (every block
+ * within reach of the river) never dry. The features lay each block as the rule keeps it ({@link #settled}), so new
+ * land and land a player has been near look and walk the same (the user's call, 2026-11-26, review R8-14: before,
+ * every block near water went soupy within minutes whatever the feature laid).
  *
  * <p><b>Light</b>: it takes light in as glass does ({@link #getLightBlock}), so a creature sunk in it is not drawn
  * black (Minecraft lights a mob from the block at its eyes); it still hides its neighbours' faces as dirt does.
@@ -301,13 +305,44 @@ public class SavannaMudBlock extends Block implements com.antcolonies.nav.SoftGr
     /** The mud's state after one random tick: wetter by water or rain, else maybe drier. */
     public static BlockState nextWetness(BlockState state, LevelReader level, BlockPos pos, RandomSource random) {
         Wetness wetness = state.getValue(WETNESS);
-        if (wetted(level, pos)) {
+        if (level instanceof Level world && world.isRainingAt(pos.above())) {
             return wetness == Wetness.SOUPY ? state : state.setValue(WETNESS, wetness.wetter());
+        }
+        Wetness kept = kept(level, pos, state.getValue(DEPTH));
+        if (kept != null && wetness.ordinal() <= kept.ordinal()) {
+            return wetness == kept ? state : state.setValue(WETNESS, wetness.wetter());
         }
         if (wetness == Wetness.CRACKED || random.nextInt(DRY_BASE + DRY_PER_DEPTH * state.getValue(DEPTH)) != 0) {
             return state;
         }
         return state.setValue(WETNESS, wetness.drier());
+    }
+
+    /** How close mud at a wallow's or mud area's rim (depth 1) must be to water to stay sticky; farther out it is drying (my pick). */
+    public static final int STICKY_REACH = 2;
+
+    /**
+     * How wet the water near keeps mud of this depth here, or null with no water within {@link #WATER_REACH} (at the
+     * mud's level or one up): soupy inside a wallow or a mud area (depth 2 and more); the rim (depth 1) sticky within
+     * {@link #STICKY_REACH} blocks of the water and drying farther out.
+     */
+    public static Wetness kept(LevelReader level, BlockPos pos, int depth) {
+        int nearest = Integer.MAX_VALUE;
+        for (BlockPos near : BlockPos.betweenClosed(pos.offset(-WATER_REACH, 0, -WATER_REACH), pos.offset(WATER_REACH, 1, WATER_REACH))) {
+            if (level.getFluidState(near).is(FluidTags.WATER)) {
+                nearest = Math.min(nearest, Math.max(Math.abs(near.getX() - pos.getX()), Math.abs(near.getZ() - pos.getZ())));
+                if (depth > 1 || nearest <= STICKY_REACH) {
+                    break;
+                }
+            }
+        }
+        return nearest == Integer.MAX_VALUE ? null : depth > 1 ? Wetness.SOUPY : nearest <= STICKY_REACH ? Wetness.STICKY : Wetness.DRYING;
+    }
+
+    /** A mud block as the water near keeps it (for the features, once their water lies); unchanged with no water near. */
+    public static BlockState settled(LevelReader level, BlockPos pos, BlockState state) {
+        Wetness kept = kept(level, pos, state.getValue(DEPTH));
+        return kept == null ? state : state.setValue(WETNESS, kept);
     }
 
     /** Whether water lies within {@link #WATER_REACH} blocks (at the mud's level or one up) or rain falls on it. */

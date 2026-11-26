@@ -142,6 +142,12 @@ public class BullSharkEntity extends WaterAnimal implements GeoEntity {
     int huntWait, meetWait, crocWait, spyWait;
     /** Whether a hunt is under way (server only): the fish do not part round it then, it stalks them unseen. */
     boolean hunting;
+    /** Where the hit came from that it could not answer, and how long it still keeps clear of there (ticks; not saved). */
+    @Nullable
+    Vec3 shotFrom;
+    int shotFor;
+    /** How long it keeps clear after such a hit (my pick: 15 seconds, then it patrols again). */
+    static final int SHOT_TICKS = 300;
     /** The player who hit it, and how long it still minds it (ticks). */
     @Nullable
     Player provokedBy;
@@ -572,6 +578,9 @@ public class BullSharkEntity extends WaterAnimal implements GeoEntity {
         if (provokedFor > 0 && --provokedFor == 0) {
             provokedBy = null;
         }
+        if (shotFor > 0 && --shotFor == 0) {
+            shotFrom = null;
+        }
         if (action() != ACT_NONE) {
             actionTicks++;
         }
@@ -674,6 +683,13 @@ public class BullSharkEntity extends WaterAnimal implements GeoEntity {
         if (hurt && source.getEntity() instanceof Player player && !player.isCreative() && !player.isSpectator()) {
             provokedBy = player;
             provokedFor = 600;
+        }
+        if (hurt && source.getEntity() instanceof LivingEntity by && by != this
+                && !(by instanceof Player p && BullSharkGoals.inDeepWater(p)) && !(by.isInWater() && by.distanceToSqr(this) < 36.0)) {
+            // Hit by something it cannot get at (a bow on the bank, a boat; the user's call 2026-11-26, review R9-24):
+            // it swims off deep and fast a while (BullSharkGoals.KeepClearGoal).
+            shotFrom = by.position();
+            shotFor = SHOT_TICKS;
         }
         return hurt;
     }

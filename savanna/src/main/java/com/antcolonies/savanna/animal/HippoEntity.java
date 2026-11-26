@@ -1430,6 +1430,9 @@ public class HippoEntity extends PathfinderMob implements GeoEntity, HasLife {
             return (t instanceof CrocodileEntity ? CROC_REACH : CHARGE_REACH) * h.getScale();
         }
 
+        /** Past this (blocks) it gives up even on what hurt it (its follow range; the user's call 2026-11-26, review R9-24). */
+        private static final double ANGRY_GIVE_UP = 32.0;
+
         /** Past this a charge gives up (a crocodile: once it has backed off). */
         private double giveUp(LivingEntity t) {
             return (t instanceof CrocodileEntity ? CROC_GIVE_UP : CHARGE_GIVE_UP) * h.getScale();
@@ -1463,7 +1466,9 @@ public class HippoEntity extends PathfinderMob implements GeoEntity, HasLife {
             if (bitten && target instanceof CrocodileEntity && h.doing() != BITE) {
                 return false;                           // one bite sees a crocodile off
             }
-            return ticks < CHARGE_TICKS && target.distanceTo(h) < giveUp(target);
+            // (what hurt it is charged from as far as it follows anything: review R9-15, a hippo shot from 17 blocks
+            // started its charge and ended it at the next check, the territory's 16 blocks)
+            return ticks < CHARGE_TICKS && target.distanceTo(h) < (h.angryAt == target ? ANGRY_GIVE_UP : giveUp(target));
         }
 
         @Override

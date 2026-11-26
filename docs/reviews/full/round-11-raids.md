@@ -247,9 +247,12 @@ takes the best remembered find every second (`Raids` 809-843, `RaidsAway` 240-27
 measure.** Also: a raid may leave until 19:00 and dusk turns it at 19:30, 25 seconds later, so a watched raid leaving
 late is turned home empty and still costs one of the day's raids. Stopping leaves earlier is **the user's call**.
 
-**Status (2026-11-26, `claude/review-fix-11b`): open:** nothing changed. The late leave (a raid may set out until 19:00 and dusk turns it at 19:30, 25 seconds later) is put to the user; the near and away difference waits for a soak to measure.
 
 **Your call (2026-11-26):** How late a raid may leave. Today a raid may set out until 19:00 and dusk turns every raid home at 19:30, which is 25 real seconds later, so a raid that leaves late walks out, turns round empty and the scout's find is used up. Stop raids leaving earlier (the find then waits for the morning)? My pick: yes, but first a soak measures how long a raid takes, so the hour is not a guess.
+
+**Call made (2026-11-26):** yes; measured from the last soak's diary, not a new soak.
+
+**Status (2026-11-26, `claude/review-fix-b6`): half fixed: the last leave is 18:00, not 19:00 (`megaponera_analis.json`, `hours`). Measured from the 2-day soak's raid diary (86 raids): from the muster to the attack's start takes 0.9 game hours at the median and 1.4 for the farthest spots (95 blocks), so by 18:00 every raid reaches its spot before dusk. Open: how often a watched colony raids against one out of sight (for a soak to measure).**
 
 ---
 

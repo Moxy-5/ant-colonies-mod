@@ -149,6 +149,9 @@ public class SavannaEvents {
             return;
         }
         if (!event.loadedFromDisk() && event.getLevel() instanceof ServerLevel level && event.getEntity() instanceof net.minecraft.world.entity.LightningBolt bolt
+                // Only the weather's own bolts (the user's call, 2026-11-26, review R7-12): a Channeling trident's bolt
+                // has its thrower as its cause and strikes its mob.
+                && bolt.getCause() == null
                 && !level.getBlockState(bolt.blockPosition().below()).is(net.minecraft.world.level.block.Blocks.LIGHTNING_ROD)) {
             // Step 5e: a big savanna tree near the strike draws it to its top (a lightning rod still wins).
             net.minecraft.core.BlockPos to = com.antcolonies.savanna.tree.Forest.get(level).lightning(level, bolt.blockPosition());
@@ -180,6 +183,9 @@ public class SavannaEvents {
     public static void onBreak(BlockEvent.BreakEvent event) {
         if (!event.isCanceled() && event.getLevel() instanceof ServerLevel level) {
             com.antcolonies.savanna.colony.Raids.blockChangedNear(level, event.getPos());
+            if (event.getState().is(com.antcolonies.savanna.registry.TreeBlocks.TREE_WOOD)) {
+                com.antcolonies.savanna.tree.Forest.get(level).brokenAt(event.getPos()); // a giant tree cut through falls
+            }
         }
     }
 

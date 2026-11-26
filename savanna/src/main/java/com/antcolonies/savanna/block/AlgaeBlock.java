@@ -189,6 +189,27 @@ public class AlgaeBlock extends BushBlock implements LiquidBlockContainer, Bonem
         }
     }
 
+    /** How many mats may lie in the 5 by 5 round a spot (its own level, one up and one down) for a new one to be seeded there (my pick). */
+    static final int PATCH_MOST = 8;
+
+    /**
+     * Whether a mat may be seeded here (the user's call, 2026-11-26, review R10-5: algae crept out of the savanna's
+     * rivers into any shallow water joined to them, and filled every bed): only in the savanna's own waters, and only
+     * while the bed round the spot is still patchy, as new land lays it.
+     */
+    static boolean roomToSpread(ServerLevel level, BlockPos to) {
+        if (!level.getBiome(to).is(com.antcolonies.savanna.worldgen.RiverBankFeature.WATERS)) {
+            return false;
+        }
+        int mats = 0;
+        for (BlockPos near : BlockPos.betweenClosed(to.offset(-2, -1, -2), to.offset(2, 1, 2))) {
+            if (level.isLoaded(near) && level.getBlockState(near).getBlock() instanceof AlgaeBlock && ++mats > PATCH_MOST) {
+                return false;
+            }
+        }
+        return true;
+    }
+
     /** Seeds a bare mat on the bed beside {@code pos} (one cell, the bed up to a block higher or lower), if there is room. */
     static void spread(ServerLevel level, BlockPos pos, RandomSource random) {
         Direction side = Direction.Plane.HORIZONTAL.getRandomDirection(random);
@@ -198,7 +219,7 @@ public class AlgaeBlock extends BushBlock implements LiquidBlockContainer, Bonem
         }
         BlockState there = level.getBlockState(to);
         BlockState bare = level.getBlockState(pos).getBlock().defaultBlockState().setValue(GROWTH, BARE).setValue(STRANDS, 0);
-        if (there.is(Blocks.WATER) && there.getFluidState().isSource() && bare.canSurvive(level, to)) {
+        if (there.is(Blocks.WATER) && there.getFluidState().isSource() && bare.canSurvive(level, to) && roomToSpread(level, to)) {
             level.setBlock(to, bare, Block.UPDATE_CLIENTS);
         }
     }

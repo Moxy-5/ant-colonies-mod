@@ -40,6 +40,8 @@ public class CrabPickGoal extends Goal {
     /** How far it smells remains, and looks for snails, scraps and algae (blocks across; up or down). */
     static final double SMELL = 8.0;
     static final int LOOK_ACROSS = 6, LOOK_UP_DOWN = 2;
+    /** How close (blocks) eggs must lie for a crab to pick at them (my pick). */
+    static final int EGG_REACH = 3;
     /** The pick clip's length, and when each claw's bit goes into the mouth (ticks; {@code crab_models.py} PICK_LEN, PICK_BITE, plus the clip's blend-in). */
     static final int PICK_TICKS = 80;
     static final int[] BITE_TICKS = {37, 65};
@@ -295,9 +297,11 @@ public class CrabPickGoal extends Goal {
             return true;
         }
         BlockPos home = crab.blockPosition();
-        // eggs first, the nearest (animal life cycle step 3: catfish eggs on the algae, snail clutches)
-        for (BlockPos at : BlockPos.betweenClosed(home.offset(-LOOK_ACROSS, -LOOK_UP_DOWN, -LOOK_ACROSS),
-                home.offset(LOOK_ACROSS, LOOK_UP_DOWN, LOOK_ACROSS))) {
+        // eggs it all but stands on, the nearest (animal life cycle step 3: catfish eggs on the algae, snail clutches;
+        // the user's call, 2026-11-26, review R10-16: it took eggs first from its whole search box, so no snail clutch
+        // near a crab ever hatched)
+        for (BlockPos at : BlockPos.betweenClosed(home.offset(-EGG_REACH, -LOOK_UP_DOWN, -EGG_REACH),
+                home.offset(EGG_REACH, LOOK_UP_DOWN, EGG_REACH))) {
             // only eggs its claws reach from the bed (a clutch high on a bank would hold it there for good)
             if (Math.abs(at.getY() - home.getY()) <= 1 && EggMeals.forCrab(crab.level().getBlockState(at))) {
                 double d = at.distSqr(home);

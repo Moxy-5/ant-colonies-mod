@@ -811,14 +811,21 @@ final class BullSharkGoals {
     }
 
     // --- hippos --------------------------------------------------------------------------------------------------------
-    /** A hippo near in the water: away through the deep water until it is {@link #HIPPO_CLEAR} blocks off. */
+    /**
+     * A hippo near in the water: away through the deep water until it is {@link #HIPPO_CLEAR} blocks off. The same way
+     * out, at a burst, from a hit it could not answer ({@link BullSharkEntity#shotFrom}, review R9-24) until it is
+     * {@link #SHOT_CLEAR} blocks from where the hit came or its fright is over.
+     */
     static class KeepClearGoal extends Goal {
+        /** How far from where the hit came it swims (blocks; my pick, past a bow's easy aim). */
+        static final double SHOT_CLEAR = 32.0;
         private final BullSharkEntity shark;
         @Nullable
         private HippoEntity hippo;
         @Nullable
         private Vec3 away;
         private int t, look;
+        private boolean shot;
 
         KeepClearGoal(BullSharkEntity shark) {
             this.shark = shark;
@@ -827,6 +834,12 @@ final class BullSharkGoals {
 
         @Override
         public boolean canUse() {
+            shot = false;
+            if (free(shark) && shark.shotFrom != null) {
+                shot = true;
+                hippo = null;
+                return true;
+            }
             if (!free(shark) || ++look % 20 != 0) {
                 return false;
             }
@@ -842,12 +855,21 @@ final class BullSharkGoals {
         }
 
         private void pickAway() {
-            float from = (float) (Mth.atan2(shark.getZ() - hippo.getZ(), shark.getX() - hippo.getX()) * Mth.RAD_TO_DEG) - 90.0F;
-            away = deepPoint(shark, from, 10, 22, false, hippo.position());
+            Vec3 danger = shot ? shark.shotFrom : hippo.position();
+            if (danger == null) {
+                away = null;
+                return;
+            }
+            float from = (float) (Mth.atan2(shark.getZ() - danger.z, shark.getX() - danger.x) * Mth.RAD_TO_DEG) - 90.0F;
+            away = deepPoint(shark, from, 10, 22, false, danger);
         }
 
         @Override
         public boolean canContinueToUse() {
+            if (shot) {
+                return shark.shotFrom != null && shark.isInWater() && !shark.isHolding()
+                        && flat(shark.position(), shark.shotFrom) < SHOT_CLEAR;
+            }
             return hippo != null && hippo.isAlive() && t < 300 && shark.isInWater() && !shark.isHolding()
                     && hippo.distanceToSqr(shark) < HIPPO_CLEAR * HIPPO_CLEAR;
         }
@@ -862,7 +884,7 @@ final class BullSharkGoals {
                 pickAway();
             }
             if (away != null) {
-                shark.swimTo(away.x, away.y, away.z, BullSharkEntity.SWIM);
+                shark.swimTo(away.x, away.y, away.z, shot ? BullSharkEntity.BURST : BullSharkEntity.SWIM);
             }
         }
 
@@ -870,6 +892,7 @@ final class BullSharkGoals {
         public void stop() {
             hippo = null;
             away = null;
+            shot = false;
         }
 
         @Override

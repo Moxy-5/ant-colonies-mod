@@ -304,6 +304,9 @@ public class MudTests {
                     helper.assertTrue(z > 4, "river mud never on the sand bank, at " + x + " " + z);
                     helper.assertTrue(state.getValue(SavannaMudBlock.TONE) == Tone.OLIVE, "river mud is olive silt");
                     helper.assertTrue(SavannaMudBlock.wetted(level, at), "every block of river mud should be kept wet by the river, not at " + x + " " + z);
+                    // (review R8-14: laid as the block's own rule keeps it, so a random tick changes nothing)
+                    helper.assertTrue(SavannaMudBlock.nextWetness(state, level, at, level.random) == state, "river mud laid " + state.getValue(SavannaMudBlock.WETNESS)
+                            + " (depth " + state.getValue(SavannaMudBlock.DEPTH) + ") changes on its first tick, at " + x + " " + z);
                     soupy += state.getValue(SavannaMudBlock.WETNESS) == Wetness.SOUPY ? 1 : 0;
                     sticky += state.getValue(SavannaMudBlock.WETNESS) == Wetness.STICKY ? 1 : 0;
                 }
@@ -390,6 +393,10 @@ public class MudTests {
             for (int dz = -20; dz <= 20; dz++) {
                 BlockPos at = middle.offset(dx, 0, dz);
                 BlockState state = level.getBlockState(at);
+                if (state.getBlock() instanceof SavannaMudBlock && SavannaMudBlock.wetted(level, at)) {
+                    helper.assertTrue(SavannaMudBlock.nextWetness(state, level, at, level.random) == state, "pan mud laid " + state.getValue(SavannaMudBlock.WETNESS)
+                            + " (depth " + state.getValue(SavannaMudBlock.DEPTH) + ") changes on its first tick, at " + at); // (review R8-14)
+                }
                 if (state.getBlock() instanceof SavannaMudBlock && state.getValue(SavannaMudBlock.WETNESS) == Wetness.SOUPY) {
                     soupy++;
                     mud++;

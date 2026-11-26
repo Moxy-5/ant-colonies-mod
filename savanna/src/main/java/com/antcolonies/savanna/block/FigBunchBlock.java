@@ -41,7 +41,7 @@ public class FigBunchBlock extends HangingPodsBlock implements BonemealableBlock
 
     @Override
     protected void createBlockStateDefinition(StateDefinition.Builder<Block, BlockState> builder) {
-        builder.add(HangingFruit.STAGE, HangingFruit.PHASE);
+        builder.add(HangingFruit.STAGE, HangingFruit.PHASE, HangingFruit.CROP);
     }
 
     /**
@@ -50,7 +50,7 @@ public class FigBunchBlock extends HangingPodsBlock implements BonemealableBlock
      */
     @Override
     public BlockState getStateForPlacement(BlockPlaceContext context) {
-        return defaultBlockState().setValue(HangingFruit.STAGE, HangingFruit.BARE).setValue(HangingFruit.PHASE, HangingFruit.phaseOf(context.getClickedPos().asLong()));
+        return HangingFruit.hungByHand(HangingFruit.Fruit.FIG, defaultBlockState(), context.getClickedPos(), context.getLevel().getDayTime());
     }
 
     @Override

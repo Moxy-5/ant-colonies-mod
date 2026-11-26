@@ -269,6 +269,10 @@ scene to measure it.
 
 **Your call (2026-11-26):** Mud at the water's edge. Today new river banks and pans are laid with a firm sticky edge and a drying ring, but within minutes of you being near every mud block within 4 blocks of water turns soupy (slow, sinking) and the rest dries and cracks, so land you have visited looks and walks differently from new land. Should the mud settle by its distance to water (soupy right at the water, sticky 2 to 4 blocks out, drying beyond; rain still wets it), so the pattern the world lays is the one that stays? My pick: yes.
 
+**Call made (2026-11-26):** yes, my pick.
+
+**Status (2026-11-26, `claude/review-fix-b6`): fixed: one place decides. Water within 4 blocks keeps mud as wet as its place asks (`SavannaMudBlock.kept`): soupy inside a wallow or mud area (depth 2 and more), the rim (depth 1) sticky within 2 blocks of the water and drying farther out; rain still wets a step, and mud wetter than its place asks dries back by the old dice. The features lay each block that way (`settled` in `RiverMudFeature` and `PanFeature`; the pan's ring mud out of the water's reach is laid cracked), so a random tick changes nothing on new land (checked in `riverMudLiesAtTheWaterlineAndStaysWet` and `aPanHasAWallowAtOneEnd`). Changed from my words to you: it goes by the mud's depth first, because a wallow's middle must stay soupy for the animals; only the rim goes by distance. A dry wallow's drying middle still cracks in time (that is the designed drying after rain).**
+
 ### R8-15 (C, proven in the code; the count rule from memory): the colonies' insects count as Minecraft's farm animals
 
 - **What is wrong:** termites and Matabele ants are signed up in Minecraft's own `CREATURE` group

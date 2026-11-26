@@ -64,13 +64,13 @@ public class DoumPieceBlock extends Block implements EntityBlock, DoumPiece, Bon
     protected void createBlockStateDefinition(StateDefinition.Builder<Block, BlockState> builder) {
         // Called from Block's constructor, before piece is set: every DoumPieceBlock has the properties; only the bunch
         // uses them (the crown's blockstate file names one model for all).
-        builder.add(HangingFruit.STAGE, HangingFruit.PHASE);
+        builder.add(HangingFruit.STAGE, HangingFruit.PHASE, HangingFruit.CROP);
     }
 
     /** A bunch put by hand fruits on its own place's timetable (a palm's own bunches are given their palm's) and starts bare (review R7-28). */
     @Override
     public BlockState getStateForPlacement(BlockPlaceContext context) {
-        return defaultBlockState().setValue(HangingFruit.STAGE, HangingFruit.BARE).setValue(HangingFruit.PHASE, HangingFruit.phaseOf(context.getClickedPos().asLong()));
+        return HangingFruit.hungByHand(HangingFruit.Fruit.DOUM, defaultBlockState(), context.getClickedPos(), context.getLevel().getDayTime());
     }
 
     @Override

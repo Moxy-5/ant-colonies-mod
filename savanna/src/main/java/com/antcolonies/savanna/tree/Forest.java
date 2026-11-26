@@ -89,6 +89,12 @@ public class Forest extends SavedData {
     static final double SPROUT_CHANCE = 0.6;
     /** No seedling comes up this close to another tree's foot or a colony's middle. */
     static final int SPROUT_SPACING = 4;
+    /**
+     * How many living trees a square of land holds before no more seedlings come up in it: a grown tree counts
+     * {@link #GROWN_ROOM}, a seedling or young one 1 (the user's call, 2026-11-26, review R7-13; my picks: new land's own
+     * 1 big tree and about 3 young ones fill a square, so the savanna stays as open as the world maker lays it).
+     */
+    static final int SQUARE_ROOM = 6, GROWN_ROOM = 3;
     static final int COLONY_SPACING = 8;
     /** How long a tree's work in a second may take before the rest waits for the next second. */
     private static final long BUDGET_NANOS = 4_000_000L;
@@ -334,6 +340,10 @@ public class Forest extends SavedData {
      */
     private final it.unimi.dsi.fastutil.longs.LongOpenHashSet snapping = new it.unimi.dsi.fastutil.longs.LongOpenHashSet();
     /** Fallen logs whose "is anything of it left" look is due and waits for its shape or its land (review R7-19). Not saved. */
+    /** The trees lightning has struck in this thunderstorm: each draws one strike a storm (review R7-12; not saved). */
+    private final it.unimi.dsi.fastutil.longs.LongOpenHashSet struckThisStorm = new it.unimi.dsi.fastutil.longs.LongOpenHashSet();
+    /** The trees a block was broken beside: looked at this second for a trunk cut through (review R7-31; not saved). */
+    private final it.unimi.dsi.fastutil.longs.LongOpenHashSet cutLooks = new it.unimi.dsi.fastutil.longs.LongOpenHashSet();
     private final it.unimi.dsi.fastutil.longs.LongOpenHashSet logLooks = new it.unimi.dsi.fastutil.longs.LongOpenHashSet();
 
     /** How long a hollow trunk killed by fire smoulders (my pick: half a day). */
@@ -405,6 +415,8 @@ public class Forest extends SavedData {
         trees.remove(tree.foot.asLong());
         snapping.remove(tree.foot.asLong());
         logLooks.remove(tree.foot.asLong());
+        cutLooks.remove(tree.foot.asLong());
+        struckThisStorm.remove(tree.foot.asLong());
         LongList list = byChunk.get(ChunkPos.asLong(tree.foot));
         if (list != null) {
             list.rem(tree.foot.asLong());
@@ -496,6 +508,9 @@ public class Forest extends SavedData {
             }
             setDirty();
         }
+        if (!level.isThundering()) {
+            struckThisStorm.clear(); // the storm is over
+        }
         long start = System.nanoTime();
         for (ServerPlayer player : level.players()) {
             if (!player.isSpectator()) {
@@ -530,7 +545,13 @@ public class Forest extends SavedData {
     private void second(ServerLevel level, Tree t, long today, long daySecond) {
         {
             if (t.settled()) {
-                if (HeartRot.diedOfRot(t) && t.placedAge >= 0) {
+                if (t.died == DIED_UNKNOWN) {
+                    // A log of new land: just fallen (so it weathers away as long after as any other log).
+                    t.died = today - TreeLife.daysDeadIn(t.treeKind(), t.seed, TreeStage.FALLEN, TreeLife.dice(t.seed, -9).nextDouble());
+                    setDirty();
+                }
+                // A log the rot killed crumbles soon; a sound one weathers away in the end (review R7-13).
+                if (t.placedAge >= 0 && (HeartRot.diedOfRot(t) || time(level) >= HeartRot.crumbleFrom(t))) {
                     crumble(level, t);
                 } else if (t.placedAge >= 0) {
                     lookForLog(level, t, daySecond);
@@ -563,8 +584,20 @@ public class Forest extends SavedData {
                 t.fell = true; // the storm brings it down
                 setDirty();
             }
-            if (t.lastDay < today || !t.upToDate() || t.dead() && t.died != DIED_UNKNOWN && changesNow(t, time(level))) {
+            if (cutLooks.remove(t.foot.asLong()) || t.lastDay < today || !t.upToDate() || t.dead() && t.died != DIED_UNKNOWN && changesNow(t, time(level))) {
                 update(level, t, today);
+            }
+        }
+    }
+
+    /**
+     * A block was broken here: the trees whose foot is close are looked at within a second for a trunk cut through
+     * (review R7-31; before, a cut tree was only found at the next dawn). Fire, blasts and termites are found at dawn.
+     */
+    public void brokenAt(BlockPos pos) {
+        for (Tree t : near(pos, 8)) {
+            if (Math.abs(pos.getY() - t.foot.getY()) <= 1 && !t.settled()) {
+                cutLooks.add(t.foot.asLong());
             }
         }
     }
@@ -704,9 +737,28 @@ public class Forest extends SavedData {
         if (now != null && !loaded(level, now.box(t.foot))) {
             return false;
         }
-        if (now != null && cutThrough(level, t, now)) {
-            remove(t); // its trunk was cut through at the foot: the record ends
-            return true;
+        if (now != null && !(t.dead() && t.treeKind().isBaobab()) && cutThrough(level, t, now)) {
+            // Its trunk was cut through at the foot (the user's call, 2026-11-26, review R7-31: the record just ended
+            // and the trunk and crown hung in the air for good).
+            if (t.placedAge < TreeLife.YOUNG_END || t.fell || t.placedStage == TreeStage.FALLEN) {
+                if (t.fell || t.placedStage == TreeStage.FALLEN) {
+                    remove(t); // a log: the record ends
+                } else {
+                    die(level, t, now); // a little tree: what is left of it goes
+                }
+                return true;
+            }
+            if (t.treeKind().isBaobab()) {
+                kill(t, today, "cut"); // a baobab dies and slumps into its heap
+            } else if (!snapShapesReady(t)) {
+                cutLooks.add(t.foot.asLong()); // its shapes are being worked out: it falls the second they are ready
+                return false;
+            } else if (!fellNow(level, t)) {
+                return false; // its land is not all loaded: it waits
+            } else {
+                t.cause = "cut";
+                return true;
+            }
         }
         if (t.lastDay > today) {
             t.lastDay = today; // the clock was set back
@@ -723,7 +775,9 @@ public class Forest extends SavedData {
             if (t.dead()) {
                 continue; // its stage comes from the days since it died, below
             }
-            if (!t.termites && t.age >= TreeLife.YOUNG_END && termitesUnder(level, t.foot)) {
+            if (!t.termites && t.age >= TreeLife.YOUNG_END && !t.treeKind().isBaobab() && termitesUnder(level, t.foot)) {
+                // (never a baobab, the user's call 2026-11-26, review R7-14: its wet fibre is not their wood, and
+                // the hollow was made for an acacia's trunk)
                 t.termites = true; // termites have come in from below: its heartwood is eaten from now on
             }
             HeartRot.daily(t, t.lastDay);
@@ -863,7 +917,7 @@ public class Forest extends SavedData {
     }
 
     /**
-     * A log of a tree the rot killed crumbles to pulp, a column a second from its far end in to the stump, over
+     * A log of a tree the rot killed (and in the end a sound log, weathered: {@link HeartRot#WEATHER_DAYS}) crumbles to pulp, a column a second from its far end in to the stump, over
      * {@link HeartRot#CRUMBLE_DAYS} days once its time has come ({@link HeartRot#crumbleFrom}); when the last column has
      * gone the tree's record ends and only the pulp is left, sinking into the soil. Called each second for every
      * rot-killed log (public for the tests).
@@ -1009,7 +1063,8 @@ public class Forest extends SavedData {
     /**
      * Step 5e: a lightning strike at {@code at}. The tallest big standing tree (living, or dead and still upright) whose
      * foot is within {@link #LIGHTNING_REACH} pulls it to its top like a lightning rod (real: a lone tall tree is the
-     * classic target on the savanna) and is struck ({@link #struck}). Returns where the strike lands now, over the tree's
+     * classic target on the savanna) and is struck ({@link #struck}), each tree once a thunderstorm (the user's call,
+     * 2026-11-26, review R7-12: every bolt pulled onto a tree killed about 1 big tree in 8 a storm, by sum). Returns where the strike lands now, over the tree's
      * highest block, or null if no tree draws it.
      */
     public BlockPos lightning(ServerLevel level, BlockPos at) {
@@ -1018,7 +1073,7 @@ public class Forest extends SavedData {
         int top = LIGHTNING_HEIGHT - 1, topX = 0, topZ = 0;
         for (Tree t : near(at, LIGHTNING_REACH)) {
             int dx = t.foot.getX() - at.getX(), dz = t.foot.getZ() - at.getZ();
-            if (dx * dx + dz * dz > LIGHTNING_REACH * LIGHTNING_REACH || t.placedAge < 0 || t.fell || t.toppling || falling(t)
+            if (dx * dx + dz * dz > LIGHTNING_REACH * LIGHTNING_REACH || struckThisStorm.contains(t.foot.asLong()) || t.placedAge < 0 || t.fell || t.toppling || falling(t)
                     || t.placedStage == TreeStage.FALLEN || t.placedStage == TreeStage.HEAP || t.placedStage == TreeStage.HEAP_DRY) {
                 continue;
             }
@@ -1040,6 +1095,7 @@ public class Forest extends SavedData {
             return null;
         }
         BlockPos to = best.foot.offset(topX, top + 1, topZ);
+        struckThisStorm.add(best.foot.asLong());
         struck(level, best, bestShape);
         return to;
     }
@@ -1394,6 +1450,9 @@ public class Forest extends SavedData {
     public int sproutIn(ServerLevel level, int x0, int z0, long since, long today) {
         int count = 0;
         for (long day : rainDays.subSet(since, today)) {
+            if (crowd(x0, z0) >= SQUARE_ROOM) {
+                break; // the square is full: seedlings come again when a tree has died
+            }
             Random dice = new Random(level.getSeed() ^ ChunkPos.asLong(x0, z0) * 31 ^ day * 0x5DEECE66DL);
             for (int i = 0; i < SPROUT_TRIES; i++) {
                 int x = x0 + dice.nextInt(REGION), z = z0 + dice.nextInt(REGION);
@@ -1401,7 +1460,7 @@ public class Forest extends SavedData {
                 String kind = pickKind(dice);
                 long seed = dice.nextLong() & 0xFFFFFFFFL;
                 BlockPos foot = sproutSite(level, x, z);
-                if (takes && foot != null && TreeLands.mayStand(kind, level.getBiome(foot))) {
+                if (takes && foot != null && TreeLands.mayStand(kind, level.getBiome(foot)) && crowd(x0, z0) < SQUARE_ROOM) {
                     Tree t = addSeedling(kind, foot, seed, day + 1, false);
                     sprouted++;
                     count++;
@@ -1410,6 +1469,17 @@ public class Forest extends SavedData {
             }
         }
         return count;
+    }
+
+    /** How full a square of land is with living trees ({@link #SQUARE_ROOM}). */
+    private int crowd(int x0, int z0) {
+        int crowd = 0;
+        for (Tree t : near(new BlockPos(x0 + REGION / 2, 0, z0 + REGION / 2), REGION / 2)) {
+            if (t.living() && t.foot.getX() >= x0 && t.foot.getX() < x0 + REGION && t.foot.getZ() >= z0 && t.foot.getZ() < z0 + REGION) {
+                crowd += t.age >= TreeLife.YOUNG_END ? GROWN_ROOM : 1;
+            }
+        }
+        return crowd;
     }
 
     static String pickKind(Random dice) {

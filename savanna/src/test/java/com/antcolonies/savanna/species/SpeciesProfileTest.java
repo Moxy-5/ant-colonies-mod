@@ -160,13 +160,13 @@ class SpeciesProfileTest {
 
     @Test
     void matabeleRaidsEndByDuskAndTheColumnSqueaksLouderNearer() throws Exception {
-        // Raid rework R7: no raid leaves after 19:00, dusk from 19:30 till the morning's first raid hour (6:00).
+        // Raid rework R7, and the user's call 2026-11-26 (review R11-17): no raid leaves after 18:00, dusk from 19:30 till the morning's first raid hour (6:00).
         SpeciesProfile profile = read("megaponera_analis");
         SavannaNumbers.ScoutNumbers scouting = profile.section(SavannaNumbers.SCOUTING).orElseThrow();
         SavannaNumbers.HoursSoundNumbers hours = profile.section(SavannaNumbers.HOURS_SOUND).orElseThrow();
         java.util.function.DoubleFunction<Long> at = hour -> Math.floorMod(Math.round((hour - 6.0) * 1000.0), 24000L);
-        assertTrue(scouting.isRaidHour(at.apply(18.9)), "18:54 is in the evening raid hours");
-        assertFalse(scouting.isRaidHour(at.apply(19.1)), "no raid leaves after 19:00");
+        assertTrue(scouting.isRaidHour(at.apply(17.9)), "17:54 is in the evening raid hours");
+        assertFalse(scouting.isRaidHour(at.apply(18.1)), "no raid leaves after 18:00");
         assertFalse(hours.isDusk(at.apply(19.4), scouting), "19:24 is not dusk yet");
         assertTrue(hours.isDusk(at.apply(19.5), scouting), "19:30 is dusk");
         assertTrue(hours.isDusk(at.apply(3.0), scouting), "3:00 is still dusk for the raids");

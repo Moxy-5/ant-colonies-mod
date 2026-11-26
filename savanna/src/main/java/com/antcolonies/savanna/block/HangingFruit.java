@@ -39,9 +39,13 @@ import net.minecraft.world.level.gameevent.GameEvent;
  * <ul>
  *   <li>A bunch goes bare, green, turning (yellow figs, half-ripe nuts), ripe ({@link #STAGE}), then drops its fruit and
  *   is bare again.</li>
- *   <li>A bare bunch buds only while its tree's crop starts ({@link #cropStarts}): each tree has its own place in the
+ *   <li>A bare bunch that has not borne its tree's crop yet takes the stage the calendar gives ({@link #cropStage}):
+ *   green at the crop's start, further on later, so a tree nobody was near (no random ticks) shows the fruit it would
+ *   have when a player comes back (the user's call, 2026-11-26, review R7-32; before, a bare bunch budded only in the
+ *   crop's first days and far trees stood bare nearly always). Each tree has its own place in the
  *   cycle ({@link #PHASE}, set from the tree's seed when it is made), so a whole tree fruits together while its
- *   neighbours along the river are at other stages, as real figs do. A bunch picked or fallen waits for the next crop.
+ *   neighbours along the river are at other stages, as real figs do. A bunch picked or fallen waits for the next crop
+ *   ({@link #CROP}).
  *   This is the one place the season will be asked once seasons exist (the shared season source; today the crop
  *   comes round by the calendar alone).</li>
  *   <li>Each later stage lasts a while by chance, the time given in game days whatever the random tick speed, so the
@@ -58,6 +62,11 @@ public final class HangingFruit {
     public static final IntegerProperty STAGE = IntegerProperty.create("stage", 0, 3);
     /** The tree's place in its fruiting cycle, in eighths (all of one tree's fruit blocks share it). */
     public static final IntegerProperty PHASE = IntegerProperty.create("phase", 0, 7);
+    /**
+     * Which crop of its tree a bunch last bore (the crop's number, counted round in fours): a bare bunch bears each crop
+     * once, so one picked or fallen waits for the next crop (review R7-32).
+     */
+    public static final IntegerProperty CROP = IntegerProperty.create("crop", 0, 3);
     public static final int BARE = 0, GREEN = 1, TURNING = 2, RIPE = 3;
     private static final int PHASES = 8;
     private static final double DAY = 24000;
@@ -66,14 +75,14 @@ public final class HangingFruit {
 
     /** The two fruits and their times, all in game days. */
     public enum Fruit implements StringRepresentable {
-        FIG(10, 1, 3.5, 2.5, 1.5, 1, () -> SavannaItems.FIG.get(), () -> SavannaItems.GREEN_FIG.get(), () -> TreeBlocks.FALLEN_FIGS.get()),
-        DOUM(30, 3, 12, 8, 5, 10, () -> SavannaItems.DOUM_NUT.get(), () -> SavannaItems.GREEN_DOUM_NUT.get(),
+        FIG(10, 3.5, 2.5, 1.5, 1, () -> SavannaItems.FIG.get(), () -> SavannaItems.GREEN_FIG.get(), () -> TreeBlocks.FALLEN_FIGS.get()),
+        DOUM(30, 12, 8, 5, 10, () -> SavannaItems.DOUM_NUT.get(), () -> SavannaItems.GREEN_DOUM_NUT.get(),
                 () -> TreeBlocks.FALLEN_DOUM_NUTS.get());
 
         public static final Codec<Fruit> CODEC = StringRepresentable.fromEnum(Fruit::values);
 
-        /** A tree's whole cycle, and how long at its start a bare bunch may bud. */
-        final double cycleDays, budDays;
+        /** A tree's whole cycle. */
+        final double cycleDays;
         /** How long each stage lasts on average. */
         final double greenDays, turningDays, ripeDays;
         /** How long fallen fruit lies fresh, then old (figs rotting, nuts weathered), before it is gone. */
@@ -81,10 +90,9 @@ public final class HangingFruit {
         private final Supplier<Item> ripe, unripe;
         private final Supplier<Block> fallen;
 
-        Fruit(double cycleDays, double budDays, double greenDays, double turningDays, double ripeDays, double lyingDays,
+        Fruit(double cycleDays, double greenDays, double turningDays, double ripeDays, double lyingDays,
               Supplier<Item> ripe, Supplier<Item> unripe, Supplier<Block> fallen) {
             this.cycleDays = cycleDays;
-            this.budDays = budDays;
             this.greenDays = greenDays;
             this.turningDays = turningDays;
             this.ripeDays = ripeDays;
@@ -140,10 +148,27 @@ public final class HangingFruit {
         return fruit.setValue(PHASE, phaseOf(seed)).setValue(STAGE, stage);
     }
 
-    /** True while a tree in this phase starts a new crop: its bare bunches bud (by the calendar, so /time moves it too). */
-    public static boolean cropStarts(Fruit fruit, int phase, long dayTime) {
+    /** Which crop of a tree in this phase is on now, counted round in fours ({@link #CROP}). */
+    public static int cropNow(Fruit fruit, int phase, long dayTime) {
         long cycle = (long) (fruit.cycleDays * DAY);
-        return Math.floorMod(dayTime + phase * cycle / PHASES, cycle) < fruit.budDays * DAY;
+        return (int) Math.floorMod(Math.floorDiv(dayTime + phase * cycle / PHASES, cycle), 4L);
+    }
+
+    /**
+     * How far a tree's crop has come by the calendar: green, turning or ripe by the stages' average times from the
+     * crop's start, bare once the crop is over (until the next starts).
+     */
+    public static int cropStage(Fruit fruit, int phase, long dayTime) {
+        long cycle = (long) (fruit.cycleDays * DAY);
+        double days = Math.floorMod(dayTime + phase * cycle / PHASES, cycle) / DAY;
+        return days < fruit.greenDays ? GREEN : days < fruit.greenDays + fruit.turningDays ? TURNING
+                : days < fruit.greenDays + fruit.turningDays + fruit.ripeDays ? RIPE : BARE;
+    }
+
+    /** A bunch hung by hand: bare, on its own place's timetable, and it waits for the next crop (review R7-28: no ripe start). */
+    public static BlockState hungByHand(Fruit fruit, BlockState state, BlockPos pos, long dayTime) {
+        int phase = phaseOf(pos.asLong());
+        return state.setValue(STAGE, BARE).setValue(PHASE, phase).setValue(CROP, cropNow(fruit, phase, dayTime));
     }
 
     /** The chance on one random tick that something lasting {@code days} on average ends (the random tick speed counted). */
@@ -156,8 +181,10 @@ public final class HangingFruit {
     public static void randomTick(Fruit fruit, int ripeMin, int ripeMax, BlockState state, ServerLevel level, BlockPos pos, RandomSource random) {
         int stage = state.getValue(STAGE);
         if (stage == BARE) {
-            if (cropStarts(fruit, state.getValue(PHASE), level.getDayTime())) {
-                level.setBlock(pos, state.setValue(STAGE, GREEN), Block.UPDATE_CLIENTS);
+            int phase = state.getValue(PHASE), crop = cropNow(fruit, phase, level.getDayTime());
+            int now = cropStage(fruit, phase, level.getDayTime());
+            if (state.getValue(CROP) != crop && now != BARE) {
+                level.setBlock(pos, state.setValue(STAGE, now).setValue(CROP, crop), Block.UPDATE_CLIENTS);
             }
             return;
         }
@@ -169,8 +196,13 @@ public final class HangingFruit {
             level.setBlock(pos, state.setValue(STAGE, stage + 1), Block.UPDATE_CLIENTS);
         } else {
             fall(fruit, level, pos, Mth.nextInt(random, ripeMin, ripeMax));
-            level.setBlock(pos, state.setValue(STAGE, BARE), Block.UPDATE_CLIENTS);
+            level.setBlock(pos, borne(fruit, state, level.getDayTime()), Block.UPDATE_CLIENTS);
         }
+    }
+
+    /** A bunch whose fruit has fallen or been picked: bare, this crop borne. */
+    private static BlockState borne(Fruit fruit, BlockState state, long dayTime) {
+        return state.setValue(STAGE, BARE).setValue(CROP, cropNow(fruit, state.getValue(PHASE), dayTime));
     }
 
     /**
@@ -251,7 +283,7 @@ public final class HangingFruit {
         if (!level.isClientSide) {
             Block.popResource(level, pos, new ItemStack(fruit.ripe(), Mth.nextInt(level.random, ripeMin, ripeMax)));
             level.playSound(null, pos, SoundEvents.SWEET_BERRY_BUSH_PICK_BERRIES, SoundSource.BLOCKS, 1.0F, 0.8F + level.random.nextFloat() * 0.4F);
-            BlockState bare = state.setValue(STAGE, BARE);
+            BlockState bare = borne(fruit, state, level.getDayTime());
             level.setBlock(pos, bare, Block.UPDATE_CLIENTS);
             level.gameEvent(GameEvent.BLOCK_CHANGE, pos, GameEvent.Context.of(player, bare));
         }

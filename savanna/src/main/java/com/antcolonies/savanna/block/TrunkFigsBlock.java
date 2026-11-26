@@ -55,7 +55,7 @@ public class TrunkFigsBlock extends HorizontalDirectionalBlock implements Boneme
 
     @Override
     protected void createBlockStateDefinition(StateDefinition.Builder<Block, BlockState> builder) {
-        builder.add(FACING, HangingFruit.STAGE, HangingFruit.PHASE);
+        builder.add(FACING, HangingFruit.STAGE, HangingFruit.PHASE, HangingFruit.CROP);
     }
 
     @Override
@@ -90,8 +90,8 @@ public class TrunkFigsBlock extends HorizontalDirectionalBlock implements Boneme
         if (face.getAxis().isVertical()) {
             return null;
         }
-        BlockState state = defaultBlockState().setValue(FACING, face).setValue(HangingFruit.STAGE, HangingFruit.BARE)
-                .setValue(HangingFruit.PHASE, HangingFruit.phaseOf(context.getClickedPos().asLong()));
+        BlockState state = HangingFruit.hungByHand(HangingFruit.Fruit.FIG, defaultBlockState().setValue(FACING, face), context.getClickedPos(),
+                context.getLevel().getDayTime());
         return canSurvive(state, context.getLevel(), context.getClickedPos()) ? state : null;
     }
 

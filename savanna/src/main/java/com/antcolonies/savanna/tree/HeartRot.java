@@ -70,6 +70,13 @@ public final class HeartRot {
      */
     static final double CRUMBLE_AFTER = 2, CRUMBLE_SPREAD = 4, CRUMBLE_DAYS = 3;
 
+    /**
+     * A sound fallen log weathers away in the end, crumbling the same way: so many days after it was due down, each log
+     * by its own dice (the user's call, 2026-11-26, review R7-13: logs stayed for good and piled up round a long-lived
+     * base; my picks, long enough that the termites and the player get their wood first).
+     */
+    static final double WEATHER_DAYS = 90, WEATHER_SPREAD = 60;
+
     public enum Stage { NONE, HIDDEN, BRACKETS, HOLLOW }
 
     private HeartRot() {
@@ -253,6 +260,10 @@ public final class HeartRot {
 
     /** The day (with its part) a rot-killed log starts crumbling. */
     static double crumbleFrom(Forest.Tree t) {
+        if (!diedOfRot(t)) {
+            return t.died + TreeLife.stageFrom(t.treeKind(), t.seed, TreeStage.FALLEN) + TreeLife.RAIN_WAIT + WEATHER_DAYS
+                    + WEATHER_SPREAD * TreeLife.dice(t.seed, -67).nextDouble();
+        }
         return t.died + TreeLife.stageFrom(t.treeKind(), t.seed, TreeStage.FALLEN) + TreeLife.RAIN_WAIT + CRUMBLE_AFTER
                 + CRUMBLE_SPREAD * TreeLife.dice(t.seed, -67).nextDouble();
     }

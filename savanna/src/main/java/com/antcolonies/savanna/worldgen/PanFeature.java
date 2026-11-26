@@ -210,7 +210,7 @@ public class PanFeature extends Feature<NoneFeatureConfiguration> {
                 continue; // a bank a step up, or something on it: left as it is
             }
             raiseTo(level, x, z, g, low, dirt);
-            level.setBlock(new BlockPos(x, low, z), shoreMud, Block.UPDATE_CLIENTS);
+            level.setBlock(new BlockPos(x, low, z), SavannaMudBlock.settled(level, new BlockPos(x, low, z), shoreMud), Block.UPDATE_CLIENTS); // (review R8-14)
             shoreLaid.put(e.getKey(), e.getValue());
         }
         for (Map.Entry<Long, Double> e : cells.trampled().entrySet()) {
@@ -223,7 +223,7 @@ public class PanFeature extends Feature<NoneFeatureConfiguration> {
             double k = RiverBankFeature.hash(x + 4, z);
             BlockState kind = k < 0.4 ? Blocks.COARSE_DIRT.defaultBlockState() : k < 0.7 ? Blocks.DIRT.defaultBlockState() : dryMud;
             raiseTo(level, x, z, g, top, dirt);
-            level.setBlock(new BlockPos(x, top, z), kind, Block.UPDATE_CLIENTS);
+            level.setBlock(new BlockPos(x, top, z), kind == dryMud ? ringMud(level, new BlockPos(x, top, z), kind) : kind, Block.UPDATE_CLIENTS);
         }
         for (Map.Entry<Long, Double> e : cells.past().entrySet()) {
             int x = BlockPos.getX(e.getKey()), z = BlockPos.getZ(e.getKey());
@@ -260,6 +260,12 @@ public class PanFeature extends Feature<NoneFeatureConfiguration> {
         wallow(level, random, depths, shoreLaid, low, tone);
         OxbowFeature.holdWater(level, depths, low);
         return new Laid(new BlockPos(cx, low, cz), want, unit.size() > 1, deepest, cells.ring(), waterBlocks, keptShare);
+    }
+
+    /** The trampled ring's mud as it will stay (review R8-14): drying where the pan's water reaches it, cracked beyond. */
+    private static BlockState ringMud(WorldGenLevel level, BlockPos at, BlockState drying) {
+        return SavannaMudBlock.kept(level, at, 1) == null ? drying.setValue(SavannaMudBlock.WETNESS, SavannaMudBlock.Wetness.CRACKED)
+                : SavannaMudBlock.settled(level, at, drying);
     }
 
     /** A pan's columns: water (with its depth), shore, trampled ring and the grazed land past it (blocks past the ring). */
@@ -369,7 +375,8 @@ public class PanFeature extends Feature<NoneFeatureConfiguration> {
                 clear(level, x, low, z);
                 int mudDepth = d < 1.0 ? 3 : d < 2.0 ? 2 : 1;
                 SavannaMudBlock.Wetness wetness = mudDepth == 1 ? SavannaMudBlock.Wetness.STICKY : SavannaMudBlock.Wetness.SOUPY;
-                level.setBlock(new BlockPos(x, low, z), SavannaBlocks.SAVANNA_MUD.get().with(wetness, mudDepth, tone), Block.UPDATE_CLIENTS);
+                level.setBlock(new BlockPos(x, low, z), SavannaMudBlock.settled(level, new BlockPos(x, low, z), SavannaBlocks.SAVANNA_MUD.get().with(wetness, mudDepth, tone)),
+                        Block.UPDATE_CLIENTS);
             }
         }
     }

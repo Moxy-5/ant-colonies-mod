@@ -97,7 +97,8 @@ public class RiverMudFeature extends Feature<NoneFeatureConfiguration> {
                 Wetness wetness = depth == 1 ? Wetness.STICKY : Wetness.SOUPY;
                 BlockPos at = new BlockPos(x, top, z);
                 clearPlants(level, at.above());
-                level.setBlock(at, SavannaBlocks.SAVANNA_MUD.get().with(wetness, depth, Tone.OLIVE), Block.UPDATE_CLIENTS);
+                // (laid as the block's own rule keeps it: the rim farther from the water is drying; review R8-14)
+                level.setBlock(at, SavannaMudBlock.settled(level, at, SavannaBlocks.SAVANNA_MUD.get().with(wetness, depth, Tone.OLIVE)), Block.UPDATE_CLIENTS);
                 laid++;
             }
         }

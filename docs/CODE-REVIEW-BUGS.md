@@ -7,12 +7,12 @@ review files under `docs/reviews/full/`; search there for a finding's number (`R
 a `**Status ...**` line under the finding there and runs the tool. Bugs that did not come from the code
 review stay in `docs/BUGS.md`.
 
-**307 findings: 180 left (14 of them wait for your call), 127 done.**
+**307 findings: 169 left (3 of them wait for your call), 138 done.**
 
 | Grade | Found | Not started | Open | Half fixed | Fixed | Not a bug after all |
 |---|---|---|---|---|---|---|
 | A: a player can meet it | 67 | 17 | 1 | 0 | 48 | 1 |
-| B: it will cost us when building on this | 143 | 46 | 16 | 11 | 68 | 2 |
+| B: it will cost us when building on this | 143 | 36 | 14 | 12 | 79 | 2 |
 | C: a tidy-up | 97 | 87 | 0 | 2 | 7 | 1 |
 
 | Round | System | Found | Left | Done |
@@ -23,44 +23,22 @@ review stay in `docs/BUGS.md`.
 | 4 | how bodies are drawn | not read yet | | |
 | 5 | the termites | not read yet | | |
 | 6 | the Matabele ants (not raids) | not read yet | | |
-| 7 | the giant trees | 36 | 20 | 16 |
-| 8 | the world | 20 | 15 | 5 |
-| 9 | the river hunters | 44 | 21 | 23 |
-| 10 | the river's small life | 19 | 11 | 8 |
+| 7 | the giant trees | 36 | 15 | 21 |
+| 8 | the world | 20 | 14 | 6 |
+| 9 | the river hunters | 44 | 19 | 25 |
+| 10 | the river's small life | 19 | 8 | 11 |
 | 11 | the new raid code | 22 | 6 | 16 |
 | 12 | the animation engine | 73 | 73 | 0 |
 
-## Waiting for your call (14)
+## Waiting for your call (3)
 
 These change how the game looks or plays, or a balance number, so nothing is built until you say. Each has
 what happens today and my pick. Answer whenever you like: tell Claude the number and what you want.
 
-- **R7-12** (grade B, the giant trees) Lightning takes big trees faster than old age
-  - *Your call:* Lightning near big trees. Today every bolt that lands within 24 blocks of a big tree is pulled onto it, so by my sum (not measured) one thunderstorm kills about 1 big tree in 8, and a Channeling trident thrown near big trees strikes the tree, not the mob. Change it so only the weather's own bolts are pulled, and a tree is struck at most once a storm? My pick: yes.
-- **R7-13** (grade B, the giant trees) Seedlings after rain fill the savanna in
-  - *Your call:* Seedlings after rain. By my sums (not measured) about 9 new grown trees come up in each 64-block square over 100 days where new land put 1, so round a long-lived base the open savanna slowly closes into woodland with fallen logs everywhere. Cap the seedlings so each square keeps about as many trees as new land gives it, and let old logs weather away in the end? My pick: yes; it keeps the savanna open, as the design says.
-- **R7-14** (grade B, the giant trees) Termites hollow baobabs, which nobody decided
-  - *Your call:* Termites and baobabs. Today termites hollow a baobab near their mound like any tree: a cave about 7 wide in the trunk, and the tree dies at half its age. Nobody decided that. Leave baobabs out? My pick: yes, leave them out (as far as I know Macrotermes do not hollow living baobabs; not checked against a paper).
-- **R7-31** (grade B, the giant trees) A cut tree's crown hangs for good
-  - *Your call:* A cut giant tree. Today a giant tree cut through at the foot keeps its trunk and whole crown hanging in the air for good, and a burnt fig or palm leaves pieces in the air. Should a tree cut through fall, the way a dead one already does (the fall, the log and the smashing are built)? My pick: yes.
-- **R7-32** (grade B, the giant trees) Fruit stands still when nobody is near
-  - *Your call:* Fruit on trees away from you. Today figs and doum nuts only bud and ripen within about 128 blocks of a player, so trees along the rest of the river are bare nearly always once their first fruit has fallen, and a bare tree you come back to stays bare for up to 9 days (fig) or 27 days (palm). Change it so a bare bunch works out from the calendar where in its fruiting cycle the tree is, as the colonies do when you are away? That means more fruit along the whole river (more food for the animals that will eat it). My pick: yes.
-- **R8-14** (grade B, the world) the mud's own wetness rule undoes the pattern the world maker lays
-  - *Your call:* Mud at the water's edge. Today new river banks and pans are laid with a firm sticky edge and a drying ring, but within minutes of you being near every mud block within 4 blocks of water turns soupy (slow, sinking) and the rest dries and cracks, so land you have visited looks and walks differently from new land. Should the mud settle by its distance to water (soupy right at the water, sticky 2 to 4 blocks out, drying beyond; rain still wets it), so the pattern the world lays is the one that stays? My pick: yes.
 - **R9-19** (grade C, the river hunters) several small things, listed in the review file
   - *Your call:* Hippo paths. Today the ground a pod walks wears to path blocks and never heals, a player's lawn by a pool too (only with mobGriefing on). Let worn paths grow back to grass when no hippo has walked them for some days? My pick: yes, slowly. (The other small things in this finding need no call.)
-- **R9-24** (grade B, the river hunters) a shark hit from the bank or from a boat does nothing
-  - *Your call:* The big river hunters and arrows. Today a shark shot from the bank or a boat does nothing about it, and the crocodile afloat and the hippo past 16 blocks are the same: all three can be killed from a distance with no answer. Should one hit by something it cannot reach swim off deep and fast for a while? My pick: yes, for the shark and the crocodile; the hippo charges or goes under.
 - **R9-44** (grade C, the river hunters) small things in the monitor
   - *Your call:* The monitor in water and on mud. Two looks: hunting in the water it leaves by Minecraft's plain hop, not its own climbing-out move, and on soft mud it steps and hops the plain way because its moves never start there. Worth the work to give both its own moves? My pick: not now (small, and only a look); say if you have seen it and it bothers you.
-- **R10-4** (grade B, the river's small life) catfish eggs are eaten long before they can hatch
-  - *Your call:* Catfish eggs and tilapia. Today every hungry tilapia goes for catfish eggs before any other food from 8 blocks off and takes 2 a bite, so by the numbers (not watched in play) a whole spawning is eaten in a minute or two and no catfish ever hatches from eggs (the world's spawner still refills them). Make eggs a find, not a magnet: a tilapia eats them only when they are the nearest good food? My pick: yes.
-- **R10-5** (grade B, the river's small life) river algae spreads into any shallow water, with nothing to stop it
-  - *Your call:* River algae spreading. Today a thick mat seeds any shallow still water beside it, with nothing to stop it: over many hours it creeps out of the savanna's rivers along lake and sea shores and into a player's pond joined to a river, and grows back unless every bare speck is broken. Keep it to the savanna's waters, and patchy (no new mat where enough lie round it)? My pick: yes.
-- **R10-16** (grade B, the river's small life) snail eggs within a crab's reach never hatch
-  - *Your call:* Crabs and snail eggs. Today a crab goes for snail eggs before any other food, anywhere in its search box, so where both live no snail clutch ever hatches (the world's spawner still refills the snails). Leave it, or make eggs one food among the others, eaten only when the crab stands within 2 or 3 blocks? My pick: the second, so the snails' own breeding counts.
-- **R11-17** (grade B, the new raid code) near and away still differ in how often a colony raids
-  - *Your call:* How late a raid may leave. Today a raid may set out until 19:00 and dusk turns every raid home at 19:30, which is 25 real seconds later, so a raid that leaves late walks out, turns round empty and the scout's find is used up. Stop raids leaving earlier (the find then waits for the morning)? My pick: yes, but first a soak measures how long a raid takes, so the hour is not a guess.
 - **R11-22** (grade C, the new raid code) numbers
   - *Your call:* Real ants in one raid. `most_real` is 75, while the project's aim is about 50 to 60 real mobs for a whole colony. Lower it to about 50 (the rest of a big raid goes along as numbers, as now), or keep 75 for the look of a long column? My pick: keep 75 unless you see lag in a big raid; it is your eye that decides.
 
@@ -148,8 +126,6 @@ is left; no word means nobody has started it. The findings that wait for your ca
   - *Open:* to measure. A follow range of 24 to 32 with far sand reached in legs is a change to how crocodiles find their banks, and the cost of the long searches was never measured. To do first: the scene named (a hungry crocodile, a cow on ...
 - **R9-9** two wide searches of the land done in a single tick
   - *Open:* to measure. Both searches read loaded land only; their cost (5 to 15 ms once, by sum) was never timed, and the fix (rings, a search spread over ticks, eggs lost after some failed tries) adds rules and one change in play (a female ...
-- **R9-15** a hippo shot from more than 16 blocks never answers
-  - *Open:* waits for the call on R9-24 (what the big river hunters do when hit by something they cannot reach; the hippo is part of that question).
 - **R9-18** when the pool is gone each hippo takes its own, and "gone" is judged two ways
   - *Half fixed:* one judge of the pool's water: `poolGone` is now "`waterTop` finds none", and `waterTop` takes the water over the pool's block when a block has landed on the bed there, so the landing, the bank rest and the nibbling go on. Open: ...
 - **R9-23** a shark with nowhere to go asks for a new target every tick and lies still
@@ -167,6 +143,11 @@ is left; no word means nobody has started it. The findings that wait for your ca
   - *Half fixed:* a hungry frog that saw nothing to eat looks again a second later, in a box 3 high (`BullfrogGoals`, `lookAgain`), and a guard told to see nobody off searches for nobody (`GuardPlaceGoal`). Open: a courtship that ends on its timer ...
 - **R10-18** small searches that run more often than they need
   - *Half fixed:* a snail looks round for what it fears 4 times a second, not every other tick, and a mother crab counts the crabs round her only once her eggs are due. Open: the crab's three avoid goals as one look (small, not measured).
+
+**Round 11, the new raid code** (`docs/reviews/full/round-11-raids.md`)
+
+- **R11-17** near and away still differ in how often a colony raids
+  - *Half fixed:* the last leave is 18:00, not 19:00 (`megaponera_analis.json`, `hours`). Measured from the 2-day soak's raid diary (86 raids): from the muster to the attack's start takes 0.9 game hours at the median and 1.4 for the farthest spots ...
 
 **Round 12, the animation engine** (`docs/reviews/full/round-12-animation-engine.md`)
 
@@ -398,6 +379,9 @@ Fixed, or found to be no bug after all. The number after a finding is its entry 
 - **R7-7** (B) Four shape stores are never emptied
 - **R7-10** (A) "Char, never vanish" against "brown leaves burn away": a fire can eat a living crown (BUGS 340)
 - **R7-11** (A) A falling tree breaks through a termite mound (BUGS 341)
+- **R7-12** (B) Lightning takes big trees faster than old age
+- **R7-13** (B) Seedlings after rain fill the savanna in
+- **R7-14** (B) Termites hollow baobabs, which nobody decided
 - **R7-15** (A) New land's trees can miss the tree book (BUGS 342)
 - **R7-16** (A) A rot-killed log on a slope leaves wood hanging (BUGS 343)
 - **R7-17** (A) A dead sapling leaves a stick sunk in the ground (BUGS 344)
@@ -408,6 +392,8 @@ Fixed, or found to be no bug after all. The number after a finding is its entry 
 - **R7-28** (A) Shears on a fruit bunch: endless fruit (BUGS 346)
 - **R7-29** (A) Animals do not know thorny twigs hurt (BUGS 347)
 - **R7-30** (B) The river animals' ground finder stops on top of a crown
+- **R7-31** (B) A cut tree's crown hangs for good
+- **R7-32** (B) Fruit stands still when nobody is near
 
 **Round 8, the world**
 
@@ -415,6 +401,7 @@ Fixed, or found to be no bug after all. The number after a finding is its entry 
 - **R8-2** (A) a 129-block search for animals on every spawn try *Not a bug after all.*
 - **R8-10** (B) the flat savannas replace eleven of Minecraft's own land files *Not a bug after all.*
 - **R8-11** (A) mounds of new land are lost when the game is left, and can turn up in the next world (BUGS 321)
+- **R8-14** (B) the mud's own wetness rule undoes the pattern the world maker lays
 - **R8-18** (A) ravines and caves still come into the savanna along its rivers (BUGS 322)
 
 **Round 9, the river hunters**
@@ -425,10 +412,12 @@ Fixed, or found to be no bug after all. The number after a finding is its entry 
 - **R9-7** (B) a crocodile whose basking spot lies beside a hippo swims to it and turns away, again and again
 - **R9-10** (B) a mother taken from her nest reads the nest's land wherever it is
 - **R9-13** (B) the warning yawn is remembered per hippo, not per visitor: the second one is bitten unwarned
+- **R9-15** (B) a hippo shot from more than 16 blocks never answers
 - **R9-16** (B) two "nothing found" searches with no wait after them
 - **R9-17** (B) the pool's water is read with no check that its land is loaded
 - **R9-21** (B) a shark's hunt hangs still for up to 45 seconds
 - **R9-22** (B) only the three nearest fish are tried, so a school on the shelf hides every fish behind it
+- **R9-24** (B) a shark hit from the bank or from a boat does nothing
 - **R9-25** (B) the catfish plans a new route every tick once its route has run out short of its prey
 - **R9-27** (A) a catch in the jaws is saved with the otter, but the otter forgets it: after a reload it is stuck at the snout for good (BUGS 326)
 - **R9-28** (A) carrying a catch has no time limit: with no bank in reach the otter floats on the spot with it for ever (BUGS 327)
@@ -447,12 +436,15 @@ Fixed, or found to be no bug after all. The number after a finding is its entry 
 
 - **R10-1** (A) the world's spawner and breeding fight for the same places, and the spawner wins (BUGS 337)
 - **R10-2** (B) a mate that dies or unloads in the middle of courtship leaves its partner "taken" for good (BUGS 323)
+- **R10-4** (B) catfish eggs are eaten long before they can hatch
+- **R10-5** (B) river algae spreads into any shallow water, with nothing to stop it
 - **R10-8** (A) a bullfrog climbing out of the water can be left hanging with no gravity, for good (BUGS 333)
 - **R10-9** (A) every tadpole tells every player its age every tick (BUGS 334)
 - **R10-12** (A) crabs, snails and catfish never grow up and breed only once in their lives (BUGS 335)
 - **R10-13** (A) a crab's meal does not count when the food ends at the first bite (BUGS 336)
 - **R10-14** (B) the crab's 20-second limit on threatening does nothing
 - **R10-15** (B) asking for a new path every tick to a spot that cannot be reached
+- **R10-16** (B) snail eggs within a crab's reach never hatch
 
 **Round 11, the new raid code**
 

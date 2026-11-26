@@ -134,19 +134,28 @@ public class GrazeAlgaeGoal extends Goal {
 
     /**
      * How much there is to eat here: the bites left (strand pairs, then the mat; 0 bare or no algae); eggs it can reach
-     * (catfish eggs on a mat, a snail clutch under water: animal life cycle step 3) count as the best of all, a treat.
+     * (catfish eggs on a mat, a snail clutch under water: animal life cycle step 3) are a find, not a magnet: they add
+     * nothing to their mat, and alone they are worth a thin mat ({@link #EGGS}).
      */
     private int growth(BlockPos pos) {
         BlockState state = fish.level().getBlockState(pos);
-        int g = AlgaeBlock.bitesLeft(state) + (EggMeals.forFish(state) ? EGGS_FIRST : 0);
+        int g = AlgaeBlock.bitesLeft(state) - (AlgaeBlock.hasEggs(state) ? 1 : 0);
+        if (EggMeals.forFish(state)) {
+            g = Math.max(g, EGGS);
+        }
         return g == 0 && com.antcolonies.savanna.block.HippoGrassBlock.livingBite(fish.level(), pos, state) ? HIPPO_GRASS : g;
     }
 
     /** What the outer edge of a hippo grass mat is worth: the least of all, so any algae comes first. */
     static final int HIPPO_GRASS = 1;
 
-    /** What eggs add to a spot's worth, so a grazer goes for the nearest eggs before any algae. */
-    static final int EGGS_FIRST = 20;
+    /**
+     * What a spot with eggs is worth at least: a thin mat's (my pick). The user's call, 2026-11-26, review R10-4: eggs
+     * were worth 20 against a lush mat's 8, so every hungry tilapia within 8 blocks went for them first and a whole
+     * catfish spawning was eaten (by the numbers) long before its day to hatch; now eggs go with the grazing of the
+     * mat they lie on, and those on thin mats last while better grazing is near.
+     */
+    static final int EGGS = 2;
 
     /** The thickest grazeable mat near it (the nearest of the thickest), or none. */
     @Nullable

@@ -385,7 +385,7 @@ dead (80 health): it neither charges nor flees.
 **Fix proposed.** For a target it is angry at, give up by time and its follow range (32), and keep the anger until
 `angryUntil`; or let it make for deep water when it cannot reach what hurts it.
 
-**Status (2026-11-26, `claude/review-fix-b5-bc1153`): open: waits for the call on R9-24 (what the big river hunters do when hit by something they cannot reach; the hippo is part of that question).**
+**Status (2026-11-26, `claude/review-fix-b6`): fixed: what hurt a hippo is charged from as far as 32 blocks (its follow range, `TerritoryGoal.ANGRY_GIVE_UP`), not the territory's 16; past 32 it still does nothing (it does not go under: no such move is built). The user's call on R9-24.**
 
 ### R9-16 (B/C, likely, to measure): two "nothing found" searches with no wait after them
 
@@ -540,6 +540,10 @@ the user's call (fun first). **Fix if wanted:** hit by something it cannot reach
 (the call its swim-off already uses).
 
 **Your call (2026-11-26):** The big river hunters and arrows. Today a shark shot from the bank or a boat does nothing about it, and the crocodile afloat and the hippo past 16 blocks are the same: all three can be killed from a distance with no answer. Should one hit by something it cannot reach swim off deep and fast for a while? My pick: yes, for the shark and the crocodile; the hippo charges or goes under.
+
+**Call made (2026-11-26):** yes, my pick: the shark and the crocodile make off, the hippo charges.
+
+**Status (2026-11-26, `claude/review-fix-b6`): fixed: a shark hit by something it cannot get at (not a player swimming in deep water, nothing in the water within 6 blocks) bursts away through the deep water until it is 32 blocks from where the hit came or 15 seconds are over (`BullSharkEntity.shotFrom`, the keep-clear goal it already has for hippos). A crocodile afloat hit from the bank, a boat or more than 8 blocks off sinks out of sight (its startle) and makes off under water (`CrocodileEntity.swimOffFrom`). The hippo: R9-15. No game test yet (to watch in play); the crocodile's swim off is a plain route to water farther from the hit, not filmed.**
 
 ### R9-25 (B, the call proven, the cost likely; the catfish's file, for round 10's fix session): the catfish plans a new route every tick once its route has run out short of its prey
 

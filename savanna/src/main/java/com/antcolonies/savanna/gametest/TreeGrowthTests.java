@@ -195,6 +195,9 @@ public class TreeGrowthTests {
         }
         forest.update(level, t, base + days + 1);
         helper.assertTrue(forest.at(foot) == null, "a tree cut through at its foot is still in the book");
+        // (review R7-31: what was left of the little tree went with it, nothing hangs)
+        int hanging = countAround(level, foot, 2, 30, b -> b.is(TreeBlocks.TREE_WOOD) || b.is(TreeBlocks.TREE_LEAVES));
+        helper.assertTrue(hanging == 0, hanging + " blocks of the cut young tree hang in the air");
         forest.forgetInside(helper.getBounds());
         helper.succeed();
     }
@@ -297,6 +300,25 @@ public class TreeGrowthTests {
         helper.assertTrue(came >= 5, "only " + came + " seedlings for 30 rain days away");
         helper.assertTrue(died > came / 2, "of " + came + " seedlings away only " + died + " died");
         helper.assertTrue(living == came - died, "the book holds " + living + " of the " + (came - died) + " that lived");
+        forest.forgetInside(helper.getBounds());
+        // Review R7-13 (the user's call, 2026-11-26): a square that holds new land's own trees (1 grown, 3 young) is
+        // full, no seedling comes up in it; when a young one has gone, one seedling does and fills it again.
+        forest.add(new Forest.Tree("umbrella_thorn", parent, tree.seed, 1.0, TreeStage.LIVING, 1.0, base + 70));
+        List<Forest.Tree> young = new ArrayList<>();
+        for (int i = 0; i < 3; i++) {
+            young.add(forest.add(new Forest.Tree("umbrella_thorn", parent.offset(12 + 6 * i, 0, -20), tree.seed + 1 + i, 0.4, TreeStage.LIVING, 0.4, base + 70)));
+        }
+        for (int d = 70; d < 80; d++) {
+            forest.rainedOn(base + d);
+        }
+        before = forest.sprouted;
+        forest.sproutIn(level, corner.getX(), corner.getZ(), base + 70, base + 71);
+        helper.assertTrue(forest.sprouted == before, (forest.sprouted - before) + " seedlings came up in a full square");
+        forest.remove(young.get(0));
+        for (int d = 71; d < 80 && forest.sprouted == before; d++) {
+            forest.sproutIn(level, corner.getX(), corner.getZ(), base + d, base + d + 1);
+        }
+        helper.assertTrue(forest.sprouted == before + 1, (forest.sprouted - before) + " seedlings came up for one free place");
         forest.forgetInside(helper.getBounds());
         helper.succeed();
     }
@@ -608,6 +630,41 @@ public class TreeGrowthTests {
         clearAbove(helper, foot);
         forest.forgetInside(helper.getBounds());
         helper.succeed();
+    }
+
+    /**
+     * Review R7-31 (the user's call, 2026-11-26): a grown living tree cut through at the foot dies and falls, as a dead
+     * one does; nothing of its trunk or crown is left hanging over the stump.
+     */
+    @GameTest(template = "arena", timeoutTicks = 400, skyAccess = true)
+    public static void aGrownTreeCutThroughAtTheFootFalls(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        grassland(helper);
+        Forest.shapesAtOnce = true;
+        Forest forest = Forest.get(level);
+        long base = Forest.today(level);
+        BlockPos foot = helper.absolutePos(new BlockPos(MIDDLE, SURFACE, MIDDLE));
+        Forest.Tree t = forest.add(new Forest.Tree("umbrella_thorn", foot, 11, 1.0, TreeStage.LIVING, -1, base));
+        forest.update(level, t, base);
+        helper.assertTrue(t.placedAge == 1.0 && t.living(), "the grown tree was not placed");
+        for (int x = -4; x <= 4; x++) {
+            for (int z = -4; z <= 4; z++) {
+                if (level.getBlockState(foot.offset(x, 0, z)).is(TreeBlocks.TREE_WOOD)) {
+                    level.setBlockAndUpdate(foot.offset(x, 0, z), Blocks.AIR.defaultBlockState());
+                }
+            }
+        }
+        forest.update(level, t, base);
+        helper.assertTrue(forest.at(foot) == t && t.dead() && "cut".equals(t.cause), "the cut tree did not die of the cut: " + t.cause);
+        helper.assertTrue(forest.falling(t), "the cut tree is not falling");
+        helper.runAfterDelay(TreeFall.CREAK + TreeFall.DROP + 10, () -> {
+            helper.assertTrue(!forest.falling(t) && t.placedStage == TreeStage.FALLEN, "it did not land: " + t.placedStage.id);
+            int high = countAround(level, foot, 9, 40, b -> b.is(TreeBlocks.TREE_WOOD) || b.is(TreeBlocks.TREE_LEAVES) || deadWood(b));
+            helper.assertTrue(high == 0, high + " blocks of the cut tree still hang up high");
+            clearAbove(helper, foot);
+            forest.forgetInside(helper.getBounds());
+            helper.succeed();
+        });
     }
 
     /**
@@ -1042,6 +1099,13 @@ public class TreeGrowthTests {
         int fires = countNear(level, foot, 6, 0, 2, b -> b.is(Blocks.FIRE));
         helper.assertTrue(fires > 0, "no fire at the foot of the scar");
         helper.assertTrue(t.dead() && "lightning".equals(t.cause), "the strike did not kill the tree: " + t.cause);
+        // The same storm: the tree draws no second strike (review R7-12).
+        net.minecraft.world.entity.LightningBolt second = net.minecraft.world.entity.EntityType.LIGHTNING_BOLT.create(level);
+        BlockPos beside = foot.offset(14, 0, 9);
+        second.moveTo(net.minecraft.world.phys.Vec3.atBottomCenterOf(beside));
+        level.addFreshEntity(second);
+        helper.assertTrue(second.blockPosition().equals(beside), "the tree drew a second strike in the same storm, to " + second.blockPosition());
+        second.discard();
         clearAbove(helper, foot);
         forest.forgetInside(helper.getBounds());
         helper.succeed();

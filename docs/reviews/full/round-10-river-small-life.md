@@ -123,6 +123,10 @@ blocks. Keep the life file's hatch time.
 
 **Your call (2026-11-26):** Catfish eggs and tilapia. Today every hungry tilapia goes for catfish eggs before any other food from 8 blocks off and takes 2 a bite, so by the numbers (not watched in play) a whole spawning is eaten in a minute or two and no catfish ever hatches from eggs (the world's spawner still refills them). Make eggs a find, not a magnet: a tilapia eats them only when they are the nearest good food? My pick: yes.
 
+**Call made (2026-11-26):** yes, my pick.
+
+**Status (2026-11-26, `claude/review-fix-b6`): fixed: eggs are a find, not a magnet. They add nothing to the worth of the mat they lie on, and alone they are worth a thin mat (`GrazeAlgaeGoal.EGGS` 2, was 20 on top), so a tilapia goes to the thickest mat near it as always and eats eggs only where it grazes. Not measured: the scene with 15 hungry tilapia and a count of eggs left.**
+
 ### R10-5 (B, proven path; its speed to measure): river algae spreads into any shallow water, with nothing to stop it
 
 **What is wrong.** A thick or lush mat seeds bare bed beside it on 1 random tick in 10 (`AlgaeBlock.spread`). The only
@@ -146,6 +150,10 @@ world's own algae feature uses), and only while fewer than some number of mats l
 beds stay patchy as new land lays them.
 
 **Your call (2026-11-26):** River algae spreading. Today a thick mat seeds any shallow still water beside it, with nothing to stop it: over many hours it creeps out of the savanna's rivers along lake and sea shores and into a player's pond joined to a river, and grows back unless every bare speck is broken. Keep it to the savanna's waters, and patchy (no new mat where enough lie round it)? My pick: yes.
+
+**Call made (2026-11-26):** yes, my pick.
+
+**Status (2026-11-26, `claude/review-fix-b6`): fixed: a mat seeds a new one only in the savanna's own waters (the biome tag the world's algae feature uses) and only while at most 8 mats lie in the 5 by 5 round the new spot (`AlgaeBlock.roomToSpread`, `PATCH_MOST`, my pick). Not measured: the 30-day count in a fenced pool.**
 
 ### R10-6 (C, proven): small things that disagree or are test-only
 
@@ -338,6 +346,10 @@ leave it (fun first, the spawner covers it), or make eggs one food among the oth
 crab stands within 2 or 3 blocks.
 
 **Your call (2026-11-26):** Crabs and snail eggs. Today a crab goes for snail eggs before any other food, anywhere in its search box, so where both live no snail clutch ever hatches (the world's spawner still refills the snails). Leave it, or make eggs one food among the others, eaten only when the crab stands within 2 or 3 blocks? My pick: the second, so the snails' own breeding counts.
+
+**Call made (2026-11-26):** the second: eggs only when the crab is close.
+
+**Status (2026-11-26, `claude/review-fix-b6`): fixed: a crab picks at eggs only within 3 blocks of where it stands (`CrabPickGoal.EGG_REACH`), not from its whole search box.**
 
 ### R10-17 (C/B, likely): the snail's crawl and rest clips flicker (BUGS 250's likely cause)
 
