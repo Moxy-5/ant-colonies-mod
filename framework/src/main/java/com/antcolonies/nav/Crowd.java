@@ -23,8 +23,8 @@ import net.minecraft.world.phys.Vec3;
  * <p>Every insect with a real size ({@link #keepsSpace}) writes itself in once a tick while it is on a floor (not on a
  * wall, a ceiling or in a channel, where it moves exactly and others squeeze past it); the others read last tick's
  * grid, so the order the insects tick in never matters. One grid per world, on the server thread only. Species-neutral:
- * any body with a size signed up ({@link com.antcolonies.entity.body.BodySizes}) keeps its space; the red harvester ant
- * (no size until its rework) walks as before.
+ * any body with a size signed up ({@link com.antcolonies.entity.body.BodySizes}) keeps its space; a body with no size
+ * signed up walks as if alone.
  */
 public final class Crowd {
     /** One body as it stood last tick: where, how big (its personal radius, its height), how it moved, whether it stood. */

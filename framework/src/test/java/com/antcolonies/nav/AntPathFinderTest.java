@@ -619,6 +619,19 @@ class AntPathFinderTest {
         assertNotNull(AntPathFinder.whatChanged(map, a, b, StepKind.CRAWL_CHANNEL));
     }
 
+    /** Review R2-19: the window it goes in or out by is sealed while the channel's other side stays open. */
+    @Test
+    void aWindowSealedInFrontOfAnInsectIsNoLongerAWayInOrOut() {
+        wallWithATunnel();
+        Foothold outside = Foothold.floor(new BlockPos(4, 64, 0));
+        Foothold inside = Foothold.channel(new BlockPos(5, 64, 0));
+        assertNull(AntPathFinder.whatChanged(map, outside, inside, StepKind.INTO_CHANNEL));
+        assertNull(AntPathFinder.whatChanged(map, inside, outside, StepKind.OUT_OF_CHANNEL));
+        channels.put(new BlockPos(5, 64, 0), sides(Direction.EAST)); // the west window sealed, the east one open
+        assertNotNull(AntPathFinder.whatChanged(map, outside, inside, StepKind.INTO_CHANNEL));
+        assertNotNull(AntPathFinder.whatChanged(map, inside, outside, StepKind.OUT_OF_CHANNEL));
+    }
+
     /** Crash found in-game: the builders reshaped a mouth into a spire piece while a termite was going in by it. */
     @Test
     void aMouthReshapedIntoASpirePieceIsNoLongerAWayInOrOut() {

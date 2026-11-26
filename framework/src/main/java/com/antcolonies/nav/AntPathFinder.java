@@ -39,7 +39,7 @@ import net.minecraft.core.Direction;
  * takes the ceiling where it is a real shortcut (a mind can ask for a ceiling spot on purpose)</li>
  * <li>{@link StepKind#UNDER_EDGE} / {@link StepKind#OUT_FROM_UNDER} (2): round a block's bottom edge between its side
  * face and its underside (an overhang)</li>
- * <li>{@link StepKind#FALL} (3 + the height): let go and drop, only where nothing can be climbed down (or off a ceiling)</li>
+ * <li>{@link StepKind#FALL} (4 + the height): let go and drop, only where nothing can be climbed down (or off a ceiling)</li>
  * </ul>
  * A slope ({@link Slope}, a ramp) is a floor in its own cell: an insect walks onto it, along it and off it wherever the
  * two surfaces meet without a step of more than half a block anywhere along the edge between them (up its high side

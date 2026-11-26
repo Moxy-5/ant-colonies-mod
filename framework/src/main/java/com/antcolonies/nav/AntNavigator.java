@@ -264,7 +264,12 @@ public class AntNavigator {
     /** Ticks it has waited behind the body in front of it (following or with no room to pass). */
     private int crowdWaitTicks;
     /** The game time the legs last held it still for the crowd (behind a nestmate, no room to pass, met a stander on arriving). */
-    private long crowdHeldAt = Long.MIN_VALUE;
+    // (Half the lowest number, like shuffledAt: with the lowest itself "now minus then" ran over and came out below
+    // zero, so an insect never yet held counted as held on every tick, and the standing-too-long rule never fired for
+    // it; found 2026-11-26 with review R2-9.)
+    private long crowdHeldAt = Long.MIN_VALUE / 2;
+    /** Of the step's ticks so far ({@link #stepTicks}), those the legs themselves held it behind another body. */
+    private int stepHeldTicks;
     /** The game time it last shuffled aside for one standing too near ({@link #keepApart}). */
     private long shuffledAt = Long.MIN_VALUE / 2;
     /** Game time until which it squeezes past bodies in its way. */
@@ -564,14 +569,14 @@ public class AntNavigator {
      * After loading: the insect was saved holding this wall or ceiling, so it holds on to it again from its first tick
      * instead of dropping and climbing all the way back up. (If the block is gone it lets go as usual.)
      */
-    public void restoreHold(Foothold hold) {
+    public void restoreHold(Foothold hold, float heading) {
         if (hold.isFloor()) {
             return;
         }
         at = hold;
         surface = hold.surface();
         inChannel = hold.isChannel();
-        heading = 0.0F;
+        this.heading = heading; // (saved with the hold: one saved head down came back head up, review R2-6)
         route = null;
     }
 
@@ -859,6 +864,17 @@ public class AntNavigator {
         return new Route(steps, onto.cost() + shared.cost());
     }
 
+    /** Counts this tick if the legs held the insect for the crowd; the step's held ticks so far (none on a step's first tick). */
+    private int heldTicksOfStep() {
+        if (stepTicks <= 1) {
+            stepHeldTicks = 0;
+        }
+        if (ant.level().getGameTime() - crowdHeldAt <= 1) {
+            stepHeldTicks++;
+        }
+        return stepHeldTicks;
+    }
+
     private void replan(String reason) {
         if (++replans > MAX_REPLANS) {
             ColonyFrameworkMod.LOGGER.debug("Ant {} gave up walking to {} ({})", ant.getId(), goal.toShortString(), reason);
@@ -910,7 +926,10 @@ public class AntNavigator {
                 return;
             }
             Foothold landed = floorUnder(map);
-            if (!landed.equals(route.start())) {
+            if (next != 1 || !landed.equals(route.start())) {
+                // (Or dropped part way along its route, let go while frozen: never on along the middle of a route from
+                // where the route began. A major that fell back to its start went "onto the ceiling" from a floor and
+                // crashed the game, found by the full run, 2026-11-26.)
                 replan("landed somewhere else");
                 return;
             }
@@ -951,7 +970,7 @@ public class AntNavigator {
             avoid.put(step.to(), ant.level().getGameTime() + AVOID_TICKS);
             replan("blocked on " + describe(step));
             return;
-        } else if (!heldForCrowd() && ++stepTicks > stepLimit(step)) {
+        } else if (++stepTicks - heldTicksOfStep() > stepLimit(step)) {
             // (A tick it waited behind another body is not a tick stuck, as in standsTooLong: a walker in a queue
             // planned again every 6 seconds and gave its errand up, review R2-9.)
             replan("stuck on " + describe(step) + ", motion " + motion);
@@ -2604,7 +2623,8 @@ public class AntNavigator {
     private static double unsqueeze(double v, double center, double width) {
         double d = v - center;
         double a = Math.abs(d);
-        return a <= width / 2.0 ? center + d / width : center + Math.signum(d) * (a - width / 2.0 + 0.5);
+        // (A column 0 wide, a spire's tip: never 0 divided by 0, which gave the body a broken position; review R2-14.)
+        return width > 0.0 && a <= width / 2.0 ? center + d / width : center + Math.signum(d) * (a - width / 2.0 + 0.5);
     }
 
     // --- Geometry of a cell: where the body's middle is when it holds a surface ---

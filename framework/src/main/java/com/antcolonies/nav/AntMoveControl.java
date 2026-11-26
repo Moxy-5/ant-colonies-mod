@@ -28,7 +28,7 @@ public class AntMoveControl extends MoveControl {
         double dx = wantedX - mob.getX();
         double dy = wantedY - mob.getY();
         double dz = wantedZ - mob.getZ();
-        if (dx * dx + dy * dy + dz * dz < 2.5E-7) {
+        if (dx * dx + dz * dz < 2.5E-7) { // (flat: a point straight above or below turned it east and walked it on, review R2-32)
             mob.setZza(0.0F);
             return;
         }

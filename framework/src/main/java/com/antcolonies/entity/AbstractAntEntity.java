@@ -2913,6 +2913,7 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
             tag.putLong("HoldCell", hold.cell().asLong());
             tag.putByte("HoldSurface", (byte) hold.surface().get3DDataValue());
             tag.putBoolean("HoldChannel", hold.isChannel());
+            tag.putFloat("HoldHeading", navigator.getHeading());
         }
     }
 
@@ -2946,7 +2947,7 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
         }
         if (tag.contains("HoldCell") && tag.contains("HoldSurface")) {
             navigator.restoreHold(new Foothold(BlockPos.of(tag.getLong("HoldCell")), Direction.from3DDataValue(tag.getByte("HoldSurface")),
-                    tag.getBoolean("HoldChannel")));
+                    tag.getBoolean("HoldChannel")), tag.getFloat("HoldHeading"));
         }
     }
 
@@ -2960,6 +2961,12 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
     @Override
     public boolean isPushable() {
         return false;
+    }
+
+    // Nor does an insect push anything else: the game's own push looked for mobs in every insect's box on every tick,
+    // and shoved animals and players an insect stood in (review R2-31).
+    @Override
+    protected void pushEntities() {
     }
 
     /**

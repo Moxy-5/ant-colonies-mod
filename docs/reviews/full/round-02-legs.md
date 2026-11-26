@@ -165,6 +165,8 @@ arriving, holding on, the walk along a floor). Every line read.
 
 ### R2-6 (C, proven): after a reload a held insect's heading, ceiling side and channel wall are gone
 
+**Status (2026-11-26, `claude/review-fix-2`): the heading fixed (saved with the hold as `HoldHeading`); the ceiling side and the channel wall are still not saved.**
+
 - **Where:** `restoreHold` 529 to 538 (`heading = 0`); `AbstractAntEntity` 2905 to 2910, 2941 to 2944 (only cell,
   surface and "in a channel" are saved). Seen by three readers.
 - **What the player sees:** an insect saved head down or sideways on a wall faces head up until it walks; one
@@ -223,7 +225,7 @@ doorways and mouths, channels, where it stands now, hugging a column). Every lin
 
 ### R2-9 (B, likely; checked again): the stuck clock counts polite waiting, so a walker in a jam plans again and gives up
 
-**Status (2026-11-26, `claude/review-fix-2`): fixed, BUGS 404: a tick held for the crowd is not counted by the step clock. No test of its own.**
+**Status (2026-11-26, `claude/review-fix-2`): fixed, BUGS 404 and 409: a tick held for the crowd is not counted by the step clock. Fixing it showed that "held for the crowd" was true on every tick for an insect never yet held (BUGS 409), so the standing-too-long rule had never fired for those. No test of its own.**
 
 - **Where:** the waits in `steer` 1300 to 1305 and 1329 to 1336; the step clock at 840; `standsTooLong` 975 to 986.
 - **What is wrong:** while `steer` holds a walker behind another body, `++stepTicks` still runs toward 120. The
@@ -268,6 +270,8 @@ doorways and mouths, channels, where it stands now, hugging a column). Every lin
 - **Fix proposed:** work them out once when the step starts and keep them, as the lane point is kept.
 
 ### R2-14 (C, unsure it can be reached): `unsqueeze` can divide by a column width of 0
+
+**Status (2026-11-26, `claude/review-fix-2`): fixed (a width of 0 never divides).**
 
 - **Where:** `pos()` 2453 to 2458, `unsqueeze` 2473, `widestBetween` 2410 to 2430.
 - **What is wrong:** a spire tip's top layers are 0 wide; 0 divided by 0 gives a broken number, and a broken
@@ -424,6 +428,8 @@ doorways and mouths, channels, where it stands now, hugging a column). Every lin
 
 ### R2-24 (C, proven): comments that disagree with the code
 
+**Status (2026-11-26, `claude/review-fix-2`): the fall's cost and the harvester line put right; the comment at 73 was rewritten with R2-16; the one at 642 to 646 is true now (R2-19).**
+
 - `AntPathFinder.java` 73: "an unreachable goal never costs much time" (it costs the most, R2-16); 42: a fall costs
   "3 + the height" (the code adds 1 more, 687); 642 to 646: a closed window is caught (only between two channels).
 - `Crowd.java` 26 to 27 still speaks of the red harvester ant.
@@ -443,6 +449,8 @@ doorways and mouths, channels, where it stands now, hugging a column). Every lin
   readers; its cost belongs in R2-17's memory.
 
 ### R2-27 (C): what no unit test covers in the planner
+
+**Status (2026-11-26, `claude/review-fix-2`): one gap closed: `aWindowSealedInFrontOfAnInsectIsNoLongerAWayInOrOut` (R2-19). The others are open.**
 
 - A search stopping at the cap; `whatChanged` for the steps into and out of a channel (R2-19) and for the edge
   moves with the corner cell filled (right today, guarded by nothing); that `passesThrough` names exactly the cells
@@ -474,7 +482,7 @@ surface and heading sent to the drawing, saving and restoring the hold, every `n
 
 ### R2-28 (A, the mod's side proven and checked again; what Minecraft does, from memory; not seen in play): a frozen insect on a wall slides down it and is drawn as climbing
 
-**Status (2026-11-26, `claude/review-fix-2`): fixed, BUGS 402 (`AntNavigator.letGo`, called from the body's tick while it is frozen; one rule: a frozen body lets go and falls; test `anInsectParalysedOnAWallLetsGoAndFalls`).**
+**Status (2026-11-26, `claude/review-fix-2`): fixed, BUGS 402 (`AntNavigator.letGo`, called from the body's tick while it is frozen; one rule: a frozen body lets go and falls; test `anInsectParalysedOnAWallLetsGoAndFalls`). The first build of it crashed a full run (BUGS 410): fixed.**
 
 - **Where:** `AbstractAntEntity.java` 1501 to 1505 (`isImmobile`), 2311 to 2353 (`customServerAiStep`), 2418 to
   2426 (the surface sent to the drawing each tick), 2597 to 2600 (`onClimbable`), 1287 to 1290 (calling for help),
@@ -522,6 +530,8 @@ surface and heading sent to the drawing, saving and restoring the hold, every `n
 
 ### R2-31 (C, likely): every insect pushes the mobs round it every tick, though nothing can push it
 
+**Status (2026-11-26, `claude/review-fix-2`): fixed: `pushEntities()` does nothing.**
+
 - **Where:** `AbstractAntEntity.java` 2953 to 2957 (`isPushable` false; `pushEntities` not overridden).
 - **What is wrong:** one search for mobs in its box per insect per tick for nothing, and insects shoving a player
   or an animal they overlap.
@@ -529,10 +539,14 @@ surface and heading sent to the drawing, saving and restoring the hold, every `n
 
 ### R2-32 (C, unsure it is ever asked): `AntMoveControl` turns to face east when the point is straight above or below
 
+**Status (2026-11-26, `claude/review-fix-2`): fixed: the flat distance is tested.**
+
 - **Where:** `AntMoveControl.java` 28 to 37 ("arrived" uses the distance in all three directions, the turn only two).
 - **Fix proposed:** test the flat distance and keep the heading when it is tiny.
 
 ### R2-33 (C, unsure it shows): "stepped up close" outlives `stop()`
+
+**Status (2026-11-26, `claude/review-fix-2`): not a fault to fix this way: the care goals call `stop()` on every tick they stand at their patient, so clearing "stepped up close" there would let the crowd shuffle a carer away. Left as it is.**
 
 - **Where:** `AntNavigator.java` 265, 377, 386 to 396, 419; read by `keepApart` 1393.
 - **What is wrong:** an insect that closed in on something and then just stands is never shuffled aside for the
