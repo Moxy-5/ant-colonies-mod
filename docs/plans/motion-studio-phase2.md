@@ -141,3 +141,13 @@ changes; the films' jump flags.
   without the gait table, which the game cannot do without (`body_plan.keep_gaits`, used by both writers). Two are
   about the gait rule, so they go with BUGS 384's rethink: a lion turning in place after a run, and a long frame
   hitch read as going back. Refuted: a plan's style change that no tool can reach.
+- **The gait rule rethought (2026-11-25, BUGS 384; the user's go-ahead "Yes start it"; branch `claude/gait-rule`).**
+  The first rule assumed every gait change starts from a steady stride whose clip can keep pace while it waits for the
+  footfall; at a start, a burst of speed or a turn on the spot it cannot. Now `GaitShift` waits for the footfall only
+  while the drawn gait carries the speed (`GaitShift.carries`: its feet within a fifth of the ground's speed, the pace
+  report's line), and changes at once otherwise; the lion's turn on the spot is judged by its own pace. In the gait film
+  every gait's feet stay planted (1.00), 4 of 8 changes wait for their footfall and the 4 at once turn the legs no faster
+  than running does; in the hunt film the starts launch straight into the run (the cow's charge feet 1.01, was a walk at
+  4.24). Left (BUGS 384): the calf's slow charge clip (378), the cub's more frequent gait flips, the male's slowing
+  gallop read late from his stride. Found on the way: BUGS 385 (a pinning lioness's paw 1 to 2 px into the grass).
+  Films now keep 60 frames a second (they drew over 1,000 and lagged the user's PC).
