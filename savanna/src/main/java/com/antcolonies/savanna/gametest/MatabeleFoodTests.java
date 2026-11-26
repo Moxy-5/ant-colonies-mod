@@ -242,6 +242,41 @@ public class MatabeleFoodTests {
                 .thenSucceed();
     }
 
+    /**
+     * Review R1-1: a Matabele queen beside a player lays. Fed a full meal by hand, she carries an egg; after the
+     * incubation time it comes out in her room, a real egg. Before, only a colony living as numbers ever got eggs.
+     */
+    @GameTest(template = "arena", timeoutTicks = 6400, skyAccess = true)
+    public static void aFedMatabeleQueenLaysHerEggWhileAPlayerIsNear(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        Colony colony = settled(helper);
+        long[] fedAt = {-1};
+        helper.onEachTick(() -> {
+            if (fedAt[0] < 0) {
+                if (!colony.queenCare().isQueenHome(level)) {
+                    helper.assertTrue(helper.getTick() < 2400, "the queen never was in her room: her room's middle " + colony.nest().getFinishedRoomCenter(level)
+                            + ", she " + (colony.getQueen(level) == null ? "is not loaded" : "stands at " + colony.getQueen(level).position()) + ", nest " + colony.nest().describeSite(level));
+                    return;
+                }
+                int meal = colony.profile().queen().meal();
+                for (int piece = 0; piece < meal; piece++) {
+                    helper.assertTrue(colony.queenCare().feedQueen(level, false), "the queen refused piece " + (piece + 1) + " of her meal");
+                }
+                fedAt[0] = helper.getTick();
+                return;
+            }
+            long waited = helper.getTick() - fedAt[0];
+            int young = colony.brood().countEggs(level) + colony.brood().countLarvae(level);
+            if (colony.queenCare().getEggsLaid() >= 1 && young >= 1) {
+                helper.assertTrue(waited >= colony.profile().queen().incubationTicks(), "the egg came out after " + waited + " ticks, before its incubation time");
+                helper.succeed();
+                return;
+            }
+            helper.assertTrue(waited < colony.profile().queen().incubationTicks() + 100, "a fed Matabele queen in her room laid no egg near a player ("
+                    + colony.queenCare().getEggsLaid() + " laid, " + young + " young in the nest)");
+        });
+    }
+
     private static Colony settled(GameTestHelper helper) {
         ServerLevel level = helper.getLevel();
         TestScenes.deepGround(helper);

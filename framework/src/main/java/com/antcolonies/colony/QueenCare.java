@@ -311,6 +311,21 @@ public class QueenCare {
         return nextStreamEgg;
     }
 
+    /**
+     * The egg the queen carries comes out where she lies, once it is ready and she is in her room: called by the queen
+     * herself once a second (a species fed for each egg, with no steady stream; review R1-1: only the away brain let
+     * the egg out, so a queen a player stayed beside never laid, and could not starve while she carried it). While her
+     * colony lives as numbers the away brain lays it by the same clock ({@link #liveAway}). True if an egg came out.
+     */
+    public boolean layCarriedEgg(ServerLevel level, double x, double y, double z) {
+        if (colony.profile().laying().isPresent() || colony.away().isAway(level) || !isEggDue(level) || !isQueenHome(level)) {
+            return false;
+        }
+        eggCameOut(level);
+        colony.brood().spawnEgg(level, x, y, z);
+        return true;
+    }
+
     private void eggCameOut(ServerLevel level) {
         eggsLaid++;
         if (burstLeft > 0) {

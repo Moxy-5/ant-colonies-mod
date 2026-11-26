@@ -74,6 +74,7 @@ afallingtreecrusheswhatisunderit 0.38
 afarmatabelecolonyraidsoutofsightintheraidhours 0.68
 afarmeadowpastthetrailstipisfoundrecruitedtoandpullsthetrailout 1.99
 afartermitecolonylivesasnumbersandcomesoutwhenaplayerisnear 0.33
+afedmatabelequeenlayshereggwhileaplayerisnear 0.10
 afedprideandasmallherdofgrownmeannohunt 0.15
 afeedingplaceinlandnotloadedisneverread 0.03
 aflycloudhangsoverthewater 1.41

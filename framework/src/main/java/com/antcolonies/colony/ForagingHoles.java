@@ -280,7 +280,11 @@ public class ForagingHoles {
         long now = level.getGameTime();
         if (outsideCheckedAt == Long.MIN_VALUE || now - outsideCheckedAt >= OUTSIDE_CHECK_TICKS || now < outsideCheckedAt) {
             outsideCheckedAt = now;
-            AABB area = colony.nestArea().inflate(8);
+            // Out to where the colony forages, the area the trails count their workers outside over (review R1-9: only
+            // the nest's own 32 blocks were searched, so with every forager out at the far holes "nobody was outside"
+            // and the holes were shut on them at dawn without the grace).
+            double reach = colony.foragingRadius() + 8.0;
+            AABB area = colony.nestArea().inflate(8).minmax(new AABB(colony.getCenter()).inflate(reach, 24.0, reach));
             anyoneOutside = !level.getEntitiesOfClass(AbstractAntEntity.class, area,
                     ant -> ant.isAlive() && colony.getId().equals(ant.getColonyId()) && !colony.nest().isInside(level, ant.blockPosition())).isEmpty();
         }

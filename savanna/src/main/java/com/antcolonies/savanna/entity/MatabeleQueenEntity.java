@@ -122,6 +122,8 @@ public class MatabeleQueenEntity extends AbstractAntEntity {
             Colony colony = manager.getColony(getColonyId());
             if (colony != null && colony.queenCare().queenStarves(serverLevel)) {
                 hurt(damageSources().starve(), 1000.0F);
+            } else if (colony != null && colony.queenCare().layCarriedEgg(serverLevel, getX(), getY(), getZ())) {
+                manager.markChanged(); // fed a full meal, the egg she carried is ready: it comes out where she lies
             }
         }
     }
