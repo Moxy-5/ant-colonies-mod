@@ -402,7 +402,13 @@ public final class LionHunt {
         }
         double f = l.settle.along(strike, l.doingFor(), LionEntity.BLEND);
         Vec3 preyStep = new Vec3(prey.getX() - prey.xo, 0.0, prey.getZ() - prey.zo);
+        if (l.level().isClientSide) {
+            l.settle.told(l.strikeWord());                       // hit or miss is the server's word (it sees the prey as it is)
+        }
         Vec3 at = l.settle.at(f, l.settle.target(strike, l.doingFor(), f, p.at(), preyStep, l.getScale(), LionEntity.BLEND));
+        if (!l.level().isClientSide) {
+            l.strikeWord(l.settle.word());
+        }
         double ground = groundAt(l.level(), at.x, at.z, prey.getY());
         move.accept(l, at.x, Double.isNaN(ground) ? l.getY() : ground, at.z);
         float yaw = l.settle.yaw(f, p.yaw());
@@ -438,8 +444,7 @@ public final class LionHunt {
     static void setOff(LionEntity l, BuffaloEntity prey, byte doing, int spot) {
         State s = l.hunt;
         l.getNavigation().stop();
-        l.setDoing(doing);
-        l.settle = null;
+        l.setDoing(doing);                                      // (a new ride from here: LionEntity.newStrike)
         s.holdSpot = spot;
         s.holding = true;
         s.struck = false;

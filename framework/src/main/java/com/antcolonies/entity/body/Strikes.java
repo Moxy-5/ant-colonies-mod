@@ -55,6 +55,7 @@ public final class Strikes {
         private Vec3 aim;                       // where the strike lands: followed through its coil, fixed once it is off
         private int missed = -1;                // decided at its hit: 1 its place had gone from where it aimed, 0 it grips
         private double gapX, gapZ;              // its aim less its place at the hit (eased away as it grips)
+        private int told = -1;                  // a screen: the server's word (-1 not come yet)
 
         private Ride(double x, double z, float yaw, double from) {
             this.x = x;
@@ -89,8 +90,8 @@ public final class Strikes {
         /**
          * Where it heads now (flat). No strike: its place. On a strike it aims, never steers in the air (the hunt film,
          * 2026-11-26: a leap that followed a fleeing calf stretched to 5 blocks at twice the clip's speed): through its
-         * coil, at where its place will be when it lands (the prey going on as it goes this tick); from the first tick
-         * off the ground that aim is fixed. At the hit it grips if its place is still within {@link #GRIP} of the aim
+         * coil, at where its place will be when it lands (the prey going on as it goes this tick), never beyond its reach
+         * from where it set off; from the first tick off the ground that aim is fixed. At the hit it grips if its place is still within {@link #GRIP} of the aim
          * (at its size), easing onto its place over {@code settleTicks}; otherwise it has missed and lands on the aim.
          *
          * @param along     its share of the way now ({@link #along})
@@ -108,13 +109,19 @@ public final class Strikes {
             int sinceHit = sinceStart - strike.lead() - strike.hit();
             if (aim == null || along <= 0.0 && sinceHit < 0) {
                 int left = Math.max(0, strike.landed() - sinceStart);
-                aim = new Vec3(place.x + preyStep.x * left, place.y, place.z + preyStep.z * left);
+                double ax = place.x + preyStep.x * left - x, az = place.z + preyStep.z * left - z;
+                double far = Math.hypot(ax, az), reach = strike.reach() * size / 16.0;
+                double k = far > reach ? reach / far : 1.0;     // no farther than it can leap: the prey fled, it lands short
+                aim = new Vec3(x + ax * k, place.y, z + az * k);
             }
-            if (missed < 0 && sinceHit >= -1) {
+            if (missed < 0 && (sinceHit >= -1 || told >= 0)) {
                 // decided the tick before the hit: the striker's own tick (its grip, its bite) comes before its placing
                 missed = Math.hypot(place.x - aim.x, place.z - aim.z) > GRIP * size ? 1 : 0;
                 gapX = aim.x - place.x;
                 gapZ = aim.z - place.z;
+            }
+            if (told >= 0 && missed >= 0) {
+                missed = told;                          // a screen: the server's word stands over its own guess
             }
             if (sinceHit < 0 || missed == 1) {
                 return aim;
@@ -123,6 +130,22 @@ public final class Strikes {
             double f = Math.min(1.0, (sinceHit + 1.0) / settleTicks);
             double left = 1.0 - f * f * (3.0 - 2.0 * f);
             return new Vec3(place.x + gapX * left, place.y, place.z + gapZ * left);
+        }
+
+        /**
+         * A screen is told the server's word on this strike (-1: not come yet; 0 it grips, 1 it missed). Hit or miss is
+         * the server's: a screen sees the prey a tick late and smoothed, and a spinning calf had the two disagree (the
+         * hunt film, 2026-11-26: the server's lioness missed, the screen's gripped and swung round with the calf).
+         */
+        public void told(int word) {
+            if (word >= 0) {
+                told = word;
+            }
+        }
+
+        /** Its word on the strike: -1 not decided yet, 0 it grips, 1 it missed (the server sends it to the screens). */
+        public int word() {
+            return missed;
         }
 
         /** Whether its strike missed (decided at the strike's hit; false before it). */
