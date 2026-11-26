@@ -6,27 +6,27 @@
    "animation_length": 0.05,
    "bones": {
     "root": {
-     "rotation": [
+     "position": [
       0.0,
       0.0,
       0.0
      ],
-     "position": [
+     "rotation": [
       0.0,
       0.0,
       0.0
      ]
     },
     "hips": {
+     "position": [
+      0.0,
+      -10.387,
+      0.0
+     ],
      "rotation": [
       0.45,
       0.0,
       -78.0
-     ],
-     "position": [
-      0.0,
-      -7.0,
-      0.0
      ]
     },
     "chest": {

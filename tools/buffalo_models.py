@@ -1105,6 +1105,7 @@ def export_game():
         "geo/entity/buffalo.geo.json": geo("buffalo", bones, tw, th, (4.8, 2.8, [0, 1.2, 0])),
         "textures/entity/buffalo.png": png(rows),
         "animations/entity/buffalo.animation.json": animations(all_clips),
+        "animations/entity/buffalo_carcass.animation.json": animations(carcass_clip(all_clips)),
     }, mod="savanna", faces=True)
 
     plan_data = build_body_plan(raw, meta)
@@ -1120,6 +1121,32 @@ def export_game():
                       "tools/buffalo_models.py game")
     print(f"Exported African Buffalo to savanna: {len(raw)} bones, {sum(len(b['cubes']) for b in raw)} boxes, "
           f"{tw}x{th} Crafted Fur texture, {len(all_clips)} clips, body_plan + block_moves.")
+
+
+def carcass_clip(all_clips):
+    """The carcass's one pose (RemainsRenderer draws a dead buffalo's remains with it): the death clip's last frame, bone
+    by bone, so the carcass lies exactly as the dying buffalo ended (the Motion Studio phase 3, step 5, 2026-11-26: the
+    file was made by hand once and stayed behind when the death changed)."""
+    def last(chan):
+        if isinstance(chan, dict):
+            v = chan[max(chan, key=float)]
+            return list(v.get("post", v)) if isinstance(v, dict) else list(v)
+        return list(chan)
+    bones = {b: {ch: last(v) for ch, v in chans.items()} for b, chans in all_clips["death"]["bones"].items()}
+    return {"carcass": {"loop": True, "animation_length": 0.05, "bones": bones}}
+
+
+def export_clips():
+    """Writes only the clips (buffalo.animation.json and the carcass's pose). Use this when only tools/buffalo_anims.py
+    changed: 'game' also writes the body plan, whose checks, course, verify and spots sections were added after by hand
+    and by other tools and would be lost."""
+    import buffalo_anims
+    all_clips, _ = buffalo_anims.build_clips(build_bones())
+    write_assets({
+        "animations/entity/buffalo.animation.json": animations(all_clips),
+        "animations/entity/buffalo_carcass.animation.json": animations(carcass_clip(all_clips)),
+    }, mod="savanna", faces=True)
+    print(f"Exported the African Buffalo's {len(all_clips)} clips and its carcass pose.")
 
 
 def audit():
@@ -1168,7 +1195,9 @@ def audit():
 
 
 if __name__ == "__main__":
-    if "game" in sys.argv[1:]:
+    if "clips" in sys.argv[1:]:
+        export_clips()
+    elif "game" in sys.argv[1:]:
         audit()
         export_game()
     else:
