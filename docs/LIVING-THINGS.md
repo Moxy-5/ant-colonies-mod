@@ -76,7 +76,7 @@ Every living thing in the mod, built or planned, plants and fungi included, in o
 - Fly clouds (a cloud of 4 to 12 darting, buzzing flies drawn by one mob; bottle fly and house fly looks; food for the bullfrog's tongue, later barbs and young crocodiles; later on remains, dung and termite flights): BUILT 2026-11-20 (the user, "go for it"; `docs/plans/fly-clouds.md`); eaten by the bullfrog's tongue.
 - Minecraft's cod, salmon, squid: kept out of savanna rivers (BUILT).
 
-**5. Savanna land animals** (fun first; all IDEA unless marked)
+**5. Savanna land animals** (fun first; all IDEA unless marked; where each lives and how common it is: `docs/plans/land-animal-homes.md`, read it before building any of them)
 - *5a. Bugs, spiders and other small creatures* (sizes beside the insects to pick by eye):
   - Giant African millipede (dead-wood and leaf-litter eater, curls up when touched): user's list 2026-11-16.
   - Giant African land snail (eats plants and rotting matter): user's list 2026-11-16.
