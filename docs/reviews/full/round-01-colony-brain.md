@@ -431,3 +431,138 @@ servers, not in the user's usual game. They stay A: a freeze is a freeze, and th
 - `Colony.roleOf` and `workOutRoles` (at most once a second); `Strays`; `Claims` (all 9 users prune it).
 - The static test hooks are set only by tests, soaks and flights (the watcher overlap is BUGS 338).
 - No species named; dice from `Colony.random()`; no season read.
+
+---
+
+## Thread: the colony's tick, near and away (a Fable reader, across all the parts)
+
+Followed the paths; not every file read whole (not read: `NestWalls`, `Refuse`, most of `ForagingHoles`,
+`ForagingTrails`, `Neighbours`, `NestPlan`, `TunnelRoute`, `RunwayRoute`, `FoodWays`, `GroundReader`, the species
+readers; the line-by-line slices above cover those).
+
+### The tick, in short
+
+1. `ModEvents.onLevelTick` calls `ColonyManager.tickColonies(level, gameTime % 20)`: each colony's brain runs once a
+   second on its own slot (from its id), so colonies are spread over the second; on the other 19 ticks a colony gets
+   only a catch-up slice, and only if it owes building.
+2. **Not here** (land not loaded, or no watcher within 64 blocks, 80 to stay): `AwayLife.tickAway`. The first minute
+   nothing runs. Then frozen insects are folded into the numbers, loaded strays every 400 ticks, and the away parts
+   run in order: mound shapes 5, hidden trips 10, galleries 20, population 30, nest life 40, field life 60, build
+   life 70, prey pile 85, raids 87; then the save is marked changed.
+3. **Here but the queen's body not loaded:** nothing runs that second.
+4. **Here:** `Colony.tick` runs the near parts in order: settle 10, fungus garden 20, mound 30, mushrooms 50, alarm 60,
+   raid defence 65, food map 70, foraging holes 80, galleries 90, hidden trips 100, bare patches 110, prey pile 115,
+   raids 117, population 120, nest defence 125, nest life 130, danger map 170, closed holes 180, neighbours 190,
+   field life 200, strays 215.
+5. **Order:** the population eats (120) before the young are fed (130) and the field brings food in (200), so food
+   gathered this second is eaten the next; the same order away (30, 40, 60). Harmless.
+6. Nothing in the brain grows with the square of the number of colonies. The widest loops: `foldLoaded` over every
+   entity, and the walks over every known plant.
+
+### R1-35 (A, the path proven and checked again; how hard it bites, to measure): sleeping in a bed takes the termites' foraging night away, while their hunger runs on
+
+- **What is wrong:** termites forage outside at night or in rain (`macrotermes.json:103`, `"forage_at": ["night",
+  "rain"]`; `Colony.isForagingTime`, 433 to 449, by `level.isDay()`). A bed works only at night and jumps the day
+  clock to morning; the game time does not jump, and the hunger clocks run on game time (`Meals:145`, a meal every
+  24,000, starving after 72,000; `docs/DESIGN.md:716` says the same of the test clock, "like sleeping in a bed; hunger
+  and ages do not jump"). Nothing in the mod listens for sleeping (grep: no `SleepFinished`, no sleep event).
+  Near: real foragers stop (`GatherFoodGoal:56`) and the holes stay shut (`ForagingHoles:221`). Away, for every colony
+  of the world, since the day clock is one: `FieldLife:384` skips every plant unless it is fed from inside, and 417
+  never forages by the land. What is left by day is only rich food (dead wood, hay) a closed gallery or runway
+  reaches; dry grass is never rich.
+- **The other side of the same root:** the savanna's `RaidsAway:224-231` counts the raid day by the day clock, so with
+  slept nights the Matabele get a full day's raids in about half the game time.
+- **Unchecked links:** Minecraft's bed rule is from memory, not read in its code (the main session agrees with it:
+  the day time is set forward, the game time is not); whether the by-day income is enough to live on needs a soak.
+- **What the player sees:** a player who sleeps every night never sees termites at their holes; colonies living on
+  grass shrink and starve all over the world, those with dead wood live on; the balance tips to the ants. The user
+  tests in creative and seldom sleeps, which is why it has not shown.
+- **The user's call (it changes how the game plays). Recommended:** a skipped night is foraged as numbers. When the
+  day clock jumps, each colony's field life (the same numbers that forage for an away colony) is given the skipped
+  foraging hours at once, near or away: the termites did forage that night, the player slept through it. One rule,
+  with machinery that exists; no new number. The raid day then needs no change.
+
+### R1-36 (B, proven; checked again): builder numbers do nothing near a player and bank work without end while away
+
+- **Where:** `ColonyParts.java:136-138` (`BUILD_LIFE` has only `.ticksAway(70, ...)`, no near tick);
+  `BuildLife.java:94-107`, `148-166`; `NestLife.java:162`.
+- **What is wrong:** near, with 200 workers and 50 real, about three quarters of the builders are numbers and build
+  nothing (forager numbers do work near: `FieldLife` ticks both ways). Away, `work += builders * 20L` every second
+  with no cap. Back, it is spent out of sight at up to 200 blocks a second, and dropped only when nothing is left to
+  do and nothing waited on a player's eyes; while a player looks at the next block the slice is tried again on 19 of
+  every 20 ticks, each try a scan of the whole nest plan and up to 8 mound passes a second.
+- **What the player sees:** beside a mound it grows at about a quarter of its pace; leave and come back and it has
+  jumped. The balance goal "the mound keeps growing over many hours of play" then hangs on where the player stands.
+- **Fix proposed:** one judge of the building pace: builder numbers add `work` near too, spent by the same
+  out-of-sight catch-up; `work` capped at what the colony can still build, so nothing is retried every tick.
+  **This changes how fast a watched mound grows: the user's call.**
+
+### R1-37 (B, the mechanism proven; checked again): all the numbers of a caste share one meal minute
+
+- **Where:** `Meals.java:124-126`, `154-158`, `185-196`; against `Population.java:224-259` (old age is spread).
+- **What is wrong:** every number with no known meal gets the same minute (`times.merge(minute(now), want - have)`); a
+  colony put in by new land gets all its workers at once. While hunger is off (termites: until the first comb) the
+  clocks are all set to now again. A day later all are due in one second: 200 workers at 4 a piece take 50 layers of
+  comb in one tick, once a day. With no food, one pass starves every minute older than `starveAfter` at once.
+- **What the player sees:** a comb untouched all day that loses a block's worth in a moment; a cut-off colony that
+  looks full for three days and is empty the next second, instead of dwindling.
+- **Fix proposed:** numbers with no known meal are spread over the last meal interval (as `growOld` spreads deaths);
+  while hunger is off, time is simply not counted, in place of setting every clock to now.
+
+### R1-38 (C, proven): two judges of "it rains"
+
+- **Where:** `Colony.java:436` (a species with a day clock asks `rainsOnNest(level)`) and `439` (one without asks
+  `level.isRaining()`, the whole world). Termites take the second. Harmless in the savanna today.
+- **Fix proposed:** `rainsOnNest(level)` on line 439 too.
+
+### R1-39 (C, proven; to measure): the away brain asks the world for eggs and larvae several times a second
+
+- **Where:** `Brood.java:83-85`, `311-313`; callers `QueenCare.java:247-248`, `265`, `338`, `382`, `429`;
+  `AwayLife.java:287-317`.
+- **What is wrong:** `Brood.isFull` counts real egg and larva bodies in the nest's box, up to five times an away
+  second, though the away brain keeps its young as numbers. `foldLoaded` walks every entity of the world every 400
+  ticks for each colony that is far with its land loaded.
+- **Fix proposed:** away, `isFull` answers from the numbers' own young; `foldLoaded` asks the colony's own box.
+
+### R1-40 (C, proven): "is the colony here" is worked out again inside parts in the middle of a tick
+
+- **Where:** `Population.java:364`; savanna `FungusGarden.java:341`; `FieldLife.java:104` takes it as a parameter, the
+  right pattern.
+- **What is wrong:** `isHere` is no stored answer: it reads the land, the players and the hooks each call. In the
+  grace minute and at the change-over it can differ from which brain is ticking the part, so a part can read the
+  world's comb while ticked as numbers: where a double count at the change-over would come from.
+- **Fix proposed:** the tick stores "here or away" on the colony once; the parts read that.
+
+### R1-41 (C, likely): the real queen's founding batch has no away guard, unlike her stream laying
+
+- **Where:** `QueenCare.java:202-234` (`raiseFoundingBatch`, no guard) against `281-286` (`layInStream`, guarded);
+  caller savanna `TermiteQueenEntity.java:164`.
+- **Unchecked link:** whether a real queen ticks long enough while her colony counts as away to matter.
+- **Fix proposed:** the same guard at the top of `raiseFoundingBatch`.
+
+### Seen by two readers (this thread and a slice)
+
+- **R1-27 and R1-31** (a dead colony never ended away; every colony ticking for ever): found again here, with what
+  one away colony costs a second: `isHere` (a player scan and the hooks), the population's age groups and meals, the
+  nest life with R1-39's world queries, the field life walking every entry of `owed` and every known plant, the build
+  life, the species' away parts; and `tickColonies` copies the whole colony list 20 times a second. This reader's fix
+  adds: a colony in land not loaded ticks its away parts on a 10-second beat with the seconds handed in (its clocks
+  run on game time, so nothing is lost).
+- **R1-13** (two judges of room in the food store): found again; rated C here, the loss "a few pieces".
+- **R1-28** (a species load lost at the fold): found again, with a different weight: the raid reads what its ants
+  hold before it folds them (savanna `Raid:941-947`), so this reader found no loss today and rates it C now, B when
+  the next carrying species comes. The two readers agree on the fix (the species owns its load both ways).
+- **R1-5** (the queen's own dice): found again.
+
+### Solid on this thread (do not "fix")
+
+- Tick slots: two parts on one place throw at sign-up; every part is made before any signs up.
+- No away path followed loads a chunk.
+- The fold is guarded against counting an insect twice; a frozen insect that comes back after being replaced is
+  folded, not doubled.
+- The numbers' clocks all run on game time: `/tick rate` and long absences need no loop "once for each missed second"
+  for ages, meals or laying.
+- The block catch-up on return is bounded: 200 blocks a second, 20 a tick, 8 mound passes, 4 gallery pieces.
+- Old-age deaths are spread; the queen's stream uses one clock near and away, guarded so both never lay.
+- The season rule and the species-name rule hold across `colony/`, `species/` and `season/` (names only in comments).
+- `crew` equal to `real_cap` makes `watch_radius` do nothing; the species file says that is the user's pick.
