@@ -87,6 +87,11 @@ public class FloodplainTreePiece extends StructurePiece {
         }
     });
 
+    /** The server has stopped: nothing is kept for the next world opened (review R7-7). */
+    public static void forgetShapes() {
+        SHAPES.clear();
+    }
+
     /** The tree's shape (worked out once, kept for its chunks). */
     public static Shape shape(FloodplainTreeStructure.Tree tree) {
         String key = tree.kind() + "|" + tree.seed() + "|" + tree.age();

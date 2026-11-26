@@ -141,6 +141,10 @@ public class Forest extends SavedData {
     /** The server has stopped: no tree of this world is kept for the next one opened. */
     public static void forgetAll() {
         QUEUE.clear();
+        // The worked-out shapes go too (review R7-7: they were kept, tens of MB, into the next world opened).
+        TreePlacer.forgetShapes();
+        com.antcolonies.savanna.worldgen.GiantTreePiece.forgetShapes();
+        com.antcolonies.savanna.worldgen.FloodplainTreePiece.forgetShapes();
     }
 
     /** The game tests: how many trees of new land wait to be taken into a book. */
@@ -321,6 +325,17 @@ public class Forest extends SavedData {
     private record Smoulder(BlockPos top, double until) {
     }
 
+    /** Where the once-a-second walk goes on next second, when its time ran out (review R7-2). Not saved. */
+    private int walkFrom;
+    /**
+     * Living hollow trees a storm is breaking, waiting for their shapes to be worked out in the background (review R7-4:
+     * the three shapes were worked out on the server's own thread, a hitch of tens of ms). Not saved: one cut off by a
+     * stop was simply not broken.
+     */
+    private final it.unimi.dsi.fastutil.longs.LongOpenHashSet snapping = new it.unimi.dsi.fastutil.longs.LongOpenHashSet();
+    /** Fallen logs whose "is anything of it left" look is due and waits for its shape or its land (review R7-19). Not saved. */
+    private final it.unimi.dsi.fastutil.longs.LongOpenHashSet logLooks = new it.unimi.dsi.fastutil.longs.LongOpenHashSet();
+
     /** How long a hollow trunk killed by fire smoulders (my pick: half a day). */
     static final double SMOULDER_DAYS = 0.5;
 
@@ -388,6 +403,8 @@ public class Forest extends SavedData {
 
     public void remove(Tree tree) {
         trees.remove(tree.foot.asLong());
+        snapping.remove(tree.foot.asLong());
+        logLooks.remove(tree.foot.asLong());
         LongList list = byChunk.get(ChunkPos.asLong(tree.foot));
         if (list != null) {
             list.rem(tree.foot.asLong());
@@ -486,15 +503,39 @@ public class Forest extends SavedData {
             }
         }
         smoulder(level);
-        for (Tree t : all()) {
+        // Only the trees of loaded land, chunk by chunk, going on next second where the time ran out (review R7-2: the
+        // walk took every tree ever met, storms acted on trees far away, and it always started from the same end).
+        long[] chunks = byChunk.keySet().toLongArray();
+        long daySecond = Math.floorMod(level.getDayTime(), 24000L) / 20;
+        for (int i = 0; i < chunks.length; i++) {
+            int at = (walkFrom + i) % chunks.length;
             if (System.nanoTime() - start > BUDGET_NANOS) {
-                break; // the rest next second
+                walkFrom = at; // the rest next second, from here
+                break;
             }
+            LongList inChunk = byChunk.get(chunks[at]);
+            if (inChunk == null || !LandReady.chunk(level, ChunkPos.getX(chunks[at]), ChunkPos.getZ(chunks[at]))) {
+                continue;
+            }
+            for (long foot : inChunk.toLongArray()) {
+                Tree t = trees.get(foot);
+                if (t != null) {
+                    second(level, t, today, daySecond);
+                }
+            }
+        }
+    }
+
+    /** One loaded tree's second. */
+    private void second(ServerLevel level, Tree t, long today, long daySecond) {
+        {
             if (t.settled()) {
                 if (HeartRot.diedOfRot(t) && t.placedAge >= 0) {
                     crumble(level, t);
+                } else if (t.placedAge >= 0) {
+                    lookForLog(level, t, daySecond);
                 }
-                continue;
+                return;
             }
             if (t.living() && t.placedAge >= 0 && BranchShedding.stormShakes(level, t.age, t.foot)) {
                 // Step 6b: a thunderstorm shakes a dead branch out of a grown tree's crown.
@@ -507,10 +548,15 @@ public class Forest extends SavedData {
                     }
                 }
             }
-            if (HeartRot.stormKills(level, t)) {
-                kill(t, today, "storm"); // part 4: the storm breaks the hollow tree
-                if (!fellNow(level, t)) {
-                    t.fell = true; // snapped at the hollow, its top comes down now (drawn falling where it can be)
+            if (snapping.contains(t.foot.asLong()) ? t.living() : HeartRot.stormKills(level, t)) {
+                if (!snapShapesReady(t)) {
+                    snapping.add(t.foot.asLong()); // its shapes are being worked out: it breaks the second they are ready
+                } else {
+                    snapping.remove(t.foot.asLong());
+                    kill(t, today, "storm"); // part 4: the storm breaks the hollow tree
+                    if (!fellNow(level, t)) {
+                        t.fell = true; // snapped at the hollow, its top comes down now (drawn falling where it can be)
+                    }
                 }
             }
             if (t.dead() && !t.fell && t.died != DIED_UNKNOWN && stormFells(level, t)) {
@@ -521,6 +567,58 @@ public class Forest extends SavedData {
                 update(level, t, today);
             }
         }
+    }
+
+    /** Whether the three shapes a storm-broken tree needs ({@link #fellNow}) are worked out (asked for if not). */
+    private static boolean snapShapesReady(Tree t) {
+        if (shapesAtOnce) {
+            return true;
+        }
+        boolean rot = HeartRot.hollow(t);
+        String kind = t.shapeKind(t.termites, rot);
+        boolean now = TreePlacer.placedSoon(t.shapeKind(t.placedTermites, t.placedRot), t.seed, t.placedAge, t.placedStage, t.placedStep) != null;
+        boolean shed = TreePlacer.placedSoon(kind, t.seed, TreeLife.shapeAge(t.age), TreeStage.SHED, TreeLife.fullStep(TreeStage.SHED)) != null;
+        boolean lying = TreePlacer.placedSoon(kind, t.seed, TreeLife.shapeAge(t.age), TreeStage.FALLEN, TreeLife.fullStep(TreeStage.FALLEN)) != null;
+        return now && shed && lying;
+    }
+
+    /**
+     * A fallen log is looked at once a day, each log at its own second: when no block of its trunk and limbs is left (termites ate it,
+     * the player took it, it burnt) its record ends (review R7-19: the record stayed for ever, keeping seedlings 4
+     * blocks from a foot no longer there). A log the rot killed ends by crumbling instead ({@link #crumble}).
+     * {@code lookForLogNow}: the look itself, for the tests.
+     */
+    public void lookForLogNow(ServerLevel level, Tree t) {
+        logLooks.add(t.foot.asLong());
+        lookForLog(level, t, -1);
+    }
+
+    private void lookForLog(ServerLevel level, Tree t, long daySecond) {
+        long key = t.foot.asLong();
+        if (daySecond == Math.floorMod(Long.hashCode(key * 0x9E3779B97F4A7C15L), 1200)) {
+            logLooks.add(key);
+        }
+        if (!logLooks.contains(key)) {
+            return;
+        }
+        TreePlacer.Placed lying = soon(t, t.placedAge, t.placedStage, t.placedStep, t.placedTermites, t.placedRot);
+        if (lying == null) {
+            return; // its shape is being worked out: next second
+        }
+        logLooks.remove(key);
+        if (!loaded(level, lying.box(t.foot))) {
+            return; // tomorrow
+        }
+        TreePlacer.Placed laid = TreePlacer.rest(lying, t.foot, TreePlacer.ground(level, t.foot));
+        BlockPos.MutableBlockPos pos = new BlockPos.MutableBlockPos();
+        for (int i = 0; i < laid.size(); i++) {
+            pos.set(t.foot.getX() + laid.xs()[i], t.foot.getY() + laid.ys()[i], t.foot.getZ() + laid.zs()[i]);
+            // (its trunk and limbs count; the twigs and loose pieces lying round it do not keep a record)
+            if (laid.states()[i].getBlock() instanceof RotatedPillarBlock && level.getBlockState(pos).is(laid.states()[i].getBlock())) {
+                return; // something of it still lies there
+            }
+        }
+        remove(t);
     }
 
     // ---------------------------------------------------------------- 4b, 4d, 4e: growing and dying
@@ -582,6 +680,17 @@ public class Forest extends SavedData {
 
     /** As {@link #update(ServerLevel, Tree, long)}, with the clock's time in days (with the part of the day). */
     public boolean update(ServerLevel level, Tree t, long today, double time) {
+        // The book counts as changed only when the tree's record really changed (review R7-6: every look at a tree
+        // waiting to be out of sight marked it, so the whole book was written at every autosave).
+        CompoundTag before = t.save();
+        boolean done = bring(level, t, today, time);
+        if (trees.get(t.foot.asLong()) == t && !before.equals(t.save())) {
+            setDirty(); // (a tree whose record ended has marked the book itself)
+        }
+        return done;
+    }
+
+    private boolean bring(ServerLevel level, Tree t, long today, double time) {
         if (falls.containsKey(t.foot.asLong())) {
             return true; // being drawn falling: it lands by itself
         }
@@ -661,7 +770,6 @@ public class Forest extends SavedData {
             }
             stageSteps = Math.abs(TreeLife.stageIndex(t.treeKind(), t.stage) - TreeLife.stageIndex(t.treeKind(), t.placedStage));
         }
-        setDirty();
         if (now != null && t.living() && t.brackets < HeartRot.bracketsWanted(t)) {
             // Part 4: the shelf fungi come out on the bark.
             t.brackets += HeartRot.placeBrackets(level, t.foot, now, HeartRot.bracketsWanted(t) - t.brackets, t.lastDay - t.rotFrom - HeartRot.BRACKETS_FROM,
@@ -735,6 +843,9 @@ public class Forest extends SavedData {
         TreePlacer.Placed now = burnt(t, TreePlacer.placed(t.shapeKind(t.placedTermites, t.placedRot), t.seed, t.placedAge, t.placedStage, t.placedStep), t.placedStage);
         TreePlacer.Placed shed = burnt(t, TreePlacer.placed(t.shapeKind(t.termites, rot), t.seed, TreeLife.shapeAge(t.age), TreeStage.SHED), TreeStage.SHED);
         TreePlacer.Placed lying = burnt(t, TreePlacer.placed(t.shapeKind(t.termites, rot), t.seed, TreeLife.shapeAge(t.age), TreeStage.FALLEN), TreeStage.FALLEN);
+        if (!loaded(level, now.box(t.foot)) || !loaded(level, shed.box(t.foot)) || !loaded(level, lying.box(t.foot))) {
+            return false; // every chunk the tree and its log reach, not only its foot's (review R7-20)
+        }
         if (t.living()) {
             t.cause = rot ? "rot" : "age";
             killed++;
@@ -857,6 +968,9 @@ public class Forest extends SavedData {
                 continue;
             }
             BoundingBox box = now.box(t.foot);
+            if (!loaded(level, box)) {
+                continue; // (review R7-20: a young tree killed here had its blocks taken out with no such check)
+            }
             boolean any = false, trunk = false;
             for (BlockPos pos : hit) {
                 if (box.isInside(pos) && isPart(now, t.foot, pos, level.getBlockState(pos))) {
@@ -1388,7 +1502,12 @@ public class Forest extends SavedData {
     private static Forest load(CompoundTag tag, HolderLookup.Provider registries) {
         Forest forest = new Forest();
         for (Tag t : tag.getList("trees", Tag.TAG_COMPOUND)) {
-            forest.add(Tree.load((CompoundTag) t));
+            try {
+                forest.add(Tree.load((CompoundTag) t));
+            } catch (RuntimeException e) {
+                // One record that cannot be read (a kind renamed or taken out) is left out, not the whole book (review R7-18).
+                com.mojang.logging.LogUtils.getLogger().error("Tree book: a tree's record could not be read and is left out: {}", t, e);
+            }
         }
         for (long day : tag.getLongArray("rain")) {
             forest.rainDays.add(day);

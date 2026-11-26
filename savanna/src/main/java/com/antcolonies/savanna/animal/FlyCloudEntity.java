@@ -316,7 +316,7 @@ public class FlyCloudEntity extends Mob {
 
     /** The top of the ground or water at this column (the first free block over it; leaves do not count). */
     static int surface(LevelReader level, double x, double z) {
-        return level.getHeight(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, Mth.floor(x), Mth.floor(z));
+        return com.antcolonies.colony.GroundTop.y(level, Mth.floor(x), Mth.floor(z)); // through any tree crown (review R7-30)
     }
 
     @Override
@@ -401,7 +401,7 @@ public class FlyCloudEntity extends Mob {
 
     /** Whether this column's top is water 1 to {@link #SHALLOW} blocks deep. */
     static boolean shallowWater(LevelAccessor level, int x, int z) {
-        int top = level.getHeight(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, x, z);
+        int top = com.antcolonies.colony.GroundTop.y(level, x, z);
         BlockPos.MutableBlockPos at = new BlockPos.MutableBlockPos(x, top - 1, z);
         int depth = 0;
         while (depth <= SHALLOW && level.getFluidState(at).is(FluidTags.WATER)) {

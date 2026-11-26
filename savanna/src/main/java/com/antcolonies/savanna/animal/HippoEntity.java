@@ -970,7 +970,7 @@ public class HippoEntity extends PathfinderMob implements GeoEntity, HasLife {
         double bestD = Double.MAX_VALUE;
         for (int i = 0; i < 40; i++) {
             int x = from.getX() + random.nextInt(2 * reach + 1) - reach, z = from.getZ() + random.nextInt(2 * reach + 1) - reach;
-            int top = level.getHeight(Heightmap.Types.WORLD_SURFACE, x, z) - 1;
+            int top = com.antcolonies.colony.GroundTop.y(level, x, z) - 1; // through any tree crown (review R7-30)
             BlockPos at = new BlockPos(x, top, z);
             if (!level.getFluidState(at).is(FluidTags.WATER)) {
                 continue;

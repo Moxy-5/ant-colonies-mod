@@ -136,7 +136,7 @@ public final class RiverZones {
         while (level.getFluidState(p.above()).is(FluidTags.WATER) && p.getY() < level.getMaxBuildHeight()) {
             p.move(0, 1, 0);
         }
-        return level.getHeight(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, pos.getX(), pos.getZ()) <= p.getY() + 2;
+        return com.antcolonies.colony.GroundTop.y(level, pos.getX(), pos.getZ()) <= p.getY() + 2; // a tree crown over the water is no roof (review R7-30)
     }
 
     /** A kind's share of its group's cap in a zone (1 for a kind not listed and for no zone). */

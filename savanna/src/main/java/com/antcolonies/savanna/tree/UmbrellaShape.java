@@ -43,19 +43,15 @@ final class UmbrellaShape {
     static final double LIMB_MIN = 1.3;
 
     // N4's numbers (my picks from the user's photos; the trial versions N1 to N3 are in docs/HISTORY.md).
-    /** The crown's top (blocks; up to 2.5 more by seed). */
-    private static final double HEIGHT = 25;
-    /** The fork's height as a share of the crown's top. */
-    private static final double FORK = 0.56;
-    private static final int LIMBS_LO = 3, LIMBS_HI = 4;
+    // The crown's top, the fork's height (a share of it), the number of limbs, the crown's thickness in the middle and
+    // how much lower its top is at the edge come from the kind's file (review R7-24: they were fixed here, and the
+    // file's own numbers changed nothing).
     /** How steeply the limbs leave the fork (above level). */
     private static final double RISE = Math.toRadians(12);
     /** Where the limbs end, as a share of the crown's radius (up to 0.18 more by limb, at most 0.9). */
     private static final double REACH = 0.75;
     /** How far a limb dips below a straight line before it curls up into the crown (blocks). */
     private static final double SAG = 1;
-    /** The crown's thickness in the middle, and how much lower its top is at the edge. */
-    private static final double THICK = 5, DOME = 2;
     /**
      * The clumps widening (the user's ask, 2026-10-18): once the limbs have grown RING_FROM of the way out from the
      * fork, each limb's leaves start widening sideways round the crown's circle toward the next limb's, widest at
@@ -116,10 +112,10 @@ final class UmbrellaShape {
         // The random numbers come in the same order as in the shape the user picked in the tree viewer, so the grown
         // tree is that one.
         TreeRandom r = new TreeRandom(seed * 7919 + kind.salt() + 977);
-        height = HEIGHT + r.next() * 2.5;
+        height = kind.trunk().height() + r.next() * kind.trunk().heightSpread();
         crownRadius = kind.crown().radius() - 1 + r.next() * 3;
         trunkRadius = kind.trunk().radius() + (r.next() - 0.5) * kind.trunk().radiusSpread() * 2;
-        double fh = height * FORK;
+        double fh = height * kind.trunk().fork().get(0);
         double leanA = r.next() * TAU, leanD = 0.5 + r.next() * 1.5;
         double[] fork = {Math.cos(leanA) * leanD, fh, Math.sin(leanA) * leanD};
         double[] mid = {fork[0] * 0.35 + (r.next() - 0.5), fh * 0.5, fork[2] * 0.35 + (r.next() - 0.5)};
@@ -131,7 +127,7 @@ final class UmbrellaShape {
         }
 
         // The big limbs from the fork, each sweeping out under the crown; some split once.
-        int n = LIMBS_LO + (int) Math.floor(r.next() * (LIMBS_HI - LIMBS_LO + 1));
+        int n = kind.crown().limbs().get(0) + (int) Math.floor(r.next() * (kind.crown().limbs().get(1) - kind.crown().limbs().get(0) + 1));
         double phase = r.next() * TAU;
         for (int i = 0; i < n; i++) {
             double az = phase + i * TAU / n + (r.next() - 0.5) * 0.7;
@@ -201,12 +197,12 @@ final class UmbrellaShape {
 
     /** The crown's top at a distance from the middle (an ancient crown a little higher). */
     private double top(double dist, double old) {
-        return height + 1.5 * old - DOME * sq(dist / crownRadius);
+        return height + 1.5 * old - kind.crown().dome() * sq(dist / crownRadius);
     }
 
     /** The crown's underside at a distance from the middle. */
     private double under(double dist, double old) {
-        return top(dist, old) - lerp(THICK, 2.5, Math.pow(clamp(dist / crownRadius, 0, 1), 1.6));
+        return top(dist, old) - lerp(kind.crown().thickness(), 2.5, Math.pow(clamp(dist / crownRadius, 0, 1), 1.6));
     }
 
     /** The tree at an age, grown out along its skeleton. */
@@ -482,7 +478,7 @@ final class UmbrellaShape {
         double pad = lerp(0.5, 1, gr.k);
         for (double[] cen : grownLeaves) {
             double rx = pad * c.padRadius() * (0.6 + 0.4 * TreeRandom.hash((int) Math.round(cen[0]), 3, (int) Math.round(cen[2]), 3));
-            double ry = THICK * 0.45;
+            double ry = kind.crown().thickness() * 0.45;
             for (int x = (int) Math.floor(cen[0] - rx); x <= Math.ceil(cen[0] + rx); x++) {
                 for (int z = (int) Math.floor(cen[2] - rx); z <= Math.ceil(cen[2] + rx); z++) {
                     double hd = Math.hypot(x, z);

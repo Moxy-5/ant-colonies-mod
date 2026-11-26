@@ -269,6 +269,13 @@ public final class TreePlacer {
                 || state.getBlock() instanceof TreeBranchBlock;
     }
 
+    /** The server has stopped: no worked-out shape is kept for the next world opened (review R7-7). */
+    public static void forgetShapes() {
+        synchronized (CACHE) {
+            CACHE.clear();
+        }
+    }
+
     /** The tree of this kind, seed, age and stage worked out into blocks (kept for a while). */
     public static Placed placed(String kindName, long seed, double age, TreeStage stage) {
         return placed(kindName, seed, age, stage, TreeLife.fullStep(stage));

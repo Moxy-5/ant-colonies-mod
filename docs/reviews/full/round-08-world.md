@@ -61,6 +61,8 @@ scene to measure it.
 - **Fix proposed:** keep the biome source and sampler with the maps (as `BigSavanna.Store` does) and start afresh when
   either differs; clear on `ServerStoppedEvent` too.
 
+**Status (2026-11-26, `claude/review-fix-b5-bc1153`): fixed: each `RiverSites` keeps its answers with the world they were asked for (the seed, the biome source and the climate reader, by identity, as `BigSavanna` does) and starts afresh when any of them differs; all are let go when the server stops (`RiverSites.forgetAll`; `BigSavanna.forget` too, R8-9's first half). Not tried in the game (two worlds with one seed in one sitting).**
+
 ### R8-2 (A if the measure confirms it; likely, to measure): a 129-block search for animals on every spawn try
 
 - **What is wrong:** `RiverZones.room` counts the animals of a kind within 64 blocks (`getEntitiesOfClass(Mob.class,
@@ -95,6 +97,8 @@ scene to measure it.
   (lines 33-36). Biomes O' Plenty and other TerraBlender mods are not hit.
 - **Fix proposed:** at server start compare the preset's biome list with Minecraft's built-in one; if it has biomes of
   another namespace, leave zone 0 alone (small savannas come back in those zones) and say so in the log.
+
+**Status (2026-11-26, `claude/review-fix-b5-bc1153`): open: proof owed. Whether a data pack biome mod (Terralith) really loses its biomes rests on a comment, not on TerraBlender's code or a world with such a mod; the fix proposed gives up the big savannas whenever such a mod is found, which is a game call. To do first: one world with Terralith, looked at on a map. The mods the user named (Biomes O' Plenty and other TerraBlender mods) are not hit.**
 
 ### R8-4 (C, likely): pans and oxbows cut holes in tree crowns that stand in land made earlier
 
@@ -147,6 +151,8 @@ scene to measure it.
 - **Scene to measure:** the flight run (`tools/flight.sh`) along a river, with the feature's time summed.
 - **Fix proposed:** find the river edges once per chunk before the tries; give up at once when there are none.
 
+**Status (2026-11-26, `claude/review-fix-b5-bc1153`): open: to measure. The work is on the world-making threads, not the tick; nobody has summed the oxbow feature's time on a flight along a river. To do first: `tools/flight.sh` with the feature's time summed; the fix (find the river's edges once a chunk, give up at once when there are none) only if the number shows.**
+
 ### R8-8 (C, proven): a log line for every site, laid or not
 
 - `[world oxbows]`, `[world pans]`, `[world mud]`, `[world plants]` write an info line for every site chunk and every
@@ -168,6 +174,8 @@ scene to measure it.
   wins or loses whole, by load order: their land, or our flat savannas and filled caves. `docs/DESIGN.md` ("Flat
   savannas") already names this as a known cost; kept here so the count of files is on record. The copies also freeze
   Minecraft 1.21.1's own numbers: a Minecraft update that changes them needs `tools/flat_savannas/` run again.
+
+**Status (2026-11-26, `claude/review-fix-b5-bc1153`): not a bug: a known cost of the flat savannas, decided and written down in `docs/DESIGN.md` ("Flat savannas"). Kept here for the count of files (eleven) and the reminder that a Minecraft update which changes its own numbers needs `tools/flat_savannas/` run again.**
 
 ### R8-11 (A, proven in the code): mounds of new land are lost when the game is left, and can turn up in the next world
 
@@ -259,6 +267,8 @@ scene to measure it.
   changes after), or the rule keeps a laid edge (a "settled" wetness by distance to water: soupy at 1, sticky at 2 to
   4, drying beyond).
 
+**Your call (2026-11-26):** Mud at the water's edge. Today new river banks and pans are laid with a firm sticky edge and a drying ring, but within minutes of you being near every mud block within 4 blocks of water turns soupy (slow, sinking) and the rest dries and cracks, so land you have visited looks and walks differently from new land. Should the mud settle by its distance to water (soupy right at the water, sticky 2 to 4 blocks out, drying beyond; rain still wets it), so the pattern the world lays is the one that stays? My pick: yes.
+
 ### R8-15 (C, proven in the code; the count rule from memory): the colonies' insects count as Minecraft's farm animals
 
 - **What is wrong:** termites and Matabele ants are signed up in Minecraft's own `CREATURE` group
@@ -321,6 +331,8 @@ scene to measure it.
   settings, not re-read; not looked for in a world.
 - **Fix proposed:** a small density function of our own that answers with the mask of the world being made (the
   `antcolonies:whole_savanna` type already knows which world it is in), used by the two cave files.
+
+**Status (2026-11-26, `claude/review-fix-b5-bc1153`): open: proof owed, and only Large Biomes worlds. That such a world reads the same two cave files is from memory of Minecraft's noise settings (mine agrees with the review's), and nobody has looked at one. The fix is a density function of our own that picks the mask of the world being made; it changes the wiring of every world's land, so it is built only once a Large Biomes savanna has been seen with cave mouths in it.**
 
 ### R8-20 (C): small things
 

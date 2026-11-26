@@ -563,7 +563,7 @@ public class BullfrogEntity extends Animal implements GeoEntity, HasLife {
     }
 
     static int surface(LevelReader level, double x, double z) {
-        return level.getHeight(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, Mth.floor(x), Mth.floor(z));
+        return com.antcolonies.colony.GroundTop.y(level, Mth.floor(x), Mth.floor(z)); // through any tree crown (review R7-30)
     }
 
     /** How deep the water a bullfrog lives by may be (blocks: pans, edges, shallows), and how far up the bank it spawns. */

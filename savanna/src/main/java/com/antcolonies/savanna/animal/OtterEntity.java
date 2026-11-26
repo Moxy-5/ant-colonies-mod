@@ -1240,7 +1240,7 @@ public class OtterEntity extends PathfinderMob implements GeoEntity, HasLife {
             if (awayFrom != null && (x - otter.getX()) * (awayFrom.x - otter.getX()) + (z - otter.getZ()) * (awayFrom.z - otter.getZ()) > 0) {
                 continue;
             }
-            int y = otter.level().getHeight(net.minecraft.world.level.levelgen.Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, Mth.floor(x), Mth.floor(z));
+            int y = com.antcolonies.colony.GroundTop.y(otter.level(), Mth.floor(x), Mth.floor(z)); // through any tree crown (review R7-30)
             BlockPos at = new BlockPos(Mth.floor(x), y, Mth.floor(z));
             if (Math.abs(y - otter.getY()) <= 3 && roomyGround(otter.level(), at)) {
                 return Vec3.atBottomCenterOf(at);

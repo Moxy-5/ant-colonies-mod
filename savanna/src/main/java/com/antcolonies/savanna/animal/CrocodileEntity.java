@@ -1464,7 +1464,7 @@ public class CrocodileEntity extends PathfinderMob implements GeoEntity, HasLife
             for (double turn : new double[] {0, 0.6, -0.6, 1.2, -1.2}) {
                 for (int far : new int[] {AWAY, AWAY - 4}) {
                     int x = Mth.floor(croc.getX() + Math.cos(base + turn) * far), z = Mth.floor(croc.getZ() + Math.sin(base + turn) * far);
-                    int top = level.getHeight(net.minecraft.world.level.levelgen.Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, x, z) - 1;
+                    int top = com.antcolonies.colony.GroundTop.y(level, x, z) - 1; // through any tree crown (review R7-30)
                     BlockPos at = new BlockPos(x, top, z);
                     if (Math.abs(top - croc.getBlockY()) > 4) {
                         continue;

@@ -1084,7 +1084,7 @@ public class MonitorEntity extends PathfinderMob implements GeoEntity, HasLife {
         for (int dx = -reach; dx <= reach; dx++) {
             for (int dz = -reach; dz <= reach; dz++) {
                 int x = pos.getX() + dx, z = pos.getZ() + dz;
-                int y = level.getHeight(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, x, z);
+                int y = com.antcolonies.colony.GroundTop.y(level, x, z); // through any tree crown (review R7-30)
                 if (y < sea - 1 || y > sea + 4) {
                     continue;
                 }

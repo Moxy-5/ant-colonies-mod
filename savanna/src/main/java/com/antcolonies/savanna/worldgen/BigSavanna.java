@@ -47,6 +47,11 @@ public final class BigSavanna {
     private BigSavanna() {
     }
 
+    /** The server has stopped: the closed world's biome source and answers are let go (review R8-9). */
+    public static void forget() {
+        store = null;
+    }
+
     /** Whether the savanna at (x, z) is big enough to live in. Ask only where the biome is one of the savanna's own. */
     public static boolean livesAt(BiomeSource biomes, Climate.Sampler sampler, int x, int z) {
         Store s = store;

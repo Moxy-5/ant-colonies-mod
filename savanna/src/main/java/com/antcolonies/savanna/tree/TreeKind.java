@@ -101,7 +101,11 @@ public record TreeKind(String form, int salt, Trunk trunk, Crown crown, List<Sha
         return shapes.get(shapes.size() > 1 && new TreeRandom(seed * 31 + 17 + salt).next() >= 0.5 ? 1 : 0);
     }
 
-    /** Reads a kind from the mod's own files (the game tests and the shape checks; the game reads them as data later). */
+    /**
+     * Reads a kind from the mod's own files, once (kept by {@code TreePlacer.kind}). The game reads them here too: a
+     * data pack cannot change a kind and {@code /reload} does not read it again (review R7-24); a number changed in the
+     * file shows after the game is started again, on trees whose shapes are worked out from then on.
+     */
     public static TreeKind load(String name) {
         String path = "/data/antcolonies/tree_kind/" + name + ".json";
         try (InputStream in = TreeKind.class.getResourceAsStream(path)) {

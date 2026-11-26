@@ -235,6 +235,8 @@ public class SavannaEvents {
     public static void onServerStopped(net.neoforged.neoforge.event.server.ServerStoppedEvent event) {
         com.antcolonies.savanna.colony.NewLandMounds.forgetAll();
         com.antcolonies.savanna.tree.Forest.forgetAll();
+        com.antcolonies.savanna.worldgen.RiverSites.forgetAll();
+        com.antcolonies.savanna.worldgen.BigSavanna.forget();
     }
 
     /** Bone meal on a giant savanna tree's seedling or young tree grows it a day's step (M7.5 step 4, {@code Forest}). */

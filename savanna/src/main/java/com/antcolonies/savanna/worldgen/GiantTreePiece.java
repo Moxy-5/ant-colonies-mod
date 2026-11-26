@@ -72,6 +72,12 @@ public class GiantTreePiece extends StructurePiece {
     /** The dead wood round each tree fitted to its land: worked out when the tree is planned, kept for its chunks. */
     private static final java.util.Map<String, TreePlacer.Placed> LITTER = kept(512);
 
+    /** The server has stopped: nothing is kept for the next world opened (review R7-7). */
+    public static void forgetShapes() {
+        FITTED.clear();
+        LITTER.clear();
+    }
+
     private static java.util.Map<String, TreePlacer.Placed> kept(int most) {
         return java.util.Collections.synchronizedMap(new java.util.LinkedHashMap<>(most * 2, 0.75F, true) {
             @Override

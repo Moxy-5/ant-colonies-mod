@@ -144,6 +144,8 @@ not proven**.
 the place in the list between seconds so the walk goes round. Storm effects then only happen to loaded trees; a tree
 away keeps to its day-by-day catch-up.
 
+**Status (2026-11-26, `claude/review-fix-b5-bc1153`): fixed: the once-a-second walk takes only the trees of loaded chunks, chunk by chunk (`byChunk`, one land check a chunk), and when its 4 ms run out it goes on next second from where it stopped (`Forest.walkFrom`). So a storm acts only on trees whose land is loaded, a tree away keeps to its day-by-day catch-up, and no biome is read for land that is away. Not measured (no book of 5,000 trees at hand); the cost now grows with the loaded trees, not with every tree ever met.**
+
 ### R7-3 (B, to measure). A tree's growth step is one tick's work, and all trees come due at the same dawn
 
 **What is wrong.** A growth step (`place` → `TreePlacer.grow`) puts the old shape in a hash map, walks the new shape
@@ -166,6 +168,8 @@ players spread out, or view distance 32, about 1,000 trees) one a second no long
 **Proposed fix (only if the number is bad).** Spread the trees over the day by their seed (each tree's "dawn" at its
 own moment), and split one big step over a few ticks.
 
+**Status (2026-11-26, `claude/review-fix-b5-bc1153`): open: to measure. Nobody has timed one growth step of a young and of a grown tree in sight, and the fix proposed (each tree its own "dawn", a big step split over ticks) is only worth its rules if the number is bad. The walk's 4 ms limit already keeps it to about one heavy tree a second. To do first: the stopwatch (`Perf.Part.TREES`) round one `Forest.update` of a young umbrella thorn and a nearly grown one.**
+
 ### R7-4 (B, proven path, cost to measure). A storm breaking a hollow tree works out three shapes on the server's own thread
 
 **What is wrong.** Everywhere else a shape that is not ready is worked out in the background and the tree waits
@@ -183,6 +187,8 @@ second of thunder for each living hollow tree).
 **Proposed fix.** Ask with `soon` and let the fall wait a second if a shape is not ready (the tree is marked to fall;
 `update` already handles "its shape is being worked out").
 
+**Status (2026-11-26, `claude/review-fix-b5-bc1153`): fixed: a storm that breaks a living hollow tree first asks for its three shapes in the background (`Forest.snapShapesReady`) and breaks the tree the second they are ready (`Forest.snapping`, not saved: a tree cut off by a stop was simply not broken). The test command still works them out at once. Not measured; the storm tests run with shapes worked out at once, so the waiting path is not under a game test.**
+
 ### R7-5 (B, to measure). The fall in sight: up to 2,500 entities made in one tick
 
 **What is wrong.** When a dead tree lets go, one tick makes a block display entity for every outer block of the
@@ -198,6 +204,8 @@ swing. A shed dead tree is mostly trunk, so the real count is likely well under 
 umbrella thorn and camel thorn; frames by eye.
 
 **Proposed fix (only if the number is bad).** A lower cap (the trunk's outside only), or one display per few blocks.
+
+**Status (2026-11-26, `claude/review-fix-b5-bc1153`): open: to measure, by eye. Nobody has counted the displays of a real falling tree or watched the frames; a lower cap changes how the fall looks, so it waits until the fall is seen to stutter. To do first: the count for an ancient umbrella thorn and camel thorn in the falling-tree test.**
 
 ### R7-6 (B, to measure). The whole tree book is written at every autosave, and it only grows
 
@@ -216,6 +224,8 @@ ms).
 
 **Proposed fix.** Mark the book changed only when a field really changed; later, if the number is bad, save by region.
 
+**Status (2026-11-26, `claude/review-fix-b5-bc1153`): half fixed: the book counts as changed only when a tree's record really changed (`Forest.update` compares the record before and after; the line that marked it on every look is gone), so a tree waiting to be out of sight no longer has the whole book written at every autosave. Open: the size of one write in a long world (not measured), and saving by region if that number is bad. R7-19's fix lets fallen logs' records end, so the book no longer only grows.**
+
 ### R7-7 (B, to measure). Four shape stores are never emptied
 
 **What is wrong.** Worked-out shapes are kept in static stores: `TreePlacer.CACHE` (256), `GiantTreePiece.FITTED`
@@ -233,6 +243,8 @@ mistake.
 **To measure.** A heap count after a long flight over new savanna.
 
 **Proposed fix.** Empty them when the server stops; size them by measured need.
+
+**Status (2026-11-26, `claude/review-fix-b5-bc1153`): fixed: the four shape stores are emptied when the server stops (`TreePlacer.forgetShapes`, `GiantTreePiece.forgetShapes`, `FloodplainTreePiece.forgetShapes`, called from `Forest.forgetAll`). Their sizes are as they were; the memory they hold while a world runs is not measured.**
 
 ### R7-8 (C, proven). Dead shapes do the living tree's work again
 
@@ -498,6 +510,8 @@ the world is frozen for good, as in R7-15, with one line in the log.
 
 **Proposed fix.** Load each record inside its own try; skip and log a bad one.
 
+**Status (2026-11-26, `claude/review-fix-b5-bc1153`): fixed: each tree's record is read inside its own try (`Forest.load`); one that cannot be read is left out with an error line in the log, the rest of the book loads. A tree left out is found again from its chunk's own record when its land loads (R7-15's fix), if its kind exists.**
+
 ### R7-19 (B, proven). A fallen log's record never ends
 
 **What is wrong.** Once a tree lies fallen (`settled()`), the once-a-second walk skips it for good, before the check
@@ -511,6 +525,8 @@ book).
 
 **Proposed fix.** Now and then (once a day is plenty) a settled log whose land is loaded is checked: no block of its
 own left means the record ends.
+
+**Status (2026-11-26, `claude/review-fix-b5-bc1153`): fixed: a fallen log whose land is loaded is looked at once a day, each log at its own second (`Forest.lookForLog`): when no block of it is left (termites ate it, the player took it, it burnt) its record ends, so seedlings may come up there again. A log the rot killed still ends by crumbling. Check added to `aFallingTreeCrushesWhatIsUnderIt`.**
 
 ### R7-20 (B, proven). Felling checks the foot's chunk only
 
@@ -527,6 +543,8 @@ made.
 
 **Proposed fix.** The same `loaded(level, box)` check as `update`; if not ready, mark the tree to fall and let
 `update` do it.
+
+**Status (2026-11-26, `claude/review-fix-b5-bc1153`): fixed: `fellNow` asks whether every chunk the standing tree, its shed shape and its log reach is ready (the same `loaded` check as `update`); if not, the storm marks the tree to fall and `update` does it. `inFire` skips a tree whose box is not all ready before it removes a young tree's blocks.**
 
 ### R7-21 (C, proven). Data that is not checked
 
@@ -575,6 +593,8 @@ through grass. `worldgen/QuietSavannaTreesFeature.java:51-56`. Fix: test the gro
 Against the project rule "a profile I can tweak without touching code". Fix: read what is in the file or take the
 dead numbers out; load kinds with the data packs if tweaking in a world is wanted.
 
+**Status (2026-11-26, `claude/review-fix-b5-bc1153`): half fixed: the umbrella thorn's file now holds the numbers its shape really uses and the shape reads them (`UmbrellaShape`: height 25, spread 2.5, fork 0.56, limbs 3 to 4, thickness 5, dome 2; the same trees as before, block for block by the same sums), the numbers nothing read are out of the file (`bends`, the second shape), and `TreeKind.load`'s note says what is true. Open on purpose: kinds are still read once from the mod's own files, not with the data packs; a number changed in the file shows after the game is started again. Loading them as data is worth building only when tweaking in a running world is wanted.**
+
 ### R7-25 (C, proven). Leftover and trial code, comments that no longer match
 
 - **Trial code in the game:** `TreeDraw.LimbLook` B to H, `earlyGrowth`, `straightLine`, the limb-pipe path in `seg`
@@ -610,6 +630,8 @@ lightning's scar, the rot stages and the catch-up are tested on flat ground with
   R7-13): numbers nobody has seen;
 - the background shape path (`placedSoon`) that the real game always uses: the tests switch it off;
 - a baobab over termites (R7-14).
+
+**Status (2026-11-26, `claude/review-fix-b5-bc1153`): half fixed: tests now guard a tree of new land the book missed (R7-15), a rot-killed log crumbling on a slope (R7-16), the ground under a dead young tree (R7-17), a log resting on a mound (R7-11), a scorched leaf (R7-10) and a fallen log's record ending (R7-19). Open: the numbers of a thunderstorm and of 200 days of seedlings (they wait for the calls on R7-12 and R7-13), the background shape path the real game uses (the tests work shapes out at once), a baobab over termites (waits for the call on R7-14).**
 
 ### Parts grown past patching
 
@@ -706,6 +728,8 @@ the river, so this is a fair share of the bank.
 **Proposed fix.** Use `GroundTop` in those places (for the animal rounds to take up; listed here because the cause
 is the tree leaves).
 
+**Status (2026-11-26, `claude/review-fix-b5-bc1153`): fixed: the hippo's pool search, the monitor's bank search, the otter's bank spot, the bullfrog's and the fly cloud's ground, the fly cloud's shallow-water test, the crocodile's way off the bank and `RiverZones.openToSky` now ask `GroundTop`, which looks down through any tree's leaves. So the ground and water under a fig's or a palm's crown count as places. Left: `SavannaSpawn` (it reads one chunk's own height map while the world is made) and the Matabele test command. Not watched in the game; the `river` and `life` tests pass.**
+
 ### R7-31 (B, proven; the user's call). A cut tree's crown hangs for good
 
 **What is wrong.** Tree leaves never decay and no tree block checks what holds it up. When a player cuts a giant
@@ -742,6 +766,8 @@ the rest of the river.
 
 **Proposed fix.** On a bare bunch's tick, work its stage out from the calendar (where in its cycle the tree is
 now), the same idea as the colonies' away timetable, instead of only starting inside the window.
+
+**Your call (2026-11-26):** Fruit on trees away from you. Today figs and doum nuts only bud and ripen within about 128 blocks of a player, so trees along the rest of the river are bare nearly always once their first fruit has fallen, and a bare tree you come back to stays bare for up to 9 days (fig) or 27 days (palm). Change it so a bare bunch works out from the calendar where in its fruiting cycle the tree is, as the colonies do when you are away? That means more fruit along the whole river (more food for the animals that will eat it). My pick: yes.
 
 ### R7-33 (A, likely; to be seen in the game). A palm's crown can blink out at the screen's edge
 

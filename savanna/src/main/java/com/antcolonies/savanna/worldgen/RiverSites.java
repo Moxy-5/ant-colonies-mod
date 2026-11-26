@@ -25,13 +25,38 @@ public final class RiverSites {
     private final int apart;
     private final long salt;
     private final Candidate candidate;
-    private final Map<Long, Boolean> candidates = new ConcurrentHashMap<>(), sites = new ConcurrentHashMap<>();
-    private volatile long cachedSeed;
+    /**
+     * One world's answers: the seed, and the biome source and climate reader it was asked with, by identity (as
+     * {@link BigSavanna}; review R8-1: remembered by the seed alone, a second world with the same seed but other land,
+     * opened in the same sitting, got the first world's sites).
+     */
+    private record Store(BiomeSource biomes, Climate.Sampler sampler, long seed, Map<Long, Boolean> candidates, Map<Long, Boolean> sites) {
+    }
+
+    private volatile Store store;
+    private static final java.util.List<RiverSites> ALL = new java.util.concurrent.CopyOnWriteArrayList<>();
 
     public RiverSites(int apart, long salt, Candidate candidate) {
         this.apart = apart;
         this.salt = salt;
         this.candidate = candidate;
+        ALL.add(this);
+    }
+
+    /** The server has stopped: no world's answers are kept for the next one opened. */
+    public static void forgetAll() {
+        for (RiverSites sites : ALL) {
+            sites.store = null;
+        }
+    }
+
+    private Store store(BiomeSource biomes, Climate.Sampler sampler, long seed) {
+        Store s = store;
+        if (s == null || s.biomes != biomes || s.sampler != sampler || s.seed != seed || s.candidates.size() > CACHE_MOST) {
+            s = new Store(biomes, sampler, seed, new ConcurrentHashMap<>(), new ConcurrentHashMap<>());
+            store = s;
+        }
+        return s;
     }
 
     /** Whether the chunk {@code cx, cz} is a site: a candidate with no site of higher rank within {@code apart} (remembered per seed). */
@@ -39,6 +64,7 @@ public final class RiverSites {
         if (!candidate(biomes, sampler, seed, cx, cz)) {
             return false;
         }
+        Map<Long, Boolean> sites = store(biomes, sampler, seed).sites();
         long key = (long) cx << 32 ^ (cz & 0xFFFFFFFFL);
         Boolean known = sites.get(key);
         if (known != null) {
@@ -65,11 +91,7 @@ public final class RiverSites {
 
     /** Whether the chunk is a candidate (remembered per seed). */
     public boolean candidate(BiomeSource biomes, Climate.Sampler sampler, long seed, int cx, int cz) {
-        if (cachedSeed != seed || candidates.size() > CACHE_MOST) {
-            candidates.clear();
-            sites.clear();
-            cachedSeed = seed;
-        }
+        Map<Long, Boolean> candidates = store(biomes, sampler, seed).candidates();
         long key = (long) cx << 32 ^ (cz & 0xFFFFFFFFL);
         Boolean known = candidates.get(key);
         if (known != null) {

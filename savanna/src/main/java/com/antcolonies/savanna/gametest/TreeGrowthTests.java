@@ -691,6 +691,23 @@ public class TreeGrowthTests {
             // Fallen it stays, whatever the clock says.
             forest.update(level, t, Forest.today(level));
             helper.assertTrue(t.stage == TreeStage.FALLEN && t.placedStage == TreeStage.FALLEN, "it stood up again: " + t.stage.id);
+            // Review R7-19: the log's record stays while anything of the log lies there, and ends once it is all gone.
+            forest.lookForLogNow(level, t);
+            helper.assertTrue(forest.at(foot) == t, "the record of a log still lying was ended");
+            BlockPos.MutableBlockPos p = new BlockPos.MutableBlockPos();
+            for (int x = -40; x <= 40; x++) {
+                for (int z = -40; z <= 40; z++) {
+                    for (int y = -4; y <= 12; y++) {
+                        p.set(foot.getX() + x, foot.getY() + y, foot.getZ() + z);
+                        BlockState there = level.getBlockState(p);
+                        if (there.getBlock() instanceof net.minecraft.world.level.block.RotatedPillarBlock) { // its trunk and limbs; the twigs stay
+                            level.setBlock(p, Blocks.AIR.defaultBlockState(), 2);
+                        }
+                    }
+                }
+            }
+            forest.lookForLogNow(level, t);
+            helper.assertTrue(forest.at(foot) == null, "the record of a log taken away whole was kept");
             chicken.discard();
             clearAbove(helper, foot);
             forest.forgetInside(helper.getBounds());

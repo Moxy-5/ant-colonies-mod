@@ -7,12 +7,12 @@ review files under `docs/reviews/full/`; search there for a finding's number (`R
 a `**Status ...**` line under the finding there and runs the tool. Bugs that did not come from the code
 review stay in `docs/BUGS.md`.
 
-**234 findings: 131 left (11 of them wait for your call), 103 done.**
+**234 findings: 122 left (13 of them wait for your call), 112 done.**
 
 | Grade | Found | Not started | Open | Half fixed | Fixed | Not a bug after all |
 |---|---|---|---|---|---|---|
 | A: a player can meet it | 50 | 0 | 1 | 0 | 48 | 1 |
-| B: it will cost us when building on this | 107 | 53 | 5 | 3 | 45 | 1 |
+| B: it will cost us when building on this | 107 | 36 | 10 | 6 | 53 | 2 |
 | C: a tidy-up | 77 | 67 | 0 | 2 | 7 | 1 |
 
 | Round | System | Found | Left | Done |
@@ -23,13 +23,13 @@ review stay in `docs/BUGS.md`.
 | 4 | how bodies are drawn | not read yet | | |
 | 5 | the termites | not read yet | | |
 | 6 | the Matabele ants (not raids) | not read yet | | |
-| 7 | the giant trees | 36 | 27 | 9 |
-| 8 | the world | 20 | 17 | 3 |
+| 7 | the giant trees | 36 | 20 | 16 |
+| 8 | the world | 20 | 15 | 5 |
 | 9 | the river hunters | 44 | 34 | 10 |
 | 10 | the river's small life | 19 | 13 | 6 |
 | 11 | the new raid code | 22 | 6 | 16 |
 
-## Waiting for your call (11)
+## Waiting for your call (13)
 
 These change how the game looks or plays, or a balance number, so nothing is built until you say. Each has
 what happens today and my pick. Answer whenever you like: tell Claude the number and what you want.
@@ -42,6 +42,10 @@ what happens today and my pick. Answer whenever you like: tell Claude the number
   - *Your call:* Termites and baobabs. Today termites hollow a baobab near their mound like any tree: a cave about 7 wide in the trunk, and the tree dies at half its age. Nobody decided that. Leave baobabs out? My pick: yes, leave them out (as far as I know Macrotermes do not hollow living baobabs; not checked against a paper).
 - **R7-31** (grade B, the giant trees) A cut tree's crown hangs for good
   - *Your call:* A cut giant tree. Today a giant tree cut through at the foot keeps its trunk and whole crown hanging in the air for good, and a burnt fig or palm leaves pieces in the air. Should a tree cut through fall, the way a dead one already does (the fall, the log and the smashing are built)? My pick: yes.
+- **R7-32** (grade B, the giant trees) Fruit stands still when nobody is near
+  - *Your call:* Fruit on trees away from you. Today figs and doum nuts only bud and ripen within about 128 blocks of a player, so trees along the rest of the river are bare nearly always once their first fruit has fallen, and a bare tree you come back to stays bare for up to 9 days (fig) or 27 days (palm). Change it so a bare bunch works out from the calendar where in its fruiting cycle the tree is, as the colonies do when you are away? That means more fruit along the whole river (more food for the animals that will eat it). My pick: yes.
+- **R8-14** (grade B, the world) the mud's own wetness rule undoes the pattern the world maker lays
+  - *Your call:* Mud at the water's edge. Today new river banks and pans are laid with a firm sticky edge and a drying ring, but within minutes of you being near every mud block within 4 blocks of water turns soupy (slow, sinking) and the rest dries and cracks, so land you have visited looks and walks differently from new land. Should the mud settle by its distance to water (soupy right at the water, sticky 2 to 4 blocks out, drying beyond; rain still wets it), so the pattern the world lays is the one that stays? My pick: yes.
 - **R9-19** (grade C, the river hunters) several small things, listed in the review file
   - *Your call:* Hippo paths. Today the ground a pod walks wears to path blocks and never heals, a player's lawn by a pool too (only with mobGriefing on). Let worn paths grow back to grass when no hippo has walked them for some days? My pick: yes, slowly. (The other small things in this finding need no call.)
 - **R9-24** (grade B, the river hunters) a shark hit from the bank or from a boat does nothing
@@ -69,7 +73,7 @@ is left; no word means nobody has started it. The findings that wait for your ca
 - **R7-33** A palm's crown can blink out at the screen's edge
   - *Open:* waits to be seen (2026-11-24). Read from how Minecraft hides parts of the world, never seen in the game; the fix is large (sharing a crown's faces out over its blocks) and is built only if the user sees fronds blink out.
 
-### B: it will cost us when building on this (53 left)
+### B: it will cost us when building on this (42 left)
 
 **Round 1, the colony brain** (`docs/reviews/full/round-01-colony-brain.md`)
 
@@ -91,30 +95,27 @@ is left; no word means nobody has started it. The findings that wait for your ca
 
 **Round 7, the giant trees** (`docs/reviews/full/round-07-trees.md`)
 
-- **R7-2** The once-a-second walk looks at every tree in the world, and always starts from the same end
 - **R7-3** A tree's growth step is one tick's work, and all trees come due at the same dawn
-- **R7-4** A storm breaking a hollow tree works out three shapes on the server's own thread
+  - *Open:* to measure. Nobody has timed one growth step of a young and of a grown tree in sight, and the fix proposed (each tree its own "dawn", a big step split over ticks) is only worth its rules if the number is bad. The walk's 4 ms ...
 - **R7-5** The fall in sight: up to 2,500 entities made in one tick
+  - *Open:* to measure, by eye. Nobody has counted the displays of a real falling tree or watched the frames; a lower cap changes how the fall looks, so it waits until the fall is seen to stutter. To do first: the count for an ancient ...
 - **R7-6** The whole tree book is written at every autosave, and it only grows
-- **R7-7** Four shape stores are never emptied
-- **R7-18** One bad record empties the tree book
-- **R7-19** A fallen log's record never ends
-- **R7-20** Felling checks the foot's chunk only
+  - *Half fixed:* the book counts as changed only when a tree's record really changed (`Forest.update` compares the record before and after; the line that marked it on every look is gone), so a tree waiting to be out of sight no longer has the ...
 - **R7-24** The tree kind files are not the "numbers I can tweak" they look like
+  - *Half fixed:* the umbrella thorn's file now holds the numbers its shape really uses and the shape reads them (`UmbrellaShape`: height 25, spread 2.5, fork 0.56, limbs 3 to 4, thickness 5, dome 2; the same trees as before, block for block by ...
 - **R7-26** Test gaps on what the player sees
-- **R7-30** The river animals' ground finder stops on top of a crown
-- **R7-32** Fruit stands still when nobody is near
+  - *Half fixed:* tests now guard a tree of new land the book missed (R7-15), a rot-killed log crumbling on a slope (R7-16), the ground under a dead young tree (R7-17), a log resting on a mound (R7-11), a scorched leaf (R7-10) and a fallen log's ...
 
 **Round 8, the world** (`docs/reviews/full/round-08-world.md`)
 
-- **R8-1** river sites are remembered by the seed alone
 - **R8-3** biome mods that are data packs lose all their biomes
+  - *Open:* proof owed. Whether a data pack biome mod (Terralith) really loses its biomes rests on a comment, not on TerraBlender's code or a world with such a mod; the fix proposed gives up the big savannas whenever such a mod is found, ...
 - **R8-7** an oxbow site with no room does all its shape sums 8 times
-- **R8-10** the flat savannas replace eleven of Minecraft's own land files
+  - *Open:* to measure. The work is on the world-making threads, not the tick; nobody has summed the oxbow feature's time on a flight along a river. To do first: `tools/flight.sh` with the feature's time summed; the fix (find the river's ...
 - **R8-12** twelve spawning groups are tried on every tick in every chunk, everywhere
   - *Open:* measured, grade B now, open (2026-11-24, `SpawnerCostTests.whatTheSpawnerCostsForOurGroups`, run by name, in the `stress` category). One try of a group with no spawn list costs 27 ns in solid ground (most tries: the spot's height ...
-- **R8-14** the mud's own wetness rule undoes the pattern the world maker lays
 - **R8-19** in a Large Biomes world the cave filling looks at the wrong map
+  - *Open:* proof owed, and only Large Biomes worlds. That such a world reads the same two cave files is from memory of Minecraft's noise settings (mine agrees with the review's), and nobody has looked at one. The fix is a density function ...
 
 **Round 9, the river hunters** (`docs/reviews/full/round-09-river-hunters.md`)
 
@@ -312,18 +313,27 @@ Fixed, or found to be no bug after all. The number after a finding is its entry 
 **Round 7, the giant trees**
 
 - **R7-1** (A) Catching up on missed days counts the ground under the whole crown once for every missed day (BUGS 339)
+- **R7-2** (B) The once-a-second walk looks at every tree in the world, and always starts from the same end
+- **R7-4** (B) A storm breaking a hollow tree works out three shapes on the server's own thread
+- **R7-7** (B) Four shape stores are never emptied
 - **R7-10** (A) "Char, never vanish" against "brown leaves burn away": a fire can eat a living crown (BUGS 340)
 - **R7-11** (A) A falling tree breaks through a termite mound (BUGS 341)
 - **R7-15** (A) New land's trees can miss the tree book (BUGS 342)
 - **R7-16** (A) A rot-killed log on a slope leaves wood hanging (BUGS 343)
 - **R7-17** (A) A dead sapling leaves a stick sunk in the ground (BUGS 344)
+- **R7-18** (B) One bad record empties the tree book
+- **R7-19** (B) A fallen log's record never ends
+- **R7-20** (B) Felling checks the foot's chunk only
 - **R7-27** (A) Every fig branch is a full cube (BUGS 345)
 - **R7-28** (A) Shears on a fruit bunch: endless fruit (BUGS 346)
 - **R7-29** (A) Animals do not know thorny twigs hurt (BUGS 347)
+- **R7-30** (B) The river animals' ground finder stops on top of a crown
 
 **Round 8, the world**
 
+- **R8-1** (B) river sites are remembered by the seed alone
 - **R8-2** (A) a 129-block search for animals on every spawn try *Not a bug after all.*
+- **R8-10** (B) the flat savannas replace eleven of Minecraft's own land files *Not a bug after all.*
 - **R8-11** (A) mounds of new land are lost when the game is left, and can turn up in the next world (BUGS 321)
 - **R8-18** (A) ravines and caves still come into the savanna along its rivers (BUGS 322)
 
