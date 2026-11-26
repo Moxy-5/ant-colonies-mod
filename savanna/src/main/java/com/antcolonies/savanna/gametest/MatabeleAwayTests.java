@@ -311,6 +311,16 @@ public class MatabeleAwayTests {
                     helper.assertTrue(raids.away().raidsToday() == 1, "the shown raid was counted " + raids.away().raidsToday() + " times today");
                     helper.assertTrue(column.members().size() >= 10, "only " + column.members().size() + " raiders were shown");
                     shown[0] = column.members().size();
+                    // (review R11-9, R11-7: the raid is as big as its real ants and its numbers, and the shown ants'
+                    // places in a bunch are numbered from the middle, the leader there)
+                    helper.assertTrue(column.size() == shown[0] + column.numbersAlong(), "the shown raid says it is " + column.size() + " strong, with "
+                            + shown[0] + " real ant(s) and " + column.numbersAlong() + " as numbers");
+                    helper.assertTrue(column.bunchNumberForTests(column.leader()) == 0, "the shown raid's leader has bunch place "
+                            + column.bunchNumberForTests(column.leader()) + ", not the middle");
+                    for (java.util.UUID id : column.members()) {
+                        helper.assertTrue(column.bunchNumberForTests(id) >= 0 && column.bunchNumberForTests(id) < shown[0],
+                                "a shown raider has bunch place " + column.bunchNumberForTests(id) + " of " + shown[0]);
+                    }
                     int held = 0;
                     for (java.util.UUID id : column.members()) {
                         helper.assertTrue(level.getEntity(id) instanceof com.antcolonies.savanna.entity.MatabeleEntity, "a shown raider is not in the world");
@@ -446,9 +456,12 @@ public class MatabeleAwayTests {
                     helper.assertTrue(toPlace <= 12 && toWatcher >= 50 && toNest >= 12, "the shown scout stands " + Math.round(toPlace) + " blocks from the number scout's place, "
                             + Math.round(toWatcher) + " from the watcher, " + Math.round(toNest) + " from the nest");
                     helper.assertFalse(colony.away().isAway(level), "the colony is away with a watcher near its scout");
-                    // Review R1-45: a minor that came out first went back into the numbers, body and all.
+                    // Review R1-45: a minor that came out first went back into the numbers, body and all. (Another scout
+                    // shown in the same second may stand beside this one: two number scouts' places are dice, BUGS 417.)
+                    java.util.Set<java.util.UUID> scoutsShown = raids.scouts().scoutsOut();
                     int standIns = com.antcolonies.gametest.TestIsolation.insectsOf(helper, com.antcolonies.savanna.entity.MatabeleEntity.class,
-                            other -> other.isAlive() && other != ant && colony.getId().equals(other.getColonyId()) && other.distanceTo(ant) < 4.0F).size();
+                            other -> other.isAlive() && other != ant && !scoutsShown.contains(other.getUUID())
+                                    && colony.getId().equals(other.getColonyId()) && other.distanceTo(ant) < 4.0F).size();
                     helper.assertTrue(standIns == 0, standIns + " other ants stand where the scout was shown (minors put back into the numbers, their bodies left)");
                     firstAt[0] = ant.blockPosition();
                     stage[0] = 3;

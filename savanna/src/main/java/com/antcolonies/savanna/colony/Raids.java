@@ -172,8 +172,8 @@ public class Raids {
     /** Why the last raid could not set out (the raid command's answer), or null. */
     @Nullable
     private String whyNoRaid;
-    /** R7: the last raid could not set out because its spot is in land not loaded (the find waits). */
-    private boolean unloadedFind;
+    /** The last raid could not set out because a raid out of sight is not home yet (the find waits for it). */
+    private boolean raidStillOut;
     /** M8 step 3f: the raids while the colony is away, as numbers (saved). */
     private final RaidsAway away;
     /** The scouts' bookkeeping: who is out, who keeps the job, their trips (step 5 of the raid rewrite). */
@@ -829,7 +829,7 @@ public class Raids {
             return "it rains";
         }
         if (by != By.COMMAND_ANY_HOUR && !isRaidTime(level)) {
-            return "outside the raid hours (" + RaidGround.clock(colony, level) + ")";
+            return "outside the raid hours"; // (review R11-14: no clock in it: a new text every second, so a diary line every second)
         }
         if (by != By.COLONY) {
             return null;
@@ -849,8 +849,8 @@ public class Raids {
 
     /**
      * The waiting find gets its raid if one may leave now ({@link #whyNoRaidNow}); it waits on while the reason passes
-     * by itself (a raid out, rain, the hours, the day's count, its land not loaded) and is only remembered once the
-     * colony is fed or no raid could be made up (nobody fit, no termite there now, nobody who knows the way: a later
+     * by itself (a raid out, rain, the hours, the day's count) and is only remembered once the colony is fed or no
+     * raid could be made up (nobody fit, no termite there now, nobody who knows the way, its land not loaded: a later
      * scout finds it again). {@code homeFrom}: the scout just home with it, or null.
      */
     private void raidTheWaitingFind(ServerLevel level, @Nullable UUID homeFrom) {
@@ -873,11 +873,11 @@ public class Raids {
                 waitNoMore();
                 return;
             }
-            if (!unloadedFind) {
+            if (!raidStillOut) {
                 waitNoMore(); // (the raid's start said why: the find is only remembered, or forgotten)
                 return;
             }
-            why = whyNoRaid; // (its land not loaded, a raid still out of sight: it waits)
+            why = whyNoRaid; // (a raid still out of sight: it waits)
         } else if (why == FED) {
             say(level, "no raid to " + find.at.toShortString() + ": " + why + "; the find is only remembered");
             waitNoMore();
@@ -956,21 +956,23 @@ public class Raids {
     @Nullable
     private Raid startRaid(ServerLevel level, Find find, boolean ownRaid, @Nullable UUID homeFrom) {
         SavannaNumbers.ColumnNumbers numbers = columnNumbers();
-        unloadedFind = false;
+        raidStillOut = false;
         if (numbers == null) {
             return null;
         }
         if (away.isOut()) {
             // M8 step 3f: a raid out of sight is not home yet: the find waits for it (one raid at a time)
-            unloadedFind = true;
+            raidStillOut = true;
             whyNoRaid = "a raid is still out of sight";
             return null;
         }
         if (!level.isPositionEntityTicking(find.at)) {
-            // R7: no raid sets out to a spot in land not loaded (no ant can walk there till drawn-only ants, M8 step 4)
-            unloadedFind = true;
+            // R7: no raid sets out to a spot in land not loaded (no ant can walk there). Review R11-13: and the find
+            // does not wait for its land (while a find waits no scout is sent: a hungry colony did nothing for up to
+            // three days); it is only remembered, a later scout finds it again
             whyNoRaid = "the spot at " + find.at.toShortString() + " is in land not loaded";
-            return null; // (a waiting find says so once, a command answers with it)
+            say(level, "no raid to " + find.at.toShortString() + ": " + whyNoRaid + "; the find is only remembered");
+            return null; // (a command answers with it)
         }
         // The raid rewrite: the one judge of "termites there now" is asked before anyone is called. Nobody there (the
         // termites fed and went, or keep off the spot): no raid, and the find is forgotten.

@@ -7,12 +7,12 @@ review files under `docs/reviews/full/`; search there for a finding's number (`R
 a `**Status ...**` line under the finding there and runs the tool. Bugs that did not come from the code
 review stay in `docs/BUGS.md`.
 
-**234 findings: 161 left, 73 done.**
+**234 findings: 150 left, 84 done.**
 
 | Grade | Found | Not started | Open | Half fixed | Fixed | Not a bug after all |
 |---|---|---|---|---|---|---|
 | A: a player can meet it | 50 | 0 | 1 | 0 | 48 | 1 |
-| B: it will cost us when building on this | 107 | 85 | 1 | 4 | 17 | 0 |
+| B: it will cost us when building on this | 107 | 73 | 2 | 4 | 27 | 1 |
 | C: a tidy-up | 77 | 68 | 0 | 2 | 6 | 1 |
 
 | Round | System | Found | Left | Done |
@@ -27,7 +27,7 @@ review stay in `docs/BUGS.md`.
 | 8 | the world | 20 | 17 | 3 |
 | 9 | the river hunters | 44 | 34 | 10 |
 | 10 | the river's small life | 19 | 13 | 6 |
-| 11 | the new raid code | 22 | 17 | 5 |
+| 11 | the new raid code | 22 | 6 | 16 |
 
 ## Left to do
 
@@ -41,7 +41,7 @@ is left; no word means nobody has started it.
 - **R7-33** A palm's crown can blink out at the screen's edge
   - *Open:* waits to be seen (2026-11-24). Read from how Minecraft hides parts of the world, never seen in the game; the fix is large (sharing a crown's faces out over its blocks) and is built only if the user sees fronds blink out.
 
-### B: it will cost us when building on this (90 left)
+### B: it will cost us when building on this (79 left)
 
 **Round 1, the colony brain** (`docs/reviews/full/round-01-colony-brain.md`)
 
@@ -146,18 +146,8 @@ is left; no word means nobody has started it.
 
 **Round 11, the new raid code** (`docs/reviews/full/round-11-raids.md`)
 
-- **R11-6** two judges of "termites here": the scout counts soldiers, the raid does not
-- **R11-7** a raid shown again after going to numbers bunches as a hollow ring
-- **R11-8** a raider called back by the leash may never fight again
-- **R11-9** the raid's size is never lowered for real ants that leave it
-- **R11-10** a raid shown "in the nest" from the halt, attack or regroup starts over
-- **R11-11** in the colony's away grace minute nobody steps the raid
-- **R11-12** a scout drafted to defend the nest stalls the whole march
-- **R11-13** a waiting find whose land does not tick stops all scouting until it fades
-- **R11-14** a waiting find writes a diary line every second outside the raid hours
-- **R11-15** a find on its way home is lost on a reload
-- **R11-16** `Scouts.mayScout` lets any ant on the out list through unchecked
 - **R11-17** near and away still differ in how often a colony raids
+  - *Open:* nothing changed. The late leave (a raid may set out until 19:00 and dusk turns it at 19:30, 25 seconds later) is put to the user; the near and away difference waits for a soak to measure.
 
 ### C: a tidy-up (70 left)
 
@@ -351,3 +341,14 @@ Fixed, or found to be no bug after all. The number after a finding is its entry 
 - **R11-3** (A) the attack's "quiet" rule is kept awake by a termite nobody can reach (BUGS 318)
 - **R11-4** (A) a raid the player is watching is folded into numbers when the nest's chunk unloads (BUGS 319)
 - **R11-5** (A) a raid as numbers takes real termites beside the player, with no ant in sight (BUGS 320)
+- **R11-6** (B) two judges of "termites here": the scout counts soldiers, the raid does not
+- **R11-7** (B) a raid shown again after going to numbers bunches as a hollow ring
+- **R11-8** (B) a raider called back by the leash may never fight again
+- **R11-9** (B) the raid's size is never lowered for real ants that leave it
+- **R11-10** (B) a raid shown "in the nest" from the halt, attack or regroup starts over
+- **R11-11** (B) in the colony's away grace minute nobody steps the raid
+- **R11-12** (B) a scout drafted to defend the nest stalls the whole march
+- **R11-13** (B) a waiting find whose land does not tick stops all scouting until it fades
+- **R11-14** (B) a waiting find writes a diary line every second outside the raid hours
+- **R11-15** (B) a find on its way home is lost on a reload *Not a bug after all.*
+- **R11-16** (B) `Scouts.mayScout` lets any ant on the out list through unchecked

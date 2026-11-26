@@ -259,11 +259,14 @@ public class Scouts {
      * {@link #VETERAN_WAIT} ticks.
      */
     public boolean mayScout(ServerLevel level, MatabeleEntity ant) {
-        if (outNow.contains(ant.getUUID())) {
-            return true;
-        }
         if (!fit(ant) || raids.isRaider(ant.getUUID()) || raids.isGoingHome(ant.getUUID())) {
+            if (outNow.contains(ant.getUUID())) {
+                back(ant); // (review R11-16: one shown as a scout that cannot scout after all gives its place up)
+            }
             return false;
+        }
+        if (outNow.contains(ant.getUUID())) {
+            return true; // (a scout out of sight just shown as a real ant: counted already, it searches on)
         }
         if (sent.contains(ant.getUUID())) {
             return true;

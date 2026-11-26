@@ -183,18 +183,21 @@ public final class RaidsAway {
         if (!watch.watcherNear(level, front, com.antcolonies.colony.AwayLife.NEAR)) {
             return; // (the colony is watched somewhere else: this raid goes on as numbers)
         }
-        boolean homeward = raid.stage() == Raid.Stage.MARCH_HOME;
-        boolean byTheNest = raid.stage() == Raid.Stage.MUSTER || raid.shareOut(now) * raid.wayBlocks() < BY_THE_NEST;
-        if (byTheNest && homeward) {
+        boolean nearNest = raid.shareOut(now) * raid.wayBlocks() < BY_THE_NEST;
+        if (nearNest && raid.stage() == Raid.Stage.MARCH_HOME) {
             return; // (nearly home: they walk in out of sight)
         }
+        // (review R11-10: only a raid mustering or on its way out forms in the nest; one at its spot on a way shorter
+        // than 8 blocks was stepped back to muster with its catch in its jaws, and its next halt took a second catch)
+        boolean byTheNest = raid.stage() == Raid.Stage.MUSTER || raid.stage() == Raid.Stage.MARCH_OUT && nearNest;
         BlockPos tail = raid.tailPlace(now);
         if (!byTheNest && (watch.seerNear(level, front, SHOW_PAST) || watch.seerNear(level, tail, SHOW_PAST)
                 || !level.isPositionEntityTicking(front) || !level.isPositionEntityTicking(tail))) {
             return; // (they would be seen appearing, or the land there does not tick)
         }
         SavannaNumbers.ColumnNumbers column = raids.columnNumbers();
-        int real = Math.min(Math.min(raid.size(), column == null ? 0 : column.mostReal()), colony.population().inside(Caste.WORKER));
+        // (review R11-9: as many as go as numbers now, never the size it set out with)
+        int real = Math.min(Math.min(raid.numbersAlong(), column == null ? 0 : column.mostReal()), colony.population().inside(Caste.WORKER));
         List<BlockPos> cells = !byTheNest ? List.of(front) : colony.nest().getAllRoomCells(level).stream()
                 .filter(cell -> RaidGround.canStand(level, cell)).toList();
         List<MatabeleEntity> ants = new ArrayList<>();

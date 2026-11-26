@@ -6,7 +6,9 @@ import net.minecraft.nbt.CompoundTag;
  * What one Matabele scout remembers of its own searching (raid scouts search like real ants, 2026-11-04; the colony
  * keeps no map of searched land): its favourite direction out of the nest, which it goes back to trip after trip (route
  * and site fidelity in ponerine ants, Fresneau 1985), how far out it searches now (its reach), how many trips in a row it
- * came home empty, and how far out its last find was. Saved on the ant. The rules that change it are in
+ * came home empty, and how far out its last find was. Saved on the ant. A trip under way is not saved, with a find or
+ * without (review R11-15, left so on purpose: quit while a scout runs home with a find and that find is lost; its
+ * memory was bent toward the spot when it chose it, so its next trip goes that way again). The rules that change it are in
  * {@code colony.Scouts} ({@code cameHomeEmpty}, {@code foundBy}); the walk that uses it is {@code MatabeleScoutGoal}.
  */
 public final class ScoutMemory {

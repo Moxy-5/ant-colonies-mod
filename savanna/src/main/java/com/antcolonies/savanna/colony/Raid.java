@@ -356,9 +356,17 @@ public final class Raid implements FightDiary {
     /** The living termite workers in the open within {@code reach} of a spot: what a player would see there. */
     private static List<AbstractAntEntity> inTheOpen(ServerLevel level, Colony raiders, BlockPos at, double reach) {
         return level.getEntitiesOfClass(AbstractAntEntity.class, new AABB(at).inflate(reach, 6.0, reach),
-                insect -> insect.isAlive() && !insect.isParalysed() && !insect.isDowned() && !(insect instanceof MatabeleEntity)
-                        && !(insect instanceof TermiteSoldierEntity) && !raiders.getId().equals(insect.getColonyId())
+                insect -> isPrey(insect) && !raiders.getId().equals(insect.getColonyId())
                         && !insect.isSheltered() && flat(insect.blockPosition(), at) <= reach);
+    }
+
+    /**
+     * <b>The one test of "a termite a raid is for"</b>: a living termite worker on its feet. Soldiers alone are no
+     * reason to raid. The raid's judge and the scout's count both ask it (review R11-6: the scout counted soldiers, ran
+     * home from two on their beat, and the judge then found nobody there).
+     */
+    public static boolean isPrey(AbstractAntEntity insect) {
+        return insect.isAlive() && !insect.isDowned() && !(insect instanceof MatabeleEntity) && !(insect instanceof TermiteSoldierEntity);
     }
 
     /**
@@ -791,6 +799,11 @@ public final class Raid implements FightDiary {
         return march.behindPlace(id);
     }
 
+    /** Tests: this ant's place number in a bunch (0 stands in the middle), or -1 before it has one. */
+    public int bunchNumberForTests(UUID id) {
+        return formIndex.getOrDefault(id, -1);
+    }
+
     /** Tests: where the way out's hump ends (along the trail; 0 for a level start). */
     public double humpEndForTests(ServerLevel level) {
         return march.hillEnd(level, out);
@@ -1011,12 +1024,18 @@ public final class Raid implements FightDiary {
         lastLevel = level;
         double share = shareOut(now);
         makeMarch(level); // (the land is loaded now: the trail's start gets its ground)
+        // (review R11-7: the places in a bunch are numbered from 0 again, the leader first; kept from the bodies before,
+        // the new ants stood as a hollow ring, and after about three showings past where "the tail is in" can be true)
+        formIndex.clear();
         for (MatabeleEntity ant : ants) {
             members.add(ant.getUUID());
             memberSet.add(ant.getUUID());
+            formIndex.put(ant.getUUID(), formIndex.size());
         }
         leader = members.get(0);
         asNumbers = false;
+        // (review R11-9: the raid is as big as its numbers now, not as it set out: the dead and the let go stay gone)
+        size = numbersAlong;
         numbersAlong = Math.max(0, size - ants.size());
         int left = hiddenCatch;
         for (MatabeleEntity ant : ants) {
@@ -1336,7 +1355,7 @@ public final class Raid implements FightDiary {
         RaidCost.updated();
         march.newUpdate();
         if (previous >= 0 && now - previous > HOLD_AFTER) {
-            say("the raid was not worked out for " + (now - previous) / 20 + " s (the colony's land not ticking): its clocks waited");
+            say("the raid was not worked out for " + (now - previous) / 20 + " s (nobody near its colony, or its land not ticking): its clocks waited");
             holdClocks(now - previous - EVERY);
         }
         if (asNumbers) {
@@ -1439,7 +1458,9 @@ public final class Raid implements FightDiary {
                         say(RaidGround.shortId(key) + " is called away to fight (it catches up after)");
                         return now;
                     });
-                    if (now - since > DRAFT_KEEP && !id.equals(leader)) {
+                    // (review R11-12: the leader too: the column stood behind a scout fighting at the nest till the
+                    // march's time was up. On the way out the raid then turns home, as with any scout lost)
+                    if (now - since > DRAFT_KEEP) {
                         lost.merge("kept by another fight", 1, Integer::sum);
                         say(RaidGround.shortId(id) + " leaves the raid: called away to fight for " + (now - since) / 20 + " s");
                         ants.remove(ant);
@@ -1866,7 +1887,8 @@ public final class Raid implements FightDiary {
                 }
             } else if (ant.getFightSpot() == null) {
                 if (returning.contains(id)) {
-                    if (off <= leash * COME_BACK) {
+                    // (review R11-8: or back at the halting place it is sent to, which may lie past half the leash)
+                    if (off <= leash * COME_BACK || flat(ant.blockPosition(), out.point(out.length())) <= RaidMarch.NEAR) {
                         returning.remove(id);
                         sendIn(ant);
                     } else {

@@ -14,6 +14,7 @@ import com.antcolonies.colony.GroundTop;
 import com.antcolonies.entity.AbstractAntEntity;
 import com.antcolonies.savanna.SavannaSpecies;
 import com.antcolonies.savanna.colony.FeedingSpots;
+import com.antcolonies.savanna.colony.Raid;
 import com.antcolonies.savanna.colony.RaidGround;
 import com.antcolonies.savanna.colony.Raids;
 import com.antcolonies.savanna.colony.Scouts;
@@ -692,7 +693,7 @@ public class MatabeleScoutGoal extends Goal {
             return List.of();
         }
         return level.getEntitiesOfClass(AbstractAntEntity.class, box,
-                insect -> SavannaSpecies.MACROTERMES.equals(insect.species()) && insect.isAlive() && !insect.isDowned()
+                insect -> SavannaSpecies.MACROTERMES.equals(insect.species()) && Raid.isPrey(insect) // (workers only, the raid's own test: R11-6)
                         && !insect.isIndoors() && Raids.awayFromMoundDoor(insect.blockPosition(), mounds));
     }
 

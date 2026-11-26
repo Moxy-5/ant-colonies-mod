@@ -151,12 +151,16 @@ soldiers within 30 blocks are worth 6, enough for a fed colony; the scout runs h
 (`Scouts.foundBy`), and `Raids.startRaid` then finds nobody there: no raid, the find forgotten. **The player sees** a
 scout run home from soldiers on their beat and nothing follow. **Fix:** the scout counts with the judge's own test.
 
+**Status (2026-11-26, `claude/review-fix-11b`): fixed:** one test of "a termite a raid is for" (`Raid.isPrey`: a living termite worker on its feet), asked by the raid's judge and by the scout's count; a scout no longer smells or counts soldiers.
+
 ### R11-7 (B, visible, proven; checked again): a raid shown again after going to numbers bunches as a hollow ring
 
 `Raid.formIndex` (209, 390, 1539) gives each ant its place number in a bunch and is never cleared, so new bodies get
 numbers after all the old ones. After one hide and show of 75 ants nobody stands in the middle; after about three the
 places lie past the 6 blocks of `TAIL_IN`, so "the tail is in" can never be true and the halt and regroup always run to
 their deadlines. **Fix:** in `takeBodies`, clear the map and number the new ants from 0, the leader first.
+
+**Status (2026-11-26, `claude/review-fix-11b`): fixed:** `takeBodies` numbers the new ants' bunch places from 0, the leader first (checked in `MatabeleAwayTests.aRaidOutAsNumbersIsShownOnItsWayOutWhenAWatcherComesNear` and `...WithItsCatchAfterItsAttack`).
 
 ### R11-8 (B, likely): a raider called back by the leash may never fight again
 
@@ -166,12 +170,16 @@ so with trail points 3 blocks apart it can lie at 7, and the test is then never 
 standing at the halting place for the rest of the attack. **Not checked:** how far apart a real scout's trail points
 lie. **Fix:** send a returner toward the spot itself.
 
+**Status (2026-11-26, `claude/review-fix-11b`): fixed:** a returner fights again once it is back at the halting place it is sent to (within 4 blocks of the trail's end), or within half the leash of the spot as before. Not measured: how far apart a real scout's trail points lie.
+
 ### R11-9 (B, proven; checked again): the raid's size is never lowered for real ants that leave it
 
 `Raid.drop` 1267-1277 leaves `size` alone; `RaidsAway.show` 197 asks for `min(size, most_real, inside)` bodies and
 `takeBodies` 1005 sets `numbersAlong = size - ants.size()`. A raid that lost 30 of 75 and went to numbers comes back 75
 strong when shown. No ant is doubled in the colony's count. **Fix:** show `min(numbersAlong, ...)` bodies and take them
 off `numbersAlong`.
+
+**Status (2026-11-26, `claude/review-fix-11b`): fixed:** a raid shown again is as big as its numbers are now (`size = numbersAlong` in `takeBodies`; `RaidsAway.show` asks for `numbersAlong` bodies, not the size it set out with).
 
 ### R11-10 (B, proven, rare; checked again): a raid shown "in the nest" from the halt, attack or regroup starts over
 
@@ -180,12 +188,16 @@ at the halt, attack and regroup, `Raid` 797-804; only the march home is left out
 back to muster with its catch already in its jaws, and the next halt takes a second catch. **Fix:** step back to muster
 only from the muster or the march out.
 
+**Status (2026-11-26, `claude/review-fix-11b`): fixed:** `RaidsAway.show` forms a raid in the nest only from the muster or the march out; at its spot it is shown at its spot whatever the way's length.
+
 ### R11-11 (B, proven): in the colony's away grace minute nobody steps the raid
 
 When a colony stops being "here" its parts are not ticked at all for 60 s (`AwayLife` 404-410, `ColonyManager` 89-98).
 A raid as numbers stands still for that minute and then writes "its clocks waited" with the wrong reason; a raid with
 bodies keeps walking on its raiders' own asks, but dusk and rain are not called and ants let go are not sent home until
 the minute is over. **Fix:** step the raid from the framework during the grace, or accept it and correct the diary line.
+
+**Status (2026-11-26, `claude/review-fix-11b`): fixed:** accepted, the diary line corrected ("nobody near its colony, or its land not ticking"). In the grace minute nobody is near the colony by definition (a watched raid keeps its colony here), so the stall is not seen; stepping the parts in the grace would be a framework change for every part.
 
 ### R11-12 (B, proven; checked again): a scout drafted to defend the nest stalls the whole march
 
@@ -194,11 +206,15 @@ A drafted leader is never let go (`Raid` 1421, `!id.equals(leader)`) and stays t
 design says no stage waits on a single ant, the leader included. **Fix (my pick):** on the way out, a leader drafted
 longer than a short time turns the raid home at once, as "the scout is lost" does.
 
+**Status (2026-11-26, `claude/review-fix-11b`): fixed:** the leader is let go by a fight elsewhere after 30 s like any raider (the exception deleted); on the way out the raid then turns home by the rule it already had ("the scout is lost"), later the next in line leads.
+
 ### R11-13 (B, likely; checked again): a waiting find whose land does not tick stops all scouting until it fades
 
 `Raids.startRaid` 922-927 answers "land not loaded" and the find goes on waiting; while any find waits no scout is sent
 (`Scouts` 274). **The player sees** a hungry colony beside them doing nothing for up to 3 game days (`spot_fade_ticks`),
 on a low simulation distance. **Fix:** give that wait an end (about a game hour), then the find is only remembered.
+
+**Status (2026-11-26, `claude/review-fix-11b`): fixed:** a find whose land is not loaded does not wait: the diary says so once and the find is only remembered (a later scout finds it again), so scouting goes on. No new number. The wait is left for one case only, a raid still out of sight.
 
 ### R11-14 (B, proven; checked again): a waiting find writes a diary line every second outside the raid hours
 
@@ -206,16 +222,22 @@ The reason text carries the clock (`Raids` 785, `RaidGround.clock` 141-147), so 
 "say it once" test at 839-842 always passes: about 250 lines between 11:00 and 16:00, 550 in a night, for each colony.
 The player sees nothing; the `[raid]` diary every diagnosis reads is flooded. **Fix:** take the clock out of the reason.
 
+**Status (2026-11-26, `claude/review-fix-11b`): fixed:** the reason is "outside the raid hours" with no clock in it (the diary line's own start gives the time), so it is said once.
+
 ### R11-15 (B, proven): a find on its way home is lost on a reload
 
 The find, its worth and the scent line are fields of the scout goal (`MatabeleScoutGoal` 133-135, 158); `ScoutMemory`
 58-69 saves only heading, reach and empty trips. Quit while a scout runs home and the find is gone, though the scout's
 memory was already bent toward it. No ant is left stuck. **Fix:** save them with `ScoutMemory`, or accept it and say so.
 
+**Status (2026-11-26, `claude/review-fix-11b`): not a bug:** left as it is on purpose and written down (`ScoutMemory`'s comment): no scout's trip under way is saved, with a find or without; the scout's memory was bent toward the spot when it chose it, so its next trip goes that way again. Saving the find alone would need the whole trip saved (its stage, its line home).
+
 ### R11-16 (B, proven as code, the bad case likely): `Scouts.mayScout` lets any ant on the out list through unchecked
 
 `Scouts` 261-264 returns true before the "is it fit", "is it a raider", hours and hunger checks, and `Scouts.plan` then
 has side effects inside a goal's "may I start" (403, 407-411). **Fix:** keep the fit and raider checks in front.
+
+**Status (2026-11-26, `claude/review-fix-11b`): fixed:** `Scouts.mayScout` asks "fit, no raider, not going home" first; an ant on the out list that fails it gives its place up (`back`). Not changed: `Scouts.plan`'s marks made inside "may I start".
 
 ### R11-17 (B, proven, written down in step 5 as left on purpose): near and away still differ in how often a colony raids
 
@@ -224,6 +246,8 @@ takes the best remembered find every second (`Raids` 809-843, `RaidsAway` 240-27
 100 needs about 2.5 raids a day: that fits out of sight, and a watched colony may stay hungrier. **For step 6's soak to
 measure.** Also: a raid may leave until 19:00 and dusk turns it at 19:30, 25 seconds later, so a watched raid leaving
 late is turned home empty and still costs one of the day's raids. Stopping leaves earlier is **the user's call**.
+
+**Status (2026-11-26, `claude/review-fix-11b`): open:** nothing changed. The late leave (a raid may set out until 19:00 and dusk turns it at 19:30, 25 seconds later) is put to the user; the near and away difference waits for a soak to measure.
 
 ---
 
