@@ -222,6 +222,11 @@ public class OtterEntity extends PathfinderMob implements GeoEntity, HasLife {
     static final double JAWS_AHEAD = 1.31, JAWS_UP = 0.49;
     /** A hunt with no catch gives up after this long (ticks: 20 s). */
     static final int HUNT_GIVE_UP = 400;
+    /**
+     * The longest it carries a catch in the water looking for a bank (ticks, 30 s, my pick; review R9-28: with no bank in
+     * reach, mid-river, the carry never ended and the otter hung on the spot with its catch for good).
+     */
+    static final int CARRY_MOST = 600;
 
     /**
      * Its moves (the Animal Maker Engine, {@code assets/antcolonies/block_moves/otter.json} written by
@@ -471,6 +476,11 @@ public class OtterEntity extends PathfinderMob implements GeoEntity, HasLife {
     /** In a play bout now (for tests). */
     public boolean inBout() {
         return bout != null;
+    }
+
+    /** Whether it is the one that started the game it is in (for tests). */
+    public boolean leadsBout() {
+        return bout != null && bout.lead == this;
     }
 
     /** Its bout's stage now, or "none" (for tests' traces). */
@@ -734,7 +744,6 @@ public class OtterEntity extends PathfinderMob implements GeoEntity, HasLife {
             playLooks();
             return;
         }
-        life.tick();
         keepApart();
         if (tickCount % 5 == 0) {
             updateMood();
@@ -747,6 +756,19 @@ public class OtterEntity extends PathfinderMob implements GeoEntity, HasLife {
         }
         if (held != null && (!held.isAlive() || held.getVehicle() != this)) {
             release();
+        }
+        if (held == null && !level().isClientSide && isVehicle()) {
+            // A catch saved in its jaws (review R9-27): Minecraft saves a rider with the animal it rides and seats it again
+            // on load, still helpless, but the otter's own note of it is not saved. It is let go properly: off, its will
+            // back, able to be hurt again.
+            for (Entity rider : java.util.List.copyOf(getPassengers())) {
+                if (rider instanceof LivingEntity living) {
+                    held = living;
+                    release();
+                } else {
+                    rider.stopRiding();
+                }
+            }
         }
         if (scare != null && (tickCount >= scaredUntil || !scare.isAlive())) {
             scare = null;
@@ -951,6 +973,15 @@ public class OtterEntity extends PathfinderMob implements GeoEntity, HasLife {
     @Override
     public int getNoActionTime() {
         return 0;
+    }
+
+    /**
+     * Kept while a player is within 96 blocks, as every other river animal (review R9-30: without this Minecraft removed
+     * otters one at a time once no player was within 32 blocks, a mother before her pup).
+     */
+    @Override
+    public boolean removeWhenFarAway(double distanceToClosestPlayer) {
+        return distanceToClosestPlayer > MonitorEntity.KEEP_NEAR * MonitorEntity.KEEP_NEAR;
     }
 
     @Override
@@ -1447,6 +1478,8 @@ public class OtterEntity extends PathfinderMob implements GeoEntity, HasLife {
         @Nullable
         private LivingEntity prey;
         private int left, again;
+        /** The tick it took its catch, and the tick it may next look for a bank. */
+        private int carriedFrom, lookAgain;
         @Nullable
         private Vec3 bank;
 
@@ -1481,6 +1514,8 @@ public class OtterEntity extends PathfinderMob implements GeoEntity, HasLife {
             left = HUNT_GIVE_UP;
             again = 0;
             bank = null;
+            carriedFrom = -1;
+            lookAgain = 0;
         }
 
         @Override
@@ -1630,7 +1665,15 @@ public class OtterEntity extends PathfinderMob implements GeoEntity, HasLife {
                 otter.setDoing(EAT);
                 return;
             }
-            if (otter.isInWater() && (bank == null || otter.getNavigation().isDone())) {
+            if (carriedFrom < 0) {
+                carriedFrom = otter.tickCount;
+            }
+            if (otter.isInWater() && otter.tickCount - carriedFrom > CARRY_MOST) {
+                otter.eatCatch();           // no bank reached in all that time: eaten afloat, as real otters do with a small catch
+                return;
+            }
+            if (otter.isInWater() && (bank == null || otter.getNavigation().isDone()) && otter.tickCount >= lookAgain) {
+                lookAgain = otter.tickCount + 20;       // (the two searches at most once a second)
                 bank = nearestBank(otter, 12.0);
                 if (bank == null) {
                     bank = landSpot(otter, 10.0, null);
@@ -2492,7 +2535,9 @@ public class OtterEntity extends PathfinderMob implements GeoEntity, HasLife {
 
         @Override
         public boolean canContinueToUse() {
-            return otter.bout != null;
+            // Either otter ends a game that is no longer on (review R9-29: only the one that started it used to look, so
+            // when that one was killed or removed mid-game the other stood in the game for good).
+            return otter.bout != null && otter.bout.on();
         }
 
         @Override

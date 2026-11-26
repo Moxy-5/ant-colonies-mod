@@ -46,8 +46,9 @@ public final class SavannaTests {
         // Soldiers and the alarm; the fights (M8 step 2).
         TestFilter.addCategory("soldiers", TermiteSoldierTests.class, TermiteAlarmTests.class, MatabeleFightTests.class, TermiteRaidDefenceTests.class,
                 MatabeleDefenceTests.class);
-        // The Matabele raids (M8 step 3): the scouts, then the columns.
-        TestFilter.addCategory("raids", MatabeleRaidTests.class);
+        // The Matabele raids (M8 step 3): the scouts, then the raids; and the raid rewrite's whole-chain tests (step 2 of
+        // docs/plans/raid-rewrite.md, written before the new raid; in this category and in full runs since step 3 built it).
+        TestFilter.addCategory("raids", MatabeleRaidTests.class, MatabeleRaidChainTests.class);
         // The colony: founding, jobs by age, the virtual population, neighbours.
         TestFilter.addCategory("colony", TermiteTests.class, TermiteJobsByAgeTests.class, TermitePopulationTests.class,
                 TermiteNeighbourTests.class, MatabeleColonyTests.class, MatabeleNestTests.class, MatabeleFoodTests.class,
@@ -73,7 +74,7 @@ public final class SavannaTests {
         // The animal life kit (M9, docs/plans/animal-life-cycle.md): sex, age, own size, saving, breeding later.
         TestFilter.addCategory("life", AnimalLifeTests.class);
         TestFilter.addCategory("worldgen", SavannaWorldTests.class, SavannaLoadingTests.class);
-        TestFilter.addCategory("stress", TermiteStressTests.class);
+        TestFilter.addCategory("stress", TermiteStressTests.class, SpawnerCostTests.class);
 
         AwayKit.addPartsCheck(SavannaTests::partsAreTheSavannas);
     }

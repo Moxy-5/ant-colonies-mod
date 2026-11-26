@@ -440,7 +440,6 @@ public class BullfrogEntity extends Animal implements GeoEntity, HasLife {
             }
             return;
         }
-        life.tick();
         breedingTick();
         filmTick();
         if (hungryIn > 0) {
@@ -463,6 +462,15 @@ public class BullfrogEntity extends Animal implements GeoEntity, HasLife {
             setDiscardFriction(false);
         } else if (a == DIG_OUT && actionTicks >= BullfrogGoals.DIG_OUT_TICKS) {
             stopActing();       // out of the ground: the clip is over
+        }
+        // "No gravity" belongs to the climb out and "no air drag" to the escape leap, and to nothing else (review R10-8:
+        // a puff at a player, a female's clasp or a save in the middle of a climb took the action away and left the
+        // frog hanging with no gravity for good; Minecraft saves that mark with the frog).
+        if (action() != CLIMB_OUT && isNoGravity()) {
+            setNoGravity(false);
+        }
+        if (action() != LEAP && shouldDiscardFriction()) {
+            setDiscardFriction(false);
         }
         floatTick();
     }

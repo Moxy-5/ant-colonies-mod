@@ -250,6 +250,8 @@ public class AnimalLifeTests {
                 }
                 case 3 -> {                         // the fry keep round her; then a catfish comes
                     if (now - since[0] == 100) {
+                        // (fry gone here were despawned, not taken in: a stand-in player left behind far off, BUGS 303)
+                        helper.assertTrue(!fryOf(helper, female).isEmpty(), "her fry are gone before anything came near");
                         for (TilapiaEntity f : fryOf(helper, female)) {
                             helper.assertTrue(f.distanceTo(female) < 3, "a fry strayed " + f.distanceTo(female) + " from its mother");
                         }
@@ -268,7 +270,7 @@ public class AnimalLifeTests {
                         stage[0] = 5;
                         since[0] = now;
                     } else if (now - since[0] > 40) {
-                        helper.fail("a player beside her and her fry not taken into her mouth");
+                        helper.fail("a player beside her and her fry not taken into her mouth (" + fryOf(helper, female).size() + " fry round her)");
                     }
                 }
                 case 5 -> {                         // and lets them out when it is gone
@@ -282,6 +284,19 @@ public class AnimalLifeTests {
                 }
             }
         });
+    }
+
+    /** The goals a mob is running now, by name (for a stuck message). */
+    private static String goalsRunning(Mob mob) {
+        try {
+            java.lang.reflect.Field field = Mob.class.getDeclaredField("goalSelector");
+            field.setAccessible(true);
+            return ((net.minecraft.world.entity.ai.goal.GoalSelector) field.get(mob)).getAvailableGoals().stream()
+                    .filter(net.minecraft.world.entity.ai.goal.WrappedGoal::isRunning)
+                    .map(g -> g.getGoal().getClass().getSimpleName()).toList().toString();
+        } catch (ReflectiveOperationException e) {
+            return "?";
+        }
     }
 
     private static List<TilapiaEntity> fryOf(GameTestHelper helper, TilapiaEntity mother) {
@@ -316,10 +331,19 @@ public class AnimalLifeTests {
         clearLeftovers(helper, SavannaEntities.SNAIL.get());
         SnailEntity a = grown(helper, SavannaEntities.SNAIL.get(), "none", new BlockPos(P0 + 1, BED + 1, P0 + 3));
         SnailEntity b = grown(helper, SavannaEntities.SNAIL.get(), "none", new BlockPos(P0 + 3, BED + 1, P0 + 3));
+        net.minecraft.world.phys.Vec3 aFrom = a.position(), bFrom = b.position();
         boolean[] laying = {false};
         helper.runAtTickTime(3590, () -> helper.fail("snails stuck: laying " + laying[0] + " a " + a.eggsToLay() + " ready " + a.life().readyToBreed()
                 + " partner " + a.life().partner() + " at " + helper.relativePos(a.blockPosition()) + "; b " + b.eggsToLay() + " ready "
-                + b.life().readyToBreed() + " at " + helper.relativePos(b.blockPosition()) + " hidden " + a.isHidden() + "/" + b.isHidden()));
+                + b.life().readyToBreed() + " at " + helper.relativePos(b.blockPosition()) + " hidden " + a.isHidden() + "/" + b.isHidden()
+                // (measured for BUGS 242, 270: the pair sat on their spawn blocks for the whole test, which room alone does not explain)
+                + "; alive " + a.isAlive() + "/" + b.isAlive() + " removed " + a.isRemoved() + "/" + b.isRemoved()
+                + " moved " + String.format("%.1f/%.1f", a.position().distanceTo(aFrom), b.position().distanceTo(bFrom))
+                + " room " + com.antcolonies.animal.RoomToBreed.here(a, a.life().numbers().localLimit())
+                + " snails near " + com.antcolonies.animal.RoomToBreed.ownKindNear(helper.getLevel(), a)
+                + " players " + helper.getLevel().getServer().getPlayerList().getPlayerCount()
+                + " goals a " + goalsRunning(a) + " b " + goalsRunning(b) + " no action " + a.getNoActionTime()
+                + " in water " + a.isInWater() + " nav done " + a.getNavigation().isDone()));
         helper.onEachTick(() -> {
             if (a.eggsToLay() > 0 || b.eggsToLay() > 0) {
                 laying[0] = true;
@@ -680,6 +704,7 @@ public class AnimalLifeTests {
         int[] eggs = {0};
         int[] carried = {0, 0};             // most at once, now
         BlockPos[] nest = {null};
+        int[] room = {0};
         long started = level.getGameTime();
         helper.runAtTickTime(5990, () -> {
             com.antcolonies.colony.Watchers.setPretend(List.of());
@@ -742,8 +767,15 @@ public class AnimalLifeTests {
                     }
                     carried[0] = Math.max(carried[0], female.carrying());
                     List<com.antcolonies.savanna.animal.CrocodileEntity> young = level.getEntitiesOfClass(com.antcolonies.savanna.animal.CrocodileEntity.class,
-                            new net.minecraft.world.phys.AABB(nest[0]).inflate(24), c -> c.isAlive() && c.life().isYoung());
-                    int expect = Math.min(eggs[0], female.life().numbers().localLimit() - 1);
+                            new net.minecraft.world.phys.AABB(nest[0]).inflate(24),
+                            c -> c.isAlive() && c.life().isYoung() && female.getUUID().equals(c.motherId()));
+                    if (level.getBlockState(nest[0]).is(SavannaBlocks.CROCODILE_NEST.get())) {
+                        // the room the nest really has, read while it stands (a crocodile of a test beside this one, within
+                        // room to breed's 48 blocks, takes a place: BUGS 268, 303), the hatchlings let out to fit it
+                        room[0] = com.antcolonies.animal.RoomToBreed.leftAt(level, nest[0], SavannaEntities.CROCODILE.get(),
+                                female.life().numbers().localLimit());
+                    }
+                    int expect = Math.min(eggs[0], room[0]);
                     if (!level.getBlockState(nest[0]).is(SavannaBlocks.CROCODILE_NEST.get()) && young.size() + female.carrying() < expect) {
                         helper.fail((young.size() + female.carrying()) + " hatchlings from " + eggs[0] + " eggs (" + expect + " wanted: room for that many)");
                     }
@@ -1046,5 +1078,67 @@ public class AnimalLifeTests {
             helper.assertTrue(!tilapia.isAlive() || tilapia.getHealth() < full, "the father never bit the tilapia ("
                     + String.format("%.2f", father.distanceTo(tilapia)) + " blocks off)");
         });
+    }
+
+    /**
+     * Breeding refills the water (the user, 2026-11-24; review R10-1). A tilapia mother whose eggs are due while the
+     * river is full of her kind keeps them in her mouth and asks again (until then one look with no room threw the
+     * whole brood away); when room opens she lets her fry out.
+     */
+    @GameTest(template = "arena", timeoutTicks = 600, batch = "breeding_full_eggs")
+    public static void aTilapiaMotherWithNoRoomKeepsHerEggsUntilThereIs(GameTestHelper helper) {
+        breedingPond(helper);
+        clearLeftovers(helper, SavannaEntities.TILAPIA.get());
+        TilapiaEntity mother = grown(helper, SavannaEntities.TILAPIA.get(), "female", new BlockPos(5, BED + 1, 5));
+        TilapiaEntity male = grown(helper, SavannaEntities.TILAPIA.get(), "male", new BlockPos(6, BED + 1, 5));
+        int limit = mother.life().numbers().localLimit();
+        List<TilapiaEntity> crowd = new java.util.ArrayList<>();
+        for (int i = 2; i < limit + 3; i++) {
+            crowd.add(grown(helper, SavannaEntities.TILAPIA.get(), "female", new BlockPos(P0 + i % 12, BED + 1 + i % 2, P0 + 1 + i / 12 * 3)));
+        }
+        mother.mated(male);
+        int eggs = mother.eggsInMouth();
+        helper.assertTrue(eggs > 0, "she took no eggs into her mouth");
+        mother.ageEggs(mother.life().numbers().hatchTicks() + 1);
+        helper.runAfterDelay(100, () -> {
+            helper.assertTrue(mother.eggsInMouth() == eggs, "with no room for her kind she has " + mother.eggsInMouth() + " of her " + eggs + " eggs left");
+            helper.assertTrue(fryOf(helper, mother).isEmpty(), "fry let out into a full river");
+            crowd.forEach(net.minecraft.world.entity.Entity::discard);
+        });
+        helper.runAfterDelay(160, () -> {
+            helper.assertTrue(mother.eggsInMouth() == 0, "room opened and she still holds her eggs");
+            helper.assertTrue(fryOf(helper, mother).size() == eggs, fryOf(helper, mother).size() + " fry from " + eggs + " eggs with room for all");
+            helper.succeed();
+        });
+    }
+
+    /**
+     * The world's own spawner fills a kind that breeds only to half its count in a zone, so breeding has the other half
+     * to fill (review R10-1: both asked for the same room, and the spawner, trying every tick, always won); a kind that
+     * does not breed is spawned to its whole count, and no kind is spawned where it does not live.
+     */
+    @GameTest(template = "arena", timeoutTicks = 20, batch = "breeding_full_eggs")
+    public static void theSpawnerLeavesHalfOfABreedingKindsCountToBreeding(GameTestHelper helper) {
+        var zones = com.antcolonies.savanna.worldgen.RiverZones.Zone.values();
+        for (EntityType<?> kind : List.of(SavannaEntities.TILAPIA.get(), SavannaEntities.CATFISH.get(), SavannaEntities.CRAB.get(),
+                SavannaEntities.SNAIL.get(), SavannaEntities.BULLFROG.get(), SavannaEntities.CROCODILE.get())) {
+            int cap = kind.getCategory().getMaxInstancesPerChunk(), limit = AnimalLives.get(kind).localLimit();
+            for (var zone : zones) {
+                int whole = com.antcolonies.savanna.worldgen.RiverZones.allows(kind, zone, 0) ? 1 : 0;
+                int bySpawner = com.antcolonies.savanna.worldgen.RiverZones.mostBySpawner(kind, zone);
+                if (whole == 0) {
+                    helper.assertTrue(bySpawner == 0, kind.getDescriptionId() + " spawned " + zone + ", where it does not live");
+                    continue;
+                }
+                helper.assertTrue(bySpawner >= 1 && bySpawner <= Math.max(1, (cap + 1) / 2),
+                        kind.getDescriptionId() + " " + zone + ": the spawner fills " + bySpawner + " of a cap of " + cap);
+            }
+            helper.assertTrue(limit > 1, kind.getDescriptionId() + " has no room to breed in (local limit " + limit + ")");
+        }
+        for (EntityType<?> kind : List.of(SavannaEntities.OTTER.get(), SavannaEntities.MONITOR.get())) {
+            helper.assertTrue(com.antcolonies.savanna.worldgen.RiverZones.mostBySpawner(kind, com.antcolonies.savanna.worldgen.RiverZones.Zone.MID)
+                    == Integer.MAX_VALUE, kind.getDescriptionId() + " does not breed and is held back all the same");
+        }
+        helper.succeed();
     }
 }

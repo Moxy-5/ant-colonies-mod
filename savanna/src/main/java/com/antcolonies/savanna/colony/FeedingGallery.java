@@ -91,6 +91,9 @@ final class FeedingGallery {
 
     /** Adds the mud casts whose channels join the one at {@code from} (a gallery cell or a cast) to {@code casts}. */
     private static void joinCasts(Level level, BlockPos from, BlockPos gallery, Map<BlockPos, BlockPos> casts, ArrayDeque<BlockPos> queue) {
+        if (!LandReady.at(level, from)) {
+            return; // (BUGS 316: a gallery cell in land not loaded is never read)
+        }
         BlockState fromState = level.getBlockState(from);
         boolean fromCast = com.antcolonies.savanna.block.MudCastBlock.isCast(fromState);
         for (Direction side : Direction.values()) {

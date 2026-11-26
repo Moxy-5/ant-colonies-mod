@@ -108,7 +108,7 @@ public class MatabeleNestTests {
             com.antcolonies.savanna.colony.Raids raids = colony.part(com.antcolonies.savanna.colony.SavannaParts.RAIDS).orElse(null);
             StringBuilder outside = new StringBuilder();
             for (com.antcolonies.savanna.entity.MatabeleEntity ant : com.antcolonies.gametest.TestIsolation.insectsOf(level, colony, com.antcolonies.savanna.entity.MatabeleEntity.class)) {
-                if (raids != null && (raids.isScouting(ant.getUUID()) || raids.isRaider(ant.getUUID()))) {
+                if (raids != null && (raids.scouts().isScouting(ant.getUUID()) || raids.isRaider(ant.getUUID()))) {
                     continue;
                 }
                 if (!rooms.contains(ant.blockPosition())) {

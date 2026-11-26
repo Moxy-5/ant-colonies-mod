@@ -139,4 +139,25 @@ class RaidRulesTest {
         double cared = Wounds.infectChance(n.licks(), n) * Wounds.deathChance(true, n);
         assertTrue(untended >= 0.7 && cared <= 0.1, "untended deaths " + untended + ", cared-for " + cared);
     }
+
+    /**
+     * Review round 11, R11-3: the attack's quiet clock is kept going only by what changes something at the spot (a grip,
+     * a sting, a breach). Going for a termite, a grab at one already stung and jaws closing on nothing are no work: an
+     * ant goes for a termite it has no way to again every 10 s, which kept every attack awake to its 2-minute deadline.
+     */
+    @Test
+    void onlyWhatChangesSomethingAtTheSpotKeepsTheAttackAwake() {
+        for (String work : new String[] {"grips a termite worker", "stings a termite worker", "strikes and misses a termite worker",
+                "its jaws slide off the head of a termite soldier", "grabs at a termite worker: it twists away",
+                "loses its grip on a termite worker", "bites 10, 64, 10 open", "picks a breach at 10, 64, 10 (0 opened so far)"}) {
+            assertTrue(Raid.worksAtTheSpot(work), "\"" + work + "\" should count as work at the spot");
+        }
+        for (String idle : new String[] {"goes for a termite worker (9.0 blocks off)", "grabs at a termite worker: already stung",
+                "grabs at a termite worker: already held by another", "its jaws close on nothing: a termite worker out of reach or it is off its feet",
+                "no foe it may go for in reach: it searches round the spot", "searched 10 s with no foe: its fight is over",
+                "chased a termite worker 5 s without a blow: leaves it a while", "no way to a termite worker: leaves it a while",
+                "no way to the breach at 10, 64, 10"}) {
+            assertTrue(!Raid.worksAtTheSpot(idle), "\"" + idle + "\" should not count as work at the spot");
+        }
+    }
 }

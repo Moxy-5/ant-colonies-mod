@@ -58,7 +58,6 @@ import software.bernie.geckolib.animation.RawAnimation;
  * until the workers are in, then go in last, and by day they wait in the foraging tunnels just inside the holes (see
  * {@code colony.Soldiers}). They answer the alarm ({@code colony.Alarm}, {@link DefendGoal}): they drum (the head bang,
  * {@link #drum}) when they feel it, the drumming spreading soldier to soldier, then go at an enemy or to the breach.
- * For now they only bite chickens ({@link #bite}, a simple first version; fighting players and ants comes with M8).
  * They do not fit the termite tunnel blocks (only workers do).
  */
 public class TermiteSoldierEntity extends AbstractAntEntity implements FedByNurses, ColonyBorn {

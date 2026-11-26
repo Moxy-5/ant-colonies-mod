@@ -34,13 +34,14 @@ import com.antcolonies.entity.goal.WoundCareGoal;
 import com.antcolonies.fight.Fights;
 import com.antcolonies.savanna.SavannaSpecies;
 import com.antcolonies.savanna.block.MoundSoil;
-import com.antcolonies.savanna.colony.RaidColumn;
+import com.antcolonies.savanna.colony.Raid;
 import com.antcolonies.savanna.colony.Raids;
 import com.antcolonies.savanna.colony.SavannaParts;
 import com.antcolonies.savanna.entity.goal.BringPreyGoal;
 import com.antcolonies.savanna.entity.goal.CarryRemainsGoal;
 import com.antcolonies.savanna.entity.goal.MatabeleBiteOutGoal;
 import com.antcolonies.savanna.entity.goal.MatabeleRaidGoal;
+import com.antcolonies.savanna.entity.goal.MatabeleWayHomeGoal;
 import com.antcolonies.savanna.entity.goal.MatabeleScoutGoal;
 import com.antcolonies.savanna.registry.SavannaBlocks;
 import com.antcolonies.savanna.registry.SavannaEntities;
@@ -210,7 +211,8 @@ public class MatabeleEntity extends AbstractAntEntity implements ColonyBorn {
         // that carry something are never called to a raid or a scout's trip, and eating stands aside while it is out)
         scoutGoal = new MatabeleScoutGoal(this);
         this.goalSelector.addGoal(1, scoutGoal); // M8 3a: a major out scouting for termites
-        this.goalSelector.addGoal(1, new MatabeleRaidGoal(this)); // M8 3b: walking in a raid column (3c: fetching the stung, going home)
+        this.goalSelector.addGoal(1, new MatabeleRaidGoal(this)); // M8 3b: walking in a raid (3c: fetching the stung)
+        this.goalSelector.addGoal(1, new MatabeleWayHomeGoal(this)); // 3c: going home from the field by itself
         this.goalSelector.addGoal(2, new BringPreyGoal(this)); // M8 3c: the termites carried home onto the prey pile
         this.goalSelector.addGoal(3, new DigGoal(this, () -> true));
         this.goalSelector.addGoal(4, new GoInsideGoal(this));
@@ -890,7 +892,7 @@ public class MatabeleEntity extends AbstractAntEntity implements ColonyBorn {
     private boolean onRaidErrand() {
         Colony colony = getColony();
         return colony != null && colony.part(SavannaParts.RAIDS)
-                .map(raids -> raids.isScouting(getUUID()) || raids.isRaider(getUUID()) || raids.isGoingHome(getUUID())).orElse(false);
+                .map(raids -> raids.scouts().isScouting(getUUID()) || raids.isRaider(getUUID()) || raids.isGoingHome(getUUID())).orElse(false);
     }
 
     /** Whether it is busy with a nest chore now (feeding the queen or the young, carrying eggs, waste or prey, care). */
@@ -964,11 +966,11 @@ public class MatabeleEntity extends AbstractAntEntity implements ColonyBorn {
         return colony.nest().getFinishedRoomCenter(level());
     }
 
-    /** M8 step 5: not while it is in a raid column (the column fetches its own hurt, {@code RaidColumn}). */
+    /** M8 step 5: not while it is in a raid column (the column fetches its own hurt, {@code Raid}). */
     @Override
     public boolean answersHelpCalls() {
         Colony colony = getColony();
-        RaidColumn column = colony == null ? null
+        Raid column = colony == null ? null
                 : colony.part(SavannaParts.RAIDS).map(Raids::column).orElse(null);
         return column == null || !column.has(getUUID());
     }

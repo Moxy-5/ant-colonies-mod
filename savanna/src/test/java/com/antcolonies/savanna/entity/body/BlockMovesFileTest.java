@@ -24,8 +24,10 @@ class BlockMovesFileTest {
         int[] ticks = {66, 69, 177, 161, 151, 103, 92, 90};
         for (int i = 0; i < names.length; i++) {
             assertEquals(i, MOVES.index(names[i]));
-            assertEquals(ticks[i], MOVES.move(i).ticks);
+            assertEquals(ticks[i], MOVES.move(i).ticks(0));    // (the smallest size's length)
         }
+        // review R9-38: a bigger monitor's walk-in is as long as its own clip, not the smallest size's
+        assertEquals(213, MOVES.move(2).ticks(4));
         assertEquals("climb_up_1000", MOVES.move(0).clip(2));
         assertEquals("water_outup_850", MOVES.move(7).clip(0));
         assertEquals(2, MOVES.nearest(1.0));

@@ -21,7 +21,9 @@ import net.minecraft.world.entity.ai.goal.Goal;
  * ({@link com.antcolonies.entity.Clamp}), walks to it, holds it still and works on it for its species'
  * {@code fight.clamped.care_ticks}: a living foe is killed first (its head stays on, the work starts over), then the
  * head comes off ({@link com.antcolonies.entity.Clamp#takeOff}). Carrying the hurt home and pulling clamps off on the
- * field are step 5's. The legs walk it; this goal only says where.
+ * field are step 5's. The legs walk it; this goal only says where. BUGS 349: one carer at a time (it claims its
+ * nestmate when it picks it, {@link AbstractAntEntity#claimCare}), and only once the nestmate has come to rest in the
+ * rooms ({@link AbstractAntEntity#restsForCare}), never on its way in.
  */
 public class ClampCareGoal extends Goal {
     /** How far (blocks) it looks for a clamped nestmate. */
@@ -55,10 +57,9 @@ public class ClampCareGoal extends Goal {
         }
         patient = level.getEntitiesOfClass(AbstractAntEntity.class, ant.getBoundingBox().inflate(LOOK_REACH),
                         other -> other != ant && other.isAlive() && colony.getId().equals(other.getColonyId())
-                                && other.clamp().isOn() && other.clamp().carer() == null
-                                && colony.nest().isInside(level, other.blockPosition()))
+                                && other.clamp().isOn() && other.careTaker(AbstractAntEntity.CareJob.CLAMP) == null && other.restsForCare(level, colony))
                 .stream().min(Comparator.comparingDouble(other -> other.distanceToSqr(ant))).orElse(null);
-        return patient != null;
+        return patient != null && patient.claimCare(AbstractAntEntity.CareJob.CLAMP, ant.getUUID(), level.getGameTime() + AbstractAntEntity.CARE_CLAIM_TICKS);
     }
 
     /** Whether it may tend a nestmate: not fighting, holding nothing, nothing clamped on itself, not downed. */
@@ -70,7 +71,7 @@ public class ClampCareGoal extends Goal {
     @Override
     public boolean canContinueToUse() {
         return patient != null && patient.isAlive() && patient.clamp().isOn() && free() && walking < WALK_TICKS
-                && (patient.clamp().carer() == null || patient.clamp().carer().equals(ant.getUUID()));
+                && ant.getUUID().equals(patient.careTaker(AbstractAntEntity.CareJob.CLAMP));
     }
 
     @Override
@@ -83,14 +84,19 @@ public class ClampCareGoal extends Goal {
     @Override
     public void stop() {
         ant.getNavigator().stop();
+        if (patient != null) {
+            patient.releaseCare(AbstractAntEntity.CareJob.CLAMP, ant.getUUID());
+        }
         patient = null;
     }
 
     @Override
     public void tick() {
-        if (!(ant.level() instanceof ServerLevel level) || patient == null) {
+        Colony colony = ant.getColony();
+        if (!(ant.level() instanceof ServerLevel level) || patient == null || colony == null) {
             return;
         }
+        patient.claimCare(AbstractAntEntity.CareJob.CLAMP, ant.getUUID(), level.getGameTime() + AbstractAntEntity.CARE_CLAIM_TICKS);
         double reach = (ant.getBbWidth() + patient.getBbWidth()) * 0.5 + 0.4;
         if (ant.distanceToSqr(patient) > reach * reach) {
             walking++;
@@ -101,8 +107,13 @@ public class ClampCareGoal extends Goal {
             }
             return;
         }
-        // At its side: it holds the nestmate still and bites at the clamp, its antennae on it.
         ant.getNavigator().stop();
+        if (working == 0 && !patient.restsForCare(level, colony)) {
+            walking++; // (at its side, its nestmate still walking on in the rooms: it waits, and gives up in time)
+            face(patient.getX(), patient.getZ());
+            return;
+        }
+        // At its side: it holds the nestmate still and bites at the clamp, its antennae on it.
         patient.clamp().holdStillFor(ant.getUUID(), level.getGameTime() + 40);
         face(patient.getX(), patient.getZ());
         ant.getLookControl().setLookAt(patient);
@@ -111,6 +122,7 @@ public class ClampCareGoal extends Goal {
         if (++working >= careTicks) {
             working = 0;
             if (patient.clamp().takeOff(level)) {
+                patient.releaseCare(AbstractAntEntity.CareJob.CLAMP, ant.getUUID());
                 patient = null; // done: nothing left on the leg
             }
         }

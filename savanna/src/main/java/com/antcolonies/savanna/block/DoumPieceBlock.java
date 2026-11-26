@@ -67,10 +67,10 @@ public class DoumPieceBlock extends Block implements EntityBlock, DoumPiece, Bon
         builder.add(HangingFruit.STAGE, HangingFruit.PHASE);
     }
 
-    /** A bunch put by hand fruits on its own place's timetable (a palm's own bunches are given their palm's). */
+    /** A bunch put by hand fruits on its own place's timetable (a palm's own bunches are given their palm's) and starts bare (review R7-28). */
     @Override
     public BlockState getStateForPlacement(BlockPlaceContext context) {
-        return defaultBlockState().setValue(HangingFruit.PHASE, HangingFruit.phaseOf(context.getClickedPos().asLong()));
+        return defaultBlockState().setValue(HangingFruit.STAGE, HangingFruit.BARE).setValue(HangingFruit.PHASE, HangingFruit.phaseOf(context.getClickedPos().asLong()));
     }
 
     @Override

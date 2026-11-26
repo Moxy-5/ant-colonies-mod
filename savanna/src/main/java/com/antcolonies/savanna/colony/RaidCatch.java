@@ -50,6 +50,25 @@ public final class RaidCatch {
         return best;
     }
 
+    /**
+     * The brain while away (2026-11-11, my pick): whether no living termite colony's mound is on record within the
+     * Matabele scouts' reach. Matabele only live where living termites are near (new land's rule), so this means the
+     * termites' land has not been made yet: their colony is put in when a player first comes near their mound. Until
+     * then the scouts and raids of a colony out of sight hunt by the land, as the far termites forage by it
+     * ({@code FieldLife.forageByTheLand}): a raid brings home its catch with no colony's count to take it from. Without
+     * this a Matabele colony at the rim of the land a player has seen found nothing and starved in four days (the soaks
+     * of 2026-11-11, 3 far colonies of 8).
+     */
+    static boolean noTermitesOnRecord(ServerLevel level, Colony matabele) {
+        int range = matabele.part(SavannaParts.RAIDS).map(raids -> raids.scouts().range()).orElse(96);
+        for (Colony termites : Raids.termiteColonies(level, matabele.getCenter(), range)) {
+            if (termites.getCount(Caste.WORKER) > 0) {
+                return false;
+            }
+        }
+        return true;
+    }
+
     /** How many termites this many raiders going as numbers could carry home: {@code per_raider} each, a quarter more or less, at most {@code most_catch}. */
     static int couldCarry(Colony matabele, int raiders, RandomSource random) {
         if (raiders <= 0) {

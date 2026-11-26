@@ -7,7 +7,7 @@ import net.minecraft.nbt.CompoundTag;
  * keeps no map of searched land): its favourite direction out of the nest, which it goes back to trip after trip (route
  * and site fidelity in ponerine ants, Fresneau 1985), how far out it searches now (its reach), how many trips in a row it
  * came home empty, and how far out its last find was. Saved on the ant. The rules that change it are in
- * {@code colony.Raids} ({@code cameHomeEmpty}, {@code foundBy}); the walk that uses it is {@code MatabeleScoutGoal}.
+ * {@code colony.Scouts} ({@code cameHomeEmpty}, {@code foundBy}); the walk that uses it is {@code MatabeleScoutGoal}.
  */
 public final class ScoutMemory {
     private static final String TAG = "matabeleScout";
@@ -18,8 +18,6 @@ public final class ScoutMemory {
     private int reach;
     /** Trips in a row it searched and came home empty. */
     private int emptyTrips;
-    /** How far from the nest its last find was (blocks), -1 none. */
-    private int lastFind = -1;
 
     public boolean hasHeading() {
         return !Double.isNaN(heading);
@@ -50,14 +48,6 @@ public final class ScoutMemory {
         this.emptyTrips = emptyTrips;
     }
 
-    public int lastFind() {
-        return lastFind;
-    }
-
-    public void setLastFind(int lastFind) {
-        this.lastFind = lastFind;
-    }
-
     /** An angle brought into 0 to a full turn. */
     public static double wrap(double angle) {
         double full = Math.PI * 2;
@@ -75,7 +65,6 @@ public final class ScoutMemory {
         }
         mine.putInt("reach", reach);
         mine.putInt("emptyTrips", emptyTrips);
-        mine.putInt("lastFind", lastFind);
         tag.put(TAG, mine);
     }
 
@@ -87,6 +76,5 @@ public final class ScoutMemory {
         heading = mine.contains("heading") ? wrap(mine.getDouble("heading")) : Double.NaN;
         reach = mine.getInt("reach");
         emptyTrips = mine.getInt("emptyTrips");
-        lastFind = mine.contains("lastFind") ? mine.getInt("lastFind") : -1;
     }
 }

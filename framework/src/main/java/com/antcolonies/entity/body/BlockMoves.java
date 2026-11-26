@@ -96,7 +96,7 @@ public final class BlockMoves {
          * into the shallows, out of them onto a bank): never cut for being in water. Optional in the file.
          */
         public final boolean wades;
-        public final int endLevel, wetTick, ticks;
+        public final int endLevel, wetTick;
         private final float[][] rise, along;
 
         private Move(JsonObject o) {
@@ -109,9 +109,22 @@ public final class BlockMoves {
             wades = o.has("wades") && o.get("wades").getAsBoolean();
             endLevel = o.has("end_level") ? o.get("end_level").getAsInt() : 0;
             wetTick = o.get("wet_tick").getAsInt();
-            ticks = o.get("ticks").getAsInt();
             rise = rows(o.getAsJsonArray("rise"));
             along = rows(o.getAsJsonArray("along"));
+            for (int size = 0; size < rise.length; size++) {
+                if (size >= along.length || rise[size].length != along[size].length || rise[size].length < 2) {
+                    throw new IllegalStateException("block move " + name + ": the rise and along rows of size " + size + " differ in length");
+                }
+            }
+        }
+
+        /**
+         * How long the move is for this size (ticks of its clip): its own path's length. A bigger animal's clip may be
+         * longer (the monitor's walk into the water), so there is no one length for the move (review R9-38: the file's
+         * single {@code ticks}, the smallest size's, ended the move early for every bigger size).
+         */
+        public int ticks(int size) {
+            return rise[size].length - 1;
         }
 
         /** Its clip's name for this size (an index into the file's sizes). */
@@ -389,7 +402,7 @@ public final class BlockMoves {
         double to = m.goesDown ? back - 0.5 : back + 0.5;
         double blockY = m.goesDown ? -0.5 : m.endLevel - 0.5;
         BlockPos step = BlockPos.containing(p.x() + p.dirX() * to, p.y() + blockY, p.z() + p.dirZ() * to);
-        int end = m.ticks + (m.endsAfloat || !rest ? 0 : data.rest);
+        int end = m.ticks(p.size()) + (m.endsAfloat || !rest ? 0 : data.rest);
         if (ticks > end) {
             return Step.DONE;
         }
@@ -414,7 +427,7 @@ public final class BlockMoves {
         mob.setYRot(yaw);
         mob.yBodyRot = yaw;
         mob.yHeadRot = yaw;
-        if (ticks >= m.ticks && m.endsAfloat) {
+        if (ticks >= m.ticks(p.size()) && m.endsAfloat) {
             // afloat: it glides on at the move's last speed into the swim
             double v = m.endSpeed(p.size()) * pxToBlocks;
             mob.setDeltaMovement(p.dirX() * v, 0.0, p.dirZ() * v);

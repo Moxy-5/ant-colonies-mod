@@ -289,14 +289,14 @@ public class MatabeleCommands {
             source.sendFailure(Component.literal("No Matabele colony within 64 blocks (/antcolonies matabele <workers> makes one)."));
             return 0;
         }
-        MatabeleEntity scout = raids.sendNow(level, anyHour);
+        MatabeleEntity scout = raids.scouts().sendNow(level, anyHour);
         if (scout == null) {
             source.sendFailure(Component.literal("No major there fit to scout (real ones only; not hurt, fighting or hungry)."));
             return 0;
         }
         source.sendSuccess(() -> Component.literal("A scout (a major at " + scout.blockPosition().toShortString()
                 + ") sets out from the Matabele nest at " + colony.getCenter().toShortString() + ", searching up to "
-                + raids.range() + " blocks out; /antcolonies list shows what the scouts found"
+                + raids.scouts().range() + " blocks out; /antcolonies list shows what the scouts found"
                 + (anyHour ? ". Its find raids at once, whatever the hour." : ". Its find raids in the raid hours (6 to 11, 16 to 19), else waits for them.")), false);
         return 1;
     }
@@ -376,7 +376,7 @@ public class MatabeleCommands {
             source.sendFailure(Component.literal("Its scouts know no termites yet (/antcolonies scout sends one; it raids by itself when home with a find)."));
             return 0;
         }
-        com.antcolonies.savanna.colony.RaidColumn column = raids.raidNow(level);
+        com.antcolonies.savanna.colony.Raid column = raids.raidNow(level);
         if (column == null) {
             String why = raids.whyNoRaid();
             source.sendFailure(Component.literal("No raid: " + (why != null ? why : "nobody there fit to raid (real workers only; not hurt, clamped or fighting)") + "."));
@@ -390,6 +390,8 @@ public class MatabeleCommands {
 
     /** The demo raid's trail when no length is given: the nearest termite mound is 40 or more blocks off (the user, 2026-11-08). */
     private static final int DEMO_TRAIL = 40;
+    /** The demo raid's termites: workers of no colony put at the trail's end for the raid to find. */
+    private static final int DEMO_TERMITES = 6;
 
     /**
      * A raid march to watch (2026-11-08, for the in-game film, {@code tools/film/raid_march.film}, and the user's own
@@ -397,8 +399,9 @@ public class MatabeleCommands {
      * major is the scout, home from a find and standing two blocks from the entrance (tagged {@code raid_scout}, so the
      * film's camera can ride along with it); every other real ant is put in the nest's rooms, so they come out of the
      * hole behind it; a straight trail of {@code blocks} is laid the way given, else the way of eight with the plainest
-     * ground ({@link #climbing}); and the raid sets out at once, whatever the hour. No termites wait at the trail's
-     * end: it is for watching the way out and the march.
+     * ground ({@link #climbing}); and the raid sets out at once, whatever the hour. Six termite workers of no colony
+     * are put at the trail's end (the raid rewrite, 2026-11-24: no raid sets out to a spot with no termite), so the
+     * demo is a whole raid: muster, march, halt, attack, regroup and home with the prey.
      */
     private static int demo(CommandSourceStack source, int blocks, @Nullable Direction way) {
         ServerLevel level = source.getLevel();
@@ -464,7 +467,17 @@ public class MatabeleCommands {
                     BlockPos.containing(entrance.getX() + 0.5 + cos * t, entrance.getY(), entrance.getZ() + 0.5 + sin * t)));
         }
         BlockPos at = trail.get(trail.size() - 1);
-        com.antcolonies.savanna.colony.RaidColumn column = raids.raidForTests(level, at, 6, trail, scout.getUUID());
+        for (int i = 0; i < DEMO_TERMITES; i++) {
+            BlockPos cell = com.antcolonies.savanna.colony.RaidGround.standAt(level, at.getX() + 0.5 + Math.cos(i * 1.05) * 1.5,
+                    at.getZ() + 0.5 + Math.sin(i * 1.05) * 1.5, at.getY());
+            com.antcolonies.savanna.entity.TermiteWorkerEntity termite = com.antcolonies.savanna.registry.SavannaEntities.TERMITE_WORKER.get().create(level);
+            if (cell != null && termite != null) {
+                termite.moveTo(cell.getX() + 0.5, cell.getY(), cell.getZ() + 0.5, i * 60.0F, 0.0F);
+                termite.keepOutOfColonies();
+                level.addFreshEntity(termite);
+            }
+        }
+        com.antcolonies.savanna.colony.Raid column = raids.raidForTests(level, at, 6, trail, scout.getUUID());
         if (column == null) {
             String why = raids.whyNoRaid();
             source.sendFailure(Component.literal("No raid: " + (why != null ? why : "nobody there fit to raid") + "."));
@@ -474,7 +487,7 @@ public class MatabeleCommands {
                 column.members().size(), entrance.toShortString(), by.toShortString(), blocks, at.toShortString());
         source.sendSuccess(() -> Component.literal("A demo raid of " + column.members().size() + " real ants sets out from the nest at "
                 + entrance.toShortString() + " along a " + blocks + "-block trail to " + at.toShortString()
-                + " (no termites there); the scout is tagged raid_scout."), false);
+                + " (" + DEMO_TERMITES + " termites put there); the scout is tagged raid_scout."), false);
         return 1;
     }
 

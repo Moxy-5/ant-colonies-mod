@@ -1,5 +1,6 @@
 package com.antcolonies.savanna.colony;
 
+import java.util.ArrayList;
 import java.util.List;
 
 import com.antcolonies.colony.GroundTop;
@@ -10,8 +11,8 @@ import net.minecraft.util.Mth;
 
 /**
  * A line of points (block middles) with the distance walked along it to each (blocks, flat): a raid column's way out
- * and home along its scent trail ({@link RaidColumn}), and an ant's walk home along a trail by itself ({@link WayHome}).
- * Taken out of {@code RaidColumn} in the raid tidy-up (2026-11-07; R9's "{@code Route} in its own file"), nothing
+ * and home along its scent trail ({@link Raid}), and an ant's walk home along a trail by itself ({@link WayHome}).
+ * Taken out of {@code Raid} in the raid tidy-up (2026-11-07; R9's "{@code Route} in its own file"), nothing
  * changed in it: ready to move into the framework with the trail store (R10).
  */
 final class Route {
@@ -23,8 +24,8 @@ final class Route {
     /** The distances walked to each point, climbs and drops counted (the raid queue fix). */
     private final double[] walks;
 
-    Route(List<BlockPos> points) {
-        this.points = List.copyOf(points);
+    Route(List<BlockPos> line) {
+        this.points = List.copyOf(withoutLoops(line));
         int n = points.size();
         xs = new double[n];
         zs = new double[n];
@@ -38,6 +39,30 @@ final class Route {
             sums[i] = i == 0 ? 0.0 : sums[i - 1] + Math.hypot(xs[i] - xs[i - 1], zs[i] - zs[i - 1]);
             walks[i] = i == 0 ? 0.0 : walks[i - 1] + Math.hypot(sums[i] - sums[i - 1], ys[i] - ys[i - 1]);
         }
+    }
+
+    /**
+     * BUGS 356: the line without its loops. A scout's line can leave itself and come back to the same cell (a little spur
+     * two blocks out and back, a ring round a bush). "How far along is this ant" is the nearest place on the line, and on
+     * the cell where a loop closes that is the first pass: a column's front, told to the place after the loop, stood on
+     * it, counted as still before the loop for good, and the whole column stood behind it till its deadline. So where a
+     * later point touches an earlier one (the same cell or the one beside it, no more than a block up or down), what lies
+     * between is left out: an ant on a scent trail that meets itself goes on, it does not walk the loop.
+     */
+    static List<BlockPos> withoutLoops(List<BlockPos> line) {
+        List<BlockPos> kept = new ArrayList<>();
+        for (int i = 0; i < line.size(); i++) {
+            BlockPos p = line.get(i);
+            kept.add(p);
+            for (int j = line.size() - 1; j > i + 1; j--) {
+                BlockPos q = line.get(j);
+                if (Math.abs(q.getX() - p.getX()) + Math.abs(q.getZ() - p.getZ()) <= 1 && Math.abs(q.getY() - p.getY()) <= 1) {
+                    i = q.getX() == p.getX() && q.getZ() == p.getZ() ? j : j - 1; // (the line goes on from the later point)
+                    break;
+                }
+            }
+        }
+        return kept.size() < 2 ? line : kept;
     }
 
     /** The cell to stand in at this place along the line, {@code side} blocks to its right; the line's own point if none. */

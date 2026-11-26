@@ -16,8 +16,9 @@ import com.antcolonies.watch.GeneralRules;
 import com.antcolonies.watch.Watch;
 import com.antcolonies.savanna.colony.NewLandMounds;
 import com.antcolonies.savanna.colony.PreyPile;
-import com.antcolonies.savanna.colony.RaidColumn;
+import com.antcolonies.savanna.colony.Raid;
 import com.antcolonies.savanna.colony.Raids;
+import com.antcolonies.savanna.colony.Scouts;
 import com.antcolonies.savanna.colony.SavannaParts;
 import com.antcolonies.savanna.command.MatabeleCommands;
 import com.antcolonies.savanna.entity.MatabeleEntity;
@@ -41,12 +42,72 @@ import net.neoforged.neoforge.gametest.GameTestHolder;
 import net.neoforged.neoforge.gametest.PrefixGameTestTemplate;
 
 /**
- * M8 step 3, the Matabele raids ({@code colony.Raids}). Step 3a, the scouts; step 3b, the column ({@code colony.RaidColumn});
+ * M8 step 3, the Matabele raids ({@code colony.Raids}). Step 3a, the scouts; step 3b, the column ({@code colony.Raid});
  * step 3c, home with the prey (the stung termites carried home onto the prey pile, the empty raid spreading out, limpers).
  */
 @GameTestHolder(SavannaMod.MODID)
 @PrefixGameTestTemplate(false)
 public class MatabeleRaidTests {
+    /**
+     * BUGS 354: an ant going home walks each walk to its end before it takes the next place. Its place is asked afresh
+     * every tick (a little ahead of it along the trail); taking each new answer at once, a walk was dropped and begun
+     * again every block or two, and where the answer jumped (beside a bend, at the trail's end) an ant on the lip of a
+     * step began the step again for good. Here: one sent home along a trail with a bend drops no walk under way.
+     */
+    @GameTest(template = "arena", timeoutTicks = 3000, skyAccess = true, batch = "matabele_way_home")
+    public static void anAntGoingHomeWalksEachWalkToItsEnd(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        int middle = TestScenes.MIDDLE;
+        TestScenes.deepGround(helper);
+        TestClock.still(helper, 13.0); // (between the raid hours: no scout's find starts a raid)
+        MatabeleScenes.deadMound(helper, middle, middle);
+        Colony colony = MatabeleScenes.colony(helper, middle + 9, middle, 30);
+        Raids raids = colony.part(SavannaParts.RAIDS).orElseThrow();
+        List<BlockPos> line = new ArrayList<>();
+        for (int i = 8; i <= 34; i++) { // (the nest end first: east along the row, then slanting off south)
+            line.add(helper.absolutePos(new BlockPos(middle + i, SURFACE + 1, middle + Math.max(0, i - 20))));
+        }
+        MatabeleEntity[] out = new MatabeleEntity[1];
+        BlockPos[] walking = new BlockPos[1];
+        int[] walks = {0}, dropped = {0};
+        helper.onEachTick(() -> {
+            if (helper.getTick() < 5) {
+                return;
+            }
+            if (out[0] == null) {
+                out[0] = com.antcolonies.gametest.TestIsolation.insectsOf(level, colony, MatabeleEntity.class).stream()
+                        .filter(mob -> mob.nestCaste() != null && mob.isAlive() && !raids.scouts().isScouting(mob.getUUID()))
+                        .findFirst().orElse(null);
+                helper.assertTrue(out[0] != null, "the colony has no real worker that is no scout");
+                BlockPos end = line.get(line.size() - 1);
+                raids.trails().lay(level, colony.getCenter(), end, line, level.getGameTime(), false);
+                out[0].teleportTo(end.getX() + 0.5, end.getY(), end.getZ() + 0.5);
+                raids.sendHome(level, out[0], "test");
+                helper.assertTrue(raids.isGoingHome(out[0].getUUID()), "the ant out in the field was not sent home");
+                return;
+            }
+            if (!raids.isGoingHome(out[0].getUUID())) {
+                return;
+            }
+            BlockPos goal = out[0].getNavigator().isDone() ? null : out[0].getNavigator().getGoal();
+            if (goal != null && !goal.equals(walking[0])) {
+                walks[0]++;
+                // (a walk that ended and the next begun in one tick is no drop: a dropped one's end was still far off)
+                if (walking[0] != null && Math.sqrt(out[0].blockPosition().distSqr(walking[0])) > 3.0) {
+                    dropped[0]++;
+                }
+            }
+            walking[0] = goal;
+        });
+        helper.succeedWhen(() -> {
+            helper.assertTrue(out[0] != null && out[0].isAlive() && !raids.isGoingHome(out[0].getUUID()),
+                    "the ant sent home along the trail is not home yet (" + walks[0] + " walks, " + dropped[0] + " dropped; at "
+                            + (out[0] == null ? "?" : out[0].blockPosition().toShortString()) + ", the nest " + colony.getCenter().toShortString() + ")");
+            helper.assertTrue(walks[0] >= 3, "it was to come home along the trail in several walks, not " + walks[0]);
+            helper.assertTrue(dropped[0] == 0, dropped[0] + " of its " + walks[0] + " walks home were dropped under way for a new one");
+        });
+    }
+
     /** The nest's middle in this scene (away from the arena's edges, so every slice round it has ground). */
     private static final int NEST = 20;
 
@@ -90,7 +151,7 @@ public class MatabeleRaidTests {
         boolean[] pushed = {false};
         java.util.Set<java.util.UUID> scouted = new java.util.HashSet<>();
         helper.onEachTick(() -> {
-            colony.population().realMembers(level).stream().filter(ant -> raids.isScouting(ant.getUUID()))
+            colony.population().realMembers(level).stream().filter(ant -> raids.scouts().isScouting(ant.getUUID()))
                     .forEach(ant -> scouted.add(ant.getUUID()));
             if (outAt[0] < 0 && !scouted.isEmpty()) {
                 outAt[0] = helper.getTick();
@@ -110,10 +171,10 @@ public class MatabeleRaidTests {
                         helper.assertTrue(scout != null && scout.scoutRunningForTests(), "the scout's goal is not running yet");
                         helper.assertTrue(scout.pushScoutAsideForTests(), "the scout's goal could not be pushed aside");
                         pushed[0] = true;
-                        helper.assertTrue(raids.isScouting(scout.getUUID()), "a scout pushed aside for a moment gave its trip up");
+                        helper.assertTrue(raids.scouts().isScouting(scout.getUUID()), "a scout pushed aside for a moment gave its trip up");
                     }
                     MatabeleEntity scout = scoutNamed(level, colony, scouted.iterator().next());
-                    helper.assertTrue(scout != null && raids.isScouting(scout.getUUID()), "a scout pushed aside gave its trip up");
+                    helper.assertTrue(scout != null && raids.scouts().isScouting(scout.getUUID()), "a scout pushed aside gave its trip up");
                     helper.assertTrue(scout.scoutRunningForTests(), "the pushed-aside scout has not taken its trip up again yet");
                 })
                 .thenWaitUntil(() -> helper.assertTrue(!raids.finds().isEmpty(), "no find yet; " + raids.describe(level)))
@@ -131,7 +192,7 @@ public class MatabeleRaidTests {
                     for (int i = 1; i < line.size(); i++) {
                         helper.assertTrue(line.get(i).closerThan(line.get(i - 1), 5), "a gap in the scent line at point " + i);
                     }
-                    helper.assertTrue(find.scout() != null && scouted.contains(find.scout()) && raids.isVeteran(find.scout()),
+                    helper.assertTrue(find.scout() != null && scouted.contains(find.scout()) && raids.scouts().isVeteran(find.scout()),
                             "the find does not name its scout as one of the colony's scouts");
                     helper.assertTrue(raids.column() == null, "a raid left at 13:00, between the raid hours; " + raids.describe(level));
                     helper.assertTrue(raids.waiting() == find, "the 13:00 find is not waiting for the raid hours; " + raids.describe(level));
@@ -145,7 +206,7 @@ public class MatabeleRaidTests {
                 })
                 .thenWaitUntil(() -> {
                     Raids.Find find = raids.finds().get(0);
-                    RaidColumn column = raids.column();
+                    Raid column = raids.column();
                     helper.assertTrue(column != null && column.leader().equals(find.scout()) && column.find() == find,
                             "in the raid hours the waiting find's scout led no raid there; " + raids.describe(level));
                     helper.assertTrue(raids.waiting() == null, "the find still waits with its raid out");
@@ -155,8 +216,8 @@ public class MatabeleRaidTests {
                 .thenExecute(() -> {
                     // (scouts search like real ants: after its find 10 blocks out the scout's reach is back to the first range)
                     MatabeleEntity scout = scoutNamed(level, colony, raids.finds().get(0).scout());
-                    helper.assertTrue(scout != null && scout.scoutMemory().reach(32) == 32 && raids.range() == 32,
-                            "the scout's reach is " + (scout == null ? "?" : scout.scoutMemory().reach(32)) + ", the colony's " + raids.range()
+                    helper.assertTrue(scout != null && scout.scoutMemory().reach(32) == 32 && raids.scouts().range() == 32,
+                            "the scout's reach is " + (scout == null ? "?" : scout.scoutMemory().reach(32)) + ", the colony's " + raids.scouts().range()
                                     + ", though termites were found 10 blocks out");
                 })
                 .thenExecute(() -> helper.assertTrue(scouted.size() == 1,
@@ -186,7 +247,7 @@ public class MatabeleRaidTests {
         helper.assertTrue(colony.getCenter().getY() - ground > 12, "the dead mound is only " + (colony.getCenter().getY() - ground)
                 + " blocks over the land: not the tall mound of the report");
         double[] farthest = {0.0};
-        helper.onEachTick(() -> colony.population().realMembers(level).stream().filter(ant -> raids.isScouting(ant.getUUID()))
+        helper.onEachTick(() -> colony.population().realMembers(level).stream().filter(ant -> raids.scouts().isScouting(ant.getUUID()))
                 .forEach(ant -> farthest[0] = Math.max(farthest[0], Math.hypot(ant.getX() - colony.getCenter().getX() - 0.5,
                         ant.getZ() - colony.getCenter().getZ() - 0.5))));
         helper.succeedWhen(() -> helper.assertTrue(farthest[0] >= 24, "the scouts got only " + Math.round(farthest[0])
@@ -219,7 +280,7 @@ public class MatabeleRaidTests {
         Colony colony = MatabeleScenes.colony(helper, NEST + 6, NEST, 20);
         Raids raids = colony.part(SavannaParts.RAIDS).orElse(null);
         helper.assertTrue(raids != null, "a Matabele colony has no raids part");
-        RaidColumn[] column = {null};
+        Raid[] column = {null};
         List<MatabeleEntity> raiders = new ArrayList<>();
         int[] marchTicks = {0};
         int[] leaderBehind = {0};
@@ -238,7 +299,7 @@ public class MatabeleRaidTests {
         IdleWatch waits = new IdleWatch("raid's waits");
         java.util.Map<java.util.UUID, Long> atPlaceSince = new java.util.HashMap<>();
         helper.onEachTick(() -> {
-            RaidColumn raid = column[0];
+            Raid raid = column[0];
             if (raid == null) {
                 return;
             }
@@ -260,7 +321,7 @@ public class MatabeleRaidTests {
                 helper.fail("a hungry raider in the column went to eat: " + hungry[0].runningGoals());
             }
             // Finding 1: one raider out of sight 10 s on the march (less than the minute's grace): kept, then back.
-            if (hidden[0] == null && raid.stage() == RaidColumn.Stage.MARCHING && level.getEntity(raid.leader()) instanceof MatabeleEntity front
+            if (hidden[0] == null && raid.stage() == Raid.Stage.MARCH_OUT && level.getEntity(raid.leader()) instanceof MatabeleEntity front
                     && raid.alongOut(front.blockPosition()) > 6.0) {
                 for (java.util.UUID id : raid.members()) {
                     if (!id.equals(raid.leader()) && (hungry[0] == null || !id.equals(hungry[0].getUUID()))
@@ -280,7 +341,7 @@ public class MatabeleRaidTests {
                     helper.fail("a raider out of sight 10 s (less than the grace) was dropped from the column; " + raid.describe());
                 }
             }
-            if (raid.stage() == RaidColumn.Stage.MARCHING && level.getEntity(raid.leader()) instanceof MatabeleEntity leader
+            if (raid.stage() == Raid.Stage.MARCH_OUT && level.getEntity(raid.leader()) instanceof MatabeleEntity leader
                     && !raid.isCasting(raid.leader()) // (R4: casting about at the gap, the front's helpers range ahead of it)
                     && raid.isOutForTests(level, leader)) { // (the scout calls down in the nest, then comes out first: from then on)
                 marchTicks[0]++;
@@ -300,7 +361,7 @@ public class MatabeleRaidTests {
                     leaderBehind[0]++;
                 }
             }
-            if (!rankChecked[0] && raid.stage() == RaidColumn.Stage.MARCHING && !raiders.isEmpty()) {
+            if (!rankChecked[0] && raid.stage() == Raid.Stage.MARCH_OUT && !raiders.isEmpty()) {
                 // Food first for the minors; M8 step 3S: a major ranks the soldiers with the workers (Corbara and Dejean 2000).
                 for (MatabeleEntity raider : raiders) {
                     if (!raider.isAlive() || !raider.isInAColumn()) {
@@ -322,7 +383,7 @@ public class MatabeleRaidTests {
                 .thenExecute(() -> {
                     BlockPos entrance = colony.getCenter();
                     MatabeleEntity scout = colony.population().realMembers(level).stream()
-                            .filter(ant -> ant instanceof MatabeleEntity matabele && matabele.hasMajorBody() && !raids.isScouting(ant.getUUID()))
+                            .filter(ant -> ant instanceof MatabeleEntity matabele && matabele.hasMajorBody() && !raids.scouts().isScouting(ant.getUUID()))
                             .map(ant -> (MatabeleEntity) ant)
                             .findFirst().orElse(null);
                     helper.assertTrue(scout != null, "no real major to be the scout");
@@ -336,11 +397,11 @@ public class MatabeleRaidTests {
                         trail.add(level.getHeightmapPos(net.minecraft.world.level.levelgen.Heightmap.Types.MOTION_BLOCKING_NO_LEAVES,
                                 new BlockPos(x, entrance.getY(), z)));
                     }
-                    RaidColumn raid = raids.raidForTests(level, at, 2, trail, scout.getUUID());
+                    Raid raid = raids.raidForTests(level, at, 2, trail, scout.getUUID());
                     helper.assertTrue(raid != null, "no raid set out; " + raids.describe(level));
                     helper.assertTrue(raid.leader().equals(scout.getUUID()), "the raid is not led by the find's scout");
                     helper.assertTrue(raid.members().size() == 10, "a raid of " + raid.members().size() + " real ants, not 10 (worth 2 of a rich 6 is a third of the spare 15, at least 10)");
-                    helper.assertTrue(flat(raid.gatheringPlace(), at) >= 4.0, "the gathering place is not short of the termites");
+                    helper.assertTrue(flat(raid.haltingPlace(), at) >= 4.0, "the gathering place is not short of the termites");
                     for (java.util.UUID id : raid.members()) {
                         if (level.getEntity(id) instanceof MatabeleEntity ant) {
                             raiders.add(ant);
@@ -357,10 +418,10 @@ public class MatabeleRaidTests {
                     level.setBlockAndUpdate(blocked[0], Blocks.STONE.defaultBlockState());
                     SavannaMod.LOGGER.info("[raid test] set out: {}", raids.describe(level));
                 })
-                .thenWaitUntil(() -> helper.assertTrue(column[0].stage().ordinal() >= RaidColumn.Stage.ATTACKING.ordinal(),
+                .thenWaitUntil(() -> helper.assertTrue(column[0].stage().ordinal() >= Raid.Stage.ATTACK.ordinal(),
                         "the column did not reach the termites; " + raids.describe(level)))
                 .thenExecute(() -> {
-                    RaidColumn raid = column[0];
+                    Raid raid = column[0];
                     helper.assertTrue(raid.attackedAt() >= 0, "no attack");
                     helper.assertTrue(raid.gatheredAtAttack() * 2 >= raid.members().size(),
                             "only " + raid.gatheredAtAttack() + " of " + raid.members().size() + " bunched up before the attack");
@@ -379,7 +440,7 @@ public class MatabeleRaidTests {
                                 && ant.holdsBreach() != null && !(ant == hidden[0] && hiddenAt[0] >= 0)),
                         "no major began to break the termites' mud open; " + raids.describe(level)))
                 .thenExecute(() -> {
-                    RaidColumn raid = column[0];
+                    Raid raid = column[0];
                     hurt[0] = raiders.stream().filter(ant -> ant.isAlive() && raid.has(ant.getUUID()) && ant.holdsBreach() != null
                                     && !(ant == hidden[0] && hiddenAt[0] >= 0)).findFirst().orElse(null);
                     helper.assertTrue(hurt[0] != null, "no raider to hurt at the spot");
@@ -393,7 +454,7 @@ public class MatabeleRaidTests {
                         "no termite worker stung; " + raids.describe(level)))
                 .thenWaitUntil(() -> helper.assertTrue(raids.column() == null, "the raid is not home yet; " + raids.describe(level)))
                 .thenExecute(() -> {
-                    RaidColumn raid = column[0];
+                    Raid raid = column[0];
                     helper.assertTrue(raid.cameHome() >= 1, "nobody came home with the column: " + raid.endedWhy());
                     helper.assertTrue(hiddenKept[0], "no raider was out of sight on the march and kept in the column");
                     // R4: the gap was met and crossed, the trail mended and walked by the column.
@@ -434,7 +495,7 @@ public class MatabeleRaidTests {
                 .thenWaitUntil(() -> helper.assertTrue(raiders.stream().noneMatch(ant -> ant.isAlive() && ant.isCarrying(MatabeleLoads.TERMITES)),
                         "a raider still holds its termites; " + colony.part(SavannaParts.PREY_PILE).map(pile -> pile.describe(level)).orElse("no pile")))
                 .thenExecute(() -> {
-                    RaidColumn raid = column[0];
+                    Raid raid = column[0];
                     PreyPile pile = colony.part(SavannaParts.PREY_PILE).orElse(null);
                     helper.assertTrue(pile != null, "a Matabele colony has no prey pile");
                     boolean anyDied = raiders.stream().anyMatch(ant -> !ant.isAlive());
@@ -457,40 +518,37 @@ public class MatabeleRaidTests {
     }
 
     /**
-     * Step 3c, the empty raid: a raid to a find where no termite is any more (the log is there, the termites gone) bunches
-     * up and attacks nothing, spreads round the spot a while looking, then comes home empty; the find counts one empty
-     * check. A raider crippled on the march (3 legs gone) leaves the column and limps home along the trail by itself;
+     * A raider crippled on the march (3 legs gone) leaves the column and limps home along the trail by itself;
      * M8 step 3S: so does one badly wounded (below 40 percent of its health, every leg kept).
+     * (The raid rewrite, 2026-11-24: this was the empty raid's test too, a raid to a log the termites had left, which
+     * spread out round the spot and came home empty. No raid sets out to such a spot any more, and a spot that empties
+     * on the march means a short look and home: both are scenes of {@code MatabeleRaidChainTests}. The termites stay
+     * here, so the raid attacks and the checks below stand.)
      * The raid code review, finding 4: a survival player stands on the entrance while the raid forms: raiders milling
      * there are called away to defend the nest, stay in the column and rejoin it once the player is gone, and at the
      * spot the raid's own fight orders stand (the nest's defence never ends them).
      */
     @GameTest(template = "arena", timeoutTicks = 14000, skyAccess = true, batch = "matabele_raids")
-    public static void aRaidThatFindsNoTermitesSpreadsOutThenComesHomeEmptyAndALimperFollowsTheTrailHome(GameTestHelper helper) {
+    public static void aLimperFollowsTheTrailHomeAndRaidersCalledToDefendRejoinTheRaid(GameTestHelper helper) {
         ServerLevel level = helper.getLevel();
         level.getServer().tickRateManager().setTickRate(2000.0F);
         TestScenes.shapeGround(helper, 45, (x, z) -> 0);
         Colony dead = MatabeleScenes.deadMound(helper, NEST, NEST);
-        List<TermiteWorkerEntity> gone = MatabeleScenes.feedingUnderALog(helper, 36, NEST + 4);
-        BlockPos at = gone.get(0).blockPosition();
-        gone.forEach(termite -> termite.discard()); // (the termites have left the log)
+        List<TermiteWorkerEntity> feeding = MatabeleScenes.feedingUnderALog(helper, 36, NEST + 4);
+        BlockPos at = feeding.get(0).blockPosition();
         Colony colony = MatabeleScenes.colony(helper, NEST + 6, NEST, 20);
         Raids raids = colony.part(SavannaParts.RAIDS).orElse(null);
         helper.assertTrue(raids != null, "a Matabele colony has no raids part");
-        RaidColumn[] column = {null};
+        Raid[] column = {null};
         Raids.Find[] find = {null};
         MatabeleEntity[] limper = {null};
         MatabeleEntity[] wounded = {null};
-        boolean[] spread = {false};
         int[] columnOrders = {0};
         net.minecraft.server.level.ServerPlayer player = MatabeleDefenceTests.survivalPlayer(helper);
         MatabeleDefenceTests.stand(player, colony.getCenter().offset(0, 0, 40));
         helper.onEachTick(() -> {
-            if (column[0] != null && column[0].stage() == RaidColumn.Stage.SPREADING) {
-                spread[0] = true;
-            }
-            RaidColumn raid = column[0];
-            if (raid != null && raid.stage() == RaidColumn.Stage.ATTACKING && raid.attackedAt() >= 0 && level.getGameTime() - raid.attackedAt() >= 40) {
+            Raid raid = column[0];
+            if (raid != null && raid.stage() == Raid.Stage.ATTACK && raid.attackedAt() >= 0 && level.getGameTime() - raid.attackedAt() >= 40) {
                 int holding = 0;
                 for (java.util.UUID id : raid.members()) {
                     if (level.getEntity(id) instanceof MatabeleEntity ant && raid.fightsForTheColumn(ant)) {
@@ -505,7 +563,7 @@ public class MatabeleRaidTests {
                 .thenExecute(() -> {
                     BlockPos entrance = colony.getCenter();
                     MatabeleEntity scout = colony.population().realMembers(level).stream()
-                            .filter(ant -> ant instanceof MatabeleEntity matabele && matabele.hasMajorBody() && !raids.isScouting(ant.getUUID()))
+                            .filter(ant -> ant instanceof MatabeleEntity matabele && matabele.hasMajorBody() && !raids.scouts().isScouting(ant.getUUID()))
                             .map(ant -> (MatabeleEntity) ant)
                             .findFirst().orElse(null);
                     helper.assertTrue(scout != null, "no real major to be the scout");
@@ -518,7 +576,7 @@ public class MatabeleRaidTests {
                         trail.add(level.getHeightmapPos(net.minecraft.world.level.levelgen.Heightmap.Types.MOTION_BLOCKING_NO_LEAVES,
                                 new BlockPos(x, entrance.getY(), z)));
                     }
-                    RaidColumn raid = raids.raidForTests(level, at, 2, trail, scout.getUUID());
+                    Raid raid = raids.raidForTests(level, at, 2, trail, scout.getUUID());
                     helper.assertTrue(raid != null, "no raid set out; " + raids.describe(level));
                     column[0] = raid;
                     find[0] = raid.find();
@@ -527,17 +585,17 @@ public class MatabeleRaidTests {
                 .thenWaitUntil(() -> helper.assertTrue(column[0].members().stream().anyMatch(column[0]::isDrafted),
                         "no raider milling at the entrance was called to defend the nest; " + raids.describe(level) + column[0].describe()))
                 .thenExecute(() -> {
-                    helper.assertTrue(column[0].stage() == RaidColumn.Stage.FORMING || column[0].stage() == RaidColumn.Stage.MARCHING,
+                    helper.assertTrue(column[0].stage() == Raid.Stage.MUSTER || column[0].stage() == Raid.Stage.MARCH_OUT,
                             "the raid was at " + column[0].stage() + " when its raiders were called to defend");
                     MatabeleDefenceTests.stand(player, colony.getCenter().offset(0, 0, 40)); // (gone: the defence ends)
                 })
                 .thenWaitUntil(() -> helper.assertTrue(column[0].members().stream().noneMatch(column[0]::isDrafted),
                         "a raider called to defend did not come back to the column; " + column[0].describe()))
-                .thenWaitUntil(() -> helper.assertTrue(column[0].stage() == RaidColumn.Stage.MARCHING
+                .thenWaitUntil(() -> helper.assertTrue(column[0].stage() == Raid.Stage.MARCH_OUT
                         && level.getEntity(column[0].leader()) instanceof MatabeleEntity leader && column[0].alongOut(leader.blockPosition()) > 6.0,
                         "the column is not well out on the march yet; " + raids.describe(level)))
                 .thenExecute(() -> {
-                    RaidColumn raid = column[0];
+                    Raid raid = column[0];
                     for (java.util.UUID id : raid.members()) {
                         if (!id.equals(raid.leader()) && level.getEntity(id) instanceof MatabeleEntity ant && ant.isAlive()) {
                             if (limper[0] == null) {
@@ -553,26 +611,22 @@ public class MatabeleRaidTests {
                     wounded[0].setHealth(wounded[0].getMaxHealth() * 0.3F);
                     helper.assertTrue(wounded[0].badlyWounded() && wounded[0].fightsNoMore(), "a raider at 30 percent health should fight no more");
                 })
-                .thenWaitUntil(() -> helper.assertTrue(raids.isLimping(limper[0].getUUID()),
+                .thenWaitUntil(() -> helper.assertTrue(raids.isGoingHome(limper[0].getUUID()),
                         "the crippled raider was not sent limping home; " + raids.describe(level)))
-                .thenWaitUntil(() -> helper.assertTrue(!wounded[0].isAlive() || raids.isLimping(wounded[0].getUUID())
+                .thenWaitUntil(() -> helper.assertTrue(!wounded[0].isAlive() || raids.isGoingHome(wounded[0].getUUID())
                         || !column[0].members().contains(wounded[0].getUUID()),
                         "the badly wounded raider was not sent home; " + raids.describe(level)))
                 .thenWaitUntil(() -> helper.assertTrue(raids.column() == null, "the raid is not home yet; " + raids.describe(level)))
                 .thenExecute(() -> {
-                    RaidColumn raid = column[0];
-                    helper.assertTrue(spread[0] && raid.spread(), "the empty raid did not spread out round the spot");
-                    helper.assertTrue(raid.carried() == 0, "the empty raid carried " + raid.carried() + " termites home");
+                    Raid raid = column[0];
                     helper.assertTrue(raid.cameHome() >= 1, "nobody came home with the column: " + raid.endedWhy());
-                    helper.assertTrue(find[0].misses() >= 1 || !raids.finds().contains(find[0]),
-                            "the empty raid did not count as an empty check of the spot; " + raids.describe(level));
-                    helper.assertTrue(raid.foundNothing() && !raid.lostFromSight(), "the empty raid did not count as found nothing");
+                    helper.assertTrue(raid.wentToNumbers() == 0, raid.wentToNumbers() + " raider(s) of a raid in sight went over to the numbers: " + raid.endedWhy());
                     helper.assertTrue(columnOrders[0] >= 1, "at the spot no raider held the raid's own fight order (the nest's defence ended them?)");
                     SavannaMod.LOGGER.info("[empty raid test] home at {}: {}", helper.getTick(), raids.describe(level));
                 })
-                .thenWaitUntil(() -> helper.assertTrue(!limper[0].isAlive() || !raids.isLimping(limper[0].getUUID()),
+                .thenWaitUntil(() -> helper.assertTrue(!limper[0].isAlive() || !raids.isGoingHome(limper[0].getUUID()),
                         "the limper is still on its way home, at " + limper[0].blockPosition().toShortString()))
-                .thenWaitUntil(() -> helper.assertTrue(!wounded[0].isAlive() || !raids.isLimping(wounded[0].getUUID()),
+                .thenWaitUntil(() -> helper.assertTrue(!wounded[0].isAlive() || !raids.isGoingHome(wounded[0].getUUID()),
                         "the wounded raider is still on its way home, at " + wounded[0].blockPosition().toShortString()))
                 .thenExecute(() -> {
                     if (limper[0].isAlive()) {
@@ -615,16 +669,16 @@ public class MatabeleRaidTests {
         // The raid test bench, B1: the whole chain runs with every rule watching (none may break).
         Watch.watchForTests(colony);
         scoutsHeadToward(helper, colony, 37, NEST + 5);
-        RaidColumn[] column = {null};
+        Raid[] column = {null};
         List<MatabeleEntity> raiders = new ArrayList<>();
-        java.util.Map<RaidColumn.Stage, Long> stageAt = new java.util.EnumMap<>(RaidColumn.Stage.class);
+        java.util.Map<Raid.Stage, Long> stageAt = new java.util.EnumMap<>(Raid.Stage.class);
         boolean[] hung = {false};
         // The raid code review, finding 18: a carrier killed on the way home drops its stung termites where it died.
         BlockPos[] diedAt = {null};
         int[] diedHolding = {0};
         int[] dropped = {-1};
         helper.onEachTick(() -> {
-            RaidColumn raid = column[0] != null ? column[0] : raids.column();
+            Raid raid = column[0] != null ? column[0] : raids.column();
             if (raid == null) {
                 return;
             }
@@ -637,25 +691,13 @@ public class MatabeleRaidTests {
                 }
             }
             long now = helper.getTick();
-            RaidColumn.Stage stage = raid.stage();
+            Raid.Stage stage = raid.stage();
             stageAt.putIfAbsent(stage, now);
             long since = now - stageAt.get(stage);
             // (the raid code review, finding 18: each stage's longest time from the species file's own numbers, a little
             // over for the column's update every few ticks; no number of its own here)
-            SavannaNumbers.ColumnNumbers numbers = raid.columnNumbers();
-            SavannaNumbers.CarryNumbers carry = raid.carryNumbers();
-            long most = SLACK + switch (stage) {
-                case FORMING -> numbers.formTicks();
-                case MARCHING -> raid.marchLimit();
-                case GATHERING -> numbers.gatherTicks();
-                case ATTACKING -> numbers.fightTicks() + 200; // (the fight's own hard end)
-                case COLLECTING -> carry.collectTicks();
-                case SPREADING -> carry.spreadTicks() + 200;
-                case REGROUPING -> numbers.regroupTicks();
-                case HOMING -> numbers.homeTicks();
-                case DONE -> Long.MAX_VALUE - SLACK;
-            };
-            if (stage == RaidColumn.Stage.HOMING && diedAt[0] == null) {
+            long most = stage == Raid.Stage.DONE ? Long.MAX_VALUE : SLACK + raid.stageMostTicks();
+            if (stage == Raid.Stage.MARCH_HOME && diedAt[0] == null) {
                 for (java.util.UUID id : raid.members()) {
                     if (level.getEntity(id) instanceof MatabeleEntity ant && MatabeleLoads.termitesHeldBy(ant) > 0
                             && flat(ant.blockPosition(), raid.find().at()) >= 10.0) {
@@ -677,11 +719,11 @@ public class MatabeleRaidTests {
         });
         helper.startSequence()
                 .thenIdle(40)
-                .thenExecute(() -> helper.assertTrue(raids.sendNow(level) != null, "the scout command found no fit major"))
+                .thenExecute(() -> helper.assertTrue(raids.scouts().sendNow(level) != null, "the scout command found no fit major"))
                 .thenWaitUntil(() -> helper.assertTrue(column[0] != null, "no raid yet; " + raids.describe(level)))
                 .thenExecute(() -> {
                     com.antcolonies.savanna.colony.RaidCost.reset(); // (the raid review, finding 9: the raid's own cost, out and home)
-                    RaidColumn raid = column[0];
+                    Raid raid = column[0];
                     Raids.Find find = raid.find();
                     helper.assertTrue(termites.stream().anyMatch(termite -> termite.blockPosition().closerThan(find.at(), 6)),
                             "the scout's find at " + find.at().toShortString() + " is not by the termites");
@@ -691,13 +733,13 @@ public class MatabeleRaidTests {
                     helper.assertTrue(raid.leader().equals(find.scout()), "the raid is not led by the scout who found the spot");
                     SavannaMod.LOGGER.info("[raid chain test] set out at {}: {}{}", helper.getTick(), raids.describe(level), raid.describe());
                 })
-                .thenWaitUntil(() -> helper.assertTrue(column[0].stage().ordinal() >= RaidColumn.Stage.ATTACKING.ordinal(),
+                .thenWaitUntil(() -> helper.assertTrue(column[0].stage().ordinal() >= Raid.Stage.ATTACK.ordinal(),
                         "the column did not reach the termites; " + raids.describe(level) + column[0].describe()))
                 .thenWaitUntil(() -> helper.assertTrue(termites.stream().anyMatch(termite -> !termite.isAlive() || termite.isParalysed()),
                         "no termite stung; " + raids.describe(level) + column[0].describe()))
                 .thenWaitUntil(() -> helper.assertTrue(raids.column() != column[0], "the raid is not home yet; " + column[0].describe()))
                 .thenExecute(() -> {
-                    RaidColumn raid = column[0];
+                    Raid raid = column[0];
                     SavannaMod.LOGGER.info("[raid chain test] home at {}, stages {}, {} came home ({}), {} carried", helper.getTick(), stageAt,
                             raid.cameHome(), raid.endedWhy(), raid.carried());
                     SavannaMod.LOGGER.info("[raid chain test] the raid's cost: {}", com.antcolonies.savanna.colony.RaidCost.report());
@@ -709,8 +751,8 @@ public class MatabeleRaidTests {
                             "only " + raid.cameHome() + " of " + raid.members().size() + " came home with the column: " + raid.endedWhy());
                     // Finding 3: the attack ends once no termite the raiders would go for is about, not at its longest time
                     // (the termites hidden in their galleries or shut in under the logs once no major still breaks in).
-                    Long attackAt = stageAt.get(RaidColumn.Stage.ATTACKING);
-                    Long afterAt = stageAt.get(RaidColumn.Stage.COLLECTING);
+                    Long attackAt = stageAt.get(Raid.Stage.ATTACK);
+                    Long afterAt = stageAt.get(Raid.Stage.REGROUP);
                     helper.assertTrue(attackAt != null && afterAt != null && afterAt - attackAt < raid.columnNumbers().fightTicks(),
                             "the attack ran to its longest time (" + (attackAt == null || afterAt == null ? "?" : (afterAt - attackAt) / 20)
                                     + " s): hidden termites kept it going; stages " + stageAt);
@@ -719,7 +761,7 @@ public class MatabeleRaidTests {
                 .thenExecute(() -> {
                     for (MatabeleEntity ant : raiders) {
                         if (ant.isAlive() && !ant.isCrippled() && !ant.isDowned() && ant.getFightSpot() == null && !raids.isRaider(ant.getUUID())
-                                && !raids.isScouting(ant.getUUID())) {
+                                && !raids.scouts().isScouting(ant.getUUID())) {
                             helper.assertTrue(flat(ant.blockPosition(), colony.getCenter()) <= 8.0 || colony.nest().isInside(level, ant.blockPosition()),
                                     "a raider stands about outside at " + ant.blockPosition().toShortString() + ", "
                                             + Math.round(flat(ant.blockPosition(), colony.getCenter())) + " from the nest, doing " + ant.runningGoals());
@@ -770,12 +812,12 @@ public class MatabeleRaidTests {
         int open = GeneralRules.closedPocket(level, colony, helper.absolutePos(hollow));
         helper.assertTrue(open == 0, "a hollow with a shaft to the sky counted as a closed pocket of " + open);
 
-        RaidColumn[] column = {null};
+        Raid[] column = {null};
         helper.startSequence()
-                .thenExecute(() -> helper.assertTrue(raids.sendNow(level) != null, "the scout command found no fit major"))
+                .thenExecute(() -> helper.assertTrue(raids.scouts().sendNow(level) != null, "the scout command found no fit major"))
                 .thenWaitUntil(() -> {
                     column[0] = raids.column();
-                    helper.assertTrue(column[0] != null && column[0].stage() != RaidColumn.Stage.FORMING,
+                    helper.assertTrue(column[0] != null && column[0].stage() != Raid.Stage.MUSTER,
                             "no raid on its way yet; " + raids.describe(level));
                 })
                 .thenExecute(() -> {
@@ -845,7 +887,7 @@ public class MatabeleRaidTests {
         Colony colony = MatabeleScenes.colony(helper, NEST + 6, NEST, 120);
         Raids raids = colony.part(SavannaParts.RAIDS).orElse(null);
         helper.assertTrue(raids != null, "a Matabele colony has no raids part");
-        RaidColumn[] column = {null};
+        Raid[] column = {null};
         long[] startedAt = {-1};
         long[] marchFrom = {-1};
         long[] milled = {-1};
@@ -904,8 +946,8 @@ public class MatabeleRaidTests {
         // blocks past the hump's foot: the march model's numbers, to compare.
         double[] lengthAt = {Double.NaN, Double.NaN, Double.NaN};
         helper.onEachTick(() -> {
-            RaidColumn raid = column[0];
-            if (raid == null || raid.stage() != RaidColumn.Stage.MARCHING) {
+            Raid raid = column[0];
+            if (raid == null || raid.stage() != Raid.Stage.MARCH_OUT) {
                 return;
             }
             long now = helper.getTick();
@@ -943,7 +985,7 @@ public class MatabeleRaidTests {
                                 ant.getNavigator().heldForCrowd() ? " held" : ""));
                     }
                 }
-                RaidColumn.Order fo = raid.orderNow(lead.getUUID());
+                Raid.Order fo = raid.orderNow(lead.getUUID());
                 SavannaMod.LOGGER.info("[march test] climb at {} s: scout y{} f{} pace {} {} going to {}; {} in the nest; higher or nearer the shaft:{}",
                         (now - marchFrom[0]) / 20, String.format(java.util.Locale.ROOT, "%.1f", lead.getY()),
                         String.format(java.util.Locale.ROOT, "%.1f", scoutFlat), fo == null ? "-" : String.format(java.util.Locale.ROOT, "%.2f", fo.pace()),
@@ -975,7 +1017,7 @@ public class MatabeleRaidTests {
                     }
                     // Nobody out is told to stand while the column marches (the trail is never broken here, so no casting;
                     // the first ones down may stand behind the scout while it waits at the hump's foot).
-                    RaidColumn.Order order = raid.orderFor(level, ant);
+                    Raid.Order order = raid.orderFor(level, ant);
                     if (ledOff && order != null && order.to() == null && !raid.isCasting(id)) {
                         standCount[0]++;
                         if (standFaults.size() < 8) {
@@ -1011,7 +1053,7 @@ public class MatabeleRaidTests {
             // Crowding on the flat (past the hump's foot, on the ground), and the column's length 10, 20, 30 blocks out.
             if (frontOut && lead.onGround() && frontAlong >= hump + 1.0) {
                 if (!Double.isNaN(lastFront[0])) {
-                    RaidColumn.Order fo = raid.orderNow(lead.getUUID());
+                    Raid.Order fo = raid.orderNow(lead.getUUID());
                     frontFree[0] += frontAlong - lastFront[0];
                     frontFree[1] += fo == null ? 1.0 : fo.pace();
                 }
@@ -1037,7 +1079,7 @@ public class MatabeleRaidTests {
                     continue;
                 }
                 onFlat.add(ant);
-                RaidColumn.Order order = raid.orderNow(id);
+                Raid.Order order = raid.orderNow(id);
                 double behind = raid.behindPlaceForTests(id);
                 if (before == null || order == null || order.to() == null || Double.isNaN(behind)) {
                     continue;
@@ -1118,7 +1160,7 @@ public class MatabeleRaidTests {
                 SavannaMod.LOGGER.info("[march test] march at {} s: {}", (now - marchFrom[0]) / 20, line);
                 // the 3 hindmost raiders out: their orders (the march's tail, where a column strings out)
                 out.stream().sorted(java.util.Comparator.comparingDouble(ant -> raid.alongOut(ant.position()))).limit(3).forEach(ant -> {
-                    RaidColumn.Order order = raid.orderNow(ant.getUUID());
+                    Raid.Order order = raid.orderNow(ant.getUUID());
                     SavannaMod.LOGGER.info("[march test]   tail {} at {} (y {}), along {}, order {} pace {}, walking {}, speed {}, held for the crowd {}, on the ground {}",
                             ant.getId(), ant.blockPosition().toShortString(), String.format("%.2f", ant.getY()),
                             String.format("%.1f", raid.alongOut(ant.position())), order == null || order.to() == null ? "-" : order.to().toShortString(),
@@ -1130,7 +1172,7 @@ public class MatabeleRaidTests {
         });
         helper.onEachTick(() -> {
             // (the stopwatch for the way down runs on past the march, until every raider out is down on the ground)
-            RaidColumn raid = column[0];
+            Raid raid = column[0];
             if (raid == null || marchFrom[0] < 0 || Double.isNaN(groundY[0])) {
                 return;
             }
@@ -1142,7 +1184,7 @@ public class MatabeleRaidTests {
             }
         });
         helper.onEachTick(() -> {
-            RaidColumn raid = column[0];
+            Raid raid = column[0];
             if (raid == null || marchFrom[0] < 0 || lastHigh[0] >= 0 && helper.getTick() - lastHigh[0] > 40) {
                 return;
             }
@@ -1159,7 +1201,7 @@ public class MatabeleRaidTests {
             }
         });
         helper.onEachTick(() -> {
-            RaidColumn raid = column[0];
+            Raid raid = column[0];
             if (raid == null || helper.getTick() > crowdUntil[0]) {
                 return;
             }
@@ -1172,12 +1214,12 @@ public class MatabeleRaidTests {
             crowd.tick(raiders);
         });
         helper.onEachTick(() -> {
-            RaidColumn raid = column[0];
+            Raid raid = column[0];
             if (raid == null || milled[0] >= 0) {
                 return;
             }
-            if (raid.stage() != RaidColumn.Stage.FORMING) {
-                milled[0] = raid.recruitedAt() < 0 ? Long.MAX_VALUE : level.getGameTime() - raid.recruitedAt();
+            if (raid.stage() != Raid.Stage.MUSTER) {
+                milled[0] = level.getGameTime() - raid.startedAt();
                 crowdUntil[0] = helper.getTick() + 200;
                 return;
             }
@@ -1187,7 +1229,7 @@ public class MatabeleRaidTests {
                 .thenExecute(() -> {
                     BlockPos entrance = colony.getCenter();
                     MatabeleEntity scout = colony.population().realMembers(level).stream()
-                            .filter(ant -> ant instanceof MatabeleEntity matabele && matabele.hasMajorBody() && !raids.isScouting(ant.getUUID())
+                            .filter(ant -> ant instanceof MatabeleEntity matabele && matabele.hasMajorBody() && !raids.scouts().isScouting(ant.getUUID())
                                     && !colony.nest().isInside(level, ant.blockPosition()))
                             .map(ant -> (MatabeleEntity) ant)
                             .findFirst().orElse(null);
@@ -1231,7 +1273,8 @@ public class MatabeleRaidTests {
                         trail.add(level.getHeightmapPos(net.minecraft.world.level.levelgen.Heightmap.Types.MOTION_BLOCKING_NO_LEAVES,
                                 new BlockPos(x, entrance.getY(), z)));
                     }
-                    RaidColumn raid = raids.raidForTests(level, at, 6, trail, scout.getUUID());
+                    MatabeleScenes.termitesAt(helper, at);
+                    Raid raid = raids.raidForTests(level, at, 6, trail, scout.getUUID());
                     helper.assertTrue(raid != null, "no raid set out; " + raids.describe(level));
                     column[0] = raid;
                     startedAt[0] = helper.getTick();
@@ -1240,25 +1283,24 @@ public class MatabeleRaidTests {
                 })
                 .thenWaitUntil(() -> helper.assertTrue(milled[0] >= 0, "still forming; " + column[0].describe()))
                 .thenExecute(() -> {
-                    RaidColumn raid = column[0];
-                    long called = raid.recruitedAt() - (level.getGameTime() - (helper.getTick() - startedAt[0]));
-                    SavannaMod.LOGGER.info("[march test] the scout called down in the nest after {} ticks, the march began {} ticks after",
-                            called, milled[0]);
-                    helper.assertTrue(called <= 600, "the scout took " + called / 20 + " s to get down into the nest (it starts a few blocks off)");
-                    // (the column is worked out every 5 ticks: the march begins in the same working out as the recruiting)
-                    helper.assertTrue(milled[0] <= 10, "the column waited " + milled[0] + " ticks after the scout recruited (no milling): " + raid.describe());
+                    Raid raid = column[0];
+                    SavannaMod.LOGGER.info("[march test] the muster lasted {} ticks", milled[0]);
+                    // (the raid rewrite: the muster ends with everyone out or at its deadline, never later; the raid is
+                    // worked out every 5 ticks)
+                    helper.assertTrue(milled[0] <= raid.columnNumbers().musterTicks() + 10,
+                            "the muster lasted " + milled[0] / 20 + " s, past its deadline: " + raid.describe());
                 })
                 .thenIdle(200)
                 .thenExecute(() -> {
                     SavannaMod.LOGGER.info("[march test] personal space: {}", crowd.describe());
                     helper.assertTrue(crowd.keptApart(), "raiders stood inside one another: " + crowd.describe());
                 })
-                .thenWaitUntil(() -> helper.assertTrue(column[0].stage().ordinal() > RaidColumn.Stage.MARCHING.ordinal(),
+                .thenWaitUntil(() -> helper.assertTrue(column[0].stage().ordinal() > Raid.Stage.MARCH_OUT.ordinal(),
                         "the front did not reach the end of its trail; " + column[0].describe()))
                 .thenWaitUntil(() -> helper.assertTrue(lastHigh[0] >= 0 && helper.getTick() - lastHigh[0] > 40,
                         "raiders still coming down the hump"))
                 .thenExecute(() -> {
-                    RaidColumn raid = column[0];
+                    Raid raid = column[0];
                     long dropped = setOut.stream().filter(id -> !raid.members().contains(id)).count();
                     double ahead = watchedTicks[0] == 0 ? 0.0 : aheadTicks[0] / (double) watchedTicks[0];
                     double offShare = streamAnts[0] == 0 ? 0.0 : offTrail[0] / (double) streamAnts[0];
@@ -1345,7 +1387,7 @@ public class MatabeleRaidTests {
                     // (one raider walking but getting nowhere on the hump's side for 15 s, sent home stuck, is BUGS 166)
                     helper.assertTrue(dropped <= 1, dropped + " raider(s) out of the nest left the column (sent home stuck): " + raid.describe());
                 })
-                .thenWaitUntil(() -> helper.assertTrue(column[0].stage().ordinal() >= RaidColumn.Stage.ATTACKING.ordinal(),
+                .thenWaitUntil(() -> helper.assertTrue(column[0].stage().ordinal() >= Raid.Stage.ATTACK.ordinal(),
                         "the raid did not attack; " + column[0].describe()))
                 .thenSucceed();
     }
@@ -1393,7 +1435,7 @@ public class MatabeleRaidTests {
         helper.assertTrue(raids != null, "a Matabele colony has no raids part");
         scoutsHeadToward(helper, colony, 37, NEST + 5);
         int plain = helper.absolutePos(new BlockPos(0, SURFACE, 0)).getY();
-        RaidColumn[] column = {null};
+        Raid[] column = {null};
         helper.onEachTick(() -> {
             if (column[0] == null && raids.column() != null) {
                 column[0] = raids.column();
@@ -1401,10 +1443,10 @@ public class MatabeleRaidTests {
         });
         helper.startSequence()
                 .thenIdle(40)
-                .thenExecute(() -> helper.assertTrue(raids.sendNow(level) != null, "the scout command found no fit major"))
+                .thenExecute(() -> helper.assertTrue(raids.scouts().sendNow(level) != null, "the scout command found no fit major"))
                 .thenWaitUntil(() -> helper.assertTrue(column[0] != null, "no raid yet; " + raids.describe(level)))
                 .thenExecute(() -> {
-                    RaidColumn raid = column[0];
+                    Raid raid = column[0];
                     Raids.Find find = raid.find();
                     helper.assertTrue(termites.stream().anyMatch(termite -> termite.blockPosition().closerThan(find.at(), 6)),
                             "the scout's find at " + find.at().toShortString() + " is not by the termites");
@@ -1428,13 +1470,13 @@ public class MatabeleRaidTests {
                     SavannaMod.LOGGER.info("[raid hill test] set out at {}, the line {} blocks off the straight way, {} up: {}{}", helper.getTick(),
                             Math.round(off * 10) / 10.0, top - plain, raids.describe(level), raid.describe());
                 })
-                .thenWaitUntil(() -> helper.assertTrue(column[0].stage().ordinal() >= RaidColumn.Stage.ATTACKING.ordinal(),
+                .thenWaitUntil(() -> helper.assertTrue(column[0].stage().ordinal() >= Raid.Stage.ATTACK.ordinal(),
                         "the column did not reach the termites over the ridge and round the pond; " + raids.describe(level) + column[0].describe()))
                 .thenWaitUntil(() -> helper.assertTrue(termites.stream().anyMatch(termite -> !termite.isAlive() || termite.isParalysed()),
                         "no termite stung; " + raids.describe(level) + column[0].describe()))
                 .thenWaitUntil(() -> helper.assertTrue(raids.column() != column[0], "the raid is not home yet; " + column[0].describe()))
                 .thenExecute(() -> {
-                    RaidColumn raid = column[0];
+                    Raid raid = column[0];
                     SavannaMod.LOGGER.info("[raid hill test] home at {}: {} came home ({}), {} carried", helper.getTick(), raid.cameHome(),
                             raid.endedWhy(), raid.carried());
                     helper.assertTrue(raid.carried() >= 1, "the raid came home with no termites: " + raid.endedWhy());
@@ -1476,17 +1518,17 @@ public class MatabeleRaidTests {
         BlockPos at = helper.absolutePos(new BlockPos(52, SURFACE, NEST + 4));
         List<java.util.UUID> lostOnes = new ArrayList<>();
         long[] hiddenSince = {-1};
-        RaidColumn[] column = {null};
+        Raid[] column = {null};
         boolean[] cast = {false};
         long[] turned = {-1};
         long[] progressAt = {-1};
         double[] best = {Double.MAX_VALUE};
         helper.onEachTick(() -> {
-            RaidColumn raid = column[0];
+            Raid raid = column[0];
             if (raid != null && raid.isCasting(raid.leader())) {
                 cast[0] = true;
             }
-            if (raid == null || !raid.lostTrail() || raid.stage() != RaidColumn.Stage.HOMING) {
+            if (raid == null || !raid.lostTrail() || raid.stage() != Raid.Stage.MARCH_HOME) {
                 return;
             }
             BlockPos entrance = colony.getCenter();
@@ -1529,9 +1571,10 @@ public class MatabeleRaidTests {
                         trail.add(level.getHeightmapPos(net.minecraft.world.level.levelgen.Heightmap.Types.MOTION_BLOCKING_NO_LEAVES,
                                 new BlockPos(x, entrance.getY(), z)));
                     }
-                    RaidColumn raid = raids.raidForTests(level, at, 2, trail, null);
+                    MatabeleScenes.termitesAt(helper, at);
+                    Raid raid = raids.raidForTests(level, at, 2, trail, null);
                     helper.assertTrue(raid != null, "no raid set out; " + raids.describe(level));
-                    helper.assertTrue(!raids.isVeteran(raid.leader()), "the raid's leader is a former scout");
+                    helper.assertTrue(!raids.scouts().isVeteran(raid.leader()), "the raid's leader is a former scout");
                     // R7: set out by hand at 21:00, outside the raid hours, it keeps no hours (dusk does not turn it)
                     helper.assertTrue(raids.isDusk(level) && raid.keepsNoHours(), "a raid set out by hand at night does not keep no hours");
                     // A wall on the trail from 10 to 18 blocks out: a gap of about 10 blocks, past casting reach.
@@ -1546,7 +1589,7 @@ public class MatabeleRaidTests {
                 .thenWaitUntil(() -> helper.assertTrue(column[0].lostTrail(), "the raid did not turn home at the wide gap; " + raids.describe(level)))
                 .thenWaitUntil(() -> helper.assertTrue(raids.column() == null, "the raid is not home yet; " + raids.describe(level)))
                 .thenExecute(() -> {
-                    RaidColumn raid = column[0];
+                    Raid raid = column[0];
                     helper.assertTrue(cast[0], "the front never cast about at the gap");
                     helper.assertTrue(raid.gapsCrossed() == 0, "the raid crossed a gap too wide to pick up, with no former scout");
                     helper.assertTrue(raid.attackedAt() < 0, "the raid attacked after losing its trail");
@@ -1559,7 +1602,7 @@ public class MatabeleRaidTests {
                     if (find.scout() != null && level.getEntity(find.scout()) != null) {
                         level.getEntity(find.scout()).discard();
                     }
-                    RaidColumn again = raids.raidNow(level);
+                    Raid again = raids.raidNow(level);
                     helper.assertTrue(again == null, "a raid set out along a faded trail with nobody who knows the way");
                     helper.assertTrue(raids.whyNoRaid() != null && raids.whyNoRaid().contains("faded"),
                             "no raid, but not for the faded trail: " + raids.whyNoRaid());
@@ -1577,12 +1620,13 @@ public class MatabeleRaidTests {
                         trail.add(level.getHeightmapPos(net.minecraft.world.level.levelgen.Heightmap.Types.MOTION_BLOCKING_NO_LEAVES,
                                 new BlockPos(x, entrance.getY(), z)));
                     }
-                    RaidColumn raid = raids.raidForTests(level, there, 2, trail, null);
+                    MatabeleScenes.termitesAt(helper, there);
+                    Raid raid = raids.raidForTests(level, there, 2, trail, null);
                     helper.assertTrue(raid != null, "no second raid set out; " + raids.describe(level));
                     column[0] = raid;
                     lostOnes.addAll(raid.members());
                 })
-                .thenWaitUntil(() -> helper.assertTrue(column[0].stage() == RaidColumn.Stage.MARCHING
+                .thenWaitUntil(() -> helper.assertTrue(column[0].stage() == Raid.Stage.MARCH_OUT
                         && level.getEntity(column[0].leader()) instanceof MatabeleEntity leader && column[0].alongOut(leader.blockPosition()) > 4.0,
                         "the second raid is not out on the march yet; " + raids.describe(level)))
                 .thenExecute(() -> {
@@ -1591,31 +1635,38 @@ public class MatabeleRaidTests {
                     lostOnes.forEach(column[0]::hideForTests);
                     hiddenSince[0] = level.getGameTime();
                 })
+                // The raid rewrite, step 4: a raid whose raiders are all out of sight is no longer dropped ("lost from
+                // sight", its ants left to walk home: 14 of 46 raids in the soak of step 1). Kept the grace first, as
+                // before; then every raider goes over to the raid's numbers, the same raid goes on from its stage out of
+                // sight and ends in done, and the spot is no empty check (finding 1's old rule, kept).
+                .thenWaitUntil(() -> helper.assertTrue(column[0].wentToNumbers() > 0, "no raider out of sight went over to the numbers; " + raids.describe(level)))
+                .thenExecute(() -> {
+                    Raid raid = column[0];
+                    helper.assertTrue(level.getGameTime() - hiddenSince[0] >= com.antcolonies.colony.AwayLife.GRACE_TICKS,
+                            "the raiders went over to the numbers " + (level.getGameTime() - hiddenSince[0]) + " ticks after going out of sight, before the grace");
+                    helper.assertTrue(raid.goesAsNumbers() && raids.column() == raid && raid.stage() != Raid.Stage.DONE,
+                            "the raid out of sight does not go on as numbers: " + raid.describe());
+                    for (java.util.UUID id : lostOnes) {
+                        helper.assertTrue(!(level.getEntity(id) instanceof MatabeleEntity ant) || !ant.isAlive(),
+                                "an ant of the raid gone over to the numbers still stands in the world: " + id);
+                    }
+                })
                 .thenWaitUntil(() -> helper.assertTrue(raids.column() == null, "the raid out of sight did not end; " + raids.describe(level)))
                 .thenExecute(() -> {
-                    RaidColumn raid = column[0];
-                    helper.assertTrue(raid.lostFromSight(), "the raid out of sight did not end lost from sight: " + raid.endedWhy());
-                    helper.assertTrue(level.getGameTime() - hiddenSince[0] >= com.antcolonies.colony.AwayLife.GRACE_TICKS,
-                            "the raid ended " + (level.getGameTime() - hiddenSince[0]) + " ticks after going out of sight, before the grace");
+                    Raid raid = column[0];
+                    helper.assertTrue(raid.stage() == Raid.Stage.DONE && raid.cameHome() > 0, "the raid as numbers did not come home: " + raid.endedWhy());
                     Raids.Find find = raid.find();
                     helper.assertTrue(raids.finds().contains(find) && find.misses() == 0,
-                            "a raid lost from sight counted as an empty check of the spot; " + raids.describe(level));
-                    for (java.util.UUID id : lostOnes) {
-                        helper.assertTrue(!(level.getEntity(id) instanceof MatabeleEntity ant) || !ant.isAlive() || raids.isGoingHome(id)
-                                        || flat(ant.blockPosition(), colony.getCenter()) <= 8.0,
-                                "an ant of the raid lost from sight is not going home: " + id);
+                            "a raid gone out of sight counted as an empty check of the spot; " + raids.describe(level));
+                    // (its raiders are numbers in the nest now; the next raids of this test need real ants again)
+                    List<BlockPos> cells = colony.nest().getAllRoomCells(level).stream()
+                            .filter(cell -> com.antcolonies.savanna.colony.RaidGround.canStand(level, cell)).toList();
+                    helper.assertTrue(!cells.isEmpty(), "the nest has no room cell to stand in");
+                    for (int i = 0; i < lostOnes.size(); i++) {
+                        colony.population().comeOutAt(level, com.antcolonies.colony.Caste.WORKER, cells.get(i % cells.size()));
                     }
                 })
-                .thenWaitUntil(() -> {
-                    for (java.util.UUID id : lostOnes) {
-                        if (level.getEntity(id) instanceof MatabeleEntity ant && ant.isAlive()) {
-                            helper.assertTrue(flat(ant.blockPosition(), colony.getCenter()) <= 9.0 || colony.nest().isInside(level, ant.blockPosition()),
-                                    "an ant of the raid lost from sight is not home, at " + ant.blockPosition().toShortString() + ", "
-                                            + Math.round(flat(ant.blockPosition(), colony.getCenter())) + " out, doing " + ant.runningGoals()
-                                            + " (going home: " + raids.whyGoingHome(id) + ")");
-                        }
-                    }
-                })
+                .thenIdle(40)
                 // Raid rework R7, dusk: a raid set out at 18:45, in the evening raid hours, keeps them; at 19:30 on the
                 // march it turns home where it is, attacks nothing, and the spot is no empty check (never reached).
                 .thenExecute(() -> {
@@ -1632,19 +1683,20 @@ public class MatabeleRaidTests {
                         trail.add(level.getHeightmapPos(net.minecraft.world.level.levelgen.Heightmap.Types.MOTION_BLOCKING_NO_LEAVES,
                                 new BlockPos(x, entrance.getY(), z)));
                     }
-                    RaidColumn raid = raids.raidForTests(level, there, 2, trail, null);
+                    MatabeleScenes.termitesAt(helper, there);
+                    Raid raid = raids.raidForTests(level, there, 2, trail, null);
                     helper.assertTrue(raid != null, "no dusk raid set out; " + raids.describe(level));
                     helper.assertTrue(!raid.keepsNoHours(), "a raid set out in the raid hours keeps no hours");
                     column[0] = raid;
                 })
-                .thenWaitUntil(() -> helper.assertTrue(column[0].stage() == RaidColumn.Stage.MARCHING
+                .thenWaitUntil(() -> helper.assertTrue(column[0].stage() == Raid.Stage.MARCH_OUT
                         && level.getEntity(column[0].leader()) instanceof MatabeleEntity leader && column[0].alongOut(leader.blockPosition()) > 4.0,
                         "the dusk raid is not out on the march yet; " + raids.describe(level)))
                 .thenExecute(() -> clock.skipTo(19.5))
                 .thenWaitUntil(() -> helper.assertTrue(column[0].turnedAtDusk(), "the raid out at 19:30 did not turn home at dusk; " + raids.describe(level)))
                 .thenWaitUntil(() -> helper.assertTrue(raids.column() == null, "the raid turned home at dusk is not home yet; " + raids.describe(level)))
                 .thenExecute(() -> {
-                    RaidColumn raid = column[0];
+                    Raid raid = column[0];
                     helper.assertTrue(raid.attackedAt() < 0, "the raid turned home at dusk on the march attacked");
                     helper.assertTrue(raid.cameHome() >= 1, "nobody came home with the dusk raid: " + raid.endedWhy());
                     Raids.Find find = raid.find();
@@ -1653,7 +1705,7 @@ public class MatabeleRaidTests {
                     helper.assertTrue("dusk".equals(raid.turnedBy()), "the dusk raid says it turned for " + raid.turnedBy());
                     // R7, unloaded land: no raid sets out to a spot in land not loaded (the find is only remembered).
                     BlockPos far = colony.getCenter().offset(600, 0, 0);
-                    RaidColumn none = raids.raidForTests(level, far, 2, List.of(colony.getCenter(), far), null);
+                    Raid none = raids.raidForTests(level, far, 2, List.of(colony.getCenter(), far), null);
                     helper.assertTrue(none == null && raids.whyNoRaid() != null && raids.whyNoRaid().contains("not loaded"),
                             "a raid set out to land not loaded, or not for that: " + raids.whyNoRaid());
                 })
@@ -1675,14 +1727,14 @@ public class MatabeleRaidTests {
                         trail.add(level.getHeightmapPos(net.minecraft.world.level.levelgen.Heightmap.Types.MOTION_BLOCKING_NO_LEAVES,
                                 new BlockPos(x, entrance.getY(), z)));
                     }
-                    RaidColumn raid = raids.raidForTests(level, there, 2, trail, null);
+                    Raid raid = raids.raidForTests(level, there, 2, trail, null);
                     helper.assertTrue(raid != null, "no morning raid set out; " + raids.describe(level));
                     helper.assertTrue(!raid.keepsNoHours(), "a raid set out in the morning raid hours keeps no hours");
                     helper.assertTrue(raids.raidsToday(level) == before + 1, "the morning raid was not counted as one of the day's raids ("
                             + before + " before, " + raids.raidsToday(level) + " after)");
                     column[0] = raid;
                 })
-                .thenWaitUntil(() -> helper.assertTrue(column[0].stage() == RaidColumn.Stage.MARCHING
+                .thenWaitUntil(() -> helper.assertTrue(column[0].stage() == Raid.Stage.MARCH_OUT
                         && level.getEntity(column[0].leader()) instanceof MatabeleEntity leader && column[0].alongOut(leader.blockPosition()) > 4.0,
                         "the morning raid is not out on the march yet; " + raids.describe(level)))
                 .thenExecute(() -> {
@@ -1693,7 +1745,7 @@ public class MatabeleRaidTests {
                         "the raid out in the rain did not turn home for it (" + column[0].turnedBy() + "); " + raids.describe(level)))
                 .thenWaitUntil(() -> helper.assertTrue(raids.column() == null, "the raid turned home by rain is not home yet; " + raids.describe(level)))
                 .thenExecute(() -> {
-                    RaidColumn raid = column[0];
+                    Raid raid = column[0];
                     colony.setRainForTests(null);
                     helper.assertTrue(raid.attackedAt() < 0, "the raid turned home by rain on the march attacked");
                     helper.assertTrue(raid.cameHome() >= 1, "nobody came home with the rain raid: " + raid.endedWhy());
@@ -1702,12 +1754,71 @@ public class MatabeleRaidTests {
                     // BUGS 172: a raid the raid command sets out is not one of the colony's own raids of the day (to the
                     // rain raid's spot: the first spot's trail was faded on purpose above, so nobody knows the way there).
                     int before = raids.raidsToday(level);
-                    RaidColumn commanded = raids.raidByCommandForTests(level, raid.find());
+                    Raid commanded = raids.raidByCommandForTests(level, raid.find());
                     helper.assertTrue(commanded != null, "the raid command set out no raid: " + raids.whyNoRaid());
                     helper.assertTrue(raids.raidsToday(level) == before, "the raid command's raid was counted among the day's raids ("
                             + before + " before, " + raids.raidsToday(level) + " after)");
                 })
                 .thenSucceed();
+    }
+
+    /**
+     * BUGS 360 (BUGS 351's cause): a raid follows the line its scout laid on its latest walk home, never an older trail to
+     * the same spot still smelt (there the termites had cased a fallen branch in mud since, and every raid stood at it).
+     * A scout's first find lays its line; a column walks it (a column's trail, lasting longer); a scout home later from
+     * the same spot by another way lays its new line, the old one is dropped, and the next raid there follows the new.
+     */
+    @GameTest(template = "arena", timeoutTicks = 1200, skyAccess = true, batch = "matabele_raids")
+    public static void aRaidFollowsItsScoutsNewestLineNotAnOlderTrailToTheSameSpot(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        TestClock clock = TestClock.still(helper, 21.0); // (night: the colony sets out no raid by itself to the finds)
+        TestScenes.shapeGround(helper, 45, (x, z) -> 0);
+        MatabeleScenes.deadMound(helper, NEST, NEST);
+        Colony colony = MatabeleScenes.colony(helper, NEST + 6, NEST, 20);
+        Raids raids = colony.part(SavannaParts.RAIDS).orElse(null);
+        helper.assertTrue(raids != null, "a Matabele colony has no raids part");
+        BlockPos at = helper.absolutePos(new BlockPos(46, SURFACE, NEST + 4));
+        BlockPos bend = helper.absolutePos(new BlockPos(36, SURFACE, NEST + 14)); // (the newer way bows 10 blocks aside)
+        helper.startSequence()
+                .thenIdle(40)
+                .thenExecute(() -> {
+                    BlockPos entrance = colony.getCenter();
+                    List<BlockPos> straight = groundLine(level, List.of(entrance, at));
+                    List<BlockPos> bowed = groundLine(level, List.of(entrance, bend, at));
+                    raids.found(level, at, 2, straight, null);
+                    Raids.Find find = raids.finds().stream().filter(one -> one.at().equals(at)).findFirst().orElse(null);
+                    helper.assertTrue(find != null, "the scout's find was not remembered; " + raids.describe(level));
+                    helper.assertTrue(raids.column() == null, "a raid set out at night by itself");
+                    helper.assertTrue(raids.trails().all().size() == 1, "the scout's line was not laid as one trail; " + raids.describe(level));
+                    com.antcolonies.savanna.colony.ScentTrails.Trail old = raids.trails().all().get(0);
+                    old.walked(level.getGameTime()); // (a column walked it: a column's trail, fresher and longer lasting)
+                    raids.found(level, at, 2, bowed, null);
+                    helper.assertTrue(!raids.trails().all().contains(old), "the find's old trail was kept beside its scout's new line");
+                    MatabeleScenes.termitesAt(helper, at); // (no raid sets out to a spot with no termites)
+                    Raid raid = raids.raidByCommandForTests(level, find);
+                    helper.assertTrue(raid != null, "no raid set out; " + raids.whyNoRaid());
+                    helper.assertTrue(raid.trail() != old, "the raid follows the older trail, not its scout's newest line");
+                    double nearBend = raid.trail().points().stream().mapToDouble(p -> flat(p, bend)).min().orElse(99);
+                    helper.assertTrue(nearBend <= 1.5, "the raid's trail does not run the scout's new way (nearest point "
+                            + Math.round(nearBend) + " from its bend)");
+                })
+                .thenSucceed();
+    }
+
+    /** A scent line on the ground through these places, a point every 2 blocks (flat), the first place first. */
+    private static List<BlockPos> groundLine(ServerLevel level, List<BlockPos> through) {
+        List<BlockPos> line = new ArrayList<>();
+        for (int leg = 0; leg + 1 < through.size(); leg++) {
+            BlockPos from = through.get(leg), to = through.get(leg + 1);
+            int steps = (int) Math.ceil(Math.hypot(to.getX() - from.getX(), to.getZ() - from.getZ()) / 2.0);
+            for (int i = leg == 0 ? 0 : 1; i <= steps; i++) {
+                double t = i / (double) steps;
+                line.add(level.getHeightmapPos(net.minecraft.world.level.levelgen.Heightmap.Types.MOTION_BLOCKING_NO_LEAVES,
+                        new BlockPos(from.getX() + (int) Math.round((to.getX() - from.getX()) * t), from.getY(),
+                                from.getZ() + (int) Math.round((to.getZ() - from.getZ()) * t))));
+            }
+        }
+        return line;
     }
 
     /**
@@ -1735,7 +1846,7 @@ public class MatabeleRaidTests {
                 .thenIdle(20)
                 .thenExecute(() -> {
                     SavannaNumbers.ScoutNumbers numbers = raids.numbers();
-                    SavannaNumbers.SearchNumbers search = raids.search();
+                    SavannaNumbers.SearchNumbers search = raids.scouts().search();
                     int first = numbers.firstRange();
                     int step = numbers.rangeStep();
                     int most = numbers.mostRange();
@@ -1744,55 +1855,55 @@ public class MatabeleRaidTests {
                             .map(ant -> (MatabeleEntity) ant).limit(3).toList();
                     helper.assertTrue(majors.size() == 3, "fewer than 3 real majors in the colony: " + majors.size());
                     MatabeleEntity a = majors.get(0);
-                    helper.assertTrue(raids.range() == first, "the colony's reach starts at " + raids.range());
+                    helper.assertTrue(raids.scouts().range() == first, "the colony's reach starts at " + raids.scouts().range());
 
                     // each new scout its own way, spread from the others'; each keeps it
                     List<Double> ways = new ArrayList<>();
                     for (MatabeleEntity major : majors) {
-                        Raids.Trip trip = raids.plan(level, major);
+                        Scouts.Trip trip = raids.scouts().plan(level, major);
                         helper.assertTrue(trip != null && trip.find() == null && trip.reach() == first, "a new scout's first trip is " + trip);
                         helper.assertTrue(trip.out() >= Math.floor(first * search.outNear()) - 1 && trip.out() <= Math.ceil(first * search.outFar()) + 1,
                                 "a trip walks out " + trip.out() + " blocks of a reach of " + first);
-                        helper.assertTrue(major.scoutMemory().hasHeading() && Math.abs(Raids.turnBetween(trip.heading(), major.scoutMemory().heading())) < 1e-6,
+                        helper.assertTrue(major.scoutMemory().hasHeading() && Math.abs(Scouts.turnBetween(trip.heading(), major.scoutMemory().heading())) < 1e-6,
                                 "the trip does not go the scout's own way");
                         ways.add(trip.heading());
                     }
                     for (int i = 0; i < ways.size(); i++) {
                         for (int j = i + 1; j < ways.size(); j++) {
-                            double gap = Math.toDegrees(Math.abs(Raids.turnBetween(ways.get(i), ways.get(j))));
+                            double gap = Math.toDegrees(Math.abs(Scouts.turnBetween(ways.get(i), ways.get(j))));
                             helper.assertTrue(gap >= 40, "two new scouts' ways are only " + Math.round(gap) + " degrees apart: " + ways);
                         }
                     }
                     double aWay = a.scoutMemory().heading();
-                    Raids.Trip trip = raids.plan(level, a);
-                    helper.assertTrue(trip != null && Math.abs(Raids.turnBetween(trip.heading(), aWay)) < 1e-6, "the scout's next trip changed its way");
+                    Scouts.Trip trip = raids.scouts().plan(level, a);
+                    helper.assertTrue(trip != null && Math.abs(Scouts.turnBetween(trip.heading(), aWay)) < 1e-6, "the scout's next trip changed its way");
 
                     // the search range bug, in its new form: setting out is not searching
-                    raids.setOut(a, trip);
-                    raids.back(a);
-                    helper.assertTrue(a.scoutMemory().reach(first) == first && raids.range() == first,
+                    raids.scouts().setOut(a, trip);
+                    raids.scouts().back(a);
+                    helper.assertTrue(a.scoutMemory().reach(first) == first && raids.scouts().range() == first,
                             "a scout's reach grew from only setting out: " + a.scoutMemory().reach(first));
                     int least = (int) Math.ceil(numbers.tripTicks() * search.searchedShare());
-                    helper.assertTrue(!raids.cameHomeEmpty(level, a, trip, least - 20, "the test"),
+                    helper.assertTrue(!raids.scouts().cameHomeEmpty(level, a, trip, least - 20, "the test"),
                             "a trip cut short counted as searched empty");
-                    helper.assertTrue(a.scoutMemory().reach(first) == first && Math.abs(Raids.turnBetween(a.scoutMemory().heading(), aWay)) < 1e-6,
+                    helper.assertTrue(a.scoutMemory().reach(first) == first && Math.abs(Scouts.turnBetween(a.scoutMemory().heading(), aWay)) < 1e-6,
                             "a trip cut short changed the scout's reach or way");
 
                     // trips really searched empty: farther each time, the way drifting a little
-                    helper.assertTrue(raids.cameHomeEmpty(level, a, trip, least, "the test"), "a trip searched long enough did not count");
-                    helper.assertTrue(a.scoutMemory().reach(first) == first + step && raids.range() == first + step,
-                            "after a trip searched empty the scout's reach is " + a.scoutMemory().reach(first) + ", the colony's " + raids.range());
-                    double drift = Math.toDegrees(Math.abs(Raids.turnBetween(aWay, a.scoutMemory().heading())));
+                    helper.assertTrue(raids.scouts().cameHomeEmpty(level, a, trip, least, "the test"), "a trip searched long enough did not count");
+                    helper.assertTrue(a.scoutMemory().reach(first) == first + step && raids.scouts().range() == first + step,
+                            "after a trip searched empty the scout's reach is " + a.scoutMemory().reach(first) + ", the colony's " + raids.scouts().range());
+                    double drift = Math.toDegrees(Math.abs(Scouts.turnBetween(aWay, a.scoutMemory().heading())));
                     helper.assertTrue(drift < 90, "the scout's way swung " + Math.round(drift) + " degrees after one empty trip (it drifts)");
                     for (int i = 0; i < 40 && a.scoutMemory().reach(first) < most; i++) {
-                        raids.cameHomeEmpty(level, a, raids.plan(level, a), numbers.tripTicks(), "the test");
+                        raids.scouts().cameHomeEmpty(level, a, raids.scouts().plan(level, a), numbers.tripTicks(), "the test");
                     }
-                    helper.assertTrue(a.scoutMemory().reach(first) == most && raids.range() == most,
+                    helper.assertTrue(a.scoutMemory().reach(first) == most && raids.scouts().range() == most,
                             "the reach did not grow to the most, " + most + ": " + a.scoutMemory().reach(first));
-                    Raids.Trip far = raids.plan(level, a);
+                    Scouts.Trip far = raids.scouts().plan(level, a);
                     helper.assertTrue(far != null && far.reach() == most && far.out() <= Math.ceil(most * search.outFar()) + 1,
                             "a trip at the most reach is " + far);
-                    raids.cameHomeEmpty(level, a, far, numbers.tripTicks(), "the test");
+                    raids.scouts().cameHomeEmpty(level, a, far, numbers.tripTicks(), "the test");
                     helper.assertTrue(a.scoutMemory().reach(first) == most, "the reach grew past the most: " + a.scoutMemory().reach(first));
                     helper.assertTrue(a.scoutMemory().emptyTrips() >= (most - first) / step + 1, "empty trips counted " + a.scoutMemory().emptyTrips());
 
@@ -1812,14 +1923,14 @@ public class MatabeleRaidTests {
                             + fedEdge + " at its whole reach, " + most + " blocks: scouts would pass feeding places over");
 
                     // a find 20 blocks out to the east: its way turns to the find, its reach shrinks back
-                    raids.foundBy(level, a, center.offset(20, 0, 0));
+                    raids.scouts().foundBy(level, a, center.offset(20, 0, 0));
                     helper.assertTrue(a.scoutMemory().reach(first) == Math.max(first, 20 + search.findMargin()) && a.scoutMemory().emptyTrips() == 0,
                             "after a find 20 out the scout's reach is " + a.scoutMemory().reach(first));
-                    helper.assertTrue(Math.abs(Raids.turnBetween(a.scoutMemory().heading(), 0.0)) < 0.05,
+                    helper.assertTrue(Math.abs(Scouts.turnBetween(a.scoutMemory().heading(), 0.0)) < 0.05,
                             "after a find to the east the scout's way is " + Math.round(Math.toDegrees(a.scoutMemory().heading())) + " degrees");
-                    helper.assertTrue(raids.range() == first, "after the find the colony's reach is " + raids.range());
-                    Raids.Trip after = raids.plan(level, a);
-                    helper.assertTrue(after != null && after.reach() == first && Math.abs(Raids.turnBetween(after.heading(), 0.0)) < 0.05,
+                    helper.assertTrue(raids.scouts().range() == first, "after the find the colony's reach is " + raids.scouts().range());
+                    Scouts.Trip after = raids.scouts().plan(level, a);
+                    helper.assertTrue(after != null && after.reach() == first && Math.abs(Scouts.turnBetween(after.heading(), 0.0)) < 0.05,
                             "the trip after the find is " + after);
                 })
                 .thenSucceed();
@@ -1854,14 +1965,14 @@ public class MatabeleRaidTests {
             }
         });
         helper.startSequence()
-                .thenWaitUntil(() -> helper.assertTrue(raids.headingsForTests().size() >= 3,
-                        "not 3 scouts out yet: " + raids.headingsForTests().size() + "; " + raids.describe(level)))
+                .thenWaitUntil(() -> helper.assertTrue(raids.scouts().headingsForTests().size() >= 3,
+                        "not 3 scouts out yet: " + raids.scouts().headingsForTests().size() + "; " + raids.describe(level)))
                 .thenExecute(() -> {
-                    List<Double> ways = new ArrayList<>(raids.headingsForTests().values());
+                    List<Double> ways = new ArrayList<>(raids.scouts().headingsForTests().values());
                     double smallest = 360;
                     for (int i = 0; i < ways.size(); i++) {
                         for (int j = i + 1; j < ways.size(); j++) {
-                            smallest = Math.min(smallest, Math.toDegrees(Math.abs(Raids.turnBetween(ways.get(i), ways.get(j)))));
+                            smallest = Math.min(smallest, Math.toDegrees(Math.abs(Scouts.turnBetween(ways.get(i), ways.get(j)))));
                         }
                     }
                     helper.assertTrue(smallest >= 30, "two scouts of one colony set out only " + Math.round(smallest) + " degrees apart");
@@ -1877,7 +1988,7 @@ public class MatabeleRaidTests {
                         if (i >= 2) {
                             double before = Math.atan2(steps.get(i - 1).getZ() - steps.get(i - 2).getZ(), steps.get(i - 1).getX() - steps.get(i - 2).getX());
                             double now = Math.atan2(steps.get(i).getZ() - steps.get(i - 1).getZ(), steps.get(i).getX() - steps.get(i - 1).getX());
-                            if (Math.abs(Raids.turnBetween(before, now)) > Math.toRadians(15)) {
+                            if (Math.abs(Scouts.turnBetween(before, now)) > Math.toRadians(15)) {
                                 turns++;
                             }
                         }
@@ -1940,15 +2051,15 @@ public class MatabeleRaidTests {
                 .thenExecute(() -> helper.assertTrue(pile.stock(level, 1) == 1, "the pile did not take a layer")) // (a layer feeds 20 of the 40)
                 .thenExecute(() -> helper.assertTrue(raids.fedShare() >= 0.4 && raids.isHungry(),
                         "the colony is " + Math.round(raids.fedShare() * 100) + " percent fed, not about half"))
-                .thenWaitUntil(() -> helper.assertTrue(!raids.finds().isEmpty(), "no find yet (" + raids.passedOverCount() + " passed over); "
+                .thenWaitUntil(() -> helper.assertTrue(!raids.finds().isEmpty(), "no find yet (" + raids.scouts().passedOverCount() + " passed over); "
                         + raids.describe(level)))
                 .thenExecute(() -> {
                     Raids.Find find = raids.finds().get(0);
                     helper.assertTrue(group.stream().anyMatch(termite -> termite.blockPosition().closerThan(find.at(), 6)),
                             "the find at " + find.at().toShortString() + " is not at the group of four");
                     helper.assertTrue(find.worth() >= 9, "the group of four scored worth only " + find.worth());
-                    helper.assertTrue(raids.passedOverCount() >= 1, "the scouts passed no lone termite over on their way out to the group");
-                    SavannaMod.LOGGER.info("[choosy scout test] found at {}, {} passed over: {}", helper.getTick(), raids.passedOverCount(),
+                    helper.assertTrue(raids.scouts().passedOverCount() >= 1, "the scouts passed no lone termite over on their way out to the group");
+                    SavannaMod.LOGGER.info("[choosy scout test] found at {}, {} passed over: {}", helper.getTick(), raids.scouts().passedOverCount(),
                             raids.describe(level));
                 })
                 .thenSucceed();
@@ -2031,16 +2142,16 @@ public class MatabeleRaidTests {
             }
         });
         helper.startSequence()
-                .thenWaitUntil(() -> helper.assertTrue(raids.moundsNoticed() >= 1, "no scout noticed the living mound yet; " + raids.describe(level)))
+                .thenWaitUntil(() -> helper.assertTrue(raids.scouts().moundsNoticed() >= 1, "no scout noticed the living mound yet; " + raids.describe(level)))
                 .thenWaitUntil(() -> helper.assertTrue(!raids.finds().isEmpty(), "no find yet; " + raids.describe(level)))
                 .thenExecute(() -> {
                     Raids.Find find = raids.finds().get(0);
                     helper.assertTrue(group.stream().anyMatch(termite -> termite.blockPosition().closerThan(find.at(), 6)),
                             "the find at " + find.at().toShortString() + " is not at the four termites at the east tunnel's end; " + raids.describe(level));
                     helper.assertTrue(find.worth() >= 9, "the four termites scored worth only " + find.worth());
-                    helper.assertTrue(raids.tunnelsFollowed() >= 1 && raids.clueFinds() >= 1,
-                            "the find was not made by following a tunnel from the mound (" + raids.tunnelsFollowed() + " followed, "
-                                    + raids.clueFinds() + " clue finds); " + raids.describe(level));
+                    helper.assertTrue(raids.scouts().tunnelsFollowed() >= 1 && raids.scouts().clueFinds() >= 1,
+                            "the find was not made by following a tunnel from the mound (" + raids.scouts().tunnelsFollowed() + " followed, "
+                                    + raids.scouts().clueFinds() + " clue finds); " + raids.describe(level));
                     // (scouts search like real ants: the find 40 out sets the finder's reach to 48, so the colony's reach is no
                     // sign of how it was found any more; the clue counts above are)
                     List<BlockPos> line = find.trail();
@@ -2235,7 +2346,7 @@ public class MatabeleRaidTests {
         SavannaMod.LOGGER.info("[bumps test] {} Matabele, {} rooms, the find at {} worth {}, its trail {} points, {} blocks; the scout at {}",
                 ants.size(), rooms.size(), find.at().toShortString(), find.worth(), find.trail().size(), Math.round(trailLength),
                 scoutAt.toShortString());
-        RaidColumn[] column = {null};
+        Raid[] column = {null};
         long[] marchFrom = {-1};
         long[] frontOutAt = {-1};
         long[] gatherAt = {-1};
@@ -2251,22 +2362,22 @@ public class MatabeleRaidTests {
         int[] nearFront = {0, 0};
         double[] spreadAtGather = {0.0};
         helper.onEachTick(() -> {
-            RaidColumn raid = column[0];
+            Raid raid = column[0];
             if (raid == null) {
                 return;
             }
             long now = helper.getTick();
-            RaidColumn.Stage stage = raids.column() == raid ? raid.stage() : null;
-            if (stage == RaidColumn.Stage.MARCHING && marchFrom[0] < 0) {
+            Raid.Stage stage = raids.column() == raid ? raid.stage() : null;
+            if (stage == Raid.Stage.MARCH_OUT && marchFrom[0] < 0) {
                 marchFrom[0] = now;
             }
-            if (attackAt[0] < 0 && (stage == null || stage.ordinal() >= RaidColumn.Stage.ATTACKING.ordinal())) {
+            if (attackAt[0] < 0 && (stage == null || stage.ordinal() >= Raid.Stage.ATTACK.ordinal())) {
                 attackAt[0] = now;
             }
             if (!(level.getEntity(raid.leader()) instanceof MatabeleEntity lead)) {
                 return;
             }
-            if (stage == RaidColumn.Stage.GATHERING && gatherAt[0] < 0) {
+            if (stage == Raid.Stage.HALT && gatherAt[0] < 0) {
                 gatherAt[0] = now;
                 frontAlongAtGather[0] = raid.alongOut(lead.position());
                 // How much of the column came with the front: raiders out within 15 blocks of it as it got there.
@@ -2283,7 +2394,7 @@ public class MatabeleRaidTests {
                 }
                 spreadAtGather[0] = farthest;
             }
-            if (stage != RaidColumn.Stage.MARCHING) {
+            if (stage != Raid.Stage.MARCH_OUT) {
                 return;
             }
             boolean frontOut = raid.isOutForTests(level, lead);
@@ -2313,7 +2424,7 @@ public class MatabeleRaidTests {
                     BlockPos cell = ant.blockPosition();
                     stallSpots.merge(cell, 1, Integer::sum);
                     if (stalls.size() < 12) {
-                        RaidColumn.Order order = raid.orderNow(id);
+                        Raid.Order order = raid.orderNow(id);
                         stalls.add(id.toString().substring(0, 4) + " at " + String.format(java.util.Locale.ROOT, "%.1f,%.1f,%.1f", at.x, at.y, at.z)
                                 + " (" + (now - marchFrom[0]) / 20 + " s, " + Math.round(raid.alongOut(at)) + " along, the front "
                                 + Math.round(frontAlong) + "; going to " + (order == null || order.to() == null ? "-" : order.to().toShortString())
@@ -2325,7 +2436,9 @@ public class MatabeleRaidTests {
         helper.startSequence()
                 .thenIdle(2)
                 .thenExecute(() -> {
-                    RaidColumn raid = raids.raidByCommandForTests(level, find);
+                    // (the raid rewrite: the saved place holds no termites, and no raid sets out to a spot with none)
+                    MatabeleScenes.termitesAt(helper, find.at());
+                    Raid raid = raids.raidByCommandForTests(level, find);
                     if (raid == null && raids.column() != null) {
                         raid = raids.column(); // (the colony set one out by itself to the same find in the raid hours)
                     }
@@ -2348,7 +2461,7 @@ public class MatabeleRaidTests {
                 .thenWaitUntil(() -> helper.assertTrue(attackAt[0] >= 0, "the raid did not get to the attack; "
                         + (column[0] == null ? "no column" : column[0].describe())))
                 .thenExecute(() -> {
-                    RaidColumn raid = column[0];
+                    Raid raid = column[0];
                     long dropped = setOut.stream().filter(id -> !raid.members().contains(id)).count();
                     double marchS = gatherAt[0] < 0 || frontOutAt[0] < 0 ? Double.NaN : (gatherAt[0] - frontOutAt[0]) / 20.0;
                     double speed = Double.isNaN(marchS) || marchS <= 0.0 ? Double.NaN : frontAlongAtGather[0] / marchS;

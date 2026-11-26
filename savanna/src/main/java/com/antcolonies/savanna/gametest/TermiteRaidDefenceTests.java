@@ -109,8 +109,27 @@ public class TermiteRaidDefenceTests {
                     if (sealedAt[0] < 0 && level.getBlockState(plug).is(colony.profile().nest().plugState().getBlock())) {
                         sealedAt[0] = tick;
                         helper.assertTrue(drummed[0], "the soldiers by the break never drummed");
-                        helper.assertTrue(raid.isShutOut(byTheBreak.getUUID()) && raid.isShutOut(beside.getUUID()),
-                                "the soldiers by the break should be shut out by the seal");
+                        if (!(raid.isShutOut(byTheBreak.getUUID()) && raid.isShutOut(beside.getUUID()))) {
+                            // (BUGS 211: where each soldier stood, its task and goals, when the seal went in)
+                            Vec3 breakMid = Vec3.atCenterOf(breakAt);
+                            StringBuilder where = new StringBuilder();
+                            for (TermiteSoldierEntity soldier : new TermiteSoldierEntity[] {byTheBreak, beside}) {
+                                where.append("; ").append(soldier == byTheBreak ? "byTheBreak" : "beside").append(" at ")
+                                        .append(String.format("%.2f,%.2f,%.2f", soldier.getX(), soldier.getY(), soldier.getZ()))
+                                        .append(" shut out ").append(raid.isShutOut(soldier.getUUID()))
+                                        .append(String.format(" distance %.2f", soldier.position().distanceTo(breakMid)))
+                                        .append(" tunnel index ").append(cells.indexOf(soldier.blockPosition()))
+                                        .append(" alive ").append(soldier.isAlive()).append(" downed ").append(soldier.isDowned())
+                                        .append(" riding ").append(soldier.getVehicle() == null ? "-" : soldier.getVehicle().getType().toShortString())
+                                        .append(" task ").append(colony.part(SavannaParts.ALARM).map(alarm -> String.valueOf(alarm.taskFor(level, soldier))).orElse("-"))
+                                        .append(" goals ").append(soldier.goalSelector.getAvailableGoals().stream()
+                                                .filter(net.minecraft.world.entity.ai.goal.WrappedGoal::isRunning)
+                                                .map(goal -> goal.getGoal().getClass().getSimpleName()).toList());
+                            }
+                            helper.fail("the soldiers by the break should be shut out by the seal: tunnel " + cells + ", break "
+                                    + breakAt.toShortString() + " (index " + at + "), plug " + plug.toShortString() + String.format(
+                                            " plugToBreak %.2f", Math.sqrt(plug.distSqr(breakAt))) + where + "; " + raid.describe(level));
+                        }
                         // (the rework, step 3: the seal waits for a soldier just inside, so the one from the nest may have
                         // run out past it and be shut out with the others; never one still on the nest's side)
                         helper.assertTrue(!raid.isShutOut(deepIn.getUUID())
@@ -589,7 +608,7 @@ public class TermiteRaidDefenceTests {
                 // not keep it going), or after its longest time; what is counted is what had happened by then.
                 if (leftAt[0] < 0) {
                     boolean breaking = ants.stream().anyMatch(ant -> ant.isAlive() && ant.breaksIn() && ant.getFightSpot() != null);
-                    if (com.antcolonies.savanna.colony.RaidColumn.preyAbout(level, null, breakAt, 10.0, breaking)) {
+                    if (preyAbout(level, breakAt, 10.0, breaking)) {
                         preyAt[0] = since;
                     }
                     for (MatabeleEntity ant : ants) {
@@ -720,6 +739,21 @@ public class TermiteRaidDefenceTests {
     }
 
     /** A grown-up-at time that makes a worker a builder now (past nursing, not yet a forager). */
+    /**
+     * The measuring scene's own "is prey still about the spot" (it was the old raid column's rule, kept here when the
+     * raid rewrite gave the raid one judge of its own, so the alarm rework's measured numbers stay comparable): a living
+     * termite worker, not stung, not sheltered, within reach, in the open or not shut in ({@code breaking}: a major still
+     * breaks a way in, so the shut in count too). Soldiers alone never count.
+     */
+    private static boolean preyAbout(ServerLevel level, BlockPos at, double reach, boolean breaking) {
+        return !level.getEntitiesOfClass(com.antcolonies.entity.AbstractAntEntity.class, new net.minecraft.world.phys.AABB(at).inflate(reach, 6.0, reach),
+                insect -> insect.isAlive() && !insect.isParalysed() && !insect.isDowned() && !(insect instanceof MatabeleEntity)
+                        && Math.hypot(insect.getX() - at.getX() - 0.5, insect.getZ() - at.getZ() - 0.5) <= reach + 0.5
+                        && !insect.isSheltered() && !(insect instanceof TermiteSoldierEntity)
+                        && (breaking || com.antcolonies.fight.Fights.isInTheOpen(level, insect.blockPosition())
+                                || !com.antcolonies.fight.Fights.isShutIn(level, insect.blockPosition()))).isEmpty();
+    }
+
     private static long builderAge(ServerLevel level, Colony colony) {
         int nurse = colony.profile().worker().nurseUntilTicks();
         int builder = colony.profile().worker().builderUntilTicks();

@@ -104,11 +104,6 @@ public final class ScentTrails {
             return shape;
         }
 
-        /** How many of its points wait for their land to load (tests). */
-        public int unsureCount() {
-            return unsure.cardinality();
-        }
-
         public boolean isBroken(int point) {
             return broken.get(point);
         }
@@ -116,10 +111,6 @@ public final class ScentTrails {
         /** How many of its points are broken now. */
         public int brokenCount() {
             return broken.cardinality();
-        }
-
-        public long laidAt() {
-            return laidAt;
         }
 
         public boolean byColumn() {
@@ -314,16 +305,20 @@ public final class ScentTrails {
         return trail;
     }
 
-    /** The freshest trail still smelt that leads to within {@code within} blocks of this spot; null if none. */
+    /** BUGS 360: the trail with this id, smelt or not; null if none (0 is no trail). */
     @Nullable
-    public Trail liveTo(BlockPos at, double within, SavannaNumbers.TrailNumbers numbers, long now) {
-        Trail best = null;
+    public Trail byId(int id) {
         for (Trail trail : trails) {
-            if (trail.alive(numbers, now) && trail.to.closerThan(at, within) && (best == null || trail.laidAt > best.laidAt)) {
-                best = trail;
+            if (id != 0 && trail.id == id) {
+                return trail;
             }
         }
-        return best;
+        return null;
+    }
+
+    /** BUGS 360: a find's old line, replaced by its scout's newer one, is no trail any more. */
+    void drop(Trail trail) {
+        trails.remove(trail);
     }
 
     /**

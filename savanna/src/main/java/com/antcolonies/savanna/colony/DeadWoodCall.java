@@ -86,7 +86,9 @@ final class DeadWoodCall {
                         continue;
                     }
                     int reach = call.reachFor(wood.blocks());
-                    if (reach > 0 && nearAny(wood.foot(), from, reach)) {
+                    // (BUGS 310: heard from its nearest wood lying open on the ground, as the colony smells it, not only
+                    // from its foot, the block nearest the nest's middle, which may lie on the far side of a big tree)
+                    if (reach > 0 && wood.grounded().stream().anyMatch(block -> nearAny(block, from, reach))) {
                         colony.foodMap().learn(wood.foot());
                         learnt.add(wood.foot());
                         SavannaMod.LOGGER.debug("[wood-call] colony {} senses dead wood of {} blocks at {} (heard from {} blocks)",
@@ -128,8 +130,8 @@ final class DeadWoodCall {
         return wood.foot();
     }
 
-    /** A piece of dead wood: how many blocks and its foot. */
-    record Wood(int blocks, BlockPos foot) {
+    /** A piece of dead wood: how many blocks, its foot, and every block of it lying open on the ground. */
+    record Wood(int blocks, BlockPos foot, List<BlockPos> grounded) {
     }
 
     /**
@@ -144,15 +146,18 @@ final class DeadWoodCall {
         measured.add(start);
         int blocks = 0;
         BlockPos foot = null;
+        List<BlockPos> grounded = new ArrayList<>();
         BlockPos center = colony.getCenter();
         while (!open.isEmpty() && blocks < MOST) {
             BlockPos pos = open.poll();
             blocks++;
             BlockPos below = pos.below();
             BlockState under = level.getBlockState(below);
-            if (!isDeadWood(under) && under.isFaceSturdy(level, below, Direction.UP) && (foot == null || pos.getY() < foot.getY()
-                    || pos.getY() == foot.getY() && pos.distSqr(center) < foot.distSqr(center)) && isUncovered(level, pos)) {
-                foot = pos;
+            if (!isDeadWood(under) && under.isFaceSturdy(level, below, Direction.UP) && isUncovered(level, pos)) {
+                grounded.add(pos);
+                if (foot == null || pos.getY() < foot.getY() || pos.getY() == foot.getY() && pos.distSqr(center) < foot.distSqr(center)) {
+                    foot = pos;
+                }
             }
             for (Direction side : Direction.values()) {
                 BlockPos next = pos.relative(side);
@@ -164,7 +169,7 @@ final class DeadWoodCall {
                 }
             }
         }
-        return foot == null ? null : new Wood(blocks, foot);
+        return foot == null ? null : new Wood(blocks, foot, grounded);
     }
 
     /**

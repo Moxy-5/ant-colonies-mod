@@ -69,8 +69,13 @@ public class TadpoleEntity extends AbstractSchoolingFish implements GeoEntity {
     /** What it is doing to be seen (synced): nothing, or grazing a mat. */
     public static final byte NONE = 0, GRAZE = 1;
     private static final EntityDataAccessor<Byte> DATA_ACTION = SynchedEntityData.defineId(TadpoleEntity.class, EntityDataSerializers.BYTE);
-    /** Its age in ticks (synced: the leg buds show from {@link #LEGS_AT}). */
-    private static final EntityDataAccessor<Integer> DATA_AGE = SynchedEntityData.defineId(TadpoleEntity.class, EntityDataSerializers.INT);
+    /**
+     * Whether its leg buds show (synced, set once at {@link #LEGS_AT}). Its age itself is the server's own count (review
+     * R10-9: the age was synced and changed every tick, so every tadpole sent every player a packet every tick).
+     */
+    private static final EntityDataAccessor<Boolean> DATA_LEGS = SynchedEntityData.defineId(TadpoleEntity.class, EntityDataSerializers.BOOLEAN);
+    /** Its age in ticks (the server's; saved). */
+    private int age;
     /** The leg buds show from the start of day 3, and it climbs out a froglet at the end of it (ticks). */
     public static final int LEGS_AT = 2 * 24000, FROGLET_AT = 3 * 24000;
     /**
@@ -109,14 +114,14 @@ public class TadpoleEntity extends AbstractSchoolingFish implements GeoEntity {
     protected void registerGoals() {
         super.registerGoals();
         goalSelector.addGoal(2, new AvoidEntityGoal<>(this, LivingEntity.class, PART_FROM, 1.3, 1.5, BarbEntity::isHunter));
-        goalSelector.addGoal(4, new TadpoleGrazeGoal(this));
+        goalSelector.addGoal(3, new TadpoleGrazeGoal(this));     // over Minecraft's random swim (4), else a swim held off the graze roll (BUGS 302)
     }
 
     @Override
     protected void defineSynchedData(SynchedEntityData.Builder builder) {
         super.defineSynchedData(builder);
         builder.define(DATA_ACTION, NONE);
-        builder.define(DATA_AGE, 0);
+        builder.define(DATA_LEGS, false);
     }
 
     public byte action() {
@@ -129,11 +134,14 @@ public class TadpoleEntity extends AbstractSchoolingFish implements GeoEntity {
 
     /** Its age (ticks since it hatched). */
     public int age() {
-        return entityData.get(DATA_AGE);
+        return age;
     }
 
     public void setAge(int ticks) {
-        entityData.set(DATA_AGE, Math.max(0, ticks));
+        age = Math.max(0, ticks);
+        if (!level().isClientSide) {
+            entityData.set(DATA_LEGS, age >= LEGS_AT);      // (sent only when it changes)
+        }
     }
 
     /** The bullfrog that guarded the eggs it hatched from (null for the world's own spawns). */
@@ -148,7 +156,7 @@ public class TadpoleEntity extends AbstractSchoolingFish implements GeoEntity {
 
     /** Whether its hind leg buds show (day 3 on). */
     public boolean hasLegs() {
-        return age() >= LEGS_AT;
+        return entityData.get(DATA_LEGS);
     }
 
     /** A strike nearby (a catfish's lunge, a crocodile's snap): it darts straight away from the hunter. */
@@ -202,8 +210,7 @@ public class TadpoleEntity extends AbstractSchoolingFish implements GeoEntity {
      */
     void becomeFroglet(ServerLevel level) {
         EntityType<BullfrogEntity> frog = SavannaEntities.BULLFROG.get();
-        if (RoomToBreed.leftAt(level, blockPosition(), frog, AnimalLives.get(frog).localLimit()) > 0
-                && RoomToBreed.groupHasRoom(level, frog.getCategory(), new net.minecraft.world.level.ChunkPos(blockPosition()))) {
+        if (RoomToBreed.leftAt(level, blockPosition(), frog, AnimalLives.get(frog).localLimit()) > 0) {
             BullfrogEntity froglet = frog.create(level);
             if (froglet != null) {
                 froglet.moveTo(getX(), getY(), getZ(), getYRot(), 0.0F);

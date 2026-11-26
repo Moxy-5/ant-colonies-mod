@@ -1100,16 +1100,33 @@ public final class TreePlacer {
         BlockPos.MutableBlockPos pos = new BlockPos.MutableBlockPos();
         int removed = 0;
         for (int i = 0; i < tree.size(); i++) {
-            if (tree.ys()[i] < 0) {
-                continue; // the roots stay in the ground
-            }
             pos.set(foot.getX() + tree.xs()[i], foot.getY() + tree.ys()[i], foot.getZ() + tree.zs()[i]);
+            if (tree.ys()[i] < 0) {
+                // The roots stay in the ground; but a little tree's thin stem under the ground is a branch post in a pit
+                // once the tree is gone (review R7-17): the soil closes over it.
+                if (tree.states()[i].getBlock() instanceof TreeBranchBlock && same(level.getBlockState(pos), tree.states()[i])) {
+                    level.setBlock(pos, soilBeside(level, pos, tree.ys()[i] == -1), flags);
+                    removed++;
+                }
+                continue;
+            }
             if (same(level.getBlockState(pos), tree.states()[i])) {
                 level.setBlock(pos, Blocks.AIR.defaultBlockState(), flags);
                 removed++;
             }
         }
         return removed;
+    }
+
+    /** The soil that closes a hole in the ground: what lies beside it (grass, sand, dirt), else grass on top and dirt below. */
+    private static BlockState soilBeside(LevelAccessor level, BlockPos pos, boolean top) {
+        for (Direction d : Direction.Plane.HORIZONTAL) {
+            BlockState beside = level.getBlockState(pos.relative(d));
+            if (isSoil(beside)) {
+                return beside.getBlock().defaultBlockState();
+            }
+        }
+        return (top ? Blocks.GRASS_BLOCK : Blocks.DIRT).defaultBlockState();
     }
 
     /** Air, or a plant or snow a tree may grow through (grass, flowers, dry grass); never water. */

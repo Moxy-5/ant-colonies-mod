@@ -552,6 +552,9 @@ public class FoodStore {
         Set<BlockPos> nest = null;
         for (net.minecraft.core.Direction direction : net.minecraft.core.Direction.values()) {
             BlockPos next = food.relative(direction);
+            if (!LandReady.at(level, next)) {
+                continue; // (BUGS 316: land not loaded is never read)
+            }
             if (colony.nest().isInside(level, next) && (Nest.isDugOut(level, next) || FoodCast.isCast(level.getBlockState(next)))) {
                 if (nest == null) {
                     nest = colony.nest().nestCells(level);

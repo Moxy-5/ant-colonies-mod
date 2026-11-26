@@ -271,7 +271,7 @@ public final class SavannaNumbers {
      * {@code breach} round a broken wall; that reach shrinks by {@code fadePerSecond} blocks a second from the last
      * thing that fed the trouble (so footsteps are over in 30 s, a foe or a breach 80 s after the last of it); the
      * drumming runs out from it at {@code drumSpeed} blocks a second (real: about 1.3 m a second, Hager and Kirchner
-     * 2013); something new within {@code mergeWithin} blocks of a trouble feeds that one. My picks but the speed.
+     * 2013, so 43.3 blocks a second at the mod's scale of 1 block = 30 mm; the user, 2026-11-25); something new within {@code mergeWithin} blocks of a trouble feeds that one. My picks but the speed.
      */
     public record AlarmNumbers(double felt, double foe, double breach, double fadePerSecond, double drumSpeed, double mergeWithin) {
         public static final Codec<AlarmNumbers> CODEC = RecordCodecBuilder.create(i -> i.group(
@@ -279,7 +279,7 @@ public final class SavannaNumbers {
                 Codec.DOUBLE.optionalFieldOf("foe", 16.0).forGetter(AlarmNumbers::foe),
                 Codec.DOUBLE.optionalFieldOf("breach", 16.0).forGetter(AlarmNumbers::breach),
                 Codec.DOUBLE.optionalFieldOf("fade_per_second", 0.2).forGetter(AlarmNumbers::fadePerSecond),
-                Codec.DOUBLE.optionalFieldOf("drum_speed", 1.3).forGetter(AlarmNumbers::drumSpeed),
+                Codec.DOUBLE.optionalFieldOf("drum_speed", 43.3).forGetter(AlarmNumbers::drumSpeed),
                 Codec.DOUBLE.optionalFieldOf("merge_within", 8.0).forGetter(AlarmNumbers::mergeWithin)
         ).apply(i, AlarmNumbers::new));
 
@@ -588,7 +588,7 @@ public final class SavannaNumbers {
     }
 
     /**
-     * Raid rework R7, hours and sound ({@code colony.Raids}, {@code colony.RaidColumn}). Raids end by dusk (the user's
+     * Raid rework R7, hours and sound ({@code colony.Raids}, {@code colony.Raid}). Raids end by dusk (the user's
      * answer, 2026-11-04): none leaves after the evening raid hours end (19:00 in {@code raids.scouting.hours}), and a raid
      * still out at {@code dusk} (19:30) stops where it is, picks up what it stung and walks home; until the morning's first
      * raid hour it stays dusk (a find made meanwhile waits for the morning). Rare night raids in the hot season wait for
@@ -647,17 +647,16 @@ public final class SavannaNumbers {
      * ({@link CatchNumbers}), never more than {@code mostTakeShare} of the real termites the termite colony's workers
      * inside stand for, taken from its numbers (the workers feeding under the mud at the spot; M8 step 3d). A share
      * {@code lostShare} of the raiders dies, {@code hurtShare} comes home hurt. At most {@code mostRaidsADay} raids a day
-     * (1 to 4, Yusuf 2026). A raid leaves only if its attack starts before dusk. A spot is the termite colony's within
-     * {@code termiteReach} blocks of its mound's middle. No raid out of sight to a spot a player is within
-     * {@code playerNear} blocks of (that one needs real ants). Out of sight the scouts are numbers too: each scouting hour
+     * (1 to 4, Yusuf 2026). A spot is the termite colony's within {@code termiteReach} blocks of its mound's middle.
+     * Out of sight the scouts are numbers too: each scouting hour
      * each scout the colony would send finds, with {@code scoutFindChance}, one of the termites' feeding places it does
      * not know yet within its reach (the termite colony's ways out to food), scored {@code scoutWorthLeast} to
      * {@code scoutWorthMost}. Every number my pick, to confirm.
      */
     public record AwayRaidNumbers(double pace, int fightTicks, double mostTakeShare, double lostShare,
-                                  double hurtShare, int mostRaidsADay, int termiteReach, int playerNear, double scoutFindChance,
+                                  double hurtShare, int mostRaidsADay, int termiteReach, double scoutFindChance,
                                   int scoutWorthLeast, int scoutWorthMost) {
-        public static final AwayRaidNumbers DEFAULT = new AwayRaidNumbers(1.5, 1200, 0.1, 0.01, 0.03, 4, 80, 64, 0.25, 6, 18);
+        public static final AwayRaidNumbers DEFAULT = new AwayRaidNumbers(1.5, 1200, 0.1, 0.01, 0.03, 4, 80, 0.25, 6, 18);
         public static final Codec<AwayRaidNumbers> CODEC = RecordCodecBuilder.create(i -> i.group(
                 Codec.DOUBLE.optionalFieldOf("pace", DEFAULT.pace()).forGetter(AwayRaidNumbers::pace),
                 Codec.INT.optionalFieldOf("fight_ticks", DEFAULT.fightTicks()).forGetter(AwayRaidNumbers::fightTicks),
@@ -666,7 +665,6 @@ public final class SavannaNumbers {
                 Codec.DOUBLE.optionalFieldOf("hurt_share", DEFAULT.hurtShare()).forGetter(AwayRaidNumbers::hurtShare),
                 Codec.INT.optionalFieldOf("most_raids_a_day", DEFAULT.mostRaidsADay()).forGetter(AwayRaidNumbers::mostRaidsADay),
                 Codec.INT.optionalFieldOf("termite_reach", DEFAULT.termiteReach()).forGetter(AwayRaidNumbers::termiteReach),
-                Codec.INT.optionalFieldOf("player_near", DEFAULT.playerNear()).forGetter(AwayRaidNumbers::playerNear),
                 Codec.DOUBLE.optionalFieldOf("scout_find_chance", DEFAULT.scoutFindChance()).forGetter(AwayRaidNumbers::scoutFindChance),
                 Codec.INT.optionalFieldOf("scout_worth_least", DEFAULT.scoutWorthLeast()).forGetter(AwayRaidNumbers::scoutWorthLeast),
                 Codec.INT.optionalFieldOf("scout_worth_most", DEFAULT.scoutWorthMost()).forGetter(AwayRaidNumbers::scoutWorthMost)
@@ -692,7 +690,7 @@ public final class SavannaNumbers {
     }
 
     /**
-     * M8 step 3b, the raid column ({@code colony.RaidColumn}; real Megaponera: the scout home from a find recruits a raid
+     * M8 step 3b, the raid column ({@code colony.Raid}; real Megaponera: the scout home from a find recruits a raid
      * in proportion to the termites it found, Frank et al. 2018, and leads it out along its scent line). The raid's size
      * (M8 step 3d): the share of the colony's workers it can spare, from {@code leastShare} for a fed colony to
      * {@code mostShare} for a starving one (30 to 75 percent, Yusuf 2026), all of it for a find worth {@code richWorth} or
@@ -701,12 +699,15 @@ public final class SavannaNumbers {
      * still in the nest {@code formTicks} after the column left stays home. On the march (the stream, 2026-11-08) each raider
      * keeps {@code spacing} blocks of trail behind the one ahead of it, side by side left to the legs. The column stops {@code stopShort} blocks short of the find and bunches up (at
      * most {@code gatherTicks}), then attacks all at once, fighting at most {@code fightTicks}; after the fight it
-     * regroups there (at most {@code regroupTicks}) and walks home, everyone home or let go after {@code homeTicks}.
-     * Every number my pick, to confirm.
+     * regroups there (at most {@code regroupTicks}) and walks home (a march's own limit is in {@code colony.Raid}).
+     * The raid rewrite's stage deadlines: the muster at most {@code musterTicks}, a bunch at least
+     * {@code bunchLeastTicks}, the look round an empty spot {@code lookTicks}, a raider fighting farther than
+     * {@code leash} blocks from the spot called back. Every number my pick, to confirm.
      */
     public record ColumnNumbers(double richWorth, int leastRaid, double leastShare, double mostShare, int mostReal, int formTicks,
                                 double spacing, int stopShort,
-                                int gatherTicks, int fightTicks, int regroupTicks, int homeTicks) {
+                                int gatherTicks, int fightTicks, int regroupTicks,
+                                int musterTicks, int bunchLeastTicks, int lookTicks, double leash) {
         public static final Codec<ColumnNumbers> CODEC = RecordCodecBuilder.create(i -> i.group(
                 Codec.DOUBLE.optionalFieldOf("rich_worth", 6.0).forGetter(ColumnNumbers::richWorth),
                 Codec.INT.optionalFieldOf("least_raid", 10).forGetter(ColumnNumbers::leastRaid),
@@ -719,40 +720,35 @@ public final class SavannaNumbers {
                 Codec.INT.optionalFieldOf("gather_ticks", 300).forGetter(ColumnNumbers::gatherTicks),
                 Codec.INT.optionalFieldOf("fight_ticks", 2400).forGetter(ColumnNumbers::fightTicks),
                 Codec.INT.optionalFieldOf("regroup_ticks", 400).forGetter(ColumnNumbers::regroupTicks),
-                Codec.INT.optionalFieldOf("home_ticks", 3600).forGetter(ColumnNumbers::homeTicks)
+                Codec.INT.optionalFieldOf("muster_ticks", 400).forGetter(ColumnNumbers::musterTicks),
+                Codec.INT.optionalFieldOf("bunch_least_ticks", 100).forGetter(ColumnNumbers::bunchLeastTicks),
+                Codec.INT.optionalFieldOf("look_ticks", 200).forGetter(ColumnNumbers::lookTicks),
+                Codec.DOUBLE.optionalFieldOf("leash", 14.0).forGetter(ColumnNumbers::leash)
         ).apply(i, ColumnNumbers::new));
     }
     /**
-     * M8 step 3c, home with the prey ({@code colony.RaidColumn}, {@code entity.goal.BringPreyGoal}; real Megaponera: after
+     * M8 step 3c, home with the prey ({@code colony.Raid}, {@code entity.goal.BringPreyGoal}; real Megaponera: after
      * the fight the raiders gather the stung termites, a major carrying a bundle of up to about 12 in its jaws, a minor 1 to
      * 3, Yusuf 2026, and walk home as a column). How many a worker can hold grows with its length: a major from
      * {@code leastMajor} (the shortest drawn with the major's model) to {@code mostMajor} (the longest), a minor from
-     * {@code leastMinor} to {@code mostMinor}. After the fight the raiders pick up the paralysed termites lying within
-     * {@code collectReach} blocks of the find, workers first (at most {@code collectTicks}), each pick-up a pause of
-     * {@code pickTicks}. A raid that found nothing spreads out round the spot up to {@code spreadReach} blocks for
-     * {@code spreadTicks}, any raider seeing a termite within {@code spreadSee} blocks going for it, then collects what it
-     * stung. Laden, the column walks home at {@code ladenPace} of its pace. At home the carriers lay their termites on the
+     * {@code leastMinor} to {@code mostMinor}. In the regroup the raiders pick up the termites on the raid's own list of
+     * what it stung, workers first, each pick-up a pause of {@code pickTicks}. Laden, the column walks home at
+     * {@code ladenPace} of its pace. At home the carriers lay their termites on the
      * prey pile, {@code termitesPerLayer} to a layer (a carrier that finds no way to the pile in {@code bringTicks} has them
      * laid there out of sight). A raider that leaves the column hurt (crippled, or a termite soldier clamped on a leg)
      * follows the raid's trail home by itself, for at most {@code limpTicks}. Every number my pick, to confirm, but the
      * loads (real).
      */
-    public record CarryNumbers(int leastMajor, int mostMajor, int leastMinor, int mostMinor, double collectReach, int collectTicks,
-                               int pickTicks, int spreadTicks, double spreadReach, double spreadSee, double ladenPace,
+    public record CarryNumbers(int leastMajor, int mostMajor, int leastMinor, int mostMinor, int pickTicks, double ladenPace,
                                int termitesPerLayer, int bringTicks, int limpTicks) {
-        /** The carry numbers when a species file has none (the same as Megaponera's; were {@code RaidColumn.DEFAULT_CARRY}). */
-        public static final CarryNumbers DEFAULT = new CarryNumbers(4, 10, 1, 3, 10.0, 1200, 10, 600, 8.0, 5.0, 0.85, 10, 2400, 6000);
+        /** The carry numbers when a species file has none (the same as Megaponera's; were {@code Raid.DEFAULT_CARRY}). */
+        public static final CarryNumbers DEFAULT = new CarryNumbers(4, 10, 1, 3, 10, 0.85, 10, 2400, 6000);
         public static final Codec<CarryNumbers> CODEC = RecordCodecBuilder.create(i -> i.group(
                 Codec.INT.optionalFieldOf("least_major", 4).forGetter(CarryNumbers::leastMajor),
                 Codec.INT.optionalFieldOf("most_major", 10).forGetter(CarryNumbers::mostMajor),
                 Codec.INT.optionalFieldOf("least_minor", 1).forGetter(CarryNumbers::leastMinor),
                 Codec.INT.optionalFieldOf("most_minor", 3).forGetter(CarryNumbers::mostMinor),
-                Codec.DOUBLE.optionalFieldOf("collect_reach", 10.0).forGetter(CarryNumbers::collectReach),
-                Codec.INT.optionalFieldOf("collect_ticks", 1200).forGetter(CarryNumbers::collectTicks),
                 Codec.INT.optionalFieldOf("pick_ticks", 10).forGetter(CarryNumbers::pickTicks),
-                Codec.INT.optionalFieldOf("spread_ticks", 600).forGetter(CarryNumbers::spreadTicks),
-                Codec.DOUBLE.optionalFieldOf("spread_reach", 8.0).forGetter(CarryNumbers::spreadReach),
-                Codec.DOUBLE.optionalFieldOf("spread_see", 5.0).forGetter(CarryNumbers::spreadSee),
                 Codec.DOUBLE.optionalFieldOf("laden_pace", 0.85).forGetter(CarryNumbers::ladenPace),
                 Codec.INT.optionalFieldOf("termites_per_layer", 10).forGetter(CarryNumbers::termitesPerLayer),
                 Codec.INT.optionalFieldOf("bring_ticks", 2400).forGetter(CarryNumbers::bringTicks),

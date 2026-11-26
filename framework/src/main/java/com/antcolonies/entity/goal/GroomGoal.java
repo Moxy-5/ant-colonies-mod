@@ -2,6 +2,8 @@ package com.antcolonies.entity.goal;
 
 import java.util.EnumSet;
 
+import org.jetbrains.annotations.Nullable;
+
 import com.antcolonies.colony.Colony;
 import com.antcolonies.entity.AbstractAntEntity;
 import com.antcolonies.species.SpeciesProfile;
@@ -35,23 +37,40 @@ public class GroomGoal extends Goal {
         if (insect.tickCount % 20 != (insect.getId() + 8) % 20 || insect.tickCount < restUntil || !insect.isIdle() || !mayCleanHere()) {
             return false; // (asked once a second, not on the same tick as a nap; the game only looks for new goals on every other tick, so the offset must be even)
         }
-        SpeciesProfile.Groom groom = insect.profile().bodyLanguage().flatMap(SpeciesProfile.BodyLanguage::groom).orElse(null);
-        if (groom == null) {
+        Clean clean = pick(insect);
+        if (clean == null) {
             return false;
         }
-        // A restless one cleans more often than a calm one (its personality).
+        side = clean.side();
+        ticksLeft = clean.ticks();
+        return true;
+    }
+
+    /** One cleaning: which antenna (an activity), and how long it takes (the clip, the blend into it and a little to settle back). */
+    public record Clean(byte side, int ticks) {
+    }
+
+    /**
+     * The one rule of how often an insect standing about cleans an antenna, asked once a second (this goal, and a
+     * species' own waiting, as a Matabele raider at its place in a raid): by its profile's {@code body_language.groom}
+     * chance, a restless one more often than a calm one (its personality); null for none now, or a species without it.
+     */
+    @Nullable
+    public static Clean pick(AbstractAntEntity insect) {
+        SpeciesProfile.Groom groom = insect.profile().bodyLanguage().flatMap(SpeciesProfile.BodyLanguage::groom).orElse(null);
+        if (groom == null) {
+            return null;
+        }
         float chance = insect.groomChanceForTests() >= 0.0F ? insect.groomChanceForTests()
                 : groom.chancePerSecond() * (0.5F + insect.restlessness());
         if (insect.getRandom().nextFloat() >= chance) {
-            return false;
+            return null;
         }
         boolean both = insect.getRandom().nextFloat() < groom.bothShare();
-        side = both ? AbstractAntEntity.ACTIVITY_GROOM_BOTH
+        byte side = both ? AbstractAntEntity.ACTIVITY_GROOM_BOTH
                 : insect.getRandom().nextBoolean() ? AbstractAntEntity.ACTIVITY_GROOM_L : AbstractAntEntity.ACTIVITY_GROOM_R;
-        // The clip, the blend into it and a little to settle back.
-        ticksLeft = (both ? AbstractAntEntity.GROOM_BOTH_TICKS : AbstractAntEntity.GROOM_ONE_TICKS)
-                + AbstractAntEntity.GROOM_SETTLE_TICKS + 2;
-        return true;
+        return new Clean(side, (both ? AbstractAntEntity.GROOM_BOTH_TICKS : AbstractAntEntity.GROOM_ONE_TICKS)
+                + AbstractAntEntity.GROOM_SETTLE_TICKS + 2);
     }
 
     /** Whether it may stop and clean here: standing on a floor with empty jaws, awake, unhurt, dry, with no alarm. */

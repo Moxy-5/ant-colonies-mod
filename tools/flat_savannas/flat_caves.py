@@ -17,5 +17,5 @@ for part in ("entrances", "noodle"):
        "argument2":{"type":"minecraft:mul","argument1":K,"argument2":"antcolonies:overworld/savanna_flatness"}})
     print(part, "vanilla top:", v["type"])
 w("antcolonies/neoforge/biome_modifier/no_savanna_ravines_or_caves.json",
-  {"type":"neoforge:remove_carvers","biomes":"#minecraft:is_savanna",
+  {"type":"neoforge:remove_carvers","biomes":"#antcolonies:savanna_waters",
    "carvers":["minecraft:canyon","minecraft:cave","minecraft:cave_extra_underground"],"steps":"air"})

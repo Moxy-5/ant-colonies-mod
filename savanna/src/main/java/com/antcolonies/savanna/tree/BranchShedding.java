@@ -62,6 +62,17 @@ public final class BranchShedding {
         if (now == null || now.size() == 0 || lyingUnder(level, foot, now) >= MAX_UNDER_TREE) {
             return false;
         }
+        return drop(level, foot, now, dice, loud);
+    }
+
+    /**
+     * {@link #shed} without the count: for a caller that has counted the branches lying under the tree itself and keeps
+     * the number (a tree living many missed days at once counted its whole crown's ground once for every day, review R7-1).
+     */
+    static boolean drop(ServerLevel level, BlockPos foot, TreePlacer.Placed now, Random dice, boolean loud) {
+        if (now == null || now.size() == 0) {
+            return false;
+        }
         for (int tries = 0; tries < 8; tries++) {
             int i = dice.nextInt(now.size());
             BlockState state = now.states()[i];
@@ -83,8 +94,12 @@ public final class BranchShedding {
         return false;
     }
 
+    /** The game tests: how many times the ground under a crown has been counted. */
+    public static int counts;
+
     /** How many fallen branches lie under this tree's crown (counted by their thick ends). Public for the tests. */
     public static int lyingUnder(ServerLevel level, BlockPos foot, TreePlacer.Placed now) {
+        counts++;
         int count = 0;
         BlockPos lo = foot.offset(now.minX(), -COUNT_DEPTH, now.minZ()), hi = foot.offset(now.maxX(), COUNT_DEPTH, now.maxZ());
         for (BlockPos pos : BlockPos.betweenClosed(lo, hi)) {

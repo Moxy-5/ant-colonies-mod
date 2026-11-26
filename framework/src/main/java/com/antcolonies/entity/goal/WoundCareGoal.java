@@ -55,18 +55,19 @@ public class WoundCareGoal extends Goal {
         // The infected first (they smell of it), then the nearest.
         patient = level.getEntitiesOfClass(AbstractAntEntity.class, ant.getBoundingBox().inflate(LOOK_REACH),
                         other -> other != ant && other.isAlive() && colony.getId().equals(other.getColonyId())
-                                && !other.isPassenger() && other.wounds().wantsCare() && other.tender() == null
-                                && colony.nest().isInside(level, other.blockPosition()))
+                                && other.wounds().wantsCare() && other.tender() == null && other.careTaker(AbstractAntEntity.CareJob.WOUND) == null
+                                && other.restsForCare(level, colony))
                 .stream().min(Comparator.<AbstractAntEntity>comparingInt(other -> other.wounds().wantsDab() ? 0 : 1)
                         .thenComparingDouble(other -> other.distanceToSqr(ant))).orElse(null);
-        return patient != null;
+        // BUGS 349: one carer at a time, claimed when picked; only one come to rest in the rooms (AbstractAntEntity#restsForCare)
+        return patient != null && patient.claimCare(AbstractAntEntity.CareJob.WOUND, ant.getUUID(), level.getGameTime() + AbstractAntEntity.CARE_CLAIM_TICKS);
     }
 
     @Override
     public boolean canContinueToUse() {
         return patient != null && patient.isAlive() && !patient.isPassenger() && RescueGoal.mayHelp(ant) && walking < WALK_TICKS
                 && (dabbing ? patient.wounds().wantsDab() : patient.wounds().wantsLicking())
-                && (patient.tender() == null || patient.tender().equals(ant.getUUID()));
+                && ant.getUUID().equals(patient.careTaker(AbstractAntEntity.CareJob.WOUND));
     }
 
     @Override
@@ -81,14 +82,19 @@ public class WoundCareGoal extends Goal {
     public void stop() {
         ant.getNavigator().stop();
         ant.setActivity(AbstractAntEntity.ACTIVITY_NONE);
+        if (patient != null) {
+            patient.releaseCare(AbstractAntEntity.CareJob.WOUND, ant.getUUID());
+        }
         patient = null;
     }
 
     @Override
     public void tick() {
-        if (!(ant.level() instanceof ServerLevel level) || patient == null) {
+        Colony colony = ant.getColony();
+        if (!(ant.level() instanceof ServerLevel level) || patient == null || colony == null) {
             return;
         }
+        patient.claimCare(AbstractAntEntity.CareJob.WOUND, ant.getUUID(), level.getGameTime() + AbstractAntEntity.CARE_CLAIM_TICKS);
         double reach = (ant.getBbWidth() + patient.getBbWidth()) * 0.5 + 0.2;
         if (ant.distanceToSqr(patient) > reach * reach) {
             walking++;
@@ -101,6 +107,11 @@ public class WoundCareGoal extends Goal {
             return;
         }
         ant.getNavigator().stop();
+        if (working == 0 && !patient.restsForCare(level, colony)) {
+            walking++; // (at its side, its nestmate still walking on in the rooms: it waits, and gives up in time)
+            face(patient.getX(), patient.getZ());
+            return;
+        }
         ant.setActivity(dabbing ? AbstractAntEntity.ACTIVITY_GLAND_DAB : AbstractAntEntity.ACTIVITY_ALLOGROOM);
         patient.tendedBy(ant.getUUID(), level.getGameTime() + 20);
         face(patient.getX(), patient.getZ());
@@ -116,6 +127,7 @@ public class WoundCareGoal extends Goal {
             } else {
                 patient.wounds().licked();
             }
+            patient.releaseCare(AbstractAntEntity.CareJob.WOUND, ant.getUUID());
             patient = null; // one lick or one dab a time; another may come next
         }
     }

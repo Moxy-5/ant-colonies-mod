@@ -92,8 +92,8 @@ public final class RaidRules {
 
     static void stageLimit(Watch.Look look) {
         Raids raids = raidsOf(look.colony());
-        RaidColumn raid = raids == null ? null : raids.column();
-        if (raid == null || raid.stage() == RaidColumn.Stage.DONE) {
+        Raid raid = raids == null ? null : raids.column();
+        if (raid == null || raid.stage() == Raid.Stage.DONE) {
             return;
         }
         long age = look.now() - raid.stageSince();
@@ -106,8 +106,8 @@ public final class RaidRules {
 
     static void heartbeat(Watch.Look look) {
         Raids raids = raidsOf(look.colony());
-        RaidColumn raid = raids == null ? null : raids.column();
-        if (raid == null || raid.stage() == RaidColumn.Stage.DONE) {
+        Raid raid = raids == null ? null : raids.column();
+        if (raid == null || raid.stage() == Raid.Stage.DONE) {
             return;
         }
         // (Counted only from the colony's coming back: while away the column is not worked out, and the rule may look
@@ -125,11 +125,11 @@ public final class RaidRules {
         if (raids == null) {
             return;
         }
-        RaidColumn raid = raids.column();
+        Raid raid = raids.column();
         List<AbstractAntEntity> stuck = new ArrayList<>();
         StringBuilder why = new StringBuilder();
         boolean walking = raid != null && switch (raid.stage()) {
-            case MARCHING, GATHERING, COLLECTING, REGROUPING, HOMING -> true;
+            case MARCH_OUT, HALT, REGROUP, MARCH_HOME -> true;
             default -> false;
         };
         Set<UUID> homing = raids.goingHomeIds();
@@ -141,7 +141,7 @@ public final class RaidRules {
             UUID id = ant.getUUID();
             long still = look.stillFor(ant);
             if (walking && raid.has(id) && !raid.isCasting(id)) {
-                RaidColumn.Order order = raid.orderNow(id);
+                Raid.Order order = raid.orderNow(id);
                 double off = order == null || order.to() == null ? 0 : Math.sqrt(ant.blockPosition().distSqr(order.to()));
                 // Still counts only from when it was put off its place: an ant that stood rightly at its place and was
                 // just given a new one is not stuck (the false alarm of the first run, 2026-11-05).
@@ -176,7 +176,7 @@ public final class RaidRules {
         if (queen == null || !colony.nest().isInside(level, queen.blockPosition())) {
             return; // no settled nest (a queen looking for one, or moving house): nowhere to be home
         }
-        RaidColumn raid = raids.column();
+        Raid raid = raids.column();
         List<AbstractAntEntity> out = new ArrayList<>();
         for (AbstractAntEntity insect : look.insects()) {
             if (!(insect instanceof MatabeleEntity ant)) {
@@ -186,7 +186,7 @@ public final class RaidRules {
             boolean away = !ant.blockPosition().closerThan(colony.getCenter(), HOME) && !colony.nest().isInside(level, ant.blockPosition());
             boolean excused = ant.getFightSpot() != null || ant.isParalysed()
                     || raid != null && raid.keepsNoHours() && raid.has(id)
-                    || raids.wasSentAnyHour(id) // (BUGS 123: a scout sent "anytime", by the command or the soak, keeps no hours)
+                    || raids.scouts().wasSentAnyHour(id) // (BUGS 123: a scout sent "anytime", by the command or the soak, keeps no hours)
                     || raids.isGoingHome(id) && look.stillFor(ant) < RAIDER_STILL
                     // BUGS 142: a scout whose search ended at 19:30 runs home straight on its own goal, not along a trail;
                     // still walking (not standing), it is on its way home like the others (one standing is raider-stuck's)
@@ -278,8 +278,8 @@ public final class RaidRules {
             if (raids == null) {
                 return null;
             }
-            RaidColumn raid = raids.column();
-            if (raid != null && raid.stage() != RaidColumn.Stage.DONE && raid.has(id)) {
+            Raid raid = raids.column();
+            if (raid != null && raid.stage() != Raid.Stage.DONE && raid.has(id)) {
                 StringBuilder words = new StringBuilder(raid.stage().name().toLowerCase(Locale.ROOT));
                 if (id.equals(raid.leader())) {
                     words.append(" (leads)");
@@ -290,7 +290,7 @@ public final class RaidRules {
                 if (raid.isCasting(id)) {
                     words.append(", casting about");
                 }
-                RaidColumn.Order order = raid.orderNow(id);
+                Raid.Order order = raid.orderNow(id);
                 if (order != null && order.to() != null) {
                     words.append(String.format(Locale.ROOT, ", place %.0f off", Math.sqrt(insect.blockPosition().distSqr(order.to()))));
                 } else if (order != null) {
@@ -301,7 +301,7 @@ public final class RaidRules {
                 }
                 return words.toString();
             }
-            if (raids.isScouting(id)) {
+            if (raids.scouts().isScouting(id)) {
                 return "scouting";
             }
             if (raids.isGoingHome(id)) {

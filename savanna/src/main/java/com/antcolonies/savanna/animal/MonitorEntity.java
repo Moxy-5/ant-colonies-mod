@@ -599,7 +599,7 @@ public class MonitorEntity extends PathfinderMob implements GeoEntity, HasLife {
      */
     private boolean roomToClimb(int y, boolean alongX, double face, int sign, double across, double scale) {
         double out = CLIMB_FEET_OUT * scale / 16.0;
-        for (double side : new double[] {across - out, across + out}) {
+        for (double side : new double[] {across - out, across, across + out}) {     // (both feet and the middle line the move itself relies on: review R9-37)
             for (double ahead : new double[] {0.5, 1.5}) {
                 BlockPos step = climbCell(alongX, face + ahead * sign, side, y);
                 if (!level().getBlockState(step).isCollisionShapeFullBlock(level(), step) || !open(step.above())) {
@@ -622,7 +622,7 @@ public class MonitorEntity extends PathfinderMob implements GeoEntity, HasLife {
      */
     private boolean roomToClimbDown(int y, boolean alongX, double face, int sign, double across, double scale) {
         double out = CLIMB_FEET_OUT * scale / 16.0;
-        for (double side : new double[] {across - out, across + out}) {
+        for (double side : new double[] {across - out, across, across + out}) {     // (both feet and the middle line the move itself relies on: review R9-37)
             BlockPos top = climbCell(alongX, face - 0.5 * sign, side, y - 1);
             if (!level().getBlockState(top).isCollisionShapeFullBlock(level(), top)) {
                 return false;
@@ -683,7 +683,7 @@ public class MonitorEntity extends PathfinderMob implements GeoEntity, HasLife {
      */
     private boolean roomToLeave(int y, boolean alongX, double face, int sign, double across, double scale) {
         double out = CLIMB_FEET_OUT * scale / 16.0;
-        for (double side : new double[] {across - out, across + out}) {
+        for (double side : new double[] {across - out, across, across + out}) {     // (both feet and the middle line the move itself relies on: review R9-37)
             for (double ahead : new double[] {0.5, 1.5}) {
                 BlockPos top = climbCell(alongX, face + ahead * sign, side, y - 1);
                 if (!level().getBlockState(top).isCollisionShapeFullBlock(level(), top) || !dryOpen(top.above())) {
@@ -1028,6 +1028,13 @@ public class MonitorEntity extends PathfinderMob implements GeoEntity, HasLife {
 
     public boolean isFed() {
         return hungryIn > 0;
+    }
+
+    /** Fed and sunned for a long while (for tests whose monitor must only walk where it is sent: a bask or a hunt
+     *  starting at its random times took the climb tests' monitor off its route, BUGS 255, 277). */
+    public void calmForTests() {
+        hungryIn = 100_000;
+        sunIn = 100_000;
     }
 
     /** Wants the sun now (for tests and the film camera). */

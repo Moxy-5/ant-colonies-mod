@@ -53,6 +53,12 @@ public final class RiverZones {
     static final double[] INLAND_FROM = {-0.11, 0.03, 0.3};
     /** A zone's share is counted among the animals of the same kind within this many blocks of the spot. */
     public static final int LOOK = 64;
+    /**
+     * The share of a kind's count the world's own spawner fills when the kind breeds (the user, 2026-11-24, "breeding
+     * refills"; review R10-1): the spawner seeds a water up to half, breeding fills the rest up to the kind's local limit
+     * ({@code RoomToBreed}). A kind that does not breed (its life file) is spawned up to its whole count.
+     */
+    public static final float SPAWNER_SHARE = 0.5F;
 
     public static final ResourceKey<Biome> RIVER = ResourceKey.create(Registries.BIOME, ResourceLocation.fromNamespaceAndPath(SavannaMod.MODID, "savanna_river"));
 
@@ -141,18 +147,34 @@ public final class RiverZones {
 
     /**
      * Whether the world may spawn one more of a kind at a spot (asked for the world's own spawns only): water open to the
-     * sky, and fewer of the kind within {@link #LOOK} blocks than its zone's share of its group's cap.
+     * sky, and fewer of the kind within {@link #LOOK} blocks than the spawner's part of its zone's share of its group's
+     * cap ({@link #mostBySpawner}).
      */
     public static boolean room(EntityType<?> type, LevelAccessor level, BlockPos pos) {
         if (!openToSky(level, pos)) {
             return false;
         }
         Zone zone = at(level, pos);
-        float share = share(type, zone);
-        if (share >= 1.0F || share <= 0.0F) {
-            return share > 0.0F;
+        int most = mostBySpawner(type, zone);
+        if (most <= 0 || most == Integer.MAX_VALUE) {
+            return most > 0;
         }
-        return allows(type, zone, level.getEntitiesOfClass(Mob.class, new AABB(pos).inflate(LOOK), e -> e.getType() == type).size());
+        return level.getEntitiesOfClass(Mob.class, new AABB(pos).inflate(LOOK), e -> e.getType() == type).size() < most;
+    }
+
+    /**
+     * How many of a kind within {@link #LOOK} blocks the world's own spawner fills a zone up to: none where the kind does
+     * not live, no limit of its own (the group's cap alone) for a kind with the whole cap that does not breed, else its
+     * zone's share of the cap, halved ({@link #SPAWNER_SHARE}) for a kind that breeds, at least one.
+     */
+    public static int mostBySpawner(EntityType<?> type, Zone zone) {
+        float share = share(type, zone);
+        if (share <= 0.0F) {
+            return 0;
+        }
+        boolean breeds = com.antcolonies.animal.AnimalLives.has(type) && com.antcolonies.animal.AnimalLives.get(type).breeds();
+        share *= breeds ? SPAWNER_SHARE : 1.0F;
+        return share >= 1.0F ? Integer.MAX_VALUE : Math.max(1, Math.round(share * type.getCategory().getMaxInstancesPerChunk()));
     }
 
     /** Whether a zone has room for one more of a kind with this many of it within {@link #LOOK} blocks. */

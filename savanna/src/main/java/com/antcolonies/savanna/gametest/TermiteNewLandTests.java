@@ -238,6 +238,26 @@ public class TermiteNewLandTests {
         });
     }
 
+    /**
+     * Review R8-11: a place world generation hands over just before the world closes (no tick left to look at it) still
+     * reaches the world's book, and nothing of this world is left behind for the next world opened in the same sitting.
+     */
+    @GameTest(template = "arena", timeoutTicks = 40, skyAccess = true)
+    public static void aMoundHandedOverAsTheWorldClosesIsNotLost(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        NewLandMounds book = NewLandMounds.get(level);
+        // Far off, in land that is never loaded here: it waits in the book and no mound is ever put in.
+        BlockPos far = middle(helper).offset(1_000_000, 0, 0);
+        NewLandMounds.queue(level, far, NewLandMounds.pickFor("half", 0, 811L));
+        helper.assertFalse(book.waitsForTests(far), "the place is in the book before any look");
+        NewLandMounds.closing(level);
+        boolean kept = book.waitsForTests(far);
+        book.dropForTests(far);
+        helper.assertTrue(kept, "a place handed over as the world closed was lost");
+        helper.assertTrue(NewLandMounds.stillWaiting(level, far, 4) == 0, "a place stayed behind for the next world");
+        helper.succeed();
+    }
+
     /** A freshly dead mound (1 day): no colony left, the dead mound in the book, the spires still standing, Xylaria on the comb. */
     @GameTest(template = "arena", timeoutTicks = 200, skyAccess = true)
     public static void aFreshDeadMoundOfNewLandStillStands(GameTestHelper helper) {

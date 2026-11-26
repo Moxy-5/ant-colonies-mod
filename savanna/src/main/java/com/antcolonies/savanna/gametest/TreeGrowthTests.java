@@ -928,8 +928,13 @@ public class TreeGrowthTests {
         helper.assertTrue(spared.living(), "the dice should have spared this tree today");
         lightBy(helper, sparedFoot); // a second fire the same day (on another side): no second roll
         helper.assertTrue(spared.living(), "a second fire the same day rolled again");
+        helper.assertTrue(level.getBlockState(youngFoot.below()).getBlock() instanceof com.antcolonies.savanna.block.TreeBranchBlock,
+                "the young tree's thin stem does not go into the ground: " + level.getBlockState(youngFoot.below()));
         lightBy(helper, youngFoot);
         helper.assertTrue(forest.at(youngFoot) == null, "the young tree in the fire is still in the book");
+        // Review R7-17: the dead little tree leaves no stick sunk in a pit; the soil closes over its stem.
+        helper.assertTrue(TreePlacer.isSoil(level.getBlockState(youngFoot.below())), "where the young tree died its stem is still in the ground: "
+                + level.getBlockState(youngFoot.below()));
         int youngLeft = countNear(level, youngFoot, 6, 1, 12, b -> b.is(TreeBlocks.TREE_WOOD) || b.is(TreeBlocks.TREE_LEAVES));
         helper.assertTrue(youngLeft == 0, youngLeft + " blocks of the burnt young tree are left");
         lightBy(helper, oldFoot);
@@ -947,8 +952,20 @@ public class TreeGrowthTests {
         level.setBlock(leaf.below(2), Blocks.STONE.defaultBlockState(), 3);
         level.setBlock(leaf.below(), Blocks.FIRE.defaultBlockState(), 3);
         helper.assertTrue(deadLeaves(level.getBlockState(leaf)), "the leaf by the fire was not scorched: " + level.getBlockState(leaf));
+        // Review R7-10 (the user: scorch, then regreen): a scorched leaf never burns away, and greens again once the fire is out.
+        BlockState scorched = level.getBlockState(leaf);
+        helper.assertTrue(scorched.getValue(com.antcolonies.savanna.block.TreeLeavesBlock.SCORCHED), "the scorched leaf is not marked scorched: " + scorched);
+        helper.assertTrue(scorched.getFlammability(level, leaf, Direction.DOWN) == 0, "a scorched leaf on a living tree can burn away");
+        BlockState withered = scorched.setValue(com.antcolonies.savanna.block.TreeLeavesBlock.SCORCHED, false);
+        helper.assertTrue(withered.getFlammability(level, leaf, Direction.DOWN) > 0, "a dead tree's withered leaves no longer burn");
+        helper.assertTrue(!com.antcolonies.savanna.block.TreeLeavesBlock.regreen(scorched, level, leaf), "a leaf greened again with the fire still under it");
+        BlockPos burnt = leaf;
         BlockPos scar = sparedBark;
         helper.runAfterDelay(100, () -> {
+            helper.assertTrue(deadLeaves(level.getBlockState(burnt)), "the scorched leaf did not last the fire: " + level.getBlockState(burnt));
+            level.setBlock(burnt.below(), Blocks.AIR.defaultBlockState(), 3);
+            helper.assertTrue(com.antcolonies.savanna.block.TreeLeavesBlock.regreen(level.getBlockState(burnt), level, burnt)
+                    && livingLeaves(level.getBlockState(burnt)), "the scorched leaf did not green again: " + level.getBlockState(burnt));
             helper.assertTrue(TreePlacer.isCharred(level.getBlockState(scar)), "the charred bark burnt away: " + level.getBlockState(scar));
             // The tree killed by fire stands black: its snag's dead wood is charred, none of it silver.
             double snag = TreeLife.stageFrom(TreePlacer.kind("umbrella_thorn"), old.seed, TreeStage.SNAG);
@@ -1314,6 +1331,106 @@ public class TreeGrowthTests {
         Forest.Tree copy = Forest.Tree.load(snag.save());
         helper.assertTrue(copy.died == snag.died && copy.placedStage == snag.placedStage && copy.lived == snag.lived,
                 "a saved and loaded dead tree differs");
+        clearAbove(helper, foot);
+        forest.forgetInside(helper.getBounds());
+        helper.succeed();
+    }
+
+    /**
+     * Review round 7's tree book. A tree living many missed days at once counts the branches under its crown once, not
+     * once a day (R7-1: a hitch as each big tree's land came back). A tree of new land still on the waiting list when the
+     * world closes goes into the book (R7-15: it stood frozen for good). A falling tree does not break a termite mound
+     * (R7-11, the user: the log rests on it), though it still smashes other soft things.
+     */
+    @GameTest(template = "arena", timeoutTicks = 100, skyAccess = true)
+    public static void missedDaysCountBranchesOnceNewLandTreesAreKeptAndMoundsStopAFall(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        grassland(helper);
+        Forest.shapesAtOnce = true;
+        Forest forest = Forest.get(level);
+        long base = Forest.today(level);
+        BlockPos foot = helper.absolutePos(new BlockPos(MIDDLE, SURFACE, MIDDLE));
+        Forest.Tree t = forest.add(new Forest.Tree("umbrella_thorn", foot, 11, 1.0, TreeStage.LIVING, -1, base));
+        forest.update(level, t, base);
+        helper.assertTrue(t.placedAge == 1.0, "the grown tree was not placed");
+        int before = com.antcolonies.savanna.tree.BranchShedding.counts;
+        forest.update(level, t, base + 40);
+        int counted = com.antcolonies.savanna.tree.BranchShedding.counts - before;
+        TreePlacer.Placed upright = TreePlacer.placed("umbrella_thorn", 11, 1.0, TreeStage.LIVING);
+        int lying = com.antcolonies.savanna.tree.BranchShedding.lyingUnder(level, foot, upright);
+        helper.assertTrue(counted <= 1, "40 missed days counted the ground under the crown " + counted + " times");
+        helper.assertTrue(lying >= 1 && lying <= com.antcolonies.savanna.tree.BranchShedding.MAX_UNDER_TREE, lying + " branches lie under it after 40 days");
+
+        BlockPos late = helper.absolutePos(new BlockPos(6, SURFACE, 6));
+        Forest.queue(level, "camel_thorn", late, 5, 0.5, TreeStage.LIVING);
+        helper.assertTrue(forest.at(late) == null, "the waiting tree is in the book before its time");
+        Forest.closing(level);
+        helper.assertTrue(forest.at(late) != null, "a tree of new land was lost as the world closed");
+
+        BlockPos spot = helper.absolutePos(new BlockPos(8, SURFACE + 3, 8));
+        for (var block : List.of(com.antcolonies.savanna.registry.SavannaBlocks.TERMITE_MOUND.get(), com.antcolonies.savanna.registry.SavannaBlocks.FUNGUS_COMB.get(),
+                com.antcolonies.savanna.registry.SavannaBlocks.TERMITE_SPIRE.get(), com.antcolonies.savanna.registry.SavannaBlocks.TERMITE_TUNNEL.get())) {
+            level.setBlock(spot, block.defaultBlockState(), 2);
+            helper.assertTrue(!TreeFall.smashes(level, spot, level.getBlockState(spot)), "a falling tree breaks " + block.getDescriptionId());
+        }
+        level.setBlock(spot, Blocks.GLASS.defaultBlockState(), 2);
+        helper.assertTrue(TreeFall.smashes(level, spot, level.getBlockState(spot)), "a falling tree no longer smashes glass");
+        level.setBlock(spot, Blocks.AIR.defaultBlockState(), 2);
+        clearAbove(helper, foot);
+        forest.forgetInside(helper.getBounds());
+        helper.succeed();
+    }
+
+    /**
+     * Review R7-16: a rot-killed log lying up the side of a bowl crumbles away whole. The columns' tops were taken from
+     * the log's flat-ground shape, so where the land lifted the log its upper wood was left hanging over the pulp.
+     */
+    @GameTest(template = "arena", timeoutTicks = 100, skyAccess = true)
+    public static void aRottenLogLyingUpASlopeCrumblesAwayWhole(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        grassland(helper);
+        for (int x = 0; x < 65; x++) {
+            for (int z = 0; z < 65; z++) {
+                int h = (int) Math.min(12, Math.floor(Math.max(0, Math.hypot(x - MIDDLE, z - MIDDLE) - 6) * 0.5));
+                for (int y = 0; y < h; y++) {
+                    BlockPos at = helper.absolutePos(new BlockPos(x, SURFACE + y, z));
+                    level.setBlock(at.below(), Blocks.DIRT.defaultBlockState(), 2);
+                    level.setBlock(at, Blocks.GRASS_BLOCK.defaultBlockState(), 2);
+                }
+            }
+        }
+        Forest.shapesAtOnce = true;
+        Forest forest = Forest.get(level);
+        long base = Forest.today(level);
+        BlockPos foot = helper.absolutePos(new BlockPos(MIDDLE, SURFACE, MIDDLE));
+        Forest.Tree t = forest.add(new Forest.Tree("umbrella_thorn", foot, 11, 1.0, TreeStage.FALLEN, -1, base));
+        t.died = base - 400;
+        t.cause = "rot";
+        t.rotFrom = base - 500;
+        forest.update(level, t, base);
+        helper.assertTrue(t.placedStage == TreeStage.FALLEN && com.antcolonies.savanna.tree.HeartRot.diedOfRot(t), "no rot-killed log lies in the bowl");
+        java.util.function.Predicate<BlockState> wood = b -> b.is(TreeBlocks.TREE_WOOD) || b.getBlock() instanceof com.antcolonies.savanna.block.TreeBranchBlock;
+        int lifted = 0;
+        for (BlockPos pos : BlockPos.betweenClosed(foot.offset(-50, 3, -50), foot.offset(50, 30, 50))) {
+            lifted += wood.test(level.getBlockState(pos)) ? 1 : 0;
+        }
+        helper.assertTrue(lifted > 20, "the log does not lie up the bowl's side: " + lifted + " wood blocks 3 or more over its foot");
+        for (int sec = 0; sec < 4000 && forest.all().contains(t); sec++) {
+            forest.crumble(level, t);
+        }
+        helper.assertTrue(!forest.all().contains(t), "the rotted log never finished crumbling: " + t.crumbled + " columns");
+        int left = 0;
+        StringBuilder where = new StringBuilder();
+        for (BlockPos pos : BlockPos.betweenClosed(foot.offset(-50, 0, -50), foot.offset(50, 30, 50))) {
+            if (wood.test(level.getBlockState(pos))) {
+                left++;
+                if (where.length() < 300) {
+                    BlockPos d = pos.subtract(foot);
+                    where.append(" ").append(d.getX()).append(",").append(d.getY()).append(",").append(d.getZ());
+                }
+            }
+        }
+        helper.assertTrue(left == 0, left + " blocks of wood were left hanging where the rotted log lay:" + where);
         clearAbove(helper, foot);
         forest.forgetInside(helper.getBounds());
         helper.succeed();

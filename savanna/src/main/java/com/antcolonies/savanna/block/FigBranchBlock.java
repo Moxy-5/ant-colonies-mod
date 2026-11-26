@@ -36,7 +36,7 @@ public class FigBranchBlock extends TreeBranchBlock {
 
     static {
         for (int level = 0; level < LEVELS; level++) {
-            double lo = (16 - width(level)) / 2 / 16, hi = 1 - lo;
+            double lo = (16 - width(level)) / 2.0 / 16, hi = 1 - lo;      // 2.0: in whole numbers this was 0, every twig a full cube (review R7-27)
             for (int mask = 0; mask < 64; mask++) {
                 VoxelShape shape = Shapes.box(lo, lo, lo, hi, hi, hi);
                 for (Direction d : Direction.values()) {
