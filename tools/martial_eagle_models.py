@@ -27,8 +27,8 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from model_parts import (  # noqa: E402
-    cube, rot_cube, rounded, mix, shade, paint_faces, png, geo, write_assets,
-    feather_fan, bird_beak, bird_eye, bird_talon_foot,
+    cube, rot_cube, rounded, mix, shade, hash3, paint_faces, png, geo, write_assets,
+    feather_grain, feather_fan, bird_beak, bird_eye, bird_talon_foot,
     euler, mat_mul, mat_vec, vadd, vsub,
 )
 
@@ -42,7 +42,8 @@ TAIL_SPREAD = 0.15        # 0.0 = narrow perched wedge, 1.0 = wide braking rudde
 BEAK_LEN = 4.4            # Compact powerful hooked raptor beak length (px)
 TALON_SCALE = 1.00        # Scale on curved gripping talons
 JAW_OPEN = 0.0            # Preview-only beak opening (deg)
-HEAD_STYLE = 'C'          # Locked Stage 3 user choice: 'C' (Bold Heavy reusable beak + hooded eyes, 348/400)
+HEAD_STYLE = 'C'          # Locked Stage 3 user choice: 'C' (Bold Heavy hooded eyes)
+BEAK_STYLE = '1'          # Stage 4 beak variation: '1' (Natural Compact ★), '2' (Deep Curved Scimitar), '3' (Chunky Classic)
 
 WORKSHOP_SHAPE = [
     ("BODY_PITCH",      "Perched torso pitch (deg)",    38.0, 54.0, 1.0),
@@ -69,7 +70,7 @@ WORKSHOP_PARTS = {
                      "leg_upper_right", "leg_lower_right", "leg_tarsus_right", "leg_foot_right"],
 }
 
-WORKSHOP_LOOK = "plain"   # Stage 2 Plain 3D Shape ("plain", "clay")
+WORKSHOP_LOOK = "painted"  # Stage 4 Paint ("painted", "plain", "clay")
 TEXELS = 2.0
 
 
@@ -376,8 +377,8 @@ def _build_spread_wing(s, side, by, bz, ws):
 
 
 def build_bones(mode='perched', pitch_override=None, crest_override=None, tail_override=None,
-                jaw_override=None, head_style=None):
-    """Builds the complete Martial Eagle skeleton & Stage 3 sculpted 3D geometry.
+                jaw_override=None, head_style=None, beak_style=None):
+    """Builds the complete Martial Eagle skeleton & Stage 3/4 sculpted 3D geometry.
     mode:
       - 'perched': upright 48 deg perched pose, folded sculpted wing capes active (for Workshop Compare!)
       - 'soaring': horizontal 0 deg soaring pose, legs tucked cleanly BACKWARD, spread wings active
@@ -386,6 +387,7 @@ def build_bones(mode='perched', pitch_override=None, crest_override=None, tail_o
     include_folded = (mode in ('perched', 'game'))
     include_spread = (mode in ('soaring', 'game'))
     hs = head_style or HEAD_STYLE
+    bs = beak_style or BEAK_STYLE
 
     wf = 0.0 if is_soar else 1.0
     bp = (BODY_PITCH * wf) if pitch_override is None else pitch_override
@@ -510,8 +512,21 @@ def build_bones(mode='perched', pitch_override=None, crest_override=None, tail_o
                      brow_pitch=14.0, brow_roll=-18.0, brow_overhang=0.58, ring_detail='bold', pupil_scale=0.45),
         ),
     }
-    hp_cfg = HEAD_PRESETS.get(hs, HEAD_PRESETS['B'])
-    b_cfg = hp_cfg['beak']
+    # 3 Distinct Arc-Length Curved Beak Variations (ZERO hanging nob / ZERO tip overhang!):
+    BEAK_VARIANTS = {
+        # 1. Natural Compact Eagle (Real Martial Eagle photo-faithful: tight curved hook, sleek tapered point!)
+        '1': dict(length=4.05, width=2.48, height=2.96, arch=0.14, hook_drop=0.68, hook_pow=2.65,
+                  keel_ratio=0.52, cere_frac=0.31, festoon=0.16, segments=6, tip_w_frac=0.14, hook_curl=0.22),
+        # 2. Deep Curved Apex Scimitar (Sleeker 7-seg crescent arch curving cleanly back into a sharp raptor fang!)
+        '2': dict(length=4.32, width=2.38, height=3.08, arch=0.18, hook_drop=1.06, hook_pow=2.45,
+                  keel_ratio=0.44, cere_frac=0.28, festoon=0.28, segments=7, tip_w_frac=0.10, hook_curl=0.34),
+        # 3. Chunky Classic Minecraft Raptor (Shorter, wider, bolder 4-seg Minecraft-crisp bill & tight hook!)
+        '3': dict(length=3.75, width=2.76, height=3.22, arch=0.15, hook_drop=0.60, hook_pow=2.95,
+                  keel_ratio=0.64, cere_frac=0.34, festoon=0.12, segments=4, tip_w_frac=0.20, hook_curl=0.16),
+    }
+
+    hp_cfg = HEAD_PRESETS.get(hs, HEAD_PRESETS['C'])
+    b_cfg = BEAK_VARIANTS.get(str(bs), hp_cfg['beak'])
     e_cfg = hp_cfg['eye']
 
     # Sculpted curved keeled raptor beak via reusable bird_beak() system!
@@ -715,11 +730,390 @@ CLAY_PALETTE = {
 }
 
 
+def _painted_colour(c, face, x, y, z):
+    """Stage 4 Minecraft-first pixel-art Martial Eagle plumage (TEXELS = 2.0):
+    - Deep chocolate-slate hood/bib/mantle (solid dark hood wrapping under chin, no white chin patch).
+    - Scalloped pale-edged dark dorsal upperwing coverts (solid dark dorsal upperwings, no white dorsal stripe!).
+    - Snow-white breast & plush feathered trousers speckled with iconic dark chocolate teardrop spots.
+    - High-contrast creamy-barred soaring underwings vs. dark leading under-coverts & charcoal wingtip fingers.
+    - Barred 7-feather tail fan with broad dark subterminal band + thin pale terminal tip.
+    - Living radial golden-amber eagle iris with limbal rim & crisp specular glint, pale blue-grey cere,
+      glossy horn-charcoal beak, scaly yellow-ochre tarsi with horizontal scutes, and glossy black talons."""
+    part = c.get('_part', 'mantle')
+    bone = c.get('_bone', 'body')
+    ox, oy, oz = c['origin']
+    sx, sy, sz = c['size']
+    lx = (x - ox) / max(1e-4, sx)
+    ly = (y - oy) / max(1e-4, sy)
+    lz = (z - oz) / max(1e-4, sz)
+
+    # Crisp Minecraft-texel quantized coordinates (2 texels per model px) for clean, non-blurry pixel art
+    qx = math.floor(x * 2.0) * 0.5
+    qy = math.floor(y * 2.0) * 0.5
+    qz = math.floor(z * 2.0) * 0.5
+    h_fine = hash3(int(math.floor(x * 2.0)), int(math.floor(y * 2.0)), int(math.floor(z * 2.0)))
+
+    # Directional face lighting bias (keeps volume readable in Minecraft flat/smooth shading)
+    fk = {'up': 1.08, 'down': 0.85, 'north': 1.03, 'south': 0.93, 'east': 0.98, 'west': 0.95}.get(face, 1.0)
+
+    # --- 1. Living Raptor Eye (radial golden-amber iris + dark limbal rim + crisp specular glint!) ---
+    if part == 'eye':
+        is_outer = (face == 'east' and 'left' in bone) or (face == 'west' and 'right' in bone)
+        if is_outer:
+            # Local iris coords: v=ly (0 bottom..1 top), u_fwd (0 back..1 front toward -Z!)
+            u_fwd = 1.0 - lz
+            du = u_fwd - 0.50
+            dv = ly - 0.50
+            r = math.hypot(du, dv)
+            ang = math.atan2(dv, du)
+            rad_streak = 0.5 + 0.5 * math.sin(ang * 10.0 + h_fine * 2.2)
+            # Crisp white specular catchlight glint at upper-front quadrant of the iris!
+            if abs(u_fwd - 0.68) < 0.14 and abs(ly - 0.72) < 0.14:
+                return (255, 252, 236)
+            if r < 0.27:
+                col = mix((255, 224, 48), (248, 196, 26), rad_streak * 0.45)
+            elif r < 0.41:
+                t = (r - 0.27) / 0.14
+                col = mix((244, 186, 22), (206, 130, 14), t)
+                col = mix(col, (254, 212, 40), rad_streak * 0.22)
+            elif r < 0.48:
+                col = mix((164, 92, 14), (58, 38, 22), (r - 0.41) / 0.07)
+            else:
+                col = (40, 28, 22)
+            return col
+        return shade((210, 152, 20), fk)
+
+    if part == 'pupil':
+        # Jet-black pupil with tiny crisp upper-front pinpoint highlight
+        if (face == 'east' and 'left' in bone) or (face == 'west' and 'right' in bone):
+            u_fwd = 1.0 - lz
+            if u_fwd > 0.62 and ly > 0.62:
+                return (210, 218, 228)
+        return (14, 13, 17)
+
+    if part == 'eyelid':
+        g = feather_grain(qx, qy, qz, scale=2.4, flow=(0.0, 0.1, 1.0))
+        return shade(mix((34, 26, 24), (52, 40, 35), 0.5 + 0.35 * g), fk)
+
+    # --- 2. Mottled Smoky-Ash Cere, Glossy Striated Slate-Horn Hooked Beak, & Fleshy Inner Mouth ---
+    if part == 'cere':
+        # Organic mottled smoky-ash / blue-grey cere blending smoothly from dark facial feathers (+Z) into horn (-Z)!
+        g_c = feather_grain(qx, qy, qz, scale=2.8, flow=(0.0, 0.0, 1.0))
+        base = mix((112, 116, 122), (156, 160, 164), 0.45 + 0.32 * g_c + 0.18 * h_fine)
+        # Feathered charcoal-brown loral blend along the rear collar (+Z) where skull meets cere
+        if lz > 0.62:
+            t_col = (lz - 0.62) / 0.38
+            base = mix(base, (58, 48, 44), t_col * (0.68 + 0.20 * h_fine))
+        # Subtle darker waxy crease right along the front cere/beak seam (-Z)
+        elif lz < 0.16:
+            base = mix(base, (74, 78, 86), (0.16 - lz) / 0.16 * 0.45)
+        if face == 'up':
+            base = mix(base, (184, 188, 192), 0.32)
+        elif face == 'down':
+            base = shade(base, 0.78)
+        return shade(base, fk)
+
+    if part == 'nostril':
+        return (16, 15, 18)
+
+    if part in ('beak', 'beak_tip'):
+        # Continuous keratin gradient from smoky-blue-ash base -> glossy dark slate-horn -> obsidian hook point!
+        bf = c.get('_beak_f', 0.25 if part == 'beak' else 0.78)
+        # Fine longitudinal horn-growth micro-striations along the curved beak surface
+        stri = 0.5 + 0.5 * math.sin((y * 4.5 + z * 2.2) + h_fine * 1.4)
+        # Smooth transition from smoky slate-blue at base to jet obsidian at razor tip
+        horn_base = mix((78, 84, 94), (20, 22, 28), min(1.0, bf * 1.12))
+        horn_lt = mix((108, 114, 126), (44, 48, 58), min(1.0, bf * 1.05))
+        base = mix(horn_base, horn_lt, stri * 0.36 + h_fine * 0.16)
+        # Soft smoky-ash blend right at the very back of segment 0 meeting the cere
+        if bf < 0.22 and lz > 0.55:
+            base = mix(base, (124, 128, 134), ((lz - 0.55) / 0.45) * 0.45)
+        if face == 'up':
+            # Crisp sunlit glossy horn sheen along the curved dorsal culmen arch (like the real photo!)
+            ridge = max(0.0, 1.0 - abs(lx - 0.5) * 2.2)
+            glint = mix((158, 166, 178), (94, 100, 114), bf)
+            base = mix(base, glint, (0.48 if bf < 0.75 else 0.36) * ridge)
+        elif face in ('east', 'west'):
+            # Subtle curved specular highlight band along upper-mid cheek of beak, darker cutting rim below
+            if ly > 0.62:
+                base = mix(base, (112, 118, 130), 0.26 * (1.0 - bf * 0.6))
+            elif ly < 0.22:
+                base = shade(base, 0.76)
+        elif face == 'down':
+            base = shade(base, 0.72)
+        return shade(base, fk)
+
+    if part == 'mouth_inner':
+        return shade(mix((114, 48, 54), (146, 68, 74), 1.0 - lz), fk)
+
+    if part == 'tongue':
+        ridge = max(0.0, 1.0 - abs(lx - 0.5) * 2.2)
+        col = mix((168, 86, 92), (212, 128, 132), 0.45 * ridge + 0.25 * (1.0 - lz))
+        return shade(col, fk)
+
+    # --- 3. Deep Chocolate-Slate Hood, Crest & V-Scalloped Chest Bib (NO white chin patch!) ---
+    if part in ('hood', 'crest'):
+        g = feather_grain(qx, qy, qz, scale=2.2, flow=(0.0, -0.25, 1.0))
+        dark = (38, 28, 24)
+        mid = (56, 42, 35)
+        warm = (82, 62, 49)
+        col = mix(dark, warm, 0.45 + 0.38 * g)
+        # Subtle paler warm-bronze crown/crest feather tips (iconic Martial Eagle textured crest!)
+        if part == 'crest':
+            tip = max(0.0, (lz - 0.62) / 0.38)
+            col = mix(col, (108, 86, 68), tip * 0.55)
+            if abs(lx - 0.5) < 0.14:
+                col = shade(col, 0.84)  # dark central quill shaft
+        elif bone in ('neck_1', 'neck_2'):
+            # Layered hackle scallop tips around the thick eagle neck
+            tile_z = (z * 0.52 + (0.5 if int(math.floor(x * 0.55)) % 2 else 0.0)) % 1.0
+            if tile_z > 0.78:
+                col = mix(col, (96, 76, 60), 0.42)
+        elif bone == 'body':
+            # Dark V-scalloped breast bib: crisp pale-edged feather scallops along lower border
+            tile_z = (z * 0.46 + (0.5 if int(math.floor(x * 0.45)) % 2 else 0.0)) % 1.0
+            if tile_z > 0.80:
+                col = mix(col, (98, 78, 62), 0.36)
+        elif bone == 'head':
+            # Subtle warm ear-covert & brow feather highlights around the dark raptor face
+            if y > 26.2 and abs(x) < 2.2:
+                col = mix(col, (76, 58, 46), 0.35)
+            elif face == 'down':
+                col = shade(mid, 0.78)  # solid dark throat under chin!
+        return shade(col, fk)
+
+    # --- 4. Mantle & Back (Scalloped Dark Umber-Chocolate Plumage with Subtle Pale Feather Edges) ---
+    if part == 'mantle':
+        g = feather_grain(qx, qy, qz, scale=2.0, flow=(0.0, -0.1, 1.0))
+        col = mix((46, 35, 29), (74, 57, 46), 0.50 + 0.36 * g)
+        # Staggered overlapping dorsal mantle feather scallops (warm buff-taupe crescent tips!)
+        col_i = int(math.floor(x * 0.42))
+        row_u = (z * 0.36 + (0.5 if col_i % 2 else 0.0)) % 1.0
+        cell_x = abs((x * 0.42) - math.floor(x * 0.42) - 0.5) * 2.0
+        scallop = row_u + cell_x * 0.26
+        if 0.84 <= scallop <= 1.04:
+            col = mix(col, (116, 98, 82), 0.52)
+        elif cell_x < 0.14:
+            col = shade(col, 0.86)  # subtle central shaft
+        return shade(col, fk)
+
+    # --- 5. Snow-White Breast, Belly & Feathered Eagle Trousers with Iconic Dark Teardrop Spots! ---
+    if part in ('chest_white', 'thigh_white'):
+        g = feather_grain(qx, qy, qz, scale=2.1, flow=(0.0, -0.85, 0.52))
+        ivory = mix((226, 220, 208), (242, 237, 227), 0.50 + 0.35 * g)
+        # Undertail coverts stay snowy-clean white
+        if bone == 'tail_base':
+            return shade(ivory, fk)
+        # Organic staggered Martial Eagle dark chocolate teardrop spots (face-projected so ZERO side-face striping!)
+        if part == 'chest_white':
+            if face in ('up', 'down'):
+                sx_cell, sy_cell = x * 0.40, z * 0.36
+            elif face in ('east', 'west'):
+                sx_cell, sy_cell = z * 0.36, y * 0.42
+            else:
+                sx_cell, sy_cell = x * 0.40, y * 0.42
+            ci = int(math.floor(sx_cell))
+            ri = int(math.floor(sy_cell + (0.5 if ci % 2 else 0.0)))
+            fx = sx_cell - ci - 0.5
+            fy = (sy_cell + (0.5 if ci % 2 else 0.0)) - ri - 0.5
+            # Slight deterministic jitter per feather spot so it never looks mechanical!
+            jx = (hash3(ci, ri, 11) - 0.5) * 0.26
+            jy = (hash3(ci, ri, 23) - 0.5) * 0.24
+            keep = hash3(ci, ri, 37)
+            dx = fx - jx
+            dy = fy - jy
+            # Crisp teardrop / spade spot (slightly taller along feather flow!)
+            dist = math.hypot(dx * 1.28, dy * 0.92)
+            # Denser spots on upper/mid breast, sparser on far flanks & lower vent
+            thresh = 0.27 if z < 2.0 else 0.22
+            if keep > 0.24 and dist < thresh:
+                spot = mix((42, 32, 28), (64, 49, 41), dist / thresh * 0.55)
+                return shade(spot, fk)
+            elif keep > 0.24 and dist < thresh + 0.06:
+                return shade(mix(ivory, (156, 144, 132), 0.38), fk)
+            return shade(ivory, fk)
+        else:
+            # Feathered eagle trousers: crisp teardrop speckles on upper/mid thigh, snow-white ankle skirt!
+            if y > 9.6:
+                if face in ('up', 'down'):
+                    sx_cell, sy_cell = x * 0.46, z * 0.46
+                elif face in ('east', 'west'):
+                    sx_cell, sy_cell = z * 0.46, y * 0.44
+                else:
+                    sx_cell, sy_cell = x * 0.46, y * 0.44
+                ci = int(math.floor(sx_cell))
+                ri = int(math.floor(sy_cell + (0.5 if ci % 2 else 0.0)))
+                fx = sx_cell - ci - 0.5
+                fy = (sy_cell + (0.5 if ci % 2 else 0.0)) - ri - 0.5
+                jx = (hash3(ci, ri, 41) - 0.5) * 0.24
+                jy = (hash3(ci, ri, 53) - 0.5) * 0.22
+                keep = hash3(ci, ri, 67)
+                dist = math.hypot((fx - jx) * 1.25, (fy - jy) * 0.94)
+                thresh = 0.25 if y > 12.2 else 0.19
+                if keep > 0.34 and dist < thresh:
+                    return shade(mix((44, 34, 30), (68, 53, 44), dist / thresh * 0.5), fk)
+            # Soft pale feather-fringe shadow at bottom edge of ankle skirt
+            if bone.startswith('leg_lower') and ly < 0.22:
+                ivory = mix(ivory, (194, 186, 174), (0.22 - ly) / 0.22 * 0.45)
+            return shade(ivory, fk)
+
+    # --- 6. Wings — Solid Dark Scalloped Dorsal Upperwings vs. High-Contrast Barred Soaring Underwings! ---
+    is_spread = bone.startswith(('wing_upper', 'wing_fore', 'wing_hand', 'wing_tips', 'alula'))
+    is_fold = bone.startswith('wing_fold')
+
+    if part in ('wing_covert', 'wing_covert_hi'):
+        g = feather_grain(qx, qy, qz, scale=2.1, flow=(0.0, 0.0, 1.0))
+        if is_spread and face == 'down':
+            # Iconic Martial Eagle DARK speckled underwing leading coverts!
+            col = mix((44, 34, 29), (64, 50, 42), 0.50 + 0.32 * g)
+            # Crisp small creamy-white under-covert flecks
+            ci = int(math.floor(x * 0.55))
+            ri = int(math.floor(z * 0.55))
+            if hash3(ci, ri, 79) > 0.72:
+                fx = (x * 0.55) - ci - 0.5
+                fz = (z * 0.55) - ri - 0.5
+                if math.hypot(fx, fz) < 0.26:
+                    col = (212, 204, 188)
+            return shade(col, 0.94)
+        # Solid dark chocolate-slate dorsal upperwing coverts with crisp pale-buff scalloped feather rims!
+        base_dk = (44, 34, 28) if part == 'wing_covert' else (56, 44, 36)
+        base_lt = (74, 58, 47) if part == 'wing_covert' else (90, 72, 58)
+        col = mix(base_dk, base_lt, 0.48 + 0.36 * g)
+        # Terraced covert feather scallops
+        if is_fold:
+            # Diagonal feather shingle edges across the folded cape
+            col_i = int(math.floor((y * 0.45 + x * 0.25)))
+            row_u = (z * 0.34 + (0.5 if col_i % 2 else 0.0)) % 1.0
+            if row_u > 0.80 or lz > 0.88:
+                col = mix(col, (132, 114, 96) if part == 'wing_covert_hi' else (106, 88, 72), 0.60)
+            elif row_u < 0.14:
+                col = shade(col, 0.80)
+        else:
+            # Spread upperwing covert tiers: crisp pale-buff trailing tip fringe on each covert row!
+            col_i = int(math.floor(x * 0.42))
+            row_u = (lz * 2.0 + (0.5 if col_i % 2 else 0.0)) % 1.0
+            if lz > 0.82 or row_u > 0.84:
+                col = mix(col, (128, 110, 92) if part == 'wing_covert_hi' else (102, 86, 72), 0.58)
+            elif abs(((x * 0.42) - col_i) - 0.5) < 0.12:
+                col = shade(col, 0.85)
+        return shade(col, fk)
+
+    if part in ('wing_flight', 'wing_primary', 'wing_tip'):
+        # Flight feathers (secondaries, primaries, alula, and slotted finger tips!)
+        g = feather_grain(qx, qy, qz, scale=2.2, flow=(0.0, 0.0, 1.0))
+        if is_spread and face == 'down':
+            # HIGH-CONTRAST SOARING UNDERWING: creamy-silver barred flight feathers + jet-black finger tips!
+            if part == 'wing_tip':
+                # Pale barred base -> crisp dark charcoal-black outer slotted fingers!
+                if lz < 0.34:
+                    bar = 0.5 + 0.5 * math.sin(lz * 22.0)
+                    col = mix((54, 46, 42), (206, 198, 184), bar * 0.85)
+                else:
+                    t = min(1.0, (lz - 0.34) / 0.22)
+                    col = mix((68, 60, 56), (26, 24, 28), t)
+                    if abs(lx - 0.5) < 0.14:
+                        col = mix(col, (92, 86, 82), 0.35 * (1.0 - t))
+                return shade(col, 0.96)
+            # Broad underwing secondaries & inner primaries: creamy-buff with 4-5 crisp dark slate raptor bars!
+            bar_phase = math.sin(lz * 5.0 * 2.0 * math.pi)
+            is_bar = bar_phase > 0.18
+            pale = mix((204, 196, 182), (224, 216, 202), 0.5 + 0.3 * g)
+            dark = mix((50, 42, 38), (68, 58, 52), 0.5 + 0.3 * g)
+            col = dark if is_bar else pale
+            # Crisp dark trailing-edge band + subtle pale feather-tip edge
+            if 0.84 <= lz <= 0.96:
+                col = (40, 34, 32)
+            elif lz > 0.96:
+                col = (198, 190, 176)
+            # Pale ivory central rachis quill shaft!
+            if abs(lx - 0.5) < 0.10:
+                col = mix(col, (236, 230, 216), 0.55)
+            return shade(col, 0.96)
+
+        # DORSAL flight feathers & FOLDED wingtip spears (solid dark slate-chocolate, subtle raptor barring!)
+        if part == 'wing_tip':
+            col = mix((24, 22, 24), (44, 38, 36), (1.0 - lz) * 0.65 + 0.25 * g)
+            if abs(lx - 0.5) < 0.12:
+                col = mix(col, (76, 68, 62), 0.35)
+            return shade(col, fk)
+        bar = 0.5 + 0.5 * math.sin(lz * 4.5 * 2.0 * math.pi)
+        dk = (36, 30, 28) if part == 'wing_primary' else (48, 40, 36)
+        lt = (66, 56, 48) if part == 'wing_primary' else (88, 76, 66)
+        col = mix(dk, lt, (0.35 + 0.35 * bar) + 0.22 * g)
+        if 0.85 <= lz <= 0.95:
+            col = (34, 28, 26)
+        elif lz > 0.95:
+            col = mix(col, (146, 134, 118), 0.62)  # crisp pale trailing feather rim!
+        if abs(lx - 0.5) < 0.10:
+            col = shade(col, 0.78)  # dark central quill shaft
+        return shade(col, fk)
+
+    # --- 7. Graduated 7-Feather Barred Raptor Tail Fan ---
+    if part == 'tail':
+        g = feather_grain(qx, qy, qz, scale=2.2, flow=(0.0, 0.0, 1.0))
+        bar_wave = math.sin(lz * 4.5 * 2.0 * math.pi)
+        if face == 'down':
+            # Crisp silver-cream barred undertail visible in soaring flight!
+            col = (46, 40, 38) if bar_wave > 0.12 else mix((192, 184, 172), (212, 204, 192), 0.5 + 0.25 * g)
+            if 0.78 <= lz <= 0.94:
+                col = (34, 29, 28)   # broad dark subterminal band!
+            elif lz > 0.94:
+                col = (224, 218, 206)  # crisp thin white tail-tip edge!
+            if abs(lx - 0.5) < 0.09:
+                col = mix(col, (230, 224, 212), 0.50)
+            return shade(col, 0.95)
+        # Dorsal tail: dark slate-chocolate with crisp ash-taupe transverse bars + broad jet subterminal band!
+        col = mix((46, 38, 34), (60, 50, 44), 0.5 + 0.3 * g) if bar_wave > 0.05 else mix((98, 86, 76), (118, 106, 94), 0.5 + 0.25 * g)
+        if 0.78 <= lz <= 0.94:
+            col = (30, 25, 24)
+        elif lz > 0.94:
+            col = (182, 172, 158)
+        if abs(lx - 0.5) < 0.09:
+            col = shade(col, 0.78)
+        return shade(col, fk)
+
+    # --- 8. Scaly Pale Yellow-Ochre Tarsi & Toes (Horizontal Reptilian Scutes!) + Glossy Jet-Black Talons ---
+    if part == 'tarsus':
+        base = mix((200, 180, 114), (222, 204, 138), h_fine * 0.45)
+        if bone.startswith('leg_tarsus'):
+            # Crisp horizontal scute scale bands wrapping around the eagle's scaly shins!
+            band = (y * 1.05) % 1.0
+            if band < 0.22:
+                base = mix(base, (132, 112, 62), 0.65)
+            elif band > 0.76:
+                base = mix(base, (238, 222, 162), 0.32)
+        else:
+            # Transverse toe-pad scale bands across every gripping toe!
+            band = (z * 1.15) % 1.0
+            if face == 'down':
+                # Rough textured dark-ochre gripping sole pads underneath toes
+                base = mix((144, 126, 78), (168, 150, 96), h_fine * 0.6)
+            elif band < 0.24:
+                base = mix(base, (128, 110, 62), 0.65)
+            elif band > 0.78:
+                base = mix(base, (236, 220, 160), 0.30)
+        return shade(base, fk)
+
+    if part == 'talon':
+        base = mix((20, 20, 24), (34, 34, 40), h_fine * 0.35)
+        if face == 'up':
+            ridge = max(0.0, 1.0 - abs(lx - 0.5) * 2.2)
+            base = mix(base, (82, 86, 98), 0.52 * ridge)  # glossy keratin talon highlight!
+        return shade(base, fk)
+
+    return shade(PLAIN_PALETTE.get(part, (150, 140, 130)), fk)
+
+
 def make_look(look_name=None, **build_kwargs):
     """Builds painted bones + PNG bytes + texture dims for workshop / viewer / game."""
     lk = look_name or WORKSHOP_LOOK
-    pal = CLAY_PALETTE if lk == 'clay' else PLAIN_PALETTE
     bones = build_bones(**build_kwargs)
+
+    if lk == 'painted':
+        painted, rows, w, h = paint_faces(bones, TEXELS, _painted_colour, world_coords=False)
+        return painted, png(rows), w, h
+
+    pal = CLAY_PALETTE if lk == 'clay' else PLAIN_PALETTE
 
     def colour(c, face, x, y, z):
         base = pal.get(c.get('_part', 'mantle'), (150, 140, 130))

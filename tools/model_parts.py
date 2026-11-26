@@ -1007,7 +1007,7 @@ def feather_fan(cubes, origin, count, length, width, thickness=0.35, spread_deg=
 # --- Reusable Bird Beak & Eye Systems (Animal Maker Engine — Fliers, 2026-11-25) --------------------------------------
 BIRD_BEAK_PRESETS = {
     # (crown_slope, hook_drop, hook_pow, keel_ratio, cere_frac, festoon, segments, tip_w_frac, jaw_drop)
-    'raptor_hook':     (0.07, 0.38, 3.20, 0.50, 0.30, 0.10, 6, 0.14, 0.08),  # Eagles, hawks, falcons, vultures, owls
+    'raptor_hook':     (0.06, 0.28, 2.85, 0.52, 0.30, 0.08, 6, 0.14, 0.06),  # Eagles, hawks, falcons, vultures, owls
     'straight_spear':  (0.06, 0.02, 1.50, 0.56, 0.14, 0.00, 4, 0.10, 0.02),  # Cranes, herons, storks, kingfishers
     'curved_scimitar': (0.12, 0.44, 1.85, 0.54, 0.16, 0.00, 6, 0.12, 0.30),  # Hornbills, ibises, bee-eaters, sunbirds
     'conical_seed':    (0.18, 0.06, 1.75, 0.62, 0.12, 0.04, 4, 0.16, 0.04),  # Weavers, finches, oxpeckers, sparrows
@@ -1016,16 +1016,18 @@ BIRD_BEAK_PRESETS = {
 
 
 def bird_beak(upper_cubes, jaw_cubes, tongue_cubes, cx=0.0, y_base=0.0, z_base=0.0,
-              length=4.4, width=2.4, height=2.9, style='raptor_hook',
+              length=4.1, width=2.45, height=2.95, style='raptor_hook',
               arch=None, hook_drop=None, hook_pow=None, keel_ratio=None, cere_frac=None,
-              festoon=None, segments=None, tip_w_frac=None, jaw_drop=None,
+              festoon=None, segments=None, tip_w_frac=None, jaw_drop=None, hook_curl=0.18,
               cere_part='cere', beak_part='beak', tip_part='beak_tip',
               inner_part='mouth_inner', tongue_part='tongue', nostril_part='nostril'):
-    """Reusable spline-arc, keeled-cross-section bird beak builder pointing toward -Z.
+    """Reusable arc-length spline, keeled-cross-section bird beak builder pointing toward -Z.
 
     Works across bird families via `style` presets ('raptor_hook', 'straight_spear',
     'curved_scimitar', 'conical_seed', 'bent_filter') or explicit overrides:
-      - Flush forehead -> sloped keeled cere -> bold high-arched culmen -> tight compact raptor hook (ZERO cliff/step!).
+      - True arc-length-equalized curve sampling so the curved hook bends smoothly across multiple short
+        tapered segments instead of one long blunt rod (ZERO hanging 'nob' / ZERO tip overhang!).
+      - Flush forehead -> sloped keeled cere -> bold high-arched culmen -> tight recurved eagle tip.
       - Keeled inverted-V cross-section (deep powerful curved tomium cutting edges + narrow dorsal culmen ridge).
       - Sleek angled recessed oval nares (nostrils) on upper cere flanks.
       - Matching tapered nested lower mandible + 100%-hidden-at-rest palate & tongue (passes hidden_at_rest).
@@ -1072,76 +1074,109 @@ def bird_beak(upper_cubes, jaw_cubes, tongue_cubes, cx=0.0, y_base=0.0, z_base=0
             pivot=[cx + s * hw * 0.92, y_base + height * 0.57, (nz0 + nz1) * 0.5],
         ))
 
-    # --- 2. High-Arched Deep Aquiline Maxilla (flush out of cere -> powerful flat-convex bridge -> tight hook!) ---
+    # --- 2. Arc-Length-Equalized Smooth Curved Aquiline Maxilla (ZERO hanging rod / ZERO tip overhang!) ---
     beak_l = length - cere_l
 
-    def _profile(u):
-        uc = max(0.0, u)
-        # Smooth forward march with tight backward-curling raptor hook tip near u=1
-        z = z_cere - beak_l * (u - 0.065 * max(0.0, uc - 0.68) * (h_drop / max(1.0, height)))
-        # High power-arch dorsal culmen: stays tall & bold across first half, then bends sharply into tight eagle hook!
+    def _raw_profile(u):
+        uc = max(0.0, min(1.0, u))
+        # Smooth forward march curving cleanly INWARD/BACKWARD at the raptor hook point!
+        curl = hook_curl * (max(0.0, (uc - 0.52) / 0.48) ** 2.1) * (h_drop / max(0.5, height * 0.35))
+        z = z_cere - beak_l * (u - curl)
+        # Smooth continuous dorsal culmen arch starting flush at cere_y_front -> plunging cleanly into curved hook!
         y_top = cere_y_front - c_slope * uc - (height * 0.94 - c_slope + h_drop) * (uc ** h_pow)
-        # Deep nearly-level tomium (cutting edge) with subtle raptor festoon curve before plunging into hook point!
-        fest_bump = fest * math.sin(max(0.0, min(1.0, (uc - 0.08) / 0.54)) * math.pi)
-        y_bot = y_base + height * 0.04 - fest_bump - (h_drop + height * 0.04) * (uc ** (h_pow + 0.80))
-        # Meaty raptor beak depth tapering sharply only at the terminal dagger tip
-        min_thick = max(0.20, height * (0.08 + 0.52 * ((1.0 - uc) ** 1.15)))
+        # Strong level cutting-edge tomium with subtle raptor festoon curve tapering cleanly into pointed tip!
+        fest_bump = fest * math.sin(max(0.0, min(1.0, (uc - 0.06) / 0.56)) * math.pi)
+        y_bot = y_base + height * 0.04 - fest_bump - (h_drop + height * 0.04) * (uc ** (h_pow + 0.55))
+        # Taper vertical thickness crisply down to a razor eagle point at uc=1 (no blunt club tip!)
+        min_thick = max(0.14, height * (0.045 + 0.52 * ((1.0 - uc) ** 1.10)))
         if y_top - y_bot < min_thick:
             y_bot = y_top - min_thick
-        # Smooth lateral taper from strong cere width to compressed cutting blade tip
-        w_half = hw * (tw_frac + (0.94 - tw_frac) * ((1.0 - uc) ** 0.92))
+        # Smooth lateral taper from cere width to sharp pointed blade tip
+        w_half = hw * (tw_frac + (0.94 - tw_frac) * ((1.0 - uc) ** 0.88))
         return z, y_top, y_bot, w_half
 
+    # Re-parameterize dorsal-centerline by true arc length so curved hook gets dense short segments!
+    N_TAB = 64
+    tab_u = [k / N_TAB for k in range(N_TAB + 1)]
+    tab_s = [0.0]
+    prev_z, prev_yt, prev_yb, _ = _raw_profile(0.0)
+    prev_y = (prev_yt + prev_yb) * 0.5
+    for k in range(1, N_TAB + 1):
+        zk, ytk, ybk, _ = _raw_profile(tab_u[k])
+        yk = (ytk + ybk) * 0.5
+        tab_s.append(tab_s[-1] + math.hypot(zk - prev_z, yk - prev_y))
+        prev_z, prev_y = zk, yk
+    total_s = max(1e-4, tab_s[-1])
+
+    def _u_at_arc(frac):
+        target = max(0.0, min(1.0, frac)) * total_s
+        for k in range(1, N_TAB + 1):
+            if tab_s[k] >= target:
+                ds = max(1e-6, tab_s[k] - tab_s[k - 1])
+                t = (target - tab_s[k - 1]) / ds
+                return tab_u[k - 1] + t * (tab_u[k] - tab_u[k - 1])
+        return 1.0
+
     for i in range(n_seg):
-        # Segment 0 embeds slightly inside the front cere so dark culmen emerges 100% flush with ZERO step!
-        u0 = -0.06 if i == 0 else i / n_seg
-        u1 = (i + 1) / n_seg
-        um = (max(0.0, u0) + u1) * 0.5
-        z0, yt0, yb0, w0 = _profile(u0)
-        z1, yt1, yb1, w1 = _profile(u1)
-        zm, ytm, ybm, wm = _profile(um)
+        f0 = i / n_seg
+        f1 = (i + 1) / n_seg
+        u0 = -0.05 if i == 0 else _u_at_arc(f0)
+        u1 = _u_at_arc(f1)
+        um = _u_at_arc((f0 + f1) * 0.5)
+        z0, yt0, yb0, w0 = _raw_profile(u0)
+        z1, yt1, yb1, w1 = _raw_profile(u1)
+        zm, ytm, ybm, wm = _raw_profile(um)
         yc0, yc1 = (yt0 + yb0) * 0.5, (yt1 + yb1) * 0.5
         dz = z0 - z1
         dy_c = yc1 - yc0
         dy_t = yt1 - yt0
         seg_len = math.hypot(dz, dy_c)
-        # Blend centerline & dorsal tangent so upper culmen stays razor-smooth with zero stair-steps!
-        pitch_c = max(2.0, math.degrees(math.atan2(-dy_c, max(1e-4, dz))))
-        pitch_t = max(2.0, math.degrees(math.atan2(-dy_t, max(1e-4, dz))))
-        thick = max(0.22, ytm - ybm)
-        olap = max(0.18, seg_len * 0.28)
-        part_i = tip_part if um >= 0.52 else beak_part
+        # Allow steep downward/inward hook angles (up to ~88 deg) so the tip curves back like a real eagle!
+        pitch_c = max(2.0, math.degrees(math.atan2(-dy_c, dz)))
+        pitch_t = max(2.0, math.degrees(math.atan2(-dy_t, dz)))
+        thick = max(0.16, ytm - ybm)
+        # Overlap backward cleanly into previous segment, NEVER overhang past the final tip!
+        back_olap = max(0.12, seg_len * 0.24)
+        front_olap = 0.0 if i == n_seg - 1 else max(0.10, seg_len * 0.18)
+        part_i = tip_part if f1 >= 0.58 else beak_part
+        # Shift center slightly backward when front_olap < back_olap so front face stops EXACTLY at z1/yc1!
+        shift = (back_olap - front_olap) * 0.5
+        half_l = seg_len * 0.5 + (back_olap + front_olap) * 0.5
         piv = [cx, (yc0 + yc1) * 0.5, (z0 + z1) * 0.5]
-        half_l = seg_len * 0.5 + olap
+        seg_meta = {'_beak_f': round((f0 + f1) * 0.5, 3)}
 
         # Lower wider deep cutting-edge cheeks (tomium blade)
-        lo_h = thick * 0.62
+        lo_h = thick * (0.64 if i < n_seg - 1 else 0.85)
         upper_cubes.append(rot_cube(
-            [cx - wm, piv[1] - thick * 0.50, piv[2] - half_l],
-            [cx + wm, piv[1] - thick * 0.50 + lo_h, piv[2] + half_l],
-            part_i, rotation=[round(pitch_c, 2), 0.0, 0.0], pivot=piv,
+            [cx - wm, piv[1] - thick * 0.50, piv[2] - half_l + shift],
+            [cx + wm, piv[1] - thick * 0.50 + lo_h, piv[2] + half_l + shift],
+            part_i, rotation=[round(pitch_c, 2), 0.0, 0.0], pivot=piv, **seg_meta,
         ))
         # Upper narrower dorsal culmen keel aligned to exact dorsal ridge slope!
-        if i < n_seg - 1 or wm > 0.26:
+        if i < n_seg - 1:
             kw = max(0.16, wm * k_rat)
             tpiv = [cx, (yt0 + yt1) * 0.5, (z0 + z1) * 0.5]
-            tlen = math.hypot(dz, dy_t) * 0.5 + olap * 0.92
+            tseg = math.hypot(dz, dy_t)
+            tback = max(0.10, tseg * 0.22)
+            tfront = max(0.08, tseg * 0.16)
+            tshift = (tback - tfront) * 0.5
+            thalf = tseg * 0.5 + (tback + tfront) * 0.5
             upper_cubes.append(rot_cube(
-                [cx - kw, tpiv[1] - thick * 0.56, tpiv[2] - tlen],
-                [cx + kw, tpiv[1] + 0.02, tpiv[2] + tlen],
-                part_i, rotation=[round(pitch_t, 2), 0.0, 0.0], pivot=tpiv,
+                [cx - kw, tpiv[1] - thick * 0.54, tpiv[2] - thalf + tshift],
+                [cx + kw, tpiv[1] + 0.02, tpiv[2] + thalf + tshift],
+                part_i, rotation=[round(pitch_t, 2), 0.0, 0.0], pivot=tpiv, **seg_meta,
             ))
 
     # Recessed dark upper palate roof (narrowed & shortened so ZERO pink EVER pokes through closed beak!)
     upper_cubes.append(cube(
-        [cx - hw * 0.42, y_base + height * 0.12, z_cere - beak_l * 0.34],
-        [cx + hw * 0.42, y_base + height * 0.32, z_base + 0.05],
+        [cx - hw * 0.40, y_base + height * 0.12, z_cere - beak_l * 0.30],
+        [cx + hw * 0.40, y_base + height * 0.32, z_base + 0.05],
         inner_part,
     ))
 
     # --- 3. Sleek Tapered Nested Lower Mandible (seals 100% cleanly inside upper rim, slender tip when open!) ---
     jaw_piv = [cx, y_base + height * 0.04, z_base - 0.05]
-    jaw_len = length * 0.66
+    jaw_len = length * 0.65
     n_j = 2 if n_seg <= 4 else 3
     for ji in range(n_j):
         t0, t1 = ji / n_j, (ji + 1) / n_j
@@ -1155,15 +1190,18 @@ def bird_beak(upper_cubes, jaw_cubes, tongue_cubes, cx=0.0, y_base=0.0, z_base=0
         jlen = math.hypot(jz0 - jz1, jy1 - jy0)
         jpit = math.degrees(math.atan2(-(jy1 - jy0), max(1e-4, jz0 - jz1)))
         jpv = [cx, (jy0 + jy1) * 0.5, (jz0 + jz1) * 0.5]
-        jol = max(0.12, jlen * 0.16)
+        jol = max(0.10, jlen * 0.14)
+        jfront = 0.0 if ji == n_j - 1 else jol
+        jshift = (jol - jfront) * 0.5
+        jhalf = jlen * 0.5 + (jol + jfront) * 0.5
         jaw_cubes.append(rot_cube(
-            [cx - jw, jpv[1] - jh * 0.60, jpv[2] - jlen * 0.5 - jol],
-            [cx + jw, jpv[1] + jh * 0.40, jpv[2] + jlen * 0.5 + jol],
+            [cx - jw, jpv[1] - jh * 0.60, jpv[2] - jhalf + jshift],
+            [cx + jw, jpv[1] + jh * 0.40, jpv[2] + jhalf + jshift],
             beak_part if tm < 0.62 else tip_part,
             rotation=[round(jpit, 2), 0.0, 0.0], pivot=jpv,
         ))
     jaw_cubes.append(cube(
-        [cx - hw * 0.36, y_base - height * 0.08, z_base - jaw_len * 0.62],
+        [cx - hw * 0.36, y_base - height * 0.08, z_base - jaw_len * 0.60],
         [cx + hw * 0.36, y_base + height * 0.06, z_base - 0.08],
         inner_part,
     ))
@@ -1171,7 +1209,7 @@ def bird_beak(upper_cubes, jaw_cubes, tongue_cubes, cx=0.0, y_base=0.0, z_base=0
     # --- 4. Slender Raptor Tongue (completely sealed inside closed beak!) ---
     tongue_piv = [cx, y_base - height * 0.01, z_base - 0.25]
     tongue_cubes.append(cube(
-        [cx - hw * 0.26, y_base - height * 0.08, z_base - jaw_len * 0.54],
+        [cx - hw * 0.26, y_base - height * 0.08, z_base - jaw_len * 0.52],
         [cx + hw * 0.26, y_base + height * 0.05, z_base - 0.28],
         tongue_part,
     ))
