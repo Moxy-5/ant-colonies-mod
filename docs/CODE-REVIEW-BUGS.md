@@ -7,18 +7,18 @@ review files under `docs/reviews/full/`; search there for a finding's number (`R
 a `**Status ...**` line under the finding there and runs the tool. Bugs that did not come from the code
 review stay in `docs/BUGS.md`.
 
-**234 findings: 150 left (11 of them wait for your call), 84 done.**
+**234 findings: 149 left (11 of them wait for your call), 85 done.**
 
 | Grade | Found | Not started | Open | Half fixed | Fixed | Not a bug after all |
 |---|---|---|---|---|---|---|
 | A: a player can meet it | 50 | 0 | 1 | 0 | 48 | 1 |
-| B: it will cost us when building on this | 107 | 73 | 2 | 4 | 27 | 1 |
+| B: it will cost us when building on this | 107 | 72 | 2 | 4 | 28 | 1 |
 | C: a tidy-up | 77 | 68 | 0 | 2 | 6 | 1 |
 
 | Round | System | Found | Left | Done |
 |---|---|---|---|---|
 | 1 | the colony brain | 50 | 30 | 20 |
-| 2 | the legs | 43 | 23 | 20 |
+| 2 | the legs | 43 | 22 | 21 |
 | 3 | the insect body | not read yet | | |
 | 4 | how bodies are drawn | not read yet | | |
 | 5 | the termites | not read yet | | |
@@ -69,7 +69,7 @@ is left; no word means nobody has started it. The findings that wait for your ca
 - **R7-33** A palm's crown can blink out at the screen's edge
   - *Open:* waits to be seen (2026-11-24). Read from how Minecraft hides parts of the world, never seen in the game; the fix is large (sharing a crown's faces out over its blocks) and is built only if the user sees fronds blink out.
 
-### B: it will cost us when building on this (71 left)
+### B: it will cost us when building on this (70 left)
 
 **Round 1, the colony brain** (`docs/reviews/full/round-01-colony-brain.md`)
 
@@ -93,14 +93,13 @@ is left; no word means nobody has started it. The findings that wait for your ca
 
 **Round 2, the legs** (`docs/reviews/full/round-02-legs.md`)
 
-- **R2-2** three new plans are all a walk gets, however far it got, and nobody hears the give-up
-  - *Half fixed:* BUGS 404: new plans are counted since the last finished step. Open: `Errand` still does not read `hasFailed()` (a change to what `walkOn` means for every goal; left for round 3's fixes), and the landing check still uses ...
 - **R2-16** a search that finds no way costs about 20 ms, most termite walks run it twice, and nothing limits how many run in a tick
   - *Half fixed:* grade B now: measured in the termite stress scene (`stressTermiteColony`). A search that finds no way is rare there (0 to 2 in a minute's window), but one alone costs 36 to 57 ms and makes its tick 50 to 64 ms: one slow tick now ...
 - **R2-18** big step costs fight the fixed cap, and the mud test hides it
+  - *Half fixed:* measured and the mud fixed. `SoftGroundSearchTest` (framework): a band of soft ground 8 wide that must be crossed is "no way" at 12 a step with the game's 6,000 and is crossed at 4; wet mud now costs 4 ...
 - **R2-29** the way through a chimney mouth still uses one body's lengths
 - **R2-39** a mind pays for the same "no way" again a tick later, and a builder can ask 24 times in one tick
-  - *Half fixed:* covered in part by R2-1 (BUGS 400): `Errand`'s second ask a tick later costs no search when the walk had no costs of the mind's own. `BuildMoundGoal`'s many asks in one tick are open (round 5).
+  - *Half fixed:* `Errand.walkOn` now treats a walk the legs gave up as "no way" (R2-2's fix): no second ask a tick later. Open: `BuildMoundGoal`'s many asks in one tick (round 5).
 - **R2-41** saving an insect that is walking a wall reads the world and loses its hold
 - **R2-42** four tests of "is this a doorway for this insect"
 - **R2-43** knocked into a cell near its route, an insect finds out only after 6 seconds
@@ -287,6 +286,7 @@ Fixed, or found to be no bug after all. The number after a finding is its entry 
 **Round 2, the legs**
 
 - **R2-1** (B) the legs never remember a failed search, so every mind must bring its own retry clock (BUGS 400)
+- **R2-2** (B) three new plans are all a walk gets, however far it got, and nobody hears the give-up (BUGS 404)
 - **R2-3** (B) an insect falling more than 12 blocks beside a wall is taken for "shut in" and snapped onto the wall (BUGS 403)
 - **R2-7** (C) `mayHaveGoal` asks the mind's test about twice as often as it needs
 - **R2-8** (B) the standing shuffle's search for a free spot can run every tick for good (BUGS 405)

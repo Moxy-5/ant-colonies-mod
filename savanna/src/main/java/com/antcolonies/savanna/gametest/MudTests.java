@@ -228,12 +228,12 @@ public class MudTests {
             }
         }
         BlockPos start = helper.absolutePos(new BlockPos(3, 2, 6)), goal = helper.absolutePos(new BlockPos(15, 2, 6));
-        com.antcolonies.nav.Route wet = com.antcolonies.nav.AntPathFinder.find(new com.antcolonies.nav.LevelCellMap(level), start, goal, 20000);
+        com.antcolonies.nav.Route wet = com.antcolonies.nav.AntPathFinder.find(new com.antcolonies.nav.LevelCellMap(level), start, goal, com.antcolonies.nav.AntPathFinder.DEFAULT_MAX_EXPANSIONS);
         helper.assertTrue(wet != null, "an ant should find a way round the wet mud");
         helper.assertTrue(stepsOnMud(level, wet) == 0, "an ant's route should go round wet mud, it steps on it " + stepsOnMud(level, wet) + " times: " + wet);
         // set down in the middle of the wet band, it still gets out
         BlockPos inside = helper.absolutePos(new BlockPos(9, 2, 6));
-        com.antcolonies.nav.Route out = com.antcolonies.nav.AntPathFinder.find(new com.antcolonies.nav.LevelCellMap(level), inside, goal, 20000);
+        com.antcolonies.nav.Route out = com.antcolonies.nav.AntPathFinder.find(new com.antcolonies.nav.LevelCellMap(level), inside, goal, com.antcolonies.nav.AntPathFinder.DEFAULT_MAX_EXPANSIONS);
         helper.assertTrue(out != null, "an ant in the middle of wet mud should still find a way out");
         // the band dries: the route goes straight over it
         for (int x = 8; x <= 10; x++) {
@@ -241,7 +241,7 @@ public class MudTests {
                 helper.setBlock(new BlockPos(x, 1, z), mud().with(Wetness.CRACKED, 2, Tone.OLIVE));
             }
         }
-        com.antcolonies.nav.Route dry = com.antcolonies.nav.AntPathFinder.find(new com.antcolonies.nav.LevelCellMap(level), start, goal, 20000);
+        com.antcolonies.nav.Route dry = com.antcolonies.nav.AntPathFinder.find(new com.antcolonies.nav.LevelCellMap(level), start, goal, com.antcolonies.nav.AntPathFinder.DEFAULT_MAX_EXPANSIONS);
         helper.assertTrue(dry != null && stepsOnMud(level, dry) >= 3, "an ant's route should cross dried mud straight, " + dry);
         helper.assertTrue(dry.size() < wet.size(), "the dry way across should be shorter than the way round (" + dry.size() + " against " + wet.size() + ")");
         // an ant on soupy mud stands on its surface

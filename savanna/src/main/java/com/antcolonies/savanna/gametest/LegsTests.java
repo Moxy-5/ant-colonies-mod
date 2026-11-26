@@ -796,6 +796,67 @@ public class LegsTests {
     }
 
     /**
+     * Review R2-2, R2-39: a walk the legs give up part way (its goal walled in while it walks there) is heard by the
+     * mind: the shared walking helper ({@code Errand}) answers "no way there" once, without another route search, and
+     * leaves the thing alone, instead of setting off on the same walk again a tick later; a walk to somewhere else
+     * sets off as ever.
+     */
+    @GameTest(template = "arena", timeoutTicks = 600, skyAccess = true)
+    public static void aWalkTheLegsGaveUpIsNoWayToTheMindWithoutAnotherSearch(GameTestHelper helper) {
+        buildNest(helper);
+        int c = MIDDLE - 7;
+        BlockPos goal = helper.absolutePos(new BlockPos(c, SURFACE, c));
+        BlockPos elsewhere = helper.absolutePos(new BlockPos(MIDDLE + 5, SURFACE, MIDDLE + 5));
+        AbstractAntEntity ant = TestAnts.lone(helper, SavannaEntities.MATABELE_MINOR.get(), MIDDLE + 5, SURFACE, MIDDLE + 5);
+        com.antcolonies.entity.goal.Errand<BlockPos> errand = new com.antcolonies.entity.goal.Errand<>(ant);
+        long[] gaveUpAt = {-1};
+        boolean[] set = {false};
+        helper.onEachTick(() -> {
+            long now = helper.getTick();
+            if (now == 10) {
+                helper.assertTrue(ant.getNavigator().moveTo(goal, 1.0), "no way over open ground to the goal");
+            }
+            if (now == 30) {
+                // the goal is walled in and roofed over while the ant is on its way
+                for (int dx = -1; dx <= 1; dx++) {
+                    for (int dy = 0; dy <= 1; dy++) {
+                        for (int dz = -1; dz <= 1; dz++) {
+                            if (dx != 0 || dy != 0 || dz != 0) {
+                                helper.setBlock(new BlockPos(c + dx, SURFACE + dy, c + dz), Blocks.STONE);
+                            }
+                        }
+                    }
+                }
+                set[0] = true;
+            }
+            if (!set[0]) {
+                return;
+            }
+            if (gaveUpAt[0] < 0) {
+                if (goal.equals(ant.getNavigator().gaveUpOn())) {
+                    gaveUpAt[0] = now;
+                    helper.assertTrue(ant.getNavigator().isDone() && ant.getNavigator().hasFailed(), "the legs gave the walk up but do not say it failed");
+                } else {
+                    helper.assertTrue(now < 500, "the legs never gave up the walk to a goal walled in on the way; walking "
+                            + !ant.getNavigator().isDone() + ", failed " + ant.getNavigator().hasFailed());
+                }
+                return;
+            }
+            if (now < gaveUpAt[0] + 15) {
+                return; // (past the legs' own half-second memory of "no way": only the mind's hearing saves the search now)
+            }
+            int before = com.antcolonies.nav.AntPathFinder.searchesRunForTests();
+            helper.assertFalse(errand.goTo(goal, goal, 1.0), "the errand set off again on the walk the legs had just given up");
+            helper.assertTrue(com.antcolonies.nav.AntPathFinder.searchesRunForTests() == before, "hearing of the give-up cost "
+                    + (com.antcolonies.nav.AntPathFinder.searchesRunForTests() - before) + " route search(es)");
+            helper.assertTrue(errand.isLeftAlone(goal), "the thing whose walk was given up is not left alone");
+            helper.assertTrue(ant.getNavigator().gaveUpOn() == null, "the give-up is told more than once");
+            helper.assertTrue(errand.walkOn(elsewhere, 1.0), "after a give-up, a walk to somewhere else does not set off");
+            helper.succeed();
+        });
+    }
+
+    /**
      * Review round 2 (R2-1, R2-16, R2-20, R2-37): a walk with no way to it costs one route search, not one each time the
      * mind asks again (the care goals asked every tick), not two for an insect with walk habits when no habit had a say,
      * and none for a goal cell in mid-air. The goal is the inside of a shut stone box on open ground: open, with a floor,

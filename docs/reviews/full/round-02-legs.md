@@ -116,6 +116,8 @@ arriving, holding on, the walk along a floor). Every line read.
 
 **Status (2026-11-26, `claude/review-fix-2`): half fixed, BUGS 404: new plans are counted since the last finished step. Open: `Errand` still does not read `hasFailed()` (a change to what `walkOn` means for every goal; left for round 3's fixes), and the landing check still uses `floorUnder`.**
 
+**Status (2026-11-26, `claude/review-fix-11b`): fixed: (b) the mind hears a give-up. The legs keep the goal of a walk they gave up part way (`AntNavigator.gaveUpOn`, told once), and `Errand.walkOn` answers "no way there" for it without a new search, so `goTo` leaves the thing alone and the goal does something else (test `LegsTests.aWalkTheLegsGaveUpIsNoWayToTheMindWithoutAnotherSearch`). (a) was BUGS 404. Not done: (c), the landing check still reads `floorUnder` (one plan saved in a rare case; that code was mended for a crash the same day and is left alone).**
+
 - **Where:** `MAX_REPLANS` 60, `replan` 749 to 766, `begin` 413 (the only reset), `tick` 799 to 802;
   `hasFailed` 457 to 460; `entity/goal/Errand.java` 179 to 181, 215 to 217. Seen by two readers.
 - **What is wrong:** (a) a walk is given up at its fourth new plan, counted over its whole length. A termite going
@@ -352,6 +354,8 @@ doorways and mouths, channels, where it stands now, hugging a column). Every lin
   times fewer reads; measure it.
 
 ### R2-18 (B, the sums sure, how often unchecked): big step costs fight the fixed cap, and the mud test hides it
+
+**Status (2026-11-26, `claude/review-fix-11b`): half fixed: measured and the mud fixed. `SoftGroundSearchTest` (framework): a band of soft ground 8 wide that must be crossed is "no way" at 12 a step with the game's 6,000 and is crossed at 4; wet mud now costs 4 (`SavannaMudBlock.WET_INSECT_COST`, my pick: a wallow is still gone round), and `MudTests` searches with the game's own limit. Open: the 50 a blocked step costs (`AntNavigator`), not measured.**
 
 - **Where:** `AntPathFinder.java` 297 (`map.footCost(to)`), 74; `SavannaMudBlock.WET_INSECT_COST = 12.0`;
   `AntNavigator.java` 622 (a blocked step costs 50 more); `MudTests.java` 231, 236, 244 (search with 20,000).
@@ -677,6 +681,8 @@ each pays its own search (a plugged hole is found again by every forager that wa
 ### R2-39 (B, proven; to measure): a mind pays for the same "no way" again a tick later, and a builder can ask 24 times in one tick
 
 **Status (2026-11-26, `claude/review-fix-2`): covered in part by R2-1 (BUGS 400): `Errand`'s second ask a tick later costs no search when the walk had no costs of the mind's own. `BuildMoundGoal`'s many asks in one tick are open (round 5).**
+
+**Status (2026-11-26, `claude/review-fix-11b`): half fixed: `Errand.walkOn` now treats a walk the legs gave up as "no way" (R2-2's fix): no second ask a tick later. Open: `BuildMoundGoal`'s many asks in one tick (round 5).**
 
 - **Where:** `entity/goal/Errand.java` 215 to 243 (`walkOn`, `goTo`); `savanna/.../BuildMoundGoal.java` 207 to 229.
 - **What is wrong:** when the way changes under a walking termite and the new plan fails, the legs set `failed`;

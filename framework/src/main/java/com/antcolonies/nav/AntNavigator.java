@@ -429,6 +429,7 @@ public class AntNavigator {
         }
         route = null;
         failed = false;
+        gaveUpOn = null;
         startLeg();
     }
 
@@ -439,6 +440,7 @@ public class AntNavigator {
      */
     private boolean begin(BlockPos goal, @Nullable Foothold foothold, @Nullable Predicate<Foothold> test, int reach,
             @Nullable Collection<BlockPos> cells, @Nullable Route shared, double speed, AntPathFinder.StepCosts mindCosts) {
+        gaveUpOn = null;
         if (askedInVainJustNow(goal, foothold, test, cells, shared, mindCosts)) {
             // The same question as a moment ago, when no route was found: the same answer, without the search.
             stop();
@@ -509,6 +511,25 @@ public class AntNavigator {
     public boolean hasFailed() {
         return failed;
     }
+
+    /**
+     * Review R2-2, R2-39: the goal cell of a walk the legs gave up part way (stuck past its new plans, or no way on
+     * from where it stood), until a mind has heard it ({@link #heardGiveUp}) or asks for any walk; null otherwise. A
+     * mind that only looked at {@link #isDone} saw "not walking" and set off on the same walk again at once, its count
+     * of new plans back at 0: a route the planner believes in and the body cannot walk was tried for ever.
+     */
+    @Nullable
+    public BlockPos gaveUpOn() {
+        return gaveUpOn;
+    }
+
+    /** The mind has heard that the walk was given up ({@link #gaveUpOn}): it is told once. */
+    public void heardGiveUp() {
+        gaveUpOn = null;
+    }
+
+    @Nullable
+    private BlockPos gaveUpOn;
 
     /** True while the body is on a wall or a ceiling (climbing, crawling, hanging or holding on), not on a floor. */
     public boolean isClimbing() {
@@ -957,6 +978,7 @@ public class AntNavigator {
             Foothold here = currentFoothold(new LevelCellMap(ant.level(), ant));
             route = null;
             failed = true;
+            gaveUpOn = goal;
             at = here;
             return;
         }
@@ -967,6 +989,7 @@ public class AntNavigator {
         }
         if (!plan()) {
             ColonyFrameworkMod.LOGGER.debug("Ant {} found no route to {}", ant.getId(), goal.toShortString());
+            gaveUpOn = goal;
         }
     }
 

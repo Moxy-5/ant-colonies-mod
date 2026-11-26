@@ -86,10 +86,14 @@ public class SavannaMudBlock extends Block implements com.antcolonies.nav.SoftGr
     static final double DRAG_PER_PIXEL = 0.04;
 
     /**
-     * What one foothold on wet (sticky or soupy) mud adds to an ant's or termite's route (my pick): about 12 blocks of
-     * walking, so a column goes round a wallow and crosses only when there is no other way (real ants keep off wet mud).
+     * What one foothold on wet (sticky or soupy) mud adds to an ant's or termite's route (my pick): about 4 blocks of
+     * walking, so a column goes round a wallow (a wallow 6 wide: 24 to cross, about 5 to go round) and crosses only
+     * when the way round is long (real ants keep off wet mud). It was 12 until review R2-18: the route search looks at
+     * every foothold cheaper than the real route first, so at 12 a band 8 wide that had to be crossed cost more
+     * searching than the game allows and read as "no way" (measured, the framework's {@code SoftGroundSearchTest}). Do
+     * not raise it without that test.
      */
-    static final double WET_INSECT_COST = 12.0;
+    static final double WET_INSECT_COST = 4.0;
 
     /** The floor for each sink in pixels (0 to {@link #HEAVY_SINK}). */
     private static final VoxelShape[] FLOORS = new VoxelShape[HEAVY_SINK + 1];

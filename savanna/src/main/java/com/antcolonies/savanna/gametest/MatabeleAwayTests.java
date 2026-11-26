@@ -444,7 +444,10 @@ public class MatabeleAwayTests {
                         helper.assertTrue(now - stageAt[0] < 200, "no real scout was shown to the watcher 56 blocks past the number scout's place");
                         return;
                     }
-                    scout[0] = raids.scouts().scoutsOut().iterator().next();
+                    // (the scout shown nearest the place the test watches: another number scout may be shown in the same
+                    // second somewhere else, BUGS 417)
+                    scout[0] = raids.scouts().scoutsOut().stream().min(java.util.Comparator.comparingDouble(id ->
+                            level.getEntity(id) == null ? Double.MAX_VALUE : level.getEntity(id).blockPosition().distSqr(placeAt[0]))).orElseThrow();
                     helper.assertTrue(level.getEntity(scout[0]) instanceof com.antcolonies.savanna.entity.MatabeleEntity, "the shown scout is not in the world");
                     com.antcolonies.savanna.entity.MatabeleEntity ant = (com.antcolonies.savanna.entity.MatabeleEntity) level.getEntity(scout[0]);
                     helper.assertTrue(ant.hasMajorBody(), "the shown scout is a minor");

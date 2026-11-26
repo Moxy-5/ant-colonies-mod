@@ -213,12 +213,27 @@ public final class Errand<K> {
      * knocked off) it sets off again. False if there is no way there from here.
      */
     public boolean walkOn(BlockPos cell, double speed) {
-        return isWalking() || setOff(cell, speed);
+        return isWalking() || !gaveUp(cell::equals) && setOff(cell, speed);
+    }
+
+    /**
+     * Review R2-2, R2-39: whether the legs gave up the walk under way to this (stuck past their new plans, or no way on
+     * from where they stood): told once, and that is "no way there from here". Before, a walk that ended so only read
+     * as "not walking": the errand set off again a tick later (one or two more route searches for a way the legs had
+     * just found shut), and a way the planner believes in and the body cannot walk was begun again for ever.
+     */
+    private boolean gaveUp(Predicate<BlockPos> mine) {
+        BlockPos on = ant.getNavigator().gaveUpOn();
+        if (on == null || !mine.test(on)) {
+            return false;
+        }
+        ant.getNavigator().heardGiveUp();
+        return true;
     }
 
     /** Like {@link #walkOn(BlockPos, double)}, with the mind's own step costs. */
     public boolean walkOn(BlockPos cell, double speed, AntPathFinder.StepCosts costs) {
-        return isWalking() || setOff(cell, speed, costs);
+        return isWalking() || !gaveUp(cell::equals) && setOff(cell, speed, costs);
     }
 
     /**
@@ -226,12 +241,12 @@ public final class Errand<K> {
      * a thing), with one route search for them all.
      */
     public boolean walkOn(Collection<BlockPos> cells, double speed) {
-        return isWalking() || ant.getNavigator().moveTo(cells, speed);
+        return isWalking() || !gaveUp(cells::contains) && ant.getNavigator().moveTo(cells, speed);
     }
 
     /** Like {@link #walkOn(BlockPos, double)}, to any foothold {@code where} accepts. */
     public boolean walkOn(Predicate<Foothold> where, BlockPos towards, double speed) {
-        return isWalking() || setOff(where, towards, speed);
+        return isWalking() || !gaveUp(towards::equals) && setOff(where, towards, speed);
     }
 
     /**
