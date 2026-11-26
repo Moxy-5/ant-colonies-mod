@@ -689,3 +689,5 @@ Every "Current status" bullet CLAUDE.md held up to 2026-11-19, word for word, ol
 - **2026-11-26, the code review's own bug list (`claude/review-fix-2`):** `docs/CODE-REVIEW-BUGS.md`, written by `python tools/review_bugs.py` from the review files (234 findings: 168 left, 66 done; of the 51 of grade A, 43 fixed, 5 half fixed, 2 open, 1 no bug after all); review fixes take no `docs/BUGS.md` number from now on.
 
 - **2026-11-26, the user's first call on round 2 (`claude/review-fix-2`): paths, farmland, slabs and carpets are plain ground (BUGS 412, R2-21 and the rest of R2-38 fixed).** One small rule in the cell map, the slope's own walking reused; legs, raids, mound, hills and mud passed 96 of 96. BUGS 411 (the pond raid) still fails now and then (2 of 9 after it), so it is not this. Open: the second call (R2-30, a hit never knocks an insect off a wall).
+
+- **2026-11-26, the user's second call on round 2 (`claude/review-fix-2`): a hit knocks a climbing insect off (BUGS 413, R2-30).** A blow from something bigger (a player, an animal) tears it off its wall or ceiling and it falls unhurt; fights between insects knock nobody off. Both of round 2's calls are done.

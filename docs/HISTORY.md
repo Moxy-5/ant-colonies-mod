@@ -1284,6 +1284,8 @@ Moved here from CLAUDE.md on 2026-10-13 (it was loaded into every chat and took 
 
 - **2026-11-26, paths, farmland, slabs and carpets are plain ground (the user's call; R2-21, BUGS 412):** `LevelCellMap.lowTop` hands a flat part-block to the route planner as a flat slope, a floor in its own cell; nothing else in the legs changed. Test `pathsFarmlandSlabsAndCarpetsArePlainGround` in `LegsTests`.
 
+- **2026-11-26, a flinging hit knocks a climbing insect off its wall (the user's call; R2-30, BUGS 413):** `AbstractAntEntity.knockback` and `isKnockedOff`; an insect's bite or sting never does. Test `anInsectHitOnAWallFallsOffIt` in `LegsTests`.
+
 ## Handover notes for a code reviewer (written at the end of a very long session)
 - State: branch `master`, all committed, `./gradlew build` passes, `./gradlew runGameTestServer` passes 47 tests (about 8 minutes, in one world, tests run in parallel arena grids). Some tests are timing-sensitive under load (`antsOnBumpyGroundReachTheFoodStore` and `aStarvingWorkerSlowsDownAndDies` have each failed once and passed on a re-run): re-run before blaming a change.
 - Confirmed in-game by the user so far: everything up to and including dead ants and the refuse chamber, rich bread, worker hunger, colony starvation, and the hill-jam fix. Older bullets in "Current status" that still say "waiting for the user to confirm" are probably stale (the user tested them and reported no problems), but this was never written down: do not rely on those flags.

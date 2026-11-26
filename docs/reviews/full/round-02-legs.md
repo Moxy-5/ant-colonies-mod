@@ -526,6 +526,8 @@ surface and heading sent to the drawing, saving and restoring the hold, every `n
 
 ### R2-30 (B, proven on the mod's side): nothing can knock an insect off a wall, and nowhere says that is meant
 
+**Status (2026-11-26, `claude/review-fix-2`): fixed the other way, BUGS 413, the user's call: a flinging blow knocks it off and it falls; an insect's bite never does. Flowing water and blasts that only set the motion still do not.**
+
 - **Where:** `AbstractAntEntity.java` 2337 to 2340 (the climb motion replaces the body's motion every tick on a
   wall), 1716 to 1721 (`knockback`).
 - **What is wrong:** a hit, flowing water or a blast only sets the motion; on a wall or ceiling the next tick puts
