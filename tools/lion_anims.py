@@ -352,6 +352,29 @@ class LionRig:
         pose["mane_chest"] = mc
 
 
+def _travel(t, v, start, up, down_from, end):
+    """How far a strike's root has gone forward at time t (px; the Motion Studio phase 3, step 4): still until start,
+    its speed easing up to v (px a second) by up, held, easing down to 0 from down_from to end (each ease a smoothstep
+    of the speed, so the travel has no jolt). start == up: it sets off at v (a leap out of a gallop)."""
+    a, b = up - start, end - down_from
+    if t <= start:
+        return 0.0
+    if t <= up:
+        u = (t - start) / a
+        return v * a * (u ** 3 - u ** 4 / 2.0)
+    if t <= down_from:
+        return v * a / 2.0 + v * (t - up)
+    u = min(1.0, (t - down_from) / b)
+    return v * a / 2.0 + v * (down_from - up) + v * b * (u - u ** 3 + u ** 4 / 2.0)
+
+
+def _strike_path_note(L, path):
+    """A strike's travel as a clip note ("path root t dy dz ...", one row a game tick, forward as -z): the game moves the
+    animal along it (from its spot table, tools/spots.py) and the lab adds it back to the root, as for a block move."""
+    n = round(L * 20)
+    return "path root " + " ".join(f"{k / 20:.4f} 0.000 {-path(k / 20):.3f}" for k in range(n + 1))
+
+
 def _bake_clip(rig, length, steps, frame_fn, loop=True, tail_lag=0.09, mane_lag=0.08):
     """Bake frames with 2nd-order damped spring physics (`secondary_lag`) for tail_1..5 & mane_*."""
     is_loop = (loop is True)
@@ -1086,10 +1109,22 @@ def build_all_clips(raw_bones, kind="male"):
     if kind == "male":
         clips["swipe_combo"] = make_swipe_combo()
 
-    # 8e. JUMP_SMACK (1.20s) — Bounding Mid-Air Hook Smack! (Crouch coil IK -> Leap & Mid-Air Torso-Whip Direct-FK Smack -> Land IK!)
+    # 8e. JUMP_SMACK (1.00s) — Bounding Mid-Air Hook Smack! (Leap straight out of the gallop -> Mid-Air Torso-Whip Direct-FK Smack -> Land IK!)
+    # The Motion Studio phase 3, step 4 (BUGS 375): it is played out of a gallop, so it carries its own travel (a path
+    # note, at the gallop clip's own speed from its first tick, easing to a stop as it lands) and starts where the old
+    # standing coil let go (0.20 s into the old 1.20 s timeline, whose keys are kept): a coil in place stopped a running
+    # lioness dead. Its feet are solved against the path: planted where they stand, moving with the body in the air,
+    # planted again where they land.
     def make_jump_smack():
-        L, N = 1.20, 38
+        L0, T0 = 1.20, 0.20                     # the old timeline (its keys) and where the leap now starts on it
+        L, N = L0 - T0, 32
+        v = walk_speeds["gallop"]
+        def path(t):
+            return _travel(t + T0, v, T0, T0, 0.72, 0.80)
+        dz_end = -path(L)
         def frame(i, t):
+            dz = -path(t)
+            t = t + T0
             coil = pulse(t, 0.0, 0.18, 0.04, 0.10)
             u_air = _clamp((t - 0.22) / 0.56, 0.0, 1.0)
             arc = math.sin(math.pi * u_air) if 0.22 <= t <= 0.78 else 0.0
@@ -1097,16 +1132,16 @@ def build_all_clips(raw_bones, kind="male"):
             # Forward-diagonal leap with mid-air torso whip INTO the apex right-paw smack!
             bT_raw = _kvec(t, ((0.0, [0.0, -0.2, 0.0]), (0.18, [0.6, -4.0, 3.0]),
                                (0.38, [1.4, 7.6, -2.5]), (0.52, [1.2, 9.6, -5.8]),
-                               (0.64, [0.4, 6.2, -6.8]), (0.82, [0.0, -2.6, -3.2]), (L, [0.0, -0.2, 0.0])))
+                               (0.64, [0.4, 6.2, -6.8]), (0.82, [0.0, -2.6, -3.2]), (L0, [0.0, -0.2, 0.0])))
             bR = _kvec(t, ((0.0, [0, 0, 0]), (0.18, [7, 10, 2]), (0.38, [-14, 14, 4]),
-                           (0.54, [-4, -18, -5]), (0.68, [10, -14, -3]), (0.84, [5, -4, 0]), (L, [0, 0, 0])))
+                           (0.54, [-4, -18, -5]), (0.68, [10, -14, -3]), (0.84, [5, -4, 0]), (L0, [0, 0, 0])))
             cR = _kvec(t, ((0.0, [0, 0, 0]), (0.18, [5, 12, 3]), (0.38, [-6, 16, 4]),
-                           (0.54, [-2, -22, -6]), (0.68, [5, -15, -3]), (0.84, [4, -4, 0]), (L, [0, 0, 0])))
+                           (0.54, [-2, -22, -6]), (0.68, [5, -15, -3]), (0.84, [4, -4, 0]), (L0, [0, 0, 0])))
             nR = _kvec(t, ((0.0, [0, 0, 0]), (0.18, [6, -10, -2]), (0.38, [8, -14, -3]),
-                           (0.54, [4, 18, 4]), (0.68, [-4, 12, 3]), (0.84, [-4, 3, 0]), (L, [0, 0, 0])))
+                           (0.54, [4, 18, 4]), (0.68, [-4, 12, 3]), (0.84, [-4, 3, 0]), (L0, [0, 0, 0])))
             hR = _kvec(t, ((0.0, [0, 0, 0]), (0.18, [-12, -8, -2]), (0.38, [4, -12, -3]),
-                           (0.54, [3, 16, 4]), (0.68, [-5, 10, 2]), (0.84, [-5, 2, 0]), (L, [0, 0, 0])))
-            jw = _kscal(t, ((0.0, 0), (0.22, 14), (0.42, 28), (0.56, 42), (0.72, 20), (0.90, 0), (L, 0)))
+                           (0.54, [3, 16, 4]), (0.68, [-5, 10, 2]), (0.84, [-5, 2, 0]), (L0, [0, 0, 0])))
+            jw = _kscal(t, ((0.0, 0), (0.22, 14), (0.42, 28), (0.56, 42), (0.72, 20), (0.90, 0), (L0, 0)))
             pin = _clamp(max(coil * 0.6, arc, jw / 32.0), 0.0, 1.0)
             p = {
                 "root": {"position": [0.0, 0.0, 0.0], "rotation": [0.0, 0.0, 0.0]},
@@ -1125,8 +1160,8 @@ def build_all_clips(raw_bones, kind="male"):
             rig.set_eyes(p, squint=0.80 * pin)
             targs = rest_targets(x_pad=0.55)
             # Smooth IK <-> Direct-FK phase blend strictly while airborne so takeoff & touchdown are 100% ground-IK clean!
-            fb_fr = _kscal(t, ((0.0, 0.0), (0.26, 0.0), (0.34, 1.0), (0.62, 1.0), (0.72, 0.0), (L, 0.0)))
-            fb_air = _kscal(t, ((0.0, 0.0), (0.28, 0.0), (0.36, 1.0), (0.62, 1.0), (0.72, 0.0), (L, 0.0)))
+            fb_fr = _kscal(t, ((0.0, 0.0), (0.26, 0.0), (0.34, 1.0), (0.62, 1.0), (0.72, 0.0), (L0, 0.0)))
+            fb_air = _kscal(t, ((0.0, 0.0), (0.28, 0.0), (0.36, 1.0), (0.62, 1.0), (0.72, 0.0), (L0, 0.0)))
             # Right foreleg: wide outward cock mid-leap -> EXPLOSIVE horizontal cross-body apex smack!
             fr1 = _kvec(t, ((0.26, [-36, 16, 8]), (0.38, [-76, 52, 22]), (0.48, [-90, 18, 10]),
                             (0.58, [-80, -38, -14]), (0.70, [-48, -16, -4]), (0.80, [-14, 0, 0])))
@@ -1156,21 +1191,38 @@ def build_all_clips(raw_bones, kind="male"):
                 targs[tag]["pos"][2] -= 2.2 * sc * land
                 targs[tag]["fk"] = b_fk
                 targs[tag]["fk_blend"] = fb_air
+            # against the path: a foot planted where it stood (its leg pushes back as the body goes), with the body in
+            # the air, planted where it lands (it reaches forward for it)
+            for tag, w in (("fr", fb_fr), ("fl", fb_air), ("bl", fb_air), ("br", fb_air)):
+                targs[tag]["pos"][2] += (1.0 - w) * (0.0 if t < 0.5 else dz_end) + w * dz
+            p["root"]["position"] = [0.0, 0.0, dz]
             rig.solve_legs(p, targs)
+            p["root"]["position"] = [0.0, 0.0, 0.0]
             # Hind launch cleats on coil; right smacking paw explodes 100% splayed mid-air -> retracts cleanly on landing!
-            fr_c = _kscal(t, ((0.0, 0.0), (0.24, 0.0), (0.34, 1.0), (0.62, 1.0), (0.72, 0.0), (L, 0.0)))
-            fl_c = _kscal(t, ((0.0, 0.0), (0.28, 0.0), (0.38, 0.68), (0.60, 0.68), (0.70, 0.0), (L, 0.0)))
+            fr_c = _kscal(t, ((0.0, 0.0), (0.24, 0.0), (0.34, 1.0), (0.62, 1.0), (0.72, 0.0), (L0, 0.0)))
+            fl_c = _kscal(t, ((0.0, 0.0), (0.28, 0.0), (0.38, 0.68), (0.60, 0.68), (0.70, 0.0), (L0, 0.0)))
             rig.set_claws(p, fl=fl_c, fr=fr_c, bl=0.65 * coil, br=0.65 * coil, hook=1.0 if arc > 0.2 else 0.0)
             mane_drv = [-14.0 * arc + 10.0 * land, cR[1] * 1.0, cR[2] * 1.0]
             return p, 34.0 * coil + 36.0 * arc + 14.0 * land, -cR[1] * 1.35, -5.0 * arc + 4.0 * land, mane_drv
-        return _bake_clip(rig, L, N, frame, loop=False, tail_lag=0.05, mane_lag=0.045)
+        made = _bake_clip(rig, L, N, frame, loop=False, tail_lag=0.05, mane_lag=0.045)
+        made["timeline"] = {"0.0": _strike_path_note(L, path)}
+        return made
     if not is_cub:
         clips["jump_smack"] = make_jump_smack()
 
     # 8f. STALK_LEAP_BITE (1.45s) — Seamless 0-deg Chain from STALK -> Torpedo Leap -> Clamping Throat Bite -> Stand!
+    # The Motion Studio phase 3, step 4 (BUGS 375): the leap carries its own travel (a path note: still through the coil,
+    # easing up to the gallop clip's own speed as the hind legs drive, held through the flight, easing to a stop as it
+    # lands on its bite at 0.80 s), its feet solved against it: planted where they stand, moving with the body in the
+    # air, planted where they land.
     def make_stalk_leap_bite():
         L, N = 1.45, 44
+        v = walk_speeds["gallop"]
+        def path(t):
+            return _travel(t, v, 0.26, 0.36, 0.70, 0.80)
+        dz_end = -path(L)
         def frame(i, t):
+            dz = -path(t)
             # Starts at t=0.0 in EXACT crouched `stalk` baseline (body_drop=-4.6, chest_p=7.5, neck_p=11.0, head_p=-17.5, hock=44.0)!
             st_base = _kscal(t, ((0.0, 1.0), (0.28, 1.0), (0.44, 0.0), (L, 0.0)))
             coil = pulse(t, 0.04, 0.16, 0.08, 0.10)
@@ -1242,7 +1294,13 @@ def build_all_clips(raw_bones, kind="male"):
                 targs[tag]["pos"][2] += (5.2 * arc - 3.6 * clamp_b) * sc
                 targs[tag]["fk"] = b_fk
                 targs[tag]["fk_blend"] = fb_air
+            # against the path: a foot planted where it stood (its leg pushes back as the body goes), with the body in
+            # the air, planted where it lands (it reaches forward for it)
+            for tag in ("fl", "fr", "bl", "br"):
+                targs[tag]["pos"][2] += (1.0 - fb_air) * (0.0 if t < 0.54 else dz_end) + fb_air * dz
+            p["root"]["position"] = [0.0, 0.0, dz]
             rig.solve_legs(p, targs)
+            p["root"]["position"] = [0.0, 0.0, 0.0]
             # Silent 0% during stalk -> hind cleats on launch -> BOTH front talons flare 100% mid-leap & clamp!
             f_c = _kscal(t, ((0.0, 0.0), (0.30, 0.0), (0.42, 1.0), (0.72, 1.0), (0.98, 0.72), (1.16, 0.0), (L, 0.0)))
             b_c = _kscal(t, ((0.0, 0.0), (0.16, 0.0), (0.26, 0.70), (0.38, 0.0), (L, 0.0)))
@@ -1252,7 +1310,9 @@ def build_all_clips(raw_bones, kind="male"):
             # Slight mane_chest lift while ultra-low in stalk coil so chest fringe clears ground cleanly!
             m_ch_t = [0.0, 1.4 * sc * (st_base * 0.5 + coil * 0.5), -0.6 * sc * coil]
             return p, 24.0 * st_base + 14.0 * coil + 36.0 * arc + 16.0 * clamp_b, twitch, -6.0 * arc + 5.0 * clamp_b, mane_drv, m_ch_t
-        return _bake_clip(rig, L, N, frame, loop=False, tail_lag=0.05, mane_lag=0.045)
+        made = _bake_clip(rig, L, N, frame, loop=False, tail_lag=0.05, mane_lag=0.045)
+        made["timeline"] = {"0.0": _strike_path_note(L, path)}
+        return made
     if not is_cub:
         clips["stalk_leap_bite"] = make_stalk_leap_bite()
 

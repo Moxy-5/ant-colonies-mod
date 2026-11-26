@@ -36,11 +36,14 @@ import net.minecraft.world.phys.Vec3;
  * prey on the den's side, fanned by its rank among the hunters; STALK starts for all when all are there.</li>
  * <li><b>STALK</b> (deadline {@link #STALK_TICKS}): crouched straight at the prey; while any buffalo of the herd within
  * {@link BuffaloEntity#LION_STALK_SEEN} has its head up, it freezes flat (at most {@link #FREEZE_MOST}, then on).
- * Reaching {@link #LEAP_FROM} unseen, it leaps ({@code stalk_leap_bite}).</li>
+ * Unseen, once its place on the prey is within its leap's reach, it leaps ({@code stalk_leap_bite}; {@link #strike}).</li>
  * <li><b>FIGHT</b> (a sprint of at most {@link #RUSH_TICKS} without a grip): when the herd flees, a mate is fighting, or
- * the stalk ran out: a gallop at the prey; touching its body, a strike ({@code jump_smack}), then it clings at the free
- * place on the prey nearest where it struck (the rump, the neck either side, the flanks), moved there with collisions,
- * biting (each bite past Minecraft's hit cooldown; a calf knocked down is pinned). A lion hurt by a buffalo lets go and
+ * the stalk ran out: a gallop at the prey; once its place on the prey is within its smack's reach, it leaps out of the
+ * gallop ({@code jump_smack}). A strike carries itself (the Motion Studio phase 3, step 4): its clip holds its own
+ * travel, and the lion rides the prey from the strike's start, placed along that travel from where it set off to its
+ * place at the free spot on the prey nearest it (the haunch, the throat either side, the flanks), so it lands there
+ * instead of gliding (BUGS 375). From the strike's hit it clings there, biting (each bite past Minecraft's hit cooldown;
+ * a calf knocked down is pinned). A lion hurt by a buffalo lets go and
  * backs off to {@link #BACK_OFF} blocks from it for {@link #BACK_OFF_TICKS}. The prey dead: the kill. The sprint spent:
  * the try is over, it lies down where it is for {@link #LIE_UP}.</li>
  * <li><b>FEAST:</b> any pride member goes to a mate's kill (the carcass with its den, near the kill), takes a place round it
@@ -74,15 +77,6 @@ public final class LionHunt {
     static final int FREEZE_MOST = 200;
     /** It freezes this far outside a buffalo's sight (blocks), so it is never caught mid-step. */
     static final double FREEZE_MARGIN = 1.0;
-    /** It leaps from the stalk this near the prey (its head's gap, blocks). */
-    static final double LEAP_FROM = 2.5;
-    /** Touching: its head box this much grown against the prey's body boxes (blocks). */
-    static final double TOUCH = 0.3;
-    /**
-     * The leap's and the smack's hit (clip ticks). A bite's and a pin's are in the lions' body plans ("holds"), read from
-     * their spot tables with the jaw's place at that tick (the Motion Studio, phase 3).
-     */
-    static final int LEAP_HIT = 16, SMACK_HIT = 11;
     /** A lion hurt by a buffalo backs off to this far from it (blocks), for this long (ticks). */
     static final double BACK_OFF = 8.0;
     static final int BACK_OFF_TICKS = 60;
@@ -293,25 +287,32 @@ public final class LionHunt {
         l.hunt.holdSpot = BuffaloEntity.SPOTS.index(spot);
     }
 
-    /** Tests: it lets go of its prey (as when hit, shaken or its hunt ends). */
+    /**
+     * Tests: it lets go of its prey and is out of the fight (as when hit or its hunt ends). Only letting go, still in the
+     * fight and within a strike's reach, it would strike again at once (step 4).
+     */
     public static void letGoForTests(LionEntity l) {
-        l.hunt.holding = false;
+        l.hunt.endHunt();
     }
 
     // --- the hold: placed on the prey's body (the Motion Studio, phase 3) ---------------------------------------------
 
-    /** Settling onto its spot: where it gripped (in the prey's frame: ahead, to its left; its heading off the prey's) and over how many ticks. */
+    /**
+     * Onto its spot: where it set off (the world: a strike's start, or where it gripped) and its heading then; on a strike,
+     * the share of the strike's travel already gone when it was first placed (a screen that learns of the strike a tick
+     * late carries on from where it draws it; below 0: no strike, it settles over its blend), and the ticks it has settled.
+     */
     static final class Settle {
-        final double ahead, left;
+        final double x, z;
         final float yaw;
-        final int ticks;
+        final double from;
         int k;
 
-        Settle(double ahead, double left, float yaw, int ticks) {
-            this.ahead = ahead;
-            this.left = left;
+        Settle(double x, double z, float yaw, double from) {
+            this.x = x;
+            this.z = z;
             this.yaw = yaw;
-            this.ticks = ticks;
+            this.from = from;
         }
     }
 
@@ -401,35 +402,98 @@ public final class LionHunt {
     }
 
     /**
-     * Places a holding lion on its prey (the prey's {@code positionRider}, on the server and on every screen alike): at its
-     * spot, its feet on the ground there, settling from where it gripped over what is left of its strike clip (its blend
-     * after any other grip). False when it has no spot to be placed on (not synced to this screen yet).
+     * Places a lion on its prey (the prey's {@code positionRider}, on the server and on every screen alike): at its spot,
+     * its feet on the ground there. On a strike (step 4) it rides from the strike's start: each tick it is the strike's
+     * share of the way (its clip's own travel, from its spot table) from where it set off to its place at the spot, so it
+     * stands through its coil, flies, and lands on its place however the prey moved, its heading turning with it; after
+     * any other grip it settles there over its blend. False when it has no spot to be placed on (not synced to this
+     * screen yet).
      */
     static boolean ride(LionEntity l, BuffaloEntity prey, Entity.MoveFunction move) {
         Place p = placeOn(l, prey, l.holdSpot());
         if (p == null) {
             return false;
         }
-        float preyYaw = prey.yBodyRot;
-        double r = preyYaw * Mth.DEG_TO_RAD, fx = -Math.sin(r), fz = Math.cos(r), lx = Math.cos(r), lz = Math.sin(r);
+        var strike = l.strike();
+        double share = strike == null ? 1.0 : strike.share(l.doingFor());
         if (l.settle == null) {
-            double dx = l.getX() - prey.getX(), dz = l.getZ() - prey.getZ();
-            byte d = l.doing();
-            int left = d == LionEntity.LEAP_BITE || d == LionEntity.JUMP_SMACK ? l.doingTicks(d) - l.doingFor() : LionEntity.BLEND;
-            l.settle = new Settle(dx * fx + dz * fz, dx * lx + dz * lz, Mth.wrapDegrees(l.yBodyRot - preyYaw), Math.max(1, left));
+            // where it stands is where the strike had it a tick ago (its start, on the server's first tick on it)
+            l.settle = new Settle(l.getX(), l.getZ(), l.yBodyRot, strike == null ? -1.0 : strike.share(l.doingFor() - 1));
         }
         Settle s = l.settle;
-        double f = s.k >= s.ticks ? 1.0 : (double) ++s.k / s.ticks;
-        f = f * f * (3.0 - 2.0 * f);
-        double tx = p.at().x - prey.getX(), tz = p.at().z - prey.getZ();
-        double ahead = Mth.lerp(f, s.ahead, tx * fx + tz * fz), left = Mth.lerp(f, s.left, tx * lx + tz * lz);
-        double x = prey.getX() + fx * ahead + lx * left, z = prey.getZ() + fz * ahead + lz * left;
+        double f;
+        if (s.from >= 0.0) {
+            f = s.from >= 1.0 ? 1.0 : Mth.clamp((share - s.from) / (1.0 - s.from), 0.0, 1.0);
+        } else {
+            f = s.k >= LionEntity.BLEND ? 1.0 : (double) ++s.k / LionEntity.BLEND;
+            f = f * f * (3.0 - 2.0 * f);
+        }
+        double x = Mth.lerp(f, s.x, p.at().x), z = Mth.lerp(f, s.z, p.at().z);
         double ground = groundAt(l.level(), x, z, prey.getY());
         move.accept(l, x, Double.isNaN(ground) ? l.getY() : ground, z);
-        float yaw = preyYaw + Mth.rotLerp((float) f, s.yaw, Mth.wrapDegrees(p.yaw() - preyYaw));
+        float yaw = s.yaw + Mth.wrapDegrees(p.yaw() - s.yaw) * (float) f;
         l.setYRot(yaw);
         l.yBodyRot = yaw;
         l.yHeadRot = yaw;
+        return true;
+    }
+
+    // --- the strike: it carries itself (the Motion Studio, phase 3, step 4) ------------------------------------------
+
+    /**
+     * The spot a strike would aim at now: the free spot on the prey nearest it, if its place there, where that will be
+     * when it lands (the prey going on as it goes now), is within the strike's reach (its clip's own travel at its size).
+     * One rule for both strikes: the leap from the stalk (still through its coil) and the smack out of a gallop (on the
+     * move from its first tick). -1: no strike now.
+     */
+    static int strikeSpot(LionEntity l, BuffaloEntity prey, byte doing) {
+        var strike = l.strikeOf(doing);
+        int spot = strike == null ? -1 : freeSpot(l, prey);
+        Place p = spot < 0 ? null : placeOn(l, prey, spot);
+        if (p == null) {
+            return -1;
+        }
+        int lands = strike.landed();
+        double x = p.at().x + (prey.getX() - prey.xo) * lands, z = p.at().z + (prey.getZ() - prey.zo) * lands;
+        return HomeGroup.flat(l.position(), x, z) <= strike.reach() * l.getScale() / 16.0 ? spot : -1;
+    }
+
+    /**
+     * It sets off on a strike at a spot: it rides the prey from now, placed along the strike's own travel from where it
+     * stands to its place at the spot ({@link #ride}); from the strike's hit it grips there ({@code hold}).
+     */
+    static void setOff(LionEntity l, BuffaloEntity prey, byte doing, int spot) {
+        State s = l.hunt;
+        l.getNavigation().stop();
+        l.setDoing(doing);
+        l.settle = null;
+        s.holdSpot = spot;
+        s.holding = true;
+        s.struck = false;
+        if (l.getVehicle() != prey && !l.startRiding(prey, true)) {
+            s.holding = false;
+            return;
+        }
+        l.setHoldSpot(spot);
+    }
+
+    /**
+     * Tests: a strike (its doing) at this prey, in a fight of its own (no try, no pride needed), if its place on the prey
+     * is within the strike's reach now (the game's own rule); false: not in reach.
+     */
+    public static boolean strikeForTests(LionEntity l, BuffaloEntity prey, byte doing) {
+        State s = l.hunt;
+        s.endHunt();
+        s.prey = prey;
+        s.preyId = prey.getUUID();
+        s.tryKey = Long.MIN_VALUE + 1;
+        s.to(Stage.FIGHT, l.tickCount);
+        s.rushSince = l.tickCount;
+        int spot = strikeSpot(l, prey, doing);
+        if (spot < 0) {
+            return false;
+        }
+        setOff(l, prey, doing, spot);
         return true;
     }
 
@@ -840,16 +904,7 @@ public final class LionHunt {
                 toFight(now);
                 return;
             }
-            byte d = l.doing();
-            if (d == LionEntity.LEAP_BITE) {
-                strikeMoment(prey, LEAP_HIT, now);
-                return;
-            }
-            if (l.headGap(prey) <= LEAP_FROM) {
-                l.getNavigation().stop();
-                l.face(prey.getX(), prey.getZ(), 20.0F);
-                s.struck = false;
-                l.setDoing(LionEntity.LEAP_BITE);
+            if (strike(prey, LionEntity.LEAP_BITE, now)) {
                 return;
             }
             // watched: any grown buffalo near it with its head up, or coming up soon (it stops a block outside their sight;
@@ -927,20 +982,13 @@ public final class LionHunt {
                 endTry(now);                                    // the sprint spent with no grip: it gives up
                 return;
             }
-            if (!onFeet()) {
+            if (!onFeet() || l.striking()) {
+                return;                                         // (a strike cut short plays out where it was let go)
+            }
+            if (strike(prey, LionEntity.JUMP_SMACK, now)) {
                 return;
             }
             byte d = l.doing();
-            if (d == LionEntity.LEAP_BITE || d == LionEntity.JUMP_SMACK) {
-                strikeMoment(prey, d == LionEntity.LEAP_BITE ? LEAP_HIT : SMACK_HIT, now);
-                return;
-            }
-            if (touches(prey)) {
-                l.getNavigation().stop();
-                s.struck = false;
-                l.setDoing(LionEntity.JUMP_SMACK);
-                return;
-            }
             if (d == LionEntity.STALK || d == LionEntity.FREEZE) {
                 l.setDoing(LionEntity.CALM);
             }
@@ -950,45 +998,18 @@ public final class LionHunt {
             }
         }
 
-        /** Its strike's moment: on the clip's hit tick, touching, it bites and grips at the free place nearest it. */
-        private void strikeMoment(BuffaloEntity prey, int hitTick, int now) {
-            int t = l.clipTick();
-            if (t < hitTick) {
-                l.getMoveControl().setWantedPosition(prey.getX(), prey.getY(), prey.getZ(), LionEntity.GALLOP);   // carried into it
-                return;
+        /** A strike when its place on the prey is within the strike's reach ({@link #strikeSpot}); false: none now. */
+        private boolean strike(BuffaloEntity prey, byte doing, int now) {
+            int spot = strikeSpot(l, prey, doing);
+            if (spot < 0) {
+                return false;
             }
-            if (t == hitTick && !s.struck) {
-                s.struck = true;
-                if (touches(prey)) {
-                    bite(prey);
-                    int spot = freeSpot(l, prey);
-                    if (spot >= 0) {
-                        s.holdSpot = spot;
-                        s.holding = true;
-                        prey.heldBy(l);
-                        if (!prey.grownUp()) {
-                            prey.setDoing(BuffaloEntity.REST_DOWN);   // a calf is knocked down
-                        }
-                    }
-                }
-                if (s.stage == Stage.STALK) {
-                    toFight(now);
-                }
+            if (s.stage == Stage.STALK) {
+                toFight(now);                                   // the leap is the fight's start (the mates rush in)
             }
-        }
-
-        /** Whether its head touches the prey's body (its box or its hit beads). */
-        private boolean touches(BuffaloEntity prey) {
-            AABB head = l.headBox().inflate(TOUCH);
-            if (head.intersects(prey.getBoundingBox())) {
-                return true;
-            }
-            for (var part : prey.getParts()) {
-                if (head.intersects(part.getBoundingBox())) {
-                    return true;
-                }
-            }
-            return false;
+            setOff(l, prey, doing, spot);
+            hold(prey, now);
+            return true;
         }
 
         /**
@@ -1015,14 +1036,25 @@ public final class LionHunt {
                 s.holding = false;
                 return;
             }
-            prey.heldBy(l);
             l.setHoldSpot(s.holdSpot);
             l.getNavigation().stop();
             Place p = placeOn(l, prey, s.holdSpot);
-            if (p == null || !roomAt(l, prey, p)) {
-                s.holding = false;                              // no room at its spot: it lets go (and stands where it is)
+            if (p == null || !roomAt(l, prey, p) || !l.level().noBlockCollision(l, l.getBoundingBox().deflate(0.05))) {
+                s.holding = false;                              // no room at its spot or where its strike took it: it lets go (and stands where it is)
                 return;
             }
+            var strike = l.strike();
+            if (strike != null && !s.struck) {
+                if (l.clipTick() < strike.hit()) {
+                    return;                                     // still on its way: not gripping yet
+                }
+                s.struck = true;                                // the strike's hit: its first bite, and from now it grips
+                bite(prey);
+                if (!prey.grownUp()) {
+                    prey.setDoing(BuffaloEntity.REST_DOWN);       // a calf is knocked down
+                }
+            }
+            prey.heldBy(l);
             String name = holdClip(l, prey, s.holdSpot);
             byte clip = name == null ? -1 : LionEntity.doingOf(name);
             if (clip < 0 || !l.has(clip)) {

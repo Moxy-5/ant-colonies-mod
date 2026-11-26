@@ -43,6 +43,39 @@ public final class Spots {
     }
 
     /**
+     * A striker's strike (step 4): the tick of its clip it hits at, its clip's length, the blend before its first frame
+     * shows (ticks), how far it goes from where it set off (model px at size 1), and how much of that it has gone each
+     * tick from the strike's start, blend included (its last share held after). The clip carries its own travel; the
+     * game moves the striker along it, aimed at its place on its prey, so it never glides (BUGS 375).
+     */
+    public record Strike(int hit, int ticks, int lead, double reach, double[] share) {
+        /** How much of its reach it has gone this many ticks after the strike started (0 before, 1 once there). */
+        public double share(int sinceStart) {
+            return share[Mth.clamp(sinceStart, 0, share.length - 1)];
+        }
+
+        /** The first tick from the strike's start it has gone all the way (lands). */
+        public int landed() {
+            for (int i = 0; i < share.length; i++) {
+                if (share[i] >= 1.0) {
+                    return i;
+                }
+            }
+            return share.length - 1;
+        }
+
+        /** How many ticks from the strike's start it goes before it sets off (stands through its coil): 0 out of a gallop. */
+        public int setsOff() {
+            for (int i = 1; i < share.length; i++) {
+                if (share[i] > 0.0) {
+                    return i - 1;
+                }
+            }
+            return 0;
+        }
+    }
+
+    /**
      * Which clip a holder holds this prey with (the prey's body plan's pairs, step 3): the holder (its model's name), its
      * hold clip, the prey's size the pair is made for, and the prey's clips and spots it goes with.
      */
@@ -56,6 +89,7 @@ public final class Spots {
     /** Each clip's middle row (a loop's: the game cannot know a loop's phase at the speed it is drawn). */
     private final Map<String, double[]> middles = new HashMap<>();
     private final Map<String, Hold> holds = new HashMap<>();
+    private final Map<String, Strike> strikes = new HashMap<>();
     private final List<Pair> pairs = new ArrayList<>();
 
     private Spots(Class<?> owner, String path) {
@@ -102,6 +136,18 @@ public final class Spots {
                     holds.put(e.getKey(), new Hold(h.get("hit").getAsInt(), jaw.get(0).getAsDouble(), jaw.get(1).getAsDouble(),
                             jaw.get(2).getAsDouble(), h.has("ticks") ? h.get("ticks").getAsInt() : 0,
                             h.has("loop") && h.get("loop").getAsBoolean()));
+                }
+            }
+            if (json.has("strikes")) {
+                for (Map.Entry<String, JsonElement> e : json.getAsJsonObject("strikes").entrySet()) {
+                    JsonObject st = e.getValue().getAsJsonObject();
+                    JsonArray rows = st.getAsJsonArray("share");
+                    double[] share = new double[rows.size()];
+                    for (int i = 0; i < share.length; i++) {
+                        share[i] = rows.get(i).getAsDouble();
+                    }
+                    strikes.put(e.getKey(), new Strike(st.get("hit").getAsInt(), st.get("ticks").getAsInt(), st.get("lead").getAsInt(),
+                            st.get("reach").getAsDouble(), share));
                 }
             }
         } catch (Exception e) {
@@ -202,6 +248,12 @@ public final class Spots {
     @Nullable
     public Hold hold(String clip) {
         return holds.get(clip);
+    }
+
+    /** A striker's strike by its clip, or null. */
+    @Nullable
+    public Strike strike(String clip) {
+        return strikes.get(clip);
     }
 
     /**

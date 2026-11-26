@@ -99,7 +99,7 @@ public class LionEntity extends PathfinderMob implements GeoEntity, HasLife, com
             "stalk", "ambush_freeze", "stalk_leap_bite", "jump_smack", "takedown_pin", "throat_hold", "hold_sink", "hold_down"};
     /** Each one-shot doing's clip length (ticks, from the clip files); 0 for the loops. The roar's is the male's (see {@link #oneShotTicks}). */
     private static final int[] DOING_TICKS = {0, 15, 0, 15, 19, 0, 19, 76, 88, 60, 68, 36, 37, 64, 33, 44, 0, 0, 0, 0, 27, 20, 18, 21, 29,
-            15, 25, 19, 0, 0, 29, 24, 26, 0, 41, 0};
+            15, 25, 19, 0, 0, 29, 20, 26, 0, 41, 0};
     /** The lioness's roar (her sharper contact call) and the cub's call (ticks). */
     static final int LIONESS_ROAR_TICKS = 50, CUB_CALL_TICKS = 32;
     /** The moods, by number: the face clips {@code face_<mood>}. */
@@ -371,6 +371,18 @@ public class LionEntity extends PathfinderMob implements GeoEntity, HasLife, com
     public boolean striking() {
         byte d = doing();
         return (d == LEAP_BITE || d == JUMP_SMACK) && doingFor() < doingTicks(d);
+    }
+
+    /** The strike it plays now (its travel and its hit, from its spot table: the Motion Studio phase 3, step 4), or null. */
+    @Nullable
+    public com.antcolonies.entity.body.Spots.Strike strike() {
+        return striking() ? spots().strike(DOING_CLIPS[doing()]) : null;
+    }
+
+    /** A strike's own (its travel and its hit, from its spot table), by its doing; null: it has none. */
+    @Nullable
+    com.antcolonies.entity.body.Spots.Strike strikeOf(byte doing) {
+        return has(doing) ? spots().strike(DOING_CLIPS[doing]) : null;
     }
 
     /** Whether its form has this doing's clip. */

@@ -388,6 +388,164 @@ public class LionHuntTests {
         });
     }
 
+    // --- the strike carries itself (the Motion Studio, phase 3, step 4) --------------------------------------------------
+
+    /** A calf standing, its days off, too tough to die in the test. */
+    private static BuffaloEntity toughCalf(GameTestHelper helper, double x, double z, float yaw) {
+        return lyingCalf(helper, x, z, yaw);                    // made standing; it lies only when knocked down
+    }
+
+    /** The most a strike's share of its travel grows in one tick (its fastest tick). */
+    private static double fastestShare(com.antcolonies.entity.body.Spots.Strike strike) {
+        double most = 0.0;
+        for (int i = 1; i < strike.share().length; i++) {
+            most = Math.max(most, strike.share()[i] - strike.share()[i - 1]);
+        }
+        return most;
+    }
+
+    /**
+     * A leap from the stalk carries itself (BUGS 375: the move control slid her box 4 to 5 blocks while the clip leapt in
+     * place): a lioness out of her leap's reach does not set off; one within it stands still through the coil, goes no
+     * faster in a tick than her leap's own fastest tick, lands with her jaw on the calf's spot the tick the leap's travel
+     * ends (having gone no farther than its reach), does not grip before the hit, and at the hit bites, knocks the calf
+     * down and holds it, her jaw on its spot as it goes down.
+     */
+    @GameTest(template = "arena", timeoutTicks = 120, skyAccess = true)
+    public static void aLeapCarriesItselfOntoItsSpotAndBites(GameTestHelper helper) {
+        TestClock.still(helper, 12.0);
+        field(helper, 0, 0, 48, 48);
+        BuffaloEntity calf = toughCalf(helper, 24.5, 24.5, 0.0F);
+        BlockPos den = helper.absolutePos(new BlockPos(4, GROUND, 4));
+        LionEntity she = lion(helper, SavannaEntities.LIONESS.get(), 24.5, 21.0, den, 0);
+        LionEntity far = lion(helper, SavannaEntities.LIONESS.get(), 31.5, 14.5, den, 0);
+        var leap = she.spots().strike("stalk_leap_bite");
+        double reach = leap.reach() * she.getScale() / 16.0;
+        Vec3[] from = {null}, last = {null};
+        int[] start = {-1};
+        far.led = true;                                         // (its own hunt goal off: only the rule is asked)
+        helper.runAtTickTime(2, () -> {
+            helper.assertFalse(LionHunt.strikeForTests(far, calf, LionEntity.LEAP_BITE), "a leap set off from out of its reach: " + far.about());
+            helper.assertTrue(LionHunt.strikeForTests(she, calf, LionEntity.LEAP_BITE), "no leap from within its reach: " + she.about());
+            from[0] = she.position();
+            last[0] = from[0];
+            start[0] = (int) helper.getTick();
+        });
+        double fastest = fastestShare(leap) * reach + 0.01;
+        helper.onEachTick(() -> {
+            if (from[0] == null || helper.getTick() <= 2) {
+                return;
+            }
+            int since = (int) helper.getTick() - start[0];      // ticks since it set off
+            Vec3 now = she.position();
+            double step = Math.hypot(now.x - last[0].x, now.z - last[0].z);
+            last[0] = now;
+            helper.assertTrue(she.getVehicle() == calf, "not on the calf through her strike: " + she.about());
+            int hitAt = LionEntity.BLEND + leap.hit();
+            if (since < LionEntity.BLEND + leap.ticks()) {
+                helper.assertTrue(she.doing() == LionEntity.LEAP_BITE && she.clipTick() + LionEntity.BLEND == since,
+                        "not in her leap on its clock " + since + " ticks after it set off: " + she.about());
+            }
+            if (since <= leap.setsOff()) {
+                helper.assertTrue(step < 0.001, String.format("she moved %.3f in her coil (tick %d)", step, since));
+            }
+            helper.assertTrue(since > leap.landed() || step <= fastest,
+                    String.format("she went %.3f in a tick, her leap's fastest %.3f (tick %d)", step, fastest, since));
+            if (since < hitAt) {
+                helper.assertTrue(calf.holders() == 0 && calf.getHealth() >= 400.0F, "gripped or bit before the hit: " + calf.about());
+            }
+            if (since >= leap.landed()) {
+                Vec3 jaw = jawAtBite(she, calf), at = calf.spotAt(she.holdSpot());
+                double off = Math.hypot(jaw.x - at.x, jaw.z - at.z);
+                helper.assertTrue(off < 0.05, String.format("her jaw %.2f off the calf's spot %d ticks into her leap", off, since));
+            }
+            if (since == leap.landed()) {
+                double gone = Math.hypot(now.x - from[0].x, now.z - from[0].z);
+                helper.assertTrue(gone > 0.5 && gone <= reach + 0.01, String.format("she leapt %.2f, her reach %.2f", gone, reach));
+                SavannaMod.LOGGER.info("[strike] the leap: {} blocks in {} ticks (its reach {}), landing {} ticks after it set off",
+                        String.format("%.2f", gone), leap.landed() - leap.setsOff(), String.format("%.2f", reach), leap.landed());
+            }
+            if (since > hitAt) {
+                helper.assertTrue(calf.getHealth() < 400.0F && calf.holders() == 1, "no bite or no grip at the hit: " + calf.about());
+                helper.assertTrue(calf.doing() == BuffaloEntity.REST_DOWN || calf.doing() == BuffaloEntity.REST,
+                        "the calf was not knocked down: " + calf.about());
+            }
+            if (since >= LionEntity.BLEND + leap.ticks()) {
+                helper.succeed();
+            }
+        });
+        helper.runAtTickTime(110, () -> helper.fail("the leap never played out: " + she.about() + "; calf " + calf.about()));
+    }
+
+    /**
+     * The smack out of a gallop carries itself onto a cow walking away: on the move from its first tick (a running leap,
+     * not a dead stop), never going back, it lands with her jaw on the cow's spot the tick its travel ends however far
+     * the cow walked meanwhile, and grips from its hit.
+     */
+    @GameTest(template = "arena", timeoutTicks = 120, skyAccess = true)
+    public static void aSmackOutOfAGallopLandsOnAWalkingCow(GameTestHelper helper) {
+        TestClock.still(helper, 12.0);
+        field(helper, 0, 0, 48, 48);
+        BuffaloEntity cow = toughCow(helper, 24.5, 18.5, 0.0F);
+        LionEntity she = lion(helper, SavannaEntities.LIONESS.get(), 24.5, 13.5, helper.absolutePos(new BlockPos(4, GROUND, 4)), 0);
+        var smack = she.spots().strike("jump_smack");
+        Vec3[] from = {null}, last = {null}, cowFrom = {null};
+        int[] start = {-1};
+        helper.onEachTick(() -> {
+            if (cow.isAlive()) {
+                cow.getMoveControl().setWantedPosition(cow.getX(), cow.getY(), cow.getZ() + 4.0, 1.0);   // walking on, south
+            }
+            int t = (int) helper.getTick();
+            if (from[0] == null) {
+                if (t >= 10 && LionHunt.strikeForTests(she, cow, LionEntity.JUMP_SMACK)) {
+                    from[0] = she.position();
+                    last[0] = from[0];
+                    cowFrom[0] = cow.position();
+                    start[0] = t;
+                }
+                helper.assertTrue(t < 40, "no smack set off on the walking cow: " + she.about() + " at " + at(helper, she)
+                        + "; cow at " + at(helper, cow));
+                return;
+            }
+            int since = t - start[0];
+            Vec3 now = she.position();
+            double dz = now.z - last[0].z;
+            last[0] = now;
+            helper.assertTrue(she.getVehicle() == cow, "not on the cow through her strike: " + she.about());
+            int hitAt = LionEntity.BLEND + smack.hit();
+            if (since < LionEntity.BLEND + smack.ticks()) {
+                helper.assertTrue(she.doing() == LionEntity.JUMP_SMACK && she.clipTick() + LionEntity.BLEND == since,
+                        "not in her smack on its clock " + since + " ticks after it set off: " + she.about());
+            }
+            if (since >= 1 && since <= LionEntity.BLEND) {
+                helper.assertTrue(dz > 0.1, String.format("not on the move as it set off: %.3f a tick (tick %d)", dz, since));
+            }
+            helper.assertTrue(since > smack.landed() || dz > -0.01, String.format("she went back %.3f (tick %d)", dz, since));
+            if (since < hitAt) {
+                helper.assertTrue(cow.holders() == 0, "gripped before the hit: " + cow.about());
+            }
+            if (since >= smack.landed()) {
+                Vec3 jaw = jawAtBite(she, cow), at = cow.spotAt(she.holdSpot());
+                double off = Math.hypot(jaw.x - at.x, jaw.z - at.z);
+                helper.assertTrue(off < 0.05, String.format("her jaw %.2f off the cow's spot %d ticks into her smack (the cow walked %.2f)",
+                        off, since, cow.position().distanceTo(cowFrom[0])));
+            }
+            if (since > hitAt) {
+                helper.assertTrue(cow.getHealth() < 400.0F && cow.holders() == 1, "no bite or no grip at the hit: " + cow.about());
+            }
+            if (since == smack.landed()) {
+                SavannaMod.LOGGER.info("[strike] the smack: {} blocks in {} ticks, the cow walking {} meanwhile (its reach {})",
+                        String.format("%.2f", Math.hypot(now.x - from[0].x, now.z - from[0].z)), smack.landed(),
+                        String.format("%.2f", cow.position().distanceTo(cowFrom[0])), String.format("%.2f", smack.reach() * she.getScale() / 16.0));
+            }
+            if (since >= LionEntity.BLEND + smack.ticks()) {
+                helper.assertTrue(cow.position().distanceTo(cowFrom[0]) > 0.5, "the cow never walked on: " + cow.about());
+                helper.succeed();
+            }
+        });
+        helper.runAtTickTime(110, () -> helper.fail("the smack never played out: " + she.about() + "; cow " + cow.about()));
+    }
+
     // --- the cow brought down (the Motion Studio, phase 3, step 3) ------------------------------------------------------
 
     /** A grown cow, its days off, too tough to die in the test unless killed on purpose. */
