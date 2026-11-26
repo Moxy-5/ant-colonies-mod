@@ -73,8 +73,8 @@ def fingerprint(animal, data):
                         sort_keys=True).encode())
     for path in (cc.lab.model_file(a.model_name, 'geo', 'entity', f'{a.model_name}.geo.json'),
                  cc.lab.model_file(a.anim_stem, 'animations', 'entity', f'{a.anim_stem}.animation.json')):
-        with open(path, 'rb') as f:
-            h.update(f.read())
+        with open(path, encoding='utf-8') as f:      # the contents, not the bytes: line endings differ between checkouts
+            h.update(json.dumps(json.load(f), sort_keys=True).encode())
     return h.hexdigest()[:16]
 
 
