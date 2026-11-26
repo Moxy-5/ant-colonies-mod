@@ -495,14 +495,63 @@ def starter(model):
     }
 
 
-def write_plan(model, data):
-    os.makedirs(os.path.dirname(plan_path(model)), exist_ok=True)
+def plan_text(data):
     text = json.dumps(data, indent=1)
     # Short lists on one line, so a leg reads as one line of the file.
     text = re.sub(r'\[\s*((?:"[^"]*",\s*)*"[^"]*")\s*\]', lambda m: '[' + re.sub(r',\s*', ', ', m.group(1)) + ']', text)
     text = re.sub(r'\{\s*("bone": "[^"]*"),\s*("share": [0-9.]+)\s*\}', r'{\1, \2}', text)
+    return text + '\n'
+
+
+def keep_gaits(path, data):
+    """The plan to write over the file at path, with that file's gait table kept (2026-11-25, the Motion Studio phase 2).
+    The game reads each walker's gaits from its plan (framework/.../entity/body/Gaits.java) and will not make the animal
+    without them, but the model makers write plans without that section: rerunning one dropped it. Kept where it stood
+    among the file's sections. After a gait clip is remade, find its gait change moments again:
+    python tools/clip_check.py <animal> --gait-changes --write."""
+    if 'gaits' in data or not os.path.exists(path):
+        return data
+    try:
+        with open(path, encoding='utf-8') as f:
+            old = json.load(f)
+    except ValueError:
+        return data
+    if 'gaits' not in old:
+        return data
+    keys = list(old)
+    i = keys.index('gaits')
+    after = keys[i - 1] if i > 0 else None
+    if after is None:
+        return {'gaits': old['gaits'], **data}
+    if after not in data:
+        return {**data, 'gaits': old['gaits']}
+    kept = {}
+    for k, v in data.items():
+        kept[k] = v
+        if k == after:
+            kept['gaits'] = old['gaits']
+    return kept
+
+
+def write_plan(model, data):
+    os.makedirs(os.path.dirname(plan_path(model)), exist_ok=True)
+    data = keep_gaits(plan_path(model), data)
     with open(plan_path(model), 'w', encoding='utf-8', newline='\n') as f:
-        f.write(text + '\n')
+        f.write(plan_text(data))
+
+
+def rewrite_plan(model, change):
+    """Changes a plan in place (change(data) edits the plan as read) in the style its file is written in: this tool's
+    own (short lists on one line) or plain JSON (the model makers' plans), so a diff shows only the change."""
+    path = plan_path(model)
+    old = open(path, encoding='utf-8').read().replace('\r\n', '\n')
+    data = json.loads(old)
+    ours = plan_text(data) == old
+    change(data)
+    text = plan_text(data) if ours else json.dumps(data, indent=1, ensure_ascii=False) + ('\n' if old.endswith('\n') else '')
+    with open(path, 'w', encoding='utf-8', newline='\n') as f:
+        f.write(text)
+    return data
 
 
 # --- the rename test --------------------------------------------------------------------------------------------------
