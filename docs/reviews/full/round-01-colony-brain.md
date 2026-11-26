@@ -321,3 +321,113 @@ slices came in, not by grade); a fix session adds a status line under a finding 
 - `BuildLife`: its limits a tick and a second, the out-of-sight checks, save and load.
 - `NestLife`: no world writes; reads only in `watch` while the queen is loaded.
 - No species named; no `level.getRandom()`.
+
+---
+
+## Slice: the colony core
+
+`Colony`, `ColonyManager`, `ColonyPart`, `ColonyParts`, `ColonyNews`, `ColonyQuestions`, `ColonyHooks`, `AwayLife`,
+`AwayReport`, `Watchers`, `Strays`, `Claims`, `ColonyRole`, `Caste`, `LandReady`. Every line read. No grade A here: no
+work every tick that need not be, no read that loads land (every land check goes through `LandReady`), no list changed
+while walked. The faults are in the away life's bookkeeping. R1-26, R1-27, R1-30 and R1-31 were checked again by the
+main session against the lines named.
+
+**A note on the unloaded-land findings (R1-7, R1-8, R1-14, R1-18), from this slice's `AwayLife.isHere` (157 to 163):**
+a colony ticks its parts "here" only with its middle loaded and a watcher within 64 blocks (80 to stay). Food and
+galleries reach 50 further, so about 130 blocks from the player at most: inside the loaded land at a view distance of
+9 chunks or more, outside it under that (and whenever something else holds the colony here: an `OUT_THERE` place such
+as a raid a player follows, or the far rule switched off). So those findings bite on small view distances and
+servers, not in the user's usual game. They stay A: a freeze is a freeze, and the fix is one guard each.
+
+### R1-26 (B, proven; checked again): the far rule removes loaded insects without asking whether a player can see them
+
+- **Where:** `AwayLife.java:163`, `189-204`, `287-317` (the `discard` at 309), `404-406`; `SavannaParts.java:302`
+  (only the raids sign up `OUT_THERE`).
+- **What is wrong:** "here" is judged from the nest's middle (and `OUT_THERE` places, which termites have none of).
+  With no watcher within 80 blocks and the minute of grace over, `foldLoaded` walks `level.getAllEntities()` and
+  discards every loaded member wherever it stands, with no `Population.outOfSight` or `Watchers` check (`Strays:77`
+  has one). Termite foragers and soldiers at gallery holes stand up to about 56 blocks out, so 24 blocks or more from
+  a player just past the 80. The sweep runs again every 400 ticks.
+- **What the player sees:** termites on the surface towards the player vanish at once (the same kind as BUGS 319).
+  Small insects at 24 blocks and more, so easy to miss: B.
+- **Fix proposed:** `foldLoaded` skips a member a watcher can see; the next sweep takes it.
+
+### R1-27 (B, proven; checked again): a colony that dies out while away is not ended until a player comes near
+
+- **Where:** `ColonyManager.java:89-98` (the away branch calls only `tickAway`); `Colony.java:675-678` (the one
+  `isQueenless() && isEmpty` check, in the near tick); `QueenCare.java:401-403` (a queen starved away is only a flag).
+- **What is wrong:** the empty record ticks as numbers every second and sends no `COLONY_ENDED` news until a player is
+  within 64 blocks; then it ends on the spot.
+- **What the player sees:** a dead mound's wear starts when the player arrives, not when the colony died; till then
+  the colony counts as living to anything that walks `getColonies()` (raids as numbers choosing a colony to take from).
+- **Unchecked link:** what the species code does with such an empty colony.
+- **Fix proposed:** the same end in the away branch, with an emptiness check that reads only numbers.
+
+### R1-28 (B, the fold proven; how often, unchecked): folding an insect into the numbers loses a species load it carries
+
+- **Where:** `AwayLife.java:348-362` (`loadOf` knows only egg, corpse, bread and seed), `418-441`; callers
+  `Strays:82`, `AwayLife:307`, `394`, `481`; `MatabeleLoads.java:24-33`; `AbstractAntEntity.java:574-580`.
+- **What is wrong:** any other load becomes `Load.NONE` and is gone with the body. A death sends the same load through
+  `load.kind().drop(...)`; a fold never asks the load's kind. A raid covers its own members (its `jaws` map), but
+  strays, the far sweep and the unloaded-land freeze also fold carriers.
+- **What the player sees:** nothing directly; Matabele colonies quietly lose prey and heap layers.
+- **Fix proposed:** a "folded" hook on `LoadKind` (by default the death drop done as numbers), called from `foldIn`,
+  in place of the framework's own list in `loadOf`. Fewer rules: one place knows what a load becomes.
+
+### R1-29 (B, proven in `AwayLife`; the `Population` side likely): an insect frozen while its colony is here waits in limbo
+
+- **Where:** `AwayLife.java:251-260`, `390-398`, `468-485`; `Population.java:179-182`, `700`.
+- **What is wrong:** a frozen insect is folded only when the colony goes away or when that same body ticks again.
+  With the player staying by the nest, one frozen at the edge of loaded land stays in the headcount, neither real nor
+  inside: it does not eat, does not age and cannot be swapped back. The comment at 40 to 41 says it "has walked home
+  meanwhile"; nothing does that.
+- **Fix proposed:** `settle` (once a second while here) folds frozen entries older than the grace.
+
+### R1-30 (B, likely; the path checked again): one colony that fails to load wipes every colony of the dimension
+
+- **Where:** `ColonyManager.java:232-240`; `Colony.java:910-929`.
+- **What is wrong:** `ColonyManager.load` loops `Colony.load` with no try. A part's `load` that throws leaves the
+  loop; Minecraft logs it and gives no data; a new, empty manager is made and written over the file at the next save.
+- **Unchecked link:** no throw was found today (it needs a bad enum name or a key a part takes for granted).
+- **What the player sees:** every colony gone after opening the world. Rare, and the worst thing in this file.
+- **Fix proposed:** a try round each `Colony.load`: log it, keep the raw record and write it back unchanged.
+
+### R1-31 (B, likely; checked again; to measure): every colony ever made ticks once a second for ever and marks the file changed
+
+- **Where:** `ColonyManager.java:81-98`; `AwayLife.java:407-410` (`markChanged()` every away second, changed or not).
+- **What is wrong:** no distance limit and no slower clock for far colonies. New land has a colony about every 96
+  blocks, so the cost a second and the size of the colony file (written whole at every autosave) grow with all the
+  land ever explored.
+- **What the player sees:** slowly rising tick time and longer autosaves in big worlds.
+- **Fix proposed:** measure first (`Perf` already files "land not loaded"); if it counts, colonies far from every
+  player tick every N seconds with N times the step, and the file is marked only when something changed.
+
+### R1-32 (C, proven by its reader): a trip out of range shorter than the grace wipes the last away report
+
+- **Where:** `AwayLife.java:374-377`, `493-505`. Out of range clears the report at once; back within the minute it
+  reads "while away (0.0 hours): nothing" and the galleries' catch-up starts over, though nothing was folded.
+- **Fix proposed:** clear the report and call `cameBack` only once the colony is really away.
+
+### R1-33 (C, proven by its reader): a colony's dice start the same run after every reload
+
+- **Where:** `Colony.java:490-496` (seeded from the colony's id, the state not saved).
+- **Fix proposed:** in a real game mix the game time at first use into the seed; the tests' seeds stay as they are.
+
+### R1-34 (C): comments from before the harvester left
+
+- **Where:** `ColonyParts.java:27-28`, `34-35`, `37-40` (names `Colony#mound()`, which is gone); `Colony.java:34`,
+  `413-415`, `425-428`; `ColonyHooks.java:354`; `AwayLife.java:358-359`.
+
+### Solid in this slice (do not "fix")
+
+- `ColonyPart`, `ColonyParts` and the check when a colony is made: each part saved or not on purpose, no tick place or
+  name used twice.
+- `ColonyNews`, `ColonyQuestions`, `ColonyHooks`: copy-on-write, called only when someone signed up.
+- `LandReady`: `getChunkNow` on the server thread never loads land.
+- `ColonyManager`'s tick spreading: a copy before the loop, the 20 slots kept, the catch-up spread over the second.
+- The guards against folding twice; `freeze` ignoring dead, killed and changed-dimension removals; the queen and king
+  never frozen.
+- `AwayLife`'s save and load of frozen entries, the report and `awaySince`.
+- `Colony.roleOf` and `workOutRoles` (at most once a second); `Strays`; `Claims` (all 9 users prune it).
+- The static test hooks are set only by tests, soaks and flights (the watcher overlap is BUGS 338).
+- No species named; dice from `Colony.random()`; no season read.
