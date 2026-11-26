@@ -166,5 +166,57 @@
  },
  "verify": {
   "films": ["tools/film/buffalo_frames.film"]
+ },
+ "spots": {
+  "about": "Where a hunter grips it (the Motion Studio, phase 3, docs/plans/motion-studio-phase3.md): each spot lies where a ray from 'from' going 'out' (degrees from straight ahead, + to its left) last leaves the skin's boxes, and moves with its bone. Lions take a buffalo by the haunch from behind, the throat from the front sides and the flanks. tools/spots.py writes assets/antcolonies/spots/buffalo.json from this (the game reads that); never edit the table by hand.",
+  "skin": ["hips", "chest", "neck"],
+  "clips": ["idle", "rest_down", "rest", "rest_up", "death"],
+  "at": {
+   "rump": {
+    "bone": "hips",
+    "from": [
+     0,
+     20,
+     20
+    ],
+    "out": 180
+   },
+   "neck_left": {
+    "bone": "neck",
+    "from": [
+     0,
+     20,
+     -15
+    ],
+    "out": 60
+   },
+   "neck_right": {
+    "bone": "neck",
+    "from": [
+     0,
+     20,
+     -15
+    ],
+    "out": -60
+   },
+   "flank_left": {
+    "bone": "hips",
+    "from": [
+     0,
+     20,
+     12
+    ],
+    "out": 90
+   },
+   "flank_right": {
+    "bone": "hips",
+    "from": [
+     0,
+     20,
+     12
+    ],
+    "out": -90
+   }
+  }
  }
 }

@@ -266,6 +266,128 @@ public class LionHuntTests {
         });
     }
 
+    // --- the hold on the prey's body (the Motion Studio, phase 3, step 1) ---------------------------------------------
+
+    /** A calf knocked down and lying, its days off, too tough to die in the test (the hold is what is looked at). */
+    private static BuffaloEntity lyingCalf(GameTestHelper helper, double x, double z, float yaw) {
+        BuffaloEntity calf = buffalo(helper, x, z, yaw, Sex.FEMALE, true, helper.absolutePos(new BlockPos((int) x, GROUND, (int) z)));
+        calf.led = true;
+        calf.getAttribute(net.minecraft.world.entity.ai.attributes.Attributes.MAX_HEALTH).setBaseValue(400.0);
+        calf.setHealth(400.0F);
+        return calf;
+    }
+
+    /** Where a holder's jaw is at its bite (the world), from its spot table. */
+    private static Vec3 jawAtBite(LionEntity she, BuffaloEntity prey) {
+        var hold = LionHunt.holdOf(she, prey);
+        return com.antcolonies.entity.body.Spots.world(new Vec3(hold.x(), hold.y(), hold.z()), she.position(), she.yBodyRot,
+                she.getScale(), she.measures.drawAheadPx());
+    }
+
+    /**
+     * A lioness holding a calf knocked down rides it on her spot (the Motion Studio, phase 3): every tick her jaw at her
+     * pin's bite is on the calf's spot (flat), as the calf goes down and as it lies (BUGS 373: it was 0.4 to 1.0 blocks
+     * off); her box is never pushed, so she keeps still while it lies still (BUGS 374: her feet skated); her pins bite.
+     */
+    @GameTest(template = "arena", timeoutTicks = 200, skyAccess = true)
+    public static void aHolderRidesOnHerSpotHerJawOnItAndKeepsStill(GameTestHelper helper) {
+        TestClock.still(helper, 12.0);
+        field(helper, 0, 0, 48, 48);
+        BuffaloEntity calf = lyingCalf(helper, 24.5, 24.5, 30.0F);
+        LionEntity she = lion(helper, SavannaEntities.LIONESS.get(), 27.0, 22.0, helper.absolutePos(new BlockPos(4, GROUND, 4)), 0);
+        int spot = BuffaloEntity.SPOTS.index("neck_left");
+        helper.runAtTickTime(1, () -> calf.setDoing(BuffaloEntity.REST_DOWN));
+        helper.runAtTickTime(2, () -> LionHunt.gripForTests(she, calf, "neck_left"));
+        double[] worst = {0.0, 0.0};
+        Vec3[] last = {null, null};
+        float[] lastYaw = {0.0F};
+        int[] still = {0};
+        helper.onEachTick(() -> {
+            if (helper.getTick() < 2 + 1 + LionEntity.BLEND + 2) {
+                return;                                         // gripped, then settled over her blend
+            }
+            helper.assertTrue(she.getVehicle() == calf && she.holdSpot() == spot, "not riding the calf at its neck: " + she.about());
+            Vec3 jaw = jawAtBite(she, calf), at = calf.spotAt(spot);
+            worst[0] = Math.max(worst[0], Math.hypot(jaw.x - at.x, jaw.z - at.z));
+            helper.assertTrue(worst[0] < 0.05, String.format("her jaw at her bite %.2f blocks off the calf's spot", worst[0]));
+            if (calf.doing() == BuffaloEntity.REST && last[0] != null) {
+                double calfMoved = calf.position().distanceTo(last[1]);
+                float calfTurned = Math.abs(net.minecraft.util.Mth.wrapDegrees(calf.yBodyRot - lastYaw[0]));
+                worst[1] = Math.max(worst[1], she.position().distanceTo(last[0]));
+                still[0]++;
+                helper.assertTrue(worst[1] < 0.01, String.format("she moved %.3f in a tick while the calf lay (the calf moved %.3f, "
+                        + "turned %.1f degrees; her height %.2f, its %.2f)", worst[1], calfMoved, calfTurned,
+                        she.getY() - last[0].y, calf.getY() - last[1].y));
+            }
+            last[0] = she.position();
+            last[1] = calf.position();
+            lastYaw[0] = calf.yBodyRot;
+            if (still[0] >= 40 && calf.getHealth() < 400.0F - 13.0F) {
+                helper.succeed();
+            }
+        });
+        helper.runAtTickTime(190, () -> helper.fail("still " + still[0] + " ticks, the calf's health " + calf.getHealth() + "; she "
+                + she.about() + "; calf " + calf.about()));
+    }
+
+    /**
+     * A second lioness on a calf already held takes a free spot, not the first one's, and the two never stand in each
+     * other (BUGS 377: three stood through each other round one calf).
+     */
+    @GameTest(template = "arena", timeoutTicks = 100, skyAccess = true)
+    public static void aSecondHolderTakesAFreeSpotClearOfTheFirst(GameTestHelper helper) {
+        TestClock.still(helper, 12.0);
+        field(helper, 0, 0, 48, 48);
+        BuffaloEntity calf = lyingCalf(helper, 24.5, 24.5, 0.0F);
+        BlockPos den = helper.absolutePos(new BlockPos(4, GROUND, 4));
+        LionEntity first = lion(helper, SavannaEntities.LIONESS.get(), 27.0, 26.0, den, 0);
+        LionEntity second = lion(helper, SavannaEntities.LIONESS.get(), 27.5, 26.5, den, 0);   // nearest the same spot
+        int taken = BuffaloEntity.SPOTS.index("neck_left");
+        helper.runAtTickTime(1, () -> calf.setDoing(BuffaloEntity.REST));
+        helper.runAtTickTime(2, () -> LionHunt.gripForTests(first, calf, "neck_left"));
+        int[] got = {-1};
+        helper.runAtTickTime(12, () -> {
+            got[0] = LionHunt.freeSpot(second, calf);
+            helper.assertTrue(got[0] >= 0 && got[0] != taken, "the second lioness's spot: " + got[0]);
+            LionHunt.gripForTests(second, calf, BuffaloEntity.SPOTS.name(got[0]));
+        });
+        helper.runAtTickTime(30, () -> {
+            helper.assertTrue(first.getVehicle() == calf && second.getVehicle() == calf && second.holdSpot() == got[0],
+                    "not both holding: " + first.about() + "; " + second.about());
+            helper.assertFalse(first.getBoundingBox().intersects(second.getBoundingBox()),
+                    "the two holders stand in each other: " + at(helper, first) + " and " + at(helper, second));
+            helper.succeed();
+        });
+    }
+
+    /**
+     * A lioness whose spot has no room (a wall there) lets go at once and stands where she is, on the ground: not set on
+     * the buffalo's back, as Minecraft sets a rider down (the old rule let go only 4 blocks off).
+     */
+    @GameTest(template = "arena", timeoutTicks = 100, skyAccess = true)
+    public static void aHolderWithNoRoomAtHerSpotLetsGo(GameTestHelper helper) {
+        TestClock.still(helper, 12.0);
+        field(helper, 0, 0, 48, 48);
+        BlockPos home = helper.absolutePos(new BlockPos(24, GROUND, 24));
+        BuffaloEntity cow = buffalo(helper, 24.5, 24.5, 0.0F, Sex.FEMALE, false, home);
+        cow.led = true;
+        for (int x = 23; x <= 25; x++) {                        // a wall where a lioness at its rump would stand (behind it: -z)
+            for (int y = FEET; y <= FEET + 2; y++) {
+                helper.setBlock(new BlockPos(x, y, 21), net.minecraft.world.level.block.Blocks.STONE);
+            }
+        }
+        LionEntity she = lion(helper, SavannaEntities.LIONESS.get(), 24.5, 19.5, helper.absolutePos(new BlockPos(4, GROUND, 4)), 0);
+        int rump = BuffaloEntity.SPOTS.index("rump");
+        helper.runAtTickTime(2, () -> LionHunt.gripForTests(she, cow, "rump"));
+        helper.runAtTickTime(6, () -> {
+            helper.assertFalse(she.isPassenger() && she.holdSpot() == rump, "still holding the rump against the wall: " + she.about());
+            helper.assertTrue(Math.abs(she.getY() - helper.absoluteVec(new Vec3(0, FEET, 0)).y) < 0.1,
+                    "not standing on the ground after letting go: " + at(helper, she));
+            helper.assertTrue(LionHunt.freeSpot(she, cow) != rump, "the rump counted free with a wall where she would stand");
+            helper.succeed();
+        });
+    }
+
     // --- the hunt ------------------------------------------------------------------------------------------------------
 
     /**

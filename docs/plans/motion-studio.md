@@ -155,6 +155,7 @@ missing the carcass, the head snap. The first job is to film them (see "The orde
 - **Phase 2, one source of truth for motion:** 20, 21, 22, 23, 24, 25, 26. Each removes a copy or a hidden difference.
 - **Phase 3, partner moves (the lion and buffalo first):** 31, 32, then 36 and 37 offline, then 33 with 34 or 35 in
   the game (pick after seeing the phase 0 films), then 38, 40, 41. The hunt's oval and fixed ticks go.
+  **Started 2026-11-26: its own plan and steps in `docs/plans/motion-studio-phase3.md` (step 1, the hold on the prey's body, built).**
 - **Phase 4, the replay key (9)** and the tests (43 to 46).
 
 ## Phase 0, built (2026-11-25, branch `claude/motion-studio`, the user's go-ahead)

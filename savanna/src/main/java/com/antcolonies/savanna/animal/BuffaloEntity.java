@@ -100,6 +100,12 @@ public class BuffaloEntity extends PathfinderMob implements GeoEntity, HasLife, 
      * Every place on its body measured from the model is this much farther ahead of its middle.
      */
     public static final double DRAW_AHEAD_PX = 10.0;
+    /**
+     * Where lions grip it (the Motion Studio, phase 3): its body plan's spots (the haunch, the throat from each front
+     * side, the flanks), each found on its skin and posed through the clips it plays while held by {@code tools/spots.py}.
+     */
+    public static final com.antcolonies.entity.body.Spots SPOTS = com.antcolonies.entity.body.Spots.of(BuffaloEntity.class,
+            com.antcolonies.savanna.SavannaMod.MODID, "buffalo");
     /** Its jaws at the chewing part of a graze: 17 px ahead of the model's origin (the clip), so this far ahead of its middle (blocks, at size 1). */
     static final double JAWS_AHEAD = (17.0 + DRAW_AHEAD_PX) / 16.0;
     /**
@@ -297,6 +303,75 @@ public class BuffaloEntity extends PathfinderMob implements GeoEntity, HasLife, 
     @Override
     public void setSpeed(float speed) {
         super.setSpeed(speed * (float) Math.max(0.0, 1.0 - 0.5 * holders()));
+    }
+
+    // --- its spots: where lions grip it (the Motion Studio, phase 3) ---------------------------------------------------
+
+    /**
+     * A spot of its body where a hunter grips it, now (the world; {@link #SPOTS}): where the clip it plays puts the spot
+     * at this tick (a loop's middle place: its phase at the speed it is drawn is not known here), with the model drawn
+     * {@link #DRAW_AHEAD_PX} toward its head at its size. The same on the server and on every screen: its clip's tick is
+     * counted on both ({@link #onSyncedDataUpdated}).
+     */
+    public Vec3 spotAt(int spot) {
+        String clip;
+        int tick;
+        boolean loop;
+        if (isDeadOrDying()) {
+            clip = "death";
+            tick = deathTime - BLEND;
+            loop = false;
+        } else {
+            byte d = doing();
+            clip = d > CALM && d < DOING_CLIPS.length ? DOING_CLIPS[d] : "idle";
+            tick = clipTick();
+            loop = !oneShot(d);
+        }
+        return com.antcolonies.entity.body.Spots.world(SPOTS.at(spot, clip, tick, loop), position(), yBodyRot,
+                MODEL_SCALE * getScale(), DRAW_AHEAD_PX);
+    }
+
+    /** A doing started: its clip's tick counted on the players' screens too (the spots its holders are placed on). */
+    @Override
+    public void onSyncedDataUpdated(EntityDataAccessor<?> key) {
+        super.onSyncedDataUpdated(key);
+        if (key == DATA_DOING_ID && level().isClientSide) {
+            doingSince = tickCount;
+        }
+    }
+
+    /**
+     * A lion gripping it rides it (the crocodile's way of carrying prey): placed on its spot here every tick, on the
+     * server and on every screen alike, so jaws and hide never drift apart with lag and its feet never skate.
+     */
+    @Override
+    protected void positionRider(Entity passenger, Entity.MoveFunction move) {
+        if (passenger instanceof LionEntity lion) {
+            if (!LionHunt.ride(lion, this, move)) {
+                move.accept(lion, lion.getX(), lion.getY(), lion.getZ());   // its spot not known yet (a screen): where it is
+            }
+            return;
+        }
+        super.positionRider(passenger, move);
+    }
+
+    /** Nobody steers a buffalo: a lion on it holds on, it does not drive it (Minecraft lets a mob steer the mob it rides). */
+    @Override
+    @Nullable
+    public LivingEntity getControllingPassenger() {
+        return null;
+    }
+
+    /** A holder stands on the ground beside it, not in a riding seat. */
+    @Override
+    public boolean shouldRiderSit() {
+        return false;
+    }
+
+    /** A holder letting go stays where it stands (Minecraft would set it on the buffalo's back). */
+    @Override
+    public Vec3 getDismountLocationForPassenger(LivingEntity passenger) {
+        return passenger.position();
     }
 
     /** Its health follows its size (a bull's 60 at size 1): a calf is not as tough as a bull. Kept as a share when it grows. */

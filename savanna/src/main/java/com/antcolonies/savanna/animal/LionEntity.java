@@ -110,6 +110,8 @@ public class LionEntity extends PathfinderMob implements GeoEntity, HasLife, com
     private static final EntityDataAccessor<Integer> DATA_DOING_ID = SynchedEntityData.defineId(LionEntity.class, EntityDataSerializers.INT);
     private static final EntityDataAccessor<Byte> DATA_MOOD = SynchedEntityData.defineId(LionEntity.class, EntityDataSerializers.BYTE);
     private static final EntityDataAccessor<Byte> DATA_COAT = SynchedEntityData.defineId(LionEntity.class, EntityDataSerializers.BYTE);
+    /** The spot of its prey it holds (the prey's spot table's index; -1: none), for the players' screens to place it on. */
+    private static final EntityDataAccessor<Byte> DATA_HOLD = SynchedEntityData.defineId(LionEntity.class, EntityDataSerializers.BYTE);
     private static final EntityDataAccessor<Byte> DATA_LIFE = AnimalLife.dataFor(LionEntity.class);
 
     /** The clips' blend (ticks; Neon's card: all 120 switches checked at 4). */
@@ -181,8 +183,11 @@ public class LionEntity extends PathfinderMob implements GeoEntity, HasLife, com
     /** The mate it greets, nuzzles or plays with now (its day goal's; read by that mate). */
     @Nullable
     LionEntity focus;
-    /** The game tick its doing started. */
+    /** The game tick its doing started (on the players' screens too, for where it is placed holding prey). */
     int doingSince;
+    /** Settling onto its spot on its prey, on each side (the strike's end); null when it holds nothing. */
+    @Nullable
+    LionHunt.Settle settle;
     private List<LionEntity> mates = List.of();
     private int matesAt = -MATES_EVERY;
     private int movedTick = -100;
@@ -301,6 +306,7 @@ public class LionEntity extends PathfinderMob implements GeoEntity, HasLife, com
         builder.define(DATA_DOING_ID, 0);
         builder.define(DATA_MOOD, CONTENT);
         builder.define(DATA_COAT, COAT_FIRST);
+        builder.define(DATA_HOLD, (byte) -1);
     }
 
     // --- what it does ----------------------------------------------------------------------------------------------------
@@ -581,6 +587,29 @@ public class LionEntity extends PathfinderMob implements GeoEntity, HasLife, com
         return hunt.holding();
     }
 
+    /** The spot of its prey it holds (its prey's spot table's index), or -1 (synced: the screens place it there too). */
+    public int holdSpot() {
+        return entityData.get(DATA_HOLD);
+    }
+
+    void setHoldSpot(int spot) {
+        entityData.set(DATA_HOLD, (byte) spot);
+    }
+
+    /** Its holds (the clips it grips with, the tick each bites, its jaw then) from its form's spot table (tools/spots.py). */
+    public com.antcolonies.entity.body.Spots spots() {
+        return com.antcolonies.entity.body.Spots.of(LionEntity.class, com.antcolonies.savanna.SavannaMod.MODID, form.clips);
+    }
+
+    /** A doing started: its clip's tick counted on the players' screens too. */
+    @Override
+    public void onSyncedDataUpdated(EntityDataAccessor<?> key) {
+        super.onSyncedDataUpdated(key);
+        if (key == DATA_DOING_ID && level().isClientSide) {
+            doingSince = tickCount;
+        }
+    }
+
     /** Ticks it has lived since its last meal (hungry from {@link LionHunt#HUNGRY}). */
     public int sinceMeal() {
         return hunt.sinceMeal;
@@ -697,6 +726,14 @@ public class LionEntity extends PathfinderMob implements GeoEntity, HasLife, com
     @Override
     public void tick() {
         super.tick();
+        if (!isPassenger()) {
+            settle = null;
+        } else if (!level().isClientSide && getVehicle() instanceof BuffaloEntity && !hunt.holding()) {
+            stopRiding();                               // its hold is over (let go, shaken, hit, the hunt ended, a reload): it stands there
+        }
+        if (!level().isClientSide && !isPassenger() && holdSpot() >= 0) {
+            setHoldSpot(-1);
+        }
         chain.place();
         double dx = getX() - xo, dz = getZ() - zo, moved = Math.sqrt(dx * dx + dz * dz);
         Gaits.Gait fastest = gaits.order().get(gaits.order().size() - 1);
@@ -903,8 +940,8 @@ public class LionEntity extends PathfinderMob implements GeoEntity, HasLife, com
         out.put("temper", temper.name());
         out.put("stage", hunt.stage.name());
         out.put("holding", hunt.holding());
-        if (hunt.holding()) {
-            out.put("hold_angle", hunt.holdAngle);
+        if (hunt.holding() && hunt.prey != null && hunt.holdSpot >= 0) {
+            out.put("hold_spot", BuffaloEntity.SPOTS.name(hunt.holdSpot));
         }
         if (hunt.prey != null) {
             out.put("prey", hunt.prey.getId());

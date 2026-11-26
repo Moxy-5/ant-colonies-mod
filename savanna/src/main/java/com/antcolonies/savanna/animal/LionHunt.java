@@ -16,7 +16,6 @@ import net.minecraft.nbt.CompoundTag;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.util.Mth;
 import net.minecraft.world.entity.Entity;
-import net.minecraft.world.entity.MoverType;
 import net.minecraft.world.entity.ai.attributes.Attributes;
 import net.minecraft.world.entity.ai.goal.Goal;
 import net.minecraft.world.phys.AABB;
@@ -80,14 +79,10 @@ public final class LionHunt {
     /** Touching: its head box this much grown against the prey's body boxes (blocks). */
     static final double TOUCH = 0.3;
     /**
-     * A holder moves to its place on the prey at most 0.6 a tick (faster than any buffalo runs), so it falls this far from
-     * its place only when caught on a block while the prey pulls away (or just struck on the far side of a big one): let go.
+     * The leap's and the smack's hit (clip ticks). A bite's and a pin's are in the lions' body plans ("holds"), read from
+     * their spot tables with the jaw's place at that tick (the Motion Studio, phase 3).
      */
-    static final double SHAKEN_OFF = 4.0;
-    /** The leap's and the smack's hit (clip ticks), a bite's and a pin's (clip ticks). */
-    static final int LEAP_HIT = 16, SMACK_HIT = 11, BITE_HIT = 7, PIN_HIT = 4;
-    /** Its places on the prey (degrees from the prey's heading, + to its left): the rump, the neck each side, the flanks. */
-    static final double[] HOLD_PLACES = {180.0, 35.0, -35.0, 90.0, -90.0};
+    static final int LEAP_HIT = 16, SMACK_HIT = 11;
     /** A lion hurt by a buffalo backs off to this far from it (blocks), for this long (ticks). */
     static final double BACK_OFF = 8.0;
     static final int BACK_OFF_TICKS = 60;
@@ -132,8 +127,8 @@ public final class LionHunt {
         BuffaloEntity prey;
         int stageSince, rushSince, frozenSince = -1, waitUntil, arriveBy;
         boolean ready, holding, struck;
-        /** Its place on the prey while holding (one of {@link #HOLD_PLACES}). */
-        double holdAngle;
+        /** The spot of its prey it holds (the prey's spot table's index: {@link BuffaloEntity#SPOTS}). */
+        int holdSpot = -1;
         /** Its start spot (worked out at each repath). */
         @Nullable
         Vec3 spot;
@@ -288,8 +283,145 @@ public final class LionHunt {
         s.to(Stage.FIGHT, l.tickCount);
         s.rushSince = l.tickCount;
         s.holding = true;
-        s.holdAngle = 180.0;
+        s.holdSpot = BuffaloEntity.SPOTS.index("rump");
         prey.heldBy(l);
+    }
+
+    /** Tests: a grip at this spot (by its name), as above. */
+    public static void gripForTests(LionEntity l, BuffaloEntity prey, String spot) {
+        gripForTests(l, prey);
+        l.hunt.holdSpot = BuffaloEntity.SPOTS.index(spot);
+    }
+
+    // --- the hold: placed on the prey's body (the Motion Studio, phase 3) ---------------------------------------------
+
+    /** Settling onto its spot: where it gripped (in the prey's frame: ahead, to its left; its heading off the prey's) and over how many ticks. */
+    static final class Settle {
+        final double ahead, left;
+        final float yaw;
+        final int ticks;
+        int k;
+
+        Settle(double ahead, double left, float yaw, int ticks) {
+            this.ahead = ahead;
+            this.left = left;
+            this.yaw = yaw;
+            this.ticks = ticks;
+        }
+    }
+
+    /** Where a holder stands (its feet, flat: the height is the ground's) and its heading. */
+    record Place(Vec3 at, float yaw) {
+    }
+
+    /** The clip it grips this prey with: a calf knocked down is pinned, a standing buffalo bitten. */
+    static byte holdClip(BuffaloEntity prey) {
+        return prey.grownUp() ? LionEntity.BITE : LionEntity.PIN;
+    }
+
+    /** Its grip with that clip (its jaw at the bite), from its spot table; a lion with no pin bites; null: it cannot hold. */
+    @Nullable
+    public static com.antcolonies.entity.body.Spots.Hold holdOf(LionEntity l, BuffaloEntity prey) {
+        var spots = l.spots();
+        var hold = spots.hold(holdClip(prey) == LionEntity.PIN ? "takedown_pin" : "bite");
+        return hold != null ? hold : spots.hold("bite");
+    }
+
+    /** Where a lion holding this spot stands and faces now: its jaw at its bite on the spot, facing in along the spot's way out. */
+    @Nullable
+    static Place placeOn(LionEntity l, BuffaloEntity prey, int spot) {
+        var hold = holdOf(l, prey);
+        if (hold == null || spot < 0 || spot >= BuffaloEntity.SPOTS.count()) {
+            return null;
+        }
+        float yaw = BuffaloEntity.SPOTS.holderYaw(spot, prey.yBodyRot);
+        return new Place(com.antcolonies.entity.body.Spots.holderAt(prey.spotAt(spot), yaw, hold, l.getScale(), l.measures.drawAheadPx()), yaw);
+    }
+
+    /** The top of the ground at this spot near the prey's feet (a block over them to two under), NaN if none. */
+    static double groundAt(net.minecraft.world.level.Level level, double x, double z, double nearY) {
+        BlockPos.MutableBlockPos p = new BlockPos.MutableBlockPos();
+        int top = Mth.floor(nearY + 1.0);
+        for (int y = top; y >= top - 3; y--) {
+            p.set(Mth.floor(x), y, Mth.floor(z));
+            var shape = level.getBlockState(p).getCollisionShape(level, p);
+            if (!shape.isEmpty()) {
+                return y + shape.max(net.minecraft.core.Direction.Axis.Y);
+            }
+        }
+        return Double.NaN;
+    }
+
+    /**
+     * The free spot on the prey nearest it (the prey's spot table's index), or -1: none. A spot is free while no other
+     * holder (of any pride) has it and a lion has room to stand there. Holders at two spots never stand through each other
+     * (BUGS 377): the spots lie far enough apart, checked offline for every pair ({@code tools/spots.py report}).
+     */
+    public static int freeSpot(LionEntity l, BuffaloEntity prey) {
+        int best = -1;
+        double bestGap = Double.MAX_VALUE;
+        for (int i = 0; i < BuffaloEntity.SPOTS.count(); i++) {
+            Place p = placeOn(l, prey, i);
+            if (p == null || taken(l, prey, i) || !roomAt(l, prey, p)) {
+                continue;
+            }
+            double gap = HomeGroup.flat(l.position(), p.at().x, p.at().z);
+            if (gap < bestGap) {
+                best = i;
+                bestGap = gap;
+            }
+        }
+        return best;
+    }
+
+    /** Whether another holder has this spot. */
+    private static boolean taken(LionEntity l, BuffaloEntity prey, int spot) {
+        for (Entity e : prey.getPassengers()) {
+            if (e instanceof LionEntity m && m != l && m.holdSpot() == spot) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /** Whether a lion has room to stand at a place: ground under it and no block in its body there. */
+    static boolean roomAt(LionEntity l, BuffaloEntity prey, Place p) {
+        double y = groundAt(l.level(), p.at().x, p.at().z, prey.getY());
+        return !Double.isNaN(y) && l.level().noBlockCollision(l,
+                l.getBoundingBox().move(p.at().x - l.getX(), y - l.getY(), p.at().z - l.getZ()).deflate(0.05));
+    }
+
+    /**
+     * Places a holding lion on its prey (the prey's {@code positionRider}, on the server and on every screen alike): at its
+     * spot, its feet on the ground there, settling from where it gripped over what is left of its strike clip (its blend
+     * after any other grip). False when it has no spot to be placed on (not synced to this screen yet).
+     */
+    static boolean ride(LionEntity l, BuffaloEntity prey, Entity.MoveFunction move) {
+        Place p = placeOn(l, prey, l.holdSpot());
+        if (p == null) {
+            return false;
+        }
+        float preyYaw = prey.yBodyRot;
+        double r = preyYaw * Mth.DEG_TO_RAD, fx = -Math.sin(r), fz = Math.cos(r), lx = Math.cos(r), lz = Math.sin(r);
+        if (l.settle == null) {
+            double dx = l.getX() - prey.getX(), dz = l.getZ() - prey.getZ();
+            byte d = l.doing();
+            int left = d == LionEntity.LEAP_BITE || d == LionEntity.JUMP_SMACK ? l.doingTicks(d) - l.doingFor() : LionEntity.BLEND;
+            l.settle = new Settle(dx * fx + dz * fz, dx * lx + dz * lz, Mth.wrapDegrees(l.yBodyRot - preyYaw), Math.max(1, left));
+        }
+        Settle s = l.settle;
+        double f = s.k >= s.ticks ? 1.0 : (double) ++s.k / s.ticks;
+        f = f * f * (3.0 - 2.0 * f);
+        double tx = p.at().x - prey.getX(), tz = p.at().z - prey.getZ();
+        double ahead = Mth.lerp(f, s.ahead, tx * fx + tz * fz), left = Mth.lerp(f, s.left, tx * lx + tz * lz);
+        double x = prey.getX() + fx * ahead + lx * left, z = prey.getZ() + fz * ahead + lz * left;
+        double ground = groundAt(l.level(), x, z, prey.getY());
+        move.accept(l, x, Double.isNaN(ground) ? l.getY() : ground, z);
+        float yaw = preyYaw + Mth.rotLerp((float) f, s.yaw, Mth.wrapDegrees(p.yaw() - preyYaw));
+        l.setYRot(yaw);
+        l.yBodyRot = yaw;
+        l.yHeadRot = yaw;
+        return true;
     }
 
     /** The goal: every lion has one (the hunters, the waiters and the feasters). */
@@ -820,9 +952,9 @@ public final class LionHunt {
                 s.struck = true;
                 if (touches(prey)) {
                     bite(prey);
-                    double place = freePlace(prey);
-                    if (!Double.isNaN(place)) {
-                        s.holdAngle = place;
+                    int spot = freeSpot(l, prey);
+                    if (spot >= 0) {
+                        s.holdSpot = spot;
                         s.holding = true;
                         prey.heldBy(l);
                         if (!prey.grownUp()) {
@@ -834,27 +966,6 @@ public final class LionHunt {
                     toFight(now);
                 }
             }
-        }
-
-        /** The free place on the prey nearest where it struck (degrees, one of {@link #HOLD_PLACES}), or NaN: all taken. */
-        private double freePlace(BuffaloEntity prey) {
-            float yaw = prey.getYRot() * Mth.DEG_TO_RAD;
-            double fx = -Mth.sin(yaw), fz = Mth.cos(yaw), lx = Mth.cos(yaw), lz = Mth.sin(yaw);
-            double rx = l.getX() - prey.getX(), rz = l.getZ() - prey.getZ();
-            double at = Math.toDegrees(Math.atan2(rx * lx + rz * lz, rx * fx + rz * fz));
-            double best = Double.NaN, bestGap = Double.MAX_VALUE;
-            for (double place : HOLD_PLACES) {
-                boolean taken = false;
-                for (LionEntity m : l.mates()) {
-                    taken |= m.hunt.holding() && m.hunt.prey == prey && m.hunt.holdAngle == place;
-                }
-                double gap = Math.abs(Mth.wrapDegrees(place - at));
-                if (!taken && gap < bestGap) {
-                    best = place;
-                    bestGap = gap;
-                }
-            }
-            return best;
         }
 
         /** Whether its head touches the prey's body (its box or its hit beads). */
@@ -871,52 +982,47 @@ public final class LionHunt {
             return false;
         }
 
-        /** One bite: its hit (past Minecraft's hit cooldown: every holder's bite counts; the killer's pride owns the body). */
+        /**
+         * One bite: its hit (past Minecraft's hit cooldown: every holder's bite counts; the killer's pride owns the body).
+         * The prey is held, not shoved: no knockback (a pinned calf hopped 0.09 blocks away at every bite, its holder with it).
+         */
         private void bite(BuffaloEntity prey) {
             prey.invulnerableTime = 0;
+            Vec3 was = prey.getDeltaMovement();
             prey.hurt(l.damageSources().mobAttack(l), (float) l.getAttributeValue(Attributes.ATTACK_DAMAGE));
+            prey.setDeltaMovement(was);
+            prey.hurtMarked = false;
             l.playSound(net.minecraft.sounds.SoundEvents.CAT_HISS, 0.8F, 0.6F);
         }
 
-        /** Clinging at its place on the prey, biting (a calf down: pinned). */
+        /**
+         * Clinging to the prey at its spot, biting (a calf down: pinned). It rides the prey ({@link #ride} places it): its
+         * box is never pushed, so its feet never skate while the prey stands still. It lets go when its place has no room
+         * to stand (a tree, a drop: the prey pulled it there). Each bite starts at the last one's end, with no calm tick
+         * between (BUGS 376); the hit is at the clip's tick in its body plan.
+         */
         private void hold(BuffaloEntity prey, int now) {
+            if (l.getVehicle() != prey && !l.startRiding(prey, true)) {
+                s.holding = false;
+                return;
+            }
             prey.heldBy(l);
-            Vec3 place = holdPlace(prey, s.holdAngle);
-            Vec3 step = place.subtract(l.position());
-            double len = Math.sqrt(step.x * step.x + step.z * step.z);
-            if (len > 0.6) {
-                step = step.scale(0.6 / len);
-            }
+            l.setHoldSpot(s.holdSpot);
             l.getNavigation().stop();
-            l.move(MoverType.SELF, new Vec3(step.x, 0, step.z));      // with collisions, never into a tree
-            l.face(prey.getX(), prey.getZ(), 20.0F);
-            if (HomeGroup.flat(l.position(), place.x, place.z) > SHAKEN_OFF) {
-                s.holding = false;                              // shaken off (caught on something, the prey away): back to the rush
+            Place p = placeOn(l, prey, s.holdSpot);
+            if (p == null || !roomAt(l, prey, p)) {
+                s.holding = false;                              // no room at its spot: it lets go (and stands where it is)
                 return;
             }
+            byte clip = holdClip(prey);
             byte d = l.doing();
-            boolean down = !prey.grownUp();
-            byte clip = down ? LionEntity.PIN : LionEntity.BITE;
-            if (d == LionEntity.CALM) {
-                l.setDoing(clip);
-                return;
+            if (d == clip || d == LionEntity.CALM || (LionEntity.oneShot(d) && l.doingFor() >= l.doingTicks(d))) {
+                l.setDoing(clip);                               // the strike played out, or the last bite: the next at once
             }
-            if (d == clip && l.clipTick() == (down ? PIN_HIT : BITE_HIT)) {
+            var hold = holdOf(l, prey);
+            if (hold != null && l.doing() == clip && l.clipTick() == hold.hit()) {
                 bite(prey);
             }
-        }
-
-        /** Its place on the prey: on its body's edge at this angle from its heading (degrees, + to its left), its head on it. */
-        private Vec3 holdPlace(BuffaloEntity prey, double angle) {
-            double size = prey.getScale();
-            double along = 1.9 * size, across = 0.6 * size;
-            double rad = Math.toRadians(angle);
-            double ca = Math.cos(rad), sa = Math.sin(rad);
-            double body = Math.sqrt(along * along * ca * ca + across * across * sa * sa);
-            double out = body + l.measures.headFront() * l.getScale() - 0.4;
-            float yaw = prey.getYRot() * Mth.DEG_TO_RAD;
-            double fx = -Mth.sin(yaw), fz = Mth.cos(yaw), lx = Mth.cos(yaw), lz = Mth.sin(yaw);
-            return prey.position().add((fx * ca + lx * sa) * out, 0, (fz * ca + lz * sa) * out);
         }
 
         // WAIT: the male and the cubs lie where they are while the lionesses hunt

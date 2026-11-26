@@ -1,0 +1,1 @@
+{"about":"Written by tools/spots.py from the body plan's spots and holds, never by hand (model px, size 1, the geo file's frame: x to the left, y up, z toward the tail).","fingerprint":"311eb7c276f60578","holds":{"bite":{"hit":7,"jaw":[0.0,17.75,-36.9]},"takedown_pin":{"hit":4,"jaw":[0.0,7.4,-34.78]}},"trunk":{"shoulders":-17.4,"hips":7.8,"half_width":8.05}}

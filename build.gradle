@@ -74,6 +74,13 @@ def checkReviewBugs = tasks.register('checkReviewBugs', Exec) {
 }
 tasks.named('check') { dependsOn checkReviewBugs }
 
+// The spot tables (assets/<mod>/spots/, where one animal touches another: the Motion Studio, phase 3) are written by
+// tools/spots.py from the body plans and the game's model and clip files; this fails when one is behind them.
+def checkSpotTables = tasks.register('checkSpotTables', Exec) {
+    commandLine 'python', 'tools/spots.py', '--check'
+}
+tasks.named('check') { dependsOn checkSpotTables }
+
 neoForge {
     version = project.neo_version
 
