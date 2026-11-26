@@ -293,6 +293,11 @@ public final class LionHunt {
         l.hunt.holdSpot = BuffaloEntity.SPOTS.index(spot);
     }
 
+    /** Tests: it lets go of its prey (as when hit, shaken or its hunt ends). */
+    public static void letGoForTests(LionEntity l) {
+        l.hunt.holding = false;
+    }
+
     // --- the hold: placed on the prey's body (the Motion Studio, phase 3) ---------------------------------------------
 
     /** Settling onto its spot: where it gripped (in the prey's frame: ahead, to its left; its heading off the prey's) and over how many ticks. */
@@ -314,23 +319,27 @@ public final class LionHunt {
     record Place(Vec3 at, float yaw) {
     }
 
-    /** The clip it grips this prey with: a calf knocked down is pinned, a standing buffalo bitten. */
-    static byte holdClip(BuffaloEntity prey) {
-        return prey.grownUp() ? LionEntity.BITE : LionEntity.PIN;
+    /**
+     * The clip it holds this prey with at this spot now, by the prey's spot table's pairs (the Motion Studio phase 3,
+     * step 3: one table, the prey's own clip and size): a standing cow bitten at its haunch and flanks, clamped at its
+     * throat, gone down with as it is brought down, held down; a calf pinned. Null: it cannot hold it there.
+     */
+    @Nullable
+    static String holdClip(LionEntity l, BuffaloEntity prey, int spot) {
+        return BuffaloEntity.SPOTS.holdClip(l.form().clips, prey.clipName(), spot, prey.spotSize());
     }
 
-    /** Its grip with that clip (its jaw at the bite), from its spot table; a lion with no pin bites; null: it cannot hold. */
+    /** Its grip with that clip (its jaw at the bite), from its own spot table; null: it cannot hold the prey there. */
     @Nullable
-    public static com.antcolonies.entity.body.Spots.Hold holdOf(LionEntity l, BuffaloEntity prey) {
-        var spots = l.spots();
-        var hold = spots.hold(holdClip(prey) == LionEntity.PIN ? "takedown_pin" : "bite");
-        return hold != null ? hold : spots.hold("bite");
+    public static com.antcolonies.entity.body.Spots.Hold holdOf(LionEntity l, BuffaloEntity prey, int spot) {
+        String clip = holdClip(l, prey, spot);
+        return clip == null ? null : l.spots().hold(clip);
     }
 
     /** Where a lion holding this spot stands and faces now: its jaw at its bite on the spot, facing in along the spot's way out. */
     @Nullable
     static Place placeOn(LionEntity l, BuffaloEntity prey, int spot) {
-        var hold = holdOf(l, prey);
+        var hold = holdOf(l, prey, spot);
         if (hold == null || spot < 0 || spot >= BuffaloEntity.SPOTS.count()) {
             return null;
         }
@@ -1014,13 +1023,20 @@ public final class LionHunt {
                 s.holding = false;                              // no room at its spot: it lets go (and stands where it is)
                 return;
             }
-            byte clip = holdClip(prey);
-            byte d = l.doing();
-            if (d == clip || d == LionEntity.CALM || (LionEntity.oneShot(d) && l.doingFor() >= l.doingTicks(d))) {
-                l.setDoing(clip);                               // the strike played out, or the last bite: the next at once
+            String name = holdClip(l, prey, s.holdSpot);
+            byte clip = name == null ? -1 : LionEntity.doingOf(name);
+            if (clip < 0 || !l.has(clip)) {
+                s.holding = false;                              // no hold of hers fits the prey there
+                return;
             }
-            var hold = holdOf(l, prey);
-            if (hold != null && l.doing() == clip && l.clipTick() == hold.hit()) {
+            if (!l.striking()) {
+                // the clip that goes with the prey's own now, switched the tick the prey's changes (passengers tick after
+                // their vehicle), so a clip made with the prey's (hold_sink) plays on its clock; a bite played out starts
+                // again at once, with no calm tick between (BUGS 376)
+                l.setDoing(clip);
+            }
+            var hold = l.spots().hold(name);
+            if (hold != null && l.doing() == clip && hold.bitesAt(l.clipTick())) {
                 bite(prey);
             }
         }

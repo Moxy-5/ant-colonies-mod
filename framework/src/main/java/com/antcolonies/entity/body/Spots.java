@@ -31,8 +31,22 @@ import net.minecraft.world.phys.Vec3;
 public final class Spots {
     private static final Map<String, Spots> LOADED = new ConcurrentHashMap<>();
 
-    /** A holder's grip: the tick of its clip it bites at, and its jaw then (model px). */
-    public record Hold(int hit, double x, double y, double z) {
+    /**
+     * A holder's grip: the tick of its clip it bites at, its jaw then (model px), its clip's length (ticks) and whether it
+     * loops (a loop bites at its hit every time round).
+     */
+    public record Hold(int hit, double x, double y, double z, int ticks, boolean loop) {
+        /** Whether it bites at this tick of its clip. */
+        public boolean bitesAt(int clipTick) {
+            return loop && ticks > 0 ? clipTick >= 0 && clipTick % ticks == hit : clipTick == hit;
+        }
+    }
+
+    /**
+     * Which clip a holder holds this prey with (the prey's body plan's pairs, step 3): the holder (its model's name), its
+     * hold clip, the prey's size the pair is made for, and the prey's clips and spots it goes with.
+     */
+    public record Pair(String holder, String hold, double size, java.util.Set<String> clips, java.util.Set<String> spots) {
     }
 
     private final List<String> names = new ArrayList<>();
@@ -42,6 +56,7 @@ public final class Spots {
     /** Each clip's middle row (a loop's: the game cannot know a loop's phase at the speed it is drawn). */
     private final Map<String, double[]> middles = new HashMap<>();
     private final Map<String, Hold> holds = new HashMap<>();
+    private final List<Pair> pairs = new ArrayList<>();
 
     private Spots(Class<?> owner, String path) {
         try (InputStream in = owner.getResourceAsStream(path)) {
@@ -70,13 +85,23 @@ public final class Spots {
                     clips.put(clip.getKey(), out);
                     middles.put(clip.getKey(), middle);
                 }
+                if (spots.has("pairs")) {
+                    for (JsonElement e : spots.getAsJsonArray("pairs")) {
+                        JsonObject p = e.getAsJsonObject();
+                        java.util.Set<String> on = new java.util.HashSet<>(), at = new java.util.HashSet<>();
+                        p.getAsJsonArray("clips").forEach(c -> on.add(c.getAsString()));
+                        p.getAsJsonArray("spots").forEach(c -> at.add(c.getAsString()));
+                        pairs.add(new Pair(p.get("holder").getAsString(), p.get("hold").getAsString(), p.get("size").getAsDouble(), on, at));
+                    }
+                }
             }
             if (json.has("holds")) {
                 for (Map.Entry<String, JsonElement> e : json.getAsJsonObject("holds").entrySet()) {
                     JsonObject h = e.getValue().getAsJsonObject();
                     JsonArray jaw = h.getAsJsonArray("jaw");
                     holds.put(e.getKey(), new Hold(h.get("hit").getAsInt(), jaw.get(0).getAsDouble(), jaw.get(1).getAsDouble(),
-                            jaw.get(2).getAsDouble()));
+                            jaw.get(2).getAsDouble(), h.has("ticks") ? h.get("ticks").getAsInt() : 0,
+                            h.has("loop") && h.get("loop").getAsBoolean()));
                 }
             }
         } catch (Exception e) {
@@ -137,6 +162,34 @@ public final class Spots {
         double fx = -Math.sin(r), fz = Math.cos(r), lx = Math.cos(r), lz = Math.sin(r);
         double ahead = (-px.z + drawnAhead) * size / 16.0, left = px.x * size / 16.0;
         return new Vec3(feet.x + fx * ahead + lx * left, feet.y + px.y * size / 16.0, feet.z + fz * ahead + lz * left);
+    }
+
+    /**
+     * The clip a holder holds this prey with now (step 3): of the holder's pairs naming the prey's clip (a clip no pair
+     * names counts as its idle) and the spot, the one made for the size nearest the prey's. Null: none (it cannot hold
+     * the prey there).
+     *
+     * @param holder its model's name (its spot table's)
+     * @param size   the prey's size as its spots are drawn (its model's share times its scale)
+     */
+    @Nullable
+    public String holdClip(String holder, String preyClip, int spot, double size) {
+        if (spot < 0 || spot >= names.size()) {
+            return null;
+        }
+        String clip = preyClip;
+        if (pairs.stream().noneMatch(p -> p.holder().equals(holder) && p.clips().contains(preyClip))) {
+            clip = "idle";
+        }
+        String name = names.get(spot);
+        Pair best = null;
+        for (Pair p : pairs) {
+            if (p.holder().equals(holder) && p.clips().contains(clip) && p.spots().contains(name)
+                    && (best == null || Math.abs(p.size() - size) < Math.abs(best.size() - size))) {
+                best = p;
+            }
+        }
+        return best == null ? null : best.hold();
     }
 
     /** The heading (Minecraft's yaw) of a holder at a spot: facing in along the spot's way out. */

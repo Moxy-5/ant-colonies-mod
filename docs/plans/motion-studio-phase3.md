@@ -34,7 +34,7 @@ round one calf. All five come from the hold being placed by hand round the prey'
 2. **The pair seen offline (ideas 36, 39). Built 2026-11-26, below.** `clip_check.py <holder> --pair <prey>`: both posed
    together from the table: parts of one inside the other, the jaw against the skin at the bite (in the air or buried),
    several holders against each other; strips from three sides. Then the hunt film again with `pair_report.py`.
-3. **Clips made against the partner (ideas 33, 37, 38):** what step 1's numbers show is missing (below): a `cling`
+3. **Clips made against the partner (ideas 33, 37, 38). Built 2026-11-26 (the user: "Go to step 3"), below.** what step 1's numbers show is missing (below): a `cling`
    (forepaws on a standing buffalo's haunch, jaws on), the pin aimed at a lying calf's neck, the buffalo bucking under a
    holder and sinking to its knees; each made against the spot's place per size and checked with step 2. Here the pair
    file plays both clips on one clock.
@@ -117,4 +117,84 @@ round one calf. All five come from the hold being placed by hand round the prey'
     flank pair's (0.7), as several lionesses on one small calf would. Reported, not flagged.
 - **Next:** the hunt film again (`tools/film/lion_hunt.film`, then `python tools/pair_report.py
   run-film/screenshots/lion_hunt`): the same numbers measured in the game, before step 3.
+
+## Step 3 (started 2026-11-26, the user: "Go to step 3")
+**What the numbers said first.** Before choosing clips I measured where a lioness stands for each spot on a standing cow
+and on a cow lying down (`spots.py`'s placement, a lioness 0.97 on a cow 0.9): her place moves 0.00 to 0.03 blocks; only
+the height of the spots changes (1.12 blocks standing, 0.65 lying). So a holder never needs to move while the cow goes
+down: only her head and body go down with it. And `bite` on a cow lying puts her jaw on the hide but her body 1.1 to 2.5
+px into the cow at the rump and the throat (the flanks are clear); the calf's pin is right already (step 2).
+
+**The picks (mine; animals are fun first, inspired by real hunts: lionesses bring a buffalo down by their weight, one
+clamps the throat):**
+- **The cow brought down (idea 38):** held by two or more lionesses that have finished their strike, a grown buffalo
+  goes down: `held_sink` (a struggle, the head tossed at them, then all four legs buckle together and it sinks onto its
+  brisket; all its spots drop together, so one holder clip fits every spot), then `held_down` (on its brisket, heaving,
+  tossing its horns, bellowing, a try to rise that fails). Fewer than two: it gets up (`rest_up`) and pulls away again
+  (the bull driving one off frees it). The calf is knocked down at the strike, as now.
+- **Dying lying down:** a buffalo that dies lying (held down, resting, a calf pinned) plays `death_down` (it rolls onto
+  its flank from its brisket: the death's own fall, ending in the same last pose) instead of standing up first into
+  `death`. Its holders let go as it dies (they are placed on its spots only while it lives).
+- **Three new lioness clips, made against the buffalo's spots (idea 37):** `throat_hold` (a standing cow's throat: her
+  jaw clamped at the spot's height, tugging), `hold_sink` (played with the cow's `held_sink` on one clock: her jaw goes
+  down with the spots tick by tick, the blends' one-tick difference counted) and `hold_down` (a cow down: her jaw at the
+  lying spots' height, body low and braced). The lion maker reads the buffalo's spot table and solves her body and
+  neck so her jaw is at the spot's height, at the same reach ahead as her `bite`: so her place is the same for every
+  hold clip, and she never slides while the cow goes down. The rump and flanks of a standing cow keep `bite`.
+- **One table picks the hold clip:** the pairs in the buffalo's plan say which hold clip goes with which of its clips
+  and spots, at which size; `spots.py` writes them into its table and the game reads them (the old rule "grown: bite,
+  else pin" goes). A prey clip no pair names counts as its idle; of the pairs that fit, the one nearest the prey's size.
+- **Not in this step:** the rearing `cling` on a standing cow's haunch (the cow now goes down as soon as a second lioness
+  holds it, so a lone lioness on a walking cow is the only standing hold left); a third lioness gripping mid-sink plays
+  `hold_sink` from its start, behind the cow's clock (a moment, said here, not patched).
+
+### Step 3, built (2026-11-26)
+- **The buffalo** (`tools/buffalo_anims.py`): `held_sink` (2.0 s: its head thrown back and hooking at the lions, a
+  bellow, a stagger, then all four legs buckle together and it sinks onto its brisket), `held_down` (2.4 s loop: heaving,
+  bellowing, a push up on its front knees that fails; its head held, a small swing only; its ears flat back; its tail
+  clamped down over its right buttock) and `death_down` (the death's own fall from its brisket, the same last pose, so
+  the carcass matches). Its rest pose maker takes a `trunk` hook so a trunk move comes before the legs are solved (the
+  hooves stay put). The old clips are unchanged (checked: the same keyframes).
+- **The lioness** (`tools/lion_anims.py` `make_holds`): `throat_hold` and `hold_down` (1.9 s loops) and `hold_sink`
+  (41 ticks, one more than the cow's 40: the blends are 4 and 5 ticks, so both end on one tick). Each frame her neck's
+  pitch and her body's shift ahead are solved (Newton, two unknowns) so her jaw is at the spots' height (the buffalo's
+  spot table, at the pair's sizes) at her bite's reach; her paws stay put through every hold; her head tugs side to
+  side under a pixel at her jaw, centred at each clip's bite tick. Her bite's tick and both blends are read where the
+  game reads them (her plan's holds, the Java), not copied. Her jaw at each hold's bite: x 0, 32.65 px ahead in all
+  four (bite, throat_hold, hold_sink, hold_down), so her place is the same whatever she plays.
+- **The pairs drive the game** (`spots.pairs` in `buffalo.json`, written into its table by `tools/spots.py`, format 2;
+  read by the framework's `Spots.holdClip`): a standing cow: `bite` at the haunch and flanks, `throat_hold` at the
+  throat; going down: `hold_sink` ("together": both clips start on one tick); down or caught lying: `hold_down`; a
+  calf: `takedown_pin`. The holds table now has each clip's length and whether it loops (a loop bites at its hit each
+  time round). `LionHunt.holdClip` asks the table (the old "grown: bite, else pin" is gone); a lion with no pair there
+  cannot hold.
+- **The game** (`BuffaloEntity`, `LionEntity`, `LionHunt`, `BuffaloGoals`): a grown buffalo with two holders past
+  their strike (`steadyHolders`, its passengers) plays `held_sink`, then `held_down`; fewer than two, `rest_up` (one
+  rule in its own tick). While down, and getting up with a holder still on, it neither pulls nor turns (it would swing
+  its holders round, or slide on its knees). It dies lying down
+  with `death_down` (`clipName`: also a resting buffalo or a pinned calf). Its holders let go as it dies. A holder
+  switches to the clip that goes with the prey's on the tick the prey's changes (riders tick after what they ride), so
+  `hold_sink` plays on the cow's clock with nothing kept in step by hand.
+- **The rump spot moved onto the left haunch** (`from` 5 px to its left): on the tail's root the cow's tail ran through
+  the holder's head (2.0 to 2.5 px), as a real lioness bites the haunch beside the tail.
+- **Measured (`clip_check.py lioness --pair buffalo`, 11 flagged, was 10):** every jaw on the hide at every bite (-0.4
+  to +0.2 px), the throat too (step 2's 1.5 px short is gone); the haunch and the flanks clear of the cow standing, going
+  down and down; no two holders touch. Left: at the throat the cow's cheek and ears press 1.2 to 1.8 px into the
+  holder's neck and shoulders (standing, going down and down): real contact for a throat hold, and moving the throat
+  spots already failed once (step 2), so it stays as it is until the film shows whether it looks wrong; a cow caught
+  resting has its tail out behind (its rest clip) and 1.5 px in the haunch holder; the calf's throat holders 1.1 px (as
+  in step 2). The new clips pass the clip checks (feet planted, nothing in the ground, every clip change smooth).
+- **Not done here:** a third lioness gripping mid-sink plays `hold_sink` from its start, behind the cow's clock (said, not
+  patched); the cling on a standing cow's haunch; holders stepping clear as the cow rolls over dying (they let go and
+  stand; the one on its right side may have the cow's back over her paws for the last half second).
+- **Tests** (`land`, `LionHuntTests`): `twoLionessesBringACowDownAndGoDownWithItOnItsClock` (it goes down under two;
+  each tick both jaws on their spots within 0.05, both within 0.08 of their places, `hold_sink` exactly a tick ahead of
+  `held_sink`, then `hold_down`; their clamps bite; one let go, the cow gets up) and
+  `aBuffaloHeldDownDiesWhereItLiesAndItsHoldersLetGo` (a cow held down and a pinned calf die with `death_down`; all three
+  holders off at once). Found on the way: her head's tug had her jaw 1 to 2 px to the side at the bite ticks, which
+  moved her place 0.11 blocks when the cow went from sinking to lying (the test caught it): the tug is now centred there.
+- **The full run** (6 servers, 36 minutes): 451 of 458 required passed; the 7 are termite, raid, crocodile and tilapia
+  tests (BUGS 418: 5 passed alone 3 of 3, 2 failed alone 1 of 3); every `land` test passed, and again (42 of 42) after
+  the last fix.
+- **Next:** the hunt film (`tools/film/lion_hunt.film`), asked first; then step 4 (the strike carries itself).
 

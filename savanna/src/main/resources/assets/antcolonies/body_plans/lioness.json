@@ -600,6 +600,58 @@
    [
     "drink",
     "walk"
+   ],
+   [
+    "jump_smack",
+    "throat_hold"
+   ],
+   [
+    "stalk_leap_bite",
+    "throat_hold"
+   ],
+   [
+    "bite",
+    "hold_sink"
+   ],
+   [
+    "throat_hold",
+    "hold_sink"
+   ],
+   [
+    "hold_sink",
+    "hold_down"
+   ],
+   [
+    "jump_smack",
+    "hold_down"
+   ],
+   [
+    "stalk_leap_bite",
+    "hold_down"
+   ],
+   [
+    "hold_down",
+    "bite"
+   ],
+   [
+    "hold_down",
+    "throat_hold"
+   ],
+   [
+    "throat_hold",
+    "idle"
+   ],
+   [
+    "hold_down",
+    "idle"
+   ],
+   [
+    "hold_sink",
+    "idle"
+   ],
+   [
+    "bite",
+    "throat_hold"
    ]
   ],
   "controller": "savanna/src/main/java/com/antcolonies/savanna/animal/LionEntity.java",
@@ -608,11 +660,14 @@
   }
  },
  "holds": {
-  "about": "The clips it grips prey with and the tick each bites (moved here from LionHunt's BITE_HIT and PIN_HIT, 2026-11-26: one place); its jaw is the carry bone's point. tools/spots.py writes assets/antcolonies/spots/<model>.json from this; the game places a holder so its jaw at the bite meets the prey's spot (docs/plans/motion-studio-phase3.md).",
+  "about": "The clips it grips prey with and the tick each bites (moved here from LionHunt's BITE_HIT and PIN_HIT, 2026-11-26: one place); its jaw is the carry bone's point. tools/spots.py writes assets/antcolonies/spots/<model>.json from this; the game places a holder so its jaw at the bite meets the prey's spot (docs/plans/motion-studio-phase3.md). Step 3: throat_hold, hold_sink and hold_down are made against the buffalo's spots (tools/lion_anims.py make_holds); the buffalo's plan's spots.pairs says which goes with which of its clips and spots.",
   "jaw": "carry",
   "clips": {
    "bite": 7,
-   "takedown_pin": 4
+   "takedown_pin": 4,
+   "throat_hold": 10,
+   "hold_sink": 30,
+   "hold_down": 10
   }
  }
 }
