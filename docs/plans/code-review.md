@@ -46,6 +46,10 @@ of Java.
 
 Rounds 5 and 9 are big enough to split in two sessions each if a session runs short.
 
+**Where the rounds stand (2026-11-25):** read: 1 (the brain; its A findings fixed), 2 (the legs, 43 findings, 4 of
+grade A, `docs/reviews/full/round-02-legs.md`; fixes not started), 7, 8, 9, 10 (fixed and merged) and 11. Not read
+yet: 3, 4, 5, 6.
+
 ## What every round looks for (the user's order, 2026-11-23: lag first, then behaviours that fight, then bugs)
 
 ### 1. Lag (high tick times)
