@@ -114,6 +114,41 @@ class BodyPlansTest {
         assertEquals(buffalo.of("walk").loop(), buffalo.of("walk").loop(), "a gait's loop is the same loop every time");
     }
 
+    /**
+     * The gait rule (BUGS 384, 2026-11-25): a gait change waits for the matching footfall only while the old gait's feet
+     * stay right at the speed. Each change between two neighbouring gaits must have a band past the new gait's start
+     * where the old one still carries the speed (or every change would be at once, its legs crossing in the blend), and a
+     * start from standing into a run must be past what the walk carries (or the walk is held with its feet sliding, as the
+     * cow's were, 4.2 times over at 4 to 5 blocks a second); a turn on the spot (a walk at half its pace) is past what a
+     * trot or gallop carries.
+     */
+    @Test
+    void eachGaitChangeHasABandWhereTheOldGaitCarriesTheSpeed() {
+        for (String model : new String[] {"lion", "lioness", "lion_cub", "buffalo"}) {
+            Gaits g = BodyPlans.gaitsOf(model);
+            List<Gaits.Gait> order = g.order();
+            for (int i = 1; i < order.size(); i++) {
+                Gaits.Gait slow = order.get(i - 1), fast = order.get(i);
+                double start = fast.from();
+                assertTrue(GaitShift.carries(slow, start * 1.02), model + ": " + slow.clip() + " carries a little past the "
+                        + fast.clip() + "'s start, to wait for the footfall going up");
+                assertTrue(GaitShift.carries(fast, start * 0.98), model + ": " + fast.clip() + " carries a little under its own "
+                        + "start, to wait for the footfall going down to the " + slow.clip());
+            }
+            Gaits.Gait walk = order.get(0), fastest = order.get(order.size() - 1);
+            assertTrue(!GaitShift.carries(walk, fastest.from() * 1.1), model + ": a run is past what the walk carries");
+            for (Gaits.Gait run : order.subList(1, order.size())) {
+                assertTrue(!GaitShift.carries(run, 0.5 * walk.madeFor()), model + ": a turn on the spot is past what the "
+                        + run.clip() + " carries");
+            }
+        }
+        // the cow of the hunt film (size 0.91): 4 to 5 blocks a second is past her walk and her trot
+        Gaits buffalo = BodyPlans.gaitsOf("buffalo");
+        double cow = Gaits.perSize(4.0 / 20.0, 0.91);
+        assertTrue(!GaitShift.carries(buffalo.of("walk"), cow));
+        assertTrue(GaitShift.carries(buffalo.of("charge"), cow));
+    }
+
     private static List<String> geoBones(String model) throws Exception {
         try (InputStream in = BodyPlansTest.class.getResourceAsStream("/assets/antcolonies/geo/entity/" + model + ".geo.json")) {
             assertNotNull(in, "no " + model + ".geo.json");

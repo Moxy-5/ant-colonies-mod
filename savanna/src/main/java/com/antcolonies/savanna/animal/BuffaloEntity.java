@@ -1021,7 +1021,7 @@ public class BuffaloEntity extends PathfinderMob implements GeoEntity, HasLife, 
             // its gait by how fast it goes, each clip's pace following its stride so its hooves never slide (in the water
             // too: the walk, at its swimming pace)
             double s = Gaits.perSize(stride, getScale());
-            Gaits.Gait gait = gaitShift.shown(gaits.pick(s), player);
+            Gaits.Gait gait = gaitShift.shown(gaits.pick(s), s, player);
             player.setAnimationSpeed(gait.rate(s));
             return state.setAndContinue(gait.loop());
         }

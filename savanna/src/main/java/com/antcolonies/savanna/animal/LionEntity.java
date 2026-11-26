@@ -1037,11 +1037,12 @@ public class LionEntity extends PathfinderMob implements GeoEntity, HasLife, com
         }
         if (walking()) {
             // its gait by how fast it goes, each clip's pace following its stride (its body plan's gaits), changed on the
-            // matching footfall; turning in place: a slow walk, its feet never skating
-            double s = Gaits.perSize(stride, getScale());
+            // matching footfall when the old gait can carry the speed (GaitShift); turning in place: a slow walk at half
+            // its pace, its feet never skating (its stride still holds the last run's speed: a turn is judged by its own)
             boolean turning = tickCount - movedTick > WALK_HOLD;
-            Gaits.Gait gait = gaitShift.shown(turning ? gaits.of("walk") : gaits.pick(s), player);
-            player.setAnimationSpeed(turning && gait.clip().equals("walk") ? 0.5 : gait.rate(s));
+            double s = turning ? 0.5 * gaits.of("walk").madeFor() : Gaits.perSize(stride, getScale());
+            Gaits.Gait gait = gaitShift.shown(turning ? gaits.of("walk") : gaits.pick(s), s, player);
+            player.setAnimationSpeed(gait.rate(s));
             return state.setAndContinue(gait.loop());
         }
         player.setAnimationSpeed(loopRate());
