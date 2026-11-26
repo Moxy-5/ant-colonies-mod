@@ -168,6 +168,98 @@ public class TermiteAwayTests {
      * in the wet); on a dry night with the alarm at 2 nothing is foraged; the alarm calmed but the store full (as the
      * brain last saw it), nothing either; with room again, 2 more tufts are eaten up.
      */
+    /**
+     * Review R1-36, the user's call (2026-11-25): the builder numbers work beside a player too, out of sight. A termite
+     * colony here (never away) with its workers all in the numbers and its nest not dug. With the near work off (as
+     * before the change) the numbers dig nothing and bank no time; with it on they dig the nest, which is out of
+     * every player's sight underground.
+     */
+    @GameTest(template = "arena", timeoutTicks = 900, skyAccess = true)
+    public static void termiteBuilderNumbersDigBesideAPlayerOutOfSight(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        TestScenes.deepGround(helper);
+        helper.spawn(SavannaEntities.TERMITE_QUEEN.get(), MIDDLE, SURFACE, MIDDLE);
+        helper.onEachTick(() -> noRealWorkers(helper));
+        helper.runAfterDelay(10, () -> {
+            Colony colony = TermiteMoundTests.colony(helper);
+            helper.assertTrue(colony != null, "no termite colony");
+            colony.population().setOnForTests(false);
+            colony.population().setViewersForTests(List.of());
+            for (long age : new long[] {250000, 100000, 50000, 20000, 5000}) {
+                colony.population().addNewMembers(Caste.WORKER, level.getGameTime() - age, 20);
+            }
+            helper.assertTrue(colony.building().buildersInside(level) > 0, "no builders among the numbers");
+            colony.building().setNearForTests(false);
+        });
+        helper.runAfterDelay(200, () -> {
+            Colony colony = TermiteMoundTests.colony(helper);
+            helper.assertTrue(colony.away().report().get(AwayReport.What.DUG) == 0 && !colony.building().hasWork(),
+                    "with the near work off the numbers should dig nothing: " + colony.away().report().get(AwayReport.What.DUG));
+            colony.building().setNearForTests(true);
+        });
+        helper.runAfterDelay(500, () -> {
+            Colony colony = TermiteMoundTests.colony(helper);
+            helper.assertTrue(colony.away().report().get(AwayReport.What.DUG) > 0, "the builder numbers should dig the nest beside a player: "
+                    + colony.away().describe(level) + ", work " + colony.building().work());
+            helper.succeed();
+        });
+    }
+
+    /**
+     * Review R1-35, the user's call (2026-11-25): a night the player slept through is foraged by the numbers. The scene
+     * of the test below at midday: 60 old workers in the numbers and 3 known dry tufts with 2 of their 4 pieces left.
+     * By day nothing is foraged. Then a night of 500 seconds is jumped over (as a bed does): in that one pass the
+     * numbers bring the 6 pieces in, and the tufts vanish out of sight after.
+     */
+    @GameTest(template = "arena", timeoutTicks = 900, skyAccess = true)
+    public static void aNightSleptThroughIsForagedByTheTermiteNumbers(GameTestHelper helper) {
+        ServerLevel level = helper.getLevel();
+        TestScenes.deepGround(helper);
+        helper.spawn(SavannaEntities.TERMITE_QUEEN.get(), MIDDLE, SURFACE, MIDDLE);
+        List<BlockPos> tufts = new ArrayList<>();
+        int[] foodBefore = new int[1];
+        TestClock.still(helper, 12.0); // midday, and it stays midday
+        helper.onEachTick(() -> noRealWorkers(helper));
+        helper.runAfterDelay(10, () -> {
+            Colony colony = TermiteMoundTests.colony(helper);
+            helper.assertTrue(colony != null, "no termite colony");
+            colony.population().setOnForTests(false);
+            colony.population().setViewersForTests(List.of());
+            TermiteScenes.digNestAtOnce(level, colony);
+            colony.population().addNewMembers(Caste.WORKER, level.getGameTime() - 250000, 60);
+            com.antcolonies.savanna.colony.Galleries.of(colony).setSwitchForTests(false);
+            int[][] spots = {{MIDDLE + 6, MIDDLE}, {MIDDLE - 6, MIDDLE}, {MIDDLE, MIDDLE + 6}};
+            for (int[] spot : spots) {
+                BlockPos tuft = helper.absolutePos(new BlockPos(spot[0], SURFACE, spot[1]));
+                level.setBlock(tuft.below(), Blocks.GRASS_BLOCK.defaultBlockState(), 3);
+                level.setBlock(tuft, com.antcolonies.savanna.registry.SavannaBlocks.DRY_GRASS.get().defaultBlockState(), 3);
+                colony.food().setPiecesCutForTests(tuft, 2);
+                colony.foodMap().knowForTests(tuft);
+                tufts.add(tuft);
+            }
+            colony.food().rescanPlantsSoon();
+            foodBefore[0] = colony.food().getFood();
+            colony.field().setOnForTests(true);
+        });
+        helper.runAfterDelay(300, () -> {
+            Colony colony = TermiteMoundTests.colony(helper);
+            helper.assertTrue(!colony.isForagingTime(level) && colony.food().getFood() == foodBefore[0], "nothing should be foraged by day: "
+                    + colony.food().getFood() + ", was " + foodBefore[0]);
+            helper.assertTrue(colony.foragingTicksBetween(level, 13000, 23000) >= 8000 && colony.foragingTicksBetween(level, 1000, 11000) == 0,
+                    "a night should count as the termites' foraging time and a day not: " + colony.foragingTicksBetween(level, 13000, 23000)
+                            + " and " + colony.foragingTicksBetween(level, 1000, 11000));
+            colony.field().forageSkippedNight(level, 500);
+            helper.assertTrue(colony.food().getFood() == foodBefore[0] + 6, "the night slept through should bring the 6 pieces in: "
+                    + colony.food().getFood() + ", was " + foodBefore[0]);
+        });
+        helper.runAfterDelay(600, () -> {
+            for (BlockPos tuft : tufts) {
+                helper.assertTrue(level.getBlockState(tuft).isAir(), "a tuft eaten up in the night slept through should be gone: " + tuft);
+            }
+            helper.succeed();
+        });
+    }
+
     @GameTest(template = "arena", timeoutTicks = 4900, skyAccess = true)
     public static void termiteNumbersForageKnownDryGrassOnlyAtNightOrInTheRain(GameTestHelper helper) {
         ServerLevel level = helper.getLevel();

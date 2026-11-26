@@ -533,6 +533,8 @@ readers; the line-by-line slices above cover those).
 
 **Status (2026-11-25, `claude/review-fix-1`): open: the user's call.**
 
+**Status (2026-11-25, `claude/review-fix-1-calls`): fixed as recommended, the user's call (BUGS 397): a slept night is foraged by the numbers.**
+
 - **What is wrong:** termites forage outside at night or in rain (`macrotermes.json:103`, `"forage_at": ["night",
   "rain"]`; `Colony.isForagingTime`, 433 to 449, by `level.isDay()`). A bed works only at night and jumps the day
   clock to morning; the game time does not jump, and the hunger clocks run on game time (`Meals:145`, a meal every
@@ -557,6 +559,8 @@ readers; the line-by-line slices above cover those).
 ### R1-36 (B, proven; checked again): builder numbers do nothing near a player and bank work without end while away
 
 **Status (2026-11-25, `claude/review-fix-1`): open: the user's call.**
+
+**Status (2026-11-25, `claude/review-fix-1-calls`): fixed as recommended, the user's call (BUGS 398): builder numbers work near, nothing banked while waiting, a waiting slice tried once a second. Banked work from while away is still not capped (it is dropped once nothing is left to build).**
 
 - **Where:** `ColonyParts.java:136-138` (`BUILD_LIFE` has only `.ticksAway(70, ...)`, no near tick);
   `BuildLife.java:94-107`, `148-166`; `NestLife.java:162`.

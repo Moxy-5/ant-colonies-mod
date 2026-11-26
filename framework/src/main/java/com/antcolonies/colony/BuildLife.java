@@ -65,6 +65,8 @@ public class BuildLife {
     private int secondChanges;
     private int secondPieces;
     private int secondPasses;
+    /** Whether a slice of this second changed nothing because it waits (a player looking): the next try is next second. */
+    private boolean secondWaits;
 
     BuildLife(Colony colony) {
         this.colony = colony;
@@ -106,6 +108,40 @@ public class BuildLife {
         }
     }
 
+    /** Tests only: whether the builder numbers work near a player (null: always, except on the game test server). Not saved. */
+    @javax.annotation.Nullable
+    private Boolean nearForTests;
+
+    /**
+     * Once a second while here (the user's call, 2026-11-25; review R1-36): the builder numbers work beside a player
+     * too. Near, most builders of a grown colony are numbers (the real-mob cap), and they built nothing, so a mound a
+     * player stayed by grew at about a quarter of its pace and jumped when the player came back from a walk. Their
+     * second goes into the same {@link #work} and is spent by the same slices as the time from while away
+     * ({@link #catchUp}): out of every player's sight, by the real builders' order and rules. While the next block
+     * waits for a player to look away nothing is banked (no burst when they do), and a founding nest is dug by its
+     * real founders only.
+     */
+    void tickNear(ServerLevel level) {
+        if (colony.isFounding() || waited && work > 0 || !worksNear(level)) {
+            return;
+        }
+        int builders = buildersInside(level);
+        if (builders > 0) {
+            work += builders * 20L;
+        }
+    }
+
+    private boolean worksNear(ServerLevel level) {
+        if (nearForTests != null) {
+            return nearForTests;
+        }
+        return !(level.getServer() instanceof net.minecraft.gametest.framework.GameTestServer);
+    }
+
+    public void setNearForTests(@javax.annotation.Nullable Boolean on) {
+        nearForTests = on;
+    }
+
     // --- coming back ----------------------------------------------------------------------------------------------
 
     /** Whether there is catching up to do on return: building time left, or founders to put in their chamber. */
@@ -131,9 +167,10 @@ public class BuildLife {
             secondChanges = 0;
             secondPieces = 0;
             secondPasses = 0;
+            secondWaits = false;
         }
-        if (secondChanges >= PER_SECOND) {
-            return false; // this second's share is done: the rest comes the next second
+        if (secondChanges >= PER_SECOND || secondWaits) {
+            return false; // this second's share is done, or it waits for a player to look away: the rest comes the next second
         }
         waited = false;
         this.eyes = eyes;
@@ -142,6 +179,8 @@ public class BuildLife {
             return slice(level, founders);
         } finally {
             secondChanges += changes;
+            // (Review R1-36: while a player looked at the next block the whole plan was read again on 19 of every 20 ticks.)
+            secondWaits = waited && changes == 0;
         }
     }
 

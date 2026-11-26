@@ -439,6 +439,27 @@ public class Colony {
         return profile().food().foragesNow(day, rainForTests != null ? rainForTests : level.isRaining());
     }
 
+    /**
+     * How many ticks of the day clock's span from {@code from} to {@code to} (at most its last day) were foraging time
+     * for this species on a dry day, by the same rule as {@link #isForagingTime}: for a night the clock jumped over
+     * (a player slept; {@link FieldLife}, review R1-35).
+     */
+    public long foragingTicksBetween(net.minecraft.world.level.Level level, long from, long to) {
+        if (level.dimensionType().hasFixedTime()) {
+            return 0;
+        }
+        Optional<SpeciesProfile.DayClock> clock = profile().food().dayClock();
+        long ticks = 0;
+        for (long time = Math.max(from, to - 24000L); time < to; time += 100) {
+            boolean out = clock.isPresent() ? clock.get().outAt(time, heat(level), false)
+                    : profile().food().foragesNow(isSunUp(level, time) || isBeforeDawn(time), false);
+            if (out) {
+                ticks += Math.min(100, to - time);
+            }
+        }
+        return ticks;
+    }
+
     /** Whether it counts as day at the nest: the sun is up, or it is the end of the night ({@link #isBeforeDawn}). */
     private boolean isDay(net.minecraft.world.level.Level level) {
         if (testTime == null) {

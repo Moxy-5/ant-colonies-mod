@@ -146,6 +146,7 @@ anantcolonyawaydigsitsroomsandheapsitshilloutofsightonreturn 0.87
 anantcolonyawaylivesonthroughasaveandloadandcatchesuponreturn 0.91
 anantgoinghomewalkseachwalktoitsend 0.05
 anearraidsnumberstaketermitesfromthecolonyandbringthemhome 0.63
+anightsleptthroughisforagedbythetermitenumbers 0.06
 anoldhumpofnewlandisgrassywithtreesandaburrow 0.03
 anotterafloatinapooldoesnotdrown 0.41
 anotteriskeptwithin96blocksofaplayer 0.00
@@ -429,6 +430,7 @@ stresssavannashapes 2.14
 tadpolesgrazethealgae 0.29
 tadpolesspawnintheshallowsbythemselves 0.00
 tenmatabelesatafeedingspottakeminutesandmanytermitesescape 0.18
+termitebuildernumbersdigbesideaplayeroutofsight 0.40
 termitemudonadeadtreestays 0.00
 termitenumbersarelostoutofsightonlywhereahostilereallyis 0.49
 termitenumbersforageknowndrygrassonlyatnightorintherain 6.25

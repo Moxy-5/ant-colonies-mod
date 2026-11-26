@@ -115,6 +115,10 @@ public class FieldLife {
         }
         awayNow = away;
         boolean changed = showCuts(level);
+        long slept = nightJumpedOver(level);
+        if (slept > 0) {
+            changed |= forageSkippedNight(level, slept);
+        }
         changed |= forage(level);
         if (changed) {
             ColonyManager.get(level).markChanged();
@@ -274,7 +278,7 @@ public class FieldLife {
     private void forageByTheLand(ServerLevel level, double free) {
         ColonyHooks.Underground web = colony.underground();
         int walk = web != null ? web.grazeRadius() : colony.profile().food().radius();
-        landGot += free * 20.0 / (TRIP_TICKS + 2.0 * walk * TICKS_PER_BLOCK);
+        landGot += free * 20.0 * seconds / (TRIP_TICKS + 2.0 * walk * TICKS_PER_BLOCK);
         placedNow += free;
         out += (int) Math.round(free);
         while (landGot >= 1 && roomNow > 0) {
@@ -351,6 +355,54 @@ public class FieldLife {
         return changed;
     }
 
+    // --- a night the day clock jumped over (a player slept) ----------------------------------------------------------
+
+    /** The day clock and the game clock at the last tick, to see the day clock jump ({@link #nightJumpedOver}). Not saved. */
+    private long lastDayTime = Long.MIN_VALUE;
+    private long lastGameTime = Long.MIN_VALUE;
+    /** How many seconds this pass of {@link #forageWith} stands for (1, or a whole jumped night's), and whether it counts as night. */
+    private double seconds = 1.0;
+    private boolean jumpedNight;
+
+    /**
+     * The seconds of foraging time the day clock jumped over since the last tick: a player slept (the day clock goes
+     * to morning, the game clock, which hunger runs on, does not), or the time was set forward. 0 for a species that
+     * keeps no schedule, and when nothing jumped.
+     */
+    private long nightJumpedOver(ServerLevel level) {
+        long day = level.getDayTime();
+        long game = level.getGameTime();
+        long wasDay = lastDayTime;
+        long wasGame = lastGameTime;
+        lastDayTime = day;
+        lastGameTime = game;
+        if (wasGame == Long.MIN_VALUE || !colony.keepsASchedule()) {
+            return 0;
+        }
+        long jumped = (day - wasDay) - (game - wasGame);
+        return jumped < 200 ? 0 : colony.foragingTicksBetween(level, wasDay + (game - wasGame), day) / 20;
+    }
+
+    /**
+     * A night the player slept through is foraged by the numbers (the user's call, 2026-11-25; review R1-35: a bed
+     * took the termites' whole foraging time while their hunger ran on, so a player who slept every night starved the
+     * grass-fed colonies of the whole world). The termites did forage that night; the player did not see it. One pass
+     * standing for the night's seconds, by the rules of any night: the forager numbers, the known plants and the
+     * holes in turn, the room in the store, plants in a player's sight left alone. True if anything changed.
+     */
+    public boolean forageSkippedNight(ServerLevel level, long nightSeconds) {
+        seconds = nightSeconds;
+        jumpedNight = true;
+        try {
+            returnedNow = 0;
+            placedNow = 0;
+            return forageWith(level, foragersInside(level));
+        } finally {
+            seconds = 1.0;
+            jumpedNight = false;
+        }
+    }
+
     /** Pieces the numbers brought home this second, and how many of them were at work on a plant (for the door). */
     private int returnedNow;
     private double placedNow;
@@ -362,7 +414,7 @@ public class FieldLife {
             progress.clear();
             return false;
         }
-        boolean outside = colony.isForagingTime(level);
+        boolean outside = jumpedNight || colony.isForagingTime(level);
         if (!outside && !colony.keepsASchedule()) {
             progress.clear();
             return false;
@@ -489,7 +541,7 @@ public class FieldLife {
         double sent = Math.min(free, places * trip / atPlant);
         placedNow += sent;
         out += (int) Math.round(sent);
-        double got = progress.getOrDefault(pos, 0.0) + sent * 20.0 / trip;
+        double got = progress.getOrDefault(pos, 0.0) + sent * 20.0 * seconds / trip;
         int left = kind.pieces() - food.getPiecesCut(pos);
         long now = level.getGameTime();
         // Brain step 4g, step 4: a trip to food near danger can be lost out of sight (species whose forager numbers go there).

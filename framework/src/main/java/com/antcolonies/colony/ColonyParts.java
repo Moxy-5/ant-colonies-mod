@@ -134,6 +134,7 @@ public final class ColonyParts {
             .saves(FieldLife::save, FieldLife::load)
             .sample(FieldLife::fillForTests));
     public static final Type<BuildLife> BUILD_LIFE = shared("build_life", BuildLife::new, part -> part
+            .ticks(135, BuildLife::tickNear)
             .ticksAway(70, BuildLife::tickAway)
             .saves(BuildLife::save, BuildLife::load));
     public static final Type<WorkerFood> WORKER_FOOD = shared("worker_food", WorkerFood::new, part -> part
