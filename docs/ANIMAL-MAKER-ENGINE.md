@@ -548,6 +548,8 @@ From then on every new animal is only the path above plus its family's piece.
 - Open: which animal after the monitor (decides which family is built next). The bullfrog and the barb came first in
   practice; step C brings them in.
 - Open: the size scale for small creatures (above).
+- Open (2026-11-25): the Motion Studio, seeing the game's real motion in the lab and two animals touching (a lion on a
+  buffalo): 50 ideas and a recommended order in `docs/plans/motion-studio.md`, nothing built or decided.
 
 ## Hard rule: offline and in-game checks for every animation (the user, 2026-11-19)
 After the monitor's climb up came out right this way ("a combination of the animation engine and in game was perfect"), every new or changed animation or movement, any animal, is checked both ways before the user sees it: offline as the game draws it (`python tools/clip_check.py <animal> <clips> --switches --times ...`, one checker for every animal since 2026-11-20, step A: parts inside the ground, step or bank, planted feet hanging, the water's surface, knees and elbows into the body, a fastest-joint-turn check that catches an elbow or knee flipping, the blends between clips, film strips with the faults in red), then the real game frozen and stepped a few ticks a picture from three sides (`tools/film/monitor_climb_frames.film` as the pattern, `tools/film_sheet.py` for contact sheets), every phase judged, joints measured over time when a limb looks wrong, and the course scenes it touches run. How-to: `docs/plans/engine-step2-climb.md`, "How stage B was got right".
