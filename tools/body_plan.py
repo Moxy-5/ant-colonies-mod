@@ -71,6 +71,8 @@ The files are <mod>/src/main/resources/assets/<mod name>/body_plans/<model>.json
               feet_parts    bone name parts of feet, toes or claws allowed to graze 1.05 px into the ground
               feet_reach_down  how far the game sets a standing foot down by itself (px)
               feet_free     clips whose feet may leave the ground on purpose (the highest-foot check skips them)
+              feet_up_ok    {clip pattern: [foot keys] or "*"}: the feet a clip holds up on purpose (a death on its
+                            back, a rear, a hop, a swiping paw); every other still foot over the ground is flagged
               tuck_ok       clips whose limbs tuck into the body on purpose (the knee and elbow check skips them)
               body_bones    the torso's bones: knees and elbows (each leg's middle bone) are judged against their boxes
               hide_in, hidden_at_rest  parts that must hide inside body_bones and hide_in at rest (a shut mouth)

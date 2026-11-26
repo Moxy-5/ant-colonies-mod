@@ -76,6 +76,9 @@
   "checks": {
     "about": "What tools/clip_check.py needs (tools/body_plan.py explains every key): the surface afloat is CrocodileEntity.AFLOAT (0.462 of its size in blocks, 7.4 model px); the game does not read this section.",
     "px": 0.0625,
+    "feet_up_ok": {
+      "death": "*"
+    },
     "controller": "savanna/src/main/java/com/antcolonies/savanna/animal/CrocodileEntity.java",
     "water": [
       "head_slap",

@@ -58,6 +58,13 @@ final class FilmChecks {
      */
     static final double ABOVE_BIG = 1.5;
     /**
+     * ... or, whatever its big moves are, this many times its usual move round it (code review R12-41; the review's
+     * pick): the part's big moves are no bar for a pop that comes back (a loop's seam, a clip change at every stride:
+     * once more than 1 move in 10 is such a pop, the bar is the pop) nor in a short take (under 20 pictures the bar is
+     * its second biggest move, and a part snapping out and back makes two).
+     */
+    static final double SURE_TIMES = 6.0;
+    /**
      * Two pictures more than this many game ticks apart are not one take (2026-11-25: a scene's bursts with the game
      * running between them read as jumps of whole blocks): no move is measured between them.
      */
@@ -242,7 +249,7 @@ final class FilmChecks {
                 double big = bigMoves(moves);
                 for (int i = 1; i < samples.size(); i++) {
                     double usual = usual(moves, i);
-                    if (!Double.isNaN(moves[i]) && moves[i] > JUMP_MIN && moves[i] > JUMP_TIMES * usual && moves[i] > ABOVE_BIG * big) {
+                    if (jump(moves, i, big)) {
                         jumps++;
                         lines.add(String.format(Locale.ROOT, "jump %s tick %d %s: %s moved %.3f a tick (usually %.3f), from %s",
                                 samples.get(i).picture(), samples.get(i).tick(), who, part.getKey(), moves[i], usual,
@@ -269,8 +276,21 @@ final class FilmChecks {
         return most;
     }
 
+    /**
+     * Whether the part's move into picture {@code i} is a jump: far enough, far more than its moves round it, and
+     * either more than its big moves in the whole scene or so far over the moves round it that those are no excuse.
+     */
+    static boolean jump(double[] moves, int i, double big) {
+        double move = moves[i];
+        if (Double.isNaN(move) || move <= JUMP_MIN) {
+            return false;
+        }
+        double usual = usual(moves, i);
+        return move > JUMP_TIMES * usual && (move > ABOVE_BIG * big || move > SURE_TIMES * usual);
+    }
+
     /** The move 9 in 10 of the part's moves are below (for a short film: its second biggest). */
-    private static double bigMoves(double[] moves) {
+    static double bigMoves(double[] moves) {
         if (moves.length < 3) {
             return 0.0;
         }
@@ -282,7 +302,7 @@ final class FilmChecks {
     }
 
     /** The middle of the part's moves in the two pictures before and the two after this one (not counting it). */
-    private static double usual(double[] moves, int i) {
+    static double usual(double[] moves, int i) {
         List<Double> round = new ArrayList<>();
         for (int j = i - 2; j <= i + 2; j++) {
             if (j != i && j >= 1 && j < moves.length && !Double.isNaN(moves[j])) {

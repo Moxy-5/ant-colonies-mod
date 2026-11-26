@@ -97,6 +97,9 @@
   },
   "checks": {
     "px": 0.0625,
+    "feet_up_ok": {
+      "death": "*"
+    },
     "controller": "savanna/src/main/java/com/antcolonies/savanna/animal/CrabEntity.java",
     "feet_parts": [
       "tip"

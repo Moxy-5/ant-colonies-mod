@@ -74,6 +74,9 @@
   "checks": {
     "about": "Offline checks for tools/clip_check.py (canonical adult scale 1.0: 1 px = 0.0625 blocks). Update controller once HippoEntity.java lands.",
     "px": 0.0625,
+    "feet_up_ok": {
+      "death": "*"
+    },
     "controller": "savanna/src/main/java/com/antcolonies/savanna/animal/HippoEntity.java",
     "blend": 5,
     "water": [

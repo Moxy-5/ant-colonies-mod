@@ -692,9 +692,14 @@ class Gait:
         # The floor is never above where the feet stand at rest (2026-10-24: a termite lying paralysed on its back has
         # every foot in the air; the floor is still under its back, not up at its feet).
         rest = min(t[1] for t in model.foot_tips({}).values()) if legs else low
-        self.ground = min(low, rest)
-        # A foot is down when its tip is within 0.15 units of the lowest any foot gets (a lifting foot is up at once).
-        self.down = {k: [tips[k][1] <= low + 0.15 for tips in self.tips] for k in legs}
+        # The floor is the game's floor: where the feet stand at rest (the model's own zero when they stand above it),
+        # never the lowest a foot gets in this clip (review R12-20: with the floor at the lowest foot, a foot pushed
+        # into the ground took the floor down with it, and the sink check below never saw it).
+        self.ground = min(rest, 0.0)
+        # A foot is down when its tip is within 0.15 units of the lowest any foot gets (a lifting foot is up at once);
+        # a foot pushed under the floor does not take that line down with it (the planted feet beside it are still down).
+        down_at = max(low, self.ground - 0.15) + 0.15
+        self.down = {k: [tips[k][1] <= down_at for tips in self.tips] for k in legs}
         # The treadmill: planted feet move back (+Z) in the body's frame at the walk's speed.
         speeds = []
         dt = clip.length / n

@@ -207,16 +207,19 @@ def scene_logs(scene):
 
 
 def camera_log_checks(problems):
-    """Routes the walker could not find, from the game's log."""
-    latest = ROOT / "run-film" / "logs" / "latest.log"
-    if not latest.exists():
-        return
-    scene = "?"
-    for line in latest.read_text(encoding="utf-8", errors="replace").splitlines():
-        if "Film: scene " in line:
-            scene = line.split("Film: scene ", 1)[1].strip()
-        if "NO ROUTE" in line or "Film: no walker" in line:
-            problems.append(f"{scene}: {line.split('Film: ', 1)[-1].strip()}")
+    """Every warning of the camera's in the game's log, by scene: a walker with no route, no walker, an "until" never
+    met, an unknown step, a scene that does not exist (code review R12-38: only the first two were read; the reader
+    is the course's, one for every tool)."""
+    import body_course
+    warnings, _ = body_course.camera_warnings(str(ROOT / "run-film" / "logs" / "latest.log"))
+    for scene, lines in (warnings or {}).items():
+        problems.extend(f"{scene}: the camera warned: {line}" for line in lines)
+
+
+def finding_size(line):
+    """How deep (an "inside" line) or how far (a "jump" line) one of the camera's findings is."""
+    after = line.split(": ", 1)[1].split()
+    return float(after[1] if line.startswith("inside") else after[2])
 
 
 def findings(scene):
@@ -230,8 +233,7 @@ def findings(scene):
         w = line.split()
         if w[0] not in ("inside", "jump") or ":" not in line:
             continue
-        after = line.split(": ", 1)[1].split()
-        part, size = after[0], float(after[1] if w[0] == "inside" else after[2])
+        part, size = line.split(": ", 1)[1].split()[0], finding_size(line)
         for key in (f"{w[0]} {part}", f"{w[0]} at {w[1]}"):   # by body part, and by moment (picture)
             entry = found.setdefault(key, [0, 0.0])
             entry[0] += 1
@@ -255,16 +257,26 @@ def film_checks(scene, problems, notes):
     for key, (count, worst) in sorted(found.items()):
         if " at " in key:
             continue
-        kind = key.split()[0]
-        at_known = {f"{kind} at {l.split()[1]}" for l in lines if l.startswith(kind + " ") and f": {key.split()[1]} " in l}
-        if at_known and at_known <= set(known):
-            continue                       # only at moments already approved (the same event, a part over the line or not)
+        kind, part = key.split()[0], key.split()[1]
+        mine = [l for l in lines if l.startswith(kind + " ") and f": {part} " in l]
+        at_known = {f"{kind} at {l.split()[1]}" for l in mine}
+        # only at moments already approved: the same event (a part over the line or not), so how often it shows is not
+        # judged. How deep or how far is judged always (code review R12-40: the films are the same moment for moment
+        # run to run, so a part gone much deeper shows at exactly the approved pictures and was let through).
+        same_event = bool(at_known) and at_known <= set(known)
         if key not in known:
-            examples = [l for l in lines if l.startswith(key.split()[0] + " ") and f": {key.split()[1]} " in l][:3]
-            problems.append(f"{scene}: new: {key}, {count} time(s), worst {worst:.3f}" + "".join("\n      " + e for e in examples))
+            if same_event:
+                # another part over the line at an approved moment: judged against what was approved at that moment
+                worse = [l for l in mine if finding_size(l) > WORSE_FINDING * known[f"{kind} at {l.split()[1]}"][1] + 0.01]
+                if worse:
+                    problems.append(f"{scene}: worse at an approved moment: {key}, worst {worst:.3f}"
+                                    + "".join("\n      " + e for e in worse[:3]))
+                continue
+            problems.append(f"{scene}: new: {key}, {count} time(s), worst {worst:.3f}" + "".join("\n      " + e for e in mine[:3]))
         else:
             old_count, old_worst = known[key]
-            if count > MORE_FINDINGS * old_count + 2 or worst > WORSE_FINDING * old_worst + 0.01:
+            more = not same_event and count > MORE_FINDINGS * old_count + 2
+            if more or worst > WORSE_FINDING * old_worst + 0.01:
                 problems.append(f"{scene}: worse: {key}, {count} time(s), worst {worst:.3f} (approved: {old_count}, {old_worst:.3f})")
     gone = sorted(k for k in set(known) - set(found) if " at " not in k)
     known_now = len({k for k in found if " at " not in k} & set(known))

@@ -90,6 +90,10 @@
   "feet_parts": ["foot"],
   "feet_free": ["walk", "trot", "charge", "charge_headbutt", "paw_ground", "gore", "rest_down", "rest", "rest_up", "death", "step_up_1000", "step_down_1000", "held_sink", "held_down", "death_down"],
   "tuck_ok": ["rest_down", "rest", "rest_up", "death", "step_up_1000", "step_down_1000", "held_sink", "held_down", "death_down"],
+  "feet_up_ok": {
+   "death": "*",
+   "death_down": "*"
+  },
   "body_bones": ["hips", "chest"],
   "walks": {
    "walk": 9.722,

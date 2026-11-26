@@ -1382,6 +1382,10 @@ def _build_body_plan(model_name, raw_bones, meta, kind="male", verify_models=Non
     ]
     feet_free = [c for c in all_feet_free if have is None or c in have]
     tuck_ok = [c for c in all_tuck_ok if have is None or c in have]
+    # the feet a clip holds off the ground on purpose (clip_check's hanging-feet check flags every other still foot
+    # that does not reach the ground; review R12-2): the licked paw, the swiping paw, a cub's paws in a wrestle
+    all_feet_up = {"groom": ["r1"], "swipe": ["l1"], "swipe_quick": ["l1"], "play_wrestle": ["l1", "r1"]}
+    feet_up = {c: f for c, f in all_feet_up.items() if have is None or c in have}
     plan = {
         "model": model_name,
         "about": desc,
@@ -1407,6 +1411,7 @@ def _build_body_plan(model_name, raw_bones, meta, kind="male", verify_models=Non
             "feet_parts": ["paw"],
             "feet_free": feet_free,
             "tuck_ok": tuck_ok,
+            "feet_up_ok": feet_up,
             "body_bones": ["chest", "waist", "hips"],
             "carry": {
                 "bone": "carry",

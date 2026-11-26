@@ -69,6 +69,9 @@
   "checks": {
     "about": "What tools/clip_check.py needs (tools/body_plan.py explains every key): a male is drawn at 0.32 (a model pixel is 0.02 blocks); the hop and the leap are thrown by the game (docs/plans/prey-fish-and-frogs.md); the game does not read this section.",
     "px": 0.02,
+    "feet_up_ok": {
+      "death": "*"
+    },
     "controller": "savanna/src/main/java/com/antcolonies/savanna/animal/BullfrogEntity.java",
     "water": [
       "swim",

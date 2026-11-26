@@ -287,6 +287,14 @@ final class FilmWatch {
                 // an animal's move file (the Animal Maker Engine step B): read again from the copied file, both sides
                 com.antcolonies.entity.body.BlockMoves.reloadAll();
                 gecko = true;
+            } else if (parts.length > 2 && parts[2].equals("spots")) {
+                // an animal's spot table (tools/spots.py): the game keeps it for ever, no resource reload reads it again
+                com.antcolonies.entity.body.Spots.reloadAll();
+                gecko = true;
+            } else if (parts.length > 2 && parts[2].equals("body_plans")) {
+                // a body plan (its gaits and their change moments): the same
+                com.antcolonies.entity.body.BodyPlans.reloadAll();
+                gecko = true;
             } else {
                 full = true;
             }
