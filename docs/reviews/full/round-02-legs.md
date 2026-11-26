@@ -312,6 +312,8 @@ doorways and mouths, channels, where it stands now, hugging a column). Every lin
 
 **Status (2026-11-26, `claude/review-fix-2`): fixed in part, BUGS 399: no second search when no habit had a say in the first (test `askingAgainAfterNoWayCostsNoSearch`); with R2-1, R2-20 and R2-17. Measured in that test, a search that finds no way on open flat ground: 19.5 ms before, 13.3 ms with R2-17. No budget per tick was added (to see first whether it is still needed).**
 
+**Status (2026-11-26, `claude/review-a-left`): half fixed, grade B now: measured in the termite stress scene (`stressTermiteColony`). A search that finds no way is rare there (0 to 2 in a minute's window), but one alone costs 36 to 57 ms and makes its tick 50 to 64 ms: one slow tick now and then, no freeze a player sees. A limit on searches a tick would not help (the cost is one search, not many), so none was added. The cap cannot come down either: in the mound, raid, away and legs tests searches that did find a way took up to 5,948 of its 6,000 steps (routes of 78 to 123 cells; each new record now goes to the log, `[route] the longest search that found a way so far`). Open: the cost of one step, or one search spread over several ticks (a rework of the search); and since real walks come that near the cap, a longer walk than these may be refused as "no way" though there is one (not seen, to watch in the log).**
+
 - **Where:** `AntPathFinder.java` 73 to 74 (`DEFAULT_MAX_EXPANSIONS = 6000`, with the comment "an unreachable goal
   never costs much time"), 279 (the loop runs to the cap); `AntNavigator.plan` 627 to 632; `AbstractAntEntity.
   walkHabits` 2272 to 2280; `Doorway.avoidMouths` 25 to 30. Seen by three readers.
@@ -643,6 +645,8 @@ each pays its own search (a plugged hole is found again by every forager that wa
 ### R2-38 (A, the legs' side proven and checked again; two facts about Minecraft from memory; not run): an insect on a path block, on farmland or in a pond with a low bank can never plan a route again
 
 **Status (2026-11-26, `claude/review-fix-2`): small half fixed, BUGS 401: a start one step up beside it, corners too, and the shuffle no longer moves an insect onto ground the planner refuses (test `anInsectOnAPathBlockWalksOffIt`). The path half fixed after, BUGS 412 (R2-21). Open: an insect in a pond more than a block from its bank still has no start (BUGS 411).**
+
+**Status (2026-11-26, `claude/review-a-left`): fixed: an insect afloat with no walk paddles to the nearest water cell that has a way out beside it, and its next walk steps out onto the bank (`AntNavigator.paddle`; the start rule is one method now, `startsBeside`, asked by the walk's start and by the paddling); test `anInsectOutInAPondPaddlesToTheBankAndWalksOn`. My pick: termites paddle too (real termites float helpless), so none is stuck for good. BUGS 411 was not this: the raid's leader was told to a place in the ground (BUGS 415).**
 
 - **Where:** `AntNavigator.plan` 583 to 661, `currentFoothold` 2099 to 2148, `floorBeside` 2179; `AntPathFinder.
   landing` 345 to 360; `Foothold.isValid` 70 to 75; `LevelCellMap.isOpen` 39 to 56, `isSolidFace` 60 to 69. How it

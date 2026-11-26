@@ -51,6 +51,8 @@ public final class Perf {
     private static long failedSearches;
     private static long expansions;
     private static long longestSearchNanos;
+    /** The most search steps of a search that found a route, this window (how low the search's cap could go, review R2-16). */
+    private static int mostStepsFound;
     private static int ticks;
     private static String last = "No report yet: the stopwatch reports every 5 seconds.";
     /** Who is asking for the route search running now (insect kind and goals), set by the navigator; null = unknown. */
@@ -175,6 +177,8 @@ public final class Perf {
         expansions += steps;
         if (!found) {
             failedSearches++;
+        } else {
+            mostStepsFound = Math.max(mostStepsFound, steps);
         }
         longestSearchNanos = Math.max(longestSearchNanos, tookNanos);
     }
@@ -208,6 +212,7 @@ public final class Perf {
         searches = 0;
         failedSearches = 0;
         expansions = 0;
+        mostStepsFound = 0;
         longestSearchNanos = 0;
         askers.clear();
         brainParts.clear();
@@ -232,8 +237,8 @@ public final class Perf {
         if (insects > 0) {
             out.append(String.format("  per insect: %.3f ms\n", ms(ours - nanos.getOrDefault(Part.BRAIN, 0L) - nanos.getOrDefault(Part.TREES, 0L)) / ticks / insects));
         }
-        out.append(String.format("Route searches: %.1f a second, %d failed, %.0f steps each, longest %.1f ms",
-                searches / (ticks / 20.0), failedSearches, searches == 0 ? 0.0 : (double) expansions / searches, ms(longestSearchNanos)));
+        out.append(String.format("Route searches: %.1f a second, %d failed, %.0f steps each, longest %.1f ms, most steps of one that found a way %d",
+                searches / (ticks / 20.0), failedSearches, searches == 0 ? 0.0 : (double) expansions / searches, ms(longestSearchNanos), mostStepsFound));
         figures.put("Route searches a second", searches / (ticks / 20.0));
         figures.put("Route searches failed a second", failedSearches / (ticks / 20.0));
         reportKinds(out);
