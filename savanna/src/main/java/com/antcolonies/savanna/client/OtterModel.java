@@ -47,7 +47,7 @@ public class OtterModel extends DefaultedEntityGeoModel<OtterEntity> {
             return;
         }
         float yaw = Mth.rotLerp(pt, otter.yBodyRotO, otter.yBodyRot);
-        Vector3d shift = otter.rider().drawnShift(x, y, z, yaw, otter.rider().clipTicks(otter.bodyClips));
+        Vector3d shift = otter.rider().drawnShift(x, y, z, yaw, otter.rider().clipTicks(otter.bodyClips), pt);
         nudge(getAnimationProcessor().getBone("root"), shift);
         byte doing = otter.doing();
         // (rearing at a playmate it looks straight at it: its body faces it)
@@ -55,9 +55,9 @@ public class OtterModel extends DefaultedEntityGeoModel<OtterEntity> {
                 && doing != OtterEntity.PLAY_UP && doing != OtterEntity.PLAY && doing != OtterEntity.PLAY_DOWN
                 && doing != OtterEntity.GULP;
         double scale = OtterEntity.MODEL_SCALE * otter.getScale(), ahead = EYES_AHEAD * scale / 16.0;
-        otter.attention.aim(pt, x - Mth.sin(yaw * Mth.DEG_TO_RAD) * ahead, z + Mth.cos(yaw * Mth.DEG_TO_RAD) * ahead, yaw,
+        otter.attention.aim(otter, pt, x - Mth.sin(yaw * Mth.DEG_TO_RAD) * ahead, z + Mth.cos(yaw * Mth.DEG_TO_RAD) * ahead, yaw,
                 looks ? HEAD_TURN : 0.0);
-        if (looks && Math.abs(otter.attention.headAim) > 1.0E-3) {
+        if (Math.abs(otter.attention.headAim) > 1.0E-3) {     // eased out, never dropped (phase 2, step 5)
             turnY(getAnimationProcessor().getBone("neck"), otter.attention.headAim * 0.45);
             turnY(getAnimationProcessor().getBone("head"), otter.attention.headAim * 0.55);
         }

@@ -5,6 +5,7 @@ import javax.annotation.Nullable;
 import org.joml.Matrix4f;
 import org.joml.Vector3f;
 
+import com.antcolonies.entity.body.DrawClock;
 import com.antcolonies.savanna.SavannaMod;
 import com.antcolonies.savanna.animal.BullfrogEntity;
 import com.antcolonies.savanna.animal.FlyCloudEntity;
@@ -58,7 +59,7 @@ public class BullfrogRenderer extends GeoEntityRenderer<BullfrogEntity> {
             @Override
             public void setCustomAnimations(BullfrogEntity frog, long instanceId, AnimationState<BullfrogEntity> state) {
                 super.setCustomAnimations(frog, instanceId, state);
-                headOnFly(frog, getAnimationProcessor().getBone("head"));
+                headOnFly(frog, getAnimationProcessor().getBone("head"), state.getPartialTick());
             }
         });
         addRenderLayer(new com.antcolonies.client.MudCoatLayer<>(this));      // mud on its body (savanna mud step 4)
@@ -154,9 +155,9 @@ public class BullfrogRenderer extends GeoEntityRenderer<BullfrogEntity> {
     }
 
     /** The head tipped up toward the fly its eyes are on (eased; only over clips that set the head themselves). */
-    private static void headOnFly(BullfrogEntity frog, @Nullable GeoBone head) {
-        long now = System.nanoTime();
-        float dt = frog.clientHeadTime == 0 ? 0 : Math.min(0.1F, (now - frog.clientHeadTime) / 1.0E9F);
+    private static void headOnFly(BullfrogEntity frog, @Nullable GeoBone head, float pt) {
+        long now = DrawClock.nanos(frog, pt);   // game time (the Motion Studio, phase 2, step 4)
+        float dt = frog.clientHeadTime == 0 ? 0 : Mth.clamp((now - frog.clientHeadTime) / 1.0E9F, 0.0F, 0.1F);
         frog.clientHeadTime = now;
         byte a = frog.action();
         FlySwarm.Fly f = fly(frog);

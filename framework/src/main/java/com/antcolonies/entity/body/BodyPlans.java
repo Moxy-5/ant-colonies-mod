@@ -38,7 +38,8 @@ public final class BodyPlans {
      * One model's plan: role to bone, the head player's bones, the spine (the pieces of the body behind the thorax, front
      * to back) and how the body climbs.
      */
-    public record Plan(String model, Map<String, String> bones, Set<String> headPlayer, List<Piece> spine, Climb climb) {
+    public record Plan(String model, Map<String, String> bones, Set<String> headPlayer, List<Piece> spine, Climb climb,
+                       @Nullable Gaits gaits) {
         /** The model's bone for a role (the role itself if the plan does not name it). */
         public String bone(String role) {
             return bones.getOrDefault(role, role);
@@ -137,6 +138,15 @@ public final class BodyPlans {
         return PLANS.get(model);
     }
 
+    /** A model's gaits from its plan; the plan must have them (an animal asks only for its own). */
+    public static Gaits gaitsOf(String model) {
+        Plan plan = PLANS.get(model);
+        if (plan == null || plan.gaits() == null) {
+            throw new IllegalStateException("no gaits in the body plan of '" + model + "'");
+        }
+        return plan.gaits();
+    }
+
     /** The plan of a geo model by its file (geo/entity/worker_ant.geo.json), or null if it has none. */
     @Nullable
     public static Plan ofGeo(ResourceLocation geo) {
@@ -217,7 +227,8 @@ public final class BodyPlans {
                     c.get("tightest_curve").getAsDouble(), c.has("lift") ? c.get("lift").getAsDouble() : Double.NaN,
                     c.has("into_wall") ? c.get("into_wall").getAsDouble() : Double.NaN);
         }
-        return new Plan(model, Collections.unmodifiableMap(bones), Collections.unmodifiableSet(head), List.copyOf(spine), climb);
+        return new Plan(model, Collections.unmodifiableMap(bones), Collections.unmodifiableSet(head), List.copyOf(spine), climb,
+                Gaits.read(json));
     }
 
     @Nullable

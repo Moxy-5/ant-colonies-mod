@@ -1,6 +1,7 @@
 package com.antcolonies.savanna.client;
 
 import com.antcolonies.entity.body.BlockMoves;
+import com.antcolonies.entity.body.DrawClock;
 import com.antcolonies.savanna.SavannaMod;
 import com.antcolonies.savanna.animal.HippoEntity;
 
@@ -50,7 +51,7 @@ public class HippoModel extends DefaultedEntityGeoModel<HippoEntity> {
         }
         float yaw = Mth.rotLerp(pt, hippo.yBodyRotO, hippo.yBodyRot);
         double scale = HippoEntity.MODEL_SCALE * hippo.getScale();
-        place(hippo, climb, scale, x, y, z, yaw);
+        place(hippo, climb, scale, x, y, z, yaw, pt);
         eyes(hippo, climb == null, scale, pt, x, z, yaw);
     }
 
@@ -62,7 +63,8 @@ public class HippoModel extends DefaultedEntityGeoModel<HippoEntity> {
      */
     private void eyes(HippoEntity hippo, boolean turnHead, double scale, float pt, double x, double z, float yaw) {
         double ahead = EYES_AHEAD * scale / 16.0;
-        hippo.attention.aim(pt, x - Mth.sin(yaw * Mth.DEG_TO_RAD) * ahead, z + Mth.cos(yaw * Mth.DEG_TO_RAD) * ahead, yaw, HEAD_TURN);
+        hippo.attention.aim(hippo, pt, x - Mth.sin(yaw * Mth.DEG_TO_RAD) * ahead, z + Mth.cos(yaw * Mth.DEG_TO_RAD) * ahead, yaw,
+                turnHead ? HEAD_TURN : 0.0);           // on a block move the head eases straight
         double back = PUPIL_SLIDE * (1.0 - Math.cos(Math.toRadians(hippo.attention.eyeAim))) / 2.0;
         for (String name : new String[] {"pupil_left", "pupil_right"}) {
             GeoBone pupil = getAnimationProcessor().getBone(name);
@@ -75,7 +77,7 @@ public class HippoModel extends DefaultedEntityGeoModel<HippoEntity> {
             }
         }
         GeoBone neck = getAnimationProcessor().getBone("neck");
-        if (turnHead && neck != null && Math.abs(hippo.attention.headAim) > 1.0E-3) {
+        if (neck != null && Math.abs(hippo.attention.headAim) > 1.0E-3) {     // eased out, never dropped (phase 2, step 5)
             boolean marked = neck.hasRotationChanged() || neck.hasPositionChanged() || neck.hasScaleChanged();
             neck.setRotY(neck.getRotY() - (float) Math.toRadians(hippo.attention.headAim));
             if (!marked) {
@@ -85,7 +87,7 @@ public class HippoModel extends DefaultedEntityGeoModel<HippoEntity> {
     }
 
     /** Where it is drawn: at its box, or on a move, on the move's path, sliding from one to the other ({@link #HAND_OVER}). */
-    private void place(HippoEntity hippo, BlockMoves.Play climb, double scale, double x, double y, double z, float yaw) {
+    private void place(HippoEntity hippo, BlockMoves.Play climb, double scale, double x, double y, double z, float yaw, float pt) {
         double wx = x, wy = y, wz = z;
         if (climb != null) {
             Vec3 at = HippoEntity.MOVES.drawnAt(climb, Math.max(0.0, hippo.climbClipTicks()), scale / 16.0);
@@ -93,7 +95,7 @@ public class HippoModel extends DefaultedEntityGeoModel<HippoEntity> {
             wy = at.y;
             wz = at.z;
         }
-        long now = System.nanoTime();
+        long now = DrawClock.nanos(hippo, pt);
         boolean climbing = climb != null;
         if (hippo.drawnNanos == 0) {
             hippo.shiftX = hippo.shiftY = hippo.shiftZ = 0;

@@ -73,6 +73,47 @@ class BodyPlansTest {
         assertEquals(0.27, major.climb().intoWallFor(0.45F, 0.75F), 1e-9);
     }
 
+    /**
+     * The gait table (the Motion Studio, phase 2, step 2, 2026-11-25): the lion's and buffalo's gaits come from their plans
+     * with the very numbers the game kept in Java before (each clip's speed, where the trot and the gallop or charge start,
+     * the play-speed limits), so moving them changed nothing in play; the lioness's and cub's stalk speeds are the plans'
+     * measured ones (the Java copies were 0.70 and 0.53 blocks a second).
+     */
+    @Test
+    void theLionsAndBuffalosGaitsAreTheOnesTheGameUsedBefore() {
+        double tick = 1.0 / 20.0;
+        // model: walk, trot, gallop clip speeds (blocks a second at size 1), as LionEntity.Measures had them
+        Object[][] lions = {{"lion", 1.228, 2.860, 6.105}, {"lioness", 1.201, 2.828, 5.938}, {"lion_cub", 0.909, 2.022, 3.464}};
+        for (Object[] row : lions) {
+            Gaits g = BodyPlans.gaitsOf((String) row[0]);
+            double walk = (double) row[1] * tick, trot = (double) row[2] * tick, gallop = (double) row[3] * tick;
+            assertEquals(walk, g.of("walk").madeFor(), 0.002 * tick, row[0] + " walk");
+            assertEquals(trot, g.of("trot").madeFor(), 0.002 * tick, row[0] + " trot");
+            assertEquals(gallop, g.of("gallop").madeFor(), 0.002 * tick, row[0] + " gallop");
+            assertEquals(walk * 1.6, g.of("trot").from(), 0.004 * tick, row[0] + ": the trot from 1.6 x the walk");
+            assertEquals(trot * 1.45, g.of("gallop").from(), 0.004 * tick, row[0] + ": the gallop from 1.45 x the trot");
+            assertEquals("walk", g.pick(walk).clip());
+            assertEquals("trot", g.pick(walk * 1.7).clip());
+            assertEquals("gallop", g.pick(trot * 1.5).clip());
+            assertEquals(0.4, g.of("walk").rate(0.0), 1e-9);
+            assertEquals(2.0, g.of("walk").rate(walk * 3), 1e-9);
+            assertEquals(1.8, g.of("trot").rate(trot * 3), 1e-9);
+            assertEquals(0.6, g.of("gallop").rate(0.0), 1e-9);
+            assertEquals(1.0, g.of("stalk").rate(g.of("stalk").madeFor()), 1e-9);
+            assertEquals(3, g.order().size(), row[0] + ": walk, trot, gallop picked by speed; the stalk only by name");
+        }
+        Gaits buffalo = BodyPlans.gaitsOf("buffalo");
+        assertEquals(0.6076 * tick, buffalo.of("walk").madeFor(), 0.001 * tick);
+        assertEquals(1.389 * tick, buffalo.of("trot").madeFor(), 0.001 * tick);
+        assertEquals(2.447 * tick, buffalo.of("charge").madeFor(), 0.001 * tick);
+        assertEquals(1.25 * tick, buffalo.of("trot").from(), 1e-9);
+        assertEquals(2.6 * tick, buffalo.of("charge").from(), 1e-9);
+        assertEquals(0.7, buffalo.of("trot").rate(0.0), 1e-9);
+        assertEquals(2.5, buffalo.of("charge").rate(1.0), 1e-9);
+        assertEquals("charge", buffalo.pick(2.7 * tick).clip());
+        assertEquals(buffalo.of("walk").loop(), buffalo.of("walk").loop(), "a gait's loop is the same loop every time");
+    }
+
     private static List<String> geoBones(String model) throws Exception {
         try (InputStream in = BodyPlansTest.class.getResourceAsStream("/assets/antcolonies/geo/entity/" + model + ".geo.json")) {
             assertNotNull(in, "no " + model + ".geo.json");

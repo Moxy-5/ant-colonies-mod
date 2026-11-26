@@ -799,8 +799,8 @@ public final class BuffaloGoals {
                 if (d == BuffaloEntity.GRAZE) {
                     b.setDoing(BuffaloEntity.CALM);
                 }
-                double pace = mom.stride() > BuffaloEntity.CHARGE_FROM ? BuffaloEntity.CHARGE
-                        : dist > 3.0 || mom.stride() > BuffaloEntity.TROT_FROM ? BuffaloEntity.TROT : BuffaloEntity.TRAVEL;
+                double pace = mom.stride() > mom.gaits.of("charge").from() ? BuffaloEntity.CHARGE
+                        : dist > 3.0 || mom.stride() > mom.gaits.of("trot").from() ? BuffaloEntity.TROT : BuffaloEntity.TRAVEL;
                 if (dist > CALF_ROUTE) {
                     if (--repath <= 0) {
                         repath = 20;
@@ -1303,7 +1303,7 @@ public final class BuffaloGoals {
                 return;
             }
             double s = b.stride();
-            if (s >= BuffaloEntity.CHARGE_FROM * b.getScale() && headGap() <= s * RUN_UP) {
+            if (s >= b.gaits.of("charge").from() * b.getScale() && headGap() <= s * RUN_UP) {
                 b.setDoing(BuffaloEntity.CHARGE_HEADBUTT);    // its pace times 1.2 s ahead: the run-up butt, running on into it
             }
             chase(BuffaloEntity.CHARGE);

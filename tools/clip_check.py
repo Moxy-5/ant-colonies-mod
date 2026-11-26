@@ -18,6 +18,13 @@ the game draws it, then in the game frame by frame.
   --switches   also (or, with no clip named, only) checks the clip changes the plan lists, GeckoLib's blend between
                them played as the game plays it (the blend length read from the animal's Java code), and draws each
                blend as a strip (sw_<from>_<to>.png) with --times.
+  --gait-changes [--write]  (the Motion Studio, phase 2, step 3, 2026-11-25) for each change between two of the plan's
+               gaits (its "gaits.order"), the moment of the old clip whose pose is nearest the new clip's first frame (the
+               farthest any box corner is from its place in the other, model px), against the worst moment; --write
+               puts the moments into the plan ("gaits.<old>.change.<new>", seconds of the old clip), where the game
+               reads them: it changes gait only as the old clip passes that moment, as a real animal changes gait at
+               a set point of its stride (GeckoLib always blends into a clip's first frame). Never written by hand.
+               With --switches, a gait change is then judged at its moment.
   --hold <prey>:<clip>  (2026-11-22) the clips with a catch in the animal's jaws, as the game draws it (the animal's
                plan's "carry", the prey's "held", the same numbers the game reads in savanna animal/HeldCatch): the
                prey posed by its own clip, gripped at the carry bone, the jaw opened round it. --caught a,b,...: the
@@ -723,12 +730,16 @@ def switch_poses(animal, a, b, ticks, phase=None):
 
 def check_switch(animal, a, b, ticks):
     """One clip change: how far apart the two clips' poses are, and how hard the blend jumps against the clips' own
-    moves. Returns (lines, worst jump, worst turn)."""
+    moves (a loop left at the worst of four moments; a gait change at its moment from the plan, the one the game
+    changes at). Returns (lines, worst jump, worst turn)."""
     model = animal.model
     lines = []
     phases = [None]
     ca_loop = animal.data[a].get('loop') in (True, 'loop', 'true')
-    if ca_loop:
+    moment = gait_change_at(animal, a, b)
+    if moment is not None:
+        phases = [moment]
+    elif ca_loop:
         L = float(animal.data[a].get('animation_length', 1.0))
         phases = [L * i / 4 for i in range(4)]
     worst = None
@@ -759,12 +770,68 @@ def check_switch(animal, a, b, ticks):
             worst = (ph, blend_jump, own, turn, gap)
     ph, (jump, jb, jt), own, (turn, tb), gap = worst
     flag = jump > max(2.0 * own, 3.0) or turn > 90
-    when = f' (left at {ph:.2f} s of the loop)' if ph is not None else ''
+    when = (f' (at its gait change moment, {ph:.2f} s)' if moment is not None
+            else f' (left at {ph:.2f} s of the loop)' if ph is not None else '')
     big = [f'{bn} {d:.0f}' for d, bn in gap if d > 0.5][:6]
     lines.append(f'  {a} -> {b}{when}: angles apart ' + (', '.join(big) if big else 'the same')
                  + f'; blend jump {jump:.1f} px ({jb}, tick {jt}) against {own:.1f} in the clips; fastest turn {turn:.0f} deg a tick ({tb})'
                  + ('  FLAGGED' if flag else ''))
     return lines, flag
+
+
+# --- gait changes on the matching footfall (the Motion Studio, phase 2, step 3) ----------------------------------------
+def gait_change_at(animal, a, b):
+    """The plan's moment (seconds of clip a) the game changes from gait a to gait b at, or None."""
+    return animal.plan_data.get('gaits', {}).get(a, {}).get('change', {}).get(b)
+
+
+def gait_pairs(animal):
+    order = animal.plan_data.get('gaits', {}).get('order', [])
+    return [(a, b) for a in order for b in order if a != b]
+
+
+def pose_gap(animal, pa, pb):
+    """How far apart two poses are: the farthest any box corner is from its place in the other (model px)."""
+    a = {bn: cs for bn, cs, _ in animal.model.posed(pa)}
+    b = {bn: cs for bn, cs, _ in animal.model.posed(pb)}
+    return max((max(math.dist(p, q) for p, q in zip(cs, b[bn])) for bn, cs in a.items() if bn in b), default=0.0)
+
+
+def gait_moment(animal, a, b, step=0.01):
+    """The moment of loop a (seconds, to the hundredth) whose pose is nearest clip b's first frame; the gap there and
+    the worst moment's gap (model px)."""
+    plan = animal.model.plan
+    ca = lab.Clip(a, plan.clip_to_roles(animal.data[a]) if plan else animal.data[a])
+    cb = lab.Clip(b, plan.clip_to_roles(animal.data[b]) if plan else animal.data[b])
+    ca.path = cb.path = None
+    goal = cb.pose(0.0)
+    n = max(1, round(ca.length / step))
+    gaps = [(pose_gap(animal, ca.pose(round(ca.length * i / n, 2)), goal), round(ca.length * i / n, 2)) for i in range(n)]
+    best, worst = min(gaps), max(gaps)
+    return best[1], best[0], worst[0]
+
+
+def gait_changes(animal, write):
+    """Finds each gait change's moment; with write, puts them into the plan (the game reads them there)."""
+    todo = gait_pairs(animal)
+    if not todo:
+        print('  the plan has no gaits ("gaits.order")')
+        return 0
+    print(f'== gait changes ({len(todo)}): the moment of the old clip nearest the new clip\'s first frame')
+    found = {}
+    for a, b in todo:
+        at, gap, worst = gait_moment(animal, a, b)
+        old = gait_change_at(animal, a, b)
+        found[(a, b)] = at
+        print(f'  {a} -> {b}: at {at:.2f} s of {a}, poses {gap:.1f} px apart (the worst moment {worst:.1f})'
+              + (f'; the plan has {old:.2f}' if old is not None and abs(old - at) > 1e-9 else ''))
+    if write:
+        def put(data):
+            for (a, b), at in found.items():
+                data['gaits'][a].setdefault('change', {})[b] = at
+        animal.plan_data = body_plan.rewrite_plan(animal.name, put)
+        print(f'  wrote them into {os.path.relpath(body_plan.plan_path(animal.name), PROJECT)}')
+    return 0
 
 
 def pairs(animal, names):
@@ -1038,6 +1105,7 @@ def main(argv):
         return 1
     animal_name, args = argv[0], argv[1:]
     times, views, model, out_dir, names, switches = None, ('side', 'three', 'front'), None, None, [], False
+    changes, write = False, False
     hold, angles = None, [90.0, 25.0, 155.0]
     i = 0
     while i < len(args):
@@ -1057,6 +1125,12 @@ def main(argv):
         elif a == '--switches':
             switches = True
             i += 1
+        elif a == '--gait-changes':
+            changes = True
+            i += 1
+        elif a == '--write':
+            write = True
+            i += 1
         elif a == '--hold':
             hold = args[i + 1]
             i += 2
@@ -1069,6 +1143,11 @@ def main(argv):
     animal = Animal(animal_name, model)
     out_dir = out_dir or os.path.join(PROJECT, 'references', 'anim_lab', animal_name)
     every = list(animal.data)
+    if changes:
+        print(f'{animal_name}, clips of {animal.anim_stem}')
+        gait_changes(animal, write)
+        if not switches:
+            return 0
     chosen = [n for n in every if any(fnmatch.fnmatch(n, p) for p in names)] if names else ([] if switches else every)
     if names and not chosen:
         print(f'no clip of {animal.anim_stem} matches {" ".join(names)}')
@@ -1100,6 +1179,7 @@ def main(argv):
     if switches:
         ticks, source = animal.blend_ticks()
         todo = pairs(animal, every)
+        todo += [ab for ab in gait_pairs(animal) if ab not in todo]      # every gait change is one the game makes
         if names:
             todo = [(a, b) for a, b in todo if a in chosen or b in chosen]
         print(f'== clip changes (GeckoLib\'s blend: {ticks} ticks, from {source}; {len(todo)} changes)')

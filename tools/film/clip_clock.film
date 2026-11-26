@@ -1,0 +1,25 @@
+# How fast a clip plays against the game's ticks, running and frozen-stepped (the Motion Studio, phase 2, 2026-11-25):
+# the same trotting lioness recorded first with the game running (several moments a tick), then frozen and stepped a
+# tick a picture as every frame film does. Each moment's clip time (play.body[1]) against its tick shows whether the
+# clip moves its play speed in clip ticks a game tick in both.
+#   ./gradlew runFilm -PfilmScene=tools/film/clip_clock.film     then read run-film/screenshots/clip_clock/body.jsonl.gz
+scene clip_clock
+cmd time set noon
+cmd weather clear
+lens 50
+cmd fill -30 -61 -7 30 -50 7 minecraft:air
+cmd fill -30 -63 -7 30 -63 7 minecraft:dirt
+cmd fill -30 -62 -7 30 -62 7 minecraft:grass_block
+wait 20
+walker antcolonies:lioness -20.5 -61 0.5 -90
+aim film-walker
+cam side 0 1.2 -7
+go 16 -61 0 1.27
+record on 6 all
+cmd tick unfreeze
+wait 40
+cmd tick freeze
+burst stepped 20 1
+record off
+cam off
+cmd tick unfreeze

@@ -363,6 +363,13 @@ public final class FilmDirector {
                 return;
             }
             waitTicks = 0;
+            // the pictures from the next tick: Minecraft's drawing learns the game stands still a frame late, so the first
+            // frame after a step still draws the animals as stepping, at the tick's start; every camera of a take then
+            // shot the next frame, at its end (BUGS 381). Ants and termites are drawn at the camera's own time, which
+            // until the next picture is that picture's (in a burst of several frames a tick, its first: left at the last
+            // frame's, their clips ran a tick ahead and never came back)
+            drawPartial = (float) burstSub / framesPerTick;
+            return;
         }
         if (burstLeft > 0) {
             drawPartial = (float) burstSub / framesPerTick;

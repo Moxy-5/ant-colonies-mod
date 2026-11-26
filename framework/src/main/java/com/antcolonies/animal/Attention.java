@@ -2,6 +2,8 @@ package com.antcolonies.animal;
 
 import javax.annotation.Nullable;
 
+import com.antcolonies.entity.body.DrawClock;
+
 import net.minecraft.util.Mth;
 import net.minecraft.util.RandomSource;
 import net.minecraft.world.entity.Entity;
@@ -111,13 +113,13 @@ public final class Attention {
      * are in the world, yaw its body's turn): the eyes dart there, the head follows slowly, turning at most headTurn
      * degrees and only toward what is in front or to the side. Call once a frame from the model.
      */
-    public void aim(float partialTick, double eyeX, double eyeZ, float yaw, double headTurn) {
+    public void aim(Entity self, float partialTick, double eyeX, double eyeZ, float yaw, double headTurn) {
         double rel = glance;
         if (on != null) {
             double tx = Mth.lerp(partialTick, on.xo, on.getX()), tz = Mth.lerp(partialTick, on.zo, on.getZ());
             rel = Mth.wrapDegrees(Math.toDegrees(Math.atan2(tz - eyeZ, tx - eyeX)) - 90.0 - yaw);
         }
-        long now = System.nanoTime();
+        long now = DrawClock.nanos(self, partialTick);         // game time (the Motion Studio, phase 2, step 4)
         double dt = nanos == 0 ? 1.0 : (now - nanos) / 1.0E9;
         nanos = now;
         double eyeK = dt <= 0 ? 0 : dt > 0.5 ? 1.0 : 1.0 - Math.exp(-dt / EYE_EASE);

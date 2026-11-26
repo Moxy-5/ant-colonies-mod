@@ -51,7 +51,7 @@ public class BuffaloModel extends DefaultedEntityGeoModel<BuffaloEntity> {
         double z = Mth.lerp(pt, buffalo.zo, buffalo.getZ());
         float yaw = Mth.rotLerp(pt, buffalo.yBodyRotO, buffalo.yBodyRot);
         double scale = BuffaloEntity.MODEL_SCALE * buffalo.getScale();
-        TILT.place(buffalo, buffalo.drawn, getAnimationProcessor().getBone("root"), scale, x, y, z, yaw);
+        TILT.place(buffalo, buffalo.drawn, getAnimationProcessor().getBone("root"), scale, x, y, z, yaw, pt);
         eyes(buffalo, scale, pt, x, z, yaw);
     }
 
@@ -65,7 +65,7 @@ public class BuffaloModel extends DefaultedEntityGeoModel<BuffaloEntity> {
         boolean turnHead = buffalo.isAlive() && d != BuffaloEntity.HEADBUTT && d != BuffaloEntity.GORE && d != BuffaloEntity.CHARGE_HEADBUTT
                 && d != BuffaloEntity.REST_DOWN && d != BuffaloEntity.REST_UP;
         double ahead = EYES_AHEAD * scale / 16.0;
-        buffalo.attention.aim(pt, x - Mth.sin(yaw * Mth.DEG_TO_RAD) * ahead, z + Mth.cos(yaw * Mth.DEG_TO_RAD) * ahead, yaw,
+        buffalo.attention.aim(buffalo, pt, x - Mth.sin(yaw * Mth.DEG_TO_RAD) * ahead, z + Mth.cos(yaw * Mth.DEG_TO_RAD) * ahead, yaw,
                 turnHead ? HEAD_TURN : 0.0);
         if (!buffalo.isAlive()) {
             return;
@@ -76,7 +76,7 @@ public class BuffaloModel extends DefaultedEntityGeoModel<BuffaloEntity> {
         slide(getAnimationProcessor().getBone("pupil_left"), PUPIL_SLIDE * Mth.clamp(-aim / 90.0, 0.0, 1.0), cos, sin, 1);
         slide(getAnimationProcessor().getBone("pupil_right"), PUPIL_SLIDE * Mth.clamp(aim / 90.0, 0.0, 1.0), cos, sin, -1);
         GeoBone neck = getAnimationProcessor().getBone("neck");
-        if (turnHead && neck != null && Math.abs(buffalo.attention.headAim) > 1.0E-3) {
+        if (neck != null && Math.abs(buffalo.attention.headAim) > 1.0E-3) {     // eased out, never dropped (phase 2, step 5)
             boolean marked = neck.hasRotationChanged() || neck.hasPositionChanged() || neck.hasScaleChanged();
             neck.setRotY(neck.getRotY() - (float) Math.toRadians(buffalo.attention.headAim));
             if (!marked) {

@@ -1,5 +1,6 @@
 package com.antcolonies.savanna.client;
 
+import com.antcolonies.entity.body.DrawClock;
 import com.antcolonies.savanna.SavannaMod;
 import com.antcolonies.savanna.animal.LionEntity;
 
@@ -57,11 +58,7 @@ public class LionModel extends DefaultedEntityGeoModel<LionEntity> {
 
     @Override
     public ResourceLocation getAnimationResource(LionEntity lion) {
-        return file("animations/entity/" + switch (lion.form()) {
-            case MALE -> "lion";
-            case LIONESS -> "lioness";
-            case CUB -> "lion_cub";
-        } + ".animation.json");
+        return file("animations/entity/" + lion.form().clips + ".animation.json");
     }
 
     @Override
@@ -73,7 +70,7 @@ public class LionModel extends DefaultedEntityGeoModel<LionEntity> {
         float yaw = Mth.rotLerp(pt, lion.yBodyRotO, lion.yBodyRot);
         double scale = lion.getScale();
         LionEntity.Measures m = lion.measures;
-        new StandTilt(m.feetPx(), m.feetPx(), m.feetOutPx(), m.drawAheadPx(), 30.0).place(lion, lion.drawn, getAnimationProcessor().getBone("root"), scale, x, y, z, yaw);
+        new StandTilt(m.feetPx(), m.feetPx(), m.feetOutPx(), m.drawAheadPx(), 30.0).place(lion, lion.drawn, getAnimationProcessor().getBone("root"), scale, x, y, z, yaw, pt);
         head(lion, scale, pt, x, z, yaw);
     }
 
@@ -81,15 +78,15 @@ public class LionModel extends DefaultedEntityGeoModel<LionEntity> {
     private void head(LionEntity lion, double scale, float pt, double x, double z, float yaw) {
         boolean turns = lion.faceShows();
         double ahead = lion.measures.eyesAheadPx() * scale / 16.0;
-        lion.attention.aim(pt, x - Mth.sin(yaw * Mth.DEG_TO_RAD) * ahead, z + Mth.cos(yaw * Mth.DEG_TO_RAD) * ahead, yaw,
+        lion.attention.aim(lion, pt, x - Mth.sin(yaw * Mth.DEG_TO_RAD) * ahead, z + Mth.cos(yaw * Mth.DEG_TO_RAD) * ahead, yaw,
                 turns ? HEAD_TURN : 0.0);
         if (!lion.isAlive()) {
             return;
         }
         // the neck's lift: lying still and watching a player
         double want = lion.doing() == LionEntity.REST && lion.attention.on() instanceof Player ? NECK_LIFT : 0.0;
-        long now = System.nanoTime();
-        double dt = lion.neckNanos == 0 ? 1.0 : Math.min(0.5, (now - lion.neckNanos) / 1.0E9);
+        long now = DrawClock.nanos(lion, pt);
+        double dt = lion.neckNanos == 0 ? 1.0 : Mth.clamp((now - lion.neckNanos) / 1.0E9, 0.0, 0.5);
         lion.neckNanos = now;
         double k = 1.0 - Math.exp(-dt / LIFT_EASE);
         lion.drawnNeckLift += (want - lion.drawnNeckLift) * k;
@@ -99,7 +96,7 @@ public class LionModel extends DefaultedEntityGeoModel<LionEntity> {
         }
         boolean marked = neck.hasRotationChanged() || neck.hasPositionChanged() || neck.hasScaleChanged();
         boolean changed = false;
-        if (turns && Math.abs(lion.attention.headAim) > 1.0E-3) {
+        if (Math.abs(lion.attention.headAim) > 1.0E-3) {     // eased out after its loops, never dropped (phase 2, step 5)
             neck.setRotY(neck.getRotY() - (float) Math.toRadians(lion.attention.headAim));
             changed = true;
         }

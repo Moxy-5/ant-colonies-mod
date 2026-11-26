@@ -17,6 +17,8 @@ import software.bernie.geckolib.renderer.GeoEntityRenderer;
 public class RemainsRenderer extends GeoEntityRenderer<RemainsEntity> {
     private static final ResourceLocation ANIMATIONS = ResourceLocation.fromNamespaceAndPath(SavannaMod.MODID, "animations/entity/remains.animation.json");
     private static final ResourceLocation CARCASS_POSE = ResourceLocation.fromNamespaceAndPath(SavannaMod.MODID, "animations/entity/buffalo_carcass.animation.json");
+    /** The living buffalo's model, which a carcass is drawn on. */
+    private static final ResourceLocation BUFFALO_GEO = ResourceLocation.fromNamespaceAndPath(SavannaMod.MODID, "geo/entity/buffalo.geo.json");
     private static final ResourceLocation[][] MODELS = new ResourceLocation[RemainsEntity.Kind.values().length][4];
     private static final ResourceLocation[][] TEXTURES = new ResourceLocation[RemainsEntity.Kind.values().length][4];
     /** A tilapia's remains in the young fish's and the breeding male's colours (by kind, look word, stage); the everyday fish wears {@link #TEXTURES}. */
@@ -27,7 +29,7 @@ public class RemainsRenderer extends GeoEntityRenderer<RemainsEntity> {
             for (int stage = 1; stage <= 4; stage++) {
                 if (kind == RemainsEntity.Kind.BUFFALO) {
                     // a carcass: the buffalo's own model and coat in its death pose (lion step 2; bones later, Neon)
-                    MODELS[kind.ordinal()][stage - 1] = ResourceLocation.fromNamespaceAndPath(SavannaMod.MODID, "geo/entity/buffalo.geo.json");
+                    MODELS[kind.ordinal()][stage - 1] = BUFFALO_GEO;
                     TEXTURES[kind.ordinal()][stage - 1] = ResourceLocation.fromNamespaceAndPath(SavannaMod.MODID, "textures/entity/buffalo.png");
                     continue;
                 }
@@ -42,6 +44,15 @@ public class RemainsRenderer extends GeoEntityRenderer<RemainsEntity> {
 
     public RemainsRenderer(EntityRendererProvider.Context context) {
         super(context, new GeoModel<>() {
+            /** The carcass draws on bones of its own, not the living buffalo's (BUGS 383: a still frame drew the bull as the carcass). */
+            private final com.antcolonies.entity.body.OwnBones bones = new com.antcolonies.entity.body.OwnBones(BUFFALO_GEO);
+
+            @Override
+            public software.bernie.geckolib.cache.object.BakedGeoModel getBakedModel(ResourceLocation location) {
+                var model = bones.model(location, getAnimationProcessor());
+                return model != null ? model : super.getBakedModel(location);
+            }
+
             @Override
             public ResourceLocation getModelResource(RemainsEntity remains) {
                 return MODELS[remains.kind().ordinal()][remains.stage() - 1];

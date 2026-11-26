@@ -9,6 +9,9 @@ import com.antcolonies.animal.AnimalLife;
 import com.antcolonies.animal.Attention;
 import com.antcolonies.animal.HasLife;
 import com.antcolonies.animal.HitChain;
+import com.antcolonies.entity.body.BodyPlans;
+import com.antcolonies.entity.body.GaitShift;
+import com.antcolonies.entity.body.Gaits;
 import com.antcolonies.entity.body.SteadyController;
 import com.antcolonies.savanna.registry.SavannaEntities;
 
@@ -70,7 +73,14 @@ import software.bernie.geckolib.util.GeckoLibUtil;
 public class LionEntity extends PathfinderMob implements GeoEntity, HasLife, com.antcolonies.debug.FilmFacts {
     /** The male, the lioness and the cub: one class, three entity types. */
     public enum Form {
-        MALE, LIONESS, CUB
+        MALE("lion"), LIONESS("lioness"), CUB("lion_cub");
+
+        /** The name of its clips and its body plan (both males, the Kalahari's own model too, play the lion's clips). */
+        public final String clips;
+
+        Form(String clips) {
+            this.clips = clips;
+        }
     }
 
     /** What it is doing, for the clips (synced). One-shots end by themselves ({@link #tick}); the loops last until a goal ends them. */
@@ -127,19 +137,25 @@ public class LionEntity extends PathfinderMob implements GeoEntity, HasLife, com
     /**
      * The model's measures for its form (model px, 16 a block, at size 1; measured from Neon's geo): drawn this far toward
      * its head (negative: toward its tail) so the middle between its feet sits on its box's middle; its front and hind feet
-     * from that middle and how far out; its eyes ahead of the middle; the front of its head bead (blocks); the walk, trot
-     * and gallop clips' own speeds (blocks a tick, from its body plan's "walks").
+     * from that middle and how far out; its eyes ahead of the middle; the front of its head bead (blocks).
      */
     public final Measures measures = Measures.of(form);
+    /**
+     * Its gaits (walk, trot, gallop, and the stalk by name): each clip's own speed, where each starts and its play-speed
+     * limits, from its body plan (the Motion Studio, phase 2, step 2; before, copies here, the lioness's and cub's stalk
+     * a little off).
+     */
+    public final Gaits gaits = BodyPlans.gaitsOf(form.clips);
+    /** The gait drawn (client): a change waits for the stride's matching moment. */
+    private final GaitShift gaitShift = new GaitShift();
 
     /** The model's measures for one form. */
-    public record Measures(double drawAheadPx, double feetPx, double feetOutPx, double eyesAheadPx, double headFront, double walkClip,
-                           double trotClip, double gallopClip, double stalkClip) {
+    public record Measures(double drawAheadPx, double feetPx, double feetOutPx, double eyesAheadPx, double headFront) {
         static Measures of(Form form) {
             return switch (form) {
-                case MALE -> new Measures(-3.2, 13.4, 5.5, 30.2, 2.15, 1.228 / 20.0, 2.860 / 20.0, 6.105 / 20.0, 0.74 / 20.0);
-                case LIONESS -> new Measures(-2.85, 11.85, 4.3, 26.9, 1.9, 1.201 / 20.0, 2.828 / 20.0, 5.938 / 20.0, 0.70 / 20.0);
-                case CUB -> new Measures(-0.85, 5.55, 3.15, 14.1, 1.02, 0.909 / 20.0, 2.022 / 20.0, 3.464 / 20.0, 0.53 / 20.0);
+                case MALE -> new Measures(-3.2, 13.4, 5.5, 30.2, 2.15);
+                case LIONESS -> new Measures(-2.85, 11.85, 4.3, 26.9, 1.9);
+                case CUB -> new Measures(-0.85, 5.55, 3.15, 14.1, 1.02);
             };
         }
     }
@@ -525,7 +541,7 @@ public class LionEntity extends PathfinderMob implements GeoEntity, HasLife, com
 
     /** Whether it runs at a gallop now. */
     public boolean galloping() {
-        return tickCount - movedTick <= WALK_HOLD && stride / Math.max(0.3, getScale()) > measures.trotClip() * 1.45;
+        return tickCount - movedTick <= WALK_HOLD && gaits.pick(Gaits.perSize(stride, getScale())).clip().equals("gallop");
     }
 
     /** Whether it is on a hunt now (spread, stalking or in the fight): it stares at no player. */
@@ -931,9 +947,6 @@ public class LionEntity extends PathfinderMob implements GeoEntity, HasLife, com
 
     private static final java.util.Map<String, RawAnimation> FILM_CLIPS = new java.util.concurrent.ConcurrentHashMap<>();
     private static final RawAnimation IDLE = RawAnimation.begin().thenLoop("idle");
-    private static final RawAnimation WALK_ANIM = RawAnimation.begin().thenLoop("walk");
-    private static final RawAnimation TROT_ANIM = RawAnimation.begin().thenLoop("trot");
-    private static final RawAnimation GALLOP_ANIM = RawAnimation.begin().thenLoop("gallop");
     private static final RawAnimation DEATH = RawAnimation.begin().thenPlayAndHold("death");
     private static final RawAnimation CUB_CALL = RawAnimation.begin().thenPlayAndHold("cub_call");
     private static final RawAnimation[] DOING_ANIMS = new RawAnimation[DOING_CLIPS.length];
@@ -1012,8 +1025,8 @@ public class LionEntity extends PathfinderMob implements GeoEntity, HasLife, com
         }
         if (d == STALK) {
             // creeping: the stalk at its pace; still between steps, held where it is (crouched, not frozen flat)
-            double s = stride / Math.max(0.3, getScale());
-            player.setAnimationSpeed(tickCount - movedTick > WALK_HOLD ? 0.0 : Mth.clamp(s / measures.stalkClip(), 0.4, 2.0));
+            double s = Gaits.perSize(stride, getScale());
+            player.setAnimationSpeed(tickCount - movedTick > WALK_HOLD ? 0.0 : gaits.of("stalk").rate(s));
             return state.setAndContinue(DOING_ANIMS[d]);
         }
         if (d > CALM && d < DOING_ANIMS.length) {
@@ -1023,21 +1036,13 @@ public class LionEntity extends PathfinderMob implements GeoEntity, HasLife, com
             return state.setAndContinue(d == ROAR && isCub() ? CUB_CALL : DOING_ANIMS[d]);
         }
         if (walking()) {
-            double s = stride / Math.max(0.3, getScale());
-            if (tickCount - movedTick > WALK_HOLD) {
-                player.setAnimationSpeed(0.5);          // turning in place: a slow walk, its feet never skating
-                return state.setAndContinue(WALK_ANIM);
-            }
-            if (s > measures.trotClip() * 1.45) {
-                player.setAnimationSpeed(Mth.clamp(s / measures.gallopClip(), 0.6, 2.0));
-                return state.setAndContinue(GALLOP_ANIM);
-            }
-            if (s > measures.walkClip() * 1.6) {
-                player.setAnimationSpeed(Mth.clamp(s / measures.trotClip(), 0.6, 1.8));
-                return state.setAndContinue(TROT_ANIM);
-            }
-            player.setAnimationSpeed(Mth.clamp(s / measures.walkClip(), 0.4, 2.0));
-            return state.setAndContinue(WALK_ANIM);
+            // its gait by how fast it goes, each clip's pace following its stride (its body plan's gaits), changed on the
+            // matching footfall; turning in place: a slow walk, its feet never skating
+            double s = Gaits.perSize(stride, getScale());
+            boolean turning = tickCount - movedTick > WALK_HOLD;
+            Gaits.Gait gait = gaitShift.shown(turning ? gaits.of("walk") : gaits.pick(s), player);
+            player.setAnimationSpeed(turning && gait.clip().equals("walk") ? 0.5 : gait.rate(s));
+            return state.setAndContinue(gait.loop());
         }
         player.setAnimationSpeed(loopRate());
         return state.setAndContinue(IDLE);

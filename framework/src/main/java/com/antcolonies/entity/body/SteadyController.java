@@ -14,6 +14,18 @@ import software.bernie.geckolib.animation.AnimationController;
  * works out from its start (the Nile monitor's climb, the Animal Maker Engine step 2) is drawn at the same moment of its
  * clip as its place, whenever the clip started playing on this player's screen.
  * <p>
+ * A blend into a new clip runs on real time, whatever the clip's play speed (BUGS 372, 2026-11-25): GeckoLib's blend
+ * clock ran at the play speed, so a clip asked for at speed 0 (a stalking lion still between steps) kept the clock at
+ * exactly 0 for two frames, and GeckoLib, which takes the next clip off its queue on any frame the blend clock reads 0,
+ * took twice and was left with no clip at all (the lioness drawn standing, gliding, until her next freeze). A blend is
+ * the controller's transition length in ticks at any speed, as the offline checker ({@code tools/clip_check.py}) has
+ * always played it.
+ * <p>
+ * The clip follows the animal's clock both ways (BUGS 380, 2026-11-25): it went on from where the clock went back, so a
+ * frozen game stepped for the camera (which draws a frame at the end of a tick, then the tick's frames from its start)
+ * counted each tick twice, and every frame film since BUGS 232 showed clips at twice their speed. In play the clock only
+ * goes forward. A clock gone back over a tick has been reset: the clip carries on from there.
+ * <p>
  * Species-neutral: any animal's clip player, made as GeckoLib's ({@code new SteadyController<>(this, "body", 4, this::animate)}).
  */
 public class SteadyController<T extends GeoAnimatable> extends AnimationController<T> {
@@ -60,11 +72,18 @@ public class SteadyController<T extends GeoAnimatable> extends AnimationControll
             at = tick;
             return super.adjustTick(tick);
         }
-        if (Double.isNaN(at) || tick < at) {    // first asked, or the clock went back (a reload): carry on from here
+        if (Double.isNaN(at) || tick < at - 1.0) {  // first asked, or the clock reset (over a tick back): carry on from here
             at = tick;
         }
-        played += animationSpeedModifier.apply(animatable) * (tick - at);
+        // the clip follows the clock both ways (BUGS 380): a frozen game stepped for the camera draws one frame at the end
+        // of the new tick, then the tick's own frames from its start, a tick back; going back carried on from there and
+        // counted the tick twice, every frame film showing clips at twice their speed. A blend is a length of time; the
+        // play speed is the clip's (BUGS 372)
+        double rate = animationState == State.TRANSITIONING ? 1.0 : animationSpeedModifier.apply(animatable);
+        played += rate * (tick - at);
         at = tick;
-        return played;
+        // (a moment before a loop's start, drawn by such a frame just after it began again, is drawn at its start; never
+        // while easing into a clip, where a clip time of exactly 0 at another clock reading makes GeckoLib take again)
+        return animationState == State.RUNNING ? Math.max(0.0, played) : played;
     }
 }

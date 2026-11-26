@@ -1678,7 +1678,7 @@ public final class LionGoals {
                 return;
             }
             double gap = l.headGap(target);
-            boolean galloping = l.stride() > l.measures.trotClip() * 1.45 * l.getScale();
+            boolean galloping = l.galloping();
             // the swat on the run: from SWAT_FROM, but only once the gap will have closed by its hit (a runner keeps going)
             if (galloping && gap <= SWAT_FROM && gap - closing() * hitTick(LionEntity.GALLOP_SWAT) <= HIT_SLACK && l.has(LionEntity.GALLOP_SWAT)) {
                 l.setDoing(LionEntity.GALLOP_SWAT);

@@ -3,6 +3,7 @@ package com.antcolonies.savanna.client;
 import com.antcolonies.client.BoneFrames;
 import com.antcolonies.client.DraggedTail;
 import com.antcolonies.entity.body.BlockMoves;
+import com.antcolonies.entity.body.DrawClock;
 import com.antcolonies.entity.body.GroundBend;
 import com.antcolonies.entity.body.TailDrag;
 import com.antcolonies.savanna.SavannaMod;
@@ -143,7 +144,7 @@ public class MonitorModel extends DefaultedEntityGeoModel<MonitorEntity> {
         boolean moving = monitor.moveClipOn();
         GroundBend bend = monitor.bend();
         bend.update(monitor.level(), x, y, z, yaw, scale, monitor.isInWater(), monitor.floatDepth(),
-                !monitor.isDeadOrDying() && climb == null, System.nanoTime());
+                !monitor.isDeadOrDying() && climb == null, DrawClock.nanos(monitor, pt));
         GeoBone body = getAnimationProcessor().getBone("body");
         if (body != null && bend.lift() > 1.0E-3) {      // the shoulders lifted onto a bank: the whole body up, in model pixels
             boolean marked = body.hasRotationChanged() || body.hasPositionChanged() || body.hasScaleChanged();
@@ -171,15 +172,15 @@ public class MonitorModel extends DefaultedEntityGeoModel<MonitorEntity> {
         }
         byte doing = monitor.doing();
         if (!monitor.isDeadOrDying() && !moving && (doing == MonitorEntity.CALM || doing == MonitorEntity.WATCH)) {
-            legs(monitor, bend, scale, x, y, z, yaw);
+            legs(monitor, bend, scale, x, y, z, yaw, pt);
         } else if (moving) {                 // a move's clip has the legs: as it ends, folded afloat or standing on land
             double end = MonitorEntity.MOVES.move(climb.move()).endsAfloat ? 0.0 : 1.0;
             monitor.legStand[0] = end;
             monitor.legStand[1] = end;
             monitor.legNanos = 0;
         }
-        Vector3d moved = place(monitor, climb, scale, x, y, z, yaw);
-        tail(monitor, bend, climb, moved, scale, x, y, z, yaw);
+        Vector3d moved = place(monitor, climb, scale, x, y, z, yaw, pt);
+        tail(monitor, bend, climb, moved, scale, x, y, z, yaw, pt);
         look(monitor, pt, x, z, yaw);
     }
 
@@ -188,7 +189,7 @@ public class MonitorModel extends DefaultedEntityGeoModel<MonitorEntity> {
      * forward and up the clip has come by the moment it is drawn at), sliding over from one to the other when it starts
      * or ends ({@link #HAND_OVER}). Moves the whole model there by its root bone; says by how much (model blocks).
      */
-    private Vector3d place(MonitorEntity monitor, BlockMoves.Play climb, double scale, double x, double y, double z, float yaw) {
+    private Vector3d place(MonitorEntity monitor, BlockMoves.Play climb, double scale, double x, double y, double z, float yaw, float pt) {
         double wx = x, wy = y, wz = z;
         if (climb != null) {
             Vec3 at = MonitorEntity.MOVES.drawnAt(climb, Math.max(0.0, monitor.climbClipTicks()), scale / 16.0);
@@ -196,7 +197,7 @@ public class MonitorModel extends DefaultedEntityGeoModel<MonitorEntity> {
             wy = at.y;
             wz = at.z;
         }
-        long now = System.nanoTime();
+        long now = DrawClock.nanos(monitor, pt);
         boolean climbing = climb != null;
         if (monitor.drawnNanos == 0) {           // first drawn (or drawn again after a while far off): no hand over
             monitor.shiftX = monitor.shiftY = monitor.shiftZ = 0;
@@ -240,7 +241,7 @@ public class MonitorModel extends DefaultedEntityGeoModel<MonitorEntity> {
      * rears the body, where the climb has moved it ({@code moved}, model blocks).
      */
     private void tail(MonitorEntity monitor, GroundBend bend, BlockMoves.Play climb, Vector3d moved, double scale, double x,
-            double y, double z, float yaw) {
+            double y, double z, float yaw, float pt) {
         Function<String, GeoBone> bones = getAnimationProcessor()::getBone;
         GeoBone hips = bones.apply("hips");
         if (hips == null) {
@@ -263,7 +264,7 @@ public class MonitorModel extends DefaultedEntityGeoModel<MonitorEntity> {
         }
         parent.mul(BoneFrames.local(hips, false));
         TAIL.pose(bones, parent, monitor.tail, TailDrag.Ground.floating(monitor.level(), y, MonitorEntity.TAIL_FLOAT * scale / 16.0),
-                scale / 16.0, on, System.nanoTime());
+                scale / 16.0, on, DrawClock.nanos(monitor, pt));
     }
 
     /**
@@ -274,8 +275,8 @@ public class MonitorModel extends DefaultedEntityGeoModel<MonitorEntity> {
      * the swim clip's folded pose, along the shortest turn between them; once the swim clip plays, its legs are that
      * folded pose already. A standing pair's feet are kept on the ground as the body bends over a step.
      */
-    private void legs(MonitorEntity monitor, GroundBend bend, double scale, double x, double y, double z, float yaw) {
-        long now = System.nanoTime();
+    private void legs(MonitorEntity monitor, GroundBend bend, double scale, double x, double y, double z, float yaw, float pt) {
+        long now = DrawClock.nanos(monitor, pt);
         double dt = monitor.legNanos == 0 ? 1.0 : (now - monitor.legNanos) / 1.0E9;
         monitor.legNanos = now;
         double k = dt <= 0 ? 0 : dt > 0.5 ? 1.0 : 1.0 - Math.exp(-dt / LEG_EASE);
@@ -457,7 +458,7 @@ public class MonitorModel extends DefaultedEntityGeoModel<MonitorEntity> {
             rel = Mth.wrapDegrees(Math.toDegrees(Math.atan2(tz - hz, tx - hx)) - 90.0 - yaw);
             want = Math.abs(rel) < 150.0 ? Mth.clamp(rel, -HEAD_TURN, HEAD_TURN) : 0.0;
         }
-        long now = System.nanoTime();
+        long now = DrawClock.nanos(monitor, pt);
         double dt = monitor.lookNanos == 0 ? 1.0 : (now - monitor.lookNanos) / 1.0E9;
         monitor.lookNanos = now;
         double eyeK = dt <= 0 ? 0 : dt > 0.5 ? 1.0 : 1.0 - Math.exp(-dt / EYE_EASE);

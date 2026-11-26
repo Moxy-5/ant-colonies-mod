@@ -1,5 +1,6 @@
 package com.antcolonies.savanna.client;
 
+import com.antcolonies.entity.body.DrawClock;
 import com.antcolonies.entity.body.GroundBend;
 import com.antcolonies.savanna.animal.DrawnGround;
 
@@ -37,7 +38,7 @@ public record StandTilt(double frontFeetPx, double hindFeetPx, double feetOutPx,
      * Where its body is drawn ({@code root}, after its clips): drawn ahead, its trunk tilted about the middle between its
      * feet to the ground under its front and hind feet, and raised or lowered so both pairs stand on it.
      */
-    public void place(LivingEntity animal, DrawnGround drawn, GeoBone root, double scale, double x, double y, double z, float yaw) {
+    public void place(LivingEntity animal, DrawnGround drawn, GeoBone root, double scale, double x, double y, double z, float yaw, float pt) {
         if (root == null) {
             return;
         }
@@ -51,7 +52,7 @@ public record StandTilt(double frontFeetPx, double hindFeetPx, double feetOutPx,
             hindWant = Mth.clamp(groundUnder(level, x, z, fx, fz, -(hindFeetPx - READ_IN) * perPx, feetOutPx * perPx, y, swims), y - MOST_DOWN, y);
         }
         // eased in world heights, so its box stepping up a block (all at once) never jolts the drawing
-        long now = System.nanoTime();
+        long now = DrawClock.nanos(animal, pt);           // game time (the Motion Studio, phase 2, step 4)
         double dt = drawn.nanos == 0 ? 1.0 : (now - drawn.nanos) / 1.0E9;
         drawn.nanos = now;
         if (dt > 0.5 || Math.abs(drawn.frontY - frontWant) > 3.0 || Math.abs(drawn.hindY - hindWant) > 3.0) {

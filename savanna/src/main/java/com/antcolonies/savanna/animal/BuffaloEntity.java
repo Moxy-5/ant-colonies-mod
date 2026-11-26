@@ -10,6 +10,9 @@ import com.antcolonies.animal.Attention;
 import com.antcolonies.animal.HasLife;
 import com.antcolonies.animal.HitChain;
 import com.antcolonies.animal.RoomToBreed;
+import com.antcolonies.entity.body.BodyPlans;
+import com.antcolonies.entity.body.GaitShift;
+import com.antcolonies.entity.body.Gaits;
 import com.antcolonies.entity.body.SteadyController;
 import com.antcolonies.savanna.registry.SavannaEntities;
 
@@ -107,10 +110,14 @@ public class BuffaloEntity extends PathfinderMob implements GeoEntity, HasLife, 
     public static final int BLEND = 5;
     /** The death clip (1.4 s) is played to its end before the body goes. */
     static final int DEATH_TICKS = 28 + BLEND;
-    /** The walk, trot and charge clips are made for these speeds (blocks a tick at size 1: 0.61, 1.39 and 2.45 blocks a second, its body plan's "walks"). */
-    static final double WALK_CLIP = 0.6076 / 20.0, TROT_CLIP = 1.389 / 20.0, CHARGE_CLIP = 2.447 / 20.0;
-    /** Faster than these (blocks a tick at size 1: 1.25 and 2.6 blocks a second, between the paces below) it is drawn trotting, then galloping. */
-    static final double TROT_FROM = 1.25 / 20.0, CHARGE_FROM = 2.6 / 20.0;
+    /**
+     * Its gaits (walk, trot, charge), from its body plan (the Motion Studio, phase 2, step 2): each clip's own speed (0.61,
+     * 1.39 and 2.45 blocks a second at size 1), where it is drawn trotting, then charging (faster than 1.25 and 2.6 blocks
+     * a second at size 1, between the paces below), and each clip's play-speed limits. Calves share the grown model's.
+     */
+    final Gaits gaits = BodyPlans.gaitsOf("buffalo");
+    /** The gait drawn (client): a change waits for the stride's matching moment. */
+    private final GaitShift gaitShift = new GaitShift();
     /**
      * Its paces (the move control's share of its speed). Minecraft's walking push goes with the square of the speed:
      * measured 2026-11-25, 1.73 x pace squared blocks a second (2.3 ran 9.23, 1.0 ran 1.73). So: stepping between plants
@@ -957,9 +964,6 @@ public class BuffaloEntity extends PathfinderMob implements GeoEntity, HasLife, 
     /** Clips named by the film camera ({@code film:<clip>}, a still one). */
     private static final java.util.Map<String, RawAnimation> FILM_CLIPS = new java.util.concurrent.ConcurrentHashMap<>();
     private static final RawAnimation IDLE = RawAnimation.begin().thenLoop("idle");
-    private static final RawAnimation WALK = RawAnimation.begin().thenLoop("walk");
-    private static final RawAnimation TROT_ANIM = RawAnimation.begin().thenLoop("trot");
-    private static final RawAnimation CHARGE_ANIM = RawAnimation.begin().thenLoop("charge");
     private static final RawAnimation DEATH = RawAnimation.begin().thenPlayAndHold("death");
     /** Each doing's clip: the one-shots played once and held, the loops looped. */
     private static final RawAnimation[] DOING_ANIMS = new RawAnimation[DOING_CLIPS.length];
@@ -1016,17 +1020,10 @@ public class BuffaloEntity extends PathfinderMob implements GeoEntity, HasLife, 
         if (walking()) {
             // its gait by how fast it goes, each clip's pace following its stride so its hooves never slide (in the water
             // too: the walk, at its swimming pace)
-            double s = stride / Math.max(0.3, getScale());
-            if (s > CHARGE_FROM) {
-                player.setAnimationSpeed(Mth.clamp(s / CHARGE_CLIP, 0.7, 2.5));
-                return state.setAndContinue(CHARGE_ANIM);
-            }
-            if (s > TROT_FROM) {
-                player.setAnimationSpeed(Mth.clamp(s / TROT_CLIP, 0.7, 1.8));
-                return state.setAndContinue(TROT_ANIM);
-            }
-            player.setAnimationSpeed(Mth.clamp(s / WALK_CLIP, 0.4, 2.0));
-            return state.setAndContinue(WALK);
+            double s = Gaits.perSize(stride, getScale());
+            Gaits.Gait gait = gaitShift.shown(gaits.pick(s), player);
+            player.setAnimationSpeed(gait.rate(s));
+            return state.setAndContinue(gait.loop());
         }
         player.setAnimationSpeed(loopRate());
         return state.setAndContinue(IDLE);

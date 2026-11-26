@@ -1,5 +1,6 @@
 package com.antcolonies.savanna.client;
 
+import com.antcolonies.entity.body.DrawClock;
 import com.antcolonies.entity.body.GroundBend;
 import com.antcolonies.savanna.SavannaMod;
 import com.antcolonies.savanna.animal.CrocodileEntity;
@@ -97,13 +98,13 @@ public class CrocodileModel extends DefaultedEntityGeoModel<CrocodileEntity> {
             }
         }
         double x = Mth.lerp(pt, croc.xo, croc.getX()), y = Mth.lerp(pt, croc.yo, croc.getY()), z = Mth.lerp(pt, croc.zo, croc.getZ());
-        lids(croc, camera.distanceToSqr(x, y, z) <= NEAR * NEAR);
+        lids(croc, camera.distanceToSqr(x, y, z) <= NEAR * NEAR, pt);
         if (camera.distanceToSqr(x, y, z) > NEAR * NEAR) {
             return;
         }
         GroundBend bend = croc.bend();
         bend.update(croc.level(), x, y, z, Mth.rotLerp(pt, croc.yBodyRotO, croc.yBodyRot), CrocodileEntity.MODEL_SCALE * croc.getScale(),
-                croc.isInWater(), croc.floatDepth(), !croc.isDeadOrDying(), System.nanoTime(), croc.growth());
+                croc.isInWater(), croc.floatDepth(), !croc.isDeadOrDying(), DrawClock.nanos(croc, pt), croc.growth());
         double scale = CrocodileEntity.MODEL_SCALE * croc.getScale();
         GeoBone body = getAnimationProcessor().getBone("body");
         if (body != null && bend.lift() > 1.0E-3) {      // the shoulders lifted onto a bank: the whole body up, in model pixels
@@ -137,8 +138,8 @@ public class CrocodileModel extends DefaultedEntityGeoModel<CrocodileEntity> {
      * as it dives). Dead, they stay shut. The lid bones are shared by every crocodile drawn, so this sets them for each
      * one, hidden while open.
      */
-    private void lids(CrocodileEntity croc, boolean near) {
-        long now = System.nanoTime();
+    private void lids(CrocodileEntity croc, boolean near, float pt) {
+        long now = DrawClock.nanos(croc, pt);
         double shut;
         if (croc.isDeadOrDying()) {
             shut = 1.0;
@@ -187,7 +188,7 @@ public class CrocodileModel extends DefaultedEntityGeoModel<CrocodileEntity> {
             double tx = Mth.lerp(pt, on.xo, on.getX()), tz = Mth.lerp(pt, on.zo, on.getZ());
             rel = Mth.wrapDegrees(Math.toDegrees(Math.atan2(tz - hz, tx - hx)) - 90.0 - yaw);
         }
-        long now = System.nanoTime();
+        long now = DrawClock.nanos(croc, pt);
         double dt = croc.eyeNanos == 0 ? 1.0 : (now - croc.eyeNanos) / 1.0E9;
         croc.eyeNanos = now;
         double eyeK = dt <= 0 ? 0 : dt > 0.5 ? 1.0 : 1.0 - Math.exp(-dt / EYE_EASE);
@@ -224,7 +225,7 @@ public class CrocodileModel extends DefaultedEntityGeoModel<CrocodileEntity> {
      * legs folded in the water); this moves each pair from that pose toward the other where its own ground says so.
      */
     private void legs(CrocodileEntity croc, GroundBend bend, double scale, float pt, double x, double y, double z, float yaw) {
-        long now = System.nanoTime();
+        long now = DrawClock.nanos(croc, pt);
         double dt = croc.legNanos == 0 ? 1.0 : (now - croc.legNanos) / 1.0E9;
         croc.legNanos = now;
         double k = dt <= 0 ? 0 : dt > 0.5 ? 1.0 : 1.0 - Math.exp(-dt / LEG_EASE);

@@ -49,6 +49,44 @@
    "leg_br_paw"
   ]
  },
+ "gaits": {
+  "about": "The game's gaits (the Motion Studio phase 2, 2026-11-25; framework entity/body/Gaits): 'order' the moving gaits slowest first, each picked once the animal goes faster than its 'from' (px a second at size 1, as checks.walks, which holds each clip's own speed); its clip played at the speed its stride needs, within 'min' and 'max'. A gait outside the order is used by name. The numbers are today's (moved here from the Java).",
+  "order": [
+   "walk",
+   "trot",
+   "gallop"
+  ],
+  "walk": {
+   "min": 0.4,
+   "max": 2.0,
+   "change": {
+    "trot": 0.92,
+    "gallop": 0.09
+   }
+  },
+  "trot": {
+   "from": 31.4256,
+   "min": 0.6,
+   "max": 1.8,
+   "change": {
+    "walk": 0.62,
+    "gallop": 0.58
+   }
+  },
+  "gallop": {
+   "from": 66.3404,
+   "min": 0.6,
+   "max": 2.0,
+   "change": {
+    "walk": 0.06,
+    "trot": 0.41
+   }
+  },
+  "stalk": {
+   "min": 0.4,
+   "max": 2.0
+  }
+ },
  "bones": {
   "root": "root",
   "body": "body",

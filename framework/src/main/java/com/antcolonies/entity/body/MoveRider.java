@@ -652,7 +652,7 @@ public final class MoveRider {
      *
      * @param x, y, z where its box is drawn this frame; {@code clipTicks} from {@link #clipTicks}
      */
-    public Vector3d drawnShift(double x, double y, double z, float yaw, double clipTicks) {
+    public Vector3d drawnShift(double x, double y, double z, float yaw, double clipTicks, float pt) {
         double scale = s.modelScale * mob.getScale();
         BlockMoves.Play p = play();
         double wx = x, wy = y, wz = z;
@@ -662,7 +662,7 @@ public final class MoveRider {
             wy = at.y;
             wz = at.z;
         }
-        long now = System.nanoTime();
+        long now = DrawClock.nanos(mob, pt);              // game time (the Motion Studio, phase 2, step 4)
         boolean on = p != null;
         if (drawnNanos == 0) {
             shiftX = shiftY = shiftZ = 0;

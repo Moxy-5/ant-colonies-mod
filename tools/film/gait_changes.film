@@ -1,0 +1,63 @@
+# Gait changes in the real game, frame by frame (the Motion Studio, phase 2, step 3, 2026-11-25; CLAUDE.md's hard rule:
+# every movement change filmed in the real game, frozen and stepped, from three sides): a lioness, then a grown buffalo,
+# sent down a long flat strip at a walk, a trot, a gallop (the buffalo's charge), a trot and a walk again (the paces their
+# own goals use), stepped a tick a picture from its side, three quarters ahead and the front, each body recorded. Each
+# gait change should come at its plan's moment (gaits.<old>.change.<new>), its legs easing a short way into the new clip.
+# Two scenes, so each walker's recording (body.jsonl.gz) has its own folder. The strip lies round the middle: Minecraft's
+# ground navigation finds no route to a goal in a chunk not loaded (the first try sent them to x 84: they never moved);
+# each "go" plans afresh from where the walker is (a route reaches 16 blocks or so; the whole run is about 22).
+#   ./gradlew runFilm -PfilmScene=tools/film/gait_changes.film   pictures in run-film/screenshots/gait_lioness/, gait_buffalo/
+#   python tools/pace_report.py run-film/screenshots/gait_lioness run-film/screenshots/gait_buffalo
+scene gait_lioness
+cmd time set noon
+cmd weather clear
+lens 50
+cmd fill -30 -61 -7 30 -50 7 minecraft:air
+cmd fill -30 -63 -7 30 -63 7 minecraft:dirt
+cmd fill -30 -62 -7 30 -62 7 minecraft:grass_block
+wait 20
+walker antcolonies:lioness -20.5 -61 0.5 -90
+aim film-walker
+cam side 0 1.2 -7
+cam three 5 2.5 -5
+cam front 7 1.2 0
+record on 1 all
+go 16 -61 0 0.83
+burst lioness_walk 40 1
+go 16 -61 0 1.27
+burst lioness_trot 30 1
+go 16 -61 0 2.08
+burst lioness_gallop 30 1
+go 16 -61 0 1.27
+burst lioness_back_trot 30 1
+go 16 -61 0 0.83
+burst lioness_back_walk 40 1
+record off
+cam off
+scene gait_buffalo
+cmd time set noon
+cmd weather clear
+lens 50
+cmd fill -30 -61 -7 30 -50 7 minecraft:air
+cmd fill -30 -63 -7 30 -63 7 minecraft:dirt
+cmd fill -30 -62 -7 30 -62 7 minecraft:grass_block
+wait 20
+walker antcolonies:buffalo -20.5 -61 0.5 -90 OwnSize:1.0f,Led:1b
+aim film-walker
+cam side 0 1.5 -9
+cam three 6 3 -6
+cam front 9 1.5 0
+record on 1 all
+go 16 -61 0 0.76
+burst buffalo_walk 40 1
+go 16 -61 0 0.96
+burst buffalo_trot 30 1
+go 16 -61 0 1.70
+burst buffalo_charge 30 1
+go 16 -61 0 0.96
+burst buffalo_back_trot 30 1
+go 16 -61 0 0.76
+burst buffalo_back_walk 40 1
+record off
+cam off
+cmd tick unfreeze
