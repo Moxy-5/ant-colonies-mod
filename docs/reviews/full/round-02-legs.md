@@ -98,6 +98,8 @@ arriving, holding on, the walk along a floor). Every line read.
 
 ### R2-1 (B, proven): the legs never remember a failed search, so every mind must bring its own retry clock
 
+**Status (2026-11-26, `claude/review-fix-2`): fixed, BUGS 400 (`AntNavigator.askedInVainJustNow`: the same walk asked again from the same cell within 10 ticks of "no way" is answered without a search; test `askingAgainAfterNoWayCostsNoSearch`). The goals' own clocks are left in place.**
+
 - **Where:** `AntNavigator.begin` 403 to 421 (always ends in a full `plan()`), `plan` 583 to 661.
 - **What is wrong:** asking again right after a failed search searches again, and asking for the same goal while it
   is being walked throws the route away and plans from scratch. Each goal guards this on its own (a half-second
@@ -111,6 +113,8 @@ arriving, holding on, the walk along a floor). Every line read.
   asked while still walking it keeps the walk. The goals' own clocks can then go one by one.
 
 ### R2-2 (B, proven; how often, unchecked): three new plans are all a walk gets, however far it got, and nobody hears the give-up
+
+**Status (2026-11-26, `claude/review-fix-2`): half fixed, BUGS 404: new plans are counted since the last finished step. Open: `Errand` still does not read `hasFailed()` (a change to what `walkOn` means for every goal; left for round 3's fixes), and the landing check still uses `floorUnder`.**
 
 - **Where:** `MAX_REPLANS` 60, `replan` 749 to 766, `begin` 413 (the only reset), `tick` 799 to 802;
   `hasFailed` 457 to 460; `entity/goal/Errand.java` 179 to 181, 215 to 217. Seen by two readers.
@@ -129,6 +133,8 @@ arriving, holding on, the walk along a floor). Every line read.
   the landing check at 799.
 
 ### R2-3 (B, likely; not seen in play): an insect falling more than 12 blocks beside a wall is taken for "shut in" and snapped onto the wall
+
+**Status (2026-11-26, `claude/review-fix-2`): fixed, BUGS 403: the beside starts are taken only when its own cell or the cell under it is closed (first tried with its own cell only: a raider bobbing at a pond's surface then never got out, the pond raid test failed 3 of 3, so the cell under it counts too). No test of its own (it needs a 13-block drop beside a wall).**
 
 - **Where:** `plan` 588 to 617, `stepOutTo` 668 to 692; `AntPathFinder.landing` 345 to 360.
 - **What is wrong:** the "start beside it" branch is meant for an insect inside a block (a mud plate, BUGS 24; a
@@ -168,6 +174,8 @@ arriving, holding on, the walk along a floor). Every line read.
 
 ### R2-7 (C, proven): `mayHaveGoal` asks the mind's test about twice as often as it needs
 
+**Status (2026-11-26, `claude/review-fix-2`): fixed with R2-40.**
+
 - **Where:** 703 to 709: a channel foothold is tried on all six surfaces though it only ever has one.
 - **Fix proposed:** `Foothold.channel(cell)` once per cell plus the six plain surfaces (with R2-40).
 
@@ -195,6 +203,8 @@ doorways and mouths, channels, where it stands now, hugging a column). Every lin
 
 ### R2-8 (B, proven; to measure): the standing shuffle's search for a free spot can run every tick for good
 
+**Status (2026-11-26, `claude/review-fix-2`): fixed, BUGS 405: one look every 10 ticks whether it found a spot or not, the found spot kept and walked to in between. The two numbers for "too close" are left as they are. No test of its own; not measured.**
+
 - **Where:** `keepApart` 1392 to 1462 (the wait is set only at 1450, when both searches fail; the "free spot here"
   way out at 1455); `spaceFor` 1468 to 1470; `freeNear` 1496 to 1526; the "pressed" test at 1411.
 - **What is wrong:** two numbers judge "too close". Pressed: the gap is under 0.85 of both radii together. Clear:
@@ -212,6 +222,8 @@ doorways and mouths, channels, where it stands now, hugging a column). Every lin
   after every search, not only a failed one.
 
 ### R2-9 (B, likely; checked again): the stuck clock counts polite waiting, so a walker in a jam plans again and gives up
+
+**Status (2026-11-26, `claude/review-fix-2`): fixed, BUGS 404: a tick held for the crowd is not counted by the step clock. No test of its own.**
 
 - **Where:** the waits in `steer` 1300 to 1305 and 1329 to 1336; the step clock at 840; `standsTooLong` 975 to 986.
 - **What is wrong:** while `steer` holds a walker behind another body, `++stepTicks` still runs toward 120. The
@@ -292,6 +304,8 @@ doorways and mouths, channels, where it stands now, hugging a column). Every lin
 
 ### R2-16 (A, the path proven and checked again; the time is the mod's earlier measurement, to measure anew): a search that finds no way costs about 20 ms, most termite walks run it twice, and nothing limits how many run in a tick
 
+**Status (2026-11-26, `claude/review-fix-2`): fixed in part, BUGS 399: no second search when no habit had a say in the first (test `askingAgainAfterNoWayCostsNoSearch`); with R2-1, R2-20 and R2-17. Measured in that test, a search that finds no way on open flat ground: 19.5 ms before, 13.3 ms with R2-17. No budget per tick was added (to see first whether it is still needed).**
+
 - **Where:** `AntPathFinder.java` 73 to 74 (`DEFAULT_MAX_EXPANSIONS = 6000`, with the comment "an unreachable goal
   never costs much time"), 279 (the loop runs to the cap); `AntNavigator.plan` 627 to 632; `AbstractAntEntity.
   walkHabits` 2272 to 2280; `Doorway.avoidMouths` 25 to 30. Seen by three readers.
@@ -316,6 +330,8 @@ doorways and mouths, channels, where it stands now, hugging a column). Every lin
   scene. Also put the comment at 73 right.
 
 ### R2-17 (B, proven by counting calls; to measure): one search reads the same blocks 50 to 60 times per step
+
+**Status (2026-11-26, `claude/review-fix-2`): fixed, BUGS 399 (`SearchMemo`, made round the map for one search). Measured: 19.5 ms to 13.3 ms for a search that finds no way on open flat ground, a third less, not the 3 to 5 times guessed.**
 
 - **Where:** `LevelCellMap.java` 38 to 106 (each call: the land-ready check, `getBlockState`, shape work,
   `HeldCells.barred`); `AntPathFinder.neighbours` 363 to 474, `intoChannels` 532 to 564; `Foothold.isValid` 70 to 75.
@@ -343,6 +359,8 @@ doorways and mouths, channels, where it stands now, hugging a column). Every lin
 
 ### R2-19 (B, proven in the planner; what the body then does, two readers disagree): a tunnel window sealed in front of an insect is not seen by the every-tick check
 
+**Status (2026-11-26, `claude/review-fix-2`): fixed, BUGS 407: `whatChanged` checks the very opening for the steps into and out of a channel. No test of its own yet.**
+
 - **Where:** `AntPathFinder.whatChanged` 648 to 677 (only `CRAWL_CHANNEL` checks the sides, 669 to 675);
   `Foothold.isValid` 63 to 66 (a channel foothold is good while any side is open).
 - **What is wrong:** for the steps into and out of a channel the check is only "the channel still opens somewhere".
@@ -355,6 +373,8 @@ doorways and mouths, channels, where it stands now, hugging a column). Every lin
   test beside `aClosedChannelIsNoLongerAWay`.
 
 ### R2-20 (B, proven; how often minds ask, unchecked): a goal cell with nothing to hold in it is searched to the cap
+
+**Status (2026-11-26, `claude/review-fix-2`): fixed, BUGS 399 (`AntPathFinder.hasHold`; checked in `askingAgainAfterNoWayCostsNoSearch`).**
 
 - **Where:** `AntPathFinder.java` 187 to 194, 203 to 222.
 - **What is wrong:** only "open, a slope or a channel" is asked before searching. A cell in mid-air, or one whose
@@ -378,6 +398,8 @@ doorways and mouths, channels, where it stands now, hugging a column). Every lin
   plan and tests. **The user's call** (see the top).
 
 ### R2-22 (B, proven; checked again; how much memory, to measure): two static maps keep a closed world in memory
+
+**Status (2026-11-26, `claude/review-fix-2`): fixed, BUGS 406: both maps are cleared when the server stops. `Body` still holds its insect; `HeldCells` is not swept in a running world.**
 
 - **Where:** `Crowd.java` 49 (`WeakHashMap<Level, Crowd>`), 31 to 33 (a `Body` holds its insect), 175 to 184;
   `fight/HeldCells.java` 30. Seen by two readers.
@@ -451,6 +473,8 @@ surface and heading sent to the drawing, saving and restoring the hold, every `n
 `Doorway`, `DoorwayMotion` and its unit test. Every line of those parts read.
 
 ### R2-28 (A, the mod's side proven and checked again; what Minecraft does, from memory; not seen in play): a frozen insect on a wall slides down it and is drawn as climbing
+
+**Status (2026-11-26, `claude/review-fix-2`): fixed, BUGS 402 (`AntNavigator.letGo`, called from the body's tick while it is frozen; one rule: a frozen body lets go and falls; test `anInsectParalysedOnAWallLetsGoAndFalls`).**
 
 - **Where:** `AbstractAntEntity.java` 1501 to 1505 (`isImmobile`), 2311 to 2353 (`customServerAiStep`), 2418 to
   2426 (the surface sent to the drawing each tick), 2597 to 2600 (`onClimbable`), 1287 to 1290 (calling for help),
@@ -573,6 +597,8 @@ each pays its own search (a plugged hole is found again by every forager that wa
 
 ### R2-37 (A, the loop proven and checked again; how dear each search is, to measure): five goals ask the legs for a route on every tick after "no way"
 
+**Status (2026-11-26, `claude/review-fix-2`): fixed by R2-1, BUGS 400: the five goals still ask every tick, and get "no" without a search for half a second after each search.**
+
 - **Where:** `entity/goal/WoundCareGoal.java` 103 to 106; `RescueGoal.java` 130 to 133 and 177 to 180;
   `ClampCareGoal.java` 104 to 107; `AllogroomGoal.java` 124 to 127 (this one ticks every tick, 94); likely also
   `FightGoal.java` 320 to 323 while a major bites a cover open. The legs' side: `AntNavigator.begin` 403 to 421.
@@ -593,6 +619,8 @@ each pays its own search (a plugged hole is found again by every forager that wa
   at most.
 
 ### R2-38 (A, the legs' side proven and checked again; two facts about Minecraft from memory; not run): an insect on a path block, on farmland or in a pond with a low bank can never plan a route again
+
+**Status (2026-11-26, `claude/review-fix-2`): small half fixed, BUGS 401: a start one step up beside it, corners too, and the shuffle no longer moves an insect onto ground the planner refuses (test `anInsectOnAPathBlockWalksOffIt`). Open: an insect in the middle of a path three wide or more, or in a pond more than a block from its bank, still has no start; the cure is R2-21, the user's call.**
 
 - **Where:** `AntNavigator.plan` 583 to 661, `currentFoothold` 2099 to 2148, `floorBeside` 2179; `AntPathFinder.
   landing` 345 to 360; `Foothold.isValid` 70 to 75; `LevelCellMap.isOpen` 39 to 56, `isSolidFace` 60 to 69. How it
@@ -622,6 +650,8 @@ each pays its own search (a plugged hole is found again by every forager that wa
 
 ### R2-39 (B, proven; to measure): a mind pays for the same "no way" again a tick later, and a builder can ask 24 times in one tick
 
+**Status (2026-11-26, `claude/review-fix-2`): covered in part by R2-1 (BUGS 400): `Errand`'s second ask a tick later costs no search when the walk had no costs of the mind's own. `BuildMoundGoal`'s many asks in one tick are open (round 5).**
+
 - **Where:** `entity/goal/Errand.java` 215 to 243 (`walkOn`, `goTo`); `savanna/.../BuildMoundGoal.java` 207 to 229.
 - **What is wrong:** when the way changes under a walking termite and the new plan fails, the legs set `failed`;
   one tick later `Errand.walkOn` sees only "not walking" and sets off again (one or two more searches), and only
@@ -635,6 +665,8 @@ each pays its own search (a plugged hole is found again by every forager that wa
   `BuildMoundGoal` is round 5's: one spot a tick.
 
 ### R2-40 (B, proven): the "no foothold in reach, no search" shortcut helps one caller only
+
+**Status (2026-11-26, `claude/review-fix-2`): fixed (no bug number, a B): `mayHaveGoal` asks only footholds that are really there.**
 
 - **Where:** `AntNavigator.mayHaveGoal` 699 to 711; callers `FightGoal.java` 245, 272, 377; `ShapeMoundGoal` 99.
 - **What is wrong:** it runs the mind's test on bare cells, not on real footholds. A test that only measures

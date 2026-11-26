@@ -56,6 +56,15 @@ public final class Crowd {
     private Crowd() {
     }
 
+    /**
+     * Forgets every world's grid (the server stopped). The grid holds last tick's bodies, each body its insect and
+     * so its world: a world that was closed never ticked again to clear them, and stayed in memory for as long as the
+     * game ran (review R2-22).
+     */
+    public static void clear() {
+        CROWDS.clear();
+    }
+
     /** The grid of this world (made on first use). */
     public static Crowd of(Level level) {
         return CROWDS.computeIfAbsent(level, l -> new Crowd());

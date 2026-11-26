@@ -2416,6 +2416,12 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
     }
 
     private void tickBody() {
+        if (!level().isClientSide && isImmobile() && (wasAttached || navigator.isAttached() || navigator.isClimbing())) {
+            // Frozen (paralysed, gripped, calling for help, carried, dead): its legs do not run, so they let go here.
+            navigator.letGo();
+            wasAttached = false;
+            lastClimbMotion = Vec3.ZERO;
+        }
         super.tick();
         // Only the route's climbing stretches make the ant climb, so ants never wander up walls by themselves.
         if (!level().isClientSide) {

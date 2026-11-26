@@ -70,7 +70,10 @@ public final class AntPathFinder {
     private static final double MOUTH_COST = 3.0;
     /** Cost of one block upside down along a ceiling. */
     public static final double CEILING_COST = 1.3;
-    /** Stops a search that can't find the goal, so an unreachable goal never costs much time. */
+    /**
+     * Stops a search that can't find the goal. A search that runs this far is the dearest there is (about 20 ms when
+     * measured, docs/HISTORY.md 2026-10-23), so the legs ask as seldom as they can (review R2-16, R2-1).
+     */
     public static final int DEFAULT_MAX_EXPANSIONS = 6000;
     /** The deepest drop a route may take (where nothing can be climbed down). */
     public static final int MAX_FALL = 12;
@@ -87,7 +90,18 @@ public final class AntPathFinder {
      */
     private static final double FOOT_OF_WALL = 2.0;
 
+    /** How many searches have been run (server thread; tests count them within one tick). */
+    private static int searchesRun;
+
     private AntPathFinder() {
+    }
+
+    /** Tests only: true searches without the search's memory of blocks ({@link SearchMemo}), to time the two side by side. */
+    public static boolean memoOffForTests;
+
+    /** Tests only: how many route searches have been run so far, by anyone. */
+    public static int searchesRunForTests() {
+        return searchesRun;
     }
 
     /** Receives the moves an insect can make from a foothold. */
@@ -190,6 +204,9 @@ public final class AntPathFinder {
             return null;
         }
         boolean hasFloor = Foothold.isValid(map, target, Direction.DOWN);
+        if (!hasFloor && !hasHold(map, target)) {
+            return null; // a cell in mid-air: nothing to end on, so no search (it could only fail, at full cost; review R2-20)
+        }
         return find(map, starts, at -> at.cell().equals(target) && (at.isFloor() || !hasFloor), target, maxExpansions, costs);
     }
 
@@ -209,7 +226,11 @@ public final class AntPathFinder {
             if (!map.isOpen(target) && !map.isSlope(target) && map.channelSides(target) == 0) {
                 continue;
             }
-            hasFloor.put(target, Foothold.isValid(map, target, Direction.DOWN));
+            boolean floor = Foothold.isValid(map, target, Direction.DOWN);
+            if (!floor && !hasHold(map, target)) {
+                continue; // nothing to end on in it (review R2-20)
+            }
+            hasFloor.put(target, floor);
             minX = Math.min(minX, target.getX());
             minY = Math.min(minY, target.getY());
             minZ = Math.min(minZ, target.getZ());
@@ -228,6 +249,19 @@ public final class AntPathFinder {
         final int x0 = minX, y0 = minY, z0 = minZ, x1 = maxX, y1 = maxY, z1 = maxZ;
         return timed(map, starts, isGoal, cell -> outside(cell.getX(), x0, x1) + outside(cell.getY(), y0, y1)
                 + outside(cell.getZ(), z0, z1), maxExpansions, costs);
+    }
+
+    /** Whether a cell with no floor has anything else a walk can end on: a channel, a wall or a ceiling to hold. */
+    private static boolean hasHold(CellMap map, BlockPos cell) {
+        if (map.channelSides(cell) != 0) {
+            return true;
+        }
+        for (Direction surface : Direction.values()) {
+            if (surface != Direction.DOWN && Foothold.isValid(map, cell, surface)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /** How far {@code at} lies outside the range {@code low} to {@code high} (0 inside it). */
@@ -250,12 +284,13 @@ public final class AntPathFinder {
     @Nullable
     private static Route timed(CellMap map, List<Foothold> starts, Predicate<Foothold> isGoal, ToDoubleFunction<BlockPos> estimate,
             int maxExpansions, StepCosts costs) {
+        searchesRun++;
         boolean timed = Perf.begin(Perf.Part.ROUTES);
         long started = System.nanoTime();
         int[] steps = new int[1];
         Route route = null;
         try {
-            route = search(map, starts, isGoal, estimate, maxExpansions, costs, steps);
+            route = search(memoOffForTests ? map : new SearchMemo(map), starts, isGoal, estimate, maxExpansions, costs, steps);
             return route;
         } finally {
             if (timed) {
@@ -665,6 +700,17 @@ public final class AntPathFinder {
         }
         if (kind == StepKind.INTO_MOUTH && !map.isMouth(to.cell())) {
             return "no mouth any more at " + to;
+        }
+        if (kind == StepKind.INTO_CHANNEL || kind == StepKind.OUT_OF_CHANNEL) {
+            // The opening it goes in or out by, not just any side of the channel (a window sealed in front of it while
+            // the channel's other sides stay open, review R2-19).
+            BlockPos channel = kind == StepKind.INTO_CHANNEL ? to.cell() : from.cell();
+            BlockPos outside = kind == StepKind.INTO_CHANNEL ? from.cell() : to.cell();
+            Direction side = Direction.getNearest(outside.getX() - channel.getX(), outside.getY() - channel.getY(),
+                    outside.getZ() - channel.getZ());
+            if (!Channel.has(map.channelSides(channel), side)) {
+                return "the opening between " + from + " and " + to + " closed";
+            }
         }
         if (kind == StepKind.CRAWL_CHANNEL) {
             Direction d = Direction.getNearest(to.cell().getX() - from.cell().getX(), to.cell().getY() - from.cell().getY(),

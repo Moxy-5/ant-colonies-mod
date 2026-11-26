@@ -57,6 +57,8 @@ public class AntNavigator {
     private static final int DOORWAY_STEP_TICKS = 400;
     /** Waiting this long for a falling insect to land is the most. */
     private static final int FALL_TICKS = 200;
+    /** For this many ticks a walk that found no route is answered "no" again without a search (half a second, BUGS 317's wait). */
+    private static final int NO_WAY_MEMORY = 10;
     private static final int MAX_REPLANS = 3;
     /** Farther than this (in blocks) from the middle of the cell its step goes to, the insect was knocked off its route. */
     private static final double OFF_THE_ROUTE = 3.0;
@@ -138,6 +140,15 @@ public class AntNavigator {
     /** The shared route's step {@code k} is step {@code k + sharedOffset} of {@link #route}. */
     private int sharedOffset;
     private double speed = 1.0;
+    /** The last walk that found no route: its goal (null: none remembered), where the insect stood, and when ({@link #askedInVainJustNow}). */
+    @Nullable
+    private BlockPos noWayGoal;
+    private BlockPos noWayFrom = BlockPos.ZERO;
+    @Nullable
+    private Foothold noWayFoothold;
+    @Nullable
+    private Set<BlockPos> noWayCells;
+    private long noWayAt;
     private boolean failed;
     private int replans;
     private int stepTicks;
@@ -245,6 +256,9 @@ public class AntNavigator {
 
     /** {@link #keepApart}: packed in, it looks for a free spot again from this tick (its own tick count). */
     private int freeSearchAfter;
+    /** The free spot its last look found (null: none), walked to until the next look. */
+    @Nullable
+    private Vec3 freeSpotFound;
     /** The game time it stopped walking (the newcomer to a crowd gives way to those who stood there first); none while walking. */
     private long standSince = Long.MAX_VALUE;
     /** Ticks it has waited behind the body in front of it (following or with no room to pass). */
@@ -382,6 +396,23 @@ public class AntNavigator {
         return true;
     }
 
+    /**
+     * The body cannot move by itself (paralysed, gripped, calling for help, carried, dead): the legs let go of any wall
+     * or ceiling, so it falls and lies like any body. While it is frozen the legs are not ticked; before, they went on
+     * saying "on a wall", and the game slid the body down it like on a ladder, drawn as climbing (review R2-28). In a
+     * channel it stays the channel's. A walk under way is kept: free again, it plans from where it landed.
+     */
+    public void letGo() {
+        if (at != null && !at.isFloor() && !at.isChannel()) {
+            at = null;
+        }
+        surface = Direction.DOWN;
+        attached = false;
+        exact = false;
+        motion = Vec3.ZERO;
+        startLeg();
+    }
+
     /** Stops walking. An insect on a wall keeps holding on where it is. */
     public void stop() {
         if (route != null) {
@@ -402,6 +433,13 @@ public class AntNavigator {
      */
     private boolean begin(BlockPos goal, @Nullable Foothold foothold, @Nullable Predicate<Foothold> test, int reach,
             @Nullable Collection<BlockPos> cells, @Nullable Route shared, double speed, AntPathFinder.StepCosts mindCosts) {
+        if (askedInVainJustNow(goal, foothold, test, cells, shared, mindCosts)) {
+            // The same question as a moment ago, when no route was found: the same answer, without the search.
+            stop();
+            this.goal = goal.immutable();
+            failed = true;
+            return false;
+        }
         this.goal = goal.immutable();
         this.goalFoothold = foothold;
         this.goalTest = test;
@@ -592,7 +630,8 @@ public class AntNavigator {
             Foothold landing = AntPathFinder.landing(map, ant.blockPosition());
             if (landing != null) {
                 starts.add(landing);
-            } else {
+            } else if (!map.isOpen(ant.blockPosition()) || !map.isOpen(ant.blockPosition().below())) {
+                // (Or right over something closed that is no floor: bobbing at a pond's surface, on a slab's top.)
                 // Inside a block that is not open (a thin plate of mud put down where it stood, the user's bug of
                 // 2026-10-14): from the open spots beside it, which it can step out to.
                 // Also a ramp it stands on with a block put on top of it (BUGS 148: a termite on a mound ramp, a
@@ -613,21 +652,49 @@ public class AntNavigator {
                         starts.add(beside);
                     }
                 }
+                if (starts.isEmpty() && map.isOpen(ant.blockPosition().above())) {
+                    // On a block whose top is no floor to the legs though the body rests on it (a path block, farmland:
+                    // its feet are in the block's own cell), or in water level with its bank: nothing beside it at its
+                    // own height. Up onto the ground one step up beside it, corners too (review R2-38: it never found
+                    // a start again and stood there for good).
+                    for (int dx = -1; dx <= 1; dx++) {
+                        for (int dz = -1; dz <= 1; dz++) {
+                            BlockPos up = ant.blockPosition().offset(dx, 1, dz);
+                            if ((dx != 0 || dz != 0) && Foothold.isValid(map, up, Direction.DOWN)) {
+                                starts.add(Foothold.floor(up));
+                            }
+                        }
+                    }
+                }
                 fromBeside = !starts.isEmpty();
             }
+            // (In open air with open air under it and no floor within a fall: no start. It plans once it has landed;
+            // before, a falling insect was taken for shut in and put on a wall beside its fall, review R2-3.)
         }
         long now = ant.level().getGameTime();
         avoid.values().removeIf(until -> until <= now);
         AntPathFinder.StepCosts costs = avoid.isEmpty() ? mindCosts
                 : mindCosts.and((from, to, kind) -> avoid.containsKey(to) ? 50.0 : 0.0);
         Route found = null;
-        if (!starts.isEmpty() && mayHaveGoal()) {
+        if (!starts.isEmpty() && mayHaveGoal(map)) {
             Perf.asking(ant.getType().builtInRegistryHolder().key().location().getPath() + " " + ant.runningGoals()
                     + (replans > 0 ? " (again)" : ""));
             try {
-                // Keeping to its habits if it can; if no route does, without them.
-                found = habits == AntPathFinder.StepCosts.NONE ? null : search(map, starts, costs.and(habits));
-                if (found == null) {
+                // Keeping to its habits if it can; if no route does, without them. (When no habit had a say in the
+                // first search, the second would be the same search over again: with no way at all, one search, not
+                // two, review R2-16.)
+                boolean[] habitSpoke = {habits == AntPathFinder.StepCosts.NONE};
+                if (habits != AntPathFinder.StepCosts.NONE) {
+                    AntPathFinder.StepCosts walkHabits = habits;
+                    found = search(map, starts, costs.and((from, to, kind) -> {
+                        double extra = walkHabits.extra(from, to, kind);
+                        if (extra != 0.0) {
+                            habitSpoke[0] = true;
+                        }
+                        return extra;
+                    }));
+                }
+                if (found == null && habitSpoke[0]) {
                     found = search(map, starts, costs);
                 }
             } finally {
@@ -636,6 +703,11 @@ public class AntNavigator {
         }
         failed = found == null;
         route = found;
+        if (found == null) {
+            rememberNoWay();
+        } else {
+            noWayGoal = null;
+        }
         if (goalCells != null) {
             // The nearest of the cells is chosen: planning again keeps to it.
             goalCells = null;
@@ -692,17 +764,58 @@ public class AntNavigator {
     }
 
     /**
+     * Whether this very walk was asked for from this very cell less than {@link #NO_WAY_MEMORY} ticks ago and no route
+     * was found (review R2-1). A mind that asks again at once after "no way" (docs/BUGS.md 76, 317, 354 and the care
+     * goals of R2-37 each did) then costs no search: the rule is kept here, once, for every mind. Only walks whose
+     * question can be compared: to a cell, a foothold or a choice of cells, with no costs of the mind's own (a walk
+     * with a test of the mind's is a new question each time).
+     */
+    private boolean askedInVainJustNow(BlockPos goal, @Nullable Foothold foothold, @Nullable Predicate<Foothold> test,
+            @Nullable Collection<BlockPos> cells, @Nullable Route shared, AntPathFinder.StepCosts mindCosts) {
+        if (noWayGoal == null || test != null || shared != null || mindCosts != AntPathFinder.StepCosts.NONE) {
+            return false;
+        }
+        long now = ant.level().getGameTime();
+        if (now < noWayAt || now - noWayAt >= NO_WAY_MEMORY) {
+            noWayGoal = null;
+            return false;
+        }
+        return noWayGoal.equals(goal) && noWayFrom.equals(ant.blockPosition()) && java.util.Objects.equals(noWayFoothold, foothold)
+                && (cells == null ? noWayCells == null : noWayCells != null && noWayCells.size() == cells.size() && noWayCells.containsAll(cells));
+    }
+
+    /** Remembers that the walk just planned found no route (see {@link #askedInVainJustNow}). */
+    private void rememberNoWay() {
+        if (goalTest != null || shared != null || mindCosts != AntPathFinder.StepCosts.NONE) {
+            noWayGoal = null;
+            return;
+        }
+        noWayGoal = goal;
+        noWayFrom = ant.blockPosition();
+        noWayFoothold = goalFoothold;
+        noWayCells = goalCells == null ? null : new HashSet<>(goalCells);
+        noWayAt = ant.level().getGameTime();
+    }
+
+    /**
      * False when the walk is known to have no route before any search: the mind promised its goal footholds lie within
      * {@link #goalReach} of the goal cell, and no foothold there passes its test (every kind of foothold a cell can give
      * is tried: each surface, in a channel or not). True otherwise (then the search decides).
      */
-    private boolean mayHaveGoal() {
+    private boolean mayHaveGoal(CellMap map) {
         if (goalTest == null || goalReach < 0 || shared != null) {
             return true;
         }
         for (BlockPos cell : BlockPos.betweenClosed(goal.offset(-goalReach, -goalReach, -goalReach), goal.offset(goalReach, goalReach, goalReach))) {
+            // Only footholds that are really there (a test that only measures the distance says yes to bare air, and
+            // then the shortcut saved nothing, review R2-40); a channel is one foothold, not six (R2-7).
+            Foothold channel = Foothold.channel(cell);
+            if (channel.isValid(map) && goalTest.test(channel)) {
+                return true;
+            }
             for (Direction surface : Direction.values()) {
-                if (goalTest.test(new Foothold(cell, surface, false)) || goalTest.test(new Foothold(cell, surface, true))) {
+                Foothold hold = new Foothold(cell, surface, false);
+                if (hold.isValid(map) && goalTest.test(hold)) {
                     return true;
                 }
             }
@@ -832,12 +945,15 @@ public class AntNavigator {
             next++;
             startLeg();
             stepTicks = 0;
+            replans = 0; // a step done: new plans are counted per place it sticks at, not over a whole long walk (review R2-2)
         } else if (isBlocked()) {
             // Pushing along a surface and getting nowhere: something is in the way that the planner can't see.
             avoid.put(step.to(), ant.level().getGameTime() + AVOID_TICKS);
             replan("blocked on " + describe(step));
             return;
-        } else if (++stepTicks > stepLimit(step)) {
+        } else if (!heldForCrowd() && ++stepTicks > stepLimit(step)) {
+            // (A tick it waited behind another body is not a tick stuck, as in standsTooLong: a walker in a queue
+            // planned again every 6 seconds and gave its errand up, review R2-9.)
             replan("stuck on " + describe(step) + ", motion " + motion);
             return;
         } else if (standsTooLong(step)) {
@@ -1427,6 +1543,7 @@ public class AntNavigator {
         }
         if (!pressed) {
             apartWhy = "not pressed";
+            freeSpotFound = null;
             return;
         }
         double push = Math.sqrt(pushX * pushX + pushZ * pushZ);
@@ -1438,7 +1555,9 @@ public class AntNavigator {
                 to = want;
             }
         }
-        if (to == null && ant.tickCount >= freeSearchAfter) {
+        if (to == null && ant.tickCount < freeSearchAfter) {
+            to = freeSpotFound; // the spot the last look found: it walks on to it, and looks again a little later
+        } else if (to == null) {
             freeNotClear = freeNotStandable = freePastWall = 0;
             // Pushed into a wall, off an edge, into others, or squeezed from all sides alike: the nearest free spot round
             // it, near first, then a little farther (a crowd overflowing a cell spills into the cells round it).
@@ -1446,8 +1565,12 @@ public class AntNavigator {
             if (to == null) {
                 to = freeNear(ant.position(), mine, FREE_REACH_FAR, 0.15);
             }
+            // One look every FREE_RETRY ticks, found or not: a look is a few hundred checks, and two bodies of
+            // different sizes standing in the thin band between "pressed" and "clear" looked every tick for as long as
+            // they stood (review R2-8).
+            freeSearchAfter = ant.tickCount + FREE_RETRY;
+            freeSpotFound = to;
             if (to == null) {
-                freeSearchAfter = ant.tickCount + FREE_RETRY; // (packed in: it stands, and looks again a little later)
                 ColonyFrameworkMod.LOGGER.debug("[crowd] ant {} at {} found no free spot: {} spots taken, {} no ground or no room, {} past a wall",
                         ant.getId(), ant.position(), freeNotClear, freeNotStandable, freePastWall);
             }
@@ -1485,7 +1608,18 @@ public class AntNavigator {
     private boolean standable(Vec3 point) {
         double dx = point.x - ant.getX();
         double dz = point.z - ant.getZ();
-        return fits(point) && !ant.level().noCollision(ant, ant.getBoundingBox().move(dx, -0.2, dz));
+        if (!fits(point) || ant.level().noCollision(ant, ant.getBoundingBox().move(dx, -0.2, dz))) {
+            return false;
+        }
+        // And ground to the route planner too, or its own cell (no worse than where it is): the top of a path block or
+        // farmland holds the body up but gives the legs no start for a route, so a shuffle onto one left it standing
+        // there for good (review R2-38: one rule of "can it stand here", the planner's).
+        BlockPos cell = BlockPos.containing(point.x, ant.getY() + 0.01, point.z);
+        if (cell.equals(ant.blockPosition())) {
+            return true;
+        }
+        CellMap map = new LevelCellMap(ant.level(), ant);
+        return Foothold.isValid(map, cell, Direction.DOWN) || map.isSlope(cell.below()) && Foothold.isValid(map, cell.below(), Direction.DOWN);
     }
 
     /**

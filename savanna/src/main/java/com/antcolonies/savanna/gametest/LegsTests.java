@@ -795,6 +795,131 @@ public class LegsTests {
         });
     }
 
+    /**
+     * Review round 2 (R2-1, R2-16, R2-20, R2-37): a walk with no way to it costs one route search, not one each time the
+     * mind asks again (the care goals asked every tick), not two for an insect with walk habits when no habit had a say,
+     * and none for a goal cell in mid-air. The goal is the inside of a shut stone box on open ground: open, with a floor,
+     * and no way in.
+     */
+    @GameTest(template = "arena", timeoutTicks = 200, skyAccess = true)
+    public static void askingAgainAfterNoWayCostsNoSearch(GameTestHelper helper) {
+        buildNest(helper);
+        int c = MIDDLE - 7;
+        for (int dx = -1; dx <= 1; dx++) {
+            for (int dy = 0; dy <= 2; dy++) {
+                for (int dz = -1; dz <= 1; dz++) {
+                    if (dx != 0 || dy != 1 || dz != 0) {
+                        helper.setBlock(new BlockPos(c + dx, SURFACE + dy, c + dz), Blocks.STONE);
+                    }
+                }
+            }
+        }
+        BlockPos inBox = helper.absolutePos(new BlockPos(c, SURFACE + 1, c));
+        BlockPos inTheAir = helper.absolutePos(new BlockPos(MIDDLE + 5, SURFACE + 6, MIDDLE - 6));
+        AbstractAntEntity ant = TestAnts.lone(helper, SavannaEntities.MATABELE_MINOR.get(), MIDDLE + 5, SURFACE, MIDDLE + 5);
+        AbstractAntEntity withHabits = TestAnts.lone(helper, SavannaEntities.TERMITE_WORKER.get(), MIDDLE + 7, SURFACE, MIDDLE + 5);
+        withHabits.setWalkHabitsForTests(com.antcolonies.nav.Doorway.avoidMouths(helper.getLevel()));
+        helper.runAfterDelay(10, () -> {
+            int before = com.antcolonies.nav.AntPathFinder.searchesRunForTests();
+            helper.assertFalse(ant.getNavigator().moveTo(inBox, 1.0), "there is a way into the shut box");
+            helper.assertTrue(com.antcolonies.nav.AntPathFinder.searchesRunForTests() == before + 1, "the first ask did not search once: "
+                    + (com.antcolonies.nav.AntPathFinder.searchesRunForTests() - before));
+            for (int i = 0; i < 5; i++) {
+                helper.assertFalse(ant.getNavigator().moveTo(inBox, 1.0), "there is a way into the shut box");
+            }
+            helper.assertTrue(ant.getNavigator().hasFailed() && ant.getNavigator().isDone(), "asked in vain, the legs do not say the walk failed");
+            helper.assertTrue(com.antcolonies.nav.AntPathFinder.searchesRunForTests() == before + 1, "asking again at once searched again: "
+                    + (com.antcolonies.nav.AntPathFinder.searchesRunForTests() - before) + " searches");
+            helper.assertFalse(ant.getNavigator().moveTo(inTheAir, 1.0), "there is a way to a cell in mid-air");
+            helper.assertTrue(com.antcolonies.nav.AntPathFinder.searchesRunForTests() == before + 1, "a goal cell in mid-air was searched for");
+            int habitsBefore = com.antcolonies.nav.AntPathFinder.searchesRunForTests();
+            helper.assertFalse(withHabits.getNavigator().moveTo(inBox, 1.0), "there is a way into the shut box");
+            helper.assertTrue(com.antcolonies.nav.AntPathFinder.searchesRunForTests() == habitsBefore + 1,
+                    "with habits that ruled nothing out, no way cost " + (com.antcolonies.nav.AntPathFinder.searchesRunForTests() - habitsBefore) + " searches");
+        });
+        helper.runAfterDelay(30, () -> {
+            // Half a second on the question is asked afresh (the box may have been opened): a search again.
+            int before = com.antcolonies.nav.AntPathFinder.searchesRunForTests();
+            helper.assertFalse(ant.getNavigator().moveTo(inBox, 1.0), "there is a way into the shut box");
+            helper.assertTrue(com.antcolonies.nav.AntPathFinder.searchesRunForTests() == before + 1, "a second later the legs still answered from memory");
+            // Measured, not asserted (review R2-17): a search that finds no way, with and without its memory of blocks.
+            List<Foothold> from = List.of(Foothold.floor(ant.blockPosition()));
+            com.antcolonies.nav.CellMap map = new com.antcolonies.nav.LevelCellMap(helper.getLevel(), ant);
+            long[] best = {Long.MAX_VALUE, Long.MAX_VALUE};
+            for (int round = 0; round < 6; round++) {
+                for (int memo = 0; memo < 2; memo++) {
+                    com.antcolonies.nav.AntPathFinder.memoOffForTests = memo == 0;
+                    long started = System.nanoTime();
+                    com.antcolonies.nav.AntPathFinder.find(map, from, inBox, com.antcolonies.nav.AntPathFinder.DEFAULT_MAX_EXPANSIONS,
+                            com.antcolonies.nav.AntPathFinder.StepCosts.NONE);
+                    best[memo] = Math.min(best[memo], System.nanoTime() - started);
+                }
+            }
+            com.antcolonies.nav.AntPathFinder.memoOffForTests = false;
+            SavannaMod.LOGGER.info("[r2] a search that finds no way: {} ms without the memory of blocks, {} ms with it",
+                    String.format("%.2f", best[0] / 1.0e6), String.format("%.2f", best[1] / 1.0e6));
+            // And a way that is there is found at once after a "no" to another question.
+            BlockPos near = helper.absolutePos(new BlockPos(MIDDLE + 3, SURFACE, MIDDLE + 5));
+            helper.assertTrue(ant.getNavigator().moveTo(near, 1.0), "no way to a cell on open ground beside it");
+            helper.succeed();
+        });
+    }
+
+    /**
+     * Review round 2 (R2-28): an insect frozen while it holds a wall (here paralysed by a sting) lets go and falls to
+     * the floor like any body. Before, its legs went on saying "on a wall" while they did not run: the game slid it
+     * down like on a ladder and it was drawn as climbing, at the wall's foot too.
+     */
+    @GameTest(template = "arena", timeoutTicks = 400, skyAccess = true)
+    public static void anInsectParalysedOnAWallLetsGoAndFalls(GameTestHelper helper) {
+        buildNest(helper);
+        int x = MIDDLE + 6;
+        int z = MIDDLE - 6;
+        for (int dy = 0; dy < 5; dy++) {
+            helper.setBlock(new BlockPos(x, SURFACE + dy, z), Blocks.STONE);
+        }
+        AbstractAntEntity ant = TestAnts.lone(helper, SavannaEntities.MATABELE_MINOR.get(), x + 3, SURFACE, z);
+        Foothold high = new Foothold(helper.absolutePos(new BlockPos(x + 1, SURFACE + 3, z)), Direction.WEST);
+        boolean[] stung = {false};
+        helper.runAfterDelay(10, () -> helper.assertTrue(ant.getNavigator().moveTo(high, 1.0), "no way up the pillar's side"));
+        helper.onEachTick(() -> {
+            if (!stung[0] && helper.getTick() > 10 && ant.getNavigator().isDone() && ant.getNavigator().isClimbing()
+                    && ant.getY() > helper.absolutePos(new BlockPos(x, SURFACE + 2, z)).getY()) {
+                ant.paralyseForTests();
+                stung[0] = true;
+            }
+        });
+        helper.succeedWhen(() -> {
+            helper.assertTrue(stung[0], "the ant has not climbed the pillar yet");
+            helper.assertTrue(!ant.getNavigator().isClimbing() && !ant.getNavigator().isAttached() && !ant.isClimbing(),
+                    "paralysed on a wall, its legs still say it holds the wall");
+            helper.assertTrue(ant.onGround() && ant.getY() < helper.absolutePos(new BlockPos(x, SURFACE, z)).getY() + 0.1,
+                    "paralysed on a wall, it has not fallen to the floor (at height " + ant.getY() + ")");
+        });
+    }
+
+    /**
+     * Review round 2 (R2-38): an insect whose feet are in a block's own cell, on a top that is no floor to the route
+     * planner (a path block, 15 pixels tall: a shovel on the grass under it, a village path), with solid ground all
+     * round at its own height, still finds a start for a walk: up onto the ground beside it. Before, it never planned
+     * a route again and stood there for good.
+     */
+    @GameTest(template = "arena", timeoutTicks = 400, skyAccess = true)
+    public static void anInsectOnAPathBlockWalksOffIt(GameTestHelper helper) {
+        buildNest(helper);
+        int x = MIDDLE - 6;
+        int z = MIDDLE + 6;
+        helper.setBlock(new BlockPos(x, SURFACE - 1, z), Blocks.DIRT_PATH);
+        AbstractAntEntity ant = TestAnts.lone(helper, SavannaEntities.MATABELE_MINOR.get(), x, SURFACE, z);
+        BlockPos goal = helper.absolutePos(new BlockPos(x + 4, SURFACE, z));
+        helper.runAfterDelay(20, () -> {
+            helper.assertTrue(ant.blockPosition().getY() == goal.getY() - 1, "the ant's feet are not in the path block's cell: " + ant.position());
+            helper.assertTrue(ant.getNavigator().moveTo(goal, 1.0), "no way off the path block");
+        });
+        helper.succeedWhen(() -> helper.assertTrue(helper.getTick() > 20 && ant.getNavigator().isDone() && !ant.getNavigator().hasFailed()
+                && ant.blockPosition().equals(goal), "the ant has not walked off the path block to its goal"));
+    }
+
     private static void watch(GameTestHelper helper, AbstractAntEntity ant) {
         TestWatch.watch(helper, ant, true);
     }

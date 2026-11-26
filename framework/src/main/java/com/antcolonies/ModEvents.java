@@ -84,6 +84,8 @@ public class ModEvents {
     public static void onServerStopped(net.neoforged.neoforge.event.server.ServerStoppedEvent event) {
         com.antcolonies.watch.Watch.clear();
         com.antcolonies.watch.Labels.clear();
+        com.antcolonies.nav.Crowd.clear();
+        com.antcolonies.fight.HeldCells.clear();
     }
 
     /** A player who leaves takes their labels with them. */

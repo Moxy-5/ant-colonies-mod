@@ -32,6 +32,11 @@ public final class HeldCells {
     private HeldCells() {
     }
 
+    /** Forgets every world's held cells (the server stopped: the holders would keep their closed world in memory, review R2-22). */
+    public static void clear() {
+        HELD.clear();
+    }
+
     /** The insect holds this cell, which it stands in, for the next few ticks. */
     public static void hold(AbstractAntEntity holder, BlockPos cell) {
         if (holder.level().isClientSide) {
