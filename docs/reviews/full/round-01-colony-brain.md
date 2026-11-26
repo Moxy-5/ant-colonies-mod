@@ -207,3 +207,117 @@ slices came in, not by grade); a fix session adds a status line under a finding 
   refusing to bury anything not of the colony.
 - `RunwayRoute`: a bounded search (4,000). `ForagingTrails`: visits capped at 128, `lastExit` at 512.
 - No species named, no `level.getRandom()` for colony dice, no season read.
+
+---
+
+## Slice: the nest
+
+`Nest`, `NestWalls`, `NestPlan`, `NestLife`, `NestLayout`, `NestLedger`, `TunnelRoute`, `BuildLife`, `GroundReader`,
+`GroundTop`. Every line read.
+
+### R1-16 (A, proven; checked again; to measure): every builder looking for work scans the whole nest for leaks
+
+- **What is wrong:** `SealGoal.canUse` (62 to 70) runs for every builder each time `looksForWork(20)` lets it and calls
+  `colony.walls().findLeak`, which calls `NestWalls.getLeaks` (61 to 90) with nothing kept between calls. `getLeaks`
+  builds `nestCells` anew, flood-fills every joined cell, and for each cell and each of its 6 sides reads a block and
+  asks `foragingHoles().isHole`, itself a walk over every tunnel (`ForagingHoles:128-135`); a second 6-side loop looks
+  for walk-through food; every leak found runs `findPlugSpot`. So about cells times 6 times holes, and every builder
+  gets the same answer. `canContinueToUse` adds `isLeakOpen` every tick for each sealer.
+- **What the player sees:** tick cost that grows with the mound and with the number of real builders; with 15 to 20
+  builders about one whole scan a tick.
+- **Fix proposed:** keep the colony's leak list, worked out at most once every 20 ticks (as `isInside` keeps its cells
+  for the tick); only the cheap claim and score loop runs for each ant.
+
+### R1-17 (A, proven; checked again; to measure): on return the nest ledger does a whole second's changes in one tick
+
+- **What is wrong:** `AwayLife.settle` (once a second, line 514) calls `colony.ledger().apply`. `apply`
+  (`NestLedger:94-103`) runs `applyBodies`, `addToStore`, `applyNurseFood`, `applyAges` and `takeFromStore`, each up
+  to `PER_SECOND = 200` changes, all in that one tick, each try working its room list out again. `BuildLife` has
+  `PER_TICK = 20` for exactly this ("a colony coming back froze the game about 200 ms once", 2026-11-10); the ledger
+  never got it.
+- **What the player sees:** a freeze when walking up to a colony that was away for long.
+- **Fix proposed:** the same slice of about 20 changes a tick, run from `catchUpSlice`; each room list worked out once
+  a slice.
+
+### R1-18 (A, the reads proven and checked again; how often, likely): reading a cell's neighbours can load land that is not ready
+
+- **What is wrong:** `GroundReader.mayDig` and `isDug` (78 to 95) check `LandReady.at` for the cell itself and then
+  call `touchesFluid` (97 to 104), which reads the fluid of all 6 neighbours with no check. `TunnelRoute.plan` searches
+  up to 6,000 columns outward; its edge stops at the last loaded column, whose sideways neighbour is in the next
+  chunk. The same unguarded neighbour read: `Nest.touchesFluid` (every `firstDiggable`, 1084 to 1086, 1144 to 1151),
+  `NestLayout.allSoilOrAir` (248) and `isCovered` (234, 236), `NestWalls.hasWallToClingTo` (688). Together with R1-8's
+  `ForagingHoles.touchesFluid` this is one family: the cell is guarded, its neighbours are not.
+- **What the player sees:** stalls of half a second or more when a colony near the edge of loaded land plans a
+  gallery or digs at a chunk border.
+- **Fix proposed:** one shared "touches fluid" helper in which a neighbour that is not `LandReady.at` gives the
+  careful answer (fluid, not covered, no wall), used by all five places.
+
+### R1-19 (A, proven in `Nest`; checked again; how often, likely): a foraging tunnel not fitted to a hillside the first time is never fitted again
+
+- **What is wrong:** `getForagingTunnels` (860 to 875) runs `fitToGround` when `planned != foragingTunnelsFor` and then
+  sets `foragingTunnelsFor = planned` whether or not the fit finished. In `fitToGround` (907 to 947) a tunnel whose
+  hole's chunk is not ready is added flat and `allLoaded = false`, so `fittedTunnels` stays null; the layout object
+  does not change in a sitting, so the fit is not tried again until a reload. Termite holes are 8 blocks out, often in
+  the next chunk, and `nestCells` asks for the tunnels from the colony's first tick. After a reload `opened` (929 to
+  931) keeps the flat tunnel if its hole was dug meanwhile.
+- **What the player sees:** on a slope, a foraging hole under the soil the termites cannot get out of (the bug of
+  2026-10-14 again), for colonies made as their land loads.
+- **Fix proposed:** set `foragingTunnelsFor` only when the fit finished.
+
+### R1-20 (A, likely; checked again): while no nest plan fits, the room planner runs on every call and a shaft is dug anyway
+
+- **What is wrong:** `getLayout` (1097 to 1106): `if (layout == null) layout = new NestLayout.Planner(...).choose(level)`.
+  `choose` gives null when nothing fits (and when land is not loaded); nothing is remembered, so every call plans
+  again: about 1,000 `LandReady` checks, then 2 depths times 4 directions of rooms, each cell with its 6 fluid reads.
+  `getLayout` is called many times a tick for each colony (`nestCells` alone 3 times). Meanwhile `findDigTarget`
+  (237 to 245) digs `shaftDepth(level)`, the default 3, with no plan.
+- **Unchecked link:** whether a colony can stand where no plan fits (a queen put on thin soil over stone or beside
+  water; ground that turns bad later).
+- **What the player sees:** such a colony lags the server and sits at the foot of a 3-block hole for ever.
+- **Fix proposed:** remember "no plan" with the game time and try again every few seconds; no shaft before a plan.
+
+### R1-21 (B, proven by its reader; to measure): `nestCells` is rebuilt on every call
+
+- **Where:** `Nest.java:826-854`, `977-1021` (998 to 1000), `702`, `1081-1083`; `FoodWays.java:166-167`;
+  `NestWalls.java:62`, `176`, `295`, `410`, `478`, `540`, `587`.
+- **What is wrong:** a new set each call (shaft, layout, the mound's tunnels, every foraging tunnel, the galleries).
+  `isInside` keeps its answer for the tick, but working it out asks `isRunwayClosed` for each runway, one more whole
+  rebuild a runway, every tick.
+- **Fix proposed:** keep `nestCells` like `inside`: once a game tick, cleared by `waysChanged()` and a layout change.
+  This also takes most of R1-16's cost.
+
+### R1-22 (B, proven by its reader): the catch-up digs the founders' chamber by weaker rules than the real diggers
+
+- **Where:** `BuildLife.java:279-301`; `Nest.java:605-639` (630 to 637); against `Nest.java:1084-1086`.
+- **What is wrong:** real diggers take a block only through `firstDiggable` (a place to stand, no fluid beside it);
+  `foundersDigLeft` lists every soil cell with neither check and `settleFounders` digs them all. Two places judging
+  "may this block be dug". Water come beside the chamber since the plan floods it on return.
+- **Fix proposed:** `foundersDigLeft` leaves out (or stops at) cells that touch fluid.
+
+### R1-23 (C, proven by its reader): progress on a leak or a dug block is cleared only when the job finishes
+
+- **Where:** `NestWalls.java:41`, `164-166`, `462-463`; `SealGoal.java:129`; `Nest.java:44`, `1153-1160`.
+- **What the player sees:** a breach bitten open again is sealed by one pack instead of several.
+- **Fix proposed:** drop `sealProgress` entries no longer open, in the pruning `findLeak` already does.
+
+### R1-24 (C, proven by its reader): `Nest.isEntranceOpen` reads the block before asking whether the land is ready
+
+- **Where:** `Nest.java:743-746` (the same slip as R1-8). **Fix proposed:** `LandReady.at` first.
+
+### R1-25 (C): two comments sit above the wrong method
+
+- **Where:** `Nest.java:953-964` (`isInside`'s comment above `isFeedingWay`); `NestWalls.java:575-586` (`findPlugSpot`'s
+  comment and `@Nullable` above `plugSpots`, which never gives null).
+
+### Solid in this slice (do not "fix")
+
+- `NestPlan`: the geometry of rooms, stairs, gardens, side rooms and foraging tunnels, the digging order, room sizes.
+- `TunnelRoute`: the search, the hole pre-check, the per-plan memory of tops and diggable cells, `isWalledIn`.
+- `GroundTop`: reads only its own column.
+- `Nest` save and load: nothing found doubled or lost. `isInside`: the once-a-tick answer and the gallery roof rule.
+- `getRoomCells`, `isFinished`, `getHomeChamber`, `isShaftOpen`: all guarded with `LandReady`.
+- `NestWalls`: `wallFirst`, `plate`, `nudgeOut` (never over a stranger), `plugLeak` with `shutsInANestmate`,
+  `casingGaps` (capped at 12), `isOpen` (never replaces a player's solid blocks).
+- `BuildLife`: its limits a tick and a second, the out-of-sight checks, save and load.
+- `NestLife`: no world writes; reads only in `watch` while the queen is loaded.
+- No species named; no `level.getRandom()`.
