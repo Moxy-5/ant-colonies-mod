@@ -67,6 +67,29 @@ public class TermiteTests {
         });
     }
 
+    /**
+     * Review R1-20: where no nest plan fits (one block of soil over rock), the founders dig nothing. Before, they dug the
+     * start of a shaft with no plan to give its depth and sat at the foot of the hole for good.
+     */
+    @GameTest(template = "arena", timeoutTicks = 2000, skyAccess = true)
+    public static void whereNoNestFitsTheFoundersDigNoShaft(GameTestHelper helper) {
+        foundColony(helper, false);
+        for (int x = MIDDLE - 9; x <= MIDDLE + 9; x++) {
+            for (int z = MIDDLE - 9; z <= MIDDLE + 9; z++) {
+                for (int y = 0; y <= SURFACE - 2; y++) {
+                    helper.setBlock(new BlockPos(x, y, z), net.minecraft.world.level.block.Blocks.STONE);
+                }
+            }
+        }
+        helper.runAfterDelay(1500, () -> {
+            Colony colony = colony(helper);
+            helper.assertTrue(colony != null, "no termite colony was founded on the thin soil");
+            helper.assertTrue(colony.nest().getPlannedChambers(helper.getLevel()).isEmpty(), "a nest plan fits in one block of soil over rock");
+            helper.assertTrue(airBelowSurface(helper) == 0, "with no nest plan the founders dug " + airBelowSurface(helper) + " blocks");
+            helper.succeed();
+        });
+    }
+
     /** A queen without a king digs alone and closes the entrance herself. */
     @GameTest(template = "arena", timeoutTicks = 20000, skyAccess = true)
     public static void aQueenWithoutAKingSealsTheEntranceHerself(GameTestHelper helper) {

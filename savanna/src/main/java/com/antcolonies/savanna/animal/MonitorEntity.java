@@ -413,6 +413,12 @@ public class MonitorEntity extends PathfinderMob implements GeoEntity, HasLife {
         if (isPassenger() || isDeadOrDying() || hurtTime > 0 || doing() != CALM && doing() != WATCH) {
             return false;
         }
+        if (cutAt != null) {
+            if (cutAt.distanceToSqr(position()) < 1.0E-6 && Math.abs(Mth.wrapDegrees(getYRot() - cutYaw)) < 0.5F) {
+                return false; // where a move was just cut on its first tick: the old way from here
+            }
+            cutAt = null;
+        }
         boolean afloat = isInWater() && !onGround();
         if (!afloat && (!onGround() || isInWater())) {
             return false;
@@ -764,14 +770,22 @@ public class MonitorEntity extends PathfinderMob implements GeoEntity, HasLife {
         }
     }
 
+    /** Where and how turned it stood when a move was cut on its first tick (null: none since it last moved or turned). */
+    @Nullable
+    private Vec3 cutAt;
+    private float cutYaw;
+
     /** In water it swims where it points, weightless; against a bank with room above it, up and out (as the crocodile). */
     @Override
     public void travel(Vec3 travelVector) {
         if (isControlledByLocalInstance() && !level().isClientSide) {
             BlockMoves.Play c = climb();
             if (c != null ? climbOn(c) : startMove()) {
-                if (c == null) {
-                    climbOn(climb());
+                if (c == null && !climbOn(climb())) {
+                    // cut on its very first tick: nothing has moved. From this same stand the same move would be cut
+                    // again, so it is not started again until the monitor has moved or turned (review R9-37)
+                    cutAt = position();
+                    cutYaw = getYRot();
                 }
                 return;
             }

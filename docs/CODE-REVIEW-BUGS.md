@@ -7,18 +7,18 @@ review files under `docs/reviews/full/`; search there for a finding's number (`R
 a `**Status ...**` line under the finding there and runs the tool. Bugs that did not come from the code
 review stay in `docs/BUGS.md`.
 
-**234 findings: 168 left, 66 done.**
+**234 findings: 167 left, 67 done.**
 
 | Grade | Found | Not started | Open | Half fixed | Fixed | Not a bug after all |
 |---|---|---|---|---|---|---|
 | A: a player can meet it | 51 | 0 | 2 | 5 | 43 | 1 |
-| B: it will cost us when building on this | 106 | 87 | 1 | 3 | 15 | 0 |
+| B: it will cost us when building on this | 106 | 86 | 1 | 3 | 16 | 0 |
 | C: a tidy-up | 77 | 68 | 0 | 2 | 6 | 1 |
 
 | Round | System | Found | Left | Done |
 |---|---|---|---|---|
 | 1 | the colony brain | 50 | 32 | 18 |
-| 2 | the legs | 43 | 26 | 17 |
+| 2 | the legs | 43 | 25 | 18 |
 | 3 | the insect body | not read yet | | |
 | 4 | how bodies are drawn | not read yet | | |
 | 5 | the termites | not read yet | | |
@@ -48,7 +48,7 @@ is left; no word means nobody has started it.
 - **R2-16** a search that finds no way costs about 20 ms, most termite walks run it twice, and nothing limits how many run in a tick
   - *Half fixed:* fixed in part, BUGS 399: no second search when no habit had a say in the first (test `askingAgainAfterNoWayCostsNoSearch`); with R2-1, R2-20 and R2-17. Measured in that test, a search that finds no way on open flat ground: 19.5 ...
 - **R2-38** an insect on a path block, on farmland or in a pond with a low bank can never plan a route again
-  - *Half fixed:* small half fixed, BUGS 401: a start one step up beside it, corners too, and the shuffle no longer moves an insect onto ground the planner refuses (test `anInsectOnAPathBlockWalksOffIt`). Open: an insect in the middle of a path ...
+  - *Half fixed:* small half fixed, BUGS 401: a start one step up beside it, corners too, and the shuffle no longer moves an insect onto ground the planner refuses (test `anInsectOnAPathBlockWalksOffIt`). The path half fixed after, BUGS 412 ...
 
 **Round 7, the giant trees** (`docs/reviews/full/round-07-trees.md`)
 
@@ -62,7 +62,7 @@ is left; no word means nobody has started it.
 - **R9-37** a staged move that is stopped on its very first tick freezes the monitor in place, and starts again every tick
   - *Half fixed:* open (2026-11-24, BUGS 330). Done: the room checks for a climb up, a climb down and a climb out ask for a whole block under both feet and on the middle line, the block the move itself relies on (as the walk into the water already ...
 
-### B: it will cost us when building on this (91 left)
+### B: it will cost us when building on this (90 left)
 
 **Round 1, the colony brain** (`docs/reviews/full/round-01-colony-brain.md`)
 
@@ -89,7 +89,6 @@ is left; no word means nobody has started it.
 - **R2-2** three new plans are all a walk gets, however far it got, and nobody hears the give-up
   - *Half fixed:* BUGS 404: new plans are counted since the last finished step. Open: `Errand` still does not read `hasFailed()` (a change to what `walkOn` means for every goal; left for round 3's fixes), and the landing check still uses ...
 - **R2-18** big step costs fight the fixed cap, and the mud test hides it
-- **R2-21** common part-blocks are neither ground nor passable
 - **R2-29** the way through a chimney mouth still uses one body's lengths
 - **R2-30** nothing can knock an insect off a wall, and nowhere says that is meant
 - **R2-39** a mind pays for the same "no way" again a tick later, and a builder can ask 24 times in one tick
@@ -311,6 +310,7 @@ Fixed, or found to be no bug after all. The number after a finding is its entry 
 - **R2-17** (B) one search reads the same blocks 50 to 60 times per step (BUGS 399)
 - **R2-19** (B) a tunnel window sealed in front of an insect is not seen by the every-tick check (BUGS 407)
 - **R2-20** (B) a goal cell with nothing to hold in it is searched to the cap (BUGS 399)
+- **R2-21** (B) common part-blocks are neither ground nor passable (BUGS 412)
 - **R2-22** (B) two static maps keep a closed world in memory (BUGS 406)
 - **R2-24** (C) comments that disagree with the code
 - **R2-28** (A) a frozen insect on a wall slides down it and is drawn as climbing (BUGS 402, 410)

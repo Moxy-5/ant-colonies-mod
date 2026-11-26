@@ -677,25 +677,8 @@ public class FieldLife {
 
     void save(CompoundTag tag) {
         CompoundTag field = new CompoundTag();
-        ListTag plants = new ListTag();
-        known.forEach((pos, plant) -> {
-            CompoundTag entry = new CompoundTag();
-            entry.putLong("pos", pos.asLong());
-            entry.putInt("kind", plant.kind());
-            entry.putFloat("trip", plant.trip());
-            entry.putBoolean("inside", plant.fromInside());
-            plants.add(entry);
-        });
-        field.put("plants", plants);
-        ListTag pictureList = new ListTag();
-        unknown.forEach((pos, plant) -> {
-            CompoundTag entry = new CompoundTag();
-            entry.putLong("pos", pos.asLong());
-            entry.putInt("kind", plant.kind());
-            entry.putFloat("trip", plant.trip());
-            pictureList.add(entry);
-        });
-        field.put("unknown", pictureList);
+        pack(field, "plant", known);
+        pack(field, "unknown", unknown);
         ListTag cuts = new ListTag();
         owed.forEach((pos, at) -> {
             CompoundTag entry = new CompoundTag();
@@ -712,12 +695,14 @@ public class FieldLife {
         unknown.clear();
         owed.clear();
         CompoundTag field = tag.getCompound("field");
+        unpack(field, "plant", known);
+        unpack(field, "unknown", unknown);
+        // Worlds saved before 2026-11-26 kept each plant as a record of its own.
         ListTag plants = field.getList("plants", Tag.TAG_COMPOUND);
         for (int i = 0; i < plants.size(); i++) {
             CompoundTag entry = plants.getCompound(i);
             known.put(BlockPos.of(entry.getLong("pos")), new Plant(entry.getInt("kind"), entry.getFloat("trip"), entry.getBoolean("inside")));
         }
-        unknown.clear();
         ListTag pictureList = field.getList("unknown", Tag.TAG_COMPOUND);
         for (int i = 0; i < pictureList.size(); i++) {
             CompoundTag entry = pictureList.getCompound(i);
@@ -727,6 +712,42 @@ public class FieldLife {
         for (int i = 0; i < cuts.size(); i++) {
             CompoundTag entry = cuts.getCompound(i);
             owed.put(BlockPos.of(entry.getLong("pos")), entry.getLong("at"));
+        }
+    }
+
+    /**
+     * A map of plants written as four rows of numbers (places, kinds, trips, from inside) instead of a record for each
+     * plant (review R1-44: the plants were half of the colonies' file, 45 bytes each; this way 14, and the file is built
+     * and written on the server's own thread at every autosave and pause).
+     */
+    static void pack(CompoundTag field, String name, Map<BlockPos, Plant> plants) {
+        long[] places = new long[plants.size()];
+        byte[] kinds = new byte[plants.size()];
+        int[] trips = new int[plants.size()];
+        byte[] inside = new byte[plants.size()];
+        int i = 0;
+        for (Map.Entry<BlockPos, Plant> entry : plants.entrySet()) {
+            places[i] = entry.getKey().asLong();
+            kinds[i] = (byte) entry.getValue().kind();
+            trips[i] = Float.floatToIntBits(entry.getValue().trip());
+            inside[i++] = (byte) (entry.getValue().fromInside() ? 1 : 0);
+        }
+        field.putLongArray(name + "Places", places);
+        field.putByteArray(name + "Kinds", kinds);
+        field.putIntArray(name + "Trips", trips);
+        field.putByteArray(name + "Inside", inside);
+    }
+
+    static void unpack(CompoundTag field, String name, Map<BlockPos, Plant> plants) {
+        long[] places = field.getLongArray(name + "Places");
+        byte[] kinds = field.getByteArray(name + "Kinds");
+        int[] trips = field.getIntArray(name + "Trips");
+        byte[] inside = field.getByteArray(name + "Inside");
+        if (kinds.length != places.length || trips.length != places.length || inside.length != places.length) {
+            return; // a broken record: these plants are found again when the land is looked at
+        }
+        for (int i = 0; i < places.length; i++) {
+            plants.put(BlockPos.of(places[i]), new Plant(kinds[i], Float.intBitsToFloat(trips[i]), inside[i] != 0));
         }
     }
 }
