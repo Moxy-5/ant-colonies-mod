@@ -7,18 +7,18 @@ review files under `docs/reviews/full/`; search there for a finding's number (`R
 a `**Status ...**` line under the finding there and runs the tool. Bugs that did not come from the code
 review stay in `docs/BUGS.md`.
 
-**234 findings: 167 left, 67 done.**
+**234 findings: 166 left, 68 done.**
 
 | Grade | Found | Not started | Open | Half fixed | Fixed | Not a bug after all |
 |---|---|---|---|---|---|---|
 | A: a player can meet it | 51 | 0 | 2 | 5 | 43 | 1 |
-| B: it will cost us when building on this | 106 | 86 | 1 | 3 | 16 | 0 |
+| B: it will cost us when building on this | 106 | 85 | 1 | 3 | 17 | 0 |
 | C: a tidy-up | 77 | 68 | 0 | 2 | 6 | 1 |
 
 | Round | System | Found | Left | Done |
 |---|---|---|---|---|
 | 1 | the colony brain | 50 | 32 | 18 |
-| 2 | the legs | 43 | 25 | 18 |
+| 2 | the legs | 43 | 24 | 19 |
 | 3 | the insect body | not read yet | | |
 | 4 | how bodies are drawn | not read yet | | |
 | 5 | the termites | not read yet | | |
@@ -62,7 +62,7 @@ is left; no word means nobody has started it.
 - **R9-37** a staged move that is stopped on its very first tick freezes the monitor in place, and starts again every tick
   - *Half fixed:* open (2026-11-24, BUGS 330). Done: the room checks for a climb up, a climb down and a climb out ask for a whole block under both feet and on the middle line, the block the move itself relies on (as the walk into the water already ...
 
-### B: it will cost us when building on this (90 left)
+### B: it will cost us when building on this (89 left)
 
 **Round 1, the colony brain** (`docs/reviews/full/round-01-colony-brain.md`)
 
@@ -90,7 +90,6 @@ is left; no word means nobody has started it.
   - *Half fixed:* BUGS 404: new plans are counted since the last finished step. Open: `Errand` still does not read `hasFailed()` (a change to what `walkOn` means for every goal; left for round 3's fixes), and the landing check still uses ...
 - **R2-18** big step costs fight the fixed cap, and the mud test hides it
 - **R2-29** the way through a chimney mouth still uses one body's lengths
-- **R2-30** nothing can knock an insect off a wall, and nowhere says that is meant
 - **R2-39** a mind pays for the same "no way" again a tick later, and a builder can ask 24 times in one tick
   - *Half fixed:* covered in part by R2-1 (BUGS 400): `Errand`'s second ask a tick later costs no search when the walk had no costs of the mind's own. `BuildMoundGoal`'s many asks in one tick are open (round 5).
 - **R2-41** saving an insect that is walking a wall reads the world and loses its hold
@@ -314,6 +313,7 @@ Fixed, or found to be no bug after all. The number after a finding is its entry 
 - **R2-22** (B) two static maps keep a closed world in memory (BUGS 406)
 - **R2-24** (C) comments that disagree with the code
 - **R2-28** (A) a frozen insect on a wall slides down it and is drawn as climbing (BUGS 402, 410)
+- **R2-30** (B) nothing can knock an insect off a wall, and nowhere says that is meant (BUGS 413)
 - **R2-31** (C) every insect pushes the mobs round it every tick, though nothing can push it
 - **R2-32** (C) `AntMoveControl` turns to face east when the point is straight above or below
 - **R2-33** (C) "stepped up close" outlives `stop()` *Not a bug after all.*
