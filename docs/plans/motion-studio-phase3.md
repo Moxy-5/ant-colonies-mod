@@ -38,8 +38,9 @@ round one calf. All five come from the hold being placed by hand round the prey'
    (forepaws on a standing buffalo's haunch, jaws on), the pin aimed at a lying calf's neck, the buffalo bucking under a
    holder and sinking to its knees; each made against the spot's place per size and checked with step 2. Here the pair
    file plays both clips on one clock.
-4. **The strike carries itself (idea 41, BUGS 375):** the leap's travel in its own clip (a path, as the block moves),
-   aimed at the spot it will grip, so it lands there instead of gliding.
+4. **The strike carries itself (idea 41, BUGS 375). Built 2026-11-26 (the user: "Go to step 4"), below.** the leap's
+   travel in its own clip (a path, as the block moves), aimed at the spot it will grip, so it lands there instead of
+   gliding.
 5. **Feeding on the carcass (idea 40, BUGS 376's other half):** feeding spots on the carcass, the `feed` clips aimed at
    them, the feeding turns with no calm tick between.
 
@@ -198,3 +199,50 @@ clamps the throat):**
   the last fix.
 - **Next:** the hunt film (`tools/film/lion_hunt.film`), asked first; then step 4 (the strike carries itself).
 
+## Step 4, built (2026-11-26, the user: "Go to step 4")
+**The starting idea (one sentence):** a strike is a move made once offline with its clip (method M1): the clip holds its
+own travel as a path, and the game places the lioness along that path from where she set off to her place on her
+prey's spot, so the drawn leap and her box can never part (BUGS 375: the move control slid her box 4 to 5 blocks while
+the clip leapt on the spot).
+- **The clips** (`tools/lion_anims.py`, both lion forms): each strike has a `path root` note (one row a game tick, as the
+  block moves), its speed the gallop clip's own (95 px a second at size 1), eased in and out (a smoothstep of the speed,
+  so no jolt). Its feet are solved against the path: planted where they stand (a leg pushes back as the body goes), with
+  the body in the air, planted where they land (a foreleg reaches forward for it). The joints in the air are the old
+  clips' own.
+  - `stalk_leap_bite`: still through its coil (from a creep), off at 0.26 s, a stop as it lands on its bite at 0.80 s:
+    41.8 px (2.5 blocks for a lioness: the old `LEAP_FROM` by chance).
+  - `jump_smack` is played out of a gallop, so its standing coil went (it stopped a running lioness dead): the clip now
+    starts where the coil let go (0.20 s into the old 1.20 s, keys kept; 1.00 s, 20 ticks, its hit at tick 7, the apex
+    swat), on the move from its first tick, landing at 0.58 s: 53.2 px, 72.2 with the blend (4.4 blocks).
+  - Checked offline (`clip_check.py lioness|lion stalk_leap_bite jump_smack --switches`, and each paw's height and
+    slide in the world tick by tick): nothing in the ground, no foot hanging, turns under 90, the 14 clip changes clean;
+    a planted paw slides at most 1 to 2 px in a tick, as it lands (the old clips' own landing shuffle).
+- **The table** (`tools/spots.py`, format 3): a holder's plan lists its strikes and the tick each hits (moved here from
+  `LionHunt`'s `LEAP_HIT` and `SMACK_HIT`: one place); its spot table gets each strike's reach (px at size 1) and its
+  share of it a tick from the strike's start, the blend included: through the blend it goes at its path's starting
+  speed (the leap waits, the smack keeps running). So the game reads one row a tick with no blend rule of its own. The
+  blend is read from the Java and is in the fingerprint.
+- **The game** (`Spots.Strike`, `LionHunt.strikeSpot`, `setOff`, `ride`):
+  - **One rule when to strike, for both:** the free spot nearest her, her place there, where that will be when she
+    lands (the prey going on as it goes now), within the strike's reach at her size. `LEAP_FROM` (2.5 head gap) and
+    `TOUCH` (the smack once touching) are gone.
+  - **She rides from the strike's start:** placed each tick the strike's share of the way from where she set off to her
+    place at the spot, her heading turning with it, on the server and on every screen alike (a screen that learns of the
+    strike a tick late carries on from where it draws her). So she stands through the coil, flies, and lands on her
+    place however the prey moved (it homes in: a strike always lands unless cut).
+  - **From the hit she grips** (its first bite; a calf knocked down); before it she is on her way and does not slow the
+    prey. The leap's hit is its landing; the smack's is its swat in the air, two thirds of the way.
+  - **A block in her way:** her box placed into a block, she lets go (the same rule as no room at her spot), and the
+    clip plays out where she is.
+  - The leap from the stalk starts the fight at once (her mates rush in 0.8 s sooner than before).
+- **Tests** (`land`): `aLeapCarriesItselfOntoItsSpotAndBites` (one out of reach does not set off; one in reach stands
+  through the coil, never faster in a tick than the leap's fastest tick, lands with her jaw on the calf's spot within
+  0.05 the tick the travel ends, having gone no farther than its reach; no grip before the hit; at the hit a bite, the
+  calf down and held) and `aSmackOutOfAGallopLandsOnAWalkingCow` (on the move from its first tick, never back, her jaw on
+  the walking cow's spot within 0.05 as she lands, grips from the hit). Measured: the smack 4.05 blocks in 16 ticks onto
+  a cow that walked 1.29 meanwhile.
+- **Not done here (said, not patched):** the 4-tick blend out of the gallop shows a still pose sliding at gallop speed
+  for 0.2 s (every clip change while moving does); her paw at the smack's hit is not checked against the hide offline
+  (`--pair` checks holds only); a strike's jaw at its hit is not in the table. The film (`tools/film/lion_hunt.film`,
+  asked first) is the judge.
+- **Next:** the hunt film, then step 5 (feeding on the carcass).

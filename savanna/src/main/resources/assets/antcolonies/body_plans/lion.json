@@ -615,5 +615,12 @@
    "bite": 7,
    "takedown_pin": 4
   }
+ },
+ "strikes": {
+  "about": "The clips it strikes prey with and the tick each hits (the Motion Studio phase 3, step 4; moved here from LionHunt's LEAP_HIT and SMACK_HIT: one place). Each carries its own travel in a 'path root' note made with it (tools/lion_anims.py: the leap from the stalk still through its coil, the smack out of a gallop on the move from its first tick, both at the gallop clip's own speed). tools/spots.py writes each strike's reach and its share of it a tick into assets/antcolonies/spots/<model>.json; the game places a striker that share of the way from where it set off to its place on its prey's spot (docs/plans/motion-studio-phase3.md).",
+  "clips": {
+   "stalk_leap_bite": 16,
+   "jump_smack": 7
+  }
  }
 }

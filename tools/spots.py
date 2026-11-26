@@ -30,13 +30,24 @@ A holder's "holds":
   jaw     the bone whose pivot is the point that bites (the plan's role name: carry)
   clips   {clip: the tick it bites}; the game reads the tick from the table (one place)
 
+A holder's "strikes" (step 4, 2026-11-26): the clips it strikes with, each carrying its own travel in a "path root"
+note made with it (tools/lion_anims.py), and the tick it hits:
+  clips   {clip: the tick it hits}
+
 The table (all model px, at size 1, the model's own frame; the game adds where it draws the model and its size):
+
   spots   names in order (the game syncs a spot by its index), each with "out" and its rest place
   clips   {clip: [one row a tick: x, y, z of each spot in order]}
   holds   {clip: {"hit", "jaw": the jaw at the hit, "ticks": the clip's length, "loop"}} (a loop bites at its hit
           every time round)
   pairs   [{"holder", "hold", "size", "clips": [prey clips], "spots": [spot names]}] (the plan's, for the game)
   trunk   the holder's shoulders and hips (z) and half its width: the line two holders keep a width apart
+  strikes {clip: {"hit", "ticks": the clip's length, "lead": the blend (ticks) before its first frame shows, "reach":
+          how far its path goes from the strike's start (px), "share": [one a tick from the strike's start, blend
+          included: how much of its reach it has gone]}}. Through the blend it goes at its path's starting speed (a
+          leap out of a gallop keeps going; one from a stand waits), so the game counts from its start and reads one
+          row a tick, with no blend of its own: it places the striker that share of the way from where it set off to
+          its place on its prey's spot (docs/plans/motion-studio-phase3.md, step 4).
 """
 import hashlib
 import json
@@ -49,7 +60,7 @@ sys.path.insert(0, HERE)
 import body_plan  # noqa: E402
 import clip_check as cc  # noqa: E402
 
-FORMAT = 2                  # changes when the table's layout or the way it is worked out changes
+FORMAT = 3                  # changes when the table's layout or the way it is worked out changes
 RAY_STEP, RAY_REACH = 0.05, 64.0
 
 
@@ -66,7 +77,7 @@ def with_spots():
     out = []
     for model, _mod in body_plan.all_plans(drafts=False):
         data = plan_data(model)
-        if 'spots' in data or 'holds' in data:
+        if 'spots' in data or 'holds' in data or 'strikes' in data:
             out.append(model)
     return out
 
@@ -77,7 +88,9 @@ def fingerprint(animal, data):
     h = hashlib.sha1()
     spots = {k: v for k, v in data.get('spots', {}).items() if k != 'about'}   # what the table is made from
     spots['pairs'] = game_pairs(spots.get('pairs', []), spots.get('at', {}))
-    h.update(json.dumps([FORMAT, spots, data.get('holds'), data.get('legs'), data.get('bones')], sort_keys=True).encode())
+    blend = a.blend_ticks()[0] if 'strikes' in data else None                   # read from the Java: a strike's lead
+    h.update(json.dumps([FORMAT, spots, data.get('holds'), data.get('strikes'), blend, data.get('legs'), data.get('bones')],
+                        sort_keys=True).encode())
     for path in (cc.lab.model_file(a.model_name, 'geo', 'entity', f'{a.model_name}.geo.json'),
                  cc.lab.model_file(a.anim_stem, 'animations', 'entity', f'{a.anim_stem}.animation.json')):
         with open(path, encoding='utf-8') as f:      # the contents, not the bytes: line endings differ between checkouts
@@ -165,6 +178,30 @@ def hold_table(animal, holds):
     return out
 
 
+def strike_table(animal, strikes):
+    """Each strike's hit, length, lead (the blend), reach and share of it a tick from the strike's start."""
+    lead = animal.blend_ticks()[0]
+    out = {}
+    for clip, hit in strikes['clips'].items():
+        if clip not in animal.data:
+            raise SystemExit(f'{animal.name}: no clip {clip} for its strikes')
+        pl = cc.Played(animal, clip)
+        if not pl.clip.path:
+            raise SystemExit(f'{animal.name}: strike {clip} has no "path root" note (its travel)')
+        n = round(pl.length * 20)
+        if hit > n:
+            raise SystemExit(f'{animal.name}: {clip} hits at tick {hit}, past its end')
+        along = [-pl.clip.travel(k / 20)[1] for k in range(n + 1)]
+        start = along[1] - along[0]                                 # through the blend at its starting speed
+        along = [along[0] - j * start for j in range(lead, 0, -1)] + along
+        reach = along[-1] - along[0]
+        if reach <= 0:
+            raise SystemExit(f'{animal.name}: strike {clip} goes nowhere')
+        out[clip] = {'hit': hit, 'ticks': n, 'lead': lead, 'reach': round(reach, 2),
+                     'share': [round((v - along[0]) / reach, 4) + 0.0 for v in along]}
+    return out
+
+
 def game_pairs(pairs, at):
     """The pairs as the game reads them: who holds with which clip, at which prey size, on which clips and spots."""
     return [{'holder': p['holder'], 'hold': p['hold'], 'size': p['size'], 'clips': list(p['clips']),
@@ -184,6 +221,8 @@ def build(animal):
     if 'holds' in data:
         table['holds'] = hold_table(a, data['holds'])
         table['trunk'] = trunk(a)
+    if 'strikes' in data:
+        table['strikes'] = strike_table(a, data['strikes'])
     return table
 
 
@@ -201,6 +240,8 @@ def write(animals):
             what.append(f"{len(s['names'])} spots on {len(s['clips'])} clips ({sum(len(r) for r in s['clips'].values())} ticks)")
         if 'holds' in table:
             what.append(f"{len(table['holds'])} holds")
+        if 'strikes' in table:
+            what.append(', '.join(f"{c} reaching {v['reach']} px" for c, v in table['strikes'].items()))
         print(f'{animal}: ' + ', '.join(what) + f' -> {os.path.relpath(path, body_plan.PROJECT)}')
 
 
