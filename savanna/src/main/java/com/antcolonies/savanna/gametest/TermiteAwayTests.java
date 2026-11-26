@@ -1093,6 +1093,48 @@ public class TermiteAwayTests {
      * settled (termites eat their dead: none lies about) and the piece is in the store. Then two stragglers frozen at the edge while the colony is here: one back
      * after a moment carries on, one back after more than the grace has walked home (it is one of the numbers).
      */
+    /**
+     * Review R1-42 (R1-2 and R1-30): a saved colony that cannot be read (its species' mod gone) costs only itself, and
+     * is written back as it was; a species file with a mistake keeps the numbers the species had, and with none to
+     * keep the loading stops, naming the file. Before, the first threw away every colony of the world and the second
+     * left the species with no numbers at all.
+     */
+    @GameTest(template = "arena", timeoutTicks = 400)
+    public static void aColonyThatCannotBeReadIsKeptAndABrokenSpeciesFileKeepsItsNumbers(GameTestHelper helper) {
+        TermiteScenes.colony(helper, List.of(), colony -> {
+            helper.assertTrue(colony != null, "no termite colony");
+            CompoundTag stranger = colony.save();
+            stranger.putUUID("id", UUID.randomUUID());
+            stranger.putString("species", "nowhere:gone");
+            net.minecraft.nbt.ListTag list = new net.minecraft.nbt.ListTag();
+            list.add(stranger);
+            list.add(colony.save());
+            CompoundTag file = new CompoundTag();
+            file.put("colonies", list);
+            com.antcolonies.colony.ColonyManager opened = com.antcolonies.colony.ColonyManager.loadForTests(file);
+            helper.assertTrue(opened.getColony(colony.getId()) != null, "the good colony was lost beside one that could not be read");
+            helper.assertTrue(opened.unreadCount() == 1, "the colony of a species nobody knows should be kept unread: " + opened.unreadCount());
+            net.minecraft.nbt.ListTag again = opened.save(new CompoundTag(), null).getList("colonies", net.minecraft.nbt.Tag.TAG_COMPOUND);
+            helper.assertTrue(again.size() == 2 && again.stream().anyMatch(saved -> ((CompoundTag) saved).getString("species").equals("nowhere:gone")),
+                    "the unread colony was not written back: " + again.size() + " colonies saved");
+
+            net.minecraft.resources.ResourceLocation species = colony.getSpecies();
+            com.google.gson.JsonObject typo = new com.google.gson.JsonObject();
+            typo.addProperty("castes", "oops");
+            Map<net.minecraft.resources.ResourceLocation, com.google.gson.JsonElement> files = Map.of(species, typo);
+            helper.assertTrue(com.antcolonies.species.SpeciesProfiles.readForTests(files, Map.of(species, colony.profile())).get(species) == colony.profile(),
+                    "a species file with a mistake should keep the numbers the species had");
+            boolean stopped = false;
+            try {
+                com.antcolonies.species.SpeciesProfiles.readForTests(files, Map.of());
+            } catch (IllegalStateException expected) {
+                stopped = expected.getMessage().contains(species.toString());
+            }
+            helper.assertTrue(stopped, "a species file with a mistake and no numbers to keep should stop the loading, naming the file");
+            helper.succeed();
+        });
+    }
+
     @GameTest(template = "arena", timeoutTicks = 900, skyAccess = true)
     public static void aTermiteColonyAwayFoldsItsFrozenInsectsIntoTheNumbersAndPutsThingsBackOnReturn(GameTestHelper helper) {
         ServerLevel level = helper.getLevel();
@@ -1160,6 +1202,11 @@ public class TermiteAwayTests {
             helper.assertTrue(colony.brood().insideCount() == 3, "the egg and 2 nymphs should be numbers: " + colony.brood().insideCount());
             helper.assertTrue(colony.away().getBodiesOwed() == 4 && colony.away().getFoodOwed() == 1,
                     "4 bodies and 1 piece owed expected: " + colony.away().describe(level));
+            // Review R1-43: a folded insect's chunk is loaded again in land where nothing ticks (so its body never
+            // gets its turn to leave) and goes out of range once more: it stays the one number it is, not folded twice.
+            Entity untouched = net.minecraft.world.entity.EntityType.loadEntityRecursive(unloaded.get(workers.get(1)), level, loaded -> loaded);
+            colony.away().freeze(level, untouched);
+            helper.assertTrue(colony.away().isFoldedIn(workers.get(1)), "a folded insect frozen again would be folded into the numbers a second time");
             // Back in range: the chunks load again, with everything that was frozen in them.
             colony.away().setAwayForTests(false);
             unloaded.values().forEach(tag -> loadAgain(level, tag));

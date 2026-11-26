@@ -27,6 +27,12 @@ public class ColonyManager extends SavedData {
     private static final String DATA_NAME = "antcolonies_colonies";
 
     private final Map<UUID, Colony> colonies = new LinkedHashMap<>();
+    /**
+     * Saved colonies that could not be read when the world was opened (its species' mod gone, a word in its record this
+     * version does not know), kept as they were and written back untouched, so nothing is lost and one bad record
+     * never costs the others (review R1-30, R1-42: before, one throw emptied the whole list).
+     */
+    private final java.util.List<CompoundTag> unread = new java.util.ArrayList<>();
 
     public static ColonyManager get(ServerLevel level) {
         return level.getDataStorage().computeIfAbsent(
@@ -225,6 +231,9 @@ public class ColonyManager extends SavedData {
         for (Colony colony : colonies.values()) {
             list.add(colony.save());
         }
+        for (CompoundTag kept : unread) {
+            list.add(kept.copy());
+        }
         tag.put("colonies", list);
         return tag;
     }
@@ -233,9 +242,26 @@ public class ColonyManager extends SavedData {
         ColonyManager manager = new ColonyManager();
         ListTag list = tag.getList("colonies", Tag.TAG_COMPOUND);
         for (int i = 0; i < list.size(); i++) {
-            Colony colony = Colony.load(list.getCompound(i));
-            manager.colonies.put(colony.getId(), colony);
+            CompoundTag saved = list.getCompound(i);
+            try {
+                Colony colony = Colony.load(saved);
+                manager.colonies.put(colony.getId(), colony);
+            } catch (RuntimeException e) {
+                manager.unread.add(saved.copy());
+                com.antcolonies.ColonyFrameworkMod.LOGGER.error("[colony] a saved colony could not be read and is kept as it was (species {}, id {})",
+                        saved.getString("species"), saved.hasUUID("id") ? saved.getUUID("id") : "?", e);
+            }
         }
         return manager;
+    }
+
+    /** Tests only: a colony list read from a save, as when the world is opened. */
+    public static ColonyManager loadForTests(CompoundTag tag) {
+        return load(tag, null);
+    }
+
+    /** How many saved colonies could not be read and are kept as they were. */
+    public int unreadCount() {
+        return unread.size();
     }
 }

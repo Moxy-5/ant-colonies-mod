@@ -155,7 +155,8 @@ public class FieldLife {
         boolean picture = keepsAPicture();
         Set<BlockPos> seen = new HashSet<>();
         for (BlockPos pos : food.plants(level)) {
-            SpeciesProfile.PlantFood plant = numbers.plantFor(level.getBlockState(pos));
+            // (the list is up to 5 seconds old: its land may have gone meanwhile, review R1-47)
+            SpeciesProfile.PlantFood plant = LandReady.at(level, pos) ? numbers.plantFor(level.getBlockState(pos)) : null;
             if (plant == null) {
                 continue;
             }

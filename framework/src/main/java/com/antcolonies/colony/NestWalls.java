@@ -685,7 +685,7 @@ public class NestWalls {
     private static boolean hasWallToClingTo(Level level, BlockPos spot) {
         for (Direction side : Direction.Plane.HORIZONTAL) {
             BlockPos wall = spot.relative(side);
-            if (level.getBlockState(wall).isFaceSturdy(level, wall, side.getOpposite())) {
+            if (LandReady.at(level, wall) && level.getBlockState(wall).isFaceSturdy(level, wall, side.getOpposite())) {
                 return true;
             }
         }

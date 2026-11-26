@@ -140,7 +140,7 @@ public class FoodMap {
                 }
                 Set<BlockPos> news = found.remove(id);
                 if (news != null) {
-                    news.removeIf(plant -> !colony.food().isFoodPlant(level.getBlockState(plant)));
+                    news.removeIf(plant -> LandReady.at(level, plant) && !colony.food().isFoodPlant(level.getBlockState(plant)));
                     if (!news.isEmpty()) {
                         known.addAll(news);
                         ColonyFrameworkMod.LOGGER.debug("[food] {} told the colony of {} plants", id, news.size());

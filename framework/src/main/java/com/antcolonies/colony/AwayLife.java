@@ -252,6 +252,12 @@ public class AwayLife {
         if (!isOn(level)) {
             return;
         }
+        Frozen was = frozen.get(entity.getUUID());
+        if (was != null && was.folded()) {
+            // Folded into the numbers already: its body was loaded again in land where nothing ticks and is leaving
+            // once more. It stays the one number it is (review R1-43: a new record here was folded in a second time).
+            return;
+        }
         Frozen what = frozenOf(level, entity);
         if (what != null) {
             frozen.put(entity.getUUID(), what);
@@ -324,6 +330,9 @@ public class AwayLife {
         long now = level.getGameTime();
         long grownUpAt = mob.getGrownUpAt() == AbstractAntEntity.AGE_NOT_SET ? now : mob.getGrownUpAt();
         foldIn(level, mob.getUUID(), new Frozen(Kind.ADULT, mob.nestCaste(), grownUpAt, loadOf(mob), 0, 0, null, now, false, mob.getLastMeal()));
+        if (!mob.isRemoved()) {
+            mob.discard(); // a number now: its body never stays behind (review R1-45, a scout's stand-in left standing)
+        }
     }
 
     /**

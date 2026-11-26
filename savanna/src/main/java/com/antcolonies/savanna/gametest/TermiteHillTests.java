@@ -190,6 +190,23 @@ public class TermiteHillTests {
                         "the " + tunnel.side() + " hole " + hole.toShortString() + " is not at the surface: " + level.getBlockState(hole)
                                 + " with " + level.getBlockState(hole.above()) + " over it");
             }
+            // Review R1-19: a colony whose holes' land is not made yet when its tunnels are first worked out gets them
+            // flat for now, and fitted to the ground once it is there; before, the flat ones were kept for the whole
+            // sitting (a hole under the soil uphill). The same colony as saved, its fit taken out, read again.
+            net.minecraft.nbt.CompoundTag saved = colony.save();
+            saved.remove("fittedTunnels");
+            Colony early = Colony.load(saved);
+            com.antcolonies.colony.LandReady.pretendNotReadyForTests(colony.getCenter(), 2, true);
+            List<BlockPos> flat;
+            try {
+                flat = early.nest().getForagingTunnels(level).stream().map(NestPlan.ForagingTunnel::hole).toList();
+            } finally {
+                com.antcolonies.colony.LandReady.pretendNotReadyForTests(colony.getCenter(), 2, false);
+            }
+            List<BlockPos> fitted = tunnels.stream().map(NestPlan.ForagingTunnel::hole).toList();
+            helper.assertTrue(flat.size() == 2, "with its land not made the holes should still be planned (flat for now): " + flat);
+            List<BlockPos> later = early.nest().getForagingTunnels(level).stream().map(NestPlan.ForagingTunnel::hole).toList();
+            helper.assertTrue(later.equals(fitted), "the holes planned flat while their land was not made were not fitted to the ground once it was: " + later + ", fitted " + fitted);
             // The shaft and rooms dug at once; the foraging tunnels are left for the workers.
             BlockPos bottom = colony.nest().getShaftBottom(level);
             for (BlockPos pos = colony.getCenter().below(); pos.getY() >= bottom.getY(); pos = pos.below()) {

@@ -231,6 +231,9 @@ record NestLayout(List<NestPlan.Chamber> chambers, List<NestPlan.Chamber> sideRo
                     if (own.contains(next)) {
                         continue;
                     }
+                    if (!LandReady.at(level, next)) {
+                        return false; // land not loaded beside it: not read, and no place to plan a room against
+                    }
                     BlockState state = level.getBlockState(next);
                     // Open to the sky (rooms of the nest dug beside it later are underground and fine), or water.
                     if (!state.getFluidState().isEmpty() || (state.isAir() || state.canBeReplaced()) && level.canSeeSky(next)) {

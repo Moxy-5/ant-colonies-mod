@@ -72,6 +72,8 @@ public class Nest {
     private List<NestPlan.ForagingTunnel> fittedTunnels;
     @Nullable
     private NestLayout foragingTunnelsFor;
+    /** The fit to the ground was left unfinished (a hole's land was not loaded): it is done as soon as that land is there. */
+    private boolean fitUnfinished;
     /** The planned foraging tunnels and the new ones together, worked out again when either changes. */
     private List<NestPlan.ForagingTunnel> allForagingTunnels = List.of();
     private boolean allForagingTunnelsStale = true;
@@ -741,8 +743,11 @@ public class Nest {
 
     /** Whether the entrance hole is open: nothing solid in it (grass or snow do not close it). */
     public boolean isEntranceOpen(Level level) {
+        if (!LandReady.at(level, center)) {
+            return false; // (asked before the block is read: reading land not loaded loads it on the spot, review R1-24)
+        }
         BlockState state = level.getBlockState(center);
-        return LandReady.at(level, center) && state.canBeReplaced() && state.getFluidState().isEmpty();
+        return state.canBeReplaced() && state.getFluidState().isEmpty();
     }
 
     /**
@@ -862,16 +867,23 @@ public class Nest {
         if (planned == null) {
             return List.of();
         }
-        if (planned != foragingTunnelsFor) {
+        // A fit left unfinished (a hole's land not loaded yet) is done as soon as that land is there (review R1-19:
+        // tried once only, a tunnel on a hillside stayed flat for the whole sitting, its hole under the soil).
+        if (planned != foragingTunnelsFor || fitUnfinished) {
             if (fittedTunnels != null) {
                 foragingTunnels = fittedTunnels;
+                fitUnfinished = false;
+                allForagingTunnelsStale = true;
             } else {
                 var numbers = colony.profile().nest();
                 List<NestPlan.ForagingTunnel> flat = NestPlan.foragingTunnels(center, planned.direction(), numbers.foragingHoles(), numbers.foragingHoleDistance());
-                foragingTunnels = fitToGround(level, planned, flat);
+                if (planned != foragingTunnelsFor || isLandReadyFor(level, flat)) {
+                    foragingTunnels = fitToGround(level, planned, flat);
+                    fitUnfinished = fittedTunnels == null;
+                    allForagingTunnelsStale = true;
+                }
             }
             foragingTunnelsFor = planned;
-            allForagingTunnelsStale = true;
         }
         if (allForagingTunnelsStale) {
             List<NestPlan.ForagingTunnel> all = new ArrayList<>(foragingTunnels);
@@ -904,6 +916,16 @@ public class Nest {
      * follow the lie of the land); one that is kept as it is (flat ground, and nests whose holes already work). Kept and
      * saved once every column of them is loaded.
      */
+    /** Whether the land {@link #fitToGround} looks at for these tunnels is all loaded (the same two checks as there). */
+    private static boolean isLandReadyFor(Level level, List<NestPlan.ForagingTunnel> flat) {
+        for (NestPlan.ForagingTunnel tunnel : flat) {
+            if (!LandReady.at(level, tunnel.hole()) || !LandReady.at(level, tunnel.hole().relative(tunnel.side(), 2))) {
+                return false;
+            }
+        }
+        return true;
+    }
+
     private List<NestPlan.ForagingTunnel> fitToGround(Level level, NestLayout planned, List<NestPlan.ForagingTunnel> flat) {
         Set<BlockPos> rooms = new HashSet<>(planned.cells());
         for (int i = 1; i <= planned.shaftDepth(); i++) {
@@ -1127,7 +1149,7 @@ public class Nest {
     public static List<BlockPos> findStandSpots(Level level, BlockPos target) {
         List<BlockPos> spots = new ArrayList<>();
         BlockPos above = target.above();
-        if (level.getBlockState(above).isAir()) {
+        if (LandReady.at(level, above) && level.getBlockState(above).isAir()) {
             spots.add(above);
         }
         for (Direction side : Direction.Plane.HORIZONTAL) {
@@ -1140,10 +1162,20 @@ public class Nest {
         return spots;
     }
 
-    /** Ants never open a block that touches water or lava (it would flood the nest). */
+    /**
+     * Ants never open a block that touches water or lava (it would flood the nest). The one judge of it, for the nest,
+     * the ground reader and the foraging holes. Land not loaded, the block's own or a neighbour's across a chunk's
+     * edge, counts as water, the careful answer: reading it would load or make that land on the spot, a freeze (review
+     * R1-8, R1-18: the cell was guarded, its neighbours were not).
+     */
     static boolean touchesFluid(Level level, BlockPos pos) {
+        if (!LandReady.at(level, pos)) {
+            return true;
+        }
         for (Direction direction : Direction.values()) {
-            if (!level.getFluidState(pos.relative(direction)).isEmpty()) {
+            BlockPos next = pos.relative(direction);
+            boolean sameChunk = next.getX() >> 4 == pos.getX() >> 4 && next.getZ() >> 4 == pos.getZ() >> 4;
+            if (!sameChunk && !LandReady.at(level, next) || !level.getFluidState(next).isEmpty()) {
                 return true;
             }
         }

@@ -198,8 +198,11 @@ public class ForagingHoles {
 
     /** Whether the hole is open: nothing solid in it, no water. */
     public static boolean isOpen(Level level, BlockPos hole) {
+        if (!LandReady.at(level, hole)) {
+            return false; // (asked before the block is read: reading land not loaded loads it on the spot, review R1-8)
+        }
         BlockState state = level.getBlockState(hole);
-        return LandReady.at(level, hole) && state.canBeReplaced() && state.getFluidState().isEmpty();
+        return state.canBeReplaced() && state.getFluidState().isEmpty();
     }
 
     /** Whether the hole holds the plug of soil the workers packed into it. */
@@ -862,8 +865,11 @@ public class ForagingHoles {
      * block there or, once that is eaten, the rich block left near it.
      */
     private boolean isSmall(Level level, BlockPos pos, SpeciesProfile.NewHoles numbers) {
+        if (!LandReady.at(level, pos)) {
+            return true; // not loaded: not read (review R1-7); it keeps its place among the spots in use
+        }
         int pieces = pieces(level, pos);
-        if (pieces == 0 && LandReady.at(level, pos)) {
+        if (pieces == 0) {
             BlockPos near = richBlockNear(level, pos, FOOD_STILL_THERE);
             pieces = near == null ? 0 : pieces(level, near);
         }
@@ -934,11 +940,6 @@ public class ForagingHoles {
     }
 
     private static boolean touchesFluid(Level level, BlockPos pos) {
-        for (Direction direction : Direction.values()) {
-            if (!level.getFluidState(pos.relative(direction)).isEmpty()) {
-                return true;
-            }
-        }
-        return false;
+        return Nest.touchesFluid(level, pos);
     }
 }

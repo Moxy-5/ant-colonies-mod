@@ -20,6 +20,26 @@ public final class LandReady {
     private LandReady() {
     }
 
+    /**
+     * Tests only: chunks that count as not made (by {@code ChunkPos.asLong}). A test adds its own arena's chunks and
+     * takes them out again in the same step; arenas never share a chunk, so tests side by side do not meet here.
+     */
+    private static final java.util.Set<Long> notReadyForTests = java.util.concurrent.ConcurrentHashMap.newKeySet();
+
+    /** Tests only: every chunk within {@code chunks} of this block counts as not made ({@code true}) or as it really is. */
+    public static void pretendNotReadyForTests(BlockPos middle, int chunks, boolean notReady) {
+        for (int cx = (middle.getX() >> 4) - chunks; cx <= (middle.getX() >> 4) + chunks; cx++) {
+            for (int cz = (middle.getZ() >> 4) - chunks; cz <= (middle.getZ() >> 4) + chunks; cz++) {
+                long key = net.minecraft.world.level.ChunkPos.asLong(cx, cz);
+                if (notReady) {
+                    notReadyForTests.add(key);
+                } else {
+                    notReadyForTests.remove(key);
+                }
+            }
+        }
+    }
+
     /** Whether the chunk holding block column (x, z) is made and loaded now. */
     public static boolean at(LevelReader level, int x, int z) {
         return chunk(level, x >> 4, z >> 4);
@@ -31,6 +51,9 @@ public final class LandReady {
 
     /** Whether chunk (cx, cz) is made and loaded now. */
     public static boolean chunk(LevelReader level, int cx, int cz) {
+        if (!notReadyForTests.isEmpty() && notReadyForTests.contains(net.minecraft.world.level.ChunkPos.asLong(cx, cz))) {
+            return false;
+        }
         if (level instanceof ServerLevel server && server.getServer().isSameThread()) {
             return server.getChunkSource().getChunkNow(cx, cz) != null;
         }

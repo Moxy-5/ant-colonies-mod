@@ -284,7 +284,7 @@ public class FoodStore {
         BlockPos best = null;
         double bestWorth = -1;
         for (BlockPos pos : plants(level)) {
-            SpeciesProfile.PlantFood plant = food().plantFor(level.getBlockState(pos));
+            SpeciesProfile.PlantFood plant = LandReady.at(level, pos) ? food().plantFor(level.getBlockState(pos)) : null;
             // (a plant the numbers have used up out of sight still stands until it is out of every player's sight: skipped)
             if (plant == null || plant.pieces() - getPiecesCut(pos) <= 0 || busyGrass.contains(pos) || avoid.contains(pos) || foragersAt(pos) >= Math.max(1, plant.foragers())
                     || !colony.foodMap().knows(pos, ant) || fromInside && !isFeedableFromInside(level, pos)

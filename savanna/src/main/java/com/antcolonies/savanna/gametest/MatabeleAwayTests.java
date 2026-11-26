@@ -446,6 +446,10 @@ public class MatabeleAwayTests {
                     helper.assertTrue(toPlace <= 12 && toWatcher >= 50 && toNest >= 12, "the shown scout stands " + Math.round(toPlace) + " blocks from the number scout's place, "
                             + Math.round(toWatcher) + " from the watcher, " + Math.round(toNest) + " from the nest");
                     helper.assertFalse(colony.away().isAway(level), "the colony is away with a watcher near its scout");
+                    // Review R1-45: a minor that came out first went back into the numbers, body and all.
+                    int standIns = com.antcolonies.gametest.TestIsolation.insectsOf(helper, com.antcolonies.savanna.entity.MatabeleEntity.class,
+                            other -> other.isAlive() && other != ant && colony.getId().equals(other.getColonyId()) && other.distanceTo(ant) < 4.0F).size();
+                    helper.assertTrue(standIns == 0, standIns + " other ants stand where the scout was shown (minors put back into the numbers, their bodies left)");
                     firstAt[0] = ant.blockPosition();
                     stage[0] = 3;
                     stageAt[0] = now;

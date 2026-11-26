@@ -8,7 +8,6 @@ import org.jetbrains.annotations.Nullable;
 import com.antcolonies.registry.ModTags;
 
 import net.minecraft.core.BlockPos;
-import net.minecraft.core.Direction;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.FallingBlock;
 import net.minecraft.world.level.block.state.BlockState;
@@ -83,8 +82,11 @@ public final class GroundReader implements TunnelRoute.Ground {
 
     @Override
     public boolean mayOpenHole(BlockPos hole) {
+        if (!mayDig(hole)) {
+            return false; // (asked first: it knows whether the land is loaded)
+        }
         BlockState above = level.getBlockState(hole.above());
-        return mayDig(hole) && above.canBeReplaced() && above.getFluidState().isEmpty();
+        return above.canBeReplaced() && above.getFluidState().isEmpty();
     }
 
     /** Dug out already under a roof of solid ground (an older tunnel): a tunnel may run on through it. */
@@ -95,11 +97,6 @@ public final class GroundReader implements TunnelRoute.Ground {
     }
 
     private boolean touchesFluid(BlockPos pos) {
-        for (Direction direction : Direction.values()) {
-            if (!level.getFluidState(pos.relative(direction)).isEmpty()) {
-                return true;
-            }
-        }
-        return false;
+        return Nest.touchesFluid(level, pos);
     }
 }
