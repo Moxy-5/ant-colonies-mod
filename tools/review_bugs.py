@@ -36,7 +36,7 @@ OUT = ROOT / "docs" / "CODE-REVIEW-BUGS.md"
 ROUNDS = {
     1: "the colony brain", 2: "the legs", 3: "the insect body", 4: "how bodies are drawn", 5: "the termites",
     6: "the Matabele ants (not raids)", 7: "the giant trees", 8: "the world", 9: "the river hunters",
-    10: "the river's small life", 11: "the new raid code",
+    10: "the river's small life", 11: "the new raid code", 12: "the animation engine",
 }
 GRADES = {"A": "A: a player can meet it", "B": "B: it will cost us when building on this", "C": "C: a tidy-up"}
 HEADING = re.compile(r"(?m)^### (R(\d+)-(\d+)) \(([ABC])(.*?)\)(?:[:.] *(.*))?$")
