@@ -124,16 +124,26 @@ public class NestWalls {
      * The leak an ant at {@code near} should work on, or null: the closest one that can be reached, but one nobody
      * is at yet beats a crowded one a little closer, so every leak gets an ant before any gets many.
      */
+    /** The leaks as last looked for, for {@link #findLeak}, and when (review R1-16: every builder looking for work scanned the whole nest). */
+    private List<Leak> leaksKept = List.of();
+    private long leaksAt = Long.MIN_VALUE;
+    /** The whole nest is scanned for leaks at most this often (ticks); a leak closed meanwhile is dropped at once ({@link #plugLeak}). */
+    private static final int LEAK_SCAN_TICKS = 20;
+
     @Nullable
     public Leak findLeak(Level level, BlockPos near) {
         long now = level.getGameTime();
+        if (leaksAt == Long.MIN_VALUE || now < leaksAt || now - leaksAt >= LEAK_SCAN_TICKS) {
+            leaksKept = getLeaks(level);
+            leaksAt = now;
+        }
         for (Map<UUID, Long> workers : claimedLeaks.values()) {
             workers.values().removeIf(until -> until <= now);
         }
         claimedLeaks.values().removeIf(Map::isEmpty);
         Leak best = null;
         double bestScore = Double.MAX_VALUE;
-        for (Leak leak : getLeaks(level)) {
+        for (Leak leak : leaksKept) {
             int workers = claimedLeaks.getOrDefault(leak.hole(), Map.of()).size();
             if (leak.stand() == null || workers >= MAX_WORKERS_PER_LEAK) {
                 continue;
@@ -461,6 +471,7 @@ public class NestWalls {
         level.setBlock(hole, wall, 3);
         claimedLeaks.remove(hole);
         sealProgress.remove(hole);
+        leaksAt = Long.MIN_VALUE; // (closed: the kept list is out of date)
         return true;
     }
 

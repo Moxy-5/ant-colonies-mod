@@ -20,8 +20,14 @@ import net.minecraft.world.phys.Vec3;
  * taken off comes off the bottom, an old one.
  */
 public class NestLedger {
-    /** At most this many changes of one kind a second (a long time away can owe a lot; the rest comes the next second). */
-    private static final int PER_SECOND = 200;
+    /**
+     * At most this many changes a second, of all kinds together (a long time away can owe a lot; the rest comes the next
+     * second). Review R1-17: it was 200 of each kind, up to a thousand block changes and room scans in the one tick a
+     * colony came back in, the freeze {@code BuildLife} got its 20 a tick for.
+     */
+    private static final int PER_SECOND = 40;
+    /** What is left of this second's {@link #PER_SECOND} while {@link #apply} runs. */
+    private int budget;
 
     private final Colony colony;
     /** Layers of the food store still to put down (above 0) or take away (below 0). Saved. */
@@ -92,6 +98,7 @@ public class NestLedger {
      * of the count); what there is nothing left to take off is dropped too (it was taken already). True if anything changed.
      */
     boolean apply(ServerLevel level, List<Vec3> eyes) {
+        budget = PER_SECOND;
         boolean changed = applyBodies(level, eyes);
         // Fungus comb, in the order it happened: layers put on top (fresh), then ripened and gone old, and only then the
         // old layers eaten or crumbled taken off the bottom (most of them went old while away: see docs/BUGS.md 26).
@@ -113,7 +120,7 @@ public class NestLedger {
             aged = 0;
             return false;
         }
-        ColonyHooks.Ages left = garden.age(level, eyes, new ColonyHooks.Ages(ripened, aged, false), PER_SECOND);
+        ColonyHooks.Ages left = garden.age(level, eyes, new ColonyHooks.Ages(ripened, aged, false), Math.max(1, budget));
         ripened = Math.max(0, left.ripened());
         aged = Math.max(0, left.aged());
         return left.changed();
@@ -121,7 +128,7 @@ public class NestLedger {
 
     private boolean applyBodies(ServerLevel level, List<Vec3> eyes) {
         boolean changed = false;
-        for (int tries = 0; bodies > 0 && tries < PER_SECOND; tries++) {
+        for (; bodies > 0 && budget > 0; budget--) {
             if (colony.refuse().eatsOrBuries()) {
                 bodies = 0; // termites ate their dead in the garden
                 return true;
@@ -145,7 +152,7 @@ public class NestLedger {
     private boolean addToStore(ServerLevel level, List<Vec3> eyes) {
         FoodStore food = colony.food();
         boolean changed = false;
-        for (int tries = 0; store > 0 && tries < PER_SECOND; tries++) {
+        for (; store > 0 && budget > 0; budget--) {
             BlockPos spot = food.pickFoodSpot(level, colony.random());
             if (spot == null) {
                 store--; // the store is full (or not dug): eaten, or put somewhere else
@@ -167,7 +174,7 @@ public class NestLedger {
     private boolean takeFromStore(ServerLevel level, List<Vec3> eyes) {
         FoodStore food = colony.food();
         boolean changed = false;
-        for (int tries = 0; store < 0 && tries < PER_SECOND; tries++) {
+        for (; store < 0 && budget > 0; budget--) {
             List<BlockPos> heaps = food.layersToTake(level);
             if (heaps.isEmpty()) {
                 store = 0; // nothing left to take off: it was taken already
@@ -191,7 +198,7 @@ public class NestLedger {
     private boolean applyNurseFood(ServerLevel level, List<Vec3> eyes) {
         NurseFood food = colony.nurseFood();
         boolean changed = false;
-        for (int tries = 0; nurseFood > 0 && tries < PER_SECOND; tries++) {
+        for (; nurseFood > 0 && budget > 0; budget--) {
             BlockPos spot = food.pickReturnSpot(level, colony.random());
             if (spot == null) {
                 nurseFood--; // nowhere to keep it: eaten meanwhile
@@ -207,7 +214,7 @@ public class NestLedger {
                 changed = true;
             }
         }
-        for (int tries = 0; nurseFood < 0 && tries < PER_SECOND; tries++) {
+        for (; nurseFood < 0 && budget > 0; budget--) {
             BlockPos spot = food.findFood(level, colony.random());
             if (spot == null) {
                 nurseFood = 0; // nothing left to take: it was taken already

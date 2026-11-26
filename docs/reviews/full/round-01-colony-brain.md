@@ -69,6 +69,8 @@ calls it. `docs/BUGS.md` was searched by class name, not read whole.
 
 ### R1-1 (A, proven; checked again): a Matabele queen never lays while a player is near
 
+**Status (2026-11-25, `claude/review-fix-1`): fixed, BUGS 392 (`QueenCare.layCarriedEgg`; test `aFedMatabeleQueenLaysHerEggWhileAPlayerIsNear`).**
+
 - **What is wrong:** the workers feed the queen (`FeedQueenGoal`, added in `MatabeleEntity:203`); a full meal sets
   `eggDue` (`QueenCare.feedQueen`, 135 to 155). The only code that lets a carried egg out is `eggCameOut`, private,
   called once, inside `liveAway` (`QueenCare:395-397`), which runs only while the colony is away.
@@ -88,6 +90,8 @@ calls it. `docs/BUGS.md` was searched by class name, not read whole.
   stream. A game test: a fed queen near a player has an egg after the incubation time.
 
 ### R1-2 (A, proven; checked again): a broken species file crashes the game while the log says "using the built-in numbers"
+
+**Status (2026-11-25, `claude/review-fix-1`): fixed, BUGS 387 (with R1-42).**
 
 - **What is wrong:** `SpeciesProfiles.builtIn` (line 33) is only ever read (66 to 68); its writer went with the
   harvester (commit `20cc23b4`). A file that fails to read is logged as "is broken, using the built-in numbers"
@@ -152,6 +156,8 @@ calls it. `docs/BUGS.md` was searched by class name, not read whole.
 
 ### R1-7 (A, proven; checked again): the new-holes check reads a far food block in land that is not loaded
 
+**Status (2026-11-25, `claude/review-fix-1`): fixed, BUGS 390.**
+
 - **What is wrong:** `ForagingHoles.tick` (every 200 ticks, line 375) walks every new tunnel. Lines 387 and 397 guard
   their reads with `LandReady.at(level, tunnel.food())`, but when the land is not loaded the code falls through to
   line 406, `isSmall(level, tunnel.food(), numbers)` (Macrotermes has `small_pieces` 8, so it always runs). `isSmall`
@@ -165,6 +171,8 @@ calls it. `docs/BUGS.md` was searched by class name, not read whole.
 
 ### R1-8 (A, proven; checked again): `ForagingHoles.isOpen` reads the block before it asks whether the land is loaded
 
+**Status (2026-11-25, `claude/review-fix-1`): fixed, BUGS 390.**
+
 - **What is wrong:** line 201 `BlockState state = level.getBlockState(hole);` and only then line 202
   `return LandReady.at(level, hole) && ...`: the guard comes after the read it is there to prevent. Callers with no
   guard of their own: `FoodWays.runwayPlant` (207, each time a worker asks what to dig next in foraging time),
@@ -175,6 +183,8 @@ calls it. `docs/BUGS.md` was searched by class name, not read whole.
 - **Fix proposed:** swap the two lines in `isOpen`; give `touchesFluid` the guard (unloaded land counts as no fluid).
 
 ### R1-9 (A, proven; checked again): "is anyone still outside" looks only 32 blocks round the nest
+
+**Status (2026-11-25, `claude/review-fix-1`): fixed, BUGS 393 (no test of its own).**
 
 - **What is wrong:** `wantsPlugging` (254 to 264) plugs the holes when the foraging time is over and either 600 ticks
   have passed or `!isAnyoneOutside`. `isAnyoneOutside` (276 to 285) searches `colony.nestArea().inflate(8)`;
@@ -224,6 +234,8 @@ calls it. `docs/BUGS.md` was searched by class name, not read whole.
 
 ### R1-14 (B, likely): a found plant far out is read with no load check once its finder is home
 
+**Status (2026-11-25, `claude/review-fix-1`): fixed, BUGS 390.**
+
 - **Where:** `FoodMap.java:141-143` (`news.removeIf(... level.getBlockState(plant) ...)`); the same file guards the
   matching read at 119.
 - **Unchecked link:** whether the plant's chunk can unload while the worker walks home.
@@ -259,6 +271,8 @@ calls it. `docs/BUGS.md` was searched by class name, not read whole.
 
 ### R1-16 (A, proven; checked again; to measure): every builder looking for work scans the whole nest for leaks
 
+**Status (2026-11-25, `claude/review-fix-1`): fixed, BUGS 394 (not measured).**
+
 - **What is wrong:** `SealGoal.canUse` (62 to 70) runs for every builder each time `looksForWork(20)` lets it and calls
   `colony.walls().findLeak`, which calls `NestWalls.getLeaks` (61 to 90) with nothing kept between calls. `getLeaks`
   builds `nestCells` anew, flood-fills every joined cell, and for each cell and each of its 6 sides reads a block and
@@ -272,6 +286,8 @@ calls it. `docs/BUGS.md` was searched by class name, not read whole.
 
 ### R1-17 (A, proven; checked again; to measure): on return the nest ledger does a whole second's changes in one tick
 
+**Status (2026-11-25, `claude/review-fix-1`): fixed, BUGS 395 (one budget of 40 a second; not measured).**
+
 - **What is wrong:** `AwayLife.settle` (once a second, line 514) calls `colony.ledger().apply`. `apply`
   (`NestLedger:94-103`) runs `applyBodies`, `addToStore`, `applyNurseFood`, `applyAges` and `takeFromStore`, each up
   to `PER_SECOND = 200` changes, all in that one tick, each try working its room list out again. `BuildLife` has
@@ -282,6 +298,8 @@ calls it. `docs/BUGS.md` was searched by class name, not read whole.
   a slice.
 
 ### R1-18 (A, the reads proven and checked again; how often, likely): reading a cell's neighbours can load land that is not ready
+
+**Status (2026-11-25, `claude/review-fix-1`): fixed, BUGS 390 (one `Nest.touchesFluid`).**
 
 - **What is wrong:** `GroundReader.mayDig` and `isDug` (78 to 95) check `LandReady.at` for the cell itself and then
   call `touchesFluid` (97 to 104), which reads the fluid of all 6 neighbours with no check. `TunnelRoute.plan` searches
@@ -296,6 +314,8 @@ calls it. `docs/BUGS.md` was searched by class name, not read whole.
 
 ### R1-19 (A, proven in `Nest`; checked again; how often, likely): a foraging tunnel not fitted to a hillside the first time is never fitted again
 
+**Status (2026-11-25, `claude/review-fix-1`): fixed, BUGS 391 (test in `TermiteHillTests`).**
+
 - **What is wrong:** `getForagingTunnels` (860 to 875) runs `fitToGround` when `planned != foragingTunnelsFor` and then
   sets `foragingTunnelsFor = planned` whether or not the fit finished. In `fitToGround` (907 to 947) a tunnel whose
   hole's chunk is not ready is added flat and `allLoaded = false`, so `fittedTunnels` stays null; the layout object
@@ -308,6 +328,8 @@ calls it. `docs/BUGS.md` was searched by class name, not read whole.
 
 ### R1-20 (A, likely; checked again): while no nest plan fits, the room planner runs on every call and a shaft is dug anyway
 
+**Status (2026-11-25, `claude/review-fix-1`): half fixed, BUGS 396 (the planner waits 40 ticks; the shaft with no plan is left).**
+
 - **What is wrong:** `getLayout` (1097 to 1106): `if (layout == null) layout = new NestLayout.Planner(...).choose(level)`.
   `choose` gives null when nothing fits (and when land is not loaded); nothing is remembered, so every call plans
   again: about 1,000 `LandReady` checks, then 2 depths times 4 directions of rooms, each cell with its 6 fluid reads.
@@ -319,6 +341,8 @@ calls it. `docs/BUGS.md` was searched by class name, not read whole.
 - **Fix proposed:** remember "no plan" with the game time and try again every few seconds; no shaft before a plan.
 
 ### R1-21 (B, proven by its reader; to measure): `nestCells` is rebuilt on every call
+
+**Status (2026-11-25, `claude/review-fix-1`): fixed, BUGS 394.**
 
 - **Where:** `Nest.java:826-854`, `977-1021` (998 to 1000), `702`, `1081-1083`; `FoodWays.java:166-167`;
   `NestWalls.java:62`, `176`, `295`, `410`, `478`, `540`, `587`.
@@ -343,6 +367,8 @@ calls it. `docs/BUGS.md` was searched by class name, not read whole.
 - **Fix proposed:** drop `sealProgress` entries no longer open, in the pruning `findLeak` already does.
 
 ### R1-24 (C, proven by its reader): `Nest.isEntranceOpen` reads the block before asking whether the land is ready
+
+**Status (2026-11-25, `claude/review-fix-1`): fixed, BUGS 390.**
 
 - **Where:** `Nest.java:743-746` (the same slip as R1-8). **Fix proposed:** `LandReady.at` first.
 
@@ -427,6 +453,8 @@ servers, not in the user's usual game. They stay A: a freeze is a freeze, and th
 
 ### R1-30 (B, likely; the path checked again): one colony that fails to load wipes every colony of the dimension
 
+**Status (2026-11-25, `claude/review-fix-1`): fixed, BUGS 387.**
+
 - **Where:** `ColonyManager.java:232-240`; `Colony.java:910-929`.
 - **What is wrong:** `ColonyManager.load` loops `Colony.load` with no try. A part's `load` that throws leaves the
   loop; Minecraft logs it and gives no data; a new, empty manager is made and written over the file at the next save.
@@ -503,6 +531,8 @@ readers; the line-by-line slices above cover those).
 
 ### R1-35 (A, the path proven and checked again; how hard it bites, to measure): sleeping in a bed takes the termites' foraging night away, while their hunger runs on
 
+**Status (2026-11-25, `claude/review-fix-1`): open: the user's call.**
+
 - **What is wrong:** termites forage outside at night or in rain (`macrotermes.json:103`, `"forage_at": ["night",
   "rain"]`; `Colony.isForagingTime`, 433 to 449, by `level.isDay()`). A bed works only at night and jumps the day
   clock to morning; the game time does not jump, and the hunger clocks run on game time (`Meals:145`, a meal every
@@ -525,6 +555,8 @@ readers; the line-by-line slices above cover those).
   with machinery that exists; no new number. The raid day then needs no change.
 
 ### R1-36 (B, proven; checked again): builder numbers do nothing near a player and bank work without end while away
+
+**Status (2026-11-25, `claude/review-fix-1`): open: the user's call.**
 
 - **Where:** `ColonyParts.java:136-138` (`BUILD_LIFE` has only `.ticksAway(70, ...)`, no near tick);
   `BuildLife.java:94-107`, `148-166`; `NestLife.java:162`.
@@ -620,6 +652,8 @@ whether new-land mound code reaches the brain from a world-making thread.
 
 ### R1-42 (A, proven; checked again): one typo in a species file empties every colony of the world (R1-2 and R1-30 joined)
 
+**Status (2026-11-25, `claude/review-fix-1`): fixed, BUGS 387 (test `aColonyThatCannotBeReadIsKeptAndABrokenSpeciesFileKeepsItsNumbers`).**
+
 - **What is wrong:** the chain, each link read:
   1. A species file with a mistake is dropped (`SpeciesProfiles:43`) and there are no built-in numbers (R1-2).
   2. `ColonyManager.load` (232 to 240) calls `Colony.load` for each colony with no try (R1-30). `Colony.load` makes the
@@ -639,6 +673,8 @@ whether new-land mound code reaches the brain from a world-making thread.
   stops the loading with the file's name at first load.
 
 ### R1-43 (A, proven in code; checked again; the link to the drift in the saves, likely): an insect already folded into the numbers is folded a second time
+
+**Status (2026-11-25, `claude/review-fix-1`): fixed, BUGS 388.**
 
 - **What is wrong:** `AwayLife.freeze` (251 to 260) writes `frozen.put(entity.getUUID(), what)` with a new record,
   `folded` false, never looking at a record already there.
@@ -661,6 +697,8 @@ whether new-land mound code reaches the brain from a world-making thread.
 
 ### R1-44 (A, what runs proven, sizes measured; milliseconds to measure): every autosave and every pause rebuilds and copies every colony's whole record
 
+**Status (2026-11-25, `claude/review-fix-1`): open: to measure first; marking the file changed less often gains little, since an away colony's numbers change every second; the size (`FieldLife`'s plants) is the lever.**
+
 - **What is wrong:** R1-31's `markChanged()` every away second keeps the store always dirty. Minecraft's
   `SavedData.save` builds the whole record and copies it on the server thread before the write goes to a worker.
 - **Measured:** the world "New World (227)", 76 colonies (75 away): 2,928,376 bytes uncompressed; a colony 21 KB at
@@ -672,6 +710,8 @@ whether new-land mound code reaches the brain from a world-making thread.
   packed arrays (one of positions, one of kinds and trips).
 
 ### R1-45 (A, proven; checked again): a minor that comes out when a number scout is shown goes back into the numbers, but its body stays
+
+**Status (2026-11-25, `claude/review-fix-1`): fixed, BUGS 389.**
 
 - **Where:** savanna `Scouts.java:125-134`; `AwayLife.java:323-327` (`foldInNow`); `Population.java:637-638`.
 - **What is wrong:** `Population.comeOut` takes one from the numbers and adds the body to the world. `Scouts.showScout`
@@ -693,6 +733,8 @@ whether new-land mound code reaches the brain from a world-making thread.
 - **Fix proposed:** a queen missing for some time with her chamber loaded takes the queen-died path.
 
 ### R1-47 (B, likely): more reads one step past the guarded cell, and on a list up to 5 seconds old
+
+**Status (2026-11-25, `claude/review-fix-1`): mostly fixed, BUGS 390 (`FoodMap`'s 27 cells round each ant and `isEntranceCovered` left: the ant's own land is loaded).**
 
 - **Where (beyond R1-18's places):** `FieldLife.java:158` and `FoodStore.java:287` (`plantFor(level.getBlockState(pos))`
   on `FoodStore.plants()`, rescanned every 100 ticks); `Nest.java:1130`; `FoodMap.tick` (the 27 cells round each

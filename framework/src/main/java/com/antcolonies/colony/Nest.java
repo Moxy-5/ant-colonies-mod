@@ -105,7 +105,17 @@ public class Nest {
     public void waysChanged() {
         allForagingTunnelsStale = true;
         insideTick = Long.MIN_VALUE;
+        nestCellsTick = Long.MIN_VALUE;
     }
+
+    /** {@link #nestCells}' answer for the game tick {@link #nestCellsTick} (review R1-21: it was built anew on every call). */
+    private Set<BlockPos> nestCellsKept = Set.of();
+    private long nestCellsTick = Long.MIN_VALUE;
+    private int nestCellsShafts = -1;
+    /** When the room planner last found no plan (land not loaded, or no room): not asked again for {@link #PLAN_AGAIN_TICKS}. */
+    private long noPlanAt = Long.MIN_VALUE;
+    /** A room plan that did not fit is tried again this often (ticks; review R1-20: it was tried on every call, many a tick). */
+    private static final int PLAN_AGAIN_TICKS = 40;
 
     /**
      * M8 step 1d, a nest of ready spaces: for a species whose nest is not dug from the plan ({@code nest.dug} false), the
@@ -827,8 +837,28 @@ public class Nest {
         return layout == null ? null : layout.founding();
     }
 
-    /** Every block that is part of the nest plan: the shaft, and the rooms once their layout is decided. */
+    /**
+     * Every block that is part of the nest plan: the shaft, and the rooms once their layout is decided. Worked out once
+     * a game tick (as {@link #isInside}) and when the ways change; the set cannot be changed, copy it to add to it.
+     */
     public Set<BlockPos> nestCells(Level level) {
+        long now = level.getGameTime();
+        // The two blocks the list turns on (the shaft's bottom and the founders' shaft, open or not) are looked at each
+        // time: dug in the middle of a tick (a colony catching up digs many blocks a tick), the list is made again.
+        int shafts = (isOpenAir(level, center.below(shaftDepth(level))) ? 1 : 0) + (isOpenAir(level, center.below(NestPlan.FOUNDING_DEPTH)) ? 2 : 0);
+        if (now != nestCellsTick || shafts != nestCellsShafts) {
+            nestCellsKept = java.util.Collections.unmodifiableSet(buildNestCells(level));
+            nestCellsTick = now;
+            nestCellsShafts = shafts;
+        }
+        return nestCellsKept;
+    }
+
+    private static boolean isOpenAir(Level level, BlockPos pos) {
+        return LandReady.at(level, pos) && level.getBlockState(pos).isAir();
+    }
+
+    private Set<BlockPos> buildNestCells(Level level) {
         Set<BlockPos> cells = new HashSet<>();
         int depth = shaftDepth(level);
         for (int i = 1; i <= depth; i++) {
@@ -999,7 +1029,7 @@ public class Nest {
     public boolean isInside(Level level, BlockPos cell) {
         long now = level.getGameTime();
         if (now != insideTick) {
-            Set<BlockPos> cells = nestCells(level);
+            Set<BlockPos> cells = new HashSet<>(nestCells(level));
             cells.add(center);
             // A feeding gallery cell is inside only while it has a roof (the food over it, the mud cast left of it, a
             // branch cased in mud): once the roof is gone it is open to the sky. Where the gallery steps down, the open cell
@@ -1122,7 +1152,13 @@ public class Nest {
             return layout; // a nest of ready spaces (see settle), or none yet
         }
         if (layout == null) {
+            long now = level.getGameTime();
+            if (noPlanAt != Long.MIN_VALUE && now >= noPlanAt && now - noPlanAt < PLAN_AGAIN_TICKS) {
+                return null;
+            }
             layout = new NestLayout.Planner(colony, center, NestLayout.sizesFor(colony)).choose(level);
+            noPlanAt = layout == null ? now : Long.MIN_VALUE;
+            nestCellsTick = Long.MIN_VALUE;
         }
         return layout;
     }
