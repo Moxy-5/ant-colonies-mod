@@ -116,6 +116,8 @@ public class LionEntity extends PathfinderMob implements GeoEntity, HasLife, com
     private static final EntityDataAccessor<Byte> DATA_COAT = SynchedEntityData.defineId(LionEntity.class, EntityDataSerializers.BYTE);
     /** The spot of its prey it holds (the prey's spot table's index; -1: none), for the players' screens to place it on. */
     private static final EntityDataAccessor<Byte> DATA_HOLD = SynchedEntityData.defineId(LionEntity.class, EntityDataSerializers.BYTE);
+    /** The server's word on the strike playing now (-1 not yet, 0 it grips, 1 it missed): the screens place it by it. */
+    private static final EntityDataAccessor<Byte> DATA_STRIKE_WORD = SynchedEntityData.defineId(LionEntity.class, EntityDataSerializers.BYTE);
     private static final EntityDataAccessor<Byte> DATA_LIFE = AnimalLife.dataFor(LionEntity.class);
 
     /** The clips' blend (ticks; Neon's card: all 120 switches checked at 4). */
@@ -311,6 +313,7 @@ public class LionEntity extends PathfinderMob implements GeoEntity, HasLife, com
         builder.define(DATA_MOOD, CONTENT);
         builder.define(DATA_COAT, COAT_FIRST);
         builder.define(DATA_HOLD, (byte) -1);
+        builder.define(DATA_STRIKE_WORD, (byte) -1);
     }
 
     // --- what it does ----------------------------------------------------------------------------------------------------
@@ -328,6 +331,7 @@ public class LionEntity extends PathfinderMob implements GeoEntity, HasLife, com
         doingSince = tickCount;
         entityData.set(DATA_DOING, doing);
         entityData.set(DATA_DOING_ID, entityData.get(DATA_DOING_ID) + 1);
+        newStrike();
         if (doing == MOOD_ANGRY && isAdult() && now != MOOD_ANGRY) {
             playSound(SoundEvents.WOLF_GROWL, 1.6F, form == Form.MALE ? 0.45F : 0.55F);
         }
@@ -639,7 +643,30 @@ public class LionEntity extends PathfinderMob implements GeoEntity, HasLife, com
         super.onSyncedDataUpdated(key);
         if (key == DATA_DOING_ID && level().isClientSide) {
             doingSince = tickCount;
+            newStrike();
         }
+    }
+
+    /**
+     * A strike starting rides from where it stands now, on the server and every screen alike (the hunt film, 2026-11-26:
+     * a smack struck again while still on the calf was drawn on the last strike's ride, 3.5 blocks off).
+     */
+    private void newStrike() {
+        if (strikeOf(doing()) != null) {
+            settle = null;
+            if (!level().isClientSide) {
+                entityData.set(DATA_STRIKE_WORD, (byte) -1);
+            }
+        }
+    }
+
+    /** The server's word on its strike now: -1 not yet, 0 it grips, 1 it missed. */
+    int strikeWord() {
+        return entityData.get(DATA_STRIKE_WORD);
+    }
+
+    void strikeWord(int word) {
+        entityData.set(DATA_STRIKE_WORD, (byte) word);
     }
 
     /** Ticks it has lived since its last meal (hungry from {@link LionHunt#HUNGRY}). */

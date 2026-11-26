@@ -708,7 +708,7 @@ Goal: a mature colony can hold 1,000+ ants or termites without lag.
 
 ### Player interaction
 
-- **Knocked off a wall (the user, 2026-11-26):** a hit from something bigger than an insect (a player, an animal) knocks a climbing ant or termite off its wall or ceiling; it falls unhurt and walks on. A bite or sting from another insect never does: real insects clamp and cut, they do not throw.
+- **Knocked off a wall (the user, 2026-11-26):** a hit from something bigger than an insect (a player, an animal) knocks a climbing ant or termite off its wall or ceiling; it falls unhurt and walks on. A bite or sting from another insect never does: real insects clamp and cut, they do not throw. On a floor the same blow flings it as ever, and a walk it was on is planned again from where it comes down (2026-11-26, review R2-43; flung into a dip it stood pushing at the side for 6 seconds); in the air its legs do nothing, about half a second.
 - Ants and termites ignore the player unless their nest is disturbed, then they defend it. (They may stop to look at a moving player, or termites freeze at its footsteps, without attacking: see "Animations and body language".)
 - Later: an ant farm (catch a founding queen in a jar, build a glass-walled farm) and a field journal that fills in as the player observes behaviors.
 

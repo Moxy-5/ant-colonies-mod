@@ -1718,20 +1718,24 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
             return;
         }
         super.knockback(strength, x, z);
-        if (!level().isClientSide && (wasAttached || navigator.isAttached() || navigator.isClimbing())) {
-            knockedOffAt = tickCount; // a blow that flings it tears it off its wall or ceiling: it falls (the user, 2026-11-26)
+        if (!level().isClientSide) {
+            // A blow that flings it takes it off its feet until it lands: off its wall or ceiling, which it falls from
+            // (the user, 2026-11-26), and off its way on a floor, where its walk is planned again from where it comes
+            // down (review R2-43: one rule for both).
+            knockedOffAt = tickCount;
+            navigator.flung();
         }
     }
 
-    /** The tick a flinging blow knocked it off a wall or ceiling (server, not saved); far back when none did. */
+    /** The tick a flinging blow knocked it off its feet (server, not saved); far back when none did. */
     private int knockedOffAt = Integer.MIN_VALUE / 2;
     /** Knocked off a wall, it does not catch hold again for this long at most (a fall of about 12 blocks). */
     private static final int KNOCKED_OFF_TICKS = 40;
 
-    /** Knocked off a wall or ceiling and still falling: its legs hold nothing until it lands (or the time is up). */
+    /** Flung by a blow and still in the air: its legs hold nothing and walk nowhere until it lands, on ground or in water (or the time is up). */
     private boolean isKnockedOff() {
         int since = tickCount - knockedOffAt;
-        return since >= 0 && since < KNOCKED_OFF_TICKS && !(onGround() && since > 2);
+        return since >= 0 && since < KNOCKED_OFF_TICKS && !((onGround() || isInWater()) && since > 2);
     }
 
     /** Tests only: its chance to dodge a grab and to bite back as it does (below 0: its body's). */
@@ -2290,7 +2294,7 @@ public abstract class AbstractAntEntity extends PathfinderMob implements GeoEnti
         Colony colony = getColony();
         ColonyHooks.Structure structure = colony == null ? null : colony.hooks().first(ColonyHooks.STRUCTURE);
         float chance = structure == null ? 1.0F : structure.mouthTripChance();
-        return chance >= 1.0F || getRandom().nextFloat() < chance ? AntPathFinder.StepCosts.NONE : Doorway.avoidMouths(level());
+        return chance >= 1.0F || getRandom().nextFloat() < chance ? AntPathFinder.StepCosts.NONE : Doorway.avoidMouths(level(), this);
     }
 
     /** Tests only: gives every walk these habits (null for the usual ones). */

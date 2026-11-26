@@ -7,18 +7,18 @@ review files under `docs/reviews/full/`; search there for a finding's number (`R
 a `**Status ...**` line under the finding there and runs the tool. Bugs that did not come from the code
 review stay in `docs/BUGS.md`.
 
-**234 findings: 149 left (11 of them wait for your call), 85 done.**
+**307 findings: 218 left (11 of them wait for your call), 89 done.**
 
 | Grade | Found | Not started | Open | Half fixed | Fixed | Not a bug after all |
 |---|---|---|---|---|---|---|
-| A: a player can meet it | 50 | 0 | 1 | 0 | 48 | 1 |
-| B: it will cost us when building on this | 107 | 72 | 2 | 4 | 28 | 1 |
-| C: a tidy-up | 77 | 68 | 0 | 2 | 6 | 1 |
+| A: a player can meet it | 67 | 17 | 1 | 0 | 48 | 1 |
+| B: it will cost us when building on this | 143 | 104 | 3 | 4 | 31 | 1 |
+| C: a tidy-up | 97 | 87 | 0 | 2 | 7 | 1 |
 
 | Round | System | Found | Left | Done |
 |---|---|---|---|---|
 | 1 | the colony brain | 50 | 30 | 20 |
-| 2 | the legs | 43 | 22 | 21 |
+| 2 | the legs | 43 | 18 | 25 |
 | 3 | the insect body | not read yet | | |
 | 4 | how bodies are drawn | not read yet | | |
 | 5 | the termites | not read yet | | |
@@ -28,6 +28,7 @@ review stay in `docs/BUGS.md`.
 | 9 | the river hunters | 44 | 34 | 10 |
 | 10 | the river's small life | 19 | 13 | 6 |
 | 11 | the new raid code | 22 | 6 | 16 |
+| 12 | the animation engine | 73 | 73 | 0 |
 
 ## Waiting for your call (11)
 
@@ -62,14 +63,34 @@ what happens today and my pick. Answer whenever you like: tell Claude the number
 Grade A first. *Open* means looked at and left for a reason (the reason is given); *half fixed* says what
 is left; no word means nobody has started it. The findings that wait for your call are in the part above.
 
-### A: a player can meet it (1 left)
+### A: a player can meet it (18 left)
 
 **Round 7, the giant trees** (`docs/reviews/full/round-07-trees.md`)
 
 - **R7-33** A palm's crown can blink out at the screen's edge
   - *Open:* waits to be seen (2026-11-24). Read from how Minecraft hides parts of the world, never seen in the game; the fix is large (sharing a crown's faces out over its blocks) and is built only if the user sees fronds blink out.
 
-### B: it will cost us when building on this (70 left)
+**Round 12, the animation engine** (`docs/reviews/full/round-12-animation-engine.md`)
+
+- **R12-1** a walk's planted feet are never judged for hanging, and a walk foot that never touches the ground raises no flag
+- **R12-2** most of the checker's findings never say FLAGGED, and a jump (a pop) is never judged at all, so the summary the rule book reads counts none of them
+- **R12-4** a part spun a whole turn at a clip change passes the blend check on any animal with a blend of 4 ticks or more
+- **R12-20** the lab's floor sinks with the lowest foot, so feet pushed into the ground are never reported
+- **R12-35** verify_animal says "passed" for an animal it never filmed in the game
+- **R12-36** a game crash during the films is not a hard failure
+- **R12-37** a course scene with no recording, or almost none, reads as "nothing found"
+- **R12-38** nothing checks that the animal did what the scene asked, and the game's own warnings are never read
+- **R12-40** a finding at an approved picture is let through however much worse it is
+- **R12-41** the camera's jump check cannot see a pop that repeats
+- **R12-42** the watch mode films old spot tables and old body plans after they change
+- **R12-58** after a step down the otter skates on about a block with its legs frozen (a move's "rest" keeps moving)
+- **R12-59** an animal seen mid-move is first drawn at the move's start, then jumps to where it really is
+- **R12-60** a Nile monitor more than 48 blocks away pops a block up or down on every move
+- **R12-61** when the server runs slow, moves on screen rewind
+- **R12-70** the monitor's drawn leg fold turns its right hind foot the wrong way (a Java copy of the swim pose, "kept in step by hand", is out of step)
+- **R12-71** the spot tables and the pair check never see what the game draws on top of the clips, so a throat hold bites the air with every check green
+
+### B: it will cost us when building on this (103 left)
 
 **Round 1, the colony brain** (`docs/reviews/full/round-01-colony-brain.md`)
 
@@ -98,11 +119,9 @@ is left; no word means nobody has started it. The findings that wait for your ca
 - **R2-18** big step costs fight the fixed cap, and the mud test hides it
   - *Half fixed:* measured and the mud fixed. `SoftGroundSearchTest` (framework): a band of soft ground 8 wide that must be crossed is "no way" at 12 a step with the game's 6,000 and is crossed at 4; wet mud now costs 4 ...
 - **R2-29** the way through a chimney mouth still uses one body's lengths
+  - *Open:* left on purpose. Checked now: only the termite worker fits the tunnels (the tag `fits_termite_tunnels`), so only it takes a mouth's tube; the king, queen and nymph pass only the old chimney crown block, which no mound builds any ...
 - **R2-39** a mind pays for the same "no way" again a tick later, and a builder can ask 24 times in one tick
   - *Half fixed:* `Errand.walkOn` now treats a walk the legs gave up as "no way" (R2-2's fix): no second ask a tick later. Open: `BuildMoundGoal`'s many asks in one tick (round 5).
-- **R2-41** saving an insect that is walking a wall reads the world and loses its hold
-- **R2-42** four tests of "is this a doorway for this insect"
-- **R2-43** knocked into a cell near its route, an insect finds out only after 6 seconds
 
 **Round 7, the giant trees** (`docs/reviews/full/round-07-trees.md`)
 
@@ -164,7 +183,46 @@ is left; no word means nobody has started it. The findings that wait for your ca
 - **R10-15** asking for a new path every tick to a spot that cannot be reached
 - **R10-18** small searches that run more often than they need
 
-### C: a tidy-up (67 left)
+**Round 12, the animation engine** (`docs/reviews/full/round-12-animation-engine.md`)
+
+- **R12-3** clip_check always exits 0, whatever it finds
+- **R12-5** the corner of a step or bank can sink into a box unseen, offline and in both game checks
+- **R12-6** the pair check sees only part of a looping prey clip, at one phase, and not the blend or the walk
+- **R12-7** "jaw to the hide" measures the nearest box of the prey, not the spot, so a jaw 2.6 px off its spot reads 0.0
+- **R12-8** the pair check takes 75 s for one holder and prey
+- **R12-9** a bone the new clip does not move goes home over GeckoLib's 5-tick reset, not the blend
+- **R12-10** the blend length is read from the Java by a pattern that misses three animals and every blend changed while playing
+- **R12-11** the picture drawn for a flagged clip change shows a different moment from the one flagged
+- **R12-12** the offline dragged tail is its own simpler rule, never matched against the game's TailDrag
+- **R12-13** a spot table can be behind its plan or the posing code and `--check` still passes
+- **R12-14** names in a plan's "checks" are never checked, and a misspelt one silently switches its check off
+- **R12-15** clip_check redoes every clip on every run; the monitor takes about 9 minutes
+- **R12-16** pair_report names the lion's strike clips and reads the jaw from another section of the plan
+- **R12-21** the loop-seam and snap checks read only rotations; a position or scale jump at the loop passes
+- **R12-22** nothing measures that the offline pose is the game's pose; `match` only puts pictures side by side
+- **R12-23** the lab's sizes and speeds are its own hand-typed tables, not the game's
+- **R12-24** a standing clip's sliding foot is only a note, so the summary says "0 problem(s)"
+- **R12-25** `two_bone` gives wrong pieces (and says "no miss") when the target is close, and crashes at the root
+- **R12-26** a pole along the leg's line crashes `two_bone` and flips the knee 180 degrees as the target crosses it
+- **R12-27** the kit returns a miss but every newer maker throws it away
+- **R12-28** the kit's clip cache leaves out the data files a maker reads, so a changed outline keeps old clips
+- **R12-32** whether a clip loops is decided twice, by the Java and by the file, and the tools read only the file
+- **R12-39** the guard films' headline says "ALL CHECKS PASS" with every picture changed
+- **R12-43** "frames N" does nothing for animals: N identical pictures a tick
+- **R12-44** the camera's jump check measures "per tick" wrongly in three cases
+- **R12-45** a fish held in a mouth is checked and recorded at the wrong place
+- **R12-46** two films at once, an open watch session, and no timeout
+- **R12-47** the frame watch runs in every player's game and samples the drawing thread
+- **R12-48** the recorder writes the blocks only round where each animal was first drawn
+- **R12-49** insects in a running scene are drawn at a stale in-between time
+- **R12-50** a frame film whose checks saw no animal is still "ok"
+- **R12-62** the animals' clip player drops the bit past a loop's end each time round (the insects' player was written to fix exactly this)
+- **R12-63** an otter holding a crab or frog reads and parses a body plan file twice every frame
+- **R12-64** a lioness's throat hold and hold-down bite on a clock the drawn clip does not keep
+- **R12-65** `MoveRider`, the planned one home for block moves, lacks two lessons of the monitor's copy, and the drawing half is copied three times
+- **R12-72** the move files have no staleness check (the spot tables do), and their unit test reads only the monitor's
+
+### C: a tidy-up (86 left)
 
 **Round 1, the colony brain** (`docs/reviews/full/round-01-colony-brain.md`)
 
@@ -190,7 +248,6 @@ is left; no word means nobody has started it. The findings that wait for your ca
 - **R2-6** after a reload a held insect's heading, ceiling side and channel wall are gone
   - *Half fixed:* the heading is saved; the ceiling side and the channel wall are not.
 - **R2-10** the shuffle can move an insect 1.5 blocks, its comment says 0.7; its wall check looks at one point
-- **R2-11** the "no mouth any more" checks in the mouth moves can never fire, and would do the wrong thing
 - **R2-12** a sideways crawl ends over a tunnel opening
 - **R2-13** worked out again every tick: the doorway's point list, and up to 64 slope reads
 - **R2-15** tiny correction moves never count as blocked
@@ -256,6 +313,29 @@ is left; no word means nobody has started it. The findings that wait for your ca
 - **R11-20** small bookkeeping
 - **R11-21** comments and notes that disagree with the code
 
+**Round 12, the animation engine** (`docs/reviews/full/round-12-animation-engine.md`)
+
+- **R12-17** pair_report's "a tick" numbers mix in the in-between time
+- **R12-18** the joint-turn check reads the keys as straight lines and skips a loop's seam
+- **R12-19** small mismatches between what is judged and what is drawn
+- **R12-29** any edit to `termite_models.py` or `body_plan.py` reruns every insect's lab check
+- **R12-30** the kit's cache is used by the monitor only; the newer makers rebuild every clip every run
+- **R12-31** `quadruped_gait` lets the feet step at different ground speeds without a word
+- **R12-33** the lab's catmull-rom curve is not GeckoLib 4.9.3's
+- **R12-34** small tidy-ups
+- **R12-51** the frame-time meter re-sorts every frame of the launch each second
+- **R12-52** a contact sheet of one burst swallows another burst that starts with the same name
+- **R12-53** `film.sh` waits "successfully" after a failed reload
+- **R12-54** the step marker turns every chat system message into text in normal play
+- **R12-55** the report key's picture can be moved while it is still being written
+- **R12-56** small miscounts in the one command's summary
+- **R12-57** two names for the camera's in-between time
+- **R12-66** the film watch's "reload the move files" swaps the moves under live plays
+- **R12-67** client-only and removed-species code inside the framework's shared package
+- **R12-68** a missing spot table is silently no table
+- **R12-69** the dragged tail does all its ground reading even when it has no say
+- **R12-73** the hippo's climb-out paths are not one row a tick, and the move writer never checks
+
 ## Done
 
 Fixed, or found to be no bug after all. The number after a finding is its entry in `docs/BUGS.md`.
@@ -291,6 +371,7 @@ Fixed, or found to be no bug after all. The number after a finding is its entry 
 - **R2-7** (C) `mayHaveGoal` asks the mind's test about twice as often as it needs
 - **R2-8** (B) the standing shuffle's search for a free spot can run every tick for good (BUGS 405)
 - **R2-9** (B) the stuck clock counts polite waiting, so a walker in a jam plans again and gives up (BUGS 404, 409)
+- **R2-11** (C) the "no mouth any more" checks in the mouth moves can never fire, and would do the wrong thing
 - **R2-14** (C) `unsqueeze` can divide by a column width of 0
 - **R2-17** (B) one search reads the same blocks 50 to 60 times per step (BUGS 399)
 - **R2-19** (B) a tunnel window sealed in front of an insect is not seen by the every-tick check (BUGS 407)
@@ -306,6 +387,9 @@ Fixed, or found to be no bug after all. The number after a finding is its entry 
 - **R2-37** (A) five goals ask the legs for a route on every tick after "no way" (BUGS 400)
 - **R2-38** (A) an insect on a path block, on farmland or in a pond with a low bank can never plan a route again (BUGS 401, 411, 412, 415)
 - **R2-40** (B) the "no foothold in reach, no search" shortcut helps one caller only
+- **R2-41** (B) saving an insect that is walking a wall reads the world and loses its hold
+- **R2-42** (B) four tests of "is this a doorway for this insect"
+- **R2-43** (B) knocked into a cell near its route, an insect finds out only after 6 seconds (BUGS 413)
 
 **Round 7, the giant trees**
 

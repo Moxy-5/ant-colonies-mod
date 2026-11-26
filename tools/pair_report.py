@@ -6,7 +6,8 @@ the game drew them, its clips and its mind's facts) and reports, for each hunter
   jaws       where its jaws (its plan's "carry" bone) were against the prey's body while holding: the gap to the
              nearest box of the prey (+ in the air, - into the body), smallest, middle and largest
   feet       its planted feet sliding over the ground while holding (blocks a tick; a planted foot should not move)
-  strike     how far its box travelled during the strike clip before its hit (the clip itself stays in place)
+  strike     its box's travel through each strike clip, tick by tick (since phase 3 step 4 the clip carries its own
+             travel and the box rides it from the strike's start: still through a coil, then the flight, then still)
   prey       the prey's clips and doings meanwhile
 
     python tools/pair_report.py <scene folder> [--prey <name>]      (default prey: film-calf)
@@ -158,8 +159,9 @@ def report(folder, prey_name):
         say(f'no prey named {prey_name}')
         return out
     for a in animals:
-        holds = [f for f in a.frames if f.get('facts', {}).get('holding')]
-        strikes = [f for f in a.frames if a.clip(f) in ('jump_smack', 'stalk_leap_bite') and not f.get('facts', {}).get('holding')]
+        striking = ('jump_smack', 'stalk_leap_bite')
+        holds = [f for f in a.frames if f.get('facts', {}).get('holding') and a.clip(f) not in striking]
+        strikes = [f for f in a.frames if a.clip(f) in striking]
         if not holds and not strikes:
             continue
         say('')
@@ -198,8 +200,15 @@ def report(folder, prey_name):
                 p0, p1 = run[0]['pos'], run[-1]['pos']
                 dist = math.hypot(p1[0] - p0[0], p1[2] - p0[2])
                 ticks = run[-1]['ft'] - run[0]['ft']
-                say(f'strike {a.clip(run[0])} at ticks {run[0]["ft"]} to {run[-1]["ft"]} (before its grip): its box went '
-                    f'{dist:.2f} blocks ({dist / max(1, ticks):.3f} a tick) while the clip plays in place')
+                steps, seen = [], {}
+                for f in run:
+                    seen.setdefault(f['ft'], f['pos'])
+                ts = sorted(seen)
+                for t0, t1 in zip(ts, ts[1:]):
+                    q0, q1 = seen[t0], seen[t1]
+                    steps.append(math.hypot(q1[0] - q0[0], q1[2] - q0[2]) / max(1, t1 - t0))
+                say(f'strike {a.clip(run[0])} at ticks {run[0]["ft"]} to {run[-1]["ft"]}: its box went {dist:.2f} blocks; '
+                    f'a tick: ' + ' '.join(f'{v:.2f}' for v in steps))
         if not holds:
             continue
         carry = a.plan.get('checks', {}).get('carry', {}).get('bone', 'carry')

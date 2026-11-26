@@ -95,7 +95,12 @@ public final class LevelCellMap implements CellMap {
 
     @Override
     public boolean isMouth(BlockPos cell) {
-        return LandReady.at(level, cell) && level.getBlockState(cell).getBlock() instanceof Doorway && channelSides(cell) != 0;
+        return doorway(cell) != null && channelSides(cell) != 0;
+    }
+
+    @Override
+    public Doorway doorway(BlockPos cell) {
+        return LandReady.at(level, cell) ? Doorway.at(level, cell, insect) : null;
     }
 
     @Override

@@ -253,6 +253,8 @@ the clip leapt on the spot).
   side alike); `tools/spots.py` and `Spots.Strike` already were. The lion's clips proved the same keyframes after the
   move; `land` 44 of 44. A new hunter needs: its strike clips made with the kit, `strikes` in its plan, and its own code
   choosing the strike and the spot.
+- **The hunt film's causes (2026-11-26, `claude/motion-phase3-film`, BUGS 421, 422):** the jaw gap was the drawing, not the game: a rider is drawn turned to its mount's heading (GeckoLib), fixed in `LionRenderer`; the stretched leap was step 4's homing with no limit: a strike now aims at take-off and never steers in the air, gripping at its hit only within `Strikes.GRIP` (0.6 blocks at size 1) of its aim, else missing (`Strikes.Ride.target`, shared). Any future animal that holds by riding its prey needs the renderer's override too.
+- **Next:** the hunt film, then step 5 (feeding on the carcass).
 - **Next (then):** the hunt film, then step 5 (feeding on the carcass).
 
 ## Step 5, built (2026-11-26, branch `claude/motion-phase3-step5`)
@@ -302,6 +304,7 @@ the clip leapt on the spot).
 - **Not done:** the carcass tilted to a slope (idea 40's other part; it lies level as before); the dead buffalo's head
   hangs about 4.5 px over the ground; forepaws holding the carcass; a feeding spot through a save (a reloaded feeder
   gets up, picks a spot and lies down again); the film (another session was filming; films never run side by side).
-- **Seen in the last hunt film's `pair_report` and not looked into:** the holding lioness's jaws 1.7 to 1.8 blocks off
-  the calf (a real fault or the report's own, unknown); a cow standing at the carcass among the feeding lions.
+- **Seen in the last hunt film and not looked into:** a cow standing at the carcass among the feeding lions. (The
+  film's 1.4 to 1.8 block jaw gap was found and fixed meanwhile by the film's own session: riders drawn at the
+  mount's heading.)
 - **Next:** the hunt film (it now shows the feast too), then phase 1 (the replay page).

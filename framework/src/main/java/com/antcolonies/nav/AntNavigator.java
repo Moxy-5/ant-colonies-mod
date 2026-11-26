@@ -22,8 +22,8 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.util.Mth;
 import net.minecraft.world.entity.ai.attributes.Attributes;
+import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
-import net.minecraft.world.phys.shapes.CollisionContext;
 import net.minecraft.world.phys.Vec3;
 
 /**
@@ -101,6 +101,19 @@ public class AntNavigator {
     private Foothold stepFrom;
     @Nullable
     private Foothold stepTo;
+    /**
+     * While a route is walked: the wall, ceiling or channel the body holds now, kept as the walk goes, so saving the
+     * insect never reads the world (review R2-41: saved as its land went, the world answered "not ready", no hold was
+     * found and the climber was at the wall's foot when the player came back). Null on a floor or in the air.
+     */
+    @Nullable
+    private Foothold walkHold;
+    /**
+     * The doorway the step being walked goes through for this insect ({@link CellMap#doorway}), read on the step's first
+     * tick: the step is walked as it began, and planned again if the answer changes under it (review R2-42).
+     */
+    @Nullable
+    private Doorway stepDoor;
     /** While a doorway's exact motion or a channel is walked: its points are where the body goes, nothing is drawn in. */
     private boolean exact;
     /** Whether the body is inside a channel now (drawn in the channel's middle, not pressed against a wall). */
@@ -413,10 +426,25 @@ public class AntNavigator {
             at = null;
         }
         surface = Direction.DOWN;
+        walkHold = null;
         attached = false;
         exact = false;
         motion = Vec3.ZERO;
         startLeg();
+    }
+
+    /**
+     * A blow flung the insect off its feet on its walk (review R2-43; off a wall or ceiling, {@link #letGo} besides):
+     * its walk goes on from where it comes down, planned again there, the way a walker that dropped part way along its
+     * route is. Before, a hit that moved it less than {@link #OFF_THE_ROUTE} into a dip beside its way was never
+     * noticed: it pushed at the dip's side until the step's clock ran out, 6 seconds.
+     */
+    public void flung() {
+        if (route != null && at != null && !at.isChannel()) {
+            at = null;
+            walkHold = null;
+            stepTicks = 0;
+        }
     }
 
     /** Stops walking. An insect on a wall keeps holding on where it is. */
@@ -590,7 +618,7 @@ public class AntNavigator {
      */
     @Nullable
     public Foothold getHold() {
-        Foothold here = route == null ? at : currentFoothold(new LevelCellMap(ant.level(), ant));
+        Foothold here = route == null ? at : walkHold;
         return here == null || here.isFloor() ? null : here;
     }
 
@@ -735,6 +763,7 @@ public class AntNavigator {
         blockedFrom = ant.position();
         spot = null;
         at = start;
+        walkHold = start;
         if (found != null && fromBeside) {
             stepOutTo(found.start());
         }
@@ -1018,6 +1047,7 @@ public class AntNavigator {
         if (at == null) {
             // Dropping to where the route starts.
             surface = Direction.DOWN;
+            walkHold = null;
             if (!standsOnFloor(map, ant.blockPosition())) {
                 if (++stepTicks > FALL_TICKS) {
                     replan("never landed");
@@ -1036,10 +1066,12 @@ public class AntNavigator {
             stepTicks = 0;
         }
         if (next >= route.size()) {
+            walkHold = at;
             arrive(map);
             return;
         }
         if (stepTicks == 0 && leg == 0 && goUnder()) {
+            walkHold = null;
             return; // out of the world along a hidden stretch of the galleries: it comes back at the far end
         }
         Route.Step step = route.step(next);
@@ -1052,6 +1084,13 @@ public class AntNavigator {
         }
         if (step.kind() != StepKind.FALL && ant.position().distanceToSqr(Vec3.atCenterOf(step.to().cell())) > OFF_THE_ROUTE * OFF_THE_ROUTE) {
             replan("knocked off the route");
+            return;
+        }
+        Doorway door = doorwayOf(map, step);
+        if (stepTicks == 0 && leg == 0) {
+            stepDoor = door;
+        } else if (door != stepDoor) {
+            replan("the way changed: its doorway, " + step.kind().name().toLowerCase());
             return;
         }
         if (advance(map, at, step)) {
@@ -1078,7 +1117,49 @@ public class AntNavigator {
             replan("standing still on " + describe(step) + ", motion " + motion);
             return;
         }
+        walkHold = holdOfStep();
         faceTheWayItGoes();
+    }
+
+    /**
+     * The end of the step under way that the body holds now, for {@link #walkHold}: the step's start or its end,
+     * whichever is a wall or ceiling on the surface the body is pressed against (the moves set it every tick), or the
+     * channel it is in (a doorway's own motion counts as in its mouth's channel); the nearer when both are. Null on a
+     * floor. Worked out from the walk alone, never from the world.
+     */
+    @Nullable
+    private Foothold holdOfStep() {
+        if (route == null) {
+            return at;
+        }
+        Foothold best = holds(at) ? at : null;
+        Foothold to = next < route.size() ? route.step(next).to() : null;
+        if (holds(to) && (best == null || ant.position().distanceToSqr(Vec3.atCenterOf(to.cell()))
+                < ant.position().distanceToSqr(Vec3.atCenterOf(best.cell())))) {
+            best = to;
+        }
+        return best;
+    }
+
+    private boolean holds(@Nullable Foothold foothold) {
+        if (foothold == null || foothold.isFloor()) {
+            return false;
+        }
+        return foothold.isChannel() ? inChannel || exact : !inChannel && surface == foothold.surface();
+    }
+
+    /**
+     * The doorway this step goes through for this insect, by the one test ({@link CellMap#doorway}): a mouth's own
+     * steps, and a step out over the top of a doorway block it is inside or in over the edge into one. Null for every
+     * other step (no read of the world).
+     */
+    @Nullable
+    private Doorway doorwayOf(CellMap map, Route.Step step) {
+        return switch (step.kind()) {
+            case OUT_OF_MOUTH, OVER_TOP -> map.doorway(at.cell());
+            case INTO_MOUTH, OVER_EDGE -> map.doorway(step.to().cell());
+            default -> null;
+        };
     }
 
     // --- Hidden trips (termites underground, step 2b): a long closed stretch of the galleries is travelled unseen ---
@@ -1155,6 +1236,7 @@ public class AntNavigator {
         underRoute = null;
         underFrom = -1;
         surface = Direction.DOWN;
+        walkHold = null;
         attached = false;
         startLeg();
         stepTicks = 0;
@@ -1226,9 +1308,7 @@ public class AntNavigator {
 
     /** Whether this step comes out of a doorway's mouth or goes in by it (it takes longer than other steps). */
     private boolean isDoorwayStep(Route.Step step) {
-        return step.kind() == StepKind.OUT_OF_MOUTH || step.kind() == StepKind.INTO_MOUTH
-                || (step.kind() == StepKind.OVER_TOP && at != null && doorwayAt(at.cell()) != null)
-                || (step.kind() == StepKind.OVER_EDGE && doorwayAt(step.to().cell()) != null);
+        return stepDoor != null;
     }
 
     /** The step being walked, for the log: its kind, which part of it, from where to where, and where the body is. */
@@ -1893,10 +1973,9 @@ public class AntNavigator {
      */
     private boolean overTop(CellMap map, Foothold from, Foothold to) {
         BlockPos c = from.cell();
-        Doorway door = doorwayAt(c);
-        if (door != null) {
+        if (stepDoor != null) {
             exact = true;
-            return comeOutOf(door, from);
+            return comeOutOf(stepDoor, from);
         }
         Direction w = from.surface();
         double lip = lipWithin(map, to.cell(), w.getOpposite(), 2 * half() + OVER_THE_TOP);
@@ -1921,10 +2000,9 @@ public class AntNavigator {
     private boolean overEdge(CellMap map, Foothold from, Route.Step step) {
         Foothold to = step.to();
         BlockPos c = from.cell();
-        Doorway door = doorwayAt(to.cell());
-        if (door != null) {
+        if (stepDoor != null) {
             exact = true;
-            return goInto(door, step);
+            return goInto(stepDoor, step);
         }
         Direction wall = to.surface();
         Direction out = wall.getOpposite();
@@ -2207,9 +2285,7 @@ public class AntNavigator {
      */
     private boolean outOfMouth(BlockPos mouth, Foothold to) {
         exact = true;
-        if (!(ant.level().getBlockState(mouth).getBlock() instanceof Doorway door)) {
-            return true; // no mouth any more: the next tick's check plans again
-        }
+        Doorway door = stepDoor; // (never null here: a mouth that is gone is seen by the tick's check, which plans again)
         BlockPos beside = to.isFloor() ? to.cell().below() : to.cell();
         Direction e = toward(mouth, beside);
         List<DoorwayMotion.Key> keys = DoorwayMotion.comeOut(door.mouthHeight(), door.mouthRadius(), half(), OVER_THE_TOP, ant.getScale());
@@ -2235,9 +2311,7 @@ public class AntNavigator {
      */
     private boolean intoMouth(Foothold from, BlockPos mouth) {
         exact = true;
-        if (!(ant.level().getBlockState(mouth).getBlock() instanceof Doorway door)) {
-            return true; // no mouth any more: the next tick's check plans again
-        }
+        Doorway door = stepDoor; // (never null here, as in outOfMouth)
         BlockPos beside = from.isFloor() ? from.cell().below() : from.cell();
         Direction e = toward(mouth, beside);
         List<DoorwayMotion.Key> keys = new ArrayList<>(DoorwayMotion.goIn(door.mouthHeight(), door.mouthRadius(), half(), OVER_THE_TOP, ant.getScale()));
@@ -2331,14 +2405,6 @@ public class AntNavigator {
         holding = false;
         leg++;
         return leg >= keys.size();
-    }
-
-    /** The doorway block in this cell if this insect passes through it (a termite in a chimney block), else null. */
-    @Nullable
-    private Doorway doorwayAt(BlockPos cell) {
-        BlockState state = ant.level().getBlockState(cell);
-        return state.getBlock() instanceof Doorway door
-                && state.getCollisionShape(ant.level(), cell, CollisionContext.of(ant)).isEmpty() ? door : null;
     }
 
     // --- Where the body is: its foothold, read from the world ---
@@ -2596,7 +2662,7 @@ public class AntNavigator {
             return stepFrom.cell().relative(surface);
         }
         BlockPos cell = ant.blockPosition();
-        return ant.level().getBlockState(cell).getBlock() instanceof ClimbShape ? cell : cell.relative(surface);
+        return blockAt(cell).getBlock() instanceof ClimbShape ? cell : cell.relative(surface);
     }
 
     /** Whether the column is narrower than a full block anywhere the body is, goes next or ends up. */
@@ -2666,7 +2732,7 @@ public class AntNavigator {
         boolean any = false;
         for (int by = Mth.floor(low); by <= Mth.floor(high - 1.0E-6); by++) {
             BlockPos pos = new BlockPos(column.getX(), by, column.getZ());
-            BlockState state = ant.level().getBlockState(pos);
+            BlockState state = blockAt(pos);
             if (state.getBlock() instanceof ClimbShape shape) {
                 for (int k = 0; k < Slope.COLUMNS; k++) {
                     double bottom = by + k / (double) Slope.COLUMNS;
@@ -2728,6 +2794,15 @@ public class AntNavigator {
         return width > 0.0 && a <= width / 2.0 ? center + d / width : center + Math.signum(d) * (a - width / 2.0 + 0.5);
     }
 
+    /**
+     * The legs' own reads of a block (the shape of a column they hug, a channel's opening beside a hold): air where the
+     * land is not made and loaded, so no read here ever makes the server wait for a chunk or brings one back that is
+     * going (review R2-41; the cell map's reads are guarded the same way).
+     */
+    private BlockState blockAt(BlockPos pos) {
+        return LandReady.at(ant.level(), pos) ? ant.level().getBlockState(pos) : Blocks.AIR.defaultBlockState();
+    }
+
     // --- Geometry of a cell: where the body's middle is when it holds a surface ---
 
     private double half() {
@@ -2755,7 +2830,7 @@ public class AntNavigator {
      */
     private double besideOpening(BlockPos cell, Direction wall, Direction.Axis along, double value) {
         BlockPos held = cell.relative(wall);
-        BlockState state = ant.level().getBlockState(held);
+        BlockState state = blockAt(held);
         if (!(state.getBlock() instanceof Channel channel) || !Channel.has(channel.openSides(ant.level(), held, state), wall.getOpposite())) {
             return value;
         }
@@ -2788,7 +2863,7 @@ public class AntNavigator {
         double x = clampIn(cell, Direction.Axis.X, ant.getX());
         double z = clampIn(cell, Direction.Axis.Z, ant.getZ());
         BlockPos held = cell.above();
-        BlockState state = ant.level().getBlockState(held);
+        BlockState state = blockAt(held);
         if (state.getBlock() instanceof Channel channel && Channel.has(channel.openSides(ant.level(), held, state), Direction.DOWN)) {
             // (docs/BUGS.md 144, as 135 on a wall: a ceiling with a channel opening over the body is held on its solid
             // rim beside the opening, the nearer way out of it, never under the hole with nothing over the legs)

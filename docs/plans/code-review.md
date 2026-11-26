@@ -43,6 +43,7 @@ of Java.
 | 9 | River hunters: crocodile, otter, hippo, monitor, bull shark | `savanna: animal/`; `framework: animal/` | about 13,000 |
 | 10 | River small life and the life cycle: fish, frogs, crab, snail, flies, eggs, breeding, remains | `savanna: animal/` | about 11,000 |
 | 11 | **The new raid code**, read last, after the rewrite (job 2) is done | `savanna: colony/Raid*`, the raid goals | new |
+| 12 | **The animation engine** (the user, 2026-11-26): the offline checker, the lab and the motion kit, how the game plays clips, moves and holds, the in-game films and `verify_animal.py`; not the workshop's looks or each animal's maker | `tools/`: `clip_check`, `body_plan`, `spots`, `anim_lab`, `motion_kit`, `ant_motion`, `verify_animal`, `body_course`, `guard_films`, `game_compare`; `framework: entity/body/` (MoveRider, BlockMoves, Gaits, Spots ...), `client/Film*`, `BodyRecorder` | about 9,000 Python, 6,500 Java |
 
 Rounds 5 and 9 are big enough to split in two sessions each if a session runs short.
 

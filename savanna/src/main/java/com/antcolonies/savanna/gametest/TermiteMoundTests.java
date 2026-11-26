@@ -323,7 +323,7 @@ public class TermiteMoundTests {
         BlockPos bottom = helper.absolutePos(new BlockPos(2, 1, 2));
         BlockPos onTop = helper.absolutePos(new BlockPos(3, 4, 2));
         TermiteWorkerEntity termite = helper.spawnWithNoFreeWill(SavannaEntities.TERMITE_WORKER.get(), 2, 1, 2);
-        termite.setWalkHabitsForTests(com.antcolonies.nav.Doorway.avoidMouths(helper.getLevel()));
+        termite.setWalkHabitsForTests(com.antcolonies.nav.Doorway.avoidMouths(helper.getLevel(), termite));
         int[] phase = {0};
         int[] peeked = new int[3];
         helper.runAfterDelay(10, () -> helper.assertTrue(termite.getNavigator().moveTo(onTop, 1.0), "no route out"));

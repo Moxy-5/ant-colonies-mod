@@ -406,9 +406,10 @@ public final class LionHunt {
      * Places a lion on its prey (the prey's {@code positionRider}, on the server and on every screen alike): at its spot,
      * its feet on the ground there. On a strike (step 4) it rides from the strike's start: each tick it is the strike's
      * share of the way (its clip's own travel, from its spot table) from where it set off to its place at the spot, so it
-     * stands through its coil, flies, and lands on its place however the prey moved, its heading turning with it; after
-     * any other grip it settles there over its blend. False when it has no spot to be placed on (not synced to this
-     * screen yet).
+     * stands through its coil, flies, and lands where it aimed at take-off (where its place would be, the prey going on as
+     * it went; it never steers in the air), gripping if its place is still near (then eased onto it), else missing; its
+     * heading turning with it; after any other grip it settles there over its blend. False when it has no spot to be
+     * placed on (not synced to this screen yet).
      */
     static boolean ride(LionEntity l, BuffaloEntity prey, Entity.MoveFunction move) {
         Place p = placeOn(l, prey, l.holdSpot());
@@ -420,7 +421,14 @@ public final class LionHunt {
             l.settle = com.antcolonies.entity.body.Strikes.Ride.from(l, l.yBodyRot, strike, l.doingFor());
         }
         double f = l.settle.along(strike, l.doingFor(), LionEntity.BLEND);
-        Vec3 at = l.settle.at(f, p.at());
+        Vec3 preyStep = new Vec3(prey.getX() - prey.xo, 0.0, prey.getZ() - prey.zo);
+        if (l.level().isClientSide) {
+            l.settle.told(l.strikeWord());                       // hit or miss is the server's word (it sees the prey as it is)
+        }
+        Vec3 at = l.settle.at(f, l.settle.target(strike, l.doingFor(), f, p.at(), preyStep, l.getScale(), LionEntity.BLEND));
+        if (!l.level().isClientSide) {
+            l.strikeWord(l.settle.word());
+        }
         double ground = groundAt(l.level(), at.x, at.z, prey.getY());
         move.accept(l, at.x, Double.isNaN(ground) ? l.getY() : ground, at.z);
         float yaw = l.settle.yaw(f, p.yaw());
@@ -546,8 +554,7 @@ public final class LionHunt {
     static void setOff(LionEntity l, BuffaloEntity prey, byte doing, int spot) {
         State s = l.hunt;
         l.getNavigation().stop();
-        l.setDoing(doing);
-        l.settle = null;
+        l.setDoing(doing);                                      // (a new ride from here: LionEntity.newStrike)
         s.holdSpot = spot;
         s.holding = true;
         s.struck = false;
@@ -556,6 +563,13 @@ public final class LionHunt {
             return;
         }
         l.setHoldSpot(spot);
+    }
+
+    /** Tests: where it stands to hold its spot on this prey now (flat), or null. */
+    @Nullable
+    public static Vec3 placeForTests(LionEntity l, BuffaloEntity prey) {
+        Place p = placeOn(l, prey, l.holdSpot());
+        return p == null ? null : p.at();
     }
 
     /**
@@ -1132,10 +1146,18 @@ public final class LionHunt {
                     return;                                     // still on its way: not gripping yet
                 }
                 s.struck = true;                                // the strike's hit: its first bite, and from now it grips
-                bite(prey);
-                if (!prey.grownUp()) {
-                    prey.setDoing(BuffaloEntity.REST_DOWN);       // a calf is knocked down
+                if (!missed()) {
+                    bite(prey);
+                    if (!prey.grownUp()) {
+                        prey.setDoing(BuffaloEntity.REST_DOWN);   // a calf is knocked down
+                    }
                 }
+            }
+            if (missed()) {
+                if (!l.striking()) {
+                    s.holding = false;                          // landed where it aimed, the prey gone from there: a miss
+                }
+                return;
             }
             prey.heldBy(l);
             String name = holdClip(l, prey, s.holdSpot);
@@ -1154,6 +1176,11 @@ public final class LionHunt {
             if (hold != null && l.doing() == clip && hold.bitesAt(l.clipTick())) {
                 bite(prey);
             }
+        }
+
+        /** Its strike landed away from its place on the prey (the ride decides it at the hit, on every screen alike). */
+        private boolean missed() {
+            return s.struck && l.settle != null && l.settle.missed();
         }
 
         // WAIT: the male and the cubs lie where they are while the lionesses hunt
