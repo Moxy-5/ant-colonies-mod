@@ -67,6 +67,13 @@ def checkBugNumbers = tasks.register('checkBugNumbers') {
 }
 tasks.named('check') { dependsOn checkBugNumbers }
 
+// The list of code review findings (docs/CODE-REVIEW-BUGS.md) is written by tools/review_bugs.py from the review
+// files; this fails when a finding or a status line was added there and the list not written again.
+def checkReviewBugs = tasks.register('checkReviewBugs', Exec) {
+    commandLine 'python', 'tools/review_bugs.py', '--check'
+}
+tasks.named('check') { dependsOn checkReviewBugs }
+
 neoForge {
     version = project.neo_version
 

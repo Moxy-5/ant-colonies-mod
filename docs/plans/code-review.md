@@ -129,7 +129,7 @@ part, with Minecraft's own tick readout and profiler and the mod's perf scenes. 
 3. **Write the findings** in `docs/reviews/full/<round>.md`, each with: what is wrong in plain words, what the player
    would see, where (file and line), the proof, and the fix proposed. Each is rated:
    - **A**: the player can meet it (a lag spike, a crash, something lost on reload, behaviours visibly fighting).
-     Gets a number in `docs/BUGS.md`.
+     (Until 2026-11-26 it got a number in `docs/BUGS.md` when fixed; now its `R` number is its only number.)
    - **B**: it will cost us when building on this (fighting rules, broken layering, a test gap on something risky).
    - **C**: tidy-ups (dead code, wrong comments, names).
 4. **No code changes in a reading round.** So reading rounds can run several at once with no clashes.
@@ -140,7 +140,18 @@ part, with Minecraft's own tick readout and profiler and the mod's perf scenes. 
   GitHub after each piece, so a session that stops half way (quota, a crash) loses nothing already written.
 - **Never deleted, only marked.** Every finding keeps its number for good (`R7-3` is round 7's third). A fix session
   never removes or rewrites a finding; it adds a status line under it: **fixed** (the commit and the test), **open**
-  (why), or **not a fault after all** (what was checked). `SUMMARY.md` counts them per round.
+  (why), or **not a fault after all** (what was checked).
+- **One list of them all: `docs/CODE-REVIEW-BUGS.md` (the user, 2026-11-26, "a separate bugs file for only the code
+  review bugs").** What is left on top (grade A first), what is done at the bottom, the counts above. It is written
+  by `python tools/review_bugs.py` from the review files and never edited by hand, so it cannot disagree with them;
+  `./gradlew build` fails when it is behind (`checkReviewBugs`). So that the list reads right, **the newest status
+  line under a finding begins with one of four words: `fixed`, `half fixed` (then what is left), `open` (then why),
+  `not a bug`.** Run the tool after writing findings or status lines, and commit the list with them.
+- **Review bugs and other bugs are kept apart (the user, 2026-11-26, "so things don't get mixed").** A review
+  finding's fix takes no number in `docs/BUGS.md` any more: its `R` number is its number (in the commit, the test's
+  comment, the change log), and what was done goes in its status line. The 67 findings fixed before this keep their
+  `BUGS` entries. `docs/BUGS.md` is for bugs found any other way (play, test runs, soaks), also one found while
+  fixing a review finding.
 - **Fixes live on their own branches**, one commit per finding or small batch, each naming its finding's number, so any
   fix can be looked at or taken back alone without touching the others or the findings.
 - **The fixes are Claude's call (the user: "this will be fully up to you").** The user is asked only when a fix would

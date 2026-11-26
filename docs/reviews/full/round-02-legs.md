@@ -167,6 +167,8 @@ arriving, holding on, the walk along a floor). Every line read.
 
 **Status (2026-11-26, `claude/review-fix-2`): the heading fixed (saved with the hold as `HoldHeading`); the ceiling side and the channel wall are still not saved.**
 
+**Status (2026-11-26, the list's wording): half fixed: the heading is saved; the ceiling side and the channel wall are not.**
+
 - **Where:** `restoreHold` 529 to 538 (`heading = 0`); `AbstractAntEntity` 2905 to 2910, 2941 to 2944 (only cell,
   surface and "in a channel" are saved). Seen by three readers.
 - **What the player sees:** an insect saved head down or sideways on a wall faces head up until it walks; one
@@ -429,6 +431,8 @@ doorways and mouths, channels, where it stands now, hugging a column). Every lin
 ### R2-24 (C, proven): comments that disagree with the code
 
 **Status (2026-11-26, `claude/review-fix-2`): the fall's cost and the harvester line put right; the comment at 73 was rewritten with R2-16; the one at 642 to 646 is true now (R2-19).**
+
+**Status (2026-11-26, the list's wording): fixed: every comment named is put right.**
 
 - `AntPathFinder.java` 73: "an unreachable goal never costs much time" (it costs the most, R2-16); 42: a fall costs
   "3 + the height" (the code adds 1 more, 687); 642 to 646: a closed window is caught (only between two channels).
