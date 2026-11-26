@@ -103,7 +103,8 @@ public class Forest extends SavedData {
     /** New land's trees, written in by world generation threads, taken into the book on the server thread. */
     private static final ConcurrentLinkedQueue<Queued> QUEUE = new ConcurrentLinkedQueue<>();
 
-    private record Queued(ResourceKey<Level> dimension, Tree tree) {
+    /** {@code found}: read from a loaded chunk's own record of its trees, not put down just now (review R7-15). */
+    private record Queued(ResourceKey<Level> dimension, Tree tree, boolean found) {
     }
 
     /** Takes this world's trees of new land from the waiting list into its book. True if there were any. */
@@ -115,6 +116,9 @@ public class Forest extends SavedData {
                 continue;
             }
             it.remove();
+            if (q.found() && (forest.at(q.tree().foot) != null || !LandReady.at(level, q.tree().foot) || level.getBlockState(q.tree().foot).isAir())) {
+                continue; // the book has it, or nothing stands there any more (a tree whose record ended)
+            }
             q.tree().lastDay = today(level);
             HeartRot.newLand(q.tree(), today(level));
             forest.add(q.tree());
@@ -336,7 +340,33 @@ public class Forest extends SavedData {
 
     /** World generation placed a tree (any thread): it goes into the book on the next server second. */
     public static void queue(ServerLevel level, String kind, BlockPos foot, long seed, double age, TreeStage stage) {
-        QUEUE.add(new Queued(level.dimension(), new Tree(kind, foot, seed, age, stage, age, Long.MIN_VALUE)));
+        QUEUE.add(new Queued(level.dimension(), new Tree(kind, foot, seed, age, stage, age, Long.MIN_VALUE), false));
+    }
+
+    /**
+     * A chunk came into the game: each giant tree that world making put in it and the book does not know goes on the
+     * waiting list, and into the book if something still stands on its foot (review R7-15: the waiting list lives in
+     * memory only, so a crash lost every tree made since the last autosave, and such a tree stood frozen for good; this
+     * also mends worlds already hit). The chunk keeps its trees' kind, seed, age and foot itself, with its structures.
+     */
+    public static void chunkLoaded(ServerLevel level, net.minecraft.world.level.chunk.ChunkAccess chunk) {
+        if (chunk.getAllStarts().isEmpty()) {
+            return;
+        }
+        Forest forest = get(level);
+        for (net.minecraft.world.level.levelgen.structure.StructureStart start : chunk.getAllStarts().values()) {
+            for (net.minecraft.world.level.levelgen.structure.StructurePiece piece : start.getPieces()) {
+                if (piece instanceof com.antcolonies.savanna.worldgen.GiantTreePiece tree && !com.antcolonies.savanna.worldgen.GiantTreePiece.fallenYoung(tree.pick())
+                        && forest.at(tree.foot()) == null) {
+                    found(level, tree.pick().kind(), tree.foot(), tree.pick().seed(), tree.pick().age(), tree.pick().stage());
+                }
+            }
+        }
+    }
+
+    /** A tree read from its chunk's record ({@link #chunkLoaded}; public for the tests). */
+    public static void found(ServerLevel level, String kind, BlockPos foot, long seed, double age, TreeStage stage) {
+        QUEUE.add(new Queued(level.dimension(), new Tree(kind, foot, seed, age, stage, age, Long.MIN_VALUE), true));
     }
 
     /** Writes a tree in (unless one already stands on that foot). Returns the tree in the book there. */

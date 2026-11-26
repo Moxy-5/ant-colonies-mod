@@ -431,6 +431,8 @@ book does not know and whose foot still stands; that also heals worlds already h
 
 **Status: half fixed** (2026-11-24, BUGS 342). The waiting list is taken into the book as a world closes (and the book written once more) and emptied when the server stops; each second every waiting tree of the world is taken, not only those at the head of the list. Open: a crash still loses the trees made since the last autosave, and worlds already hit are not healed (the sturdy fix, reading a loaded chunk's tree pieces, is not built). Test `missedDaysCountBranchesOnceNewLandTreesAreKeptAndMoundsStopAFall`.
 
+**Status (2026-11-26, `claude/review-a-left`): fixed: a chunk coming into the game hands the giant trees the book does not know to the book (`Forest.chunkLoaded`, from the trees' own records kept with the chunk's structures); each is written in if something still stands on its foot. So a crash loses no tree for good, and worlds already hit are mended as their land loads. Test: the new part of `missedDaysCountBranchesOnceNewLandTreesAreKeptAndMoundsStopAFall`.**
+
 ### R7-16 (A, proven). A rot-killed log on a slope leaves wood hanging
 
 **What is wrong.** A fallen log is laid on the land it falls on: each slice is moved up or down to sit on its own

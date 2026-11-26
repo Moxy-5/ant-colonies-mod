@@ -1559,7 +1559,10 @@ public final class Raid implements FightDiary {
     private BlockPos bunchPlace(ServerLevel level, BlockPos middle, UUID id, @Nullable BlockPos ahead) {
         int n = formIndex.computeIfAbsent(id, k -> formIndex.size());
         if (n == 0) {
-            return middle;
+            // (the middle is the line's own point, which on a slope lies in the ground: the leader, the bunch's first,
+            // was told to a cell inside the ridge, found no way and stood till the raid went home without it, BUGS 411)
+            BlockPos stand = standAt(level, middle.getX() + 0.5, middle.getZ() + 0.5, middle.getY());
+            return stand != null ? stand : middle;
         }
         double angle = n * 2.39996;
         double radius = 1.0 + BUNCH_SPREAD * Math.sqrt(n);

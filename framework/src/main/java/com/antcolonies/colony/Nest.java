@@ -246,6 +246,9 @@ public class Nest {
                 return next; // the queen alone digs nothing but her founding chamber
             }
         }
+        if (planned == null) {
+            return null; // no plan (yet, or none fits here): no shaft either, its depth is the plan's (review R1-20)
+        }
         int depth = shaftDepth(level);
         List<BlockPos> shaft = new ArrayList<>();
         for (int i = 1; i <= depth; i++) {

@@ -223,6 +223,14 @@ public class SavannaEvents {
         }
     }
 
+    /** A chunk comes into the game: its giant trees the tree book does not know are written in (review R7-15). */
+    @SubscribeEvent
+    public static void onChunkLoad(net.neoforged.neoforge.event.level.ChunkEvent.Load event) {
+        if (event.getLevel() instanceof ServerLevel level) {
+            com.antcolonies.savanna.tree.Forest.chunkLoaded(level, event.getChunk());
+        }
+    }
+
     @SubscribeEvent
     public static void onServerStopped(net.neoforged.neoforge.event.server.ServerStoppedEvent event) {
         com.antcolonies.savanna.colony.NewLandMounds.forgetAll();

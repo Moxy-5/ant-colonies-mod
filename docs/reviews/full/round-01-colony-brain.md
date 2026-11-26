@@ -330,6 +330,8 @@ calls it. `docs/BUGS.md` was searched by class name, not read whole.
 
 **Status (2026-11-25, `claude/review-fix-1`): half fixed, BUGS 396 (the planner waits 40 ticks; the shaft with no plan is left).**
 
+**Status (2026-11-26, `claude/review-a-left`): fixed: with no nest plan no shaft is dug (`Nest.findDigTarget`); test `whereNoNestFitsTheFoundersDigNoShaft` (one block of soil over rock: the founders dig nothing).**
+
 - **What is wrong:** `getLayout` (1097 to 1106): `if (layout == null) layout = new NestLayout.Planner(...).choose(level)`.
   `choose` gives null when nothing fits (and when land is not loaded); nothing is remembered, so every call plans
   again: about 1,000 `LandReady` checks, then 2 depths times 4 directions of rooms, each cell with its 6 fluid reads.
@@ -702,6 +704,8 @@ whether new-land mound code reaches the brain from a world-making thread.
 ### R1-44 (A, what runs proven, sizes measured; milliseconds to measure): every autosave and every pause rebuilds and copies every colony's whole record
 
 **Status (2026-11-25, `claude/review-fix-1`): open: to measure first; marking the file changed less often gains little, since an away colony's numbers change every second; the size (`FieldLife`'s plants) is the lever.**
+
+**Status (2026-11-26, `claude/review-a-left`): fixed: measured first (31,760 plants, as the 76-colony world had): building and copying the plants' records on the server's own thread took 6.3 ms, packed into four rows of numbers 0.55 ms (`FieldLife.pack`, `FieldSaveTest`); the writing itself is done on a worker thread (NeoForge's `SavedData.save`), so it never was part of the hitch. Saves from before still load. Not packed: the rest of the file (`insideNest` and the others, about as many bytes again, a few ms at 76 colonies); no single tick comes near 50 ms from it.**
 
 - **What is wrong:** R1-31's `markChanged()` every away second keeps the store always dirty. Minecraft's
   `SavedData.save` builds the whole record and copies it on the server thread before the write goes to a worker.

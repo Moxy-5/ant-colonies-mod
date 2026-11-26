@@ -954,6 +954,35 @@ public class LegsTests {
     }
 
     /**
+     * Review round 2 (R2-38's last half, BUGS 411): an insect out in a pond level with its banks, three blocks from the
+     * nearest one, paddles to the bank, and a walk asked for then takes it out and on to its goal. Before, a route had
+     * no start out there and it bobbed in the pond for good.
+     */
+    @GameTest(template = "arena", timeoutTicks = 600, skyAccess = true)
+    public static void anInsectOutInAPondPaddlesToTheBankAndWalksOn(GameTestHelper helper) {
+        buildNest(helper);
+        int x = MIDDLE - 7;
+        int z = MIDDLE - 7;
+        for (int dx = -3; dx <= 3; dx++) {
+            for (int dz = -3; dz <= 3; dz++) {
+                helper.setBlock(new BlockPos(x + dx, SURFACE - 2, z + dz), Blocks.STONE);
+                helper.setBlock(new BlockPos(x + dx, SURFACE - 1, z + dz), Blocks.WATER);
+            }
+        }
+        AbstractAntEntity ant = TestAnts.lone(helper, SavannaEntities.MATABELE_MINOR.get(), x, SURFACE - 1, z);
+        BlockPos goal = helper.absolutePos(new BlockPos(x + 7, SURFACE, z));
+        boolean[] inWater = {false};
+        helper.onEachTick(() -> {
+            inWater[0] |= ant.isInWater();
+            if (helper.getTick() > 20 && helper.getTick() % 10 == 0 && ant.getNavigator().isDone() && !ant.blockPosition().equals(goal)) {
+                ant.getNavigator().moveTo(goal, 1.0);
+            }
+        });
+        helper.succeedWhen(() -> helper.assertTrue(inWater[0] && ant.getNavigator().isDone() && ant.blockPosition().equals(goal),
+                "the ant in the pond has not come out and walked to its goal (it is at " + ant.position() + ", in water " + ant.isInWater() + ")"));
+    }
+
+    /**
      * Review round 2 (R2-21, the user's call 2026-11-26: plain ground): an insect in the middle of a path three wide
      * plans a walk, and its way goes straight over farmland, a slab set into the ground, a carpet and a slab lying on
      * the ground. Before, each of these was a gap no route crossed.

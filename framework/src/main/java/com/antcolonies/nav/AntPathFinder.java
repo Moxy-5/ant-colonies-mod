@@ -280,6 +280,9 @@ public final class AntPathFinder {
         return timed(map, starts, isGoal, cell -> distance(cell, towards), maxExpansions, costs);
     }
 
+    /** The most steps a search that found a route has taken since the game started (see the log line in {@link #timed}). */
+    private static volatile int mostStepsFound;
+
     /** A search, timed by the stopwatch ({@code /antcolonies perf}). {@code estimate}: how far a cell is from the goal at least. */
     @Nullable
     private static Route timed(CellMap map, List<Foothold> starts, Predicate<Foothold> isGoal, ToDoubleFunction<BlockPos> estimate,
@@ -291,6 +294,15 @@ public final class AntPathFinder {
         Route route = null;
         try {
             route = search(memoOffForTests ? map : new SearchMemo(map), starts, isGoal, estimate, maxExpansions, costs, steps);
+            if (route != null && steps[0] > mostStepsFound) {
+                // The watch on the search's cap (review R2-16): each new record over a tenth of the cap goes to the log,
+                // so a soak or a play session shows how near the longest real walk comes to it.
+                mostStepsFound = steps[0];
+                if (mostStepsFound > maxExpansions / 10) {
+                    com.antcolonies.ColonyFrameworkMod.LOGGER.info("[route] the longest search that found a way so far: {} steps of {} (a route of {} cells)",
+                            mostStepsFound, maxExpansions, route.size());
+                }
+            }
             return route;
         } finally {
             if (timed) {

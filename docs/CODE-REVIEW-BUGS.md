@@ -7,25 +7,25 @@ review files under `docs/reviews/full/`; search there for a finding's number (`R
 a `**Status ...**` line under the finding there and runs the tool. Bugs that did not come from the code
 review stay in `docs/BUGS.md`.
 
-**234 findings: 166 left, 68 done.**
+**234 findings: 161 left, 73 done.**
 
 | Grade | Found | Not started | Open | Half fixed | Fixed | Not a bug after all |
 |---|---|---|---|---|---|---|
-| A: a player can meet it | 51 | 0 | 2 | 5 | 43 | 1 |
-| B: it will cost us when building on this | 106 | 85 | 1 | 3 | 17 | 0 |
+| A: a player can meet it | 50 | 0 | 1 | 0 | 48 | 1 |
+| B: it will cost us when building on this | 107 | 85 | 1 | 4 | 17 | 0 |
 | C: a tidy-up | 77 | 68 | 0 | 2 | 6 | 1 |
 
 | Round | System | Found | Left | Done |
 |---|---|---|---|---|
-| 1 | the colony brain | 50 | 32 | 18 |
-| 2 | the legs | 43 | 24 | 19 |
+| 1 | the colony brain | 50 | 30 | 20 |
+| 2 | the legs | 43 | 23 | 20 |
 | 3 | the insect body | not read yet | | |
 | 4 | how bodies are drawn | not read yet | | |
 | 5 | the termites | not read yet | | |
 | 6 | the Matabele ants (not raids) | not read yet | | |
-| 7 | the giant trees | 36 | 28 | 8 |
+| 7 | the giant trees | 36 | 27 | 9 |
 | 8 | the world | 20 | 17 | 3 |
-| 9 | the river hunters | 44 | 35 | 9 |
+| 9 | the river hunters | 44 | 34 | 10 |
 | 10 | the river's small life | 19 | 13 | 6 |
 | 11 | the new raid code | 22 | 17 | 5 |
 
@@ -34,35 +34,14 @@ review stay in `docs/BUGS.md`.
 Grade A first. *Open* means looked at and left for a reason (the reason is given); *half fixed* says what
 is left; no word means nobody has started it.
 
-### A: a player can meet it (7 left)
-
-**Round 1, the colony brain** (`docs/reviews/full/round-01-colony-brain.md`)
-
-- **R1-20** while no nest plan fits, the room planner runs on every call and a shaft is dug anyway
-  - *Half fixed:* BUGS 396 (the planner waits 40 ticks; the shaft with no plan is left).
-- **R1-44** every autosave and every pause rebuilds and copies every colony's whole record
-  - *Open:* to measure first; marking the file changed less often gains little, since an away colony's numbers change every second; the size (`FieldLife`'s plants) is the lever.
-
-**Round 2, the legs** (`docs/reviews/full/round-02-legs.md`)
-
-- **R2-16** a search that finds no way costs about 20 ms, most termite walks run it twice, and nothing limits how many run in a tick
-  - *Half fixed:* fixed in part, BUGS 399: no second search when no habit had a say in the first (test `askingAgainAfterNoWayCostsNoSearch`); with R2-1, R2-20 and R2-17. Measured in that test, a search that finds no way on open flat ground: 19.5 ...
-- **R2-38** an insect on a path block, on farmland or in a pond with a low bank can never plan a route again
-  - *Half fixed:* small half fixed, BUGS 401: a start one step up beside it, corners too, and the shuffle no longer moves an insect onto ground the planner refuses (test `anInsectOnAPathBlockWalksOffIt`). The path half fixed after, BUGS 412 ...
+### A: a player can meet it (1 left)
 
 **Round 7, the giant trees** (`docs/reviews/full/round-07-trees.md`)
 
-- **R7-15** New land's trees can miss the tree book
-  - *Half fixed:* (2026-11-24, BUGS 342). The waiting list is taken into the book as a world closes (and the book written once more) and emptied when the server stops; each second every waiting tree of the world is taken, not only those at the ...
 - **R7-33** A palm's crown can blink out at the screen's edge
   - *Open:* waits to be seen (2026-11-24). Read from how Minecraft hides parts of the world, never seen in the game; the fix is large (sharing a crown's faces out over its blocks) and is built only if the user sees fronds blink out.
 
-**Round 9, the river hunters** (`docs/reviews/full/round-09-river-hunters.md`)
-
-- **R9-37** a staged move that is stopped on its very first tick freezes the monitor in place, and starts again every tick
-  - *Half fixed:* open (2026-11-24, BUGS 330). Done: the room checks for a climb up, a climb down and a climb out ask for a whole block under both feet and on the middle line, the block the move itself relies on (as the walk into the water already ...
-
-### B: it will cost us when building on this (89 left)
+### B: it will cost us when building on this (90 left)
 
 **Round 1, the colony brain** (`docs/reviews/full/round-01-colony-brain.md`)
 
@@ -88,6 +67,8 @@ is left; no word means nobody has started it.
 
 - **R2-2** three new plans are all a walk gets, however far it got, and nobody hears the give-up
   - *Half fixed:* BUGS 404: new plans are counted since the last finished step. Open: `Errand` still does not read `hasFailed()` (a change to what `walkOn` means for every goal; left for round 3's fixes), and the landing check still uses ...
+- **R2-16** a search that finds no way costs about 20 ms, most termite walks run it twice, and nothing limits how many run in a tick
+  - *Half fixed:* grade B now: measured in the termite stress scene (`stressTermiteColony`). A search that finds no way is rare there (0 to 2 in a minute's window), but one alone costs 36 to 57 ms and makes its tick 50 to 64 ms: one slow tick now ...
 - **R2-18** big step costs fight the fixed cap, and the mud test hides it
 - **R2-29** the way through a chimney mouth still uses one body's lengths
 - **R2-39** a mind pays for the same "no way" again a tick later, and a builder can ask 24 times in one tick
@@ -289,6 +270,7 @@ Fixed, or found to be no bug after all. The number after a finding is its entry 
 - **R1-17** (A) on return the nest ledger does a whole second's changes in one tick (BUGS 395)
 - **R1-18** (A) reading a cell's neighbours can load land that is not ready (BUGS 390)
 - **R1-19** (A) a foraging tunnel not fitted to a hillside the first time is never fitted again (BUGS 391)
+- **R1-20** (A) while no nest plan fits, the room planner runs on every call and a shaft is dug anyway (BUGS 396)
 - **R1-21** (B) `nestCells` is rebuilt on every call (BUGS 394)
 - **R1-24** (C) `Nest.isEntranceOpen` reads the block before asking whether the land is ready (BUGS 390)
 - **R1-30** (B) one colony that fails to load wipes every colony of the dimension (BUGS 387)
@@ -296,6 +278,7 @@ Fixed, or found to be no bug after all. The number after a finding is its entry 
 - **R1-36** (B) builder numbers do nothing near a player and bank work without end while away (BUGS 398)
 - **R1-42** (A) one typo in a species file empties every colony of the world (R1-2 and R1-30 joined) (BUGS 387)
 - **R1-43** (A) an insect already folded into the numbers is folded a second time (BUGS 388)
+- **R1-44** (A) every autosave and every pause rebuilds and copies every colony's whole record
 - **R1-45** (A) a minor that comes out when a number scout is shown goes back into the numbers, but its body stays (BUGS 389)
 
 **Round 2, the legs**
@@ -318,6 +301,7 @@ Fixed, or found to be no bug after all. The number after a finding is its entry 
 - **R2-32** (C) `AntMoveControl` turns to face east when the point is straight above or below
 - **R2-33** (C) "stepped up close" outlives `stop()` *Not a bug after all.*
 - **R2-37** (A) five goals ask the legs for a route on every tick after "no way" (BUGS 400)
+- **R2-38** (A) an insect on a path block, on farmland or in a pond with a low bank can never plan a route again (BUGS 401, 411, 412, 415)
 - **R2-40** (B) the "no foothold in reach, no search" shortcut helps one caller only
 
 **Round 7, the giant trees**
@@ -325,6 +309,7 @@ Fixed, or found to be no bug after all. The number after a finding is its entry 
 - **R7-1** (A) Catching up on missed days counts the ground under the whole crown once for every missed day (BUGS 339)
 - **R7-10** (A) "Char, never vanish" against "brown leaves burn away": a fire can eat a living crown (BUGS 340)
 - **R7-11** (A) A falling tree breaks through a termite mound (BUGS 341)
+- **R7-15** (A) New land's trees can miss the tree book (BUGS 342)
 - **R7-16** (A) A rot-killed log on a slope leaves wood hanging (BUGS 343)
 - **R7-17** (A) A dead sapling leaves a stick sunk in the ground (BUGS 344)
 - **R7-27** (A) Every fig branch is a full cube (BUGS 345)
@@ -346,6 +331,7 @@ Fixed, or found to be no bug after all. The number after a finding is its entry 
 - **R9-28** (A) carrying a catch has no time limit: with no bank in reach the otter floats on the spot with it for ever (BUGS 327)
 - **R9-29** (A) only the otter that started a game of play can end it: if that one is killed or vanishes mid-game the other stands in the game for good (BUGS 328)
 - **R9-30** (A) the otter is the only river animal Minecraft may remove 32 blocks from the player: they vanish one at a time (BUGS 329)
+- **R9-37** (A) a staged move that is stopped on its very first tick freezes the monitor in place, and starts again every tick (BUGS 330)
 - **R9-38** (A) the walk into the water is cut short for 7 monitors in 8 (BUGS 331)
 - **R9-41** (B) the monitor never counts its life clock (nor does the hippo); the kit leaves that to each animal to remember (BUGS 335)
 

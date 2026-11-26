@@ -1,5 +1,6 @@
 package com.antcolonies.nav;
 
+import com.antcolonies.colony.LandReady;
 import com.antcolonies.debug.Perf;
 
 import java.util.ArrayList;
@@ -497,6 +498,13 @@ public class AntNavigator {
         return route == null;
     }
 
+    /** For the diary: why the last walk asked for found no route (meaningful while {@link #hasFailed}). */
+    public String whyNoWay() {
+        return whyNoWay;
+    }
+
+    private String whyNoWay = "";
+
     /** True if the last {@link #moveTo} found no route, or the insect got stuck and couldn't recover. */
     public boolean hasFailed() {
         return failed;
@@ -642,35 +650,7 @@ public class AntNavigator {
                 // Also a ramp it stands on with a block put on top of it (BUGS 148: a termite on a mound ramp, a
                 // builder's thin layer laid over it, no longer counts as a floor): the walls beside it as well as the
                 // floors, since on the face of a mound there is often no floor within a drop.
-                for (Direction side : Direction.values()) {
-                    if (side == Direction.DOWN) {
-                        continue;
-                    }
-                    BlockPos next = ant.blockPosition().relative(side);
-                    List<Foothold> holds = AntPathFinder.footholdsIn(map, next);
-                    if (!holds.isEmpty()) {
-                        starts.addAll(holds);
-                        continue;
-                    }
-                    Foothold beside = AntPathFinder.landing(map, next);
-                    if (beside != null) {
-                        starts.add(beside);
-                    }
-                }
-                if (starts.isEmpty() && map.isOpen(ant.blockPosition().above())) {
-                    // On a block whose top is no floor to the legs though the body rests on it (a path block, farmland:
-                    // its feet are in the block's own cell), or in water level with its bank: nothing beside it at its
-                    // own height. Up onto the ground one step up beside it, corners too (review R2-38: it never found
-                    // a start again and stood there for good).
-                    for (int dx = -1; dx <= 1; dx++) {
-                        for (int dz = -1; dz <= 1; dz++) {
-                            BlockPos up = ant.blockPosition().offset(dx, 1, dz);
-                            if ((dx != 0 || dz != 0) && Foothold.isValid(map, up, Direction.DOWN)) {
-                                starts.add(Foothold.floor(up));
-                            }
-                        }
-                    }
-                }
+                starts.addAll(startsBeside(map, ant.blockPosition()));
                 fromBeside = !starts.isEmpty();
             }
             // (In open air with open air under it and no floor within a fall: no start. It plans once it has landed;
@@ -709,6 +689,9 @@ public class AntNavigator {
         failed = found == null;
         route = found;
         if (found == null) {
+            whyNoWay = starts.isEmpty() ? "no start where it stands" : !mayHaveGoal(map) ? "its goal is out of reach by its own rule"
+                    : "no way to " + goal.toShortString() + (map.isOpen(goal) ? "" : ", a closed cell,") + " from " + starts.get(0).cell().toShortString()
+                    + (start == null ? " (not where it stands: " + (fromBeside ? "beside it" : "where it lands") + ")" : "");
             rememberNoWay();
         } else {
             noWayGoal = null;
@@ -735,6 +718,99 @@ public class AntNavigator {
             stepOutTo(found.start());
         }
         return found != null;
+    }
+
+    /**
+     * The spots beside a cell that an insect shut in there, or afloat there, can step straight out to
+     * ({@link #stepOutTo}): the footholds in the cells touching it (not the one below) or a landing under them, and
+     * failing those the ground one step up beside it, corners too.
+     */
+    private static List<Foothold> startsBeside(CellMap map, BlockPos pos) {
+        List<Foothold> starts = new ArrayList<>();
+        for (Direction side : Direction.values()) {
+            if (side == Direction.DOWN) {
+                continue;
+            }
+            BlockPos next = pos.relative(side);
+            List<Foothold> holds = AntPathFinder.footholdsIn(map, next);
+            if (!holds.isEmpty()) {
+                starts.addAll(holds);
+                continue;
+            }
+            Foothold beside = AntPathFinder.landing(map, next);
+            if (beside != null) {
+                starts.add(beside);
+            }
+        }
+        if (starts.isEmpty() && map.isOpen(pos.above())) {
+            // On a block whose top is no floor to the legs though the body rests on it (its feet are in the block's
+            // own cell), or in water level with its bank: nothing beside it at its own height. Up onto the ground one
+            // step up beside it, corners too (review R2-38: it never found a start again and stood there for good).
+            for (int dx = -1; dx <= 1; dx++) {
+                for (int dz = -1; dz <= 1; dz++) {
+                    BlockPos up = pos.offset(dx, 1, dz);
+                    if ((dx != 0 || dz != 0) && Foothold.isValid(map, up, Direction.DOWN)) {
+                        starts.add(Foothold.floor(up));
+                    }
+                }
+            }
+        }
+        return starts;
+    }
+
+    /** How far over the water (in cells swum) an insect afloat looks for a bank to paddle to. */
+    private static final int PADDLE_REACH = 12;
+    /** The water cell beside the nearest bank, for an insect afloat ({@link #paddle}); null: none looked for or found. */
+    @Nullable
+    private BlockPos bank;
+    private long bankLookedAt = Long.MIN_VALUE;
+
+    /**
+     * Afloat with no walk (review R2-38, BUGS 411): out in the water, more than a block from the bank, a route has no
+     * start, so an insect that fell in bobbed there for as long as it was watched. It paddles to the nearest water cell
+     * that has a way out beside it (the same question a walk's start asks, {@link #startsBeside}); from there its next
+     * walk steps out onto the bank. Real ants on water row with their front legs for the nearest shore. True while it
+     * paddles.
+     */
+    private boolean paddle(CellMap map) {
+        BlockPos feet = ant.blockPosition();
+        if (!LandReady.at(ant.level(), feet) || ant.level().getFluidState(feet).isEmpty()) {
+            bank = null;
+            return false;
+        }
+        long now = ant.level().getGameTime();
+        if (bank == null || now < bankLookedAt || now - bankLookedAt >= 20) {
+            bankLookedAt = now;
+            bank = bankCell(map, feet);
+        }
+        if (bank == null || bank.equals(feet)) {
+            return false; // no bank in reach, or at it: its next walk starts from here
+        }
+        ant.getMoveControl().setWantedPosition(bank.getX() + 0.5, ant.getY(), bank.getZ() + 0.5, speed > 0 ? speed : 1.0);
+        return true;
+    }
+
+    /** The nearest water cell, swimming at its own height from {@code from}, that has a way out beside it; null if none in reach. */
+    @Nullable
+    private BlockPos bankCell(CellMap map, BlockPos from) {
+        java.util.ArrayDeque<BlockPos> open = new java.util.ArrayDeque<>();
+        Set<BlockPos> seen = new HashSet<>();
+        open.add(from);
+        seen.add(from);
+        while (!open.isEmpty()) {
+            BlockPos cell = open.poll();
+            if (!startsBeside(map, cell).isEmpty()) {
+                return cell;
+            }
+            for (Direction side : Direction.Plane.HORIZONTAL) {
+                BlockPos next = cell.relative(side);
+                if (next.distManhattan(from) <= PADDLE_REACH && LandReady.at(ant.level(), next) && !ant.level().getFluidState(next).isEmpty()
+                        && seen.add(next)) {
+                    open.add(next);
+                }
+            }
+        }
+        return null;
     }
 
     /**
@@ -1212,7 +1288,9 @@ public class AntNavigator {
             at = null; // its wall or ceiling is gone: let go
         }
         surface = Direction.DOWN;
-        keepApart();
+        if (!paddle(map)) {
+            keepApart();
+        }
     }
 
     // --- The moves on floors, walls and ceilings (one tick each; true once the move is done) ---

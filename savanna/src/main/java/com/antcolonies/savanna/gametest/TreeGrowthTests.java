@@ -1366,6 +1366,18 @@ public class TreeGrowthTests {
         helper.assertTrue(forest.at(late) == null, "the waiting tree is in the book before its time");
         Forest.closing(level);
         helper.assertTrue(forest.at(late) != null, "a tree of new land was lost as the world closed");
+        // A tree read from its chunk's own record (after a crash the book never had it): taken in while it stands,
+        // left out when nothing stands on its foot (its record ended long ago).
+        BlockPos standing = helper.absolutePos(new BlockPos(10, SURFACE, 6));
+        BlockPos gone = helper.absolutePos(new BlockPos(12, SURFACE, 6));
+        level.setBlock(standing, Blocks.ACACIA_LOG.defaultBlockState(), 2);
+        level.setBlock(gone, Blocks.AIR.defaultBlockState(), 2);
+        Forest.found(level, "camel_thorn", standing, 6, 0.5, TreeStage.LIVING);
+        Forest.found(level, "camel_thorn", gone, 7, 0.5, TreeStage.LIVING);
+        Forest.closing(level);
+        helper.assertTrue(forest.at(standing) != null, "a standing tree the book did not know was not written in from its chunk");
+        helper.assertTrue(forest.at(gone) == null, "a tree long gone came back into the book from its chunk's record");
+        level.setBlock(standing, Blocks.AIR.defaultBlockState(), 2);
 
         BlockPos spot = helper.absolutePos(new BlockPos(8, SURFACE + 3, 8));
         for (var block : List.of(com.antcolonies.savanna.registry.SavannaBlocks.TERMITE_MOUND.get(), com.antcolonies.savanna.registry.SavannaBlocks.FUNGUS_COMB.get(),

@@ -90,7 +90,7 @@ public final class InsectStories {
         }
         BlockPos goal = insect.getNavigator().getGoal();
         if (insect.getNavigator().isDone()) {
-            line.append(insect.getNavigator().hasFailed() ? " no route (last search failed)" : " standing");
+            line.append(insect.getNavigator().hasFailed() ? " no route (" + insect.getNavigator().whyNoWay() + ")" : " standing");
         } else {
             line.append(" walking to ").append(goal == null ? "?" : goal.toShortString());
         }
